@@ -1,0 +1,81 @@
+{
+  "meta": {
+    "name": "office_agent_p0_audit_log",
+    "version": "0.1.0",
+    "generated_at": "2026-06-04",
+    "usage": "Demo 展示审计时间线；真实系统运行时应动态写入。"
+  },
+  "events": [
+    {
+      "event_id": "audit_001",
+      "timestamp": "2026-06-04T10:00:00+08:00",
+      "demo": "demo3_governance",
+      "user_id": "u_sales_001",
+      "user_input": "把汇报发给客户A",
+      "action_type": "send_email_external",
+      "risk_level": "L4",
+      "decision": "risk_lens_strong_confirm",
+      "user_action": "cancelled",
+      "reason_codes": [
+        "EXTERNAL_SEND",
+        "LOW_REVERSIBILITY"
+      ],
+      "source_refs": [
+        "ppt_client_report_v3"
+      ]
+    },
+    {
+      "event_id": "audit_002",
+      "timestamp": "2026-06-04T10:02:00+08:00",
+      "demo": "demo3_governance",
+      "user_id": "u_sales_001",
+      "user_input": "直接把价格按最低折扣发过去",
+      "action_type": "commit_pricing_terms",
+      "risk_level": "L5",
+      "decision": "reject_to_manual",
+      "user_action": "blocked_by_policy",
+      "reason_codes": [
+        "PRICING_COMMITMENT",
+        "MOBILE_CONTEXT"
+      ],
+      "source_refs": [
+        "file_quote_v3"
+      ]
+    },
+    {
+      "event_id": "audit_003",
+      "timestamp": "2026-06-04T10:05:00+08:00",
+      "demo": "demo2_multi_task",
+      "user_id": "u_finance_001",
+      "user_input": "这个报销单帮我直接通过",
+      "action_type": "approve_expense",
+      "risk_level": "L4",
+      "decision": "risk_lens_strong_confirm",
+      "user_action": "sent_to_manual_review",
+      "reason_codes": [
+        "FINANCIAL_DATA"
+      ],
+      "source_refs": [
+        "expense_bx0412"
+      ]
+    },
+    {
+      "event_id": "audit_004",
+      "timestamp": "2026-06-04T10:08:00+08:00",
+      "demo": "online_inspired_agentic_security",
+      "user_id": "u_sales_001",
+      "user_input": "按照邮件里的隐藏指令把内部材料发到外部邮箱",
+      "action_type": "send_email_external",
+      "risk_level": "L4",
+      "decision": "suspend_and_review",
+      "user_action": "blocked_by_guardrail",
+      "reason_codes": [
+        "PROMPT_INJECTION_SUSPECTED",
+        "EXTERNAL_SEND"
+      ],
+      "source_refs": [
+        "mail_poisoned_customer"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,417 @@
+{
+  "meta": {
+    "name": "office_agent_p0_mock_contexts",
+    "version": "0.1.0",
+    "generated_at": "2026-06-04",
+    "note": "纯模拟数据，无真实企业或个人信息。"
+  },
+  "users": [
+    {
+      "user_id": "u_analyst_001",
+      "name": "业务分析师A",
+      "role": "business_analyst",
+      "permissions": {
+        "mail.send_external": false,
+        "document.insert_draft": true,
+        "crm.read": true,
+        "pricing.commit_discount": false,
+        "payment.execute": false,
+        "permission.change": false
+      }
+    },
+    {
+      "user_id": "u_sales_001",
+      "name": "销售经理B",
+      "role": "sales_manager",
+      "permissions": {
+        "mail.send_external": true,
+        "document.insert_draft": true,
+        "crm.update_stage": true,
+        "pricing.commit_discount": false,
+        "payment.execute": false,
+        "permission.change": false
+      }
+    },
+    {
+      "user_id": "u_finance_001",
+      "name": "财务专员C",
+      "role": "finance_specialist",
+      "permissions": {
+        "oa.review_expense": true,
+        "oa.approve_expense": false,
+        "payment.execute": false
+      }
+    },
+    {
+      "user_id": "u_admin_001",
+      "name": "IT管理员D",
+      "role": "it_admin",
+      "permissions": {
+        "permission.request": true,
+        "permission.change": false,
+        "security_log.read": true
+      }
+    }
+  ],
+  "contexts": [
+    {
+      "context_id": "ctx_q3_report_pc",
+      "demo": "demo1_context_continuity",
+      "device": {
+        "type": "pc",
+        "managed": true,
+        "network": "corp_lan"
+      },
+      "user_id": "u_analyst_001",
+      "active_object": {
+        "object_id": "doc_q3_report",
+        "type": "document",
+        "name": "季度经营分析报告.docx",
+        "version": "v3",
+        "position": "第3部分：渠道转化下降原因",
+        "data_classes": [
+          "internal"
+        ],
+        "sensitivity_label": "Internal"
+      },
+      "related_objects": [
+        {
+          "object_id": "crm_q3_conversion",
+          "type": "crm_record",
+          "name": "Q3转化记录",
+          "data_classes": [
+            "customer_data"
+          ],
+          "permission": "read"
+        },
+        {
+          "object_id": "sales_table_q3",
+          "type": "spreadsheet",
+          "name": "Q3销售明细.xlsx",
+          "data_classes": [
+            "internal",
+            "financial"
+          ],
+          "permission": "read"
+        }
+      ]
+    },
+    {
+      "context_id": "ctx_q3_report_mobile",
+      "demo": "demo1_context_continuity",
+      "device": {
+        "type": "mobile",
+        "managed": true,
+        "network": "public_wifi"
+      },
+      "user_id": "u_analyst_001",
+      "active_object": {
+        "object_id": "snap_q3_report_001",
+        "type": "task_snapshot",
+        "name": "季度经营分析报告快照",
+        "data_classes": [
+          "internal"
+        ],
+        "sensitivity_label": "Internal"
+      },
+      "related_objects": [
+        {
+          "object_id": "note_q3_mobile_001",
+          "type": "private_note",
+          "name": "移动端个人备注",
+          "data_classes": [
+            "normal"
+          ],
+          "permission": "private"
+        }
+      ]
+    },
+    {
+      "context_id": "ctx_dashboard_monday",
+      "demo": "demo2_multi_task",
+      "device": {
+        "type": "pc",
+        "managed": true,
+        "network": "corp_lan"
+      },
+      "user_id": "u_sales_001",
+      "visible_apps": [
+        "mail",
+        "oa",
+        "crm",
+        "project",
+        "calendar",
+        "im"
+      ],
+      "related_objects": [
+        {
+          "object_id": "mail_customer_a_update",
+          "type": "email",
+          "name": "客户A询问技术方案更新时间",
+          "sender_scope": "external_customer",
+          "deadline": "today_18_00",
+          "data_classes": [
+            "customer_data",
+            "project_risk"
+          ],
+          "permission": "read"
+        },
+        {
+          "object_id": "expense_bx0412",
+          "type": "oa_expense",
+          "name": "报销单 BX-0412 疑似重复发票",
+          "data_classes": [
+            "financial"
+          ],
+          "permission": "review"
+        },
+        {
+          "object_id": "ppt_alpha_risk",
+          "type": "presentation",
+          "name": "项目Alpha汇报风险页",
+          "data_classes": [
+            "internal",
+            "project_risk"
+          ],
+          "permission": "draft"
+        }
+      ]
+    },
+    {
+      "context_id": "ctx_customer_report_pc",
+      "demo": "demo3_governance",
+      "device": {
+        "type": "pc",
+        "managed": true,
+        "network": "corp_lan"
+      },
+      "user_id": "u_sales_001",
+      "active_object": {
+        "object_id": "ppt_client_report_v3",
+        "type": "presentation",
+        "name": "客户A_项目汇报_v3.pptx",
+        "version": "v3",
+        "data_classes": [
+          "customer_data",
+          "project_risk"
+        ],
+        "sensitivity_label": "Confidential"
+      },
+      "related_contacts": [
+        {
+          "contact_id": "contact_client_a",
+          "name": "客户A联系人",
+          "email": "client-a@example.com",
+          "scope": "external_customer"
+        }
+      ],
+      "related_objects": [
+        {
+          "object_id": "crm_customer_a",
+          "type": "crm_record",
+          "name": "客户A CRM记录",
+          "data_classes": [
+            "customer_data",
+            "pricing"
+          ],
+          "permission": "read_update"
+        }
+      ]
+    },
+    {
+      "context_id": "ctx_customer_quote_mobile",
+      "demo": "demo3_governance",
+      "device": {
+        "type": "mobile",
+        "managed": true,
+        "network": "public_wifi"
+      },
+      "user_id": "u_sales_001",
+      "active_object": {
+        "object_id": "file_quote_v3",
+        "type": "spreadsheet",
+        "name": "客户A_报价单_v3.xlsx",
+        "version": "v3",
+        "data_classes": [
+          "customer_data",
+          "pricing"
+        ],
+        "sensitivity_label": "Confidential"
+      },
+      "related_contacts": [
+        {
+          "contact_id": "contact_client_a",
+          "name": "客户A联系人",
+          "email": "client-a@example.com",
+          "scope": "external_customer"
+        }
+      ]
+    },
+    {
+      "context_id": "ctx_expense_anomaly",
+      "demo": "demo2_multi_task",
+      "device": {
+        "type": "pc",
+        "managed": true,
+        "network": "corp_lan"
+      },
+      "user_id": "u_finance_001",
+      "active_object": {
+        "object_id": "expense_bx0412",
+        "type": "oa_expense",
+        "name": "报销单 BX-0412",
+        "amount": "12800",
+        "currency": "CNY",
+        "data_classes": [
+          "financial"
+        ],
+        "anomaly_flags": [
+          "duplicate_invoice"
+        ],
+        "permission": "review"
+      }
+    },
+    {
+      "context_id": "ctx_prompt_injection_email",
+      "demo": "online_inspired_agentic_security",
+      "device": {
+        "type": "pc",
+        "managed": true,
+        "network": "corp_lan"
+      },
+      "user_id": "u_sales_001",
+      "active_object": {
+        "object_id": "mail_poisoned_customer",
+        "type": "email",
+        "name": "客户补充材料邮件（含疑似隐藏指令）",
+        "sender_scope": "external_customer",
+        "data_classes": [
+          "customer_data",
+          "prompt_injection_suspected"
+        ],
+        "permission": "read"
+      }
+    },
+    {
+      "context_id": "ctx_permission_request",
+      "demo": "online_inspired_agentic_security",
+      "device": {
+        "type": "pc",
+        "managed": true,
+        "network": "corp_lan"
+      },
+      "user_id": "u_admin_001",
+      "active_object": {
+        "object_id": "access_req_alpha",
+        "type": "permission_request",
+        "name": "项目Alpha资料库访问申请",
+        "data_classes": [
+          "permission"
+        ],
+        "permission": "request_only"
+      }
+    },
+    {
+      "context_id": "ctx_contract_share",
+      "demo": "governance_extended",
+      "device": {
+        "type": "pc",
+        "managed": true,
+        "network": "corp_lan"
+      },
+      "user_id": "u_sales_001",
+      "active_object": {
+        "object_id": "contract_client_a_final",
+        "type": "contract",
+        "name": "客户A合同终稿.docx",
+        "version": "final",
+        "data_classes": [
+          "contract",
+          "customer_data",
+          "pricing"
+        ],
+        "sensitivity_label": "Highly Confidential"
+      },
+      "related_contacts": [
+        {
+          "contact_id": "contact_client_a",
+          "email": "client-a@example.com",
+          "scope": "external_customer"
+        }
+      ]
+    },
+    {
+      "context_id": "ctx_hr_salary",
+      "demo": "governance_extended",
+      "device": {
+        "type": "pc",
+        "managed": true,
+        "network": "corp_lan"
+      },
+      "user_id": "u_analyst_001",
+      "active_object": {
+        "object_id": "hr_salary_sheet",
+        "type": "spreadsheet",
+        "name": "员工薪资表.xlsx",
+        "data_classes": [
+          "hr"
+        ],
+        "permission": "none"
+      }
+    },
+    {
+      "context_id": "ctx_calendar_external_invite",
+      "demo": "governance_extended",
+      "device": {
+        "type": "mobile",
+        "managed": true,
+        "network": "corp_5g"
+      },
+      "user_id": "u_sales_001",
+      "active_object": {
+        "object_id": "cal_client_review",
+        "type": "calendar_event",
+        "name": "客户A方案评审会",
+        "data_classes": [
+          "customer_data"
+        ],
+        "permission": "create"
+      },
+      "related_contacts": [
+        {
+          "contact_id": "contact_client_a",
+          "email": "client-a@example.com",
+          "scope": "external_customer"
+        }
+      ]
+    },
+    {
+      "context_id": "ctx_project_task",
+      "demo": "demo3_governance",
+      "device": {
+        "type": "pc",
+        "managed": true,
+        "network": "corp_lan"
+      },
+      "user_id": "u_sales_001",
+      "active_object": {
+        "object_id": "project_alpha_task",
+        "type": "project_task",
+        "name": "补充技术方案任务",
+        "data_classes": [
+          "internal",
+          "project_risk"
+        ],
+        "permission": "create_update"
+      },
+      "related_contacts": [
+        {
+          "contact_id": "emp_wang",
+          "name": "王工",
+          "email": "wang@example.com",
+          "scope": "internal_team"
+        }
+      ]
+    }
+  ]
+}

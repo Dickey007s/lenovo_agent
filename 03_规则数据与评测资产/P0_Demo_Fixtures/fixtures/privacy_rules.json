@@ -1,0 +1,103 @@
+{
+  "meta": {
+    "name": "office_agent_p0_privacy_rules",
+    "version": "0.1.0",
+    "generated_at": "2026-06-04",
+    "usage": "P0 Demo 隐私与敏感信息处理规则。"
+  },
+  "global_principles": [
+    "密码、验证码、token 不进入模型上下文，不进入日志，只由安全输入控件/企业认证系统处理。",
+    "客户、报价、财务、人事、合同信息在移动端默认折叠或脱敏。",
+    "Agent 的记忆只保存任务快照、来源引用和用户可清除的备注，不保存完整浏览历史。",
+    "L3-L5 审计记录只记录标签、理由码、用户确认结果，不记录敏感原文。"
+  ],
+  "data_class_rules": {
+    "credential": {
+      "model_access": "forbidden",
+      "prompt_policy": "never_include_value",
+      "display_pc": "secure_input_only",
+      "display_mobile": "never_show_plaintext",
+      "log_policy": "do_not_log_value",
+      "gate": "block_and_mask"
+    },
+    "customer_data": {
+      "model_access": "allowed_if_authorized",
+      "prompt_policy": "include_minimal_snippet",
+      "display_pc": "show_with_label",
+      "display_mobile": "mask_by_default",
+      "log_policy": "desensitized",
+      "gate": "confirm_if_external"
+    },
+    "pricing": {
+      "model_access": "summary_only",
+      "prompt_policy": "include_label_and_range_only",
+      "display_pc": "collapsed_by_default",
+      "display_mobile": "collapsed_by_default",
+      "log_policy": "label_only",
+      "gate": "risk_lens"
+    },
+    "financial": {
+      "model_access": "summary_only",
+      "prompt_policy": "include_evidence_not_full_value",
+      "display_pc": "show_if_authorized",
+      "display_mobile": "mask_by_default",
+      "log_policy": "label_only",
+      "gate": "risk_lens_or_manual"
+    },
+    "contract": {
+      "model_access": "summary_only",
+      "prompt_policy": "clause_reference_only",
+      "display_pc": "collapsed_by_default",
+      "display_mobile": "collapsed_by_default",
+      "log_policy": "label_only",
+      "gate": "manual_review"
+    },
+    "hr": {
+      "model_access": "forbidden_or_summary_only",
+      "prompt_policy": "avoid_raw_personal_data",
+      "display_pc": "restricted",
+      "display_mobile": "restricted",
+      "log_policy": "label_only",
+      "gate": "manual_review"
+    },
+    "prompt_injection_suspected": {
+      "model_access": "quarantine",
+      "prompt_policy": "treat_as_untrusted_data",
+      "display_pc": "show_warning_only",
+      "display_mobile": "show_warning_only",
+      "log_policy": "reason_code_only",
+      "gate": "suspend_and_review"
+    }
+  },
+  "mobile_display_strategy": {
+    "task_snapshot": [
+      "任务标题",
+      "进度摘要",
+      "最多3条待核实点",
+      "个人备注入口",
+      "一键隐藏"
+    ],
+    "hidden_by_default": [
+      "完整客户邮箱",
+      "报价金额",
+      "合同条款",
+      "财务金额",
+      "员工信息",
+      "密码/验证码"
+    ],
+    "actions_allowed": [
+      "查看摘要",
+      "添加个人备注",
+      "设置提醒",
+      "请求回PC处理"
+    ],
+    "actions_blocked": [
+      "自动外发",
+      "自动审批",
+      "价格承诺",
+      "付款",
+      "权限变更",
+      "合同签署"
+    ]
+  }
+}

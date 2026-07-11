@@ -1,0 +1,168 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.local/schemas/action_spec.schema.json",
+  "title": "ActionSpec",
+  "type": "object",
+  "required": [
+    "action_type",
+    "target_system",
+    "target_scope",
+    "objects",
+    "recipients",
+    "data_classes",
+    "state_change_type",
+    "state_change",
+    "reversibility",
+    "device_type",
+    "permission_state",
+    "missing_slots",
+    "source_refs"
+  ],
+  "properties": {
+    "action_type": {
+      "type": "string",
+      "enum": [
+        "background_index_update",
+        "sync_status_heartbeat",
+        "format_document",
+        "save_task_snapshot",
+        "restore_task_snapshot",
+        "add_private_note",
+        "generate_summary",
+        "extract_verification_points",
+        "draft_email",
+        "draft_ppt_slide",
+        "rank_tasks",
+        "explain_ranking",
+        "insert_draft",
+        "create_internal_task",
+        "send_email_internal",
+        "create_calendar_invite_internal",
+        "update_project_status",
+        "notify_expense_owner",
+        "send_email_external",
+        "create_calendar_invite_external",
+        "submit_approval",
+        "approve_expense",
+        "update_crm_stage",
+        "export_customer_list",
+        "run_script_or_command",
+        "commit_pricing_terms",
+        "make_payment",
+        "sign_contract",
+        "change_permission",
+        "view_or_change_hr_sensitive",
+        "read_credential",
+        "bulk_delete"
+      ]
+    },
+    "target_system": {
+      "type": "string"
+    },
+    "target_scope": {
+      "type": "string",
+      "enum": [
+        "none",
+        "self",
+        "internal_team",
+        "cross_department",
+        "external_customer",
+        "external_supplier",
+        "public",
+        "batch_external"
+      ]
+    },
+    "objects": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "recipients": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "data_classes": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": [
+          "public",
+          "normal",
+          "internal",
+          "project_risk",
+          "customer_data",
+          "supplier_data",
+          "pricing",
+          "financial",
+          "contract",
+          "hr",
+          "credential",
+          "permission",
+          "security_log",
+          "prompt_injection_suspected"
+        ]
+      }
+    },
+    "state_change_type": {
+      "type": "string",
+      "enum": [
+        "none",
+        "read_only",
+        "draft_only",
+        "local_state_change",
+        "internal_system_write",
+        "external_effect",
+        "restricted_execution"
+      ]
+    },
+    "state_change": {
+      "type": "boolean"
+    },
+    "reversibility": {
+      "type": "string",
+      "enum": [
+        "not_applicable",
+        "high",
+        "medium",
+        "low",
+        "none"
+      ]
+    },
+    "device_type": {
+      "type": "string",
+      "enum": [
+        "pc",
+        "mobile",
+        "tablet",
+        "server"
+      ]
+    },
+    "permission_state": {
+      "type": "string",
+      "enum": [
+        "allowed",
+        "allowed_read_only",
+        "allowed_draft_only",
+        "requires_confirmation",
+        "requires_manager_approval",
+        "not_allowed"
+      ]
+    },
+    "missing_slots": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "source_refs": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "additionalProperties": true
+}
