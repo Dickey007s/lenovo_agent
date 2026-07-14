@@ -1,0 +1,19 @@
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: agent
+      POSTGRES_PASSWORD: agent
+      POSTGRES_DB: office_agent
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U agent -d office_agent"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    volumes:
+      - office_agent_pg:/var/lib/postgresql/data
+
+volumes:
+  office_agent_pg:
