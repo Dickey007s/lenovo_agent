@@ -136,7 +136,7 @@ LANGGRAPH_CHECKPOINT_DSN=postgresql://agent:agent@127.0.0.1:5432/office_agent
 Windows 推荐直接运行：
 
 ```powershell
-.\start-demo.ps1
+.\scripts\start-demo.ps1
 ```
 
 脚本会检查 Docker Desktop、启动 PostgreSQL、FastAPI 和 Next.js：
@@ -149,7 +149,7 @@ Windows 推荐直接运行：
 停止服务：
 
 ```powershell
-.\stop-demo.ps1
+.\scripts\stop-demo.ps1
 ```
 
 也可以分别启动：

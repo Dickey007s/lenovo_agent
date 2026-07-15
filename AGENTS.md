@@ -57,8 +57,8 @@ pnpm --dir apps/web build
 本地启动与停止：
 
 ```powershell
-.\start-demo.ps1
-.\stop-demo.ps1
+.\scripts\start-demo.ps1
+.\scripts\stop-demo.ps1
 ```
 
 默认地址为前端 `http://localhost:3000`、API `http://localhost:8010`、OpenAPI `http://localhost:8010/docs`。若运行结果与本文档不一致，以源码和命令输出为准，并修正文档。

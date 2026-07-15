@@ -210,7 +210,7 @@ Browser :3000  ──REST/SSE──>  FastAPI :8010
                                  └── in-process Simulators
 ```
 
-`start-demo.ps1` 负责启动 Docker Desktop、PostgreSQL、API 和 Web，并把日志写入 `.runtime/`。Windows 使用 Selector event loop 以兼容 psycopg 异步连接。
+`scripts/start-demo.ps1` 负责启动 Docker Desktop、PostgreSQL、API 和 Web，并把日志写入 `.runtime/`。Windows 使用 Selector event loop 以兼容 psycopg 异步连接。
 
 ## 7. 扩展路线
 
