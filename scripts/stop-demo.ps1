@@ -1,5 +1,5 @@
 $ErrorActionPreference = "Continue"
-$Root = $PSScriptRoot
+$Root = Split-Path -Parent $PSScriptRoot
 $Runtime = Join-Path $Root ".runtime"
 
 foreach ($Port in @(3000, 8010)) {

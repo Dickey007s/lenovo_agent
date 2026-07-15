@@ -1,6 +1,6 @@
 $ErrorActionPreference = "Stop"
 
-$Root = $PSScriptRoot
+$Root = Split-Path -Parent $PSScriptRoot
 $Runtime = Join-Path $Root ".runtime"
 New-Item -ItemType Directory -Force -Path $Runtime | Out-Null
 
