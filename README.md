@@ -88,6 +88,7 @@ flowchart LR
 - [工作区、对话与流式协议](docs/WORKSPACE_AND_STREAMING.md)
 - [HTTP API 与 SSE 事件](docs/API.md)
 - [演示脚本与 Presentation Brief](docs/PRESENTATION_BRIEF.md)
+- [Loop、Swarm 与统一 Agent Runtime 目标架构](docs/TARGET_ARCHITECTURE.md)
 
 ## 目录结构
 
