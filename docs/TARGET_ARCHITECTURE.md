@@ -2,6 +2,8 @@
 
 本文整理本地最终汇报、讲稿和最新评审反馈中的有效技术方向，作为 V0.1 之后的目标架构输入。它不是当前能力清单，不改变现有 API、Pydantic 协议、Risk/Policy 规则、Permit、Gateway 或 Simulator 边界。
 
+最终原始参考集及“下一步重点”逐条覆盖矩阵见 [`docs/final-reference/`](final-reference/README.md)。
+
 当前实现事实仍以源码、`README.md`、`ARCHITECTURE.md`、`WORKSPACE_AND_STREAMING.md` 和 `GOVERNANCE_AND_ACTIONS.md` 为准。本文出现的 Task Contract、长期任务分支、跨端控制、动态 Worker、Shared Artifact Workspace 和 Conflict Resolver 均为尚未完成的目标能力。
 
 ## 1. 需要解决的问题

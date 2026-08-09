@@ -7,6 +7,7 @@ from pathlib import Path
 REPOSITORY_ROOT = Path(__file__).parents[2]
 PROTOTYPE = REPOSITORY_ROOT / "docs" / "prototypes" / "loop-swarm-showcase.html"
 TARGET_ARCHITECTURE = REPOSITORY_ROOT / "docs" / "TARGET_ARCHITECTURE.md"
+FINAL_REFERENCE = REPOSITORY_ROOT / "docs" / "final-reference"
 
 
 def test_offline_prototype_covers_runtime_components_and_demos() -> None:
@@ -49,3 +50,25 @@ def test_target_architecture_does_not_claim_future_capabilities_are_implemented(
     assert "不是当前能力清单" in content
     assert "尚未完成的目标能力" in content
     assert "当前执行结果仍全部来自 Simulator" in content
+
+
+def test_final_reference_set_preserves_the_reviewed_prototype() -> None:
+    reference_prototype = FINAL_REFERENCE / "office_agent_demo_showcase_v5_reference_layout.html"
+
+    assert reference_prototype.read_bytes() == PROTOTYPE.read_bytes()
+    assert (FINAL_REFERENCE / "未来办公Agent_一小时汇报讲稿_v5.md").is_file()
+    assert (FINAL_REFERENCE / "0716-v2.pptx").is_file()
+
+
+def test_final_reference_covers_every_next_step_focus() -> None:
+    content = (FINAL_REFERENCE / "README.md").read_text(encoding="utf-8")
+
+    for focus in (
+        "技术对比及其交互影响",
+        "具体用户场景与设计来源",
+        "AI 与交互方式的共同演进",
+        "技术落地后的前台输出",
+        "前端与后端统一策略",
+        "基于 8 个最小模块继续 Demo",
+    ):
+        assert focus in content
