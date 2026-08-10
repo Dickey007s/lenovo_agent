@@ -167,6 +167,8 @@ Demo 3 复用当前工作区、非模态确认卡和确定性治理链。目标�
 
 ## 10. 实施顺序
 
+Demo 1 的实施决策、场景、协议和前台事实映射已经固定在 [`DR-0002`](decisions/DR-0002-bounded-durable-office-loop.md)、[`SCENARIO-001`](scenarios/SCENARIO-001-customer-a-durable-report.md)、[`TASK_RUNTIME_PROTOCOL.md`](contracts/TASK_RUNTIME_PROTOCOL.md) 和 [`UI_SERVER_FACT_MATRIX.md`](contracts/UI_SERVER_FACT_MATRIX.md)。在运行证据产生前，这些材料保持 `Ready` 而不是当前能力。
+
 1. 定义 Task Contract、Task/Branch State、Artifact Version 和 Control Event 协议。
 2. 在现有 PostgreSQL/Checkpoint 基础上实现长期任务持久化和幂等恢复。
 3. 建立单任务 Observe/Plan/Act/Verify/Commit 循环，不先引入 Swarm。

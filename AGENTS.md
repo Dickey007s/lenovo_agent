@@ -9,6 +9,7 @@
 5. `docs/API.md`：真实路由、请求和事件协议。
 6. `docs/PRESENTATION_BRIEF.md`：对外叙事、演示路径和不可夸大的边界。
 7. `docs/DECISION_AND_REPORTING_GOVERNANCE.md`：所有决策、推进、PR、Demo 和汇报必须通过的场景、来源、前台与后端事实门槛。
+8. 修改 Demo 1 Task Runtime 时，再读 `docs/decisions/DR-0002-bounded-durable-office-loop.md`、`docs/scenarios/SCENARIO-001-customer-a-durable-report.md` 和 `docs/contracts/` 下的协议与 UI 事实矩阵。
 
 源码永远高于文档。行为变更后必须同步相关文档；不要只改 README 的宣传描述。关键实现路径：
 
