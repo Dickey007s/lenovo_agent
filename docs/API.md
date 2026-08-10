@@ -1,6 +1,6 @@
 # HTTP API 与 SSE 事件
 
-本文记录 V0.1 与 Demo 1 PR 3 实际暴露的 FastAPI 接口。运行后以 <http://localhost:8010/docs> 的 OpenAPI 页面和 `services/api/app/api/routes.py` 为最终事实来源。
+本文记录 V0.1 与 Demo 1 PR 4 实际使用的 FastAPI 接口。运行后以 <http://localhost:8010/docs> 的 OpenAPI 页面和 `services/api/app/api/routes.py` 为最终事实来源。PR 4 没有增加工件专用 API；交付物工作区读取现有 `TaskSnapshot`。
 
 ## 1. 约定
 
@@ -234,6 +234,15 @@ mutation 合约要求：相同 key 和相同命令返回首次 mutation 的 Snap
 
 `start` 会预留 4 个 step、4 次工具调用和 1 秒运行时长，`resolve_evidence` 会预留 1 个 step 和 1 秒运行时长；预计用量超过契约预算或已到 `deadline_at` 时返回 409，且不产生 mutation。当前还没有专门的预算耗尽恢复 API 或完整前台引导。
 
+PR 4 交付物工作区直接使用创建、读取、start、control 和 SSE 对账所返回的同一个 `TaskSnapshot`：
+
+- `branches[].artifact_heads` 决定每个交付物的当前 head；Task 面板只会打开该映射指向的服务端版本。
+- `artifact_versions[]` 提供不可变版本、`parent_version_id`、结构化 `content` 与 `source_refs`。
+- `verification_reports[]` 与 `conflicts[]` 提供验证和冲突事实；来源与逐项检查在前台默认折叠。
+- `last_commit` 提供 task version、工件/报告引用和 `state_hash`；缺少该字段时前台不得显示最终提交。
+
+该工作区当前只读，没有创建、编辑或覆盖 ArtifactVersion 的路由。前端只为固定 Fixture 的 `analysis/risk_brief/reply_draft` 提供字段 allowlist，未知 kind/字段默认隐藏；`source_ref` 只显示安全的非敏感 opaque scheme，疑似 token、secret、signature、路径或 URL 的值显示隐藏占位。这是前端第二道投影，不能替代服务端脱敏、授权或未来通用的字段可见性 Schema。即使字段名在 allowlist 中，其任意文本值仍需要服务端 display projection 承担通用安全保证。
+
 ### 3.5 直接创建治理 Run
 
 ```json
@@ -392,4 +401,4 @@ SSE 在响应已经开始后无法再改变 HTTP 状态码，因此流内错误�
 - `ActionCandidate`、Permit claims 和哈希规则是安全边界，不能由前端自行构造并绕过 RunService。
 - 文档示例中的邮箱、报价号、用户和 Key 全部是演示值。
 
-Task API 当前只把上述能力暴露给固定 Demo 1 Fixture。它不是通用 LLM Agent Loop、后台队列或真实 Connector；PostgreSQL mutation、进程重启、多实例通知和完整浏览器恢复尚无本机验收证据。副作用动作仍必须走 RunService 与 Tool Gateway，Task Control 不能直接发送邮件或写入企业系统。
+Task API 当前只把上述能力暴露给固定 Demo 1 Fixture。PR 4 浏览器 E2E 已通过真实本地 API `8011` 与 Next.js `3011` 覆盖创建、start、冲突、Steer accepted、resolve、Commit、交付物读取，以及 start 请求发送前 abort 后的 reload/同 key 重试；它没有覆盖请求已到服务端但响应丢失、Task SSE 断线回放、API 进程重启、PostgreSQL 或多实例通知。Task Runtime 仍不是通用 LLM Agent Loop、后台队列或真实 Connector。副作用动作必须继续走 RunService 与 Tool Gateway，Task Control 不能直接发送邮件或写入企业系统，Task Artifact 也尚未绑定 Action 失效规则。证据见 [`DEMO1-PR4-FRONTEND-E2E-EVIDENCE.md`](evidence/DEMO1-PR4-FRONTEND-E2E-EVIDENCE.md)。

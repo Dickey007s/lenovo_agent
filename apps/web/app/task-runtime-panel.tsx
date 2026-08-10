@@ -19,6 +19,7 @@ type TaskRuntimePanelProps = {
   busy: boolean;
   onStart: () => void;
   onControl: (intent: ControlIntent) => Promise<boolean>;
+  onOpenArtifact: (artifactVersionId: string) => void;
 };
 
 const OFFICIAL_REVENUE_SOURCE = "fixture:crm/customer-a:official-revenue-v3";
@@ -111,7 +112,14 @@ function BranchControls({
   return null;
 }
 
-export function TaskRuntimePanel({ task, syncState, busy, onStart, onControl }: TaskRuntimePanelProps) {
+export function TaskRuntimePanel({
+  task,
+  syncState,
+  busy,
+  onStart,
+  onControl,
+  onOpenArtifact,
+}: TaskRuntimePanelProps) {
   const [steerInstruction, setSteerInstruction] = useState("");
   const taskTerminal = task ? ["committed", "failed", "cancelled"].includes(task.status) : false;
   const controlsDisabled = syncState !== "synced" || busy || taskTerminal;
@@ -231,6 +239,22 @@ export function TaskRuntimePanel({ task, syncState, busy, onStart, onControl }: 
                   </span>
                 </header>
                 {branch.pause_reason && <p className="task-branch-reason">{branch.pause_reason}</p>}
+                {Object.entries(branch.artifact_heads).length > 0 && (
+                  <div className="task-branch-artifacts" aria-label={`${branch.title}共享工件`}>
+                    {Object.entries(branch.artifact_heads).map(([deliverableId, artifactVersionId]) => {
+                      const deliverable = task.contract.deliverables.find(item => item.deliverable_id === deliverableId);
+                      return (
+                        <button
+                          type="button"
+                          key={artifactVersionId}
+                          onClick={() => onOpenArtifact(artifactVersionId)}
+                        >
+                          查看{deliverable?.title ?? "工件"}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
                 <BranchControls branch={branch} disabled={controlsDisabled} onControl={onControl} />
               </article>
             </li>

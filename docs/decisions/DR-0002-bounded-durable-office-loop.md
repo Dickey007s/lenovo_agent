@@ -25,6 +25,7 @@
 | `C-005` | 治理依据 | 人类监督、责任记录和持续风险管理应是运行过程职责 | `NIST-AI-RMF-1.0` | 支持控制事件、Trace 和人工接管方向 | 通用框架，不规定具体风险算法或组件布局 |
 | `C-006` | 源码事实 | PR 2 实现 TaskService/TaskStore、创建/读取/列表/SSE、Owner scope、创建幂等和最薄 Task Bar | PR 2 merge commit `2923d19` 及当时源码 | 支持 PR 3 的输入基线 | 只描述 PR 2；不能代表当前 PR 3 能力 |
 | `C-007` | 源码、测试与截图事实 | PR 3 工作区已出现固定 Fixture 的 start/control、Artifact/Verify/Conflict/Commit 和最薄 Branch/Conflict/Control UI | [`RUNTIME-EVIDENCE-DEMO1-PR3-20260810`](../evidence/DEMO1-PR3-RUNTIME-EVIDENCE.md) | 支持固定 Fixture 的可观察工程纵切、内存引用/hash/幂等行为和前后端事实映射 | 不证明 PostgreSQL 重启、真实 Connector、通用后台 Loop 或用户价值 |
+| `C-008` | 浏览器运行证据 | PR 4 用同一服务端 Snapshot 驱动只读交付物工作区，并通过固定主路径与发送前失败恢复 E2E | [`FRONTEND-E2E-DEMO1-PR4-20260810`](../evidence/DEMO1-PR4-FRONTEND-E2E-EVIDENCE.md) | 支持 head/version/verification/conflict/content/source/lineage/Commit 的前台映射、Tasks 双 tab、reload 同 key 恢复及被测移动布局 | 仅内存 Store 与固定 Fixture；不证明服务端已提交但响应丢失、SSE 回放、PostgreSQL、用户价值或 Artifact/Action 绑定 |
 | `H-001` | 待验证假设 | Task Bar 与分支列表能降低用户恢复上下文的成本 | 尚无目标用户研究 | 指导前台原型和指标 | `Draft hypothesis`，不得汇报为已提升体验 |
 | `H-002` | 待验证假设 | 冲突只暂停受影响分支能减少等待且不扩散错误 | 固定 Fixture 已有工程行为；无真实任务收益数据 | 指导分支隔离测试 | 功能正确不等于真实业务收益，仍是 `Draft hypothesis` |
 | `H-003` | 待验证假设 | 客户 A 场景代表联想目标办公用户的高价值流程 | 尚无访谈/任务频率证据 | 仅作为 Demo Fixture | 需要情境访谈与真实任务样本验证 |
@@ -59,7 +60,7 @@
 - Snapshot、Artifact/Control 和对应 TaskEvent 原子提交后才能通过 SSE 广播。
 - 任务涉及副作用时继续调用现有 RunService 和 Gateway，Task Runtime 不签发 Permit，也不建立旁路。
 
-PR 3 当前可观察落点为：
+PR 3/PR 4 当前可观察落点为：
 
 - `TaskService` 仍从服务端 Task ID、Owner、契约、三个初始 Branch 和 `TASK_CREATED(sequence=1)` 开始；`POST /v1/tasks/{task_id}/start` 在一次 mutation 中物化固定客户 A 的 Observe/Plan/Act/Verify Trace、ArtifactVersion、VerificationReport 和局部 Conflict。
 - `POST /v1/tasks/{task_id}/controls` 接受 Steer、Pause、Resume、Take over、Return control 和 Resolve evidence。分支控制经服务端应用后改变 Snapshot；Steer 当前只持久记录为 `accepted`，不宣称已重新规划。
@@ -83,9 +84,11 @@ PR 3 当前可观察落点为：
 
 默认隐藏 Prompt、思维链、Worker 对话、完整 Trace JSON、JWT/Permit、幂等键、权限哈希、工具秘密和堆栈。现有业务动作确认 tray 保持独立，不能与任务级控制合并。
 
-PR 3 保留 Active Task Bar，并从服务端 Snapshot 显示分支状态、固定收入口径冲突、分支控制与最近 Commit。EventSource 使用 `after=last_event_sequence`，连接打开或收到新事件后重新 GET Snapshot 对账；`loading/connecting/synced/reconnecting/offline` 只是传输状态。未知 mutation 会在当前标签页保留原 key/intent；offline/reconnecting 时可同 key 确认，随后再 GET 最新 Snapshot。桌面冲突态、380 x 822 导出内容区的窄屏冲突态和桌面提交态截图见 [`RUNTIME-EVIDENCE-DEMO1-PR3-20260810`](../evidence/DEMO1-PR3-RUNTIME-EVIDENCE.md)；它们只证明界面可见，不证明交互效果。
+PR 4 在上述 Task Bar 与控制 UI 之外增加只读交付物工作区。Task 面板从 `branches[].artifact_heads` 直达版本；工作区从同一 Snapshot 显示版本/状态、验证、冲突、结构化内容、折叠来源与检查、lineage 以及 Commit/state hash，并以两个 tab 保留原“工作台待办”。固定 Fixture 内容按 `artifact.kind` allowlist 投影，未知 kind/字段默认隐藏；非安全或疑似敏感 `source_ref` 显示隐藏占位。这仍只是前端第二道投影，服务端通用字段可见性 Schema/display projection 尚未实现。
 
-Action Gate 打开时保留 Active Task Bar，Gate 占用独立网格行；TaskRuntimePanel 保持挂载以保留 Steer 草稿，但视觉隐藏，Task Control 与 Task Bar 操作均不可用；Gate 收起后行高缩至 58px。Task Control 与副作用 Action 仍是两条服务端事实链；Task Artifact 尚未绑定 ActionCandidate/Run 的参数版本，Artifact 改动也尚未触发旧 Action 失效。完整 Task Artifact Workspace、人工接管编辑、新 ArtifactVersion、预算耗尽、单分支失败、重启和断线恢复仍未完成。
+system Edge E2E 通过真实本地 Next.js `3011` 与 FastAPI `8011` 覆盖创建、start、冲突、Steer accepted、resolve、Commit、客户回复 v3/2,400 万元/仅草稿未发送，以及 start 请求发送前 abort 后的 `sessionStorage` reload、同 key 重试和无重复工件。五张截图、DOM 断言与完整边界见 [`FRONTEND-E2E-DEMO1-PR4-20260810`](../evidence/DEMO1-PR4-FRONTEND-E2E-EVIDENCE.md)。该用例没有把 start 请求交给服务端，不能扩展为“服务端已提交但响应丢失”的恢复证明；Task SSE 断线回放也未测试。
+
+Action Gate 打开时保留 Active Task Bar，Gate 占用独立网格行；TaskRuntimePanel 保持挂载以保留 Steer 草稿，但视觉隐藏，Task Control 与 Task Bar 操作均不可用；Gate 收起后行高缩至 58px。Task Control 与副作用 Action 仍是两条服务端事实链；Task Artifact 尚未绑定 ActionCandidate/Run 的参数版本，Artifact 改动也尚未触发旧 Action 失效。人工接管编辑并创建新 ArtifactVersion、预算耗尽、单分支失败、重启和 SSE 断线恢复仍未完成。
 
 ## 6. 验证计划与完成边界
 
@@ -96,16 +99,19 @@ Action Gate 打开时保留 Active Task Bar，Gate 占用独立网格行；TaskR
 | SSE 能否无漏地续订 | 服务层证明 `after=N` 读取后续持久事件；浏览器序号缺口与多实例待验 | integration tests；browser/PostgreSQL evidence 待补 |
 | 冲突能否局部隔离 | 固定收入冲突只令目标 Branch waiting，另两 Branch 形成已验证工件 | PR 3 tests + Snapshot；只证明 Fixture 工程行为 |
 | 控制与恢复是否幂等 | 相同 mutation 不产生重复 Event/ArtifactVersion/Commit，并返回协议规定结果 | PR 3 内存 tests + state hash 已覆盖；PostgreSQL 重启待补 |
-| 前后端是否一致 | UI 只根据服务端 Snapshot/Event 显示状态 | PR 3 代码映射与截图；完整 E2E 仍在 PR 4 |
+| 前后端是否一致 | UI 只根据服务端 Snapshot/Event 显示状态 | PR 4 固定主路径 system Edge E2E 已覆盖；其他异常/SSE 路径待补 |
+| pending mutation 能否浏览器恢复 | reload 后保留原 key/intent，同 key确认且不重复工件 | PR 4 已覆盖发送前 abort；服务端已提交但响应丢失待补 |
 | 用户是否更易理解和控制 | 尚未设为功能完成条件 | 后续独立用户研究；未完成前保持假设 |
 
-本决策在 PR 1 只能保持 `Ready`。四个 PR 全部完成后，只有“固定 Fixture 的功能实现与工程一致性”可以升为 `Verified`；用户价值、代表性和易用性假设仍需独立证据。
+四个 PR 完成后，“固定 Fixture 的功能实现、前后端映射和本次列出的浏览器路径”已有 `C-007/C-008` 工程证据，可以限定为 `Verified`。本决策整体仍保持 `Ready`：PostgreSQL/进程重启、SSE 断线、服务端已提交但响应丢失、真实 Connector 和 Artifact/Action 绑定尚未验收，用户价值、代表性与易用性假设仍需独立证据。
 
 PR 1 实际验证（2026-08-10）：`uv run pytest -q` 为 37 passed，`uv run ruff check .`、`pnpm --dir apps/web lint`、`pnpm --dir apps/web build` 和 `git diff --check` 均通过。该结果只证明协议、类型、文档留痕和防回退检查已落地，不证明 Task Store、SSE、Loop 或界面已经实现。
 
 PR 2 实际验证（2026-08-10）：针对性 Task 测试为 7 passed；全量 `uv run pytest -q` 为 44 passed，`uv run ruff check .`、`pnpm --dir apps/web lint`、`pnpm --dir apps/web build` 和 `git diff --check` 均通过。它证明内存 Store 下的初始创建、Owner scope、创建幂等、事件游标、路由以及前端类型和生产构建；不证明 PostgreSQL 进程重启、多实例通知、浏览器 E2E 或任何 Loop/控制/工件提交行为。本机没有可用的 Docker/PostgreSQL 进程，因此没有把 PostgreSQL 实现表述为已完成运行验收。
 
 PR 3 Runtime 验证（2026-08-10）：针对性 Task 测试 `15 passed`，全量 Python 回归 `56 passed`，Ruff、前端 lint 和生产构建通过。测试覆盖固定 Fixture 主路径、局部冲突、解决最后冲突时联动重生成回复、仍有其他 open Conflict 时只持久化本次 resolution 且不生成 reply v3/Commit、Artifact lineage/head、state hash、预算/截止时间、Owner/版本与原响应幂等。完整记录与三张截图哈希见 [`RUNTIME-EVIDENCE-DEMO1-PR3-20260810`](../evidence/DEMO1-PR3-RUNTIME-EVIDENCE.md)。它不证明 PostgreSQL 重启、多实例通知、真实 Connector、后台持续调度、完整浏览器恢复或 `H-001` 至 `H-004`。
+
+PR 4 前端验证（2026-08-10）：`pnpm --dir apps/web test:e2e` 在本地 FastAPI `8011`、Next.js `3011` 与 system Edge 上为 `2 passed (18.4s)`。主路径覆盖 create/start/conflict/Steer/resolve/commit、客户回复 v3、正式收入 2,400 万元、仅草稿未发送和 state hash；恢复路径覆盖发送前 abort、`sessionStorage` reload、同 key 重试及无重复工件；移动 DOM 断言覆盖被测区域无横向 overflow 和可见操作目标至少 44px。该结果不覆盖服务端已提交但响应丢失、SSE 断线、PostgreSQL、真实 Connector 或 `H-001` 至 `H-004`。
 
 ## 7. 关联项
 
@@ -115,4 +121,5 @@ PR 3 Runtime 验证（2026-08-10）：针对性 Task 测试 `15 passed`，全量
 - TypeScript：`apps/web/app/task-types.ts`
 - 当前静态原型边界：[`docs/prototypes/README.md`](../prototypes/README.md)
 - PR 3 运行证据：[`DEMO1-PR3-RUNTIME-EVIDENCE.md`](../evidence/DEMO1-PR3-RUNTIME-EVIDENCE.md)
-- 最终实现证据：后续 PR、最终自动化测试、Task Trace、恢复实验与汇报材料，产生后继续回填。
+- PR 4 前端 E2E 证据：[`DEMO1-PR4-FRONTEND-E2E-EVIDENCE.md`](../evidence/DEMO1-PR4-FRONTEND-E2E-EVIDENCE.md)
+- 后续证据：PostgreSQL/进程重启、SSE/响应丢失恢复、Task/Action 绑定、真实 Connector 和用户研究，产生后继续回填。

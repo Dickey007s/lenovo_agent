@@ -13,10 +13,12 @@ import {
 } from "react";
 
 import type { TaskEvent, TaskEventType, TaskSnapshot } from "./task-types";
+import { TaskArtifactWorkspace } from "./task-artifact-workspace";
 import { TaskRuntimePanel, type ControlIntent } from "./task-runtime-panel";
 
 type ViewId = "mail" | "document" | "quote" | "tasks" | "calendar" | "expense" | "crm" | "audit";
 type WorkspaceKind = Exclude<ViewId, "audit">;
+type TaskViewMode = "runtime" | "manual";
 
 type ChatMessage = {
   message_id: string;
@@ -407,6 +409,8 @@ export default function Home() {
   const [taskCreating, setTaskCreating] = useState(false);
   const [taskMutating, setTaskMutating] = useState(false);
   const [pendingTaskMutation, setPendingTaskMutation] = useState<PendingTaskMutation | null>(null);
+  const [taskViewMode, setTaskViewMode] = useState<TaskViewMode>("runtime");
+  const [selectedTaskArtifactVersionId, setSelectedTaskArtifactVersionId] = useState<string | null>(null);
   const [workspaceWidth, setWorkspaceWidth] = useState(0);
   const shellRef = useRef<HTMLElement>(null);
   const conversationRef = useRef<HTMLDivElement>(null);
@@ -451,7 +455,7 @@ export default function Home() {
       setTask(activeTask);
       taskSequenceRef.current = activeTask?.last_event_sequence ?? 0;
       if (activeTask) reconcilePendingTaskMutation(activeTask);
-      setTaskSyncState("synced");
+      setTaskSyncState(pendingTaskMutationRef.current ? "reconnecting" : "synced");
     }).catch(() => { if (!cancelled) setTaskSyncState("offline"); });
     return () => { cancelled = true; };
   }, []);
@@ -482,7 +486,7 @@ export default function Home() {
         setTask(snapshot);
         reconcilePendingTaskMutation(snapshot);
         taskSequenceRef.current = snapshot.last_event_sequence;
-        setTaskSyncState("synced");
+        setTaskSyncState(pendingTaskMutationRef.current ? "reconnecting" : "synced");
       } catch {
         if (!cancelled) setTaskSyncState("reconnecting");
       }
@@ -562,8 +566,8 @@ export default function Home() {
       }
       setTask(activeTask);
       taskSequenceRef.current = activeTask?.last_event_sequence ?? 0;
-      setTaskSyncState("synced");
       if (activeTask) reconcilePendingTaskMutation(activeTask);
+      setTaskSyncState(pendingTaskMutationRef.current ? "reconnecting" : "synced");
     } catch (reason) {
       setTaskSyncState("offline");
       setError(reason instanceof Error ? reason.message : "任务服务仍不可用");
@@ -948,6 +952,20 @@ export default function Home() {
   const viewProps = activeArtifact ? { artifact: activeArtifact, dirty: currentDirty, onChange: updateArtifact, onSave: () => void saveArtifact() } : null;
   const actionGateOpen = Boolean(run && !["EXECUTED", "DENIED", "FAILED"].includes(run.status));
 
+  function openTaskArtifact(artifactVersionId: string) {
+    setSelectedTaskArtifactVersionId(artifactVersionId);
+    setTaskViewMode("runtime");
+    setActiveView("tasks");
+  }
+
+  function handleTaskViewTabKeyDown(event: KeyboardEvent<HTMLButtonElement>) {
+    if (!["ArrowLeft", "ArrowRight"].includes(event.key)) return;
+    event.preventDefault();
+    const nextMode: TaskViewMode = taskViewMode === "runtime" ? "manual" : "runtime";
+    setTaskViewMode(nextMode);
+    window.requestAnimationFrame(() => document.getElementById(`task-view-tab-${nextMode}`)?.focus());
+  }
+
   return <main className="app-shell" ref={shellRef} style={shellStyle}>
     <section className="workbench">
       <nav className="view-rail" aria-label="工作台视图">{(Object.keys(VIEW_LABELS) as ViewId[]).map(view => <button key={view} className={activeView === view ? "active" : ""} onClick={() => setActiveView(view)} title={VIEW_LABELS[view]}><Icon name={view}/><span>{VIEW_LABELS[view]}</span></button>)}</nav>
@@ -956,7 +974,18 @@ export default function Home() {
         {activeView === "mail" && viewProps && <MailView {...viewProps} onNew={() => void startNewMail()} onSend={() => void triggerWorkspaceAction("发送当前工作区中的邮件")}/>}
         {activeView === "document" && viewProps && <DocumentView {...viewProps}/>}
         {activeView === "quote" && viewProps && <QuoteView {...viewProps} onImport={() => setNotice("报价表导入入口已预留")}/>}
-        {activeView === "tasks" && viewProps && <TasksView {...viewProps}/>}
+        {activeView === "tasks" && <div className="task-view-shell">
+          <div className="task-view-tabs" role="tablist" aria-label="任务工作区模式">
+            <button id="task-view-tab-runtime" type="button" role="tab" aria-controls="task-view-panel" aria-selected={taskViewMode === "runtime"} tabIndex={taskViewMode === "runtime" ? 0 : -1} className={taskViewMode === "runtime" ? "active" : ""} onKeyDown={handleTaskViewTabKeyDown} onClick={() => setTaskViewMode("runtime")}>长期任务工件</button>
+            <button id="task-view-tab-manual" type="button" role="tab" aria-controls="task-view-panel" aria-selected={taskViewMode === "manual"} tabIndex={taskViewMode === "manual" ? 0 : -1} className={taskViewMode === "manual" ? "active" : ""} onKeyDown={handleTaskViewTabKeyDown} onClick={() => setTaskViewMode("manual")}>工作台待办</button>
+          </div>
+          <div id="task-view-panel" className="task-view-region" role="tabpanel" aria-labelledby={`task-view-tab-${taskViewMode}`}>
+            {taskViewMode === "runtime"
+              ? <TaskArtifactWorkspace task={task} selectedArtifactVersionId={selectedTaskArtifactVersionId} onSelectArtifact={setSelectedTaskArtifactVersionId}/>
+              : viewProps && <TasksView {...viewProps}/>
+            }
+          </div>
+        </div>}
         {activeView === "calendar" && viewProps && <CalendarView {...viewProps} onInvite={() => void triggerWorkspaceAction("创建当前工作区中的会议邀请")}/>}
         {activeView === "expense" && viewProps && <ExpenseView {...viewProps}/>}
         {activeView === "crm" && viewProps && <CrmView {...viewProps}/>}
@@ -969,7 +998,7 @@ export default function Home() {
       <div className="chat-identity"><div className="avatar">OA</div><div><strong>Office Agent</strong><span>已连接当前工作区</span></div></div>
       <ActiveTaskStrip task={task} syncState={taskSyncState} creating={taskCreating} blocked={actionGateOpen} onCreate={() => void createDemo1Task()} onRetry={() => void (pendingTaskMutation ? retryPendingTaskMutation() : retryTaskConnection())}/>
       {task && <div className={`task-runtime-slot ${actionGateOpen ? "is-hidden" : ""}`} aria-hidden={actionGateOpen}>
-        <TaskRuntimePanel task={task} syncState={taskSyncState} busy={taskMutating || Boolean(pendingTaskMutation) || actionGateOpen} onStart={() => void startDemo1Loop()} onControl={controlDemo1Task}/>
+        <TaskRuntimePanel task={task} syncState={taskSyncState} busy={taskMutating || Boolean(pendingTaskMutation) || actionGateOpen} onStart={() => void startDemo1Loop()} onControl={controlDemo1Task} onOpenArtifact={openTaskArtifact}/>
       </div>}
       <div className="conversation" ref={conversationRef} onScroll={handleConversationScroll}>
         <article className="message assistant-message"><div className="message-body"><p>我会读取你正在编辑的工作区，并直接协助修改。涉及发送、写入或外部影响时，我会先请求确认。</p></div></article>
