@@ -2,6 +2,8 @@
 
 > V0.1 定稿基线，2026-07-14。一个以办公工作区为主体、由 Agent 协助编辑，并对副作用动作实施确定性治理与人工确认的 P0 原型。
 
+最新阶段的目标架构、最终讲稿、交互原型和 0716 汇报原件见 [`docs/final-reference/`](docs/final-reference/README.md)。这些材料用于后续版本转向参考，不改变本页描述的 V0.1 已实现边界。
+
 ## 项目定位
 
 本项目不是“把聊天框放进办公软件”，而是在邮件、文档、报价表、任务、日历、报销和 CRM 等既有工作区之上增加 Agent 辅助层：用户可以独立编辑和保存，Agent 能读取当前未保存内容并直接修改工作区；只有涉及发送、系统写入或外部影响时，系统才创建受控动作，执行风险评估、证据校验、人工审批和一次性授权。
@@ -88,6 +90,7 @@ flowchart LR
 - [工作区、对话与流式协议](docs/WORKSPACE_AND_STREAMING.md)
 - [HTTP API 与 SSE 事件](docs/API.md)
 - [演示脚本与 Presentation Brief](docs/PRESENTATION_BRIEF.md)
+- [Loop、Swarm 与统一 Agent Runtime 目标架构](docs/TARGET_ARCHITECTURE.md)
 
 ## 目录结构
 

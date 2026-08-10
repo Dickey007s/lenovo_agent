@@ -1,0 +1,1660 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>未来办公 Agent Demo：Durable Loop、Adaptive Swarm 与 Risk Gate</title>
+  <style>
+    :root {
+      --bg: #0f1115;
+      --panel: #181b21;
+      --panel-2: #20242c;
+      --panel-3: #262b34;
+      --border: #333a46;
+      --text: #f3f5f8;
+      --muted: #aab2c0;
+      --subtle: #788397;
+      --perception: #3b92f2;
+      --memory: #11b9ad;
+      --execution: #2fb870;
+      --orchestration: #936fe8;
+      --governance: #ef7146;
+      --warning: #f2c14f;
+      --danger: #ef5b68;
+      --safe: #65d394;
+      --radius: 8px;
+      --shadow: 0 12px 34px rgba(0, 0, 0, 0.28);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: var(--bg);
+      color: var(--text);
+      font-family: "Microsoft YaHei", "PingFang SC", "Segoe UI", Arial, sans-serif;
+      font-size: 14px;
+      letter-spacing: 0;
+      line-height: 1.55;
+    }
+
+    button {
+      border: 0;
+      font: inherit;
+      color: inherit;
+      cursor: pointer;
+    }
+
+    .app {
+      max-width: 1680px;
+      margin: 0 auto;
+      padding: 20px 20px 32px;
+    }
+
+    .topbar {
+      display: flex;
+      justify-content: space-between;
+      gap: 28px;
+      align-items: start;
+      padding: 22px 24px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background:
+        linear-gradient(100deg, rgba(59, 146, 242, 0.12), transparent 40%),
+        linear-gradient(270deg, rgba(239, 113, 70, 0.1), transparent 34%),
+        var(--panel);
+      box-shadow: var(--shadow);
+    }
+
+    .title-group {
+      max-width: 880px;
+    }
+
+    .kicker {
+      color: var(--safe);
+      font-size: 12px;
+      margin-bottom: 8px;
+    }
+
+    h1, h2, h3, h4 {
+      margin: 0;
+      font-weight: 650;
+      letter-spacing: 0;
+    }
+
+    h1 {
+      font-size: 29px;
+      line-height: 1.24;
+      margin-bottom: 10px;
+    }
+
+    .title-group p {
+      margin: 0;
+      color: #d0d6df;
+      font-size: 15px;
+    }
+
+    .constraints {
+      width: min(450px, 38%);
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+    }
+
+    .constraint {
+      padding: 10px 11px;
+      min-height: 66px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: rgba(255, 255, 255, 0.035);
+    }
+
+    .constraint b {
+      display: block;
+      color: var(--warning);
+      font-size: 12px;
+      margin-bottom: 3px;
+    }
+
+    .constraint span {
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .module-overview {
+      margin-top: 16px;
+      padding: 14px 16px 16px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: var(--panel);
+    }
+
+    .module-overview-head {
+      display: flex;
+      gap: 14px;
+      align-items: baseline;
+      margin-bottom: 12px;
+    }
+
+    .module-overview-head h2 {
+      font-size: 15px;
+    }
+
+    .module-overview-head p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .module-overview-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 8px;
+    }
+
+    .module-summary {
+      --module-accent: var(--perception);
+      min-height: 72px;
+      padding: 9px 10px 10px;
+      border: 1px solid var(--border);
+      border-top: 2px solid var(--module-accent);
+      border-radius: var(--radius);
+      background: var(--panel-2);
+    }
+
+    .module-summary strong {
+      display: block;
+      margin-bottom: 4px;
+      color: var(--text);
+      font-size: 12px;
+    }
+
+    .module-summary span {
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .scenario-nav {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 16px 0;
+    }
+
+    .scenario-tab {
+      min-height: 46px;
+      padding: 10px 16px;
+      color: var(--muted);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: var(--panel);
+      transition: border-color 150ms ease, color 150ms ease, background 150ms ease;
+    }
+
+    .scenario-tab:hover {
+      color: var(--text);
+      border-color: #657082;
+    }
+
+    .scenario-tab.active {
+      color: var(--text);
+      border-color: var(--perception);
+      background: rgba(59, 146, 242, 0.12);
+    }
+
+    .scenario-tab strong {
+      display: block;
+      font-size: 14px;
+    }
+
+    .scenario-tab span {
+      display: block;
+      font-size: 12px;
+      color: inherit;
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: 250px minmax(500px, 1fr) 410px;
+      gap: 16px;
+      align-items: start;
+    }
+
+    .surface {
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: var(--panel);
+      box-shadow: var(--shadow);
+    }
+
+    .stack-panel {
+      padding: 14px;
+      position: sticky;
+      top: 14px;
+    }
+
+    .surface-title {
+      margin-bottom: 13px;
+      font-size: 15px;
+    }
+
+    .surface-note {
+      color: var(--muted);
+      font-size: 12px;
+      margin: -7px 0 13px;
+    }
+
+    .ability {
+      --accent: var(--perception);
+      width: 100%;
+      display: flex;
+      gap: 9px;
+      align-items: center;
+      text-align: left;
+      padding: 10px 9px;
+      margin-bottom: 7px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: var(--panel-2);
+    }
+
+    .ability::before {
+      content: "";
+      flex: 0 0 4px;
+      height: 33px;
+      border-radius: 3px;
+      background: var(--accent);
+    }
+
+    .ability b {
+      display: block;
+      font-size: 13px;
+    }
+
+    .ability small {
+      color: var(--muted);
+      font-size: 11px;
+    }
+
+    .ability.used {
+      border-color: var(--accent);
+      background: color-mix(in srgb, var(--accent) 10%, var(--panel-2));
+    }
+
+    .boundary {
+      margin-top: 15px;
+      padding-top: 13px;
+      border-top: 1px solid var(--border);
+    }
+
+    .boundary h3 {
+      font-size: 13px;
+      margin-bottom: 8px;
+    }
+
+    .boundary-tag {
+      display: inline-flex;
+      margin: 0 4px 5px 0;
+      padding: 4px 7px;
+      color: #ffd9d9;
+      border: 1px solid rgba(239, 91, 104, 0.35);
+      background: rgba(239, 91, 104, 0.09);
+      border-radius: 999px;
+      font-size: 11px;
+    }
+
+    .main-panel {
+      padding: 17px;
+      min-height: 810px;
+    }
+
+    .scenario-header {
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+      align-items: start;
+      margin-bottom: 16px;
+    }
+
+    .scenario-header h2 {
+      font-size: 22px;
+      margin-bottom: 6px;
+    }
+
+    .scenario-header p {
+      color: var(--muted);
+      margin: 0;
+      max-width: 650px;
+    }
+
+    .badge {
+      white-space: nowrap;
+      padding: 6px 10px;
+      color: #d9e6ff;
+      border: 1px solid rgba(59,146,242,0.38);
+      border-radius: 999px;
+      background: rgba(59,146,242,0.1);
+      font-size: 12px;
+    }
+
+    .step-list {
+      display: flex;
+      gap: 8px;
+      overflow-x: auto;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 16px;
+    }
+
+    .step-btn {
+      min-width: 128px;
+      height: 75px;
+      text-align: left;
+      padding: 9px 10px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: var(--panel-2);
+    }
+
+    .step-btn span {
+      display: block;
+      color: var(--subtle);
+      font-size: 11px;
+      margin-bottom: 4px;
+    }
+
+    .step-btn b {
+      display: block;
+      font-size: 13px;
+      line-height: 1.35;
+    }
+
+    .step-btn.active {
+      border-color: var(--warning);
+      background: rgba(242, 193, 79, 0.1);
+    }
+
+    .stage-grid {
+      display: grid;
+      grid-template-columns: minmax(250px, .8fr) minmax(280px, 1fr);
+      gap: 12px;
+    }
+
+    .user-action,
+    .mock-ui,
+    .source-row,
+    .runtime-row {
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: var(--panel-2);
+    }
+
+    .user-action {
+      padding: 15px;
+    }
+
+    .label {
+      color: var(--subtle);
+      font-size: 11px;
+      text-transform: uppercase;
+      margin-bottom: 8px;
+    }
+
+    .quote {
+      min-height: 66px;
+      padding: 11px;
+      border-left: 3px solid var(--perception);
+      background: rgba(59, 146, 242, 0.07);
+      color: #f1f4f8;
+      font-size: 16px;
+      margin-bottom: 12px;
+    }
+
+    .meta-pair {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 7px 0;
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .meta-pair:last-child {
+      border-bottom: 0;
+    }
+
+    .meta-pair strong {
+      color: #e4e8ef;
+      font-weight: 500;
+      text-align: right;
+    }
+
+    .mock-ui {
+      padding: 15px;
+      min-height: 315px;
+    }
+
+    .mock-window {
+      border: 1px solid #3b424e;
+      background: #15181e;
+      border-radius: var(--radius);
+      overflow: hidden;
+    }
+
+    .mock-toolbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 10px;
+      color: var(--muted);
+      background: #242932;
+      border-bottom: 1px solid var(--border);
+      font-size: 11px;
+    }
+
+    .mock-toolbar i {
+      display: inline-block;
+      width: 7px;
+      height: 7px;
+      margin-right: 4px;
+      border-radius: 50%;
+      background: #687182;
+    }
+
+    .mock-content {
+      padding: 12px;
+      min-height: 235px;
+    }
+
+    .mock-title {
+      font-size: 16px;
+      margin-bottom: 8px;
+    }
+
+    .mock-description {
+      color: var(--muted);
+      margin: 0 0 12px;
+      font-size: 12px;
+    }
+
+    .ui-field {
+      display: grid;
+      grid-template-columns: 86px 1fr;
+      gap: 8px;
+      padding: 7px 0;
+      border-top: 1px solid rgba(255,255,255,.06);
+      font-size: 12px;
+    }
+
+    .ui-field:first-of-type {
+      border-top: 0;
+    }
+
+    .ui-field label {
+      color: var(--subtle);
+    }
+
+    .ui-field div {
+      color: #e2e6ed;
+    }
+
+    .action-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 7px;
+      padding-top: 12px;
+    }
+
+    .action-chip {
+      padding: 5px 9px;
+      border: 1px solid #49515e;
+      border-radius: 5px;
+      background: var(--panel-3);
+      color: #dce2ea;
+      font-size: 12px;
+    }
+
+    .action-chip.primary {
+      border-color: rgba(59,146,242,.55);
+      background: rgba(59,146,242,.18);
+      color: #e5efff;
+    }
+
+    .action-chip.risk {
+      border-color: rgba(239,113,70,.55);
+      background: rgba(239,113,70,.14);
+      color: #ffe4da;
+    }
+
+    .info-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-top: 12px;
+    }
+
+    .source-row,
+    .runtime-row {
+      padding: 12px;
+    }
+
+    .pill-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .pill {
+      padding: 4px 7px;
+      border: 1px solid var(--border);
+      background: #242932;
+      border-radius: 999px;
+      color: #d1d7e1;
+      font-size: 11px;
+    }
+
+    .trace-panel {
+      position: sticky;
+      top: 14px;
+      overflow: hidden;
+    }
+
+    .trace-header {
+      padding: 15px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .trace-header h2 {
+      font-size: 18px;
+      margin-bottom: 5px;
+    }
+
+    .trace-header p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .module-chain {
+      padding: 12px 15px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .module-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .module-chip {
+      --module-color: var(--perception);
+      padding: 5px 8px;
+      border: 1px solid color-mix(in srgb, var(--module-color) 54%, transparent);
+      border-radius: 5px;
+      color: #f3f5f8;
+      background: color-mix(in srgb, var(--module-color) 15%, var(--panel-2));
+      font-size: 11px;
+    }
+
+    .code-tabs {
+      display: flex;
+      padding: 10px 12px 0;
+      gap: 5px;
+    }
+
+    .code-tab {
+      flex: 1;
+      padding: 7px 5px;
+      border: 1px solid var(--border);
+      border-radius: 5px 5px 0 0;
+      background: #171a20;
+      color: var(--muted);
+      font-size: 11px;
+    }
+
+    .code-tab.active {
+      color: var(--text);
+      border-bottom-color: #11141a;
+      background: #11141a;
+    }
+
+    pre {
+      height: 445px;
+      overflow: auto;
+      margin: 0 12px 12px;
+      padding: 13px;
+      color: #d4deee;
+      border: 1px solid var(--border);
+      border-top: 0;
+      border-radius: 0 0 var(--radius) var(--radius);
+      background: #11141a;
+      font-family: Consolas, "Cascadia Code", monospace;
+      font-size: 11px;
+      line-height: 1.58;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    .footer-strip {
+      display: flex;
+      gap: 12px;
+      margin-top: 16px;
+      padding: 14px 17px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: var(--panel);
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .footer-strip strong {
+      color: var(--text);
+      white-space: nowrap;
+    }
+
+    @media (max-width: 1260px) {
+      .module-overview-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .layout {
+        grid-template-columns: 220px minmax(440px, 1fr);
+      }
+
+      .trace-panel {
+        position: static;
+        grid-column: 1 / -1;
+      }
+
+      pre {
+        height: 340px;
+      }
+    }
+
+    @media (max-width: 820px) {
+      .app {
+        padding: 12px;
+      }
+
+      .topbar {
+        display: block;
+      }
+
+      .constraints {
+        width: 100%;
+        margin-top: 15px;
+      }
+
+      .module-overview-head {
+        display: block;
+      }
+
+      .module-overview-head p {
+        margin-top: 4px;
+      }
+
+      .module-overview-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .layout {
+        display: block;
+      }
+
+      .stack-panel {
+        position: static;
+        margin-bottom: 12px;
+      }
+
+      .main-panel {
+        margin-bottom: 12px;
+        min-height: auto;
+      }
+
+      .stage-grid,
+      .info-row {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <header class="topbar">
+      <div class="title-group">
+        <div class="kicker">FUTURE OFFICE AGENT · 受治理的持续工作系统</div>
+        <h1>未来办公 Agent：受控持久任务、自适应协作与可信执行</h1>
+        <p>沿用原 Demo 的交互板块，展示同一 Task ID 如何持续推进、复杂任务如何按需组队，以及真实业务动作如何保持风险边界。</p>
+      </div>
+      <div class="constraints" aria-label="实现边界">
+        <div class="constraint"><b>统一任务</b><span>同一 Task ID、状态版本、工件与证据</span></div>
+        <div class="constraint"><b>持续运行</b><span>Observe · Plan · Act · Verify · Commit</span></div>
+        <div class="constraint"><b>按需协作</b><span>仅在 Admission 通过后动态生成 Worker</span></div>
+        <div class="constraint"><b>业务治理</b><span>Demo 3 保持 L0-L5 与 Risk Lens 边界</span></div>
+      </div>
+    </header>
+
+    <section class="module-overview" aria-label="最小功能模块说明">
+      <div class="module-overview-head">
+        <h2>Agent 最小功能模块</h2>
+        <p>八个常驻 Runtime 组件构成底座；Swarm 只在复杂任务中按需增强。</p>
+      </div>
+      <div class="module-overview-grid">
+        <div class="module-summary" style="--module-accent:var(--perception)">
+          <strong>Task Contract · 任务契约</strong>
+          <span>明确目标、材料边界、交付物、完成条件与截止时间。</span>
+        </div>
+        <div class="module-summary" style="--module-accent:var(--memory)">
+          <strong>Durable Task State · 持久状态</strong>
+          <span>保存事件、阶段、分支、版本、决定与工件引用。</span>
+        </div>
+        <div class="module-summary" style="--module-accent:var(--perception)">
+          <strong>Context State Manager · 上下文状态</strong>
+          <span>按来源、权限和任务阶段组装可用上下文。</span>
+        </div>
+        <div class="module-summary" style="--module-accent:var(--orchestration)">
+          <strong>Execution Loop · 执行循环</strong>
+          <span>持续观察、计划、行动、验证并提交结构化状态。</span>
+        </div>
+        <div class="module-summary" style="--module-accent:var(--execution)">
+          <strong>Capability Runtime · 能力运行时</strong>
+          <span>统一调度模型、工具、连接器和临时 Worker。</span>
+        </div>
+        <div class="module-summary" style="--module-accent:var(--governance)">
+          <strong>Evidence &amp; Quality Verifier · 证据验证</strong>
+          <span>检查来源、事实口径、覆盖度、引用和产物质量。</span>
+        </div>
+        <div class="module-summary" style="--module-accent:var(--governance)">
+          <strong>Control Policy · 控制策略</strong>
+          <span>管理 Evidence Gate、预算、停止、纠偏和接管。</span>
+        </div>
+        <div class="module-summary" style="--module-accent:var(--memory)">
+          <strong>Trace &amp; Checkpoints · 追踪检查点</strong>
+          <span>记录运行轨迹、证据、状态提交、回退与审计。</span>
+        </div>
+      </div>
+    </section>
+
+    <nav class="scenario-nav" id="scenarioNav" aria-label="场景切换"></nav>
+
+    <section class="layout">
+      <aside class="surface stack-panel">
+        <h2 class="surface-title">Agent 能力层</h2>
+        <p class="surface-note">当前步骤只高亮实际调用的能力。</p>
+        <div id="abilityStack"></div>
+        <div class="boundary">
+          <h3>演示边界</h3>
+          <span class="boundary-tag">可持续但可停止</span>
+          <span class="boundary-tag">可并行但受预算</span>
+          <span class="boundary-tag">证据不足局部暂停</span>
+          <span class="boundary-tag">真实动作进入 Risk Gate</span>
+        </div>
+      </aside>
+
+      <article class="surface main-panel">
+        <div class="scenario-header">
+          <div>
+            <h2 id="scenarioTitle"></h2>
+            <p id="scenarioSummary"></p>
+          </div>
+          <div class="badge" id="scenarioBadge"></div>
+        </div>
+        <div class="step-list" id="stepList"></div>
+        <div class="stage-grid">
+          <section class="user-action">
+            <div class="label">用户动作 / 输入</div>
+            <div class="quote" id="userQuote"></div>
+            <div id="stepMeta"></div>
+          </section>
+          <section class="mock-ui">
+            <div class="label">Agent 反馈界面</div>
+            <div class="mock-window">
+              <div class="mock-toolbar">
+                <span><i></i><i></i><i></i> Agent Workspace</span>
+                <span id="riskBadge"></span>
+              </div>
+              <div class="mock-content">
+                <h3 class="mock-title" id="panelTitle"></h3>
+                <p class="mock-description" id="panelDescription"></p>
+                <div id="panelFields"></div>
+                <div class="action-row" id="panelActions"></div>
+              </div>
+            </div>
+          </section>
+        </div>
+        <div class="info-row">
+          <section class="source-row">
+            <div class="label">抓取的数据来源</div>
+            <div class="pill-row" id="sourcePills"></div>
+          </section>
+          <section class="runtime-row">
+            <div class="label">Agent 当前理解</div>
+            <p id="understanding" style="margin:0;color:#dde3ec;"></p>
+          </section>
+        </div>
+      </article>
+
+      <aside class="surface trace-panel">
+        <div class="trace-header">
+          <h2>Agent Trace</h2>
+          <p>模块调用与结构化输入输出随步骤同步切换</p>
+        </div>
+        <section class="module-chain">
+          <div class="label">所用模块</div>
+          <div class="module-chips" id="moduleChips"></div>
+        </section>
+        <div class="code-tabs" id="codeTabs">
+          <button class="code-tab active" data-code="input">输入 JSON</button>
+          <button class="code-tab" data-code="output">输出 JSON</button>
+          <button class="code-tab" data-code="state">状态 JSON</button>
+          <button class="code-tab" data-code="risk">风险 JSON</button>
+        </div>
+        <pre id="codeView"></pre>
+      </aside>
+    </section>
+
+    <footer class="footer-strip">
+      <strong>实现原则</strong>
+      <span>核心 Runtime 始终运行；复杂任务才通过 Swarm Admission 展开临时 Worker；Evidence Gate 控制长任务运行方向；L0-L5、Risk Lens 与 Human Gate 继续控制真实业务动作。</span>
+    </footer>
+  </main>
+
+  <script>
+    const moduleMeta = {
+      task: { name: "Task Contract", ability: "context" },
+      state: { name: "Durable Task State", ability: "state" },
+      context: { name: "Context State Manager", ability: "context" },
+      loop: { name: "Execution Loop", ability: "loop" },
+      capability: { name: "Capability Runtime", ability: "capability" },
+      verifier: { name: "Evidence & Quality Verifier", ability: "governance" },
+      policy: { name: "Control Policy", ability: "governance" },
+      trace: { name: "Trace & Checkpoints", ability: "state" },
+      admission: { name: "Swarm Admission", ability: "loop" },
+      supervisor: { name: "Supervisor / Dynamic Task Graph", ability: "loop" },
+      registry: { name: "Capability Registry / Dynamic Workers", ability: "capability" },
+      workspace: { name: "Shared Artifact Workspace", ability: "capability" },
+      resolver: { name: "Conflict Resolver", ability: "governance" },
+      controlPlane: { name: "Swarm Control Plane", ability: "governance" },
+      riskLens: { name: "Risk Lens / L0-L5", ability: "governance" },
+      human: { name: "Human Gate", ability: "governance" }
+    };
+
+    const abilities = {
+      context: { name: "Goal & Context", summary: "目标契约、来源与权限上下文", color: "var(--perception)" },
+      state: { name: "State & Memory", summary: "事件、版本、Durable State 与 checkpoint", color: "var(--memory)" },
+      loop: { name: "Loop & Orchestration", summary: "循环、分支、任务图与重规划", color: "var(--orchestration)" },
+      capability: { name: "Capability & Collaboration", summary: "工具、连接器、Worker 与共享工件", color: "var(--execution)" },
+      governance: { name: "Evidence & Governance", summary: "验证、预算、停止、接管与 Risk Gate", color: "var(--governance)" }
+    };
+
+    const legacyScenarios = [
+      {
+        id: "continuity",
+        name: "Demo 1 上下文连续",
+        subtitle: "跨设备深度工作流延续",
+        summary: "Agent 保存电脑端任务上下文，在手机端提供轻量继续入口，并将移动备注安全地恢复为草稿。",
+        badge: "感知 + 记忆 + 恢复",
+        steps: [
+          {
+            name: "打开任务",
+            user: "在 PC 打开《季度经营分析报告》并点击 Agent 侧栏",
+            device: "PC · Document Workspace",
+            understanding: "用户正在处理经营分析报告，当前工作点位于渠道转化下降原因段落。",
+            modules: ["context", "risk", "memory"],
+            sources: ["mock_workspace.html", "mock_crm.html"],
+            input: { event: { type: "click", ui_target: "agent_sidebar", selected_object_ids: ["doc_q3_report"] }, device: "pc" },
+            output: { panel_type: "task_snapshot_sidebar", current_task: "季度经营分析报告", position: "第 3 部分：渠道转化下降原因", materials: ["Q3 销售表", "CRM 转化记录"] },
+            state: { demo_session_state: "observing", task_branch_state: { task_q3_report: "context_ready" } },
+            risk: { risk_level: "L1", autonomy_level: "AL4", decision: "observe_context" },
+            panel: { title: "当前任务快照", description: "Agent 已定位当前工作状态与授权材料。", fields: [["当前任务", "季度经营分析报告"], ["正在编辑", "第 3 部分：渠道转化下降原因"], ["相关材料", "Q3 销售表 / CRM 转化记录"]], actions: ["生成待核实点", "稍后继续"] }
+          },
+          {
+            name: "提取待核实点",
+            user: "点击“生成待核实点”",
+            device: "PC · Agent Sidebar",
+            understanding: "当前段落包含需要验证的统计口径和渠道变化假设。",
+            modules: ["context", "draft", "risk"],
+            sources: ["doc_q3_report", "crm_q3"],
+            input: { task: "extract_verification_points", source_refs: ["doc_q3_report", "crm_q3"], max_items: 3 },
+            output: { panel_type: "task_snapshot_sidebar", verification_points: [{ text: "核实 Q3 新客转化率统计口径", source_ref: "doc_q3_report" }, { text: "核实华东区渠道结构变化", source_ref: "crm_q3" }] },
+            state: { demo_session_state: "observing", artifact: "verification_points_ready" },
+            risk: { risk_level: "L2", autonomy_level: "AL2", decision: "draft_only" },
+            panel: { title: "待核实点已生成", description: "仅根据授权内容生成，并标注来源。", fields: [["核实点 1", "Q3 新客转化率统计口径"], ["来源", "当前报告"], ["核实点 2", "华东区渠道结构变化"]], actions: ["稍后继续", "编辑列表"] }
+          },
+          {
+            name: "保存快照",
+            user: "点击“稍后继续”，离开电脑",
+            device: "PC -> Mobile",
+            understanding: "用户中断任务，需要将可恢复上下文转成移动端安全摘要。",
+            modules: ["orchestrator", "memory", "draft", "risk"],
+            sources: ["doc_q3_report", "crm_q3"],
+            input: { event: "USER_SAVE_SNAPSHOT", task_id: "task_q3_report", sync_target: "mobile" },
+            output: { snapshot_id: "snap_q3_001", panel_type: "mobile_continue_card", progress: "写到第 3 部分", sensitive_collapsed: true },
+            state: { demo_session_state: "snapshot_saved", task_branch_state: { task_q3_report: "context_ready" } },
+            risk: { risk_level: "L2", autonomy_level: "AL2", decision: "show_redacted_summary" },
+            panel: { title: "手机继续卡片", description: "移动端只显示轻量信息，敏感数据默认隐藏。", fields: [["刚才在做", "季度经营分析报告"], ["写到", "第 3 部分：渠道转化下降原因"], ["敏感字段", "已隐藏"]], actions: ["添加个人备注", "稍后提醒", "一键隐藏"] }
+          },
+          {
+            name: "手机补充备注",
+            user: "手机输入：渠道下降可能和代理商调整有关，回去查新增代理数量。",
+            device: "Mobile · Continue Card",
+            understanding: "这是用户私有想法，只保存为个人备注，不作为正式材料。",
+            modules: ["memory", "risk"],
+            sources: ["snap_q3_001"],
+            input: { event: { type: "text_command", device: "mobile" }, note_text: "渠道下降可能和代理商调整有关，回去查新增代理数量。" },
+            output: { note_id: "note_q3_001", visibility: "private", saved: true },
+            state: { demo_session_state: "mobile_continuing", notes: ["note_q3_001"] },
+            risk: { risk_level: "L2", autonomy_level: "AL2", decision: "save_private_note" },
+            panel: { title: "备注已保存", description: "该信息仅作为个人备注，返回电脑后可选择是否插入草稿。", fields: [["备注", "渠道下降可能和代理商调整有关"], ["可见范围", "仅自己可见"]], actions: ["返回电脑继续", "新增提醒"] }
+          },
+          {
+            name: "返回恢复",
+            user: "回到 PC，点击“继续上次任务”",
+            device: "PC · Resume",
+            understanding: "快照和备注可恢复，当前文档版本仍可安全继续。",
+            modules: ["memory", "context", "orchestrator"],
+            sources: ["snap_q3_001", "note_q3_001", "mock_workspace.html"],
+            input: { event: "USER_RESUME", snapshot_id: "snap_q3_001", expected_version: "v3" },
+            output: { panel_type: "restore_panel", restore_position: "第 3 部分：渠道转化下降原因", new_notes: 1, version_check: "matched" },
+            state: { demo_session_state: "restoring", task_branch_state: { task_q3_report: "draft_ready" } },
+            risk: { risk_level: "L1", autonomy_level: "AL4", decision: "restore_state" },
+            panel: { title: "恢复上次任务", description: "Agent 找到移动期间新增内容，并给出建议插入位置。", fields: [["恢复位置", "第 3 部分第 2 段后"], ["新增备注", "1 条"], ["版本校验", "v3 匹配"]], actions: ["插入为草稿", "只保留备注", "忽略"] }
+          },
+          {
+            name: "插入草稿",
+            user: "点击“插入为草稿”并确认",
+            device: "PC · Draft Area",
+            understanding: "用户希望把个人备注转为可编辑内容，不能覆盖正式正文。",
+            modules: ["parser", "draft", "risk", "human", "audit"],
+            sources: ["note_q3_001", "doc_q3_report"],
+            input: { intent_type: "continue_task", action_type: "insert_draft", object: "季度经营分析报告第 3 部分" },
+            output: { panel_type: "draft_insert_preview", draft: "补充待核实假设：渠道转化下降可能与华东区代理商结构调整有关，建议进一步核查新增代理数量与转化贡献。", simulation_only: true },
+            state: { demo_session_state: "completed", task_branch_state: { task_q3_report: "simulated_done" }, action_gate_state: "confirmed" },
+            risk: { risk_level: "L3", autonomy_level: "AL3", decision: "confirm_before_simulated_insert" },
+            panel: { title: "已插入草稿区", description: "内容已进入可编辑草稿，不覆盖正式正文。", fields: [["插入位置", "第 3 部分第 2 段后"], ["执行方式", "模拟插入草稿"], ["审计", "已记录确认动作"]], actions: ["查看草稿", "撤销模拟插入"] }
+          }
+        ]
+      },
+      {
+        id: "orchestration",
+        name: "Demo 2 多任务编排",
+        subtitle: "个性化多任务驾驶舱",
+        summary: "Agent 从多个拟真应用抓取任务，按规则排序并解释理由，生成多个可核查产物，将关键动作集中交给用户决定。",
+        badge: "聚合 + 并行 + 确认",
+        steps: [
+          {
+            name: "打开驾驶舱",
+            user: "说：看看今天重点",
+            device: "PC · Agent Dashboard",
+            understanding: "用户需要统一查看邮件、审批和项目任务中的关键事项。",
+            modules: ["context", "risk", "orchestrator"],
+            sources: ["mock_mail.html", "mock_oa_expense.html", "mock_project.html", "mock_crm.html", "mock_calendar.html"],
+            input: { event: { type: "voice_transcript", raw_input: "看看今天重点" }, demo_now: "2026-05-25T10:00:00+08:00" },
+            output: { panel_type: "dashboard", tasks: ["客户邮件", "报销异常", "PPT 风险页"], source_count: 5 },
+            state: { demo_session_state: "dashboard_ready", branches: { customer_mail: "queued", expense: "queued", ppt: "queued" } },
+            risk: { risk_level: "L2", autonomy_level: "AL2", decision: "show_authorized_tasks" },
+            panel: { title: "今日工作驾驶舱", description: "已聚合授权应用中的重点事项。", fields: [["1 客户 A", "今日 18:00 前回复 · 可生成草稿"], ["2 报销异常", "疑似重复发票 · 仅核查"], ["3 项目汇报", "准备风险页 · 可生成草稿"]], actions: ["查看排序理由", "启动并行处理"] }
+          },
+          {
+            name: "排序解释",
+            user: "问：为什么客户 A 排第一？",
+            device: "PC · Dashboard",
+            understanding: "排序基于截止时间、客户等级与业务影响，需向用户可解释。",
+            modules: ["orchestrator", "draft", "memory"],
+            sources: ["mail_customer_a", "crm_customer_a", "cal_tomorrow_report"],
+            input: { scores: { customer_mail: 90, expense: 65, ppt: 58 }, rules: ["deadline", "customer_tier", "business_impact"] },
+            output: { panel_type: "ranking_explanation", top_task: "客户 A 邮件", explanation: "截止时间最紧，客户等级为 A，且影响明日汇报。" },
+            state: { demo_session_state: "dashboard_ready", ranking_saved: true },
+            risk: { risk_level: "L2", autonomy_level: "AL2", decision: "explain_only" },
+            panel: { title: "为什么客户 A 排第一", description: "排序由规则计算，Agent 负责解释。", fields: [["截止时间", "今天 18:00"], ["客户等级", "A"], ["业务影响", "影响明日项目汇报"]], actions: ["调整优先级", "接受排序"] }
+          },
+          {
+            name: "调整优先级",
+            user: "拖拽“PPT 风险页”到第二位",
+            device: "PC · Dashboard",
+            understanding: "用户希望本次优先准备汇报材料，不代表长期偏好。",
+            modules: ["orchestrator", "memory", "human"],
+            sources: ["task_ppt_risk_page"],
+            input: { event: { type: "drag" }, order: ["task_customer_mail", "task_ppt_risk_page", "task_expense_bx0412"] },
+            output: { panel_type: "preference_confirm_small", scope: "current_session", question: "仅本次调整排序？" },
+            state: { demo_session_state: "dashboard_ready", session_preference: "ppt_before_expense" },
+            risk: { risk_level: "L1", autonomy_level: "AL4", decision: "save_session_preference" },
+            panel: { title: "排序已调整", description: "调整默认仅在本次演示任务中生效。", fields: [["当前顺序", "客户邮件 > PPT 风险页 > 报销异常"], ["偏好范围", "本次会话"]], actions: ["仅本次生效", "撤销调整"] }
+          },
+          {
+            name: "启动并行",
+            user: "点击“开始准备”",
+            device: "PC · Parallel Tasks",
+            understanding: "Agent 可同时准备草稿与核查结果，但不执行发送或审批。",
+            modules: ["orchestrator", "risk", "human"],
+            sources: ["mail_customer_a", "expense_bx0412", "project_alpha_weekly"],
+            input: { event: "USER_START_PARALLEL", selected_tasks: ["customer_mail", "ppt", "expense"] },
+            output: { panel_type: "parallel_status", allowed: ["生成邮件草稿", "生成 PPT 草稿", "核查发票异常"], blocked: ["发送邮件", "覆盖 PPT", "通过报销"] },
+            state: { demo_session_state: "parallel_running", branches: { customer_mail: "drafting", ppt: "drafting", expense: "drafting" } },
+            risk: { risk_level: "L3", autonomy_level: "AL3", decision: "confirm_parallel_scope" },
+            panel: { title: "并行准备中", description: "三个任务已启动，写操作仍由用户确认。", fields: [["客户邮件", "生成草稿中"], ["PPT 风险页", "生成草稿中"], ["报销异常", "核查中"]], actions: ["暂停全部", "查看可做范围"] }
+          },
+          {
+            name: "邮件草稿",
+            user: "查看客户邮件处理分支",
+            device: "PC · Mail Draft",
+            understanding: "客户回复可先生成草稿，但对外发送需单独强确认。",
+            modules: ["parser", "context", "draft", "risk"],
+            sources: ["mail_customer_a", "crm_customer_a"],
+            input: { draft_request: "email_reply", recipient: "client-a@example.com", no_external_send: true },
+            output: { panel_type: "email_draft", draft_id: "draft_customer_mail_001", status: "待发送确认", source_refs_valid: true },
+            state: { demo_session_state: "parallel_running", branches: { customer_mail: "draft_ready", ppt: "drafting", expense: "drafting" } },
+            risk: { risk_level: "L4", autonomy_level: "AL2", decision: "draft_now_gate_send" },
+            panel: { title: "客户邮件草稿已准备", description: "草稿可审阅，发送动作尚未执行。", fields: [["收件人", "client-a@example.com"], ["草稿主题", "技术方案更新时间回复"], ["发送状态", "待 Risk Lens 强确认"]], actions: ["查看草稿", "加入待确认"] }
+          },
+          {
+            name: "异常核查",
+            user: "打开报销核查结果",
+            device: "PC · OA Exception",
+            understanding: "报销单命中重复发票规则，只能挂起并提供证据。",
+            modules: ["context", "risk", "draft", "orchestrator", "audit"],
+            sources: ["mock_oa_expense.html"],
+            input: { expense_id: "BX-0412", invoice_id: "INV-2026-0318-889", operation: "review_exception" },
+            output: { panel_type: "suspend_card", anomaly: "疑似重复发票", evidence: "发票号与历史记录相同", blocked_action: "approve_expense" },
+            state: { demo_session_state: "parallel_running", branches: { expense: "suspended" } },
+            risk: { risk_level: "L4", autonomy_level: "AL2", decision: "suspend_only" },
+            panel: { title: "报销单已挂起", description: "发现需要人工复核的证据。", fields: [["异常", "疑似重复发票"], ["证据", "发票号码与历史记录相同"], ["可执行范围", "仅通知和人工复核"]], actions: ["通知申请人", "人工处理"] }
+          },
+          {
+            name: "PPT 草稿",
+            user: "查看项目汇报 PPT 分支",
+            device: "PC · Presentation Draft",
+            understanding: "Agent 根据项目周报生成风险页内容，插入汇报文件前仍需确认。",
+            modules: ["context", "draft", "risk", "human"],
+            sources: ["project_alpha_weekly", "mock_workspace.html"],
+            input: { draft_request: "ppt_risk_page", destination: "项目汇报_v3.pptx", no_overwrite: true },
+            output: { panel_type: "ppt_draft_preview", draft_id: "draft_ppt_risk_001", slide_title: "风险与应对", status: "待插入确认" },
+            state: { demo_session_state: "parallel_running", branches: { customer_mail: "draft_ready", ppt: "draft_ready", expense: "suspended" } },
+            risk: { risk_level: "L3", autonomy_level: "AL3", decision: "confirm_before_insert" },
+            panel: { title: "PPT 风险页草稿", description: "内容已准备，但不会直接覆盖原文件。", fields: [["页面", "风险与应对"], ["来源", "项目周报 / 当前汇报文件"], ["插入状态", "待用户确认"]], actions: ["预览页面", "加入待确认"] }
+          },
+          {
+            name: "集中确认",
+            user: "点击“待我确认”队列",
+            device: "PC · Confirm Queue",
+            understanding: "所有可能改变系统或对外影响的动作均集中等待用户处理。",
+            modules: ["orchestrator", "risk", "human", "audit"],
+            sources: ["draft_customer_mail_001", "draft_ppt_risk_001", "expense_bx0412"],
+            input: { event: "OPEN_CONFIRM_QUEUE", pending_actions: ["send_customer_mail", "notify_expense_owner", "insert_ppt_draft"] },
+            output: { panel_type: "confirm_queue", items: [{ action: "发送客户邮件", risk: "L4" }, { action: "通知申请人", risk: "L3" }, { action: "插入 PPT 草稿", risk: "L3" }] },
+            state: { demo_session_state: "waiting_user", action_gate_state: "waiting_confirm" },
+            risk: { risk_level: "L4", autonomy_level: "AL3", decision: "gate_by_action" },
+            panel: { title: "待我确认", description: "关键动作统一排队，逐项确认。", fields: [["L4", "发送客户 A 邮件 · Risk Lens"], ["L3", "通知报销申请人"], ["L3", "插入 PPT 风险页草稿"]], actions: ["查看第一项", "暂停全部"] }
+          }
+        ]
+      },
+      {
+        id: "governance",
+        name: "Demo 3 风险治理",
+        subtitle: "动态风险边界与 Risk Lens",
+        summary: "同一个 Agent 依据动作影响和企业策略切换主动程度：无影响动作静默处理，低风险可撤销，高风险必须确认，受限动作直接转人工。",
+        badge: "风险 L0-L5 + 审计",
+        steps: [
+          {
+            name: "L0 静默后台",
+            user: "打开 Agent Workspace，后台同步演示状态",
+            device: "PC · Agent Workspace",
+            understanding: "仅同步本地演示状态和索引，不读取敏感内容，也不改变业务系统。",
+            modules: ["memory", "risk"],
+            sources: ["local_demo_state"],
+            input: { event: "WORKSPACE_OPENED", background_sync: ["demo_state", "local_index"], no_sensitive_content: true },
+            output: { panel_type: "status_ping", message: "演示状态已同步", business_impact: "none" },
+            state: { demo_session_state: "background_ready", background_jobs: ["local_index_synced"] },
+            risk: { risk_level: "L0", autonomy_level: "AL5", decision: "silent_background_sync" },
+            panel: { title: "后台状态已同步", description: "无业务影响动作静默完成，不打断用户。", fields: [["范围", "本地演示状态 / 索引"], ["业务影响", "无"], ["执行方式", "静默后台"]], actions: ["继续操作"] }
+          },
+          {
+            name: "L1 自动处理",
+            user: "说：帮我把 PPT 格式统一一下",
+            device: "PC · Presentation",
+            understanding: "格式统一仅影响个人草稿且可撤销，可以自动模拟完成。",
+            modules: ["parser", "risk", "orchestrator"],
+            sources: ["mock_workspace.html"],
+            input: { raw_input: "帮我把 PPT 格式统一一下", object: "ppt_client_report" },
+            output: { panel_type: "toast", message: "已统一 PPT 格式", actions: ["撤销"] },
+            state: { demo_session_state: "observing", action_gate_state: "not_required", light_event_log: ["format_done"] },
+            risk: { risk_level: "L1", autonomy_level: "AL4", decision: "auto_execute_with_undo" },
+            panel: { title: "已统一 PPT 格式", description: "低风险且可撤销，Agent 自动处理。", fields: [["范围", "当前 PPT 草稿"], ["可撤销性", "高"], ["执行方式", "模拟完成"]], actions: ["撤销"] }
+          },
+          {
+            name: "L2 摘要草稿",
+            user: "说：总结一下客户问题",
+            device: "PC · Agent Sidebar",
+            understanding: "涉及客户信息，但只生成内部摘要，不改变业务状态。",
+            modules: ["context", "parser", "risk", "draft"],
+            sources: ["mock_mail.html", "mock_project.html"],
+            input: { raw_input: "总结一下客户问题", source_refs: ["mail_customer_a", "project_alpha_weekly"] },
+            output: { panel_type: "draft_card", content: "客户关注方案更新时间、接口联调风险和验收指标口径。", source_refs: ["mail_customer_a", "project_alpha_weekly"] },
+            state: { demo_session_state: "observing", task_branch_state: { summary: "draft_ready" } },
+            risk: { risk_level: "L2", autonomy_level: "AL2", decision: "draft_only" },
+            panel: { title: "客户问题摘要", description: "摘要已生成，未外发。", fields: [["摘要", "更新时间、联调风险、验收口径"], ["来源", "客户邮件 / 项目周报"]], actions: ["加入汇报草稿", "忽略"] }
+          },
+          {
+            name: "L3 内部任务",
+            user: "说：提醒王工今天补技术方案",
+            device: "PC · Project Task",
+            understanding: "将创建内部协作任务，改变项目任务状态，需要确认。",
+            modules: ["parser", "risk", "human", "orchestrator", "audit"],
+            sources: ["mock_im.html", "mock_project.html"],
+            input: { raw_input: "提醒王工今天补技术方案", action_type: "create_task", assignee: "王工" },
+            output: { panel_type: "confirm_card", task: "补充技术方案", assignee: "王工", deadline: "今天 18:00" },
+            state: { demo_session_state: "waiting_user", action_gate_state: "waiting_confirm", audit_log: ["act_create_task_pending"] },
+            risk: { risk_level: "L3", autonomy_level: "AL3", decision: "confirm_before_execute" },
+            panel: { title: "创建内部任务", description: "确认后只在演示环境中模拟创建。", fields: [["负责人", "王工"], ["任务", "补充技术方案"], ["截止", "今天 18:00"]], actions: ["确认创建", "修改", "取消"] }
+          },
+          {
+            name: "L4 强确认",
+            user: "说：把汇报发给客户",
+            device: "PC · Mail Compose",
+            understanding: "动作涉及对外发送，附件含客户和项目风险信息，必须强确认。",
+            modules: ["parser", "context", "risk", "draft", "human", "audit"],
+            sources: ["mock_mail.html", "mock_workspace.html", "mock_crm.html"],
+            input: { raw_input: "把汇报发给客户", action_type: "send_email", recipients: ["client-a@example.com"], files: ["客户A_项目汇报_v3.pdf"] },
+            output: { panel_type: "risk_lens", policy_hits: ["external_send_requires_confirmation"], required_gate: "strong_confirm" },
+            state: { demo_session_state: "waiting_user", action_gate_state: "waiting_confirm", audit_log: ["external_send_review"] },
+            risk: { risk_level: "L4", autonomy_level: "AL3", decision: "strong_confirm", can_override: true },
+            panel: { title: "外发客户汇报需要强确认", description: "发送后不可完全撤销，请检查对象与敏感内容。", fields: [["收件人", "client-a@example.com"], ["附件", "客户A_项目汇报_v3.pdf"], ["敏感内容", "客户信息 / 项目风险"], ["策略命中", "外发必须确认"]], actions: ["确认发送", "修改邮件", "取消"], riskAction: true }
+          },
+          {
+            name: "L5 拒绝",
+            user: "说：直接把价格按最低折扣发过去",
+            device: "PC · Risk Lens",
+            understanding: "涉及价格承诺和授权边界，Agent 无权完成该动作。",
+            modules: ["parser", "risk", "human", "audit"],
+            sources: ["mock_crm.html", "mock_mail.html"],
+            input: { raw_input: "直接把价格按最低折扣发过去", data_classes: ["pricing", "contract"], external_impact: true },
+            output: { panel_type: "reject_card", reason: "涉及价格承诺与授权边界", actions: ["生成审批草稿", "打开审批入口", "取消"] },
+            state: { demo_session_state: "waiting_user", action_gate_state: "rejected_to_manual", audit_log: ["blocked_by_policy"] },
+            risk: { risk_level: "L5", autonomy_level: "AL1", decision: "reject_to_manual", can_override: false },
+            panel: { title: "无法自动发送最低折扣承诺", description: "该动作已被企业策略阻止。", fields: [["风险", "L5 极高风险"], ["原因", "价格承诺与授权边界"], ["处理方式", "仅转人工审批"]], actions: ["生成审批草稿", "打开审批入口", "取消"], riskAction: true }
+          },
+          {
+            name: "审计时间线",
+            user: "说：查看刚才做了什么",
+            device: "PC · Audit Timeline",
+            understanding: "用户需要追溯 Agent 的判断、确认要求与被策略阻止的动作。",
+            modules: ["memory", "audit"],
+            sources: ["light_event_log", "audit_log"],
+            input: { raw_input: "查看刚才做了什么", include: ["L0", "L1", "L2", "L3", "L4", "L5"] },
+            output: { panel_type: "audit_timeline", items: ["L0 后台同步：无业务影响", "L1 格式统一：可撤销", "L2 客户摘要：草稿", "L3 内部任务：待确认", "L4 外发汇报：强确认", "L5 价格承诺：已阻止"] },
+            state: { demo_session_state: "completed", audit_log_complete_for: ["L3", "L4", "L5"] },
+            risk: { risk_level: "L0", autonomy_level: "AL0", decision: "show_audit_read_only" },
+            panel: { title: "Agent 操作与决策记录", description: "高风险动作保留完整确认与拦截记录。", fields: [["09:59", "L0 后台同步 · 无业务影响"], ["10:00", "L1 格式统一 · 可撤销"], ["10:02", "L3 创建任务 · 确认后模拟"], ["10:03", "L4 外发汇报 · 强确认"], ["10:04", "L5 最低折扣 · 已阻止"]], actions: ["导出演示记录"] }
+          }
+        ]
+      }
+    ];
+
+    const scenarios = [
+      {
+        id: "loop",
+        name: "Demo 1 · Bounded Durable Office Loop",
+        subtitle: "同一 Task ID 持续推进，支持分支级控制",
+        summary: "同一 Task ID 在电脑与手机之间持续运行；每一轮都提交可验证状态，证据不足时只暂停相关分支，用户可随时纠偏、暂停或接管。",
+        badge: "Durable State + Evidence Gate",
+        steps: [
+          {
+            name: "建立任务契约",
+            user: "完成客户 A 经营分析、风险页和回复草稿，今天 18:00 前给我可核查版本。",
+            device: "PC · Agent Workspace",
+            understanding: "这是一个跨邮件、CRM、项目周报和 PPT 的长任务，需要统一目标、材料边界、交付物与完成条件。",
+            modules: ["task", "context", "state", "trace"],
+            sources: ["mail_customer_a", "crm_customer_a", "project_alpha_weekly", "report_v3.pptx"],
+            input: { goal: "完成客户 A 经营分析、风险页和回复草稿", deadline: "18:00", device: "pc" },
+            output: { task_id: "office-task-0615", deliverables: ["经营分析", "风险页", "回复草稿"], done_conditions: ["事实有来源", "口径一致", "草稿可审阅"] },
+            state: { task: "contracted", version: 1, branches: { "customer-issues": "queued", "project-risk": "queued", "revenue-baseline": "queued" } },
+            risk: { risk_level: "RUN", autonomy_level: "controlled", decision: "contract_before_run" },
+            panel: { title: "Task Contract 已建立", description: "Agent 不要求用户逐步规划，但先把目标、边界和完成条件结构化。", fields: [["Task ID", "office-task-0615"], ["交付物", "经营分析 / 风险页 / 回复草稿"], ["完成条件", "有来源、口径一致、可审阅"]], actions: ["开始持续推进", "调整边界"] }
+          },
+          {
+            name: "持续推进",
+            user: "用户离开电脑，任务继续运行。",
+            device: "PC → Background Runtime",
+            understanding: "Execution Loop 按 Observe、Plan、Act 推进三个分支，每完成一段就提交状态和中间工件。",
+            modules: ["loop", "context", "capability", "state", "trace"],
+            sources: ["mail_customer_a", "crm_customer_a", "project_alpha_weekly", "report_v3.pptx"],
+            input: { event: "RUN_CONTINUES", phases: ["Observe", "Plan", "Act"], budget: { tool_calls: 20, minutes: 15 } },
+            output: { artifacts: ["facts_v1", "risks_v1", "revenue_notes_v1"], checkpoint: "cp-02", progress: 0.56 },
+            state: { task: "running", version: 2, branches: { "customer-issues": "running", "project-risk": "running", "revenue-baseline": "running" } },
+            risk: { risk_level: "RUN", autonomy_level: "controlled", decision: "continue_with_budget" },
+            panel: { title: "Execution Loop 正在推进", description: "恢复是底层能力，用户不需要管理恢复按钮。", fields: [["当前阶段", "Act"], ["中间工件", "facts_v1 / risks_v1 / revenue_notes_v1"], ["预算", "12 / 20 次工具调用"]], actions: ["查看 Trace", "Steer", "Pause branch"] }
+          },
+          {
+            name: "发现证据冲突",
+            user: "Agent 在 Verify 阶段核对金额口径。",
+            device: "Runtime · Verify",
+            understanding: "正式版为 2,400 万，预测版为 2,680 万；现有证据不能决定主口径，继续写入会放大错误方向。",
+            modules: ["verifier", "policy", "state", "trace"],
+            sources: ["crm_official_v4", "forecast_sheet_v7", "mail_finance_note"],
+            input: { phase: "Verify", claims: [{ source: "crm_official_v4", amount: "2,400 万" }, { source: "forecast_sheet_v7", amount: "2,680 万" }] },
+            output: { issue: "baseline_conflict", evidence_sufficient: false, requested_input: "本次经营分析采用正式口径还是预测口径？" },
+            state: { task: "running_with_issue", version: 3, branches: { "revenue-baseline": "waiting-input", "customer-issues": "running", "project-risk": "running" } },
+            risk: { risk_level: "EVIDENCE", autonomy_level: "branch_gate", decision: "pause_affected_branch_only" },
+            panel: { title: "Evidence Gate 发现口径冲突", description: "冲突影响金额口径，但不阻断客户事实和项目风险整理。", fields: [["正式版", "2,400 万"], ["预测版", "2,680 万"], ["最小必要输入", "选择本次主口径"]], actions: ["采用正式口径", "采用预测口径", "补充证据"] }
+          },
+          {
+            name: "局部分支暂停",
+            user: "暂时不选金额口径，先继续其他工作。",
+            device: "Runtime · Evidence Gate",
+            understanding: "Control Policy 将 revenue-baseline 保持为 waiting-input；customer-issues 与 project-risk 继续生成可核查工件。",
+            modules: ["policy", "loop", "state", "trace"],
+            sources: ["facts_v1", "risks_v1", "issue_baseline_01"],
+            input: { user_decision: "defer_baseline", affected_branch: "revenue-baseline" },
+            output: { continued: ["customer-issues", "project-risk"], paused: ["revenue-baseline"], artifacts: ["customer_issues_v2", "project_risks_v2"] },
+            state: { task: "partially_running", version: 4, branches: { "revenue-baseline": "waiting-input", "customer-issues": "ready", "project-risk": "ready" } },
+            risk: { risk_level: "EVIDENCE", autonomy_level: "branch_gate", decision: "isolate_and_continue" },
+            panel: { title: "只有相关分支暂停", description: "长任务没有整体卡死，也不会带着错误口径继续扩散。", fields: [["revenue-baseline", "waiting-input"], ["customer-issues", "ready"], ["project-risk", "ready"]], actions: ["查看已完成分支", "补充口径"] }
+          },
+          {
+            name: "跨端共享控制权",
+            user: "手机上说：先用正式口径，但保留预测版差异说明。",
+            device: "Mobile · Same Task ID",
+            understanding: "手机端直接在同一任务上发出控制事件；Durable State 立即记录新方向。",
+            modules: ["context", "state", "policy", "trace"],
+            sources: ["office-task-0615", "issue_baseline_01"],
+            input: { task_id: "office-task-0615", action: "Steer", instruction: "采用 2,400 万正式口径，并保留 2,680 万差异说明" },
+            output: { accepted_control: "Steer", available_controls: ["Steer", "Pause branch", "Take over"], replan_required: true },
+            state: { task: "replanning", version: 5, control_event: "mobile-steer-01", branches: { "revenue-baseline": "replanning", "customer-issues": "ready", "project-risk": "ready" } },
+            risk: { risk_level: "RUN", autonomy_level: "human_steerable", decision: "apply_control_event" },
+            panel: { title: "同一任务已实时转向", description: "无需点击继续上次任务，电脑端与手机端看到同一状态版本。", fields: [["控制动作", "Steer"], ["主口径", "2,400 万"], ["保留说明", "2,680 万预测差异"]], actions: ["Steer", "Pause branch", "Take over"] }
+          },
+          {
+            name: "Commit 可追溯工件",
+            user: "返回电脑查看最终可核查版本。",
+            device: "PC · Deliverables",
+            understanding: "Agent 重新规划金额分支，验证来源、引用和口径后提交工件；Trace 保留每次状态变化。",
+            modules: ["loop", "verifier", "state", "trace"],
+            sources: ["customer_issues_v2", "project_risks_v2", "revenue_baseline_v2", "trace_office_task_0615"],
+            input: { phase: "Commit", required_checks: ["source_traceable", "baseline_consistent", "open_issues_resolved"] },
+            output: { deliverables: ["经营分析_vFinal", "风险页_vFinal", "回复草稿_vFinal"], verification: "passed", checkpoint: "cp-final" },
+            state: { task: "completed", version: 6, branches: { "revenue-baseline": "committed", "customer-issues": "committed", "project-risk": "committed" } },
+            risk: { risk_level: "RUN", autonomy_level: "verified_commit", decision: "commit_verified_artifacts" },
+            panel: { title: "可追溯工件已提交", description: "任务完成以验证通过的工件为判断依据。", fields: [["交付物", "经营分析 / 风险页 / 回复草稿"], ["口径", "2,400 万正式口径"], ["Trace", "6 个状态版本 / 3 个 checkpoint"]], actions: ["打开工件", "查看完整 Trace"] }
+          }
+        ]
+      },
+      {
+        id: "swarm",
+        name: "Demo 2 · 智能工作驾驶舱 + Governed Adaptive Office Swarm",
+        subtitle: "信息聚合、重点排序、执行分流与复杂任务动态组队",
+        summary: "驾驶舱持续聚合邮件、CRM、项目、报销和日历中的工作，完成今日重点排序并解释依据。每项任务根据复杂度进入 Tool Call、Single Agent、Fixed Workflow 或 Adaptive Swarm；Swarm 是复杂任务的一种执行方式，结果继续回到统一驾驶舱。",
+        badge: "Dashboard + Routing + Swarm",
+        steps: [
+          {
+            name: "信息聚合",
+            user: "看看今天重点。",
+            device: "PC · Work Dashboard",
+            understanding: "Agent 从已授权的邮件、CRM、项目、报销和日历中抓取工作信号，去重后形成统一任务卡。",
+            modules: ["task", "context", "capability", "trace"],
+            sources: ["mail", "crm", "project", "expense", "calendar"],
+            input: { request: "aggregate_authorized_work", tool_queries: ["mail.search", "crm.lookup", "project.status", "expense.anomalies", "calendar.events"] },
+            output: { source_count: 5, raw_signals: 17, normalized_tasks: 8, duplicates_removed: 3 },
+            state: { dashboard: "aggregated", ranking_ready: true, swarm_started: false },
+            risk: { risk_level: "RUN", autonomy_level: "tool_only", decision: "aggregate_authorized_sources" },
+            panel: { title: "今日工作驾驶舱 · 信息聚合", description: "五类授权来源已归并为统一任务卡，尚未启动任何执行分支。", fields: [["邮件 / CRM", "7 条工作信号"], ["项目 / 日历", "8 条工作信号"], ["报销", "2 条异常信号"], ["聚合结果", "8 项任务 · 去重 3 项"]], actions: ["生成今日重点", "查看来源"] }
+          },
+          {
+            name: "今日重点排序",
+            user: "按截止时间、客户等级和业务影响排出今天重点。",
+            device: "PC · Work Dashboard",
+            understanding: "系统对统一任务卡评分，同时保留排序理由和用户可调整入口。",
+            modules: ["task", "context", "policy", "trace"],
+            sources: ["dashboard_tasks_v1", "priority_policy", "calendar"],
+            input: { ranking_rules: ["deadline", "customer_tier", "business_impact", "dependency"], task_count: 8 },
+            output: { priorities: ["客户 A 经营汇报", "供应商邮件回复", "周报格式统一", "报销异常核查"], scores: [94, 82, 74, 69] },
+            state: { dashboard: "ranked", active_order_version: 1, swarm_started: false },
+            risk: { risk_level: "RUN", autonomy_level: "recommend_only", decision: "show_ranked_priorities" },
+            panel: { title: "今日重点", description: "驾驶舱完成排序，并在任务卡上显示建议执行方式。", fields: [["1", "客户 A 经营汇报 · 今日 18:00 · Swarm 候选"], ["2", "供应商邮件回复 · 今日 · Single Agent"], ["3", "周报格式统一 · 明早 · Fixed Workflow"], ["4", "报销异常核查 · 待证据 · Tool Call"]], actions: ["排序解释", "调整优先级"] }
+          },
+          {
+            name: "排序解释",
+            user: "为什么客户 A 经营汇报排第一？",
+            device: "PC · Work Dashboard",
+            understanding: "排序结论可解释，用户可以查看每项规则对优先级的贡献。",
+            modules: ["task", "context", "policy", "trace"],
+            sources: ["mail_customer_a", "crm_customer_a", "calendar_exec_review", "priority_policy"],
+            input: { task: "客户 A 经营汇报", score: 94, explain: true },
+            output: { explanation: ["今日 18:00 截止", "客户等级 A", "影响明日经营会", "依赖四类资料"] },
+            state: { dashboard: "ranking_explained", active_order_version: 1 },
+            risk: { risk_level: "RUN", autonomy_level: "explain_only", decision: "explain_priority" },
+            panel: { title: "排序解释 · 客户 A 经营汇报", description: "优先级来自规则评分，用户可以查看并修正。", fields: [["截止时间", "今日 18:00"], ["客户等级", "A"], ["业务影响", "影响明日经营会"], ["资料依赖", "邮件 / CRM / 项目 / 日历"]], actions: ["接受排序", "调整优先级"] }
+          },
+          {
+            name: "调整优先级",
+            user: "把周报格式统一调到第二位，仅本次生效。",
+            device: "PC · Work Dashboard",
+            understanding: "用户直接调整本次任务顺序，系统记录会话级偏好并重新计算执行计划。",
+            modules: ["task", "policy", "state", "trace"],
+            sources: ["dashboard_tasks_v1", "session_preference"],
+            input: { event: "drag_priority", task: "周报格式统一", new_position: 2, scope: "current_session" },
+            output: { order: ["客户 A 经营汇报", "周报格式统一", "供应商邮件回复", "报销异常核查"], preference_scope: "current_session" },
+            state: { dashboard: "reprioritized", active_order_version: 2 },
+            risk: { risk_level: "RUN", autonomy_level: "human_steered", decision: "apply_session_priority" },
+            panel: { title: "优先级已调整", description: "本次会话采用用户顺序，长期排序规则保持原值。", fields: [["1", "客户 A 经营汇报"], ["2", "周报格式统一"], ["3", "供应商邮件回复"], ["4", "报销异常核查"]], actions: ["确认本次顺序", "撤销调整"] }
+          },
+          {
+            name: "执行方式分流",
+            user: "按任务复杂度启动准备工作。",
+            device: "Runtime · Task Router",
+            understanding: "每项任务独立选择成本合适的执行方式，复杂经营汇报进入 Admission 评估。",
+            modules: ["task", "capability", "admission", "policy", "trace"],
+            sources: ["dashboard_tasks_v2", "routing_policy", "budget_policy"],
+            input: { routes: ["Tool Call", "Single Agent", "Fixed Workflow", "Adaptive Swarm"] },
+            output: { assignments: { "报销异常核查": "Tool Call", "供应商邮件回复": "Single Agent", "周报格式统一": "Fixed Workflow", "客户 A 经营汇报": "Adaptive Swarm candidate" } },
+            state: { dashboard: "routes_assigned", parallel_tasks: 4, swarm_started: false },
+            risk: { risk_level: "RUN", autonomy_level: "cost_aware_routing", decision: "route_each_task" },
+            panel: { title: "四项工作，四种执行方式", description: "驾驶舱保留全部任务，Swarm 只承接高价值复杂任务。", fields: [["Tool Call", "报销异常核查 · 先查证据"], ["Single Agent", "供应商邮件回复 · 生成草稿"], ["Fixed Workflow", "周报格式统一 · 稳定流程"], ["Adaptive Swarm", "客户 A 经营汇报 · 进入 Admission"]], actions: ["评估 Swarm", "返回驾驶舱"] }
+          },
+          {
+            name: "Swarm Admission",
+            user: "系统评估经营汇报的价值、广度、并行度、风险和预算。",
+            device: "Runtime · Admission",
+            understanding: "任务跨四类资料、三个事实分支可并行且截止时间紧，Swarm 的收益高于额外成本。",
+            modules: ["admission", "supervisor", "policy", "controlPlane", "trace"],
+            sources: ["task_contract", "source_inventory", "budget_policy"],
+            input: { value: "high", breadth: 4, parallelizable_branches: 3, deadline_pressure: "high", budget: "approved" },
+            output: { route: "adaptive_swarm", reason: "high-value breadth-first task", max_workers: 5, max_tool_calls: 30 },
+            state: { swarm_started: true, wave: 0, worker_count: 0 },
+            risk: { risk_level: "RUN", autonomy_level: "governed_fanout", decision: "admit_with_limits" },
+            panel: { title: "客户 A 经营汇报通过 Admission", description: "其余待办继续沿各自路由执行；本任务按收益、风险和预算启动 Swarm。", fields: [["路由", "Adaptive Swarm"], ["Worker 上限", "5"], ["工具预算", "30 次"], ["驾驶舱状态", "其余 3 项继续执行"]], actions: ["启动 Wave 1", "改为 Single Agent"] }
+          },
+          {
+            name: "Wave 1 · 事实覆盖",
+            user: "Supervisor 按依赖关系创建第一波并行工作包。",
+            device: "Runtime · Dynamic Task Graph",
+            understanding: "三个独立分支并行查证客户事实、项目风险和报销证据；Worker 由任务动态生成。",
+            modules: ["supervisor", "registry", "workspace", "controlPlane", "trace"],
+            sources: ["mail_customer_a", "crm_customer_a", "project_alpha_weekly", "expense_bx0412"],
+            input: { wave: 1, work_packages: ["customer-facts", "project-risk", "expense-evidence"] },
+            output: { workers: ["customer-facts", "project-risk", "expense-evidence"], shared_paths: ["facts/", "risks/", "evidence/"] },
+            state: { wave: 1, worker_count: 3, workers: { "customer-facts": "running", "project-risk": "running", "expense-evidence": "running" } },
+            risk: { risk_level: "RUN", autonomy_level: "bounded_parallel", decision: "fanout_wave_1" },
+            panel: { title: "Wave 1：三个 Worker 并行", description: "Worker 使用独立 context，但结果写入同一个 Shared Artifact Workspace。", fields: [["customer-facts", "核对客户与 CRM 事实"], ["project-risk", "提取风险与依赖"], ["expense-evidence", "核查异常证据"]], actions: ["查看任务图", "查看预算"] }
+          },
+          {
+            name: "Wave 2 · 动态生成",
+            user: "事实与风险达到 coverage threshold，Supervisor 根据中间结果重规划。",
+            device: "Runtime · Replan",
+            understanding: "只有在事实覆盖足够后，才动态生成 draft-worker 与 slide-worker，避免基于薄弱证据过早写稿。",
+            modules: ["supervisor", "registry", "workspace", "controlPlane", "trace"],
+            sources: ["facts/customer_v2", "risks/project_v2", "evidence/expense_v1"],
+            input: { coverage_threshold: 0.8, current_coverage: 0.86, completed_workers: ["customer-facts", "project-risk"] },
+            output: { spawned_workers: ["draft-worker", "slide-worker"], reason: "coverage threshold reached", dependencies: ["facts", "risks"] },
+            state: { wave: 2, worker_count: 5, workers: { "customer-facts": "ready", "project-risk": "ready", "expense-evidence": "running", "draft-worker": "running", "slide-worker": "running" } },
+            risk: { risk_level: "RUN", autonomy_level: "bounded_parallel", decision: "spawn_wave_2" },
+            panel: { title: "Wave 2：按结果生成两个 Worker", description: "Worker 数量由覆盖度和依赖关系动态决定。", fields: [["coverage threshold", "80%"], ["当前覆盖", "86%"], ["新 Worker", "draft-worker / slide-worker"]], actions: ["查看依赖", "暂停扩展"] }
+          },
+          {
+            name: "共享工件协同",
+            user: "查看各 Worker 如何共享事实和版本。",
+            device: "Runtime · Shared Artifact Workspace",
+            understanding: "各 Worker 直接读写带来源、版本和状态的共享工件。",
+            modules: ["workspace", "supervisor", "verifier", "trace"],
+            sources: ["facts/customer_v2", "risks/project_v2", "drafts/mail_v1", "slides/risk_v1", "issues/open"],
+            input: { operation: "merge_artifacts", required_fields: ["source", "version", "owner", "status"] },
+            output: { workspace: { facts: 12, sources: 9, risks: 4, drafts: 1, slides: 1, issues: 1, versions: 7 } },
+            state: { wave: 2, convergence: "verifying", shared_workspace_version: 7 },
+            risk: { risk_level: "RUN", autonomy_level: "verified_collaboration", decision: "merge_with_provenance" },
+            panel: { title: "围绕工件协同，不靠聊天转述", description: "每条事实都有来源、版本、负责人和状态。", fields: [["facts / sources", "12 / 9"], ["drafts / slides", "1 / 1"], ["open issues", "1"]], actions: ["查看来源", "查看版本"] }
+          },
+          {
+            name: "验证与冲突收敛",
+            user: "Verifier 检查各分支结果的一致性。",
+            device: "Runtime · Verifier / Conflict Resolver",
+            understanding: "Verifier 发现 2,400 万与 2,680 万冲突后按需调用 Conflict Resolver。",
+            modules: ["verifier", "resolver", "workspace", "supervisor", "trace"],
+            sources: ["facts/crm_official_v4", "facts/forecast_v7", "drafts/mail_v1", "slides/risk_v1"],
+            input: { conflict: { official: "2,400 万", forecast: "2,680 万" }, affected_artifacts: ["mail_v1", "risk_slide_v1"] },
+            output: { resolution: "use official baseline; preserve forecast delta", updated_artifacts: ["mail_v2", "risk_slide_v2"], resolver_invoked: true },
+            state: { convergence: "resolved", issues: { baseline_conflict: "closed" }, shared_workspace_version: 8 },
+            risk: { risk_level: "EVIDENCE", autonomy_level: "resolver_on_demand", decision: "resolve_then_reverify" },
+            panel: { title: "并行结果重新一致", description: "冲突被写入 issue，解决后回写所有受影响工件并重新验证。", fields: [["冲突", "2,400 万 vs 2,680 万"], ["采用", "正式口径 + 预测差异说明"], ["更新", "邮件 v2 / 风险页 v2"]], actions: ["查看冲突记录", "重新验证"] }
+          },
+          {
+            name: "返回驾驶舱",
+            user: "返回今日工作驾驶舱，查看全部任务结果和待确认事项。",
+            device: "PC · Work Dashboard",
+            understanding: "Swarm 结果回到原任务卡；Tool Call、Single Agent 和 Fixed Workflow 的结果同时汇总，真实动作进入待我确认或 Demo 3 Risk Gate。",
+            modules: ["supervisor", "workspace", "verifier", "controlPlane", "trace"],
+            sources: ["drafts/customer_report_v2", "slides/risk_v2", "evidence/package_v1", "drafts/vendor_mail_v1", "weekly_report_formatted", "expense_issue_v1"],
+            input: { finish_condition: "all_required_artifacts_verified", dashboard_refresh: true, route_risk_item_to: "Demo 3" },
+            output: { completed: ["客户 A 经营汇报包", "周报格式统一"], pending_confirmation: ["供应商邮件草稿"], handoff: { item: "报销异常", destination: "Demo 3 Risk Gate" }, cost: { workers: 5, tool_calls: 26 } },
+            state: { dashboard: "results_ready", swarm: "completed", worker_count: 0, shared_workspace_version: 9 },
+            risk: { risk_level: "RUN", autonomy_level: "single_exit", decision: "return_verified_results" },
+            panel: { title: "返回驾驶舱 · 结果与待我确认", description: "四种执行方式的结果汇总到同一入口，用户继续掌握优先级和动作决定权。", fields: [["Adaptive Swarm", "经营汇报包完成 · 冲突已解决"], ["Fixed Workflow", "周报格式统一完成"], ["Single Agent", "供应商邮件草稿 · 待我确认"], ["Tool Call", "报销异常证据就绪 · 转 Demo 3"]], actions: ["打开待我确认", "查看成本与 Trace"] }
+          }
+        ]
+      },
+      {
+        id: "risk",
+        name: "Demo 3 · Risk Gate",
+        subtitle: "Demo 3 保持不变：真实动作前的 L0-L5",
+        summary: "保留原 Demo 3 的业务逻辑：Risk Lens 根据动作影响、数据、可逆性、权限和缺失槽位判断 L0-L5，并决定自动、草稿、确认、强确认或拒绝。",
+        badge: "L0-L5 + Risk Lens + Human Gate",
+        steps: [
+          {
+            name: "L0 静默后台",
+            user: "打开 Agent Workspace，后台同步演示状态。",
+            device: "PC · Agent Workspace",
+            understanding: "只同步本地演示状态，不读取敏感数据，也不改变业务系统。",
+            modules: ["state", "riskLens", "trace"],
+            sources: ["local_demo_state"],
+            input: { action_type: "background_sync", business_impact: "none" },
+            output: { result: "status_synced", user_interruption: false },
+            state: { gate: "not_required", audit: "light_event" },
+            risk: { risk_level: "L0", autonomy_level: "AL5", decision: "silent_background" },
+            panel: { title: "后台状态已同步", description: "无业务影响动作静默完成。", fields: [["业务影响", "无"], ["敏感数据", "未读取"], ["用户打扰", "无"]], actions: ["继续"] }
+          },
+          {
+            name: "L1 自动可撤销",
+            user: "帮我把 PPT 格式统一一下。",
+            device: "PC · Presentation",
+            understanding: "低风险、局部且可撤销，可以自动执行并提供撤销入口。",
+            modules: ["capability", "riskLens", "trace"],
+            sources: ["report_draft.pptx"],
+            input: { action_type: "format_presentation", reversibility: "high" },
+            output: { result: "formatted", undo_available: true },
+            state: { gate: "not_required", artifact: "report_draft_formatted" },
+            risk: { risk_level: "L1", autonomy_level: "AL4", decision: "auto_with_undo" },
+            panel: { title: "PPT 格式已统一", description: "低风险且可撤销，自动完成。", fields: [["范围", "当前 PPT 草稿"], ["可撤销", "是"], ["执行方式", "自动"]], actions: ["撤销"] }
+          },
+          {
+            name: "L2 只生成草稿",
+            user: "总结一下客户诉求。",
+            device: "PC · Agent Sidebar",
+            understanding: "涉及客户信息，但只生成内部草稿，不写业务系统、不外发。",
+            modules: ["context", "capability", "riskLens", "trace"],
+            sources: ["mail_customer_a", "project_alpha_weekly"],
+            input: { action_type: "draft_summary", target_scope: "internal" },
+            output: { artifact: "customer_summary_draft", external_send: false },
+            state: { gate: "draft_only", artifact: "ready" },
+            risk: { risk_level: "L2", autonomy_level: "AL2", decision: "draft_only" },
+            panel: { title: "客户诉求摘要", description: "摘要已生成，但未外发、未写入系统。", fields: [["关注点", "交付时间 / 接口 / 风险"], ["来源", "客户邮件 / 项目周报"], ["状态", "内部草稿"]], actions: ["继续编辑", "用于汇报草稿"] }
+          },
+          {
+            name: "L3 普通确认",
+            user: "给张明创建明天补交技术说明的任务。",
+            device: "PC · Project Task",
+            understanding: "创建内部任务会改变项目状态，需要用户预览确认。",
+            modules: ["task", "riskLens", "human", "trace"],
+            sources: ["project_alpha", "directory"],
+            input: { action_type: "create_internal_task", assignee: "张明", deadline: "tomorrow 18:00" },
+            output: { preview: "补交技术说明", required_gate: "confirm" },
+            state: { gate: "waiting_confirm", audit: "pending" },
+            risk: { risk_level: "L3", autonomy_level: "AL3", decision: "confirm_before_execute" },
+            panel: { title: "创建内部任务", description: "用户确认后才改变项目任务状态。", fields: [["负责人", "张明"], ["任务", "补交技术说明"], ["截止", "明天 18:00"]], actions: ["确认创建", "修改", "取消"] }
+          },
+          {
+            name: "L4 Risk Lens 强确认",
+            user: "把汇报发给客户。",
+            device: "PC · Mail Compose",
+            understanding: "外发不可完全撤回，且包含客户与项目数据，需要 Risk Lens 展示风险并强确认。",
+            modules: ["context", "riskLens", "human", "trace"],
+            sources: ["mail_customer_a", "report_final.pdf", "crm_customer_a"],
+            input: { action_type: "send_external_email", recipient: "client-a@example.com", attachment: "客户A_项目汇报.pdf" },
+            output: { required_gate: "strong_confirm", policy_hits: ["external_send", "customer_data"] },
+            state: { gate: "waiting_strong_confirm", audit: "external_send_review" },
+            risk: { risk_level: "L4", autonomy_level: "AL3", decision: "strong_confirm" },
+            panel: { title: "外发客户汇报需要强确认", description: "Risk Lens 展示收件人、附件、敏感内容和不可逆影响。", fields: [["收件人", "client-a@example.com"], ["附件", "客户A_项目汇报.pdf"], ["敏感内容", "客户信息 / 项目风险"]], actions: ["强确认并发送", "修改邮件", "取消"], riskAction: true }
+          },
+          {
+            name: "L5 拒绝转人工",
+            user: "直接把价格承诺和折扣发出去。",
+            device: "PC · Risk Lens",
+            understanding: "涉及价格承诺与授权边界，Agent 不得通过确认绕过企业政策。",
+            modules: ["riskLens", "human", "trace"],
+            sources: ["pricing_policy", "contract_policy", "crm_customer_a"],
+            input: { action_type: "send_pricing_commitment", permission: "missing", external_impact: true },
+            output: { result: "rejected", reason: "pricing commitment exceeds authority", route: "manual_approval" },
+            state: { gate: "rejected_to_manual", audit: "blocked_by_policy" },
+            risk: { risk_level: "L5", autonomy_level: "AL1", decision: "reject_to_manual" },
+            panel: { title: "无法自动完成价格承诺", description: "企业政策禁止 Agent 越过授权边界。", fields: [["等级", "L5"], ["原因", "价格承诺超出授权"], ["处理", "转人工审批"]], actions: ["生成内部草稿", "发起人工审批", "取消"], riskAction: true }
+          },
+          {
+            name: "审计时间线",
+            user: "查看刚才 Agent 做了什么。",
+            device: "PC · Audit Timeline",
+            understanding: "关键判断、确认、强确认、拒绝和结果都可追溯。",
+            modules: ["state", "trace", "riskLens"],
+            sources: ["trace_events", "audit_log"],
+            input: { include_levels: ["L0", "L1", "L2", "L3", "L4", "L5"] },
+            output: { timeline: ["L0 后台同步", "L1 自动可撤销", "L2 草稿", "L3 确认", "L4 强确认", "L5 拒绝"] },
+            state: { gate: "read_only", audit_complete: true },
+            risk: { risk_level: "L0", autonomy_level: "AL0", decision: "show_audit_read_only" },
+            panel: { title: "Agent 决策与结果记录", description: "Demo 3 保持原有预览、确认、强确认、拒绝与审计闭环。", fields: [["L0-L2", "自动 / 可撤销 / 草稿"], ["L3-L4", "确认 / Risk Lens 强确认"], ["L5", "拒绝并转人工"]], actions: ["导出演示记录"] }
+          }
+        ]
+      }
+    ];
+
+    let activeScenario = scenarios[0];
+    let activeStep = scenarios[0].steps[0];
+    let activeCode = "input";
+
+    function json(value) {
+      return JSON.stringify(value, null, 2);
+    }
+
+    function renderNav() {
+      const nav = document.getElementById("scenarioNav");
+      nav.innerHTML = scenarios.map((scenario) => `
+        <button class="scenario-tab ${scenario.id === activeScenario.id ? "active" : ""}" data-scenario="${scenario.id}">
+          <strong>${scenario.name}</strong>
+          <span>${scenario.subtitle}</span>
+        </button>
+      `).join("");
+      nav.querySelectorAll("[data-scenario]").forEach((button) => {
+        button.addEventListener("click", () => {
+          activeScenario = scenarios.find((scenario) => scenario.id === button.dataset.scenario);
+          activeStep = activeScenario.steps[0];
+          render();
+        });
+      });
+    }
+
+    function renderAbilities() {
+      const used = new Set(activeStep.modules.map((moduleId) => moduleMeta[moduleId].ability));
+      document.getElementById("abilityStack").innerHTML = Object.entries(abilities).map(([id, ability]) => `
+        <div class="ability ${used.has(id) ? "used" : ""}" style="--accent:${ability.color}">
+          <div>
+            <b>${ability.name}</b>
+            <small>${ability.summary}</small>
+          </div>
+        </div>
+      `).join("");
+    }
+
+    function renderScenario() {
+      document.getElementById("scenarioTitle").textContent = activeScenario.name;
+      document.getElementById("scenarioSummary").textContent = activeScenario.summary;
+      document.getElementById("scenarioBadge").textContent = activeScenario.badge;
+      const stepList = document.getElementById("stepList");
+      stepList.innerHTML = activeScenario.steps.map((step, index) => `
+        <button class="step-btn ${step === activeStep ? "active" : ""}" data-step="${index}">
+          <span>STEP ${index + 1}</span>
+          <b>${step.name}</b>
+        </button>
+      `).join("");
+      stepList.querySelectorAll("[data-step]").forEach((button) => {
+        button.addEventListener("click", () => {
+          activeStep = activeScenario.steps[Number(button.dataset.step)];
+          render();
+        });
+      });
+    }
+
+    function renderStage() {
+      document.getElementById("userQuote").textContent = activeStep.user;
+      document.getElementById("stepMeta").innerHTML = `
+        <div class="meta-pair"><span>设备/页面</span><strong>${activeStep.device}</strong></div>
+        <div class="meta-pair"><span>当前步骤</span><strong>${activeStep.name}</strong></div>
+        <div class="meta-pair"><span>边界控制</span><strong>${activeStep.risk.decision}</strong></div>
+      `;
+      document.getElementById("riskBadge").textContent = `${activeStep.risk.risk_level} / ${activeStep.risk.autonomy_level}`;
+      document.getElementById("panelTitle").textContent = activeStep.panel.title;
+      document.getElementById("panelDescription").textContent = activeStep.panel.description;
+      document.getElementById("panelFields").innerHTML = activeStep.panel.fields.map(([label, value]) => `
+        <div class="ui-field"><label>${label}</label><div>${value}</div></div>
+      `).join("");
+      document.getElementById("panelActions").innerHTML = activeStep.panel.actions.map((action, index) => `
+        <span class="action-chip ${activeStep.panel.riskAction && index === 0 ? "risk" : index === 0 ? "primary" : ""}">${action}</span>
+      `).join("");
+      document.getElementById("sourcePills").innerHTML = activeStep.sources.map((source) => `<span class="pill">${source}</span>`).join("");
+      document.getElementById("understanding").textContent = activeStep.understanding;
+    }
+
+    function moduleColor(id) {
+      return abilities[moduleMeta[id].ability].color;
+    }
+
+    function renderTrace() {
+      document.getElementById("moduleChips").innerHTML = activeStep.modules.map((id) => `
+        <span class="module-chip" style="--module-color:${moduleColor(id)}">${moduleMeta[id].name}</span>
+      `).join("");
+      const source = {
+        input: activeStep.input,
+        output: activeStep.output,
+        state: activeStep.state,
+        risk: activeStep.risk
+      };
+      document.getElementById("codeView").textContent = json(source[activeCode]);
+      document.querySelectorAll(".code-tab").forEach((button) => {
+        button.classList.toggle("active", button.dataset.code === activeCode);
+      });
+    }
+
+    function bindCodeTabs() {
+      document.querySelectorAll(".code-tab").forEach((button) => {
+        button.addEventListener("click", () => {
+          activeCode = button.dataset.code;
+          renderTrace();
+        });
+      });
+    }
+
+    function render() {
+      renderNav();
+      renderAbilities();
+      renderScenario();
+      renderStage();
+      renderTrace();
+    }
+
+    bindCodeTabs();
+    render();
+  </script>
+</body>
+</html>
