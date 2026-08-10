@@ -1,6 +1,6 @@
 # Demo 1 Task Runtime 协议
 
-> 状态：`Ready`。PR 3 已增加固定 Fixture 的 start/control mutation、ArtifactVersion、Verifier、局部冲突、Commit 和最薄控制 UI；内存 Store 已覆盖引用/hash/幂等回归，PostgreSQL 重启、完整异常恢复与 Artifact/Action 绑定尚未验收。
+> 状态：`Ready`。PR 3 已实现固定 Fixture 的 start/control、ArtifactVersion、Verifier、局部冲突与 Commit；PR 4 已用真实本地 API/Next.js/system Edge E2E 验证服务端事实驱动的交付物工作区和发送前失败恢复。PostgreSQL 重启、SSE 断线浏览器回放、完整异常恢复与 Artifact/Action 绑定尚未验收。
 
 ## 1. 权威来源与兼容规则
 
@@ -12,7 +12,7 @@
 
 `schema_version="1.0"` 的未知顶层字段必须拒绝，不能静默接受。协议变更必须同步 Pydantic、TypeScript、API/SSE、本文、UI 事实矩阵和测试。
 
-### 1.1 PR 3 当前实现边界
+### 1.1 PR 4 当前实现边界
 
 | 能力 | 当前事实 | 尚未实现 |
 | --- | --- | --- |
@@ -23,7 +23,8 @@
 | 幂等 | 新 mutation 的 marker 保存原结果 Snapshot；内存回归证明旧 key 在后续 mutation 后仍返回原结果且不重复写。旧版 marker 缺原结果时仅在当前 version 未前进时兼容返回，否则 409 拒绝不安全重放 | PostgreSQL 崩溃/重启恢复实证 |
 | Owner scope | 列表、读取和事件均以 `X-User-Id` 过滤，跨 Owner 按不存在处理 | 生产 SSO/JWT、租户 RBAC |
 | Budget / Deadline | start 和 resolve 会在 mutation 前校验预计用量与 `deadline_at`，`TaskBudgetSnapshot.exhausted` 字段存在；预计超限时当前请求不写状态 | 专门的顶层/分支耗尽状态、缩小范围/申请额度和完整恢复 UI |
-| 前台 | Active Task Bar、Branch、Conflict、Control 和最近 Commit 均读取服务端 Snapshot；Task SSE 后重新 GET 对账；未知 mutation 在当前标签页保存原 key/intent，offline/reconnecting 时可同 key 对账 | 完整 Artifact Workspace、人工新版本、失败/预算/重启闭环与浏览器恢复 E2E |
+| 前台 | Active Task Bar、Branch/Conflict/Control/Commit 与只读交付物工作区均读取服务端 Snapshot；Task 面板可打开分支 head；Tasks 视图保留手工待办 tab | 人工编辑新版本、失败/预算/重启完整闭环、Artifact/Action 绑定 |
+| 浏览器恢复 | E2E 覆盖 start 请求发送前 abort、`sessionStorage` reload、同 key 重试与无重复工件；重试后再 GET 最新 Snapshot | 服务端已提交但响应丢失、Task SSE 断线回放、API 进程重启 |
 
 创建后的初始事实仍是 `ready / contract`、三个 `queued` Branch、空工件/验证/冲突/控制列表、`last_commit=null` 和 `TASK_CREATED(sequence=1)`。只有固定 Demo 1 `start` 后，服务端才产生后续工件、验证、冲突和阶段事件。该调用不使用 LLM 或真实 Connector，且所有阶段在一个事务提交后才可见，不等于持续后台 Loop。
 
@@ -116,7 +117,18 @@ stateDiagram-v2
 5. `TaskCommit.state_hash` 必须覆盖 Task 版本、契约摘要、按 Branch/deliverable 映射的 heads、每个 head 的完整 Artifact lineage 与内容摘要、各 head 的完整 VerificationReport，以及全部 resolved Conflict 内容；只要仍有 open Conflict 就必须拒绝 Commit。
 6. 视觉动画、模型回复、客户端缓存和 SSE 连接状态都不能创建 Commit。
 
-PR 3 的内存 Store 回归已覆盖内容摘要、单 lineage、连续版本与父链、历史不可变、最新 head、Verification/Conflict/Commit 引用和最终 state hash。`state_hash` 绑定契约摘要、按 Branch/deliverable 排序的 head、完整 lineage、各 head 的完整 VerificationReport，以及全部已关闭 Conflict 内容。该证据仍不替代 PostgreSQL 实例与进程重启验证。
+PR 3 的内存 Store 回归已覆盖内容摘要、单 lineage、连续版本与父链、历史不可变、最新 head、Verification/Conflict/Commit 引用和最终 state hash。`state_hash` 绑定契约摘要、按 Branch/deliverable 排序的 head、完整 lineage、各 head 的完整 VerificationReport，以及全部已关闭 Conflict 内容。PR 4 工作区只读取并呈现这些事实；它不重新计算或签发 Commit。该证据仍不替代 PostgreSQL 实例与进程重启验证。
+
+### 4.1 PR 4 交付物显示协议
+
+1. 导航项来自 `branches[].deliverable_ids`、`branches[].artifact_heads` 和 `contract.deliverables[]`；没有 head 时只能显示“尚未生成”。
+2. 当前工件及历史版本来自 `artifact_versions[]`，lineage 只沿同一 `artifact_id` 的 `parent_version_id` 追溯；前端不能合并或改写历史。
+3. 工件状态与验证徽标分别来自 `ArtifactVersion.status` 和该版本最新的 `VerificationReport.status`；candidate/conflict 不得显示为完成。
+4. 冲突来自同一 Branch 的 `conflicts[]`；来源与验证检查默认折叠，但仍可按需查看 `source_refs` 与 `checks[]`。
+5. 最终提交只在 `last_commit` 存在时显示 task version、工件数、报告数和 `state_hash`。
+6. 固定 Fixture 的结构化内容只按 `artifact.kind` 的 allowlist 投影；未知 kind/字段默认隐藏。`source_ref` 只显示安全的非敏感 opaque scheme，疑似 token、secret、signature、路径或 URL 的标识显示隐藏占位。
+7. 上述规则只是前端第二道投影。服务端尚未提供通用字段可见性 Schema/display projection；allowlist 字段中的任意文本仍需服务端脱敏，不能仅凭前端过滤视为安全。
+8. Tasks 视图必须保留原“工作台待办”tab；长期 Task Artifact 不能覆盖手工待办 WorkspaceArtifact。
 
 ## 5. 控制命令
 
@@ -164,7 +176,7 @@ event: BRANCH_STATUS_CHANGED
 data: {TaskEvent JSON}
 ```
 
-当前 Task SSE 使用 `after` 查询参数并轮询 Store，路由不读取 `Last-Event-ID` 请求头。Active Task Bar 收到事件或连接建立后 GET 最新 Snapshot 对账；heartbeat 和断线属于传输状态，不改变任务业务状态。当前没有 PostgreSQL `LISTEN/NOTIFY`、消息代理或跨实例广播，多实例通知未实现和验证。
+当前 Task SSE 使用 `after` 查询参数并轮询 Store，路由不读取 `Last-Event-ID` 请求头。Active Task Bar 收到事件或连接建立后 GET 最新 Snapshot 对账；heartbeat 和断线属于传输状态，不改变任务业务状态。PR 4 E2E 没有主动断开该 SSE 或验证 `after` 回放。当前没有 PostgreSQL `LISTEN/NOTIFY`、消息代理或跨实例广播，多实例通知未实现和验证。
 
 内存模式下复用同一 Store 构造新的 `TaskService` 可以恢复相同 Snapshot 和游标，但 API 进程退出会丢失全部 Task。只有 PostgreSQL 模式具备跨进程保存基础，且当前尚无真实进程重启验收证据。
 
@@ -181,8 +193,9 @@ data: {TaskEvent JSON}
 | 能力 | 当前状态 | 后续目标 |
 | --- | --- | --- |
 | Pydantic 与 TypeScript 协议 | PR 1 已实现并测试 | 随行为演进同步 |
-| 场景、来源、状态机、UI 映射 | `Ready` | 用运行证据更新为 Verified |
-| Task Store / Snapshot API / SSE | PR 3 已增加 mutation 和多事件回放；内存路径有自动化覆盖 | PostgreSQL 真实重启与多实例通知 |
+| 场景、来源、状态机、UI 映射 | 固定 Fixture 的工程映射已有 PR 3/PR 4 证据 | 真实场景代表性与用户价值研究 |
+| Task Store / Snapshot API / SSE | mutation、多事件回放与内存路径有自动化覆盖 | PostgreSQL 真实重启、SSE 浏览器回放与多实例通知 |
 | Observe/Plan/Act/Verify/Commit | 固定 Fixture 在单次 start/resolve mutation 中可观察；引用/hash/幂等已有内存回归 | 通用后台 Loop、任意中间恢复、PostgreSQL 重启回归 |
-| Task UI 与断线恢复 | PR 3 已实现最薄 Branch/Conflict/Control/Commit、自动重连、当前 Task 优先对账，以及当前标签页内 pending mutation 的保存；offline/reconnecting 可同 key 对账，重放后强制读取最新 Snapshot | pending 入口 reload 可达性、完整 Artifact、异常、跨标签页/进程重启与浏览器 E2E |
+| Task Artifact Workspace | PR 4 已实现只读 head/version/verification/conflict/content/source/lineage/Commit 视图，并保留手工待办 tab | 人工编辑新版本、Artifact/Action 绑定、通用工件类型 |
+| Task UI 与恢复 | PR 4 E2E 覆盖主路径、发送前 abort、reload、同 key 重试、桌面/移动布局 | 已提交但响应丢失、SSE 断线、跨进程恢复与更多异常路径 |
 | Adaptive Swarm / 真实 Connector | 非本决策范围 | 需独立 Admission 和来源证据 |

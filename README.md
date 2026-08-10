@@ -55,16 +55,18 @@ V0.1 重点验证三件事：
 - 工作区内容在动作绑定后发生变化时，旧 Action 会被作废，不能用旧审批执行新参数。
 - Run、工作区、审计事件和 LangGraph checkpoint 可持久化并在服务重启后恢复。
 
-### Demo 1 受控任务纵切（PR 3）
+### Demo 1 交付物工作区与浏览器闭环（PR 4）
 
 - `TaskService` 从严格的 `TaskContractDraft` 创建服务端拥有的 `TaskContract`、`TaskSnapshot`、三个初始 `BranchSnapshot` 和首条 `TASK_CREATED`。新任务仍从 `ready / contract` 开始。
 - `POST /v1/tasks/{task_id}/start` 对固定客户 A Fixture 执行一次确定性状态转换：产生 Observe、Plan、Act、Verify 事件，追加 ArtifactVersion 和 VerificationReport，并把 2,400 万元正式口径与 2,680 万元预测口径的冲突限制在经营分析分支。该路径不调用 LLM，也不读取真实邮箱、CRM、预测表或项目系统。
 - `POST /v1/tasks/{task_id}/controls` 接受带 `expected_task_version` 和 `idempotency_key` 的 Steer、Pause、Resume、Take over、Return control 与 Resolve evidence。分支控制只有在服务端返回新 Snapshot 后才显示为已应用；Steer 当前只进入 `accepted` 时，前端只显示“方向指令已记录，等待后续循环应用”。
 - `TaskStore` 的内存与 PostgreSQL 实现包含 Snapshot、TaskEvent 和 ArtifactVersion 的 mutation 路径。`start` 和 `resolve_evidence` 会在写入前校验预计步骤、工具调用、运行时长和截止时间，超限时拒绝 mutation。当前自动化主要证明内存 Store 行为；本机尚无 PostgreSQL 实际运行或 API 进程重启证据，不能据此宣称持久恢复已经验收。
-- 右侧 Agent 区域从服务端 Snapshot 显示 Active Task、分支、证据冲突、控制和最近 Commit；Task SSE 只用于发现新事件并触发 Snapshot 对账。同步标记只表示客户端连接状态，不代表后台仍在执行。未知 mutation 会在当前标签页保存原 key、intent 与预期版本；处于 offline/reconnecting 时可用同 key 对账，确认后再 GET 最新 Snapshot。这仍只有源码与构建证据，浏览器恢复 E2E 尚未完成。原始 Prompt、思维链、Worker 对话、幂等键和完整 Trace 默认隐藏。
+- 右侧 Agent 区域从服务端 Snapshot 显示 Active Task、分支、证据冲突、控制和最近 Commit；每个分支 head 可直接打开左侧 Tasks 视图中的交付物工作区。该工作区从同一 Snapshot 显示当前版本、验证状态、冲突、结构化内容、折叠来源与检查、完整 lineage，以及最终 Commit/state hash，不在前端补造工件或完成状态。
+- Tasks 视图保留“长期任务工件”和“工作台待办”两个 tab，原手工待办编辑流程没有被长期任务 UI 替换。PR 4 对 `analysis/risk_brief/reply_draft` 使用字段 allowlist，未知 kind/字段默认隐藏；`source_ref` 只显示安全的非敏感 opaque scheme，其他值显示隐藏占位。这是前端第二道投影，不代表服务端数据删除，也不是通用字段安全保证。
+- Task SSE 只用于发现新事件并触发 Snapshot 对账；同步标记只表示客户端连接状态，不代表后台仍在执行。未知 mutation 会在当前标签页保存原 key、intent 与预期版本。浏览器 E2E 已覆盖 start 请求发送前 abort、reload、同 key 对账和无重复工件；尚未覆盖请求已到服务端但响应丢失或 SSE 断线回放。
 - Action Gate 打开时保留 Active Task Bar；TaskRuntimePanel 仍挂载以保留未提交 Steer 草稿，但通过 CSS 视觉隐藏并退出交互，Task Runtime 与 Task Bar 操作均不可用。Gate 使用独立网格行，收起后把该行缩至 58px。Action Gate 仍沿用独立 `RunService → Risk/Policy/Evidence/Approval/Permit → Gateway` 链路；Task Artifact 尚未绑定 Action 版本和失效规则。
 
-这仍是固定 Fixture 的同步纵切，不是通用后台调度器或真实 Connector。`start` 在一次 mutation 中物化阶段 Trace，浏览器在事务提交后才看到结果；完整 Task Artifact Workspace、人工编辑后产生新版本、预算/截止时间拒绝后的恢复 UI、单分支失败、PostgreSQL 重启恢复、多实例通知和完整浏览器 E2E 仍待后续验证。可观察证据与禁止夸大的边界见 [`DEMO1-PR3-RUNTIME-EVIDENCE.md`](docs/evidence/DEMO1-PR3-RUNTIME-EVIDENCE.md)。
+这仍是固定 Fixture 的同步纵切，不是通用后台调度器或真实 Connector。`start` 在一次 mutation 中物化阶段 Trace，浏览器在事务提交后才看到结果；人工编辑后产生新版本、预算/截止时间拒绝后的完整恢复 UI、单分支失败、服务端已提交但响应丢失、SSE 断线回放、PostgreSQL 重启、多实例通知和 Task Artifact → Action 失效绑定仍待验证。PR 3 Runtime 与 PR 4 浏览器证据分别见 [`DEMO1-PR3-RUNTIME-EVIDENCE.md`](docs/evidence/DEMO1-PR3-RUNTIME-EVIDENCE.md) 和 [`DEMO1-PR4-FRONTEND-E2E-EVIDENCE.md`](docs/evidence/DEMO1-PR4-FRONTEND-E2E-EVIDENCE.md)。
 
 ## 技术架构
 
@@ -110,6 +112,7 @@ flowchart LR
 - [Demo 1 UI—服务端事实矩阵](docs/contracts/UI_SERVER_FACT_MATRIX.md)
 - [Demo 1 场景与决策记录](docs/scenarios/SCENARIO-001-customer-a-durable-report.md)
 - [Demo 1 PR 3 运行证据与边界](docs/evidence/DEMO1-PR3-RUNTIME-EVIDENCE.md)
+- [Demo 1 PR 4 前端与 E2E 证据](docs/evidence/DEMO1-PR4-FRONTEND-E2E-EVIDENCE.md)
 
 ## 目录结构
 
@@ -193,7 +196,7 @@ pnpm --dir apps/web lint
 pnpm --dir apps/web build
 ```
 
-V0.1 定稿基线和 Demo 1 各 PR 的实际验证结果分别记录在 [`DR-0002`](docs/decisions/DR-0002-bounded-durable-office-loop.md) 与 [`DEMO1-PR3-RUNTIME-EVIDENCE.md`](docs/evidence/DEMO1-PR3-RUNTIME-EVIDENCE.md)。PR 3 封口验证为全量 Python `56 passed`、Ruff 通过、前端 lint 与生产构建通过；固定 Fixture 测试不调用真实 LLM，也不消耗模型额度。
+V0.1 定稿基线和 Demo 1 各 PR 的实际验证结果记录在 [`DR-0002`](docs/decisions/DR-0002-bounded-durable-office-loop.md) 及对应 evidence。PR 3 封口验证为全量 Python `56 passed`、Ruff、前端 lint 和生产构建通过；PR 4 在真实本地 FastAPI `8011`、Next.js `3011` 与 system Edge 上运行 `pnpm --dir apps/web test:e2e`，结果为 `2 passed (18.4s)`。固定 Fixture 测试不调用真实 LLM，也不消耗模型额度。
 
 ## 数据、身份与安全边界
 
@@ -202,7 +205,7 @@ V0.1 定稿基线和 Demo 1 各 PR 的实际验证结果分别记录在 [`DR-000
 - 未配置 Permit PEM 文件时，服务启动会生成进程级 Ed25519 密钥；重启后旧 Permit 失效。
 - 所有副作用工具均为 Simulator；UI 中的“发送成功”“创建成功”只代表 Simulator 成功。
 - 对话 Thread/Message 当前保存在 API 进程内存中，重启后丢失；Workspace、Run、Audit 和 LangGraph checkpoint 在配置 PostgreSQL 时可恢复。
-- Task 在未配置数据库时同样只保存在 API 进程内存中；PR 3 的 mutation 会写 Snapshot、TaskEvent 和 ArtifactVersion。配置 PostgreSQL 后对应表为 `agent_tasks`、`agent_task_events` 和 `agent_task_artifact_versions`，但本机尚未实际运行该路径，也没有以真实 API 进程重启证明恢复。
+- Task 在未配置数据库时同样只保存在 API 进程内存中；Demo 1 mutation 会写 Snapshot、TaskEvent 和 ArtifactVersion。配置 PostgreSQL 后对应表为 `agent_tasks`、`agent_task_events` 和 `agent_task_artifact_versions`，但本机尚未实际运行该路径，也没有以真实 API 进程重启证明恢复。
 - 当前没有 Alembic 迁移、生产级 RBAC、真实 Connector、后台任务队列、分布式 Permit 重放存储、Task 跨实例通知和多实例一致性保障。
 
 ## V0.1 验收结论
