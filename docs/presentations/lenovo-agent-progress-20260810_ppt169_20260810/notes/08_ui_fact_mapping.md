@@ -1,0 +1,1 @@
+这张图是以后每次前端设计都要回看的事实映射。Task Bar 对应 TaskSnapshot，分支与冲突对应 branches、conflicts 和事件，工件区对应 artifact versions、verification reports 与 last commit，控制动作必须等待服务端 mutation 返回新的 Snapshot。Action Gate 仍然读取独立的 RunSnapshot，所以 Task Runtime 与副作用动作目前还是两条事实链。SSE 只负责发现变化，随后必须重新读取 Snapshot 对账；连接颜色、动画和 Toast 都不是业务真值。

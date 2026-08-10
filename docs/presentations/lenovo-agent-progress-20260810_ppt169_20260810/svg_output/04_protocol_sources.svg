@@ -1,0 +1,79 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720" width="1280" height="720">
+  <g id="background">
+    <rect x="0" y="0" width="1280" height="720" fill="#F7F9F8"/>
+  </g>
+  <g id="header">
+    <rect x="56" y="42" width="6" height="52" fill="#14865F"/>
+    <text x="80" y="82" font-family="'Microsoft YaHei UI', 'Segoe UI', Arial, sans-serif" font-size="44" font-weight="700" fill="#1C2A24">PR #4：先让设计与事实有出处</text>
+    <text x="1224" y="78" text-anchor="end" font-family="Consolas, 'Courier New', monospace" font-size="14" fill="#74817B">CONTRACTS · P04</text>
+  </g>
+  <g id="takeaway">
+    <text x="56" y="138" font-family="'Microsoft YaHei UI', 'Segoe UI', Arial, sans-serif" font-size="28" font-weight="600" fill="#202824">先固定场景、来源、协议与 UI 事实矩阵，避免静态原型或口头判断冒充实现证据。</text>
+    <line x1="56" y1="168" x2="1224" y2="168" stroke="#CDD8D2" stroke-width="1"/>
+  </g>
+  <g id="source-spine">
+    <text x="56" y="214" font-family="'Microsoft YaHei UI', 'Segoe UI', Arial, sans-serif" font-size="28" font-weight="700" fill="#1C2A24">来源按证明力分级</text>
+    <line x1="82" y1="254" x2="82" y2="508" stroke="#CDD8D2" stroke-width="2"/>
+    <g id="source-feedback">
+      <circle cx="82" cy="278" r="12" fill="#14865F"/>
+      <use data-icon="chunk-filled/users" x="108" y="254" width="36" height="36" fill="#14865F"/>
+      <text x="158" y="280" font-family="'Microsoft YaHei UI', 'Segoe UI', Arial, sans-serif" font-size="24" font-weight="700" fill="#202824">Stakeholder 输入</text>
+      <text x="158" y="314" font-family="'Microsoft YaHei UI', 'Segoe UI', Arial, sans-serif" font-size="18" fill="#52605A">0716-v2 会后反馈、原始汇报、内部脚本</text>
+      <text x="158" y="340" font-family="'Microsoft YaHei UI', 'Segoe UI', Arial, sans-serif" font-size="18" fill="#C58B2B">证明需求与演示输入，不证明方案有效</text>
+    </g>
+    <g id="source-research">
+      <circle cx="82" cy="380" r="12" fill="#C58B2B"/>
+      <use data-icon="chunk-filled/link" x="108" y="356" width="36" height="36" fill="#C58B2B"/>
+      <text x="158" y="382" font-family="'Microsoft YaHei UI', 'Segoe UI', Arial, sans-serif" font-size="24" font-weight="700" fill="#202824">研究与官方实践</text>
+      <text x="158" y="416" font-family="'Microsoft YaHei UI', 'Segoe UI', Arial, sans-serif" font-size="18" fill="#52605A">ReAct · LangGraph · NIST AI RMF</text>
+      <text x="158" y="442" font-family="'Microsoft YaHei UI', 'Segoe UI', Arial, sans-serif" font-size="18" fill="#C58B2B">支持设计原则，不证明本地实现或体验收益</text>
+    </g>
+    <g id="source-repo">
+      <circle cx="82" cy="482" r="12" fill="#1C2A24"/>
+      <use data-icon="chunk-filled/code" x="108" y="458" width="36" height="36" fill="#1C2A24"/>
+      <text x="158" y="484" font-family="'Microsoft YaHei UI', 'Segoe UI', Arial, sans-serif" font-size="24" font-weight="700" fill="#202824">仓库事实</text>
+      <text x="158" y="518" font-family="'Microsoft YaHei UI', 'Segoe UI', Arial, sans-serif" font-size="18" fill="#52605A">commit · 源码 · 测试 · 截图 · E2E</text>
+      <text x="158" y="544" font-family="'Microsoft YaHei UI', 'Segoe UI', Arial, sans-serif" font-size="18" fill="#14865F">只在实测范围内支持“已实现”</text>
+    </g>
+    <rect x="56" y="568" width="424" height="68" fill="#EEF3F0"/>
+    <text x="76" y="596" font-family="Consolas, 'Courier New', monospace" font-size="18" font-weight="700" fill="#1C2A24">SOURCE ID ≠ source_ref</text>
+    <text x="76" y="624" font-family="'Microsoft YaHei UI', 'Segoe UI', Arial, sans-serif" font-size="18" fill="#52605A">设计依据与运行时 Fixture 引用必须分开记录</text>
+  </g>
+  <g id="protocol-stack">
+    <text x="530" y="214" font-family="'Microsoft YaHei UI', 'Segoe UI', Arial, sans-serif" font-size="28" font-weight="700" fill="#1C2A24">协议骨架先于实现</text>
+    <g id="protocol-lifecycle">
+      <rect x="530" y="244" width="694" height="104" fill="#FFFFFF" stroke="#CDD8D2" stroke-width="1"/>
+      <rect x="530" y="244" width="8" height="104" fill="#14865F"/>
+      <use data-icon="chunk-filled/layers" x="558" y="272" width="44" height="44" fill="#14865F"/>
+      <text x="624" y="280" font-family="'Microsoft YaHei UI', 'Segoe UI', Arial, sans-serif" font-size="24" font-weight="700" fill="#202824">任务与版本</text>
+      <text x="1188" y="280" text-anchor="end" font-family="'Microsoft YaHei UI', 'Segoe UI', Arial, sans-serif" font-size="18" fill="#74817B">身份、Owner、version、head、lineage</text>
+      <text x="624" y="320" font-family="Consolas, 'Courier New', monospace" font-size="18" fill="#52605A">Task · Branch · ArtifactVersion</text>
+    </g>
+    <g id="protocol-control">
+      <rect x="530" y="368" width="694" height="104" fill="#EEF3F0" stroke="#CDD8D2" stroke-width="1"/>
+      <rect x="530" y="368" width="8" height="104" fill="#C58B2B"/>
+      <use data-icon="chunk-filled/shield-check" x="558" y="396" width="44" height="44" fill="#C58B2B"/>
+      <text x="624" y="404" font-family="'Microsoft YaHei UI', 'Segoe UI', Arial, sans-serif" font-size="24" font-weight="700" fill="#202824">证据与控制</text>
+      <text x="1188" y="404" text-anchor="end" font-family="'Microsoft YaHei UI', 'Segoe UI', Arial, sans-serif" font-size="18" fill="#74817B">验证、冲突、预期版本、幂等键</text>
+      <text x="624" y="444" font-family="Consolas, 'Courier New', monospace" font-size="18" fill="#52605A">VerificationReport · ConflictRecord · ControlEvent</text>
+    </g>
+    <g id="protocol-trace">
+      <rect x="530" y="492" width="694" height="104" fill="#FFFFFF" stroke="#CDD8D2" stroke-width="1"/>
+      <rect x="530" y="492" width="8" height="104" fill="#1C2A24"/>
+      <use data-icon="chunk-filled/file" x="558" y="520" width="44" height="44" fill="#1C2A24"/>
+      <text x="624" y="528" font-family="'Microsoft YaHei UI', 'Segoe UI', Arial, sans-serif" font-size="24" font-weight="700" fill="#202824">Trace 与提交</text>
+      <text x="1188" y="528" text-anchor="end" font-family="'Microsoft YaHei UI', 'Segoe UI', Arial, sans-serif" font-size="18" fill="#74817B">sequence、引用完整性、state hash</text>
+      <text x="624" y="568" font-family="Consolas, 'Courier New', monospace" font-size="18" fill="#52605A">TaskEvent · TaskCommit</text>
+    </g>
+    <g id="verification-strip">
+      <line x1="530" y1="620" x2="1224" y2="620" stroke="#14865F" stroke-width="4"/>
+      <use data-icon="chunk-filled/circle-checkmark" x="530" y="634" width="32" height="32" fill="#14865F"/>
+      <text x="578" y="658" font-family="'Microsoft YaHei UI', 'Segoe UI', Arial, sans-serif" font-size="24" font-weight="600" fill="#202824">PR #4：全量 Python 37 passed</text>
+      <text x="1224" y="654" text-anchor="end" font-family="'Microsoft YaHei UI', 'Segoe UI', Arial, sans-serif" font-size="18" fill="#C58B2B">只证明协议、类型与治理入口</text>
+    </g>
+  </g>
+  <g id="footer">
+    <text x="56" y="688" font-family="'Microsoft YaHei UI', 'Segoe UI', Arial, sans-serif" font-size="14" fill="#74817B">Source: SOURCE_REGISTER · SCENARIO-001 · DR-0002 §2-4</text>
+    <text x="1224" y="688" text-anchor="end" font-family="Consolas, 'Courier New', monospace" font-size="14" fill="#14865F">04 / 11</text>
+  </g>
+</svg>

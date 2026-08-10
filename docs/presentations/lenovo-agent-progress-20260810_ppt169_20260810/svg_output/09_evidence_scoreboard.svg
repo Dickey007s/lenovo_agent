@@ -1,0 +1,66 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720" width="1280" height="720">
+  <g id="background">
+    <rect x="0" y="0" width="1280" height="720" fill="#F7F9F8"/>
+  </g>
+  <g id="header">
+    <rect x="56" y="42" width="6" height="52" fill="#14865F"/>
+    <text x="80" y="82" font-family="'Microsoft YaHei UI', 'Segoe UI', Arial, sans-serif" font-size="44" font-weight="700" fill="#1C2A24">我们用可复核证据汇报，不把不同测试相加</text>
+    <text x="1224" y="78" text-anchor="end" font-family="Consolas, 'Courier New', monospace" font-size="14" fill="#74817B">EVIDENCE · P09</text>
+  </g>
+  <g id="takeaway">
+    <text x="56" y="136" font-family="'Microsoft YaHei UI', 'Segoe UI', Arial, sans-serif" font-size="28" font-weight="600" fill="#202824">每个数字只支持它明确覆盖的工程范围；PR 快照、Python、浏览器 E2E 与截图分别计数。</text>
+    <line x1="56" y1="166" x2="1224" y2="166" stroke="#CDD8D2" stroke-width="1"/>
+  </g>
+  <g id="metric-prs">
+    <rect x="56" y="190" width="280" height="142" fill="#FFFFFF" stroke="#CDD8D2" stroke-width="1"/>
+    <rect x="56" y="190" width="280" height="6" fill="#14865F"/>
+    <text x="76" y="250" font-family="Consolas, 'Courier New', monospace" font-size="56" font-weight="700" fill="#14865F">4</text>
+    <text x="148" y="244" font-family="'Microsoft YaHei UI', 'Segoe UI', Arial, sans-serif" font-size="24" font-weight="700" fill="#202824">已合并 PR</text>
+    <text x="76" y="296" font-family="Consolas, 'Courier New', monospace" font-size="18" fill="#52605A">#4 · #5 · #6 · #7</text>
+    <text x="76" y="320" font-family="'Microsoft YaHei UI', 'Segoe UI', Arial, sans-serif" font-size="14" fill="#74817B">merge commits 已登记</text>
+  </g>
+  <g id="metric-python">
+    <rect x="352" y="190" width="280" height="142" fill="#EEF3F0" stroke="#CDD8D2" stroke-width="1"/>
+    <rect x="352" y="190" width="280" height="6" fill="#1C2A24"/>
+    <text x="372" y="250" font-family="Consolas, 'Courier New', monospace" font-size="56" font-weight="700" fill="#1C2A24">56</text>
+    <text x="466" y="244" font-family="'Microsoft YaHei UI', 'Segoe UI', Arial, sans-serif" font-size="24" font-weight="700" fill="#202824">全量 Python</text>
+    <text x="372" y="296" font-family="'Microsoft YaHei UI', 'Segoe UI', Arial, sans-serif" font-size="18" fill="#52605A">PR #6 时点</text>
+    <text x="372" y="320" font-family="'Microsoft YaHei UI', 'Segoe UI', Arial, sans-serif" font-size="14" fill="#74817B">不与 37 / 44 相加</text>
+  </g>
+  <g id="metric-e2e">
+    <rect x="648" y="190" width="280" height="142" fill="#FFFFFF" stroke="#CDD8D2" stroke-width="1"/>
+    <rect x="648" y="190" width="280" height="6" fill="#14865F"/>
+    <text x="668" y="250" font-family="Consolas, 'Courier New', monospace" font-size="56" font-weight="700" fill="#14865F">2</text>
+    <text x="740" y="244" font-family="'Microsoft YaHei UI', 'Segoe UI', Arial, sans-serif" font-size="24" font-weight="700" fill="#202824">Edge E2E</text>
+    <text x="668" y="296" font-family="Consolas, 'Courier New', monospace" font-size="18" fill="#52605A">18.4s · system Edge</text>
+    <text x="668" y="320" font-family="'Microsoft YaHei UI', 'Segoe UI', Arial, sans-serif" font-size="14" fill="#74817B">不是 Python 测试</text>
+  </g>
+  <g id="metric-screenshots">
+    <rect x="944" y="190" width="280" height="142" fill="#EEF3F0" stroke="#CDD8D2" stroke-width="1"/>
+    <rect x="944" y="190" width="280" height="6" fill="#C58B2B"/>
+    <text x="964" y="250" font-family="Consolas, 'Courier New', monospace" font-size="56" font-weight="700" fill="#C58B2B">5</text>
+    <text x="1036" y="244" font-family="'Microsoft YaHei UI', 'Segoe UI', Arial, sans-serif" font-size="24" font-weight="700" fill="#202824">证据截图</text>
+    <text x="964" y="296" font-family="'Microsoft YaHei UI', 'Segoe UI', Arial, sans-serif" font-size="18" fill="#52605A">实测尺寸 + SHA-256</text>
+    <text x="964" y="320" font-family="'Microsoft YaHei UI', 'Segoe UI', Arial, sans-serif" font-size="14" fill="#74817B">截图不替代 API 断言</text>
+  </g>
+  <g id="recovery-before">
+    <text x="56" y="370" font-family="'Microsoft YaHei UI', 'Segoe UI', Arial, sans-serif" font-size="18" font-weight="600" fill="#C58B2B">发送前 abort · 结果待确认</text>
+    <rect x="56" y="382" width="500" height="281" fill="#FFFFFF" stroke="#C58B2B" stroke-width="2"/>
+    <image href="../images/demo1-pr4-pending-recovery.png" x="56" y="382" width="500" height="281" preserveAspectRatio="xMidYMid meet"/>
+  </g>
+  <g id="recovery-arrow">
+    <use data-icon="chunk-filled/arrows-repeat" x="612" y="474" width="56" height="56" fill="#14865F"/>
+    <text x="640" y="552" text-anchor="middle" font-family="Consolas, 'Courier New', monospace" font-size="18" font-weight="700" fill="#14865F">reload</text>
+    <text x="640" y="578" text-anchor="middle" font-family="Consolas, 'Courier New', monospace" font-size="18" fill="#52605A">same key</text>
+    <text x="640" y="616" text-anchor="middle" font-family="'Microsoft YaHei UI', 'Segoe UI', Arial, sans-serif" font-size="14" fill="#C58B2B">仅证明发送前失败</text>
+  </g>
+  <g id="recovery-after">
+    <text x="724" y="370" font-family="'Microsoft YaHei UI', 'Segoe UI', Arial, sans-serif" font-size="18" font-weight="600" fill="#14865F">同 key 对账 · 5 个唯一 ArtifactVersion</text>
+    <rect x="724" y="382" width="500" height="281" fill="#FFFFFF" stroke="#14865F" stroke-width="2"/>
+    <image href="../images/demo1-pr4-reconciled.png" x="724" y="382" width="500" height="281" preserveAspectRatio="xMidYMid meet"/>
+  </g>
+  <g id="footer">
+    <text x="56" y="688" font-family="'Microsoft YaHei UI', 'Segoe UI', Arial, sans-serif" font-size="14" fill="#74817B">Source: REPORT_STATUS_SNAPSHOT · DEMO1-PR3 §3 · DEMO1-PR4 §2-3</text>
+    <text x="1224" y="688" text-anchor="end" font-family="Consolas, 'Courier New', monospace" font-size="14" fill="#14865F">09 / 11</text>
+  </g>
+</svg>

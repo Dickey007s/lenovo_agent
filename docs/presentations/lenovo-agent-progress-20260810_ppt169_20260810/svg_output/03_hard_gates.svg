@@ -1,0 +1,70 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720" width="1280" height="720">
+  <g id="background">
+    <rect x="0" y="0" width="1280" height="720" fill="#F7F9F8"/>
+  </g>
+  <g id="header">
+    <rect x="56" y="42" width="6" height="52" fill="#14865F"/>
+    <text x="80" y="82" font-family="'Microsoft YaHei UI', 'Segoe UI', Arial, sans-serif" font-size="44" font-weight="700" fill="#1C2A24">0716-v2 反馈不再是提醒，而是完成门槛</text>
+    <text x="1224" y="78" text-anchor="end" font-family="Consolas, 'Courier New', monospace" font-size="14" fill="#74817B">GOVERNANCE · P03</text>
+  </g>
+  <g id="takeaway">
+    <text x="56" y="136" font-family="'Microsoft YaHei UI', 'Segoe UI', Arial, sans-serif" font-size="28" font-weight="600" fill="#202824">每个决策、推进与汇报都必须同时回答：用户看见什么、依据是什么、设计从哪里来。</text>
+    <line x1="56" y1="166" x2="1224" y2="166" stroke="#CDD8D2" stroke-width="1"/>
+  </g>
+  <g id="pillar-frontend">
+    <rect x="56" y="202" width="360" height="352" fill="#FFFFFF" stroke="#CDD8D2" stroke-width="1"/>
+    <rect x="56" y="202" width="360" height="8" fill="#14865F"/>
+    <text x="80" y="264" font-family="Consolas, 'Courier New', monospace" font-size="56" font-weight="700" fill="#14865F">01</text>
+    <use data-icon="chunk-filled/desktop" x="344" y="226" width="44" height="44" fill="#14865F"/>
+    <text x="80" y="312" font-family="'Microsoft YaHei UI', 'Segoe UI', Arial, sans-serif" font-size="28" font-weight="700" fill="#1C2A24">前台输出</text>
+    <line x1="80" y1="334" x2="392" y2="334" stroke="#DFE7E3" stroke-width="1"/>
+    <circle cx="88" cy="374" r="5" fill="#14865F"/>
+    <text x="108" y="382" font-family="'Microsoft YaHei UI', 'Segoe UI', Arial, sans-serif" font-size="24" fill="#202824">目标 · 状态 · 版本 · 冲突</text>
+    <circle cx="88" cy="426" r="5" fill="#14865F"/>
+    <text x="108" y="434" font-family="'Microsoft YaHei UI', 'Segoe UI', Arial, sans-serif" font-size="24" fill="#202824">验证结果 · 待确认动作</text>
+    <circle cx="88" cy="478" r="5" fill="#C58B2B"/>
+    <text x="108" y="486" font-family="'Microsoft YaHei UI', 'Segoe UI', Arial, sans-serif" font-size="24" fill="#202824">等待 · 失败 · 恢复路径</text>
+    <text x="80" y="530" font-family="'Microsoft YaHei UI', 'Segoe UI', Arial, sans-serif" font-size="18" fill="#52605A">只展示会改变用户判断的事实</text>
+  </g>
+  <g id="pillar-facts">
+    <rect x="460" y="202" width="360" height="352" fill="#EEF3F0" stroke="#CDD8D2" stroke-width="1"/>
+    <rect x="460" y="202" width="360" height="8" fill="#1C2A24"/>
+    <text x="484" y="264" font-family="Consolas, 'Courier New', monospace" font-size="56" font-weight="700" fill="#1C2A24">02</text>
+    <use data-icon="chunk-filled/link" x="748" y="226" width="44" height="44" fill="#1C2A24"/>
+    <text x="484" y="312" font-family="'Microsoft YaHei UI', 'Segoe UI', Arial, sans-serif" font-size="28" font-weight="700" fill="#1C2A24">前后端统一</text>
+    <line x1="484" y1="334" x2="796" y2="334" stroke="#CDD8D2" stroke-width="1"/>
+    <circle cx="492" cy="374" r="5" fill="#1C2A24"/>
+    <text x="512" y="382" font-family="'Microsoft YaHei UI', 'Segoe UI', Arial, sans-serif" font-size="24" fill="#202824">UI 状态 → Snapshot 字段</text>
+    <circle cx="492" cy="426" r="5" fill="#1C2A24"/>
+    <text x="512" y="434" font-family="'Microsoft YaHei UI', 'Segoe UI', Arial, sans-serif" font-size="24" fill="#202824">状态变化 → 有序 Event</text>
+    <circle cx="492" cy="478" r="5" fill="#B34B3E"/>
+    <text x="512" y="486" font-family="'Microsoft YaHei UI', 'Segoe UI', Arial, sans-serif" font-size="24" fill="#202824">颜色 / Toast 不能创造事实</text>
+    <text x="484" y="530" font-family="'Microsoft YaHei UI', 'Segoe UI', Arial, sans-serif" font-size="18" fill="#52605A">不存在于服务端，就不能写成已完成</text>
+  </g>
+  <g id="pillar-source">
+    <rect x="864" y="202" width="360" height="352" fill="#FFFFFF" stroke="#CDD8D2" stroke-width="1"/>
+    <rect x="864" y="202" width="360" height="8" fill="#C58B2B"/>
+    <text x="888" y="264" font-family="Consolas, 'Courier New', monospace" font-size="56" font-weight="700" fill="#C58B2B">03</text>
+    <use data-icon="chunk-filled/users" x="1152" y="226" width="44" height="44" fill="#C58B2B"/>
+    <text x="888" y="312" font-family="'Microsoft YaHei UI', 'Segoe UI', Arial, sans-serif" font-size="28" font-weight="700" fill="#1C2A24">场景与来源</text>
+    <line x1="888" y1="334" x2="1200" y2="334" stroke="#DFE7E3" stroke-width="1"/>
+    <circle cx="896" cy="374" r="5" fill="#C58B2B"/>
+    <text x="916" y="382" font-family="'Microsoft YaHei UI', 'Segoe UI', Arial, sans-serif" font-size="24" fill="#202824">登记 Source ID 与精确引用</text>
+    <circle cx="896" cy="426" r="5" fill="#C58B2B"/>
+    <text x="916" y="434" font-family="'Microsoft YaHei UI', 'Segoe UI', Arial, sans-serif" font-size="24" fill="#202824">说明支持判断与局限</text>
+    <circle cx="896" cy="478" r="5" fill="#C58B2B"/>
+    <text x="916" y="486" font-family="'Microsoft YaHei UI', 'Segoe UI', Arial, sans-serif" font-size="24" fill="#202824">设计依据 ≠ 运行证据</text>
+    <text x="888" y="516" font-family="'Microsoft YaHei UI', 'Segoe UI', Arial, sans-serif" font-size="18" fill="#52605A">反馈 / 论文 / 源码分级使用</text>
+    <text x="888" y="542" font-family="'Microsoft YaHei UI', 'Segoe UI', Arial, sans-serif" font-size="18" fill="#52605A">各自只支持明确范围</text>
+  </g>
+  <g id="gate-rule">
+    <rect x="56" y="582" width="1168" height="64" fill="#1C2A24"/>
+    <use data-icon="chunk-filled/shield-check" x="82" y="594" width="40" height="40" fill="#FFFFFF"/>
+    <text x="144" y="624" font-family="'Microsoft YaHei UI', 'Segoe UI', Arial, sans-serif" font-size="28" font-weight="600" fill="#FFFFFF">缺少任一项，不进入“完成”结论。</text>
+    <text x="1200" y="620" text-anchor="end" font-family="'Microsoft YaHei UI', 'Segoe UI', Arial, sans-serif" font-size="18" fill="#CDD8D2">默认隐藏 Prompt、思维链、Worker 对话、密钥、Permit 与堆栈</text>
+  </g>
+  <g id="footer">
+    <text x="56" y="688" font-family="'Microsoft YaHei UI', 'Segoe UI', Arial, sans-serif" font-size="14" fill="#74817B">Source: DR-0001 · SOURCE_REGISTER · UI_SERVER_FACT_MATRIX</text>
+    <text x="1224" y="688" text-anchor="end" font-family="Consolas, 'Courier New', monospace" font-size="14" fill="#14865F">03 / 11</text>
+  </g>
+</svg>

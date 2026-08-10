@@ -1,0 +1,14 @@
+# 来源台账
+
+所有设计、架构、实现、交互、实验和汇报判断都应在这里或等价的机器可查台账中登记来源。来源只能支持其明确覆盖的判断，不能自动证明实现或效果。
+
+| Source ID | 类型 | 精确引用 | 日期或版本 | 支持的判断 | 局限 | Owner | 使用它的 Decision ID |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| `USER-FEEDBACK-20260810-01` | 用户反馈 | 当前 Codex 任务中的用户消息：“以后每次汇报，每个决策和推进都需要考虑前端的角度……场景与来源……必须留痕。” | 2026-08-10，Asia/Shanghai | 前台交互影响、UI—后端事实映射、场景与来源留痕必须成为强制门槛 | 这是治理要求，不直接证明某个交互方案有效，也不替代后续目标用户研究 | Office Agent 项目组 | `DR-0001` |
+| `USER-FEEDBACK-20260810-02` | Stakeholder 会后反馈摘要 | [`docs/sources/USER-FEEDBACK-20260810-02-0716-v2-follow-up.md`](../sources/USER-FEEDBACK-20260810-02-0716-v2-follow-up.md) | 2026-08-10，用户称关联“0716-v2”会议 | 后续工作须补充具体场景、来源、交互影响、前台输出和前后端统一；Demo 1 聚焦持续运行与分支管理 | 用户提供摘要，不是签字纪要、录音或逐字稿；不证明方案效果 | Office Agent 项目组 | `DR-0002` |
+| `MEETING-DECK-0716-V2-01` | 阶段汇报原件 | `docs/final-reference/0716-v2.pptx`，SHA-256 `A768EFA7412F35FD65FCFDE61DA4DA616066999E157DEC64AE3DD79F6C5E0B8B`；文件清单见 [`docs/final-reference/README.md`](../final-reference/README.md) | 文件版本 `0716-v2`，36 页 | 证明 0716 阶段汇报原件与当时展示内容存在 | 原件封面写 2025-07-16，而阶段上下文指向 2026-07；不能证明会后反馈，也不能证明 Runtime 实现 | Office Agent 项目组 | `DR-0002` |
+| `SCRIPT-V5-202607` | 内部设计与演示脚本 | [`docs/final-reference/未来办公Agent_一小时汇报讲稿_v5.md`](../final-reference/未来办公Agent_一小时汇报讲稿_v5.md)，SHA-256 `E346EEF04935BF2095E37B6E153183901B0192B06901C7A1D6AAB3A66F0937D2`，重点 P04、P11、P12 | 2026-07 阶段最终参考 | 定义客户 A、三交付物、收入冲突、分支级 Evidence Gate、Steer 与 Verified Commit 的演示设想 | 项目内部衍生设计，不是独立用户研究或运行证据 | Office Agent 项目组 | `DR-0002` |
+| `REPO-BASELINE-84AABC9` | 源码与测试基线 | Git commit `84aabc9`; `packages/contracts/models.py`; `services/api/app/application/storage.py`; `services/api/app/application/runs.py`; `packages/agent_runtime/workflow.py`; `apps/web/app/page.tsx`; `tests/` | 2026-08-10 | 当前只具备单动作治理、Run/Workspace/Audit/checkpoint 基础；尚无长期 Task/Branch/ArtifactVersion/ControlEvent Runtime | 只描述该提交；后续实现必须以新提交和实际测试更新证据 | Office Agent 项目组 | `DR-0002` |
+| `REACT-ICLR-2023` | 同行评审论文 | Yao et al., “ReAct: Synergizing Reasoning and Acting in Language Models”, arXiv `2210.03629v3`, 2023-03-10, <https://arxiv.org/abs/2210.03629> | ICLR 2023 版本 | 支持把推理、动作和环境观察交错组织为任务轨迹 | 不定义持久 Task 状态、分支控制、Verifier、Commit 或办公 UI | Office Agent 项目组 | `DR-0002` |
+| `LANGGRAPH-DURABLE-20260810` | 官方工程文档 | LangGraph [Functional API](https://docs.langchain.com/oss/python/langgraph/functional-api)、[Persistence](https://docs.langchain.com/oss/python/langgraph/persistence)、[Streaming](https://docs.langchain.com/oss/python/langgraph/streaming) | 2026-08-10 访问 | 支持 checkpoint 恢复、任务幂等设计、状态/更新/checkpoint 流式输出等工程原则 | 库级实践，不证明本项目协议、交互或恢复实现正确；版本可能变化 | Office Agent 项目组 | `DR-0002` |
+| `NIST-AI-RMF-1.0` | 官方风险治理框架 | NIST AI 100-1, DOI `10.6028/NIST.AI.100-1`, [AI RMF 1.0](https://www.nist.gov/publications/artificial-intelligence-risk-management-framework-ai-rmf-10) | 2023-01 | 支持持续治理、责任记录、人类监督和风险管理作为系统职责 | 通用框架，不规定 Agent Runtime、具体风险算法或界面布局 | Office Agent 项目组 | `DR-0002` |

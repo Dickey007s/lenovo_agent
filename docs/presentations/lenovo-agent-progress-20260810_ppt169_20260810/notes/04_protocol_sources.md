@@ -1,0 +1,1 @@
+在写 Runtime 代码之前，我们先把来源按证明力分级。用户反馈和会议材料证明需求与演示输入，ReAct、LangGraph 和 NIST 支持设计原则，只有提交、源码、测试、截图和端到端运行才能证明本地实现。与此同时，我们固定了 Task、Branch、ArtifactVersion、VerificationReport、ConflictRecord、ControlEvent、TaskEvent 和 TaskCommit 等核心实体。PR 四的三十七个 Python 测试只证明协议、类型和治理入口，并不证明 Store、事件流或前台已经运行。

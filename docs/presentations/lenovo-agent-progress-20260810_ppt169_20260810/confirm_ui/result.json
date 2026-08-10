@@ -1,0 +1,51 @@
+{
+  "canvas": "ppt169",
+  "page_count": "11",
+  "audience": "联想方项目负责人、产品与技术决策者，以及华南理工联合项目团队；用于阶段评审，核心信息是四个可审查 PR 已把治理要求落成固定 Demo 1 的前后端闭环，同时明确下一阶段尚缺的真实持久化、SSE 恢复、Action 绑定与用户研究证据。",
+  "content_divergence": "",
+  "mode": "pyramid",
+  "visual_style": "swiss-minimal",
+  "color": {
+    "name": "证据绿与石墨灰",
+    "palette": {
+      "background": "#F7F9F8",
+      "secondary_bg": "#EEF3F0",
+      "primary": "#1C2A24",
+      "accent": "#14865F",
+      "secondary_accent": "#C58B2B",
+      "body_text": "#202824"
+    }
+  },
+  "icons": "chunk-filled",
+  "typography": {
+    "name": "理性雅黑",
+    "heading": {
+      "cjk": "Microsoft YaHei UI",
+      "latin": "Segoe UI",
+      "css": "'Microsoft YaHei UI','Segoe UI',Arial,sans-serif"
+    },
+    "body": {
+      "cjk": "Microsoft YaHei UI",
+      "latin": "Segoe UI",
+      "css": "'Microsoft YaHei UI','Segoe UI',Arial,sans-serif"
+    },
+    "body_size": 24,
+    "body_size_unit": "px",
+    "sizes": {
+      "title": 44,
+      "subtitle": 32,
+      "annotation": 18
+    }
+  },
+  "delivery_purpose": "balanced",
+  "formula_policy": "text-only",
+  "image_usage": [
+    "provided"
+  ],
+  "image_notes": "只使用仓库内已验证的 Demo 1 桌面/移动端截图作为证据图；架构、协议和路线图用原生 SVG 图形重绘，不使用氛围图、库存照片或 AI 生成图。截图必须保留状态语义，不裁掉关键冲突、版本、Commit 或恢复提示。",
+  "generation_mode": "continuous",
+  "refine_spec": false,
+  "stage": "final",
+  "status": "confirmed",
+  "confirmed_at": "2026-08-10T15:25:03+08:00"
+}

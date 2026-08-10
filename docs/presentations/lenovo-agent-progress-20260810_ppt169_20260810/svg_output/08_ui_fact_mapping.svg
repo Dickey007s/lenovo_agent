@@ -1,0 +1,82 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720" width="1280" height="720">
+  <g id="background">
+    <rect x="0" y="0" width="1280" height="720" fill="#F7F9F8"/>
+  </g>
+  <g id="header">
+    <rect x="56" y="42" width="6" height="52" fill="#14865F"/>
+    <text x="80" y="82" font-family="'Microsoft YaHei UI', 'Segoe UI', Arial, sans-serif" font-size="44" font-weight="700" fill="#1C2A24">每个 UI 状态都必须能回答“依据是什么”</text>
+    <text x="1224" y="78" text-anchor="end" font-family="Consolas, 'Courier New', monospace" font-size="14" fill="#74817B">UI ↔ SERVER · P08</text>
+  </g>
+  <g id="takeaway">
+    <text x="56" y="136" font-family="'Microsoft YaHei UI', 'Segoe UI', Arial, sans-serif" font-size="28" font-weight="600" fill="#202824">UI 负责翻译事实与提供动作入口；Snapshot、Event 和 RunSnapshot 才决定真实状态。</text>
+    <line x1="56" y1="166" x2="1224" y2="166" stroke="#CDD8D2" stroke-width="1"/>
+  </g>
+  <g id="column-labels">
+    <use data-icon="chunk-filled/desktop" x="56" y="188" width="32" height="32" fill="#14865F"/>
+    <text x="102" y="212" font-family="'Microsoft YaHei UI', 'Segoe UI', Arial, sans-serif" font-size="24" font-weight="700" fill="#1C2A24">前台投影</text>
+    <use data-icon="chunk-filled/database" x="796" y="188" width="32" height="32" fill="#1C2A24"/>
+    <text x="842" y="212" font-family="'Microsoft YaHei UI', 'Segoe UI', Arial, sans-serif" font-size="24" font-weight="700" fill="#1C2A24">服务端权威事实</text>
+    <text x="640" y="212" text-anchor="middle" font-family="Consolas, 'Courier New', monospace" font-size="18" fill="#74817B">REST / SSE</text>
+  </g>
+  <g id="mapping-taskbar">
+    <rect x="56" y="234" width="428" height="58" fill="#FFFFFF" stroke="#CDD8D2" stroke-width="1"/>
+    <use data-icon="chunk-filled/target-arrow" x="72" y="247" width="32" height="32" fill="#14865F"/>
+    <text x="120" y="272" font-family="'Microsoft YaHei UI', 'Segoe UI', Arial, sans-serif" font-size="24" font-weight="600" fill="#202824">Active Task Bar</text>
+    <line x1="484" y1="263" x2="780" y2="263" stroke="#14865F" stroke-width="2"/>
+    <polygon points="780,254 796,263 780,272" fill="#14865F"/>
+    <text x="640" y="252" text-anchor="middle" font-family="Consolas, 'Courier New', monospace" font-size="18" fill="#52605A">GET Snapshot</text>
+    <rect x="796" y="234" width="428" height="58" fill="#EEF3F0" stroke="#CDD8D2" stroke-width="1"/>
+    <text x="816" y="270" font-family="Consolas, 'Courier New', monospace" font-size="18" fill="#202824">task_id · status · phase · version · budget</text>
+  </g>
+  <g id="mapping-branch">
+    <rect x="56" y="304" width="428" height="58" fill="#EEF3F0" stroke="#CDD8D2" stroke-width="1"/>
+    <use data-icon="chunk-filled/git-branch" x="72" y="317" width="32" height="32" fill="#1C2A24"/>
+    <text x="120" y="342" font-family="'Microsoft YaHei UI', 'Segoe UI', Arial, sans-serif" font-size="24" font-weight="600" fill="#202824">Branch / Conflict</text>
+    <line x1="484" y1="333" x2="780" y2="333" stroke="#1C2A24" stroke-width="2"/>
+    <polygon points="780,324 796,333 780,342" fill="#1C2A24"/>
+    <text x="640" y="322" text-anchor="middle" font-family="Consolas, 'Courier New', monospace" font-size="18" fill="#52605A">Snapshot + Event</text>
+    <rect x="796" y="304" width="428" height="58" fill="#FFFFFF" stroke="#CDD8D2" stroke-width="1"/>
+    <text x="816" y="340" font-family="Consolas, 'Courier New', monospace" font-size="18" fill="#202824">branches[] · conflicts[] · TaskEvent</text>
+  </g>
+  <g id="mapping-artifact">
+    <rect x="56" y="374" width="428" height="58" fill="#FFFFFF" stroke="#CDD8D2" stroke-width="1"/>
+    <use data-icon="chunk-filled/layers" x="72" y="387" width="32" height="32" fill="#14865F"/>
+    <text x="120" y="412" font-family="'Microsoft YaHei UI', 'Segoe UI', Arial, sans-serif" font-size="24" font-weight="600" fill="#202824">Artifact Workspace</text>
+    <line x1="484" y1="403" x2="780" y2="403" stroke="#14865F" stroke-width="2"/>
+    <polygon points="780,394 796,403 780,412" fill="#14865F"/>
+    <text x="640" y="392" text-anchor="middle" font-family="Consolas, 'Courier New', monospace" font-size="18" fill="#52605A">GET Snapshot</text>
+    <rect x="796" y="374" width="428" height="58" fill="#EEF3F0" stroke="#CDD8D2" stroke-width="1"/>
+    <text x="816" y="410" font-family="Consolas, 'Courier New', monospace" font-size="18" fill="#202824">artifact_versions[] · reports[] · last_commit</text>
+  </g>
+  <g id="mapping-control">
+    <rect x="56" y="444" width="428" height="58" fill="#EEF3F0" stroke="#CDD8D2" stroke-width="1"/>
+    <use data-icon="chunk-filled/arrows-repeat" x="72" y="457" width="32" height="32" fill="#C58B2B"/>
+    <text x="120" y="482" font-family="'Microsoft YaHei UI', 'Segoe UI', Arial, sans-serif" font-size="24" font-weight="600" fill="#202824">Task Control</text>
+    <line x1="484" y1="473" x2="780" y2="473" stroke="#C58B2B" stroke-width="2"/>
+    <polygon points="780,464 796,473 780,482" fill="#C58B2B"/>
+    <text x="640" y="462" text-anchor="middle" font-family="Consolas, 'Courier New', monospace" font-size="18" fill="#52605A">mutation + new Snapshot</text>
+    <rect x="796" y="444" width="428" height="58" fill="#FFFFFF" stroke="#CDD8D2" stroke-width="1"/>
+    <text x="816" y="480" font-family="Consolas, 'Courier New', monospace" font-size="18" fill="#202824">controls[] · branch.status · expected_version</text>
+  </g>
+  <g id="mapping-action">
+    <rect x="56" y="514" width="428" height="58" fill="#FFFFFF" stroke="#CDD8D2" stroke-width="1"/>
+    <use data-icon="chunk-filled/shield-check" x="72" y="527" width="32" height="32" fill="#1C2A24"/>
+    <text x="120" y="552" font-family="'Microsoft YaHei UI', 'Segoe UI', Arial, sans-serif" font-size="24" font-weight="600" fill="#202824">Action Gate</text>
+    <line x1="484" y1="543" x2="780" y2="543" stroke="#1C2A24" stroke-width="2"/>
+    <polygon points="780,534 796,543 780,552" fill="#1C2A24"/>
+    <text x="640" y="532" text-anchor="middle" font-family="Consolas, 'Courier New', monospace" font-size="18" fill="#52605A">independent Run API</text>
+    <rect x="796" y="514" width="428" height="58" fill="#EEF3F0" stroke="#CDD8D2" stroke-width="1"/>
+    <text x="816" y="550" font-family="Consolas, 'Courier New', monospace" font-size="18" fill="#202824">risk · control_plan · permit · tool_result</text>
+  </g>
+  <g id="transport-rule">
+    <rect x="56" y="594" width="1168" height="66" fill="#1C2A24"/>
+    <use data-icon="chunk-filled/arrows-repeat" x="76" y="608" width="36" height="36" fill="#FFFFFF"/>
+    <text x="132" y="634" font-family="'Microsoft YaHei UI', 'Segoe UI', Arial, sans-serif" font-size="24" font-weight="600" fill="#FFFFFF">SSE 只发现变化 → GET Snapshot 对账</text>
+    <text x="1200" y="622" text-anchor="end" font-family="'Microsoft YaHei UI', 'Segoe UI', Arial, sans-serif" font-size="18" fill="#CDD8D2">默认隐藏：Prompt · 思维链 · Worker 对话 · 幂等键 · Permit · 密钥 · 堆栈</text>
+    <text x="1200" y="648" text-anchor="end" font-family="'Microsoft YaHei UI', 'Segoe UI', Arial, sans-serif" font-size="18" fill="#C58B2B">连接状态不是任务完成、预算、风险或执行成功事实</text>
+  </g>
+  <g id="footer">
+    <text x="56" y="688" font-family="'Microsoft YaHei UI', 'Segoe UI', Arial, sans-serif" font-size="14" fill="#74817B">Source: UI_SERVER_FACT_MATRIX §1-4 · SCENARIO-001 §6</text>
+    <text x="1224" y="688" text-anchor="end" font-family="Consolas, 'Courier New', monospace" font-size="14" fill="#14865F">08 / 11</text>
+  </g>
+</svg>

@@ -1,0 +1,58 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720" width="1280" height="720">
+  <g id="background">
+    <rect x="0" y="0" width="1280" height="720" fill="#F7F9F8"/>
+  </g>
+  <g id="header">
+    <rect x="56" y="42" width="6" height="52" fill="#14865F"/>
+    <text x="80" y="82" font-family="'Microsoft YaHei UI', 'Segoe UI', Arial, sans-serif" font-size="44" font-weight="700" fill="#1C2A24">工程闭环成立，不等于生产能力成立</text>
+    <text x="1224" y="78" text-anchor="end" font-family="Consolas, 'Courier New', monospace" font-size="14" fill="#74817B">CLAIM BOUNDARY · P10</text>
+  </g>
+  <g id="takeaway">
+    <text x="56" y="136" font-family="'Microsoft YaHei UI', 'Segoe UI', Arial, sans-serif" font-size="28" font-weight="600" fill="#202824">
+      <tspan x="56" dy="0">当前证据足以支持固定 Fixture 的受控前后端纵切，</tspan>
+      <tspan x="56" dy="38">不足以支持真实持久恢复、真实连接器、通用安全或用户价值结论。</tspan>
+    </text>
+    <line x1="56" y1="196" x2="1224" y2="196" stroke="#CDD8D2" stroke-width="1"/>
+  </g>
+  <g id="verified-column">
+    <use data-icon="chunk-filled/circle-checkmark" x="56" y="224" width="56" height="56" fill="#14865F"/>
+    <text x="132" y="264" font-family="'Microsoft YaHei UI', 'Segoe UI', Arial, sans-serif" font-size="44" font-weight="700" fill="#14865F">已证明</text>
+    <line x1="56" y1="292" x2="592" y2="292" stroke="#14865F" stroke-width="4"/>
+    <circle cx="72" cy="336" r="6" fill="#14865F"/>
+    <text x="96" y="344" font-family="'Microsoft YaHei UI', 'Segoe UI', Arial, sans-serif" font-size="24" fill="#202824">协议、来源台账与汇报治理门槛</text>
+    <circle cx="72" cy="392" r="6" fill="#14865F"/>
+    <text x="96" y="400" font-family="'Microsoft YaHei UI', 'Segoe UI', Arial, sans-serif" font-size="24" fill="#202824">内存 Store 下的固定状态转换与局部冲突</text>
+    <circle cx="72" cy="448" r="6" fill="#14865F"/>
+    <text x="96" y="456" font-family="'Microsoft YaHei UI', 'Segoe UI', Arial, sans-serif" font-size="24" fill="#202824">Artifact lineage、验证、Commit 与 state hash</text>
+    <circle cx="72" cy="504" r="6" fill="#14865F"/>
+    <text x="96" y="512" font-family="'Microsoft YaHei UI', 'Segoe UI', Arial, sans-serif" font-size="24" fill="#202824">指定浏览器主路径与发送前 abort 恢复</text>
+  </g>
+  <g id="divider">
+    <line x1="640" y1="224" x2="640" y2="548" stroke="#CDD8D2" stroke-width="1"/>
+    <text x="640" y="386" text-anchor="middle" font-family="Consolas, 'Courier New', monospace" font-size="18" fill="#74817B" transform="rotate(-90 640 386)">EVIDENCE BOUNDARY</text>
+  </g>
+  <g id="unverified-column">
+    <use data-icon="chunk-filled/triangle-exclamation" x="688" y="224" width="56" height="56" fill="#C58B2B"/>
+    <text x="764" y="264" font-family="'Microsoft YaHei UI', 'Segoe UI', Arial, sans-serif" font-size="44" font-weight="700" fill="#C58B2B">未证明</text>
+    <line x1="688" y1="292" x2="1224" y2="292" stroke="#C58B2B" stroke-width="4"/>
+    <circle cx="704" cy="336" r="6" fill="#C58B2B"/>
+    <text x="728" y="344" font-family="'Microsoft YaHei UI', 'Segoe UI', Arial, sans-serif" font-size="24" fill="#202824">PostgreSQL / API 重启、多实例一致性</text>
+    <circle cx="704" cy="392" r="6" fill="#C58B2B"/>
+    <text x="728" y="400" font-family="'Microsoft YaHei UI', 'Segoe UI', Arial, sans-serif" font-size="24" fill="#202824">SSE 断线/缺口、提交后响应丢失恢复</text>
+    <circle cx="704" cy="448" r="6" fill="#C58B2B"/>
+    <text x="728" y="456" font-family="'Microsoft YaHei UI', 'Segoe UI', Arial, sans-serif" font-size="24" fill="#202824">真实 LLM/Connector、通用脱敏与 RBAC</text>
+    <circle cx="704" cy="504" r="6" fill="#C58B2B"/>
+    <text x="728" y="512" font-family="'Microsoft YaHei UI', 'Segoe UI', Arial, sans-serif" font-size="24" fill="#202824">Artifact → Action 失效、人工编辑新版本</text>
+  </g>
+  <g id="hypothesis-band">
+    <rect x="56" y="574" width="1168" height="72" fill="#EEF3F0"/>
+    <rect x="56" y="574" width="8" height="72" fill="#B34B3E"/>
+    <use data-icon="chunk-filled/users" x="84" y="592" width="36" height="36" fill="#B34B3E"/>
+    <text x="140" y="612" font-family="Consolas, 'Courier New', monospace" font-size="24" font-weight="700" fill="#B34B3E">H-001 → H-004 = Draft hypothesis</text>
+    <text x="1200" y="612" text-anchor="end" font-family="'Microsoft YaHei UI', 'Segoe UI', Arial, sans-serif" font-size="24" font-weight="600" fill="#202824">功能正确性不能自动等于理解、等待或接管收益</text>
+  </g>
+  <g id="footer">
+    <text x="56" y="688" font-family="'Microsoft YaHei UI', 'Segoe UI', Arial, sans-serif" font-size="14" fill="#74817B">Source: DR-0002 §4-6 · DEMO1-PR4 §4-5 · SCENARIO-001 §2/§7</text>
+    <text x="1224" y="688" text-anchor="end" font-family="Consolas, 'Courier New', monospace" font-size="14" fill="#14865F">10 / 11</text>
+  </g>
+</svg>

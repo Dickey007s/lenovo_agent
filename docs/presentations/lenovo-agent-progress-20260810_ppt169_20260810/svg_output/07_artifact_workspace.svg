@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720" width="1280" height="720">
+  <g id="background">
+    <rect x="0" y="0" width="1280" height="720" fill="#F7F9F8"/>
+  </g>
+  <g id="header">
+    <rect x="56" y="42" width="6" height="52" fill="#14865F"/>
+    <text x="80" y="82" font-family="'Microsoft YaHei UI', 'Segoe UI', Arial, sans-serif" font-size="44" font-weight="700" fill="#1C2A24">PR #7：后台状态终于落到可操作的前台</text>
+    <text x="1224" y="78" text-anchor="end" font-family="Consolas, 'Courier New', monospace" font-size="14" fill="#74817B">ARTIFACT WORKSPACE · P07</text>
+  </g>
+  <g id="takeaway">
+    <text x="56" y="136" font-family="'Microsoft YaHei UI', 'Segoe UI', Arial, sans-serif" font-size="28" font-weight="600" fill="#202824">Task Runtime 与 Artifact Workspace 共享同一 Snapshot，前端不创建虚假工件或完成状态。</text>
+    <line x1="56" y1="166" x2="1224" y2="166" stroke="#CDD8D2" stroke-width="1"/>
+  </g>
+  <g id="image-conflict-desktop">
+    <rect x="56" y="198" width="650" height="406" fill="#FFFFFF" stroke="#14865F" stroke-width="2"/>
+    <image href="../images/demo1-pr4-conflict-artifact-desktop.png" x="56" y="198" width="650" height="406" preserveAspectRatio="xMidYMid meet"/>
+    <rect x="56" y="198" width="650" height="8" fill="#14865F"/>
+    <text x="56" y="632" font-family="'Microsoft YaHei UI', 'Segoe UI', Arial, sans-serif" font-size="18" font-weight="600" fill="#202824">冲突态 · 经营分析 v1 · candidate / source / verification</text>
+    <text x="706" y="632" text-anchor="end" font-family="Consolas, 'Courier New', monospace" font-size="14" fill="#74817B">1440 × 900 · no crop</text>
+  </g>
+  <g id="image-committed-desktop">
+    <rect x="750" y="198" width="360" height="225" fill="#FFFFFF" stroke="#CDD8D2" stroke-width="2"/>
+    <image href="../images/demo1-pr4-committed-artifact-desktop.png" x="750" y="198" width="360" height="225" preserveAspectRatio="xMidYMid meet"/>
+    <rect x="750" y="198" width="360" height="6" fill="#14865F"/>
+    <text x="750" y="449" font-family="'Microsoft YaHei UI', 'Segoe UI', Arial, sans-serif" font-size="18" fill="#52605A">提交态 · reply v3 · 2,400 万 · 仅草稿</text>
+  </g>
+  <g id="image-mobile">
+    <rect x="1144" y="198" width="70" height="226" fill="#FFFFFF" stroke="#CDD8D2" stroke-width="2"/>
+    <image href="../images/demo1-pr4-conflict-artifact-mobile.png" x="1144" y="198" width="70" height="226" preserveAspectRatio="xMidYMid meet"/>
+    <rect x="1144" y="198" width="70" height="6" fill="#C58B2B"/>
+    <text x="1179" y="449" text-anchor="middle" font-family="Consolas, 'Courier New', monospace" font-size="14" fill="#74817B">390px</text>
+  </g>
+  <g id="fact-callouts">
+    <line x1="750" y1="478" x2="1214" y2="478" stroke="#CDD8D2" stroke-width="1"/>
+    <use data-icon="chunk-filled/layers" x="750" y="494" width="36" height="36" fill="#14865F"/>
+    <text x="802" y="518" font-family="'Microsoft YaHei UI', 'Segoe UI', Arial, sans-serif" font-size="24" font-weight="700" fill="#202824">同一 Snapshot</text>
+    <text x="990" y="506" font-family="Consolas, 'Courier New', monospace" font-size="14" fill="#52605A">head · version · verify</text>
+    <text x="990" y="530" font-family="Consolas, 'Courier New', monospace" font-size="14" fill="#52605A">conflict · lineage · Commit</text>
+    <use data-icon="chunk-filled/shield-check" x="750" y="542" width="36" height="36" fill="#C58B2B"/>
+    <text x="802" y="566" font-family="'Microsoft YaHei UI', 'Segoe UI', Arial, sans-serif" font-size="24" font-weight="700" fill="#202824">安全投影</text>
+    <text x="990" y="554" font-family="'Microsoft YaHei UI', 'Segoe UI', Arial, sans-serif" font-size="16" fill="#52605A">已知 kind allowlist</text>
+    <text x="990" y="578" font-family="'Microsoft YaHei UI', 'Segoe UI', Arial, sans-serif" font-size="16" fill="#52605A">未知类型默认隐藏</text>
+    <text x="802" y="600" font-family="'Microsoft YaHei UI', 'Segoe UI', Arial, sans-serif" font-size="16" fill="#C58B2B">第二道防线，不是服务端通用脱敏</text>
+    <use data-icon="chunk-filled/circle-checkmark" x="750" y="610" width="36" height="36" fill="#14865F"/>
+    <text x="802" y="636" font-family="'Microsoft YaHei UI', 'Segoe UI', Arial, sans-serif" font-size="24" font-weight="700" fill="#202824">2 passed</text>
+    <text x="990" y="624" font-family="'Microsoft YaHei UI', 'Segoe UI', Arial, sans-serif" font-size="16" fill="#52605A">1 Task · 3 committed Branch</text>
+    <text x="990" y="648" font-family="'Microsoft YaHei UI', 'Segoe UI', Arial, sans-serif" font-size="16" fill="#52605A">7 unique ArtifactVersion</text>
+  </g>
+  <g id="footer">
+    <text x="56" y="688" font-family="'Microsoft YaHei UI', 'Segoe UI', Arial, sans-serif" font-size="14" fill="#74817B">Source: DEMO1-PR4-FRONTEND-E2E-EVIDENCE §1-5 · UI_SERVER_FACT_MATRIX §1/§5</text>
+    <text x="1224" y="688" text-anchor="end" font-family="Consolas, 'Courier New', monospace" font-size="14" fill="#14865F">07 / 11</text>
+  </g>
+</svg>
