@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import re
 from pathlib import Path
 
@@ -8,6 +9,15 @@ REPOSITORY_ROOT = Path(__file__).parents[2]
 PROTOTYPE = REPOSITORY_ROOT / "docs" / "prototypes" / "loop-swarm-showcase.html"
 TARGET_ARCHITECTURE = REPOSITORY_ROOT / "docs" / "TARGET_ARCHITECTURE.md"
 FINAL_REFERENCE = REPOSITORY_ROOT / "docs" / "final-reference"
+REFERENCE_SHA256 = {
+    "未来办公Agent_一小时汇报讲稿_v5.md": (
+        "E346EEF04935BF2095E37B6E153183901B0192B06901C7A1D6AAB3A66F0937D2"
+    ),
+    "office_agent_demo_showcase_v5_reference_layout.html": (
+        "0E9C9EA49AEA838C9B05DB80E44BF6C7E88EA9691BE4D2E2AF77D9B362E6D535"
+    ),
+    "0716-v2.pptx": "A768EFA7412F35FD65FCFDE61DA4DA616066999E157DEC64AE3DD79F6C5E0B8B",
+}
 
 
 def test_offline_prototype_covers_runtime_components_and_demos() -> None:
@@ -58,6 +68,12 @@ def test_final_reference_set_preserves_the_reviewed_prototype() -> None:
     assert reference_prototype.read_bytes() == PROTOTYPE.read_bytes()
     assert (FINAL_REFERENCE / "未来办公Agent_一小时汇报讲稿_v5.md").is_file()
     assert (FINAL_REFERENCE / "0716-v2.pptx").is_file()
+
+
+def test_final_reference_hashes_match_the_documented_manifest() -> None:
+    for filename, expected_sha256 in REFERENCE_SHA256.items():
+        content = (FINAL_REFERENCE / filename).read_bytes()
+        assert hashlib.sha256(content).hexdigest().upper() == expected_sha256
 
 
 def test_final_reference_covers_every_next_step_focus() -> None:
