@@ -92,6 +92,9 @@ flowchart LR
 - [演示脚本与 Presentation Brief](docs/PRESENTATION_BRIEF.md)
 - [Loop、Swarm 与统一 Agent Runtime 目标架构](docs/TARGET_ARCHITECTURE.md)
 - [决策、推进与汇报治理](docs/DECISION_AND_REPORTING_GOVERNANCE.md)
+- [Demo 1 Task Runtime 协议](docs/contracts/TASK_RUNTIME_PROTOCOL.md)
+- [Demo 1 UI—服务端事实矩阵](docs/contracts/UI_SERVER_FACT_MATRIX.md)
+- [Demo 1 场景与决策记录](docs/scenarios/SCENARIO-001-customer-a-durable-report.md)
 
 ## 目录结构
 
