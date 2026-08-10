@@ -1,0 +1,61 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720" width="1280" height="720">
+  <g id="background">
+    <rect x="0" y="0" width="1280" height="720" fill="#F7F9F8"/>
+  </g>
+  <g id="header">
+    <rect x="56" y="42" width="6" height="52" fill="#14865F"/>
+    <text x="80" y="82" font-family="'Microsoft YaHei UI', 'Segoe UI', Arial, sans-serif" font-size="44" font-weight="700" fill="#1C2A24">PR #5：Task Bar 背后有了服务端真值</text>
+    <text x="1224" y="78" text-anchor="end" font-family="Consolas, 'Courier New', monospace" font-size="14" fill="#74817B">TASK FACTS · P05</text>
+  </g>
+  <g id="takeaway">
+    <text x="56" y="136" font-family="'Microsoft YaHei UI', 'Segoe UI', Arial, sans-serif" font-size="28" font-weight="600" fill="#202824">Task Bar 不再模拟进度，而是读取 Owner 隔离、可幂等创建、可按序查询的服务端 Task 事实。</text>
+    <line x1="56" y1="166" x2="1224" y2="166" stroke="#CDD8D2" stroke-width="1"/>
+  </g>
+  <g id="layer-ui">
+    <rect x="56" y="198" width="1168" height="112" fill="#FFFFFF" stroke="#CDD8D2" stroke-width="1"/>
+    <rect x="56" y="198" width="72" height="112" fill="#14865F"/>
+    <text x="92" y="268" text-anchor="middle" font-family="Consolas, 'Courier New', monospace" font-size="28" font-weight="700" fill="#FFFFFF">01</text>
+    <use data-icon="chunk-filled/desktop" x="154" y="226" width="48" height="48" fill="#14865F"/>
+    <text x="222" y="236" font-family="'Microsoft YaHei UI', 'Segoe UI', Arial, sans-serif" font-size="24" font-weight="700" fill="#202824">UI · Active Task Bar</text>
+    <text x="222" y="276" font-family="'Microsoft YaHei UI', 'Segoe UI', Arial, sans-serif" font-size="24" fill="#52605A">Task ID · 目标 · 阶段 · 预算 · version · 同步状态</text>
+    <line x1="884" y1="216" x2="884" y2="292" stroke="#DFE7E3" stroke-width="1"/>
+    <text x="912" y="240" font-family="Consolas, 'Courier New', monospace" font-size="18" font-weight="700" fill="#14865F">READ</text>
+    <text x="912" y="270" font-family="'Microsoft YaHei UI', 'Segoe UI', Arial, sans-serif" font-size="18" fill="#52605A">只渲染 TaskSnapshot</text>
+    <text x="1188" y="270" text-anchor="end" font-family="'Microsoft YaHei UI', 'Segoe UI', Arial, sans-serif" font-size="18" fill="#14865F">已实现</text>
+  </g>
+  <g id="layer-api">
+    <rect x="56" y="330" width="1168" height="112" fill="#EEF3F0" stroke="#CDD8D2" stroke-width="1"/>
+    <rect x="56" y="330" width="72" height="112" fill="#1C2A24"/>
+    <text x="92" y="400" text-anchor="middle" font-family="Consolas, 'Courier New', monospace" font-size="28" font-weight="700" fill="#FFFFFF">02</text>
+    <use data-icon="chunk-filled/arrows-repeat" x="154" y="358" width="48" height="48" fill="#1C2A24"/>
+    <text x="222" y="368" font-family="'Microsoft YaHei UI', 'Segoe UI', Arial, sans-serif" font-size="24" font-weight="700" fill="#202824">API · REST + Task SSE</text>
+    <text x="222" y="408" font-family="'Microsoft YaHei UI', 'Segoe UI', Arial, sans-serif" font-size="24" fill="#52605A">POST 创建 · GET 列表/详情 · EventSource `after` · heartbeat</text>
+    <line x1="884" y1="348" x2="884" y2="424" stroke="#CDD8D2" stroke-width="1"/>
+    <text x="912" y="372" font-family="Consolas, 'Courier New', monospace" font-size="18" font-weight="700" fill="#1C2A24">DISCOVER</text>
+    <text x="912" y="402" font-family="'Microsoft YaHei UI', 'Segoe UI', Arial, sans-serif" font-size="18" fill="#52605A">SSE 后重新 GET 对账</text>
+    <text x="1188" y="402" text-anchor="end" font-family="'Microsoft YaHei UI', 'Segoe UI', Arial, sans-serif" font-size="18" fill="#14865F">已实现</text>
+  </g>
+  <g id="layer-store">
+    <rect x="56" y="462" width="1168" height="126" fill="#FFFFFF" stroke="#CDD8D2" stroke-width="1"/>
+    <rect x="56" y="462" width="72" height="126" fill="#C58B2B"/>
+    <text x="92" y="540" text-anchor="middle" font-family="Consolas, 'Courier New', monospace" font-size="28" font-weight="700" fill="#FFFFFF">03</text>
+    <use data-icon="chunk-filled/database" x="154" y="498" width="48" height="48" fill="#C58B2B"/>
+    <text x="222" y="502" font-family="'Microsoft YaHei UI', 'Segoe UI', Arial, sans-serif" font-size="24" font-weight="700" fill="#202824">Store · Snapshot + Event + ArtifactVersion</text>
+    <text x="222" y="538" font-family="'Microsoft YaHei UI', 'Segoe UI', Arial, sans-serif" font-size="21" fill="#52605A">Owner scope · 创建幂等 · TASK_CREATED(sequence=1)</text>
+    <text x="222" y="570" font-family="'Microsoft YaHei UI', 'Segoe UI', Arial, sans-serif" font-size="18" fill="#74817B">三个初始 Branch · InMemoryTaskStore verified</text>
+    <line x1="884" y1="480" x2="884" y2="570" stroke="#DFE7E3" stroke-width="1"/>
+    <text x="912" y="506" font-family="Consolas, 'Courier New', monospace" font-size="18" font-weight="700" fill="#C58B2B">PERSIST</text>
+    <text x="912" y="536" font-family="'Microsoft YaHei UI', 'Segoe UI', Arial, sans-serif" font-size="17" fill="#52605A">内存路径有自动化证据</text>
+    <text x="912" y="566" font-family="'Microsoft YaHei UI', 'Segoe UI', Arial, sans-serif" font-size="17" fill="#C58B2B">PostgreSQL 未实跑/重启</text>
+  </g>
+  <g id="verification-strip">
+    <rect x="56" y="612" width="1168" height="50" fill="#1C2A24"/>
+    <use data-icon="chunk-filled/circle-checkmark" x="76" y="621" width="32" height="32" fill="#FFFFFF"/>
+    <text x="124" y="645" font-family="'Microsoft YaHei UI', 'Segoe UI', Arial, sans-serif" font-size="24" font-weight="600" fill="#FFFFFF">针对性 7 passed · 全量 Python 44 passed</text>
+    <text x="1200" y="642" text-anchor="end" font-family="'Microsoft YaHei UI', 'Segoe UI', Arial, sans-serif" font-size="18" fill="#CDD8D2">未验证：API 重启 · 多实例通知 · 浏览器 E2E</text>
+  </g>
+  <g id="footer">
+    <text x="56" y="688" font-family="'Microsoft YaHei UI', 'Segoe UI', Arial, sans-serif" font-size="14" fill="#74817B">Source: DR-0002 §4/§6 · UI_SERVER_FACT_MATRIX §5 · REPORT_STATUS_SNAPSHOT</text>
+    <text x="1224" y="688" text-anchor="end" font-family="Consolas, 'Courier New', monospace" font-size="14" fill="#14865F">05 / 11</text>
+  </g>
+</svg>

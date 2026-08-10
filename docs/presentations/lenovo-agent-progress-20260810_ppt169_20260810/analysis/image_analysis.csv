@@ -1,0 +1,6 @@
+No,Filename,Width,Height,AspectRatio,PixelAspectRatio,RatioSource,UsageCount,DisplayRatioVariants,AssetKind,SvgRenderable,PptxNativeSupported,SizeKB,Category,ImageArea_SxS,TextArea_SxS
+1,demo1-pr4-committed-artifact-desktop.png,1440,900,1.60,1.60,pixel,1,,bitmap,True,True,113.6,Wide landscape,812x508,328x600
+2,demo1-pr4-conflict-artifact-desktop.png,1440,900,1.60,1.60,pixel,1,,bitmap,True,True,110.7,Wide landscape,812x508,328x600
+3,demo1-pr4-conflict-artifact-mobile.png,390,1260,0.31,0.31,pixel,1,,bitmap,True,True,62.6,Portrait,186x600,954x600
+4,demo1-pr4-pending-recovery.png,1280,720,1.78,1.78,pixel,1,,bitmap,True,True,76.2,Wide landscape,812x457,328x600
+5,demo1-pr4-reconciled.png,1280,720,1.78,1.78,pixel,1,,bitmap,True,True,76.7,Wide landscape,812x457,328x600

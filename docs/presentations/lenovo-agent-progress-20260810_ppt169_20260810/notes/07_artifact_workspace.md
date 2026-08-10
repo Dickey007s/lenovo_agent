@@ -1,0 +1,1 @@
+接下来把视线转到用户真正看到的界面。右侧 Task Runtime 与左侧 Artifact Workspace 共享同一份 Snapshot，分支 head、版本、结构化内容、验证、冲突、lineage 和 Commit 都来自服务端，前端不会补造工件或完成状态。固定三类工件使用 allowlist，未知字段和不安全的 source reference 默认隐藏，但这只是前端第二道投影，不是服务端通用脱敏保证。System Edge 的两条端到端用例覆盖了主路径和发送前失败恢复，主路径终态是一项任务、三个已提交分支和七个唯一工件版本。

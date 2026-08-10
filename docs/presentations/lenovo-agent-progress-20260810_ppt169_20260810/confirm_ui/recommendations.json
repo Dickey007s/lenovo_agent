@@ -1,0 +1,151 @@
+{
+  "tier": 2,
+  "lang": "zh",
+  "recommend": {
+    "icons": "chunk-filled",
+    "image_usage": [
+      "provided"
+    ],
+    "formula_policy": "text-only",
+    "generation_mode": "continuous"
+  },
+  "page_count": {
+    "value": "11"
+  },
+  "color": {
+    "selected": 0,
+    "candidates": [
+      {
+        "name_zh": "证据绿与石墨灰",
+        "name_en": "Evidence Green",
+        "note_zh": "推荐。延续 Demo 界面的绿色确认与琥珀色风险语义，适合把工程事实、验证与边界放在同一套视觉语言中。",
+        "note_en": "Recommended. Carries the demo's confirmation green and risk amber into a restrained evidence-led review.",
+        "palette": {
+          "background": "#F7F9F8",
+          "secondary_bg": "#EEF3F0",
+          "primary": "#1C2A24",
+          "accent": "#14865F",
+          "secondary_accent": "#C58B2B",
+          "body_text": "#202824"
+        }
+      },
+      {
+        "name_zh": "结构蓝与信号绿",
+        "name_en": "Structural Blue",
+        "note_zh": "更偏架构评审，蓝色负责协议与系统结构，绿色只标记已验证结果。",
+        "note_en": "Architecture-review oriented: blue carries system structure and green marks verified outcomes.",
+        "palette": {
+          "background": "#F5F7F8",
+          "secondary_bg": "#E8EEF2",
+          "primary": "#183B56",
+          "accent": "#1A8F68",
+          "secondary_accent": "#D08B20",
+          "body_text": "#1C2B36"
+        }
+      },
+      {
+        "name_zh": "黑白与研究黄",
+        "name_en": "Research Signal",
+        "note_zh": "更具研究宣言感，黑白网格承载事实，黄色突出结论，红色仅用于未完成边界。",
+        "note_en": "A research-manifesto option: black-white grids carry facts, yellow lands conclusions, and red stays reserved for gaps.",
+        "palette": {
+          "background": "#FAFAF7",
+          "secondary_bg": "#EFEDE5",
+          "primary": "#111111",
+          "accent": "#F2B705",
+          "secondary_accent": "#D4483B",
+          "body_text": "#202020"
+        }
+      }
+    ]
+  },
+  "typography": {
+    "selected": 0,
+    "candidates": [
+      {
+        "name_zh": "理性雅黑",
+        "name_en": "Rational YaHei",
+        "note_zh": "推荐。中文信息密度稳定，Segoe UI 让英文协议名和代码标识保持清晰。",
+        "note_en": "Recommended. Stable CJK density with clear English protocol and code identifiers.",
+        "sample_heading": "四个 PR 已形成可审查的 Demo 1 闭环",
+        "sample_heading_latin": "Four PRs, One Verifiable Demo Loop",
+        "sample_body": "每个前台状态都由服务端事实产生，内部细节默认隐藏。",
+        "sample_body_latin": "Every visible state is backed by a server fact.",
+        "heading": {
+          "cjk": "Microsoft YaHei UI",
+          "latin": "Segoe UI",
+          "css": "'Microsoft YaHei UI','Segoe UI',Arial,sans-serif"
+        },
+        "body": {
+          "cjk": "Microsoft YaHei UI",
+          "latin": "Segoe UI",
+          "css": "'Microsoft YaHei UI','Segoe UI',Arial,sans-serif"
+        },
+        "body_size": 24,
+        "sizes": {
+          "title": 44,
+          "subtitle": 32,
+          "annotation": 18
+        }
+      },
+      {
+        "name_zh": "工程等线",
+        "name_en": "Engineering DengXian",
+        "note_zh": "笔画更轻、技术感更强，适合协议矩阵和架构流程，但投影距离较远时对比略弱。",
+        "note_en": "Lighter and more technical, strong for protocol matrices and architecture flows, with lower long-distance weight.",
+        "sample_heading": "从治理规则到前后端事实映射",
+        "sample_heading_latin": "From Governance Rules to UI Facts",
+        "sample_body": "任务、分支、工件、控制事件和提交共享同一个可追踪状态模型。",
+        "sample_body_latin": "Task, branch, artifact, control, and commit share one traceable model.",
+        "heading": {
+          "cjk": "DengXian",
+          "latin": "Arial",
+          "css": "DengXian,Arial,sans-serif"
+        },
+        "body": {
+          "cjk": "DengXian",
+          "latin": "Arial",
+          "css": "DengXian,Arial,sans-serif"
+        },
+        "body_size": 24,
+        "sizes": {
+          "title": 44,
+          "subtitle": 32,
+          "annotation": 18
+        }
+      },
+      {
+        "name_zh": "紧凑证据体",
+        "name_en": "Compact Evidence",
+        "note_zh": "更适合阅读型附件，雅黑承载中文，Arial Narrow 压缩英文证据编号与路径。",
+        "note_en": "More document-like: YaHei carries Chinese while Arial Narrow compresses evidence IDs and paths.",
+        "sample_heading": "证据证明了什么，也明确不能证明什么",
+        "sample_heading_latin": "What the Evidence Proves, and What It Does Not",
+        "sample_body": "固定 Fixture 通过工程验证，但真实恢复和用户价值仍待补证。",
+        "sample_body_latin": "The fixture is verified; real recovery and user value remain open.",
+        "heading": {
+          "cjk": "Microsoft YaHei",
+          "latin": "Arial Narrow",
+          "css": "'Microsoft YaHei','Arial Narrow',Arial,sans-serif"
+        },
+        "body": {
+          "cjk": "Microsoft YaHei",
+          "latin": "Arial Narrow",
+          "css": "'Microsoft YaHei','Arial Narrow',Arial,sans-serif"
+        },
+        "body_size": 24,
+        "sizes": {
+          "title": 42,
+          "subtitle": 31,
+          "annotation": 18
+        }
+      }
+    ]
+  },
+  "image_notes": {
+    "value": "只使用仓库内已验证的 Demo 1 桌面/移动端截图作为证据图；架构、协议和路线图用原生 SVG 图形重绘，不使用氛围图、库存照片或 AI 生成图。截图必须保留状态语义，不裁掉关键冲突、版本、Commit 或恢复提示。"
+  },
+  "refine_spec": {
+    "value": false
+  }
+}

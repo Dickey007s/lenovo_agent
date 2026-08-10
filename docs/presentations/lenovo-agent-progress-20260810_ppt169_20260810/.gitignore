@@ -1,0 +1,8 @@
+/backup/
+/live_preview/
+/renders/
+/renders_final/
+/svg_final/
+/templates/
+/exports/*.pptx
+!/exports/lenovo-agent-progress-20260810_20260810_161821.pptx

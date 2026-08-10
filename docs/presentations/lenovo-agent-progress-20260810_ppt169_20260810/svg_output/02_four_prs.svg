@@ -1,0 +1,66 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720" width="1280" height="720">
+  <g id="background">
+    <rect x="0" y="0" width="1280" height="720" fill="#F7F9F8"/>
+  </g>
+  <g id="header">
+    <rect x="56" y="42" width="6" height="52" fill="#14865F"/>
+    <text x="80" y="82" font-family="'Microsoft YaHei UI', 'Segoe UI', Arial, sans-serif" font-size="44" font-weight="700" fill="#1C2A24">四个 PR 已形成可审查纵切</text>
+    <text x="1224" y="78" text-anchor="end" font-family="Consolas, 'Courier New', monospace" font-size="14" fill="#74817B">ANSWER FIRST · P02</text>
+    <line x1="56" y1="108" x2="1224" y2="108" stroke="#CDD8D2" stroke-width="1"/>
+  </g>
+  <g id="takeaway">
+    <text x="56" y="148" font-family="'Microsoft YaHei UI', 'Segoe UI', Arial, sans-serif" font-size="28" font-weight="600" fill="#202824">
+      <tspan x="56" dy="0">治理门槛、服务端任务事实、固定 Fixture 状态转换与真实浏览器投影已经串联；</tspan>
+      <tspan x="56" dy="38">当前结论仍限定为工程纵切，不是生产级长任务引擎。</tspan>
+    </text>
+  </g>
+  <g id="pr-chain">
+    <g id="stage-pr4">
+      <polygon points="56,250 298,250 326,302 298,354 56,354" fill="#FFFFFF" stroke="#CDD8D2" stroke-width="2"/>
+      <use data-icon="chunk-filled/file" x="78" y="272" width="34" height="34" fill="#14865F"/>
+      <text x="126" y="288" font-family="Consolas, 'Courier New', monospace" font-size="18" font-weight="700" fill="#14865F">PR #4</text>
+      <text x="126" y="326" font-family="'Microsoft YaHei UI', 'Segoe UI', Arial, sans-serif" font-size="24" font-weight="700" fill="#1C2A24">协议与留痕</text>
+      <text x="78" y="392" font-family="'Microsoft YaHei UI', 'Segoe UI', Arial, sans-serif" font-size="18" fill="#52605A">Scenario · Source · Contract</text>
+      <text x="78" y="422" font-family="'Microsoft YaHei UI', 'Segoe UI', Arial, sans-serif" font-size="18" fill="#52605A">UI 事实矩阵</text>
+    </g>
+    <g id="stage-pr5">
+      <polygon points="334,250 576,250 604,302 576,354 334,354 362,302" fill="#EEF3F0" stroke="#CDD8D2" stroke-width="2"/>
+      <use data-icon="chunk-filled/database" x="372" y="272" width="34" height="34" fill="#14865F"/>
+      <text x="420" y="288" font-family="Consolas, 'Courier New', monospace" font-size="18" font-weight="700" fill="#14865F">PR #5</text>
+      <text x="420" y="326" font-family="'Microsoft YaHei UI', 'Segoe UI', Arial, sans-serif" font-size="24" font-weight="700" fill="#1C2A24">服务端真值</text>
+      <text x="356" y="392" font-family="'Microsoft YaHei UI', 'Segoe UI', Arial, sans-serif" font-size="18" fill="#52605A">TaskStore · REST · SSE</text>
+      <text x="356" y="422" font-family="'Microsoft YaHei UI', 'Segoe UI', Arial, sans-serif" font-size="18" fill="#52605A">真实 Task Bar</text>
+    </g>
+    <g id="stage-pr6">
+      <polygon points="612,250 854,250 882,302 854,354 612,354 640,302" fill="#FFFFFF" stroke="#CDD8D2" stroke-width="2"/>
+      <use data-icon="chunk-filled/git-branch" x="650" y="272" width="34" height="34" fill="#14865F"/>
+      <text x="698" y="288" font-family="Consolas, 'Courier New', monospace" font-size="18" font-weight="700" fill="#14865F">PR #6</text>
+      <text x="698" y="326" font-family="'Microsoft YaHei UI', 'Segoe UI', Arial, sans-serif" font-size="24" font-weight="700" fill="#1C2A24">受控状态转换</text>
+      <text x="634" y="392" font-family="'Microsoft YaHei UI', 'Segoe UI', Arial, sans-serif" font-size="18" fill="#52605A">Loop · Conflict · Control</text>
+      <text x="634" y="422" font-family="'Microsoft YaHei UI', 'Segoe UI', Arial, sans-serif" font-size="18" fill="#52605A">Verified Commit</text>
+    </g>
+    <g id="stage-pr7">
+      <polygon points="890,250 1194,250 1224,302 1194,354 890,354 918,302" fill="#14865F" stroke="#14865F" stroke-width="2"/>
+      <use data-icon="chunk-filled/desktop" x="934" y="272" width="34" height="34" fill="#FFFFFF"/>
+      <text x="982" y="288" font-family="Consolas, 'Courier New', monospace" font-size="18" font-weight="700" fill="#FFFFFF">PR #7</text>
+      <text x="982" y="326" font-family="'Microsoft YaHei UI', 'Segoe UI', Arial, sans-serif" font-size="24" font-weight="700" fill="#FFFFFF">前台工件闭环</text>
+      <text x="912" y="392" font-family="'Microsoft YaHei UI', 'Segoe UI', Arial, sans-serif" font-size="18" fill="#14865F">Artifact Workspace · E2E</text>
+      <text x="912" y="422" font-family="'Microsoft YaHei UI', 'Segoe UI', Arial, sans-serif" font-size="18" fill="#52605A">桌面 + 移动端</text>
+    </g>
+  </g>
+  <g id="boundary-band">
+    <rect x="56" y="486" width="1168" height="132" fill="#EEF3F0"/>
+    <rect x="56" y="486" width="8" height="132" fill="#C58B2B"/>
+    <use data-icon="chunk-filled/triangle-exclamation" x="88" y="516" width="40" height="40" fill="#C58B2B"/>
+    <text x="152" y="542" font-family="'Microsoft YaHei UI', 'Segoe UI', Arial, sans-serif" font-size="28" font-weight="600" fill="#1C2A24">边界必须与进展同屏</text>
+    <text x="152" y="584" font-family="'Microsoft YaHei UI', 'Segoe UI', Arial, sans-serif" font-size="22" fill="#202824">固定 Fixture · 内存 Store · start 为一次原子 mutation</text>
+    <line x1="724" y1="510" x2="724" y2="598" stroke="#CDD8D2" stroke-width="1"/>
+    <text x="760" y="526" font-family="Consolas, 'Courier New', monospace" font-size="16" font-weight="700" fill="#C58B2B">NOT YET VERIFIED</text>
+    <text x="760" y="558" font-family="'Microsoft YaHei UI', 'Segoe UI', Arial, sans-serif" font-size="20" fill="#202824">PostgreSQL 重启 · SSE 断线</text>
+    <text x="760" y="590" font-family="'Microsoft YaHei UI', 'Segoe UI', Arial, sans-serif" font-size="20" fill="#202824">真实 Connector · 用户研究</text>
+  </g>
+  <g id="footer">
+    <text x="56" y="688" font-family="'Microsoft YaHei UI', 'Segoe UI', Arial, sans-serif" font-size="14" fill="#74817B">Source: REPORT_STATUS_SNAPSHOT · DR-0002 §6</text>
+    <text x="1224" y="688" text-anchor="end" font-family="Consolas, 'Courier New', monospace" font-size="14" fill="#14865F">02 / 11</text>
+  </g>
+</svg>
