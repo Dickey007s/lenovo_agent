@@ -1,6 +1,6 @@
 # Demo 1 Task Runtime 协议
 
-> 状态：`Ready`。本文件定义目标协议；PR 1 只落地严格 Pydantic/TypeScript 类型和测试，不宣称持久化、SSE、Loop 或前端已经实现。
+> 状态：`Ready`。PR 2 已落地 TaskService/TaskStore、Task 创建与读取 API、初始 `TASK_CREATED` SSE 和最薄 Active Task Bar；本文件其余 Loop、控制、工件、验证、冲突与 Commit 语义仍是目标协议。
 
 ## 1. 权威来源与兼容规则
 
@@ -11,6 +11,19 @@
 3. 本文解释语义、状态机和时序；行为实现后由 API、TaskService、Store、Trace 和测试共同证明。
 
 `schema_version="1.0"` 的未知顶层字段必须拒绝，不能静默接受。协议变更必须同步 Pydantic、TypeScript、API/SSE、本文、UI 事实矩阵和测试。
+
+### 1.1 PR 2 已实现边界
+
+| 能力 | 当前事实 | 尚未实现 |
+| --- | --- | --- |
+| Task 创建 | `TaskService` 从 `TaskContractDraft` 生成服务端 Task ID、Owner、契约、三个初始 Branch 和 `TASK_CREATED` | 契约修改、取消和运行命令 |
+| TaskStore | `InMemoryTaskStore` 与 `PostgresTaskStore` 支持 create/load/list/load_events；PostgreSQL 原子创建 Snapshot 和初始事件 | Snapshot 更新、ArtifactVersion 写入、Outbox、迁移工具 |
+| API | `POST /demo1/tasks`、`POST /tasks`、`GET /tasks`、`GET /tasks/{id}`、Task SSE | `/controls`、Loop、验证、冲突与 Commit mutation |
+| 幂等 | `POST /tasks` 可用 `Idempotency-Key`；同 Owner+key+契约返回原 Task，不同契约返回 409；Demo 1 使用 Owner 固定 key | 运行步骤和控制命令幂等 |
+| Owner scope | 列表、读取和事件均以 `X-User-Id` 过滤，跨 Owner 按不存在处理 | 生产 SSO/JWT、租户 RBAC |
+| 前台 | Active Task Bar 读取服务端 Snapshot，展示状态、阶段、预算、版本、Task ID 与客户端同步状态 | Branch、Conflict、Artifact、Control 和 Commit UI |
+
+创建后的唯一运行时事实是 `ready / contract`、三个 `queued` Branch、空工件/验证/冲突/控制列表、`last_commit=null` 和 `TASK_CREATED(sequence=1)`。类型中存在其他状态和事件，不表示服务端已经产生它们。
 
 ## 2. 服务端权威实体
 
@@ -107,7 +120,7 @@ stateDiagram-v2
 | `return_control` | Branch | `branch_id`、version、key | 从人工最新版本恢复 Agent 控制 | 重新校验来源和版本后继续 |
 | `resolve_evidence` | Branch | `branch_id`、`selected_source_ref`、version、key | 解决指定冲突并创建重新验证工作 | 冲突保持 open，直到收到服务端 resolved 事件 |
 
-每个 mutation 都必须携带 `expected_task_version` 和 `idempotency_key`。版本过期返回 `409`；相同 key 与相同命令返回原结果；相同 key 与不同命令返回 `409`，不得产生新事件。
+以下控制命令仍是 PR 3 目标，当前没有 `/controls` 路由。未来每个 mutation 都必须携带 `expected_task_version` 和 `idempotency_key`。版本过期返回 `409`；相同 key 与相同命令返回原结果；相同 key 与不同命令返回 `409`，不得产生新事件。
 
 ## 6. 事件目录与 SSE
 
@@ -115,20 +128,26 @@ stateDiagram-v2
 
 | 事件族 | 事件 | UI 用途 |
 | --- | --- | --- |
-| Task | `TASK_CREATED`、`TASK_RESTORED`、`TASK_STATUS_CHANGED`、`TASK_PHASE_CHANGED`、`TASK_FAILED`、`TASK_COMMITTED` | Task Bar 与终态 |
+| Task | `TASK_CREATED`（PR 2 已产生）；`TASK_RESTORED`、`TASK_STATUS_CHANGED`、`TASK_PHASE_CHANGED`、`TASK_FAILED`、`TASK_COMMITTED`（目标） | Task Bar 与终态 |
 | Loop | `LOOP_STEP_STARTED`、`LOOP_STEP_COMPLETED`、`BUDGET_UPDATED` | 阶段和预算，不等同于完成 |
 | Branch | `BRANCH_STATUS_CHANGED` | 分支列表与影响范围 |
 | Artifact | `ARTIFACT_VERSION_CREATED`、`VERIFICATION_RECORDED`、`CHECKPOINT_COMMITTED` | 工件版本、验证和恢复点 |
 | Conflict | `CONFLICT_OPENED`、`CONFLICT_RESOLVED` | 冲突卡与重新验证 |
 | Control | `CONTROL_ACCEPTED`、`CONTROL_APPLIED`、`CONTROL_REJECTED` | 用户命令终态与原因 |
 
-目标接口：
+当前接口：
 
 ```text
 POST /v1/tasks
+POST /v1/demo1/tasks
 GET  /v1/tasks
 GET  /v1/tasks/{task_id}
 GET  /v1/tasks/{task_id}/events?after={sequence}
+```
+
+PR 3 目标接口：
+
+```text
 POST /v1/tasks/{task_id}/controls
 ```
 
@@ -140,7 +159,9 @@ event: BRANCH_STATUS_CHANGED
 data: {TaskEvent JSON}
 ```
 
-断线恢复顺序固定为：携带最后确认的 `after=sequence` 回放事件，再 GET 最新 Snapshot；若版本或序号存在缺口，以 Snapshot 覆盖本地投影。heartbeat 和断线属于传输状态，不改变任务业务状态。
+当前 Task SSE 使用 `after` 查询参数并轮询 Store，路由不读取 `Last-Event-ID` 请求头。Active Task Bar 收到事件或连接建立后 GET 最新 Snapshot 对账；heartbeat 和断线属于传输状态，不改变任务业务状态。当前没有 PostgreSQL `LISTEN/NOTIFY`、消息代理或跨实例广播，多实例通知未实现和验证。
+
+内存模式下复用同一 Store 构造新的 `TaskService` 可以恢复相同 Snapshot 和游标，但 API 进程退出会丢失全部 Task。只有 PostgreSQL 模式具备跨进程保存基础，且当前尚无真实进程重启验收证据。
 
 ## 7. 身份、权限与隐藏信息
 
@@ -151,11 +172,11 @@ data: {TaskEvent JSON}
 
 ## 8. 分阶段实现状态
 
-| 能力 | PR 1 | 后续目标 |
+| 能力 | 当前状态 | 后续目标 |
 | --- | --- | --- |
-| Pydantic 与 TypeScript 协议 | 实现并测试 | 随行为演进同步 |
+| Pydantic 与 TypeScript 协议 | PR 1 已实现并测试 | 随行为演进同步 |
 | 场景、来源、状态机、UI 映射 | `Ready` | 用运行证据更新为 Verified |
-| Task Store / Snapshot API / SSE | 未实现 | PR 2 |
+| Task Store / Snapshot API / SSE | PR 2 已实现创建、读取、Owner scope、创建幂等和 `TASK_CREATED` 回放 | 增加 mutation、真实重启和多实例通知 |
 | Observe/Plan/Act/Verify/Commit | 未实现 | PR 3 |
-| Task UI 与断线恢复 | 未实现 | PR 2 最薄 Task Bar，PR 3/4 完整闭环 |
+| Task UI 与断线恢复 | PR 2 已实现最薄 Task Bar、自动重连和 Snapshot 对账 | PR 3/4 完整异常与控制闭环 |
 | Adaptive Swarm / 真实 Connector | 非本决策范围 | 需独立 Admission 和来源证据 |

@@ -1,7 +1,7 @@
 import json
 from typing import Annotated, Literal
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, status
 from langgraph.checkpoint.base import BaseCheckpointSaver
 from pydantic import BaseModel, ConfigDict, Field
 from starlette.responses import StreamingResponse
@@ -10,6 +10,7 @@ from packages.agent_runtime import AgentWorkflow, WorkflowCallbacks
 from packages.audit import InMemoryAuditLog
 from packages.authorization import AuthorizationError, AuthorizationService, PermitKeyPair
 from packages.tool_gateway import GatewayError, ToolGateway
+from packages.contracts import TaskContractDraft, TaskSnapshot
 from services.api.app.application.llm import (
     AutoDLActionParser,
     ModelConfigurationError,
@@ -27,6 +28,11 @@ from services.api.app.application.runs import (
     RunSnapshot,
 )
 from services.api.app.application.storage import InMemoryRunStore, RunStore
+from services.api.app.application.tasks import (
+    TaskCreateConflictError,
+    TaskNotFoundError,
+    TaskService,
+)
 from services.api.app.application.conversation_models import ConversationThread, WorkspaceArtifact
 from services.api.app.application.conversations import (
     ConversationNotFoundError,
@@ -118,6 +124,10 @@ def get_conversation_service(request: Request) -> ConversationService:
     return request.app.state.conversation_service
 
 
+def get_task_service(request: Request) -> TaskService:
+    return request.app.state.task_service
+
+
 def current_user(
     x_user_id: Annotated[str, Header()] = "demo_user",
     x_user_roles: Annotated[str, Header()] = "current_user",
@@ -139,7 +149,90 @@ async def health(request: Request) -> dict[str, str]:
         "status": "ok",
         "model": settings.llm_model,
         "checkpoint": request.app.state.checkpoint_backend,
+        "task_store": request.app.state.task_store_backend,
     }
+
+
+@router.post(
+    "/demo1/tasks",
+    response_model=TaskSnapshot,
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_demo1_task(
+    user: Annotated[CurrentUser, Depends(current_user)],
+    service: Annotated[TaskService, Depends(get_task_service)],
+) -> TaskSnapshot:
+    return await service.create_demo1(user.user_id)
+
+
+@router.post("/tasks", response_model=TaskSnapshot, status_code=status.HTTP_201_CREATED)
+async def create_task(
+    body: TaskContractDraft,
+    user: Annotated[CurrentUser, Depends(current_user)],
+    service: Annotated[TaskService, Depends(get_task_service)],
+    idempotency_key: Annotated[
+        str | None, Header(alias="Idempotency-Key", min_length=8, max_length=160)
+    ] = None,
+) -> TaskSnapshot:
+    try:
+        return await service.create(
+            body, user.user_id, idempotency_key=idempotency_key
+        )
+    except TaskCreateConflictError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
+@router.get("/tasks", response_model=list[TaskSnapshot])
+async def list_tasks(
+    user: Annotated[CurrentUser, Depends(current_user)],
+    service: Annotated[TaskService, Depends(get_task_service)],
+) -> list[TaskSnapshot]:
+    return await service.list(user.user_id)
+
+
+@router.get("/tasks/{task_id}", response_model=TaskSnapshot)
+async def get_task(
+    task_id: str,
+    user: Annotated[CurrentUser, Depends(current_user)],
+    service: Annotated[TaskService, Depends(get_task_service)],
+) -> TaskSnapshot:
+    try:
+        return await service.get(task_id, user.user_id)
+    except TaskNotFoundError as exc:
+        raise HTTPException(status_code=404, detail="任务不存在") from exc
+
+
+@router.get("/tasks/{task_id}/events")
+async def stream_task_events(
+    task_id: str,
+    request: Request,
+    user: Annotated[CurrentUser, Depends(current_user)],
+    service: Annotated[TaskService, Depends(get_task_service)],
+    after: Annotated[int, Query(ge=0)] = 0,
+) -> StreamingResponse:
+    try:
+        await service.get(task_id, user.user_id)
+    except TaskNotFoundError as exc:
+        raise HTTPException(status_code=404, detail="任务不存在") from exc
+
+    async def event_source():
+        async for event in service.event_stream(task_id, user.user_id, after):
+            if await request.is_disconnected():
+                break
+            if event is None:
+                yield ": heartbeat\n\n"
+            else:
+                yield (
+                    f"id: {event.sequence}\n"
+                    f"event: {event.event_type}\n"
+                    f"data: {event.model_dump_json()}\n\n"
+                )
+
+    return StreamingResponse(
+        event_source(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
 
 
 @router.post("/threads", response_model=ConversationThread, status_code=status.HTTP_201_CREATED)

@@ -19,13 +19,14 @@ flowchart TB
     subgraph Client["交互层"]
         WEB["Next.js 单页工作台"]
         WORKSPACE["7 类 WorkspaceArtifact"]
-        CHAT["Agent 对话 + 确认卡 + 审计"]
+        CHAT["Agent 对话 + Active Task Bar + 确认卡 + 审计"]
     end
 
     subgraph API["应用层"]
         ROUTES["FastAPI Routes"]
         CONV["ConversationService"]
         RUN["RunService"]
+        TASK["TaskService"]
         LLM["AutoDLActionParser / LLM Adapter"]
     end
 
@@ -44,6 +45,7 @@ flowchart TB
     subgraph Infra["基础设施与边界"]
         MODEL["OpenAI-compatible Model"]
         PG["PostgreSQL 16"]
+        TASKSTORE["TaskStore"]
         CHECKPOINT["LangGraph Postgres Checkpoint"]
         EMAILSIM["Email Simulator"]
         OFFICESIM["Office Action Simulator"]
@@ -52,6 +54,7 @@ flowchart TB
     WEB --> ROUTES
     ROUTES --> CONV
     ROUTES --> RUN
+    ROUTES --> TASK
     CONV --> LLM --> MODEL
     CONV --> CONTRACTS
     RUN --> RISK --> POLICY --> EVIDENCE --> PLAN
@@ -59,6 +62,7 @@ flowchart TB
     GATEWAY --> EMAILSIM
     GATEWAY --> OFFICESIM
     RUN --> AUDIT
+    TASK --> TASKSTORE --> PG
     CONV <--> PG
     RUN <--> PG
     GRAPH <--> CHECKPOINT
@@ -72,6 +76,7 @@ flowchart TB
 - 左侧：视图工具栏与工作区。
 - 中间：可拖动分隔条。
 - 右侧：持续对话、底部输入框和非阻塞确认卡。
+- 右侧顶部：Active Task Bar，从 TaskSnapshot 展示 Task ID、状态、阶段、预算、版本和连接同步状态。
 
 前端不拥有风险决策、审批状态或 Permit；它只渲染服务端 Snapshot 并提交用户选择。
 
@@ -82,14 +87,16 @@ flowchart TB
 | FastAPI Routes | `services/api/app/api/routes.py` | 身份头解析、REST/SSE 接口、错误映射 |
 | ConversationService | `services/api/app/application/conversations.py` | Thread、受信上下文、通识路由、工作区合并、SSE、动作与对话闭环 |
 | RunService | `services/api/app/application/runs.py` | Run 生命周期、重评估、审批、授权、执行、持久化、审计 |
+| TaskService | `services/api/app/application/tasks.py` | 创建并恢复 TaskSnapshot、Owner scope、创建幂等和 Task 事件轮询 |
 | LLM Adapter | `services/api/app/application/llm.py` | 对话计划、动作抽取、执行后自然语言回应、Schema 修复 |
 | Storage | `services/api/app/application/storage.py` | Run 与 Workspace 的内存/PostgreSQL 实现 |
+| Task Storage | `services/api/app/application/task_storage.py` | Task、初始事件和预留 ArtifactVersion 的内存/PostgreSQL 实现 |
 
 ### 2.3 领域层
 
 `packages/` 不依赖前端展示：
 
-- `contracts`：模型与代码之间唯一允许的结构化协议。
+- `contracts`：动作治理与 Task Runtime 的严格结构化协议。
 - `risk_core`：风险评分、策略匹配、ControlPlan 合成。
 - `evidence`：将外部事实解析为可审计 `EvidenceRecord`。
 - `agent_runtime`：LangGraph interrupt/resume 编排。
@@ -99,7 +106,7 @@ flowchart TB
 
 ### 2.4 基础设施层
 
-V0.1 使用 PostgreSQL 16 保存 Workspace、Run Snapshot 和审计事件，并使用官方 `AsyncPostgresSaver` 保存 LangGraph checkpoint。LLM 使用 OpenAI-compatible `/chat/completions`。所有工具调用落到 `simulators/`，不连接真实办公系统。
+V0.1 使用 PostgreSQL 16 保存 Workspace、Run Snapshot 和审计事件，并使用官方 `AsyncPostgresSaver` 保存 LangGraph checkpoint。Demo 1 PR 2 另用 `agent_tasks`、`agent_task_events` 和预留的 `agent_task_artifact_versions` 表保存 Task 投影与事件。LLM 使用 OpenAI-compatible `/chat/completions`。所有工具调用落到 `simulators/`，不连接真实办公系统。
 
 ## 3. 两条核心数据路径
 
@@ -165,6 +172,34 @@ sequenceDiagram
     R-->>A: Agent 读取结果并回应
 ```
 
+### 3.3 Demo 1 Task 创建与读取（PR 2）
+
+```mermaid
+sequenceDiagram
+    participant U as 用户
+    participant W as Active Task Bar
+    participant A as Task API
+    participant S as TaskService
+    participant D as TaskStore
+
+    U->>W: 创建 Demo 1 Task
+    W->>A: POST /demo1/tasks + X-User-Id
+    A->>S: create_demo1(owner_id)
+    S->>S: 生成 TaskContract、3 个 Branch 和 TASK_CREATED
+    S->>D: 原子创建 Snapshot + 初始事件
+    D-->>W: TaskSnapshot ready / contract
+    W->>A: GET /tasks/{task_id}/events?after=1
+    loop Store 轮询
+        A->>D: 读取 sequence > after
+        A-->>W: TaskEvent 或 heartbeat
+    end
+    W->>A: GET /tasks/{task_id} 对账
+```
+
+Task 创建只实现契约与初始投影：`status=ready`、`phase=contract`、三个交付分支为 `queued`，首条事件序号为 1。Task ID、Owner、版本、状态和时间均由服务端产生。读取、列表和订阅都按 Owner 过滤；`POST /tasks` 的可选 `Idempotency-Key` 在同一 Owner 内绑定契约，相同 key 改用于不同契约时返回 409。
+
+该路径尚未运行 `Observe/Plan/Act/Verify/Commit`，没有控制命令、ArtifactVersion 写入、验证、冲突或 Commit。Task SSE 通过当前 API 进程轮询 Store，不是跨实例通知系统；Active Task Bar 的“已同步”仅代表 Snapshot 对账完成，不代表后台任务在推进。
+
 ## 4. 信任边界
 
 ### 4.1 可由 LLM 产生
@@ -196,9 +231,11 @@ sequenceDiagram
 | RunSnapshot / submitted evidence | 内存 | `runs` | 是 |
 | AuditEvent | 内存 | `audit_events` | 是 |
 | LangGraph checkpoint | `InMemorySaver` | PostgresSaver 表 | 是 |
+| TaskSnapshot / TaskEvent | `InMemoryTaskStore` | `agent_tasks` / `agent_task_events` | 仅 PostgreSQL 模式具备跨进程保存基础 |
+| Task ArtifactVersion | 空内存列表 | 已建表但无写入路径 | 未实现 |
 | Permit 已使用集合 | 进程内存 | 进程内存 | 否 |
 
-配置 `LANGGRAPH_CHECKPOINT_DSN` 后，FastAPI lifespan 会同时初始化 Run、Workspace、Audit 和 checkpoint 存储，并恢复 Run Snapshot。对话持久化和分布式 Permit 重放存储属于后续版本工作。
+TaskStore 优先使用 `DATABASE_DSN`，没有时回退到 `LANGGRAPH_CHECKPOINT_DSN`；两者都不存在时使用进程内存。内存测试中复用同一个 Store 创建新 `TaskService` 只能证明服务对象可恢复投影，不能证明 API 进程重启恢复。PostgreSQL 路径仍需真实重启验收。配置 `LANGGRAPH_CHECKPOINT_DSN` 后，FastAPI lifespan 还会初始化 Run、Workspace、Audit 和 checkpoint 存储，并恢复 Run Snapshot。对话持久化、跨实例 Task 通知和分布式 Permit 重放存储属于后续工作。
 
 ## 6. 运行时与部署拓扑
 
@@ -209,6 +246,8 @@ Browser :3000  ──REST/SSE──>  FastAPI :8010
                                  ├── PostgreSQL :5432
                                  └── in-process Simulators
 ```
+
+当前 Task SSE 是每个 API 进程对 TaskStore 的轮询，没有 PostgreSQL `LISTEN/NOTIFY`、消息代理或跨实例广播；多实例的通知延迟、连接迁移和一致性尚未实现或验证。
 
 `scripts/start-demo.ps1` 负责启动 Docker Desktop、PostgreSQL、API 和 Web，并把日志写入 `.runtime/`。Windows 使用 Selector event loop 以兼容 psycopg 异步连接。
 
@@ -240,10 +279,12 @@ Browser :3000  ──REST/SSE──>  FastAPI :8010
 
 1. `README.md`：范围与边界。
 2. `packages/contracts/models.py`：协议词汇表。
-3. `services/api/app/application/conversations.py`：工作区与对话主链。
-4. `services/api/app/application/runs.py`：动作执行主链。
-5. `packages/risk_core/`：风险与策略真值。
-6. `packages/agent_runtime/workflow.py`：人工 Gate。
-7. `packages/authorization/` 与 `packages/tool_gateway/`：执行安全边界。
-8. `apps/web/app/page.tsx`：前端交互状态机。
-9. `tests/`：预期行为与回归边界。
+3. `packages/contracts/task_models.py`：Demo 1 Task Runtime 协议。
+4. `services/api/app/application/tasks.py` 与 `task_storage.py`：Task 创建、读取、Owner scope、幂等和 Store。
+5. `services/api/app/application/conversations.py`：工作区与对话主链。
+6. `services/api/app/application/runs.py`：动作执行主链。
+7. `packages/risk_core/`：风险与策略真值。
+8. `packages/agent_runtime/workflow.py`：人工 Gate。
+9. `packages/authorization/` 与 `packages/tool_gateway/`：执行安全边界。
+10. `apps/web/app/page.tsx`：前端交互状态机与 Active Task Bar。
+11. `tests/`：预期行为与回归边界。

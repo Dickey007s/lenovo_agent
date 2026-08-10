@@ -55,12 +55,23 @@ V0.1 重点验证三件事：
 - 工作区内容在动作绑定后发生变化时，旧 Action 会被作废，不能用旧审批执行新参数。
 - Run、工作区、审计事件和 LangGraph checkpoint 可持久化并在服务重启后恢复。
 
+### Demo 1 持久任务基础（PR 2）
+
+- `TaskService` 可从严格的 `TaskContractDraft` 创建服务端拥有的 `TaskContract`、`TaskSnapshot`、三个初始 `BranchSnapshot` 和首条 `TASK_CREATED` 事件。当前新任务固定处于 `ready / contract`，分支固定处于 `queued`。
+- `TaskStore` 提供内存与 PostgreSQL 两种实现。配置 `DATABASE_DSN` 或 `LANGGRAPH_CHECKPOINT_DSN` 时使用 PostgreSQL；两者都未配置时使用进程内 `InMemoryTaskStore`。`GET /v1/health` 的 `task_store` 字段会暴露实际后端。
+- 已提供 `POST /v1/demo1/tasks`、`POST /v1/tasks`、`GET /v1/tasks`、`GET /v1/tasks/{task_id}` 和 `GET /v1/tasks/{task_id}/events?after={sequence}`。读取、列表和事件订阅均按当前 `X-User-Id` 做 Owner scope；其他用户读取同一 Task ID 时得到 404 或空列表。
+- `POST /v1/tasks` 支持可选 `Idempotency-Key`。同一 Owner、同一 key 和同一契约返回同一个 Task；同一 key 改用于不同契约返回 409。Demo 1 入口使用按 Owner 固定的 key，因此重复创建不会产生第二个 Task。
+- 右侧 Agent 区域已有真实 Active Task Bar：初始从 `GET /v1/tasks` 读取最近任务，显示服务端状态、阶段、预算、版本和 Task ID，并用 Task SSE 触发 Snapshot 对账。同步标记只表示客户端连接状态，不代表任务正在后台执行。
+
+PR 2 还没有实现 `Observe → Plan → Act → Verify → Commit`、任务或分支控制、ArtifactVersion 写入、验证报告、冲突处理或 Task Commit。当前 Task SSE 只会回放已经持久化的 `TASK_CREATED`，通过轮询 Store 获得事件并发送 heartbeat；没有跨实例通知总线，也没有验证多实例一致性。内存模式下“用同一个 Store 创建新的 `TaskService` 后仍能读取”不等于进程重启恢复，API 进程退出后内存 Task 会丢失；只有 PostgreSQL 才具备跨进程保存基础，且仍需单独的真实重启验收。
+
 ## 技术架构
 
 ```mermaid
 flowchart LR
     UI["Next.js 工作区 + Agent 对话"]
-    API["FastAPI Conversation / Run API"]
+    API["FastAPI Conversation / Run / Task API"]
+    TASK["TaskService + TaskStore"]
     LLM["OpenAI-compatible LLM"]
     CONTRACT["Pydantic Contracts"]
     GOVERN["Risk + Policy + Evidence + ControlPlan"]
@@ -71,6 +82,8 @@ flowchart LR
     PG["PostgreSQL + LangGraph Checkpoint"]
 
     UI <-->|"REST + SSE"| API
+    API --> TASK
+    TASK <--> PG
     API --> LLM
     LLM --> CONTRACT
     CONTRACT --> GOVERN
@@ -100,14 +113,14 @@ flowchart LR
 
 ```text
 apps/web/                         Next.js 16 + React 19 前端
-packages/contracts/               领域协议与哈希
+packages/contracts/               动作与 Task Runtime 协议、哈希
 packages/risk_core/               风险、策略和 ControlPlan
 packages/evidence/                确定性 Mock Evidence Resolver
 packages/agent_runtime/           LangGraph interrupt/resume 工作流
 packages/authorization/           Ed25519 Permit 签发
 packages/tool_gateway/            Permit 校验与工具路由
 packages/audit/                   内存/PostgreSQL 审计日志
-services/api/app/application/     ConversationService、RunService、LLM 适配器
+services/api/app/application/     ConversationService、RunService、TaskService 与存储适配器
 services/api/app/api/             FastAPI 路由
 simulators/                       邮件与办公动作 Simulator
 tests/                            单元与集成测试
@@ -187,7 +200,8 @@ V0.1 定稿时共有 22 项自动化测试。测试不调用真实 LLM，不消�
 - 未配置 Permit PEM 文件时，服务启动会生成进程级 Ed25519 密钥；重启后旧 Permit 失效。
 - 所有副作用工具均为 Simulator；UI 中的“发送成功”“创建成功”只代表 Simulator 成功。
 - 对话 Thread/Message 当前保存在 API 进程内存中，重启后丢失；Workspace、Run、Audit 和 LangGraph checkpoint 在配置 PostgreSQL 时可恢复。
-- 当前没有 Alembic 迁移、生产级 RBAC、真实 Connector、后台任务队列、分布式 Permit 重放存储和多实例一致性保障。
+- Task 在未配置数据库时同样只保存在 API 进程内存中；配置 PostgreSQL 后会写入 `agent_tasks`、`agent_task_events` 和预留的 `agent_task_artifact_versions` 表。当前没有 ArtifactVersion 写入路径，也没有以真实进程重启证明恢复。
+- 当前没有 Alembic 迁移、生产级 RBAC、真实 Connector、后台任务队列、分布式 Permit 重放存储、Task 跨实例通知和多实例一致性保障。
 
 ## V0.1 验收结论
 

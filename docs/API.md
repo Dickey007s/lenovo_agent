@@ -1,6 +1,6 @@
 # HTTP API 与 SSE 事件
 
-本文记录 V0.1 实际暴露的 FastAPI 接口。运行后以 <http://localhost:8010/docs> 的 OpenAPI 页面和 `services/api/app/api/routes.py` 为最终事实来源。
+本文记录 V0.1 与 Demo 1 PR 2 实际暴露的 FastAPI 接口。运行后以 <http://localhost:8010/docs> 的 OpenAPI 页面和 `services/api/app/api/routes.py` 为最终事实来源。
 
 ## 1. 约定
 
@@ -9,6 +9,7 @@
 - SSE：流式接口返回 `text/event-stream`，并设置 `Cache-Control: no-cache`、`X-Accel-Buffering: no`。
 - 身份头：`X-User-Id`，默认 `demo_user`。
 - 角色头：`X-User-Roles`，英文逗号分隔，默认 `current_user`；前端 Demo 使用 `current_user,sales_manager`。
+- Task 创建幂等头：`Idempotency-Key`，可选，长度 8-160。它只作用于当前 Owner 的 `POST /tasks`，不会授权读取其他用户任务。
 
 上述身份头没有签名，只是 P0 占位。生产环境必须在 API 边界替换为经过验证的 SSO/JWT，并从可信身份声明映射角色。
 
@@ -26,7 +27,7 @@ $headers = @{
 
 | 方法 | 路径 | 用途 |
 | --- | --- | --- |
-| GET | `/health` | 返回服务、模型名和 checkpoint backend |
+| GET | `/health` | 返回服务、模型名、checkpoint backend 和 `task_store` backend |
 | POST | `/threads` | 为当前用户创建内存对话 Thread |
 | GET | `/threads/{thread_id}` | 读取 Thread、Message 和关联 Artifact |
 | POST | `/threads/{thread_id}/messages/stream` | 提交消息并流式返回对话、工作区和动作事件 |
@@ -38,7 +39,19 @@ $headers = @{
 
 `kind` 仅允许：`mail`、`document`、`quote`、`tasks`、`calendar`、`expense`、`crm`。
 
-### 2.2 场景、治理与审计
+### 2.2 Demo 1 Task
+
+| 方法 | 路径 | 用途 |
+| --- | --- | --- |
+| POST | `/demo1/tasks` | 为当前用户幂等创建固定客户 A Task Contract |
+| POST | `/tasks` | 从 `TaskContractDraft` 创建服务端 Task；可带 `Idempotency-Key` |
+| GET | `/tasks` | 按更新时间倒序列出当前 Owner 的 TaskSnapshot |
+| GET | `/tasks/{task_id}` | 读取当前 Owner 的单个 TaskSnapshot |
+| GET | `/tasks/{task_id}/events?after={sequence}` | 回放并订阅该 Task 的有序事件 SSE |
+
+Task ID、Owner、契约版本、任务状态、分支状态、事件序号和时间均由服务端生成。客户端不能在 `TaskContractDraft` 中提交这些字段；多余字段返回 422。其他 Owner 的 Task 不会通过列表暴露，按 ID 读取或订阅时统一返回 404。
+
+### 2.3 场景、治理与审计
 
 | 方法 | 路径 | 用途 |
 | --- | --- | --- |
@@ -132,7 +145,55 @@ Invoke-RestMethod -Method Post -Uri "$base/workspace/mail/new" -Headers $headers
 
 保存已绑定动作的 Artifact 会让旧动作失效，并返回 `requires_recheck=true`。`mail/new` 返回新的空白 Artifact，不是清空旧对象后复用其动作 ID。
 
-### 3.4 直接创建治理 Run
+### 3.4 创建并读取 Demo 1 Task
+
+固定 Demo 1 入口不需要请求体，并为每个 Owner 使用稳定的幂等键：
+
+```powershell
+$task = Invoke-RestMethod -Method Post -Uri "$base/demo1/tasks" -Headers $headers
+$task.task_id
+Invoke-RestMethod -Method Get -Uri "$base/tasks/$($task.task_id)" -Headers $headers
+```
+
+也可以提交严格的 `TaskContractDraft`。下面只展示最小结构，实际字段和限制以 `packages/contracts/task_models.py` 为准：
+
+```json
+{
+  "title": "客户 A 经营汇报",
+  "objective": "形成带来源、版本和验证记录的经营分析。",
+  "source_scope": ["fixture:crm/customer-a:official-revenue-v3"],
+  "allowed_capabilities": ["crm.customer.read", "document.draft"],
+  "deliverables": [
+    {
+      "deliverable_id": "operating-analysis",
+      "title": "经营分析",
+      "kind": "analysis",
+      "completion_criteria": ["关键事实绑定允许来源。"]
+    }
+  ],
+  "completion_criteria": ["必需交付物通过验证。"],
+  "budget": {
+    "max_steps": 12,
+    "max_tool_calls": 30,
+    "max_runtime_seconds": 3600
+  },
+  "deadline_at": null
+}
+```
+
+```powershell
+$taskHeaders = $headers.Clone()
+$taskHeaders["Idempotency-Key"] = "customer-a-report-001"
+Invoke-RestMethod -Method Post -Uri "$base/tasks" `
+  -Headers $taskHeaders -ContentType "application/json" `
+  -Body ($draft | ConvertTo-Json -Depth 10)
+```
+
+同一 Owner 使用相同 key 重放相同契约时仍返回 201 和原 TaskSnapshot，不增加第二条 `TASK_CREATED`；相同 key 改用于不同契约返回 409。不传 key 时每次请求都会创建新的 Task。
+
+PR 2 创建后的真实状态固定为：`TaskSnapshot.status=ready`、`phase=contract`、`version=1`、`last_event_sequence=1`，每个交付物对应一个 `queued` Branch。`artifact_versions`、`verification_reports`、`conflicts`、`controls` 均为空，`last_commit=null`。当前没有启动 Loop 或提交控制命令的 API。
+
+### 3.5 直接创建治理 Run
 
 ```json
 {
@@ -150,7 +211,7 @@ status / action / risk / policy_effects / evidence / approvals
 control_plan / permit / tool_result / created_at / updated_at
 ```
 
-### 3.5 补证据、审批和最终授权
+### 3.6 补证据、审批和最终授权
 
 提交证据：
 
@@ -247,21 +308,38 @@ data: {"sequence":168,"event_id":"...","run_id":"...","trace_id":"...",...}
 
 没有新事件时服务端发送 `: heartbeat` 注释。断线重连时把最后接收的 `sequence` 作为 `after`，只读取后续事件。审计流属于运行事实，不等同于 Conversation SSE 的视觉增量。
 
-## 6. 错误语义
+## 6. Task SSE
+
+`GET /tasks/{task_id}/events?after=0` 先验证当前 Owner，再通过 Store 轮询回放 `sequence > after` 的事件。当前实现只创建一条 `TASK_CREATED`，其格式为：
+
+```text
+id: 1
+event: TASK_CREATED
+data: {"sequence":1,"event_id":"task_evt_...","task_id":"task_...",...}
+```
+
+没有新事件时发送 `: heartbeat`。客户端只能通过 `after` 查询参数提交游标；当前路由不解析 `Last-Event-ID` 请求头。Active Task Bar 收到新事件后重新 GET TaskSnapshot 对账，不把 SSE payload 自行推导成任务完成状态。
+
+SSE 目前由每个 API 进程轮询 TaskStore，没有 PostgreSQL `LISTEN/NOTIFY`、消息代理或跨实例广播层。共享数据库可能被不同进程轮询到，但多实例通知延迟、连接迁移和一致性均未验证，不能表述为已支持多实例实时更新。
+
+## 7. 错误语义
 
 | 状态码 | 含义 |
 | --- | --- |
 | 403 | 当前身份不拥有提交的审批角色 |
-| 404 | Thread、Artifact、Run、Action、Scenario 或 Trace 不存在，或不属于当前用户 |
-| 409 | 授权条件未满足、动作已失效、Permit/Gateway 拒绝 |
-| 422 | 请求 Schema、证据值或模型结构化输出无效 |
+| 404 | Thread、Artifact、Run、Action、Scenario、Trace 或 Task 不存在，或不属于当前用户 |
+| 409 | 授权条件未满足、动作已失效、Permit/Gateway 拒绝，或 Task 幂等键被用于不同契约 |
+| 422 | 请求 Schema、TaskContractDraft、证据值或模型结构化输出无效 |
 | 503 | LLM endpoint、Key 或模型配置不可用 |
 
 SSE 在响应已经开始后无法再改变 HTTP 状态码，因此流内错误使用 `event: error` 和 `detail`。客户端应同时处理 HTTP 错误与流内错误。
 
-## 7. 兼容性规则
+## 8. 兼容性规则
 
 - 请求模型均 `extra="forbid"`；新增顶层字段会破坏旧服务端，协议变更需同步前端和文档。
+- Task Runtime 当前使用 `schema_version="1.0"`；Python 权威模型在 `packages/contracts/task_models.py`，前端镜像在 `apps/web/app/task-types.ts`。
 - V0.1 没有公开版本协商；`/v1` 是唯一 API 版本。
 - `ActionCandidate`、Permit claims 和哈希规则是安全边界，不能由前端自行构造并绕过 RunService。
 - 文档示例中的邮箱、报价号、用户和 Key 全部是演示值。
+
+Task API 当前只覆盖创建、列表、读取和事件订阅。`Observe/Plan/Act/Verify/Commit`、Steer/Pause/Take over、ArtifactVersion 写入、冲突解决和 Task Commit 仍未暴露；类型目录中的未来事件也不表示服务端已经产生这些事件。
