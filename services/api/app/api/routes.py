@@ -168,8 +168,11 @@ async def health(request: Request) -> dict[str, str]:
 async def create_demo1_task(
     user: Annotated[CurrentUser, Depends(current_user)],
     service: Annotated[TaskService, Depends(get_task_service)],
+    idempotency_key: Annotated[
+        str | None, Header(alias="Idempotency-Key", min_length=8, max_length=160)
+    ] = None,
 ) -> TaskSnapshot:
-    return await service.create_demo1(user.user_id)
+    return await service.create_demo1(user.user_id, idempotency_key=idempotency_key)
 
 
 @router.post("/tasks", response_model=TaskSnapshot, status_code=status.HTTP_201_CREATED)

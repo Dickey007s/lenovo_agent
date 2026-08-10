@@ -13,7 +13,7 @@ V0.1 采用 **workspace-first** 结构，而不是以聊天记录为唯一产物
 - 需要人工介入时，确认卡从对话输入区上方弹出，不遮挡历史消息，也不禁止继续对话。
 - 审批不是独立页面。确认完成后动作继续运行，Simulator 结果再由 Agent 以自然语言收尾。
 
-前端入口是 `apps/web/app/page.tsx`，主要视觉和动效位于 `apps/web/app/styles.css`。全局字体优先使用“微软雅黑”，小范围卡片采用轻度透明与模糊效果，主体保持浅色白底黑字。
+前端入口是 `apps/web/app/page.tsx`，主要视觉和动效位于 `apps/web/app/styles.css`。视觉体系为暖纸底色、墨黑正文与靛蓝强调色；每种工作区有固定身份色（邮件蓝、报价绿、任务橙、日历红、报销青、CRM 紫、审计石板灰），用于页头图标、导航激活态与局部强调。各工作区页头标题是固定的“XX 工作台”名称，不随 Artifact 数据变化；邮件主题、文档标题等动态内容只在卡片内部的业务字段中展示和编辑。Demo 1 Task Artifact 与 Task Runtime 使用同一字号层级，正文保持约 10-13px，移动端关键操作目标至少 44px。
 
 ## 2. WorkspaceArtifact
 
@@ -41,8 +41,8 @@ updated_at           最后更新时间
 | `mail` | `to[]`、`cc[]`、`subject`、`body`、`attachments[]` | 新用户为空白编辑器；“新邮件”创建新 Artifact，并清除旧动作绑定 |
 | `document` | `document_type`、`sections[{heading, body}]` | 分章节编辑，Agent 可按章节渐进写入 |
 | `quote` | `quote_id`、`customer`、`currency`、`valid_until`、`approved_floor`、`items[]`、`total`、`approval` | 类表格编辑与金额展示；导入仅为界面占位 |
-| `tasks` | `tasks[{id, title, source, priority, status, reason}]` | 维护任务卡并可创建受控内部任务 |
-| `calendar` | `month`、`selected_date`、`events[{id, title, date, start, end, attendees, location, agenda}]` | 月视图、日程标记、按日展开和受控邀请 |
+| `tasks` | `tasks[{id, title, source, priority, status, reason}]` | “工作台待办”按状态分栏维护任务卡，并可创建受控内部任务；“长期任务工件”仍只投影 TaskSnapshot |
+| `calendar` | `month`、`selected_date`、`events[{id, title, date, start, end, attendees, location, agenda}]` | 一级为全宽月历，日期格内嵌日程条目；点击进入当日安排视图（可前后翻日、返回月历），支持受控邀请 |
 | `expense` | `case_id`、`owner`、`amount`、`status`、`invoices[]`、`anomalies[]` | 展示报销核查结果并可受控发起补件 |
 | `crm` | `customer`、`opportunity_id`、`amount`、`before`、`suggested_stage`、`next_step` | 编辑商机建议并可受控更新 CRM 阶段 |
 

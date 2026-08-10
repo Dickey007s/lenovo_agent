@@ -9,7 +9,7 @@
 - SSE：流式接口返回 `text/event-stream`，并设置 `Cache-Control: no-cache`、`X-Accel-Buffering: no`。
 - 身份头：`X-User-Id`，默认 `demo_user`。
 - 角色头：`X-User-Roles`，英文逗号分隔，默认 `current_user`；前端 Demo 使用 `current_user,sales_manager`。
-- Task 创建幂等头：`Idempotency-Key`，可选，长度 8-160。它只作用于当前 Owner 的 `POST /tasks`，不会授权读取其他用户任务。
+- Task 创建幂等头：`Idempotency-Key`，可选，长度 8-160。它作用于当前 Owner 的 `POST /tasks` 或 `POST /demo1/tasks`；后者用不同 key 区分演示轮次。该 header 不会授权读取其他用户任务。
 - Task mutation：`start` 和 `controls` 在 JSON body 中携带 `expected_task_version` 与 `idempotency_key`。版本过期或同一 key 被用于不同命令时返回 409。
 
 上述身份头没有签名，只是 P0 占位。生产环境必须在 API 边界替换为经过验证的 SSO/JWT，并从可信身份声明映射角色。
@@ -44,7 +44,7 @@ $headers = @{
 
 | 方法 | 路径 | 用途 |
 | --- | --- | --- |
-| POST | `/demo1/tasks` | 为当前用户幂等创建固定客户 A Task Contract |
+| POST | `/demo1/tasks` | 为当前用户幂等创建固定客户 A Task Contract；可用 `Idempotency-Key` 区分演示轮次 |
 | POST | `/tasks` | 从 `TaskContractDraft` 创建服务端 Task；可带 `Idempotency-Key` |
 | GET | `/tasks` | 按更新时间倒序列出当前 Owner 的 TaskSnapshot |
 | GET | `/tasks/{task_id}` | 读取当前 Owner 的单个 TaskSnapshot |
@@ -150,13 +150,17 @@ Invoke-RestMethod -Method Post -Uri "$base/workspace/mail/new" -Headers $headers
 
 ### 3.4 创建、启动与控制 Demo 1 Task
 
-固定 Demo 1 入口不需要请求体，并为每个 Owner 使用稳定的幂等键：
+固定 Demo 1 入口不需要请求体。前端每次显式开始新一轮时发送新的 `Idempotency-Key`；同一轮重试复用同一个 key，因此不会重复创建，下一轮换 key 后会保留旧 Task 并创建新的 `ready / contract` Task。为了兼容旧客户端，不传 header 时仍使用每个 Owner 的稳定默认键：
 
 ```powershell
-$task = Invoke-RestMethod -Method Post -Uri "$base/demo1/tasks" -Headers $headers
+$roundHeaders = $headers.Clone()
+$roundHeaders["Idempotency-Key"] = "demo1-round-20260810-001"
+$task = Invoke-RestMethod -Method Post -Uri "$base/demo1/tasks" -Headers $roundHeaders
 $task.task_id
 Invoke-RestMethod -Method Get -Uri "$base/tasks/$($task.task_id)" -Headers $headers
 ```
+
+完成一轮后，把 key 改为新的轮次值即可再次演示。相同 Owner+key 始终返回原 TaskSnapshot；不同 key 生成不同 Task ID。Task 列表按更新时间倒序返回，前端刷新时优先恢复未终止 Task，否则显示最近终态 Task 并提供“再次演示”。
 
 也可以提交严格的 `TaskContractDraft`。下面只展示最小结构，实际字段和限制以 `packages/contracts/task_models.py` 为准：
 

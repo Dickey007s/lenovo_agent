@@ -236,6 +236,21 @@ test("Demo 1 uses server facts from creation through the three-branch commit", a
   ]);
   expect(tasks[0].controls.some((control) => control.kind === "steer" && control.status === "accepted")).toBeTruthy();
   expect(new Set(tasks[0].artifact_versions.map((artifact) => artifact.artifact_version_id)).size).toBe(7);
+
+  const completedTaskId = tasks[0].task_id;
+  await page.reload();
+  const replayButton = page.getByRole("button", { name: "再次演示" });
+  await expect(replayButton).toBeEnabled();
+  await replayButton.click();
+  await expect(page.getByText("ACTIVE TASK", { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "启动任务" })).toBeEnabled();
+
+  const repeatedTasks = await listTasks(request, owner);
+  expect(repeatedTasks).toHaveLength(2);
+  expect(repeatedTasks[0].task_id).not.toBe(completedTaskId);
+  expect(repeatedTasks[0].status).toBe("ready");
+  expect(repeatedTasks[1].task_id).toBe(completedTaskId);
+  expect(repeatedTasks[1].status).toBe("committed");
 });
 
 test("an aborted start keeps one idempotency key across reload and reconciles without duplicates", async ({ page, request }, testInfo) => {

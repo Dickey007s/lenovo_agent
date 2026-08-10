@@ -3,6 +3,7 @@
 import {
   CSSProperties,
   FormEvent,
+  Fragment,
   KeyboardEvent,
   PointerEvent as ReactPointerEvent,
   ReactNode,
@@ -217,11 +218,11 @@ function SourceInspector({ artifact }: { artifact: WorkspaceArtifact }) {
   </details></aside>;
 }
 
-function ArtifactHeader({ artifact, eyebrow, dirty, onSave, actions }: {
-  artifact: WorkspaceArtifact; eyebrow: string; dirty: boolean; onSave: () => void; actions?: ReactNode;
+function ArtifactHeader({ artifact, eyebrow, title, dirty, onSave, actions }: {
+  artifact: WorkspaceArtifact; eyebrow: string; title: string; dirty: boolean; onSave: () => void; actions?: ReactNode;
 }) {
   return <header className="artifact-header">
-    <div><span>{eyebrow}</span><h1>{artifact.title}</h1></div>
+    <div className="artifact-title"><div className="app-chip"><Icon name={artifact.kind}/></div><div><span className="eyebrow">{eyebrow}</span><h1>{title}</h1></div></div>
     <div className="workspace-actions"><span className={`save-state ${dirty ? "dirty" : ""}`}><i/>{dirty ? "未保存修改" : "已保存"}</span>{actions}<button className="save-button" disabled={!dirty} onClick={onSave}>保存</button></div>
   </header>;
 }
@@ -231,7 +232,7 @@ type ViewProps = { artifact: WorkspaceArtifact; dirty: boolean; onChange: (patch
 function MailView({ artifact, dirty, onChange, onSave, onSend, onNew }: ViewProps & { onSend: () => void; onNew: () => void }) {
   const to = Array.isArray(artifact.content.to) ? artifact.content.to.join(", ") : String(artifact.content.to ?? "");
   const attachments = Array.isArray(artifact.content.attachments) ? artifact.content.attachments as string[] : [];
-  return <div className="artifact-page"><ArtifactHeader artifact={artifact} eyebrow="MAIL" dirty={dirty} onSave={onSave} actions={<><button className="outline-button" onClick={onNew}>＋ 新邮件</button><button className="outline-button" onClick={onSend}>发送邮件</button></>}/>
+  return <div className="artifact-page"><ArtifactHeader artifact={artifact} eyebrow="MAIL" title="邮件工作台" dirty={dirty} onSave={onSave} actions={<><button className="outline-button" onClick={onNew}>＋ 新邮件</button><button className="outline-button" onClick={onSend}>发送邮件</button></>}/>
     <div className="artifact-layout"><section className="editor-card mail-editor">
       <div className="mail-field"><label>收件人</label><input aria-label="收件人" value={to} onChange={e => onChange({ to: e.target.value.split(",").map(v => v.trim()).filter(Boolean) })}/></div>
       <div className="mail-field"><label>抄送</label><input aria-label="抄送" value={Array.isArray(artifact.content.cc) ? artifact.content.cc.join(", ") : ""} onChange={e => onChange({ cc: e.target.value.split(",").map(v => v.trim()).filter(Boolean) })}/></div>
@@ -244,7 +245,7 @@ function MailView({ artifact, dirty, onChange, onSave, onSend, onNew }: ViewProp
 
 function DocumentView({ artifact, dirty, onChange, onSave }: ViewProps) {
   const sections = Array.isArray(artifact.content.sections) ? artifact.content.sections as { heading?: string; body?: string }[] : [];
-  return <div className="artifact-page"><ArtifactHeader artifact={artifact} eyebrow="DOCUMENT" dirty={dirty} onSave={onSave}/><div className="artifact-layout">
+  return <div className="artifact-page"><ArtifactHeader artifact={artifact} eyebrow="DOCUMENT" title="文档工作台" dirty={dirty} onSave={onSave}/><div className="artifact-layout">
     <section className="editor-card document-editor"><div className="document-meta"><span>{String(artifact.content.document_type ?? "内部文档")}</span><input aria-label="文档标题" value={artifact.title} readOnly/></div>
       {sections.map((section, index) => <section className="doc-section" key={`${section.heading}-${index}`}><input aria-label={`章节 ${index + 1} 标题`} value={section.heading ?? ""} onChange={e => onChange({ sections: sections.map((item, i) => i === index ? { ...item, heading: e.target.value } : item) })}/><textarea aria-label={`章节 ${index + 1} 正文`} value={section.body ?? ""} onChange={e => onChange({ sections: sections.map((item, i) => i === index ? { ...item, body: e.target.value } : item) })}/></section>)}
     </section><SourceInspector artifact={artifact}/></div></div>;
@@ -253,9 +254,9 @@ function DocumentView({ artifact, dirty, onChange, onSave }: ViewProps) {
 function QuoteView({ artifact, dirty, onChange, onSave, onImport }: ViewProps & { onImport: () => void }) {
   const items = Array.isArray(artifact.content.items) ? artifact.content.items as { name?: string; qty?: number; unit_price?: number; discount?: number; subtotal?: number }[] : [];
   const floor = Number(artifact.content.approved_floor ?? .88);
-  return <div className="artifact-page"><ArtifactHeader artifact={artifact} eyebrow="QUOTE WORKBOOK" dirty={dirty} onSave={onSave} actions={<button className="outline-button" onClick={onImport}>导入报价表</button>}/><div className="artifact-layout">
+  return <div className="artifact-page"><ArtifactHeader artifact={artifact} eyebrow="QUOTE WORKBOOK" title="报价工作台" dirty={dirty} onSave={onSave} actions={<button className="outline-button" onClick={onImport}>导入报价表</button>}/><div className="artifact-layout">
     <section className="editor-card quote-editor"><div className="quote-summary"><div><span>客户</span><strong>{String(artifact.content.customer ?? "-")}</strong></div><div><span>报价编号</span><strong>{String(artifact.content.quote_id ?? "-")}</strong></div><div><span>有效期</span><input aria-label="报价有效期" value={String(artifact.content.valid_until ?? "")} onChange={e => onChange({ valid_until: e.target.value })}/></div><div><span>折扣底线</span><strong>{Math.round(floor * 100)}%</strong></div></div>
-      <div className="sheet"><div className="sheet-row sheet-head"><span>项目</span><span>数量</span><span>标准价</span><span>折扣</span><span>小计</span></div>{items.map((item, index) => <div className={`sheet-row ${Number(item.discount ?? 1) < floor ? "sheet-warning" : ""}`} key={`${item.name}-${index}`}><input value={item.name ?? ""} onChange={e => onChange({ items: items.map((row, i) => i === index ? { ...row, name: e.target.value } : row) })}/><input value={item.qty ?? 0} onChange={e => onChange({ items: items.map((row, i) => i === index ? { ...row, qty: Number(e.target.value) } : row) })}/><span>¥{Number(item.unit_price ?? 0).toLocaleString()}</span><input value={Math.round(Number(item.discount ?? 1) * 100)} onChange={e => { const discount = Number(e.target.value) / 100; const next = items.map((row, i) => i === index ? { ...row, discount, subtotal: Number(row.qty ?? 0) * Number(row.unit_price ?? 0) * discount } : row); onChange({ items: next, total: next.reduce((sum, row) => sum + Number(row.subtotal ?? 0), 0) }); }}/><span>¥{Number(item.subtotal ?? 0).toLocaleString()}</span></div>)}</div>
+      <div className="sheet"><div className="sheet-letters"><span/><span>A</span><span>B</span><span>C</span><span>D</span><span>E</span></div><div className="sheet-row sheet-head"><span className="row-num"/><span>项目</span><span>数量</span><span>标准价</span><span>折扣 %</span><span>小计</span></div>{items.map((item, index) => <div className={`sheet-row ${Number(item.discount ?? 1) < floor ? "sheet-warning" : ""}`} key={`${item.name}-${index}`}><i className="row-num">{index + 1}</i><input value={item.name ?? ""} onChange={e => onChange({ items: items.map((row, i) => i === index ? { ...row, name: e.target.value } : row) })}/><input value={item.qty ?? 0} onChange={e => onChange({ items: items.map((row, i) => i === index ? { ...row, qty: Number(e.target.value) } : row) })}/><span>¥{Number(item.unit_price ?? 0).toLocaleString()}</span><input value={Math.round(Number(item.discount ?? 1) * 100)} onChange={e => { const discount = Number(e.target.value) / 100; const next = items.map((row, i) => i === index ? { ...row, discount, subtotal: Number(row.qty ?? 0) * Number(row.unit_price ?? 0) * discount } : row); onChange({ items: next, total: next.reduce((sum, row) => sum + Number(row.subtotal ?? 0), 0) }); }}/><span>¥{Number(item.subtotal ?? 0).toLocaleString()}</span></div>)}</div>
       <div className="quote-total"><span>含税总计</span><strong>¥{Number(artifact.content.total ?? 0).toLocaleString()}</strong></div>
     </section><SourceInspector artifact={artifact}/></div></div>;
 }
@@ -264,8 +265,19 @@ function TasksView({ artifact, dirty, onChange, onSave }: ViewProps) {
   const tasks = Array.isArray(artifact.content.tasks) ? artifact.content.tasks as { id?: string; title?: string; source?: string; priority?: string; status?: string; reason?: string }[] : [];
   const updateTask = (index: number, patch: Record<string, unknown>) => onChange({ tasks: tasks.map((task, i) => i === index ? { ...task, ...patch } : task) });
   const addTask = () => onChange({ tasks: [...tasks, { id: `T-${Date.now().toString().slice(-4)}`, title: "新任务", source: "手动", priority: "中", status: "待处理", reason: "" }] });
-  return <div className="artifact-page"><ArtifactHeader artifact={artifact} eyebrow="TASKS" dirty={dirty} onSave={onSave} actions={<button className="outline-button" onClick={addTask}>＋ 新建任务</button>}/><div className="artifact-layout">
-    <section className="task-board editor-card">{tasks.map((task, index) => <article className="task-card" key={task.id ?? index}><div className="task-card-top"><select aria-label={`任务 ${index + 1} 优先级`} value={task.priority ?? "中"} onChange={e => updateTask(index, { priority: e.target.value })}><option>高</option><option>中</option><option>低</option></select><small>{task.source}</small></div><input aria-label={`任务 ${index + 1} 标题`} value={task.title ?? ""} onChange={e => updateTask(index, { title: e.target.value })}/><textarea aria-label={`任务 ${index + 1} 说明`} value={task.reason ?? ""} onChange={e => updateTask(index, { reason: e.target.value })}/><footer><select aria-label={`任务 ${index + 1} 状态`} value={task.status ?? "待处理"} onChange={e => updateTask(index, { status: e.target.value })}><option>待处理</option><option>进行中</option><option>待确认</option><option>已完成</option><option>异常挂起</option></select><code>{task.id}</code></footer></article>)}</section>
+  const columns: { status: string; color: string }[] = [
+    { status: "待处理", color: "#8a93a1" }, { status: "进行中", color: "#2470e0" }, { status: "待确认", color: "#b97a12" },
+    { status: "已完成", color: "#0e9f6e" }, { status: "异常挂起", color: "#cf4343" },
+  ];
+  return <div className="artifact-page"><ArtifactHeader artifact={artifact} eyebrow="TASKS" title="任务看板" dirty={dirty} onSave={onSave} actions={<button className="outline-button" onClick={addTask}>＋ 新建任务</button>}/><div className="artifact-layout">
+    <section className="task-board editor-card">{columns.map(column => {
+      const columnTasks = tasks.map((task, index) => ({ task, index })).filter(({ task }) => (task.status ?? "待处理") === column.status);
+      return <div className="kanban-col" key={column.status} style={{ "--col": column.color } as CSSProperties}>
+        <header className="kanban-head"><i/><strong>{column.status}</strong><span>{columnTasks.length}</span></header>
+        {columnTasks.map(({ task, index }) => <article className="task-card" key={task.id ?? index}><div className="task-card-top"><select aria-label={`任务 ${index + 1} 优先级`} value={task.priority ?? "中"} onChange={e => updateTask(index, { priority: e.target.value })}><option>高</option><option>中</option><option>低</option></select><small>{task.source}</small></div><input aria-label={`任务 ${index + 1} 标题`} value={task.title ?? ""} onChange={e => updateTask(index, { title: e.target.value })}/><textarea aria-label={`任务 ${index + 1} 说明`} value={task.reason ?? ""} onChange={e => updateTask(index, { reason: e.target.value })}/><footer><select aria-label={`任务 ${index + 1} 状态`} value={task.status ?? "待处理"} onChange={e => updateTask(index, { status: e.target.value })}><option>待处理</option><option>进行中</option><option>待确认</option><option>已完成</option><option>异常挂起</option></select><code>{task.id}</code></footer></article>)}
+        {columnTasks.length === 0 && <div className="kanban-empty">无任务</div>}
+      </div>;
+    })}</section>
     <SourceInspector artifact={artifact}/></div></div>;
 }
 
@@ -275,6 +287,7 @@ function CalendarView({ artifact, dirty, onChange, onSave, onInvite }: ViewProps
   const seedDate = String(artifact.content.selected_date ?? `${String(artifact.content.month ?? "2026-07")}-01`);
   const [selectedDate, setSelectedDate] = useState(seedDate);
   const [displayMonth, setDisplayMonth] = useState(seedDate.slice(0, 7));
+  const [panel, setPanel] = useState<"month" | "day">("month");
   useEffect(() => {
     const next = String(artifact.content.selected_date ?? "");
     if (next) { setSelectedDate(next); setDisplayMonth(next.slice(0, 7)); }
@@ -288,27 +301,45 @@ function CalendarView({ artifact, dirty, onChange, onSave, onInvite }: ViewProps
     return { date: formatDate(date), day: date.getDate(), outside: date.getMonth() !== month - 1 };
   });
   const today = formatDate(new Date());
-  const selectedEvents = events.filter(item => item.date === selectedDate);
-  const eventCount = events.reduce<Record<string, number>>((result, item) => {
-    if (item.date) result[item.date] = (result[item.date] ?? 0) + 1;
+  const selectedEvents = events.filter(item => item.date === selectedDate).sort((a, b) => String(a.start ?? "").localeCompare(String(b.start ?? "")));
+  const eventsByDate = events.reduce<Record<string, CalendarItem[]>>((result, item) => {
+    if (item.date) (result[item.date] ??= []).push(item);
     return result;
   }, {});
   const changeMonth = (offset: number) => {
     const date = new Date(year, month - 1 + offset, 1);
     setDisplayMonth(formatDate(date).slice(0, 7));
   };
+  const shiftDay = (offset: number) => {
+    const date = new Date(`${selectedDate}T00:00:00`);
+    date.setDate(date.getDate() + offset);
+    setSelectedDate(formatDate(date));
+  };
+  const openDay = (date: string, outside: boolean) => {
+    setSelectedDate(date);
+    if (outside) setDisplayMonth(date.slice(0, 7));
+    setPanel("day");
+  };
   const updateEvent = (target: CalendarItem, patch: Partial<CalendarItem>) => onChange({ events: events.map(item => item === target ? { ...item, ...patch } : item) });
   const addEvent = () => onChange({ events: [...events, { id: `CAL-${Date.now()}`, title: "新日程", date: selectedDate, start: "09:00", end: "09:30", attendees: [], location: "", agenda: "" }] });
 
-  return <div className="artifact-page"><ArtifactHeader artifact={artifact} eyebrow="CALENDAR" dirty={dirty} onSave={onSave} actions={<button className="outline-button" onClick={onInvite}>创建邀请</button>}/><div className="artifact-layout">
+  return <div className="artifact-page"><ArtifactHeader artifact={artifact} eyebrow="CALENDAR" title="日历工作台" dirty={dirty} onSave={onSave} actions={<button className="outline-button" onClick={onInvite}>创建邀请</button>}/><div className="artifact-layout">
     <section className="calendar-workspace editor-card">
-      <div className="month-calendar"><header><button aria-label="上个月" onClick={() => changeMonth(-1)}>‹</button><div><strong>{year} 年 {month} 月</strong><span>{events.filter(item => item.date?.startsWith(displayMonth)).length} 项日程</span></div><button aria-label="下个月" onClick={() => changeMonth(1)}>›</button></header>
+      {panel === "month" && <div className="month-calendar">
+        <header><button aria-label="上个月" onClick={() => changeMonth(-1)}>‹</button><div><strong>{year} 年 {month} 月</strong><span>{events.filter(item => item.date?.startsWith(displayMonth)).length} 项日程 · 点击日期查看当日安排</span></div><button aria-label="下个月" onClick={() => changeMonth(1)}>›</button></header>
         <div className="calendar-weekdays">{["日", "一", "二", "三", "四", "五", "六"].map(day => <span key={day}>{day}</span>)}</div>
-        <div className="calendar-grid">{cells.map(cell => <button key={cell.date} className={`${cell.outside ? "outside" : ""} ${cell.date === selectedDate ? "selected" : ""} ${cell.date === today ? "today" : ""}`} onClick={() => { setSelectedDate(cell.date); if (cell.outside) setDisplayMonth(cell.date.slice(0, 7)); }}><span>{cell.day}</span>{eventCount[cell.date] ? <i aria-label={`${eventCount[cell.date]} 项日程`}>{eventCount[cell.date] > 1 ? eventCount[cell.date] : ""}</i> : null}</button>)}</div>
-      </div>
-      <aside className="day-agenda" key={selectedDate}><header><div><span>{selectedDate}</span><h2>{new Date(`${selectedDate}T00:00:00`).toLocaleDateString("zh-CN", { weekday: "long" })}</h2></div><button onClick={addEvent}>＋ 新建日程</button></header>
+        <div className="calendar-grid">{cells.map(cell => {
+          const dayEvents = (eventsByDate[cell.date] ?? []).slice().sort((a, b) => String(a.start ?? "").localeCompare(String(b.start ?? "")));
+          return <button key={cell.date} className={`${cell.outside ? "outside" : ""} ${cell.date === selectedDate ? "selected" : ""} ${cell.date === today ? "today" : ""}`} onClick={() => openDay(cell.date, cell.outside)}>
+            <span className="day-number">{cell.day}</span>
+            <span className="day-events">{dayEvents.slice(0, 3).map(item => <i key={item.id ?? item.title}>{item.start ?? ""} {item.title ?? "日程"}</i>)}{dayEvents.length > 3 && <em>＋{dayEvents.length - 3} 更多</em>}</span>
+          </button>;
+        })}</div>
+      </div>}
+      {panel === "day" && <div className="day-agenda" key={selectedDate}>
+        <header><div className="day-agenda-title"><button className="back-button" onClick={() => setPanel("month")}>‹ 月历</button><div><span>{selectedDate}</span><h2>{new Date(`${selectedDate}T00:00:00`).toLocaleDateString("zh-CN", { weekday: "long" })}</h2></div></div><div className="day-agenda-actions"><button aria-label="前一天" onClick={() => shiftDay(-1)}>‹</button><button aria-label="后一天" onClick={() => shiftDay(1)}>›</button><button className="add-event" onClick={addEvent}>＋ 新建日程</button></div></header>
         <div className="day-event-list">{selectedEvents.length ? selectedEvents.map((item, index) => <article className="day-event" key={item.id ?? index}><div className="event-time"><input aria-label={`日程 ${index + 1} 开始时间`} type="time" value={item.start ?? ""} onChange={e => updateEvent(item, { start: e.target.value })}/><span>—</span><input aria-label={`日程 ${index + 1} 结束时间`} type="time" value={item.end ?? ""} onChange={e => updateEvent(item, { end: e.target.value })}/></div><input className="event-title" aria-label={`日程 ${index + 1} 标题`} value={item.title ?? ""} onChange={e => updateEvent(item, { title: e.target.value })}/><label>地点<input value={item.location ?? ""} onChange={e => updateEvent(item, { location: e.target.value })}/></label><label>参与人<input value={Array.isArray(item.attendees) ? item.attendees.join(", ") : ""} onChange={e => updateEvent(item, { attendees: e.target.value.split(",").map(value => value.trim()).filter(Boolean) })}/></label><label>议程<textarea value={item.agenda ?? ""} onChange={e => updateEvent(item, { agenda: e.target.value })}/></label></article>) : <div className="calendar-empty"><span>○</span><strong>当天暂无日程</strong><p>可以手动新建，或让 Agent 协助安排。</p></div>}</div>
-      </aside>
+      </div>}
     </section>
     <SourceInspector artifact={artifact}/></div></div>;
 }
@@ -316,15 +347,22 @@ function CalendarView({ artifact, dirty, onChange, onSave, onInvite }: ViewProps
 function ExpenseView({ artifact, dirty, onChange, onSave }: ViewProps) {
   const invoices = Array.isArray(artifact.content.invoices) ? artifact.content.invoices as { number?: string; vendor?: string; amount?: number; result?: string }[] : [];
   const anomalies = Array.isArray(artifact.content.anomalies) ? artifact.content.anomalies as string[] : [];
-  return <div className="artifact-page"><ArtifactHeader artifact={artifact} eyebrow="EXPENSE" dirty={dirty} onSave={onSave}/><div className="artifact-layout"><section className="editor-card expense-card"><div className="expense-summary"><label>报销单<input aria-label="报销单号" value={String(artifact.content.case_id ?? "")} onChange={e => onChange({ case_id: e.target.value })}/></label><div><span>申请人</span><strong>{String(artifact.content.owner ?? "-")}</strong></div><div><span>总金额</span><strong>¥{Number(artifact.content.amount ?? 0).toLocaleString()}</strong></div></div><div className="invoice-list">{invoices.map((row, index) => <div key={`${row.number}-${index}`}><code>{row.number}</code><span>{row.vendor}</span><strong>¥{Number(row.amount ?? 0).toLocaleString()}</strong><b className={row.result?.includes("通过") ? "ok" : "warn"}>{row.result}</b></div>)}</div><div className="anomaly-box"><strong>需要关注</strong>{anomalies.map(item => <p key={item}>! {item}</p>)}</div></section><SourceInspector artifact={artifact}/></div></div>;
+  return <div className="artifact-page"><ArtifactHeader artifact={artifact} eyebrow="EXPENSE" title="报销核查" dirty={dirty} onSave={onSave}/><div className="artifact-layout"><section className="editor-card expense-card"><div className="expense-summary"><label>报销单<input aria-label="报销单号" value={String(artifact.content.case_id ?? "")} onChange={e => onChange({ case_id: e.target.value })}/></label><div><span>申请人</span><strong>{String(artifact.content.owner ?? "-")}</strong></div><div><span>总金额</span><strong>¥{Number(artifact.content.amount ?? 0).toLocaleString()}</strong></div></div><div className="invoice-list">{invoices.map((row, index) => <div key={`${row.number}-${index}`}><code>{row.number}</code><span>{row.vendor}</span><strong>¥{Number(row.amount ?? 0).toLocaleString()}</strong><b className={row.result?.includes("通过") ? "ok" : "warn"}>{row.result}</b></div>)}</div><div className="anomaly-box"><strong>需要关注</strong>{anomalies.map(item => <p key={item}>! {item}</p>)}</div></section><SourceInspector artifact={artifact}/></div></div>;
 }
 
 function CrmView({ artifact, dirty, onChange, onSave }: ViewProps) {
-  return <div className="artifact-page"><ArtifactHeader artifact={artifact} eyebrow="CRM" dirty={dirty} onSave={onSave}/><div className="artifact-layout"><section className="editor-card crm-card"><div className="crm-customer"><span>{String(artifact.content.customer ?? "客").slice(0, 1)}</span><div><h3>{String(artifact.content.customer ?? "-")}</h3><p>{String(artifact.content.opportunity_id ?? "-")}</p></div><strong>¥{Number(artifact.content.amount ?? 0).toLocaleString()}</strong></div><div className="stage-flow"><div><span>当前阶段</span><strong>{String(artifact.content.before ?? "-")}</strong></div><i>→</i><label><span>目标阶段</span><select aria-label="目标阶段" value={String(artifact.content.suggested_stage ?? "合同谈判")} onChange={e => onChange({ suggested_stage: e.target.value })}><option>需求确认</option><option>方案沟通</option><option>商务谈判</option><option>合同谈判</option><option>赢单</option></select></label></div><label className="crm-next">下一步<textarea aria-label="CRM 下一步" value={String(artifact.content.next_step ?? "")} onChange={e => onChange({ next_step: e.target.value })}/></label></section><SourceInspector artifact={artifact}/></div></div>;
+  const stages = ["需求确认", "方案沟通", "商务谈判", "合同谈判", "赢单"];
+  const current = String(artifact.content.before ?? "");
+  const target = String(artifact.content.suggested_stage ?? "合同谈判");
+  const currentIndex = stages.indexOf(current);
+  return <div className="artifact-page"><ArtifactHeader artifact={artifact} eyebrow="CRM" title="商机工作台" dirty={dirty} onSave={onSave}/><div className="artifact-layout"><section className="editor-card crm-card"><div className="crm-customer"><span>{String(artifact.content.customer ?? "客").slice(0, 1)}</span><div><h3>{String(artifact.content.customer ?? "-")}</h3><p>{String(artifact.content.opportunity_id ?? "-")}</p></div><strong>¥{Number(artifact.content.amount ?? 0).toLocaleString()}</strong></div><div className="stage-stepper">{stages.map((stage, index) => {
+    const state = stage === target && stage !== current ? "target" : stage === current ? "current" : index < currentIndex ? "passed" : "";
+    return <div className={`stage-step ${state}`} key={stage}><i>{index < currentIndex ? "✓" : index + 1}</i><span>{stage}</span></div>;
+  })}</div><div className="stage-flow"><div><span>当前阶段</span><strong>{current || "-"}</strong></div><i>→</i><label><span>目标阶段</span><select aria-label="目标阶段" value={target} onChange={e => onChange({ suggested_stage: e.target.value })}><option>需求确认</option><option>方案沟通</option><option>商务谈判</option><option>合同谈判</option><option>赢单</option></select></label></div><label className="crm-next">下一步<textarea aria-label="CRM 下一步" value={String(artifact.content.next_step ?? "")} onChange={e => onChange({ next_step: e.target.value })}/></label></section><SourceInspector artifact={artifact}/></div></div>;
 }
 
 function AuditView({ events, run }: { events: AuditEvent[]; run: RunSnapshot | null }) {
-  return <div className="artifact-page audit-page"><header className="artifact-header"><div><span>AUDIT</span><h1>执行审计</h1></div><code>{run?.trace_id ?? "等待受控动作"}</code></header>{events.length === 0 ? <div className="workspace-empty"><span>◇</span><strong>暂无审计事件</strong><p>Agent 发起受控动作后，证据、审批、Permit 与执行结果会记录在这里。</p></div> : <div className="audit-timeline">{events.map(event => <details key={event.sequence}><summary><b>{String(event.sequence).padStart(3, "0")}</b><span><strong>{EVENT_LABELS[event.event_type] ?? event.event_type}</strong><small>{event.event_type}</small></span><time>{new Date(event.occurred_at).toLocaleTimeString("zh-CN")}</time><i>⌄</i></summary><pre>{JSON.stringify(event.payload, null, 2)}</pre></details>)}</div>}</div>;
+  return <div className="artifact-page audit-page"><header className="artifact-header"><div className="artifact-title"><div className="app-chip"><Icon name="audit"/></div><div><span className="eyebrow">AUDIT</span><h1>执行审计</h1></div></div><code>{run?.trace_id ?? "等待受控动作"}</code></header>{events.length === 0 ? <div className="workspace-empty"><span>◇</span><strong>暂无审计事件</strong><p>Agent 发起受控动作后，证据、审批、Permit 与执行结果会记录在这里。</p></div> : <div className="audit-timeline">{events.map(event => <details key={event.sequence}><summary><b>{String(event.sequence).padStart(3, "0")}</b><span><strong>{EVENT_LABELS[event.event_type] ?? event.event_type}</strong><small>{event.event_type}</small></span><time>{new Date(event.occurred_at).toLocaleTimeString("zh-CN")}</time><i>⌄</i></summary><pre>{JSON.stringify(event.payload, null, 2)}</pre></details>)}</div>}</div>;
 }
 
 function ApprovalModal({ run, evidenceCatalog, evidence, busy, onEvidence, onSubmitEvidence, onDecide, onAuthorize }: {
@@ -335,7 +373,7 @@ function ApprovalModal({ run, evidenceCatalog, evidence, busy, onEvidence, onSub
   const [expanded, setExpanded] = useState(true);
   const status = run.control_plan.status;
   const riskReasons = run.risk.reason_codes.map(code => RISK_REASON_LABELS[code] ?? code);
-  return <div className={`approval-overlay ${expanded ? "" : "collapsed"}`}><section className="approval-modal" role="dialog" aria-modal="false" aria-label="动作确认">
+  return <div className={`approval-overlay ${expanded ? "" : "collapsed"}`}><section className={`approval-modal risk-${run.risk.risk_level}`} role="dialog" aria-modal="false" aria-label="动作确认">
     <header><div><span>AGENT 请求确认</span><h2>{run.action.action_type.replaceAll("_", " ")}</h2></div><div className="approval-header-actions"><b className={`risk-badge ${run.risk.risk_level}`}>{run.risk.risk_level}</b><button aria-label={expanded ? "收起确认卡片" : "展开确认卡片"} onClick={() => setExpanded(value => !value)}>{expanded ? "−" : "+"}</button></div></header>
     {expanded && <div className="approval-expandable">
     <p className="approval-summary">{run.user_message}</p>
@@ -384,7 +422,7 @@ function ActiveTaskStrip({ task, syncState, creating, blocked, onCreate, onRetry
       <div><dt>预算</dt><dd>{task.budget.steps_used}/{task.contract.budget.max_steps} 步</dd></div>
       <div><dt>版本</dt><dd>v{task.version}</dd></div>
     </dl>
-    <div className={`task-sync-state ${syncState}`}><i/><span>{syncLabels[syncState]}</span><code>{task.task_id}</code>{["offline", "reconnecting"].includes(syncState) && <button type="button" disabled={blocked} onClick={onRetry}>{syncState === "offline" ? "重新连接" : "立即对账"}</button>}</div>
+    <div className={`task-sync-state ${syncState}`}><i/><span>{syncLabels[syncState]}</span><code>{task.task_id}</code>{terminal && <button type="button" className="task-replay-button" disabled={blocked || creating || !["synced", "offline"].includes(syncState)} onClick={onCreate}>{creating ? "创建中" : "再次演示"}</button>}{["offline", "reconnecting"].includes(syncState) && <button type="button" disabled={blocked} onClick={onRetry}>{syncState === "offline" ? "重新连接" : "立即对账"}</button>}</div>
   </section>;
 }
 
@@ -418,6 +456,7 @@ export default function Home() {
   const silentRequestRef = useRef(false);
   const taskSequenceRef = useRef(0);
   const pendingTaskMutationRef = useRef<PendingTaskMutation | null>(null);
+  const demo1CreateKeyRef = useRef<string | null>(null);
 
   useEffect(() => {
     try {
@@ -536,15 +575,24 @@ export default function Home() {
   const activeArtifact = useMemo(() => activeView !== "audit" ? artifacts[activeView] : undefined, [activeView, artifacts]);
 
   async function createDemo1Task() {
+    const repeat = Boolean(task && ["committed", "failed", "cancelled"].includes(task.status));
+    const idempotencyKey = demo1CreateKeyRef.current ?? `demo1-round:${crypto.randomUUID()}`;
+    demo1CreateKeyRef.current = idempotencyKey;
     setTaskCreating(true);
     setTaskSyncState("connecting");
     setError("");
     try {
-      const snapshot = await request<TaskSnapshot>("/v1/demo1/tasks", { method: "POST" });
+      const snapshot = await request<TaskSnapshot>("/v1/demo1/tasks", {
+        method: "POST",
+        headers: { "Idempotency-Key": idempotencyKey },
+      });
+      demo1CreateKeyRef.current = null;
       setTask(snapshot);
+      setSelectedTaskArtifactVersionId(null);
+      setTaskViewMode("runtime");
       taskSequenceRef.current = snapshot.last_event_sequence;
       setTaskSyncState("synced");
-      setNotice("Demo 1 任务契约已创建");
+      setNotice(repeat ? "新一轮 Demo 1 已创建" : "Demo 1 任务契约已创建");
     } catch (reason) {
       setTaskSyncState("offline");
       setError(reason instanceof Error ? reason.message : "无法创建 Demo 1 任务");
@@ -967,8 +1015,10 @@ export default function Home() {
   }
 
   return <main className="app-shell" ref={shellRef} style={shellStyle}>
-    <section className="workbench">
-      <nav className="view-rail" aria-label="工作台视图">{(Object.keys(VIEW_LABELS) as ViewId[]).map(view => <button key={view} className={activeView === view ? "active" : ""} onClick={() => setActiveView(view)} title={VIEW_LABELS[view]}><Icon name={view}/><span>{VIEW_LABELS[view]}</span></button>)}</nav>
+    <section className="workbench" data-view={activeView}>
+      <nav className="view-rail" aria-label="工作台视图">{(Object.keys(VIEW_LABELS) as ViewId[]).map(view => view === "audit"
+        ? <Fragment key={view}><div className="rail-divider"/><button className={activeView === view ? "active" : ""} onClick={() => setActiveView(view)} title={VIEW_LABELS[view]}><Icon name={view}/><span>{VIEW_LABELS[view]}</span></button></Fragment>
+        : <button key={view} className={activeView === view ? "active" : ""} onClick={() => setActiveView(view)} title={VIEW_LABELS[view]}><Icon name={view}/><span>{VIEW_LABELS[view]}</span></button>)}</nav>
       <div className={`workspace-viewport ${streamingArtifact === activeView ? "is-agent-editing" : ""}`}>
         {streamingArtifact === activeView && <div className="agent-edit-indicator"><i/><span>Agent 正在编辑{VIEW_LABELS[activeView]}</span></div>}
         {activeView === "mail" && viewProps && <MailView {...viewProps} onNew={() => void startNewMail()} onSend={() => void triggerWorkspaceAction("发送当前工作区中的邮件")}/>}
@@ -995,15 +1045,15 @@ export default function Home() {
     </section>
     <div className="resize-divider" role="separator" aria-orientation="vertical" onPointerDown={startResize}><span>•••</span></div>
     <section className={`chat-pane ${!task || actionGateOpen ? "without-task-runtime" : ""} ${actionGateOpen ? "has-action-gate" : ""}`}>
-      <div className="chat-identity"><div className="avatar">OA</div><div><strong>Office Agent</strong><span>已连接当前工作区</span></div></div>
+      <div className="chat-identity"><div className="avatar">OA</div><div><strong>Office Agent</strong><span className="id-status">已连接当前工作区</span></div></div>
       <ActiveTaskStrip task={task} syncState={taskSyncState} creating={taskCreating} blocked={actionGateOpen} onCreate={() => void createDemo1Task()} onRetry={() => void (pendingTaskMutation ? retryPendingTaskMutation() : retryTaskConnection())}/>
       {task && <div className={`task-runtime-slot ${actionGateOpen ? "is-hidden" : ""}`} aria-hidden={actionGateOpen}>
         <TaskRuntimePanel task={task} syncState={taskSyncState} busy={taskMutating || Boolean(pendingTaskMutation) || actionGateOpen} onStart={() => void startDemo1Loop()} onControl={controlDemo1Task} onOpenArtifact={openTaskArtifact}/>
       </div>}
       <div className="conversation" ref={conversationRef} onScroll={handleConversationScroll}>
-        <article className="message assistant-message"><div className="message-body"><p>我会读取你正在编辑的工作区，并直接协助修改。涉及发送、写入或外部影响时，我会先请求确认。</p></div></article>
-        {messages.map(item => <article className={`message ${item.role === "user" ? "user-message" : "assistant-message"} message-enter`} key={item.message_id}><div className="message-body">{item.role === "assistant" && <strong>Office Agent</strong>}<MessageContent text={item.content} streaming={item.status === "streaming"}/></div></article>)}
-        {assistantStatus && <article className="message assistant-message message-enter"><div className="message-body"><div className="typing-bubble"><span/><span/><span/><em>{assistantStatus}</em></div></div></article>}
+        {messages.length === 0 && <article className="message assistant-message"><div className="msg-avatar">✦</div><div className="message-body"><strong>Office Agent</strong><p>我会读取你正在编辑的工作区，并直接协助修改。涉及发送、写入或外部影响时，我会先请求确认。</p><div className="suggestion-chips"><button type="button" onClick={() => void runAgent("帮我完善当前工作区中的内容")}>完善当前内容</button><button type="button" onClick={() => void runAgent("检查当前工作区有没有需要我注意的问题")}>检查潜在问题</button><button type="button" onClick={() => void runAgent("总结一下当前工作区的状态")}>总结当前状态</button></div></div></article>}
+        {messages.map(item => <article className={`message ${item.role === "user" ? "user-message" : "assistant-message"} message-enter`} key={item.message_id}>{item.role === "assistant" && <div className="msg-avatar">✦</div>}<div className="message-body">{item.role === "assistant" && <strong>Office Agent</strong>}<MessageContent text={item.content} streaming={item.status === "streaming"}/></div></article>)}
+        {assistantStatus && <article className="message assistant-message message-enter"><div className="msg-avatar">✦</div><div className="message-body"><div className="typing-bubble"><span/><span/><span/><em>{assistantStatus}</em></div></div></article>}
       </div>
       <div className="chat-footer">{error && <div className="error-banner">{error}</div>}<form className="chat-composer glass-card" onSubmit={sendMessage}><textarea aria-label="输入办公任务" value={message} onChange={event => setMessage(event.target.value)} onKeyDown={handleComposerKeyDown} placeholder={`让 Agent 协助当前${VIEW_LABELS[activeView]}…`}/><button aria-label="发送消息" disabled={busy || !message.trim() || !threadId}>{busy ? <span className="send-spinner"/> : "↑"}</button></form><small>Agent 可读取当前未保存内容 · Enter 发送</small></div>
       {run && actionGateOpen && <ApprovalModal run={run} evidenceCatalog={evidenceCatalog} evidence={evidence} busy={busy} onEvidence={(key, value) => setEvidence(current => ({ ...current, [key]: value }))} onSubmitEvidence={submitEvidence} onDecide={decide} onAuthorize={authorize}/>}
