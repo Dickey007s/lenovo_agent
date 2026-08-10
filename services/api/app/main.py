@@ -18,6 +18,8 @@ from services.api.app.application.storage import (
     PostgresRunStore,
     PostgresWorkspaceStore,
 )
+from services.api.app.application.task_storage import InMemoryTaskStore, PostgresTaskStore
+from services.api.app.application.tasks import TaskService
 from services.api.app.application.conversations import ConversationService
 from services.api.app.config import get_settings
 
@@ -25,6 +27,16 @@ from services.api.app.config import get_settings
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     settings = get_settings()
+    task_store_dsn = settings.database_dsn or settings.langgraph_checkpoint_dsn
+    if task_store_dsn:
+        task_store = PostgresTaskStore(task_store_dsn)
+        app.state.task_store_backend = "postgres"
+    else:
+        task_store = InMemoryTaskStore()
+        app.state.task_store_backend = "memory"
+    await task_store.setup()
+    app.state.task_service = TaskService(task_store)
+
     if settings.langgraph_checkpoint_dsn:
         database_dsn = settings.database_dsn or settings.langgraph_checkpoint_dsn
         run_store = PostgresRunStore(database_dsn)

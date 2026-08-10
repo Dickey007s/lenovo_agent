@@ -12,6 +12,8 @@ import {
   useState,
 } from "react";
 
+import type { TaskEvent, TaskEventType, TaskSnapshot } from "./task-types";
+
 type ViewId = "mail" | "document" | "quote" | "tasks" | "calendar" | "expense" | "crm" | "audit";
 type WorkspaceKind = Exclude<ViewId, "audit">;
 
@@ -93,6 +95,22 @@ type EvidenceDefinition = {
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8010";
 const REQUEST_HEADERS = { "Content-Type": "application/json", "X-User-Id": "demo_user", "X-User-Roles": "current_user,sales_manager" };
 const EVENT_TYPES = ["RUN_CREATED", "ACTION_PARSED", "EVIDENCE_SUBMITTED", "APPROVAL_RECORDED", "CONTROL_PLAN_UPDATED", "ACTION_INVALIDATED", "PERMIT_ISSUED", "TOOL_EXECUTED", "TAMPER_BLOCKED"];
+const TASK_EVENT_TYPES: TaskEventType[] = [
+  "TASK_CREATED", "TASK_RESTORED", "TASK_STATUS_CHANGED", "TASK_PHASE_CHANGED",
+  "BRANCH_STATUS_CHANGED", "LOOP_STEP_STARTED", "LOOP_STEP_COMPLETED",
+  "ARTIFACT_VERSION_CREATED", "VERIFICATION_RECORDED", "CONFLICT_OPENED",
+  "CONFLICT_RESOLVED", "CONTROL_ACCEPTED", "CONTROL_APPLIED", "CONTROL_REJECTED",
+  "BUDGET_UPDATED", "CHECKPOINT_COMMITTED", "TASK_COMMITTED", "TASK_FAILED",
+];
+const TASK_STATUS_LABELS: Record<TaskSnapshot["status"], string> = {
+  ready: "等待启动", running: "运行中", waiting_input: "等待你的决定", paused: "已暂停",
+  taken_over: "由你接管", verifying: "正在验证", committed: "已验证并提交",
+  failed: "任务失败", cancelled: "已取消",
+};
+const TASK_PHASE_LABELS: Record<TaskSnapshot["phase"], string> = {
+  contract: "任务契约", observe: "读取来源", plan: "规划分支", act: "生成工件",
+  verify: "验证证据", commit: "提交结果",
+};
 const EVENT_LABELS: Record<string, string> = {
   RUN_CREATED: "创建运行", ACTION_PARSED: "解析动作", EVIDENCE_SUBMITTED: "补充证据",
   APPROVAL_RECORDED: "记录审批", CONTROL_PLAN_UPDATED: "更新控制计划", ACTION_INVALIDATED: "作废旧动作",
@@ -321,6 +339,35 @@ function ApprovalModal({ run, evidenceCatalog, evidence, busy, onEvidence, onSub
   </section></div>;
 }
 
+type TaskSyncState = "loading" | "connecting" | "synced" | "reconnecting" | "offline";
+
+function ActiveTaskStrip({ task, syncState, creating, onCreate }: {
+  task: TaskSnapshot | null;
+  syncState: TaskSyncState;
+  creating: boolean;
+  onCreate: () => void;
+}) {
+  const syncLabels: Record<TaskSyncState, string> = {
+    loading: "正在读取", connecting: "正在连接", synced: "已同步",
+    reconnecting: "正在重新对账", offline: "状态未知",
+  };
+  if (!task) return <section className="active-task-strip empty" aria-label="受控持久任务">
+    <div><span>DEMO 1</span><strong>受控持久任务</strong><small>服务端将创建 Task ID、契约和三个交付分支</small></div>
+    <button className="task-create-button" disabled={creating || syncState === "loading"} onClick={onCreate}>{creating ? "创建中" : "＋ 创建任务"}</button>
+  </section>;
+
+  return <section className="active-task-strip" aria-label="当前受控持久任务">
+    <div className="task-strip-main"><span>ACTIVE TASK</span><strong>{task.contract.title}</strong><small>{task.contract.objective}</small></div>
+    <dl className="task-strip-facts">
+      <div><dt>状态</dt><dd>{TASK_STATUS_LABELS[task.status]}</dd></div>
+      <div><dt>阶段</dt><dd>{TASK_PHASE_LABELS[task.phase]}</dd></div>
+      <div><dt>预算</dt><dd>{task.budget.steps_used}/{task.contract.budget.max_steps} 步</dd></div>
+      <div><dt>版本</dt><dd>v{task.version}</dd></div>
+    </dl>
+    <div className={`task-sync-state ${syncState}`}><i/><span>{syncLabels[syncState]}</span><code>{task.task_id}</code></div>
+  </section>;
+}
+
 export default function Home() {
   const [threadId, setThreadId] = useState("");
   const [message, setMessage] = useState("");
@@ -337,11 +384,15 @@ export default function Home() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [task, setTask] = useState<TaskSnapshot | null>(null);
+  const [taskSyncState, setTaskSyncState] = useState<TaskSyncState>("loading");
+  const [taskCreating, setTaskCreating] = useState(false);
   const [workspaceWidth, setWorkspaceWidth] = useState(0);
   const shellRef = useRef<HTMLElement>(null);
   const conversationRef = useRef<HTMLDivElement>(null);
   const stickToBottomRef = useRef(true);
   const silentRequestRef = useRef(false);
+  const taskSequenceRef = useRef(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -349,12 +400,20 @@ export default function Home() {
       request<{ thread_id: string }>("/v1/threads", { method: "POST" }),
       request<EvidenceDefinition[]>("/v1/evidence/requirements"),
       request<WorkspaceArtifact[]>("/v1/workspace"),
-    ]).then(([thread, requirements, workspace]) => {
+      request<TaskSnapshot[]>("/v1/tasks"),
+    ]).then(([thread, requirements, workspace, tasks]) => {
       if (cancelled) return;
       setThreadId(thread.thread_id);
       setEvidenceCatalog(Object.fromEntries(requirements.map(item => [item.requirement, item])));
       setArtifacts(Object.fromEntries(workspace.map(item => [item.kind, item])) as Record<WorkspaceKind, WorkspaceArtifact>);
-    }).catch(reason => setError(reason instanceof Error ? reason.message : "初始化失败"));
+      const activeTask = tasks[0] ?? null;
+      setTask(activeTask);
+      taskSequenceRef.current = activeTask?.last_event_sequence ?? 0;
+      setTaskSyncState("synced");
+    }).catch(reason => {
+      setTaskSyncState("offline");
+      setError(reason instanceof Error ? reason.message : "初始化失败");
+    });
     return () => { cancelled = true; };
   }, []);
 
@@ -371,6 +430,53 @@ export default function Home() {
   }, [run?.run_id]);
 
   useEffect(() => {
+    const taskId = task?.task_id;
+    if (!taskId) return;
+    let cancelled = false;
+    let source: EventSource | null = null;
+    let reconnectTimer: number | undefined;
+
+    const reconcile = async () => {
+      try {
+        const snapshot = await request<TaskSnapshot>(`/v1/tasks/${taskId}`);
+        if (cancelled) return;
+        setTask(snapshot);
+        taskSequenceRef.current = snapshot.last_event_sequence;
+        setTaskSyncState("synced");
+      } catch {
+        if (!cancelled) setTaskSyncState("reconnecting");
+      }
+    };
+    const receive = (raw: Event) => {
+      const event = JSON.parse((raw as MessageEvent<string>).data) as TaskEvent;
+      if (event.sequence <= taskSequenceRef.current) return;
+      if (event.sequence !== taskSequenceRef.current + 1) setTaskSyncState("reconnecting");
+      taskSequenceRef.current = event.sequence;
+      void reconcile();
+    };
+    const connect = () => {
+      if (cancelled) return;
+      setTaskSyncState(current => current === "synced" ? current : "connecting");
+      source = new EventSource(`${API_BASE}/v1/tasks/${taskId}/events?after=${taskSequenceRef.current}`);
+      TASK_EVENT_TYPES.forEach(type => source?.addEventListener(type, receive));
+      source.onopen = () => { void reconcile(); };
+      source.onerror = () => {
+        source?.close();
+        if (cancelled) return;
+        setTaskSyncState("reconnecting");
+        reconnectTimer = window.setTimeout(connect, 1200);
+      };
+    };
+
+    connect();
+    return () => {
+      cancelled = true;
+      source?.close();
+      if (reconnectTimer !== undefined) window.clearTimeout(reconnectTimer);
+    };
+  }, [task?.task_id]);
+
+  useEffect(() => {
     const element = conversationRef.current;
     if (!element || !stickToBottomRef.current) return;
     const frame = requestAnimationFrame(() => { element.scrollTop = element.scrollHeight; });
@@ -384,6 +490,24 @@ export default function Home() {
   }, [notice]);
 
   const activeArtifact = useMemo(() => activeView !== "audit" ? artifacts[activeView] : undefined, [activeView, artifacts]);
+
+  async function createDemo1Task() {
+    setTaskCreating(true);
+    setTaskSyncState("connecting");
+    setError("");
+    try {
+      const snapshot = await request<TaskSnapshot>("/v1/demo1/tasks", { method: "POST" });
+      setTask(snapshot);
+      taskSequenceRef.current = snapshot.last_event_sequence;
+      setTaskSyncState("synced");
+      setNotice("Demo 1 任务契约已创建");
+    } catch (reason) {
+      setTaskSyncState("offline");
+      setError(reason instanceof Error ? reason.message : "无法创建 Demo 1 任务");
+    } finally {
+      setTaskCreating(false);
+    }
+  }
 
   function handleStreamEvent(event: Record<string, unknown>) {
     const type = String(event.type ?? "");
@@ -599,6 +723,7 @@ export default function Home() {
     <div className="resize-divider" role="separator" aria-orientation="vertical" onPointerDown={startResize}><span>•••</span></div>
     <section className="chat-pane">
       <div className="chat-identity"><div className="avatar">OA</div><div><strong>Office Agent</strong><span>已连接当前工作区</span></div></div>
+      <ActiveTaskStrip task={task} syncState={taskSyncState} creating={taskCreating} onCreate={() => void createDemo1Task()}/>
       <div className="conversation" ref={conversationRef} onScroll={handleConversationScroll}>
         <article className="message assistant-message"><div className="message-body"><p>我会读取你正在编辑的工作区，并直接协助修改。涉及发送、写入或外部影响时，我会先请求确认。</p></div></article>
         {messages.map(item => <article className={`message ${item.role === "user" ? "user-message" : "assistant-message"} message-enter`} key={item.message_id}><div className="message-body">{item.role === "assistant" && <strong>Office Agent</strong>}<MessageContent text={item.content} streaming={item.status === "streaming"}/></div></article>)}

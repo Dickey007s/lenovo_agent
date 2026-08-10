@@ -23,6 +23,7 @@
 | `C-003` | 内部设计输入 | 客户 A、三个交付物、分支收入冲突和控制事件构成 Demo 1 参考路径 | `MEETING-DECK-0716-V2-01`、`SCRIPT-V5-202607` | 支持固定 Fixture 和演示连续性 | 内部材料，不是独立用户或运行证据 |
 | `C-004` | 研究/工程依据 | 推理、动作与观察应交错组织；长任务恢复需要 checkpoint、确定性和幂等 | `REACT-ICLR-2023`、`LANGGRAPH-DURABLE-20260810` | 支持 Loop、checkpoint 和幂等设计原则 | 不规定本项目协议或 UI；需由本地测试证明实现 |
 | `C-005` | 治理依据 | 人类监督、责任记录和持续风险管理应是运行过程职责 | `NIST-AI-RMF-1.0` | 支持控制事件、Trace 和人工接管方向 | 通用框架，不规定具体风险算法或组件布局 |
+| `C-006` | 源码事实 | PR 2 已实现 TaskService/TaskStore、创建/读取/列表/SSE、Owner scope、创建幂等和最薄 Task Bar | `services/api/app/application/tasks.py`、`task_storage.py`、`routes.py`、`main.py`、`apps/web/app/page.tsx` | 只支持初始 `ready / contract` Snapshot、三个 `queued` Branch 和 `TASK_CREATED` | 尚无 Loop、控制、工件写入、验证、冲突或 Commit；PostgreSQL 重启和多实例未验证 |
 | `H-001` | 待验证假设 | Task Bar 与分支列表能降低用户恢复上下文的成本 | 尚无目标用户研究 | 指导前台原型和指标 | `Draft hypothesis`，不得汇报为已提升体验 |
 | `H-002` | 待验证假设 | 冲突只暂停受影响分支能减少等待且不扩散错误 | 固定 Fixture 工程实验待产出 | 指导分支隔离测试 | 功能正确不等于真实业务收益 |
 | `H-003` | 待验证假设 | 客户 A 场景代表联想目标办公用户的高价值流程 | 尚无访谈/任务频率证据 | 仅作为 Demo Fixture | 需要情境访谈与真实任务样本验证 |
@@ -57,6 +58,16 @@
 - Snapshot、Artifact/Control 和对应 TaskEvent 原子提交后才能通过 SSE 广播。
 - 任务涉及副作用时继续调用现有 RunService 和 Gateway，Task Runtime 不签发 Permit，也不建立旁路。
 
+PR 2 当前实际落点为：
+
+- `TaskService` 创建服务端 Task ID、Owner、契约、三个初始 Branch 和首条 `TASK_CREATED(sequence=1)`；新 Task 固定为 `status=ready`、`phase=contract`、`version=1`。
+- `TaskStore` 已有内存和 PostgreSQL 实现，支持 create/load/list/load_events。PostgreSQL 创建 Snapshot 和初始事件处于同一连接事务；ArtifactVersion 表已建立，但没有写入方法。
+- `POST /v1/demo1/tasks` 使用 Owner 绑定的固定幂等键；`POST /v1/tasks` 接受可选 `Idempotency-Key`。同一 Owner+key 重放同一契约返回原 Task，同一 key 改用于不同契约返回 409。
+- `GET /v1/tasks`、`GET /v1/tasks/{task_id}` 和 Task SSE 均按当前 Owner 过滤，跨 Owner 按不存在处理。
+- Task SSE 按 `after` 轮询 Store 并发送 heartbeat。当前没有 `LISTEN/NOTIFY`、消息代理或跨实例广播，多实例通知未实现或验证。
+
+PR 2 没有 Snapshot 更新入口，未执行 `Observe/Plan/Act/Verify/Commit`，也没有控制、ArtifactVersion、VerificationReport、ConflictRecord 或 TaskCommit 事实。内存测试中复用同一个 Store 创建新 `TaskService` 不等于 API 进程重启恢复；进程退出后内存数据丢失。PostgreSQL 虽提供跨进程保存基础，仍缺真实进程重启证据。
+
 ## 5. 前台输出
 
 完整映射见 [`UI_SERVER_FACT_MATRIX.md`](../contracts/UI_SERVER_FACT_MATRIX.md)。前台必须提供：
@@ -70,13 +81,17 @@
 
 默认隐藏 Prompt、思维链、Worker 对话、完整 Trace JSON、JWT/Permit、幂等键、权限哈希、工具秘密和堆栈。现有业务动作确认 tray 保持独立，不能与任务级控制合并。
 
+PR 2 只实现 Active Task Bar：页面启动时从 `GET /v1/tasks` 选择最近任务，显示服务端 title/objective、status、phase、预算用量、version 和 Task ID；没有任务时可调用固定 Demo 1 创建入口。EventSource 使用 `after=last_event_sequence`，连接打开或收到新事件后重新 GET Snapshot 对账，连接错误后自动重连。`loading/connecting/synced/reconnecting/offline` 是客户端传输状态，不是 Task 业务状态，也不能证明后台 Loop 正在运行。
+
+Branch、Conflict、Artifact、Control、Commit、断线后的完整恢复操作和移动端闭环仍未实现；前端虽然拥有这些目标枚举的类型和文案，也不得将它们表述为当前能力。
+
 ## 6. 验证计划与完成边界
 
 | 验证问题 | 成功标准 | 证据 |
 | --- | --- | --- |
 | 协议能否拒绝越权字段和非法引用 | 未知字段、重复 Deliverable、未知引用、非法控制形状均被 Pydantic 拒绝 | PR 1 unit tests |
-| 持久状态能否恢复 | 重启前后 Task ID、version、Artifact head、event sequence 一致 | PR 2 Store/API tests + PostgreSQL 运行证据 |
-| SSE 能否无漏地续订 | `after=N` 只返回后续事件，重复/断线后 Snapshot 对账一致 | PR 2 integration/browser tests |
+| 持久状态能否恢复 | 当前仅证明同一内存 Store 可由新 TaskService 读取相同 Task ID、version 和 cursor；不等于进程重启 | PR 2 内存 Store tests；PostgreSQL 进程重启证据待补 |
+| SSE 能否无漏地续订 | 当前证明 `after=N` 只返回后续持久事件和 heartbeat；浏览器断线、多事件缺口与多实例待验 | PR 2 integration tests；browser/PostgreSQL evidence 待补 |
 | 冲突能否局部隔离 | 仅目标 Branch waiting，其他 Branch 继续并产生可验证工件 | PR 3 Trace + tests |
 | 控制与恢复是否幂等 | 重复命令、重复 resume、崩溃恢复产生的重复 ArtifactVersion/Commit 为 0 | PR 3 tests + state hash |
 | 前后端是否一致 | UI 终态与服务端 Snapshot/Commit 一致率 100% | PR 4 E2E + 桌面/移动截图 |
@@ -85,6 +100,8 @@
 本决策在 PR 1 只能保持 `Ready`。四个 PR 全部完成后，只有“固定 Fixture 的功能实现与工程一致性”可以升为 `Verified`；用户价值、代表性和易用性假设仍需独立证据。
 
 PR 1 实际验证（2026-08-10）：`uv run pytest -q` 为 37 passed，`uv run ruff check .`、`pnpm --dir apps/web lint`、`pnpm --dir apps/web build` 和 `git diff --check` 均通过。该结果只证明协议、类型、文档留痕和防回退检查已落地，不证明 Task Store、SSE、Loop 或界面已经实现。
+
+PR 2 实际验证（2026-08-10）：针对性 Task 测试为 7 passed；全量 `uv run pytest -q` 为 44 passed，`uv run ruff check .`、`pnpm --dir apps/web lint`、`pnpm --dir apps/web build` 和 `git diff --check` 均通过。它证明内存 Store 下的初始创建、Owner scope、创建幂等、事件游标、路由以及前端类型和生产构建；不证明 PostgreSQL 进程重启、多实例通知、浏览器 E2E 或任何 Loop/控制/工件提交行为。本机没有可用的 Docker/PostgreSQL 进程，因此没有把 PostgreSQL 实现表述为已完成运行验收。
 
 ## 7. 关联项
 
