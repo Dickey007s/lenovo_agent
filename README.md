@@ -91,6 +91,7 @@ flowchart LR
 - [HTTP API 与 SSE 事件](docs/API.md)
 - [演示脚本与 Presentation Brief](docs/PRESENTATION_BRIEF.md)
 - [Loop、Swarm 与统一 Agent Runtime 目标架构](docs/TARGET_ARCHITECTURE.md)
+- [决策、推进与汇报治理](docs/DECISION_AND_REPORTING_GOVERNANCE.md)
 
 ## 目录结构
 
