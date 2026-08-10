@@ -1,6 +1,6 @@
 # HTTP API 与 SSE 事件
 
-本文记录 V0.1 与 Demo 1 PR 2 实际暴露的 FastAPI 接口。运行后以 <http://localhost:8010/docs> 的 OpenAPI 页面和 `services/api/app/api/routes.py` 为最终事实来源。
+本文记录 V0.1 与 Demo 1 PR 3 实际暴露的 FastAPI 接口。运行后以 <http://localhost:8010/docs> 的 OpenAPI 页面和 `services/api/app/api/routes.py` 为最终事实来源。
 
 ## 1. 约定
 
@@ -10,6 +10,7 @@
 - 身份头：`X-User-Id`，默认 `demo_user`。
 - 角色头：`X-User-Roles`，英文逗号分隔，默认 `current_user`；前端 Demo 使用 `current_user,sales_manager`。
 - Task 创建幂等头：`Idempotency-Key`，可选，长度 8-160。它只作用于当前 Owner 的 `POST /tasks`，不会授权读取其他用户任务。
+- Task mutation：`start` 和 `controls` 在 JSON body 中携带 `expected_task_version` 与 `idempotency_key`。版本过期或同一 key 被用于不同命令时返回 409。
 
 上述身份头没有签名，只是 P0 占位。生产环境必须在 API 边界替换为经过验证的 SSO/JWT，并从可信身份声明映射角色。
 
@@ -47,6 +48,8 @@ $headers = @{
 | POST | `/tasks` | 从 `TaskContractDraft` 创建服务端 Task；可带 `Idempotency-Key` |
 | GET | `/tasks` | 按更新时间倒序列出当前 Owner 的 TaskSnapshot |
 | GET | `/tasks/{task_id}` | 读取当前 Owner 的单个 TaskSnapshot |
+| POST | `/tasks/{task_id}/start` | 启动固定 Demo 1 Fixture 状态转换 |
+| POST | `/tasks/{task_id}/controls` | 提交任务或分支控制命令 |
 | GET | `/tasks/{task_id}/events?after={sequence}` | 回放并订阅该 Task 的有序事件 SSE |
 
 Task ID、Owner、契约版本、任务状态、分支状态、事件序号和时间均由服务端生成。客户端不能在 `TaskContractDraft` 中提交这些字段；多余字段返回 422。其他 Owner 的 Task 不会通过列表暴露，按 ID 读取或订阅时统一返回 404。
@@ -145,7 +148,7 @@ Invoke-RestMethod -Method Post -Uri "$base/workspace/mail/new" -Headers $headers
 
 保存已绑定动作的 Artifact 会让旧动作失效，并返回 `requires_recheck=true`。`mail/new` 返回新的空白 Artifact，不是清空旧对象后复用其动作 ID。
 
-### 3.4 创建并读取 Demo 1 Task
+### 3.4 创建、启动与控制 Demo 1 Task
 
 固定 Demo 1 入口不需要请求体，并为每个 Owner 使用稳定的幂等键：
 
@@ -191,7 +194,45 @@ Invoke-RestMethod -Method Post -Uri "$base/tasks" `
 
 同一 Owner 使用相同 key 重放相同契约时仍返回 201 和原 TaskSnapshot，不增加第二条 `TASK_CREATED`；相同 key 改用于不同契约返回 409。不传 key 时每次请求都会创建新的 Task。
 
-PR 2 创建后的真实状态固定为：`TaskSnapshot.status=ready`、`phase=contract`、`version=1`、`last_event_sequence=1`，每个交付物对应一个 `queued` Branch。`artifact_versions`、`verification_reports`、`conflicts`、`controls` 均为空，`last_commit=null`。当前没有启动 Loop 或提交控制命令的 API。
+创建后的状态为：`TaskSnapshot.status=ready`、`phase=contract`、`version=1`、`last_event_sequence=1`，每个交付物对应一个 `queued` Branch。`artifact_versions`、`verification_reports`、`conflicts`、`controls` 均为空，`last_commit=null`。
+
+启动请求：
+
+```json
+{
+  "expected_task_version": 1,
+  "idempotency_key": "start-demo1-001"
+}
+```
+
+```powershell
+$start = @{
+  expected_task_version = $task.version
+  idempotency_key = "start-demo1-001"
+} | ConvertTo-Json
+$task = Invoke-RestMethod -Method Post -Uri "$base/tasks/$($task.task_id)/start" `
+  -Headers $headers -ContentType "application/json" -Body $start
+```
+
+当前 `start` 仅物化固定客户 A Fixture，不调用 LLM 或真实 Connector。它在一次服务端 mutation 中追加阶段事件、五个 ArtifactVersion、三个 VerificationReport 和一个收入冲突；最终 Snapshot 进入 `waiting_input / verify`，只有经营分析分支为 `waiting_evidence`，另外两个固定分支为 `committed`。这些阶段事件在事务提交后才可见，不能解释成浏览器观察到了一个持续后台进程。
+
+控制请求统一提交到 `/tasks/{task_id}/controls`：
+
+```json
+{
+  "kind": "resolve_evidence",
+  "branch_id": "branch_...",
+  "selected_source_ref": "fixture:crm/customer-a:official-revenue-v3",
+  "expected_task_version": 2,
+  "idempotency_key": "resolve-demo1-001"
+}
+```
+
+当前固定路径允许 `steer`、`pause_branch`、`resume_branch`、`take_over`、`return_control` 和 `resolve_evidence`。分支控制返回 `ControlEvent.status=applied` 后才改变前台状态；`steer` 当前只记录为 `accepted`，没有 `applied_task_version`，也不会在本次请求内重新规划，因此只能反馈“方向指令已记录，等待后续循环应用”。`resolve_evidence` 只接受契约内的 CRM 正式收入 Fixture：服务端先追加通过验证的经营分析 v2。若解决后仍有其他 open Conflict，本次只持久化该 resolution、经营分析 v2 和其 passed VerificationReport，任务保持 `waiting_input / verify`，不生成客户回复 v3 或 `TASK_COMMITTED`；只有已经不存在其他 open Conflict 时，服务端才联动重生成并验证客户回复 v3，再为全部必需 heads 生成 Commit。
+
+mutation 合约要求：相同 key 和相同命令返回首次 mutation 的 Snapshot，且不新增事件、ArtifactVersion 或 Commit；相同 key 被用于不同命令返回 409。当前内存 Store 回归已覆盖旧 key 在后续 mutation 之后仍返回原响应、Artifact lineage/head 引用、内容摘要和 Commit state hash。历史遗留 marker 若没有保存原 Snapshot，只在当前 Task version 仍等于 marker version 时兼容返回；发生过后续 mutation 时返回 409，而不是错误返回最新 Snapshot。PostgreSQL 实例上的同等行为仍未运行验收。
+
+`start` 会预留 4 个 step、4 次工具调用和 1 秒运行时长，`resolve_evidence` 会预留 1 个 step 和 1 秒运行时长；预计用量超过契约预算或已到 `deadline_at` 时返回 409，且不产生 mutation。当前还没有专门的预算耗尽恢复 API 或完整前台引导。
 
 ### 3.5 直接创建治理 Run
 
@@ -310,7 +351,16 @@ data: {"sequence":168,"event_id":"...","run_id":"...","trace_id":"...",...}
 
 ## 6. Task SSE
 
-`GET /tasks/{task_id}/events?after=0` 先验证当前 Owner，再通过 Store 轮询回放 `sequence > after` 的事件。当前实现只创建一条 `TASK_CREATED`，其格式为：
+`GET /tasks/{task_id}/events?after=0` 先验证当前 Owner，再通过 Store 轮询回放 `sequence > after` 的事件。创建时先产生 `TASK_CREATED`；固定 Demo 1 start 和 control mutation 还会产生下列已注册事件：
+
+- `TASK_STATUS_CHANGED`、`TASK_PHASE_CHANGED`、`TASK_COMMITTED`
+- `LOOP_STEP_STARTED`、`LOOP_STEP_COMPLETED`、`BUDGET_UPDATED`
+- `BRANCH_STATUS_CHANGED`
+- `ARTIFACT_VERSION_CREATED`、`VERIFICATION_RECORDED`、`CHECKPOINT_COMMITTED`
+- `CONFLICT_OPENED`、`CONFLICT_RESOLVED`
+- `CONTROL_ACCEPTED`、`CONTROL_APPLIED`
+
+SSE 帧格式为：
 
 ```text
 id: 1
@@ -328,7 +378,7 @@ SSE 目前由每个 API 进程轮询 TaskStore，没有 PostgreSQL `LISTEN/NOTIF
 | --- | --- |
 | 403 | 当前身份不拥有提交的审批角色 |
 | 404 | Thread、Artifact、Run、Action、Scenario、Trace 或 Task 不存在，或不属于当前用户 |
-| 409 | 授权条件未满足、动作已失效、Permit/Gateway 拒绝，或 Task 幂等键被用于不同契约 |
+| 409 | 授权条件未满足、动作已失效、Permit/Gateway 拒绝，或 Task 版本过期、状态转换非法、幂等键被用于不同契约/命令 |
 | 422 | 请求 Schema、TaskContractDraft、证据值或模型结构化输出无效 |
 | 503 | LLM endpoint、Key 或模型配置不可用 |
 
@@ -342,4 +392,4 @@ SSE 在响应已经开始后无法再改变 HTTP 状态码，因此流内错误�
 - `ActionCandidate`、Permit claims 和哈希规则是安全边界，不能由前端自行构造并绕过 RunService。
 - 文档示例中的邮箱、报价号、用户和 Key 全部是演示值。
 
-Task API 当前只覆盖创建、列表、读取和事件订阅。`Observe/Plan/Act/Verify/Commit`、Steer/Pause/Take over、ArtifactVersion 写入、冲突解决和 Task Commit 仍未暴露；类型目录中的未来事件也不表示服务端已经产生这些事件。
+Task API 当前只把上述能力暴露给固定 Demo 1 Fixture。它不是通用 LLM Agent Loop、后台队列或真实 Connector；PostgreSQL mutation、进程重启、多实例通知和完整浏览器恢复尚无本机验收证据。副作用动作仍必须走 RunService 与 Tool Gateway，Task Control 不能直接发送邮件或写入企业系统。

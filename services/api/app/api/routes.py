@@ -10,7 +10,7 @@ from packages.agent_runtime import AgentWorkflow, WorkflowCallbacks
 from packages.audit import InMemoryAuditLog
 from packages.authorization import AuthorizationError, AuthorizationService, PermitKeyPair
 from packages.tool_gateway import GatewayError, ToolGateway
-from packages.contracts import TaskContractDraft, TaskSnapshot
+from packages.contracts import TaskContractDraft, TaskControlCommand, TaskSnapshot
 from services.api.app.application.llm import (
     AutoDLActionParser,
     ModelConfigurationError,
@@ -30,8 +30,10 @@ from services.api.app.application.runs import (
 from services.api.app.application.storage import InMemoryRunStore, RunStore
 from services.api.app.application.tasks import (
     TaskCreateConflictError,
+    TaskMutationConflictError,
     TaskNotFoundError,
     TaskService,
+    TaskTransitionError,
 )
 from services.api.app.application.conversation_models import ConversationThread, WorkspaceArtifact
 from services.api.app.application.conversations import (
@@ -67,6 +69,11 @@ class EvidenceInput(StrictRequest):
 class ApprovalInput(StrictRequest):
     approver_role: str
     decision: Literal["approved", "rejected"]
+
+
+class StartTaskRequest(StrictRequest):
+    expected_task_version: int = Field(ge=1)
+    idempotency_key: str = Field(min_length=8, max_length=160)
 
 
 class CurrentUser(StrictRequest):
@@ -200,6 +207,41 @@ async def get_task(
         return await service.get(task_id, user.user_id)
     except TaskNotFoundError as exc:
         raise HTTPException(status_code=404, detail="任务不存在") from exc
+
+
+@router.post("/tasks/{task_id}/start", response_model=TaskSnapshot)
+async def start_task(
+    task_id: str,
+    body: StartTaskRequest,
+    user: Annotated[CurrentUser, Depends(current_user)],
+    service: Annotated[TaskService, Depends(get_task_service)],
+) -> TaskSnapshot:
+    try:
+        return await service.start(
+            task_id,
+            user.user_id,
+            expected_task_version=body.expected_task_version,
+            idempotency_key=body.idempotency_key,
+        )
+    except TaskNotFoundError as exc:
+        raise HTTPException(status_code=404, detail="任务不存在") from exc
+    except (TaskMutationConflictError, TaskTransitionError) as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
+@router.post("/tasks/{task_id}/controls", response_model=TaskSnapshot)
+async def control_task(
+    task_id: str,
+    body: TaskControlCommand,
+    user: Annotated[CurrentUser, Depends(current_user)],
+    service: Annotated[TaskService, Depends(get_task_service)],
+) -> TaskSnapshot:
+    try:
+        return await service.control(task_id, user.user_id, body)
+    except TaskNotFoundError as exc:
+        raise HTTPException(status_code=404, detail="任务不存在") from exc
+    except (TaskMutationConflictError, TaskTransitionError) as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
 
 
 @router.get("/tasks/{task_id}/events")
