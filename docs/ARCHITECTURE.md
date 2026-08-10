@@ -77,8 +77,11 @@ flowchart TB
 - 中间：可拖动分隔条。
 - 右侧：持续对话、底部输入框和非阻塞确认卡。
 - 右侧顶部：Active Task Bar，从 TaskSnapshot 展示 Task ID、状态、阶段、预算、版本和连接同步状态。
+- Active Task 下方：PR 3 的 Branch、Conflict、Control 和最近 Commit 明细；其业务状态全部来自服务端 Snapshot 或 SSE 后的 Snapshot 对账。
 
 前端不拥有风险决策、审批状态或 Permit；它只渲染服务端 Snapshot 并提交用户选择。
+
+Action Gate 打开时，Active Task Bar 保留，Gate 占用独立网格行。TaskRuntimePanel 继续挂载以保留未提交 Steer 草稿，但其容器视觉隐藏并带 `aria-hidden`；Task Runtime 控制与 Task Bar 的创建、重连和立即对账均因 Gate 状态被禁用。Gate 收起后该行缩至 58px，把空间归还给对话。这样避免任务控制与副作用确认同时抢占用户决策，但目前只是交互互斥：Task Artifact 尚未绑定到 ActionCandidate/Run，Task Artifact 改变也尚不会自动触发现有 Action 失效。
 
 ### 2.2 应用层
 
@@ -87,10 +90,10 @@ flowchart TB
 | FastAPI Routes | `services/api/app/api/routes.py` | 身份头解析、REST/SSE 接口、错误映射 |
 | ConversationService | `services/api/app/application/conversations.py` | Thread、受信上下文、通识路由、工作区合并、SSE、动作与对话闭环 |
 | RunService | `services/api/app/application/runs.py` | Run 生命周期、重评估、审批、授权、执行、持久化、审计 |
-| TaskService | `services/api/app/application/tasks.py` | 创建并恢复 TaskSnapshot、Owner scope、创建幂等和 Task 事件轮询 |
+| TaskService | `services/api/app/application/tasks.py` | 创建和恢复 TaskSnapshot、固定 Demo 1 start、Verifier/Conflict/Commit、任务控制、Owner scope、mutation 幂等与事件轮询 |
 | LLM Adapter | `services/api/app/application/llm.py` | 对话计划、动作抽取、执行后自然语言回应、Schema 修复 |
 | Storage | `services/api/app/application/storage.py` | Run 与 Workspace 的内存/PostgreSQL 实现 |
-| Task Storage | `services/api/app/application/task_storage.py` | Task、初始事件和预留 ArtifactVersion 的内存/PostgreSQL 实现 |
+| Task Storage | `services/api/app/application/task_storage.py` | Task Snapshot、TaskEvent 与 ArtifactVersion 原子 mutation 的内存/PostgreSQL 实现 |
 
 ### 2.3 领域层
 
@@ -106,7 +109,7 @@ flowchart TB
 
 ### 2.4 基础设施层
 
-V0.1 使用 PostgreSQL 16 保存 Workspace、Run Snapshot 和审计事件，并使用官方 `AsyncPostgresSaver` 保存 LangGraph checkpoint。Demo 1 PR 2 另用 `agent_tasks`、`agent_task_events` 和预留的 `agent_task_artifact_versions` 表保存 Task 投影与事件。LLM 使用 OpenAI-compatible `/chat/completions`。所有工具调用落到 `simulators/`，不连接真实办公系统。
+V0.1 使用 PostgreSQL 16 保存 Workspace、Run Snapshot 和审计事件，并使用官方 `AsyncPostgresSaver` 保存 LangGraph checkpoint。Demo 1 TaskStore 另用 `agent_tasks`、`agent_task_events` 和 `agent_task_artifact_versions` 保存 Task 投影、事件和追加式工件版本。PR 3 已有 PostgreSQL mutation 代码路径，但本机尚未实际运行或完成 API 进程重启验收。LLM 使用 OpenAI-compatible `/chat/completions`；固定 Demo 1 Task start 不调用 LLM。所有工具调用落到 `simulators/`，不连接真实办公系统。
 
 ## 3. 两条核心数据路径
 
@@ -172,12 +175,12 @@ sequenceDiagram
     R-->>A: Agent 读取结果并回应
 ```
 
-### 3.3 Demo 1 Task 创建与读取（PR 2）
+### 3.3 Demo 1 固定 Fixture 受控纵切（PR 3）
 
 ```mermaid
 sequenceDiagram
     participant U as 用户
-    participant W as Active Task Bar
+    participant W as Task UI
     participant A as Task API
     participant S as TaskService
     participant D as TaskStore
@@ -188,7 +191,27 @@ sequenceDiagram
     S->>S: 生成 TaskContract、3 个 Branch 和 TASK_CREATED
     S->>D: 原子创建 Snapshot + 初始事件
     D-->>W: TaskSnapshot ready / contract
-    W->>A: GET /tasks/{task_id}/events?after=1
+    U->>W: 启动任务
+    W->>A: POST /tasks/{id}/start + version + key
+    A->>S: 固定 Fixture 状态转换
+    S->>S: Observe / Plan / Act / Verify
+    S->>D: 原子写 Snapshot + Event + ArtifactVersion
+    D-->>W: waiting_input / verify Snapshot
+    W-->>U: 显示局部冲突与服务端分支状态
+    U->>W: 选择正式来源或提交任务/分支控制
+    W->>A: POST /tasks/{id}/controls + version + key
+    A->>S: 校验 Owner、版本、状态与来源
+    alt Steer 或分支控制
+        S->>D: 原子写 Snapshot + Control + Event
+        D-->>W: accepted/applied Snapshot，无 Artifact 或 Commit
+    else Resolve 后仍有其他 open Conflict
+        S->>D: 原子写 resolution + 经营分析 v2 + Verification + Event
+        D-->>W: waiting_input / verify，无 reply v3 或 Commit
+    else Resolve 最后一个 open Conflict
+        S->>D: 原子写经营分析 v2 + reply v3 + Verification + Commit + Event
+        D-->>W: committed Snapshot
+    end
+    W->>A: GET /tasks/{task_id}/events?after={last_sequence}
     loop Store 轮询
         A->>D: 读取 sequence > after
         A-->>W: TaskEvent 或 heartbeat
@@ -196,9 +219,11 @@ sequenceDiagram
     W->>A: GET /tasks/{task_id} 对账
 ```
 
-Task 创建只实现契约与初始投影：`status=ready`、`phase=contract`、三个交付分支为 `queued`，首条事件序号为 1。Task ID、Owner、版本、状态和时间均由服务端产生。读取、列表和订阅都按 Owner 过滤；`POST /tasks` 的可选 `Idempotency-Key` 在同一 Owner 内绑定契约，相同 key 改用于不同契约时返回 409。
+Task ID、Owner、版本、状态和时间均由服务端产生。读取、列表、控制和订阅都按 Owner 过滤；所有 mutation 使用预期 Task 版本和幂等键，前端只在收到服务端 Snapshot 后更新业务状态。
 
-该路径尚未运行 `Observe/Plan/Act/Verify/Commit`，没有控制命令、ArtifactVersion 写入、验证、冲突或 Commit。Task SSE 通过当前 API 进程轮询 Store，不是跨实例通知系统；Active Task Bar 的“已同步”仅代表 Snapshot 对账完成，不代表后台任务在推进。
+`start` 中的 Observe、Plan、Act、Verify 是一次请求内的固定 Fixture 轨迹，数据和工件内容由确定性代码提供，不来自 LLM 或真实 Connector。事务提交前没有对外可见的中间 Snapshot，因此该路径不能表述为通用后台持续运行器。Steer 当前若只进入 `accepted`，服务端只证明指令已持久记录；重新规划和 `CONTROL_APPLIED` 仍需后续循环。Task SSE 通过当前 API 进程轮询 Store，不是跨实例通知系统；Active Task Bar 的“已同步”仅代表 Snapshot 对账完成。
+
+前端在 mutation 结果未知时把原始 `idempotency_key`、intent 和预期版本保存到当前标签页的 `sessionStorage` 并冻结新控制；offline/reconnecting 状态会提供同 key 对账入口。同 key 重放返回的是首次响应，因此前端确认后还会 GET 当前 Task 的最新 Snapshot，避免用历史响应回滚当前界面。当前代码尚未证明 reload 后若同步状态先恢复为 synced，pending 对账入口仍始终可达；该机制目前只有源码、lint 和 build 证据，没有浏览器刷新/断线 E2E。
 
 ## 4. 信任边界
 
@@ -217,6 +242,7 @@ Task 创建只实现契约与初始投影：`status=ready`、`phase=contract`、
 - 策略命中、capability verdict、证据要求、审批角色。
 - Evidence 的状态、来源、摘要和检查时间。
 - Action/参数哈希、Permit、执行结果和审计事件。
+- Task/Branch 状态、ArtifactVersion 身份与摘要、VerificationReport、ConflictRecord、ControlEvent、TaskCommit 和 TaskEvent sequence。
 
 ### 4.3 企业事实边界
 
@@ -232,10 +258,10 @@ Task 创建只实现契约与初始投影：`status=ready`、`phase=contract`、
 | AuditEvent | 内存 | `audit_events` | 是 |
 | LangGraph checkpoint | `InMemorySaver` | PostgresSaver 表 | 是 |
 | TaskSnapshot / TaskEvent | `InMemoryTaskStore` | `agent_tasks` / `agent_task_events` | 仅 PostgreSQL 模式具备跨进程保存基础 |
-| Task ArtifactVersion | 空内存列表 | 已建表但无写入路径 | 未实现 |
+| Task ArtifactVersion | `InMemoryTaskStore` 追加列表 | `agent_task_artifact_versions` mutation 路径 | 代码具备保存路径；本机重启恢复未验收 |
 | Permit 已使用集合 | 进程内存 | 进程内存 | 否 |
 
-TaskStore 优先使用 `DATABASE_DSN`，没有时回退到 `LANGGRAPH_CHECKPOINT_DSN`；两者都不存在时使用进程内存。内存测试中复用同一个 Store 创建新 `TaskService` 只能证明服务对象可恢复投影，不能证明 API 进程重启恢复。PostgreSQL 路径仍需真实重启验收。配置 `LANGGRAPH_CHECKPOINT_DSN` 后，FastAPI lifespan 还会初始化 Run、Workspace、Audit 和 checkpoint 存储，并恢复 Run Snapshot。对话持久化、跨实例 Task 通知和分布式 Permit 重放存储属于后续工作。
+TaskStore 优先使用 `DATABASE_DSN`，没有时回退到 `LANGGRAPH_CHECKPOINT_DSN`；两者都不存在时使用进程内存。内存测试中的服务重建只能证明同一个 Store 对象仍可读取投影，不能证明 API 进程重启恢复。PostgreSQL mutation 与重启仍需真实验收，不能仅凭表结构和事务代码标记完成。配置 `LANGGRAPH_CHECKPOINT_DSN` 后，FastAPI lifespan 还会初始化 Run、Workspace、Audit 和 checkpoint 存储，并恢复 Run Snapshot。对话持久化、跨实例 Task 通知和分布式 Permit 重放存储属于后续工作。
 
 ## 6. 运行时与部署拓扑
 

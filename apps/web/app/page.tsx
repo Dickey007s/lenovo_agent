@@ -13,6 +13,7 @@ import {
 } from "react";
 
 import type { TaskEvent, TaskEventType, TaskSnapshot } from "./task-types";
+import { TaskRuntimePanel, type ControlIntent } from "./task-runtime-panel";
 
 type ViewId = "mail" | "document" | "quote" | "tasks" | "calendar" | "expense" | "crm" | "audit";
 type WorkspaceKind = Exclude<ViewId, "audit">;
@@ -93,6 +94,7 @@ type EvidenceDefinition = {
 };
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8010";
+const TASK_MUTATION_SESSION_KEY = "office-agent.pending-task-mutation.v1";
 const REQUEST_HEADERS = { "Content-Type": "application/json", "X-User-Id": "demo_user", "X-User-Roles": "current_user,sales_manager" };
 const EVENT_TYPES = ["RUN_CREATED", "ACTION_PARSED", "EVIDENCE_SUBMITTED", "APPROVAL_RECORDED", "CONTROL_PLAN_UPDATED", "ACTION_INVALIDATED", "PERMIT_ISSUED", "TOOL_EXECUTED", "TAMPER_BLOCKED"];
 const TASK_EVENT_TYPES: TaskEventType[] = [
@@ -129,10 +131,16 @@ const VIEW_LABELS: Record<ViewId, string> = {
   expense: "报销", crm: "CRM", audit: "审计",
 };
 
+class ApiError extends Error {
+  constructor(public status: number, message: string) {
+    super(message);
+  }
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${API_BASE}${path}`, { ...init, headers: { ...REQUEST_HEADERS, ...init?.headers } });
   const body = await response.json();
-  if (!response.ok) throw new Error(typeof body.detail === "string" ? body.detail : JSON.stringify(body.detail));
+  if (!response.ok) throw new ApiError(response.status, typeof body.detail === "string" ? body.detail : JSON.stringify(body.detail));
   return body as T;
 }
 
@@ -340,31 +348,41 @@ function ApprovalModal({ run, evidenceCatalog, evidence, busy, onEvidence, onSub
 }
 
 type TaskSyncState = "loading" | "connecting" | "synced" | "reconnecting" | "offline";
+type PendingTaskMutation = {
+  taskId: string;
+  kind: "start" | ControlIntent["kind"];
+  idempotencyKey: string;
+  expectedVersion: number;
+  intent?: ControlIntent;
+};
 
-function ActiveTaskStrip({ task, syncState, creating, onCreate }: {
+function ActiveTaskStrip({ task, syncState, creating, blocked, onCreate, onRetry }: {
   task: TaskSnapshot | null;
   syncState: TaskSyncState;
   creating: boolean;
+  blocked: boolean;
   onCreate: () => void;
+  onRetry: () => void;
 }) {
   const syncLabels: Record<TaskSyncState, string> = {
     loading: "正在读取", connecting: "正在连接", synced: "已同步",
     reconnecting: "正在重新对账", offline: "状态未知",
   };
   if (!task) return <section className="active-task-strip empty" aria-label="受控持久任务">
-    <div><span>DEMO 1</span><strong>受控持久任务</strong><small>服务端将创建 Task ID、契约和三个交付分支</small></div>
-    <button className="task-create-button" disabled={creating || syncState === "loading"} onClick={onCreate}>{creating ? "创建中" : "＋ 创建任务"}</button>
+    <div><span>DEMO 1</span><strong>受控持久任务</strong><small>{syncState === "offline" ? "任务服务暂不可用，已有工作区仍可继续使用" : "服务端将创建 Task ID、契约和三个交付分支"}</small></div>
+    <button className="task-create-button" disabled={blocked || creating || (syncState !== "synced" && syncState !== "offline")} onClick={syncState === "offline" ? onRetry : onCreate}>{creating ? "创建中" : syncState === "offline" ? "重新连接" : "＋ 创建任务"}</button>
   </section>;
 
+  const terminal = ["committed", "failed", "cancelled"].includes(task.status);
   return <section className="active-task-strip" aria-label="当前受控持久任务">
-    <div className="task-strip-main"><span>ACTIVE TASK</span><strong>{task.contract.title}</strong><small>{task.contract.objective}</small></div>
+    <div className="task-strip-main"><span>{terminal ? "RECENT TASK" : "ACTIVE TASK"}</span><strong>{task.contract.title}</strong><small>{task.contract.objective}</small></div>
     <dl className="task-strip-facts">
       <div><dt>状态</dt><dd>{TASK_STATUS_LABELS[task.status]}</dd></div>
       <div><dt>阶段</dt><dd>{TASK_PHASE_LABELS[task.phase]}</dd></div>
       <div><dt>预算</dt><dd>{task.budget.steps_used}/{task.contract.budget.max_steps} 步</dd></div>
       <div><dt>版本</dt><dd>v{task.version}</dd></div>
     </dl>
-    <div className={`task-sync-state ${syncState}`}><i/><span>{syncLabels[syncState]}</span><code>{task.task_id}</code></div>
+    <div className={`task-sync-state ${syncState}`}><i/><span>{syncLabels[syncState]}</span><code>{task.task_id}</code>{["offline", "reconnecting"].includes(syncState) && <button type="button" disabled={blocked} onClick={onRetry}>{syncState === "offline" ? "重新连接" : "立即对账"}</button>}</div>
   </section>;
 }
 
@@ -387,12 +405,29 @@ export default function Home() {
   const [task, setTask] = useState<TaskSnapshot | null>(null);
   const [taskSyncState, setTaskSyncState] = useState<TaskSyncState>("loading");
   const [taskCreating, setTaskCreating] = useState(false);
+  const [taskMutating, setTaskMutating] = useState(false);
+  const [pendingTaskMutation, setPendingTaskMutation] = useState<PendingTaskMutation | null>(null);
   const [workspaceWidth, setWorkspaceWidth] = useState(0);
   const shellRef = useRef<HTMLElement>(null);
   const conversationRef = useRef<HTMLDivElement>(null);
   const stickToBottomRef = useRef(true);
   const silentRequestRef = useRef(false);
   const taskSequenceRef = useRef(0);
+  const pendingTaskMutationRef = useRef<PendingTaskMutation | null>(null);
+
+  useEffect(() => {
+    try {
+      const raw = window.sessionStorage.getItem(TASK_MUTATION_SESSION_KEY);
+      if (!raw) return;
+      const saved = JSON.parse(raw) as PendingTaskMutation;
+      if (saved.taskId && saved.kind && saved.idempotencyKey && Number.isInteger(saved.expectedVersion)) {
+        rememberPendingTaskMutation(saved);
+        setTaskSyncState("reconnecting");
+      }
+    } catch {
+      window.sessionStorage.removeItem(TASK_MUTATION_SESSION_KEY);
+    }
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -400,20 +435,24 @@ export default function Home() {
       request<{ thread_id: string }>("/v1/threads", { method: "POST" }),
       request<EvidenceDefinition[]>("/v1/evidence/requirements"),
       request<WorkspaceArtifact[]>("/v1/workspace"),
-      request<TaskSnapshot[]>("/v1/tasks"),
-    ]).then(([thread, requirements, workspace, tasks]) => {
+    ]).then(([thread, requirements, workspace]) => {
       if (cancelled) return;
       setThreadId(thread.thread_id);
       setEvidenceCatalog(Object.fromEntries(requirements.map(item => [item.requirement, item])));
       setArtifacts(Object.fromEntries(workspace.map(item => [item.kind, item])) as Record<WorkspaceKind, WorkspaceArtifact>);
-      const activeTask = tasks[0] ?? null;
+    }).catch(reason => setError(reason instanceof Error ? reason.message : "初始化失败"));
+    request<TaskSnapshot[]>("/v1/tasks").then(tasks => {
+      if (cancelled) return;
+      const pendingTaskId = pendingTaskMutationRef.current?.taskId;
+      const activeTask = tasks.find(item => item.task_id === pendingTaskId)
+        ?? tasks.find(item => !["committed", "failed", "cancelled"].includes(item.status))
+        ?? tasks[0]
+        ?? null;
       setTask(activeTask);
       taskSequenceRef.current = activeTask?.last_event_sequence ?? 0;
+      if (activeTask) reconcilePendingTaskMutation(activeTask);
       setTaskSyncState("synced");
-    }).catch(reason => {
-      setTaskSyncState("offline");
-      setError(reason instanceof Error ? reason.message : "初始化失败");
-    });
+    }).catch(() => { if (!cancelled) setTaskSyncState("offline"); });
     return () => { cancelled = true; };
   }, []);
 
@@ -441,6 +480,7 @@ export default function Home() {
         const snapshot = await request<TaskSnapshot>(`/v1/tasks/${taskId}`);
         if (cancelled) return;
         setTask(snapshot);
+        reconcilePendingTaskMutation(snapshot);
         taskSequenceRef.current = snapshot.last_event_sequence;
         setTaskSyncState("synced");
       } catch {
@@ -506,6 +546,209 @@ export default function Home() {
       setError(reason instanceof Error ? reason.message : "无法创建 Demo 1 任务");
     } finally {
       setTaskCreating(false);
+    }
+  }
+
+  async function retryTaskConnection() {
+    setTaskSyncState("connecting");
+    setError("");
+    try {
+      let activeTask: TaskSnapshot | null;
+      if (task) {
+        activeTask = await request<TaskSnapshot>(`/v1/tasks/${task.task_id}`);
+      } else {
+        const tasks = await request<TaskSnapshot[]>("/v1/tasks");
+        activeTask = tasks.find(item => !["committed", "failed", "cancelled"].includes(item.status)) ?? tasks[0] ?? null;
+      }
+      setTask(activeTask);
+      taskSequenceRef.current = activeTask?.last_event_sequence ?? 0;
+      setTaskSyncState("synced");
+      if (activeTask) reconcilePendingTaskMutation(activeTask);
+    } catch (reason) {
+      setTaskSyncState("offline");
+      setError(reason instanceof Error ? reason.message : "任务服务仍不可用");
+    }
+  }
+
+  async function retryPendingTaskMutation() {
+    const pending = pendingTaskMutationRef.current;
+    if (!pending || taskMutating) return;
+    setTaskMutating(true);
+    setError("");
+    try {
+      const path = pending.kind === "start"
+        ? `/v1/tasks/${pending.taskId}/start`
+        : `/v1/tasks/${pending.taskId}/controls`;
+      const body = pending.kind === "start"
+        ? { expected_task_version: pending.expectedVersion, idempotency_key: pending.idempotencyKey }
+        : {
+            ...pending.intent,
+            expected_task_version: pending.expectedVersion,
+            idempotency_key: pending.idempotencyKey,
+          };
+      const replayed = await request<TaskSnapshot>(path, { method: "POST", body: JSON.stringify(body) });
+      rememberPendingTaskMutation(null);
+      try {
+        const latest = await request<TaskSnapshot>(`/v1/tasks/${pending.taskId}`);
+        setTask(latest);
+        taskSequenceRef.current = latest.last_event_sequence;
+        setTaskSyncState("synced");
+        setNotice(`原操作已确认，当前状态已对账至 v${latest.version}`);
+      } catch {
+        if (!task || task.task_id !== replayed.task_id || task.version <= replayed.version) {
+          setTask(replayed);
+          taskSequenceRef.current = Math.max(taskSequenceRef.current, replayed.last_event_sequence);
+        }
+        setTaskSyncState("reconnecting");
+        setNotice("原操作已确认，正在读取最新任务状态");
+      }
+    } catch (reason) {
+      let reconciled: TaskSnapshot | null = null;
+      try { reconciled = await refreshTaskSnapshot(pending.taskId); } catch { /* Keep waiting on the original key. */ }
+      if (!pendingTaskMutationRef.current) return;
+      if (reason instanceof ApiError && reason.status < 500) {
+        rememberPendingTaskMutation(null);
+        setError(`${reason.message}${reconciled ? `；已刷新到 v${reconciled.version}` : ""}`);
+      } else {
+        setTaskSyncState("reconnecting");
+        setError("原操作仍待确认；系统会继续保留同一幂等键，不会生成重复请求");
+      }
+    } finally {
+      setTaskMutating(false);
+    }
+  }
+
+  async function refreshTaskSnapshot(taskId: string) {
+    const snapshot = await request<TaskSnapshot>(`/v1/tasks/${taskId}`);
+    setTask(snapshot);
+    reconcilePendingTaskMutation(snapshot);
+    taskSequenceRef.current = snapshot.last_event_sequence;
+    return snapshot;
+  }
+
+  function rememberPendingTaskMutation(mutation: PendingTaskMutation | null) {
+    pendingTaskMutationRef.current = mutation;
+    setPendingTaskMutation(mutation);
+    if (typeof window !== "undefined") {
+      if (mutation) window.sessionStorage.setItem(TASK_MUTATION_SESSION_KEY, JSON.stringify(mutation));
+      else window.sessionStorage.removeItem(TASK_MUTATION_SESSION_KEY);
+    }
+  }
+
+  function reconcilePendingTaskMutation(snapshot: TaskSnapshot) {
+    const pending = pendingTaskMutationRef.current;
+    if (!pending || pending.taskId !== snapshot.task_id) return;
+    if (pending.kind === "start") {
+      if (snapshot.version > pending.expectedVersion && snapshot.status !== "ready") {
+        rememberPendingTaskMutation(null);
+        setNotice(`服务端任务已更新，已对账至 v${snapshot.version}`);
+      }
+      return;
+    }
+    const recorded = snapshot.controls.find(item => item.idempotency_key === pending.idempotencyKey);
+    if (!recorded) return;
+    rememberPendingTaskMutation(null);
+    if (recorded.status === "rejected") {
+      setError(`服务端拒绝了 ${pending.kind} 控制，请按 v${snapshot.version} 复核后重试`);
+    } else {
+      setNotice(recorded.status === "accepted"
+        ? "方向指令已记录，等待后续循环应用"
+        : `服务端已应用控制，已对账至 v${snapshot.version}`);
+    }
+  }
+
+  async function startDemo1Loop() {
+    if (!task || taskMutating || pendingTaskMutationRef.current) return;
+    const targetTask = task;
+    const expectedVersion = targetTask.version;
+    const idempotencyKey = `start-${crypto.randomUUID()}`;
+    rememberPendingTaskMutation({ taskId: targetTask.task_id, kind: "start", idempotencyKey, expectedVersion });
+    setTaskMutating(true);
+    setError("");
+    try {
+      const snapshot = await request<TaskSnapshot>(`/v1/tasks/${targetTask.task_id}/start`, {
+        method: "POST",
+        body: JSON.stringify({
+          expected_task_version: expectedVersion,
+          idempotency_key: idempotencyKey,
+        }),
+      });
+      setTask(snapshot);
+      rememberPendingTaskMutation(null);
+      taskSequenceRef.current = snapshot.last_event_sequence;
+      setNotice(snapshot.status === "waiting_input"
+        ? "任务已运行到证据验证阶段"
+        : `任务状态已同步：${TASK_STATUS_LABELS[snapshot.status]}`);
+    } catch (reason) {
+      let reconciled: TaskSnapshot | null = null;
+      try { reconciled = await refreshTaskSnapshot(targetTask.task_id); } catch { /* Keep the last confirmed Snapshot. */ }
+      if (reconciled && reconciled.version > expectedVersion && reconciled.status !== "ready") {
+        setNotice(`服务端任务已更新，已对账至 v${reconciled.version}`);
+      } else if (reason instanceof ApiError && reason.status < 500) {
+        rememberPendingTaskMutation(null);
+        setError(`${reason.message}${reconciled ? `；已刷新到 v${reconciled.version}，请复核后重试` : ""}`);
+      } else {
+        setTaskSyncState("reconnecting");
+        setError("启动结果待确认；已保留最后一次服务端状态，请稍后重试对账");
+      }
+    } finally {
+      setTaskMutating(false);
+    }
+  }
+
+  async function controlDemo1Task(intent: ControlIntent): Promise<boolean> {
+    if (!task || taskMutating || pendingTaskMutationRef.current) return false;
+    const targetTask = task;
+    const idempotencyKey = `${intent.kind}-${crypto.randomUUID()}`;
+    rememberPendingTaskMutation({
+      taskId: targetTask.task_id,
+      kind: intent.kind,
+      idempotencyKey,
+      expectedVersion: targetTask.version,
+      intent,
+    });
+    setTaskMutating(true);
+    setError("");
+    try {
+      const snapshot = await request<TaskSnapshot>(`/v1/tasks/${targetTask.task_id}/controls`, {
+        method: "POST",
+        body: JSON.stringify({
+          ...intent,
+          expected_task_version: targetTask.version,
+          idempotency_key: idempotencyKey,
+        }),
+      });
+      setTask(snapshot);
+      rememberPendingTaskMutation(null);
+      taskSequenceRef.current = snapshot.last_event_sequence;
+      const recorded = snapshot.controls.find(item => item.idempotency_key === idempotencyKey);
+      setNotice(intent.kind === "resolve_evidence"
+        ? snapshot.status === "committed" ? "证据冲突已解决，任务已提交" : "证据选择已记录，仍有待处理项"
+        : recorded?.status === "accepted"
+          ? "方向指令已记录，等待后续循环应用"
+          : "任务控制已应用");
+      return true;
+    } catch (reason) {
+      let reconciled: TaskSnapshot | null = null;
+      try { reconciled = await refreshTaskSnapshot(targetTask.task_id); } catch { /* Keep the last confirmed Snapshot. */ }
+      const recorded = reconciled?.controls.find(item => item.idempotency_key === idempotencyKey);
+      if (recorded && recorded.status !== "rejected") {
+        rememberPendingTaskMutation(null);
+        setNotice(recorded.status === "accepted"
+          ? "方向指令已记录，等待后续循环应用"
+          : `服务端已应用控制，已对账至 v${reconciled?.version}`);
+        return true;
+      }
+      if (reason instanceof ApiError && reason.status < 500) {
+        rememberPendingTaskMutation(null);
+        setError(`${reason.message}${reconciled ? `；已刷新到 v${reconciled.version}，请复核后重试` : ""}`);
+      } else {
+        setTaskSyncState("reconnecting");
+        setError("控制结果待确认；已重新读取服务端状态，未确认前不会显示为已应用");
+      }
+      return false;
+    } finally {
+      setTaskMutating(false);
     }
   }
 
@@ -703,6 +946,7 @@ export default function Home() {
   const shellStyle = workspaceWidth ? ({ "--workspace-width": `${workspaceWidth}px` } as CSSProperties) : undefined;
   const currentDirty = activeArtifact ? Boolean(dirty[activeArtifact.kind]) : false;
   const viewProps = activeArtifact ? { artifact: activeArtifact, dirty: currentDirty, onChange: updateArtifact, onSave: () => void saveArtifact() } : null;
+  const actionGateOpen = Boolean(run && !["EXECUTED", "DENIED", "FAILED"].includes(run.status));
 
   return <main className="app-shell" ref={shellRef} style={shellStyle}>
     <section className="workbench">
@@ -721,16 +965,19 @@ export default function Home() {
       {notice && <div className="workspace-toast">✓ {notice}</div>}
     </section>
     <div className="resize-divider" role="separator" aria-orientation="vertical" onPointerDown={startResize}><span>•••</span></div>
-    <section className="chat-pane">
+    <section className={`chat-pane ${!task || actionGateOpen ? "without-task-runtime" : ""} ${actionGateOpen ? "has-action-gate" : ""}`}>
       <div className="chat-identity"><div className="avatar">OA</div><div><strong>Office Agent</strong><span>已连接当前工作区</span></div></div>
-      <ActiveTaskStrip task={task} syncState={taskSyncState} creating={taskCreating} onCreate={() => void createDemo1Task()}/>
+      <ActiveTaskStrip task={task} syncState={taskSyncState} creating={taskCreating} blocked={actionGateOpen} onCreate={() => void createDemo1Task()} onRetry={() => void (pendingTaskMutation ? retryPendingTaskMutation() : retryTaskConnection())}/>
+      {task && <div className={`task-runtime-slot ${actionGateOpen ? "is-hidden" : ""}`} aria-hidden={actionGateOpen}>
+        <TaskRuntimePanel task={task} syncState={taskSyncState} busy={taskMutating || Boolean(pendingTaskMutation) || actionGateOpen} onStart={() => void startDemo1Loop()} onControl={controlDemo1Task}/>
+      </div>}
       <div className="conversation" ref={conversationRef} onScroll={handleConversationScroll}>
         <article className="message assistant-message"><div className="message-body"><p>我会读取你正在编辑的工作区，并直接协助修改。涉及发送、写入或外部影响时，我会先请求确认。</p></div></article>
         {messages.map(item => <article className={`message ${item.role === "user" ? "user-message" : "assistant-message"} message-enter`} key={item.message_id}><div className="message-body">{item.role === "assistant" && <strong>Office Agent</strong>}<MessageContent text={item.content} streaming={item.status === "streaming"}/></div></article>)}
         {assistantStatus && <article className="message assistant-message message-enter"><div className="message-body"><div className="typing-bubble"><span/><span/><span/><em>{assistantStatus}</em></div></div></article>}
       </div>
       <div className="chat-footer">{error && <div className="error-banner">{error}</div>}<form className="chat-composer glass-card" onSubmit={sendMessage}><textarea aria-label="输入办公任务" value={message} onChange={event => setMessage(event.target.value)} onKeyDown={handleComposerKeyDown} placeholder={`让 Agent 协助当前${VIEW_LABELS[activeView]}…`}/><button aria-label="发送消息" disabled={busy || !message.trim() || !threadId}>{busy ? <span className="send-spinner"/> : "↑"}</button></form><small>Agent 可读取当前未保存内容 · Enter 发送</small></div>
-      {run && !["EXECUTED", "DENIED", "FAILED"].includes(run.status) && <ApprovalModal run={run} evidenceCatalog={evidenceCatalog} evidence={evidence} busy={busy} onEvidence={(key, value) => setEvidence(current => ({ ...current, [key]: value }))} onSubmitEvidence={submitEvidence} onDecide={decide} onAuthorize={authorize}/>}
+      {run && actionGateOpen && <ApprovalModal run={run} evidenceCatalog={evidenceCatalog} evidence={evidence} busy={busy} onEvidence={(key, value) => setEvidence(current => ({ ...current, [key]: value }))} onSubmitEvidence={submitEvidence} onDecide={decide} onAuthorize={authorize}/>}
     </section>
   </main>;
 }
