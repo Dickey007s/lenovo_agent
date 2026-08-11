@@ -6,7 +6,7 @@
 
 V0.1 采用 **workspace-first** 结构，而不是以聊天记录为唯一产物：
 
-- 左侧为办公工作区和视图工具栏，右侧保留持续存在的 Agent 区域。根路径默认进入 Demo 1 Tasks；左侧先回答本轮要准备什么和下一步，右侧默认显示“现在需要你做什么”，并可切回同一 Agent 对话。
+- 左侧为办公工作区和视图工具栏，右侧保留持续存在的 Agent 区域。根路径默认进入 Demo 1 Tasks；左侧先回答本轮要准备什么和下一步，右侧默认显示“现在需要你做什么”，并可切回同一 Agent 对话。离开 Tasks 后，右侧只保留后台任务摘要和返回 Tasks 的入口，不继续展示冲突决定或分支控制。
 - 中间分隔条可拖动，双方独立滚动；切换工作区只替换左侧内容。
 - 用户无需 Agent 也能编辑、保存或从工作区发起操作。
 - Agent 接收当前活动视图和浏览器中的未保存内容，可以直接更新该工作区。
@@ -58,15 +58,17 @@ Tasks 主视图采用三个客户端模式，它们不改变服务端 Task 状�
 | `artifacts`（前台“成果”） | 当前与历史 ArtifactVersion、来源、检查、lineage 和 Commit | `branches[].artifact_heads`、`artifact_versions[]`、`verification_reports[]`、`conflicts[]`、`last_commit` |
 | `manual`（前台“执行记录”） | 原手工待办看板 | `WorkspaceArtifact(kind=tasks)`；不与 TaskSnapshot 相互覆盖 |
 
-初始 `/v1/tasks` 未返回时只显示读取态，不暴露创建动作；确认无 Task 后，固定 Demo 1 空态使用 `/v1/demo1/tasks` 客户 A 创建模板的客户端副本，一次点击依次创建并启动。已有 Task 的标题、目标和交付物全部取自 `TaskSnapshot.contract`。通用产品仍需服务端模板描述接口，不能把固定空态副本扩展成通用事实。
+初始 `/v1/tasks` 未返回时只显示读取态，不暴露创建动作；确认无 Task 后，固定 Demo 1 空态使用 `/v1/demo1/tasks` 客户 A 创建模板的客户端副本，一次点击依次创建并启动。已有 Task 的标题、目标和交付物全部取自 `TaskSnapshot.contract`。终态“开始新一轮汇报”也依次 create 与 start：新 round key 创建独立 Task，旧 Task 不修改；固定路径启动后通常直接进入 `waiting_input / verify`，不是把旧状态重置为可启动。通用产品仍需服务端模板描述接口，不能把固定空态副本扩展成通用事实。
 
-右侧在 Tasks 中默认进入 `decisions`。open Conflict 先解释为什么需要人、两个口径和具体后果；顶部“查看待确认项”只是弱化定位，唯一改变 Task 状态的主动作仍是服务端 `resolve_evidence` 正式来源。查看材料、补证、暂停和接管降低层级；用户可切到 `agent` 继续同一 Conversation。“补充更多依据”只填充方向输入，提交后也只能显示 `steer accepted / 等待后续循环应用`。右侧模式切换不重建 Conversation，也不产生 TaskEvent。
+右侧在 Tasks 中默认进入 `decisions`。open Conflict 先解释为什么需要人、两个口径和具体后果；顶部“查看待确认项”只是弱化定位，唯一改变 Task 状态的主动作仍是服务端 `resolve_evidence` 正式来源。查看材料、补证、暂停和接管降低层级；用户可切到 `agent` 继续同一 Conversation。“补充更多依据”只填充方向输入，提交后也只能显示 `steer accepted / 等待后续循环应用`。右侧模式切换不重建 Conversation，也不产生 TaskEvent。邮件、文档等非 Tasks 工作区不挂载决定控制，只从同一 Snapshot 显示“后台任务”摘要；“打开任务 / 前往处理 / 查看任务 / 查看汇报”只切换客户端视图。
 
 工件选择使用客户端 `follow_head` 与 `pinned_history` 两种语义。默认跟随服务端 Branch head；用户主动选择旧版本时必须显示历史版本 banner、当前 head 版本和返回动作。mutation 完成后，`follow_head` 自动选择新 head；任何旧 candidate 都不能静默冒充当前已验证工件。
 
-Task 同步状态与传输状态仍是客户端事实：它们只说明浏览器是否已经对账和 SSE/GET 是否可用，不表示后台 Loop 进度。主摘要只显示材料核对、业务状态和同步状态；预算、Owner 与内部步数从业务主路径隐藏，必要时由执行记录或服务端证据复核。完成态直接列出 `last_commit` 支持的三项成果和“回复草稿未发送”边界。移动端把编排画布改为纵向流，并从阻塞摘要提供到待确认项的可达路径，不通过缩小字体或横向页面滚动保留桌面泳道。
+Task 同步状态与传输状态仍是客户端事实：它们只说明浏览器是否已经对账和 SSE/GET 是否可用，不表示后台 Loop 进度。主摘要只显示材料核对、业务状态和同步状态；预算、Owner 与内部步数从业务主路径隐藏，必要时由执行记录或服务端证据复核。完成态直接列出 `last_commit` 支持的三项成果和“回复草稿未发送”边界。服务端列表保留多轮 Task，但当前前端只自动选择最近活动 Task，否则选择最近终态 Task，没有历史轮次选择入口。移动端把编排画布改为纵向流，并从阻塞摘要提供到待确认项的可达路径，不通过缩小字体或横向页面滚动保留桌面泳道。
 
 原 PR 6 视觉基线的浏览器 E2E 为 `6 passed (34.5s)`，历史 [`design-qa.md`](../design-qa.md) 只证明当时记录视图的视觉实现。收到用途不清反馈后的当前工程代理回归为 `12 passed (43.7s)`；新增单次开始、延迟列表加载防重复创建、无任务离线时左右区域一致、快速重复开始只产生一次 create/start、同分支多冲突按顺序开放且按剩余冲突解释后果、失败终态覆盖残留冲突卡、完成成果以及 Conflict/Committed 的 `1181 x 900` 溢出断言。既有 `390 x 844` 移动、乱序 Snapshot、`409`、历史版本与 source-ref 回归继续通过。该结果仍不证明目标用户理解、效率或决策质量改善，`DR-0005` 保持 `Draft`。
+
+随后来源与轮次语义修订的完整浏览器 E2E 为 `12 passed (44.5s)`：覆盖非 Tasks 只显示后台摘要/跳转、已知来源显示“演示数据”且原始 ID 不进入 DOM、终态一键 create+start 新 Task 并保留旧 Task。独立证据见 [`DEMO1-ROUND-AND-SOURCE-CLARITY-EVIDENCE-20260811.md`](evidence/DEMO1-ROUND-AND-SOURCE-CLARITY-EVIDENCE-20260811.md)。这仍是工程证据，不证明用户理解。
 
 ## 3. 来源、权限和修改记录
 
@@ -79,11 +81,11 @@ source_id | label | system | excerpt | permission | updated_at
 来源、权限使用和修改记录收纳在工作区底部的“上下文与治理”折叠区，默认不占用主编辑画布。其设计目的不是装饰，而是区分：
 
 - 哪些内容来自模型生成；
-- 哪些事实来自企业邮箱、CRM、知识库、项目系统、日历或 OA Fixture；
+- 哪些事实来自演示用邮箱、CRM、知识库、项目系统、日历或 OA Fixture；
 - 当前用户以什么权限读取；
 - 保存、Agent 修改和动作失效分别在何时发生。
 
-这些来源在 V0.1 中是确定性 Demo 数据，并非真实 Connector 返回值。
+这些来源在 V0.1 中是确定性 Demo 数据，并非真实 Connector 返回值。固定 Demo 1 的已知来源在普通业务 UI 中显示为“演示数据 · 业务来源（版本）”；原始 `fixture:` ID 仅保留在服务端协议中用于校验与审计，不进入普通业务 DOM。未知来源继续显示隐藏占位。
 
 ## 4. Agent 上下文与规划
 

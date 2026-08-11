@@ -34,7 +34,7 @@ import {
   TaskWorkspaceHeader,
   type TaskDirectorViewMode,
 } from "./task-director-studio";
-import { TaskRuntimePanel, type ControlIntent } from "./task-runtime-panel";
+import type { ControlIntent } from "./task-runtime-panel";
 
 type ViewId = "mail" | "document" | "quote" | "tasks" | "calendar" | "expense" | "crm" | "audit";
 type WorkspaceKind = Exclude<ViewId, "audit">;
@@ -429,33 +429,45 @@ type PendingTaskMutation = {
   intent?: ControlIntent;
 };
 
-function ActiveTaskStrip({ task, syncState, creating, blocked, onCreate, onRetry }: {
+function ActiveTaskStrip({ task, syncState, blocked, onOpenTask, onRetry }: {
   task: TaskSnapshot | null;
   syncState: TaskSyncState;
-  creating: boolean;
   blocked: boolean;
-  onCreate: () => void;
+  onOpenTask: () => void;
   onRetry: () => void;
 }) {
   const syncLabels: Record<TaskSyncState, string> = {
-    loading: "正在读取", connecting: "正在连接", synced: "已同步",
-    reconnecting: "正在重新对账", offline: "状态未知",
+    loading: "正在读取", connecting: "正在连接", synced: "状态已更新",
+    reconnecting: "正在恢复", offline: "状态待确认",
   };
-  if (!task) return <section className="active-task-strip empty" aria-label="受控持久任务">
-    <div><span>DEMO 1</span><strong>受控持久任务</strong><small>{syncState === "offline" ? "任务服务暂不可用，已有工作区仍可继续使用" : "服务端将创建 Task ID、契约和三个交付分支"}</small></div>
-    <button className="task-create-button" disabled={blocked || creating || (syncState !== "synced" && syncState !== "offline")} onClick={syncState === "offline" ? onRetry : onCreate}>{creating ? "创建中" : syncState === "offline" ? "重新连接" : "＋ 创建任务"}</button>
-  </section>;
+  if (!task) {
+    const title = syncState === "synced"
+      ? "当前没有进行中的经营汇报"
+      : syncState === "offline"
+        ? "经营汇报任务暂时不可用"
+        : syncState === "reconnecting"
+          ? "正在恢复经营汇报任务"
+          : "正在读取经营汇报任务";
+    const detail = syncState === "synced"
+      ? "可在任务工作区准备经营分析、风险页和客户回复草稿"
+      : syncState === "offline"
+        ? "任务服务暂不可用，当前工作区仍可继续使用"
+        : "读取完成前不会新建或覆盖任务";
+    const pending = syncState === "loading" || syncState === "connecting";
+    return <section className="active-task-strip empty" aria-label="客户经营汇报">
+      <div><span>后台任务</span><strong>{title}</strong><small>{detail}</small></div>
+      <button className="task-create-button" disabled={blocked || pending} onClick={syncState === "synced" ? onOpenTask : onRetry}>{syncState === "synced" ? "打开任务" : syncState === "offline" ? "重新连接" : syncState === "reconnecting" ? "立即对账" : "请稍候"}</button>
+    </section>;
+  }
 
   const terminal = ["committed", "failed", "cancelled"].includes(task.status);
-  return <section className="active-task-strip" aria-label="当前受控持久任务">
-    <div className="task-strip-main"><span>{terminal ? "RECENT TASK" : "ACTIVE TASK"}</span><strong>{task.contract.title}</strong><small>{task.contract.objective}</small></div>
+  return <section className="active-task-strip" aria-label={terminal ? "上一轮经营汇报" : "当前经营汇报"}>
+    <div className="task-strip-main"><span>{terminal ? "上一轮汇报" : "当前汇报"}</span><strong>{task.contract.title}</strong><small>{task.contract.objective}</small></div>
     <dl className="task-strip-facts">
-      <div><dt>状态</dt><dd>{TASK_STATUS_LABELS[task.status]}</dd></div>
-      <div><dt>阶段</dt><dd>{TASK_PHASE_LABELS[task.phase]}</dd></div>
-      <div><dt>预算</dt><dd>{task.budget.steps_used}/{task.contract.budget.max_steps} 步</dd></div>
-      <div><dt>版本</dt><dd>v{task.version}</dd></div>
+      <div><dt>当前状态</dt><dd>{TASK_STATUS_LABELS[task.status]}</dd></div>
+      <div><dt>处理阶段</dt><dd>{TASK_PHASE_LABELS[task.phase]}</dd></div>
     </dl>
-    <div className={`task-sync-state ${syncState}`}><i/><span>{syncLabels[syncState]}</span><code>{task.task_id}</code>{terminal && <button type="button" className="task-replay-button" disabled={blocked || creating || !["synced", "offline"].includes(syncState)} onClick={onCreate}>{creating ? "创建中" : "再次演示"}</button>}{["offline", "reconnecting"].includes(syncState) && <button type="button" disabled={blocked} onClick={onRetry}>{syncState === "offline" ? "重新连接" : "立即对账"}</button>}</div>
+    <div className={`task-sync-state ${syncState}`}><i/><span>{syncLabels[syncState]}</span><button type="button" className="task-replay-button" disabled={blocked} onClick={onOpenTask}>{terminal ? "查看汇报" : task.status === "waiting_input" ? "前往处理" : "查看任务"}</button>{["offline", "reconnecting"].includes(syncState) && <button type="button" disabled={blocked} onClick={onRetry}>{syncState === "offline" ? "重新连接" : "立即对账"}</button>}</div>
   </section>;
 }
 
@@ -709,7 +721,7 @@ export default function Home() {
       setTaskTransportState("connected");
       setTaskSyncState(applied ? "synced" : "reconnecting");
       setNotice(applied
-        ? repeat ? "新一轮经营汇报已创建" : "经营汇报任务已创建"
+        ? repeat ? "上一轮记录已保留；新一轮经营汇报已创建" : "经营汇报任务已创建"
         : "任务创建请求已确认，正在读取最新任务状态");
       return applied ? snapshot : null;
     } catch (reason) {
@@ -1203,6 +1215,17 @@ export default function Home() {
   const taskWorkspaceActive = activeView === "tasks";
   const effectiveTaskRightMode: TaskRightMode = actionGateOpen ? "conversation" : taskRightMode;
   const showTaskDecisions = taskWorkspaceActive && effectiveTaskRightMode === "decisions";
+  function openTaskWorkspace() {
+    setActiveView("tasks");
+    setTaskViewMode("director");
+    setTaskRightMode("decisions");
+    window.requestAnimationFrame(() => window.requestAnimationFrame(() => {
+      const target = document.getElementById("task-decision-conflicts-title")
+        ?? document.getElementById("task-director-workspace-title");
+      target?.scrollIntoView({ behavior: "smooth", block: "start" });
+      target?.focus({ preventScroll: true });
+    }));
+  }
 
   return <main className={`app-shell${taskWorkspaceActive ? " is-task-director" : ""}`} ref={shellRef} style={shellStyle}>
     <section className="workbench" data-view={activeView}>
@@ -1233,7 +1256,7 @@ export default function Home() {
             creating={taskCreating}
             onModeChange={setTaskViewMode}
             onRefresh={() => void retryTaskConnection()}
-            onCreate={() => void createDemo1Task()}
+            onCreate={() => void createAndStartDemo1Task()}
           />
           <div id="task-view-panel" className="task-view-region" role="tabpanel" aria-labelledby={`task-view-tab-${taskViewMode}`}>
             {taskViewMode === "director" && (
@@ -1269,7 +1292,7 @@ export default function Home() {
       {notice && <div className="workspace-toast"><IconCheck aria-hidden="true" />{notice}</div>}
     </section>
     <div className="resize-divider" role="separator" aria-orientation="vertical" onPointerDown={startResize}><span>•••</span></div>
-    <section className={`chat-pane ${!task || actionGateOpen || taskWorkspaceActive ? "without-task-runtime" : ""} ${actionGateOpen ? "has-action-gate" : ""} ${taskWorkspaceActive ? "task-director-side-pane" : ""}`}>
+    <section className={`chat-pane without-task-runtime ${actionGateOpen ? "has-action-gate" : ""} ${taskWorkspaceActive ? "task-director-side-pane" : ""}`}>
       {taskWorkspaceActive && (
         <div className="task-side-mode-switch" role="tablist" aria-label="右侧 Agent 模式">
           <button id="task-side-tab-decisions" type="button" role="tab" aria-controls="task-side-panel" aria-selected={effectiveTaskRightMode === "decisions"} tabIndex={effectiveTaskRightMode === "decisions" ? 0 : -1} className={effectiveTaskRightMode === "decisions" ? "active" : ""} onClick={() => setTaskRightMode("decisions")} onKeyDown={(event) => moveTaskSideTab(event, "decisions")}>待我决定</button>
@@ -1291,10 +1314,7 @@ export default function Home() {
       ) : (
         <div id={taskWorkspaceActive ? "task-side-panel" : undefined} className={`task-conversation-panel${taskWorkspaceActive ? " is-task-workspace" : ""}`} role={taskWorkspaceActive ? "tabpanel" : undefined} aria-labelledby={taskWorkspaceActive ? "task-side-tab-conversation" : undefined}>
           <div className="chat-identity"><div className="avatar">OA</div><div><strong>Office Agent</strong><span className={`id-status is-${taskTransportState}`}>{AGENT_CONNECTION_LABELS[taskTransportState]}</span></div></div>
-          <ActiveTaskStrip task={task} syncState={taskSyncState} creating={taskCreating} blocked={actionGateOpen} onCreate={() => void createDemo1Task()} onRetry={() => void (pendingTaskMutation ? retryPendingTaskMutation() : retryTaskConnection())}/>
-          {!taskWorkspaceActive && task && <div className={`task-runtime-slot ${actionGateOpen ? "is-hidden" : ""}`} aria-hidden={actionGateOpen}>
-            <TaskRuntimePanel task={task} syncState={taskSyncState} busy={taskMutating || Boolean(pendingTaskMutation) || actionGateOpen} onStart={() => void startDemo1Loop()} onControl={controlDemo1Task} onOpenArtifact={openTaskArtifact}/>
-          </div>}
+          <ActiveTaskStrip task={task} syncState={taskSyncState} blocked={actionGateOpen} onOpenTask={openTaskWorkspace} onRetry={() => void (pendingTaskMutation ? retryPendingTaskMutation() : retryTaskConnection())}/>
           <div className="conversation" ref={conversationRef} onScroll={handleConversationScroll}>
             {messages.length === 0 && <article className="message assistant-message"><div className="msg-avatar"><IconSparkles aria-hidden="true" /></div><div className="message-body"><strong>Office Agent</strong><p>我会读取你正在编辑的工作区，并直接协助修改。涉及发送、写入或外部影响时，我会先请求确认。</p><div className="suggestion-chips"><button type="button" onClick={() => void runAgent("帮我完善当前工作区中的内容")}>完善当前内容</button><button type="button" onClick={() => void runAgent("检查当前工作区有没有需要我注意的问题")}>检查潜在问题</button><button type="button" onClick={() => void runAgent("总结一下当前工作区的状态")}>总结当前状态</button></div></div></article>}
             {messages.map(item => <article className={`message ${item.role === "user" ? "user-message" : "assistant-message"} message-enter`} key={item.message_id}>{item.role === "assistant" && <div className="msg-avatar"><IconSparkles aria-hidden="true" /></div>}<div className="message-body">{item.role === "assistant" && <strong>Office Agent</strong>}<MessageContent text={item.content} streaming={item.status === "streaming"}/></div></article>)}

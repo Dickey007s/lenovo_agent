@@ -9,7 +9,7 @@
 - SSE：流式接口返回 `text/event-stream`，并设置 `Cache-Control: no-cache`、`X-Accel-Buffering: no`。
 - 身份头：`X-User-Id`，默认 `demo_user`。
 - 角色头：`X-User-Roles`，英文逗号分隔，默认 `current_user`；前端 Demo 使用 `current_user,sales_manager`。
-- Task 创建幂等头：`Idempotency-Key`，可选，长度 8-160。它作用于当前 Owner 的 `POST /tasks` 或 `POST /demo1/tasks`；后者用不同 key 区分演示轮次。该 header 不会授权读取其他用户任务。
+- Task 创建幂等头：`Idempotency-Key`，可选，长度 8-160。它作用于当前 Owner 的 `POST /tasks` 或 `POST /demo1/tasks`；后者用不同 key 区分独立汇报轮次。该 header 不会授权读取其他用户任务。
 - Task mutation：`start` 和 `controls` 在 JSON body 中携带 `expected_task_version` 与 `idempotency_key`。版本过期或同一 key 被用于不同命令时返回 409。
 
 上述身份头没有签名，只是 P0 占位。生产环境必须在 API 边界替换为经过验证的 SSO/JWT，并从可信身份声明映射角色。
@@ -44,7 +44,7 @@ $headers = @{
 
 | 方法 | 路径 | 用途 |
 | --- | --- | --- |
-| POST | `/demo1/tasks` | 为当前用户幂等创建固定客户 A Task Contract；可用 `Idempotency-Key` 区分演示轮次 |
+| POST | `/demo1/tasks` | 为当前用户幂等创建固定客户 A Task Contract；可用 `Idempotency-Key` 区分独立汇报轮次 |
 | POST | `/tasks` | 从 `TaskContractDraft` 创建服务端 Task；可带 `Idempotency-Key` |
 | GET | `/tasks` | 按更新时间倒序列出当前 Owner 的 TaskSnapshot |
 | GET | `/tasks/{task_id}` | 读取当前 Owner 的单个 TaskSnapshot |
@@ -150,7 +150,7 @@ Invoke-RestMethod -Method Post -Uri "$base/workspace/mail/new" -Headers $headers
 
 ### 3.4 创建、启动与控制 Demo 1 Task
 
-固定 Demo 1 入口不需要请求体。前端每次显式开始新一轮时发送新的 `Idempotency-Key`；同一轮重试复用同一个 key，因此不会重复创建，下一轮换 key 后会保留旧 Task 并创建新的 `ready / contract` Task。创建 key 重放返回该 Task 当前已持久化的 Snapshot，不回退到最初 `ready` 响应；这与 start/control mutation 返回“首次 mutation 结果”的幂等语义不同。为了兼容旧客户端，不传 header 时仍使用每个 Owner 的稳定默认键：
+固定 Demo 1 创建入口不需要请求体。前端每次显式开始新一轮汇报时发送新的 `Idempotency-Key`；同一轮重试复用同一个 key，因此不会重复创建，下一轮换 key 后会保留旧 Task 并创建新的 `ready / contract` Task。创建 key 重放返回该 Task 当前已持久化的 Snapshot，不回退到最初 `ready` 响应；这与 start/control mutation 返回“首次 mutation 结果”的幂等语义不同。为了兼容旧客户端，不传 header 时仍使用每个 Owner 的稳定默认键：
 
 ```powershell
 $roundHeaders = $headers.Clone()
@@ -160,7 +160,7 @@ $task.task_id
 Invoke-RestMethod -Method Get -Uri "$base/tasks/$($task.task_id)" -Headers $headers
 ```
 
-完成一轮后，把 key 改为新的轮次值即可再次演示。相同 Owner+key 始终定位同一 Task 并返回其当前持久化 Snapshot；不同 key 生成不同 Task ID。Task 列表按更新时间倒序返回，前端刷新时优先恢复未终止 Task，否则显示最近终态 Task 并提供“再次演示”。
+完成一轮后，把 key 改为新的轮次值会创建另一项独立 Task。相同 Owner+key 始终定位同一 Task 并返回其当前持久化 Snapshot；不同 key 生成不同 Task ID。当前 Web 的“开始新一轮汇报”是客户端组合动作：先调用本接口创建新 Task，再以新 Task 的版本调用 `/tasks/{task_id}/start`，固定路径通常直接返回 `waiting_input / verify`。它不会把旧 Task 重置为 `ready`。Task 列表按更新时间倒序返回，前端刷新时优先恢复未终止 Task，否则显示最近终态 Task；列表虽然保留多轮 Snapshot，当前 Web 尚无历史轮次选择入口。
 
 也可以提交严格的 `TaskContractDraft`。下面只展示最小结构，实际字段和限制以 `packages/contracts/task_models.py` 为准：
 
@@ -245,7 +245,7 @@ PR 4 交付物工作区直接使用创建、读取、start、control 和 SSE 对
 - `verification_reports[]` 与 `conflicts[]` 提供验证和冲突事实；来源与逐项检查在前台默认折叠。
 - `last_commit` 提供 task version、工件/报告引用和 `state_hash`；缺少该字段时前台不得显示最终提交。
 
-该工作区当前只读，没有创建、编辑或覆盖 ArtifactVersion 的路由。前端只为固定 Fixture 的 `analysis/risk_brief/reply_draft` 提供字段 allowlist，未知 kind/字段默认隐藏；Conflict Card 与 Artifact Workspace 复用同一 `source_ref` 投影，只显示契约中的四个已知 Demo 1 Fixture 引用，其他值统一显示隐藏占位，URL、路径和凭据形态已有负例回归。这是前端第二道投影，不能替代服务端脱敏、授权或未来通用的字段可见性 Schema。即使字段名在 allowlist 中，其任意文本值仍需要服务端 display projection 承担通用安全保证。
+该工作区当前只读，没有创建、编辑或覆盖 ArtifactVersion 的路由。前端只为固定 Fixture 的 `analysis/risk_brief/reply_draft` 提供字段 allowlist，未知 kind/字段默认隐藏；Conflict Card 与 Artifact Workspace 复用同一 `source_ref` 投影，四个已知值显示为“演示数据 · 业务来源（版本）”。服务端响应仍包含原始 `source_refs` 供控制校验和审计，但普通业务 DOM 使用与原值无关的序号 key，不接收 `fixture:` 原值；其他值统一显示隐藏占位，URL、路径和凭据形态已有负例回归。这是前端第二道投影，不能替代服务端脱敏、授权或未来通用的字段可见性 Schema。即使字段名在 allowlist 中，其任意文本值仍需要服务端 display projection 承担通用安全保证。
 
 ### 3.5 直接创建治理 Run
 
@@ -381,7 +381,7 @@ event: TASK_CREATED
 data: {"sequence":1,"event_id":"task_evt_...","task_id":"task_...",...}
 ```
 
-没有新事件时发送 `: heartbeat`。客户端只能通过 `after` 查询参数提交游标；当前路由不解析 `Last-Event-ID` 请求头。Active Task Bar 收到新事件后重新 GET TaskSnapshot 对账，不把 SSE payload 自行推导成任务完成状态。
+没有新事件时发送 `: heartbeat`。客户端只能通过 `after` 查询参数提交游标；当前路由不解析 `Last-Event-ID` 请求头。后台任务摘要和 Tasks 主视图收到新事件后重新 GET TaskSnapshot 对账，不把 SSE payload 自行推导成任务完成状态。
 
 API 进程重启本身不写 `TASK_RESTORED`，也不改变 Task version 或 event sequence。PR 5 的同页浏览器路径在 EventSource error 时保留最后确认 Snapshot、禁用控制并显示恢复中；新进程可用后通过重新 GET 同一 Task 才恢复“已同步”。该路径没有在停机期间新增事件，不能扩展为 `after` 缺口回放证明。
 
@@ -407,4 +407,4 @@ SSE 在响应已经开始后无法再改变 HTTP 状态码，因此流内错误�
 - `ActionCandidate`、Permit claims 和哈希规则是安全边界，不能由前端自行构造并绕过 RunService。
 - 文档示例中的邮箱、报价号、用户和 Key 全部是演示值。
 
-Task API 当前只把上述能力暴露给固定 Demo 1 Fixture。PR 4 浏览器 E2E 覆盖创建、start、冲突、Steer accepted、resolve、Commit、交付物读取，以及 start 请求发送前 abort 后的 reload/同 key 重试。PR 5 在 PostgreSQL 16.14 和三个顺序 API 进程上验证 v2/v3 Snapshot、Artifact 和 Commit 恢复及幂等零重复；同页 system Edge 运行验证 API 停止、控制禁用、连接文案和新进程后的 GET 对账。它仍没有覆盖请求已到服务端但响应丢失、断线期间事件回放、数据库进程故障或多实例通知。Task Runtime 仍不是通用 LLM Agent Loop、后台队列或真实 Connector；Conversation Thread/Message 也不随 Task 恢复。副作用动作必须继续走 RunService 与 Tool Gateway，Task Control 不能直接发送邮件或写入企业系统，Task Artifact 也尚未绑定 Action 失效规则。证据见 [`PR 4 Frontend E2E`](evidence/DEMO1-PR4-FRONTEND-E2E-EVIDENCE.md) 与 [`PR 5 PostgreSQL-backed API Restart`](evidence/DEMO1-PR5-POSTGRES-BACKED-API-RESTART-EVIDENCE.md)。
+Task API 当前只把上述能力暴露给固定 Demo 1 Fixture。PR 4 浏览器 E2E 覆盖创建、start、冲突、Steer accepted、resolve、Commit、交付物读取，以及 start 请求发送前 abort 后的 reload/同 key 重试。PR 5 在 PostgreSQL 16.14 和三个顺序 API 进程上验证 v2/v3 Snapshot、Artifact 和 Commit 恢复及幂等零重复；同页 system Edge 运行验证 API 停止、控制禁用、连接文案和新进程后的 GET 对账。它仍没有覆盖请求已到服务端但响应丢失、断线期间事件回放、数据库进程故障、多实例通知或历史轮次 UI。Task Runtime 仍不是通用 LLM Agent Loop、后台队列或真实 Connector；Conversation Thread/Message 也不随 Task 恢复。副作用动作必须继续走 RunService 与 Tool Gateway，Task Control 不能直接发送邮件或写入企业系统，Task Artifact 也尚未绑定 Action 失效规则。非 Tasks 工作区是否展示决定控制、按钮叫什么以及“开始新一轮汇报”如何串联 create/start 都是客户端交互，不是新的 API 能力。自动化通过也不能证明普通用户理解这些语义。证据见 [`PR 4 Frontend E2E`](evidence/DEMO1-PR4-FRONTEND-E2E-EVIDENCE.md) 与 [`PR 5 PostgreSQL-backed API Restart`](evidence/DEMO1-PR5-POSTGRES-BACKED-API-RESTART-EVIDENCE.md)。

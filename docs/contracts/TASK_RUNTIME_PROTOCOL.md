@@ -1,6 +1,6 @@
 # Demo 1 Task Runtime 协议
 
-> 状态：`Ready`。PR 3 已实现固定 Fixture 的 start/control、ArtifactVersion、Verifier、局部冲突与 Commit；PR 4 已验证服务端事实驱动的交付物工作区和发送前失败恢复；PR 5 已在 PostgreSQL 16.14 和三个顺序 API 进程上验证 v2/v3 恢复与幂等零重复，并验证同页前台的断线/对账状态。断线期间事件回放、响应丢失、完整异常恢复与 Artifact/Action 绑定尚未验收。
+> 状态：协议 `Ready`，交互决策 `DR-0005` 仍为 `Draft`。PR 3 已实现固定 Fixture 的 start/control、ArtifactVersion、Verifier、局部冲突与 Commit；PR 4 已验证服务端事实驱动的交付物工作区和发送前失败恢复；PR 5 已在 PostgreSQL 16.14 和三个顺序 API 进程上验证 v2/v3 恢复与幂等零重复，并验证同页前台的断线/对账状态。断线期间事件回放、响应丢失、历史轮次选择、完整异常恢复与 Artifact/Action 绑定尚未验收。
 
 ## 1. 权威来源与兼容规则
 
@@ -23,7 +23,7 @@
 | 幂等 | 新 mutation 的 marker 保存原结果 Snapshot；内存与 PostgreSQL 跨进程回归证明旧 key 在后续 mutation 后仍返回原结果且不重复写。旧版 marker 缺原结果时仅在当前 version 未前进时兼容返回，否则 409 拒绝不安全重放 | 响应丢失浏览器闭环、数据库中途崩溃 |
 | Owner scope | 列表、读取和事件均以 `X-User-Id` 过滤，跨 Owner 按不存在处理 | 生产 SSO/JWT、租户 RBAC |
 | Budget / Deadline | start 和 resolve 会在 mutation 前校验预计用量与 `deadline_at`，`TaskBudgetSnapshot.exhausted` 字段存在；预计超限时当前请求不写状态 | 专门的顶层/分支耗尽状态、缩小范围/申请额度和完整恢复 UI |
-| 前台 | Active Task Bar、Branch/Conflict/Control/Commit 与只读交付物工作区均读取服务端 Snapshot；顶部连接文案与 Task 传输状态一致；Task 面板可打开分支 head；Tasks 视图保留手工待办 tab | 人工编辑新版本、失败/预算完整闭环、Artifact/Action 绑定 |
+| 前台 | 非 Tasks 后台摘要与 Tasks 中的 Branch/Conflict/Control/Commit、只读交付物工作区均读取服务端 Snapshot；顶部连接文案与 Task 传输状态一致；Task 面板可打开分支 head；Tasks 视图保留手工待办 tab | 历史轮次选择、人工编辑新版本、失败/预算完整闭环、Artifact/Action 绑定 |
 | 浏览器恢复 | E2E 覆盖发送前 abort、`sessionStorage` reload、同 key 重试；PR 5 system Edge 运行覆盖 API 进程停止、保留 Snapshot/禁用控制、自动重连和 v2/v3 对账 | 服务端已提交但响应丢失、断线期间 TaskEvent 回放、多实例连接迁移 |
 
 创建后的初始事实仍是 `ready / contract`、三个 `queued` Branch、空工件/验证/冲突/控制列表、`last_commit=null` 和 `TASK_CREATED(sequence=1)`。只有固定 Demo 1 `start` 后，服务端才产生后续工件、验证、冲突和阶段事件。该调用不使用 LLM 或真实 Connector，且所有阶段在一个事务提交后才可见，不等于持续后台 Loop。
@@ -126,9 +126,10 @@ PR 3 的内存 Store 回归已覆盖内容摘要、单 lineage、连续版本与
 3. 工件状态与验证徽标分别来自 `ArtifactVersion.status` 和该版本最新的 `VerificationReport.status`；candidate/conflict 不得显示为完成。
 4. 冲突来自同一 Branch 的 `conflicts[]`；来源与验证检查默认折叠，但仍可按需查看 `source_refs` 与 `checks[]`。
 5. 最终提交只在 `last_commit` 存在时显示 task version、工件数、报告数和 `state_hash`。
-6. 固定 Fixture 的结构化内容只按 `artifact.kind` 的 allowlist 投影；未知 kind/字段默认隐藏。Conflict Card 与 Artifact Workspace 复用同一 `source_ref` 投影，只显示契约中的四个已知 Demo 1 Fixture 引用；其他标识 fail closed，URL、路径和凭据形态负例必须显示隐藏占位。
+6. 固定 Fixture 的结构化内容只按 `artifact.kind` 的 allowlist 投影；未知 kind/字段默认隐藏。Conflict Card 与 Artifact Workspace 复用同一 `source_ref` 投影，四个已知 Demo 1 引用必须显示为带“演示数据”前缀的业务标签；普通业务 DOM 使用序号 key，不接收原始 `fixture:` 值。其他标识 fail closed，URL、路径和凭据形态负例必须显示隐藏占位。
 7. 上述规则只是前端第二道投影。服务端尚未提供通用字段可见性 Schema/display projection；allowlist 字段中的任意文本仍需服务端脱敏，不能仅凭前端过滤视为安全。
 8. Tasks 视图必须保留原“工作台待办”tab；长期 Task Artifact 不能覆盖手工待办 WorkspaceArtifact。
+9. Conflict、来源候选和 Task Control 只在 Tasks 工作区投影；非 Tasks 工作区只能显示当前/上一轮后台任务摘要和进入 Tasks 的客户端跳转。
 
 ## 5. 控制命令
 
@@ -168,7 +169,7 @@ POST /v1/tasks/{task_id}/controls
 GET  /v1/tasks/{task_id}/events?after={sequence}
 ```
 
-`POST /v1/demo1/tasks` 可带 `Idempotency-Key` 表示一次演示轮次。同一 Owner+key 重放必须返回已存在 Task 当前已持久化的 Snapshot，不新增 `TASK_CREATED`、不回退已发生的 mutation；这与 start/control 命令重放返回首次 mutation Snapshot 的语义不同。不同 key 必须创建独立 Task。未带 key 时使用 Owner 绑定的兼容默认键。终态 Task 不回滚、不删除，前端通过新 round key 创建下一轮。
+`POST /v1/demo1/tasks` 可带 `Idempotency-Key` 表示一次独立汇报轮次。同一 Owner+key 重放必须返回已存在 Task 当前已持久化的 Snapshot，不新增 `TASK_CREATED`、不回退已发生的 mutation；这与 start/control 命令重放返回首次 mutation Snapshot 的语义不同。不同 key 必须创建独立 Task。未带 key 时使用 Owner 绑定的兼容默认键。终态 Task 不回滚、不删除。当前前端“开始新一轮汇报”使用新 round key 创建 Task，再立即以新 Task 的版本调用 start；它不是 reset/reopen 旧 Task。`GET /tasks` 会返回多轮 Snapshot，但当前前端没有历史轮次选择入口。
 
 SSE 帧：
 
@@ -178,7 +179,7 @@ event: BRANCH_STATUS_CHANGED
 data: {TaskEvent JSON}
 ```
 
-当前 Task SSE 使用 `after` 查询参数并轮询 Store，路由不读取 `Last-Event-ID` 请求头。Active Task Bar 收到事件或连接建立后 GET 最新 Snapshot 对账；heartbeat 和断线属于传输状态，不改变任务业务状态。PR 5 的同页 system Edge 运行实际停止并重启 API，验证断线文案、控制禁用、自动重连和 GET 对账；停机期间没有新增业务事件，因此没有验证 `after` 缺口回放。当前没有 PostgreSQL `LISTEN/NOTIFY`、消息代理或跨实例广播，多实例通知未实现和验证。
+当前 Task SSE 使用 `after` 查询参数并轮询 Store，路由不读取 `Last-Event-ID` 请求头。后台任务摘要和 Tasks 主视图收到事件或连接建立后 GET 最新 Snapshot 对账；heartbeat 和断线属于传输状态，不改变任务业务状态。PR 5 的同页 system Edge 运行实际停止并重启 API，验证断线文案、控制禁用、自动重连和 GET 对账；停机期间没有新增业务事件，因此没有验证 `after` 缺口回放。当前没有 PostgreSQL `LISTEN/NOTIFY`、消息代理或跨实例广播，多实例通知未实现和验证。
 
 内存模式下复用同一 Store 构造新的 `TaskService` 可以恢复相同 Snapshot 和游标，但 API 进程退出会丢失全部 Task。PostgreSQL 16.14 模式已验证顺序 API 进程对 v2/v3 Snapshot、Event、ArtifactVersion 和 Commit 的恢复；这不包含 Conversation Thread/Message、数据库进程重启或多实例并发。
 
@@ -187,7 +188,7 @@ data: {TaskEvent JSON}
 - 读取、控制和事件订阅必须验证 Task Owner；生产环境需要 SSO/JWT，V0.1 身份头仍只是 Demo 占位。
 - Branch 来源读取必须落在 `TaskContract.source_scope` 和当前用户权限内。
 - 副作用动作不属于 TaskControlCommand，继续调用现有 RunService 和 Tool Gateway，不能旁路 Permit。
-- Action Gate 打开时前端保留 Active Task Bar，并让 Gate 占用独立网格行。TaskRuntimePanel 保持挂载以保留 Steer 草稿，但视觉隐藏、`aria-hidden`；Task Control 与 Task Bar 的创建/重连/立即对账均被禁用。Gate 收起后网格行缩至 58px。该互斥不表示 Task Artifact 已绑定 Action；Artifact 改动触发 Action 失效仍未实现。
+- Action Gate 打开时前端保留后台任务摘要，并让 Gate 占用独立网格行。Tasks 决策区退出交互；Task 跳转、Control、创建/重连/立即对账均被禁用。该互斥不表示 Task Artifact 已绑定 Action；Artifact 改动触发 Action 失效仍未实现。
 - 普通 UI 不展示原始 Prompt、思维链、Worker 对话、JWT/Permit、幂等键、完整工具参数、权限哈希、密钥或堆栈。
 
 ## 8. 分阶段实现状态
@@ -200,4 +201,5 @@ data: {TaskEvent JSON}
 | Observe/Plan/Act/Verify/Commit | 固定 Fixture 在单次 start/resolve mutation 中可观察；引用/hash/幂等已有内存与 PostgreSQL 回归 | 通用后台 Loop、任意中间 checkpoint 恢复 |
 | Task Artifact Workspace | PR 4 已实现只读 head/version/verification/conflict/content/source/lineage/Commit 视图，并保留手工待办 tab | 人工编辑新版本、Artifact/Action 绑定、通用工件类型 |
 | Task UI 与恢复 | PR 4 E2E 覆盖主路径和发送前 abort；PR 5 运行覆盖 API 进程断开、禁用、自动重连与 v2/v3 对账 | 已提交但响应丢失、断线期间事件回放与更多异常路径 |
+| 来源与多轮前台语义 | 非 Tasks 摘要、带“演示数据”的来源标签、原始 ID 不入普通业务 DOM，以及独立新 Task 的 create+start 已有浏览器工程证据 | 历史轮次选择与至少 5 人无引导理解测试 |
 | Adaptive Swarm / 真实 Connector | 非本决策范围 | 需独立 Admission 和来源证据 |

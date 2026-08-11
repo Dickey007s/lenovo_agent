@@ -12,7 +12,7 @@ import type {
   VerificationReport,
   VerificationStatus,
 } from "./task-types";
-import { formatSourceReference } from "./source-reference";
+import { projectSourceReferences } from "./source-reference";
 
 export type TaskArtifactWorkspaceProps = {
   task: TaskSnapshot | null;
@@ -327,12 +327,8 @@ function SourceReferences({ sourceRefs, label }: { sourceRefs: string[]; label: 
       </summary>
       {sourceRefs.length > 0 ? (
         <ul className="task-artifact-source-list">
-          {sourceRefs.map((sourceRef, index) => (
-            <li key={`${sourceRef}:${index}`}>
-              <code>
-                {formatSourceReference(sourceRef, index)}
-              </code>
-            </li>
+          {projectSourceReferences(sourceRefs).map((source) => (
+            <li key={source.key}>{source.label}</li>
           ))}
         </ul>
       ) : (
@@ -397,7 +393,7 @@ function ConflictSummary({
                   {conflict.resolution}
                 </p>
               )}
-              <SourceReferences sourceRefs={conflict.source_refs} label="查看冲突来源" />
+              <SourceReferences sourceRefs={conflict.source_refs} label="查看冲突的演示数据来源" />
             </article>
           </li>
         ))}
@@ -482,7 +478,7 @@ function ArtifactDetail({
         )}
       </section>
 
-      <SourceReferences sourceRefs={artifact.source_refs} label="查看工件来源" />
+      <SourceReferences sourceRefs={artifact.source_refs} label="查看工件的演示数据来源" />
 
       {report && (
         <details className="task-artifact-checks">
@@ -493,7 +489,7 @@ function ArtifactDetail({
                 <li className={`task-artifact-check task-artifact-check-${check.status}`} key={check.check_id}>
                   <strong>{check.label}</strong>
                   <span>{check.detail}</span>
-                  <SourceReferences sourceRefs={check.source_refs} label="检查来源" />
+                  <SourceReferences sourceRefs={check.source_refs} label="查看检查项的演示数据来源" />
                 </li>
               ))}
             </ul>

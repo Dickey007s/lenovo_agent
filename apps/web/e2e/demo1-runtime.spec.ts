@@ -62,65 +62,6 @@ async function attachScreenshot(page: Page, testInfo: TestInfo, name: string) {
   await testInfo.attach(name, { path, contentType: "image/png" });
 }
 
-async function expectRuntimeStack(page: Page, panelMaxHeight: number) {
-  const rectangles = await page.evaluate(() => {
-    const selectors = [
-      ".chat-pane",
-      ".chat-identity",
-      ".active-task-strip",
-      ".task-runtime-panel",
-      ".conversation",
-      ".chat-footer",
-    ];
-    return Object.fromEntries(selectors.map((selector) => {
-      const element = document.querySelector(selector);
-      if (!element) throw new Error(`Missing layout element: ${selector}`);
-      const rect = element.getBoundingClientRect();
-      return [selector, {
-        top: rect.top,
-        right: rect.right,
-        bottom: rect.bottom,
-        left: rect.left,
-        width: rect.width,
-        height: rect.height,
-      }];
-    }));
-  });
-
-  const pane = rectangles[".chat-pane"];
-  const stack = [
-    rectangles[".chat-identity"],
-    rectangles[".active-task-strip"],
-    rectangles[".task-runtime-panel"],
-    rectangles[".conversation"],
-    rectangles[".chat-footer"],
-  ];
-  for (const item of stack) {
-    expect(item.left).toBeGreaterThanOrEqual(pane.left - 1);
-    expect(item.right).toBeLessThanOrEqual(pane.right + 1);
-  }
-  for (let index = 0; index < stack.length - 1; index += 1) {
-    expect(stack[index].bottom).toBeLessThanOrEqual(stack[index + 1].top + 1);
-  }
-  expect(rectangles[".task-runtime-panel"].height).toBeLessThanOrEqual(panelMaxHeight + 1);
-  expect(rectangles[".conversation"].height).toBeGreaterThanOrEqual(180);
-}
-
-async function expectConflictBeforeBranches(page: Page) {
-  const orderedSections = await page
-    .locator(".task-runtime-panel > .task-conflicts, .task-runtime-panel > .task-branches")
-    .evaluateAll((elements) => elements.map((element) => element.className));
-  expect(orderedSections).toHaveLength(2);
-  expect(orderedSections[0]).toContain("task-conflicts");
-  expect(orderedSections[1]).toContain("task-branches");
-
-  const firstTabStop = await page.locator(".task-runtime-panel").evaluate((panel) => {
-    const controls = Array.from(panel.querySelectorAll<HTMLElement>("button, input, summary"));
-    return controls.find((control) => control.tabIndex >= 0 && !control.hasAttribute("disabled"))?.textContent?.trim();
-  });
-  expect(firstTabStop).toContain("采用正式收入来源");
-}
-
 async function expectMobileArtifactWorkspace(page: Page) {
   const overflow = await page.evaluate(() => {
     const selectors = ["html", ".workspace-viewport", ".task-view-shell", ".task-artifact-workspace"];
@@ -266,6 +207,11 @@ test("the initial task lookup cannot expose a duplicate-create action", async ({
   await page.goto("/");
   await expect(page.locator(".task-director-empty").getByRole("heading", { name: "正在读取经营汇报任务" })).toBeVisible();
   await expect(page.getByRole("button", { name: "开始准备汇报", exact: true })).toHaveCount(0);
+  await page.getByRole("button", { name: "邮件", exact: true }).click();
+  const loadingBackgroundTask = page.getByLabel("客户经营汇报");
+  await expect(loadingBackgroundTask.getByText("正在读取经营汇报任务", { exact: true })).toBeVisible();
+  await expect(loadingBackgroundTask.getByText("当前没有进行中的经营汇报", { exact: true })).toHaveCount(0);
+  await page.getByRole("button", { name: "任务", exact: true }).click();
   releaseTasks();
   await expect(page.getByRole("heading", { name: "准备 3 份经营汇报材料" })).toBeVisible();
   expect(await listTasks(request, owner)).toHaveLength(1);
@@ -287,6 +233,10 @@ test("a no-task service failure is consistent across the workspace and decision 
   await expect(page.locator("#task-side-panel").getByRole("heading", { name: "经营汇报任务暂时不可用" })).toBeVisible();
   await expect(page.getByText("连接恢复后，这里会显示最近确认的待处理事项。", { exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "开始准备汇报", exact: true })).toHaveCount(0);
+  await page.getByRole("button", { name: "文档", exact: true }).click();
+  const offlineBackgroundTask = page.getByLabel("客户经营汇报");
+  await expect(offlineBackgroundTask.getByText("经营汇报任务暂时不可用", { exact: true })).toBeVisible();
+  await expect(offlineBackgroundTask.getByText("任务服务暂不可用，当前工作区仍可继续使用", { exact: true })).toBeVisible();
 });
 
 test("rapid repeated start intent creates and starts only one report task", async ({ page, request }) => {
@@ -733,14 +683,25 @@ test("Demo 1 uses server facts from creation through the three-branch commit", a
   await expect(createButton).toBeEnabled();
   await createButton.click();
   await page.getByRole("button", { name: "邮件", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "待处理的证据冲突" })).toBeVisible();
-  await expect(page.locator(".task-branch-status.is-waiting_evidence")).toHaveCount(1);
-  await expect(page.locator(".task-branch-status.is-committed")).toHaveCount(2);
-  await expectConflictBeforeBranches(page);
-  await expectRuntimeStack(page, 270);
+  const backgroundTask = page.getByLabel("当前经营汇报");
+  await expect(backgroundTask.getByText("等待你的决定", { exact: true })).toBeVisible();
+  await expect(backgroundTask.getByRole("button", { name: "前往处理" })).toBeVisible();
+  await expect(page.locator(".task-runtime-panel")).toHaveCount(0);
+  await expect(page.locator(".chat-pane")).not.toContainText("fixture:");
+  await attachScreenshot(page, testInfo, "demo1-mail-background-task-desktop");
+  await backgroundTask.getByRole("button", { name: "前往处理" }).click();
+  await expect(page.getByRole("heading", { name: "请确认 1 件事" })).toBeVisible();
+  await expect(page.locator("#task-decision-conflicts-title")).toBeFocused();
+  const decisionPane = page.locator(".task-director-side-pane");
+  const demoSources = decisionPane.getByText("查看演示数据来源", { exact: true });
+  await expect(demoSources).toBeVisible();
+  await demoSources.click();
+  await expect(decisionPane.getByText("演示数据 · CRM 正式收入记录（v3）", { exact: true })).toBeVisible();
+  await expect(decisionPane.getByText("演示数据 · 收入预测表（v2）", { exact: true })).toBeVisible();
+  await expect(decisionPane).not.toContainText("fixture:");
   await attachScreenshot(page, testInfo, "demo1-open-conflict-desktop");
 
-  const openAnalysis = page.getByRole("button", { name: "查看经营分析" });
+  const openAnalysis = page.getByRole("button", { name: "查看当前材料：经营分析", exact: true });
   await openAnalysis.scrollIntoViewIfNeeded();
   await openAnalysis.click();
   await expect(page.getByRole("heading", { name: "交付物工作区" })).toBeVisible();
@@ -822,10 +783,15 @@ test("Demo 1 uses server facts from creation through the three-branch commit", a
 
   const completedTaskId = tasks[0].task_id;
   await page.reload();
-  const replayButton = page.getByRole("button", { name: "新建一轮" });
+  const replayButton = page.getByRole("button", { name: "开始新一轮汇报" });
   await expect(replayButton).toBeEnabled();
 
   const repeatKeys: string[] = [];
+  let repeatStartRequests = 0;
+  await page.route(`${API_URL}/v1/tasks/*/start`, async (route) => {
+    repeatStartRequests += 1;
+    await route.fallback();
+  });
   await page.route(`${API_URL}/v1/demo1/tasks`, async (route) => {
     if (route.request().method() !== "POST") {
       await route.fallback();
@@ -848,17 +814,24 @@ test("Demo 1 uses server facts from creation through the three-branch commit", a
   expect(await listTasks(request, owner)).toHaveLength(1);
 
   await replayButton.click();
-  await expect(page.getByRole("button", { name: "开始准备汇报", exact: true })).toBeEnabled();
+  await expect(page.getByRole("heading", { name: "请确认 1 件事" })).toBeVisible();
   expect(repeatKeys).toHaveLength(2);
   expect(repeatKeys[0]).not.toBe("");
   expect(repeatKeys[1]).toBe(repeatKeys[0]);
+  expect(repeatStartRequests).toBe(1);
 
   const repeatedTasks = await listTasks(request, owner);
   expect(repeatedTasks).toHaveLength(2);
   expect(repeatedTasks[0].task_id).not.toBe(completedTaskId);
-  expect(repeatedTasks[0].status).toBe("ready");
+  expect(repeatedTasks[0].status).toBe("waiting_input");
   expect(repeatedTasks[1].task_id).toBe(completedTaskId);
   expect(repeatedTasks[1].status).toBe("committed");
+  expect(repeatedTasks[1].branches.map((branch) => branch.status)).toEqual([
+    "committed",
+    "committed",
+    "committed",
+  ]);
+  expect(new Set(repeatedTasks[1].artifact_versions.map((artifact) => artifact.artifact_version_id)).size).toBe(7);
 });
 
 test("an aborted start keeps one idempotency key across reload and reconciles without duplicates", async ({ page, request }, testInfo) => {

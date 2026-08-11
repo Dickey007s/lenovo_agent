@@ -19,7 +19,7 @@ flowchart TB
     subgraph Client["交互层"]
         WEB["Next.js 单页工作台"]
         WORKSPACE["7 类 WorkspaceArtifact"]
-        CHAT["Agent 对话 + Active Task Bar + 确认卡 + 审计"]
+        CHAT["Agent 对话 + 后台任务摘要 + Tasks 决策区 + 确认卡 + 审计"]
     end
 
     subgraph API["应用层"]
@@ -76,15 +76,15 @@ flowchart TB
 - 左侧：视图工具栏与工作区。
 - 中间：可拖动分隔条。
 - 右侧：持续对话、底部输入框和非阻塞确认卡。
-- 右侧顶部：Active Task Bar，从 TaskSnapshot 展示 Task ID、状态、阶段、预算、版本和连接同步状态。
-- Active Task 下方：Branch、Conflict、Control 和最近 Commit 明细；其业务状态全部来自服务端 Snapshot 或 SSE 后的 Snapshot 对账。
-- 左侧 Tasks 视图：PR 4 用“长期任务工件 / 工作台待办”两个 tab 同时保留服务端 Task Artifact Workspace 与原手工待办；手工待办按状态分栏显示为可编辑看板。Task 面板的分支 head 可直接打开对应工件。
+- 右侧顶部：后台任务摘要，从 `TaskSnapshot.contract/status/phase` 和客户端同步状态显示当前或上一轮经营汇报。邮件、文档等非 Tasks 工作区只提供“打开任务 / 前往处理 / 查看任务 / 查看汇报”跳转，不渲染 Branch、Conflict 或 Control。
+- 右侧 Tasks 专属区：在“待我决定 / Agent 对话”之间切换；Conflict、候选依据、控制和恢复只在 Tasks 中出现，其业务状态全部来自服务端 Snapshot 或 SSE 后的 Snapshot 对账。
+- 左侧 Tasks 视图：用“进度 / 成果 / 执行记录”三个模式分别承载 Task Director、只读 Task Artifact Workspace 和原手工待办。手工待办按状态分栏显示为可编辑看板，Task 分支 head 可直接打开对应工件。
 
-`TaskArtifactWorkspace` 只投影 `TaskSnapshot`：以 `branches[].artifact_heads` 选择 head，以 `artifact_versions[].parent_version_id` 构建 lineage，以 `verification_reports[]` 和 `conflicts[]` 显示验证/冲突，以 `last_commit` 显示最终提交与 state hash。没有服务端 head、验证或 Commit 时，前端显示缺失状态而不是补造事实。来源和验证检查默认折叠。固定 Fixture 的 `analysis/risk_brief/reply_draft` 使用字段 allowlist，未知 kind/字段默认隐藏；`source_ref` 只显示契约中的四个已知 Demo 1 Fixture 引用，其他标识显示隐藏占位。这只是前端第二道投影：服务端尚未提供通用字段可见性 Schema/display projection，allowlist 字段中的任意文本仍不能视为天然安全。
+`TaskArtifactWorkspace` 只投影 `TaskSnapshot`：以 `branches[].artifact_heads` 选择 head，以 `artifact_versions[].parent_version_id` 构建 lineage，以 `verification_reports[]` 和 `conflicts[]` 显示验证/冲突，以 `last_commit` 显示最终提交与 state hash。没有服务端 head、验证或 Commit 时，前端显示缺失状态而不是补造事实。来源和验证检查默认折叠。固定 Fixture 的 `analysis/risk_brief/reply_draft` 使用字段 allowlist，未知 kind/字段默认隐藏；四个已知 `source_ref` 投影为带“演示数据”前缀的业务标签，普通业务 DOM 只接收标签和序号 key，不接收原始 `fixture:` 值，其他标识显示隐藏占位。服务端 Snapshot 仍保留原始标识用于控制校验与审计。这只是前端第二道投影：服务端尚未提供通用字段可见性 Schema/display projection，allowlist 字段中的任意文本仍不能视为天然安全。
 
 前端不拥有风险决策、审批状态或 Permit；它只渲染服务端 Snapshot 并提交用户选择。
 
-Action Gate 打开时，Active Task Bar 保留，Gate 占用独立网格行。TaskRuntimePanel 继续挂载以保留未提交 Steer 草稿，但其容器视觉隐藏并带 `aria-hidden`；Task Runtime 控制与 Task Bar 的创建、重连和立即对账均因 Gate 状态被禁用。Gate 收起后该行缩至 58px，把空间归还给对话。这样避免任务控制与副作用确认同时抢占用户决策，但目前只是交互互斥：Task Artifact 尚未绑定到 ActionCandidate/Run，Task Artifact 改变也尚不会自动触发现有 Action 失效。
+Action Gate 打开时，后台任务摘要保留，Gate 占用独立网格行；Tasks 决策区退出交互，任务跳转、创建、重连和立即对账均被禁用。Gate 收起后把空间归还给对话。这样避免任务控制与副作用确认同时抢占用户决策，但目前只是交互互斥：Task Artifact 尚未绑定到 ActionCandidate/Run，Task Artifact 改变也尚不会自动触发现有 Action 失效。
 
 ### 2.2 应用层
 
@@ -188,14 +188,14 @@ sequenceDiagram
     participant S as TaskService
     participant D as TaskStore
 
-    U->>W: 创建或再次演示 Demo 1
+    U->>W: 开始第一轮或新一轮汇报
     W->>A: POST /demo1/tasks + X-User-Id + Idempotency-Key
     A->>S: create_demo1(owner_id, round_key)
     S->>S: 生成 TaskContract、3 个 Branch 和 TASK_CREATED
     S->>D: 原子创建 Snapshot + 初始事件
-    D-->>W: TaskSnapshot ready / contract
-    U->>W: 启动任务
-    W->>A: POST /tasks/{id}/start + version + key
+    D-->>W: 新 TaskSnapshot ready / contract
+    W->>W: 应用新 Task；旧轮次保持不变
+    W->>A: 同一次前台动作继续 POST /tasks/{id}/start + version + key
     A->>S: 固定 Fixture 状态转换
     S->>S: Observe / Plan / Act / Verify
     S->>D: 原子写 Snapshot + Event + ArtifactVersion
@@ -222,17 +222,19 @@ sequenceDiagram
     W->>A: GET /tasks/{task_id} 对账
 ```
 
-每个用户显式发起的新一轮 Demo 使用新的 round key，因此得到新的服务端 Task ID；同一 round key 的网络重试返回该 Task 当前已持久化的 Snapshot，不回退已经发生的 start/control 变更。未提供 `Idempotency-Key` 时保留旧客户端兼容行为，仍按 Owner 使用稳定默认键。刷新只从 `/tasks` 恢复最近的活动或历史 Task，不会重置旧任务；终态 Task 的“再次演示”按钮负责创建下一轮。
+每个用户显式发起的新一轮汇报使用新的 round key，因此得到新的服务端 Task ID；同一 round key 的网络重试返回该 Task 当前已持久化的 Snapshot，不回退已经发生的 start/control 变更。未提供 `Idempotency-Key` 时保留旧客户端兼容行为，仍按 Owner 使用稳定默认键。刷新只从 `/tasks` 恢复最近活动 Task，否则显示最近终态 Task，不会重置旧任务。终态“开始新一轮汇报”是 Web 组合动作：创建独立 Task 后立即启动新 Task，固定路径通常进入 `waiting_input / verify`，不是把旧 Task 设置回可启动状态。服务端保留多轮 Task，但前端尚无历史轮次选择器。
 
 Task ID、Owner、版本、状态和时间均由服务端产生。读取、列表、控制和订阅都按 Owner 过滤；所有 mutation 使用预期 Task 版本和幂等键，前端只在收到服务端 Snapshot 后更新业务状态。
 
-`start` 中的 Observe、Plan、Act、Verify 是一次请求内的固定 Fixture 轨迹，数据和工件内容由确定性代码提供，不来自 LLM 或真实 Connector。事务提交前没有对外可见的中间 Snapshot，因此该路径不能表述为通用后台持续运行器。Steer 当前若只进入 `accepted`，服务端只证明指令已持久记录；重新规划和 `CONTROL_APPLIED` 仍需后续循环。Task SSE 通过当前 API 进程轮询 Store，不是跨实例通知系统；Active Task Bar 的“已同步”仅代表 Snapshot 对账完成。
+`start` 中的 Observe、Plan、Act、Verify 是一次请求内的固定 Fixture 轨迹，数据和工件内容由确定性代码提供，不来自 LLM 或真实 Connector。事务提交前没有对外可见的中间 Snapshot，因此该路径不能表述为通用后台持续运行器。Steer 当前若只进入 `accepted`，服务端只证明指令已持久记录；重新规划和 `CONTROL_APPLIED` 仍需后续循环。Task SSE 通过当前 API 进程轮询 Store，不是跨实例通知系统；后台任务摘要的“状态已更新”仅代表 Snapshot 对账完成。
 
 前端在 mutation 结果未知时把原始 `idempotency_key`、intent 和预期版本保存到当前标签页的 `sessionStorage` 并冻结新控制；pending 状态提供同 key 对账入口。同 key 重放返回首次响应，因此前端确认后还会 GET 当前 Task 的最新 Snapshot，避免用历史响应回滚当前界面。PR 4 浏览器 E2E 已覆盖 start 请求发送前 abort、reload 后入口可达、同 key 重试和无重复 ArtifactVersion；由于 abort 发生在请求交给服务端之前，它不证明“服务端已经提交但响应丢失”的浏览器恢复。
 
 PR 4 E2E 使用 system Edge 访问 Next.js `3011`，由页面调用真实本地 FastAPI `8011` 与内存 TaskStore。主路径断言服务端创建、冲突、Steer accepted、resolve、Commit 和交付物终态；移动 viewport 断言被测区域无横向 overflow、被测可见操作目标至少 44px。该拓扑不包含 PostgreSQL、API 进程重启、多实例或真实 Connector，也未覆盖 Task SSE 断线回放。
 
 PR 5 增加独立 opt-in system test：每次创建随机 PostgreSQL 16 数据库，API A 写入第一轮 v2 后退出，API B 逐字段恢复 v2、重放同一轮次 key、用不同 key 创建第二个 `ready` Task，再为原 Task 形成 v3 Commit 后退出；API C 恢复两个 Task 并重放轮次、start 与 resolve key。数据库最终保持 `2 tasks`，其中原 Task 严格保持 `45 events / 7 artifacts / 1 TASK_COMMITTED`，第二个 Task 仅有初始创建事件。同页 system Edge 运行还验证 API 停止时保留最后 Snapshot、禁用控制并显示恢复中，新进程启动后再 GET 同一 Task。该浏览器证据没有在停机期间写入事件，因此不证明 `after` 缺口回放。
+
+后续来源与新一轮语义修订的完整浏览器 E2E 为 `12 passed (44.5s)`，并保存 `1440 x 900` Mail 后台任务摘要截图。证据见 [`DEMO1-ROUND-AND-SOURCE-CLARITY-EVIDENCE-20260811.md`](evidence/DEMO1-ROUND-AND-SOURCE-CLARITY-EVIDENCE-20260811.md)。自动化只证明指定 DOM、create/start 调用与 Snapshot 列表一致，不证明用户已经理解，也不补上历史轮次选择器。
 
 ## 4. 信任边界
 
@@ -321,5 +323,5 @@ Browser :3000  ──REST/SSE──>  FastAPI :8010
 7. `packages/risk_core/`：风险与策略真值。
 8. `packages/agent_runtime/workflow.py`：人工 Gate。
 9. `packages/authorization/` 与 `packages/tool_gateway/`：执行安全边界。
-10. `apps/web/app/page.tsx`：前端交互状态机与 Active Task Bar。
+10. `apps/web/app/page.tsx`：前端交互状态机、非 Tasks 后台任务摘要与 Tasks 组合视图。
 11. `tests/`：预期行为与回归边界。

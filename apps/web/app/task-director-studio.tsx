@@ -21,7 +21,7 @@ import {
   IconTargetArrow,
 } from "@tabler/icons-react";
 
-import { formatSourceReference } from "./source-reference";
+import { projectSourceReferences } from "./source-reference";
 import type { ControlIntent, SyncState } from "./task-runtime-panel";
 import type {
   ArtifactVersion,
@@ -213,7 +213,7 @@ export function TaskWorkspaceHeader({
       <div className="task-director-title">
         <span className="task-director-product-label">持续任务协作</span>
         <div className="task-director-heading-row">
-          <h1>{task?.contract.title ?? "经营汇报协作"}</h1>
+          <h1 id="task-director-workspace-title" tabIndex={-1}>{task?.contract.title ?? "经营汇报协作"}</h1>
         </div>
         <p>{task?.contract.objective ?? "把长任务拆成可核对的材料，只在必须由你判断时暂停。"}</p>
         {task && (
@@ -266,11 +266,12 @@ export function TaskWorkspaceHeader({
           <button
             className="task-director-create-button"
             type="button"
+            title="保留上一轮成果和记录，并创建、启动一项新的经营汇报任务"
             disabled={busy || creating}
             onClick={onCreate}
           >
             <IconPlayerPlay aria-hidden="true" />
-            <span>{creating ? "正在创建" : "新建一轮"}</span>
+            <span>{creating ? "正在准备" : "开始新一轮汇报"}</span>
           </button>
         )}
       </div>
@@ -455,7 +456,7 @@ function StageCard({
     </>
   );
   return onClick ? (
-    <button className={`task-director-stage-card is-${tone ?? "neutral"}`} type="button" onClick={onClick}>
+    <button aria-label={`查看当前材料：${title}`} className={`task-director-stage-card is-${tone ?? "neutral"}`} type="button" onClick={onClick}>
       {content}
     </button>
   ) : (
@@ -933,10 +934,10 @@ export function TaskDecisionPane({
                     ))}
                   </dl>
                   <details>
-                    <summary>查看来源依据</summary>
+                    <summary>查看演示数据来源</summary>
                     <ul>
-                      {conflict.source_refs.map((sourceRef, index) => (
-                        <li key={`${sourceRef}:${index}`}>{formatSourceReference(sourceRef, index)}</li>
+                      {projectSourceReferences(conflict.source_refs).map((source) => (
+                        <li key={source.key}>{source.label}</li>
                       ))}
                     </ul>
                   </details>
