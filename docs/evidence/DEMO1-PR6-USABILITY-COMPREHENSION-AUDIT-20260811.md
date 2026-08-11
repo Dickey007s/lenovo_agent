@@ -66,7 +66,7 @@
 - 浏览器回归：`corepack.cmd pnpm --dir apps/web test:e2e`，`12 passed (43.7s)`。首访业务路径覆盖默认任务入口、固定空态三项成果与创建后服务端契约交付清单一致、单次开始、冲突原因与具体后果、三项完成成果、草稿未发送边界、Conflict/Committed 两状态的 `1181 x 900` 无横向溢出；另覆盖延迟初始 Task 列表、无任务离线时左右区域恢复文案一致、快速重复开始只产生一次 create/start、同分支多冲突只按服务端可定位顺序开放且在全部解决后才承诺同步回复草稿、失败终态覆盖残留冲突卡；既有恢复、乱序 Snapshot、历史版本与 source-ref fail-closed 回归继续通过。
 - Python：`uv run pytest -q`，`58 passed, 1 skipped (2.24s)`。
 - 静态与构建：`uv run ruff check .`、`corepack.cmd pnpm --dir apps/web lint`、`corepack.cmd pnpm --dir apps/web build` 均通过。
-- 源码提交与 PR：待本轮提交后回填。
+- 源码提交与 PR：实现提交 `4852cc2`；[`PR #10`](https://github.com/Dickey007s/lenovo_agent/pull/10)。
 - 5 人无引导任务测试：未运行。
 - 直接注入“较新 Snapshot 先于陈旧 create 响应到达”的浏览器用例尚未构造；当前代码会拒绝未应用的 create 响应并在启动前再次核对 ready/version/sequence，浏览器已覆盖延迟列表与快速双触发仅一次 create/start，但该防御分支仍是明确测试缺口。
 
