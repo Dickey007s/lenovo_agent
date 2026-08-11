@@ -1203,8 +1203,8 @@ export default function Home() {
           !== (requestEpoch.editTokens[artifact.kind] ?? 0);
       if (editedDuringRequest) {
         const draft = artifactsRef.current[artifact.kind];
-        const baseArtifact = workspaceEditBasesRef.current[artifact.kind]
-          ?? requestEpoch.artifacts[artifact.kind]
+        const baseArtifact = requestEpoch.artifacts[artifact.kind]
+          ?? workspaceEditBasesRef.current[artifact.kind]
           ?? null;
         const result = draft
           ? reapplyWorkspaceDraft(artifact, draft, baseArtifact)

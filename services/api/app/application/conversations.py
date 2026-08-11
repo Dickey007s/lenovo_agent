@@ -103,20 +103,33 @@ def _string_list(value: Any) -> list[str]:
     return []
 
 
+_EMAIL_ADDRESS_PATTERN = re.compile(
+    r"^(?=.{3,254}$)(?!.*\.\.)"
+    r"[a-z0-9!#$%&'*+/=?^_`{|}~-]+"
+    r"(?:\.[a-z0-9!#$%&'*+/=?^_`{|}~-]+)*@"
+    r"(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+"
+    r"[a-z](?:[a-z0-9-]{0,61}[a-z0-9])?$",
+    flags=re.IGNORECASE,
+)
+
+
 def _recipient_scope(values: list[str]) -> tuple[str, bool]:
-    internal_domains = ("@lenovo.com", "@internal.example")
+    internal_domains = {"lenovo.com", "internal.example"}
+    external = False
     uncertain = False
     for value in values:
         normalized = value.strip().lower()
         if not normalized:
             continue
-        if "客户" in normalized or "供应商" in normalized:
-            return "external_customer", uncertain
-        if "@" in normalized and not normalized.endswith(internal_domains):
-            return "external_customer", uncertain
-        if "@" not in normalized:
+        if _EMAIL_ADDRESS_PATTERN.fullmatch(normalized) is None:
             uncertain = True
-    return ("external_customer", True) if uncertain else ("internal_member", False)
+            continue
+        domain = normalized.rsplit("@", maxsplit=1)[1]
+        if domain not in internal_domains:
+            external = True
+    if external or uncertain:
+        return "external_customer", uncertain
+    return "internal_member", False
 
 
 def _is_pricing_text(value: str) -> bool:

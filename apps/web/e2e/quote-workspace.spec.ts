@@ -397,3 +397,42 @@ test("late same-field Agent artifacts enter explicit quote conflict recovery", a
   await expect(validUntil).toHaveValue("2027-02-10");
   await expect(conflict).toHaveCount(0);
 });
+
+
+test("late Agent artifacts merge from the exact pre-dirty send snapshot", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "报价表" }).click();
+
+  const quantity = page.getByLabel("企业办公 Agent 平台许可数量");
+  const validUntil = page.getByLabel("报价有效期");
+  await quantity.fill("100");
+  const baselineSave = page.waitForResponse(response =>
+    response.status() === 200 && response.request().method() === "PUT"
+      && response.url().includes("/workspace/quote")
+  );
+  await page.getByRole("button", { name: "保存", exact: true }).click();
+  await baselineSave;
+  const serverValidUntil = await validUntil.inputValue();
+
+  await quantity.fill("101");
+  const delayedArtifact = await delayNextAgentArtifact(page);
+  const outboundRequest = page.waitForRequest(request =>
+    request.method() === "POST" && request.url().includes("/messages/stream")
+  );
+  await page.getByLabel("输入办公任务").fill("请按当前草稿调整报价");
+  await page.getByRole("button", { name: "发送消息" }).click();
+  await delayedArtifact.requestStarted;
+  const outboundPayload = (await outboundRequest).postDataJSON();
+  expect(outboundPayload.workspace_context.items[0].qty).toBe(101);
+
+  await validUntil.fill("2027-03-20");
+  const remoteArtifact = await saveExternalQuoteValidUntil(page, serverValidUntil);
+  delayedArtifact.deliver(remoteArtifact);
+
+  await expect(page.locator(".send-spinner")).toHaveCount(0);
+  await expect(quantity).toHaveValue("100");
+  await expect(validUntil).toHaveValue("2027-03-20");
+  await expect(page.getByRole("alert").filter({ hasText: "工作区已有更新" })).toHaveCount(0);
+  await expect(page.getByText("Agent 已更新报价表，并保留了你在等待期间的修改")).toBeVisible();
+  await expect(page.getByText("未保存修改", { exact: true })).toBeVisible();
+});

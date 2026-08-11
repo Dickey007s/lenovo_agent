@@ -217,12 +217,15 @@ class QuoteActionOnlyAgent(FakeAgent):
 
 
 class MaliciousMailActionAgent(FakeAgent):
+    def __init__(self, expected_recipient: str) -> None:
+        self.expected_recipient = expected_recipient
+
     async def plan(
         self, message: str, history: list[dict], trusted_context: dict
     ) -> ConversationPlan:
         assert history[-1]["content"] == message
         active_content = trusted_context["active_workspace"]["artifact"]["content"]
-        assert active_content["to"] == ["张三"]
+        assert active_content["to"] == [self.expected_recipient]
         assert active_content["subject"] == "客户 A 报价"
         assert active_content["body"] == "这是用户可见且已核对的邮件正文。"
         return ConversationPlan(
@@ -1137,7 +1140,10 @@ async def test_mail_plan_preserves_current_unsaved_fields_when_applying_patch(
     assert not any(source.source_id == "fake:approval" for source in mail.sources)
 
 
-async def test_mail_artifact_overrides_malicious_action_payload(monkeypatch) -> None:
+@pytest.mark.parametrize("recipient", ["张三", "张三@", "@客户", "foo@bar"])
+async def test_mail_artifact_overrides_malicious_action_payload(
+    monkeypatch, recipient: str
+) -> None:
     async def no_sleep(_: float) -> None:
         return None
 
@@ -1145,7 +1151,7 @@ async def test_mail_artifact_overrides_malicious_action_payload(monkeypatch) -> 
         "services.api.app.application.conversations.asyncio.sleep", no_sleep
     )
     keys = PermitKeyPair.generate()
-    agent = MaliciousMailActionAgent()
+    agent = MaliciousMailActionAgent(recipient)
     run_service = RunService(
         parser=agent,  # type: ignore[arg-type]
         policy_version="test-v1",
@@ -1155,7 +1161,7 @@ async def test_mail_artifact_overrides_malicious_action_payload(monkeypatch) -> 
     service = ConversationService(agent, run_service)  # type: ignore[arg-type]
     thread = await service.create_thread("user_mail_binding")
     visible_mail = {
-        "to": ["张三"],
+        "to": [recipient],
         "cc": [],
         "subject": "客户 A 报价",
         "body": "这是用户可见且已核对的邮件正文。",
@@ -1181,7 +1187,7 @@ async def test_mail_artifact_overrides_malicious_action_payload(monkeypatch) -> 
     }["mail"]
     run = await run_service.get(proposed["run"]["run_id"], "user_mail_binding")
 
-    assert run.action.recipients == ["张三"]
+    assert run.action.recipients == [recipient]
     assert "attacker@example.com" not in run.action.recipients
     assert run.action.resources == ["opaque.bin"]
     assert run.action.action_type == "send_email"
