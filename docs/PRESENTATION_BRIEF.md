@@ -45,7 +45,7 @@ Office Agent V0.1 把 AI 放在可独立工作的邮件、文档、报价、任�
 | 端到端 Simulator capability | 5 个 | `simulators/` 与 Tool Gateway 注册 |
 | Evidence requirement | 8 类 | `application/evidence_catalog.py` |
 | 确定性治理演示场景 | 4 个 | `application/demo3.py` |
-| 自动化测试 | 22 项 | `uv run pytest -q` 的定稿结果 |
+| Python 自动化收集 | 57 项（56 passed，1 个 PostgreSQL opt-in skip） | `uv run pytest -q` 的 PR 5 封口结果 |
 
 7 类工作区为邮件、文档、报价表、任务、日历、报销和 CRM；审计是独立观察视图，不计入可编辑 WorkspaceArtifact。
 
@@ -109,15 +109,17 @@ flowchart LR
 
 准确边界：配置 PostgreSQL 时，Workspace、Run、Audit 与 LangGraph checkpoint 可恢复；Conversation Thread/Message 和 Permit replay set 当前仍在进程内存中。
 
+Demo 1 的 TaskStore 另有独立证据：固定 Fixture 已在同一个 PostgreSQL 16.14 数据库、三个顺序 API 进程之间逐字段恢复 v2 冲突态和 v3 Commit，并验证旧 mutation key 重放不新增事件、工件或 Commit。前台只显示“连接中断，正在恢复”、最后确认的 Snapshot 和恢复后的同一 Task，不展示数据库类型、DSN 或内部重试日志。该证据不等于整个工作区会话无损恢复，也不覆盖数据库进程故障、多实例并发或断线事件缺口。
+
 ### 第 9 页：V0.1 工程实现
 
-展示技术栈：Next.js 16、React 19、TypeScript；FastAPI、Pydantic、LangGraph；PostgreSQL 16；Ed25519 JWT；OpenAI-compatible LLM；SSE 双流。
+展示技术栈：Next.js 16、React 19、TypeScript；FastAPI、Pydantic、LangGraph；PostgreSQL 16；Ed25519 JWT；OpenAI-compatible LLM；三条 SSE 前台流。
 
-强调两个流：Conversation SSE 服务文字与工作区增量，Run SSE 服务有序审计与确认卡刷新。
+强调三条流：Conversation SSE 服务文字与工作区增量，Run SSE 服务有序审计与确认卡刷新，Task SSE 通知持久 Task 的事件推进并触发完整 Snapshot 对账。三者是不同事实链，Task SSE 也不能被描述为 Conversation 持久化。
 
 ### 第 10 页：阶段结论与下一步
 
-阶段结论：V0.1 已验证 workspace-first、人机共编、确定性治理、人工 Gate、最小权限 Permit、Simulator 执行与 Agent 结果闭环。
+阶段结论：V0.1 已验证 workspace-first、人机共编、确定性治理、人工 Gate、最小权限 Permit、Simulator 执行与 Agent 结果闭环；固定 Demo 1 TaskStore 还完成了有边界的 PostgreSQL 顺序 API 进程恢复验证。
 
 下一步优先级：真实 SSO/RBAC → Connector SDK 与沙箱 → 对话和 replay 持久化 → 多实例一致性/任务队列 → 历史版本和多人协同 → 评测与可观测性。不要把“增加更多模型自治权”列为首要路线。
 
@@ -173,11 +175,13 @@ flowchart LR
 
 ### 可以明确陈述
 
-- “实现了 OpenAI-compatible 模型驱动的真实对话与结构化规划。”
+- “实现了 OpenAI-compatible 对话与结构化规划适配器及严格 Schema 校验。”
+- “当前配置的 `deepseek-v4-pro` 已实测通用问答与 Conversation SSE 文本连通；该 smoke 不证明结构化规划、Action 或工具调用。”
 - “实现了 7 类可编辑办公工作区和 SSE 流式人机协作。”
 - “实现了确定性风险/策略/证据/审批/Permit/Gateway 闭环。”
 - “实现了 5 个 Simulator capability 的端到端受控执行。”
 - “配置 PostgreSQL 时可持久化 Workspace、Run、Audit 与 checkpoint。”
+- “固定 Demo 1 TaskStore 已在 PostgreSQL 16.14 和三个顺序 API 进程上验证 v2/v3 Snapshot、Artifact、Commit 恢复与幂等零重复。”
 
 ### 不可夸大
 
@@ -186,6 +190,7 @@ flowchart LR
 - 不说“已经具备生产级权限系统”；身份头是 P0 占位。
 - 不说“所有 ActionSpec 都能执行”；25 类是协议目录，只有 5 个 capability 注册了端到端 Simulator。
 - 不说“全量会话长期保存”；Thread/Message 重启后丢失。
+- 不说“整个工作区会话已无损恢复”或“已具备高可用”；PR 5 只证明固定 Demo 1 Task 在同一数据库、顺序 API 进程下的恢复，不包含数据库故障/迁移、多实例、事件缺口和响应丢失。
 - 不说“L5 操作经审批可以执行”；当前策略对受限能力和 L5 直接 deny。
 - 不把前端打字动效描述成模型 token 直接写数据库；数据库保存的是最终 Artifact。
 
