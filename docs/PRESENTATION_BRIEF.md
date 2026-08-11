@@ -47,8 +47,8 @@ Office Agent V0.1 把 AI 放在可独立工作的邮件、文档、报价、任�
 | 端到端 Simulator capability | 5 个 | `simulators/` 与 Tool Gateway 注册 |
 | Evidence requirement | 8 类 | `application/evidence_catalog.py` |
 | 确定性治理演示场景 | 4 个 | `application/demo3.py` |
-| Python 自动化结果 | 105 passed，1 个 PostgreSQL opt-in skip（2.63s） | `uv run pytest -q`，实现提交 `2f9866f + fe865bd` |
-| 报价浏览器路径 | 14 passed（23.5s） | 两个报价 E2E 文件；完整浏览器为 26 passed（59.6s） |
+| Python 自动化结果 | 108 passed，1 个 PostgreSQL opt-in skip（2.62s） | `uv run pytest -q`，实现提交 `2f9866f + fe865bd + e2c4b56` |
+| 报价浏览器路径 | 15 passed（23.6s） | 两个报价 E2E 文件；完整浏览器为 27 passed（1.1m） |
 
 7 类工作区为邮件、文档、报价表、任务、日历、报销和 CRM；审计是独立观察视图，不计入可编辑 WorkspaceArtifact。
 
@@ -122,7 +122,7 @@ Demo 1 的 TaskStore 另有独立证据：固定 Fixture 已在同一个 Postgre
 
 在报价案例中补充“模型职责之外的确定性计算”：用户未保存的数量/折后比例先与服务端报价身份、标准价和最低折后比例合并，前端即时重算，服务端独立重算并通过 Conversation SSE 解释。基线可复算为标准总价 272000 元、折后总价 253400 元、优惠金额 18600 元、综合折后比例 93.16%（约 9.32 折）、优惠率 6.84%。必须同时说明这是假数据，不是 CRM 实时查询。
 
-前后端一致性不能只讲金额：显式工作区上下文和保存都携带 Artifact/revision；旧版本不覆盖新版本，页面保留草稿并让用户查看最新或三方重应用，同字段双改必须人工处理。请求等待期间的新编辑还由 request epoch 保护，不同字段保留双方结果，同字段显式冲突。进入发送等副作用动作后，模型自报的来源、payload 和治理字段不直接执行，服务端从当前 Artifact 重建；未解析收件人/附件固定 deny 且自报 evidence/审批不能解锁。Run 绑定真实 Conversation Thread，跨 Thread 续写拒绝；终态说明暂时失败可重新读取，已完成结果按同一消息重放。
+前后端一致性不能只讲金额：显式工作区上下文和保存都携带 Artifact/revision；旧版本不覆盖新版本，页面保留草稿并让用户查看最新或三方重应用，同字段双改必须人工处理。请求等待期间的新编辑还由 request epoch 保护，并以请求发出时实际发送的草稿作为三方 base，不同字段只保留等待期新增修改，同字段显式冲突。进入发送等副作用动作后，模型自报的来源、payload 和治理字段不直接执行，服务端从当前 Artifact 重建；未解析姓名、畸形邮箱或不透明附件固定 deny，且自报 evidence/审批不能解锁。Run 绑定真实 Conversation Thread，跨 Thread 续写拒绝；终态说明暂时失败可重新读取，已完成结果按同一消息重放。
 
 前台截图不能只证明技术结构存在。Demo 1 应按“准备哪三项材料 → 为什么此刻需要人 → 确认会改变什么 → 最后得到什么”的业务顺序展示。非 Tasks 截图只能显示后台任务摘要与前往处理，不应把冲突决定铺在邮件等当前工作区旁；来源标签必须明确写“演示数据”，不得展示原始 `fixture:` ID。来源与新一轮语义修订的完整浏览器工程代理为 `12 passed (44.5s)`，但 `DR-0005` 仍是 `Draft`，5 人无引导任务测试未运行。
 

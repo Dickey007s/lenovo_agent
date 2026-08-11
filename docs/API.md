@@ -167,7 +167,7 @@ Invoke-RestMethod -Method Post -Uri "$base/workspace/mail/new" -Headers $headers
 
 保存 `quote` 时同样应用上述服务端字段所有权与确定性重算。相对服务端基线修改 `name/qty/discount/valid_until` 后，响应中的 `content.approval.status` 为 `needs_review`，并返回 `requires_recheck=true`；旧小计/总计不会被保存为权威值。报价字段非法时返回 422，不会持久化部分总计。
 
-当 Conversation 规划产生 ArtifactDraft 或注册 capability 的 ActionCandidate 时，服务端不信任模型提交的 `sources`、动作参数、目标范围、数据分类、状态变化类型和可逆性。更新已有 Artifact 时保留服务端来源，新 Artifact 使用服务端默认来源；可执行动作的收件人、附件、正文和治理字段从当前 Artifact 与 capability 重新构造，`source_refs` 不接受模型自报。内容或 capability 不匹配时不创建动作。无法解析的纯文本收件人产生 `RECIPIENT_IDENTITY_UNRESOLVED`，不透明附件产生 `ATTACHMENT_DATA_CLASS_UNRESOLVED`；ControlPlan 确定性 `DENIED`，用户在 evidence 接口自报同一姓名/哈希也不能解锁。已知邮箱与可按演示规则分类的报价附件仍沿正常 Evidence、Approval、Permit 与 Simulator 链路。若活动或目标 Artifact 在规划期间改变，流返回 `workspace.conflict`，不覆盖内容也不产生 `action.proposed`。
+当 Conversation 规划产生 ArtifactDraft 或注册 capability 的 ActionCandidate 时，服务端不信任模型提交的 `sources`、动作参数、目标范围、数据分类、状态变化类型和可逆性。更新已有 Artifact 时保留服务端来源，新 Artifact 使用服务端默认来源；可执行动作的收件人、附件、正文和治理字段从当前 Artifact 与 capability 重新构造，`source_refs` 不接受模型自报。内容或 capability 不匹配时不创建动作。无法解析的纯文本姓名或畸形邮箱产生 `RECIPIENT_IDENTITY_UNRESOLVED`，不透明附件产生 `ATTACHMENT_DATA_CLASS_UNRESOLVED`；ControlPlan 确定性 `DENIED`，用户在 evidence 接口自报同一姓名/哈希也不能解锁。格式合法的邮箱与可按演示规则分类的报价附件仍沿正常 Evidence、Approval、Permit 与 Simulator 链路。若活动或目标 Artifact 在规划期间改变，流返回 `workspace.conflict`，不覆盖内容也不产生 `action.proposed`。
 
 ### 3.4 创建、启动与控制 Demo 1 Task
 

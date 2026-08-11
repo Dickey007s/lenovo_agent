@@ -43,7 +43,7 @@ V0.1 重点验证三件事：
 - 报价核算、复算、最低折后比例检查和来源追问不再交给模型自由计算：后端用 Decimal、前端用整数分与 BigInt 按同一逐行舍入规则投影。基线三行的标准总价为 272000 元、折后总价为 253400 元、优惠金额为 18600 元、综合折后比例为 93.16%（约 9.32 折）、优惠率为 6.84%。
 - 未保存的项目名、数量、折后比例和有效期可以参与当前回答；报价编号、客户、币种、最低折后比例、标准价和来源仍由服务端拥有。旧小计/总计会被忽略并重算，非法字段会停止聚合显示和回答，不回退到历史金额。
 - 未保存上下文和保存请求都绑定当前 `WorkspaceArtifact.artifact_id/revision`。旧版本保存返回 409，页面保留本地草稿并读取最新版本；不同字段修改可经显式三方重应用合并，同一字段双方都修改时不会静默覆盖。
-- 进入发送等副作用链路后，服务端从当前 Artifact 重建收件人、附件、正文和治理元数据，忽略模型伪造的 Action 参数与来源；规划期间 Artifact 改变则不创建动作。无法解析的纯文本收件人或不透明附件被确定性 deny，用户自报 evidence 不能把未解析值变成可信证据。Run 绑定发起它的真实 Conversation Thread，跨 Thread 续写被拒绝；动作终态说明失败后可重新读取，成功重试复用同一完成消息。
+- 进入发送等副作用链路后，服务端从当前 Artifact 重建收件人、附件、正文和治理元数据，忽略模型伪造的 Action 参数与来源；规划期间 Artifact 改变则不创建动作。无法解析的姓名、畸形邮箱或不透明附件被确定性 deny，用户自报 evidence 不能把未解析值变成可信证据。Run 绑定发起它的真实 Conversation Thread，跨 Thread 续写被拒绝；动作终态说明失败后可重新读取，成功重试复用同一完成消息。
 - 用户在等待 Agent 返回期间继续修改工作区时，前端以请求发出时版本为编辑起点处理晚到 `artifact.updated`：不同字段自动保留双方修改，同字段双改进入显式冲突，Agent 结果不再直接覆盖新输入。
 - 风险等级和判断规则只在确认前的 Agent 回复中出现一次；执行完成后只反馈成功、失败或拒绝结果。
 
@@ -218,7 +218,7 @@ pnpm --dir apps/web build
 
 V0.1 定稿基线和 Demo 1 各 PR 的实际验证结果记录在 [`DR-0002`](docs/decisions/DR-0002-bounded-durable-office-loop.md) 及对应 evidence。PR 3 封口验证为全量 Python `56 passed`；PR 4 的 system Edge E2E 为 `2 passed (18.4s)`。PR 5 与前端视觉刷新/可重复演示合并后的封口回归为：PostgreSQL 16.14 opt-in 系统测试 `1 passed (9.78s)`，system Edge suite `3 passed (17.0s)`，完整 Python `58 passed, 1 skipped (2.00s)`。PR 6 原 Task Director 工程封口为浏览器 `6 passed (34.5s)`。收到“看不懂系统要做什么”的 Stakeholder 反馈后，本轮改以业务任务重排首屏、单次开始、决策后果和完成成果；该轮浏览器为 `12 passed (43.7s)`，Python 为 `58 passed, 1 skipped (2.24s)`，Ruff、前端 lint 和生产构建通过，并保存 `1181 x 900` 三状态与 `390 x 844` CSS 视口截图。随后针对来源与“再次演示”歧义的修订完成浏览器 `12 passed (44.5s)`，覆盖非 Tasks 只显示后台摘要、已知来源标为演示数据且原始 ID 不入 DOM，以及“开始新一轮汇报”创建并启动独立 Task、旧 Task 保留；另保存 `1440 x 900` Mail 摘要截图。新增回归只证明预设信息、动作和服务端事实一致，不证明真实用户已经理解。故 [`DR-0005`](docs/decisions/DR-0005-task-director-interaction.md) 保持 `Draft`，至少 5 人无引导形成性测试尚未运行。固定 Demo 1 Task 测试不调用真实 LLM；独立 LLM smoke 只验证 `deepseek-v4-pro` 通用问答与 Conversation SSE 连通性。
 
-报价错误修复的来源、决策、前台—后端事实链和证据分别记录在 [`USER-FEEDBACK-20260811-06`](docs/sources/USER-FEEDBACK-20260811-06-quote-calculation-grounding.md)、[`DR-0006`](docs/decisions/DR-0006-deterministic-quote-calculation.md) 和 [`QUOTE-WORKSPACE-DETERMINISTIC-CALCULATION-EVIDENCE-20260811`](docs/evidence/QUOTE-WORKSPACE-DETERMINISTIC-CALCULATION-EVIDENCE-20260811.md)。实现提交为 `2f9866f + fe865bd`；全量 Python 为 `105 passed, 1 skipped (2.63s)`，报价/Conversation 聚焦为 `51 passed (1.55s)`，完整浏览器为 `26 passed (59.6s)`，其中报价浏览器为 `14 passed (23.5s)`，Ruff、前端 lint 与生产构建通过。`DR-0006` 因此仅在固定演示报价、当前公式、当前协议和被测前台恢复范围内为 `Verified`，不是生产级报价引擎或用户可用性结论。
+报价错误修复的来源、决策、前台—后端事实链和证据分别记录在 [`USER-FEEDBACK-20260811-06`](docs/sources/USER-FEEDBACK-20260811-06-quote-calculation-grounding.md)、[`DR-0006`](docs/decisions/DR-0006-deterministic-quote-calculation.md) 和 [`QUOTE-WORKSPACE-DETERMINISTIC-CALCULATION-EVIDENCE-20260811`](docs/evidence/QUOTE-WORKSPACE-DETERMINISTIC-CALCULATION-EVIDENCE-20260811.md)。实现提交为 `2f9866f + fe865bd + e2c4b56`；全量 Python 为 `108 passed, 1 skipped (2.62s)`，报价/Conversation 聚焦为 `54 passed (1.72s)`，完整浏览器为 `27 passed (1.1m)`，其中报价浏览器为 `15 passed (23.6s)`，Ruff、前端 lint 与生产构建通过。`DR-0006` 因此仅在固定演示报价、当前公式、当前协议和被测前台恢复范围内为 `Verified`，不是生产级报价引擎或用户可用性结论。
 
 ## 数据、身份与安全边界
 

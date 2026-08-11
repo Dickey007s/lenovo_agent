@@ -43,5 +43,5 @@
 - Decision：[`DR-0006`](../decisions/DR-0006-deterministic-quote-calculation.md)
 - Evidence：[`QUOTE-WORKSPACE-DETERMINISTIC-CALCULATION-EVIDENCE-20260811`](../evidence/QUOTE-WORKSPACE-DETERMINISTIC-CALCULATION-EVIDENCE-20260811.md)
 - UI 事实矩阵：[`UI_SERVER_FACT_MATRIX.md`](../contracts/UI_SERVER_FACT_MATRIX.md)
-- Implementation commits：`2f9866f + fe865bd`
+- Implementation commits：`2f9866f + fe865bd + e2c4b56`
 - Evidence status：`Verified`（固定演示报价与被测协议/UI 范围；不改变本记录仍是单一 Stakeholder feedback 的性质）

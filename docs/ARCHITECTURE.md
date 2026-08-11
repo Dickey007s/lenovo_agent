@@ -206,7 +206,7 @@ sequenceDiagram
     R-->>A: Agent 读取结果并回应
 ```
 
-在 `ActionCandidate` 进入 RunService 之前，ConversationService 会按注册 capability 将它重新绑定到当前可见 WorkspaceArtifact。邮件收件人、附件、主题和正文来自 Artifact；目标范围、数据分类、状态变化类型、可逆性和 `artifact_id/revision/content` 由确定性代码重建，模型自报的参数与 `source_refs` 不进入可执行动作。ArtifactDraft 的 `sources` 同样被忽略：已有 Artifact 保留服务端来源，新 Artifact 使用服务端默认来源。内容/capability 不匹配或规划期间 Artifact 改变时 fail closed。纯文本收件人身份未解析或附件无法按固定演示规则分类时，额外确定性策略直接 deny；Mock Evidence 不再用 Action 自身值伪造“已满足”，用户自报姓名/哈希也不能解锁。已知邮箱与已分类报价附件继续正常评估。
+在 `ActionCandidate` 进入 RunService 之前，ConversationService 会按注册 capability 将它重新绑定到当前可见 WorkspaceArtifact。邮件收件人、附件、主题和正文来自 Artifact；目标范围、数据分类、状态变化类型、可逆性和 `artifact_id/revision/content` 由确定性代码重建，模型自报的参数与 `source_refs` 不进入可执行动作。ArtifactDraft 的 `sources` 同样被忽略：已有 Artifact 保留服务端来源，新 Artifact 使用服务端默认来源。内容/capability 不匹配或规划期间 Artifact 改变时 fail closed。纯文本姓名、畸形邮箱或附件无法按固定演示规则分类时，额外确定性策略直接 deny；Mock Evidence 不再用 Action 自身值伪造“已满足”，用户自报姓名/哈希也不能解锁。格式合法的邮箱与已分类报价附件继续正常评估。
 
 Conversation 创建 Run 时保留真实对话 `thread_id`，而 LangGraph checkpoint 另用 `thread_id:run_id` 隔离同一对话中的多个 Run。动作达到终态后，continue stream 先校验 Run 属于 URL 中的 Thread，跨 Thread 续写即使同一用户也被拒绝。生成前的暂时失败可由前端“重新读取结果”；生成成功后，同一 API 进程按 `(thread_id, run_id)` 重放同一个 `message.completed`，前端按 `message_id` upsert。该缓存不跨进程持久化，工具仍全部落到 Simulator。
 

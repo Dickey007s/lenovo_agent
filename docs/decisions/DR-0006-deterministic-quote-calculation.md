@@ -22,7 +22,7 @@
 | Source ID | 类型 | 精确引用 | 支持判断 | 局限 |
 | --- | --- | --- | --- | --- |
 | `USER-FEEDBACK-20260811-QUOTE-CALCULATION-04` | Stakeholder feedback | [`USER-FEEDBACK-20260811-06-quote-calculation-grounding.md`](../sources/USER-FEEDBACK-20260811-06-quote-calculation-grounding.md) 及两张原始截图 | 原 Agent 数值和来源回答与当前工作台冲突，需要建立单一核算事实链 | 单一 Stakeholder 反馈，不是目标用户研究，也不覆盖真实报价规则 |
-| `SOURCE-QUOTE-CALCULATOR-20260811` | 源码事实 | 实现提交 `2f9866f + fe865bd`：`services/api/app/application/quote_calculator.py`、`services/api/app/application/conversations.py`、`services/api/app/application/runs.py`、`packages/evidence/mock.py`、`apps/web/app/quote-calculator.ts`、`apps/web/app/page.tsx` | 服务端 Decimal 与前端 BigInt 核算；revision/request epoch 冲突保护；Artifact 来源、Action/Thread 绑定与 unresolved-context deny | 只描述当前提交，不能证明真实 CRM、生产财务精度或多实例一致性 |
+| `SOURCE-QUOTE-CALCULATOR-20260811` | 源码事实 | 实现提交 `2f9866f + fe865bd + e2c4b56`：`services/api/app/application/quote_calculator.py`、`services/api/app/application/conversations.py`、`services/api/app/application/runs.py`、`packages/evidence/mock.py`、`apps/web/app/quote-calculator.ts`、`apps/web/app/page.tsx` | 服务端 Decimal 与前端 BigInt 核算；revision/request epoch 冲突保护；Artifact 来源、Action/Thread 绑定、严格收件人识别与 unresolved-context deny | 只描述当前提交，不能证明真实 CRM、生产财务精度或多实例一致性 |
 | `QUOTE-WORKSPACE-DETERMINISTIC-CALCULATION-20260811` | 自动化、运行与截图证据 | [`QUOTE-WORKSPACE-DETERMINISTIC-CALCULATION-EVIDENCE-20260811.md`](../evidence/QUOTE-WORKSPACE-DETERMINISTIC-CALCULATION-EVIDENCE-20260811.md) | 覆盖基线、编辑、舍入、越界、空上下文、字段所有权、来源回答、revision 冲突、恶意 Action/source、结果重放和浏览器 UI | 不替代真实用户研究、真实 Connector、复杂计价或数据库/多实例 CAS 验证 |
 
 ## 3. 决策与备选
@@ -34,8 +34,8 @@
 3. 报价核算、复算、底线检查和来源追问由确定性意图路由处理，通过 Conversation SSE 返回可读解释；写入、修改、保存、发送、创建或导入等动作词会退出该快捷路由，继续既有业务规划与治理路径。
 4. 非法或不完整输入不显示部分总计，也不回退到旧值。保存后的服务端内容写回规范化小计和总计；相对基线发生可编辑字段变化时设置 `approval.status=needs_review` 与 `requires_recheck=true`。
 5. 同一 Thread 的消息流串行更新，避免两个并发回答用旧 Thread 覆盖彼此；这不改变 Conversation 仍为进程内存状态的边界。
-6. 显式未保存上下文携带 `workspace_artifact_id/workspace_revision`，保存携带 `expected_artifact_id/expected_revision`。过期保存返回 409；流式处理遇到过期或规划期间 Artifact 变化时发出 `workspace.conflict`，不写回也不创建动作。Web 保留草稿并提供查看最新或有界三方重应用，同字段双改拒绝自动合并。若用户在请求等待期间继续编辑，晚到 Agent Artifact 也以请求时版本为 base 应用同一规则。
-7. 模型提交的 Artifact `sources` 和可执行 Action 参数/治理元数据不是权威事实。已有 Artifact 保留服务端来源，新 Artifact 使用服务端默认来源；注册 capability 从当前 Artifact 重建收件人、附件、正文、目标范围、数据分类、状态变化、可逆性与 Artifact revision，内容不匹配时 fail closed。纯文本收件人身份未解析或附件类别不明时确定性 deny，Action 自身值和用户自报姓名/哈希不能充当可信 evidence。
+6. 显式未保存上下文携带 `workspace_artifact_id/workspace_revision`，保存携带 `expected_artifact_id/expected_revision`。过期保存返回 409；流式处理遇到过期或规划期间 Artifact 变化时发出 `workspace.conflict`，不写回也不创建动作。Web 保留草稿并提供查看最新或有界三方重应用，同字段双改拒绝自动合并。若用户在请求等待期间继续编辑，晚到 Agent Artifact 以请求发出时实际发送的草稿为 base，而不是更早的保存版本；不同字段只保留等待期新增编辑，同字段进入显式冲突。
+7. 模型提交的 Artifact `sources` 和可执行 Action 参数/治理元数据不是权威事实。已有 Artifact 保留服务端来源，新 Artifact 使用服务端默认来源；注册 capability 从当前 Artifact 重建收件人、附件、正文、目标范围、数据分类、状态变化、可逆性与 Artifact revision，内容不匹配时 fail closed。纯文本姓名、畸形邮箱或附件类别不明时确定性 deny，Action 自身值和用户自报姓名/哈希不能充当可信 evidence；合法邮箱仍走既有 Evidence/Approval/Permit 链。
 8. Conversation 创建的 Run 绑定真实 Thread，LangGraph checkpoint 另以 `thread_id:run_id` 隔离；跨 Thread continuation 即使同一用户也拒绝。动作终态结果说明暂时失败时可以重试；成功后同一 API 进程重放同一 `message.completed`，前端按 `message_id` upsert，避免重复结果。
 
 未采用让 LLM 继续计算，因为数值正确性无法靠 Prompt 稳定保证，且历史消息会污染当前工作区事实。未采用信任客户端 `subtotal/total`，因为它们可能过期或被篡改。未采用只修复 Agent 回答而保留前端浮点计算，因为这样仍会在舍入、编辑和异常输入上产生两套结果。未采用只依赖服务端保存后再显示，因为用户需要核对尚未保存的当前编辑值。
@@ -54,7 +54,7 @@
 | 版本冲突 | 保存 HTTP 409；Conversation SSE `workspace.conflict.latest_artifact` | 前端保留草稿并读取最新；只重应用相对 base 的本地独有修改，同字段双改/行结构变化交给用户 |
 | Artifact 来源与可执行动作 | 服务端现有/默认 `sources`；`_bind_action_to_artifact` 与确定性 unresolved-context policy 输出 | 模型 source/payload/治理元数据不能直接执行；不匹配或竞态不创建 Run；未解析收件人/附件类别直接 deny，自报 evidence 不能解锁 |
 | 动作结果送达 | `RunSnapshot.thread_id`、终态 Run 与进程内 `(thread_id, run_id) → completed message` | continue 先校验真实 Thread；首次成功写 Thread，重试重放同一消息与 `action.closed`，前端 upsert；跨 Thread 拒绝 |
-| 请求等待期本地编辑 | 前端请求时 Artifact/edit token、本地草稿和晚到服务端 Artifact | 不同字段自动保留双方改动并保持 dirty；同字段双改进入 conflict，不直接接受晚到 `artifact.updated` |
+| 请求等待期本地编辑 | 前端请求时实际发送的 Artifact/edit token、本地草稿和晚到服务端 Artifact | 以请求发送快照为三方 base；不同字段只保留等待期新增改动并保持 dirty；同字段双改进入 conflict，不直接接受晚到 `artifact.updated` |
 
 同一线程内消息串行化、Workspace 锁、revision 比较和结果重放只保证当前 API 进程中的顺序与缓存语义，不提供数据库原子 CAS、多实例锁、跨进程队列、SSE 游标恢复或 Thread 持久化。前端即时投影不是新的审批或服务端业务状态；只有保存响应可以宣布 `needs_review` 已持久化。
 
@@ -70,7 +70,7 @@
 
 ## 6. 验证与边界
 
-独立证据记录见 [`QUOTE-WORKSPACE-DETERMINISTIC-CALCULATION-EVIDENCE-20260811.md`](../evidence/QUOTE-WORKSPACE-DETERMINISTIC-CALCULATION-EVIDENCE-20260811.md)。实现提交 `2f9866f + fe865bd` 的封口结果为：全量 Python `105 passed, 1 skipped (2.63s)`；报价/Conversation 聚焦 `51 passed (1.55s)`；报价浏览器 `14 passed (23.5s)`；完整浏览器 `26 passed (59.6s)`；Ruff、前端 lint 与 Next.js build 通过。稳定桌面截图为 `1440 x 900`、164869 bytes、SHA-256 `3BDA0E2F2C5E34F0624349E26D977D37F5B5FA1D1169AD9D72EFDD41D14F69ED`。
+独立证据记录见 [`QUOTE-WORKSPACE-DETERMINISTIC-CALCULATION-EVIDENCE-20260811.md`](../evidence/QUOTE-WORKSPACE-DETERMINISTIC-CALCULATION-EVIDENCE-20260811.md)。实现提交 `2f9866f + fe865bd + e2c4b56` 的封口结果为：全量 Python `108 passed, 1 skipped (2.62s)`；报价/Conversation 聚焦 `54 passed (1.72s)`；报价浏览器 `15 passed (23.6s)`；完整浏览器 `27 passed (1.1m)`；Ruff、前端 lint 与 Next.js build 通过。稳定桌面截图为 `1440 x 900`、164869 bytes、SHA-256 `3BDA0E2F2C5E34F0624349E26D977D37F5B5FA1D1169AD9D72EFDD41D14F69ED`。
 
 因此本决策在固定演示报价、当前公式、服务端字段所有权、revision/晚到结果冲突恢复、Artifact/Action/Thread 绑定和被测浏览器路径内为 `Verified`。未解析收件人/附件采用固定演示 deny，不等于已接入企业通讯录或内容分类。它不覆盖税费、汇率、阶梯价、套餐依赖、真实审批制度、真实 Connector、生产并发、数据库 CAS、多实例一致性、报价专用移动截图或目标用户可用性；工具执行仍全部来自 Simulator。
 

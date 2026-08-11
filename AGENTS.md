@@ -43,7 +43,7 @@ tests/                                        单元与端到端回归
 - 报价任一必需字段无效、越界、超限或行数与服务端版本不一致时必须 fail closed：前台不显示部分总计，Agent 不回退到历史金额，保存接口不写入猜测结果。保存后的规范化报价若相对基线有修改，必须标记 `needs_review` / `requires_recheck`，不能沿用旧审批。
 - 显式发送未保存 `workspace_context` 时必须同时提交服务端 `artifact_id + revision`；保存必须提交 `expected_artifact_id + expected_revision`。版本过期时不得覆盖最新内容：前端保留当前草稿、读取最新 Artifact，并只允许查看最新版本或基于编辑起点/本地草稿/最新版本做有界三方重应用；同字段双改必须交给用户处理。
 - LLM 产生的 Artifact `sources`、Action 参数、目标范围、数据分类、状态变化类型和可逆性都不是权威事实。服务端必须保留/生成受信来源，并从当前可见 Artifact 与 capability 重建可执行动作；内容不匹配、目标不确定或版本在规划期间变化时 fail closed。动作终态说明允许同一 API 进程内幂等重放同一个 `message.completed`，前端按 `message_id` 更新而不是重复追加。
-- 不得把动作自身携带的未知姓名或不透明附件当作“已验证证据”。纯文本收件人身份未解析或附件数据类别不明时必须确定性 deny，用户自报同一值不能解锁；已知邮箱与可分类附件才沿正常 Evidence/Approval/Permit 链路。Conversation 创建的 Run 必须绑定真实 Thread，同一用户也不能把一个 Thread 的结果续写到另一个 Thread。
+- 不得把动作自身携带的未知姓名、畸形邮箱或不透明附件当作“已验证证据”。收件人身份未解析、邮箱格式不合法或附件数据类别不明时必须确定性 deny，用户自报同一值不能解锁；格式合法的已知邮箱与可分类附件才沿正常 Evidence/Approval/Permit 链路。Conversation 创建的 Run 必须绑定真实 Thread，同一用户也不能把一个 Thread 的结果续写到另一个 Thread。
 - 用户在等待 Agent 返回 Artifact 期间仍可继续编辑。晚到的 `artifact.updated` 必须以请求发出时版本为 base 做三方处理：不同字段保留双方修改，同字段双改进入显式冲突；不得把晚到 Agent 结果直接覆盖用户新输入。
 - 动作确认后必须继续执行并由 Agent 返回结果，前端不能硬编码“已完成”。
 - LLM 只生成自然语言、ArtifactDraft 与 ActionCandidate；Risk、Policy、Evidence、Approval、Permit 和工具执行由确定性代码决定。

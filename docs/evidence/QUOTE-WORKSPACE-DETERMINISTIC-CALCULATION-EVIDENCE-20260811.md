@@ -42,27 +42,27 @@
 | 同线程并发回答是否丢失 | 并发提交后保留两条用户消息和两条完成的 Assistant 消息 | Conversation 集成测试 |
 | 旧 revision 是否覆盖新版本 | 保存返回 409；流式处理产生 `workspace.conflict`，不调用 Planner、不创建动作；最新 Artifact 保留 | Conversation 集成与浏览器用例 |
 | 前台能否恢复草稿 | 保存 409 后不同字段可三方重应用；同字段双改列出冲突且不静默覆盖 | `apps/web/e2e/quote-workspace.spec.ts` |
-| 等待 Agent 时的新编辑是否丢失 | request epoch/edit token 识别请求后的本地修改；不同字段自动保留并保持 dirty，同字段进入显式冲突 | `apps/web/e2e/quote-workspace.spec.ts` |
+| 等待 Agent 时的新编辑是否丢失 | request epoch/edit token 识别请求后的本地修改；三方 base 是请求发出时实际发送的草稿，而不是更早保存版本；不同字段自动保留并保持 dirty，同字段进入显式冲突 | `apps/web/e2e/quote-workspace.spec.ts` |
 | Planner 能否伪造来源或动作 | 模型 `sources` 被服务端保留/默认来源覆盖；邮件 payload、目标范围、数据分类、状态变化和可逆性从当前 Artifact 重建，不匹配时 fail closed | Conversation 集成测试 |
-| 未解析收件人/附件能否被自证解锁 | 纯文本姓名和不透明附件触发确定性 `DENIED`；Action 自身值、用户自报 evidence 和审批都不能解锁；已知邮箱/报价附件仍可执行 Simulator | Conversation 集成测试 |
+| 未解析收件人/附件能否被自证解锁 | 纯文本姓名、畸形邮箱和不透明附件触发确定性 `DENIED`；Action 自身值、用户自报 evidence 和审批都不能解锁；合法邮箱/已知报价附件仍可执行 Simulator | Conversation 集成测试 |
 | 规划期间目标 Artifact 改变是否安全 | 竞态产生 `workspace.conflict`，并发保存保留，不写旧计划、不产生 Run | Conversation 集成测试 |
 | Run 与结果是否写入正确对话 | Conversation Run 保存真实 `thread_id`，graph checkpoint 用 `thread_id:run_id` 隔离；跨 Thread continuation 拒绝 | Conversation 集成测试 |
 | 动作结果重试是否重复 | 暂时失败后可重新生成；首次完成后重放同一 `message.completed`，Thread 不追加重复结果 | Conversation 集成测试 |
 
 ## 3. 最终运行记录
 
-以下结果针对实现提交 `2f9866f + fe865bd` 及其文档封口工作树：
+以下结果针对实现提交 `2f9866f + fe865bd + e2c4b56` 及其文档封口工作树：
 
 | 检查 | 命令 | 最终结果 |
 | --- | --- | --- |
-| Python 全量 | `uv run pytest -q` | `105 passed, 1 skipped in 2.63s` |
-| 报价/Conversation 聚焦 | `uv run pytest -q tests/unit/test_quote_calculator.py tests/integration/test_conversation_service.py` | `51 passed in 1.55s` |
+| Python 全量 | `uv run pytest -q` | `108 passed, 1 skipped in 2.62s` |
+| 报价/Conversation 聚焦 | `uv run pytest -q tests/unit/test_quote_calculator.py tests/integration/test_conversation_service.py` | `54 passed in 1.72s` |
 | Python 静态检查 | `uv run ruff check .` | `Passed` |
 | 前端 lint | `pnpm --dir apps/web lint` | `Passed` |
 | Next.js 构建 | `pnpm --dir apps/web build` | `Passed` |
 | Diff whitespace | `git diff --check` | `Passed` |
-| 报价浏览器 E2E | `pnpm --dir apps/web exec playwright test e2e/quote-calculator.spec.ts e2e/quote-workspace.spec.ts` | `14 passed (23.5s)` |
-| 完整浏览器 E2E | `pnpm --dir apps/web exec playwright test` | `26 passed (59.6s)` |
+| 报价浏览器 E2E | `pnpm --dir apps/web exec playwright test e2e/quote-calculator.spec.ts e2e/quote-workspace.spec.ts` | `15 passed (23.6s)` |
+| 完整浏览器 E2E | `pnpm --dir apps/web exec playwright test` | `27 passed (1.1m)` |
 | 最新本地 live smoke | 重启 API `8013` / Web `3000` 后调用 health、创建 Thread、读取报价并发送真实 HTTP/SSE 核算问题 | `status=ok`，`model=deepseek-v4-pro`，checkpoint/task_store 均为 postgres；`Q-991-V3 revision=1`；观察 `assistant.status=calculating` 与 `message.completed` |
 
 上述浏览器运行启动真实本地 FastAPI 与 Next.js、使用内存 Store 和 system Edge。它覆盖请求/响应/SSE/DOM 的纵向路径，但不覆盖 PostgreSQL、多 API 实例或真实 Connector。
@@ -92,5 +92,5 @@
 
 ## 6. 提交与 PR
 
-- Implementation commits：`2f9866f + fe865bd`
+- Implementation commits：`2f9866f + fe865bd + e2c4b56`
 - PR：[`#11`](https://github.com/Dickey007s/lenovo_agent/pull/11)

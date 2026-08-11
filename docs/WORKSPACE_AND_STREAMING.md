@@ -203,7 +203,7 @@ sequenceDiagram
 
 风险说明只在动作确认前的 Agent 文本中出现一次；确认卡保留结构化风险字段属于操作控件，不再在执行结果文本中重复。
 
-可执行动作在创建 Run 前重新绑定当前 Artifact：模型提供的收件人、附件、payload、目标范围、数据分类、状态变化类型、可逆性和 `source_refs` 不直接进入执行；服务端按 capability 从可见 Artifact 重建并绑定 `artifact_id/revision/content`。ArtifactDraft 的模型来源也被服务端保留值或默认来源覆盖。内容不匹配时不创建动作；纯文本收件人身份未解析或附件数据类别不明时，Run 由确定性策略置为 `DENIED`，Mock Evidence 不把 Action 自身值或用户自报姓名/哈希当作可信佐证。已知邮箱和已分类报价附件仍可沿 Evidence/Approval/Permit 链路执行 Simulator。
+可执行动作在创建 Run 前重新绑定当前 Artifact：模型提供的收件人、附件、payload、目标范围、数据分类、状态变化类型、可逆性和 `source_refs` 不直接进入执行；服务端按 capability 从可见 Artifact 重建并绑定 `artifact_id/revision/content`。ArtifactDraft 的模型来源也被服务端保留值或默认来源覆盖。内容不匹配时不创建动作；纯文本姓名、畸形邮箱或附件数据类别不明时，Run 由确定性策略置为 `DENIED`，Mock Evidence 不把 Action 自身值或用户自报姓名/哈希当作可信佐证。格式合法的邮箱和已分类报价附件仍可沿 Evidence/Approval/Permit 链路执行 Simulator。
 
 Conversation 创建的 Run 绑定发起它的真实 Thread；continue stream 会拒绝同一用户从另一 Thread 续写该 Run。动作结果说明暂时失败时，前端保留“重新读取结果”；成功生成后，同一 API 进程重试会重放相同 `message.completed`，前端按 `message_id` 更新而不是重复追加。
 
