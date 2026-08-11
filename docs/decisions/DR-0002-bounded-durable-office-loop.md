@@ -26,7 +26,7 @@
 | `C-006` | 源码事实 | PR 2 实现 TaskService/TaskStore、创建/读取/列表/SSE、Owner scope、创建幂等和最薄 Task Bar | PR 2 merge commit `2923d19` 及当时源码 | 支持 PR 3 的输入基线 | 只描述 PR 2；不能代表当前 PR 3 能力 |
 | `C-007` | 源码、测试与截图事实 | PR 3 工作区已出现固定 Fixture 的 start/control、Artifact/Verify/Conflict/Commit 和最薄 Branch/Conflict/Control UI | [`RUNTIME-EVIDENCE-DEMO1-PR3-20260810`](../evidence/DEMO1-PR3-RUNTIME-EVIDENCE.md) | 支持固定 Fixture 的可观察工程纵切、内存引用/hash/幂等行为和前后端事实映射 | 不证明 PostgreSQL 重启、真实 Connector、通用后台 Loop 或用户价值 |
 | `C-008` | 浏览器运行证据 | PR 4 用同一服务端 Snapshot 驱动只读交付物工作区，并通过固定主路径与发送前失败恢复 E2E | [`FRONTEND-E2E-DEMO1-PR4-20260810`](../evidence/DEMO1-PR4-FRONTEND-E2E-EVIDENCE.md) | 支持 head/version/verification/conflict/content/source/lineage/Commit 的前台映射、Tasks 双 tab、reload 同 key 恢复及被测移动布局 | 仅内存 Store 与固定 Fixture；不证明服务端已提交但响应丢失、SSE 回放、PostgreSQL、用户价值或 Artifact/Action 绑定 |
-| `C-009` | 源码、PostgreSQL 自动化与浏览器运行证据 | PR 5 在 PostgreSQL 16.14、同一数据库和三个顺序 API 进程上恢复 v2/v3，重放历史 start/resolve 结果且 Event/Artifact/Commit 零新增；同页前台能显示断线、禁用和重新对账 | `POSTGRES-WINDOWS-16.14-20260811`、[`POSTGRES-BACKED-API-RESTART-DEMO1-PR5-20260811`](../evidence/DEMO1-PR5-POSTGRES-BACKED-API-RESTART-EVIDENCE.md)、tested implementation `4634d8a` | 支持固定 Fixture 的 TaskStore 跨 API 进程恢复、幂等原响应和前台传输状态映射 | 不证明 Conversation、数据库重启/崩溃、多实例、事件缺口回放、响应丢失、真实 Connector 或用户价值 |
+| `C-009` | 源码、PostgreSQL 自动化与浏览器运行证据 | PR 5 在 PostgreSQL 16.14、同一数据库和三个顺序 API 进程上恢复 v2/v3，重放历史 start/resolve 结果且 Event/Artifact/Commit 零新增；同页前台能显示断线、禁用和重新对账 | `POSTGRES-WINDOWS-16.14-20260811`、[`POSTGRES-BACKED-API-RESTART-DEMO1-PR5-20260811`](../evidence/DEMO1-PR5-POSTGRES-BACKED-API-RESTART-EVIDENCE.md)、tested implementation `4634d8a`、merge compatibility `9814183` | 支持固定 Fixture 的 TaskStore 跨 API 进程恢复、幂等原响应、显式轮次 key 重放和前台传输状态映射 | 不证明 Conversation、数据库重启/崩溃、多实例、事件缺口回放、响应丢失、真实 Connector 或用户价值 |
 | `C-010` | LLM 运行证据 | 当前配置的 `deepseek-v4-pro` 可通过 OpenAI-compatible 通用问答和 Conversation SSE 返回文本 | [`LLM-API-SMOKE-20260811`](../evidence/LLM-API-SMOKE-EVIDENCE-20260811.md) | 只支持当前文本连通性 | 不证明固定 Demo 1 Task 使用 LLM，也不证明结构化规划、Action、工具执行、质量或 SLA |
 | `H-001` | 待验证假设 | Task Bar 与分支列表能降低用户恢复上下文的成本 | 尚无目标用户研究 | 指导前台原型和指标 | `Draft hypothesis`，不得汇报为已提升体验 |
 | `H-002` | 待验证假设 | 冲突只暂停受影响分支能减少等待且不扩散错误 | 固定 Fixture 已有工程行为；无真实任务收益数据 | 指导分支隔离测试 | 功能正确不等于真实业务收益，仍是 `Draft hypothesis` |
@@ -66,7 +66,7 @@ PR 3 至 PR 5 当前可观察落点为：
 
 - `TaskService` 仍从服务端 Task ID、Owner、契约、三个初始 Branch 和 `TASK_CREATED(sequence=1)` 开始；`POST /v1/tasks/{task_id}/start` 在一次 mutation 中物化固定客户 A 的 Observe/Plan/Act/Verify Trace、ArtifactVersion、VerificationReport 和局部 Conflict。
 - `POST /v1/tasks/{task_id}/controls` 接受 Steer、Pause、Resume、Take over、Return control 和 Resolve evidence。分支控制经服务端应用后改变 Snapshot；Steer 当前只持久记录为 `accepted`，不宣称已重新规划。
-- `TaskStore` 已有内存和 PostgreSQL 的 Snapshot、Event 和 ArtifactVersion commit 路径。PR 5 的 opt-in system test 在随机 PostgreSQL 16.14 数据库上，以 API A/B/C 顺序恢复 v2/v3，并验证旧 start/resolve key 返回首次结果且数据库维持 `45 events / 7 artifacts / 1 TASK_COMMITTED`。
+- `TaskStore` 已有内存和 PostgreSQL 的 Snapshot、Event 和 ArtifactVersion commit 路径。PR 5 的 opt-in system test 在随机 PostgreSQL 16.14 数据库上，以 API A/B/C 顺序恢复 v2/v3，并验证旧 start/resolve key 返回首次结果且原 Task 维持 `45 events / 7 artifacts / 1 TASK_COMMITTED`；合并兼容回归另验证同一显式轮次 key 跨进程返回同 Task、不同 key 产生第二个 Task。
 - `POST /v1/demo1/tasks` 接受可选 `Idempotency-Key` 作为演示轮次：同一 Owner+key 重放返回原 Task，不同 key 创建独立 Task；未传 key 时保留 Owner 绑定的兼容默认键。`POST /v1/tasks` 同样接受可选 key，同一 key 改用于不同契约返回 409。
 - `GET /v1/tasks`、`GET /v1/tasks/{task_id}` 和 Task SSE 均按当前 Owner 过滤，跨 Owner 按不存在处理。
 - Task SSE 按 `after` 轮询 Store 并发送 heartbeat。当前没有 `LISTEN/NOTIFY`、消息代理或跨实例广播，多实例通知未实现或验证。
@@ -117,7 +117,7 @@ PR 3 Runtime 验证（2026-08-10）：针对性 Task 测试 `15 passed`，全量
 
 PR 4 前端验证（2026-08-10）：`pnpm --dir apps/web test:e2e` 在本地 FastAPI `8011`、Next.js `3011` 与 system Edge 上为 `2 passed (18.4s)`。主路径覆盖 create/start/conflict/Steer/resolve/commit、客户回复 v3、正式收入 2,400 万元、仅草稿未发送和 state hash；恢复路径覆盖发送前 abort、`sessionStorage` reload、同 key 重试及无重复工件；移动 DOM 断言覆盖被测区域无横向 overflow 和可见操作目标至少 44px。该结果不覆盖服务端已提交但响应丢失、SSE 断线、PostgreSQL、真实 Connector 或 `H-001` 至 `H-004`。
 
-PR 5 PostgreSQL 与前台恢复验证（2026-08-11）：opt-in PostgreSQL 16.14 system test 为 `1 passed (9.62s)`，API A/B/C 恢复 v2/v3，重放后保持 `45 events / 7 artifacts / 1 TASK_COMMITTED`；system Edge suite 为 `3 passed (17.9s)`，包含两条既有浏览器路径和 source-ref fail-closed 负例回归，并断言 pending mutation 不误报传输断线。同页 API 重启运行还以五张 1440 x 900 截图和 DOM 断言验证连接文案、控制禁用、同 Task ID 与 v2/v3 Snapshot 全等。封口回归为完整 Python `56 passed, 1 skipped`、治理文档 `4 passed`，Ruff、前端 lint、生产构建和 `git diff --check` 均通过；skip 是普通测试没有显式配置 opt-in 维护库 DSN。该结果不覆盖 Conversation、数据库进程故障、事件缺口、响应丢失、多实例或 `H-001` 至 `H-004`。
+PR 5 PostgreSQL 与前台恢复验证（2026-08-11）：基线证据以五张 1440 x 900 截图和 DOM 断言验证连接文案、控制禁用、同 Task ID 与 v2/v3 Snapshot 全等。与 `origin/master@1a413f3` 合并后，commit `9814183` 的兼容封口为：opt-in PostgreSQL 16.14 system test `1 passed (9.78s)`，同一显式轮次 key 跨 API A/B/C 返回同 Task，不同 key 产生第二个 Task，原 Task 保持 `45 events / 7 artifacts / 1 TASK_COMMITTED`；system Edge suite `3 passed (17.0s)`，还断言“再次演示”首次创建请求中断时旧 Task 仍显示已连接、重试复用同 key 且只新增一个 Task。完整 Python 为 `58 passed, 1 skipped (2.00s)`，治理文档 `4 passed`，Ruff、前端 lint、生产构建和 `git diff --check` 均通过；skip 是普通测试没有显式配置 opt-in 维护库 DSN。该结果不覆盖 Conversation、数据库进程故障、事件缺口、响应丢失、多实例或 `H-001` 至 `H-004`。
 
 ## 7. 关联项
 

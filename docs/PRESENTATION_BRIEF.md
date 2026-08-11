@@ -45,7 +45,7 @@ Office Agent V0.1 把 AI 放在可独立工作的邮件、文档、报价、任�
 | 端到端 Simulator capability | 5 个 | `simulators/` 与 Tool Gateway 注册 |
 | Evidence requirement | 8 类 | `application/evidence_catalog.py` |
 | 确定性治理演示场景 | 4 个 | `application/demo3.py` |
-| Python 自动化收集 | 57 项（56 passed，1 个 PostgreSQL opt-in skip） | `uv run pytest -q` 的 PR 5 封口结果 |
+| Python 自动化收集 | 59 项（58 passed，1 个 PostgreSQL opt-in skip） | `uv run pytest -q` 的 PR 5 合并兼容封口结果 |
 
 7 类工作区为邮件、文档、报价表、任务、日历、报销和 CRM；审计是独立观察视图，不计入可编辑 WorkspaceArtifact。
 

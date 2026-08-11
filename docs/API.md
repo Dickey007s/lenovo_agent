@@ -150,7 +150,7 @@ Invoke-RestMethod -Method Post -Uri "$base/workspace/mail/new" -Headers $headers
 
 ### 3.4 创建、启动与控制 Demo 1 Task
 
-固定 Demo 1 入口不需要请求体。前端每次显式开始新一轮时发送新的 `Idempotency-Key`；同一轮重试复用同一个 key，因此不会重复创建，下一轮换 key 后会保留旧 Task 并创建新的 `ready / contract` Task。为了兼容旧客户端，不传 header 时仍使用每个 Owner 的稳定默认键：
+固定 Demo 1 入口不需要请求体。前端每次显式开始新一轮时发送新的 `Idempotency-Key`；同一轮重试复用同一个 key，因此不会重复创建，下一轮换 key 后会保留旧 Task 并创建新的 `ready / contract` Task。创建 key 重放返回该 Task 当前已持久化的 Snapshot，不回退到最初 `ready` 响应；这与 start/control mutation 返回“首次 mutation 结果”的幂等语义不同。为了兼容旧客户端，不传 header 时仍使用每个 Owner 的稳定默认键：
 
 ```powershell
 $roundHeaders = $headers.Clone()
@@ -160,7 +160,7 @@ $task.task_id
 Invoke-RestMethod -Method Get -Uri "$base/tasks/$($task.task_id)" -Headers $headers
 ```
 
-完成一轮后，把 key 改为新的轮次值即可再次演示。相同 Owner+key 始终返回原 TaskSnapshot；不同 key 生成不同 Task ID。Task 列表按更新时间倒序返回，前端刷新时优先恢复未终止 Task，否则显示最近终态 Task 并提供“再次演示”。
+完成一轮后，把 key 改为新的轮次值即可再次演示。相同 Owner+key 始终定位同一 Task 并返回其当前持久化 Snapshot；不同 key 生成不同 Task ID。Task 列表按更新时间倒序返回，前端刷新时优先恢复未终止 Task，否则显示最近终态 Task 并提供“再次演示”。
 
 也可以提交严格的 `TaskContractDraft`。下面只展示最小结构，实际字段和限制以 `packages/contracts/task_models.py` 为准：
 
@@ -196,7 +196,7 @@ Invoke-RestMethod -Method Post -Uri "$base/tasks" `
   -Body ($draft | ConvertTo-Json -Depth 10)
 ```
 
-同一 Owner 使用相同 key 重放相同契约时仍返回 201 和原 TaskSnapshot，不增加第二条 `TASK_CREATED`；相同 key 改用于不同契约返回 409。不传 key 时每次请求都会创建新的 Task。
+同一 Owner 使用相同 key 重放相同契约时仍返回 201 和已存在 Task 的当前持久化 Snapshot，不增加第二条 `TASK_CREATED`；相同 key 改用于不同契约返回 409。不传 key 时每次请求都会创建新的 Task。
 
 创建后的状态为：`TaskSnapshot.status=ready`、`phase=contract`、`version=1`、`last_event_sequence=1`，每个交付物对应一个 `queued` Branch。`artifact_versions`、`verification_reports`、`conflicts`、`controls` 均为空，`last_commit=null`。
 

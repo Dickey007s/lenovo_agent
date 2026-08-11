@@ -168,7 +168,7 @@ POST /v1/tasks/{task_id}/controls
 GET  /v1/tasks/{task_id}/events?after={sequence}
 ```
 
-`POST /v1/demo1/tasks` 可带 `Idempotency-Key` 表示一次演示轮次。同一 Owner+key 重放必须返回原创建 Snapshot，不新增 `TASK_CREATED`；不同 key 必须创建独立 Task。未带 key 时使用 Owner 绑定的兼容默认键。终态 Task 不回滚、不删除，前端通过新 round key 创建下一轮。
+`POST /v1/demo1/tasks` 可带 `Idempotency-Key` 表示一次演示轮次。同一 Owner+key 重放必须返回已存在 Task 当前已持久化的 Snapshot，不新增 `TASK_CREATED`、不回退已发生的 mutation；这与 start/control 命令重放返回首次 mutation Snapshot 的语义不同。不同 key 必须创建独立 Task。未带 key 时使用 Owner 绑定的兼容默认键。终态 Task 不回滚、不删除，前端通过新 round key 创建下一轮。
 
 SSE 帧：
 

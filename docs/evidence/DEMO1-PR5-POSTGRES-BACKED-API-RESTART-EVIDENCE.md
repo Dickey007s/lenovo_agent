@@ -6,6 +6,7 @@
 | Date | 2026-08-11，Asia/Shanghai |
 | Branch | `feature/demo1-postgres-restart-20260811` |
 | Tested implementation | Git commit `4634d8a` |
+| Merge compatibility | Git commit `9814183`，包含 `origin/master@1a413f3` 的前端视觉刷新与可重复 Demo 1 轮次 |
 | Decision | [`DR-0002`](../decisions/DR-0002-bounded-durable-office-loop.md) |
 | Scenario | [`SCENARIO-001`](../scenarios/SCENARIO-001-customer-a-durable-report.md) |
 | Status | `Verified engineering path`，仅限固定 Demo 1 Fixture、本机 PostgreSQL 16.14、同一数据库和顺序启动的单个 API 进程 |
@@ -24,6 +25,7 @@
 4. 只停止 API B；API C 必须逐字段恢复同一 v3 Snapshot。
 5. API C 重放旧 start key 返回原 v2，重放旧 resolve key 返回原 v3；当前 GET 仍为 v3，数据库行数完全不增加。
 6. 浏览器在 API 停止时保留旧 Snapshot、显示恢复状态并禁用控制；新进程启动后显示已同步且 Task 事实不变。
+7. 合并兼容版还要求显式第一轮 key 在 API B/C 返回同一 Task 的当前 Snapshot，不同第二轮 key 创建独立 `ready` Task，两轮均能被 API C 恢复且重放不新增行。
 
 ## 2. 可重复后端验收
 
@@ -36,7 +38,7 @@ $env:OFFICE_AGENT_POSTGRES_ADMIN_DSN = "<PostgreSQL 16 maintenance database DSN>
 .\scripts\verify-postgres-restart.ps1
 ```
 
-2026-08-11 实际结果：
+2026-08-11 在 tested implementation `4634d8a` 上的基线实际结果：
 
 ```text
 api_a_pid=58056
@@ -52,7 +54,7 @@ state_hash=sha256:11d54c157ac99893c5377157198ea7b10401237c528623861db44e096b9624
 1 passed in 9.62s
 ```
 
-测试同时断言：API A/B 都在下一进程启动前退出，API C 完成后也退出；健康接口的 `task_store=postgres`；自动化只验证 TaskStore，所以主动保持 `checkpoint=memory`；v2/v3 的列表与详情响应均与重启前完全相等；两个历史幂等响应分别等于原 v2/v3；重放前后 `1 task / 45 events / 7 artifacts / 1 commit` 不变。测试结束后随机数据库和三个测试 API 进程均已清理。PID 仅作为单次运行诊断记录，不作为跨平台正确性断言，因为操作系统允许复用已退出进程的 PID。
+该次 `4634d8a` 基线测试同时断言：API A/B 都在下一进程启动前退出，API C 完成后也退出；健康接口的 `task_store=postgres`；自动化只验证 TaskStore，所以主动保持 `checkpoint=memory`；v2/v3 的列表与详情响应均与重启前完全相等；两个历史幂等响应分别等于原 v2/v3；重放前后 `1 task / 45 events / 7 artifacts / 1 commit` 不变。当前合并兼容版已在同一测试文件中扩展为两个轮次 Task，具体输出见第 6 节。测试结束后随机数据库和三个测试 API 进程均已清理。PID 仅作为单次运行诊断记录，不作为跨平台正确性断言，因为操作系统允许复用已退出进程的 PID。
 
 ## 3. 前台输出与服务端事实
 
@@ -77,7 +79,7 @@ state_hash=sha256:11d54c157ac99893c5377157198ea7b10401237c528623861db44e096b9624
 | [`demo1-postgres-backed-api-restart-v3.png`](screenshots/demo1-postgres-backed-api-restart-v3.png) | 1440 x 900 | `9BF76FC4386FAB2ECDB88934369E396A11E01F5DC687352F57D61FF33F174865` | API B 下 v3 committed 与三个 committed 分支 |
 | [`demo1-postgres-backed-api-restart-recovered-v3.png`](screenshots/demo1-postgres-backed-api-restart-recovered-v3.png) | 1440 x 900 | `60DC9EBEFED37EDD281293F25957A3AB6998109700F98458ABFAE025ED79AC45` | API C 恢复后同一 v3 Commit 与已同步状态 |
 
-浏览器流程使用一次性、Git 忽略的本地 Playwright runner 驱动 system Edge，并实际断言连接文案、控制禁用、同 Task ID、v2/v3 Snapshot 全等和最终 state hash；它不是本 PR 提交的持续自动化用例。可重复、提交到仓库的恢复证据以第 2 节的 Python system test 为准。
+浏览器流程使用一次性、Git 忽略的本地 Playwright runner 驱动 system Edge，并实际断言连接文案、控制禁用、同 Task ID、v2/v3 Snapshot 全等和最终 state hash；它不是本 PR 提交的持续自动化用例。这五张图是 commit `4634d8a` 的历史运行证据，不作为合并后视觉样式的截图基线；刷新界面的视觉证据见 [`DR-0003-FRONTEND-VISUAL-SYNC-EVIDENCE`](DR-0003-FRONTEND-VISUAL-SYNC-EVIDENCE.md)。可重复、提交到仓库的恢复证据以第 2 节的 Python system test 为准。
 
 ## 5. 当前可说与不可说
 
@@ -97,8 +99,10 @@ state_hash=sha256:11d54c157ac99893c5377157198ea7b10401237c528623861db44e096b9624
 
 ## 6. 回归
 
-- PostgreSQL opt-in system test：`1 passed in 9.62s`。
-- system Edge suite：`3 passed in 17.9s`；其中两条为 PR 4 浏览器路径，一条为本轮新增的 source-ref fail-closed 负例回归；pending mutation 路径还断言传输在线时顶部不误报网络断线。
-- 完整 Python：`56 passed, 1 skipped in 2.68s`；skip 是未向普通测试进程提供 opt-in 维护库 DSN 的 PostgreSQL system test。
+commit `4634d8a` 的基线证据保留在第 2 至第 4 节。与 `origin/master@1a413f3` 合并后，在 commit `9814183` 上重新封口：
+
+- PostgreSQL opt-in system test：`1 passed in 9.78s`；API A/B/C 跨进程重放同一显式轮次 key 返回同 Task，不同 key 产生第二个 Task，最终为 `2 tasks`，原 Task 仍为 `45 events / 7 artifacts / 1 commit`，state hash 为 `sha256:7ff0c4b0e508c1f256279c72d7819d3ac3b7f423a6ed9abe1f6ac04d062be7c9`。
+- system Edge suite：`3 passed in 17.0s`；主路径还覆盖首次“再次演示”创建请求中断、旧 Task 保持已连接、复用同 key 重试且只新增一个 Task；其余两条为发送前 abort/reload 恢复和 source-ref fail-closed 回归。
+- 完整 Python：`58 passed, 1 skipped in 2.00s`；skip 是未向普通测试进程提供 opt-in 维护库 DSN 的 PostgreSQL system test。
 - 治理文档定向回归：`4 passed in 0.03s`。
 - `uv run ruff check .`、`pnpm --dir apps/web lint`、`pnpm --dir apps/web build` 与 `git diff --check` 均通过。

@@ -222,7 +222,7 @@ sequenceDiagram
     W->>A: GET /tasks/{task_id} 对账
 ```
 
-每个用户显式发起的新一轮 Demo 使用新的 round key，因此得到新的服务端 Task ID；同一 round key 的网络重试仍返回第一次创建的 Snapshot。未提供 `Idempotency-Key` 时保留旧客户端兼容行为，仍按 Owner 使用稳定默认键。刷新只从 `/tasks` 恢复最近的活动或历史 Task，不会重置旧任务；终态 Task 的“再次演示”按钮负责创建下一轮。
+每个用户显式发起的新一轮 Demo 使用新的 round key，因此得到新的服务端 Task ID；同一 round key 的网络重试返回该 Task 当前已持久化的 Snapshot，不回退已经发生的 start/control 变更。未提供 `Idempotency-Key` 时保留旧客户端兼容行为，仍按 Owner 使用稳定默认键。刷新只从 `/tasks` 恢复最近的活动或历史 Task，不会重置旧任务；终态 Task 的“再次演示”按钮负责创建下一轮。
 
 Task ID、Owner、版本、状态和时间均由服务端产生。读取、列表、控制和订阅都按 Owner 过滤；所有 mutation 使用预期 Task 版本和幂等键，前端只在收到服务端 Snapshot 后更新业务状态。
 
@@ -232,7 +232,7 @@ Task ID、Owner、版本、状态和时间均由服务端产生。读取、列�
 
 PR 4 E2E 使用 system Edge 访问 Next.js `3011`，由页面调用真实本地 FastAPI `8011` 与内存 TaskStore。主路径断言服务端创建、冲突、Steer accepted、resolve、Commit 和交付物终态；移动 viewport 断言被测区域无横向 overflow、被测可见操作目标至少 44px。该拓扑不包含 PostgreSQL、API 进程重启、多实例或真实 Connector，也未覆盖 Task SSE 断线回放。
 
-PR 5 增加独立 opt-in system test：每次创建随机 PostgreSQL 16 数据库，API A 写入 v2 后退出，API B 逐字段恢复 v2 并形成 v3 Commit 后退出，API C 逐字段恢复 v3，再重放旧 start/resolve key；数据库保持 `1 task / 45 events / 7 artifacts / 1 TASK_COMMITTED`。同页 system Edge 运行还验证 API 停止时保留最后 Snapshot、禁用控制并显示恢复中，新进程启动后再 GET 同一 Task。该浏览器证据没有在停机期间写入事件，因此不证明 `after` 缺口回放。
+PR 5 增加独立 opt-in system test：每次创建随机 PostgreSQL 16 数据库，API A 写入第一轮 v2 后退出，API B 逐字段恢复 v2、重放同一轮次 key、用不同 key 创建第二个 `ready` Task，再为原 Task 形成 v3 Commit 后退出；API C 恢复两个 Task 并重放轮次、start 与 resolve key。数据库最终保持 `2 tasks`，其中原 Task 严格保持 `45 events / 7 artifacts / 1 TASK_COMMITTED`，第二个 Task 仅有初始创建事件。同页 system Edge 运行还验证 API 停止时保留最后 Snapshot、禁用控制并显示恢复中，新进程启动后再 GET 同一 Task。该浏览器证据没有在停机期间写入事件，因此不证明 `after` 缺口回放。
 
 ## 4. 信任边界
 

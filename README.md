@@ -202,7 +202,7 @@ pnpm --dir apps/web lint
 pnpm --dir apps/web build
 ```
 
-V0.1 定稿基线和 Demo 1 各 PR 的实际验证结果记录在 [`DR-0002`](docs/decisions/DR-0002-bounded-durable-office-loop.md) 及对应 evidence。PR 3 封口验证为全量 Python `56 passed`；PR 4 的 system Edge E2E 为 `2 passed (18.4s)`。PR 5 的 PostgreSQL 16.14 opt-in 系统测试为 `1 passed (9.62s)`；system Edge suite 为 `3 passed (17.9s)`，包含两条既有浏览器路径和一条 source-ref fail-closed 负例回归；封口回归为完整 Python `56 passed, 1 skipped`，Ruff、前端 lint/build 与治理检查通过。固定 Demo 1 Task 测试不调用真实 LLM；独立 LLM smoke 只验证 `deepseek-v4-pro` 通用问答与 Conversation SSE 连通性。
+V0.1 定稿基线和 Demo 1 各 PR 的实际验证结果记录在 [`DR-0002`](docs/decisions/DR-0002-bounded-durable-office-loop.md) 及对应 evidence。PR 3 封口验证为全量 Python `56 passed`；PR 4 的 system Edge E2E 为 `2 passed (18.4s)`。PR 5 与前端视觉刷新/可重复演示合并后的封口回归为：PostgreSQL 16.14 opt-in 系统测试 `1 passed (9.78s)`，system Edge suite `3 passed (17.0s)`，完整 Python `58 passed, 1 skipped (2.00s)`，Ruff、前端 lint/build 与治理检查通过。该 opt-in 路径还验证了显式轮次 key 跨 API 进程重放与不同 key 创建第二个 Task。固定 Demo 1 Task 测试不调用真实 LLM；独立 LLM smoke 只验证 `deepseek-v4-pro` 通用问答与 Conversation SSE 连通性。
 
 ## 数据、身份与安全边界
 
