@@ -10,6 +10,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from packages.contracts import (
     ActionCandidate,
     ApprovalRecord,
+    CapabilityDecision,
     ControlPlan,
     EvidenceRecord,
     PolicyEffect,
@@ -98,9 +99,16 @@ class RunService:
             self._action_to_run[snapshot.action.action_id] = snapshot.run_id
             self._submitted_evidence[snapshot.action.action_id] = stored.submitted_evidence
 
-    async def create(self, message: str, user_id: str) -> RunSnapshot:
+    async def create(
+        self, message: str, user_id: str, thread_id: str | None = None
+    ) -> RunSnapshot:
         candidate = await self.parser.parse(message)
-        return await self.create_from_candidate(candidate, message=message, user_id=user_id)
+        return await self.create_from_candidate(
+            candidate,
+            message=message,
+            user_id=user_id,
+            thread_id=thread_id,
+        )
 
     async def create_from_candidate(
         self,
@@ -108,6 +116,7 @@ class RunService:
         message: str,
         user_id: str,
         trusted_context: dict | None = None,
+        thread_id: str | None = None,
     ) -> RunSnapshot:
         now = datetime.now(UTC)
         run_id = f"run_{uuid4().hex}"
@@ -131,7 +140,7 @@ class RunService:
         snapshot = RunSnapshot(
             run_id=run_id,
             trace_id=trace_id,
-            thread_id=f"thread_{uuid4().hex}",
+            thread_id=thread_id or f"thread_{uuid4().hex}",
             user_id=user_id,
             user_message=message,
             trusted_context=trusted_context,
@@ -160,7 +169,7 @@ class RunService:
             },
         )
         if self.workflow is not None:
-            await self.workflow.start(run_id, snapshot.thread_id)
+            await self.workflow.start(run_id, self._workflow_checkpoint_id(snapshot))
         return self._runs[run_id]
 
     async def get(self, run_id: str, user_id: str) -> RunSnapshot:
@@ -192,7 +201,9 @@ class RunService:
             actor_id=user_id,
         )
         if self.workflow is not None:
-            await self.workflow.resume(snapshot.thread_id, "evidence_submitted")
+            await self.workflow.resume(
+                self._workflow_checkpoint_id(snapshot), "evidence_submitted"
+            )
             return self._runs[snapshot.run_id]
         return await self._reevaluate(snapshot)
 
@@ -232,7 +243,9 @@ class RunService:
             actor_id=approver_id,
         )
         if self.workflow is not None:
-            await self.workflow.resume(snapshot.thread_id, "approval_submitted")
+            await self.workflow.resume(
+                self._workflow_checkpoint_id(snapshot), "approval_submitted"
+            )
             return self._runs[snapshot.run_id]
         return await self._reevaluate(snapshot)
 
@@ -244,7 +257,9 @@ class RunService:
             raise RuntimeError("Authorization Service 或 Tool Gateway 未配置")
 
         if self.workflow is not None:
-            await self.workflow.resume(snapshot.thread_id, "authorization_requested")
+            await self.workflow.resume(
+                self._workflow_checkpoint_id(snapshot), "authorization_requested"
+            )
             return self._runs[snapshot.run_id]
 
         # Non-LangGraph fallback used by isolated unit/integration tests.
@@ -326,7 +341,7 @@ class RunService:
         snapshot = await self.get(run_id, user_id)
         if self.workflow is None:
             return {"values": {"run_id": run_id, "status": snapshot.status}, "next": []}
-        return await self.workflow.state(snapshot.thread_id)
+        return await self.workflow.state(self._workflow_checkpoint_id(snapshot))
 
     async def audit_history(self, trace_id: str, user_id: str) -> list:
         snapshot = next(
@@ -449,6 +464,12 @@ class RunService:
             raise ActionNotFoundError(action_id)
         return self._runs[run_id]
 
+    @staticmethod
+    def _workflow_checkpoint_id(snapshot: RunSnapshot) -> str:
+        # A conversation can own more than one governed run. Keep the real
+        # conversation binding on the snapshot while isolating graph state per run.
+        return f"{snapshot.thread_id}:{snapshot.run_id}"
+
     async def _reevaluate(self, snapshot: RunSnapshot) -> RunSnapshot:
         risk, effects, evidence, plan = await self._evaluate(
             snapshot.action, snapshot.approvals, snapshot.trusted_context
@@ -482,6 +503,24 @@ class RunService:
     ) -> tuple[RiskAssessment, list[PolicyEffect], dict[str, EvidenceRecord], ControlPlan]:
         risk = assess_risk(action)
         effects = evaluate_policies(action, risk, trusted_context)
+        unresolved_reason_codes: list[str] = []
+        if "recipient_identity" in action.missing_slots:
+            unresolved_reason_codes.append("RECIPIENT_IDENTITY_UNRESOLVED")
+        if any(
+            slot.startswith("attachment_data_class:")
+            for slot in action.missing_slots
+        ):
+            unresolved_reason_codes.append("ATTACHMENT_DATA_CLASS_UNRESOLVED")
+        if unresolved_reason_codes:
+            effects.append(
+                PolicyEffect(
+                    policy_id="unresolved_action_context_v1",
+                    capability_effects={
+                        action.capability: CapabilityDecision(verdict="deny")
+                    },
+                    reason_codes=unresolved_reason_codes,
+                )
+            )
         requirements = list(
             dict.fromkeys(req for effect in effects for req in effect.required_evidence)
         )

@@ -85,6 +85,11 @@ type WorkspaceConflict = {
   conflictingFields: string[];
 };
 
+type WorkspaceRequestEpoch = {
+  editTokens: Partial<Record<WorkspaceKind, number>>;
+  artifacts: Partial<Record<WorkspaceKind, WorkspaceArtifact>>;
+};
+
 type CapabilityDecision = { verdict: "allow" | "blocked" | "deny"; constraints: string[] };
 
 type RunSnapshot = {
@@ -674,6 +679,7 @@ export default function Home() {
   const conversationRef = useRef<HTMLDivElement>(null);
   const artifactsRef = useRef<Partial<Record<WorkspaceKind, WorkspaceArtifact>>>({});
   const workspaceEditBasesRef = useRef<Partial<Record<WorkspaceKind, WorkspaceArtifact>>>({});
+  const workspaceEditTokensRef = useRef<Partial<Record<WorkspaceKind, number>>>({});
   const stickToBottomRef = useRef(true);
   const silentRequestRef = useRef(false);
   const taskSequenceRef = useRef(0);
@@ -1152,7 +1158,10 @@ export default function Home() {
     }
   }
 
-  function handleStreamEvent(event: Record<string, unknown>) {
+  function handleStreamEvent(
+    event: Record<string, unknown>,
+    requestEpoch?: WorkspaceRequestEpoch,
+  ) {
     const type = String(event.type ?? "");
     if (type === "message.created") {
       if (silentRequestRef.current) return;
@@ -1160,17 +1169,26 @@ export default function Home() {
       setMessages(current => [...current.filter(item => !item.message_id.startsWith("pending_")), incoming]);
     } else if (type === "artifact.stream.started") {
       const artifact = event.artifact as WorkspaceArtifact;
-      setArtifacts(current => {
-        const next = { ...current, [artifact.kind]: artifact };
-        artifactsRef.current = next;
-        return next;
-      });
-      delete workspaceEditBasesRef.current[artifact.kind];
-      setDirty(current => ({ ...current, [artifact.kind]: false }));
+      const editedDuringRequest = requestEpoch
+        && (workspaceEditTokensRef.current[artifact.kind] ?? 0)
+          !== (requestEpoch.editTokens[artifact.kind] ?? 0);
+      if (!editedDuringRequest) {
+        setArtifacts(current => {
+          const next = { ...current, [artifact.kind]: artifact };
+          artifactsRef.current = next;
+          return next;
+        });
+        delete workspaceEditBasesRef.current[artifact.kind];
+        setDirty(current => ({ ...current, [artifact.kind]: false }));
+      }
       setStreamingArtifact(artifact.kind);
     } else if (type === "artifact.delta") {
       const kind = String(event.kind) as WorkspaceKind;
       const patch = event.patch as Record<string, unknown>;
+      const editedDuringRequest = requestEpoch
+        && (workspaceEditTokensRef.current[kind] ?? 0)
+          !== (requestEpoch.editTokens[kind] ?? 0);
+      if (editedDuringRequest) return;
       setArtifacts(current => {
         const artifact = current[kind];
         if (!artifact) return current;
@@ -1180,6 +1198,43 @@ export default function Home() {
       });
     } else if (type === "artifact.updated") {
       const artifact = event.artifact as WorkspaceArtifact;
+      const editedDuringRequest = requestEpoch
+        && (workspaceEditTokensRef.current[artifact.kind] ?? 0)
+          !== (requestEpoch.editTokens[artifact.kind] ?? 0);
+      if (editedDuringRequest) {
+        const draft = artifactsRef.current[artifact.kind];
+        const baseArtifact = workspaceEditBasesRef.current[artifact.kind]
+          ?? requestEpoch.artifacts[artifact.kind]
+          ?? null;
+        const result = draft
+          ? reapplyWorkspaceDraft(artifact, draft, baseArtifact)
+          : { artifact: null, conflictingFields: ["当前草稿"] };
+        if (result.artifact) {
+          const hasLocalChanges = JSON.stringify(result.artifact.content)
+            !== JSON.stringify(artifact.content);
+          const next = { ...artifactsRef.current, [artifact.kind]: result.artifact };
+          artifactsRef.current = next;
+          setArtifacts(next);
+          if (hasLocalChanges) workspaceEditBasesRef.current[artifact.kind] = artifact;
+          else delete workspaceEditBasesRef.current[artifact.kind];
+          setDirty(current => ({ ...current, [artifact.kind]: hasLocalChanges }));
+          setWorkspaceConflict(current => current?.kind === artifact.kind ? null : current);
+          setNotice(hasLocalChanges
+            ? `Agent 已更新${VIEW_LABELS[artifact.kind]}，并保留了你在等待期间的修改`
+            : `Agent 已更新${VIEW_LABELS[artifact.kind]}`);
+        } else {
+          setWorkspaceConflict({
+            kind: artifact.kind,
+            latestArtifact: artifact,
+            baseArtifact,
+            conflictingFields: result.conflictingFields,
+          });
+          setDirty(current => ({ ...current, [artifact.kind]: true }));
+          setNotice("Agent 返回了新版本；你在等待期间的修改未被覆盖，请处理冲突");
+        }
+        setStreamingArtifact(current => current === artifact.kind ? null : current);
+        return;
+      }
       setArtifacts(current => {
         const next = { ...current, [artifact.kind]: artifact };
         artifactsRef.current = next;
@@ -1230,7 +1285,7 @@ export default function Home() {
     }
   }
 
-  async function consumeStream(response: Response) {
+  async function consumeStream(response: Response, requestEpoch?: WorkspaceRequestEpoch) {
     if (!response.ok || !response.body) throw new Error(`请求失败 (${response.status})`);
     const reader = response.body.getReader();
     const decoder = new TextDecoder();
@@ -1243,7 +1298,7 @@ export default function Home() {
       buffer = blocks.pop() ?? "";
       for (const block of blocks) {
         const data = block.split("\n").find(line => line.startsWith("data: "))?.slice(6);
-        if (data) handleStreamEvent(JSON.parse(data) as Record<string, unknown>);
+        if (data) handleStreamEvent(JSON.parse(data) as Record<string, unknown>, requestEpoch);
       }
     }
   }
@@ -1254,6 +1309,10 @@ export default function Home() {
     contextArtifact: WorkspaceArtifact | undefined = activeArtifact,
   ) {
     if (!threadId || busy) return;
+    const requestEpoch: WorkspaceRequestEpoch = {
+      editTokens: { ...workspaceEditTokensRef.current },
+      artifacts: { ...artifactsRef.current },
+    };
     setBusy(true); setError(""); setMessage("");
     silentRequestRef.current = silent;
     stickToBottomRef.current = true;
@@ -1273,7 +1332,7 @@ export default function Home() {
         method: "POST", headers: REQUEST_HEADERS,
         body: JSON.stringify(payload),
       });
-      await consumeStream(response);
+      await consumeStream(response, requestEpoch);
     } catch (reason) {
       const detail = reason instanceof Error ? reason.message : "Agent 处理失败";
       setError(detail);
@@ -1291,15 +1350,17 @@ export default function Home() {
 
   function updateArtifact(patch: Record<string, unknown>) {
     if (!activeArtifact) return;
+    const kind = activeArtifact.kind;
+    if (!workspaceEditBasesRef.current[kind]) {
+      workspaceEditBasesRef.current[kind] = artifactsRef.current[kind] ?? activeArtifact;
+    }
+    workspaceEditTokensRef.current[kind] = (workspaceEditTokensRef.current[kind] ?? 0) + 1;
     setArtifacts(current => {
-      const currentArtifact = current[activeArtifact.kind];
+      const currentArtifact = current[kind];
       if (!currentArtifact) return current;
-      if (!workspaceEditBasesRef.current[activeArtifact.kind]) {
-        workspaceEditBasesRef.current[activeArtifact.kind] = currentArtifact;
-      }
       const next = {
         ...current,
-        [activeArtifact.kind]: {
+        [kind]: {
           ...currentArtifact,
           content: { ...currentArtifact.content, ...patch },
         },
@@ -1307,7 +1368,7 @@ export default function Home() {
       artifactsRef.current = next;
       return next;
     });
-    setDirty(current => ({ ...current, [activeArtifact.kind]: true }));
+    setDirty(current => ({ ...current, [kind]: true }));
   }
 
   async function saveArtifact(

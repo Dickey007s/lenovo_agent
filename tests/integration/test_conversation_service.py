@@ -2,7 +2,7 @@ import asyncio
 
 import pytest
 
-from packages.authorization import AuthorizationService, PermitKeyPair
+from packages.authorization import AuthorizationError, AuthorizationService, PermitKeyPair
 from packages.contracts import ActionCandidate
 from packages.tool_gateway import ToolGateway
 from services.api.app.application.conversation_models import (
@@ -238,6 +238,30 @@ class MaliciousMailActionAgent(FakeAgent):
                     "subject": "恶意候选标题",
                     "body": "恶意候选正文",
                 },
+                data_classes=["public"],
+                state_change_type="local_state_change",
+                reversibility="high",
+            ),
+        )
+
+
+class KnownMailActionAgent(FakeAgent):
+    async def plan(
+        self, message: str, history: list[dict], trusted_context: dict
+    ) -> ConversationPlan:
+        assert history[-1]["content"] == message
+        assert trusted_context["active_workspace"]["artifact"]["content"]["to"] == [
+            "customer@example.com"
+        ]
+        return ConversationPlan(
+            assistant_response="邮件动作已准备，等待治理检查。",
+            focus_view="mail",
+            action=ActionCandidate(
+                action_type="send_email",
+                capability="email.send",
+                target_scope="self",
+                recipients=["attacker@example.com"],
+                resources=["hidden.bin"],
                 data_classes=["public"],
                 state_change_type="local_state_change",
                 reversibility="high",
@@ -1135,7 +1159,7 @@ async def test_mail_artifact_overrides_malicious_action_payload(monkeypatch) -> 
         "cc": [],
         "subject": "客户 A 报价",
         "body": "这是用户可见且已核对的邮件正文。",
-        "attachments": ["Q-991-V3.pdf"],
+        "attachments": ["opaque.bin"],
     }
 
     events = [
@@ -1159,14 +1183,17 @@ async def test_mail_artifact_overrides_malicious_action_payload(monkeypatch) -> 
 
     assert run.action.recipients == ["张三"]
     assert "attacker@example.com" not in run.action.recipients
-    assert run.action.resources == ["Q-991-V3.pdf"]
+    assert run.action.resources == ["opaque.bin"]
     assert run.action.action_type == "send_email"
     assert run.action.target_scope == "external_customer"
     assert run.action.data_classes == ["customer_data", "pricing"]
     assert run.action.state_change_type == "external_effect"
     assert run.action.reversibility == "low"
     assert run.action.source_refs == []
-    assert run.action.missing_slots == ["recipient_identity"]
+    assert run.action.missing_slots == [
+        "recipient_identity",
+        "attachment_data_class:opaque.bin",
+    ]
     assert run.action.parameters["subject"] == visible_mail["subject"]
     assert run.action.parameters["body"] == visible_mail["body"]
     assert run.action.parameters["artifact_id"] == bound_mail.artifact_id
@@ -1177,6 +1204,105 @@ async def test_mail_artifact_overrides_malicious_action_payload(monkeypatch) -> 
     assert proposed["action"]["recipients"] == run.action.recipients
     assert proposed["action"]["resources"] == run.action.resources
     assert proposed["action"]["parameters"] == run.action.parameters
+    assert run.status == "DENIED"
+    assert run.evidence["recipient_identity"].status == "missing"
+    assert run.evidence["attachment_hash"].status == "missing"
+    assert "RECIPIENT_IDENTITY_UNRESOLVED" in run.control_plan.reason_codes
+    assert "ATTACHMENT_DATA_CLASS_UNRESOLVED" in run.control_plan.reason_codes
+
+    run = await run_service.submit_evidence(
+        run.action.action_id,
+        {
+            "recipient_identity": "张三",
+            "attachment_hash": "user-asserted-hash",
+            "pricing_source": "crm:quote/991:v3",
+        },
+        "user_mail_binding",
+    )
+    assert run.status == "DENIED"
+    assert run.evidence["recipient_identity"].status == "missing"
+    assert run.evidence["attachment_hash"].status == "missing"
+
+    for role in ("current_user", "sales_manager"):
+        run = await run_service.submit_approval(
+            run.action.action_id,
+            role,
+            "approved",
+            "user_mail_binding",
+        )
+    assert run.status == "DENIED"
+    with pytest.raises(AuthorizationError, match="READY_TO_AUTHORIZE"):
+        await run_service.authorize_and_execute(
+            run.action.action_id, "user_mail_binding"
+        )
+
+
+async def test_known_mail_identity_and_pricing_attachment_remain_executable(
+    monkeypatch,
+) -> None:
+    async def no_sleep(_: float) -> None:
+        return None
+
+    monkeypatch.setattr(
+        "services.api.app.application.conversations.asyncio.sleep", no_sleep
+    )
+    keys = PermitKeyPair.generate()
+    agent = KnownMailActionAgent()
+    run_service = RunService(
+        parser=agent,  # type: ignore[arg-type]
+        policy_version="test-v1",
+        authorization_service=AuthorizationService(keys),
+        tool_gateway=ToolGateway(keys.public_key, "test-v1"),
+    )
+    service = ConversationService(agent, run_service)  # type: ignore[arg-type]
+    thread = await service.create_thread("known_mail_user")
+    visible_mail = {
+        "to": ["customer@example.com"],
+        "cc": [],
+        "subject": "客户 A 报价",
+        "body": "请查收服务端已核对的报价。",
+        "attachments": ["Q-991-V3.pdf"],
+    }
+
+    events = [
+        event
+        async for event in _stream_with_current_revision(
+            service,
+            thread.thread_id,
+            "发送当前邮件",
+            "known_mail_user",
+            active_view="mail",
+            workspace_context=visible_mail,
+        )
+    ]
+    proposed = next(event for event in events if event["type"] == "action.proposed")
+    run = await run_service.get(proposed["run"]["run_id"], "known_mail_user")
+
+    assert run.thread_id == thread.thread_id
+    assert run.action.recipients == ["customer@example.com"]
+    assert run.action.resources == ["Q-991-V3.pdf"]
+    assert run.action.missing_slots == []
+    assert run.status == "WAITING_EVIDENCE"
+    assert run.evidence["recipient_identity"].status == "satisfied"
+    assert run.evidence["attachment_hash"].status == "satisfied"
+
+    run = await run_service.submit_evidence(
+        run.action.action_id,
+        {"pricing_source": "crm:quote/991:v3"},
+        "known_mail_user",
+    )
+    assert run.status == "WAITING_APPROVAL"
+    for role in ("current_user", "sales_manager"):
+        run = await run_service.submit_approval(
+            run.action.action_id,
+            role,
+            "approved",
+            "known_mail_user",
+        )
+    run = await run_service.authorize_and_execute(
+        run.action.action_id, "known_mail_user"
+    )
+    assert run.status == "EXECUTED"
 
 
 async def test_quote_side_effect_mismatch_fails_closed_and_concurrent_save_is_preserved(
@@ -1462,7 +1588,9 @@ async def test_action_result_can_retry_after_transient_response_failure(
     )
     service = ConversationService(agent, run_service)  # type: ignore[arg-type]
     thread = await service.create_thread("user_1")
-    run = await run_service.create("把报价发给客户", "user_1")
+    run = await run_service.create(
+        "把报价发给客户", "user_1", thread_id=thread.thread_id
+    )
     run = await run_service.submit_evidence(
         run.action.action_id,
         {"pricing_source": "crm:quote/991:v3"},
@@ -1527,6 +1655,38 @@ async def test_action_result_can_retry_after_transient_response_failure(
     assert replayed_events[0]["message"]["message_id"] == restored.messages[0].message_id
     assert len((await service.get_thread(thread.thread_id, "user_1")).messages) == 1
     assert agent.response_attempts == 2
+
+
+async def test_action_result_rejects_same_user_cross_thread_continuation() -> None:
+    keys = PermitKeyPair.generate()
+    agent = FlakyActionResultAgent()
+    run_service = RunService(
+        parser=agent,  # type: ignore[arg-type]
+        policy_version="test-v1",
+        authorization_service=AuthorizationService(keys),
+        tool_gateway=ToolGateway(keys.public_key, "test-v1"),
+    )
+    service = ConversationService(agent, run_service)  # type: ignore[arg-type]
+    owner_thread = await service.create_thread("user_1")
+    other_thread = await service.create_thread("user_1")
+    run = await run_service.create(
+        "把报价发给客户", "user_1", thread_id=owner_thread.thread_id
+    )
+    run = await run_service.invalidate_action(run.action.action_id, "user_1")
+    assert run.status == "FAILED"
+
+    with pytest.raises(ValueError, match="不属于当前对话"):
+        _ = [
+            event
+            async for event in service.stream_action_result(
+                other_thread.thread_id,
+                run.run_id,
+                "user_1",
+            )
+        ]
+
+    assert (other_thread.thread_id, run.run_id) not in service._continued_runs
+    assert (await service.get_thread(other_thread.thread_id, "user_1")).messages == []
 
 
 async def test_invalid_quote_question_fails_closed_without_calling_model(

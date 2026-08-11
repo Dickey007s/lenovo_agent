@@ -1,4 +1,81 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
+
+
+type QuoteWorkspaceArtifact = {
+  artifact_id: string;
+  revision: number;
+  kind: "quote";
+  title: string;
+  content: Record<string, unknown>;
+  sources: Record<string, unknown>[];
+  linked_action_id: string | null;
+  linked_run_id: string | null;
+  requires_recheck: boolean;
+  change_history: Record<string, unknown>[];
+  updated_at: string;
+};
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>(next => { resolve = next; });
+  return { promise, resolve };
+}
+
+async function delayNextAgentArtifact(page: Page) {
+  const requestStarted = deferred<void>();
+  const artifactReady = deferred<QuoteWorkspaceArtifact>();
+  await page.route("**/v1/threads/*/messages/stream", async route => {
+    requestStarted.resolve();
+    const artifact = await artifactReady.promise;
+    const stamp = Date.now();
+    const events = [
+      {
+        type: "message.created",
+        message: { message_id: `test-user-${stamp}`, role: "user", content: "请更新报价", status: "completed" },
+      },
+      { type: "artifact.updated", artifact },
+      {
+        type: "message.completed",
+        message: { message_id: `test-assistant-${stamp}`, role: "assistant", content: "报价已更新。", status: "completed" },
+      },
+    ];
+    await route.fulfill({
+      status: 200,
+      contentType: "text/event-stream",
+      body: `${events.map(event => `data: ${JSON.stringify(event)}`).join("\n\n")}\n\n`,
+    });
+  });
+  return {
+    requestStarted: requestStarted.promise,
+    deliver: (artifact: QuoteWorkspaceArtifact) => artifactReady.resolve(artifact),
+  };
+}
+
+async function saveExternalQuoteValidUntil(page: Page, validUntil: string) {
+  return await page.evaluate(async value => {
+    const headers = {
+      "Content-Type": "application/json",
+      "X-User-Id": "demo_user",
+      "X-User-Roles": "current_user,sales_manager",
+    };
+    const workspace = await fetch("http://localhost:8011/v1/workspace", { headers })
+      .then(response => response.json()) as QuoteWorkspaceArtifact[];
+    const quote = workspace.find(item => item.kind === "quote");
+    if (!quote) throw new Error("quote workspace is missing");
+    const response = await fetch("http://localhost:8011/v1/workspace/quote", {
+      method: "PUT",
+      headers,
+      body: JSON.stringify({
+        title: quote.title,
+        content: { ...quote.content, valid_until: value },
+        expected_artifact_id: quote.artifact_id,
+        expected_revision: quote.revision,
+      }),
+    });
+    if (!response.ok) throw new Error(`external save failed: ${response.status}`);
+    return await response.json() as QuoteWorkspaceArtifact;
+  }, validUntil);
+}
 
 
 test("quote workspace recalculates edits and answers from the visible rows", async ({ page }) => {
@@ -258,5 +335,65 @@ test("same-field quote conflicts are shown instead of silently overwriting eithe
 
   await conflict.getByRole("button", { name: "查看最新版本" }).click();
   await expect(validUntil).toHaveValue("2026-10-01");
+  await expect(conflict).toHaveCount(0);
+});
+
+
+test("late Agent artifacts preserve different-field quote edits made after send", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "报价表" }).click();
+
+  const delayedArtifact = await delayNextAgentArtifact(page);
+  const quantity = page.getByLabel("企业办公 Agent 平台许可数量");
+  const localQuantity = String(Number(await quantity.inputValue()) + 7);
+  await page.getByLabel("输入办公任务").fill("请更新报价有效期");
+  await page.getByRole("button", { name: "发送消息" }).click();
+  await delayedArtifact.requestStarted;
+
+  await quantity.fill(localQuantity);
+  const remoteArtifact = await saveExternalQuoteValidUntil(page, "2027-01-15");
+  delayedArtifact.deliver(remoteArtifact);
+
+  await expect(page.locator(".send-spinner")).toHaveCount(0);
+  await expect(quantity).toHaveValue(localQuantity);
+  await expect(page.getByLabel("报价有效期")).toHaveValue("2027-01-15");
+  await expect(page.getByRole("alert").filter({ hasText: "工作区已有更新" })).toHaveCount(0);
+  await expect(page.getByText("Agent 已更新报价表，并保留了你在等待期间的修改")).toBeVisible();
+  await expect(page.getByText("未保存修改", { exact: true })).toBeVisible();
+
+  const saveResponse = page.waitForResponse(response =>
+    response.status() === 200 && response.request().method() === "PUT"
+      && response.url().includes("/workspace/quote")
+  );
+  await page.getByRole("button", { name: "保存", exact: true }).click();
+  const saved = await (await saveResponse).json();
+  expect(saved.content.valid_until).toBe("2027-01-15");
+  expect(String(saved.content.items[0].qty)).toBe(localQuantity);
+});
+
+
+test("late same-field Agent artifacts enter explicit quote conflict recovery", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "报价表" }).click();
+
+  const delayedArtifact = await delayNextAgentArtifact(page);
+  const validUntil = page.getByLabel("报价有效期");
+  await page.getByLabel("输入办公任务").fill("请更新报价有效期");
+  await page.getByRole("button", { name: "发送消息" }).click();
+  await delayedArtifact.requestStarted;
+
+  await validUntil.fill("2027-02-20");
+  const remoteArtifact = await saveExternalQuoteValidUntil(page, "2027-02-10");
+  delayedArtifact.deliver(remoteArtifact);
+
+  await expect(page.locator(".send-spinner")).toHaveCount(0);
+  await expect(validUntil).toHaveValue("2027-02-20");
+  const conflict = page.getByRole("alert").filter({ hasText: "工作区已有更新" });
+  await expect(conflict).toBeVisible();
+  await expect(conflict).toContainText("有效期在两个版本中都被修改");
+  await expect(page.getByText("Agent 返回了新版本；你在等待期间的修改未被覆盖，请处理冲突")).toBeVisible();
+
+  await conflict.getByRole("button", { name: "查看最新版本" }).click();
+  await expect(validUntil).toHaveValue("2027-02-10");
   await expect(conflict).toHaveCount(0);
 });

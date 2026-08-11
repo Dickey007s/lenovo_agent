@@ -119,23 +119,35 @@ def _recipient_scope(values: list[str]) -> tuple[str, bool]:
     return ("external_customer", True) if uncertain else ("internal_member", False)
 
 
-def _mail_data_classes(content: dict[str, Any]) -> list[str]:
-    attachments = [str(item) for item in content.get("attachments", []) if item]
-    text = " ".join(
-        [
-            str(content.get("subject", "")),
-            str(content.get("body", "")),
-            *attachments,
-        ]
+def _is_pricing_text(value: str) -> bool:
+    return bool(
+        re.search(
+            r"报价|价格|折扣|金额|¥|￥|\bquote\b|\bpricing\b|\bdiscount\b|\bamount\b|\bQ-\d+",
+            value,
+            flags=re.IGNORECASE,
+        )
     )
+
+
+def _mail_data_classes(content: dict[str, Any]) -> tuple[list[str], list[str]]:
+    message_text = " ".join(
+        [str(content.get("subject", "")), str(content.get("body", ""))]
+    )
+    attachments = _string_list(content.get("attachments"))
     classes = ["customer_data"]
-    if re.search(
-        r"报价|价格|折扣|金额|¥|￥|\bquote\b|\bpricing\b|\bdiscount\b|\bamount\b|\bQ-\d+",
-        text,
-        flags=re.IGNORECASE,
-    ):
+    if _is_pricing_text(message_text):
         classes.append("pricing")
-    return classes
+
+    unknown_attachments: list[str] = []
+    for attachment in attachments:
+        # Attachment classification is deliberately independent from the mail
+        # body. A pricing subject must never make an opaque file look classified.
+        if _is_pricing_text(attachment):
+            if "pricing" not in classes:
+                classes.append("pricing")
+        else:
+            unknown_attachments.append(attachment)
+    return classes, unknown_attachments
 
 
 def _bind_action_to_artifact(
@@ -167,13 +179,15 @@ def _bind_action_to_artifact(
         resources = attachments
         action_type = "send_email"
         target_scope, uncertain_recipient = _recipient_scope(recipients)
-        data_classes = _mail_data_classes(content)
+        data_classes, unknown_attachments = _mail_data_classes(content)
         state_change_type = "external_effect"
         reversibility = "low"
         if uncertain_recipient:
             missing_slots.append("recipient_identity")
-        if attachments and "pricing" not in data_classes:
-            missing_slots.append("attachment_data_class")
+        missing_slots.extend(
+            f"attachment_data_class:{attachment}"
+            for attachment in unknown_attachments
+        )
     elif action.capability == "calendar.invite":
         if artifact.kind != "calendar":
             raise ActionArtifactMismatchError
@@ -1264,6 +1278,7 @@ class ConversationService:
                         action,
                         message=text,
                         user_id=user_id,
+                        thread_id=thread_id,
                         trusted_context={
                             "device": {"managed": True, "name": "managed_pc"},
                             "user": {"id": user_id},
@@ -1327,6 +1342,7 @@ class ConversationService:
                     action,
                     message=text,
                     user_id=user_id,
+                    thread_id=thread_id,
                     trusted_context={
                         "device": {"managed": True, "name": "managed_pc"},
                         "user": {"id": user_id},
@@ -1419,6 +1435,8 @@ class ConversationService:
     ) -> AsyncIterator[dict[str, Any]]:
         thread = await self.get_thread(thread_id, user_id)
         run = await self.run_service.get(run_id, user_id)
+        if run.thread_id != thread.thread_id:
+            raise ValueError("该运行不属于当前对话，不能继续写入结果")
         key = (thread_id, run_id)
         previous_completion = self._continued_runs.get(key)
         if previous_completion is not None:
