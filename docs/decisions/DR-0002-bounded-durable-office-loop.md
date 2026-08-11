@@ -28,10 +28,14 @@
 | `C-008` | 浏览器运行证据 | PR 4 用同一服务端 Snapshot 驱动只读交付物工作区，并通过固定主路径与发送前失败恢复 E2E | [`FRONTEND-E2E-DEMO1-PR4-20260810`](../evidence/DEMO1-PR4-FRONTEND-E2E-EVIDENCE.md) | 支持 head/version/verification/conflict/content/source/lineage/Commit 的前台映射、Tasks 双 tab、reload 同 key 恢复及被测移动布局 | 仅内存 Store 与固定 Fixture；不证明服务端已提交但响应丢失、SSE 回放、PostgreSQL、用户价值或 Artifact/Action 绑定 |
 | `C-009` | 源码、PostgreSQL 自动化与浏览器运行证据 | PR 5 在 PostgreSQL 16.14、同一数据库和三个顺序 API 进程上恢复 v2/v3，重放历史 start/resolve 结果且 Event/Artifact/Commit 零新增；同页前台能显示断线、禁用和重新对账 | `POSTGRES-WINDOWS-16.14-20260811`、[`POSTGRES-BACKED-API-RESTART-DEMO1-PR5-20260811`](../evidence/DEMO1-PR5-POSTGRES-BACKED-API-RESTART-EVIDENCE.md)、tested implementation `4634d8a`、merge compatibility `9814183` | 支持固定 Fixture 的 TaskStore 跨 API 进程恢复、幂等原响应、显式轮次 key 重放和前台传输状态映射 | 不证明 Conversation、数据库重启/崩溃、多实例、事件缺口回放、响应丢失、真实 Connector 或用户价值 |
 | `C-010` | LLM 运行证据 | 当前配置的 `deepseek-v4-pro` 可通过 OpenAI-compatible 通用问答和 Conversation SSE 返回文本 | [`LLM-API-SMOKE-20260811`](../evidence/LLM-API-SMOKE-EVIDENCE-20260811.md) | 只支持当前文本连通性 | 不证明固定 Demo 1 Task 使用 LLM，也不证明结构化规划、Action、工具执行、质量或 SLA |
+| `C-011` | Stakeholder requirement 与方向选择 | 工程实现是基线，后续需把前台设计和用户交互作为一等目标；本轮选择 Task Director 第二个方向 | `USER-FEEDBACK-20260811-INTERACTION-01`、`DESIGN-REFERENCE-TASK-DIRECTOR-OPTION2-20260811`、[`DR-0005`](DR-0005-task-director-interaction.md) | 支持 PR 6 的布局与交互优先级 | 不证明该界面易用或提升效率 |
+| `C-012` | 源码、自动化、浏览器与视觉复审 | PR 6 的 Task Director、Decision Inbox、Agent 切换、既有控制、历史版本区分、Snapshot 乱序防回滚和被测桌面/移动布局通过最终回归与 Design QA | `TASK-DIRECTOR-INTERACTION-DEMO1-PR6-20260811`、`TASK-DIRECTOR-DESIGN-QA-20260811`、[`运行证据`](../evidence/DEMO1-PR6-TASK-DIRECTOR-INTERACTION-EVIDENCE.md) | 支持固定 Fixture 的工程实现、事实映射、Snapshot 单调应用、响应式主路径和无剩余 P0/P1/P2 的限定结论 | 不证明真实 Connector、通用后台 Loop、真实事件缺口回放、全部异常状态或用户价值 |
 | `H-001` | 待验证假设 | Task Bar 与分支列表能降低用户恢复上下文的成本 | 尚无目标用户研究 | 指导前台原型和指标 | `Draft hypothesis`，不得汇报为已提升体验 |
 | `H-002` | 待验证假设 | 冲突只暂停受影响分支能减少等待且不扩散错误 | 固定 Fixture 已有工程行为；无真实任务收益数据 | 指导分支隔离测试 | 功能正确不等于真实业务收益，仍是 `Draft hypothesis` |
 | `H-003` | 待验证假设 | 客户 A 场景代表联想目标办公用户的高价值流程 | 尚无访谈/任务频率证据 | 仅作为 Demo Fixture | 需要情境访谈与真实任务样本验证 |
 | `H-004` | 待验证假设 | `Steer / Pause / Take over` 符合用户对长期任务的控制心智 | 尚无可用性研究 | 指导控制界面 | 完成按钮功能后仍不能宣称易用 |
+| `H-005` | 待验证假设 | Task Director 与 Decision Inbox 能减少在聊天、工件和冲突动作之间的查找成本 | Stakeholder 选择了该方向；尚无目标用户任务测试 | 指导信息层级、模式切换与测量 | 方向偏好不等于可用性或效率提升，仍是 `Draft hypothesis` |
+| `H-006` | 待验证假设 | `follow_head` 与历史版本 banner 能减少旧 candidate 被误认为当前事实 | 工程与浏览器路径已验证；误读率尚未测量 | 指导历史版本交互与后续测试 | 工程状态区分不等于真实用户不会误读 |
 
 ## 3. 决策与取舍
 
@@ -40,8 +44,9 @@
 1. 先固定 Task/Branch/Artifact/Verification/Conflict/Control/Event/Commit 协议和 UI 事实矩阵。
 2. 再实现持久 Task Store、Snapshot API、按 sequence 恢复的 SSE 和最薄 Task Bar。
 3. 再实现单任务 `Observe → Plan → Act → Verify → Commit`、分支冲突隔离、任务控制和幂等恢复，同时交付最薄真实控制 UI。
-4. 最后完成 Task Artifact Workspace、断线/过期/失败/部分完成/恢复和浏览器端到端验证。
-5. Adaptive Swarm 必须等单任务 Loop 和 Admission 对照成立后另立决策，不进入本决策。
+4. 完成 Task Artifact Workspace、断线/过期/失败/部分完成/恢复和浏览器端到端验证。
+5. 在不新增业务真值的前提下，用 Task Director、Decision Inbox 和历史版本防误读把现有服务端事实组织成可扫描、可控制的用户路径；工程正确性与用户价值分别验证，不能互相替代。
+6. Adaptive Swarm 必须等单任务 Loop 和 Admission 对照成立后另立决策，不进入本决策。
 
 未采用的方案：
 
@@ -62,7 +67,7 @@
 - Snapshot、Artifact/Control 和对应 TaskEvent 原子提交后才能通过 SSE 广播。
 - 任务涉及副作用时继续调用现有 RunService 和 Gateway，Task Runtime 不签发 Permit，也不建立旁路。
 
-PR 3 至 PR 5 当前可观察落点为：
+PR 3 至 PR 5 的后端可观察落点为：
 
 - `TaskService` 仍从服务端 Task ID、Owner、契约、三个初始 Branch 和 `TASK_CREATED(sequence=1)` 开始；`POST /v1/tasks/{task_id}/start` 在一次 mutation 中物化固定客户 A 的 Observe/Plan/Act/Verify Trace、ArtifactVersion、VerificationReport 和局部 Conflict。
 - `POST /v1/tasks/{task_id}/controls` 接受 Steer、Pause、Resume、Take over、Return control 和 Resolve evidence。分支控制经服务端应用后改变 Snapshot；Steer 当前只持久记录为 `accepted`，不宣称已重新规划。
@@ -73,20 +78,24 @@ PR 3 至 PR 5 当前可观察落点为：
 
 该 start 路径不调用 LLM，也不读取真实邮箱、CRM、预测表或项目系统；所有阶段在一次服务端事务提交后才对浏览器可见。因此当前结论是“固定 Fixture 的确定性受控纵切”，不是“通用长任务已在后台持续运行”。内存回归已覆盖 Artifact lineage/head、Commit state hash、剩余 open Conflict 不提交和 mutation 原响应幂等；PostgreSQL 16.14 已补齐顺序 API 进程恢复证据。数据库进程重启/崩溃、已有库迁移、Conversation、多实例通知和通用后台 Loop 仍无证据。
 
+PR 6 的 Task Director 没有改变上述后端事实、接口或状态机；它只重组前台信息层级与客户端视图/选择状态。因此任何视觉上的阶段轨、泳道、汇聚卡、Decision Inbox 数量和同步提示都必须能回指当前 Snapshot 或明确标注为客户端事实。
+
 ## 5. 前台输出
 
 完整映射见 [`UI_SERVER_FACT_MATRIX.md`](../contracts/UI_SERVER_FACT_MATRIX.md)。前台必须提供：
 
-- Active Task Bar：Task ID、目标、阶段、预算、同步状态和最近 Commit。
-- Branch Status List：running、waiting evidence、paused、taken over、failed、committed。
-- Conflict Card：冲突主题、来源、影响分支和解决动作。
-- Task Artifact Workspace：版本、来源、验证结果和 Artifact head。
-- Task Control：Steer、Pause、Resume、Take over、Return control，并在服务端确认后才改变状态。
+- Task Director 头部与事实摘要：目标、版本、阶段、预算、同步状态、已验证分支和待决策数。
+- Branch 泳道：running、waiting evidence、paused、taken over、failed、committed，以及对应契约、head、验证/冲突和 Commit 汇聚条件。
+- Decision Inbox：冲突主题、正式/候选口径、来源、影响分支和现有解决/接管动作；可切换到既有 Agent 对话。
+- Task Artifact Workspace：版本、来源、验证结果、Artifact head，以及主动查看历史版本时的明确 banner。
+- Task Control：Steer、Pause、Resume、Take over、Return control，并在服务端确认后才改变状态；Steer 只称已记录待应用。
 - 断线、过期版本、预算耗尽、权限不足、部分失败和恢复的明确反馈。
 
 默认隐藏 Prompt、思维链、Worker 对话、完整 Trace JSON、JWT/Permit、幂等键、权限哈希、DSN、工具秘密和堆栈。现有业务动作确认 tray 保持独立，不能与任务级控制合并。
 
 PR 4 在上述 Task Bar 与控制 UI 之外增加只读交付物工作区。Task 面板从 `branches[].artifact_heads` 直达版本；工作区从同一 Snapshot 显示版本/状态、验证、冲突、结构化内容、折叠来源与检查、lineage 以及 Commit/state hash，并以两个 tab 保留原“工作台待办”。PR 5 让 Conflict Card 与 Artifact Workspace 共用 fail-closed source-ref 投影，只放行契约中的四个已知 Fixture；顶部连接文案改由独立传输状态驱动，pending mutation/Snapshot 对账继续由 Task 同步状态表达，避免相互误报。这仍只是前端第二道投影，服务端通用字段可见性 Schema/display projection 尚未实现。
+
+PR 6 把 Tasks 默认入口调整为左侧 Task Director 与右侧 Decision Inbox，并保留“共享工件 / 待办”和 Agent 模式。工件选择区分默认跟随 head 与用户固定历史版本；mutation 后默认追随新 head，固定旧版本时显示当前 head 和返回动作。移动端阻塞摘要提供到决策区的可达路径。最终浏览器回归、桌面/移动/历史截图和 Design QA 已回填到 `DR-0005` evidence；它们证明固定 Fixture 的工程交互，不证明交互效果或业务收益改善。
 
 system Edge E2E 通过真实本地 Next.js `3011` 与 FastAPI `8011` 覆盖创建、start、冲突、Steer accepted、resolve、Commit、客户回复 v3/2,400 万元/仅草稿未发送，以及 start 请求发送前 abort 后的 `sessionStorage` reload、同 key 重试和无重复工件。五张截图、DOM 断言与完整边界见 [`FRONTEND-E2E-DEMO1-PR4-20260810`](../evidence/DEMO1-PR4-FRONTEND-E2E-EVIDENCE.md)。该用例没有把 start 请求交给服务端，不能扩展为“服务端已提交但响应丢失”的恢复证明；Task SSE 断线回放也未测试。
 
@@ -103,11 +112,11 @@ Action Gate 打开时保留 Active Task Bar，Gate 占用独立网格行；TaskR
 | SSE 能否无漏地续订 | 服务层证明 `after=N`；PR 5 浏览器证明无停机期新事件时的断线、重连和 GET 对账；事件缺口与多实例待验 | integration tests + PR 5 browser evidence |
 | 冲突能否局部隔离 | 固定收入冲突只令目标 Branch waiting，另两 Branch 形成已验证工件 | PR 3 tests + Snapshot；只证明 Fixture 工程行为 |
 | 控制与恢复是否幂等 | 相同 mutation 不产生重复 Event/ArtifactVersion/Commit，并返回协议规定结果 | PR 3 内存 tests；PR 5 PostgreSQL 跨进程重放保持 `45/7/1`，返回原 v2/v3 |
-| 前后端是否一致 | UI 只根据服务端 Snapshot/Event 显示业务状态；连接文案只表达客户端传输状态 | PR 4 固定主路径 + PR 5 API 重启 system Edge；其他异常/事件缺口待补 |
+| 前后端是否一致 | UI 只根据服务端 Snapshot/Event 显示业务状态；连接、右侧模式和历史选择只表达客户端事实 | PR 4 固定主路径 + PR 5 API 重启 system Edge + PR 6 最终 Task Director E2E/视觉复审；未测异常与事件缺口仍待补 |
 | pending mutation 能否浏览器恢复 | reload 后保留原 key/intent，同 key确认且不重复工件 | PR 4 已覆盖发送前 abort；服务端已提交但响应丢失待补 |
 | 用户是否更易理解和控制 | 尚未设为功能完成条件 | 后续独立用户研究；未完成前保持假设 |
 
-截至 PR 5，“固定 Fixture 的功能实现、前后端映射、PostgreSQL 顺序 API 进程恢复和本次列出的浏览器路径”已有 `C-007/C-008/C-009` 工程证据，可以在各自边界内标记 `Verified`。本决策整体仍保持 `Ready`：数据库故障/迁移、多实例、事件缺口、服务端已提交但响应丢失、真实 Connector 和 Artifact/Action 绑定尚未验收，用户价值、代表性与易用性假设仍需独立证据。
+截至 PR 6，“固定 Fixture 的功能实现、前后端映射、PostgreSQL 顺序 API 进程恢复、被测浏览器路径和 Task Director 视觉封口”已有 `C-007` 至 `C-012` 中对应工程证据，可以在各自边界内标记 `Verified`；`DR-0005` 已在该边界内标记 `Verified`。本决策整体仍保持 `Ready`：数据库故障/迁移、多实例、事件缺口、服务端已提交但响应丢失、真实 Connector 和 Artifact/Action 绑定尚未验收，`H-001` 至 `H-006` 仍需独立用户/业务证据。
 
 PR 1 实际验证（2026-08-10）：`uv run pytest -q` 为 37 passed，`uv run ruff check .`、`pnpm --dir apps/web lint`、`pnpm --dir apps/web build` 和 `git diff --check` 均通过。该结果只证明协议、类型、文档留痕和防回退检查已落地，不证明 Task Store、SSE、Loop 或界面已经实现。
 
@@ -118,6 +127,8 @@ PR 3 Runtime 验证（2026-08-10）：针对性 Task 测试 `15 passed`，全量
 PR 4 前端验证（2026-08-10）：`pnpm --dir apps/web test:e2e` 在本地 FastAPI `8011`、Next.js `3011` 与 system Edge 上为 `2 passed (18.4s)`。主路径覆盖 create/start/conflict/Steer/resolve/commit、客户回复 v3、正式收入 2,400 万元、仅草稿未发送和 state hash；恢复路径覆盖发送前 abort、`sessionStorage` reload、同 key 重试及无重复工件；移动 DOM 断言覆盖被测区域无横向 overflow 和可见操作目标至少 44px。该结果不覆盖服务端已提交但响应丢失、SSE 断线、PostgreSQL、真实 Connector 或 `H-001` 至 `H-004`。
 
 PR 5 PostgreSQL 与前台恢复验证（2026-08-11）：基线证据以五张 1440 x 900 截图和 DOM 断言验证连接文案、控制禁用、同 Task ID 与 v2/v3 Snapshot 全等。与 `origin/master@1a413f3` 合并后，commit `9814183` 的兼容封口为：opt-in PostgreSQL 16.14 system test `1 passed (9.78s)`，同一显式轮次 key 跨 API A/B/C 返回同 Task，不同 key 产生第二个 Task，原 Task 保持 `45 events / 7 artifacts / 1 TASK_COMMITTED`；system Edge suite `3 passed (17.0s)`，还断言“再次演示”首次创建请求中断时旧 Task 仍显示已连接、重试复用同 key 且只新增一个 Task。完整 Python 为 `58 passed, 1 skipped (2.00s)`，治理文档 `4 passed`，Ruff、前端 lint、生产构建和 `git diff --check` 均通过；skip 是普通测试没有显式配置 opt-in 维护库 DSN。该结果不覆盖 Conversation、数据库进程故障、事件缺口、响应丢失、多实例或 `H-001` 至 `H-004`。
+
+PR 6 Task Director 验证（2026-08-11）：最终全量浏览器 E2E 为 `6 passed (34.5s)`，专用 Task Director 截图封口用例为 `1 passed (21.6s)`；完整 Python 为 `58 passed, 1 skipped (3.46s)`，Ruff、前端 lint、生产构建和治理测试通过。新增两项乱序回归，证明旧 GET 不能覆盖较新 version/sequence Snapshot，已观察 SSE 序号又会成为应用与同步状态的下限，未追上该下限时不能伪标 `synced`。`design-qa.md` 最终为 `passed`，全图、编排、Decision Inbox、移动和历史版本两轮复审后无剩余 P0/P1/P2。该结论只覆盖固定 Fixture、记录的桌面/移动视口和被测交互，不覆盖目标用户理解、效率、决策质量、真实 Connector 或通用后台 Loop。
 
 ## 7. 关联项
 
@@ -130,4 +141,6 @@ PR 5 PostgreSQL 与前台恢复验证（2026-08-11）：基线证据以五张 14
 - PR 4 前端 E2E 证据：[`DEMO1-PR4-FRONTEND-E2E-EVIDENCE.md`](../evidence/DEMO1-PR4-FRONTEND-E2E-EVIDENCE.md)
 - PR 5 PostgreSQL-backed API 重启证据：[`DEMO1-PR5-POSTGRES-BACKED-API-RESTART-EVIDENCE.md`](../evidence/DEMO1-PR5-POSTGRES-BACKED-API-RESTART-EVIDENCE.md)
 - LLM 连通性证据：[`LLM-API-SMOKE-EVIDENCE-20260811.md`](../evidence/LLM-API-SMOKE-EVIDENCE-20260811.md)
+- Task Director 决策：[`DR-0005-task-director-interaction.md`](DR-0005-task-director-interaction.md)
+- PR 6 Task Director 运行与视觉证据：[`DEMO1-PR6-TASK-DIRECTOR-INTERACTION-EVIDENCE.md`](../evidence/DEMO1-PR6-TASK-DIRECTOR-INTERACTION-EVIDENCE.md)
 - 后续证据：数据库故障/迁移、SSE 事件缺口、响应丢失、多实例、Task/Action 绑定、真实 Connector 和用户研究，产生后继续回填。

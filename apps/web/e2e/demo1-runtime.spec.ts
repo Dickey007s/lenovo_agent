@@ -8,6 +8,7 @@ type TaskSnapshot = {
   status: string;
   phase: string;
   version: number;
+  last_event_sequence: number;
   branches: { branch_id: string; status: string }[];
   artifact_versions: { artifact_version_id: string }[];
   controls: { kind: string; status: string; idempotency_key: string }[];
@@ -128,7 +129,7 @@ async function expectMobileArtifactWorkspace(page: Page) {
     expect(item.scrollWidth, `${item.selector} should not scroll horizontally`).toBeLessThanOrEqual(item.clientWidth + 1);
   }
 
-  const undersizedTargets = await page.locator(".task-view-shell button, .task-view-shell summary").evaluateAll((elements) => (
+  const undersizedTargets = await page.locator(".task-artifact-workspace button, .task-artifact-workspace summary").evaluateAll((elements) => (
     elements.flatMap((element) => {
       const rect = element.getBoundingClientRect();
       if (rect.width === 0 || rect.height === 0) return [];
@@ -137,6 +138,279 @@ async function expectMobileArtifactWorkspace(page: Page) {
   ));
   expect(undersizedTargets, "visible artifact actions should be at least 44px tall").toEqual([]);
 }
+
+async function expectMobileTaskDirector(page: Page) {
+  const overflow = await page.evaluate(() => {
+    const selectors = ["html", "body", ".app-shell", ".task-view-shell", ".task-director-canvas", ".task-director-side-pane"];
+    return selectors.map((selector) => {
+      const element = document.querySelector<HTMLElement>(selector);
+      if (!element) throw new Error(`Missing responsive element: ${selector}`);
+      return { selector, clientWidth: element.clientWidth, scrollWidth: element.scrollWidth };
+    });
+  });
+  for (const item of overflow) {
+    expect(item.scrollWidth, `${item.selector} should not scroll horizontally`).toBeLessThanOrEqual(item.clientWidth + 1);
+  }
+
+  const undersizedTargets = await page.locator([
+    ".task-view-shell button",
+    ".task-view-shell summary",
+    ".task-director-side-pane button",
+    ".task-director-side-pane summary",
+  ].join(", ")).evaluateAll((elements) => elements.flatMap((element) => {
+    const rect = element.getBoundingClientRect();
+    if (rect.width === 0 || rect.height === 0) return [];
+    return rect.height < 44 ? [{ text: element.textContent?.trim(), height: rect.height }] : [];
+  }));
+  expect(undersizedTargets, "visible Task Director actions should be at least 44px tall").toEqual([]);
+}
+
+test("Task Director keeps decisions, controls, errors, and versions understandable", async ({ page, request }, testInfo) => {
+  const owner = "e2e_task_director";
+  await routeBrowserApiAs(page, owner);
+  await page.setViewportSize({ width: 1487, height: 1058 });
+  await page.goto("/");
+  await page.getByRole("button", { name: "任务", exact: true }).click();
+
+  await expect(page.getByRole("heading", { name: "把持续任务变成可见的协作过程" })).toBeVisible();
+  await page.getByRole("button", { name: "创建任务", exact: true }).click();
+  await expect(page.getByText("等待启动", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "启动任务" }).first().click();
+
+  await expect(page.getByRole("heading", { name: "任务编排与分支状态" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "需要你的决定" })).toBeVisible();
+  await expect(page.getByText("2 / 3", { exact: true })).toBeVisible();
+  await expect(page.getByText("分支已提交", { exact: true })).toHaveCount(2);
+  await expect(page.getByText("已汇入最终提交", { exact: true })).toHaveCount(0);
+  await expect(page.locator(".workspace-toast")).toBeHidden({ timeout: 4_000 });
+  await attachScreenshot(page, testInfo, "task-director-conflict-desktop");
+
+  const viewTabs = page.getByRole("tablist", { name: "任务工作区视图" });
+  const directorTab = viewTabs.getByRole("tab", { name: "指挥台" });
+  await directorTab.focus();
+  await directorTab.press("ArrowRight");
+  await expect(viewTabs.getByRole("tab", { name: "共享工件" })).toHaveAttribute("aria-selected", "true");
+  await viewTabs.getByRole("tab", { name: "共享工件" }).press("Home");
+  await expect(directorTab).toHaveAttribute("aria-selected", "true");
+
+  await page.getByRole("tab", { name: "Agent 对话" }).click();
+  await expect(page.getByRole("heading", { name: "需要你的决定" })).toHaveCount(0);
+  await page.getByRole("button", { name: "查看决策" }).click();
+  await expect(page.getByRole("tab", { name: "待我决定" })).toHaveAttribute("aria-selected", "true");
+  await expect(page.getByRole("heading", { name: "需要你的决定" })).toBeFocused();
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.getByRole("button", { name: "查看决策" }).click();
+  await expectMobileTaskDirector(page);
+  await page.locator("#task-decision-conflicts-title").scrollIntoViewIfNeeded();
+  await attachScreenshot(page, testInfo, "task-director-decision-mobile");
+
+  await page.setViewportSize({ width: 1487, height: 1058 });
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await page.getByRole("button", { name: "查看相关工件" }).click();
+  await expect(page.locator(".task-artifact-status")).toContainText("v1 · 候选版本");
+  await page.getByRole("tab", { name: "指挥台" }).click();
+
+  const primaryDecision = page.getByRole("button", { name: "采用正式口径并保留差异" });
+  await page.getByRole("button", { name: "暂停分支" }).click();
+  await expect(primaryDecision).toBeDisabled();
+  await expect(page.getByText("先恢复分支，再提交证据决定。")).toBeVisible();
+  await page.getByRole("button", { name: "恢复分支" }).click();
+  await expect(primaryDecision).toBeEnabled();
+
+  let rejectedOnce = false;
+  await page.route(/\/v1\/tasks\/[^/]+\/controls$/, async (route) => {
+    if (!rejectedOnce && route.request().method() === "POST" && route.request().postDataJSON()?.kind === "resolve_evidence") {
+      rejectedOnce = true;
+      await route.fulfill({ status: 409, contentType: "application/json", body: JSON.stringify({ detail: "测试冲突：任务版本已更新" }) });
+      return;
+    }
+    await route.fallback();
+  });
+  await primaryDecision.click();
+  await expect(page.getByRole("alert").filter({ hasText: "测试冲突" })).toBeVisible();
+  await expect(page.getByText(/已刷新到 v\d+，请复核后重试/)).toBeVisible();
+
+  await primaryDecision.click();
+  await expect(page.getByText("当前没有待决策项", { exact: true })).toBeVisible();
+  await expect(page.getByText("已汇入最终提交", { exact: true })).toHaveCount(3);
+  await expect(page.getByText("分支已提交", { exact: true })).toHaveCount(0);
+  await expect(page.getByRole("alert").filter({ hasText: "测试冲突" })).toHaveCount(0);
+  await expect(page.locator(".workspace-toast")).toBeHidden({ timeout: 4_000 });
+  await attachScreenshot(page, testInfo, "task-director-committed-desktop");
+
+  await page.getByRole("tab", { name: "共享工件" }).click();
+  await expect(page.locator(".task-artifact-status")).toContainText("v2 · 已验证");
+  await expect(page.getByText(/正在查看历史版本/)).toHaveCount(0);
+  await page.getByRole("button", { name: /^v1 候选版本/ }).click();
+  await expect(page.getByText("正在查看历史版本 v1", { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "返回当前版本" })).toBeVisible();
+  await attachScreenshot(page, testInfo, "task-director-history-desktop");
+
+  const tasks = await listTasks(request, owner);
+  expect(tasks).toHaveLength(1);
+  expect(tasks[0].status).toBe("committed");
+  expect(rejectedOnce).toBeTruthy();
+});
+
+test("a late older task GET cannot roll back a newer mutation snapshot", async ({ page }) => {
+  const owner = "e2e_demo1_snapshot_order";
+  await routeBrowserApiAs(page, owner);
+
+  let releaseStaleGet = () => {};
+  let markStaleCaptured = () => {};
+  let markStaleDelivered = () => {};
+  const staleGetGate = new Promise<void>((resolve) => { releaseStaleGet = resolve; });
+  const staleCaptured = new Promise<void>((resolve) => { markStaleCaptured = resolve; });
+  const staleDelivered = new Promise<void>((resolve) => { markStaleDelivered = resolve; });
+  let delayedSnapshot: TaskSnapshot | null = null;
+  let delayedVersion = 0;
+  let delayedSequence = 0;
+
+  await page.route(/\/v1\/tasks\/[^/]+$/, async (route) => {
+    if (route.request().method() !== "GET" || delayedSnapshot) {
+      await route.fallback();
+      return;
+    }
+    const response = await route.fetch({
+      headers: {
+        ...route.request().headers(),
+        "x-user-id": owner,
+        "x-user-roles": "current_user,sales_manager",
+      },
+    });
+    const snapshot = (await response.json()) as TaskSnapshot;
+    if (snapshot.status !== "ready") {
+      await route.fulfill({ response, body: JSON.stringify(snapshot) });
+      return;
+    }
+    delayedSnapshot = snapshot;
+    delayedVersion = snapshot.version;
+    delayedSequence = snapshot.last_event_sequence;
+    markStaleCaptured();
+    await staleGetGate;
+    await route.fulfill({ response, body: JSON.stringify(snapshot) });
+    markStaleDelivered();
+  });
+
+  await page.goto("/");
+  await page.getByRole("button", { name: "任务", exact: true }).click();
+  await page.getByRole("button", { name: "创建任务", exact: true }).click();
+  await staleCaptured;
+  expect(delayedVersion).toBe(1);
+  expect(delayedSequence).toBe(1);
+
+  await page.getByRole("button", { name: "启动任务" }).first().click();
+  await expect(page.locator(".task-director-version")).toHaveText("v2");
+  await expect(page.getByRole("heading", { name: "需要你的决定" })).toBeVisible();
+
+  releaseStaleGet();
+  await staleDelivered;
+  await page.waitForTimeout(250);
+  await expect(page.locator(".task-director-version")).toHaveText("v2");
+  await expect(page.getByRole("heading", { name: "需要你的决定" })).toBeVisible();
+  await expect(page.getByText("等待启动", { exact: true })).toHaveCount(0);
+});
+
+test("task snapshot ordering uses the received SSE sequence as its floor", async ({ page }) => {
+  const owner = "e2e_demo1_snapshot_sse_floor";
+  await routeBrowserApiAs(page, owner);
+
+  let releaseStaleGet = () => {};
+  let markStaleCaptured = () => {};
+  let markStaleDelivered = () => {};
+  let markReconnected = () => {};
+  const staleGetGate = new Promise<void>((resolve) => { releaseStaleGet = resolve; });
+  const staleCaptured = new Promise<void>((resolve) => { markStaleCaptured = resolve; });
+  const staleDelivered = new Promise<void>((resolve) => { markStaleDelivered = resolve; });
+  const reconnected = new Promise<void>((resolve) => { markReconnected = resolve; });
+  let delayed = false;
+  let syntheticEventSent = false;
+  let reconnectAfter = "";
+
+  await page.route(/\/v1\/tasks\/[^/]+$/, async (route) => {
+    if (route.request().method() !== "GET" || delayed) {
+      await route.fallback();
+      return;
+    }
+    const response = await route.fetch({
+      headers: {
+        ...route.request().headers(),
+        "x-user-id": owner,
+        "x-user-roles": "current_user,sales_manager",
+      },
+    });
+    const snapshot = (await response.json()) as TaskSnapshot;
+    delayed = true;
+    markStaleCaptured();
+    await staleGetGate;
+    await route.fulfill({
+      response,
+      body: JSON.stringify({
+        ...snapshot,
+        status: "failed",
+        version: snapshot.version + 1,
+        last_event_sequence: snapshot.last_event_sequence + 1,
+      }),
+    });
+    markStaleDelivered();
+  });
+
+  await page.route(/\/v1\/tasks\/[^/]+\/events\?after=\d+$/, async (route) => {
+    const url = new URL(route.request().url());
+    if (syntheticEventSent) {
+      reconnectAfter = url.searchParams.get("after") ?? "";
+      markReconnected();
+      await route.fallback();
+      return;
+    }
+    syntheticEventSent = true;
+    const taskId = url.pathname.split("/")[3];
+    const event = {
+      sequence: 3,
+      event_id: "synthetic-sequence-floor",
+      task_id: taskId,
+      trace_id: "synthetic-sequence-floor",
+      task_version: 1,
+      branch_id: null,
+      artifact_version_id: null,
+      control_event_id: null,
+      actor_id: owner,
+      event_type: "TASK_STATUS_CHANGED",
+      idempotency_key: null,
+      payload: {},
+      occurred_at: new Date().toISOString(),
+    };
+    await route.fulfill({
+      status: 200,
+      contentType: "text/event-stream",
+      headers: {
+        "Access-Control-Allow-Origin": "http://localhost:3011",
+        "Cache-Control": "no-cache",
+      },
+      body: `event: TASK_STATUS_CHANGED\ndata: ${JSON.stringify(event)}\n\n`,
+    });
+  });
+
+  await page.goto("/");
+  await page.getByRole("button", { name: "任务", exact: true }).click();
+  await page.getByRole("button", { name: "创建任务", exact: true }).click();
+  await staleCaptured;
+  await reconnected;
+  expect(reconnectAfter).toBe("3");
+
+  releaseStaleGet();
+  await staleDelivered;
+  await page.waitForTimeout(250);
+  await expect(page.locator(".task-director-version")).toHaveText("v1");
+  await expect(page.getByText("等待启动", { exact: true })).toBeVisible();
+  await expect(page.getByText("任务未能继续", { exact: true })).toHaveCount(0);
+  await expect(page.getByText("浏览器正在对账", { exact: true })).toBeVisible();
+
+  await page.getByRole("button", { name: "立即对账" }).first().click();
+  await expect(page.getByText("浏览器正在对账", { exact: true })).toBeVisible();
+  await expect(page.getByText("浏览器已同步", { exact: true })).toHaveCount(0);
+});
 
 test("Demo 1 uses server facts from creation through the three-branch commit", async ({ page, request }, testInfo) => {
   const owner = "e2e_demo1_main";
@@ -171,10 +445,9 @@ test("Demo 1 uses server facts from creation through the three-branch commit", a
   await attachScreenshot(page, testInfo, "demo1-conflict-artifact-desktop");
 
   await page.setViewportSize({ width: 390, height: 844 });
-  await expectRuntimeStack(page, 220);
   await expectMobileArtifactWorkspace(page);
-  const conflictAction = page.getByRole("button", { name: "采用正式收入来源" });
-  const steerInput = page.getByLabel("方向指令");
+  const conflictAction = page.getByRole("button", { name: "采用正式口径并保留差异" });
+  const steerInput = page.getByRole("textbox", { name: "方向指令" });
   for (const control of [conflictAction, steerInput]) {
     const box = await control.boundingBox();
     expect(box, "mobile control should have a rendered box").not.toBeNull();
@@ -187,15 +460,14 @@ test("Demo 1 uses server facts from creation through the three-branch commit", a
   await page.evaluate(() => window.scrollTo(0, 0));
   await steerInput.scrollIntoViewIfNeeded();
   await steerInput.fill("保持客户回复为草稿，并突出正式口径与预测差异。");
-  await page.getByRole("button", { name: "记录指令" }).click();
+  await page.getByRole("button", { name: "记录方向指令" }).click();
   await expect(page.getByText(/方向指令已记录.*应用/)).toBeVisible();
 
   await conflictAction.scrollIntoViewIfNeeded();
   await conflictAction.click();
-  await expect(page.getByText("RECENT TASK", { exact: true })).toBeVisible();
-  await expect(page.getByText("已验证并提交", { exact: true })).toBeVisible();
-  await expect(page.locator(".task-branch-status.is-committed")).toHaveCount(3);
-  await expect(page.locator(".task-conflicts")).toHaveCount(0);
+  await expect(page.getByText("当前没有待决策项", { exact: true })).toBeVisible();
+  await expect(page.locator(".task-artifact-branch-status-committed")).toHaveCount(3);
+  await expect(page.locator(".task-decision-card")).toHaveCount(0);
   await attachScreenshot(page, testInfo, "demo1-committed-desktop");
 
   const openReply = page.getByRole("button", { name: "查看客户回复草稿" });
@@ -217,6 +489,7 @@ test("Demo 1 uses server facts from creation through the three-branch commit", a
   const replyLineage = page.locator(".task-artifact-lineage-button");
   await replyLineage.first().click();
   await expect(page.locator(".task-artifact-status")).toContainText("v1 · 候选版本");
+  await expect(page.getByText("正在查看历史版本 v1", { exact: true })).toBeVisible();
   await expect(replyLineage.first()).toHaveAttribute("aria-pressed", "true");
   await expect(page.locator(".task-artifact-navigation-button-selected")).toHaveCount(0);
   await openReply.click();

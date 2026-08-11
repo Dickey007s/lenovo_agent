@@ -17,7 +17,11 @@ import { formatSourceReference } from "./source-reference";
 export type TaskArtifactWorkspaceProps = {
   task: TaskSnapshot | null;
   selectedArtifactVersionId?: string | null;
-  onSelectArtifact: (artifactVersionId: string) => void;
+  selectionMode?: "follow_head" | "pinned_history";
+  onSelectArtifact: (
+    artifactVersionId: string,
+    selectionMode?: "follow_head" | "pinned_history",
+  ) => void;
 };
 
 export type TaskArtifactWorkspaceItem = {
@@ -61,6 +65,12 @@ const BRANCH_STATUS_LABELS: Record<BranchSnapshot["status"], string> = {
   failed: "失败",
   committed: "已提交",
   cancelled: "已取消",
+};
+
+const ARTIFACT_KIND_LABELS: Record<string, string> = {
+  analysis: "经营分析",
+  risk_brief: "风险摘要",
+  reply_draft: "客户回复草稿",
 };
 
 const CONTENT_FIELD_LABELS: Record<string, string> = {
@@ -320,25 +330,43 @@ function SourceReferences({ sourceRefs, label }: { sourceRefs: string[]; label: 
   );
 }
 
-function ConflictSummary({ conflicts }: { conflicts: ConflictRecord[] }) {
+function ConflictSummary({
+  conflicts,
+  historicalVersion,
+  currentHeadVersion,
+}: {
+  conflicts: ConflictRecord[];
+  historicalVersion: boolean;
+  currentHeadVersion: number;
+}) {
   if (conflicts.length === 0) return null;
 
   return (
     <section className="task-artifact-conflicts" aria-labelledby="task-artifact-conflicts-title">
       <header className="task-artifact-section-header">
-        <h3 id="task-artifact-conflicts-title">证据冲突</h3>
-        <span>{conflicts.filter((conflict) => conflict.status === "open").length} 项待处理</span>
+        <h3 id="task-artifact-conflicts-title">{historicalVersion ? "当前任务冲突状态" : "证据冲突"}</h3>
+        <span>{historicalVersion
+          ? `当前分支头 v${currentHeadVersion}`
+          : `${conflicts.filter((conflict) => conflict.status === "open").length} 项待处理`}</span>
       </header>
+      {historicalVersion && (
+        <p className="task-artifact-conflict-context-note">
+          下方状态来自当前 Task Snapshot；“已解决”仅表示当前 Snapshot 记录的冲突状态，
+          不表示解决发生在当前分支头，也不代表正在查看的历史工件已通过验证。
+        </p>
+      )}
       <ul className="task-artifact-conflict-list">
         {conflicts.map((conflict) => (
           <li
-            className={`task-artifact-conflict task-artifact-conflict-${conflict.status}`}
+            className={`task-artifact-conflict task-artifact-conflict-${conflict.status}${historicalVersion ? " is-historical-context" : ""}`}
             key={conflict.conflict_id}
           >
             <article>
               <header className="task-artifact-conflict-header">
                 <h4>{conflict.subject}</h4>
-                <span>{CONFLICT_STATUS_LABELS[conflict.status]}</span>
+                <span>{historicalVersion && conflict.status === "resolved"
+                  ? "当前 Snapshot 已解决"
+                  : CONFLICT_STATUS_LABELS[conflict.status]}</span>
               </header>
               <p>{conflict.summary}</p>
               {conflict.candidate_values.length > 0 && (
@@ -353,7 +381,7 @@ function ConflictSummary({ conflicts }: { conflicts: ConflictRecord[] }) {
               )}
               {conflict.resolution && (
                 <p className="task-artifact-conflict-resolution">
-                  <strong>处理结果：</strong>
+                  <strong>{historicalVersion ? "当前任务处理结果：" : "处理结果："}</strong>
                   {conflict.resolution}
                 </p>
               )}
@@ -377,9 +405,12 @@ function ArtifactDetail({
   artifact: ArtifactVersion;
   reportsByArtifactId: Map<string, VerificationReport>;
   selectedArtifactVersionId: string;
-  onSelectArtifact: (artifactVersionId: string) => void;
+  onSelectArtifact: TaskArtifactWorkspaceProps["onSelectArtifact"];
 }) {
   const report = reportsByArtifactId.get(artifact.artifact_version_id) ?? null;
+  const historicalVersion = Boolean(
+    item.head && item.head.artifact_version_id !== artifact.artifact_version_id,
+  );
   const visibleContentFields = VISIBLE_CONTENT_FIELDS_BY_KIND[artifact.kind]
     ?? EMPTY_VISIBLE_CONTENT_FIELDS;
 
@@ -399,6 +430,21 @@ function ArtifactDetail({
         </div>
       </header>
 
+      {historicalVersion && item.head && (
+        <aside className="task-artifact-history-warning" role="status">
+          <div>
+            <strong>正在查看历史版本 v{artifact.version}</strong>
+            <p>当前分支头为 v{item.head.version}。服务端最新状态未被覆盖。</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => onSelectArtifact(item.head!.artifact_version_id, "follow_head")}
+          >
+            返回当前版本
+          </button>
+        </aside>
+      )}
+
       {item.branch.status === "waiting_evidence" && (
         <aside className="task-artifact-waiting" role="status">
           <strong>此分支正在等待证据</strong>
@@ -406,12 +452,16 @@ function ArtifactDetail({
         </aside>
       )}
 
-      <ConflictSummary conflicts={item.conflicts} />
+      <ConflictSummary
+        conflicts={item.conflicts}
+        historicalVersion={historicalVersion}
+        currentHeadVersion={item.head?.version ?? artifact.version}
+      />
 
       <section className="task-artifact-content" aria-labelledby="task-artifact-content-title">
         <header className="task-artifact-section-header">
           <h3 id="task-artifact-content-title">工件内容</h3>
-          <span>{item.deliverable?.kind || artifact.kind}</span>
+          <span>{ARTIFACT_KIND_LABELS[item.deliverable?.kind || artifact.kind] ?? "结构化工件"}</span>
         </header>
         {visibleRecordEntries(artifact.content, visibleContentFields).length > 0 ? (
           <StructuredValue value={artifact.content} visibleFields={visibleContentFields} />
@@ -453,10 +503,15 @@ function ArtifactDetail({
             return (
               <li key={version.artifact_version_id}>
                 <button
-                  className={`task-artifact-lineage-button${selected ? " task-artifact-lineage-button-selected" : ""}`}
+                  className={`task-artifact-lineage-button task-artifact-lineage-button-${version.status}${selected ? " task-artifact-lineage-button-selected" : ""}`}
                   type="button"
                   aria-pressed={selected}
-                  onClick={() => onSelectArtifact(version.artifact_version_id)}
+                  onClick={() => onSelectArtifact(
+                    version.artifact_version_id,
+                    version.artifact_version_id === item.head?.artifact_version_id
+                      ? "follow_head"
+                      : "pinned_history",
+                  )}
                 >
                   <span>v{version.version}</span>
                   <strong>{ARTIFACT_STATUS_LABELS[version.status]}</strong>
@@ -576,7 +631,8 @@ export function TaskArtifactWorkspace({
                           className={`task-artifact-navigation-button${selected ? " task-artifact-navigation-button-selected" : ""}`}
                           type="button"
                           aria-pressed={selected}
-                          onClick={() => onSelectArtifact(item.head!.artifact_version_id)}
+                          aria-label={`查看${item.deliverable?.title || item.branch.title}`}
+                          onClick={() => onSelectArtifact(item.head!.artifact_version_id, "follow_head")}
                         >
                           <span>v{item.head.version}</span>
                           <strong>{ARTIFACT_STATUS_LABELS[item.head.status]}</strong>
@@ -647,9 +703,12 @@ export function TaskArtifactWorkspace({
                 <dd>{task.last_commit.verification_report_ids.length} 份</dd>
               </div>
               <div>
-                <dt>状态哈希</dt>
+                <dt>提交证据</dt>
                 <dd>
-                  <code>{task.last_commit.state_hash}</code>
+                  <details className="task-artifact-commit-evidence">
+                    <summary>查看状态哈希</summary>
+                    <code>{task.last_commit.state_hash}</code>
+                  </details>
                 </dd>
               </div>
             </dl>
