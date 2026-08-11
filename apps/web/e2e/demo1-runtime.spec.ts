@@ -263,6 +263,7 @@ test("an aborted start keeps one idempotency key across reload and reconciles wi
   await page.getByRole("button", { name: "启动任务" }).click();
   await expect(page.getByText(/启动结果待确认/)).toBeVisible();
   await expect(page.getByRole("button", { name: "立即对账" })).toBeVisible();
+  await expect(page.getByText("已连接当前工作区", { exact: true })).toBeVisible();
   expect(aborted).toBeTruthy();
   const capturedBody = attemptedBody as { expected_task_version: number; idempotency_key: string };
 
@@ -281,6 +282,7 @@ test("an aborted start keeps one idempotency key across reload and reconciles wi
 
   await page.reload();
   await expect(page.getByRole("button", { name: "立即对账" })).toBeVisible();
+  await expect(page.getByText("已连接当前工作区", { exact: true })).toBeVisible();
   const savedAfterReload = await page.evaluate((key) => window.sessionStorage.getItem(key), PENDING_MUTATION_KEY);
   expect(savedAfterReload).toBe(savedBeforeReload);
 

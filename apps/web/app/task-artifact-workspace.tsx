@@ -12,6 +12,7 @@ import type {
   VerificationReport,
   VerificationStatus,
 } from "./task-types";
+import { formatSourceReference } from "./source-reference";
 
 export type TaskArtifactWorkspaceProps = {
   task: TaskSnapshot | null;
@@ -115,8 +116,6 @@ const EMPTY_VISIBLE_CONTENT_FIELDS = new Set<string>();
 
 const INTERNAL_CONTENT_FIELD =
   /(^|_)(api_key|chain_of_thought|internal|logs?|prompt|raw_log|reasoning|secret|system_prompt|token|trace|trace_id|worker|worker_id|worker_messages)($|_)/i;
-const SAFE_SOURCE_REFERENCE = /^(fixture|source|artifact|workspace|crm|forecast|document):[a-z0-9][a-z0-9._:/-]*$/i;
-const SENSITIVE_SOURCE_REFERENCE = /(api[_-]?key|credential|password|secret|signature|token)/i;
 
 function formatDateTime(value: string) {
   const parsed = new Date(value);
@@ -309,9 +308,7 @@ function SourceReferences({ sourceRefs, label }: { sourceRefs: string[]; label: 
           {sourceRefs.map((sourceRef, index) => (
             <li key={`${sourceRef}:${index}`}>
               <code>
-                {SAFE_SOURCE_REFERENCE.test(sourceRef) && !SENSITIVE_SOURCE_REFERENCE.test(sourceRef)
-                  ? sourceRef
-                  : `来源 ${index + 1} 的内部标识已隐藏`}
+                {formatSourceReference(sourceRef, index)}
               </code>
             </li>
           ))}
