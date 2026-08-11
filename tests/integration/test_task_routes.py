@@ -44,6 +44,57 @@ async def test_demo1_task_routes_return_server_snapshot_and_enforce_owner() -> N
         assert hidden.status_code == 404
 
 
+async def test_demo1_route_can_create_repeatable_rounds_without_losing_idempotency() -> None:
+    app = build_test_app()
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        first_headers = {
+            "X-User-Id": "user_1",
+            "Idempotency-Key": "demo1-round-001",
+        }
+        first = await client.post("/v1/demo1/tasks", headers=first_headers)
+        replay = await client.post("/v1/demo1/tasks", headers=first_headers)
+        second = await client.post(
+            "/v1/demo1/tasks",
+            headers={
+                "X-User-Id": "user_1",
+                "Idempotency-Key": "demo1-round-002",
+            },
+        )
+
+        assert first.status_code == 201
+        assert replay.status_code == 201
+        assert second.status_code == 201
+        assert replay.json()["task_id"] == first.json()["task_id"]
+        assert second.json()["task_id"] != first.json()["task_id"]
+
+        listed = await client.get("/v1/tasks", headers={"X-User-Id": "user_1"})
+        assert listed.status_code == 200
+        assert {item["task_id"] for item in listed.json()} == {
+            first.json()["task_id"],
+            second.json()["task_id"],
+        }
+
+
+async def test_demo1_route_rejects_key_reused_by_generic_route_for_different_contract() -> None:
+    app = build_test_app()
+    payload = demo1_contract_draft().model_dump(mode="json") | {
+        "objective": "A different contract objective."
+    }
+    headers = {
+        "X-User-Id": "user_1",
+        "Idempotency-Key": "cross-route-create-001",
+    }
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        created = await client.post("/v1/tasks", json=payload, headers=headers)
+        conflict = await client.post("/v1/demo1/tasks", headers=headers)
+
+    assert created.status_code == 201
+    assert conflict.status_code == 409
+    assert conflict.json()["detail"] == "幂等键已用于不同任务契约"
+
+
 async def test_task_create_route_forbids_server_fields_and_honors_idempotency() -> None:
     app = build_test_app()
     payload = demo1_contract_draft().model_dump(mode="json")

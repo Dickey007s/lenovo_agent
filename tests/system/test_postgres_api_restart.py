@@ -23,6 +23,8 @@ from psycopg.conninfo import conninfo_to_dict, make_conninfo
 ADMIN_DSN_ENV = "OFFICE_AGENT_POSTGRES_ADMIN_DSN"
 OWNER_HEADERS = {"X-User-Id": "postgres_restart_user"}
 OFFICIAL_SOURCE = "fixture:crm/customer-a:official-revenue-v3"
+ROUND_ONE_KEY = "system-demo-round-001"
+ROUND_TWO_KEY = "system-demo-round-002"
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
@@ -228,7 +230,13 @@ def test_postgres_task_survives_api_restart_and_replays_original_mutation(
             headers=OWNER_HEADERS,
             timeout=15,
         ) as client:
-            created = _response_json(client.post("/v1/demo1/tasks"), 201)
+            created = _response_json(
+                client.post(
+                    "/v1/demo1/tasks",
+                    headers={"Idempotency-Key": ROUND_ONE_KEY},
+                ),
+                201,
+            )
             started = _response_json(
                 client.post(
                     f"/v1/tasks/{created['task_id']}/start",
@@ -268,13 +276,34 @@ def test_postgres_task_survives_api_restart_and_replays_original_mutation(
             headers=OWNER_HEADERS,
             timeout=15,
         ) as client:
+            replayed_round_one = _response_json(
+                client.post(
+                    "/v1/demo1/tasks",
+                    headers={"Idempotency-Key": ROUND_ONE_KEY},
+                ),
+                201,
+            )
+            round_two = _response_json(
+                client.post(
+                    "/v1/demo1/tasks",
+                    headers={"Idempotency-Key": ROUND_TWO_KEY},
+                ),
+                201,
+            )
             restored = _response_json(client.get(f"/v1/tasks/{started['task_id']}"))
             listed_response = client.get("/v1/tasks")
             assert listed_response.status_code == 200
             listed = listed_response.json()
 
+            assert replayed_round_one == started
+            assert round_two["task_id"] != started["task_id"]
+            assert round_two["status"] == "ready"
+            assert round_two["version"] == 1
             assert restored == started
-            assert listed == [started]
+            assert {item["task_id"] for item in listed} == {
+                started["task_id"],
+                round_two["task_id"],
+            }
             assert {
                 branch["branch_id"]: branch["artifact_heads"]
                 for branch in restored["branches"]
@@ -295,6 +324,7 @@ def test_postgres_task_survives_api_restart_and_replays_original_mutation(
             assert committed["status"] == "committed"
             assert committed["phase"] == "commit"
             assert committed["version"] == 3
+            assert committed["last_event_sequence"] == 45
             assert len(committed["artifact_versions"]) == 7
             assert committed["last_commit"]["state_hash"].startswith("sha256:")
 
@@ -320,12 +350,36 @@ def test_postgres_task_survives_api_restart_and_replays_original_mutation(
             restored_committed = _response_json(
                 client.get(f"/v1/tasks/{started['task_id']}")
             )
+            restored_round_two = _response_json(
+                client.get(f"/v1/tasks/{round_two['task_id']}")
+            )
             committed_list_response = client.get("/v1/tasks")
             assert committed_list_response.status_code == 200
             committed_list = committed_list_response.json()
 
             assert restored_committed == committed
-            assert committed_list == [committed]
+            assert restored_round_two == round_two
+            assert {
+                item["task_id"]: item for item in committed_list
+            } == {
+                committed["task_id"]: committed,
+                round_two["task_id"]: round_two,
+            }
+
+            replayed_round_one = _response_json(
+                client.post(
+                    "/v1/demo1/tasks",
+                    headers={"Idempotency-Key": ROUND_ONE_KEY},
+                ),
+                201,
+            )
+            replayed_round_two = _response_json(
+                client.post(
+                    "/v1/demo1/tasks",
+                    headers={"Idempotency-Key": ROUND_TWO_KEY},
+                ),
+                201,
+            )
 
             replayed_start = _response_json(
                 client.post(
@@ -350,15 +404,31 @@ def test_postgres_task_survives_api_restart_and_replays_original_mutation(
             )
             latest = _response_json(client.get(f"/v1/tasks/{started['task_id']}"))
 
+        assert replayed_round_one == committed
+        assert replayed_round_two == round_two
         assert replayed_start == started
         assert replayed_resolve == committed
         assert latest == committed
         assert _database_counts(database_dsn, started["task_id"]) == counts_before_replay
+        assert _database_counts(database_dsn, round_two["task_id"]) == (
+            1,
+            1,
+            0,
+            0,
+            0,
+            0,
+        )
 
     assert api_c.process.returncode is not None
 
     with psycopg.connect(database_dsn) as connection:
         postgres_version = connection.info.server_version
+        owner_task_rows = connection.execute(
+            "SELECT count(*) FROM agent_tasks WHERE owner_id = %s",
+            (OWNER_HEADERS["X-User-Id"],),
+        ).fetchone()
+    assert owner_task_rows is not None
+    assert int(owner_task_rows[0]) == 2
     print(
         json.dumps(
             {
@@ -369,6 +439,9 @@ def test_postgres_task_survives_api_restart_and_replays_original_mutation(
                 "commit_rows": counts_before_replay[5],
                 "event_rows": counts_before_replay[1],
                 "postgres_server_version": postgres_version,
+                "round_one_replay_task_id": replayed_round_one["task_id"],
+                "round_two_task_id": replayed_round_two["task_id"],
+                "round_task_rows": int(owner_task_rows[0]),
                 "state_hash": committed["last_commit"]["state_hash"],
                 "status": committed["status"],
                 "task_id": committed["task_id"],

@@ -67,7 +67,7 @@ PR 3 至 PR 5 当前可观察落点为：
 - `TaskService` 仍从服务端 Task ID、Owner、契约、三个初始 Branch 和 `TASK_CREATED(sequence=1)` 开始；`POST /v1/tasks/{task_id}/start` 在一次 mutation 中物化固定客户 A 的 Observe/Plan/Act/Verify Trace、ArtifactVersion、VerificationReport 和局部 Conflict。
 - `POST /v1/tasks/{task_id}/controls` 接受 Steer、Pause、Resume、Take over、Return control 和 Resolve evidence。分支控制经服务端应用后改变 Snapshot；Steer 当前只持久记录为 `accepted`，不宣称已重新规划。
 - `TaskStore` 已有内存和 PostgreSQL 的 Snapshot、Event 和 ArtifactVersion commit 路径。PR 5 的 opt-in system test 在随机 PostgreSQL 16.14 数据库上，以 API A/B/C 顺序恢复 v2/v3，并验证旧 start/resolve key 返回首次结果且数据库维持 `45 events / 7 artifacts / 1 TASK_COMMITTED`。
-- `POST /v1/demo1/tasks` 使用 Owner 绑定的固定幂等键；`POST /v1/tasks` 接受可选 `Idempotency-Key`。同一 Owner+key 重放同一契约返回原 Task，同一 key 改用于不同契约返回 409。
+- `POST /v1/demo1/tasks` 接受可选 `Idempotency-Key` 作为演示轮次：同一 Owner+key 重放返回原 Task，不同 key 创建独立 Task；未传 key 时保留 Owner 绑定的兼容默认键。`POST /v1/tasks` 同样接受可选 key，同一 key 改用于不同契约返回 409。
 - `GET /v1/tasks`、`GET /v1/tasks/{task_id}` 和 Task SSE 均按当前 Owner 过滤，跨 Owner 按不存在处理。
 - Task SSE 按 `after` 轮询 Store 并发送 heartbeat。当前没有 `LISTEN/NOTIFY`、消息代理或跨实例广播，多实例通知未实现或验证。
 

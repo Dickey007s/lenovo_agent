@@ -190,11 +190,16 @@ class TaskService:
             return restored
         return snapshot
 
-    async def create_demo1(self, owner_id: str) -> TaskSnapshot:
+    async def create_demo1(
+        self,
+        owner_id: str,
+        *,
+        idempotency_key: str | None = None,
+    ) -> TaskSnapshot:
         return await self.create(
             demo1_contract_draft(),
             owner_id,
-            idempotency_key=f"demo1-customer-a:{owner_id}",
+            idempotency_key=idempotency_key or f"demo1-customer-a:{owner_id}",
         )
 
     async def start(

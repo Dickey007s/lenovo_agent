@@ -236,6 +236,47 @@ test("Demo 1 uses server facts from creation through the three-branch commit", a
   ]);
   expect(tasks[0].controls.some((control) => control.kind === "steer" && control.status === "accepted")).toBeTruthy();
   expect(new Set(tasks[0].artifact_versions.map((artifact) => artifact.artifact_version_id)).size).toBe(7);
+
+  const completedTaskId = tasks[0].task_id;
+  await page.reload();
+  const replayButton = page.getByRole("button", { name: "再次演示" });
+  await expect(replayButton).toBeEnabled();
+
+  const repeatKeys: string[] = [];
+  await page.route(`${API_URL}/v1/demo1/tasks`, async (route) => {
+    if (route.request().method() !== "POST") {
+      await route.fallback();
+      return;
+    }
+    repeatKeys.push(route.request().headers()["idempotency-key"] ?? "");
+    if (repeatKeys.length === 1) {
+      await route.abort("failed");
+      return;
+    }
+    await route.fallback();
+  });
+
+  await replayButton.click();
+  await expect.poll(() => repeatKeys.length).toBe(1);
+  await expect(page.getByText("RECENT TASK", { exact: true })).toBeVisible();
+  await expect(page.getByText("已连接当前工作区", { exact: true })).toBeVisible();
+  await expect(page.getByText("服务连接中断，正在恢复", { exact: true })).toHaveCount(0);
+  await expect(replayButton).toBeEnabled();
+  expect(await listTasks(request, owner)).toHaveLength(1);
+
+  await replayButton.click();
+  await expect(page.getByText("ACTIVE TASK", { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "启动任务" })).toBeEnabled();
+  expect(repeatKeys).toHaveLength(2);
+  expect(repeatKeys[0]).not.toBe("");
+  expect(repeatKeys[1]).toBe(repeatKeys[0]);
+
+  const repeatedTasks = await listTasks(request, owner);
+  expect(repeatedTasks).toHaveLength(2);
+  expect(repeatedTasks[0].task_id).not.toBe(completedTaskId);
+  expect(repeatedTasks[0].status).toBe("ready");
+  expect(repeatedTasks[1].task_id).toBe(completedTaskId);
+  expect(repeatedTasks[1].status).toBe("committed");
 });
 
 test("an aborted start keeps one idempotency key across reload and reconciles without duplicates", async ({ page, request }, testInfo) => {

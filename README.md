@@ -25,8 +25,8 @@ V0.1 重点验证三件事：
 | 邮件 | 空白编辑器、新邮件入口、收件人/抄送/主题/正文/附件编辑、保存、Agent 渐进式写入、受控发送 |
 | 文档 | 分章节编辑、Agent 生成会议纪要或周报、来源与修改记录 |
 | 报价表 | 类 Excel 行列编辑、折扣底线提示、金额汇总、导入入口占位 |
-| 任务 | 任务卡编辑、新建、优先级与状态维护、受控创建内部任务 |
-| 日历 | 月视图、日程红点、按日展开全部日程、新建与编辑、受控创建邀请 |
+| 任务 | “长期任务工件 / 工作台待办”双 Tab；长期任务展示服务端工件，工作台待办使用按状态分栏的可编辑看板 |
+| 日历 | 全宽月历一级视图、日期格内嵌日程条目、点击进入当日安排、新建与编辑、受控创建邀请 |
 | 报销 | 报销单与发票核查、异常提示、受控发起补件请求 |
 | CRM | 商机阶段和下一步编辑、受控更新商机 |
 | 审计 | Run 事件流、Trace、审批、Permit 与 Simulator 执行记录 |
@@ -58,6 +58,7 @@ V0.1 重点验证三件事：
 ### Demo 1 交付物工作区与恢复闭环（PR 4-5）
 
 - `TaskService` 从严格的 `TaskContractDraft` 创建服务端拥有的 `TaskContract`、`TaskSnapshot`、三个初始 `BranchSnapshot` 和首条 `TASK_CREATED`。新任务仍从 `ready / contract` 开始。
+- 完成、失败或取消后的 Demo 1 会在右上角显示“再次演示”；每一轮通过新的 `Idempotency-Key` 创建独立 Task，刷新后仍可开始下一轮，旧 Task、工件和 Commit 历史不会被重置或覆盖。
 - `POST /v1/tasks/{task_id}/start` 对固定客户 A Fixture 执行一次确定性状态转换：产生 Observe、Plan、Act、Verify 事件，追加 ArtifactVersion 和 VerificationReport，并把 2,400 万元正式口径与 2,680 万元预测口径的冲突限制在经营分析分支。该路径不调用 LLM，也不读取真实邮箱、CRM、预测表或项目系统。
 - `POST /v1/tasks/{task_id}/controls` 接受带 `expected_task_version` 和 `idempotency_key` 的 Steer、Pause、Resume、Take over、Return control 与 Resolve evidence。分支控制只有在服务端返回新 Snapshot 后才显示为已应用；Steer 当前只进入 `accepted` 时，前端只显示“方向指令已记录，等待后续循环应用”。
 - `TaskStore` 的内存与 PostgreSQL 实现包含 Snapshot、TaskEvent 和 ArtifactVersion 的 mutation 路径。`start` 和 `resolve_evidence` 会在写入前校验预计步骤、工具调用、运行时长和截止时间，超限时拒绝 mutation。PR 5 已用 PostgreSQL 16.14 隔离数据库和三个顺序 API 进程验证 v2/v3 Snapshot 恢复、原幂等响应重放，以及 Event/ArtifactVersion/Commit 零新增。
@@ -115,6 +116,9 @@ flowchart LR
 - [Demo 1 PR 4 前端与 E2E 证据](docs/evidence/DEMO1-PR4-FRONTEND-E2E-EVIDENCE.md)
 - [Demo 1 PR 5 PostgreSQL-backed API 重启证据](docs/evidence/DEMO1-PR5-POSTGRES-BACKED-API-RESTART-EVIDENCE.md)
 - [LLM API 连通性证据](docs/evidence/LLM-API-SMOKE-EVIDENCE-20260811.md)
+- [前端视觉同步与 Demo 1 兼容决策](docs/decisions/DR-0003-frontend-visual-refresh-sync.md)
+- [前端视觉同步与兼容证据](docs/evidence/DR-0003-FRONTEND-VISUAL-SYNC-EVIDENCE.md)
+- [Demo 1 可重复演示决策](docs/decisions/DR-0004-repeatable-demo1-rounds.md)
 
 ## 目录结构
 

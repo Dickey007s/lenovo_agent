@@ -71,14 +71,14 @@ flowchart TB
 
 ### 2.1 交互层
 
-`apps/web/app/page.tsx` 是 V0.1 的主要前端应用，`styles.css` 提供简约浅色视觉系统和少量磨砂玻璃点缀。布局固定为：
+`apps/web/app/page.tsx` 是 V0.1 的主要前端应用，`styles.css` 提供暖纸底色、墨黑正文、靛蓝全局强调和工作区身份色组成的浅色视觉系统。布局固定为：
 
 - 左侧：视图工具栏与工作区。
 - 中间：可拖动分隔条。
 - 右侧：持续对话、底部输入框和非阻塞确认卡。
 - 右侧顶部：Active Task Bar，从 TaskSnapshot 展示 Task ID、状态、阶段、预算、版本和连接同步状态。
 - Active Task 下方：Branch、Conflict、Control 和最近 Commit 明细；其业务状态全部来自服务端 Snapshot 或 SSE 后的 Snapshot 对账。
-- 左侧 Tasks 视图：PR 4 用“长期任务工件 / 工作台待办”两个 tab 同时保留服务端 Task Artifact Workspace 与原手工待办。Task 面板的分支 head 可直接打开对应工件。
+- 左侧 Tasks 视图：PR 4 用“长期任务工件 / 工作台待办”两个 tab 同时保留服务端 Task Artifact Workspace 与原手工待办；手工待办按状态分栏显示为可编辑看板。Task 面板的分支 head 可直接打开对应工件。
 
 `TaskArtifactWorkspace` 只投影 `TaskSnapshot`：以 `branches[].artifact_heads` 选择 head，以 `artifact_versions[].parent_version_id` 构建 lineage，以 `verification_reports[]` 和 `conflicts[]` 显示验证/冲突，以 `last_commit` 显示最终提交与 state hash。没有服务端 head、验证或 Commit 时，前端显示缺失状态而不是补造事实。来源和验证检查默认折叠。固定 Fixture 的 `analysis/risk_brief/reply_draft` 使用字段 allowlist，未知 kind/字段默认隐藏；`source_ref` 只显示契约中的四个已知 Demo 1 Fixture 引用，其他标识显示隐藏占位。这只是前端第二道投影：服务端尚未提供通用字段可见性 Schema/display projection，allowlist 字段中的任意文本仍不能视为天然安全。
 
@@ -188,9 +188,9 @@ sequenceDiagram
     participant S as TaskService
     participant D as TaskStore
 
-    U->>W: 创建 Demo 1 Task
-    W->>A: POST /demo1/tasks + X-User-Id
-    A->>S: create_demo1(owner_id)
+    U->>W: 创建或再次演示 Demo 1
+    W->>A: POST /demo1/tasks + X-User-Id + Idempotency-Key
+    A->>S: create_demo1(owner_id, round_key)
     S->>S: 生成 TaskContract、3 个 Branch 和 TASK_CREATED
     S->>D: 原子创建 Snapshot + 初始事件
     D-->>W: TaskSnapshot ready / contract
@@ -221,6 +221,8 @@ sequenceDiagram
     end
     W->>A: GET /tasks/{task_id} 对账
 ```
+
+每个用户显式发起的新一轮 Demo 使用新的 round key，因此得到新的服务端 Task ID；同一 round key 的网络重试仍返回第一次创建的 Snapshot。未提供 `Idempotency-Key` 时保留旧客户端兼容行为，仍按 Owner 使用稳定默认键。刷新只从 `/tasks` 恢复最近的活动或历史 Task，不会重置旧任务；终态 Task 的“再次演示”按钮负责创建下一轮。
 
 Task ID、Owner、版本、状态和时间均由服务端产生。读取、列表、控制和订阅都按 Owner 过滤；所有 mutation 使用预期 Task 版本和幂等键，前端只在收到服务端 Snapshot 后更新业务状态。
 
