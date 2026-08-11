@@ -241,9 +241,35 @@ test("Demo 1 uses server facts from creation through the three-branch commit", a
   await page.reload();
   const replayButton = page.getByRole("button", { name: "再次演示" });
   await expect(replayButton).toBeEnabled();
+
+  const repeatKeys: string[] = [];
+  await page.route(`${API_URL}/v1/demo1/tasks`, async (route) => {
+    if (route.request().method() !== "POST") {
+      await route.fallback();
+      return;
+    }
+    repeatKeys.push(route.request().headers()["idempotency-key"] ?? "");
+    if (repeatKeys.length === 1) {
+      await route.abort("failed");
+      return;
+    }
+    await route.fallback();
+  });
+
+  await replayButton.click();
+  await expect.poll(() => repeatKeys.length).toBe(1);
+  await expect(page.getByText("RECENT TASK", { exact: true })).toBeVisible();
+  await expect(page.getByText("已连接当前工作区", { exact: true })).toBeVisible();
+  await expect(page.getByText("服务连接中断，正在恢复", { exact: true })).toHaveCount(0);
+  await expect(replayButton).toBeEnabled();
+  expect(await listTasks(request, owner)).toHaveLength(1);
+
   await replayButton.click();
   await expect(page.getByText("ACTIVE TASK", { exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "启动任务" })).toBeEnabled();
+  expect(repeatKeys).toHaveLength(2);
+  expect(repeatKeys[0]).not.toBe("");
+  expect(repeatKeys[1]).toBe(repeatKeys[0]);
 
   const repeatedTasks = await listTasks(request, owner);
   expect(repeatedTasks).toHaveLength(2);
@@ -278,6 +304,7 @@ test("an aborted start keeps one idempotency key across reload and reconciles wi
   await page.getByRole("button", { name: "启动任务" }).click();
   await expect(page.getByText(/启动结果待确认/)).toBeVisible();
   await expect(page.getByRole("button", { name: "立即对账" })).toBeVisible();
+  await expect(page.getByText("已连接当前工作区", { exact: true })).toBeVisible();
   expect(aborted).toBeTruthy();
   const capturedBody = attemptedBody as { expected_task_version: number; idempotency_key: string };
 
@@ -296,6 +323,7 @@ test("an aborted start keeps one idempotency key across reload and reconciles wi
 
   await page.reload();
   await expect(page.getByRole("button", { name: "立即对账" })).toBeVisible();
+  await expect(page.getByText("已连接当前工作区", { exact: true })).toBeVisible();
   const savedAfterReload = await page.evaluate((key) => window.sessionStorage.getItem(key), PENDING_MUTATION_KEY);
   expect(savedAfterReload).toBe(savedBeforeReload);
 

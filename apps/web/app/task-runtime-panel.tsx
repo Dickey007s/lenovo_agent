@@ -3,6 +3,7 @@
 import { FormEvent, useState } from "react";
 
 import type { BranchSnapshot, TaskControlCommand, TaskSnapshot } from "./task-types";
+import { formatSourceReference } from "./source-reference";
 
 type SyncState = "loading" | "connecting" | "synced" | "reconnecting" | "offline";
 
@@ -210,7 +211,11 @@ export function TaskRuntimePanel({
                   <div className="task-conflict-sources">
                     <strong>来源</strong>
                     <ul>
-                      {conflict.source_refs.map((sourceRef) => <li key={sourceRef}><code>{sourceRef}</code></li>)}
+                      {conflict.source_refs.map((sourceRef, index) => (
+                        <li key={`${sourceRef}:${index}`}>
+                          <code>{formatSourceReference(sourceRef, index)}</code>
+                        </li>
+                      ))}
                     </ul>
                   </div>
                 </details>

@@ -388,6 +388,13 @@ function ApprovalModal({ run, evidenceCatalog, evidence, busy, onEvidence, onSub
 }
 
 type TaskSyncState = "loading" | "connecting" | "synced" | "reconnecting" | "offline";
+type TaskTransportState = "connecting" | "connected" | "interrupted";
+
+const AGENT_CONNECTION_LABELS: Record<TaskTransportState, string> = {
+  connecting: "正在连接当前工作区",
+  connected: "已连接当前工作区",
+  interrupted: "服务连接中断，正在恢复",
+};
 type PendingTaskMutation = {
   taskId: string;
   kind: "start" | ControlIntent["kind"];
@@ -444,6 +451,7 @@ export default function Home() {
   const [notice, setNotice] = useState("");
   const [task, setTask] = useState<TaskSnapshot | null>(null);
   const [taskSyncState, setTaskSyncState] = useState<TaskSyncState>("loading");
+  const [taskTransportState, setTaskTransportState] = useState<TaskTransportState>("connecting");
   const [taskCreating, setTaskCreating] = useState(false);
   const [taskMutating, setTaskMutating] = useState(false);
   const [pendingTaskMutation, setPendingTaskMutation] = useState<PendingTaskMutation | null>(null);
@@ -494,8 +502,14 @@ export default function Home() {
       setTask(activeTask);
       taskSequenceRef.current = activeTask?.last_event_sequence ?? 0;
       if (activeTask) reconcilePendingTaskMutation(activeTask);
+      setTaskTransportState("connected");
       setTaskSyncState(pendingTaskMutationRef.current ? "reconnecting" : "synced");
-    }).catch(() => { if (!cancelled) setTaskSyncState("offline"); });
+    }).catch(() => {
+      if (!cancelled) {
+        setTaskTransportState("interrupted");
+        setTaskSyncState("offline");
+      }
+    });
     return () => { cancelled = true; };
   }, []);
 
@@ -539,13 +553,18 @@ export default function Home() {
     };
     const connect = () => {
       if (cancelled) return;
+      setTaskTransportState("connecting");
       setTaskSyncState(current => current === "synced" ? current : "connecting");
       source = new EventSource(`${API_BASE}/v1/tasks/${taskId}/events?after=${taskSequenceRef.current}`);
       TASK_EVENT_TYPES.forEach(type => source?.addEventListener(type, receive));
-      source.onopen = () => { void reconcile(); };
+      source.onopen = () => {
+        setTaskTransportState("connected");
+        void reconcile();
+      };
       source.onerror = () => {
         source?.close();
         if (cancelled) return;
+        setTaskTransportState("interrupted");
         setTaskSyncState("reconnecting");
         reconnectTimer = window.setTimeout(connect, 1200);
       };
@@ -579,7 +598,10 @@ export default function Home() {
     const idempotencyKey = demo1CreateKeyRef.current ?? `demo1-round:${crypto.randomUUID()}`;
     demo1CreateKeyRef.current = idempotencyKey;
     setTaskCreating(true);
-    setTaskSyncState("connecting");
+    if (!repeat) {
+      setTaskTransportState("connecting");
+      setTaskSyncState("connecting");
+    }
     setError("");
     try {
       const snapshot = await request<TaskSnapshot>("/v1/demo1/tasks", {
@@ -591,10 +613,14 @@ export default function Home() {
       setSelectedTaskArtifactVersionId(null);
       setTaskViewMode("runtime");
       taskSequenceRef.current = snapshot.last_event_sequence;
+      setTaskTransportState("connected");
       setTaskSyncState("synced");
       setNotice(repeat ? "新一轮 Demo 1 已创建" : "Demo 1 任务契约已创建");
     } catch (reason) {
-      setTaskSyncState("offline");
+      if (!repeat) {
+        setTaskTransportState("interrupted");
+        setTaskSyncState("offline");
+      }
       setError(reason instanceof Error ? reason.message : "无法创建 Demo 1 任务");
     } finally {
       setTaskCreating(false);
@@ -602,6 +628,7 @@ export default function Home() {
   }
 
   async function retryTaskConnection() {
+    setTaskTransportState("connecting");
     setTaskSyncState("connecting");
     setError("");
     try {
@@ -615,8 +642,10 @@ export default function Home() {
       setTask(activeTask);
       taskSequenceRef.current = activeTask?.last_event_sequence ?? 0;
       if (activeTask) reconcilePendingTaskMutation(activeTask);
+      setTaskTransportState("connected");
       setTaskSyncState(pendingTaskMutationRef.current ? "reconnecting" : "synced");
     } catch (reason) {
+      setTaskTransportState("interrupted");
       setTaskSyncState("offline");
       setError(reason instanceof Error ? reason.message : "任务服务仍不可用");
     }
@@ -1045,7 +1074,7 @@ export default function Home() {
     </section>
     <div className="resize-divider" role="separator" aria-orientation="vertical" onPointerDown={startResize}><span>•••</span></div>
     <section className={`chat-pane ${!task || actionGateOpen ? "without-task-runtime" : ""} ${actionGateOpen ? "has-action-gate" : ""}`}>
-      <div className="chat-identity"><div className="avatar">OA</div><div><strong>Office Agent</strong><span className="id-status">已连接当前工作区</span></div></div>
+      <div className="chat-identity"><div className="avatar">OA</div><div><strong>Office Agent</strong><span className={`id-status is-${taskTransportState}`}>{AGENT_CONNECTION_LABELS[taskTransportState]}</span></div></div>
       <ActiveTaskStrip task={task} syncState={taskSyncState} creating={taskCreating} blocked={actionGateOpen} onCreate={() => void createDemo1Task()} onRetry={() => void (pendingTaskMutation ? retryPendingTaskMutation() : retryTaskConnection())}/>
       {task && <div className={`task-runtime-slot ${actionGateOpen ? "is-hidden" : ""}`} aria-hidden={actionGateOpen}>
         <TaskRuntimePanel task={task} syncState={taskSyncState} busy={taskMutating || Boolean(pendingTaskMutation) || actionGateOpen} onStart={() => void startDemo1Loop()} onControl={controlDemo1Task} onOpenArtifact={openTaskArtifact}/>

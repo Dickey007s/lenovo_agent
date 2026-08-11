@@ -76,6 +76,25 @@ async def test_demo1_route_can_create_repeatable_rounds_without_losing_idempoten
         }
 
 
+async def test_demo1_route_rejects_key_reused_by_generic_route_for_different_contract() -> None:
+    app = build_test_app()
+    payload = demo1_contract_draft().model_dump(mode="json") | {
+        "objective": "A different contract objective."
+    }
+    headers = {
+        "X-User-Id": "user_1",
+        "Idempotency-Key": "cross-route-create-001",
+    }
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        created = await client.post("/v1/tasks", json=payload, headers=headers)
+        conflict = await client.post("/v1/demo1/tasks", headers=headers)
+
+    assert created.status_code == 201
+    assert conflict.status_code == 409
+    assert conflict.json()["detail"] == "幂等键已用于不同任务契约"
+
+
 async def test_task_create_route_forbids_server_fields_and_honors_idempotency() -> None:
     app = build_test_app()
     payload = demo1_contract_draft().model_dump(mode="json")

@@ -80,7 +80,7 @@ flowchart TB
 - Active Task 下方：Branch、Conflict、Control 和最近 Commit 明细；其业务状态全部来自服务端 Snapshot 或 SSE 后的 Snapshot 对账。
 - 左侧 Tasks 视图：PR 4 用“长期任务工件 / 工作台待办”两个 tab 同时保留服务端 Task Artifact Workspace 与原手工待办；手工待办按状态分栏显示为可编辑看板。Task 面板的分支 head 可直接打开对应工件。
 
-`TaskArtifactWorkspace` 只投影 `TaskSnapshot`：以 `branches[].artifact_heads` 选择 head，以 `artifact_versions[].parent_version_id` 构建 lineage，以 `verification_reports[]` 和 `conflicts[]` 显示验证/冲突，以 `last_commit` 显示最终提交与 state hash。没有服务端 head、验证或 Commit 时，前端显示缺失状态而不是补造事实。来源和验证检查默认折叠。固定 Fixture 的 `analysis/risk_brief/reply_draft` 使用字段 allowlist，未知 kind/字段默认隐藏；`source_ref` 只显示安全的非敏感 opaque scheme，其他标识显示隐藏占位。这只是前端第二道投影：服务端尚未提供通用字段可见性 Schema/display projection，allowlist 字段中的任意文本仍不能视为天然安全。
+`TaskArtifactWorkspace` 只投影 `TaskSnapshot`：以 `branches[].artifact_heads` 选择 head，以 `artifact_versions[].parent_version_id` 构建 lineage，以 `verification_reports[]` 和 `conflicts[]` 显示验证/冲突，以 `last_commit` 显示最终提交与 state hash。没有服务端 head、验证或 Commit 时，前端显示缺失状态而不是补造事实。来源和验证检查默认折叠。固定 Fixture 的 `analysis/risk_brief/reply_draft` 使用字段 allowlist，未知 kind/字段默认隐藏；`source_ref` 只显示契约中的四个已知 Demo 1 Fixture 引用，其他标识显示隐藏占位。这只是前端第二道投影：服务端尚未提供通用字段可见性 Schema/display projection，allowlist 字段中的任意文本仍不能视为天然安全。
 
 前端不拥有风险决策、审批状态或 Permit；它只渲染服务端 Snapshot 并提交用户选择。
 
@@ -112,7 +112,7 @@ Action Gate 打开时，Active Task Bar 保留，Gate 占用独立网格行。Ta
 
 ### 2.4 基础设施层
 
-V0.1 使用 PostgreSQL 16 保存 Workspace、Run Snapshot 和审计事件，并使用官方 `AsyncPostgresSaver` 保存 LangGraph checkpoint。Demo 1 TaskStore 另用 `agent_tasks`、`agent_task_events` 和 `agent_task_artifact_versions` 保存 Task 投影、事件和追加式工件版本。Demo 1 已有 PostgreSQL mutation 代码路径，但本机尚未实际运行或完成 API 进程重启验收。LLM 使用 OpenAI-compatible `/chat/completions`；固定 Demo 1 Task start 不调用 LLM。所有工具调用落到 `simulators/`，不连接真实办公系统。
+V0.1 使用 PostgreSQL 16 保存 Workspace、Run Snapshot 和审计事件，并使用官方 `AsyncPostgresSaver` 保存 LangGraph checkpoint。Demo 1 TaskStore 另用 `agent_tasks`、`agent_task_events` 和 `agent_task_artifact_versions` 保存 Task 投影、事件和追加式工件版本。PR 5 已在本机 PostgreSQL 16.14 上用三个顺序 API 进程验证 waiting-input 与 committed 两个恢复点，以及跨重启幂等零重复；这不等于 Conversation、多实例或数据库故障恢复。LLM 使用 OpenAI-compatible `/chat/completions`；固定 Demo 1 Task start 不调用 LLM。所有工具调用落到 `simulators/`，不连接真实办公系统。
 
 ## 3. 两条核心数据路径
 
@@ -222,7 +222,7 @@ sequenceDiagram
     W->>A: GET /tasks/{task_id} 对账
 ```
 
-每个用户显式发起的新一轮 Demo 使用新的 round key，因此得到新的服务端 Task ID；同一 round key 的网络重试仍返回第一次创建的 Snapshot。未提供 `Idempotency-Key` 时保留旧客户端兼容行为，仍按 Owner 使用稳定默认键。刷新只从 `/tasks` 恢复最近的活动或历史 Task，不会重置旧任务；终态 Task 的“再次演示”按钮负责创建下一轮。
+每个用户显式发起的新一轮 Demo 使用新的 round key，因此得到新的服务端 Task ID；同一 round key 的网络重试返回该 Task 当前已持久化的 Snapshot，不回退已经发生的 start/control 变更。未提供 `Idempotency-Key` 时保留旧客户端兼容行为，仍按 Owner 使用稳定默认键。刷新只从 `/tasks` 恢复最近的活动或历史 Task，不会重置旧任务；终态 Task 的“再次演示”按钮负责创建下一轮。
 
 Task ID、Owner、版本、状态和时间均由服务端产生。读取、列表、控制和订阅都按 Owner 过滤；所有 mutation 使用预期 Task 版本和幂等键，前端只在收到服务端 Snapshot 后更新业务状态。
 
@@ -231,6 +231,8 @@ Task ID、Owner、版本、状态和时间均由服务端产生。读取、列�
 前端在 mutation 结果未知时把原始 `idempotency_key`、intent 和预期版本保存到当前标签页的 `sessionStorage` 并冻结新控制；pending 状态提供同 key 对账入口。同 key 重放返回首次响应，因此前端确认后还会 GET 当前 Task 的最新 Snapshot，避免用历史响应回滚当前界面。PR 4 浏览器 E2E 已覆盖 start 请求发送前 abort、reload 后入口可达、同 key 重试和无重复 ArtifactVersion；由于 abort 发生在请求交给服务端之前，它不证明“服务端已经提交但响应丢失”的浏览器恢复。
 
 PR 4 E2E 使用 system Edge 访问 Next.js `3011`，由页面调用真实本地 FastAPI `8011` 与内存 TaskStore。主路径断言服务端创建、冲突、Steer accepted、resolve、Commit 和交付物终态；移动 viewport 断言被测区域无横向 overflow、被测可见操作目标至少 44px。该拓扑不包含 PostgreSQL、API 进程重启、多实例或真实 Connector，也未覆盖 Task SSE 断线回放。
+
+PR 5 增加独立 opt-in system test：每次创建随机 PostgreSQL 16 数据库，API A 写入第一轮 v2 后退出，API B 逐字段恢复 v2、重放同一轮次 key、用不同 key 创建第二个 `ready` Task，再为原 Task 形成 v3 Commit 后退出；API C 恢复两个 Task 并重放轮次、start 与 resolve key。数据库最终保持 `2 tasks`，其中原 Task 严格保持 `45 events / 7 artifacts / 1 TASK_COMMITTED`，第二个 Task 仅有初始创建事件。同页 system Edge 运行还验证 API 停止时保留最后 Snapshot、禁用控制并显示恢复中，新进程启动后再 GET 同一 Task。该浏览器证据没有在停机期间写入事件，因此不证明 `after` 缺口回放。
 
 ## 4. 信任边界
 
@@ -264,11 +266,11 @@ PR 4 E2E 使用 system Edge 访问 Next.js `3011`，由页面调用真实本地 
 | RunSnapshot / submitted evidence | 内存 | `runs` | 是 |
 | AuditEvent | 内存 | `audit_events` | 是 |
 | LangGraph checkpoint | `InMemorySaver` | PostgresSaver 表 | 是 |
-| TaskSnapshot / TaskEvent | `InMemoryTaskStore` | `agent_tasks` / `agent_task_events` | 仅 PostgreSQL 模式具备跨进程保存基础 |
-| Task ArtifactVersion | `InMemoryTaskStore` 追加列表 | `agent_task_artifact_versions` mutation 路径 | 代码具备保存路径；本机重启恢复未验收 |
+| TaskSnapshot / TaskEvent | `InMemoryTaskStore` | `agent_tasks` / `agent_task_events` | PostgreSQL 16.14 下已验证顺序 API 进程恢复 v2/v3；内存模式进程退出即丢失 |
+| Task ArtifactVersion | `InMemoryTaskStore` 追加列表 | `agent_task_artifact_versions` mutation 路径 | PostgreSQL 16.14 下已验证 5/7 个版本跨进程恢复及幂等零新增 |
 | Permit 已使用集合 | 进程内存 | 进程内存 | 否 |
 
-TaskStore 优先使用 `DATABASE_DSN`，没有时回退到 `LANGGRAPH_CHECKPOINT_DSN`；两者都不存在时使用进程内存。内存测试中的服务重建只能证明同一个 Store 对象仍可读取投影，不能证明 API 进程重启恢复。PostgreSQL mutation 与重启仍需真实验收，不能仅凭表结构和事务代码标记完成。配置 `LANGGRAPH_CHECKPOINT_DSN` 后，FastAPI lifespan 还会初始化 Run、Workspace、Audit 和 checkpoint 存储，并恢复 Run Snapshot。对话持久化、跨实例 Task 通知和分布式 Permit 重放存储属于后续工作。
+TaskStore 优先使用 `DATABASE_DSN`，没有时回退到 `LANGGRAPH_CHECKPOINT_DSN`；两者都不存在时使用进程内存。内存测试中的服务重建只能证明同一个 Store 对象仍可读取投影，不能证明 API 进程重启恢复。PR 5 的 PostgreSQL 证据将 TaskStore 单独设为 postgres、checkpoint 保持 memory，以隔离证明 Task 表；本机完整演示配置两条 DSN 时健康接口显示两者均为 postgres。配置 `LANGGRAPH_CHECKPOINT_DSN` 后，FastAPI lifespan 还会初始化 Run、Workspace、Audit 和 checkpoint 存储，并恢复 Run Snapshot。已有库迁移、数据库进程故障、对话持久化、跨实例 Task 通知和分布式 Permit 重放存储属于后续工作。
 
 ## 6. 运行时与部署拓扑
 

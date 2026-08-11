@@ -24,7 +24,7 @@
 
 ## 3. 决策与备选
 
-`POST /v1/demo1/tasks` 接受可选 `Idempotency-Key` 作为演示轮次。前端每次用户显式开始新一轮时生成新 key；请求失败后当前页面复用该 key，成功后清除。相同 Owner+key 仍返回第一次创建的 Snapshot，不同 key 创建独立 Task。未传 header 时保留原 Owner 默认 key，兼容旧客户端和既有调用。
+`POST /v1/demo1/tasks` 接受可选 `Idempotency-Key` 作为演示轮次。前端每次用户显式开始新一轮时生成新 key；请求失败后当前页面复用该 key，成功后清除。相同 Owner+key 返回已存在 Task 当前已持久化的 Snapshot，不新增 `TASK_CREATED`、不回退已发生的 mutation；不同 key 创建独立 Task。未传 header 时保留原 Owner 默认 key，兼容旧客户端和既有调用。
 
 未采用删除或重置旧 Task，因为这会破坏审计、Artifact lineage、Commit 和恢复事实。未采用前端伪造空白 Task，因为 Task ID、契约、分支和状态必须由服务端产生。
 
@@ -39,6 +39,6 @@
 
 ## 5. 验证与边界
 
-聚焦路由回归 `6 passed`，覆盖同 key 重放得到同 Task、不同 key 得到不同 Task、列表同时保留两轮。system Edge E2E `2 passed (17.5s)`，主用例新增完成一轮、刷新、点击“再次演示”、出现可用“启动任务”、列表包含不同新 Task ID 和旧 committed Task 的断言。全量回归为 Python `57 passed`、Ruff、前端 TypeScript lint 和 Next.js 生产构建通过。重启本地 `8010/3000` 后又用独立 smoke Owner 验证：同 key 返回同 Task、换 key 返回不同 `ready / contract` Task、列表数量为 2，前端 HTTP 200。
+聚焦路由基线回归 `6 passed`，覆盖同 key 重放得到同 Task、不同 key 得到不同 Task、列表同时保留两轮。system Edge E2E `2 passed (17.5s)`，主用例新增完成一轮、刷新、点击“再次演示”、出现可用“启动任务”、列表包含不同新 Task ID 和旧 committed Task 的断言。全量回归为 Python `57 passed`、Ruff、前端 TypeScript lint 和 Next.js 生产构建通过。重启本地 `8010/3000` 后又用独立 smoke Owner 验证：同 key 返回同 Task、换 key 返回不同 `ready / contract` Task、列表数量为 2，前端 HTTP 200。PR 5 合并兼容回归还中断了首次“再次演示”创建请求，验证旧 Task 仍显示已连接，重试复用同 key 且只创建一个新 Task；合并后聚焦路由回归为 `7 passed`，新增断言跨路由复用同 key 但契约不同时返回 409。
 
-该结论只验证固定 Fixture 与内存 TaskStore 浏览器路径。PostgreSQL 跨进程恢复、多实例通知和演示轮次列表选择仍是现有边界；“再次演示”不会复制真实企业数据或触发真实 Connector。
+该结论自身只验证固定 Fixture 与内存 TaskStore 浏览器路径。后续 PR 5 另行验证了同一 PostgreSQL 16.14 数据库、三个顺序 API 进程的 v2/v3 恢复；数据库故障或重启、多实例通知和演示轮次列表选择仍未验证。“再次演示”不会复制真实企业数据或触发真实 Connector。

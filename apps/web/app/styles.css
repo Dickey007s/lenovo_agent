@@ -461,6 +461,7 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outlin
 .chat-identity strong { font-size: 13.5px; font-weight: 800; letter-spacing: -.01em; }
 .chat-identity .id-status { display: inline-flex; align-items: center; gap: 6px; color: var(--green); font-size: 10.5px; font-weight: 600; }
 .chat-identity .id-status::before { width: 6px; height: 6px; border-radius: 50%; background: currentColor; box-shadow: 0 0 0 0 rgba(14, 159, 110, .4); content: ""; animation: edit-pulse 2s infinite; }
+.chat-identity .id-status.is-connecting, .chat-identity .id-status.is-interrupted { color: var(--amber); }
 .conversation { min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 26px 20px 36px; }
 .message { display: flex; gap: 10px; margin-bottom: 20px; }
 .msg-avatar { display: grid; width: 28px; height: 28px; place-items: center; flex: 0 0 auto; margin-top: 2px; border-radius: 9px; color: #fff; background: linear-gradient(150deg, #2b2e34, #101215); box-shadow: 0 3px 8px rgba(16, 18, 21, .22); font-size: 12px; }
@@ -766,7 +767,6 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outlin
 .chat-pane.without-task-runtime > .chat-footer { grid-row: 4; }
 .task-runtime-slot { display: contents; }
 .task-runtime-slot.is-hidden { display: none; }
-
 .active-task-strip { grid-row: 2; min-width: 0; display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(190px, .9fr) auto; align-items: center; gap: 14px; min-height: 82px; padding: 12px 18px; border-bottom: 1px solid var(--line); background: rgba(247,249,250,.94); }
 .active-task-strip.empty { grid-template-columns: minmax(0, 1fr) auto; }
 .active-task-strip.empty > div, .task-strip-main { min-width: 0; display: grid; gap: 3px; }

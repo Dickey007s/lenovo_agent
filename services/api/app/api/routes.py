@@ -172,7 +172,12 @@ async def create_demo1_task(
         str | None, Header(alias="Idempotency-Key", min_length=8, max_length=160)
     ] = None,
 ) -> TaskSnapshot:
-    return await service.create_demo1(user.user_id, idempotency_key=idempotency_key)
+    try:
+        return await service.create_demo1(
+            user.user_id, idempotency_key=idempotency_key
+        )
+    except TaskCreateConflictError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
 
 
 @router.post("/tasks", response_model=TaskSnapshot, status_code=status.HTTP_201_CREATED)

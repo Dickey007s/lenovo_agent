@@ -150,7 +150,7 @@ Invoke-RestMethod -Method Post -Uri "$base/workspace/mail/new" -Headers $headers
 
 ### 3.4 创建、启动与控制 Demo 1 Task
 
-固定 Demo 1 入口不需要请求体。前端每次显式开始新一轮时发送新的 `Idempotency-Key`；同一轮重试复用同一个 key，因此不会重复创建，下一轮换 key 后会保留旧 Task 并创建新的 `ready / contract` Task。为了兼容旧客户端，不传 header 时仍使用每个 Owner 的稳定默认键：
+固定 Demo 1 入口不需要请求体。前端每次显式开始新一轮时发送新的 `Idempotency-Key`；同一轮重试复用同一个 key，因此不会重复创建，下一轮换 key 后会保留旧 Task 并创建新的 `ready / contract` Task。创建 key 重放返回该 Task 当前已持久化的 Snapshot，不回退到最初 `ready` 响应；这与 start/control mutation 返回“首次 mutation 结果”的幂等语义不同。为了兼容旧客户端，不传 header 时仍使用每个 Owner 的稳定默认键：
 
 ```powershell
 $roundHeaders = $headers.Clone()
@@ -160,7 +160,7 @@ $task.task_id
 Invoke-RestMethod -Method Get -Uri "$base/tasks/$($task.task_id)" -Headers $headers
 ```
 
-完成一轮后，把 key 改为新的轮次值即可再次演示。相同 Owner+key 始终返回原 TaskSnapshot；不同 key 生成不同 Task ID。Task 列表按更新时间倒序返回，前端刷新时优先恢复未终止 Task，否则显示最近终态 Task 并提供“再次演示”。
+完成一轮后，把 key 改为新的轮次值即可再次演示。相同 Owner+key 始终定位同一 Task 并返回其当前持久化 Snapshot；不同 key 生成不同 Task ID。Task 列表按更新时间倒序返回，前端刷新时优先恢复未终止 Task，否则显示最近终态 Task 并提供“再次演示”。
 
 也可以提交严格的 `TaskContractDraft`。下面只展示最小结构，实际字段和限制以 `packages/contracts/task_models.py` 为准：
 
@@ -196,7 +196,7 @@ Invoke-RestMethod -Method Post -Uri "$base/tasks" `
   -Body ($draft | ConvertTo-Json -Depth 10)
 ```
 
-同一 Owner 使用相同 key 重放相同契约时仍返回 201 和原 TaskSnapshot，不增加第二条 `TASK_CREATED`；相同 key 改用于不同契约返回 409。不传 key 时每次请求都会创建新的 Task。
+同一 Owner 使用相同 key 重放相同契约时仍返回 201 和已存在 Task 的当前持久化 Snapshot，不增加第二条 `TASK_CREATED`；相同 key 改用于不同契约返回 409。不传 key 时每次请求都会创建新的 Task。
 
 创建后的状态为：`TaskSnapshot.status=ready`、`phase=contract`、`version=1`、`last_event_sequence=1`，每个交付物对应一个 `queued` Branch。`artifact_versions`、`verification_reports`、`conflicts`、`controls` 均为空，`last_commit=null`。
 
@@ -234,7 +234,7 @@ $task = Invoke-RestMethod -Method Post -Uri "$base/tasks/$($task.task_id)/start"
 
 当前固定路径允许 `steer`、`pause_branch`、`resume_branch`、`take_over`、`return_control` 和 `resolve_evidence`。分支控制返回 `ControlEvent.status=applied` 后才改变前台状态；`steer` 当前只记录为 `accepted`，没有 `applied_task_version`，也不会在本次请求内重新规划，因此只能反馈“方向指令已记录，等待后续循环应用”。`resolve_evidence` 只接受契约内的 CRM 正式收入 Fixture：服务端先追加通过验证的经营分析 v2。若解决后仍有其他 open Conflict，本次只持久化该 resolution、经营分析 v2 和其 passed VerificationReport，任务保持 `waiting_input / verify`，不生成客户回复 v3 或 `TASK_COMMITTED`；只有已经不存在其他 open Conflict 时，服务端才联动重生成并验证客户回复 v3，再为全部必需 heads 生成 Commit。
 
-mutation 合约要求：相同 key 和相同命令返回首次 mutation 的 Snapshot，且不新增事件、ArtifactVersion 或 Commit；相同 key 被用于不同命令返回 409。当前内存 Store 回归已覆盖旧 key 在后续 mutation 之后仍返回原响应、Artifact lineage/head 引用、内容摘要和 Commit state hash。历史遗留 marker 若没有保存原 Snapshot，只在当前 Task version 仍等于 marker version 时兼容返回；发生过后续 mutation 时返回 409，而不是错误返回最新 Snapshot。PostgreSQL 实例上的同等行为仍未运行验收。
+mutation 合约要求：相同 key 和相同命令返回首次 mutation 的 Snapshot，且不新增事件、ArtifactVersion 或 Commit；相同 key 被用于不同命令返回 409。内存 Store 回归已覆盖旧 key 在后续 mutation 之后仍返回原响应、Artifact lineage/head 引用、内容摘要和 Commit state hash。PR 5 又在 PostgreSQL 16.14 上跨三个顺序 API 进程验证：旧 start key 返回原 v2、旧 resolve key 返回原 v3，当前 GET 保持 v3，重放前后数据库维持 `45 events / 7 artifacts / 1 TASK_COMMITTED`。历史遗留 marker 若没有保存原 Snapshot，只在当前 Task version 仍等于 marker version 时兼容返回；发生过后续 mutation 时返回 409，而不是错误返回最新 Snapshot。
 
 `start` 会预留 4 个 step、4 次工具调用和 1 秒运行时长，`resolve_evidence` 会预留 1 个 step 和 1 秒运行时长；预计用量超过契约预算或已到 `deadline_at` 时返回 409，且不产生 mutation。当前还没有专门的预算耗尽恢复 API 或完整前台引导。
 
@@ -245,7 +245,7 @@ PR 4 交付物工作区直接使用创建、读取、start、control 和 SSE 对
 - `verification_reports[]` 与 `conflicts[]` 提供验证和冲突事实；来源与逐项检查在前台默认折叠。
 - `last_commit` 提供 task version、工件/报告引用和 `state_hash`；缺少该字段时前台不得显示最终提交。
 
-该工作区当前只读，没有创建、编辑或覆盖 ArtifactVersion 的路由。前端只为固定 Fixture 的 `analysis/risk_brief/reply_draft` 提供字段 allowlist，未知 kind/字段默认隐藏；`source_ref` 只显示安全的非敏感 opaque scheme，疑似 token、secret、signature、路径或 URL 的值显示隐藏占位。这是前端第二道投影，不能替代服务端脱敏、授权或未来通用的字段可见性 Schema。即使字段名在 allowlist 中，其任意文本值仍需要服务端 display projection 承担通用安全保证。
+该工作区当前只读，没有创建、编辑或覆盖 ArtifactVersion 的路由。前端只为固定 Fixture 的 `analysis/risk_brief/reply_draft` 提供字段 allowlist，未知 kind/字段默认隐藏；Conflict Card 与 Artifact Workspace 复用同一 `source_ref` 投影，只显示契约中的四个已知 Demo 1 Fixture 引用，其他值统一显示隐藏占位，URL、路径和凭据形态已有负例回归。这是前端第二道投影，不能替代服务端脱敏、授权或未来通用的字段可见性 Schema。即使字段名在 allowlist 中，其任意文本值仍需要服务端 display projection 承担通用安全保证。
 
 ### 3.5 直接创建治理 Run
 
@@ -383,6 +383,8 @@ data: {"sequence":1,"event_id":"task_evt_...","task_id":"task_...",...}
 
 没有新事件时发送 `: heartbeat`。客户端只能通过 `after` 查询参数提交游标；当前路由不解析 `Last-Event-ID` 请求头。Active Task Bar 收到新事件后重新 GET TaskSnapshot 对账，不把 SSE payload 自行推导成任务完成状态。
 
+API 进程重启本身不写 `TASK_RESTORED`，也不改变 Task version 或 event sequence。PR 5 的同页浏览器路径在 EventSource error 时保留最后确认 Snapshot、禁用控制并显示恢复中；新进程可用后通过重新 GET 同一 Task 才恢复“已同步”。该路径没有在停机期间新增事件，不能扩展为 `after` 缺口回放证明。
+
 SSE 目前由每个 API 进程轮询 TaskStore，没有 PostgreSQL `LISTEN/NOTIFY`、消息代理或跨实例广播层。共享数据库可能被不同进程轮询到，但多实例通知延迟、连接迁移和一致性均未验证，不能表述为已支持多实例实时更新。
 
 ## 7. 错误语义
@@ -405,4 +407,4 @@ SSE 在响应已经开始后无法再改变 HTTP 状态码，因此流内错误�
 - `ActionCandidate`、Permit claims 和哈希规则是安全边界，不能由前端自行构造并绕过 RunService。
 - 文档示例中的邮箱、报价号、用户和 Key 全部是演示值。
 
-Task API 当前只把上述能力暴露给固定 Demo 1 Fixture。PR 4 浏览器 E2E 已通过真实本地 API `8011` 与 Next.js `3011` 覆盖创建、start、冲突、Steer accepted、resolve、Commit、交付物读取，以及 start 请求发送前 abort 后的 reload/同 key 重试；它没有覆盖请求已到服务端但响应丢失、Task SSE 断线回放、API 进程重启、PostgreSQL 或多实例通知。Task Runtime 仍不是通用 LLM Agent Loop、后台队列或真实 Connector。副作用动作必须继续走 RunService 与 Tool Gateway，Task Control 不能直接发送邮件或写入企业系统，Task Artifact 也尚未绑定 Action 失效规则。证据见 [`DEMO1-PR4-FRONTEND-E2E-EVIDENCE.md`](evidence/DEMO1-PR4-FRONTEND-E2E-EVIDENCE.md)。
+Task API 当前只把上述能力暴露给固定 Demo 1 Fixture。PR 4 浏览器 E2E 覆盖创建、start、冲突、Steer accepted、resolve、Commit、交付物读取，以及 start 请求发送前 abort 后的 reload/同 key 重试。PR 5 在 PostgreSQL 16.14 和三个顺序 API 进程上验证 v2/v3 Snapshot、Artifact 和 Commit 恢复及幂等零重复；同页 system Edge 运行验证 API 停止、控制禁用、连接文案和新进程后的 GET 对账。它仍没有覆盖请求已到服务端但响应丢失、断线期间事件回放、数据库进程故障或多实例通知。Task Runtime 仍不是通用 LLM Agent Loop、后台队列或真实 Connector；Conversation Thread/Message 也不随 Task 恢复。副作用动作必须继续走 RunService 与 Tool Gateway，Task Control 不能直接发送邮件或写入企业系统，Task Artifact 也尚未绑定 Action 失效规则。证据见 [`PR 4 Frontend E2E`](evidence/DEMO1-PR4-FRONTEND-E2E-EVIDENCE.md) 与 [`PR 5 PostgreSQL-backed API Restart`](evidence/DEMO1-PR5-POSTGRES-BACKED-API-RESTART-EVIDENCE.md)。
