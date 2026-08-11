@@ -21,6 +21,7 @@ V0.1 采用 **workspace-first** 结构，而不是以聊天记录为唯一产物
 
 ```text
 artifact_id          当前活动产物的唯一标识
+revision             当前活动产物的单调保存版本，从 1 开始
 kind                 mail | document | quote | tasks | calendar | expense | crm
 title                工作区标题
 content              各视图的业务内容
@@ -40,13 +41,15 @@ updated_at           最后更新时间
 | --- | --- | --- |
 | `mail` | `to[]`、`cc[]`、`subject`、`body`、`attachments[]` | 新用户为空白编辑器；“新邮件”创建新 Artifact，并清除旧动作绑定 |
 | `document` | `document_type`、`sections[{heading, body}]` | 分章节编辑，Agent 可按章节渐进写入 |
-| `quote` | `quote_id`、`customer`、`currency`、`valid_until`、`approved_floor`、`items[]`、`total`、`approval` | 类表格编辑与金额展示；导入仅为界面占位 |
+| `quote` | `quote_id`、`customer`、`currency`、`valid_until`、`approved_floor`、`items[{name, qty, unit_price, discount, subtotal}]`、`total`、`approval` | 类表格编辑；行小计、四项汇总与最低折后比例状态由确定性公式投影；导入仅为界面占位 |
 | `tasks` | `tasks[{id, title, source, priority, status, reason}]` | “执行记录”按状态分栏维护手工任务卡；“进度 / 成果”只投影 `TaskSnapshot`，不写入该 WorkspaceArtifact |
 | `calendar` | `month`、`selected_date`、`events[{id, title, date, start, end, attendees, location, agenda}]` | 一级为全宽月历，日期格内嵌日程条目；点击进入当日安排视图（可前后翻日、返回月历），支持受控邀请 |
 | `expense` | `case_id`、`owner`、`amount`、`status`、`invoices[]`、`anomalies[]` | 展示报销核查结果并可受控发起补件 |
 | `crm` | `customer`、`opportunity_id`、`amount`、`before`、`suggested_stage`、`next_step` | 编辑商机建议并可受控更新 CRM 阶段 |
 
-报价、任务、报销和 CRM 中声称来自业务系统的记录由确定性 Fixture 合并，模型不能覆盖这些 Connector-owned 字段；模型主要负责文本草稿和候选动作。
+报价、任务、报销和 CRM 中声称来自业务系统的记录由确定性 Fixture 合并，模型不能覆盖这些 Connector-owned 字段；模型主要负责文本草稿和候选动作。报价的服务端所有字段为 `quote_id/customer/currency/approved_floor/items[].unit_price/sources`，当前用户可编辑字段为 `valid_until/items[].name/qty/discount`。`subtotal/total/approval` 不能从浏览器升级为权威事实。
+
+报价即时汇总由前端整数分/BigInt 投影，服务端保存与 Agent 数值回答由 Decimal/`ROUND_HALF_UP` 投影，二者都先将每行标准金额舍入到分，再按该行折后比例计算并舍入折后小计，最后求和。基线结果是标准总价 272000 元、折后总价 253400 元、优惠金额 18600 元、综合折后比例 93.16%（约 9.32 折）、优惠率 6.84%。任一行无效时，前端所有聚合值都显示“待核对”，而不是继续显示部分总计。
 
 ### 2.2 Demo 1 Task Director
 
@@ -95,6 +98,8 @@ source_id | label | system | excerpt | permission | updated_at
 {
   "message": "根据当前内容写一封客户确认邮件",
   "active_view": "mail",
+  "workspace_artifact_id": "artifact_demo_mail",
+  "workspace_revision": 3,
   "workspace_context": {
     "to": ["client-a@example.com"],
     "cc": [],
@@ -105,7 +110,7 @@ source_id | label | system | excerpt | permission | updated_at
 }
 ```
 
-`workspace_context` 以浏览器当前值为准，因此 Agent 能感知尚未点击保存的编辑内容。服务端还会加入当前时间和按关键词检索到的 Demo 企业记录，形成 trusted context。
+`workspace_context` 表达浏览器当前未保存的编辑内容。显式发送时必须同时携带当前 `workspace_artifact_id/workspace_revision`；省略/`null` 表示使用已保存 Artifact 且不要求该 token。普通工作区以当前值形成 active workspace；报价工作区会先把当前 `name/qty/discount/valid_until` 合并到服务端基线，再确定性重算，不能覆盖报价编号、客户、币种、最低折后比例、标准价、来源或审批。显式 `{}` 表示当前上下文为空并 fail closed，不能悄悄回退到旧金额。服务端还会加入当前时间和按关键词检索到的 Demo 企业记录，形成 trusted context。
 
 LLM 必须返回严格的 `ConversationPlan`：
 
@@ -117,6 +122,8 @@ action               可选的 ActionCandidate
 ```
 
 规划结果经 Pydantic 校验，失败时最多修复一次。普通公共知识问题走直接问答路径，避免无关问题继承上一轮动作；涉及公司、客户、报价、报销、权限等企业事实的问题必须依赖 trusted context，不能用模型常识伪造内部记录。
+
+报价核算、复算、最低折后比例检查和来源追问是更窄的确定性分支：ConversationService 从当前活动报价调用 Quote Calculator，并直接形成可读回答，LLM 不生成金额。写入、修改、保存、发送、创建或导入等业务动作不会被该分支截获，继续进入 `ConversationPlan` 与治理链路。来源回答必须说明数据是当前屏幕中的固定演示报价、公式为数量 × 标准价 × 折后比例，且没有访问真实 CRM。
 
 ## 5. 对话 SSE 协议
 
@@ -133,6 +140,7 @@ action               可选的 ActionCandidate
 | `artifact.stream.started` | `artifact`、`fields` | 初始化渐进写入状态 |
 | `artifact.delta` | `kind`、`artifact_id`、`field`、`value` 或 `item` | 增量更新正文、章节、行或卡片 |
 | `artifact.updated` | `artifact` | 接受服务端最终 Artifact |
+| `workspace.conflict` | `view`、`latest_artifact` | 保留本地草稿；展示查看最新版本或有界三方重应用，不创建动作 |
 | `action.proposed` | `run` | 在输入框上方打开确认卡并订阅 Run |
 | `action.closed` | `run_id`、`status` | 关闭确认卡或标记最终状态 |
 | `error` | `detail` | 结束当前流并显示可理解错误 |
@@ -164,6 +172,12 @@ sequenceDiagram
     C-->>UI: message.started / assistant.delta / message.completed
 ```
 
+报价确定性回答使用较短时序：`message.created → assistant.status(status=calculating) → message.started → assistant.delta* → message.completed`。回复事件与 LLM 回复共用同一 UI 协议，但数值来自服务端 Quote Calculator。同一 API 进程内同一 Thread 的流串行更新，避免并发消息用旧 Thread 覆盖；这不提供跨进程顺序、Thread 持久化或断线游标恢复。
+
+显式上下文的 Artifact/revision 已过期，或 LLM 规划期间活动/目标 Artifact 发生变化时，服务端发出 `workspace.conflict` 并停止写回和动作创建。Web 保留当前输入，读取事件中的最新 Artifact；“重新应用我的修改”只把相对编辑起点发生变化且未被服务端同时改动的字段应用到最新版本。同字段双改、缺失编辑起点或报价行结构变化会列出冲突字段并拒绝自动合并。“查看最新版本”会明确放弃当前草稿并采用服务端版本。
+
+即使请求发出时 revision 有效，用户也可能在 Agent 流返回前继续编辑。Web 在发起请求时记录各工作区的 Artifact 快照与本地 edit token；晚到 `artifact.stream.started/delta/updated` 不直接覆盖请求后的编辑。最终 Artifact 与本地草稿改动不同字段时自动保留双方并继续显示“未保存修改”，同字段双改则把 Agent 版本作为最新版本放入相同冲突 UI，用户输入保持可见。
+
 ## 6. 工作区渐进写入
 
 渐进写入是交互呈现，不是逐 token 数据库存储：
@@ -189,18 +203,25 @@ sequenceDiagram
 
 风险说明只在动作确认前的 Agent 文本中出现一次；确认卡保留结构化风险字段属于操作控件，不再在执行结果文本中重复。
 
+可执行动作在创建 Run 前重新绑定当前 Artifact：模型提供的收件人、附件、payload、目标范围、数据分类、状态变化类型、可逆性和 `source_refs` 不直接进入执行；服务端按 capability 从可见 Artifact 重建并绑定 `artifact_id/revision/content`。ArtifactDraft 的模型来源也被服务端保留值或默认来源覆盖。内容不匹配时不创建动作；纯文本收件人身份未解析或附件数据类别不明时，Run 由确定性策略置为 `DENIED`，Mock Evidence 不把 Action 自身值或用户自报姓名/哈希当作可信佐证。已知邮箱和已分类报价附件仍可沿 Evidence/Approval/Permit 链路执行 Simulator。
+
+Conversation 创建的 Run 绑定发起它的真实 Thread；continue stream 会拒绝同一用户从另一 Thread 续写该 Run。动作结果说明暂时失败时，前端保留“重新读取结果”；成功生成后，同一 API 进程重试会重放相同 `message.completed`，前端按 `message_id` 更新而不是重复追加。
+
 ## 8. 保存、修改与失效
 
-- 用户点击保存时调用 `PUT /v1/workspace/{kind}`，服务端合并 content 并追加修改记录。
+- 用户点击保存时调用 `PUT /v1/workspace/{kind}`，同时提交 `expected_artifact_id/expected_revision`；服务端只在 token 匹配时合并 content、递增 `revision` 并追加修改记录。
 - Artifact 已绑定 Action 后再次保存会设置 `requires_recheck=true`，并作废旧 Action；旧审批和旧 Permit 不能用于新内容。
 - Agent 更新工作区时同样产生修改记录，并将新动作绑定到当前 Artifact。
 - 邮件“新邮件”调用 `POST /v1/workspace/mail/new`，创建空白邮件 Artifact；这也是已编辑邮件返回空白编辑器的正式入口。
+- 报价保存先按服务端字段所有权合并并重算小计/总计。相对基线修改 `name/qty/discount/valid_until` 时，保存结果设置 `approval.status=needs_review` 和 `requires_recheck=true`；字段无效时返回 422，不持久化猜测值。
 
 ## 9. V0.1 边界
 
 - Thread 和 Message 在 API 进程内存中，重启后不恢复。
 - 每个用户每种 kind 只有一个活动 WorkspaceArtifact。
-- 没有冲突合并、多人协作、自动保存节流、离线队列或历史版本恢复。
+- 当前只有活动 WorkspaceArtifact 的 409 检测与前端有界三方重应用，不是通用冲突合并或多人协作；没有自动保存节流、离线队列或历史版本恢复。Workspace 锁与 revision 比较只在单 API 进程内，数据库原子 CAS 和多实例协调未实现或验证。
 - 邮件附件仅保存元数据/名称，不上传真实文件。
 - 报价导入、真实邮箱目录、日历账户切换等仅为后续 Connector 扩展点。
+- 报价核算只覆盖数量、标准价和单行折后比例，不含税费、汇率、阶梯价、套餐依赖或真实审批规则；当前来源为固定演示数据，不访问真实 CRM/CPQ/ERP。
 - SSE 没有断线游标恢复；Run 审计流单独支持 `after` 序号续订。
+- 动作结果的 `message.completed` 重放缓存与 Conversation Thread 一样位于单 API 进程内，重启后不恢复。

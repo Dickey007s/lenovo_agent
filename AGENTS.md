@@ -10,6 +10,7 @@
 6. `docs/PRESENTATION_BRIEF.md`：对外叙事、演示路径和不可夸大的边界。
 7. `docs/DECISION_AND_REPORTING_GOVERNANCE.md`：所有决策、推进、PR、Demo 和汇报必须通过的场景、来源、前台与后端事实门槛。
 8. 修改 Demo 1 Task Runtime 时，再读 `docs/decisions/DR-0002-bounded-durable-office-loop.md`、`docs/scenarios/SCENARIO-001-customer-a-durable-report.md` 和 `docs/contracts/` 下的协议与 UI 事实矩阵。
+9. 修改报价工作台、报价上下文或报价问答时，再读 `docs/decisions/DR-0006-deterministic-quote-calculation.md`、对应 Source/Evidence 和 `docs/contracts/UI_SERVER_FACT_MATRIX.md` 的报价映射。
 
 源码永远高于文档。行为变更后必须同步相关文档；不要只改 README 的宣传描述。关键实现路径：
 
@@ -38,6 +39,12 @@ tests/                                        单元与端到端回归
 - Demo 1 的冲突决定、候选依据和分支控制只在 Tasks 工作区显示；非 Tasks 工作区只显示后台任务摘要和前往 Tasks 的入口，跳转本身不得提交 Task Control。
 - 固定 Demo 1 的已知来源在普通业务 UI 中必须标为“演示数据”并使用可读业务标签；原始 `fixture:` ID 和未知内部标识不得进入 DOM。服务端仍保留原值用于校验与审计。
 - 终态入口统一为“开始新一轮汇报”：创建独立 Task 并立即启动，旧 Task、Artifact、Event 与 Commit 不得重置或覆盖。当前没有历史轮次选择入口，不得把后台保留表述成前台可自由切换历史轮次。
+- 报价工作台的行小计、标准总价、折后总价、优惠金额、综合折后比例、优惠率和最低折后比例检查必须由确定性公式产生，LLM 只能解释结果，不能充当计算器。服务端拥有 `quote_id/customer/currency/approved_floor/unit_price/sources`；当前用户只能通过工作区编辑 `name/qty/discount/valid_until`，客户端 `subtotal/total/approval` 永远不是权威事实。
+- 报价任一必需字段无效、越界、超限或行数与服务端版本不一致时必须 fail closed：前台不显示部分总计，Agent 不回退到历史金额，保存接口不写入猜测结果。保存后的规范化报价若相对基线有修改，必须标记 `needs_review` / `requires_recheck`，不能沿用旧审批。
+- 显式发送未保存 `workspace_context` 时必须同时提交服务端 `artifact_id + revision`；保存必须提交 `expected_artifact_id + expected_revision`。版本过期时不得覆盖最新内容：前端保留当前草稿、读取最新 Artifact，并只允许查看最新版本或基于编辑起点/本地草稿/最新版本做有界三方重应用；同字段双改必须交给用户处理。
+- LLM 产生的 Artifact `sources`、Action 参数、目标范围、数据分类、状态变化类型和可逆性都不是权威事实。服务端必须保留/生成受信来源，并从当前可见 Artifact 与 capability 重建可执行动作；内容不匹配、目标不确定或版本在规划期间变化时 fail closed。动作终态说明允许同一 API 进程内幂等重放同一个 `message.completed`，前端按 `message_id` 更新而不是重复追加。
+- 不得把动作自身携带的未知姓名或不透明附件当作“已验证证据”。纯文本收件人身份未解析或附件数据类别不明时必须确定性 deny，用户自报同一值不能解锁；已知邮箱与可分类附件才沿正常 Evidence/Approval/Permit 链路。Conversation 创建的 Run 必须绑定真实 Thread，同一用户也不能把一个 Thread 的结果续写到另一个 Thread。
+- 用户在等待 Agent 返回 Artifact 期间仍可继续编辑。晚到的 `artifact.updated` 必须以请求发出时版本为 base 做三方处理：不同字段保留双方修改，同字段双改进入显式冲突；不得把晚到 Agent 结果直接覆盖用户新输入。
 - 动作确认后必须继续执行并由 Agent 返回结果，前端不能硬编码“已完成”。
 - LLM 只生成自然语言、ArtifactDraft 与 ActionCandidate；Risk、Policy、Evidence、Approval、Permit 和工具执行由确定性代码决定。
 - 风险规则不能退化为“所有外部动作都是 L5”。普通累计最高 L4；L5 仅由受限能力、受限执行或凭据公开等硬条件触发。

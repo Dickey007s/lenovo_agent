@@ -35,6 +35,7 @@ flowchart TB
         RISK["Risk Engine"]
         POLICY["Policy Engine"]
         EVIDENCE["Evidence Resolver"]
+        QUOTE["Quote Calculator / Workspace Trust Merge"]
         PLAN["ControlPlan Builder"]
         GRAPH["LangGraph Workflow"]
         AUTH["Authorization Service"]
@@ -57,6 +58,7 @@ flowchart TB
     ROUTES --> TASK
     CONV --> LLM --> MODEL
     CONV --> CONTRACTS
+    CONV --> QUOTE
     RUN --> RISK --> POLICY --> EVIDENCE --> PLAN
     PLAN --> GRAPH --> AUTH --> GATEWAY
     GATEWAY --> EMAILSIM
@@ -92,6 +94,7 @@ Action Gate 打开时，后台任务摘要保留，Gate 占用独立网格行；
 | --- | --- | --- |
 | FastAPI Routes | `services/api/app/api/routes.py` | 身份头解析、REST/SSE 接口、错误映射 |
 | ConversationService | `services/api/app/application/conversations.py` | Thread、受信上下文、通识路由、工作区合并、SSE、动作与对话闭环 |
+| Quote Calculator | `services/api/app/application/quote_calculator.py` | 报价字段所有权合并、Decimal 逐行核算、最低折后比例检查、来源/核算确定性回答 |
 | RunService | `services/api/app/application/runs.py` | Run 生命周期、重评估、审批、授权、执行、持久化、审计 |
 | TaskService | `services/api/app/application/tasks.py` | 创建和恢复 TaskSnapshot、固定 Demo 1 start、Verifier/Conflict/Commit、任务控制、Owner scope、mutation 幂等与事件轮询 |
 | LLM Adapter | `services/api/app/application/llm.py` | 对话计划、动作抽取、执行后自然语言回应、Schema 修复 |
@@ -142,6 +145,31 @@ sequenceDiagram
 
 模型生成的是最终目标内容；后端把最终内容拆成可视增量事件。数据库只保存最终一致版本，不保存每个动画帧。
 
+#### 报价核算旁路（DR-0006）
+
+报价数值或来源问题沿用 Conversation SSE 外壳，但不让 LLM 生成金额：
+
+```mermaid
+sequenceDiagram
+    participant U as 用户
+    participant W as Quote Workspace
+    participant C as ConversationService
+    participant Q as Decimal Quote Calculator
+    participant S as WorkspaceStore
+
+    U->>W: 编辑数量/折后比例并询问复算
+    W->>C: message + workspace_context + artifact_id/revision
+    C->>S: 读取服务端报价基线与来源
+    C->>C: 只合并 name/qty/discount/valid_until
+    C->>Q: 当前行项目 + 服务端标准价/底线/币种
+    Q-->>C: 行小计、总计、比例、底线结果
+    C-->>W: assistant.status(calculating) + message SSE
+```
+
+前端 `apps/web/app/quote-calculator.ts` 用整数分与 BigInt 实现相同的逐行半入舍入，负责未保存编辑时的即时反馈；它不拥有报价身份、标准价、审批或来源。显式未保存上下文绑定当前 `artifact_id/revision`，保存绑定 `expected_artifact_id/expected_revision`。服务端忽略旧 `subtotal/total` 并规范化保存；任一必需字段无效、越界、超限或行数与基线不一致时，两端都 fail closed。用户要求写入或发送时退出核算旁路，继续 LLM 规划与确定性治理链路。
+
+Workspace revision 采用当前进程内的乐观并发检查。同一用户的 Workspace 写入由进程内锁串行；旧 revision 保存返回 409，Conversation 流中的旧 revision 或规划期间目标 Artifact 变化产生 `workspace.conflict`，且不写 Artifact、不创建 Run。Web 保留本地草稿并读取最新 Artifact，可选择直接查看最新版本，或用编辑起点、本地草稿、最新版本做有界三方重应用；同字段双改和行结构变化拒绝自动合并。请求发出后用户又编辑时，前端用请求时 Artifact 和 edit token 识别晚到的 Agent Artifact，不同字段保留双方修改，同字段进入同一冲突恢复。这还不是数据库原子 compare-and-swap、多实例锁或通用协作文档合并。
+
 ### 3.2 受控动作执行
 
 ```mermaid
@@ -177,6 +205,10 @@ sequenceDiagram
     S-->>R: ToolExecutionResult
     R-->>A: Agent 读取结果并回应
 ```
+
+在 `ActionCandidate` 进入 RunService 之前，ConversationService 会按注册 capability 将它重新绑定到当前可见 WorkspaceArtifact。邮件收件人、附件、主题和正文来自 Artifact；目标范围、数据分类、状态变化类型、可逆性和 `artifact_id/revision/content` 由确定性代码重建，模型自报的参数与 `source_refs` 不进入可执行动作。ArtifactDraft 的 `sources` 同样被忽略：已有 Artifact 保留服务端来源，新 Artifact 使用服务端默认来源。内容/capability 不匹配或规划期间 Artifact 改变时 fail closed。纯文本收件人身份未解析或附件无法按固定演示规则分类时，额外确定性策略直接 deny；Mock Evidence 不再用 Action 自身值伪造“已满足”，用户自报姓名/哈希也不能解锁。已知邮箱与已分类报价附件继续正常评估。
+
+Conversation 创建 Run 时保留真实对话 `thread_id`，而 LangGraph checkpoint 另用 `thread_id:run_id` 隔离同一对话中的多个 Run。动作达到终态后，continue stream 先校验 Run 属于 URL 中的 Thread，跨 Thread 续写即使同一用户也被拒绝。生成前的暂时失败可由前端“重新读取结果”；生成成功后，同一 API 进程按 `(thread_id, run_id)` 重放同一个 `message.completed`，前端按 `message_id` upsert。该缓存不跨进程持久化，工具仍全部落到 Simulator。
 
 ### 3.3 Demo 1 固定 Fixture 受控纵切（PR 3 后端，PR 4 前台）
 
@@ -242,7 +274,7 @@ PR 5 增加独立 opt-in system test：每次创建随机 PostgreSQL 16 数据�
 
 - `assistant_response` 自然语言。
 - `ArtifactDraft` 的表达性内容。
-- `ActionCandidate` 中的业务候选字段：动作类型、目标、资源、数据类别、状态变化类型等。
+- `ActionCandidate` 中的业务候选字段：动作类型、目标、资源、数据类别、状态变化类型等；这些字段在可执行 capability 上仍需由当前 Artifact 重新绑定。
 
 所有字段必须通过严格枚举与 Schema 校验。LLM 输出只表示“候选事实”，不是授权结论。
 
@@ -254,17 +286,19 @@ PR 5 增加独立 opt-in system test：每次创建随机 PostgreSQL 16 数据�
 - Evidence 的状态、来源、摘要和检查时间。
 - Action/参数哈希、Permit、执行结果和审计事件。
 - Task/Branch 状态、ArtifactVersion 身份与摘要、VerificationReport、ConflictRecord、ControlEvent、TaskCommit 和 TaskEvent sequence。
+- 报价的规范化行小计、标准总价、折后总价、优惠金额、综合折后比例、优惠率、最低折后比例检查，以及保存后的 `needs_review` / `requires_recheck`。
+- WorkspaceArtifact `revision`、可执行 Action 的 Artifact 绑定字段，以及服务端保留/生成的 Artifact 来源。
 
 ### 4.3 企业事实边界
 
-模型只能从 `trusted_context` 使用内部事实。V0.1 的 `trusted_context` 来自确定性 Demo Fixture 和当前工作区；没有来源的企业金额、报价、发票、权限和客户记录必须标注待查询或待确认。通识问答可直接调用模型，但不能据此声称知道企业内部数据。
+模型只能从 `trusted_context` 使用内部事实。V0.1 的 `trusted_context` 来自确定性 Demo Fixture 和当前工作区；没有来源的企业金额、报价、发票、权限和客户记录必须标注待查询或待确认。通识问答可直接调用模型，但不能据此声称知道企业内部数据。报价中 `quote_id/customer/currency/approved_floor/unit_price/sources` 由服务端基线拥有，未保存的 `name/qty/discount/valid_until` 可由当前浏览器视图提供；客户端 `subtotal/total/approval` 和历史对话金额都不是权威输入。当前来源仍是固定演示数据，不代表访问真实 CRM。
 
 ## 5. 状态与持久化
 
 | 数据 | 默认内存模式 | 配置 PostgreSQL 后 | 重启恢复 |
 | --- | --- | --- | --- |
 | ConversationThread / ChatMessage | 内存 | 仍为内存 | 否 |
-| WorkspaceArtifact | 内存 | `workspace_artifacts` | 是 |
+| WorkspaceArtifact（含 `revision`） | 内存 | `workspace_artifacts` | 是；当前写入 CAS 仍只在单 API 进程内校验 |
 | RunSnapshot / submitted evidence | 内存 | `runs` | 是 |
 | AuditEvent | 内存 | `audit_events` | 是 |
 | LangGraph checkpoint | `InMemorySaver` | PostgresSaver 表 | 是 |
@@ -272,7 +306,7 @@ PR 5 增加独立 opt-in system test：每次创建随机 PostgreSQL 16 数据�
 | Task ArtifactVersion | `InMemoryTaskStore` 追加列表 | `agent_task_artifact_versions` mutation 路径 | PostgreSQL 16.14 下已验证 5/7 个版本跨进程恢复及幂等零新增 |
 | Permit 已使用集合 | 进程内存 | 进程内存 | 否 |
 
-TaskStore 优先使用 `DATABASE_DSN`，没有时回退到 `LANGGRAPH_CHECKPOINT_DSN`；两者都不存在时使用进程内存。内存测试中的服务重建只能证明同一个 Store 对象仍可读取投影，不能证明 API 进程重启恢复。PR 5 的 PostgreSQL 证据将 TaskStore 单独设为 postgres、checkpoint 保持 memory，以隔离证明 Task 表；本机完整演示配置两条 DSN 时健康接口显示两者均为 postgres。配置 `LANGGRAPH_CHECKPOINT_DSN` 后，FastAPI lifespan 还会初始化 Run、Workspace、Audit 和 checkpoint 存储，并恢复 Run Snapshot。已有库迁移、数据库进程故障、对话持久化、跨实例 Task 通知和分布式 Permit 重放存储属于后续工作。
+TaskStore 优先使用 `DATABASE_DSN`，没有时回退到 `LANGGRAPH_CHECKPOINT_DSN`；两者都不存在时使用进程内存。内存测试中的服务重建只能证明同一个 Store 对象仍可读取投影，不能证明 API 进程重启恢复。PR 5 的 PostgreSQL 证据将 TaskStore 单独设为 postgres、checkpoint 保持 memory，以隔离证明 Task 表；本机完整演示配置两条 DSN 时健康接口显示两者均为 postgres。配置 `LANGGRAPH_CHECKPOINT_DSN` 后，FastAPI lifespan 还会初始化 Run、Workspace、Audit 和 checkpoint 存储，并恢复 Run Snapshot。Workspace 的 `revision` 会随保存写入 Store，但读取、比较与写入尚未形成数据库单语句 CAS；两个 API 实例仍可能各自基于旧缓存写入。已有库迁移、数据库进程故障、对话持久化、跨实例 Task/Workspace 协调和分布式 Permit 重放存储属于后续工作。
 
 ## 6. 运行时与部署拓扑
 
