@@ -5,8 +5,8 @@
 | Scenario ID | `SCENARIO-001` |
 | Owner | Office Agent 项目组 |
 | Status | `Ready` |
-| Decision | [`DR-0002`](../decisions/DR-0002-bounded-durable-office-loop.md) |
-| 设计来源 | `USER-FEEDBACK-20260810-01/02`、`MEETING-DECK-0716-V2-01`、`SCRIPT-V5-202607`、`REPO-BASELINE-84AABC9`、`REACT-ICLR-2023`、`LANGGRAPH-DURABLE-20260810`、`NIST-AI-RMF-1.0`；PR 5 运行来源为 `POSTGRES-WINDOWS-16.14-20260811`、`POSTGRES-BACKED-API-RESTART-DEMO1-PR5-20260811` |
+| Decision | [`DR-0002`](../decisions/DR-0002-bounded-durable-office-loop.md)、[`DR-0005`](../decisions/DR-0005-task-director-interaction.md) |
+| 设计来源 | `USER-FEEDBACK-20260810-01/02`、`USER-FEEDBACK-20260811-INTERACTION-01`、`DESIGN-REFERENCE-TASK-DIRECTOR-OPTION2-20260811`、`MEETING-DECK-0716-V2-01`、`SCRIPT-V5-202607`、`REPO-BASELINE-84AABC9`、`REACT-ICLR-2023`、`LANGGRAPH-DURABLE-20260810`、`NIST-AI-RMF-1.0`；PR 5 运行来源为 `POSTGRES-WINDOWS-16.14-20260811`、`POSTGRES-BACKED-API-RESTART-DEMO1-PR5-20260811` |
 
 ## 1. 用户、触发与当前问题
 
@@ -14,7 +14,7 @@
 
 PR 3 之前的 V0.1 基线可以编辑工作区并治理一次副作用动作，但没有长期 Task、分支、工件版本和任务级控制事实。原流程只能看到一次对话或一次 Run，无法可靠判断：任务是否仍在推进、哪个分支被证据阻塞、其他分支是否安全继续、当前工件来自哪个版本，以及恢复后是否重复执行。
 
-目标是让用户围绕同一个 Task ID 观察、纠偏和接管任务，并且只在服务端验证与提交完成后看到“完成”。
+目标是让用户围绕同一个 Task ID 观察、纠偏和接管任务，并且只在服务端验证与提交完成后看到“完成”。DR-0005 进一步把任务阶段、分支、工件、冲突和人工决定集中到 Task Director，避免用户在窄 Runtime、工件区与长聊天记录之间寻找下一步；这仍是待运行与用户研究验证的交互假设，不改变服务端状态机。
 
 ## 2. 业务价值与明确边界
 
@@ -48,14 +48,14 @@ PR 3 之前的 V0.1 基线可以编辑工作区并治理一次副作用动作，
 
 ## 4. 主路径
 
-| 阶段 | 服务端行为 | PR 5 前台输出 | 当前证据与边界 |
+| 阶段 | 服务端行为 | Task Director 前台输出 | 当前证据与边界 |
 | --- | --- | --- | --- |
-| Contract | 创建稳定 `TaskContract`、Task ID、三个分支和预算 | Active Task Bar 显示目标、阶段、预算、版本和 Task ID | 已实现：`TASK_CREATED` + `TaskSnapshot.version=1` |
+| Contract | 创建稳定 `TaskContract`、Task ID、三个分支和预算 | Task 头部与事实摘要显示目标、阶段、预算和版本；Task ID 保留为可追溯事实但不作为视觉主角 | 已实现：`TASK_CREATED` + `TaskSnapshot.version=1`；PR 6 最终浏览器回归已覆盖新布局 |
 | Observe | 从四个代码内固定 Fixture `source_ref` 生成 Observe Trace | 不显示原始 Prompt 或内部推理 | 已产生 `LOOP_STEP_STARTED/COMPLETED`；不是真实 Connector 读取 |
-| Plan | 为三个固定交付物记录分支运行 Trace | 分支列表在 start 响应后显示服务端终态 | 已产生 `BRANCH_STATUS_CHANGED`；事务中间态不对浏览器逐步可见 |
-| Act | 由确定性代码生成候选工件 | Task 面板可从 Branch head 打开只读交付物工作区，查看 v/status、结构化内容与 lineage | 服务端已产生 `ARTIFACT_VERSION_CREATED`；system Edge E2E 已覆盖经营分析 v1，不来自 LLM |
-| Verify | 发现 2,400 万与 2,680 万冲突，只阻塞经营分析分支 | 工作区显示 Branch 状态、冲突、验证徽标；来源与逐项检查默认折叠 | 固定 Fixture E2E 与截图已覆盖；不证明真实来源、等待时间或业务收益 |
-| Control | 用户选择正式口径，或提交分支控制 | 只有服务端 Snapshot 确认后才更新；Steer accepted 只称已记录待应用 | Resolve/分支控制已有事实；Steer 重新规划尚未实现 |
+| Plan | 为三个固定交付物记录分支运行 Trace | 阶段轨与三个 Branch 泳道在 start 响应后显示服务端终态 | 已产生 `BRANCH_STATUS_CHANGED`；事务中间态不对浏览器逐步可见，阶段轨不能冒充流式进度 |
+| Act | 由确定性代码生成候选工件 | 泳道从 Branch head 打开共享工件，查看 v/status、结构化内容与 lineage | 服务端已产生 `ARTIFACT_VERSION_CREATED`；PR 6 E2E 覆盖经营分析 v1、follow-head 与历史版本，不来自 LLM |
+| Verify | 发现 2,400 万与 2,680 万冲突，只阻塞经营分析分支 | 泳道显示局部冲突，右侧 Decision Inbox 集中正式/预测口径、相关工件和可用控制 | PR 6 最终 E2E 与冲突截图已覆盖固定 Fixture；不证明真实来源、业务收益或用户决策质量 |
+| Control | 用户选择正式口径，或提交分支控制 | 只有服务端 Snapshot 确认后才更新；补证按钮先准备 Steer，提交后也只称已记录待应用 | Resolve/分支控制已有事实；Steer 重新规划尚未实现 |
 | Commit | 解决最后一个 open Conflict 时重新验证经营分析，并联动重生成、验证客户回复后再生成 TaskCommit；若仍有其他冲突则不生成 reply v3 或 Commit | 只在 `last_commit` 存在时显示提交版本、工件/报告数量与 state hash；客户回复显示 v3、2,400 万元和“仅草稿，未发送” | 内存与 PostgreSQL 跨 API 进程回归、真实本地浏览器主路径已覆盖；不代表发送邮件或数据库故障恢复 |
 
 ## 5. 异常与恢复路径
@@ -72,13 +72,14 @@ PR 3 之前的 V0.1 基线可以编辑工作区并治理一次副作用动作，
 | 进程重启 | 从持久 Snapshot、事件和工件版本恢复；重启本身不新增业务事件 | 继续显示同一 Task ID、v2 冲突或 v3 Commit；恢复前控制禁用 | PR 5 已在 PostgreSQL 16.14、三个顺序 API 进程上验证 v2/v3；Conversation、数据库重启/崩溃和多实例并发未覆盖 |
 | 单分支失败 | 仅受影响分支 `failed` | 显示失败范围、最近 Commit 和恢复选项 | 目标，当前未实现 |
 | Take over | 分支进入 `taken_over` | 显示当前控制权和 Return control | 只实现状态机；人工编辑和新 ArtifactVersion 未实现 |
+| 固定查看历史工件 | Branch head 已前进，但用户主动选择旧 ArtifactVersion | 显示“正在查看历史版本”、当前 head 版本和返回动作；默认 mutation 后自动跟随新 head | PR 6 专用 E2E 与历史截图已验证 `follow_head/pinned_history`；仍未测量目标用户误读率 |
 | Action Gate 打开 | RunSnapshot 进入等待证据、审批或授权 | Gate 使用独立网格行；Task 面板视觉隐藏且不可交互，但保持挂载以保留 Steer 草稿；Task Bar 操作禁用，Gate 收起后行高缩至 58px | 已实现交互互斥；Task Artifact 与 Action 失效尚未绑定 |
 
 ## 6. 前台信息层级
 
-PR 5 默认展示：目标、Task ID、阶段、预算、分支状态、冲突摘要、待处理动作、Branch head 对应的工件版本/状态、结构化内容、验证徽标、lineage 和最近 Commit。工件来源、冲突来源与逐项验证检查按需展开；顶部连接文案与 Task 传输状态一致，不能在 Task 已断线时仍写“已连接”。
+Task Director 默认展示：目标、版本、阶段、预算、分支状态、Branch head、验证/冲突、待处理动作和最近 Commit。工件来源、冲突来源与逐项验证检查按需展开；同步/连接文案只表达客户端对账与传输事实，不能在断线时写成任务仍在推进。右侧默认只呈现当前 Decision Inbox，用户可切到既有 Agent 对话；模式切换不重建 Conversation，也不产生 TaskEvent。
 
-Tasks 视图用“长期任务工件 / 工作台待办”两个 tab 保留长期 Task 与手工待办。人工编辑 Task Artifact、创建新 ArtifactVersion、通用 Trace 浏览器和异常恢复中心仍是后续目标。
+Tasks 视图用“指挥台 / 共享工件 / 待办”三个模式保留长期 Task 与手工待办。共享工件默认跟随 Branch head；主动选择旧版本时显示历史 banner。人工编辑 Task Artifact、创建新 ArtifactVersion、通用 Trace 浏览器和异常恢复中心仍是后续目标。
 
 默认隐藏：原始 Prompt、思维链、Worker 内部对话、JWT/Permit、幂等键、权限哈希、完整工具参数、密钥、DSN、堆栈、未脱敏个人信息和无决策价值的调度日志。三个固定 Artifact kind 使用字段 allowlist，未知 kind/字段默认隐藏；Conflict Card 与 Artifact Workspace 共用 `source_ref` 投影，只显示契约中的四个已知 Demo 1 Fixture 引用，其他值 fail closed。这是前端第二道投影，不替代服务端授权、脱敏或未来通用字段可见性 Schema；允许字段中的任意文本仍需服务端保证。
 
@@ -86,12 +87,13 @@ Task UI 与 Action Gate 必须各自读取服务端事实。Gate 打开时视觉
 
 ## 7. 验收指标
 
-以下同时列出验收目标与截至 PR 5 的限定结果：
+以下同时列出验收目标与截至 PR 6 的限定结果：
 
 - 持久恢复：重启前后 Task ID、版本、Artifact head 和 state hash 一致率目标 `100%`。PR 5 的固定 Fixture 在 v2/v3、三个顺序 API 进程的逐字段比较为 `100%`；不能外推到未测场景或生产总体。
 - 幂等恢复：重复命令、重复 resume 和网络重试导致的重复 ArtifactVersion/Commit 数目标为 `0`。PR 5 在重启后重放旧 start/resolve key，新增 Event/ArtifactVersion/Commit 均为 `0`；响应丢失浏览器路径仍待补。
 - 分支隔离：收入冲突发生时，只有目标分支进入 `waiting_evidence`。固定 Fixture 内存测试已有阶段证据。
-- 前后端一致：UI 终态与服务端 Snapshot 终态一致率目标 `100%`。PR 5 的服务端 Snapshot 在 v2/v3 跨 API 进程比较中逐字段一致，前台已断言连接文案、Task ID、冲突/Commit 与控制禁用等关键可见状态；尚未对 UI 全字段投影或所有错误状态、事件缺口、响应丢失做总体测量，不能宣称总体 100%。
+- 前后端一致：UI 终态与服务端 Snapshot 终态一致率目标 `100%`。PR 5 的服务端 Snapshot 在 v2/v3 跨 API 进程比较中逐字段一致；PR 6 最终 E2E 又断言 Task Director 标题/阶段/分支/冲突/Commit、控制反馈、follow-head 与历史状态。尚未对 UI 全字段投影或所有错误状态、事件缺口、响应丢失做总体测量，不能宣称总体 100%。
+- 前台工程闭环：最终全量浏览器 E2E `6 passed (34.5s)`，专用 Task Director 封口 `1 passed (21.6s)`；其中两项乱序回归防止旧 GET 覆盖较新 Snapshot 或把尚未追上已观察 SSE 的页面伪标为已同步。`design-qa.md` 最终 `passed`，被测全图、编排、Decision Inbox、移动和历史状态无剩余 P0/P1/P2。该结果不证明用户理解或效率提升。
 - 控制反馈：本地 Demo 的控制事件到可见服务端确认目标 `P95 ≤ 2s`。尚未采集时延分布。
 - 用户理解、认知负担和接管效果尚未测量，不能在功能验收后自动宣称改善。
 
@@ -103,4 +105,5 @@ Task UI 与 Action Gate 必须各自读取服务端事实。Gate 打开时视觉
 - PR 3 运行证据：[`DEMO1-PR3-RUNTIME-EVIDENCE.md`](../evidence/DEMO1-PR3-RUNTIME-EVIDENCE.md)
 - PR 4 前端 E2E 证据：[`DEMO1-PR4-FRONTEND-E2E-EVIDENCE.md`](../evidence/DEMO1-PR4-FRONTEND-E2E-EVIDENCE.md)
 - PR 5 PostgreSQL-backed API 重启证据：[`DEMO1-PR5-POSTGRES-BACKED-API-RESTART-EVIDENCE.md`](../evidence/DEMO1-PR5-POSTGRES-BACKED-API-RESTART-EVIDENCE.md)
+- PR 6 Task Director 运行与视觉证据：[`DEMO1-PR6-TASK-DIRECTOR-INTERACTION-EVIDENCE.md`](../evidence/DEMO1-PR6-TASK-DIRECTOR-INTERACTION-EVIDENCE.md)
 - 后续实现证据：响应丢失、断线期间事件回放、数据库故障/迁移、多实例、Artifact/Action 绑定和用户研究；在产生前均标记为待验证。

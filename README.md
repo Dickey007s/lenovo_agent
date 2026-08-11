@@ -25,7 +25,7 @@ V0.1 重点验证三件事：
 | 邮件 | 空白编辑器、新邮件入口、收件人/抄送/主题/正文/附件编辑、保存、Agent 渐进式写入、受控发送 |
 | 文档 | 分章节编辑、Agent 生成会议纪要或周报、来源与修改记录 |
 | 报价表 | 类 Excel 行列编辑、折扣底线提示、金额汇总、导入入口占位 |
-| 任务 | “长期任务工件 / 工作台待办”双 Tab；长期任务展示服务端工件，工作台待办使用按状态分栏的可编辑看板 |
+| 任务 | “指挥台 / 共享工件 / 待办”三种模式；Task Director 展示服务端阶段、分支、工件、验证、冲突和 Commit，待办保留可编辑看板 |
 | 日历 | 全宽月历一级视图、日期格内嵌日程条目、点击进入当日安排、新建与编辑、受控创建邀请 |
 | 报销 | 报销单与发票核查、异常提示、受控发起补件请求 |
 | CRM | 商机阶段和下一步编辑、受控更新商机 |
@@ -55,15 +55,17 @@ V0.1 重点验证三件事：
 - 工作区内容在动作绑定后发生变化时，旧 Action 会被作废，不能用旧审批执行新参数。
 - Run、工作区、审计事件和 LangGraph checkpoint 可持久化并在服务重启后恢复。
 
-### Demo 1 交付物工作区与恢复闭环（PR 4-5）
+### Demo 1 Task Director、交付物与恢复闭环（PR 4-6）
 
 - `TaskService` 从严格的 `TaskContractDraft` 创建服务端拥有的 `TaskContract`、`TaskSnapshot`、三个初始 `BranchSnapshot` 和首条 `TASK_CREATED`。新任务仍从 `ready / contract` 开始。
 - 完成、失败或取消后的 Demo 1 会在右上角显示“再次演示”；每一轮通过新的 `Idempotency-Key` 创建独立 Task，刷新后仍可开始下一轮，旧 Task、工件和 Commit 历史不会被重置或覆盖。
 - `POST /v1/tasks/{task_id}/start` 对固定客户 A Fixture 执行一次确定性状态转换：产生 Observe、Plan、Act、Verify 事件，追加 ArtifactVersion 和 VerificationReport，并把 2,400 万元正式口径与 2,680 万元预测口径的冲突限制在经营分析分支。该路径不调用 LLM，也不读取真实邮箱、CRM、预测表或项目系统。
 - `POST /v1/tasks/{task_id}/controls` 接受带 `expected_task_version` 和 `idempotency_key` 的 Steer、Pause、Resume、Take over、Return control 与 Resolve evidence。分支控制只有在服务端返回新 Snapshot 后才显示为已应用；Steer 当前只进入 `accepted` 时，前端只显示“方向指令已记录，等待后续循环应用”。
 - `TaskStore` 的内存与 PostgreSQL 实现包含 Snapshot、TaskEvent 和 ArtifactVersion 的 mutation 路径。`start` 和 `resolve_evidence` 会在写入前校验预计步骤、工具调用、运行时长和截止时间，超限时拒绝 mutation。PR 5 已用 PostgreSQL 16.14 隔离数据库和三个顺序 API 进程验证 v2/v3 Snapshot 恢复、原幂等响应重放，以及 Event/ArtifactVersion/Commit 零新增。
-- 右侧 Agent 区域从服务端 Snapshot 显示 Active Task、分支、证据冲突、控制和最近 Commit；每个分支 head 可直接打开左侧 Tasks 视图中的交付物工作区。该工作区从同一 Snapshot 显示当前版本、验证状态、冲突、结构化内容、折叠来源与检查、完整 lineage，以及最终 Commit/state hash，不在前端补造工件或完成状态。
-- Tasks 视图保留“长期任务工件”和“工作台待办”两个 tab，原手工待办编辑流程没有被长期任务 UI 替换。PR 4 对 `analysis/risk_brief/reply_draft` 使用字段 allowlist，未知 kind/字段默认隐藏；PR 5 让冲突卡与交付物工作区复用同一 `source_ref` 投影，只放行契约中的四个已知 Demo 1 Fixture 引用，其他标识显示隐藏占位。这是前端第二道防线，不代表服务端数据删除，也不是通用字段安全保证。
+- Tasks 默认进入左侧 Task Director：头部事实摘要、Observe/Plan/Act/Verify/Commit 阶段轨和三个 Branch 泳道都来自同一 `TaskSnapshot`；右侧默认 Decision Inbox，只突出 open Conflict 和现有服务端控制，也可切回持续存在的 Agent 对话。视觉阶段、连接线和颜色不构成新的后台进度事实。
+- 每个分支 head 可直接打开“共享工件”。该工作区从同一 Snapshot 显示当前版本、验证、冲突、结构化内容、折叠来源与检查、完整 lineage 以及最终 Commit/state hash；默认在 mutation 后跟随新 head，用户主动查看旧版本时显示明确历史 banner 和返回当前版本动作。
+- Tasks 保留“待办”模式，原手工待办编辑流程没有被长期任务 UI 替换。PR 4 对 `analysis/risk_brief/reply_draft` 使用字段 allowlist，未知 kind/字段默认隐藏；PR 5 让冲突与交付物复用同一 `source_ref` 投影，只放行契约中的四个已知 Demo 1 Fixture 引用，其他标识显示隐藏占位。这是前端第二道防线，不代表服务端数据删除，也不是通用字段安全保证。
+- Decision Inbox 的收入冲突主动作仍提交 `resolve_evidence` 并采用契约内 CRM 正式来源；“准备补证指令”只填充 Steer，提交后也只显示“已记录，等待后续循环应用”。新布局没有新增后端协议、控制种类或真实 Connector。
 - Task SSE 只用于发现新事件并触发 Snapshot 对账；同步标记只表示客户端传输状态，不代表后台仍在执行。未知 mutation 会在当前标签页保存原 key、intent 与预期版本。浏览器 E2E 已覆盖 start 请求发送前 abort、reload、同 key 对账和无重复工件；PR 5 的 system Edge 运行还覆盖同页 API 进程停止、控制禁用、顶部与 Task 面板一致显示恢复中，以及新进程启动后的 Snapshot 对账。尚未覆盖请求已到服务端但响应丢失或断线期间产生新事件的 `after` 回放。
 - Action Gate 打开时保留 Active Task Bar；TaskRuntimePanel 仍挂载以保留未提交 Steer 草稿，但通过 CSS 视觉隐藏并退出交互，Task Runtime 与 Task Bar 操作均不可用。Gate 使用独立网格行，收起后把该行缩至 58px。Action Gate 仍沿用独立 `RunService → Risk/Policy/Evidence/Approval/Permit → Gateway` 链路；Task Artifact 尚未绑定 Action 版本和失效规则。
 
@@ -119,6 +121,8 @@ flowchart LR
 - [前端视觉同步与 Demo 1 兼容决策](docs/decisions/DR-0003-frontend-visual-refresh-sync.md)
 - [前端视觉同步与兼容证据](docs/evidence/DR-0003-FRONTEND-VISUAL-SYNC-EVIDENCE.md)
 - [Demo 1 可重复演示决策](docs/decisions/DR-0004-repeatable-demo1-rounds.md)
+- [Task Director 交互决策](docs/decisions/DR-0005-task-director-interaction.md)
+- [Task Director 交互证据](docs/evidence/DEMO1-PR6-TASK-DIRECTOR-INTERACTION-EVIDENCE.md)
 
 ## 目录结构
 
@@ -202,7 +206,7 @@ pnpm --dir apps/web lint
 pnpm --dir apps/web build
 ```
 
-V0.1 定稿基线和 Demo 1 各 PR 的实际验证结果记录在 [`DR-0002`](docs/decisions/DR-0002-bounded-durable-office-loop.md) 及对应 evidence。PR 3 封口验证为全量 Python `56 passed`；PR 4 的 system Edge E2E 为 `2 passed (18.4s)`。PR 5 与前端视觉刷新/可重复演示合并后的封口回归为：PostgreSQL 16.14 opt-in 系统测试 `1 passed (9.78s)`，system Edge suite `3 passed (17.0s)`，完整 Python `58 passed, 1 skipped (2.00s)`，Ruff、前端 lint/build 与治理检查通过。该 opt-in 路径还验证了显式轮次 key 跨 API 进程重放与不同 key 创建第二个 Task。固定 Demo 1 Task 测试不调用真实 LLM；独立 LLM smoke 只验证 `deepseek-v4-pro` 通用问答与 Conversation SSE 连通性。
+V0.1 定稿基线和 Demo 1 各 PR 的实际验证结果记录在 [`DR-0002`](docs/decisions/DR-0002-bounded-durable-office-loop.md) 及对应 evidence。PR 3 封口验证为全量 Python `56 passed`；PR 4 的 system Edge E2E 为 `2 passed (18.4s)`。PR 5 与前端视觉刷新/可重复演示合并后的封口回归为：PostgreSQL 16.14 opt-in 系统测试 `1 passed (9.78s)`，system Edge suite `3 passed (17.0s)`，完整 Python `58 passed, 1 skipped (2.00s)`。PR 6 Task Director 的最终全量浏览器 E2E 为 `6 passed (34.5s)`，专用截图封口用例为 `1 passed (21.6s)`，完整 Python 为 `58 passed, 1 skipped (3.46s)`，Ruff、前端 lint、生产构建和治理测试通过；[`design-qa.md`](design-qa.md) 最终为 `passed`，无剩余 P0/P1/P2。新增两项乱序回归防止旧 GET 覆盖较新 Snapshot 或把未追上已观察 SSE 的页面伪标为已同步。这只证明固定 Fixture 的前台投影和被测交互，不证明用户理解、效率或决策质量已经改善。固定 Demo 1 Task 测试不调用真实 LLM；独立 LLM smoke 只验证 `deepseek-v4-pro` 通用问答与 Conversation SSE 连通性。
 
 ## 数据、身份与安全边界
 

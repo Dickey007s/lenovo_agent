@@ -6,14 +6,14 @@
 
 V0.1 采用 **workspace-first** 结构，而不是以聊天记录为唯一产物：
 
-- 左侧为办公工作区和视图工具栏，右侧为持续存在的 Agent 对话。
+- 左侧为办公工作区和视图工具栏，右侧保留持续存在的 Agent 区域。普通工作区默认显示 Agent 对话；Demo 1 Tasks 默认显示只包含当前人工阻塞的 Decision Inbox，并可切回同一 Agent 对话。
 - 中间分隔条可拖动，双方独立滚动；切换工作区只替换左侧内容。
 - 用户无需 Agent 也能编辑、保存或从工作区发起操作。
 - Agent 接收当前活动视图和浏览器中的未保存内容，可以直接更新该工作区。
 - 需要人工介入时，确认卡从对话输入区上方弹出，不遮挡历史消息，也不禁止继续对话。
 - 审批不是独立页面。确认完成后动作继续运行，Simulator 结果再由 Agent 以自然语言收尾。
 
-前端入口是 `apps/web/app/page.tsx`，主要视觉和动效位于 `apps/web/app/styles.css`。视觉体系为暖纸底色、墨黑正文与靛蓝强调色；每种工作区有固定身份色（邮件蓝、报价绿、任务橙、日历红、报销青、CRM 紫、审计石板灰），用于页头图标、导航激活态与局部强调。各工作区页头标题是固定的“XX 工作台”名称，不随 Artifact 数据变化；邮件主题、文档标题等动态内容只在卡片内部的业务字段中展示和编辑。Demo 1 Task Artifact 与 Task Runtime 使用同一字号层级，正文保持约 10-13px，移动端关键操作目标至少 44px。
+前端入口是 `apps/web/app/page.tsx`，主要视觉和动效位于 `apps/web/app/styles.css`。普通工作区保留暖纸底色、墨黑正文与工作区身份色；Demo 1 Task Director 使用更中性的高密度工作台，蓝色表达当前交互或运行阶段、绿色表达服务端已验证事实、琥珀色表达等待证据或人工决定。颜色、图标、连接线和进度式布局都不是业务真值。各工作区页头标题是固定的“XX 工作台”名称，不随 Artifact 数据变化；Task Director 标题和目标是例外，直接投影当前 `TaskSnapshot.contract`。移动端关键操作目标至少 44px。
 
 ## 2. WorkspaceArtifact
 
@@ -41,12 +41,30 @@ updated_at           最后更新时间
 | `mail` | `to[]`、`cc[]`、`subject`、`body`、`attachments[]` | 新用户为空白编辑器；“新邮件”创建新 Artifact，并清除旧动作绑定 |
 | `document` | `document_type`、`sections[{heading, body}]` | 分章节编辑，Agent 可按章节渐进写入 |
 | `quote` | `quote_id`、`customer`、`currency`、`valid_until`、`approved_floor`、`items[]`、`total`、`approval` | 类表格编辑与金额展示；导入仅为界面占位 |
-| `tasks` | `tasks[{id, title, source, priority, status, reason}]` | “工作台待办”按状态分栏维护任务卡，并可创建受控内部任务；“长期任务工件”仍只投影 TaskSnapshot |
+| `tasks` | `tasks[{id, title, source, priority, status, reason}]` | “待办”按状态分栏维护手工任务卡；“指挥台 / 共享工件”只投影 `TaskSnapshot`，不写入该 WorkspaceArtifact |
 | `calendar` | `month`、`selected_date`、`events[{id, title, date, start, end, attendees, location, agenda}]` | 一级为全宽月历，日期格内嵌日程条目；点击进入当日安排视图（可前后翻日、返回月历），支持受控邀请 |
 | `expense` | `case_id`、`owner`、`amount`、`status`、`invoices[]`、`anomalies[]` | 展示报销核查结果并可受控发起补件 |
 | `crm` | `customer`、`opportunity_id`、`amount`、`before`、`suggested_stage`、`next_step` | 编辑商机建议并可受控更新 CRM 阶段 |
 
 报价、任务、报销和 CRM 中声称来自业务系统的记录由确定性 Fixture 合并，模型不能覆盖这些 Connector-owned 字段；模型主要负责文本草稿和候选动作。
+
+### 2.2 Demo 1 Task Director
+
+Tasks 主视图采用三个客户端模式，它们不改变服务端 Task 状态：
+
+| 模式 | 前台职责 | 权威事实 |
+| --- | --- | --- |
+| `director` | 阶段、分支、工件 head、验证、冲突和 Commit 的编排画布 | 当前 `TaskSnapshot`；不存在的 head/report/Commit 必须显示等待或缺失 |
+| `artifacts` | 当前与历史 ArtifactVersion、来源、检查、lineage 和 Commit | `branches[].artifact_heads`、`artifact_versions[]`、`verification_reports[]`、`conflicts[]`、`last_commit` |
+| `manual` | 原手工待办看板 | `WorkspaceArtifact(kind=tasks)`；不与 TaskSnapshot 相互覆盖 |
+
+右侧在 Tasks 中默认进入 `decisions`，只突出 open Conflict 和现有 Branch Control；用户可切到 `agent` 继续同一 Conversation。收入冲突的主动作仍是服务端 `resolve_evidence` 正式来源；“准备补证指令”只填充方向输入，提交后也只能显示 `steer accepted / 等待后续循环应用`。右侧模式切换不重建 Conversation，也不产生 TaskEvent。
+
+工件选择使用客户端 `follow_head` 与 `pinned_history` 两种语义。默认跟随服务端 Branch head；用户主动选择旧版本时必须显示历史版本 banner、当前 head 版本和返回动作。mutation 完成后，`follow_head` 自动选择新 head；任何旧 candidate 都不能静默冒充当前已验证工件。
+
+Task 同步状态与传输状态仍是客户端事实：它们只说明浏览器是否已经对账和 SSE/GET 是否可用，不表示后台 Loop 进度。移动端把编排画布改为纵向流，并从阻塞摘要提供到 Decision Inbox 的可达路径，不通过缩小字体或横向页面滚动保留桌面泳道。
+
+PR 6 最终全量浏览器 E2E 为 `6 passed (34.5s)`，专用 Task Director 截图封口用例为 `1 passed (21.6s)`；被测 `1487 x 1058` 桌面与 `390 x 844` 移动 CSS 视口无页面级横向溢出，[`design-qa.md`](../design-qa.md) 最终为 `passed` 且无剩余 P0/P1/P2。两项乱序回归还验证 Snapshot 按 `version`、`last_event_sequence` 与已观察 SSE 序号下限单调应用，旧 GET 不能回滚页面或制造虚假 `synced`。这只验证固定 Fixture 的上述交互和视口，不证明目标用户理解、效率或决策质量改善。
 
 ## 3. 来源、权限和修改记录
 
