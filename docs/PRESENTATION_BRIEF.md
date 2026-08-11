@@ -45,7 +45,7 @@ Office Agent V0.1 把 AI 放在可独立工作的邮件、文档、报价、任�
 | 端到端 Simulator capability | 5 个 | `simulators/` 与 Tool Gateway 注册 |
 | Evidence requirement | 8 类 | `application/evidence_catalog.py` |
 | 确定性治理演示场景 | 4 个 | `application/demo3.py` |
-| Python 自动化收集 | 59 项（58 passed，1 个 PostgreSQL opt-in skip） | `uv run pytest -q` 的 PR 5 合并兼容封口结果 |
+| Python 自动化收集 | 59 项（58 passed，1 个 PostgreSQL opt-in skip） | `uv run pytest -q` 的当前可理解性修订回归 |
 
 7 类工作区为邮件、文档、报价表、任务、日历、报销和 CRM；审计是独立观察视图，不计入可编辑 WorkspaceArtifact。
 
@@ -117,11 +117,13 @@ Demo 1 的 TaskStore 另有独立证据：固定 Fixture 已在同一个 Postgre
 
 强调三条流：Conversation SSE 服务文字与工作区增量，Run SSE 服务有序审计与确认卡刷新，Task SSE 通知持久 Task 的事件推进并触发完整 Snapshot 对账。三者是不同事实链，Task SSE 也不能被描述为 Conversation 持久化。
 
+前台截图不能只证明技术结构存在。Demo 1 应按“准备哪三项材料 → 为什么此刻需要人 → 确认会改变什么 → 最后得到什么”的业务顺序展示，并在同页脚注明：当前浏览器工程代理为 `12 passed (43.7s)`，但 `DR-0005` 仍是 `Draft`，5 人无引导任务测试未运行。
+
 ### 第 10 页：阶段结论与下一步
 
 阶段结论：V0.1 已验证 workspace-first、人机共编、确定性治理、人工 Gate、最小权限 Permit、Simulator 执行与 Agent 结果闭环；固定 Demo 1 TaskStore 还完成了有边界的 PostgreSQL 顺序 API 进程恢复验证。
 
-下一步优先级：真实 SSO/RBAC → Connector SDK 与沙箱 → 对话和 replay 持久化 → 多实例一致性/任务队列 → 历史版本和多人协同 → 评测与可观测性。不要把“增加更多模型自治权”列为首要路线。
+下一步优先级：先完成至少 5 人的无引导任务测试并修复理解/误点问题 → 真实 SSO/RBAC → Connector SDK 与沙箱 → 对话和 replay 持久化 → 多实例一致性/任务队列 → 历史版本和多人协同 → 评测与可观测性。不要把“增加更多模型自治权”列为首要路线。
 
 ## 5. 推荐演示流程
 
@@ -182,12 +184,14 @@ Demo 1 的 TaskStore 另有独立证据：固定 Fixture 已在同一个 Postgre
 - “实现了 5 个 Simulator capability 的端到端受控执行。”
 - “配置 PostgreSQL 时可持久化 Workspace、Run、Audit 与 checkpoint。”
 - “固定 Demo 1 TaskStore 已在 PostgreSQL 16.14 和三个顺序 API 进程上验证 v2/v3 Snapshot、Artifact、Commit 恢复与幂等零重复。”
+- “固定客户 A 场景已用浏览器自动化验证业务首屏、单次开始、决定后果、完成成果和被测响应式路径；这是工程代理证据，不是用户理解结论。”
 
 ### 不可夸大
 
 - 不说“已经接入并发送真实企业邮件”；当前是 Email Simulator。
 - 不说“已经连接真实 CRM、OA、知识库和日历”；当前是 Fixture/Mock Resolver。
 - 不说“已经具备生产级权限系统”；身份头是 P0 占位。
+- 不说“用户已经看懂”或“可用性问题已经解决”；当前只有 Stakeholder 反馈与工程代理回归，没有目标用户任务数据。
 - 不说“所有 ActionSpec 都能执行”；25 类是协议目录，只有 5 个 capability 注册了端到端 Simulator。
 - 不说“全量会话长期保存”；Thread/Message 重启后丢失。
 - 不说“整个工作区会话已无损恢复”或“已具备高可用”；PR 5 只证明固定 Demo 1 Task 在同一数据库、顺序 API 进程下的恢复，不包含数据库故障/迁移、多实例、事件缺口和响应丢失。

@@ -464,7 +464,7 @@ export default function Home() {
   const [message, setMessage] = useState("");
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [assistantStatus, setAssistantStatus] = useState("");
-  const [activeView, setActiveView] = useState<ViewId>("mail");
+  const [activeView, setActiveView] = useState<ViewId>("tasks");
   const [artifacts, setArtifacts] = useState<Partial<Record<WorkspaceKind, WorkspaceArtifact>>>({});
   const [dirty, setDirty] = useState<Partial<Record<WorkspaceKind, boolean>>>({});
   const [streamingArtifact, setStreamingArtifact] = useState<WorkspaceKind | null>(null);
@@ -495,6 +495,7 @@ export default function Home() {
   const taskSnapshotRef = useRef<TaskSnapshot | null>(null);
   const pendingTaskMutationRef = useRef<PendingTaskMutation | null>(null);
   const demo1CreateKeyRef = useRef<string | null>(null);
+  const demo1CreateInFlightRef = useRef(false);
 
   function applyTaskSnapshot(snapshot: TaskSnapshot | null, allowTaskSwitch = false) {
     const current = taskSnapshotRef.current;
@@ -681,8 +682,11 @@ export default function Home() {
 
   const activeArtifact = useMemo(() => activeView !== "audit" ? artifacts[activeView] : undefined, [activeView, artifacts]);
 
-  async function createDemo1Task() {
-    const repeat = Boolean(task && ["committed", "failed", "cancelled"].includes(task.status));
+  async function createDemo1Task(): Promise<TaskSnapshot | null> {
+    if (demo1CreateInFlightRef.current) return null;
+    demo1CreateInFlightRef.current = true;
+    const currentTask = taskSnapshotRef.current;
+    const repeat = Boolean(currentTask && ["committed", "failed", "cancelled"].includes(currentTask.status));
     const idempotencyKey = demo1CreateKeyRef.current ?? `demo1-round:${crypto.randomUUID()}`;
     demo1CreateKeyRef.current = idempotencyKey;
     setTaskCreating(true);
@@ -705,16 +709,33 @@ export default function Home() {
       setTaskTransportState("connected");
       setTaskSyncState(applied ? "synced" : "reconnecting");
       setNotice(applied
-        ? repeat ? "新一轮 Demo 1 已创建" : "Demo 1 任务契约已创建"
+        ? repeat ? "新一轮经营汇报已创建" : "经营汇报任务已创建"
         : "任务创建请求已确认，正在读取最新任务状态");
+      return applied ? snapshot : null;
     } catch (reason) {
       if (!repeat) {
         setTaskTransportState("interrupted");
         setTaskSyncState("offline");
       }
-      setTaskError(reason instanceof Error ? reason.message : "无法创建 Demo 1 任务");
+      setTaskError(reason instanceof Error ? reason.message : "无法创建经营汇报任务");
+      return null;
     } finally {
+      demo1CreateInFlightRef.current = false;
       setTaskCreating(false);
+    }
+  }
+
+  async function createAndStartDemo1Task() {
+    const created = await createDemo1Task();
+    const current = taskSnapshotRef.current;
+    if (
+      created?.status === "ready"
+      && current?.task_id === created.task_id
+      && current.status === "ready"
+      && current.version === created.version
+      && current.last_event_sequence === created.last_event_sequence
+    ) {
+      await startDemo1Loop(current);
     }
   }
 
@@ -834,9 +855,9 @@ export default function Home() {
     }
   }
 
-  async function startDemo1Loop() {
-    if (!task || taskMutating || pendingTaskMutationRef.current) return;
-    const targetTask = task;
+  async function startDemo1Loop(snapshot?: TaskSnapshot) {
+    const targetTask = snapshot ?? taskSnapshotRef.current;
+    if (!targetTask || taskMutating || pendingTaskMutationRef.current) return;
     const expectedVersion = targetTask.version;
     const idempotencyKey = `start-${crypto.randomUUID()}`;
     rememberPendingTaskMutation({ taskId: targetTask.task_id, kind: "start", idempotencyKey, expectedVersion });
@@ -1222,7 +1243,7 @@ export default function Home() {
                 transportState={taskTransportState}
                 busy={taskMutating || Boolean(pendingTaskMutation) || actionGateOpen}
                 creating={taskCreating}
-                onCreate={() => void createDemo1Task()}
+                onCreate={() => void createAndStartDemo1Task()}
                 onStart={() => void startDemo1Loop()}
                 onRetry={() => void (pendingTaskMutation ? retryPendingTaskMutation() : retryTaskConnection())}
                 onShowDecisions={showTaskDecisionInbox}
@@ -1263,7 +1284,6 @@ export default function Home() {
           busy={taskMutating || actionGateOpen}
           pending={Boolean(pendingTaskMutation)}
           errorMessage={taskError}
-          onStart={() => void startDemo1Loop()}
           onRetry={() => void (pendingTaskMutation ? retryPendingTaskMutation() : retryTaskConnection())}
           onControl={controlDemo1Task}
           onOpenArtifact={openTaskArtifact}

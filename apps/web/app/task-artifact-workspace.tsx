@@ -67,6 +67,18 @@ const BRANCH_STATUS_LABELS: Record<BranchSnapshot["status"], string> = {
   cancelled: "已取消",
 };
 
+const TASK_STATUS_LABELS: Record<TaskSnapshot["status"], string> = {
+  ready: "尚未开始",
+  running: "正在准备",
+  waiting_input: "等待你的决定",
+  paused: "已暂停",
+  taken_over: "由你接管",
+  verifying: "正在核对",
+  committed: "已完成",
+  failed: "需要处理",
+  cancelled: "已取消",
+};
+
 const ARTIFACT_KIND_LABELS: Record<string, string> = {
   analysis: "经营分析",
   risk_brief: "风险摘要",
@@ -351,8 +363,8 @@ function ConflictSummary({
       </header>
       {historicalVersion && (
         <p className="task-artifact-conflict-context-note">
-          下方状态来自当前 Task Snapshot；“已解决”仅表示当前 Snapshot 记录的冲突状态，
-          不表示解决发生在当前分支头，也不代表正在查看的历史工件已通过验证。
+          下方显示的是本轮任务当前记录的冲突状态；“已解决”不表示解决发生在当前分支头，
+          也不代表正在查看的历史材料已经通过核对。
         </p>
       )}
       <ul className="task-artifact-conflict-list">
@@ -365,7 +377,7 @@ function ConflictSummary({
               <header className="task-artifact-conflict-header">
                 <h4>{conflict.subject}</h4>
                 <span>{historicalVersion && conflict.status === "resolved"
-                  ? "当前 Snapshot 已解决"
+                  ? "本轮任务当前已解决"
                   : CONFLICT_STATUS_LABELS[conflict.status]}</span>
               </header>
               <p>{conflict.summary}</p>
@@ -596,7 +608,7 @@ export function TaskArtifactWorkspace({
 
       {task.status === "waiting_input" && (
         <aside className="task-artifact-task-waiting" role="status">
-          任务正在等待输入。当前显示的是最近一次服务端任务快照。
+          任务正在等待你的决定。当前显示的是本轮最近确认的材料状态。
         </aside>
       )}
 
@@ -717,7 +729,7 @@ export function TaskArtifactWorkspace({
           <div className="task-artifact-commit-empty" role="status">
             <span>最终提交</span>
             <strong>尚未形成最终提交</strong>
-            <p>当前任务状态：{task.status}，阶段：{task.phase}。</p>
+            <p>当前进展：{TASK_STATUS_LABELS[task.status]}。</p>
           </div>
         )}
       </footer>

@@ -5,8 +5,8 @@
 | Decision ID | `DR-0005` |
 | Owner | Office Agent 项目组 |
 | Date | 2026-08-11 |
-| Status | `Verified` |
-| Scope | Demo 1 Tasks 主视图、Decision Inbox、Agent 对话切换、工件历史防误读与移动端决策路径 |
+| Status | `Draft`（2026-08-11 可理解性验收重新打开；既有工程证据仍按原范围保留） |
+| Scope | Demo 1 Tasks 主视图、首次用途理解、单一下一步、决策后果、完成成果、失败恢复、工件历史与移动端主路径 |
 | Depends on | `DR-0001`、`DR-0002`、`DR-0004`、现有 `TaskSnapshot` / Control / SSE 协议 |
 
 ## 1. 用户场景与问题
@@ -15,7 +15,16 @@
 
 既有 Runtime 已经能显示这些事实，但长期任务明细被压缩在通用 Agent 对话旁的窄面板中。冲突证据和决定动作分居工作区与 Runtime，用户需要跨区域来回寻找；通用聊天记录又长期占据主要空间。工件 mutation 后若仍停留在旧版本，历史内容还可能与当前 Branch head 并列出现而缺少足够强的区分。
 
-本轮完成条件是：Tasks 默认进入第一类 Task Director 工作区；左侧用编排画布集中呈现阶段、分支、工件、验证、冲突和 Commit，右侧默认只放需要用户处理的 Decision Inbox，同时允许切回 Agent 对话；移动端阻塞摘要可到达决策区；用户主动查看旧版本时有明确历史标识，mutation 后默认跟随新的 Branch head。所有业务结论必须继续来自服务端 Snapshot，不能为匹配参考图伪造进度、恢复或执行结果。
+上一轮工程完成条件是：Tasks 默认进入第一类 Task Director 工作区；左侧用编排画布集中呈现阶段、分支、工件、验证、冲突和 Commit，右侧默认只放需要用户处理的 Decision Inbox，同时允许切回 Agent 对话；移动端阻塞摘要可到达决策区；用户主动查看旧版本时有明确历史标识，mutation 后默认跟随新的 Branch head。所有业务结论必须继续来自服务端 Snapshot，不能为匹配参考图伪造进度、恢复或执行结果。
+
+2026-08-11 的实际试用反馈指出当前系统“还有很多问题”，且 Stakeholder “有点看不懂这个是要做什么”。因此，上述工程完成条件不再等同于交互完成。本决策重新打开为 `Draft`，新增六个必须同时通过的完成门槛：
+
+1. 首次理解：没有功能讲解时，用户能从首屏理解系统正在帮助准备客户 A 经营汇报、协调三项交付物，并只在需要决定时请人介入。
+2. 单一下一步：空态一次点击创建并启动；Conflict 只保留一个改变状态的主要动作，定位、导航、刷新和审计入口降级；Committed 转入成果复核。
+3. 决策后果：提交前说明冲突、来源、受影响分支、将改变的内容和不会发生的真实外部动作。
+4. 完成成果：终态直接呈现三项交付物、验证结果和可复核下一步，不能只留下“没有待决策项”的空状态。
+5. 失败恢复：重新对账、`409`、历史版本和等待状态都要说明发生了什么以及用户如何回到最新可操作事实。
+6. 移动端主路径：`390 x 844` 视口中从任务摘要到主要决定、后果和恢复入口可达，无横向溢出或被次要信息遮挡。
 
 ## 2. 来源与依据
 
@@ -25,8 +34,10 @@
 | `DESIGN-REFERENCE-TASK-DIRECTOR-OPTION2-20260811` | 选中视觉参考 | 支持编排画布、Decision Inbox、工作台密度和状态色的信息层级 | 不是运行截图；图中的时间、进度和动作不能直接视为产品事实 |
 | `USER-FEEDBACK-20260810-01/02` | 治理要求与 0716-v2 会后反馈 | 每次推进必须同时说明前台影响、后端事实、场景与来源 | 不指定具体布局，也不证明该布局有效 |
 | `FRONTEND-E2E-DEMO1-PR4-20260810`、`POSTGRES-BACKED-API-RESTART-DEMO1-PR5-20260811` | 既有运行证据 | 证明当前 TaskSnapshot 主路径、工件工作区和断线对账事实可供新前台复用 | 不验证本轮新布局、历史防误读或用户价值 |
-| `TASK-DIRECTOR-INTERACTION-DEMO1-PR6-20260811` | 源码、自动化、浏览器与截图证据 | 证明固定 Fixture 的新布局、既有控制、历史版本区分与被测响应式路径 | 不证明真实 Connector、通用后台 Loop 或用户价值 |
-| `TASK-DIRECTOR-DESIGN-QA-20260811` | 参考图与实现视觉复审 | 两轮比较关闭历史混淆、移动阶段轨、裁切与原始协议词等 P1/P2，最终无 P0/P1/P2 | 视觉通过不等于目标用户更快或更正确地决策 |
+| `TASK-DIRECTOR-INTERACTION-DEMO1-PR6-20260811` | 历史源码、自动化、浏览器与截图证据 | 证明 `a47cb28` 原 PR 6 基线的固定 Fixture 布局、既有控制、历史版本区分与被测响应式路径 | 不描述当前可理解性修订；不证明真实 Connector、通用后台 Loop 或用户价值 |
+| `TASK-DIRECTOR-DESIGN-QA-20260811` | 参考图与历史实现视觉复审 | 绑定 `a47cb28` 的两轮比较关闭当时的历史混淆、移动阶段轨、裁切与原始协议词等 P1/P2 | 不描述当前可理解性修订；视觉通过不等于目标用户更快或更正确地决策 |
+| `USER-FEEDBACK-20260811-USABILITY-02` | Stakeholder feedback | 当前原型的产品用途和主路径仍不清楚，触发本决策重新进入可理解性修订 | 不是用户研究，不能量化问题发生率或替代目标用户任务测试 |
+| `TASK-DIRECTOR-USABILITY-AUDIT-DEMO1-PR6-20260811` | Draft 可理解性验收与工程代理证据 | 固定首次理解、单一下一步、决策后果、完成成果、恢复和移动端验收门槛；当前浏览器脚本与截图已验证可见信息和主路径 | 工程代理不证明真实用户理解；5 人无引导研究未完成 |
 
 完整登记见 [`SOURCE_REGISTER.md`](SOURCE_REGISTER.md)。
 
@@ -38,19 +49,22 @@
 4. 工件选择区分 `follow_head` 与 `pinned_history`。默认跟随 Branch head；用户主动选择非 head 版本时显示“正在查看历史版本”，并提供返回当前版本的动作。mutation 后不能让旧内容静默冒充当前版本。
 5. 移动端采用纵向编排和可到达的决策路径，不把桌面泳道强行缩成不可读缩略图；页面本身不得产生横向溢出。
 6. 本轮不新增后端协议、Task 状态、控制种类或真实 Connector，也不把同步/传输状态写成 Task 业务进度。
+7. 首屏和每个主状态优先表达“正在做什么、卡在哪里、现在做什么、决定会改变什么、完成后得到什么”。`Task Director`、Snapshot version、Loop step、内部状态枚举和事件序号降级到审计层，不能承担产品用途说明。
+8. 一个状态只设置一个业务主动作。Conflict 的主动作必须在提交前展示后果；Committed 的主动作必须指向服务端确认的交付成果，而不是继续强调已经为空的 Decision Inbox。
 
 未采用继续扩张原窄 Runtime，因为它会延续证据与动作分离、业务状态截断和聊天占据主空间的问题。未采用纯静态大屏，因为它无法处理控制、历史版本和断线恢复，也违反服务端事实门槛。未采用完整内部 Trace/Worker 会话作为主视图，因为这些信息会增加认知负担并暴露不应前台展示的实现细节。
 
-## 4. 前台输出与交互
+## 4. 前台目标输出与交互（Draft）
 
 | 区域 | 用户看见什么 | 用户可做什么 | 反馈与恢复 | 默认隐藏 |
 | --- | --- | --- | --- | --- |
-| Task 头部与事实摘要 | 标题、目标、Task version、状态、已验证分支数、Loop step、同步/传输状态和待决策数 | 刷新、创建或再次演示、切换指挥台/共享工件/待办 | 未同步时显示重新对账；终态新建不覆盖旧 Task | Task ID 的内部用法、幂等键、DSN、网络重试日志 |
-| 编排画布 | Observe/Plan/Act/Verify/Commit 阶段；每个 Branch 的契约、交付、head、验证/冲突和汇聚条件 | 打开服务端 head 工件 | 没有 head/report/Commit 时明确显示等待，不补造完成比例 | Prompt、思维链、Worker 对话、完整 Trace JSON |
-| Decision Inbox | 只显示当前 open Conflict、正式/候选口径、来源摘要和相关分支控制 | 采用正式口径、查看工件、准备并提交补证 Steer、暂停或接管分支 | mutation 提交中冻结重复动作；只有新 Snapshot 才改变业务状态；Steer 明示待应用 | 原始检索日志、未知或敏感来源、权限哈希 |
+| 任务简报与主要下一步 | 客户 A 经营汇报、三项交付目标、当前业务状态、阻塞原因和一个主要下一步 | 空态一次点击创建并启动；已有 Ready Task 时开始准备；Conflict 时处理收入决定；Committed 时查看交付成果 | 初始列表未完成时只显示读取态，不允许重复创建；未同步时保留最后确认事实并显示重新对账；终态新建不覆盖旧 Task | Task ID、Snapshot version、Loop step、原始枚举、幂等键、DSN、网络重试日志 |
+| 任务进展 | 读取资料、拆分任务、生成材料、核对事实、准备完成五个用户语言阶段；每份材料的当前成果、核对/冲突和是否纳入结果 | 打开服务端确认的当前材料 | 没有 head/report/Commit 时明确显示等待，不补造完成比例 | Prompt、思维链、Worker 对话、完整 Trace JSON、预算与内部步数 |
+| 待我决定 | 当前 open Conflict、正式/候选口径、来源、受影响交付物，以及“采用后会改变什么、不会执行什么” | 采用正式口径；查看受影响工件；次要位置提供补证、暂停或接管 | mutation 提交中冻结重复动作；只有新 Snapshot 才改变业务状态；Simulator 边界始终可见 | 原始检索日志、未知或敏感来源、权限哈希、未由协议支持的后果 |
+| 完成成果 | 服务端确认的三项交付物、验证结果、Commit 摘要和可复核下一步 | 打开交付物并复核，不把空决策列表作为完成反馈 | 只在终态 Snapshot 和 `last_commit` 支持时出现；缺少任一事实则保持等待或部分完成 | 前端推断的完成比例、真实发送或外部写入暗示 |
 | Agent 模式 | 既有 Conversation 历史、输入和 Action Gate | 切回通用对话并继续既有办公协作 | 切换不重建 Conversation；Action Gate 继续使用原确定性治理链 | CoT、Prompt、Permit token 和工具秘密 |
 | 共享工件 | Branch head、版本、验证、内容、来源、lineage 与 Commit | 选择版本或返回当前 head | 历史版本显示强提醒；默认 mutation 后跟随新 head | 未在 kind allowlist 中的字段与非安全 source ref |
-| 移动端 | 纵向事实摘要、分支状态和阻塞摘要 | 从“查看决策”跳到 Decision Inbox | 无横向页面溢出；控制仍服从同步和 pending 状态 | 桌面专用密度和装饰性连接信息 |
+| 移动端 | 纵向事实摘要、材料状态和阻塞摘要 | 从“查看待确认项”跳到“待我决定” | 无横向页面溢出；控制仍服从同步和 pending 状态 | 桌面专用密度和装饰性连接信息 |
 
 ## 5. 后端事实映射
 
@@ -58,7 +72,11 @@
 
 - 标题、目标、版本、任务状态、阶段和预算来自 `TaskSnapshot.contract`、`version`、`status`、`phase` 与 `budget`。
 - 分支泳道来自 `branches[]`；交付定义来自 `contract.deliverables[]`；最新工件来自 `branches[].artifact_heads` 与 `artifact_versions[]`；验证、冲突和提交分别来自 `verification_reports[]`、`conflicts[]` 与 `last_commit`。
-- “等待你的决定”只在存在 open Conflict 或服务端任务状态要求输入时出现；任务完成只在 `last_commit` 和终态 Snapshot 支持时出现。
+- “等待你的决定”只在 `TaskSnapshot.status=waiting_input` 且存在 open Conflict 时出现；failed/cancelled 终态即使保留 open 记录也优先显示失败/取消事实。任务完成只在 `last_commit` 和终态 Snapshot 支持时出现。
+- 已有任务的首屏业务用途来自 `contract.title/objective/deliverables`。尚无 Task 时，空态来自固定 `/v1/demo1/tasks` 创建模板的客户 A 场景副本，不是 Snapshot 事实；其文案由 E2E 与创建后的契约校验保持一致。通用产品仍需服务端模板/场景描述接口，不能长期依赖客户端副本。初始 Task 列表未返回时保持读取态，不能先显示可创建空态。
+- 主要下一步是对服务端事实的有限表达：终态状态优先；仅 `waiting_input` 的 open `conflicts[]` 进入可操作决定；未启动状态使用契约允许的启动命令，终态且存在 `last_commit` 时进入成果复核；前端不得用计时器、动画进度或局部请求成功自行改变业务阶段。
+- 决策后果必须由 open `ConflictRecord`、受影响 Branch/Artifact head 与既有 `resolve_evidence` 语义共同支持；协议未提供的外部影响不得写入确认文案。
+- 完成成果只读取终态 `status`、`last_commit`、`artifact_heads` 和 `verification_reports[]`。缺少 Commit 或验证报告时不能用“已完成”掩盖部分完成。
 - `taskSyncState`、`taskTransportState`、右侧模式、工作区模式和工件选择模式是客户端交互事实，不是 Task 业务字段。它们只能描述浏览器是否已对账、当前显示哪个视图以及用户是否固定查看历史版本。
 - 同一 Task 的 Snapshot 只在 `version` 不低于当前版本、`last_event_sequence` 不低于当前 Snapshot 与已观察 SSE sequence floor 时应用；否则保留较新事实并保持重新对账，不能被乱序旧 GET 回滚或伪标 `synced`。
 - `resolve_evidence`、Pause、Resume、Take over、Return control 和 Steer 继续携带 `expected_task_version` 与幂等键。业务状态只在服务端返回新 Snapshot 后改变；`steer` 当前只产生 `CONTROL_ACCEPTED`。
@@ -74,15 +92,17 @@
 
 ## 7. 验证与当前状态
 
-本决策已通过固定 Fixture 的工程验收：最终全量浏览器 E2E `6 passed (34.5s)`，专用 Task Director 截图封口用例 `1 passed (21.6s)`；完整 Python `58 passed, 1 skipped (3.46s)`，Ruff、前端 lint 和生产构建通过。新增两项 Snapshot 乱序回归，防止旧 GET 覆盖较新事实或在未追上已观察 SSE 序号时伪标 `synced`。桌面 `1487 x 1058`、移动 `390 x 844` CSS 视口及历史版本状态均有哈希截图；[`design-qa.md`](../../design-qa.md) 最终为 `passed`，两轮复审后无剩余 P0/P1/P2。逐项结果与截图哈希见 [`DEMO1-PR6-TASK-DIRECTOR-INTERACTION-EVIDENCE.md`](../evidence/DEMO1-PR6-TASK-DIRECTOR-INTERACTION-EVIDENCE.md)。
+既有固定 Fixture 工程验收仍是有效的窄范围证据：全量浏览器 E2E `6 passed (34.5s)`、专用 Task Director 用例 `1 passed (21.6s)`、Python `58 passed, 1 skipped (3.46s)`，Ruff、前端 lint 和生产构建通过；Snapshot 乱序、历史版本和被测桌面/移动视口也有记录。它们证明脚本能找到控件、命令与服务端事实按预期衔接，不证明真实用户理解系统用途、找到正确下一步、预测决定后果或识别完成成果。
 
-即使工程验收全部通过，也只能证明固定 Fixture 的页面投影与控制路径。`H-001/H-004` 及“Decision Inbox 降低查找成本”“历史标识降低误读”仍需目标用户任务测试，不能在 PR 完成后自动写成体验提升结论。
+Stakeholder 的本轮试用反馈构成反例，说明不能再用上述工程通过率关闭交互决策。当前已完成一轮以业务任务为中心的修订：根路径默认进入经营汇报；空态一次点击完成创建与启动；初始列表加载中不暴露创建动作，无任务离线时左右区域使用同一恢复事实；快速重复开始由 in-flight guard 收敛；没有 `conflict_id` 的 resolve 只开放每分支第一条 open conflict，并按剩余冲突解释阶段后果；只有 `waiting_input` 投影可操作冲突，失败或取消终态优先；Committed 列出三项服务端确认成果。浏览器回归为 `12 passed (43.7s)`，Python 为 `58 passed, 1 skipped (2.24s)`，Ruff、前端 lint 与生产构建通过；四张当前截图及哈希已回填。它们只证明预设信息和路径存在且与服务端事实一致。至少 5 名接近目标角色参与者的无引导任务测试仍未运行，因此 `DR-0005` 保持 `Draft`，不得表述为用户已经理解或可用性问题已解决。完整边界见 [`DEMO1-PR6-USABILITY-COMPREHENSION-AUDIT-20260811.md`](../evidence/DEMO1-PR6-USABILITY-COMPREHENSION-AUDIT-20260811.md)。
 
 ## 8. 关联项
 
 - 场景：[`SCENARIO-001`](../scenarios/SCENARIO-001-customer-a-durable-report.md)
 - 事实矩阵：[`UI_SERVER_FACT_MATRIX.md`](../contracts/UI_SERVER_FACT_MATRIX.md)
-- 用户反馈原文：[`USER-FEEDBACK-20260811-03`](../sources/USER-FEEDBACK-20260811-03-task-director.md)
+- 方向选择反馈原文：[`USER-FEEDBACK-20260811-03`](../sources/USER-FEEDBACK-20260811-03-task-director.md)
+- 可理解性问题反馈原文：[`USER-FEEDBACK-20260811-04`](../sources/USER-FEEDBACK-20260811-04-usability-comprehension.md)
 - 选中参考图：[`dr-0005-task-director-option2-reference.png`](../evidence/assets/dr-0005-task-director-option2-reference.png)
 - 运行与视觉证据：[`DEMO1-PR6-TASK-DIRECTOR-INTERACTION-EVIDENCE.md`](../evidence/DEMO1-PR6-TASK-DIRECTOR-INTERACTION-EVIDENCE.md)
+- Draft 任务验收：[`DEMO1-PR6-USABILITY-COMPREHENSION-AUDIT-20260811.md`](../evidence/DEMO1-PR6-USABILITY-COMPREHENSION-AUDIT-20260811.md)
 - Design QA：[`design-qa.md`](../../design-qa.md)

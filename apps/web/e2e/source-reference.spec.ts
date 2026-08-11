@@ -4,7 +4,7 @@ import { formatSourceReference } from "../app/source-reference";
 
 test("Demo 1 source references use a fail-closed display allowlist", () => {
   expect(formatSourceReference("fixture:crm/customer-a:official-revenue-v3", 0))
-    .toBe("fixture:crm/customer-a:official-revenue-v3");
+    .toBe("CRM 客户主数据 · 正式收入 v3");
 
   const unsafeReferences = [
     "source:https://intranet.example/private",

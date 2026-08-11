@@ -9,6 +9,11 @@ type TaskSnapshot = {
   phase: string;
   version: number;
   last_event_sequence: number;
+  contract: {
+    title: string;
+    objective: string;
+    deliverables: { title: string }[];
+  };
   branches: { branch_id: string; status: string }[];
   artifact_versions: { artifact_version_id: string }[];
   controls: { kind: string; status: string; idempotency_key: string }[];
@@ -165,56 +170,351 @@ async function expectMobileTaskDirector(page: Page) {
   expect(undersizedTargets, "visible Task Director actions should be at least 44px tall").toEqual([]);
 }
 
-test("Task Director keeps decisions, controls, errors, and versions understandable", async ({ page, request }, testInfo) => {
+async function expectPrimarySurfaceToHideRuntimeJargon(page: Page) {
+  const surface = page.locator(".app-shell.is-task-director");
+  await expect(surface).toBeVisible();
+  const visibleText = await surface.innerText();
+  expect(visibleText).not.toMatch(/Demo 1|Snapshot|ORCHESTRATION BOARD|DECISION INBOX/i);
+}
+
+test("the first task path exposes the customer A purpose, decision facts, and confirmed outcomes", async ({ page, request }, testInfo) => {
+  const owner = "e2e_customer_report_comprehension";
+  await routeBrowserApiAs(page, owner);
+  await page.setViewportSize({ width: 1181, height: 900 });
+  await page.goto("/");
+
+  await expect(page.getByRole("heading", { name: "准备客户 A 的经营汇报" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "开始准备汇报", exact: true })).toHaveCount(1);
+  const promisedDeliverables = await page.locator(".task-director-empty li").allTextContents();
+  await expectPrimarySurfaceToHideRuntimeJargon(page);
+  await attachScreenshot(page, testInfo, "usability-first-open-1181");
+
+  await page.getByRole("button", { name: "开始准备汇报", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "还差 1 个决定，确认后继续核对" })).toBeVisible();
+  await expect(page.getByText("为什么需要你", { exact: true })).toBeVisible();
+  await expect(page.getByText("确认后会发生什么", { exact: true })).toBeVisible();
+  await expect(page.getByText(/经营分析会改用 CRM 正式口径/)).toBeVisible();
+  await expect(page.getByRole("button", { name: "查看待确认项", exact: true })).toHaveCount(1);
+  await expect(page.getByRole("button", { name: "采用正式口径并继续核对", exact: true })).toHaveCount(1);
+  await expectPrimarySurfaceToHideRuntimeJargon(page);
+  const overflow = await page.evaluate(() => ["html", "body", ".app-shell", ".workspace-viewport", ".task-view-shell"]
+    .map((selector) => {
+      const element = document.querySelector<HTMLElement>(selector);
+      if (!element) throw new Error(`Missing usability surface: ${selector}`);
+      return { selector, clientWidth: element.clientWidth, scrollWidth: element.scrollWidth };
+    }));
+  for (const item of overflow) {
+    expect(item.scrollWidth, `${item.selector} should not hide the main task horizontally at 1181px`)
+      .toBeLessThanOrEqual(item.clientWidth + 1);
+  }
+  await expect(page.locator(".workspace-toast")).toBeHidden({ timeout: 4_000 });
+  await attachScreenshot(page, testInfo, "usability-decision-1181");
+
+  await page.getByRole("button", { name: "采用正式口径并继续核对", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "客户 A 经营汇报已准备完成" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "查看经营分析", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "查看风险页", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "查看客户回复草稿", exact: true })).toBeVisible();
+  await expect(page.getByText("客户回复仍是草稿，未发送", { exact: true })).toBeVisible();
+  await expectPrimarySurfaceToHideRuntimeJargon(page);
+  await expect(page.locator(".workspace-toast")).toBeHidden({ timeout: 4_000 });
+  const completeOverflow = await page.evaluate(() => ["html", "body", ".app-shell", ".workspace-viewport", ".task-view-shell"]
+    .map((selector) => {
+      const element = document.querySelector<HTMLElement>(selector);
+      if (!element) throw new Error(`Missing completed usability surface: ${selector}`);
+      return { selector, clientWidth: element.clientWidth, scrollWidth: element.scrollWidth };
+    }));
+  for (const item of completeOverflow) {
+    expect(item.scrollWidth, `${item.selector} should not hide completed task content at 1181px`)
+      .toBeLessThanOrEqual(item.clientWidth + 1);
+  }
+  await attachScreenshot(page, testInfo, "usability-complete-1181");
+
+  const tasks = await listTasks(request, owner);
+  expect(tasks).toHaveLength(1);
+  expect(tasks[0].status).toBe("committed");
+  expect(tasks[0].contract.title).toBe("客户 A 经营汇报");
+  expect(promisedDeliverables).toEqual(tasks[0].contract.deliverables.map((deliverable) => deliverable.title));
+});
+
+test("the initial task lookup cannot expose a duplicate-create action", async ({ page, request }) => {
+  const owner = "e2e_task_initial_lookup";
+  await routeBrowserApiAs(page, owner);
+  const seeded = await request.post(`${API_URL}/v1/demo1/tasks`, {
+    headers: {
+      "X-User-Id": owner,
+      "X-User-Roles": "current_user,sales_manager",
+      "Idempotency-Key": "initial-lookup-seed",
+    },
+  });
+  expect(seeded.ok()).toBeTruthy();
+
+  let releaseTasks = () => {};
+  const tasksGate = new Promise<void>((resolve) => { releaseTasks = resolve; });
+  await page.route(`${API_URL}/v1/tasks`, async (route) => {
+    const response = await route.fetch({
+      headers: {
+        ...route.request().headers(),
+        "x-user-id": owner,
+        "x-user-roles": "current_user,sales_manager",
+      },
+    });
+    await tasksGate;
+    await route.fulfill({ response });
+  });
+
+  await page.goto("/");
+  await expect(page.locator(".task-director-empty").getByRole("heading", { name: "正在读取经营汇报任务" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "开始准备汇报", exact: true })).toHaveCount(0);
+  releaseTasks();
+  await expect(page.getByRole("heading", { name: "准备 3 份经营汇报材料" })).toBeVisible();
+  expect(await listTasks(request, owner)).toHaveLength(1);
+});
+
+test("a no-task service failure is consistent across the workspace and decision pane", async ({ page }) => {
+  const owner = "e2e_task_initial_offline";
+  await routeBrowserApiAs(page, owner);
+  await page.route(`${API_URL}/v1/tasks`, async (route) => {
+    await route.fulfill({
+      status: 503,
+      contentType: "application/json",
+      body: JSON.stringify({ detail: "fixture task service unavailable" }),
+    });
+  });
+
+  await page.goto("/");
+  await expect(page.locator(".task-director-empty").getByRole("heading", { name: "经营汇报任务暂时不可用" })).toBeVisible();
+  await expect(page.locator("#task-side-panel").getByRole("heading", { name: "经营汇报任务暂时不可用" })).toBeVisible();
+  await expect(page.getByText("连接恢复后，这里会显示最近确认的待处理事项。", { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "开始准备汇报", exact: true })).toHaveCount(0);
+});
+
+test("rapid repeated start intent creates and starts only one report task", async ({ page, request }) => {
+  const owner = "e2e_task_single_start";
+  await routeBrowserApiAs(page, owner);
+  let createRequests = 0;
+  let startRequests = 0;
+
+  await page.route(`${API_URL}/v1/demo1/tasks`, async (route) => {
+    createRequests += 1;
+    const response = await route.fetch({
+      headers: {
+        ...route.request().headers(),
+        "x-user-id": owner,
+        "x-user-roles": "current_user,sales_manager",
+      },
+    });
+    await new Promise((resolve) => setTimeout(resolve, 200));
+    await route.fulfill({ response });
+  });
+  await page.route(/\/v1\/tasks\/[^/]+\/start$/, async (route) => {
+    startRequests += 1;
+    await route.continue({
+      headers: {
+        ...route.request().headers(),
+        "x-user-id": owner,
+        "x-user-roles": "current_user,sales_manager",
+      },
+    });
+  });
+
+  await page.goto("/");
+  const startButton = page.getByRole("button", { name: "开始准备汇报", exact: true });
+  await startButton.evaluate((element) => {
+    element.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
+    element.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
+  });
+
+  await expect(page.getByRole("heading", { name: "还差 1 个决定，确认后继续核对" })).toBeVisible();
+  expect(createRequests).toBe(1);
+  expect(startRequests).toBe(1);
+  expect(await listTasks(request, owner)).toHaveLength(1);
+});
+
+test("only the first open conflict in a branch is actionable without a conflict id contract", async ({ page }) => {
+  const owner = "e2e_task_conflict_order";
+  await routeBrowserApiAs(page, owner);
+
+  let firstConflictResolved = false;
+  const projectConflictSequence = (snapshot: Record<string, unknown>) => {
+    const conflicts = snapshot.conflicts as Array<Record<string, unknown>> | undefined;
+    if (!conflicts?.length) return snapshot;
+    const first = conflicts[0];
+    const secondId = `${String(first.conflict_id)}-second`;
+    const second = {
+      ...first,
+      conflict_id: secondId,
+      subject: "客户 A 收入口径的时间范围",
+      summary: "同一份经营分析还有一个后续口径问题。",
+      status: "open",
+      resolution: null,
+      resolved_at: null,
+    };
+    const branches = snapshot.branches as Array<Record<string, unknown>> | undefined;
+    if (!firstConflictResolved && snapshot.status === "waiting_input") {
+      snapshot.conflicts = [...conflicts, second];
+      snapshot.branches = branches?.map((branch) => branch.branch_id === first.branch_id
+        ? { ...branch, issue_ids: [...((branch.issue_ids as string[] | undefined) ?? []), secondId] }
+        : branch);
+    } else if (firstConflictResolved && snapshot.status === "committed") {
+      snapshot.status = "waiting_input";
+      snapshot.phase = "verify";
+      snapshot.last_commit = null;
+      snapshot.conflicts = [...conflicts, second];
+      snapshot.branches = branches?.map((branch) => branch.branch_id === first.branch_id
+        ? { ...branch, status: "waiting_evidence", issue_ids: [secondId], last_commit_id: null }
+        : branch);
+    }
+    return snapshot;
+  };
+
+  await page.route(/\/v1\/tasks\/[^/]+\/start$/, async (route) => {
+    const response = await route.fetch({
+      headers: {
+        ...route.request().headers(),
+        "x-user-id": owner,
+        "x-user-roles": "current_user,sales_manager",
+      },
+    });
+    const snapshot = projectConflictSequence(await response.json() as Record<string, unknown>);
+    await route.fulfill({ response, json: snapshot });
+  });
+  await page.route(/\/v1\/tasks\/[^/]+$/, async (route) => {
+    const response = await route.fetch({
+      headers: {
+        ...route.request().headers(),
+        "x-user-id": owner,
+        "x-user-roles": "current_user,sales_manager",
+      },
+    });
+    const snapshot = projectConflictSequence(await response.json() as Record<string, unknown>);
+    await route.fulfill({ response, json: snapshot });
+  });
+  await page.route(/\/v1\/tasks\/[^/]+\/controls$/, async (route) => {
+    const response = await route.fetch({
+      headers: {
+        ...route.request().headers(),
+        "x-user-id": owner,
+        "x-user-roles": "current_user,sales_manager",
+      },
+    });
+    firstConflictResolved = true;
+    const snapshot = projectConflictSequence(await response.json() as Record<string, unknown>);
+    await route.fulfill({ response, json: snapshot });
+  });
+
+  await page.goto("/");
+  await page.getByRole("button", { name: "开始准备汇报", exact: true }).click();
+  const cards = page.locator(".task-decision-card");
+  await expect(cards).toHaveCount(2);
+  const firstDecision = cards.nth(0).getByRole("button", { name: "采用正式口径并继续核对" });
+  await expect(firstDecision).toBeEnabled();
+  await expect(cards.nth(1).getByRole("button", { name: "采用正式口径并继续核对" })).toBeDisabled();
+  await expect(cards.nth(1).getByText("请先处理同一材料中较早的待确认项。", { exact: true })).toBeVisible();
+  await expect(cards.nth(0).getByText(/本次只会更新经营分析并保留其余待确认项/)).toBeVisible();
+
+  await firstDecision.click();
+  await expect(cards).toHaveCount(1);
+  await expect(cards.getByRole("heading", { name: "客户 A 收入口径的时间范围" })).toBeVisible();
+  await expect(cards.getByRole("button", { name: "采用正式口径并继续核对" })).toBeEnabled();
+  await expect(cards.getByText(/客户回复草稿会同步核对/)).toBeVisible();
+  await page.unrouteAll({ behavior: "ignoreErrors" });
+});
+
+test("a terminal failure takes precedence over stale open conflict cards", async ({ page }) => {
+  const owner = "e2e_task_terminal_conflict";
+  await routeBrowserApiAs(page, owner);
+  const projectFailure = (snapshot: Record<string, unknown>) => {
+    if (snapshot.status !== "waiting_input") return snapshot;
+    snapshot.status = "failed";
+    snapshot.last_error = {
+      code: "fixture_failed",
+      message: "经营分析需要重新连接数据来源后再试。",
+      recoverable: true,
+      user_action: "重新连接后刷新任务状态。",
+    };
+    return snapshot;
+  };
+
+  await page.route(/\/v1\/tasks\/[^/]+\/start$/, async (route) => {
+    const response = await route.fetch({
+      headers: {
+        ...route.request().headers(),
+        "x-user-id": owner,
+        "x-user-roles": "current_user,sales_manager",
+      },
+    });
+    await route.fulfill({ response, json: projectFailure(await response.json() as Record<string, unknown>) });
+  });
+  await page.route(/\/v1\/tasks\/[^/]+$/, async (route) => {
+    const response = await route.fetch({
+      headers: {
+        ...route.request().headers(),
+        "x-user-id": owner,
+        "x-user-roles": "current_user,sales_manager",
+      },
+    });
+    await route.fulfill({ response, json: projectFailure(await response.json() as Record<string, unknown>) });
+  });
+
+  await page.goto("/");
+  await page.getByRole("button", { name: "开始准备汇报", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "任务需要处理后才能继续" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "任务未能继续" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "任务需要恢复" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /请确认 \d+ 件事/ })).toHaveCount(0);
+  await expect(page.locator(".task-decision-card")).toHaveCount(0);
+  await page.unrouteAll({ behavior: "ignoreErrors" });
+});
+
+test("Task Director projects decisions, controls, errors, and versions from server facts", async ({ page, request }, testInfo) => {
   const owner = "e2e_task_director";
   await routeBrowserApiAs(page, owner);
   await page.setViewportSize({ width: 1487, height: 1058 });
   await page.goto("/");
-  await page.getByRole("button", { name: "任务", exact: true }).click();
 
-  await expect(page.getByRole("heading", { name: "把持续任务变成可见的协作过程" })).toBeVisible();
-  await page.getByRole("button", { name: "创建任务", exact: true }).click();
-  await expect(page.getByText("等待启动", { exact: true })).toBeVisible();
-  await page.getByRole("button", { name: "启动任务" }).first().click();
+  await expect(page.getByRole("heading", { name: "准备客户 A 的经营汇报" })).toBeVisible();
+  await page.getByRole("button", { name: "开始准备汇报", exact: true }).click();
 
-  await expect(page.getByRole("heading", { name: "任务编排与分支状态" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "需要你的决定" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "还差 1 个决定，确认后继续核对" })).toBeVisible();
   await expect(page.getByText("2 / 3", { exact: true })).toBeVisible();
-  await expect(page.getByText("分支已提交", { exact: true })).toHaveCount(2);
-  await expect(page.getByText("已汇入最终提交", { exact: true })).toHaveCount(0);
+  await expect(page.getByText("材料已准备", { exact: true })).toHaveCount(2);
+  await expect(page.getByText("已纳入本轮成果", { exact: true })).toHaveCount(0);
   await expect(page.locator(".workspace-toast")).toBeHidden({ timeout: 4_000 });
   await attachScreenshot(page, testInfo, "task-director-conflict-desktop");
 
   const viewTabs = page.getByRole("tablist", { name: "任务工作区视图" });
-  const directorTab = viewTabs.getByRole("tab", { name: "指挥台" });
+  const directorTab = viewTabs.getByRole("tab", { name: "进度" });
   await directorTab.focus();
   await directorTab.press("ArrowRight");
-  await expect(viewTabs.getByRole("tab", { name: "共享工件" })).toHaveAttribute("aria-selected", "true");
-  await viewTabs.getByRole("tab", { name: "共享工件" }).press("Home");
+  await expect(viewTabs.getByRole("tab", { name: "成果" })).toHaveAttribute("aria-selected", "true");
+  await viewTabs.getByRole("tab", { name: "成果" }).press("Home");
   await expect(directorTab).toHaveAttribute("aria-selected", "true");
 
   await page.getByRole("tab", { name: "Agent 对话" }).click();
-  await expect(page.getByRole("heading", { name: "需要你的决定" })).toHaveCount(0);
-  await page.getByRole("button", { name: "查看决策" }).click();
+  await expect(page.getByRole("heading", { name: "请确认 1 件事" })).toHaveCount(0);
+  await page.getByRole("button", { name: "查看待确认项" }).click();
   await expect(page.getByRole("tab", { name: "待我决定" })).toHaveAttribute("aria-selected", "true");
-  await expect(page.getByRole("heading", { name: "需要你的决定" })).toBeFocused();
+  await expect(page.getByRole("heading", { name: "请确认 1 件事" })).toBeFocused();
 
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.getByRole("button", { name: "查看决策" }).click();
+  await page.getByRole("button", { name: "查看待确认项" }).click();
   await expectMobileTaskDirector(page);
   await page.locator("#task-decision-conflicts-title").scrollIntoViewIfNeeded();
   await attachScreenshot(page, testInfo, "task-director-decision-mobile");
 
   await page.setViewportSize({ width: 1487, height: 1058 });
   await page.evaluate(() => window.scrollTo(0, 0));
-  await page.getByRole("button", { name: "查看相关工件" }).click();
+  await page.getByRole("button", { name: "查看相关材料" }).click();
   await expect(page.locator(".task-artifact-status")).toContainText("v1 · 候选版本");
-  await page.getByRole("tab", { name: "指挥台" }).click();
+  await expectPrimarySurfaceToHideRuntimeJargon(page);
+  await page.getByRole("tab", { name: "进度" }).click();
 
-  const primaryDecision = page.getByRole("button", { name: "采用正式口径并保留差异" });
+  const primaryDecision = page.getByRole("button", { name: "采用正式口径并继续核对" });
+  await page.getByText("其他处理方式", { exact: true }).click();
   await page.getByRole("button", { name: "暂停分支" }).click();
-  await expect(primaryDecision).toBeDisabled();
-  await expect(page.getByText("先恢复分支，再提交证据决定。")).toBeVisible();
+  await expect(primaryDecision).toHaveCount(0);
+  await expect(page.locator("#task-side-panel").getByRole("heading", { name: "任务已暂停" })).toBeVisible();
   await page.getByRole("button", { name: "恢复分支" }).click();
   await expect(primaryDecision).toBeEnabled();
 
@@ -232,14 +532,14 @@ test("Task Director keeps decisions, controls, errors, and versions understandab
   await expect(page.getByText(/已刷新到 v\d+，请复核后重试/)).toBeVisible();
 
   await primaryDecision.click();
-  await expect(page.getByText("当前没有待决策项", { exact: true })).toBeVisible();
-  await expect(page.getByText("已汇入最终提交", { exact: true })).toHaveCount(3);
-  await expect(page.getByText("分支已提交", { exact: true })).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "客户 A 经营汇报已准备完成" })).toBeVisible();
+  await expect(page.getByText("已纳入本轮成果", { exact: true })).toHaveCount(3);
+  await expect(page.getByText("材料已准备", { exact: true })).toHaveCount(0);
   await expect(page.getByRole("alert").filter({ hasText: "测试冲突" })).toHaveCount(0);
   await expect(page.locator(".workspace-toast")).toBeHidden({ timeout: 4_000 });
   await attachScreenshot(page, testInfo, "task-director-committed-desktop");
 
-  await page.getByRole("tab", { name: "共享工件" }).click();
+  await page.getByRole("tab", { name: "成果" }).click();
   await expect(page.locator(".task-artifact-status")).toContainText("v2 · 已验证");
   await expect(page.getByText(/正在查看历史版本/)).toHaveCount(0);
   await page.getByRole("button", { name: /^v1 候选版本/ }).click();
@@ -253,9 +553,17 @@ test("Task Director keeps decisions, controls, errors, and versions understandab
   expect(rejectedOnce).toBeTruthy();
 });
 
-test("a late older task GET cannot roll back a newer mutation snapshot", async ({ page }) => {
+test("a late older task GET cannot roll back a newer mutation snapshot", async ({ page, request }) => {
   const owner = "e2e_demo1_snapshot_order";
   await routeBrowserApiAs(page, owner);
+  const seeded = await request.post(`${API_URL}/v1/demo1/tasks`, {
+    headers: {
+      "X-User-Id": owner,
+      "X-User-Roles": "current_user,sales_manager",
+      "Idempotency-Key": "snapshot-order-seed",
+    },
+  });
+  expect(seeded.ok()).toBeTruthy();
 
   let releaseStaleGet = () => {};
   let markStaleCaptured = () => {};
@@ -294,27 +602,33 @@ test("a late older task GET cannot roll back a newer mutation snapshot", async (
   });
 
   await page.goto("/");
-  await page.getByRole("button", { name: "任务", exact: true }).click();
-  await page.getByRole("button", { name: "创建任务", exact: true }).click();
   await staleCaptured;
   expect(delayedVersion).toBe(1);
   expect(delayedSequence).toBe(1);
 
-  await page.getByRole("button", { name: "启动任务" }).first().click();
-  await expect(page.locator(".task-director-version")).toHaveText("v2");
-  await expect(page.getByRole("heading", { name: "需要你的决定" })).toBeVisible();
+  await page.getByRole("button", { name: "开始准备汇报", exact: true }).click();
+  await expect(page.getByLabel("任务状态摘要").getByText("已同步 v2", { exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "还差 1 个决定，确认后继续核对" })).toBeVisible();
 
   releaseStaleGet();
   await staleDelivered;
   await page.waitForTimeout(250);
-  await expect(page.locator(".task-director-version")).toHaveText("v2");
-  await expect(page.getByRole("heading", { name: "需要你的决定" })).toBeVisible();
-  await expect(page.getByText("等待启动", { exact: true })).toHaveCount(0);
+  await expect(page.getByLabel("任务状态摘要").getByText("已同步 v2", { exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "还差 1 个决定，确认后继续核对" })).toBeVisible();
+  await expect(page.getByText("尚未开始", { exact: true })).toHaveCount(0);
 });
 
-test("task snapshot ordering uses the received SSE sequence as its floor", async ({ page }) => {
+test("task snapshot ordering uses the received SSE sequence as its floor", async ({ page, request }) => {
   const owner = "e2e_demo1_snapshot_sse_floor";
   await routeBrowserApiAs(page, owner);
+  const seeded = await request.post(`${API_URL}/v1/demo1/tasks`, {
+    headers: {
+      "X-User-Id": owner,
+      "X-User-Roles": "current_user,sales_manager",
+      "Idempotency-Key": "sse-floor-seed",
+    },
+  });
+  expect(seeded.ok()).toBeTruthy();
 
   let releaseStaleGet = () => {};
   let markStaleCaptured = () => {};
@@ -393,8 +707,6 @@ test("task snapshot ordering uses the received SSE sequence as its floor", async
   });
 
   await page.goto("/");
-  await page.getByRole("button", { name: "任务", exact: true }).click();
-  await page.getByRole("button", { name: "创建任务", exact: true }).click();
   await staleCaptured;
   await reconnected;
   expect(reconnectAfter).toBe("3");
@@ -402,14 +714,13 @@ test("task snapshot ordering uses the received SSE sequence as its floor", async
   releaseStaleGet();
   await staleDelivered;
   await page.waitForTimeout(250);
-  await expect(page.locator(".task-director-version")).toHaveText("v1");
-  await expect(page.getByText("等待启动", { exact: true })).toBeVisible();
+  await expect(page.getByLabel("任务状态摘要").getByText("尚未开始", { exact: true })).toBeVisible();
   await expect(page.getByText("任务未能继续", { exact: true })).toHaveCount(0);
-  await expect(page.getByText("浏览器正在对账", { exact: true })).toBeVisible();
+  await expect(page.getByLabel("任务状态摘要").getByText("正在对账", { exact: true })).toBeVisible();
 
   await page.getByRole("button", { name: "立即对账" }).first().click();
-  await expect(page.getByText("浏览器正在对账", { exact: true })).toBeVisible();
-  await expect(page.getByText("浏览器已同步", { exact: true })).toHaveCount(0);
+  await expect(page.getByLabel("任务状态摘要").getByText("正在对账", { exact: true })).toBeVisible();
+  await expect(page.getByLabel("任务状态摘要").getByText(/^已同步 v/)).toHaveCount(0);
 });
 
 test("Demo 1 uses server facts from creation through the three-branch commit", async ({ page, request }, testInfo) => {
@@ -418,12 +729,10 @@ test("Demo 1 uses server facts from creation through the three-branch commit", a
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto("/");
 
-  const createButton = page.getByRole("button", { name: /创建任务/ });
+  const createButton = page.getByRole("button", { name: "开始准备汇报", exact: true });
   await expect(createButton).toBeEnabled();
   await createButton.click();
-  await expect(page.getByText("ACTIVE TASK", { exact: true })).toBeVisible();
-
-  await page.getByRole("button", { name: "启动任务" }).click();
+  await page.getByRole("button", { name: "邮件", exact: true }).click();
   await expect(page.getByRole("heading", { name: "待处理的证据冲突" })).toBeVisible();
   await expect(page.locator(".task-branch-status.is-waiting_evidence")).toHaveCount(1);
   await expect(page.locator(".task-branch-status.is-committed")).toHaveCount(2);
@@ -446,7 +755,7 @@ test("Demo 1 uses server facts from creation through the three-branch commit", a
 
   await page.setViewportSize({ width: 390, height: 844 });
   await expectMobileArtifactWorkspace(page);
-  const conflictAction = page.getByRole("button", { name: "采用正式口径并保留差异" });
+  const conflictAction = page.getByRole("button", { name: "采用正式口径并继续核对" });
   const steerInput = page.getByRole("textbox", { name: "方向指令" });
   for (const control of [conflictAction, steerInput]) {
     const box = await control.boundingBox();
@@ -465,12 +774,13 @@ test("Demo 1 uses server facts from creation through the three-branch commit", a
 
   await conflictAction.scrollIntoViewIfNeeded();
   await conflictAction.click();
-  await expect(page.getByText("当前没有待决策项", { exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "本轮成果已准备好" })).toBeVisible();
   await expect(page.locator(".task-artifact-branch-status-committed")).toHaveCount(3);
   await expect(page.locator(".task-decision-card")).toHaveCount(0);
   await attachScreenshot(page, testInfo, "demo1-committed-desktop");
 
-  const openReply = page.getByRole("button", { name: "查看客户回复草稿" });
+  const openReply = page.getByRole("navigation", { name: "任务分支与交付物" })
+    .getByRole("button", { name: "查看客户回复草稿" });
   await openReply.scrollIntoViewIfNeeded();
   await openReply.click();
   await expect(page.locator("#task-artifact-detail-title")).toHaveText("客户回复草稿");
@@ -512,7 +822,7 @@ test("Demo 1 uses server facts from creation through the three-branch commit", a
 
   const completedTaskId = tasks[0].task_id;
   await page.reload();
-  const replayButton = page.getByRole("button", { name: "再次演示" });
+  const replayButton = page.getByRole("button", { name: "新建一轮" });
   await expect(replayButton).toBeEnabled();
 
   const repeatKeys: string[] = [];
@@ -531,15 +841,14 @@ test("Demo 1 uses server facts from creation through the three-branch commit", a
 
   await replayButton.click();
   await expect.poll(() => repeatKeys.length).toBe(1);
-  await expect(page.getByText("RECENT TASK", { exact: true })).toBeVisible();
-  await expect(page.getByText("已连接当前工作区", { exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "客户 A 经营汇报已准备完成" })).toBeVisible();
+  await expect(page.getByText(/已连接当前工作区/).first()).toBeVisible();
   await expect(page.getByText("服务连接中断，正在恢复", { exact: true })).toHaveCount(0);
   await expect(replayButton).toBeEnabled();
   expect(await listTasks(request, owner)).toHaveLength(1);
 
   await replayButton.click();
-  await expect(page.getByText("ACTIVE TASK", { exact: true })).toBeVisible();
-  await expect(page.getByRole("button", { name: "启动任务" })).toBeEnabled();
+  await expect(page.getByRole("button", { name: "开始准备汇报", exact: true })).toBeEnabled();
   expect(repeatKeys).toHaveLength(2);
   expect(repeatKeys[0]).not.toBe("");
   expect(repeatKeys[1]).toBe(repeatKeys[0]);
@@ -557,10 +866,8 @@ test("an aborted start keeps one idempotency key across reload and reconciles wi
   await routeBrowserApiAs(page, owner);
   await page.goto("/");
 
-  const createButton = page.getByRole("button", { name: /创建任务/ });
+  const createButton = page.getByRole("button", { name: "开始准备汇报", exact: true });
   await expect(createButton).toBeEnabled();
-  await createButton.click();
-  await expect(page.getByText("ACTIVE TASK", { exact: true })).toBeVisible();
 
   let aborted = false;
   let attemptedBody: { expected_task_version: number; idempotency_key: string } | undefined;
@@ -574,10 +881,10 @@ test("an aborted start keeps one idempotency key across reload and reconciles wi
     await route.abort("failed");
   });
 
-  await page.getByRole("button", { name: "启动任务" }).click();
+  await createButton.click();
   await expect(page.getByText(/启动结果待确认/)).toBeVisible();
-  await expect(page.getByRole("button", { name: "立即对账" })).toBeVisible();
-  await expect(page.getByText("已连接当前工作区", { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "立即对账" }).first()).toBeVisible();
+  await expect(page.getByText(/已连接当前工作区/).first()).toBeVisible();
   expect(aborted).toBeTruthy();
   const capturedBody = attemptedBody as { expected_task_version: number; idempotency_key: string };
 
@@ -595,13 +902,13 @@ test("an aborted start keeps one idempotency key across reload and reconciles wi
   await attachScreenshot(page, testInfo, "demo1-start-result-pending");
 
   await page.reload();
-  await expect(page.getByRole("button", { name: "立即对账" })).toBeVisible();
-  await expect(page.getByText("已连接当前工作区", { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "立即对账" }).first()).toBeVisible();
+  await expect(page.getByText(/已连接当前工作区/).first()).toBeVisible();
   const savedAfterReload = await page.evaluate((key) => window.sessionStorage.getItem(key), PENDING_MUTATION_KEY);
   expect(savedAfterReload).toBe(savedBeforeReload);
 
-  await page.getByRole("button", { name: "立即对账" }).click();
-  await expect(page.getByRole("heading", { name: "待处理的证据冲突" })).toBeVisible();
+  await page.getByRole("button", { name: "立即对账" }).first().click();
+  await expect(page.getByRole("heading", { name: "还差 1 个决定，确认后继续核对" })).toBeVisible();
   await expect.poll(() => page.evaluate((key) => window.sessionStorage.getItem(key), PENDING_MUTATION_KEY)).toBeNull();
 
   const afterRetry = await listTasks(request, owner);
