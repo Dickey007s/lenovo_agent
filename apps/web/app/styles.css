@@ -268,7 +268,7 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outlin
 /* ------------------------------------------------------------
    报价表 · 仿 Excel 电子表格
    ------------------------------------------------------------ */
-.quote-editor { overflow: hidden; }
+.quote-editor { overflow: hidden; container-type: inline-size; }
 .quote-summary { display: grid; grid-template-columns: repeat(4, 1fr); border-bottom: 1px solid var(--line); background: linear-gradient(180deg, #fbfaf8, #f6f5f2); }
 .quote-summary > div { min-width: 0; min-height: 80px; display: flex; flex-direction: column; justify-content: center; gap: 8px; padding: 0 18px; border-right: 1px solid var(--line); }
 .quote-summary > div:last-child { border-right: 0; }
@@ -276,8 +276,13 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outlin
 .quote-summary strong { overflow: hidden; font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
 .quote-summary input { width: 100%; border: 0; border-bottom: 1px solid transparent; background: transparent; font-size: 12.5px; font-weight: 700; transition: border-color var(--t-fast); }
 .quote-summary input:focus { border-color: var(--app); }
-.sheet { overflow-x: auto; padding: 0 0 6px; }
-.sheet-letters, .sheet-row { min-width: 680px; display: grid; grid-template-columns: 44px 2fr .55fr .8fr .72fr .9fr; align-items: center; }
+.sheet-frame { position: relative; min-width: 0; }
+.sheet { overflow-x: auto; padding: 0 0 6px; scrollbar-color: #aeb4bd #eceae6; scrollbar-width: thin; }
+.sheet::-webkit-scrollbar { height: 8px; }
+.sheet::-webkit-scrollbar-track { background: #eceae6; }
+.sheet::-webkit-scrollbar-thumb { border: 2px solid #eceae6; border-radius: 4px; background: #aeb4bd; }
+.sheet-scroll-affordance { display: none; }
+.sheet-letters, .sheet-row { min-width: 640px; display: grid; grid-template-columns: 44px minmax(200px, 2fr) 70px 100px 90px 110px; align-items: center; }
 .sheet-letters { min-height: 30px; border-bottom: 1px solid var(--line); color: var(--faint); background: #f7f6f3; font-size: 10px; font-weight: 700; letter-spacing: .12em; text-align: center; }
 .sheet-row { min-height: 52px; border-bottom: 1px solid var(--line); font-size: 12px; transition: background var(--t-fast); }
 .sheet-row:not(.sheet-head):hover { background: #faf9f6; }
@@ -292,9 +297,34 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outlin
 .sheet-warning { background: var(--amber-soft); }
 .sheet-warning:hover { background: #fceed3; }
 .sheet-warning .row-num { background: #f8e8c8; color: var(--amber); }
-.quote-total { display: flex; align-items: center; justify-content: flex-end; gap: 22px; padding: 18px 24px; border-top: 2px solid var(--ink); background: #fbfaf8; }
-.quote-total span { color: var(--muted); font-size: 11.5px; font-weight: 700; letter-spacing: .08em; }
-.quote-total strong { font-size: 20px; font-weight: 800; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+.quote-total { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); border-top: 2px solid var(--ink); background: #fbfaf8; }
+.quote-total > div { min-width: 0; min-height: 84px; display: grid; align-content: center; gap: 5px; padding: 14px 16px; border-right: 1px solid var(--line); }
+.quote-total > div:last-of-type { border-right: 0; }
+.quote-total span { color: var(--muted); font-size: 11px; font-weight: 700; letter-spacing: 0; }
+.quote-total strong { font-size: 17px; font-weight: 800; letter-spacing: 0; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.quote-total small { color: var(--muted); font-size: 10px; line-height: 1.4; }
+.quote-total p { grid-column: 1 / -1; min-height: 38px; display: flex; align-items: center; gap: 7px; margin: 0; padding: 8px 16px; border-top: 1px solid var(--line); font-size: 11px; font-weight: 650; line-height: 1.45; }
+.quote-total p svg { width: 15px; height: 15px; flex: 0 0 auto; stroke-width: 2; }
+.quote-total p.is-ok { color: #16724b; background: #edf8f2; }
+.quote-total p.is-warning { color: #986218; background: #fff6e7; }
+
+.action-result-retry { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 8px; padding: 9px 10px; border: 1px solid #e6c986; border-radius: 8px; color: #76531d; background: #fff8e8; font-size: 11px; line-height: 1.45; }
+.action-result-retry button { flex: 0 0 auto; min-height: 34px; padding: 0 12px; border: 1px solid #b88937; border-radius: 6px; color: #684711; background: #fff; font-size: 11px; font-weight: 750; }
+.workspace-conflict-banner { display: grid; gap: 9px; margin-bottom: 8px; padding: 10px 12px; border: 1px solid #e6c986; border-radius: 6px; color: #6f4f1d; background: #fff8e8; }
+.workspace-conflict-banner > div:first-child { display: grid; gap: 2px; }
+.workspace-conflict-banner strong { font-size: 12px; }
+.workspace-conflict-banner span { font-size: 11px; line-height: 1.5; }
+.workspace-conflict-banner > div:last-child { display: flex; flex-wrap: wrap; gap: 7px; }
+.workspace-conflict-banner button { min-height: 34px; padding: 0 11px; border: 1px solid #b88937; border-radius: 6px; color: #684711; background: #fff; font-size: 11px; font-weight: 750; }
+
+@container (max-width: 700px) {
+  .quote-summary, .quote-total { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .quote-summary > div:nth-child(2), .quote-total > div:nth-of-type(2) { border-right: 0; }
+  .quote-summary > div:nth-child(-n+2), .quote-total > div:nth-of-type(-n+2) { border-bottom: 1px solid var(--line); }
+  .quote-summary strong { text-overflow: clip; }
+  .sheet-scroll-affordance { position: absolute; inset: 0 0 8px auto; display: grid; width: 30px; place-items: center; color: #4d5661; background: linear-gradient(90deg, rgba(255, 255, 255, 0), rgba(255, 255, 255, .94) 58%); pointer-events: none; }
+  .sheet-scroll-affordance svg { width: 16px; height: 16px; stroke-width: 2.2; }
+}
 
 /* ------------------------------------------------------------
    任务 · 看板
@@ -612,6 +642,7 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outlin
   .chat-pane { height: 72dvh; min-height: 570px; border-top: 1px solid var(--line); }
   .artifact-header { align-items: flex-start; flex-direction: column; }
   .workspace-actions { width: 100%; justify-content: flex-start; flex-wrap: wrap; }
+  .save-button, .outline-button, .primary-button { min-height: 44px; }
   .artifact-layout, .inspector-panel { display: block; }
   .inspector-panel { margin-top: 16px; }
   .inspector-stack { grid-template-columns: 1fr; }
@@ -619,6 +650,8 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outlin
   .day-events i:nth-child(n+2) { display: none; }
   .day-event-list { grid-template-columns: 1fr; }
   .approval-overlay { inset: auto 8px 122px; }
+  .action-result-retry { align-items: stretch; flex-direction: column; }
+  .action-result-retry button, .workspace-conflict-banner button { min-height: 44px; }
 }
 /* ============================================================
    Demo 1 compatibility layer

@@ -58,6 +58,7 @@ class ChatMessage(StrictConversationModel):
 
 class WorkspaceArtifact(StrictConversationModel):
     artifact_id: str
+    revision: int = Field(default=1, ge=1)
     kind: Literal["mail", "document", "quote", "tasks", "calendar", "expense", "crm"]
     title: str
     content: dict[str, Any] = Field(default_factory=dict)

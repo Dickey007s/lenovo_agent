@@ -3,7 +3,7 @@ from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, status
 from langgraph.checkpoint.base import BaseCheckpointSaver
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 from starlette.responses import StreamingResponse
 
 from packages.agent_runtime import AgentWorkflow, WorkflowCallbacks
@@ -39,7 +39,9 @@ from services.api.app.application.conversation_models import ConversationThread,
 from services.api.app.application.conversations import (
     ConversationNotFoundError,
     ConversationService,
+    WorkspaceChangedError,
 )
+from services.api.app.application.quote_calculator import QuoteCalculationError
 from services.api.app.config import get_settings
 
 
@@ -54,12 +56,29 @@ class CreateRunRequest(StrictRequest):
 class SendConversationMessageRequest(StrictRequest):
     message: str = Field(min_length=1, max_length=10_000)
     active_view: Literal["mail", "document", "quote", "tasks", "calendar", "expense", "crm", "audit"] | None = None
-    workspace_context: dict = Field(default_factory=dict)
+    workspace_context: dict | None = None
+    workspace_artifact_id: str | None = None
+    workspace_revision: int | None = Field(default=None, ge=1)
+
+    @model_validator(mode="after")
+    def require_workspace_revision(self):
+        if self.workspace_context is not None and (
+            self.workspace_artifact_id is None or self.workspace_revision is None
+        ):
+            raise ValueError(
+                "workspace_context requires workspace_artifact_id and workspace_revision"
+            )
+        return self
 
 
 class UpdateArtifactRequest(StrictRequest):
     content: dict
     title: str | None = None
+
+
+class SaveWorkspaceArtifactRequest(UpdateArtifactRequest):
+    expected_artifact_id: str
+    expected_revision: int = Field(ge=1)
 
 
 class EvidenceInput(StrictRequest):
@@ -325,6 +344,8 @@ async def stream_conversation_message(
                 user.user_id,
                 active_view=body.active_view,
                 workspace_context=body.workspace_context,
+                expected_artifact_id=body.workspace_artifact_id,
+                expected_revision=body.workspace_revision,
             ):
                 event_type = event.get("type", "message")
                 yield f"event: {event_type}\ndata: {json.dumps(event, ensure_ascii=False)}\n\n"
@@ -333,9 +354,9 @@ async def stream_conversation_message(
                 {"type": "error", "detail": str(exc)}, ensure_ascii=False
             )
             yield f"event: error\ndata: {payload}\n\n"
-        except Exception as exc:
+        except Exception:
             payload = json.dumps(
-                {"type": "error", "detail": f"办公 Agent 处理失败：{exc}"},
+                {"type": "error", "detail": "办公 Agent 暂时无法完成处理，请稍后重试"},
                 ensure_ascii=False,
             )
             yield f"event: error\ndata: {payload}\n\n"
@@ -363,6 +384,15 @@ async def continue_conversation_after_action(
                 yield f"event: {event_type}\ndata: {json.dumps(event, ensure_ascii=False)}\n\n"
         except (ModelConfigurationError, ModelOutputError, ValueError) as exc:
             payload = json.dumps({"type": "error", "detail": str(exc)}, ensure_ascii=False)
+            yield f"event: error\ndata: {payload}\n\n"
+        except Exception:
+            payload = json.dumps(
+                {
+                    "type": "error",
+                    "detail": "Agent 暂时无法读取执行结果，请重试",
+                },
+                ensure_ascii=False,
+            )
             yield f"event: error\ndata: {payload}\n\n"
 
     return StreamingResponse(
@@ -394,16 +424,28 @@ async def start_new_mail(
 @router.put("/workspace/{kind}", response_model=WorkspaceArtifact)
 async def save_workspace_artifact(
     kind: Literal["mail", "document", "quote", "tasks", "calendar", "expense", "crm"],
-    body: UpdateArtifactRequest,
+    body: SaveWorkspaceArtifactRequest,
     user: Annotated[CurrentUser, Depends(current_user)],
     service: Annotated[ConversationService, Depends(get_conversation_service)],
 ) -> WorkspaceArtifact:
     try:
         return await service.save_workspace_artifact(
-            kind, body.content, user.user_id, title=body.title
+            kind,
+            body.content,
+            user.user_id,
+            title=body.title,
+            expected_artifact_id=body.expected_artifact_id,
+            expected_revision=body.expected_revision,
         )
     except ConversationNotFoundError as exc:
         raise HTTPException(status_code=404, detail="工作区不存在") from exc
+    except QuoteCalculationError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except WorkspaceChangedError as exc:
+        raise HTTPException(
+            status_code=409,
+            detail="工作区已在其他窗口更新；当前修改未覆盖新版本，请重新载入后再试",
+        ) from exc
 
 
 @router.put(
@@ -422,6 +464,8 @@ async def update_artifact(
         )
     except ConversationNotFoundError as exc:
         raise HTTPException(status_code=404, detail="对话或生成物不存在") from exc
+    except QuoteCalculationError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
 
 
 @router.get("/demo3/scenarios", response_model=list[Demo3Scenario])

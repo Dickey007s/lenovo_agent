@@ -17,6 +17,12 @@ from services.api.app.application.conversation_models import (
     WorkspaceArtifact,
 )
 from services.api.app.application.llm import AutoDLActionParser
+from services.api.app.application.quote_calculator import (
+    QuoteCalculationError,
+    merge_quote_workspace_context,
+    quote_question_intent,
+    render_quote_answer,
+)
 from services.api.app.application.runs import RunService
 from services.api.app.application.storage import InMemoryWorkspaceStore, WorkspaceStore
 
@@ -25,11 +31,20 @@ class ConversationNotFoundError(LookupError):
     pass
 
 
-_SIDE_EFFECTS = {
-    "internal_effect",
-    "internal_system_write",
-    "external_effect",
-    "restricted_execution",
+class WorkspaceChangedError(RuntimeError):
+    pass
+
+
+class ActionArtifactMismatchError(RuntimeError):
+    pass
+
+
+_EXECUTABLE_SIDE_EFFECT_CAPABILITIES = {
+    "email.send",
+    "task.create",
+    "calendar.invite",
+    "crm.opportunity.update",
+    "expense.request_evidence",
 }
 
 _WORKSPACE_TITLES = {
@@ -71,6 +86,221 @@ def _describe_risk(risk: RiskAssessment) -> str:
     return f"风险等级：{risk.risk_level}。判断规则：{'；'.join(reasons)}。"
 
 
+def _workspace_artifact_matches_snapshot(
+    artifact: WorkspaceArtifact | None,
+    snapshot: dict[str, Any] | None,
+) -> bool:
+    if snapshot is None:
+        return artifact is None
+    return artifact is not None and artifact.model_dump(mode="json") == snapshot
+
+
+def _string_list(value: Any) -> list[str]:
+    if isinstance(value, str):
+        return [value.strip()] if value.strip() else []
+    if isinstance(value, list):
+        return [str(item).strip() for item in value if str(item).strip()]
+    return []
+
+
+def _recipient_scope(values: list[str]) -> tuple[str, bool]:
+    internal_domains = ("@lenovo.com", "@internal.example")
+    uncertain = False
+    for value in values:
+        normalized = value.strip().lower()
+        if not normalized:
+            continue
+        if "客户" in normalized or "供应商" in normalized:
+            return "external_customer", uncertain
+        if "@" in normalized and not normalized.endswith(internal_domains):
+            return "external_customer", uncertain
+        if "@" not in normalized:
+            uncertain = True
+    return ("external_customer", True) if uncertain else ("internal_member", False)
+
+
+def _mail_data_classes(content: dict[str, Any]) -> list[str]:
+    attachments = [str(item) for item in content.get("attachments", []) if item]
+    text = " ".join(
+        [
+            str(content.get("subject", "")),
+            str(content.get("body", "")),
+            *attachments,
+        ]
+    )
+    classes = ["customer_data"]
+    if re.search(
+        r"报价|价格|折扣|金额|¥|￥|\bquote\b|\bpricing\b|\bdiscount\b|\bamount\b|\bQ-\d+",
+        text,
+        flags=re.IGNORECASE,
+    ):
+        classes.append("pricing")
+    return classes
+
+
+def _bind_action_to_artifact(
+    action: ActionCandidate,
+    artifact: WorkspaceArtifact,
+) -> ActionCandidate:
+    requested_parameters = dict(action.parameters)
+    parameters: dict[str, Any] = {}
+    recipients: list[str] = []
+    resources: list[str] = []
+    action_type = action.action_type
+    target_scope = action.target_scope
+    data_classes = list(action.data_classes)
+    state_change_type = action.state_change_type
+    reversibility = action.reversibility
+    missing_slots: list[str] = []
+    content = artifact.content
+
+    if action.capability == "email.send":
+        if artifact.kind != "mail":
+            raise ActionArtifactMismatchError
+        recipients = [*_string_list(content.get("to")), *_string_list(content.get("cc"))]
+        subject = str(content.get("subject", "")).strip()
+        body = str(content.get("body", "")).strip()
+        if not recipients or not subject or not body:
+            raise ActionArtifactMismatchError
+        attachments = _string_list(content.get("attachments"))
+        parameters = {"subject": subject, "body": body}
+        resources = attachments
+        action_type = "send_email"
+        target_scope, uncertain_recipient = _recipient_scope(recipients)
+        data_classes = _mail_data_classes(content)
+        state_change_type = "external_effect"
+        reversibility = "low"
+        if uncertain_recipient:
+            missing_slots.append("recipient_identity")
+        if attachments and "pricing" not in data_classes:
+            missing_slots.append("attachment_data_class")
+    elif action.capability == "calendar.invite":
+        if artifact.kind != "calendar":
+            raise ActionArtifactMismatchError
+        events = content.get("events")
+        if not isinstance(events, list):
+            raise ActionArtifactMismatchError
+        event_id = str(requested_parameters.get("event_id", ""))
+        title = str(requested_parameters.get("title", ""))
+        matches = [
+            event
+            for event in events if isinstance(event, dict)
+            and (
+                (event_id and str(event.get("id", "")) == event_id)
+                or (title and str(event.get("title", "")) == title)
+            )
+        ]
+        if len(matches) != 1:
+            raise ActionArtifactMismatchError
+        event = matches[0]
+        recipients = _string_list(event.get("attendees"))
+        parameters = {
+            "title": event.get("title"),
+            "start_at": f"{event.get('date')}T{event.get('start')}:00",
+            "end_at": f"{event.get('date')}T{event.get('end')}:00",
+            "location": event.get("location"),
+            "agenda": event.get("agenda"),
+        }
+        recipient_scope, uncertain_recipient = _recipient_scope(recipients)
+        external = recipient_scope == "external_customer"
+        action_type = "create_calendar_invite"
+        target_scope = "external_customer" if external else "internal_team"
+        data_classes = ["customer_data" if external else "internal"]
+        state_change_type = "external_effect" if external else "internal_system_write"
+        reversibility = "medium"
+        if not recipients:
+            missing_slots.append("attendees")
+        elif uncertain_recipient:
+            missing_slots.append("recipient_identity")
+    elif action.capability == "task.create":
+        if artifact.kind != "tasks":
+            raise ActionArtifactMismatchError
+        tasks = content.get("tasks")
+        if not isinstance(tasks, list):
+            raise ActionArtifactMismatchError
+        task_id = str(requested_parameters.get("task_id", ""))
+        title = str(requested_parameters.get("title", ""))
+        matches = [
+            task
+            for task in tasks if isinstance(task, dict)
+            and (
+                (task_id and str(task.get("id", "")) == task_id)
+                or (title and str(task.get("title", "")) == title)
+            )
+        ]
+        if len(matches) != 1:
+            raise ActionArtifactMismatchError
+        task = matches[0]
+        parameters = {
+            "title": task.get("title"),
+            "assignee": task.get("assignee"),
+            "due_at": task.get("due_at"),
+        }
+        action_type = "create_internal_task"
+        target_scope = "internal_member"
+        data_classes = ["internal"]
+        state_change_type = "internal_system_write"
+        reversibility = "high"
+        if not task.get("assignee"):
+            missing_slots.append("assignee")
+    elif action.capability == "crm.opportunity.update":
+        if artifact.kind != "crm":
+            raise ActionArtifactMismatchError
+        parameters = {
+            "opportunity_id": content.get("opportunity_id"),
+            "before": content.get("before"),
+            "after": content.get("suggested_stage"),
+        }
+        action_type = "update_crm_stage"
+        target_scope = "internal_team"
+        data_classes = ["customer_data"]
+        state_change_type = "internal_system_write"
+        reversibility = "medium"
+    elif action.capability == "expense.request_evidence":
+        if artifact.kind != "expense":
+            raise ActionArtifactMismatchError
+        parameters = {
+            "case_id": content.get("case_id"),
+            "owner": content.get("owner"),
+            "missing_items": content.get("anomalies", []),
+        }
+        action_type = "expense_request_evidence"
+        target_scope = "internal_member"
+        data_classes = ["financial"]
+        state_change_type = "internal_system_write"
+        reversibility = "medium"
+    else:
+        raise ActionArtifactMismatchError
+
+    parameters.update(
+        {
+            "artifact_id": artifact.artifact_id,
+            "artifact_revision": artifact.revision,
+            "artifact_content": artifact.content,
+        }
+    )
+    return action.model_copy(
+        update={
+            "action_type": action_type,
+            "recipients": recipients,
+            "resources": resources,
+            "target_scope": target_scope,
+            "data_classes": data_classes,
+            "state_change_type": state_change_type,
+            "reversibility": reversibility,
+            "source_refs": [],
+            "missing_slots": missing_slots,
+            "parameters": parameters,
+        }
+    )
+
+
+def _is_side_effect_action(action: ActionCandidate | None) -> bool:
+    return bool(
+        action and action.capability in _EXECUTABLE_SIDE_EFFECT_CAPABILITIES
+    )
+
+
 def _describe_candidate_risk(action: ActionCandidate) -> str:
     spec = ProposedActionSpec(
         **action.model_dump(),
@@ -91,6 +321,11 @@ def _strip_repeated_risk(text: str) -> str:
         text,
     )
     return "\n".join(line.strip() for line in cleaned.splitlines() if line.strip())
+
+
+def _quote_needs_review(content: dict[str, Any]) -> bool:
+    approval = content.get("approval")
+    return isinstance(approval, dict) and approval.get("status") == "needs_review"
 
 
 def _describe_action_gate(run: Any) -> str:
@@ -162,17 +397,17 @@ def _default_sources(kind: str) -> list[SourceReference]:
         "quote": [
             SourceReference(
                 source_id="crm:quote/991:v3",
-                label="客户 991 · 报价 V3",
-                system="CRM 报价库",
-                excerpt="已批准版本，有效期至 2026-07-31。",
-                permission="销售可读 · 经理批准",
+                label="客户 A · 报价 V3（演示数据）",
+                system="演示 CRM 报价库",
+                excerpt="演示基线版本已批准，有效期至 2026-07-31；修改后需要重新复核。",
+                permission="销售可读 · 基线经经理批准",
                 updated_at="昨天 17:40",
             ),
             SourceReference(
                 source_id="kb:pricing/floor-2026",
-                label="2026 报价与折扣政策",
-                system="内部制度库",
-                excerpt="标准服务最低批准折扣为 88%。",
+                label="2026 报价与折扣政策（演示数据）",
+                system="演示制度库",
+                excerpt="标准服务最低折后比例为 88%（8.8 折）。",
                 permission="销售团队可读",
                 updated_at="2026-07-01",
             ),
@@ -518,40 +753,63 @@ class ConversationService:
         self.run_service = run_service
         self.workspace_store = workspace_store or InMemoryWorkspaceStore()
         self._threads: dict[str, ConversationThread] = {}
+        self._thread_locks: dict[str, asyncio.Lock] = {}
+        self._workspace_locks: dict[str, asyncio.Lock] = {}
         self._workspace_cache: dict[str, dict[str, WorkspaceArtifact]] = {}
-        self._continued_runs: set[tuple[str, str]] = set()
+        self._continued_runs: dict[tuple[str, str], ChatMessage] = {}
         self._lock = asyncio.Lock()
 
     async def get_workspace(self, user_id: str) -> list[WorkspaceArtifact]:
         cached = self._workspace_cache.get(user_id)
         if cached is None:
-            stored = await self.workspace_store.load(user_id)
-            cached = {
-                artifact.kind: artifact
-                for item in stored
-                if (artifact := WorkspaceArtifact.model_validate(item))
-            }
-            for kind in _WORKSPACE_TITLES:
-                if kind not in cached:
-                    artifact = _seed_workspace_artifact(kind)
-                    cached[kind] = artifact
-                    await self.workspace_store.save(
-                        user_id, artifact.model_dump(mode="json")
-                    )
-            calendar = cached.get("calendar")
-            if calendar and not isinstance(calendar.content.get("events"), list):
-                calendar = calendar.model_copy(
-                    update={
-                        "title": _WORKSPACE_TITLES["calendar"],
-                        "content": _default_content("calendar"),
-                        "updated_at": datetime.now(UTC),
+            async with self._lock:
+                cached = self._workspace_cache.get(user_id)
+                if cached is None:
+                    stored = await self.workspace_store.load(user_id)
+                    cached = {
+                        artifact.kind: artifact
+                        for item in stored
+                        if (artifact := WorkspaceArtifact.model_validate(item))
                     }
-                )
-                cached["calendar"] = calendar
-                await self.workspace_store.save(
-                    user_id, calendar.model_dump(mode="json")
-                )
-            self._workspace_cache[user_id] = cached
+                    for kind in _WORKSPACE_TITLES:
+                        if kind not in cached:
+                            artifact = _seed_workspace_artifact(kind)
+                            cached[kind] = artifact
+                            await self.workspace_store.save(
+                                user_id, artifact.model_dump(mode="json")
+                            )
+                    calendar = cached.get("calendar")
+                    if calendar and not isinstance(
+                        calendar.content.get("events"), list
+                    ):
+                        calendar = calendar.model_copy(
+                            update={
+                                "title": _WORKSPACE_TITLES["calendar"],
+                                "content": _default_content("calendar"),
+                                "revision": calendar.revision + 1,
+                                "updated_at": datetime.now(UTC),
+                            }
+                        )
+                        cached["calendar"] = calendar
+                        await self.workspace_store.save(
+                            user_id, calendar.model_dump(mode="json")
+                        )
+                    quote = cached.get("quote")
+                    if quote and quote.content.get("quote_id") == "Q-991-V3":
+                        demo_sources = _default_sources("quote")
+                        if quote.sources != demo_sources:
+                            quote = quote.model_copy(
+                                update={
+                                    "sources": demo_sources,
+                                    "revision": quote.revision + 1,
+                                    "updated_at": datetime.now(UTC),
+                                }
+                            )
+                            cached["quote"] = quote
+                            await self.workspace_store.save(
+                                user_id, quote.model_dump(mode="json")
+                            )
+                    self._workspace_cache[user_id] = cached
         return list(cached.values())
 
     async def save_workspace_artifact(
@@ -560,69 +818,94 @@ class ConversationService:
         content: dict[str, Any],
         user_id: str,
         *,
+        expected_artifact_id: str,
+        expected_revision: int,
         title: str | None = None,
         actor: str = "当前用户",
         action: str = "保存工作区内容",
     ) -> WorkspaceArtifact:
-        workspace = {item.kind: item for item in await self.get_workspace(user_id)}
-        artifact = workspace.get(kind)
-        if artifact is None:
-            raise ConversationNotFoundError(kind)
-        updated = artifact.model_copy(
-            update={
-                "title": title or artifact.title,
-                "content": artifact.content | content,
-                "requires_recheck": bool(artifact.linked_action_id),
-                "change_history": [
-                    {
-                        "actor": actor,
-                        "action": action,
-                        "time": datetime.now(UTC).isoformat(),
-                    },
-                    *artifact.change_history[:19],
-                ],
-                "updated_at": datetime.now(UTC),
-            }
-        )
-        self._workspace_cache[user_id][kind] = updated
-        await self.workspace_store.save(user_id, updated.model_dump(mode="json"))
-        if updated.linked_action_id:
-            await self.run_service.invalidate_action(updated.linked_action_id, user_id)
-        return updated
+        await self.get_workspace(user_id)
+        lock = self._workspace_locks.setdefault(user_id, asyncio.Lock())
+        async with lock:
+            artifact = self._workspace_cache[user_id].get(kind)
+            if artifact is None:
+                raise ConversationNotFoundError(kind)
+            if (
+                artifact.artifact_id != expected_artifact_id
+                or artifact.revision != expected_revision
+            ):
+                raise WorkspaceChangedError
+            next_content = artifact.content | content
+            requires_recheck = bool(artifact.linked_action_id)
+            if kind == "quote":
+                next_content = merge_quote_workspace_context(
+                    artifact.content, next_content
+                )
+                requires_recheck = requires_recheck or _quote_needs_review(
+                    next_content
+                )
+            updated = artifact.model_copy(
+                update={
+                    "title": title or artifact.title,
+                    "content": next_content,
+                    "requires_recheck": requires_recheck,
+                    "revision": artifact.revision + 1,
+                    "change_history": [
+                        {
+                            "actor": actor,
+                            "action": action,
+                            "time": datetime.now(UTC).isoformat(),
+                        },
+                        *artifact.change_history[:19],
+                    ],
+                    "updated_at": datetime.now(UTC),
+                }
+            )
+            if artifact.linked_action_id:
+                await self.run_service.invalidate_action(
+                    artifact.linked_action_id, user_id
+                )
+            await self.workspace_store.save(
+                user_id, updated.model_dump(mode="json")
+            )
+            self._workspace_cache[user_id][kind] = updated
+            return updated
 
     async def start_new_mail(self, user_id: str) -> WorkspaceArtifact:
-        workspace = {item.kind: item for item in await self.get_workspace(user_id)}
-        previous = workspace.get("mail")
-        if previous is None:
-            raise ConversationNotFoundError("mail")
+        await self.get_workspace(user_id)
+        lock = self._workspace_locks.setdefault(user_id, asyncio.Lock())
+        async with lock:
+            previous = self._workspace_cache[user_id].get("mail")
+            if previous is None:
+                raise ConversationNotFoundError("mail")
 
-        if previous.linked_action_id:
-            try:
-                await self.run_service.invalidate_action(
-                    previous.linked_action_id, user_id
-                )
-            except LookupError:
-                # A persisted workspace can outlive an in-memory demo run.
-                pass
+            if previous.linked_action_id:
+                try:
+                    await self.run_service.invalidate_action(
+                        previous.linked_action_id, user_id
+                    )
+                except LookupError:
+                    # A persisted workspace can outlive an in-memory demo run.
+                    pass
 
-        mail = WorkspaceArtifact(
-            artifact_id=f"workspace_mail_{uuid4().hex}",
-            kind="mail",
-            title=_WORKSPACE_TITLES["mail"],
-            content=_default_content("mail"),
-            sources=_default_sources("mail"),
-            change_history=[
-                {
-                    "actor": "当前用户",
-                    "action": "新建空白邮件",
-                    "time": datetime.now(UTC).isoformat(),
-                },
-                *previous.change_history[:19],
-            ],
-        )
-        self._workspace_cache[user_id]["mail"] = mail
-        await self.workspace_store.save(user_id, mail.model_dump(mode="json"))
-        return mail
+            mail = WorkspaceArtifact(
+                artifact_id=f"workspace_mail_{uuid4().hex}",
+                kind="mail",
+                title=_WORKSPACE_TITLES["mail"],
+                content=_default_content("mail"),
+                sources=_default_sources("mail"),
+                change_history=[
+                    {
+                        "actor": "当前用户",
+                        "action": "新建空白邮件",
+                        "time": datetime.now(UTC).isoformat(),
+                    },
+                    *previous.change_history[:19],
+                ],
+            )
+            await self.workspace_store.save(user_id, mail.model_dump(mode="json"))
+            self._workspace_cache[user_id]["mail"] = mail
+            return mail
 
     async def create_thread(self, user_id: str) -> ConversationThread:
         thread = ConversationThread(thread_id=f"chat_{uuid4().hex}", user_id=user_id)
@@ -636,17 +919,69 @@ class ConversationService:
             raise ConversationNotFoundError(thread_id)
         return thread
 
+    async def _stream_assistant_reply(
+        self, thread: ConversationThread, response_text: str
+    ) -> AsyncIterator[dict[str, Any]]:
+        assistant_message = ChatMessage(
+            message_id=f"msg_{uuid4().hex}",
+            role="assistant",
+            content="",
+            status="streaming",
+        )
+        yield {
+            "type": "message.started",
+            "message": assistant_message.model_dump(mode="json"),
+        }
+        for start in range(0, len(response_text), 2):
+            yield {
+                "type": "assistant.delta",
+                "message_id": assistant_message.message_id,
+                "delta": response_text[start : start + 2],
+            }
+            await asyncio.sleep(0.012)
+        completed = assistant_message.model_copy(
+            update={"content": response_text, "status": "completed"}
+        )
+        self._threads[thread.thread_id] = thread.model_copy(
+            update={
+                "messages": [*thread.messages, completed],
+                "updated_at": datetime.now(UTC),
+            }
+        )
+        yield {
+            "type": "message.completed",
+            "message": completed.model_dump(mode="json"),
+        }
+
     async def update_artifact(
+        self, thread_id: str, artifact_id: str, content: dict[str, Any], user_id: str
+    ) -> WorkspaceArtifact:
+        lock = self._thread_locks.setdefault(thread_id, asyncio.Lock())
+        async with lock:
+            return await self._update_artifact_unlocked(
+                thread_id, artifact_id, content, user_id
+            )
+
+    async def _update_artifact_unlocked(
         self, thread_id: str, artifact_id: str, content: dict[str, Any], user_id: str
     ) -> WorkspaceArtifact:
         thread = await self.get_thread(thread_id, user_id)
         artifact = next((item for item in thread.artifacts if item.artifact_id == artifact_id), None)
         if artifact is None:
             raise ConversationNotFoundError(artifact_id)
+        next_content = artifact.content | content
+        if artifact.kind == "quote":
+            next_content = merge_quote_workspace_context(
+                artifact.content, next_content
+            )
         updated = artifact.model_copy(
             update={
-                "content": artifact.content | content,
-                "requires_recheck": bool(artifact.linked_action_id),
+                "content": next_content,
+                "requires_recheck": (
+                    bool(artifact.linked_action_id)
+                    or _quote_needs_review(next_content)
+                ),
+                "revision": artifact.revision + 1,
                 "updated_at": datetime.now(UTC),
             }
         )
@@ -665,6 +1000,64 @@ class ConversationService:
         user_id: str,
         active_view: str | None = None,
         workspace_context: dict[str, Any] | None = None,
+        expected_artifact_id: str | None = None,
+        expected_revision: int | None = None,
+    ) -> AsyncIterator[dict[str, Any]]:
+        lock = self._thread_locks.setdefault(thread_id, asyncio.Lock())
+        async with lock:
+            try:
+                async for event in self._stream_message_unlocked(
+                    thread_id,
+                    text,
+                    user_id,
+                    active_view=active_view,
+                    workspace_context=workspace_context,
+                    expected_artifact_id=expected_artifact_id,
+                    expected_revision=expected_revision,
+                ):
+                    yield event
+            except WorkspaceChangedError:
+                current = await self.get_thread(thread_id, user_id)
+                latest_workspace = {
+                    item.kind: item for item in await self.get_workspace(user_id)
+                }
+                latest_artifact = latest_workspace.get(active_view or "")
+                if latest_artifact is not None:
+                    yield {
+                        "type": "workspace.conflict",
+                        "view": active_view,
+                        "latest_artifact": latest_artifact.model_dump(mode="json"),
+                    }
+                response_text = (
+                    "处理期间，当前工作区已被另一个操作更新。"
+                    "为避免覆盖新内容，我没有生成或执行动作。"
+                    "你的当前草稿仍保留在页面中，请选择查看最新版本或在最新版本上重新应用。"
+                )
+                async for event in self._stream_assistant_reply(
+                    current, response_text
+                ):
+                    yield event
+            except ActionArtifactMismatchError:
+                current = await self.get_thread(thread_id, user_id)
+                response_text = (
+                    "动作参数与当前工作区内容不一致，或当前内容还不完整。"
+                    "为避免批准一份内容却执行另一份内容，我没有创建动作。"
+                    "请先在对应工作区补全并核对目标、标题和正文后重试。"
+                )
+                async for event in self._stream_assistant_reply(
+                    current, response_text
+                ):
+                    yield event
+
+    async def _stream_message_unlocked(
+        self,
+        thread_id: str,
+        text: str,
+        user_id: str,
+        active_view: str | None = None,
+        workspace_context: dict[str, Any] | None = None,
+        expected_artifact_id: str | None = None,
+        expected_revision: int | None = None,
     ) -> AsyncIterator[dict[str, Any]]:
         thread = await self.get_thread(thread_id, user_id)
         user_message = ChatMessage(
@@ -687,13 +1080,43 @@ class ConversationService:
         ]
         trusted_context = _retrieve_trusted_context(text)
         workspace = {item.kind: item for item in await self.get_workspace(user_id)}
+        workspace_snapshot = {
+            kind: item.model_dump(mode="json") for kind, item in workspace.items()
+        }
         active_artifact = workspace.get(active_view or "")
+        active_artifact_snapshot = workspace_snapshot.get(active_view or "")
+        if workspace_context is not None:
+            if active_artifact is None or expected_artifact_id is None or expected_revision is None:
+                raise WorkspaceChangedError
+            if (
+                active_artifact.artifact_id != expected_artifact_id
+                or active_artifact.revision != expected_revision
+            ):
+                raise WorkspaceChangedError
+        active_content = (
+            workspace_context
+            if workspace_context is not None
+            else (active_artifact.content if active_artifact else {})
+        )
+        quote_context_error: QuoteCalculationError | None = None
+        if active_view == "quote" and active_artifact is not None:
+            try:
+                active_content = (
+                    active_artifact.content
+                    if workspace_context is None
+                    else merge_quote_workspace_context(
+                        active_artifact.content, workspace_context
+                    )
+                )
+            except QuoteCalculationError as exc:
+                active_content = {}
+                quote_context_error = exc
         trusted_context["active_workspace"] = {
             "view": active_view,
             "artifact": (
                 {
                     "title": active_artifact.title,
-                    "content": workspace_context or active_artifact.content,
+                    "content": active_content,
                     "sources": [
                         source.model_dump(mode="json")
                         for source in active_artifact.sources
@@ -702,8 +1125,43 @@ class ConversationService:
                 if active_artifact
                 else None
             ),
-            "notice": "这是用户当前正在编辑的工作区，可能包含尚未保存的输入。",
+            "notice": (
+                f"当前工作区数据未通过校验：{quote_context_error}"
+                if quote_context_error
+                else "这是用户当前正在编辑的工作区，可能包含尚未保存的输入。"
+            ),
         }
+
+        quote_intent = quote_question_intent(text) if active_view == "quote" else None
+        if quote_intent is not None:
+            yield {
+                "type": "assistant.status",
+                "status": "calculating",
+                "label": "正在按当前报价表逐行核算",
+            }
+            try:
+                if active_artifact is None:
+                    raise QuoteCalculationError("服务端报价工作区不存在")
+                if quote_context_error is not None:
+                    raise quote_context_error
+                response_text = render_quote_answer(active_content, quote_intent)
+            except QuoteCalculationError as exc:
+                response_text = (
+                    f"当前报价无法完成核算：{exc}。"
+                    "我没有使用历史对话中的金额，也不会在字段不完整时猜测结果。"
+                )
+            async for event in self._stream_assistant_reply(thread, response_text):
+                yield event
+            return
+
+        if quote_context_error is not None and not _is_general_question(text):
+            response_text = (
+                f"当前报价无法继续处理：{quote_context_error}。"
+                "我不会使用历史金额生成、修改或发送报价；请先修正当前工作区中的字段。"
+            )
+            async for event in self._stream_assistant_reply(thread, response_text):
+                yield event
+            return
 
         if _is_general_question(text):
             response_text = await self.agent.answer_general(
@@ -711,55 +1169,145 @@ class ConversationService:
                 history,
                 trusted_context["current_datetime"],
             )
-            assistant_message = ChatMessage(
-                message_id=f"msg_{uuid4().hex}",
-                role="assistant",
-                content="",
-                status="streaming",
-            )
-            yield {
-                "type": "message.started",
-                "message": assistant_message.model_dump(mode="json"),
-            }
-            for start in range(0, len(response_text), 2):
-                yield {
-                    "type": "assistant.delta",
-                    "message_id": assistant_message.message_id,
-                    "delta": response_text[start : start + 2],
-                }
-                await asyncio.sleep(0.012)
-            completed = assistant_message.model_copy(
-                update={"content": response_text, "status": "completed"}
-            )
-            self._threads[thread_id] = thread.model_copy(
-                update={
-                    "messages": [*thread.messages, completed],
-                    "updated_at": datetime.now(UTC),
-                }
-            )
-            yield {
-                "type": "message.completed",
-                "message": completed.model_dump(mode="json"),
-            }
+            async for event in self._stream_assistant_reply(thread, response_text):
+                yield event
             return
 
         plan: ConversationPlan = await self.agent.plan(text, history, trusted_context)
         artifact = None
         previous_artifact = None
+        run = None
+        action: ActionCandidate | None = plan.action
         if plan.artifact:
-            existing = workspace.get(plan.artifact.kind)
-            previous_artifact = existing
-            if existing:
+            await self.get_workspace(user_id)
+            workspace_lock = self._workspace_locks.setdefault(
+                user_id, asyncio.Lock()
+            )
+            async with workspace_lock:
+                current_active = self._workspace_cache[user_id].get(
+                    active_view or ""
+                )
+                if active_artifact_snapshot is not None and not _workspace_artifact_matches_snapshot(
+                    current_active, active_artifact_snapshot
+                ):
+                    raise WorkspaceChangedError
+                existing = self._workspace_cache[user_id].get(plan.artifact.kind)
+                if not _workspace_artifact_matches_snapshot(
+                    existing, workspace_snapshot.get(plan.artifact.kind)
+                ):
+                    raise WorkspaceChangedError
+                previous_artifact = existing
+                if existing:
+                    current_content = (
+                        active_content
+                        if existing.kind == active_view
+                        and workspace_context is not None
+                        and quote_context_error is None
+                        else existing.content
+                    )
+                    next_content = current_content | plan.artifact.content
+                    if existing.kind == "quote":
+                        next_content = merge_quote_workspace_context(
+                            existing.content, next_content
+                        )
+                    artifact = existing.model_copy(
+                        update={
+                            "title": (
+                                existing.title
+                                if existing.kind == "quote"
+                                else plan.artifact.title or existing.title
+                            ),
+                            "content": next_content,
+                            "sources": (
+                                existing.sources
+                            ),
+                            "requires_recheck": (
+                                bool(existing.linked_action_id)
+                                or _quote_needs_review(next_content)
+                            ),
+                            "revision": existing.revision + 1,
+                            "change_history": [
+                                {
+                                    "actor": "Office Agent",
+                                    "action": "根据对话编辑工作区",
+                                    "time": datetime.now(UTC).isoformat(),
+                                },
+                                *existing.change_history[:19],
+                            ],
+                            "updated_at": datetime.now(UTC),
+                        }
+                    )
+                else:
+                    artifact = _merge_artifact(plan.artifact).model_copy(
+                        update={"sources": _default_sources(plan.artifact.kind)}
+                    )
+
+                replaces_linked_action = _is_side_effect_action(action)
+                if (
+                    previous_artifact is not None
+                    and previous_artifact.linked_action_id
+                    and (
+                        artifact.content != previous_artifact.content
+                        or replaces_linked_action
+                    )
+                ):
+                    try:
+                        await self.run_service.invalidate_action(
+                            previous_artifact.linked_action_id, user_id
+                        )
+                    except LookupError:
+                        pass
+
+                if _is_side_effect_action(action):
+                    action = _bind_action_to_artifact(action, artifact)
+                    run = await self.run_service.create_from_candidate(
+                        action,
+                        message=text,
+                        user_id=user_id,
+                        trusted_context={
+                            "device": {"managed": True, "name": "managed_pc"},
+                            "user": {"id": user_id},
+                        },
+                    )
+                    artifact = artifact.model_copy(
+                        update={
+                            "linked_action_id": run.action.action_id,
+                            "linked_run_id": run.run_id,
+                        }
+                    )
+
+                await self.workspace_store.save(
+                    user_id, artifact.model_dump(mode="json")
+                )
+                self._workspace_cache[user_id][artifact.kind] = artifact
+        elif _is_side_effect_action(action):
+            if active_artifact is None:
+                raise WorkspaceChangedError
+            await self.get_workspace(user_id)
+            workspace_lock = self._workspace_locks.setdefault(
+                user_id, asyncio.Lock()
+            )
+            async with workspace_lock:
+                existing = self._workspace_cache[user_id].get(active_view or "")
+                if active_artifact_snapshot is None or not _workspace_artifact_matches_snapshot(
+                    existing, active_artifact_snapshot
+                ):
+                    raise WorkspaceChangedError
+                previous_artifact = existing
+                next_content = active_content
+                if existing.kind == "quote":
+                    next_content = merge_quote_workspace_context(
+                        existing.content, active_content
+                    )
                 artifact = existing.model_copy(
                     update={
-                        "title": plan.artifact.title or existing.title,
-                        "content": existing.content | plan.artifact.content,
-                        "sources": plan.artifact.sources or existing.sources,
-                        "requires_recheck": False,
+                        "content": next_content,
+                        "requires_recheck": _quote_needs_review(next_content),
+                        "revision": existing.revision + 1,
                         "change_history": [
                             {
                                 "actor": "Office Agent",
-                                "action": "根据对话编辑工作区",
+                                "action": "绑定动作前记录当前工作区",
                                 "time": datetime.now(UTC).isoformat(),
                             },
                             *existing.change_history[:19],
@@ -767,12 +1315,33 @@ class ConversationService:
                         "updated_at": datetime.now(UTC),
                     }
                 )
-            else:
-                artifact = _merge_artifact(plan.artifact)
-            self._workspace_cache[user_id][artifact.kind] = artifact
-            await self.workspace_store.save(user_id, artifact.model_dump(mode="json"))
-        run = None
-        action: ActionCandidate | None = plan.action
+                if existing.linked_action_id:
+                    try:
+                        await self.run_service.invalidate_action(
+                            existing.linked_action_id, user_id
+                        )
+                    except LookupError:
+                        pass
+                action = _bind_action_to_artifact(action, artifact)
+                run = await self.run_service.create_from_candidate(
+                    action,
+                    message=text,
+                    user_id=user_id,
+                    trusted_context={
+                        "device": {"managed": True, "name": "managed_pc"},
+                        "user": {"id": user_id},
+                    },
+                )
+                artifact = artifact.model_copy(
+                    update={
+                        "linked_action_id": run.action.action_id,
+                        "linked_run_id": run.run_id,
+                    }
+                )
+                await self.workspace_store.save(
+                    user_id, artifact.model_dump(mode="json")
+                )
+                self._workspace_cache[user_id][artifact.kind] = artifact
 
         if artifact is not None:
             yield {"type": "ui.focus", "view": artifact.kind}
@@ -781,38 +1350,9 @@ class ConversationService:
             ):
                 yield artifact_event
 
-        if action is not None and action.state_change_type in _SIDE_EFFECTS:
-            if artifact is not None:
-                action = action.model_copy(
-                    update={
-                        "resources": action.resources or [artifact.title],
-                        "parameters": action.parameters
-                        | {
-                            "artifact_id": artifact.artifact_id,
-                            "artifact_content": artifact.content,
-                        },
-                    }
-                )
-            run = await self.run_service.create_from_candidate(
-                action,
-                message=text,
-                user_id=user_id,
-                trusted_context={
-                    "device": {"managed": True, "name": "managed_pc"},
-                    "user": {"id": user_id},
-                },
-            )
-            if artifact is not None:
-                artifact = artifact.model_copy(
-                    update={
-                        "linked_action_id": run.action.action_id,
-                        "linked_run_id": run.run_id,
-                    }
-                )
-                self._workspace_cache[user_id][artifact.kind] = artifact
-                await self.workspace_store.save(
-                    user_id, artifact.model_dump(mode="json")
-                )
+        if _is_side_effect_action(action):
+            if run is None:
+                raise RuntimeError("side-effect action was not initialized")
             yield {
                 "type": "action.proposed",
                 "action": action.model_dump(mode="json"),
@@ -867,14 +1407,33 @@ class ConversationService:
     async def stream_action_result(
         self, thread_id: str, run_id: str, user_id: str
     ) -> AsyncIterator[dict[str, Any]]:
+        lock = self._thread_locks.setdefault(thread_id, asyncio.Lock())
+        async with lock:
+            async for event in self._stream_action_result_unlocked(
+                thread_id, run_id, user_id
+            ):
+                yield event
+
+    async def _stream_action_result_unlocked(
+        self, thread_id: str, run_id: str, user_id: str
+    ) -> AsyncIterator[dict[str, Any]]:
         thread = await self.get_thread(thread_id, user_id)
         run = await self.run_service.get(run_id, user_id)
         key = (thread_id, run_id)
-        if key in self._continued_runs:
+        previous_completion = self._continued_runs.get(key)
+        if previous_completion is not None:
+            yield {
+                "type": "message.completed",
+                "message": previous_completion.model_dump(mode="json"),
+            }
+            yield {
+                "type": "action.closed",
+                "run_id": run_id,
+                "status": run.status,
+            }
             return
         if run.status not in {"EXECUTED", "DENIED", "FAILED"}:
             raise ValueError("动作尚未结束，不能生成结果回应")
-        self._continued_runs.add(key)
         yield {
             "type": "assistant.status",
             "status": "reflecting",
@@ -924,5 +1483,6 @@ class ConversationService:
                 "updated_at": datetime.now(UTC),
             }
         )
+        self._continued_runs[key] = completed
         yield {"type": "message.completed", "message": completed.model_dump(mode="json")}
         yield {"type": "action.closed", "run_id": run_id, "status": run.status}

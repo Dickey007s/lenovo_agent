@@ -13,9 +13,11 @@ import {
   useState,
 } from "react";
 import {
+  IconAlertTriangle,
   IconArrowUp,
   IconCalendar,
   IconCheck,
+  IconChevronRight,
   IconFileText,
   IconListCheck,
   IconMail,
@@ -28,6 +30,11 @@ import {
 
 import type { TaskEvent, TaskEventType, TaskSnapshot } from "./task-types";
 import { TaskArtifactWorkspace } from "./task-artifact-workspace";
+import {
+  calculateQuoteSummary,
+  updateQuoteItem,
+  type QuoteLineItem,
+} from "./quote-calculator";
 import {
   TaskDecisionPane,
   TaskDirectorCanvas,
@@ -59,6 +66,7 @@ type SourceReference = {
 
 type WorkspaceArtifact = {
   artifact_id: string;
+  revision: number;
   kind: WorkspaceKind;
   title: string;
   content: Record<string, unknown>;
@@ -67,6 +75,14 @@ type WorkspaceArtifact = {
   linked_run_id: string | null;
   requires_recheck: boolean;
   change_history: { actor?: string; action?: string; time?: string }[];
+  updated_at: string;
+};
+
+type WorkspaceConflict = {
+  kind: WorkspaceKind;
+  latestArtifact: WorkspaceArtifact;
+  baseArtifact: WorkspaceArtifact | null;
+  conflictingFields: string[];
 };
 
 type CapabilityDecision = { verdict: "allow" | "blocked" | "deny"; constraints: string[] };
@@ -248,7 +264,128 @@ function ArtifactHeader({ artifact, eyebrow, title, dirty, onSave, actions }: {
   </header>;
 }
 
+function WorkspaceConflictBanner({
+  conflict,
+  onResolve,
+}: {
+  conflict: WorkspaceConflict;
+  onResolve: (mode: "latest" | "reapply") => void;
+}) {
+  return <div className="workspace-conflict-banner" role="alert" aria-live="assertive">
+    <div>
+      <strong>工作区已有更新</strong>
+      <span>{conflict.conflictingFields.length
+        ? `无法自动合并：${conflict.conflictingFields.join("、")}在两个版本中都被修改。`
+        : "当前草稿尚未覆盖服务端新版本。系统只会重新应用你实际修改的字段。"}</span>
+    </div>
+    <div>
+      <button type="button" onClick={() => onResolve("latest")}>查看最新版本</button>
+      <button type="button" onClick={() => onResolve("reapply")}>重新应用我的修改</button>
+    </div>
+  </div>;
+}
+
 type ViewProps = { artifact: WorkspaceArtifact; dirty: boolean; onChange: (patch: Record<string, unknown>) => void; onSave: () => void };
+
+function workspaceContextForAgent(artifact: WorkspaceArtifact | undefined) {
+  if (!artifact || artifact.kind !== "quote") return artifact?.content ?? {};
+  const items = Array.isArray(artifact.content.items)
+    ? artifact.content.items as QuoteLineItem[]
+    : [];
+  const rawFloor = artifact.content.approved_floor;
+  const floor = typeof rawFloor === "number" && Number.isFinite(rawFloor) && rawFloor >= 0 && rawFloor <= 1
+    ? rawFloor
+    : undefined;
+  const calculation = calculateQuoteSummary(items, floor);
+  return calculation.valid
+    ? { ...artifact.content, items: calculation.items, total: calculation.discountedTotal }
+    : artifact.content;
+}
+
+function reapplyWorkspaceDraft(
+  latest: WorkspaceArtifact,
+  draft: WorkspaceArtifact,
+  base: WorkspaceArtifact | null,
+): { artifact: WorkspaceArtifact | null; conflictingFields: string[] } {
+  if (!base || base.kind !== latest.kind || draft.kind !== latest.kind) {
+    return { artifact: null, conflictingFields: ["编辑起点版本"] };
+  }
+
+  const same = (left: unknown, right: unknown) => JSON.stringify(left) === JSON.stringify(right);
+  if (latest.kind !== "quote") {
+    const content = { ...latest.content };
+    const conflictingFields: string[] = [];
+    const keys = new Set([...Object.keys(base.content), ...Object.keys(draft.content)]);
+    for (const key of keys) {
+      const baseValue = base.content[key];
+      const draftValue = draft.content[key];
+      if (same(draftValue, baseValue)) continue;
+      const latestValue = latest.content[key];
+      if (!same(latestValue, baseValue) && !same(latestValue, draftValue)) {
+        conflictingFields.push(key);
+      } else {
+        content[key] = draftValue;
+      }
+    }
+    return conflictingFields.length
+      ? { artifact: null, conflictingFields }
+      : { artifact: { ...latest, content }, conflictingFields: [] };
+  }
+
+  const latestItems = Array.isArray(latest.content.items)
+    ? latest.content.items as QuoteLineItem[]
+    : [];
+  const draftItems = Array.isArray(draft.content.items)
+    ? draft.content.items as QuoteLineItem[]
+    : [];
+  const baseItems = Array.isArray(base.content.items)
+    ? base.content.items as QuoteLineItem[]
+    : [];
+  if (latestItems.length !== baseItems.length || draftItems.length !== baseItems.length) {
+    return { artifact: null, conflictingFields: ["报价行项目结构"] };
+  }
+
+  const conflictingFields: string[] = [];
+  const content = { ...latest.content };
+  const mergeValue = (
+    label: string,
+    baseValue: unknown,
+    draftValue: unknown,
+    latestValue: unknown,
+    apply: (value: unknown) => void,
+  ) => {
+    if (same(draftValue, baseValue)) return;
+    if (!same(latestValue, baseValue) && !same(latestValue, draftValue)) {
+      conflictingFields.push(label);
+      return;
+    }
+    apply(draftValue);
+  };
+
+  mergeValue(
+    "有效期",
+    base.content.valid_until,
+    draft.content.valid_until,
+    latest.content.valid_until,
+    value => { content.valid_until = value; },
+  );
+  const items = latestItems.map(item => ({ ...item }));
+  for (let index = 0; index < items.length; index += 1) {
+    for (const field of ["name", "qty", "discount"] as const) {
+      mergeValue(
+        `第 ${index + 1} 行${field === "name" ? "项目名" : field === "qty" ? "数量" : "折后比例"}`,
+        baseItems[index]?.[field],
+        draftItems[index]?.[field],
+        latestItems[index]?.[field],
+        value => { items[index][field] = value as never; },
+      );
+    }
+  }
+  content.items = items;
+  return conflictingFields.length
+    ? { artifact: null, conflictingFields }
+    : { artifact: { ...latest, content }, conflictingFields: [] };
+}
 
 function MailView({ artifact, dirty, onChange, onSave, onSend, onNew }: ViewProps & { onSend: () => void; onNew: () => void }) {
   const to = Array.isArray(artifact.content.to) ? artifact.content.to.join(", ") : String(artifact.content.to ?? "");
@@ -273,12 +410,45 @@ function DocumentView({ artifact, dirty, onChange, onSave }: ViewProps) {
 }
 
 function QuoteView({ artifact, dirty, onChange, onSave, onImport }: ViewProps & { onImport: () => void }) {
-  const items = Array.isArray(artifact.content.items) ? artifact.content.items as { name?: string; qty?: number; unit_price?: number; discount?: number; subtotal?: number }[] : [];
-  const floor = Number(artifact.content.approved_floor ?? .88);
+  const items = Array.isArray(artifact.content.items) ? artifact.content.items as QuoteLineItem[] : [];
+  const rawFloor = artifact.content.approved_floor;
+  const floor = typeof rawFloor === "number" && Number.isFinite(rawFloor) && rawFloor >= 0 && rawFloor <= 1 ? rawFloor : undefined;
+  const calculation = calculateQuoteSummary(items, floor);
+  const approval = artifact.content.approval;
+  const savedNeedsReview = artifact.requires_recheck || (
+    typeof approval === "object" && approval !== null && "status" in approval
+      && approval.status === "needs_review"
+  );
+  const updateItem = (index: number, patch: Partial<QuoteLineItem>) => {
+    const next = updateQuoteItem(items, index, patch, floor);
+    onChange({ items: next.items, total: next.discountedTotal });
+  };
+  const currency = (value: number | null | undefined) => value === null || value === undefined ? "待核对" : `¥${value.toLocaleString("zh-CN", { maximumFractionDigits: 2 })}`;
+  const percent = (value: string | null) => value === null ? "待核对" : `${value}%`;
+  const discountZhe = calculation.effectivePriceZhe === null ? "" : `约 ${calculation.effectivePriceZhe} 折`;
+  const floorStatus = !calculation.valid
+    ? `核算暂停：${calculation.errors[0]}`
+    : floor === undefined
+      ? "当前报价未提供可核验的最低折后比例"
+      : calculation.belowFloorItems.length
+        ? `${calculation.belowFloorItems.join("、")}低于 ${calculation.approvedFloorPercent}%（${calculation.approvedFloorZhe} 折）底线`
+        : `各行折后比例均不低于 ${calculation.approvedFloorPercent}%（${calculation.approvedFloorZhe} 折），符合底线`;
+  const reviewStatus = dirty
+    ? " 当前修改尚未保存，保存后需要重新复核。"
+    : savedNeedsReview
+      ? " 当前版本已保存，正在等待重新复核，不能沿用基线审批结论。"
+      : "";
+  const floorState = !calculation.valid || floor === undefined || calculation.effectivePricePercent === null || calculation.belowFloorItems.length || dirty || savedNeedsReview ? "is-warning" : "is-ok";
   return <div className="artifact-page"><ArtifactHeader artifact={artifact} eyebrow="QUOTE WORKBOOK" title="报价工作台" dirty={dirty} onSave={onSave} actions={<button className="outline-button" onClick={onImport}>导入报价表</button>}/><div className="artifact-layout">
-    <section className="editor-card quote-editor"><div className="quote-summary"><div><span>客户</span><strong>{String(artifact.content.customer ?? "-")}</strong></div><div><span>报价编号</span><strong>{String(artifact.content.quote_id ?? "-")}</strong></div><div><span>有效期</span><input aria-label="报价有效期" value={String(artifact.content.valid_until ?? "")} onChange={e => onChange({ valid_until: e.target.value })}/></div><div><span>折扣底线</span><strong>{Math.round(floor * 100)}%</strong></div></div>
-      <div className="sheet"><div className="sheet-letters"><span/><span>A</span><span>B</span><span>C</span><span>D</span><span>E</span></div><div className="sheet-row sheet-head"><span className="row-num"/><span>项目</span><span>数量</span><span>标准价</span><span>折扣 %</span><span>小计</span></div>{items.map((item, index) => <div className={`sheet-row ${Number(item.discount ?? 1) < floor ? "sheet-warning" : ""}`} key={`${item.name}-${index}`}><i className="row-num">{index + 1}</i><input value={item.name ?? ""} onChange={e => onChange({ items: items.map((row, i) => i === index ? { ...row, name: e.target.value } : row) })}/><input value={item.qty ?? 0} onChange={e => onChange({ items: items.map((row, i) => i === index ? { ...row, qty: Number(e.target.value) } : row) })}/><span>¥{Number(item.unit_price ?? 0).toLocaleString()}</span><input value={Math.round(Number(item.discount ?? 1) * 100)} onChange={e => { const discount = Number(e.target.value) / 100; const next = items.map((row, i) => i === index ? { ...row, discount, subtotal: Number(row.qty ?? 0) * Number(row.unit_price ?? 0) * discount } : row); onChange({ items: next, total: next.reduce((sum, row) => sum + Number(row.subtotal ?? 0), 0) }); }}/><span>¥{Number(item.subtotal ?? 0).toLocaleString()}</span></div>)}</div>
-      <div className="quote-total"><span>含税总计</span><strong>¥{Number(artifact.content.total ?? 0).toLocaleString()}</strong></div>
+    <section className="editor-card quote-editor"><div className="quote-summary"><div><span>客户</span><strong>{String(artifact.content.customer ?? "-")}</strong></div><div><span>报价编号</span><strong>{String(artifact.content.quote_id ?? "-")}</strong></div><div><span>有效期</span><input aria-label="报价有效期" value={String(artifact.content.valid_until ?? "")} onChange={e => onChange({ valid_until: e.target.value })}/></div><div><span>最低折后比例</span><strong>{calculation.approvedFloorPercent === null || calculation.approvedFloorZhe === null ? "待核验" : `${calculation.approvedFloorPercent}% · ${calculation.approvedFloorZhe} 折`}</strong></div></div>
+      <div className="sheet-frame"><div className="sheet"><div className="sheet-letters"><span/><span>A</span><span>B</span><span>C</span><span>D</span><span>E</span></div><div className="sheet-row sheet-head"><span className="row-num"/><span>项目</span><span>数量</span><span>标准价</span><span>折后比例 %</span><span>小计</span></div>{calculation.items.map((item, index) => <div className={`sheet-row ${floor !== undefined && typeof item.discount === "number" && item.discount < floor ? "sheet-warning" : ""}`} key={`quote-line-${index}`}><i className="row-num">{index + 1}</i><input value={item.name ?? ""} onChange={e => updateItem(index, { name: e.target.value })}/><input type="number" inputMode="decimal" min="0" step="0.01" aria-label={`${item.name ?? `第 ${index + 1} 行`}数量`} value={item.qty ?? ""} onChange={e => updateItem(index, { qty: e.target.value === "" ? undefined : Number(e.target.value) })}/><span>{currency(item.unit_price)}</span><input type="number" inputMode="decimal" min="0" max="100" step="0.01" aria-label={`${item.name ?? `第 ${index + 1} 行`}折后比例`} value={typeof item.discount === "number" ? Number((item.discount * 100).toFixed(6)) : ""} onChange={e => updateItem(index, { discount: e.target.value === "" ? undefined : Number(e.target.value) / 100 })}/><span>{currency(item.subtotal)}</span></div>)}</div><span className="sheet-scroll-affordance" aria-hidden="true"><IconChevronRight/></span></div>
+      <footer className="quote-total" aria-label="报价核算结果">
+        <div><span>标准总价</span><strong>{currency(calculation.standardTotal)}</strong></div>
+        <div><span>优惠金额</span><strong>{currency(calculation.savingsAmount)}</strong><small>优惠率 {percent(calculation.savingsPercent)}</small></div>
+        <div><span>综合折后比例</span><strong>{percent(calculation.effectivePricePercent)}</strong><small>{discountZhe}</small></div>
+        <div><span>折后总计</span><strong>{currency(calculation.discountedTotal)}</strong></div>
+        <p className={floorState} role="status" aria-live="polite">{floorState === "is-warning" ? <IconAlertTriangle aria-hidden="true"/> : <IconCheck aria-hidden="true"/>}{floorStatus}{reviewStatus}</p>
+      </footer>
     </section><SourceInspector artifact={artifact}/></div></div>;
 }
 
@@ -478,6 +648,7 @@ export default function Home() {
   const [assistantStatus, setAssistantStatus] = useState("");
   const [activeView, setActiveView] = useState<ViewId>("tasks");
   const [artifacts, setArtifacts] = useState<Partial<Record<WorkspaceKind, WorkspaceArtifact>>>({});
+  const [workspaceConflict, setWorkspaceConflict] = useState<WorkspaceConflict | null>(null);
   const [dirty, setDirty] = useState<Partial<Record<WorkspaceKind, boolean>>>({});
   const [streamingArtifact, setStreamingArtifact] = useState<WorkspaceKind | null>(null);
   const [run, setRun] = useState<RunSnapshot | null>(null);
@@ -501,6 +672,8 @@ export default function Home() {
   const [workspaceWidth, setWorkspaceWidth] = useState(0);
   const shellRef = useRef<HTMLElement>(null);
   const conversationRef = useRef<HTMLDivElement>(null);
+  const artifactsRef = useRef<Partial<Record<WorkspaceKind, WorkspaceArtifact>>>({});
+  const workspaceEditBasesRef = useRef<Partial<Record<WorkspaceKind, WorkspaceArtifact>>>({});
   const stickToBottomRef = useRef(true);
   const silentRequestRef = useRef(false);
   const taskSequenceRef = useRef(0);
@@ -508,6 +681,10 @@ export default function Home() {
   const pendingTaskMutationRef = useRef<PendingTaskMutation | null>(null);
   const demo1CreateKeyRef = useRef<string | null>(null);
   const demo1CreateInFlightRef = useRef(false);
+
+  useEffect(() => {
+    artifactsRef.current = artifacts;
+  }, [artifacts]);
 
   function applyTaskSnapshot(snapshot: TaskSnapshot | null, allowTaskSwitch = false) {
     const current = taskSnapshotRef.current;
@@ -574,7 +751,10 @@ export default function Home() {
       if (cancelled) return;
       setThreadId(thread.thread_id);
       setEvidenceCatalog(Object.fromEntries(requirements.map(item => [item.requirement, item])));
-      setArtifacts(Object.fromEntries(workspace.map(item => [item.kind, item])) as Record<WorkspaceKind, WorkspaceArtifact>);
+      const nextArtifacts = Object.fromEntries(workspace.map(item => [item.kind, item])) as Record<WorkspaceKind, WorkspaceArtifact>;
+      artifactsRef.current = nextArtifacts;
+      workspaceEditBasesRef.current = {};
+      setArtifacts(nextArtifacts);
     }).catch(reason => setError(reason instanceof Error ? reason.message : "初始化失败"));
     request<TaskSnapshot[]>("/v1/tasks").then(tasks => {
       if (cancelled) return;
@@ -980,7 +1160,12 @@ export default function Home() {
       setMessages(current => [...current.filter(item => !item.message_id.startsWith("pending_")), incoming]);
     } else if (type === "artifact.stream.started") {
       const artifact = event.artifact as WorkspaceArtifact;
-      setArtifacts(current => ({ ...current, [artifact.kind]: artifact }));
+      setArtifacts(current => {
+        const next = { ...current, [artifact.kind]: artifact };
+        artifactsRef.current = next;
+        return next;
+      });
+      delete workspaceEditBasesRef.current[artifact.kind];
       setDirty(current => ({ ...current, [artifact.kind]: false }));
       setStreamingArtifact(artifact.kind);
     } else if (type === "artifact.delta") {
@@ -988,11 +1173,20 @@ export default function Home() {
       const patch = event.patch as Record<string, unknown>;
       setArtifacts(current => {
         const artifact = current[kind];
-        return artifact ? { ...current, [kind]: { ...artifact, content: { ...artifact.content, ...patch } } } : current;
+        if (!artifact) return current;
+        const next = { ...current, [kind]: { ...artifact, content: { ...artifact.content, ...patch } } };
+        artifactsRef.current = next;
+        return next;
       });
     } else if (type === "artifact.updated") {
       const artifact = event.artifact as WorkspaceArtifact;
-      setArtifacts(current => ({ ...current, [artifact.kind]: artifact }));
+      setArtifacts(current => {
+        const next = { ...current, [artifact.kind]: artifact };
+        artifactsRef.current = next;
+        return next;
+      });
+      delete workspaceEditBasesRef.current[artifact.kind];
+      setWorkspaceConflict(current => current?.kind === artifact.kind ? null : current);
       setDirty(current => ({ ...current, [artifact.kind]: false }));
       setStreamingArtifact(current => current === artifact.kind ? null : current);
       setNotice(`Agent 已更新${VIEW_LABELS[artifact.kind]}`);
@@ -1006,7 +1200,9 @@ export default function Home() {
       setMessages(current => current.map(item => item.message_id === messageId ? { ...item, content: item.content + delta } : item));
     } else if (type === "message.completed") {
       const incoming = event.message as ChatMessage;
-      setMessages(current => current.map(item => item.message_id === incoming.message_id ? incoming : item));
+      setMessages(current => current.some(item => item.message_id === incoming.message_id)
+        ? current.map(item => item.message_id === incoming.message_id ? incoming : item)
+        : [...current.filter(item => item.status !== "streaming"), incoming]);
     } else if (type === "assistant.status") {
       setAssistantStatus(String(event.label ?? "正在处理"));
     } else if (type === "action.proposed") {
@@ -1017,6 +1213,18 @@ export default function Home() {
       if (view in VIEW_LABELS && view !== "audit") setActiveView(view);
     } else if (type === "action.closed") {
       setRun(null);
+    } else if (type === "workspace.conflict") {
+      const latestArtifact = event.latest_artifact as WorkspaceArtifact;
+      if (latestArtifact?.kind) {
+        setWorkspaceConflict({
+          kind: latestArtifact.kind,
+          latestArtifact,
+          baseArtifact: workspaceEditBasesRef.current[latestArtifact.kind]
+            ?? artifactsRef.current[latestArtifact.kind]
+            ?? null,
+          conflictingFields: [],
+        });
+      }
     } else if (type === "error") {
       throw new Error(String(event.detail ?? "Agent 处理失败"));
     }
@@ -1040,7 +1248,11 @@ export default function Home() {
     }
   }
 
-  async function runAgent(text: string, silent = false) {
+  async function runAgent(
+    text: string,
+    silent = false,
+    contextArtifact: WorkspaceArtifact | undefined = activeArtifact,
+  ) {
     if (!threadId || busy) return;
     setBusy(true); setError(""); setMessage("");
     silentRequestRef.current = silent;
@@ -1048,9 +1260,18 @@ export default function Home() {
     if (!silent) setMessages(current => [...current, { message_id: `pending_${Date.now()}`, role: "user", content: text, status: "completed" }]);
     setAssistantStatus(silent ? "Agent 正在读取当前工作区" : "正在连接当前工作区");
     try {
+      const payload = contextArtifact
+        ? {
+            message: text,
+            active_view: activeView,
+            workspace_context: workspaceContextForAgent(contextArtifact),
+            workspace_artifact_id: contextArtifact.artifact_id,
+            workspace_revision: contextArtifact.revision,
+          }
+        : { message: text, active_view: activeView };
       const response = await fetch(`${API_BASE}/v1/threads/${threadId}/messages/stream`, {
         method: "POST", headers: REQUEST_HEADERS,
-        body: JSON.stringify({ message: text, active_view: activeView, workspace_context: activeArtifact?.content ?? {} }),
+        body: JSON.stringify(payload),
       });
       await consumeStream(response);
     } catch (reason) {
@@ -1070,34 +1291,130 @@ export default function Home() {
 
   function updateArtifact(patch: Record<string, unknown>) {
     if (!activeArtifact) return;
-    setArtifacts(current => ({ ...current, [activeArtifact.kind]: { ...activeArtifact, content: { ...activeArtifact.content, ...patch } } }));
+    setArtifacts(current => {
+      const currentArtifact = current[activeArtifact.kind];
+      if (!currentArtifact) return current;
+      if (!workspaceEditBasesRef.current[activeArtifact.kind]) {
+        workspaceEditBasesRef.current[activeArtifact.kind] = currentArtifact;
+      }
+      const next = {
+        ...current,
+        [activeArtifact.kind]: {
+          ...currentArtifact,
+          content: { ...currentArtifact.content, ...patch },
+        },
+      };
+      artifactsRef.current = next;
+      return next;
+    });
     setDirty(current => ({ ...current, [activeArtifact.kind]: true }));
   }
 
-  async function saveArtifact(kind: WorkspaceKind = activeArtifact?.kind as WorkspaceKind) {
+  async function saveArtifact(
+    kind: WorkspaceKind = activeArtifact?.kind as WorkspaceKind,
+  ): Promise<WorkspaceArtifact | null> {
     const artifact = artifacts[kind];
-    if (!artifact) return;
+    if (!artifact) return null;
     setBusy(true); setError("");
     try {
-      const saved = await request<WorkspaceArtifact>(`/v1/workspace/${kind}`, { method: "PUT", body: JSON.stringify({ title: artifact.title, content: artifact.content }) });
-      setArtifacts(current => ({ ...current, [kind]: saved }));
+      const saved = await request<WorkspaceArtifact>(`/v1/workspace/${kind}`, {
+        method: "PUT",
+        body: JSON.stringify({
+          title: artifact.title,
+          content: artifact.content,
+          expected_artifact_id: artifact.artifact_id,
+          expected_revision: artifact.revision,
+        }),
+      });
+      setArtifacts(current => {
+        const next = { ...current, [kind]: saved };
+        artifactsRef.current = next;
+        return next;
+      });
+      delete workspaceEditBasesRef.current[kind];
       setDirty(current => ({ ...current, [kind]: false }));
+      setWorkspaceConflict(current => current?.kind === kind ? null : current);
       setNotice(`${VIEW_LABELS[kind]}已保存`);
+      return saved;
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "保存失败");
+      const detail = reason instanceof Error ? reason.message : "保存失败";
+      setError(detail);
+      if (reason instanceof ApiError && reason.status === 409) {
+        try {
+          const workspace = await request<WorkspaceArtifact[]>("/v1/workspace");
+          const latestArtifact = workspace.find(item => item.kind === kind);
+          if (latestArtifact) {
+            setWorkspaceConflict({
+              kind,
+              latestArtifact,
+              baseArtifact: workspaceEditBasesRef.current[kind] ?? artifact,
+              conflictingFields: [],
+            });
+          }
+        } catch {
+          // Keep the local draft and original conflict message visible.
+        }
+      }
+      return null;
     } finally { setBusy(false); }
   }
 
   async function triggerWorkspaceAction(text: string) {
-    if (activeArtifact && dirty[activeArtifact.kind]) await saveArtifact(activeArtifact.kind);
-    await runAgent(text, true);
+    let contextArtifact = activeArtifact;
+    if (activeArtifact && dirty[activeArtifact.kind]) {
+      contextArtifact = await saveArtifact(activeArtifact.kind) ?? undefined;
+      if (!contextArtifact) return;
+    }
+    await runAgent(text, true, contextArtifact);
+  }
+
+  function resolveWorkspaceConflict(mode: "latest" | "reapply") {
+    if (!workspaceConflict) return;
+    const { kind, latestArtifact, baseArtifact } = workspaceConflict;
+    const draft = artifactsRef.current[kind];
+    if (mode === "reapply" && draft) {
+      const result = reapplyWorkspaceDraft(latestArtifact, draft, baseArtifact);
+      if (!result.artifact) {
+        setWorkspaceConflict(current => current ? {
+          ...current,
+          conflictingFields: result.conflictingFields,
+        } : current);
+        setError(`无法自动重新应用：${result.conflictingFields.join("、")}在两个版本中都发生了变化`);
+        return;
+      }
+      const nextArtifacts = { ...artifactsRef.current, [kind]: result.artifact };
+      artifactsRef.current = nextArtifacts;
+      const hasLocalChanges = JSON.stringify(result.artifact.content) !== JSON.stringify(latestArtifact.content);
+      if (hasLocalChanges) workspaceEditBasesRef.current[kind] = latestArtifact;
+      else delete workspaceEditBasesRef.current[kind];
+      setArtifacts(nextArtifacts);
+      setDirty(current => ({ ...current, [kind]: hasLocalChanges }));
+      setNotice(hasLocalChanges
+        ? "已把仅在当前草稿中修改的字段重新应用到最新版本，请复核后保存"
+        : "已载入服务端最新版本；当前没有需要重新应用的本地修改");
+    } else {
+      const nextArtifacts = { ...artifactsRef.current, [kind]: latestArtifact };
+      artifactsRef.current = nextArtifacts;
+      delete workspaceEditBasesRef.current[kind];
+      setArtifacts(nextArtifacts);
+      setDirty(current => ({ ...current, [kind]: false }));
+      setNotice("已载入服务端最新版本");
+    }
+    setWorkspaceConflict(null);
+    setError("");
   }
 
   async function startNewMail() {
     setBusy(true); setError("");
     try {
       const mail = await request<WorkspaceArtifact>("/v1/workspace/mail/new", { method: "POST" });
-      setArtifacts(current => ({ ...current, mail }));
+      setArtifacts(current => {
+        const next = { ...current, mail };
+        artifactsRef.current = next;
+        return next;
+      });
+      delete workspaceEditBasesRef.current.mail;
+      setWorkspaceConflict(current => current?.kind === "mail" ? null : current);
       setDirty(current => ({ ...current, mail: false }));
       setRun(null);
       setActiveView("mail");
@@ -1108,7 +1425,8 @@ export default function Home() {
   }
 
   async function continueAfterAction(snapshot: RunSnapshot) {
-    setRun(null);
+    setBusy(true);
+    setError("");
     silentRequestRef.current = false;
     setAssistantStatus("Agent 正在读取执行结果");
     try {
@@ -1167,6 +1485,7 @@ export default function Home() {
   const currentDirty = activeArtifact ? Boolean(dirty[activeArtifact.kind]) : false;
   const viewProps = activeArtifact ? { artifact: activeArtifact, dirty: currentDirty, onChange: updateArtifact, onSave: () => void saveArtifact() } : null;
   const actionGateOpen = Boolean(run && !["EXECUTED", "DENIED", "FAILED"].includes(run.status));
+  const actionResultPending = Boolean(run && ["EXECUTED", "DENIED", "FAILED"].includes(run.status));
 
   function openTaskArtifact(artifactVersionId: string) {
     setSelectedTaskArtifactVersionId(artifactVersionId);
@@ -1316,11 +1635,11 @@ export default function Home() {
           <div className="chat-identity"><div className="avatar">OA</div><div><strong>Office Agent</strong><span className={`id-status is-${taskTransportState}`}>{AGENT_CONNECTION_LABELS[taskTransportState]}</span></div></div>
           <ActiveTaskStrip task={task} syncState={taskSyncState} blocked={actionGateOpen} onOpenTask={openTaskWorkspace} onRetry={() => void (pendingTaskMutation ? retryPendingTaskMutation() : retryTaskConnection())}/>
           <div className="conversation" ref={conversationRef} onScroll={handleConversationScroll}>
-            {messages.length === 0 && <article className="message assistant-message"><div className="msg-avatar"><IconSparkles aria-hidden="true" /></div><div className="message-body"><strong>Office Agent</strong><p>我会读取你正在编辑的工作区，并直接协助修改。涉及发送、写入或外部影响时，我会先请求确认。</p><div className="suggestion-chips"><button type="button" onClick={() => void runAgent("帮我完善当前工作区中的内容")}>完善当前内容</button><button type="button" onClick={() => void runAgent("检查当前工作区有没有需要我注意的问题")}>检查潜在问题</button><button type="button" onClick={() => void runAgent("总结一下当前工作区的状态")}>总结当前状态</button></div></div></article>}
+            {messages.length === 0 && <article className="message assistant-message"><div className="msg-avatar"><IconSparkles aria-hidden="true" /></div><div className="message-body"><strong>Office Agent</strong><p>我会读取你正在编辑的工作区，并直接协助修改。涉及发送、写入或外部影响时，我会先请求确认。</p><div className="suggestion-chips">{activeView === "quote" ? <><button type="button" onClick={() => void runAgent("核算当前报价的综合折后比例")}>核算综合折后比例</button><button type="button" onClick={() => void runAgent("检查当前报价的最低折后比例")}>检查最低折后比例</button><button type="button" onClick={() => void runAgent("说明当前报价的数据来源")}>说明数据来源</button></> : <><button type="button" onClick={() => void runAgent("帮我完善当前工作区中的内容")}>完善当前内容</button><button type="button" onClick={() => void runAgent("检查当前工作区有没有需要我注意的问题")}>检查潜在问题</button><button type="button" onClick={() => void runAgent("总结一下当前工作区的状态")}>总结当前状态</button></>}</div></div></article>}
             {messages.map(item => <article className={`message ${item.role === "user" ? "user-message" : "assistant-message"} message-enter`} key={item.message_id}>{item.role === "assistant" && <div className="msg-avatar"><IconSparkles aria-hidden="true" /></div>}<div className="message-body">{item.role === "assistant" && <strong>Office Agent</strong>}<MessageContent text={item.content} streaming={item.status === "streaming"}/></div></article>)}
             {assistantStatus && <article className="message assistant-message message-enter"><div className="msg-avatar"><IconSparkles aria-hidden="true" /></div><div className="message-body"><div className="typing-bubble"><span/><span/><span/><em>{assistantStatus}</em></div></div></article>}
           </div>
-          <div className="chat-footer">{(error || taskError) && <div className="error-banner" role="alert" aria-live="assertive">{taskError || error}</div>}<form className="chat-composer glass-card" onSubmit={sendMessage}><textarea aria-label="输入办公任务" value={message} onChange={event => setMessage(event.target.value)} onKeyDown={handleComposerKeyDown} placeholder={`让 Agent 协助当前${VIEW_LABELS[activeView]}…`}/><button aria-label="发送消息" disabled={busy || !message.trim() || !threadId}>{busy ? <span className="send-spinner"/> : <IconArrowUp aria-hidden="true" />}</button></form><small>Agent 可读取当前未保存内容 · Enter 发送</small></div>
+          <div className="chat-footer">{actionResultPending && run && <div className="action-result-retry" role="status"><span>动作已经结束，Agent 的结果说明尚未确认送达。</span><button type="button" disabled={busy} onClick={() => void continueAfterAction(run)}>重新读取结果</button></div>}{workspaceConflict?.kind === activeView && <WorkspaceConflictBanner conflict={workspaceConflict} onResolve={resolveWorkspaceConflict}/>} {(error || taskError) && <div className="error-banner" role="alert" aria-live="assertive">{taskError || error}</div>}<form className="chat-composer glass-card" onSubmit={sendMessage}><textarea aria-label="输入办公任务" value={message} onChange={event => setMessage(event.target.value)} onKeyDown={handleComposerKeyDown} placeholder={`让 Agent 协助当前${VIEW_LABELS[activeView]}…`}/><button aria-label="发送消息" disabled={busy || !message.trim() || !threadId}>{busy ? <span className="send-spinner"/> : <IconArrowUp aria-hidden="true" />}</button></form><small>Agent 可读取当前未保存内容 · Enter 发送</small></div>
           {run && actionGateOpen && (
             <ApprovalModal run={run} evidenceCatalog={evidenceCatalog} evidence={evidence} busy={busy} onEvidence={(key, value) => setEvidence(current => ({ ...current, [key]: value }))} onSubmitEvidence={submitEvidence} onDecide={decide} onAuthorize={authorize}/>
           )}

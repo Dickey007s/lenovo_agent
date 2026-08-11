@@ -29,7 +29,9 @@ class MockEvidenceResolver:
                 value = value or action.recipients[0]
             elif requirement == "attachment_hash" and action.resources:
                 value = value or canonical_hash({"resources": action.resources})
-            elif requirement == "dlp_result" and action.resources:
+            elif requirement == "dlp_result" and (
+                action.resources or action.parameters.get("body")
+            ):
                 # P0 adapter simulates invoking the DLP service. The user never
                 # types a scan result or an attachment hash.
                 value = "mock:dlp/passed"
