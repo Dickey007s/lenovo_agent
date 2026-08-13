@@ -74,9 +74,10 @@ V0.1 重点验证三件事：
 - 完成态直接列出 `last_commit` 支持的三项可复核成果，并明确客户回复仍为草稿、未发送；不再用“没有待决策项”代表完成。每个 Branch head 可在“成果”中查看当前版本、验证、冲突、结构化内容、来源、lineage 与 Commit 证据；默认 mutation 后跟随新 head，用户主动查看旧版本时显示明确历史 banner 和返回动作。
 - “执行记录”保留原手工待办编辑流程。固定 Demo 1 的四个已知 `source_ref` 投影为“演示数据 · 客户往来邮件 / CRM 正式收入记录 / 收入预测表 / 客户项目周报（版本）”；原始 `fixture:` 标识和未知来源值不进入普通业务 DOM，未知值显示隐藏占位。服务端仍保存原值用于校验与审计；这只是前端第二道防线，不代表服务端数据删除，也不是通用字段安全保证。
 - Task SSE 只用于发现新事件并触发 Snapshot 对账；同步标记只表示客户端传输状态，不代表后台仍在执行。未知 mutation 会在当前标签页保存原 key、intent 与预期版本。浏览器 E2E 已覆盖 start 请求发送前 abort、reload、同 key 对账和无重复工件；PR 5 的 system Edge 运行还覆盖同页 API 进程停止、控制禁用、顶部与 Task 面板一致显示恢复中，以及新进程启动后的 Snapshot 对账。尚未覆盖请求已到服务端但响应丢失或断线期间产生新事件的 `after` 回放。
-- Action Gate 打开时保留后台任务摘要，但 Task 跳转与 Tasks 中的决定控制不可用。Gate 使用独立网格行，收起后把空间归还给对话。Action Gate 仍沿用独立 `RunService → Risk/Policy/Evidence/Approval/Permit → Gateway` 链路；Task Artifact 尚未绑定 Action 版本和失效规则。
+- 最终提交且验证通过的客户回复草稿现在可以进入 Demo 3 治理链。完成态只提供“准备发送客户回复”：服务端把 Task、Commit、ArtifactVersion、内容摘要和 VerificationReport 绑定到 `ProposedActionSpec`，确认卡展示版本、L4 原因、外部目标和为什么必须由人确认；批准后才签发一次性 Permit 并调用 Email Simulator。绑定变化时旧 Action 失效，拒绝或动作失败不会回滚已完成的 Task Commit。
+- Action Gate 打开时保留后台任务摘要，但 Task 跳转与 Tasks 中的决定控制不可用。Gate 使用右侧完整独立网格行，收起后把空间归还给对话。当前 Task 派生动作只支持固定客户 A 的最终回复草稿与演示地址，不是通用 Artifact Action registry。
 
-这仍是固定演示数据的同步纵切，不是通用后台调度器或真实 Connector。`start` 在一次 mutation 中物化阶段 Trace，浏览器在事务提交后才看到结果；人工编辑后产生新版本、历史轮次选择、预算/截止时间拒绝后的完整恢复 UI、单分支失败、服务端已提交但响应丢失、断线期间事件回放、数据库进程重启、已有库迁移、多实例通知和 Task Artifact → Action 失效绑定仍待验证。Task 恢复也不等于 Conversation 恢复，Thread/Message 仍在 API 内存中。自动化通过只证明预设 DOM、动作调用和服务端事实一致，不能证明目标用户已经理解这些文案和流程。证据见 PR 3 Runtime、PR 4 浏览器与 [`PR 5 PostgreSQL-backed API 重启证据`](docs/evidence/DEMO1-PR5-POSTGRES-BACKED-API-RESTART-EVIDENCE.md)。
+这仍是固定演示数据的同步纵切，不是通用后台调度器或真实 Connector。`start` 在一次 mutation 中物化阶段 Trace，浏览器在事务提交后才看到结果；人工编辑后产生新版本、历史轮次选择、预算/截止时间拒绝后的完整恢复 UI、单分支失败、服务端已提交但响应丢失、断线期间事件回放、数据库进程重启、已有库迁移、多实例通知和 Task 派生 Run 的 PostgreSQL 恢复仍待验证。Task 恢复也不等于 Conversation 恢复，Thread/Message 仍在 API 内存中。自动化通过只证明预设 DOM、动作调用和服务端事实一致，不能证明目标用户已经理解这些文案和流程。跨 Demo 纵切证据见 [`DR-0007`](docs/decisions/DR-0007-task-artifact-action-bridge.md) 与 [`Task Artifact → Action Evidence`](docs/evidence/DEMO1-DEMO3-TASK-ARTIFACT-ACTION-BRIDGE-EVIDENCE-20260813.md)。
 
 ## 技术架构
 
@@ -132,6 +133,8 @@ flowchart LR
 - [Task Director 交互证据](docs/evidence/DEMO1-PR6-TASK-DIRECTOR-INTERACTION-EVIDENCE.md)
 - [可理解性验收与工程代理证据](docs/evidence/DEMO1-PR6-USABILITY-COMPREHENSION-AUDIT-20260811.md)
 - [来源与新一轮语义修订证据](docs/evidence/DEMO1-ROUND-AND-SOURCE-CLARITY-EVIDENCE-20260811.md)
+- [Demo 1 已验证工件进入 Demo 3 动作治理决策](docs/decisions/DR-0007-task-artifact-action-bridge.md)
+- [Demo 1 → Demo 3 Task Artifact 动作桥接证据](docs/evidence/DEMO1-DEMO3-TASK-ARTIFACT-ACTION-BRIDGE-EVIDENCE-20260813.md)
 - [来源台账](docs/decisions/SOURCE_REGISTER.md)
 
 ## 目录结构
@@ -219,6 +222,8 @@ pnpm --dir apps/web build
 V0.1 定稿基线和 Demo 1 各 PR 的实际验证结果记录在 [`DR-0002`](docs/decisions/DR-0002-bounded-durable-office-loop.md) 及对应 evidence。PR 3 封口验证为全量 Python `56 passed`；PR 4 的 system Edge E2E 为 `2 passed (18.4s)`。PR 5 与前端视觉刷新/可重复演示合并后的封口回归为：PostgreSQL 16.14 opt-in 系统测试 `1 passed (9.78s)`，system Edge suite `3 passed (17.0s)`，完整 Python `58 passed, 1 skipped (2.00s)`。PR 6 原 Task Director 工程封口为浏览器 `6 passed (34.5s)`。收到“看不懂系统要做什么”的 Stakeholder 反馈后，本轮改以业务任务重排首屏、单次开始、决策后果和完成成果；该轮浏览器为 `12 passed (43.7s)`，Python 为 `58 passed, 1 skipped (2.24s)`，Ruff、前端 lint 和生产构建通过，并保存 `1181 x 900` 三状态与 `390 x 844` CSS 视口截图。随后针对来源与“再次演示”歧义的修订完成浏览器 `12 passed (44.5s)`，覆盖非 Tasks 只显示后台摘要、已知来源标为演示数据且原始 ID 不入 DOM，以及“开始新一轮汇报”创建并启动独立 Task、旧 Task 保留；另保存 `1440 x 900` Mail 摘要截图。新增回归只证明预设信息、动作和服务端事实一致，不证明真实用户已经理解。故 [`DR-0005`](docs/decisions/DR-0005-task-director-interaction.md) 保持 `Draft`，至少 5 人无引导形成性测试尚未运行。固定 Demo 1 Task 测试不调用真实 LLM；独立 LLM smoke 只验证 `deepseek-v4-pro` 通用问答与 Conversation SSE 连通性。
 
 报价错误修复的来源、决策、前台—后端事实链和证据分别记录在 [`USER-FEEDBACK-20260811-06`](docs/sources/USER-FEEDBACK-20260811-06-quote-calculation-grounding.md)、[`DR-0006`](docs/decisions/DR-0006-deterministic-quote-calculation.md) 和 [`QUOTE-WORKSPACE-DETERMINISTIC-CALCULATION-EVIDENCE-20260811`](docs/evidence/QUOTE-WORKSPACE-DETERMINISTIC-CALCULATION-EVIDENCE-20260811.md)。实现提交为 `2f9866f + fe865bd + e2c4b56`；全量 Python 为 `108 passed, 1 skipped (2.62s)`，报价/Conversation 聚焦为 `54 passed (1.72s)`，完整浏览器为 `27 passed (1.1m)`，其中报价浏览器为 `15 passed (23.6s)`，Ruff、前端 lint 与生产构建通过。`DR-0006` 因此仅在固定演示报价、当前公式、当前协议和被测前台恢复范围内为 `Verified`，不是生产级报价引擎或用户可用性结论。
+
+2026-08-13 的跨 Demo 迭代把最终且验证通过的客户回复草稿接入 Demo 3 治理链。实现提交 `4f500c6` 的封口结果为 Python `112 passed, 1 skipped (4.11s)`、完整 system Edge `29 passed (1.4m)`、Demo 1 浏览器 `13 passed (1.0m)`，Ruff、前端 lint、生产构建与治理门槛通过。浏览器覆盖 L4 Gate、绑定版本、批准后 Permit + Email Simulator、拒绝后 Task Commit 不变以及确定性结果说明；这是固定 Fixture 的工程证据，不证明真实发送或用户已经理解。决策和证据见 [`DR-0007`](docs/decisions/DR-0007-task-artifact-action-bridge.md) 与 [`TASK-ARTIFACT-ACTION-BRIDGE-20260813`](docs/evidence/DEMO1-DEMO3-TASK-ARTIFACT-ACTION-BRIDGE-EVIDENCE-20260813.md)。
 
 ## 数据、身份与安全边界
 

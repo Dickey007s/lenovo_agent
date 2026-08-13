@@ -4,7 +4,7 @@
 
 最终原始参考集及“下一步重点”逐条覆盖矩阵见 [`docs/final-reference/`](final-reference/README.md)。
 
-当前实现事实仍以源码、`README.md`、`ARCHITECTURE.md`、`WORKSPACE_AND_STREAMING.md` 和 `GOVERNANCE_AND_ACTIONS.md` 为准。本文出现的 Task Contract、长期任务分支、跨端控制、动态 Worker、Shared Artifact Workspace 和 Conflict Resolver 均为尚未完成的目标能力。
+当前实现事实仍以源码、`README.md`、`ARCHITECTURE.md`、`WORKSPACE_AND_STREAMING.md` 和 `GOVERNANCE_AND_ACTIONS.md` 为准。固定 Demo 1 已落地 Task Contract、服务端 Task/Branch Snapshot、只读 Artifact Workspace、局部 Conflict、控制状态机、Commit 和顺序 API 进程恢复；DR-0007 又落地了已验证客户回复到治理 Run 的窄桥。真正后台持续的 Loop、跨端身份、动态 Worker、通用 Shared Artifact Workspace/Conflict Resolver 和真实 Connector 仍是目标能力。
 
 ## 1. 需要解决的问题
 
@@ -37,14 +37,14 @@
 
 | 组件 | 目标职责 | 当前仓库基础 | 主要缺口 |
 | --- | --- | --- | --- |
-| Task Contract | 定义 Task ID、目标、边界、交付物、来源范围和完成条件 | `ActionCandidate`、`ProposedActionSpec` 可表达单次动作 | 缺少长期任务契约、交付物清单和完成条件协议 |
-| Durable Task State | 保存事件、分支、版本、控制事件和中间工件 | Run、Workspace、Audit 与 LangGraph checkpoint 可持久化 | 缺少统一长期任务/分支状态；Thread/Message 仍在内存 |
+| Task Contract | 定义 Task ID、目标、边界、交付物、来源范围和完成条件 | 固定 Demo 1 已有严格 Task Contract、3 项 Deliverable 与完成条件 | 缺少通用契约模板、修改/取消和生产权限语义 |
+| Durable Task State | 保存事件、分支、版本、控制事件和中间工件 | 固定 Task Snapshot/Event/ArtifactVersion 已支持 PostgreSQL 顺序 API 进程恢复；Run、Workspace、Audit 与 checkpoint 可持久化 | 缺少通用长期执行状态、数据库故障/多实例证据；Thread/Message 仍在内存 |
 | Context State Manager | 按步骤、权限和版本组装最小上下文投影 | `trusted_context`、`workspace_context` 和来源引用 | 缺少按步骤的上下文投影、版本污染控制和预算策略 |
 | Execution Loop | Observe → Plan → Act → Verify → Commit | LangGraph 已用于治理 Gate | 尚无可后台持续运行的长期任务循环 |
 | Capability Runtime | 统一模型、工具、Connector、沙箱和临时 Worker 调度 | Tool Gateway 和 5 个 Simulator capability | 缺少真实 Connector、通用沙箱、资源预算和 Worker 生命周期 |
-| Evidence & Quality Verifier | 校验来源、一致性、覆盖度、质量与工件冲突 | Mock Evidence Resolver 和确定性证据目录 | 尚无跨工件质量验证、冲突解析和重新验证 |
-| Control Policy | 决定继续、暂停分支、重规划、降级、接管或停止 | Risk/Policy/ControlPlan 已覆盖业务动作 | 缺少任务预算、停止条件和分支级控制事件 |
-| Trace & Checkpoints | 记录状态提交、工具、证据、版本、控制和恢复点 | Audit SSE、Trace API、Postgres checkpoint | 缺少长期任务统一 Trace、工件版本和恢复 UI |
+| Evidence & Quality Verifier | 校验来源、一致性、覆盖度、质量与工件冲突 | 固定 Fixture 已有 VerificationReport、局部 Conflict 与重验证；业务动作有 Evidence Resolver | 缺少通用跨工件质量规则、真实来源解析和可扩展冲突策略 |
+| Control Policy | 决定继续、暂停分支、重规划、降级、接管或停止 | Risk/Policy/ControlPlan 已覆盖业务动作；固定 Task 有 Steer/Pause/Take over 状态机与预算门 | 缺少 Steer 实际重规划、通用停止/降级和跨分支调度 |
+| Trace & Checkpoints | 记录状态提交、工具、证据、版本、控制和恢复点 | TaskEvent/ArtifactVersion/Commit、Audit SSE、Trace API、Postgres checkpoint | 缺少中间阶段可见 checkpoint、统一恢复 UI 和跨域 Trace 视图 |
 
 这张表是实施边界，不是完成度宣传。扩展时应复用当前成熟的动作治理链路，而不是另建一套可绕过 RunService 的授权系统。
 
@@ -96,7 +96,7 @@ Worker 使用隔离上下文和最小权限；事实、来源、负责人、状�
 
 同一 Task ID 持续推进经营分析、风险页和回复草稿。Verify 发现某个事实口径冲突时，只暂停受影响分支，其他分支继续生成可核查工件。用户可跨端发出 Steer、Pause branch 或 Take over 控制事件；最终交付包含来源、版本、验证结果和 Trace。
 
-这不是当前 V0.1 的跨端能力。实现前必须完成 Task Contract、分支状态、控制事件、幂等恢复和设备身份设计。
+当前 V0.1 已在固定 Fixture 中实现 Task Contract、分支状态、控制事件、工件版本、Commit 和有边界的幂等恢复，但 start 仍是一次同步 mutation，Steer 不会立即重规划，也没有真实跨端身份或后台 Worker。它是目标 Demo 的纵切，不是完整跨端持续运行能力。
 
 ### Demo 2：智能工作驾驶舱
 
@@ -112,6 +112,8 @@ Demo 3 复用当前工作区、非模态确认卡和确定性治理链。目标�
 - L5 只由受限 capability、受限执行或凭据公开等硬条件触发；
 - Risk、Policy、Evidence、Approval、Permit 和执行结果全部由服务端确定性逻辑产生；
 - 当前执行结果仍全部来自 Simulator。
+
+DR-0007 已验证第一条跨 Demo 连接：Demo 1 的 `committed + passed` 客户回复可带 Task/Commit/ArtifactVersion/Verification 绑定进入 Demo 3 `email.send` Gate，并在治理门前重校验。它证明“已核对成果可以作为受控动作输入”，但只支持固定演示地址和 Simulator，不代表通用任务成果或真实企业动作已经接通。
 
 演示稿中的 L0-L5 视觉阶梯是交互叙事，不是新的规范性评分实现。任何映射变更都必须同步 Pydantic 协议、RunService、前端类型、文档和回归测试。
 
@@ -167,13 +169,13 @@ Demo 3 复用当前工作区、非模态确认卡和确定性治理链。目标�
 
 ## 10. 实施顺序
 
-Demo 1 的实施决策、场景、协议和前台事实映射已经固定在 [`DR-0002`](decisions/DR-0002-bounded-durable-office-loop.md)、[`SCENARIO-001`](scenarios/SCENARIO-001-customer-a-durable-report.md)、[`TASK_RUNTIME_PROTOCOL.md`](contracts/TASK_RUNTIME_PROTOCOL.md) 和 [`UI_SERVER_FACT_MATRIX.md`](contracts/UI_SERVER_FACT_MATRIX.md)。在运行证据产生前，这些材料保持 `Ready` 而不是当前能力。
+Demo 1 的实施决策、场景、协议和前台事实映射已经固定在 [`DR-0002`](decisions/DR-0002-bounded-durable-office-loop.md)、[`SCENARIO-001`](scenarios/SCENARIO-001-customer-a-durable-report.md)、[`TASK_RUNTIME_PROTOCOL.md`](contracts/TASK_RUNTIME_PROTOCOL.md) 和 [`UI_SERVER_FACT_MATRIX.md`](contracts/UI_SERVER_FACT_MATRIX.md)。其中固定纵切已有分阶段运行证据；交互是否真正提升理解仍由 `DR-0005` 以 `Draft` 管理。Demo 1 到 Demo 3 的窄桥由 [`DR-0007`](decisions/DR-0007-task-artifact-action-bridge.md) 单独记录，不把一条已验证路径外推为整个目标架构完成。
 
 1. 定义 Task Contract、Task/Branch State、Artifact Version 和 Control Event 协议。
 2. 在现有 PostgreSQL/Checkpoint 基础上实现长期任务持久化和幂等恢复。
 3. 建立单任务 Observe/Plan/Act/Verify/Commit 循环，不先引入 Swarm。
 4. 接入任务级预算、停止、Steer、Pause branch 和 Take over，并补审计测试。
-5. 实现 Shared Artifact Workspace 与独立 Verifier/Conflict Resolver。
+5. 实现 Shared Artifact Workspace 与独立 Verifier/Conflict Resolver；固定只读版本和一条 Task Artifact/Action 绑定已落地，下一步扩展前仍需通用契约与用户研究。
 6. 用离线基准验证 Admission 后，再引入动态 Worker 和 Control Plane。
 7. 最后扩展前端驾驶舱、分支控制和跨端体验，并保持当前动作治理不变量。
 

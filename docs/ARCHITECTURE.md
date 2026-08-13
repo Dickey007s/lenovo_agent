@@ -86,7 +86,7 @@ flowchart TB
 
 前端不拥有风险决策、审批状态或 Permit；它只渲染服务端 Snapshot 并提交用户选择。
 
-Action Gate 打开时，后台任务摘要保留，Gate 占用独立网格行；Tasks 决策区退出交互，任务跳转、创建、重连和立即对账均被禁用。Gate 收起后把空间归还给对话。这样避免任务控制与副作用确认同时抢占用户决策，但目前只是交互互斥：Task Artifact 尚未绑定到 ActionCandidate/Run，Task Artifact 改变也尚不会自动触发现有 Action 失效。
+Action Gate 打开时，后台任务摘要保留，Gate 占用独立网格行；Tasks 决策区退出交互，任务跳转、创建、重连和立即对账均被禁用。Gate 收起后把空间归还给对话。这样避免任务控制与副作用确认同时抢占用户决策。`DR-0007` 又为固定客户回复补上一条窄绑定：只有 `TaskCommit` 中已通过验证的当前 `reply_draft` 才能准备 `email.send` Run，Gate 展示绑定成果版本并明确“准备动作不等于发送”；通用 Task Artifact 动作、附件和真实 Connector 仍未实现。
 
 ### 2.2 应用层
 
@@ -95,8 +95,8 @@ Action Gate 打开时，后台任务摘要保留，Gate 占用独立网格行；
 | FastAPI Routes | `services/api/app/api/routes.py` | 身份头解析、REST/SSE 接口、错误映射 |
 | ConversationService | `services/api/app/application/conversations.py` | Thread、受信上下文、通识路由、工作区合并、SSE、动作与对话闭环 |
 | Quote Calculator | `services/api/app/application/quote_calculator.py` | 报价字段所有权合并、Decimal 逐行核算、最低折后比例检查、来源/核算确定性回答 |
-| RunService | `services/api/app/application/runs.py` | Run 生命周期、重评估、审批、授权、执行、持久化、审计 |
-| TaskService | `services/api/app/application/tasks.py` | 创建和恢复 TaskSnapshot、固定 Demo 1 start、Verifier/Conflict/Commit、任务控制、Owner scope、mutation 幂等与事件轮询 |
+| RunService | `services/api/app/application/runs.py` | Run 生命周期、重评估、审批、授权、执行、持久化、审计，以及 Task Artifact binding 的创建幂等与门前重校验 |
+| TaskService | `services/api/app/application/tasks.py` | 创建和恢复 TaskSnapshot、固定 Demo 1 start、Verifier/Conflict/Commit、任务控制、Owner scope、mutation 幂等、事件轮询，以及已提交工件的受控读取与动作绑定校验 |
 | LLM Adapter | `services/api/app/application/llm.py` | 对话计划、动作抽取、执行后自然语言回应、Schema 修复 |
 | Storage | `services/api/app/application/storage.py` | Run 与 Workspace 的内存/PostgreSQL 实现 |
 | Task Storage | `services/api/app/application/task_storage.py` | Task Snapshot、TaskEvent 与 ArtifactVersion 原子 mutation 的内存/PostgreSQL 实现 |
@@ -268,6 +268,38 @@ PR 5 增加独立 opt-in system test：每次创建随机 PostgreSQL 16 数据�
 
 后续来源与新一轮语义修订的完整浏览器 E2E 为 `12 passed (44.5s)`，并保存 `1440 x 900` Mail 后台任务摘要截图。证据见 [`DEMO1-ROUND-AND-SOURCE-CLARITY-EVIDENCE-20260811.md`](evidence/DEMO1-ROUND-AND-SOURCE-CLARITY-EVIDENCE-20260811.md)。自动化只证明指定 DOM、create/start 调用与 Snapshot 列表一致，不证明用户已经理解，也不补上历史轮次选择器。
 
+### 3.4 Demo 1 成果到 Demo 3 治理动作的窄桥（DR-0007）
+
+```mermaid
+sequenceDiagram
+    participant U as 用户
+    participant W as Task 成果区
+    participant T as TaskService
+    participant R as RunService
+    participant G as Risk/Policy/Evidence
+    participant A as Action Gate
+    participant P as Permit/Gateway
+
+    U->>W: 准备发送已核对客户回复
+    W->>T: 读取 committed Task 与当前 ArtifactVersion
+    T->>T: 校验 Commit 引用、passed Verification 与内容摘要
+    T-->>R: TaskArtifactBinding + 确定性邮件候选
+    R->>R: 幂等创建 Run，绑定 Task/Commit/Artifact/Report
+    R->>G: 计算 L4 风险、策略和证据
+    G-->>A: 等待人工批准
+    A-->>U: 展示发送目标、绑定成果和确认后果
+    U->>R: 批准或拒绝
+    R->>T: 再次校验全部绑定事实
+    alt 绑定仍有效且批准
+        R->>P: Authorize + 一次性 Permit
+        P-->>A: Simulator 结果
+    else 拒绝或绑定变化
+        R-->>A: 终止或失效，不修改 Task Commit
+    end
+```
+
+准备接口不调用 LLM 生成目标或正文，当前目标固定为演示地址；`TaskArtifactBinding` 将 Task 版本、Commit 身份与状态指纹、ArtifactVersion 内容摘要、Deliverable 和 VerificationReport 一起进入 `ProposedActionSpec`。RunService 在证据、审批、授权和执行推进前重新调用 TaskService 校验，因此 Action Gate 不能把已变化的 Task 成果当成原批准对象。绑定失败、用户拒绝或 Simulator 失败都只改变 Run，不回滚已验证的 Task。这条桥只证明一个固定 `reply_draft -> email.send` 纵切，不证明通用工件动作编排或真实邮件发送。验证见 [`DR-0007`](decisions/DR-0007-task-artifact-action-bridge.md) 与对应 [`Evidence`](evidence/DEMO1-DEMO3-TASK-ARTIFACT-ACTION-BRIDGE-EVIDENCE-20260813.md)。
+
 ## 4. 信任边界
 
 ### 4.1 可由 LLM 产生
@@ -285,6 +317,7 @@ PR 5 增加独立 opt-in system test：每次创建随机 PostgreSQL 16 数据�
 - 策略命中、capability verdict、证据要求、审批角色。
 - Evidence 的状态、来源、摘要和检查时间。
 - Action/参数哈希、Permit、执行结果和审计事件。
+- Task Artifact 与治理动作之间的 `TaskArtifactBinding`、创建幂等摘要和每次推进前的绑定重校验结果。
 - Task/Branch 状态、ArtifactVersion 身份与摘要、VerificationReport、ConflictRecord、ControlEvent、TaskCommit 和 TaskEvent sequence。
 - 报价的规范化行小计、标准总价、折后总价、优惠金额、综合折后比例、优惠率、最低折后比例检查，以及保存后的 `needs_review` / `requires_recheck`。
 - WorkspaceArtifact `revision`、可执行 Action 的 Artifact 绑定字段，以及服务端保留/生成的 Artifact 来源。

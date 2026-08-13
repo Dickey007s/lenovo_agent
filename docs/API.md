@@ -1,6 +1,6 @@
 # HTTP API 与 SSE 事件
 
-本文记录 V0.1、Demo 1 与 `DR-0006` 报价核算实际使用的 FastAPI 接口。运行后以 <http://localhost:8010/docs> 的 OpenAPI 页面和 `services/api/app/api/routes.py` 为最终事实来源。Demo 1 没有增加工件专用 API；交付物工作区读取现有 `TaskSnapshot`。
+本文记录 V0.1、Demo 1、`DR-0006` 报价核算与 `DR-0007` Task 工件动作桥实际使用的 FastAPI 接口。运行后以 <http://localhost:8010/docs> 的 OpenAPI 页面和 `services/api/app/api/routes.py` 为最终事实来源。交付物工作区仍读取现有 `TaskSnapshot`；新增的窄动作接口只把已提交、已通过验证的客户回复草稿准备为治理 Run，不提供通用 Task 工件 CRUD。
 
 ## 1. 约定
 
@@ -10,6 +10,7 @@
 - 身份头：`X-User-Id`，默认 `demo_user`。
 - 角色头：`X-User-Roles`，英文逗号分隔，默认 `current_user`；前端 Demo 使用 `current_user,sales_manager`。
 - Task 创建幂等头：`Idempotency-Key`，可选，长度 8-160。它作用于当前 Owner 的 `POST /tasks` 或 `POST /demo1/tasks`；后者用不同 key 区分独立汇报轮次。该 header 不会授权读取其他用户任务。
+- Task 工件动作幂等头：`POST /tasks/{task_id}/artifacts/{artifact_version_id}/actions/email-send` 必须带 `Idempotency-Key`，长度 8-160。相同用户、相同 key 与完全相同的动作事实返回同一 Run；相同 key 对应不同工件事实时返回 409。
 - Task mutation：`start` 和 `controls` 在 JSON body 中携带 `expected_task_version` 与 `idempotency_key`。版本过期或同一 key 被用于不同命令时返回 409。
 - Workspace revision token：显式提交 `workspace_context` 时同时提交 `workspace_artifact_id + workspace_revision`；保存 `PUT /workspace/{kind}` 时提交 `expected_artifact_id + expected_revision`。这两个字段是当前活动 Artifact 的乐观并发 token，不是权限凭据。
 
@@ -51,6 +52,7 @@ $headers = @{
 | GET | `/tasks/{task_id}` | 读取当前 Owner 的单个 TaskSnapshot |
 | POST | `/tasks/{task_id}/start` | 启动固定 Demo 1 Fixture 状态转换 |
 | POST | `/tasks/{task_id}/controls` | 提交任务或分支控制命令 |
+| POST | `/tasks/{task_id}/artifacts/{artifact_version_id}/actions/email-send` | 将已提交、已通过验证的客户回复草稿准备为绑定版本的治理 Run；不会直接发送 |
 | GET | `/tasks/{task_id}/events?after={sequence}` | 回放并订阅该 Task 的有序事件 SSE |
 
 Task ID、Owner、契约版本、任务状态、分支状态、事件序号和时间均由服务端生成。客户端不能在 `TaskContractDraft` 中提交这些字段；多余字段返回 422。其他 Owner 的 Task 不会通过列表暴露，按 ID 读取或订阅时统一返回 404。
@@ -268,7 +270,31 @@ PR 4 交付物工作区直接使用创建、读取、start、control 和 SSE 对
 
 该工作区当前只读，没有创建、编辑或覆盖 ArtifactVersion 的路由。前端只为固定 Fixture 的 `analysis/risk_brief/reply_draft` 提供字段 allowlist，未知 kind/字段默认隐藏；Conflict Card 与 Artifact Workspace 复用同一 `source_ref` 投影，四个已知值显示为“演示数据 · 业务来源（版本）”。服务端响应仍包含原始 `source_refs` 供控制校验和审计，但普通业务 DOM 使用与原值无关的序号 key，不接收 `fixture:` 原值；其他值统一显示隐藏占位，URL、路径和凭据形态已有负例回归。这是前端第二道投影，不能替代服务端脱敏、授权或未来通用的字段可见性 Schema。即使字段名在 allowlist 中，其任意文本值仍需要服务端 display projection 承担通用安全保证。
 
-### 3.5 直接创建治理 Run
+### 3.5 从已验证 Task 工件准备治理 Run
+
+```powershell
+$prepareHeaders = $headers.Clone()
+$prepareHeaders["Idempotency-Key"] = "task-action-$([guid]::NewGuid())"
+$body = @{ thread_id = $thread.thread_id } | ConvertTo-Json
+
+$run = Invoke-RestMethod -Method Post `
+  -Uri "$base/tasks/$taskId/artifacts/$artifactVersionId/actions/email-send" `
+  -Headers $prepareHeaders -ContentType "application/json" -Body $body
+```
+
+该接口只接受当前 Owner 的 `committed` Task 中、被 `last_commit.artifact_version_ids` 引用且具有 `passed` VerificationReport 的 `reply_draft`。它根据服务端工件主题和正文构建固定演示邮件动作，并在 `ProposedActionSpec.task_artifact_binding` 中绑定：
+
+```text
+task_id / task_version / commit_id / commit_state_hash
+artifact_id / artifact_version_id / artifact_version / artifact_content_digest
+deliverable_id / verification_report_id
+```
+
+响应是 `RunSnapshot`，通常为 L4 外部动作并进入人工审批，不表示已经发送。前台在准备成功后打开 Action Gate，说明绑定成果、目标、为什么需要确认，以及拒绝不会改变已提交 Task。审批和最终授权前，RunService 会重新读取 Task 并核对全部绑定事实；Task、Commit、工件摘要或验证事实不一致时旧 Run 失效。拒绝、授权失败或 Simulator 执行失败都不会回滚或改写 Task Commit。
+
+该接口不调用 LLM 生成收件人、主题或正文；收件人固定为演示地址 `customer@example.com`。当前没有真实联系人选择、附件映射、批量发送或真实 Connector。客户端只在请求结果未知时复用同一准备 key；收到确定成功或确定 4xx 后清除 key，下一次用户意图使用新 key。
+
+### 3.6 直接创建治理 Run
 
 ```json
 {
@@ -286,7 +312,7 @@ status / action / risk / policy_effects / evidence / approvals
 control_plan / permit / tool_result / created_at / updated_at
 ```
 
-### 3.6 补证据、审批和最终授权
+### 3.7 补证据、审批和最终授权
 
 提交证据：
 
@@ -421,7 +447,7 @@ SSE 目前由每个 API 进程轮询 TaskStore，没有 PostgreSQL `LISTEN/NOTIF
 | --- | --- |
 | 403 | 当前身份不拥有提交的审批角色 |
 | 404 | Thread、Artifact、Run、Action、Scenario、Trace 或 Task 不存在，或不属于当前用户 |
-| 409 | 授权条件未满足、动作已失效、Permit/Gateway 拒绝，Workspace Artifact/revision 过期，或 Task 版本过期、状态转换非法、幂等键被用于不同契约/命令 |
+| 409 | 授权条件未满足、动作已失效、Permit/Gateway 拒绝，Workspace Artifact/revision 过期，Task 版本过期、状态转换非法、Task 工件绑定已变化，或幂等键被用于不同契约/命令/动作事实 |
 | 422 | 请求 Schema、TaskContractDraft、证据值、报价当前字段或模型结构化输出无效 |
 | 503 | LLM endpoint、Key 或模型配置不可用 |
 
@@ -437,4 +463,4 @@ SSE 在响应已经开始后无法再改变 HTTP 状态码，因此流内错误�
 - 报价来源回答中的 CRM/政策标签同样是固定演示数据；接口没有访问真实 CRM、CPQ 或 ERP。当前报价公式不覆盖税费、汇率、阶梯价或跨行套餐依赖。
 - Workspace revision 目前不是数据库原子 compare-and-swap；多 API 实例并发写、跨实例锁和 Conversation 结果重放均未实现或验证。
 
-Task API 当前只把上述能力暴露给固定 Demo 1 Fixture。PR 4 浏览器 E2E 覆盖创建、start、冲突、Steer accepted、resolve、Commit、交付物读取，以及 start 请求发送前 abort 后的 reload/同 key 重试。PR 5 在 PostgreSQL 16.14 和三个顺序 API 进程上验证 v2/v3 Snapshot、Artifact 和 Commit 恢复及幂等零重复；同页 system Edge 运行验证 API 停止、控制禁用、连接文案和新进程后的 GET 对账。它仍没有覆盖请求已到服务端但响应丢失、断线期间事件回放、数据库进程故障、多实例通知或历史轮次 UI。Task Runtime 仍不是通用 LLM Agent Loop、后台队列或真实 Connector；Conversation Thread/Message 也不随 Task 恢复。副作用动作必须继续走 RunService 与 Tool Gateway，Task Control 不能直接发送邮件或写入企业系统，Task Artifact 也尚未绑定 Action 失效规则。非 Tasks 工作区是否展示决定控制、按钮叫什么以及“开始新一轮汇报”如何串联 create/start 都是客户端交互，不是新的 API 能力。自动化通过也不能证明普通用户理解这些语义。证据见 [`PR 4 Frontend E2E`](evidence/DEMO1-PR4-FRONTEND-E2E-EVIDENCE.md) 与 [`PR 5 PostgreSQL-backed API Restart`](evidence/DEMO1-PR5-POSTGRES-BACKED-API-RESTART-EVIDENCE.md)。
+Task API 当前只把上述能力暴露给固定 Demo 1 Fixture。PR 4 浏览器 E2E 覆盖创建、start、冲突、Steer accepted、resolve、Commit、交付物读取，以及 start 请求发送前 abort 后的 reload/同 key 重试。PR 5 在 PostgreSQL 16.14 和三个顺序 API 进程上验证 v2/v3 Snapshot、Artifact 和 Commit 恢复及幂等零重复；同页 system Edge 运行验证 API 停止、控制禁用、连接文案和新进程后的 GET 对账。DR-0007 进一步验证了一条窄桥：最终客户回复草稿可按 Task/Commit/Artifact/Verification 精确绑定到 `email.send` 治理 Run，批准后仍只执行 Simulator。它不等于通用 Task Artifact 动作框架，也没有验证 Task 或数据库重启后的 Run 幂等恢复、真实收件人目录、真实邮件 Connector、附件、批量动作或用户价值。Task Control 仍不能直接发送邮件或写入企业系统；副作用必须经过 RunService、Policy/Evidence/Approval、Permit 与 Tool Gateway。其他未覆盖边界仍包括请求已到服务端但响应丢失、断线期间事件回放、数据库进程故障、多实例通知和历史轮次 UI。非 Tasks 工作区是否展示决定控制、按钮叫什么以及“开始新一轮汇报”如何串联 create/start 都是客户端交互，不是新的 API 能力。自动化通过也不能证明普通用户理解这些语义。证据见 [`PR 4 Frontend E2E`](evidence/DEMO1-PR4-FRONTEND-E2E-EVIDENCE.md)、[`PR 5 PostgreSQL-backed API Restart`](evidence/DEMO1-PR5-POSTGRES-BACKED-API-RESTART-EVIDENCE.md) 与 [`DR-0007 Task Artifact Action Bridge`](evidence/DEMO1-DEMO3-TASK-ARTIFACT-ACTION-BRIDGE-EVIDENCE-20260813.md)。

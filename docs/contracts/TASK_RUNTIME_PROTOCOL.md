@@ -1,6 +1,6 @@
 # Demo 1 Task Runtime 协议
 
-> 状态：协议 `Ready`，交互决策 `DR-0005` 仍为 `Draft`。PR 3 已实现固定 Fixture 的 start/control、ArtifactVersion、Verifier、局部冲突与 Commit；PR 4 已验证服务端事实驱动的交付物工作区和发送前失败恢复；PR 5 已在 PostgreSQL 16.14 和三个顺序 API 进程上验证 v2/v3 恢复与幂等零重复，并验证同页前台的断线/对账状态。断线期间事件回放、响应丢失、历史轮次选择、完整异常恢复与 Artifact/Action 绑定尚未验收。
+> 状态：协议 `Ready`，交互决策 `DR-0005` 仍为 `Draft`。PR 3 已实现固定 Fixture 的 start/control、ArtifactVersion、Verifier、局部冲突与 Commit；PR 4 已验证服务端事实驱动的交付物工作区和发送前失败恢复；PR 5 已在 PostgreSQL 16.14 和三个顺序 API 进程上验证 v2/v3 恢复与幂等零重复，并验证同页前台的断线/对账状态。`DR-0007` 已验证固定 `reply_draft` 到 `email.send` 治理 Run 的单一 Artifact/Action 绑定；断线期间事件回放、响应丢失、历史轮次选择、完整异常恢复与通用 Artifact/Action 绑定尚未验收。
 
 ## 1. 权威来源与兼容规则
 
@@ -19,11 +19,11 @@
 | Task 创建 | `TaskService` 从 `TaskContractDraft` 生成服务端 Task ID、Owner、契约、三个初始 Branch 和 `TASK_CREATED` | 契约修改与取消 |
 | 固定 Runtime | `/start` 在一次 mutation 中产生固定客户 A 的阶段 Trace、ArtifactVersion、VerificationReport 和局部 Conflict；`resolve_evidence` 可形成 TaskCommit | 通用任务规划、LLM 生成、后台调度和任意中间阶段恢复 |
 | TaskStore | `InMemoryTaskStore` 与 `PostgresTaskStore` 已有 Snapshot、Event 和 ArtifactVersion commit 路径；PostgreSQL 16.14 下已验证两个状态、三个顺序 API 进程的恢复 | 数据库重启/中途崩溃、Outbox、迁移工具、多实例并发 |
-| API | 创建、列表、读取、`POST /tasks/{id}/start`、`POST /tasks/{id}/controls` 和 Task SSE | 取消、通用任务执行、人工 Artifact 编辑 API |
+| API | 创建、列表、读取、`POST /tasks/{id}/start`、`POST /tasks/{id}/controls`、固定客户回复的 `POST /tasks/{id}/artifacts/{version_id}/actions/email-send` 和 Task SSE | 取消、通用任务执行、人工 Artifact 编辑 API、任意工件动作路由 |
 | 幂等 | 新 mutation 的 marker 保存原结果 Snapshot；内存与 PostgreSQL 跨进程回归证明旧 key 在后续 mutation 后仍返回原结果且不重复写。旧版 marker 缺原结果时仅在当前 version 未前进时兼容返回，否则 409 拒绝不安全重放 | 响应丢失浏览器闭环、数据库中途崩溃 |
 | Owner scope | 列表、读取和事件均以 `X-User-Id` 过滤，跨 Owner 按不存在处理 | 生产 SSO/JWT、租户 RBAC |
 | Budget / Deadline | start 和 resolve 会在 mutation 前校验预计用量与 `deadline_at`，`TaskBudgetSnapshot.exhausted` 字段存在；预计超限时当前请求不写状态 | 专门的顶层/分支耗尽状态、缩小范围/申请额度和完整恢复 UI |
-| 前台 | 非 Tasks 后台摘要与 Tasks 中的 Branch/Conflict/Control/Commit、只读交付物工作区均读取服务端 Snapshot；顶部连接文案与 Task 传输状态一致；Task 面板可打开分支 head；Tasks 视图保留手工待办 tab | 历史轮次选择、人工编辑新版本、失败/预算完整闭环、Artifact/Action 绑定 |
+| 前台 | 非 Tasks 后台摘要与 Tasks 中的 Branch/Conflict/Control/Commit、只读交付物工作区均读取服务端 Snapshot；顶部连接文案与 Task 传输状态一致；Task 面板可打开分支 head；Tasks 视图保留手工待办 tab；当前已验证客户回复可准备受控 Action | 历史轮次选择、人工编辑新版本、失败/预算完整闭环、通用 Artifact/Action 绑定 |
 | 浏览器恢复 | E2E 覆盖发送前 abort、`sessionStorage` reload、同 key 重试；PR 5 system Edge 运行覆盖 API 进程停止、保留 Snapshot/禁用控制、自动重连和 v2/v3 对账 | 服务端已提交但响应丢失、断线期间 TaskEvent 回放、多实例连接迁移 |
 
 创建后的初始事实仍是 `ready / contract`、三个 `queued` Branch、空工件/验证/冲突/控制列表、`last_commit=null` 和 `TASK_CREATED(sequence=1)`。只有固定 Demo 1 `start` 后，服务端才产生后续工件、验证、冲突和阶段事件。该调用不使用 LLM 或真实 Connector，且所有阶段在一个事务提交后才可见，不等于持续后台 Loop。
@@ -188,7 +188,7 @@ data: {TaskEvent JSON}
 - 读取、控制和事件订阅必须验证 Task Owner；生产环境需要 SSO/JWT，V0.1 身份头仍只是 Demo 占位。
 - Branch 来源读取必须落在 `TaskContract.source_scope` 和当前用户权限内。
 - 副作用动作不属于 TaskControlCommand，继续调用现有 RunService 和 Tool Gateway，不能旁路 Permit。
-- Action Gate 打开时前端保留后台任务摘要，并让 Gate 占用独立网格行。Tasks 决策区退出交互；Task 跳转、Control、创建/重连/立即对账均被禁用。该互斥不表示 Task Artifact 已绑定 Action；Artifact 改动触发 Action 失效仍未实现。
+- Action Gate 打开时前端保留后台任务摘要，并让 Gate 占用独立网格行。Tasks 决策区退出交互；Task 跳转、Control、创建/重连/立即对账均被禁用。固定客户回复路径还必须携带 `TaskArtifactBinding`，绑定 Task version、Commit、ArtifactVersion content digest 与 passed VerificationReport；RunService 在每个治理门前重校验，变化即失效。该规则只覆盖当前固定 `reply_draft -> email.send`，不能外推为通用 Artifact/Action 框架。
 - 普通 UI 不展示原始 Prompt、思维链、Worker 对话、JWT/Permit、幂等键、完整工具参数、权限哈希、密钥或堆栈。
 
 ## 8. 分阶段实现状态
@@ -199,7 +199,8 @@ data: {TaskEvent JSON}
 | 场景、来源、状态机、UI 映射 | 固定 Fixture 的工程映射已有 PR 3/PR 4/PR 5 证据 | 真实场景代表性与用户价值研究 |
 | Task Store / Snapshot API / SSE | mutation、多事件回放、内存路径和 PostgreSQL 顺序 API 进程恢复有自动化覆盖 | 数据库故障、SSE 缺口回放与多实例通知 |
 | Observe/Plan/Act/Verify/Commit | 固定 Fixture 在单次 start/resolve mutation 中可观察；引用/hash/幂等已有内存与 PostgreSQL 回归 | 通用后台 Loop、任意中间 checkpoint 恢复 |
-| Task Artifact Workspace | PR 4 已实现只读 head/version/verification/conflict/content/source/lineage/Commit 视图，并保留手工待办 tab | 人工编辑新版本、Artifact/Action 绑定、通用工件类型 |
+| Task Artifact Workspace | PR 4 已实现只读 head/version/verification/conflict/content/source/lineage/Commit 视图，并保留手工待办 tab；DR-0007 已实现已验证客户回复到治理 Run 的窄绑定 | 人工编辑新版本、其他 Artifact/Action 绑定、通用工件类型 |
+| Task Artifact Action Bridge | `committed + Commit 引用 + passed report + reply_draft` 才可准备动作；创建 key 幂等，绑定在证据/审批/授权/执行前重校验；拒绝/失败不修改 Task | 跨进程 Run 创建幂等、真实联系人/附件、通用 capability 映射、真实 Connector |
 | Task UI 与恢复 | PR 4 E2E 覆盖主路径和发送前 abort；PR 5 运行覆盖 API 进程断开、禁用、自动重连与 v2/v3 对账 | 已提交但响应丢失、断线期间事件回放与更多异常路径 |
 | 来源与多轮前台语义 | 非 Tasks 摘要、带“演示数据”的来源标签、原始 ID 不入普通业务 DOM，以及独立新 Task 的 create+start 已有浏览器工程证据 | 历史轮次选择与至少 5 人无引导理解测试 |
 | Adaptive Swarm / 真实 Connector | 非本决策范围 | 需独立 Admission 和来源证据 |

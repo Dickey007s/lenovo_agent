@@ -5,8 +5,8 @@
 | Scenario ID | `SCENARIO-001` |
 | Owner | Office Agent 项目组 |
 | Status | `Ready` |
-| Decision | [`DR-0002`](../decisions/DR-0002-bounded-durable-office-loop.md)、[`DR-0005`](../decisions/DR-0005-task-director-interaction.md) |
-| 设计来源 | `USER-FEEDBACK-20260810-01/02`、`USER-FEEDBACK-20260811-INTERACTION-01`、`USER-FEEDBACK-20260811-USABILITY-02`、`USER-FEEDBACK-20260811-ROUND-AND-SOURCE-03`、`DESIGN-REFERENCE-TASK-DIRECTOR-OPTION2-20260811`、`TASK-DIRECTOR-USABILITY-AUDIT-DEMO1-PR6-20260811`、`TASK-DIRECTOR-ROUND-AND-SOURCE-CLARITY-20260811`、`MEETING-DECK-0716-V2-01`、`SCRIPT-V5-202607`、`REPO-BASELINE-84AABC9`、`REACT-ICLR-2023`、`LANGGRAPH-DURABLE-20260810`、`NIST-AI-RMF-1.0`；PR 5 运行来源为 `POSTGRES-WINDOWS-16.14-20260811`、`POSTGRES-BACKED-API-RESTART-DEMO1-PR5-20260811` |
+| Decision | [`DR-0002`](../decisions/DR-0002-bounded-durable-office-loop.md)、[`DR-0005`](../decisions/DR-0005-task-director-interaction.md)、[`DR-0007`](../decisions/DR-0007-task-artifact-action-bridge.md) |
+| 设计来源 | `USER-FEEDBACK-20260810-01/02`、`USER-FEEDBACK-20260811-INTERACTION-01`、`USER-FEEDBACK-20260811-USABILITY-02`、`USER-FEEDBACK-20260811-ROUND-AND-SOURCE-03`、`USER-FEEDBACK-20260813-DEMO-BRIDGE-05`、`DESIGN-REFERENCE-TASK-DIRECTOR-OPTION2-20260811`、`TASK-DIRECTOR-USABILITY-AUDIT-DEMO1-PR6-20260811`、`TASK-DIRECTOR-ROUND-AND-SOURCE-CLARITY-20260811`、`TASK-ARTIFACT-ACTION-BRIDGE-20260813`、`MEETING-DECK-0716-V2-01`、`SCRIPT-V5-202607`、`REPO-BASELINE-84AABC9`、`REACT-ICLR-2023`、`LANGGRAPH-DURABLE-20260810`、`NIST-AI-RMF-1.0`；PR 5 运行来源为 `POSTGRES-WINDOWS-16.14-20260811`、`POSTGRES-BACKED-API-RESTART-DEMO1-PR5-20260811` |
 
 ## 1. 用户、触发与当前问题
 
@@ -22,7 +22,7 @@ PR 3 之前的 V0.1 基线可以编辑工作区并治理一次副作用动作，
 
 - 所有邮件、CRM、金额、项目和客户名称都是 Demo Fixture。
 - 普通业务 UI 将已知来源明确标为“演示数据”并使用业务名称；本文件保留原始 `source_ref` 只是为了记录协议与审计事实，不代表这些内部 ID 应显示给用户。
-- 本场景不发送邮件、不写入 CRM；若后续产生副作用动作，必须进入现有 `RunService → Risk/Policy/Evidence/Approval/Permit → Tool Gateway → Simulator` 链路。
+- 本场景的 Task Runtime 本身不发送邮件、不写入 CRM；DR-0007 允许用户把已验证的回复草稿准备为独立治理 Run，并继续进入 `RunService → Risk/Policy/Evidence/Approval/Permit → Tool Gateway → Simulator`。最终结果仍是 Simulator，不是真实邮件。
 - “客户 A 场景具有代表性”“Task Bar 降低理解成本”“分支控制符合用户心智”仍是待用户研究验证的假设。
 - 设计来源 Source ID 与运行时 Fixture `source_ref` 是两套概念，不能互相替代。
 
@@ -58,6 +58,7 @@ PR 3 之前的 V0.1 基线可以编辑工作区并治理一次副作用动作，
 | Verify | 发现 2,400 万与 2,680 万冲突，只阻塞经营分析分支 | 待确认区说明为什么需要人、两个口径、经营分析/回复草稿会如何更新、风险页保持状态，以及唯一 resolve 主动作 | 当前 E2E 与冲突截图已覆盖固定 Fixture；不证明真实来源、业务收益或用户决策质量 |
 | Control | 用户选择正式口径，或提交分支控制 | 只有服务端 Snapshot 确认后才更新；补证按钮先准备 Steer，提交后也只称已记录待应用 | Resolve/分支控制已有事实；Steer 重新规划尚未实现 |
 | Commit | 解决最后一个 open Conflict 时重新验证经营分析，并联动重生成、验证客户回复后再生成 TaskCommit；若仍有其他冲突则不生成 reply v3 或 Commit | 只在 `last_commit` 存在时列出经营分析、风险页、客户回复草稿三项可复核成果，并明确回复未发送；版本和 state hash 收进审计 | 内存与 PostgreSQL 跨 API 进程回归、真实本地浏览器主路径已覆盖；不代表发送邮件或数据库故障恢复 |
+| Prepare action | 仅从 Commit 中的 passed 当前 `reply_draft` 构建 `TaskArtifactBinding` 与固定 `email.send` Run；准备、审批、授权和执行前重校验 | 当前回复成果显示“准备发送”；Action Gate 解释演示目标、绑定版本、L4 风险、为何需要确认与拒绝后果；按钮分为准备、批准、确认执行 | DR-0007 API/服务/E2E 已覆盖；只执行 Simulator，不支持真实联系人、附件、批量或通用工件动作 |
 | New round | 终态以新 round key 创建独立 Task，再对新 Task 执行 start；旧轮次不 mutation | “开始新一轮汇报”一次点击后进入新一轮待确认状态；不是把旧 Task 重置为 ready | 完整浏览器 E2E 已覆盖新旧 Task 同时保留；当前没有历史轮次选择入口，不证明用户理解该语义 |
 
 ## 5. 异常与恢复路径
@@ -76,7 +77,9 @@ PR 3 之前的 V0.1 基线可以编辑工作区并治理一次副作用动作，
 | Take over | 分支进入 `taken_over` | 显示当前控制权和 Return control | 只实现状态机；人工编辑和新 ArtifactVersion 未实现 |
 | 固定查看历史工件 | Branch head 已前进，但用户主动选择旧 ArtifactVersion | 显示“正在查看历史版本”、当前 head 版本和返回动作；默认 mutation 后自动跟随新 head | PR 6 专用 E2E 与历史截图已验证 `follow_head/pinned_history`；仍未测量目标用户误读率 |
 | 多轮 Task 历史 | `GET /tasks` 返回当前 Owner 的多轮 Snapshot | 默认恢复最近活动 Task，否则显示最近终态 Task | 当前没有历史轮次选择器；旧轮次保留不等于用户可从 UI 自由切换 |
-| Action Gate 打开 | RunSnapshot 进入等待证据、审批或授权 | Gate 使用独立网格行；Task 面板视觉隐藏且不可交互，但保持挂载以保留 Steer 草稿；Task Bar 操作禁用，Gate 收起后行高缩至 58px | 已实现交互互斥；Task Artifact 与 Action 失效尚未绑定 |
+| Action Gate 打开 | RunSnapshot 进入等待证据、审批或授权；DR-0007 固定路径携带精确 `TaskArtifactBinding` | Gate 使用独立网格行；Task 面板视觉隐藏且不可交互，但保持挂载以保留 Steer 草稿；显示绑定成果和演示目标；Task Bar 操作禁用 | 交互互斥与固定回复绑定已实现；其他 Task Artifact/Action 类型仍未绑定 |
+| 动作绑定变化 | Task/Commit/ArtifactVersion/Verification 与 Run 中绑定不再一致 | Gate 显示动作失效，要求重新从当前成果准备；不把 Task 改成失败 | 服务层回归覆盖门前重校验；没有跨进程 Run 恢复证据 |
+| 拒绝或执行失败 | Run 终止、失效或失败，Task Commit 保持不变 | 明确“本轮成果仍保留，未发送”；用户可继续查看成果或重新发起新意图 | 浏览器拒绝路径覆盖 Task 仍 committed；执行只到 Simulator |
 
 ## 6. 前台信息层级
 
@@ -86,7 +89,7 @@ Tasks 视图用“进度 / 成果 / 执行记录”三个模式保留长期 Task
 
 默认隐藏：原始 Prompt、思维链、Worker 内部对话、JWT/Permit、幂等键、权限哈希、完整工具参数、密钥、DSN、堆栈、未脱敏个人信息和无决策价值的调度日志。三个固定 Artifact kind 使用字段 allowlist，未知 kind/字段默认隐藏；Conflict Card 与 Artifact Workspace 共用 `source_ref` 投影，四个已知 Demo 1 值显示为带“演示数据”前缀的业务标签，普通业务 DOM 使用序号 key，不接收原始 ID，其他值 fail closed。这是前端第二道投影，不替代服务端授权、脱敏或未来通用字段可见性 Schema；允许字段中的任意文本仍需服务端保证。
 
-Task UI 与 Action Gate 必须各自读取服务端事实。Gate 打开时视觉隐藏 Task 明细、冻结控制但保留组件草稿，只是避免并发控制，不代表两条领域链已经建立版本绑定；在 Task Artifact 与 Action 参数哈希真正关联前，不能声称 Task 改动会自动使旧 Action 失效。
+Task UI 与 Action Gate 必须各自读取服务端事实。Gate 打开时视觉隐藏 Task 明细、冻结控制但保留组件草稿，以避免并发控制。固定客户回复路径已经通过 `TaskArtifactBinding` 把 Task/Commit/ArtifactVersion/Verification 与 Run 关联并在每个治理门前重校验；其他 Artifact kind 仍不能声称具备同样的失效保证。
 
 ## 7. 验收指标
 
@@ -112,4 +115,5 @@ Task UI 与 Action Gate 必须各自读取服务端事实。Gate 打开时视觉
 - PR 6 Task Director 运行与视觉证据：[`DEMO1-PR6-TASK-DIRECTOR-INTERACTION-EVIDENCE.md`](../evidence/DEMO1-PR6-TASK-DIRECTOR-INTERACTION-EVIDENCE.md)
 - PR 6 可理解性验收与工程代理证据：[`DEMO1-PR6-USABILITY-COMPREHENSION-AUDIT-20260811.md`](../evidence/DEMO1-PR6-USABILITY-COMPREHENSION-AUDIT-20260811.md)
 - 来源与新一轮修订证据：[`DEMO1-ROUND-AND-SOURCE-CLARITY-EVIDENCE-20260811.md`](../evidence/DEMO1-ROUND-AND-SOURCE-CLARITY-EVIDENCE-20260811.md)
-- 后续实现证据：响应丢失、断线期间事件回放、数据库故障/迁移、多实例、Artifact/Action 绑定和用户研究；在产生前均标记为待验证。
+- Task 成果到治理动作证据：[`DEMO1-DEMO3-TASK-ARTIFACT-ACTION-BRIDGE-EVIDENCE-20260813.md`](../evidence/DEMO1-DEMO3-TASK-ARTIFACT-ACTION-BRIDGE-EVIDENCE-20260813.md)
+- 后续实现证据：响应丢失、断线期间事件回放、数据库故障/迁移、多实例、通用 Artifact/Action 绑定、真实 Connector 和用户研究；在产生前均标记为待验证。
