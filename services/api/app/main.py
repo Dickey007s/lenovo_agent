@@ -50,6 +50,9 @@ async def lifespan(app: FastAPI):
         ) as checkpointer:
             await checkpointer.setup()
             app.state.run_service = build_run_service(checkpointer, run_store, audit_log)
+            app.state.run_service.attach_task_artifact_validator(
+                app.state.task_service.validate_action_binding
+            )
             await app.state.run_service.restore()
             app.state.conversation_service = ConversationService(
                 app.state.run_service.parser,
@@ -62,6 +65,9 @@ async def lifespan(app: FastAPI):
         workspace_store = InMemoryWorkspaceStore()
         await workspace_store.setup()
         app.state.run_service = build_run_service(InMemorySaver())
+        app.state.run_service.attach_task_artifact_validator(
+            app.state.task_service.validate_action_binding
+        )
         app.state.conversation_service = ConversationService(
             app.state.run_service.parser,
             app.state.run_service,

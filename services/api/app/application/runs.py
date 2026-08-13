@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime
 from typing import Any
 from uuid import uuid4
@@ -17,6 +18,7 @@ from packages.contracts import (
     PermitMetadata,
     ProposedActionSpec,
     RiskAssessment,
+    TaskArtifactBinding,
     ToolExecutionResult,
 )
 from packages.authorization import AuthorizationError, AuthorizationService
@@ -40,6 +42,10 @@ class ActionNotFoundError(LookupError):
     pass
 
 
+class RunCreateConflictError(RuntimeError):
+    pass
+
+
 class RunSnapshot(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -48,6 +54,8 @@ class RunSnapshot(BaseModel):
     thread_id: str
     user_id: str
     user_message: str
+    creation_idempotency_key: str | None = None
+    creation_digest: str | None = None
     trusted_context: dict = Field(default_factory=lambda: {"device": {"managed": True}})
     status: str
     action: ProposedActionSpec
@@ -86,17 +94,31 @@ class RunService:
         self._action_to_run: dict[str, str] = {}
         self._submitted_evidence: dict[str, dict[str, Any]] = {}
         self._invalidated_actions: set[str] = set()
+        self._creation_to_run: dict[tuple[str, str], str] = {}
+        self._task_artifact_validator: Callable[
+            [TaskArtifactBinding, str], Awaitable[None]
+        ] | None = None
         self._lock = asyncio.Lock()
         self.workflow: AgentWorkflow | None = None
 
     def attach_workflow(self, workflow: AgentWorkflow) -> None:
         self.workflow = workflow
 
+    def attach_task_artifact_validator(
+        self,
+        validator: Callable[[TaskArtifactBinding, str], Awaitable[None]],
+    ) -> None:
+        self._task_artifact_validator = validator
+
     async def restore(self) -> None:
         for stored in await self.run_store.load_all():
             snapshot = RunSnapshot.model_validate(stored.snapshot)
             self._runs[snapshot.run_id] = snapshot
             self._action_to_run[snapshot.action.action_id] = snapshot.run_id
+            if snapshot.creation_idempotency_key:
+                self._creation_to_run[(snapshot.user_id, snapshot.creation_idempotency_key)] = (
+                    snapshot.run_id
+                )
             self._submitted_evidence[snapshot.action.action_id] = stored.submitted_evidence
 
     async def create(
@@ -117,7 +139,36 @@ class RunService:
         user_id: str,
         trusted_context: dict | None = None,
         thread_id: str | None = None,
+        task_artifact_binding: TaskArtifactBinding | None = None,
+        creation_idempotency_key: str | None = None,
     ) -> RunSnapshot:
+        trusted_context = trusted_context or {
+            "device": {"managed": True},
+            "user": {"id": user_id},
+        }
+        creation_digest = canonical_hash(
+            {
+                "candidate": candidate.model_dump(mode="json"),
+                "message": message,
+                "thread_id": thread_id,
+                "task_artifact_binding": (
+                    task_artifact_binding.model_dump(mode="json")
+                    if task_artifact_binding
+                    else None
+                ),
+            }
+        )
+        if creation_idempotency_key:
+            async with self._lock:
+                existing_run_id = self._creation_to_run.get(
+                    (user_id, creation_idempotency_key)
+                )
+                if existing_run_id:
+                    existing = self._runs[existing_run_id]
+                    if existing.creation_digest != creation_digest:
+                        raise RunCreateConflictError("幂等键已用于不同动作")
+                    return existing
+
         now = datetime.now(UTC)
         run_id = f"run_{uuid4().hex}"
         trace_id = f"tr_{uuid4().hex}"
@@ -127,13 +178,19 @@ class RunService:
             trace_id=trace_id,
             action_id=action_id,
             actor_id=user_id,
-            payload_digest=canonical_hash(candidate),
+            payload_digest=canonical_hash(
+                {
+                    "candidate": candidate.model_dump(mode="json"),
+                    "task_artifact_binding": (
+                        task_artifact_binding.model_dump(mode="json")
+                        if task_artifact_binding
+                        else None
+                    ),
+                }
+            ),
             idempotency_key=f"execute_{action_id}",
+            task_artifact_binding=task_artifact_binding,
         )
-        trusted_context = trusted_context or {
-            "device": {"managed": True},
-            "user": {"id": user_id},
-        }
         risk, effects, evidence, plan = await self._evaluate(
             action, approvals=[], trusted_context=trusted_context
         )
@@ -143,6 +200,8 @@ class RunService:
             thread_id=thread_id or f"thread_{uuid4().hex}",
             user_id=user_id,
             user_message=message,
+            creation_idempotency_key=creation_idempotency_key,
+            creation_digest=creation_digest,
             trusted_context=trusted_context,
             status=plan.status,
             action=action,
@@ -154,10 +213,32 @@ class RunService:
             updated_at=now,
         )
         async with self._lock:
+            if creation_idempotency_key:
+                existing_run_id = self._creation_to_run.get(
+                    (user_id, creation_idempotency_key)
+                )
+                if existing_run_id:
+                    existing = self._runs[existing_run_id]
+                    if existing.creation_digest != creation_digest:
+                        raise RunCreateConflictError("幂等键已用于不同动作")
+                    return existing
             self._runs[run_id] = snapshot
             self._action_to_run[action_id] = run_id
+            if creation_idempotency_key:
+                self._creation_to_run[(user_id, creation_idempotency_key)] = run_id
         await self._persist(snapshot)
-        await self._audit(snapshot, "RUN_CREATED", {"thread_id": snapshot.thread_id})
+        await self._audit(
+            snapshot,
+            "RUN_CREATED",
+            {
+                "thread_id": snapshot.thread_id,
+                "task_artifact_version_id": (
+                    task_artifact_binding.artifact_version_id
+                    if task_artifact_binding
+                    else None
+                ),
+            },
+        )
         await self._audit(
             snapshot,
             "ACTION_PARSED",
@@ -182,6 +263,7 @@ class RunService:
         self, action_id: str, values: dict[str, str], user_id: str
     ) -> RunSnapshot:
         snapshot = self._by_action(action_id, user_id)
+        await self._ensure_task_artifact_current(snapshot)
         if action_id in self._invalidated_actions or "ARTIFACT_CONTENT_CHANGED" in snapshot.control_plan.reason_codes:
             raise ValueError("生成内容已修改，请基于新版本重新提交动作")
         allowed = {
@@ -215,6 +297,7 @@ class RunService:
         approver_id: str,
     ) -> RunSnapshot:
         snapshot = self._find_action(action_id)
+        await self._ensure_task_artifact_current(snapshot)
         if action_id in self._invalidated_actions or "ARTIFACT_CONTENT_CHANGED" in snapshot.control_plan.reason_codes:
             raise ValueError("生成内容已修改，旧动作不能继续审批")
         allowed_roles = {
@@ -251,6 +334,10 @@ class RunService:
 
     async def authorize_and_execute(self, action_id: str, user_id: str) -> RunSnapshot:
         snapshot = self._by_action(action_id, user_id)
+        try:
+            await self._ensure_task_artifact_current(snapshot)
+        except ValueError as exc:
+            raise AuthorizationError(str(exc)) from exc
         if action_id in self._invalidated_actions or "ARTIFACT_CONTENT_CHANGED" in snapshot.control_plan.reason_codes:
             raise AuthorizationError("生成内容已修改，旧 Action 和 Permit 已作废")
         if self.authorization_service is None or self.tool_gateway is None:
@@ -385,6 +472,10 @@ class RunService:
         return updated.status
 
     async def _issue_and_execute(self, snapshot: RunSnapshot) -> RunSnapshot:
+        try:
+            await self._ensure_task_artifact_current(snapshot)
+        except ValueError as exc:
+            raise AuthorizationError(str(exc)) from exc
         if self.authorization_service is None or self.tool_gateway is None:
             raise RuntimeError("Authorization Service 或 Tool Gateway 未配置")
         issued = self.authorization_service.issue(
@@ -435,6 +526,18 @@ class RunService:
             },
         )
         return updated
+
+    async def _ensure_task_artifact_current(self, snapshot: RunSnapshot) -> None:
+        binding = snapshot.action.task_artifact_binding
+        if binding is None or self._task_artifact_validator is None:
+            return
+        try:
+            await self._task_artifact_validator(binding, snapshot.user_id)
+        except (LookupError, RuntimeError, ValueError) as exc:
+            await self.invalidate_action(snapshot.action.action_id, snapshot.user_id)
+            raise ValueError(
+                "绑定成果已经变化，旧动作已作废；请从当前成果重新准备"
+            ) from exc
 
     async def _audit(
         self,

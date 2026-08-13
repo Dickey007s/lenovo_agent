@@ -10,7 +10,13 @@ from packages.agent_runtime import AgentWorkflow, WorkflowCallbacks
 from packages.audit import InMemoryAuditLog
 from packages.authorization import AuthorizationError, AuthorizationService, PermitKeyPair
 from packages.tool_gateway import GatewayError, ToolGateway
-from packages.contracts import TaskContractDraft, TaskControlCommand, TaskSnapshot
+from packages.contracts import (
+    ActionCandidate,
+    TaskArtifactBinding,
+    TaskContractDraft,
+    TaskControlCommand,
+    TaskSnapshot,
+)
 from services.api.app.application.llm import (
     AutoDLActionParser,
     ModelConfigurationError,
@@ -24,6 +30,7 @@ from services.api.app.application.evidence_catalog import (
 from services.api.app.application.runs import (
     ActionNotFoundError,
     RunNotFoundError,
+    RunCreateConflictError,
     RunService,
     RunSnapshot,
 )
@@ -93,6 +100,10 @@ class ApprovalInput(StrictRequest):
 class StartTaskRequest(StrictRequest):
     expected_task_version: int = Field(ge=1)
     idempotency_key: str = Field(min_length=8, max_length=160)
+
+
+class PrepareTaskArtifactActionRequest(StrictRequest):
+    thread_id: str = Field(min_length=1, max_length=120)
 
 
 class CurrentUser(StrictRequest):
@@ -268,6 +279,89 @@ async def control_task(
     except TaskNotFoundError as exc:
         raise HTTPException(status_code=404, detail="任务不存在") from exc
     except (TaskMutationConflictError, TaskTransitionError) as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
+@router.post(
+    "/tasks/{task_id}/artifacts/{artifact_version_id}/actions/email-send",
+    response_model=RunSnapshot,
+    status_code=status.HTTP_201_CREATED,
+)
+async def prepare_task_artifact_email_action(
+    task_id: str,
+    artifact_version_id: str,
+    body: PrepareTaskArtifactActionRequest,
+    user: Annotated[CurrentUser, Depends(current_user)],
+    task_service: Annotated[TaskService, Depends(get_task_service)],
+    run_service: Annotated[RunService, Depends(get_run_service)],
+    conversation_service: Annotated[
+        ConversationService, Depends(get_conversation_service)
+    ],
+    idempotency_key: Annotated[
+        str, Header(alias="Idempotency-Key", min_length=8, max_length=160)
+    ],
+) -> RunSnapshot:
+    try:
+        await conversation_service.get_thread(body.thread_id, user.user_id)
+    except ConversationNotFoundError as exc:
+        raise HTTPException(status_code=404, detail="对话不存在") from exc
+    try:
+        task, artifact, report = await task_service.get_committed_artifact(
+            task_id, artifact_version_id, user.user_id
+        )
+    except TaskNotFoundError as exc:
+        raise HTTPException(status_code=404, detail="任务不存在") from exc
+    except TaskTransitionError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+    if artifact.kind != "reply_draft":
+        raise HTTPException(status_code=422, detail="当前成果不支持准备邮件发送动作")
+    subject = str(artifact.content.get("subject", "")).strip()
+    message_body = str(artifact.content.get("body", "")).strip()
+    if not subject or not message_body:
+        raise HTTPException(status_code=422, detail="客户回复草稿缺少主题或正文")
+    commit = task.last_commit
+    if commit is None:
+        raise HTTPException(status_code=409, detail="任务尚未形成最终提交")
+
+    binding = TaskArtifactBinding(
+        task_id=task.task_id,
+        task_version=task.version,
+        commit_id=commit.commit_id,
+        commit_state_hash=commit.state_hash,
+        artifact_id=artifact.artifact_id,
+        artifact_version_id=artifact.artifact_version_id,
+        artifact_version=artifact.version,
+        artifact_content_digest=artifact.content_digest,
+        deliverable_id=artifact.deliverable_id,
+        verification_report_id=report.report_id,
+    )
+    candidate = ActionCandidate(
+        action_type="send_email",
+        capability="email.send",
+        target_scope="external_customer",
+        recipients=["customer@example.com"],
+        data_classes=["customer_data", "financial", "project_risk"],
+        state_change_type="external_effect",
+        reversibility="low",
+        source_refs=[],
+        parameters={"subject": subject, "body": message_body},
+    )
+    try:
+        return await run_service.create_from_candidate(
+            candidate,
+            message="准备将已核对的客户回复发送给演示客户地址 customer@example.com",
+            user_id=user.user_id,
+            trusted_context={
+                "device": {"managed": True, "name": "managed_pc"},
+                "user": {"id": user.user_id},
+                "task_artifact": binding.model_dump(mode="json"),
+            },
+            thread_id=body.thread_id,
+            task_artifact_binding=binding,
+            creation_idempotency_key=idempotency_key,
+        )
+    except RunCreateConflictError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
 
 

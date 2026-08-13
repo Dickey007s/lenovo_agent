@@ -1470,21 +1470,34 @@ class ConversationService:
             "status": "reflecting",
             "label": "Agent 正在读取执行结果并更新对话",
         }
-        response_text = await self.agent.respond_after_action(
-            run.user_message,
-            [
-                {"role": item.role, "content": item.content}
-                for item in thread.messages[-12:]
-            ],
-            {
-                "status": run.status,
-                "action": run.action.model_dump(mode="json"),
-                "tool_result": (
-                    run.tool_result.model_dump(mode="json") if run.tool_result else None
-                ),
-            },
-        )
-        response_text = _strip_repeated_risk(response_text)
+        binding = run.action.task_artifact_binding
+        if binding is not None:
+            if run.status == "EXECUTED":
+                response_text = (
+                    f"客户回复草稿 v{binding.artifact_version} 已通过风险判断、人工确认和一次性执行许可，"
+                    "交给 Email Simulator 完成了模拟发送。未连接真实邮箱，也没有向真实客户发送邮件。"
+                )
+            elif run.status == "DENIED":
+                response_text = "该客户回复动作已被策略拒绝，没有执行，也没有连接真实邮箱。"
+            else:
+                response_text = "该客户回复动作未能完成，没有执行，也没有连接真实邮箱。"
+        else:
+            response_text = await self.agent.respond_after_action(
+                run.user_message,
+                [
+                    {"role": item.role, "content": item.content}
+                    for item in thread.messages[-12:]
+                ],
+                {
+                    "status": run.status,
+                    "action": run.action.model_dump(mode="json"),
+                    "tool_result": (
+                        run.tool_result.model_dump(mode="json") if run.tool_result else None
+                    ),
+                },
+            )
+        if binding is None:
+            response_text = _strip_repeated_risk(response_text)
         if not response_text:
             response_text = {
                 "EXECUTED": "动作已执行完成。",

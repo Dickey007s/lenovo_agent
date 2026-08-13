@@ -10,6 +10,7 @@ from .models import (
     PermitMetadata,
     ProposedActionSpec,
     RiskAssessment,
+    TaskArtifactBinding,
     ToolExecutionResult,
 )
 from .task_models import (
@@ -52,6 +53,7 @@ __all__ = [
     "PermitMetadata",
     "ProposedActionSpec",
     "RiskAssessment",
+    "TaskArtifactBinding",
     "ToolExecutionResult",
     "ArtifactStatus",
     "ArtifactVersion",

@@ -23,6 +23,7 @@ from packages.contracts import (
     TaskControlCommand,
     TaskEvent,
     TaskEventType,
+    TaskArtifactBinding,
     TaskSnapshot,
     VerificationCheck,
     VerificationReport,
@@ -201,6 +202,68 @@ class TaskService:
             owner_id,
             idempotency_key=idempotency_key or f"demo1-customer-a:{owner_id}",
         )
+
+    async def get_committed_artifact(
+        self,
+        task_id: str,
+        artifact_version_id: str,
+        owner_id: str,
+    ) -> tuple[TaskSnapshot, ArtifactVersion, VerificationReport]:
+        snapshot = await self.get(task_id, owner_id)
+        if snapshot.status != "committed" or snapshot.last_commit is None:
+            raise TaskTransitionError("任务尚未形成最终提交，不能准备外部动作")
+        if artifact_version_id not in snapshot.last_commit.artifact_version_ids:
+            raise TaskTransitionError("只能从最终提交中的当前成果准备动作")
+        artifact = next(
+            (
+                item
+                for item in snapshot.artifact_versions
+                if item.artifact_version_id == artifact_version_id
+            ),
+            None,
+        )
+        if artifact is None:
+            raise TaskTransitionError("最终提交引用的工件版本不存在")
+        report = next(
+            (
+                item
+                for item in snapshot.verification_reports
+                if item.artifact_version_id == artifact_version_id
+                and item.status == "passed"
+                and item.report_id in snapshot.last_commit.verification_report_ids
+            ),
+            None,
+        )
+        if report is None or artifact.status != "verified":
+            raise TaskTransitionError("工件尚未通过最终验证，不能准备外部动作")
+        return snapshot, artifact, report
+
+    async def validate_action_binding(
+        self,
+        binding: TaskArtifactBinding,
+        owner_id: str,
+    ) -> None:
+        snapshot, artifact, report = await self.get_committed_artifact(
+            binding.task_id,
+            binding.artifact_version_id,
+            owner_id,
+        )
+        commit = snapshot.last_commit
+        if commit is None:
+            raise TaskTransitionError("绑定成果的最终提交已不可用")
+        expected = {
+            "task_version": snapshot.version,
+            "commit_id": commit.commit_id,
+            "commit_state_hash": commit.state_hash,
+            "artifact_id": artifact.artifact_id,
+            "artifact_version": artifact.version,
+            "artifact_content_digest": artifact.content_digest,
+            "deliverable_id": artifact.deliverable_id,
+            "verification_report_id": report.report_id,
+        }
+        actual = binding.model_dump(exclude={"task_id", "artifact_version_id"})
+        if actual != expected:
+            raise TaskTransitionError("绑定成果已经变化，请基于当前核对结果重新准备动作")
 
     async def start(
         self,

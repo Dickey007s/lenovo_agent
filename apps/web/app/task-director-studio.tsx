@@ -69,6 +69,7 @@ type TaskDecisionPaneProps = {
   onRetry: () => void;
   onControl: (intent: ControlIntent) => Promise<boolean>;
   onOpenArtifact: (artifactVersionId: string) => void;
+  onPrepareAction: (artifactVersionId: string) => void;
 };
 
 const TASK_STATUS_LABELS: Record<TaskSnapshot["status"], string> = {
@@ -697,17 +698,23 @@ function BranchControls({
 function TaskNoDecisionState({
   task,
   disabled,
+  actionDisabled,
   onControl,
   onOpenArtifact,
+  onPrepareAction,
 }: {
   task: TaskSnapshot;
   disabled: boolean;
+  actionDisabled: boolean;
   onControl: (intent: ControlIntent) => Promise<boolean>;
   onOpenArtifact: (artifactVersionId: string) => void;
+  onPrepareAction: (artifactVersionId: string) => void;
 }) {
   if (task.status === "committed" && task.last_commit) {
     const artifacts = committedArtifacts(task);
-    const replyIsDraft = artifacts.some((artifact) => artifact.content.send_status === "draft_only");
+    const replyDraft = artifacts.find(
+      (artifact) => artifact.kind === "reply_draft" && artifact.content.send_status === "draft_only",
+    );
     return (
       <section className="task-decision-empty is-complete">
         <IconCircleCheck aria-hidden="true" />
@@ -727,7 +734,25 @@ function TaskNoDecisionState({
             </li>
           ))}
         </ul>
-        {replyIsDraft && <strong className="task-outcome-boundary">客户回复仍是草稿，未发送</strong>}
+        {replyDraft && (
+          <>
+            <strong className="task-outcome-boundary">客户回复仍是草稿，未发送</strong>
+            <div className="task-outcome-next-action">
+              <div>
+                <strong>下一步：准备发送客户回复</strong>
+                <span>先创建受控动作，再显示风险、目标和确认要求。此时不会发送。</span>
+              </div>
+              <button
+                type="button"
+                disabled={actionDisabled}
+                onClick={() => onPrepareAction(replyDraft.artifact_version_id)}
+              >
+                准备发送客户回复
+              </button>
+              <small>固定演示收件人为 customer@example.com；只在模拟环境执行，不会触达真实邮箱。</small>
+            </div>
+          </>
+        )}
         <details className="task-decision-commit-evidence">
           <summary>查看运行与审计</summary>
           <code>{task.last_commit.state_hash}</code>
@@ -802,6 +827,7 @@ export function TaskDecisionPane({
   onRetry,
   onControl,
   onOpenArtifact,
+  onPrepareAction,
 }: TaskDecisionPaneProps) {
   const [steerInstruction, setSteerInstruction] = useState("");
   const steerRef = useRef<HTMLTextAreaElement>(null);
@@ -810,6 +836,7 @@ export function TaskDecisionPane({
     : [];
   const terminal = isTerminal(task);
   const controlsDisabled = !task || syncState !== "synced" || busy || pending || terminal;
+  const actionDisabled = !task || syncState !== "synced" || busy || pending;
 
   const branchById = useMemo(
     () => new Map(task?.branches.map((branch) => [branch.branch_id, branch]) ?? []),
@@ -1000,8 +1027,10 @@ export function TaskDecisionPane({
       <TaskNoDecisionState
         task={task}
         disabled={controlsDisabled}
+        actionDisabled={actionDisabled}
         onControl={onControl}
         onOpenArtifact={onOpenArtifact}
+        onPrepareAction={onPrepareAction}
       />
         )}
       </div>

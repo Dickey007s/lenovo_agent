@@ -10,6 +10,21 @@ class StrictModel(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
+class TaskArtifactBinding(StrictModel):
+    """Immutable Task artifact facts bound to a governed action."""
+
+    task_id: str = Field(min_length=1, max_length=120)
+    task_version: int = Field(ge=1)
+    commit_id: str = Field(min_length=1, max_length=120)
+    commit_state_hash: str = Field(pattern=r"^sha256:[0-9a-f]{64}$")
+    artifact_id: str = Field(min_length=1, max_length=120)
+    artifact_version_id: str = Field(min_length=1, max_length=160)
+    artifact_version: int = Field(ge=1)
+    artifact_content_digest: str = Field(pattern=r"^sha256:[0-9a-f]{64}$")
+    deliverable_id: str = Field(min_length=1, max_length=100)
+    verification_report_id: str = Field(min_length=1, max_length=120)
+
+
 class ActionCandidate(StrictModel):
     """Only business facts may come from the language model."""
 
@@ -119,6 +134,7 @@ class ProposedActionSpec(ActionCandidate):
     actor_id: str
     payload_digest: str
     idempotency_key: str
+    task_artifact_binding: TaskArtifactBinding | None = None
 
 
 class RiskDimensions(StrictModel):

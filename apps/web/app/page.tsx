@@ -106,6 +106,14 @@ type RunSnapshot = {
     resources: string[];
     source_refs: string[];
     parameters: Record<string, unknown>;
+    task_artifact_binding?: {
+      task_id: string;
+      task_version: number;
+      commit_id: string;
+      artifact_version_id: string;
+      artifact_version: number;
+      deliverable_id: string;
+    } | null;
   };
   risk: { risk_level: string; reason_codes: string[] };
   control_plan: {
@@ -169,6 +177,25 @@ const RISK_REASON_LABELS: Record<string, string> = {
   LOW_REVERSIBILITY: "执行后不易撤回", ACTION_INFORMATION_MISSING: "关键信息仍不完整",
   CREDENTIAL_EXPOSURE: "存在凭据暴露风险", RESTRICTED_OPERATION: "属于受限操作",
   RESTRICTED_EXECUTION: "属于受限执行",
+};
+const CAPABILITY_LABELS: Record<string, string> = {
+  "email.send": "发送外部邮件",
+  "calendar.invite": "创建日历邀请",
+  "task.create": "创建内部任务",
+  "crm.opportunity.update": "更新商机阶段",
+  "expense.request_evidence": "请求补充报销凭证",
+};
+const TARGET_SCOPE_LABELS: Record<string, string> = {
+  external_customer: "企业外客户",
+  external_supplier: "企业外供应商",
+  internal_member: "企业内成员",
+  internal_team: "企业内团队",
+  self: "当前用户",
+};
+const VERDICT_LABELS: Record<CapabilityDecision["verdict"], string> = {
+  allow: "允许",
+  blocked: "等待条件",
+  deny: "拒绝",
 };
 const VIEW_LABELS: Record<ViewId, string> = {
   mail: "邮件", document: "文档", quote: "报价表", tasks: "任务", calendar: "日历",
@@ -569,15 +596,18 @@ function ApprovalModal({ run, evidenceCatalog, evidence, busy, onEvidence, onSub
   const [expanded, setExpanded] = useState(true);
   const status = run.control_plan.status;
   const riskReasons = run.risk.reason_codes.map(code => RISK_REASON_LABELS[code] ?? code);
+  const taskBinding = run.action.task_artifact_binding;
   return <div className={`approval-overlay ${expanded ? "" : "collapsed"}`}><section className={`approval-modal risk-${run.risk.risk_level}`} role="dialog" aria-modal="false" aria-label="动作确认">
-    <header><div><span>AGENT 请求确认</span><h2>{run.action.action_type.replaceAll("_", " ")}</h2></div><div className="approval-header-actions"><b className={`risk-badge ${run.risk.risk_level}`}>{run.risk.risk_level}</b><button aria-label={expanded ? "收起确认卡片" : "展开确认卡片"} onClick={() => setExpanded(value => !value)}>{expanded ? "−" : "+"}</button></div></header>
+    <header><div><span>Agent 请求确认</span><h2>{run.action.capability === "email.send" ? "发送客户邮件" : run.action.action_type.replaceAll("_", " ")}</h2></div><div className="approval-header-actions"><b className={`risk-badge ${run.risk.risk_level}`}>{run.risk.risk_level}</b><button aria-label={expanded ? "收起确认卡片" : "展开确认卡片"} onClick={() => setExpanded(value => !value)}>{expanded ? "−" : "+"}</button></div></header>
     {expanded && <div className="approval-expandable">
     <p className="approval-summary">{run.user_message}</p>
+    {taskBinding && <div className="approval-task-binding"><strong>基于已核对成果</strong><span>客户回复草稿 v{taskBinding.artifact_version} · 本轮汇报 v{taskBinding.task_version}</span><small>当前只是准备动作，尚未发送。执行许可只绑定这个版本；成果变化后必须重新准备。</small></div>}
     <div className="approval-risk-rule"><strong>{run.risk.risk_level} 风险判断</strong><span>{riskReasons.length ? riskReasons.join("；") : "仅草稿、只读或当前用户范围内操作，未命中额外风险因子"}</span></div>
-    <div className="approval-facts"><span><small>能力</small><strong>{run.action.capability}</strong></span><span><small>影响范围</small><strong>{run.action.target_scope}</strong></span><span><small>目标</small><strong>{run.action.recipients.join(", ") || run.action.resources.join(", ") || "当前工作区"}</strong></span></div>
-    <details className="approval-details"><summary>查看策略判断与约束 <b>⌄</b></summary><div>{Object.entries(run.control_plan.capabilities).map(([name, decision]) => <p key={name}><span><strong>{name}</strong><small>{decision.constraints.join(" · ") || "无额外约束"}</small></span><b className={decision.verdict}>{decision.verdict}</b></p>)}</div></details>
+    <div className="approval-facts"><span><small>要做什么</small><strong>{CAPABILITY_LABELS[run.action.capability] ?? run.action.capability}</strong></span><span><small>影响范围</small><strong>{TARGET_SCOPE_LABELS[run.action.target_scope] ?? run.action.target_scope}</strong></span><span><small>目标</small><strong>{run.action.recipients.join(", ") || run.action.resources.join(", ") || "当前工作区"}</strong></span></div>
+    {taskBinding && status === "WAITING_APPROVAL" && <div className="approval-next-step"><strong>为什么需要你确认</strong><span>这一步会产生面向企业外客户的发送结果。只有你批准后，系统才会签发一次性执行许可；拒绝不会改变已经完成的汇报成果。</span></div>}
+    <details className="approval-details"><summary>查看策略判断与约束 <b>⌄</b></summary><div>{Object.entries(run.control_plan.capabilities).map(([name, decision]) => <p key={name}><span><strong>{CAPABILITY_LABELS[name] ?? name}</strong><small>{decision.constraints.length ? "存在额外执行约束" : "无额外约束"}</small></span><b className={decision.verdict}>{VERDICT_LABELS[decision.verdict]}</b></p>)}</div></details>
     {status === "WAITING_EVIDENCE" && <div className="approval-gate"><strong>需要补充可信依据</strong>{run.control_plan.missing_requirements.map(requirement => { const item = evidenceCatalog[requirement]; return <label key={requirement}><span>{item?.label ?? requirement}</span>{item?.input_type === "select" ? <select value={evidence[requirement] ?? ""} onChange={e => onEvidence(requirement, e.target.value)}><option value="">请选择</option>{item.options.map(option => <option value={option.value} key={option.value}>{option.label}</option>)}</select> : <small>✓ {item?.user_action ?? "系统自动校验"}</small>}</label>})}<button className="primary-button" disabled={busy} onClick={onSubmitEvidence}>提交依据</button></div>}
-    {status === "WAITING_APPROVAL" && <div className="approval-gate"><strong>需要以下角色确认</strong>{run.control_plan.required_approvals.map(role => <div className="approval-role" key={role}><span><b>{ROLE_LABELS[role] ?? role}</b><small>{role}</small></span><div><button disabled={busy} onClick={() => onDecide(role, "rejected")}>拒绝</button><button className="primary-button" disabled={busy} onClick={() => onDecide(role, "approved")}>批准</button></div></div>)}</div>}
+    {status === "WAITING_APPROVAL" && <div className="approval-gate"><strong>需要以下角色确认</strong>{run.control_plan.required_approvals.map(role => <div className="approval-role" key={role}><span><b>{ROLE_LABELS[role] ?? "指定审批人"}</b><small>当前工作区身份</small></span><div><button disabled={busy} onClick={() => onDecide(role, "rejected")}>拒绝</button><button className="primary-button" disabled={busy} onClick={() => onDecide(role, "approved")}>批准</button></div></div>)}</div>}
     {status === "READY_TO_AUTHORIZE" && <footer className="approval-final"><div><strong>审批条件已满足</strong><small>确认后使用一次性 Permit 执行</small></div><button className="primary-button" disabled={busy} onClick={onAuthorize}>确认执行</button></footer>}
     </div>}
   </section></div>;
@@ -687,6 +717,7 @@ export default function Home() {
   const pendingTaskMutationRef = useRef<PendingTaskMutation | null>(null);
   const demo1CreateKeyRef = useRef<string | null>(null);
   const demo1CreateInFlightRef = useRef(false);
+  const taskArtifactActionKeyRef = useRef<{ artifactVersionId: string; key: string } | null>(null);
 
   useEffect(() => {
     artifactsRef.current = artifacts;
@@ -1498,6 +1529,40 @@ export default function Home() {
     } finally { setAssistantStatus(""); setBusy(false); }
   }
 
+  async function prepareTaskArtifactAction(artifactVersionId: string) {
+    if (!task || !threadId || busy) return;
+    const pendingKey = taskArtifactActionKeyRef.current;
+    const idempotencyKey = pendingKey?.artifactVersionId === artifactVersionId
+      ? pendingKey.key
+      : `task-artifact-email:${crypto.randomUUID()}`;
+    taskArtifactActionKeyRef.current = { artifactVersionId, key: idempotencyKey };
+    setBusy(true);
+    setError("");
+    setTaskError("");
+    try {
+      const snapshot = await request<RunSnapshot>(
+        `/v1/tasks/${task.task_id}/artifacts/${artifactVersionId}/actions/email-send`,
+        {
+          method: "POST",
+          headers: { "Idempotency-Key": idempotencyKey },
+          body: JSON.stringify({ thread_id: threadId }),
+        },
+      );
+      taskArtifactActionKeyRef.current = null;
+      setRun(snapshot);
+      setEvidence({});
+      setTaskRightMode("conversation");
+      setNotice("已准备受控动作；尚未发送，请复核风险与目标");
+    } catch (reason) {
+      if (reason instanceof ApiError && reason.status < 500) {
+        taskArtifactActionKeyRef.current = null;
+      }
+      setTaskError(reason instanceof Error ? reason.message : "无法准备发送动作");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function updateRun(path: string, init?: RequestInit) {
     if (!run) return;
     setBusy(true); setError("");
@@ -1659,6 +1724,8 @@ export default function Home() {
                 selectedArtifactVersionId={selectedTaskArtifactVersionId}
                 selectionMode={taskArtifactSelectionMode}
                 onSelectArtifact={selectTaskArtifact}
+                onPrepareAction={(artifactVersionId) => void prepareTaskArtifactAction(artifactVersionId)}
+                actionBusy={busy}
               />
             )}
             {taskViewMode === "manual" && viewProps && <TasksView {...viewProps}/>}
@@ -1690,6 +1757,7 @@ export default function Home() {
           onRetry={() => void (pendingTaskMutation ? retryPendingTaskMutation() : retryTaskConnection())}
           onControl={controlDemo1Task}
           onOpenArtifact={openTaskArtifact}
+          onPrepareAction={(artifactVersionId) => void prepareTaskArtifactAction(artifactVersionId)}
         />
       ) : (
         <div id={taskWorkspaceActive ? "task-side-panel" : undefined} className={`task-conversation-panel${taskWorkspaceActive ? " is-task-workspace" : ""}`} role={taskWorkspaceActive ? "tabpanel" : undefined} aria-labelledby={taskWorkspaceActive ? "task-side-tab-conversation" : undefined}>
