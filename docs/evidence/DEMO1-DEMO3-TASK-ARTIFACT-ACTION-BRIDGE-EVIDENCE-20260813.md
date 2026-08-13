@@ -7,7 +7,7 @@
 | Status | `Verified`（限定于固定客户 A、最终客户回复草稿、当前 L4 策略、Email Simulator 与被测前台路径） |
 | Decision | [`DR-0007`](../decisions/DR-0007-task-artifact-action-bridge.md) |
 | Source | [`USER-FEEDBACK-20260813-DEMO-BRIDGE-05`](../sources/USER-FEEDBACK-20260813-07-task-artifact-action-bridge.md)、`MEETING-DECK-0716-V2-01`、`SCRIPT-V5-202607` |
-| Implementation | `4f500c6` |
+| Implementation | `d827f29`；文档基线 `d1cc746` |
 
 ## 1. 验证问题与成功标准
 
@@ -76,6 +76,6 @@ Run 的批准、拒绝或执行不会回写 Task 状态。Task Commit 是成果�
 
 ## 6. 提交与 PR
 
-- Implementation commit：`4f500c6`
-- Documentation commit：本文件提交后回填
-- PR：创建后回填
+- Implementation commit：`d827f29`
+- Documentation commit：`d1cc746`
+- PR：[#12](https://github.com/Dickey007s/lenovo_agent/pull/12)，base 为 PR #11 分支

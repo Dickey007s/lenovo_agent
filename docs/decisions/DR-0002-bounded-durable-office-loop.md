@@ -140,7 +140,7 @@ PR 6 可理解性修订工程代理验证（2026-08-11）：当前浏览器 E2E 
 
 来源与新一轮语义修订工程验证（2026-08-11）：完整浏览器 E2E 为 `12 passed (44.5s)`，覆盖非 Tasks 只显示后台摘要与跳转、已知来源显示“演示数据”且原始 ID 不入普通业务 DOM、终态一键 create+start 独立新 Task 并保留旧 committed Task；另保存 `1440 x 900` Mail 摘要截图。证据独立记录在 [`DEMO1-ROUND-AND-SOURCE-CLARITY-EVIDENCE-20260811.md`](../evidence/DEMO1-ROUND-AND-SOURCE-CLARITY-EVIDENCE-20260811.md)，没有反写历史 evidence。5 人无引导任务测试与历史轮次选择仍未完成。
 
-DR-0007 Task 工件动作桥验证（2026-08-13）：实现提交 `4f500c6` 把最终 passed 客户回复按 Task/Commit/ArtifactVersion/Verification 绑定到 `email.send` Run。完整 Python `112 passed, 1 skipped (4.11s)`，完整浏览器 `29 passed (1.4m)`，Ruff、前端 lint、生产构建和治理测试通过；浏览器覆盖批准/执行与拒绝两条路径，拒绝后 Task 仍为 committed。该结果只证明固定演示地址与 Email Simulator，不证明真实发送、通用工件动作、跨进程 Run 创建幂等或用户理解。
+DR-0007 Task 工件动作桥验证（2026-08-13）：实现提交 `d827f29` 把最终 passed 客户回复按 Task/Commit/ArtifactVersion/Verification 绑定到 `email.send` Run，文档提交为 `d1cc746`，堆叠 PR 为 [#12](https://github.com/Dickey007s/lenovo_agent/pull/12)。完整 Python `112 passed, 1 skipped (4.11s)`，完整浏览器 `29 passed (1.4m)`，Ruff、前端 lint、生产构建和治理测试通过；浏览器覆盖批准/执行与拒绝两条路径，拒绝后 Task 仍为 committed。该结果只证明固定演示地址与 Email Simulator，不证明真实发送、通用工件动作、跨进程 Run 创建幂等或用户理解。
 
 ## 7. 关联项
 

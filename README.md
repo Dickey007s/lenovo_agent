@@ -223,7 +223,7 @@ V0.1 定稿基线和 Demo 1 各 PR 的实际验证结果记录在 [`DR-0002`](do
 
 报价错误修复的来源、决策、前台—后端事实链和证据分别记录在 [`USER-FEEDBACK-20260811-06`](docs/sources/USER-FEEDBACK-20260811-06-quote-calculation-grounding.md)、[`DR-0006`](docs/decisions/DR-0006-deterministic-quote-calculation.md) 和 [`QUOTE-WORKSPACE-DETERMINISTIC-CALCULATION-EVIDENCE-20260811`](docs/evidence/QUOTE-WORKSPACE-DETERMINISTIC-CALCULATION-EVIDENCE-20260811.md)。实现提交为 `2f9866f + fe865bd + e2c4b56`；全量 Python 为 `108 passed, 1 skipped (2.62s)`，报价/Conversation 聚焦为 `54 passed (1.72s)`，完整浏览器为 `27 passed (1.1m)`，其中报价浏览器为 `15 passed (23.6s)`，Ruff、前端 lint 与生产构建通过。`DR-0006` 因此仅在固定演示报价、当前公式、当前协议和被测前台恢复范围内为 `Verified`，不是生产级报价引擎或用户可用性结论。
 
-2026-08-13 的跨 Demo 迭代把最终且验证通过的客户回复草稿接入 Demo 3 治理链。实现提交 `4f500c6` 的封口结果为 Python `112 passed, 1 skipped (4.11s)`、完整 system Edge `29 passed (1.4m)`、Demo 1 浏览器 `13 passed (1.0m)`，Ruff、前端 lint、生产构建与治理门槛通过。浏览器覆盖 L4 Gate、绑定版本、批准后 Permit + Email Simulator、拒绝后 Task Commit 不变以及确定性结果说明；这是固定 Fixture 的工程证据，不证明真实发送或用户已经理解。决策和证据见 [`DR-0007`](docs/decisions/DR-0007-task-artifact-action-bridge.md) 与 [`TASK-ARTIFACT-ACTION-BRIDGE-20260813`](docs/evidence/DEMO1-DEMO3-TASK-ARTIFACT-ACTION-BRIDGE-EVIDENCE-20260813.md)。
+2026-08-13 的跨 Demo 迭代把最终且验证通过的客户回复草稿接入 Demo 3 治理链。实现提交 `d827f29`、文档提交 `d1cc746` 的封口结果为 Python `112 passed, 1 skipped (4.11s)`、完整 system Edge `29 passed (1.4m)`、Demo 1 浏览器 `13 passed (1.0m)`，Ruff、前端 lint、生产构建与治理门槛通过。浏览器覆盖 L4 Gate、绑定版本、批准后 Permit + Email Simulator、拒绝后 Task Commit 不变以及确定性结果说明；这是固定 Fixture 的工程证据，不证明真实发送或用户已经理解。决策和证据见 [`DR-0007`](docs/decisions/DR-0007-task-artifact-action-bridge.md) 与 [`TASK-ARTIFACT-ACTION-BRIDGE-20260813`](docs/evidence/DEMO1-DEMO3-TASK-ARTIFACT-ACTION-BRIDGE-EVIDENCE-20260813.md)，对应堆叠 PR [#12](https://github.com/Dickey007s/lenovo_agent/pull/12)。
 
 ## 数据、身份与安全边界
 

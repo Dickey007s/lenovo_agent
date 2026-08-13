@@ -24,7 +24,7 @@
 | `USER-FEEDBACK-20260813-DEMO-BRIDGE-05` | Stakeholder feedback | [`USER-FEEDBACK-20260813-07-task-artifact-action-bridge.md`](../sources/USER-FEEDBACK-20260813-07-task-artifact-action-bridge.md) | 继续按三个 Demo 的高层关系迭代，并把设计、实现和交互一起推进 | 不是用户研究，不证明当前交互有效 |
 | `MEETING-DECK-0716-V2-01` | 阶段汇报原件 | `docs/final-reference/0716-v2.pptx`，原件与哈希登记见 [`SOURCE_REGISTER`](SOURCE_REGISTER.md) | 三 Demo 分别处理持续任务、复杂协作和动作风险；共享工件、证据、控制与 Trace | 内部阶段材料，不证明 Runtime 或产品效果 |
 | `SCRIPT-V5-202607` | 内部设计讲稿 | [`未来办公Agent_一小时汇报讲稿_v5.md`](../final-reference/未来办公Agent_一小时汇报讲稿_v5.md)，P03、P04、P21、P22 | P22 明确 Demo 1 输出已验证工件与 Trace，Demo 3 控制真实动作；P03/P04 要求通过稳定接口接入统一 Runtime | 内部衍生设计，不是独立行业证据或运行验证 |
-| `TASK-ARTIFACT-ACTION-BRIDGE-20260813` | 源码、自动化、浏览器与截图证据 | [`DEMO1-DEMO3-TASK-ARTIFACT-ACTION-BRIDGE-EVIDENCE-20260813.md`](../evidence/DEMO1-DEMO3-TASK-ARTIFACT-ACTION-BRIDGE-EVIDENCE-20260813.md)，实现提交 `4f500c6` | 当前固定纵切已实现版本绑定、L4 Gate、批准/拒绝、Permit、Simulator 和结果说明 | 不证明真实邮件、通用 Artifact Action、Adaptive Swarm、生产持久化或用户理解 |
+| `TASK-ARTIFACT-ACTION-BRIDGE-20260813` | 源码、自动化、浏览器与截图证据 | [`DEMO1-DEMO3-TASK-ARTIFACT-ACTION-BRIDGE-EVIDENCE-20260813.md`](../evidence/DEMO1-DEMO3-TASK-ARTIFACT-ACTION-BRIDGE-EVIDENCE-20260813.md)，实现提交 `d827f29`，文档提交 `d1cc746` | 当前固定纵切已实现版本绑定、L4 Gate、批准/拒绝、Permit、Simulator 和结果说明 | 不证明真实邮件、通用 Artifact Action、Adaptive Swarm、生产持久化或用户理解 |
 
 ## 3. 决策与备选
 
@@ -62,7 +62,7 @@ Task 本身在 Commit 后保持终态，不因为派生 Run 的批准、拒绝�
 
 ## 6. 验证与边界
 
-独立证据见 [`DEMO1-DEMO3-TASK-ARTIFACT-ACTION-BRIDGE-EVIDENCE-20260813.md`](../evidence/DEMO1-DEMO3-TASK-ARTIFACT-ACTION-BRIDGE-EVIDENCE-20260813.md)。实现提交 `4f500c6` 的封口结果：Python 全量 `112 passed, 1 skipped (4.11s)`；完整 system Edge 浏览器 `29 passed (1.4m)`，其中 Demo 1 文件 `13 passed (1.0m)`；治理 `4 passed`；Ruff、前端 lint、Next.js build 和 diff-check 通过。两张 `1440 x 900` 截图记录 Gate 与 Simulator 结果。
+独立证据见 [`DEMO1-DEMO3-TASK-ARTIFACT-ACTION-BRIDGE-EVIDENCE-20260813.md`](../evidence/DEMO1-DEMO3-TASK-ARTIFACT-ACTION-BRIDGE-EVIDENCE-20260813.md)。实现提交 `d827f29`、文档提交 `d1cc746` 的封口结果：Python 全量 `112 passed, 1 skipped (4.11s)`；完整 system Edge 浏览器 `29 passed (1.4m)`，其中 Demo 1 文件 `13 passed (1.0m)`；治理 `4 passed`；Ruff、前端 lint、Next.js build 和 diff-check 通过。两张 `1440 x 900` 截图记录 Gate 与 Simulator 结果。
 
 因此本决策仅在固定客户 A、最终回复草稿、当前 L4 规则、内存浏览器路径和 Email Simulator 内为 `Verified`。它不覆盖真实邮箱、用户可用性、任意工件/动作映射、多收件人、附件、Task 派生 Run 的 PostgreSQL 重启恢复、多实例创建幂等、数据库 CAS、真实身份、历史轮次选择、Adaptive Swarm 或生产 SLA。
 
@@ -72,5 +72,6 @@ Task 本身在 Commit 后保持终态，不因为派生 Run 的批准、拒绝�
 - Evidence：`TASK-ARTIFACT-ACTION-BRIDGE-20260813`
 - API：`POST /v1/tasks/{task_id}/artifacts/{artifact_version_id}/actions/email-send`
 - 协议：`TaskArtifactBinding`、`ProposedActionSpec.task_artifact_binding`
-- 实现提交：`4f500c6`
-- PR：本分支创建后回填
+- 实现提交：`d827f29`
+- 文档提交：`d1cc746`
+- PR：[#12](https://github.com/Dickey007s/lenovo_agent/pull/12)，堆叠在开放的 PR #11 之上
