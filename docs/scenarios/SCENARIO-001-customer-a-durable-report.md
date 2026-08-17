@@ -104,7 +104,22 @@ Task UI 与 Action Gate 必须各自读取服务端事实。Gate 打开时视觉
 - 控制反馈：本地 Demo 的控制事件到可见服务端确认目标 `P95 ≤ 2s`。尚未采集时延分布。
 - 用户理解、认知负担和接管效果尚未测量，不能在功能验收后自动宣称改善。
 
-## 8. 证据位置
+## 8. 当前渐进主路径（2026-08-17）
+
+旧版 start 一次返回 waiting input 的描述保留为历史基线；当前场景要求浏览器按已确认 Snapshot 协调以下服务端状态：
+
+| 交互 | Snapshot/version | 可见事实 |
+| --- | --- | --- |
+| 创建 | `ready / contract` v1 | 三项目标，零工件 |
+| 开始准备 | `running / observe` v2 | 读取允许来源 |
+| 第一次 advance | `running / plan` v3 | 三交付物工作包 |
+| 第二次 advance | `running / act` v4 | 候选材料 |
+| 第三、四次 advance | `verifying / verify` v5，`waiting_input / verify` v6 | 5 工件、1 冲突、2 已验证 |
+| 解决证据 | `committed / commit` v7 | 最终 Commit 与成果 |
+
+每个 mutation 都带 expected version 和幂等键，浏览器关闭不会触发后台继续；重开后从 stage_records/Snapshot 继续。Plan/Act 使用严格 `deepseek-v4-pro` 适配器，只有与服务端批准模板逐字段一致的文字才记录为 `model`，否则显式回退；Observe/Verify/Commit 确定性完成。完整 Demo 契约还校验预算与截止时间。预算是 steps/tool calls/runtime，不是 token 费用；模型 smoke 不证明质量。旧 Snapshot 缺 stage_records 时默认空数组兼容读取。
+
+## 9. 证据位置
 
 - 协议与状态机：[`TASK_RUNTIME_PROTOCOL.md`](../contracts/TASK_RUNTIME_PROTOCOL.md)
 - UI—服务端事实：[`UI_SERVER_FACT_MATRIX.md`](../contracts/UI_SERVER_FACT_MATRIX.md)

@@ -115,6 +115,18 @@ sequenceDiagram
 
 Workspace revision 恢复是独立于 Task mutation 的较小机制：保存 409 或 `workspace.conflict` 后保留草稿并显式选择最新/三方重应用，报价浏览器已覆盖不同字段合并与同字段冲突。它不使用 Task 的 idempotency key、Snapshot sequence 或 SSE `after`，也不证明数据库 CAS、多实例锁、离线重放或历史版本浏览。
 
+## 当前 Demo 1 渐进映射（2026-08-17）
+
+| 用户看到的状态 | 服务端事实 | 浏览器行为与边界 |
+| --- | --- | --- |
+| 读取资料 | v2 `running / observe` + `stage_records[observe]` | `start` 后显示；确认 Snapshot 后才请求下一步 |
+| 拆分任务 | v3 `running / plan` + Plan record | 严格适配器结果只作为摘要/详情；身份和来源由服务端重建 |
+| 生成材料 | v4 `running / act` + Act record | 显示候选工件，不能显示为已验证 |
+| 核对事实 | v5 `verifying / verify`，随后 v6 `waiting_input / verify` | v6 显示 5 工件、1 open conflict、2 passed verification |
+| 已提交 | v7 `committed / commit` + `last_commit` | 仅收到服务端 Commit 才显示完成 |
+
+`stage_records` 缺失时使用默认空数组以兼容旧 Snapshot；客户端不能用动画、SSE payload、版本猜测或 token 预算推导阶段。关闭浏览器只保留最后一次持久化 mutation，重新打开后继续协调；无后台 scheduler。Plan/Act 使用 `deepseek-v4-pro`，只有与服务端批准模板逐字段一致的文字才记录为 `model`，否则显式 `template_fallback`；smoke 只证明连接和严格响应，不证明质量。预算是 steps/tool calls/runtime，不是 token cost；跨实例无分布式 LLM lease。原始 `fixture:`、思维链和内部 ID 只在受控服务端边界处理，普通 DOM 使用“演示数据”业务标签。
+
 ## 5. 实现与验证责任
 
 | PR | 前台最小输出 | 后端事实 | 必须提供的证据 |

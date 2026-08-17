@@ -50,7 +50,8 @@ $headers = @{
 | POST | `/tasks` | 从 `TaskContractDraft` 创建服务端 Task；可带 `Idempotency-Key` |
 | GET | `/tasks` | 按更新时间倒序列出当前 Owner 的 TaskSnapshot |
 | GET | `/tasks/{task_id}` | 读取当前 Owner 的单个 TaskSnapshot |
-| POST | `/tasks/{task_id}/start` | 启动固定 Demo 1 Fixture 状态转换 |
+| POST | `/tasks/{task_id}/start` | 仅进入 v2 `running / observe` |
+| POST | `/tasks/{task_id}/advance` | 以一个 expected version + idempotency key 完成一个当前阶段 |
 | POST | `/tasks/{task_id}/controls` | 提交任务或分支控制命令 |
 | POST | `/tasks/{task_id}/artifacts/{artifact_version_id}/actions/email-send` | 将已提交、已通过验证的客户回复草稿准备为绑定版本的治理 Run；不会直接发送 |
 | GET | `/tasks/{task_id}/events?after={sequence}` | 回放并订阅该 Task 的有序事件 SSE |
@@ -193,7 +194,7 @@ $task.task_id
 Invoke-RestMethod -Method Get -Uri "$base/tasks/$($task.task_id)" -Headers $headers
 ```
 
-完成一轮后，把 key 改为新的轮次值会创建另一项独立 Task。相同 Owner+key 始终定位同一 Task 并返回其当前持久化 Snapshot；不同 key 生成不同 Task ID。当前 Web 的“开始新一轮汇报”是客户端组合动作：先调用本接口创建新 Task，再以新 Task 的版本调用 `/tasks/{task_id}/start`，固定路径通常直接返回 `waiting_input / verify`。它不会把旧 Task 重置为 `ready`。Task 列表按更新时间倒序返回，前端刷新时优先恢复未终止 Task，否则显示最近终态 Task；列表虽然保留多轮 Snapshot，当前 Web 尚无历史轮次选择入口。
+完成一轮后，把 key 改为新的轮次值会创建另一项独立 Task。相同 Owner+key 始终定位同一 Task 并返回其当前持久化 Snapshot；不同 key 生成不同 Task ID。当前 Web 的“开始新一轮汇报”是客户端组合动作：先调用本接口创建新 Task，再以新 Task 的版本调用 `/tasks/{task_id}/start`，随后按 Snapshot 确认逐次调用 `/tasks/{task_id}/advance`。它不会把旧 Task 重置为 `ready`。Task 列表按更新时间倒序返回，前端刷新时优先恢复未终止 Task，否则显示最近终态 Task；列表虽然保留多轮 Snapshot，当前 Web 尚无历史轮次选择入口。
 
 也可以提交严格的 `TaskContractDraft`。下面只展示最小结构，实际字段和限制以 `packages/contracts/task_models.py` 为准：
 
@@ -251,7 +252,7 @@ $task = Invoke-RestMethod -Method Post -Uri "$base/tasks/$($task.task_id)/start"
   -Headers $headers -ContentType "application/json" -Body $start
 ```
 
-当前 `start` 仅物化固定客户 A Fixture，不调用 LLM 或真实 Connector。它在一次服务端 mutation 中追加阶段事件、五个 ArtifactVersion、三个 VerificationReport 和一个收入冲突；最终 Snapshot 进入 `waiting_input / verify`，只有经营分析分支为 `waiting_evidence`，另外两个固定分支为 `committed`。这些阶段事件在事务提交后才可见，不能解释成浏览器观察到了一个持续后台进程。
+当前 `start` 只把 Snapshot 从 v1 `ready / contract` 推进到 v2 `running / observe`，不调用 LLM。浏览器再调用 `advance`，每次只完成当前阶段：v3 `plan`、v4 `act`、v5 `verifying / verify`、v6 `waiting_input / verify`。v6 的固定事实是 5 个 ArtifactVersion、1 个 open Conflict、2 个 passed VerificationReport；`resolve_evidence` 成功后为 v7 `committed / commit`。固定渐进路径要求完整 Demo 契约匹配，包括预算与截止时间。Plan/Act 的严格模型调用发生在 CAS 之前，只有与服务端批准模板逐字段一致的文字才可记录为 `model`，否则使用 `template_fallback`；冲突时结果丢弃，Observe/Verify/Commit 为确定性逻辑。
 
 控制请求统一提交到 `/tasks/{task_id}/controls`：
 
@@ -269,7 +270,7 @@ $task = Invoke-RestMethod -Method Post -Uri "$base/tasks/$($task.task_id)/start"
 
 mutation 合约要求：相同 key 和相同命令返回首次 mutation 的 Snapshot，且不新增事件、ArtifactVersion 或 Commit；相同 key 被用于不同命令返回 409。内存 Store 回归已覆盖旧 key 在后续 mutation 之后仍返回原响应、Artifact lineage/head 引用、内容摘要和 Commit state hash。PR 5 又在 PostgreSQL 16.14 上跨三个顺序 API 进程验证：旧 start key 返回原 v2、旧 resolve key 返回原 v3，当前 GET 保持 v3，重放前后数据库维持 `45 events / 7 artifacts / 1 TASK_COMMITTED`。历史遗留 marker 若没有保存原 Snapshot，只在当前 Task version 仍等于 marker version 时兼容返回；发生过后续 mutation 时返回 409，而不是错误返回最新 Snapshot。
 
-`start` 会预留 4 个 step、4 次工具调用和 1 秒运行时长，`resolve_evidence` 会预留 1 个 step 和 1 秒运行时长；预计用量超过契约预算或已到 `deadline_at` 时返回 409，且不产生 mutation。当前还没有专门的预算耗尽恢复 API 或完整前台引导。
+每次 `start/advance/resolve_evidence` 都按当前契约预留步骤、工具调用和运行时长；预计用量超过预算或已到 `deadline_at` 时返回 409 且不产生 mutation。该预算不是 token 成本，也不提供供应商账单事实。浏览器关闭不会触发后台继续执行；同进程相同 advance key 有锁保护，跨实例没有分布式 LLM lease。
 
 PR 4 交付物工作区直接使用创建、读取、start、control 和 SSE 对账所返回的同一个 `TaskSnapshot`：
 
@@ -495,3 +496,19 @@ SSE 在响应已经开始后无法再改变 HTTP 状态码，因此流内错误�
 - Workspace revision 目前不是数据库原子 compare-and-swap；多 API 实例并发写、跨实例锁和 Conversation 结果重放均未实现或验证。
 
 Task API 当前只把上述能力暴露给固定 Demo 1 Fixture。PR 4 浏览器 E2E 覆盖创建、start、冲突、Steer accepted、resolve、Commit、交付物读取，以及 start 请求发送前 abort 后的 reload/同 key 重试。PR 5 在 PostgreSQL 16.14 和三个顺序 API 进程上验证 v2/v3 Snapshot、Artifact 和 Commit 恢复及幂等零重复；同页 system Edge 运行验证 API 停止、控制禁用、连接文案和新进程后的 GET 对账。DR-0007 进一步验证了一条窄桥：最终客户回复草稿可按 Task/Commit/Artifact/Verification 精确绑定到 `email.send` 治理 Run，批准后仍只执行 Simulator。它不等于通用 Task Artifact 动作框架，也没有验证 Task 或数据库重启后的 Run 幂等恢复、真实收件人目录、真实邮件 Connector、附件、批量动作或用户价值。Task Control 仍不能直接发送邮件或写入企业系统；副作用必须经过 RunService、Policy/Evidence/Approval、Permit 与 Tool Gateway。其他未覆盖边界仍包括请求已到服务端但响应丢失、断线期间事件回放、数据库进程故障、多实例通知和历史轮次 UI。非 Tasks 工作区是否展示决定控制、按钮叫什么以及“开始新一轮汇报”如何串联 create/start 都是客户端交互，不是新的 API 能力。自动化通过也不能证明普通用户理解这些语义。证据见 [`PR 4 Frontend E2E`](evidence/DEMO1-PR4-FRONTEND-E2E-EVIDENCE.md)、[`PR 5 PostgreSQL-backed API Restart`](evidence/DEMO1-PR5-POSTGRES-BACKED-API-RESTART-EVIDENCE.md) 与 [`DR-0007 Task Artifact Action Bridge`](evidence/DEMO1-DEMO3-TASK-ARTIFACT-ACTION-BRIDGE-EVIDENCE-20260813.md)。
+
+## 9. Demo 1 当前渐进协议（2026-08-17）
+
+以下覆盖旧版“start 一次物化终态”的描述：
+
+| 请求 | 成功结果 |
+| --- | --- |
+| `POST /v1/demo1/tasks` | v1 `ready / contract`，无工件 |
+| `POST /v1/tasks/{id}/start` | v2 `running / observe`，仅完成 Observe 入口 |
+| 第一次 `advance` | v3 `running / plan` |
+| 第二次 `advance` | v4 `running / act` |
+| 第三次 `advance` | v5 `verifying / verify` |
+| 第四次 `advance` | v6 `waiting_input / verify`，5 工件、1 open conflict、2 passed verification |
+| `resolve_evidence` | v7 `committed / commit`，写入最终 `TaskCommit` |
+
+每次 mutation 都要求 `expected_task_version` 和命令级 `idempotency_key`；成功只前进一个 version，重复 key 重放首次 Snapshot，旧 version 返回 409。Task SSE 只发现事件，客户端随后 GET Snapshot；没有后台 worker。`stage_records` 是业务 UI 的权威阶段事实，旧 Snapshot 缺失该字段时按空数组兼容读取，不自动伪造渐进过程。

@@ -33,6 +33,7 @@
 | `C-013` | Stakeholder feedback、源码、浏览器与截图 | 用途不清反馈触发首屏、单次开始、决定后果和完成成果重排；当前固定 Fixture 的工程代理回归与截图通过 | `USER-FEEDBACK-20260811-USABILITY-02`、[`TASK-DIRECTOR-USABILITY-AUDIT-DEMO1-PR6-20260811`](../evidence/DEMO1-PR6-USABILITY-COMPREHENSION-AUDIT-20260811.md) | 支持当前 DOM、动作、服务端事实和被测视口满足预设门槛 | 自动化不证明真实用户理解；5 人无引导测试未运行，`DR-0005` 仍为 `Draft` |
 | `C-014` | Stakeholder feedback、源码、浏览器与截图 | 内部来源和“再次演示”歧义触发跨工作区职责、演示数据标签和独立新轮次修订；完整浏览器 E2E 与 Mail 摘要截图通过 | `USER-FEEDBACK-20260811-ROUND-AND-SOURCE-03`、[`TASK-DIRECTOR-ROUND-AND-SOURCE-CLARITY-20260811`](../evidence/DEMO1-ROUND-AND-SOURCE-CLARITY-EVIDENCE-20260811.md) | 支持非 Tasks 仅摘要/跳转、原始来源 ID 不入普通业务 DOM、新一轮 create+start 且旧 Task 保留 | 自动化不证明用户理解；历史轮次选择、真实 Connector 和通用后台 Loop 未实现，`DR-0005` 仍为 `Draft` |
 | `C-015` | Stakeholder direction、源码、自动化与浏览器证据 | 固定 Demo 1 的已验证客户回复可精确绑定到 Demo 3 治理 Run，前台将准备、批准与执行分开，并在拒绝/失败时保留 Task Commit | `USER-FEEDBACK-20260813-DEMO-BRIDGE-05`、[`DR-0007`](DR-0007-task-artifact-action-bridge.md)、[`TASK-ARTIFACT-ACTION-BRIDGE-20260813`](../evidence/DEMO1-DEMO3-TASK-ARTIFACT-ACTION-BRIDGE-EVIDENCE-20260813.md) | 支持固定 `reply_draft -> email.send Simulator` 的跨 Demo 纵切、绑定重校验与幂等创建 | 不证明通用 Task Artifact 动作、真实发送、跨进程 Run 创建幂等或用户价值 |
+| `C-016` | Stakeholder feedback、源码、自动化、模型 smoke 与截图 | 固定 Demo 1 不再从 start 直接跳到 Verify，而是把 Observe、Plan、Act、Verify 分成服务端确认的可恢复阶段；完整 Demo 契约与 Plan/Act 批准文字由服务端严格校验 | `USER-FEEDBACK-20260817-02`、[`DR-0009`](DR-0009-progressive-demo1-stages.md)、[`DEMO1-PROGRESSIVE-STAGES-20260817`](../evidence/DEMO1-PROGRESSIVE-STAGES-EVIDENCE-20260817.md) | 支持固定 Fixture 的阶段协议、回看、刷新恢复、候选压缩和被测桌面/移动交互 | 不证明用户理解提升、后台无人值守、多实例 LLM 去重、真实 token 成本、模型质量或真实 Connector |
 | `H-001` | 待验证假设 | Task Bar 与分支列表能降低用户恢复上下文的成本 | 尚无目标用户研究 | 指导前台原型和指标 | `Draft hypothesis`，不得汇报为已提升体验 |
 | `H-002` | 待验证假设 | 冲突只暂停受影响分支能减少等待且不扩散错误 | 固定 Fixture 已有工程行为；无真实任务收益数据 | 指导分支隔离测试 | 功能正确不等于真实业务收益，仍是 `Draft hypothesis` |
 | `H-003` | 待验证假设 | 客户 A 场景代表联想目标办公用户的高价值流程 | 尚无访谈/任务频率证据 | 仅作为 Demo Fixture | 需要情境访谈与真实任务样本验证 |
@@ -142,7 +143,13 @@ PR 6 可理解性修订工程代理验证（2026-08-11）：当前浏览器 E2E 
 
 DR-0007 Task 工件动作桥验证（2026-08-13）：实现提交 `d827f29` 把最终 passed 客户回复按 Task/Commit/ArtifactVersion/Verification 绑定到 `email.send` Run，文档提交为 `d1cc746`，堆叠 PR 为 [#12](https://github.com/Dickey007s/lenovo_agent/pull/12)。完整 Python `112 passed, 1 skipped (4.11s)`，完整浏览器 `29 passed (1.4m)`，Ruff、前端 lint、生产构建和治理测试通过；浏览器覆盖批准/执行与拒绝两条路径，拒绝后 Task 仍为 committed。该结果只证明固定演示地址与 Email Simulator，不证明真实发送、通用工件动作、跨进程 Run 创建幂等或用户理解。
 
-## 7. 关联项
+## 7. 2026-08-17 渐进 Runtime 修订
+
+本节是 Demo 1 当前语义，对本决策中“start 一次同步物化 Observe/Plan/Act/Verify”的历史描述作替代；历史 PR/evidence 数字不反写。现在 create 为 v1 `ready / contract`，start 仅产生 v2 `running / observe`，浏览器协调四次幂等 `advance` 得到 v3 Plan、v4 Act、v5 Verify、v6 `waiting_input / verify`，解决证据后 v7 `committed / commit`。v6 固定事实为 5 个工件、1 个 open conflict、2 个 passed verification。
+
+Plan/Act 通过严格 `TaskStageAgent` 调用当前 `deepseek-v4-pro`；只有与服务端批准模板逐字段一致的用户文字才记录为 `model`，否则记录 `template_fallback`。Observe/Verify/Commit 保持确定性。模型调用在 CAS 前，版本冲突时结果丢弃，模型不能决定身份、来源、状态、冲突、验证或 Commit。完整 Demo 契约还校验预算与截止时间。`stage_records` 是 UI 事实并兼容旧快照默认空数组。浏览器关闭后停在已持久化阶段，重新打开再继续；没有后台 scheduler。预算指 steps/tool calls/runtime，不是 token cost；同进程同 key 去重，跨实例无 LLM lease。模型 smoke 只证明连通和严格响应，不证明质量。
+
+## 8. 关联项
 
 - 场景：[`SCENARIO-001`](../scenarios/SCENARIO-001-customer-a-durable-report.md)
 - 来源：[`SOURCE_REGISTER.md`](SOURCE_REGISTER.md)

@@ -64,12 +64,12 @@ V0.1 重点验证三件事：
 
 - `TaskService` 从严格的 `TaskContractDraft` 创建服务端拥有的 `TaskContract`、`TaskSnapshot`、三个初始 `BranchSnapshot` 和首条 `TASK_CREATED`。新任务仍从 `ready / contract` 开始。
 - 完成、失败或取消后，Tasks 工作区右上角显示“开始新一轮汇报”。这不是把当前 Task 重置成可启动状态：前端使用新的 `Idempotency-Key` 创建独立 Task，并立即启动新 Task；旧 Task、工件、事件和 Commit 不被重置或覆盖。服务端列表会保留多轮 Task，但前端尚无历史轮次选择入口。
-- `POST /v1/tasks/{task_id}/start` 对固定客户 A Fixture 执行一次确定性状态转换：产生 Observe、Plan、Act、Verify 事件，追加 ArtifactVersion 和 VerificationReport，并把 2,400 万元正式口径与 2,680 万元预测口径的冲突限制在经营分析分支。该路径不调用 LLM，也不读取真实邮箱、CRM、预测表或项目系统。
+- `POST /v1/tasks/{task_id}/start` 只把固定客户 A Task 从 `ready / contract` 推进到 `running / observe`（v2）；浏览器随后以带版本和幂等键的 `POST /v1/tasks/{task_id}/advance` 一次推进一个阶段：v3 Plan、v4 Act、v5 Verify、v6 `waiting_input / verify`。Plan/Act 通过严格 `TaskStageAgent` 调用当前配置的 `deepseek-v4-pro`；只有与服务端批准模板逐字段一致的业务文字才记录为 `model`，否则显式 `template_fallback`。Observe/Verify/Commit 仍由确定性服务完成。
 - `POST /v1/tasks/{task_id}/controls` 接受带 `expected_task_version` 和 `idempotency_key` 的 Steer、Pause、Resume、Take over、Return control 与 Resolve evidence。分支控制只有在服务端返回新 Snapshot 后才显示为已应用；Steer 当前只进入 `accepted` 时，前端只显示“方向指令已记录，等待后续循环应用”。
 - `TaskStore` 的内存与 PostgreSQL 实现包含 Snapshot、TaskEvent 和 ArtifactVersion 的 mutation 路径。`start` 和 `resolve_evidence` 会在写入前校验预计步骤、工具调用、运行时长和截止时间，超限时拒绝 mutation。PR 5 已用 PostgreSQL 16.14 隔离数据库和三个顺序 API 进程验证 v2/v3 Snapshot 恢复、原幂等响应重放，以及 Event/ArtifactVersion/Commit 零新增。
 - 根路径默认进入经营汇报任务。初始列表返回前只显示读取态，不允许重复创建；确认没有 Task 后，空态说明要得到经营分析、风险页和客户回复草稿，“开始准备汇报”一次点击完成创建与启动。Conflict 顶部只保留弱化的“查看待确认项”定位，真正改变状态的主动作只有“采用正式口径并继续核对”；Committed 转入成果复核。主摘要只保留材料核对、业务状态和同步状态，版本、预算、Owner 等内部运行字段不再抢占业务主路径。
 - 冲突决定、候选依据和分支控制只在 Tasks 工作区显示。邮件、文档等非 Tasks 工作区的右侧只保留“后台任务”摘要与“打开任务 / 前往处理 / 查看任务 / 查看汇报”入口；点击只切换到 Tasks，不提交 Task Control。
-- 任务进度仍来自同一 `TaskSnapshot`。读取资料、拆分任务、生成材料、核对事实、准备完成五阶段只是服务端 phase 的用户语言投影；三个材料泳道只展示当前材料、核对结果/冲突和是否纳入本轮成果，视觉阶段、连接线和颜色不构成新的后台进度事实。
+- 任务进度仍来自同一 `TaskSnapshot`，而 `stage_records` 是每个阶段的服务端 UI 事实：读取资料、拆分任务、生成材料、核对事实分别对应独立 Snapshot/version、摘要、详情、工件引用、来源和时间。v6 固定事实为 5 个工件、1 个开放冲突、2 个已验证工件；解决冲突后 v7 为 `committed / commit`。视觉阶段、连接线和颜色不能自行推断进度。
 - 收入冲突区在提交前同时说明“为什么需要你”和“确认后会发生什么”，主动作仍提交 `resolve_evidence` 并采用契约内 CRM 正式来源。查看材料是次级动作；Steer、Pause 和 Take over 收入“其他处理方式”。Steer 提交后仍只显示“已记录，等待后续循环应用”，新信息层级没有新增后端协议、控制种类或真实 Connector。
 - 完成态直接列出 `last_commit` 支持的三项可复核成果，并明确客户回复仍为草稿、未发送；不再用“没有待决策项”代表完成。每个 Branch head 可在“成果”中查看当前版本、验证、冲突、结构化内容、来源、lineage 与 Commit 证据；默认 mutation 后跟随新 head，用户主动查看旧版本时显示明确历史 banner 和返回动作。
 - “执行记录”保留原手工待办编辑流程。固定 Demo 1 的四个已知 `source_ref` 投影为“演示数据 · 客户往来邮件 / CRM 正式收入记录 / 收入预测表 / 客户项目周报（版本）”；原始 `fixture:` 标识和未知来源值不进入普通业务 DOM，未知值显示隐藏占位。服务端仍保存原值用于校验与审计；这只是前端第二道防线，不代表服务端数据删除，也不是通用字段安全保证。
@@ -77,7 +77,7 @@ V0.1 重点验证三件事：
 - 最终提交且验证通过的客户回复草稿现在可以进入 Demo 3 治理链。完成态只提供“准备发送客户回复”：服务端把 Task、Commit、ArtifactVersion、内容摘要和 VerificationReport 绑定到 `ProposedActionSpec`，确认卡展示版本、L4 原因、外部目标和为什么必须由人确认；批准后才签发一次性 Permit 并调用 Email Simulator。绑定变化时旧 Action 失效，拒绝或动作失败不会回滚已完成的 Task Commit。
 - Action Gate 打开时保留后台任务摘要，但 Task 跳转与 Tasks 中的决定控制不可用。Gate 使用右侧完整独立网格行，收起后把空间归还给对话。当前 Task 派生动作只支持固定客户 A 的最终回复草稿与演示地址，不是通用 Artifact Action registry。
 
-这仍是固定演示数据的同步纵切，不是通用后台调度器或真实 Connector。`start` 在一次 mutation 中物化阶段 Trace，浏览器在事务提交后才看到结果；人工编辑后产生新版本、历史轮次选择、预算/截止时间拒绝后的完整恢复 UI、单分支失败、服务端已提交但响应丢失、断线期间事件回放、数据库进程重启、已有库迁移、多实例通知和 Task 派生 Run 的 PostgreSQL 恢复仍待验证。Task 恢复也不等于 Conversation 恢复，Thread/Message 仍在 API 内存中。自动化通过只证明预设 DOM、动作调用和服务端事实一致，不能证明目标用户已经理解这些文案和流程。跨 Demo 纵切证据见 [`DR-0007`](docs/decisions/DR-0007-task-artifact-action-bridge.md) 与 [`Task Artifact → Action Evidence`](docs/evidence/DEMO1-DEMO3-TASK-ARTIFACT-ACTION-BRIDGE-EVIDENCE-20260813.md)。
+这仍是固定演示数据的单 Task 纵切，不是通用后台调度器或真实 Connector。浏览器在每次 Snapshot 确认后协调下一次 `advance`；关闭浏览器后停在最后一个已持久化阶段，重新打开再继续。预算当前是步骤、工具调用和运行时长预算，不是 token 成本或供应商账单；同进程同 key 有并发去重，跨实例只有 CAS/幂等保护而没有分布式 LLM lease。模型 smoke 只证明连通和严格响应形状，不证明生成质量。人工编辑后产生新版本、响应丢失、断线事件回放、数据库故障/迁移、多实例通知、通用后台 Loop 和目标用户理解仍待验证。Task 恢复也不等于 Conversation 恢复，Thread/Message 仍在 API 内存中。
 
 ### Demo 2 智能工作驾驶舱第一纵切（DR-0008，限定范围 Verified）
 
@@ -146,6 +146,8 @@ flowchart LR
 - [Demo 2 可解释 Admission 决策（限定范围 Verified）](docs/decisions/DR-0008-demo2-explainable-admission.md)
 - [Demo 2 智能工作驾驶舱场景（限定范围 Verified）](docs/scenarios/SCENARIO-002-demo2-explainable-admission.md)
 - [Demo 2 PR-1 工程证据](docs/evidence/DEMO2-PR1-EXPLAINABLE-ADMISSION-EVIDENCE-20260817.md)
+- [Demo 1 渐进阶段决策（限定范围 Verified）](docs/decisions/DR-0009-progressive-demo1-stages.md)
+- [Demo 1 渐进阶段工程证据](docs/evidence/DEMO1-PROGRESSIVE-STAGES-EVIDENCE-20260817.md)
 - [来源台账](docs/decisions/SOURCE_REGISTER.md)
 
 ## 目录结构
@@ -235,6 +237,10 @@ V0.1 定稿基线和 Demo 1 各 PR 的实际验证结果记录在 [`DR-0002`](do
 报价错误修复的来源、决策、前台—后端事实链和证据分别记录在 [`USER-FEEDBACK-20260811-06`](docs/sources/USER-FEEDBACK-20260811-06-quote-calculation-grounding.md)、[`DR-0006`](docs/decisions/DR-0006-deterministic-quote-calculation.md) 和 [`QUOTE-WORKSPACE-DETERMINISTIC-CALCULATION-EVIDENCE-20260811`](docs/evidence/QUOTE-WORKSPACE-DETERMINISTIC-CALCULATION-EVIDENCE-20260811.md)。实现提交为 `2f9866f + fe865bd + e2c4b56`；全量 Python 为 `108 passed, 1 skipped (2.62s)`，报价/Conversation 聚焦为 `54 passed (1.72s)`，完整浏览器为 `27 passed (1.1m)`，其中报价浏览器为 `15 passed (23.6s)`，Ruff、前端 lint 与生产构建通过。`DR-0006` 因此仅在固定演示报价、当前公式、当前协议和被测前台恢复范围内为 `Verified`，不是生产级报价引擎或用户可用性结论。
 
 2026-08-13 的跨 Demo 迭代把最终且验证通过的客户回复草稿接入 Demo 3 治理链。实现提交 `d827f29`、文档提交 `d1cc746` 的封口结果为 Python `112 passed, 1 skipped (4.11s)`、完整 system Edge `29 passed (1.4m)`、Demo 1 浏览器 `13 passed (1.0m)`，Ruff、前端 lint、生产构建与治理门槛通过。浏览器覆盖 L4 Gate、绑定版本、批准后 Permit + Email Simulator、拒绝后 Task Commit 不变以及确定性结果说明；这是固定 Fixture 的工程证据，不证明真实发送或用户已经理解。决策和证据见 [`DR-0007`](docs/decisions/DR-0007-task-artifact-action-bridge.md) 与 [`TASK-ARTIFACT-ACTION-BRIDGE-20260813`](docs/evidence/DEMO1-DEMO3-TASK-ARTIFACT-ACTION-BRIDGE-EVIDENCE-20260813.md)，对应堆叠 PR [#12](https://github.com/Dickey007s/lenovo_agent/pull/12)。
+
+> 说明：上方历史回归段落中“固定 Demo 1 Task 测试不调用真实 LLM”仅描述旧 atomic 测试；当前 progressive Runtime 的运行配置允许 Plan/Act 通过严格适配器调用 `deepseek-v4-pro`，单元测试默认注入确定性 agent。模型 smoke 仍只证明连通和严格响应，不证明质量。
+
+2026-08-17 的渐进 Runtime 修订实现为 `13c9c13`：start 只进入 Observe，四次 `advance` 才依次确认 Plan、Act、Verify 和待决策状态，解决证据后提交；完整 Demo 契约（含预算与截止时间）和 Plan/Act 安全文本均在服务端校验。封口结果为 Python `138 passed, 1 skipped (3.14s)`、完整浏览器 `35 passed (1.9m)`、渐进主路径连续三次 `3 passed (29.5s)`，Ruff、前端 lint/build 与治理门槛通过；八张截图覆盖阶段等待、候选回看、核对进展、移动决策和成果终态。该结论只证明固定 Fixture 的协议与被测交互，不证明后台无人值守、模型质量或用户理解改善。
 
 ## 数据、身份与安全边界
 

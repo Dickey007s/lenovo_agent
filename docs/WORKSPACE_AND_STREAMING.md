@@ -237,3 +237,13 @@ Conversation 创建的 Run 绑定发起它的真实 Thread；continue stream 会
 - 报价核算只覆盖数量、标准价和单行折后比例，不含税费、汇率、阶梯价、套餐依赖或真实审批规则；当前来源为固定演示数据，不访问真实 CRM/CPQ/ERP。
 - SSE 没有断线游标恢复；Run 审计流单独支持 `after` 序号续订。
 - 动作结果的 `message.completed` 重放缓存与 Conversation Thread 一样位于单 API 进程内，重启后不恢复。
+
+## 10. Demo 1 Task 阶段与浏览器协调（2026-08-17）
+
+Tasks 工作区的“读取资料 / 拆分任务 / 生成材料 / 核对事实”不是前端动画，而是 `TaskSnapshot.stage_records` 中的服务端事实。`start` 返回 v2 `running / observe`；浏览器在确认后依次提交四次 `advance`，得到 v3 Plan、v4 Act、v5 Verify、v6 `waiting_input / verify`。v6 展示 5 个工件、1 个待解决冲突和 2 个已验证工件，解决后 v7 才显示 Commit。
+
+Plan/Act 可以调用当前 `deepseek-v4-pro`，但前台看到的阶段文字不是任意模型输出：适配器与 TaskService 都要求它与服务端批准模板逐字段一致，否则明确记录为 `template_fallback`。思维链、内部 ID、原始来源引用和模型自报状态不会进入 `stage_records`。固定路径还校验包括预算与截止时间在内的完整 Demo 契约。
+
+阶段轮询只由浏览器协调。关闭标签页后任务停在最后一个已持久化阶段，重新打开通过 GET/SSE 对账后继续；不存在后台 scheduler 或“关闭浏览器仍在运行”的事实。SSE payload 不能直接推断完成状态。旧 Snapshot 没有 `stage_records` 时按空数组兼容读取，不补造历史阶段。
+
+来源显示使用可读业务标签“演示数据”，原始 `fixture:` 只保留在服务端校验/审计。阶段详情可显示摘要、受限详情、工件引用、来源和时间，但不显示 prompt、思维链或内部日志。预算文案只表达运行时预算，不展示或推断 token 成本、供应商账单或模型质量。

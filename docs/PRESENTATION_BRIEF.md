@@ -279,3 +279,11 @@ Demo 1 的 TaskStore 另有独立证据：固定 Fixture 已在同一个 Postgre
 | Permit | 短时、单次、参数绑定的 Ed25519 JWT 授权票据 |
 | Tool Gateway | Permit 校验、重放保护和工具路由边界 |
 | Simulator | 不接触真实办公系统的副作用模拟器 |
+
+## Demo 1 当前讲解口径（2026-08-17）
+
+演示时先展示 `start` 返回的 Observe，再让浏览器在每次服务端确认后推进四次 `advance`：Plan、Act、Verify、等待决定。此顺序对应 v2、v3、v4、v5、v6 Snapshot，而不是延时动画。v6 的可复核事实是 5 个工件、1 个冲突、2 个已验证工件；用户解决冲突后才到 v7 Commit。
+
+Plan/Act 当前通过严格适配器调用 `deepseek-v4-pro`，但只有与服务端批准模板逐字段一致的用户文字才被接受，否则显式回退；Observe/Verify/Commit 确定性完成。模型 smoke 只证明接口连通和响应符合契约，不应讲成“模型质量已验证”。预算是步骤、工具调用和运行时长，不是 token 成本。关闭浏览器会暂停在已保存阶段，重新打开后继续；当前没有无人值守后台调度器，也没有跨实例 LLM lease。
+
+对外叙事必须把阶段状态、来源标签、冲突和 Commit 映射到服务端 Snapshot/stage_records；不要展示原始 `fixture:`、prompt、思维链、内部日志或供应商账单。最终测试耗时、commit SHA、PR URL 和截图 hash 以本轮证据封口时回填，当前不作结论。
