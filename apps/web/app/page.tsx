@@ -29,6 +29,7 @@ import {
 } from "@tabler/icons-react";
 
 import type { TaskEvent, TaskEventType, TaskSnapshot } from "./task-types";
+import type { Demo2CockpitSnapshot, Demo2RouteMode, Demo2RouteSelectionResult } from "./demo2-types";
 import { TaskArtifactWorkspace } from "./task-artifact-workspace";
 import {
   calculateQuoteSummary,
@@ -42,6 +43,7 @@ import {
   type TaskDirectorViewMode,
 } from "./task-director-studio";
 import type { ControlIntent } from "./task-runtime-panel";
+import { WorkCockpit, WorkCockpitDecisionPane } from "./work-cockpit";
 
 type ViewId = "mail" | "document" | "quote" | "tasks" | "calendar" | "expense" | "crm" | "audit";
 type WorkspaceKind = Exclude<ViewId, "audit">;
@@ -196,6 +198,12 @@ const VERDICT_LABELS: Record<CapabilityDecision["verdict"], string> = {
   allow: "允许",
   blocked: "等待条件",
   deny: "拒绝",
+};
+const DEMO2_ROUTE_LABELS: Record<Demo2RouteMode, string> = {
+  tool_call: "工具调用",
+  single_agent: "单 Agent",
+  fixed_workflow: "固定流程",
+  adaptive_swarm: "自适应协作群组",
 };
 const VIEW_LABELS: Record<ViewId, string> = {
   mail: "邮件", document: "文档", quote: "报价表", tasks: "任务", calendar: "日历",
@@ -700,10 +708,16 @@ export default function Home() {
   const [taskCreating, setTaskCreating] = useState(false);
   const [taskMutating, setTaskMutating] = useState(false);
   const [pendingTaskMutation, setPendingTaskMutation] = useState<PendingTaskMutation | null>(null);
-  const [taskViewMode, setTaskViewMode] = useState<TaskDirectorViewMode>("director");
+  const [taskViewMode, setTaskViewMode] = useState<TaskDirectorViewMode>("cockpit");
   const [taskRightMode, setTaskRightMode] = useState<TaskRightMode>("decisions");
   const [selectedTaskArtifactVersionId, setSelectedTaskArtifactVersionId] = useState<string | null>(null);
   const [taskArtifactSelectionMode, setTaskArtifactSelectionMode] = useState<TaskArtifactSelectionMode>("follow_head");
+  const [demo2Cockpit, setDemo2Cockpit] = useState<Demo2CockpitSnapshot | null>(null);
+  const [demo2Loading, setDemo2Loading] = useState(true);
+  const [demo2Saving, setDemo2Saving] = useState(false);
+  const [demo2Error, setDemo2Error] = useState("");
+  const [selectedDemo2WorkItemId, setSelectedDemo2WorkItemId] = useState<string | null>(null);
+  const [demo2DraftMode, setDemo2DraftMode] = useState<Demo2RouteMode | null>(null);
   const [workspaceWidth, setWorkspaceWidth] = useState(0);
   const shellRef = useRef<HTMLElement>(null);
   const conversationRef = useRef<HTMLDivElement>(null);
@@ -718,6 +732,7 @@ export default function Home() {
   const demo1CreateKeyRef = useRef<string | null>(null);
   const demo1CreateInFlightRef = useRef(false);
   const taskArtifactActionKeyRef = useRef<{ artifactVersionId: string; key: string } | null>(null);
+  const demo2RouteKeyRef = useRef<{ workItemId: string; mode: Demo2RouteMode; key: string } | null>(null);
 
   useEffect(() => {
     artifactsRef.current = artifacts;
@@ -810,6 +825,25 @@ export default function Home() {
         setTaskSyncState("offline");
         setTaskError("任务服务暂时不可用；已保留最后确认状态，请重新连接。");
       }
+    });
+    return () => { cancelled = true; };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    request<Demo2CockpitSnapshot>("/v1/demo2/cockpit").then((snapshot) => {
+      if (cancelled) return;
+      const preferred = snapshot.items.find((item) => item.admission_status === "recommended")
+        ?? snapshot.items[0]
+        ?? null;
+      setDemo2Cockpit(snapshot);
+      setSelectedDemo2WorkItemId(preferred?.work_item_id ?? null);
+      setDemo2DraftMode(preferred?.selected_mode ?? preferred?.recommendation.mode ?? null);
+      setDemo2Error("");
+    }).catch((reason) => {
+      if (!cancelled) setDemo2Error(reason instanceof Error ? reason.message : "今日工作暂时无法读取");
+    }).finally(() => {
+      if (!cancelled) setDemo2Loading(false);
     });
     return () => { cancelled = true; };
   }, []);
@@ -908,6 +942,109 @@ export default function Home() {
       setSelectedTaskArtifactVersionId(currentHeadId);
     }
   }, [task, selectedTaskArtifactVersionId, taskArtifactSelectionMode]);
+
+  const selectedDemo2WorkItem = useMemo(() => {
+    if (!demo2Cockpit) return null;
+    return demo2Cockpit.items.find((item) => item.work_item_id === selectedDemo2WorkItemId)
+      ?? demo2Cockpit.items[0]
+      ?? null;
+  }, [demo2Cockpit, selectedDemo2WorkItemId]);
+
+  function selectDemo2WorkItem(workItemId: string) {
+    const item = demo2Cockpit?.items.find((candidate) => candidate.work_item_id === workItemId);
+    if (!item) return;
+    setSelectedDemo2WorkItemId(workItemId);
+    setDemo2DraftMode(item.selected_mode ?? item.recommendation.mode);
+    setDemo2Error("");
+    demo2RouteKeyRef.current = null;
+  }
+
+  async function refreshDemo2Cockpit(preserveDraft = true) {
+    setDemo2Loading(true);
+    try {
+      const snapshot = await request<Demo2CockpitSnapshot>("/v1/demo2/cockpit");
+      const currentId = selectedDemo2WorkItemId;
+      const selected = snapshot.items.find((item) => item.work_item_id === currentId)
+        ?? snapshot.items.find((item) => item.admission_status === "recommended")
+        ?? snapshot.items[0]
+        ?? null;
+      const draftStillAllowed = Boolean(
+        preserveDraft
+        && demo2DraftMode
+        && selected?.allowed_modes.includes(demo2DraftMode),
+      );
+      setDemo2Cockpit(snapshot);
+      setSelectedDemo2WorkItemId(selected?.work_item_id ?? null);
+      if (!draftStillAllowed) {
+        setDemo2DraftMode(selected?.selected_mode ?? selected?.recommendation.mode ?? null);
+      }
+      setDemo2Error("");
+      return snapshot;
+    } catch (reason) {
+      setDemo2Error(reason instanceof Error ? reason.message : "今日工作暂时无法读取");
+      return null;
+    } finally {
+      setDemo2Loading(false);
+    }
+  }
+
+  async function confirmDemo2Route() {
+    const item = selectedDemo2WorkItem;
+    const mode = demo2DraftMode ?? item?.selected_mode ?? item?.recommendation.mode ?? null;
+    if (!item || !mode || demo2Saving || !item.allowed_modes.includes(mode)) return;
+
+    const existingKey = demo2RouteKeyRef.current;
+    const idempotencyKey = existingKey?.workItemId === item.work_item_id && existingKey.mode === mode
+      ? existingKey.key
+      : `demo2-route:${crypto.randomUUID()}`;
+    demo2RouteKeyRef.current = { workItemId: item.work_item_id, mode, key: idempotencyKey };
+    setDemo2Saving(true);
+    setDemo2Error("");
+    try {
+      const result = await request<Demo2RouteSelectionResult>(
+        `/v1/demo2/work-items/${item.work_item_id}/route`,
+        {
+          method: "POST",
+          body: JSON.stringify({
+            mode,
+            scope: "this_run",
+            expected_version: item.version,
+            idempotency_key: idempotencyKey,
+          }),
+        },
+      );
+      const updated = result.item;
+      setDemo2Cockpit((current) => current ? {
+        ...current,
+        version: result.cockpit_version,
+        last_event_sequence: result.cockpit_last_event_sequence,
+        items: current.items.map((candidate) => candidate.work_item_id === updated.work_item_id ? updated : candidate),
+      } : current);
+      setDemo2DraftMode(updated.selected_mode ?? updated.recommendation.mode);
+      demo2RouteKeyRef.current = null;
+      setNotice(updated.selection_source === "user_override"
+        ? `本次已改为${DEMO2_ROUTE_LABELS[mode]}；执行尚未启动`
+        : `已采用${DEMO2_ROUTE_LABELS[mode]}建议；执行尚未启动`);
+    } catch (reason) {
+      if (reason instanceof ApiError && reason.status === 409) {
+        demo2RouteKeyRef.current = null;
+        await refreshDemo2Cockpit(true);
+        setDemo2Error("工作项已经更新；你的本次选择仍保留，请复核最新状态后重新确认。");
+      } else {
+        const latest = await refreshDemo2Cockpit(true);
+        const reconciled = latest?.items.find((candidate) => candidate.work_item_id === item.work_item_id);
+        if (reconciled?.selected_mode === mode && reconciled.version > item.version) {
+          demo2RouteKeyRef.current = null;
+          setDemo2Error("");
+          setNotice(`服务端已记录${DEMO2_ROUTE_LABELS[mode]}；执行尚未启动`);
+        } else {
+          setDemo2Error("确认结果仍待核对；系统保留了同一次请求，请重新读取后继续。");
+        }
+      }
+    } finally {
+      setDemo2Saving(false);
+    }
+  }
 
   const activeArtifact = useMemo(() => activeView !== "audit" ? artifacts[activeView] : undefined, [activeView, artifacts]);
 
@@ -1659,7 +1796,9 @@ export default function Home() {
 
   const taskWorkspaceActive = activeView === "tasks";
   const effectiveTaskRightMode: TaskRightMode = actionGateOpen ? "conversation" : taskRightMode;
-  const showTaskDecisions = taskWorkspaceActive && effectiveTaskRightMode === "decisions";
+  const cockpitWorkspaceActive = taskWorkspaceActive && taskViewMode === "cockpit";
+  const showTaskDecisions = taskWorkspaceActive && !cockpitWorkspaceActive && effectiveTaskRightMode === "decisions";
+  const showCockpitDecision = cockpitWorkspaceActive && effectiveTaskRightMode === "decisions";
   function openTaskWorkspace() {
     setActiveView("tasks");
     setTaskViewMode("director");
@@ -1697,13 +1836,25 @@ export default function Home() {
             task={task}
             mode={taskViewMode}
             syncState={taskSyncState}
-            busy={taskMutating || Boolean(pendingTaskMutation) || actionGateOpen}
+            busy={cockpitWorkspaceActive
+              ? demo2Loading || demo2Saving
+              : taskMutating || Boolean(pendingTaskMutation) || actionGateOpen}
             creating={taskCreating}
             onModeChange={setTaskViewMode}
-            onRefresh={() => void retryTaskConnection()}
+            onRefresh={() => void (cockpitWorkspaceActive ? refreshDemo2Cockpit(true) : retryTaskConnection())}
             onCreate={() => void createAndStartDemo1Task()}
           />
           <div id="task-view-panel" className="task-view-region" role="tabpanel" aria-labelledby={`task-view-tab-${taskViewMode}`}>
+            {taskViewMode === "cockpit" && (
+              <WorkCockpit
+                snapshot={demo2Cockpit}
+                loading={demo2Loading}
+                saving={demo2Saving}
+                selectedId={selectedDemo2WorkItemId}
+                onSelect={selectDemo2WorkItem}
+                onRefresh={() => void refreshDemo2Cockpit(true)}
+              />
+            )}
             {taskViewMode === "director" && (
               <TaskDirectorCanvas
                 task={task}
@@ -1742,11 +1893,21 @@ export default function Home() {
     <section className={`chat-pane without-task-runtime ${actionGateOpen ? "has-action-gate" : ""} ${taskWorkspaceActive ? "task-director-side-pane" : ""}`}>
       {taskWorkspaceActive && (
         <div className="task-side-mode-switch" role="tablist" aria-label="右侧 Agent 模式">
-          <button id="task-side-tab-decisions" type="button" role="tab" aria-controls="task-side-panel" aria-selected={effectiveTaskRightMode === "decisions"} tabIndex={effectiveTaskRightMode === "decisions" ? 0 : -1} className={effectiveTaskRightMode === "decisions" ? "active" : ""} onClick={() => setTaskRightMode("decisions")} onKeyDown={(event) => moveTaskSideTab(event, "decisions")}>待我决定</button>
+          <button id="task-side-tab-decisions" type="button" role="tab" aria-controls="task-side-panel" aria-selected={effectiveTaskRightMode === "decisions"} tabIndex={effectiveTaskRightMode === "decisions" ? 0 : -1} className={effectiveTaskRightMode === "decisions" ? "active" : ""} onClick={() => setTaskRightMode("decisions")} onKeyDown={(event) => moveTaskSideTab(event, "decisions")}>{cockpitWorkspaceActive ? "执行方式" : "待我决定"}</button>
           <button id="task-side-tab-conversation" type="button" role="tab" aria-controls="task-side-panel" aria-selected={effectiveTaskRightMode === "conversation"} tabIndex={effectiveTaskRightMode === "conversation" ? 0 : -1} className={effectiveTaskRightMode === "conversation" ? "active" : ""} onClick={() => setTaskRightMode("conversation")} onKeyDown={(event) => moveTaskSideTab(event, "conversation")}>Agent 对话</button>
         </div>
       )}
-      {showTaskDecisions ? (
+      {showCockpitDecision ? (
+        <WorkCockpitDecisionPane
+          item={selectedDemo2WorkItem}
+          saving={demo2Saving}
+          error={demo2Error}
+          draftMode={demo2DraftMode}
+          onDraftMode={setDemo2DraftMode}
+          onConfirm={() => void confirmDemo2Route()}
+          onRefresh={() => void refreshDemo2Cockpit(true)}
+        />
+      ) : showTaskDecisions ? (
         <TaskDecisionPane
           task={task}
           syncState={taskSyncState}

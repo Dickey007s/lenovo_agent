@@ -119,11 +119,18 @@ async function expectPrimarySurfaceToHideRuntimeJargon(page: Page) {
   expect(visibleText).not.toMatch(/Demo 1|Snapshot|ORCHESTRATION BOARD|DECISION INBOX/i);
 }
 
+async function openLongTask(page: Page) {
+  const tab = page.getByRole("tab", { name: "长任务", exact: true });
+  await expect(tab).toBeVisible();
+  await tab.click();
+}
+
 test("the first task path exposes the customer A purpose, decision facts, and confirmed outcomes", async ({ page, request }, testInfo) => {
   const owner = "e2e_customer_report_comprehension";
   await routeBrowserApiAs(page, owner);
   await page.setViewportSize({ width: 1181, height: 900 });
   await page.goto("/");
+  await openLongTask(page);
 
   await expect(page.getByRole("heading", { name: "准备客户 A 的经营汇报" })).toBeVisible();
   await expect(page.getByRole("button", { name: "开始准备汇报", exact: true })).toHaveCount(1);
@@ -185,6 +192,7 @@ test("a verified reply becomes a version-bound governed simulator action", async
   await routeBrowserApiAs(page, owner);
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto("/");
+  await openLongTask(page);
 
   await page.getByRole("button", { name: "开始准备汇报", exact: true }).click();
   await page.getByRole("button", { name: "采用正式口径并继续核对", exact: true }).click();
@@ -270,6 +278,7 @@ test("rejecting a task-derived action leaves the completed report intact", async
   await routeBrowserApiAs(page, owner);
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto("/");
+  await openLongTask(page);
 
   await page.getByRole("button", { name: "开始准备汇报", exact: true }).click();
   await page.getByRole("button", { name: "采用正式口径并继续核对", exact: true }).click();
@@ -317,6 +326,7 @@ test("the initial task lookup cannot expose a duplicate-create action", async ({
   });
 
   await page.goto("/");
+  await openLongTask(page);
   await expect(page.locator(".task-director-empty").getByRole("heading", { name: "正在读取经营汇报任务" })).toBeVisible();
   await expect(page.getByRole("button", { name: "开始准备汇报", exact: true })).toHaveCount(0);
   await page.getByRole("button", { name: "邮件", exact: true }).click();
@@ -341,6 +351,7 @@ test("a no-task service failure is consistent across the workspace and decision 
   });
 
   await page.goto("/");
+  await openLongTask(page);
   await expect(page.locator(".task-director-empty").getByRole("heading", { name: "经营汇报任务暂时不可用" })).toBeVisible();
   await expect(page.locator("#task-side-panel").getByRole("heading", { name: "经营汇报任务暂时不可用" })).toBeVisible();
   await expect(page.getByText("连接恢复后，这里会显示最近确认的待处理事项。", { exact: true })).toBeVisible();
@@ -381,6 +392,7 @@ test("rapid repeated start intent creates and starts only one report task", asyn
   });
 
   await page.goto("/");
+  await openLongTask(page);
   const startButton = page.getByRole("button", { name: "开始准备汇报", exact: true });
   await startButton.evaluate((element) => {
     element.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
@@ -466,6 +478,7 @@ test("only the first open conflict in a branch is actionable without a conflict 
   });
 
   await page.goto("/");
+  await openLongTask(page);
   await page.getByRole("button", { name: "开始准备汇报", exact: true }).click();
   const cards = page.locator(".task-decision-card");
   await expect(cards).toHaveCount(2);
@@ -520,6 +533,7 @@ test("a terminal failure takes precedence over stale open conflict cards", async
   });
 
   await page.goto("/");
+  await openLongTask(page);
   await page.getByRole("button", { name: "开始准备汇报", exact: true }).click();
   await expect(page.getByRole("heading", { name: "任务需要处理后才能继续" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "任务未能继续" })).toBeVisible();
@@ -534,6 +548,7 @@ test("Task Director projects decisions, controls, errors, and versions from serv
   await routeBrowserApiAs(page, owner);
   await page.setViewportSize({ width: 1487, height: 1058 });
   await page.goto("/");
+  await openLongTask(page);
 
   await expect(page.getByRole("heading", { name: "准备客户 A 的经营汇报" })).toBeVisible();
   await page.getByRole("button", { name: "开始准备汇报", exact: true }).click();
@@ -546,12 +561,14 @@ test("Task Director projects decisions, controls, errors, and versions from serv
   await attachScreenshot(page, testInfo, "task-director-conflict-desktop");
 
   const viewTabs = page.getByRole("tablist", { name: "任务工作区视图" });
-  const directorTab = viewTabs.getByRole("tab", { name: "进度" });
+  const cockpitTab = viewTabs.getByRole("tab", { name: "今日工作" });
+  const directorTab = viewTabs.getByRole("tab", { name: "长任务" });
   await directorTab.focus();
   await directorTab.press("ArrowRight");
   await expect(viewTabs.getByRole("tab", { name: "成果" })).toHaveAttribute("aria-selected", "true");
   await viewTabs.getByRole("tab", { name: "成果" }).press("Home");
-  await expect(directorTab).toHaveAttribute("aria-selected", "true");
+  await expect(cockpitTab).toHaveAttribute("aria-selected", "true");
+  await directorTab.click();
 
   await page.getByRole("tab", { name: "Agent 对话" }).click();
   await expect(page.getByRole("heading", { name: "请确认 1 件事" })).toHaveCount(0);
@@ -570,7 +587,7 @@ test("Task Director projects decisions, controls, errors, and versions from serv
   await page.getByRole("button", { name: "查看相关材料" }).click();
   await expect(page.locator(".task-artifact-status")).toContainText("v1 · 候选版本");
   await expectPrimarySurfaceToHideRuntimeJargon(page);
-  await page.getByRole("tab", { name: "进度" }).click();
+  await page.getByRole("tab", { name: "长任务" }).click();
 
   const primaryDecision = page.getByRole("button", { name: "采用正式口径并继续核对" });
   await page.getByText("其他处理方式", { exact: true }).click();
@@ -664,6 +681,7 @@ test("a late older task GET cannot roll back a newer mutation snapshot", async (
   });
 
   await page.goto("/");
+  await openLongTask(page);
   await staleCaptured;
   expect(delayedVersion).toBe(1);
   expect(delayedSequence).toBe(1);
@@ -769,6 +787,7 @@ test("task snapshot ordering uses the received SSE sequence as its floor", async
   });
 
   await page.goto("/");
+  await openLongTask(page);
   await staleCaptured;
   await reconnected;
   expect(reconnectAfter).toBe("3");
@@ -790,6 +809,7 @@ test("Demo 1 uses server facts from creation through the three-branch commit", a
   await routeBrowserApiAs(page, owner);
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto("/");
+  await openLongTask(page);
 
   const createButton = page.getByRole("button", { name: "开始准备汇报", exact: true });
   await expect(createButton).toBeEnabled();
@@ -895,6 +915,7 @@ test("Demo 1 uses server facts from creation through the three-branch commit", a
 
   const completedTaskId = tasks[0].task_id;
   await page.reload();
+  await openLongTask(page);
   const replayButton = page.getByRole("button", { name: "开始新一轮汇报" });
   await expect(replayButton).toBeEnabled();
 
@@ -950,6 +971,7 @@ test("an aborted start keeps one idempotency key across reload and reconciles wi
   const owner = "e2e_demo1_recovery";
   await routeBrowserApiAs(page, owner);
   await page.goto("/");
+  await openLongTask(page);
 
   const createButton = page.getByRole("button", { name: "开始准备汇报", exact: true });
   await expect(createButton).toBeEnabled();
@@ -987,6 +1009,7 @@ test("an aborted start keeps one idempotency key across reload and reconciles wi
   await attachScreenshot(page, testInfo, "demo1-start-result-pending");
 
   await page.reload();
+  await openLongTask(page);
   await expect(page.getByRole("button", { name: "立即对账" }).first()).toBeVisible();
   await expect(page.getByText(/已连接当前工作区/).first()).toBeVisible();
   const savedAfterReload = await page.evaluate((key) => window.sessionStorage.getItem(key), PENDING_MUTATION_KEY);
