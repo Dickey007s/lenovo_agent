@@ -242,8 +242,17 @@ Demo 1 的 TaskStore 另有独立证据：固定 Fixture 已在同一个 Postgre
 - 不说“已支持多人实时协作/多实例一致写入”；Workspace 锁、revision 比较和动作完成消息重放都只在单 API 进程内，尚无数据库 CAS 或跨实例验证。
 - 不说“可以由用户补证所有未知收件人/附件”；当前未解析纯文本姓名或不透明附件直接 deny，使用的是固定演示识别规则，不是企业通讯录或附件扫描服务。
 - 不说“所有 Task 成果都能直接执行”或“已完成真实邮件发送”；当前桥只支持固定客户回复草稿到固定演示地址的 `email.send` Simulator，也没有跨进程 Run 创建幂等证据。
+- 不说“Demo 2 已经启动 Adaptive Swarm”或“已经有动态 Worker”；`DR-0008` 第一纵切已实现四项固定演示工作、固定队列、路由解释和客户 A 的本次模式选择，但 `execution_status` 始终为 `not_started`。
+- 不说“Demo 2 已经调度三类简单任务”或“实现了拖拽调序”；三项简单任务只是 Admission 的固定演示选择，拖拽调序与长期排序偏好留待后续。
+- 不说“Demo 2 降低了成本/时延”；`route_profiles[].forecast.source_type=fixture_policy_forecast`，没有真实账单、Worker 运行或端到端基准。
 
-## 8. 常见问答
+## 8. Demo 2 第一纵切的汇报口径（限定范围 Verified）
+
+现场应先讲清楚：驾驶舱是用户入口，Adaptive Swarm 只是复杂任务的一种待选择执行方式。四项固定演示工作由服务端 `WorkCockpitSnapshot` 提供；供应商邮件、周报格式统一、报销异常分别固定选择 Single Agent、Fixed Workflow、Tool Call；客户 A 保持待决定并允许三种模式。
+
+用户可以查看六类业务条件、比较预测代价，接受 Admission 推荐或把客户 A 改成其他允许模式，范围只在 `this_run`。选择推荐时 `selection_source=admission`，其他允许选择为 `selection_source=user_override`。无论哪种选择，当前都停在 `execution_status=not_started`。本节对应 [`DR-0008`](decisions/DR-0008-demo2-explainable-admission.md)，在单进程固定演示范围内为 `Verified`：已有 API、前台、版本/幂等、409 草稿保留、移动端、完整回归和截图工程证据，但没有用户研究、真实执行、成本或时延测量。
+
+## 9. 常见问答
 
 **为什么不用 LLM 直接判断风险？**  风险和权限属于可验证控制面，需要稳定、可测试和可审计；LLM 只提供业务候选事实。
 
@@ -255,7 +264,7 @@ Demo 1 的 TaskStore 另有独立证据：固定 Fixture 已在同一个 Postgre
 
 **现在最大的生产化缺口是什么？**  真实身份和 Connector、分布式 replay/幂等、Conversation 持久化、后台任务、多实例一致性和生产评测。
 
-## 9. 术语表
+## 10. 术语表
 
 | 术语 | 含义 |
 | --- | --- |

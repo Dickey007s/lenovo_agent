@@ -79,6 +79,14 @@ V0.1 重点验证三件事：
 
 这仍是固定演示数据的同步纵切，不是通用后台调度器或真实 Connector。`start` 在一次 mutation 中物化阶段 Trace，浏览器在事务提交后才看到结果；人工编辑后产生新版本、历史轮次选择、预算/截止时间拒绝后的完整恢复 UI、单分支失败、服务端已提交但响应丢失、断线期间事件回放、数据库进程重启、已有库迁移、多实例通知和 Task 派生 Run 的 PostgreSQL 恢复仍待验证。Task 恢复也不等于 Conversation 恢复，Thread/Message 仍在 API 内存中。自动化通过只证明预设 DOM、动作调用和服务端事实一致，不能证明目标用户已经理解这些文案和流程。跨 Demo 纵切证据见 [`DR-0007`](docs/decisions/DR-0007-task-artifact-action-bridge.md) 与 [`Task Artifact → Action Evidence`](docs/evidence/DEMO1-DEMO3-TASK-ARTIFACT-ACTION-BRIDGE-EVIDENCE-20260813.md)。
 
+### Demo 2 智能工作驾驶舱第一纵切（DR-0008，限定范围 Verified）
+
+当前已实现服务端驱动的 `WorkCockpitSnapshot` 单进程 memory 纵切和“智能工作驾驶舱”前台。固定演示队列包含客户 A 经营汇报、供应商邮件回复、周报格式统一、报销异常核查四项工作；后三项由 Admission 固定选择 Single Agent、Fixed Workflow、Tool Call，客户 A 保持待决定并允许 Single Agent、Fixed Workflow、Adaptive Swarm。
+
+用户可以查看业务价值、资料广度、可并行工作包、截止压力、风险和资源边界，比较允许的执行方式，并将客户 A 的选择限定为“仅本次运行”。选择推荐模式时 `selection_source=admission`，选择其他允许模式时为 `user_override` 与 `override_scope=this_run`。mutation 使用预期版本和幂等键；409 会保留用户草稿并重新读取服务端事实。无论推荐还是选择，`execution_status` 都是 `not_started`。
+
+`route_profiles[].forecast.source_type` 固定为 `fixture_policy_forecast`，只表示固定规则预测，不代表真实账单、实测耗时、Worker、Connector 或生产 SLA。当前没有 Demo 2 SSE、PostgreSQL 恢复、动态 Worker、Shared Artifact Workspace 或真实执行。工程证据包含聚焦 Python `6 passed`、专用 system Edge `5 passed`、完整 Python `118 passed, 1 skipped`、完整浏览器 `34 passed` 和三张桌面/移动截图；Ruff、前端 lint、生产构建与 diff-check 通过。详见 [`DR-0008`](docs/decisions/DR-0008-demo2-explainable-admission.md)、[`SCENARIO-002`](docs/scenarios/SCENARIO-002-demo2-explainable-admission.md) 与 [`Demo 2 Evidence`](docs/evidence/DEMO2-PR1-EXPLAINABLE-ADMISSION-EVIDENCE-20260817.md)。
+
 ## 技术架构
 
 ```mermaid
@@ -135,6 +143,9 @@ flowchart LR
 - [来源与新一轮语义修订证据](docs/evidence/DEMO1-ROUND-AND-SOURCE-CLARITY-EVIDENCE-20260811.md)
 - [Demo 1 已验证工件进入 Demo 3 动作治理决策](docs/decisions/DR-0007-task-artifact-action-bridge.md)
 - [Demo 1 → Demo 3 Task Artifact 动作桥接证据](docs/evidence/DEMO1-DEMO3-TASK-ARTIFACT-ACTION-BRIDGE-EVIDENCE-20260813.md)
+- [Demo 2 可解释 Admission 决策（限定范围 Verified）](docs/decisions/DR-0008-demo2-explainable-admission.md)
+- [Demo 2 智能工作驾驶舱场景（限定范围 Verified）](docs/scenarios/SCENARIO-002-demo2-explainable-admission.md)
+- [Demo 2 PR-1 工程证据](docs/evidence/DEMO2-PR1-EXPLAINABLE-ADMISSION-EVIDENCE-20260817.md)
 - [来源台账](docs/decisions/SOURCE_REGISTER.md)
 
 ## 目录结构
