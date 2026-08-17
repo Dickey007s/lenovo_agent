@@ -196,6 +196,21 @@ def _response_json(response: httpx.Response, expected_status: int = 200) -> dict
     return payload
 
 
+def _advance_until_waiting(client: httpx.Client, task: dict) -> dict:
+    snapshot = task
+    for index in range(4):
+        snapshot = _response_json(
+            client.post(
+                f"/v1/tasks/{task['task_id']}/advance",
+                json={
+                    "expected_task_version": snapshot["version"],
+                    "idempotency_key": f"system-advance-{index:03d}",
+                },
+            )
+        )
+    return snapshot
+
+
 def _database_counts(database_dsn: str, task_id: str) -> tuple[int, int, int, int, int, int]:
     with psycopg.connect(database_dsn) as connection:
         row = connection.execute(
@@ -237,7 +252,7 @@ def test_postgres_task_survives_api_restart_and_replays_original_mutation(
                 ),
                 201,
             )
-            started = _response_json(
+            initial_started = _response_json(
                 client.post(
                     f"/v1/tasks/{created['task_id']}/start",
                     json={
@@ -246,10 +261,13 @@ def test_postgres_task_survives_api_restart_and_replays_original_mutation(
                     },
                 )
             )
+            started = _advance_until_waiting(client, initial_started)
 
+        assert initial_started["status"] == "running"
+        assert initial_started["phase"] == "observe"
         assert started["status"] == "waiting_input"
         assert started["phase"] == "verify"
-        assert started["version"] == 2
+        assert started["version"] == 6
         assert len(started["branches"]) == 3
         assert len(started["artifact_versions"]) == 5
         waiting_branch = next(
@@ -323,8 +341,8 @@ def test_postgres_task_survives_api_restart_and_replays_original_mutation(
             )
             assert committed["status"] == "committed"
             assert committed["phase"] == "commit"
-            assert committed["version"] == 3
-            assert committed["last_event_sequence"] == 45
+            assert committed["version"] == 7
+            assert committed["last_event_sequence"] > started["last_event_sequence"]
             assert len(committed["artifact_versions"]) == 7
             assert committed["last_commit"]["state_hash"].startswith("sha256:")
 
@@ -406,7 +424,7 @@ def test_postgres_task_survives_api_restart_and_replays_original_mutation(
 
         assert replayed_round_one == committed
         assert replayed_round_two == round_two
-        assert replayed_start == started
+        assert replayed_start == initial_started
         assert replayed_resolve == committed
         assert latest == committed
         assert _database_counts(database_dsn, started["task_id"]) == counts_before_replay

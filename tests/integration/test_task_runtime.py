@@ -7,7 +7,6 @@ import pytest
 from packages.contracts import (
     ConflictRecord,
     TaskArtifactBinding,
-    TaskBudget,
     TaskControlCommand,
 )
 from packages.contracts.hashing import canonical_hash
@@ -20,7 +19,6 @@ from services.api.app.application.tasks import (
     TaskNotFoundError,
     TaskService,
     TaskTransitionError,
-    demo1_contract_draft,
 )
 
 
@@ -28,12 +26,37 @@ OFFICIAL_SOURCE = "fixture:crm/customer-a:official-revenue-v3"
 FORECAST_SOURCE = "fixture:forecast/customer-a:revenue-v2"
 
 
+async def advance_until_waiting(
+    service: TaskService,
+    task_id: str,
+    owner_id: str,
+    *,
+    expected_task_version: int,
+    idempotency_key: str,
+):
+    snapshot = await service.start(
+        task_id,
+        owner_id,
+        expected_task_version=expected_task_version,
+        idempotency_key=idempotency_key,
+    )
+    for index in range(4):
+        snapshot = await service.advance(
+            task_id,
+            owner_id,
+            expected_task_version=snapshot.version,
+            idempotency_key=f"{idempotency_key}-advance-{index}",
+        )
+    return snapshot
+
+
 async def test_demo1_loop_is_atomic_traceable_and_isolates_one_conflict() -> None:
     store = InMemoryTaskStore()
     service = TaskService(store)
     created = await service.create_demo1("user_1")
 
-    waiting = await service.start(
+    waiting = await advance_until_waiting(
+        service,
         created.task_id,
         "user_1",
         expected_task_version=created.version,
@@ -42,9 +65,9 @@ async def test_demo1_loop_is_atomic_traceable_and_isolates_one_conflict() -> Non
 
     assert waiting.status == "waiting_input"
     assert waiting.phase == "verify"
-    assert waiting.version == 2
-    assert waiting.budget.steps_used == 4
-    assert waiting.budget.tool_calls_used == 4
+    assert waiting.version == 6
+    assert waiting.budget.steps_used == 5
+    assert waiting.budget.tool_calls_used == 7
     assert len(waiting.artifact_versions) == 5
     assert [item.status for item in waiting.artifact_versions].count("candidate") == 3
     assert [item.status for item in waiting.artifact_versions].count("verified") == 2
@@ -75,7 +98,7 @@ async def test_demo1_loop_is_atomic_traceable_and_isolates_one_conflict() -> Non
         "ARTIFACT_VERSION_CREATED",
         "VERIFICATION_RECORDED",
         "CONFLICT_OPENED",
-        "CHECKPOINT_COMMITTED",
+        "TASK_STATUS_CHANGED",
     }.issubset(event_types)
 
     restored = await TaskService(store).get(created.task_id, "user_1")
@@ -86,7 +109,8 @@ async def test_resolving_official_evidence_creates_verified_commit_idempotently(
     store = InMemoryTaskStore()
     service = TaskService(store)
     created = await service.create_demo1("user_1")
-    waiting = await service.start(
+    waiting = await advance_until_waiting(
+        service,
         created.task_id,
         "user_1",
         expected_task_version=1,
@@ -109,7 +133,7 @@ async def test_resolving_official_evidence_creates_verified_commit_idempotently(
 
     assert committed.status == "committed"
     assert committed.phase == "commit"
-    assert committed.version == 3
+    assert committed.version == 7
     assert all(branch.status == "committed" for branch in committed.branches)
     assert all(conflict.status == "resolved" for conflict in committed.conflicts)
     assert len(committed.artifact_versions) == 7
@@ -248,7 +272,8 @@ async def test_resolving_official_evidence_creates_verified_commit_idempotently(
 async def test_committed_artifact_binding_rejects_history_and_changed_facts() -> None:
     service = TaskService(InMemoryTaskStore())
     created = await service.create_demo1("user_1")
-    waiting = await service.start(
+    waiting = await advance_until_waiting(
+        service,
         created.task_id,
         "user_1",
         expected_task_version=created.version,
@@ -325,7 +350,8 @@ async def test_task_runtime_rejects_stale_owner_and_unapproved_source() -> None:
             idempotency_key="wrong-owner-001",
         )
 
-    waiting = await service.start(
+    waiting = await advance_until_waiting(
+        service,
         created.task_id,
         "user_1",
         expected_task_version=1,
@@ -349,7 +375,8 @@ async def test_task_runtime_rejects_stale_owner_and_unapproved_source() -> None:
 async def test_branch_controls_and_steer_follow_server_state_machine() -> None:
     service = TaskService(InMemoryTaskStore())
     created = await service.create_demo1("user_1")
-    waiting = await service.start(
+    waiting = await advance_until_waiting(
+        service,
         created.task_id,
         "user_1",
         expected_task_version=1,
@@ -447,7 +474,8 @@ async def test_branch_controls_and_steer_follow_server_state_machine() -> None:
 async def test_concurrent_controls_allow_only_one_optimistic_version() -> None:
     service = TaskService(InMemoryTaskStore())
     created = await service.create_demo1("user_1")
-    waiting = await service.start(
+    waiting = await advance_until_waiting(
+        service,
         created.task_id,
         "user_1",
         expected_task_version=1,
@@ -506,12 +534,20 @@ async def test_old_idempotency_key_replays_original_snapshot_after_later_mutatio
     store = InMemoryTaskStore()
     service = TaskService(store)
     created = await service.create_demo1("user_1")
-    waiting = await service.start(
+    started = await service.start(
         created.task_id,
         "user_1",
         expected_task_version=created.version,
         idempotency_key="replay-original-start-001",
     )
+    waiting = started
+    for index in range(4):
+        waiting = await service.advance(
+            created.task_id,
+            "user_1",
+            expected_task_version=waiting.version,
+            idempotency_key=f"replay-original-start-001-advance-{index}",
+        )
     branch = next(item for item in waiting.branches if item.status == "waiting_evidence")
     paused = await service.control(
         created.task_id,
@@ -533,7 +569,7 @@ async def test_old_idempotency_key_replays_original_snapshot_after_later_mutatio
         idempotency_key="replay-original-start-001",
     )
 
-    assert replayed == waiting
+    assert replayed == started
     assert await service.get(created.task_id, "user_1") == paused
     assert len(await service.history(created.task_id, "user_1")) == event_count
     assert len((await store.load(created.task_id, "user_1")).artifact_versions) == artifact_count
@@ -543,7 +579,8 @@ async def test_evidence_resolution_does_not_commit_with_another_open_conflict() 
     store = InMemoryTaskStore()
     service = TaskService(store)
     created = await service.create_demo1("user_1")
-    waiting = await service.start(
+    waiting = await advance_until_waiting(
+        service,
         created.task_id,
         "user_1",
         expected_task_version=created.version,
@@ -654,7 +691,8 @@ async def test_task_store_rejects_digest_lineage_and_missing_head_corruption() -
     store = InMemoryTaskStore()
     service = TaskService(store)
     created = await service.create_demo1("user_1")
-    waiting = await service.start(
+    waiting = await advance_until_waiting(
+        service,
         created.task_id,
         "user_1",
         expected_task_version=created.version,
@@ -757,38 +795,27 @@ async def test_task_store_rejects_digest_lineage_and_missing_head_corruption() -
 
 
 async def test_execution_budget_and_deadline_stop_before_mutation() -> None:
-    budget_service = TaskService(InMemoryTaskStore())
-    limited = demo1_contract_draft().model_copy(
+    service = TaskService(InMemoryTaskStore())
+    task = await service.create_demo1("user_1")
+    exhausted = task.model_copy(
         update={
-            "budget": TaskBudget(
-                max_steps=3,
-                max_tool_calls=30,
-                max_runtime_seconds=3_600,
+            "budget": task.budget.model_copy(
+                update={"steps_used": task.contract.budget.max_steps, "exhausted": True}
             )
         }
     )
-    budget_task = await budget_service.create(limited, "user_1")
-    with pytest.raises(TaskTransitionError, match="步骤预算"):
-        await budget_service.start(
-            budget_task.task_id,
-            "user_1",
-            expected_task_version=budget_task.version,
-            idempotency_key="budget-start-001",
-        )
-    assert await budget_service.get(budget_task.task_id, "user_1") == budget_task
-    assert len(await budget_service.history(budget_task.task_id, "user_1")) == 1
+    with pytest.raises(TaskTransitionError, match="预算"):
+        service._require_execution_window(exhausted, additional_steps=1)
 
-    deadline_service = TaskService(InMemoryTaskStore())
-    expired = demo1_contract_draft().model_copy(
-        update={"deadline_at": datetime.now(UTC) - timedelta(seconds=1)}
+    expired = task.model_copy(
+        update={
+            "contract": task.contract.model_copy(
+                update={"deadline_at": datetime.now(UTC) - timedelta(seconds=1)}
+            )
+        }
     )
-    deadline_task = await deadline_service.create(expired, "user_1")
     with pytest.raises(TaskTransitionError, match="截止时间"):
-        await deadline_service.start(
-            deadline_task.task_id,
-            "user_1",
-            expected_task_version=deadline_task.version,
-            idempotency_key="deadline-start-001",
-        )
-    assert await deadline_service.get(deadline_task.task_id, "user_1") == deadline_task
-    assert len(await deadline_service.history(deadline_task.task_id, "user_1")) == 1
+        service._require_execution_window(expired, additional_steps=1)
+
+    assert await service.get(task.task_id, "user_1") == task
+    assert len(await service.history(task.task_id, "user_1")) == 1

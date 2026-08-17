@@ -31,7 +31,7 @@ export default defineConfig({
   webServer: [
     {
       command:
-        `pnpm exec cross-env API_CORS_ORIGINS=${webUrl} LANGGRAPH_CHECKPOINT_DSN= DATABASE_DSN= ` +
+        `pnpm exec cross-env API_CORS_ORIGINS=${webUrl} LANGGRAPH_CHECKPOINT_DSN= DATABASE_DSN= LLM_BASE_URL= LLM_API_KEY= ` +
         "uv --directory ../.. run uvicorn services.api.app.main:app --host 127.0.0.1 --port 8011",
       url: `${apiUrl}/v1/health`,
       reuseExistingServer: false,

@@ -23,8 +23,11 @@ from packages.contracts import (
     TaskControlCommand,
     TaskEvent,
     TaskEventType,
+    TaskError,
     TaskArtifactBinding,
     TaskSnapshot,
+    TaskStageRecord,
+    TaskStage,
     VerificationCheck,
     VerificationReport,
 )
@@ -33,6 +36,18 @@ from services.api.app.application.task_storage import (
     StoredTask,
     TaskStore,
     TaskStoreConflictError,
+)
+from services.api.app.application.task_stage_agent import (
+    DeterministicTaskStageAgent,
+    TaskStageAct,
+    TaskStageActRequest,
+    TaskStageAgent,
+    TaskStageContract,
+    TaskStageDeliverable,
+    TaskStagePlan,
+    TaskStagePlanRequest,
+    TaskStageSourceAlias,
+    TaskStageTrustedFact,
 )
 
 
@@ -118,9 +133,20 @@ def demo1_contract_draft() -> TaskContractDraft:
 
 
 class TaskService:
-    def __init__(self, store: TaskStore, poll_interval_seconds: float = 0.5) -> None:
+    def __init__(
+        self,
+        store: TaskStore,
+        poll_interval_seconds: float = 0.5,
+        stage_agent: TaskStageAgent | None = None,
+    ) -> None:
         self.store = store
         self.poll_interval_seconds = poll_interval_seconds
+        # Library callers and tests must remain offline and deterministic. The
+        # application entrypoint may explicitly inject the model-backed agent.
+        self.stage_agent = stage_agent or DeterministicTaskStageAgent()
+        # Prevent duplicate paid model calls for concurrent retries carrying
+        # the same mutation key. Store CAS remains the cross-process guard.
+        self._advance_locks: dict[tuple[str, str], asyncio.Lock] = {}
 
     async def create(
         self,
@@ -275,7 +301,7 @@ class TaskService:
     ) -> TaskSnapshot:
         command_digest = canonical_hash(
             {
-                "operation": "start_demo1_loop",
+                "operation": "start_demo1_stage",
                 "task_id": task_id,
                 "expected_task_version": expected_task_version,
             }
@@ -288,14 +314,184 @@ class TaskService:
         self._require_version(current, expected_task_version)
         if current.status != "ready" or current.phase != "contract":
             raise TaskTransitionError("任务只能从 ready / contract 启动")
+        self._require_demo1_stage_contract(current)
         self._require_execution_window(
             current,
-            additional_steps=4,
-            additional_tool_calls=4,
+            additional_steps=1,
+            additional_tool_calls=1,
             additional_runtime_seconds=1,
         )
 
-        updated, artifacts, specs = self._build_started_demo1(current)
+        now = datetime.now(UTC)
+        stage = TaskStageRecord(
+            phase="observe",
+            status="running",
+            summary="正在读取本轮允许资料",
+            detail={
+                "source_count": len(current.contract.source_scope),
+                "source_labels": self._demo1_source_labels(),
+            },
+            generation_source="deterministic",
+            started_at=now,
+        )
+        budget = self._consume_budget(
+            current,
+            additional_steps=1,
+            additional_tool_calls=1,
+            additional_runtime_seconds=1,
+        )
+        updated = self._updated_snapshot(
+            current,
+            status="running",
+            phase="observe",
+            stage_records=[*current.stage_records, stage],
+            budget=budget,
+            updated_at=now,
+        )
+        specs = [
+            TaskEventSpec(
+                "TASK_STATUS_CHANGED",
+                {"from": current.status, "to": "running"},
+            ),
+            TaskEventSpec(
+                "TASK_PHASE_CHANGED",
+                {"from": current.phase, "to": "observe"},
+            ),
+            TaskEventSpec(
+                "LOOP_STEP_STARTED",
+                {"phase": "observe", "source_count": len(current.contract.source_scope)},
+                idempotent=True,
+            ),
+            TaskEventSpec(
+                "BUDGET_UPDATED",
+                {
+                    "steps_used": budget.steps_used,
+                    "tool_calls_used": budget.tool_calls_used,
+                },
+            ),
+        ]
+        return await self._commit_mutation(
+            current,
+            updated,
+            owner_id,
+            [],
+            specs,
+            idempotency_key,
+            command_digest,
+        )
+
+    async def advance(
+        self,
+        task_id: str,
+        owner_id: str,
+        *,
+        expected_task_version: int,
+        idempotency_key: str,
+    ) -> TaskSnapshot:
+        lock = self._advance_locks.setdefault((task_id, idempotency_key), asyncio.Lock())
+        async with lock:
+            return await self._advance_unlocked(
+                task_id,
+                owner_id,
+                expected_task_version=expected_task_version,
+                idempotency_key=idempotency_key,
+            )
+
+    async def _advance_unlocked(
+        self,
+        task_id: str,
+        owner_id: str,
+        *,
+        expected_task_version: int,
+        idempotency_key: str,
+    ) -> TaskSnapshot:
+        """Complete exactly one durable stage and expose its next checkpoint."""
+        current = await self.get(task_id, owner_id)
+        command_digest = canonical_hash(
+            {
+                "operation": "advance_task_stage",
+                "task_id": task_id,
+                "expected_task_version": expected_task_version,
+            }
+        )
+        replay = await self._idempotent_replay(task_id, owner_id, idempotency_key, command_digest)
+        if replay is not None:
+            return replay
+        self._require_version(current, expected_task_version)
+        if current.status in {"committed", "failed", "cancelled"}:
+            raise TaskTransitionError("终态任务不能继续推进")
+        if current.status == "waiting_input":
+            raise TaskTransitionError("任务正在等待用户处理，不能自动推进")
+        if current.phase not in {"observe", "plan", "act", "verify"}:
+            raise TaskTransitionError("当前任务阶段不能推进")
+
+        try:
+            if current.phase == "observe":
+                self._require_execution_window(
+                    current,
+                    additional_steps=1,
+                    additional_tool_calls=1,
+                    additional_runtime_seconds=1,
+                )
+                updated, artifacts, specs = self._advance_observe(current)
+            elif current.phase == "plan":
+                self._require_execution_window(
+                    current,
+                    additional_steps=1,
+                    additional_tool_calls=1,
+                    additional_runtime_seconds=1,
+                )
+                started_at = monotonic()
+                plan = await self.stage_agent.plan(self._build_plan_request(current))
+                plan = self._validated_plan(current, plan)
+                runtime_seconds = max(1, int(monotonic() - started_at + 0.999))
+                self._require_execution_window(
+                    current,
+                    additional_steps=1,
+                    additional_tool_calls=1,
+                    additional_runtime_seconds=runtime_seconds,
+                )
+                updated, artifacts, specs = self._advance_plan(
+                    current, plan, runtime_seconds=runtime_seconds
+                )
+            elif current.phase == "act":
+                self._require_execution_window(
+                    current,
+                    additional_steps=1,
+                    additional_tool_calls=len(current.branches),
+                    additional_runtime_seconds=1,
+                )
+                plan = self._stage_detail(current, "plan").get("plan", {})
+                started_at = monotonic()
+                act = await self.stage_agent.act(self._build_act_request(current, plan))
+                runtime_seconds = max(1, int(monotonic() - started_at + 0.999))
+                self._require_execution_window(
+                    current,
+                    additional_steps=1,
+                    additional_tool_calls=len(current.branches),
+                    additional_runtime_seconds=runtime_seconds,
+                )
+                updated, artifacts, specs = self._advance_act(
+                    current,
+                    self._validated_act(current, act, plan),
+                    runtime_seconds=runtime_seconds,
+                )
+            else:
+                self._require_execution_window(
+                    current,
+                    additional_steps=1,
+                    additional_tool_calls=1,
+                    additional_runtime_seconds=1,
+                )
+                updated, artifacts, specs = self._advance_verify(current)
+        except Exception as exc:
+            return await self._commit_stage_failure(
+                current,
+                owner_id,
+                idempotency_key,
+                command_digest,
+                exc,
+            )
         return await self._commit_mutation(
             current,
             updated,
@@ -386,6 +582,498 @@ class TaskService:
                 last_emit = monotonic()
                 yield None
             await asyncio.sleep(self.poll_interval_seconds)
+
+    @staticmethod
+    def _require_demo1_stage_contract(current: TaskSnapshot) -> None:
+        expected = demo1_contract_draft()
+        if (
+            current.contract.title != expected.title
+            or current.contract.objective != expected.objective
+            or current.contract.source_scope != expected.source_scope
+            or current.contract.allowed_capabilities != expected.allowed_capabilities
+            or current.contract.deliverables != expected.deliverables
+            or current.contract.completion_criteria != expected.completion_criteria
+            or current.contract.budget != expected.budget
+            or current.contract.deadline_at != expected.deadline_at
+        ):
+            raise TaskTransitionError("当前渐进阶段只支持固定 Demo 1 契约与来源范围")
+
+    @staticmethod
+    def _demo1_source_labels() -> list[str]:
+        return [
+            "客户来信（演示数据）",
+            "CRM 正式经营口径（演示数据）",
+            "预测收入表（演示数据）",
+            "项目周报（演示数据）",
+        ]
+
+    @classmethod
+    def _validated_plan(
+        cls,
+        current: TaskSnapshot,
+        generated: TaskStagePlan,
+    ) -> TaskStagePlan:
+        """Persist only the bounded, user-facing plan vocabulary approved by the server."""
+        request = cls._build_plan_request(current)
+        approved = DeterministicTaskStageAgent.plan_template(request)
+        if generated.model_dump() != approved.model_dump():
+            return approved
+        return generated
+
+    @classmethod
+    def _validated_act(
+        cls,
+        current: TaskSnapshot,
+        generated: TaskStageAct,
+        plan: dict[str, Any],
+    ) -> TaskStageAct:
+        """Accept only server-approved prose; model output never introduces new facts."""
+        request = cls._build_act_request(current, plan)
+        approved = DeterministicTaskStageAgent.act_template(request)
+        if generated.model_dump() != approved.model_dump():
+            return approved
+        return generated
+
+    @staticmethod
+    def _stage_context(current: TaskSnapshot) -> tuple[TaskStageContract, list[TaskStageDeliverable], list[TaskStageSourceAlias], list[TaskStageTrustedFact]]:
+        TaskService._require_demo1_stage_contract(current)
+        contract = TaskStageContract(
+            title=current.contract.title,
+            objective=current.contract.objective,
+            completion_criteria=current.contract.completion_criteria,
+        )
+        deliverables = [
+            TaskStageDeliverable(
+                deliverable_id=item.deliverable_id,
+                title=item.title,
+                kind=item.kind,
+                completion_criteria=item.completion_criteria,
+            )
+            for item in current.contract.deliverables
+        ]
+        # Keep internal fixture references on the server. The model only sees
+        # stable business labels and the trusted facts below refer to aliases.
+        business_labels = TaskService._demo1_source_labels()
+        aliases = [
+            TaskStageSourceAlias(
+                alias=f"source_{index}",
+                label=business_labels[index - 1] if index <= len(business_labels) else "演示资料",
+            )
+            for index, _source in enumerate(current.contract.source_scope, start=1)
+        ]
+        facts: list[TaskStageTrustedFact] = []
+        if len(aliases) >= 2:
+            facts.append(TaskStageTrustedFact(fact_key="official_revenue_wan", source_alias="source_2", value=2400))
+        if len(aliases) >= 3:
+            facts.append(TaskStageTrustedFact(fact_key="forecast_revenue_wan", source_alias="source_3", value=2680))
+        if len(aliases) >= 4:
+            facts.append(TaskStageTrustedFact(fact_key="project_risk", source_alias="source_4", value="里程碑存在一周延期风险"))
+        return contract, deliverables, aliases, facts
+
+    @classmethod
+    def _build_plan_request(cls, current: TaskSnapshot) -> TaskStagePlanRequest:
+        contract, deliverables, aliases, facts = cls._stage_context(current)
+        return TaskStagePlanRequest(
+            contract=contract,
+            deliverables=deliverables,
+            source_aliases=aliases,
+            trusted_facts=facts,
+            instruction="仅规划契约内三份交付材料，不改变服务端身份、来源或状态。",
+        )
+
+    @classmethod
+    def _build_act_request(cls, current: TaskSnapshot, plan: dict[str, Any]) -> TaskStageActRequest:
+        contract, deliverables, aliases, facts = cls._stage_context(current)
+        return TaskStageActRequest(
+            contract=contract,
+            deliverables=deliverables,
+            source_aliases=aliases,
+            trusted_facts=facts,
+            work_packages=plan.get("work_packages", []),
+        )
+
+    def _stage_detail(self, current: TaskSnapshot, phase: TaskStage) -> dict[str, Any]:
+        for record in reversed(current.stage_records):
+            if record.phase == phase:
+                return record.detail
+        return {}
+
+    @staticmethod
+    def _replace_stage(
+        current: TaskSnapshot,
+        phase: TaskStage,
+        record: TaskStageRecord,
+        *extra: TaskStageRecord,
+    ) -> list[TaskStageRecord]:
+        records = list(current.stage_records)
+        for index in range(len(records) - 1, -1, -1):
+            if records[index].phase == phase:
+                records[index] = record
+                break
+        else:
+            records.append(record)
+        records.extend(extra)
+        return records
+
+    def _advance_observe(
+        self, current: TaskSnapshot
+    ) -> tuple[TaskSnapshot, list[ArtifactVersion], list[TaskEventSpec]]:
+        now = datetime.now(UTC)
+        running = self._stage_record(current, "observe")
+        observed = running.model_copy(
+            update={
+                "status": "completed",
+                "summary": "已读取本轮允许资料",
+                "detail": {
+                    "source_count": len(current.contract.source_scope),
+                    "source_labels": self._demo1_source_labels(),
+                },
+                "completed_at": now,
+            }
+        )
+        plan = TaskStageRecord(
+            phase="plan",
+            status="running",
+            summary="正在拆分三份交付材料",
+            detail={"deliverable_ids": [item.deliverable_id for item in current.contract.deliverables]},
+            generation_source="system",
+            started_at=now,
+        )
+        budget = self._consume_budget(current, additional_steps=1, additional_tool_calls=1, additional_runtime_seconds=1)
+        updated = self._updated_snapshot(
+            current,
+            status="running",
+            phase="plan",
+            stage_records=self._replace_stage(current, "observe", observed, plan),
+            budget=budget,
+            updated_at=now,
+        )
+        specs = [
+            TaskEventSpec("LOOP_STEP_COMPLETED", {"phase": "observe", "source_refs": current.contract.source_scope}, idempotent=True),
+            TaskEventSpec("TASK_PHASE_CHANGED", {"from": "observe", "to": "plan"}),
+            TaskEventSpec("LOOP_STEP_STARTED", {"phase": "plan", "deliverable_count": len(current.contract.deliverables)}),
+            TaskEventSpec("BUDGET_UPDATED", {"steps_used": budget.steps_used, "tool_calls_used": budget.tool_calls_used}),
+        ]
+        return updated, [], specs
+
+    def _advance_plan(
+        self,
+        current: TaskSnapshot,
+        plan: TaskStagePlan,
+        *,
+        runtime_seconds: int = 1,
+    ) -> tuple[TaskSnapshot, list[ArtifactVersion], list[TaskEventSpec]]:
+        expected_ids = [item.deliverable_id for item in current.contract.deliverables]
+        packages = {item.deliverable_id: item for item in plan.work_packages}
+        if set(packages) != set(expected_ids) or len(packages) != len(plan.work_packages):
+            raise TaskTransitionError("模型规划不能改变任务交付物")
+        safe_plan = {
+            "deliverable_ids": expected_ids,
+            "summary": plan.summary[:500],
+            "work_packages": [packages[item_id].model_dump(mode="json") for item_id in expected_ids],
+        }
+        now = datetime.now(UTC)
+        running = self._stage_record(current, "plan")
+        completed = running.model_copy(
+            update={
+                "status": "completed",
+                "summary": "已拆分三份交付材料",
+                "detail": {"plan": safe_plan},
+                "generation_source": plan.origin,
+                "completed_at": now,
+            }
+        )
+        act = TaskStageRecord(
+            phase="act",
+            status="running",
+            summary="正在生成三份交付材料",
+            detail={"deliverable_ids": expected_ids},
+            generation_source="system",
+            started_at=now,
+        )
+        branches = [
+            branch.model_copy(update={"status": "running", "version": branch.version + 1, "updated_at": now})
+            if branch.status == "queued" else branch
+            for branch in current.branches
+        ]
+        budget = self._consume_budget(
+            current,
+            additional_steps=1,
+            additional_tool_calls=1,
+            additional_runtime_seconds=runtime_seconds,
+        )
+        updated = self._updated_snapshot(
+            current,
+            status="running",
+            phase="act",
+            branches=branches,
+            stage_records=self._replace_stage(current, "plan", completed, act),
+            budget=budget,
+            updated_at=now,
+        )
+        specs: list[TaskEventSpec] = [
+            TaskEventSpec("LOOP_STEP_COMPLETED", {"phase": "plan", "branch_count": len(branches)}, idempotent=True),
+            TaskEventSpec("TASK_PHASE_CHANGED", {"from": "plan", "to": "act"}),
+        ]
+        specs.extend(
+            TaskEventSpec("BRANCH_STATUS_CHANGED", {"from": "queued", "to": "running", "title": branch.title}, branch_id=branch.branch_id)
+            for branch in current.branches
+            if branch.status == "queued"
+        )
+        specs.extend(
+            [
+                TaskEventSpec("LOOP_STEP_STARTED", {"phase": "act", "deliverable_count": len(expected_ids)}),
+                TaskEventSpec("BUDGET_UPDATED", {"steps_used": budget.steps_used, "tool_calls_used": budget.tool_calls_used}),
+            ]
+        )
+        return updated, [], specs
+
+    def _advance_act(
+        self,
+        current: TaskSnapshot,
+        generated: TaskStageAct,
+        *,
+        runtime_seconds: int = 1,
+    ) -> tuple[TaskSnapshot, list[ArtifactVersion], list[TaskEventSpec]]:
+        now = datetime.now(UTC)
+        source_refs = {
+            "operating-analysis": ["fixture:crm/customer-a:official-revenue-v3", "fixture:forecast/customer-a:revenue-v2"],
+            "risk-brief": ["fixture:project/customer-a:weekly-v5"],
+            "reply-draft": ["fixture:mail/customer-a:2026-06-15", "fixture:project/customer-a:weekly-v5"],
+        }
+        artifacts: list[ArtifactVersion] = []
+        for branch in current.branches:
+            deliverable_id = branch.deliverable_ids[0]
+            if deliverable_id == "operating-analysis":
+                content = {
+                    "customer": "客户 A",
+                    "official_revenue_wan": 2400,
+                    "forecast_revenue_wan": 2680,
+                    "selected_revenue_wan": None,
+                    "revenue_basis": "待确认正式口径",
+                    "summary": "正式 CRM 与预测表存在收入口径冲突，需人工选择依据。",
+                }
+            elif deliverable_id == "risk-brief":
+                content = {
+                    "customer": "客户 A",
+                    "risks": [{"level": "medium", "summary": generated.risk_summary, "mitigation": generated.risk_mitigation}],
+                }
+            elif deliverable_id == "reply-draft":
+                content = {
+                    "customer": "客户 A",
+                    "subject": generated.reply_subject,
+                    "body": generated.reply_body,
+                    "send_status": "draft_only",
+                }
+            else:
+                raise TaskTransitionError(f"不支持的交付物：{deliverable_id}")
+            artifacts.append(
+                self._new_artifact(
+                    current,
+                    branch,
+                    deliverable_id,
+                    1,
+                    "candidate",
+                    content,
+                    source_refs[deliverable_id],
+                    now,
+                )
+            )
+        running = self._stage_record(current, "act")
+        completed = running.model_copy(
+            update={
+                "status": "completed",
+                "summary": "已生成三份可核对材料",
+                "detail": {"artifact_count": len(artifacts)},
+                "generation_source": generated.origin,
+                "artifact_version_ids": [item.artifact_version_id for item in artifacts],
+                "completed_at": now,
+            }
+        )
+        verify = TaskStageRecord(
+            phase="verify",
+            status="running",
+            summary="正在核对材料中的事实与来源",
+            detail={"candidate_artifact_ids": [item.artifact_version_id for item in artifacts]},
+            generation_source="deterministic",
+            started_at=now,
+        )
+        artifact_by_branch = {item.branch_id: item for item in artifacts}
+        branches = [
+            branch.model_copy(
+                update={
+                    "artifact_heads": {
+                        **branch.artifact_heads,
+                        branch.deliverable_ids[0]: artifact_by_branch[branch.branch_id].artifact_version_id,
+                    },
+                    "updated_at": now,
+                }
+            )
+            for branch in current.branches
+        ]
+        budget = self._consume_budget(
+            current,
+            additional_steps=1,
+            additional_tool_calls=len(artifacts),
+            additional_runtime_seconds=runtime_seconds,
+        )
+        updated = self._updated_snapshot(
+            current,
+            status="verifying",
+            phase="verify",
+            branches=branches,
+            artifact_versions=[*current.artifact_versions, *artifacts],
+            stage_records=self._replace_stage(current, "act", completed, verify),
+            budget=budget,
+            updated_at=now,
+        )
+        specs: list[TaskEventSpec] = [
+            TaskEventSpec("LOOP_STEP_COMPLETED", {"phase": "act", "candidate_count": len(artifacts)}, idempotent=True),
+            TaskEventSpec("TASK_PHASE_CHANGED", {"from": "act", "to": "verify"}),
+            TaskEventSpec("TASK_STATUS_CHANGED", {"from": current.status, "to": "verifying"}),
+        ]
+        specs.extend(
+            TaskEventSpec(
+                "ARTIFACT_VERSION_CREATED",
+                {"deliverable_id": item.deliverable_id, "version": item.version, "status": item.status},
+                branch_id=item.branch_id,
+                artifact_version_id=item.artifact_version_id,
+            )
+            for item in artifacts
+        )
+        specs.append(TaskEventSpec("LOOP_STEP_STARTED", {"phase": "verify"}))
+        specs.append(TaskEventSpec("BUDGET_UPDATED", {"steps_used": budget.steps_used, "tool_calls_used": budget.tool_calls_used}))
+        return updated, artifacts, specs
+
+    def _advance_verify(
+        self, current: TaskSnapshot
+    ) -> tuple[TaskSnapshot, list[ArtifactVersion], list[TaskEventSpec]]:
+        now = datetime.now(UTC)
+        candidates = {
+            item.deliverable_id: item
+            for item in current.artifact_versions
+            if item.version == 1 and item.status == "candidate"
+        }
+        operating = self._branch_for(current, "operating-analysis")
+        risk = self._branch_for(current, "risk-brief")
+        reply = self._branch_for(current, "reply-draft")
+        if set(candidates) != {"operating-analysis", "risk-brief", "reply-draft"}:
+            raise TaskTransitionError("核对阶段缺少候选工件")
+        verified_risk = self._new_artifact(current, risk, "risk-brief", 2, "verified", candidates["risk-brief"].content, candidates["risk-brief"].source_refs, now, artifact_id=candidates["risk-brief"].artifact_id, parent_version_id=candidates["risk-brief"].artifact_version_id)
+        verified_reply = self._new_artifact(current, reply, "reply-draft", 2, "verified", candidates["reply-draft"].content, candidates["reply-draft"].source_refs, now, artifact_id=candidates["reply-draft"].artifact_id, parent_version_id=candidates["reply-draft"].artifact_version_id)
+        conflict = ConflictRecord(
+            conflict_id=f"task_conflict_{uuid4().hex}",
+            task_id=current.task_id,
+            branch_id=operating.branch_id,
+            subject="客户 A 收入口径",
+            summary="CRM 正式口径为 2400 万元，预测表为 2680 万元。最终汇报必须选择并记录正式依据。",
+            source_refs=["fixture:crm/customer-a:official-revenue-v3", "fixture:forecast/customer-a:revenue-v2"],
+            candidate_values=["2400 万元（CRM 正式口径）", "2680 万元（预测口径）"],
+            opened_at=now,
+        )
+        reports = [
+            VerificationReport(
+                report_id=f"task_verify_{uuid4().hex}", task_id=current.task_id, branch_id=operating.branch_id,
+                artifact_version_id=candidates["operating-analysis"].artifact_version_id, status="conflict",
+                checks=[VerificationCheck(check_id=f"task_check_{uuid4().hex}", label="收入来源一致性", status="conflict", detail="正式 CRM 与预测表相差 280 万元，不能自动选择最终口径。", source_refs=conflict.source_refs)], checked_at=now,
+            ),
+            VerificationReport(
+                report_id=f"task_verify_{uuid4().hex}", task_id=current.task_id, branch_id=risk.branch_id,
+                artifact_version_id=verified_risk.artifact_version_id, status="passed",
+                checks=[VerificationCheck(check_id=f"task_check_{uuid4().hex}", label="风险来源绑定", status="passed", detail="风险项绑定到允许范围内的项目周报版本。", source_refs=verified_risk.source_refs)], checked_at=now,
+            ),
+            VerificationReport(
+                report_id=f"task_verify_{uuid4().hex}", task_id=current.task_id, branch_id=reply.branch_id,
+                artifact_version_id=verified_reply.artifact_version_id, status="passed",
+                checks=[VerificationCheck(check_id=f"task_check_{uuid4().hex}", label="草稿外部影响", status="passed", detail="回复保持为草稿，且未写入存在冲突的收入数字。", source_refs=verified_reply.source_refs)], checked_at=now,
+            ),
+        ]
+        branches = [
+            item.model_copy(update={"status": "waiting_evidence", "version": item.version + 1, "artifact_heads": {**item.artifact_heads, "operating-analysis": candidates["operating-analysis"].artifact_version_id}, "issue_ids": [conflict.conflict_id], "pause_reason": "收入来源口径冲突", "updated_at": now})
+            if item.branch_id == operating.branch_id else
+            item.model_copy(update={"status": "committed", "version": item.version + 1, "artifact_heads": {**item.artifact_heads, item.deliverable_ids[0]: verified_risk.artifact_version_id if item.branch_id == risk.branch_id else verified_reply.artifact_version_id}, "last_commit_id": f"task_checkpoint_{uuid4().hex}", "updated_at": now})
+            for item in current.branches
+        ]
+        running = self._stage_record(current, "verify")
+        completed = running.model_copy(update={"status": "completed", "summary": "已完成事实核对，发现一项需人工决定的冲突", "detail": {"conflict_ids": [conflict.conflict_id]}, "artifact_version_ids": [verified_risk.artifact_version_id, verified_reply.artifact_version_id], "completed_at": now})
+        budget = self._consume_budget(current, additional_steps=1, additional_tool_calls=1, additional_runtime_seconds=1)
+        updated = self._updated_snapshot(
+            current,
+            status="waiting_input",
+            phase="verify",
+            branches=branches,
+            artifact_versions=[*current.artifact_versions, verified_risk, verified_reply],
+            verification_reports=[*current.verification_reports, *reports],
+            conflicts=[*current.conflicts, conflict],
+            stage_records=self._replace_stage(current, "verify", completed),
+            budget=budget,
+            updated_at=now,
+        )
+        specs: list[TaskEventSpec] = [
+            TaskEventSpec("LOOP_STEP_COMPLETED", {"phase": "verify", "result": "waiting_evidence", "conflict_id": conflict.conflict_id}, idempotent=True),
+            TaskEventSpec("CONFLICT_OPENED", {"conflict_id": conflict.conflict_id, "subject": conflict.subject, "candidate_values": conflict.candidate_values}, branch_id=conflict.branch_id, artifact_version_id=candidates["operating-analysis"].artifact_version_id),
+        ]
+        specs.extend(TaskEventSpec("ARTIFACT_VERSION_CREATED", {"deliverable_id": item.deliverable_id, "version": item.version, "status": item.status}, branch_id=item.branch_id, artifact_version_id=item.artifact_version_id) for item in [verified_risk, verified_reply])
+        specs.extend(TaskEventSpec("VERIFICATION_RECORDED", {"report_id": report.report_id, "status": report.status}, branch_id=report.branch_id, artifact_version_id=report.artifact_version_id) for report in reports)
+        specs.extend(TaskEventSpec("BRANCH_STATUS_CHANGED", {"from": before.status, "to": after.status, "title": after.title}, branch_id=after.branch_id) for before, after in zip(current.branches, branches) if before.status != after.status)
+        specs.extend([
+            TaskEventSpec("BUDGET_UPDATED", {"steps_used": budget.steps_used, "tool_calls_used": budget.tool_calls_used}),
+            TaskEventSpec("TASK_STATUS_CHANGED", {"from": current.status, "to": "waiting_input"}),
+        ])
+        return updated, [verified_risk, verified_reply], specs
+
+    @staticmethod
+    def _stage_record(current: TaskSnapshot, phase: TaskStage) -> TaskStageRecord:
+        for record in reversed(current.stage_records):
+            if record.phase == phase and record.status == "running":
+                return record
+        raise TaskTransitionError(f"缺少运行中的 {phase} 阶段记录")
+
+    async def _commit_stage_failure(
+        self,
+        current: TaskSnapshot,
+        owner_id: str,
+        idempotency_key: str,
+        command_digest: str,
+        error: Exception,
+    ) -> TaskSnapshot:
+        now = datetime.now(UTC)
+        phase = current.phase
+        if phase not in {"observe", "plan", "act", "verify"}:
+            raise TaskTransitionError("当前阶段不能记录失败")
+        running = self._stage_record(current, phase)
+        error_code = type(error).__name__
+        message = "当前阶段未能安全完成，任务已停在最近确认的状态。"
+        failed = running.model_copy(
+            update={
+                "status": "failed",
+                "summary": "阶段执行失败",
+                "detail": {"error_code": error_code},
+                "failed_at": now,
+            }
+        )
+        updated = self._updated_snapshot(
+            current,
+            status="failed",
+            stage_records=self._replace_stage(current, phase, failed),
+            last_error=TaskError(
+                code="TASK_STAGE_FAILED",
+                scope="task",
+                message=message,
+                recoverable=True,
+                user_action="查看最近确认的阶段，并开始新一轮任务",
+            ),
+            updated_at=now,
+        )
+        specs = [
+            TaskEventSpec(
+                "TASK_FAILED",
+                {"phase": phase, "error_code": error_code},
+                idempotent=True,
+            ),
+            TaskEventSpec("TASK_STATUS_CHANGED", {"from": current.status, "to": "failed"}),
+        ]
+        return await self._commit_mutation(current, updated, owner_id, [], specs, idempotency_key, command_digest)
 
     def _build_started_demo1(
         self, current: TaskSnapshot

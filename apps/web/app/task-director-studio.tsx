@@ -1,8 +1,9 @@
 "use client";
 
-import { FormEvent, KeyboardEvent, useMemo, useRef, useState } from "react";
+import { FormEvent, KeyboardEvent, useEffect, useMemo, useRef, useState } from "react";
 import {
   IconAlertTriangle,
+  IconArrowLeft,
   IconArrowRight,
   IconArrowsExchange,
   IconBolt,
@@ -28,6 +29,7 @@ import type {
   BranchSnapshot,
   ConflictRecord,
   TaskPhase,
+  TaskStageRecord,
   TaskSnapshot,
   VerificationReport,
 } from "./task-types";
@@ -104,6 +106,15 @@ const PHASES: { key: Exclude<TaskPhase, "contract">; label: string; summary: str
   { key: "commit", label: "准备完成", summary: "汇总已核对结果" },
 ];
 
+const STAGE_LABELS: Record<TaskPhase, string> = {
+  contract: "确认任务",
+  observe: "读取资料",
+  plan: "拆分任务",
+  act: "生成材料",
+  verify: "核对事实",
+  commit: "准备完成",
+};
+
 const PHASE_ORDER: Record<TaskPhase, number> = {
   contract: -1,
   observe: 0,
@@ -160,11 +171,88 @@ function verifiedBranchCount(task: TaskSnapshot) {
 }
 
 function phaseState(task: TaskSnapshot, phase: Exclude<TaskPhase, "contract">) {
+  const stageRecord = task.stage_records?.find((record) => record.phase === phase);
+  if (task.stage_records?.length && stageRecord) {
+    if (stageBlocked(task, phase)) return "current";
+    if (stageRecord.status === "completed") return "complete";
+    if (stageRecord.status === "running" || stageRecord.status === "failed") return "current";
+    return "pending";
+  }
   const current = PHASE_ORDER[task.phase];
   const target = PHASE_ORDER[phase];
   if (task.status === "committed" || target < current) return "complete";
   if (target === current) return "current";
   return "pending";
+}
+
+function stageBlocked(task: TaskSnapshot, phase: TaskPhase) {
+  return task.status === "waiting_input" && phase === "verify"
+    && task.conflicts.some((conflict) => conflict.status === "open");
+}
+
+function currentStageRecord(task: TaskSnapshot, phase = task.phase): TaskStageRecord | null {
+  return task.stage_records?.find((record) => record.phase === phase) ?? null;
+}
+
+function progressiveTask(task: TaskSnapshot) {
+  return Boolean(task.stage_records?.length);
+}
+
+function stageDetailItems(task: TaskSnapshot, phase: TaskPhase, detail: Record<string, unknown> | undefined) {
+  if (!detail) return [];
+  const deliverableTitles = new Map(
+    task.contract.deliverables.map((item) => [item.deliverable_id, item.title]),
+  );
+  if (phase === "observe" && Array.isArray(detail.source_labels)) {
+    return detail.source_labels
+      .filter((value): value is string => typeof value === "string")
+      .map((value) => ({ title: value, detail: "已纳入本轮允许读取范围" }));
+  }
+  if (phase === "plan") {
+    const plan = detail.plan;
+    if (plan && typeof plan === "object" && !Array.isArray(plan)) {
+      const packages = (plan as Record<string, unknown>).work_packages;
+      if (Array.isArray(packages)) {
+        return packages.flatMap((item) => {
+          if (!item || typeof item !== "object" || Array.isArray(item)) return [];
+          const record = item as Record<string, unknown>;
+          if (typeof record.deliverable_id !== "string" || typeof record.approach !== "string") return [];
+          return [{
+            title: deliverableTitles.get(record.deliverable_id) ?? "本轮交付材料",
+            detail: record.approach,
+          }];
+        });
+      }
+    }
+    if (Array.isArray(detail.deliverable_ids)) {
+      const deliverables = new Map(task.contract.deliverables.map((item) => [item.deliverable_id, item]));
+      return detail.deliverable_ids.flatMap((value) => {
+        if (typeof value !== "string") return [];
+        const deliverable = deliverables.get(value);
+        return deliverable ? [{
+          title: deliverable.title,
+          detail: `完成条件：${deliverable.completion_criteria[0]}`,
+        }] : [];
+      });
+    }
+  }
+  if (phase === "act" && Array.isArray(detail.deliverable_ids)) {
+    return detail.deliverable_ids
+      .filter((value): value is string => typeof value === "string")
+      .map((value) => ({
+        title: deliverableTitles.get(value) ?? "本轮交付材料",
+        detail: "候选内容生成后仍需进入事实核对",
+      }));
+  }
+  if (phase === "verify") {
+    const conflictCount = Array.isArray(detail.conflict_ids) ? detail.conflict_ids.length : 0;
+    const candidateCount = Array.isArray(detail.candidate_artifact_ids)
+      ? detail.candidate_artifact_ids.length
+      : 0;
+    if (conflictCount) return [{ title: `发现 ${conflictCount} 项需确认事实`, detail: "只暂停受影响材料，其他材料保留已核对状态" }];
+    if (candidateCount) return [{ title: `正在核对 ${candidateCount} 份候选材料`, detail: "逐项检查来源、内容和交付条件" }];
+  }
+  return [];
 }
 
 function branchTone(branch: BranchSnapshot, conflicts: ConflictRecord[]) {
@@ -300,12 +388,14 @@ function TaskNextStepBanner({
   task,
   disabled,
   onStart,
+  onRetry,
   onShowDecisions,
   onOpenArtifact,
 }: {
   task: TaskSnapshot;
   disabled: boolean;
   onStart: () => void;
+  onRetry: () => void;
   onShowDecisions: () => void;
   onOpenArtifact: (artifactVersionId: string) => void;
 }) {
@@ -329,6 +419,9 @@ function TaskNextStepBanner({
     tone = "failed";
     title = task.status === "failed" ? "任务需要处理后才能继续" : "本轮任务已取消";
     detail = task.last_error?.message ?? "当前没有可继续执行的步骤。";
+    if (task.status === "failed" && task.last_error?.recoverable) {
+      action = { label: "重新读取状态", onClick: onRetry };
+    }
   } else if (task.status === "committed" && task.last_commit) {
     tone = "complete";
     label = "已完成";
@@ -371,9 +464,9 @@ function TaskNextStepBanner({
         <button type="button" disabled={disabled} onClick={action.onClick}>
           {tone === "complete"
             ? <IconFileDescription aria-hidden="true" />
-            : tone === "attention"
+          : tone === "attention"
               ? <IconArrowRight aria-hidden="true" />
-              : <IconPlayerPlay aria-hidden="true" />}
+            : <IconPlayerPlay aria-hidden="true" />}
           <span>{action.label}</span>
         </button>
       )}
@@ -417,25 +510,142 @@ function TaskSummaryBar({
   );
 }
 
-function PhaseRail({ task }: { task: TaskSnapshot }) {
+function PhaseRail({
+  task,
+  selectedPhase,
+  onSelect,
+}: {
+  task: TaskSnapshot;
+  selectedPhase: TaskPhase;
+  onSelect: (phase: TaskPhase) => void;
+}) {
   return (
     <ol className="task-director-phases" aria-label="任务阶段">
       {PHASES.map((phase, index) => {
         const state = phaseState(task, phase.key);
+        const selected = selectedPhase === phase.key;
         return (
           <li className={`is-${state}`} key={phase.key} aria-current={state === "current" ? "step" : undefined}>
-            <span className="task-director-phase-icon">
-              {state === "complete" ? <IconCheck aria-hidden="true" /> : index + 1}
-            </span>
-            <div>
-              <strong>{phase.label}</strong>
-              <small>{phase.summary}</small>
-            </div>
+            <button
+              type="button"
+              className={selected ? "is-selected" : ""}
+              aria-label={`${phase.label}：${state === "complete" ? "已完成" : state === "current" ? "当前阶段" : "待处理"}`}
+              aria-pressed={selected}
+              disabled={state === "pending"}
+              onClick={() => onSelect(phase.key)}
+            >
+              <span className="task-director-phase-icon">
+                {state === "complete" ? <IconCheck aria-hidden="true" /> : index + 1}
+              </span>
+              <span>
+                <strong>{phase.label}</strong>
+                <small>{phase.summary}</small>
+              </span>
+            </button>
             {index < PHASES.length - 1 && <IconArrowRight className="task-director-phase-arrow" aria-hidden="true" />}
           </li>
         );
       })}
     </ol>
+  );
+}
+
+function StageDetail({
+  task,
+  phase,
+  reviewing,
+  onReturnCurrent,
+}: {
+  task: TaskSnapshot;
+  phase: TaskPhase;
+  reviewing: boolean;
+  onReturnCurrent: () => void;
+}) {
+  const record = currentStageRecord(task, phase);
+  const label = STAGE_LABELS[phase];
+  const items = stageDetailItems(task, phase, record?.detail);
+  const copy: Record<TaskPhase, string> = {
+    contract: "任务目标和交付物已由服务端确认。",
+    observe: "正在读取本轮允许的业务来源，不会读取未授权的系统。",
+    plan: "服务端已将本轮目标拆成三份可独立核对的材料。",
+    act: "候选材料正在生成，候选版本不会被当作已核对成果。",
+    verify: "逐项核对来源；发现冲突时只暂停受影响的材料。",
+    commit: "等待所有必需材料通过核对并形成不可变提交。",
+  };
+  return (
+    <section className="task-stage-detail" aria-live="polite">
+      <div>
+        <span>{reviewing ? "阶段回看" : "当前阶段"}</span>
+        <h2>{label}</h2>
+        <p>{record?.summary ?? copy[phase]}</p>
+        {record?.generation_source === "template_fallback" && (
+          <small className="task-stage-detail-copy">模型结果未通过协议，本阶段使用安全模板继续。</small>
+        )}
+        {stageBlocked(task, phase) && <strong className="task-stage-blocked">等待你的决定后继续</strong>}
+        {reviewing && (
+          <button type="button" className="task-stage-return" onClick={onReturnCurrent}>
+            <IconArrowLeft aria-hidden="true" />
+            返回当前阶段
+          </button>
+        )}
+      </div>
+      <div>
+        <span>{items.length ? "本阶段记录" : "本阶段会影响"}</span>
+        <ul>
+          {items.length
+            ? items.map((item) => (
+                <li key={`${item.title}:${item.detail}`}>
+                  <strong>{item.title}</strong>
+                  <small>{item.detail}</small>
+                </li>
+              ))
+            : task.contract.deliverables.map((deliverable) => <li key={deliverable.deliverable_id}>{deliverable.title}</li>)}
+        </ul>
+      </div>
+    </section>
+  );
+}
+
+function CandidateMaterials({
+  task,
+  reviewing,
+  onReturnCurrent,
+}: {
+  task: TaskSnapshot;
+  reviewing: boolean;
+  onReturnCurrent: () => void;
+}) {
+  const stage = currentStageRecord(task, "act");
+  const stageIds = new Set(stage?.artifact_version_ids ?? []);
+  const candidates = task.artifact_versions.filter((artifact) =>
+    artifact.status === "candidate" && (!stageIds.size || stageIds.has(artifact.artifact_version_id)),
+  );
+  return (
+    <section className="task-candidate-materials" aria-labelledby="task-candidate-materials-title">
+      <div>
+        <span>{reviewing ? "阶段回看" : "候选材料"}</span>
+        <h2 id="task-candidate-materials-title">{candidates.length ? "已生成，等待事实核对" : "正在生成候选材料"}</h2>
+        <p>{candidates.length
+          ? "候选版本可以查看，但不会被当作本轮完成成果。"
+          : "服务端确认候选版本后会逐份展示；当前不会提前标记为已生成。"}</p>
+        {reviewing && (
+          <button type="button" className="task-stage-return" onClick={onReturnCurrent}>
+            <IconArrowLeft aria-hidden="true" />
+            返回当前阶段
+          </button>
+        )}
+      </div>
+      <ul>
+        {candidates.length
+          ? candidates.map((artifact) => (
+              <li key={artifact.artifact_version_id}>
+                <strong>{artifact.title}</strong>
+                <span>候选版本 v{artifact.version} · {artifact.source_refs.length} 个来源</span>
+              </li>
+            ))
+          : <li><strong>候选材料尚未返回</strong><span>等待服务端确认生成结果。</span></li>}
+      </ul>
+    </section>
   );
 }
 
@@ -477,10 +687,12 @@ function BranchLane({
   task,
   branch,
   onOpenArtifact,
+  collapsed = false,
 }: {
   task: TaskSnapshot;
   branch: BranchSnapshot;
   onOpenArtifact: (artifactVersionId: string) => void;
+  collapsed?: boolean;
 }) {
   const conflicts = task.conflicts.filter((conflict) => conflict.branch_id === branch.branch_id);
   const openConflict = conflicts.find((conflict) => conflict.status === "open") ?? null;
@@ -491,6 +703,24 @@ function BranchLane({
   const includedInFinalCommit = Boolean(
     head && task.last_commit?.artifact_version_ids.includes(head.artifact_version_id),
   );
+
+  if (collapsed) {
+    return (
+      <li className={`task-director-lane task-director-lane-collapsed is-${tone}`}>
+        <details>
+          <summary>
+            <BranchStatusIcon tone={tone} />
+            <span><strong>{branch.title}</strong><small>{BRANCH_STATUS_LABELS[branch.status]} · 已核对</small></span>
+            <b>展开</b>
+          </summary>
+          <div>
+            <p>{branch.objective}</p>
+            {head && <button type="button" onClick={() => onOpenArtifact(head.artifact_version_id)}>查看当前材料</button>}
+          </div>
+        </details>
+      </li>
+    );
+  }
 
   return (
     <li className={`task-director-lane is-${tone}`}>
@@ -562,6 +792,12 @@ export function TaskDirectorCanvas({
   onShowDecisions,
   onOpenArtifact,
 }: TaskDirectorCanvasProps) {
+  const [selectedPhase, setSelectedPhase] = useState<TaskPhase | null>(null);
+
+  useEffect(() => {
+    setSelectedPhase(null);
+  }, [task?.task_id, task?.version, task?.phase]);
+
   if (!task) {
     if (syncState !== "synced") {
       const unavailable = syncState === "offline";
@@ -595,12 +831,33 @@ export function TaskDirectorCanvas({
     );
   }
 
+  const progressive = progressiveTask(task);
+  const displayedPhase = selectedPhase ?? task.phase;
+  const showingEarlyStage = progressive && ["observe", "plan"].includes(displayedPhase);
+  const showingCandidates = progressive && displayedPhase === "act";
+  const showingActiveVerification = progressive
+    && displayedPhase === "verify"
+    && task.status === "verifying";
+  const decisionFocused = progressive
+    && displayedPhase === "verify"
+    && task.status === "waiting_input";
+  const blockingBranchIds = new Set(
+    task.conflicts.filter((conflict) => conflict.status === "open").map((conflict) => conflict.branch_id),
+  );
+  const visibleBranches = decisionFocused
+    ? task.branches.filter((branch) => blockingBranchIds.has(branch.branch_id))
+    : task.branches;
+  const backgroundBranches = decisionFocused
+    ? task.branches.filter((branch) => !blockingBranchIds.has(branch.branch_id))
+    : [];
+
   return (
-    <section className="task-director-canvas" aria-label="持续任务进度">
+    <section className="task-director-canvas" aria-label="持续任务进度" aria-busy={Boolean(busy || creating)}>
       <TaskNextStepBanner
         task={task}
         disabled={busy || syncState !== "synced"}
         onStart={onStart}
+        onRetry={onRetry}
         onShowDecisions={onShowDecisions}
         onOpenArtifact={onOpenArtifact}
       />
@@ -631,6 +888,26 @@ export function TaskDirectorCanvas({
             <small>客户回复始终保留为草稿，不会由本轮任务直接发送。</small>
           </div>
         </section>
+      ) : progressive && (showingEarlyStage || showingCandidates || showingActiveVerification) ? (
+        <>
+          <PhaseRail task={task} selectedPhase={displayedPhase} onSelect={setSelectedPhase} />
+          {showingCandidates
+            ? (
+                <CandidateMaterials
+                  task={task}
+                  reviewing={displayedPhase !== task.phase}
+                  onReturnCurrent={() => setSelectedPhase(null)}
+                />
+              )
+            : (
+                <StageDetail
+                  task={task}
+                  phase={displayedPhase}
+                  reviewing={displayedPhase !== task.phase}
+                  onReturnCurrent={() => setSelectedPhase(null)}
+                />
+              )}
+        </>
       ) : (
         <>
           <div className="task-director-board-header">
@@ -639,12 +916,34 @@ export function TaskDirectorCanvas({
               <h2 id="task-director-board-title">三份材料的当前状态</h2>
             </div>
           </div>
-          <PhaseRail task={task} />
+          <PhaseRail task={task} selectedPhase={displayedPhase} onSelect={setSelectedPhase} />
           <ol className="task-director-lanes" aria-label="三份交付材料">
-            {task.branches.map((branch) => (
-              <BranchLane key={branch.branch_id} task={task} branch={branch} onOpenArtifact={onOpenArtifact} />
+            {visibleBranches.map((branch) => (
+              <BranchLane
+                key={branch.branch_id}
+                task={task}
+                branch={branch}
+                onOpenArtifact={onOpenArtifact}
+                collapsed={false}
+              />
             ))}
           </ol>
+          {backgroundBranches.length > 0 && (
+            <details className="task-background-materials">
+              <summary>{backgroundBranches.length} 份材料已核对，展开查看</summary>
+              <ol className="task-director-lanes" aria-label="已核对材料">
+                {backgroundBranches.map((branch) => (
+                  <BranchLane
+                    key={branch.branch_id}
+                    task={task}
+                    branch={branch}
+                    onOpenArtifact={onOpenArtifact}
+                    collapsed
+                  />
+                ))}
+              </ol>
+            </details>
+          )}
           <footer className="task-director-commit-bar">
             <div>
               {task.last_commit ? <IconCircleCheck aria-hidden="true" /> : <IconListCheck aria-hidden="true" />}
@@ -814,6 +1113,22 @@ function TaskNoDecisionState({
       </section>
     );
   }
+  const stage = currentStageRecord(task);
+  if (progressiveTask(task) && stage && ["observe", "plan", "act", "verify"].includes(task.phase)) {
+    return (
+      <section className="task-decision-empty is-progress" role="status" aria-live="polite">
+        <IconBolt aria-hidden="true" />
+        <span>服务端已确认当前阶段</span>
+        <h3>{STAGE_LABELS[task.phase]}进行中</h3>
+        <p>{task.phase === "verify"
+          ? "系统正在逐项核对 3 份候选材料；只有服务端确认冲突后，才会请求你做决定。"
+          : stage.status === "running"
+            ? "系统正在准备下一阶段，完成后会继续更新。"
+            : "当前阶段已记录，正在等待下一次服务端确认。"}</p>
+        <small>不会把本地动画或客户端计时当作任务完成。</small>
+      </section>
+    );
+  }
   return (
     <section className="task-decision-empty">
       <IconBolt aria-hidden="true" />
@@ -866,8 +1181,8 @@ export function TaskDecisionPane({
     <div id="task-side-panel" className="task-decision-layout" role="tabpanel" aria-labelledby="task-side-tab-decisions" tabIndex={-1}>
       <header className="task-decision-header">
         <div>
-          <span>需要你处理</span>
-          <h2>现在需要你做什么</h2>
+          <span>{openConflicts.length > 0 ? "需要你处理" : task && progressiveTask(task) ? "当前阶段" : "需要你处理"}</span>
+          <h2>{openConflicts.length > 0 ? "现在需要你做什么" : task && progressiveTask(task) ? `${STAGE_LABELS[task.phase]}进展` : "现在需要你做什么"}</h2>
         </div>
         <b>{openConflicts.length}</b>
       </header>
@@ -894,6 +1209,7 @@ export function TaskDecisionPane({
               <h3>{task.last_error.recoverable ? "任务需要恢复" : "任务未能继续"}</h3>
               <p>{task.last_error.message}</p>
               {task.last_error.user_action && <strong>{task.last_error.user_action}</strong>}
+              {task.last_error.recoverable && <button type="button" onClick={onRetry}>重新读取状态</button>}
             </div>
           </section>
         )}
