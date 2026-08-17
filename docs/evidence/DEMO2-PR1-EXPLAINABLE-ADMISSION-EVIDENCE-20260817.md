@@ -71,6 +71,6 @@
 ## 7. 交付封口
 
 - 实现提交：`82df6b8`
-- PR：`待回填`
+- PR：堆叠 PR [#13](https://github.com/Dickey007s/lenovo_agent/pull/13)，base 为 PR #12 的分支
 - 完整回归：Python `118 passed, 1 skipped (2.79s)`；浏览器 `34 passed (1.2m)`；Ruff、lint、build、diff-check 通过
 - 用户研究：未运行；至少 5 人无引导形成性测试留待后续

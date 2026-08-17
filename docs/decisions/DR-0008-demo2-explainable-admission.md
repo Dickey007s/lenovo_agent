@@ -93,4 +93,4 @@
 - Source：`USER-FEEDBACK-20260817-01`、`USER-FEEDBACK-20260810-02`、`MEETING-DECK-0716-V2-01`、`SCRIPT-V5-202607`
 - UI 事实矩阵：[`UI_SERVER_FACT_MATRIX.md`](../contracts/UI_SERVER_FACT_MATRIX.md) 的 Demo 2 区域
 - Evidence：[`DEMO2-PR1-EXPLAINABLE-ADMISSION-EVIDENCE-20260817.md`](../evidence/DEMO2-PR1-EXPLAINABLE-ADMISSION-EVIDENCE-20260817.md)
-- 实现提交：`82df6b8`；完整 Python `118 passed, 1 skipped`；完整浏览器 `34 passed`；PR 在证据封口后创建
+- 实现提交：`82df6b8`；完整 Python `118 passed, 1 skipped`；完整浏览器 `34 passed`；堆叠 PR [#13](https://github.com/Dickey007s/lenovo_agent/pull/13)（依赖 PR #12）
