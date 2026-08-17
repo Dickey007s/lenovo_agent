@@ -169,7 +169,7 @@ POST /v1/tasks/{task_id}/controls
 GET  /v1/tasks/{task_id}/events?after={sequence}
 ```
 
-`POST /v1/demo1/tasks` 可带 `Idempotency-Key` 表示一次独立汇报轮次。同一 Owner+key 重放必须返回已存在 Task 当前已持久化的 Snapshot，不新增 `TASK_CREATED`、不回退已发生的 mutation；这与 start/control 命令重放返回首次 mutation Snapshot 的语义不同。不同 key 必须创建独立 Task。未带 key 时使用 Owner 绑定的兼容默认键。终态 Task 不回滚、不删除。当前前端“开始新一轮汇报”使用新 round key 创建 Task，再立即以新 Task 的版本调用 start；它不是 reset/reopen 旧 Task。`GET /tasks` 会返回多轮 Snapshot，但当前前端没有历史轮次选择入口。
+`POST /v1/demo1/tasks` 可带 `Idempotency-Key` 表示一次独立汇报轮次。同一 Owner+key 重放必须返回已存在 Task 当前已持久化的 Snapshot，不新增 `TASK_CREATED`、不回退已发生的 mutation；这与 start/control 命令重放返回首次 mutation Snapshot 的语义不同。不同 key 必须创建独立 Task。未带 key 时使用 Owner 绑定的兼容默认键。终态 Task 不回滚、不删除。当前前端“开始新一轮汇报”使用新 round key 创建 Task，再立即以新 Task 的版本调用 start 到 v2 Observe；浏览器随后在每个服务端 Snapshot 确认后依次调用四次 `advance` 到 v6 待决策。它不是 reset/reopen 旧 Task。`GET /tasks` 会返回多轮 Snapshot，但当前前端没有历史轮次选择入口。
 
 SSE 帧：
 
