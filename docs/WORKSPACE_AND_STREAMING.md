@@ -77,6 +77,14 @@ Task 同步状态与传输状态仍是客户端事实：它们只说明浏览器
 
 DR-0007 的跨 Demo 浏览器路径进一步覆盖：完成本轮 → 从已验证客户回复准备动作 → Action Gate 核对绑定版本和演示目标 → 批准与确认执行 → Agent 返回 Simulator 结果；拒绝路径则验证 Task 仍为 committed。完整浏览器为 `29 passed (1.4m)`。该证据只证明被测交互和服务端绑定，不证明真实邮件发送、用户理解或通用 Task 成果动作。
 
+### 2.3 Demo 2 智能工作驾驶舱
+
+Tasks 工作区新增客户端 `cockpit` 模式，并把它设为当前默认入口。它不复用 Demo 1 `TaskSnapshot` 推断多任务状态，而是读取独立的 `WorkCockpitSnapshot`：左侧显示四项固定演示工作的统一队列、演示来源、业务条件和三种候选方式比较；右侧显示当前工作项的服务端推荐、理由、规则预测和允许选择。
+
+三项轻量工作只有一个 `allowed_modes` 值，前台以只读已选状态展示且不提供确认按钮。客户 A 才显示 Single Agent、Fixed Workflow、Adaptive Swarm 三个服务端允许选项。确认 mutation 带 `expected_version`、`scope=this_run` 和 `idempotency_key`；收到服务端新 `WorkItemSnapshot` 后才显示“已记录”，并始终同时显示“任务尚未启动”。409 时保留本地单选草稿，重新 GET 最新驾驶舱后让用户复核；其他未知结果先 GET 对账，相同模式已被服务端记录才显示成功，否则保留同一请求语义。
+
+当前 Demo 2 没有 SSE。浏览器加载和手动刷新都走 GET，API 进程重启会丢失 memory 选择；因此 UI 不显示恢复进度、Worker 数、共享工件或运行状态。`route_profiles[].forecast` 只投影为“规则预测”，原始 Prompt、内部来源 ID、策略权重和 Worker 名称不进入业务 DOM。移动端把队列改为横向可选择条、详情与右侧决策区改为纵向自然流；关键可见控件至少 44px，页面不允许整体横向溢出。
+
 ## 3. 来源、权限和修改记录
 
 每个 `SourceReference` 包含：

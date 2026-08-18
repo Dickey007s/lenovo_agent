@@ -1,6 +1,6 @@
 # HTTP API 与 SSE 事件
 
-本文记录 V0.1、Demo 1、`DR-0006` 报价核算与 `DR-0007` Task 工件动作桥实际使用的 FastAPI 接口。运行后以 <http://localhost:8010/docs> 的 OpenAPI 页面和 `services/api/app/api/routes.py` 为最终事实来源。交付物工作区仍读取现有 `TaskSnapshot`；新增的窄动作接口只把已提交、已通过验证的客户回复草稿准备为治理 Run，不提供通用 Task 工件 CRUD。
+本文记录 V0.1、Demo 1、`DR-0006` 报价核算、`DR-0007` Task 工件动作桥与 `DR-0008` Demo 2 Admission 纵切实际使用的 FastAPI 接口。运行后以 <http://localhost:8010/docs> 的 OpenAPI 页面和 `services/api/app/api/routes.py` 为最终事实来源。Demo 2 当前只提供固定工作队列、路由解释和路由选择，不启动 Worker 或外部动作。
 
 ## 1. 约定
 
@@ -57,7 +57,17 @@ $headers = @{
 
 Task ID、Owner、契约版本、任务状态、分支状态、事件序号和时间均由服务端生成。客户端不能在 `TaskContractDraft` 中提交这些字段；多余字段返回 422。其他 Owner 的 Task 不会通过列表暴露，按 ID 读取或订阅时统一返回 404。
 
-### 2.3 场景、治理与审计
+### 2.3 Demo 2 智能工作驾驶舱
+
+| 方法 | 路径 | 用途 |
+| --- | --- | --- |
+| GET | `/demo2/cockpit` | 读取当前 Owner 的四项固定演示工作、Admission 建议和路由状态 |
+| GET | `/demo2/work-items/{work_item_id}` | 读取当前 Owner 的单个固定演示工作项 |
+| POST | `/demo2/work-items/{work_item_id}/route` | 以预期版本和幂等键记录本次执行方式；不启动实际执行 |
+
+Demo 2 当前服务端为进程内 memory。API 重启后路由选择会回到固定初始状态；没有 SSE、数据库恢复、Worker 生命周期或跨实例通知。四项工作在每个 Owner 的独立固定队列中生成，普通 UI 只显示“演示数据”业务标签，不显示内部来源 ID。
+
+### 2.4 场景、治理与审计
 
 | 方法 | 路径 | 用途 |
 | --- | --- | --- |
@@ -270,7 +280,27 @@ PR 4 交付物工作区直接使用创建、读取、start、control 和 SSE 对
 
 该工作区当前只读，没有创建、编辑或覆盖 ArtifactVersion 的路由。前端只为固定 Fixture 的 `analysis/risk_brief/reply_draft` 提供字段 allowlist，未知 kind/字段默认隐藏；Conflict Card 与 Artifact Workspace 复用同一 `source_ref` 投影，四个已知值显示为“演示数据 · 业务来源（版本）”。服务端响应仍包含原始 `source_refs` 供控制校验和审计，但普通业务 DOM 使用与原值无关的序号 key，不接收 `fixture:` 原值；其他值统一显示隐藏占位，URL、路径和凭据形态已有负例回归。这是前端第二道投影，不能替代服务端脱敏、授权或未来通用的字段可见性 Schema。即使字段名在 allowlist 中，其任意文本值仍需要服务端 display projection 承担通用安全保证。
 
-### 3.5 从已验证 Task 工件准备治理 Run
+### 3.5 读取 Demo 2 驾驶舱并记录本次路由
+
+```powershell
+$cockpit = Invoke-RestMethod -Method Get -Uri "$base/demo2/cockpit" -Headers $headers
+$customerA = $cockpit.items | Where-Object work_item_id -eq "customer_a_operating_review"
+$route = @{
+  mode = "fixed_workflow"
+  scope = "this_run"
+  expected_version = $customerA.version
+  idempotency_key = "demo2-route-example-001"
+} | ConvertTo-Json
+Invoke-RestMethod -Method Post `
+  -Uri "$base/demo2/work-items/$($customerA.work_item_id)/route" `
+  -Headers $headers -ContentType "application/json" -Body $route
+```
+
+响应为 `RouteSelectionResult`，其中 `cockpit_version` 与 `cockpit_last_event_sequence` 是服务端提交后的驾驶舱聚合版本，`item` 是新的 `WorkItemSnapshot`。前端不得用工作项版本自行推算驾驶舱版本。接受服务端推荐时 `selection_source="admission"`；选择其他允许方式时为 `selection_source="user_override"` 且 `override_scope="this_run"`。两种情况都保持 `execution_status="not_started"`。相同 Owner、工作项、幂等键和命令返回原结果；相同 key 对应不同命令、`expected_version` 过期或选择不在 `allowed_modes` 内时返回 409。
+
+`route_profiles[].forecast` 只有 `estimated_tool_calls`、`estimated_runtime_seconds` 和 `max_workers` 三个固定规则预测字段。它们不是模型账单、实际耗时、生产 SLA 或已经创建的 Worker 数。
+
+### 3.6 从已验证 Task 工件准备治理 Run
 
 ```powershell
 $prepareHeaders = $headers.Clone()
@@ -294,7 +324,7 @@ deliverable_id / verification_report_id
 
 该接口不调用 LLM 生成收件人、主题或正文；收件人固定为演示地址 `customer@example.com`。当前没有真实联系人选择、附件映射、批量发送或真实 Connector。客户端只在请求结果未知时复用同一准备 key；收到确定成功或确定 4xx 后清除 key，下一次用户意图使用新 key。
 
-### 3.6 直接创建治理 Run
+### 3.7 直接创建治理 Run
 
 ```json
 {
@@ -312,7 +342,7 @@ status / action / risk / policy_effects / evidence / approvals
 control_plan / permit / tool_result / created_at / updated_at
 ```
 
-### 3.7 补证据、审批和最终授权
+### 3.8 补证据、审批和最终授权
 
 提交证据：
 
@@ -446,8 +476,8 @@ SSE 目前由每个 API 进程轮询 TaskStore，没有 PostgreSQL `LISTEN/NOTIF
 | 状态码 | 含义 |
 | --- | --- |
 | 403 | 当前身份不拥有提交的审批角色 |
-| 404 | Thread、Artifact、Run、Action、Scenario、Trace 或 Task 不存在，或不属于当前用户 |
-| 409 | 授权条件未满足、动作已失效、Permit/Gateway 拒绝，Workspace Artifact/revision 过期，Task 版本过期、状态转换非法、Task 工件绑定已变化，或幂等键被用于不同契约/命令/动作事实 |
+| 404 | Thread、Artifact、Run、Action、Scenario、Trace、Task 或 Demo 2 WorkItem 不存在，或不属于当前用户 |
+| 409 | 授权条件未满足、动作已失效、Permit/Gateway 拒绝，Workspace Artifact/revision 过期，Task 或 Demo 2 WorkItem 版本过期、状态转换/路由非法、Task 工件绑定已变化，或幂等键被用于不同契约/命令/动作事实 |
 | 422 | 请求 Schema、TaskContractDraft、证据值、报价当前字段或模型结构化输出无效 |
 | 503 | LLM endpoint、Key 或模型配置不可用 |
 
@@ -457,6 +487,7 @@ SSE 在响应已经开始后无法再改变 HTTP 状态码，因此流内错误�
 
 - 请求模型均 `extra="forbid"`；新增顶层字段会破坏旧服务端，协议变更需同步前端和文档。
 - Task Runtime 当前使用 `schema_version="1.0"`；Python 权威模型在 `packages/contracts/task_models.py`，前端镜像在 `apps/web/app/task-types.ts`。
+- Demo 2 Python 权威模型在 `packages/contracts/demo2_models.py`，前端镜像在 `apps/web/app/demo2-types.ts`；当前没有公开 schema version 或持久化迁移协议。
 - V0.1 没有公开版本协商；`/v1` 是唯一 API 版本。
 - `ActionCandidate`、Permit claims 和哈希规则是安全边界，不能由前端自行构造并绕过 RunService。
 - 文档示例中的邮箱、报价号、用户和 Key 全部是演示值。

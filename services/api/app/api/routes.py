@@ -12,10 +12,14 @@ from packages.authorization import AuthorizationError, AuthorizationService, Per
 from packages.tool_gateway import GatewayError, ToolGateway
 from packages.contracts import (
     ActionCandidate,
+    RouteSelectionRequest,
+    RouteSelectionResult,
     TaskArtifactBinding,
     TaskContractDraft,
     TaskControlCommand,
     TaskSnapshot,
+    WorkCockpitSnapshot,
+    WorkItemSnapshot,
 )
 from services.api.app.application.llm import (
     AutoDLActionParser,
@@ -49,6 +53,11 @@ from services.api.app.application.conversations import (
     WorkspaceChangedError,
 )
 from services.api.app.application.quote_calculator import QuoteCalculationError
+from services.api.app.application.demo2_cockpit import (
+    Demo2CockpitService,
+    Demo2ConflictError,
+    Demo2NotFoundError,
+)
 from services.api.app.config import get_settings
 
 
@@ -165,6 +174,10 @@ def get_task_service(request: Request) -> TaskService:
     return request.app.state.task_service
 
 
+def get_demo2_cockpit_service(request: Request) -> Demo2CockpitService:
+    return request.app.state.demo2_cockpit_service
+
+
 def current_user(
     x_user_id: Annotated[str, Header()] = "demo_user",
     x_user_roles: Annotated[str, Header()] = "current_user",
@@ -177,6 +190,41 @@ def current_user(
 
 
 router = APIRouter(prefix="/v1")
+
+
+@router.get("/demo2/cockpit", response_model=WorkCockpitSnapshot)
+async def get_demo2_cockpit(
+    user: Annotated[CurrentUser, Depends(current_user)],
+    service: Annotated[Demo2CockpitService, Depends(get_demo2_cockpit_service)],
+) -> WorkCockpitSnapshot:
+    return await service.get_cockpit(user.user_id)
+
+
+@router.get("/demo2/work-items/{work_item_id}", response_model=WorkItemSnapshot)
+async def get_demo2_work_item(
+    work_item_id: str,
+    user: Annotated[CurrentUser, Depends(current_user)],
+    service: Annotated[Demo2CockpitService, Depends(get_demo2_cockpit_service)],
+) -> WorkItemSnapshot:
+    try:
+        return await service.get_work_item(work_item_id, user.user_id)
+    except Demo2NotFoundError as exc:
+        raise HTTPException(status_code=404, detail="工作项不存在") from exc
+
+
+@router.post("/demo2/work-items/{work_item_id}/route", response_model=RouteSelectionResult)
+async def select_demo2_route(
+    work_item_id: str,
+    body: RouteSelectionRequest,
+    user: Annotated[CurrentUser, Depends(current_user)],
+    service: Annotated[Demo2CockpitService, Depends(get_demo2_cockpit_service)],
+) -> RouteSelectionResult:
+    try:
+        return await service.select_route(work_item_id, user.user_id, body)
+    except Demo2NotFoundError as exc:
+        raise HTTPException(status_code=404, detail="工作项不存在") from exc
+    except Demo2ConflictError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
 
 
 @router.get("/health")

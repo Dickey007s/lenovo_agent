@@ -104,6 +104,14 @@ Worker 使用隔离上下文和最小权限；事实、来源、负责人、状�
 
 驾驶舱是用户入口，Swarm 是后台执行方式。前端不应把 Worker 数量或对话轮次当作价值指标，而应展示任务状态、来源、冲突、预算和需要用户决定的节点。
 
+### 6.1 Demo 2 第一纵切：可解释 Admission（DR-0008，限定范围 Verified）
+
+2026-08-17 的第一纵切先验证用户能否看懂“今天有哪些工作、准备采用什么方式”，不把动态 Worker 作为首屏价值。服务端 `WorkCockpitSnapshot` 固定返回四项演示任务：客户 A 经营汇报、供应商邮件回复、周报格式统一、报销异常核查。后三项分别由 Admission 固定选择 Single Agent、Fixed Workflow、Tool Call；客户 A 保持待决定，并允许 Single Agent、Fixed Workflow、Adaptive Swarm 三种模式。
+
+用户可以查看固定队列中的路由解释，并将客户 A 的路由选择限定为“仅本次生效”；拖拽调序和长期排序偏好留待后续。复杂任务打开 Admission 时展示 Value、Breadth、Parallelism、Deadline、Risk、Budget 六类依据。Adaptive Swarm 在本纵切只能处于“推荐”或“本次已选择”，其 `execution_status` 必须保持 `not_started`；没有真实 Worker、Connector、计费或端到端运行证据，不得显示已启动、运行中、已完成或节省成本。
+
+当前已实现 `WorkCockpitSnapshot`、四项固定演示工作、三项轻量固定路由、客户 A 三种允许模式、版本/幂等路由选择与驾驶舱前台。成本与时效只允许以 `route_profiles[].forecast.source_type=fixture_policy_forecast` 出现，表示演示策略预测，不是实际账单、实测耗时或生产 SLA。具体场景、事实映射、工程证据和边界见 [`DR-0008`](decisions/DR-0008-demo2-explainable-admission.md)、[`SCENARIO-002`](scenarios/SCENARIO-002-demo2-explainable-admission.md) 和 [`Demo 2 PR-1 Evidence`](evidence/DEMO2-PR1-EXPLAINABLE-ADMISSION-EVIDENCE-20260817.md)。
+
 ### Demo 3：真实动作 Risk Gate
 
 Demo 3 复用当前工作区、非模态确认卡和确定性治理链。目标架构不得用演示稿中的颜色或文案替换当前风险算法：
@@ -178,5 +186,7 @@ Demo 1 的实施决策、场景、协议和前台事实映射已经固定在 [`D
 5. 实现 Shared Artifact Workspace 与独立 Verifier/Conflict Resolver；固定只读版本和一条 Task Artifact/Action 绑定已落地，下一步扩展前仍需通用契约与用户研究。
 6. 用离线基准验证 Admission 后，再引入动态 Worker 和 Control Plane。
 7. 最后扩展前端驾驶舱、分支控制和跨端体验，并保持当前动作治理不变量。
+
+`DR-0008` 是在真实 Swarm 之前的产品/协议验证纵切，不改变上述实施顺序：当前只把单进程 memory 驾驶舱、Admission 解释和受限选择标为限定范围 `Verified`；动态 Worker、共享工件、执行循环、Verifier/Resolver、持久恢复和用户价值仍是尚未完成的目标能力，不进入当前完成清单。
 
 每一步都必须保留当前稳定行为，并通过局部协议和回归测试接入；不得为了展示 Loop 或 Swarm 而绕过现有安全链。

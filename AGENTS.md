@@ -12,6 +12,7 @@
 8. 修改 Demo 1 Task Runtime 时，再读 `docs/decisions/DR-0002-bounded-durable-office-loop.md`、`docs/scenarios/SCENARIO-001-customer-a-durable-report.md` 和 `docs/contracts/` 下的协议与 UI 事实矩阵。
 9. 修改报价工作台、报价上下文或报价问答时，再读 `docs/decisions/DR-0006-deterministic-quote-calculation.md`、对应 Source/Evidence 和 `docs/contracts/UI_SERVER_FACT_MATRIX.md` 的报价映射。
 10. 修改 Task 最终工件进入业务动作的桥接时，再读 `docs/decisions/DR-0007-task-artifact-action-bridge.md`、对应 Evidence、`docs/GOVERNANCE_AND_ACTIONS.md` 与 Task/UI 协议。
+11. 修改 Demo 2 智能工作驾驶舱、Admission、路由选择或 WorkCockpitSnapshot 时，再读 `docs/decisions/DR-0008-demo2-explainable-admission.md`、`docs/scenarios/SCENARIO-002-demo2-explainable-admission.md`、`docs/evidence/DEMO2-PR1-EXPLAINABLE-ADMISSION-EVIDENCE-20260817.md` 与 `docs/contracts/UI_SERVER_FACT_MATRIX.md` 的 Demo 2 区域。
 
 源码永远高于文档。行为变更后必须同步相关文档；不要只改 README 的宣传描述。关键实现路径：
 
@@ -54,6 +55,9 @@ tests/                                        单元与端到端回归
 - Task 派生动作只能来自当前 Owner 的最终 `TaskCommit` 中、已经 passed 验证的不可变 ArtifactVersion；必须绑定 Task/Commit/Artifact/Verification 的身份、版本和 digest，并在证据、审批、授权与执行前重新校验。前台“准备动作”不得表述为已发送，拒绝或动作失败不得回滚已完成的 Task Commit。
 - `email.send` 等执行结果当前全部来自 Simulator。不得在文档、UI 或汇报中表述为真实邮件、CRM、日历或 OA 写入。
 - 25 类 ActionCandidate 是协议目录，不代表全部可执行；当前只有 5 个 capability 注册了端到端 Simulator。
+- Demo 2 第一纵切只允许使用四项固定演示任务、服务端 `WorkCockpitSnapshot`、固定队列、路由解释和客户 A 的 `this_run` 模式选择；三项简单任务的 Admission 路由是固定演示选择，拖拽调序和长期排序偏好不属于本纵切。
+- Demo 2 的 Adaptive Swarm 只能标记为推荐或本次已选择；没有真实 Worker/Connector/执行事件时，`execution_status` 必须为 `not_started`。`selection_source=admission` 表示接受推荐，降级必须为 `selection_source=user_override`，并使用 `override_scope=this_run`。
+- Demo 2 的成本/时效只能使用 `route_profiles[].forecast.source_type=fixture_policy_forecast` 语义；不得写成真实账单、实测时延、节省比例、生产 SLA 或已验证效果。当前服务端边界是 memory，跨进程恢复与真实执行均待证据。
 
 决策、推进与汇报的硬门槛：
 

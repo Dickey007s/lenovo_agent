@@ -40,6 +40,22 @@ from .task_models import (
     VerificationReport,
     VerificationStatus,
 )
+from .demo2_models import (
+    AdmissionForecast,
+    AdmissionReason,
+    AdmissionRecommendation,
+    AdmissionStatus,
+    ExecutionMode,
+    ExecutionStatus,
+    OverrideScope,
+    RouteSelectionRequest,
+    RouteSelectionResult,
+    RouteSelectionSource,
+    RouteProfile,
+    WorkCockpitSnapshot,
+    WorkItemFacts,
+    WorkItemSnapshot,
+)
 
 __all__ = [
     "ActionCandidate",
@@ -80,4 +96,18 @@ __all__ = [
     "VerificationCheck",
     "VerificationReport",
     "VerificationStatus",
+    "AdmissionForecast",
+    "AdmissionReason",
+    "AdmissionRecommendation",
+    "AdmissionStatus",
+    "RouteProfile",
+    "ExecutionMode",
+    "ExecutionStatus",
+    "OverrideScope",
+    "RouteSelectionRequest",
+    "RouteSelectionResult",
+    "RouteSelectionSource",
+    "WorkCockpitSnapshot",
+    "WorkItemFacts",
+    "WorkItemSnapshot",
 ]

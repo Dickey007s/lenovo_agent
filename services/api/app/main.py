@@ -20,6 +20,7 @@ from services.api.app.application.storage import (
 )
 from services.api.app.application.task_storage import InMemoryTaskStore, PostgresTaskStore
 from services.api.app.application.tasks import TaskService
+from services.api.app.application.demo2_cockpit import Demo2CockpitService
 from services.api.app.application.conversations import ConversationService
 from services.api.app.config import get_settings
 
@@ -36,6 +37,9 @@ async def lifespan(app: FastAPI):
         app.state.task_store_backend = "memory"
     await task_store.setup()
     app.state.task_service = TaskService(task_store)
+    # Demo 2 is intentionally an in-memory admission slice; it does not start workers.
+    app.state.demo2_cockpit_service = Demo2CockpitService()
+    await app.state.demo2_cockpit_service.setup()
 
     if settings.langgraph_checkpoint_dsn:
         database_dsn = settings.database_dsn or settings.langgraph_checkpoint_dsn

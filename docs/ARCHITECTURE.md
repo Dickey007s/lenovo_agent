@@ -300,6 +300,31 @@ sequenceDiagram
 
 准备接口不调用 LLM 生成目标或正文，当前目标固定为演示地址；`TaskArtifactBinding` 将 Task 版本、Commit 身份与状态指纹、ArtifactVersion 内容摘要、Deliverable 和 VerificationReport 一起进入 `ProposedActionSpec`。RunService 在证据、审批、授权和执行推进前重新调用 TaskService 校验，因此 Action Gate 不能把已变化的 Task 成果当成原批准对象。绑定失败、用户拒绝或 Simulator 失败都只改变 Run，不回滚已验证的 Task。这条桥只证明一个固定 `reply_draft -> email.send` 纵切，不证明通用工件动作编排或真实邮件发送。验证见 [`DR-0007`](decisions/DR-0007-task-artifact-action-bridge.md) 与对应 [`Evidence`](evidence/DEMO1-DEMO3-TASK-ARTIFACT-ACTION-BRIDGE-EVIDENCE-20260813.md)。
 
+### 3.5 Demo 2 可解释 Admission 纵切（DR-0008）
+
+```mermaid
+flowchart LR
+    UI["智能工作驾驶舱"]
+    API["Demo 2 REST API"]
+    SVC["Demo2CockpitService"]
+    SNAP["WorkCockpitSnapshot memory"]
+    ADMIT["固定 Admission 规则与解释"]
+    STOP["execution_status = not_started"]
+
+    UI -->|"GET cockpit / work item"| API
+    UI -->|"POST route + expected_version + idempotency_key"| API
+    API --> SVC
+    SVC --> ADMIT
+    SVC <--> SNAP
+    SVC --> STOP
+```
+
+`Demo2CockpitService` 为每个 Owner 生成四项固定演示工作。服务端拥有队列顺序、业务事实、允许模式、推荐理由、规则预测、选择来源、版本和事件序号；浏览器只负责投影与提交本次选择。供应商邮件、周报、报销核查分别固定为 Single Agent、Fixed Workflow、Tool Call；客户 A 允许 Single Agent、Fixed Workflow、Adaptive Swarm。
+
+路由 mutation 使用工作项 `version` 乐观并发和命令级幂等。接受推荐写入 `selection_source=admission`；选择其他允许方式写入 `selection_source=user_override` 与 `override_scope=this_run`。无论哪种选择，服务端都只返回 `execution_status=not_started`，不创建 Worker、共享工件、Verifier 或外部动作。
+
+当前 Snapshot 与幂等结果只保存在单 API 进程内。没有 Demo 2 SSE、PostgreSQL Store、跨进程恢复、动态调度、真实 Connector 或成本/时延测量；`route_profiles[].forecast` 仅是固定规则预测。该边界使第一纵切能够验证“用户是否看得懂和能否作出受限选择”，但不能证明 Adaptive Swarm Runtime 或用户价值。
+
 ## 4. 信任边界
 
 ### 4.1 可由 LLM 产生
