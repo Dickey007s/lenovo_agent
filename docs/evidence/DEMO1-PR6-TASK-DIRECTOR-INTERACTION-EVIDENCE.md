@@ -5,8 +5,11 @@
 | Evidence ID | `TASK-DIRECTOR-INTERACTION-DEMO1-PR6-20260811` |
 | Date | 2026-08-11 |
 | Status | `Verified` |
+| Baseline commit | `a47cb28` |
 | Decision | [`DR-0005`](../decisions/DR-0005-task-director-interaction.md) |
 | Scope | 固定客户 A Fixture 的 Task Director、Decision Inbox、Agent 切换、历史版本防误读与响应式布局 |
+
+> 本记录冻结 `a47cb28` 的原 PR 6 工程基线，`Verified` 仅指当时固定 Fixture 的投影、控制和被测布局，不再描述当前源码。2026-08-11 的 Stakeholder 试用反馈指出产品用途仍不清楚，`DR-0005` 已重新进入 `Draft`；当前首屏、下一步、决策后果、完成成果、恢复和移动端的工程代理验收见 [`DEMO1-PR6-USABILITY-COMPREHENSION-AUDIT-20260811.md`](DEMO1-PR6-USABILITY-COMPREHENSION-AUDIT-20260811.md)。
 
 ## 1. 参考与可追溯性
 
@@ -16,11 +19,11 @@ Stakeholder 选择的第二个交互方向已作为不可变参考保存：
 | --- | --- | --- | --- | --- |
 | [`assets/dr-0005-task-director-option2-reference.png`](assets/dr-0005-task-director-option2-reference.png) | `1487 x 1058` | `BB8B6F16C65FF0FBF0F5F3838D3BB7E8ED9CD249B07578A7B0B9970E12794E40` | 选中布局、密度、Decision Inbox 位置和状态色方向 | 不是运行截图；不证明实现一致、可用性或任何后台事实 |
 
-用户反馈与选择原文见 [`USER-FEEDBACK-20260811-03`](../sources/USER-FEEDBACK-20260811-03-task-director.md)。
+方向选择原文见 [`USER-FEEDBACK-20260811-03`](../sources/USER-FEEDBACK-20260811-03-task-director.md)；当前“有点看不懂这个是要做什么”的问题反馈见 [`USER-FEEDBACK-20260811-04`](../sources/USER-FEEDBACK-20260811-04-usability-comprehension.md)。后者是 Stakeholder feedback，不是用户研究。
 
 ## 2. 源码实现事实
 
-以下内容已经过当前源码、真实本地浏览器和自动化回归交叉检查：
+以下内容是 `a47cb28` 基线经当时源码、真实本地浏览器和自动化回归交叉检查的历史事实：
 
 | 前台能力 | 服务端或客户端事实 | 实现位置 | 当前边界 |
 | --- | --- | --- | --- |
@@ -37,8 +40,8 @@ Stakeholder 选择的第二个交互方向已作为不可变参考保存：
 
 | 验证项 | 成功标准 | 当前结果 |
 | --- | --- | --- |
-| 固定主路径与兼容 E2E | create/start/open conflict/resolve/Commit 继续通过；既有恢复与可重复演示不回退 | 最终 `pnpm --dir apps/web test:e2e`：`6 passed (34.5s)` |
-| Task Director 专用封口 | Decision/Agent 切换、移动决策跳转、Pause/Resume、非法 resolution 禁用、`409` 可见反馈、resolve、Commit、follow-head 与 pinned-history | 最终专用 `Task Director keeps decisions, controls, errors, and versions understandable` 用例：`1 passed (21.6s)` |
+| 固定主路径与兼容 E2E | create/start/open conflict/resolve/Commit 继续通过；既有恢复与可重复演示不回退 | 原基线 `pnpm --dir apps/web test:e2e`：`6 passed (34.5s)` |
+| Task Director 专用封口 | Decision/Agent 切换、移动决策跳转、Pause/Resume、非法 resolution 禁用、`409` 可见反馈、resolve、Commit、follow-head 与 pinned-history | 原基线专用 `Task Director keeps decisions, controls, errors, and versions understandable` 用例：`1 passed (21.6s)`；该名称是历史测试名，不是用户理解结论 |
 | Snapshot 乱序 | 延迟旧 GET 不能回滚 mutation 后 v2；已接收 SSE sequence 成为应用与 `synced` 的下限 | `a late older task GET cannot roll back a newer mutation snapshot` 与 `task snapshot ordering uses the received SSE sequence as its floor` 两项回归通过 |
 | 历史版本路径 | 固定查看旧版本时出现历史 banner；mutation 后默认选择新的 Branch head | 专用用例通过；历史截图显示 v1 candidate 与当前 Snapshot/新 head 的明确区分 |
 | 桌面视觉 | `1487 x 1058` 中核心编排、冲突和主决策可扫描，无文字或持久控件重叠 | 冲突、Commit、历史三种状态截图与全图/局部对照已复审 |
@@ -68,3 +71,4 @@ Stakeholder 选择的第二个交互方向已作为不可变参考保存：
 - 本轮不能证明：Task 在后台异步持续执行、真实 Connector 可用、响应丢失已恢复、多实例事件无缺口、人工接管可编辑工件、用户理解或效率已经提高。
 - 选中参考图中的时间、恢复语句、进度数字和按钮集合不是协议；实现必须以实际 Snapshot 和现有 Control 能力为准。
 - 目标用户理解度、决策时间、误读率和接管成功率需要独立可用性研究，不能用视觉相似度或 E2E 代替。
+- 工程 E2E 可以证明脚本找到控件并触发预期服务端路径，但不能证明真实用户理解控件用途、预判决定后果或知道任务何时完成。后续必须进行至少 5 名接近目标角色参与者的无引导形成性任务测试；该测试当前未运行。

@@ -1,6 +1,6 @@
 # HTTP API 与 SSE 事件
 
-本文记录 V0.1 与 Demo 1 PR 4 实际使用的 FastAPI 接口。运行后以 <http://localhost:8010/docs> 的 OpenAPI 页面和 `services/api/app/api/routes.py` 为最终事实来源。PR 4 没有增加工件专用 API；交付物工作区读取现有 `TaskSnapshot`。
+本文记录 V0.1、Demo 1、`DR-0006` 报价核算、`DR-0007` Task 工件动作桥与 `DR-0008` Demo 2 Admission 纵切实际使用的 FastAPI 接口。运行后以 <http://localhost:8010/docs> 的 OpenAPI 页面和 `services/api/app/api/routes.py` 为最终事实来源。Demo 2 当前只提供固定工作队列、路由解释和路由选择，不启动 Worker 或外部动作。
 
 ## 1. 约定
 
@@ -9,8 +9,10 @@
 - SSE：流式接口返回 `text/event-stream`，并设置 `Cache-Control: no-cache`、`X-Accel-Buffering: no`。
 - 身份头：`X-User-Id`，默认 `demo_user`。
 - 角色头：`X-User-Roles`，英文逗号分隔，默认 `current_user`；前端 Demo 使用 `current_user,sales_manager`。
-- Task 创建幂等头：`Idempotency-Key`，可选，长度 8-160。它作用于当前 Owner 的 `POST /tasks` 或 `POST /demo1/tasks`；后者用不同 key 区分演示轮次。该 header 不会授权读取其他用户任务。
+- Task 创建幂等头：`Idempotency-Key`，可选，长度 8-160。它作用于当前 Owner 的 `POST /tasks` 或 `POST /demo1/tasks`；后者用不同 key 区分独立汇报轮次。该 header 不会授权读取其他用户任务。
+- Task 工件动作幂等头：`POST /tasks/{task_id}/artifacts/{artifact_version_id}/actions/email-send` 必须带 `Idempotency-Key`，长度 8-160。相同用户、相同 key 与完全相同的动作事实返回同一 Run；相同 key 对应不同工件事实时返回 409。
 - Task mutation：`start` 和 `controls` 在 JSON body 中携带 `expected_task_version` 与 `idempotency_key`。版本过期或同一 key 被用于不同命令时返回 409。
+- Workspace revision token：显式提交 `workspace_context` 时同时提交 `workspace_artifact_id + workspace_revision`；保存 `PUT /workspace/{kind}` 时提交 `expected_artifact_id + expected_revision`。这两个字段是当前活动 Artifact 的乐观并发 token，不是权限凭据。
 
 上述身份头没有签名，只是 P0 占位。生产环境必须在 API 边界替换为经过验证的 SSO/JWT，并从可信身份声明映射角色。
 
@@ -44,17 +46,28 @@ $headers = @{
 
 | 方法 | 路径 | 用途 |
 | --- | --- | --- |
-| POST | `/demo1/tasks` | 为当前用户幂等创建固定客户 A Task Contract；可用 `Idempotency-Key` 区分演示轮次 |
+| POST | `/demo1/tasks` | 为当前用户幂等创建固定客户 A Task Contract；可用 `Idempotency-Key` 区分独立汇报轮次 |
 | POST | `/tasks` | 从 `TaskContractDraft` 创建服务端 Task；可带 `Idempotency-Key` |
 | GET | `/tasks` | 按更新时间倒序列出当前 Owner 的 TaskSnapshot |
 | GET | `/tasks/{task_id}` | 读取当前 Owner 的单个 TaskSnapshot |
 | POST | `/tasks/{task_id}/start` | 启动固定 Demo 1 Fixture 状态转换 |
 | POST | `/tasks/{task_id}/controls` | 提交任务或分支控制命令 |
+| POST | `/tasks/{task_id}/artifacts/{artifact_version_id}/actions/email-send` | 将已提交、已通过验证的客户回复草稿准备为绑定版本的治理 Run；不会直接发送 |
 | GET | `/tasks/{task_id}/events?after={sequence}` | 回放并订阅该 Task 的有序事件 SSE |
 
 Task ID、Owner、契约版本、任务状态、分支状态、事件序号和时间均由服务端生成。客户端不能在 `TaskContractDraft` 中提交这些字段；多余字段返回 422。其他 Owner 的 Task 不会通过列表暴露，按 ID 读取或订阅时统一返回 404。
 
-### 2.3 场景、治理与审计
+### 2.3 Demo 2 智能工作驾驶舱
+
+| 方法 | 路径 | 用途 |
+| --- | --- | --- |
+| GET | `/demo2/cockpit` | 读取当前 Owner 的四项固定演示工作、Admission 建议和路由状态 |
+| GET | `/demo2/work-items/{work_item_id}` | 读取当前 Owner 的单个固定演示工作项 |
+| POST | `/demo2/work-items/{work_item_id}/route` | 以预期版本和幂等键记录本次执行方式；不启动实际执行 |
+
+Demo 2 当前服务端为进程内 memory。API 重启后路由选择会回到固定初始状态；没有 SSE、数据库恢复、Worker 生命周期或跨实例通知。四项工作在每个 Owner 的独立固定队列中生成，普通 UI 只显示“演示数据”业务标签，不显示内部来源 ID。
+
+### 2.4 场景、治理与审计
 
 | 方法 | 路径 | 用途 |
 | --- | --- | --- |
@@ -89,6 +102,8 @@ Invoke-RestMethod -Method Get -Uri "$base/threads/$($thread.thread_id)" -Headers
 {
   "message": "读取当前邮件草稿，补全正文并准备发送",
   "active_view": "mail",
+  "workspace_artifact_id": "artifact_demo_mail",
+  "workspace_revision": 3,
   "workspace_context": {
     "to": ["client-a@example.com"],
     "cc": [],
@@ -99,12 +114,22 @@ Invoke-RestMethod -Method Get -Uri "$base/threads/$($thread.thread_id)" -Headers
 }
 ```
 
+`workspace_context` 是可选字段：省略或传 `null` 时，服务端使用已保存的活动 WorkspaceArtifact，此时不要求 revision token；显式传入对象时，表示浏览器当前未保存的视图，必须同时带当前 `workspace_artifact_id` 和 `workspace_revision`，缺任一字段返回 422。对于 `active_view="quote"`，显式 `{}` 不会回退到已保存报价，而是按无效当前上下文 fail closed。
+
+报价上下文使用字段级信任边界。服务端保留 `quote_id`、`customer`、`currency`、`approved_floor`、每行 `unit_price`、`sources` 和既有审批事实；只从当前上下文接收等长行列表中的 `name`、`qty`、`discount` 以及顶层 `valid_until`。客户端提供的 `subtotal`、`total` 或服务端所有字段会被忽略，服务端按行重新规范化。行数不一致、字段缺失、比例越界或金额超限时，核算/处理路径拒绝猜测。
+
+当活动视图为报价且消息属于核算、复算、最低折后比例检查或来源追问时，ConversationService 不调用 LLM 计算数值，而是用确定性 Decimal 计算器生成回复，再通过同一 Conversation SSE 发送。包含“写入、修改、保存、发送、创建、导入”等动作词的请求不会被该快捷路由截获，仍进入既有规划和治理路径。基线结果为标准总价 272000 元、折后总价 253400 元、优惠金额 18600 元、综合折后比例 93.16%（约 9.32 折）、优惠率 6.84%。
+
 PowerShell 中可用 `curl.exe -N` 直接观察 SSE：
 
 ```powershell
+$mailArtifact = Invoke-RestMethod -Method Get -Uri "$base/workspace" -Headers $headers |
+  Where-Object { $_.kind -eq "mail" }
 $body = @{
   message = "读取当前邮件草稿，补全正文并准备发送"
   active_view = "mail"
+  workspace_artifact_id = $mailArtifact.artifact_id
+  workspace_revision = $mailArtifact.revision
   workspace_context = @{
     to = @("client-a@example.com")
     cc = @()
@@ -128,6 +153,8 @@ curl.exe -N -X POST "$base/threads/$($thread.thread_id)/messages/stream" `
 ```json
 {
   "title": "客户 A 方案确认",
+  "expected_artifact_id": "artifact_demo_mail",
+  "expected_revision": 3,
   "content": {
     "to": ["client-a@example.com"],
     "cc": [],
@@ -146,11 +173,17 @@ Invoke-RestMethod -Method Put -Uri "$base/workspace/mail" `
 Invoke-RestMethod -Method Post -Uri "$base/workspace/mail/new" -Headers $headers
 ```
 
+保存成功后响应返回递增的 `revision`。服务端只在 `expected_artifact_id/revision` 与当前活动 Artifact 一致时写入；旧 token 返回 409，不覆盖新版本。当前 Web 会保留未保存草稿、重新 `GET /workspace`，并显示“查看最新版本 / 重新应用我的修改”。重新应用使用编辑起点、本地草稿和服务端最新版本做有界三方比较：不同字段修改可合并，同一字段双方都改动或行结构变化时停止自动合并并列出冲突字段。该行为不是通用多人协作或数据库级 CAS；锁与 revision 比较当前只在单个 API 进程内。
+
 保存已绑定动作的 Artifact 会让旧动作失效，并返回 `requires_recheck=true`。`mail/new` 返回新的空白 Artifact，不是清空旧对象后复用其动作 ID。
+
+保存 `quote` 时同样应用上述服务端字段所有权与确定性重算。相对服务端基线修改 `name/qty/discount/valid_until` 后，响应中的 `content.approval.status` 为 `needs_review`，并返回 `requires_recheck=true`；旧小计/总计不会被保存为权威值。报价字段非法时返回 422，不会持久化部分总计。
+
+当 Conversation 规划产生 ArtifactDraft 或注册 capability 的 ActionCandidate 时，服务端不信任模型提交的 `sources`、动作参数、目标范围、数据分类、状态变化类型和可逆性。更新已有 Artifact 时保留服务端来源，新 Artifact 使用服务端默认来源；可执行动作的收件人、附件、正文和治理字段从当前 Artifact 与 capability 重新构造，`source_refs` 不接受模型自报。内容或 capability 不匹配时不创建动作。无法解析的纯文本姓名或畸形邮箱产生 `RECIPIENT_IDENTITY_UNRESOLVED`，不透明附件产生 `ATTACHMENT_DATA_CLASS_UNRESOLVED`；ControlPlan 确定性 `DENIED`，用户在 evidence 接口自报同一姓名/哈希也不能解锁。格式合法的邮箱与可按演示规则分类的报价附件仍沿正常 Evidence、Approval、Permit 与 Simulator 链路。若活动或目标 Artifact 在规划期间改变，流返回 `workspace.conflict`，不覆盖内容也不产生 `action.proposed`。
 
 ### 3.4 创建、启动与控制 Demo 1 Task
 
-固定 Demo 1 入口不需要请求体。前端每次显式开始新一轮时发送新的 `Idempotency-Key`；同一轮重试复用同一个 key，因此不会重复创建，下一轮换 key 后会保留旧 Task 并创建新的 `ready / contract` Task。创建 key 重放返回该 Task 当前已持久化的 Snapshot，不回退到最初 `ready` 响应；这与 start/control mutation 返回“首次 mutation 结果”的幂等语义不同。为了兼容旧客户端，不传 header 时仍使用每个 Owner 的稳定默认键：
+固定 Demo 1 创建入口不需要请求体。前端每次显式开始新一轮汇报时发送新的 `Idempotency-Key`；同一轮重试复用同一个 key，因此不会重复创建，下一轮换 key 后会保留旧 Task 并创建新的 `ready / contract` Task。创建 key 重放返回该 Task 当前已持久化的 Snapshot，不回退到最初 `ready` 响应；这与 start/control mutation 返回“首次 mutation 结果”的幂等语义不同。为了兼容旧客户端，不传 header 时仍使用每个 Owner 的稳定默认键：
 
 ```powershell
 $roundHeaders = $headers.Clone()
@@ -160,7 +193,7 @@ $task.task_id
 Invoke-RestMethod -Method Get -Uri "$base/tasks/$($task.task_id)" -Headers $headers
 ```
 
-完成一轮后，把 key 改为新的轮次值即可再次演示。相同 Owner+key 始终定位同一 Task 并返回其当前持久化 Snapshot；不同 key 生成不同 Task ID。Task 列表按更新时间倒序返回，前端刷新时优先恢复未终止 Task，否则显示最近终态 Task 并提供“再次演示”。
+完成一轮后，把 key 改为新的轮次值会创建另一项独立 Task。相同 Owner+key 始终定位同一 Task 并返回其当前持久化 Snapshot；不同 key 生成不同 Task ID。当前 Web 的“开始新一轮汇报”是客户端组合动作：先调用本接口创建新 Task，再以新 Task 的版本调用 `/tasks/{task_id}/start`，固定路径通常直接返回 `waiting_input / verify`。它不会把旧 Task 重置为 `ready`。Task 列表按更新时间倒序返回，前端刷新时优先恢复未终止 Task，否则显示最近终态 Task；列表虽然保留多轮 Snapshot，当前 Web 尚无历史轮次选择入口。
 
 也可以提交严格的 `TaskContractDraft`。下面只展示最小结构，实际字段和限制以 `packages/contracts/task_models.py` 为准：
 
@@ -245,9 +278,53 @@ PR 4 交付物工作区直接使用创建、读取、start、control 和 SSE 对
 - `verification_reports[]` 与 `conflicts[]` 提供验证和冲突事实；来源与逐项检查在前台默认折叠。
 - `last_commit` 提供 task version、工件/报告引用和 `state_hash`；缺少该字段时前台不得显示最终提交。
 
-该工作区当前只读，没有创建、编辑或覆盖 ArtifactVersion 的路由。前端只为固定 Fixture 的 `analysis/risk_brief/reply_draft` 提供字段 allowlist，未知 kind/字段默认隐藏；Conflict Card 与 Artifact Workspace 复用同一 `source_ref` 投影，只显示契约中的四个已知 Demo 1 Fixture 引用，其他值统一显示隐藏占位，URL、路径和凭据形态已有负例回归。这是前端第二道投影，不能替代服务端脱敏、授权或未来通用的字段可见性 Schema。即使字段名在 allowlist 中，其任意文本值仍需要服务端 display projection 承担通用安全保证。
+该工作区当前只读，没有创建、编辑或覆盖 ArtifactVersion 的路由。前端只为固定 Fixture 的 `analysis/risk_brief/reply_draft` 提供字段 allowlist，未知 kind/字段默认隐藏；Conflict Card 与 Artifact Workspace 复用同一 `source_ref` 投影，四个已知值显示为“演示数据 · 业务来源（版本）”。服务端响应仍包含原始 `source_refs` 供控制校验和审计，但普通业务 DOM 使用与原值无关的序号 key，不接收 `fixture:` 原值；其他值统一显示隐藏占位，URL、路径和凭据形态已有负例回归。这是前端第二道投影，不能替代服务端脱敏、授权或未来通用的字段可见性 Schema。即使字段名在 allowlist 中，其任意文本值仍需要服务端 display projection 承担通用安全保证。
 
-### 3.5 直接创建治理 Run
+### 3.5 读取 Demo 2 驾驶舱并记录本次路由
+
+```powershell
+$cockpit = Invoke-RestMethod -Method Get -Uri "$base/demo2/cockpit" -Headers $headers
+$customerA = $cockpit.items | Where-Object work_item_id -eq "customer_a_operating_review"
+$route = @{
+  mode = "fixed_workflow"
+  scope = "this_run"
+  expected_version = $customerA.version
+  idempotency_key = "demo2-route-example-001"
+} | ConvertTo-Json
+Invoke-RestMethod -Method Post `
+  -Uri "$base/demo2/work-items/$($customerA.work_item_id)/route" `
+  -Headers $headers -ContentType "application/json" -Body $route
+```
+
+响应为 `RouteSelectionResult`，其中 `cockpit_version` 与 `cockpit_last_event_sequence` 是服务端提交后的驾驶舱聚合版本，`item` 是新的 `WorkItemSnapshot`。前端不得用工作项版本自行推算驾驶舱版本。接受服务端推荐时 `selection_source="admission"`；选择其他允许方式时为 `selection_source="user_override"` 且 `override_scope="this_run"`。两种情况都保持 `execution_status="not_started"`。相同 Owner、工作项、幂等键和命令返回原结果；相同 key 对应不同命令、`expected_version` 过期或选择不在 `allowed_modes` 内时返回 409。
+
+`route_profiles[].forecast` 只有 `estimated_tool_calls`、`estimated_runtime_seconds` 和 `max_workers` 三个固定规则预测字段。它们不是模型账单、实际耗时、生产 SLA 或已经创建的 Worker 数。
+
+### 3.6 从已验证 Task 工件准备治理 Run
+
+```powershell
+$prepareHeaders = $headers.Clone()
+$prepareHeaders["Idempotency-Key"] = "task-action-$([guid]::NewGuid())"
+$body = @{ thread_id = $thread.thread_id } | ConvertTo-Json
+
+$run = Invoke-RestMethod -Method Post `
+  -Uri "$base/tasks/$taskId/artifacts/$artifactVersionId/actions/email-send" `
+  -Headers $prepareHeaders -ContentType "application/json" -Body $body
+```
+
+该接口只接受当前 Owner 的 `committed` Task 中、被 `last_commit.artifact_version_ids` 引用且具有 `passed` VerificationReport 的 `reply_draft`。它根据服务端工件主题和正文构建固定演示邮件动作，并在 `ProposedActionSpec.task_artifact_binding` 中绑定：
+
+```text
+task_id / task_version / commit_id / commit_state_hash
+artifact_id / artifact_version_id / artifact_version / artifact_content_digest
+deliverable_id / verification_report_id
+```
+
+响应是 `RunSnapshot`，通常为 L4 外部动作并进入人工审批，不表示已经发送。前台在准备成功后打开 Action Gate，说明绑定成果、目标、为什么需要确认，以及拒绝不会改变已提交 Task。审批和最终授权前，RunService 会重新读取 Task 并核对全部绑定事实；Task、Commit、工件摘要或验证事实不一致时旧 Run 失效。拒绝、授权失败或 Simulator 执行失败都不会回滚或改写 Task Commit。
+
+该接口不调用 LLM 生成收件人、主题或正文；收件人固定为演示地址 `customer@example.com`。当前没有真实联系人选择、附件映射、批量发送或真实 Connector。客户端只在请求结果未知时复用同一准备 key；收到确定成功或确定 4xx 后清除 key，下一次用户意图使用新 key。
+
+### 3.7 直接创建治理 Run
 
 ```json
 {
@@ -265,7 +342,7 @@ status / action / risk / policy_effects / evidence / approvals
 control_plan / permit / tool_result / created_at / updated_at
 ```
 
-### 3.6 补证据、审批和最终授权
+### 3.8 补证据、审批和最终授权
 
 提交证据：
 
@@ -319,6 +396,7 @@ Conversation SSE 的事件集：
 | `artifact.stream.started` | 工作区渐进更新开始 |
 | `artifact.delta` | 工作区字段或列表项增量 |
 | `artifact.updated` | WorkspaceArtifact 最终终态 |
+| `workspace.conflict` | 请求携带的 Artifact/revision 已过期，或规划期间活动/目标 Artifact 改变；包含 `view` 与最新 `latest_artifact` |
 | `ui.focus` | 建议前端聚焦的工作区 |
 | `action.proposed` | 已创建 Run，打开人工确认卡 |
 | `action.closed` | Run 已执行、拒绝或结束 |
@@ -336,6 +414,12 @@ data: {"type":"action.proposed","run":{...RunSnapshot...}}
 ```
 
 客户端必须按空行分帧，不能假设一次网络读取正好对应一个事件。接到 `message.completed` 或 `artifact.updated` 时，应以完整服务端对象校准本地增量状态。
+
+报价确定性回答仍使用 `message.created → assistant.status(status=calculating) → message.started → assistant.delta* → message.completed`。事件顺序表示同一 Thread 中已接受消息和完成回答，不把客户端即时总计升级为审批或持久化事实。同一 API 进程会串行同一 Thread 的消息流以避免相互覆盖，但 Thread/Message 仍不跨进程持久化，也没有 Conversation SSE 断线游标。
+
+`workspace.conflict` 是 SSE 已开始后的可恢复业务冲突，不等同于通用 `error`。当前 Web 保留本地输入，以事件中的最新 Artifact 提供显式查看或三方重应用；服务端随后发送一条说明“未生成或执行动作”的完成消息。即使请求发出时 revision 有效，用户也可能在等待流期间继续编辑；Web 为每次请求记录当时的 Artifact 与本地 edit token，晚到 `artifact.updated` 只在不同字段时自动三方合并，同字段双改转入相同冲突 UI。
+
+动作达到 `EXECUTED / DENIED / FAILED` 后，`POST /threads/{thread_id}/runs/{run_id}/continue/stream` 才会生成结果说明。Conversation 创建 Run 时将真实 `thread_id` 写入 RunSnapshot；continue 要求 URL 中的 Thread 与 Run 绑定一致，即使同一用户也不能把结果续写到另一条对话。若生成说明前发生暂时失败，前端保留“重新读取结果”入口；一旦某个 `(thread_id, run_id)` 已完成，同一 API 进程内重试会重放同一个 `message.completed` 与 `action.closed`，不会再次调用模型或向 Thread 追加第二条完成消息。前端按 `message_id` upsert。该重放缓存与 Thread 一样不跨 API 进程持久化。
 
 ## 5. Run 审计 SSE
 
@@ -381,7 +465,7 @@ event: TASK_CREATED
 data: {"sequence":1,"event_id":"task_evt_...","task_id":"task_...",...}
 ```
 
-没有新事件时发送 `: heartbeat`。客户端只能通过 `after` 查询参数提交游标；当前路由不解析 `Last-Event-ID` 请求头。Active Task Bar 收到新事件后重新 GET TaskSnapshot 对账，不把 SSE payload 自行推导成任务完成状态。
+没有新事件时发送 `: heartbeat`。客户端只能通过 `after` 查询参数提交游标；当前路由不解析 `Last-Event-ID` 请求头。后台任务摘要和 Tasks 主视图收到新事件后重新 GET TaskSnapshot 对账，不把 SSE payload 自行推导成任务完成状态。
 
 API 进程重启本身不写 `TASK_RESTORED`，也不改变 Task version 或 event sequence。PR 5 的同页浏览器路径在 EventSource error 时保留最后确认 Snapshot、禁用控制并显示恢复中；新进程可用后通过重新 GET 同一 Task 才恢复“已同步”。该路径没有在停机期间新增事件，不能扩展为 `after` 缺口回放证明。
 
@@ -392,9 +476,9 @@ SSE 目前由每个 API 进程轮询 TaskStore，没有 PostgreSQL `LISTEN/NOTIF
 | 状态码 | 含义 |
 | --- | --- |
 | 403 | 当前身份不拥有提交的审批角色 |
-| 404 | Thread、Artifact、Run、Action、Scenario、Trace 或 Task 不存在，或不属于当前用户 |
-| 409 | 授权条件未满足、动作已失效、Permit/Gateway 拒绝，或 Task 版本过期、状态转换非法、幂等键被用于不同契约/命令 |
-| 422 | 请求 Schema、TaskContractDraft、证据值或模型结构化输出无效 |
+| 404 | Thread、Artifact、Run、Action、Scenario、Trace、Task 或 Demo 2 WorkItem 不存在，或不属于当前用户 |
+| 409 | 授权条件未满足、动作已失效、Permit/Gateway 拒绝，Workspace Artifact/revision 过期，Task 或 Demo 2 WorkItem 版本过期、状态转换/路由非法、Task 工件绑定已变化，或幂等键被用于不同契约/命令/动作事实 |
+| 422 | 请求 Schema、TaskContractDraft、证据值、报价当前字段或模型结构化输出无效 |
 | 503 | LLM endpoint、Key 或模型配置不可用 |
 
 SSE 在响应已经开始后无法再改变 HTTP 状态码，因此流内错误使用 `event: error` 和 `detail`。客户端应同时处理 HTTP 错误与流内错误。
@@ -403,8 +487,11 @@ SSE 在响应已经开始后无法再改变 HTTP 状态码，因此流内错误�
 
 - 请求模型均 `extra="forbid"`；新增顶层字段会破坏旧服务端，协议变更需同步前端和文档。
 - Task Runtime 当前使用 `schema_version="1.0"`；Python 权威模型在 `packages/contracts/task_models.py`，前端镜像在 `apps/web/app/task-types.ts`。
+- Demo 2 Python 权威模型在 `packages/contracts/demo2_models.py`，前端镜像在 `apps/web/app/demo2-types.ts`；当前没有公开 schema version 或持久化迁移协议。
 - V0.1 没有公开版本协商；`/v1` 是唯一 API 版本。
 - `ActionCandidate`、Permit claims 和哈希规则是安全边界，不能由前端自行构造并绕过 RunService。
 - 文档示例中的邮箱、报价号、用户和 Key 全部是演示值。
+- 报价来源回答中的 CRM/政策标签同样是固定演示数据；接口没有访问真实 CRM、CPQ 或 ERP。当前报价公式不覆盖税费、汇率、阶梯价或跨行套餐依赖。
+- Workspace revision 目前不是数据库原子 compare-and-swap；多 API 实例并发写、跨实例锁和 Conversation 结果重放均未实现或验证。
 
-Task API 当前只把上述能力暴露给固定 Demo 1 Fixture。PR 4 浏览器 E2E 覆盖创建、start、冲突、Steer accepted、resolve、Commit、交付物读取，以及 start 请求发送前 abort 后的 reload/同 key 重试。PR 5 在 PostgreSQL 16.14 和三个顺序 API 进程上验证 v2/v3 Snapshot、Artifact 和 Commit 恢复及幂等零重复；同页 system Edge 运行验证 API 停止、控制禁用、连接文案和新进程后的 GET 对账。它仍没有覆盖请求已到服务端但响应丢失、断线期间事件回放、数据库进程故障或多实例通知。Task Runtime 仍不是通用 LLM Agent Loop、后台队列或真实 Connector；Conversation Thread/Message 也不随 Task 恢复。副作用动作必须继续走 RunService 与 Tool Gateway，Task Control 不能直接发送邮件或写入企业系统，Task Artifact 也尚未绑定 Action 失效规则。证据见 [`PR 4 Frontend E2E`](evidence/DEMO1-PR4-FRONTEND-E2E-EVIDENCE.md) 与 [`PR 5 PostgreSQL-backed API Restart`](evidence/DEMO1-PR5-POSTGRES-BACKED-API-RESTART-EVIDENCE.md)。
+Task API 当前只把上述能力暴露给固定 Demo 1 Fixture。PR 4 浏览器 E2E 覆盖创建、start、冲突、Steer accepted、resolve、Commit、交付物读取，以及 start 请求发送前 abort 后的 reload/同 key 重试。PR 5 在 PostgreSQL 16.14 和三个顺序 API 进程上验证 v2/v3 Snapshot、Artifact 和 Commit 恢复及幂等零重复；同页 system Edge 运行验证 API 停止、控制禁用、连接文案和新进程后的 GET 对账。DR-0007 进一步验证了一条窄桥：最终客户回复草稿可按 Task/Commit/Artifact/Verification 精确绑定到 `email.send` 治理 Run，批准后仍只执行 Simulator。它不等于通用 Task Artifact 动作框架，也没有验证 Task 或数据库重启后的 Run 幂等恢复、真实收件人目录、真实邮件 Connector、附件、批量动作或用户价值。Task Control 仍不能直接发送邮件或写入企业系统；副作用必须经过 RunService、Policy/Evidence/Approval、Permit 与 Tool Gateway。其他未覆盖边界仍包括请求已到服务端但响应丢失、断线期间事件回放、数据库进程故障、多实例通知和历史轮次 UI。非 Tasks 工作区是否展示决定控制、按钮叫什么以及“开始新一轮汇报”如何串联 create/start 都是客户端交互，不是新的 API 能力。自动化通过也不能证明普通用户理解这些语义。证据见 [`PR 4 Frontend E2E`](evidence/DEMO1-PR4-FRONTEND-E2E-EVIDENCE.md)、[`PR 5 PostgreSQL-backed API Restart`](evidence/DEMO1-PR5-POSTGRES-BACKED-API-RESTART-EVIDENCE.md) 与 [`DR-0007 Task Artifact Action Bridge`](evidence/DEMO1-DEMO3-TASK-ARTIFACT-ACTION-BRIDGE-EVIDENCE-20260813.md)。

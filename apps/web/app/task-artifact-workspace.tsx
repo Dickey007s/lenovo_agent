@@ -12,7 +12,7 @@ import type {
   VerificationReport,
   VerificationStatus,
 } from "./task-types";
-import { formatSourceReference } from "./source-reference";
+import { projectSourceReferences } from "./source-reference";
 
 export type TaskArtifactWorkspaceProps = {
   task: TaskSnapshot | null;
@@ -22,6 +22,8 @@ export type TaskArtifactWorkspaceProps = {
     artifactVersionId: string,
     selectionMode?: "follow_head" | "pinned_history",
   ) => void;
+  onPrepareAction?: (artifactVersionId: string) => void;
+  actionBusy?: boolean;
 };
 
 export type TaskArtifactWorkspaceItem = {
@@ -64,6 +66,18 @@ const BRANCH_STATUS_LABELS: Record<BranchSnapshot["status"], string> = {
   verifying: "验证中",
   failed: "失败",
   committed: "已提交",
+  cancelled: "已取消",
+};
+
+const TASK_STATUS_LABELS: Record<TaskSnapshot["status"], string> = {
+  ready: "尚未开始",
+  running: "正在准备",
+  waiting_input: "等待你的决定",
+  paused: "已暂停",
+  taken_over: "由你接管",
+  verifying: "正在核对",
+  committed: "已完成",
+  failed: "需要处理",
   cancelled: "已取消",
 };
 
@@ -315,12 +329,8 @@ function SourceReferences({ sourceRefs, label }: { sourceRefs: string[]; label: 
       </summary>
       {sourceRefs.length > 0 ? (
         <ul className="task-artifact-source-list">
-          {sourceRefs.map((sourceRef, index) => (
-            <li key={`${sourceRef}:${index}`}>
-              <code>
-                {formatSourceReference(sourceRef, index)}
-              </code>
-            </li>
+          {projectSourceReferences(sourceRefs).map((source) => (
+            <li key={source.key}>{source.label}</li>
           ))}
         </ul>
       ) : (
@@ -351,8 +361,8 @@ function ConflictSummary({
       </header>
       {historicalVersion && (
         <p className="task-artifact-conflict-context-note">
-          下方状态来自当前 Task Snapshot；“已解决”仅表示当前 Snapshot 记录的冲突状态，
-          不表示解决发生在当前分支头，也不代表正在查看的历史工件已通过验证。
+          下方显示的是本轮任务当前记录的冲突状态；“已解决”不表示解决发生在当前分支头，
+          也不代表正在查看的历史材料已经通过核对。
         </p>
       )}
       <ul className="task-artifact-conflict-list">
@@ -365,7 +375,7 @@ function ConflictSummary({
               <header className="task-artifact-conflict-header">
                 <h4>{conflict.subject}</h4>
                 <span>{historicalVersion && conflict.status === "resolved"
-                  ? "当前 Snapshot 已解决"
+                  ? "本轮任务当前已解决"
                   : CONFLICT_STATUS_LABELS[conflict.status]}</span>
               </header>
               <p>{conflict.summary}</p>
@@ -385,7 +395,7 @@ function ConflictSummary({
                   {conflict.resolution}
                 </p>
               )}
-              <SourceReferences sourceRefs={conflict.source_refs} label="查看冲突来源" />
+              <SourceReferences sourceRefs={conflict.source_refs} label="查看冲突的演示数据来源" />
             </article>
           </li>
         ))}
@@ -400,12 +410,18 @@ function ArtifactDetail({
   reportsByArtifactId,
   selectedArtifactVersionId,
   onSelectArtifact,
+  onPrepareAction,
+  actionBusy = false,
+  actionEligible = false,
 }: {
   item: TaskArtifactWorkspaceItem;
   artifact: ArtifactVersion;
   reportsByArtifactId: Map<string, VerificationReport>;
   selectedArtifactVersionId: string;
   onSelectArtifact: TaskArtifactWorkspaceProps["onSelectArtifact"];
+  onPrepareAction?: TaskArtifactWorkspaceProps["onPrepareAction"];
+  actionBusy?: boolean;
+  actionEligible?: boolean;
 }) {
   const report = reportsByArtifactId.get(artifact.artifact_version_id) ?? null;
   const historicalVersion = Boolean(
@@ -470,7 +486,7 @@ function ArtifactDetail({
         )}
       </section>
 
-      <SourceReferences sourceRefs={artifact.source_refs} label="查看工件来源" />
+      <SourceReferences sourceRefs={artifact.source_refs} label="查看工件的演示数据来源" />
 
       {report && (
         <details className="task-artifact-checks">
@@ -481,7 +497,7 @@ function ArtifactDetail({
                 <li className={`task-artifact-check task-artifact-check-${check.status}`} key={check.check_id}>
                   <strong>{check.label}</strong>
                   <span>{check.detail}</span>
-                  <SourceReferences sourceRefs={check.source_refs} label="检查来源" />
+                  <SourceReferences sourceRefs={check.source_refs} label="查看检查项的演示数据来源" />
                 </li>
               ))}
             </ul>
@@ -489,6 +505,23 @@ function ArtifactDetail({
             <p className="task-artifact-check-empty">此验证报告没有逐项检查记录。</p>
           )}
         </details>
+      )}
+
+      {artifact.kind === "reply_draft" && report?.status === "passed" && !historicalVersion && actionEligible && (
+        <section className="task-artifact-action" aria-labelledby="task-artifact-action-title">
+          <div>
+            <span>下一步</span>
+            <h3 id="task-artifact-action-title">将这份已核对草稿交给动作治理</h3>
+            <p>系统只准备发送动作，不会直接发送。收件人、风险和确认要求由服务端重新判断。</p>
+          </div>
+          <button
+            type="button"
+            disabled={actionBusy || !onPrepareAction}
+            onClick={() => onPrepareAction?.(artifact.artifact_version_id)}
+          >
+            {actionBusy ? "正在准备" : "准备发送客户回复"}
+          </button>
+        </section>
       )}
 
       <section className="task-artifact-lineage" aria-labelledby="task-artifact-lineage-title">
@@ -535,6 +568,8 @@ export function TaskArtifactWorkspace({
   task,
   selectedArtifactVersionId,
   onSelectArtifact,
+  onPrepareAction,
+  actionBusy = false,
 }: TaskArtifactWorkspaceProps) {
   if (!task) {
     return (
@@ -596,7 +631,7 @@ export function TaskArtifactWorkspace({
 
       {task.status === "waiting_input" && (
         <aside className="task-artifact-task-waiting" role="status">
-          任务正在等待输入。当前显示的是最近一次服务端任务快照。
+          任务正在等待你的决定。当前显示的是本轮最近确认的材料状态。
         </aside>
       )}
 
@@ -669,6 +704,14 @@ export function TaskArtifactWorkspace({
               reportsByArtifactId={reportsByArtifactId}
               selectedArtifactVersionId={effectiveSelectedArtifactId}
               onSelectArtifact={onSelectArtifact}
+              onPrepareAction={onPrepareAction}
+              actionBusy={actionBusy}
+              actionEligible={Boolean(
+                task.status === "committed"
+                && task.last_commit?.artifact_version_ids.includes(
+                  selectedArtifact.artifact_version_id,
+                ),
+              )}
             />
           ) : (
             <section className="task-artifact-detail-empty" aria-live="polite">
@@ -717,7 +760,7 @@ export function TaskArtifactWorkspace({
           <div className="task-artifact-commit-empty" role="status">
             <span>最终提交</span>
             <strong>尚未形成最终提交</strong>
-            <p>当前任务状态：{task.status}，阶段：{task.phase}。</p>
+            <p>当前进展：{TASK_STATUS_LABELS[task.status]}。</p>
           </div>
         )}
       </footer>

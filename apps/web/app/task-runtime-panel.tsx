@@ -3,7 +3,7 @@
 import { FormEvent, useState } from "react";
 
 import type { BranchSnapshot, TaskControlCommand, TaskSnapshot } from "./task-types";
-import { formatSourceReference } from "./source-reference";
+import { projectSourceReferences } from "./source-reference";
 
 type SyncState = "loading" | "connecting" | "synced" | "reconnecting" | "offline";
 
@@ -201,7 +201,7 @@ export function TaskRuntimePanel({
                   采用正式收入来源
                 </button>
                 <details className="task-conflict-details">
-                  <summary>查看候选值与来源</summary>
+                  <summary>查看候选值与演示数据来源</summary>
                   <div className="task-conflict-values">
                     <strong>候选值</strong>
                     <ul>
@@ -211,10 +211,8 @@ export function TaskRuntimePanel({
                   <div className="task-conflict-sources">
                     <strong>来源</strong>
                     <ul>
-                      {conflict.source_refs.map((sourceRef, index) => (
-                        <li key={`${sourceRef}:${index}`}>
-                          <code>{formatSourceReference(sourceRef, index)}</code>
-                        </li>
+                      {projectSourceReferences(conflict.source_refs).map((source) => (
+                        <li key={source.key}>{source.label}</li>
                       ))}
                     </ul>
                   </div>

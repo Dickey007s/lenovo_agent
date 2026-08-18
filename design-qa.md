@@ -1,5 +1,7 @@
 # DR-0005 Task Director Design QA
 
+> Historical visual baseline for commit `a47cb28`. The visual comparison below remains valid for that recorded implementation, but it does not close the current usability decision. The current business-first revision and screenshots are tracked in `docs/evidence/DEMO1-PR6-USABILITY-COMPREHENSION-AUDIT-20260811.md`; `DR-0005` remains `Draft` until unguided participant testing is completed.
+
 ## Comparison Target
 
 - Source visual truth: `docs/evidence/assets/dr-0005-task-director-option2-reference.png`

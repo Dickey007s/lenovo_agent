@@ -37,6 +37,9 @@ def evaluate_policies(
     ]
 
     if action.capability == "email.send" and action.target_scope.startswith("external"):
+        required_evidence = ["recipient_identity", "dlp_result"]
+        if action.resources:
+            required_evidence.append("attachment_hash")
         effects.append(
             PolicyEffect(
                 policy_id="external_email_v1",
@@ -45,7 +48,7 @@ def evaluate_policies(
                     "email.preview": CapabilityDecision(verdict="allow"),
                     "email.send": CapabilityDecision(verdict="blocked"),
                 },
-                required_evidence=["recipient_identity", "attachment_hash", "dlp_result"],
+                required_evidence=required_evidence,
                 required_approvals=["current_user"],
                 reason_codes=["EXTERNAL_SEND_RESTRICTED"],
             )

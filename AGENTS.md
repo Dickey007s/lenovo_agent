@@ -10,6 +10,9 @@
 6. `docs/PRESENTATION_BRIEF.md`：对外叙事、演示路径和不可夸大的边界。
 7. `docs/DECISION_AND_REPORTING_GOVERNANCE.md`：所有决策、推进、PR、Demo 和汇报必须通过的场景、来源、前台与后端事实门槛。
 8. 修改 Demo 1 Task Runtime 时，再读 `docs/decisions/DR-0002-bounded-durable-office-loop.md`、`docs/scenarios/SCENARIO-001-customer-a-durable-report.md` 和 `docs/contracts/` 下的协议与 UI 事实矩阵。
+9. 修改报价工作台、报价上下文或报价问答时，再读 `docs/decisions/DR-0006-deterministic-quote-calculation.md`、对应 Source/Evidence 和 `docs/contracts/UI_SERVER_FACT_MATRIX.md` 的报价映射。
+10. 修改 Task 最终工件进入业务动作的桥接时，再读 `docs/decisions/DR-0007-task-artifact-action-bridge.md`、对应 Evidence、`docs/GOVERNANCE_AND_ACTIONS.md` 与 Task/UI 协议。
+11. 修改 Demo 2 智能工作驾驶舱、Admission、路由选择或 WorkCockpitSnapshot 时，再读 `docs/decisions/DR-0008-demo2-explainable-admission.md`、`docs/scenarios/SCENARIO-002-demo2-explainable-admission.md`、`docs/evidence/DEMO2-PR1-EXPLAINABLE-ADMISSION-EVIDENCE-20260817.md` 与 `docs/contracts/UI_SERVER_FACT_MATRIX.md` 的 Demo 2 区域。
 
 源码永远高于文档。行为变更后必须同步相关文档；不要只改 README 的宣传描述。关键实现路径：
 
@@ -35,13 +38,26 @@ tests/                                        单元与端到端回归
 - 工作区在左、Agent 在右；双方独立滚动，中间可拖动，切换工作区不重建对话。
 - 用户可以独立编辑和保存；Agent 接收活动视图与未保存的 `workspace_context`。
 - 人工确认使用对话底部非模态 tray，不恢复独立审批页，也不完全遮挡消息区。
+- Demo 1 的冲突决定、候选依据和分支控制只在 Tasks 工作区显示；非 Tasks 工作区只显示后台任务摘要和前往 Tasks 的入口，跳转本身不得提交 Task Control。
+- 固定 Demo 1 的已知来源在普通业务 UI 中必须标为“演示数据”并使用可读业务标签；原始 `fixture:` ID 和未知内部标识不得进入 DOM。服务端仍保留原值用于校验与审计。
+- 终态入口统一为“开始新一轮汇报”：创建独立 Task 并立即启动，旧 Task、Artifact、Event 与 Commit 不得重置或覆盖。当前没有历史轮次选择入口，不得把后台保留表述成前台可自由切换历史轮次。
+- 报价工作台的行小计、标准总价、折后总价、优惠金额、综合折后比例、优惠率和最低折后比例检查必须由确定性公式产生，LLM 只能解释结果，不能充当计算器。服务端拥有 `quote_id/customer/currency/approved_floor/unit_price/sources`；当前用户只能通过工作区编辑 `name/qty/discount/valid_until`，客户端 `subtotal/total/approval` 永远不是权威事实。
+- 报价任一必需字段无效、越界、超限或行数与服务端版本不一致时必须 fail closed：前台不显示部分总计，Agent 不回退到历史金额，保存接口不写入猜测结果。保存后的规范化报价若相对基线有修改，必须标记 `needs_review` / `requires_recheck`，不能沿用旧审批。
+- 显式发送未保存 `workspace_context` 时必须同时提交服务端 `artifact_id + revision`；保存必须提交 `expected_artifact_id + expected_revision`。版本过期时不得覆盖最新内容：前端保留当前草稿、读取最新 Artifact，并只允许查看最新版本或基于编辑起点/本地草稿/最新版本做有界三方重应用；同字段双改必须交给用户处理。
+- LLM 产生的 Artifact `sources`、Action 参数、目标范围、数据分类、状态变化类型和可逆性都不是权威事实。服务端必须保留/生成受信来源，并从当前可见 Artifact 与 capability 重建可执行动作；内容不匹配、目标不确定或版本在规划期间变化时 fail closed。动作终态说明允许同一 API 进程内幂等重放同一个 `message.completed`，前端按 `message_id` 更新而不是重复追加。
+- 不得把动作自身携带的未知姓名、畸形邮箱或不透明附件当作“已验证证据”。收件人身份未解析、邮箱格式不合法或附件数据类别不明时必须确定性 deny，用户自报同一值不能解锁；格式合法的已知邮箱与可分类附件才沿正常 Evidence/Approval/Permit 链路。Conversation 创建的 Run 必须绑定真实 Thread，同一用户也不能把一个 Thread 的结果续写到另一个 Thread。
+- 用户在等待 Agent 返回 Artifact 期间仍可继续编辑。晚到的 `artifact.updated` 必须以请求发出时版本为 base 做三方处理：不同字段保留双方修改，同字段双改进入显式冲突；不得把晚到 Agent 结果直接覆盖用户新输入。
 - 动作确认后必须继续执行并由 Agent 返回结果，前端不能硬编码“已完成”。
 - LLM 只生成自然语言、ArtifactDraft 与 ActionCandidate；Risk、Policy、Evidence、Approval、Permit 和工具执行由确定性代码决定。
 - 风险规则不能退化为“所有外部动作都是 L5”。普通累计最高 L4；L5 仅由受限能力、受限执行或凭据公开等硬条件触发。
 - 风险判断在确认前的 Agent 文本中只输出一次；确认卡可保留结构化风险，最终结果不重复风险段落。
 - Artifact 绑定动作后若内容改变，旧 Action 必须失效；不能复用旧审批或 Permit。
+- Task 派生动作只能来自当前 Owner 的最终 `TaskCommit` 中、已经 passed 验证的不可变 ArtifactVersion；必须绑定 Task/Commit/Artifact/Verification 的身份、版本和 digest，并在证据、审批、授权与执行前重新校验。前台“准备动作”不得表述为已发送，拒绝或动作失败不得回滚已完成的 Task Commit。
 - `email.send` 等执行结果当前全部来自 Simulator。不得在文档、UI 或汇报中表述为真实邮件、CRM、日历或 OA 写入。
 - 25 类 ActionCandidate 是协议目录，不代表全部可执行；当前只有 5 个 capability 注册了端到端 Simulator。
+- Demo 2 第一纵切只允许使用四项固定演示任务、服务端 `WorkCockpitSnapshot`、固定队列、路由解释和客户 A 的 `this_run` 模式选择；三项简单任务的 Admission 路由是固定演示选择，拖拽调序和长期排序偏好不属于本纵切。
+- Demo 2 的 Adaptive Swarm 只能标记为推荐或本次已选择；没有真实 Worker/Connector/执行事件时，`execution_status` 必须为 `not_started`。`selection_source=admission` 表示接受推荐，降级必须为 `selection_source=user_override`，并使用 `override_scope=this_run`。
+- Demo 2 的成本/时效只能使用 `route_profiles[].forecast.source_type=fixture_policy_forecast` 语义；不得写成真实账单、实测时延、节省比例、生产 SLA 或已验证效果。当前服务端边界是 memory，跨进程恢复与真实执行均待证据。
 
 决策、推进与汇报的硬门槛：
 

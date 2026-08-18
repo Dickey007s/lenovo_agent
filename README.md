@@ -24,8 +24,8 @@ V0.1 重点验证三件事：
 | --- | --- |
 | 邮件 | 空白编辑器、新邮件入口、收件人/抄送/主题/正文/附件编辑、保存、Agent 渐进式写入、受控发送 |
 | 文档 | 分章节编辑、Agent 生成会议纪要或周报、来源与修改记录 |
-| 报价表 | 类 Excel 行列编辑、折扣底线提示、金额汇总、导入入口占位 |
-| 任务 | “指挥台 / 共享工件 / 待办”三种模式；Task Director 展示服务端阶段、分支、工件、验证、冲突和 Commit，待办保留可编辑看板 |
+| 报价表 | 类 Excel 行列编辑、确定性行级核算、最低折后比例与待复核提示、导入入口占位 |
+| 任务 | 默认从“准备客户 A 经营汇报”进入；“进度 / 成果 / 执行记录”三种模式分别承载业务下一步、服务端工件与原手工待办 |
 | 日历 | 全宽月历一级视图、日期格内嵌日程条目、点击进入当日安排、新建与编辑、受控创建邀请 |
 | 报销 | 报销单与发票核查、异常提示、受控发起补件请求 |
 | CRM | 商机阶段和下一步编辑、受控更新商机 |
@@ -40,6 +40,11 @@ V0.1 重点验证三件事：
 - 对话使用 SSE 流式输出；工作区更新使用 `artifact.stream.started → artifact.delta → artifact.updated` 增量协议。
 - 邮件正文按文本块呈现打字效果；文档章节、任务、报价和日历项目按项出现，并显示轻量“Agent 正在编辑”状态。
 - 普通非敏感通识问题走直接问答路径，避免误复用上一轮办公动作；企业内部事实仍只能来自受信上下文。
+- 报价核算、复算、最低折后比例检查和来源追问不再交给模型自由计算：后端用 Decimal、前端用整数分与 BigInt 按同一逐行舍入规则投影。基线三行的标准总价为 272000 元、折后总价为 253400 元、优惠金额为 18600 元、综合折后比例为 93.16%（约 9.32 折）、优惠率为 6.84%。
+- 未保存的项目名、数量、折后比例和有效期可以参与当前回答；报价编号、客户、币种、最低折后比例、标准价和来源仍由服务端拥有。旧小计/总计会被忽略并重算，非法字段会停止聚合显示和回答，不回退到历史金额。
+- 未保存上下文和保存请求都绑定当前 `WorkspaceArtifact.artifact_id/revision`。旧版本保存返回 409，页面保留本地草稿并读取最新版本；不同字段修改可经显式三方重应用合并，同一字段双方都修改时不会静默覆盖。
+- 进入发送等副作用链路后，服务端从当前 Artifact 重建收件人、附件、正文和治理元数据，忽略模型伪造的 Action 参数与来源；规划期间 Artifact 改变则不创建动作。无法解析的姓名、畸形邮箱或不透明附件被确定性 deny，用户自报 evidence 不能把未解析值变成可信证据。Run 绑定发起它的真实 Conversation Thread，跨 Thread 续写被拒绝；动作终态说明失败后可重新读取，成功重试复用同一完成消息。
+- 用户在等待 Agent 返回期间继续修改工作区时，前端以请求发出时版本为编辑起点处理晚到 `artifact.updated`：不同字段自动保留双方修改，同字段双改进入显式冲突，Agent 结果不再直接覆盖新输入。
 - 风险等级和判断规则只在确认前的 Agent 回复中出现一次；执行完成后只反馈成功、失败或拒绝结果。
 
 ### 治理与执行闭环
@@ -55,21 +60,32 @@ V0.1 重点验证三件事：
 - 工作区内容在动作绑定后发生变化时，旧 Action 会被作废，不能用旧审批执行新参数。
 - Run、工作区、审计事件和 LangGraph checkpoint 可持久化并在服务重启后恢复。
 
-### Demo 1 Task Director、交付物与恢复闭环（PR 4-6）
+### Demo 1 经营汇报任务、交付物与恢复闭环（PR 4-6）
 
 - `TaskService` 从严格的 `TaskContractDraft` 创建服务端拥有的 `TaskContract`、`TaskSnapshot`、三个初始 `BranchSnapshot` 和首条 `TASK_CREATED`。新任务仍从 `ready / contract` 开始。
-- 完成、失败或取消后的 Demo 1 会在右上角显示“再次演示”；每一轮通过新的 `Idempotency-Key` 创建独立 Task，刷新后仍可开始下一轮，旧 Task、工件和 Commit 历史不会被重置或覆盖。
+- 完成、失败或取消后，Tasks 工作区右上角显示“开始新一轮汇报”。这不是把当前 Task 重置成可启动状态：前端使用新的 `Idempotency-Key` 创建独立 Task，并立即启动新 Task；旧 Task、工件、事件和 Commit 不被重置或覆盖。服务端列表会保留多轮 Task，但前端尚无历史轮次选择入口。
 - `POST /v1/tasks/{task_id}/start` 对固定客户 A Fixture 执行一次确定性状态转换：产生 Observe、Plan、Act、Verify 事件，追加 ArtifactVersion 和 VerificationReport，并把 2,400 万元正式口径与 2,680 万元预测口径的冲突限制在经营分析分支。该路径不调用 LLM，也不读取真实邮箱、CRM、预测表或项目系统。
 - `POST /v1/tasks/{task_id}/controls` 接受带 `expected_task_version` 和 `idempotency_key` 的 Steer、Pause、Resume、Take over、Return control 与 Resolve evidence。分支控制只有在服务端返回新 Snapshot 后才显示为已应用；Steer 当前只进入 `accepted` 时，前端只显示“方向指令已记录，等待后续循环应用”。
 - `TaskStore` 的内存与 PostgreSQL 实现包含 Snapshot、TaskEvent 和 ArtifactVersion 的 mutation 路径。`start` 和 `resolve_evidence` 会在写入前校验预计步骤、工具调用、运行时长和截止时间，超限时拒绝 mutation。PR 5 已用 PostgreSQL 16.14 隔离数据库和三个顺序 API 进程验证 v2/v3 Snapshot 恢复、原幂等响应重放，以及 Event/ArtifactVersion/Commit 零新增。
-- Tasks 默认进入左侧 Task Director：头部事实摘要、Observe/Plan/Act/Verify/Commit 阶段轨和三个 Branch 泳道都来自同一 `TaskSnapshot`；右侧默认 Decision Inbox，只突出 open Conflict 和现有服务端控制，也可切回持续存在的 Agent 对话。视觉阶段、连接线和颜色不构成新的后台进度事实。
-- 每个分支 head 可直接打开“共享工件”。该工作区从同一 Snapshot 显示当前版本、验证、冲突、结构化内容、折叠来源与检查、完整 lineage 以及最终 Commit/state hash；默认在 mutation 后跟随新 head，用户主动查看旧版本时显示明确历史 banner 和返回当前版本动作。
-- Tasks 保留“待办”模式，原手工待办编辑流程没有被长期任务 UI 替换。PR 4 对 `analysis/risk_brief/reply_draft` 使用字段 allowlist，未知 kind/字段默认隐藏；PR 5 让冲突与交付物复用同一 `source_ref` 投影，只放行契约中的四个已知 Demo 1 Fixture 引用，其他标识显示隐藏占位。这是前端第二道防线，不代表服务端数据删除，也不是通用字段安全保证。
-- Decision Inbox 的收入冲突主动作仍提交 `resolve_evidence` 并采用契约内 CRM 正式来源；“准备补证指令”只填充 Steer，提交后也只显示“已记录，等待后续循环应用”。新布局没有新增后端协议、控制种类或真实 Connector。
+- 根路径默认进入经营汇报任务。初始列表返回前只显示读取态，不允许重复创建；确认没有 Task 后，空态说明要得到经营分析、风险页和客户回复草稿，“开始准备汇报”一次点击完成创建与启动。Conflict 顶部只保留弱化的“查看待确认项”定位，真正改变状态的主动作只有“采用正式口径并继续核对”；Committed 转入成果复核。主摘要只保留材料核对、业务状态和同步状态，版本、预算、Owner 等内部运行字段不再抢占业务主路径。
+- 冲突决定、候选依据和分支控制只在 Tasks 工作区显示。邮件、文档等非 Tasks 工作区的右侧只保留“后台任务”摘要与“打开任务 / 前往处理 / 查看任务 / 查看汇报”入口；点击只切换到 Tasks，不提交 Task Control。
+- 任务进度仍来自同一 `TaskSnapshot`。读取资料、拆分任务、生成材料、核对事实、准备完成五阶段只是服务端 phase 的用户语言投影；三个材料泳道只展示当前材料、核对结果/冲突和是否纳入本轮成果，视觉阶段、连接线和颜色不构成新的后台进度事实。
+- 收入冲突区在提交前同时说明“为什么需要你”和“确认后会发生什么”，主动作仍提交 `resolve_evidence` 并采用契约内 CRM 正式来源。查看材料是次级动作；Steer、Pause 和 Take over 收入“其他处理方式”。Steer 提交后仍只显示“已记录，等待后续循环应用”，新信息层级没有新增后端协议、控制种类或真实 Connector。
+- 完成态直接列出 `last_commit` 支持的三项可复核成果，并明确客户回复仍为草稿、未发送；不再用“没有待决策项”代表完成。每个 Branch head 可在“成果”中查看当前版本、验证、冲突、结构化内容、来源、lineage 与 Commit 证据；默认 mutation 后跟随新 head，用户主动查看旧版本时显示明确历史 banner 和返回动作。
+- “执行记录”保留原手工待办编辑流程。固定 Demo 1 的四个已知 `source_ref` 投影为“演示数据 · 客户往来邮件 / CRM 正式收入记录 / 收入预测表 / 客户项目周报（版本）”；原始 `fixture:` 标识和未知来源值不进入普通业务 DOM，未知值显示隐藏占位。服务端仍保存原值用于校验与审计；这只是前端第二道防线，不代表服务端数据删除，也不是通用字段安全保证。
 - Task SSE 只用于发现新事件并触发 Snapshot 对账；同步标记只表示客户端传输状态，不代表后台仍在执行。未知 mutation 会在当前标签页保存原 key、intent 与预期版本。浏览器 E2E 已覆盖 start 请求发送前 abort、reload、同 key 对账和无重复工件；PR 5 的 system Edge 运行还覆盖同页 API 进程停止、控制禁用、顶部与 Task 面板一致显示恢复中，以及新进程启动后的 Snapshot 对账。尚未覆盖请求已到服务端但响应丢失或断线期间产生新事件的 `after` 回放。
-- Action Gate 打开时保留 Active Task Bar；TaskRuntimePanel 仍挂载以保留未提交 Steer 草稿，但通过 CSS 视觉隐藏并退出交互，Task Runtime 与 Task Bar 操作均不可用。Gate 使用独立网格行，收起后把该行缩至 58px。Action Gate 仍沿用独立 `RunService → Risk/Policy/Evidence/Approval/Permit → Gateway` 链路；Task Artifact 尚未绑定 Action 版本和失效规则。
+- 最终提交且验证通过的客户回复草稿现在可以进入 Demo 3 治理链。完成态只提供“准备发送客户回复”：服务端把 Task、Commit、ArtifactVersion、内容摘要和 VerificationReport 绑定到 `ProposedActionSpec`，确认卡展示版本、L4 原因、外部目标和为什么必须由人确认；批准后才签发一次性 Permit 并调用 Email Simulator。绑定变化时旧 Action 失效，拒绝或动作失败不会回滚已完成的 Task Commit。
+- Action Gate 打开时保留后台任务摘要，但 Task 跳转与 Tasks 中的决定控制不可用。Gate 使用右侧完整独立网格行，收起后把空间归还给对话。当前 Task 派生动作只支持固定客户 A 的最终回复草稿与演示地址，不是通用 Artifact Action registry。
 
-这仍是固定 Fixture 的同步纵切，不是通用后台调度器或真实 Connector。`start` 在一次 mutation 中物化阶段 Trace，浏览器在事务提交后才看到结果；人工编辑后产生新版本、预算/截止时间拒绝后的完整恢复 UI、单分支失败、服务端已提交但响应丢失、断线期间事件回放、数据库进程重启、已有库迁移、多实例通知和 Task Artifact → Action 失效绑定仍待验证。Task 恢复也不等于 Conversation 恢复，Thread/Message 仍在 API 内存中。证据见 PR 3 Runtime、PR 4 浏览器与 [`PR 5 PostgreSQL-backed API 重启证据`](docs/evidence/DEMO1-PR5-POSTGRES-BACKED-API-RESTART-EVIDENCE.md)。
+这仍是固定演示数据的同步纵切，不是通用后台调度器或真实 Connector。`start` 在一次 mutation 中物化阶段 Trace，浏览器在事务提交后才看到结果；人工编辑后产生新版本、历史轮次选择、预算/截止时间拒绝后的完整恢复 UI、单分支失败、服务端已提交但响应丢失、断线期间事件回放、数据库进程重启、已有库迁移、多实例通知和 Task 派生 Run 的 PostgreSQL 恢复仍待验证。Task 恢复也不等于 Conversation 恢复，Thread/Message 仍在 API 内存中。自动化通过只证明预设 DOM、动作调用和服务端事实一致，不能证明目标用户已经理解这些文案和流程。跨 Demo 纵切证据见 [`DR-0007`](docs/decisions/DR-0007-task-artifact-action-bridge.md) 与 [`Task Artifact → Action Evidence`](docs/evidence/DEMO1-DEMO3-TASK-ARTIFACT-ACTION-BRIDGE-EVIDENCE-20260813.md)。
+
+### Demo 2 智能工作驾驶舱第一纵切（DR-0008，限定范围 Verified）
+
+当前已实现服务端驱动的 `WorkCockpitSnapshot` 单进程 memory 纵切和“智能工作驾驶舱”前台。固定演示队列包含客户 A 经营汇报、供应商邮件回复、周报格式统一、报销异常核查四项工作；后三项由 Admission 固定选择 Single Agent、Fixed Workflow、Tool Call，客户 A 保持待决定并允许 Single Agent、Fixed Workflow、Adaptive Swarm。
+
+用户可以查看业务价值、资料广度、可并行工作包、截止压力、风险和资源边界，比较允许的执行方式，并将客户 A 的选择限定为“仅本次运行”。选择推荐模式时 `selection_source=admission`，选择其他允许模式时为 `user_override` 与 `override_scope=this_run`。mutation 使用预期版本和幂等键；409 会保留用户草稿并重新读取服务端事实。无论推荐还是选择，`execution_status` 都是 `not_started`。
+
+`route_profiles[].forecast.source_type` 固定为 `fixture_policy_forecast`，只表示固定规则预测，不代表真实账单、实测耗时、Worker、Connector 或生产 SLA。当前没有 Demo 2 SSE、PostgreSQL 恢复、动态 Worker、Shared Artifact Workspace 或真实执行。工程证据包含聚焦 Python `6 passed`、专用 system Edge `5 passed`、完整 Python `118 passed, 1 skipped`、完整浏览器 `34 passed` 和三张桌面/移动截图；Ruff、前端 lint、生产构建与 diff-check 通过。实现位于堆叠 PR [#13](https://github.com/Dickey007s/lenovo_agent/pull/13)，依赖 PR #12。详见 [`DR-0008`](docs/decisions/DR-0008-demo2-explainable-admission.md)、[`SCENARIO-002`](docs/scenarios/SCENARIO-002-demo2-explainable-admission.md) 与 [`Demo 2 Evidence`](docs/evidence/DEMO2-PR1-EXPLAINABLE-ADMISSION-EVIDENCE-20260817.md)。
 
 ## 技术架构
 
@@ -120,9 +136,17 @@ flowchart LR
 - [LLM API 连通性证据](docs/evidence/LLM-API-SMOKE-EVIDENCE-20260811.md)
 - [前端视觉同步与 Demo 1 兼容决策](docs/decisions/DR-0003-frontend-visual-refresh-sync.md)
 - [前端视觉同步与兼容证据](docs/evidence/DR-0003-FRONTEND-VISUAL-SYNC-EVIDENCE.md)
-- [Demo 1 可重复演示决策](docs/decisions/DR-0004-repeatable-demo1-rounds.md)
+- [Demo 1 独立新一轮汇报决策](docs/decisions/DR-0004-repeatable-demo1-rounds.md)
 - [Task Director 交互决策](docs/decisions/DR-0005-task-director-interaction.md)
 - [Task Director 交互证据](docs/evidence/DEMO1-PR6-TASK-DIRECTOR-INTERACTION-EVIDENCE.md)
+- [可理解性验收与工程代理证据](docs/evidence/DEMO1-PR6-USABILITY-COMPREHENSION-AUDIT-20260811.md)
+- [来源与新一轮语义修订证据](docs/evidence/DEMO1-ROUND-AND-SOURCE-CLARITY-EVIDENCE-20260811.md)
+- [Demo 1 已验证工件进入 Demo 3 动作治理决策](docs/decisions/DR-0007-task-artifact-action-bridge.md)
+- [Demo 1 → Demo 3 Task Artifact 动作桥接证据](docs/evidence/DEMO1-DEMO3-TASK-ARTIFACT-ACTION-BRIDGE-EVIDENCE-20260813.md)
+- [Demo 2 可解释 Admission 决策（限定范围 Verified）](docs/decisions/DR-0008-demo2-explainable-admission.md)
+- [Demo 2 智能工作驾驶舱场景（限定范围 Verified）](docs/scenarios/SCENARIO-002-demo2-explainable-admission.md)
+- [Demo 2 PR-1 工程证据](docs/evidence/DEMO2-PR1-EXPLAINABLE-ADMISSION-EVIDENCE-20260817.md)
+- [来源台账](docs/decisions/SOURCE_REGISTER.md)
 
 ## 目录结构
 
@@ -206,12 +230,19 @@ pnpm --dir apps/web lint
 pnpm --dir apps/web build
 ```
 
-V0.1 定稿基线和 Demo 1 各 PR 的实际验证结果记录在 [`DR-0002`](docs/decisions/DR-0002-bounded-durable-office-loop.md) 及对应 evidence。PR 3 封口验证为全量 Python `56 passed`；PR 4 的 system Edge E2E 为 `2 passed (18.4s)`。PR 5 与前端视觉刷新/可重复演示合并后的封口回归为：PostgreSQL 16.14 opt-in 系统测试 `1 passed (9.78s)`，system Edge suite `3 passed (17.0s)`，完整 Python `58 passed, 1 skipped (2.00s)`。PR 6 Task Director 的最终全量浏览器 E2E 为 `6 passed (34.5s)`，专用截图封口用例为 `1 passed (21.6s)`，完整 Python 为 `58 passed, 1 skipped (3.46s)`，Ruff、前端 lint、生产构建和治理测试通过；[`design-qa.md`](design-qa.md) 最终为 `passed`，无剩余 P0/P1/P2。新增两项乱序回归防止旧 GET 覆盖较新 Snapshot 或把未追上已观察 SSE 的页面伪标为已同步。这只证明固定 Fixture 的前台投影和被测交互，不证明用户理解、效率或决策质量已经改善。固定 Demo 1 Task 测试不调用真实 LLM；独立 LLM smoke 只验证 `deepseek-v4-pro` 通用问答与 Conversation SSE 连通性。
+V0.1 定稿基线和 Demo 1 各 PR 的实际验证结果记录在 [`DR-0002`](docs/decisions/DR-0002-bounded-durable-office-loop.md) 及对应 evidence。PR 3 封口验证为全量 Python `56 passed`；PR 4 的 system Edge E2E 为 `2 passed (18.4s)`。PR 5 与前端视觉刷新/可重复演示合并后的封口回归为：PostgreSQL 16.14 opt-in 系统测试 `1 passed (9.78s)`，system Edge suite `3 passed (17.0s)`，完整 Python `58 passed, 1 skipped (2.00s)`。PR 6 原 Task Director 工程封口为浏览器 `6 passed (34.5s)`。收到“看不懂系统要做什么”的 Stakeholder 反馈后，本轮改以业务任务重排首屏、单次开始、决策后果和完成成果；该轮浏览器为 `12 passed (43.7s)`，Python 为 `58 passed, 1 skipped (2.24s)`，Ruff、前端 lint 和生产构建通过，并保存 `1181 x 900` 三状态与 `390 x 844` CSS 视口截图。随后针对来源与“再次演示”歧义的修订完成浏览器 `12 passed (44.5s)`，覆盖非 Tasks 只显示后台摘要、已知来源标为演示数据且原始 ID 不入 DOM，以及“开始新一轮汇报”创建并启动独立 Task、旧 Task 保留；另保存 `1440 x 900` Mail 摘要截图。新增回归只证明预设信息、动作和服务端事实一致，不证明真实用户已经理解。故 [`DR-0005`](docs/decisions/DR-0005-task-director-interaction.md) 保持 `Draft`，至少 5 人无引导形成性测试尚未运行。固定 Demo 1 Task 测试不调用真实 LLM；独立 LLM smoke 只验证 `deepseek-v4-pro` 通用问答与 Conversation SSE 连通性。
+
+报价错误修复的来源、决策、前台—后端事实链和证据分别记录在 [`USER-FEEDBACK-20260811-06`](docs/sources/USER-FEEDBACK-20260811-06-quote-calculation-grounding.md)、[`DR-0006`](docs/decisions/DR-0006-deterministic-quote-calculation.md) 和 [`QUOTE-WORKSPACE-DETERMINISTIC-CALCULATION-EVIDENCE-20260811`](docs/evidence/QUOTE-WORKSPACE-DETERMINISTIC-CALCULATION-EVIDENCE-20260811.md)。实现提交为 `2f9866f + fe865bd + e2c4b56`；全量 Python 为 `108 passed, 1 skipped (2.62s)`，报价/Conversation 聚焦为 `54 passed (1.72s)`，完整浏览器为 `27 passed (1.1m)`，其中报价浏览器为 `15 passed (23.6s)`，Ruff、前端 lint 与生产构建通过。`DR-0006` 因此仅在固定演示报价、当前公式、当前协议和被测前台恢复范围内为 `Verified`，不是生产级报价引擎或用户可用性结论。
+
+2026-08-13 的跨 Demo 迭代把最终且验证通过的客户回复草稿接入 Demo 3 治理链。实现提交 `d827f29`、文档提交 `d1cc746` 的封口结果为 Python `112 passed, 1 skipped (4.11s)`、完整 system Edge `29 passed (1.4m)`、Demo 1 浏览器 `13 passed (1.0m)`，Ruff、前端 lint、生产构建与治理门槛通过。浏览器覆盖 L4 Gate、绑定版本、批准后 Permit + Email Simulator、拒绝后 Task Commit 不变以及确定性结果说明；这是固定 Fixture 的工程证据，不证明真实发送或用户已经理解。决策和证据见 [`DR-0007`](docs/decisions/DR-0007-task-artifact-action-bridge.md) 与 [`TASK-ARTIFACT-ACTION-BRIDGE-20260813`](docs/evidence/DEMO1-DEMO3-TASK-ARTIFACT-ACTION-BRIDGE-EVIDENCE-20260813.md)，对应堆叠 PR [#12](https://github.com/Dickey007s/lenovo_agent/pull/12)。
 
 ## 数据、身份与安全边界
 
 - `X-User-Id` 与 `X-User-Roles` 只是 V0.1 Demo 身份头，默认前端使用 `demo_user` 和 `current_user,sales_manager`；生产环境必须替换为经过验证的 SSO/JWT。
-- 内部邮箱、CRM、报价、OA、知识库和日历内容均为确定性 Demo Fixture，不是真实企业数据。
+- 内部邮箱、CRM、报价、OA、知识库和日历内容均为确定性演示数据，不是真实企业数据；固定 Demo 1 的普通业务 UI 必须明确标注“演示数据”，不得显示原始 `fixture:` ID。
+- 报价工作台不访问真实 CRM/CPQ/ERP；当前公式只覆盖数量、标准价和单行折后比例，不含税费、汇率、阶梯价、套餐依赖或真实审批制度。当前模型仍为 `deepseek-v4-pro`，但报价数值问答由确定性代码完成。
+- Workspace revision 校验和 Conversation/Workspace 锁当前只在单个 API 进程内形成一致性保护；没有数据库原子 compare-and-swap、多实例锁或跨实例 Conversation 顺序验证。前端三方重应用也不是通用多人协作文档合并器。
+- 未解析收件人/附件当前采用固定 deny，而不是已接入企业通讯录或内容分类服务；附件名称识别只适用于演示规则。Run/Thread 绑定与结果重放仍随 Conversation 内存边界，API 重启后不恢复。
 - 未配置 Permit PEM 文件时，服务启动会生成进程级 Ed25519 密钥；重启后旧 Permit 失效。
 - 所有副作用工具均为 Simulator；UI 中的“发送成功”“创建成功”只代表 Simulator 成功。
 - 对话 Thread/Message 当前保存在 API 进程内存中，重启后丢失；Workspace、Run、Audit 和 LangGraph checkpoint 在配置 PostgreSQL 时可恢复。

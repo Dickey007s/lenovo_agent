@@ -3,14 +3,24 @@ from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, status
 from langgraph.checkpoint.base import BaseCheckpointSaver
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 from starlette.responses import StreamingResponse
 
 from packages.agent_runtime import AgentWorkflow, WorkflowCallbacks
 from packages.audit import InMemoryAuditLog
 from packages.authorization import AuthorizationError, AuthorizationService, PermitKeyPair
 from packages.tool_gateway import GatewayError, ToolGateway
-from packages.contracts import TaskContractDraft, TaskControlCommand, TaskSnapshot
+from packages.contracts import (
+    ActionCandidate,
+    RouteSelectionRequest,
+    RouteSelectionResult,
+    TaskArtifactBinding,
+    TaskContractDraft,
+    TaskControlCommand,
+    TaskSnapshot,
+    WorkCockpitSnapshot,
+    WorkItemSnapshot,
+)
 from services.api.app.application.llm import (
     AutoDLActionParser,
     ModelConfigurationError,
@@ -24,6 +34,7 @@ from services.api.app.application.evidence_catalog import (
 from services.api.app.application.runs import (
     ActionNotFoundError,
     RunNotFoundError,
+    RunCreateConflictError,
     RunService,
     RunSnapshot,
 )
@@ -39,6 +50,13 @@ from services.api.app.application.conversation_models import ConversationThread,
 from services.api.app.application.conversations import (
     ConversationNotFoundError,
     ConversationService,
+    WorkspaceChangedError,
+)
+from services.api.app.application.quote_calculator import QuoteCalculationError
+from services.api.app.application.demo2_cockpit import (
+    Demo2CockpitService,
+    Demo2ConflictError,
+    Demo2NotFoundError,
 )
 from services.api.app.config import get_settings
 
@@ -54,12 +72,29 @@ class CreateRunRequest(StrictRequest):
 class SendConversationMessageRequest(StrictRequest):
     message: str = Field(min_length=1, max_length=10_000)
     active_view: Literal["mail", "document", "quote", "tasks", "calendar", "expense", "crm", "audit"] | None = None
-    workspace_context: dict = Field(default_factory=dict)
+    workspace_context: dict | None = None
+    workspace_artifact_id: str | None = None
+    workspace_revision: int | None = Field(default=None, ge=1)
+
+    @model_validator(mode="after")
+    def require_workspace_revision(self):
+        if self.workspace_context is not None and (
+            self.workspace_artifact_id is None or self.workspace_revision is None
+        ):
+            raise ValueError(
+                "workspace_context requires workspace_artifact_id and workspace_revision"
+            )
+        return self
 
 
 class UpdateArtifactRequest(StrictRequest):
     content: dict
     title: str | None = None
+
+
+class SaveWorkspaceArtifactRequest(UpdateArtifactRequest):
+    expected_artifact_id: str
+    expected_revision: int = Field(ge=1)
 
 
 class EvidenceInput(StrictRequest):
@@ -74,6 +109,10 @@ class ApprovalInput(StrictRequest):
 class StartTaskRequest(StrictRequest):
     expected_task_version: int = Field(ge=1)
     idempotency_key: str = Field(min_length=8, max_length=160)
+
+
+class PrepareTaskArtifactActionRequest(StrictRequest):
+    thread_id: str = Field(min_length=1, max_length=120)
 
 
 class CurrentUser(StrictRequest):
@@ -135,6 +174,10 @@ def get_task_service(request: Request) -> TaskService:
     return request.app.state.task_service
 
 
+def get_demo2_cockpit_service(request: Request) -> Demo2CockpitService:
+    return request.app.state.demo2_cockpit_service
+
+
 def current_user(
     x_user_id: Annotated[str, Header()] = "demo_user",
     x_user_roles: Annotated[str, Header()] = "current_user",
@@ -147,6 +190,41 @@ def current_user(
 
 
 router = APIRouter(prefix="/v1")
+
+
+@router.get("/demo2/cockpit", response_model=WorkCockpitSnapshot)
+async def get_demo2_cockpit(
+    user: Annotated[CurrentUser, Depends(current_user)],
+    service: Annotated[Demo2CockpitService, Depends(get_demo2_cockpit_service)],
+) -> WorkCockpitSnapshot:
+    return await service.get_cockpit(user.user_id)
+
+
+@router.get("/demo2/work-items/{work_item_id}", response_model=WorkItemSnapshot)
+async def get_demo2_work_item(
+    work_item_id: str,
+    user: Annotated[CurrentUser, Depends(current_user)],
+    service: Annotated[Demo2CockpitService, Depends(get_demo2_cockpit_service)],
+) -> WorkItemSnapshot:
+    try:
+        return await service.get_work_item(work_item_id, user.user_id)
+    except Demo2NotFoundError as exc:
+        raise HTTPException(status_code=404, detail="工作项不存在") from exc
+
+
+@router.post("/demo2/work-items/{work_item_id}/route", response_model=RouteSelectionResult)
+async def select_demo2_route(
+    work_item_id: str,
+    body: RouteSelectionRequest,
+    user: Annotated[CurrentUser, Depends(current_user)],
+    service: Annotated[Demo2CockpitService, Depends(get_demo2_cockpit_service)],
+) -> RouteSelectionResult:
+    try:
+        return await service.select_route(work_item_id, user.user_id, body)
+    except Demo2NotFoundError as exc:
+        raise HTTPException(status_code=404, detail="工作项不存在") from exc
+    except Demo2ConflictError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
 
 
 @router.get("/health")
@@ -252,6 +330,89 @@ async def control_task(
         raise HTTPException(status_code=409, detail=str(exc)) from exc
 
 
+@router.post(
+    "/tasks/{task_id}/artifacts/{artifact_version_id}/actions/email-send",
+    response_model=RunSnapshot,
+    status_code=status.HTTP_201_CREATED,
+)
+async def prepare_task_artifact_email_action(
+    task_id: str,
+    artifact_version_id: str,
+    body: PrepareTaskArtifactActionRequest,
+    user: Annotated[CurrentUser, Depends(current_user)],
+    task_service: Annotated[TaskService, Depends(get_task_service)],
+    run_service: Annotated[RunService, Depends(get_run_service)],
+    conversation_service: Annotated[
+        ConversationService, Depends(get_conversation_service)
+    ],
+    idempotency_key: Annotated[
+        str, Header(alias="Idempotency-Key", min_length=8, max_length=160)
+    ],
+) -> RunSnapshot:
+    try:
+        await conversation_service.get_thread(body.thread_id, user.user_id)
+    except ConversationNotFoundError as exc:
+        raise HTTPException(status_code=404, detail="对话不存在") from exc
+    try:
+        task, artifact, report = await task_service.get_committed_artifact(
+            task_id, artifact_version_id, user.user_id
+        )
+    except TaskNotFoundError as exc:
+        raise HTTPException(status_code=404, detail="任务不存在") from exc
+    except TaskTransitionError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+    if artifact.kind != "reply_draft":
+        raise HTTPException(status_code=422, detail="当前成果不支持准备邮件发送动作")
+    subject = str(artifact.content.get("subject", "")).strip()
+    message_body = str(artifact.content.get("body", "")).strip()
+    if not subject or not message_body:
+        raise HTTPException(status_code=422, detail="客户回复草稿缺少主题或正文")
+    commit = task.last_commit
+    if commit is None:
+        raise HTTPException(status_code=409, detail="任务尚未形成最终提交")
+
+    binding = TaskArtifactBinding(
+        task_id=task.task_id,
+        task_version=task.version,
+        commit_id=commit.commit_id,
+        commit_state_hash=commit.state_hash,
+        artifact_id=artifact.artifact_id,
+        artifact_version_id=artifact.artifact_version_id,
+        artifact_version=artifact.version,
+        artifact_content_digest=artifact.content_digest,
+        deliverable_id=artifact.deliverable_id,
+        verification_report_id=report.report_id,
+    )
+    candidate = ActionCandidate(
+        action_type="send_email",
+        capability="email.send",
+        target_scope="external_customer",
+        recipients=["customer@example.com"],
+        data_classes=["customer_data", "financial", "project_risk"],
+        state_change_type="external_effect",
+        reversibility="low",
+        source_refs=[],
+        parameters={"subject": subject, "body": message_body},
+    )
+    try:
+        return await run_service.create_from_candidate(
+            candidate,
+            message="准备将已核对的客户回复发送给演示客户地址 customer@example.com",
+            user_id=user.user_id,
+            trusted_context={
+                "device": {"managed": True, "name": "managed_pc"},
+                "user": {"id": user.user_id},
+                "task_artifact": binding.model_dump(mode="json"),
+            },
+            thread_id=body.thread_id,
+            task_artifact_binding=binding,
+            creation_idempotency_key=idempotency_key,
+        )
+    except RunCreateConflictError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
 @router.get("/tasks/{task_id}/events")
 async def stream_task_events(
     task_id: str,
@@ -325,6 +486,8 @@ async def stream_conversation_message(
                 user.user_id,
                 active_view=body.active_view,
                 workspace_context=body.workspace_context,
+                expected_artifact_id=body.workspace_artifact_id,
+                expected_revision=body.workspace_revision,
             ):
                 event_type = event.get("type", "message")
                 yield f"event: {event_type}\ndata: {json.dumps(event, ensure_ascii=False)}\n\n"
@@ -333,9 +496,9 @@ async def stream_conversation_message(
                 {"type": "error", "detail": str(exc)}, ensure_ascii=False
             )
             yield f"event: error\ndata: {payload}\n\n"
-        except Exception as exc:
+        except Exception:
             payload = json.dumps(
-                {"type": "error", "detail": f"办公 Agent 处理失败：{exc}"},
+                {"type": "error", "detail": "办公 Agent 暂时无法完成处理，请稍后重试"},
                 ensure_ascii=False,
             )
             yield f"event: error\ndata: {payload}\n\n"
@@ -363,6 +526,15 @@ async def continue_conversation_after_action(
                 yield f"event: {event_type}\ndata: {json.dumps(event, ensure_ascii=False)}\n\n"
         except (ModelConfigurationError, ModelOutputError, ValueError) as exc:
             payload = json.dumps({"type": "error", "detail": str(exc)}, ensure_ascii=False)
+            yield f"event: error\ndata: {payload}\n\n"
+        except Exception:
+            payload = json.dumps(
+                {
+                    "type": "error",
+                    "detail": "Agent 暂时无法读取执行结果，请重试",
+                },
+                ensure_ascii=False,
+            )
             yield f"event: error\ndata: {payload}\n\n"
 
     return StreamingResponse(
@@ -394,16 +566,28 @@ async def start_new_mail(
 @router.put("/workspace/{kind}", response_model=WorkspaceArtifact)
 async def save_workspace_artifact(
     kind: Literal["mail", "document", "quote", "tasks", "calendar", "expense", "crm"],
-    body: UpdateArtifactRequest,
+    body: SaveWorkspaceArtifactRequest,
     user: Annotated[CurrentUser, Depends(current_user)],
     service: Annotated[ConversationService, Depends(get_conversation_service)],
 ) -> WorkspaceArtifact:
     try:
         return await service.save_workspace_artifact(
-            kind, body.content, user.user_id, title=body.title
+            kind,
+            body.content,
+            user.user_id,
+            title=body.title,
+            expected_artifact_id=body.expected_artifact_id,
+            expected_revision=body.expected_revision,
         )
     except ConversationNotFoundError as exc:
         raise HTTPException(status_code=404, detail="工作区不存在") from exc
+    except QuoteCalculationError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except WorkspaceChangedError as exc:
+        raise HTTPException(
+            status_code=409,
+            detail="工作区已在其他窗口更新；当前修改未覆盖新版本，请重新载入后再试",
+        ) from exc
 
 
 @router.put(
@@ -422,6 +606,8 @@ async def update_artifact(
         )
     except ConversationNotFoundError as exc:
         raise HTTPException(status_code=404, detail="对话或生成物不存在") from exc
+    except QuoteCalculationError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
 
 
 @router.get("/demo3/scenarios", response_model=list[Demo3Scenario])

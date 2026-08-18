@@ -23,13 +23,27 @@ class MockEvidenceResolver:
         submitted = submitted or {}
         now = datetime.now(UTC)
         records: dict[str, EvidenceRecord] = {}
+        recipient_unresolved = "recipient_identity" in action.missing_slots
+        attachment_unresolved = any(
+            slot.startswith("attachment_data_class:")
+            for slot in action.missing_slots
+        )
         for requirement in requirements:
             value = submitted.get(requirement)
-            if requirement == "recipient_identity" and action.recipients:
+            if requirement == "recipient_identity" and recipient_unresolved:
+                # A free-form name is not an identity lookup result. The mock
+                # adapter must not turn the Action's own untrusted value into
+                # evidence that the value is trusted.
+                value = None
+            elif requirement == "recipient_identity" and action.recipients:
                 value = value or action.recipients[0]
+            elif requirement == "attachment_hash" and attachment_unresolved:
+                value = None
             elif requirement == "attachment_hash" and action.resources:
                 value = value or canonical_hash({"resources": action.resources})
-            elif requirement == "dlp_result" and action.resources:
+            elif requirement == "dlp_result" and (
+                action.resources or action.parameters.get("body")
+            ):
                 # P0 adapter simulates invoking the DLP service. The user never
                 # types a scan result or an attachment hash.
                 value = "mock:dlp/passed"

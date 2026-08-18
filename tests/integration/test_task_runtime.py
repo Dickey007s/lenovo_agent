@@ -4,7 +4,12 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
-from packages.contracts import ConflictRecord, TaskBudget, TaskControlCommand
+from packages.contracts import (
+    ConflictRecord,
+    TaskArtifactBinding,
+    TaskBudget,
+    TaskControlCommand,
+)
 from packages.contracts.hashing import canonical_hash
 from services.api.app.application.task_storage import (
     InMemoryTaskStore,
@@ -238,6 +243,67 @@ async def test_resolving_official_evidence_creates_verified_commit_idempotently(
     changed = command.model_copy(update={"reason": "reuse key with another payload"})
     with pytest.raises(TaskMutationConflictError, match="幂等键"):
         await service.control(created.task_id, "user_1", changed)
+
+
+async def test_committed_artifact_binding_rejects_history_and_changed_facts() -> None:
+    service = TaskService(InMemoryTaskStore())
+    created = await service.create_demo1("user_1")
+    waiting = await service.start(
+        created.task_id,
+        "user_1",
+        expected_task_version=created.version,
+        idempotency_key="binding-start-001",
+    )
+    branch = next(item for item in waiting.branches if item.status == "waiting_evidence")
+    committed = await service.control(
+        created.task_id,
+        "user_1",
+        TaskControlCommand(
+            kind="resolve_evidence",
+            branch_id=branch.branch_id,
+            selected_source_ref=OFFICIAL_SOURCE,
+            expected_task_version=waiting.version,
+            idempotency_key="binding-resolve-001",
+        ),
+    )
+    reply_branch = next(
+        item for item in committed.branches if "reply-draft" in item.deliverable_ids
+    )
+    current_id = reply_branch.artifact_heads["reply-draft"]
+    task, artifact, report = await service.get_committed_artifact(
+        committed.task_id, current_id, "user_1"
+    )
+    assert artifact.kind == "reply_draft"
+    assert task.last_commit is not None
+    binding = TaskArtifactBinding(
+        task_id=task.task_id,
+        task_version=task.version,
+        commit_id=task.last_commit.commit_id,
+        commit_state_hash=task.last_commit.state_hash,
+        artifact_id=artifact.artifact_id,
+        artifact_version_id=artifact.artifact_version_id,
+        artifact_version=artifact.version,
+        artifact_content_digest=artifact.content_digest,
+        deliverable_id=artifact.deliverable_id,
+        verification_report_id=report.report_id,
+    )
+    await service.validate_action_binding(binding, "user_1")
+
+    historical_id = next(
+        item.artifact_version_id
+        for item in committed.artifact_versions
+        if item.artifact_id == artifact.artifact_id
+        and item.artifact_version_id != current_id
+    )
+    with pytest.raises(TaskTransitionError, match="最终提交"):
+        await service.get_committed_artifact(
+            committed.task_id, historical_id, "user_1"
+        )
+    with pytest.raises(TaskTransitionError, match="已经变化"):
+        await service.validate_action_binding(
+            binding.model_copy(update={"artifact_content_digest": "sha256:" + "0" * 64}),
+            "user_1",
+        )
 
 
 async def test_task_runtime_rejects_stale_owner_and_unapproved_source() -> None:
