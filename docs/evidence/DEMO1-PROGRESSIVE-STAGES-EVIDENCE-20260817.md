@@ -7,7 +7,7 @@
 | Scenario | [`SCENARIO-001`](../scenarios/SCENARIO-001-customer-a-durable-report.md) |
 | Status | `Verified`（限定工程范围） |
 | Implementation | `13c9c13` |
-| Pull request | 待创建后回填 |
+| Pull request | [`#14`](https://github.com/Dickey007s/lenovo_agent/pull/14) |
 
 ## 1. 已证明的工程事实
 
