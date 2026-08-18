@@ -32,7 +32,7 @@ import type {
   VerificationReport,
 } from "./task-types";
 
-export type TaskDirectorViewMode = "director" | "artifacts" | "manual";
+export type TaskDirectorViewMode = "cockpit" | "director" | "artifacts" | "manual";
 export type TaskTransportState = "connecting" | "connected" | "interrupted";
 
 type TaskWorkspaceHeaderProps = {
@@ -69,6 +69,7 @@ type TaskDecisionPaneProps = {
   onRetry: () => void;
   onControl: (intent: ControlIntent) => Promise<boolean>;
   onOpenArtifact: (artifactVersionId: string) => void;
+  onPrepareAction: (artifactVersionId: string) => void;
 };
 
 const TASK_STATUS_LABELS: Record<TaskSnapshot["status"], string> = {
@@ -192,7 +193,8 @@ export function TaskWorkspaceHeader({
   onCreate,
 }: TaskWorkspaceHeaderProps) {
   const terminal = isTerminal(task);
-  const modes = ["director", "artifacts", "manual"] as const;
+  const modes = ["cockpit", "director", "artifacts", "manual"] as const;
+  const cockpitMode = mode === "cockpit";
 
   function moveModeFocus(event: KeyboardEvent<HTMLButtonElement>, current: TaskDirectorViewMode) {
     if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
@@ -211,12 +213,16 @@ export function TaskWorkspaceHeader({
   return (
     <header className="task-director-workspace-header">
       <div className="task-director-title">
-        <span className="task-director-product-label">持续任务协作</span>
+        <span className="task-director-product-label">{cockpitMode ? "智能工作驾驶舱" : "持续任务协作"}</span>
         <div className="task-director-heading-row">
-          <h1 id="task-director-workspace-title" tabIndex={-1}>{task?.contract.title ?? "经营汇报协作"}</h1>
+          <h1 id="task-director-workspace-title" tabIndex={-1}>
+            {cockpitMode ? "今天的工作，应该怎么处理" : task?.contract.title ?? "经营汇报协作"}
+          </h1>
         </div>
-        <p>{task?.contract.objective ?? "把长任务拆成可核对的材料，只在必须由你判断时暂停。"}</p>
-        {task && (
+        <p>{cockpitMode
+          ? "先比较工作价值、资料范围和并行收益，再决定用工具、单 Agent、固定流程还是协作群组。"
+          : task?.contract.objective ?? "把长任务拆成可核对的材料，只在必须由你判断时暂停。"}</p>
+        {!cockpitMode && task && (
           <div className="task-director-deliverables" aria-label="本轮产出">
             <span>本轮产出</span>
             {task.contract.deliverables.map((deliverable) => (
@@ -229,7 +235,8 @@ export function TaskWorkspaceHeader({
       <div className="task-director-header-actions">
         <div className="task-director-mode-switch" role="tablist" aria-label="任务工作区视图">
           {([
-            ["director", "进度", IconLayoutDashboard],
+            ["cockpit", "今日工作", IconLayoutDashboard],
+            ["director", "长任务", IconTargetArrow],
             ["artifacts", "成果", IconFileDescription],
             ["manual", "执行记录", IconListCheck],
           ] as const).map(([target, label, ModeIcon]) => (
@@ -250,19 +257,19 @@ export function TaskWorkspaceHeader({
             </button>
           ))}
         </div>
-        {task && (
+        {(task || cockpitMode) && (
           <button
             className="task-director-icon-button"
             type="button"
-            title="刷新服务端状态"
-            aria-label="刷新服务端状态"
+            title={cockpitMode ? "刷新今日工作" : "刷新服务端状态"}
+            aria-label={cockpitMode ? "刷新今日工作" : "刷新服务端状态"}
             disabled={busy || syncState === "loading"}
             onClick={onRefresh}
           >
             <IconRefresh aria-hidden="true" />
           </button>
         )}
-        {terminal && (
+        {!cockpitMode && terminal && (
           <button
             className="task-director-create-button"
             type="button"
@@ -697,17 +704,23 @@ function BranchControls({
 function TaskNoDecisionState({
   task,
   disabled,
+  actionDisabled,
   onControl,
   onOpenArtifact,
+  onPrepareAction,
 }: {
   task: TaskSnapshot;
   disabled: boolean;
+  actionDisabled: boolean;
   onControl: (intent: ControlIntent) => Promise<boolean>;
   onOpenArtifact: (artifactVersionId: string) => void;
+  onPrepareAction: (artifactVersionId: string) => void;
 }) {
   if (task.status === "committed" && task.last_commit) {
     const artifacts = committedArtifacts(task);
-    const replyIsDraft = artifacts.some((artifact) => artifact.content.send_status === "draft_only");
+    const replyDraft = artifacts.find(
+      (artifact) => artifact.kind === "reply_draft" && artifact.content.send_status === "draft_only",
+    );
     return (
       <section className="task-decision-empty is-complete">
         <IconCircleCheck aria-hidden="true" />
@@ -727,7 +740,25 @@ function TaskNoDecisionState({
             </li>
           ))}
         </ul>
-        {replyIsDraft && <strong className="task-outcome-boundary">客户回复仍是草稿，未发送</strong>}
+        {replyDraft && (
+          <>
+            <strong className="task-outcome-boundary">客户回复仍是草稿，未发送</strong>
+            <div className="task-outcome-next-action">
+              <div>
+                <strong>下一步：准备发送客户回复</strong>
+                <span>先创建受控动作，再显示风险、目标和确认要求。此时不会发送。</span>
+              </div>
+              <button
+                type="button"
+                disabled={actionDisabled}
+                onClick={() => onPrepareAction(replyDraft.artifact_version_id)}
+              >
+                准备发送客户回复
+              </button>
+              <small>固定演示收件人为 customer@example.com；只在模拟环境执行，不会触达真实邮箱。</small>
+            </div>
+          </>
+        )}
         <details className="task-decision-commit-evidence">
           <summary>查看运行与审计</summary>
           <code>{task.last_commit.state_hash}</code>
@@ -802,6 +833,7 @@ export function TaskDecisionPane({
   onRetry,
   onControl,
   onOpenArtifact,
+  onPrepareAction,
 }: TaskDecisionPaneProps) {
   const [steerInstruction, setSteerInstruction] = useState("");
   const steerRef = useRef<HTMLTextAreaElement>(null);
@@ -810,6 +842,7 @@ export function TaskDecisionPane({
     : [];
   const terminal = isTerminal(task);
   const controlsDisabled = !task || syncState !== "synced" || busy || pending || terminal;
+  const actionDisabled = !task || syncState !== "synced" || busy || pending;
 
   const branchById = useMemo(
     () => new Map(task?.branches.map((branch) => [branch.branch_id, branch]) ?? []),
@@ -1000,8 +1033,10 @@ export function TaskDecisionPane({
       <TaskNoDecisionState
         task={task}
         disabled={controlsDisabled}
+        actionDisabled={actionDisabled}
         onControl={onControl}
         onOpenArtifact={onOpenArtifact}
+        onPrepareAction={onPrepareAction}
       />
         )}
       </div>

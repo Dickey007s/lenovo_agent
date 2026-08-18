@@ -39,6 +39,7 @@
 | `actor_id` | 已认证用户上下文 | Permit subject 和资源隔离 |
 | `payload_digest` | canonical hash | 记录候选动作摘要 |
 | `idempotency_key` | 服务端 | 执行去重 |
+| `task_artifact_binding` | TaskService + RunService | 可选；把已验证 Task 成果的 Task/Commit/ArtifactVersion/Verification 身份绑定到动作 |
 
 示例：
 
@@ -226,6 +227,20 @@ Tool Gateway 在执行边界重新验证：
 - 已完成 Run 和审计历史保持不可变。
 
 这条规则防止“批准了 A 内容，却执行 B 内容”。
+
+### 9.1 已验证 Task Artifact 的动作绑定
+
+`DR-0007` 为固定 Demo 1 客户回复增加一条窄桥。准备 `email.send` 前，TaskService 必须同时证明：
+
+- Task 属于当前用户且状态为 `committed`；
+- `last_commit` 引用请求的 `ArtifactVersion`；
+- Artifact kind 是 `reply_draft`，主题和正文完整；
+- Commit 引用的 VerificationReport 对该 ArtifactVersion 为 `passed`；
+- Task version、Commit ID/state hash、Artifact content digest、Deliverable 和 VerificationReport ID 与绑定完全一致。
+
+上述事实写入 `TaskArtifactBinding`，并进入 Run 创建摘要与 `ProposedActionSpec`。相同用户、相同创建 key 和相同绑定重放同一 Run；同 key 指向不同事实时冲突。Run 在补证据、审批、授权和执行前都会重校验绑定，任何事实变化都会让旧动作失效，不能沿用审批或 Permit。
+
+前台“准备发送”只是创建治理 Run。它必须先显示动作目标、绑定成果版本、风险原因和确认后果，再由用户批准并最终授权。拒绝、绑定失效或 Simulator 失败不得修改 Task Commit。当前只支持固定演示客户回复到固定演示邮箱，不支持通用 Artifact 类型、联系人选择、附件、批量动作或真实 Connector。
 
 ## 10. 审计事件
 

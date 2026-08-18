@@ -22,6 +22,8 @@ export type TaskArtifactWorkspaceProps = {
     artifactVersionId: string,
     selectionMode?: "follow_head" | "pinned_history",
   ) => void;
+  onPrepareAction?: (artifactVersionId: string) => void;
+  actionBusy?: boolean;
 };
 
 export type TaskArtifactWorkspaceItem = {
@@ -408,12 +410,18 @@ function ArtifactDetail({
   reportsByArtifactId,
   selectedArtifactVersionId,
   onSelectArtifact,
+  onPrepareAction,
+  actionBusy = false,
+  actionEligible = false,
 }: {
   item: TaskArtifactWorkspaceItem;
   artifact: ArtifactVersion;
   reportsByArtifactId: Map<string, VerificationReport>;
   selectedArtifactVersionId: string;
   onSelectArtifact: TaskArtifactWorkspaceProps["onSelectArtifact"];
+  onPrepareAction?: TaskArtifactWorkspaceProps["onPrepareAction"];
+  actionBusy?: boolean;
+  actionEligible?: boolean;
 }) {
   const report = reportsByArtifactId.get(artifact.artifact_version_id) ?? null;
   const historicalVersion = Boolean(
@@ -499,6 +507,23 @@ function ArtifactDetail({
         </details>
       )}
 
+      {artifact.kind === "reply_draft" && report?.status === "passed" && !historicalVersion && actionEligible && (
+        <section className="task-artifact-action" aria-labelledby="task-artifact-action-title">
+          <div>
+            <span>下一步</span>
+            <h3 id="task-artifact-action-title">将这份已核对草稿交给动作治理</h3>
+            <p>系统只准备发送动作，不会直接发送。收件人、风险和确认要求由服务端重新判断。</p>
+          </div>
+          <button
+            type="button"
+            disabled={actionBusy || !onPrepareAction}
+            onClick={() => onPrepareAction?.(artifact.artifact_version_id)}
+          >
+            {actionBusy ? "正在准备" : "准备发送客户回复"}
+          </button>
+        </section>
+      )}
+
       <section className="task-artifact-lineage" aria-labelledby="task-artifact-lineage-title">
         <header className="task-artifact-section-header">
           <h3 id="task-artifact-lineage-title">版本沿革</h3>
@@ -543,6 +568,8 @@ export function TaskArtifactWorkspace({
   task,
   selectedArtifactVersionId,
   onSelectArtifact,
+  onPrepareAction,
+  actionBusy = false,
 }: TaskArtifactWorkspaceProps) {
   if (!task) {
     return (
@@ -677,6 +704,14 @@ export function TaskArtifactWorkspace({
               reportsByArtifactId={reportsByArtifactId}
               selectedArtifactVersionId={effectiveSelectedArtifactId}
               onSelectArtifact={onSelectArtifact}
+              onPrepareAction={onPrepareAction}
+              actionBusy={actionBusy}
+              actionEligible={Boolean(
+                task.status === "committed"
+                && task.last_commit?.artifact_version_ids.includes(
+                  selectedArtifact.artifact_version_id,
+                ),
+              )}
             />
           ) : (
             <section className="task-artifact-detail-empty" aria-live="polite">

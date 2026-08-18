@@ -128,7 +128,7 @@ Demo 1 的 TaskStore 另有独立证据：固定 Fixture 已在同一个 Postgre
 
 ### 第 10 页：阶段结论与下一步
 
-阶段结论：V0.1 已验证 workspace-first、人机共编、确定性治理、人工 Gate、最小权限 Permit、Simulator 执行与 Agent 结果闭环；固定 Demo 1 TaskStore 还完成了有边界的 PostgreSQL 顺序 API 进程恢复验证。
+阶段结论：V0.1 已验证 workspace-first、人机共编、确定性治理、人工 Gate、最小权限 Permit、Simulator 执行与 Agent 结果闭环；固定 Demo 1 TaskStore 还完成了有边界的 PostgreSQL 顺序 API 进程恢复验证。DR-0007 又把 Demo 1 的已验证客户回复与 Demo 3 治理链连接成一条窄纵切：准备动作绑定 Task/Commit/ArtifactVersion/Verification，确认后仍只进入受控 Simulator。
 
 下一步优先级：先完成至少 5 人的无引导任务测试并修复理解/误点问题 → 真实 SSO/RBAC → Connector SDK 与沙箱 → 对话和 replay 持久化 → 多实例一致性/任务队列 → 历史版本和多人协同 → 评测与可观测性。不要把“增加更多模型自治权”列为首要路线。
 
@@ -188,6 +188,16 @@ Demo 1 的 TaskStore 另有独立证据：固定 Fixture 已在同一个 Postgre
 
 演示点：前台即时反馈与服务端事实同公式、服务端字段不可由客户端覆盖、错误 fail closed、模型不承担财务计算、未保存编辑可被 Agent 感知。
 
+### 可选流程 G：从已验证汇报成果到受控外发
+
+1. 完成客户 A 汇报，确认页面列出经营分析、风险页和“客户回复草稿”，并明确尚未发送。
+2. 在客户回复成果上点击“准备发送”，说明这一步只创建治理 Run，不产生外部副作用。
+3. Action Gate 核对绑定成果版本、固定演示收件人、L4 风险和“为什么需要确认”；先批准，再点击“确认执行”。
+4. 展示 Simulator 结果与 Agent 收尾，同时回到 Tasks 确认原 Task 仍为已提交、三项成果未被修改。
+5. 重新准备一次新意图会得到新的 Run；请求结果未知时才复用同一创建 key。拒绝路径同样保留 Task Commit。
+
+演示点：Demo 1 的成果不是停在静态展示，而是可以作为 Demo 3 的受控动作输入；绑定与重校验防止“核对 A、执行 B”，同时“准备、批准、执行”在前台是三个不同承诺。当前只覆盖固定回复草稿、演示收件人与 Email Simulator。
+
 ## 6. 建议截图与视觉素材
 
 - 产品总览：1280×720 或 16:9，完整显示工作区、拖动分隔和 Agent。
@@ -213,6 +223,7 @@ Demo 1 的 TaskStore 另有独立证据：固定 Fixture 已在同一个 Postgre
 - “固定客户 A 场景已用浏览器自动化验证业务首屏、单次开始、决定后果、完成成果和被测响应式路径；这是工程代理证据，不是用户理解结论。”
 - “来源与新一轮修订已用浏览器自动化验证：非 Tasks 只显示摘要，来源明确为演示数据，终态创建并启动独立新 Task 且旧 Task 保留；当前没有历史轮次选择器。”
 - “在固定客户 A 演示报价与当前公式内，行小计、总计、综合折后比例、优惠率和最低折后比例检查已由前后端同规则确定性重算，Agent 数值回答不依赖模型猜测；旧 revision、晚到 Agent 结果、恶意 Action/source、Run/Thread 绑定与结果重试已有自动化回归。”
+- “固定客户 A 的已提交、已验证回复草稿可以按 Task/Commit/ArtifactVersion/Verification 精确绑定到治理 Run；准备、批准和执行在前台分开，绑定在治理门前重校验，拒绝或失败不回滚 Task。”
 
 ### 不可夸大
 
@@ -230,8 +241,18 @@ Demo 1 的 TaskStore 另有独立证据：固定 Fixture 已在同一个 Postgre
 - 不说“已连接真实报价库/CRM”或“适用于所有商业计价”；当前是固定演示数据，只覆盖数量 × 标准价 × 单行折后比例，不含税费、汇率、阶梯价、套餐依赖或真实审批政策。
 - 不说“已支持多人实时协作/多实例一致写入”；Workspace 锁、revision 比较和动作完成消息重放都只在单 API 进程内，尚无数据库 CAS 或跨实例验证。
 - 不说“可以由用户补证所有未知收件人/附件”；当前未解析纯文本姓名或不透明附件直接 deny，使用的是固定演示识别规则，不是企业通讯录或附件扫描服务。
+- 不说“所有 Task 成果都能直接执行”或“已完成真实邮件发送”；当前桥只支持固定客户回复草稿到固定演示地址的 `email.send` Simulator，也没有跨进程 Run 创建幂等证据。
+- 不说“Demo 2 已经启动 Adaptive Swarm”或“已经有动态 Worker”；`DR-0008` 第一纵切已实现四项固定演示工作、固定队列、路由解释和客户 A 的本次模式选择，但 `execution_status` 始终为 `not_started`。
+- 不说“Demo 2 已经调度三类简单任务”或“实现了拖拽调序”；三项简单任务只是 Admission 的固定演示选择，拖拽调序与长期排序偏好留待后续。
+- 不说“Demo 2 降低了成本/时延”；`route_profiles[].forecast.source_type=fixture_policy_forecast`，没有真实账单、Worker 运行或端到端基准。
 
-## 8. 常见问答
+## 8. Demo 2 第一纵切的汇报口径（限定范围 Verified）
+
+现场应先讲清楚：驾驶舱是用户入口，Adaptive Swarm 只是复杂任务的一种待选择执行方式。四项固定演示工作由服务端 `WorkCockpitSnapshot` 提供；供应商邮件、周报格式统一、报销异常分别固定选择 Single Agent、Fixed Workflow、Tool Call；客户 A 保持待决定并允许三种模式。
+
+用户可以查看六类业务条件、比较预测代价，接受 Admission 推荐或把客户 A 改成其他允许模式，范围只在 `this_run`。选择推荐时 `selection_source=admission`，其他允许选择为 `selection_source=user_override`。无论哪种选择，当前都停在 `execution_status=not_started`。本节对应 [`DR-0008`](decisions/DR-0008-demo2-explainable-admission.md)，在单进程固定演示范围内为 `Verified`：已有 API、前台、版本/幂等、409 草稿保留、移动端、完整回归和截图工程证据，但没有用户研究、真实执行、成本或时延测量。
+
+## 9. 常见问答
 
 **为什么不用 LLM 直接判断风险？**  风险和权限属于可验证控制面，需要稳定、可测试和可审计；LLM 只提供业务候选事实。
 
@@ -243,7 +264,7 @@ Demo 1 的 TaskStore 另有独立证据：固定 Fixture 已在同一个 Postgre
 
 **现在最大的生产化缺口是什么？**  真实身份和 Connector、分布式 replay/幂等、Conversation 持久化、后台任务、多实例一致性和生产评测。
 
-## 9. 术语表
+## 10. 术语表
 
 | 术语 | 含义 |
 | --- | --- |
