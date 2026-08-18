@@ -228,10 +228,15 @@ sequenceDiagram
     D-->>W: 新 TaskSnapshot ready / contract
     W->>W: 应用新 Task；旧轮次保持不变
     W->>A: 同一次前台动作继续 POST /tasks/{id}/start + version + key
-    A->>S: 固定 Fixture 状态转换
-    S->>S: Observe / Plan / Act / Verify
-    S->>D: 原子写 Snapshot + Event + ArtifactVersion
-    D-->>W: waiting_input / verify Snapshot
+    A->>S: 校验完整 Demo 契约并启动 Observe
+    S->>D: 原子写 v2 running / observe Snapshot + Event
+    D-->>W: Observe Snapshot
+    loop 浏览器收到服务端确认后逐阶段协调四次
+        W->>A: POST /tasks/{id}/advance + version + key
+        A->>S: 完成当前阶段并启动下一阶段
+        S->>D: 原子写单阶段 Snapshot + Event + 本阶段工件
+        D-->>W: v3 Plan / v4 Act / v5 Verify / v6 waiting_input
+    end
     W-->>U: 显示局部冲突与服务端分支状态
     U->>W: 选择正式来源或提交任务/分支控制
     W->>A: POST /tasks/{id}/controls + version + key
@@ -254,11 +259,11 @@ sequenceDiagram
     W->>A: GET /tasks/{task_id} 对账
 ```
 
-每个用户显式发起的新一轮汇报使用新的 round key，因此得到新的服务端 Task ID；同一 round key 的网络重试返回该 Task 当前已持久化的 Snapshot，不回退已经发生的 start/control 变更。未提供 `Idempotency-Key` 时保留旧客户端兼容行为，仍按 Owner 使用稳定默认键。刷新只从 `/tasks` 恢复最近活动 Task，否则显示最近终态 Task，不会重置旧任务。终态“开始新一轮汇报”是 Web 组合动作：创建独立 Task 后立即启动新 Task，固定路径通常进入 `waiting_input / verify`，不是把旧 Task 设置回可启动状态。服务端保留多轮 Task，但前端尚无历史轮次选择器。
+每个用户显式发起的新一轮汇报使用新的 round key，因此得到新的服务端 Task ID；同一 round key 的网络重试返回该 Task 当前已持久化的 Snapshot，不回退已经发生的 start/control 变更。未提供 `Idempotency-Key` 时保留旧客户端兼容行为，仍按 Owner 使用稳定默认键。刷新只从 `/tasks` 恢复最近活动 Task，否则显示最近终态 Task，不会重置旧任务。终态“开始新一轮汇报”是 Web 组合动作：创建独立 Task 后立即启动到 v2 `running / observe`，随后只在服务端确认后逐次协调 `advance`；它不是把旧 Task 设置回可启动状态。服务端保留多轮 Task，但前端尚无历史轮次选择器。
 
 Task ID、Owner、版本、状态和时间均由服务端产生。读取、列表、控制和订阅都按 Owner 过滤；所有 mutation 使用预期 Task 版本和幂等键，前端只在收到服务端 Snapshot 后更新业务状态。
 
-`start` 中的 Observe、Plan、Act、Verify 是一次请求内的固定 Fixture 轨迹，数据和工件内容由确定性代码提供，不来自 LLM 或真实 Connector。事务提交前没有对外可见的中间 Snapshot，因此该路径不能表述为通用后台持续运行器。Steer 当前若只进入 `accepted`，服务端只证明指令已持久记录；重新规划和 `CONTROL_APPLIED` 仍需后续循环。Task SSE 通过当前 API 进程轮询 Store，不是跨实例通知系统；后台任务摘要的“状态已更新”仅代表 Snapshot 对账完成。
+Observe、Plan、Act、Verify 现在由 `start + 4 x advance` 形成独立 Snapshot。Observe/Verify/Commit 和所有身份、来源、验证、冲突、状态仍由确定性代码提供；Plan/Act 可以调用当前模型，但只接受服务端批准文字。浏览器关闭会让任务停在最后一个已持久化阶段，所以该路径仍不能表述为通用后台持续运行器。Steer 当前若只进入 `accepted`，服务端只证明指令已持久记录；重新规划和 `CONTROL_APPLIED` 仍需后续循环。Task SSE 通过当前 API 进程轮询 Store，不是跨实例通知系统；后台任务摘要的“状态已更新”仅代表 Snapshot 对账完成。
 
 前端在 mutation 结果未知时把原始 `idempotency_key`、intent 和预期版本保存到当前标签页的 `sessionStorage` 并冻结新控制；pending 状态提供同 key 对账入口。同 key 重放返回首次响应，因此前端确认后还会 GET 当前 Task 的最新 Snapshot，避免用历史响应回滚当前界面。PR 4 浏览器 E2E 已覆盖 start 请求发送前 abort、reload 后入口可达、同 key 重试和无重复 ArtifactVersion；由于 abort 发生在请求交给服务端之前，它不证明“服务端已经提交但响应丢失”的浏览器恢复。
 
@@ -417,3 +422,11 @@ Browser :3000  ──REST/SSE──>  FastAPI :8010
 9. `packages/authorization/` 与 `packages/tool_gateway/`：执行安全边界。
 10. `apps/web/app/page.tsx`：前端交互状态机、非 Tasks 后台任务摘要与 Tasks 组合视图。
 11. `tests/`：预期行为与回归边界。
+
+## 9. Demo 1 渐进 Runtime 当前事实（2026-08-17）
+
+Demo 1 的调用链是 `Browser start -> Snapshot(v2 observe) -> Browser advance loop -> Snapshot(v3/v4/v5/v6) -> resolve_evidence -> v7 commit`。浏览器只有在收到并应用当前 Snapshot 后才请求下一阶段；关闭浏览器不会让服务端继续执行，重新打开后从持久化阶段继续。Task SSE 只回放有序事件并触发 GET 对账，不是后台调度器。
+
+Observe、Verify、Commit 是确定性服务逻辑。Plan/Act 通过 `services/api/app/application/task_stage_agent.py` 的严格 `TaskStageAgent` 请求/响应调用当前配置 `deepseek-v4-pro`；适配器与 TaskService 都只接受和服务端批准模板逐字段一致的面向用户文字，否则返回 `template_fallback`，所以模型不能把思维链、内部 ID、来源引用、状态或新事实写入阶段记录。Task/Branch/Artifact 身份、来源、状态、冲突、验证和 Commit 始终由服务端决定。模型调用在 Store CAS 之前，若 version 冲突则丢弃结果。`stage_records` 与 Snapshot 一起持久化阶段状态、摘要、详情、工件 ID、generation source 和时间。
+
+预算是步骤数、工具调用数和运行时长的运行时预算，不是 token 成本；同进程同幂等 key 有锁避免重复模型调用，跨进程只有数据库 CAS/marker，没有分布式 LLM lease。PostgreSQL 保存 Snapshot、Event、ArtifactVersion 和 stage records；现有恢复证据限于顺序 API 进程和已覆盖版本，数据库崩溃、迁移、跨实例通知仍未证明。

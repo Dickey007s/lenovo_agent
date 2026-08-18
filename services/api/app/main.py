@@ -20,9 +20,22 @@ from services.api.app.application.storage import (
 )
 from services.api.app.application.task_storage import InMemoryTaskStore, PostgresTaskStore
 from services.api.app.application.tasks import TaskService
+from services.api.app.application.task_stage_agent import AutoDLTaskStageAgent
 from services.api.app.application.demo2_cockpit import Demo2CockpitService
 from services.api.app.application.conversations import ConversationService
 from services.api.app.config import get_settings
+
+
+def _build_task_service(task_store, settings):
+    """Inject the single strict Task Stage agent used by the progressive runtime."""
+    stage_agent = AutoDLTaskStageAgent(
+        base_url=settings.llm_base_url,
+        api_key=settings.llm_api_key,
+        model=settings.llm_model,
+        timeout=settings.llm_timeout_seconds,
+        thinking_mode=settings.llm_thinking_mode,
+    )
+    return TaskService(task_store, stage_agent=stage_agent)
 
 
 @asynccontextmanager
@@ -36,7 +49,7 @@ async def lifespan(app: FastAPI):
         task_store = InMemoryTaskStore()
         app.state.task_store_backend = "memory"
     await task_store.setup()
-    app.state.task_service = TaskService(task_store)
+    app.state.task_service = _build_task_service(task_store, settings)
     # Demo 2 is intentionally an in-memory admission slice; it does not start workers.
     app.state.demo2_cockpit_service = Demo2CockpitService()
     await app.state.demo2_cockpit_service.setup()

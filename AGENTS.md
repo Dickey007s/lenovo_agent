@@ -59,6 +59,8 @@ tests/                                        单元与端到端回归
 - Demo 2 的 Adaptive Swarm 只能标记为推荐或本次已选择；没有真实 Worker/Connector/执行事件时，`execution_status` 必须为 `not_started`。`selection_source=admission` 表示接受推荐，降级必须为 `selection_source=user_override`，并使用 `override_scope=this_run`。
 - Demo 2 的成本/时效只能使用 `route_profiles[].forecast.source_type=fixture_policy_forecast` 语义；不得写成真实账单、实测时延、节省比例、生产 SLA 或已验证效果。当前服务端边界是 memory，跨进程恢复与真实执行均待证据。
 
+Demo 1 当前 Runtime 事实（2026-08-17）：create 为 v1 `ready / contract`；start 仅进入 v2 `running / observe`；浏览器在 Snapshot 确认后四次调用幂等 advance，依次得到 v3 Plan、v4 Act、v5 Verify、v6 `waiting_input / verify`，固定为 5 个工件、1 个 open conflict、2 个 passed verification；resolve 后 v7 `committed / commit`。`stage_records` 是 UI 事实且旧快照默认空数组。Plan/Act 通过严格 `TaskStageAgent` 调用 `deepseek-v4-pro`，但只有与服务端批准模板逐字段一致的业务文字才记录为 `model`，否则显式 `template_fallback`；Observe/Verify/Commit 确定性，模型不拥有身份、来源、状态、冲突、验证或 Commit。固定渐进路径还要求完整 Demo 契约，包括预算和截止时间。浏览器关闭不会后台继续，预算是 steps/tool calls/runtime 而非 token cost；同进程同 key 有锁，跨实例无分布式 LLM lease。模型 smoke 只证明连通与严格响应，不证明质量。最终时长、commit SHA、PR URL、截图 hash 以新 evidence 封口数据为准。
+
 决策、推进与汇报的硬门槛：
 
 - 每个方案、决策、实现项、PR、Demo 和汇报结论都必须同时记录：用户场景与问题、依据来源、前台交互影响、后端事实来源、验证证据与当前边界。

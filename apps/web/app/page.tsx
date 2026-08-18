@@ -28,7 +28,7 @@ import {
   IconUsersGroup,
 } from "@tabler/icons-react";
 
-import type { TaskEvent, TaskEventType, TaskSnapshot } from "./task-types";
+import type { TaskEvent, TaskEventType, TaskPhase, TaskSnapshot } from "./task-types";
 import type { Demo2CockpitSnapshot, Demo2RouteMode, Demo2RouteSelectionResult } from "./demo2-types";
 import { TaskArtifactWorkspace } from "./task-artifact-workspace";
 import {
@@ -636,10 +636,11 @@ const RAIL_CONNECTION_LABELS: Record<TaskTransportState, string> = {
 };
 type PendingTaskMutation = {
   taskId: string;
-  kind: "start" | ControlIntent["kind"];
+  kind: "start" | "advance" | ControlIntent["kind"];
   idempotencyKey: string;
   expectedVersion: number;
   intent?: ControlIntent;
+  phase?: TaskPhase;
 };
 
 function ActiveTaskStrip({ task, syncState, blocked, onOpenTask, onRetry }: {
@@ -729,10 +730,13 @@ export default function Home() {
   const taskSequenceRef = useRef(0);
   const taskSnapshotRef = useRef<TaskSnapshot | null>(null);
   const pendingTaskMutationRef = useRef<PendingTaskMutation | null>(null);
+  const restoredTaskMutationKeyRef = useRef<string | null>(null);
   const demo1CreateKeyRef = useRef<string | null>(null);
   const demo1CreateInFlightRef = useRef(false);
   const taskArtifactActionKeyRef = useRef<{ artifactVersionId: string; key: string } | null>(null);
   const demo2RouteKeyRef = useRef<{ workItemId: string; mode: Demo2RouteMode; key: string } | null>(null);
+  const stageAdvanceTimerRef = useRef<number | undefined>(undefined);
+  const stageAdvanceInFlightRef = useRef<string | null>(null);
 
   useEffect(() => {
     artifactsRef.current = artifacts;
@@ -785,6 +789,7 @@ export default function Home() {
       if (!raw) return;
       const saved = JSON.parse(raw) as PendingTaskMutation;
       if (saved.taskId && saved.kind && saved.idempotencyKey && Number.isInteger(saved.expectedVersion)) {
+        restoredTaskMutationKeyRef.current = saved.idempotencyKey;
         rememberPendingTaskMutation(saved);
         setTaskSyncState("reconnecting");
       }
@@ -916,6 +921,48 @@ export default function Home() {
       if (reconnectTimer !== undefined) window.clearTimeout(reconnectTimer);
     };
   }, [task?.task_id]);
+
+  // Progressive runtimes advance only after a confirmed Snapshot. A missing
+  // stage_records field keeps the V0.1 atomic start path unchanged.
+  useEffect(() => {
+    const current = task;
+    if (
+      !current
+      || !current.stage_records?.length
+      || !["observe", "plan", "act", "verify"].includes(current.phase)
+      || ["waiting_input", "committed", "failed", "cancelled"].includes(current.status)
+      || pendingTaskMutationRef.current
+      || taskMutating
+    ) return;
+    const record = current.stage_records.find((item) => item.phase === current.phase);
+    if (!record || record.status !== "running") return;
+    const advanceKey = `${current.task_id}:${current.version}:${current.phase}`;
+    if (stageAdvanceInFlightRef.current === advanceKey) return;
+    const reviewDelay = window.matchMedia("(prefers-reduced-motion: reduce)").matches ? 1200 : 900;
+    stageAdvanceTimerRef.current = window.setTimeout(() => {
+      stageAdvanceTimerRef.current = undefined;
+      void advanceDemo1Stage(current);
+    }, reviewDelay);
+    return () => {
+      if (stageAdvanceTimerRef.current !== undefined) {
+        window.clearTimeout(stageAdvanceTimerRef.current);
+        stageAdvanceTimerRef.current = undefined;
+      }
+    };
+  }, [task, taskMutating, pendingTaskMutation]);
+
+  useEffect(() => {
+    const pending = pendingTaskMutation;
+    if (
+      !pending
+      || restoredTaskMutationKeyRef.current !== pending.idempotencyKey
+      || taskMutating
+      || task?.task_id !== pending.taskId
+    ) return;
+    restoredTaskMutationKeyRef.current = null;
+    const timer = window.setTimeout(() => void retryPendingTaskMutation(), 250);
+    return () => window.clearTimeout(timer);
+  }, [pendingTaskMutation, task?.task_id, taskMutating]);
 
   useEffect(() => {
     const element = conversationRef.current;
@@ -1137,14 +1184,18 @@ export default function Home() {
     try {
       const path = pending.kind === "start"
         ? `/v1/tasks/${pending.taskId}/start`
-        : `/v1/tasks/${pending.taskId}/controls`;
+        : pending.kind === "advance"
+          ? `/v1/tasks/${pending.taskId}/advance`
+          : `/v1/tasks/${pending.taskId}/controls`;
       const body = pending.kind === "start"
         ? { expected_task_version: pending.expectedVersion, idempotency_key: pending.idempotencyKey }
-        : {
+        : pending.kind === "advance"
+          ? { expected_task_version: pending.expectedVersion, idempotency_key: pending.idempotencyKey }
+          : {
             ...pending.intent,
             expected_task_version: pending.expectedVersion,
             idempotency_key: pending.idempotencyKey,
-          };
+            };
       const replayed = await request<TaskSnapshot>(path, { method: "POST", body: JSON.stringify(body) });
       applyTaskSnapshot(replayed);
       rememberPendingTaskMutation(null);
@@ -1197,6 +1248,60 @@ export default function Home() {
     }
   }
 
+  async function advanceDemo1Stage(snapshot: TaskSnapshot) {
+    if (
+      !snapshot.stage_records?.length
+      || !["observe", "plan", "act", "verify"].includes(snapshot.phase)
+      || snapshot.status === "waiting_input"
+      || pendingTaskMutationRef.current
+      || taskMutating
+    ) return;
+    const stage = snapshot.stage_records.find((item) => item.phase === snapshot.phase);
+    if (!stage || stage.status !== "running") return;
+    const advanceKey = `${snapshot.task_id}:${snapshot.version}:${snapshot.phase}`;
+    if (stageAdvanceInFlightRef.current === advanceKey) return;
+    stageAdvanceInFlightRef.current = advanceKey;
+    const expectedVersion = snapshot.version;
+    const idempotencyKey = `advance-${snapshot.phase}-${crypto.randomUUID()}`;
+    rememberPendingTaskMutation({
+      taskId: snapshot.task_id,
+      kind: "advance",
+      phase: snapshot.phase,
+      idempotencyKey,
+      expectedVersion,
+    });
+    setTaskMutating(true);
+    setTaskError("");
+    try {
+      const next = await request<TaskSnapshot>(`/v1/tasks/${snapshot.task_id}/advance`, {
+        method: "POST",
+        body: JSON.stringify({ expected_task_version: expectedVersion, idempotency_key: idempotencyKey }),
+      });
+      const applied = applyTaskSnapshot(next);
+      if (applied) {
+        rememberPendingTaskMutation(null);
+        updateTaskSyncAfterSnapshot(true, snapshot.task_id);
+      } else {
+        setTaskSyncState("reconnecting");
+      }
+    } catch (reason) {
+      let reconciled: TaskSnapshot | null = null;
+      try { reconciled = await refreshTaskSnapshot(snapshot.task_id); } catch { /* Keep the same key for a later replay. */ }
+      if (!pendingTaskMutationRef.current) return;
+      if (reason instanceof ApiError && reason.status < 500) {
+        rememberPendingTaskMutation(null);
+        updateTaskSyncAfterSnapshot(false, snapshot.task_id);
+        setTaskError(`${reason.message}${reconciled ? `；已刷新到 v${reconciled.version}，请复核后重试` : ""}`);
+      } else {
+        setTaskSyncState("reconnecting");
+        setTaskError("阶段推进结果待确认；系统会保留同一请求并在恢复后继续对账");
+      }
+    } finally {
+      stageAdvanceInFlightRef.current = null;
+      setTaskMutating(false);
+    }
+  }
+
   function reconcilePendingTaskMutation(snapshot: TaskSnapshot) {
     const pending = pendingTaskMutationRef.current;
     if (!pending || pending.taskId !== snapshot.task_id) return;
@@ -1205,6 +1310,15 @@ export default function Home() {
         rememberPendingTaskMutation(null);
         setTaskError("");
         setNotice(`服务端任务已更新，已对账至 v${snapshot.version}`);
+      }
+      return;
+    }
+    if (pending.kind === "advance") {
+      const stage = snapshot.stage_records?.find((item) => item.phase === pending.phase);
+      if (snapshot.version > pending.expectedVersion && (!stage || stage.status !== "running")) {
+        rememberPendingTaskMutation(null);
+        setTaskError("");
+        setNotice(`阶段已确认，当前状态已对账至 v${snapshot.version}`);
       }
       return;
     }

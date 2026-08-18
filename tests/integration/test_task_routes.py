@@ -145,10 +145,10 @@ async def test_task_start_and_control_routes_return_server_truth() -> None:
             headers={"X-User-Id": "user_1"},
         )
         assert started_response.status_code == 200
-        waiting = started_response.json()
-        assert waiting["status"] == "waiting_input"
-        assert waiting["phase"] == "verify"
-        assert [item["status"] for item in waiting["branches"]].count("waiting_evidence") == 1
+        started = started_response.json()
+        assert started["status"] == "running"
+        assert started["phase"] == "observe"
+        assert started["stage_records"][-1]["phase"] == "observe"
 
         replay = await client.post(
             f"/v1/tasks/{created['task_id']}/start",
@@ -156,7 +156,33 @@ async def test_task_start_and_control_routes_return_server_truth() -> None:
             headers={"X-User-Id": "user_1"},
         )
         assert replay.status_code == 200
-        assert replay.json() == waiting
+        assert replay.json() == started
+
+        stale_advance = await client.post(
+            f"/v1/tasks/{created['task_id']}/advance",
+            json={
+                "expected_task_version": created["version"],
+                "idempotency_key": "route-stale-advance-001",
+            },
+            headers={"X-User-Id": "user_1"},
+        )
+        assert stale_advance.status_code == 409
+
+        waiting = started
+        for index in range(4):
+            advanced_response = await client.post(
+                f"/v1/tasks/{created['task_id']}/advance",
+                json={
+                    "expected_task_version": waiting["version"],
+                    "idempotency_key": f"route-advance-{index}",
+                },
+                headers={"X-User-Id": "user_1"},
+            )
+            assert advanced_response.status_code == 200
+            waiting = advanced_response.json()
+        assert waiting["status"] == "waiting_input"
+        assert waiting["phase"] == "verify"
+        assert [item["status"] for item in waiting["branches"]].count("waiting_evidence") == 1
 
         branch = next(item for item in waiting["branches"] if item["status"] == "waiting_evidence")
         resolved_response = await client.post(

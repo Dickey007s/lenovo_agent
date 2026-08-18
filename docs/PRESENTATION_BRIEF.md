@@ -214,7 +214,7 @@ Demo 1 的 TaskStore 另有独立证据：固定 Fixture 已在同一个 Postgre
 ### 可以明确陈述
 
 - “实现了 OpenAI-compatible 对话与结构化规划适配器及严格 Schema 校验。”
-- “当前配置的 `deepseek-v4-pro` 已实测通用问答与 Conversation SSE 文本连通；该 smoke 不证明结构化规划、Action 或工具调用。”
+- “当前配置的 `deepseek-v4-pro` 已分别实测通用问答/Conversation SSE 连通，以及 Demo 1 Plan/Act 返回服务端批准的严格结构；这些 smoke 不证明模型质量、Action、工具调用、成本或 SLA。”
 - “实现了 7 类可编辑办公工作区和 SSE 流式人机协作。”
 - “实现了确定性风险/策略/证据/审批/Permit/Gateway 闭环。”
 - “实现了 5 个 Simulator capability 的端到端受控执行。”
@@ -279,3 +279,11 @@ Demo 1 的 TaskStore 另有独立证据：固定 Fixture 已在同一个 Postgre
 | Permit | 短时、单次、参数绑定的 Ed25519 JWT 授权票据 |
 | Tool Gateway | Permit 校验、重放保护和工具路由边界 |
 | Simulator | 不接触真实办公系统的副作用模拟器 |
+
+## Demo 1 当前讲解口径（2026-08-17）
+
+演示时先展示 `start` 返回的 Observe，再让浏览器在每次服务端确认后推进四次 `advance`：Plan、Act、Verify、等待决定。此顺序对应 v2、v3、v4、v5、v6 Snapshot，而不是延时动画。v6 的可复核事实是 5 个工件、1 个冲突、2 个已验证工件；用户解决冲突后才到 v7 Commit。
+
+Plan/Act 当前通过严格适配器调用 `deepseek-v4-pro`，但只有与服务端批准模板逐字段一致的用户文字才被接受，否则显式回退；Observe/Verify/Commit 确定性完成。模型 smoke 只证明接口连通和响应符合契约，不应讲成“模型质量已验证”。预算是步骤、工具调用和运行时长，不是 token 成本。关闭浏览器会暂停在已保存阶段，重新打开后继续；当前没有无人值守后台调度器，也没有跨实例 LLM lease。
+
+对外叙事必须把阶段状态、来源标签、冲突和 Commit 映射到服务端 Snapshot/stage_records；不要展示原始 `fixture:`、prompt、思维链、内部日志或供应商账单。最终测试耗时、实现提交和八张截图 hash 已在 [`DEMO1-PROGRESSIVE-STAGES-20260817`](evidence/DEMO1-PROGRESSIVE-STAGES-EVIDENCE-20260817.md) 封口；PR 链接以该证据的后续回填为准。

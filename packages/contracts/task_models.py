@@ -22,6 +22,10 @@ TaskStatus = Literal[
 
 TaskPhase = Literal["contract", "observe", "plan", "act", "verify", "commit"]
 
+TaskStage = Literal["observe", "plan", "act", "verify"]
+TaskStageStatus = Literal["pending", "running", "completed", "failed"]
+TaskStageSource = Literal["deterministic", "model", "template_fallback", "human", "system"]
+
 BranchStatus = Literal[
     "queued",
     "running",
@@ -247,6 +251,20 @@ class TaskError(StrictModel):
     user_action: str | None = None
 
 
+class TaskStageRecord(StrictModel):
+    """Durable, user-facing record for one bounded runtime stage."""
+
+    phase: TaskStage
+    status: TaskStageStatus
+    summary: str = Field(min_length=1, max_length=500)
+    detail: dict[str, Any] = Field(default_factory=dict)
+    artifact_version_ids: list[str] = Field(default_factory=list)
+    generation_source: TaskStageSource
+    started_at: datetime
+    completed_at: datetime | None = None
+    failed_at: datetime | None = None
+
+
 class TaskSnapshot(StrictModel):
     task_id: str = Field(min_length=1, max_length=120)
     trace_id: str = Field(min_length=1, max_length=120)
@@ -260,6 +278,7 @@ class TaskSnapshot(StrictModel):
     verification_reports: list[VerificationReport] = Field(default_factory=list)
     conflicts: list[ConflictRecord] = Field(default_factory=list)
     controls: list[ControlEvent] = Field(default_factory=list)
+    stage_records: list[TaskStageRecord] = Field(default_factory=list)
     budget: TaskBudgetSnapshot = Field(default_factory=TaskBudgetSnapshot)
     last_commit: TaskCommit | None = None
     last_event_sequence: int = Field(default=0, ge=0)

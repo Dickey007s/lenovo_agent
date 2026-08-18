@@ -1040,6 +1040,10 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outlin
 .task-director-phases { min-width: 0; display: grid; grid-template-columns: repeat(5, minmax(110px, 1fr)); margin: 0 0 12px; padding: 0; border: 1px solid #dfe2e6; border-radius: 6px; background: #fff; list-style: none; }
 .task-director-phases li { position: relative; min-width: 0; min-height: 66px; display: grid; grid-template-columns: 30px minmax(0, 1fr); align-items: center; gap: 8px; padding: 8px 20px 8px 12px; border-right: 1px solid #e4e6e9; }
 .task-director-phases li:last-child { border-right: 0; }
+.task-director-phases li > button { min-width: 0; width: 100%; grid-column: 1 / -1; display: grid; grid-template-columns: 30px minmax(0, 1fr); align-items: center; gap: 8px; padding: 0; border: 0; color: inherit; background: transparent; text-align: left; }
+.task-director-phases li > button > span:last-child { min-width: 0; display: grid; gap: 2px; }
+.task-director-phases li > button:focus-visible { outline: 2px solid #1265d6; outline-offset: 2px; border-radius: 4px; }
+.task-director-phases li > button.is-selected { color: #1265d6; }
 .task-director-phase-icon { display: grid; width: 28px; height: 28px; place-items: center; border: 1px solid #cfd4d9; border-radius: 50%; color: #626a74; background: #f6f7f8; font-size: 10px; font-weight: 750; }
 .task-director-phase-icon svg { width: 15px; height: 15px; stroke-width: 2.1; }
 .task-director-phases li > div { min-width: 0; display: grid; gap: 2px; }
@@ -1089,6 +1093,39 @@ button.task-director-stage-card:hover { border-color: #98a3af; background: #fafb
 .task-director-merge-card strong { font-size: 12px; }
 .task-director-merge-card span { color: #737a84; font-size: 10px; line-height: 1.45; }
 .task-director-merge-card.is-ready svg, .task-director-merge-card.is-ready strong { color: #188a5c; }
+.task-director-lane-collapsed { min-width: 0; display: block; padding: 0; border-left-width: 3px; }
+.task-director-lane-collapsed details { min-width: 0; }
+.task-director-lane-collapsed summary { min-height: 58px; display: grid; grid-template-columns: 20px minmax(0, 1fr) auto; align-items: center; gap: 8px; padding: 9px 12px; cursor: pointer; list-style: none; }
+.task-director-lane-collapsed summary::-webkit-details-marker { display: none; }
+.task-director-lane-collapsed summary > svg { width: 17px; height: 17px; color: #188a5c; }
+.task-director-lane-collapsed summary > span { min-width: 0; display: grid; gap: 2px; }
+.task-director-lane-collapsed summary strong { overflow: hidden; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.task-director-lane-collapsed summary small { color: #69717b; font-size: 10px; }
+.task-director-lane-collapsed summary b { color: #1265d6; font-size: 10px; }
+.task-director-lane-collapsed details > div { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 0 12px 11px 40px; }
+.task-director-lane-collapsed details p { margin: 0; color: #69717b; font-size: 10px; line-height: 1.45; }
+.task-director-lane-collapsed details button { min-height: 36px; padding: 0 9px; border: 1px solid #d7dce1; border-radius: 4px; color: #1265d6; background: #fff; font-size: 10px; font-weight: 700; }
+.task-stage-detail, .task-candidate-materials { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(240px, .8fr); gap: 12px; }
+.task-stage-detail > div, .task-candidate-materials > div { min-width: 0; padding: 18px; border: 1px solid #dfe2e6; border-radius: 6px; background: #fff; }
+.task-stage-detail > div > span, .task-candidate-materials > div > span { color: #69717b; font-size: 11px; font-weight: 700; }
+.task-stage-detail h2, .task-candidate-materials h2 { margin: 5px 0 0; font-size: 17px; }
+.task-stage-detail p, .task-candidate-materials p { margin: 8px 0 0; color: #5f6873; font-size: 12px; line-height: 1.6; }
+.task-stage-detail-copy { display: block; margin-top: 7px; color: #727984; font-size: 10px; line-height: 1.5; }
+.task-stage-detail ul, .task-candidate-materials ul { display: grid; gap: 7px; margin: 0; padding: 0; list-style: none; }
+.task-stage-detail li, .task-candidate-materials li { padding: 10px 11px; border: 1px solid #dfe2e6; border-radius: 5px; background: #f9fafb; font-size: 12px; }
+.task-stage-detail li { display: grid; gap: 2px; }
+.task-stage-detail li strong { color: #25292f; font-size: 12px; }
+.task-stage-detail li small { color: #66707b; font-size: 11px; line-height: 1.45; }
+.task-stage-return { min-height: 36px; display: inline-flex; align-items: center; gap: 6px; margin-top: 12px; padding: 0 12px; border: 1px solid #cfd5dd; border-radius: 5px; color: #2f5f9f; background: #fff; font-weight: 700; }
+.task-stage-return svg { width: 15px; height: 15px; }
+.task-director-phases button:disabled { cursor: default; opacity: .48; }
+.task-background-materials { border: 1px solid #dfe3e8; border-radius: 6px; background: #fff; }
+.task-background-materials > summary { min-height: 44px; display: flex; align-items: center; padding: 0 14px; color: #53606c; font-size: 12px; font-weight: 700; cursor: pointer; }
+.task-background-materials > .task-director-lanes { padding: 0 10px 10px; }
+.task-candidate-materials > ul { min-width: 0; display: grid; gap: 7px; margin: 0; padding: 0; list-style: none; }
+.task-candidate-materials li { display: grid; gap: 3px; }
+.task-candidate-materials li span { color: #69717b; font-size: 10px; }
+.task-stage-blocked { display: block; margin-top: 10px; color: #bc5d0c; font-size: 11px; }
 .task-director-commit-bar { min-width: 0; min-height: 52px; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 12px; margin-top: 10px; padding: 9px 12px; border: 1px solid #d9dde2; border-radius: 5px; background: #fff; }
 .task-director-commit-bar > div { display: flex; align-items: center; gap: 7px; color: #188a5c; }
 .task-director-commit-bar svg { width: 17px; height: 17px; stroke-width: 1.9; }
@@ -1129,6 +1166,7 @@ button.task-director-stage-card:hover { border-color: #98a3af; background: #fafb
 .task-decision-failure h3 { margin: 0; font-size: 11px; }
 .task-decision-failure p { margin: 4px 0 0; font-size: 9px; line-height: 1.55; }
 .task-decision-failure strong { display: block; margin-top: 6px; font-size: 9px; }
+.task-decision-failure button { min-height: 36px; margin-top: 8px; padding: 0 9px; border: 1px solid #d59898; border-radius: 4px; color: #7c2e2e; background: #fff; font-size: 10px; font-weight: 700; }
 .task-decision-group { min-width: 0; }
 .task-decision-group-title { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 2px 2px 8px; }
 .task-decision-group-title h3 { margin: 0; color: #b45a0c; font-size: 13px; }
@@ -1171,6 +1209,9 @@ button.task-director-stage-card:hover { border-color: #98a3af; background: #fafb
 .task-decision-empty.is-complete > svg { color: #188a5c; }
 .task-decision-empty.is-warning > svg { color: #d66c0e; }
 .task-decision-empty.is-failed > svg { color: #c94141; }
+.task-decision-empty.is-progress > svg { color: #1265d6; }
+.task-decision-empty.is-progress > span { color: #69717b; font-size: 10px; font-weight: 700; }
+.task-decision-empty.is-progress small { color: #7b828b; font-size: 9px; }
 .task-decision-empty h3, .task-decision-start h3 { margin: 3px 0 0; color: #2b3036; font-size: 14px; }
 .task-decision-empty p, .task-decision-start p { max-width: 260px; margin: 0; font-size: 11px; line-height: 1.65; }
 .task-decision-empty code { max-width: 100%; overflow-wrap: anywhere; color: #7b828b; font-size: 8px; }
@@ -1282,6 +1323,8 @@ button.task-director-stage-card:hover { border-color: #98a3af; background: #fafb
   .task-next-step { grid-template-columns: 38px minmax(0, 1fr); }
   .task-next-step > button { grid-column: 1 / -1; width: 100%; min-height: 44px; }
   .task-ready-brief ul { grid-template-columns: 1fr; }
+  .task-stage-detail, .task-candidate-materials { grid-template-columns: 1fr; }
+  .task-stage-return { min-height: 44px; }
 }
 
 @media (max-width: 620px) {
@@ -1308,8 +1351,10 @@ button.task-director-stage-card:hover { border-color: #98a3af; background: #fafb
   .task-director-summary > div:nth-child(3) { grid-column: 1 / -1; border-right: 0; }
   .task-director-phases { grid-template-columns: repeat(5, minmax(0, 1fr)); overflow: visible; }
   .task-director-phases li { min-width: 0; grid-template-columns: 1fr; justify-items: center; gap: 4px; padding: 8px 2px; text-align: center; }
+  .task-director-phases li > button { grid-template-columns: 1fr; justify-items: center; gap: 4px; text-align: center; }
   .task-director-phases li > div { justify-items: center; }
   .task-director-phases small { display: none; }
+  .task-director-phase-arrow { display: none; }
   .task-director-board-header { align-items: flex-start; }
   .task-director-lanes { overflow: visible; }
   .task-director-lane { min-width: 0; display: grid; grid-template-columns: 1fr; gap: 6px; padding: 8px; }
@@ -1320,6 +1365,10 @@ button.task-director-stage-card:hover { border-color: #98a3af; background: #fafb
   .task-director-lane.is-complete > .task-director-merge-card { display: none; }
   .task-director-lane.is-complete > .task-director-branch-card { min-height: 76px; border-bottom: 0; }
   .task-director-stage-card { min-height: 100px; }
+  .task-stage-detail > div, .task-candidate-materials > div { padding: 14px; }
+  .task-director-lane-collapsed summary { min-height: 62px; }
+  .task-director-lane-collapsed details > div { align-items: stretch; flex-direction: column; padding-left: 12px; }
+  .task-director-lane-collapsed details button { min-height: 44px; }
   .task-director-lane-arrow { width: 100%; height: 17px; transform: rotate(90deg); }
   .task-director-merge-card { min-height: 78px; border-top: 1px solid #e0e3e6; border-left: 0; }
   .task-director-commit-bar { grid-template-columns: 1fr; gap: 5px; }

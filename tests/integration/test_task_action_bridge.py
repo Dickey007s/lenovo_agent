@@ -32,6 +32,13 @@ async def _committed_reply(
         expected_task_version=created.version,
         idempotency_key="bridge-start-001",
     )
+    for index in range(4):
+        waiting = await task_service.advance(
+            created.task_id,
+            "user_1",
+            expected_task_version=waiting.version,
+            idempotency_key=f"bridge-advance-{index}",
+        )
     branch = next(item for item in waiting.branches if item.status == "waiting_evidence")
     committed = await task_service.control(
         created.task_id,

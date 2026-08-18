@@ -17,7 +17,7 @@
 | 能力 | 当前事实 | 尚未实现 |
 | --- | --- | --- |
 | Task 创建 | `TaskService` 从 `TaskContractDraft` 生成服务端 Task ID、Owner、契约、三个初始 Branch 和 `TASK_CREATED` | 契约修改与取消 |
-| 固定 Runtime | `/start` 在一次 mutation 中产生固定客户 A 的阶段 Trace、ArtifactVersion、VerificationReport 和局部 Conflict；`resolve_evidence` 可形成 TaskCommit | 通用任务规划、LLM 生成、后台调度和任意中间阶段恢复 |
+| 固定 Runtime | `/start` 进入 v2 Observe；四次 `/advance` 分别完成 Plan、Act、Verify 和 waiting-input；`resolve_evidence` 可形成 v7 TaskCommit | 通用任务规划、后台调度和任意非 Demo 阶段恢复 |
 | TaskStore | `InMemoryTaskStore` 与 `PostgresTaskStore` 已有 Snapshot、Event 和 ArtifactVersion commit 路径；PostgreSQL 16.14 下已验证两个状态、三个顺序 API 进程的恢复 | 数据库重启/中途崩溃、Outbox、迁移工具、多实例并发 |
 | API | 创建、列表、读取、`POST /tasks/{id}/start`、`POST /tasks/{id}/controls`、固定客户回复的 `POST /tasks/{id}/artifacts/{version_id}/actions/email-send` 和 Task SSE | 取消、通用任务执行、人工 Artifact 编辑 API、任意工件动作路由 |
 | 幂等 | 新 mutation 的 marker 保存原结果 Snapshot；内存与 PostgreSQL 跨进程回归证明旧 key 在后续 mutation 后仍返回原结果且不重复写。旧版 marker 缺原结果时仅在当前 version 未前进时兼容返回，否则 409 拒绝不安全重放 | 响应丢失浏览器闭环、数据库中途崩溃 |
@@ -169,7 +169,7 @@ POST /v1/tasks/{task_id}/controls
 GET  /v1/tasks/{task_id}/events?after={sequence}
 ```
 
-`POST /v1/demo1/tasks` 可带 `Idempotency-Key` 表示一次独立汇报轮次。同一 Owner+key 重放必须返回已存在 Task 当前已持久化的 Snapshot，不新增 `TASK_CREATED`、不回退已发生的 mutation；这与 start/control 命令重放返回首次 mutation Snapshot 的语义不同。不同 key 必须创建独立 Task。未带 key 时使用 Owner 绑定的兼容默认键。终态 Task 不回滚、不删除。当前前端“开始新一轮汇报”使用新 round key 创建 Task，再立即以新 Task 的版本调用 start；它不是 reset/reopen 旧 Task。`GET /tasks` 会返回多轮 Snapshot，但当前前端没有历史轮次选择入口。
+`POST /v1/demo1/tasks` 可带 `Idempotency-Key` 表示一次独立汇报轮次。同一 Owner+key 重放必须返回已存在 Task 当前已持久化的 Snapshot，不新增 `TASK_CREATED`、不回退已发生的 mutation；这与 start/control 命令重放返回首次 mutation Snapshot 的语义不同。不同 key 必须创建独立 Task。未带 key 时使用 Owner 绑定的兼容默认键。终态 Task 不回滚、不删除。当前前端“开始新一轮汇报”使用新 round key 创建 Task，再立即以新 Task 的版本调用 start 到 v2 Observe；浏览器随后在每个服务端 Snapshot 确认后依次调用四次 `advance` 到 v6 待决策。它不是 reset/reopen 旧 Task。`GET /tasks` 会返回多轮 Snapshot，但当前前端没有历史轮次选择入口。
 
 SSE 帧：
 
@@ -198,9 +198,27 @@ data: {TaskEvent JSON}
 | Pydantic 与 TypeScript 协议 | PR 1 已实现并测试 | 随行为演进同步 |
 | 场景、来源、状态机、UI 映射 | 固定 Fixture 的工程映射已有 PR 3/PR 4/PR 5 证据 | 真实场景代表性与用户价值研究 |
 | Task Store / Snapshot API / SSE | mutation、多事件回放、内存路径和 PostgreSQL 顺序 API 进程恢复有自动化覆盖 | 数据库故障、SSE 缺口回放与多实例通知 |
-| Observe/Plan/Act/Verify/Commit | 固定 Fixture 在单次 start/resolve mutation 中可观察；引用/hash/幂等已有内存与 PostgreSQL 回归 | 通用后台 Loop、任意中间 checkpoint 恢复 |
+| Observe/Plan/Act/Verify/Commit | 固定 Fixture 通过 start + 四次 advance + resolve 分阶段可观察；引用/hash/幂等由内存与 PostgreSQL Store 保护 | 通用后台 Loop、任意非 Demo 中间 checkpoint 恢复 |
 | Task Artifact Workspace | PR 4 已实现只读 head/version/verification/conflict/content/source/lineage/Commit 视图，并保留手工待办 tab；DR-0007 已实现已验证客户回复到治理 Run 的窄绑定 | 人工编辑新版本、其他 Artifact/Action 绑定、通用工件类型 |
 | Task Artifact Action Bridge | `committed + Commit 引用 + passed report + reply_draft` 才可准备动作；创建 key 幂等，绑定在证据/审批/授权/执行前重校验；拒绝/失败不修改 Task | 跨进程 Run 创建幂等、真实联系人/附件、通用 capability 映射、真实 Connector |
 | Task UI 与恢复 | PR 4 E2E 覆盖主路径和发送前 abort；PR 5 运行覆盖 API 进程断开、禁用、自动重连与 v2/v3 对账 | 已提交但响应丢失、断线期间事件回放与更多异常路径 |
 | 来源与多轮前台语义 | 非 Tasks 摘要、带“演示数据”的来源标签、原始 ID 不入普通业务 DOM，以及独立新 Task 的 create+start 已有浏览器工程证据 | 历史轮次选择与至少 5 人无引导理解测试 |
 | Adaptive Swarm / 真实 Connector | 非本决策范围 | 需独立 Admission 和来源证据 |
+
+## 9. 当前渐进阶段补充（2026-08-17）
+
+本节覆盖旧版“start 一次产生阶段 Trace”的表述，作为当前 Demo 1 协议：
+
+| mutation | 预期 Snapshot |
+| --- | --- |
+| create | v1 `ready / contract`，`stage_records=[]` |
+| start | v2 `running / observe` |
+| advance 1 | v3 `running / plan` |
+| advance 2 | v4 `running / act` |
+| advance 3 | v5 `verifying / verify` |
+| advance 4 | v6 `waiting_input / verify`，5 ArtifactVersion、1 open Conflict、2 passed VerificationReport |
+| resolve evidence | v7 `committed / commit`，最终 `TaskCommit` |
+
+每个阶段记录持久化 `stage`、`status`、用户摘要、受限详情、`artifact_ids`、`generation_source` 和时间戳；缺少该字段的旧 Snapshot 反序列化为默认空数组。`start`、`advance` 和 `resolve_evidence` 均要求 `expected_task_version + idempotency_key`，成功只增加一个 version；同 key 重放首次响应，旧 version 返回 409。
+
+Plan/Act 的请求和响应由 `TaskStagePlanRequest/TaskStagePlan` 与 `TaskStageActRequest/TaskStageAct` 严格校验，适配器当前配置 `deepseek-v4-pro`；只有与服务端批准模板逐字段一致的面向用户文字才保留 `generation_source=model`，否则显式 `template_fallback`。因此模型不能把思维链、内部 ID、来源引用、状态或新事实写入阶段记录，也不能决定身份、来源、冲突、验证、预算或 Commit；Observe/Verify/Commit 是确定性逻辑。固定渐进路径还要求完整 Demo 契约匹配，包括预算与截止时间。模型调用在 CAS 前执行，CAS 冲突时结果丢弃。预算是 steps/tool calls/runtime，不是 token cost。浏览器负责下一阶段协调，关闭浏览器不触发后台运行；同进程同 key 有锁，跨实例无分布式 LLM lease。

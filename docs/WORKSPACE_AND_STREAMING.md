@@ -61,7 +61,7 @@ Tasks 主视图采用三个客户端模式，它们不改变服务端 Task 状�
 | `artifacts`（前台“成果”） | 当前与历史 ArtifactVersion、来源、检查、lineage 和 Commit | `branches[].artifact_heads`、`artifact_versions[]`、`verification_reports[]`、`conflicts[]`、`last_commit` |
 | `manual`（前台“执行记录”） | 原手工待办看板 | `WorkspaceArtifact(kind=tasks)`；不与 TaskSnapshot 相互覆盖 |
 
-初始 `/v1/tasks` 未返回时只显示读取态，不暴露创建动作；确认无 Task 后，固定 Demo 1 空态使用 `/v1/demo1/tasks` 客户 A 创建模板的客户端副本，一次点击依次创建并启动。已有 Task 的标题、目标和交付物全部取自 `TaskSnapshot.contract`。终态“开始新一轮汇报”也依次 create 与 start：新 round key 创建独立 Task，旧 Task 不修改；固定路径启动后通常直接进入 `waiting_input / verify`，不是把旧状态重置为可启动。通用产品仍需服务端模板描述接口，不能把固定空态副本扩展成通用事实。
+初始 `/v1/tasks` 未返回时只显示读取态，不暴露创建动作；确认无 Task 后，固定 Demo 1 空态使用 `/v1/demo1/tasks` 客户 A 创建模板的客户端副本，一次点击依次创建并启动。已有 Task 的标题、目标和交付物全部取自 `TaskSnapshot.contract`。终态“开始新一轮汇报”也依次 create 与 start：新 round key 创建独立 Task，旧 Task 不修改；start 只进入 v2 `running / observe`，浏览器随后在服务端确认后逐次协调四个 `advance`，不是把旧状态重置为可启动。通用产品仍需服务端模板描述接口，不能把固定空态副本扩展成通用事实。
 
 右侧在 Tasks 中默认进入 `decisions`。open Conflict 先解释为什么需要人、两个口径和具体后果；顶部“查看待确认项”只是弱化定位，唯一改变 Task 状态的主动作仍是服务端 `resolve_evidence` 正式来源。查看材料、补证、暂停和接管降低层级；用户可切到 `agent` 继续同一 Conversation。“补充更多依据”只填充方向输入，提交后也只能显示 `steer accepted / 等待后续循环应用`。右侧模式切换不重建 Conversation，也不产生 TaskEvent。邮件、文档等非 Tasks 工作区不挂载决定控制，只从同一 Snapshot 显示“后台任务”摘要；“打开任务 / 前往处理 / 查看任务 / 查看汇报”只切换客户端视图。
 
@@ -237,3 +237,13 @@ Conversation 创建的 Run 绑定发起它的真实 Thread；continue stream 会
 - 报价核算只覆盖数量、标准价和单行折后比例，不含税费、汇率、阶梯价、套餐依赖或真实审批规则；当前来源为固定演示数据，不访问真实 CRM/CPQ/ERP。
 - SSE 没有断线游标恢复；Run 审计流单独支持 `after` 序号续订。
 - 动作结果的 `message.completed` 重放缓存与 Conversation Thread 一样位于单 API 进程内，重启后不恢复。
+
+## 10. Demo 1 Task 阶段与浏览器协调（2026-08-17）
+
+Tasks 工作区的“读取资料 / 拆分任务 / 生成材料 / 核对事实”不是前端动画，而是 `TaskSnapshot.stage_records` 中的服务端事实。`start` 返回 v2 `running / observe`；浏览器在确认后依次提交四次 `advance`，得到 v3 Plan、v4 Act、v5 Verify、v6 `waiting_input / verify`。v6 展示 5 个工件、1 个待解决冲突和 2 个已验证工件，解决后 v7 才显示 Commit。
+
+Plan/Act 可以调用当前 `deepseek-v4-pro`，但前台看到的阶段文字不是任意模型输出：适配器与 TaskService 都要求它与服务端批准模板逐字段一致，否则明确记录为 `template_fallback`。思维链、内部 ID、原始来源引用和模型自报状态不会进入 `stage_records`。固定路径还校验包括预算与截止时间在内的完整 Demo 契约。
+
+阶段轮询只由浏览器协调。关闭标签页后任务停在最后一个已持久化阶段，重新打开通过 GET/SSE 对账后继续；不存在后台 scheduler 或“关闭浏览器仍在运行”的事实。SSE payload 不能直接推断完成状态。旧 Snapshot 没有 `stage_records` 时按空数组兼容读取，不补造历史阶段。
+
+来源显示使用可读业务标签“演示数据”，原始 `fixture:` 只保留在服务端校验/审计。阶段详情可显示摘要、受限详情、工件引用、来源和时间，但不显示 prompt、思维链或内部日志。预算文案只表达运行时预算，不展示或推断 token 成本、供应商账单或模型质量。

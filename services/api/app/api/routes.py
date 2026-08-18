@@ -111,6 +111,10 @@ class StartTaskRequest(StrictRequest):
     idempotency_key: str = Field(min_length=8, max_length=160)
 
 
+class AdvanceTaskRequest(StartTaskRequest):
+    pass
+
+
 class PrepareTaskArtifactActionRequest(StrictRequest):
     thread_id: str = Field(min_length=1, max_length=120)
 
@@ -304,6 +308,26 @@ async def start_task(
 ) -> TaskSnapshot:
     try:
         return await service.start(
+            task_id,
+            user.user_id,
+            expected_task_version=body.expected_task_version,
+            idempotency_key=body.idempotency_key,
+        )
+    except TaskNotFoundError as exc:
+        raise HTTPException(status_code=404, detail="任务不存在") from exc
+    except (TaskMutationConflictError, TaskTransitionError) as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
+@router.post("/tasks/{task_id}/advance", response_model=TaskSnapshot)
+async def advance_task(
+    task_id: str,
+    body: AdvanceTaskRequest,
+    user: Annotated[CurrentUser, Depends(current_user)],
+    service: Annotated[TaskService, Depends(get_task_service)],
+) -> TaskSnapshot:
+    try:
+        return await service.advance(
             task_id,
             user.user_id,
             expected_task_version=body.expected_task_version,

@@ -217,7 +217,7 @@ test("a verified reply becomes a version-bound governed simulator action", async
   await expect(gate).toBeVisible();
   await expect(gate.getByRole("heading", { name: "发送客户邮件" })).toBeVisible();
   await expect(gate.getByText("基于已核对成果", { exact: true })).toBeVisible();
-  await expect(gate.getByText(/客户回复草稿 v3 · 本轮汇报 v3/)).toBeVisible();
+  await expect(gate.getByText(/客户回复草稿 v3 · 本轮汇报 v7/)).toBeVisible();
   await expect(gate.getByText("发送外部邮件", { exact: true }).first()).toBeVisible();
   await expect(gate.getByText("企业外客户", { exact: true })).toBeVisible();
   await expect(gate.getByText("customer@example.com", { exact: true })).toBeVisible();
@@ -453,6 +453,17 @@ test("only the first open conflict in a branch is actionable without a conflict 
     const snapshot = projectConflictSequence(await response.json() as Record<string, unknown>);
     await route.fulfill({ response, json: snapshot });
   });
+  await page.route(/\/v1\/tasks\/[^/]+\/advance$/, async (route) => {
+    const response = await route.fetch({
+      headers: {
+        ...route.request().headers(),
+        "x-user-id": owner,
+        "x-user-roles": "current_user,sales_manager",
+      },
+    });
+    const snapshot = projectConflictSequence(await response.json() as Record<string, unknown>);
+    await route.fulfill({ response, json: snapshot });
+  });
   await page.route(/\/v1\/tasks\/[^/]+$/, async (route) => {
     const response = await route.fetch({
       headers: {
@@ -521,6 +532,16 @@ test("a terminal failure takes precedence over stale open conflict cards", async
     });
     await route.fulfill({ response, json: projectFailure(await response.json() as Record<string, unknown>) });
   });
+  await page.route(/\/v1\/tasks\/[^/]+\/advance$/, async (route) => {
+    const response = await route.fetch({
+      headers: {
+        ...route.request().headers(),
+        "x-user-id": owner,
+        "x-user-roles": "current_user,sales_manager",
+      },
+    });
+    await route.fulfill({ response, json: projectFailure(await response.json() as Record<string, unknown>) });
+  });
   await page.route(/\/v1\/tasks\/[^/]+$/, async (route) => {
     const response = await route.fetch({
       headers: {
@@ -555,7 +576,7 @@ test("Task Director projects decisions, controls, errors, and versions from serv
 
   await expect(page.getByRole("heading", { name: "还差 1 个决定，确认后继续核对" })).toBeVisible();
   await expect(page.getByText("2 / 3", { exact: true })).toBeVisible();
-  await expect(page.getByText("材料已准备", { exact: true })).toHaveCount(2);
+  await expect(page.getByText("2 份材料已核对，展开查看", { exact: true })).toBeVisible();
   await expect(page.getByText("已纳入本轮成果", { exact: true })).toHaveCount(0);
   await expect(page.locator(".workspace-toast")).toBeHidden({ timeout: 4_000 });
   await attachScreenshot(page, testInfo, "task-director-conflict-desktop");
@@ -687,13 +708,16 @@ test("a late older task GET cannot roll back a newer mutation snapshot", async (
   expect(delayedSequence).toBe(1);
 
   await page.getByRole("button", { name: "开始准备汇报", exact: true }).click();
-  await expect(page.getByLabel("任务状态摘要").getByText("已同步 v2", { exact: true })).toBeVisible();
   await expect(page.getByRole("heading", { name: "还差 1 个决定，确认后继续核对" })).toBeVisible();
+  const syncState = page.getByLabel("任务状态摘要").getByText(/已同步 v\d+/).first();
+  const versionBeforeStaleGet = Number((await syncState.innerText()).match(/v(\d+)/)?.[1]);
+  expect(versionBeforeStaleGet).toBeGreaterThanOrEqual(6);
 
   releaseStaleGet();
   await staleDelivered;
   await page.waitForTimeout(250);
-  await expect(page.getByLabel("任务状态摘要").getByText("已同步 v2", { exact: true })).toBeVisible();
+  const versionAfterStaleGet = Number((await syncState.innerText()).match(/v(\d+)/)?.[1]);
+  expect(versionAfterStaleGet).toBeGreaterThanOrEqual(versionBeforeStaleGet);
   await expect(page.getByRole("heading", { name: "还差 1 个决定，确认后继续核对" })).toBeVisible();
   await expect(page.getByText("尚未开始", { exact: true })).toHaveCount(0);
 });
@@ -1021,7 +1045,7 @@ test("an aborted start keeps one idempotency key across reload and reconciles wi
 
   const afterRetry = await listTasks(request, owner);
   expect(afterRetry).toHaveLength(1);
-  expect(afterRetry[0].version).toBe(2);
+  expect(afterRetry[0].version).toBe(6);
   expect(afterRetry[0].status).toBe("waiting_input");
   expect(afterRetry[0].artifact_versions).toHaveLength(5);
   expect(new Set(afterRetry[0].artifact_versions.map((artifact) => artifact.artifact_version_id)).size).toBe(5);
@@ -1036,10 +1060,81 @@ test("an aborted start keeps one idempotency key across reload and reconciles wi
   expect(replay.ok()).toBeTruthy();
   const replayed = (await replay.json()) as TaskSnapshot;
   expect(replayed.version).toBe(2);
-  expect(replayed.artifact_versions).toHaveLength(5);
+  expect(replayed.phase).toBe("observe");
+  expect(replayed.status).toBe("running");
+  expect(replayed.artifact_versions).toHaveLength(0);
   const afterReplay = await listTasks(request, owner);
   expect(afterReplay).toHaveLength(1);
-  expect(afterReplay[0].version).toBe(2);
+  expect(afterReplay[0].version).toBe(6);
   expect(afterReplay[0].artifact_versions).toHaveLength(5);
   await attachScreenshot(page, testInfo, "demo1-start-reconciled");
+});
+
+test("progressive Task Runtime advances confirmed stages, supports review, disclosure, and reload recovery", async ({ page }, testInfo) => {
+  const owner = `e2e_task_progressive_stages_${testInfo.repeatEachIndex}`;
+  await routeBrowserApiAs(page, owner);
+  let advanceCalls = 0;
+  const observedStages: string[] = [];
+  const releaseAdvanceGate: Array<() => void> = [];
+  const advanceGates = Array.from({ length: 4 }, (_, index) => new Promise<void>((resolve) => {
+    releaseAdvanceGate.push(resolve);
+    if (index === 0) resolve();
+  }));
+
+  await page.route(/\/v1\/tasks\/[^/]+\/advance$/, async (route) => {
+    const callIndex = advanceCalls;
+    advanceCalls += 1;
+    await advanceGates[callIndex];
+    const response = await route.fetch({ headers: { ...route.request().headers(), ...ownerHeaders(owner) } });
+    const snapshot = await response.json() as TaskSnapshot;
+    observedStages.push(`${snapshot.status}:${snapshot.phase}`);
+    await route.fulfill({ response, json: snapshot });
+  });
+
+  await page.goto("/");
+  await openLongTask(page);
+  await page.getByRole("button", { name: "开始准备汇报", exact: true }).click();
+  await expect(page.locator(".task-director-phases li").nth(0)).toHaveClass(/is-current/);
+  await expect(page.getByRole("heading", { name: "读取资料", exact: true })).toBeVisible();
+  await expect(page.locator(".task-director-phases li").nth(3).getByRole("button")).toBeDisabled();
+  await expect.poll(() => advanceCalls).toBeGreaterThanOrEqual(1);
+  await expect(page.locator(".task-director-phases li").nth(1)).toHaveClass(/is-current/);
+  await expect(page.getByRole("heading", { name: "拆分任务", exact: true })).toBeVisible();
+  await expect(page.getByText(/完成条件：/).first()).toBeVisible();
+  releaseAdvanceGate[1]();
+  await expect(page.locator(".task-director-phases li").nth(2)).toHaveClass(/is-current/);
+  await expect(page.getByRole("heading", { name: "正在生成候选材料" })).toBeVisible();
+  releaseAdvanceGate[2]();
+  await expect(page.locator(".task-director-phases li").nth(3)).toHaveClass(/is-current/);
+  await expect(page.getByRole("heading", { name: "核对事实进行中", exact: true })).toBeVisible();
+  releaseAdvanceGate[3]();
+
+  await expect(page.getByRole("heading", { name: "还差 1 个决定，确认后继续核对" })).toBeVisible();
+  expect(observedStages).toEqual([
+    "running:plan",
+    "running:act",
+    "verifying:verify",
+    "waiting_input:verify",
+  ]);
+  await expect(page.getByText("2 份材料已核对，展开查看", { exact: true })).toBeVisible();
+
+  await page.locator(".task-director-phases li").nth(2).getByRole("button").click();
+  await expect(page.getByText("阶段回看", { exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "已生成，等待事实核对" })).toBeVisible();
+  await expect(page.getByText(/候选版本 v1/)).toHaveCount(3);
+  await expect(page.locator(".task-candidate-materials")).not.toContainText("fixture:");
+  await page.getByRole("button", { name: "返回当前阶段" }).click();
+
+  await page.reload();
+  await openLongTask(page);
+  await expect(page.getByRole("heading", { name: "还差 1 个决定，确认后继续核对" })).toBeVisible();
+
+  await page.locator(".task-director-phases li").nth(0).getByRole("button").click();
+  await expect(page.getByText("阶段回看", { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "返回当前阶段" })).toBeVisible();
+  await expect(page.locator(".task-stage-detail")).not.toContainText("fixture:");
+  await page.getByRole("button", { name: "返回当前阶段" }).click();
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expectMobileTaskDirector(page);
 });

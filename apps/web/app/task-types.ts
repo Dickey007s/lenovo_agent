@@ -11,6 +11,26 @@ export type TaskStatus =
 
 export type TaskPhase = "contract" | "observe" | "plan" | "act" | "verify" | "commit";
 
+export type TaskStageStatus = "pending" | "running" | "completed" | "failed";
+export type TaskStage = "observe" | "plan" | "act" | "verify";
+export type TaskStageSource = "deterministic" | "model" | "template_fallback" | "human" | "system";
+
+/**
+ * Durable stage facts returned by the progressive Task Runtime.
+ * Older servers omit this field; the UI must then stay on the legacy snapshot.
+ */
+export type TaskStageRecord = {
+  phase: TaskStage;
+  status: TaskStageStatus;
+  summary: string;
+  detail: Record<string, unknown>;
+  artifact_version_ids: string[];
+  generation_source: TaskStageSource;
+  started_at: string;
+  completed_at?: string | null;
+  failed_at?: string | null;
+};
+
 export type BranchStatus =
   | "queued"
   | "running"
@@ -215,6 +235,7 @@ export type TaskSnapshot = {
   last_error: TaskError | null;
   created_at: string;
   updated_at: string;
+  stage_records?: TaskStageRecord[];
 };
 
 export type TaskEvent = {

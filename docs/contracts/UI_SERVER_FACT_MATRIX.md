@@ -115,6 +115,18 @@ sequenceDiagram
 
 Workspace revision 恢复是独立于 Task mutation 的较小机制：保存 409 或 `workspace.conflict` 后保留草稿并显式选择最新/三方重应用，报价浏览器已覆盖不同字段合并与同字段冲突。它不使用 Task 的 idempotency key、Snapshot sequence 或 SSE `after`，也不证明数据库 CAS、多实例锁、离线重放或历史版本浏览。
 
+## 当前 Demo 1 渐进映射（2026-08-17）
+
+| 用户看到的状态 | 服务端事实 | 浏览器行为与边界 |
+| --- | --- | --- |
+| 读取资料 | v2 `running / observe` + `stage_records[observe]` | `start` 后显示；确认 Snapshot 后才请求下一步 |
+| 拆分任务 | v3 `running / plan` + Plan record | 严格适配器结果只作为摘要/详情；身份和来源由服务端重建 |
+| 生成材料 | v4 `running / act` + Act record | 显示候选工件，不能显示为已验证 |
+| 核对事实 | v5 `verifying / verify`，随后 v6 `waiting_input / verify` | v6 显示 5 工件、1 open conflict、2 passed verification |
+| 已提交 | v7 `committed / commit` + `last_commit` | 仅收到服务端 Commit 才显示完成 |
+
+`stage_records` 缺失时使用默认空数组以兼容旧 Snapshot；客户端不能用动画、SSE payload、版本猜测或 token 预算推导阶段。关闭浏览器只保留最后一次持久化 mutation，重新打开后继续协调；无后台 scheduler。Plan/Act 使用 `deepseek-v4-pro`，只有与服务端批准模板逐字段一致的文字才记录为 `model`，否则显式 `template_fallback`；smoke 只证明连接和严格响应，不证明质量。预算是 steps/tool calls/runtime，不是 token cost；跨实例无分布式 LLM lease。原始 `fixture:`、思维链和内部 ID 只在受控服务端边界处理，普通 DOM 使用“演示数据”业务标签。
+
 ## 5. 实现与验证责任
 
 | PR | 前台最小输出 | 后端事实 | 必须提供的证据 |
@@ -125,7 +137,8 @@ Workspace revision 恢复是独立于 Task mutation 的较小机制：保存 409
 | PR 4 | 已实现只读 Task Artifact Workspace、Tasks 双 tab、Task 面板直达工件和移动端布局 | 复用 PR 3 Snapshot/Event/Artifact/Verification/Conflict/Commit | system Edge E2E `2 passed (18.4s)`；覆盖主路径、发送前 abort/reload/同 key恢复、桌面/移动截图与被测 overflow/44px；SSE/响应丢失/PostgreSQL/用户研究仍待补 |
 | PR 5 | 顶部按独立传输状态显示已连接/中断，Task Bar 单独显示同步/对账；断线时保留 Snapshot 并禁用控制；Conflict/Artifact 共用 fail-closed source-ref 投影 | PostgreSQL TaskStore 恢复 v2/v3；历史 mutation result Snapshot；事件/工件唯一约束与 Commit 状态机 | 合并兼容回归：opt-in PostgreSQL system test `1 passed (9.78s)`，三个顺序 API 进程、两个演示轮次、原 Task 45 events/7 artifacts/1 commit；system Edge suite `3 passed (17.0s)`，另有基线同页断线/恢复五张截图；事件缺口/响应丢失/用户研究仍待补 |
 | PR 6 | 原基线实现 Task Director/Decision Inbox、历史版本与 Snapshot 单调应用；当前修订改为根路径业务任务、单次开始、具体决定后果和完成成果 | 复用现有 TaskSnapshot/Control；无 Task 空态为固定 Demo 模板副本；客户端拒绝低 version/sequence 或未覆盖 SSE floor 的 Snapshot；快速重复开始由 in-flight guard 收敛；没有 `conflict_id` 的 resolve 只开放每分支第一条 open conflict；只有 `waiting_input` 投影可操作冲突，终态优先；无任务 offline 在左右区域使用同一恢复事实 | 原基线 [`TASK-DIRECTOR-INTERACTION-DEMO1-PR6-20260811`](../evidence/DEMO1-PR6-TASK-DIRECTOR-INTERACTION-EVIDENCE.md) 为 `6 passed (34.5s)`；当前 Draft [`TASK-DIRECTOR-USABILITY-AUDIT-DEMO1-PR6-20260811`](../evidence/DEMO1-PR6-USABILITY-COMPREHENSION-AUDIT-20260811.md) 为 `12 passed (43.7s)`；工程代理通过不证明用户理解，5 人测试未运行 |
-| 当前后续修订（工程范围已验证，交互结论 Draft） | 非 Tasks 只保留后台摘要与跳转；来源明确标为演示数据且原始 ID 不入 DOM；终态入口为“开始新一轮汇报”并一键创建、启动独立 Task | 仍复用同一 TaskSnapshot、source_refs、创建/启动幂等协议；旧 Task 不 mutation，前端也不新增历史轮次选择事实 | 来源为 [`USER-FEEDBACK-20260811-ROUND-AND-SOURCE-03`](../sources/USER-FEEDBACK-20260811-05-source-labels-and-new-round.md)；独立工程证据为 [`TASK-DIRECTOR-ROUND-AND-SOURCE-CLARITY-20260811`](../evidence/DEMO1-ROUND-AND-SOURCE-CLARITY-EVIDENCE-20260811.md)，完整浏览器 E2E `12 passed (44.5s)`；历史 PR 6 evidence 未反写，自动化不证明用户理解 |
+| 2026-08-11 来源/新轮次修订（工程范围已验证，交互结论 Draft） | 非 Tasks 只保留后台摘要与跳转；来源明确标为演示数据且原始 ID 不入 DOM；终态入口为“开始新一轮汇报”并一键创建、启动独立 Task | 复用当时的 TaskSnapshot、source_refs、创建/启动幂等协议；旧 Task 不 mutation，前端也不新增历史轮次选择事实 | 来源为 [`USER-FEEDBACK-20260811-ROUND-AND-SOURCE-03`](../sources/USER-FEEDBACK-20260811-05-source-labels-and-new-round.md)；独立工程证据为 [`TASK-DIRECTOR-ROUND-AND-SOURCE-CLARITY-20260811`](../evidence/DEMO1-ROUND-AND-SOURCE-CLARITY-EVIDENCE-20260811.md)，完整浏览器 E2E `12 passed (44.5s)`；历史证据未反写，自动化不证明用户理解 |
+| DR-0009 Demo 1 渐进阶段（限定范围 Verified） | 新一轮 start 先显示 Observe，随后依次展示 Plan、Act、Verify；已完成阶段可回看，v6 只展开待决策材料，完成后显示三项成果 | `TaskSnapshot.stage_records`；`start` 到 v2，四次带版本和幂等键的 `advance` 到 v3-v6，resolve 到 v7；Plan/Act 只接受服务端批准文字；完整 Demo 契约含预算/截止时间 | [`DEMO1-PROGRESSIVE-STAGES-20260817`](../evidence/DEMO1-PROGRESSIVE-STAGES-EVIDENCE-20260817.md)：实现 `13c9c13`，Python `138 passed, 1 skipped`，完整浏览器 `35 passed`，渐进重复 `3 passed`，八张截图；不证明用户理解、后台无人值守、多实例 LLM 去重、模型质量或成本 |
 | DR-0006 报价修订（限定范围 Verified） | 当前行即时核算、指标区分、错误停算、待复核、版本/晚到结果冲突恢复与可追溯 Agent 回答 | Decimal/BigInt 同公式；Workspace Artifact/revision/request epoch；请求发送快照作为三方 base；服务端来源与字段所有权；Artifact/Thread 绑定 Action；严格收件人识别与确定性 unresolved-context deny；结果完成消息重放 | [`QUOTE-WORKSPACE-DETERMINISTIC-CALCULATION-EVIDENCE-20260811`](../evidence/QUOTE-WORKSPACE-DETERMINISTIC-CALCULATION-EVIDENCE-20260811.md)：提交 `2f9866f + fe865bd + e2c4b56`；Python `108 passed, 1 skipped (2.62s)`；聚焦 `54 passed (1.72s)`；报价浏览器 `15 passed (23.6s)`；完整浏览器 `27 passed (1.1m)`；不证明用户理解、真实 Connector/计价或多实例 CAS |
 | DR-0007 Task 工件动作桥（限定范围 Verified） | 完成态列出成果，当前已验证客户回复提供“准备发送”；Gate 显示绑定版本、演示目标、L4 风险、确认原因和拒绝后果 | TaskService 校验 Commit/ArtifactVersion/Verification；RunService 持久化并重校验 `TaskArtifactBinding`；Policy/Evidence/Approval/Permit/Gateway 延续 Demo 3 事实链 | [`TASK-ARTIFACT-ACTION-BRIDGE-20260813`](../evidence/DEMO1-DEMO3-TASK-ARTIFACT-ACTION-BRIDGE-EVIDENCE-20260813.md)：实现提交 `d827f29`、文档提交 `d1cc746`、PR #12；Python `112 passed, 1 skipped`；完整浏览器 `29 passed`；Ruff、lint、build 与治理测试通过；不证明真实发送、通用工件动作、跨重启 Run 幂等或用户价值 |
 | DR-0008 Demo 2 可解释 Admission（限定范围 Verified） | 四项固定演示任务的固定队列、路由解释与客户 A 仅本次模式选择；Adaptive Swarm 推荐/选择后保持 `execution_status=not_started` | 已实现 `WorkCockpitSnapshot(owner_id/backend/version/last_event_sequence/items)`、`RouteSelectionResult(cockpit_version/cockpit_last_event_sequence/item)` 与 WorkItem 路由事实；当前仅 memory | [`DEMO2-PR1-EXPLAINABLE-ADMISSION-EVIDENCE-20260817`](../evidence/DEMO2-PR1-EXPLAINABLE-ADMISSION-EVIDENCE-20260817.md)；聚焦 Python 6 passed、专用浏览器 5 passed、完整 Python 118 passed/1 skipped、完整浏览器 34 passed，Ruff/lint/build/diff-check 通过 | 只允许查看解释、接受推荐、选择其他允许模式或暂不选择；scope 为 `this_run`；不覆盖拖拽调序、长期偏好或执行 | 409 保留本地选择并 GET 对账；未知结果先 GET；memory 重启不恢复；预测标记 `fixture_policy_forecast` | 原始 Prompt、思维链、内部来源 ID、策略权重、Token、Permit、真实账单和未测量的节省/时延 |
