@@ -1,0 +1,11 @@
+{
+  "project_id": "PRJ-CUST-A-2026",
+  "account_id": "CUST-A-042",
+  "reporting_week": "2026-W34",
+  "status": "at_risk",
+  "milestone_variance_days": 7,
+  "risk_summary": "交付里程碑存在一周延期风险。",
+  "mitigation": "在下次周会确认资源补位与新的里程碑安排。",
+  "updated_at": "2026-08-18T17:45:00+08:00",
+  "owner_role": "交付项目经理"
+}

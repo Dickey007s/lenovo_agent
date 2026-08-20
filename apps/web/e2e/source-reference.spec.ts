@@ -7,7 +7,7 @@ import {
 
 test("Demo 1 source references use a fail-closed display allowlist", () => {
   expect(formatSourceReference("fixture:crm/customer-a:official-revenue-v3", 0))
-    .toBe("演示数据 · CRM 正式收入记录（v3）");
+    .toBe("演示文件 · crm/customer-a-revenue-close-v3.csv");
 
   const unsafeReferences = [
     "source:https://intranet.example/private",
@@ -31,10 +31,10 @@ test("Demo 1 source references use a fail-closed display allowlist", () => {
     ...unsafeReferences,
   ]);
   const serializedProjection = JSON.stringify(visibleProjection);
-  expect(serializedProjection).toContain("演示数据 · 客户往来邮件（2026-06-15）");
-  expect(serializedProjection).toContain("演示数据 · CRM 正式收入记录（v3）");
-  expect(serializedProjection).toContain("演示数据 · 收入预测表（v2）");
-  expect(serializedProjection).toContain("演示数据 · 客户项目周报（v5）");
+  expect(serializedProjection).toContain("演示文件 · mail/customer-a-status-request-2026-06-15.eml");
+  expect(serializedProjection).toContain("演示文件 · crm/customer-a-revenue-close-v3.csv");
+  expect(serializedProjection).toContain("演示文件 · forecast/customer-a-revenue-forecast-v2.csv");
+  expect(serializedProjection).toContain("演示文件 · project/customer-a-weekly-status-v5.json");
   expect(serializedProjection).not.toContain("fixture:");
   expect(serializedProjection).not.toContain("source:");
   expect(serializedProjection).not.toContain("document:");

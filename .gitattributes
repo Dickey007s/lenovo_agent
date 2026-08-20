@@ -2,3 +2,4 @@ docs/final-reference/*.md text eol=lf
 docs/final-reference/*.html text eol=lf
 docs/prototypes/*.html text eol=lf
 docs/final-reference/*.pptx binary
+demo-enterprise-data/** text eol=lf

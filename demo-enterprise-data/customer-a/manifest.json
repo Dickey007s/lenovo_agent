@@ -1,0 +1,74 @@
+{
+  "schema_version": "1.0",
+  "dataset_id": "customer-a-reporting-demo-20260820",
+  "content_nature": "project_generated_simulation",
+  "customer_label": "客户 A（演示企业）",
+  "public_basis": [
+    {
+      "source_id": "MICROSOFT-ADVENTUREWORKS-SCHEMA",
+      "url": "https://github.com/microsoft/sql-server-samples/tree/master/samples/databases/adventure-works",
+      "supports": "企业客户、销售、订单和财务记录的结构参考",
+      "limitation": "只借鉴公开样例结构；本目录未复制样例记录，也不代表真实企业数据"
+    },
+    {
+      "source_id": "MICROSOFT-POWERBI-CUSTOMER-PROFITABILITY",
+      "url": "https://learn.microsoft.com/en-us/power-bi/create-reports/sample-customer-profitability",
+      "supports": "客户收入、预算、利润与管理汇报的业务语义参考",
+      "limitation": "只用于场景设计依据；本目录内容由项目生成"
+    }
+  ],
+  "documents": [
+    {
+      "source_ref": "fixture:mail/customer-a:2026-06-15",
+      "document_id": "customer-request-2026-06-15",
+      "relative_path": "mail/customer-a-status-request-2026-06-15.eml",
+      "display_name": "客户经营汇报请求邮件",
+      "system_label": "企业邮件归档",
+      "semantic_type": "request_context",
+      "record_status": "已归档",
+      "recorded_at": "2026-06-15T09:12:00+08:00",
+      "owner_role": "客户经理",
+      "parser": "eml",
+      "sha256": "0f0da46c204f82eb3155660d4a0839227d4dbef5258cc145bc1c19783aa8c5f2"
+    },
+    {
+      "source_ref": "fixture:crm/customer-a:official-revenue-v3",
+      "document_id": "crm-revenue-close-v3",
+      "relative_path": "crm/customer-a-revenue-close-v3.csv",
+      "display_name": "客户收入月结记录",
+      "system_label": "CRM 月结档案",
+      "semantic_type": "historical_actual",
+      "record_status": "已关账",
+      "recorded_at": "2026-08-05T09:30:00+08:00",
+      "owner_role": "财务控制岗",
+      "parser": "crm_revenue_csv",
+      "sha256": "d49d186d9bcba18891eb8a26dd646fabb3f948ecf65fcff247d846b0be1459fb"
+    },
+    {
+      "source_ref": "fixture:forecast/customer-a:revenue-v2",
+      "document_id": "sales-revenue-forecast-v2",
+      "relative_path": "forecast/customer-a-revenue-forecast-v2.csv",
+      "display_name": "客户收入预测工作簿导出",
+      "system_label": "销售预测工作簿",
+      "semantic_type": "forecast",
+      "record_status": "预测中",
+      "recorded_at": "2026-08-18T15:20:00+08:00",
+      "owner_role": "客户经理",
+      "parser": "forecast_revenue_csv",
+      "sha256": "a69e47ab1bc181d492048aca0cfc93c5e0c26f8d8a1c47dc44fff2ae154eb268"
+    },
+    {
+      "source_ref": "fixture:project/customer-a:weekly-v5",
+      "document_id": "project-weekly-status-v5",
+      "relative_path": "project/customer-a-weekly-status-v5.json",
+      "display_name": "客户项目周报",
+      "system_label": "项目交付台账",
+      "semantic_type": "project_risk",
+      "record_status": "风险跟踪中",
+      "recorded_at": "2026-08-18T17:45:00+08:00",
+      "owner_role": "交付项目经理",
+      "parser": "project_status_json",
+      "sha256": "0b91166767f5aecd45492813ff39fbafd5b0311f546d8bf0a83fc457bbbdf9cd"
+    }
+  ]
+}

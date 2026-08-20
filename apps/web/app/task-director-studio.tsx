@@ -37,6 +37,7 @@ import type {
   TaskPhase,
   TaskStageRecord,
   TaskSnapshot,
+  TaskSourceDocument,
   VerificationReport,
 } from "./task-types";
 
@@ -601,6 +602,89 @@ function PhaseRail({
         );
       })}
     </ol>
+  );
+}
+
+function formatRecordedAt(value: string) {
+  const date = new Date(value);
+  return Number.isNaN(date.getTime())
+    ? "记录时间待确认"
+    : date.toLocaleString("zh-CN", {
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    });
+}
+
+function sourceDocumentsFor(task: TaskSnapshot, sourceRefs: string[]): TaskSourceDocument[] {
+  const allowed = new Set(sourceRefs);
+  return (task.source_documents ?? []).filter((document) => allowed.has(document.source_ref));
+}
+
+function ConflictFileEvidence({ task, conflict }: { task: TaskSnapshot; conflict: ConflictRecord }) {
+  const documents = sourceDocumentsFor(task, conflict.source_refs);
+
+  if (documents.length === 0) {
+    return (
+      <details className="task-decision-source-fallback">
+        <summary>查看演示数据来源</summary>
+        <ul>
+          {projectSourceReferences(conflict.source_refs).map((source) => (
+            <li key={source.key}>{source.label}</li>
+          ))}
+        </ul>
+      </details>
+    );
+  }
+
+  return (
+    <section className="task-decision-files" aria-label="冲突文件证据">
+      <header>
+        <div>
+          <span>冲突来自哪两份记录</span>
+          <strong>演示资料夹中的文件事实</strong>
+        </div>
+        <small>项目生成仿真数据</small>
+      </header>
+      <div className="task-decision-file-grid">
+        {documents.map((document) => (
+          <article className={`task-decision-file is-${document.semantic_type}`} key={document.document_id}>
+            <header>
+              <IconFileDescription aria-hidden="true" />
+              <div>
+                <strong>{document.display_name}</strong>
+                <span>{document.record_status}</span>
+              </div>
+            </header>
+            <p>{document.relative_path}</p>
+            <dl>
+              <div>
+                <dt>业务系统</dt>
+                <dd>{document.system_label}</dd>
+              </div>
+              <div>
+                <dt>形成时间</dt>
+                <dd>{formatRecordedAt(document.recorded_at)}</dd>
+              </div>
+              <div>
+                <dt>负责人</dt>
+                <dd>{document.owner_role}</dd>
+              </div>
+            </dl>
+            <ul>
+              {document.facts.map((fact) => (
+                <li key={fact.field}>
+                  <span>{fact.label}</span>
+                  <strong>{fact.display_value}</strong>
+                </li>
+              ))}
+            </ul>
+          </article>
+        ))}
+      </div>
+    </section>
   );
 }
 
@@ -1555,6 +1639,29 @@ export function TaskDecisionPane({
                   </header>
                   <h4>{conflict.subject}</h4>
                   <p>{conflict.summary}</p>
+                  {conflict.operation_context && (
+                    <section className="task-decision-operation">
+                      <div>
+                        <span>当前操作</span>
+                        <strong>{conflict.operation_context.operation_label}</strong>
+                      </div>
+                      <dl>
+                        <div>
+                          <dt>准备写入</dt>
+                          <dd>{conflict.operation_context.target_field}</dd>
+                        </div>
+                        <div>
+                          <dt>当前取值</dt>
+                          <dd>{conflict.operation_context.attempted_value}</dd>
+                        </div>
+                        <div>
+                          <dt>取自字段</dt>
+                          <dd>{conflict.operation_context.attempted_source_field}</dd>
+                        </div>
+                      </dl>
+                      <p>{conflict.operation_context.mismatch_reason}</p>
+                    </section>
+                  )}
                   <section className="task-decision-why">
                     <strong>为什么需要你</strong>
                     <p>{decisionReason}</p>
@@ -1567,14 +1674,7 @@ export function TaskDecisionPane({
                       </div>
                     ))}
                   </dl>
-                  <details>
-                    <summary>查看演示数据来源</summary>
-                    <ul>
-                      {projectSourceReferences(conflict.source_refs).map((source) => (
-                        <li key={source.key}>{source.label}</li>
-                      ))}
-                    </ul>
-                  </details>
+                  {task && <ConflictFileEvidence task={task} conflict={conflict} />}
                   {resolutionOption ? (
                     <TaskImpactPreview conflict={conflict} option={resolutionOption} />
                   ) : (

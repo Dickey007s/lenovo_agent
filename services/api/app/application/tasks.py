@@ -6,6 +6,7 @@ import logging
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from decimal import Decimal, ROUND_HALF_UP
 from time import monotonic
 from typing import Any
 from uuid import uuid4
@@ -14,6 +15,7 @@ from packages.contracts import (
     ArtifactVersion,
     BranchSnapshot,
     ConflictRecord,
+    ConflictOperationContext,
     ConflictResolutionOption,
     ControlEvent,
     DeliverableSpec,
@@ -34,6 +36,7 @@ from packages.contracts import (
     TaskStageRecord,
     TaskStage,
     TaskStageProcessing,
+    TaskSourceDocument,
     VerificationCheck,
     VerificationReport,
 )
@@ -54,6 +57,14 @@ from services.api.app.application.task_stage_agent import (
     TaskStagePlanRequest,
     TaskStageSourceAlias,
     TaskStageTrustedFact,
+)
+from services.api.app.application.demo_source_catalog import (
+    DEMO1_FORECAST_REVENUE_SOURCE,
+    DEMO1_MAIL_SOURCE,
+    DEMO1_OFFICIAL_REVENUE_SOURCE,
+    DEMO1_PROJECT_SOURCE,
+    DemoSourceCatalog,
+    DemoSourceError,
 )
 
 
@@ -118,10 +129,10 @@ def demo1_contract_draft() -> TaskContractDraft:
         title="客户 A 经营汇报",
         objective="形成带来源、版本和验证记录的经营分析、风险页和客户回复草稿。",
         source_scope=[
-            "fixture:mail/customer-a:2026-06-15",
-            "fixture:crm/customer-a:official-revenue-v3",
-            "fixture:forecast/customer-a:revenue-v2",
-            "fixture:project/customer-a:weekly-v5",
+            DEMO1_MAIL_SOURCE,
+            DEMO1_OFFICIAL_REVENUE_SOURCE,
+            DEMO1_FORECAST_REVENUE_SOURCE,
+            DEMO1_PROJECT_SOURCE,
         ],
         allowed_capabilities=[
             "mail.search",
@@ -174,12 +185,14 @@ class TaskService:
         store: TaskStore,
         poll_interval_seconds: float = 0.5,
         stage_agent: TaskStageAgent | None = None,
+        source_catalog: DemoSourceCatalog | None = None,
     ) -> None:
         self.store = store
         self.poll_interval_seconds = poll_interval_seconds
         # Library callers and tests must remain offline and deterministic. The
         # application entrypoint may explicitly inject the model-backed agent.
         self.stage_agent = stage_agent or DeterministicTaskStageAgent()
+        self.source_catalog = source_catalog or DemoSourceCatalog()
         # Prevent duplicate paid model calls for concurrent retries carrying
         # the same mutation key. Store CAS remains the cross-process guard.
         self._advance_locks: dict[tuple[str, str], asyncio.Lock] = {}
@@ -190,7 +203,10 @@ class TaskService:
         owner_id: str,
         *,
         idempotency_key: str | None = None,
+        source_documents: list[TaskSourceDocument] | None = None,
     ) -> TaskSnapshot:
+        if source_documents is None and draft == demo1_contract_draft():
+            source_documents = list(self._load_demo1_sources().documents)
         now = datetime.now(UTC)
         task_id = self._task_id(owner_id, idempotency_key)
         trace_id = f"task_trace_{uuid4().hex}"
@@ -218,6 +234,7 @@ class TaskService:
             owner_id=owner_id,
             contract=contract,
             branches=branches,
+            source_documents=source_documents or [],
             last_event_sequence=1,
             created_at=now,
             updated_at=now,
@@ -236,6 +253,13 @@ class TaskService:
                 "contract_version": contract.contract_version,
                 "deliverable_ids": [item.deliverable_id for item in contract.deliverables],
                 "contract_digest": canonical_hash(contract),
+                "source_document_digests": [
+                    {
+                        "document_id": item.document_id,
+                        "content_digest": item.content_digest,
+                    }
+                    for item in snapshot.source_documents
+                ],
             },
             occurred_at=now,
         )
@@ -259,10 +283,12 @@ class TaskService:
         *,
         idempotency_key: str | None = None,
     ) -> TaskSnapshot:
+        package = self._load_demo1_sources()
         return await self.create(
             demo1_contract_draft(),
             owner_id,
             idempotency_key=idempotency_key or f"demo1-customer-a:{owner_id}",
+            source_documents=list(package.documents),
         )
 
     async def get_committed_artifact(
@@ -351,6 +377,7 @@ class TaskService:
         if current.status != "ready" or current.phase != "contract":
             raise TaskTransitionError("任务只能从 ready / contract 启动")
         self._require_demo1_stage_contract(current)
+        self._require_demo1_sources_unchanged(current)
         self._require_execution_window(
             current,
             additional_steps=1,
@@ -365,7 +392,7 @@ class TaskService:
             summary="正在读取本轮允许资料",
             detail={
                 "source_count": len(current.contract.source_scope),
-                "source_labels": self._demo1_source_labels(),
+                "source_labels": self._demo1_source_labels(current),
             },
             generation_source="deterministic",
             processing=TaskStageProcessing(
@@ -468,6 +495,7 @@ class TaskService:
             raise TaskTransitionError("当前任务阶段不能推进")
 
         try:
+            self._require_demo1_sources_unchanged(current)
             if current.phase == "observe":
                 self._require_execution_window(
                     current,
@@ -630,6 +658,7 @@ class TaskService:
         current = await self.get(task_id, owner_id)
         self._require_version(current, command.expected_task_version)
         if command.kind == "resolve_evidence":
+            self._require_demo1_sources_unchanged(current)
             self._require_execution_window(
                 current,
                 additional_steps=1,
@@ -703,26 +732,88 @@ class TaskService:
             or current.contract.deadline_at != expected.deadline_at
         ):
             raise TaskTransitionError("当前渐进阶段只支持固定 Demo 1 契约与来源范围")
+        if {item.source_ref for item in current.source_documents} != set(
+            expected.source_scope
+        ):
+            raise TaskTransitionError("当前 Demo 1 任务缺少已冻结的文件来源快照")
+
+    def _load_demo1_sources(self):
+        try:
+            return self.source_catalog.load_demo1()
+        except DemoSourceError as exc:
+            raise TaskTransitionError(
+                "演示资料包不可用，任务没有读取或猜测任何业务数据"
+            ) from exc
+
+    def _require_demo1_sources_unchanged(self, current: TaskSnapshot) -> None:
+        self._require_demo1_stage_contract(current)
+        try:
+            self.source_catalog.require_unchanged(current.source_documents)
+        except DemoSourceError as exc:
+            raise TaskTransitionError(
+                "演示资料文件已变化或校验失败，请基于当前文件开始新一轮任务"
+            ) from exc
 
     @staticmethod
-    def _demo1_source_labels() -> list[str]:
+    def _demo1_document(current: TaskSnapshot, source_ref: str) -> TaskSourceDocument:
+        for document in current.source_documents:
+            if document.source_ref == source_ref:
+                return document
+        raise TaskTransitionError("任务来源快照缺少契约要求的演示文件")
+
+    @classmethod
+    def _demo1_fact(cls, current: TaskSnapshot, source_ref: str, field: str) -> str:
+        document = cls._demo1_document(current, source_ref)
+        for fact in document.facts:
+            if fact.field == field:
+                return fact.value
+        raise TaskTransitionError("任务来源快照缺少运行所需业务字段")
+
+    @classmethod
+    def _demo1_amounts(cls, current: TaskSnapshot) -> tuple[int, int, int, Decimal]:
+        try:
+            official = int(
+                cls._demo1_fact(
+                    current, DEMO1_OFFICIAL_REVENUE_SOURCE, "recognized_revenue"
+                )
+            )
+            forecast = int(
+                cls._demo1_fact(
+                    current, DEMO1_FORECAST_REVENUE_SOURCE, "forecast_revenue"
+                )
+            )
+        except ValueError as exc:
+            raise TaskTransitionError("任务来源快照中的收入金额无效") from exc
+        if official <= 0 or forecast <= 0:
+            raise TaskTransitionError("任务来源快照中的收入金额必须为正数")
+        delta = forecast - official
+        if delta <= 0:
+            raise TaskTransitionError("Demo 1 文件场景要求预测收入高于已关账收入")
+        delta_percent = (Decimal(delta) * Decimal(100) / Decimal(official)).quantize(
+            Decimal("0.1"), rounding=ROUND_HALF_UP
+        )
+        return official, forecast, delta, delta_percent
+
+    @classmethod
+    def _demo1_source_labels(cls, current: TaskSnapshot) -> list[str]:
         return [
-            "客户来信（演示数据）",
-            "CRM 正式经营口径（演示数据）",
-            "预测收入表（演示数据）",
-            "项目周报（演示数据）",
+            f"{cls._demo1_document(current, source_ref).display_name}（演示文件）"
+            for source_ref in current.contract.source_scope
         ]
 
-    @staticmethod
-    def _demo1_resolution_options() -> list[ConflictResolutionOption]:
+    @classmethod
+    def _demo1_resolution_options(
+        cls, current: TaskSnapshot
+    ) -> list[ConflictResolutionOption]:
         """Return the only server-approved resolution exposed by Demo 1."""
+        official, _, _, _ = cls._demo1_amounts(current)
         return [
             ConflictResolutionOption(
                 option_id="use-official-crm-revenue",
                 kind="select_source",
                 label="采用 CRM 正式口径",
-                description="经营分析使用 CRM 正式收入 2400 万元，并保留预测值作为差异说明。",
-                selected_source_ref="fixture:crm/customer-a:official-revenue-v3",
+                description=f"经营分析使用已关账收入 {official} 万元，并保留预测值作为差异说明。",
+                selected_source_ref=DEMO1_OFFICIAL_REVENUE_SOURCE,
                 expected_impact=ResolutionImpact(
                     task_status="committed",
                     task_phase="commit",
@@ -737,7 +828,7 @@ class TaskService:
                             change_kind="will_change",
                             label="经营分析",
                             before="待确认正式口径",
-                            after="CRM 正式收入 2400 万元，并保留预测差异",
+                            after=f"已关账收入 {official} 万元，并保留预测差异",
                             deliverable_ids=["operating-analysis"],
                         ),
                         ImpactChange(
@@ -840,9 +931,9 @@ class TaskService:
             )
             for item in current.contract.deliverables
         ]
-        # Keep internal fixture references on the server. The model only sees
-        # stable business labels and the trusted facts below refer to aliases.
-        business_labels = TaskService._demo1_source_labels()
+        # Keep internal source references on the server. The model only sees
+        # bounded file labels and trusted facts parsed from the frozen snapshot.
+        business_labels = TaskService._demo1_source_labels(current)
         aliases = [
             TaskStageSourceAlias(
                 alias=f"source_{index}",
@@ -852,11 +943,43 @@ class TaskService:
         ]
         facts: list[TaskStageTrustedFact] = []
         if len(aliases) >= 2:
-            facts.append(TaskStageTrustedFact(fact_key="official_revenue_wan", source_alias="source_2", value=2400))
+            facts.append(
+                TaskStageTrustedFact(
+                    fact_key="official_revenue_wan",
+                    source_alias="source_2",
+                    value=int(
+                        TaskService._demo1_fact(
+                            current,
+                            DEMO1_OFFICIAL_REVENUE_SOURCE,
+                            "recognized_revenue",
+                        )
+                    ),
+                )
+            )
         if len(aliases) >= 3:
-            facts.append(TaskStageTrustedFact(fact_key="forecast_revenue_wan", source_alias="source_3", value=2680))
+            facts.append(
+                TaskStageTrustedFact(
+                    fact_key="forecast_revenue_wan",
+                    source_alias="source_3",
+                    value=int(
+                        TaskService._demo1_fact(
+                            current,
+                            DEMO1_FORECAST_REVENUE_SOURCE,
+                            "forecast_revenue",
+                        )
+                    ),
+                )
+            )
         if len(aliases) >= 4:
-            facts.append(TaskStageTrustedFact(fact_key="project_risk", source_alias="source_4", value="里程碑存在一周延期风险"))
+            facts.append(
+                TaskStageTrustedFact(
+                    fact_key="project_risk",
+                    source_alias="source_4",
+                    value=TaskService._demo1_fact(
+                        current, DEMO1_PROJECT_SOURCE, "risk_summary"
+                    ),
+                )
+            )
         return contract, deliverables, aliases, facts
 
     @classmethod
@@ -915,7 +1038,7 @@ class TaskService:
                 "summary": "已读取本轮允许资料",
                 "detail": {
                     "source_count": len(current.contract.source_scope),
-                    "source_labels": self._demo1_source_labels(),
+                    "source_labels": self._demo1_source_labels(current),
                 },
                 "processing": processing,
                 "completed_at": now,
@@ -1029,10 +1152,14 @@ class TaskService:
         processing: TaskStageProcessing | None = None,
     ) -> tuple[TaskSnapshot, list[ArtifactVersion], list[TaskEventSpec]]:
         now = datetime.now(UTC)
+        official, forecast, _, _ = self._demo1_amounts(current)
         source_refs = {
-            "operating-analysis": ["fixture:crm/customer-a:official-revenue-v3", "fixture:forecast/customer-a:revenue-v2"],
-            "risk-brief": ["fixture:project/customer-a:weekly-v5"],
-            "reply-draft": ["fixture:mail/customer-a:2026-06-15", "fixture:project/customer-a:weekly-v5"],
+            "operating-analysis": [
+                DEMO1_OFFICIAL_REVENUE_SOURCE,
+                DEMO1_FORECAST_REVENUE_SOURCE,
+            ],
+            "risk-brief": [DEMO1_PROJECT_SOURCE],
+            "reply-draft": [DEMO1_MAIL_SOURCE, DEMO1_PROJECT_SOURCE],
         }
         artifacts: list[ArtifactVersion] = []
         for branch in current.branches:
@@ -1040,8 +1167,8 @@ class TaskService:
             if deliverable_id == "operating-analysis":
                 content = {
                     "customer": "客户 A",
-                    "official_revenue_wan": 2400,
-                    "forecast_revenue_wan": 2680,
+                    "official_revenue_wan": official,
+                    "forecast_revenue_wan": forecast,
                     "selected_revenue_wan": None,
                     "revenue_basis": "待确认正式口径",
                     "summary": "正式 CRM 与预测表存在收入口径冲突，需人工选择依据。",
@@ -1143,6 +1270,7 @@ class TaskService:
         self, current: TaskSnapshot, *, processing: TaskStageProcessing | None = None
     ) -> tuple[TaskSnapshot, list[ArtifactVersion], list[TaskEventSpec]]:
         now = datetime.now(UTC)
+        official, forecast, delta, _ = self._demo1_amounts(current)
         candidates = {
             item.deliverable_id: item
             for item in current.artifact_versions
@@ -1160,17 +1288,33 @@ class TaskService:
             task_id=current.task_id,
             branch_id=operating.branch_id,
             subject="客户 A 收入口径",
-            summary="CRM 正式口径为 2400 万元，预测表为 2680 万元。最终汇报必须选择并记录正式依据。",
-            source_refs=["fixture:crm/customer-a:official-revenue-v3", "fixture:forecast/customer-a:revenue-v2"],
-            candidate_values=["2400 万元（CRM 正式口径）", "2680 万元（预测口径）"],
-            resolution_options=self._demo1_resolution_options(),
+            summary=(
+                f"已关账文件记录 {official} 万元，销售预测文件记录 {forecast} 万元。"
+                "当前草稿不能把预测收入写成已实现收入。"
+            ),
+            source_refs=[
+                DEMO1_OFFICIAL_REVENUE_SOURCE,
+                DEMO1_FORECAST_REVENUE_SOURCE,
+            ],
+            candidate_values=[
+                f"{official} 万元（已关账收入）",
+                f"{forecast} 万元（销售预测）",
+            ],
+            operation_context=ConflictOperationContext(
+                operation_label="生成经营分析",
+                target_field="经营分析.已实现收入",
+                attempted_value=f"{forecast} 万元",
+                attempted_source_field="forecast_revenue",
+                mismatch_reason="当前操作正尝试把预测字段写入已实现收入；两份文件的时间状态和字段语义不同。",
+            ),
+            resolution_options=self._demo1_resolution_options(current),
             opened_at=now,
         )
         reports = [
             VerificationReport(
                 report_id=f"task_verify_{uuid4().hex}", task_id=current.task_id, branch_id=operating.branch_id,
                 artifact_version_id=candidates["operating-analysis"].artifact_version_id, status="conflict",
-                checks=[VerificationCheck(check_id=f"task_check_{uuid4().hex}", label="收入来源一致性", status="conflict", detail="正式 CRM 与预测表相差 280 万元，不能自动选择最终口径。", source_refs=conflict.source_refs)], checked_at=now,
+                checks=[VerificationCheck(check_id=f"task_check_{uuid4().hex}", label="收入来源一致性", status="conflict", detail=f"已关账收入与销售预测相差 {delta} 万元，而且字段语义不同，不能自动写入最终口径。", source_refs=conflict.source_refs)], checked_at=now,
             ),
             VerificationReport(
                 report_id=f"task_verify_{uuid4().hex}", task_id=current.task_id, branch_id=risk.branch_id,
@@ -1274,14 +1418,21 @@ class TaskService:
         self, current: TaskSnapshot
     ) -> tuple[TaskSnapshot, list[ArtifactVersion], list[TaskEventSpec]]:
         now = datetime.now(UTC)
+        official, forecast, delta, _ = self._demo1_amounts(current)
+        project_risk = self._demo1_fact(
+            current, DEMO1_PROJECT_SOURCE, "risk_summary"
+        )
+        project_mitigation = self._demo1_fact(
+            current, DEMO1_PROJECT_SOURCE, "mitigation"
+        )
         operating_branch = self._branch_for(current, "operating-analysis")
         risk_branch = self._branch_for(current, "risk-brief")
         reply_branch = self._branch_for(current, "reply-draft")
 
         operating_content = {
             "customer": "客户 A",
-            "official_revenue_wan": 2400,
-            "forecast_revenue_wan": 2680,
+            "official_revenue_wan": official,
+            "forecast_revenue_wan": forecast,
             "selected_revenue_wan": None,
             "revenue_basis": "待确认正式口径",
             "summary": "正式 CRM 与预测表存在收入口径冲突，需人工选择依据。",
@@ -1291,8 +1442,8 @@ class TaskService:
             "risks": [
                 {
                     "level": "medium",
-                    "summary": "项目周报显示交付里程碑存在一周延期风险。",
-                    "mitigation": "在下次周会确认资源补位与新里程碑。",
+                    "summary": project_risk,
+                    "mitigation": project_mitigation,
                 }
             ],
         }
@@ -1310,8 +1461,8 @@ class TaskService:
             "candidate",
             operating_content,
             [
-                "fixture:crm/customer-a:official-revenue-v3",
-                "fixture:forecast/customer-a:revenue-v2",
+                DEMO1_OFFICIAL_REVENUE_SOURCE,
+                DEMO1_FORECAST_REVENUE_SOURCE,
             ],
             now,
         )
@@ -1322,7 +1473,7 @@ class TaskService:
             1,
             "candidate",
             risk_content,
-            ["fixture:project/customer-a:weekly-v5"],
+            [DEMO1_PROJECT_SOURCE],
             now,
         )
         reply_candidate = self._new_artifact(
@@ -1333,8 +1484,8 @@ class TaskService:
             "candidate",
             reply_content,
             [
-                "fixture:mail/customer-a:2026-06-15",
-                "fixture:project/customer-a:weekly-v5",
+                DEMO1_MAIL_SOURCE,
+                DEMO1_PROJECT_SOURCE,
             ],
             now,
         )
@@ -1375,13 +1526,26 @@ class TaskService:
             task_id=current.task_id,
             branch_id=operating_branch.branch_id,
             subject="客户 A 收入口径",
-            summary="CRM 正式口径为 2400 万元，预测表为 2680 万元。最终汇报必须选择并记录正式依据。",
+            summary=(
+                f"已关账文件记录 {official} 万元，销售预测文件记录 {forecast} 万元。"
+                "当前草稿不能把预测收入写成已实现收入。"
+            ),
             source_refs=[
-                "fixture:crm/customer-a:official-revenue-v3",
-                "fixture:forecast/customer-a:revenue-v2",
+                DEMO1_OFFICIAL_REVENUE_SOURCE,
+                DEMO1_FORECAST_REVENUE_SOURCE,
             ],
-            candidate_values=["2400 万元（CRM 正式口径）", "2680 万元（预测口径）"],
-            resolution_options=self._demo1_resolution_options(),
+            candidate_values=[
+                f"{official} 万元（已关账收入）",
+                f"{forecast} 万元（销售预测）",
+            ],
+            operation_context=ConflictOperationContext(
+                operation_label="生成经营分析",
+                target_field="经营分析.已实现收入",
+                attempted_value=f"{forecast} 万元",
+                attempted_source_field="forecast_revenue",
+                mismatch_reason="当前操作正尝试把预测字段写入已实现收入；两份文件的时间状态和字段语义不同。",
+            ),
+            resolution_options=self._demo1_resolution_options(current),
             opened_at=now,
         )
         operating_report = VerificationReport(
@@ -1395,7 +1559,7 @@ class TaskService:
                     check_id=f"task_check_{uuid4().hex}",
                     label="收入来源一致性",
                     status="conflict",
-                    detail="正式 CRM 与预测表相差 280 万元，不能自动选择最终口径。",
+                    detail=f"已关账收入与销售预测相差 {delta} 万元，而且字段语义不同，不能自动写入最终口径。",
                     source_refs=conflict.source_refs,
                 )
             ],
@@ -1673,7 +1837,7 @@ class TaskService:
             )
             if selected_option is None or not selected_option.executable:
                 raise TaskTransitionError("选择的解决方案不是服务端允许的可执行选项")
-        official_source = "fixture:crm/customer-a:official-revenue-v3"
+        official_source = DEMO1_OFFICIAL_REVENUE_SOURCE
         if command.selected_source_ref != official_source:
             raise TaskTransitionError("当前任务契约要求采用 CRM 正式收入口径")
         if selected_option is not None and selected_option.selected_source_ref != command.selected_source_ref:
@@ -1695,13 +1859,18 @@ class TaskService:
             raise TaskTransitionError("冲突分支缺少候选工件")
 
         now = datetime.now(UTC)
+        official, forecast, delta, delta_percent = self._demo1_amounts(current)
+        delta_percent_number = float(delta_percent)
         content = {
             **candidate.content,
-            "selected_revenue_wan": 2400,
+            "selected_revenue_wan": official,
             "revenue_basis": "CRM 正式口径",
-            "forecast_delta_wan": 280,
-            "forecast_delta_percent": 11.7,
-            "summary": "汇报采用 CRM 正式收入 2400 万元，并保留预测值 2680 万元及 11.7% 差异说明。",
+            "forecast_delta_wan": delta,
+            "forecast_delta_percent": delta_percent_number,
+            "summary": (
+                f"汇报采用已关账收入 {official} 万元，并保留销售预测 {forecast} 万元"
+                f"及 {delta_percent}% 差异说明。"
+            ),
         }
         verified = self._new_artifact(
             current,
@@ -1735,7 +1904,10 @@ class TaskService:
         resolved_conflict = conflict.model_copy(
             update={
                 "status": "resolved",
-                "resolution": "采用 CRM 正式收入 2400 万元；预测 2680 万元作为差异说明保留。",
+                "resolution": (
+                    f"采用已关账收入 {official} 万元；销售预测 {forecast} 万元"
+                    "作为差异说明保留。"
+                ),
                 "resolved_at": now,
             }
         )
@@ -1821,7 +1993,7 @@ class TaskService:
                                 change_kind="will_change",
                                 label="经营分析",
                                 before="待确认正式口径",
-                                after="已采用 CRM 正式收入 2400 万元",
+                                after=f"已采用已关账收入 {official} 万元",
                                 deliverable_ids=[deliverable_id],
                                 artifact_version_ids=[verified.artifact_version_id],
                             ),
@@ -1948,14 +2120,14 @@ class TaskService:
         reply_content = {
             **reply_head.content,
             "body": (
-                "已完成经营资料核对。正式收入采用 CRM 口径 2400 万元；"
-                "预测值为 2680 万元，差异 280 万元（11.7%）。"
+                f"已完成经营资料核对。已实现收入采用已关账口径 {official} 万元；"
+                f"销售预测为 {forecast} 万元，差异 {delta} 万元（{delta_percent}%）。"
                 "项目风险与后续安排已更新，当前仅保留为客户回复草稿。"
             ),
-            "official_revenue_wan": 2400,
-            "forecast_revenue_wan": 2680,
-            "forecast_delta_wan": 280,
-            "forecast_delta_percent": 11.7,
+            "official_revenue_wan": official,
+            "forecast_revenue_wan": forecast,
+            "forecast_delta_wan": delta,
+            "forecast_delta_percent": delta_percent_number,
             "revenue_basis": "CRM 正式口径",
             "send_status": "draft_only",
         }
@@ -1983,8 +2155,8 @@ class TaskService:
                     label="回复与正式经营事实一致",
                     status="passed",
                     detail=(
-                        "回复已按正式 CRM 收入 2400 万元重生成，并保留"
-                        "预测 2680 万元及 11.7% 差异说明。"
+                        f"回复已按已关账收入 {official} 万元重生成，并保留"
+                        f"销售预测 {forecast} 万元及 {delta_percent}% 差异说明。"
                     ),
                     source_refs=verified.source_refs,
                 ),
@@ -2089,6 +2261,12 @@ class TaskService:
                 "task_id": current.task_id,
                 "task_version": next_version,
                 "contract_digest": canonical_hash(current.contract),
+                "source_documents": [
+                    item.model_dump(mode="json")
+                    for item in sorted(
+                        current.source_documents, key=lambda item: item.source_ref
+                    )
+                ],
                 "artifact_heads": sorted(
                     state_artifacts,
                     key=lambda item: (item["branch_id"], item["deliverable_id"]),
@@ -2127,7 +2305,7 @@ class TaskService:
                             change_kind="will_change",
                             label="经营分析",
                             before="待确认正式口径",
-                            after="采用 CRM 正式收入 2400 万元，并保留预测差异",
+                            after=f"采用已关账收入 {official} 万元，并保留预测差异",
                             deliverable_ids=[deliverable_id],
                             artifact_version_ids=[verified.artifact_version_id],
                         ),

@@ -1,8 +1,8 @@
 const DEMO1_VISIBLE_SOURCE_REFERENCES: Record<string, string> = {
-  "fixture:mail/customer-a:2026-06-15": "演示数据 · 客户往来邮件（2026-06-15）",
-  "fixture:crm/customer-a:official-revenue-v3": "演示数据 · CRM 正式收入记录（v3）",
-  "fixture:forecast/customer-a:revenue-v2": "演示数据 · 收入预测表（v2）",
-  "fixture:project/customer-a:weekly-v5": "演示数据 · 客户项目周报（v5）",
+  "fixture:mail/customer-a:2026-06-15": "演示文件 · mail/customer-a-status-request-2026-06-15.eml",
+  "fixture:crm/customer-a:official-revenue-v3": "演示文件 · crm/customer-a-revenue-close-v3.csv",
+  "fixture:forecast/customer-a:revenue-v2": "演示文件 · forecast/customer-a-revenue-forecast-v2.csv",
+  "fixture:project/customer-a:weekly-v5": "演示文件 · project/customer-a-weekly-status-v5.json",
 };
 
 export type VisibleSourceReference = {
