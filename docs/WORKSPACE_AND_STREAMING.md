@@ -257,3 +257,9 @@ Action Gate 在创建 Run 后先展示服务端 `impact_preview`，并在 Run �
 Run SSE 的 `RUN_CREATED`、`EVIDENCE_SUBMITTED`、`CONTROL_PLAN_UPDATED`、`APPROVAL_RECORDED`、`PERMIT_ISSUED`、`TOOL_EXECUTED`、`ACTION_INVALIDATED`、`TAMPER_BLOCKED` 和终态事件是唯一时序事实；前端收到事件后必须以 `GET /runs/{run_id}` 的完整 Snapshot 对账。结果未知时显示“结果待确认”，不得由动画、按钮或本地状态宣告执行成功。
 
 桌面 Action Gate 的主按钮按阶段显示“提交依据 / 批准 / 确认执行”，移动端保持同一顺序并保证触控尺寸。确认前不得写成“已发送”；Simulator 成功只显示“模拟器已返回结果”，不显示真实邮箱、CRM、OA 或日历写入。拒绝、失效、篡改和失败需明确反馈且保留 Task Commit 不变。当前验证为固定 Demo 3 工程路径；断线/跨进程对账、真实 Connector、生产身份和用户理解仍待独立证据。
+
+## 12. 处理来源与真实等待
+
+Conversation 回答在 `message.started/message.completed` 中携带相同的 `processing`：确定性报价为 `deterministic_formula`，通用回答或业务规划为 `language_model`，确定性动作回执可为 `policy_engine`。右侧消息完成后保留“处理来源 + 真实耗时”；真实模型请求等待期间显示配置模型名，确定性路径明确“未调用大模型”。该元数据不暴露 Prompt、思维链、Token、Key 或供应商原始响应。
+
+Demo 2 路由按钮只写入服务端选择，因此命名为“记录本轮方式”，并明确规则路由不调用模型、不会启动协作。系统禁止用固定 sleep 伪造模型思考；毫秒级公式/规则应立即完成，模型路径的等待和耗时必须来自真实调用。

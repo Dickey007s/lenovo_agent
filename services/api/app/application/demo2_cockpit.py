@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 from dataclasses import dataclass
+from time import perf_counter
 
 from packages.contracts import (
     AdmissionForecast,
@@ -18,6 +20,9 @@ from packages.contracts import (
     WorkItemSnapshot,
 )
 from packages.contracts.hashing import canonical_hash
+
+
+runtime_logger = logging.getLogger("uvicorn.error")
 
 
 class Demo2NotFoundError(LookupError):
@@ -66,6 +71,7 @@ class Demo2CockpitService:
         owner_id: str,
         request: RouteSelectionRequest,
     ) -> RouteSelectionResult:
+        started_at = perf_counter()
         command_digest = canonical_hash(
             {
                 "operation": "demo2_route_selection",
@@ -81,6 +87,11 @@ class Demo2CockpitService:
             if replay is not None:
                 if replay.command_digest != command_digest:
                     raise Demo2ConflictError("幂等键已用于不同路由命令")
+                runtime_logger.info(
+                    "demo2_route_selection path=policy_engine model_called=false elapsed_ms=%d replay=true work_item_id=%s",
+                    max(0, round((perf_counter() - started_at) * 1000)),
+                    work_item_id,
+                )
                 return replay.result.model_copy(deep=True)
 
             cockpit = self._cockpits.setdefault(owner_id, self._new_cockpit(owner_id))
@@ -193,6 +204,11 @@ class Demo2CockpitService:
                 item=updated,
             )
             self._idempotent[key] = _IdempotentResult(command_digest, result)
+            runtime_logger.info(
+                "demo2_route_selection path=policy_engine model_called=false elapsed_ms=%d replay=false work_item_id=%s",
+                max(0, round((perf_counter() - started_at) * 1000)),
+                work_item_id,
+            )
             return result.model_copy(deep=True)
 
     @classmethod

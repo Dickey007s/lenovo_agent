@@ -665,6 +665,8 @@ async def test_general_question_does_not_repeat_previous_office_action() -> None
     assert not any(event["type"] == "action.proposed" for event in events)
     restored = await service.get_thread(thread.thread_id, "user_1")
     assert restored.messages[-1].content == "今天是 2026 年 7 月 13 日。"
+    assert restored.messages[-1].processing is not None
+    assert restored.messages[-1].processing.path == "language_model"
 
 
 async def test_quote_question_uses_current_workspace_without_calling_model(
@@ -713,6 +715,9 @@ async def test_quote_question_uses_current_workspace_without_calling_model(
 
     completed = [event for event in events if event["type"] == "message.completed"][-1]
     answer = completed["message"]["content"]
+    assert completed["message"]["processing"]["path"] == "deterministic_formula"
+    assert completed["message"]["processing"]["model"] is None
+    assert "未调用大模型" in completed["message"]["processing"]["label"]
     assert "¥273,680" in answer
     assert "¥254,912" in answer
     assert "¥18,768" in answer
@@ -724,6 +729,8 @@ async def test_quote_question_uses_current_workspace_without_calling_model(
     assert not any(event["type"] == "action.proposed" for event in events)
     restored = await service.get_thread(thread.thread_id, "user_1")
     assert restored.messages[-1].content == answer
+    assert restored.messages[-1].processing is not None
+    assert restored.messages[-1].processing.path == "deterministic_formula"
 
 
 async def test_invalid_quote_send_is_blocked_without_planner_or_action(

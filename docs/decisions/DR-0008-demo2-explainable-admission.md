@@ -29,6 +29,8 @@
 | `SCRIPT-V5-202607` | 内部设计讲稿 | [`未来办公Agent_一小时汇报讲稿_v5.md`](../final-reference/未来办公Agent_%E4%B8%80%E5%B0%8F%E6%97%B6%E6%B1%87%E6%8A%A5%E8%AE%B2%E7%A8%BF_v5.md)，P18-P22 | 支持四种执行方式、Admission、驾驶舱排序解释和结果回收的产品叙事 | 内部设计输入，不是运行证据 |
 | `TARGET-ARCHITECTURE` | 仓库目标架构 | [`TARGET_ARCHITECTURE.md`](../TARGET_ARCHITECTURE.md):71-91、101-140、174-182 | 支持 Swarm 按需路由、六类 Admission 依据、前后端事实映射和先单任务后 Swarm 的顺序 | 目标能力，不能写成当前实现 |
 | `USER-FEEDBACK-20260817-01` | Stakeholder 推进与成本偏好 | [`USER-FEEDBACK-20260817-01-demo2-continued-iteration.md`](../sources/USER-FEEDBACK-20260817-01-demo2-continued-iteration.md) | 支持继续推进并保持成本敏感的协作方式 | 不提供业务成本、时效或质量测量 |
+| `USER-FEEDBACK-20260820-04` | Stakeholder 浏览器试用反馈 | [`USER-FEEDBACK-20260820-04-processing-path-realism.md`](../sources/USER-FEEDBACK-20260820-04-processing-path-realism.md) | “确认执行方式”会把路由写入误解为 Agent 已执行，需显示处理来源与真实边界 | 单一反馈，不证明用户理解改善 |
+| `PROCESSING-PATH-REALISM-20260820` | 运行与自动化证据 | [`PROCESSING-PATH-REALISM-EVIDENCE-20260820.md`](../evidence/PROCESSING-PATH-REALISM-EVIDENCE-20260820.md) | Route POST 为 `policy_engine/model_called=false`，前台动作改为记录且 Snapshot 保持未执行 | 不证明真实 Swarm 或用户理解 |
 
 ## 3. 决策与备选
 
@@ -40,6 +42,7 @@
 4. 客户 A 的模式选择只在本次运行生效。选择推荐的 Adaptive Swarm 时 `selection_source=admission`；降级到其他允许模式时 `selection_source=user_override`，并记录 `override_scope=this_run`。
 5. Adaptive Swarm 只有“推荐”或“本次已选择”两种业务选择状态；`execution_status` 固定为 `not_started`。
 6. 成本与时效只能使用 `route_profiles[].forecast` 展示，且 `source_type=fixture_policy_forecast`；UI 必须标注为规则预测，不得伪装成模型账单、真实 Worker 运行或实测 SLA。
+7. 路由 POST 是确定性策略写入，不调用 LLM。主动作使用“记录本轮方式”，并在提交前说明不会启动协作；服务端日志记录 `policy_engine/model_called=false/elapsed_ms`，不通过固定 sleep 伪造 Agent 等待。
 
 未采用以下方案：
 

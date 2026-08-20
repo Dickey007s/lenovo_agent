@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
+import logging
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -53,6 +54,25 @@ from services.api.app.application.task_stage_agent import (
     TaskStageSourceAlias,
     TaskStageTrustedFact,
 )
+
+
+runtime_logger = logging.getLogger("uvicorn.error")
+
+
+def _task_stage_model_attempted(stage_agent: Any) -> bool:
+    return bool(getattr(stage_agent, "base_url", "") and getattr(stage_agent, "api_key", ""))
+
+
+def _log_task_stage(stage: str, stage_agent: Any, elapsed_seconds: float, origin: str) -> None:
+    runtime_logger.info(
+        "task_stage_processing stage=%s model_called=%s accepted_model_output=%s model=%s elapsed_ms=%d origin=%s",
+        stage,
+        _task_stage_model_attempted(stage_agent),
+        origin == "model",
+        getattr(stage_agent, "model", "none"),
+        max(0, round(elapsed_seconds * 1000)),
+        origin,
+    )
 
 
 class TaskNotFoundError(LookupError):
@@ -447,8 +467,10 @@ class TaskService:
                 )
                 started_at = monotonic()
                 plan = await self.stage_agent.plan(self._build_plan_request(current))
+                elapsed_seconds = monotonic() - started_at
+                _log_task_stage("plan", self.stage_agent, elapsed_seconds, plan.origin)
                 plan = self._validated_plan(current, plan)
-                runtime_seconds = max(1, int(monotonic() - started_at + 0.999))
+                runtime_seconds = max(1, int(elapsed_seconds + 0.999))
                 self._require_execution_window(
                     current,
                     additional_steps=1,
@@ -468,7 +490,9 @@ class TaskService:
                 plan = self._stage_detail(current, "plan").get("plan", {})
                 started_at = monotonic()
                 act = await self.stage_agent.act(self._build_act_request(current, plan))
-                runtime_seconds = max(1, int(monotonic() - started_at + 0.999))
+                elapsed_seconds = monotonic() - started_at
+                _log_task_stage("act", self.stage_agent, elapsed_seconds, act.origin)
+                runtime_seconds = max(1, int(elapsed_seconds + 0.999))
                 self._require_execution_window(
                     current,
                     additional_steps=1,

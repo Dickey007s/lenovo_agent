@@ -263,6 +263,8 @@ V0.1 定稿基线和 Demo 1 各 PR 的实际验证结果记录在 [`DR-0002`](do
 
 2026-08-20 的 Agent 影响交互实现为 `258861f`、PR [#16](https://github.com/Dickey007s/lenovo_agent/pull/16)：服务端为收入口径决定提供结构化影响选项，前台在提交前逐项预演经营分析、回复草稿、风险页和外部发送的变化，提交后再用 `ControlEvent.impact_receipt` 展示实际落地回执。封口结果为 Python `139 passed, 1 skipped (4.74s)`、完整浏览器 `35 passed (1.9m)`、Ruff、前端 lint/build、治理门槛与 diff-check 通过，另有三张带 hash 的桌面/移动截图。该结论只证明固定 Fixture 的前后端事实一致与被测交互，不证明真实用户理解改善或任意真实动作均可准确预演。
 
+处理来源现在是一等前台事实：报价公式回答显示“服务端公式核算，未调用大模型”，Demo 2 使用“记录本轮方式”明确只写路由且保持未执行；真实 Conversation 模型路径在等待时显示配置模型名，完成消息保留模型名与实际调用耗时。后台 runtime log 同时记录 `path/model_called/model/elapsed_ms`，不记录消息正文、Key 或思维链；系统不会为了显得像 AI 人为增加等待。
+
 ## 数据、身份与安全边界
 
 - `X-User-Id` 与 `X-User-Roles` 只是 V0.1 Demo 身份头，默认前端使用 `demo_user` 和 `current_user,sales_manager`；生产环境必须替换为经过验证的 SSO/JWT。
