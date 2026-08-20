@@ -1,6 +1,7 @@
 # 处理路径与真实等待 Evidence · 2026-08-20
 
 - 状态：`Verified`（仅限本地固定报价、Demo 2 路由写入与一次当前模型连通样本）
+- 实现提交：`fe0969a`
 - 用户反馈：[`USER-FEEDBACK-20260820-04`](../sources/USER-FEEDBACK-20260820-04-processing-path-realism.md)
 - 关联决策：[`DR-0006`](../decisions/DR-0006-deterministic-quote-calculation.md)、[`DR-0008`](../decisions/DR-0008-demo2-explainable-admission.md)、[`DR-0011`](../decisions/DR-0011-demo2-route-impact.md)
 
