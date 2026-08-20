@@ -10,6 +10,7 @@ import {
   IconCheck,
   IconCircleCheck,
   IconFileDescription,
+  IconGitCompare,
   IconHandStop,
   IconHistory,
   IconLayoutDashboard,
@@ -19,6 +20,7 @@ import {
   IconRefresh,
   IconRobot,
   IconSend2,
+  IconShieldCheck,
   IconTargetArrow,
 } from "@tabler/icons-react";
 
@@ -28,6 +30,9 @@ import type {
   ArtifactVersion,
   BranchSnapshot,
   ConflictRecord,
+  ConflictResolutionOption,
+  ImpactChange,
+  ImpactReceipt,
   TaskPhase,
   TaskStageRecord,
   TaskSnapshot,
@@ -168,6 +173,54 @@ function verifiedBranchCount(task: TaskSnapshot) {
     const head = latestHead(task, branch);
     return latestVerification(task, head)?.status === "passed";
   }).length;
+}
+
+function deliverableTitle(task: TaskSnapshot, deliverableId: string) {
+  return task.contract.deliverables.find((item) => item.deliverable_id === deliverableId)?.title
+    ?? "本轮材料";
+}
+
+function latestImpactReceipt(task: TaskSnapshot) {
+  const receipt = [...task.controls]
+    .reverse()
+    .find((control) => control.status === "applied" && control.impact_receipt)?.impact_receipt ?? null;
+  if (!receipt) return null;
+  const artifactIds = new Set(task.artifact_versions.map((artifact) => artifact.artifact_version_id));
+  if (receipt.changed_artifact_version_ids.some((artifactId) => !artifactIds.has(artifactId))) return null;
+  if (receipt.commit_created && (!task.last_commit || receipt.commit_id !== task.last_commit.commit_id)) return null;
+  return receipt;
+}
+
+function impactVerificationLabel(receipt: ImpactReceipt) {
+  if (receipt.verification_status === "passed") return "核对通过";
+  if (receipt.verification_status === "partial") return "部分核对完成";
+  if (receipt.verification_status === "failed") return "核对未通过";
+  return "尚未核对";
+}
+
+function impactChangeLabel(change: ImpactChange, applied: boolean) {
+  if (change.change_kind === "will_change") return applied ? "已改变" : "会改变";
+  if (change.change_kind === "will_recheck") return applied ? "已重新核对" : "会重新核对";
+  if (change.change_kind === "unchanged") return "保持不变";
+  return applied ? "未发生" : "不会发生";
+}
+
+function ImpactChangeList({ changes, applied }: { changes: ImpactChange[]; applied: boolean }) {
+  return (
+    <ol className="task-impact-change-list">
+      {changes.map((change, index) => (
+        <li className={`is-${change.change_kind}`} key={`${change.label}-${index}`}>
+          <span>{impactChangeLabel(change, applied)}</span>
+          <strong>{change.label}</strong>
+          <div>
+            {change.before && !["unchanged", "no_external_action"].includes(change.change_kind) && <small>{change.before}</small>}
+            {change.before && change.after && !["unchanged", "no_external_action"].includes(change.change_kind) && <IconArrowRight aria-hidden="true" />}
+            {change.after && <b>{change.after}</b>}
+          </div>
+        </li>
+      ))}
+    </ol>
+  );
 }
 
 function phaseState(task: TaskSnapshot, phase: Exclude<TaskPhase, "contract">) {
@@ -606,6 +659,103 @@ function StageDetail({
   );
 }
 
+function TaskImpactPreview({
+  conflict,
+  option,
+}: {
+  conflict: ConflictRecord;
+  option: ConflictResolutionOption;
+}) {
+  const impact = option.expected_impact;
+  const titleId = `task-impact-preview-${conflict.conflict_id}`;
+  const taskOutcome = impact.commit_created
+    ? "核对通过后形成本轮成果"
+    : impact.task_status
+      ? TASK_STATUS_LABELS[impact.task_status]
+      : "等待服务端返回下一状态";
+
+  return (
+    <section className="task-impact-preview" aria-labelledby={titleId}>
+      <header>
+        <IconGitCompare aria-hidden="true" />
+        <div>
+          <span>确认后会发生什么</span>
+          <strong id={titleId}>影响预演：你的决定会怎样改变本轮工作</strong>
+        </div>
+      </header>
+
+      <div className="task-impact-choice">
+        <span>你的决定</span>
+        <strong>{option.label}</strong>
+        <small>{option.description}</small>
+      </div>
+
+      <ImpactChangeList changes={impact.changes} applied={false} />
+
+      <div className="task-impact-outcome">
+        <IconShieldCheck aria-hidden="true" />
+        <div>
+          <span>任务随后</span>
+          <strong>{taskOutcome}</strong>
+          <small>{impact.creates_verification_reports > 0
+            ? `服务端预计重新核对 ${impact.creates_verification_reports} 项结果`
+            : "不会用前端动画代替服务端核对"}</small>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function TaskImpactReceiptView({ task, receipt }: { task: TaskSnapshot; receipt: ImpactReceipt }) {
+  const changed = receipt.changed_deliverable_ids.map((id) => deliverableTitle(task, id));
+  const changedIds = new Set(receipt.changed_deliverable_ids);
+  const preserved = task.contract.deliverables
+    .filter((item) => !changedIds.has(item.deliverable_id))
+    .map((item) => item.title);
+
+  return (
+    <section className="task-impact-receipt" role="status" aria-live="polite" aria-labelledby="task-impact-receipt-title">
+      <header>
+        <span className="task-impact-receipt-icon"><IconCircleCheck aria-hidden="true" /></span>
+        <div>
+          <span>服务端变化回执</span>
+          <h2 id="task-impact-receipt-title">你的决定已经落实到材料中</h2>
+          <p>{receipt.summary}</p>
+        </div>
+      </header>
+      <ImpactChangeList changes={receipt.changes} applied />
+      <dl>
+        <div className="is-change">
+          <dt>已改变</dt>
+          <dd>{changed.length ? changed.join("、") : "没有材料被改写"}</dd>
+          <small>{receipt.changed_artifact_version_ids.length > 0
+            ? `生成 ${receipt.changed_artifact_version_ids.length} 个新材料版本`
+            : "没有生成新版本"}</small>
+        </div>
+        <div className="is-verified">
+          <dt>核对结果</dt>
+          <dd>{impactVerificationLabel(receipt)}</dd>
+          <small>{receipt.verification_report_ids.length} 项服务端核对记录</small>
+        </div>
+        <div className="is-preserved">
+          <dt>保持不变</dt>
+          <dd>{preserved.length ? preserved.join("、") : "无"}</dd>
+          <small>未被这次决定重新生成</small>
+        </div>
+        <div className="is-boundary">
+          <dt>外部动作</dt>
+          <dd>{receipt.external_side_effect === "none" ? "未执行" : "进入独立治理"}</dd>
+          <small>{receipt.commit_created ? "本轮成果已形成，客户回复仍是草稿" : "任务仍按服务端状态继续"}</small>
+        </div>
+      </dl>
+      <details>
+        <summary>查看运行记录</summary>
+        <p>任务从 v{receipt.from_task_version} 更新到 v{receipt.to_task_version}{receipt.commit_id ? "，并形成最终提交" : ""}。</p>
+      </details>
+    </section>
+  );
+}
+
 function CandidateMaterials({
   task,
   reviewing,
@@ -833,6 +983,7 @@ export function TaskDirectorCanvas({
 
   const progressive = progressiveTask(task);
   const displayedPhase = selectedPhase ?? task.phase;
+  const impactReceipt = latestImpactReceipt(task);
   const showingEarlyStage = progressive && ["observe", "plan"].includes(displayedPhase);
   const showingCandidates = progressive && displayedPhase === "act";
   const showingActiveVerification = progressive
@@ -867,6 +1018,7 @@ export function TaskDirectorCanvas({
         transportState={transportState}
         onRetry={onRetry}
       />
+      {impactReceipt && <TaskImpactReceiptView task={task} receipt={impactReceipt} />}
       {task.status === "ready" ? (
         <section className="task-ready-brief" aria-labelledby="task-ready-brief-title">
           <div>
@@ -1251,7 +1403,11 @@ export function TaskDecisionPane({
               const report = task ? latestVerification(task, head) : null;
               const decisionReason = report?.checks.find((check) => check.status === "conflict")?.detail
                 ?? conflict.summary;
-              const hasOfficialSource = conflict.source_refs.includes(OFFICIAL_REVENUE_SOURCE);
+              const resolutionOption = conflict.resolution_options.find(
+                (option) => option.selected_source_ref === OFFICIAL_REVENUE_SOURCE && option.executable,
+              ) ?? null;
+              const hasOfficialSource = conflict.source_refs.includes(OFFICIAL_REVENUE_SOURCE)
+                && (conflict.resolution_options.length === 0 || Boolean(resolutionOption));
               const branchAllowsResolution = branch?.status === "waiting_evidence";
               const firstOpenConflict = openConflicts.find((item) => item.branch_id === conflict.branch_id);
               const isNextConflictForBranch = firstOpenConflict?.conflict_id === conflict.conflict_id;
@@ -1290,20 +1446,26 @@ export function TaskDecisionPane({
                       ))}
                     </ul>
                   </details>
+                  {resolutionOption ? (
+                    <TaskImpactPreview conflict={conflict} option={resolutionOption} />
+                  ) : (
                     <section className="task-decision-impact">
                       <strong>确认后会发生什么</strong>
                       <p>{hasRemainingConflictAfterThis
                         ? "本次只会更新经营分析并保留其余待确认项；全部冲突处理完后，客户回复草稿才会重新核对。风险页保持已核对状态，客户回复不会发送。"
                         : "经营分析会改用 CRM 正式口径，客户回复草稿会同步核对；风险页保持已核对状态。页面会等待服务端返回新结果，客户回复不会发送。"}</p>
                     </section>
+                  )}
                   <div className="task-decision-actions">
                     <button
                       className="is-primary"
                       type="button"
+                      aria-describedby={resolutionOption ? `task-impact-preview-${conflict.conflict_id}` : undefined}
                       disabled={controlsDisabled || !canResolve}
                       onClick={() => void onControl({
                         kind: "resolve_evidence",
                         branch_id: conflict.branch_id,
+                        resolution_option_id: resolutionOption?.option_id,
                         selected_source_ref: OFFICIAL_REVENUE_SOURCE,
                       })}
                     >

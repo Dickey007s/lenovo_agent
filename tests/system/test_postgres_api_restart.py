@@ -333,6 +333,7 @@ def test_postgres_task_survives_api_restart_and_replays_original_mutation(
                     json={
                         "kind": "resolve_evidence",
                         "branch_id": waiting_branch["branch_id"],
+                        "resolution_option_id": "use-official-crm-revenue",
                         "selected_source_ref": OFFICIAL_SOURCE,
                         "expected_task_version": started["version"],
                         "idempotency_key": "system-resolve-001",
@@ -414,6 +415,7 @@ def test_postgres_task_survives_api_restart_and_replays_original_mutation(
                     json={
                         "kind": "resolve_evidence",
                         "branch_id": waiting_branch["branch_id"],
+                        "resolution_option_id": "use-official-crm-revenue",
                         "selected_source_ref": OFFICIAL_SOURCE,
                         "expected_task_version": started["version"],
                         "idempotency_key": "system-resolve-001",

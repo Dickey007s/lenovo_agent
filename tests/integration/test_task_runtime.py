@@ -74,6 +74,17 @@ async def test_demo1_loop_is_atomic_traceable_and_isolates_one_conflict() -> Non
     assert len(waiting.verification_reports) == 3
     assert len(waiting.conflicts) == 1
     assert waiting.conflicts[0].status == "open"
+    option = waiting.conflicts[0].resolution_options[0]
+    assert option.option_id == "use-official-crm-revenue"
+    assert option.executable is True
+    assert option.selected_source_ref == OFFICIAL_SOURCE
+    assert option.expected_impact.commit_created is True
+    assert {item.change_kind for item in option.expected_impact.changes} == {
+        "will_change",
+        "will_recheck",
+        "unchanged",
+        "no_external_action",
+    }
     assert waiting.last_commit is None
 
     statuses = {branch.deliverable_ids[0]: branch.status for branch in waiting.branches}
@@ -124,6 +135,7 @@ async def test_resolving_official_evidence_creates_verified_commit_idempotently(
     command = TaskControlCommand(
         kind="resolve_evidence",
         branch_id=operating.branch_id,
+        resolution_option_id="use-official-crm-revenue",
         selected_source_ref=OFFICIAL_SOURCE,
         expected_task_version=waiting.version,
         idempotency_key="resolve-demo1-002",
@@ -178,6 +190,27 @@ async def test_resolving_official_evidence_creates_verified_commit_idempotently(
     )
     assert reply_report.status == "passed"
     assert any(check.label == "回复与正式经营事实一致" for check in reply_report.checks)
+    receipt = committed.controls[-1].impact_receipt
+    assert receipt is not None
+    assert receipt.impact_status == "applied"
+    assert receipt.from_task_version == waiting.version
+    assert receipt.to_task_version == committed.version
+    assert set(receipt.changed_deliverable_ids) == {"operating-analysis", "reply-draft"}
+    assert set(receipt.changed_artifact_version_ids) == {
+        resolved_artifact.artifact_version_id,
+        committed_reply_head,
+    }
+    assert receipt.verification_status == "passed"
+    assert set(receipt.verification_report_ids) == {report.report_id for report in committed.verification_reports[-2:]}
+    assert receipt.commit_created is True
+    assert receipt.commit_id == committed.last_commit.commit_id
+    assert receipt.external_side_effect == "none"
+    assert {item.change_kind for item in receipt.changes} == {
+        "will_change",
+        "will_recheck",
+        "unchanged",
+        "no_external_action",
+    }
 
     artifacts_by_id = {
         item.artifact_version_id: item for item in committed.artifact_versions
@@ -286,6 +319,7 @@ async def test_committed_artifact_binding_rejects_history_and_changed_facts() ->
         TaskControlCommand(
             kind="resolve_evidence",
             branch_id=branch.branch_id,
+            resolution_option_id="use-official-crm-revenue",
             selected_source_ref=OFFICIAL_SOURCE,
             expected_task_version=waiting.version,
             idempotency_key="binding-resolve-001",
@@ -361,6 +395,7 @@ async def test_task_runtime_rejects_stale_owner_and_unapproved_source() -> None:
     invalid = TaskControlCommand(
         kind="resolve_evidence",
         branch_id=operating.branch_id,
+        resolution_option_id="use-official-crm-revenue",
         selected_source_ref=FORECAST_SOURCE,
         expected_task_version=waiting.version,
         idempotency_key="bad-source-001",
@@ -370,6 +405,25 @@ async def test_task_runtime_rejects_stale_owner_and_unapproved_source() -> None:
     unchanged = await service.get(created.task_id, "user_1")
     assert unchanged.version == waiting.version
     assert unchanged.conflicts[0].status == "open"
+
+    missing_option = TaskControlCommand(
+        kind="resolve_evidence",
+        branch_id=operating.branch_id,
+        selected_source_ref=OFFICIAL_SOURCE,
+        expected_task_version=waiting.version,
+        idempotency_key="missing-option-001",
+    )
+    with pytest.raises(TaskTransitionError, match="必须选择"):
+        await service.control(created.task_id, "user_1", missing_option)
+
+    unknown_option = missing_option.model_copy(
+        update={
+            "resolution_option_id": "unknown-option",
+            "idempotency_key": "unknown-option-001",
+        }
+    )
+    with pytest.raises(TaskTransitionError, match="不是服务端允许"):
+        await service.control(created.task_id, "user_1", unknown_option)
 
 
 async def test_branch_controls_and_steer_follow_server_state_machine() -> None:
@@ -648,6 +702,7 @@ async def test_evidence_resolution_does_not_commit_with_another_open_conflict() 
     command = TaskControlCommand(
         kind="resolve_evidence",
         branch_id=branch.branch_id,
+        resolution_option_id="use-official-crm-revenue",
         selected_source_ref=OFFICIAL_SOURCE,
         expected_task_version=with_extra.version,
         idempotency_key="global-conflict-resolve-001",

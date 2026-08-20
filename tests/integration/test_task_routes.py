@@ -190,6 +190,7 @@ async def test_task_start_and_control_routes_return_server_truth() -> None:
             json={
                 "kind": "resolve_evidence",
                 "branch_id": branch["branch_id"],
+                "resolution_option_id": "use-official-crm-revenue",
                 "selected_source_ref": "fixture:crm/customer-a:official-revenue-v3",
                 "expected_task_version": waiting["version"],
                 "idempotency_key": "route-resolve-001",

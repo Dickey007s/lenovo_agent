@@ -142,7 +142,13 @@ test("the first task path exposes the customer A purpose, decision facts, and co
   await expect(page.getByRole("heading", { name: "还差 1 个决定，确认后继续核对" })).toBeVisible();
   await expect(page.getByText("为什么需要你", { exact: true })).toBeVisible();
   await expect(page.getByText("确认后会发生什么", { exact: true })).toBeVisible();
-  await expect(page.getByText(/经营分析会改用 CRM 正式口径/)).toBeVisible();
+  const impactPreview = page.locator(".task-impact-preview");
+  await expect(impactPreview.locator("strong").filter({ hasText: "影响预演" })).toBeVisible();
+  await expect(impactPreview.getByText("待确认正式口径", { exact: true })).toBeVisible();
+  await expect(impactPreview.getByText("CRM 正式收入 2400 万元，并保留预测差异", { exact: true })).toBeVisible();
+  await expect(impactPreview.getByText("按 CRM 正式口径重新核对，仍保持草稿", { exact: true })).toBeVisible();
+  await expect(impactPreview.getByText("保持已核对状态", { exact: true })).toBeVisible();
+  await expect(impactPreview.getByText("仍不发送", { exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "查看待确认项", exact: true })).toHaveCount(1);
   await expect(page.getByRole("button", { name: "采用正式口径并继续核对", exact: true })).toHaveCount(1);
   await expectPrimarySurfaceToHideRuntimeJargon(page);
@@ -159,8 +165,22 @@ test("the first task path exposes the customer A purpose, decision facts, and co
   await expect(page.locator(".workspace-toast")).toBeHidden({ timeout: 4_000 });
   await attachScreenshot(page, testInfo, "usability-decision-1181");
 
+  const controlRequest = page.waitForRequest(
+    (request) => request.url().includes("/control") && request.method() === "POST",
+  );
   await page.getByRole("button", { name: "采用正式口径并继续核对", exact: true }).click();
+  expect((await controlRequest).postDataJSON()).toMatchObject({
+    kind: "resolve_evidence",
+    resolution_option_id: "use-official-crm-revenue",
+  });
   await expect(page.getByRole("heading", { name: "客户 A 经营汇报已准备完成" })).toBeVisible();
+  const impactReceipt = page.locator(".task-impact-receipt");
+  await expect(impactReceipt.getByRole("heading", { name: "你的决定已经落实到材料中" })).toBeVisible();
+  await expect(impactReceipt.getByText("采用 CRM 正式收入 2400 万元，并保留预测差异", { exact: true })).toBeVisible();
+  await expect(impactReceipt.getByText("已按正式口径重新核对，仍为草稿", { exact: true })).toBeVisible();
+  await expect(impactReceipt.getByText("保持已核对状态", { exact: true })).toBeVisible();
+  await expect(impactReceipt.getByText("仍不发送", { exact: true })).toBeVisible();
+  await expect(impactReceipt.getByText("任务从 v6 更新到 v7，并形成最终提交。", { exact: true })).toBeHidden();
   await expect(page.getByRole("button", { name: "查看经营分析", exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "查看风险页", exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "查看客户回复草稿", exact: true })).toBeVisible();
@@ -179,6 +199,11 @@ test("the first task path exposes the customer A purpose, decision facts, and co
       .toBeLessThanOrEqual(item.clientWidth + 1);
   }
   await attachScreenshot(page, testInfo, "usability-complete-1181");
+
+  await page.reload();
+  await openLongTask(page);
+  await expect(page.getByRole("heading", { name: "客户 A 经营汇报已准备完成" })).toBeVisible();
+  await expect(page.locator(".task-impact-receipt").getByRole("heading", { name: "你的决定已经落实到材料中" })).toBeVisible();
 
   const tasks = await listTasks(request, owner);
   expect(tasks).toHaveLength(1);
@@ -497,13 +522,14 @@ test("only the first open conflict in a branch is actionable without a conflict 
   await expect(firstDecision).toBeEnabled();
   await expect(cards.nth(1).getByRole("button", { name: "采用正式口径并继续核对" })).toBeDisabled();
   await expect(cards.nth(1).getByText("请先处理同一材料中较早的待确认项。", { exact: true })).toBeVisible();
-  await expect(cards.nth(0).getByText(/本次只会更新经营分析并保留其余待确认项/)).toBeVisible();
+  await expect(cards.nth(0).locator(".task-impact-preview")).toContainText("影响预演");
 
   await firstDecision.click();
   await expect(cards).toHaveCount(1);
+  await expect(page.locator(".task-impact-receipt")).toHaveCount(0);
   await expect(cards.getByRole("heading", { name: "客户 A 收入口径的时间范围" })).toBeVisible();
   await expect(cards.getByRole("button", { name: "采用正式口径并继续核对" })).toBeEnabled();
-  await expect(cards.getByText(/客户回复草稿会同步核对/)).toBeVisible();
+  await expect(cards.locator(".task-impact-preview")).toContainText("影响预演");
   await page.unrouteAll({ behavior: "ignoreErrors" });
 });
 

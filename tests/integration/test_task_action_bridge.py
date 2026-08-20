@@ -46,6 +46,7 @@ async def _committed_reply(
         TaskControlCommand(
             kind="resolve_evidence",
             branch_id=branch.branch_id,
+            resolution_option_id="use-official-crm-revenue",
             selected_source_ref=OFFICIAL_SOURCE,
             expected_task_version=waiting.version,
             idempotency_key="bridge-resolve-001",
