@@ -4,9 +4,9 @@
 | --- | --- |
 | Scenario ID | `SCENARIO-001` |
 | Owner | Office Agent 项目组 |
-| Status | `Ready` |
-| Decision | [`DR-0002`](../decisions/DR-0002-bounded-durable-office-loop.md)、[`DR-0005`](../decisions/DR-0005-task-director-interaction.md)、[`DR-0007`](../decisions/DR-0007-task-artifact-action-bridge.md) |
-| 设计来源 | `USER-FEEDBACK-20260810-01/02`、`USER-FEEDBACK-20260811-INTERACTION-01`、`USER-FEEDBACK-20260811-USABILITY-02`、`USER-FEEDBACK-20260811-ROUND-AND-SOURCE-03`、`USER-FEEDBACK-20260813-DEMO-BRIDGE-05`、`DESIGN-REFERENCE-TASK-DIRECTOR-OPTION2-20260811`、`TASK-DIRECTOR-USABILITY-AUDIT-DEMO1-PR6-20260811`、`TASK-DIRECTOR-ROUND-AND-SOURCE-CLARITY-20260811`、`TASK-ARTIFACT-ACTION-BRIDGE-20260813`、`MEETING-DECK-0716-V2-01`、`SCRIPT-V5-202607`、`REPO-BASELINE-84AABC9`、`REACT-ICLR-2023`、`LANGGRAPH-DURABLE-20260810`、`NIST-AI-RMF-1.0`；PR 5 运行来源为 `POSTGRES-WINDOWS-16.14-20260811`、`POSTGRES-BACKED-API-RESTART-DEMO1-PR5-20260811` |
+| Status | `Draft`（文件驱动工程证据已封口；真实用户理解与业务价值仍待验证） |
+| Decision | [`DR-0002`](../decisions/DR-0002-bounded-durable-office-loop.md)、[`DR-0005`](../decisions/DR-0005-task-director-interaction.md)、[`DR-0007`](../decisions/DR-0007-task-artifact-action-bridge.md)、[`DR-0014`](../decisions/DR-0014-file-backed-demo1-sources.md) |
+| 设计来源 | `USER-FEEDBACK-20260810-01/02`、`USER-FEEDBACK-20260811-INTERACTION-01`、`USER-FEEDBACK-20260811-USABILITY-02`、`USER-FEEDBACK-20260811-ROUND-AND-SOURCE-03`、`USER-FEEDBACK-20260813-DEMO-BRIDGE-05`、`USER-FEEDBACK-20260820-06`、`ENTERPRISE-DEMO-DATA-RESEARCH-20260820`、`DESIGN-REFERENCE-TASK-DIRECTOR-OPTION2-20260811`、`TASK-DIRECTOR-USABILITY-AUDIT-DEMO1-PR6-20260811`、`TASK-DIRECTOR-ROUND-AND-SOURCE-CLARITY-20260811`、`TASK-ARTIFACT-ACTION-BRIDGE-20260813`、`MEETING-DECK-0716-V2-01`、`SCRIPT-V5-202607`、`REPO-BASELINE-84AABC9`、`REACT-ICLR-2023`、`LANGGRAPH-DURABLE-20260810`、`NIST-AI-RMF-1.0`；PR 5 运行来源为 `POSTGRES-WINDOWS-16.14-20260811`、`POSTGRES-BACKED-API-RESTART-DEMO1-PR5-20260811` |
 
 ## 1. 用户、触发与当前问题
 
@@ -20,11 +20,11 @@ PR 3 之前的 V0.1 基线可以编辑工作区并治理一次副作用动作，
 
 本场景验证的是固定 Fixture 下的任务协议、可持久状态模型、分支隔离、控制事件、交付物工作区和可验证提交。PR 5 已把 TaskStore 的持久性验证推进到同一 PostgreSQL 16.14 数据库上的顺序 API 进程恢复，但不验证 Conversation、数据库故障、真实客户数据接入、真实跨端身份、生产级多实例一致性或 Adaptive Swarm。当前 start 是一次同步 mutation，不是后台持续调度器。
 
-- 所有邮件、CRM、金额、项目和客户名称都是 Demo Fixture。
-- 普通业务 UI 将已知来源明确标为“演示数据”并使用业务名称；本文件保留原始 `source_ref` 只是为了记录协议与审计事实，不代表这些内部 ID 应显示给用户。
+- 所有邮件、CRM、金额、项目和客户名称都是 `demo-enterprise-data/customer-a/` 中的项目生成仿真资料，不是 Lenovo、真实客户或真实企业数据库。
+- 普通业务 UI 将来源明确标为“项目演示数据”并使用文件/业务名称；稳定 `fixture:` `source_ref` 只用于服务端控制和审计，不进入普通业务 DOM。
 - 本场景的 Task Runtime 本身不发送邮件、不写入 CRM；DR-0007 允许用户把已验证的回复草稿准备为独立治理 Run，并继续进入 `RunService → Risk/Policy/Evidence/Approval/Permit → Tool Gateway → Simulator`。最终结果仍是 Simulator，不是真实邮件。
 - “客户 A 场景具有代表性”“Task Bar 降低理解成本”“分支控制符合用户心智”仍是待用户研究验证的假设。
-- 设计来源 Source ID 与运行时 Fixture `source_ref` 是两套概念，不能互相替代。
+- 设计来源 Source ID 与运行时 Fixture `source_ref`、manifest 文件是三套概念，不能互相替代；当前运行时来源事实由 manifest 文件解析后冻结到 `TaskSnapshot.source_documents[]`。
 
 ## 3. Task Contract
 
@@ -47,6 +47,21 @@ PR 3 之前的 V0.1 基线可以编辑工作区并治理一次副作用动作，
 | `fixture:forecast/customer-a:revenue-v2` | 预测口径：2,680 万 | Demo Fixture，不是真实预测系统 |
 | `fixture:project/customer-a:weekly-v5` | 项目风险和里程碑 | Demo Fixture，不是真实项目系统 |
 
+### 3.1 文件驱动来源包（2026-08-20）
+
+本轮来源不再由代码常量单独构造。仓库目录 [`demo-enterprise-data/customer-a/`](../../demo-enterprise-data/customer-a/) 由 `manifest.json` allowlist 四份项目生成仿真文件，并为每份文件登记相对路径、解析器、系统标签、记录时间、责任角色和 SHA-256：
+
+| 文件 | 业务语义 | 冲突/用途 |
+| --- | --- | --- |
+| `mail/customer-a-status-request-2026-06-15.eml` | 客户要求经营汇报收入采用财务已关账记录 | 当前任务的请求上下文 |
+| `crm/customer-a-revenue-close-v3.csv` | CRM 月结档案，`recognized_revenue=2400` 万元，状态“已关账” | 历史正式口径 |
+| `forecast/customer-a-revenue-forecast-v2.csv` | 销售预测工作簿导出，`forecast_revenue=2680` 万元，状态“预测中” | 当前预测口径，不得当作已实现收入 |
+| `project/customer-a-weekly-status-v5.json` | 项目风险、建议动作和里程碑偏差 | 风险页来源 |
+
+文件内容是项目生成的仿真数据。Microsoft AdventureWorks、Power BI 和 Dynamics 官方资料只用于借鉴企业数据结构与业务语义，精确引用和局限见 [`DR-0014`](../decisions/DR-0014-file-backed-demo1-sources.md) 与 [`ENTERPRISE-DEMO-DATA-RESEARCH-20260820`](../research/ENTERPRISE-DEMO-DATA-RESEARCH-20260820.md)。
+
+文件链路固定为：`manifest allowlist/hash → 结构化解析 → TaskSnapshot.source_documents 冻结 → Conflict.operation_context → 前台文件证据卡`。文件缺失、哈希变化、路径不安全或解析失败时必须 fail closed，不用旧金额或模型猜测继续。
+
 ## 4. 主路径
 
 | 阶段 | 服务端行为 | Task Director 前台输出 | 当前证据与边界 |
@@ -61,11 +76,15 @@ PR 3 之前的 V0.1 基线可以编辑工作区并治理一次副作用动作，
 | Prepare action | 仅从 Commit 中的 passed 当前 `reply_draft` 构建 `TaskArtifactBinding` 与固定 `email.send` Run；准备、审批、授权和执行前重校验 | 当前回复成果显示“准备发送”；Action Gate 解释演示目标、绑定版本、L4 风险、为何需要确认与拒绝后果；按钮分为准备、批准、确认执行 | DR-0007 API/服务/E2E 已覆盖；只执行 Simulator，不支持真实联系人、附件、批量或通用工件动作 |
 | New round | 终态以新 round key 创建独立 Task，再对新 Task 执行 start；旧轮次不 mutation | “开始新一轮汇报”一次点击后进入新一轮待确认状态；不是把旧 Task 重置为 ready | 完整浏览器 E2E 已覆盖新旧 Task 同时保留；当前没有历史轮次选择入口，不证明用户理解该语义 |
 
+2026-08-20 起，Observe/Act/Verify 的来源事实改为读取文件驱动仿真资料包；上述历史表格中“固定 Fixture”描述只说明演示路径，不表示仍由代码常量生成。文件证据卡的可见事实来自 `TaskSnapshot.source_documents[]` 与 `ConflictRecord.operation_context`，不是前端从 `source_ref` 或候选文案推断。
+
 ## 5. 异常与恢复路径
 
 | 异常 | 服务端真值 | 用户反馈与动作 | 验收要求 |
 | --- | --- | --- | --- |
-| 证据冲突 | 单个 `BranchSnapshot.status=waiting_evidence` | 优先显示冲突摘要和解决动作；工件区同步显示冲突，Fixture `source_ref` 默认折叠 | PR 3 内存测试与 PR 4 浏览器主路径已覆盖；其他分支不得被暂停 |
+| 证据冲突 | 单个 `BranchSnapshot.status=waiting_evidence`；`ConflictRecord.operation_context` 记录当前操作与文件事实的错位 | 优先显示冲突摘要、当前操作和两份文件证据；工件区同步显示冲突，内部 `source_ref` 仍默认隐藏 | `DR-0014` 文件驱动回归、完整浏览器与桌面/移动截图已通过；其他分支不得被暂停 |
+| 文件来源不可用 | manifest、路径、文件大小、哈希或结构化解析校验失败 | 保留当前 Snapshot，显示“演示资料待核验/请开始新一轮任务”，不生成猜测工件或部分总计 | `DR-0014` 单测与 API fail-closed 回归已通过；不证明生产文件系统恢复 |
+| 文件在任务运行期间变化 | catalog 读取结果与 `TaskSnapshot.source_documents[]` 冻结 digest 不一致 | 阻止继续推进并要求基于当前文件开始新一轮，不静默替换历史事实 | `DR-0014` 变化回归已通过；不证明多实例或真实 Connector 一致性 |
 | SSE 断线 | 业务状态不变，客户端仅失去更新 | 顶部和 Task 面板一致显示恢复中，保留最后 Snapshot 并禁用 Task Control | PR 5 已通过停止 API 进程验证同页断线、自动重连和 GET 对账；停机期间无新事件，`after` 缺口回放仍待补 |
 | start 发送前失败 | 服务端仍为 v1、0 个 ArtifactVersion | 显示结果待确认，保存原 key，reload 后允许立即对账 | PR 4 E2E 已覆盖；同 key 重试后为 v2、5 个唯一工件 |
 | 服务端已提交但响应丢失 | 幂等 marker 保存首次结果，浏览器尚未知 | 应用原 key 查询首次结果，再 GET 最新 Snapshot | 后端内存测试有幂等证据，但该浏览器路径未测试，不能与发送前 abort 混同 |

@@ -34,6 +34,7 @@
 | `C-014` | Stakeholder feedback、源码、浏览器与截图 | 内部来源和“再次演示”歧义触发跨工作区职责、演示数据标签和独立新轮次修订；完整浏览器 E2E 与 Mail 摘要截图通过 | `USER-FEEDBACK-20260811-ROUND-AND-SOURCE-03`、[`TASK-DIRECTOR-ROUND-AND-SOURCE-CLARITY-20260811`](../evidence/DEMO1-ROUND-AND-SOURCE-CLARITY-EVIDENCE-20260811.md) | 支持非 Tasks 仅摘要/跳转、原始来源 ID 不入普通业务 DOM、新一轮 create+start 且旧 Task 保留 | 自动化不证明用户理解；历史轮次选择、真实 Connector 和通用后台 Loop 未实现，`DR-0005` 仍为 `Draft` |
 | `C-015` | Stakeholder direction、源码、自动化与浏览器证据 | 固定 Demo 1 的已验证客户回复可精确绑定到 Demo 3 治理 Run，前台将准备、批准与执行分开，并在拒绝/失败时保留 Task Commit | `USER-FEEDBACK-20260813-DEMO-BRIDGE-05`、[`DR-0007`](DR-0007-task-artifact-action-bridge.md)、[`TASK-ARTIFACT-ACTION-BRIDGE-20260813`](../evidence/DEMO1-DEMO3-TASK-ARTIFACT-ACTION-BRIDGE-EVIDENCE-20260813.md) | 支持固定 `reply_draft -> email.send Simulator` 的跨 Demo 纵切、绑定重校验与幂等创建 | 不证明通用 Task Artifact 动作、真实发送、跨进程 Run 创建幂等或用户价值 |
 | `C-016` | Stakeholder feedback、源码、自动化、模型 smoke 与截图 | 固定 Demo 1 不再从 start 直接跳到 Verify，而是把 Observe、Plan、Act、Verify 分成服务端确认的可恢复阶段；完整 Demo 契约与 Plan/Act 批准文字由服务端严格校验 | `USER-FEEDBACK-20260817-02`、[`DR-0009`](DR-0009-progressive-demo1-stages.md)、[`DEMO1-PROGRESSIVE-STAGES-20260817`](../evidence/DEMO1-PROGRESSIVE-STAGES-EVIDENCE-20260817.md) | 支持固定 Fixture 的阶段协议、回看、刷新恢复、候选压缩和被测桌面/移动交互 | 不证明用户理解提升、后台无人值守、多实例 LLM 去重、真实 token 成本、模型质量或真实 Connector |
+| `C-017` | Stakeholder feedback、官方资料研究、源码、自动化与截图 | Demo 1 来源从代码内常量推进为仓库内项目生成仿真文件包：manifest allowlist/hash、结构化解析、TaskSnapshot 来源快照和操作上下文冲突 | `USER-FEEDBACK-20260820-06`、[`DR-0014`](DR-0014-file-backed-demo1-sources.md)、[`ENTERPRISE-DEMO-DATA-RESEARCH-20260820`](../research/ENTERPRISE-DEMO-DATA-RESEARCH-20260820.md)、[`DEMO1-FILE-BACKED-SOURCES-20260820`](../evidence/DEMO1-FILE-BACKED-SOURCES-EVIDENCE-20260820.md) | 支持仓库仿真文件、前台文件证据卡、来源异常 fail closed 和被测桌面/移动投影 | 文件是项目生成仿真数据，不是 Lenovo/真实客户/真实数据库；不证明真实 Connector、生产恢复或用户价值 |
 | `H-001` | 待验证假设 | Task Bar 与分支列表能降低用户恢复上下文的成本 | 尚无目标用户研究 | 指导前台原型和指标 | `Draft hypothesis`，不得汇报为已提升体验 |
 | `H-002` | 待验证假设 | 冲突只暂停受影响分支能减少等待且不扩散错误 | 固定 Fixture 已有工程行为；无真实任务收益数据 | 指导分支隔离测试 | 功能正确不等于真实业务收益，仍是 `Draft hypothesis` |
 | `H-003` | 待验证假设 | 客户 A 场景代表联想目标办公用户的高价值流程 | 尚无访谈/任务频率证据 | 仅作为 Demo Fixture | 需要情境访谈与真实任务样本验证 |
@@ -81,7 +82,7 @@ PR 3 至 PR 5 的后端可观察落点为：
 - `GET /v1/tasks`、`GET /v1/tasks/{task_id}` 和 Task SSE 均按当前 Owner 过滤，跨 Owner 按不存在处理。
 - Task SSE 按 `after` 轮询 Store 并发送 heartbeat。当前没有 `LISTEN/NOTIFY`、消息代理或跨实例广播，多实例通知未实现或验证。
 
-该 start 路径不调用 LLM，也不读取真实邮箱、CRM、预测表或项目系统；所有阶段在一次服务端事务提交后才对浏览器可见。因此当前结论是“固定 Fixture 的确定性受控纵切”，不是“通用长任务已在后台持续运行”。内存回归已覆盖 Artifact lineage/head、Commit state hash、剩余 open Conflict 不提交和 mutation 原响应幂等；PostgreSQL 16.14 已补齐顺序 API 进程恢复证据。数据库进程重启/崩溃、已有库迁移、Conversation、多实例通知和通用后台 Loop 仍无证据。
+该 start 路径不调用 LLM，也不读取真实邮箱、CRM、预测表或项目系统；当前读取的是仓库内 manifest allowlist 管理的项目生成仿真文件，结构化解析后冻结到 `TaskSnapshot.source_documents[]`。所有阶段在一次服务端事务提交后才对浏览器可见。因此当前结论是“文件驱动仿真资料的确定性受控纵切”，不是“通用长任务已在后台持续运行”，也不是“已接入企业数据库”。内存回归已覆盖 Artifact lineage/head、Commit state hash、剩余 open Conflict 不提交和 mutation 原响应幂等；文件驱动专项单测、API 回归、完整浏览器与截图已按限定工程范围封口。PostgreSQL 16.14 的既有顺序 API 进程恢复证据不能自动扩展到文件系统变化、数据库进程重启/崩溃、已有库迁移、Conversation、多实例通知和通用后台 Loop。
 
 PR 6 的 Task Director 没有改变上述后端事实、接口或状态机；它只重组前台信息层级与客户端视图/选择状态。因此任何视觉上的阶段轨、泳道、汇聚卡、Decision Inbox 数量和同步提示都必须能回指当前 Snapshot 或明确标注为客户端事实。
 
@@ -98,6 +99,10 @@ PR 6 的 Task Director 没有改变上述后端事实、接口或状态机；它
 - 断线、过期版本、预算耗尽、权限不足、部分失败和恢复的明确反馈。
 
 默认隐藏 Prompt、思维链、Worker 对话、完整 Trace JSON、JWT/Permit、幂等键、权限哈希、DSN、工具秘密和堆栈。现有业务动作确认 tray 保持独立，不能与任务级控制合并。
+
+### 文件来源前台修订（2026-08-20）
+
+冲突卡在现有“演示数据来源”折叠区之外增加服务端投影的文件证据：显示名、演示目录下的相对路径、系统标签、记录时间、责任角色、记录状态、字段和值；同时显示 `ConflictRecord.operation_context` 的当前操作、目标字段、尝试值和错位原因。原始 `fixture:` 只保留在服务端用于控制校验和审计，不能进入普通业务 DOM。文件证据缺失或不一致时显示待核验而不是复用旧常量。实现、失败关闭、浏览器截图和 hash 见已封口的限定范围证据 [`DEMO1-FILE-BACKED-SOURCES-20260820`](../evidence/DEMO1-FILE-BACKED-SOURCES-EVIDENCE-20260820.md)。
 
 PR 4 在上述 Task Bar 与控制 UI 之外增加只读交付物工作区。Task 面板从 `branches[].artifact_heads` 直达版本；工作区从同一 Snapshot 显示版本/状态、验证、冲突、结构化内容、折叠来源与检查、lineage 以及 Commit/state hash，并保留原“工作台待办”。当前 Conflict Card 与 Artifact Workspace 共用 fail-closed source-ref 投影：已知固定来源显示为带“演示数据”前缀的业务标签，普通业务 DOM 不接收原始 ID；顶部连接文案由独立传输状态驱动，pending mutation/Snapshot 对账继续由 Task 同步状态表达，避免相互误报。这仍只是前端第二道投影，服务端通用字段可见性 Schema/display projection 尚未实现。
 

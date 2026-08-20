@@ -72,12 +72,12 @@ V0.1 重点验证三件事：
 - 任务进度仍来自同一 `TaskSnapshot`，而 `stage_records` 是每个阶段的服务端 UI 事实：读取资料、拆分任务、生成材料、核对事实分别对应独立 Snapshot/version、摘要、详情、工件引用、来源和时间。v6 固定事实为 5 个工件、1 个开放冲突、2 个已验证工件；解决冲突后 v7 为 `committed / commit`。视觉阶段、连接线和颜色不能自行推断进度。
 - 收入冲突区在提交前同时说明“为什么需要你”，并读取服务端 `resolution_options[].expected_impact` 逐项预演经营分析、客户回复草稿、风险页和外部发送的 `before → after`。主动作提交 `resolution_option_id + resolve_evidence`；服务端应用后把实际工件、验证、Commit、版本和未发送边界写入 `ControlEvent.impact_receipt`，完成态再显示“变化回执”。查看材料是次级动作；Steer、Pause 和 Take over 收入“其他处理方式”。
 - 完成态直接列出 `last_commit` 支持的三项可复核成果，并明确客户回复仍为草稿、未发送；不再用“没有待决策项”代表完成。每个 Branch head 可在“成果”中查看当前版本、验证、冲突、结构化内容、来源、lineage 与 Commit 证据；默认 mutation 后跟随新 head，用户主动查看旧版本时显示明确历史 banner 和返回动作。
-- “执行记录”保留原手工待办编辑流程。固定 Demo 1 的四个已知 `source_ref` 投影为“演示数据 · 客户往来邮件 / CRM 正式收入记录 / 收入预测表 / 客户项目周报（版本）”；原始 `fixture:` 标识和未知来源值不进入普通业务 DOM，未知值显示隐藏占位。服务端仍保存原值用于校验与审计；这只是前端第二道防线，不代表服务端数据删除，也不是通用字段安全保证。
+- “执行记录”保留原手工待办编辑流程。Demo 1 当前从仓库内 `demo-enterprise-data/customer-a/` 的四个项目生成仿真文件读取来源：客户来信 `.eml`、CRM 收入记录 `.csv`、收入预测 `.csv` 和项目周报 `.json`。`manifest.json` 先做 allowlist、相对路径、文件大小、非符号链接和 SHA-256 校验，再交给受限结构化解析器；`TaskSnapshot.source_documents[]` 在创建时冻结，冲突的 `operation_context` 记录当前操作与文件事实的字段差异，Tasks 前台展示文件名、系统标签、记录时间和字段级依据。它们不是 Lenovo、真实客户、实时企业数据库或 Connector；原始 `fixture:` 只作服务端稳定控制/审计 ID，不进入普通业务 DOM。文件缺失、篡改、解析失败或 manifest 不一致时必须 fail closed，不显示猜测来源。这只是前台投影和演示数据链路，不是通用文件安全保证。
 - Task SSE 只用于发现新事件并触发 Snapshot 对账；同步标记只表示客户端传输状态，不代表后台仍在执行。未知 mutation 会在当前标签页保存原 key、intent 与预期版本。浏览器 E2E 已覆盖 start 请求发送前 abort、reload、同 key 对账和无重复工件；PR 5 的 system Edge 运行还覆盖同页 API 进程停止、控制禁用、顶部与 Task 面板一致显示恢复中，以及新进程启动后的 Snapshot 对账。尚未覆盖请求已到服务端但响应丢失或断线期间产生新事件的 `after` 回放。
 - 最终提交且验证通过的客户回复草稿现在可以进入 Demo 3 治理链。完成态只提供“准备发送客户回复”：服务端把 Task、Commit、ArtifactVersion、内容摘要和 VerificationReport 绑定到 `ProposedActionSpec`，确认卡展示版本、L4 原因、外部目标和为什么必须由人确认；批准后才签发一次性 Permit 并调用 Email Simulator。绑定变化时旧 Action 失效，拒绝或动作失败不会回滚已完成的 Task Commit。
 - Action Gate 打开时保留后台任务摘要，但 Task 跳转与 Tasks 中的决定控制不可用。Gate 使用右侧完整独立网格行，收起后把空间归还给对话。当前 Task 派生动作只支持固定客户 A 的最终回复草稿与演示地址，不是通用 Artifact Action registry。
 
-这仍是固定演示数据的单 Task 纵切，不是通用后台调度器或真实 Connector。浏览器在每次 Snapshot 确认后协调下一次 `advance`；关闭浏览器后停在最后一个已持久化阶段，重新打开再继续。预算当前是步骤、工具调用和运行时长预算，不是 token 成本或供应商账单；同进程同 key 有并发去重，跨实例只有 CAS/幂等保护而没有分布式 LLM lease。模型 smoke 只证明连通和严格响应形状，不证明生成质量。人工编辑后产生新版本、响应丢失、断线事件回放、数据库故障/迁移、多实例通知、通用后台 Loop 和目标用户理解仍待验证。Task 恢复也不等于 Conversation 恢复，Thread/Message 仍在 API 内存中。
+这仍是文件驱动的项目生成仿真单 Task 纵切，不是 Lenovo/真实客户数据库、实时企业 Connector、通用后台调度器或生产数据接入。文件包与 manifest 的篡改/缺失 fail closed；浏览器在每次 Snapshot 确认后协调下一次 `advance`，关闭浏览器后停在最后一个已持久化阶段，重新打开再继续。预算当前是步骤、工具调用和运行时长预算，不是 token 成本或供应商账单；同进程同 key 有并发去重，跨实例只有 CAS/幂等保护而没有分布式 LLM lease。模型 smoke 只证明连通和严格响应形状，不证明生成质量。文件证据已通过源码、全量自动化与桌面/移动截图按限定工程范围封口，精确提交、PR、测试数字与 hash 见 [`DEMO1-FILE-BACKED-SOURCES-EVIDENCE-20260820`](docs/evidence/DEMO1-FILE-BACKED-SOURCES-EVIDENCE-20260820.md)。人工编辑后产生新版本、响应丢失、断线事件回放、数据库故障/迁移、多实例通知、通用后台 Loop 和目标用户理解仍待验证。Task 恢复也不等于 Conversation 恢复，Thread/Message 仍在 API 内存中。
 
 ### Demo 2 智能工作驾驶舱第一纵切（DR-0008，限定范围 Verified）
 
@@ -150,6 +150,10 @@ flowchart LR
 - [Demo 1 Task Runtime 协议](docs/contracts/TASK_RUNTIME_PROTOCOL.md)
 - [Demo 1 UI—服务端事实矩阵](docs/contracts/UI_SERVER_FACT_MATRIX.md)
 - [Demo 1 场景与决策记录](docs/scenarios/SCENARIO-001-customer-a-durable-report.md)
+- [Demo 1 文件驱动来源决策](docs/decisions/DR-0014-file-backed-demo1-sources.md)
+- [企业演示数据结构调研](docs/research/ENTERPRISE-DEMO-DATA-RESEARCH-20260820.md)
+- [文件驱动来源证据](docs/evidence/DEMO1-FILE-BACKED-SOURCES-EVIDENCE-20260820.md)
+- [文件驱动需求反馈](docs/sources/USER-FEEDBACK-20260820-06-file-backed-enterprise-demo.md)
 - [Demo 1 PR 3 运行证据与边界](docs/evidence/DEMO1-PR3-RUNTIME-EVIDENCE.md)
 - [Demo 1 PR 4 前端与 E2E 证据](docs/evidence/DEMO1-PR4-FRONTEND-E2E-EVIDENCE.md)
 - [Demo 1 PR 5 PostgreSQL-backed API 重启证据](docs/evidence/DEMO1-PR5-POSTGRES-BACKED-API-RESTART-EVIDENCE.md)
@@ -278,7 +282,7 @@ V0.1 定稿基线和 Demo 1 各 PR 的实际验证结果记录在 [`DR-0002`](do
 ## 数据、身份与安全边界
 
 - `X-User-Id` 与 `X-User-Roles` 只是 V0.1 Demo 身份头，默认前端使用 `demo_user` 和 `current_user,sales_manager`；生产环境必须替换为经过验证的 SSO/JWT。
-- 内部邮箱、CRM、报价、OA、知识库和日历内容均为确定性演示数据，不是真实企业数据；固定 Demo 1 的普通业务 UI 必须明确标注“演示数据”，不得显示原始 `fixture:` ID。
+- 内部邮箱、CRM、报价、OA、知识库和日历内容均为确定性演示数据，不是真实企业数据；Demo 1 的 `demo-enterprise-data/customer-a/` 是项目生成的仿真文件包，不是 Lenovo/真实客户数据库或 Connector。普通业务 UI 必须明确标注“演示数据”，不得显示原始 `fixture:` ID、绝对路径或完整摘要。
 - 报价工作台不访问真实 CRM/CPQ/ERP；当前公式只覆盖数量、标准价和单行折后比例，不含税费、汇率、阶梯价、套餐依赖或真实审批制度。当前模型仍为 `deepseek-v4-pro`，但报价数值问答由确定性代码完成。
 - Workspace revision 校验和 Conversation/Workspace 锁当前只在单个 API 进程内形成一致性保护；没有数据库原子 compare-and-swap、多实例锁或跨实例 Conversation 顺序验证。前端三方重应用也不是通用多人协作文档合并器。
 - 未解析收件人/附件当前采用固定 deny，而不是已接入企业通讯录或内容分类服务；附件名称识别只适用于演示规则。Run/Thread 绑定与结果重放仍随 Conversation 内存边界，API 重启后不恢复。
