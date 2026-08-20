@@ -238,17 +238,24 @@ test("a verified reply becomes a version-bound governed simulator action", async
     action: { task_artifact_binding: { artifact_version_id: string } | null };
   };
 
-  const gate = page.getByRole("dialog", { name: "动作确认" });
+  const gate = page.getByRole("dialog", { name: "动作影响账本" });
   await expect(gate).toBeVisible();
-  await expect(gate.getByRole("heading", { name: "发送客户邮件" })).toBeVisible();
+  await expect(gate.getByRole("heading", { name: "发送外部邮件" })).toBeVisible();
+  await expect(gate.getByText("预演已生成", { exact: true })).toBeVisible();
+  await expect(gate.getByText("会改变", { exact: true })).toBeVisible();
+  await expect(gate.getByText("会重新核对", { exact: true })).toBeVisible();
+  await expect(gate.getByText("会保持", { exact: true })).toBeVisible();
+  await expect(gate.getByText("不会发生", { exact: true })).toBeVisible();
   await expect(gate.getByText("基于已核对成果", { exact: true })).toBeVisible();
   await expect(gate.getByText(/客户回复草稿 v3 · 本轮汇报 v7/)).toBeVisible();
   await expect(gate.getByText("发送外部邮件", { exact: true }).first()).toBeVisible();
   await expect(gate.getByText("企业外客户", { exact: true })).toBeVisible();
   await expect(gate.getByText("customer@example.com", { exact: true })).toBeVisible();
-  await expect(gate.getByText(/尚未发送/)).toBeVisible();
-  await expect(gate.getByText("为什么需要你确认", { exact: true })).toBeVisible();
-  await expect(gate.getByText(/拒绝不会改变已经完成的汇报成果/)).toBeVisible();
+  await expect(gate.getByText(/动作只绑定这一版成果/)).toBeVisible();
+  await expect(gate).not.toContainText("email_simulator");
+  await expect(gate).not.toContainText("office_action_simulator");
+  await expect(gate).not.toContainText("email.send");
+  await expect(gate).not.toContainText("Permit");
   const [gateBox, sidePaneBox] = await Promise.all([
     gate.boundingBox(),
     page.locator(".task-director-side-pane").boundingBox(),
@@ -267,16 +274,21 @@ test("a verified reply becomes a version-bound governed simulator action", async
   expect(gateBox!.x).toBeGreaterThanOrEqual(sidePaneBox!.x);
   expect(gateBox!.x + gateBox!.width).toBeLessThanOrEqual(sidePaneBox!.x + sidePaneBox!.width + 1);
   expect(prepareCount).toBe(1);
-  await attachScreenshot(page, testInfo, "task-artifact-action-gate-1440");
+  await expect(page.locator(".workspace-toast")).toHaveCount(0);
+  await attachScreenshot(page, testInfo, "demo3-action-impact-preview-1440");
 
-  await gate.getByRole("button", { name: "批准" }).click();
-  await expect(gate.getByText("审批条件已满足", { exact: true })).toBeVisible();
-  await gate.getByRole("button", { name: "确认执行" }).click();
+  await gate.getByRole("button", { name: "批准这次影响" }).click();
+  await expect(gate.getByText("你的批准已记录", { exact: true })).toBeVisible();
+  await gate.getByRole("button", { name: "执行这次已批准的动作" }).click();
 
   await expect(page.getByText(/交给 Email Simulator 完成了模拟发送/)).toBeVisible();
   await expect(page.getByText(/没有向真实客户发送邮件/)).toBeVisible();
+  await expect(gate.getByText("服务端已返回实际回执", { exact: true })).toBeVisible();
+  await expect(gate.getByText("实际回执", { exact: true })).toBeVisible();
+  await expect(gate.getByRole("heading", { name: "发送外部邮件" })).toBeVisible();
+  await attachScreenshot(page, testInfo, "demo3-action-impact-receipt-1440");
+  await gate.getByRole("button", { name: "收起动作回执" }).click();
   await expect(gate).toHaveCount(0);
-  await attachScreenshot(page, testInfo, "task-artifact-action-result-1440");
 
   expect(prepared.action.task_artifact_binding?.artifact_version_id).toBeTruthy();
   const runResponse = await request.get(`${API_URL}/v1/runs/${prepared.run_id}`, {
@@ -286,19 +298,31 @@ test("a verified reply becomes a version-bound governed simulator action", async
   const completed = await runResponse.json() as {
     status: string;
     tool_result: { simulator: string; output: { simulated: boolean } } | null;
+    execution_receipt: { items: { item_id: string; change_kind: string }[] } | null;
   };
   expect(completed.status).toBe("EXECUTED");
   expect(completed.tool_result?.simulator).toBe("email_simulator");
   expect(completed.tool_result?.output.simulated).toBe(true);
+  expect(completed.execution_receipt?.items.length).toBeGreaterThan(0);
   const auditResponse = await request.get(`${API_URL}/v1/audit/${prepared.trace_id}`, {
     headers: ownerHeaders(owner),
   });
   const audit = await auditResponse.json() as { event_type: string }[];
   expect(audit.map((event) => event.event_type)).toContain("PERMIT_ISSUED");
   expect(audit.map((event) => event.event_type)).toContain("TOOL_EXECUTED");
+
+  await page.getByRole("button", { name: "审计", exact: true }).click();
+  const auditPage = page.locator(".audit-page");
+  await expect(auditPage.getByText("受控演示动作已执行", { exact: true })).toBeVisible();
+  await expect(auditPage).not.toContainText("email_simulator");
+  await expect(auditPage).not.toContainText("email.send");
+  await expect(auditPage).not.toContainText("PERMIT_ISSUED");
+  await expect(auditPage).not.toContainText("Permit");
+  await auditPage.getByText("受控演示动作已执行", { exact: true }).click();
+  await expect(auditPage.getByText("受控演示工具已返回结果；真实外部系统未连接。", { exact: true })).toBeVisible();
 });
 
-test("rejecting a task-derived action leaves the completed report intact", async ({ page, request }) => {
+test("rejecting a task-derived action leaves the completed report intact", async ({ page, request }, testInfo) => {
   const owner = "e2e_task_action_reject";
   await routeBrowserApiAs(page, owner);
   await page.setViewportSize({ width: 1440, height: 900 });
@@ -310,11 +334,12 @@ test("rejecting a task-derived action leaves the completed report intact", async
   await expect(page.getByRole("heading", { name: "客户 A 经营汇报已准备完成" })).toBeVisible();
   await page.getByRole("button", { name: "准备发送客户回复", exact: true }).click();
 
-  const gate = page.getByRole("dialog", { name: "动作确认" });
+  const gate = page.getByRole("dialog", { name: "动作影响账本" });
   await expect(gate).toBeVisible();
-  await gate.getByRole("button", { name: "拒绝", exact: true }).click();
-  await expect(page.getByText(/动作已被策略拒绝，没有执行，也没有连接真实邮箱/)).toBeVisible();
-  await expect(gate).toHaveCount(0);
+  await gate.getByRole("button", { name: "不执行", exact: true }).click();
+  await expect(gate.getByText("服务端确认本次未执行", { exact: true })).toBeVisible();
+  await expect(gate.getByRole("heading", { name: "发送外部邮件" })).toBeVisible();
+  await attachScreenshot(page, testInfo, "demo3-action-impact-denied-1440");
 
   const tasks = await listTasks(request, owner);
   expect(tasks).toHaveLength(1);
@@ -322,6 +347,66 @@ test("rejecting a task-derived action leaves the completed report intact", async
   const commit = tasks[0].last_commit;
   expect(commit).not.toBeNull();
   expect(commit?.artifact_version_ids).toHaveLength(3);
+});
+
+test("keeps the action impact ledger readable and bounded on mobile", async ({ page }, testInfo) => {
+  const owner = "e2e_task_action_mobile";
+  await routeBrowserApiAs(page, owner);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/");
+  await openLongTask(page);
+  await page.getByRole("button", { name: "开始准备汇报", exact: true }).click();
+  await page.getByRole("button", { name: "采用正式口径并继续核对", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "客户 A 经营汇报已准备完成" })).toBeVisible();
+  await page.getByRole("button", { name: "准备发送客户回复", exact: true }).click();
+
+  const ledger = page.getByRole("dialog", { name: "动作影响账本" });
+  await expect(ledger).toBeVisible();
+  await expect(ledger.getByRole("button", { name: "批准这次影响" })).toBeVisible();
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1);
+  expect(overflow).toBe(false);
+  const undersized = await ledger.locator("button, select, summary").evaluateAll(elements => elements.flatMap(element => {
+    const rect = element.getBoundingClientRect();
+    return rect.width > 0 && rect.height > 0 && rect.height < 44 ? [element.textContent?.trim()] : [];
+  }));
+  expect(undersized).toEqual([]);
+  const nestedScroll = await ledger.evaluate(element => element.scrollHeight > element.clientHeight + 1);
+  expect(nestedScroll).toBe(false);
+  await expect(ledger.getByText("会改变", { exact: true })).toBeVisible();
+  await expect(ledger.getByText("不会发生", { exact: true })).toBeVisible();
+  await attachScreenshot(page, testInfo, "demo3-action-impact-preview-mobile-390");
+});
+
+test("fails closed when the server omits the impact preview", async ({ page }) => {
+  const owner = "e2e_task_action_no_preview";
+  await routeBrowserApiAs(page, owner);
+  await page.route(/\/v1\/tasks\/[^/]+\/artifacts\/[^/]+\/actions\/email-send$/, async route => {
+    const response = await route.fetch({
+      headers: {
+        ...route.request().headers(),
+        "x-user-id": owner,
+        "x-user-roles": "current_user,sales_manager",
+      },
+    });
+    const body = await response.json() as Record<string, unknown>;
+    delete body.impact_preview;
+    const headers: Record<string, string> = { ...response.headers(), "content-type": "application/json" };
+    delete headers["content-length"];
+    delete headers["content-encoding"];
+    await route.fulfill({ status: response.status(), headers, body: JSON.stringify(body) });
+  });
+  await page.goto("/");
+  await openLongTask(page);
+  await page.getByRole("button", { name: "开始准备汇报", exact: true }).click();
+  await page.getByRole("button", { name: "采用正式口径并继续核对", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "客户 A 经营汇报已准备完成" })).toBeVisible();
+  await page.getByRole("button", { name: "准备发送客户回复", exact: true }).click();
+
+  const ledger = page.getByRole("dialog", { name: "动作影响账本" });
+  await expect(ledger).toBeVisible();
+  await expect(ledger.getByText(/服务端尚未提供完整影响预演/)).toBeVisible();
+  await expect(ledger.getByRole("button", { name: "批准这次影响" })).toBeDisabled();
+  await expect(ledger.getByRole("button", { name: "执行这次已批准的动作" })).toHaveCount(0);
 });
 
 test("the initial task lookup cannot expose a duplicate-create action", async ({ page, request }) => {

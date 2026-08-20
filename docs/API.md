@@ -345,8 +345,11 @@ deliverable_id / verification_report_id
 ```text
 run_id / trace_id / thread_id / user_id / user_message / trusted_context
 status / action / risk / policy_effects / evidence / approvals
-control_plan / permit / tool_result / created_at / updated_at
+control_plan / permit / tool_result / impact_preview / execution_receipt
+created_at / updated_at
 ```
+
+`impact_preview` 与 `execution_receipt` 是 `DR-0012` 的服务端字段对象，分别包含 `items[]`。每个 `ImpactItem` 使用 `item_id/change_kind/label/before/after`，并固定映射 `target-change→will_change`、`binding-recheck→will_recheck`、`task-preserved→unchanged`、`real-connector-not-called→no_external_action`。前者由服务端在 Action、Risk、Policy、Evidence 和 ControlPlan 评估后生成，后者只在治理事件或 `ToolExecutionResult` 产生后生成。前端不得将 preview 复制成 receipt，也不得从按钮点击、颜色或动画推断执行结果。
 
 ### 3.8 补证据、审批和最终授权
 
@@ -451,6 +454,10 @@ data: {"sequence":168,"event_id":"...","run_id":"...","trace_id":"...",...}
 - `TAMPER_BLOCKED`
 
 没有新事件时服务端发送 `: heartbeat` 注释。断线重连时把最后接收的 `sequence` 作为 `after`，只读取后续事件。审计流属于运行事实，不等同于 Conversation SSE 的视觉增量。
+
+普通业务审计工作台不是原始事件查看器：前端必须把 `event_type`、`payload`、`trace`、`email_simulator`、`email.send`、`PERMIT_ISSUED` 和 `Permit` 投影为可读业务标签与服务端摘要，不得把原值渲染进普通业务 DOM。原始事件仍由 API/服务端审计保留，只有受控技术审计视图可查看。
+
+Demo 3 Action Gate 使用 RunSnapshot 和上述有序事件投影“动作影响账本”。预演固定显示“会改变 / 会重新核对 / 保持不变 / 不会发生”；`TOOL_EXECUTED` 的结果必须标记为 Simulator 结果，不能表述为真实邮箱、CRM、OA、日历或任务系统写入。`ACTION_INVALIDATED`、`TAMPER_BLOCKED`、拒绝和 `FAILED` 都必须显示动作未产生真实外部影响，并保留已完成 Task/Artifact/Commit 不变。固定 Demo 3 工程纵切已由 Python `151 passed, 1 skipped in 3.69s`、完整浏览器 `37 passed (2.2m)`、Ruff、governance、lint 和 build 验证；视觉终验无 P0/P1。实现提交为 `9335470`，文档提交为 `34aee71`，对应 [PR #18](https://github.com/Dickey007s/lenovo_agent/pull/18)。跨进程执行幂等/Permit replay、多实例/数据库恢复、真实 Connector 和用户理解不在该结论内。
 
 ## 6. Task SSE
 

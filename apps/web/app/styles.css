@@ -472,6 +472,7 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outlin
 .audit-timeline summary > i { color: var(--faint); font-style: normal; transition: transform var(--t-med) var(--ease); }
 .audit-timeline details[open] summary > i { transform: rotate(180deg); }
 .audit-timeline pre { max-height: 300px; overflow: auto; margin: 0 18px 18px 72px; padding: 15px; border-radius: 11px; color: #cfd6e2; background: #17191d; box-shadow: inset 0 1px 0 rgba(255, 255, 255, .05); font-size: 11px; line-height: 1.65; animation: reveal .18s var(--ease) both; }
+.audit-timeline details > p { margin: 0 18px 18px 72px; padding: 12px 14px; border-left: 3px solid #1265d6; color: #44515e; background: #f2f7fd; font-size: 11px; line-height: 1.55; animation: reveal .18s var(--ease) both; }
 .workspace-empty { display: grid; min-height: calc(100dvh - 170px); place-items: center; align-content: center; gap: 10px; color: var(--muted); text-align: center; }
 .workspace-empty span { font-size: 30px; opacity: .45; }
 .workspace-empty strong { color: var(--ink); font-size: 15px; }
@@ -602,6 +603,98 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outlin
 .approval-final > div { display: grid; gap: 3px; }
 .approval-final strong { color: var(--green); font-size: 12px; }
 .approval-final small { color: #5a7a6c; font-size: 10.5px; }
+.action-impact-overlay { overflow: hidden; }
+.action-impact-ledger { border-top-color: #1265d6; }
+.action-impact-ledger.is-terminal { border-top-color: var(--green); }
+.action-impact-ledger.is-failed { border-top-color: var(--red); }
+.action-impact-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.action-impact-header > div:first-child { min-width: 0; }
+.action-impact-header h2 { margin-top: 4px; text-transform: none; }
+.action-impact-stage b { display: inline-flex; min-height: 25px; align-items: center; padding: 0 8px; border: 1px solid #b9d6ef; border-radius: 999px; color: #1265d6; background: #eef5ff; font-size: 10px; white-space: nowrap; }
+.action-impact-stage b.is-done { border-color: #b9d6c7; color: var(--green); background: var(--green-soft); }
+.action-impact-stage b.is-failed, .action-impact-ledger.is-failed .action-impact-stage b { border-color: #e8c5c2; color: var(--red); background: var(--red-soft); }
+.action-impact-stage { display: flex; align-items: center; gap: 6px; }
+.action-impact-dismiss { display: grid; width: 28px; height: 28px; place-items: center; border: 1px solid var(--line); border-radius: 7px; color: var(--muted); background: #fff; }
+.action-impact-dismiss:hover { border-color: var(--ink); color: var(--ink); }
+.action-impact-dismiss svg { width: 14px; height: 14px; }
+.action-impact-stage b.is-blocked { border-color: #eadcbc; color: var(--amber); background: var(--amber-soft); }
+.action-impact-steps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px; margin-top: 12px; padding: 5px; border: 1px solid var(--line); border-radius: 8px; background: #f7f8f9; }
+.action-impact-steps span { display: flex; align-items: center; justify-content: center; gap: 5px; min-height: 28px; color: var(--faint); font-size: 10.5px; font-weight: 750; }
+.action-impact-steps span i { display: grid; width: 17px; height: 17px; place-items: center; border-radius: 50%; color: #6b737b; background: #e7eaed; font-style: normal; font-size: 9px; }
+.action-impact-steps span.is-current { color: #1265d6; background: #eef5ff; }
+.action-impact-steps span.is-current i { color: #fff; background: #1265d6; }
+.action-impact-steps span.is-done { color: var(--green); }
+.action-impact-steps span.is-done i { color: #fff; background: var(--green); }
+.action-impact-action-facts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); margin-top: 9px; border: 1px solid var(--line); background: #fbfaf8; }
+.action-impact-action-facts > span { min-width: 0; display: grid; gap: 4px; padding: 7px 9px; border-right: 1px solid var(--line); }
+.action-impact-action-facts > span:last-child { border-right: 0; }
+.action-impact-action-facts small { color: var(--faint); font-size: 10px; font-weight: 700; }
+.action-impact-action-facts strong { overflow-wrap: anywhere; color: #303841; font-size: 11.5px; line-height: 1.4; }
+.action-impact-groups { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; margin-top: 10px; }
+.action-impact-group { min-width: 0; padding: 8px 9px; border: 1px solid var(--line); border-left: 3px solid #1265d6; background: #fbfcfd; }
+.action-impact-group.is-recheck { border-left-color: var(--amber); }
+.action-impact-group.is-preserve { border-left-color: var(--green); }
+.action-impact-group.is-no-action { border-left-color: #78828d; }
+.action-impact-group > header { display: flex; align-items: baseline; justify-content: space-between; gap: 7px; }
+.action-impact-group > header span { color: #24313c; font-size: 12px; font-weight: 800; }
+.action-impact-group > header small { color: var(--faint); font-size: 10px; }
+.action-impact-group ul { display: grid; gap: 6px; margin: 7px 0 0; padding: 0; list-style: none; }
+.action-impact-group li { min-width: 0; display: grid; grid-template-columns: 16px minmax(0, 1fr); gap: 5px; }
+.action-impact-item-mark { display: grid; width: 16px; height: 16px; place-items: center; color: #1265d6; }
+.action-impact-item-mark svg { width: 13px; height: 13px; stroke-width: 2; }
+.is-receipt.is-success .action-impact-item-mark { color: var(--green); }
+.is-receipt.is-denied .action-impact-item-mark { color: var(--red); }
+.is-receipt.is-uncertain .action-impact-item-mark { color: var(--amber); }
+.action-impact-group li div { min-width: 0; display: grid; gap: 2px; }
+.action-impact-group li strong { overflow-wrap: anywhere; color: #303841; font-size: 11.5px; line-height: 1.45; }
+.action-impact-group li small { overflow-wrap: anywhere; color: var(--faint); font-size: 10.5px; line-height: 1.4; }
+.action-impact-transition { display: inline-flex; align-items: center; gap: 3px; color: #4e6a84 !important; }
+.action-impact-transition svg { width: 11px; height: 11px; }
+.action-impact-unavailable { margin: 7px 0 0; color: var(--muted); font-size: 10.5px; line-height: 1.45; }
+.action-impact-fail-closed { display: flex; align-items: flex-start; gap: 7px; margin-top: 9px; padding: 8px 9px; border-left: 3px solid var(--amber); color: #735b3a; background: var(--amber-soft); font-size: 11px; line-height: 1.5; }
+.action-impact-fail-closed svg { flex: 0 0 auto; width: 15px; height: 15px; }
+.action-impact-receipt-heading { display: flex; align-items: flex-start; gap: 8px; margin-top: 11px; padding: 9px 10px; border-left: 3px solid var(--green); color: #286545; background: var(--green-soft); }
+.action-impact-receipt-heading.is-failed { border-left-color: var(--red); color: #923e3a; background: var(--red-soft); }
+.action-impact-receipt-heading.is-failed small { color: #9a6561; }
+.action-impact-receipt-heading svg { flex: 0 0 auto; width: 18px; height: 18px; }
+.action-impact-receipt-heading div { display: grid; gap: 3px; }
+.action-impact-receipt-heading strong { font-size: 12px; }
+.action-impact-receipt-heading small { color: #5a7a6c; font-size: 10.5px; line-height: 1.45; }
+.action-impact-tool-result { margin-top: 8px; }
+.action-impact-tool-result p { margin: 8px 12px 0; color: var(--muted); font-size: 9px; line-height: 1.4; }
+.action-impact-tool-result p:last-child { margin-bottom: 10px; }
+.action-impact-status-note { margin-top: 9px; padding: 8px 10px; color: var(--muted); background: #f5f6f7; font-size: 10px; }
+.action-impact-final { align-items: center; }
+.action-impact-final button { min-height: 38px; }
+.action-impact-final button:disabled, .approval-role button:disabled { cursor: not-allowed; opacity: .52; }
+.action-impact-ledger .approval-role button { display: inline-flex; align-items: center; justify-content: center; gap: 5px; }
+.action-impact-ledger .approval-role button svg { width: 14px; height: 14px; }
+
+@media (min-width: 901px) {
+  .action-impact-ledger { padding: 11px 12px; border-radius: 12px; }
+  .action-impact-ledger .action-impact-header h2 { margin-top: 2px; font-size: 15px; }
+  .action-impact-ledger .action-impact-steps { margin-top: 7px; padding: 3px; }
+  .action-impact-ledger .action-impact-steps span { min-height: 24px; }
+  .action-impact-ledger .approval-task-binding { gap: 2px; margin-bottom: 6px; padding: 7px 9px; }
+  .action-impact-ledger .approval-task-binding small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .action-impact-ledger .action-impact-action-facts { margin-top: 6px; }
+  .action-impact-ledger .action-impact-action-facts > span { gap: 2px; padding: 5px 7px; }
+  .action-impact-ledger .approval-summary { margin: 6px 0 4px; font-size: 10.5px; line-height: 1.45; }
+  .action-impact-ledger .action-impact-groups { gap: 4px; margin-top: 6px; }
+  .action-impact-ledger .action-impact-group { padding: 6px 7px; }
+  .action-impact-ledger .action-impact-group > header small { display: none; }
+  .action-impact-ledger .action-impact-group ul { gap: 3px; margin-top: 4px; }
+  .action-impact-ledger .action-impact-group li { grid-template-columns: 14px minmax(0, 1fr); gap: 3px; }
+  .action-impact-ledger .action-impact-item-mark { width: 14px; height: 14px; }
+  .action-impact-ledger .action-impact-group li strong { font-size: 10.5px; line-height: 1.3; }
+  .action-impact-ledger .action-impact-group li small { font-size: 9.5px; line-height: 1.3; }
+  .action-impact-ledger .action-impact-receipt-heading { margin-top: 6px; padding: 6px 8px; }
+  .action-impact-ledger .action-impact-receipt-heading small { line-height: 1.3; }
+  .action-impact-ledger .approval-role,
+  .action-impact-ledger .action-impact-final { margin-top: 6px; padding: 8px 9px; }
+  .action-impact-ledger .approval-role button,
+  .action-impact-ledger .action-impact-final button { min-height: 34px; }
+}
 .task-director-side-pane .approval-modal { padding: 14px; border-radius: 12px; }
 .task-director-side-pane .approval-modal h2 { font-size: 16px; }
 .task-director-side-pane .approval-summary { margin: 10px 0 8px; font-size: 11px; line-height: 1.55; }
@@ -881,6 +974,19 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outlin
 .chat-pane.has-action-gate .approval-modal { width: 100%; height: 100%; max-height: none; }
 .chat-pane.has-action-gate:has(.approval-overlay.collapsed) { grid-template-rows: auto auto minmax(0, 58px) minmax(180px, 1fr) auto; }
 .chat-pane.has-action-gate .approval-overlay.collapsed .approval-modal { height: auto; }
+.chat-pane.has-action-receipt { grid-template-rows: auto auto minmax(0, 1fr) auto minmax(0, 300px); }
+.chat-pane.has-action-receipt .conversation { grid-row: 3; }
+.chat-pane.has-action-receipt .chat-footer { grid-row: 4; }
+.chat-pane.has-action-receipt .action-impact-overlay { position: static; grid-row: 5; min-height: 0; overflow: hidden; padding: 10px; }
+.chat-pane.has-action-receipt .action-impact-ledger { width: 100%; max-height: 100%; overflow-y: auto; }
+.task-director-side-pane.has-action-gate .active-task-strip,
+.task-director-side-pane.has-action-receipt .active-task-strip { display: none; }
+
+@media (min-width: 1281px) {
+  .app-shell.is-task-director:has(.action-impact-ledger) {
+    grid-template-columns: minmax(0, calc(100% - 449px)) 9px minmax(420px, 440px);
+  }
+}
 
 @media (max-width: 980px) {
   .task-artifact-workspace-body { grid-template-columns: minmax(190px, 230px) minmax(0, 1fr); }
@@ -926,6 +1032,7 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outlin
   .chat-pane { height: 82dvh; min-height: 740px; grid-template-rows: auto auto minmax(0, 220px) minmax(180px, 1fr) auto; }
   .chat-pane.without-task-runtime { grid-template-rows: auto auto minmax(180px, 1fr) auto; }
   .chat-pane.has-action-gate { grid-template-rows: auto auto minmax(0, 220px) minmax(180px, 1fr) auto; }
+  .chat-pane.has-action-receipt { grid-template-rows: auto auto minmax(180px, 1fr) auto minmax(0, 280px); }
   .active-task-strip { min-height: 96px; padding: 12px 14px; }
   .active-task-strip.empty { grid-template-columns: minmax(0, 1fr) auto; }
   .task-strip-facts > div { padding-inline: 5px; }
@@ -934,6 +1041,22 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outlin
   .task-create-button, .task-sync-state button, .task-runtime-start button, .task-conflict > button, .task-branch-actions button, .task-branch-artifacts button, .task-steer-form input, .task-steer-form button { min-height: 44px; font-size: 10px; }
   .approval-header-actions > button, .approval-role button, .approval-gate button, .approval-final button, .chat-composer button { min-width: 44px; min-height: 44px; }
   .approval-gate select, .approval-details summary { min-height: 44px; }
+  .action-impact-groups { grid-template-columns: 1fr; }
+  .action-impact-action-facts { grid-template-columns: 1fr; }
+  .action-impact-action-facts > span { border-right: 0; border-bottom: 1px solid var(--line); }
+  .action-impact-action-facts > span:last-child { border-bottom: 0; }
+  .action-impact-steps span { min-height: 38px; }
+  .action-impact-ledger .approval-role { align-items: stretch; flex-direction: column; }
+  .action-impact-ledger .approval-role > div { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .action-impact-ledger .approval-role button, .action-impact-final button { min-height: 46px; }
+  .action-impact-final { align-items: stretch; flex-direction: column; }
+  .action-impact-final button { width: 100%; }
+}
+
+@media (max-width: 900px) {
+  .chat-pane.has-action-receipt { height: auto; min-height: 0; grid-template-rows: auto auto auto auto auto; }
+  .chat-pane.has-action-receipt .action-impact-overlay { overflow: visible; padding: 8px; }
+  .chat-pane.has-action-receipt .action-impact-ledger { max-height: none; overflow: visible; }
 }
 
 /* ============================================================
@@ -1166,7 +1289,8 @@ button.task-director-stage-card:hover { border-color: #98a3af; background: #fafb
 
 .task-director-side-pane { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); border-left: 0; background: #fff; }
 .chat-pane.task-director-side-pane.has-action-gate,
-.chat-pane.task-director-side-pane.has-action-gate:has(.approval-overlay.collapsed) { grid-template-rows: auto minmax(0, 1fr); }
+.chat-pane.task-director-side-pane.has-action-gate:has(.approval-overlay.collapsed),
+.chat-pane.task-director-side-pane.has-action-receipt { grid-template-rows: auto minmax(0, 1fr); }
 .task-side-mode-switch { width: calc(100% - 24px); grid-column: 1 / -1; justify-self: stretch; margin: 10px 12px 0; }
 .task-side-mode-switch button { flex: 1; min-height: 34px; }
 .task-decision-layout { min-width: 0; min-height: 0; display: grid; grid-template-rows: auto auto minmax(0, 1fr) auto; overflow: hidden; }
@@ -1312,21 +1436,32 @@ button.task-director-stage-card:hover { border-color: #98a3af; background: #fafb
 .chat-pane.without-task-runtime .task-conversation-panel > .conversation { grid-row: 3; }
 .chat-pane.without-task-runtime .task-conversation-panel > .chat-footer { grid-row: 4; }
 .task-conversation-panel.is-task-workspace { min-height: 0; display: grid; grid-column: 1 / -1; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto minmax(0, 1fr) auto; overflow: hidden; }
-.chat-pane.has-action-gate .task-conversation-panel.is-task-workspace {
+.chat-pane.has-action-gate .task-conversation-panel.is-task-workspace,
+.chat-pane.has-action-receipt .task-conversation-panel.is-task-workspace {
   width: 100%;
   grid-column: 1 / -1;
   grid-template-columns: minmax(0, 1fr);
-  grid-template-rows: auto auto minmax(0, 420px) minmax(120px, 1fr) auto;
+  grid-template-rows: auto auto minmax(0, 680px) minmax(64px, 1fr) auto;
 }
-.chat-pane.has-action-gate .task-conversation-panel.is-task-workspace > .approval-overlay {
+.chat-pane.has-action-gate .task-conversation-panel.is-task-workspace > .conversation,
+.chat-pane.has-action-receipt .task-conversation-panel.is-task-workspace > .conversation { grid-row: 4; }
+.chat-pane.has-action-gate .task-conversation-panel.is-task-workspace > .chat-footer,
+.chat-pane.has-action-receipt .task-conversation-panel.is-task-workspace > .chat-footer { grid-row: 5; }
+.chat-pane.has-action-gate .task-conversation-panel.is-task-workspace > .approval-overlay,
+.chat-pane.has-action-receipt .task-conversation-panel.is-task-workspace > .approval-overlay {
   inset: auto;
   width: 100%;
   max-width: none;
+  height: 100%;
+  grid-row: 3;
   box-sizing: border-box;
   justify-self: stretch;
 }
-.chat-pane.has-action-gate .task-conversation-panel.is-task-workspace > .approval-overlay > .approval-modal {
+.chat-pane.has-action-gate .task-conversation-panel.is-task-workspace > .approval-overlay > .approval-modal,
+.chat-pane.has-action-receipt .task-conversation-panel.is-task-workspace > .approval-overlay > .approval-modal {
   min-width: 0;
+  height: 100%;
+  max-height: none;
   box-sizing: border-box;
 }
 
@@ -1348,6 +1483,9 @@ button.task-director-stage-card:hover { border-color: #98a3af; background: #fafb
 }
 
 @media (min-width: 901px) and (max-width: 1280px) {
+  .app-shell.is-task-director:has(.action-impact-ledger) {
+    grid-template-columns: minmax(0, calc(100% - 399px)) 7px minmax(382px, 392px);
+  }
   .task-director-mode-switch button { width: auto; padding: 0 9px; }
   .task-director-mode-switch button span { display: inline; }
 }
@@ -1373,6 +1511,38 @@ button.task-director-stage-card:hover { border-color: #98a3af; background: #fafb
   .task-director-side-pane:has(.task-decision-layout) { height: auto; min-height: 0; display: block; overflow: visible; }
   .task-director-side-pane:has(.task-decision-layout) .task-decision-layout { min-height: 0; display: block; overflow: visible; }
   .task-director-side-pane:has(.task-decision-layout) .task-decision-scroll { overflow: visible; }
+  .chat-pane.task-director-side-pane.has-action-gate,
+  .chat-pane.task-director-side-pane.has-action-receipt {
+    height: auto;
+    min-height: 0;
+    display: block;
+    overflow: visible;
+  }
+  .chat-pane.task-director-side-pane.has-action-gate .task-conversation-panel.is-task-workspace,
+  .chat-pane.task-director-side-pane.has-action-receipt .task-conversation-panel.is-task-workspace {
+    height: auto;
+    display: block;
+    overflow: visible;
+  }
+  .chat-pane.task-director-side-pane.has-action-gate .task-conversation-panel.is-task-workspace > .approval-overlay,
+  .chat-pane.task-director-side-pane.has-action-receipt .task-conversation-panel.is-task-workspace > .approval-overlay {
+    position: static;
+    width: auto;
+    max-width: none;
+    overflow: visible;
+    margin: 0;
+    padding: 12px;
+  }
+  .chat-pane.task-director-side-pane.has-action-gate .action-impact-ledger,
+  .chat-pane.task-director-side-pane.has-action-receipt .action-impact-ledger {
+    max-height: none;
+    overflow: visible;
+  }
+  .chat-pane.task-director-side-pane.has-action-gate .conversation,
+  .chat-pane.task-director-side-pane.has-action-receipt .conversation {
+    min-height: 280px;
+    max-height: 48dvh;
+  }
   .task-next-step { grid-template-columns: 38px minmax(0, 1fr); }
   .task-next-step > button { grid-column: 1 / -1; width: 100%; min-height: 44px; }
   .task-ready-brief ul { grid-template-columns: 1fr; }

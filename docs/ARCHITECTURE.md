@@ -440,3 +440,23 @@ v6 Conflict 现在同时携带服务端批准的 `resolution_options[].expected_
 Observe、Verify、Commit 是确定性服务逻辑。Plan/Act 通过 `services/api/app/application/task_stage_agent.py` 的严格 `TaskStageAgent` 请求/响应调用当前配置 `deepseek-v4-pro`；适配器与 TaskService 都只接受和服务端批准模板逐字段一致的面向用户文字，否则返回 `template_fallback`，所以模型不能把思维链、内部 ID、来源引用、状态或新事实写入阶段记录。Task/Branch/Artifact 身份、来源、状态、冲突、验证和 Commit 始终由服务端决定。模型调用在 Store CAS 之前，若 version 冲突则丢弃结果。`stage_records` 与 Snapshot 一起持久化阶段状态、摘要、详情、工件 ID、generation source 和时间。
 
 预算是步骤数、工具调用数和运行时长的运行时预算，不是 token 成本；同进程同幂等 key 有锁避免重复模型调用，跨进程只有数据库 CAS/marker，没有分布式 LLM lease。PostgreSQL 保存 Snapshot、Event、ArtifactVersion 和 stage records；现有恢复证据限于顺序 API 进程和已覆盖版本，数据库崩溃、迁移、跨实例通知仍未证明。
+
+## 10. Demo 3 动作影响账本（DR-0012 Verified 限定范围）
+
+Demo 3 的影响账本位于 Run 治理链，而不是 Conversation 文本或前端本地状态：
+
+```text
+ActionCandidate
+  -> ProposedActionSpec
+  -> RiskAssessment + PolicyEffect + EvidenceRecord
+  -> ControlPlan
+  -> RunSnapshot.impact_preview
+  -> Approval / Permit
+  -> ToolGateway
+  -> Simulator
+  -> RunSnapshot.execution_receipt + AuditEvent
+```
+
+`impact_preview` 由服务端依据当前动作、风险、策略、证据和 Artifact Binding 生成；`execution_receipt` 只由治理事件和 `ToolExecutionResult` 生成。两者均使用 `ImpactItem(item_id/change_kind/label/before/after)`，并固定映射 `target-change→will_change`、`binding-recheck→will_recheck`、`task-preserved→unchanged`、`real-connector-not-called→no_external_action`；前端不得把 preview 复制成实际回执。
+
+四类影响的业务投影是“会改变 / 会重新核对 / 保持不变 / 不会发生”。拒绝、绑定失效、参数篡改、Permit 重放或 Simulator 失败只改变 Run/审计事实，不回写已提交 Task、ArtifactVersion 或 VerificationReport。当前边界是内存 RunStore 与五个受控 Simulator capability；真实 Connector、生产身份、跨进程执行幂等/Permit replay、多实例/数据库恢复和用户理解仍不在 Verified 范围。

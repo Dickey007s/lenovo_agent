@@ -58,7 +58,7 @@ V0.1 重点验证三件事：
 - Tool Gateway 校验签名、过期、主体、capability、参数、策略版本和重放后，才允许调用 Simulator。
 - 已端到端注册 5 个执行 capability：`email.send`、`task.create`、`calendar.invite`、`crm.opportunity.update`、`expense.request_evidence`。
 - 工作区内容在动作绑定后发生变化时，旧 Action 会被作废，不能用旧审批执行新参数。
-- Run、工作区、审计事件和 LangGraph checkpoint 可持久化并在服务重启后恢复。
+- 配置 PostgreSQL 时，Workspace、Run、Audit 和 LangGraph checkpoint 具备持久化路径；当前 Demo 3 动作账本的跨进程 Run 创建幂等、Permit replay、响应丢失恢复和 Conversation Thread/Message 恢复仍需独立证据，不能由该配置推断为高可用。
 
 ### Demo 1 经营汇报任务、交付物与恢复闭环（PR 4-6）
 
@@ -90,6 +90,14 @@ V0.1 重点验证三件事：
 `route_profiles[].forecast.source_type` 固定为 `fixture_policy_forecast`，只表示固定规则预测，不代表真实账单、实测耗时、Worker、Connector 或生产 SLA。当前没有 Demo 2 SSE、PostgreSQL 恢复、动态 Worker、Shared Artifact Workspace 或真实执行。工程证据包含聚焦 Python `6 passed`、专用 system Edge `5 passed`、完整 Python `118 passed, 1 skipped`、完整浏览器 `34 passed` 和三张桌面/移动截图；Ruff、前端 lint、生产构建与 diff-check 通过。实现位于堆叠 PR [#13](https://github.com/Dickey007s/lenovo_agent/pull/13)，依赖 PR #12。详见 [`DR-0008`](docs/decisions/DR-0008-demo2-explainable-admission.md)、[`SCENARIO-002`](docs/scenarios/SCENARIO-002-demo2-explainable-admission.md) 与 [`Demo 2 Evidence`](docs/evidence/DEMO2-PR1-EXPLAINABLE-ADMISSION-EVIDENCE-20260817.md)。
 
 2026-08-20 的路由影响扩展实现为 `db461ec`、PR [#17](https://github.com/Dickey007s/lenovo_agent/pull/17)：已完成聚焦协议/服务 `11 passed`、完整 Python `144 passed, 1 skipped`、专用 Demo 2 浏览器 `5 passed`、完整浏览器 `35 passed`，并保存桌面预演、桌面回执和 `390px` 移动长页截图。该证据只证明固定策略事实、选择回执和被测交互，不证明 Adaptive Swarm 已执行或用户理解提升。详见 [`DR-0011`](docs/decisions/DR-0011-demo2-route-impact.md) 与对应 [`Evidence`](docs/evidence/DEMO2-ROUTE-IMPACT-EVIDENCE-20260820.md)。
+
+### Demo 3 动作影响账本（DR-0012，Verified 限定范围）
+
+Demo 3 的前台重点是“动作影响账本”：用户在 Action Gate 中先看到“会改变 / 会重新核对 / 保持不变 / 不会发生”，再分别进入补证、审批、授权和执行。提交前只显示服务端 `impact_preview`；治理或执行事实确认后才显示 `execution_receipt`。每个 `ImpactItem` 使用 `item_id/change_kind/label/before/after`，不能由前端或 LLM 补造。
+
+当前最小场景仍是固定客户 A 的已核对 `reply_draft → email.send`。拒绝、成果版本变化、参数篡改、Permit 重放和 Simulator 失败都必须保持 Task Commit、ArtifactVersion 和 VerificationReport 不变。`ToolExecutionResult.succeeded` 只代表 Email/Office Simulator 返回成功，不代表真实邮箱、CRM、OA、日历或任务系统已写入。
+
+当前固定工程纵切已完成验证：Python `151 passed, 1 skipped in 3.69s`、完整浏览器 `37 passed (2.2m)`，并新增审计工作台回归；Ruff、governance `4 passed in 0.02s`、前端 lint 和 build 通过，视觉终验无 P0/P1。普通业务 UI 只显示业务标签与服务端摘要，不渲染 raw event/payload/trace 或 `email_simulator`、`email.send`、`PERMIT_ISSUED`、`Permit`；内部原值仅留 API/服务端审计。四张桌面/移动截图及 SHA-256 见 Evidence。该结果不证明目标用户理解、真实 Connector、生产身份、跨进程执行幂等/Permit replay、多实例或数据库恢复。实现提交为 `9335470`，文档提交为 `34aee71`，对应 [PR #18](https://github.com/Dickey007s/lenovo_agent/pull/18)。详见 [`DR-0012`](docs/decisions/DR-0012-demo3-action-impact-ledger.md)、[`SCENARIO-003`](docs/scenarios/SCENARIO-003-demo3-action-impact-ledger.md) 与 [`Demo 3 Evidence`](docs/evidence/DEMO3-ACTION-IMPACT-LEDGER-EVIDENCE-20260820.md)。
 
 ## 技术架构
 
@@ -156,6 +164,9 @@ flowchart LR
 - [Demo 1 渐进阶段工程证据](docs/evidence/DEMO1-PROGRESSIVE-STAGES-EVIDENCE-20260817.md)
 - [Demo 1 Agent 影响预演与变化回执决策](docs/decisions/DR-0010-visible-agent-impact.md)
 - [Demo 1 Agent 影响预演与变化回执证据](docs/evidence/DEMO1-AGENT-IMPACT-PREVIEW-EVIDENCE-20260820.md)
+- [Demo 3 动作影响账本决策（Verified 限定范围）](docs/decisions/DR-0012-demo3-action-impact-ledger.md)
+- [Demo 3 动作影响账本场景（Verified 固定场景）](docs/scenarios/SCENARIO-003-demo3-action-impact-ledger.md)
+- [Demo 3 动作影响账本证据（Verified 限定范围）](docs/evidence/DEMO3-ACTION-IMPACT-LEDGER-EVIDENCE-20260820.md)
 - [来源台账](docs/decisions/SOURCE_REGISTER.md)
 
 ## 目录结构

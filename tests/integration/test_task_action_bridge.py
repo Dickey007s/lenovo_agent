@@ -1,12 +1,13 @@
 from langgraph.checkpoint.memory import InMemorySaver
 from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
+import pytest
 
 from packages.agent_runtime import AgentWorkflow, WorkflowCallbacks
 from packages.authorization import AuthorizationService, PermitKeyPair
 from packages.contracts import ActionCandidate, TaskArtifactBinding, TaskControlCommand
 from packages.tool_gateway import ToolGateway
-from services.api.app.application.runs import RunService
+from services.api.app.application.runs import RunCreateConflictError, RunService
 from services.api.app.application.conversations import ConversationService
 from services.api.app.application.storage import InMemoryWorkspaceStore
 from services.api.app.application.task_storage import InMemoryTaskStore
@@ -165,34 +166,23 @@ async def test_changed_task_binding_invalidates_prepared_action() -> None:
         raise ValueError("changed")
 
     run_service.attach_task_artifact_validator(reject_changed_binding)
-    run = await run_service.create_from_candidate(
-        ActionCandidate(
-            action_type="send_email",
-            capability="email.send",
-            target_scope="external_customer",
-            recipients=["customer@example.com"],
-            data_classes=["financial"],
-            state_change_type="external_effect",
-            reversibility="low",
-            parameters={"subject": content["subject"], "body": content["body"]},
-        ),
-        message="准备发送已核对客户回复",
-        user_id="user_1",
-        thread_id="chat_bridge",
-        task_artifact_binding=binding,
-    )
-
-    try:
-        await run_service.submit_approval(
-            run.action.action_id, "current_user", "approved", "user_1"
+    with pytest.raises(RunCreateConflictError, match="绑定成果"):
+        await run_service.create_from_candidate(
+            ActionCandidate(
+                action_type="send_email",
+                capability="email.send",
+                target_scope="external_customer",
+                recipients=["customer@example.com"],
+                data_classes=["financial"],
+                state_change_type="external_effect",
+                reversibility="low",
+                parameters={"subject": content["subject"], "body": content["body"]},
+            ),
+            message="准备发送已核对客户回复",
+            user_id="user_1",
+            thread_id="chat_bridge",
+            task_artifact_binding=binding,
         )
-    except ValueError as exc:
-        assert "旧动作已作废" in str(exc)
-    else:
-        raise AssertionError("changed Task binding must fail closed")
-    invalidated = await run_service.get(run.run_id, "user_1")
-    assert invalidated.status == "FAILED"
-    assert "ARTIFACT_CONTENT_CHANGED" in invalidated.control_plan.reason_codes
 
 
 async def test_task_artifact_action_route_binds_thread_and_replays_prepare_key() -> None:

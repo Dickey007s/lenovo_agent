@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class StrictModel(BaseModel):
@@ -23,6 +23,98 @@ class TaskArtifactBinding(StrictModel):
     artifact_content_digest: str = Field(pattern=r"^sha256:[0-9a-f]{64}$")
     deliverable_id: str = Field(min_length=1, max_length=100)
     verification_report_id: str = Field(min_length=1, max_length=120)
+
+
+ImpactChangeKind = Literal[
+    "will_change",
+    "will_recheck",
+    "unchanged",
+    "no_external_action",
+]
+
+_IMPACT_KINDS = {
+    "will_change",
+    "will_recheck",
+    "unchanged",
+    "no_external_action",
+}
+_IMPACT_ITEM_KINDS = {
+    "target-change": "will_change",
+    "binding-recheck": "will_recheck",
+    "task-preserved": "unchanged",
+    "real-connector-not-called": "no_external_action",
+}
+
+
+class ImpactItem(StrictModel):
+    """Server-owned business fact used by action previews and receipts."""
+
+    item_id: Literal[
+        "target-change",
+        "binding-recheck",
+        "task-preserved",
+        "real-connector-not-called",
+    ]
+    change_kind: ImpactChangeKind
+    label: str = Field(min_length=1, max_length=200)
+    before: str | None = None
+    after: str | None = None
+
+    @model_validator(mode="after")
+    def validate_kind(self) -> "ImpactItem":
+        if self.change_kind not in _IMPACT_KINDS:
+            raise ValueError("unsupported impact change kind")
+        if _IMPACT_ITEM_KINDS[self.item_id] != self.change_kind:
+            raise ValueError("impact item id does not match its change kind")
+        return self
+
+
+class ActionImpactPreview(StrictModel):
+    """Deterministic expectation shown before a governed action is confirmed."""
+
+    schema_version: Literal["1.0"] = "1.0"
+    preview_id: str = Field(min_length=1, max_length=160)
+    action_id: str = Field(min_length=1, max_length=160)
+    action_hash: str = Field(pattern=r"^sha256:[0-9a-f]{64}$")
+    policy_version: str = Field(min_length=1, max_length=120)
+    items: list[ImpactItem] = Field(min_length=4, max_length=4)
+    executor: str | None = Field(default=None, max_length=120)
+    external_side_effect: Literal["none", "simulator_only", "external"] = "none"
+    generated_at: datetime
+    task_artifact_binding: TaskArtifactBinding | None = None
+
+    @model_validator(mode="after")
+    def validate_four_impact_kinds(self) -> "ActionImpactPreview":
+        kinds = [item.change_kind for item in self.items]
+        if set(kinds) != _IMPACT_KINDS or len(kinds) != len(_IMPACT_KINDS):
+            raise ValueError("action impact preview must contain each impact kind once")
+        return self
+
+
+class ActionExecutionReceipt(StrictModel):
+    """Server receipt for the terminal decision or tool execution outcome."""
+
+    schema_version: Literal["1.0"] = "1.0"
+    receipt_id: str = Field(min_length=1, max_length=160)
+    action_id: str = Field(min_length=1, max_length=160)
+    action_hash: str = Field(pattern=r"^sha256:[0-9a-f]{64}$")
+    status: Literal["succeeded", "denied", "failed", "unknown"]
+    items: list[ImpactItem] = Field(min_length=4, max_length=4)
+    execution_id: str | None = Field(default=None, max_length=160)
+    permit_id: str | None = Field(default=None, max_length=160)
+    simulator: str | None = Field(default=None, max_length=120)
+    external_side_effect: Literal["none", "simulator_only", "external", "unknown"]
+    error_code: str | None = Field(default=None, max_length=160)
+    failure_stage: Literal["binding", "policy", "authorization", "gateway", "simulator"] | None = None
+    retryable: bool = False
+    observed_at: datetime
+
+    @model_validator(mode="after")
+    def validate_four_impact_kinds(self) -> "ActionExecutionReceipt":
+        kinds = [item.change_kind for item in self.items]
+        if set(kinds) != _IMPACT_KINDS or len(kinds) != len(_IMPACT_KINDS):
+            raise ValueError("action execution receipt must contain each impact kind once")
+        return self
 
 
 class ActionCandidate(StrictModel):

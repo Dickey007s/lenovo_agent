@@ -46,7 +46,7 @@ async def test_pricing_scenario_blocks_parameter_tamper_before_simulator() -> No
     run = await service.submit_evidence(run.action.action_id, evidence, "demo_user")
     for role in list(run.control_plan.required_approvals):
         run = await service.submit_approval(
-            run.action.action_id, role, "approved", f"approver_{role}"
+            run.action.action_id, role, "approved", "demo_user"
         )
 
     result = await service.demonstrate_parameter_tamper(

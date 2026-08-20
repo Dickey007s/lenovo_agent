@@ -119,3 +119,9 @@
 ```
 
 这条链路是后续工作的默认交付单位。不能只交后台实现、只交界面、只交引用列表或只交汇报文案。
+
+## 6. Demo 3 动作影响账本门槛（DR-0012 Verified 限定范围）
+
+Demo 3 的每个动作推进和汇报必须额外回答四类前台影响：“会改变 / 会重新核对 / 保持不变 / 不会发生”。四类内容必须分别关联服务端 `impact_preview` 或 `execution_receipt` 的 `ImpactItem(item_id/change_kind/label/before/after)`，并遵循固定 `item_id → change_kind` 映射，不能由前端静态文案或 LLM 解释补造。
+
+`impact_preview` 只能证明服务端当前动作和治理条件下的预计影响；`execution_receipt` 只能证明有序 Run 事件、`ToolExecutionResult` 或终态 Snapshot 已记录的实际事实。Simulator 成功、Permit 签发和审批通过不能被汇报为真实外部系统已写入。当前工程验证覆盖固定四场景、成功/拒绝/缺失 preview、后端失败/未知结果、固定映射和桌面/移动被测路径；真实 Connector、生产身份、跨进程执行幂等/Permit replay、多实例/数据库恢复和用户理解仍保持待验证。

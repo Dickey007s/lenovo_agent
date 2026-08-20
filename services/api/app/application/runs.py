@@ -3,17 +3,20 @@ from __future__ import annotations
 import asyncio
 from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, Literal
 from uuid import uuid4
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from packages.contracts import (
     ActionCandidate,
+    ActionExecutionReceipt,
+    ActionImpactPreview,
     ApprovalRecord,
     CapabilityDecision,
     ControlPlan,
     EvidenceRecord,
+    ImpactItem,
     PolicyEffect,
     PermitMetadata,
     ProposedActionSpec,
@@ -46,6 +49,17 @@ class RunCreateConflictError(RuntimeError):
     pass
 
 
+RunStatus = Literal[
+    "DENIED",
+    "WAITING_EVIDENCE",
+    "WAITING_APPROVAL",
+    "READY_TO_AUTHORIZE",
+    "AUTHORIZED",
+    "EXECUTED",
+    "FAILED",
+]
+
+
 class RunSnapshot(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -57,17 +71,55 @@ class RunSnapshot(BaseModel):
     creation_idempotency_key: str | None = None
     creation_digest: str | None = None
     trusted_context: dict = Field(default_factory=lambda: {"device": {"managed": True}})
-    status: str
+    status: RunStatus
     action: ProposedActionSpec
     risk: RiskAssessment
     policy_effects: list[PolicyEffect]
     evidence: dict[str, EvidenceRecord]
     approvals: list[ApprovalRecord] = Field(default_factory=list)
     control_plan: ControlPlan
+    impact_preview: ActionImpactPreview | None = None
     permit: PermitMetadata | None = None
     tool_result: ToolExecutionResult | None = None
+    execution_receipt: ActionExecutionReceipt | None = None
     created_at: datetime
     updated_at: datetime
+
+    @model_validator(mode="after")
+    def validate_action_artifacts(self) -> "RunSnapshot":
+        if self.status != self.control_plan.status:
+            raise ValueError("run status does not match control plan status")
+        expected_hash = self.control_plan.action_hash
+        if self.impact_preview is not None:
+            if self.impact_preview.action_id != self.action.action_id:
+                raise ValueError("impact preview action_id does not match action")
+            if self.impact_preview.action_hash != expected_hash:
+                raise ValueError("impact preview action_hash does not match control plan")
+        if self.execution_receipt is not None:
+            if self.status not in {"EXECUTED", "DENIED", "FAILED"}:
+                raise ValueError("execution receipt requires a terminal run")
+            if self.execution_receipt.action_id != self.action.action_id:
+                raise ValueError("execution receipt action_id does not match action")
+            if self.execution_receipt.action_hash != expected_hash:
+                raise ValueError("execution receipt action_hash does not match control plan")
+            expected_status = {
+                "EXECUTED": "succeeded",
+                "DENIED": "denied",
+            }.get(self.status)
+            if expected_status is not None and self.execution_receipt.status != expected_status:
+                raise ValueError("execution receipt status does not match run status")
+            if self.status == "FAILED" and self.execution_receipt.status not in {"failed", "unknown"}:
+                raise ValueError("failed run requires failed or unknown receipt")
+            if self.impact_preview is not None:
+                preview_items = {
+                    (item.item_id, item.change_kind) for item in self.impact_preview.items
+                }
+                receipt_items = {
+                    (item.item_id, item.change_kind) for item in self.execution_receipt.items
+                }
+                if preview_items != receipt_items:
+                    raise ValueError("execution receipt impact items do not match preview")
+        return self
 
 
 class RunService:
@@ -98,6 +150,7 @@ class RunService:
         self._task_artifact_validator: Callable[
             [TaskArtifactBinding, str], Awaitable[None]
         ] | None = None
+        self._execution_locks: dict[str, asyncio.Lock] = {}
         self._lock = asyncio.Lock()
         self.workflow: AgentWorkflow | None = None
 
@@ -142,6 +195,17 @@ class RunService:
         task_artifact_binding: TaskArtifactBinding | None = None,
         creation_idempotency_key: str | None = None,
     ) -> RunSnapshot:
+        if task_artifact_binding is not None:
+            if self._task_artifact_validator is None:
+                raise RunCreateConflictError(
+                    "Task Artifact 绑定校验器未配置，不能创建动作"
+                )
+            try:
+                await self._task_artifact_validator(task_artifact_binding, user_id)
+            except (LookupError, RuntimeError, ValueError) as exc:
+                raise RunCreateConflictError(
+                    "绑定成果已变化或不可用，不能创建动作"
+                ) from exc
         trusted_context = trusted_context or {
             "device": {"managed": True},
             "user": {"id": user_id},
@@ -209,9 +273,23 @@ class RunService:
             policy_effects=effects,
             evidence=evidence,
             control_plan=plan,
+            impact_preview=self._build_impact_preview(action, plan, now),
             created_at=now,
             updated_at=now,
         )
+        if plan.status == "DENIED":
+            snapshot = snapshot.model_copy(
+                update={
+                    "execution_receipt": self._build_execution_receipt(
+                        snapshot,
+                        status="denied",
+                        observed_at=now,
+                        external_side_effect="none",
+                        error_code=(plan.reason_codes[0] if plan.reason_codes else "POLICY_DENIED"),
+                        failure_stage="policy",
+                    )
+                }
+            )
         async with self._lock:
             if creation_idempotency_key:
                 existing_run_id = self._creation_to_run.get(
@@ -263,6 +341,7 @@ class RunService:
         self, action_id: str, values: dict[str, str], user_id: str
     ) -> RunSnapshot:
         snapshot = self._by_action(action_id, user_id)
+        self._require_non_terminal(snapshot)
         await self._ensure_task_artifact_current(snapshot)
         if action_id in self._invalidated_actions or "ARTIFACT_CONTENT_CHANGED" in snapshot.control_plan.reason_codes:
             raise ValueError("生成内容已修改，请基于新版本重新提交动作")
@@ -296,7 +375,8 @@ class RunService:
         decision: str,
         approver_id: str,
     ) -> RunSnapshot:
-        snapshot = self._find_action(action_id)
+        snapshot = self._by_action(action_id, approver_id)
+        self._require_non_terminal(snapshot)
         await self._ensure_task_artifact_current(snapshot)
         if action_id in self._invalidated_actions or "ARTIFACT_CONTENT_CHANGED" in snapshot.control_plan.reason_codes:
             raise ValueError("生成内容已修改，旧动作不能继续审批")
@@ -333,31 +413,46 @@ class RunService:
         return await self._reevaluate(snapshot)
 
     async def authorize_and_execute(self, action_id: str, user_id: str) -> RunSnapshot:
-        snapshot = self._by_action(action_id, user_id)
-        try:
-            await self._ensure_task_artifact_current(snapshot)
-        except ValueError as exc:
-            raise AuthorizationError(str(exc)) from exc
-        if action_id in self._invalidated_actions or "ARTIFACT_CONTENT_CHANGED" in snapshot.control_plan.reason_codes:
-            raise AuthorizationError("生成内容已修改，旧 Action 和 Permit 已作废")
-        if self.authorization_service is None or self.tool_gateway is None:
-            raise RuntimeError("Authorization Service 或 Tool Gateway 未配置")
+        lock = self._execution_locks.setdefault(action_id, asyncio.Lock())
+        async with lock:
+            snapshot = self._by_action(action_id, user_id)
+            # A completed execution is the durable result of this command. Do
+            # not issue a fresh permit merely because the client retried.
+            if snapshot.status == "EXECUTED":
+                return snapshot
+            if snapshot.status in {"DENIED", "FAILED"}:
+                if "ARTIFACT_CONTENT_CHANGED" in snapshot.control_plan.reason_codes:
+                    raise AuthorizationError("生成内容已修改，旧 Action 和 Permit 已作废")
+                raise AuthorizationError("ControlPlan 尚未达到 READY_TO_AUTHORIZE")
+            try:
+                await self._ensure_task_artifact_current(snapshot)
+            except ValueError as exc:
+                raise AuthorizationError(str(exc)) from exc
+            if action_id in self._invalidated_actions or "ARTIFACT_CONTENT_CHANGED" in snapshot.control_plan.reason_codes:
+                raise AuthorizationError("生成内容已修改，旧 Action 和 Permit 已作废")
+            if self.authorization_service is None or self.tool_gateway is None:
+                raise RuntimeError("Authorization Service 或 Tool Gateway 未配置")
 
-        if self.workflow is not None:
-            await self.workflow.resume(
-                self._workflow_checkpoint_id(snapshot), "authorization_requested"
-            )
-            return self._runs[snapshot.run_id]
+            if self.workflow is not None:
+                await self.workflow.resume(
+                    self._workflow_checkpoint_id(snapshot), "authorization_requested"
+                )
+                return self._runs[snapshot.run_id]
 
-        # Non-LangGraph fallback used by isolated unit/integration tests.
-        snapshot = await self._reevaluate(snapshot)
-        return await self._issue_and_execute(snapshot)
+            # Non-LangGraph fallback used by isolated unit/integration tests.
+            snapshot = await self._reevaluate(snapshot)
+            if snapshot.status != "READY_TO_AUTHORIZE":
+                raise AuthorizationError("ControlPlan 尚未达到 READY_TO_AUTHORIZE")
+            return await self._issue_and_execute(snapshot)
 
     async def demonstrate_parameter_tamper(self, action_id: str, user_id: str) -> dict:
         snapshot = self._by_action(action_id, user_id)
+        self._require_non_terminal(snapshot)
         if self.authorization_service is None or self.tool_gateway is None:
             raise RuntimeError("Authorization Service 或 Tool Gateway 未配置")
         snapshot = await self._reevaluate(snapshot)
+        if snapshot.status != "READY_TO_AUTHORIZE":
+            raise AuthorizationError("ControlPlan 尚未达到 READY_TO_AUTHORIZE")
         issued = self.authorization_service.issue(
             snapshot.action, snapshot.control_plan, snapshot.approvals
         )
@@ -410,6 +505,14 @@ class RunService:
             update={
                 "status": "FAILED",
                 "control_plan": invalid_plan,
+                "execution_receipt": self._build_execution_receipt(
+                    snapshot,
+                    status="failed",
+                    observed_at=datetime.now(UTC),
+                    external_side_effect="none",
+                    error_code="ARTIFACT_CONTENT_CHANGED",
+                    failure_stage="binding",
+                ),
                 "updated_at": datetime.now(UTC),
             }
         )
@@ -490,13 +593,41 @@ class RunService:
                 "expires_at": issued.metadata.expires_at.isoformat(),
             },
         )
-        result = await self.tool_gateway.execute(
-            capability=snapshot.action.capability,
-            arguments=tool_arguments(snapshot.action),
-            permit_token=issued.token,
-            subject=snapshot.user_id,
-            action_hash=snapshot.control_plan.action_hash,
-        )
+        try:
+            result = await self.tool_gateway.execute(
+                capability=snapshot.action.capability,
+                arguments=tool_arguments(snapshot.action),
+                permit_token=issued.token,
+                subject=snapshot.user_id,
+                action_hash=snapshot.control_plan.action_hash,
+            )
+        except GatewayError as exc:
+            await self._record_execution_failure(
+                snapshot,
+                issued.metadata,
+                error_code=exc.code,
+                failure_stage="gateway",
+                receipt_status="failed",
+                external_side_effect="none",
+                panel_message="Gateway 在进入 Simulator 前拒绝了动作。",
+            )
+            raise
+        except Exception as exc:
+            # A simulator timeout/error does not prove that no side effect
+            # occurred. Persist an unknown outcome before returning a safe error.
+            await self._record_execution_failure(
+                snapshot,
+                issued.metadata,
+                error_code="SIMULATOR_EXECUTION_UNKNOWN",
+                failure_stage="simulator",
+                receipt_status="unknown",
+                external_side_effect="unknown",
+                panel_message="Simulator 执行结果未知，请读取服务端回执后再决定是否重试。",
+            )
+            raise GatewayError(
+                "SIMULATOR_EXECUTION_UNKNOWN",
+                "Simulator 执行结果未知，请先读取回执再决定是否重试",
+            ) from exc
         executed_plan = snapshot.control_plan.model_copy(
             update={
                 "status": "EXECUTED",
@@ -509,6 +640,14 @@ class RunService:
                 "control_plan": executed_plan,
                 "permit": issued.metadata,
                 "tool_result": result,
+                "execution_receipt": self._build_execution_receipt(
+                    snapshot,
+                    status="succeeded",
+                    observed_at=result.executed_at,
+                    result=result,
+                    permit_id=issued.metadata.permit_id,
+                    external_side_effect="simulator_only",
+                ),
                 "updated_at": datetime.now(UTC),
             }
         )
@@ -529,8 +668,11 @@ class RunService:
 
     async def _ensure_task_artifact_current(self, snapshot: RunSnapshot) -> None:
         binding = snapshot.action.task_artifact_binding
-        if binding is None or self._task_artifact_validator is None:
+        if binding is None:
             return
+        if self._task_artifact_validator is None:
+            await self.invalidate_action(snapshot.action.action_id, snapshot.user_id)
+            raise ValueError("Task Artifact 绑定校验器未配置，旧动作不能继续")
         try:
             await self._task_artifact_validator(binding, snapshot.user_id)
         except (LookupError, RuntimeError, ValueError) as exc:
@@ -538,6 +680,63 @@ class RunService:
             raise ValueError(
                 "绑定成果已经变化，旧动作已作废；请从当前成果重新准备"
             ) from exc
+
+    async def _record_execution_failure(
+        self,
+        snapshot: RunSnapshot,
+        permit: PermitMetadata,
+        *,
+        error_code: str,
+        failure_stage: Literal["binding", "policy", "authorization", "gateway", "simulator"],
+        receipt_status: Literal["failed", "unknown"],
+        external_side_effect: Literal["none", "simulator_only", "external", "unknown"],
+        panel_message: str,
+    ) -> RunSnapshot:
+        failed_plan = snapshot.control_plan.model_copy(
+            update={
+                "status": "FAILED",
+                "panel": PanelSpec(
+                    type="error",
+                    message=panel_message,
+                ),
+                "reason_codes": [
+                    *snapshot.control_plan.reason_codes,
+                    "ACTION_EXECUTION_FAILED",
+                ],
+            }
+        )
+        observed_at = datetime.now(UTC)
+        updated = snapshot.model_copy(
+            update={
+                "status": "FAILED",
+                "control_plan": failed_plan,
+                "permit": permit,
+                "execution_receipt": self._build_execution_receipt(
+                    snapshot,
+                    status=receipt_status,
+                    observed_at=observed_at,
+                    permit_id=permit.permit_id,
+                    external_side_effect=external_side_effect,
+                    error_code=error_code,
+                    failure_stage=failure_stage,
+                ),
+                "updated_at": observed_at,
+            }
+        )
+        async with self._lock:
+            self._runs[snapshot.run_id] = updated
+        await self._persist(updated)
+        await self._audit(
+            updated,
+            "TOOL_FAILED",
+            {
+                "permit_id": permit.permit_id,
+                "error_code": error_code,
+                "failure_stage": failure_stage,
+                "external_side_effect": external_side_effect,
+            },
+        )
+        return updated
 
     async def _audit(
         self,
@@ -573,10 +772,153 @@ class RunService:
         # conversation binding on the snapshot while isolating graph state per run.
         return f"{snapshot.thread_id}:{snapshot.run_id}"
 
+    @staticmethod
+    def _impact_items(
+        action: ProposedActionSpec,
+        *,
+        actual: bool = False,
+        execution_id: str | None = None,
+        unknown: bool = False,
+    ) -> list[ImpactItem]:
+        executor_label = {
+            "email.send": "演示邮件工具",
+            "task.create": "演示任务工具",
+            "calendar.invite": "演示日历工具",
+            "crm.opportunity.update": "演示 CRM 工具",
+            "expense.request_evidence": "演示报销工具",
+        }.get(action.capability, "受控演示工具")
+        connector_label = {
+            "email.send": "真实邮箱未连接",
+            "calendar.invite": "真实日历未连接",
+            "crm.opportunity.update": "真实 CRM 未连接",
+            "task.create": "真实项目系统未连接",
+            "expense.request_evidence": "真实 OA 未连接",
+        }.get(action.capability, "真实外部系统未连接")
+        action_label = {
+            "email.send": "发送外部邮件",
+            "task.create": "创建内部任务",
+            "calendar.invite": "创建日历邀请",
+            "crm.opportunity.update": "更新 CRM 机会",
+            "expense.request_evidence": "请求报销凭证",
+        }.get(action.capability, "受控办公动作")
+        if action.task_artifact_binding is not None:
+            preserved_label = "已核对客户回复成果"
+            preserved_before = "当前已核对客户回复成果"
+        else:
+            preserved_label = "动作范围外内容"
+            preserved_before = "当前动作范围外的业务内容"
+        if unknown:
+            change_after = "执行结果未知，必须先对账再重试"
+        elif actual and execution_id:
+            change_after = "演示工具已接受本次受控动作"
+        elif actual:
+            change_after = "未执行"
+        else:
+            change_after = f"确认后交给{executor_label}"
+        return [
+            ImpactItem(
+                item_id="target-change",
+                change_kind="will_change",
+                label=action_label,
+                before="尚未执行",
+                after=change_after,
+            ),
+            ImpactItem(
+                item_id="binding-recheck",
+                change_kind="will_recheck",
+                label="执行前治理核对",
+                before="尚未核对",
+                after="成果版本、目标身份、可信依据、策略约束与确认记录",
+            ),
+            ImpactItem(
+                item_id="task-preserved",
+                change_kind="unchanged",
+                label=preserved_label,
+                before=preserved_before,
+                after="保持不变",
+            ),
+            ImpactItem(
+                item_id="real-connector-not-called",
+                change_kind="no_external_action",
+                label=connector_label,
+                before="未调用",
+                after="不会写入真实外部系统",
+            ),
+        ]
+
+    @classmethod
+    def _build_impact_preview(
+        cls,
+        action: ProposedActionSpec,
+        plan: ControlPlan,
+        generated_at: datetime,
+    ) -> ActionImpactPreview:
+        executor = {
+            "email.send": "email_simulator",
+            "task.create": "office_action_simulator",
+            "calendar.invite": "office_action_simulator",
+            "crm.opportunity.update": "office_action_simulator",
+            "expense.request_evidence": "office_action_simulator",
+        }.get(action.capability)
+        return ActionImpactPreview(
+            preview_id=f"preview_{plan.action_hash[7:31]}",
+            action_id=action.action_id,
+            action_hash=plan.action_hash,
+            policy_version=plan.policy_version,
+            items=cls._impact_items(action),
+            executor=executor,
+            external_side_effect="none",
+            generated_at=generated_at,
+            task_artifact_binding=action.task_artifact_binding,
+        )
+
+    @classmethod
+    def _build_execution_receipt(
+        cls,
+        snapshot: RunSnapshot,
+        *,
+        status: Literal["succeeded", "denied", "failed", "unknown"],
+        observed_at: datetime,
+        result: ToolExecutionResult | None = None,
+        permit_id: str | None = None,
+        external_side_effect: Literal["none", "simulator_only", "external", "unknown"],
+        error_code: str | None = None,
+        failure_stage: Literal["binding", "policy", "authorization", "gateway", "simulator"] | None = None,
+        retryable: bool = False,
+    ) -> ActionExecutionReceipt:
+        unknown = status == "unknown"
+        return ActionExecutionReceipt(
+            receipt_id=f"receipt_{canonical_hash({'action_id': snapshot.action.action_id, 'status': status, 'execution_id': result.execution_id if result else None, 'error_code': error_code})[7:31]}",
+            action_id=snapshot.action.action_id,
+            action_hash=snapshot.control_plan.action_hash,
+            status=status,
+            items=cls._impact_items(
+                snapshot.action,
+                actual=True,
+                execution_id=result.execution_id if result else None,
+                unknown=unknown,
+            ),
+            execution_id=result.execution_id if result else None,
+            permit_id=permit_id,
+            simulator=result.simulator if result else None,
+            external_side_effect=external_side_effect,
+            error_code=error_code,
+            failure_stage=failure_stage,
+            retryable=retryable,
+            observed_at=observed_at,
+        )
+
+    @staticmethod
+    def _require_non_terminal(snapshot: RunSnapshot) -> None:
+        if snapshot.status in {"EXECUTED", "DENIED", "FAILED"}:
+            raise ValueError(f"动作已进入终态 {snapshot.status}，不能继续修改")
+
     async def _reevaluate(self, snapshot: RunSnapshot) -> RunSnapshot:
         risk, effects, evidence, plan = await self._evaluate(
             snapshot.action, snapshot.approvals, snapshot.trusted_context
         )
+        now = datetime.now(UTC)
+        preview = self._build_impact_preview(snapshot.action, plan, now)
         updated = snapshot.model_copy(
             update={
                 "risk": risk,
@@ -584,9 +926,24 @@ class RunService:
                 "evidence": evidence,
                 "control_plan": plan,
                 "status": plan.status,
-                "updated_at": datetime.now(UTC),
+                "impact_preview": preview,
+                "execution_receipt": None,
+                "updated_at": now,
             }
         )
+        if plan.status == "DENIED":
+            updated = updated.model_copy(
+                update={
+                    "execution_receipt": self._build_execution_receipt(
+                        updated,
+                        status="denied",
+                        observed_at=now,
+                        external_side_effect="none",
+                        error_code=(plan.reason_codes[0] if plan.reason_codes else "POLICY_DENIED"),
+                        failure_stage="policy",
+                    )
+                }
+            )
         async with self._lock:
             self._runs[snapshot.run_id] = updated
         await self._persist(updated)

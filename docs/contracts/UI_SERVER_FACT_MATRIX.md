@@ -1,6 +1,6 @@
 # UI—服务端事实矩阵（Demo 1、Demo 2 与报价工作区）
 
-> 状态：Demo 1 与报价协议映射 `Ready`，交互决策 `DR-0005` 为 `Draft`，Agent 影响预演决策 `DR-0010` 在固定 Demo 1 的限定工程范围内为 `Verified`；报价核算决策 `DR-0006` 在固定演示报价、当前公式、revision 协议和被测恢复路径内为 `Verified`；`DR-0007` 在固定客户回复草稿到治理 Run 的单一纵切内为 `Verified`；Demo 2 `DR-0008` 的单进程 memory WorkCockpitSnapshot、路由解释和本次选择纵切以及 `DR-0011` 的路由影响预演/回执扩展均为限定范围 `Verified`。自动化只能验证投影与调用语义，不能代替真实用户理解、真实 Connector、Adaptive Swarm Runtime、生产报价规则或多实例一致性验证。
+> 状态：Demo 1 与报价协议映射 `Ready`，交互决策 `DR-0005` 为 `Draft`，Agent 影响预演决策 `DR-0010` 在固定 Demo 1 的限定工程范围内为 `Verified`；报价核算决策 `DR-0006` 在固定演示报价、当前公式、revision 协议和被测恢复路径内为 `Verified`；`DR-0007` 在固定客户回复草稿到治理 Run 的单一纵切内为 `Verified`；Demo 2 `DR-0008` 的单进程 memory WorkCockpitSnapshot、路由解释和本次选择纵切以及 `DR-0011` 的路由影响预演/回执扩展均为限定范围 `Verified`；Demo 3 `DR-0012` 在固定客户 A `reply_draft → email.send`、四个治理场景和被测桌面/移动路径内为限定范围 `Verified`。自动化只能验证投影与调用语义，不能代替真实用户理解、真实 Connector、Adaptive Swarm Runtime、生产报价规则、跨进程执行幂等/Permit replay 或多实例一致性验证。
 
 ## 1. 组件映射
 
@@ -42,6 +42,21 @@
 | 驾驶舱读取与恢复边界 | 浏览器是否读到了当前进程的最新 WorkCockpitSnapshot | 客户端 loading/error + 服务端 `owner_id/version/last_event_sequence` | 初始/手动 GET 与 mutation 后 GET 对账；无 SSE | 重新读取、冲突后复核并重试 | 保留最后确认 Snapshot；memory API 重启会丢选择，不宣称跨进程恢复 | 网络栈、数据库 DSN、内部重试日志 |
 
 本节所有行均限定在 `DR-0008` 的单进程固定演示纵切。它只覆盖固定队列、路由解释、客户 A 的本次模式选择和服务端 Admission 事实；拖拽调序、长期排序偏好、真实执行、动态 Worker、Shared Artifact Workspace、Verifier/Resolver、成本/时效实测和跨进程恢复留待后续决策与证据。
+
+### 1.3 Demo 3 动作影响账本（DR-0012，Verified 限定范围）
+
+以下字段是 Demo 3 Action Gate 的服务端协议。`impact_preview` 与 `execution_receipt` 均由服务端生成；前端只翻译业务标签，不自行推断动作影响。当前 Verified 仅限固定客户 A `reply_draft → email.send`、四个治理场景和被测桌面/移动路径。
+
+| UI 状态或组件 | 用户含义 | 服务端权威字段 | Snapshot / SSE | 允许动作 | 失败与恢复 | 默认隐藏 |
+| --- | --- | --- | --- | --- | --- | --- |
+| 动作影响预演 | 提交前知道会改变、重新核对、保持不变和不会发生什么 | `RunSnapshot.impact_preview.items[]`；基于 `ProposedActionSpec`、`RiskAssessment`、`PolicyEffect`、`EvidenceRecord`、`ControlPlan` 生成 | `RUN_CREATED` 的 RunSnapshot；后续治理状态更新重新返回完整 Snapshot | 查看目标、范围、治理门槛和未执行边界 | 缺 preview 时禁用确认；旧 action/hash 时标记待重新准备；未知结果读取 RunSnapshot 对账 | Prompt、CoT、Worker、原始 source_refs、完整参数、内部权重 |
+| ImpactItem | 一条可读业务影响 | `ImpactItem.item_id/change_kind/label/before/after`；固定 `target-change→will_change`、`binding-recheck→will_recheck`、`task-preserved→unchanged`、`real-connector-not-called→no_external_action` | 随 `impact_preview.items[]` 或 `execution_receipt.items[]` 返回 | 只读查看；不得编辑 `after` | 字段缺失或枚举非法时整组账本降级为待核对，不补静态文字 | action_id、run_id、trace_id、哈希、Permit |
+| 治理过程账本 | 用户知道补证、审批和授权是否已记录，但不把治理记录说成业务执行 | `EvidenceRecord`、`ApprovalRecord`、`ControlPlan.status`、`PermitMetadata`、`AuditEvent` | `EVIDENCE_SUBMITTED`、`CONTROL_PLAN_UPDATED`、`APPROVAL_RECORDED`、`PERMIT_ISSUED` | 提交依据、批准/拒绝、确认执行 | 409/401/403/未知结果均保留最后确认 Snapshot；不自动重放业务含义 | Permit token、审批内部 ID、策略内部 ID、网络/重试日志 |
+| 执行回执 | 用户知道服务端记录了什么实际终态 | `RunSnapshot.execution_receipt.items[]`、`ActionExecutionReceipt.status`、`ToolExecutionResult`、`RunSnapshot.status` | `TOOL_EXECUTED`、`ACTION_INVALIDATED`、`TAMPER_BLOCKED`、`action.closed` 后 GET 对账 | 查看模拟器结果、重新读取结果；新意图使用新幂等键 | 拒绝、失效、篡改、失败不得回滚 Task Commit；结果未知不得声称成功或失败 | Simulator 原始 payload、Permit、完整 audit payload |
+| 普通业务审计工作台 | 用户查看动作进展和结果，但不需要理解内部事件协议 | 服务端 `AuditEvent` 经业务 display projection；摘要来自 RunSnapshot、ImpactItem、ToolExecutionResult 状态 | Run SSE/Trace API 后由前端按服务端摘要对账 | 查看业务标签、状态、时间和结果边界 | 缺摘要时显示待核对，不回退渲染 raw event；技术审计另行受控访问 | raw `event_type`、`payload`、`trace`、`email_simulator`、`email.send`、`PERMIT_ISSUED`、`Permit` |
+| 任务成果保持不变 | 已提交 Task、ArtifactVersion、VerificationReport 不被派生动作改写 | `TaskArtifactBinding`、`TaskSnapshot.last_commit`、绑定校验结果 | Run 事件；Task Snapshot 不因拒绝/失败改变 | 返回成果或重新准备新动作 | 绑定变化使旧 Action 失效；重新准备必须产生新的 action/hash/key | state hash、content digest、内部 Artifact ID |
+
+本节的四类影响固定为“会改变 / 会重新核对 / 保持不变 / 不会发生”。工程验证为 Python `151 passed, 1 skipped in 3.69s`、完整浏览器 `37 passed (2.2m)`，Ruff、governance、lint、build 通过；视觉终验无 P0/P1，截图及 hash 见 Demo 3 Evidence。五个 Simulator capability 的通用影响预测、真实 Connector、生产身份、跨进程执行幂等/Permit replay、多实例/数据库恢复和用户理解均不在 Verified 范围。
 
 当前 Task Director 展示的仍是固定 Demo 1 的服务端状态，不是通用 Agent 执行器。Task、分支、工件、验证、冲突和 Commit 必须逐项映射上述 Snapshot 字段；不存在于 Snapshot/TaskEvent 的事实不得由前端文案、颜色、泳道或 Toast 补造。顶部连接文案映射独立客户端传输状态，pending mutation/Snapshot 对账仍由 Task 同步状态表达；右侧模式、活动工作区和工件选择模式同样只是客户端事实。非 Tasks 工作区只能投影后台任务摘要并跳转到 Tasks，不得提交决定或分支控制。字段 allowlist 与 Conflict/Artifact 共用的 `source_ref` 投影只放行契约中的四个已知 Demo 1 Fixture 引用，将其显示为带“演示数据”前缀的业务标签，并使用与原值无关的序号 DOM key；原始标识不进入普通业务 DOM，其他值 fail closed。这只是前端第二道防线，服务端仍保存原值且尚无通用字段可见性 Schema/display projection。
 

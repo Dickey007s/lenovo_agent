@@ -108,7 +108,7 @@ flowchart LR
 
 ### 第 8 页：可追溯与可恢复
 
-展示审计视图中的 `RUN_CREATED`、`ACTION_PARSED`、`CONTROL_PLAN_UPDATED`、`APPROVAL_RECORDED`、`PERMIT_ISSUED`、`TOOL_EXECUTED`。
+技术审计视图可展示 `RUN_CREATED`、`ACTION_PARSED`、`CONTROL_PLAN_UPDATED`、`APPROVAL_RECORDED`、`PERMIT_ISSUED`、`TOOL_EXECUTED`；普通业务审计工作台只展示业务标签与服务端摘要，不渲染 raw event/payload/trace、`email_simulator`、`email.send`、`PERMIT_ISSUED` 或 `Permit`。
 
 准确边界：配置 PostgreSQL 时，Workspace、Run、Audit 与 LangGraph checkpoint 可恢复；Conversation Thread/Message 和 Permit replay set 当前仍在进程内存中。
 
@@ -253,6 +253,19 @@ Demo 1 的 TaskStore 另有独立证据：固定 Fixture 已在同一个 Postgre
 用户可以查看六类业务条件、比较预测代价，接受 Admission 推荐或把客户 A 改成其他允许模式，范围只在 `this_run`。选择推荐时 `selection_source=admission`，其他允许选择为 `selection_source=user_override`。无论哪种选择，当前都停在 `execution_status=not_started`。本节对应 [`DR-0008`](decisions/DR-0008-demo2-explainable-admission.md)，在单进程固定演示范围内为 `Verified`：已有 API、前台、版本/幂等、409 草稿保留、移动端、完整回归和截图工程证据，但没有用户研究、真实执行、成本或时延测量。
 
 当前新增的前台记忆点不是“多个 Agent 头像”，而是“工作组织影响地图”：在右侧切换 Single Agent、Fixed Workflow 或 Adaptive Swarm，左侧立即用服务端预览显示任务怎么分、哪里并行和等待、什么时候需要人、哪些外部动作不会发生；确认后同一区域变为服务端选择回执，并继续显示尚未执行。现场可以说“用户先预演 Agent 的工作组织影响，再确认本次路由”；不能说“Swarm 已启动”“已经创建三个 Agent”或“实测提速”。本节对应 [`DR-0011`](decisions/DR-0011-demo2-route-impact.md)，最终工程状态以对应 Evidence 为准。
+
+## Demo 3 动作影响账本（DR-0012，Verified 限定范围）
+
+Demo 3 的前台不只展示风险等级和确认按钮，还展示动作影响账本。固定顺序是：先看“会改变 / 会重新核对 / 保持不变 / 不会发生”，再进入补证、审批、授权和执行。提交前使用服务端 `impact_preview`，治理或执行事实确认后才使用 `execution_receipt`；每项统一为 `item_id/change_kind/label/before/after`，并固定映射四个 `item_id` 与四类 `change_kind`。
+
+建议演示口径：
+
+1. “准备发送”只创建治理 Run，不代表邮件已经发送。
+2. “批准”只记录人工决策；“确认执行”才进入一次性 Permit 和 Gateway。
+3. `ToolExecutionResult.succeeded` 只说明 Email/Office Simulator 返回成功，不说明真实邮箱、CRM、OA、日历或任务系统发生写入。
+4. 拒绝、绑定变化、参数篡改、Permit 重放和模拟器失败都保留已完成 Task、Commit、ArtifactVersion 和 VerificationReport 不变。
+
+当前这一节在固定 Demo 3 工程纵切内已 Verified：Python `151 passed, 1 skipped in 3.69s`、完整浏览器 `37 passed (2.2m)`，Ruff、governance `4 passed in 0.02s`、lint、build 通过，视觉终验无 P0/P1，四张截图及 hash 见 Evidence。不能将其表述为用户理解改善、真实 Connector、生产身份、跨进程执行幂等/Permit replay、多实例或数据库恢复；也不能用 DR-0007 的既有证据替代本轮账本证据。实现提交为 `9335470`，文档提交为 `34aee71`，对应 [PR #18](https://github.com/Dickey007s/lenovo_agent/pull/18)。
 
 ## 9. 常见问答
 
