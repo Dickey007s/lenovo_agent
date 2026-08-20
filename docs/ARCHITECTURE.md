@@ -314,19 +314,27 @@ flowchart LR
     SVC["Demo2CockpitService"]
     SNAP["WorkCockpitSnapshot memory"]
     ADMIT["固定 Admission 规则与解释"]
+    PREVIEW["RouteImpactPreview"]
+    RECEIPT["RouteSelectionReceipt"]
     STOP["execution_status = not_started"]
 
     UI -->|"GET cockpit / work item"| API
     UI -->|"POST route + expected_version + idempotency_key"| API
     API --> SVC
     SVC --> ADMIT
+    ADMIT --> PREVIEW
+    PREVIEW --> UI
     SVC <--> SNAP
+    SVC --> RECEIPT
+    RECEIPT --> SNAP
     SVC --> STOP
 ```
 
 `Demo2CockpitService` 为每个 Owner 生成四项固定演示工作。服务端拥有队列顺序、业务事实、允许模式、推荐理由、规则预测、选择来源、版本和事件序号；浏览器只负责投影与提交本次选择。供应商邮件、周报、报销核查分别固定为 Single Agent、Fixed Workflow、Tool Call；客户 A 允许 Single Agent、Fixed Workflow、Adaptive Swarm。
 
 路由 mutation 使用工作项 `version` 乐观并发和命令级幂等。接受推荐写入 `selection_source=admission`；选择其他允许方式写入 `selection_source=user_override` 与 `override_scope=this_run`。无论哪种选择，服务端都只返回 `execution_status=not_started`，不创建 Worker、共享工件、Verifier 或外部动作。
+
+`RouteProfile.impact_preview` 是选择前的服务端策略事实，按工作分配、协调、人工介入、预测、执行边界和外部动作组织；浏览器切换本地模式草稿时只投影对应 preview。选择提交后，服务端创建独立 `RouteSelectionReceipt`，写入 cockpit/item 版本前后、选择来源、范围与实际记录变化，并随 `WorkItemSnapshot` 和幂等结果返回；`selection_receipts[]` 连续追加改选历史，旧 latest-only 快照会归一化。同模式新请求、缺 profile/preview 和版本过期都 fail closed 且不增加版本。preview 不能被复制成完成回执，receipt 也只证明选择已记录；两者都固定保持 `not_started` 与无外部副作用。
 
 当前 Snapshot 与幂等结果只保存在单 API 进程内。没有 Demo 2 SSE、PostgreSQL Store、跨进程恢复、动态调度、真实 Connector 或成本/时延测量；`route_profiles[].forecast` 仅是固定规则预测。该边界使第一纵切能够验证“用户是否看得懂和能否作出受限选择”，但不能证明 Adaptive Swarm Runtime 或用户价值。
 

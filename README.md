@@ -85,7 +85,11 @@ V0.1 重点验证三件事：
 
 用户可以查看业务价值、资料广度、可并行工作包、截止压力、风险和资源边界，比较允许的执行方式，并将客户 A 的选择限定为“仅本次运行”。选择推荐模式时 `selection_source=admission`，选择其他允许模式时为 `user_override` 与 `override_scope=this_run`。mutation 使用预期版本和幂等键；409 会保留用户草稿并重新读取服务端事实。无论推荐还是选择，`execution_status` 都是 `not_started`。
 
+路由选择现在采用双时态影响交互：服务端在每个 `RouteProfile.impact_preview` 中说明任务如何分配、哪里并行与等待、什么时候需要用户、规则预测、执行边界和不会发生的外部动作。用户在右侧切换模式时，左侧工作区的影响地图立即使用同一预览变化；确认成功后，服务端把版本、选择来源、范围与实际记录变化写入 `WorkItemSnapshot.selection_receipt/selection_receipts[]`，页面再切换为绿色实际变化地图，右侧显示精简回执。同模式重复确认和缺 route profile/preview 均 fail closed 且版本不变。预演与回执都明确“未执行”，刷新只恢复当前 memory 进程中的服务端回执。
+
 `route_profiles[].forecast.source_type` 固定为 `fixture_policy_forecast`，只表示固定规则预测，不代表真实账单、实测耗时、Worker、Connector 或生产 SLA。当前没有 Demo 2 SSE、PostgreSQL 恢复、动态 Worker、Shared Artifact Workspace 或真实执行。工程证据包含聚焦 Python `6 passed`、专用 system Edge `5 passed`、完整 Python `118 passed, 1 skipped`、完整浏览器 `34 passed` 和三张桌面/移动截图；Ruff、前端 lint、生产构建与 diff-check 通过。实现位于堆叠 PR [#13](https://github.com/Dickey007s/lenovo_agent/pull/13)，依赖 PR #12。详见 [`DR-0008`](docs/decisions/DR-0008-demo2-explainable-admission.md)、[`SCENARIO-002`](docs/scenarios/SCENARIO-002-demo2-explainable-admission.md) 与 [`Demo 2 Evidence`](docs/evidence/DEMO2-PR1-EXPLAINABLE-ADMISSION-EVIDENCE-20260817.md)。
+
+2026-08-20 的路由影响扩展实现为 `db461ec`、PR [#17](https://github.com/Dickey007s/lenovo_agent/pull/17)：已完成聚焦协议/服务 `11 passed`、完整 Python `144 passed, 1 skipped`、专用 Demo 2 浏览器 `5 passed`、完整浏览器 `35 passed`，并保存桌面预演、桌面回执和 `390px` 移动长页截图。该证据只证明固定策略事实、选择回执和被测交互，不证明 Adaptive Swarm 已执行或用户理解提升。详见 [`DR-0011`](docs/decisions/DR-0011-demo2-route-impact.md) 与对应 [`Evidence`](docs/evidence/DEMO2-ROUTE-IMPACT-EVIDENCE-20260820.md)。
 
 ## 技术架构
 
@@ -146,6 +150,8 @@ flowchart LR
 - [Demo 2 可解释 Admission 决策（限定范围 Verified）](docs/decisions/DR-0008-demo2-explainable-admission.md)
 - [Demo 2 智能工作驾驶舱场景（限定范围 Verified）](docs/scenarios/SCENARIO-002-demo2-explainable-admission.md)
 - [Demo 2 PR-1 工程证据](docs/evidence/DEMO2-PR1-EXPLAINABLE-ADMISSION-EVIDENCE-20260817.md)
+- [Demo 2 路由影响预演与选择回执决策](docs/decisions/DR-0011-demo2-route-impact.md)
+- [Demo 2 路由影响预演与选择回执证据](docs/evidence/DEMO2-ROUTE-IMPACT-EVIDENCE-20260820.md)
 - [Demo 1 渐进阶段决策（限定范围 Verified）](docs/decisions/DR-0009-progressive-demo1-stages.md)
 - [Demo 1 渐进阶段工程证据](docs/evidence/DEMO1-PROGRESSIVE-STAGES-EVIDENCE-20260817.md)
 - [Demo 1 Agent 影响预演与变化回执决策](docs/decisions/DR-0010-visible-agent-impact.md)

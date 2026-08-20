@@ -298,7 +298,11 @@ Invoke-RestMethod -Method Post `
   -Headers $headers -ContentType "application/json" -Body $route
 ```
 
-响应为 `RouteSelectionResult`，其中 `cockpit_version` 与 `cockpit_last_event_sequence` 是服务端提交后的驾驶舱聚合版本，`item` 是新的 `WorkItemSnapshot`。前端不得用工作项版本自行推算驾驶舱版本。接受服务端推荐时 `selection_source="admission"`；选择其他允许方式时为 `selection_source="user_override"` 且 `override_scope="this_run"`。两种情况都保持 `execution_status="not_started"`。相同 Owner、工作项、幂等键和命令返回原结果；相同 key 对应不同命令、`expected_version` 过期或选择不在 `allowed_modes` 内时返回 409。
+响应为 `RouteSelectionResult`，其中 `cockpit_version` 与 `cockpit_last_event_sequence` 是服务端提交后的驾驶舱聚合版本，`item` 是新的 `WorkItemSnapshot`。前端不得用工作项版本自行推算驾驶舱版本。接受服务端推荐时 `selection_source="admission"`；选择其他允许方式时为 `selection_source="user_override"` 且 `override_scope="this_run"`。两种情况都保持 `execution_status="not_started"`。相同 Owner、工作项、幂等键和命令返回原结果；相同 key 对应不同命令、`expected_version` 过期、选择不在 `allowed_modes` 内、用新 key 重复确认当前模式或对应 route profile/impact preview 缺失时返回 409，版本不增加。
+
+每个 `RouteProfile` 可以携带服务端 `impact_preview`：`changes[]` 依次描述工作分配、协调与等待、人工介入、规则预测、执行边界和外部动作边界；`execution_status_before/after` 当前均为 `not_started`，`external_side_effect="none"`。旧 Snapshot 缺失该字段时仍可读取，但新选择若没有对应 preview，服务端拒绝 mutation，前端也不得自行补造影响。
+
+选择成功后的 `RouteSelectionResult.item.selection_receipt` 是最新独立服务端事实，`selection_receipts[]` 按 cockpit/item 版本连续保留当前 memory Snapshot 内的改选历史；只有 latest receipt 的旧 Snapshot 会归一化为一条历史。回执包含版本前后、最终模式、`selection_source`、`override_scope`、固定规则预测和实际记录的 `changes[]`。它证明路由选择已应用，不证明 Agent、协作单元或外部动作已启动；相同幂等命令重放返回同一 receipt，随后 GET 在同一 API 进程内读回同一 receipt。
 
 `route_profiles[].forecast` 只有 `estimated_tool_calls`、`estimated_runtime_seconds` 和 `max_workers` 三个固定规则预测字段。它们不是模型账单、实际耗时、生产 SLA 或已经创建的 Worker 数。
 

@@ -47,8 +47,8 @@ Office Agent V0.1 把 AI 放在可独立工作的邮件、文档、报价、任�
 | 端到端 Simulator capability | 5 个 | `simulators/` 与 Tool Gateway 注册 |
 | Evidence requirement | 8 类 | `application/evidence_catalog.py` |
 | 确定性治理演示场景 | 4 个 | `application/demo3.py` |
-| Python 自动化结果 | 108 passed，1 个 PostgreSQL opt-in skip（2.62s） | `uv run pytest -q`，实现提交 `2f9866f + fe865bd + e2c4b56` |
-| 报价浏览器路径 | 15 passed（23.6s） | 两个报价 E2E 文件；完整浏览器为 27 passed（1.1m） |
+| Python 自动化结果 | 144 passed，1 个 PostgreSQL opt-in skip（3.60s） | 当前 `uv run pytest -q`；历史证据分别保留当时提交和数字 |
+| 完整浏览器路径 | 35 passed（2.2m） | 报价 15 条、Demo 2 5 条，其余为 Demo 1/动作桥/来源回归 |
 
 7 类工作区为邮件、文档、报价表、任务、日历、报销和 CRM；审计是独立观察视图，不计入可编辑 WorkspaceArtifact。
 
@@ -251,6 +251,8 @@ Demo 1 的 TaskStore 另有独立证据：固定 Fixture 已在同一个 Postgre
 现场应先讲清楚：驾驶舱是用户入口，Adaptive Swarm 只是复杂任务的一种待选择执行方式。四项固定演示工作由服务端 `WorkCockpitSnapshot` 提供；供应商邮件、周报格式统一、报销异常分别固定选择 Single Agent、Fixed Workflow、Tool Call；客户 A 保持待决定并允许三种模式。
 
 用户可以查看六类业务条件、比较预测代价，接受 Admission 推荐或把客户 A 改成其他允许模式，范围只在 `this_run`。选择推荐时 `selection_source=admission`，其他允许选择为 `selection_source=user_override`。无论哪种选择，当前都停在 `execution_status=not_started`。本节对应 [`DR-0008`](decisions/DR-0008-demo2-explainable-admission.md)，在单进程固定演示范围内为 `Verified`：已有 API、前台、版本/幂等、409 草稿保留、移动端、完整回归和截图工程证据，但没有用户研究、真实执行、成本或时延测量。
+
+当前新增的前台记忆点不是“多个 Agent 头像”，而是“工作组织影响地图”：在右侧切换 Single Agent、Fixed Workflow 或 Adaptive Swarm，左侧立即用服务端预览显示任务怎么分、哪里并行和等待、什么时候需要人、哪些外部动作不会发生；确认后同一区域变为服务端选择回执，并继续显示尚未执行。现场可以说“用户先预演 Agent 的工作组织影响，再确认本次路由”；不能说“Swarm 已启动”“已经创建三个 Agent”或“实测提速”。本节对应 [`DR-0011`](decisions/DR-0011-demo2-route-impact.md)，最终工程状态以对应 Evidence 为准。
 
 ## 9. 常见问答
 
