@@ -121,7 +121,8 @@ test.describe("Demo 2 work cockpit", () => {
     await expect(impactCanvas.getByText("选择后仍未启动，只记录本次路由。")).toBeVisible();
     await expect(impactCanvas.getByText("不会发送邮件、写入 CRM，也不会创建实际协作单元或访问真实业务系统。")).toBeVisible();
     await expect(decision.getByText("确认后只记录执行方式，任务尚未启动。")).toBeVisible();
-    const confirmButton = decision.getByRole("button", { name: "确认执行方式" });
+    await expect(decision.getByText("规则路由，不调用大模型。", { exact: false })).toBeVisible();
+    const confirmButton = decision.getByRole("button", { name: "记录本轮方式" });
     await expect(confirmButton).toBeVisible();
     const confirmButtonInViewport = await confirmButton.evaluate((button) => {
       const rect = button.getBoundingClientRect();
@@ -149,7 +150,7 @@ test.describe("Demo 2 work cockpit", () => {
     await expect(decision.getByRole("radio", { name: /单 Agent/ })).toBeChecked();
     await expect(decision.getByRole("radio", { name: /单 Agent/ })).toBeDisabled();
     await expect(decision.getByText("这项工作已按规则选择最轻量的方式，本轮不需要你再次确认。")).toBeVisible();
-    await expect(decision.getByRole("button", { name: /确认执行方式/ })).toHaveCount(0);
+    await expect(decision.getByRole("button", { name: /记录本轮方式/ })).toHaveCount(0);
   });
 
   test("allows a bounded fixed-workflow override and records it before execution", async ({ page }, testInfo) => {
@@ -171,7 +172,7 @@ test.describe("Demo 2 work cockpit", () => {
     const impactCanvas = page.locator(".work-cockpit-impact-canvas");
     await expect(impactCanvas.getByRole("heading", { name: "如果选择固定流程，工作会怎样展开" })).toBeVisible();
     await expect(impactCanvas.getByText("一个固定步骤序列处理资料、核对和汇总。")).toBeVisible();
-    await page.getByRole("button", { name: /确认执行方式/ }).click();
+    await page.getByRole("button", { name: /记录本轮方式/ }).click();
     await expect(page.getByRole("heading", { name: "本次工作方式已记录" })).toBeVisible();
     await expect(page.getByText("本次覆盖服务端推荐")).toBeVisible();
     await expect(page.getByText("仅本次运行")).toBeVisible();
@@ -192,7 +193,7 @@ test.describe("Demo 2 work cockpit", () => {
     await expect(page.getByText("新选择尚未提交").first()).toBeVisible();
     await expect(impactCanvas.getByRole("heading", { name: "如果改为单 Agent，工作会怎样展开" })).toBeVisible();
     await expect(page.getByText("服务端当前为“固定流程”；改为“单 Agent”尚未提交。")).toBeVisible();
-    await expect(page.getByRole("button", { name: "确认改为单 Agent" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "记录为单 Agent" })).toBeVisible();
   });
 
   test("keeps the local route choice visible when the server reports a version conflict", async ({ page }) => {
@@ -214,7 +215,7 @@ test.describe("Demo 2 work cockpit", () => {
 
     await page.goto("/");
     await page.getByRole("radio", { name: /固定流程/ }).check();
-    await page.getByRole("button", { name: /确认执行方式/ }).click();
+    await page.getByRole("button", { name: /记录本轮方式/ }).click();
 
     const decision = page.locator(".work-cockpit-decision-pane");
     await expect(decision.getByRole("radio", { name: /固定流程/ })).toBeChecked();

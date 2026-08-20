@@ -121,6 +121,8 @@ Invoke-RestMethod -Method Get -Uri "$base/threads/$($thread.thread_id)" -Headers
 
 当活动视图为报价且消息属于核算、复算、最低折后比例检查或来源追问时，ConversationService 不调用 LLM 计算数值，而是用确定性 Decimal 计算器生成回复，再通过同一 Conversation SSE 发送。包含“写入、修改、保存、发送、创建、导入”等动作词的请求不会被该快捷路由截获，仍进入既有规划和治理路径。基线结果为标准总价 272000 元、折后总价 253400 元、优惠金额 18600 元、综合折后比例 93.16%（约 9.32 折）、优惠率 6.84%。
 
+`ChatMessage.processing` 记录本次回答的处理来源：`deterministic_formula`、`language_model` 或 `policy_engine`，并带可读 `label`、真实 `elapsed_ms` 与可选 `model`。它只描述生成该条回答的服务端路径，不是思维链、任务总时长或供应商 SLA。模型路径在真实 HTTP 等待前发送 `assistant.status(status=model_call)`；服务端日志同时记录 `path/model_called/model/elapsed_ms/thread_id/active_view`，不记录消息正文或 Key。不得为了“像 AI”人为延迟确定性路径。
+
 PowerShell 中可用 `curl.exe -N` 直接观察 SSE：
 
 ```powershell
@@ -303,6 +305,8 @@ Invoke-RestMethod -Method Post `
 每个 `RouteProfile` 可以携带服务端 `impact_preview`：`changes[]` 依次描述工作分配、协调与等待、人工介入、规则预测、执行边界和外部动作边界；`execution_status_before/after` 当前均为 `not_started`，`external_side_effect="none"`。旧 Snapshot 缺失该字段时仍可读取，但新选择若没有对应 preview，服务端拒绝 mutation，前端也不得自行补造影响。
 
 选择成功后的 `RouteSelectionResult.item.selection_receipt` 是最新独立服务端事实，`selection_receipts[]` 按 cockpit/item 版本连续保留当前 memory Snapshot 内的改选历史；只有 latest receipt 的旧 Snapshot 会归一化为一条历史。回执包含版本前后、最终模式、`selection_source`、`override_scope`、固定规则预测和实际记录的 `changes[]`。它证明路由选择已应用，不证明 Agent、协作单元或外部动作已启动；相同幂等命令重放返回同一 receipt，随后 GET 在同一 API 进程内读回同一 receipt。
+
+该 POST 走确定性 `policy_engine`，不调用 LLM。前台主动作因此使用“记录本轮方式”，而不是“执行”；服务端 runtime log 记录 `model_called=false` 与实际毫秒耗时。未来只有新增真实启动协议、执行事件和 Worker/Connector 事实后，才能出现“启动协作”动作。
 
 `route_profiles[].forecast` 只有 `estimated_tool_calls`、`estimated_runtime_seconds` 和 `max_workers` 三个固定规则预测字段。它们不是模型账单、实际耗时、生产 SLA 或已经创建的 Worker 数。
 

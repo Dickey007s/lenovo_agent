@@ -48,11 +48,19 @@ class ConversationPlan(StrictConversationModel):
     artifact: ArtifactDraft | None = None
 
 
+class MessageProcessing(StrictConversationModel):
+    path: Literal["deterministic_formula", "language_model", "policy_engine"]
+    label: str
+    elapsed_ms: int = Field(ge=0)
+    model: str | None = None
+
+
 class ChatMessage(StrictConversationModel):
     message_id: str
     role: Literal["user", "assistant"]
     content: str
     status: Literal["streaming", "completed", "failed"] = "completed"
+    processing: MessageProcessing | None = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 

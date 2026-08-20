@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import re
 from datetime import UTC, datetime
+from time import perf_counter
 from typing import Any, AsyncIterator
 from uuid import uuid4
 
@@ -13,6 +15,7 @@ from services.api.app.application.conversation_models import (
     ChatMessage,
     ConversationPlan,
     ConversationThread,
+    MessageProcessing,
     SourceReference,
     WorkspaceArtifact,
 )
@@ -25,6 +28,34 @@ from services.api.app.application.quote_calculator import (
 )
 from services.api.app.application.runs import RunService
 from services.api.app.application.storage import InMemoryWorkspaceStore, WorkspaceStore
+
+
+runtime_logger = logging.getLogger("uvicorn.error")
+
+
+def _model_name(agent: Any) -> str:
+    return str(getattr(agent, "model", "configured-model"))
+
+
+def _elapsed_ms(started_at: float) -> int:
+    return max(0, round((perf_counter() - started_at) * 1000))
+
+
+def _log_processing_path(
+    *,
+    thread_id: str,
+    active_view: str | None,
+    processing: MessageProcessing,
+) -> None:
+    runtime_logger.info(
+        "assistant_processing path=%s model_called=%s model=%s elapsed_ms=%d thread_id=%s active_view=%s",
+        processing.path,
+        processing.path == "language_model",
+        processing.model or "none",
+        processing.elapsed_ms,
+        thread_id,
+        active_view or "none",
+    )
 
 
 class ConversationNotFoundError(LookupError):
@@ -947,25 +978,29 @@ class ConversationService:
         return thread
 
     async def _stream_assistant_reply(
-        self, thread: ConversationThread, response_text: str
+        self,
+        thread: ConversationThread,
+        response_text: str,
+        processing: MessageProcessing | None = None,
     ) -> AsyncIterator[dict[str, Any]]:
         assistant_message = ChatMessage(
             message_id=f"msg_{uuid4().hex}",
             role="assistant",
             content="",
             status="streaming",
+            processing=processing,
         )
         yield {
             "type": "message.started",
             "message": assistant_message.model_dump(mode="json"),
         }
-        for start in range(0, len(response_text), 2):
+        if response_text:
             yield {
                 "type": "assistant.delta",
                 "message_id": assistant_message.message_id,
-                "delta": response_text[start : start + 2],
+                "delta": response_text,
             }
-            await asyncio.sleep(0.012)
+            await asyncio.sleep(0)
         completed = assistant_message.model_copy(
             update={"content": response_text, "status": "completed"}
         )
@@ -1166,6 +1201,7 @@ class ConversationService:
                 "status": "calculating",
                 "label": "正在按当前报价表逐行核算",
             }
+            processing_started_at = perf_counter()
             try:
                 if active_artifact is None:
                     raise QuoteCalculationError("服务端报价工作区不存在")
@@ -1177,7 +1213,19 @@ class ConversationService:
                     f"当前报价无法完成核算：{exc}。"
                     "我没有使用历史对话中的金额，也不会在字段不完整时猜测结果。"
                 )
-            async for event in self._stream_assistant_reply(thread, response_text):
+            processing = MessageProcessing(
+                path="deterministic_formula",
+                label="服务端公式核算，未调用大模型",
+                elapsed_ms=_elapsed_ms(processing_started_at),
+            )
+            _log_processing_path(
+                thread_id=thread_id,
+                active_view=active_view,
+                processing=processing,
+            )
+            async for event in self._stream_assistant_reply(
+                thread, response_text, processing
+            ):
                 yield event
             return
 
@@ -1191,16 +1239,54 @@ class ConversationService:
             return
 
         if _is_general_question(text):
+            model_name = _model_name(self.agent)
+            yield {
+                "type": "assistant.status",
+                "status": "model_call",
+                "label": f"正在调用 {model_name} 生成回答",
+            }
+            processing_started_at = perf_counter()
             response_text = await self.agent.answer_general(
                 text,
                 history,
                 trusted_context["current_datetime"],
             )
-            async for event in self._stream_assistant_reply(thread, response_text):
+            processing = MessageProcessing(
+                path="language_model",
+                label=f"由 {model_name} 生成",
+                elapsed_ms=_elapsed_ms(processing_started_at),
+                model=model_name,
+            )
+            _log_processing_path(
+                thread_id=thread_id,
+                active_view=active_view,
+                processing=processing,
+            )
+            async for event in self._stream_assistant_reply(
+                thread, response_text, processing
+            ):
                 yield event
             return
 
+        model_name = _model_name(self.agent)
+        yield {
+            "type": "assistant.status",
+            "status": "model_call",
+            "label": f"正在调用 {model_name} 规划当前任务",
+        }
+        processing_started_at = perf_counter()
         plan: ConversationPlan = await self.agent.plan(text, history, trusted_context)
+        plan_processing = MessageProcessing(
+            path="language_model",
+            label=f"由 {model_name} 规划",
+            elapsed_ms=_elapsed_ms(processing_started_at),
+            model=model_name,
+        )
+        _log_processing_path(
+            thread_id=thread_id,
+            active_view=active_view,
+            processing=plan_processing,
+        )
         artifact = None
         previous_artifact = None
         run = None
@@ -1404,6 +1490,7 @@ class ConversationService:
             role="assistant",
             content="",
             status="streaming",
+            processing=plan_processing,
         )
         yield {"type": "message.started", "message": assistant_message.model_dump(mode="json")}
         response_text = plan.assistant_response.strip() or "我已完成当前任务的准备。"
@@ -1411,10 +1498,13 @@ class ConversationService:
             response_text = f"{response_text}\n\n{_describe_action_gate(run)}"
         elif action is not None:
             response_text = f"{response_text}\n\n{_describe_candidate_risk(action)}"
-        for start in range(0, len(response_text), 2):
-            delta = response_text[start : start + 2]
-            yield {"type": "assistant.delta", "message_id": assistant_message.message_id, "delta": delta}
-            await asyncio.sleep(0.012)
+        if response_text:
+            yield {
+                "type": "assistant.delta",
+                "message_id": assistant_message.message_id,
+                "delta": response_text,
+            }
+            await asyncio.sleep(0)
 
         completed = assistant_message.model_copy(
             update={"content": response_text, "status": "completed"}
@@ -1471,6 +1561,7 @@ class ConversationService:
             "label": "Agent 正在读取执行结果并更新对话",
         }
         binding = run.action.task_artifact_binding
+        processing_started_at = perf_counter()
         if binding is not None:
             if run.status == "EXECUTED":
                 response_text = (
@@ -1481,7 +1572,18 @@ class ConversationService:
                 response_text = "该客户回复动作已被策略拒绝，没有执行，也没有连接真实邮箱。"
             else:
                 response_text = "该客户回复动作未能完成，没有执行，也没有连接真实邮箱。"
+            processing = MessageProcessing(
+                path="policy_engine",
+                label="服务端执行回执，未调用大模型",
+                elapsed_ms=_elapsed_ms(processing_started_at),
+            )
         else:
+            model_name = _model_name(self.agent)
+            yield {
+                "type": "assistant.status",
+                "status": "model_call",
+                "label": f"正在调用 {model_name} 解释执行结果",
+            }
             response_text = await self.agent.respond_after_action(
                 run.user_message,
                 [
@@ -1496,6 +1598,17 @@ class ConversationService:
                     ),
                 },
             )
+            processing = MessageProcessing(
+                path="language_model",
+                label=f"由 {model_name} 解释执行结果",
+                elapsed_ms=_elapsed_ms(processing_started_at),
+                model=model_name,
+            )
+        _log_processing_path(
+            thread_id=thread_id,
+            active_view="action_result",
+            processing=processing,
+        )
         if binding is None:
             response_text = _strip_repeated_risk(response_text)
         if not response_text:
@@ -1509,15 +1622,16 @@ class ConversationService:
             role="assistant",
             content="",
             status="streaming",
+            processing=processing,
         )
         yield {"type": "message.started", "message": assistant.model_dump(mode="json")}
-        for start in range(0, len(response_text), 2):
+        if response_text:
             yield {
                 "type": "assistant.delta",
                 "message_id": assistant.message_id,
-                "delta": response_text[start : start + 2],
+                "delta": response_text,
             }
-            await asyncio.sleep(0.012)
+            await asyncio.sleep(0)
         completed = assistant.model_copy(
             update={"content": response_text, "status": "completed"}
         )

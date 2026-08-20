@@ -277,9 +277,9 @@ export function WorkCockpitDecisionPane({
 
         {!fixedByAdmission && (
           <footer className="work-cockpit-confirm-bar is-inline">
-            <span>当前选择：{routeLabel(selectedMode)}。确认只会记录路由，不会发送邮件、写入 CRM 或启动外部动作。</span>
+            <span>规则路由，不调用大模型。这里只记录“{routeLabel(selectedMode)}”作为本轮组织方式，不会启动协作或触发外部动作。</span>
             <button type="button" aria-describedby={!visibleReceipt ? "work-cockpit-impact-canvas-title" : undefined} disabled={saving || selectedDisabled || alreadyRecorded || !selectedOption?.impact_preview} onClick={onConfirm}>
-              {saving ? "正在确认" : alreadyRecorded ? "本次方式已记录" : previewingOverride ? `确认改为${routeLabel(selectedMode)}` : "确认执行方式"}<IconArrowRight aria-hidden="true" />
+              {saving ? "正在记录" : alreadyRecorded ? "本次方式已记录" : previewingOverride ? `记录为${routeLabel(selectedMode)}` : "记录本轮方式"}<IconArrowRight aria-hidden="true" />
             </button>
           </footer>
         )}

@@ -24,6 +24,8 @@
 | `USER-FEEDBACK-20260811-QUOTE-CALCULATION-04` | Stakeholder feedback | [`USER-FEEDBACK-20260811-06-quote-calculation-grounding.md`](../sources/USER-FEEDBACK-20260811-06-quote-calculation-grounding.md) 及两张原始截图 | 原 Agent 数值和来源回答与当前工作台冲突，需要建立单一核算事实链 | 单一 Stakeholder 反馈，不是目标用户研究，也不覆盖真实报价规则 |
 | `SOURCE-QUOTE-CALCULATOR-20260811` | 源码事实 | 实现提交 `2f9866f + fe865bd + e2c4b56`：`services/api/app/application/quote_calculator.py`、`services/api/app/application/conversations.py`、`services/api/app/application/runs.py`、`packages/evidence/mock.py`、`apps/web/app/quote-calculator.ts`、`apps/web/app/page.tsx` | 服务端 Decimal 与前端 BigInt 核算；revision/request epoch 冲突保护；Artifact 来源、Action/Thread 绑定、严格收件人识别与 unresolved-context deny | 只描述当前提交，不能证明真实 CRM、生产财务精度或多实例一致性 |
 | `QUOTE-WORKSPACE-DETERMINISTIC-CALCULATION-20260811` | 自动化、运行与截图证据 | [`QUOTE-WORKSPACE-DETERMINISTIC-CALCULATION-EVIDENCE-20260811.md`](../evidence/QUOTE-WORKSPACE-DETERMINISTIC-CALCULATION-EVIDENCE-20260811.md) | 覆盖基线、编辑、舍入、越界、空上下文、字段所有权、来源回答、revision 冲突、恶意 Action/source、结果重放和浏览器 UI | 不替代真实用户研究、真实 Connector、复杂计价或数据库/多实例 CAS 验证 |
+| `USER-FEEDBACK-20260820-04` | Stakeholder feedback | [`USER-FEEDBACK-20260820-04-processing-path-realism.md`](../sources/USER-FEEDBACK-20260820-04-processing-path-realism.md) | 毫秒级报价回答若不说明来源，会被误解为模型“秒思考” | 单一反馈，不证明延迟或模型质量 |
+| `PROCESSING-PATH-REALISM-20260820` | 运行与自动化证据 | [`PROCESSING-PATH-REALISM-EVIDENCE-20260820.md`](../evidence/PROCESSING-PATH-REALISM-EVIDENCE-20260820.md) | 报价公式、真实模型问答和 Demo 2 规则写入的路径与耗时可区分 | 单次模型样本不是 SLA 或质量证据 |
 
 ## 3. 决策与备选
 
@@ -32,6 +34,7 @@
 1. 服务端以 `Decimal` 和 `ROUND_HALF_UP` 按行计算 `qty × unit_price`，先将标准行金额舍入到分，再乘 `discount` 并将折后行金额舍入到分；总计由行金额求和。前端用整数分和 `BigInt` 实现同一顺序与舍入规则。
 2. 服务端拥有 `quote_id`、`customer`、`currency`、`approved_floor`、每行 `unit_price` 和 `sources`。当前用户可编辑 `name`、`qty`、`discount`、`valid_until`；客户端提交的 `subtotal`、`total`、审批状态和上述服务端字段都不能成为核算事实。
 3. 报价核算、复算、底线检查和来源追问由确定性意图路由处理，通过 Conversation SSE 返回可读解释；写入、修改、保存、发送、创建或导入等动作词会退出该快捷路由，继续既有业务规划与治理路径。
+   完成消息必须持久显示“服务端公式核算，未调用大模型”与真实耗时，不能用人工等待模拟模型处理。
 4. 非法或不完整输入不显示部分总计，也不回退到旧值。保存后的服务端内容写回规范化小计和总计；相对基线发生可编辑字段变化时设置 `approval.status=needs_review` 与 `requires_recheck=true`。
 5. 同一 Thread 的消息流串行更新，避免两个并发回答用旧 Thread 覆盖彼此；这不改变 Conversation 仍为进程内存状态的边界。
 6. 显式未保存上下文携带 `workspace_artifact_id/workspace_revision`，保存携带 `expected_artifact_id/expected_revision`。过期保存返回 409；流式处理遇到过期或规划期间 Artifact 变化时发出 `workspace.conflict`，不写回也不创建动作。Web 保留草稿并提供查看最新或有界三方重应用，同字段双改拒绝自动合并。若用户在请求等待期间继续编辑，晚到 Agent Artifact 以请求发出时实际发送的草稿为 base，而不是更早的保存版本；不同字段只保留等待期新增编辑，同字段进入显式冲突。

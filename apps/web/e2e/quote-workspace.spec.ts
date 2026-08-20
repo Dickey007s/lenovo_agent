@@ -105,6 +105,7 @@ test("quote workspace recalculates edits and answers from the visible rows", asy
   await expect(initialAnswer).toContainText("优惠金额：¥18,600");
   await expect(initialAnswer).toContainText("优惠率：6.84%");
   await expect(initialAnswer).toContainText("没有访问真实 CRM");
+  await expect(initialAnswer).toContainText("服务端公式核算，未调用大模型");
   await expect(initialAnswer).not.toContainText("2,000,000");
   await expect(initialAnswer).not.toContainText("1,770,000");
   await expect(page.locator(".send-spinner")).toHaveCount(0);

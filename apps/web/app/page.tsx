@@ -56,7 +56,18 @@ type ChatMessage = {
   role: "user" | "assistant";
   content: string;
   status: "streaming" | "completed" | "failed";
+  processing?: {
+    path: "deterministic_formula" | "language_model" | "policy_engine";
+    label: string;
+    elapsed_ms: number;
+    model: string | null;
+  } | null;
 };
+
+function processingDuration(elapsedMs: number) {
+  if (elapsedMs < 1) return "<1 ms";
+  return elapsedMs < 1000 ? `${elapsedMs} ms` : `${(elapsedMs / 1000).toFixed(1)} s`;
+}
 
 type SourceReference = {
   source_id: string;
@@ -2071,7 +2082,7 @@ export default function Home() {
           <ActiveTaskStrip task={task} syncState={taskSyncState} blocked={actionGateOpen} onOpenTask={openTaskWorkspace} onRetry={() => void (pendingTaskMutation ? retryPendingTaskMutation() : retryTaskConnection())}/>
           <div className="conversation" ref={conversationRef} onScroll={handleConversationScroll}>
             {messages.length === 0 && <article className="message assistant-message"><div className="msg-avatar"><IconSparkles aria-hidden="true" /></div><div className="message-body"><strong>Office Agent</strong><p>我会读取你正在编辑的工作区，并直接协助修改。涉及发送、写入或外部影响时，我会先请求确认。</p><div className="suggestion-chips">{activeView === "quote" ? <><button type="button" onClick={() => void runAgent("核算当前报价的综合折后比例")}>核算综合折后比例</button><button type="button" onClick={() => void runAgent("检查当前报价的最低折后比例")}>检查最低折后比例</button><button type="button" onClick={() => void runAgent("说明当前报价的数据来源")}>说明数据来源</button></> : <><button type="button" onClick={() => void runAgent("帮我完善当前工作区中的内容")}>完善当前内容</button><button type="button" onClick={() => void runAgent("检查当前工作区有没有需要我注意的问题")}>检查潜在问题</button><button type="button" onClick={() => void runAgent("总结一下当前工作区的状态")}>总结当前状态</button></>}</div></div></article>}
-            {messages.map(item => <article className={`message ${item.role === "user" ? "user-message" : "assistant-message"} message-enter`} key={item.message_id}>{item.role === "assistant" && <div className="msg-avatar"><IconSparkles aria-hidden="true" /></div>}<div className="message-body">{item.role === "assistant" && <strong>Office Agent</strong>}<MessageContent text={item.content} streaming={item.status === "streaming"}/></div></article>)}
+            {messages.map(item => <article className={`message ${item.role === "user" ? "user-message" : "assistant-message"} message-enter`} key={item.message_id}>{item.role === "assistant" && <div className="msg-avatar"><IconSparkles aria-hidden="true" /></div>}<div className="message-body">{item.role === "assistant" && <strong>Office Agent</strong>}<MessageContent text={item.content} streaming={item.status === "streaming"}/>{item.role === "assistant" && item.processing && item.status === "completed" && <div className={`message-processing is-${item.processing.path}`}><span>{item.processing.label}</span><b>{processingDuration(item.processing.elapsed_ms)}</b></div>}</div></article>)}
             {assistantStatus && <article className="message assistant-message message-enter"><div className="msg-avatar"><IconSparkles aria-hidden="true" /></div><div className="message-body"><div className="typing-bubble"><span/><span/><span/><em>{assistantStatus}</em></div></div></article>}
           </div>
           <div className="chat-footer">{actionResultPending && actionResultRun && <div className="action-result-retry" role="status"><span>动作已经结束，Agent 的结果说明尚未确认送达。</span><button type="button" disabled={busy} onClick={() => void continueAfterAction(actionResultRun)}>重新读取结果</button></div>}{workspaceConflict?.kind === activeView && <WorkspaceConflictBanner conflict={workspaceConflict} onResolve={resolveWorkspaceConflict}/>} {(error || taskError) && <div className="error-banner" role="alert" aria-live="assertive">{taskError || error}</div>}<form className="chat-composer glass-card" onSubmit={sendMessage}><textarea aria-label="输入办公任务" value={message} onChange={event => setMessage(event.target.value)} onKeyDown={handleComposerKeyDown} placeholder={`让 Agent 协助当前${VIEW_LABELS[activeView]}…`}/><button aria-label="发送消息" disabled={busy || !message.trim() || !threadId}>{busy ? <span className="send-spinner"/> : <IconArrowUp aria-hidden="true" />}</button></form><small>Agent 可读取当前未保存内容 · Enter 发送</small></div>

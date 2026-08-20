@@ -27,6 +27,7 @@
 | `GOOGLE-PAIR-FEEDBACK-CONTROL-2021` | 官方设计实践 | Google PAIR, Feedback + Control，2021 版 Guidebook | 支持尽快反馈用户选择如何影响系统，并保持控制与自动化平衡 | 设计实践，不是本项目用户研究 |
 | `DR-0008`、`SCENARIO-002` | 既有内部决策与场景 | Demo 2 可解释 Admission、固定队列与 `this_run` 选择 | 提供当前服务端路由、版本、幂等和未启动边界 | 旧纵切只证明选择，不包含结构化影响或回执 |
 | `DR-0010` | 既有交互决策 | Demo 1 的“预期影响 + 实际回执”双时态模式 | 支持把同一原则扩展到路由选择，但需重新绑定 Demo 2 事实 | Demo 1 的 Task Artifact 变化不能直接充当 Demo 2 路由事实 |
+| `USER-FEEDBACK-20260820-04`、`PROCESSING-PATH-REALISM-20260820` | Stakeholder 反馈与运行证据 | [`USER-FEEDBACK`](../sources/USER-FEEDBACK-20260820-04-processing-path-realism.md)、[`Evidence`](../evidence/PROCESSING-PATH-REALISM-EVIDENCE-20260820.md) | 只记录路由的毫秒级操作不能写成执行，且应明确规则路径未调用模型 | 不证明真实 Swarm、用户理解或延迟 SLA |
 
 ## 3. 决策
 
@@ -40,6 +41,7 @@
 6. `impact_preview` 与 `selection_receipt` 保持可选以读取旧 Snapshot；但新服务端选择缺少 preview 时必须拒绝 mutation，前端也禁用确认。
 7. 路由选择回执随 `WorkItemSnapshot` 返回并进入现有幂等结果，因此同一进程内 GET 和相同 key 重放能恢复同一回执；`selection_receipts[]` 按版本连续追加，再次改选会保留真实上一方式。旧 Snapshot 只有 latest receipt 时在读取时归一化为一条历史。当前 memory 后端不支持跨进程恢复。
 8. 已记录的相同方式不得用新幂等键再次确认并制造无意义版本；缺少 route profile 或 impact preview 时必须 409 且版本不变。
+9. 主动作改为“记录本轮方式”，提交栏持续说明这是 `policy_engine` 规则路由、不调用 LLM，也不会启动协作。服务端写入结构化 runtime log 的真实毫秒耗时，不添加模拟等待。
 
 不采用只在 Toast 中写“已切换模式”，因为它不能说明影响，也不能刷新恢复。不采用显示多个 Agent 头像，因为当前没有 Worker 生命周期事实。不使用 LLM 自由生成影响文案；当前影响是固定策略事实，避免把不可控解释当成治理承诺。
 
