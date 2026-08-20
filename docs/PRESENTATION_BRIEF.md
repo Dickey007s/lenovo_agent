@@ -265,7 +265,7 @@ Demo 3 的前台不只展示风险等级和确认按钮，还展示动作影响�
 3. `ToolExecutionResult.succeeded` 只说明 Email/Office Simulator 返回成功，不说明真实邮箱、CRM、OA、日历或任务系统发生写入。
 4. 拒绝、绑定变化、参数篡改、Permit 重放和模拟器失败都保留已完成 Task、Commit、ArtifactVersion 和 VerificationReport 不变。
 
-当前这一节在固定 Demo 3 工程纵切内已 Verified：Python `151 passed, 1 skipped in 3.69s`、完整浏览器 `37 passed (2.2m)`，Ruff、governance `4 passed in 0.02s`、lint、build 通过，视觉终验无 P0/P1，四张截图及 hash 见 Evidence。不能将其表述为用户理解改善、真实 Connector、生产身份、跨进程执行幂等/Permit replay、多实例或数据库恢复；也不能用 DR-0007 的既有证据替代本轮账本证据。实现提交为 `9335470`，对应 [PR #18](https://github.com/Dickey007s/lenovo_agent/pull/18)；文档提交在首次证据提交后回填。
+当前这一节在固定 Demo 3 工程纵切内已 Verified：Python `151 passed, 1 skipped in 3.69s`、完整浏览器 `37 passed (2.2m)`，Ruff、governance `4 passed in 0.02s`、lint、build 通过，视觉终验无 P0/P1，四张截图及 hash 见 Evidence。不能将其表述为用户理解改善、真实 Connector、生产身份、跨进程执行幂等/Permit replay、多实例或数据库恢复；也不能用 DR-0007 的既有证据替代本轮账本证据。实现提交为 `9335470`，文档提交为 `34aee71`，对应 [PR #18](https://github.com/Dickey007s/lenovo_agent/pull/18)。
 
 ## 9. 常见问答
 

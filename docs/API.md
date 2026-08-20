@@ -457,7 +457,7 @@ data: {"sequence":168,"event_id":"...","run_id":"...","trace_id":"...",...}
 
 普通业务审计工作台不是原始事件查看器：前端必须把 `event_type`、`payload`、`trace`、`email_simulator`、`email.send`、`PERMIT_ISSUED` 和 `Permit` 投影为可读业务标签与服务端摘要，不得把原值渲染进普通业务 DOM。原始事件仍由 API/服务端审计保留，只有受控技术审计视图可查看。
 
-Demo 3 Action Gate 使用 RunSnapshot 和上述有序事件投影“动作影响账本”。预演固定显示“会改变 / 会重新核对 / 保持不变 / 不会发生”；`TOOL_EXECUTED` 的结果必须标记为 Simulator 结果，不能表述为真实邮箱、CRM、OA、日历或任务系统写入。`ACTION_INVALIDATED`、`TAMPER_BLOCKED`、拒绝和 `FAILED` 都必须显示动作未产生真实外部影响，并保留已完成 Task/Artifact/Commit 不变。固定 Demo 3 工程纵切已由 Python `151 passed, 1 skipped in 3.69s`、完整浏览器 `37 passed (2.2m)`、Ruff、governance、lint 和 build 验证；视觉终验无 P0/P1。实现提交为 `9335470`，对应 [PR #18](https://github.com/Dickey007s/lenovo_agent/pull/18)；文档提交在首次证据提交后回填。跨进程执行幂等/Permit replay、多实例/数据库恢复、真实 Connector 和用户理解不在该结论内。
+Demo 3 Action Gate 使用 RunSnapshot 和上述有序事件投影“动作影响账本”。预演固定显示“会改变 / 会重新核对 / 保持不变 / 不会发生”；`TOOL_EXECUTED` 的结果必须标记为 Simulator 结果，不能表述为真实邮箱、CRM、OA、日历或任务系统写入。`ACTION_INVALIDATED`、`TAMPER_BLOCKED`、拒绝和 `FAILED` 都必须显示动作未产生真实外部影响，并保留已完成 Task/Artifact/Commit 不变。固定 Demo 3 工程纵切已由 Python `151 passed, 1 skipped in 3.69s`、完整浏览器 `37 passed (2.2m)`、Ruff、governance、lint 和 build 验证；视觉终验无 P0/P1。实现提交为 `9335470`，文档提交为 `34aee71`，对应 [PR #18](https://github.com/Dickey007s/lenovo_agent/pull/18)。跨进程执行幂等/Permit replay、多实例/数据库恢复、真实 Connector 和用户理解不在该结论内。
 
 ## 6. Task SSE
 

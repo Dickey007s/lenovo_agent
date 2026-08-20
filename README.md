@@ -97,7 +97,7 @@ Demo 3 的前台重点是“动作影响账本”：用户在 Action Gate 中先
 
 当前最小场景仍是固定客户 A 的已核对 `reply_draft → email.send`。拒绝、成果版本变化、参数篡改、Permit 重放和 Simulator 失败都必须保持 Task Commit、ArtifactVersion 和 VerificationReport 不变。`ToolExecutionResult.succeeded` 只代表 Email/Office Simulator 返回成功，不代表真实邮箱、CRM、OA、日历或任务系统已写入。
 
-当前固定工程纵切已完成验证：Python `151 passed, 1 skipped in 3.69s`、完整浏览器 `37 passed (2.2m)`，并新增审计工作台回归；Ruff、governance `4 passed in 0.02s`、前端 lint 和 build 通过，视觉终验无 P0/P1。普通业务 UI 只显示业务标签与服务端摘要，不渲染 raw event/payload/trace 或 `email_simulator`、`email.send`、`PERMIT_ISSUED`、`Permit`；内部原值仅留 API/服务端审计。四张桌面/移动截图及 SHA-256 见 Evidence。该结果不证明目标用户理解、真实 Connector、生产身份、跨进程执行幂等/Permit replay、多实例或数据库恢复。实现提交为 `9335470`，对应 [PR #18](https://github.com/Dickey007s/lenovo_agent/pull/18)；文档提交在首次证据提交后回填。详见 [`DR-0012`](docs/decisions/DR-0012-demo3-action-impact-ledger.md)、[`SCENARIO-003`](docs/scenarios/SCENARIO-003-demo3-action-impact-ledger.md) 与 [`Demo 3 Evidence`](docs/evidence/DEMO3-ACTION-IMPACT-LEDGER-EVIDENCE-20260820.md)。
+当前固定工程纵切已完成验证：Python `151 passed, 1 skipped in 3.69s`、完整浏览器 `37 passed (2.2m)`，并新增审计工作台回归；Ruff、governance `4 passed in 0.02s`、前端 lint 和 build 通过，视觉终验无 P0/P1。普通业务 UI 只显示业务标签与服务端摘要，不渲染 raw event/payload/trace 或 `email_simulator`、`email.send`、`PERMIT_ISSUED`、`Permit`；内部原值仅留 API/服务端审计。四张桌面/移动截图及 SHA-256 见 Evidence。该结果不证明目标用户理解、真实 Connector、生产身份、跨进程执行幂等/Permit replay、多实例或数据库恢复。实现提交为 `9335470`，文档提交为 `34aee71`，对应 [PR #18](https://github.com/Dickey007s/lenovo_agent/pull/18)。详见 [`DR-0012`](docs/decisions/DR-0012-demo3-action-impact-ledger.md)、[`SCENARIO-003`](docs/scenarios/SCENARIO-003-demo3-action-impact-ledger.md) 与 [`Demo 3 Evidence`](docs/evidence/DEMO3-ACTION-IMPACT-LEDGER-EVIDENCE-20260820.md)。
 
 ## 技术架构
 

@@ -113,7 +113,7 @@ RUN_CREATED
 | 刷新、断线、未知结果 | GET/SSE 对账、无重复 Run/事件/完成消息 | 部分验证：终态重放与未知结果已测；跨进程/断线恢复仍待验证 |
 | 前台响应式 | 桌面、移动、键盘、读屏、无横溢和 44px 触控门槛 | 已验证：桌面/移动 E2E；用户理解仍待研究 |
 
-工程验证记录见 [`DEMO3-ACTION-IMPACT-LEDGER-20260820`](../evidence/DEMO3-ACTION-IMPACT-LEDGER-EVIDENCE-20260820.md)：Python `151 passed, 1 skipped in 3.69s`、完整 E2E `37 passed (2.2m)`（含审计工作台 raw 字段隐藏回归）、Ruff/governance `4 passed in 0.02s`/lint/build 通过；视觉终验无 P0/P1，四张截图的尺寸、文件大小和 SHA-256 已在 Evidence 记录。实现提交为 `9335470`，对应 [PR #18](https://github.com/Dickey007s/lenovo_agent/pull/18)；文档提交在首次证据提交后回填。
+工程验证记录见 [`DEMO3-ACTION-IMPACT-LEDGER-20260820`](../evidence/DEMO3-ACTION-IMPACT-LEDGER-EVIDENCE-20260820.md)：Python `151 passed, 1 skipped in 3.69s`、完整 E2E `37 passed (2.2m)`（含审计工作台 raw 字段隐藏回归）、Ruff/governance `4 passed in 0.02s`/lint/build 通过；视觉终验无 P0/P1，四张截图的尺寸、文件大小和 SHA-256 已在 Evidence 记录。实现提交为 `9335470`，文档提交为 `34aee71`，对应 [PR #18](https://github.com/Dickey007s/lenovo_agent/pull/18)。
 
 ## 7. Simulator 与系统边界
 

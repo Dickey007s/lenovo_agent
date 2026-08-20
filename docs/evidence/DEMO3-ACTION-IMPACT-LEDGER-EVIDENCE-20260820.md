@@ -29,7 +29,7 @@ Governance: 4 passed in 0.02s
 Frontend lint: passed
 Next.js build: passed
 Implementation commit: `9335470`
-Documentation commit: 首次证据提交后回填
+Documentation commit: `34aee71`
 PR URL: https://github.com/Dickey007s/lenovo_agent/pull/18
 ```
 
@@ -48,4 +48,4 @@ PR URL: https://github.com/Dickey007s/lenovo_agent/pull/18
 
 ## 4. 当前边界
 
-本文件记录的是限定固定 Demo 3 工程纵切的运行结果，不是用户研究或生产能力证明。普通业务 UI 只显示业务标签与服务端摘要，不渲染 raw `event_type/payload/trace` 或 `email_simulator`、`email.send`、`PERMIT_ISSUED`、`Permit`；内部原值仅留在 API/服务端审计。真实邮箱、CRM、OA、日历、真实 Connector、生产身份、跨进程执行幂等/Permit replay、多实例/数据库恢复和用户理解仍未验证。实现提交与 PR 已记录，文档提交需在首次证据提交后补入；不得把 DR-0007 的既有证据直接复用为 DR-0012 的完成证明。
+本文件记录的是限定固定 Demo 3 工程纵切的运行结果，不是用户研究或生产能力证明。普通业务 UI 只显示业务标签与服务端摘要，不渲染 raw `event_type/payload/trace` 或 `email_simulator`、`email.send`、`PERMIT_ISSUED`、`Permit`；内部原值仅留在 API/服务端审计。真实邮箱、CRM、OA、日历、真实 Connector、生产身份、跨进程执行幂等/Permit replay、多实例/数据库恢复和用户理解仍未验证。实现提交、首次证据文档提交与 PR 已记录；不得把 DR-0007 的既有证据直接复用为 DR-0012 的完成证明。

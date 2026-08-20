@@ -286,4 +286,4 @@ item_id / change_kind / label / before / after
 
 `ToolExecutionResult.status=succeeded` 只表示注册的 Simulator 返回成功。它不得被翻译为真实外部系统已经写入。拒绝、绑定失效、参数篡改、Permit 重放和 Simulator 失败不得回滚 Task Commit；结果未知时必须读取 Run Snapshot 和 Run SSE 对账，而不是自动重复执行。
 
-本节在固定客户回复草稿、四个治理场景、五个 Simulator capability 和被测桌面/移动路径内为 Verified。它不覆盖通用 Artifact Action、真实 Connector、生产身份、跨进程执行幂等/Permit replay、多实例/数据库恢复或目标用户理解；实现提交为 `9335470`，对应 [PR #18](https://github.com/Dickey007s/lenovo_agent/pull/18)，文档提交在首次证据提交后回填。
+本节在固定客户回复草稿、四个治理场景、五个 Simulator capability 和被测桌面/移动路径内为 Verified。它不覆盖通用 Artifact Action、真实 Connector、生产身份、跨进程执行幂等/Permit replay、多实例/数据库恢复或目标用户理解；实现提交为 `9335470`，文档提交为 `34aee71`，对应 [PR #18](https://github.com/Dickey007s/lenovo_agent/pull/18)。
