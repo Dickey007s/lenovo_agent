@@ -1216,27 +1216,24 @@ async def test_mail_artifact_overrides_malicious_action_payload(
     assert "RECIPIENT_IDENTITY_UNRESOLVED" in run.control_plan.reason_codes
     assert "ATTACHMENT_DATA_CLASS_UNRESOLVED" in run.control_plan.reason_codes
 
-    run = await run_service.submit_evidence(
-        run.action.action_id,
-        {
-            "recipient_identity": "张三",
-            "attachment_hash": "user-asserted-hash",
-            "pricing_source": "crm:quote/991:v3",
-        },
-        "user_mail_binding",
-    )
-    assert run.status == "DENIED"
-    assert run.evidence["recipient_identity"].status == "missing"
-    assert run.evidence["attachment_hash"].status == "missing"
-
-    for role in ("current_user", "sales_manager"):
-        run = await run_service.submit_approval(
+    with pytest.raises(ValueError, match="终态"):
+        await run_service.submit_evidence(
             run.action.action_id,
-            role,
+            {
+                "recipient_identity": "张三",
+                "attachment_hash": "user-asserted-hash",
+                "pricing_source": "crm:quote/991:v3",
+            },
+            "user_mail_binding",
+        )
+
+    with pytest.raises(ValueError, match="终态"):
+        await run_service.submit_approval(
+            run.action.action_id,
+            "current_user",
             "approved",
             "user_mail_binding",
         )
-    assert run.status == "DENIED"
     with pytest.raises(AuthorizationError, match="READY_TO_AUTHORIZE"):
         await run_service.authorize_and_execute(
             run.action.action_id, "user_mail_binding"

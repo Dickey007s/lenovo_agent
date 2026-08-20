@@ -44,6 +44,7 @@ import {
 } from "./task-director-studio";
 import type { ControlIntent } from "./task-runtime-panel";
 import { WorkCockpit, WorkCockpitDecisionPane } from "./work-cockpit";
+import { ActionImpactLedger } from "./action-impact-ledger";
 
 type ViewId = "mail" | "document" | "quote" | "tasks" | "calendar" | "expense" | "crm" | "audit";
 type WorkspaceKind = Exclude<ViewId, "audit">;
@@ -119,6 +120,7 @@ type RunSnapshot = {
   };
   risk: { risk_level: string; reason_codes: string[] };
   control_plan: {
+    action_hash: string;
     status: string;
     capabilities: Record<string, CapabilityDecision>;
     missing_requirements: string[];
@@ -126,8 +128,10 @@ type RunSnapshot = {
     reason_codes: string[];
     panel: { type: string; message: string };
   };
+  impact_preview?: import("./action-impact-ledger").ActionImpactPayload | null;
+  execution_receipt?: import("./action-impact-ledger").ActionImpactPayload | null;
   permit: null | { permit_id: string; expires_at: string };
-  tool_result: null | { execution_id: string; simulator: string; status: string; output: Record<string, unknown> };
+  tool_result: null | { execution_id: string; simulator: string; status: string; output: Record<string, unknown>; executed_at?: string };
 };
 
 type AuditEvent = {
@@ -168,10 +172,22 @@ const TASK_PHASE_LABELS: Record<TaskSnapshot["phase"], string> = {
   verify: "验证证据", commit: "提交结果",
 };
 const EVENT_LABELS: Record<string, string> = {
-  RUN_CREATED: "创建运行", ACTION_PARSED: "解析动作", EVIDENCE_SUBMITTED: "补充证据",
-  APPROVAL_RECORDED: "记录审批", CONTROL_PLAN_UPDATED: "更新控制计划", ACTION_INVALIDATED: "作废旧动作",
-  PERMIT_ISSUED: "签发执行许可", TOOL_EXECUTED: "Simulator 执行", TAMPER_BLOCKED: "拦截参数篡改",
+  RUN_CREATED: "动作进入治理流程", ACTION_PARSED: "解析动作意图", EVIDENCE_SUBMITTED: "提交可信依据",
+  APPROVAL_RECORDED: "记录人工确认", CONTROL_PLAN_UPDATED: "更新控制计划", ACTION_INVALIDATED: "旧动作已作废",
+  PERMIT_ISSUED: "签发一次性执行许可", TOOL_EXECUTED: "受控演示动作已执行", TAMPER_BLOCKED: "拦截参数篡改",
 };
+
+function auditEventSummary(event: AuditEvent): string {
+  const status = typeof event.payload.status === "string" ? event.payload.status : "";
+  const decision = typeof event.payload.decision === "string" ? event.payload.decision : "";
+  if (event.event_type === "APPROVAL_RECORDED") return decision === "approved" ? "指定确认人已批准本次影响。" : decision === "rejected" ? "指定确认人已拒绝，本次动作不会执行。" : "服务端已记录确认结果。";
+  if (event.event_type === "CONTROL_PLAN_UPDATED") return status ? `控制状态已更新为：${status === "READY_TO_AUTHORIZE" ? "可以执行" : status === "WAITING_APPROVAL" ? "等待确认" : status === "DENIED" ? "已拒绝" : "处理中"}。` : "服务端已重新核对动作约束。";
+  if (event.event_type === "PERMIT_ISSUED") return "服务端已为当前动作和成果版本签发一次性执行许可。";
+  if (event.event_type === "TOOL_EXECUTED") return "受控演示工具已返回结果；真实外部系统未连接。";
+  if (event.event_type === "TAMPER_BLOCKED") return "执行参数与已确认内容不一致，服务端已阻止执行。";
+  if (event.event_type === "ACTION_INVALIDATED") return "成果或动作内容发生变化，旧确认与执行许可不可复用。";
+  return "服务端已记录本次治理状态变化。";
+}
 const ROLE_LABELS: Record<string, string> = { current_user: "由我确认", sales_manager: "销售经理审批" };
 const RISK_REASON_LABELS: Record<string, string> = {
   EXTERNAL_RECIPIENT: "包含企业外部联系人", PUBLIC_SCOPE: "影响范围为公开发布",
@@ -593,32 +609,30 @@ function CrmView({ artifact, dirty, onChange, onSave }: ViewProps) {
 }
 
 function AuditView({ events, run }: { events: AuditEvent[]; run: RunSnapshot | null }) {
-  return <div className="artifact-page audit-page"><header className="artifact-header"><div className="artifact-title"><div className="app-chip"><Icon name="audit"/></div><div><span className="eyebrow">AUDIT</span><h1>执行审计</h1></div></div><code>{run?.trace_id ?? "等待受控动作"}</code></header>{events.length === 0 ? <div className="workspace-empty"><span>◇</span><strong>暂无审计事件</strong><p>Agent 发起受控动作后，证据、审批、Permit 与执行结果会记录在这里。</p></div> : <div className="audit-timeline">{events.map(event => <details key={event.sequence}><summary><b>{String(event.sequence).padStart(3, "0")}</b><span><strong>{EVENT_LABELS[event.event_type] ?? event.event_type}</strong><small>{event.event_type}</small></span><time>{new Date(event.occurred_at).toLocaleTimeString("zh-CN")}</time><i>⌄</i></summary><pre>{JSON.stringify(event.payload, null, 2)}</pre></details>)}</div>}</div>;
+  return <div className="artifact-page audit-page"><header className="artifact-header"><div className="artifact-title"><div className="app-chip"><Icon name="audit"/></div><div><span className="eyebrow">AUDIT</span><h1>执行审计</h1></div></div><span>{run ? "服务端审计记录" : "等待受控动作"}</span></header>{events.length === 0 ? <div className="workspace-empty"><span>◇</span><strong>暂无审计事件</strong><p>Agent 发起受控动作后，可信依据、人工确认、一次性执行许可与结果会记录在这里。</p></div> : <div className="audit-timeline">{events.map(event => <details key={event.sequence}><summary><b>{String(event.sequence).padStart(3, "0")}</b><span><strong>{EVENT_LABELS[event.event_type] ?? "服务端状态更新"}</strong><small>服务端记录</small></span><time>{new Date(event.occurred_at).toLocaleTimeString("zh-CN")}</time><i>⌄</i></summary><p>{auditEventSummary(event)}</p></details>)}</div>}</div>;
 }
 
-function ApprovalModal({ run, evidenceCatalog, evidence, busy, onEvidence, onSubmitEvidence, onDecide, onAuthorize }: {
+function ApprovalModal({ run, evidenceCatalog, evidence, busy, onEvidence, onSubmitEvidence, onDecide, onAuthorize, onDismissReceipt }: {
   run: RunSnapshot; evidenceCatalog: Record<string, EvidenceDefinition>; evidence: Record<string, string>; busy: boolean;
   onEvidence: (key: string, value: string) => void; onSubmitEvidence: () => void;
   onDecide: (role: string, decision: "approved" | "rejected") => void; onAuthorize: () => void;
+  onDismissReceipt?: () => void;
 }) {
-  const [expanded, setExpanded] = useState(true);
-  const status = run.control_plan.status;
-  const riskReasons = run.risk.reason_codes.map(code => RISK_REASON_LABELS[code] ?? code);
-  const taskBinding = run.action.task_artifact_binding;
-  return <div className={`approval-overlay ${expanded ? "" : "collapsed"}`}><section className={`approval-modal risk-${run.risk.risk_level}`} role="dialog" aria-modal="false" aria-label="动作确认">
-    <header><div><span>Agent 请求确认</span><h2>{run.action.capability === "email.send" ? "发送客户邮件" : run.action.action_type.replaceAll("_", " ")}</h2></div><div className="approval-header-actions"><b className={`risk-badge ${run.risk.risk_level}`}>{run.risk.risk_level}</b><button aria-label={expanded ? "收起确认卡片" : "展开确认卡片"} onClick={() => setExpanded(value => !value)}>{expanded ? "−" : "+"}</button></div></header>
-    {expanded && <div className="approval-expandable">
-    <p className="approval-summary">{run.user_message}</p>
-    {taskBinding && <div className="approval-task-binding"><strong>基于已核对成果</strong><span>客户回复草稿 v{taskBinding.artifact_version} · 本轮汇报 v{taskBinding.task_version}</span><small>当前只是准备动作，尚未发送。执行许可只绑定这个版本；成果变化后必须重新准备。</small></div>}
-    <div className="approval-risk-rule"><strong>{run.risk.risk_level} 风险判断</strong><span>{riskReasons.length ? riskReasons.join("；") : "仅草稿、只读或当前用户范围内操作，未命中额外风险因子"}</span></div>
-    <div className="approval-facts"><span><small>要做什么</small><strong>{CAPABILITY_LABELS[run.action.capability] ?? run.action.capability}</strong></span><span><small>影响范围</small><strong>{TARGET_SCOPE_LABELS[run.action.target_scope] ?? run.action.target_scope}</strong></span><span><small>目标</small><strong>{run.action.recipients.join(", ") || run.action.resources.join(", ") || "当前工作区"}</strong></span></div>
-    {taskBinding && status === "WAITING_APPROVAL" && <div className="approval-next-step"><strong>为什么需要你确认</strong><span>这一步会产生面向企业外客户的发送结果。只有你批准后，系统才会签发一次性执行许可；拒绝不会改变已经完成的汇报成果。</span></div>}
-    <details className="approval-details"><summary>查看策略判断与约束 <b>⌄</b></summary><div>{Object.entries(run.control_plan.capabilities).map(([name, decision]) => <p key={name}><span><strong>{CAPABILITY_LABELS[name] ?? name}</strong><small>{decision.constraints.length ? "存在额外执行约束" : "无额外约束"}</small></span><b className={decision.verdict}>{VERDICT_LABELS[decision.verdict]}</b></p>)}</div></details>
-    {status === "WAITING_EVIDENCE" && <div className="approval-gate"><strong>需要补充可信依据</strong>{run.control_plan.missing_requirements.map(requirement => { const item = evidenceCatalog[requirement]; return <label key={requirement}><span>{item?.label ?? requirement}</span>{item?.input_type === "select" ? <select value={evidence[requirement] ?? ""} onChange={e => onEvidence(requirement, e.target.value)}><option value="">请选择</option>{item.options.map(option => <option value={option.value} key={option.value}>{option.label}</option>)}</select> : <small>✓ {item?.user_action ?? "系统自动校验"}</small>}</label>})}<button className="primary-button" disabled={busy} onClick={onSubmitEvidence}>提交依据</button></div>}
-    {status === "WAITING_APPROVAL" && <div className="approval-gate"><strong>需要以下角色确认</strong>{run.control_plan.required_approvals.map(role => <div className="approval-role" key={role}><span><b>{ROLE_LABELS[role] ?? "指定审批人"}</b><small>当前工作区身份</small></span><div><button disabled={busy} onClick={() => onDecide(role, "rejected")}>拒绝</button><button className="primary-button" disabled={busy} onClick={() => onDecide(role, "approved")}>批准</button></div></div>)}</div>}
-    {status === "READY_TO_AUTHORIZE" && <footer className="approval-final"><div><strong>审批条件已满足</strong><small>确认后使用一次性 Permit 执行</small></div><button className="primary-button" disabled={busy} onClick={onAuthorize}>确认执行</button></footer>}
-    </div>}
-  </section></div>;
+  return <ActionImpactLedger
+    run={run}
+    evidenceCatalog={evidenceCatalog}
+    evidence={evidence}
+    busy={busy}
+    onEvidence={onEvidence}
+    onSubmitEvidence={onSubmitEvidence}
+    onDecide={onDecide}
+    onAuthorize={onAuthorize}
+    roleLabels={ROLE_LABELS}
+    capabilityLabels={CAPABILITY_LABELS}
+    targetScopeLabels={TARGET_SCOPE_LABELS}
+    riskLabel={run.risk.reason_codes.map(code => RISK_REASON_LABELS[code] ?? code).join("；")}
+    onDismissReceipt={onDismissReceipt}
+  />;
 }
 
 type TaskSyncState = "loading" | "connecting" | "synced" | "reconnecting" | "offline";
@@ -696,6 +710,7 @@ export default function Home() {
   const [dirty, setDirty] = useState<Partial<Record<WorkspaceKind, boolean>>>({});
   const [streamingArtifact, setStreamingArtifact] = useState<WorkspaceKind | null>(null);
   const [run, setRun] = useState<RunSnapshot | null>(null);
+  const [lastActionReceiptRun, setLastActionReceiptRun] = useState<RunSnapshot | null>(null);
   const [events, setEvents] = useState<AuditEvent[]>([]);
   const [evidenceCatalog, setEvidenceCatalog] = useState<Record<string, EvidenceDefinition>>({});
   const [evidence, setEvidence] = useState<Record<string, string>>({});
@@ -1100,6 +1115,10 @@ export default function Home() {
     demo1CreateInFlightRef.current = true;
     const currentTask = taskSnapshotRef.current;
     const repeat = Boolean(currentTask && ["committed", "failed", "cancelled"].includes(currentTask.status));
+    if (repeat) {
+      setRun(null);
+      setLastActionReceiptRun(null);
+    }
     const idempotencyKey = demo1CreateKeyRef.current ?? `demo1-round:${crypto.randomUUID()}`;
     demo1CreateKeyRef.current = idempotencyKey;
     setTaskCreating(true);
@@ -1544,12 +1563,15 @@ export default function Home() {
       setAssistantStatus(String(event.label ?? "正在处理"));
     } else if (type === "action.proposed") {
       const nextRun = event.run as RunSnapshot | null;
-      if (nextRun) { setRun(nextRun); setEvidence({}); setAssistantStatus(""); }
+      if (nextRun) { setRun(nextRun); setLastActionReceiptRun(null); setEvidence({}); setAssistantStatus(""); }
     } else if (type === "ui.focus") {
       const view = String(event.view) as ViewId;
       if (view in VIEW_LABELS && view !== "audit") setActiveView(view);
     } else if (type === "action.closed") {
-      setRun(null);
+      setRun(current => {
+        if (current && ["EXECUTED", "DENIED", "FAILED"].includes(current.status)) setLastActionReceiptRun(current);
+        return null;
+      });
     } else if (type === "workspace.conflict") {
       const latestArtifact = event.latest_artifact as WorkspaceArtifact;
       if (latestArtifact?.kind) {
@@ -1591,6 +1613,10 @@ export default function Home() {
     contextArtifact: WorkspaceArtifact | undefined = activeArtifact,
   ) {
     if (!threadId || busy) return;
+    setRun(current => {
+      if (current && ["EXECUTED", "DENIED", "FAILED"].includes(current.status)) setLastActionReceiptRun(current);
+      return null;
+    });
     const requestEpoch: WorkspaceRequestEpoch = {
       editTokens: { ...workspaceEditTokensRef.current },
       artifacts: { ...artifactsRef.current },
@@ -1760,6 +1786,7 @@ export default function Home() {
       setWorkspaceConflict(current => current?.kind === "mail" ? null : current);
       setDirty(current => ({ ...current, mail: false }));
       setRun(null);
+      setLastActionReceiptRun(null);
       setActiveView("mail");
       setNotice("已打开空白新邮件");
     } catch (reason) {
@@ -1862,7 +1889,8 @@ export default function Home() {
   const currentDirty = activeArtifact ? Boolean(dirty[activeArtifact.kind]) : false;
   const viewProps = activeArtifact ? { artifact: activeArtifact, dirty: currentDirty, onChange: updateArtifact, onSave: () => void saveArtifact() } : null;
   const actionGateOpen = Boolean(run && !["EXECUTED", "DENIED", "FAILED"].includes(run.status));
-  const actionResultPending = Boolean(run && ["EXECUTED", "DENIED", "FAILED"].includes(run.status));
+  const actionResultRun = run && ["EXECUTED", "DENIED", "FAILED"].includes(run.status) ? run : !run ? lastActionReceiptRun : null;
+  const actionResultPending = Boolean(actionResultRun);
 
   function openTaskArtifact(artifactVersionId: string) {
     setSelectedTaskArtifactVersionId(artifactVersionId);
@@ -2000,12 +2028,14 @@ export default function Home() {
         {activeView === "calendar" && viewProps && <CalendarView {...viewProps} onInvite={() => void triggerWorkspaceAction("创建当前工作区中的会议邀请")}/>}
         {activeView === "expense" && viewProps && <ExpenseView {...viewProps}/>}
         {activeView === "crm" && viewProps && <CrmView {...viewProps}/>}
-        {activeView === "audit" && <AuditView events={events} run={run}/>}
+        {activeView === "audit" && (
+          <AuditView events={events} run={run ?? lastActionReceiptRun}/>
+        )}
       </div>
       {notice && <div className="workspace-toast"><IconCheck aria-hidden="true" />{notice}</div>}
     </section>
     <div className="resize-divider" role="separator" aria-orientation="vertical" onPointerDown={startResize}><span>•••</span></div>
-    <section className={`chat-pane without-task-runtime ${actionGateOpen ? "has-action-gate" : ""} ${taskWorkspaceActive ? "task-director-side-pane" : ""}`}>
+    <section className={`chat-pane without-task-runtime ${actionGateOpen ? "has-action-gate" : ""} ${actionResultPending ? "has-action-receipt" : ""} ${taskWorkspaceActive ? "task-director-side-pane" : ""}`}>
       {taskWorkspaceActive && (
         <div className="task-side-mode-switch" role="tablist" aria-label="右侧 Agent 模式">
           <button id="task-side-tab-decisions" type="button" role="tab" aria-controls="task-side-panel" aria-selected={effectiveTaskRightMode === "decisions"} tabIndex={effectiveTaskRightMode === "decisions" ? 0 : -1} className={effectiveTaskRightMode === "decisions" ? "active" : ""} onClick={() => setTaskRightMode("decisions")} onKeyDown={(event) => moveTaskSideTab(event, "decisions")}>{cockpitWorkspaceActive ? "执行方式" : "待我决定"}</button>
@@ -2044,9 +2074,9 @@ export default function Home() {
             {messages.map(item => <article className={`message ${item.role === "user" ? "user-message" : "assistant-message"} message-enter`} key={item.message_id}>{item.role === "assistant" && <div className="msg-avatar"><IconSparkles aria-hidden="true" /></div>}<div className="message-body">{item.role === "assistant" && <strong>Office Agent</strong>}<MessageContent text={item.content} streaming={item.status === "streaming"}/></div></article>)}
             {assistantStatus && <article className="message assistant-message message-enter"><div className="msg-avatar"><IconSparkles aria-hidden="true" /></div><div className="message-body"><div className="typing-bubble"><span/><span/><span/><em>{assistantStatus}</em></div></div></article>}
           </div>
-          <div className="chat-footer">{actionResultPending && run && <div className="action-result-retry" role="status"><span>动作已经结束，Agent 的结果说明尚未确认送达。</span><button type="button" disabled={busy} onClick={() => void continueAfterAction(run)}>重新读取结果</button></div>}{workspaceConflict?.kind === activeView && <WorkspaceConflictBanner conflict={workspaceConflict} onResolve={resolveWorkspaceConflict}/>} {(error || taskError) && <div className="error-banner" role="alert" aria-live="assertive">{taskError || error}</div>}<form className="chat-composer glass-card" onSubmit={sendMessage}><textarea aria-label="输入办公任务" value={message} onChange={event => setMessage(event.target.value)} onKeyDown={handleComposerKeyDown} placeholder={`让 Agent 协助当前${VIEW_LABELS[activeView]}…`}/><button aria-label="发送消息" disabled={busy || !message.trim() || !threadId}>{busy ? <span className="send-spinner"/> : <IconArrowUp aria-hidden="true" />}</button></form><small>Agent 可读取当前未保存内容 · Enter 发送</small></div>
-          {run && actionGateOpen && (
-            <ApprovalModal run={run} evidenceCatalog={evidenceCatalog} evidence={evidence} busy={busy} onEvidence={(key, value) => setEvidence(current => ({ ...current, [key]: value }))} onSubmitEvidence={submitEvidence} onDecide={decide} onAuthorize={authorize}/>
+          <div className="chat-footer">{actionResultPending && actionResultRun && <div className="action-result-retry" role="status"><span>动作已经结束，Agent 的结果说明尚未确认送达。</span><button type="button" disabled={busy} onClick={() => void continueAfterAction(actionResultRun)}>重新读取结果</button></div>}{workspaceConflict?.kind === activeView && <WorkspaceConflictBanner conflict={workspaceConflict} onResolve={resolveWorkspaceConflict}/>} {(error || taskError) && <div className="error-banner" role="alert" aria-live="assertive">{taskError || error}</div>}<form className="chat-composer glass-card" onSubmit={sendMessage}><textarea aria-label="输入办公任务" value={message} onChange={event => setMessage(event.target.value)} onKeyDown={handleComposerKeyDown} placeholder={`让 Agent 协助当前${VIEW_LABELS[activeView]}…`}/><button aria-label="发送消息" disabled={busy || !message.trim() || !threadId}>{busy ? <span className="send-spinner"/> : <IconArrowUp aria-hidden="true" />}</button></form><small>Agent 可读取当前未保存内容 · Enter 发送</small></div>
+          {((run && actionGateOpen) || actionResultRun) && (
+            <ApprovalModal key={`${(run && actionGateOpen ? run : actionResultRun)!.run_id}:${(run && actionGateOpen ? run : actionResultRun)!.status}`} run={(run && actionGateOpen ? run : actionResultRun)!} evidenceCatalog={evidenceCatalog} evidence={evidence} busy={busy} onEvidence={(key, value) => setEvidence(current => ({ ...current, [key]: value }))} onSubmitEvidence={submitEvidence} onDecide={decide} onAuthorize={authorize} onDismissReceipt={() => { setLastActionReceiptRun(null); setRun(null); }}/>
           )}
         </div>
       )}
