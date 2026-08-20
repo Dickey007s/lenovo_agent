@@ -55,8 +55,8 @@ PR 3 之前的 V0.1 基线可以编辑工作区并治理一次副作用动作，
 | Observe | 从四个代码内固定 Fixture `source_ref` 生成 Observe Trace | 不显示原始 Prompt 或内部推理 | 已产生 `LOOP_STEP_STARTED/COMPLETED`；不是真实 Connector 读取 |
 | Plan | 为三个固定交付物记录分支运行 Trace | 阶段轨与三个 Branch 泳道在 start 响应后显示服务端终态 | 已产生 `BRANCH_STATUS_CHANGED`；事务中间态不对浏览器逐步可见，阶段轨不能冒充流式进度 |
 | Act | 由确定性代码生成候选工件 | 泳道从 Branch head 打开共享工件，查看 v/status、结构化内容与 lineage | 服务端已产生 `ARTIFACT_VERSION_CREATED`；PR 6 E2E 覆盖经营分析 v1、follow-head 与历史版本，不来自 LLM |
-| Verify | 发现 2,400 万与 2,680 万冲突，只阻塞经营分析分支 | 待确认区说明为什么需要人、两个口径、经营分析/回复草稿会如何更新、风险页保持状态，以及唯一 resolve 主动作 | 当前 E2E 与冲突截图已覆盖固定 Fixture；不证明真实来源、业务收益或用户决策质量 |
-| Control | 用户选择正式口径，或提交分支控制 | 只有服务端 Snapshot 确认后才更新；补证按钮先准备 Steer，提交后也只称已记录待应用 | Resolve/分支控制已有事实；Steer 重新规划尚未实现 |
+| Verify | 发现 2,400 万与 2,680 万冲突，只阻塞经营分析分支 | 待确认区说明为什么需要人、两个口径，并从服务端 option 逐项展示经营分析、回复草稿、风险页和外部发送的预期 `before → after` | DR-0010 聚焦自动化与截图覆盖固定 Fixture；不证明真实来源、业务收益或用户决策质量 |
+| Control | 用户选择服务端批准的正式口径选项，或提交其他分支控制 | 请求携带 `resolution_option_id`；只有新 Snapshot 中的 `ControlEvent.impact_receipt` 才触发“变化回执”。补证按钮先准备 Steer，提交后也只称已记录待应用 | Resolve/分支控制已有事实；旧 Snapshot 无 receipt 时不补造；Steer 重新规划尚未实现 |
 | Commit | 解决最后一个 open Conflict 时重新验证经营分析，并联动重生成、验证客户回复后再生成 TaskCommit；若仍有其他冲突则不生成 reply v3 或 Commit | 只在 `last_commit` 存在时列出经营分析、风险页、客户回复草稿三项可复核成果，并明确回复未发送；版本和 state hash 收进审计 | 内存与 PostgreSQL 跨 API 进程回归、真实本地浏览器主路径已覆盖；不代表发送邮件或数据库故障恢复 |
 | Prepare action | 仅从 Commit 中的 passed 当前 `reply_draft` 构建 `TaskArtifactBinding` 与固定 `email.send` Run；准备、审批、授权和执行前重校验 | 当前回复成果显示“准备发送”；Action Gate 解释演示目标、绑定版本、L4 风险、为何需要确认与拒绝后果；按钮分为准备、批准、确认执行 | DR-0007 API/服务/E2E 已覆盖；只执行 Simulator，不支持真实联系人、附件、批量或通用工件动作 |
 | New round | 终态以新 round key 创建独立 Task，再对新 Task 执行 start；旧轮次不 mutation | “开始新一轮汇报”一次点击后进入新一轮待确认状态；不是把旧 Task 重置为 ready | 完整浏览器 E2E 已覆盖新旧 Task 同时保留；当前没有历史轮次选择入口，不证明用户理解该语义 |

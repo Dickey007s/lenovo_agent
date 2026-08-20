@@ -5,7 +5,11 @@ from pydantic import ValidationError
 
 from packages.contracts import (
     BranchSnapshot,
+    ConflictResolutionOption,
+    ControlEvent,
     DeliverableSpec,
+    ImpactReceipt,
+    ResolutionImpact,
     TaskContract,
     TaskContractDraft,
     TaskControlCommand,
@@ -137,3 +141,59 @@ def test_task_snapshot_round_trip_is_strict_and_stable() -> None:
     assert restored.status == "ready"
     assert restored.phase == "contract"
     assert restored.version == 1
+
+
+def test_impact_protocol_is_strict_and_old_snapshots_default_empty() -> None:
+    option = ConflictResolutionOption(
+        option_id="use-official-crm-revenue",
+        label="采用 CRM 正式口径",
+        description="更新经营分析并重新核对客户回复草稿。",
+        selected_source_ref="fixture:crm/customer-a:official-revenue-v3",
+        expected_impact=ResolutionImpact(
+            task_status="committed",
+            task_phase="commit",
+            changed_deliverable_ids=["operating-analysis", "reply-draft"],
+            commit_created=True,
+        ),
+    )
+    assert option.expected_impact.commit_created is True
+
+    # A pre-impact ConflictRecord payload remains valid without new fields.
+    from packages.contracts import ConflictRecord
+
+    conflict = ConflictRecord(
+        conflict_id="conflict-1",
+        task_id="task-1",
+        branch_id="branch-1",
+        subject="收入口径",
+        summary="存在两个来源",
+        source_refs=["source-1", "source-2"],
+        candidate_values=["甲", "乙"],
+        opened_at=NOW,
+    )
+    assert conflict.resolution_options == []
+
+    receipt = ImpactReceipt(
+        from_task_version=6,
+        to_task_version=7,
+        summary="已应用决定",
+    )
+    assert receipt.impact_status == "applied"
+    assert receipt.external_side_effect == "none"
+
+    event = ControlEvent(
+        kind="resolve_evidence",
+        branch_id="branch-1",
+        selected_source_ref="source-1",
+        expected_task_version=6,
+        idempotency_key="resolve-001",
+        control_event_id="event-1",
+        task_id="task-1",
+        actor_id="user-1",
+        status="applied",
+        applied_task_version=7,
+        created_at=NOW,
+        applied_at=NOW,
+        impact_receipt=receipt,
+    )
+    assert event.impact_receipt == receipt

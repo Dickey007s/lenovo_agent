@@ -70,7 +70,7 @@ V0.1 重点验证三件事：
 - 根路径默认进入经营汇报任务。初始列表返回前只显示读取态，不允许重复创建；确认没有 Task 后，空态说明要得到经营分析、风险页和客户回复草稿，“开始准备汇报”一次点击完成创建与启动。Conflict 顶部只保留弱化的“查看待确认项”定位，真正改变状态的主动作只有“采用正式口径并继续核对”；Committed 转入成果复核。主摘要只保留材料核对、业务状态和同步状态，版本、预算、Owner 等内部运行字段不再抢占业务主路径。
 - 冲突决定、候选依据和分支控制只在 Tasks 工作区显示。邮件、文档等非 Tasks 工作区的右侧只保留“后台任务”摘要与“打开任务 / 前往处理 / 查看任务 / 查看汇报”入口；点击只切换到 Tasks，不提交 Task Control。
 - 任务进度仍来自同一 `TaskSnapshot`，而 `stage_records` 是每个阶段的服务端 UI 事实：读取资料、拆分任务、生成材料、核对事实分别对应独立 Snapshot/version、摘要、详情、工件引用、来源和时间。v6 固定事实为 5 个工件、1 个开放冲突、2 个已验证工件；解决冲突后 v7 为 `committed / commit`。视觉阶段、连接线和颜色不能自行推断进度。
-- 收入冲突区在提交前同时说明“为什么需要你”和“确认后会发生什么”，主动作仍提交 `resolve_evidence` 并采用契约内 CRM 正式来源。查看材料是次级动作；Steer、Pause 和 Take over 收入“其他处理方式”。Steer 提交后仍只显示“已记录，等待后续循环应用”，新信息层级没有新增后端协议、控制种类或真实 Connector。
+- 收入冲突区在提交前同时说明“为什么需要你”，并读取服务端 `resolution_options[].expected_impact` 逐项预演经营分析、客户回复草稿、风险页和外部发送的 `before → after`。主动作提交 `resolution_option_id + resolve_evidence`；服务端应用后把实际工件、验证、Commit、版本和未发送边界写入 `ControlEvent.impact_receipt`，完成态再显示“变化回执”。查看材料是次级动作；Steer、Pause 和 Take over 收入“其他处理方式”。
 - 完成态直接列出 `last_commit` 支持的三项可复核成果，并明确客户回复仍为草稿、未发送；不再用“没有待决策项”代表完成。每个 Branch head 可在“成果”中查看当前版本、验证、冲突、结构化内容、来源、lineage 与 Commit 证据；默认 mutation 后跟随新 head，用户主动查看旧版本时显示明确历史 banner 和返回动作。
 - “执行记录”保留原手工待办编辑流程。固定 Demo 1 的四个已知 `source_ref` 投影为“演示数据 · 客户往来邮件 / CRM 正式收入记录 / 收入预测表 / 客户项目周报（版本）”；原始 `fixture:` 标识和未知来源值不进入普通业务 DOM，未知值显示隐藏占位。服务端仍保存原值用于校验与审计；这只是前端第二道防线，不代表服务端数据删除，也不是通用字段安全保证。
 - Task SSE 只用于发现新事件并触发 Snapshot 对账；同步标记只表示客户端传输状态，不代表后台仍在执行。未知 mutation 会在当前标签页保存原 key、intent 与预期版本。浏览器 E2E 已覆盖 start 请求发送前 abort、reload、同 key 对账和无重复工件；PR 5 的 system Edge 运行还覆盖同页 API 进程停止、控制禁用、顶部与 Task 面板一致显示恢复中，以及新进程启动后的 Snapshot 对账。尚未覆盖请求已到服务端但响应丢失或断线期间产生新事件的 `after` 回放。
@@ -148,6 +148,8 @@ flowchart LR
 - [Demo 2 PR-1 工程证据](docs/evidence/DEMO2-PR1-EXPLAINABLE-ADMISSION-EVIDENCE-20260817.md)
 - [Demo 1 渐进阶段决策（限定范围 Verified）](docs/decisions/DR-0009-progressive-demo1-stages.md)
 - [Demo 1 渐进阶段工程证据](docs/evidence/DEMO1-PROGRESSIVE-STAGES-EVIDENCE-20260817.md)
+- [Demo 1 Agent 影响预演与变化回执决策](docs/decisions/DR-0010-visible-agent-impact.md)
+- [Demo 1 Agent 影响预演与变化回执证据](docs/evidence/DEMO1-AGENT-IMPACT-PREVIEW-EVIDENCE-20260820.md)
 - [来源台账](docs/decisions/SOURCE_REGISTER.md)
 
 ## 目录结构
@@ -241,6 +243,8 @@ V0.1 定稿基线和 Demo 1 各 PR 的实际验证结果记录在 [`DR-0002`](do
 > 说明：上方历史回归段落中“固定 Demo 1 Task 测试不调用真实 LLM”仅描述旧 atomic 测试；当前 progressive Runtime 的运行配置允许 Plan/Act 通过严格适配器调用 `deepseek-v4-pro`，单元测试默认注入确定性 agent。模型 smoke 仍只证明连通和严格响应，不证明质量。
 
 2026-08-17 的渐进 Runtime 修订实现为 `13c9c13`：start 只进入 Observe，四次 `advance` 才依次确认 Plan、Act、Verify 和待决策状态，解决证据后提交；完整 Demo 契约（含预算与截止时间）和 Plan/Act 安全文本均在服务端校验。封口结果为 Python `138 passed, 1 skipped (3.14s)`、完整浏览器 `35 passed (1.9m)`、渐进主路径连续三次 `3 passed (29.5s)`，Ruff、前端 lint/build 与治理门槛通过；八张截图覆盖阶段等待、候选回看、核对进展、移动决策和成果终态。该结论只证明固定 Fixture 的协议与被测交互，不证明后台无人值守、模型质量或用户理解改善。
+
+2026-08-20 的 Agent 影响交互实现为 `258861f`、PR [#16](https://github.com/Dickey007s/lenovo_agent/pull/16)：服务端为收入口径决定提供结构化影响选项，前台在提交前逐项预演经营分析、回复草稿、风险页和外部发送的变化，提交后再用 `ControlEvent.impact_receipt` 展示实际落地回执。封口结果为 Python `139 passed, 1 skipped (4.74s)`、完整浏览器 `35 passed (1.9m)`、Ruff、前端 lint/build、治理门槛与 diff-check 通过，另有三张带 hash 的桌面/移动截图。该结论只证明固定 Fixture 的前后端事实一致与被测交互，不证明真实用户理解改善或任意真实动作均可准确预演。
 
 ## 数据、身份与安全边界
 

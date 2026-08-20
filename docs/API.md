@@ -260,13 +260,14 @@ $task = Invoke-RestMethod -Method Post -Uri "$base/tasks/$($task.task_id)/start"
 {
   "kind": "resolve_evidence",
   "branch_id": "branch_...",
+  "resolution_option_id": "use-official-crm-revenue",
   "selected_source_ref": "fixture:crm/customer-a:official-revenue-v3",
-  "expected_task_version": 2,
+  "expected_task_version": 6,
   "idempotency_key": "resolve-demo1-001"
 }
 ```
 
-当前固定路径允许 `steer`、`pause_branch`、`resume_branch`、`take_over`、`return_control` 和 `resolve_evidence`。分支控制返回 `ControlEvent.status=applied` 后才改变前台状态；`steer` 当前只记录为 `accepted`，没有 `applied_task_version`，也不会在本次请求内重新规划，因此只能反馈“方向指令已记录，等待后续循环应用”。`resolve_evidence` 只接受契约内的 CRM 正式收入 Fixture：服务端先追加通过验证的经营分析 v2。若解决后仍有其他 open Conflict，本次只持久化该 resolution、经营分析 v2 和其 passed VerificationReport，任务保持 `waiting_input / verify`，不生成客户回复 v3 或 `TASK_COMMITTED`；只有已经不存在其他 open Conflict 时，服务端才联动重生成并验证客户回复 v3，再为全部必需 heads 生成 Commit。
+当前固定路径允许 `steer`、`pause_branch`、`resume_branch`、`take_over`、`return_control` 和 `resolve_evidence`。分支控制返回 `ControlEvent.status=applied` 后才改变前台状态；`steer` 当前只记录为 `accepted`，没有 `applied_task_version`，也不会在本次请求内重新规划，因此只能反馈“方向指令已记录，等待后续循环应用”。当前 Conflict 还返回服务端批准的 `resolution_options[]`；前端提交其中的 `resolution_option_id` 和匹配来源。`resolve_evidence` 只接受契约内的 CRM 正式收入 Fixture：服务端先追加通过验证的经营分析 v2。若解决后仍有其他 open Conflict，本次只持久化该 resolution、经营分析 v2、passed VerificationReport 和 partial `impact_receipt`，任务保持 `waiting_input / verify`；只有已经不存在其他 open Conflict 时，服务端才联动重生成并验证客户回复 v3，生成 Commit，并在 ControlEvent 中写实际工件、验证、Commit、版本和 `external_side_effect=none` 的回执。
 
 mutation 合约要求：相同 key 和相同命令返回首次 mutation 的 Snapshot，且不新增事件、ArtifactVersion 或 Commit；相同 key 被用于不同命令返回 409。内存 Store 回归已覆盖旧 key 在后续 mutation 之后仍返回原响应、Artifact lineage/head 引用、内容摘要和 Commit state hash。PR 5 又在 PostgreSQL 16.14 上跨三个顺序 API 进程验证：旧 start key 返回原 v2、旧 resolve key 返回原 v3，当前 GET 保持 v3，重放前后数据库维持 `45 events / 7 artifacts / 1 TASK_COMMITTED`。历史遗留 marker 若没有保存原 Snapshot，只在当前 Task version 仍等于 marker version 时兼容返回；发生过后续 mutation 时返回 409，而不是错误返回最新 Snapshot。
 

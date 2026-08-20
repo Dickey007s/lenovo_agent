@@ -41,6 +41,10 @@ BranchStatus = Literal[
 ArtifactStatus = Literal["candidate", "verified", "rejected", "committed", "invalidated"]
 VerificationStatus = Literal["pending", "passed", "failed", "conflict"]
 ConflictStatus = Literal["open", "resolved", "dismissed"]
+ResolutionOptionKind = Literal["select_source"]
+ImpactVerificationStatus = Literal["not_run", "passed", "partial", "failed"]
+ExternalSideEffect = Literal["none", "simulator", "real"]
+ImpactChangeKind = Literal["will_change", "will_recheck", "unchanged", "no_external_action"]
 ControlKind = Literal[
     "steer",
     "pause_branch",
@@ -180,6 +184,43 @@ class VerificationReport(StrictModel):
     checked_at: datetime
 
 
+class ImpactChange(StrictModel):
+    """A business-facing before/after row for preview and receipt rendering."""
+
+    change_kind: ImpactChangeKind
+    label: str = Field(min_length=1, max_length=200)
+    before: str | None = None
+    after: str | None = None
+    deliverable_ids: list[str] = Field(default_factory=list)
+    artifact_version_ids: list[str] = Field(default_factory=list)
+
+
+class ResolutionImpact(StrictModel):
+    """Server-owned preview of the state change an option would cause."""
+
+    task_status: TaskStatus | None = None
+    task_phase: TaskPhase | None = None
+    branch_status: BranchStatus | None = None
+    changed_deliverable_ids: list[str] = Field(default_factory=list)
+    creates_artifact_versions: int = Field(default=0, ge=0)
+    creates_verification_reports: int = Field(default=0, ge=0)
+    commit_created: bool = False
+    external_side_effect: ExternalSideEffect = "none"
+    changes: list[ImpactChange] = Field(default_factory=list)
+
+
+class ConflictResolutionOption(StrictModel):
+    """Executable, server-approved option exposed with a conflict."""
+
+    option_id: str = Field(min_length=1, max_length=120)
+    kind: ResolutionOptionKind = "select_source"
+    label: str = Field(min_length=1, max_length=200)
+    description: str = Field(min_length=1, max_length=2_000)
+    selected_source_ref: str = Field(min_length=1, max_length=500)
+    executable: bool = True
+    expected_impact: ResolutionImpact = Field(default_factory=ResolutionImpact)
+
+
 class ConflictRecord(StrictModel):
     conflict_id: str = Field(min_length=1, max_length=120)
     task_id: str = Field(min_length=1, max_length=120)
@@ -188,10 +229,20 @@ class ConflictRecord(StrictModel):
     summary: str = Field(min_length=1, max_length=2_000)
     source_refs: list[str] = Field(min_length=2)
     candidate_values: list[str] = Field(min_length=2)
+    resolution_options: list[ConflictResolutionOption] = Field(default_factory=list)
     status: ConflictStatus = "open"
     resolution: str | None = None
     opened_at: datetime
     resolved_at: datetime | None = None
+
+    @model_validator(mode="after")
+    def validate_resolution_options(self) -> ConflictRecord:
+        option_ids = [item.option_id for item in self.resolution_options]
+        if len(option_ids) != len(set(option_ids)):
+            raise ValueError("resolution option_id values must be unique")
+        if any(item.selected_source_ref not in self.source_refs for item in self.resolution_options):
+            raise ValueError("resolution option source must be listed in conflict source_refs")
+        return self
 
 
 class TaskControlCommand(StrictModel):
@@ -199,6 +250,7 @@ class TaskControlCommand(StrictModel):
     branch_id: str | None = None
     instruction: str | None = Field(default=None, max_length=4_000)
     reason: str | None = Field(default=None, max_length=1_000)
+    resolution_option_id: str | None = Field(default=None, max_length=120)
     selected_source_ref: str | None = Field(default=None, max_length=500)
     expected_task_version: int = Field(ge=1)
     idempotency_key: str = Field(min_length=8, max_length=160)
@@ -221,6 +273,23 @@ class TaskControlCommand(StrictModel):
         return self
 
 
+class ImpactReceipt(StrictModel):
+    """Actual server-observed impact committed with a control event."""
+
+    from_task_version: int = Field(ge=1)
+    to_task_version: int = Field(ge=1)
+    impact_status: Literal["accepted", "applied", "rejected"] = "applied"
+    changed_artifact_version_ids: list[str] = Field(default_factory=list)
+    changed_deliverable_ids: list[str] = Field(default_factory=list)
+    verification_report_ids: list[str] = Field(default_factory=list)
+    verification_status: ImpactVerificationStatus = "not_run"
+    commit_id: str | None = Field(default=None, max_length=120)
+    commit_created: bool = False
+    external_side_effect: ExternalSideEffect = "none"
+    changes: list[ImpactChange] = Field(default_factory=list)
+    summary: str = Field(min_length=1, max_length=2_000)
+
+
 class ControlEvent(TaskControlCommand):
     control_event_id: str = Field(min_length=1, max_length=120)
     task_id: str = Field(min_length=1, max_length=120)
@@ -230,6 +299,7 @@ class ControlEvent(TaskControlCommand):
     rejection_reason: str | None = None
     created_at: datetime
     applied_at: datetime | None = None
+    impact_receipt: "ImpactReceipt | None" = None
 
 
 class TaskCommit(StrictModel):

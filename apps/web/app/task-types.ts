@@ -45,6 +45,9 @@ export type BranchStatus =
 export type ArtifactStatus = "candidate" | "verified" | "rejected" | "committed" | "invalidated";
 export type VerificationStatus = "pending" | "passed" | "failed" | "conflict";
 export type ConflictStatus = "open" | "resolved" | "dismissed";
+export type ImpactChangeKind = "will_change" | "will_recheck" | "unchanged" | "no_external_action";
+export type ImpactVerificationStatus = "not_run" | "passed" | "partial" | "failed";
+export type ExternalSideEffect = "none" | "simulator" | "real";
 export type ControlKind =
   | "steer"
   | "pause_branch"
@@ -162,6 +165,37 @@ export type VerificationReport = {
   checked_at: string;
 };
 
+export type ImpactChange = {
+  change_kind: ImpactChangeKind;
+  label: string;
+  before: string | null;
+  after: string | null;
+  deliverable_ids: string[];
+  artifact_version_ids: string[];
+};
+
+export type ResolutionImpact = {
+  task_status: TaskStatus | null;
+  task_phase: TaskPhase | null;
+  branch_status: BranchStatus | null;
+  changed_deliverable_ids: string[];
+  creates_artifact_versions: number;
+  creates_verification_reports: number;
+  commit_created: boolean;
+  external_side_effect: ExternalSideEffect;
+  changes: ImpactChange[];
+};
+
+export type ConflictResolutionOption = {
+  option_id: string;
+  kind: "select_source";
+  label: string;
+  description: string;
+  selected_source_ref: string;
+  executable: boolean;
+  expected_impact: ResolutionImpact;
+};
+
 export type ConflictRecord = {
   conflict_id: string;
   task_id: string;
@@ -170,6 +204,7 @@ export type ConflictRecord = {
   summary: string;
   source_refs: string[];
   candidate_values: string[];
+  resolution_options: ConflictResolutionOption[];
   status: ConflictStatus;
   resolution: string | null;
   opened_at: string;
@@ -181,6 +216,7 @@ export type TaskControlCommand = {
   branch_id?: string | null;
   instruction?: string | null;
   reason?: string | null;
+  resolution_option_id?: string | null;
   selected_source_ref?: string | null;
   expected_task_version: number;
   idempotency_key: string;
@@ -195,6 +231,22 @@ export type ControlEvent = TaskControlCommand & {
   rejection_reason: string | null;
   created_at: string;
   applied_at: string | null;
+  impact_receipt?: ImpactReceipt | null;
+};
+
+export type ImpactReceipt = {
+  from_task_version: number;
+  to_task_version: number;
+  impact_status: "accepted" | "applied" | "rejected";
+  changed_artifact_version_ids: string[];
+  changed_deliverable_ids: string[];
+  verification_report_ids: string[];
+  verification_status: ImpactVerificationStatus;
+  commit_id: string | null;
+  commit_created: boolean;
+  external_side_effect: ExternalSideEffect;
+  changes: ImpactChange[];
+  summary: string;
 };
 
 export type TaskCommit = {

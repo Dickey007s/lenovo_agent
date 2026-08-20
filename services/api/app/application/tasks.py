@@ -13,8 +13,12 @@ from packages.contracts import (
     ArtifactVersion,
     BranchSnapshot,
     ConflictRecord,
+    ConflictResolutionOption,
     ControlEvent,
     DeliverableSpec,
+    ImpactChange,
+    ImpactReceipt,
+    ResolutionImpact,
     TaskBudget,
     TaskBudgetSnapshot,
     TaskCommit,
@@ -607,6 +611,89 @@ class TaskService:
             "项目周报（演示数据）",
         ]
 
+    @staticmethod
+    def _demo1_resolution_options() -> list[ConflictResolutionOption]:
+        """Return the only server-approved resolution exposed by Demo 1."""
+        return [
+            ConflictResolutionOption(
+                option_id="use-official-crm-revenue",
+                kind="select_source",
+                label="采用 CRM 正式口径",
+                description="经营分析使用 CRM 正式收入 2400 万元，并保留预测值作为差异说明。",
+                selected_source_ref="fixture:crm/customer-a:official-revenue-v3",
+                expected_impact=ResolutionImpact(
+                    task_status="committed",
+                    task_phase="commit",
+                    branch_status="committed",
+                    changed_deliverable_ids=["operating-analysis", "reply-draft"],
+                    creates_artifact_versions=2,
+                    creates_verification_reports=2,
+                    commit_created=True,
+                    external_side_effect="none",
+                    changes=[
+                        ImpactChange(
+                            change_kind="will_change",
+                            label="经营分析",
+                            before="待确认正式口径",
+                            after="CRM 正式收入 2400 万元，并保留预测差异",
+                            deliverable_ids=["operating-analysis"],
+                        ),
+                        ImpactChange(
+                            change_kind="will_recheck",
+                            label="客户回复草稿",
+                            before="收入数字待正式口径确认",
+                            after="按 CRM 正式口径重新核对，仍保持草稿",
+                            deliverable_ids=["reply-draft"],
+                        ),
+                        ImpactChange(
+                            change_kind="unchanged",
+                            label="风险页",
+                            before="已通过核对",
+                            after="保持已核对状态",
+                            deliverable_ids=["risk-brief"],
+                        ),
+                        ImpactChange(
+                            change_kind="no_external_action",
+                            label="外部发送",
+                            before="未发送",
+                            after="仍不发送",
+                        ),
+                    ],
+                ),
+            )
+        ]
+
+    @staticmethod
+    def _impact_receipt(
+        current: TaskSnapshot,
+        *,
+        to_task_version: int,
+        artifacts: list[ArtifactVersion],
+        reports: list[VerificationReport],
+        commit_id: str | None,
+        commit_created: bool,
+        changes: list[ImpactChange],
+        summary: str,
+    ) -> ImpactReceipt:
+        return ImpactReceipt(
+            from_task_version=current.version,
+            to_task_version=to_task_version,
+            impact_status="applied",
+            changed_artifact_version_ids=[item.artifact_version_id for item in artifacts],
+            changed_deliverable_ids=list(dict.fromkeys(item.deliverable_id for item in artifacts)),
+            verification_report_ids=[item.report_id for item in reports],
+            verification_status=(
+                "passed"
+                if commit_created and reports and all(item.status == "passed" for item in reports)
+                else "partial" if reports else "not_run"
+            ),
+            commit_id=commit_id,
+            commit_created=commit_created,
+            external_side_effect="none",
+            changes=changes,
+            summary=summary,
+        )
+
     @classmethod
     def _validated_plan(
         cls,
@@ -969,6 +1056,7 @@ class TaskService:
             summary="CRM 正式口径为 2400 万元，预测表为 2680 万元。最终汇报必须选择并记录正式依据。",
             source_refs=["fixture:crm/customer-a:official-revenue-v3", "fixture:forecast/customer-a:revenue-v2"],
             candidate_values=["2400 万元（CRM 正式口径）", "2680 万元（预测口径）"],
+            resolution_options=self._demo1_resolution_options(),
             opened_at=now,
         )
         reports = [
@@ -1186,6 +1274,7 @@ class TaskService:
                 "fixture:forecast/customer-a:revenue-v2",
             ],
             candidate_values=["2400 万元（CRM 正式口径）", "2680 万元（预测口径）"],
+            resolution_options=self._demo1_resolution_options(),
             opened_at=now,
         )
         operating_report = VerificationReport(
@@ -1463,9 +1552,25 @@ class TaskService:
         )
         if conflict is None:
             raise TaskTransitionError("该分支没有待解决冲突")
+        selected_option = None
+        if conflict.resolution_options and command.resolution_option_id is None:
+            raise TaskTransitionError("当前冲突必须选择服务端允许的解决方案")
+        if command.resolution_option_id is not None:
+            selected_option = next(
+                (
+                    item
+                    for item in conflict.resolution_options
+                    if item.option_id == command.resolution_option_id
+                ),
+                None,
+            )
+            if selected_option is None or not selected_option.executable:
+                raise TaskTransitionError("选择的解决方案不是服务端允许的可执行选项")
         official_source = "fixture:crm/customer-a:official-revenue-v3"
         if command.selected_source_ref != official_source:
             raise TaskTransitionError("当前任务契约要求采用 CRM 正式收入口径")
+        if selected_option is not None and selected_option.selected_source_ref != command.selected_source_ref:
+            raise TaskTransitionError("解决方案与来源选择不一致")
         if official_source not in current.contract.source_scope:
             raise TaskTransitionError("选择的来源不在任务允许范围内")
 
@@ -1595,6 +1700,41 @@ class TaskService:
                 else:
                     branches.append(item)
 
+            control_event = control_event.model_copy(
+                update={
+                    "impact_receipt": self._impact_receipt(
+                        current,
+                        to_task_version=next_version,
+                        artifacts=[verified],
+                        reports=[report],
+                        commit_id=None,
+                        commit_created=False,
+                        changes=[
+                            ImpactChange(
+                                change_kind="will_change",
+                                label="经营分析",
+                                before="待确认正式口径",
+                                after="已采用 CRM 正式收入 2400 万元",
+                                deliverable_ids=[deliverable_id],
+                                artifact_version_ids=[verified.artifact_version_id],
+                            ),
+                            ImpactChange(
+                                change_kind="unchanged",
+                                label="其余待确认材料",
+                                before="仍有待确认冲突",
+                                after="保持待确认",
+                            ),
+                            ImpactChange(
+                                change_kind="no_external_action",
+                                label="外部发送",
+                                before="未发送",
+                                after="仍不发送",
+                            ),
+                        ],
+                        summary="已应用证据决定；经营分析已更新，其余冲突仍待处理，未创建最终提交。",
+                    )
+                }
+            )
             updated = self._updated_snapshot(
                 current,
                 status="waiting_input",
@@ -1865,6 +2005,50 @@ class TaskService:
             state_hash=state_hash,
             summary="三个必需交付分支均已验证；收入采用正式口径并保留预测差异。",
             committed_at=now,
+        )
+        control_event = control_event.model_copy(
+            update={
+                "impact_receipt": self._impact_receipt(
+                    current,
+                    to_task_version=next_version,
+                    artifacts=[verified, reply_verified],
+                    reports=[report, reply_report],
+                    commit_id=commit_id,
+                    commit_created=True,
+                    changes=[
+                        ImpactChange(
+                            change_kind="will_change",
+                            label="经营分析",
+                            before="待确认正式口径",
+                            after="采用 CRM 正式收入 2400 万元，并保留预测差异",
+                            deliverable_ids=[deliverable_id],
+                            artifact_version_ids=[verified.artifact_version_id],
+                        ),
+                        ImpactChange(
+                            change_kind="will_recheck",
+                            label="客户回复草稿",
+                            before="收入数字待正式口径确认",
+                            after="已按正式口径重新核对，仍为草稿",
+                            deliverable_ids=["reply-draft"],
+                            artifact_version_ids=[reply_verified.artifact_version_id],
+                        ),
+                        ImpactChange(
+                            change_kind="unchanged",
+                            label="风险页",
+                            before="已通过核对",
+                            after="保持已核对状态",
+                            deliverable_ids=["risk-brief"],
+                        ),
+                        ImpactChange(
+                            change_kind="no_external_action",
+                            label="外部发送",
+                            before="未发送",
+                            after="仍不发送",
+                        ),
+                    ],
+                    summary="证据决定已应用；经营分析与客户回复草稿已更新并通过验证，任务已提交，未触发外部发送。",
+                )
+            }
         )
         updated = self._updated_snapshot(
             current,

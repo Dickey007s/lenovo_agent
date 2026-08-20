@@ -11,6 +11,7 @@ type ControlIntent = {
   kind: TaskControlCommand["kind"];
   branch_id?: string;
   instruction?: string;
+  resolution_option_id?: string;
   selected_source_ref?: string;
 };
 
@@ -195,6 +196,9 @@ export function TaskRuntimePanel({
                   onClick={() => void onControl({
                     kind: "resolve_evidence",
                     branch_id: conflict.branch_id,
+                    resolution_option_id: conflict.resolution_options.find(
+                      (option) => option.selected_source_ref === OFFICIAL_REVENUE_SOURCE && option.executable,
+                    )?.option_id,
                     selected_source_ref: OFFICIAL_REVENUE_SOURCE,
                   })}
                 >
