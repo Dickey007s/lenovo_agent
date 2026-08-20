@@ -61,6 +61,8 @@
 | 路由选择 | `items[].selected_mode/selection_source/override_scope` | 推荐选择来自 `admission`；其他允许选择来自 `user_override`，范围为 `this_run` |
 | 规则预测 | `items[].route_profiles[].forecast` | `source_type=fixture_policy_forecast` 与工具次数、秒数、并行上限；不是实测 |
 | 执行边界 | `items[].execution_status` | 本轮固定为 `not_started`；没有 Worker 运行事实就不能显示其他状态 |
+| 选择前影响 | `items[].route_profiles[].impact_preview` | 服务端拥有的工作分配、协调、人工介入、规则预测、执行与外部动作边界；不是执行结果 |
+| 选择回执 | `items[].selection_receipt/selection_receipts[]` | 本次选择的实际版本变化与连续历史；仍固定未执行，旧 latest-only 快照会归一化 |
 | WorkItem 版本 | `items[].version/last_event_sequence/last_event_type` | 每个任务 Admission 与选择状态的版本和事件类型 |
 
 本纵切路由选择 mutation 必须带 `expected_version`、`scope=this_run` 与 `idempotency_key`；服务端返回 `RouteSelectionResult.cockpit_version/cockpit_last_event_sequence/item` 后，前端才同时更新驾驶舱聚合版本与客户 A 的选择，不自行推算版本。版本冲突时保留本地选择草稿并重新 GET Cockpit；未知结果先 GET 对账，不凭客户端错误宣布结果。当前没有 Demo 2 SSE。未来若真的启动 Worker，还必须另建执行事件、预算消耗、工件版本、Verifier 和恢复证据，不能由本决策的 `selected_mode` 状态推断。
@@ -69,7 +71,7 @@
 
 驾驶舱首屏展示“今天有哪些工作、为什么建议这样处理”；任务卡显示业务标题、固定队列位置、截止压力、来源性质、业务影响、建议路由和当前选择范围。展开 Admission 时显示六类业务依据、演示策略预测和“选择后尚未启动执行”的边界。
 
-用户可执行：查看路由解释、接受客户 A 的推荐模式、将客户 A 降级到其他允许模式、暂不选择、查看演示来源和重新对账。本纵切不提供拖拽调序或长期排序偏好。动作反馈必须区分“推荐”“本次已选择”“执行未启动”“结果待确认”。
+用户可执行：查看路由解释、切换服务端允许模式并在左侧即时预演工作影响、接受客户 A 的推荐模式、将客户 A 降级到其他允许模式、暂不选择、查看演示来源和重新对账。确认后右侧显示精简服务端回执，左侧显示实际 `before → after`；同模式重复确认被拒绝。本纵切不提供拖拽调序或长期排序偏好。动作反馈必须区分“推荐”“预演”“本次已选择”“执行未启动”“结果待确认”。
 
 默认隐藏：原始 Prompt、思维链、Worker 对话、Worker 内部名称、原始 `fixture:` ID、模型 Token、Permit、底层日志、网络重试、策略内部权重和无业务含义的调度图。技术审计信息只能在受控审计视图中开放。
 
@@ -85,7 +87,7 @@
 4. 用户选择 Adaptive Swarm 后，界面是否明确保持 `execution_status=not_started`，不产生虚假运行或完成状态？
 5. 版本冲突、不允许的模式、未知结果和 API 读取失败时，是否保留最后服务端事实并可恢复？
 
-协议、API、驾驶舱交互、聚焦后端测试、5 条专用浏览器用例、完整回归和三张视觉证据已经产生，见 [`DEMO2-PR1-EXPLAINABLE-ADMISSION-EVIDENCE-20260817.md`](../evidence/DEMO2-PR1-EXPLAINABLE-ADMISSION-EVIDENCE-20260817.md)。因此本决策只在单进程固定演示范围内标为 `Verified`：可以写“已实现可解释 Admission 纵切”，不能写“已启动 Swarm”“节省成本”“提升效率”或“目标用户已经理解”。
+第一纵切证据见 [`DEMO2-PR1-EXPLAINABLE-ADMISSION-EVIDENCE-20260817.md`](../evidence/DEMO2-PR1-EXPLAINABLE-ADMISSION-EVIDENCE-20260817.md)；路由影响预演、连续回执与跨区域交互扩展见 [`DR-0011`](DR-0011-demo2-route-impact.md) 和 [`DEMO2-ROUTE-IMPACT-EVIDENCE-20260820`](../evidence/DEMO2-ROUTE-IMPACT-EVIDENCE-20260820.md)。因此本决策只在单进程固定演示范围内标为 `Verified`：可以写“已实现可解释 Admission 与路由影响纵切”，不能写“已启动 Swarm”“节省成本”“提升效率”或“目标用户已经理解”。
 
 ## 7. 关联项
 
@@ -93,4 +95,5 @@
 - Source：`USER-FEEDBACK-20260817-01`、`USER-FEEDBACK-20260810-02`、`MEETING-DECK-0716-V2-01`、`SCRIPT-V5-202607`
 - UI 事实矩阵：[`UI_SERVER_FACT_MATRIX.md`](../contracts/UI_SERVER_FACT_MATRIX.md) 的 Demo 2 区域
 - Evidence：[`DEMO2-PR1-EXPLAINABLE-ADMISSION-EVIDENCE-20260817.md`](../evidence/DEMO2-PR1-EXPLAINABLE-ADMISSION-EVIDENCE-20260817.md)
+- 交互扩展：[`DR-0011`](DR-0011-demo2-route-impact.md)；[`DEMO2-ROUTE-IMPACT-EVIDENCE-20260820`](../evidence/DEMO2-ROUTE-IMPACT-EVIDENCE-20260820.md)
 - 实现提交：`82df6b8`；完整 Python `118 passed, 1 skipped`；完整浏览器 `34 passed`；堆叠 PR [#13](https://github.com/Dickey007s/lenovo_agent/pull/13)（依赖 PR #12）

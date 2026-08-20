@@ -1449,12 +1449,15 @@ button.task-director-stage-card:hover { border-color: #98a3af; background: #fafb
    Demo 2: 智能工作驾驶舱
    Admission 只展示服务端事实，不将内部 worker 状态带到前台。
    ------------------------------------------------------------ */
-.work-cockpit {
+.work-cockpit,
+.work-cockpit-decision-pane {
   --cockpit-blue: #1265d6;
   --cockpit-blue-soft: #edf4fe;
   --cockpit-line: #dfe2e6;
   --cockpit-muted: #69717b;
   --cockpit-paper: #fff;
+}
+.work-cockpit {
   min-width: 0;
   min-height: 100%;
   padding: 24px 26px 42px;
@@ -1571,6 +1574,117 @@ button.task-director-stage-card:hover { border-color: #98a3af; background: #fafb
 .work-cockpit-source-summary strong { font-size: 12px; }
 .work-cockpit-source-summary ul { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 5px; margin: 0; padding: 0; list-style: none; }
 .work-cockpit-source-summary li { padding: 4px 6px; border: 1px solid #d9e1ea; border-radius: 4px; color: #40566f; background: #fff; font-size: 10px; }
+.work-cockpit-impact-canvas {
+  border-bottom: 1px solid #c8d9ec;
+  background: #f4f8fd;
+}
+.work-cockpit-impact-canvas.is-recorded {
+  border-bottom-color: #bcdcca;
+  background: #f2faf6;
+}
+.work-cockpit-impact-canvas.is-server-selected {
+  border-bottom-color: #d6dbe1;
+  background: #f7f8f9;
+}
+.work-cockpit-impact-canvas > header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 15px 17px 12px;
+}
+.work-cockpit-impact-canvas > header > div { min-width: 0; }
+.work-cockpit-impact-canvas > header span {
+  display: block;
+  margin-bottom: 4px;
+  color: #2d639c;
+  font-size: 9px;
+  font-weight: 800;
+}
+.work-cockpit-impact-canvas.is-recorded > header span { color: #28704e; }
+.work-cockpit-impact-canvas.is-server-selected > header span { color: #586574; }
+.work-cockpit-impact-canvas > header h3 {
+  margin: 0;
+  color: #163e6d;
+  font-size: 16px;
+  line-height: 1.35;
+}
+.work-cockpit-impact-canvas.is-recorded > header h3 { color: #205b40; }
+.work-cockpit-impact-canvas.is-server-selected > header h3 { color: #2f3e4e; }
+.work-cockpit-impact-canvas > header p {
+  margin: 5px 0 0;
+  color: #637185;
+  font-size: 11px;
+  line-height: 1.5;
+}
+.work-cockpit-impact-canvas > header > b {
+  flex: 0 0 auto;
+  padding: 5px 7px;
+  color: #205f9f;
+  background: #dfeafa;
+  font-size: 9px;
+  white-space: nowrap;
+}
+.work-cockpit-impact-canvas.is-recorded > header > b { color: #276747; background: #dcefe5; }
+.work-cockpit-impact-canvas.is-server-selected > header > b { color: #4f5f70; background: #e7eaee; }
+.work-cockpit-impact-canvas-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  border-top: 1px solid #d2dfed;
+}
+.work-cockpit-impact-canvas.is-recorded .work-cockpit-impact-canvas-grid { border-top-color: #cfe2d8; }
+.work-cockpit-impact-canvas-grid > article {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 27px minmax(0, 1fr);
+  gap: 9px;
+  padding: 12px;
+  border-right: 1px solid #d9e4ef;
+  border-bottom: 1px solid #d9e4ef;
+}
+.work-cockpit-impact-canvas-grid > article:nth-child(3n) { border-right: 0; }
+.work-cockpit-impact-canvas.is-recorded .work-cockpit-impact-canvas-grid > article { border-color: #d5e7dd; }
+.work-cockpit-impact-canvas-grid > article > span {
+  display: grid;
+  width: 27px;
+  height: 27px;
+  place-items: center;
+  color: #2467aa;
+  background: #fff;
+  font-size: 9px;
+  font-weight: 800;
+}
+.work-cockpit-impact-canvas-grid > article > span svg { width: 15px; height: 15px; }
+.work-cockpit-impact-canvas-grid > article.is-preserve > span,
+.work-cockpit-impact-canvas-grid > article.is-no_external_action > span,
+.work-cockpit-impact-canvas.is-recorded .work-cockpit-impact-canvas-grid > article > span { color: #27704e; }
+.work-cockpit-impact-canvas-grid > article > div { min-width: 0; display: grid; align-content: start; gap: 3px; }
+.work-cockpit-impact-canvas-grid small { color: #6d7886; font-size: 8px; font-weight: 750; }
+.work-cockpit-impact-canvas-grid strong { color: #23384f; font-size: 11px; line-height: 1.35; }
+.work-cockpit-impact-before { display: flex; align-items: center; gap: 5px; color: #7a8592; font-size: 9px; line-height: 1.4; }
+.work-cockpit-impact-before svg { width: 12px; height: 12px; flex: 0 0 auto; }
+.work-cockpit-impact-canvas-grid p { margin: 0; color: #465c75; font-size: 10px; line-height: 1.5; }
+.work-cockpit-impact-canvas-grid em { color: #7c684f; font-size: 9px; line-height: 1.4; font-style: normal; }
+.work-cockpit-supporting-details { border-bottom: 1px solid #e1e5ea; }
+.work-cockpit-supporting-details > summary {
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 17px;
+  cursor: pointer;
+  list-style: none;
+  color: #33485f;
+  background: #fbfcfd;
+}
+.work-cockpit-supporting-details > summary::-webkit-details-marker { display: none; }
+.work-cockpit-supporting-details > summary span { font-size: 11px; font-weight: 800; }
+.work-cockpit-supporting-details > summary strong { color: #748090; font-size: 9px; font-weight: 650; }
+.work-cockpit-supporting-details > summary::after { content: "+"; color: #2c66a6; font-size: 17px; font-weight: 500; }
+.work-cockpit-supporting-details[open] > summary::after { content: "−"; }
+.work-cockpit-supporting-details[open] > summary { border-bottom: 1px solid #e1e5ea; }
+.work-cockpit-supporting-details > .work-cockpit-admission-facts { padding-top: 14px; }
 .work-cockpit-admission-facts, .work-cockpit-route-overview { padding: 0 17px 17px; }
 .work-cockpit-admission-facts .work-cockpit-section-heading, .work-cockpit-route-overview .work-cockpit-section-heading { margin: 0 -17px 12px; padding: 13px 17px 11px; }
 .work-cockpit-admission-facts > dl { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); margin: 0; border: 1px solid #e1e5ea; }
@@ -1602,13 +1716,22 @@ button.task-director-stage-card:hover { border-color: #98a3af; background: #fafb
 .work-cockpit-overview-status strong { font-size: 11px; }
 .work-cockpit-overview-status span { font-size: 10px; line-height: 1.5; }
 .work-cockpit-decision-pane { padding: 17px; }
-.task-director-side-pane > .work-cockpit-decision-pane { min-height: 0; overflow: auto; border: 0; border-radius: 0; }
+.task-director-side-pane > .work-cockpit-decision-pane { height: 100%; min-height: 0; display: grid; grid-template-rows: minmax(0, 1fr) auto; overflow: hidden; padding: 0; border: 0; border-radius: 0; }
+.task-director-side-pane .work-cockpit-decision-scroll { min-height: 0; overflow: auto; padding: 17px; }
 .task-director-side-pane .work-cockpit-option-facts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .task-director-side-pane .work-cockpit-option-facts > div:nth-child(2) { border-right: 0; }
 .task-director-side-pane .work-cockpit-option-facts > div:nth-child(-n + 2) { border-bottom: 1px solid #e7eaed; }
 .task-director-side-pane .work-cockpit-route-option { grid-template-columns: 20px 26px minmax(0, 1fr); }
 .task-director-side-pane .work-cockpit-route-badges { grid-column: 3; justify-content: flex-start; }
 .task-director-side-pane .work-cockpit-confirm-bar { display: grid; grid-template-columns: 1fr; }
+.task-director-side-pane .work-cockpit-confirm-bar {
+  z-index: 3;
+  margin: 0;
+  padding: 13px 17px 17px;
+  border-top: 1px solid #dfe5ec;
+  background: #fff;
+}
+.task-director-side-pane .work-cockpit-confirm-bar.is-inline { margin-top: 14px; padding: 12px 0 0; }
 .task-director-side-pane .work-cockpit-confirm-bar button { width: 100%; }
 .work-cockpit-decision-header {
   display: flex;
@@ -1676,6 +1799,79 @@ button.task-director-stage-card:hover { border-color: #98a3af; background: #fafb
 .work-cockpit-tradeoff strong { color: #a6530d; font-size: 11px; }
 .work-cockpit-tradeoff p { margin: 4px 0 0; font-size: 11px; line-height: 1.5; }
 .work-cockpit-decision-pane > .work-cockpit-option-facts { margin-top: 12px; }
+.work-cockpit-impact-preview,
+.work-cockpit-selection-receipt {
+  margin-top: 14px;
+  border: 1px solid #b8d1ef;
+  border-left: 4px solid var(--cockpit-blue);
+  background: #f8fbff;
+}
+.work-cockpit-selection-receipt { border-color: #a9d5c0; border-left-color: #188a5c; background: #f6fcf9; }
+.work-cockpit-impact-preview > header,
+.work-cockpit-selection-receipt > header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 12px 12px 10px;
+  border-bottom: 1px solid #d9e7f7;
+}
+.work-cockpit-selection-receipt > header { border-bottom-color: #d5ebe0; }
+.work-cockpit-impact-preview > header > div,
+.work-cockpit-selection-receipt > header > div { min-width: 0; display: grid; gap: 3px; }
+.work-cockpit-impact-preview > header span,
+.work-cockpit-selection-receipt > header span { color: #657180; font-size: 9px; font-weight: 750; }
+.work-cockpit-impact-preview > header h3,
+.work-cockpit-selection-receipt > header h3 { margin: 0; font-size: 13px; line-height: 1.4; }
+.work-cockpit-impact-preview > header h3:focus-visible,
+.work-cockpit-selection-receipt > header h3:focus-visible { outline: 2px solid var(--cockpit-blue); outline-offset: 3px; }
+.work-cockpit-selection-receipt { scroll-margin-top: 12px; }
+.work-cockpit-impact-preview > header > b,
+.work-cockpit-selection-receipt > header > b {
+  flex: 0 0 auto;
+  padding: 4px 6px;
+  color: #4e637b;
+  background: #e8f1fb;
+  font-size: 9px;
+  white-space: nowrap;
+}
+.work-cockpit-selection-receipt > header > b { color: #276345; background: #def2e8; }
+.work-cockpit-impact-preview > p,
+.work-cockpit-selection-receipt > p { margin: 0; padding: 9px 12px; color: #5b6877; font-size: 10px; line-height: 1.55; }
+.work-cockpit-impact-rows { margin: 0; border-top: 1px solid #d9e7f7; }
+.work-cockpit-selection-receipt .work-cockpit-impact-rows { border-top-color: #d5ebe0; }
+.work-cockpit-impact-rows > div {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 86px minmax(0, 1fr);
+  gap: 9px;
+  padding: 9px 12px;
+  border-bottom: 1px solid #dfe9f4;
+}
+.work-cockpit-selection-receipt .work-cockpit-impact-rows > div { border-bottom-color: #dcebe3; }
+.work-cockpit-impact-rows > div:last-child { border-bottom: 0; }
+.work-cockpit-impact-rows dt { display: grid; align-content: start; gap: 3px; }
+.work-cockpit-impact-rows dt span { width: fit-content; padding: 2px 4px; color: #1c5da9; background: #e7f0fc; font-size: 8px; font-weight: 750; }
+.work-cockpit-impact-rows .is-preserve dt span,
+.work-cockpit-impact-rows .is-no_external_action dt span { color: #276345; background: #e4f4ec; }
+.work-cockpit-impact-rows dt strong { font-size: 10px; line-height: 1.35; }
+.work-cockpit-impact-rows dd { min-width: 0; display: grid; grid-template-columns: minmax(0, auto) 13px minmax(0, 1fr); align-items: start; gap: 5px; margin: 0; }
+.work-cockpit-impact-rows dd small { color: #858d97; font-size: 9px; line-height: 1.45; }
+.work-cockpit-impact-rows dd > svg { width: 13px; height: 13px; margin-top: 1px; color: #94a0ad; }
+.work-cockpit-impact-rows dd b { color: #173d6b; font-size: 10px; line-height: 1.5; }
+.work-cockpit-selection-receipt .work-cockpit-impact-rows dd b { color: #20573c; }
+.work-cockpit-impact-rows dd em { grid-column: 1 / -1; color: #7a6751; font-size: 9px; line-height: 1.45; font-style: normal; }
+.work-cockpit-receipt-meta { display: flex; flex-wrap: wrap; gap: 5px; padding: 0 12px 9px; }
+.work-cockpit-receipt-meta strong,
+.work-cockpit-receipt-meta span { padding: 4px 6px; color: #276345; background: #e4f4ec; font-size: 9px; }
+.work-cockpit-selection-receipt details { border-top: 1px solid #d5ebe0; }
+.work-cockpit-selection-receipt summary { min-height: 40px; display: flex; align-items: center; padding: 0 12px; cursor: pointer; color: #4b6658; font-size: 10px; font-weight: 700; }
+.work-cockpit-selection-receipt details p { margin: 0; padding: 0 12px 10px; color: #68756e; font-size: 9px; line-height: 1.5; }
+.work-cockpit-impact-unavailable { display: flex; align-items: flex-start; gap: 8px; margin-top: 12px; padding: 10px; color: #7c2e2e; background: #fff7f7; }
+.work-cockpit-impact-unavailable svg { width: 16px; height: 16px; flex: 0 0 auto; }
+.work-cockpit-impact-unavailable div { display: grid; gap: 3px; }
+.work-cockpit-impact-unavailable strong { font-size: 11px; }
+.work-cockpit-impact-unavailable span { font-size: 10px; line-height: 1.45; }
 .work-cockpit-not-started, .work-cockpit-recorded, .work-cockpit-boundary { display: flex; align-items: flex-start; gap: 7px; margin: 12px 0 0; padding: 9px 10px; font-size: 11px; line-height: 1.5; }
 .work-cockpit-not-started { color: #4c637e; background: #f2f7fd; }
 .work-cockpit-recorded { color: #276345; background: #edf8f3; }
@@ -1710,9 +1906,17 @@ button.task-director-stage-card:hover { border-color: #98a3af; background: #fafb
   .work-cockpit-layout { grid-template-columns: 1fr; }
   .work-cockpit-queue { order: 0; }
   .work-cockpit-main { order: 1; }
+  .work-cockpit-impact-canvas-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .work-cockpit-impact-canvas-grid > article,
+  .work-cockpit-impact-canvas-grid > article:nth-child(3n) { border-right: 1px solid #d9e4ef; border-bottom: 1px solid #d9e4ef; }
+  .work-cockpit-impact-canvas.is-recorded .work-cockpit-impact-canvas-grid > article { border-color: #d5e7dd; }
+  .work-cockpit-impact-canvas-grid > article:nth-child(2n) { border-right: 0; }
   .work-cockpit-admission-facts > dl { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .work-cockpit-admission-facts > dl > div:nth-child(3) { border-right: 0; }
   .work-cockpit-admission-facts > dl > div:nth-child(-n + 3) { border-bottom: 1px solid #e7eaed; }
+  .task-director-side-pane > .work-cockpit-decision-pane { height: auto; display: block; overflow: visible; }
+  .task-director-side-pane .work-cockpit-decision-scroll { overflow: visible; }
+  .task-director-side-pane .work-cockpit-confirm-bar { position: static; }
 }
 
 @media (max-width: 620px) {
@@ -1725,6 +1929,15 @@ button.task-director-stage-card:hover { border-color: #98a3af; background: #fafb
   .work-cockpit-queue-item { min-height: 86px; }
   .work-cockpit-overview > header, .work-cockpit-source-summary { align-items: flex-start; flex-direction: column; }
   .work-cockpit-source-summary ul { justify-content: flex-start; }
+  .work-cockpit-impact-canvas > header { display: grid; }
+  .work-cockpit-impact-canvas > header > b { width: fit-content; }
+  .work-cockpit-impact-canvas-grid { grid-template-columns: 1fr; }
+  .work-cockpit-impact-canvas-grid > article,
+  .work-cockpit-impact-canvas-grid > article:nth-child(2n),
+  .work-cockpit-impact-canvas-grid > article:nth-child(3n),
+  .work-cockpit-impact-canvas-grid > article:nth-last-child(-n + 2) { border-right: 0; border-bottom: 1px solid #d9e4ef; }
+  .work-cockpit-impact-canvas.is-recorded .work-cockpit-impact-canvas-grid > article { border-color: #d5e7dd; }
+  .work-cockpit-impact-canvas-grid > article:last-child { border-bottom: 0; }
   .work-cockpit-admission-facts > dl { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .work-cockpit-admission-facts > dl > div:nth-child(2n) { border-right: 0; }
   .work-cockpit-admission-facts > dl > div:nth-child(-n + 4) { border-bottom: 1px solid #e7eaed; }
@@ -1732,6 +1945,8 @@ button.task-director-stage-card:hover { border-color: #98a3af; background: #fafb
   .work-cockpit-route-overview-heading .work-cockpit-route-badges { grid-column: 2; justify-content: flex-start; }
   .work-cockpit-route-overview-list article > dl, .work-cockpit-route-overview-list article > p { margin-left: 0; }
   .work-cockpit-decision-pane { padding: 13px; }
+  .task-director-side-pane > .work-cockpit-decision-pane { padding: 0; }
+  .task-director-side-pane .work-cockpit-decision-scroll { padding: 13px; }
   .work-cockpit-decision-header { display: block; }
   .work-cockpit-status { display: inline-block; margin-top: 9px; }
   .work-cockpit-decision-header h2 { font-size: 17px; }
@@ -1742,6 +1957,16 @@ button.task-director-stage-card:hover { border-color: #98a3af; background: #fafb
   .work-cockpit-route-badges { grid-column: 3; justify-content: flex-start; }
   .work-cockpit-confirm-bar { display: grid; grid-template-columns: 1fr; }
   .work-cockpit-confirm-bar button { width: 100%; }
+  .task-director-side-pane:has(> .work-cockpit-decision-pane) { height: auto; min-height: 0; display: block; overflow: visible; }
+  .task-director-side-pane > .work-cockpit-decision-pane { overflow: visible; }
+  .task-director-side-pane .work-cockpit-confirm-bar { margin: 0; padding: 13px; }
+  .work-cockpit-impact-rows > div { grid-template-columns: 1fr; }
+  .work-cockpit-impact-rows dd { grid-template-columns: minmax(0, auto) 13px minmax(0, 1fr); }
+  .work-cockpit-impact-preview > header,
+  .work-cockpit-selection-receipt > header { display: grid; }
+  .work-cockpit-impact-preview > header > b,
+  .work-cockpit-selection-receipt > header > b { width: fit-content; }
+  .work-cockpit-selection-receipt summary { min-height: 44px; }
   .work-cockpit-error { grid-template-columns: 18px minmax(0, 1fr); }
   .work-cockpit-error button { grid-column: 2; justify-self: start; min-height: 44px; }
 }

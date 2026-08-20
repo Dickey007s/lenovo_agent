@@ -3,19 +3,20 @@ import {
   IconArrowRight,
   IconBolt,
   IconCheck,
-  IconClock,
   IconRefresh,
   IconRobot,
   IconShieldCheck,
   IconSparkles,
-  IconTool,
   IconUsersGroup,
 } from "@tabler/icons-react";
+import { useEffect, useRef } from "react";
 
 import type {
   Demo2CockpitSnapshot,
   Demo2RouteMode,
+  Demo2RouteImpactChange,
   Demo2RouteProfile,
+  Demo2RouteSelectionReceipt,
   Demo2WorkItem,
   WorkCockpitDecisionPaneProps,
   WorkCockpitProps,
@@ -71,36 +72,143 @@ function statusLabel(item: Demo2WorkItem) {
     : BUSINESS_STATUS_LABELS[item.business_status];
 }
 
-function optionFacts(option: Demo2RouteProfile) {
+const IMPACT_KIND_LABELS = {
+  change: "会改变",
+  preserve: "保持不变",
+  no_external_action: "不会发生",
+} as const;
+
+const IMPACT_ICONS: Record<Demo2RouteImpactChange["aspect"], typeof IconBolt> = {
+  route_decision: IconArrowRight,
+  work_allocation: IconBolt,
+  coordination: IconUsersGroup,
+  human_control: IconCheck,
+  policy_forecast: IconSparkles,
+  execution_boundary: IconShieldCheck,
+  external_action: IconAlertTriangle,
+};
+
+function ImpactRows({ changes, applied }: { changes: Demo2RouteImpactChange[]; applied: boolean }) {
   return (
-    <dl className="work-cockpit-option-facts">
-      <div>
-        <dt><IconClock aria-hidden="true" />预计耗时</dt>
-        <dd>{formatRuntime(option.forecast.estimated_runtime_seconds)}<small>规则预测</small></dd>
-      </div>
-      <div>
-        <dt><IconTool aria-hidden="true" />工具调用上限</dt>
-        <dd>{option.forecast.estimated_tool_calls} 次工具调用<small>规则预测</small></dd>
-      </div>
-      <div>
-        <dt><IconUsersGroup aria-hidden="true" />并行程度</dt>
-        <dd>最多 {option.forecast.max_workers} 个并行单元</dd>
-      </div>
-      <div>
-        <dt><IconShieldCheck aria-hidden="true" />人工确认</dt>
-        <dd>{option.mode === "adaptive_swarm" ? "关键节点确认" : "结果确认"}</dd>
-      </div>
+    <dl className="work-cockpit-impact-rows">
+      {changes.map((change) => (
+        <div className={`is-${change.change_kind}`} key={`${change.aspect}-${change.label}`}>
+          <dt>
+            <span>{applied && change.change_kind === "change" ? "已记录" : IMPACT_KIND_LABELS[change.change_kind]}</span>
+            <strong>{change.label}</strong>
+          </dt>
+          <dd>
+            {change.before && <small>{change.before}</small>}
+            <IconArrowRight aria-hidden="true" />
+            <b>{change.after}</b>
+            {change.detail && <em>{change.detail}</em>}
+          </dd>
+        </div>
+      ))}
     </dl>
   );
 }
 
+function RouteImpactCanvas({
+  option,
+  receipt,
+  isServerSelected,
+  previewingOverride,
+}: {
+  option: Demo2RouteProfile;
+  receipt: Demo2RouteSelectionReceipt | null;
+  isServerSelected: boolean;
+  previewingOverride: boolean;
+}) {
+  const preview = option.impact_preview;
+  if (!preview) return null;
+  const appliedReceipt = receipt?.selected_mode === option.mode ? receipt : null;
+  const changes = appliedReceipt?.changes ?? preview.changes;
+  const stateClass = appliedReceipt ? " is-recorded" : isServerSelected ? " is-server-selected" : "";
+  const title = appliedReceipt
+    ? `本次已选择${routeLabel(option.mode)}`
+    : previewingOverride
+      ? `如果改为${routeLabel(option.mode)}，工作会怎样展开`
+      : isServerSelected
+        ? `服务端当前方式：${routeLabel(option.mode)}`
+        : `如果选择${routeLabel(option.mode)}，工作会怎样展开`;
+  return (
+    <section className={`work-cockpit-impact-canvas${stateClass}`} aria-live="polite" aria-labelledby="work-cockpit-impact-canvas-title">
+      <header>
+        <div>
+          <span>{appliedReceipt ? "选择后的影响" : isServerSelected ? "服务端当前方式" : "工作方式影响地图"}</span>
+          <h3 id="work-cockpit-impact-canvas-title">{title}</h3>
+          <p>{appliedReceipt?.summary ?? preview.summary}</p>
+        </div>
+        <b>{appliedReceipt ? "已记录 · 未执行" : isServerSelected ? "当前方式 · 未执行" : "选择前预演"}</b>
+      </header>
+      <div className="work-cockpit-impact-canvas-grid">
+        {changes.map((change) => {
+          const ImpactIcon = IMPACT_ICONS[change.aspect];
+          return (
+          <article className={`is-${change.change_kind}`} key={`${change.aspect}-${change.label}`}>
+            <span><ImpactIcon aria-hidden="true" /></span>
+            <div>
+              <small>{appliedReceipt && change.change_kind === "change" ? "已记录" : IMPACT_KIND_LABELS[change.change_kind]}</small>
+              <strong>{change.label}</strong>
+              {change.before && <span className="work-cockpit-impact-before">{change.before}<IconArrowRight aria-hidden="true" /></span>}
+              <p>{change.after}</p>
+              {change.detail && <em>{change.detail}</em>}
+            </div>
+          </article>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+function RouteSelectionReceiptView({ receipt, historyCount }: { receipt: Demo2RouteSelectionReceipt; historyCount: number }) {
+  const receiptRef = useRef<HTMLElement>(null);
+  const titleRef = useRef<HTMLHeadingElement>(null);
+  useEffect(() => {
+    receiptRef.current?.scrollIntoView({ block: "nearest" });
+    titleRef.current?.focus({ preventScroll: true });
+  }, [receipt.receipt_id]);
+  return (
+    <section ref={receiptRef} className="work-cockpit-selection-receipt" role="status" aria-live="polite" aria-labelledby="work-cockpit-selection-receipt-title">
+      <header>
+        <div>
+          <span>服务端路由回执</span>
+          <h3 id="work-cockpit-selection-receipt-title" ref={titleRef} tabIndex={-1}>本次工作方式已记录</h3>
+        </div>
+        <b>尚未执行</b>
+      </header>
+      <p>{receipt.summary}</p>
+      <div className="work-cockpit-receipt-meta">
+        <strong>{routeLabel(receipt.selected_mode)}</strong>
+        <span>{receipt.selection_source === "admission" ? "接受服务端推荐" : "本次覆盖服务端推荐"}</span>
+        <span>仅本次运行</span>
+      </div>
+      <details>
+        <summary>查看记录版本与选择历史</summary>
+        <p>工作项 v{receipt.from_item_version} → v{receipt.to_item_version}；驾驶舱 v{receipt.from_cockpit_version} → v{receipt.to_cockpit_version}。本轮服务端共保留 {historyCount} 次选择记录；规则预测仍不是实际运行结果。</p>
+      </details>
+    </section>
+  );
+}
+
 function DecisionStatus({ item, selectedMode }: { item: Demo2WorkItem; selectedMode: Demo2RouteMode }) {
-  const recorded = item.admission_status === "route_selected" && item.selected_mode !== null;
-  if (!recorded) {
+  const recordedMode = item.admission_status === "route_selected" ? item.selected_mode : null;
+  if (!recordedMode) {
     return (
       <p className="work-cockpit-not-started" role="status">
         <IconShieldCheck aria-hidden="true" />
         确认后只记录执行方式，任务尚未启动。
+      </p>
+    );
+  }
+
+  if (recordedMode !== selectedMode) {
+    return (
+      <p className="work-cockpit-not-started" role="status">
+        <IconArrowRight aria-hidden="true" />
+        服务端当前为“{routeLabel(recordedMode)}”；改为“{routeLabel(selectedMode)}”尚未提交。
       </p>
     );
   }
@@ -134,24 +242,26 @@ export function WorkCockpitDecisionPane({
 
   const selectedMode = draftMode ?? item.selected_mode ?? item.recommendation.mode;
   const selectedOption = routeOption(item, selectedMode);
-  const recommendedOption = routeOption(item, item.recommendation.mode);
-  const selectedIsRecommended = selectedMode === item.recommendation.mode;
   const selectedDisabled = !selectedOption || !selectedOption.available;
   const executionPending = item.execution_status === "not_started";
   const fixedByAdmission = item.admission_status === "route_selected" && item.allowed_modes.length === 1;
+  const alreadyRecorded = item.admission_status === "route_selected" && item.selected_mode === selectedMode;
+  const visibleReceipt = alreadyRecorded ? item.selection_receipt : null;
+  const previewingOverride = item.selected_mode !== null && item.selected_mode !== selectedMode;
 
   return (
     <section className="work-cockpit-decision-pane" aria-labelledby="work-cockpit-decision-title">
-      <header className="work-cockpit-decision-header">
+      <div className="work-cockpit-decision-scroll">
+        <header className="work-cockpit-decision-header">
         <div>
           <span className="work-cockpit-eyebrow">执行方式建议</span>
           <h2 id="work-cockpit-decision-title">怎么完成这项工作</h2>
           <p>{item.objective}</p>
         </div>
-        <span className="work-cockpit-status">{statusLabel(item)}</span>
-      </header>
+        <span className="work-cockpit-status">{previewingOverride ? "新选择尚未提交" : statusLabel(item)}</span>
+        </header>
 
-      <section className="work-cockpit-recommendation" aria-labelledby="work-cockpit-recommendation-title">
+        <section className="work-cockpit-recommendation" aria-labelledby="work-cockpit-recommendation-title">
         <div className="work-cockpit-recommendation-heading">
           <div className="work-cockpit-recommendation-icon" aria-hidden="true"><IconSparkles /></div>
           <div>
@@ -163,10 +273,20 @@ export function WorkCockpitDecisionPane({
         <ul className="work-cockpit-reason-list" aria-label="推荐理由">
           {item.recommendation.reasons.map((reason) => <li key={`${reason.factor}-${reason.label}`}><IconCheck aria-hidden="true" /><span><strong>{reason.label}</strong> · {reason.detail}</span></li>)}
         </ul>
-        {recommendedOption && optionFacts(recommendedOption)}
-      </section>
+        </section>
 
-      <fieldset className="work-cockpit-route-options">
+        {!fixedByAdmission && (
+          <footer className="work-cockpit-confirm-bar is-inline">
+            <span>当前选择：{routeLabel(selectedMode)}。确认只会记录路由，不会发送邮件、写入 CRM 或启动外部动作。</span>
+            <button type="button" aria-describedby={!visibleReceipt ? "work-cockpit-impact-canvas-title" : undefined} disabled={saving || selectedDisabled || alreadyRecorded || !selectedOption?.impact_preview} onClick={onConfirm}>
+              {saving ? "正在确认" : alreadyRecorded ? "本次方式已记录" : previewingOverride ? `确认改为${routeLabel(selectedMode)}` : "确认执行方式"}<IconArrowRight aria-hidden="true" />
+            </button>
+          </footer>
+        )}
+
+        {visibleReceipt && <RouteSelectionReceiptView receipt={visibleReceipt} historyCount={item.selection_receipts?.length ?? 1} />}
+
+        <fieldset className="work-cockpit-route-options">
         <legend>执行方式</legend>
         <p className="work-cockpit-field-help">{fixedByAdmission
           ? "这项工作已按规则选择最轻量的方式，本轮不需要你再次确认。"
@@ -201,35 +321,26 @@ export function WorkCockpitDecisionPane({
             );
           })}
         </div>
-      </fieldset>
+        </fieldset>
 
-      {selectedOption && !selectedIsRecommended && (
-        <section className="work-cockpit-tradeoff" aria-label="改写代价">
-          <strong>本次改为“{routeLabel(selectedMode)}”的影响</strong>
-          <p>{selectedOption.tradeoff || "服务端未提供改写代价，当前不能确认该方式。"}</p>
-        </section>
-      )}
-
-      {selectedOption && !selectedIsRecommended && optionFacts(selectedOption)}
-      <DecisionStatus item={item} selectedMode={selectedMode} />
-      {selectedMode === "adaptive_swarm" && executionPending && (
-        <p className="work-cockpit-boundary"><IconUsersGroup aria-hidden="true" />当前仅记录为候选执行方式，不会自动创建或启动实际协作。</p>
-      )}
-      {error && (
-        <div className="work-cockpit-error" role="alert">
-          <IconAlertTriangle aria-hidden="true" />
-          <div><strong>执行方式尚未确认</strong><span>{error}</span></div>
-          <button type="button" onClick={onRefresh} disabled={saving}><IconRefresh aria-hidden="true" />重新读取</button>
-        </div>
-      )}
-      {!fixedByAdmission && (
-        <footer className="work-cockpit-confirm-bar">
-          <span>确认只会记录路由选择，不会发送邮件、写入 CRM 或启动外部动作。</span>
-          <button type="button" disabled={saving || selectedDisabled} onClick={onConfirm}>
-            {saving ? "正在确认" : "确认执行方式"}<IconArrowRight aria-hidden="true" />
-          </button>
-        </footer>
-      )}
+        {!selectedOption?.impact_preview && (
+          <section className="work-cockpit-impact-unavailable" role="status">
+            <IconAlertTriangle aria-hidden="true" />
+            <div><strong>影响预演暂不可用</strong><span>服务端没有返回这项执行方式的影响事实，当前不能确认。</span></div>
+          </section>
+        )}
+        {!visibleReceipt && <DecisionStatus item={item} selectedMode={selectedMode} />}
+        {selectedMode === "adaptive_swarm" && executionPending && (
+          <p className="work-cockpit-boundary"><IconUsersGroup aria-hidden="true" />当前仅记录为候选执行方式，不会自动创建或启动实际协作。</p>
+        )}
+        {error && (
+          <div className="work-cockpit-error" role="alert">
+            <IconAlertTriangle aria-hidden="true" />
+            <div><strong>执行方式尚未确认</strong><span>{error}</span></div>
+            <button type="button" onClick={onRefresh} disabled={saving}><IconRefresh aria-hidden="true" />重新读取</button>
+          </div>
+        )}
+      </div>
     </section>
   );
 }
@@ -259,8 +370,15 @@ const BAND_LABELS = {
   ample: "充足",
 } as const;
 
-function WorkItemOverview({ item }: { item: Demo2WorkItem }) {
+function WorkItemOverview({ item, previewMode }: { item: Demo2WorkItem; previewMode: Demo2RouteMode | null }) {
   const activeMode = item.selected_mode ?? item.recommendation.mode;
+  const impactMode = previewMode && item.allowed_modes.includes(previewMode) ? previewMode : activeMode;
+  const impactOption = routeOption(item, impactMode);
+  const isServerSelected = item.admission_status === "route_selected" && item.selected_mode === impactMode;
+  const previewingOverride = item.selected_mode !== null && item.selected_mode !== impactMode;
+  const visibleReceipt = isServerSelected && item.selection_receipt?.selected_mode === impactMode
+    ? item.selection_receipt
+    : null;
   return (
     <article className="work-cockpit-overview" aria-labelledby="work-cockpit-overview-title">
       <header>
@@ -269,7 +387,7 @@ function WorkItemOverview({ item }: { item: Demo2WorkItem }) {
           <h2 id="work-cockpit-overview-title">{item.title}</h2>
           <p>{item.objective}</p>
         </div>
-        <span className="work-cockpit-status">{statusLabel(item)}</span>
+        <span className="work-cockpit-status">{previewingOverride ? "新选择尚未提交" : statusLabel(item)}</span>
       </header>
 
       <section className="work-cockpit-source-summary" aria-labelledby="work-cockpit-source-title">
@@ -282,54 +400,70 @@ function WorkItemOverview({ item }: { item: Demo2WorkItem }) {
         </ul>
       </section>
 
-      <section className="work-cockpit-admission-facts" aria-labelledby="work-cockpit-admission-facts-title">
-        <div className="work-cockpit-section-heading">
-          <span>为什么这样建议</span>
-          <strong id="work-cockpit-admission-facts-title">当前工作条件</strong>
-        </div>
-        <dl>
-          <div><dt>业务价值</dt><dd>{BAND_LABELS[item.facts.value_band]}</dd></div>
-          <div><dt>资料广度</dt><dd>{item.facts.breadth} 类</dd></div>
-          <div><dt>可并行工作包</dt><dd>{item.facts.parallelism} 个</dd></div>
-          <div><dt>截止压力</dt><dd>{BAND_LABELS[item.facts.deadline_pressure]}</dd></div>
-          <div><dt>业务风险</dt><dd>{BAND_LABELS[item.facts.risk_band]}</dd></div>
-          <div><dt>资源边界</dt><dd>{BAND_LABELS[item.facts.budget_band]}</dd></div>
-        </dl>
-      </section>
+      {impactOption && (
+        <RouteImpactCanvas
+          option={impactOption}
+          receipt={visibleReceipt}
+          isServerSelected={isServerSelected}
+          previewingOverride={previewingOverride}
+        />
+      )}
 
-      <section className="work-cockpit-route-overview" aria-labelledby="work-cockpit-route-overview-title">
-        <div className="work-cockpit-section-heading">
-          <span>执行方式比较</span>
-          <strong id="work-cockpit-route-overview-title">推荐与可选代价</strong>
-        </div>
-        <div className="work-cockpit-route-overview-list">
-          {item.route_profiles.map((profile) => {
-            const recommended = profile.mode === item.recommendation.mode;
-            const selected = profile.mode === item.selected_mode;
-            const RouteIcon = ROUTE_ICONS[profile.mode];
-            return (
-              <article className={`${recommended ? "is-recommended" : ""}${selected ? " is-selected" : ""}`} key={profile.mode}>
-                <div className="work-cockpit-route-overview-heading">
-                  <span><RouteIcon aria-hidden="true" /></span>
-                  <div><strong>{routeLabel(profile.mode)}</strong><small>{profile.summary}</small></div>
-                  <div className="work-cockpit-route-badges">{recommended && <b>推荐</b>}{selected && <b className="is-selected">本次已选</b>}</div>
-                </div>
-                <dl>
-                  <div><dt>预计</dt><dd>{formatRuntime(profile.forecast.estimated_runtime_seconds)}</dd></div>
-                  <div><dt>工具上限</dt><dd>{profile.forecast.estimated_tool_calls} 次</dd></div>
-                  <div><dt>并行单元</dt><dd>{profile.forecast.max_workers} 个</dd></div>
-                </dl>
-                <p>{profile.tradeoff}</p>
-              </article>
-            );
-          })}
-        </div>
-      </section>
+      <details className="work-cockpit-supporting-details">
+        <summary><span>推荐依据与方式比较</span><strong>需要更多细节时展开</strong></summary>
+        <section className="work-cockpit-admission-facts" aria-labelledby="work-cockpit-admission-facts-title">
+          <div className="work-cockpit-section-heading">
+            <span>为什么这样建议</span>
+            <strong id="work-cockpit-admission-facts-title">当前工作条件</strong>
+          </div>
+          <dl>
+            <div><dt>业务价值</dt><dd>{BAND_LABELS[item.facts.value_band]}</dd></div>
+            <div><dt>资料广度</dt><dd>{item.facts.breadth} 类</dd></div>
+            <div><dt>可并行工作包</dt><dd>{item.facts.parallelism} 个</dd></div>
+            <div><dt>截止压力</dt><dd>{BAND_LABELS[item.facts.deadline_pressure]}</dd></div>
+            <div><dt>业务风险</dt><dd>{BAND_LABELS[item.facts.risk_band]}</dd></div>
+            <div><dt>资源边界</dt><dd>{BAND_LABELS[item.facts.budget_band]}</dd></div>
+          </dl>
+        </section>
+
+        <section className="work-cockpit-route-overview" aria-labelledby="work-cockpit-route-overview-title">
+          <div className="work-cockpit-section-heading">
+            <span>执行方式比较</span>
+            <strong id="work-cockpit-route-overview-title">推荐与可选代价</strong>
+          </div>
+          <div className="work-cockpit-route-overview-list">
+            {item.route_profiles.map((profile) => {
+              const recommended = profile.mode === item.recommendation.mode;
+              const selected = profile.mode === item.selected_mode;
+              const RouteIcon = ROUTE_ICONS[profile.mode];
+              return (
+                <article className={`${recommended ? "is-recommended" : ""}${selected ? " is-selected" : ""}`} key={profile.mode}>
+                  <div className="work-cockpit-route-overview-heading">
+                    <span><RouteIcon aria-hidden="true" /></span>
+                    <div><strong>{routeLabel(profile.mode)}</strong><small>{profile.summary}</small></div>
+                    <div className="work-cockpit-route-badges">{recommended && <b>推荐</b>}{selected && <b className="is-selected">本次已选</b>}</div>
+                  </div>
+                  <dl>
+                    <div><dt>预计</dt><dd>{formatRuntime(profile.forecast.estimated_runtime_seconds)}</dd></div>
+                    <div><dt>工具上限</dt><dd>{profile.forecast.estimated_tool_calls} 次</dd></div>
+                    <div><dt>并行单元</dt><dd>{profile.forecast.max_workers} 个</dd></div>
+                  </dl>
+                  <p>{profile.tradeoff}</p>
+                </article>
+              );
+            })}
+          </div>
+        </section>
+      </details>
 
       <footer className="work-cockpit-overview-status">
         <IconShieldCheck aria-hidden="true" />
         <div>
-          <strong>{item.admission_status === "route_selected" ? `已确定为${routeLabel(activeMode)}` : `建议使用${routeLabel(activeMode)}`}</strong>
+          <strong>{previewingOverride
+            ? `服务端仍为${routeLabel(activeMode)}；${routeLabel(impactMode)}尚未提交`
+            : item.admission_status === "route_selected"
+              ? `已确定为${routeLabel(activeMode)}`
+              : `建议使用${routeLabel(activeMode)}`}</strong>
           <span>当前执行状态：尚未启动。实际协作和外部动作都没有被创建。</span>
         </div>
       </footer>
@@ -347,6 +481,7 @@ export function WorkCockpit({
   loading,
   saving,
   selectedId,
+  draftMode,
   onSelect,
   onRefresh,
 }: WorkCockpitProps) {
@@ -392,7 +527,7 @@ export function WorkCockpit({
           </ul>
         </aside>
         <main className="work-cockpit-main">
-          {selectedItem && <WorkItemOverview item={selectedItem} />}
+          {selectedItem && <WorkItemOverview item={selectedItem} previewMode={draftMode} />}
         </main>
       </div>
     </section>

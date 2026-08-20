@@ -7,8 +7,11 @@ from packages.contracts import (
     AdmissionForecast,
     AdmissionReason,
     AdmissionRecommendation,
+    RouteImpactChange,
+    RouteImpactPreview,
     RouteProfile,
     RouteSelectionRequest,
+    RouteSelectionReceipt,
     RouteSelectionResult,
     WorkCockpitSnapshot,
     WorkItemFacts,
@@ -100,10 +103,65 @@ class Demo2CockpitService:
                 raise Demo2ConflictError("该工作项的执行方式由 Admission 固定，本轮无需重复选择")
             if request.mode not in current.allowed_modes:
                 raise Demo2ConflictError("该工作项不支持所选执行方式")
+            if current.selected_mode == request.mode:
+                raise Demo2ConflictError("该工作项已记录为当前执行方式，无需重复确认")
             selection_source = (
                 "admission"
                 if request.mode == current.recommendation.mode
                 else "user_override"
+            )
+            selected_profile = next(
+                (
+                    profile
+                    for profile in current.route_profiles
+                    if profile.mode == request.mode
+                ),
+                None,
+            )
+            if selected_profile is None:
+                raise Demo2ConflictError("该执行方式缺少服务端路由事实")
+            impact_preview = selected_profile.impact_preview
+            if impact_preview is None:
+                raise Demo2ConflictError("该执行方式缺少服务端影响预演，当前不能确认")
+            next_cockpit_version = cockpit.version + 1
+            next_item_version = current.version + 1
+            receipt_seed = {
+                "owner_id": owner_id,
+                "work_item_id": work_item_id,
+                "from_cockpit_version": cockpit.version,
+                "to_cockpit_version": next_cockpit_version,
+                "from_item_version": current.version,
+                "to_item_version": next_item_version,
+                "mode": request.mode,
+                "selection_source": selection_source,
+                "scope": request.scope,
+            }
+            previous_profile = next(
+                (
+                    profile
+                    for profile in current.route_profiles
+                    if profile.mode == current.selected_mode
+                ),
+                None,
+            )
+            receipt = RouteSelectionReceipt(
+                receipt_id=f"route-receipt:{canonical_hash(receipt_seed)[7:31]}",
+                from_cockpit_version=cockpit.version,
+                to_cockpit_version=next_cockpit_version,
+                from_item_version=current.version,
+                to_item_version=next_item_version,
+                selected_mode=request.mode,
+                selection_source=selection_source,
+                override_scope=request.scope if selection_source == "user_override" else None,
+                forecast=selected_profile.forecast,
+                changes=self._receipt_changes(
+                    selected_profile,
+                    previous_label=previous_profile.label if previous_profile else None,
+                ),
+                summary=(
+                    f"服务端已记录本次使用{selected_profile.label}；"
+                    "执行仍未启动，也未创建实际协作单元或触发外部动作。"
+                ),
             )
 
             updated = current.model_copy(
@@ -112,7 +170,9 @@ class Demo2CockpitService:
                     "selected_mode": request.mode,
                     "selection_source": selection_source,
                     "override_scope": request.scope if selection_source == "user_override" else None,
-                    "version": current.version + 1,
+                    "selection_receipt": receipt,
+                    "selection_receipts": [*current.selection_receipts, receipt],
+                    "version": next_item_version,
                     "last_event_sequence": current.last_event_sequence + 1,
                     "last_event_type": "ROUTE_SELECTED",
                 }
@@ -121,7 +181,7 @@ class Demo2CockpitService:
             items[index] = updated
             updated_cockpit = cockpit.model_copy(
                 update={
-                    "version": cockpit.version + 1,
+                    "version": next_cockpit_version,
                     "last_event_sequence": cockpit.last_event_sequence + 1,
                     "items": items,
                 }
@@ -191,27 +251,142 @@ class Demo2CockpitService:
         return [
             RouteProfile(
                 mode="adaptive_swarm",
-                label="Adaptive Swarm",
+                label="自适应协作群组",
                 summary="按工作包受限并行，适合高广度复杂任务。",
                 forecast=recommendation.forecast,
                 tradeoff="覆盖速度更好，但需要协调多个工作包；本轮仅记录路由，不会启动实际并行执行。",
                 candidate_only=True,
+                impact_preview=cls._route_impact_preview(
+                    "adaptive_swarm",
+                    recommendation.forecast,
+                ),
             ),
             RouteProfile(
                 mode="single_agent",
-                label="Single Agent",
+                label="单 Agent",
                 summary="由一个 Agent 串行完成计划与草稿。",
                 forecast=AdmissionForecast(estimated_tool_calls=12, estimated_runtime_seconds=600, max_workers=1),
                 tradeoff="协调成本更低，但复杂资料的完成时间和覆盖度可能下降。",
+                impact_preview=cls._route_impact_preview(
+                    "single_agent",
+                    AdmissionForecast(estimated_tool_calls=12, estimated_runtime_seconds=600, max_workers=1),
+                ),
             ),
             RouteProfile(
                 mode="fixed_workflow",
-                label="Fixed Workflow",
+                label="固定流程",
                 summary="按预设步骤执行，结果更可预测。",
                 forecast=AdmissionForecast(estimated_tool_calls=15, estimated_runtime_seconds=720, max_workers=1),
                 tradeoff="稳定性较好，但对临时分支和新问题的适应性较弱。",
+                impact_preview=cls._route_impact_preview(
+                    "fixed_workflow",
+                    AdmissionForecast(estimated_tool_calls=15, estimated_runtime_seconds=720, max_workers=1),
+                ),
             ),
         ]
+
+    @classmethod
+    def _route_impact_preview(
+        cls,
+        mode: str,
+        forecast: AdmissionForecast,
+    ) -> RouteImpactPreview:
+        shapes = {
+            "adaptive_swarm": (
+                "三个受限工作包可并行准备，最终仍需统一汇总核对。",
+                "允许受限并行与工作包协调，不创建实际协作单元。",
+                "关键节点需要用户确认，最终结果仍需复核。",
+            ),
+            "single_agent": (
+                "一个 Agent 串行处理全部资料和草稿。",
+                "不拆分协作单元，资料按顺序进入同一上下文。",
+                "在结果形成后由用户统一确认。",
+            ),
+            "fixed_workflow": (
+                "一个固定步骤序列处理资料、核对和汇总。",
+                "按预设检查点推进，不根据新问题动态拆分。",
+                "在固定检查点和最终结果处由用户复核。",
+            ),
+            "tool_call": (
+                "一个受限工具读取当前异常所需的最小证据。",
+                "只处理当前核查点，不创建额外协作单元。",
+                "证据不足时停下并由用户补充或确认。",
+            ),
+        }
+        allocation, coordination, human_control = shapes[mode]
+        forecast_text = (
+            f"约 {round(forecast.estimated_runtime_seconds / 60)} 分钟、"
+            f"最多 {forecast.estimated_tool_calls} 次工具调用、"
+            f"并行上限 {forecast.max_workers} 个单元。"
+        )
+        return RouteImpactPreview(
+            summary="选择前先查看工作如何组织、在哪里等待，以及哪些动作不会发生。",
+            changes=[
+                RouteImpactChange(
+                    change_kind="change",
+                    aspect="work_allocation",
+                    label="任务怎么分配",
+                    before="本次工作组织方式尚未确定",
+                    after=allocation,
+                ),
+                RouteImpactChange(
+                    change_kind="change",
+                    aspect="coordination",
+                    label="并行与等待",
+                    before="尚未记录本次协调方式",
+                    after=coordination,
+                ),
+                RouteImpactChange(
+                    change_kind="change",
+                    aspect="human_control",
+                    label="什么时候需要你",
+                    before="确认节点尚未记录",
+                    after=human_control,
+                ),
+                RouteImpactChange(
+                    change_kind="change",
+                    aspect="policy_forecast",
+                    label="演示策略预测",
+                    before="尚未绑定本次执行方式",
+                    after=forecast_text,
+                    detail="固定规则预测，不是实测耗时、账单、节省比例或生产 SLA。",
+                ),
+                RouteImpactChange(
+                    change_kind="preserve",
+                    aspect="execution_boundary",
+                    label="执行状态",
+                    before="尚未启动",
+                    after="选择后仍未启动，只记录本次路由。",
+                ),
+                RouteImpactChange(
+                    change_kind="no_external_action",
+                    aspect="external_action",
+                    label="不会发生",
+                    before="未触发外部动作",
+                    after="不会发送邮件、写入 CRM，也不会创建实际协作单元或访问真实业务系统。",
+                ),
+            ],
+        )
+
+    @classmethod
+    def _receipt_changes(
+        cls,
+        profile: RouteProfile,
+        *,
+        previous_label: str | None,
+    ) -> list[RouteImpactChange]:
+        preview = profile.impact_preview
+        if preview is None:
+            return []
+        route_change = RouteImpactChange(
+            change_kind="change",
+            aspect="route_decision",
+            label="本次执行方式",
+            before=f"已记录为{previous_label}" if previous_label else "等待选择",
+            after=f"已记录为{profile.label}",
+            detail="这里只记录路由决定，不代表执行已经开始。",
+        )
+        return [route_change, *preview.changes]
 
     @classmethod
     def _item_supplier_reply(cls, owner_id: str) -> WorkItemSnapshot:
@@ -338,6 +513,10 @@ class Demo2CockpitService:
                     summary=recommendation.summary,
                     forecast=recommendation.forecast,
                     tradeoff="固定路由，不进入本轮人工覆盖。",
+                    impact_preview=Demo2CockpitService._route_impact_preview(
+                        recommendation.mode,
+                        recommendation.forecast,
+                    ),
                 )
             ],
             admission_status="route_selected",

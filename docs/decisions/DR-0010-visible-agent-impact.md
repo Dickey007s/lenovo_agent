@@ -73,3 +73,5 @@ ConflictRecord.resolution_options[].expected_impact
 工程封口已覆盖：严格 Schema 与旧 Snapshot 兼容、非法 option/source 拒绝、最终与部分完成 receipt、幂等零重复、浏览器请求携带 option ID、提交前 preview、提交后 receipt、桌面/移动布局、全量回归和截图 hash。实现为 `258861f`，PR 为 [#16](https://github.com/Dickey007s/lenovo_agent/pull/16)，证据位置为 [`DEMO1-AGENT-IMPACT-PREVIEW-EVIDENCE-20260820`](../evidence/DEMO1-AGENT-IMPACT-PREVIEW-EVIDENCE-20260820.md)。
 
 本决策即使工程验证通过，也只能证明固定 Fixture 的协议与被测交互。它不证明真实用户理解更快、决策更好，也不证明通用 Agent 动作都可预测。至少 5 名目标用户的无引导测试、非确定性工具结果、多个可执行选项、部分失败和真实 Connector 仍需后续研究。
+
+Demo 2 已在 [`DR-0011`](DR-0011-demo2-route-impact.md) 中复用同一双时态原则，但绑定的是 `RouteProfile.impact_preview → RouteSelectionReceipt`：选择前说明工作如何组织，选择后只证明服务端已记录路由，仍不等于 Worker 或外部动作已经启动。对应工程证据见 [`DEMO2-ROUTE-IMPACT-EVIDENCE-20260820`](../evidence/DEMO2-ROUTE-IMPACT-EVIDENCE-20260820.md)。
