@@ -249,3 +249,11 @@ Plan/Act 可以调用当前 `deepseek-v4-pro`，但前台看到的阶段文字�
 阶段轮询只由浏览器协调。关闭标签页后任务停在最后一个已持久化阶段，重新打开通过 GET/SSE 对账后继续；不存在后台 scheduler 或“关闭浏览器仍在运行”的事实。SSE payload 不能直接推断完成状态。旧 Snapshot 没有 `stage_records` 时按空数组兼容读取，不补造历史阶段。
 
 来源显示使用可读业务标签“演示数据”，原始 `fixture:` 只保留在服务端校验/审计。阶段详情可显示摘要、受限详情、工件引用、来源和时间，但不显示 prompt、思维链或内部日志。预算文案只表达运行时预算，不展示或推断 token 成本、供应商账单或模型质量。
+
+## 11. Demo 3 动作影响账本（DR-0012 Verified 限定范围）
+
+Action Gate 在创建 Run 后先展示服务端 `impact_preview`，并在 Run 事件或执行结果确认后展示 `execution_receipt`。两者都使用 `ImpactItem(item_id/change_kind/label/before/after)`，且固定映射 `target-change→will_change`、`binding-recheck→will_recheck`、`task-preserved→unchanged`、`real-connector-not-called→no_external_action`；前台固定翻译为“会改变 / 会重新核对 / 保持不变 / 不会发生”。
+
+Run SSE 的 `RUN_CREATED`、`EVIDENCE_SUBMITTED`、`CONTROL_PLAN_UPDATED`、`APPROVAL_RECORDED`、`PERMIT_ISSUED`、`TOOL_EXECUTED`、`ACTION_INVALIDATED`、`TAMPER_BLOCKED` 和终态事件是唯一时序事实；前端收到事件后必须以 `GET /runs/{run_id}` 的完整 Snapshot 对账。结果未知时显示“结果待确认”，不得由动画、按钮或本地状态宣告执行成功。
+
+桌面 Action Gate 的主按钮按阶段显示“提交依据 / 批准 / 确认执行”，移动端保持同一顺序并保证触控尺寸。确认前不得写成“已发送”；Simulator 成功只显示“模拟器已返回结果”，不显示真实邮箱、CRM、OA 或日历写入。拒绝、失效、篡改和失败需明确反馈且保留 Task Commit 不变。当前验证为固定 Demo 3 工程路径；断线/跨进程对账、真实 Connector、生产身份和用户理解仍待独立证据。

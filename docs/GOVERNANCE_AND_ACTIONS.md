@@ -258,4 +258,32 @@ TOOL_EXECUTED
 TAMPER_BLOCKED
 ```
 
-事件包含 sequence、run_id、trace_id、action_id、actor_id、payload 和 occurred_at，可从 Run SSE 或 Trace API 读取。
+事件包含 sequence、run_id、trace_id、action_id、actor_id、payload 和 occurred_at，可从 Run SSE 或 Trace API 读取。普通业务审计工作台不得直接渲染这些 raw 字段或 `email_simulator`、`email.send`、`PERMIT_ISSUED`、`Permit`；前台必须使用业务标签与服务端摘要，原值只留在 API/服务端审计或受控技术视图。
+
+## 11. Demo 3 动作影响账本（DR-0012 Verified 限定范围）
+
+Demo 3 Action Gate 的前台影响投影必须由服务端事实生成，不能由 LLM、按钮状态或静态模板补造。当前协议在 `RunSnapshot` 中使用：
+
+```text
+impact_preview: ActionImpactPreview | null
+execution_receipt: ActionExecutionReceipt | null
+```
+
+每个 `ImpactItem` 至少包含：
+
+```text
+item_id / change_kind / label / before / after
+```
+
+`change_kind` 只允许 `will_change`、`will_recheck`、`unchanged`、`no_external_action`，并固定绑定 `target-change`、`binding-recheck`、`task-preserved`、`real-connector-not-called` 四个 `item_id`。预演使用“预计 / 尚未执行”，回执使用“已记录 / 已核对 / 未执行 / 模拟器已返回结果”。`impact_preview.items` 与 `execution_receipt.items` 使用 `ImpactItem`，且必须绑定当前 `action_id` 和 `control_plan.action_hash`；`execution_receipt` 只能在对应治理事件或 `ToolExecutionResult` 产生后写入。
+
+四类前台影响的含义是：
+
+1. **会改变**：服务端动作或治理状态预计/实际改变的业务对象。
+2. **会重新核对**：收件人、附件、DLP、报价来源、领域权限、Task Artifact Binding 或审批等门槛。
+3. **保持不变**：已提交 Task、Commit、ArtifactVersion、VerificationReport 和动作范围外的工作区。
+4. **不会发生**：确认前不执行、未授权动作不执行、当前不写入真实邮箱/CRM/OA/日历。
+
+`ToolExecutionResult.status=succeeded` 只表示注册的 Simulator 返回成功。它不得被翻译为真实外部系统已经写入。拒绝、绑定失效、参数篡改、Permit 重放和 Simulator 失败不得回滚 Task Commit；结果未知时必须读取 Run Snapshot 和 Run SSE 对账，而不是自动重复执行。
+
+本节在固定客户回复草稿、四个治理场景、五个 Simulator capability 和被测桌面/移动路径内为 Verified。它不覆盖通用 Artifact Action、真实 Connector、生产身份、跨进程执行幂等/Permit replay、多实例/数据库恢复或目标用户理解；实现提交为 `9335470`，对应 [PR #18](https://github.com/Dickey007s/lenovo_agent/pull/18)，文档提交在首次证据提交后回填。

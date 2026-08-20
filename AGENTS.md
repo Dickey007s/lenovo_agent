@@ -13,6 +13,7 @@
 9. 修改报价工作台、报价上下文或报价问答时，再读 `docs/decisions/DR-0006-deterministic-quote-calculation.md`、对应 Source/Evidence 和 `docs/contracts/UI_SERVER_FACT_MATRIX.md` 的报价映射。
 10. 修改 Task 最终工件进入业务动作的桥接时，再读 `docs/decisions/DR-0007-task-artifact-action-bridge.md`、对应 Evidence、`docs/GOVERNANCE_AND_ACTIONS.md` 与 Task/UI 协议。
 11. 修改 Demo 2 智能工作驾驶舱、Admission、路由选择或 WorkCockpitSnapshot 时，再读 `docs/decisions/DR-0008-demo2-explainable-admission.md`、`docs/decisions/DR-0011-demo2-route-impact.md`、`docs/scenarios/SCENARIO-002-demo2-explainable-admission.md`、对应 Evidence 与 `docs/contracts/UI_SERVER_FACT_MATRIX.md` 的 Demo 2 区域。
+12. 修改 Demo 3 Action Gate、动作影响账本、治理回执或 Simulator 边界时，再读 `docs/decisions/DR-0007-task-artifact-action-bridge.md`、`docs/decisions/DR-0010-visible-agent-impact.md`、`docs/decisions/DR-0012-demo3-action-impact-ledger.md`、`docs/scenarios/SCENARIO-003-demo3-action-impact-ledger.md`、对应 Evidence、`docs/GOVERNANCE_AND_ACTIONS.md`、`docs/API.md` 与 `docs/contracts/UI_SERVER_FACT_MATRIX.md` 的 Demo 3 区域。
 
 源码永远高于文档。行为变更后必须同步相关文档；不要只改 README 的宣传描述。关键实现路径：
 
@@ -60,6 +61,11 @@ tests/                                        单元与端到端回归
 - Demo 2 的可选路由必须优先展示服务端 `RouteProfile.impact_preview`：右侧选择改变左侧工作组织影响地图，确认后只能依据 `WorkItemSnapshot.selection_receipt` 显示已记录变化。预演不是回执，路由已选不是任务已执行；缺少服务端 preview/receipt 时前端不得自行补造。
 - Demo 2 的 Adaptive Swarm 只能标记为推荐或本次已选择；没有真实 Worker/Connector/执行事件时，`execution_status` 必须为 `not_started`。`selection_source=admission` 表示接受推荐，降级必须为 `selection_source=user_override`，并使用 `override_scope=this_run`。
 - Demo 2 的成本/时效只能使用 `route_profiles[].forecast.source_type=fixture_policy_forecast` 语义；不得写成真实账单、实测时延、节省比例、生产 SLA 或已验证效果。当前服务端边界是 memory，跨进程恢复与真实执行均待证据。
+- Demo 3 动作影响账本只能使用服务端 `impact_preview` 与 `execution_receipt`。每个 `ImpactItem` 必须包含 `item_id/change_kind/label/before/after`，且固定映射为 `target-change→will_change`、`binding-recheck→will_recheck`、`task-preserved→unchanged`、`real-connector-not-called→no_external_action`；预演不是回执，`ToolExecutionResult.succeeded` 只证明 Simulator 返回结果。
+- Demo 3 的四类前台影响固定为“会改变 / 会重新核对 / 保持不变 / 不会发生”。拒绝、绑定失效、参数篡改、Permit 重放和 Simulator 失败都必须保留已完成 Task/Artifact/Commit 不变的回执。
+- Demo 3 不得表述真实邮箱、CRM、OA、日历或任务系统发生写入；当前仅覆盖固定场景和五个 Simulator capability。RunStore、Permit replay、Thread/Message 与完成消息的跨进程恢复边界必须按证据表述，不能从配置 PostgreSQL 推断为高可用。
+- Demo 3 当前仅在固定客户 A `reply_draft → email.send`、四个治理场景、被测桌面/移动路径内为 `Verified`；无用户研究、真实 Connector、生产身份、跨进程执行幂等/Permit replay、多实例或数据库恢复证据时，不得扩展为通用能力或用户效果结论。实现与文档 commit、PR URL 必须回填到 DR-0012 Evidence 后才能封口。
+- Demo 3 普通业务审计工作台不得渲染 raw `event_type`、`payload`、`trace` 或 `email_simulator`、`email.send`、`PERMIT_ISSUED`、`Permit`；必须投影为业务标签与服务端摘要。内部原值只保留在 API/服务端审计与授权技术视图。
 
 Demo 1 当前 Runtime 事实（2026-08-17）：create 为 v1 `ready / contract`；start 仅进入 v2 `running / observe`；浏览器在 Snapshot 确认后四次调用幂等 advance，依次得到 v3 Plan、v4 Act、v5 Verify、v6 `waiting_input / verify`，固定为 5 个工件、1 个 open conflict、2 个 passed verification；resolve 后 v7 `committed / commit`。`stage_records` 是 UI 事实且旧快照默认空数组。Plan/Act 通过严格 `TaskStageAgent` 调用 `deepseek-v4-pro`，但只有与服务端批准模板逐字段一致的业务文字才记录为 `model`，否则显式 `template_fallback`；Observe/Verify/Commit 确定性，模型不拥有身份、来源、状态、冲突、验证或 Commit。固定渐进路径还要求完整 Demo 契约，包括预算和截止时间。浏览器关闭不会后台继续，预算是 steps/tool calls/runtime 而非 token cost；同进程同 key 有锁，跨实例无分布式 LLM lease。模型 smoke 只证明连通与严格响应，不证明质量。最终时长、commit SHA、PR URL、截图 hash 以新 evidence 封口数据为准。
 
