@@ -37,8 +37,8 @@
 | `BranchSnapshot` | `branch_id + version` | 保存单分支目标、状态、Artifact head、问题和最近 Commit | 只读；状态只能由服务端循环或控制事件改变 |
 | `ArtifactVersion` | `artifact_id + version` | 不可变候选或已验证工件，绑定分支、来源和内容摘要 | 客户端不能覆盖旧版本；人工接管时也只能创建新版本 |
 | `VerificationReport` | `report_id` | 记录来源、一致性和完成条件检查 | 只读；前端不能把 candidate 改成 verified |
-| `ConflictRecord` | `conflict_id` | 记录冲突主题、候选值、来源和解决结果 | 用户只能提交解决命令；服务端写 resolved 事实 |
-| `ControlEvent` | `control_event_id` | 持久记录 Steer、Pause、Resume、Take over、Return control、Resolve evidence | 客户端提交 `TaskControlCommand`，服务端校验版本、权限和幂等 |
+| `ConflictRecord` | `conflict_id` | 记录冲突主题、候选值、来源、服务端允许的解决选项和解决结果 | 用户只能提交已暴露的解决选项；服务端写 resolved 事实 |
+| `ControlEvent` | `control_event_id` | 持久记录 Steer、Pause、Resume、Take over、Return control、Resolve evidence 及实际影响回执 | 客户端提交 `TaskControlCommand`，服务端校验选项、版本、权限和幂等 |
 | `TaskEvent` | `task_id + sequence` | 追加式 Trace 与 SSE 事实 | 只读；事件顺序不能由客户端指定 |
 | `TaskCommit` | `commit_id + state_hash` | 把通过验证的 ArtifactVersion 和 VerificationReport 固定为完成证据 | 只读；前端收到提交事实后才可显示完成 |
 
@@ -140,9 +140,11 @@ PR 3 的内存 Store 回归已覆盖内容摘要、单 lineage、连续版本与
 | `resume_branch` | Branch | `branch_id`、version、key | paused Branch 回到 queued；有 open conflict 时回到 waiting_evidence | 服务端确认后恢复，不乐观动画 |
 | `take_over` | Branch | `branch_id`、version、key | Branch 进入 taken_over | 显示控制权和 Return control；人工新 ArtifactVersion 尚未实现 |
 | `return_control` | Branch | `branch_id`、version、key | taken_over Branch 回到 queued；有 open conflict 时回到 waiting_evidence | 服务端确认后更新，不声称已从人工新版本恢复 |
-| `resolve_evidence` | Branch | `branch_id`、`selected_source_ref`、version、key | 解决指定冲突并创建重新验证工作 | UI 在收到 mutation 响应或 SSE 后重新 GET 的 resolved Snapshot 前保持旧状态，不乐观关闭冲突 |
+| `resolve_evidence` | Branch | `branch_id`、当前 Snapshot 暴露的 `resolution_option_id`、匹配的 `selected_source_ref`、version、key | 校验服务端选项后解决冲突，创建新工件与验证，并写实际 `impact_receipt` | 提交前只显示 `expected_impact`；收到 applied Snapshot 后才显示实际变化回执，不乐观关闭冲突 |
 
 当前已有 `/controls` 路由。每个 mutation 都必须携带 `expected_task_version` 和 `idempotency_key`；版本过期返回 `409`，前端刷新最新 Snapshot，但不自动重放旧命令。相同 key 与相同命令返回幂等 marker 中保存的原 mutation Snapshot，不产生新事件、ArtifactVersion 或 Commit；相同 key 与不同命令返回 `409`。该语义已由内存回归和 PostgreSQL 16.14 跨 API 进程回归覆盖；数据库事务中途崩溃和响应丢失浏览器路径仍未验证。
+
+`ResolutionImpact` 与 `ImpactReceipt` 是两个不同时间点的事实。前者位于 `ConflictResolutionOption.expected_impact`，只描述服务端当前选项预计产生的业务变化；后者只在 Control 已应用后写入 `ControlEvent.impact_receipt`，记录实际 `from/to task version`、新增 ArtifactVersion、VerificationReport、Commit、外部副作用和逐项变化。旧 Conflict/Control payload 缺少这些字段时分别反序列化为 `[]` 与 `null`，前端不得用静态 preview 补成 receipt。
 
 ## 6. 事件目录与 SSE
 

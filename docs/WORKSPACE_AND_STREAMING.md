@@ -63,7 +63,7 @@ Tasks 主视图采用三个客户端模式，它们不改变服务端 Task 状�
 
 初始 `/v1/tasks` 未返回时只显示读取态，不暴露创建动作；确认无 Task 后，固定 Demo 1 空态使用 `/v1/demo1/tasks` 客户 A 创建模板的客户端副本，一次点击依次创建并启动。已有 Task 的标题、目标和交付物全部取自 `TaskSnapshot.contract`。终态“开始新一轮汇报”也依次 create 与 start：新 round key 创建独立 Task，旧 Task 不修改；start 只进入 v2 `running / observe`，浏览器随后在服务端确认后逐次协调四个 `advance`，不是把旧状态重置为可启动。通用产品仍需服务端模板描述接口，不能把固定空态副本扩展成通用事实。
 
-右侧在 Tasks 中默认进入 `decisions`。open Conflict 先解释为什么需要人、两个口径和具体后果；顶部“查看待确认项”只是弱化定位，唯一改变 Task 状态的主动作仍是服务端 `resolve_evidence` 正式来源。查看材料、补证、暂停和接管降低层级；用户可切到 `agent` 继续同一 Conversation。“补充更多依据”只填充方向输入，提交后也只能显示 `steer accepted / 等待后续循环应用`。右侧模式切换不重建 Conversation，也不产生 TaskEvent。邮件、文档等非 Tasks 工作区不挂载决定控制，只从同一 Snapshot 显示“后台任务”摘要；“打开任务 / 前往处理 / 查看任务 / 查看汇报”只切换客户端视图。
+右侧在 Tasks 中默认进入 `decisions`。open Conflict 先解释为什么需要人和两个口径，再读取 `resolution_options[].expected_impact` 以差异行展示“会改变 / 会重新核对 / 保持不变 / 不会发生”；主动作提交服务端 `resolution_option_id + resolve_evidence`。新 Snapshot 返回后，左侧完成态只从 `ControlEvent.impact_receipt` 显示“服务端变化回执”，让用户把自己的决定与实际材料版本、核对、Commit 和未发送边界对应起来。查看材料、补证、暂停和接管降低层级；用户可切到 `agent` 继续同一 Conversation。“补充更多依据”只填充方向输入，提交后也只能显示 `steer accepted / 等待后续循环应用`。右侧模式切换不重建 Conversation，也不产生 TaskEvent。邮件、文档等非 Tasks 工作区不挂载决定控制，只从同一 Snapshot 显示“后台任务”摘要。
 
 当 Task 已 `committed` 时，三项成果仍首先作为可阅读结果出现；只有当前 `reply_draft` 同时被 Commit 引用并具有 passed VerificationReport 时，成果区才显示“准备发送”。点击后前端调用专用准备接口并切到同一 Conversation 的 Action Gate。该动作不会把 Task 改成 sending，也不表示邮件已发出。Gate 显示绑定成果版本、固定演示目标、风险、为什么需要确认和拒绝后果；用户先批准，再确认执行。拒绝、绑定失效或 Simulator 失败后，原 Task Commit 和三项成果继续保留。
 

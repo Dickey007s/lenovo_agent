@@ -427,6 +427,8 @@ Browser :3000  ──REST/SSE──>  FastAPI :8010
 
 Demo 1 的调用链是 `Browser start -> Snapshot(v2 observe) -> Browser advance loop -> Snapshot(v3/v4/v5/v6) -> resolve_evidence -> v7 commit`。浏览器只有在收到并应用当前 Snapshot 后才请求下一阶段；关闭浏览器不会让服务端继续执行，重新打开后从持久化阶段继续。Task SSE 只回放有序事件并触发 GET 对账，不是后台调度器。
 
+v6 Conflict 现在同时携带服务端批准的 `resolution_options[].expected_impact`。它是决定前的预期影响，不是完成事实；浏览器用它渲染材料与外部动作的逐项差异。`resolve_evidence` 应用后，TaskService 把本次实际新增的 ArtifactVersion、VerificationReport、Commit、版本跨度和外部副作用写入 `ControlEvent.impact_receipt`，并与 Snapshot/TaskEvent 原子提交。完成态回执只读取该字段，不能从绿色样式、preview 或最终文案反推。当前只覆盖固定 Demo 1 选项，不是通用作用模拟器。
+
 Observe、Verify、Commit 是确定性服务逻辑。Plan/Act 通过 `services/api/app/application/task_stage_agent.py` 的严格 `TaskStageAgent` 请求/响应调用当前配置 `deepseek-v4-pro`；适配器与 TaskService 都只接受和服务端批准模板逐字段一致的面向用户文字，否则返回 `template_fallback`，所以模型不能把思维链、内部 ID、来源引用、状态或新事实写入阶段记录。Task/Branch/Artifact 身份、来源、状态、冲突、验证和 Commit 始终由服务端决定。模型调用在 Store CAS 之前，若 version 冲突则丢弃结果。`stage_records` 与 Snapshot 一起持久化阶段状态、摘要、详情、工件 ID、generation source 和时间。
 
 预算是步骤数、工具调用数和运行时长的运行时预算，不是 token 成本；同进程同幂等 key 有锁避免重复模型调用，跨进程只有数据库 CAS/marker，没有分布式 LLM lease。PostgreSQL 保存 Snapshot、Event、ArtifactVersion 和 stage records；现有恢复证据限于顺序 API 进程和已覆盖版本，数据库崩溃、迁移、跨实例通知仍未证明。
