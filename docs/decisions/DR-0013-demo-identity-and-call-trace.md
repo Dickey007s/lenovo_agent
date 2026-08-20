@@ -93,7 +93,7 @@ impact_preview / execution_receipt
   - [`dr-0013-demo3-call-trace-mobile-390.png`](../evidence/screenshots/dr-0013-demo3-call-trace-mobile-390.png)，`390 x 2957`，`186934` bytes，`7F27A54658B17D1E685C3764792FE57926DC61E7AB197DB6339C6C56ABC707E2`。
   - [`dr-0013-demo1-live-model-call-trace-1280.png`](../evidence/screenshots/dr-0013-demo1-live-model-call-trace-1280.png)，`1280 x 720`，`144016` bytes，`DE0BDE56EE62E53D7D8B0A9993C9F35752260C778055E1A68104B6BE40B165B6`；一次本机 memory 运行记录 Observe/Verify deterministic `0 ms`，Plan/Act 使用 `deepseek-v4-pro`，分别 `4469 ms`、`5016 ms`，且 `model_called=true/output_used=model`；全局 Demo 导航在滚动后仍保留当前 Demo 与切换入口。
 
-详细测试、截图和边界见 [`DEMO-IDENTITY-AND-CALL-TRACE-EVIDENCE-20260820`](../evidence/DEMO-IDENTITY-AND-CALL-TRACE-EVIDENCE-20260820.md)。真实模型截图只证明单次连通与处理来源，不证明模型质量、token 成本或 SLA。实现 commit、文档 commit 和 PR URL 仍待回填，不在本轮编造。
+详细测试、截图和边界见 [`DEMO-IDENTITY-AND-CALL-TRACE-EVIDENCE-20260820`](../evidence/DEMO-IDENTITY-AND-CALL-TRACE-EVIDENCE-20260820.md)。真实模型截图只证明单次连通与处理来源，不证明模型质量、token 成本或 SLA。实现与文档主体提交为 `5e3bc9c`，对应 [PR #20](https://github.com/Dickey007s/lenovo_agent/pull/20)。
 
 ## 6. 来源与局限
 

@@ -105,6 +105,8 @@ Demo 3 的前台重点是“动作影响账本”：用户在 Action Gate 中先
 
 普通业务 UI 只显示业务标签与服务端摘要；Demo3 以“执行许可服务”“受控演示工具”等业务词为主，Permit/Gateway/Simulator 仅作二级技术元信息；Prompt、CoT、原始 payload、密钥、Permit token/内容/permit_id/签名、内部 ID、Worker 对话和底层日志隐藏。Demo 2 的 selected 不等于 running，Demo 3 的技术元信息不等于真实外部系统写入；unknown 工具结果显示“工具结果待核对”。v>1 的 Demo 1 旧阶段缺少 `processing` 时显示“模型调用待核对”，不推断为未调用。固定工程验证与截图见 [`DR-0013`](docs/decisions/DR-0013-demo-identity-and-call-trace.md) 和 [`Evidence`](docs/evidence/DEMO-IDENTITY-AND-CALL-TRACE-EVIDENCE-20260820.md)。
 
+本轮实现与文档主体提交为 `5e3bc9c`，对应 [PR #20](https://github.com/Dickey007s/lenovo_agent/pull/20)。
+
 ## 技术架构
 
 ```mermaid

@@ -6,9 +6,9 @@
 | Decision | [`DR-0013`](../decisions/DR-0013-demo-identity-and-call-trace.md) |
 | Status | `Verified`（限定当前 Demo 1/2/3 工程范围） |
 | 日期 | 2026-08-20，Asia/Shanghai |
-| 实现 commit | 待回填 |
-| 文档 commit | 待回填 |
-| PR URL | 待回填 |
+| 实现 commit | `5e3bc9c` |
+| 文档主体 commit | `5e3bc9c`（本次元数据由后续封口提交回填） |
+| PR URL | [#20](https://github.com/Dickey007s/lenovo_agent/pull/20) |
 
 ## 1. 场景与验证问题
 
