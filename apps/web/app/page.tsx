@@ -1965,6 +1965,7 @@ export default function Home() {
                 loading={demo2Loading}
                 saving={demo2Saving}
                 selectedId={selectedDemo2WorkItemId}
+                draftMode={demo2DraftMode}
                 onSelect={selectDemo2WorkItem}
                 onRefresh={() => void refreshDemo2Cockpit(true)}
               />

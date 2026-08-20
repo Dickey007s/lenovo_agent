@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Literal
 
-from pydantic import Field
+from pydantic import Field, model_validator
 
 from .models import StrictModel
 
@@ -17,6 +17,16 @@ AdmissionStatus = Literal["recommended", "route_selected"]
 RouteSelectionSource = Literal["admission", "user_override"]
 OverrideScope = Literal["this_run"]
 ExecutionStatus = Literal["not_started"]
+RouteImpactKind = Literal["change", "preserve", "no_external_action"]
+RouteImpactAspect = Literal[
+    "route_decision",
+    "work_allocation",
+    "coordination",
+    "human_control",
+    "policy_forecast",
+    "execution_boundary",
+    "external_action",
+]
 
 
 class WorkItemFacts(StrictModel):
@@ -49,6 +59,60 @@ class AdmissionForecast(StrictModel):
     max_workers: int = Field(ge=1, le=20)
 
 
+class RouteImpactChange(StrictModel):
+    change_kind: RouteImpactKind
+    aspect: RouteImpactAspect
+    label: str = Field(min_length=1, max_length=80)
+    before: str | None = Field(default=None, max_length=300)
+    after: str = Field(min_length=1, max_length=500)
+    detail: str | None = Field(default=None, max_length=500)
+
+
+class RouteImpactPreview(StrictModel):
+    summary: str = Field(min_length=1, max_length=500)
+    changes: list[RouteImpactChange] = Field(min_length=4)
+    execution_status_before: ExecutionStatus = "not_started"
+    execution_status_after: ExecutionStatus = "not_started"
+    external_side_effect: Literal["none"] = "none"
+
+    @model_validator(mode="after")
+    def validate_required_boundaries(self) -> RouteImpactPreview:
+        aspects = {change.aspect for change in self.changes}
+        required = {"execution_boundary", "external_action"}
+        if not required.issubset(aspects):
+            raise ValueError("route impact preview must include execution and external action boundaries")
+        return self
+
+
+class RouteSelectionReceipt(StrictModel):
+    receipt_id: str = Field(min_length=1, max_length=160)
+    from_cockpit_version: int = Field(ge=1)
+    to_cockpit_version: int = Field(ge=1)
+    from_item_version: int = Field(ge=1)
+    to_item_version: int = Field(ge=1)
+    selected_mode: ExecutionMode
+    selection_source: RouteSelectionSource
+    override_scope: OverrideScope | None = None
+    forecast: AdmissionForecast
+    changes: list[RouteImpactChange] = Field(min_length=4)
+    execution_status_before: ExecutionStatus = "not_started"
+    execution_status_after: ExecutionStatus = "not_started"
+    external_side_effect: Literal["none"] = "none"
+    summary: str = Field(min_length=1, max_length=500)
+
+    @model_validator(mode="after")
+    def validate_receipt_transition(self) -> RouteSelectionReceipt:
+        if self.to_cockpit_version <= self.from_cockpit_version:
+            raise ValueError("cockpit version must advance")
+        if self.to_item_version <= self.from_item_version:
+            raise ValueError("work item version must advance")
+        aspects = {change.aspect for change in self.changes}
+        required = {"route_decision", "execution_boundary", "external_action"}
+        if not required.issubset(aspects):
+            raise ValueError("route selection receipt is missing required impact boundaries")
+        return self
+
+
 class AdmissionRecommendation(StrictModel):
     mode: ExecutionMode
     summary: str = Field(min_length=1, max_length=300)
@@ -64,6 +128,7 @@ class RouteProfile(StrictModel):
     forecast: AdmissionForecast
     tradeoff: str = Field(min_length=1, max_length=500)
     candidate_only: bool = False
+    impact_preview: RouteImpactPreview | None = None
 
 
 class WorkItemSnapshot(StrictModel):
@@ -82,9 +147,28 @@ class WorkItemSnapshot(StrictModel):
     selection_source: RouteSelectionSource | None = None
     override_scope: OverrideScope | None = None
     execution_status: ExecutionStatus = "not_started"
+    selection_receipt: RouteSelectionReceipt | None = None
+    selection_receipts: list[RouteSelectionReceipt] = Field(default_factory=list)
     version: int = Field(default=1, ge=1)
     last_event_sequence: int = Field(default=1, ge=1)
     last_event_type: Literal["ADMISSION_EVALUATED", "ROUTE_SELECTED"] = "ADMISSION_EVALUATED"
+
+    @model_validator(mode="after")
+    def normalize_and_validate_receipt_history(self) -> WorkItemSnapshot:
+        if self.selection_receipt is not None and not self.selection_receipts:
+            self.selection_receipts = [self.selection_receipt]
+        elif self.selection_receipt is None and self.selection_receipts:
+            self.selection_receipt = self.selection_receipts[-1]
+        if not self.selection_receipts:
+            return self
+        if self.selection_receipt is None or self.selection_receipts[-1].receipt_id != self.selection_receipt.receipt_id:
+            raise ValueError("latest route receipt must match receipt history")
+        for previous, current in zip(self.selection_receipts, self.selection_receipts[1:], strict=False):
+            if current.from_cockpit_version != previous.to_cockpit_version:
+                raise ValueError("cockpit receipt history must be contiguous")
+            if current.from_item_version != previous.to_item_version:
+                raise ValueError("work item receipt history must be contiguous")
+        return self
 
 
 class WorkCockpitSnapshot(StrictModel):
