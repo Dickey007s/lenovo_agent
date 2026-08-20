@@ -33,6 +33,7 @@ from packages.contracts import (
     TaskSnapshot,
     TaskStageRecord,
     TaskStage,
+    TaskStageProcessing,
     VerificationCheck,
     VerificationReport,
 )
@@ -63,15 +64,26 @@ def _task_stage_model_attempted(stage_agent: Any) -> bool:
     return bool(getattr(stage_agent, "base_url", "") and getattr(stage_agent, "api_key", ""))
 
 
-def _log_task_stage(stage: str, stage_agent: Any, elapsed_seconds: float, origin: str) -> None:
+def _stage_processing(stage_agent: Any, elapsed_seconds: float, origin: str) -> TaskStageProcessing:
+    model_called = _task_stage_model_attempted(stage_agent)
+    return TaskStageProcessing(
+        path="language_model" if model_called else "deterministic",
+        model_called=model_called,
+        model=getattr(stage_agent, "model", None) if model_called else None,
+        elapsed_ms=max(0, round(elapsed_seconds * 1000)),
+        output_used=origin,
+    )
+
+
+def _log_task_stage(stage: str, processing: TaskStageProcessing) -> None:
     runtime_logger.info(
         "task_stage_processing stage=%s model_called=%s accepted_model_output=%s model=%s elapsed_ms=%d origin=%s",
         stage,
-        _task_stage_model_attempted(stage_agent),
-        origin == "model",
-        getattr(stage_agent, "model", "none"),
-        max(0, round(elapsed_seconds * 1000)),
-        origin,
+        processing.model_called,
+        processing.output_used == "model",
+        processing.model or "none",
+        processing.elapsed_ms,
+        processing.output_used,
     )
 
 
@@ -356,6 +368,12 @@ class TaskService:
                 "source_labels": self._demo1_source_labels(),
             },
             generation_source="deterministic",
+            processing=TaskStageProcessing(
+                path="deterministic",
+                model_called=False,
+                elapsed_ms=0,
+                output_used="deterministic",
+            ),
             started_at=now,
         )
         budget = self._consume_budget(
@@ -457,7 +475,37 @@ class TaskService:
                     additional_tool_calls=1,
                     additional_runtime_seconds=1,
                 )
-                updated, artifacts, specs = self._advance_observe(current)
+                started_at = monotonic()
+                updated, artifacts, specs = self._advance_observe(
+                    current,
+                    processing=TaskStageProcessing(
+                        path="deterministic",
+                        model_called=False,
+                        elapsed_ms=0,
+                        output_used="deterministic",
+                    ),
+                )
+                processing = TaskStageProcessing(
+                    path="deterministic",
+                    model_called=False,
+                    elapsed_ms=max(0, round((monotonic() - started_at) * 1000)),
+                    output_used="deterministic",
+                )
+                updated = updated.model_copy(
+                    update={
+                        "stage_records": [
+                            record.model_copy(
+                                update={
+                                    "processing": processing
+                                }
+                            )
+                            if record.phase == "observe" and record.status == "completed"
+                            else record
+                            for record in updated.stage_records
+                        ]
+                    }
+                )
+                _log_task_stage("observe", processing)
             elif current.phase == "plan":
                 self._require_execution_window(
                     current,
@@ -468,8 +516,9 @@ class TaskService:
                 started_at = monotonic()
                 plan = await self.stage_agent.plan(self._build_plan_request(current))
                 elapsed_seconds = monotonic() - started_at
-                _log_task_stage("plan", self.stage_agent, elapsed_seconds, plan.origin)
                 plan = self._validated_plan(current, plan)
+                processing = _stage_processing(self.stage_agent, elapsed_seconds, plan.origin)
+                _log_task_stage("plan", processing)
                 runtime_seconds = max(1, int(elapsed_seconds + 0.999))
                 self._require_execution_window(
                     current,
@@ -478,7 +527,7 @@ class TaskService:
                     additional_runtime_seconds=runtime_seconds,
                 )
                 updated, artifacts, specs = self._advance_plan(
-                    current, plan, runtime_seconds=runtime_seconds
+                    current, plan, runtime_seconds=runtime_seconds, processing=processing
                 )
             elif current.phase == "act":
                 self._require_execution_window(
@@ -491,7 +540,9 @@ class TaskService:
                 started_at = monotonic()
                 act = await self.stage_agent.act(self._build_act_request(current, plan))
                 elapsed_seconds = monotonic() - started_at
-                _log_task_stage("act", self.stage_agent, elapsed_seconds, act.origin)
+                act = self._validated_act(current, act, plan)
+                processing = _stage_processing(self.stage_agent, elapsed_seconds, act.origin)
+                _log_task_stage("act", processing)
                 runtime_seconds = max(1, int(elapsed_seconds + 0.999))
                 self._require_execution_window(
                     current,
@@ -501,8 +552,9 @@ class TaskService:
                 )
                 updated, artifacts, specs = self._advance_act(
                     current,
-                    self._validated_act(current, act, plan),
+                    act,
                     runtime_seconds=runtime_seconds,
+                    processing=processing,
                 )
             else:
                 self._require_execution_window(
@@ -511,7 +563,33 @@ class TaskService:
                     additional_tool_calls=1,
                     additional_runtime_seconds=1,
                 )
-                updated, artifacts, specs = self._advance_verify(current)
+                started_at = monotonic()
+                updated, artifacts, specs = self._advance_verify(
+                    current,
+                    processing=TaskStageProcessing(
+                        path="deterministic",
+                        model_called=False,
+                        elapsed_ms=0,
+                        output_used="deterministic",
+                    ),
+                )
+                processing = TaskStageProcessing(
+                    path="deterministic",
+                    model_called=False,
+                    elapsed_ms=max(0, round((monotonic() - started_at) * 1000)),
+                    output_used="deterministic",
+                )
+                updated = updated.model_copy(
+                    update={
+                        "stage_records": [
+                            record.model_copy(update={"processing": processing})
+                            if record.phase == "verify" and record.status == "completed"
+                            else record
+                            for record in updated.stage_records
+                        ]
+                    }
+                )
+                _log_task_stage("verify", processing)
         except Exception as exc:
             return await self._commit_stage_failure(
                 current,
@@ -827,7 +905,7 @@ class TaskService:
         return records
 
     def _advance_observe(
-        self, current: TaskSnapshot
+        self, current: TaskSnapshot, *, processing: TaskStageProcessing | None = None
     ) -> tuple[TaskSnapshot, list[ArtifactVersion], list[TaskEventSpec]]:
         now = datetime.now(UTC)
         running = self._stage_record(current, "observe")
@@ -839,6 +917,7 @@ class TaskService:
                     "source_count": len(current.contract.source_scope),
                     "source_labels": self._demo1_source_labels(),
                 },
+                "processing": processing,
                 "completed_at": now,
             }
         )
@@ -873,6 +952,7 @@ class TaskService:
         plan: TaskStagePlan,
         *,
         runtime_seconds: int = 1,
+        processing: TaskStageProcessing | None = None,
     ) -> tuple[TaskSnapshot, list[ArtifactVersion], list[TaskEventSpec]]:
         expected_ids = [item.deliverable_id for item in current.contract.deliverables]
         packages = {item.deliverable_id: item for item in plan.work_packages}
@@ -891,6 +971,7 @@ class TaskService:
                 "summary": "已拆分三份交付材料",
                 "detail": {"plan": safe_plan},
                 "generation_source": plan.origin,
+                "processing": processing,
                 "completed_at": now,
             }
         )
@@ -945,6 +1026,7 @@ class TaskService:
         generated: TaskStageAct,
         *,
         runtime_seconds: int = 1,
+        processing: TaskStageProcessing | None = None,
     ) -> tuple[TaskSnapshot, list[ArtifactVersion], list[TaskEventSpec]]:
         now = datetime.now(UTC)
         source_refs = {
@@ -997,6 +1079,7 @@ class TaskService:
                 "summary": "已生成三份可核对材料",
                 "detail": {"artifact_count": len(artifacts)},
                 "generation_source": generated.origin,
+                "processing": processing,
                 "artifact_version_ids": [item.artifact_version_id for item in artifacts],
                 "completed_at": now,
             }
@@ -1057,7 +1140,7 @@ class TaskService:
         return updated, artifacts, specs
 
     def _advance_verify(
-        self, current: TaskSnapshot
+        self, current: TaskSnapshot, *, processing: TaskStageProcessing | None = None
     ) -> tuple[TaskSnapshot, list[ArtifactVersion], list[TaskEventSpec]]:
         now = datetime.now(UTC)
         candidates = {
@@ -1107,7 +1190,7 @@ class TaskService:
             for item in current.branches
         ]
         running = self._stage_record(current, "verify")
-        completed = running.model_copy(update={"status": "completed", "summary": "已完成事实核对，发现一项需人工决定的冲突", "detail": {"conflict_ids": [conflict.conflict_id]}, "artifact_version_ids": [verified_risk.artifact_version_id, verified_reply.artifact_version_id], "completed_at": now})
+        completed = running.model_copy(update={"status": "completed", "summary": "已完成事实核对，发现一项需人工决定的冲突", "detail": {"conflict_ids": [conflict.conflict_id]}, "artifact_version_ids": [verified_risk.artifact_version_id, verified_reply.artifact_version_id], "processing": processing, "completed_at": now})
         budget = self._consume_budget(current, additional_steps=1, additional_tool_calls=1, additional_runtime_seconds=1)
         updated = self._updated_snapshot(
             current,

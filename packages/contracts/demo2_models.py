@@ -84,6 +84,14 @@ class RouteImpactPreview(StrictModel):
         return self
 
 
+class RouteSelectionProcessing(StrictModel):
+    """Server-observed route-selection path; absent on legacy receipts."""
+
+    path: Literal["policy_engine"] = "policy_engine"
+    model_called: Literal[False] = False
+    elapsed_ms: int = Field(ge=0)
+
+
 class RouteSelectionReceipt(StrictModel):
     receipt_id: str = Field(min_length=1, max_length=160)
     from_cockpit_version: int = Field(ge=1)
@@ -98,6 +106,7 @@ class RouteSelectionReceipt(StrictModel):
     execution_status_before: ExecutionStatus = "not_started"
     execution_status_after: ExecutionStatus = "not_started"
     external_side_effect: Literal["none"] = "none"
+    processing: RouteSelectionProcessing | None = None
     summary: str = Field(min_length=1, max_length=500)
 
     @model_validator(mode="after")

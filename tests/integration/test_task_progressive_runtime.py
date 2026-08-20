@@ -2,8 +2,9 @@ import asyncio
 from datetime import UTC, datetime
 
 import pytest
+from pydantic import ValidationError
 
-from packages.contracts import TaskBudget
+from packages.contracts import TaskBudget, TaskStageProcessing
 
 from services.api.app.application.task_stage_agent import (
     AutoDLTaskStageAgent,
@@ -40,6 +41,10 @@ class CountingStageAgent(DeterministicTaskStageAgent):
 
 
 class ExactModelStageAgent(DeterministicTaskStageAgent):
+    base_url = "https://model.test/v1"
+    api_key = "test-key"
+    model = "test-stage-model"
+
     async def plan(self, request):
         return (await super().plan(request)).mark_origin("model")
 
@@ -97,6 +102,9 @@ async def test_task_runtime_exposes_one_durable_stage_per_mutation() -> None:
     )
     assert (started.version, started.phase, started.status) == (2, "observe", "running")
     assert [(item.phase, item.status) for item in started.stage_records] == [("observe", "running")]
+    assert started.stage_records[0].processing is not None
+    assert started.stage_records[0].processing.path == "deterministic"
+    assert started.stage_records[0].processing.model_called is False
 
     observed = await service.advance(
         created.task_id,
@@ -106,6 +114,8 @@ async def test_task_runtime_exposes_one_durable_stage_per_mutation() -> None:
     )
     assert (observed.phase, observed.status) == ("plan", "running")
     assert [item.status for item in observed.stage_records] == ["completed", "running"]
+    assert observed.stage_records[0].processing is not None
+    assert observed.stage_records[0].processing.output_used == "deterministic"
 
     planned = await service.advance(
         created.task_id,
@@ -119,6 +129,10 @@ async def test_task_runtime_exposes_one_durable_stage_per_mutation() -> None:
         "risk-brief",
         "reply-draft",
     ]
+    assert planned.stage_records[1].processing is not None
+    assert planned.stage_records[1].processing.path == "deterministic"
+    assert planned.stage_records[1].processing.output_used == "template_fallback"
+    assert planned.stage_records[1].processing.model_called is False
 
     acted = await service.advance(
         created.task_id,
@@ -129,6 +143,8 @@ async def test_task_runtime_exposes_one_durable_stage_per_mutation() -> None:
     assert (acted.phase, acted.status) == ("verify", "verifying")
     assert len(acted.artifact_versions) == 3
     assert acted.stage_records[2].artifact_version_ids
+    assert acted.stage_records[2].processing is not None
+    assert acted.stage_records[2].processing.output_used == "template_fallback"
     act_events = await service.history(created.task_id, "user_1")
     assert any(
         event.event_type == "TASK_STATUS_CHANGED"
@@ -145,6 +161,9 @@ async def test_task_runtime_exposes_one_durable_stage_per_mutation() -> None:
     assert (waiting.phase, waiting.status) == ("verify", "waiting_input")
     assert waiting.stage_records[-1].status == "completed"
     assert waiting.stage_records[-1].detail["conflict_ids"]
+    assert waiting.stage_records[-1].processing is not None
+    assert waiting.stage_records[-1].processing.path == "deterministic"
+    assert waiting.stage_records[-1].processing.model_called is False
     assert len(await service.history(created.task_id, "user_1")) == waiting.last_event_sequence
 
 
@@ -206,6 +225,10 @@ async def test_model_adapter_fallback_origin_is_persisted_per_stage() -> None:
         idempotency_key="fallback-plan-001",
     )
     assert current.stage_records[1].generation_source == "template_fallback"
+    assert current.stage_records[1].processing is not None
+    assert current.stage_records[1].processing.path == "deterministic"
+    assert current.stage_records[1].processing.model_called is False
+    assert current.stage_records[1].processing.output_used == "template_fallback"
     current = await service.advance(
         created.task_id,
         "user_1",
@@ -213,6 +236,10 @@ async def test_model_adapter_fallback_origin_is_persisted_per_stage() -> None:
         idempotency_key="fallback-act-001",
     )
     assert current.stage_records[2].generation_source == "template_fallback"
+    assert current.stage_records[2].processing is not None
+    assert current.stage_records[2].processing.path == "deterministic"
+    assert current.stage_records[2].processing.model_called is False
+    assert current.stage_records[2].processing.output_used == "template_fallback"
 
 
 async def test_exact_approved_model_text_keeps_model_origin_per_stage() -> None:
@@ -234,6 +261,10 @@ async def test_exact_approved_model_text_keeps_model_origin_per_stage() -> None:
 
     assert current.stage_records[1].generation_source == "model"
     assert current.stage_records[2].generation_source == "model"
+    assert current.stage_records[1].processing is not None
+    assert current.stage_records[1].processing.output_used == "model"
+    assert current.stage_records[2].processing is not None
+    assert current.stage_records[2].processing.output_used == "model"
 
 
 async def test_stage_failure_persists_failure_record_without_partial_artifacts() -> None:
@@ -431,3 +462,34 @@ async def test_progressive_runtime_rejects_modified_demo_contract_text() -> None
             expected_task_version=1,
             idempotency_key="modified-contract-start",
         )
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        {
+            "path": "language_model",
+            "model_called": False,
+            "model": None,
+            "elapsed_ms": 12,
+            "output_used": "model",
+        },
+        {
+            "path": "deterministic",
+            "model_called": True,
+            "model": "deepseek-v4-pro",
+            "elapsed_ms": 12,
+            "output_used": "template_fallback",
+        },
+        {
+            "path": "language_model",
+            "model_called": True,
+            "model": "deepseek-v4-pro",
+            "elapsed_ms": 12,
+            "output_used": "deterministic",
+        },
+    ],
+)
+def test_task_stage_processing_rejects_inconsistent_model_facts(payload) -> None:
+    with pytest.raises(ValidationError):
+        TaskStageProcessing.model_validate(payload)

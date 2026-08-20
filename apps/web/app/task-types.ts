@@ -15,6 +15,14 @@ export type TaskStageStatus = "pending" | "running" | "completed" | "failed";
 export type TaskStage = "observe" | "plan" | "act" | "verify";
 export type TaskStageSource = "deterministic" | "model" | "template_fallback" | "human" | "system";
 
+export type TaskStageProcessing = {
+  path: "deterministic" | "language_model";
+  model_called: boolean;
+  model: string | null;
+  elapsed_ms: number;
+  output_used: "deterministic" | "model" | "template_fallback";
+};
+
 /**
  * Durable stage facts returned by the progressive Task Runtime.
  * Older servers omit this field; the UI must then stay on the legacy snapshot.
@@ -26,6 +34,7 @@ export type TaskStageRecord = {
   detail: Record<string, unknown>;
   artifact_version_ids: string[];
   generation_source: TaskStageSource;
+  processing?: TaskStageProcessing | null;
   started_at: string;
   completed_at?: string | null;
   failed_at?: string | null;

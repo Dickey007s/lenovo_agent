@@ -460,3 +460,11 @@ ActionCandidate
 `impact_preview` 由服务端依据当前动作、风险、策略、证据和 Artifact Binding 生成；`execution_receipt` 只由治理事件和 `ToolExecutionResult` 生成。两者均使用 `ImpactItem(item_id/change_kind/label/before/after)`，并固定映射 `target-change→will_change`、`binding-recheck→will_recheck`、`task-preserved→unchanged`、`real-connector-not-called→no_external_action`；前端不得把 preview 复制成实际回执。
 
 四类影响的业务投影是“会改变 / 会重新核对 / 保持不变 / 不会发生”。拒绝、绑定失效、参数篡改、Permit 重放或 Simulator 失败只改变 Run/审计事实，不回写已提交 Task、ArtifactVersion 或 VerificationReport。当前边界是内存 RunStore 与五个受控 Simulator capability；真实 Connector、生产身份、跨进程执行幂等/Permit replay、多实例/数据库恢复和用户理解仍不在 Verified 范围。
+
+## 11. Demo 身份与处理来源投影（DR-0013 Verified 限定范围）
+
+Demo 1/2/3 的名称与目标是客户端产品级信息架构，不依赖服务端 Demo descriptor；页面中的当前状态副标题仍由对应的 Task、WorkCockpit 或 Run Snapshot 提供。工程没有新增通用 `call_trace` 协议，前端按既有事实投影统一的业务语义：Demo 1 读取 `TaskStageRecord.processing`，Demo 2 读取 `RouteSelectionReceipt.processing`，Demo 3 复用 `RunSnapshot` 的治理字段、影响预演和执行回执。Proposal 或 Task-derived action 出现时，前端全局切换到 Demo3/审计视图，避免身份错位。
+
+Demo 1 的 `processing.path/model_called/model/elapsed_ms/output_used` 区分确定性路径、模型调用和模板回退；通用完成状态显示“已运行”，只有 `model_called=true` 显示“模型已调用”；旧 v>1 Snapshot 缺少 `stage_records`，或旧 Plan/Act 缺少 `processing` 时只能显示模型调用待核对。`TaskStageProcessing` 的跨字段 validator 拒绝确定性路径携带模型调用/模型输出，也拒绝语言模型路径缺失观测调用或模型名。Demo 2 的 Receipt 当前是 `policy_engine` 且 `model_called=false`，`execution_status=not_started` 仍表示未启动 Worker/Connector。Demo 3 只有确定成功的 `RunSnapshot.tool_result` 与对应治理事件能支持“受控演示工具已运行”；unknown 必须显示“工具结果待核对”，Simulator 不等于真实外部写入。
+
+普通业务 UI 只显示业务标签和服务端摘要；“执行许可服务”“受控演示工具”“已运行”“工具结果待核对”等业务状态可以显示，但 Permit/Gateway/Simulator 只作为二级技术元信息出现。Prompt、CoT、原始事件 payload、密钥、Permit token/内容/permit_id/签名、内部 ID、Worker 对话和供应商原始响应留在 API/服务端审计边界。完整工程验证与截图见 [`DEMO-IDENTITY-AND-CALL-TRACE-EVIDENCE-20260820`](evidence/DEMO-IDENTITY-AND-CALL-TRACE-EVIDENCE-20260820.md)。

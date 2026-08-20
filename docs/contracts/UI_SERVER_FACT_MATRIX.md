@@ -1,6 +1,6 @@
 # UI—服务端事实矩阵（Demo 1、Demo 2 与报价工作区）
 
-> 状态：Demo 1 与报价协议映射 `Ready`，交互决策 `DR-0005` 为 `Draft`，Agent 影响预演决策 `DR-0010` 在固定 Demo 1 的限定工程范围内为 `Verified`；报价核算决策 `DR-0006` 在固定演示报价、当前公式、revision 协议和被测恢复路径内为 `Verified`；`DR-0007` 在固定客户回复草稿到治理 Run 的单一纵切内为 `Verified`；Demo 2 `DR-0008` 的单进程 memory WorkCockpitSnapshot、路由解释和本次选择纵切以及 `DR-0011` 的路由影响预演/回执扩展均为限定范围 `Verified`；Demo 3 `DR-0012` 在固定客户 A `reply_draft → email.send`、四个治理场景和被测桌面/移动路径内为限定范围 `Verified`。自动化只能验证投影与调用语义，不能代替真实用户理解、真实 Connector、Adaptive Swarm Runtime、生产报价规则、跨进程执行幂等/Permit replay 或多实例一致性验证。
+> 状态：Demo 1 与报价协议映射 `Ready`，交互决策 `DR-0005` 为 `Draft`，Agent 影响预演决策 `DR-0010` 在固定 Demo 1 的限定工程范围内为 `Verified`；报价核算决策 `DR-0006` 在固定演示报价、当前公式、revision 协议和被测恢复路径内为 `Verified`；`DR-0007` 在固定客户回复草稿到治理 Run 的单一纵切内为 `Verified`；Demo 2 `DR-0008` 的单进程 memory WorkCockpitSnapshot、路由解释和本次选择纵切以及 `DR-0011` 的路由影响预演/回执扩展均为限定范围 `Verified`；Demo 3 `DR-0012` 在固定客户 A `reply_draft → email.send`、四个治理场景和被测桌面/移动路径内为限定范围 `Verified`；Demo 身份导航与调用轨迹证据层 `DR-0013` 在固定 Demo 1/2/3 前台投影范围内为 `Verified`。统一的是前台语义，不新增通用 `call_trace` 协议。自动化只能验证投影与调用语义，不能代替真实用户理解、真实 Connector/Worker、Adaptive Swarm Runtime、生产报价规则、后台无人值守、跨进程执行幂等/Permit replay 或多实例一致性验证。
 
 ## 1. 组件映射
 
@@ -53,10 +53,23 @@
 | ImpactItem | 一条可读业务影响 | `ImpactItem.item_id/change_kind/label/before/after`；固定 `target-change→will_change`、`binding-recheck→will_recheck`、`task-preserved→unchanged`、`real-connector-not-called→no_external_action` | 随 `impact_preview.items[]` 或 `execution_receipt.items[]` 返回 | 只读查看；不得编辑 `after` | 字段缺失或枚举非法时整组账本降级为待核对，不补静态文字 | action_id、run_id、trace_id、哈希、Permit |
 | 治理过程账本 | 用户知道补证、审批和授权是否已记录，但不把治理记录说成业务执行 | `EvidenceRecord`、`ApprovalRecord`、`ControlPlan.status`、`PermitMetadata`、`AuditEvent` | `EVIDENCE_SUBMITTED`、`CONTROL_PLAN_UPDATED`、`APPROVAL_RECORDED`、`PERMIT_ISSUED` | 提交依据、批准/拒绝、确认执行 | 409/401/403/未知结果均保留最后确认 Snapshot；不自动重放业务含义 | Permit token、审批内部 ID、策略内部 ID、网络/重试日志 |
 | 执行回执 | 用户知道服务端记录了什么实际终态 | `RunSnapshot.execution_receipt.items[]`、`ActionExecutionReceipt.status`、`ToolExecutionResult`、`RunSnapshot.status` | `TOOL_EXECUTED`、`ACTION_INVALIDATED`、`TAMPER_BLOCKED`、`action.closed` 后 GET 对账 | 查看模拟器结果、重新读取结果；新意图使用新幂等键 | 拒绝、失效、篡改、失败不得回滚 Task Commit；结果未知不得声称成功或失败 | Simulator 原始 payload、Permit、完整 audit payload |
-| 普通业务审计工作台 | 用户查看动作进展和结果，但不需要理解内部事件协议 | 服务端 `AuditEvent` 经业务 display projection；摘要来自 RunSnapshot、ImpactItem、ToolExecutionResult 状态 | Run SSE/Trace API 后由前端按服务端摘要对账 | 查看业务标签、状态、时间和结果边界 | 缺摘要时显示待核对，不回退渲染 raw event；技术审计另行受控访问 | raw `event_type`、`payload`、`trace`、`email_simulator`、`email.send`、`PERMIT_ISSUED`、`Permit` |
+| 普通业务审计工作台 | 用户查看动作进展和结果，但不需要理解内部事件协议 | 服务端 `AuditEvent` 经业务 display projection；摘要来自 RunSnapshot、ImpactItem、ToolExecutionResult 状态 | Run SSE/Trace API 后由前端按服务端摘要对账 | 查看业务标签、状态、时间和结果边界；可显示“Permit Service”等业务级状态 | 缺摘要时显示待核对，不回退渲染 raw event；技术审计另行受控访问 | raw `event_type`、`payload`、`trace`、`email_simulator`、`email.send`、`PERMIT_ISSUED`、Permit token/内容/permit_id/签名 |
 | 任务成果保持不变 | 已提交 Task、ArtifactVersion、VerificationReport 不被派生动作改写 | `TaskArtifactBinding`、`TaskSnapshot.last_commit`、绑定校验结果 | Run 事件；Task Snapshot 不因拒绝/失败改变 | 返回成果或重新准备新动作 | 绑定变化使旧 Action 失效；重新准备必须产生新的 action/hash/key | state hash、content digest、内部 Artifact ID |
 
 本节的四类影响固定为“会改变 / 会重新核对 / 保持不变 / 不会发生”。工程验证为 Python `151 passed, 1 skipped in 3.69s`、完整浏览器 `37 passed (2.2m)`，Ruff、governance、lint、build 通过；视觉终验无 P0/P1，截图及 hash 见 Demo 3 Evidence。五个 Simulator capability 的通用影响预测、真实 Connector、生产身份、跨进程执行幂等/Permit replay、多实例/数据库恢复和用户理解均不在 Verified 范围。
+
+### 1.4 Demo 身份导航与调用轨迹（DR-0013，Verified 限定范围）
+
+本节记录已经实现的前台事实投影。用户先看见当前 Demo 1/2/3 的业务身份和目标，再看到“已运行 / 未调用 / 未执行 / 待核对”的统一语义，只有模型事实显示“模型已调用”；没有服务端事实时不得由前端补造。统一的是显示语义，不新增通用 `call_trace[]`。
+
+| UI 状态或组件 | 用户含义 | 服务端权威字段（Draft） | Snapshot / SSE | 允许动作 | 失败与恢复 | 默认隐藏 |
+| --- | --- | --- | --- | --- | --- | --- |
+| Demo 身份导航 | 当前正在看 Demo 1、2 还是 3，以及它要证明的业务问题 | 产品级客户端信息架构提供 Demo 名称/目标；当前状态副标题来自 Task/WorkCockpit/Run scope | 路由/页面初始化与完整 Snapshot 对账 | 切换 Demo 视图；不得重置 Task、Run、Artifact、Event 或 Conversation | 状态事实缺失时显示待核对；Demo 名称本身不是服务端 descriptor | Prompt、内部路由、Task/Run/Artifact 内部 ID |
+| 调用轨迹 | 用户知道哪个业务阶段真实调用了什么 | Demo 1：`TaskStageRecord.processing`；Demo 2：`RouteSelectionReceipt.processing`；Demo 3：`RunSnapshot.status/control_plan/evidence/approvals/permit/tool_result` 与 `impact_preview/execution_receipt` | 对应 Task Snapshot、WorkCockpit Snapshot/Receipt、Run Snapshot/SSE | 通用完成状态显示“已运行”；模型字段显示“模型已调用”；Demo3 使用“执行许可服务”“受控演示工具”等业务词，Permit/Gateway/Simulator 仅为二级技术元信息 | 事件缺口、响应丢失或跨进程未知时显示待核对并重新读取；unknown 工具结果显示“工具结果待核对” | raw event_type、payload、trace、密钥、Permit token/内容/permit_id/签名、Worker 对话 |
+| 调用来源标签 | 区分确定性处理、策略规则、语言模型、路由记录、治理 Run 和受控演示工具 | 现有 `processing.path/model_called/output_used`，或 RunSnapshot 治理字段；不新增 `source_kind`/`call_trace` 协议 | 与对应 Snapshot/有序事件绑定 | 查看“已运行 / 未调用 / 未执行 / 待核对”；仅模型事实显示“模型已调用” | 缺来源时不显示“已运行”；unknown 不转成成功 | Prompt、CoT、供应商原始响应、内部模型参数 |
+| 未执行边界 | 用户知道 selected、执行许可服务或受控演示工具不等于真实业务执行 | `WorkItemSnapshot.execution_status`、`RunSnapshot.status`、`RunSnapshot.tool_result`、外部副作用字段 | WorkCockpitSnapshot、Run SSE、完整 RunSnapshot | 重新读取或进入受控技术审计 | unknown 结果显示“工具结果待核对”，不写成未调用/未执行；结果未知不自动重试副作用 | `email.send`、`email_simulator`、`PERMIT_ISSUED`、Permit token/内容/permit_id/签名等技术原值 |
+
+本节为 `DR-0013` Verified 限定范围；全量 Python `154 passed, 1 skipped in 4.32s`，浏览器 `38 passed (2.3m)`，Ruff/governance/lint/build 通过。`TaskStageProcessing` 已有跨字段一致性校验。截图及 hash 见 [`DEMO-IDENTITY-AND-CALL-TRACE-EVIDENCE-20260820`](../evidence/DEMO-IDENTITY-AND-CALL-TRACE-EVIDENCE-20260820.md)。这些证据不证明真实用户理解、真实 Connector/Worker、后台无人值守、生产持久化、跨进程执行幂等/Permit replay、多实例或数据库恢复。
 
 当前 Task Director 展示的仍是固定 Demo 1 的服务端状态，不是通用 Agent 执行器。Task、分支、工件、验证、冲突和 Commit 必须逐项映射上述 Snapshot 字段；不存在于 Snapshot/TaskEvent 的事实不得由前端文案、颜色、泳道或 Toast 补造。顶部连接文案映射独立客户端传输状态，pending mutation/Snapshot 对账仍由 Task 同步状态表达；右侧模式、活动工作区和工件选择模式同样只是客户端事实。非 Tasks 工作区只能投影后台任务摘要并跳转到 Tasks，不得提交决定或分支控制。字段 allowlist 与 Conflict/Artifact 共用的 `source_ref` 投影只放行契约中的四个已知 Demo 1 Fixture 引用，将其显示为带“演示数据”前缀的业务标签，并使用与原值无关的序号 DOM key；原始标识不进入普通业务 DOM，其他值 fail closed。这只是前端第二道防线，服务端仍保存原值且尚无通用字段可见性 Schema/display projection。
 
@@ -143,7 +156,7 @@ Workspace revision 恢复是独立于 Task mutation 的较小机制：保存 409
 | 核对事实 | v5 `verifying / verify`，随后 v6 `waiting_input / verify` | v6 显示 5 工件、1 open conflict、2 passed verification |
 | 已提交 | v7 `committed / commit` + `last_commit` | 仅收到服务端 Commit 才显示完成 |
 
-`stage_records` 缺失时使用默认空数组以兼容旧 Snapshot；客户端不能用动画、SSE payload、版本猜测或 token 预算推导阶段。关闭浏览器只保留最后一次持久化 mutation，重新打开后继续协调；无后台 scheduler。Plan/Act 使用 `deepseek-v4-pro`，只有与服务端批准模板逐字段一致的文字才记录为 `model`，否则显式 `template_fallback`；smoke 只证明连接和严格响应，不证明质量。预算是 steps/tool calls/runtime，不是 token cost；跨实例无分布式 LLM lease。原始 `fixture:`、思维链和内部 ID 只在受控服务端边界处理，普通 DOM 使用“演示数据”业务标签。
+`stage_records` 缺失时使用默认空数组以兼容旧 Snapshot；v>1 若无任何阶段记录，或旧 Plan/Act 记录缺少 `processing`，前端显示“模型调用待核对”，不能推断为未调用。客户端不能用动画、SSE payload、版本猜测或 token 预算推导阶段。关闭浏览器只保留最后一次持久化 mutation，重新打开后继续协调；无后台 scheduler。Plan/Act 使用 `deepseek-v4-pro`，只有与服务端批准模板逐字段一致的文字才记录为 `model`，否则显式 `template_fallback`；smoke 只证明连接和严格响应，不证明质量。预算是 steps/tool calls/runtime，不是 token cost；跨实例无分布式 LLM lease。原始 `fixture:`、思维链和内部 ID 只在受控服务端边界处理，普通 DOM 使用“演示数据”业务标签。
 
 ## 5. 实现与验证责任
 

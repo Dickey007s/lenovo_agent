@@ -13,6 +13,7 @@ from packages.contracts import (
     RouteImpactPreview,
     RouteProfile,
     RouteSelectionRequest,
+    RouteSelectionProcessing,
     RouteSelectionReceipt,
     RouteSelectionResult,
     WorkCockpitSnapshot,
@@ -168,6 +169,9 @@ class Demo2CockpitService:
                 changes=self._receipt_changes(
                     selected_profile,
                     previous_label=previous_profile.label if previous_profile else None,
+                ),
+                processing=RouteSelectionProcessing(
+                    elapsed_ms=max(0, round((perf_counter() - started_at) * 1000)),
                 ),
                 summary=(
                     f"服务端已记录本次使用{selected_profile.label}；"

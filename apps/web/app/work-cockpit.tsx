@@ -11,6 +11,7 @@ import {
 } from "@tabler/icons-react";
 import { useEffect, useRef } from "react";
 
+import { AgentCallTrace, type AgentCallStep } from "./agent-call-trace";
 import type {
   Demo2CockpitSnapshot,
   Demo2RouteMode,
@@ -70,6 +71,69 @@ function statusLabel(item: Demo2WorkItem) {
   return item.admission_status === "route_selected"
     ? "执行方式已记录"
     : BUSINESS_STATUS_LABELS[item.business_status];
+}
+
+function Demo2AgentCallTrace({ item }: { item: Demo2WorkItem }) {
+  const receipt = item.selection_receipt;
+  const routeStatus: AgentCallStep["status"] = receipt ? "complete" : "waiting";
+  const processing = receipt?.processing;
+  const steps: AgentCallStep[] = [
+    {
+      id: "admission",
+      label: "比较工作条件",
+      component: "任务条件评估",
+      kind: "rule",
+      status: "complete",
+      detail: `规则已根据价值、资料广度、并行性、时限、风险和资源边界给出“${routeLabel(item.recommendation.mode)}”建议。`,
+      meta: "Admission Policy · 演示路由规则 v1 · 不调用大模型",
+    },
+    {
+      id: "route",
+      label: "记录本轮工作方式",
+      component: "工作方式决策规则",
+      kind: "rule",
+      status: routeStatus,
+      detail: receipt
+        ? `服务端已记录“${routeLabel(receipt.selected_mode)}”，来源为${receipt.selection_source === "admission" ? "接受规则推荐" : "用户仅覆盖本轮"}。`
+        : "服务端已生成推荐与影响预演，正在等待你决定是否记录本轮方式。",
+      meta: processing
+        ? `Route Policy Engine · ${processing.elapsed_ms} ms · 未调用大模型`
+        : receipt
+          ? "旧回执未提供处理耗时；路由语义仍由服务端规则产生"
+          : "尚未提交本轮路由决定",
+    },
+    {
+      id: "workers",
+      label: "创建 Agent / Worker",
+      component: "协作单元",
+      kind: "runtime",
+      status: "not_called",
+      detail: "当前只预演并记录工作组织方式，没有创建或启动任何实际 Agent、Worker 或协作群组。",
+      meta: item.execution_status === "not_started" ? "Worker Runtime · 尚未启动" : "Worker Runtime · 状态已由服务端更新",
+    },
+    {
+      id: "tools",
+      label: "执行外部动作",
+      component: "外部工具",
+      kind: "tool",
+      status: "not_called",
+      detail: "路由选择不会写入邮件、CRM、日历或其他外部系统。",
+      meta: "Connector / Tool Gateway · 未进入 · 外部副作用为零",
+    },
+  ];
+
+  return <AgentCallTrace
+    demo="Demo 2"
+    summary="本轮只调用服务端 Admission 与路由规则；大模型、Worker 和外部工具都没有被调用。"
+    metrics={[
+      { label: "规则引擎已调用", tone: "rule" },
+      { label: "大模型 0", tone: "safe" },
+      { label: "Worker 0", tone: "safe" },
+      { label: "外部工具 0", tone: "safe" },
+    ]}
+    steps={steps}
+    boundary="这里的预计时间、工具次数和并行单元来自演示策略预测，不是实际运行、真实账单或 SLA。"
+  />;
 }
 
 const IMPACT_KIND_LABELS = {
@@ -399,6 +463,8 @@ function WorkItemOverview({ item, previewMode }: { item: Demo2WorkItem; previewM
           {item.facts.source_labels.map((source) => <li key={source}>演示数据 · {source}</li>)}
         </ul>
       </section>
+
+      <Demo2AgentCallTrace item={item} />
 
       {impactOption && (
         <RouteImpactCanvas

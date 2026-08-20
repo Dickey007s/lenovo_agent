@@ -25,6 +25,8 @@ TaskPhase = Literal["contract", "observe", "plan", "act", "verify", "commit"]
 TaskStage = Literal["observe", "plan", "act", "verify"]
 TaskStageStatus = Literal["pending", "running", "completed", "failed"]
 TaskStageSource = Literal["deterministic", "model", "template_fallback", "human", "system"]
+TaskStageProcessingPath = Literal["deterministic", "language_model"]
+TaskStageOutputUsed = Literal["deterministic", "model", "template_fallback"]
 
 BranchStatus = Literal[
     "queued",
@@ -321,6 +323,28 @@ class TaskError(StrictModel):
     user_action: str | None = None
 
 
+class TaskStageProcessing(StrictModel):
+    """Server-observed path for one stage; absent on legacy snapshots."""
+
+    path: TaskStageProcessingPath
+    model_called: bool = False
+    model: str | None = Field(default=None, max_length=120)
+    elapsed_ms: int = Field(ge=0)
+    output_used: TaskStageOutputUsed
+
+    @model_validator(mode="after")
+    def validate_processing_path(self) -> "TaskStageProcessing":
+        if self.path == "deterministic":
+            if self.model_called or self.model is not None or self.output_used == "model":
+                raise ValueError("deterministic stage processing cannot claim a model call or model output")
+            return self
+        if not self.model_called or not self.model:
+            raise ValueError("language-model stage processing requires an observed model call and model name")
+        if self.output_used == "deterministic":
+            raise ValueError("language-model stage processing cannot claim deterministic output")
+        return self
+
+
 class TaskStageRecord(StrictModel):
     """Durable, user-facing record for one bounded runtime stage."""
 
@@ -330,6 +354,7 @@ class TaskStageRecord(StrictModel):
     detail: dict[str, Any] = Field(default_factory=dict)
     artifact_version_ids: list[str] = Field(default_factory=list)
     generation_source: TaskStageSource
+    processing: TaskStageProcessing | None = None
     started_at: datetime
     completed_at: datetime | None = None
     failed_at: datetime | None = None

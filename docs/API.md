@@ -123,6 +123,12 @@ Invoke-RestMethod -Method Get -Uri "$base/threads/$($thread.thread_id)" -Headers
 
 `ChatMessage.processing` 记录本次回答的处理来源：`deterministic_formula`、`language_model` 或 `policy_engine`，并带可读 `label`、真实 `elapsed_ms` 与可选 `model`。它只描述生成该条回答的服务端路径，不是思维链、任务总时长或供应商 SLA。模型路径在真实 HTTP 等待前发送 `assistant.status(status=model_call)`；服务端日志同时记录 `path/model_called/model/elapsed_ms/thread_id/active_view`，不记录消息正文或 Key。不得为了“像 AI”人为延迟确定性路径。
 
+### 2.6 Demo 身份与处理来源投影（DR-0013）
+
+Demo 1/2/3 的名称与目标属于客户端产品级信息架构，不是服务端 Demo descriptor；当前状态副标题仍必须从对应的 Task、WorkCockpit 或 Run Snapshot 对账。工程不新增通用 `call_trace[]` 协议，前端按 Demo 直接投影既有事实：Demo 1 使用 `TaskStageRecord.processing`（`path/model_called/model/elapsed_ms/output_used`），Demo 2 使用 `RouteSelectionReceipt.processing`（`path/model_called/elapsed_ms`），Demo 3 复用 `RunSnapshot.status/control_plan/evidence/approvals/permit/tool_result/impact_preview/execution_receipt` 与 Run SSE/AuditEvent。
+
+前台统一显示“已运行 / 未调用 / 未执行 / 待核对”，只有模型来源显示“模型已调用”，但不统一后端字段。Demo 1 的 v>1 Snapshot 没有 `stage_records`，或旧 Plan/Act 记录缺少 `processing` 时，模型调用显示“待核对”，不得推断为未调用。Demo 2 `execution_status=not_started` 时，路由已运行不表示 Worker 或 Connector 已运行；Demo 3 以“执行许可服务”“受控演示工具”为主，Permit/Gateway/Simulator 只在二级技术元信息中出现，且不表示真实外部写入。普通业务审计页只显示业务标签与服务端摘要，原始 `event_type/payload/trace`、Prompt、CoT、密钥、Permit token/内容/permit_id/签名和内部 ID 保留在 API/服务端审计边界。Proposal 或 Task-derived action 出现时，前端全局切换到 Demo3/审计视图。
+
 PowerShell 中可用 `curl.exe -N` 直接观察 SSE：
 
 ```powershell
@@ -459,7 +465,7 @@ data: {"sequence":168,"event_id":"...","run_id":"...","trace_id":"...",...}
 
 没有新事件时服务端发送 `: heartbeat` 注释。断线重连时把最后接收的 `sequence` 作为 `after`，只读取后续事件。审计流属于运行事实，不等同于 Conversation SSE 的视觉增量。
 
-普通业务审计工作台不是原始事件查看器：前端必须把 `event_type`、`payload`、`trace`、`email_simulator`、`email.send`、`PERMIT_ISSUED` 和 `Permit` 投影为可读业务标签与服务端摘要，不得把原值渲染进普通业务 DOM。原始事件仍由 API/服务端审计保留，只有受控技术审计视图可查看。
+普通业务审计工作台不是原始事件查看器：前端必须把 `event_type`、`payload`、`trace`、`email_simulator`、`email.send`、`PERMIT_ISSUED` 和 Permit token/内容/permit_id/签名投影为可读业务标签与服务端摘要；“执行许可服务”“受控演示工具”“已运行”“工具结果待核对”等业务状态可以保留。不得把原值渲染进普通业务 DOM。原始事件仍由 API/服务端审计保留，只有受控技术审计视图可查看；unknown 工具结果不得投影为未调用或未执行。
 
 Demo 3 Action Gate 使用 RunSnapshot 和上述有序事件投影“动作影响账本”。预演固定显示“会改变 / 会重新核对 / 保持不变 / 不会发生”；`TOOL_EXECUTED` 的结果必须标记为 Simulator 结果，不能表述为真实邮箱、CRM、OA、日历或任务系统写入。`ACTION_INVALIDATED`、`TAMPER_BLOCKED`、拒绝和 `FAILED` 都必须显示动作未产生真实外部影响，并保留已完成 Task/Artifact/Commit 不变。固定 Demo 3 工程纵切已由 Python `151 passed, 1 skipped in 3.69s`、完整浏览器 `37 passed (2.2m)`、Ruff、governance、lint 和 build 验证；视觉终验无 P0/P1。实现提交为 `9335470`，文档提交为 `34aee71`，对应 [PR #18](https://github.com/Dickey007s/lenovo_agent/pull/18)。跨进程执行幂等/Permit replay、多实例/数据库恢复、真实 Connector 和用户理解不在该结论内。
 

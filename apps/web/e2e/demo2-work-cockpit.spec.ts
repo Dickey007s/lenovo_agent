@@ -53,6 +53,7 @@ const selectionReceipt = (mode: "single_agent" | "fixed_workflow" | "adaptive_sw
   execution_status_before: "not_started",
   execution_status_after: "not_started",
   external_side_effect: "none",
+  processing: { path: "policy_engine", model_called: false, elapsed_ms: 3 },
   summary: "服务端已记录本次执行方式；执行仍未启动，也未创建实际协作单元或触发外部动作。",
 });
 
@@ -108,6 +109,10 @@ test.describe("Demo 2 work cockpit", () => {
     await page.goto("/");
 
     await expect(page.getByRole("heading", { name: "今天的工作，应该怎么处理" })).toBeVisible();
+    const demoNav = page.getByRole("navigation", { name: "三个演示能力" });
+    await expect(demoNav.getByRole("button", { name: /Demo 1.*持续任务/ })).toBeVisible();
+    await expect(demoNav.getByRole("button", { name: /Demo 2.*智能调度/ })).toHaveAttribute("aria-current", "page");
+    await expect(demoNav.getByRole("button", { name: /Demo 3.*受控执行/ })).toBeVisible();
     await expect(page.getByRole("button", { name: /客户 A 经营汇报/ })).toBeVisible();
     await expect(page.getByRole("button", { name: /供应商邮件回复/ })).toBeVisible();
     await expect(page.getByRole("button", { name: /周报格式统一/ })).toBeVisible();
@@ -122,6 +127,13 @@ test.describe("Demo 2 work cockpit", () => {
     await expect(impactCanvas.getByText("不会发送邮件、写入 CRM，也不会创建实际协作单元或访问真实业务系统。")).toBeVisible();
     await expect(decision.getByText("确认后只记录执行方式，任务尚未启动。")).toBeVisible();
     await expect(decision.getByText("规则路由，不调用大模型。", { exact: false })).toBeVisible();
+    const callTrace = page.locator(".work-cockpit-overview .agent-call-trace");
+    await expect(callTrace.getByText("本次用了什么", { exact: true })).toBeVisible();
+    await callTrace.locator("summary").click();
+    await expect(callTrace.getByText("任务条件评估", { exact: true })).toBeVisible();
+    await expect(callTrace.getByText("协作单元", { exact: true })).toBeVisible();
+    await expect(callTrace.getByText("大模型 0", { exact: true })).toBeVisible();
+    await expect(callTrace.getByText("外部工具 0", { exact: true })).toBeVisible();
     const confirmButton = decision.getByRole("button", { name: "记录本轮方式" });
     await expect(confirmButton).toBeVisible();
     const confirmButtonInViewport = await confirmButton.evaluate((button) => {
@@ -140,6 +152,13 @@ test.describe("Demo 2 work cockpit", () => {
     await expect(page.locator("body")).not.toContainText("fixture:");
     await expect(page.locator("body")).not.toContainText("worker");
     await attachScreenshot(page, testInfo, "demo2-route-impact-preview-desktop");
+
+    await demoNav.getByRole("button", { name: /Demo 1.*持续任务/ }).click();
+    await expect(page.getByRole("heading", { name: "准备客户 A 的经营汇报" })).toBeVisible();
+    await demoNav.getByRole("button", { name: /Demo 3.*受控执行/ }).click();
+    await expect(page.getByRole("heading", { name: "受控动作与调用记录" })).toBeVisible();
+    await demoNav.getByRole("button", { name: /Demo 2.*智能调度/ }).click();
+    await expect(page.getByRole("heading", { name: "今天的工作，应该怎么处理" })).toBeVisible();
   });
 
   test("shows fixed lightweight routes as server decisions instead of fake user choices", async ({ page }) => {
@@ -178,6 +197,10 @@ test.describe("Demo 2 work cockpit", () => {
     await expect(page.getByText("仅本次运行")).toBeVisible();
     await expect(page.getByText("尚未执行")).toBeVisible();
     await expect(page.locator(".work-cockpit-impact-canvas.is-recorded").getByText("这里只记录路由决定，不代表执行已经开始。")).toBeVisible();
+    const callTrace = page.locator(".work-cockpit-overview .agent-call-trace");
+    await callTrace.locator("summary").click();
+    await expect(callTrace.getByText("工作方式决策规则", { exact: true })).toBeVisible();
+    await expect(callTrace.getByText("3 ms", { exact: false })).toBeVisible();
     await attachScreenshot(page, testInfo, "demo2-route-selection-receipt-desktop");
     expect(submitted.mode).toBe("fixed_workflow");
     expect(submitted.scope).toBe("this_run");
@@ -230,9 +253,11 @@ test.describe("Demo 2 work cockpit", () => {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto("/");
     await expect(page.getByRole("heading", { name: "今天的工作，应该怎么处理" })).toBeVisible();
+    const callTrace = page.locator(".work-cockpit-overview .agent-call-trace");
+    await callTrace.locator("summary").click();
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1);
     expect(overflow).toBe(false);
-    const undersized = await page.locator(".work-cockpit button, .work-cockpit label, .work-cockpit-decision-pane button, .work-cockpit-decision-pane label").evaluateAll((elements) => elements.filter((element) => {
+    const undersized = await page.locator(".demo-experience-nav button, .agent-call-trace summary, .work-cockpit button, .work-cockpit label, .work-cockpit-decision-pane button, .work-cockpit-decision-pane label").evaluateAll((elements) => elements.filter((element) => {
       const rect = element.getBoundingClientRect();
       return rect.height > 0 && rect.height < 44;
     }).length);

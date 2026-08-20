@@ -108,7 +108,7 @@ flowchart LR
 
 ### 第 8 页：可追溯与可恢复
 
-技术审计视图可展示 `RUN_CREATED`、`ACTION_PARSED`、`CONTROL_PLAN_UPDATED`、`APPROVAL_RECORDED`、`PERMIT_ISSUED`、`TOOL_EXECUTED`；普通业务审计工作台只展示业务标签与服务端摘要，不渲染 raw event/payload/trace、`email_simulator`、`email.send`、`PERMIT_ISSUED` 或 `Permit`。
+技术审计视图可展示 `RUN_CREATED`、`ACTION_PARSED`、`CONTROL_PLAN_UPDATED`、`APPROVAL_RECORDED`、`PERMIT_ISSUED`、`TOOL_EXECUTED`；普通业务审计工作台只展示业务标签与服务端摘要，可以显示“Permit Service”“Permit 已签发/未签发”等业务状态，但不渲染 raw event/payload/trace、`email_simulator`、`email.send`、`PERMIT_ISSUED`、Permit token/内容/permit_id 或签名。
 
 准确边界：配置 PostgreSQL 时，Workspace、Run、Audit 与 LangGraph checkpoint 可恢复；Conversation Thread/Message 和 Permit replay set 当前仍在进程内存中。
 
@@ -266,6 +266,19 @@ Demo 3 的前台不只展示风险等级和确认按钮，还展示动作影响�
 4. 拒绝、绑定变化、参数篡改、Permit 重放和模拟器失败都保留已完成 Task、Commit、ArtifactVersion 和 VerificationReport 不变。
 
 当前这一节在固定 Demo 3 工程纵切内已 Verified：Python `151 passed, 1 skipped in 3.69s`、完整浏览器 `37 passed (2.2m)`，Ruff、governance `4 passed in 0.02s`、lint、build 通过，视觉终验无 P0/P1，四张截图及 hash 见 Evidence。不能将其表述为用户理解改善、真实 Connector、生产身份、跨进程执行幂等/Permit replay、多实例或数据库恢复；也不能用 DR-0007 的既有证据替代本轮账本证据。实现提交为 `9335470`，文档提交为 `34aee71`，对应 [PR #18](https://github.com/Dickey007s/lenovo_agent/pull/18)。
+
+## Demo 身份导航与调用轨迹（DR-0013，Verified 限定范围）
+
+汇报时先让观众看到客户端产品级的 Demo 1“长任务与分支”、Demo 2“工作组织与路由”、Demo 3“风险与动作治理”业务身份，再说明当前状态副标题对应的服务端事实。调用展示只使用“已运行 / 未调用 / 未执行 / 待核对”四种前台语义，只有模型来源显示“模型已调用”；不新增通用 `call_trace` 协议：Demo 1 读取 `TaskStageRecord.processing`，Demo 2 读取 `RouteSelectionReceipt.processing`，Demo 3 复用 `RunSnapshot` 治理字段。
+
+演示口径：
+
+1. Demo 1 的阶段推进和模型调用以 `TaskSnapshot.stage_records[].processing` 为准；阶段完成说“已运行”，只有 `model_called=true` 说“模型已调用”，不把阶段动画或模型名当成调用成功；v>1 旧记录缺少 `processing` 时说“模型调用待核对”，不说“未调用”。
+2. Demo 2 的模式选择只记录本轮路由时，明确“未启动协作、未执行外部动作”。
+3. Demo 3 使用“执行许可服务”“受控演示工具”等业务词；Permit、Gateway 和 Simulator 只作为二级技术元信息，不说明真实邮箱、CRM、OA 或日历写入。工具结果 unknown 时说“工具结果待核对”，不能说未调用或未执行。
+4. Proposal 或 Task-derived action 出现时，前端全局切换到 Demo3/审计视图，避免仍以 Demo1/2 身份展示。普通业务审计工作台只展示业务标签与服务端摘要，可以展示业务级许可/工具状态，但不展示 Prompt、CoT、raw event/payload/trace、密钥、内部 ID、Permit token/内容/permit_id 或签名；原始值只进入受控技术审计视图。
+
+固定 Demo 1/2/3 工程路径已完成限定验证：Python `154 passed, 1 skipped in 4.32s`，浏览器 `38 passed (2.3m)`，Ruff、governance、lint、build 通过；`TaskStageProcessing` 跨字段一致性校验已纳入回归。截图和 hash 见 [`DEMO-IDENTITY-AND-CALL-TRACE-EVIDENCE-20260820`](evidence/DEMO-IDENTITY-AND-CALL-TRACE-EVIDENCE-20260820.md)。这不证明真实用户理解、真实 Connector/Worker、后台无人值守、生产持久化、跨进程幂等或多实例恢复。
 
 ## 9. 常见问答
 

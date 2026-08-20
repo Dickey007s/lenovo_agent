@@ -258,7 +258,7 @@ TOOL_EXECUTED
 TAMPER_BLOCKED
 ```
 
-事件包含 sequence、run_id、trace_id、action_id、actor_id、payload 和 occurred_at，可从 Run SSE 或 Trace API 读取。普通业务审计工作台不得直接渲染这些 raw 字段或 `email_simulator`、`email.send`、`PERMIT_ISSUED`、`Permit`；前台必须使用业务标签与服务端摘要，原值只留在 API/服务端审计或受控技术视图。
+事件包含 sequence、run_id、trace_id、action_id、actor_id、payload 和 occurred_at，可从 Run SSE 或 Trace API 读取。普通业务审计工作台不得直接渲染这些 raw 字段或 `email_simulator`、`email.send`、`PERMIT_ISSUED`、Permit token/内容/permit_id/签名；前台必须使用“执行许可服务”“受控演示工具”等业务标签与服务端摘要，工具 unknown 时显示“工具结果待核对”，原值只留在 API/服务端审计或受控技术视图。
 
 ## 11. Demo 3 动作影响账本（DR-0012 Verified 限定范围）
 
