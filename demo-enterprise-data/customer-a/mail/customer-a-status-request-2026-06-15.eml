@@ -1,0 +1,11 @@
+From: account.manager@example.invalid
+To: project.owner@example.invalid
+Date: Mon, 15 Jun 2026 09:12:00 +0800
+Message-ID: <demo-customer-a-status-request@example.invalid>
+Subject: =?UTF-8?B?5a6i5oi3IEEg57uP6JCl5rGH5oql5LiO57ut57qm5YeG5aSH?=
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+请在本周五前准备客户 A 经营汇报、风险页和回复草稿。
+收入部分以财务已关账记录为正式口径；销售预测可以作为后续展望，但不能替代已实现收入。
+客户回复在内部核对完成前只保留为草稿，不要直接发送。

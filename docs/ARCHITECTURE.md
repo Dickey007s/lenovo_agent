@@ -82,7 +82,7 @@ flowchart TB
 - 右侧 Tasks 专属区：在“待我决定 / Agent 对话”之间切换；Conflict、候选依据、控制和恢复只在 Tasks 中出现，其业务状态全部来自服务端 Snapshot 或 SSE 后的 Snapshot 对账。
 - 左侧 Tasks 视图：用“进度 / 成果 / 执行记录”三个模式分别承载 Task Director、只读 Task Artifact Workspace 和原手工待办。手工待办按状态分栏显示为可编辑看板，Task 分支 head 可直接打开对应工件。
 
-`TaskArtifactWorkspace` 只投影 `TaskSnapshot`：以 `branches[].artifact_heads` 选择 head，以 `artifact_versions[].parent_version_id` 构建 lineage，以 `verification_reports[]` 和 `conflicts[]` 显示验证/冲突，以 `last_commit` 显示最终提交与 state hash。没有服务端 head、验证或 Commit 时，前端显示缺失状态而不是补造事实。来源和验证检查默认折叠。固定 Fixture 的 `analysis/risk_brief/reply_draft` 使用字段 allowlist，未知 kind/字段默认隐藏；四个已知 `source_ref` 投影为带“演示数据”前缀的业务标签，普通业务 DOM 只接收标签和序号 key，不接收原始 `fixture:` 值，其他标识显示隐藏占位。服务端 Snapshot 仍保留原始标识用于控制校验与审计。这只是前端第二道投影：服务端尚未提供通用字段可见性 Schema/display projection，allowlist 字段中的任意文本仍不能视为天然安全。
+`TaskArtifactWorkspace` 只投影 `TaskSnapshot`：以 `branches[].artifact_heads` 选择 head，以 `artifact_versions[].parent_version_id` 构建 lineage，以 `verification_reports[]` 和 `conflicts[]` 显示验证/冲突，以 `last_commit` 显示最终提交与 state hash。没有服务端 head、验证或 Commit 时，前端显示缺失状态而不是补造事实。来源和验证检查默认折叠。当前 Demo 1 的 `analysis/risk_brief/reply_draft` 使用字段 allowlist，`TaskSnapshot.source_documents[]` 投影仓库内项目生成仿真文件的文件名、系统标签、记录时间和字段事实；冲突卡的 operation context 来自服务端 `ConflictRecord.operation_context`。普通业务 DOM 不接收原始 `fixture:` 控制 ID、绝对路径或完整摘要；服务端仍保留稳定标识用于控制校验与审计。这些文件不是 Lenovo/真实客户数据库或 Connector，manifest/哈希/解析失败时前台只显示待核对，不能回退到旧常量或模型猜测。
 
 前端不拥有风险决策、审批状态或 Permit；它只渲染服务端 Snapshot 并提交用户选择。
 
@@ -96,7 +96,7 @@ Action Gate 打开时，后台任务摘要保留，Gate 占用独立网格行；
 | ConversationService | `services/api/app/application/conversations.py` | Thread、受信上下文、通识路由、工作区合并、SSE、动作与对话闭环 |
 | Quote Calculator | `services/api/app/application/quote_calculator.py` | 报价字段所有权合并、Decimal 逐行核算、最低折后比例检查、来源/核算确定性回答 |
 | RunService | `services/api/app/application/runs.py` | Run 生命周期、重评估、审批、授权、执行、持久化、审计，以及 Task Artifact binding 的创建幂等与门前重校验 |
-| TaskService | `services/api/app/application/tasks.py` | 创建和恢复 TaskSnapshot、固定 Demo 1 start、Verifier/Conflict/Commit、任务控制、Owner scope、mutation 幂等、事件轮询，以及已提交工件的受控读取与动作绑定校验 |
+| TaskService + DemoSourceCatalog | `services/api/app/application/tasks.py`、`services/api/app/application/demo_source_catalog.py` | 创建和恢复 TaskSnapshot、读取 manifest allowlist 文件并校验哈希、冻结 `source_documents`、固定 Demo 1 start、Verifier/Conflict/Commit、任务控制、Owner scope、mutation 幂等、事件轮询，以及已提交工件的受控读取与动作绑定校验 |
 | LLM Adapter | `services/api/app/application/llm.py` | 对话计划、动作抽取、执行后自然语言回应、Schema 修复 |
 | Storage | `services/api/app/application/storage.py` | Run 与 Workspace 的内存/PostgreSQL 实现 |
 | Task Storage | `services/api/app/application/task_storage.py` | Task Snapshot、TaskEvent 与 ArtifactVersion 原子 mutation 的内存/PostgreSQL 实现 |
@@ -115,7 +115,7 @@ Action Gate 打开时，后台任务摘要保留，Gate 占用独立网格行；
 
 ### 2.4 基础设施层
 
-V0.1 使用 PostgreSQL 16 保存 Workspace、Run Snapshot 和审计事件，并使用官方 `AsyncPostgresSaver` 保存 LangGraph checkpoint。Demo 1 TaskStore 另用 `agent_tasks`、`agent_task_events` 和 `agent_task_artifact_versions` 保存 Task 投影、事件和追加式工件版本。PR 5 已在本机 PostgreSQL 16.14 上用三个顺序 API 进程验证 waiting-input 与 committed 两个恢复点，以及跨重启幂等零重复；这不等于 Conversation、多实例或数据库故障恢复。LLM 使用 OpenAI-compatible `/chat/completions`；固定 Demo 1 Task start 不调用 LLM。所有工具调用落到 `simulators/`，不连接真实办公系统。
+V0.1 使用 PostgreSQL 16 保存 Workspace、Run Snapshot 和审计事件，并使用官方 `AsyncPostgresSaver` 保存 LangGraph checkpoint。Demo 1 TaskStore 另用 `agent_tasks`、`agent_task_events` 和 `agent_task_artifact_versions` 保存 Task 投影、事件和追加式工件版本；来源文件当前从仓库内 `demo-enterprise-data/customer-a/` 读取，manifest allowlist、相对路径、文件大小、非符号链接和 SHA-256 校验后才进入结构化解析，并在 `TaskSnapshot.source_documents[]` 冻结。PR 5 已在本机 PostgreSQL 16.14 上用三个顺序 API 进程验证 waiting-input 与 committed 两个恢复点，以及跨重启幂等零重复；这不等于 Conversation、多实例或数据库故障恢复。LLM 使用 OpenAI-compatible `/chat/completions`；固定 Demo 1 Task start 不调用 LLM。所有工具调用落到 `simulators/`，不连接真实办公系统；文件包也不是 Lenovo/真实客户数据库。
 
 ## 3. 两条核心数据路径
 
@@ -210,7 +210,7 @@ sequenceDiagram
 
 Conversation 创建 Run 时保留真实对话 `thread_id`，而 LangGraph checkpoint 另用 `thread_id:run_id` 隔离同一对话中的多个 Run。动作达到终态后，continue stream 先校验 Run 属于 URL 中的 Thread，跨 Thread 续写即使同一用户也被拒绝。生成前的暂时失败可由前端“重新读取结果”；生成成功后，同一 API 进程按 `(thread_id, run_id)` 重放同一个 `message.completed`，前端按 `message_id` upsert。该缓存不跨进程持久化，工具仍全部落到 Simulator。
 
-### 3.3 Demo 1 固定 Fixture 受控纵切（PR 3 后端，PR 4 前台）
+### 3.3 Demo 1 文件驱动受控纵切（DR-0014；历史 Fixture 叙述仅作兼容背景）
 
 ```mermaid
 sequenceDiagram
@@ -223,7 +223,8 @@ sequenceDiagram
     U->>W: 开始第一轮或新一轮汇报
     W->>A: POST /demo1/tasks + X-User-Id + Idempotency-Key
     A->>S: create_demo1(owner_id, round_key)
-    S->>S: 生成 TaskContract、3 个 Branch 和 TASK_CREATED
+    S->>S: manifest allowlist/hash 校验并结构化解析四个仿真文件
+    S->>S: 冻结 source_documents，生成 TaskContract、3 个 Branch 和 TASK_CREATED
     S->>D: 原子创建 Snapshot + 初始事件
     D-->>W: 新 TaskSnapshot ready / contract
     W->>W: 应用新 Task；旧轮次保持不变
@@ -237,7 +238,7 @@ sequenceDiagram
         S->>D: 原子写单阶段 Snapshot + Event + 本阶段工件
         D-->>W: v3 Plan / v4 Act / v5 Verify / v6 waiting_input
     end
-    W-->>U: 显示局部冲突与服务端分支状态
+    W-->>U: 显示文件证据卡、局部冲突与服务端分支状态
     U->>W: 选择正式来源或提交任务/分支控制
     W->>A: POST /tasks/{id}/controls + version + key
     A->>S: 校验 Owner、版本、状态与来源
@@ -264,6 +265,8 @@ sequenceDiagram
 Task ID、Owner、版本、状态和时间均由服务端产生。读取、列表、控制和订阅都按 Owner 过滤；所有 mutation 使用预期 Task 版本和幂等键，前端只在收到服务端 Snapshot 后更新业务状态。
 
 Observe、Plan、Act、Verify 现在由 `start + 4 x advance` 形成独立 Snapshot。Observe/Verify/Commit 和所有身份、来源、验证、冲突、状态仍由确定性代码提供；Plan/Act 可以调用当前模型，但只接受服务端批准文字。浏览器关闭会让任务停在最后一个已持久化阶段，所以该路径仍不能表述为通用后台持续运行器。Steer 当前若只进入 `accepted`，服务端只证明指令已持久记录；重新规划和 `CONTROL_APPLIED` 仍需后续循环。Task SSE 通过当前 API 进程轮询 Store，不是跨实例通知系统；后台任务摘要的“状态已更新”仅代表 Snapshot 对账完成。
+
+文件来源链路是 `demo-enterprise-data/customer-a/` → `manifest.json` allowlist/安全路径/大小/符号链接/SHA-256 → `.eml/.csv/.json` 结构化解析 → `TaskSnapshot.source_documents[]` 冻结 → `ConflictRecord.operation_context` → Tasks 文件证据卡。文件缺失、篡改、解析失败或 source scope 不一致时创建/推进 fail closed；`fixture:` 仅是服务端稳定控制 ID，绝对路径、完整摘要和内部日志不进入普通业务 DOM。该链路是项目生成仿真，不是实时企业数据库或 Connector，当前验证状态见 [`DR-0014 Evidence`](evidence/DEMO1-FILE-BACKED-SOURCES-EVIDENCE-20260820.md)。
 
 前端在 mutation 结果未知时把原始 `idempotency_key`、intent 和预期版本保存到当前标签页的 `sessionStorage` 并冻结新控制；pending 状态提供同 key 对账入口。同 key 重放返回首次响应，因此前端确认后还会 GET 当前 Task 的最新 Snapshot，避免用历史响应回滚当前界面。PR 4 浏览器 E2E 已覆盖 start 请求发送前 abort、reload 后入口可达、同 key 重试和无重复 ArtifactVersion；由于 abort 发生在请求交给服务端之前，它不证明“服务端已经提交但响应丢失”的浏览器恢复。
 
@@ -362,7 +365,7 @@ flowchart LR
 
 ### 4.3 企业事实边界
 
-模型只能从 `trusted_context` 使用内部事实。V0.1 的 `trusted_context` 来自确定性 Demo Fixture 和当前工作区；没有来源的企业金额、报价、发票、权限和客户记录必须标注待查询或待确认。通识问答可直接调用模型，但不能据此声称知道企业内部数据。报价中 `quote_id/customer/currency/approved_floor/unit_price/sources` 由服务端基线拥有，未保存的 `name/qty/discount/valid_until` 可由当前浏览器视图提供；客户端 `subtotal/total/approval` 和历史对话金额都不是权威输入。当前来源仍是固定演示数据，不代表访问真实 CRM。
+模型只能从 `trusted_context` 使用内部事实。V0.1 的 Demo 1 `trusted_context` 当前来自 manifest allowlist 的仓库内项目生成仿真文件和当前工作区；没有来源的企业金额、报价、发票、权限和客户记录必须标注待查询或待确认。通识问答可直接调用模型，但不能据此声称知道企业内部数据。报价中 `quote_id/customer/currency/approved_floor/unit_price/sources` 由服务端基线拥有，未保存的 `name/qty/discount/valid_until` 可由当前浏览器视图提供；客户端 `subtotal/total/approval` 和历史对话金额都不是权威输入。文件证据不是实时 CRM 访问；它只证明项目仿真文件在当前 manifest 与摘要校验下可读。
 
 ## 5. 状态与持久化
 

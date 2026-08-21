@@ -122,6 +122,27 @@ export type TaskContract = {
   created_at: string;
 };
 
+export type TaskSourceFact = {
+  field: string;
+  label: string;
+  value: string;
+  display_value: string;
+};
+
+export type TaskSourceDocument = {
+  source_ref: string;
+  document_id: string;
+  display_name: string;
+  relative_path: string;
+  system_label: string;
+  semantic_type: "request_context" | "historical_actual" | "forecast" | "project_risk";
+  record_status: string;
+  recorded_at: string;
+  owner_role: string;
+  content_digest: string;
+  facts: TaskSourceFact[];
+};
+
 export type BranchSnapshot = {
   branch_id: string;
   task_id: string;
@@ -213,6 +234,13 @@ export type ConflictRecord = {
   summary: string;
   source_refs: string[];
   candidate_values: string[];
+  operation_context?: {
+    operation_label: string;
+    target_field: string;
+    attempted_value: string;
+    attempted_source_field: string;
+    mismatch_reason: string;
+  } | null;
   resolution_options: ConflictResolutionOption[];
   status: ConflictStatus;
   resolution: string | null;
@@ -286,6 +314,7 @@ export type TaskSnapshot = {
   phase: TaskPhase;
   version: number;
   branches: BranchSnapshot[];
+  source_documents?: TaskSourceDocument[];
   artifact_versions: ArtifactVersion[];
   verification_reports: VerificationReport[];
   conflicts: ConflictRecord[];

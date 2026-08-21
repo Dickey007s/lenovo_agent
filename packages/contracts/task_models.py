@@ -43,6 +43,12 @@ BranchStatus = Literal[
 ArtifactStatus = Literal["candidate", "verified", "rejected", "committed", "invalidated"]
 VerificationStatus = Literal["pending", "passed", "failed", "conflict"]
 ConflictStatus = Literal["open", "resolved", "dismissed"]
+TaskSourceSemanticType = Literal[
+    "request_context",
+    "historical_actual",
+    "forecast",
+    "project_risk",
+]
 ResolutionOptionKind = Literal["select_source"]
 ImpactVerificationStatus = Literal["not_run", "passed", "partial", "failed"]
 ExternalSideEffect = Literal["none", "simulator", "real"]
@@ -186,6 +192,48 @@ class VerificationReport(StrictModel):
     checked_at: datetime
 
 
+class TaskSourceFact(StrictModel):
+    """A bounded business fact parsed from an allowlisted demo file."""
+
+    field: str = Field(min_length=1, max_length=120)
+    label: str = Field(min_length=1, max_length=200)
+    value: str = Field(min_length=1, max_length=2_000)
+    display_value: str = Field(min_length=1, max_length=2_000)
+
+
+class TaskSourceDocument(StrictModel):
+    """Immutable source metadata frozen into the Task at creation time."""
+
+    source_ref: str = Field(min_length=1, max_length=500)
+    document_id: str = Field(min_length=1, max_length=160)
+    display_name: str = Field(min_length=1, max_length=240)
+    relative_path: str = Field(min_length=1, max_length=500)
+    system_label: str = Field(min_length=1, max_length=200)
+    semantic_type: TaskSourceSemanticType
+    record_status: str = Field(min_length=1, max_length=120)
+    recorded_at: datetime
+    owner_role: str = Field(min_length=1, max_length=120)
+    content_digest: str = Field(pattern=r"^sha256:[0-9a-f]{64}$")
+    facts: list[TaskSourceFact] = Field(min_length=1, max_length=20)
+
+    @model_validator(mode="after")
+    def validate_relative_path(self) -> TaskSourceDocument:
+        normalized = self.relative_path.replace("\\", "/")
+        if normalized.startswith("/") or ":" in normalized or ".." in normalized.split("/"):
+            raise ValueError("source document path must stay relative to the demo data root")
+        return self
+
+
+class ConflictOperationContext(StrictModel):
+    """The current business write that conflicts with the recorded sources."""
+
+    operation_label: str = Field(min_length=1, max_length=240)
+    target_field: str = Field(min_length=1, max_length=240)
+    attempted_value: str = Field(min_length=1, max_length=240)
+    attempted_source_field: str = Field(min_length=1, max_length=120)
+    mismatch_reason: str = Field(min_length=1, max_length=1_000)
+
+
 class ImpactChange(StrictModel):
     """A business-facing before/after row for preview and receipt rendering."""
 
@@ -231,6 +279,7 @@ class ConflictRecord(StrictModel):
     summary: str = Field(min_length=1, max_length=2_000)
     source_refs: list[str] = Field(min_length=2)
     candidate_values: list[str] = Field(min_length=2)
+    operation_context: ConflictOperationContext | None = None
     resolution_options: list[ConflictResolutionOption] = Field(default_factory=list)
     status: ConflictStatus = "open"
     resolution: str | None = None
@@ -369,6 +418,7 @@ class TaskSnapshot(StrictModel):
     phase: TaskPhase = "contract"
     version: int = Field(default=1, ge=1)
     branches: list[BranchSnapshot] = Field(min_length=1)
+    source_documents: list[TaskSourceDocument] = Field(default_factory=list)
     artifact_versions: list[ArtifactVersion] = Field(default_factory=list)
     verification_reports: list[VerificationReport] = Field(default_factory=list)
     conflicts: list[ConflictRecord] = Field(default_factory=list)
@@ -386,6 +436,11 @@ class TaskSnapshot(StrictModel):
         if self.contract.task_id != self.task_id or self.contract.owner_id != self.owner_id:
             raise ValueError("task contract identity must match snapshot identity")
         deliverable_ids = {item.deliverable_id for item in self.contract.deliverables}
+        source_refs = [item.source_ref for item in self.source_documents]
+        if len(source_refs) != len(set(source_refs)):
+            raise ValueError("source document references must be unique")
+        if not set(source_refs).issubset(set(self.contract.source_scope)):
+            raise ValueError("source document is outside the task source scope")
         branch_ids: set[str] = set()
         for branch in self.branches:
             if branch.task_id != self.task_id:

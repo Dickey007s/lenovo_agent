@@ -83,6 +83,13 @@ async function attachScreenshot(page: Page, testInfo: TestInfo, name: string) {
   await testInfo.attach(name, { path, contentType: "image/png" });
 }
 
+async function attachViewportScreenshot(page: Page, testInfo: TestInfo, name: string) {
+  await page.addStyleTag({ content: "nextjs-portal { display: none !important; }" });
+  const path = testInfo.outputPath(`${name}.png`);
+  await page.screenshot({ path, fullPage: false });
+  await testInfo.attach(name, { path, contentType: "image/png" });
+}
+
 async function expectMobileArtifactWorkspace(page: Page) {
   const overflow = await page.evaluate(() => {
     const selectors = ["html", ".workspace-viewport", ".task-view-shell", ".task-artifact-workspace"];
@@ -176,7 +183,7 @@ test("the first task path exposes the customer A purpose, decision facts, and co
   const impactPreview = page.locator(".task-impact-preview");
   await expect(impactPreview.locator("strong").filter({ hasText: "影响预演" })).toBeVisible();
   await expect(impactPreview.getByText("待确认正式口径", { exact: true })).toBeVisible();
-  await expect(impactPreview.getByText("CRM 正式收入 2400 万元，并保留预测差异", { exact: true })).toBeVisible();
+  await expect(impactPreview.getByText("已关账收入 2400 万元，并保留预测差异", { exact: true })).toBeVisible();
   await expect(impactPreview.getByText("按 CRM 正式口径重新核对，仍保持草稿", { exact: true })).toBeVisible();
   await expect(impactPreview.getByText("保持已核对状态", { exact: true })).toBeVisible();
   await expect(impactPreview.getByText("仍不发送", { exact: true })).toBeVisible();
@@ -221,7 +228,7 @@ test("the first task path exposes the customer A purpose, decision facts, and co
   await expect(page.getByRole("heading", { name: "客户 A 经营汇报已准备完成" })).toBeVisible();
   const impactReceipt = page.locator(".task-impact-receipt");
   await expect(impactReceipt.getByRole("heading", { name: "你的决定已经落实到材料中" })).toBeVisible();
-  await expect(impactReceipt.getByText("采用 CRM 正式收入 2400 万元，并保留预测差异", { exact: true })).toBeVisible();
+  await expect(impactReceipt.getByText("采用已关账收入 2400 万元，并保留预测差异", { exact: true })).toBeVisible();
   await expect(impactReceipt.getByText("已按正式口径重新核对，仍为草稿", { exact: true })).toBeVisible();
   await expect(impactReceipt.getByText("保持已核对状态", { exact: true })).toBeVisible();
   await expect(impactReceipt.getByText("仍不发送", { exact: true })).toBeVisible();
@@ -1009,13 +1016,33 @@ test("Demo 1 uses server facts from creation through the three-branch commit", a
   await expect(page.getByRole("heading", { name: "请确认 1 件事" })).toBeVisible();
   await expect(page.locator("#task-decision-conflicts-title")).toBeFocused();
   const decisionPane = page.locator(".task-director-side-pane");
-  const demoSources = decisionPane.getByText("查看演示数据来源", { exact: true });
-  await expect(demoSources).toBeVisible();
-  await demoSources.click();
-  await expect(decisionPane.getByText("演示数据 · CRM 正式收入记录（v3）", { exact: true })).toBeVisible();
-  await expect(decisionPane.getByText("演示数据 · 收入预测表（v2）", { exact: true })).toBeVisible();
+  await expect(decisionPane.getByText("当前操作", { exact: true })).toBeVisible();
+  await expect(decisionPane.getByText("经营分析.已实现收入", { exact: true })).toBeVisible();
+  await expect(decisionPane.getByText("forecast_revenue", { exact: true })).toBeVisible();
+  await expect(decisionPane.getByText("冲突来自哪两份记录", { exact: true })).toBeVisible();
+  await expect(decisionPane.getByText("crm/customer-a-revenue-close-v3.csv", { exact: true })).toBeVisible();
+  await expect(decisionPane.getByText("forecast/customer-a-revenue-forecast-v2.csv", { exact: true })).toBeVisible();
+  await expect(decisionPane.getByText("已关账", { exact: true }).first()).toBeVisible();
+  await expect(decisionPane.getByText("预测中", { exact: true }).first()).toBeVisible();
+  await expect(decisionPane.getByText("项目生成仿真数据", { exact: true })).toBeVisible();
   await expect(decisionPane).not.toContainText("fixture:");
-  await attachScreenshot(page, testInfo, "demo1-open-conflict-desktop");
+  await decisionPane.locator(".task-decision-files").scrollIntoViewIfNeeded();
+  await attachScreenshot(page, testInfo, "demo1-file-backed-conflict-desktop");
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await decisionPane.locator(".task-decision-files").scrollIntoViewIfNeeded();
+  const fileEvidenceOverflow = await page.evaluate(() => ["html", "body", ".app-shell", ".task-view-shell"]
+    .map((selector) => {
+      const element = document.querySelector<HTMLElement>(selector);
+      if (!element) throw new Error(`Missing file-evidence surface: ${selector}`);
+      return { selector, clientWidth: element.clientWidth, scrollWidth: element.scrollWidth };
+    }));
+  for (const item of fileEvidenceOverflow) {
+    expect(item.scrollWidth, `${item.selector} should not overflow with file evidence at 390px`)
+      .toBeLessThanOrEqual(item.clientWidth + 1);
+  }
+  await attachViewportScreenshot(page, testInfo, "demo1-file-backed-conflict-mobile");
+  await page.setViewportSize({ width: 1440, height: 900 });
 
   const openAnalysis = page.getByRole("button", { name: "查看当前材料：经营分析", exact: true });
   await openAnalysis.scrollIntoViewIfNeeded();

@@ -192,6 +192,8 @@ Invoke-RestMethod -Method Post -Uri "$base/workspace/mail/new" -Headers $headers
 
 ### 3.4 创建、启动与控制 Demo 1 Task
 
+Demo 1 的固定演示入口现在是文件驱动的项目仿真来源链：服务端从 `demo-enterprise-data/customer-a/manifest.json` 读取 allowlist，校验相对路径、文件大小、非符号链接和 SHA-256，再用受限 `.eml/.csv/.json` 解析器生成来源事实。创建时把 `document_id/display_name/relative_path/system_label/semantic_type/record_status/recorded_at/owner_role/content_digest/facts[]` 投影到 `TaskSnapshot.source_documents[]` 并冻结；冲突记录的 `operation_context` 再绑定当前操作、目标字段、尝试值、文件字段与不一致原因。前台文件证据卡只显示文件名、业务系统标签、记录时间、状态和字段级依据，隐藏 `fixture:` 控制 ID、绝对路径、完整摘要、Prompt 和内部日志。文件缺失、篡改、manifest 不一致或解析失败时创建/推进 fail closed，不使用历史常量或模型猜测。该文件包是项目生成的演示仿真，不是 Lenovo/真实客户数据库、实时 CRM 或 Connector。
+
 固定 Demo 1 创建入口不需要请求体。前端每次显式开始新一轮汇报时发送新的 `Idempotency-Key`；同一轮重试复用同一个 key，因此不会重复创建，下一轮换 key 后会保留旧 Task 并创建新的 `ready / contract` Task。创建 key 重放返回该 Task 当前已持久化的 Snapshot，不回退到最初 `ready` 响应；这与 start/control mutation 返回“首次 mutation 结果”的幂等语义不同。为了兼容旧客户端，不传 header 时仍使用每个 Owner 的稳定默认键：
 
 ```powershell
@@ -204,7 +206,7 @@ Invoke-RestMethod -Method Get -Uri "$base/tasks/$($task.task_id)" -Headers $head
 
 完成一轮后，把 key 改为新的轮次值会创建另一项独立 Task。相同 Owner+key 始终定位同一 Task 并返回其当前持久化 Snapshot；不同 key 生成不同 Task ID。当前 Web 的“开始新一轮汇报”是客户端组合动作：先调用本接口创建新 Task，再以新 Task 的版本调用 `/tasks/{task_id}/start`，随后按 Snapshot 确认逐次调用 `/tasks/{task_id}/advance`。它不会把旧 Task 重置为 `ready`。Task 列表按更新时间倒序返回，前端刷新时优先恢复未终止 Task，否则显示最近终态 Task；列表虽然保留多轮 Snapshot，当前 Web 尚无历史轮次选择入口。
 
-也可以提交严格的 `TaskContractDraft`。下面只展示最小结构，实际字段和限制以 `packages/contracts/task_models.py` 为准：
+也可以提交严格的 `TaskContractDraft`。下面只展示最小结构，实际字段和限制以 `packages/contracts/task_models.py` 为准。示例中的 `source_scope` 是服务端稳定控制 ID，不是前台文件路径；当前 Demo 1 会把它解析并映射为冻结的 `source_documents[]`：
 
 ```json
 {
@@ -275,7 +277,7 @@ $task = Invoke-RestMethod -Method Post -Uri "$base/tasks/$($task.task_id)/start"
 }
 ```
 
-当前固定路径允许 `steer`、`pause_branch`、`resume_branch`、`take_over`、`return_control` 和 `resolve_evidence`。分支控制返回 `ControlEvent.status=applied` 后才改变前台状态；`steer` 当前只记录为 `accepted`，没有 `applied_task_version`，也不会在本次请求内重新规划，因此只能反馈“方向指令已记录，等待后续循环应用”。当前 Conflict 还返回服务端批准的 `resolution_options[]`；前端提交其中的 `resolution_option_id` 和匹配来源。`resolve_evidence` 只接受契约内的 CRM 正式收入 Fixture：服务端先追加通过验证的经营分析 v2。若解决后仍有其他 open Conflict，本次只持久化该 resolution、经营分析 v2、passed VerificationReport 和 partial `impact_receipt`，任务保持 `waiting_input / verify`；只有已经不存在其他 open Conflict 时，服务端才联动重生成并验证客户回复 v3，生成 Commit，并在 ControlEvent 中写实际工件、验证、Commit、版本和 `external_side_effect=none` 的回执。
+当前固定路径允许 `steer`、`pause_branch`、`resume_branch`、`take_over`、`return_control` 和 `resolve_evidence`。分支控制返回 `ControlEvent.status=applied` 后才改变前台状态；`steer` 当前只记录为 `accepted`，没有 `applied_task_version`，也不会在本次请求内重新规划，因此只能反馈“方向指令已记录，等待后续循环应用”。当前 Conflict 还返回服务端批准的 `resolution_options[]`；前端提交其中的 `resolution_option_id` 和匹配来源。`resolve_evidence` 只接受契约内的 CRM 正式收入来源控制 ID，并在当前冻结的 `source_documents[]` 与 `operation_context` 上复核：服务端先追加通过验证的经营分析 v2。若解决后仍有其他 open Conflict，本次只持久化该 resolution、经营分析 v2、passed VerificationReport 和 partial `impact_receipt`，任务保持 `waiting_input / verify`；只有已经不存在其他 open Conflict 时，服务端才联动重生成并验证客户回复 v3，生成 Commit，并在 ControlEvent 中写实际工件、验证、Commit、版本和 `external_side_effect=none` 的回执。文件事实不可用或摘要变化时 fail closed，不回退到历史 Fixture 数值。
 
 mutation 合约要求：相同 key 和相同命令返回首次 mutation 的 Snapshot，且不新增事件、ArtifactVersion 或 Commit；相同 key 被用于不同命令返回 409。内存 Store 回归已覆盖旧 key 在后续 mutation 之后仍返回原响应、Artifact lineage/head 引用、内容摘要和 Commit state hash。PR 5 又在 PostgreSQL 16.14 上跨三个顺序 API 进程验证：旧 start key 返回原 v2、旧 resolve key 返回原 v3，当前 GET 保持 v3，重放前后数据库维持 `45 events / 7 artifacts / 1 TASK_COMMITTED`。历史遗留 marker 若没有保存原 Snapshot，只在当前 Task version 仍等于 marker version 时兼容返回；发生过后续 mutation 时返回 409，而不是错误返回最新 Snapshot。
 
@@ -288,7 +290,7 @@ PR 4 交付物工作区直接使用创建、读取、start、control 和 SSE 对
 - `verification_reports[]` 与 `conflicts[]` 提供验证和冲突事实；来源与逐项检查在前台默认折叠。
 - `last_commit` 提供 task version、工件/报告引用和 `state_hash`；缺少该字段时前台不得显示最终提交。
 
-该工作区当前只读，没有创建、编辑或覆盖 ArtifactVersion 的路由。前端只为固定 Fixture 的 `analysis/risk_brief/reply_draft` 提供字段 allowlist，未知 kind/字段默认隐藏；Conflict Card 与 Artifact Workspace 复用同一 `source_ref` 投影，四个已知值显示为“演示数据 · 业务来源（版本）”。服务端响应仍包含原始 `source_refs` 供控制校验和审计，但普通业务 DOM 使用与原值无关的序号 key，不接收 `fixture:` 原值；其他值统一显示隐藏占位，URL、路径和凭据形态已有负例回归。这是前端第二道投影，不能替代服务端脱敏、授权或未来通用的字段可见性 Schema。即使字段名在 allowlist 中，其任意文本值仍需要服务端 display projection 承担通用安全保证。
+该工作区当前只读，没有创建、编辑或覆盖 ArtifactVersion 的路由。前端只为 `analysis/risk_brief/reply_draft` 提供字段 allowlist，未知 kind/字段默认隐藏；Conflict Card 与 Artifact Workspace 复用同一服务端来源投影，文件证据显示“演示数据 · 文件名 / 系统 / 记录时间”，不显示内部控制 ID。服务端响应仍包含原始 `source_refs` 供控制校验和审计，但普通业务 DOM 使用与原值无关的序号 key，不接收 `fixture:`、绝对路径或完整摘要；其他值统一显示隐藏占位。这是前端第二道投影，不能替代服务端 manifest、哈希、授权或未来通用的字段可见性 Schema。即使字段名在 allowlist 中，其任意文本值仍需要服务端 display projection 承担通用安全保证。
 
 ### 3.5 读取 Demo 2 驾驶舱并记录本次路由
 

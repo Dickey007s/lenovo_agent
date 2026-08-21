@@ -169,10 +169,10 @@ Demo 1 的 TaskStore 另有独立证据：固定 Fixture 已在同一个 Postgre
 
 使用 `pricing` 固定场景完成证据与审批，再调用 `/v1/demo3/actions/{action_id}/tamper-check`。展示 `TAMPER_BLOCKED`，说明 Permit 绑定具体参数而非只绑定“允许发邮件”。
 
-### 可选流程 E：后台汇报与独立新一轮
+### 可选流程 E：后台汇报、文件冲突与独立新一轮
 
 1. 在客户 A 经营汇报停在收入冲突后切到邮件工作区，只展示“后台任务”摘要、状态、阶段和“前往处理”，不展示冲突卡或分支控制。
-2. 点击“前往处理”回到 Tasks 并聚焦待确认标题，展开“查看演示数据来源”，展示“演示数据 · CRM 正式收入记录（v3）”与“演示数据 · 收入预测表（v2）”，不展示原始 `fixture:` ID。
+2. 点击“前往处理”回到 Tasks 并聚焦待确认标题，展开“查看演示数据来源”，展示仓库演示文件的文件名、业务系统、记录时间和字段依据：`customer-a-revenue-close-v3.csv` 与 `customer-a-revenue-forecast-v2.csv`；明确这是项目生成的演示数据，不是真实 CRM。页面不展示原始 `fixture:` ID、绝对路径或完整摘要。
 3. 完成本轮并点击“开始新一轮汇报”，说明系统创建并启动独立新 Task，不重置上一轮。
 4. 明确当前边界：旧轮次已在服务端保留，但尚无历史轮次选择入口。
 
@@ -308,10 +308,10 @@ Demo 3 的前台不只展示风险等级和确认按钮，还展示动作影响�
 | Tool Gateway | Permit 校验、重放保护和工具路由边界 |
 | Simulator | 不接触真实办公系统的副作用模拟器 |
 
-## Demo 1 当前讲解口径（2026-08-17）
+## Demo 1 当前讲解口径（2026-08-20，文件驱动修订）
 
 演示时先展示 `start` 返回的 Observe，再让浏览器在每次服务端确认后推进四次 `advance`：Plan、Act、Verify、等待决定。此顺序对应 v2、v3、v4、v5、v6 Snapshot，而不是延时动画。v6 的可复核事实是 5 个工件、1 个冲突、2 个已验证工件；用户解决冲突后才到 v7 Commit。
 
 Plan/Act 当前通过严格适配器调用 `deepseek-v4-pro`，但只有与服务端批准模板逐字段一致的用户文字才被接受，否则显式回退；Observe/Verify/Commit 确定性完成。模型 smoke 只证明接口连通和响应符合契约，不应讲成“模型质量已验证”。预算是步骤、工具调用和运行时长，不是 token 成本。关闭浏览器会暂停在已保存阶段，重新打开后继续；当前没有无人值守后台调度器，也没有跨实例 LLM lease。
 
-对外叙事必须把阶段状态、来源标签、冲突和 Commit 映射到服务端 Snapshot/stage_records；不要展示原始 `fixture:`、prompt、思维链、内部日志或供应商账单。最终测试耗时、实现提交和八张截图 hash 已在 [`DEMO1-PROGRESSIVE-STAGES-20260817`](evidence/DEMO1-PROGRESSIVE-STAGES-EVIDENCE-20260817.md) 封口；PR 链接以该证据的后续回填为准。
+对外叙事必须把阶段状态、来源标签、冲突和 Commit 映射到服务端 Snapshot/stage_records；不要展示原始 `fixture:`、绝对路径、完整文件摘要、prompt、思维链、内部日志或供应商账单。当前 Demo 1 的来源链是仓库 `demo-enterprise-data/customer-a/` 仿真文件 → manifest allowlist/哈希 → 结构化解析 → `TaskSnapshot.source_documents[]` 冻结 → `ConflictRecord.operation_context` → Tasks 文件证据卡。讲解“CRM 正式收入记录”和“收入预测”冲突时，要同时说明这些是项目生成的演示数据，不是 Lenovo、真实客户数据库、实时 CRM 或 Connector。文件缺失、篡改、解析失败或版本变化时，前台显示“待核对”并停止推进，不用旧常量或模型猜测补齐。该修订已由实现 `5b07702`、PR #21、全量自动化与桌面/移动截图按限定工程范围封口，精确耗时和 hash 见 [`DEMO1-FILE-BACKED-SOURCES-EVIDENCE-20260820`](evidence/DEMO1-FILE-BACKED-SOURCES-EVIDENCE-20260820.md)；该证据不证明真实 Connector、真实企业数据或用户价值。

@@ -260,6 +260,8 @@ async def create_demo1_task(
         )
     except TaskCreateConflictError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except TaskTransitionError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
 
 
 @router.post("/tasks", response_model=TaskSnapshot, status_code=status.HTTP_201_CREATED)
@@ -277,6 +279,8 @@ async def create_task(
         )
     except TaskCreateConflictError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except TaskTransitionError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
 
 
 @router.get("/tasks", response_model=list[TaskSnapshot])

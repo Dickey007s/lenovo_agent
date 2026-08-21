@@ -1479,6 +1479,40 @@ button.task-director-stage-card:hover { border-color: #98a3af; background: #fafb
 .task-decision-impact { border-left-color: #1265d6; color: #475769; background: #eef5fd; }
 .task-decision-why strong, .task-decision-impact strong { display: block; font-size: 11px; }
 .task-decision-why p, .task-decision-impact p { margin: 4px 0 0; font-size: 11px; line-height: 1.6; }
+.task-decision-operation { margin: 10px 0; padding: 11px 0; border-top: 1px solid #dbe4ee; border-bottom: 1px solid #dbe4ee; }
+.task-decision-operation > div { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.task-decision-operation > div span { color: #5b6876; font-size: 11px; font-weight: 700; }
+.task-decision-operation > div strong { font-size: 12px; }
+.task-decision-card .task-decision-operation > dl { display: grid; grid-template-columns: 1fr; gap: 6px; margin: 9px 0 0; border: 0; border-radius: 0; background: transparent; }
+.task-decision-card .task-decision-operation > dl > div { min-width: 0; display: grid; grid-template-columns: 66px minmax(0, 1fr); gap: 7px; padding: 0; border: 0; }
+.task-decision-operation dt { color: #6f7c89; font-size: 10px; }
+.task-decision-operation dd { overflow-wrap: anywhere; margin: 0; color: #1f2d3a; font-size: 11px; font-weight: 750; line-height: 1.45; }
+.task-decision-operation > p { margin: 9px 0 0; color: #9b4c12; font-size: 11px; line-height: 1.6; }
+.task-decision-files { margin-top: 11px; padding-top: 11px; border-top: 1px solid #dfc7ad; }
+.task-decision-files > header { display: flex; align-items: flex-end; justify-content: space-between; gap: 10px; }
+.task-decision-files > header > div { display: grid; gap: 2px; }
+.task-decision-files > header span { color: #7a6653; font-size: 10px; }
+.task-decision-files > header strong { font-size: 12px; }
+.task-decision-files > header small { color: #7a6653; font-size: 10px; }
+.task-decision-file-grid { display: grid; grid-template-columns: 1fr; gap: 10px; margin-top: 10px; }
+.task-decision-file { min-width: 0; padding: 9px 0 9px 10px; border-left: 3px solid #62788f; }
+.task-decision-file.is-historical_actual { border-left-color: #168a5b; }
+.task-decision-file.is-forecast { border-left-color: #d97822; }
+.task-decision-file > header { display: flex; align-items: flex-start; gap: 7px; }
+.task-decision-file > header svg { width: 15px; height: 15px; flex: 0 0 auto; margin-top: 1px; color: #53687d; }
+.task-decision-file > header > div { min-width: 0; display: grid; gap: 2px; }
+.task-decision-file > header strong { overflow-wrap: anywhere; font-size: 11px; line-height: 1.4; }
+.task-decision-file > header span { color: #587063; font-size: 10px; font-weight: 700; }
+.task-decision-file > p { overflow-wrap: anywhere; margin: 7px 0; color: #65717d; font-family: Consolas, "Courier New", monospace; font-size: 10px; line-height: 1.45; }
+.task-decision-file > dl { display: grid; gap: 4px; margin: 0; border: 0; border-radius: 0; background: transparent; }
+.task-decision-file > dl > div { display: grid; grid-template-columns: 58px minmax(0, 1fr); gap: 6px; padding: 0; border: 0; }
+.task-decision-file > dl dt, .task-decision-file > dl dd { margin: 0; font-size: 10px; line-height: 1.45; }
+.task-decision-file > dl dt { color: #7a858f; }
+.task-decision-file > dl dd { overflow-wrap: anywhere; color: #394754; font-weight: 650; }
+.task-decision-file > ul { display: grid; gap: 5px; margin: 8px 0 0; padding: 8px 0 0; border-top: 1px dashed #dcc7b2; list-style: none; }
+.task-decision-file > ul li { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; color: #5c6874; font-size: 10px; }
+.task-decision-file > ul strong { color: #1d2a36; font-size: 11px; text-align: right; }
+.task-decision-source-fallback { margin-top: 8px; border-bottom: 1px solid #ecd5be; }
 .task-impact-preview { min-width: 0; margin: 10px -12px 0; border-block: 1px solid #c9d9ec; color: #34465b; background: #f5f8fc; }
 .task-impact-preview > header { display: grid; grid-template-columns: 24px minmax(0, 1fr); align-items: center; gap: 8px; padding: 10px 12px 8px; }
 .task-impact-preview > header > svg { width: 20px; height: 20px; color: #1265d6; stroke-width: 1.8; }
@@ -1775,6 +1809,12 @@ button.task-director-stage-card:hover { border-color: #98a3af; background: #fafb
   .task-decision-card dl { grid-template-columns: 1fr; }
   .task-decision-card dl > div { border-right: 0; border-bottom: 1px solid #edd5bb; }
   .task-decision-card dl > div:last-child { border-bottom: 0; }
+  .task-decision-operation > dl { grid-template-columns: 1fr; gap: 7px; }
+  .task-decision-operation > dl > div { padding: 0 0 7px; border-right: 0; border-bottom: 1px solid #dbe4ee; }
+  .task-decision-operation > dl > div:last-child { padding-bottom: 0; border-bottom: 0; }
+  .task-decision-files > header { align-items: flex-start; flex-direction: column; }
+  .task-decision-file-grid { grid-template-columns: 1fr; }
+  .task-decision-file > dl > div { grid-template-columns: 68px minmax(0, 1fr); padding: 0; border: 0; }
   .task-impact-change-list li { grid-template-columns: 72px minmax(0, 1fr); gap: 5px 8px; }
   .task-impact-change-list li > div { grid-column: 1 / -1; }
   .task-impact-receipt > header { grid-template-columns: 32px minmax(0, 1fr); padding-inline: 12px; }

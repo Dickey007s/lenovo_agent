@@ -152,6 +152,7 @@ async def test_resolving_official_evidence_creates_verified_commit_idempotently(
     assert len(committed.verification_reports) == 5
     assert committed.last_commit is not None
     assert committed.last_commit.state_hash.startswith("sha256:")
+    assert len(committed.source_documents) == 4
     assert set(committed.last_commit.artifact_version_ids) == {
         branch.artifact_heads[branch.deliverable_ids[0]] for branch in committed.branches
     }
@@ -259,6 +260,12 @@ async def test_resolving_official_evidence_creates_verified_commit_idempotently(
         "task_id": committed.task_id,
         "task_version": committed.version,
         "contract_digest": canonical_hash(committed.contract),
+        "source_documents": [
+            item.model_dump(mode="json")
+            for item in sorted(
+                committed.source_documents, key=lambda item: item.source_ref
+            )
+        ],
         "artifact_heads": sorted(
             state_artifacts,
             key=lambda item: (item["branch_id"], item["deliverable_id"]),

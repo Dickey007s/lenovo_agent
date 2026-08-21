@@ -1,7 +1,11 @@
+import shutil
+from pathlib import Path
+
 from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
 
 from services.api.app.api.routes import router
+from services.api.app.application.demo_source_catalog import DemoSourceCatalog
 from services.api.app.application.task_storage import InMemoryTaskStore
 from services.api.app.application.tasks import TaskService, demo1_contract_draft
 
@@ -27,6 +31,12 @@ async def test_demo1_task_routes_return_server_snapshot_and_enforce_owner() -> N
         assert created["owner_id"] == "user_1"
         assert created["status"] == "ready"
         assert created["last_event_sequence"] == 1
+        assert {item["relative_path"] for item in created["source_documents"]} == {
+            "mail/customer-a-status-request-2026-06-15.eml",
+            "crm/customer-a-revenue-close-v3.csv",
+            "forecast/customer-a-revenue-forecast-v2.csv",
+            "project/customer-a-weekly-status-v5.json",
+        }
 
         listed = await client.get("/v1/tasks", headers={"X-User-Id": "user_1"})
         assert listed.status_code == 200
@@ -93,6 +103,29 @@ async def test_demo1_route_rejects_key_reused_by_generic_route_for_different_con
     assert created.status_code == 201
     assert conflict.status_code == 409
     assert conflict.json()["detail"] == "幂等键已用于不同任务契约"
+
+
+async def test_demo1_route_fails_closed_when_file_package_is_unavailable(
+    tmp_path: Path,
+) -> None:
+    source_root = DemoSourceCatalog.default_root()
+    test_root = tmp_path / "customer-a"
+    shutil.copytree(source_root, test_root)
+    (test_root / "crm" / "customer-a-revenue-close-v3.csv").unlink()
+    app = build_test_app()
+    app.state.task_service = TaskService(
+        InMemoryTaskStore(), source_catalog=DemoSourceCatalog(test_root)
+    )
+    transport = ASGITransport(app=app)
+
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        response = await client.post(
+            "/v1/demo1/tasks",
+            headers={"X-User-Id": "user_1"},
+        )
+
+    assert response.status_code == 503
+    assert response.json()["detail"] == "演示资料包不可用，任务没有读取或猜测任何业务数据"
 
 
 async def test_task_create_route_forbids_server_fields_and_honors_idempotency() -> None:

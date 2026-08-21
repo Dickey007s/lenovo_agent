@@ -102,7 +102,7 @@ source_id | label | system | excerpt | permission | updated_at
 - 当前用户以什么权限读取；
 - 保存、Agent 修改和动作失效分别在何时发生。
 
-这些来源在 V0.1 中是确定性 Demo 数据，并非真实 Connector 返回值。固定 Demo 1 的已知来源在普通业务 UI 中显示为“演示数据 · 业务来源（版本）”；原始 `fixture:` ID 仅保留在服务端协议中用于校验与审计，不进入普通业务 DOM。未知来源继续显示隐藏占位。
+这些来源在 V0.1 中是确定性 Demo 数据，并非真实 Connector 返回值。Demo 1 当前的文件包位于 `demo-enterprise-data/customer-a/`：manifest allowlist、相对路径、文件大小、非符号链接和 SHA-256 通过后，受限解析器把 `.eml/.csv/.json` 形成 `TaskSnapshot.source_documents[]`，并在创建时冻结。Conflict 卡的字段级差异来自服务端 `ConflictRecord.operation_context`，不是前端或模型推断。普通业务 UI 显示“演示数据 · 文件名 / 系统标签 / 记录时间”，原始 `fixture:` 控制 ID、绝对路径和完整摘要只保留在服务端校验/审计，不进入 DOM；未知来源、缺文件、篡改或解析失败显示“待核对”并 fail closed，不回退到旧金额或静态事实。这些文件是项目生成仿真，不是 Lenovo/真实客户数据、实时企业数据库或 Connector。
 
 ## 4. Agent 上下文与规划
 
@@ -248,7 +248,7 @@ Plan/Act 可以调用当前 `deepseek-v4-pro`，但前台看到的阶段文字�
 
 阶段轮询只由浏览器协调。关闭标签页后任务停在最后一个已持久化阶段，重新打开通过 GET/SSE 对账后继续；不存在后台 scheduler 或“关闭浏览器仍在运行”的事实。SSE payload 不能直接推断完成状态。旧 Snapshot 没有 `stage_records` 时按空数组兼容读取，不补造历史阶段。
 
-来源显示使用可读业务标签“演示数据”，原始 `fixture:` 只保留在服务端校验/审计。阶段详情可显示摘要、受限详情、工件引用、来源和时间，但不显示 prompt、思维链或内部日志。预算文案只表达运行时预算，不展示或推断 token 成本、供应商账单或模型质量。
+来源显示使用可读业务标签“演示数据”，文件证据卡只显示服务端 `source_documents[]` 的 display_name、system_label、recorded_at、record_status 和 allowlisted facts；原始 `fixture:`、绝对路径、完整 SHA-256、prompt、思维链和内部日志只保留在服务端校验/审计。阶段详情可显示摘要、受限详情、工件引用、来源和时间。预算文案只表达运行时预算，不展示或推断 token 成本、供应商账单或模型质量。来源文件校验失败时阶段不能继续，前台保持待核对状态。
 
 ## 11. Demo 3 动作影响账本（DR-0012 Verified 限定范围）
 

@@ -131,6 +131,18 @@ PR 3 的内存 Store 回归已覆盖内容摘要、单 lineage、连续版本与
 8. Tasks 视图必须保留原“工作台待办”tab；长期 Task Artifact 不能覆盖手工待办 WorkspaceArtifact。
 9. Conflict、来源候选和 Task Control 只在 Tasks 工作区投影；非 Tasks 工作区只能显示当前/上一轮后台任务摘要和进入 Tasks 的客户端跳转。
 
+## 4.2 文件驱动来源与操作冲突（DR-0014）
+
+Demo 1 的当前资料包位于仓库 [`demo-enterprise-data/customer-a/`](../../demo-enterprise-data/customer-a/)，性质为 `project_generated_simulation`。`manifest.json` 是唯一 allowlist，逐文件声明 source ref、document ID、相对路径、业务显示名、系统标签、语义类型、记录状态、记录时间、责任角色、解析器和 SHA-256。AdventureWorks、Power BI 和 Dynamics 官方资料只提供结构与业务语义依据，不是运行时企业事实。
+
+服务端 `DemoSourceCatalog` 必须在任何业务事实进入 Task 前检查：manifest schema、source scope、相对路径、路径穿越、符号链接、文件大小、SHA-256 和声明的结构化解析器。CSV/JSON/EML 只产生 allowlist 内的 `TaskSourceFact(field/label/value/display_value)`；文件缺失、变化、哈希不一致或解析失败时 fail closed，不能使用旧常量、LLM 猜测或部分结果推进。
+
+`TaskSnapshot.source_documents[]` 在创建时冻结 `TaskSourceDocument(source_ref/document_id/display_name/relative_path/system_label/semantic_type/record_status/recorded_at/owner_role/content_digest/facts[])`，并在 `TASK_CREATED` 记录文档 digest。任务推进前若当前文件与冻结快照不一致，服务端拒绝继续并要求基于当前文件开始新一轮。旧 Snapshot 缺失该字段时只兼容读取，不能补造文件事实；完成提交的 state hash 应覆盖来源快照摘要或 digest。
+
+`ConflictRecord.operation_context` 记录当前业务操作与历史/当前文件事实的关系：`operation_label/target_field/attempted_value/attempted_source_field/mismatch_reason`。例如销售预测文件的 `forecast_revenue` 不能直接写入财务关账文件定义的 `recognized_revenue`。`source_refs[]` 继续用于契约、控制和审计；普通 UI 只投影 `source_documents[]` 的安全字段，不渲染原始 ref、绝对路径、完整 digest、解析日志或任意原始文件正文。
+
+前台文件证据卡必须由 Snapshot 事实驱动，显示文件名/相对目录、系统、记录时间、状态、字段值和当前操作 before/attempted/after 差异；提交前仍是 expected impact，提交后仍只认 ControlEvent receipt。文件失败、过期或投影缺失时显示待核验和恢复动作，不关闭冲突、不宣布完成。
+
 ## 5. 控制命令
 
 | kind | 目标 | 必填字段 | 服务端效果 | 前台反馈 |

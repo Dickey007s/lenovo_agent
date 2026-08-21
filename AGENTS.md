@@ -40,7 +40,8 @@ tests/                                        单元与端到端回归
 - 用户可以独立编辑和保存；Agent 接收活动视图与未保存的 `workspace_context`。
 - 人工确认使用对话底部非模态 tray，不恢复独立审批页，也不完全遮挡消息区。
 - Demo 1 的冲突决定、候选依据和分支控制只在 Tasks 工作区显示；非 Tasks 工作区只显示后台任务摘要和前往 Tasks 的入口，跳转本身不得提交 Task Control。
-- 固定 Demo 1 的已知来源在普通业务 UI 中必须标为“演示数据”并使用可读业务标签；原始 `fixture:` ID 和未知内部标识不得进入 DOM。服务端仍保留原值用于校验与审计。
+- Demo 1 的文件来源在普通业务 UI 中必须标为“演示数据”并使用可读业务标签；原始 `fixture:` ID 和未知内部标识不得进入 DOM。服务端仍保留稳定控制 ID 用于校验与审计。
+- Demo 1 当前来源包位于 `demo-enterprise-data/customer-a/`，仅是项目生成的仿真文件，不是 Lenovo、真实客户、实时企业数据库或 Connector。服务端必须先以 `manifest.json` 做 allowlist、相对路径、文件大小、非符号链接和 SHA-256 校验，再做受限结构化解析；创建时冻结 `TaskSnapshot.source_documents[]`，冲突以 `ConflictRecord.operation_context` 绑定文件字段事实。文件缺失、篡改、解析失败或摘要变化必须 fail closed；前台只显示文件名、系统标签、记录时间和字段依据，隐藏 `fixture:` 控制 ID、绝对路径和完整摘要。
 - 涉及 Task 决策或副作用的主要动作必须优先展示服务端拥有的影响：提交前说明会改变什么、重新核对什么、保持什么和不会发生什么，提交后只依据实际 Snapshot/Event 回执展示已经发生的变化。前端动画、模型说明或静态文案不得冒充变化事实。
 - 终态入口统一为“开始新一轮汇报”：创建独立 Task 并立即启动，旧 Task、Artifact、Event 与 Commit 不得重置或覆盖。当前没有历史轮次选择入口，不得把后台保留表述成前台可自由切换历史轮次。
 - 报价工作台的行小计、标准总价、折后总价、优惠金额、综合折后比例、优惠率和最低折后比例检查必须由确定性公式产生，LLM 只能解释结果，不能充当计算器。服务端拥有 `quote_id/customer/currency/approved_floor/unit_price/sources`；当前用户只能通过工作区编辑 `name/qty/discount/valid_until`，客户端 `subtotal/total/approval` 永远不是权威事实。
@@ -69,7 +70,7 @@ tests/                                        单元与端到端回归
 - Demo 1/2/3 的通用完成状态在前台显示“已运行”，只有模型事实显示“模型已调用”；Demo 3 以“执行许可服务”“受控演示工具”为主，Permit/Gateway/Simulator 仅在二级技术元信息出现。unknown 工具结果必须显示“工具结果待核对”，不得写成未调用或未执行。
 - Demo 3 的 proposal 或 Task-derived action 出现时，前端必须全局切换到 Demo 3/审计视图，避免身份仍停留在 Demo 1/2。`TaskStageProcessing` 必须保持跨字段一致：确定性路径不得声称模型调用/模型输出；语言模型路径必须有观测调用和模型名。
 
-Demo 1 当前 Runtime 事实（2026-08-17）：create 为 v1 `ready / contract`；start 仅进入 v2 `running / observe`；浏览器在 Snapshot 确认后四次调用幂等 advance，依次得到 v3 Plan、v4 Act、v5 Verify、v6 `waiting_input / verify`，固定为 5 个工件、1 个 open conflict、2 个 passed verification；resolve 后 v7 `committed / commit`。`stage_records` 是 UI 事实且旧快照默认空数组。Plan/Act 通过严格 `TaskStageAgent` 调用 `deepseek-v4-pro`，但只有与服务端批准模板逐字段一致的业务文字才记录为 `model`，否则显式 `template_fallback`；Observe/Verify/Commit 确定性，模型不拥有身份、来源、状态、冲突、验证或 Commit。固定渐进路径还要求完整 Demo 契约，包括预算和截止时间。浏览器关闭不会后台继续，预算是 steps/tool calls/runtime 而非 token cost；同进程同 key 有锁，跨实例无分布式 LLM lease。模型 smoke 只证明连通与严格响应，不证明质量。最终时长、commit SHA、PR URL、截图 hash 以新 evidence 封口数据为准。
+Demo 1 当前 Runtime 事实（2026-08-20，文件驱动修订）：create 为 v1 `ready / contract`；创建前必须从 `demo-enterprise-data/customer-a/` manifest allowlist/hash 校验并解析文件，冻结 `TaskSnapshot.source_documents[]`；冲突字段来自文件事实与 `ConflictRecord.operation_context`。start 仅进入 v2 `running / observe`；浏览器在 Snapshot 确认后四次调用幂等 advance，依次得到 v3 Plan、v4 Act、v5 Verify、v6 `waiting_input / verify`，固定为 5 个工件、1 个 open conflict、2 个 passed verification；resolve 后 v7 `committed / commit`。`stage_records` 是 UI 事实且旧快照默认空数组。Plan/Act 通过严格 `TaskStageAgent` 调用 `deepseek-v4-pro`，但只有与服务端批准模板逐字段一致的业务文字才记录为 `model`，否则显式 `template_fallback`；Observe/Verify/Commit 确定性，模型不拥有身份、来源、状态、冲突、验证或 Commit。固定渐进路径还要求完整 Demo 契约，包括预算和截止时间。浏览器关闭不会后台继续，预算是 steps/tool calls/runtime 而非 token cost；同进程同 key 有锁，跨实例无分布式 LLM lease。模型 smoke 只证明连通与严格响应，不证明质量。文件证据已由实现 `5b07702`、PR #21、Python `166 passed, 1 skipped`、浏览器 `38 passed` 和桌面/移动截图按限定工程范围封口；精确 hash 与边界见 `docs/evidence/DEMO1-FILE-BACKED-SOURCES-EVIDENCE-20260820.md`。
 
 决策、推进与汇报的硬门槛：
 
