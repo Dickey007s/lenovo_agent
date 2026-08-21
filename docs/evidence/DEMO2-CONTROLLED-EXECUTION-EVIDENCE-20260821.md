@@ -7,6 +7,8 @@
 | Scenario | [`SCENARIO-002`](../scenarios/SCENARIO-002-demo2-explainable-admission.md) |
 | Status | `Limited Verified`（固定客户 A、单 API 进程、memory、真实模型受控内部执行） |
 | Date | 2026-08-21 |
+| Implementation commit | [`252f8d02725f341137f1580d4230003d2477ecca`](https://github.com/Dickey007s/lenovo_agent/commit/252f8d02725f341137f1580d4230003d2477ecca) |
+| Pull request | [PR #22](https://github.com/Dickey007s/lenovo_agent/pull/22)（未在本 Evidence 中声明已合并） |
 
 ## 1. 结论与限定范围
 

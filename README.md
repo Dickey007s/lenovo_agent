@@ -97,7 +97,7 @@ V0.1 重点验证三件事：
 
 前端将“记录本轮方式”和“启动协作”分开，运行状态、模型调用事实、动态增派、共享工件与完成回执只投影 execution Snapshot/SSE；不靠动画或固定延时宣布完成。模型只生成受限业务摘要/要点，服务端拥有 Worker/Artifact 身份、来源、依赖、状态、事件、验证和回执。两轮 live `deepseek-v4-pro` 运行及 6 张桌面/移动截图已记录：第一轮整轮 8799 ms、4/4 模型输出采用；第二轮为 4 workers、5 artifacts、seq 9/10/15 与无外部动作。封口为 Python `178 passed, 1 skipped in 6.31s`、浏览器 `41 passed (2.0m)`，Ruff、lint、build、governance 与 diff-check 通过。精确事实与截图 hash 见 [`DEMO2-CONTROLLED-EXECUTION-20260821`](docs/evidence/DEMO2-CONTROLLED-EXECUTION-EVIDENCE-20260821.md)。
 
-该纵切只在固定客户 A、单 API 进程、memory、项目生成仿真文件和无外部动作范围内为 `Limited Verified`。API 重启不会恢复执行；没有后台任务队列、跨进程 Worker lease、真实 Connector、生产身份、成本/质量基准或用户研究。主流技术差异与用户价值仍是 `Design claim / Draft`，官方材料不是竞品实测。
+该纵切只在固定客户 A、单 API 进程、memory、项目生成仿真文件和无外部动作范围内为 `Limited Verified`。实现提交为 [`252f8d02725f341137f1580d4230003d2477ecca`](https://github.com/Dickey007s/lenovo_agent/commit/252f8d02725f341137f1580d4230003d2477ecca)，对应 [PR #22](https://github.com/Dickey007s/lenovo_agent/pull/22)；PR 链接不表示已合并。API 重启不会恢复执行；没有后台任务队列、跨进程 Worker lease、真实 Connector、生产身份、成本/质量基准或用户研究。主流技术差异与用户价值仍是 `Design claim / Draft`，官方材料不是竞品实测。
 
 ### Demo 3 动作影响账本（DR-0012，Verified 限定范围）
 

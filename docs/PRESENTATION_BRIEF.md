@@ -260,7 +260,7 @@ Demo 1 的 TaskStore 另有独立证据：固定 Fixture 已在同一个 Postgre
 
 前台重点不是“有四个 Agent”，而是用户能看见：已选择尚未启动、谁在处理哪类业务事实、真实模型调用与耗时、为什么增派、共享工件如何收敛、完成后哪些外部动作没有发生。模型不拥有 Worker 身份、来源、状态、Artifact 版本/digest 或回执；普通 UI 不展示 Prompt、思维链、Worker 对话或底层日志。
 
-第一轮 live 模型运行整轮 8799 ms、4/4 模型输出采用，四个请求 4956/4268/3590/3665 ms；第二轮浏览器 manifest 为 4 workers、5 artifacts、seq 9/10/15、`external_side_effect=none`，并登记六张截图。封口为 Python `178 passed, 1 skipped in 6.31s`、浏览器 `41 passed (2.0m)`，Ruff、lint、build、governance 与 diff-check 通过。精确证据见 [`DEMO2-CONTROLLED-EXECUTION-20260821`](evidence/DEMO2-CONTROLLED-EXECUTION-EVIDENCE-20260821.md)。该结论不覆盖 API 重启/跨进程恢复、后台队列、真实 Connector、生产身份、通用动态调度、成本/质量效果或用户研究。
+第一轮 live 模型运行整轮 8799 ms、4/4 模型输出采用，四个请求 4956/4268/3590/3665 ms；该轮仅有交互式文字记录。第二轮浏览器 manifest 为主要可复核证据，记录 4 workers、5 artifacts、seq 9/10/15、`external_side_effect=none` 和六张截图。封口为 Python `178 passed, 1 skipped in 6.31s`、浏览器 `41 passed (2.0m)`，Ruff、lint、build、governance 与 diff-check 通过。实现提交为 `252f8d02725f341137f1580d4230003d2477ecca`，对应 [PR #22](https://github.com/Dickey007s/lenovo_agent/pull/22)；精确证据见 [`DEMO2-CONTROLLED-EXECUTION-20260821`](evidence/DEMO2-CONTROLLED-EXECUTION-EVIDENCE-20260821.md)。该结论不覆盖 API 重启/跨进程恢复、后台队列、真实 Connector、生产身份、通用动态调度、成本/质量效果或用户研究。
 
 ## Demo 3 动作影响账本（DR-0012，Verified 限定范围）
 

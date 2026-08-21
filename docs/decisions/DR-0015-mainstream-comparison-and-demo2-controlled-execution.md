@@ -8,6 +8,8 @@
 | Status | `Limited Verified`（仅固定客户 A、单 API 进程、memory、真实模型受控内部执行）；技术差异与用户价值仍为 `Design claim / Draft` |
 | Scope | 汇报用技术对比、八模块缺口，以及 Demo 2 从 Admission 到无外部副作用的受控内部执行纵切 |
 | Depends on | `DR-0008`、`DR-0011`、`DR-0012`、`DR-0013`、`docs/research/COMPETITOR-RESEARCH-OPENCLAW-CODEX-CLAUDE-CODE-20260821.md` |
+| Implementation | `252f8d02725f341137f1580d4230003d2477ecca`；[PR #22](https://github.com/Dickey007s/lenovo_agent/pull/22) |
+| Evidence | [`DEMO2-CONTROLLED-EXECUTION-20260821`](../evidence/DEMO2-CONTROLLED-EXECUTION-EVIDENCE-20260821.md) |
 
 ## 1. 场景与问题
 
