@@ -4,7 +4,7 @@
 
 最终原始参考集及“下一步重点”逐条覆盖矩阵见 [`docs/final-reference/`](final-reference/README.md)。
 
-当前实现事实仍以源码、`README.md`、`ARCHITECTURE.md`、`WORKSPACE_AND_STREAMING.md` 和 `GOVERNANCE_AND_ACTIONS.md` 为准。固定 Demo 1 已落地 Task Contract、服务端 Task/Branch Snapshot、只读 Artifact Workspace、局部 Conflict、控制状态机、Commit 和顺序 API 进程恢复；DR-0007 又落地了已验证客户回复到治理 Run 的窄桥。真正后台持续的 Loop、跨端身份、动态 Worker、通用 Shared Artifact Workspace/Conflict Resolver 和真实 Connector 仍是目标能力。
+当前实现事实仍以源码、`README.md`、`ARCHITECTURE.md`、`WORKSPACE_AND_STREAMING.md` 和 `GOVERNANCE_AND_ACTIONS.md` 为准。固定 Demo 1 已落地 Task Contract、服务端 Task/Branch Snapshot、只读 Artifact Workspace、局部 Conflict、控制状态机、Commit 和顺序 API 进程恢复；DR-0007 落地已验证客户回复到治理 Run 的窄桥；DR-0015 又在固定客户 A、单 API 进程 memory 内落地受控模型 Worker、SharedArtifactVersion、固定事实冲突重排和无外部副作用回执。真正后台持续的 Loop、跨端身份、通用动态 Worker/Conflict Resolver 和真实 Connector 仍是目标能力。
 
 ## 1. 需要解决的问题
 
@@ -38,13 +38,13 @@
 | 组件 | 目标职责 | 当前仓库基础 | 主要缺口 |
 | --- | --- | --- | --- |
 | Task Contract | 定义 Task ID、目标、边界、交付物、来源范围和完成条件 | 固定 Demo 1 已有严格 Task Contract、3 项 Deliverable 与完成条件 | 缺少通用契约模板、修改/取消和生产权限语义 |
-| Durable Task State | 保存事件、分支、版本、控制事件和中间工件 | 固定 Task Snapshot/Event/ArtifactVersion 已支持 PostgreSQL 顺序 API 进程恢复；Run、Workspace、Audit 与 checkpoint 可持久化 | 缺少通用长期执行状态、数据库故障/多实例证据；Thread/Message 仍在内存 |
-| Context State Manager | 按步骤、权限和版本组装最小上下文投影 | `trusted_context`、`workspace_context` 和来源引用 | 缺少按步骤的上下文投影、版本污染控制和预算策略 |
-| Execution Loop | Observe → Plan → Act → Verify → Commit | LangGraph 已用于治理 Gate | 尚无可后台持续运行的长期任务循环 |
-| Capability Runtime | 统一模型、工具、Connector、沙箱和临时 Worker 调度 | Tool Gateway 和 5 个 Simulator capability | 缺少真实 Connector、通用沙箱、资源预算和 Worker 生命周期 |
+| Durable Task State | 保存事件、分支、版本、控制事件和中间工件 | 固定 Task 状态支持 PostgreSQL 顺序 API 进程恢复；Demo 2 Execution Snapshot/Event 当前为 memory | 缺少 Demo 2 持久化、通用长期执行状态、数据库故障/多实例证据；Thread/Message 仍在内存 |
+| Context State Manager | 按步骤、权限和版本组装最小上下文投影 | `trusted_context`、`workspace_context`、来源引用；Demo 2 Worker 使用固定 allowlisted 文件事实 | 缺少通用按步骤投影、Worker 版本隔离和预算策略 |
+| Execution Loop | Observe → Plan → Act → Verify → Commit | LangGraph 用于治理 Gate；Demo 1 有固定阶段；Demo 2 有单进程执行、并行 Worker、重排、验证和完成事件 | 尚无后台队列、跨进程恢复、暂停/恢复、预算耗尽和通用重规划 |
+| Capability Runtime | 统一模型、工具、Connector、沙箱和临时 Worker 调度 | Tool Gateway、5 个 Simulator capability，以及 Demo 2 受限 `deepseek-v4-pro` Worker 生命周期 | 缺少真实 Connector、通用沙箱、资源账本和跨进程 Worker lease |
 | Evidence & Quality Verifier | 校验来源、一致性、覆盖度、质量与工件冲突 | 固定 Fixture 已有 VerificationReport、局部 Conflict 与重验证；业务动作有 Evidence Resolver | 缺少通用跨工件质量规则、真实来源解析和可扩展冲突策略 |
-| Control Policy | 决定继续、暂停分支、重规划、降级、接管或停止 | Risk/Policy/ControlPlan 已覆盖业务动作；固定 Task 有 Steer/Pause/Take over 状态机与预算门 | 缺少 Steer 实际重规划、通用停止/降级和跨分支调度 |
-| Trace & Checkpoints | 记录状态提交、工具、证据、版本、控制和恢复点 | TaskEvent/ArtifactVersion/Commit、Audit SSE、Trace API、Postgres checkpoint | 缺少中间阶段可见 checkpoint、统一恢复 UI 和跨域 Trace 视图 |
+| Control Policy | 决定继续、暂停分支、重规划、降级、接管或停止 | Risk/Policy/ControlPlan 覆盖业务动作；固定 Task 有控制状态；Demo 2 固定事实冲突可增派核验 | 缺少通用 Worker 停止/降级/预算/人工接管和跨分支调度 |
+| Trace & Checkpoints | 记录状态提交、工具、证据、版本、控制和恢复点 | TaskEvent/ArtifactVersion/Commit、Audit SSE、Trace API、Postgres checkpoint；Demo 2 有 memory Snapshot/SSE/Receipt | 缺少 Demo 2 持久化、统一恢复 UI 和跨域 Trace 视图 |
 
 这张表是实施边界，不是完成度宣传。扩展时应复用当前成熟的动作治理链路，而不是另建一套可绕过 RunService 的授权系统。
 
@@ -108,9 +108,15 @@ Worker 使用隔离上下文和最小权限；事实、来源、负责人、状�
 
 2026-08-17 的第一纵切先验证用户能否看懂“今天有哪些工作、准备采用什么方式”，不把动态 Worker 作为首屏价值。服务端 `WorkCockpitSnapshot` 固定返回四项演示任务：客户 A 经营汇报、供应商邮件回复、周报格式统一、报销异常核查。后三项分别由 Admission 固定选择 Single Agent、Fixed Workflow、Tool Call；客户 A 保持待决定，并允许 Single Agent、Fixed Workflow、Adaptive Swarm 三种模式。
 
-用户可以查看固定队列中的路由解释，并将客户 A 的路由选择限定为“仅本次生效”；拖拽调序和长期排序偏好留待后续。复杂任务打开 Admission 时展示 Value、Breadth、Parallelism、Deadline、Risk、Budget 六类依据。Adaptive Swarm 在本纵切只能处于“推荐”或“本次已选择”，其 `execution_status` 必须保持 `not_started`；没有真实 Worker、Connector、计费或端到端运行证据，不得显示已启动、运行中、已完成或节省成本。
+用户可以查看固定队列中的路由解释，并将客户 A 的路由选择限定为“仅本次生效”；拖拽调序和长期排序偏好留待后续。复杂任务打开 Admission 时展示 Value、Breadth、Parallelism、Deadline、Risk、Budget 六类依据。第一纵切的 route mutation 只能处于“推荐”或“本次已选择”，其 `execution_status` 必须保持 `not_started`；它自身不能显示已启动、运行中、已完成或节省成本。下方第二纵切通过独立命令启动，不改变这个选择/执行分离不变量。
 
 当前已实现 `WorkCockpitSnapshot`、四项固定演示工作、三项轻量固定路由、客户 A 三种允许模式、版本/幂等路由选择与驾驶舱前台。成本与时效只允许以 `route_profiles[].forecast.source_type=fixture_policy_forecast` 出现，表示演示策略预测，不是实际账单、实测耗时或生产 SLA。具体场景、事实映射、工程证据和边界见 [`DR-0008`](decisions/DR-0008-demo2-explainable-admission.md)、[`SCENARIO-002`](scenarios/SCENARIO-002-demo2-explainable-admission.md) 和 [`Demo 2 PR-1 Evidence`](evidence/DEMO2-PR1-EXPLAINABLE-ADMISSION-EVIDENCE-20260817.md)。
+
+### 6.2 Demo 2 第二纵切：受控内部执行（DR-0015，Limited Verified）
+
+2026-08-21 的第二纵切保留“选择不等于执行”，新增独立 execution command。固定客户 A 选择 Adaptive Swarm 后，用户显式启动；服务端创建 `Demo2ExecutionSnapshot`，并行运行收入事实、项目风险、客户要求三个受限模型工作单元。文件中的确认收入/预测收入冲突触发 sequence 9 `DYNAMIC_REPLAN` 和 sequence 10 `WORKER_ADDED`，增派收入口径核验；最终 sequence 15 完成，形成 4 个 Worker、5 个 SharedArtifactVersion 和 `external_side_effect=none` 的回执。
+
+模型固定为 `deepseek-v4-pro`，只生成受限业务摘要和要点；服务端拥有身份、来源、依赖、状态、事件、工件版本/digest、验证和回执。当前 Execution Store/锁/幂等/SSE 均在单 API 进程 memory 内，API 重启无恢复，也没有真实 Connector、生产身份或外部动作。两轮 live 模型和六张截图见 [`DEMO2-CONTROLLED-EXECUTION-20260821`](evidence/DEMO2-CONTROLLED-EXECUTION-EVIDENCE-20260821.md)。这证明固定工程路径，不证明通用 Adaptive Swarm、用户理解或成本/质量改善。
 
 ### Demo 3：真实动作 Risk Gate
 
@@ -187,6 +193,34 @@ Demo 1 的实施决策、场景、协议和前台事实映射已经固定在 [`D
 6. 用离线基准验证 Admission 后，再引入动态 Worker 和 Control Plane。
 7. 最后扩展前端驾驶舱、分支控制和跨端体验，并保持当前动作治理不变量。
 
-`DR-0008` 是在真实 Swarm 之前的产品/协议验证纵切，不改变上述实施顺序：当前只把单进程 memory 驾驶舱、Admission 解释和受限选择标为限定范围 `Verified`；动态 Worker、共享工件、执行循环、Verifier/Resolver、持久恢复和用户价值仍是尚未完成的目标能力，不进入当前完成清单。
+`DR-0008` 是执行前的产品/协议验证纵切；`DR-0015` 进一步把固定客户 A 的受控模型 Worker、共享工件、固定事实冲突增派、验证和无外部副作用回执标为单 API 进程 memory 范围的 `Limited Verified`。通用动态 Worker/Resolver、后台队列、持久恢复、真实 Connector、生产身份和用户价值仍是尚未完成的目标能力，不进入当前完成清单。
 
 每一步都必须保留当前稳定行为，并通过局部协议和回归测试接入；不得为了展示 Loop 或 Swarm 而绕过现有安全链。
+
+## 11. 2026-08 汇报对比补充（Draft）
+
+本节用于汇报准备，不改变当前协议或实现状态。主流方案的能力判断来自 [`COMPETITOR-RESEARCH-OPENCLAW-CODEX-CLAUDE-CODE-20260821`](research/COMPETITOR-RESEARCH-OPENCLAW-CODEX-CLAUDE-CODE-20260821.md) 的官方材料登记；官方材料不是竞品实测，不能据此宣称竞品做不到某项业务能力。
+
+| 维度 | OpenClaw / Codex / Claude Code 的公开主流形态 | Office Agent 目标设计 | 用户交互变化 | 当前状态 |
+| --- | --- | --- | --- | --- |
+| 执行中心 | Gateway、代码仓库/终端、当前目录和 session | 业务 Task、Branch、Artifact、ControlEvent 成为一等事实 | 用户看“我的哪项业务工作正在推进”，不只看命令或线程 | Draft |
+| 多 Agent | 独立 Agent、并行 thread、subagent/background、worktree 或 workspace 隔离 | Admission 后创建有边界 Worker，结果汇入 SharedArtifactVersion | 用户看到业务工作单元、依赖和重排，不用追踪 Agent 对话 | 固定客户 A `Limited Verified`；通用化 Draft |
+| 事实与版本 | transcript、diff、worktree、session/task state | 来源文档/字段、版本、digest、验证状态绑定业务工件 | 冲突卡解释旧事实、当前操作和暂停原因 | Demo 1 有限定工程证据；通用 Draft |
+| 权限与审批 | 工具策略、sandbox、host approval、permission mode、hooks | Risk/Evidence/Approval/Permit 绑定语义动作、工件版本和目标影响 | 用户确认“会改变什么”，而不是只批准一条命令 | Demo 3 固定路径限定 Verified；通用 Draft |
+| 影响反馈 | diff、tool、command、task/session 可观察性 | `impact_preview → execution_receipt` 双时态事实链 | 提交前预演，提交后只显示真实回执；结果未知则待核对 | 各 Demo 固定纵切；跨 Demo Draft |
+| 恢复与失败 | session resume、rewind、fork、cron/task state | 源版本变化、证据冲突、未知结果 fail closed，保留草稿/Commit | 用户知道重核什么，不会被旧结果静默覆盖 | Draft |
+
+### 11.1 八模块成熟度和缺口（汇报用）
+
+| 模块 | 已有基础 | 仍需补齐 | 汇报不可夸大 |
+| --- | --- | --- | --- |
+| Task Contract | Demo 1 固定任务契约 | 通用模板、修改/取消、Worker 子契约 | 不是全业务通用 |
+| Durable Task State | Task/Event/Artifact/Commit 有固定 PostgreSQL 恢复；Demo 2 Execution 为 memory | Demo 2 持久化、跨进程并发、事件缺口回放 | 不是全系统高可用 |
+| Context State Manager | `trusted_context`、`workspace_context`、来源引用；Demo 2 固定文件事实投影 | 通用最小权限投影、Worker 版本隔离、预算上下文 | 固定来源不等于完整上下文治理 |
+| Execution Loop | Demo 1 固定阶段；Demo 2 单进程执行、并行 Worker、固定冲突重排和事件流 | 后台队列、暂停恢复、预算和任意重排 | 固定纵切不等于无人值守后台 Loop |
+| Capability Runtime | Tool Gateway、5 个 Simulator、Demo 2 受限模型 Worker | Connector、沙箱、资源账本、跨进程 Worker lease | 模型 Worker 不等于真实外部业务执行 |
+| Evidence & Quality Verifier | 固定来源、Conflict、VerificationReport | 跨工件质量规则、真实解析、通用 Resolver | 固定场景不能外推 |
+| Control Policy | Risk/Policy/ControlPlan、Task 控制状态、Demo 2 固定事实冲突增派 | 通用 Worker 停止、降级、预算和重排 | 固定触发不等于通用动态调度 |
+| Trace & Checkpoints | TaskEvent、ArtifactVersion、Commit、Audit SSE、checkpoint；Demo 2 memory Snapshot/SSE/receipt | Demo 2 持久化、统一业务 Trace、可视化恢复点、跨域回放 | 单进程 trace 不等于生产恢复 |
+
+上述表格是目标设计和缺口清单。除文中明确标为 Verified 的固定纵切，其余均为 Draft/待验证。

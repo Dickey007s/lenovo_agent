@@ -1,6 +1,7 @@
 import { expect, test, type Page, type TestInfo } from "@playwright/test";
 import type {
   Demo2CockpitSnapshot,
+  Demo2ExecutionSnapshot,
   Demo2RouteImpactPreview,
   Demo2RouteMode,
   Demo2RouteProfile,
@@ -131,7 +132,7 @@ test.describe("Demo 2 work cockpit", () => {
     await expect(callTrace.getByText("本次用了什么", { exact: true })).toBeVisible();
     await callTrace.locator("summary").click();
     await expect(callTrace.getByText("任务条件评估", { exact: true })).toBeVisible();
-    await expect(callTrace.getByText("协作单元", { exact: true })).toBeVisible();
+    await expect(callTrace.getByText("受控协作运行时", { exact: true })).toBeVisible();
     await expect(callTrace.getByText("大模型 0", { exact: true })).toBeVisible();
     await expect(callTrace.getByText("外部工具 0", { exact: true })).toBeVisible();
     const confirmButton = decision.getByRole("button", { name: "记录本轮方式" });
@@ -263,5 +264,244 @@ test.describe("Demo 2 work cockpit", () => {
     }).length);
     expect(undersized).toBe(0);
     await attachScreenshot(page, testInfo, "demo2-route-impact-preview-mobile");
+  });
+
+  test("starts the selected adaptive swarm and renders server SSE work-package convergence", async ({ page }) => {
+    const initial = cockpitFixture();
+    const base = initial.items[0];
+    const selectedReceipt = selectionReceipt("adaptive_swarm");
+    const selected = {
+      ...base,
+      admission_status: "route_selected" as const,
+      selected_mode: "adaptive_swarm" as const,
+      selection_source: "admission" as const,
+      override_scope: null,
+      selection_receipt: selectedReceipt,
+      selection_receipts: [selectedReceipt],
+      version: 2,
+      last_event_sequence: 2,
+      last_event_type: "ROUTE_SELECTED" as const,
+    };
+    const runningExecution: Demo2ExecutionSnapshot = {
+      execution_id: "demo2-execution-fake",
+      owner_id: "demo_user",
+      work_item_id: "customer_a_operating_review",
+      mode: "adaptive_swarm" as const,
+      version: 1,
+      status: "running" as const,
+      source_document_ids: ["crm-customer-a", "forecast-customer-a", "project-customer-a", "mail-customer-a"],
+      worker_runs: [
+        { worker_run_id: "facts", label: "经营事实核对", role: "revenue_analyst", objective: "核对 CRM 与预测中的经营口径。", status: "running", source_document_ids: ["crm-customer-a", "forecast-customer-a"], trigger: "initial_plan", artifact_version_id: null, depends_on: [], processing: null },
+        { worker_run_id: "risk", label: "项目风险提取", role: "project_risk_analyst", objective: "从项目周报提取延期和风险。", status: "queued", source_document_ids: ["project-customer-a"], trigger: "initial_plan", artifact_version_id: null, depends_on: [], processing: null },
+        { worker_run_id: "dependencies", label: "汇报依赖整理", role: "request_context_analyst", objective: "整理日历截止时间和汇报依赖。", status: "queued", source_document_ids: ["mail-customer-a"], trigger: "initial_plan", artifact_version_id: null, depends_on: [], processing: null },
+      ],
+      artifacts: [],
+      events: [{ execution_id: "demo2-execution-fake", sequence: 1, event_type: "DYNAMIC_REPLAN", status: "running", worker_run_id: "facts", artifact_version_id: null, message: "已派发三个业务工作包", details: { reason: "recognized_revenue_vs_forecast_revenue" } }],
+      receipt: null,
+      last_event_sequence: 1,
+      budget_max_workers: 3,
+      budget_max_worker_runs: 4,
+    };
+    const processing = [
+      { path: "language_model", kind: "language_model", label: "模型 Worker", model_called: true, model: "deepseek-v4-pro", elapsed_ms: 812, output_used: "model", fallback_reason: null },
+      { path: "deterministic", kind: "deterministic", label: "确定性演示 Worker", model_called: false, model: null, elapsed_ms: 34, output_used: "deterministic", fallback_reason: null },
+      { path: "language_model", kind: "language_model", label: "模型调用后使用安全回退", model_called: true, model: "deepseek-v4-pro", elapsed_ms: 901, output_used: "template_fallback", fallback_reason: "ValidationError" },
+    ] as const;
+    const workerArtifacts = runningExecution.worker_runs.map((unit, index) => ({
+      artifact_version_id: `${unit.worker_run_id}-artifact`,
+      artifact_id: `${unit.worker_run_id}-finding`,
+      version: 1,
+      title: `${unit.label}结果`,
+      kind: "worker_finding" as const,
+      status: "validated" as const,
+      source_document_ids: unit.source_document_ids,
+      content: { summary: `${unit.label}已完成。` },
+      created_at: "2026-08-21T00:00:00Z",
+      processing: processing[index],
+    }));
+    const completedExecution: Demo2ExecutionSnapshot = {
+      ...runningExecution,
+      version: 8,
+      status: "completed",
+      worker_runs: runningExecution.worker_runs.map((unit, index) => ({ ...unit, status: "completed", artifact_version_id: `${unit.worker_run_id}-artifact`, processing: processing[index] })),
+      artifacts: [...workerArtifacts, { artifact_version_id: "report-artifact", artifact_id: "shared-fake", version: 2, title: "客户 A 经营汇报包", kind: "verified_report_bundle", status: "validated", source_document_ids: runningExecution.source_document_ids ?? [], content: { summary: "三个工作包均已完成来源校验。" }, created_at: "2026-08-21T00:00:00Z" }],
+      events: [...runningExecution.events, { execution_id: "demo2-execution-fake", sequence: 8, event_type: "EXECUTION_COMPLETED", status: "completed", worker_run_id: null, artifact_version_id: "report-artifact", message: "共享工件已验证", details: {} }],
+      receipt: { receipt_id: "receipt-fake", execution_id: "demo2-execution-fake", work_item_id: "customer_a_operating_review", worker_run_ids: ["facts", "risk", "dependencies"], artifact_version_ids: ["facts-artifact"], final_artifact_version_id: "facts-artifact", status: "completed" as const, summary: "内部工作包已汇总；没有发生外部系统写入。", external_side_effect: "none" as const, started_at: "2026-08-21T00:00:00Z", completed_at: "2026-08-21T00:00:01Z" },
+      last_event_sequence: 8,
+    };
+    const staleExecution: Demo2ExecutionSnapshot = { ...runningExecution, version: 2, last_event_sequence: 2 };
+    let releaseSse: (() => void) | undefined;
+    const sseGate = new Promise<void>((resolve) => { releaseSse = resolve; });
+    let releaseStaleGet: (() => void) | undefined;
+    const staleGetGate = new Promise<void>((resolve) => { releaseStaleGet = resolve; });
+    let executionReads = 0;
+    let cockpit = { ...initial, version: 2, last_event_sequence: 6, items: [selected, ...initial.items.slice(1)] };
+    await page.route("**/v1/demo2/cockpit", async (route) => route.fulfill({ json: cockpit }));
+    await page.route("**/v1/demo2/work-items/*/execution", async (route) => {
+      if (route.request().method() === "GET") {
+        executionReads += 1;
+        if (executionReads === 1) {
+          await staleGetGate;
+          await route.fulfill({ json: staleExecution });
+          return;
+        }
+        await route.fulfill({ json: completedExecution });
+        releaseStaleGet?.();
+        return;
+      }
+      const item = { ...selected, execution_id: runningExecution.execution_id, execution_status: "running" as const, execution: runningExecution };
+      cockpit = { ...cockpit, version: 3, last_event_sequence: 7, items: [item, ...cockpit.items.slice(1)] };
+      await route.fulfill({ json: { cockpit_version: 3, cockpit_last_event_sequence: 7, item, execution: runningExecution } });
+    });
+    await page.route("**/v1/demo2/work-items/*/execution/events**", async (route) => {
+      await sseGate;
+      const item = { ...selected, execution_status: "completed" as const, execution: completedExecution };
+      cockpit = { ...cockpit, version: 4, last_event_sequence: 8, items: [item, ...cockpit.items.slice(1)] };
+      const started = JSON.stringify({ execution_id: "demo2-execution-fake", sequence: 2, event_type: "WORKER_STARTED", status: "running", message: "经营事实核对已开始", details: {} });
+      const completed = JSON.stringify({ execution_id: "demo2-execution-fake", sequence: 8, event_type: "EXECUTION_COMPLETED", status: "completed", message: "共享工件已验证", details: {} });
+      await route.fulfill({
+        status: 200,
+        headers: { "content-type": "text/event-stream", "cache-control": "no-cache" },
+        body: `id: 2\nevent: WORKER_STARTED\ndata: ${started}\n\nid: 2\ndata: ${started}\n\nid: 8\nevent: EXECUTION_COMPLETED\ndata: ${completed}\n\nid: 8\ndata: ${completed}\n\n`,
+      });
+    });
+
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto("/");
+    await expect(page.getByRole("button", { name: /启动本次协作/ })).toBeVisible();
+    await page.getByRole("button", { name: /启动本次协作/ }).click();
+    await expect(page.getByRole("heading", { name: "业务工作包正在收敛" })).toBeVisible();
+    releaseSse?.();
+    await expect(page.getByRole("heading", { name: "业务工作包已收敛" })).toBeVisible();
+    await expect(page.locator(".demo2-work-unit-grid").getByText("经营事实核对", { exact: true })).toBeVisible();
+    await expect(page.locator(".demo2-work-unit-grid").getByText("允许来源", { exact: true }).first()).toBeVisible();
+    await expect(page.locator(".demo2-work-unit-grid").getByText("销售预测", { exact: true })).toBeVisible();
+    await expect(page.locator(".demo2-work-unit-grid").getByText("模型已调用 · deepseek-v4-pro", { exact: true })).toBeVisible();
+    await expect(page.locator(".demo2-work-unit-grid").getByText("确定性处理", { exact: true })).toBeVisible();
+    await expect(page.locator(".demo2-work-unit-grid").getByText("模板回退", { exact: true })).toBeVisible();
+    await expect(page.locator(".demo2-work-unit-grid")).not.toContainText("等待人");
+    await expect(page.locator(".demo2-work-unit-grid")).not.toContainText("验证中");
+    const callTrace = page.locator(".work-cockpit-overview .agent-call-trace");
+    await expect(callTrace.getByText("模型采用 1", { exact: true })).toBeVisible();
+    await expect(callTrace.getByText("模型回退 1", { exact: true })).toBeVisible();
+    await expect(callTrace.getByText("确定性 1", { exact: true })).toBeVisible();
+    await page.locator(".demo2-replan-log summary").click();
+    await expect(page.getByText("已派发三个业务工作包", { exact: true })).toBeVisible();
+    await expect(page.getByText("正式收入与预测收入存在口径冲突，需要增加专项核验。", { exact: true })).toBeVisible();
+    await expect(page.getByText("本次协作已完成", { exact: true })).toBeVisible();
+    await expect(page.getByText("不会发送邮件、写入 CRM 或调用外部业务系统", { exact: true })).toBeVisible();
+    await expect(page.locator("body")).not.toContainText("demo2-execution-fake");
+    await expect(page.locator("body")).not.toContainText("shared-fake");
+    await expect(page.locator("body")).not.toContainText("recognized_revenue_vs_forecast_revenue");
+    expect(executionReads).toBe(2);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)).toBe(false);
+  });
+
+  test("reconnects the execution event stream after reloading an existing run", async ({ page }) => {
+    const fixture = cockpitFixture();
+    const receipt = selectionReceipt("adaptive_swarm");
+    const running: Demo2ExecutionSnapshot = {
+      execution_id: "existing-execution",
+      owner_id: "demo_user",
+      work_item_id: "customer_a_operating_review",
+      mode: "adaptive_swarm",
+      version: 4,
+      status: "running",
+      last_event_sequence: 4,
+      source_document_ids: ["crm-customer-a"],
+      worker_runs: [{ worker_run_id: "facts", label: "经营事实核对", objective: "核对经营口径。", role: "revenue_analyst", depends_on: [], source_document_ids: ["crm-customer-a"], trigger: "initial_plan", status: "running", artifact_version_id: null, processing: null }],
+      artifacts: [],
+      events: [],
+      receipt: null,
+      budget_max_workers: 3,
+      budget_max_worker_runs: 4,
+    };
+    const selected = { ...fixture.items[0], admission_status: "route_selected" as const, selected_mode: "adaptive_swarm" as const, selection_source: "admission" as const, selection_receipt: receipt, selection_receipts: [receipt], execution_id: running.execution_id, execution_status: "running" as const };
+    const cockpit = { ...fixture, version: 4, items: [selected] };
+    let streamConnections = 0;
+    await page.route("**/v1/demo2/cockpit", async (route) => route.fulfill({ json: cockpit }));
+    await page.route("**/v1/demo2/work-items/*/execution", async (route) => route.fulfill({ json: running }));
+    await page.route("**/v1/demo2/work-items/*/execution/events**", async (route) => {
+      streamConnections += 1;
+      await route.fulfill({ status: 200, headers: { "content-type": "text/event-stream" }, body: ": heartbeat\n\n" });
+    });
+
+    await page.goto("/");
+    await expect(page.getByRole("heading", { name: "业务工作包正在收敛" })).toBeVisible();
+    await expect.poll(() => streamConnections).toBeGreaterThanOrEqual(1);
+    const beforeReload = streamConnections;
+    await page.reload();
+    await expect(page.getByRole("heading", { name: "业务工作包正在收敛" })).toBeVisible();
+    await expect.poll(() => streamConnections).toBeGreaterThan(beforeReload);
+  });
+
+  test("refreshes intermediate worker failure events and offers a truthful reconnect", async ({ page }) => {
+    const fixture = cockpitFixture();
+    const receipt = selectionReceipt("adaptive_swarm");
+    const running: Demo2ExecutionSnapshot = {
+      execution_id: "failure-execution",
+      owner_id: "demo_user",
+      work_item_id: "customer_a_operating_review",
+      mode: "adaptive_swarm",
+      version: 4,
+      status: "running",
+      last_event_sequence: 4,
+      source_document_ids: ["crm-customer-a", "project-customer-a"],
+      worker_runs: [
+        { worker_run_id: "facts", label: "经营事实核对", objective: "核对经营口径。", role: "revenue_analyst", depends_on: [], source_document_ids: ["crm-customer-a"], trigger: "initial_plan", status: "running", artifact_version_id: null, processing: null },
+        { worker_run_id: "risk", label: "项目风险提取", objective: "提取项目风险。", role: "project_risk_analyst", depends_on: [], source_document_ids: ["project-customer-a"], trigger: "initial_plan", status: "queued", artifact_version_id: null, processing: null },
+      ],
+      artifacts: [],
+      events: [],
+      receipt: null,
+      budget_max_workers: 3,
+      budget_max_worker_runs: 4,
+    };
+    const interrupted: Demo2ExecutionSnapshot = {
+      ...running,
+      version: 6,
+      last_event_sequence: 6,
+      worker_runs: [
+        { ...running.worker_runs[0], status: "failed", error_code: "worker_result_invalid" },
+        { ...running.worker_runs[1], status: "cancelled", error_code: "peer_failed" },
+      ],
+      events: [
+        { execution_id: running.execution_id, sequence: 5, event_type: "WORKER_FAILED", status: "running", worker_run_id: "facts", artifact_version_id: null, message: "经营事实核对失败", details: { error_code: "worker_result_invalid" } },
+        { execution_id: running.execution_id, sequence: 6, event_type: "WORKER_CANCELLED", status: "running", worker_run_id: "risk", artifact_version_id: null, message: "项目风险提取已取消", details: { error_code: "peer_failed" } },
+      ],
+    };
+    const selected = { ...fixture.items[0], admission_status: "route_selected" as const, selected_mode: "adaptive_swarm" as const, selection_source: "admission" as const, selection_receipt: receipt, selection_receipts: [receipt], execution_id: running.execution_id, execution_status: "running" as const };
+    const cockpit = { ...fixture, version: 4, items: [selected] };
+    let executionReads = 0;
+    let streamConnections = 0;
+    await page.route("**/v1/demo2/cockpit", async (route) => route.fulfill({ json: cockpit }));
+    await page.route("**/v1/demo2/work-items/*/execution", async (route) => {
+      executionReads += 1;
+      await route.fulfill({ json: executionReads === 1 ? running : interrupted });
+    });
+    await page.route("**/v1/demo2/work-items/*/execution/events**", async (route) => {
+      streamConnections += 1;
+      const failed = JSON.stringify(interrupted.events[0]);
+      const cancelled = JSON.stringify(interrupted.events[1]);
+      await route.fulfill({
+        status: 200,
+        headers: { "content-type": "text/event-stream" },
+        body: `id: 5\nevent: WORKER_FAILED\ndata: ${failed}\n\nid: 5\ndata: ${failed}\n\nid: 6\nevent: WORKER_CANCELLED\ndata: ${cancelled}\n\nid: 6\ndata: ${cancelled}\n\n`,
+      });
+    });
+
+    await page.goto("/");
+    await expect(page.getByRole("article", { name: "经营事实核对 · 失败" })).toBeVisible();
+    await expect(page.getByRole("article", { name: "项目风险提取 · 已取消" })).toBeVisible();
+    await expect(page.getByRole("article", { name: "经营事实核对 · 失败" }).getByText("处理失败", { exact: true })).toBeVisible();
+    const error = page.locator(".work-cockpit-error");
+    await expect(error.getByText("协作进展需要重新连接", { exact: true })).toBeVisible();
+    await expect(error).toContainText("已保留服务端已返回的状态");
+    expect(executionReads).toBe(3);
+    expect(streamConnections).toBe(1);
+
+    await error.getByRole("button", { name: "重新读取" }).click();
+    await expect.poll(() => streamConnections).toBeGreaterThanOrEqual(2);
+    expect(executionReads).toBeGreaterThanOrEqual(4);
   });
 });

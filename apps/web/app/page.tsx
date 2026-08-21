@@ -29,7 +29,7 @@ import {
 } from "@tabler/icons-react";
 
 import type { TaskEvent, TaskEventType, TaskPhase, TaskSnapshot } from "./task-types";
-import type { Demo2CockpitSnapshot, Demo2RouteMode, Demo2RouteSelectionResult } from "./demo2-types";
+import type { Demo2CockpitSnapshot, Demo2ExecutionSnapshot, Demo2ExecutionStartResult, Demo2RouteMode, Demo2RouteSelectionResult } from "./demo2-types";
 import { TaskArtifactWorkspace } from "./task-artifact-workspace";
 import {
   calculateQuoteSummary,
@@ -177,6 +177,13 @@ const TASK_EVENT_TYPES: TaskEventType[] = [
   "CONFLICT_RESOLVED", "CONTROL_ACCEPTED", "CONTROL_APPLIED", "CONTROL_REJECTED",
   "BUDGET_UPDATED", "CHECKPOINT_COMMITTED", "TASK_COMMITTED", "TASK_FAILED",
 ];
+const DEMO2_EXECUTION_EVENT_TYPES = [
+  "EXECUTION_QUEUED", "EXECUTION_STARTED", "WORKER_STARTED", "WORKER_COMPLETED",
+  "WORKER_FAILED", "WORKER_CANCELLED",
+  "DYNAMIC_REPLAN", "WORKER_ADDED", "EXECUTION_VERIFYING", "ARTIFACT_VERIFIED",
+  "EXECUTION_COMPLETED", "EXECUTION_FAILED", "EXECUTION_CANCELLED",
+] as const;
+const DEMO2_TERMINAL_STATUSES: Demo2ExecutionSnapshot["status"][] = ["completed", "failed", "cancelled"];
 const TASK_STATUS_LABELS: Record<TaskSnapshot["status"], string> = {
   ready: "等待启动", running: "运行中", waiting_input: "等待你的决定", paused: "已暂停",
   taken_over: "由你接管", verifying: "正在验证", committed: "已验证并提交",
@@ -758,6 +765,11 @@ export default function Home() {
   const [demo2Error, setDemo2Error] = useState("");
   const [selectedDemo2WorkItemId, setSelectedDemo2WorkItemId] = useState<string | null>(null);
   const [demo2DraftMode, setDemo2DraftMode] = useState<Demo2RouteMode | null>(null);
+  const [demo2ExecutionLoading, setDemo2ExecutionLoading] = useState(false);
+  const demo2ExecutionStreamRef = useRef<{ source: EventSource; workItemId: string; executionId: string } | null>(null);
+  const demo2ExecutionIdentityRef = useRef<Record<string, string>>({});
+  const demo2ExecutionSnapshotRef = useRef<Record<string, { executionId: string; sequence: number; version: number }>>({});
+  const demo2ExecutionEventSequenceRef = useRef<Record<string, number>>({});
   const [workspaceWidth, setWorkspaceWidth] = useState(0);
   const shellRef = useRef<HTMLElement>(null);
   const conversationRef = useRef<HTMLDivElement>(null);
@@ -776,6 +788,11 @@ export default function Home() {
   const demo2RouteKeyRef = useRef<{ workItemId: string; mode: Demo2RouteMode; key: string } | null>(null);
   const stageAdvanceTimerRef = useRef<number | undefined>(undefined);
   const stageAdvanceInFlightRef = useRef<string | null>(null);
+
+  useEffect(() => () => {
+    demo2ExecutionStreamRef.current?.source.close();
+    demo2ExecutionStreamRef.current = null;
+  }, []);
 
   useEffect(() => {
     artifactsRef.current = artifacts;
@@ -880,6 +897,7 @@ export default function Home() {
       const preferred = snapshot.items.find((item) => item.admission_status === "recommended")
         ?? snapshot.items[0]
         ?? null;
+      rememberDemo2CockpitExecutionFacts(snapshot);
       setDemo2Cockpit(snapshot);
       setSelectedDemo2WorkItemId(preferred?.work_item_id ?? null);
       setDemo2DraftMode(preferred?.selected_mode ?? preferred?.recommendation.mode ?? null);
@@ -1036,6 +1054,90 @@ export default function Home() {
       ?? null;
   }, [demo2Cockpit, selectedDemo2WorkItemId]);
 
+  const selectedDemo2ExecutionId = selectedDemo2WorkItem?.execution_id
+    ?? selectedDemo2WorkItem?.execution?.execution_id
+    ?? null;
+  const selectedDemo2ExecutionIsTerminal = Boolean(
+    selectedDemo2WorkItem
+    && DEMO2_TERMINAL_STATUSES.includes(selectedDemo2WorkItem.execution_status),
+  );
+
+  function rememberDemo2CockpitExecutionFacts(snapshot: Demo2CockpitSnapshot) {
+    snapshot.items.forEach((item) => {
+      const executionId = item.execution_id ?? item.execution?.execution_id;
+      if (executionId) demo2ExecutionIdentityRef.current[item.work_item_id] = executionId;
+      if (item.execution) {
+        const known = demo2ExecutionSnapshotRef.current[item.work_item_id];
+        if (
+          !known
+          || known.executionId !== item.execution.execution_id
+          || item.execution.last_event_sequence > known.sequence
+          || (item.execution.last_event_sequence === known.sequence && (item.execution.version ?? 0) >= known.version)
+        ) {
+          demo2ExecutionSnapshotRef.current[item.work_item_id] = {
+            executionId: item.execution.execution_id,
+            sequence: item.execution.last_event_sequence,
+            version: item.execution.version ?? 0,
+          };
+        }
+      }
+    });
+  }
+
+  function mergeDemo2CockpitSnapshot(snapshot: Demo2CockpitSnapshot) {
+    rememberDemo2CockpitExecutionFacts(snapshot);
+    setDemo2Cockpit((current) => ({
+      ...snapshot,
+      items: snapshot.items.map((incoming) => {
+        const previous = current?.items.find((item) => item.work_item_id === incoming.work_item_id);
+        const previousExecution = previous?.execution;
+        const incomingExecution = incoming.execution;
+        if (!previousExecution) return incoming;
+        if (!incomingExecution && incoming.execution_id === previousExecution.execution_id) {
+          return { ...incoming, execution: previousExecution, execution_status: previousExecution.status };
+        }
+        if (
+          incomingExecution?.execution_id === previousExecution.execution_id
+          && incomingExecution.last_event_sequence < previousExecution.last_event_sequence
+        ) {
+          return { ...incoming, execution: previousExecution, execution_status: previousExecution.status };
+        }
+        return incoming;
+      }),
+    }));
+  }
+
+  useEffect(() => {
+    const item = selectedDemo2WorkItem;
+    const workItemId = item?.work_item_id;
+    const executionId = selectedDemo2ExecutionId;
+    if (!item || !workItemId || !executionId || item.execution_status === "not_started" || selectedDemo2ExecutionIsTerminal) {
+      return;
+    }
+    let cancelled = false;
+    const reconnect = async () => {
+      const current = item.execution?.execution_id === executionId
+        ? item.execution
+        : await refreshDemo2Execution(workItemId);
+      if (cancelled || !current || current.execution_id !== executionId || DEMO2_TERMINAL_STATUSES.includes(current.status)) return;
+      const lastEvent = Math.max(
+        current.last_event_sequence,
+        demo2ExecutionEventSequenceRef.current[executionId] ?? 0,
+      );
+      setDemo2ExecutionLoading(true);
+      listenToDemo2Execution(workItemId, executionId, lastEvent);
+    };
+    void reconnect();
+    return () => {
+      cancelled = true;
+      const active = demo2ExecutionStreamRef.current;
+      if (active?.workItemId === workItemId && active.executionId === executionId) {
+        active.source.close();
+        demo2ExecutionStreamRef.current = null;
+      }
+    };
+  }, [selectedDemo2WorkItem?.work_item_id, selectedDemo2ExecutionId, selectedDemo2ExecutionIsTerminal]);
+
   function selectDemo2WorkItem(workItemId: string) {
     const item = demo2Cockpit?.items.find((candidate) => candidate.work_item_id === workItemId);
     if (!item) return;
@@ -1059,12 +1161,27 @@ export default function Home() {
         && demo2DraftMode
         && selected?.allowed_modes.includes(demo2DraftMode),
       );
-      setDemo2Cockpit(snapshot);
+      mergeDemo2CockpitSnapshot(snapshot);
       setSelectedDemo2WorkItemId(selected?.work_item_id ?? null);
       if (!draftStillAllowed) {
         setDemo2DraftMode(selected?.selected_mode ?? selected?.recommendation.mode ?? null);
       }
       setDemo2Error("");
+      const executionId = selected?.execution_id ?? selected?.execution?.execution_id;
+      if (
+        selected
+        && executionId
+        && selected.execution_status !== "not_started"
+        && !DEMO2_TERMINAL_STATUSES.includes(selected.execution_status)
+        && !demo2ExecutionStreamRef.current
+      ) {
+        const execution = await refreshDemo2Execution(selected.work_item_id);
+        if (execution && execution.execution_id === executionId && !DEMO2_TERMINAL_STATUSES.includes(execution.status)) {
+          const after = Math.max(execution.last_event_sequence, demo2ExecutionEventSequenceRef.current[executionId] ?? 0);
+          setDemo2ExecutionLoading(true);
+          listenToDemo2Execution(selected.work_item_id, executionId, after);
+        }
+      }
       return snapshot;
     } catch (reason) {
       setDemo2Error(reason instanceof Error ? reason.message : "今日工作暂时无法读取");
@@ -1127,6 +1244,137 @@ export default function Home() {
           setDemo2Error("确认结果仍待核对；系统保留了同一次请求，请重新读取后继续。");
         }
       }
+    } finally {
+      setDemo2Saving(false);
+    }
+  }
+
+  function applyDemo2ExecutionUpdate(execution: Demo2ExecutionSnapshot, updatedItem?: Demo2CockpitSnapshot["items"][number], workItemId?: string) {
+    const targetWorkItemId = updatedItem?.work_item_id ?? workItemId ?? execution.work_item_id ?? selectedDemo2WorkItemId;
+    if (!targetWorkItemId) return false;
+    if (execution.work_item_id && execution.work_item_id !== targetWorkItemId) return false;
+    const itemExecutionId = updatedItem?.execution_id;
+    if (itemExecutionId && itemExecutionId !== execution.execution_id) return false;
+    if (itemExecutionId) demo2ExecutionIdentityRef.current[targetWorkItemId] = itemExecutionId;
+    const expectedExecutionId = demo2ExecutionIdentityRef.current[targetWorkItemId];
+    if (expectedExecutionId && expectedExecutionId !== execution.execution_id) return false;
+    const known = demo2ExecutionSnapshotRef.current[targetWorkItemId];
+    const incomingVersion = execution.version ?? 0;
+    if (
+      known
+      && known.executionId === execution.execution_id
+      && (
+        execution.last_event_sequence < known.sequence
+        || (execution.last_event_sequence === known.sequence && incomingVersion < known.version)
+      )
+    ) return false;
+    demo2ExecutionIdentityRef.current[targetWorkItemId] = execution.execution_id;
+    demo2ExecutionSnapshotRef.current[targetWorkItemId] = {
+      executionId: execution.execution_id,
+      sequence: execution.last_event_sequence,
+      version: incomingVersion,
+    };
+    setDemo2Cockpit((current) => {
+      if (!current) return current;
+      return {
+        ...current,
+        items: current.items.map((candidate) => candidate.work_item_id === targetWorkItemId
+          ? { ...candidate, ...(updatedItem ?? {}), execution, execution_status: execution.status }
+          : candidate),
+      };
+    });
+    return true;
+  }
+
+  async function refreshDemo2Execution(workItemId: string) {
+    try {
+      const execution = await request<Demo2ExecutionSnapshot>(`/v1/demo2/work-items/${workItemId}/execution`);
+      const applied = applyDemo2ExecutionUpdate(execution, undefined, workItemId);
+      if (!applied) return null;
+      if (DEMO2_TERMINAL_STATUSES.includes(execution.status)) {
+        setDemo2ExecutionLoading(false);
+      }
+      return execution;
+    } catch (reason) {
+      setDemo2Error(reason instanceof Error ? reason.message : "协作状态暂时无法读取");
+      return null;
+    }
+  }
+
+  function listenToDemo2Execution(workItemId: string, executionId: string, after = 0) {
+    demo2ExecutionStreamRef.current?.source.close();
+    demo2ExecutionEventSequenceRef.current[executionId] = Math.max(
+      demo2ExecutionEventSequenceRef.current[executionId] ?? 0,
+      after,
+    );
+    const stream = new EventSource(`${API_BASE}/v1/demo2/work-items/${workItemId}/execution/events?after=${after}&execution_id=${encodeURIComponent(executionId)}`);
+    demo2ExecutionStreamRef.current = { source: stream, workItemId, executionId };
+    let terminalObserved = false;
+    const handleEvent = (event: MessageEvent<string>) => {
+      try {
+        const payload = JSON.parse(event.data) as { execution_id?: string; status?: Demo2ExecutionSnapshot["status"]; message?: string; sequence?: number; execution?: Demo2ExecutionSnapshot; item?: Demo2CockpitSnapshot["items"][number]; snapshot?: { execution?: Demo2ExecutionSnapshot; item?: Demo2CockpitSnapshot["items"][number] } };
+        if (payload.execution_id && payload.execution_id !== executionId) return;
+        if (typeof payload.sequence === "number") {
+          const seen = demo2ExecutionEventSequenceRef.current[executionId] ?? after;
+          if (payload.sequence <= seen) return;
+          demo2ExecutionEventSequenceRef.current[executionId] = payload.sequence;
+        }
+        if (payload.status && DEMO2_TERMINAL_STATUSES.includes(payload.status)) terminalObserved = true;
+        const embedded = payload.execution ?? payload.snapshot?.execution;
+        if (embedded) {
+          const applied = applyDemo2ExecutionUpdate(embedded, payload.item ?? payload.snapshot?.item);
+          if (applied && DEMO2_TERMINAL_STATUSES.includes(embedded.status)) {
+            terminalObserved = true;
+            stream.close();
+            if (demo2ExecutionStreamRef.current?.source === stream) demo2ExecutionStreamRef.current = null;
+            setDemo2ExecutionLoading(false);
+            setNotice(embedded.status === "completed" ? "本次协作已完成，内部工作包已汇总" : "本次协作未完成，请查看工作包状态");
+          }
+          return;
+        }
+        void refreshDemo2Execution(workItemId).then((current) => {
+          if (current && current.execution_id === executionId && DEMO2_TERMINAL_STATUSES.includes(current.status)) {
+            stream.close();
+            if (demo2ExecutionStreamRef.current?.source === stream) demo2ExecutionStreamRef.current = null;
+            setNotice(current.status === "completed" ? "本次协作已完成，内部工作包已汇总" : "本次协作未完成，请查看工作包状态");
+          }
+        });
+      } catch {
+        setDemo2Error("协作进展暂时无法解析；请重新读取服务端状态。 ");
+      }
+    };
+    DEMO2_EXECUTION_EVENT_TYPES.forEach((eventType) => {
+      stream.addEventListener(eventType, handleEvent);
+    });
+    stream.onerror = () => {
+      stream.close();
+      if (demo2ExecutionStreamRef.current?.source === stream) demo2ExecutionStreamRef.current = null;
+      if (terminalObserved) return;
+      setDemo2ExecutionLoading(false);
+      setDemo2Error("协作进展连接中断；已保留服务端已返回的状态，请重新读取。 ");
+    };
+  }
+
+  async function startDemo2Execution(workItemId: string) {
+    const item = demo2Cockpit?.items.find((candidate) => candidate.work_item_id === workItemId);
+    if (!item || item.selected_mode !== "adaptive_swarm" || item.execution_status !== "not_started" || demo2ExecutionLoading) return;
+    setDemo2ExecutionLoading(true);
+    setDemo2Saving(true);
+    setDemo2Error("");
+    try {
+      const result = await request<Demo2ExecutionStartResult>(
+        `/v1/demo2/work-items/${workItemId}/execution`,
+        {
+          method: "POST",
+          body: JSON.stringify({ expected_version: item.version, max_workers: 3, idempotency_key: `demo2-execution:${crypto.randomUUID()}` }),
+        },
+      );
+      applyDemo2ExecutionUpdate(result.execution, result.item);
+      setDemo2DraftMode("adaptive_swarm");
+      setNotice("本次协作已启动；正在接收服务端进展");
+    } catch (reason) {
+      setDemo2ExecutionLoading(false);
+      setDemo2Error(reason instanceof Error ? reason.message : "本次协作暂时无法启动");
     } finally {
       setDemo2Saving(false);
     }
@@ -2120,6 +2368,7 @@ export default function Home() {
           draftMode={demo2DraftMode}
           onDraftMode={setDemo2DraftMode}
           onConfirm={() => void confirmDemo2Route()}
+          onStartExecution={(workItemId) => void startDemo2Execution(workItemId)}
           onRefresh={() => void refreshDemo2Cockpit(true)}
         />
       ) : showTaskDecisions ? (

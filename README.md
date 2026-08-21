@@ -87,9 +87,17 @@ V0.1 重点验证三件事：
 
 路由选择现在采用双时态影响交互：服务端在每个 `RouteProfile.impact_preview` 中说明任务如何分配、哪里并行与等待、什么时候需要用户、规则预测、执行边界和不会发生的外部动作。用户在右侧切换模式时，左侧工作区的影响地图立即使用同一预览变化；确认成功后，服务端把版本、选择来源、范围与实际记录变化写入 `WorkItemSnapshot.selection_receipt/selection_receipts[]`，页面再切换为绿色实际变化地图，右侧显示精简回执。同模式重复确认和缺 route profile/preview 均 fail closed 且版本不变。预演与回执都明确“未执行”，刷新只恢复当前 memory 进程中的服务端回执。
 
-`route_profiles[].forecast.source_type` 固定为 `fixture_policy_forecast`，只表示固定规则预测，不代表真实账单、实测耗时、Worker、Connector 或生产 SLA。当前没有 Demo 2 SSE、PostgreSQL 恢复、动态 Worker、Shared Artifact Workspace 或真实执行。工程证据包含聚焦 Python `6 passed`、专用 system Edge `5 passed`、完整 Python `118 passed, 1 skipped`、完整浏览器 `34 passed` 和三张桌面/移动截图；Ruff、前端 lint、生产构建与 diff-check 通过。实现位于堆叠 PR [#13](https://github.com/Dickey007s/lenovo_agent/pull/13)，依赖 PR #12。详见 [`DR-0008`](docs/decisions/DR-0008-demo2-explainable-admission.md)、[`SCENARIO-002`](docs/scenarios/SCENARIO-002-demo2-explainable-admission.md) 与 [`Demo 2 Evidence`](docs/evidence/DEMO2-PR1-EXPLAINABLE-ADMISSION-EVIDENCE-20260817.md)。
+`route_profiles[].forecast.source_type` 固定为 `fixture_policy_forecast`，只表示固定规则预测，不代表真实账单、实测耗时、Worker、Connector 或生产 SLA。第一纵切当时没有 Demo 2 SSE、Worker 或真实执行；该历史边界不否定下方 2026-08-21 第二纵切。工程证据包含聚焦 Python `6 passed`、专用 system Edge `5 passed`、完整 Python `118 passed, 1 skipped`、完整浏览器 `34 passed` 和三张桌面/移动截图；Ruff、前端 lint、生产构建与 diff-check 通过。实现位于堆叠 PR [#13](https://github.com/Dickey007s/lenovo_agent/pull/13)，依赖 PR #12。详见 [`DR-0008`](docs/decisions/DR-0008-demo2-explainable-admission.md)、[`SCENARIO-002`](docs/scenarios/SCENARIO-002-demo2-explainable-admission.md) 与 [`Demo 2 Evidence`](docs/evidence/DEMO2-PR1-EXPLAINABLE-ADMISSION-EVIDENCE-20260817.md)。
 
 2026-08-20 的路由影响扩展实现为 `db461ec`、PR [#17](https://github.com/Dickey007s/lenovo_agent/pull/17)：已完成聚焦协议/服务 `11 passed`、完整 Python `144 passed, 1 skipped`、专用 Demo 2 浏览器 `5 passed`、完整浏览器 `35 passed`，并保存桌面预演、桌面回执和 `390px` 移动长页截图。该证据只证明固定策略事实、选择回执和被测交互，不证明 Adaptive Swarm 已执行或用户理解提升。详见 [`DR-0011`](docs/decisions/DR-0011-demo2-route-impact.md) 与对应 [`Evidence`](docs/evidence/DEMO2-ROUTE-IMPACT-EVIDENCE-20260820.md)。
+
+### Demo 2 受控内部执行第二纵切（DR-0015，Limited Verified）
+
+固定客户 A 选择 Adaptive Swarm 后，现在由独立启动动作创建 `Demo2ExecutionSnapshot`。服务端并行运行收入事实核对、项目风险提取、客户要求核对三个受限 `deepseek-v4-pro` 工作单元；项目仿真文件中的确认收入/预测收入冲突触发 sequence 9 `DYNAMIC_REPLAN` 和 sequence 10 `WORKER_ADDED`，增派收入口径核验。最终 sequence 15 完成，形成 4 个 Worker、5 个带来源/版本/digest 的 `SharedArtifactVersion`，并返回 `ExecutionReceipt.external_side_effect=none`。
+
+前端将“记录本轮方式”和“启动协作”分开，运行状态、模型调用事实、动态增派、共享工件与完成回执只投影 execution Snapshot/SSE；不靠动画或固定延时宣布完成。模型只生成受限业务摘要/要点，服务端拥有 Worker/Artifact 身份、来源、依赖、状态、事件、验证和回执。两轮 live `deepseek-v4-pro` 运行及 6 张桌面/移动截图已记录：第一轮整轮 8799 ms、4/4 模型输出采用；第二轮为 4 workers、5 artifacts、seq 9/10/15 与无外部动作。封口为 Python `178 passed, 1 skipped in 6.31s`、浏览器 `41 passed (2.0m)`，Ruff、lint、build、governance 与 diff-check 通过。精确事实与截图 hash 见 [`DEMO2-CONTROLLED-EXECUTION-20260821`](docs/evidence/DEMO2-CONTROLLED-EXECUTION-EVIDENCE-20260821.md)。
+
+该纵切只在固定客户 A、单 API 进程、memory、项目生成仿真文件和无外部动作范围内为 `Limited Verified`。API 重启不会恢复执行；没有后台任务队列、跨进程 Worker lease、真实 Connector、生产身份、成本/质量基准或用户研究。主流技术差异与用户价值仍是 `Design claim / Draft`，官方材料不是竞品实测。
 
 ### Demo 3 动作影响账本（DR-0012，Verified 限定范围）
 
@@ -101,7 +109,7 @@ Demo 3 的前台重点是“动作影响账本”：用户在 Action Gate 中先
 
 ### Demo 身份导航与调用轨迹（DR-0013，Verified 限定范围）
 
-用户不仅能看到 Demo 1/2/3，还能知道当前业务阶段真实调用了什么。Demo 名称与目标是客户端产品级信息架构；当前状态从服务端 Snapshot、持久化字段或有序事件对账。前端用“已运行 / 未调用 / 未执行 / 待核对”统一投影现有事实，只有模型显示“模型已调用”：Demo 1 使用 `TaskStageRecord.processing`，Demo 2 使用 `RouteSelectionReceipt.processing`，Demo 3 复用 `RunSnapshot` 治理字段。工程没有新增通用 `call_trace` 协议；没有服务端事实时不得自行补造调用结论。
+用户不仅能看到 Demo 1/2/3，还能知道当前业务阶段真实调用了什么。Demo 名称与目标是客户端产品级信息架构；当前状态从服务端 Snapshot、持久化字段或有序事件对账。前端用“已运行 / 未调用 / 未执行 / 待核对”统一投影现有事实，只有模型显示“模型已调用”：Demo 1 使用 `TaskStageRecord.processing`，Demo 2 的路由使用 `RouteSelectionReceipt.processing`、内部执行使用 `Demo2WorkerSpec.processing/events/receipt`，Demo 3 复用 `RunSnapshot` 治理字段。工程没有新增通用 `call_trace` 协议；没有服务端事实时不得自行补造调用结论。
 
 普通业务 UI 只显示业务标签与服务端摘要；Demo3 以“执行许可服务”“受控演示工具”等业务词为主，Permit/Gateway/Simulator 仅作二级技术元信息；Prompt、CoT、原始 payload、密钥、Permit token/内容/permit_id/签名、内部 ID、Worker 对话和底层日志隐藏。Demo 2 的 selected 不等于 running，Demo 3 的技术元信息不等于真实外部系统写入；unknown 工具结果显示“工具结果待核对”。v>1 的 Demo 1 旧阶段缺少 `processing` 时显示“模型调用待核对”，不推断为未调用。固定工程验证与截图见 [`DR-0013`](docs/decisions/DR-0013-demo-identity-and-call-trace.md) 和 [`Evidence`](docs/evidence/DEMO-IDENTITY-AND-CALL-TRACE-EVIDENCE-20260820.md)。
 
@@ -172,6 +180,9 @@ flowchart LR
 - [Demo 2 PR-1 工程证据](docs/evidence/DEMO2-PR1-EXPLAINABLE-ADMISSION-EVIDENCE-20260817.md)
 - [Demo 2 路由影响预演与选择回执决策](docs/decisions/DR-0011-demo2-route-impact.md)
 - [Demo 2 路由影响预演与选择回执证据](docs/evidence/DEMO2-ROUTE-IMPACT-EVIDENCE-20260820.md)
+- [主流 Agent 对比研究：OpenClaw、Codex、Claude Code、LangGraph](docs/research/COMPETITOR-RESEARCH-OPENCLAW-CODEX-CLAUDE-CODE-20260821.md)
+- [主流对比与 Demo 2 受控执行决策（Draft）](docs/decisions/DR-0015-mainstream-comparison-and-demo2-controlled-execution.md)
+- [2026-08-21 汇报准备与八模块推进反馈](docs/sources/USER-FEEDBACK-20260821-07-reporting-comparison-and-eight-modules.md)
 - [Demo 1 渐进阶段决策（限定范围 Verified）](docs/decisions/DR-0009-progressive-demo1-stages.md)
 - [Demo 1 渐进阶段工程证据](docs/evidence/DEMO1-PROGRESSIVE-STAGES-EVIDENCE-20260817.md)
 - [Demo 1 Agent 影响预演与变化回执决策](docs/decisions/DR-0010-visible-agent-impact.md)
@@ -277,7 +288,7 @@ V0.1 定稿基线和 Demo 1 各 PR 的实际验证结果记录在 [`DR-0002`](do
 
 2026-08-20 的 Agent 影响交互实现为 `258861f`、PR [#16](https://github.com/Dickey007s/lenovo_agent/pull/16)：服务端为收入口径决定提供结构化影响选项，前台在提交前逐项预演经营分析、回复草稿、风险页和外部发送的变化，提交后再用 `ControlEvent.impact_receipt` 展示实际落地回执。封口结果为 Python `139 passed, 1 skipped (4.74s)`、完整浏览器 `35 passed (1.9m)`、Ruff、前端 lint/build、治理门槛与 diff-check 通过，另有三张带 hash 的桌面/移动截图。该结论只证明固定 Fixture 的前后端事实一致与被测交互，不证明真实用户理解改善或任意真实动作均可准确预演。
 
-处理来源现在是一等前台事实：报价公式回答显示“服务端公式核算，未调用大模型”，Demo 2 使用“记录本轮方式”明确只写路由且保持未执行；真实 Conversation 模型路径在等待时显示配置模型名，完成消息保留模型名与实际调用耗时。后台 runtime log 同时记录 `path/model_called/model/elapsed_ms`，不记录消息正文、Key 或思维链；系统不会为了显得像 AI 人为增加等待。
+处理来源现在是一等前台事实：报价公式回答显示“服务端公式核算，未调用大模型”；Demo 2 使用“记录本轮方式”明确只写路由，独立启动后再按 Worker 的 `processing` 显示真实模型调用与实际耗时；真实 Conversation 模型路径在等待时显示配置模型名，完成消息保留模型名与耗时。后台 runtime log 记录 `path/model_called/model/elapsed_ms/output_used`，不记录消息正文、Key 或思维链；系统不会为了显得像 AI 人为增加等待。
 
 ## 数据、身份与安全边界
 
@@ -289,6 +300,7 @@ V0.1 定稿基线和 Demo 1 各 PR 的实际验证结果记录在 [`DR-0002`](do
 - 未配置 Permit PEM 文件时，服务启动会生成进程级 Ed25519 密钥；重启后旧 Permit 失效。
 - 所有副作用工具均为 Simulator；UI 中的“发送成功”“创建成功”只代表 Simulator 成功。
 - 对话 Thread/Message 当前保存在 API 进程内存中，重启后丢失；Workspace、Run、Audit 和 LangGraph checkpoint 在配置 PostgreSQL 时可恢复。
+- Demo 2 的 Cockpit/Execution Snapshot、Worker、SharedArtifactVersion、SwarmEvent、SSE 回放、锁和幂等结果当前都在单 API 进程 memory；API 重启后不恢复，不能从其他 PostgreSQL 路径推断其跨进程能力。
 - Task 在未配置数据库时同样只保存在 API 进程内存中；Demo 1 mutation 会写 Snapshot、TaskEvent 和 ArtifactVersion。配置 PostgreSQL 后对应表为 `agent_tasks`、`agent_task_events` 和 `agent_task_artifact_versions`。本机 PostgreSQL 16.14 已验证同一数据库上的顺序 API 进程恢复；该结论不覆盖数据库重启/崩溃、多实例并发、迁移或 Conversation Thread/Message。
 - 当前没有 Alembic 迁移、生产级 RBAC、真实 Connector、后台任务队列、分布式 Permit 重放存储、Task 跨实例通知和多实例一致性保障。
 

@@ -1,6 +1,6 @@
 # UI—服务端事实矩阵（Demo 1、Demo 2 与报价工作区）
 
-> 状态：Demo 1 与报价协议映射 `Ready`，文件驱动来源决策 `DR-0014` 在仓库仿真文件、来源快照、冲突投影和被测桌面/移动路径内为限定范围 `Verified`；交互决策 `DR-0005` 为 `Draft`，Agent 影响预演决策 `DR-0010` 在固定 Demo 1 的限定工程范围内为 `Verified`；报价核算决策 `DR-0006` 在固定演示报价、当前公式、revision 协议和被测恢复路径内为 `Verified`；`DR-0007` 在固定客户回复草稿到治理 Run 的单一纵切内为 `Verified`；Demo 2 `DR-0008` 的单进程 memory WorkCockpitSnapshot、路由解释和本次选择纵切以及 `DR-0011` 的路由影响预演/回执扩展均为限定范围 `Verified`；Demo 3 `DR-0012` 在固定客户 A `reply_draft → email.send`、四个治理场景和被测桌面/移动路径内为限定范围 `Verified`；Demo 身份导航与调用轨迹证据层 `DR-0013` 在固定 Demo 1/2/3 前台投影范围内为 `Verified`。统一的是前台语义，不新增通用 `call_trace` 协议。自动化只能验证投影与调用语义，不能代替真实用户理解、真实 Connector/Worker、Adaptive Swarm Runtime、生产报价规则、后台无人值守、跨进程执行幂等/Permit replay 或多实例一致性验证。
+> 状态：Demo 1 与报价协议映射 `Ready`，文件驱动来源决策 `DR-0014` 在仓库仿真文件、来源快照、冲突投影和被测桌面/移动路径内为限定范围 `Verified`；交互决策 `DR-0005` 为 `Draft`，Agent 影响预演决策 `DR-0010` 在固定 Demo 1 的限定工程范围内为 `Verified`；报价核算决策 `DR-0006` 在固定演示报价、当前公式、revision 协议和被测恢复路径内为 `Verified`；`DR-0007` 在固定客户回复草稿到治理 Run 的单一纵切内为 `Verified`；Demo 2 `DR-0008` 的 Admission/路由和 `DR-0011` 的影响预演/回执为限定范围 `Verified`，`DR-0015` 的固定客户 A、单 API 进程 memory、真实模型受控内部执行为 `Limited Verified`；Demo 3 `DR-0012` 在固定客户 A `reply_draft → email.send`、四个治理场景和被测桌面/移动路径内为限定范围 `Verified`；Demo 身份导航与调用轨迹证据层 `DR-0013` 在固定 Demo 1/2/3 前台投影范围内为 `Verified`。统一的是前台语义，不新增通用 `call_trace` 协议。自动化只能验证工程投影与调用语义，不能代替真实用户理解、真实 Connector、通用 Adaptive Swarm、生产报价规则、后台无人值守、跨进程恢复或多实例一致性验证。
 
 ## 1. 组件映射
 
@@ -26,23 +26,26 @@
 | Task Error Banner（部分实现） | mutation 是否被拒绝、过期或结果待确认 | HTTP 状态、重新 GET 的 Snapshot version；`last_error` 完整路径尚未实现 | mutation 响应与 Snapshot 对账 | 复核后重新提交 | `5xx` 只显示结果待确认；不凭客户端异常宣告失败 | 堆栈、内部服务地址、敏感参数 |
 | Action Gate Tray | 某个副作用动作是否可执行 | `RunSnapshot.risk/control_plan/permit/tool_result/thread_id`；注册 capability 的 Action 由当前 WorkspaceArtifact 内容与 revision 确定性重建；DR-0007 的固定路径另携带 `task_artifact_binding` | Conversation `action.proposed`、Task 工件准备动作响应、Run API/SSE、绑定 Thread 的 continue stream | 补证据、审批、Authorize；结果未确认送达时重新读取 | 模型参数/source_refs 不直接执行，内容不匹配或 Artifact 竞态时不创建动作；Task 绑定变化时失效；未解析纯文本收件人/附件类别固定 deny且自报 evidence 不能解锁；跨 Thread continue 拒绝；完成说明单进程重放同一消息 | Permit token、策略内部秘密、模型伪造 payload/source、Task 内容摘要与内部重放缓存 |
 
-### 1.2 Demo 2 智能工作驾驶舱（DR-0008，限定范围 Verified）
+### 1.2 Demo 2 智能工作驾驶舱（DR-0008/0011 Verified；DR-0015 Limited Verified）
 
-以下字段和页面已在固定演示纵切中实现。服务端当前仅使用 memory；固定队列和路由选择不等于后台执行。
+以下字段和页面已在固定演示纵切中实现。服务端当前仅使用 memory；固定队列和路由选择不等于执行，固定客户 A 的执行也不等于后台/跨进程 Runtime 或外部动作。
 
 | UI 状态或组件 | 用户含义 | 服务端权威字段 | Snapshot / SSE | 允许动作 | 失败与恢复 | 默认隐藏 |
 | --- | --- | --- | --- | --- | --- | --- |
-| 驾驶舱固定队列 | 四项统一工作来自当前 Owner 的固定演示 Snapshot；顺序由服务端给出 | `WorkCockpitSnapshot.owner_id/backend/version/last_event_sequence/items[]`；每项 `facts` | `GET /demo2/cockpit`；当前没有 Demo 2 SSE | 查看工作卡、演示来源、业务条件和固定队列位置 | GET 未返回前只显示读取态；失败保留已有 Snapshot并提供重新读取 | 原始 Prompt、检索日志、原始 `fixture:` ID、内部来源路径 |
+| 驾驶舱固定队列 | 四项统一工作来自当前 Owner 的固定演示 Snapshot；顺序由服务端给出 | `WorkCockpitSnapshot.owner_id/backend/version/last_event_sequence/items[]`；每项 `facts` | `GET /demo2/cockpit`；执行 SSE 与驾驶舱读取分离 | 查看工作卡、演示来源、业务条件和固定队列位置 | GET 未返回前只显示读取态；失败保留已有 Snapshot并提供重新读取 | 原始 Prompt、检索日志、原始 `fixture:` ID、内部来源路径 |
 | 路由解释 | 用户知道每项任务为什么进入某种处理方式 | `items[].recommendation/allowed_modes/route_profiles` | 同一 Snapshot；路由解释不由前端自算 | 展开路由理由和允许模式 | 字段缺失或版本过期时显示待核对，不补造推荐 | 模型思维链、策略内部权重、Worker 对话 |
 | 路由影响预演 | 用户在确认前知道所选方式将如何改变工作分配、并行/等待和人工介入，以及什么不会发生 | `items[].route_profiles[].impact_preview.summary/changes/execution_status_before/execution_status_after/external_side_effect` | 随 `WorkCockpitSnapshot` 返回；右侧 `draftMode` 只选择要投影的服务端 profile | 切换允许模式并比较影响；确认前不提交 mutation | preview 缺失时显示不可预演并禁用确认；不得用前端常量补造 | 内部调度图、Worker 对话、策略权重、真实成本和时延 |
 | 三项简单任务固定路由 | 报销异常、供应商邮件、周报分别使用 Tool Call、Single Agent、Fixed Workflow 的固定演示选择 | 对应 `items[].recommendation`、`selected_mode`、`selection_source=admission`、`execution_status=not_started` | 同一 Cockpit Snapshot | 查看规则选择；单一允许模式的 radio 禁用且没有确认按钮 | 读取失败后重新 GET；不创建 Worker | 真实工具调用、模型调用、成本账单、时延日志 |
 | 客户 A 待决定 | 复杂任务尚未自动启动；用户需要在允许模式中作出本次选择 | `items[].allowed_modes=[single_agent,fixed_workflow,adaptive_swarm]`、`selected_mode`、`selection_source`、`override_scope`、`version`；响应另含 `cockpit_version/cockpit_last_event_sequence` | `POST /demo2/work-items/{id}/route` 返回 `RouteSelectionResult` | 接受推荐、选择其他允许模式、暂不选择；范围固定为 `this_run` | 只应用服务端返回的聚合版本；`expected_version` 冲突保留本地意图并 GET 最新 Snapshot；未知结果先 GET 对账 | 内部 Admission 打分过程、底层调度图、实际幂等键 |
 | 路由选择回执 | 用户确认服务端记录了哪种工作方式、由谁选择、影响了什么，并知道任务仍未执行 | `items[].selection_receipt` 的版本前后、`selected_mode/selection_source/override_scope/forecast/changes/execution_status_before/execution_status_after/external_side_effect` | 路由 mutation 返回的 `RouteSelectionResult.item`；同进程后续 GET | 查看业务变化与折叠的版本审计 | 409 不显示回执；刷新只有读回同一 receipt 才恢复；memory 重启会丢失 | receipt ID、内部事件序号、幂等键、真实 Worker/Connector 日志 |
-| Adaptive Swarm 推荐/本次选择 | 用户选择了复杂协作方式，但系统尚未开始执行 | `items[].selected_mode=adaptive_swarm`、`selection_source`、`override_scope`、`execution_status=not_started` | 选择 mutation 返回的 `RouteSelectionResult.item`；没有执行 API/事件 | 查看依据，或用另一允许模式覆盖本次选择 | 不允许的模式或过期版本返回 409；任何错误都不能改写为已启动 | 不展示“已启动”“运行中”“已完成”、真实 Worker、真实 Connector、实际成本/时延 |
+| Adaptive Swarm 推荐/本次选择 | 用户选择了复杂协作方式，但尚未开始执行；可显式启动 | `items[].selected_mode=adaptive_swarm`、`selection_source`、`override_scope`、`execution_status=not_started` | 选择 mutation 返回 `RouteSelectionResult.item`；启动是独立 POST | 查看依据、改选，或提交启动命令 | 不允许模式/过期版本返回 409；错误不能改写为已启动 | 启动前不展示“运行中/已完成”、实际成本或外部动作 |
+| 受控执行状态 | 用户知道整轮协作处于当前 Runtime 可达的 queued/running/verifying/completed/failed，并看到工作单元、共享工件和模型调用事实；`verifying` 不属于 Worker | `Demo2ExecutionSnapshot.status`；协议虽含 Execution `cancelled`，当前无取消路由/转换；`workers[].status` 仅为 queued/running/completed/failed/cancelled；另有 `processing/artifacts/events/receipt` | execution GET、events replay、SSE；sequence 单调；当前无 Demo 2 `waiting_input` | 启动、查看业务工作单元/工件/来源、断线后重读；Execution cancel 为 Draft | 响应未知或事件缺口时 GET 对账；memory 重启不恢复 | Prompt、CoT、Worker 对话、原始响应、内部来源 ID、底层日志 |
+| 动态增派 | 用户知道为什么新增收入口径核验，而不是只看到 Worker 数变化 | `SwarmEvent.message/details` 与新增 `Demo2WorkerSpec.trigger=dynamic_replan` | seq 9 `DYNAMIC_REPLAN`、seq 10 `WORKER_ADDED` | 只读查看原因与依赖 | 缺事件时不由前端补造；当前不可手动接受/拒绝任意调度 | 策略权重、内部评分、模型推理、任意调度主张 |
+| 内部完成回执 | 用户知道 4 个 Worker/5 个 Artifact 已收敛，且外部动作没有发生 | `ExecutionReceipt.status/worker_ids/artifact_version_ids/final_artifact_version_id/external_side_effect/summary` | seq 15 `EXECUTION_COMPLETED` 后完整 Snapshot | 查看共享汇报工件包；另行进入 Demo 3 | 无 receipt 不显示成功；当前 failed 不冒充完成；cancelled 仅为协议兼容、无当前 Execution 路径 | 真实 Connector 写入、供应商账单、未测量质量/效率 |
 | 演示策略成本/时效预测 | 用户看到的是固定规则给出的工具调用上限、预计秒数和并行上限，不是实测结果 | `items[].route_profiles[].forecast.source_type=fixture_policy_forecast`、`estimated_tool_calls/estimated_runtime_seconds/max_workers` | 随 WorkCockpitSnapshot 返回 | 查看预测与选择代价 | Schema 缺失时页面不能补数字 | 供应商账单、模型 Token 计费、真实 SLA、未经测量的节省比例 |
-| 驾驶舱读取与恢复边界 | 浏览器是否读到了当前进程的最新 WorkCockpitSnapshot | 客户端 loading/error + 服务端 `owner_id/version/last_event_sequence` | 初始/手动 GET 与 mutation 后 GET 对账；无 SSE | 重新读取、冲突后复核并重试 | 保留最后确认 Snapshot；memory API 重启会丢选择，不宣称跨进程恢复 | 网络栈、数据库 DSN、内部重试日志 |
+| 驾驶舱读取与恢复边界 | 浏览器是否读到了当前进程的最新 Cockpit/Execution Snapshot | 客户端 loading/error + 服务端 owner/version/sequence/execution_id | 初始/手动 GET、mutation 后 GET、execution SSE 后 GET 对账 | 重新读取、冲突后复核并重试 | 保留最后确认 Snapshot；memory API 重启会丢选择和执行，不宣称跨进程恢复 | 网络栈、数据库 DSN、内部重试日志 |
 
-本节所有行均限定在 `DR-0008` 的单进程固定演示纵切。它只覆盖固定队列、路由解释、客户 A 的本次模式选择和服务端 Admission 事实；拖拽调序、长期排序偏好、真实执行、动态 Worker、Shared Artifact Workspace、Verifier/Resolver、成本/时效实测和跨进程恢复留待后续决策与证据。
+本节所有行均限定在单 API 进程固定演示纵切。它覆盖固定队列、路由解释、客户 A 本次模式选择，以及受控模型 Worker、固定事实冲突增派、SharedArtifactVersion、验证和无外部副作用回执；拖拽调序、长期偏好、任意动态调度、人工冲突处理、真实 Connector、成本/质量效果和跨进程恢复仍待后续证据。
 
 ### 1.3 Demo 3 动作影响账本（DR-0012，Verified 限定范围）
 
@@ -66,9 +69,9 @@
 | UI 状态或组件 | 用户含义 | 服务端权威字段（Draft） | Snapshot / SSE | 允许动作 | 失败与恢复 | 默认隐藏 |
 | --- | --- | --- | --- | --- | --- | --- |
 | Demo 身份导航 | 当前正在看 Demo 1、2 还是 3，以及它要证明的业务问题 | 产品级客户端信息架构提供 Demo 名称/目标；当前状态副标题来自 Task/WorkCockpit/Run scope | 路由/页面初始化与完整 Snapshot 对账 | 切换 Demo 视图；不得重置 Task、Run、Artifact、Event 或 Conversation | 状态事实缺失时显示待核对；Demo 名称本身不是服务端 descriptor | Prompt、内部路由、Task/Run/Artifact 内部 ID |
-| 调用轨迹 | 用户知道哪个业务阶段真实调用了什么 | Demo 1：`TaskStageRecord.processing`；Demo 2：`RouteSelectionReceipt.processing`；Demo 3：`RunSnapshot.status/control_plan/evidence/approvals/permit/tool_result` 与 `impact_preview/execution_receipt` | 对应 Task Snapshot、WorkCockpit Snapshot/Receipt、Run Snapshot/SSE | 通用完成状态显示“已运行”；模型字段显示“模型已调用”；Demo3 使用“执行许可服务”“受控演示工具”等业务词，Permit/Gateway/Simulator 仅为二级技术元信息 | 事件缺口、响应丢失或跨进程未知时显示待核对并重新读取；unknown 工具结果显示“工具结果待核对” | raw event_type、payload、trace、密钥、Permit token/内容/permit_id/签名、Worker 对话 |
+| 调用轨迹 | 用户知道哪个业务阶段真实调用了什么 | Demo 1：`TaskStageRecord.processing`；Demo 2：`RouteSelectionReceipt.processing` 与 `Demo2WorkerSpec.processing/events/receipt`；Demo 3：`RunSnapshot.status/control_plan/evidence/approvals/permit/tool_result` 与 `impact_preview/execution_receipt` | 对应 Task Snapshot、WorkCockpit/Execution Snapshot/SSE、Run Snapshot/SSE | 通用完成状态显示“已运行”；模型字段显示“模型已调用”；Demo3 使用“执行许可服务”“受控演示工具”等业务词，Permit/Gateway/Simulator 仅为二级技术元信息 | 事件缺口、响应丢失或跨进程未知时显示待核对并重新读取；unknown 工具结果显示“工具结果待核对” | raw event_type、payload、trace、密钥、Permit token/内容/permit_id/签名、Worker 对话 |
 | 调用来源标签 | 区分确定性处理、策略规则、语言模型、路由记录、治理 Run 和受控演示工具 | 现有 `processing.path/model_called/output_used`，或 RunSnapshot 治理字段；不新增 `source_kind`/`call_trace` 协议 | 与对应 Snapshot/有序事件绑定 | 查看“已运行 / 未调用 / 未执行 / 待核对”；仅模型事实显示“模型已调用” | 缺来源时不显示“已运行”；unknown 不转成成功 | Prompt、CoT、供应商原始响应、内部模型参数 |
-| 未执行边界 | 用户知道 selected、执行许可服务或受控演示工具不等于真实业务执行 | `WorkItemSnapshot.execution_status`、`RunSnapshot.status`、`RunSnapshot.tool_result`、外部副作用字段 | WorkCockpitSnapshot、Run SSE、完整 RunSnapshot | 重新读取或进入受控技术审计 | unknown 结果显示“工具结果待核对”，不写成未调用/未执行；结果未知不自动重试副作用 | `email.send`、`email_simulator`、`PERMIT_ISSUED`、Permit token/内容/permit_id/签名等技术原值 |
+| 未执行边界 | 用户知道 selected 不等于 running，内部 completed 不等于真实外部写入 | `WorkItemSnapshot.execution_status`、`Demo2ExecutionSnapshot.receipt.external_side_effect`、`RunSnapshot.status/tool_result` | WorkCockpit/Execution Snapshot、Demo 2/3 SSE | 重新读取或进入受控技术审计 | unknown 结果显示“工具结果待核对”；结果未知不自动重试副作用 | `email.send`、`email_simulator`、`PERMIT_ISSUED`、Permit token/内容/permit_id/签名等技术原值 |
 
 本节为 `DR-0013` Verified 限定范围；全量 Python `154 passed, 1 skipped in 4.32s`，浏览器 `38 passed (2.3m)`，Ruff/governance/lint/build 通过。`TaskStageProcessing` 已有跨字段一致性校验。截图及 hash 见 [`DEMO-IDENTITY-AND-CALL-TRACE-EVIDENCE-20260820`](../evidence/DEMO-IDENTITY-AND-CALL-TRACE-EVIDENCE-20260820.md)。这些证据不证明真实用户理解、真实 Connector/Worker、后台无人值守、生产持久化、跨进程执行幂等/Permit replay、多实例或数据库恢复。
 
@@ -175,3 +178,20 @@ Workspace revision 恢复是独立于 Task mutation 的较小机制：保存 409
 | DR-0007 Task 工件动作桥（限定范围 Verified） | 完成态列出成果，当前已验证客户回复提供“准备发送”；Gate 显示绑定版本、演示目标、L4 风险、确认原因和拒绝后果 | TaskService 校验 Commit/ArtifactVersion/Verification；RunService 持久化并重校验 `TaskArtifactBinding`；Policy/Evidence/Approval/Permit/Gateway 延续 Demo 3 事实链 | [`TASK-ARTIFACT-ACTION-BRIDGE-20260813`](../evidence/DEMO1-DEMO3-TASK-ARTIFACT-ACTION-BRIDGE-EVIDENCE-20260813.md)：实现提交 `d827f29`、文档提交 `d1cc746`、PR #12；Python `112 passed, 1 skipped`；完整浏览器 `29 passed`；Ruff、lint、build 与治理测试通过；不证明真实发送、通用工件动作、跨重启 Run 幂等或用户价值 |
 | DR-0008 Demo 2 可解释 Admission（限定范围 Verified） | 四项固定演示任务的固定队列、路由解释与客户 A 仅本次模式选择；主动作写“记录本轮方式”并明确规则路由不调用模型；选择后保持 `execution_status=not_started` | 已实现 `WorkCockpitSnapshot(owner_id/backend/version/last_event_sequence/items)`、`RouteSelectionResult(cockpit_version/cockpit_last_event_sequence/item)` 与 WorkItem 路由事实；POST 是确定性 `policy_engine`；当前仅 memory | [`DEMO2-PR1-EXPLAINABLE-ADMISSION-EVIDENCE-20260817`](../evidence/DEMO2-PR1-EXPLAINABLE-ADMISSION-EVIDENCE-20260817.md) 及本轮处理路径证据；旧证据数字保持历史口径 | 只允许查看解释、记录推荐或其他允许模式、暂不选择；scope 为 `this_run`；不覆盖启动执行、拖拽调序或长期偏好 | 409 保留本地选择并 GET 对账；未知结果先 GET；memory 重启不恢复；预测标记 `fixture_policy_forecast` | 原始 Prompt、思维链、内部来源 ID、策略权重、Token、Permit、真实账单和未测量的节省/时延 |
 | DR-0011 Demo 2 路由影响（限定范围 Verified） | 右侧切换服务端允许模式时，左侧即时显示工作组织影响地图；确认后左侧显示实际变化、右侧显示精简回执且仍未执行 | `RouteProfile.impact_preview`、`WorkItemSnapshot.selection_receipt/selection_receipts[]`、RouteSelection 的版本/幂等事实；当前仅 memory | [`DEMO2-ROUTE-IMPACT-EVIDENCE-20260820`](../evidence/DEMO2-ROUTE-IMPACT-EVIDENCE-20260820.md)；聚焦协议/服务 11 passed、Demo 2 浏览器 5 passed、完整 Python 144 passed/1 skipped、完整浏览器 35 passed | 只预演/记录任务分配、协调、人工介入、规则预测与无外部动作；不启动执行 | preview/profile 缺失、同模式重复和版本过期均 409；草稿保留；同进程 GET 恢复 receipt/history；进程重启不恢复 | 内部 ID、Worker 对话、真实 Connector、账单、时延和用户效果结论 |
+
+## 6. Demo 2 Admission→受控执行事实矩阵（Limited Verified）
+
+以下协议已在固定客户 A、单 API 进程 memory、项目仿真文件、真实 `deepseek-v4-pro` Worker 且无外部动作的纵切内实现。任意任务编排、人工冲突接管、预算控制、跨进程恢复、真实 Connector 与用户价值仍为 Draft。
+
+| UI 状态 | 用户看到/可做什么 | 权威后端事实（目标） | 事件/版本/权限 | 隐藏内容与失败边界 |
+| --- | --- | --- | --- | --- |
+| 推荐协作方式 | 看六类 Admission 依据、组织预演；改选或暂不确认 | `WorkCockpitSnapshot` + `RouteProfile.impact_preview` | `cockpit_version` + `expected_version`；Owner scope | 不显示策略权重/Prompt；缺 preview 禁止确认 |
+| 已确认本次方式 | 看选择回执和“尚未启动执行” | `WorkItemSnapshot.selection_receipt` | `RouteSelectionReceipt` 幂等；`selection_source`、`override_scope=this_run` | 选择不等于执行；memory 重启不伪装恢复 |
+| 协作已启动 | 看三个初始业务工作单元和依赖 | `Demo2ExecutionSnapshot.status/workers/events` | `EXECUTION_STARTED/WORKER_STARTED`、单调 sequence；服务端创建 | 不显示 Worker 内部对话；创建失败保留选择回执 |
+| 处理中 | 看业务阶段、模型调用事实、已产生工件和等待原因 | `workers[].status/processing`、`SharedArtifactVersion[]` | execution GET/SSE、Artifact version/digest | 不用客户端动画推断完成；事件缺口显示待核对 |
+| 动态重排 | 看为什么增派收入口径核验 | `SwarmEvent.message/details`、新增 `Demo2WorkerSpec` | seq 9 `DYNAMIC_REPLAN`、seq 10 `WORKER_ADDED` | 当前固定事实冲突触发；不显示内部评分或声称通用调度 |
+| 已验证汇总 | 看 5 个共享工件、来源、验证状态；准备 Demo 3 | `SharedArtifactVersion[]`、`ExecutionReceipt` | `ARTIFACT_VERIFIED`、seq 15 `EXECUTION_COMPLETED` | 不能称真实外部业务已完成；无 receipt 不显示成功 |
+| 外部动作边界 | 看“未触发外部动作”；另行进入 Demo 3 Action Gate | `ExecutionReceipt.external_side_effect=none` | 内部完成不触发外部 Connector | 不显示真实系统写入；未知结果为“状态待核对” |
+| 失败/恢复 | 来源或 Worker 失败时看终态；断线后重读 | failed Snapshot/Event | sequence 回放 + 完整 Snapshot 对账；memory 单进程 | 跨进程不恢复；失败不生成成功 receipt |
+
+前端只能投影服务端 Snapshot、字段和有序事件。当前已落地的是 `Demo2ExecutionSnapshot`、`Demo2WorkerSpec`、`SharedArtifactVersion`、`SwarmEvent` 和 `ExecutionReceipt`；没有通用 `WorkerRun/SchedulerReplan/BudgetLedger`，也没有持久化执行 Store。运行与截图证据见 [`DEMO2-CONTROLLED-EXECUTION-20260821`](../evidence/DEMO2-CONTROLLED-EXECUTION-EVIDENCE-20260821.md)。
