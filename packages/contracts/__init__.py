@@ -80,6 +80,14 @@ from .demo2_models import (
     WorkCockpitSnapshot,
     WorkItemFacts,
     WorkItemSnapshot,
+    Demo2ExecutionSnapshot,
+    Demo2ExecutionStartRequest,
+    Demo2ExecutionStartResult,
+    Demo2WorkerSpec,
+    ExecutionReceipt,
+    SharedArtifactVersion,
+    SwarmEvent,
+    WorkerProcessing,
 )
 
 __all__ = [
@@ -160,4 +168,12 @@ __all__ = [
     "WorkCockpitSnapshot",
     "WorkItemFacts",
     "WorkItemSnapshot",
+    "Demo2ExecutionSnapshot",
+    "Demo2ExecutionStartRequest",
+    "Demo2ExecutionStartResult",
+    "Demo2WorkerSpec",
+    "ExecutionReceipt",
+    "SharedArtifactVersion",
+    "SwarmEvent",
+    "WorkerProcessing",
 ]

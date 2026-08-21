@@ -1,6 +1,6 @@
 # HTTP API 与 SSE 事件
 
-本文记录 V0.1、Demo 1、`DR-0006` 报价核算、`DR-0007` Task 工件动作桥与 `DR-0008` Demo 2 Admission 纵切实际使用的 FastAPI 接口。运行后以 <http://localhost:8010/docs> 的 OpenAPI 页面和 `services/api/app/api/routes.py` 为最终事实来源。Demo 2 当前只提供固定工作队列、路由解释和路由选择，不启动 Worker 或外部动作。
+本文记录 V0.1、Demo 1、`DR-0006` 报价核算、`DR-0007` Task 工件动作桥、`DR-0008` Demo 2 Admission 与 `DR-0015` 受控内部执行纵切实际使用的 FastAPI 接口。运行后以 <http://localhost:8010/docs> 的 OpenAPI 页面和 `services/api/app/api/routes.py` 为最终事实来源。Demo 2 当前能在固定客户 A、单 API 进程 memory 范围内启动受控模型 Worker、形成共享工件和事件回执，但不调用外部 Connector。
 
 ## 1. 约定
 
@@ -65,8 +65,12 @@ Task ID、Owner、契约版本、任务状态、分支状态、事件序号和�
 | GET | `/demo2/cockpit` | 读取当前 Owner 的四项固定演示工作、Admission 建议和路由状态 |
 | GET | `/demo2/work-items/{work_item_id}` | 读取当前 Owner 的单个固定演示工作项 |
 | POST | `/demo2/work-items/{work_item_id}/route` | 以预期版本和幂等键记录本次执行方式；不启动实际执行 |
+| POST | `/demo2/work-items/{work_item_id}/execution` | 以预期版本和幂等键启动固定客户 A 的受控内部执行；返回 202 |
+| GET | `/demo2/work-items/{work_item_id}/execution` | 读取当前 Owner 的完整 `Demo2ExecutionSnapshot` |
+| GET | `/demo2/work-items/{work_item_id}/execution/events?after={sequence}` | 读取某 sequence 之后的有序执行事件 |
+| GET | `/demo2/work-items/{work_item_id}/execution/stream?after={sequence}` | 回放并订阅执行 SSE；支持可选 `execution_id` 对账 |
 
-Demo 2 当前服务端为进程内 memory。API 重启后路由选择会回到固定初始状态；没有 SSE、数据库恢复、Worker 生命周期或跨实例通知。四项工作在每个 Owner 的独立固定队列中生成，普通 UI 只显示“演示数据”业务标签，不显示内部来源 ID。
+Demo 2 当前服务端为进程内 memory。API 重启后路由选择、执行 Snapshot、事件和幂等结果都会丢失；没有数据库恢复、后台任务队列、跨进程 Worker lease 或跨实例通知。四项工作在每个 Owner 的独立固定队列中生成；只有固定客户 A、已选择 `adaptive_swarm` 的当前版本可进入执行纵切。普通 UI 只显示“演示数据”业务标签，不显示内部来源 ID、Prompt、思维链或 Worker 对话。
 
 ### 2.4 场景、治理与审计
 
@@ -125,9 +129,9 @@ Invoke-RestMethod -Method Get -Uri "$base/threads/$($thread.thread_id)" -Headers
 
 ### 2.6 Demo 身份与处理来源投影（DR-0013）
 
-Demo 1/2/3 的名称与目标属于客户端产品级信息架构，不是服务端 Demo descriptor；当前状态副标题仍必须从对应的 Task、WorkCockpit 或 Run Snapshot 对账。工程不新增通用 `call_trace[]` 协议，前端按 Demo 直接投影既有事实：Demo 1 使用 `TaskStageRecord.processing`（`path/model_called/model/elapsed_ms/output_used`），Demo 2 使用 `RouteSelectionReceipt.processing`（`path/model_called/elapsed_ms`），Demo 3 复用 `RunSnapshot.status/control_plan/evidence/approvals/permit/tool_result/impact_preview/execution_receipt` 与 Run SSE/AuditEvent。
+Demo 1/2/3 的名称与目标属于客户端产品级信息架构，不是服务端 Demo descriptor；当前状态副标题仍必须从对应的 Task、WorkCockpit、Demo2Execution 或 Run Snapshot 对账。工程不新增通用 `call_trace[]` 协议，前端按 Demo 直接投影既有事实：Demo 1 使用 `TaskStageRecord.processing`（`path/model_called/model/elapsed_ms/output_used`），Demo 2 的选择使用 `RouteSelectionReceipt.processing`，内部执行使用 `Demo2WorkerSpec.processing` 与 `SwarmEvent`，Demo 3 复用 `RunSnapshot.status/control_plan/evidence/approvals/permit/tool_result/impact_preview/execution_receipt` 与 Run SSE/AuditEvent。
 
-前台统一显示“已运行 / 未调用 / 未执行 / 待核对”，只有模型来源显示“模型已调用”，但不统一后端字段。Demo 1 的 v>1 Snapshot 没有 `stage_records`，或旧 Plan/Act 记录缺少 `processing` 时，模型调用显示“待核对”，不得推断为未调用。Demo 2 `execution_status=not_started` 时，路由已运行不表示 Worker 或 Connector 已运行；Demo 3 以“执行许可服务”“受控演示工具”为主，Permit/Gateway/Simulator 只在二级技术元信息中出现，且不表示真实外部写入。普通业务审计页只显示业务标签与服务端摘要，原始 `event_type/payload/trace`、Prompt、CoT、密钥、Permit token/内容/permit_id/签名和内部 ID 保留在 API/服务端审计边界。Proposal 或 Task-derived action 出现时，前端全局切换到 Demo3/审计视图。
+前台统一显示“已运行 / 未调用 / 未执行 / 待核对”，只有模型来源显示“模型已调用”，但不统一后端字段。Demo 1 的 v>1 Snapshot 没有 `stage_records`，或旧 Plan/Act 记录缺少 `processing` 时，模型调用显示“待核对”，不得推断为未调用。Demo 2 `WorkItemSnapshot.execution_status=not_started` 时，路由已运行不表示 Worker 或 Connector 已运行；启动后只能依据 `Demo2ExecutionSnapshot.status` 显示当前 Runtime 可达的 `queued/running/verifying/completed/failed`。Execution `cancelled` 虽在协议枚举中，但当前没有取消路由或状态转换，不得展示成已实现操作。`Demo2WorkerSpec.status` 只允许 `queued/running/completed/failed/cancelled`，没有 Worker `verifying` 或 Demo 2 `waiting_input`；`verifying` 只表示整轮 Execution 正在核验共享工件。`external_side_effect=none` 表示未触发外部动作。Demo 3 以“执行许可服务”“受控演示工具”为主，Permit/Gateway/Simulator 只在二级技术元信息中出现，且不表示真实外部写入。普通业务审计页只显示业务标签与服务端摘要，原始 `event_type/payload/trace`、Prompt、CoT、密钥、Permit token/内容/permit_id/签名和内部 ID 保留在 API/服务端审计边界。Proposal 或 Task-derived action 出现时，前端全局切换到 Demo3/审计视图。
 
 PowerShell 中可用 `curl.exe -N` 直接观察 SSE：
 
@@ -314,9 +318,30 @@ Invoke-RestMethod -Method Post `
 
 选择成功后的 `RouteSelectionResult.item.selection_receipt` 是最新独立服务端事实，`selection_receipts[]` 按 cockpit/item 版本连续保留当前 memory Snapshot 内的改选历史；只有 latest receipt 的旧 Snapshot 会归一化为一条历史。回执包含版本前后、最终模式、`selection_source`、`override_scope`、固定规则预测和实际记录的 `changes[]`。它证明路由选择已应用，不证明 Agent、协作单元或外部动作已启动；相同幂等命令重放返回同一 receipt，随后 GET 在同一 API 进程内读回同一 receipt。
 
-该 POST 走确定性 `policy_engine`，不调用 LLM。前台主动作因此使用“记录本轮方式”，而不是“执行”；服务端 runtime log 记录 `model_called=false` 与实际毫秒耗时。未来只有新增真实启动协议、执行事件和 Worker/Connector 事实后，才能出现“启动协作”动作。
+路由 POST 走确定性 `policy_engine`，不调用 LLM。前台该动作使用“记录本轮方式”，服务端 runtime log 记录 `model_called=false` 与实际毫秒耗时。只有选择 Adaptive Swarm 且服务端仍返回当前版本后，独立的 execution POST 才允许显示“启动协作”。
 
 `route_profiles[].forecast` 只有 `estimated_tool_calls`、`estimated_runtime_seconds` 和 `max_workers` 三个固定规则预测字段。它们不是模型账单、实际耗时、生产 SLA 或已经创建的 Worker 数。
+
+启动受控内部执行：
+
+```powershell
+$start = @{
+  expected_version = $route.item.version
+  idempotency_key = "demo2-execution-example-001"
+  max_workers = 3
+} | ConvertTo-Json
+$started = Invoke-RestMethod -Method Post `
+  -Uri "$base/demo2/work-items/$($customerA.work_item_id)/execution" `
+  -Headers $headers -ContentType "application/json" -Body $start
+```
+
+启动接口只接受当前 Owner 的固定客户 A、`selected_mode=adaptive_swarm` 和匹配的工作项版本。相同 Owner、work item、key 与同一命令返回同一结果；相同 key 对应不同命令、重复新意图、版本过期或模式不符返回 409。来源文件在启动和执行期间都要通过 manifest/摘要校验；不满足时 fail closed。
+
+`Demo2ExecutionSnapshot` 是执行真值，包含 `execution_id/owner_id/work_item_id/status/version/last_event_sequence/source_documents/workers/artifacts/events/receipt/backend`。三个初始 Worker 分别处理收入事实、项目风险和客户要求；固定文件事实发现确认收入与预测收入冲突时，sequence 9 `DYNAMIC_REPLAN`、sequence 10 `WORKER_ADDED` 增派收入口径核验。最终验证工件后，sequence 15 `EXECUTION_COMPLETED` 与 `ExecutionReceipt.external_side_effect=none` 表示内部汇总完成且未触发外部动作。
+
+Worker 使用固定 `deepseek-v4-pro` 适配器，只允许返回业务 `summary/key_points`；身份、角色、来源、状态、依赖、Artifact 版本/digest、事件和回执由服务端生成。只有模型输出与服务端批准业务文本严格一致时 `processing.output_used=model`，否则显式 `template_fallback`；因此“模型已调用”和“结果被采用”要分别读取 `processing.model_called/output_used`，不能由耗时或模型名推断。
+
+SSE 使用单调 sequence 作为 `id`，事件名为对应 `SwarmEvent.event_type`，`data` 为事件 JSON；支持 `after` 回放和可选 `execution_id` 校验。事件连接断开、序号缺口或 POST 响应未知时，前端重新 GET 完整 Snapshot 对账。当前 Store、执行线程、锁和幂等结果仅在单 API 进程内；API 重启后无恢复证据，且没有真实 Connector 或外部副作用。
 
 ### 3.6 从已验证 Task 工件准备治理 Run
 

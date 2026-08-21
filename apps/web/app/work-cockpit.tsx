@@ -3,6 +3,9 @@ import {
   IconArrowRight,
   IconBolt,
   IconCheck,
+  IconClock,
+  IconFileDescription,
+  IconLoader,
   IconRefresh,
   IconRobot,
   IconShieldCheck,
@@ -18,6 +21,10 @@ import type {
   Demo2RouteImpactChange,
   Demo2RouteProfile,
   Demo2RouteSelectionReceipt,
+  Demo2ExecutionSnapshot,
+  Demo2ArtifactVersion,
+  Demo2WorkerRun,
+  Demo2WorkUnitStatus,
   Demo2WorkItem,
   WorkCockpitDecisionPaneProps,
   WorkCockpitProps,
@@ -45,6 +52,79 @@ const BUSINESS_STATUS_LABELS: Record<Demo2WorkItem["business_status"], string> =
   waiting: "等待处理",
 };
 
+const EXECUTION_STATUS_LABELS: Record<Demo2ExecutionSnapshot["status"], string> = {
+  not_started: "待启动",
+  queued: "已排队",
+  running: "运行中",
+  verifying: "验证中",
+  completed: "已完成",
+  failed: "失败",
+  cancelled: "已取消",
+};
+
+const UNIT_STATUS_LABELS: Record<Demo2WorkUnitStatus, string> = {
+  queued: "待处理",
+  running: "运行中",
+  completed: "已完成",
+  failed: "失败",
+  cancelled: "已取消",
+};
+
+function processingLabel(unit: Demo2WorkerRun) {
+  if (unit.status === "failed") return "处理失败";
+  const processing = unit.processing;
+  if (!processing) return "处理来源待服务端回执";
+  if (processing.output_used === "template_fallback") return "模板回退";
+  if (
+    processing.path === "language_model"
+    && processing.kind === "language_model"
+    && processing.model_called
+    && processing.model
+    && processing.output_used === "model"
+  ) {
+    return `模型已调用 · ${processing.model}`;
+  }
+  if (
+    processing.path === "deterministic"
+    && processing.kind === "deterministic"
+    && !processing.model_called
+    && processing.output_used === "deterministic"
+  ) {
+    return "确定性处理";
+  }
+  return "处理事实待核对";
+}
+
+function processingCategory(unit: Demo2WorkerRun) {
+  if (unit.status === "failed") return "failed" as const;
+  if (unit.processing?.output_used === "template_fallback") return "fallback" as const;
+  if (
+    unit.processing?.path === "language_model"
+    && unit.processing.model_called
+    && unit.processing.model
+    && unit.processing.output_used === "model"
+  ) return "model" as const;
+  if (
+    unit.processing?.path === "deterministic"
+    && !unit.processing.model_called
+    && unit.processing.output_used === "deterministic"
+  ) return "deterministic" as const;
+  return "pending" as const;
+}
+
+function executionHeading(status: Demo2ExecutionSnapshot["status"]) {
+  if (status === "completed") return "业务工作包已收敛";
+  if (status === "failed") return "业务工作包未完成";
+  if (status === "cancelled") return "本次协作已取消";
+  if (status === "verifying") return "业务工作包正在验证";
+  if (status === "queued") return "业务工作包等待启动";
+  return "业务工作包正在收敛";
+}
+
+function executionTone(status: Demo2ExecutionSnapshot["status"] | Demo2WorkUnitStatus) {
+  return `is-${status.replaceAll("_", "-")}`;
+}
+
 function routeLabel(mode: Demo2RouteMode) {
   return ROUTE_LABELS[mode];
 }
@@ -68,6 +148,8 @@ function formatRuntime(seconds: number) {
 }
 
 function statusLabel(item: Demo2WorkItem) {
+  if (item.execution && item.execution.status !== "not_started") return EXECUTION_STATUS_LABELS[item.execution.status];
+  if (item.execution_status !== "not_started") return EXECUTION_STATUS_LABELS[item.execution_status];
   return item.admission_status === "route_selected"
     ? "执行方式已记录"
     : BUSINESS_STATUS_LABELS[item.business_status];
@@ -77,6 +159,24 @@ function Demo2AgentCallTrace({ item }: { item: Demo2WorkItem }) {
   const receipt = item.selection_receipt;
   const routeStatus: AgentCallStep["status"] = receipt ? "complete" : "waiting";
   const processing = receipt?.processing;
+  const execution = item.execution;
+  const hasExecution = Boolean(execution && execution.status !== "not_started");
+  const workersCreated = Boolean(execution?.worker_runs.length);
+  const processingCounts = execution?.worker_runs.reduce((counts, worker) => {
+    counts[processingCategory(worker)] += 1;
+    return counts;
+  }, { model: 0, fallback: 0, deterministic: 0, failed: 0, pending: 0 }) ?? { model: 0, fallback: 0, deterministic: 0, failed: 0, pending: 0 };
+  const workerRuntimeStatus: AgentCallStep["status"] = !hasExecution
+    ? "not_called"
+    : execution?.status === "failed" || execution?.status === "cancelled"
+      ? "blocked"
+      : !workersCreated
+        ? "waiting"
+        : execution?.status === "completed"
+          ? "complete"
+          : execution?.worker_runs.some((worker) => worker.status === "running")
+            ? "active"
+            : "complete";
   const steps: AgentCallStep[] = [
     {
       id: "admission",
@@ -104,12 +204,12 @@ function Demo2AgentCallTrace({ item }: { item: Demo2WorkItem }) {
     },
     {
       id: "workers",
-      label: "创建 Agent / Worker",
-      component: "协作单元",
+      label: "创建业务工作包",
+      component: "受控协作运行时",
       kind: "runtime",
-      status: "not_called",
-      detail: "当前只预演并记录工作组织方式，没有创建或启动任何实际 Agent、Worker 或协作群组。",
-      meta: item.execution_status === "not_started" ? "Worker Runtime · 尚未启动" : "Worker Runtime · 状态已由服务端更新",
+      status: workerRuntimeStatus,
+      detail: workersCreated ? `服务端已创建 ${execution?.worker_runs.length ?? 0} 个受限业务工作包；前台只展示状态、允许来源与产物。` : hasExecution ? "执行记录已建立，服务端尚未返回业务工作包。" : "当前只预演并记录工作组织方式，没有创建或启动任何实际 Agent、Worker 或协作群组。",
+      meta: hasExecution ? `模型采用 ${processingCounts.model} · 模板回退 ${processingCounts.fallback} · 确定性 ${processingCounts.deterministic} · 待回执 ${processingCounts.pending}` : "Worker Runtime · 尚未启动",
     },
     {
       id: "tools",
@@ -124,8 +224,13 @@ function Demo2AgentCallTrace({ item }: { item: Demo2WorkItem }) {
 
   return <AgentCallTrace
     demo="Demo 2"
-    summary="本轮只调用服务端 Admission 与路由规则；大模型、Worker 和外部工具都没有被调用。"
-    metrics={[
+    summary={hasExecution ? "本轮先由 Admission 选择组织方式，再由受控协作运行时推进业务工作包；模型、回退和确定性处理只按服务端回执计数。" : "本轮只调用服务端 Admission 与路由规则；大模型、Worker 和外部工具都没有被调用。"}
+    metrics={hasExecution ? [
+      { label: `模型采用 ${processingCounts.model}`, tone: processingCounts.model ? "model" : "safe" },
+      { label: `模型回退 ${processingCounts.fallback}`, tone: processingCounts.fallback ? "warning" : "safe" },
+      { label: `确定性 ${processingCounts.deterministic}`, tone: "rule" },
+      { label: processingCounts.failed ? `处理失败 ${processingCounts.failed}` : processingCounts.pending ? `待回执 ${processingCounts.pending}` : "外部工具 0", tone: processingCounts.failed ? "warning" : "safe" },
+    ] : [
       { label: "规则引擎已调用", tone: "rule" },
       { label: "大模型 0", tone: "safe" },
       { label: "Worker 0", tone: "safe" },
@@ -134,6 +239,121 @@ function Demo2AgentCallTrace({ item }: { item: Demo2WorkItem }) {
     steps={steps}
     boundary="这里的预计时间、工具次数和并行单元来自演示策略预测，不是实际运行、真实账单或 SLA。"
   />;
+}
+
+function sourceLabel(sourceId: string) {
+  const normalized = sourceId.toLowerCase();
+  if (normalized.includes("forecast")) return "销售预测";
+  if (normalized.includes("crm") || normalized.includes("revenue")) return "CRM 财务记录";
+  if (normalized.includes("project") || normalized.includes("status")) return "项目周报";
+  if (normalized.includes("mail") || normalized.includes("request")) return "客户邮件";
+  if (normalized.includes("calendar")) return "日历";
+  return "受限业务资料";
+}
+
+function replanReason(reason: string | undefined) {
+  if (reason === "recognized_revenue_vs_forecast_revenue") {
+    return "正式收入与预测收入存在口径冲突，需要增加专项核验。";
+  }
+  if (reason && !/^[a-z0-9_.:-]+$/i.test(reason)) return reason;
+  return "服务端根据当前工作包事实调整了协作计划。";
+}
+
+function WorkUnitCard({ unit, artifacts }: { unit: Demo2WorkerRun; artifacts: Demo2ArtifactVersion[] }) {
+  const artifact = unit.artifact_version_id ? artifacts.find((candidate) => candidate.artifact_version_id === unit.artifact_version_id) : null;
+  return (
+    <article className={`demo2-work-unit ${executionTone(unit.status)}`} aria-label={`${unit.label} · ${UNIT_STATUS_LABELS[unit.status]}`}>
+      <header>
+        <div className="demo2-work-unit-mark" aria-hidden="true">
+          {unit.status === "running" ? <IconLoader /> : unit.status === "completed" ? <IconCheck /> : unit.status === "failed" || unit.status === "cancelled" ? <IconAlertTriangle /> : <IconClock />}
+        </div>
+        <div>
+          <strong>{unit.label}</strong>
+          <span className="demo2-execution-status">{UNIT_STATUS_LABELS[unit.status]}</span>
+        </div>
+      </header>
+      <p>{unit.objective}</p>
+      <div className="demo2-work-unit-sources">
+        <span>允许来源</span>
+        <div>{unit.source_document_ids.map((source) => <b key={source}>{sourceLabel(source)}</b>)}</div>
+      </div>
+      <div className="demo2-work-unit-processing">
+        <IconSparkles aria-hidden="true" />
+        <span>{processingLabel(unit)}</span>
+        {unit.processing?.elapsed_ms !== null && unit.processing?.elapsed_ms !== undefined && <small>{unit.processing.elapsed_ms} ms</small>}
+      </div>
+      {unit.status !== "completed" && unit.status !== "queued" && <div className="demo2-work-unit-detail">{unit.status === "running" ? "正在处理允许来源。" : "服务端已记录当前工作包状态。"}</div>}
+      {artifact && (
+        <div className={`demo2-work-unit-artifact is-${artifact.status === "validated" ? "verified" : "draft"}`}>
+          <IconFileDescription aria-hidden="true" />
+          <div><span>产物 · {artifact.title}</span><strong>{artifact.status === "validated" ? "已通过服务端来源验证。" : "已生成，等待共享工件验证。"}</strong></div>
+        </div>
+      )}
+    </article>
+  );
+}
+
+function Demo2ExecutionBoard({ execution }: { execution: Demo2ExecutionSnapshot }) {
+  const terminal = execution.status === "completed" || execution.status === "failed" || execution.status === "cancelled";
+  const verifiedArtifact = execution.artifacts.find((artifact) => artifact.kind === "verified_report_bundle");
+  const workerArtifacts = execution.artifacts.filter((artifact) => artifact.kind === "worker_finding");
+  const verifiedCount = workerArtifacts.filter((artifact) => artifact.status === "validated").length;
+  const replanEvents = execution.events.filter((event) => event.event_type === "DYNAMIC_REPLAN" || event.event_type === "WORKER_ADDED");
+  return (
+    <section className="demo2-execution-board" aria-labelledby="demo2-execution-title" aria-live="polite">
+      <header className="demo2-execution-header">
+        <div>
+          <span className="work-cockpit-eyebrow">本次协作</span>
+          <h3 id="demo2-execution-title">{executionHeading(execution.status)}</h3>
+          <p>服务端按允许来源创建受限业务工作包，完成后汇总为共享工件并进行统一验证。</p>
+        </div>
+        <strong className={`demo2-execution-status ${executionTone(execution.status)}`}>{EXECUTION_STATUS_LABELS[execution.status]}</strong>
+      </header>
+
+      <section className="demo2-work-plan" aria-labelledby="demo2-work-plan-title">
+        <div className="demo2-execution-section-heading"><span>协作计划</span><strong id="demo2-work-plan-title">{execution.worker_runs.filter((unit) => unit.trigger !== "verification").length} 个工作包</strong></div>
+        <div className="demo2-work-unit-grid">
+          {execution.worker_runs.filter((unit) => unit.trigger !== "verification").map((unit) => <WorkUnitCard key={unit.worker_run_id} unit={unit} artifacts={execution.artifacts} />)}
+        </div>
+      </section>
+
+      {replanEvents.length > 0 && (
+        <details className="demo2-replan-log">
+          <summary><span>调度变化</span><strong>{replanEvents.length} 条服务端记录</strong></summary>
+          <ol>
+            {replanEvents.map((event) => <li key={event.sequence}><b>{event.message}</b><span>{replanReason(event.details.reason)}</span></li>)}
+          </ol>
+        </details>
+      )}
+
+      {verifiedArtifact && (
+        <section className="demo2-shared-artifact is-verified" aria-labelledby="demo2-shared-artifact-title">
+          <div className="demo2-execution-section-heading"><span>共享工件验证</span><strong id="demo2-shared-artifact-title">{verifiedArtifact.title}</strong></div>
+          <div className="demo2-shared-artifact-body">
+            <div className="demo2-shared-progress" aria-label={`已验证 ${verifiedCount} 个，共 ${execution.worker_runs.filter((unit) => unit.trigger !== "verification").length} 个`}>
+              <span style={{ width: `${execution.worker_runs.length ? Math.round(verifiedCount / Math.max(1, execution.worker_runs.filter((unit) => unit.trigger !== "verification").length) * 100) : 0}%` }} />
+            </div>
+            <strong>{verifiedCount}/{Math.max(1, execution.worker_runs.filter((unit) => unit.trigger !== "verification").length)} 个工作包已验证</strong>
+            <p>{verifiedArtifact.status === "validated" ? "共享工件已通过服务端来源和一致性验证。" : "工作包产物已汇入，等待最终共享工件验证。"}</p>
+          </div>
+        </section>
+      )}
+
+      {terminal && execution.receipt && (
+        <section className={`demo2-execution-receipt ${execution.receipt.status === "completed" ? "is-completed" : "is-failed"}`} aria-labelledby="demo2-execution-receipt-title">
+          <div className="demo2-execution-section-heading"><span>内部执行回执</span><strong id="demo2-execution-receipt-title">{execution.receipt.status === "completed" ? "本次协作已完成" : "本次协作未完成"}</strong></div>
+          <p>{execution.receipt.summary}</p>
+          <div className="demo2-receipt-boundaries"><b>不会发生</b><span>不会发送邮件、写入 CRM 或调用外部业务系统</span><b>保持不变</b><span>原始资料、任务内容与外部系统状态保持不变</span></div>
+        </section>
+      )}
+
+      <details className="demo2-execution-audit">
+        <summary><span>查看处理来源</span><strong>技术信息</strong></summary>
+        <p>仅展示服务端已返回的处理类型和状态，不展示 Prompt、思维链、Worker 对话或内部标识。</p>
+        <ul>{execution.worker_runs.map((unit) => <li key={unit.worker_run_id}><span>{unit.label}</span><b>{processingLabel(unit)}</b></li>)}</ul>
+      </details>
+    </section>
+  );
 }
 
 const IMPACT_KIND_LABELS = {
@@ -293,6 +513,7 @@ export function WorkCockpitDecisionPane({
   onDraftMode,
   onConfirm,
   onRefresh,
+  onStartExecution,
 }: WorkCockpitDecisionPaneProps) {
   if (!item) {
     return (
@@ -312,6 +533,12 @@ export function WorkCockpitDecisionPane({
   const alreadyRecorded = item.admission_status === "route_selected" && item.selected_mode === selectedMode;
   const visibleReceipt = alreadyRecorded ? item.selection_receipt : null;
   const previewingOverride = item.selected_mode !== null && item.selected_mode !== selectedMode;
+  const canStartSwarm = selectedMode === "adaptive_swarm"
+    && item.admission_status === "route_selected"
+    && item.selected_mode === "adaptive_swarm"
+    && item.execution_status === "not_started"
+    && Boolean(onStartExecution);
+  const execution = item.execution;
 
   return (
     <section className="work-cockpit-decision-pane" aria-labelledby="work-cockpit-decision-title">
@@ -394,13 +621,26 @@ export function WorkCockpitDecisionPane({
           </section>
         )}
         {!visibleReceipt && <DecisionStatus item={item} selectedMode={selectedMode} />}
-        {selectedMode === "adaptive_swarm" && executionPending && (
-          <p className="work-cockpit-boundary"><IconUsersGroup aria-hidden="true" />当前仅记录为候选执行方式，不会自动创建或启动实际协作。</p>
+        {canStartSwarm && (
+          <section className="demo2-start-execution" aria-labelledby="demo2-start-execution-title">
+            <div>
+              <span>已选择 · 自适应协作群组</span>
+              <strong id="demo2-start-execution-title">准备好让本次协作发生了吗？</strong>
+              <p>点击后会创建受控业务工作包，并通过服务端事件展示进展。不会发送邮件、写入 CRM 或调用外部系统。</p>
+            </div>
+            <button type="button" onClick={() => onStartExecution?.(item.work_item_id)} disabled={saving}>
+              {saving ? "正在启动" : "启动本次协作"}<IconArrowRight aria-hidden="true" />
+            </button>
+          </section>
         )}
+        {selectedMode === "adaptive_swarm" && executionPending && !canStartSwarm && !execution && (
+          <p className="work-cockpit-boundary"><IconUsersGroup aria-hidden="true" />选择 Adaptive Swarm 后，需要明确点击“启动本次协作”；系统不会自动创建工作单元。</p>
+        )}
+        {execution && execution.status !== "not_started" && <p className="work-cockpit-recorded"><IconCheck aria-hidden="true" />本次协作状态：{EXECUTION_STATUS_LABELS[execution.status]} · 进展来自服务端事件</p>}
         {error && (
           <div className="work-cockpit-error" role="alert">
             <IconAlertTriangle aria-hidden="true" />
-            <div><strong>执行方式尚未确认</strong><span>{error}</span></div>
+            <div><strong>{execution ? "协作进展需要重新连接" : "执行方式尚未确认"}</strong><span>{error}</span></div>
             <button type="button" onClick={onRefresh} disabled={saving}><IconRefresh aria-hidden="true" />重新读取</button>
           </div>
         )}
@@ -466,7 +706,11 @@ function WorkItemOverview({ item, previewMode }: { item: Demo2WorkItem; previewM
 
       <Demo2AgentCallTrace item={item} />
 
-      {impactOption && (
+      {item.execution && item.execution.status !== "not_started" && (
+        <Demo2ExecutionBoard execution={item.execution} />
+      )}
+
+      {!item.execution && impactOption && (
         <RouteImpactCanvas
           option={impactOption}
           receipt={visibleReceipt}

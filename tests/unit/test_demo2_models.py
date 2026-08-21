@@ -5,6 +5,7 @@ from packages.contracts import (
     RouteProfile,
     RouteSelectionReceipt,
     RouteSelectionRequest,
+    WorkerProcessing,
     WorkItemSnapshot,
 )
 
@@ -142,3 +143,47 @@ def test_demo2_impact_boundaries_and_receipt_versions_are_enforced() -> None:
                 "summary": "无效版本",
             }
         )
+
+
+def test_demo2_worker_processing_cannot_overstate_model_use() -> None:
+    deterministic = WorkerProcessing(
+        path="deterministic",
+        kind="deterministic",
+        label="确定性处理",
+        model_called=False,
+        elapsed_ms=3,
+        output_used="deterministic",
+    )
+    assert deterministic.model is None
+
+    model = WorkerProcessing(
+        path="language_model",
+        kind="language_model",
+        label="模型 Worker",
+        model_called=True,
+        model="deepseek-v4-pro",
+        elapsed_ms=25,
+        output_used="model",
+    )
+    assert model.model_called is True
+
+    fallback = WorkerProcessing(
+        path="language_model",
+        kind="language_model",
+        label="模型调用后回退",
+        model_called=True,
+        model="deepseek-v4-pro",
+        elapsed_ms=40,
+        output_used="template_fallback",
+        fallback_reason="ValidationError",
+    )
+    assert fallback.output_used == "template_fallback"
+
+    invalid_payloads = [
+        {**deterministic.model_dump(), "model_called": True, "model": "deepseek-v4-pro"},
+        {**model.model_dump(), "model_called": False},
+        {**fallback.model_dump(), "fallback_reason": None},
+    ]
+    for payload in invalid_payloads:
+        with pytest.raises(ValidationError):
+            WorkerProcessing.model_validate(payload)

@@ -85,7 +85,7 @@ Tasks 工作区新增客户端 `cockpit` 模式，并把它设为当前默认入
 
 客户 A 的模式 radio 与左侧主工作区形成一组跨区域影响预演：切换本地 `draftMode` 不提交请求，但左侧立即投影所选 `route_profiles[].impact_preview`，显示工作分配、并行与等待、人的介入、策略预测、执行状态与不会发生的动作。服务端确认后，左侧由蓝色预演变为绿色实际变化地图，右侧显示精简 `selection_receipt` 并把焦点移到回执标题；完整 `before → after` 不在窄侧栏重复。`selection_receipts[]` 连续保留当前 memory Snapshot 内的改选历史，同模式重复和缺 route profile/preview 均 409 且版本不变。刷新后只有 GET 返回同一 receipt 才恢复成功状态，Toast 和颜色都不能代替服务端事实。
 
-当前 Demo 2 没有 SSE。浏览器加载和手动刷新都走 GET，API 进程重启会丢失 memory 选择；因此 UI 不显示恢复进度、Worker 数、共享工件或运行状态。`route_profiles[].forecast` 只投影为“规则预测”，原始 Prompt、内部来源 ID、策略权重和 Worker 名称不进入业务 DOM。移动端把队列改为横向可选择条、详情与右侧决策区改为纵向自然流；关键可见控件至少 44px，页面不允许整体横向溢出。
+Demo 2 的 Admission/route 仍通过 GET/POST 对账；固定客户 A 的受控执行另使用 execution GET、event replay 与 SSE。选择回执必须先显示“已选择、尚未启动”，用户启动后才根据整轮 `Demo2ExecutionSnapshot.status` 显示当前 Runtime 可达的 `queued/running/verifying/completed/failed`；协议枚举中的 Execution `cancelled` 尚无当前取消路由/转换，只能按 Draft/兼容状态处理。单个工作单元只显示 `queued/running/completed/failed/cancelled`，不显示 Worker `verifying` 或 Demo 2 `waiting_input`；`verifying` 专指整轮共享工件核验。四个业务工作单元、5 个共享工件、动态增派和完成回执均投影服务端 Snapshot/有序事件；API 进程重启会丢失 memory 选择与执行，因此 UI 不得显示跨进程恢复。`route_profiles[].forecast` 只投影为“规则预测”；Prompt、思维链、内部来源 ID、策略权重、Worker 对话和底层日志不进入业务 DOM。移动端把队列改为横向可选择条、详情与右侧决策区改为纵向自然流；关键可见控件至少 44px，页面不允许整体横向溢出。
 
 ## 3. 来源、权限和修改记录
 
@@ -262,12 +262,12 @@ Run SSE 的 `RUN_CREATED`、`EVIDENCE_SUBMITTED`、`CONTROL_PLAN_UPDATED`、`APP
 
 Conversation 回答在 `message.started/message.completed` 中携带相同的 `processing`：确定性报价为 `deterministic_formula`，通用回答或业务规划为 `language_model`，确定性动作回执可为 `policy_engine`。右侧消息完成后保留“处理来源 + 真实耗时”；真实模型请求等待期间显示配置模型名，确定性路径明确“未调用大模型”。该元数据不暴露 Prompt、思维链、Token、Key 或供应商原始响应。
 
-Demo 2 路由按钮只写入服务端选择，因此命名为“记录本轮方式”，并明确规则路由不调用模型、不会启动协作。系统禁止用固定 sleep 伪造模型思考；毫秒级公式/规则应立即完成，模型路径的等待和耗时必须来自真实调用。
+Demo 2 路由按钮只写入服务端选择，因此命名为“记录本轮方式”，并明确规则路由不调用模型、不会自动启动协作。独立“启动协作”动作只有在 Adaptive Swarm 已选且版本匹配时出现；运行等待、Worker 模型耗时和最终完成都来自 execution Snapshot/Event。系统禁止用固定 sleep 伪造模型思考；毫秒级公式/规则应立即完成，模型路径的等待和耗时必须来自真实调用。
 
 ## 13. Demo 身份与处理来源投影（DR-0013 Verified 限定范围）
 
-用户打开前台时，首屏先显示客户端产品级的 Demo 1、Demo 2 或 Demo 3 业务身份与目标；当前状态副标题再从对应 Task、WorkCockpit 或 Run Snapshot 对账。统一显示“已运行 / 未调用 / 未执行 / 待核对”，只有模型来源显示“模型已调用”，但工程不新增通用 `call_trace` 字段。
+用户打开前台时，首屏先显示客户端产品级的 Demo 1、Demo 2 或 Demo 3 业务身份与目标；当前状态副标题再从对应 Task、WorkCockpit、Demo2Execution 或 Run Snapshot 对账。统一显示“已运行 / 未调用 / 未执行 / 待核对”，只有模型来源显示“模型已调用”，但工程不新增通用 `call_trace` 字段。
 
-Demo 1 直接投影 `TaskSnapshot.stage_records[].processing`（`path/model_called/model/elapsed_ms/output_used`）及阶段状态；Demo 2 直接投影 `RouteSelectionReceipt.processing`（`path/model_called/elapsed_ms`）和 `execution_status`；Demo 3 复用 `RunSnapshot.status/control_plan/evidence/approvals/permit/tool_result/impact_preview/execution_receipt` 与 Run SSE/AuditEvent。Demo 2 的 selected 不等于 running，Demo 3 以“执行许可服务”“受控演示工具”为主，Permit/Gateway/Simulator 仅是二级技术元信息。v>1 的 Demo 1 缺少 `stage_records`，或旧 Plan/Act 缺少 `processing` 时显示“模型调用待核对”，不得推断未调用；unknown 工具结果显示“工具结果待核对”，不得写成未调用或未执行。Proposal 或 Task-derived action 出现时，前端全局切换到 Demo3/审计视图，避免继续显示 Demo1/2 身份。
+Demo 1 直接投影 `TaskSnapshot.stage_records[].processing`（`path/model_called/model/elapsed_ms/output_used`）及阶段状态；Demo 2 的路由选择投影 `RouteSelectionReceipt.processing`，受控内部执行投影 `Demo2ExecutionSnapshot.workers[].processing/events/receipt`；Demo 3 复用 `RunSnapshot.status/control_plan/evidence/approvals/permit/tool_result/impact_preview/execution_receipt` 与 Run SSE/AuditEvent。Demo 2 的 selected 不等于 running，completed 也只表示内部工件包完成且 `external_side_effect=none`；Demo 3 以“执行许可服务”“受控演示工具”为主，Permit/Gateway/Simulator 仅是二级技术元信息。v>1 的 Demo 1 缺少 `stage_records`，或旧 Plan/Act 缺少 `processing` 时显示“模型调用待核对”，不得推断未调用；unknown 工具结果显示“工具结果待核对”，不得写成未调用或未执行。Proposal 或 Task-derived action 出现时，前端全局切换到 Demo3/审计视图，避免继续显示 Demo1/2 身份。
 
 普通业务 UI 不显示 Prompt、CoT、raw `event_type/payload/trace`、密钥、Permit token/内容/permit_id/签名、内部 ID、Worker 对话或供应商原始响应；“执行许可服务”“受控演示工具”及必要的“已运行/结果待核对”业务状态可以显示，技术审计另行受控。移动端按 Demo 身份、当前阶段、调用状态、下一步渐进披露，不把完整事件列表堆在首屏。工程验证和截图见 [`DEMO-IDENTITY-AND-CALL-TRACE-EVIDENCE-20260820`](evidence/DEMO-IDENTITY-AND-CALL-TRACE-EVIDENCE-20260820.md)。

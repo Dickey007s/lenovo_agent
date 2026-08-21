@@ -1,0 +1,156 @@
+{
+  "captured_at": "2026-08-21T03:48:25.370Z",
+  "browser": "Microsoft Edge via Playwright system channel",
+  "api": {
+    "status": "completed",
+    "backend": "memory",
+    "last_event_sequence": 15,
+    "worker_count": 4,
+    "artifact_count": 5,
+    "receipt": {
+      "status": "completed",
+      "external_side_effect": "none",
+      "summary": "已完成四个受限工作单元并生成共享汇报工件包，未触发外部动作。"
+    }
+  },
+  "processing": [
+    {
+      "label": "收入事实核对",
+      "role": "revenue_analyst",
+      "trigger": "initial_plan",
+      "status": "completed",
+      "error_code": null,
+      "processing": {
+        "path": "language_model",
+        "kind": "language_model",
+        "label": "模型 Worker",
+        "model_called": true,
+        "model": "deepseek-v4-pro",
+        "elapsed_ms": 6200,
+        "output_used": "model",
+        "fallback_reason": null
+      }
+    },
+    {
+      "label": "项目风险提取",
+      "role": "project_risk_analyst",
+      "trigger": "initial_plan",
+      "status": "completed",
+      "error_code": null,
+      "processing": {
+        "path": "language_model",
+        "kind": "language_model",
+        "label": "模型 Worker",
+        "model_called": true,
+        "model": "deepseek-v4-pro",
+        "elapsed_ms": 5190,
+        "output_used": "model",
+        "fallback_reason": null
+      }
+    },
+    {
+      "label": "客户要求核对",
+      "role": "request_context_analyst",
+      "trigger": "initial_plan",
+      "status": "completed",
+      "error_code": null,
+      "processing": {
+        "path": "language_model",
+        "kind": "language_model",
+        "label": "模型 Worker",
+        "model_called": true,
+        "model": "deepseek-v4-pro",
+        "elapsed_ms": 4450,
+        "output_used": "model",
+        "fallback_reason": null
+      }
+    },
+    {
+      "label": "收入口径核验",
+      "role": "reconciliation_analyst",
+      "trigger": "dynamic_replan",
+      "status": "completed",
+      "error_code": null,
+      "processing": {
+        "path": "language_model",
+        "kind": "language_model",
+        "label": "模型 Worker",
+        "model_called": true,
+        "model": "deepseek-v4-pro",
+        "elapsed_ms": 3735,
+        "output_used": "model",
+        "fallback_reason": null
+      }
+    }
+  ],
+  "dynamic_events": [
+    {
+      "sequence": 9,
+      "event_type": "DYNAMIC_REPLAN",
+      "message": "文件事实发现收入口径冲突，动态增派口径核验工作单元。",
+      "details": {
+        "reason": "recognized_revenue_vs_forecast_revenue"
+      }
+    },
+    {
+      "sequence": 10,
+      "event_type": "WORKER_ADDED",
+      "message": "已增派收入口径核验工作单元，依赖前三项事实分析。",
+      "details": {
+        "trigger": "dynamic_replan",
+        "external_action": "none"
+      }
+    }
+  ],
+  "mobile": {
+    "innerWidth": 390,
+    "scrollWidth": 390,
+    "overflow": false
+  },
+  "captures": [
+    {
+      "file": "docs/evidence/screenshots/dr-0015-demo2-controlled-execution-1440-selected-not-started.png",
+      "width": 1440,
+      "height": 1000,
+      "sha256": "014e7b10df4730f1a88c5182cccd89114675de585acdbf6ad8c10a67d9a17c56"
+    },
+    {
+      "file": "docs/evidence/screenshots/dr-0015-demo2-controlled-execution-1440-running.png",
+      "width": 1440,
+      "height": 1000,
+      "sha256": "8ad1a4a768036447dff465c4b81fabf26ee0d6e437f4a67cf8161948a3759428"
+    },
+    {
+      "file": "docs/evidence/screenshots/dr-0015-demo2-controlled-execution-1440-dynamic-replan.png",
+      "width": 1440,
+      "height": 1000,
+      "sha256": "9614f2d6f4695f03295e1b9beb6f27553f1cffa0bcc34b1f94a03cbdab4ee54b"
+    },
+    {
+      "file": "docs/evidence/screenshots/dr-0015-demo2-controlled-execution-1440-completed.png",
+      "width": 1440,
+      "height": 1000,
+      "sha256": "52d788b3a01085ffcb40c88880f5b4753648fc7110285952efcf8b2c4cccb8ec"
+    },
+    {
+      "file": "docs/evidence/screenshots/dr-0015-demo2-controlled-execution-1440-completed-receipt.png",
+      "width": 1440,
+      "height": 1000,
+      "sha256": "da5083b6c82830a989063d9e9916bab171aefeb1758d8655b42420c9ffff8ebf"
+    },
+    {
+      "file": "docs/evidence/screenshots/dr-0015-demo2-controlled-execution-390-completed.png",
+      "width": 390,
+      "height": 3856,
+      "sha256": "b441ab7b3ea8c3c26c7686e71c9f2e5e7170a2d16bc4e0fbe9715f2bc7ea8949"
+    }
+  ],
+  "console_errors": [
+    {
+      "type": "console",
+      "text": "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "url": "http://localhost:3000/favicon.ico",
+      "assessment": "favicon_missing_non_blocking"
+    }
+  ]
+}

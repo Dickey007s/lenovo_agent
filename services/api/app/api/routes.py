@@ -12,6 +12,9 @@ from packages.authorization import AuthorizationError, AuthorizationService, Per
 from packages.tool_gateway import GatewayError, ToolGateway
 from packages.contracts import (
     ActionCandidate,
+    Demo2ExecutionSnapshot,
+    Demo2ExecutionStartRequest,
+    Demo2ExecutionStartResult,
     RouteSelectionRequest,
     RouteSelectionResult,
     TaskArtifactBinding,
@@ -57,6 +60,12 @@ from services.api.app.application.demo2_cockpit import (
     Demo2CockpitService,
     Demo2ConflictError,
     Demo2NotFoundError,
+)
+from services.api.app.application.demo2_execution import (
+    Demo2ExecutionConflictError,
+    Demo2ExecutionNotFoundError,
+    Demo2ExecutionService,
+    Demo2ExecutionSourceError,
 )
 from services.api.app.config import get_settings
 
@@ -182,6 +191,10 @@ def get_demo2_cockpit_service(request: Request) -> Demo2CockpitService:
     return request.app.state.demo2_cockpit_service
 
 
+def get_demo2_execution_service(request: Request) -> Demo2ExecutionService:
+    return request.app.state.demo2_execution_service
+
+
 def current_user(
     x_user_id: Annotated[str, Header()] = "demo_user",
     x_user_roles: Annotated[str, Header()] = "current_user",
@@ -229,6 +242,76 @@ async def select_demo2_route(
         raise HTTPException(status_code=404, detail="工作项不存在") from exc
     except Demo2ConflictError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
+@router.post(
+    "/demo2/work-items/{work_item_id}/execution",
+    response_model=Demo2ExecutionStartResult,
+    status_code=status.HTTP_202_ACCEPTED,
+)
+async def start_demo2_execution(
+    work_item_id: str,
+    body: Demo2ExecutionStartRequest,
+    user: Annotated[CurrentUser, Depends(current_user)],
+    service: Annotated[Demo2ExecutionService, Depends(get_demo2_execution_service)],
+) -> Demo2ExecutionStartResult:
+    try:
+        return await service.start_execution(work_item_id, user.user_id, body)
+    except Demo2ExecutionNotFoundError as exc:
+        raise HTTPException(status_code=404, detail="执行工作项不存在") from exc
+    except Demo2ExecutionSourceError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except (Demo2ExecutionConflictError, Demo2NotFoundError, Demo2ConflictError) as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
+@router.get(
+    "/demo2/work-items/{work_item_id}/execution",
+    response_model=Demo2ExecutionSnapshot,
+)
+async def get_demo2_execution(
+    work_item_id: str,
+    user: Annotated[CurrentUser, Depends(current_user)],
+    service: Annotated[Demo2ExecutionService, Depends(get_demo2_execution_service)],
+) -> Demo2ExecutionSnapshot:
+    try:
+        return await service.get_execution(work_item_id, user.user_id)
+    except Demo2ExecutionNotFoundError as exc:
+        raise HTTPException(status_code=404, detail="执行不存在") from exc
+
+
+@router.get("/demo2/work-items/{work_item_id}/execution/events")
+@router.get("/demo2/work-items/{work_item_id}/execution/stream")
+async def stream_demo2_execution_events(
+    work_item_id: str,
+    request: Request,
+    user: Annotated[CurrentUser, Depends(current_user)],
+    service: Annotated[Demo2ExecutionService, Depends(get_demo2_execution_service)],
+    after: Annotated[int, Query(ge=0)] = 0,
+    execution_id: str | None = None,
+) -> StreamingResponse:
+    try:
+        execution = await service.get_execution(work_item_id, user.user_id)
+        if execution_id is not None and execution.execution_id != execution_id:
+            raise HTTPException(status_code=409, detail="执行标识与当前工作项不一致")
+    except Demo2ExecutionNotFoundError as exc:
+        raise HTTPException(status_code=404, detail="执行不存在") from exc
+
+    async def event_source():
+        async for event in service.event_stream(work_item_id, user.user_id, after):
+            if await request.is_disconnected():
+                break
+            if event is None:
+                yield ": heartbeat\n\n"
+            else:
+                payload = event.model_dump_json()
+                yield f"id: {event.sequence}\nevent: {event.event_type}\ndata: {payload}\n\n"
+
+    return StreamingResponse(
+        event_source(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
 
 
 @router.get("/health")
