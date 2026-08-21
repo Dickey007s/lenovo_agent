@@ -44,7 +44,8 @@ import {
 } from "./task-director-studio";
 import type { ControlIntent } from "./task-runtime-panel";
 import { WorkCockpit, WorkCockpitDecisionPane } from "./work-cockpit";
-import { ActionImpactLedger } from "./action-impact-ledger";
+import { ActionGovernanceTrace, ActionImpactLedger } from "./action-impact-ledger";
+import { DemoExperienceNav, type DemoExperienceId, type DemoExperienceItem } from "./agent-call-trace";
 
 type ViewId = "mail" | "document" | "quote" | "tasks" | "calendar" | "expense" | "crm" | "audit";
 type WorkspaceKind = Exclude<ViewId, "audit">;
@@ -130,6 +131,9 @@ type RunSnapshot = {
     } | null;
   };
   risk: { risk_level: string; reason_codes: string[] };
+  policy_effects?: { policy_id: string; matched: boolean }[];
+  evidence?: Record<string, { status: string }>;
+  approvals?: { approver_role: string; decision: "approved" | "rejected" }[];
   control_plan: {
     action_hash: string;
     status: string;
@@ -181,6 +185,15 @@ const TASK_STATUS_LABELS: Record<TaskSnapshot["status"], string> = {
 const TASK_PHASE_LABELS: Record<TaskSnapshot["phase"], string> = {
   contract: "任务契约", observe: "读取来源", plan: "规划分支", act: "生成工件",
   verify: "验证证据", commit: "提交结果",
+};
+const RUN_STATUS_LABELS: Record<string, string> = {
+  WAITING_EVIDENCE: "等待可信依据",
+  WAITING_APPROVAL: "等待人工确认",
+  READY_TO_AUTHORIZE: "等待执行确认",
+  AUTHORIZED: "许可已签发",
+  EXECUTED: "Simulator 已返回回执",
+  DENIED: "治理规则已拒绝",
+  FAILED: "动作已停止",
 };
 const EVENT_LABELS: Record<string, string> = {
   RUN_CREATED: "动作进入治理流程", ACTION_PARSED: "解析动作意图", EVIDENCE_SUBMITTED: "提交可信依据",
@@ -620,7 +633,7 @@ function CrmView({ artifact, dirty, onChange, onSave }: ViewProps) {
 }
 
 function AuditView({ events, run }: { events: AuditEvent[]; run: RunSnapshot | null }) {
-  return <div className="artifact-page audit-page"><header className="artifact-header"><div className="artifact-title"><div className="app-chip"><Icon name="audit"/></div><div><span className="eyebrow">AUDIT</span><h1>执行审计</h1></div></div><span>{run ? "服务端审计记录" : "等待受控动作"}</span></header>{events.length === 0 ? <div className="workspace-empty"><span>◇</span><strong>暂无审计事件</strong><p>Agent 发起受控动作后，可信依据、人工确认、一次性执行许可与结果会记录在这里。</p></div> : <div className="audit-timeline">{events.map(event => <details key={event.sequence}><summary><b>{String(event.sequence).padStart(3, "0")}</b><span><strong>{EVENT_LABELS[event.event_type] ?? "服务端状态更新"}</strong><small>服务端记录</small></span><time>{new Date(event.occurred_at).toLocaleTimeString("zh-CN")}</time><i>⌄</i></summary><p>{auditEventSummary(event)}</p></details>)}</div>}</div>;
+  return <div className="artifact-page audit-page"><header className="artifact-header"><div className="artifact-title"><div className="app-chip"><Icon name="audit"/></div><div><span className="eyebrow">DEMO 3 · ACTION GOVERNANCE</span><h1>受控动作与调用记录</h1></div></div><span>{run ? "服务端治理事实" : "等待受控动作"}</span></header>{run && <ActionGovernanceTrace run={run} defaultOpen />}{events.length === 0 ? <div className="workspace-empty"><span>◇</span><strong>暂无治理事件</strong><p>Agent 发起受控动作后，风险规则、可信依据、人工确认、一次性执行许可与 Simulator 结果会记录在这里。</p></div> : <div className="audit-timeline">{events.map(event => <details key={event.sequence}><summary><b>{String(event.sequence).padStart(3, "0")}</b><span><strong>{EVENT_LABELS[event.event_type] ?? "服务端状态更新"}</strong><small>服务端记录</small></span><time>{new Date(event.occurred_at).toLocaleTimeString("zh-CN")}</time><i>⌄</i></summary><p>{auditEventSummary(event)}</p></details>)}</div>}</div>;
 }
 
 function ApprovalModal({ run, evidenceCatalog, evidence, busy, onEvidence, onSubmitEvidence, onDecide, onAuthorize, onDismissReceipt }: {
@@ -1574,7 +1587,13 @@ export default function Home() {
       setAssistantStatus(String(event.label ?? "正在处理"));
     } else if (type === "action.proposed") {
       const nextRun = event.run as RunSnapshot | null;
-      if (nextRun) { setRun(nextRun); setLastActionReceiptRun(null); setEvidence({}); setAssistantStatus(""); }
+      if (nextRun) {
+        setRun(nextRun);
+        setLastActionReceiptRun(null);
+        setEvidence({});
+        setAssistantStatus("");
+        setActiveView("audit");
+      }
     } else if (type === "ui.focus") {
       const view = String(event.view) as ViewId;
       if (view in VIEW_LABELS && view !== "audit") setActiveView(view);
@@ -1841,6 +1860,7 @@ export default function Home() {
       setRun(snapshot);
       setEvidence({});
       setTaskRightMode("conversation");
+      setActiveView("audit");
       setNotice("已准备受控动作；尚未发送，请复核风险与目标");
     } catch (reason) {
       if (reason instanceof ApiError && reason.status < 500) {
@@ -1950,6 +1970,34 @@ export default function Home() {
   const taskWorkspaceActive = activeView === "tasks";
   const effectiveTaskRightMode: TaskRightMode = actionGateOpen ? "conversation" : taskRightMode;
   const cockpitWorkspaceActive = taskWorkspaceActive && taskViewMode === "cockpit";
+  const demoSurfaceActive = taskWorkspaceActive || activeView === "audit";
+  const activeDemo: DemoExperienceId = activeView === "audit" || actionGateOpen || actionResultPending
+    ? "demo3"
+    : cockpitWorkspaceActive
+      ? "demo2"
+      : "demo1";
+  const activeGovernanceRun = run ?? lastActionReceiptRun;
+  const demo2PendingCount = demo2Cockpit?.items.filter((item) => item.admission_status === "recommended").length ?? 0;
+  const demoExperienceItems: DemoExperienceItem[] = [
+    {
+      id: "demo1",
+      label: "Demo 1",
+      title: "持续任务",
+      status: task ? TASK_STATUS_LABELS[task.status] : "尚未创建本轮任务",
+    },
+    {
+      id: "demo2",
+      label: "Demo 2",
+      title: "智能调度",
+      status: demo2Cockpit ? `${demo2PendingCount} 项待确定方式` : "正在读取工作队列",
+    },
+    {
+      id: "demo3",
+      label: "Demo 3",
+      title: "受控执行",
+      status: activeGovernanceRun ? RUN_STATUS_LABELS[activeGovernanceRun.status] ?? "治理状态已更新" : "等待受控动作",
+    },
+  ];
   const showTaskDecisions = taskWorkspaceActive && !cockpitWorkspaceActive && effectiveTaskRightMode === "decisions";
   const showCockpitDecision = cockpitWorkspaceActive && effectiveTaskRightMode === "decisions";
   function openTaskWorkspace() {
@@ -1964,7 +2012,17 @@ export default function Home() {
     }));
   }
 
-  return <main className={`app-shell${taskWorkspaceActive ? " is-task-director" : ""}`} ref={shellRef} style={shellStyle}>
+  function openDemoExperience(id: DemoExperienceId) {
+    if (id === "demo3") {
+      setActiveView("audit");
+      return;
+    }
+    setActiveView("tasks");
+    setTaskViewMode(id === "demo2" ? "cockpit" : "director");
+    setTaskRightMode("decisions");
+  }
+
+  return <main className={`app-shell${taskWorkspaceActive ? " is-task-director" : ""}${activeDemo === "demo3" ? " is-demo3-experience" : ""}`} ref={shellRef} style={shellStyle}>
     <section className="workbench" data-view={activeView}>
       <nav className="view-rail" aria-label="工作台视图">
         <div className="task-rail-brand" aria-label="Lenovo Office Agent">
@@ -1980,6 +2038,7 @@ export default function Home() {
         </div>
       </nav>
       <div className={`workspace-viewport ${streamingArtifact === activeView ? "is-agent-editing" : ""}`}>
+        {demoSurfaceActive && <DemoExperienceNav active={activeDemo} items={demoExperienceItems} onSelect={openDemoExperience} />}
         {streamingArtifact === activeView && <div className="agent-edit-indicator"><i/><span>Agent 正在编辑{VIEW_LABELS[activeView]}</span></div>}
         {activeView === "mail" && viewProps && <MailView {...viewProps} onNew={() => void startNewMail()} onSend={() => void triggerWorkspaceAction("发送当前工作区中的邮件")}/>}
         {activeView === "document" && viewProps && <DocumentView {...viewProps}/>}
@@ -2046,7 +2105,7 @@ export default function Home() {
       {notice && <div className="workspace-toast"><IconCheck aria-hidden="true" />{notice}</div>}
     </section>
     <div className="resize-divider" role="separator" aria-orientation="vertical" onPointerDown={startResize}><span>•••</span></div>
-    <section className={`chat-pane without-task-runtime ${actionGateOpen ? "has-action-gate" : ""} ${actionResultPending ? "has-action-receipt" : ""} ${taskWorkspaceActive ? "task-director-side-pane" : ""}`}>
+    <section className={`chat-pane without-task-runtime ${actionGateOpen ? "has-action-gate" : ""} ${actionResultPending ? "has-action-receipt" : ""} ${taskWorkspaceActive ? "task-director-side-pane" : ""} ${activeDemo === "demo3" ? "is-demo3-governance" : ""}`}>
       {taskWorkspaceActive && (
         <div className="task-side-mode-switch" role="tablist" aria-label="右侧 Agent 模式">
           <button id="task-side-tab-decisions" type="button" role="tab" aria-controls="task-side-panel" aria-selected={effectiveTaskRightMode === "decisions"} tabIndex={effectiveTaskRightMode === "decisions" ? 0 : -1} className={effectiveTaskRightMode === "decisions" ? "active" : ""} onClick={() => setTaskRightMode("decisions")} onKeyDown={(event) => moveTaskSideTab(event, "decisions")}>{cockpitWorkspaceActive ? "执行方式" : "待我决定"}</button>

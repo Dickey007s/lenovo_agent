@@ -99,6 +99,14 @@ Demo 3 的前台重点是“动作影响账本”：用户在 Action Gate 中先
 
 当前固定工程纵切已完成验证：Python `151 passed, 1 skipped in 3.69s`、完整浏览器 `37 passed (2.2m)`，并新增审计工作台回归；Ruff、governance `4 passed in 0.02s`、前端 lint 和 build 通过，视觉终验无 P0/P1。普通业务 UI 只显示业务标签与服务端摘要，不渲染 raw event/payload/trace 或 `email_simulator`、`email.send`、`PERMIT_ISSUED`、`Permit`；内部原值仅留 API/服务端审计。四张桌面/移动截图及 SHA-256 见 Evidence。该结果不证明目标用户理解、真实 Connector、生产身份、跨进程执行幂等/Permit replay、多实例或数据库恢复。实现提交为 `9335470`，文档提交为 `34aee71`，对应 [PR #18](https://github.com/Dickey007s/lenovo_agent/pull/18)。详见 [`DR-0012`](docs/decisions/DR-0012-demo3-action-impact-ledger.md)、[`SCENARIO-003`](docs/scenarios/SCENARIO-003-demo3-action-impact-ledger.md) 与 [`Demo 3 Evidence`](docs/evidence/DEMO3-ACTION-IMPACT-LEDGER-EVIDENCE-20260820.md)。
 
+### Demo 身份导航与调用轨迹（DR-0013，Verified 限定范围）
+
+用户不仅能看到 Demo 1/2/3，还能知道当前业务阶段真实调用了什么。Demo 名称与目标是客户端产品级信息架构；当前状态从服务端 Snapshot、持久化字段或有序事件对账。前端用“已运行 / 未调用 / 未执行 / 待核对”统一投影现有事实，只有模型显示“模型已调用”：Demo 1 使用 `TaskStageRecord.processing`，Demo 2 使用 `RouteSelectionReceipt.processing`，Demo 3 复用 `RunSnapshot` 治理字段。工程没有新增通用 `call_trace` 协议；没有服务端事实时不得自行补造调用结论。
+
+普通业务 UI 只显示业务标签与服务端摘要；Demo3 以“执行许可服务”“受控演示工具”等业务词为主，Permit/Gateway/Simulator 仅作二级技术元信息；Prompt、CoT、原始 payload、密钥、Permit token/内容/permit_id/签名、内部 ID、Worker 对话和底层日志隐藏。Demo 2 的 selected 不等于 running，Demo 3 的技术元信息不等于真实外部系统写入；unknown 工具结果显示“工具结果待核对”。v>1 的 Demo 1 旧阶段缺少 `processing` 时显示“模型调用待核对”，不推断为未调用。固定工程验证与截图见 [`DR-0013`](docs/decisions/DR-0013-demo-identity-and-call-trace.md) 和 [`Evidence`](docs/evidence/DEMO-IDENTITY-AND-CALL-TRACE-EVIDENCE-20260820.md)。
+
+本轮实现与文档主体提交为 `5e3bc9c`，对应 [PR #20](https://github.com/Dickey007s/lenovo_agent/pull/20)。
+
 ## 技术架构
 
 ```mermaid
@@ -167,6 +175,8 @@ flowchart LR
 - [Demo 3 动作影响账本决策（Verified 限定范围）](docs/decisions/DR-0012-demo3-action-impact-ledger.md)
 - [Demo 3 动作影响账本场景（Verified 固定场景）](docs/scenarios/SCENARIO-003-demo3-action-impact-ledger.md)
 - [Demo 3 动作影响账本证据（Verified 限定范围）](docs/evidence/DEMO3-ACTION-IMPACT-LEDGER-EVIDENCE-20260820.md)
+- [Demo 身份导航与调用轨迹决策（Verified 限定范围）](docs/decisions/DR-0013-demo-identity-and-call-trace.md)
+- [Demo 身份与调用轨迹反馈来源](docs/sources/USER-FEEDBACK-20260820-05-demo-identity-and-call-trace.md)
 - [来源台账](docs/decisions/SOURCE_REGISTER.md)
 
 ## 目录结构

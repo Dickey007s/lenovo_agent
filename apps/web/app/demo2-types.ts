@@ -71,6 +71,11 @@ export type Demo2RouteSelectionReceipt = {
   execution_status_before: "not_started";
   execution_status_after: "not_started";
   external_side_effect: "none";
+  processing?: {
+    path: "policy_engine";
+    model_called: false;
+    elapsed_ms: number;
+  } | null;
   summary: string;
 };
 

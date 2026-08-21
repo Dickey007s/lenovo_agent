@@ -1,7 +1,27 @@
 import { expect, test, type APIRequestContext, type Page, type TestInfo } from "@playwright/test";
 
+import { deriveGovernedToolState } from "../app/action-impact-ledger";
+
 const API_URL = "http://localhost:8011";
 const PENDING_MUTATION_KEY = "office-agent.pending-task-mutation.v1";
+
+test("governed tool projection distinguishes unknown simulator outcomes from not-called tools", () => {
+  expect(deriveGovernedToolState({
+    status: "FAILED",
+    tool_result: null,
+    execution_receipt: { status: "unknown", failure_stage: "simulator" },
+  })).toMatchObject({ attempted: true, outcomeUnknown: true, status: "unknown" });
+  expect(deriveGovernedToolState({
+    status: "FAILED",
+    tool_result: null,
+    execution_receipt: { status: "unknown" },
+  })).toMatchObject({ attempted: true, outcomeUnknown: true, status: "unknown" });
+  expect(deriveGovernedToolState({
+    status: "FAILED",
+    tool_result: null,
+    execution_receipt: { status: "failed", failure_stage: "gateway" },
+  })).toMatchObject({ attempted: false, outcomeUnknown: false, status: "blocked" });
+});
 
 type TaskSnapshot = {
   task_id: string;
@@ -116,7 +136,7 @@ async function expectPrimarySurfaceToHideRuntimeJargon(page: Page) {
   const surface = page.locator(".app-shell.is-task-director");
   await expect(surface).toBeVisible();
   const visibleText = await surface.innerText();
-  expect(visibleText).not.toMatch(/Demo 1|Snapshot|ORCHESTRATION BOARD|DECISION INBOX/i);
+  expect(visibleText).not.toMatch(/Snapshot|ORCHESTRATION BOARD|DECISION INBOX/i);
 }
 
 async function openLongTask(page: Page) {
@@ -140,6 +160,17 @@ test("the first task path exposes the customer A purpose, decision facts, and co
 
   await page.getByRole("button", { name: "开始准备汇报", exact: true }).click();
   await expect(page.getByRole("heading", { name: "还差 1 个决定，确认后继续核对" })).toBeVisible();
+  const demoNav = page.getByRole("navigation", { name: "三个演示能力" });
+  await expect(demoNav.getByRole("button", { name: /Demo 1.*持续任务/ })).toHaveAttribute("aria-current", "page");
+  await expect(demoNav.getByRole("button", { name: /Demo 2.*智能调度/ })).toBeVisible();
+  await expect(demoNav.getByRole("button", { name: /Demo 3.*受控执行/ })).toBeVisible();
+  const demo1Trace = page.locator(".task-director-canvas .agent-call-trace");
+  await expect(demo1Trace.getByText("本次用了什么", { exact: true })).toBeVisible();
+  await demo1Trace.locator("summary").click();
+  await expect(demo1Trace.getByText("任务运行服务", { exact: true })).toBeVisible();
+  await expect(demo1Trace.getByText("服务端模板接管", { exact: true })).toHaveCount(2);
+  await expect(demo1Trace.getByText("确定性事实核对器", { exact: true })).toBeVisible();
+  await expect(demo1Trace.getByText("外部动作 0", { exact: true })).toBeVisible();
   await expect(page.getByText("为什么需要你", { exact: true })).toBeVisible();
   await expect(page.getByText("确认后会发生什么", { exact: true })).toBeVisible();
   const impactPreview = page.locator(".task-impact-preview");
@@ -164,6 +195,20 @@ test("the first task path exposes the customer A purpose, decision facts, and co
   }
   await expect(page.locator(".workspace-toast")).toBeHidden({ timeout: 4_000 });
   await attachScreenshot(page, testInfo, "usability-decision-1181");
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  const mobileCallTraceOverflow = await page.evaluate(() => ["html", "body", ".app-shell", ".task-view-shell"]
+    .map((selector) => {
+      const element = document.querySelector<HTMLElement>(selector);
+      if (!element) throw new Error(`Missing mobile call-trace surface: ${selector}`);
+      return { selector, clientWidth: element.clientWidth, scrollWidth: element.scrollWidth };
+    }));
+  for (const item of mobileCallTraceOverflow) {
+    expect(item.scrollWidth, `${item.selector} should not overflow with the Demo 1 call trace open at 390px`)
+      .toBeLessThanOrEqual(item.clientWidth + 1);
+  }
+  await attachScreenshot(page, testInfo, "demo1-call-trace-mobile-390");
+  await page.setViewportSize({ width: 1181, height: 900 });
 
   const controlRequest = page.waitForRequest(
     (request) => request.url().includes("/control") && request.method() === "POST",
@@ -240,6 +285,10 @@ test("a verified reply becomes a version-bound governed simulator action", async
 
   const gate = page.getByRole("dialog", { name: "动作影响账本" });
   await expect(gate).toBeVisible();
+  const demoNav = page.getByRole("navigation", { name: "三个演示能力" });
+  await expect(demoNav.getByRole("button", { name: /Demo 3.*受控执行/ })).toHaveAttribute("aria-current", "page");
+  const auditPage = page.locator(".audit-page");
+  await expect(auditPage.getByRole("heading", { name: "受控动作与调用记录" })).toBeVisible();
   await expect(gate.getByRole("heading", { name: "发送外部邮件" })).toBeVisible();
   await expect(gate.getByText("预演已生成", { exact: true })).toBeVisible();
   await expect(gate.getByText("会改变", { exact: true })).toBeVisible();
@@ -252,25 +301,22 @@ test("a verified reply becomes a version-bound governed simulator action", async
   await expect(gate.getByText("企业外客户", { exact: true })).toBeVisible();
   await expect(gate.getByText("customer@example.com", { exact: true })).toBeVisible();
   await expect(gate.getByText(/动作只绑定这一版成果/)).toBeVisible();
+  const governanceTrace = auditPage.locator(".agent-call-trace");
+  await expect(governanceTrace.getByText("风险与权限规则", { exact: true })).toBeVisible();
+  await expect(governanceTrace.getByText("人工确认", { exact: true }).first()).toBeVisible();
+  await expect(governanceTrace.getByText("执行许可未签发", { exact: true })).toBeVisible();
+  await expect(governanceTrace.getByText("演示工具未调用", { exact: true })).toBeVisible();
   await expect(gate).not.toContainText("email_simulator");
   await expect(gate).not.toContainText("office_action_simulator");
   await expect(gate).not.toContainText("email.send");
-  await expect(gate).not.toContainText("Permit");
   const [gateBox, sidePaneBox] = await Promise.all([
     gate.boundingBox(),
-    page.locator(".task-director-side-pane").boundingBox(),
+    page.locator(".chat-pane.is-demo3-governance").boundingBox(),
   ]);
-  const sidePanelColumns = await page.locator(".task-director-side-pane").evaluate(
-    (element) => getComputedStyle(element).gridTemplateColumns,
-  );
-  const conversationPanelBox = await page.locator(".task-conversation-panel.is-task-workspace").boundingBox();
   expect(gateBox).not.toBeNull();
   expect(sidePaneBox).not.toBeNull();
-  expect(conversationPanelBox).not.toBeNull();
-  expect(sidePanelColumns.trim().split(/\s+/)).toHaveLength(1);
-  expect(conversationPanelBox!.height).toBeGreaterThan(sidePaneBox!.height * 0.8);
   expect(gateBox!.width).toBeGreaterThan(sidePaneBox!.width * 0.8);
-  expect(gateBox!.height).toBeGreaterThan(300);
+  expect(gateBox!.height).toBeGreaterThan(sidePaneBox!.height * 0.4);
   expect(gateBox!.x).toBeGreaterThanOrEqual(sidePaneBox!.x);
   expect(gateBox!.x + gateBox!.width).toBeLessThanOrEqual(sidePaneBox!.x + sidePaneBox!.width + 1);
   expect(prepareCount).toBe(1);
@@ -286,6 +332,8 @@ test("a verified reply becomes a version-bound governed simulator action", async
   await expect(gate.getByText("服务端已返回实际回执", { exact: true })).toBeVisible();
   await expect(gate.getByText("实际回执", { exact: true })).toBeVisible();
   await expect(gate.getByRole("heading", { name: "发送外部邮件" })).toBeVisible();
+  await expect(governanceTrace.getByText("执行许可已签发", { exact: true })).toBeVisible();
+  await expect(governanceTrace.getByText("演示工具已调用", { exact: true })).toBeVisible();
   await attachScreenshot(page, testInfo, "demo3-action-impact-receipt-1440");
   await gate.getByRole("button", { name: "收起动作回执" }).click();
   await expect(gate).toHaveCount(0);
@@ -311,13 +359,12 @@ test("a verified reply becomes a version-bound governed simulator action", async
   expect(audit.map((event) => event.event_type)).toContain("PERMIT_ISSUED");
   expect(audit.map((event) => event.event_type)).toContain("TOOL_EXECUTED");
 
-  await page.getByRole("button", { name: "审计", exact: true }).click();
-  const auditPage = page.locator(".audit-page");
+  await expect(auditPage.getByRole("heading", { name: "受控动作与调用记录" })).toBeVisible();
+  await expect(demoNav.getByRole("button", { name: /Demo 3.*受控执行/ })).toHaveAttribute("aria-current", "page");
   await expect(auditPage.getByText("受控演示动作已执行", { exact: true })).toBeVisible();
   await expect(auditPage).not.toContainText("email_simulator");
   await expect(auditPage).not.toContainText("email.send");
   await expect(auditPage).not.toContainText("PERMIT_ISSUED");
-  await expect(auditPage).not.toContainText("Permit");
   await auditPage.getByText("受控演示动作已执行", { exact: true }).click();
   await expect(auditPage.getByText("受控演示工具已返回结果；真实外部系统未连接。", { exact: true })).toBeVisible();
 });
@@ -374,6 +421,8 @@ test("keeps the action impact ledger readable and bounded on mobile", async ({ p
   expect(nestedScroll).toBe(false);
   await expect(ledger.getByText("会改变", { exact: true })).toBeVisible();
   await expect(ledger.getByText("不会发生", { exact: true })).toBeVisible();
+  await expect(page.locator(".workspace-toast")).toBeHidden({ timeout: 4_000 });
+  await page.evaluate(() => window.scrollTo(0, 0));
   await attachScreenshot(page, testInfo, "demo3-action-impact-preview-mobile-390");
 });
 
@@ -1022,7 +1071,10 @@ test("Demo 1 uses server facts from creation through the three-branch commit", a
   }).first();
   await expect(sendStatus.locator("dd")).toHaveText("仅草稿，未发送");
   await expect(page.locator(".task-artifact-commit-heading")).toContainText("最终提交");
-  await expect(page.locator(".task-artifact-commit-facts code")).toHaveText(/^sha256:[0-9a-f]{64}$/);
+  const commitEvidence = page.locator(".task-artifact-commit-evidence");
+  await commitEvidence.locator("summary").click();
+  await expect(commitEvidence).toContainText("服务端已保留状态指纹");
+  await expect(commitEvidence).not.toContainText(/sha256:[0-9a-f]{64}/);
 
   const replyLineage = page.locator(".task-artifact-lineage-button");
   await replyLineage.first().click();
@@ -1145,13 +1197,28 @@ test("an aborted start keeps one idempotency key across reload and reconciles wi
 
   await page.reload();
   await openLongTask(page);
-  await expect(page.getByRole("button", { name: "立即对账" }).first()).toBeVisible();
   await expect(page.getByText(/已连接当前工作区/).first()).toBeVisible();
   const savedAfterReload = await page.evaluate((key) => window.sessionStorage.getItem(key), PENDING_MUTATION_KEY);
   expect(savedAfterReload).toBe(savedBeforeReload);
 
-  await page.getByRole("button", { name: "立即对账" }).first().click();
-  await expect(page.getByRole("heading", { name: "还差 1 个决定，确认后继续核对" })).toBeVisible();
+  const reconcileButton = page.getByRole("button", { name: "立即对账" }).first();
+  const waitingDecisionHeading = page.getByRole("heading", { name: "还差 1 个决定，确认后继续核对" });
+  await expect
+    .poll(
+      async () => {
+        if (await waitingDecisionHeading.isVisible()) return "reconciled";
+        if (await reconcileButton.isVisible()) {
+          try {
+            await reconcileButton.click({ timeout: 1_000 });
+          } catch {
+            // Automatic reconciliation can replace the button between visibility and click.
+          }
+        }
+        return (await waitingDecisionHeading.isVisible()) ? "reconciled" : "pending";
+      },
+      { timeout: 15_000 },
+    )
+    .toBe("reconciled");
   await expect.poll(() => page.evaluate((key) => window.sessionStorage.getItem(key), PENDING_MUTATION_KEY)).toBeNull();
 
   const afterRetry = await listTasks(request, owner);

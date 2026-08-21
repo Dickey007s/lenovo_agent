@@ -749,8 +749,8 @@ export function TaskArtifactWorkspace({
                 <dt>提交证据</dt>
                 <dd>
                   <details className="task-artifact-commit-evidence">
-                    <summary>查看状态哈希</summary>
-                    <code>{task.last_commit.state_hash}</code>
+                    <summary>查看审计说明</summary>
+                    <p>服务端已保留状态指纹；普通工作区不显示原始哈希。</p>
                   </details>
                 </dd>
               </div>

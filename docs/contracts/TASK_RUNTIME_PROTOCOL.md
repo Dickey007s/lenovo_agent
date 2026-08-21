@@ -224,3 +224,9 @@ data: {TaskEvent JSON}
 每个阶段记录持久化 `stage`、`status`、用户摘要、受限详情、`artifact_ids`、`generation_source` 和时间戳；缺少该字段的旧 Snapshot 反序列化为默认空数组。`start`、`advance` 和 `resolve_evidence` 均要求 `expected_task_version + idempotency_key`，成功只增加一个 version；同 key 重放首次响应，旧 version 返回 409。
 
 Plan/Act 的请求和响应由 `TaskStagePlanRequest/TaskStagePlan` 与 `TaskStageActRequest/TaskStageAct` 严格校验，适配器当前配置 `deepseek-v4-pro`；只有与服务端批准模板逐字段一致的面向用户文字才保留 `generation_source=model`，否则显式 `template_fallback`。因此模型不能把思维链、内部 ID、来源引用、状态或新事实写入阶段记录，也不能决定身份、来源、冲突、验证、预算或 Commit；Observe/Verify/Commit 是确定性逻辑。固定渐进路径还要求完整 Demo 契约匹配，包括预算与截止时间。模型调用在 CAS 前执行，CAS 冲突时结果丢弃。预算是 steps/tool calls/runtime，不是 token cost。浏览器负责下一阶段协调，关闭浏览器不触发后台运行；同进程同 key 有锁，跨实例无分布式 LLM lease。
+
+## 10. Demo 1 处理来源投影（DR-0013）
+
+Task Runtime 不新增通用 `call_trace` 协议。前端直接读取 `TaskStageRecord.processing` 的 `path/model_called/model/elapsed_ms/output_used`，并结合阶段 `status`、`generation_source` 和时间戳显示业务处理来源。阶段完成的通用状态为“已运行”；只有 `model_called=true` 显示“模型已调用”，`path=language_model` 且 `output_used=model` 才表示模型输出被采用；模型调用但输出被模板接管时显示回退；确定性阶段显示“已运行 · 未调用大模型”。
+
+兼容旧数据时，v>1 Snapshot 没有 `stage_records`，或旧 Plan/Act 记录缺少 `processing`，前端必须显示“模型调用待核对”，不能推断为未调用。`TaskStageProcessing` 的跨字段 validator 拒绝确定性路径携带模型调用/模型输出，也拒绝语言模型路径缺少观测调用或模型名。当前真实模型路径仅以服务端记录的本次处理事实为准；日志只保留 stage、model_called、accepted_model_output、model、elapsed_ms、origin 等元数据，不把 Prompt、正文或 Key 暴露到普通 UI。

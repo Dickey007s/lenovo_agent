@@ -100,6 +100,12 @@ async def test_demo2_customer_route_is_versioned_and_idempotent() -> None:
     assert receipt["execution_status_before"] == "not_started"
     assert receipt["execution_status_after"] == "not_started"
     assert receipt["external_side_effect"] == "none"
+    assert receipt["processing"] == {
+        "path": "policy_engine",
+        "model_called": False,
+        "elapsed_ms": receipt["processing"]["elapsed_ms"],
+    }
+    assert receipt["processing"]["elapsed_ms"] >= 0
     assert any(change["aspect"] == "work_allocation" for change in receipt["changes"])
     assert any(change["aspect"] == "external_action" for change in receipt["changes"])
     assert different.status_code == 409

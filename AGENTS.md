@@ -65,7 +65,9 @@ tests/                                        单元与端到端回归
 - Demo 3 的四类前台影响固定为“会改变 / 会重新核对 / 保持不变 / 不会发生”。拒绝、绑定失效、参数篡改、Permit 重放和 Simulator 失败都必须保留已完成 Task/Artifact/Commit 不变的回执。
 - Demo 3 不得表述真实邮箱、CRM、OA、日历或任务系统发生写入；当前仅覆盖固定场景和五个 Simulator capability。RunStore、Permit replay、Thread/Message 与完成消息的跨进程恢复边界必须按证据表述，不能从配置 PostgreSQL 推断为高可用。
 - Demo 3 当前仅在固定客户 A `reply_draft → email.send`、四个治理场景、被测桌面/移动路径内为 `Verified`；无用户研究、真实 Connector、生产身份、跨进程执行幂等/Permit replay、多实例或数据库恢复证据时，不得扩展为通用能力或用户效果结论。实现与文档 commit、PR URL 必须回填到 DR-0012 Evidence 后才能封口。
-- Demo 3 普通业务审计工作台不得渲染 raw `event_type`、`payload`、`trace` 或 `email_simulator`、`email.send`、`PERMIT_ISSUED`、`Permit`；必须投影为业务标签与服务端摘要。内部原值只保留在 API/服务端审计与授权技术视图。
+- Demo 3 普通业务审计工作台不得渲染 raw `event_type`、`payload`、`trace` 或 `email_simulator`、`email.send`、`PERMIT_ISSUED`、Permit token/内容/permit_id/签名；必须投影为业务标签与服务端摘要，可以显示“Permit Service”“Permit 已签发/未签发”等业务级状态。内部原值只保留在 API/服务端审计与授权技术视图。
+- Demo 1/2/3 的通用完成状态在前台显示“已运行”，只有模型事实显示“模型已调用”；Demo 3 以“执行许可服务”“受控演示工具”为主，Permit/Gateway/Simulator 仅在二级技术元信息出现。unknown 工具结果必须显示“工具结果待核对”，不得写成未调用或未执行。
+- Demo 3 的 proposal 或 Task-derived action 出现时，前端必须全局切换到 Demo 3/审计视图，避免身份仍停留在 Demo 1/2。`TaskStageProcessing` 必须保持跨字段一致：确定性路径不得声称模型调用/模型输出；语言模型路径必须有观测调用和模型名。
 
 Demo 1 当前 Runtime 事实（2026-08-17）：create 为 v1 `ready / contract`；start 仅进入 v2 `running / observe`；浏览器在 Snapshot 确认后四次调用幂等 advance，依次得到 v3 Plan、v4 Act、v5 Verify、v6 `waiting_input / verify`，固定为 5 个工件、1 个 open conflict、2 个 passed verification；resolve 后 v7 `committed / commit`。`stage_records` 是 UI 事实且旧快照默认空数组。Plan/Act 通过严格 `TaskStageAgent` 调用 `deepseek-v4-pro`，但只有与服务端批准模板逐字段一致的业务文字才记录为 `model`，否则显式 `template_fallback`；Observe/Verify/Commit 确定性，模型不拥有身份、来源、状态、冲突、验证或 Commit。固定渐进路径还要求完整 Demo 契约，包括预算和截止时间。浏览器关闭不会后台继续，预算是 steps/tool calls/runtime 而非 token cost；同进程同 key 有锁，跨实例无分布式 LLM lease。模型 smoke 只证明连通与严格响应，不证明质量。最终时长、commit SHA、PR URL、截图 hash 以新 evidence 封口数据为准。
 

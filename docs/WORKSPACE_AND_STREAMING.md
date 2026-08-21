@@ -263,3 +263,11 @@ Run SSE 的 `RUN_CREATED`、`EVIDENCE_SUBMITTED`、`CONTROL_PLAN_UPDATED`、`APP
 Conversation 回答在 `message.started/message.completed` 中携带相同的 `processing`：确定性报价为 `deterministic_formula`，通用回答或业务规划为 `language_model`，确定性动作回执可为 `policy_engine`。右侧消息完成后保留“处理来源 + 真实耗时”；真实模型请求等待期间显示配置模型名，确定性路径明确“未调用大模型”。该元数据不暴露 Prompt、思维链、Token、Key 或供应商原始响应。
 
 Demo 2 路由按钮只写入服务端选择，因此命名为“记录本轮方式”，并明确规则路由不调用模型、不会启动协作。系统禁止用固定 sleep 伪造模型思考；毫秒级公式/规则应立即完成，模型路径的等待和耗时必须来自真实调用。
+
+## 13. Demo 身份与处理来源投影（DR-0013 Verified 限定范围）
+
+用户打开前台时，首屏先显示客户端产品级的 Demo 1、Demo 2 或 Demo 3 业务身份与目标；当前状态副标题再从对应 Task、WorkCockpit 或 Run Snapshot 对账。统一显示“已运行 / 未调用 / 未执行 / 待核对”，只有模型来源显示“模型已调用”，但工程不新增通用 `call_trace` 字段。
+
+Demo 1 直接投影 `TaskSnapshot.stage_records[].processing`（`path/model_called/model/elapsed_ms/output_used`）及阶段状态；Demo 2 直接投影 `RouteSelectionReceipt.processing`（`path/model_called/elapsed_ms`）和 `execution_status`；Demo 3 复用 `RunSnapshot.status/control_plan/evidence/approvals/permit/tool_result/impact_preview/execution_receipt` 与 Run SSE/AuditEvent。Demo 2 的 selected 不等于 running，Demo 3 以“执行许可服务”“受控演示工具”为主，Permit/Gateway/Simulator 仅是二级技术元信息。v>1 的 Demo 1 缺少 `stage_records`，或旧 Plan/Act 缺少 `processing` 时显示“模型调用待核对”，不得推断未调用；unknown 工具结果显示“工具结果待核对”，不得写成未调用或未执行。Proposal 或 Task-derived action 出现时，前端全局切换到 Demo3/审计视图，避免继续显示 Demo1/2 身份。
+
+普通业务 UI 不显示 Prompt、CoT、raw `event_type/payload/trace`、密钥、Permit token/内容/permit_id/签名、内部 ID、Worker 对话或供应商原始响应；“执行许可服务”“受控演示工具”及必要的“已运行/结果待核对”业务状态可以显示，技术审计另行受控。移动端按 Demo 身份、当前阶段、调用状态、下一步渐进披露，不把完整事件列表堆在首屏。工程验证和截图见 [`DEMO-IDENTITY-AND-CALL-TRACE-EVIDENCE-20260820`](evidence/DEMO-IDENTITY-AND-CALL-TRACE-EVIDENCE-20260820.md)。

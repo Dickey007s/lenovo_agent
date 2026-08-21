@@ -25,6 +25,7 @@ import {
 } from "@tabler/icons-react";
 
 import { projectSourceReferences } from "./source-reference";
+import { AgentCallTrace, type AgentCallStep } from "./agent-call-trace";
 import type { ControlIntent, SyncState } from "./task-runtime-panel";
 import type {
   ArtifactVersion,
@@ -354,7 +355,7 @@ export function TaskWorkspaceHeader({
   return (
     <header className="task-director-workspace-header">
       <div className="task-director-title">
-        <span className="task-director-product-label">{cockpitMode ? "智能工作驾驶舱" : "持续任务协作"}</span>
+        <span className="task-director-product-label">{cockpitMode ? "DEMO 2 · 智能工作驾驶舱" : "DEMO 1 · 持续任务协作"}</span>
         <div className="task-director-heading-row">
           <h1 id="task-director-workspace-title" tabIndex={-1}>
             {cockpitMode ? "今天的工作，应该怎么处理" : task?.contract.title ?? "经营汇报协作"}
@@ -601,6 +602,133 @@ function PhaseRail({
       })}
     </ol>
   );
+}
+
+function stageCallStatus(record: TaskStageRecord | undefined): AgentCallStep["status"] {
+  if (!record) return "not_called";
+  if (record.status === "running") return "active";
+  if (record.status === "failed") return "blocked";
+  return "complete";
+}
+
+function taskStageCallStep(
+  task: TaskSnapshot,
+  phase: "observe" | "plan" | "act" | "verify",
+  label: string,
+  defaultComponent: string,
+): AgentCallStep {
+  const record = task.stage_records?.find((item) => item.phase === phase);
+  const processing = record?.processing;
+  let component = defaultComponent;
+  let detail = record?.summary ?? "这一能力尚未被调用。";
+  let kind: AgentCallStep["kind"] = phase === "plan" || phase === "act" ? "model" : "rule";
+  let meta: string | undefined;
+
+  if (processing?.path === "language_model" && processing.output_used === "model") {
+    component = processing.model ?? "任务阶段模型";
+    detail = "模型返回的业务文字已通过服务端严格结构与批准模板校验，并被本阶段采用。";
+    meta = `${processing.elapsed_ms} ms · 模型只生成受限文字，不拥有来源、状态、冲突或提交权`;
+  } else if (processing?.output_used === "template_fallback") {
+    kind = "rule";
+    component = "服务端模板接管";
+    detail = processing.model_called
+      ? `${processing.model ?? "任务阶段模型"} 已被调用，但输出未被服务端采用，本阶段由批准模板接管。`
+      : "本阶段未调用大模型，由服务端批准模板生成受限业务文字。";
+    meta = `${processing.elapsed_ms} ms · 回退路径已写入任务阶段事实`;
+  } else if (processing?.path === "deterministic") {
+    kind = "rule";
+    detail = record?.summary ?? "由服务端确定性逻辑处理。";
+    meta = `${processing.elapsed_ms} ms · 不调用大模型`;
+  } else if (record?.generation_source === "model") {
+    component = "任务阶段模型";
+    detail = "服务端记录该阶段采用了模型输出；旧版任务记录未提供模型名称与耗时。";
+  } else if (record?.generation_source === "template_fallback") {
+    kind = "rule";
+    component = "服务端模板接管";
+    detail = "服务端记录该阶段由批准模板接管；旧版任务记录未提供是否尝试模型与耗时。";
+  }
+
+  return {
+    id: phase,
+    label,
+    component,
+    kind,
+    status: stageCallStatus(record),
+    statusLabel: processing?.model_called ? "模型已调用" : record?.status === "completed" ? "已运行" : undefined,
+    detail,
+    meta,
+  };
+}
+
+function TaskAgentCallTrace({ task }: { task: TaskSnapshot }) {
+  const stageRecords = task.stage_records ?? [];
+  const stageFactsMissing = task.version > 1 && stageRecords.length === 0;
+  const modelAccepted = stageRecords.filter((item) => item.processing?.output_used === "model" || item.generation_source === "model").length;
+  const modelAttempted = stageRecords.filter((item) => item.processing?.model_called).length;
+  const fallbacks = stageRecords.filter((item) => item.processing?.output_used === "template_fallback" || item.generation_source === "template_fallback").length;
+  const modelAttemptUnknown = stageRecords.some((item) => (item.phase === "plan" || item.phase === "act") && item.status === "completed" && !item.processing);
+  const commitStatus: AgentCallStep["status"] = task.last_commit
+    ? "complete"
+    : task.status === "failed" || task.status === "cancelled"
+      ? "blocked"
+      : "not_called";
+  const stageStep = (phase: "observe" | "plan" | "act" | "verify", label: string, component: string): AgentCallStep => {
+    const step = taskStageCallStep(task, phase, label, component);
+    return stageFactsMissing
+      ? {
+          ...step,
+          component: "处理路径待核对",
+          status: "waiting",
+          detail: "当前是兼容旧版任务快照，服务端没有提供这一阶段的调用记录，前台不推断是否调用。",
+          meta: undefined,
+        }
+      : step;
+  };
+  const steps: AgentCallStep[] = [
+    {
+      id: "runtime",
+      label: "建立任务与检查点",
+      component: "任务运行服务",
+      kind: "runtime",
+      status: "complete",
+      detail: `服务端正在维护同一任务的版本、预算、分支和阶段记录；当前为 v${task.version}。`,
+      meta: "创建任务不等于完成任务，也不会触发外部动作",
+    },
+    stageStep("observe", "读取允许资料", "来源范围读取器"),
+    stageStep("plan", "拆分交付材料", "任务规划模型"),
+    stageStep("act", "生成材料草稿", "材料生成模型"),
+    stageStep("verify", "核对事实与来源", "确定性事实核对器"),
+    {
+      id: "commit",
+      label: "形成可审计结果",
+      component: "结果提交服务",
+      kind: "runtime",
+      status: commitStatus,
+      detail: task.last_commit
+        ? `服务端已把 ${task.last_commit.artifact_version_ids.length} 份工件和 ${task.last_commit.verification_report_ids.length} 份核对报告绑定到本轮结果。`
+        : "只有全部材料通过核对且冲突关闭后，服务端才会形成最终提交。",
+      meta: "结果提交仍不是邮件发送或外部系统写入",
+    },
+  ];
+  const modelMetric = stageFactsMissing || modelAttemptUnknown
+    ? "模型调用待核对"
+    : modelAccepted > 0
+    ? `模型输出采用 ${modelAccepted} 步`
+    : modelAttempted > 0
+      ? `模型尝试 ${modelAttempted} 步 · 未采用`
+      : "大模型未调用";
+
+  return <AgentCallTrace
+    demo="Demo 1"
+    summary="任务运行时逐阶段推进；模型只参与规划与材料文字，事实核对和最终提交由服务端确定。"
+    metrics={[
+      { label: modelMetric, tone: modelAccepted > 0 ? "model" : "neutral" },
+      ...(fallbacks > 0 ? [{ label: `模板接管 ${fallbacks} 步`, tone: "warning" as const }] : []),
+      { label: "外部动作 0", tone: "safe" },
+    ]}
+    steps={steps}
+    boundary="这里展示的是服务端写入本轮任务记录的处理路径，不展示 Prompt、思维链、原始来源 ID 或内部日志。"
+  />;
 }
 
 function StageDetail({
@@ -1018,6 +1146,7 @@ export function TaskDirectorCanvas({
         transportState={transportState}
         onRetry={onRetry}
       />
+      <TaskAgentCallTrace task={task} />
       {impactReceipt && <TaskImpactReceiptView task={task} receipt={impactReceipt} />}
       {task.status === "ready" ? (
         <section className="task-ready-brief" aria-labelledby="task-ready-brief-title">
@@ -1212,7 +1341,7 @@ function TaskNoDecisionState({
         )}
         <details className="task-decision-commit-evidence">
           <summary>查看运行与审计</summary>
-          <code>{task.last_commit.state_hash}</code>
+          <p>服务端已保留状态指纹；普通工作区不显示原始哈希。</p>
         </details>
       </section>
     );
