@@ -74,6 +74,8 @@ Every Scenario must state:
 
 An abstract capability name is not a Scenario.
 
+Demo names are acceptance/reporting lenses, not runtime feature flags. A Demo may bind a concrete Scenario to a generic task topology, orchestration policy and control requirements, but it must not introduce private capabilities that are unavailable to user-authored tasks. Every Demo report must state which generic modules were exercised and which target capabilities remain Draft.
+
 ## 4. 来源台账
 
 `docs/decisions/SOURCE_REGISTER.md` is the canonical 来源台账. New sources are append-only and use stable IDs. Preserve stakeholder wording verbatim where authorized, distinguish a screenshot's visible content from interpretation, and record file hash/size when the local asset is evidence.
@@ -135,4 +137,4 @@ Before delivery, verify:
 - living docs and retirement lifecycle are synchronized;
 - governance test, Markdown link check and `git diff --check` pass.
 
-The current FORTE product application of this policy is [DR-0018](decisions/DR-0018-forte-data-workbench-and-verifiable-trace.md). DR-0016/0017 remain historical foundations with their original evidence scope.
+The current FORTE product application of this policy is [DR-0018](decisions/DR-0018-forte-data-workbench-and-verifiable-trace.md). The generic capability-composition rule is [DR-0019](decisions/DR-0019-capability-composed-agent-runtime.md). DR-0016/0017 remain historical foundations with their original evidence scope.

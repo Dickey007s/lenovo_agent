@@ -15,6 +15,8 @@ server-owned Scenario + selected source set
 
 No current route continues into a Tool Gateway or external action. Retained risk, evidence, authorization, gateway and simulator packages are future building blocks, not mounted current capabilities.
 
+The work policy is generic: `task_topology`, `orchestration` and `control_requirements`. Demo names never select a governance shortcut. `risk_gate` must apply to any single-task or multi-task plan that proposes a side effect; `evidence_gate` and `human_gate` pause the affected work based on server facts, not presentation mode.
+
 ## 2. Server-owned facts
 
 The server owns:

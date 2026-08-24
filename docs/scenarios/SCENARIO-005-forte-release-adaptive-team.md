@@ -2,7 +2,8 @@
 
 | Field | Value |
 | --- | --- |
-| Related Demo | Demo 2 |
+| Acceptance lens | Demo 2; not a runtime identity |
+| Generic work profile | `multi_task + adaptive_swarm + evidence_gate + human_gate`; current scope `read_only_analysis` |
 | Status | workbench/preview/read-only contract `Limited Verified`; release conclusion and adaptive execution `Draft` |
 | Source | FORTE `pm-014`, commit `345c1ec1487139db9dd319787fa9405ba85d1869`, top-level MIT; original bytes pinned by `DR-0016` |
 | Target user | Product manager or release owner |
@@ -24,6 +25,8 @@ The Agent must determine release readiness, coverage, failed or untested functio
 5. Workers write source-bound SharedArtifactVersions; they never own source identity, status or verification truth.
 6. A discrepancy discovered in outputs may create a reconciliation unit through a versioned replan; no discrepancy means no synthetic extra worker.
 7. Verifier produces the final readiness result and `external_side_effect=none` receipt.
+
+This flow must be implemented by the reusable multi-task Scheduler/Worker layer. Selecting pm-014 or calling it “Demo 2” must not create synthetic Workers or unlock a Demo-only execution path.
 
 ## Frontend experience
 

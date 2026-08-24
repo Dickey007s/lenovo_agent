@@ -2,7 +2,8 @@
 
 | Field | Value |
 | --- | --- |
-| Related Demo | Demo 3 |
+| Acceptance lens | Demo 3; cross-cutting control validation, not a runtime identity |
+| Generic work profile | `single_task + bounded_loop + evidence_gate + human_gate + risk_gate`; current scope `read_only_analysis` |
 | Status | workbench/preview/read-only contract `Limited Verified`; governed action execution `Draft` |
 | Source | FORTE `Operations-008`, commit `345c1ec1487139db9dd319787fa9405ba85d1869`, top-level MIT; original bytes pinned by `DR-0016` |
 | Target user | Operations policy owner or collection-process supervisor |
@@ -24,6 +25,8 @@ The Agent produces a versioned process artifact and a set of bounded action cand
 5. Proposed action binds the current artifact version, target scope, policy evidence and impact preview.
 6. The user sees what would change, be rechecked, remain unchanged and not happen.
 7. Approval may produce a one-time Permit for a Simulator capability; denial or mismatch preserves the artifact and records why execution did not occur.
+
+The Risk Gate is a shared control plane for both single-task and multi-task work. Calling this scenario “Demo 3” must not create a third orchestration engine or bypass the common Task, Artifact and Event contracts.
 
 ## Frontend experience
 

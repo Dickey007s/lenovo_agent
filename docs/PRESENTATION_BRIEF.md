@@ -21,7 +21,7 @@ Every slide must pass [DECISION_AND_REPORTING_GOVERNANCE.md](DECISION_AND_REPORT
 | 7. Result truth | citations can pass while the numerical answer is wrong | desktop/mobile result screenshots + deterministic 23 / `1,845,444.71` versus model 20 / `2,202,000` | `completed` is not a quality pass |
 | 8. Frontend/backend alignment | every state maps to a field or named event | UI—server fact matrix | no animation/CoT as fact |
 | 9. Eight modules | current and target capabilities stay separate | maturity table | modules 5-6 and durable Artifact remain Draft |
-| 10. Three policies | finance, release and operations share one work contract | three collection examples | not three independent completed Demos |
+| 10. Three acceptance lenses | Demo 1 single-task bounded loop, Demo 2 multi-task adaptive swarm, Demo 3 cross-cutting Risk Gate share one capability layer | `work_profile` composition map + three FORTE collections | generic contract is implemented; three execution engines are not |
 | 11. Engineering evidence | code, focused tests, live records and screenshots have distinct roles | Evidence ledger | engineering checks do not prove user value |
 | 12. Next proof | semantic verifier, durable Artifact, Scheduler, action governance, user study | phased roadmap | no production/value claim |
 
@@ -46,6 +46,8 @@ Do not claim competitors “cannot” support an untested capability, Office Age
 
 Never call displayed plan tool labels “executed tools”. Never call the result an Artifact Commit.
 
+When introducing the three Demos, say explicitly: they are three acceptance lenses over one Agent Runtime, not three modes that inject different abilities. Demo 1 proves the single-task loop, Demo 2 proves multi-task self-organization, and Demo 3 proves the risk/action control plane across either topology. The current product has only the generic contract and read-only analysis slice; the three execution proof targets remain `Draft`.
+
 ## 6. Screenshot provenance
 
 | Screenshot | Provenance | Allowed use | Prohibited inference |
@@ -66,6 +68,7 @@ Console/page errors were 0 for these captures. Exact hashes and dimensions are i
 | cited initial result | Limited Verified | v9/seq 8 Snapshot facts and manifest | semantic/numeric correctness |
 | deterministic negative comparison | Verified regression fact | public-preview test reproduces 23 / `1,845,444.71` | a Runtime semantic verifier already exists |
 | no external effect | current boundary | Runtime/events/result footer | future Connector governance |
+| generic capability profile, no Demo identity | Limited Verified | `eef656e`, focused Python `30 passed`, browser `8 passed` | bounded loop, adaptive swarm or Risk Gate execution |
 | reduced text improves clarity | Draft | no target-user study | usability claim |
 
 Final verification is Python `53 passed in 2.68s`, Ruff and web lint passed, and the production build passed (`2.5s` compile, `4.4s` TypeScript, `810ms` static generation). [PR #25](https://github.com/Dickey007s/lenovo_agent/pull/25) is open and not yet merged.
@@ -76,5 +79,8 @@ Final verification is Python `53 passed in 2.68s`, Ruff and web lint passed, and
 - [Stakeholder Feedback 10](sources/USER-FEEDBACK-20260824-10-data-workbench-and-trace.md)
 - [DR-0018](decisions/DR-0018-forte-data-workbench-and-verifiable-trace.md)
 - [DR-0018 Evidence](evidence/FORTE-DATA-WORKBENCH-TRACE-EVIDENCE-20260824.md)
+- [Stakeholder Feedback 11](sources/USER-FEEDBACK-20260824-11-generic-capability-composition.md)
+- [DR-0019](decisions/DR-0019-capability-composed-agent-runtime.md)
+- [DR-0019 Evidence](evidence/AGENT-CAPABILITY-COMPOSITION-EVIDENCE-20260824.md)
 - [FORTE audit](research/FORTE-DATASET-AUDIT-20260824.md)
 - [Competitor research](research/COMPETITOR-RESEARCH-OPENCLAW-CODEX-CLAUDE-CODE-20260821.md)

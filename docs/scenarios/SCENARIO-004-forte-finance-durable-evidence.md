@@ -2,7 +2,8 @@
 
 | Field | Value |
 | --- | --- |
-| Related Demo | Demo 1 |
+| Acceptance lens | Demo 1; not a runtime identity |
+| Generic work profile | `single_task + bounded_loop + evidence_gate + human_gate`; current scope `read_only_analysis` |
 | Status | bounded data preview/read-only analysis `Limited Verified`; durable Artifact/Commit migration `Draft` |
 | Source | FORTE `Finance-018`, commit `345c1ec1487139db9dd319787fa9405ba85d1869`, top-level MIT; original bytes pinned by `DR-0016` |
 | Target user | Finance operations lead or account reconciliation owner |
@@ -24,6 +25,8 @@ The Agent must produce versioned unpaid and uncollected summaries, identify bala
 5. The verifier checks row-level citations, period coverage, numeric totals and persistent-balance criteria.
 6. Mapping ambiguity or conflicting entity identity creates a server conflict and a user decision; otherwise the Agent continues without interruption.
 7. Commit contains the output versions, evidence bindings, verification reports and workspace fingerprint.
+
+This flow must be implemented by the reusable single-task executor. Selecting the Finance collection or calling the scenario “Demo 1” must not enable a private Demo-only code path.
 
 ## Frontend experience
 

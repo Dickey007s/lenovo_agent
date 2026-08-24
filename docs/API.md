@@ -30,6 +30,12 @@ Scenario responses contain business fields and:
 
 ```json
 {
+  "work_profile": {
+    "task_topology": "single_task",
+    "orchestration": "bounded_loop",
+    "control_requirements": ["evidence_gate", "human_gate"],
+    "current_runtime_scope": "read_only_analysis"
+  },
   "files": [
     {
       "file_ref": "forte-a0bccc1df48cc6a1",
@@ -40,6 +46,8 @@ Scenario responses contain business fields and:
   ]
 }
 ```
+
+`work_profile` is a generic capability composition, not a Demo switch. Public, internal and Planner projections omit `demo_id` and `experience_policy`. `current_runtime_scope=read_only_analysis` is authoritative for the current Runtime; `bounded_loop` or `adaptive_swarm` describes the target organization policy and does not prove that executor ran.
 
 `file_ref` is stable for a pinned Scenario/path pair and hides the relative path. Public Scenario payloads omit raw task instruction, rubric, solution, grading, path and hash.
 

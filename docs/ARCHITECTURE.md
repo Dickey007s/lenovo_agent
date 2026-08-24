@@ -46,6 +46,19 @@ The start command freezes:
 
 The server rejects duplicate/invalid refs and refs outside the current Scenario. `instruction_source=user|dataset_task` remains visible in the Snapshot. An unknown response can be retried with the same command key; changing content under the key returns 409.
 
+The Scenario policy is expressed as a generic `work_profile`, never a Demo identity:
+
+```json
+{
+  "task_topology": "single_task | multi_task",
+  "orchestration": "bounded_loop | adaptive_swarm",
+  "control_requirements": ["evidence_gate", "human_gate", "risk_gate"],
+  "current_runtime_scope": "read_only_analysis"
+}
+```
+
+The first three fields describe the intended reusable capability composition. `current_runtime_scope` prevents that target policy from being mistaken for current execution. The pinned FORTE Catalog currently supplies the profile; dynamic Admission from arbitrary user work remains `Draft`.
+
 ## 4. Model and validation boundaries
 
 ### Planning call
@@ -119,8 +132,10 @@ The plan's tool fields are readable intent declarations. The analysis is perform
 | 7. Artifact Workspace & Verifier | Partial | memory result plus selected-ref validation | immutable Artifact versions, provenance, merge and Commit |
 | 8. Checkpoint, Event & Governance Control | Partial | memory Snapshot, eight ordered events, Owner/idempotency | durable store, production identity and action governance |
 
+Demo 1/2/3 do not add modules. They exercise different compositions of the same modules: Demo 1 uses a single-task bounded loop and pauses on evidence/human gates; Demo 2 uses multi-task adaptive scheduling and shared-artifact convergence; Demo 3 applies the risk gate across either topology before a side effect.
+
 ## 8. Lifecycle
 
-[DR-0016](decisions/DR-0016-public-workspace-agent-harness.md) remains the historical planning foundation. [DR-0017](decisions/DR-0017-single-forte-worksite-and-legacy-retirement.md) remains the historical product-convergence decision. [DR-0018](decisions/DR-0018-forte-data-workbench-and-verifiable-trace.md) defines current applicability.
+[DR-0016](decisions/DR-0016-public-workspace-agent-harness.md) remains the historical planning foundation. [DR-0017](decisions/DR-0017-single-forte-worksite-and-legacy-retirement.md) remains the historical product-convergence decision. [DR-0018](decisions/DR-0018-forte-data-workbench-and-verifiable-trace.md) defines the current workbench. [DR-0019](decisions/DR-0019-capability-composed-agent-runtime.md) defines the generic capability contract and the execution migration boundary.
 
 Current implementation Evidence is [FORTE data workbench and trace](evidence/FORTE-DATA-WORKBENCH-TRACE-EVIDENCE-20260824.md). User comprehension and value remain `Draft`.

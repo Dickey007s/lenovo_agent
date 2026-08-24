@@ -26,7 +26,7 @@ The root page becomes a `FORTE 数据工作台`:
 - right: a compact ordered trajectory with separate planning and analysis receipts;
 - bottom boundary: selected-source and no-external-action constraints.
 
-The ordinary foreground does not use Demo 1/2/3 as its primary navigation. The three `demo_id` values remain internal policy compatibility fields, while business labels organize the visible collections.
+The ordinary foreground does not use Demo 1/2/3 as its primary navigation. [DR-0019](DR-0019-capability-composed-agent-runtime.md) subsequently removed `demo_id` and `experience_policy` from public, internal and Planner Scenario projections in favor of a generic `work_profile`; Demo labels are acceptance/reporting lenses only.
 
 ## 3. Seven-path API
 

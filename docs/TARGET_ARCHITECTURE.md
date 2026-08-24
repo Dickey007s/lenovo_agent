@@ -42,7 +42,27 @@ Sources and limitations: [competitor research](research/COMPETITOR-RESEARCH-OPEN
 | 7 | Artifact Workspace & Verifier | Partial | Snapshot result; no immutable Artifact | version, provenance, merge/conflict, verification and Commit |
 | 8 | Checkpoint, Event & Governance Control | Partial | memory events/idempotency, unsigned Owner | durable store, production identity, audit and action control |
 
-## 4. Current cross-scenario slice
+## 4. Capability composition, not Demo runtimes
+
+The Agent owns one reusable capability layer. Admission composes a work policy from the task and available evidence:
+
+```text
+task_topology = single_task | multi_task
+orchestration = bounded_loop | adaptive_swarm
+control_requirements = evidence_gate | human_gate | risk_gate
+```
+
+The three Demos are acceptance lenses over that layer:
+
+| Demo lens | Composition | User-visible proof target |
+| --- | --- | --- |
+| Demo 1 | one task + bounded loop + evidence/human gates | a task is decomposed, advances checkpoint by checkpoint, pauses at the exact uncertain unit, accepts a human decision, resumes and commits a traceable artifact |
+| Demo 2 | multiple tasks + adaptive swarm + evidence/human gates | real work units self-organize from dependencies, run in parallel when allowed, replan when facts change and converge into a shared verified artifact |
+| Demo 3 | risk gate across either topology | an intended side effect shows semantic impact, deterministic controls and the actual execution/no-execution receipt |
+
+Selecting a benchmark collection never grants a capability. Scenario policy constrains sources/tools and can recommend a profile; the Runtime capability registry and control plane are shared. The current code only exposes `current_runtime_scope=read_only_analysis`, so all three execution proof targets remain `Draft`.
+
+## 5. Current cross-scenario slice
 
 The current workbench applies one interaction contract to three FORTE collections:
 
@@ -52,7 +72,7 @@ The current workbench applies one interaction contract to three FORTE collection
 
 Current completion is a cited, review-required, read-only Snapshot response. It is not a correctness/quality pass, versioned Artifact, multi-Worker execution or governed external action. In the recorded Finance case, the model stated 20 / `2,202,000`; a deterministic regression reproduced 23 / `1,845,444.71`.
 
-## 5. 尚未完成的目标能力
+## 6. 尚未完成的目标能力
 
 以下迁移都是目标设计，不是现行产品能力。历史动作原型中的**当前执行结果仍全部来自 Simulator**；现行 FORTE 数据工作台没有调用这些旧动作路径，也没有真实 Connector 副作用。
 
@@ -70,16 +90,19 @@ Bind reviewed Artifact to ActionCandidate, Risk/Policy/Evidence, Approval, Permi
 
 All three execution migrations remain `Draft`.
 
-## 6. Delivery order
+## 7. Delivery order
 
 1. Preserve the data-first workbench, stable refs, preview integrity and truthful trace.
 2. Add a deterministic spreadsheet operator and claim verification beyond citation membership; the Finance negative regression is the acceptance baseline.
 3. Persist Task Contract, Run/Event and immutable Artifact versions under production identity.
-4. Implement durable evidence/Commit as the first governed execution slice.
-5. Add Scheduler/Worker and shared convergence.
-6. Add governed Simulator, then real Connector only after identity/idempotency/recovery evidence.
-7. Run target-user studies for clarity, trust and task success.
+4. Implement the generic single-task bounded executor and durable evidence/Commit; use Demo 1 only as its first acceptance scenario.
+5. Extend the same Task/Artifact/Event contracts with adaptive Scheduler/Workers and shared convergence; use Demo 2 as the acceptance scenario.
+6. Apply the shared risk/action control plane to both topologies; use Demo 3 to verify impact preview, approval and receipts.
+7. Add governed Simulator, then real Connector only after identity/idempotency/recovery evidence.
+8. Run target-user studies for clarity, trust and task success.
 
-## 7. Current evidence boundary
+## 8. Current evidence boundary
 
 [DR-0018](decisions/DR-0018-forte-data-workbench-and-verifiable-trace.md) is `Limited Verified` for the fixed FORTE workbench, bounded preview, two model calls per observed Run, selected-ref validation, eight-event trace and an initial Finance-018 response. Its two live observations, three provenance-scoped screenshots and deterministic negative regression do not verify semantic correctness, durable recovery, external action or user value.
+
+[DR-0019](decisions/DR-0019-capability-composed-agent-runtime.md) is `Limited Verified` only for replacing Demo-specific Scenario/Planner identity with a strict generic `work_profile`. It does not verify bounded execution, adaptive self-organization or governed action.

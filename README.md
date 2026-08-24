@@ -13,7 +13,15 @@ The root page is the only product entry:
 - right: eight ordered server events plus separate planning and analysis model receipts;
 - boundary: selected public files are read-only, results require human review, and no external action occurs.
 
-The ordinary UI is work-led rather than Demo-led. `demo_id` remains an internal Scenario policy field, but the foreground does not use Demo 1/2/3 as its primary navigation.
+The ordinary UI and Runtime contract are work-led rather than Demo-led. Public, internal and Planner Scenario projections use a generic `work_profile` (`task_topology`, `orchestration`, `control_requirements`, `current_runtime_scope`); they do not carry `demo_id` or `experience_policy`.
+
+Demo 1/2/3 are acceptance lenses over the same Agent capabilities:
+
+- Demo 1: one decomposed task, bounded checkpoint loop, evidence/human pause and later resume;
+- Demo 2: multiple work units, adaptive scheduling and shared-artifact convergence;
+- Demo 3: a cross-cutting risk/action gate applied to either topology, not a separate task engine.
+
+The current `work_profile.current_runtime_scope` is always `read_only_analysis`. The current product does not yet execute the bounded loop, adaptive swarm or governed action path; those remain target architecture under [DR-0019](docs/decisions/DR-0019-capability-composed-agent-runtime.md).
 
 Legacy mail, document, quote, task, calendar, expense, CRM, audit and fixed Customer A runtimes remain retired. Historical decisions and Evidence retain their recorded facts; current applicability is governed by [DR-0018](docs/decisions/DR-0018-forte-data-workbench-and-verifiable-trace.md) and the [retirement register](docs/decisions/RETIREMENT_REGISTER.md).
 
@@ -30,6 +38,8 @@ DR-0018 is `Limited Verified` for implementation [`fffa36a8cc83e895aaba35276568a
 - result: 10 findings, citations limited to two selected stable `file_ref` values, `review_required=true`, external side effect `none`.
 
 A deterministic regression over the same safe previews found 23 unchanged balances totaling `1,845,444.71`; the live model Snapshot stated 20 and `2,202,000`. This preserved negative result proves why citation membership is not answer correctness. The current build and three final-UI screenshots are registered in the Evidence with their distinct live/replay provenance. Final verification is Python `53 passed in 2.68s`, Ruff and web lint passed, and the production build passed (`2.5s` compile, `4.4s` TypeScript, `810ms` static generation). There is no target-user study.
+
+DR-0019 is separately `Limited Verified` for implementation [`eef656e`](https://github.com/Dickey007s/lenovo_agent/commit/eef656e): the current public/internal/Planner contract contains no Demo identity and exposes strict generic work profiles. Focused Python is `30 passed in 2.56s`, full Python is `53 passed in 2.51s`, Harness browser E2E is `8 passed in 52.5s`, and Ruff/lint/build pass. This is contract evidence only, not evidence that bounded execution, adaptive self-organization or governed action already runs.
 
 ## Current flow
 
@@ -151,5 +161,7 @@ pnpm --dir apps/web exec playwright test e2e/harness-workbench.spec.ts
 - [Source register](docs/decisions/SOURCE_REGISTER.md)
 - [DR-0018](docs/decisions/DR-0018-forte-data-workbench-and-verifiable-trace.md)
 - [DR-0018 Evidence](docs/evidence/FORTE-DATA-WORKBENCH-TRACE-EVIDENCE-20260824.md)
+- [DR-0019](docs/decisions/DR-0019-capability-composed-agent-runtime.md)
+- [DR-0019 Evidence](docs/evidence/AGENT-CAPABILITY-COMPOSITION-EVIDENCE-20260824.md)
 
 A dated historical document is not a current product contract unless a living doc explicitly says so.

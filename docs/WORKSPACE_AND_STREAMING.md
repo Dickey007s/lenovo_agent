@@ -11,6 +11,8 @@ The root page is one data workbench, not a Demo selector or internal log console
 
 The interface prioritizes actual data and the user's task. Explanatory policy text is secondary and collapsible.
 
+Demo 1/2/3 are not navigation modes and do not grant capabilities. The public Scenario contract carries a generic `work_profile`; ordinary UI may later show a compact server Admission receipt such as “单任务有界推进” or “多任务自适应协作”, but only when the corresponding executor has produced a Snapshot/event. The current scope remains `read_only_analysis`, so no loop or swarm animation may imply execution.
+
 ## 2. Browse and select
 
 1. Health and Scenario list load.
@@ -90,4 +92,8 @@ Ordinary UI hides raw `task.md`, Planner policy context, Prompt, chain of though
 
 All Run state is memory-only. There is no background Scheduler/Worker, Tool Gateway execution, versioned Artifact, durable recovery, production identity, Connector or external action.
 
+Target interaction after those engines exist is capability-driven: single-task work progressively reveals decomposition, current checkpoint and a precise pause reason; multi-task work reveals real units, dependencies, additions/cancellations and shared-artifact convergence; the Risk Gate appears only when a proposed side effect requires it. None of these target views may expose Prompt, chain of thought or raw Worker chat.
+
 DR-0018 includes one actual running screenshot and two result screenshots produced by replaying a real persisted Snapshot through the same formal UI. Replay is not another model call or product history/restart recovery. These screenshots and browser E2E support tested engineering behavior, not the claim that users find the page clearer or the trajectory easier to understand; no target-user study exists.
+
+See [DR-0019](decisions/DR-0019-capability-composed-agent-runtime.md) for the generic capability contract and the distinction between target orchestration policy and current execution fact.
