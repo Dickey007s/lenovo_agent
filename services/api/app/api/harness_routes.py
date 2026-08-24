@@ -14,8 +14,11 @@ from services.api.app.application.harness_runtime import (
     HarnessRunStart,
     HarnessRuntime,
 )
+from services.api.app.application.benchmark_scenario_catalog import BenchmarkScenarioError
+from services.api.app.config import get_settings
 
 router = APIRouter(prefix="/v1/harness", tags=["harness"])
+health_router = APIRouter(prefix="/v1", tags=["health"])
 
 
 def get_harness_runtime(request: Request) -> HarnessRuntime:
@@ -29,11 +32,25 @@ def harness_owner(x_user_id: Annotated[str, Header()] = "demo_user") -> str:
     return x_user_id
 
 
+@health_router.get("/health")
+async def health(request: Request) -> dict[str, str]:
+    settings = get_settings()
+    return {
+        "status": "ok",
+        "model": settings.llm_model,
+        "checkpoint": getattr(request.app.state, "checkpoint_backend", "memory"),
+        "task_store": getattr(request.app.state, "task_store_backend", "memory"),
+    }
+
+
 @router.get("/scenarios")
 async def list_harness_scenarios(
     runtime: Annotated[HarnessRuntime, Depends(get_harness_runtime)],
 ):
-    return {"scenarios": runtime.list_scenarios()}
+    try:
+        return {"scenarios": runtime.list_scenarios()}
+    except BenchmarkScenarioError as exc:
+        raise HTTPException(status_code=503, detail="场景目录完整性校验失败") from exc
 
 
 @router.get("/scenarios/{scenario_id}")
@@ -45,6 +62,8 @@ async def get_harness_scenario(
         return runtime.get_scenario(scenario_id)
     except HarnessNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except BenchmarkScenarioError as exc:
+        raise HTTPException(status_code=503, detail="场景目录完整性校验失败") from exc
 
 
 @router.post("/runs", status_code=status.HTTP_202_ACCEPTED)
@@ -60,6 +79,8 @@ async def start_harness_run(
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except HarnessConflictError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except BenchmarkScenarioError as exc:
+        raise HTTPException(status_code=503, detail="场景目录完整性校验失败") from exc
 
 
 @router.get("/runs/{run_id}")

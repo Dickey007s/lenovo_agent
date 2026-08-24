@@ -1,5 +1,7 @@
 # Public office workspace dataset selection
 
+Status update (DR-0017): the selected FORTE pack is now the sole current product source. The fixed Customer A package has been removed from the current Git tree; historical evidence remains retired. This selection still supports only a pinned public benchmark input, not a production enterprise Connector or user-value claim.
+
 ## Research question
 
 Which existing public dataset can provide original office files for all three Office Agent demonstrations without inventing a customer folder or stitching facts from unrelated datasets?

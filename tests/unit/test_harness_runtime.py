@@ -342,6 +342,43 @@ async def test_public_route_returns_contract_not_planner_context():
 
 
 @pytest.mark.asyncio
+async def test_main_mounts_only_harness_and_health_routes():
+    app = create_app()
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+        health = await client.get("/v1/health")
+        assert health.status_code == 200
+        assert health.json()["status"] == "ok"
+        assert health.json()["task_store"] == "memory"
+        for retired_path in (
+            "/v1/workspace",
+            "/v1/threads",
+            "/v1/tasks",
+            "/v1/demo2/cockpit",
+            "/v1/demo3/scenarios",
+        ):
+            response = await client.get(retired_path)
+            assert response.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_catalog_integrity_failure_is_exposed_as_503():
+    from services.api.app.application.benchmark_scenario_catalog import BenchmarkScenarioError
+
+    class BrokenRuntime:
+        def list_scenarios(self):
+            raise BenchmarkScenarioError("tampered")
+
+    app = create_app()
+    app.state.harness_runtime = BrokenRuntime()
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+        response = await client.get("/v1/harness/scenarios")
+    assert response.status_code == 503
+    assert response.json()["detail"] == "场景目录完整性校验失败"
+
+
+@pytest.mark.asyncio
 async def test_harness_routes_asgi_snapshot_and_named_sse():
     app = create_app()
     runtime = HarnessRuntime(FakeCatalog(), FakePlanner())

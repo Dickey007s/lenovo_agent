@@ -9,7 +9,7 @@
 
 ## Trigger and current pain
 
-The user receives three period workbooks and must identify unpaid, uncollected, and long-lived balances. The current prototype begins with a predetermined conflict and three predetermined deliverables. It does not show whether the Agent located the right sheets, how it mapped columns across periods, or which evidence made a balance suspicious.
+The user receives three period workbooks and must identify unpaid, uncollected, and long-lived balances. The retired Customer A prototype began with a predetermined conflict and deliverables. The current FORTE worksite instead exposes the real public file set and a dynamic validated plan, but it still does not execute row-level inspection or produce the evidence Artifact.
 
 ## Goal and completion condition
 
@@ -45,6 +45,6 @@ The Agent must produce versioned unpaid and uncollected summaries, identify bala
 
 ## Boundary
 
-The current shared Harness vertical slice has one manifest-bound `deepseek-v4-pro` run with 3 public files, 10 dynamic plan units and v6/seq 5 `ready_to_execute` in 17112 ms. It does not read workbook rows through tools, create the finance artifacts above or Commit the task. That execution migration remains `Draft`.
+The current sole FORTE worksite is governed by DR-0017. One final observed `deepseek-v4-pro` Finance-018 run used 3 public files, produced 10 dynamic plan units and reached v6/seq 5 `ready_to_execute` in 16838 ms with `called=true/output_used=true`. It did not read workbook rows through tools, create the finance artifacts above or Commit the task. That execution migration remains `Draft`; the observation is not a quality or SLA benchmark.
 
 The files are public benchmark inputs, not production finance records. Raw `task.md`, `task_instruction`, rubric and solution content stay out of the public API/UI. This scenario does not prove arbitrary workbook understanding, cross-process recovery, accounting correctness, or user-value improvement until corresponding evidence exists; E2E is not user research.

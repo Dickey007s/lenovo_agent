@@ -1,0 +1,70 @@
+{
+  "schema_version": "1.0",
+  "captured_at": "2026-08-24T20:30:00+08:00",
+  "decision": "DR-0017",
+  "status": "Limited Verified",
+  "implementation_commits": [
+    "b2b759b106738fbb3aed597319208e8ff4718cc7",
+    "5fab10fb4f638958ff78b39583a4eace2e99396b"
+  ],
+  "pull_request": {
+    "number": 24,
+    "url": "https://github.com/Dickey007s/lenovo_agent/pull/24",
+    "state_at_capture": "open_unmerged"
+  },
+  "fresh_clone": {
+    "head": "5fab10fb4f638958ff78b39583a4eace2e99396b",
+    "forte_file_count": 11,
+    "forte_total_bytes": 115352,
+    "hash_or_size_mismatches": 0,
+    "customer_a_path_present": false
+  },
+  "openapi_paths": [
+    "/v1/health",
+    "/v1/harness/scenarios",
+    "/v1/harness/scenarios/{scenario_id}",
+    "/v1/harness/runs",
+    "/v1/harness/runs/{run_id}",
+    "/v1/harness/runs/{run_id}/events"
+  ],
+  "legacy_prefix_status": {
+    "/v1/workspace": 404,
+    "/v1/threads": 404,
+    "/v1/tasks": 404,
+    "/v1/demo1": 404,
+    "/v1/demo2": 404,
+    "/v1/demo3": 404
+  },
+  "live_run": {
+    "evidence_type": "interactive_final_verification_record",
+    "run_id_prefix": "harness:bce...",
+    "scenario_id": "Finance-018",
+    "model": "deepseek-v4-pro",
+    "model_called": true,
+    "output_used": true,
+    "elapsed_ms": 16838,
+    "plan_unit_count": 10,
+    "status": "ready_to_execute",
+    "version": 6,
+    "last_event_sequence": 5,
+    "tool_executed": false,
+    "external_action": false
+  },
+  "verification": {
+    "python": "47 passed in 2.42s",
+    "ruff": "passed",
+    "web_lint": "passed",
+    "web_build": "passed; compile 2.1s, TypeScript 4.1s, static generation 757ms",
+    "harness_browser": "11 passed in 41.4s"
+  },
+  "feedback_screenshot": {
+    "file": "user-feedback-20260824-forte-only-offline.png",
+    "width": 1316,
+    "height": 887,
+    "bytes": 80179,
+    "sha256": "e79097991e06acbfacb2954bc576ea0182a9b1a4e731cec120b9ab9e71bdb0c3",
+    "meaning": "negative pre-fix stakeholder evidence, not a final-state screenshot"
+  },
+  "final_ui_screenshot": null,
+  "boundary": "The current product has one FORTE planning worksite and stops at ready_to_execute. Runtime is memory-only; X-User-Id is an unsigned placeholder; no Worker, tool, Artifact mutation, Connector, Permit, or external side effect was executed; no user study was run."
+}

@@ -9,7 +9,7 @@
 
 ## Trigger and current pain
 
-Before a release decision, the user must reconcile a PRD, release configuration, functional test report and compatibility test report. The current Demo 2 always starts from four fixed work items and a predetermined worker/replan sequence. It can prove its own vertical slice, but it does not make the Harness feel reusable across a new folder.
+Before a release decision, the user must reconcile a PRD, release configuration, functional test report and compatibility test report. The retired fixed Demo 2 used four predetermined work items and a predetermined Worker/replan sequence. The current FORTE worksite exposes four real public inputs and a dynamic validated plan, while execution and replanning remain future work.
 
 ## Goal and completion condition
 
@@ -45,6 +45,6 @@ The Agent must determine release readiness, coverage, failed or untested functio
 
 ## Boundary
 
-The current shared Harness vertical slice has one manifest-bound `deepseek-v4-pro` run with 4 public files, 6 dynamic plan units and v6/seq 5 `ready_to_execute` in 13577 ms. It does not start Scheduler/Workers, read the four files through tools, produce SharedArtifactVersions or decide release readiness. That execution migration remains `Draft`.
+The DR-0016 foundation Evidence contains one manifest-bound `deepseek-v4-pro` run with 4 public files, 6 dynamic plan units and v6/seq 5 `ready_to_execute` in 13577 ms. DR-0017 makes this Scenario part of the sole current worksite but does not transfer the retired Customer A execution facts. It does not start Scheduler/Workers, read the four files through tools, produce SharedArtifactVersions or decide release readiness. That execution migration remains `Draft`.
 
 This scenario uses public benchmark inputs and a simulated run workspace. Raw `task.md`, `task_instruction`, rubric and solution content stay out of the public API/UI. It does not prove a general distributed swarm, production deployment, cost savings, SLA improvement, or target-user understanding; E2E is not user research.

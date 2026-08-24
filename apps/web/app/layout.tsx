@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import "./styles.css";
 
 export const metadata: Metadata = {
-  title: "Office Agent P0",
-  description: "可审计的办公动作授权原型",
+  title: "Office Agent · 工作现场",
+  description: "基于 FORTE 公开办公场景的可观察 Agent 工作现场",
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {

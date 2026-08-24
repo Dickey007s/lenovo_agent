@@ -24,7 +24,7 @@ function scenario(demo: DemoId) {
   return {
     ...item,
     demo_id: demo,
-    dataset_label: "公开办公基准数据",
+    dataset_label: "公开办公基准数据 · FORTE",
     dataset_version: "FORTE · pinned",
     deliverables: [demo === "demo2" ? "上线核对结论" : "可复核业务结论"],
     data_boundary: "仅限本轮公开基准输入文件",
@@ -61,14 +61,19 @@ function snapshot(demo: DemoId, options: { sequence?: number; version?: number; 
     plan: failed ? null : planFor(demo, options.suffix),
     model_receipt: { called: true, model: "deepseek-v4-pro", elapsed_ms: 1280, output_used: options.outputUsed ?? true },
     validation_errors: failed ? ["测试错误"] : [],
-    events: sequence > 0 ? [{ sequence, event_name: eventName, occurred_at: new Date().toISOString(), status: failed ? "failed" : "ready_to_execute", message: failed ? "计划未通过安全校验，执行未启动。" : "计划通过服务端校验，执行未启动。", details: {} }] : [],
+    events: sequence > 0 ? [
+      ...(failed && sequence > 1 ? [{ sequence: sequence - 1, event_name: "plan_validation", occurred_at: new Date().toISOString(), status: "validating", message: "正在校验计划。", details: {} }] : []),
+      { sequence, event_name: eventName, occurred_at: new Date().toISOString(), status: failed ? "failed" : "ready_to_execute", message: failed ? "计划未通过安全校验，执行未启动。" : "计划通过服务端校验，执行未启动。", details: {} },
+    ] : [],
   };
 }
 
 async function fulfillJson(route: Route, body: unknown, status = 200) { await route.fulfill({ status, contentType: "application/json", body: JSON.stringify(body) }); }
 
-async function mockHarness(page: Page, options: { outputUsed?: boolean; failed?: boolean; disconnect?: boolean; failFirstStart?: boolean; delayedFinanceDetail?: boolean; outOfOrderGet?: boolean } = {}) {
+async function mockHarness(page: Page, options: { outputUsed?: boolean; failed?: boolean; disconnect?: boolean; failFirstStart?: boolean; delayedFinanceDetail?: boolean; detailFailure?: boolean; outOfOrderGet?: boolean; healthFailures?: number; catalogFailures?: number; catalogInvalidFailures?: number } = {}) {
   let activeDemo: DemoId = "demo1";
+  let healthCalls = 0;
+  let catalogCalls = 0;
   let startCalls = 0;
   let getCalls = 0;
   let streamCalls = 0;
@@ -77,13 +82,22 @@ async function mockHarness(page: Page, options: { outputUsed?: boolean; failed?:
   await page.route(`${API_URL}/v1/**`, async (route) => {
     const url = new URL(route.request().url());
     const path = url.pathname;
-    if (path === "/v1/threads" && route.request().method() === "POST") return fulfillJson(route, { thread_id: "thread-harness" });
-    if (path === "/v1/evidence/requirements" || path === "/v1/workspace" || path === "/v1/tasks") return fulfillJson(route, []);
-    if (path === "/v1/demo2/cockpit") return fulfillJson(route, { items: [] });
-    if (path === "/v1/harness/scenarios") return fulfillJson(route, { scenarios: (["demo1", "demo2", "demo3"] as DemoId[]).map(scenario) });
+    if (path === "/v1/health") {
+      healthCalls += 1;
+      return healthCalls <= (options.healthFailures ?? 0)
+        ? fulfillJson(route, { status: "starting" }, 503)
+        : fulfillJson(route, { status: "ok" });
+    }
+    if (path === "/v1/harness/scenarios") {
+      catalogCalls += 1;
+      if (catalogCalls <= (options.catalogFailures ?? 0)) return fulfillJson(route, { detail: "catalog unavailable" }, 503);
+      if (catalogCalls <= (options.catalogInvalidFailures ?? 0)) return fulfillJson(route, { detail: "场景目录完整性校验失败" }, 503);
+      return fulfillJson(route, { scenarios: (["demo1", "demo2", "demo3"] as DemoId[]).map(scenario) });
+    }
     const detailDemo = (["demo1", "demo2", "demo3"] as DemoId[]).find((demo) => path === `/v1/harness/scenarios/${scenarioData[demo].scenario_id}`);
     if (detailDemo) {
       if (detailDemo === "demo1" && options.delayedFinanceDetail) await new Promise((resolve) => setTimeout(resolve, 500));
+      if (options.detailFailure) return fulfillJson(route, { detail: "detail unavailable" }, 503);
       return fulfillJson(route, scenario(detailDemo));
     }
     if (path === "/v1/harness/runs" && route.request().method() === "POST") {
@@ -123,17 +137,71 @@ async function mockHarness(page: Page, options: { outputUsed?: boolean; failed?:
     }
     return fulfillJson(route, {});
   });
-  return { startKeys, streamUrls, getStartCalls: () => startCalls, getStreamCalls: () => streamCalls };
+  return { startKeys, streamUrls, getHealthCalls: () => healthCalls, getCatalogCalls: () => catalogCalls, getStartCalls: () => startCalls, getStreamCalls: () => streamCalls };
 }
 
-test("opens the unified work site by default and leaves it from any workspace rail item", async ({ page }) => {
+test("renders the FORTE work site as the only application experience", async ({ page }) => {
   await mockHarness(page);
+  await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto("/");
   await expect(page.getByText("工作现场", { exact: true }).first()).toBeVisible();
   await expect(page.getByRole("heading", { name: "核对跨年度往来账款" }).first()).toBeVisible();
   await expect(page.locator(".harness-workbench")).toBeVisible();
-  await page.getByRole("button", { name: "邮件", exact: true }).click();
-  await expect(page.locator(".harness-workbench")).toHaveCount(0);
+  await expect(page.locator(".harness-agent-shell")).toBeVisible();
+  await expect(page.locator("main")).toHaveCount(1);
+  await expect(page.locator(".view-rail, .demo-experience-nav")).toHaveCount(0);
+  await expect(page.getByText("返回工作区", { exact: true })).toHaveCount(0);
+  const demoTabs = page.getByRole("navigation", { name: "演示场景" }).getByRole("button");
+  await expect(demoTabs).toHaveCount(3);
+  await expect(page.getByText("公开办公基准数据 · FORTE")).toBeVisible();
+  await expect(page.getByText("服务可用", { exact: true })).toHaveCount(2);
+  await expect(page.getByText(/实时/)).toHaveCount(0);
+  const bodyText = await page.locator("body").innerText();
+  expect(bodyText).not.toMatch(/客户 A|2400|2680|邮件工作台|报价工作台|今天的工作，应该怎么处理|受控动作与调用记录/);
+  const overflow = await page.locator(".harness-app-shell").evaluate((element) => ({ clientWidth: element.clientWidth, scrollWidth: element.scrollWidth }));
+  expect(overflow.scrollWidth).toBeLessThanOrEqual(overflow.clientWidth + 1);
+});
+
+test("recovers automatically after the API is initially unavailable and clears the offline state", async ({ page }) => {
+  const state = await mockHarness(page, { healthFailures: 3 });
+  await page.goto("/");
+  await expect(page.getByRole("heading", { name: "办公服务正在恢复" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "工作现场暂时离线" })).toBeVisible();
+  await expect.poll(() => state.getHealthCalls()).toBeGreaterThan(3);
+  await expect(page.getByRole("heading", { name: "核对跨年度往来账款" }).first()).toBeVisible();
+  await expect(page.getByRole("heading", { name: "工作现场暂时离线" })).toHaveCount(0);
+  await expect(page.getByText("无法连接办公服务，系统会继续自动重试。")).toHaveCount(0);
+});
+
+test("keeps the API available while a transient scenario catalog failure recovers", async ({ page }) => {
+  const state = await mockHarness(page, { catalogFailures: 3 });
+  await page.goto("/");
+  await expect(page.getByRole("heading", { name: "正在重新读取工作场景" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "工作场景暂时不可用" })).toBeVisible();
+  await expect(page.getByText("办公服务已连接，但场景目录暂时无法读取；系统会继续自动重试。").first()).toBeVisible();
+  await expect(page.getByRole("heading", { name: "工作现场暂时离线" })).toHaveCount(0);
+  await expect.poll(() => state.getCatalogCalls()).toBeGreaterThan(3);
+  await expect(page.getByRole("heading", { name: "核对跨年度往来账款" }).first()).toBeVisible();
+  await expect(page.getByText("服务可用", { exact: true })).toHaveCount(2);
+});
+
+test("reports an invalid scenario catalog separately from an offline API", async ({ page }) => {
+  await mockHarness(page, { catalogInvalidFailures: 3 });
+  await page.goto("/");
+  await expect(page.getByRole("heading", { name: "工作场景需要更新" })).toBeVisible();
+  await expect(page.getByText("办公服务已连接，但场景目录未通过完整性检查；系统会继续自动重试。").first()).toBeVisible();
+  await expect(page.getByRole("heading", { name: "工作现场暂时离线" })).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "核对跨年度往来账款" }).first()).toBeVisible();
+});
+
+test("shows an explicit catalog-preview fallback when scenario detail cannot be read", async ({ page }) => {
+  await mockHarness(page, { detailFailure: true });
+  await page.goto("/");
+  await expect(page.getByRole("heading", { name: "核对跨年度往来账款" }).first()).toBeVisible();
+  await expect(page.getByText("场景详情暂时不可用，当前使用目录中的公开信息。").first()).toBeVisible();
+  await expect(page.getByRole("button", { name: "开始本轮" })).toBeEnabled();
+  await expect(page.getByText("服务可用", { exact: true })).toHaveCount(2);
+  await expect(page.getByText(/实时/)).toHaveCount(0);
 });
 
 test("projects all three real scenarios and rejects a late previous-scenario detail", async ({ page }) => {
@@ -157,8 +225,8 @@ test("renders the final server plan in the left workspace and receipts in the pe
   await expect(page.getByText("最新读取资料")).toBeVisible();
   await page.waitForTimeout(450);
   await expect(page.getByText("迟到旧版读取资料")).toHaveCount(0);
-  await expect(page.locator(".chat-pane").getByText("模型计划已采纳")).toBeVisible();
-  await expect(page.locator(".chat-pane").getByText("计划已通过校验，任务尚未执行")).toBeVisible();
+  await expect(page.locator(".harness-agent-shell").getByText("模型计划已采纳")).toBeVisible();
+  await expect(page.locator(".harness-agent-shell").getByText("计划已通过校验，任务尚未执行")).toBeVisible();
   await expect(page.getByText("2025 年往来明细").last()).toBeVisible();
   await expect(page.getByText("task.md")).toHaveCount(0);
   await expect(page.getByText(/Finance-018\/input/)).toHaveCount(0);
@@ -173,7 +241,7 @@ test("shows rejected model output and reuses the same idempotency key after an u
   await page.getByRole("button", { name: "开始本轮" }).click();
   await expect(page.getByRole("button", { name: "重试启动" })).toBeVisible();
   await page.getByRole("button", { name: "重试启动" }).click();
-  await expect(page.locator(".chat-pane").getByText("模型计划未采纳")).toBeVisible();
+  await expect(page.locator(".harness-agent-shell").getByText("模型计划未采纳")).toBeVisible();
   expect(state.getStartCalls()).toBe(2);
   expect(state.startKeys[0]).toBe(state.startKeys[1]);
 });
@@ -184,6 +252,8 @@ test("keeps a failed plan unexecuted and creates a fresh command only for a new 
   await page.getByRole("button", { name: "开始本轮" }).click();
   await expect(page.getByText("计划未通过服务端校验").first()).toBeVisible();
   await expect(page.getByText("计划已通过服务端校验，尚未执行任务")).toHaveCount(0);
+  await expect(page.locator(".harness-phase").nth(2)).toHaveClass(/is-active/);
+  await expect(page.locator(".harness-phase").first()).not.toHaveClass(/is-active/);
   await page.getByRole("button", { name: "开始新一轮" }).click();
   await expect.poll(() => state.getStartCalls()).toBe(2);
   expect(state.startKeys[0]).not.toBe(state.startKeys[1]);
@@ -206,9 +276,24 @@ test("keeps the 390px work site private, touchable and free from horizontal over
   await page.goto("/");
   await expect(page.locator(".harness-workbench")).toBeVisible();
   const privateText = await page.locator("body").innerText();
-  expect(privateText).not.toMatch(/task\.md|rubric|prompt|sha256|Finance-018\/input|file-01|harness:|\b[0-9a-f]{40}\b|\b[0-9a-f]{64}\b/i);
-  const overflow = await page.locator(".harness-workbench").evaluate((element) => ({ clientWidth: element.clientWidth, scrollWidth: element.scrollWidth }));
-  expect(overflow.scrollWidth).toBeLessThanOrEqual(overflow.clientWidth + 1);
+  expect(privateText).not.toMatch(/task\.md|rubric|prompt|sha256|Finance-018\/input|file-01|harness:|\b[0-9a-f]{40}\b|\b[0-9a-f]{64}\b|客户 A|2400|2680|返回工作区|邮件工作台|报价工作台/i);
+  const overflow = await page.evaluate(() => ["html", "body", ".harness-app-shell", ".harness-workspace-shell", ".harness-workbench"].map((selector) => {
+    const element = document.querySelector<HTMLElement>(selector);
+    if (!element) throw new Error(`Missing responsive surface: ${selector}`);
+    return { selector, clientWidth: element.clientWidth, scrollWidth: element.scrollWidth };
+  }));
+  for (const item of overflow) expect(item.scrollWidth, `${item.selector} should not overflow`).toBeLessThanOrEqual(item.clientWidth + 1);
   const small = await page.locator(".harness-workbench button").evaluateAll((elements) => elements.flatMap((element) => { const rect = element.getBoundingClientRect(); return rect.width && rect.height < 44 ? [{ text: element.textContent, height: rect.height }] : []; }));
   expect(small).toEqual([]);
+  const separator = page.getByRole("separator", { name: "调整 Agent 面板大小" });
+  const expandedHitTarget = await separator.evaluate((element) => {
+    const rect = element.getBoundingClientRect();
+    const target = document.elementFromPoint(rect.left + rect.width / 2, rect.top - 15);
+    return target === element || target?.closest(".harness-app-divider") === element;
+  });
+  expect(expandedHitTarget).toBeTruthy();
+  const before = Number(await separator.getAttribute("aria-valuenow"));
+  await separator.focus();
+  await separator.press("ArrowUp");
+  await expect(separator).toHaveAttribute("aria-valuenow", String(before + 20));
 });

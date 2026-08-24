@@ -2,5 +2,8 @@ docs/final-reference/*.md text eol=lf
 docs/final-reference/*.html text eol=lf
 docs/prototypes/*.html text eol=lf
 docs/final-reference/*.pptx binary
-demo-enterprise-data/** text eol=lf
-demo-enterprise-data/**/*.xlsx binary
+demo-enterprise-data/forte/*/task.md binary
+demo-enterprise-data/forte/*/input/** binary
+demo-enterprise-data/forte/manifest.json text eol=lf
+demo-enterprise-data/forte/README.md text eol=lf
+demo-enterprise-data/forte/THIRD_PARTY_LICENSE.txt text eol=lf
