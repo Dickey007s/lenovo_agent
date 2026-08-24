@@ -4,59 +4,75 @@ Base URL: `http://localhost:8010`.
 
 ## 1. Public surface
 
-The application exposes exactly six OpenAPI paths:
+OpenAPI exposes exactly seven paths:
 
 | Method | Path | Purpose |
 | --- | --- | --- |
 | GET | `/v1/health` | process health and configured model/storage labels |
-| GET | `/v1/harness/scenarios` | safe public Scenario list |
-| GET | `/v1/harness/scenarios/{scenario_id}` | one safe public Scenario |
-| POST | `/v1/harness/runs` | start an independent planning round |
-| GET | `/v1/harness/runs/{run_id}` | read the Owner-scoped public Snapshot |
+| GET | `/v1/harness/scenarios` | safe Scenario list |
+| GET | `/v1/harness/scenarios/{scenario_id}` | one safe Scenario |
+| GET | `/v1/harness/scenarios/{scenario_id}/files/{file_ref}` | bounded allowlisted file preview |
+| POST | `/v1/harness/runs` | start an idempotent read-only task |
+| GET | `/v1/harness/runs/{run_id}` | Owner-scoped public Snapshot |
 | GET | `/v1/harness/runs/{run_id}/events?after=N` | ordered SSE after a sequence |
 
-Legacy `/v1/workspace`, `/v1/threads`, `/v1/tasks`, `/v1/demo1`, `/v1/demo2` and `/v1/demo3` prefixes are not mounted and return 404.
+Legacy workspace/thread/task/Demo prefixes remain unmounted.
 
-## 2. Owner and durability
+## 2. Owner and persistence
 
-Harness endpoints use `X-User-Id`; if omitted, the demo default is `demo_user`. This header is unsigned and is not production authentication. GET and SSE return the same 404 for missing and wrong-owner Runs so resource existence is not disclosed across Owners.
+Harness Run endpoints use `X-User-Id`; omitted requests use demo default `demo_user`. This unsigned header is not production authentication. Missing and wrong-owner Runs both return 404 before SSE StreamingResponse creation.
 
-Runs, events, in-flight planning tasks and idempotency results are single-process memory. API restart loses them.
+Runs, results, receipts, events, in-flight model calls and idempotency records live in one API process memory and disappear on restart.
 
-## 3. Scenario projection
+## 3. Scenario and stable files
 
-`GET /v1/harness/scenarios` returns:
+Scenario responses contain business fields and:
 
 ```json
 {
-  "scenarios": [
+  "files": [
     {
-      "scenario_id": "Finance-018",
-      "demo_id": "demo1",
-      "title": "跨期间财务证据任务",
-      "goal": "...",
-      "deliverables": ["..."],
-      "data_boundary": "...",
-      "human_gate_summary": "...",
-      "allowed_capabilities": ["..."],
-      "dataset_label": "公开办公基准数据 · FORTE",
-      "dataset_version": "FORTE 公开版本 · 345c1ec",
-      "experience_policy": "durable_task",
-      "files": [
-        {
-          "display_label": "...",
-          "display_group": "...",
-          "display_summary": "..."
-        }
-      ]
+      "file_ref": "forte-a0bccc1df48cc6a1",
+      "display_label": "2025 年上半年往来明细",
+      "display_group": "财务往来",
+      "display_summary": "Excel 表格，共 1 个工作表；..."
     }
   ]
 }
 ```
 
-The projection intentionally omits raw task instruction, rubric, solution, grading fields, internal path, absolute path and full hash. Catalog integrity failure returns `503 {"detail":"场景目录完整性校验失败"}`; no partial Scenario is returned.
+`file_ref` is stable for a pinned Scenario/path pair and hides the relative path. Public Scenario payloads omit raw task instruction, rubric, solution, grading, path and hash.
 
-## 4. Start a Run
+## 4. File preview
+
+```http
+GET /v1/harness/scenarios/Finance-018/files/forte-a0bccc1df48cc6a1
+```
+
+Table response:
+
+```json
+{
+  "scenario_id": "Finance-018",
+  "file_ref": "forte-a0bccc1df48cc6a1",
+  "display_label": "2025 年上半年往来明细",
+  "display_group": "财务往来",
+  "display_summary": "...",
+  "kind": "table",
+  "sheet_name": "sheet1",
+  "columns": ["科目名称", "客商名称", "方向"],
+  "rows": [{"row_number": 2, "values": ["...", "...", "..."]}],
+  "total_rows": 75,
+  "text": null,
+  "truncated": false
+}
+```
+
+The Catalog rechecks size/hash before each preview. XLSX output is the first visible sheet, at most 30 columns and 120 data rows. Markdown output is at most 30,000 characters. Unknown Scenario/ref returns 404; source-integrity failure returns controlled 503.
+
+Preview is a bounded projection of public benchmark input, not an arbitrary filesystem read API.
+
+## 5. Start a Run
 
 ```http
 POST /v1/harness/runs
@@ -67,97 +83,102 @@ Content-Type: application/json
 ```json
 {
   "scenario_id": "Finance-018",
-  "idempotency_key": "ui-20260824-example",
-  "expected_version": 1
+  "idempotency_key": "harness:client-generated-key",
+  "expected_version": 1,
+  "instruction": "只检查余额连续不变的客商，并说明引用文件。",
+  "selected_file_refs": [
+    "forte-a0bccc1df48cc6a1",
+    "forte-b6e701bcf4494076"
+  ]
 }
 ```
 
-The response is `202 Accepted`:
+`instruction` is optional, 3-2,000 characters; omission uses the Scenario default and records `instruction_source=dataset_task`. `selected_file_refs` is optional; omission selects the Scenario's allowlisted inputs. When supplied, it must be nonempty, unique, well-formed and belong to that Scenario.
+
+The response is `202 Accepted` with `{"run": snapshot, "replayed": false}`. Reusing the same Owner/key/request returns the prior start result with `replayed=true`. Reusing the key for different content returns 409.
+
+## 6. Snapshot
+
+Important public fields:
 
 ```json
 {
-  "run": {
-    "run_id": "harness:...",
-    "owner_id": "demo_user",
-    "scenario_id": "Finance-018",
-    "status": "queued",
-    "version": 1,
-    "last_event_sequence": 0,
-    "source_documents": [],
-    "selection_reason": null,
-    "plan": null,
-    "model_receipt": null,
-    "validation_errors": [],
-    "events": []
+  "run_id": "harness:...",
+  "scenario_id": "Finance-018",
+  "status": "completed",
+  "version": 9,
+  "last_event_sequence": 8,
+  "instruction": "...",
+  "instruction_source": "user",
+  "source_documents": [{"file_ref": "...", "display_label": "..."}],
+  "plan": {"summary": "...", "units": []},
+  "model_receipt": {
+    "called": true,
+    "model": "deepseek-v4-pro",
+    "elapsed_ms": 14685,
+    "output_used": true
   },
-  "replayed": false
+  "analysis_receipt": {
+    "called": true,
+    "model": "deepseek-v4-pro",
+    "elapsed_ms": 18041,
+    "output_used": true
+  },
+  "result": {
+    "summary": "...",
+    "findings": [
+      {"title": "...", "detail": "...", "file_refs": ["forte-..."]}
+    ],
+    "follow_ups": ["..."],
+    "review_required": true
+  },
+  "validation_errors": [],
+  "events": []
 }
 ```
 
-Reusing the same Owner/idempotency key with the same request returns the prior result and `replayed=true`. Reusing it for a different request, or violating the start contract, returns 409.
+Statuses are `queued`, `indexing`, `planning`, `validating`, `analyzing`, `verifying`, `completed`, `failed`, plus compatibility `ready_to_execute` when the Runtime is built without an Analyst.
 
-## 5. Snapshot and plan
+For the current Runtime, `completed` means an Analyst response passed schema, citation-scope and read-only-boundary checks. The business UI projects this as “初步结果已形成”. It does not mean the answer is correct, plan-declared tools executed, an ArtifactVersion was committed or an external system changed.
 
-Run status is one of `queued`, `indexing`, `planning`, `validating`, `ready_to_execute`, or `failed`.
+## 7. Result validation
 
-A public plan unit contains:
+`HarnessTaskResult` requires 1-10 findings and `review_required=true`. Each finding needs at least one `file_ref`. The server checks that all cited refs belong to the frozen selected source set.
 
-```json
-{
-  "unit_id": "unit-1",
-  "title": "...",
-  "objective": "...",
-  "input_file_refs": ["source-1"],
-  "depends_on": [],
-  "tool": "file.read",
-  "requires_human_gate": false,
-  "side_effect": "none",
-  "artifact_name": null,
-  "artifact_type": null
-}
-```
+This is reference-membership validation. The API does not claim semantic proof, formula verification, exhaustive matching or row-level entailment. A preserved Finance-018 regression recomputes 23 unchanged balances totaling `1,845,444.71`, whereas one live model Snapshot stated 20 and `2,202,000`; see [DR-0018 Evidence](evidence/FORTE-DATA-WORKBENCH-TRACE-EVIDENCE-20260824.md). The current server therefore does not present `result_validation` as a quality pass.
 
-`input_file_refs` are public Run-scoped references, not source paths. `model_receipt` contains `called`, `model`, `elapsed_ms`, and `output_used`. Model call, adoption and validation must be presented separately.
-
-`ready_to_execute` is the current terminal success state. It means the plan passed deterministic validation and is waiting at an execution boundary; it does not mean a Worker, tool, Artifact or external action ran.
-
-## 6. SSE
+## 8. SSE
 
 ```http
 GET /v1/harness/runs/{run_id}/events?after=3
 Accept: text/event-stream
-X-User-Id: demo_user
 ```
 
-Each message uses the event sequence as SSE `id`:
-
-```text
-id: 4
-event: plan_validation
-data: {"sequence":4,"event_name":"plan_validation","status":"validating",...}
-```
-
-A normal successful order is:
+Successful production order:
 
 ```text
 workspace_index
 planning_started
 planning_completed
 plan_validation
-ready_to_execute
+analysis_started
+analysis_completed
+result_validation
+task_completed
 ```
 
-`after=N` returns only later events. The client must apply monotonically increasing sequence values and reconcile with GET after terminal events or transport interruption. Heartbeats carry no business state.
+The SSE `id` equals event sequence. `after=N` returns only later events. Heartbeats carry no business state. Terminal event closes the stream and requires final GET reconciliation; nonterminal interruption uses GET plus `after=N` recovery.
 
-## 7. Errors and frontend meaning
+## 9. Error meaning
 
-| HTTP/result | Meaning | Required frontend behavior |
+| Result | Meaning | Frontend behavior |
 | --- | --- | --- |
-| connection failure | API unreachable | show service recovery state; bounded automatic retry and explicit retry |
-| 503 from Scenario routes | Catalog unavailable or integrity invalid | keep fail closed; show Catalog-specific message; never invent sources |
-| 404 Scenario | unknown Scenario | keep current safe selection or ask user to choose |
-| 404 Run/SSE | missing or wrong Owner | do not reveal ownership; clear stale Run and start a new round |
-| 409 start | idempotency or contract conflict | preserve local context and reconcile rather than double-start |
-| `status=failed` | planning/validation failed | show `validation_errors`; do not show a ready or execution-success state |
+| connection failure | API unreachable | bounded automatic and explicit retry |
+| Scenario 503 | Catalog unavailable/integrity invalid | fail closed; do not invent data |
+| preview 404 | unknown Scenario/ref | keep selection; show explicit preview error |
+| preview 503 | selected source failed integrity | do not show stale/partial preview |
+| Run/SSE 404 | missing or wrong Owner | do not reveal ownership; clear stale Run |
+| start 409 | idempotency/contract conflict | preserve task and reconcile |
+| `status=failed` | plan, model structure, source or citation validation failed | show safe error; do not enable a result |
 
-See [UI—server fact matrix](contracts/UI_SERVER_FACT_MATRIX.md) and [worksite streaming behavior](WORKSPACE_AND_STREAMING.md).
+See [UI—server fact matrix](contracts/UI_SERVER_FACT_MATRIX.md).

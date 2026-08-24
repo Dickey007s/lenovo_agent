@@ -1,0 +1,192 @@
+{
+  "schema_version": "1.0",
+  "captured_date": "2026-08-24",
+  "decision": "DR-0018",
+  "status": "Limited Verified",
+  "evidence_type": "sanitized_interactive_live_run_record",
+  "raw_snapshot_included": false,
+  "implementation_commits": [
+    "fffa36a8cc83e895aaba35276568ad79e348f541",
+    "041186d"
+  ],
+  "source": {
+    "dataset": "FORTE",
+    "source_commit": "345c1ec1487139db9dd319787fa9405ba85d1869",
+    "scenario_id": "Finance-018",
+    "selected_files": [
+      {
+        "file_ref": "forte-a0bccc1df48cc6a1",
+        "display_label": "2025 年上半年往来明细"
+      },
+      {
+        "file_ref": "forte-b6e701bcf4494076",
+        "display_label": "2025 年下半年往来明细"
+      }
+    ]
+  },
+  "run": {
+    "run_id": "harness:8c9b10d493004bd9aac305c294f48fa6",
+    "status": "completed",
+    "version": 9,
+    "last_event_sequence": 8,
+    "instruction_source": "user",
+    "planning_receipt": {
+      "called": true,
+      "model": "deepseek-v4-pro",
+      "elapsed_ms": 14685,
+      "output_used": true
+    },
+    "analysis_receipt": {
+      "called": true,
+      "model": "deepseek-v4-pro",
+      "elapsed_ms": 18041,
+      "output_used": true
+    },
+    "result": {
+      "finding_count": 10,
+      "distinct_citation_file_refs": [
+        "forte-a0bccc1df48cc6a1",
+        "forte-b6e701bcf4494076"
+      ],
+      "citation_scope_validation": "passed",
+      "semantic_correctness_validation": "not_performed",
+      "review_required": true
+    },
+    "events": [
+      {
+        "sequence": 1,
+        "event_name": "workspace_index"
+      },
+      {
+        "sequence": 2,
+        "event_name": "planning_started"
+      },
+      {
+        "sequence": 3,
+        "event_name": "planning_completed"
+      },
+      {
+        "sequence": 4,
+        "event_name": "plan_validation"
+      },
+      {
+        "sequence": 5,
+        "event_name": "analysis_started"
+      },
+      {
+        "sequence": 6,
+        "event_name": "analysis_completed"
+      },
+      {
+        "sequence": 7,
+        "event_name": "result_validation"
+      },
+      {
+        "sequence": 8,
+        "event_name": "task_completed"
+      }
+    ],
+    "thinking_request": "disabled",
+    "chain_of_thought_in_public_projection": false,
+    "tool_gateway_invoked": false,
+    "artifact_version_mutated": false,
+    "connector_invoked": false,
+    "external_side_effect": "none"
+  },
+  "additional_live_run": {
+    "run_id_prefix": "harness:f3a071...",
+    "screenshot_captured_approximately_ms_after_start": 1800,
+    "terminal_status": "completed",
+    "terminal_version": 9,
+    "terminal_last_event_sequence": 8,
+    "planning_receipt": {
+      "called": true,
+      "model": "deepseek-v4-pro",
+      "elapsed_ms": 14155,
+      "output_used": true
+    },
+    "analysis_receipt": {
+      "called": true,
+      "model": "deepseek-v4-pro",
+      "elapsed_ms": 17122,
+      "output_used": true
+    },
+    "boundary": "Second interactive observation only. The recorded duration and in-progress screenshot are not a latency benchmark, background-execution proof, or semantic-quality result. The full run id was not included in the documentation record supplied for this capture."
+  },
+  "negative_quality_check": {
+    "scenario_id": "Finance-018",
+    "method": "Deterministic equality comparison over the public safe previews, grouped by subject name, counterparty name, and closing direction, with non-empty closing balances.",
+    "model_snapshot_claim": {
+      "unchanged_item_count": 20,
+      "absolute_amount_total": "2202000"
+    },
+    "deterministic_result": {
+      "unchanged_item_count": 23,
+      "absolute_amount_total": "1845444.71"
+    },
+    "regression_test": "tests/unit/test_benchmark_scenario_catalog.py::test_finance_cross_period_ground_truth_is_deterministically_reproducible",
+    "test_file_result": "10 passed",
+    "interpretation": "The live response was numerically incorrect. Current result validation checks schema, selected file_ref membership, and the read-only boundary; it does not verify semantic correctness, exhaustive coverage, or arithmetic."
+  },
+  "screenshots": [
+    {
+      "file": "docs/evidence/screenshots/dr-0018-data-workbench-running-desktop.png",
+      "width": 1440,
+      "height": 900,
+      "bytes": 136670,
+      "sha256": "41B57A38C571C69B5624777A1E0376BADAA4A70B52D968470B12DB4D4D47EC61",
+      "provenance": "Actual in-progress state of the second real run harness:f3a071..., captured about 1.8 seconds after start.",
+      "replay_injected": false
+    },
+    {
+      "file": "docs/evidence/screenshots/dr-0018-data-workbench-result-desktop.png",
+      "width": 1440,
+      "height": 900,
+      "bytes": 180565,
+      "sha256": "9EC29203B0D5D24665152D468A690B2F78C42FD8C7D53112694253D52D377850",
+      "provenance": "Previously persisted real snapshot harness:8c9... projected into the same formal UI by browser POST replay.",
+      "replay_injected": true,
+      "model_call_triggered_by_capture": false,
+      "product_history_or_restart_recovery_proven": false,
+      "console_errors": 0,
+      "page_errors": 0
+    },
+    {
+      "file": "docs/evidence/screenshots/dr-0018-data-workbench-result-mobile.png",
+      "width": 390,
+      "height": 3284,
+      "bytes": 178485,
+      "sha256": "C4226CF19DBECCD85233E7861EEBE768A7B88DF1F6176A9A6DC2863C2CD09A00",
+      "provenance": "Same replayed harness:8c9... snapshot in the formal UI at a 390px viewport.",
+      "replay_injected": true,
+      "model_call_triggered_by_capture": false,
+      "product_history_or_restart_recovery_proven": false,
+      "visible_finding_count": 3,
+      "expand_control": "查看其余7条发现",
+      "scroll_width": 390,
+      "console_errors": 0,
+      "page_errors": 0
+    }
+  ],
+  "public_api_paths": [
+    "/v1/health",
+    "/v1/harness/scenarios",
+    "/v1/harness/scenarios/{scenario_id}",
+    "/v1/harness/scenarios/{scenario_id}/files/{file_ref}",
+    "/v1/harness/runs",
+    "/v1/harness/runs/{run_id}",
+    "/v1/harness/runs/{run_id}/events"
+  ],
+  "verification": {
+    "focused_python": "30 passed in 2.46s",
+    "deterministic_finance_regression_file": "10 passed",
+    "focused_harness_browser": "8 passed in 26.8s",
+    "web_build": "compile 2.5s; TypeScript 4.4s; static generation 810ms",
+    "final_full_suite": "Python 53 passed in 2.68s; Ruff passed; web lint passed",
+    "pull_request": {
+      "url": "https://github.com/Dickey007s/lenovo_agent/pull/25",
+      "state_at_capture": "open_not_merged"
+    }
+  },
+  "boundary": "Two sanitized Finance-018 read-only observations in a single API process. Citation validation checks selected file_ref membership, not semantic correctness, completeness, or arithmetic; the deterministic negative check demonstrates a wrong live result. Result screenshots replay one persisted real snapshot through the formal UI and are neither a third model call nor product history/restart recovery. No raw result text, prompt, model response, path, source hash, chain of thought, tool execution, Artifact mutation, Connector, external action, production identity, durable recovery, or user study is included or proven."
+}

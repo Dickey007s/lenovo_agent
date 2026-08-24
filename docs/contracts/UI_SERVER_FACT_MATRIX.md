@@ -1,53 +1,61 @@
 # UI—Server Fact Matrix
 
-This matrix is the current product contract. Historical Task/Cockpit/Action mappings are retired and indexed in [RETIREMENT_REGISTER](../decisions/RETIREMENT_REGISTER.md).
+This is the current DR-0018 product contract. Historical Task/Cockpit/Action mappings remain in retired Evidence.
 
-## 1. Active worksite facts
+## 1. Data workbench
 
-| UI state/location | User-visible meaning/action | 服务端权威字段 or event | Transition, recovery and idempotency | 默认隐藏 | Evidence/status |
+| UI state/location | User-visible meaning/action | 服务端权威字段 or event | Transition/recovery/idempotency | 默认隐藏 | Evidence/status |
 | --- | --- | --- | --- | --- | --- |
-| Header: 连接中 | service/Catalog or Run transport is unresolved | pending health/Catalog/Run request | wait; no business-state transition | request internals, Key | E2E; Limited Verified |
-| Header: 服务可用 | API/Catalog is reachable; no active Run SSE | successful health/Catalog and no open EventSource | user may select/start/retry | prior stream state | E2E; Limited Verified |
-| Header: 事件流实时 | current nonterminal Run SSE is open | EventSource `open` for current `run_id` | events still require sequence checks | heartbeat/log payload | E2E; Limited Verified |
-| Header: 正在重连 | a nonterminal transport failed and recovery is active | EventSource error or failed GET with retained Run | GET Snapshot, then resume `after=N` | raw network exception | E2E; Limited Verified |
-| Header: 暂时离线 | API remains unreachable after bounded retry | health request failure | automatic retry plus explicit retry | generic stack trace | E2E; Limited Verified |
-| Scenario tabs | three safe FORTE work policies | `GET /v1/harness/scenarios` | selection is local view state; does not mutate a Run | raw task instruction, rubric, solution, path/hash | Catalog tests/E2E; Limited Verified |
-| Scenario detail fallback | public list data remains usable while detail is unavailable | list projection exists; detail GET failed | show explicit notice; retry detail later | raw `task.md` fallback | E2E; Limited Verified |
-| Source tree | business labels, groups and summaries for allowed inputs | public Scenario `files[]`; Run `source_documents[]` after index | index event freezes Run-scoped refs | absolute/internal path, full hash, parser internals | tests/E2E; Limited Verified |
-| Task Contract | goal, deliverables, data boundary, allowed capabilities, human gate summary | public Scenario contract | review before start; no client edits in current slice | sanitized Planner context, grading data | tests/E2E; Limited Verified |
-| Start button | create one independent planning round | POST body `scenario_id/idempotency_key/expected_version` | same Owner/key/request replays; conflicting reuse 409 | internal task handle | tests/E2E; Limited Verified |
-| Read phase | source index is frozen | Snapshot `status=indexing`, event `workspace_index` | only after server event/Snapshot | raw source path/hash | live/E2E; Limited Verified |
-| Plan phase | model is proposing a plan | `planning_started`, `planning_completed` | not proof of validation or execution | Prompt, CoT, raw response | live/E2E; Limited Verified |
-| Model receipt | call occurred, model label, elapsed observation, adoption result | `HarnessModelReceipt.called/model/elapsed_ms/output_used` | call/adoption displayed separately | token details, provider trace | live/E2E; Limited Verified |
-| Dynamic plan graph | the adopted, public validated candidate and dependencies | public `plan.summary/units[]` | render only public refs; no client-created units | internal input paths and unvalidated candidate | live/E2E; Limited Verified |
-| Validate phase | server checks source refs, tools, dependencies, effects and gates | event `plan_validation`, empty `validation_errors` | does not mean business quality or execution | validator internals beyond useful error | live/E2E; Limited Verified |
-| Ready banner | plan passed validation and waits before execution | Snapshot `status=ready_to_execute`, event `ready_to_execute` | terminal SSE closes; final GET; “开始新一轮” creates a new Run | any fabricated Worker/tool/Artifact receipt | live/E2E; Limited Verified |
-| Failed banner | planning or validation stopped | Snapshot `status=failed`, `validation_errors[]`, `harness_failed` event | terminal GET; user can start new round | stack trace/raw model response | tests/E2E; Limited Verified |
-| Catalog unavailable | service reachable but Catalog temporarily failed | Scenario request failure without integrity classification | retain no invented Scenario; automatic/explicit retry | internal exception | E2E; Limited Verified |
-| Catalog integrity failure | source package requires repair/update | Scenario 503 with integrity detail | fail closed; retry only after source repair | affected raw path/hash in ordinary UI | tests/E2E; Limited Verified |
-| Run not found/wrong Owner | stale or inaccessible Run | GET/SSE 404 before stream creation | clear stale Run; start new round | whether another Owner owns it | route tests; Limited Verified |
+| Header: 服务可用 | API/Catalog reachable; no active Run stream | successful health/Catalog and no open EventSource | user may browse or run | previous stream state | E2E; Limited Verified |
+| Header: 轨迹实时 | current nonterminal SSE is open | EventSource `open` for current Run | still requires ordered events/GET | heartbeat/raw transport | E2E/live screenshot; Limited Verified |
+| Header: 正在重连/暂时离线 | recovery active or API unreachable | stream/request failure | GET + `after=N`, automatic/explicit retry | stack trace | E2E; Limited Verified |
+| Business collections | three safe FORTE Scenario groups | `GET /v1/harness/scenarios` | switching clears current local Run view | foreground Demo IDs, task/rubric/solution | tests/E2E |
+| File checkbox | include/exclude a file from this task | POST `selected_file_refs`; server membership validation | UI retains at least one; edits create new command signature | source path/hash | tests/E2E |
+| File preview | actual bounded public benchmark content | preview route by Scenario + `file_ref` | unknown/integrity failure is explicit; no fallback data | path/hash/raw task | tests/E2E |
+| Task composer | user defines the question | POST `instruction`; Snapshot `instruction/instruction_source` | 3-2,000 chars; edit invalidates pending command key | hidden benchmark task substitution | tests/E2E |
+| Run start | create one independent read-only task | POST Owner/key/version/instruction/refs | identical unknown outcome reuses key; different content conflicts | internal task handle | tests/E2E |
 
-## 2. Plan declaration is not execution
+## 2. Plan, result and trace
 
-| Public unit field | Current meaning | Forbidden UI inference |
+| UI state/location | User-visible meaning/action | 服务端权威字段 or event | Transition/recovery/idempotency | 默认隐藏 | Evidence/status |
+| --- | --- | --- | --- | --- | --- |
+| 已锁定所选文件 | Run context frozen | `workspace_index`, public `source_documents[]` | seq 1 / v2 | internal path/hash/summary |
+| 规划模型开始/返回 | Planner call stage | `planning_started/completed` | seq 2-3; not validation | Prompt, CoT, raw response |
+| 规划调用 receipt | whether Planner called/adopted and elapsed observation | `model_receipt.called/model/elapsed_ms/output_used` | independent of Analyst | provider trace/tokens |
+| 已校验的工作图 | public accepted plan | `plan_validation`, public `plan.units[]` | seq 4; tool names are intent only | unvalidated candidate/internal paths |
+| 分析模型开始/返回 | Analyst call over safe previews | `analysis_started/completed` | seq 5-6; not completion | Prompt, CoT, raw response |
+| 分析调用 receipt | whether Analyst called/adopted and elapsed observation | `analysis_receipt.*` | independent of Planner receipt | provider trace/tokens |
+| 服务端核对文件引用 | each finding cites selected refs | `result_validation` | seq 7; membership only | false claim of semantic proof |
+| 模型初步结论 · 待复核 | read-only model result available | Snapshot `result`, `review_required=true` | default first 3 findings; user expands remainder | hidden findings are user-expandable, not absent |
+| Citation label | which selected file a finding references | `result.findings[].file_refs` resolved against `source_documents[]` | unknown ref fails Run | internal path/hash |
+| 仍需你判断 | follow-up needs human review | `result.follow_ups[]`, `review_required=true` | no automatic approval/action | fabricated decision |
+| 初步结果已形成 | response available in memory and trace terminal | `status=completed`, `task_completed`, result present | seq 8 / v9; terminal GET | correctness, quality-pass, external success or Artifact Commit claim |
+| 本轮已安全停止 | source/model/plan/result validation failed | `status=failed`, `harness_failed`, safe `validation_errors[]` | no result tab enabled | stack/raw response |
+
+## 3. Preview and validation limits
+
+| Fact | Current guarantee | Not guaranteed |
 | --- | --- | --- |
-| `tool=file.read/table.inspect` | proposed allowlisted tool | the file was opened or inspected |
-| `tool=artifact.write` | proposed logical workspace write | an Artifact exists |
-| `side_effect=run_workspace_write` | candidate may write inside a future Run workspace | source or workspace changed |
-| `side_effect=external_action` | candidate crosses a future governed-action boundary | approval, Permit or Connector ran |
-| `requires_human_gate=true` | a future execution would require a gate | a gate was created or approved |
+| XLSX preview | first visible sheet, <=30 columns, <=120 data rows | arbitrary workbook features or full-sheet UI |
+| Markdown preview | allowlisted input, <=30,000 chars | raw task instruction |
+| stable `file_ref` | deterministic for pinned Scenario/path | a production enterprise document identity |
+| plan validation | refs/tools/effects/dependencies/gates | plan quality |
+| result validation | every citation ref belongs to selected set | claim entailment, exhaustive matching, arithmetic or policy correctness |
+| deterministic spreadsheet check | regression reproduces 23 unchanged items / `1,845,444.71` | not yet part of the Runtime; observed model response stated 20 / `2,202,000` |
+| `completed` | response passed schema/ref/read-only checks and needs review | answer correctness, quality pass, tool, Artifact, Connector or business process completion |
 
-The current Snapshot has no Worker status, tool receipt, Artifact version, verification, Commit, approval, Permit or execution receipt. Any corresponding UI is `Draft`.
+## 4. Model and action boundary
 
-## 3. Ownership and sequence rules
+The two receipts are the only foreground facts for model calls. Configured model name, duration animation or event prose cannot substitute for `called/output_used`.
 
-- Apply only Snapshot versions and Event sequences that are newer than the current client fact.
-- SSE `after=N` is a recovery cursor, not a completion signal.
-- Terminal events require a final GET; nonterminal interruption requires GET plus resumed SSE.
-- Missing and wrong-owner Runs both return 404.
-- `X-User-Id` is an unsigned demo placeholder, and all state is one-process memory.
-- Client animation, elapsed time, configured model name or prose cannot upgrade a state.
+Plan fields `file.read`, `table.inspect`, `artifact.write`, `evidence.verify` and `action.preview` are declarations. The current successful path directly invokes the Analyst over Catalog previews; it does not invoke Tool Gateway or mutate an ArtifactVersion.
 
-## 4. Lifecycle boundary
+## 5. Ownership and lifecycle
 
-The fixed Customer A Task Runtime, quote workbench, Demo 2 controlled Worker run and Demo 3 Action Gate mappings remain historical. Their Evidence is not deleted, but they are not current frontend or API facts. See [DR-0017](../decisions/DR-0017-single-forte-worksite-and-legacy-retirement.md).
+- Snapshot version and event sequence must increase monotonically.
+- Terminal event requires final GET; nonterminal disconnect uses GET + `after=N`.
+- Missing/wrong-owner Run returns the same 404.
+- `X-User-Id` is unsigned and all state is one-process memory.
+- DR-0016 planning-only and DR-0017 six-path screenshots/numbers remain historical; DR-0018 governs current applicability.
+
+See [DR-0018](../decisions/DR-0018-forte-data-workbench-and-verifiable-trace.md) and [current Evidence](../evidence/FORTE-DATA-WORKBENCH-TRACE-EVIDENCE-20260824.md).

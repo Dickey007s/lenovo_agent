@@ -2,101 +2,125 @@
 
 ## 1. Current boundary
 
-The current product is one FORTE-backed planning worksite:
-
 ```text
-Browser
-  -> six-path FastAPI surface
+Browser: FORTE data workbench + trace
+  -> seven-path FastAPI surface
   -> BenchmarkScenarioCatalog
-       -> pinned manifest + upstream bytes + license
-       -> safe public Scenario projection
-       -> private sanitized Planner context
+       -> pinned manifest/upstream bytes/license
+       -> safe Scenario + stable file_ref
+       -> bounded XLSX/Markdown preview
+       -> private Planner policy context
   -> HarnessRuntime
-       -> source index
-       -> deepseek-v4-pro plan candidate
-       -> deterministic Plan Validator
-       -> memory Snapshot + ordered events + idempotency result
-  -> public Snapshot / SSE
-  -> ready_to_execute
+       -> freeze user instruction + selected file_ref set
+       -> deepseek-v4-pro Planner
+       -> deterministic plan validation
+       -> deepseek-v4-pro Analyst over safe previews
+       -> deterministic citation-scope validation
+       -> memory Snapshot + ordered SSE + idempotency
+  -> completed + review_required=true
 ```
 
-The Runtime deliberately stops before execution. There is no public command or mounted service for Worker scheduling, tool use, Artifact mutation, approval, Permit, Connector, or external action.
+The current Runtime performs a bounded read-only analysis. It does not invoke Scheduler/Worker, Tool Gateway, ArtifactVersion/Commit, Approval/Permit, Connector or an external action.
 
-## 2. Trust boundaries
+## 2. Source and preview boundary
 
-### Source boundary
+`demo-enterprise-data/forte/manifest.json` binds 11 source files at FORTE commit `345c1ec1487139db9dd319787fa9405ba85d1869`, totaling `115352` bytes. Catalog loading checks declared path, root boundary, symlink, size, SHA-256, type and parser constraints. Task/input files retain upstream bytes and are binary-marked against line-ending normalization.
 
-`demo-enterprise-data/forte/manifest.json` binds 11 vendored source files at FORTE commit `345c1ec1487139db9dd319787fa9405ba85d1869`, totaling `115352` bytes. Catalog loading checks declared path, root boundary, symlink status, size, SHA-256, type and parser constraints.
+Raw `task.md` is provenance. It is not previewable and does not enter the public API or Analyst. The Catalog publishes:
 
-Five upstream Markdown files contain CRLF bytes. Task and input files are marked binary in `.gitattributes` so Git cannot silently normalize those bytes away from the manifest. Any mismatch fails closed.
+- Scenario business fields and safe display metadata;
+- stable opaque `file_ref` values derived from Scenario ID plus the allowlisted relative path;
+- the first visible XLSX sheet, bounded to 30 columns and 120 data rows; or
+- allowlisted input Markdown bounded to 30,000 characters.
 
-### Planner boundary
+Filesystem path, full hash, task instruction, rubric, solution, grading metadata, Prompt, chain of thought and raw model response remain outside ordinary UI.
 
-Raw `task.md` is provenance, not public content. The Catalog produces two separate projections:
+## 3. User Task Contract
 
-- public Scenario: business title, goal, deliverables, data boundary, gate summary, capability labels and safe file labels/summaries;
-- internal Planner context: sanitized instruction, allowlisted tool/effect policy and internal source metadata.
+The start command freezes:
 
-The public API and ordinary DOM must not contain `task_instruction`, rubric, solution, grading content, absolute path, full hash, Prompt, chain of thought, raw model response or secrets.
+- Scenario ID;
+- user instruction, or a Scenario default;
+- one or more selected `file_ref` values;
+- Owner, expected version and idempotency key.
 
-### Model and validation boundary
+The server rejects duplicate/invalid refs and refs outside the current Scenario. `instruction_source=user|dataset_task` remains visible in the Snapshot. An unknown response can be retried with the same command key; changing content under the key returns 409.
 
-The model can propose a `HarnessPlan`; it does not own scenario identity, source identity, Run state, event sequence, validation result or execution outcome. The server validates:
+## 4. Model and validation boundaries
 
-- unit identity and dependency graph, including cycles;
-- input file references against the frozen source set;
-- tool and side-effect values against the Scenario policy;
-- `artifact.write` logical naming and `run_workspace_write` mapping;
-- human-gate declarations for external-action candidates.
+### Planning call
 
-`called=true`, `output_used=true`, and `status=ready_to_execute` are separate facts. A model response can be called but not adopted; an adopted plan still must pass deterministic validation.
+The Planner receives the user goal, safe file metadata and server policy. It returns a strict `HarnessPlan`. The server validates unit IDs, dependencies/cycles, selected refs, allowlisted tools, side-effect types, logical Artifact names and required human gates.
 
-## 3. Runtime state
+### Analysis call
 
-Statuses are `queued -> indexing -> planning -> validating -> ready_to_execute`, or `failed`. A successful run emits:
+The Analyst receives the instruction, validated plan and server-produced safe previews. It returns a strict `HarnessTaskResult` with 1-10 findings, optional follow-ups and `review_required=true`.
+
+The server validates that every finding cites only the frozen selected refs. It does not validate semantic correctness, accounting interpretation, arithmetic, exhaustive coverage or whether a cited source proves the precise sentence. A deterministic Finance regression produces 23 / `1,845,444.71` where the observed model response produced 20 / `2,202,000`; this negative result is evidence that citation-scope validation cannot be treated as answer validation.
+
+Both requests use `deepseek-v4-pro`, temperature 0, strict JSON and `thinking.type=disabled`. Public receipts separately expose `called/model/elapsed_ms/output_used`; no chain of thought is projected.
+
+## 5. State and events
+
+The production path is:
+
+```text
+queued
+  -> indexing
+  -> planning
+  -> validating
+  -> analyzing
+  -> verifying
+  -> completed
+```
+
+The success trace has eight events:
 
 ```text
 workspace_index
 planning_started
 planning_completed
 plan_validation
-ready_to_execute
+analysis_started
+analysis_completed
+result_validation
+task_completed
 ```
 
-Snapshot version and event sequence increase monotonically. Start is bound to Owner and idempotency key. GET and SSE enforce the same Owner scope; missing and wrong-owner Runs both return 404.
+Each event increments Snapshot version and sequence; a new successful Run starts at v1/seq 0 and ends v9/seq 8. `failed` is terminal. `ready_to_execute` remains a compatibility state when no Analyst adapter exists, but is not the current production success path.
 
-Runs, events, in-flight planning tasks and idempotency results live only in one API process. API restart loses them. The configured health response may still expose `checkpoint=memory` and `task_store=memory`; this is not durable recovery.
+GET and SSE enforce Owner scope; missing and wrong-owner Runs both return 404. Terminal SSE closes and the client performs a final GET. Nonterminal interruptions reconcile Snapshot and resume with `after=N`.
 
-## 4. Frontend projection
+Runs, results, events, in-flight calls and idempotency records live in one API process memory. Restart loses them.
 
-The root page imports only `HarnessWorkbench`. The worksite shows:
+## 6. Frontend projection
 
-- Scenario and safe source material;
-- the public Task Contract;
-- progressive read/plan/validate/ready stages;
-- validated plan units and dependencies;
-- a resizable desktop right rail or mobile lower rail with server activity and model receipt;
-- separate recovery states for service unreachable, Catalog unavailable and Catalog integrity failure.
+The root page imports one workbench:
 
-“事件流实时” requires an open EventSource. After a terminal event the client closes SSE and performs a final GET. A nonterminal interruption resumes with `after=N`; the client does not fabricate missing events or a completed status.
+- dataset browser with search and explicit file selection;
+- real bounded file preview;
+- user-owned task composer;
+- validated plan and cited result views;
+- separate planning/analysis receipts;
+- eight-event trajectory and fail-closed recovery.
 
-## 5. Eight canonical modules
+The plan's tool fields are readable intent declarations. The analysis is performed directly by the Harness over Catalog previews; no Tool Gateway or Artifact mutation is implied. `completed` is projected as “初步结果已形成”: a response is ready for review, not that its conclusion is correct or an external business process completed.
+
+## 7. Eight canonical modules
 
 | Module | Current state | Current evidence | Next boundary |
 | --- | --- | --- | --- |
-| 1. Scenario Pack & Workspace Catalog | Implemented, bounded | pinned FORTE bytes, manifest checks, safe/private projections | Connector-backed enterprise source adapters |
-| 2. Task Contract | Implemented, bounded | public goal, deliverables, data boundary, capability/gate summary | editable/versioned enterprise contracts |
-| 3. Planner | Implemented, bounded | real-model candidate and receipt | quality evaluation, model policy and fallback studies |
-| 4. Admission & Plan Validator | Implemented, bounded | deterministic path/tool/dependency/effect/gate checks | budgets, richer policy and replanning admission |
-| 5. Scheduler & Worker Manager | Draft | no current execution command | leases, cancellation, recovery and dynamic Worker control |
-| 6. Tool Gateway | Draft for current product | generic package exists but is not mounted | current-contract capability registry and governed invocation |
-| 7. Artifact Workspace & Verifier | Draft | plan declarations only | versioned outputs, citations, verification and Commit |
-| 8. Checkpoint, Event & Governance Control | Partial | memory Snapshot, ordered SSE, Owner/idempotency | durable store, production identity, execution controls and audit |
+| 1. Scenario Pack & Workspace Catalog | Limited Verified | manifest, safe Scenario, stable refs, bounded preview | enterprise source adapters and data policy |
+| 2. Task Contract | Limited Verified | user instruction, selected refs, Owner/version/idempotency | editable durable contracts, budget/deadline |
+| 3. Planner | Limited Verified | separate Planner and Analyst receipts | quality evaluation, fallback/model policy |
+| 4. Admission & Plan Validator | Limited Verified | plan checks plus result citation-scope check | deterministic spreadsheet operator, claim verifier, budgets and replanning admission |
+| 5. Scheduler & Worker Manager | Draft | no current execution scheduler | lease, retry, cancellation and recovery |
+| 6. Tool Gateway | Draft | retained package is not invoked | current capability registry and receipts |
+| 7. Artifact Workspace & Verifier | Partial | memory result plus selected-ref validation | immutable Artifact versions, provenance, merge and Commit |
+| 8. Checkpoint, Event & Governance Control | Partial | memory Snapshot, eight ordered events, Owner/idempotency | durable store, production identity and action governance |
 
-This table is the only maturity vocabulary used in code review and reporting.
+## 8. Lifecycle
 
-## 6. Lifecycle
+[DR-0016](decisions/DR-0016-public-workspace-agent-harness.md) remains the historical planning foundation. [DR-0017](decisions/DR-0017-single-forte-worksite-and-legacy-retirement.md) remains the historical product-convergence decision. [DR-0018](decisions/DR-0018-forte-data-workbench-and-verifiable-trace.md) defines current applicability.
 
-The legacy workspace shell, fixed Customer A runtimes, action routes and Customer A data are absent from the current tree. Historical decisions and Evidence remain valid for their recorded commits, but are retired from current-product claims. See [DR-0017](decisions/DR-0017-single-forte-worksite-and-legacy-retirement.md) and the [retirement register](decisions/RETIREMENT_REGISTER.md).
-
-Current implementation evidence is [FORTE-only worksite Evidence](evidence/FORTE-ONLY-WORKSITE-RETIREMENT-EVIDENCE-20260824.md). Its status is `Limited Verified`; user comprehension and value remain `Draft`.
+Current implementation Evidence is [FORTE data workbench and trace](evidence/FORTE-DATA-WORKBENCH-TRACE-EVIDENCE-20260824.md). User comprehension and value remain `Draft`.

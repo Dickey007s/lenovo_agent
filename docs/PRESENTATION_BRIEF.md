@@ -2,75 +2,79 @@
 
 ## 1. One-sentence position
 
-Office Agent is not another “multi-agent can call tools” demo. It is a FORTE-backed office worksite that binds source, Task Contract, model plan, deterministic validation and foreground receipts, then stops honestly at `ready_to_execute`.
+Office Agent turns a pinned public office dataset into a user-operated workbench: inspect data, choose context, ask a task, then verify two model receipts, server checks, file citations and the no-external-action boundary.
 
 ## 2. Reporting rule
 
-Every slide and spoken claim must pass [DECISION_AND_REPORTING_GOVERNANCE.md](DECISION_AND_REPORTING_GOVERNANCE.md): it needs 场景与来源、前台交互影响、后端事实映射、验证与边界. Historical Customer A screenshots or run numbers cannot describe the current product.
+Every slide must pass [DECISION_AND_REPORTING_GOVERNANCE.md](DECISION_AND_REPORTING_GOVERNANCE.md): 场景与来源、前台交互影响、后端事实映射、验证与边界. Historical Customer A or DR-0016/0017 facts cannot be presented as the current workbench.
 
-## 3. Recommended 12-slide story
+## 3. Recommended story
 
-| Slide | Core message | Visual | Evidence/claim boundary |
+| Slide | Core message | Visual/evidence | Boundary |
 | --- | --- | --- | --- |
-| 1. Why now | long office tasks fail when source, state and impact are invisible | source → plan → validation → receipt flow | problem framing; not a measured prevalence claim |
-| 2. Mainstream baseline | OpenClaw/Codex/Claude Code already cover tools, permissions, sessions and parallel/background work | official-material comparison table | official docs, not competitor testing |
-| 3. Our design thesis | novelty target is business-fact alignment, shared Artifact convergence, semantic action governance and two-time impact feedback | four design pillars | `Draft` differentiation/value claim |
-| 4. One worksite | old product identities are retired; FORTE worksite is the only current entry | current layout schematic, not a fabricated screenshot | DR-0017 + code/E2E; no independent final screenshot |
-| 5. Real source | 3 public FORTE folders, 8 input files plus 3 provenance task files | source tree with safe labels | pinned commit/MIT/11 files/`115352` bytes |
-| 6. Eight modules | one canonical Runtime architecture | maturity matrix | modules 1-4 + memory part of 8 current; 5-7 Draft |
-| 7. Demo 1 | cross-period finance planning from three workbooks | progressive source/plan/validate journey | planning only; no row-level execution or Artifact |
-| 8. Demo 2 | release evidence becomes a dynamic dependency plan | plan graph and future replan lane | Scheduler/Worker/shared Artifact remain Draft |
-| 9. Demo 3 | action candidates declare gate and effect before execution | future impact preview → receipt | current product never executes action |
-| 10. Frontend/backend alignment | every label comes from a Snapshot field or ordered event | UI—server fact matrix | no animation or model prose as truth |
-| 11. Engineering evidence | source integrity, route retirement, E2E, live model planning | Evidence ledger | bounded engineering evidence only |
-| 12. Next proof | durable execution, Artifact convergence, governance, then user study | phased roadmap | no production/value claim yet |
+| 1. User problem | too much explanation and Demo framing hide the user's real work | verbatim Feedback 10 | one stakeholder, not research |
+| 2. Mainstream baseline | tools, permissions, sessions and delegation are already mainstream | official-material comparison | not competitor testing |
+| 3. Product thesis | business source, user-owned task, verifiable trace and semantic impact | four-pillar diagram | differentiation/value still Draft |
+| 4. Data workbench | actual benchmark data is the first screen | DR-0018 result desktop screenshot | replayed persisted Snapshot, not a new model call |
+| 5. Real source | pinned FORTE bytes become stable safe refs and previews | source/preview diagram | public benchmark, not enterprise database |
+| 6. Two-call loop | Planner then Analyst, each with independent receipt | running desktop screenshot + eight events | screenshot is second live Run around 1.8s |
+| 7. Result truth | citations can pass while the numerical answer is wrong | desktop/mobile result screenshots + deterministic 23 / `1,845,444.71` versus model 20 / `2,202,000` | `completed` is not a quality pass |
+| 8. Frontend/backend alignment | every state maps to a field or named event | UI—server fact matrix | no animation/CoT as fact |
+| 9. Eight modules | current and target capabilities stay separate | maturity table | modules 5-6 and durable Artifact remain Draft |
+| 10. Three policies | finance, release and operations share one work contract | three collection examples | not three independent completed Demos |
+| 11. Engineering evidence | code, focused tests, live records and screenshots have distinct roles | Evidence ledger | engineering checks do not prove user value |
+| 12. Next proof | semantic verifier, durable Artifact, Scheduler, action governance, user study | phased roadmap | no production/value claim |
 
 ## 4. Technical comparison wording
 
 Use:
 
-> OpenClaw, Codex and Claude Code official materials show that tools, permissions, background work, sessions and agent delegation are already mainstream. Our target distinction is not the number of Agents. It is how an office user sees business source, shared Artifact state, semantic impact and execution receipt.
+> OpenClaw, Codex and Claude Code official materials show that tool use, permissions, sessions, background work and delegation are already mainstream. Our target distinction is the office user's control surface: choose business data, define the task, inspect what was called and validated, review cited outputs, and see the effect boundary.
 
-Do not use:
+Do not claim competitors “cannot” support an untested capability, Office Agent is “first”, or the workbench is safer/faster/easier without comparative and user evidence.
 
-- “competitors do not support multi-agent/background/approval”;
-- “Office Agent is the first”;
-- “our approach is safer/faster/more trusted” without a controlled evaluation;
-- “the demos are complete” when the current Runtime stops before execution.
+## 5. Current demo narration
 
-## 5. Demo narration
+1. Open `FORTE 数据工作台`; do not begin with architecture prose.
+2. Browse an actual table or Markdown input and point out the public benchmark label.
+3. Check the files that should define the task context.
+4. Write a new question and run it.
+5. Follow eight named stages and distinguish planning call, plan validation, analysis call and citation validation.
+6. Open the result. By default the summary and only three findings are visible; “展开结论” and “查看其余7条发现” are explicit user choices.
+7. Read the title “模型初步结论 · 待复核” and explain that the server checked file references and the read-only boundary, not the numerical conclusion.
+8. Close on `completed`: an initial response exists in memory and passed schema/reference/boundary checks; the negative deterministic comparison shows it was not numerically correct, it requires review, and no external action occurred.
 
-1. Open the sole FORTE worksite and select a Scenario.
-2. Point to public source labels and the Task Contract; explain what is deliberately hidden.
-3. Start a new round. Let read, planning and validation appear progressively.
-4. In the activity rail, distinguish model called, output adopted and plan validated.
-5. At `ready_to_execute`, say: “计划已经通过服务端校验，但任何工具和外部动作都还没有执行。”
-6. Switch scenarios to show one Runtime contract supporting three policies, not three unrelated products.
-7. Close with the target execution migration and its evidence gates.
+Never call displayed plan tool labels “executed tools”. Never call the result an Artifact Commit.
 
-Never use the negative user-feedback screenshot as a final-state product image. It is evidence of the pre-fix problem only. Older DR-0016 screenshots are transitional history. The current visual state lacks an independent new screenshot.
+## 6. Screenshot provenance
 
-## 6. Evidence ledger
+| Screenshot | Provenance | Allowed use | Prohibited inference |
+| --- | --- | --- | --- |
+| [`dr-0018-data-workbench-running-desktop.png`](evidence/screenshots/dr-0018-data-workbench-running-desktop.png) | second real Run `harness:f3a071...`, captured around 1.8s; final Run later completed v9/seq 8 | show real in-progress trajectory and receipt waiting states | not timing benchmark or proof of background execution |
+| [`dr-0018-data-workbench-result-desktop.png`](evidence/screenshots/dr-0018-data-workbench-result-desktop.png) | prior real Run `harness:8c9...` persisted Snapshot replayed into the formal UI by browser POST | show final desktop projection of a real persisted Snapshot | not a third model call or cross-restart/history recovery |
+| [`dr-0018-data-workbench-result-mobile.png`](evidence/screenshots/dr-0018-data-workbench-result-mobile.png) | same replayed `harness:8c9...` Snapshot at 390px; no horizontal overflow | show mobile engineering layout | not a mobile user study |
+
+Console/page errors were 0 for these captures. Exact hashes and dimensions are in [DR-0018 Evidence](evidence/FORTE-DATA-WORKBENCH-TRACE-EVIDENCE-20260824.md).
+
+## 7. Evidence ledger
 
 | Claim | Status | Evidence | Cannot imply |
 | --- | --- | --- | --- |
-| one current worksite and six API paths | Limited Verified | implementation `b2b759b...` + `5fab10f...`, PR #24, OpenAPI/404 probes | merge to master or product adoption |
-| FORTE source exactness | Verified for fixed import | fresh-clone 11 files/`115352` bytes/0 mismatches; source commit `345c1ec...` | enterprise production realism |
-| frontend recovery and privacy | Limited Verified | Harness E2E `11 passed in 41.4s` | user comprehension or visual quality |
-| real-model planning | observed bounded run | Finance-018, `deepseek-v4-pro`, `16838 ms`, 10 units, called/adopted, v6/seq 5 | quality, SLA, savings or repeated benchmark |
-| no current execution | Verified current boundary | code/routes/Snapshot `ready_to_execute` | future Scheduler/Worker/action capability |
-| user value and trust | Draft | no target-user study | effectiveness claim |
+| seven-path data workbench | Limited Verified | `fffa36a...` + `041186d`, focused Python `30 passed` | production readiness |
+| browse/select/custom task | Limited Verified | focused browser `8 passed in 26.8s` + screenshots | user comprehension |
+| two real model calls | observed | two live Run records | quality, repeatability or SLA |
+| cited initial result | Limited Verified | v9/seq 8 Snapshot facts and manifest | semantic/numeric correctness |
+| deterministic negative comparison | Verified regression fact | public-preview test reproduces 23 / `1,845,444.71` | a Runtime semantic verifier already exists |
+| no external effect | current boundary | Runtime/events/result footer | future Connector governance |
+| reduced text improves clarity | Draft | no target-user study | usability claim |
 
-Automated acceptance for PR #24: Python `47 passed in 2.42s`; Ruff passed; web lint passed; build passed (compile `2.1s`, TypeScript `4.1s`, static `757ms`); Harness E2E `11 passed in 41.4s`.
+Final verification is Python `53 passed in 2.68s`, Ruff and web lint passed, and the production build passed (`2.5s` compile, `4.4s` TypeScript, `810ms` static generation). [PR #25](https://github.com/Dickey007s/lenovo_agent/pull/25) is open and not yet merged.
 
-PR #24 was open and unmerged at evidence capture. The implementation commits are `b2b759b106738fbb3aed597319208e8ff4718cc7` and `5fab10fb4f638958ff78b39583a4eace2e99396b`.
-
-## 7. Source trail
+## 8. Source trail
 
 - [Source Register](decisions/SOURCE_REGISTER.md)
+- [Stakeholder Feedback 10](sources/USER-FEEDBACK-20260824-10-data-workbench-and-trace.md)
+- [DR-0018](decisions/DR-0018-forte-data-workbench-and-verifiable-trace.md)
+- [DR-0018 Evidence](evidence/FORTE-DATA-WORKBENCH-TRACE-EVIDENCE-20260824.md)
 - [FORTE audit](research/FORTE-DATASET-AUDIT-20260824.md)
 - [Competitor research](research/COMPETITOR-RESEARCH-OPENCLAW-CODEX-CLAUDE-CODE-20260821.md)
-- [DR-0016](decisions/DR-0016-public-workspace-agent-harness.md)
-- [DR-0017](decisions/DR-0017-single-forte-worksite-and-legacy-retirement.md)
-- [DR-0017 Evidence](evidence/FORTE-ONLY-WORKSITE-RETIREMENT-EVIDENCE-20260824.md)
-- [Retirement register](decisions/RETIREMENT_REGISTER.md)

@@ -3,13 +3,13 @@
 | Field | Value |
 | --- | --- |
 | Related Demo | Demo 3 |
-| Status | shared planning slice `Limited Verified`; execution migration `Draft` |
+| Status | workbench/preview/read-only contract `Limited Verified`; governed action execution `Draft` |
 | Source | FORTE `Operations-008`, commit `345c1ec1487139db9dd319787fa9405ba85d1869`, top-level MIT; original bytes pinned by `DR-0016` |
 | Target user | Operations policy owner or collection-process supervisor |
 
 ## Trigger and current pain
 
-The user asks the Agent to design an AI-assisted M1 collection-call process. A plausible process diagram alone is unsafe: calling time, recording notice, retry limit, human escalation and terminal-state rules must govern every proposed action. The retired Demo 3 began from a fixed email-send candidate; the current FORTE worksite starts from the public policy document but stops before action execution.
+The user asks the Agent to inspect an M1 collection-call policy and identify governed conditions. A plausible answer alone is unsafe: calling time, recording notice, retry limit, human escalation and terminal-state rules must govern every proposed action. The current workbench lets the user read the public policy input and ask a custom question, but stops at a review-required read-only result.
 
 ## Goal and completion condition
 
@@ -27,11 +27,11 @@ The Agent produces a versioned process artifact and a set of bounded action cand
 
 ## Frontend experience
 
-- Policy source panel links each constraint to the imported document section.
-- Process canvas distinguishes model-authored content from deterministic gates.
-- Action impact ledger appears before confirmation and receipt after the command.
-- Unknown identity, unclear data class, out-of-hours call or exhausted retry budget is visibly denied.
-- Technical audit can show service names and event summaries, but normal UI hides Permit tokens, raw payloads and model reasoning.
+- Current data preview shows bounded real policy text; the user owns the question.
+- Current result cites the selected policy file and states that only reference scope/read-only boundary were checked.
+- Current trace shows two call receipts and named events while hiding Prompt/reasoning.
+- Section-level policy entailment, process canvas, Action impact ledger and deterministic deny states remain target interactions.
+- Normal UI must continue to hide Permit tokens, raw payloads and model reasoning.
 
 ## Key exceptions
 
@@ -45,6 +45,6 @@ The Agent produces a versioned process artifact and a set of bounded action cand
 
 ## Boundary
 
-The DR-0016 foundation Evidence contains one manifest-bound `deepseek-v4-pro` run with 1 public file, 4 dynamic plan units and v6/seq 5 `ready_to_execute` in 10243 ms. DR-0017 makes this Scenario part of the sole current worksite but does not make the retired action path current. It does not draft the process Artifact, create an ActionCandidate, run Risk/Policy/Evidence/Approval/Permit or call a Simulator. That execution migration remains `Draft`.
+DR-0018 makes the preview/custom-task/two-call/citation contract current for this collection, and focused E2E covers its Markdown preview. No new live Operations-008 result is bound to DR-0018 Evidence. The Runtime does not create an immutable process Artifact or ActionCandidate, run Risk/Policy/Evidence/Approval/Permit, or call a Simulator/Connector. Governed action execution remains `Draft`.
 
 The task source is a public benchmark requirement document. Raw `task.md`, `task_instruction`, rubric and solution content stay out of the public API/UI. The current project has no real dialer or collection-system Connector. A successful Simulator receipt in a later bounded slice still cannot be reported as a real customer contact or production policy deployment; E2E is not user research.

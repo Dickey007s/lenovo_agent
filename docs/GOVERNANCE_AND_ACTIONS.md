@@ -1,69 +1,78 @@
 # Governance and Action Boundary
 
-## 1. Current governance
+## 1. Current governed path
 
-The current FORTE worksite governs plans, not actions. Its live path is:
+The current product governs a read-only analysis result:
 
 ```text
-server-owned Scenario and source set
+server-owned Scenario + selected source set
   -> model plan candidate
-  -> deterministic Admission & Plan Validator
-  -> public validated plan
-  -> ready_to_execute
+  -> deterministic plan validation
+  -> model result candidate over safe previews
+  -> deterministic selected-file citation validation
+  -> completed response + review_required=true
 ```
 
-No current route continues beyond this boundary. Generic risk, evidence, authorization, tool-gateway and simulator packages may remain in the repository, but they are not mounted capabilities of the current product.
+No current route continues into a Tool Gateway or external action. Retained risk, evidence, authorization, gateway and simulator packages are future building blocks, not mounted current capabilities.
 
 ## 2. Server-owned facts
 
 The server owns:
 
-- Scenario identity, safe public contract and frozen source references;
-- allowed tools and side-effect categories;
-- Run identity, Owner, version, status and ordered event sequence;
-- unit dependency validity and source-reference mapping;
-- validation outcome and error list;
-- whether the model was called, whether its output was adopted, and elapsed observation;
-- the fact that execution has not started.
+- Scenario identity, manifest integrity, safe preview and stable `file_ref`;
+- frozen instruction, instruction source and selected file set;
+- allowed tools/effect declarations;
+- Run identity, Owner, version, status and sequence;
+- plan validation and result citation-scope validation;
+- separate planning/analysis call receipts and adoption facts;
+- result schema, `review_required=true` and no-external-action terminal message.
 
-The model owns only bounded plan text and intent. The frontend owns presentation and local interaction state, not business truth.
+The model proposes plan/result text. It does not own source identity, state, sequence, validation, execution or external-effect facts.
 
-## 3. Deterministic plan checks
+## 3. Deterministic checks
 
-A proposed plan fails closed when it contains:
+### Before analysis
 
-- unknown or duplicate unit identities;
-- unknown dependencies or a dependency cycle;
-- an input path outside the frozen Scenario source set;
-- a tool or side effect outside the Scenario policy;
-- a source write or path-shaped Artifact name;
-- `artifact.write` without `side_effect=run_workspace_write`;
-- `run_workspace_write` without `artifact.write`;
-- an external-action candidate without a human-gate declaration;
-- malformed or excessive units.
+A plan fails closed for duplicate/unknown units, cycles, unselected file refs, unallowlisted tools/effects, unsafe Artifact names, invalid `artifact.write` mapping, or an external-action declaration without `action.preview` and a human gate.
 
-The successful UI wording is “计划已通过服务端校验，尚未执行”. It must never be shortened to “任务已完成”.
+### Before completion
 
-## 4. Visible impact
+A result fails closed when its schema is invalid, has no findings, omits citations, cites an unselected ref or does not require review.
 
-Even before execution exists, the UI must make plan impact legible:
+Citation validation checks membership only. It is not semantic, numeric, exhaustive, policy or row-level verification. The deterministic Finance regression produces 23 / `1,845,444.71`, while the observed live response produced 20 / `2,202,000`; the frontend must not label `completed` or `result_validation` “事实已证明” or “质量通过”.
 
-| Plan declaration | What the user may see | What must remain explicit |
+## 4. Plan declaration versus action
+
+| Declaration | Current meaning | Not current |
 | --- | --- | --- |
-| `side_effect=none` | read/inspect/analyze candidate | no source or external system is changed |
-| `run_workspace_write` | proposed logical Artifact name/type | no Artifact has been written yet |
-| `external_action` + human gate | proposed action boundary and gate requirement | no approval, Permit, tool or Connector has run |
+| `file.read/table.inspect/evidence.verify` | proposed plan intent | no Tool Gateway receipt |
+| `artifact.write + run_workspace_write` | proposed logical result organization | no ArtifactVersion, mutation or Commit |
+| `action.preview + external_action + human gate` | a future governed-action boundary | no approval, Permit, Simulator or Connector |
+| `status=completed` | an initial bounded read-only response is reviewable | no correctness, quality-pass or external business-process claim |
 
-The four future impact classes remain useful design principles: 会改变、会重新核对、保持不变、不会发生. They are not current execution receipts.
+The Analyst is called directly with Catalog previews. This is model inference over server-projected data, not a generic tool-execution loop.
 
-## 5. Target action chain
+## 5. Foreground impact
 
-The future execution architecture remains `Draft`:
+The current UI must show:
+
+- selected file count and read-only boundary before start;
+- separate planning and analysis receipts;
+- named server events, not raw reasoning;
+- result citations resolved to visible file labels;
+- follow-ups under “仍需你判断”;
+- a final statement that the result needs review and no external action occurred.
+
+It must hide Prompt, chain of thought, raw response, filesystem path/hash, rubric/solution/grading data, credentials and internal logs.
+
+## 6. Future action chain
+
+The following remains `Draft`:
 
 ```text
-validated plan
-  -> Scheduler / Worker
-  -> versioned Artifact + verification
+reviewed result
+  -> deterministic spreadsheet operator + claim verifier
+  -> immutable ArtifactVersion + verifier
   -> semantic ActionCandidate
   -> Risk / Policy / Evidence
   -> human Approval
@@ -73,22 +82,8 @@ validated plan
   -> execution receipt
 ```
 
-Before any part becomes current, it must be bound to the FORTE Task Contract and exposed through new server facts, tests, Evidence and UI mappings. The existence of historical Customer A Simulator evidence does not verify migration to this worksite.
-
-## 6. Required execution invariants
-
-These remain target requirements:
-
-- an action must bind the current immutable Artifact version, verification and digest;
-- policy, evidence, approval and Permit must be rebuilt or revalidated after any bound content change;
-- impact preview is not an execution receipt;
-- denial, expiry, tampering or tool failure must preserve completed upstream work;
-- unknown tool outcome must be “待核对”, never inferred as success or no-op;
-- real Connector writes must be distinguished from Simulator results;
-- internal event payload, token, signature, Prompt and chain of thought stay out of ordinary business UI.
-
-Until those facts are implemented in the current Harness, every execution, governance and user-value statement is `Draft`.
+Future foreground impact should retain the four classes 会改变、会重新核对、保持不变、不会发生 and distinguish preview from actual receipt. Historical Customer A action Evidence cannot verify migration to the current workbench.
 
 ## 7. Evidence boundary
 
-[DR-0017 Evidence](evidence/FORTE-ONLY-WORKSITE-RETIREMENT-EVIDENCE-20260824.md) verifies only the single worksite, source integrity, safe planning projection, deterministic validation, Snapshot/SSE, recovery behavior and no-execution boundary. One live Finance-018 run reached `ready_to_execute`; it did not call a tool or produce an external side effect.
+[DR-0018 Evidence](evidence/FORTE-DATA-WORKBENCH-TRACE-EVIDENCE-20260824.md) binds two observed Finance-018 read-only Runs, focused automation, three provenance-scoped screenshots, a deterministic negative regression and implementation baseline `fffa36a...`. It does not prove semantic correctness, user value, production identity/durability or any external action.

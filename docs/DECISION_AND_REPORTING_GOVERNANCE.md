@@ -93,6 +93,8 @@ Never rewrite an old source to fit a later design. Add a new Source and link sup
 
 The frontend must not infer completion, model call, Artifact mutation, risk, approval, Permit, tool success or external effect from animation, elapsed time, prose or configured model name.
 
+For model-generated results, a citation that belongs to the selected source set proves only reference membership unless a separate semantic/numeric verifier exists. Reports must not rename citation-scope validation as factual correctness. `completed` must be qualified by the concrete completed scope, such as “read-only analysis result available for review”.
+
 ## 6. Evidence hierarchy
 
 | Evidence | Supports | Does not automatically support |
@@ -133,4 +135,4 @@ Before delivery, verify:
 - living docs and retirement lifecycle are synchronized;
 - governance test, Markdown link check and `git diff --check` pass.
 
-The current FORTE product application of this policy is [DR-0017](decisions/DR-0017-single-forte-worksite-and-legacy-retirement.md).
+The current FORTE product application of this policy is [DR-0018](decisions/DR-0018-forte-data-workbench-and-verifiable-trace.md). DR-0016/0017 remain historical foundations with their original evidence scope.

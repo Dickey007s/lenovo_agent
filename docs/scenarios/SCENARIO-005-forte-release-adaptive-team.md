@@ -3,13 +3,13 @@
 | Field | Value |
 | --- | --- |
 | Related Demo | Demo 2 |
-| Status | shared planning slice `Limited Verified`; execution migration `Draft` |
+| Status | workbench/preview/read-only contract `Limited Verified`; release conclusion and adaptive execution `Draft` |
 | Source | FORTE `pm-014`, commit `345c1ec1487139db9dd319787fa9405ba85d1869`, top-level MIT; original bytes pinned by `DR-0016` |
 | Target user | Product manager or release owner |
 
 ## Trigger and current pain
 
-Before a release decision, the user must reconcile a PRD, release configuration, functional test report and compatibility test report. The retired fixed Demo 2 used four predetermined work items and a predetermined Worker/replan sequence. The current FORTE worksite exposes four real public inputs and a dynamic validated plan, while execution and replanning remain future work.
+Before a release decision, the user must reconcile a PRD, release configuration, functional test report and compatibility test report. The retired fixed Demo 2 used predetermined work and Worker steps. The current workbench exposes all four public inputs, lets the user select context and ask a custom question, and can return a cited read-only result. A live semantic release-readiness result, adaptive Workers and replanning remain unevidenced.
 
 ## Goal and completion condition
 
@@ -27,11 +27,11 @@ The Agent must determine release readiness, coverage, failed or untested functio
 
 ## Frontend experience
 
-- File shelf groups product requirement, configuration, functional test and compatibility evidence.
-- Dynamic work map shows current units, dependencies, selected files, model/tool receipts and why a new unit was added.
-- Shared artifact desk shows convergence and competing versions rather than Worker conversation.
-- The user can inspect or pause a unit, but worker count and completion are server facts.
-- Completion says the internal readiness package is ready and deployment has not happened.
+- Data browser groups requirement, configuration, functional and compatibility evidence and previews real bounded content.
+- The user chooses files, writes a release question and sees independent Planner/Analyst receipts.
+- Current result citations resolve to selected file labels and require review.
+- Dynamic Worker map, shared Artifact convergence, pause and replan controls remain target interactions.
+- `completed` can only mean the read-only analysis result exists; deployment has not happened.
 
 ## Key exceptions
 
@@ -45,6 +45,6 @@ The Agent must determine release readiness, coverage, failed or untested functio
 
 ## Boundary
 
-The DR-0016 foundation Evidence contains one manifest-bound `deepseek-v4-pro` run with 4 public files, 6 dynamic plan units and v6/seq 5 `ready_to_execute` in 13577 ms. DR-0017 makes this Scenario part of the sole current worksite but does not transfer the retired Customer A execution facts. It does not start Scheduler/Workers, read the four files through tools, produce SharedArtifactVersions or decide release readiness. That execution migration remains `Draft`.
+DR-0018 makes the preview/custom-task/two-call/citation contract current for this collection, and focused E2E covers browsing its public files. No new live pm-014 model result is bound to DR-0018 Evidence, so semantic release readiness remains `Draft`. The Runtime does not start Scheduler/Workers, invoke tools, produce SharedArtifactVersions or deploy a release.
 
 This scenario uses public benchmark inputs and a simulated run workspace. Raw `task.md`, `task_instruction`, rubric and solution content stay out of the public API/UI. It does not prove a general distributed swarm, production deployment, cost savings, SLA improvement, or target-user understanding; E2E is not user research.
