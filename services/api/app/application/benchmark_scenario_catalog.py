@@ -21,7 +21,9 @@ from pydantic import ValidationError
 
 from packages.contracts.harness_models import (
     BenchmarkFileEntry,
+    BenchmarkFilePreview,
     BenchmarkManifest,
+    BenchmarkPreviewRow,
     BenchmarkPublicScenario,
     BenchmarkTaskEntry,
 )
@@ -127,6 +129,62 @@ class BenchmarkScenarioCatalog:
     def public_task(self, task_id: str) -> dict[str, Any]:
         return self._public_scenario(self.task(task_id)).model_dump(mode="json")
 
+    def public_file(self, task_id: str, file_ref: str) -> dict[str, Any]:
+        """Return a bounded, allowlisted preview without exposing filesystem facts."""
+        scenario = self.task(task_id)
+        item = next(
+            (
+                candidate
+                for candidate in scenario.files
+                if candidate.role == "input"
+                and not candidate.provenance_only
+                and self._file_ref(task_id, candidate.path) == file_ref
+            ),
+            None,
+        )
+        if item is None:
+            raise KeyError(file_ref)
+        entry = BenchmarkFileEntry(
+            path=item.path,
+            sha256=item.sha256,
+            size=item.size,
+            mime=item.mime,
+            role="input",
+        )
+        raw = self._read_checked(self._safe_path(item.path), entry)
+        common = {
+            "scenario_id": task_id,
+            "file_ref": file_ref,
+            "display_label": self._display_label(task_id, item.path),
+            "display_group": self._display_group(task_id, item.path),
+            "display_summary": self._display_summary(item),
+        }
+        if Path(item.path).suffix.lower() == ".xlsx":
+            return BenchmarkFilePreview(
+                **common,
+                kind="table",
+                **self._preview_xlsx(raw),
+            ).model_dump(mode="json")
+        if Path(item.path).suffix.lower() == ".md":
+            try:
+                text = raw.decode("utf-8")
+            except UnicodeDecodeError as exc:
+                raise BenchmarkScenarioError("公开基准 Markdown 不是 UTF-8") from exc
+            limit = 30_000
+            return BenchmarkFilePreview(
+                **common,
+                kind="markdown",
+                text=text[:limit],
+                truncated=len(text) > limit,
+            ).model_dump(mode="json")
+        raise BenchmarkScenarioError("公开基准文件使用了未允许的预览器")
+
+    def agent_file_inputs(
+        self, task_id: str, file_refs: list[str]
+    ) -> list[dict[str, Any]]:
+        """Safe file contents for a bounded read-only analysis model call."""
+        return [self.public_file(task_id, file_ref) for file_ref in file_refs]
+
     def internal_task(self, task_id: str) -> dict[str, Any]:
         """Return planner-only context; never use this for the public API."""
         scenario = self.task(task_id)
@@ -143,6 +201,7 @@ class BenchmarkScenarioCatalog:
                     "size": item.size,
                     "sha256": item.sha256,
                     "summary": item.summary,
+                    "file_ref": self._file_ref(scenario.task_id, item.path),
                     "display_label": self._display_label(scenario.task_id, item.path),
                     "display_group": self._display_group(scenario.task_id, item.path),
                     "display_summary": self._display_summary(item),
@@ -165,6 +224,9 @@ class BenchmarkScenarioCatalog:
         ]
         display_files = [
             {
+                "file_ref": BenchmarkScenarioCatalog._file_ref(
+                    scenario.task_id, item.path
+                ),
                 "display_label": BenchmarkScenarioCatalog._display_label(
                     scenario.task_id, item.path
                 ),
@@ -189,6 +251,11 @@ class BenchmarkScenarioCatalog:
             experience_policy=projection["experience_policy"],
             files=display_files,
         )
+
+    @staticmethod
+    def _file_ref(task_id: str, path: str) -> str:
+        digest = hashlib.sha256(f"{task_id}:{path}".encode("utf-8")).hexdigest()
+        return f"forte-{digest[:16]}"
 
     @staticmethod
     def _display_label(task_id: str, path: str) -> str:
@@ -486,6 +553,115 @@ class BenchmarkScenarioCatalog:
                 }
         except (KeyError, ET.ParseError, ValueError, zipfile.BadZipFile) as exc:
             raise BenchmarkScenarioError("公开基准 XLSX 无法按只读结构解析") from exc
+
+    def _preview_xlsx(self, raw: bytes) -> dict[str, Any]:
+        """Read the first visible sheet into a small, display-only table."""
+        try:
+            with zipfile.ZipFile(io.BytesIO(raw)) as archive:
+                names = archive.namelist()
+                self._validate_xlsx_parts(names)
+                workbook = ET.fromstring(archive.read("xl/workbook.xml"))
+                relationships = ET.fromstring(
+                    archive.read("xl/_rels/workbook.xml.rels")
+                )
+                relation_map = {
+                    item.attrib.get("Id"): item.attrib.get("Target")
+                    for item in relationships
+                }
+                shared = self._read_shared_strings(archive, names)
+                selected_name = ""
+                selected_tree: ET.Element | None = None
+                for sheet in workbook.findall("m:sheets/m:sheet", self._XML_NS):
+                    if sheet.attrib.get("state", "visible") != "visible":
+                        continue
+                    rid = sheet.attrib.get("{%s}id" % self._XML_NS["r"])
+                    target = relation_map.get(rid)
+                    if not target or target.startswith("/") or ".." in target.split("/"):
+                        raise BenchmarkScenarioError("XLSX 工作表关系不安全")
+                    sheet_path = posixpath.normpath(posixpath.join("xl", target))
+                    if not sheet_path.startswith("xl/") or sheet_path not in names:
+                        raise BenchmarkScenarioError("XLSX 工作表关系无效")
+                    selected_name = sheet.attrib.get("name", "工作表")
+                    selected_tree = ET.fromstring(archive.read(sheet_path))
+                    break
+                if selected_tree is None:
+                    raise BenchmarkScenarioError("XLSX 没有可预览的工作表")
+
+                parsed_rows: list[tuple[int, list[str]]] = []
+                max_column = 0
+                for position, row in enumerate(
+                    selected_tree.findall("m:sheetData/m:row", self._XML_NS), start=1
+                ):
+                    row_number = int(row.attrib.get("r", position))
+                    sparse: dict[int, str] = {}
+                    fallback_column = 0
+                    for cell in row.findall("m:c", self._XML_NS):
+                        reference = cell.attrib.get("r", "")
+                        column = self._column_index(reference) if reference else fallback_column
+                        fallback_column = column + 1
+                        if column >= 30:
+                            continue
+                        value = self._cell_value(cell, shared)
+                        sparse[column] = "" if value is None else str(value)
+                        max_column = max(max_column, column + 1)
+                    parsed_rows.append(
+                        (
+                            row_number,
+                            [sparse.get(index, "") for index in range(max_column)],
+                        )
+                    )
+                if not parsed_rows:
+                    return {
+                        "sheet_name": selected_name,
+                        "columns": [],
+                        "rows": [],
+                        "total_rows": 0,
+                        "truncated": False,
+                    }
+
+                width = min(max_column, 30)
+                normalized = [
+                    (number, values[:width] + [""] * max(0, width - len(values)))
+                    for number, values in parsed_rows
+                ]
+                header_values = normalized[0][1]
+                columns = [
+                    value.strip() if value.strip() else self._column_label(index)
+                    for index, value in enumerate(header_values)
+                ]
+                data_rows = normalized[1:]
+                limit = 120
+                return {
+                    "sheet_name": selected_name,
+                    "columns": columns,
+                    "rows": [
+                        BenchmarkPreviewRow(row_number=number, values=values)
+                        for number, values in data_rows[:limit]
+                    ],
+                    "total_rows": len(data_rows),
+                    "truncated": len(data_rows) > limit,
+                }
+        except (KeyError, ET.ParseError, ValueError, zipfile.BadZipFile) as exc:
+            raise BenchmarkScenarioError("公开基准 XLSX 无法按只读结构预览") from exc
+
+    @staticmethod
+    def _column_index(reference: str) -> int:
+        match = re.match(r"^([A-Za-z]+)", reference)
+        if match is None:
+            raise BenchmarkScenarioError("XLSX 单元格引用无效")
+        value = 0
+        for character in match.group(1).upper():
+            value = value * 26 + ord(character) - ord("A") + 1
+        return value - 1
+
+    @staticmethod
+    def _column_label(index: int) -> str:
+        value = index + 1
+        label = ""
+        while value:
+            value, remainder = divmod(value - 1, 26)
+            label = chr(ord("A") + remainder) + label
+        return label
 
     @staticmethod
     def _validate_xlsx_parts(names: list[str]) -> None:

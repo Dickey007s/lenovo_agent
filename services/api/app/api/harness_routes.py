@@ -66,6 +66,20 @@ async def get_harness_scenario(
         raise HTTPException(status_code=503, detail="场景目录完整性校验失败") from exc
 
 
+@router.get("/scenarios/{scenario_id}/files/{file_ref}")
+async def get_harness_file_preview(
+    scenario_id: str,
+    file_ref: str,
+    runtime: Annotated[HarnessRuntime, Depends(get_harness_runtime)],
+):
+    try:
+        return runtime.get_file_preview(scenario_id, file_ref)
+    except HarnessNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except BenchmarkScenarioError as exc:
+        raise HTTPException(status_code=503, detail="公开文件完整性校验失败") from exc
+
+
 @router.post("/runs", status_code=status.HTTP_202_ACCEPTED)
 async def start_harness_run(
     body: HarnessRunStart,

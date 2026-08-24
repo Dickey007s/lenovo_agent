@@ -83,7 +83,12 @@ def test_public_projection_hides_planner_prompt_and_raw_paths() -> None:
         assert not re.search(r"(?<![0-9a-f])[0-9a-f]{40}(?![0-9a-f])", serialized)
         assert not re.search(r"(?<![0-9a-f])[0-9a-f]{64}(?![0-9a-f])", serialized)
         assert "input_dir" not in item
-        assert all(set(file) == {"display_label", "display_group", "display_summary"} for file in item["files"])
+        assert all(
+            set(file)
+            == {"file_ref", "display_label", "display_group", "display_summary"}
+            for file in item["files"]
+        )
+        assert all(re.fullmatch(r"forte-[0-9a-f]{16}", file["file_ref"]) for file in item["files"])
         assert all("/workspace/input" not in file["display_summary"] for file in item["files"])
     finance_files = public[0]["files"]
     assert any("工作表" in file["display_summary"] and "A1:J59" in file["display_summary"] for file in finance_files)
@@ -111,6 +116,38 @@ def test_internal_task_has_sanitized_prompt_and_raw_input_with_display_projectio
     assert internal["files"]
     assert all(file["path"].startswith("Operations-008/input/") for file in internal["files"])
     assert all(file["display_label"] and file["display_group"] and file["display_summary"] for file in internal["files"])
+    assert all(re.fullmatch(r"forte-[0-9a-f]{16}", file["file_ref"]) for file in internal["files"])
+
+
+def test_public_file_preview_exposes_real_rows_without_raw_metadata() -> None:
+    catalog = BenchmarkScenarioCatalog(ROOT)
+    public = catalog.public_task("Finance-018")
+    file_ref = public["files"][0]["file_ref"]
+    preview = catalog.public_file("Finance-018", file_ref)
+
+    assert preview["kind"] == "table"
+    assert preview["columns"][:3] == ["科目名称", "客商名称", "方向"]
+    assert preview["total_rows"] == 75
+    assert preview["rows"][0]["row_number"] == 2
+    assert "黄杉文化传播有限公司" in preview["rows"][0]["values"][1]
+    serialized = json.dumps(preview, ensure_ascii=False)
+    assert "Finance-018/input" not in serialized
+    assert "sha256" not in serialized
+    assert "task_instruction" not in serialized
+
+
+def test_public_markdown_preview_never_exposes_task_instruction() -> None:
+    catalog = BenchmarkScenarioCatalog(ROOT)
+    public = catalog.public_task("Operations-008")
+    assert len(public["files"]) == 1
+    preview = catalog.public_file("Operations-008", public["files"][0]["file_ref"])
+
+    assert preview["kind"] == "markdown"
+    assert "外呼" in preview["text"]
+    assert "## Prompt" not in preview["text"]
+    assert "Grading Criteria" not in preview["text"]
+    with pytest.raises(KeyError):
+        catalog.public_file("Operations-008", "forte-0000000000000000")
 
 
 def test_catalog_fails_closed_when_a_declared_file_is_tampered(tmp_path: Path) -> None:

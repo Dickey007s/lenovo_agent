@@ -2,62 +2,79 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
-  IconAlertTriangle, IconArrowRight, IconCheck, IconChevronDown, IconChevronRight,
-  IconCircleDot, IconClock, IconFile, IconFolder, IconLoader2, IconPlayerPlay,
-  IconRefresh, IconRoute, IconShieldCheck, IconSparkles, IconUserCheck,
+  IconAlertTriangle,
+  IconCheck,
+  IconChevronDown,
+  IconCircleCheck,
+  IconCircleDot,
+  IconClock,
+  IconDatabase,
+  IconFile,
+  IconFileDescription,
+  IconFileSpreadsheet,
+  IconLoader2,
+  IconRefresh,
+  IconRoute,
+  IconSearch,
+  IconSend,
+  IconShieldCheck,
+  IconSparkles,
 } from "@tabler/icons-react";
 
-export type HarnessDemo = "demo1" | "demo2" | "demo3";
-type HarnessPhase = "read" | "plan" | "validate" | "ready_to_execute";
 type ConnectionState = "connecting" | "available" | "live" | "reconnecting" | "offline";
 type CatalogStatus = "checking" | "retrying" | "online" | "unavailable";
 type CatalogFailureKind = "service_unreachable" | "catalog_unavailable" | "catalog_invalid";
+type WorkspaceView = "data" | "plan" | "result";
 
 export type HarnessFile = {
   key: string;
-  file_ref?: string;
+  file_ref: string;
   display_label: string;
   display_group: string;
   display_summary: string;
 };
 
-type ContractDeliverable = { label: string; description?: string };
-
 export type HarnessScenario = {
   scenario_id: string;
-  demo: HarnessDemo;
+  demo: "demo1" | "demo2" | "demo3";
   title: string;
-  goal?: string;
-  dataset_label?: string;
-  dataset_version?: string;
+  goal: string;
+  dataset_label: string;
+  dataset_version: string;
   files: HarnessFile[];
-  deliverables?: ContractDeliverable[];
-  data_boundary?: string[];
+  data_boundary?: string;
   human_gate_summary?: string;
-  allowed_capabilities?: string[];
+};
+
+type HarnessPreview = {
+  scenario_id: string;
+  file_ref: string;
+  display_label: string;
+  display_group: string;
+  display_summary: string;
+  kind: "table" | "markdown";
+  sheet_name: string | null;
+  columns: string[];
+  rows: { row_number: number; values: string[] }[];
+  total_rows: number | null;
+  text: string | null;
+  truncated: boolean;
 };
 
 export type HarnessPlanNode = {
   node_id: string;
   label: string;
-  description?: string;
+  description: string;
   depends_on: string[];
   source_refs: string[];
   allowed_tools: string[];
   needs_human: boolean;
-  side_effect?: string;
 };
 
 type ModelReceipt = { called: boolean; model: string; elapsed_ms: number; output_used: boolean };
-
-type HarnessServerEvent = {
-  sequence: number;
-  event_name: string;
-  occurred_at?: string;
-  status?: string;
-  message?: string;
-  details?: Record<string, unknown>;
-};
+type HarnessFinding = { title: string; detail: string; file_refs: string[] };
+type HarnessResult = { summary: string; findings: HarnessFinding[]; follow_ups: string[]; review_required: boolean };
+type HarnessServerEvent = { sequence: number; event_name: string; occurred_at?: string; status?: string; message?: string };
 
 export type HarnessRun = {
   run_id: string;
@@ -65,13 +82,16 @@ export type HarnessRun = {
   status: string;
   version: number;
   last_event_sequence: number;
+  instruction: string;
+  instruction_source: "dataset_task" | "user";
   source_documents: HarnessFile[];
   plan: HarnessPlanNode[];
   plan_summary?: string;
   model_receipt: ModelReceipt | null;
+  analysis_receipt: ModelReceipt | null;
+  result: HarnessResult | null;
   validation_errors: string[];
   events: HarnessActivityItem[];
-  observed_phase: HarnessPhase;
 };
 
 export type HarnessActivityItem = {
@@ -84,261 +104,219 @@ export type HarnessActivityItem = {
 
 export type HarnessActivityState = {
   scenarioTitle: string;
+  instruction: string | null;
   runStatus: string | null;
   connection: ConnectionState;
-  modelReceipt: ModelReceipt | null;
+  planningReceipt: ModelReceipt | null;
+  analysisReceipt: ModelReceipt | null;
   events: HarnessActivityItem[];
-  readyToExecute: boolean;
+  resultReady: boolean;
   error: string | null;
-  notice: string | null;
 };
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8010";
 const HEADERS = { "Content-Type": "application/json", "X-User-Id": "demo_user" };
 const NAMED_EVENTS = [
-  "workspace_indexed", "workspace_index", "planning_started", "planning_completed",
-  "plan_validated", "plan_validation", "ready_to_execute", "harness_failed",
+  "workspace_index", "planning_started", "planning_completed", "plan_validation",
+  "ready_to_execute", "analysis_started", "analysis_completed", "result_validation",
+  "task_completed", "harness_failed",
 ];
-const TERMINAL_EVENTS = new Set(["ready_to_execute", "harness_failed"]);
-const TERMINAL_STATUSES = new Set(["ready_to_execute", "failed"]);
-const PHASES: { id: HarnessPhase; label: string; hint: string }[] = [
-  { id: "read", label: "读取文件", hint: "建立本轮资料范围" },
-  { id: "plan", label: "生成计划", hint: "形成动态工作单元" },
-  { id: "validate", label: "校验计划", hint: "核对来源、依赖和权限" },
-  { id: "ready_to_execute", label: "准备执行", hint: "计划通过，任务尚未执行" },
-];
+const TERMINAL_EVENTS = new Set(["ready_to_execute", "task_completed", "harness_failed"]);
+const TERMINAL_STATUSES = new Set(["ready_to_execute", "completed", "failed"]);
+const COLLECTION_LABELS: Record<string, string> = {
+  "Finance-018": "财务证据", "pm-014": "上线核对", "Operations-008": "运营规则",
+};
+const COLLECTION_HINTS: Record<string, string> = {
+  "Finance-018": "跨期往来与余额", "pm-014": "配置、测试与发布资料", "Operations-008": "外呼规则与人工边界",
+};
+const EXAMPLE_TASKS: Record<string, string> = {
+  "Finance-018": "找出三个期间期末余额完全不变的往来项，并说明依据。",
+  "pm-014": "核对当前版本是否满足上线条件，列出未通过项和引用文件。",
+  "Operations-008": "检查规则中哪些情况必须转人工，并按触发条件归类。",
+};
 
 function asText(value: unknown, fallback = "") { return typeof value === "string" ? value : fallback; }
 function asStrings(value: unknown) { return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : []; }
-class CatalogLoadError extends Error {
-  constructor(public kind: CatalogFailureKind) { super(kind); }
-}
-async function fetchWithTimeout(input: RequestInfo | URL, init: RequestInit = {}, timeoutMs = 4_000) {
+class CatalogLoadError extends Error { constructor(public kind: CatalogFailureKind) { super(kind); } }
+async function fetchWithTimeout(input: RequestInfo | URL, init: RequestInit = {}, timeoutMs = 5_000) {
   const controller = new AbortController();
   const timer = window.setTimeout(() => controller.abort(), timeoutMs);
   try { return await fetch(input, { ...init, signal: controller.signal }); }
   finally { window.clearTimeout(timer); }
 }
-function demoLabel(demo: HarnessDemo) { return demo === "demo1" ? "Demo 1 · 持续任务" : demo === "demo2" ? "Demo 2 · 动态协作" : "Demo 3 · 受控执行"; }
-function toolLabel(tool: string) {
-  const labels: Record<string, string> = {
-    "file.read": "读取文件", "table.inspect": "检查表格",
-    "artifact.write": "准备工作成果", "evidence.verify": "核验证据",
-    "action.preview": "预演受控动作",
-  };
-  return labels[tool] ?? "受控办公工具";
-}
 
 function normalizeFiles(value: unknown): HarnessFile[] {
   if (!Array.isArray(value)) return [];
-  const keyOccurrences = new Map<string, number>();
-  return value.flatMap((item) => {
+  return value.flatMap((item, index) => {
     if (!item || typeof item !== "object") return [];
     const raw = item as Record<string, unknown>;
-    const label = asText(raw.display_label);
-    const group = asText(raw.display_group);
-    const summary = asText(raw.display_summary);
-    if (!label || !group || !summary) return [];
-    const publicRef = asText(raw.file_ref);
-    const baseKey = publicRef || `display:${group}:${label}`;
-    const occurrence = (keyOccurrences.get(baseKey) ?? 0) + 1;
-    keyOccurrences.set(baseKey, occurrence);
-    return [{
-      key: `${baseKey}:${occurrence}`,
-      file_ref: publicRef || undefined,
-      display_label: label,
-      display_group: group,
-      display_summary: summary,
-    }];
+    const fileRef = asText(raw.file_ref); const label = asText(raw.display_label);
+    const group = asText(raw.display_group); const summary = asText(raw.display_summary);
+    if (!fileRef || !label || !group || !summary) return [];
+    return [{ key: `${fileRef}:${index}`, file_ref: fileRef, display_label: label, display_group: group, display_summary: summary }];
   });
-}
-
-function normalizeDeliverables(value: unknown): ContractDeliverable[] | undefined {
-  if (!Array.isArray(value)) return undefined;
-  const result = value.flatMap((item) => {
-    if (typeof item === "string") return [{ label: item }];
-    if (!item || typeof item !== "object") return [];
-    const raw = item as Record<string, unknown>;
-    const label = asText(raw.label ?? raw.title ?? raw.name);
-    return label ? [{ label, description: asText(raw.description) || undefined }] : [];
-  });
-  return result.length ? result : undefined;
 }
 
 function normalizeScenario(value: unknown): HarnessScenario | null {
   if (!value || typeof value !== "object") return null;
   const raw = value as Record<string, unknown>;
-  const scenarioId = asText(raw.scenario_id);
-  const demo = asText(raw.demo ?? raw.demo_id) as HarnessDemo;
-  if (!scenarioId || !["demo1", "demo2", "demo3"].includes(demo)) return null;
-  const dataBoundary = typeof raw.data_boundary === "string" ? [raw.data_boundary] : asStrings(raw.data_boundary);
+  const scenarioId = asText(raw.scenario_id); const demo = asText(raw.demo_id) as HarnessScenario["demo"];
+  const files = normalizeFiles(raw.files);
+  if (!scenarioId || !["demo1", "demo2", "demo3"].includes(demo) || !files.length) return null;
   return {
-    scenario_id: scenarioId,
-    demo,
-    title: asText(raw.title, "办公任务"),
-    goal: asText(raw.goal) || undefined,
-    dataset_label: asText(raw.dataset_label) || undefined,
-    dataset_version: asText(raw.dataset_version) || undefined,
-    files: normalizeFiles(raw.files ?? raw.file_tree),
-    deliverables: normalizeDeliverables(raw.deliverables),
-    data_boundary: dataBoundary.length ? dataBoundary : undefined,
+    scenario_id: scenarioId, demo, title: asText(raw.title, COLLECTION_LABELS[scenarioId] ?? "办公资料"),
+    goal: asText(raw.goal, "查看公开办公资料并形成可核对结论。"),
+    dataset_label: asText(raw.dataset_label, "FORTE 公开办公基准数据"),
+    dataset_version: asText(raw.dataset_version, "FORTE 公开版本"), files,
+    data_boundary: asText(raw.data_boundary) || undefined,
     human_gate_summary: asText(raw.human_gate_summary) || undefined,
-    allowed_capabilities: asStrings(raw.allowed_capabilities),
   };
 }
 
-function phaseFromEventName(eventName: string): HarnessPhase | null {
-  if (["workspace_indexed", "workspace_index"].includes(eventName)) return "read";
-  if (["planning_started", "planning_completed"].includes(eventName)) return "plan";
-  if (["plan_validated", "plan_validation"].includes(eventName)) return "validate";
-  if (eventName === "ready_to_execute") return "ready_to_execute";
-  return null;
+function normalizePreview(value: unknown): HarnessPreview | null {
+  if (!value || typeof value !== "object") return null;
+  const raw = value as Record<string, unknown>; const kind = asText(raw.kind);
+  if (!asText(raw.file_ref) || !["table", "markdown"].includes(kind)) return null;
+  const rows = Array.isArray(raw.rows) ? raw.rows.flatMap((item) => {
+    if (!item || typeof item !== "object") return [];
+    const row = item as Record<string, unknown>;
+    return typeof row.row_number === "number" && Array.isArray(row.values) ? [{ row_number: row.row_number, values: asStrings(row.values) }] : [];
+  }) : [];
+  return {
+    scenario_id: asText(raw.scenario_id), file_ref: asText(raw.file_ref),
+    display_label: asText(raw.display_label), display_group: asText(raw.display_group),
+    display_summary: asText(raw.display_summary), kind: kind as HarnessPreview["kind"],
+    sheet_name: asText(raw.sheet_name) || null, columns: asStrings(raw.columns), rows,
+    total_rows: typeof raw.total_rows === "number" ? raw.total_rows : null,
+    text: typeof raw.text === "string" ? raw.text : null, truncated: raw.truncated === true,
+  };
+}
+
+function normalizeReceipt(value: unknown): ModelReceipt | null {
+  if (!value || typeof value !== "object") return null;
+  const raw = value as Record<string, unknown>;
+  return { called: raw.called === true, model: asText(raw.model), elapsed_ms: typeof raw.elapsed_ms === "number" ? raw.elapsed_ms : 0, output_used: raw.output_used === true };
+}
+
+function normalizeResult(value: unknown): HarnessResult | null {
+  if (!value || typeof value !== "object") return null;
+  const raw = value as Record<string, unknown>;
+  const findings = Array.isArray(raw.findings) ? raw.findings.flatMap((item) => {
+    if (!item || typeof item !== "object") return [];
+    const finding = item as Record<string, unknown>; const title = asText(finding.title);
+    const detail = asText(finding.detail); const fileRefs = asStrings(finding.file_refs);
+    return title && detail && fileRefs.length ? [{ title, detail, file_refs: fileRefs }] : [];
+  }) : [];
+  const summary = asText(raw.summary); if (!summary || !findings.length) return null;
+  return { summary, findings, follow_ups: asStrings(raw.follow_ups), review_required: raw.review_required === true };
+}
+
+function activityItem(event: HarnessServerEvent): HarnessActivityItem {
+  const labels: Record<string, string> = {
+    workspace_index: "已锁定所选文件", planning_started: "规划模型开始组织任务",
+    planning_completed: "规划模型返回工作图", plan_validation: "服务端校验工作图",
+    ready_to_execute: "工作图已准备", analysis_started: "分析模型开始读取内容",
+    analysis_completed: "分析模型返回结果", result_validation: "服务端核对文件引用",
+    task_completed: "只读任务完成", harness_failed: "本轮已安全停止",
+  };
+  const tone = event.event_name === "harness_failed" ? "warning"
+    : event.event_name.includes("planning") || event.event_name.includes("analysis") ? "model"
+      : event.event_name.includes("validation") || event.event_name === "task_completed" || event.event_name === "ready_to_execute" ? "success" : "neutral";
+  return { sequence: event.sequence, label: labels[event.event_name] ?? "服务端状态已更新", detail: event.message ?? "本轮状态来自服务端回执。", occurred_at: event.occurred_at, tone };
 }
 
 function normalizeRun(value: unknown): HarnessRun | null {
   if (!value || typeof value !== "object") return null;
   const outer = value as Record<string, unknown>;
   const raw = outer.run && typeof outer.run === "object" ? outer.run as Record<string, unknown> : outer;
-  const runId = asText(raw.run_id);
-  const scenarioId = asText(raw.scenario_id);
+  const runId = asText(raw.run_id); const scenarioId = asText(raw.scenario_id);
   if (!runId || !scenarioId) return null;
   const planRaw = raw.plan && typeof raw.plan === "object" ? raw.plan as Record<string, unknown> : null;
   const plan = Array.isArray(planRaw?.units) ? planRaw.units.flatMap((item) => {
     if (!item || typeof item !== "object") return [];
-    const unit = item as Record<string, unknown>;
-    const nodeId = asText(unit.unit_id);
+    const unit = item as Record<string, unknown>; const nodeId = asText(unit.unit_id);
     if (!nodeId) return [];
-    return [{
-      node_id: nodeId,
-      label: asText(unit.title, "工作单元"),
-      description: asText(unit.objective) || undefined,
-      depends_on: asStrings(unit.depends_on),
-      source_refs: asStrings(unit.input_file_refs),
-      allowed_tools: unit.tool ? [asText(unit.tool)] : [],
-      needs_human: unit.requires_human_gate === true,
-      side_effect: asText(unit.side_effect) || undefined,
-    }];
+    return [{ node_id: nodeId, label: asText(unit.title, "工作单元"), description: asText(unit.objective), depends_on: asStrings(unit.depends_on), source_refs: asStrings(unit.input_file_refs), allowed_tools: unit.tool ? [asText(unit.tool)] : [], needs_human: unit.requires_human_gate === true }];
   }) : [];
   const serverEvents = Array.isArray(raw.events) ? raw.events.flatMap((item) => {
     if (!item || typeof item !== "object") return [];
     const event = item as Record<string, unknown>;
     if (typeof event.sequence !== "number" || !asText(event.event_name)) return [];
-    return [{
-      sequence: event.sequence,
-      event_name: asText(event.event_name),
-      occurred_at: asText(event.occurred_at) || undefined,
-      status: asText(event.status) || undefined,
-      message: asText(event.message) || undefined,
-      details: event.details && typeof event.details === "object" ? event.details as Record<string, unknown> : undefined,
-    } satisfies HarnessServerEvent];
+    return [{ sequence: event.sequence, event_name: asText(event.event_name), occurred_at: asText(event.occurred_at) || undefined, status: asText(event.status) || undefined, message: asText(event.message) || undefined } satisfies HarnessServerEvent];
   }) : [];
-  const lastSequence = serverEvents.reduce((latest, event) => {
-    const sequence = event.sequence;
-    return typeof sequence === "number" ? Math.max(latest, sequence) : latest;
-  }, typeof raw.last_event_sequence === "number" ? raw.last_event_sequence : 0);
-  const receipt = raw.model_receipt && typeof raw.model_receipt === "object" ? raw.model_receipt as Record<string, unknown> : null;
-  const observedPhase = serverEvents.slice().sort((a, b) => a.sequence - b.sequence).reduce<HarnessPhase>((latest, event) => phaseFromEventName(event.event_name) ?? latest, "read");
   return {
-    run_id: runId,
-    scenario_id: scenarioId,
-    status: asText(raw.status, "queued"),
+    run_id: runId, scenario_id: scenarioId, status: asText(raw.status, "queued"),
     version: typeof raw.version === "number" ? raw.version : 1,
-    last_event_sequence: lastSequence,
-    source_documents: normalizeFiles(raw.source_documents),
-    plan,
+    last_event_sequence: typeof raw.last_event_sequence === "number" ? raw.last_event_sequence : 0,
+    instruction: asText(raw.instruction), instruction_source: raw.instruction_source === "user" ? "user" : "dataset_task",
+    source_documents: normalizeFiles(raw.source_documents), plan,
     plan_summary: planRaw ? asText(planRaw.summary) || undefined : undefined,
-    model_receipt: receipt ? { called: receipt.called === true, model: asText(receipt.model), elapsed_ms: typeof receipt.elapsed_ms === "number" ? receipt.elapsed_ms : 0, output_used: receipt.output_used === true } : null,
-    validation_errors: asStrings(raw.validation_errors),
+    model_receipt: normalizeReceipt(raw.model_receipt), analysis_receipt: normalizeReceipt(raw.analysis_receipt),
+    result: normalizeResult(raw.result), validation_errors: asStrings(raw.validation_errors),
     events: serverEvents.map(activityItem).sort((a, b) => a.sequence - b.sequence),
-    observed_phase: observedPhase,
   };
 }
 
-function phaseFromRun(run: HarnessRun | null): HarnessPhase {
-  if (run?.status === "ready_to_execute") return "ready_to_execute";
-  if (run?.status === "failed") return run.observed_phase;
-  if (run?.status === "validating") return "validate";
-  if (run?.status === "planning") return "plan";
-  return "read";
+function toolLabel(tool: string) {
+  const labels: Record<string, string> = { "file.read": "读取文件", "table.inspect": "检查表格", "artifact.write": "组织工作成果", "evidence.verify": "核对证据", "action.preview": "预演受控动作" };
+  return labels[tool] ?? "受控办公工具";
 }
 
-function activityItem(event: HarnessServerEvent): HarnessActivityItem {
-  const labels: Record<string, string> = {
-    workspace_indexed: "已读取并冻结文件范围", workspace_index: "已读取并冻结文件范围",
-    planning_started: "正在生成本轮计划", planning_completed: "模型计划已经返回",
-    plan_validated: "计划已通过服务端校验", plan_validation: "计划已通过服务端校验",
-    ready_to_execute: "计划已准备好", harness_failed: "本轮计划已停止",
-  };
-  const tone = event.event_name === "harness_failed" ? "warning" : event.event_name.includes("planning") ? "model" : event.event_name.includes("valid") || event.event_name === "ready_to_execute" ? "success" : "neutral";
-  return { sequence: event.sequence, label: labels[event.event_name] ?? "服务端状态已更新", detail: event.message ?? (event.status ? `当前状态：${event.status}` : "本轮状态来自服务端回执。"), occurred_at: event.occurred_at, tone };
+function Receipt({ receipt, label }: { receipt: ModelReceipt | null; label: string }) {
+  if (!receipt) return null;
+  return <div className="trace-receipt"><IconSparkles aria-hidden="true" /><div><strong>{label}</strong><span>{receipt.called ? `${receipt.model} · ${(receipt.elapsed_ms / 1000).toFixed(1)} 秒` : "模型未调用"}</span></div><b className={receipt.output_used ? "is-used" : "is-rejected"}>{receipt.output_used ? "结果采用" : "未采用"}</b></div>;
 }
 
 export function HarnessActivityPane({ state }: { state: HarnessActivityState | null }) {
-  if (!state) return <section className="harness-activity-pane is-empty"><IconClock aria-hidden="true" /><h2>Agent 此刻在做什么</h2><p>打开工作现场后，这里会持续显示本轮服务端回执。</p></section>;
-  return <section className="harness-activity-pane" aria-labelledby="harness-activity-title">
-    <header><div className="harness-agent-avatar"><IconSparkles aria-hidden="true" /></div><div><span>Agent 此刻在做什么</span><h2 id="harness-activity-title">{state.scenarioTitle}</h2></div><b className={`is-${state.connection}`}><i />{state.connection === "live" ? "事件实时" : state.connection === "available" ? "服务可用" : state.connection === "reconnecting" ? "重连中" : state.connection === "offline" ? "离线" : "连接中"}</b></header>
-    <div className="harness-model-receipt" aria-live="polite">{state.modelReceipt?.called ? <><IconSparkles aria-hidden="true" /><div><strong>模型调用完成</strong><span>{state.modelReceipt.model} · {state.modelReceipt.elapsed_ms} ms</span></div><b className={state.modelReceipt.output_used ? "is-used" : "is-rejected"}>{state.modelReceipt.output_used ? "模型计划已采纳" : "模型计划未采纳"}</b></> : <><IconClock aria-hidden="true" /><div><strong>等待模型事实</strong><span>尚未收到模型调用回执</span></div></>}</div>
-    <ol className="harness-activity-list" aria-live="polite" aria-relevant="additions text">{state.events.length ? state.events.map((item) => <li key={item.sequence} className={`is-${item.tone}`}><span>{item.tone === "model" ? <IconSparkles aria-hidden="true" /> : item.tone === "success" ? <IconCheck aria-hidden="true" /> : item.tone === "warning" ? <IconAlertTriangle aria-hidden="true" /> : <IconCircleDot aria-hidden="true" />}</span><div><strong>{item.label}</strong><p>{item.detail}</p>{item.occurred_at && <small>{new Date(item.occurred_at).toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}</small>}</div></li>) : <li className="is-placeholder"><span><IconClock aria-hidden="true" /></span><div><strong>等待本轮开始</strong><p>先读取文件，再生成并校验计划。</p></div></li>}</ol>
-    {state.readyToExecute && <footer className="is-ready" role="status"><IconShieldCheck aria-hidden="true" /><span>计划已通过校验，任务尚未执行</span></footer>}
-    {state.notice && <footer className="is-notice" role="status"><IconAlertTriangle aria-hidden="true" /><span>{state.notice}</span></footer>}
+  if (!state) return <section className="trace-pane is-empty"><IconRoute aria-hidden="true" /><h2>执行轨迹</h2><p>提交一个任务后，这里会按服务端事件显示 Agent 做了什么。</p></section>;
+  return <section className="trace-pane" aria-labelledby="trace-title">
+    <header><div className="trace-avatar"><IconSparkles aria-hidden="true" /></div><div><span>可核对的 Agent 路径</span><h2 id="trace-title">执行轨迹</h2></div><b className={`is-${state.connection}`}><i />{state.connection === "live" ? "实时" : state.connection === "available" ? "可用" : state.connection === "reconnecting" ? "重连" : state.connection === "offline" ? "离线" : "连接"}</b></header>
+    {state.instruction && <div className="trace-task"><span>本轮任务</span><p>{state.instruction}</p></div>}
+    <div className="trace-receipts"><Receipt receipt={state.planningReceipt} label="规划调用" /><Receipt receipt={state.analysisReceipt} label="分析调用" /></div>
+    <ol className="trace-list" aria-live="polite" aria-relevant="additions text">{state.events.length ? state.events.map((item) => <li key={item.sequence} className={`is-${item.tone}`}><span>{item.tone === "model" ? <IconSparkles aria-hidden="true" /> : item.tone === "success" ? <IconCheck aria-hidden="true" /> : item.tone === "warning" ? <IconAlertTriangle aria-hidden="true" /> : <IconCircleDot aria-hidden="true" />}</span><div><strong>{item.label}</strong><p>{item.detail}</p>{item.occurred_at && <small>{new Date(item.occurred_at).toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}</small>}</div></li>) : <li><span><IconClock aria-hidden="true" /></span><div><strong>等待任务</strong><p>选择文件并输入任务，轨迹会从读取开始。</p></div></li>}</ol>
+    {state.resultReady && <footer className="is-success"><IconCircleCheck aria-hidden="true" /><span>只读结果已形成，等待你的复核</span></footer>}
     {state.error && <footer className="is-error" role="alert"><IconAlertTriangle aria-hidden="true" /><span>{state.error}</span></footer>}
   </section>;
 }
 
-export function HarnessWorkbench({ initialDemo = "demo1", onActivityChange }: { initialDemo?: HarnessDemo; onActivityChange?: (state: HarnessActivityState | null) => void }) {
+export function HarnessWorkbench({ onActivityChange }: { onActivityChange?: (state: HarnessActivityState | null) => void }) {
   const [scenarios, setScenarios] = useState<HarnessScenario[]>([]);
-  const [selectedDemo, setSelectedDemo] = useState<HarnessDemo>(initialDemo);
-  const [scenario, setScenario] = useState<HarnessScenario | null>(null);
-  const [run, setRun] = useState<HarnessRun | null>(null);
-  const [selectedFile, setSelectedFile] = useState<HarnessFile | null>(null);
-  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
-  const [loading, setLoading] = useState(true);
+  const [scenarioId, setScenarioId] = useState(""); const [selectedRefs, setSelectedRefs] = useState<string[]>([]);
+  const [activeFileRef, setActiveFileRef] = useState(""); const [preview, setPreview] = useState<HarnessPreview | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false); const [previewError, setPreviewError] = useState("");
+  const [query, setQuery] = useState(""); const [fileSearch, setFileSearch] = useState("");
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({}); const [view, setView] = useState<WorkspaceView>("data");
+  const [run, setRun] = useState<HarnessRun | null>(null); const [activity, setActivity] = useState<HarnessActivityItem[]>([]);
   const [catalogStatus, setCatalogStatus] = useState<CatalogStatus>("checking");
   const [catalogFailureKind, setCatalogFailureKind] = useState<CatalogFailureKind | null>(null);
-  const [catalogError, setCatalogError] = useState("");
-  const [detailNotice, setDetailNotice] = useState("");
-  const [starting, setStarting] = useState(false);
-  const [startAttempted, setStartAttempted] = useState(false);
-  const [error, setError] = useState("");
-  const [connection, setConnection] = useState<ConnectionState>("connecting");
-  const [activity, setActivity] = useState<HarnessActivityItem[]>([]);
-  const eventSourceRef = useRef<EventSource | null>(null);
-  const reconnectTimerRef = useRef<number | undefined>(undefined);
-  const catalogRetryTimerRef = useRef<number | undefined>(undefined);
-  const catalogRequestRef = useRef(0);
-  const catalogAttemptRef = useRef(0);
-  const generationRef = useRef(0);
-  const runRef = useRef<HarnessRun | null>(null);
-  const lastSequenceRef = useRef(0);
-  const startCommandRef = useRef<{ scenarioId: string; key: string } | null>(null);
+  const [catalogError, setCatalogError] = useState(""); const [starting, setStarting] = useState(false);
+  const [error, setError] = useState(""); const [connection, setConnection] = useState<ConnectionState>("connecting");
+  const eventSourceRef = useRef<EventSource | null>(null); const reconnectTimerRef = useRef<number | undefined>(undefined);
+  const retryTimerRef = useRef<number | undefined>(undefined); const catalogAttemptRef = useRef(0); const requestRef = useRef(0);
+  const previewRequestRef = useRef(0);
+  const generationRef = useRef(0); const runRef = useRef<HarnessRun | null>(null); const lastSequenceRef = useRef(0);
+  const startCommandRef = useRef<{ signature: string; key: string } | null>(null);
+  const scenario = scenarios.find((item) => item.scenario_id === scenarioId) ?? null;
+  const activeFile = scenarios.flatMap((item) => item.files).find((item) => item.file_ref === activeFileRef) ?? null;
 
   function closeTransport() { eventSourceRef.current?.close(); eventSourceRef.current = null; window.clearTimeout(reconnectTimerRef.current); reconnectTimerRef.current = undefined; }
   function applySnapshot(snapshot: HarnessRun, generation: number) {
     if (generation !== generationRef.current) return false;
     const current = runRef.current;
-    if (current && snapshot.run_id !== current.run_id) return false;
-    if (snapshot.last_event_sequence < lastSequenceRef.current) return false;
-    if (current && (snapshot.version < current.version || (snapshot.version === current.version && snapshot.last_event_sequence < current.last_event_sequence))) return false;
-    runRef.current = snapshot;
-    lastSequenceRef.current = Math.max(lastSequenceRef.current, snapshot.last_event_sequence);
-    setRun(snapshot);
-    setActivity(snapshot.events.slice(-24));
-    return true;
+    if (current && current.run_id !== snapshot.run_id) return false;
+    if (snapshot.last_event_sequence < lastSequenceRef.current || (current && snapshot.version < current.version)) return false;
+    runRef.current = snapshot; lastSequenceRef.current = Math.max(lastSequenceRef.current, snapshot.last_event_sequence);
+    setRun(snapshot); setActivity(snapshot.events.slice(-30)); if (snapshot.status === "completed") setView("result"); return true;
   }
   async function readSnapshot(runId: string, generation: number) {
     const response = await fetch(`${API_BASE}/v1/harness/runs/${encodeURIComponent(runId)}`, { headers: HEADERS });
-    if (!response.ok) throw new Error(`本轮状态读取失败（${response.status}）`);
-    const snapshot = normalizeRun(await response.json() as unknown);
-    if (!snapshot) throw new Error("服务端返回的本轮状态无效");
+    if (!response.ok) throw new Error(`任务状态读取失败（${response.status}）`);
+    const snapshot = normalizeRun(await response.json() as unknown); if (!snapshot) throw new Error("服务端返回的任务状态无效");
     applySnapshot(snapshot, generation);
   }
   function connectStream(runId: string, generation: number) {
-    if (generation !== generationRef.current) return;
-    closeTransport();
-    if (runRef.current?.run_id === runId && TERMINAL_STATUSES.has(runRef.current.status)) {
-      setConnection("available");
-      return;
-    }
+    if (generation !== generationRef.current) return; closeTransport();
+    if (runRef.current?.run_id === runId && TERMINAL_STATUSES.has(runRef.current.status)) { setConnection("available"); return; }
     setConnection("connecting");
     const source = new EventSource(`${API_BASE}/v1/harness/runs/${encodeURIComponent(runId)}/events?after=${lastSequenceRef.current}`);
     eventSourceRef.current = source;
@@ -346,179 +324,126 @@ export function HarnessWorkbench({ initialDemo = "demo1", onActivityChange }: { 
       if (generation !== generationRef.current || eventSourceRef.current !== source || runRef.current?.run_id !== runId) return;
       try {
         const parsed = JSON.parse((raw as MessageEvent<string>).data) as HarnessServerEvent;
-        const event = { ...parsed, event_name: name };
-        if (event.sequence <= lastSequenceRef.current) return;
-        lastSequenceRef.current = event.sequence;
-        setActivity((current) => [...current.filter((item) => item.sequence !== event.sequence), activityItem(event)].sort((a, b) => a.sequence - b.sequence).slice(-24));
-        setConnection("live");
-        if (TERMINAL_EVENTS.has(name)) {
-          source.close();
-          eventSourceRef.current = null;
-          setConnection("available");
-          window.clearTimeout(reconnectTimerRef.current);
-          reconnectTimerRef.current = undefined;
-          void readSnapshot(runId, generation).catch(() => {
-            if (generation === generationRef.current && runRef.current?.run_id === runId) setConnection("offline");
-          });
-          return;
-        }
+        if (parsed.sequence <= lastSequenceRef.current) return;
+        lastSequenceRef.current = parsed.sequence; const item = activityItem({ ...parsed, event_name: name });
+        setActivity((current) => [...current.filter((entry) => entry.sequence !== item.sequence), item].sort((a, b) => a.sequence - b.sequence).slice(-30)); setConnection("live");
+        if (TERMINAL_EVENTS.has(name)) { source.close(); eventSourceRef.current = null; setConnection("available"); void readSnapshot(runId, generation).catch(() => setConnection("offline")); return; }
         void readSnapshot(runId, generation).catch(() => setConnection("reconnecting"));
       } catch { setConnection("reconnecting"); }
     };
     NAMED_EVENTS.forEach((name) => source.addEventListener(name, (event) => receive(event, name)));
-    source.onopen = () => { if (generation === generationRef.current && eventSourceRef.current === source) setConnection("live"); };
+    source.onopen = () => setConnection("live");
     source.onerror = () => {
       if (generation !== generationRef.current || eventSourceRef.current !== source) return;
       source.close(); eventSourceRef.current = null; setConnection("reconnecting");
       void readSnapshot(runId, generation).catch(() => setConnection("offline")).finally(() => {
-        if (generation !== generationRef.current || runRef.current?.run_id !== runId) return;
-        window.clearTimeout(reconnectTimerRef.current);
+        if (generation !== generationRef.current || runRef.current?.run_id !== runId || TERMINAL_STATUSES.has(runRef.current.status)) return;
         reconnectTimerRef.current = window.setTimeout(() => connectStream(runId, generation), 900);
       });
     };
   }
+
   async function loadScenarios(manual = false) {
-    const request = catalogRequestRef.current + 1;
-    catalogRequestRef.current = request;
-    window.clearTimeout(catalogRetryTimerRef.current);
-    catalogRetryTimerRef.current = undefined;
-    if (manual) catalogAttemptRef.current = 0;
-    const attempt = catalogAttemptRef.current + 1;
-    catalogAttemptRef.current = attempt;
-    setLoading(true);
-    setCatalogStatus(attempt === 1 ? "checking" : "retrying");
-    setCatalogError("");
+    const request = requestRef.current + 1; requestRef.current = request; window.clearTimeout(retryTimerRef.current);
+    if (manual) catalogAttemptRef.current = 0; const attempt = catalogAttemptRef.current + 1; catalogAttemptRef.current = attempt;
+    setCatalogStatus(attempt === 1 ? "checking" : "retrying"); setCatalogError("");
     try {
-      let health: Response;
-      try { health = await fetchWithTimeout(`${API_BASE}/v1/health`, { headers: HEADERS }); }
-      catch { throw new CatalogLoadError("service_unreachable"); }
+      let health: Response; try { health = await fetchWithTimeout(`${API_BASE}/v1/health`, { headers: HEADERS }); } catch { throw new CatalogLoadError("service_unreachable"); }
       if (!health.ok) throw new CatalogLoadError("service_unreachable");
-      let response: Response;
-      try { response = await fetchWithTimeout(`${API_BASE}/v1/harness/scenarios`, { headers: HEADERS }); }
-      catch { throw new CatalogLoadError("catalog_unavailable"); }
-      if (!response.ok) {
-        let detail = "";
-        try {
-          const errorBody = await response.json() as unknown;
-          if (errorBody && typeof errorBody === "object") detail = asText((errorBody as Record<string, unknown>).detail);
-        } catch { /* The status remains the authoritative failure fact. */ }
-        throw new CatalogLoadError(detail.includes("完整性") ? "catalog_invalid" : "catalog_unavailable");
-      }
-      let body: unknown;
-      try { body = await response.json() as unknown; }
-      catch { throw new CatalogLoadError("catalog_invalid"); }
+      const response = await fetchWithTimeout(`${API_BASE}/v1/harness/scenarios`, { headers: HEADERS });
+      if (!response.ok) { const detail = await response.json().then((body: unknown) => body && typeof body === "object" ? asText((body as Record<string, unknown>).detail) : "").catch(() => ""); throw new CatalogLoadError(detail.includes("完整性") ? "catalog_invalid" : "catalog_unavailable"); }
+      const body = await response.json() as unknown;
       const raw = body && typeof body === "object" && Array.isArray((body as { scenarios?: unknown[] }).scenarios) ? (body as { scenarios: unknown[] }).scenarios : [];
-      const normalized = raw.flatMap((item) => { const value = normalizeScenario(item); return value ? [value] : []; })
-        .filter((item) => item.dataset_label?.toUpperCase().includes("FORTE"));
-      const forteScenarios = (["demo1", "demo2", "demo3"] as HarnessDemo[]).flatMap((demo) => {
-        const item = normalized.find((candidate) => candidate.demo === demo);
-        return item ? [item] : [];
-      });
-      if (forteScenarios.length !== 3) throw new CatalogLoadError("catalog_invalid");
-      if (request !== catalogRequestRef.current) return;
-      setScenarios(forteScenarios);
-      catalogAttemptRef.current = 0;
-      setCatalogStatus("online");
-      setCatalogFailureKind(null);
-      setCatalogError("");
-      setConnection("available");
+      const normalized = raw.flatMap((item) => { const value = normalizeScenario(item); return value ? [value] : []; }).filter((item) => item.dataset_label.toUpperCase().includes("FORTE"));
+      if (normalized.length !== 3) throw new CatalogLoadError("catalog_invalid"); if (request !== requestRef.current) return;
+      setScenarios(normalized); const first = normalized[0];
+      setScenarioId((current) => current && normalized.some((item) => item.scenario_id === current) ? current : first.scenario_id);
+      setSelectedRefs((current) => current.length ? current : first.files.map((file) => file.file_ref));
+      setActiveFileRef((current) => current || first.files[0].file_ref); setQuery((current) => current || EXAMPLE_TASKS[first.scenario_id]);
+      catalogAttemptRef.current = 0; setCatalogStatus("online"); setCatalogFailureKind(null); setConnection("available");
     } catch (reason) {
-      if (request !== catalogRequestRef.current) return;
-      const kind = reason instanceof CatalogLoadError ? reason.kind : "service_unreachable";
-      const unavailable = attempt >= 3;
-      setCatalogFailureKind(kind);
-      setCatalogStatus(unavailable ? "unavailable" : "retrying");
-      setCatalogError(unavailable ? kind === "service_unreachable"
-        ? "无法连接办公服务，系统会继续自动重试。"
-        : kind === "catalog_invalid"
-          ? "办公服务已连接，但场景目录未通过完整性检查；系统会继续自动重试。"
-          : "办公服务已连接，但场景目录暂时无法读取；系统会继续自动重试。" : "");
+      if (request !== requestRef.current) return; const kind = reason instanceof CatalogLoadError ? reason.kind : "service_unreachable"; const unavailable = attempt >= 3;
+      setCatalogFailureKind(kind); setCatalogStatus(unavailable ? "unavailable" : "retrying");
+      setCatalogError(unavailable ? kind === "service_unreachable" ? "无法连接办公服务，系统会继续自动重试。" : kind === "catalog_invalid" ? "FORTE 目录未通过完整性检查。" : "FORTE 目录暂时无法读取。" : "");
       setConnection(kind === "service_unreachable" ? unavailable ? "offline" : "reconnecting" : "available");
-      const delays = [650, 1_200, 2_500, 5_000];
-      const delay = delays[Math.min(attempt - 1, delays.length - 1)];
-      catalogRetryTimerRef.current = window.setTimeout(() => void loadScenarios(), delay);
-    } finally {
-      if (request === catalogRequestRef.current) setLoading(false);
+      retryTimerRef.current = window.setTimeout(() => void loadScenarios(), [650, 1200, 2500, 5000][Math.min(attempt - 1, 3)]);
     }
   }
 
-  useEffect(() => { void loadScenarios(); return () => { catalogRequestRef.current += 1; window.clearTimeout(catalogRetryTimerRef.current); closeTransport(); }; }, []);
+  useEffect(() => { void loadScenarios(); return () => { requestRef.current += 1; previewRequestRef.current += 1; window.clearTimeout(retryTimerRef.current); closeTransport(); }; }, []);
   useEffect(() => {
-    const generation = generationRef.current + 1;
-    generationRef.current = generation;
-    closeTransport(); runRef.current = null; lastSequenceRef.current = 0; startCommandRef.current = null;
-    setRun(null); setActivity([]); setError(""); setDetailNotice(""); setStartAttempted(false); setSelectedFile(null);
-    const preview = scenarios.find((item) => item.demo === selectedDemo) ?? null;
-    setScenario(preview);
-    if (!preview) return;
-    void fetchWithTimeout(`${API_BASE}/v1/harness/scenarios/${encodeURIComponent(preview.scenario_id)}`, { headers: HEADERS })
-      .then(async (response) => {
-        if (!response.ok) throw new Error("detail unavailable");
-        return response.json() as Promise<unknown>;
-      })
-      .then((body) => {
-        if (generation !== generationRef.current) return;
-        const detail = normalizeScenario(body);
-        if (!detail) throw new Error("detail invalid");
-        setScenario(detail);
-        setDetailNotice("");
-      })
-      .catch(() => {
-        if (generation === generationRef.current) setDetailNotice("场景详情暂时不可用，当前使用目录中的公开信息。");
-      });
-  }, [selectedDemo, scenarios]);
+    if (!scenario || !activeFileRef) return; const request = previewRequestRef.current + 1; previewRequestRef.current = request;
+    setPreviewLoading(true); setPreviewError(""); setPreview(null);
+    void fetchWithTimeout(`${API_BASE}/v1/harness/scenarios/${encodeURIComponent(scenario.scenario_id)}/files/${encodeURIComponent(activeFileRef)}`, { headers: HEADERS })
+      .then(async (response) => { if (!response.ok) throw new Error(`文件预览读取失败（${response.status}）`); const normalized = normalizePreview(await response.json() as unknown); if (!normalized) throw new Error("文件预览格式无效"); return normalized; })
+      .then((value) => { if (request === previewRequestRef.current) setPreview(value); })
+      .catch((reason) => { if (request === previewRequestRef.current) setPreviewError(reason instanceof Error ? reason.message : "文件预览读取失败"); })
+      .finally(() => { if (request === previewRequestRef.current) setPreviewLoading(false); });
+  }, [activeFileRef, scenario]);
 
-  async function startRun(newRound = false) {
-    if (!scenario || starting) return;
-    const command = !newRound && startCommandRef.current?.scenarioId === scenario.scenario_id ? startCommandRef.current : { scenarioId: scenario.scenario_id, key: `harness:${scenario.scenario_id}:${crypto.randomUUID()}` };
-    startCommandRef.current = command;
-    if (newRound) { generationRef.current += 1; closeTransport(); runRef.current = null; lastSequenceRef.current = 0; setRun(null); setActivity([]); }
-    setStarting(true); setStartAttempted(true); setError("");
-    const generation = generationRef.current;
+  function chooseScenario(next: HarnessScenario, fileRef?: string) {
+    generationRef.current += 1; closeTransport(); runRef.current = null; lastSequenceRef.current = 0; startCommandRef.current = null;
+    setRun(null); setActivity([]); setError(""); setScenarioId(next.scenario_id); setSelectedRefs(next.files.map((file) => file.file_ref));
+    setActiveFileRef(fileRef ?? next.files[0].file_ref); setQuery(EXAMPLE_TASKS[next.scenario_id]); setView("data");
+  }
+  function openCollection(next: HarnessScenario) {
+    if (next.scenario_id !== scenarioId) {
+      setExpanded((current) => ({ ...current, [next.scenario_id]: true }));
+      chooseScenario(next);
+      return;
+    }
+    setExpanded((current) => ({ ...current, [next.scenario_id]: !(current[next.scenario_id] ?? true) }));
+  }
+  function openFile(owner: HarnessScenario, file: HarnessFile) { if (owner.scenario_id !== scenarioId) chooseScenario(owner, file.file_ref); else { setActiveFileRef(file.file_ref); setView("data"); } }
+  function toggleFile(fileRef: string) { setSelectedRefs((current) => current.includes(fileRef) ? current.length === 1 ? current : current.filter((item) => item !== fileRef) : [...current, fileRef]); startCommandRef.current = null; }
+
+  async function startRun() {
+    if (!scenario || starting || query.trim().length < 3 || !selectedRefs.length) return;
+    const signature = JSON.stringify({ scenario: scenario.scenario_id, instruction: query.trim(), files: selectedRefs });
+    const command = startCommandRef.current?.signature === signature ? startCommandRef.current : { signature, key: `harness:${crypto.randomUUID()}` };
+    startCommandRef.current = command; generationRef.current += 1; const generation = generationRef.current;
+    closeTransport(); runRef.current = null; lastSequenceRef.current = 0; setRun(null); setActivity([]); setError(""); setStarting(true);
     try {
-      const response = await fetch(`${API_BASE}/v1/harness/runs`, { method: "POST", headers: HEADERS, body: JSON.stringify({ scenario_id: scenario.scenario_id, idempotency_key: command.key, expected_version: 1 }) });
-      if (!response.ok) throw new Error(`本轮启动结果未知（${response.status}），重试会复用同一命令`);
-      const snapshot = normalizeRun(await response.json() as unknown);
-      if (!snapshot) throw new Error("本轮启动结果未知，重试会复用同一命令");
-      runRef.current = null;
+      const response = await fetch(`${API_BASE}/v1/harness/runs`, { method: "POST", headers: HEADERS, body: JSON.stringify({ scenario_id: scenario.scenario_id, idempotency_key: command.key, expected_version: 1, instruction: query.trim(), selected_file_refs: selectedRefs }) });
+      if (!response.ok) throw new Error(`任务启动结果未知（${response.status}），重试会复用同一命令`);
+      const snapshot = normalizeRun(await response.json() as unknown); if (!snapshot) throw new Error("任务启动结果无效");
       if (applySnapshot(snapshot, generation)) connectStream(snapshot.run_id, generation);
-    } catch (reason) { if (generation === generationRef.current) { setError(reason instanceof Error ? reason.message : "本轮启动结果未知"); setConnection("offline"); } }
+    } catch (reason) { if (generation === generationRef.current) { setError(reason instanceof Error ? reason.message : "任务启动结果未知"); setConnection("offline"); } }
     finally { if (generation === generationRef.current) setStarting(false); }
   }
+  function reconnect() { if (!run) { void loadScenarios(true); return; } const generation = generationRef.current; closeTransport(); void readSnapshot(run.run_id, generation).finally(() => connectStream(run.run_id, generation)); }
 
-  const activityState = useMemo<HarnessActivityState>(() => ({ scenarioTitle: scenario?.title ?? "工作现场", runStatus: run?.status ?? null, connection, modelReceipt: run?.model_receipt ?? null, events: activity, readyToExecute: run?.status === "ready_to_execute", error: run?.status === "failed" ? run.validation_errors[0] ?? "本轮计划未通过校验" : error || catalogError || null, notice: detailNotice || null }), [activity, catalogError, connection, detailNotice, error, run, scenario?.title]);
-  useEffect(() => { onActivityChange?.(activityState); }, [activityState, onActivityChange]);
-  useEffect(() => () => onActivityChange?.(null), [onActivityChange]);
+  const activityState = useMemo<HarnessActivityState>(() => ({ scenarioTitle: scenario?.title ?? "FORTE 数据任务", instruction: run?.instruction ?? null, runStatus: run?.status ?? null, connection, planningReceipt: run?.model_receipt ?? null, analysisReceipt: run?.analysis_receipt ?? null, events: activity, resultReady: run?.status === "completed" && Boolean(run.result), error: run?.status === "failed" ? run.validation_errors[0] ?? "本轮已安全停止" : error || catalogError || null }), [activity, catalogError, connection, error, run, scenario?.title]);
+  useEffect(() => { onActivityChange?.(activityState); }, [activityState, onActivityChange]); useEffect(() => () => onActivityChange?.(null), [onActivityChange]);
+  const filteredScenarios = useMemo(() => { const needle = fileSearch.trim().toLowerCase(); if (!needle) return scenarios; return scenarios.map((item) => ({ ...item, files: item.files.filter((file) => `${file.display_label} ${file.display_group}`.toLowerCase().includes(needle)) })).filter((item) => item.files.length); }, [fileSearch, scenarios]);
+  const runFiles = run?.source_documents.length ? run.source_documents : scenario?.files ?? [];
 
-  const files = run?.source_documents.length ? run.source_documents : scenario?.files ?? [];
-  const plan = run?.plan ?? [];
-  const phase = phaseFromRun(run);
-  const currentPhaseIndex = PHASES.findIndex((item) => item.id === phase);
-  const isReady = run?.status === "ready_to_execute";
-  const groupedFiles = useMemo(() => { const groups = new Map<string, HarnessFile[]>(); files.forEach((item) => { const group = item.display_group || "本轮资料"; groups.set(group, [...(groups.get(group) ?? []), item]); }); return [...groups.entries()]; }, [files]);
-  const hasContract = Boolean(scenario?.deliverables?.length || scenario?.data_boundary?.length || scenario?.human_gate_summary || scenario?.allowed_capabilities?.length);
-  const startLabel = starting ? "启动中" : run && ["ready_to_execute", "failed"].includes(run.status) ? "开始新一轮" : startAttempted && error ? "重试启动" : "开始本轮";
-  function manualReconnect() { if (!run) { void loadScenarios(true); return; } const generation = generationRef.current; closeTransport(); void readSnapshot(run.run_id, generation).finally(() => connectStream(run.run_id, generation)); }
+  if (catalogStatus !== "online" && !scenarios.length) return <section className={`data-workbench-empty ${catalogStatus === "unavailable" ? "is-error" : ""}`} role={catalogStatus === "unavailable" ? "alert" : "status"}>{catalogStatus === "unavailable" ? <IconAlertTriangle aria-hidden="true" /> : <IconLoader2 aria-hidden="true" />}<h1>{catalogStatus === "unavailable" ? catalogFailureKind === "service_unreachable" ? "办公服务暂时离线" : "FORTE 数据暂时不可用" : "正在读取 FORTE 数据"}</h1><p>{catalogError || "正在校验公开数据目录与文件完整性。"}</p>{catalogStatus === "unavailable" && <button type="button" onClick={() => void loadScenarios(true)}>重新读取</button>}</section>;
 
-  return <section className="harness-workbench" aria-label="工作现场">
-    <header className="harness-header"><div className="harness-title"><div className="harness-mark"><IconRoute aria-hidden="true" /></div><div><span>工作现场</span><h1>{scenario?.title ?? "工作现场"}</h1><p>{scenario?.goal ?? "从公开办公资料开始，形成一份可核对的任务计划。"}</p></div></div><div className="harness-header-actions"><span className={`harness-connection is-${connection}`} aria-live="polite"><i />{connection === "live" ? "事件流实时" : connection === "available" ? "服务可用" : connection === "reconnecting" ? "正在重连" : connection === "offline" ? "暂时离线" : "连接中"}</span><button type="button" className="harness-icon-button" onClick={manualReconnect} title="重新连接" aria-label="重新连接"><IconRefresh aria-hidden="true" /></button></div></header>
-    <nav className="harness-demo-tabs" aria-label="演示场景">{(["demo1", "demo2", "demo3"] as HarnessDemo[]).map((demo) => <button key={demo} type="button" aria-current={selectedDemo === demo ? "page" : undefined} className={selectedDemo === demo ? "is-active" : ""} onClick={() => demo !== selectedDemo && setSelectedDemo(demo)}><span>{demoLabel(demo)}</span><small>{scenarios.find((item) => item.demo === demo)?.title ?? "等待服务端场景"}</small><IconChevronRight aria-hidden="true" /></button>)}</nav>
-    {!scenario && (loading || catalogStatus === "checking" || catalogStatus === "retrying") ? <div className="harness-empty" role="status" aria-live="polite"><IconLoader2 aria-hidden="true" /><h2>{catalogStatus === "checking" ? "正在连接办公服务" : catalogFailureKind === "service_unreachable" ? "办公服务正在恢复" : "正在重新读取工作场景"}</h2><p>{catalogFailureKind && catalogFailureKind !== "service_unreachable" ? "办公服务已连接，场景目录恢复后会自动显示三项 FORTE 办公场景。" : "连接恢复后会自动读取三项 FORTE 办公场景。"}</p></div> : !scenario && catalogStatus === "unavailable" ? <div className="harness-empty is-error" role="alert"><IconAlertTriangle aria-hidden="true" /><h2>{catalogFailureKind === "service_unreachable" ? "工作现场暂时离线" : catalogFailureKind === "catalog_invalid" ? "工作场景需要更新" : "工作场景暂时不可用"}</h2><p>{catalogError}</p><button type="button" className="harness-primary-button" onClick={() => void loadScenarios(true)}>立即重试</button></div> : <div className="harness-grid">
-      <aside className="harness-source-panel" aria-labelledby="harness-source-title"><div className="harness-panel-heading"><div><span>来源工作区</span><h2 id="harness-source-title">{scenario?.dataset_label ?? "公开办公基准数据"}</h2></div><IconFolder aria-hidden="true" /></div>{scenario?.dataset_version && <div className="harness-source-meta"><b>{scenario.dataset_version}</b></div>}<div className="harness-file-tree" role="tree" aria-label="本轮文件来源">{groupedFiles.length === 0 && <div className="harness-muted">启动后显示服务端冻结的文件范围。</div>}{groupedFiles.map(([group, items]) => <div key={group} className="harness-folder"><button type="button" role="treeitem" aria-expanded={expandedGroups[group] ?? true} onClick={() => setExpandedGroups((current) => ({ ...current, [group]: !(current[group] ?? true) }))}><IconChevronDown className={expandedGroups[group] ?? true ? "is-open" : ""} aria-hidden="true" /><IconFolder aria-hidden="true" /><span>{group}</span><small>{items.length}</small></button>{(expandedGroups[group] ?? true) && <div className="harness-files" role="group">{items.map((item) => <button type="button" role="treeitem" aria-selected={selectedFile?.key === item.key} key={item.key} className={selectedFile?.key === item.key ? "is-selected" : ""} onClick={() => setSelectedFile(item)}><IconFile aria-hidden="true" /><span>{item.display_label}</span></button>)}</div>}</div>)}</div>{selectedFile && <FileInspector file={selectedFile} />}</aside>
-      <main className="harness-main-panel"><div className="harness-scenario-heading"><div><span>{scenario ? demoLabel(scenario.demo) : "办公场景"}</span><h2>{scenario?.title ?? "等待场景"}</h2><p>{scenario?.goal}</p></div><button type="button" className="harness-primary-button" onClick={() => void startRun(Boolean(run && ["ready_to_execute", "failed"].includes(run.status)))} disabled={!scenario || starting || Boolean(run && !["ready_to_execute", "failed"].includes(run.status))}>{starting && <IconLoader2 aria-hidden="true" />}{!starting && <IconPlayerPlay aria-hidden="true" />}{startLabel}</button></div>
-      {hasContract && <TaskContract scenario={scenario!} />}
-      <section className="harness-phase-rail" aria-label="任务阶段">{PHASES.map((item, index) => { const complete = currentPhaseIndex > index; const active = currentPhaseIndex === index; return <div className={`harness-phase ${complete ? "is-complete" : active ? "is-active" : ""}`} key={item.id}><span>{complete ? <IconCheck aria-hidden="true" /> : index + 1}</span><div><strong>{item.label}</strong><small>{active ? item.hint : complete ? "服务端已回执" : "等待前一阶段"}</small></div>{index < PHASES.length - 1 && <IconArrowRight aria-hidden="true" />}</div>; })}</section>
-      <section className="harness-plan-panel" aria-labelledby="harness-plan-title"><header><div><span>本轮工作图</span><h3 id="harness-plan-title">{plan.length ? `${plan.length} 个动态工作单元` : "等待 Agent 生成计划"}</h3></div>{isReady ? <b className="is-ready"><IconCheck aria-hidden="true" />计划已通过校验</b> : <b className="is-waiting"><IconClock aria-hidden="true" />{run?.status === "planning" ? "正在形成计划" : "尚未形成计划"}</b>}</header>{plan.length === 0 ? <div className="harness-plan-placeholder"><IconRoute aria-hidden="true" /><p>读取文件后，工作单元、依赖、允许工具和人工边界会按服务端回执出现。</p></div> : <div className="harness-plan-dag">{plan.map((node) => <article key={node.node_id} className="harness-plan-node"><header><span><IconCircleDot aria-hidden="true" /></span><div><strong>{node.label}</strong><small>计划产出</small></div></header>{node.description && <p>{node.description}</p>}{node.source_refs.length > 0 && <div className="harness-node-facts"><span>使用文件</span><div>{node.source_refs.map((fileRef) => <b key={fileRef}>{files.find((file) => file.file_ref === fileRef)?.display_label ?? "本轮受控文件"}</b>)}</div></div>}{node.allowed_tools.length > 0 && <div className="harness-node-facts"><span>允许工具</span><div>{node.allowed_tools.map((tool) => <b key={tool}>{toolLabel(tool)}</b>)}</div></div>}{node.needs_human && <div className="harness-human-gate"><IconUserCheck aria-hidden="true" /><span>此工作单元需要人工确认后才能进入执行</span></div>}{node.depends_on.length > 0 && <footer>依赖 {node.depends_on.length} 个前置工作单元</footer>}</article>)}</div>}</section>
-      {detailNotice && <div className="harness-inline-notice" role="status"><IconAlertTriangle aria-hidden="true" /><span>{detailNotice}</span></div>}{isReady && <div className="harness-ready-banner" role="status"><IconShieldCheck aria-hidden="true" /><div><strong>计划已通过服务端校验，尚未执行任务</strong><span>任何外部动作仍需进入独立控制流程。</span></div></div>}{run?.status === "failed" && <div className="harness-inline-error" role="alert"><IconAlertTriangle aria-hidden="true" /><div><strong>计划未通过服务端校验</strong><span>{run.validation_errors[0] ?? "本轮已停止，执行未启动。"}</span></div></div>}{error && scenario && <div className="harness-inline-error" role="alert"><IconAlertTriangle aria-hidden="true" /><span>{error}</span></div>}
-      </main>
-    </div>}
+  return <section className="data-workbench" aria-label="FORTE 数据工作台">
+    <header className="data-workbench-header"><div><span>公开办公数据</span><h1>FORTE 数据工作台</h1><p>浏览真实基准文件，选择上下文，再把任务交给 Agent。</p></div><div className="data-workbench-status"><b className={`is-${connection}`}><i />{connection === "live" ? "轨迹实时" : connection === "available" ? "服务可用" : connection === "reconnecting" ? "正在重连" : connection === "offline" ? "暂时离线" : "连接中"}</b><button type="button" className="icon-action" onClick={reconnect} aria-label="重新连接" title="重新连接"><IconRefresh aria-hidden="true" /></button></div></header>
+    <div className="data-workbench-grid"><aside className="dataset-browser" aria-label="FORTE 数据目录"><header><div><IconDatabase aria-hidden="true" /><div><strong>基准资料</strong><span>{scenarios.reduce((total, item) => total + item.files.length, 0)} 份公开文件</span></div></div><label><IconSearch aria-hidden="true" /><input value={fileSearch} onChange={(event) => setFileSearch(event.target.value)} placeholder="查找文件" aria-label="查找文件" /></label></header><div className="dataset-tree">{filteredScenarios.map((item) => <section key={item.scenario_id} className={item.scenario_id === scenarioId ? "is-active" : ""}><button type="button" className="dataset-group" onClick={() => openCollection(item)} aria-expanded={expanded[item.scenario_id] ?? true}><IconChevronDown className={(expanded[item.scenario_id] ?? true) ? "is-open" : ""} aria-hidden="true" /><div><strong>{COLLECTION_LABELS[item.scenario_id] ?? item.title}</strong><span>{COLLECTION_HINTS[item.scenario_id] ?? item.goal}</span></div><b>{item.files.length}</b></button>{(expanded[item.scenario_id] ?? true) && <div className="dataset-files">{item.files.map((file) => <div key={file.file_ref} className={file.file_ref === activeFileRef ? "is-open" : ""}><label title={item.scenario_id === scenarioId ? "纳入本轮上下文" : "打开后切换资料集"}><input type="checkbox" checked={item.scenario_id === scenarioId && selectedRefs.includes(file.file_ref)} onChange={() => item.scenario_id === scenarioId ? toggleFile(file.file_ref) : chooseScenario(item, file.file_ref)} /><span aria-hidden="true"><IconCheck /></span></label><button type="button" onClick={() => openFile(item, file)}><IconFile aria-hidden="true" /><span>{file.display_label}</span></button></div>)}</div>}</section>)}</div></aside>
+      <main className="data-task-surface"><section className="task-composer" aria-labelledby="task-composer-title"><div><span>给 Agent 一个任务</span><h2 id="task-composer-title">你想从这些数据里知道什么？</h2></div><textarea aria-label="你想从这些数据里知道什么？" value={query} onChange={(event) => { setQuery(event.target.value); startCommandRef.current = null; }} maxLength={2000} rows={3} placeholder="例如：找出三期都没有变化的往来项，并给出引用文件。" /><footer><span>{selectedRefs.length} 份文件已选 · 只读分析，不会修改原数据</span><button type="button" onClick={() => void startRun()} disabled={!scenario || starting || query.trim().length < 3 || !selectedRefs.length}>{starting ? <IconLoader2 aria-hidden="true" /> : <IconSend aria-hidden="true" />}{starting ? "正在启动" : "运行任务"}</button></footer></section>
+        <nav className="workspace-tabs" aria-label="工作台视图"><button type="button" className={view === "data" ? "is-active" : ""} onClick={() => setView("data")}><IconFileSpreadsheet aria-hidden="true" />数据预览</button><button type="button" className={view === "plan" ? "is-active" : ""} onClick={() => setView("plan")} disabled={!run?.plan.length}><IconRoute aria-hidden="true" />任务计划{run?.plan.length ? <b>{run.plan.length}</b> : null}</button><button type="button" className={view === "result" ? "is-active" : ""} onClick={() => setView("result")} disabled={!run?.result}><IconFileDescription aria-hidden="true" />分析结果</button></nav>
+        <section className="workspace-content">{view === "data" && <FilePreview preview={preview} file={activeFile} loading={previewLoading} error={previewError} />}{view === "plan" && <PlanView run={run} files={runFiles} />}{view === "result" && <ResultView result={run?.result ?? null} files={runFiles} />}</section>
+        <details className="workspace-boundary"><summary><IconShieldCheck aria-hidden="true" />本轮边界</summary><p>{scenario?.data_boundary ?? "只读取所选 FORTE 公开输入，不访问真实企业系统。"}</p><p>{scenario?.human_gate_summary ?? "任何外部动作都不在本轮只读分析范围内。"}</p></details>
+      </main></div>
   </section>;
 }
 
-function TaskContract({ scenario }: { scenario: HarnessScenario }) {
-  return <section className="harness-contract" aria-labelledby="harness-contract-title"><header><IconShieldCheck aria-hidden="true" /><div><span>本轮任务契约</span><h3 id="harness-contract-title">开始前确认完成条件与边界</h3></div></header><div>{scenario.deliverables?.length ? <dl><dt>完成条件</dt>{scenario.deliverables.map((item) => <dd key={item.label}><strong>{item.label}</strong>{item.description && <span>{item.description}</span>}</dd>)}</dl> : null}{scenario.data_boundary?.length ? <dl><dt>数据边界</dt>{scenario.data_boundary.map((item) => <dd key={item}>{item}</dd>)}</dl> : null}{scenario.allowed_capabilities?.length ? <dl><dt>允许能力</dt>{scenario.allowed_capabilities.map((item) => <dd key={item}>{item}</dd>)}</dl> : null}{scenario.human_gate_summary && <dl><dt>需要人工时</dt><dd>{scenario.human_gate_summary}</dd></dl>}</div></section>;
+function FilePreview({ preview, file, loading, error }: { preview: HarnessPreview | null; file: HarnessFile | null; loading: boolean; error: string }) {
+  if (loading) return <div className="file-preview-empty" role="status"><IconLoader2 aria-hidden="true" /><strong>正在读取文件内容</strong></div>;
+  if (error) return <div className="file-preview-empty is-error" role="alert"><IconAlertTriangle aria-hidden="true" /><strong>{error}</strong></div>;
+  if (!preview || !file) return <div className="file-preview-empty"><IconFile aria-hidden="true" /><strong>从左侧选择一份文件</strong></div>;
+  return <div className="file-preview"><header><div><span>{preview.display_group}</span><h2>{preview.display_label}</h2><p>{preview.display_summary}</p></div>{preview.kind === "table" && <b>{preview.total_rows ?? preview.rows.length} 行 · {preview.columns.length} 列</b>}</header>{preview.kind === "markdown" ? <article className="markdown-preview">{preview.text}</article> : <div className="table-preview" tabIndex={0} aria-label={`${preview.display_label} 表格内容`}><table><thead><tr><th className="row-number">#</th>{preview.columns.map((column, index) => <th key={`${column}:${index}`}>{column}</th>)}</tr></thead><tbody>{preview.rows.map((row) => <tr key={row.row_number}><th className="row-number">{row.row_number}</th>{preview.columns.map((_, index) => <td key={index}>{row.values[index] ?? ""}</td>)}</tr>)}</tbody></table></div>}{preview.truncated && <footer>当前显示安全预览范围，文件仍由服务端完整校验。</footer>}</div>;
 }
 
-function FileInspector({ file }: { file: HarnessFile }) {
-  return <div className="harness-file-inspector"><span>当前文件</span><strong>{file.display_label}</strong><p>{file.display_summary}</p></div>;
+function PlanView({ run, files }: { run: HarnessRun | null; files: HarnessFile[] }) {
+  if (!run?.plan.length) return <div className="workspace-placeholder"><IconRoute aria-hidden="true" /><h2>任务计划尚未形成</h2><p>运行任务后，模型计划与服务端校验结果会出现在这里。</p></div>;
+  return <div className="plan-view"><header><span>已校验的工作图</span><h2>{run.plan_summary ?? `${run.plan.length} 个工作步骤`}</h2></header><ol>{run.plan.map((node, index) => <li key={node.node_id}><b>{index + 1}</b><div><strong>{node.label}</strong><p>{node.description}</p><footer>{node.source_refs.map((ref) => <span key={ref}>{files.find((file) => file.file_ref === ref)?.display_label ?? "所选文件"}</span>)}{node.allowed_tools.map((tool) => <span key={tool}>{toolLabel(tool)}</span>)}{node.needs_human && <span className="is-gate">需要人工确认</span>}</footer></div></li>)}</ol></div>;
+}
+
+function ResultView({ result, files }: { result: HarnessResult | null; files: HarnessFile[] }) {
+  if (!result) return <div className="workspace-placeholder"><IconClock aria-hidden="true" /><h2>分析结果尚未形成</h2><p>Agent 完成只读分析并通过引用校验后，结果会出现在这里。</p></div>;
+  return <article className="result-view"><header><IconCircleCheck aria-hidden="true" /><div><span>只读分析完成</span><h2>{result.summary}</h2></div></header><div className="result-findings">{result.findings.map((finding, index) => <section key={`${finding.title}:${index}`}><b>{index + 1}</b><div><h3>{finding.title}</h3><p>{finding.detail}</p><footer>{finding.file_refs.map((ref) => <span key={ref}>{files.find((file) => file.file_ref === ref)?.display_label ?? "所选文件"}</span>)}</footer></div></section>)}</div>{result.follow_ups.length > 0 && <aside><strong>仍需你判断</strong>{result.follow_ups.map((item) => <p key={item}>{item}</p>)}</aside>}<footer><IconShieldCheck aria-hidden="true" />结果由模型生成并经过文件引用校验，仍需人工复核；本轮没有外部动作。</footer></article>;
 }

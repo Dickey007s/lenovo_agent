@@ -75,9 +75,34 @@ class BenchmarkManifest(StrictModel):
 class BenchmarkDisplayFile(StrictModel):
     """Business-facing file projection; raw path/hash stay server-side."""
 
+    file_ref: str = Field(pattern=r"^forte-[0-9a-f]{16}$")
     display_label: str = Field(min_length=1, max_length=200)
     display_group: str = Field(min_length=1, max_length=120)
     display_summary: str = Field(min_length=1, max_length=500)
+
+
+class BenchmarkPreviewRow(StrictModel):
+    """One bounded row in a public spreadsheet preview."""
+
+    row_number: int = Field(ge=1)
+    values: list[str] = Field(max_length=30)
+
+
+class BenchmarkFilePreview(StrictModel):
+    """Allowlisted file content safe for the foreground data explorer."""
+
+    scenario_id: str = Field(min_length=1, max_length=120)
+    file_ref: str = Field(pattern=r"^forte-[0-9a-f]{16}$")
+    display_label: str = Field(min_length=1, max_length=200)
+    display_group: str = Field(min_length=1, max_length=120)
+    display_summary: str = Field(min_length=1, max_length=500)
+    kind: Literal["table", "markdown"]
+    sheet_name: str | None = Field(default=None, max_length=120)
+    columns: list[str] = Field(default_factory=list, max_length=30)
+    rows: list[BenchmarkPreviewRow] = Field(default_factory=list, max_length=120)
+    total_rows: int | None = Field(default=None, ge=0)
+    text: str | None = Field(default=None, max_length=30_000)
+    truncated: bool = False
 
 
 class BenchmarkPublicScenario(StrictModel):
