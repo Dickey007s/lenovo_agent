@@ -239,7 +239,7 @@ class BenchmarkScenarioCatalog:
         ]
         return BenchmarkPublicScenario(
             scenario_id=scenario.task_id,
-            demo_id=projection["demo_id"],
+            work_profile=projection["work_profile"],
             title=projection["title"],
             goal=projection["goal"],
             deliverables=projection["deliverables"],
@@ -248,7 +248,6 @@ class BenchmarkScenarioCatalog:
             allowed_capabilities=projection["allowed_capabilities"],
             dataset_label=projection["dataset_label"],
             dataset_version=f"FORTE 公开版本 · {str(projection['dataset_version'])[:7]}",
-            experience_policy=projection["experience_policy"],
             files=display_files,
         )
 
@@ -340,10 +339,14 @@ class BenchmarkScenarioCatalog:
             raise BenchmarkScenarioError("任务缺少可供 Harness 使用的 Prompt")
         policy = {
             "Finance-018": {
-                "demo_id": "demo1",
+                "work_profile": {
+                    "task_topology": "single_task",
+                    "orchestration": "bounded_loop",
+                    "control_requirements": ["evidence_gate", "human_gate"],
+                    "current_runtime_scope": "read_only_analysis",
+                },
                 "title": "跨期间财务证据任务",
                 "goal": "汇总三个期间的欠款与未收余额，核查是否存在连续三期未变的僵尸账款。",
-                "experience_policy": "durable_task",
                 "deliverables": ["欠款与未收摘要", "僵尸账款核查结论", "可追溯证据工件"],
                 "data_boundary": "只读取三期往来明细，结果写入本轮受控工作区，不调用外部系统。",
                 "human_gate_summary": "形成财务摘要后，由用户确认是否进入后续汇报或业务动作。",
@@ -352,10 +355,14 @@ class BenchmarkScenarioCatalog:
                 "allowed_side_effects": ["none", "run_workspace_write"],
             },
             "pm-014": {
-                "demo_id": "demo2",
+                "work_profile": {
+                    "task_topology": "multi_task",
+                    "orchestration": "adaptive_swarm",
+                    "control_requirements": ["evidence_gate", "human_gate"],
+                    "current_runtime_scope": "read_only_analysis",
+                },
                 "title": "版本上线合规协作任务",
                 "goal": "联合核对 PRD、配置、功能测试和兼容测试资料，形成可追溯的上线结论与改进计划。",
-                "experience_policy": "adaptive_team",
                 "deliverables": ["上线结论", "测试覆盖与通过率核对", "风险分级", "上线改进计划"],
                 "data_boundary": "只读取 PRD、上线配置、功能测试与兼容测试资料，结果写入本轮受控工作区。",
                 "human_gate_summary": "上线结论和改进计划形成后，由用户确认，不自动发布或修改线上系统。",
@@ -364,10 +371,18 @@ class BenchmarkScenarioCatalog:
                 "allowed_side_effects": ["none", "run_workspace_write"],
             },
             "Operations-008": {
-                "demo_id": "demo3",
+                "work_profile": {
+                    "task_topology": "single_task",
+                    "orchestration": "bounded_loop",
+                    "control_requirements": [
+                        "evidence_gate",
+                        "human_gate",
+                        "risk_gate",
+                    ],
+                    "current_runtime_scope": "read_only_analysis",
+                },
                 "title": "受约束的运营流程设计任务",
                 "goal": "依据外呼合规规则设计闭环流程，明确人工升级、停止外呼和禁呼等动作边界。",
-                "experience_policy": "governed_action",
                 "deliverables": ["合规外呼流程草案", "人工升级路径", "终态与动作边界清单"],
                 "data_boundary": "只读取公开的外呼合规规则说明，结果写入本轮受控工作区，不拨打电话或写入名单。",
                 "human_gate_summary": "任何外部动作前必须由用户确认，当前仅生成受控流程草案。",
@@ -377,14 +392,13 @@ class BenchmarkScenarioCatalog:
             },
         }.get(task.task_id)
         if policy is None:
-            raise BenchmarkScenarioError("未注册的公开基准任务不能进入三 Demo Harness")
+            raise BenchmarkScenarioError("未注册的公开基准任务不能进入 Agent Harness")
         return {
-            "demo_id": policy["demo_id"],
+            "work_profile": policy["work_profile"],
             "title": policy["title"],
             "goal": policy["goal"],
             "dataset_label": "公开办公基准数据 · FORTE",
             "dataset_version": manifest.source_commit,
-            "experience_policy": policy["experience_policy"],
             "selection_reason": "按公开任务说明冻结 allowlisted input 文件",
             "allowed_tools": policy["allowed_tools"],
             "allowed_side_effects": policy["allowed_side_effects"],

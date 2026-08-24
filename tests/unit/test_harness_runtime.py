@@ -375,23 +375,27 @@ class ThreeScenarioPlanner:
     model = "deepseek-v4-pro"
 
     async def plan(self, *, scenario, files):
-        tool = "table.inspect" if scenario["demo_id"] in {"demo1", "demo2"} else "file.read"
+        profile = scenario["work_profile"]
+        tool = "table.inspect" if any(item["mime"].endswith("sheet") for item in files) else "file.read"
         return HarnessPlan(
-            summary=f"{scenario['demo_id']} dynamic plan",
+            summary=f"{profile['task_topology']} dynamic plan",
             units=[HarnessPlanUnit(
-                unit_id=f"{scenario['demo_id']}-read", title="读取输入", objective=scenario["goal"],
+                unit_id=f"{profile['task_topology']}-read", title="读取输入", objective=scenario["goal"],
                 input_file_refs=[files[0]["file_ref"]], tool=tool,
             )],
         )
 
 
 @pytest.mark.asyncio
-async def test_real_catalog_three_demo_projections_accept_dynamic_fake_plans():
+async def test_real_catalog_capability_profiles_accept_dynamic_fake_plans():
     from services.api.app.application.benchmark_scenario_catalog import BenchmarkScenarioCatalog
 
     runtime = HarnessRuntime(BenchmarkScenarioCatalog(), ThreeScenarioPlanner())
     scenarios = runtime.list_scenarios()
-    assert {item["demo_id"] for item in scenarios} == {"demo1", "demo2", "demo3"}
+    assert {item["work_profile"]["orchestration"] for item in scenarios} == {
+        "bounded_loop",
+        "adaptive_swarm",
+    }
     for scenario in scenarios:
         result = await runtime.start("alice", HarnessRunStart(
             scenario_id=scenario["scenario_id"], idempotency_key=f"{scenario['scenario_id']}-fake-1",
@@ -410,7 +414,7 @@ async def test_real_catalog_three_demo_projections_accept_dynamic_fake_plans():
 
 
 @pytest.mark.asyncio
-async def test_capability_side_effect_allowlist_is_per_demo():
+async def test_capability_side_effect_allowlist_is_per_business_scenario():
     from services.api.app.application.benchmark_scenario_catalog import BenchmarkScenarioCatalog
 
     class ActionPlanner:
@@ -456,9 +460,14 @@ async def test_public_route_returns_contract_not_planner_context():
         response = await client.get("/v1/harness/scenarios")
     assert response.status_code == 200
     payload = response.json()["scenarios"]
-    assert {item["demo_id"] for item in payload} == {"demo1", "demo2", "demo3"}
+    assert {item["work_profile"]["task_topology"] for item in payload} == {
+        "single_task",
+        "multi_task",
+    }
     for item in payload:
         serialized = json.dumps(item, ensure_ascii=False)
+        assert "demo_id" not in serialized
+        assert "experience_policy" not in serialized
         assert "task_instruction" not in serialized
         assert "/workspace/input" not in serialized
         assert "不要问我" not in serialized

@@ -34,9 +34,16 @@ export type HarnessFile = {
   display_summary: string;
 };
 
+export type HarnessWorkProfile = {
+  task_topology: "single_task" | "multi_task";
+  orchestration: "bounded_loop" | "adaptive_swarm";
+  control_requirements: ("evidence_gate" | "human_gate" | "risk_gate")[];
+  current_runtime_scope: "read_only_analysis";
+};
+
 export type HarnessScenario = {
   scenario_id: string;
-  demo: "demo1" | "demo2" | "demo3";
+  work_profile: HarnessWorkProfile;
   title: string;
   goal: string;
   dataset_label: string;
@@ -157,14 +164,38 @@ function normalizeFiles(value: unknown): HarnessFile[] {
   });
 }
 
+function normalizeWorkProfile(value: unknown): HarnessWorkProfile | null {
+  if (!value || typeof value !== "object") return null;
+  const raw = value as Record<string, unknown>;
+  const taskTopology = asText(raw.task_topology);
+  const orchestration = asText(raw.orchestration);
+  const controlRequirements = asStrings(raw.control_requirements);
+  const runtimeScope = asText(raw.current_runtime_scope);
+  const validControls = new Set(["evidence_gate", "human_gate", "risk_gate"]);
+  if (
+    !["single_task", "multi_task"].includes(taskTopology)
+    || !["bounded_loop", "adaptive_swarm"].includes(orchestration)
+    || !controlRequirements.length
+    || controlRequirements.some((item) => !validControls.has(item))
+    || runtimeScope !== "read_only_analysis"
+  ) return null;
+  return {
+    task_topology: taskTopology as HarnessWorkProfile["task_topology"],
+    orchestration: orchestration as HarnessWorkProfile["orchestration"],
+    control_requirements: controlRequirements as HarnessWorkProfile["control_requirements"],
+    current_runtime_scope: "read_only_analysis",
+  };
+}
+
 function normalizeScenario(value: unknown): HarnessScenario | null {
   if (!value || typeof value !== "object") return null;
   const raw = value as Record<string, unknown>;
-  const scenarioId = asText(raw.scenario_id); const demo = asText(raw.demo_id) as HarnessScenario["demo"];
+  const scenarioId = asText(raw.scenario_id);
+  const workProfile = normalizeWorkProfile(raw.work_profile);
   const files = normalizeFiles(raw.files);
-  if (!scenarioId || !["demo1", "demo2", "demo3"].includes(demo) || !files.length) return null;
+  if (!scenarioId || !workProfile || !files.length) return null;
   return {
-    scenario_id: scenarioId, demo, title: asText(raw.title, COLLECTION_LABELS[scenarioId] ?? "办公资料"),
+    scenario_id: scenarioId, work_profile: workProfile, title: asText(raw.title, COLLECTION_LABELS[scenarioId] ?? "办公资料"),
     goal: asText(raw.goal, "查看公开办公资料并形成可核对结论。"),
     dataset_label: asText(raw.dataset_label, "FORTE 公开办公基准数据"),
     dataset_version: asText(raw.dataset_version, "FORTE 公开版本"), files,

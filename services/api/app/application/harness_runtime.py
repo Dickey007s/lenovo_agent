@@ -612,7 +612,7 @@ class HarnessRuntime:
             )
         return {
             "scenario_id": scenario.task_id,
-            "demo_id": projection["demo_id"],
+            "work_profile": projection["work_profile"],
             "title": projection["title"],
             "goal": projection["goal"],
             "deliverables": projection["deliverables"],
@@ -621,7 +621,6 @@ class HarnessRuntime:
             "allowed_capabilities": projection["allowed_capabilities"],
             "dataset_label": projection["dataset_label"],
             "dataset_version": projection["dataset_version"],
-            "experience_policy": projection["experience_policy"],
             "files": files,
         }
 
@@ -641,12 +640,11 @@ class HarnessRuntime:
             projection = {
                 key: getattr(scenario, key, None)
                 for key in (
-                    "demo_id",
+                    "work_profile",
                     "title",
                     "goal",
                     "dataset_label",
                     "dataset_version",
-                    "experience_policy",
                     "selection_reason",
                     "allowed_tools",
                     "task_instruction",
@@ -678,13 +676,12 @@ class HarnessRuntime:
             )
         return {
             "scenario_id": task_id,
-            "demo_id": projection["demo_id"],
+            "work_profile": projection["work_profile"],
             "title": projection["title"],
             "goal": projection["goal"],
             "category": category,
             "dataset_label": projection["dataset_label"],
             "dataset_version": projection["dataset_version"],
-            "experience_policy": projection["experience_policy"],
             "input_dir": getattr(scenario, "input_dir", ""),
             "selection_reason": projection["selection_reason"],
             "allowlisted_tools": projection["allowed_tools"],
@@ -1126,7 +1123,7 @@ class HarnessRuntime:
         """Expose only the planning policy, never catalog paths or hidden tasks."""
         return {
             "scenario_id": scenario.get("scenario_id"),
-            "demo_id": scenario.get("demo_id"),
+            "work_profile": scenario.get("work_profile"),
             "title": scenario.get("title"),
             "goal": instruction,
             "task_instruction": instruction,

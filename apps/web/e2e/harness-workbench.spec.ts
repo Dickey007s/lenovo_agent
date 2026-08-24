@@ -12,9 +12,9 @@ const files = {
 };
 
 const scenarios = [
-  { scenario_id: "Finance-018", demo_id: "demo1", title: "核对跨年度往来账款", goal: "识别未收款与长期不变账款。", dataset_label: "公开办公基准数据 · FORTE", dataset_version: "FORTE 公开版本 · 345c1ec", data_boundary: "仅限所选 FORTE 文件", human_gate_summary: "任何外部动作不在本轮范围内", files: [files.finance2025, files.finance2026] },
-  { scenario_id: "pm-014", demo_id: "demo2", title: "核对产品上线条件", goal: "并行核对配置、功能和兼容性测试。", dataset_label: "公开办公基准数据 · FORTE", dataset_version: "FORTE 公开版本 · 345c1ec", data_boundary: "仅限所选 FORTE 文件", human_gate_summary: "任何外部动作不在本轮范围内", files: [files.releaseConfig, files.releaseTest] },
-  { scenario_id: "Operations-008", demo_id: "demo3", title: "审核外呼流程边界", goal: "核对时间和人工升级规则。", dataset_label: "公开办公基准数据 · FORTE", dataset_version: "FORTE 公开版本 · 345c1ec", data_boundary: "仅限所选 FORTE 文件", human_gate_summary: "任何外部动作不在本轮范围内", files: [files.operations] },
+  { scenario_id: "Finance-018", work_profile: { task_topology: "single_task", orchestration: "bounded_loop", control_requirements: ["evidence_gate", "human_gate"], current_runtime_scope: "read_only_analysis" }, title: "核对跨年度往来账款", goal: "识别未收款与长期不变账款。", dataset_label: "公开办公基准数据 · FORTE", dataset_version: "FORTE 公开版本 · 345c1ec", data_boundary: "仅限所选 FORTE 文件", human_gate_summary: "任何外部动作不在本轮范围内", files: [files.finance2025, files.finance2026] },
+  { scenario_id: "pm-014", work_profile: { task_topology: "multi_task", orchestration: "adaptive_swarm", control_requirements: ["evidence_gate", "human_gate"], current_runtime_scope: "read_only_analysis" }, title: "核对产品上线条件", goal: "并行核对配置、功能和兼容性测试。", dataset_label: "公开办公基准数据 · FORTE", dataset_version: "FORTE 公开版本 · 345c1ec", data_boundary: "仅限所选 FORTE 文件", human_gate_summary: "任何外部动作不在本轮范围内", files: [files.releaseConfig, files.releaseTest] },
+  { scenario_id: "Operations-008", work_profile: { task_topology: "single_task", orchestration: "bounded_loop", control_requirements: ["evidence_gate", "human_gate", "risk_gate"], current_runtime_scope: "read_only_analysis" }, title: "审核外呼流程边界", goal: "核对时间和人工升级规则。", dataset_label: "公开办公基准数据 · FORTE", dataset_version: "FORTE 公开版本 · 345c1ec", data_boundary: "仅限所选 FORTE 文件", human_gate_summary: "任何外部动作不在本轮范围内", files: [files.operations] },
 ] as const;
 
 function tablePreview(file = files.finance2025) {

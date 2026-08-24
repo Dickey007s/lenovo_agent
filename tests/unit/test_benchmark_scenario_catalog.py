@@ -36,9 +36,17 @@ def test_catalog_indexes_only_three_public_input_workspaces() -> None:
         "Operations-008",
     ]
     assert [len(item.files) for item in scenarios] == [4, 5, 2]
-    assert scenarios[0].projection["demo_id"] == "demo1"
-    assert scenarios[1].projection["experience_policy"] == "adaptive_team"
-    assert scenarios[2].projection["demo_id"] == "demo3"
+    assert scenarios[0].projection["work_profile"] == {
+        "task_topology": "single_task",
+        "orchestration": "bounded_loop",
+        "control_requirements": ["evidence_gate", "human_gate"],
+        "current_runtime_scope": "read_only_analysis",
+    }
+    assert scenarios[1].projection["work_profile"]["task_topology"] == "multi_task"
+    assert scenarios[1].projection["work_profile"]["orchestration"] == "adaptive_swarm"
+    assert "risk_gate" in scenarios[2].projection["work_profile"][
+        "control_requirements"
+    ]
 
     finance = scenarios[0]
     workbook = finance.file("Finance-018/input/2026往来明细.xlsx")
@@ -66,10 +74,13 @@ def test_catalog_indexes_only_three_public_input_workspaces() -> None:
 def test_public_projection_hides_planner_prompt_and_raw_paths() -> None:
     catalog = BenchmarkScenarioCatalog(ROOT)
     public = catalog.public_scenarios()
-    assert {item["demo_id"] for item in public} == {"demo1", "demo2", "demo3"}
+    assert {item["work_profile"]["task_topology"] for item in public} == {
+        "single_task",
+        "multi_task",
+    }
     required = {
         "title", "goal", "deliverables", "data_boundary", "human_gate_summary",
-        "allowed_capabilities", "files",
+        "allowed_capabilities", "work_profile", "files",
     }
     for item in public:
         assert required.issubset(item)
@@ -81,6 +92,8 @@ def test_public_projection_hides_planner_prompt_and_raw_paths() -> None:
         assert "customer-a" not in serialized
         assert "2400" not in serialized
         assert "2680" not in serialized
+        assert "demo_id" not in serialized
+        assert "experience_policy" not in serialized
         assert not re.search(r"(?<![0-9a-f])[0-9a-f]{40}(?![0-9a-f])", serialized)
         assert not re.search(r"(?<![0-9a-f])[0-9a-f]{64}(?![0-9a-f])", serialized)
         assert "input_dir" not in item
