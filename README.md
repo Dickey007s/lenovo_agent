@@ -16,6 +16,16 @@ V0.1 重点验证三件事：
 
 所有产生副作用的工具当前均为 **Simulator**，不会发送真实邮件、写入真实日历、CRM、OA 或任务系统。
 
+## 当前推进：FORTE Workspace + 统一 Agent Harness（DR-0016，Limited Verified）
+
+最新纵切不再为三个 Demo 各画一套固定脚本，而是采用同一条 `Scenario Pack -> Harness Run -> Frontend Projection`：用户默认面对“工作现场”，先看本轮公开来源与文件，再看 Agent 逐步形成动态计划，最后在右侧查看服务端活动回执。统一八模块固定为 Scenario Pack & Workspace Catalog、Task Contract、Planner、Admission & Plan Validator、Scheduler & Worker Manager、Tool Gateway、Artifact Workspace & Verifier、Checkpoint/Event/Governance Control。
+
+来源使用公开 [FORTE](https://github.com/AGI-Eval-Official/FORTE) 固定 commit `345c1ec1487139db9dd319787fa9405ba85d1869` 和顶层 MIT。项目原样保存 11 个导入文件、总计 `115352` bytes，并以 manifest 固定 size/MIME/SHA-256：其中 8 个 input 进入只读场景目录，3 个 raw `task.md` 仅作 provenance。Catalog 只把 Prompt 净化文本送给内部 Planner；公共 API/UI 不得出现 raw task、`task_instruction`、rubric、solution 或 grading 内容。前台必须称“公开办公基准数据”，不能称真实企业文件、Lenovo 数据或实时 Connector。
+
+第一纵切只运行 Catalog、Task Contract、`deepseek-v4-pro` Planner、Plan Validator 和单进程 memory Snapshot/SSE，最终到 `ready_to_execute`。可复核 live manifest 记录 Finance-018、pm-014、Operations-008 分别生成 10/6/4 个计划单元，三者均为 v6/seq 5、`called=true`、`output_used=true`、`validation_errors=[]` 和 `execution_started=false`；模型是否调用、输出是否采用、计划是否通过服务端校验是三个不同事实。当前没有 execution command，Scheduler/Worker、工具调用、Artifact mutation/验证/Commit、审批、Permit、Connector 和任何外部副作用均未发生。
+
+Finance-018、pm-014、Operations-008 分别是 Demo 1/2/3 的新场景来源，但三条执行迁移仍为 `Draft`；旧固定 Demo 的限定 Verified 事实不能复制为 FORTE 运行事实。限定工程封口为 Python `199 passed, 1 skipped in 7.93s`、浏览器 `48 passed (3.6m)`，Ruff、lint、build 通过，并绑定三次 live run、六张桌面/移动截图、实现 [`fdcc3d819686b0d0afd99fcd0b637b5329607835`](https://github.com/Dickey007s/lenovo_agent/commit/fdcc3d819686b0d0afd99fcd0b637b5329607835) 与 open、未合并的 [PR #23](https://github.com/Dickey007s/lenovo_agent/pull/23)；文档提交待本次文档提交后回填。E2E 只能作为工程代理，不能替代目标用户研究。范围、Manifest 和不可夸大边界见 [`DR-0016`](docs/decisions/DR-0016-public-workspace-agent-harness.md) 与 [`Limited Verified Evidence`](docs/evidence/FORTE-WORKSPACE-AGENT-HARNESS-EVIDENCE-20260824.md)。
+
 ## V0.1 已实现能力
 
 ### 办公工作区
@@ -122,6 +132,7 @@ flowchart LR
     UI["Next.js 工作区 + Agent 对话"]
     API["FastAPI Conversation / Run / Task API"]
     TASK["TaskService + TaskStore"]
+    HARNESS["FORTE Catalog + Unified Harness"]
     LLM["OpenAI-compatible LLM"]
     CONTRACT["Pydantic Contracts"]
     GOVERN["Risk + Policy + Evidence + ControlPlan"]
@@ -133,8 +144,10 @@ flowchart LR
 
     UI <-->|"REST + SSE"| API
     API --> TASK
+    API --> HARNESS
     TASK <--> PG
     API --> LLM
+    HARNESS --> LLM
     LLM --> CONTRACT
     CONTRACT --> GOVERN
     GOVERN --> GRAPH
@@ -146,6 +159,8 @@ flowchart LR
 
 核心依赖方向是：**LLM 输出候选业务事实 → 严格协议校验 → 确定性治理 → 人工 Gate → 一次性授权 → Gateway 校验 → Simulator**。模型不能直接签发 Permit、改变风险等级、伪造证据或调用工具。
 
+统一 Harness 的第一纵切另为：**固定来源原字节 → 安全公共场景 / 内部净化 Planner context → 模型 DAG 候选 → 服务端 Plan Validator → `ready_to_execute`**。这条链当前在执行边界前停止，不能与上方既有 Simulator 动作链合并叙述为已经执行。
+
 详细说明见：
 
 - [系统架构与技术路线](docs/ARCHITECTURE.md)
@@ -154,6 +169,13 @@ flowchart LR
 - [HTTP API 与 SSE 事件](docs/API.md)
 - [演示脚本与 Presentation Brief](docs/PRESENTATION_BRIEF.md)
 - [Loop、Swarm 与统一 Agent Runtime 目标架构](docs/TARGET_ARCHITECTURE.md)
+- [公开 Workspace + 统一 Harness 决策（Limited Verified 规划纵切）](docs/decisions/DR-0016-public-workspace-agent-harness.md)
+- [FORTE Workspace + Harness 证据账本（Limited Verified）](docs/evidence/FORTE-WORKSPACE-AGENT-HARNESS-EVIDENCE-20260824.md)
+- [FORTE 数据导入审计](docs/research/FORTE-DATASET-AUDIT-20260824.md)
+- [公开办公数据集选择研究](docs/research/REAL-OFFICE-DATASET-SELECTION-20260824.md)
+- [Demo 1 FORTE 财务证据场景](docs/scenarios/SCENARIO-004-forte-finance-durable-evidence.md)
+- [Demo 2 FORTE 上线协作场景](docs/scenarios/SCENARIO-005-forte-release-adaptive-team.md)
+- [Demo 3 FORTE 受治理运营场景](docs/scenarios/SCENARIO-006-forte-governed-operations-action.md)
 - [决策、推进与汇报治理](docs/DECISION_AND_REPORTING_GOVERNANCE.md)
 - [Demo 1 Task Runtime 协议](docs/contracts/TASK_RUNTIME_PROTOCOL.md)
 - [Demo 1 UI—服务端事实矩阵](docs/contracts/UI_SERVER_FACT_MATRIX.md)
@@ -199,13 +221,14 @@ flowchart LR
 ```text
 apps/web/                         Next.js 16 + React 19 前端
 packages/contracts/               动作与 Task Runtime 协议、哈希
+demo-enterprise-data/forte/       固定 FORTE 原字节、MIT 与 manifest；运行时只读
 packages/risk_core/               风险、策略和 ControlPlan
 packages/evidence/                确定性 Mock Evidence Resolver
 packages/agent_runtime/           LangGraph interrupt/resume 工作流
 packages/authorization/           Ed25519 Permit 签发
 packages/tool_gateway/            Permit 校验与工具路由
 packages/audit/                   内存/PostgreSQL 审计日志
-services/api/app/application/     ConversationService、RunService、TaskService 与存储适配器
+services/api/app/application/     Conversation/Run/Task、FORTE Catalog、Unified Harness 与存储适配器
 services/api/app/api/             FastAPI 路由
 simulators/                       邮件与办公动作 Simulator
 tests/                            单元与集成测试
@@ -294,6 +317,7 @@ V0.1 定稿基线和 Demo 1 各 PR 的实际验证结果记录在 [`DR-0002`](do
 
 - `X-User-Id` 与 `X-User-Roles` 只是 V0.1 Demo 身份头，默认前端使用 `demo_user` 和 `current_user,sales_manager`；生产环境必须替换为经过验证的 SSO/JWT。
 - 内部邮箱、CRM、报价、OA、知识库和日历内容均为确定性演示数据，不是真实企业数据；Demo 1 的 `demo-enterprise-data/customer-a/` 是项目生成的仿真文件包，不是 Lenovo/真实客户数据库或 Connector。普通业务 UI 必须明确标注“演示数据”，不得显示原始 `fixture:` ID、绝对路径或完整摘要。
+- DR-0016 的 `demo-enterprise-data/forte/` 是固定公开 benchmark input，不是内部演示 Fixture，也不是生产企业数据。raw `task.md` 只作 provenance；公共 API/UI 不得返回 `task_instruction`、rubric、solution 或 grading 内容，内部净化 Prompt 也不进入普通 DOM。
 - 报价工作台不访问真实 CRM/CPQ/ERP；当前公式只覆盖数量、标准价和单行折后比例，不含税费、汇率、阶梯价、套餐依赖或真实审批制度。当前模型仍为 `deepseek-v4-pro`，但报价数值问答由确定性代码完成。
 - Workspace revision 校验和 Conversation/Workspace 锁当前只在单个 API 进程内形成一致性保护；没有数据库原子 compare-and-swap、多实例锁或跨实例 Conversation 顺序验证。前端三方重应用也不是通用多人协作文档合并器。
 - 未解析收件人/附件当前采用固定 deny，而不是已接入企业通讯录或内容分类服务；附件名称识别只适用于演示规则。Run/Thread 绑定与结果重放仍随 Conversation 内存边界，API 重启后不恢复。
@@ -301,6 +325,7 @@ V0.1 定稿基线和 Demo 1 各 PR 的实际验证结果记录在 [`DR-0002`](do
 - 所有副作用工具均为 Simulator；UI 中的“发送成功”“创建成功”只代表 Simulator 成功。
 - 对话 Thread/Message 当前保存在 API 进程内存中，重启后丢失；Workspace、Run、Audit 和 LangGraph checkpoint 在配置 PostgreSQL 时可恢复。
 - Demo 2 的 Cockpit/Execution Snapshot、Worker、SharedArtifactVersion、SwarmEvent、SSE 回放、锁和幂等结果当前都在单 API 进程 memory；API 重启后不恢复，不能从其他 PostgreSQL 路径推断其跨进程能力。
+- Unified Harness 的 Run/Snapshot/Event/start 幂等结果同样只在单 API 进程 memory；第一纵切只到 `ready_to_execute`，没有执行路由、Worker、工具、Artifact Commit 或外部动作。
 - Task 在未配置数据库时同样只保存在 API 进程内存中；Demo 1 mutation 会写 Snapshot、TaskEvent 和 ArtifactVersion。配置 PostgreSQL 后对应表为 `agent_tasks`、`agent_task_events` 和 `agent_task_artifact_versions`。本机 PostgreSQL 16.14 已验证同一数据库上的顺序 API 进程恢复；该结论不覆盖数据库重启/崩溃、多实例并发、迁移或 Conversation Thread/Message。
 - 当前没有 Alembic 迁移、生产级 RBAC、真实 Connector、后台任务队列、分布式 Permit 重放存储、Task 跨实例通知和多实例一致性保障。
 

@@ -27,6 +27,7 @@ flowchart TB
         CONV["ConversationService"]
         RUN["RunService"]
         TASK["TaskService"]
+        HARNESS["Unified Harness Runtime"]
         LLM["AutoDLActionParser / LLM Adapter"]
     end
 
@@ -50,13 +51,17 @@ flowchart TB
         CHECKPOINT["LangGraph Postgres Checkpoint"]
         EMAILSIM["Email Simulator"]
         OFFICESIM["Office Action Simulator"]
+        FORTE["Pinned FORTE read-only package"]
     end
 
     WEB --> ROUTES
     ROUTES --> CONV
     ROUTES --> RUN
     ROUTES --> TASK
+    ROUTES --> HARNESS
     CONV --> LLM --> MODEL
+    HARNESS --> MODEL
+    HARNESS --> FORTE
     CONV --> CONTRACTS
     CONV --> QUOTE
     RUN --> RISK --> POLICY --> EVIDENCE --> PLAN
@@ -97,6 +102,8 @@ Action Gate 打开时，后台任务摘要保留，Gate 占用独立网格行；
 | Quote Calculator | `services/api/app/application/quote_calculator.py` | 报价字段所有权合并、Decimal 逐行核算、最低折后比例检查、来源/核算确定性回答 |
 | RunService | `services/api/app/application/runs.py` | Run 生命周期、重评估、审批、授权、执行、持久化、审计，以及 Task Artifact binding 的创建幂等与门前重校验 |
 | TaskService + DemoSourceCatalog | `services/api/app/application/tasks.py`、`services/api/app/application/demo_source_catalog.py` | 创建和恢复 TaskSnapshot、读取 manifest allowlist 文件并校验哈希、冻结 `source_documents`、固定 Demo 1 start、Verifier/Conflict/Commit、任务控制、Owner scope、mutation 幂等、事件轮询，以及已提交工件的受控读取与动作绑定校验 |
+| BenchmarkScenarioCatalog | `services/api/app/application/benchmark_scenario_catalog.py` | 校验固定 FORTE commit/MIT 导入包的 manifest、原始字节、路径、hash、链接与受限解析；raw `task.md` 只作 provenance，净化 Prompt 只进入内部 Planner context |
+| HarnessRuntime | `services/api/app/application/harness_runtime.py` | 统一 Workspace Snapshot、严格模型 Planner、确定性 Plan Validator、Owner/幂等、Snapshot 和有序 SSE；第一纵切只到 `ready_to_execute`，不执行工具或外部动作 |
 | LLM Adapter | `services/api/app/application/llm.py` | 对话计划、动作抽取、执行后自然语言回应、Schema 修复 |
 | Storage | `services/api/app/application/storage.py` | Run 与 Workspace 的内存/PostgreSQL 实现 |
 | Task Storage | `services/api/app/application/task_storage.py` | Task Snapshot、TaskEvent 与 ArtifactVersion 原子 mutation 的内存/PostgreSQL 实现 |
@@ -115,7 +122,9 @@ Action Gate 打开时，后台任务摘要保留，Gate 占用独立网格行；
 
 ### 2.4 基础设施层
 
-V0.1 使用 PostgreSQL 16 保存 Workspace、Run Snapshot 和审计事件，并使用官方 `AsyncPostgresSaver` 保存 LangGraph checkpoint。Demo 1 TaskStore 另用 `agent_tasks`、`agent_task_events` 和 `agent_task_artifact_versions` 保存 Task 投影、事件和追加式工件版本；来源文件当前从仓库内 `demo-enterprise-data/customer-a/` 读取，manifest allowlist、相对路径、文件大小、非符号链接和 SHA-256 校验后才进入结构化解析，并在 `TaskSnapshot.source_documents[]` 冻结。PR 5 已在本机 PostgreSQL 16.14 上用三个顺序 API 进程验证 waiting-input 与 committed 两个恢复点，以及跨重启幂等零重复；这不等于 Conversation、多实例或数据库故障恢复。LLM 使用 OpenAI-compatible `/chat/completions`；固定 Demo 1 Task start 不调用 LLM。所有工具调用落到 `simulators/`，不连接真实办公系统；文件包也不是 Lenovo/真实客户数据库。
+V0.1 使用 PostgreSQL 16 保存 Workspace、Run Snapshot 和审计事件，并使用官方 `AsyncPostgresSaver` 保存 LangGraph checkpoint。Demo 1 TaskStore 另用 `agent_tasks`、`agent_task_events` 和 `agent_task_artifact_versions` 保存 Task 投影、事件和追加式工件版本；来源文件当前从仓库内 `demo-enterprise-data/customer-a/` 读取，manifest allowlist、相对路径、文件大小、非符号链接和 SHA-256 校验后才进入结构化解析，并在 `TaskSnapshot.source_documents[]` 冻结。PR 5 已在本机 PostgreSQL 16.14 上用三个顺序 API 进程验证 waiting-input 与 committed 两个恢复点，以及跨重启幂等零重复；这不等于 Conversation、多实例或数据库故障恢复。LLM 使用 OpenAI-compatible `/chat/completions`；固定 Demo 1 Task start 不调用 LLM。所有既有业务动作工具调用落到 `simulators/`，不连接真实办公系统。
+
+DR-0016 另从 `demo-enterprise-data/forte/` 读取公开 FORTE 固定 commit `345c1ec1487139db9dd319787fa9405ba85d1869` 的原始输入，保留顶层 MIT 许可证和 11 个文件/`115352` bytes 的 manifest 台账。三份 raw `task.md` 只作 provenance；Catalog 抽取净化 Prompt 供内部 Planner，公共 API/UI 不得返回 `task_instruction`、rubric 或 solution。Harness Run、事件、幂等表和异步规划任务当前只在单 API 进程 memory；live health 也明确为 `checkpoint=memory/task_store=memory`，API 重启不恢复。第一纵切没有启动 Worker、调用 Tool Gateway、修改 Artifact、连接 Connector 或执行外部动作。
 
 ## 3. 两条核心数据路径
 
@@ -373,6 +382,36 @@ sequenceDiagram
 
 前端先显示 route `impact_preview`，确认选择后只显示 `selection_receipt`；用户再次启动后，当前 Runtime 的整轮 `Demo2ExecutionSnapshot.status` 才可达 `queued/running/verifying/completed/failed`。协议枚举保留 Execution `cancelled`，但当前无取消路由/转换，属于兼容保留或 Draft。单个 Worker 状态仅为 `queued/running/completed/failed/cancelled`，不存在 Worker `verifying` 或 Demo 2 `waiting_input`；核验阶段由整轮 `EXECUTION_VERIFYING` 与 Artifact 事件表达。运行中状态、动态增派与完成必须来自执行 Snapshot 和 `SwarmEvent`，完成回执固定 `external_side_effect=none`。两轮 live 模型与六张截图证据见 [`DEMO2-CONTROLLED-EXECUTION-20260821`](evidence/DEMO2-CONTROLLED-EXECUTION-EVIDENCE-20260821.md)。
 
+### 3.7 FORTE Workspace + 统一 Harness 规划纵切（DR-0016，Limited Verified）
+
+```mermaid
+sequenceDiagram
+    participant U as User
+    participant UI as 工作现场
+    participant API as Harness API
+    participant CAT as Scenario Catalog
+    participant PLAN as deepseek-v4-pro Planner
+    participant VAL as Plan Validator
+    participant MEM as Memory Snapshot/Event Store
+
+    U->>UI: 选择公开办公场景并开始本轮
+    UI->>API: POST /v1/harness/runs
+    API->>CAT: 校验 manifest 与 allowlisted input
+    CAT-->>MEM: workspace_index
+    API->>PLAN: 内部净化任务 + 文件索引
+    PLAN-->>API: HarnessPlan JSON 候选
+    API-->>MEM: planning_completed(output_used=false)
+    API->>VAL: 路径 / 工具 / 副作用 / Artifact / 依赖 / Gate
+    VAL-->>MEM: plan_validation(output_used=true)
+    MEM-->>UI: ready_to_execute(execution_started=false)
+```
+
+Catalog 以 FORTE 固定 commit、MIT、manifest、逐文件 size/SHA-256、路径边界、非符号链接和受限 Markdown/XLSX 摘要建立只读 Workspace Snapshot。raw `task.md` 原字节只留 provenance；只有去掉 front matter 和 grading/rubric 段的 Prompt 净化文本进入内部 Planner。公共场景 API 与普通 DOM 只接收安全业务投影，不接收 `task_instruction`、rubric、solution、绝对路径或完整 hash。
+
+模型返回严格 `HarnessPlan` 候选；服务端拥有 Run/事件身份、来源范围、状态和校验结论。`HarnessModelReceipt.called`、`output_used` 与 `HarnessRun.status=ready_to_execute` 分别回答“是否实际调用”“是否采用模型输出”“是否通过服务端校验”，不得合并成一个“模型成功”状态。可复核 manifest 中三场景均到 v6/seq 5 `ready_to_execute` 且 `execution_started=false`：Finance-018 为 3 files/10 units/17112 ms，pm-014 为 4 files/6 units/13577 ms，Operations-008 为 1 file/4 units/10243 ms。正常事件均为 `workspace_index -> planning_started -> planning_completed -> plan_validation -> ready_to_execute`；终态流只连接一次并最终 GET，非终态断流才用 `after=N` 恢复。限定工程证据见 [`FORTE-WORKSPACE-AGENT-HARNESS-EVIDENCE-20260824`](evidence/FORTE-WORKSPACE-AGENT-HARNESS-EVIDENCE-20260824.md)。
+
+统一八模块为 Scenario Pack & Workspace Catalog、Task Contract、Planner、Admission & Plan Validator、Scheduler & Worker Manager、Tool Gateway、Artifact Workspace & Verifier、Checkpoint/Event/Governance Control。当前纵切只真正运行前四项和最后一项的 memory Snapshot/SSE 子集；Scheduler/Worker、工具执行、Artifact mutation/验证/Commit、审批/Permit、Connector 与三 Demo 执行迁移均为 Draft。
+
 ## 4. 信任边界
 
 ### 4.1 可由 LLM 产生
@@ -380,6 +419,7 @@ sequenceDiagram
 - `assistant_response` 自然语言。
 - `ArtifactDraft` 的表达性内容。
 - Demo 2 Worker 的受限业务 `summary/key_points` 候选；只有通过服务端批准文本校验才采用。
+- Harness Planner 的 `summary/units[].title/objective/input_paths/depends_on/tool/requires_human_gate/side_effect/artifact_name/artifact_type` 候选；必须通过严格结构与服务端 Plan Validator 才采用。
 - `ActionCandidate` 中的业务候选字段：动作类型、目标、资源、数据类别、状态变化类型等；这些字段在可执行 capability 上仍需由当前 Artifact 重新绑定。
 
 所有字段必须通过严格枚举与 Schema 校验。LLM 输出只表示“候选事实”，不是授权结论。
@@ -394,6 +434,7 @@ sequenceDiagram
 - Task Artifact 与治理动作之间的 `TaskArtifactBinding`、创建幂等摘要和每次推进前的绑定重校验结果。
 - Task/Branch 状态、ArtifactVersion 身份与摘要、VerificationReport、ConflictRecord、ControlEvent、TaskCommit 和 TaskEvent sequence。
 - Demo 2 的执行/Worker/共享工件身份、来源范围、依赖、状态、事件 sequence、Artifact 版本/digest、动态重排触发和 ExecutionReceipt。
+- Harness Run/事件身份、Owner、来源 Snapshot、状态、版本、事件 sequence、模型调用回执、输出采纳事实、计划校验结果和 `execution_started=false` 边界。
 - 报价的规范化行小计、标准总价、折后总价、优惠金额、综合折后比例、优惠率、最低折后比例检查，以及保存后的 `needs_review` / `requires_recheck`。
 - WorkspaceArtifact `revision`、可执行 Action 的 Artifact 绑定字段，以及服务端保留/生成的 Artifact 来源。
 
@@ -413,6 +454,7 @@ sequenceDiagram
 | TaskSnapshot / TaskEvent | `InMemoryTaskStore` | `agent_tasks` / `agent_task_events` | PostgreSQL 16.14 下已验证顺序 API 进程恢复 v2/v3；内存模式进程退出即丢失 |
 | Task ArtifactVersion | `InMemoryTaskStore` 追加列表 | `agent_task_artifact_versions` mutation 路径 | PostgreSQL 16.14 下已验证 5/7 个版本跨进程恢复及幂等零新增 |
 | Demo 2 Cockpit / Execution Snapshot / SwarmEvent / SharedArtifactVersion | 进程内存 | 未实现 | 否；API 重启即丢失 |
+| HarnessRunSnapshot / HarnessEvent / start 幂等结果 | 进程内存 | 未实现 | 否；API 重启即丢失，且第一纵切只到 `ready_to_execute` |
 | Permit 已使用集合 | 进程内存 | 进程内存 | 否 |
 
 TaskStore 优先使用 `DATABASE_DSN`，没有时回退到 `LANGGRAPH_CHECKPOINT_DSN`；两者都不存在时使用进程内存。内存测试中的服务重建只能证明同一个 Store 对象仍可读取投影，不能证明 API 进程重启恢复。PR 5 的 PostgreSQL 证据将 TaskStore 单独设为 postgres、checkpoint 保持 memory，以隔离证明 Task 表；本机完整演示配置两条 DSN 时健康接口显示两者均为 postgres。配置 `LANGGRAPH_CHECKPOINT_DSN` 后，FastAPI lifespan 还会初始化 Run、Workspace、Audit 和 checkpoint 存储，并恢复 Run Snapshot。Workspace 的 `revision` 会随保存写入 Store，但读取、比较与写入尚未形成数据库单语句 CAS；两个 API 实例仍可能各自基于旧缓存写入。已有库迁移、数据库进程故障、对话持久化、跨实例 Task/Workspace 协调和分布式 Permit 重放存储属于后续工作。
@@ -423,6 +465,7 @@ TaskStore 优先使用 `DATABASE_DSN`，没有时回退到 `LANGGRAPH_CHECKPOINT
 Browser :3000  ──REST/SSE──>  FastAPI :8010
                                  │
                                  ├── OpenAI-compatible LLM endpoint
+                                 ├── vendored FORTE read-only package
                                  ├── PostgreSQL :5432
                                  └── in-process Simulators
 ```
@@ -460,14 +503,16 @@ Browser :3000  ──REST/SSE──>  FastAPI :8010
 1. `README.md`：范围与边界。
 2. `packages/contracts/models.py`：协议词汇表。
 3. `packages/contracts/task_models.py`：Demo 1 Task Runtime 协议。
-4. `services/api/app/application/tasks.py` 与 `task_storage.py`：Task 创建、读取、Owner scope、幂等和 Store。
-5. `services/api/app/application/conversations.py`：工作区与对话主链。
-6. `services/api/app/application/runs.py`：动作执行主链。
-7. `packages/risk_core/`：风险与策略真值。
-8. `packages/agent_runtime/workflow.py`：人工 Gate。
-9. `packages/authorization/` 与 `packages/tool_gateway/`：执行安全边界。
-10. `apps/web/app/page.tsx`：前端交互状态机、非 Tasks 后台任务摘要与 Tasks 组合视图。
-11. `tests/`：预期行为与回归边界。
+4. `packages/contracts/harness_models.py`：公开场景安全投影与 FORTE manifest 协议。
+5. `services/api/app/application/benchmark_scenario_catalog.py` 与 `harness_runtime.py`：只读 Catalog、内部 Planner、Plan Validator、memory Snapshot/SSE 和未执行边界。
+6. `services/api/app/application/tasks.py` 与 `task_storage.py`：Task 创建、读取、Owner scope、幂等和 Store。
+7. `services/api/app/application/conversations.py`：工作区与对话主链。
+8. `services/api/app/application/runs.py`：动作执行主链。
+9. `packages/risk_core/`：风险与策略真值。
+10. `packages/agent_runtime/workflow.py`：人工 Gate。
+11. `packages/authorization/` 与 `packages/tool_gateway/`：执行安全边界。
+12. `apps/web/app/harness-workbench.tsx` 与 `page.tsx`：统一工作现场和既有前端交互状态机。
+13. `tests/`：预期行为与回归边界。
 
 ## 9. Demo 1 渐进 Runtime 当前事实（2026-08-17）
 

@@ -15,6 +15,8 @@ V0.1 采用 **workspace-first** 结构，而不是以聊天记录为唯一产物
 
 前端入口是 `apps/web/app/page.tsx`，主要视觉和动效位于 `apps/web/app/styles.css`。普通工作区保留暖纸底色、墨黑正文与工作区身份色；Demo 1 Task Director 使用更中性的高密度工作台，蓝色表达当前交互或运行阶段、绿色表达服务端已验证事实、琥珀色表达等待证据或人工决定。颜色、图标、连接线和进度式布局都不是业务真值。各工作区页头标题是固定的“XX 工作台”名称，不随 Artifact 数据变化；Task Director 标题和目标是例外，直接投影当前 `TaskSnapshot.contract`。移动端关键操作目标至少 44px。
 
+`DR-0016` 已把统一“工作现场”设为三 Demo 的默认体验：来源工作区在左、渐进阶段与动态计划在中、服务端活动回执在右。该第一纵切只在固定 FORTE 三场景、单进程 memory 和 `ready_to_execute` 边界为 `Limited Verified`，不删除普通 WorkspaceArtifact、对话或既有 Demo Runtime，也不表示三 Demo 已迁移执行。
+
 ## 2. WorkspaceArtifact
 
 `services/api/app/application/conversation_models.py` 中的 `WorkspaceArtifact` 是工作区的服务端协议：
@@ -87,6 +89,22 @@ Tasks 工作区新增客户端 `cockpit` 模式，并把它设为当前默认入
 
 Demo 2 的 Admission/route 仍通过 GET/POST 对账；固定客户 A 的受控执行另使用 execution GET、event replay 与 SSE。选择回执必须先显示“已选择、尚未启动”，用户启动后才根据整轮 `Demo2ExecutionSnapshot.status` 显示当前 Runtime 可达的 `queued/running/verifying/completed/failed`；协议枚举中的 Execution `cancelled` 尚无当前取消路由/转换，只能按 Draft/兼容状态处理。单个工作单元只显示 `queued/running/completed/failed/cancelled`，不显示 Worker `verifying` 或 Demo 2 `waiting_input`；`verifying` 专指整轮共享工件核验。四个业务工作单元、5 个共享工件、动态增派和完成回执均投影服务端 Snapshot/有序事件；API 进程重启会丢失 memory 选择与执行，因此 UI 不得显示跨进程恢复。`route_profiles[].forecast` 只投影为“规则预测”；Prompt、思维链、内部来源 ID、策略权重、Worker 对话和底层日志不进入业务 DOM。移动端把队列改为横向可选择条、详情与右侧决策区改为纵向自然流；关键可见控件至少 44px，页面不允许整体横向溢出。
 
+### 2.4 FORTE Workspace + 统一 Harness 工作现场（DR-0016，Limited Verified 规划纵切）
+
+工作现场是统一 Harness 的业务前台，不是内部调试器。三个区域各自承担一个用户问题：
+
+| 区域 | 用户问题 | 当前服务端事实 | 默认隐藏 |
+| --- | --- | --- | --- |
+| 左侧来源工作区 | “Agent 本轮可以看哪些资料？” | 安全公共场景投影与 `PublicHarnessRunSnapshot.source_documents[].file_ref/display_*` | raw `task.md`、内部净化 Prompt、`task_instruction`、rubric/solution/grading、绝对路径、完整 hash |
+| 中间动态计划 | “Agent 准备怎么做，依赖与边界是什么？” | `HarnessRunSnapshot.status/plan/model_receipt/validation_errors` 和有序事件 | Prompt、CoT、模型原始响应、静态预画的伪 DAG |
+| 右侧活动回执 | “模型是否调用、结果是否采用、执行是否发生？” | `HarnessModelReceipt.called/output_used/elapsed_ms`、`HarnessEvent`、`execution_started=false` | Key、供应商 payload、内部堆栈、无决策价值日志 |
+
+进入页面时先显示三个安全场景和原始 input 的业务标签，再由用户开始本轮。四个前台阶段固定翻译服务端事实：读取文件（`workspace_index`）、生成计划（`planning_started/completed`）、校验计划（`plan_validation`）、准备执行（`ready_to_execute`）。页面不能一打开就跳到校验；恢复时只有 Snapshot 的真实 status/version/sequence 可以决定当前位置。
+
+动态计划节点来自服务端安全公共 `plan.units[]`，可以在不同真实模型运行中改变数量、依赖、`input_file_refs` 和允许工具，前端不得按 Demo 写固定 Worker 模板，也不得接收内部 path/hash。`called=true` 显示“模型已调用”；`output_used=true` 显示模型计划已被采用；`ready_to_execute` 才显示“计划已通过服务端校验，尚未执行”。三者不得合并。当前没有 execution command、Scheduler/Worker、工具调用、Artifact 写入、审批或 Permit；按钮点击与动画都不能显示任务完成。
+
+断线后页面保留最后确认 Snapshot 和 event sequence；非终态意外断流先 GET 对账，再以 `after=N` 继续 SSE。收到 `ready_to_execute` 或 `harness_failed` 后关闭唯一终态连接，并只做一次最终 GET，不再循环重连。单进程 API 重启则 Run 丢失，只能明确提示重新开始新一轮，不能声称恢复。`X-User-Id` 仍是 P0 占位。桌面/移动 E2E 只验证被测工程投影，不属于用户研究。
+
 ## 3. 来源、权限和修改记录
 
 每个 `SourceReference` 包含：
@@ -103,6 +121,8 @@ source_id | label | system | excerpt | permission | updated_at
 - 保存、Agent 修改和动作失效分别在何时发生。
 
 这些来源在 V0.1 中是确定性 Demo 数据，并非真实 Connector 返回值。Demo 1 当前的文件包位于 `demo-enterprise-data/customer-a/`：manifest allowlist、相对路径、文件大小、非符号链接和 SHA-256 通过后，受限解析器把 `.eml/.csv/.json` 形成 `TaskSnapshot.source_documents[]`，并在创建时冻结。Conflict 卡的字段级差异来自服务端 `ConflictRecord.operation_context`，不是前端或模型推断。普通业务 UI 显示“演示数据 · 文件名 / 系统标签 / 记录时间”，原始 `fixture:` 控制 ID、绝对路径和完整摘要只保留在服务端校验/审计，不进入 DOM；未知来源、缺文件、篡改或解析失败显示“待核对”并 fail closed，不回退到旧金额或静态事实。这些文件是项目生成仿真，不是 Lenovo/真实客户数据、实时企业数据库或 Connector。
+
+DR-0016 的统一 Harness 使用另一条明确隔离的来源链：FORTE 公开仓库固定 commit `345c1ec1487139db9dd319787fa9405ba85d1869`、顶层 MIT 和本地 manifest 中 11 个原始文件/`115352` bytes。8 个 input 是普通工作现场的候选来源；3 个 raw `task.md` 只保留 provenance，不显示为工作区文件。Catalog 仅把 Prompt 净化文本送入内部 Planner，公共 API/UI 不得出现 `task_instruction`、rubric、solution 或 grading 内容。前台必须标“公开办公基准数据”，不能称为真实企业文件或客户数据库。
 
 ## 4. Agent 上下文与规划
 
@@ -136,6 +156,8 @@ action               可选的 ActionCandidate
 ```
 
 规划结果经 Pydantic 校验，失败时最多修复一次。普通公共知识问题走直接问答路径，避免无关问题继承上一轮动作；涉及公司、客户、报价、报销、权限等企业事实的问题必须依赖 trusted context，不能用模型常识伪造内部记录。
+
+Harness Planner 是独立的严格规划协议：内部只接收安全场景契约、净化任务文本和 allowlisted input 索引，返回 `HarnessPlan.summary/units[]`。该 Planner 不拥有 Run/事件身份、来源真值、执行状态、Artifact 版本、验证结论、Approval 或 Permit；路径、工具、副作用、Artifact 名称、依赖、环和 Human Gate 均由服务端验证。模型调用、输出采纳与服务端 validation 是三个分离事实。
 
 报价核算、复算、最低折后比例检查和来源追问是更窄的确定性分支：ConversationService 从当前活动报价调用 Quote Calculator，并直接形成可读回答，LLM 不生成金额。写入、修改、保存、发送、创建或导入等业务动作不会被该分支截获，继续进入 `ConversationPlan` 与治理链路。来源回答必须说明数据是当前屏幕中的固定演示报价、公式为数量 × 标准价 × 折后比例，且没有访问真实 CRM。
 
@@ -271,3 +293,9 @@ Demo 2 路由按钮只写入服务端选择，因此命名为“记录本轮方�
 Demo 1 直接投影 `TaskSnapshot.stage_records[].processing`（`path/model_called/model/elapsed_ms/output_used`）及阶段状态；Demo 2 的路由选择投影 `RouteSelectionReceipt.processing`，受控内部执行投影 `Demo2ExecutionSnapshot.workers[].processing/events/receipt`；Demo 3 复用 `RunSnapshot.status/control_plan/evidence/approvals/permit/tool_result/impact_preview/execution_receipt` 与 Run SSE/AuditEvent。Demo 2 的 selected 不等于 running，completed 也只表示内部工件包完成且 `external_side_effect=none`；Demo 3 以“执行许可服务”“受控演示工具”为主，Permit/Gateway/Simulator 仅是二级技术元信息。v>1 的 Demo 1 缺少 `stage_records`，或旧 Plan/Act 缺少 `processing` 时显示“模型调用待核对”，不得推断未调用；unknown 工具结果显示“工具结果待核对”，不得写成未调用或未执行。Proposal 或 Task-derived action 出现时，前端全局切换到 Demo3/审计视图，避免继续显示 Demo1/2 身份。
 
 普通业务 UI 不显示 Prompt、CoT、raw `event_type/payload/trace`、密钥、Permit token/内容/permit_id/签名、内部 ID、Worker 对话或供应商原始响应；“执行许可服务”“受控演示工具”及必要的“已运行/结果待核对”业务状态可以显示，技术审计另行受控。移动端按 Demo 身份、当前阶段、调用状态、下一步渐进披露，不把完整事件列表堆在首屏。工程验证和截图见 [`DEMO-IDENTITY-AND-CALL-TRACE-EVIDENCE-20260820`](evidence/DEMO-IDENTITY-AND-CALL-TRACE-EVIDENCE-20260820.md)。
+
+## 14. Harness Snapshot 与 SSE（DR-0016，Limited Verified 规划纵切）
+
+Harness 的命名事件为 `workspace_index`、`planning_started`、`planning_completed`、`plan_validation`、`ready_to_execute` 和失败时的 `harness_failed`。每个事件带单调 `sequence`；浏览器用 `after` 续读并在事件到达后 GET 完整 `HarnessRunSnapshot`。不存在或非当前 Owner 的 Run 在建流前统一返回 404。事件只通知阶段变化，Snapshot 才拥有当前 status、version、来源、plan、model receipt 和 validation errors。
+
+正常路径的四个前台阶段与五个服务端事件不是一一合并的动画：`planning_started` 只说明进入规划；`planning_completed` 必须结合 `model_receipt.called/output_used`；`plan_validation` 才允许显示服务端校验通过；`ready_to_execute` 固定显示“尚未执行”。失败时保留文件范围和真实模型调用回执，清楚说明执行未启动。终态只维持一次 SSE 连接并最终 GET；非终态断流用 `after=N` 续读。当前 memory Runtime 在 API 重启后无法恢复，SSE 重连只覆盖同一进程仍持有 Run 的情况。三次 live run、六张桌面/移动截图和 `48 passed (3.6m)` 浏览器结果见 [`FORTE-WORKSPACE-AGENT-HARNESS-EVIDENCE-20260824`](evidence/FORTE-WORKSPACE-AGENT-HARNESS-EVIDENCE-20260824.md)；它们不是用户研究。

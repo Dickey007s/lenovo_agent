@@ -1,6 +1,6 @@
 # HTTP API 与 SSE 事件
 
-本文记录 V0.1、Demo 1、`DR-0006` 报价核算、`DR-0007` Task 工件动作桥、`DR-0008` Demo 2 Admission 与 `DR-0015` 受控内部执行纵切实际使用的 FastAPI 接口。运行后以 <http://localhost:8010/docs> 的 OpenAPI 页面和 `services/api/app/api/routes.py` 为最终事实来源。Demo 2 当前能在固定客户 A、单 API 进程 memory 范围内启动受控模型 Worker、形成共享工件和事件回执，但不调用外部 Connector。
+本文记录 V0.1、Demo 1、`DR-0006` 报价核算、`DR-0007` Task 工件动作桥、`DR-0008` Demo 2 Admission、`DR-0015` 受控内部执行与 `DR-0016` FORTE Workspace + 统一 Harness 规划纵切使用的 FastAPI 接口。运行后以 <http://localhost:8010/docs> 的 OpenAPI 页面和 `services/api/app/api/` 路由源码为最终事实来源。Demo 2 当前能在固定客户 A、单 API 进程 memory 范围内启动受控模型 Worker；新的 Harness 第一纵切另只到 `ready_to_execute`，不调用任何工具、Worker 或外部 Connector。
 
 ## 1. 约定
 
@@ -13,6 +13,7 @@
 - Task 工件动作幂等头：`POST /tasks/{task_id}/artifacts/{artifact_version_id}/actions/email-send` 必须带 `Idempotency-Key`，长度 8-160。相同用户、相同 key 与完全相同的动作事实返回同一 Run；相同 key 对应不同工件事实时返回 409。
 - Task mutation：`start` 和 `controls` 在 JSON body 中携带 `expected_task_version` 与 `idempotency_key`。版本过期或同一 key 被用于不同命令时返回 409。
 - Workspace revision token：显式提交 `workspace_context` 时同时提交 `workspace_artifact_id + workspace_revision`；保存 `PUT /workspace/{kind}` 时提交 `expected_artifact_id + expected_revision`。这两个字段是当前活动 Artifact 的乐观并发 token，不是权限凭据。
+- Harness start 幂等字段：`POST /harness/runs` 的 JSON body 携带 `idempotency_key`（8-160）与 `expected_version`。同一 Owner、相同 key 和相同 body 重放同一 `run_id`；同 key 用于不同 body 返回 409。该机制只在单 API 进程 memory。
 
 上述身份头没有签名，只是 P0 占位。生产环境必须在 API 边界替换为经过验证的 SSO/JWT，并从可信身份声明映射角色。
 
@@ -88,6 +89,18 @@ Demo 2 当前服务端为进程内 memory。API 重启后路由选择、执行 S
 | POST | `/actions/{action_id}/approvals` | 以当前用户拥有的角色批准或拒绝 |
 | POST | `/actions/{action_id}/authorize` | 最终授权、签发 Permit 并调用 Gateway |
 | POST | `/demo3/actions/{action_id}/tamper-check` | 演示参数被篡改时 Gateway 拒绝执行 |
+
+### 2.5 FORTE Workspace + 统一 Harness（DR-0016，Limited Verified 规划纵切）
+
+| 方法 | 路径 | 用途 |
+| --- | --- | --- |
+| GET | `/harness/scenarios` | 返回三个安全公共场景投影；不创建 Run |
+| GET | `/harness/scenarios/{scenario_id}` | 返回一个安全公共场景投影 |
+| POST | `/harness/runs` | 幂等创建规划 Run，异步读取来源、调用 Planner 并校验计划；返回 202 |
+| GET | `/harness/runs/{run_id}` | 读取当前 Owner 的安全 `PublicHarnessRunSnapshot` 投影 |
+| GET | `/harness/runs/{run_id}/events?after={sequence}` | 回放并订阅命名 Harness SSE；不存在或非当前 Owner Run 统一 404 |
+
+公共场景投影只包含 `scenario_id/demo_id/title/goal/deliverables/data_boundary/human_gate_summary/allowed_capabilities/dataset_label/dataset_version/experience_policy/files[]`，其中文件只含 `display_label/display_group/display_summary`。raw `task.md`、内部净化 Prompt、`task_instruction`、rubric、solution、grading、原始路径和完整 hash 不属于该公共协议。
 
 ## 3. 主要请求与示例
 
@@ -428,6 +441,44 @@ Invoke-RestMethod -Method Post -Uri "$base/actions/$actionId/authorize" -Headers
 
 前置条件不足、Permit 无法签发或 Gateway 校验失败返回 409。成功响应中的 `tool_result.simulator` 明确指出被调用的是 Simulator。
 
+### 3.9 创建并观察 Harness 规划 Run（DR-0016，Limited Verified 规划纵切）
+
+```json
+{
+  "scenario_id": "Finance-018",
+  "idempotency_key": "harness:finance-018:run-001",
+  "expected_version": 1
+}
+```
+
+`POST /harness/runs` 立即返回 202 和 `{run, replayed}`；`run.status` 初始为 `queued`，随后同一 API 进程的异步任务推进。可达状态只有 `queued/indexing/planning/validating/ready_to_execute/failed`。当前没有 execution、cancel、pause、resume、Worker 或 tool 路由。
+
+`PublicHarnessRunSnapshot` 的主要字段是：
+
+```text
+run_id / owner_id / scenario_id / status / version
+created_at / updated_at / last_event_sequence
+source_documents[] / selection_reason
+plan / model_receipt / validation_errors / events[]
+```
+
+`source_documents[]` 只含 `file_ref/display_label/display_group/display_summary`；公共 `plan.units[]` 使用 `input_file_refs[]` 关联这些文件，不返回内部 `input_paths`。内部 Planner/Validator 仍使用 manifest path/hash，但路由在 start、GET 和 SSE 三处统一转换为安全投影并清理错误文字与 event details。
+
+`HarnessModelReceipt.called/model/elapsed_ms/output_used` 必须分别解释。`called=true` 只证明发起了模型 HTTP 调用；`output_used=true` 只在结构解析与完整服务端 Plan Validator 通过后出现；最终 `status=ready_to_execute` 仍只表示计划已校验。服务端事件固定按本纵切顺序记录：
+
+| event | 含义 | 不能推断 |
+| --- | --- | --- |
+| `workspace_index` | allowlisted input 已冻结为本轮来源范围 | 不是文件业务内容已完成核对 |
+| `planning_started` | Planner 阶段开始 | 不能只凭事件认定模型请求已送达 |
+| `planning_completed` | 模型结果返回或失败事实已记录；查看 `model_called/output_used` | 不是计划已经采用 |
+| `plan_validation` | 路径、工具、副作用、Artifact 元数据、依赖、环和人工 Gate 已通过 | 不是工作单元已经执行 |
+| `ready_to_execute` | 计划等待未来独立执行命令 | `execution_started=false`；无工具、工件写入或外部动作 |
+| `harness_failed` | 规划或校验 fail closed | 失败不触发 fallback 执行 |
+
+Harness SSE 以 `id: sequence`、`event: event_name` 和安全投影后的 `HarnessEvent` JSON 发送，`after` 仅返回 `sequence > after` 的事件；无事件时发送 `: heartbeat`。不存在的 Run 或不属于当前 Owner 的 Run 都在建立 `StreamingResponse` 前统一返回 404，不泄露资源是否属于其他 Owner。客户端在事件后 GET 完整公共 Snapshot 对账，不能用 SSE 文案自行合成计划或完成状态。收到 `ready_to_execute` 或 `harness_failed` 后客户端关闭当前流，并只做一次最终 GET；只有非终态意外断流才携带 `after=N` 重连。Run、事件和幂等结果当前是单 API 进程 memory，重启后返回 404；`X-User-Id` 仍为未签名的 P0 占位。
+
+固定三场景 live manifest 已验证 start/GET/SSE 安全投影、真实 `deepseek-v4-pro` 计划、确定性 validation 和 v6/seq 5 终态；浏览器全量为 `48 passed (3.6m)`。这不扩展路由能力：当前仍没有 execution、cancel、pause、resume、Worker、Tool、Artifact mutation、Connector 或外部副作用 API，详情见 [`FORTE-WORKSPACE-AGENT-HARNESS-EVIDENCE-20260824`](evidence/FORTE-WORKSPACE-AGENT-HARNESS-EVIDENCE-20260824.md)。
+
 ## 4. Conversation SSE
 
 Conversation SSE 的事件集：
@@ -526,8 +577,8 @@ SSE 目前由每个 API 进程轮询 TaskStore，没有 PostgreSQL `LISTEN/NOTIF
 | 状态码 | 含义 |
 | --- | --- |
 | 403 | 当前身份不拥有提交的审批角色 |
-| 404 | Thread、Artifact、Run、Action、Scenario、Trace、Task 或 Demo 2 WorkItem 不存在，或不属于当前用户 |
-| 409 | 授权条件未满足、动作已失效、Permit/Gateway 拒绝，Workspace Artifact/revision 过期，Task 或 Demo 2 WorkItem 版本过期、状态转换/路由非法、Task 工件绑定已变化，或幂等键被用于不同契约/命令/动作事实 |
+| 404 | Thread、Artifact、Run、Action、Scenario、Trace、Task、Demo 2 WorkItem、Harness Scenario 或 Harness Run 不存在，或不属于当前用户 |
+| 409 | 授权条件未满足、动作已失效、Permit/Gateway 拒绝，Workspace Artifact/revision 过期，Task 或 Demo 2 WorkItem 版本过期、状态转换/路由非法、Task 工件绑定已变化，或幂等键被用于不同契约/命令/动作事实；Harness start key 复用于不同 body 同样返回 409 |
 | 422 | 请求 Schema、TaskContractDraft、证据值、报价当前字段或模型结构化输出无效 |
 | 503 | LLM endpoint、Key 或模型配置不可用 |
 
@@ -538,6 +589,7 @@ SSE 在响应已经开始后无法再改变 HTTP 状态码，因此流内错误�
 - 请求模型均 `extra="forbid"`；新增顶层字段会破坏旧服务端，协议变更需同步前端和文档。
 - Task Runtime 当前使用 `schema_version="1.0"`；Python 权威模型在 `packages/contracts/task_models.py`，前端镜像在 `apps/web/app/task-types.ts`。
 - Demo 2 Python 权威模型在 `packages/contracts/demo2_models.py`，前端镜像在 `apps/web/app/demo2-types.ts`；当前没有公开 schema version 或持久化迁移协议。
+- FORTE manifest 与安全场景投影的 Python 权威模型在 `packages/contracts/harness_models.py`；Harness Plan/Run/Event 当前由 `services/api/app/application/harness_runtime.py` 定义，尚无公开 schema version、持久化迁移或 execution 协议。
 - V0.1 没有公开版本协商；`/v1` 是唯一 API 版本。
 - `ActionCandidate`、Permit claims 和哈希规则是安全边界，不能由前端自行构造并绕过 RunService。
 - 文档示例中的邮箱、报价号、用户和 Key 全部是演示值。

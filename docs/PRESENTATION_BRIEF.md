@@ -1,6 +1,6 @@
 # Office Agent V0.1 · Presentation Brief
 
-本文用于后续 Agent 生成汇报材料。内容只陈述 V0.1 已实现且可由代码或演示验证的事实；制作 PPT 前应以当前 README、源码和自动化测试再次核对。
+本文用于后续 Agent 生成汇报材料。已实现结论只陈述可由代码或演示验证的事实；标为 `Draft` 的目标设计必须与已验证事实分开。制作 PPT 前应以当前 README、源码、Evidence 和自动化测试再次核对。
 
 本文只覆盖当前 V0.1 实现汇报。面向后续 Loop、Adaptive Swarm 和长期任务 Runtime 的战略汇报，以 [`TARGET_ARCHITECTURE.md`](TARGET_ARCHITECTURE.md) 为路线基线；两者不得混写为同一实现状态。
 
@@ -338,7 +338,7 @@ Plan/Act 当前通过严格适配器调用 `deepseek-v4-pro`，但只有与服�
 
 ### 第 13 页：八个常驻模块和当前缺口
 
-展示八模块环：Task Contract、Durable Task State、Context State Manager、Execution Loop、Capability Runtime、Evidence & Quality Verifier、Control Policy、Trace & Checkpoints。每个模块旁边只标“已有固定纵切/目标 Draft/缺少验证”，不把目标架构冒充成完成清单。
+展示统一八模块：Scenario Pack & Workspace Catalog、Task Contract、Planner、Admission & Plan Validator、Scheduler & Worker Manager、Tool Gateway、Artifact Workspace & Verifier、Checkpoint/Event/Governance Control。每个模块旁边只标“已有固定纵切/目标 Draft/缺少验证”，不再并列展示旧八模块命名，也不把目标架构冒充成完成清单。
 
 ### 第 14 页：Demo 1、Demo 2、Demo 3 如何形成一条链
 
@@ -373,3 +373,55 @@ Demo 1 处理长任务、分支和文件事实冲突；Demo 2 组织复杂任务
 7. 明确“内部成果包已完成，但外部邮件/CRM/日历没有发生”，下一步业务动作需进入 Demo 3。
 
 现场不得把固定冲突触发扩写为通用动态调度，不得把 memory 单进程扩写为后台/跨进程恢复，也不得使用静态动画、固定延时或多个头像冒充执行。模型耗时只讲本轮观测，不讲成本节省或生产 SLA；主流官方材料不是竞品实测，不能说竞品做不到。
+
+## 13. FORTE Workspace + 统一 Harness 汇报故事板（2026-08-24，规划纵切 Limited Verified）
+
+这一轮的叙事从“我们又做了三个 Demo”改为：“同一个 Harness 如何面对三个不同的办公文件夹，并让用户看见 Agent 使用了什么、为什么这样计划、哪些事实已经发生。”来源、架构、前台和证据必须在同一组页面出现。
+
+### 第 1 页：问题不是缺少动画，而是缺少可信工作现场
+
+展示 Stakeholder 原反馈：数据和流程像写死系统。对应场景是评审者打开演示后，无法判断资料从哪里来、计划是否由 Agent 动态形成、模型是否真的调用、按钮后是否已经执行。该反馈只代表一位 Stakeholder，不是用户研究。
+
+### 第 2 页：来源先于能力
+
+展示 FORTE 官方仓库固定 commit `345c1ec1487139db9dd319787fa9405ba85d1869`、顶层 MIT、本地 11 个原始文件/`115352` bytes 与逐文件 SHA-256。明确 8 个 input 是公开办公 benchmark，3 个 raw `task.md` 只作 provenance；不导入 `solution/`、`skills/`。不能写“真实客户资料”或“企业数据库”。
+
+### 第 3 页：隐私边界不是前端隐藏
+
+画两条数据流：raw `task.md` 原字节留在 provenance；Prompt 净化文本只进入内部 Planner。公共 REST、SSE 和普通 UI 不出现 `task_instruction`、rubric、solution 或 grading 内容。公开场景只显示业务目标、交付物、数据边界和安全文件标签；若 API 泄漏这些字段，即使 DOM 没渲染也算失败。
+
+### 第 4 页：统一八模块，不再三套脚本
+
+用一条横向链展示唯一八模块：Scenario Pack & Workspace Catalog → Task Contract → Planner → Admission & Plan Validator → Scheduler & Worker Manager → Tool Gateway → Artifact Workspace & Verifier → Checkpoint/Event/Governance Control。第一纵切只点亮 Catalog、Contract、Planner、Validator 和 memory Snapshot/SSE 子集；后三 Demo 执行迁移保持灰色 `Draft`。
+
+### 第 5 页：前台先回答三个问题
+
+用产品实图而不是架构占位：左侧来源工作区回答“Agent 能看什么”；中间渐进阶段与动态 Plan 回答“Agent 准备怎么做”；右侧活动回执回答“模型是否调用、输出是否采用、执行是否发生”。页面按读取、规划、校验、准备执行逐步展开，不直接跳到第四步，也不显示 Prompt、CoT、Worker 对话或内部日志。
+
+### 第 6 页：模型调用、采纳、校验是三件事
+
+并列 `HarnessModelReceipt.called`、`output_used` 和 `HarnessRun.status/event`。可复核 live manifest：Finance-018 为 3 files/10 units/17112 ms，pm-014 为 4 files/6 units/13577 ms，Operations-008 为 1 file/4 units/10243 ms；三者均 v6/seq 5、`called=true`、`output_used=true`、`validation_errors=[]`、`execution_started=false`。强调这些是三次本轮观测，不是质量基准、重复实验或 SLA。
+
+### 第 7 页：`ready_to_execute` 是有意停止，不是半成品文案
+
+展示终态 banner：“计划已通过服务端校验，尚未执行任务”。同时列出 `execution_started=false`，说明当前没有 execution command、Scheduler/Worker、Tool execution、Artifact write/verification/Commit、Approval、Permit 或外部动作。不要使用“任务完成”“工件已生成”或“Demo 已执行”。
+
+### 第 8 页：三个 Demo 共享底座，但迁移不抢跑
+
+Finance-018 对应 Demo 1 长任务证据；pm-014 对应 Demo 2 动态协作；Operations-008 对应 Demo 3 语义动作治理。当前只证明三个来源都能进入同一 Catalog/Planner/Validator。旧固定客户 A 的冲突、4 Worker/5 Artifact 和邮件 Simulator 事实不能复制到 FORTE 场景；三条执行迁移仍为 Draft。
+
+### 第 9 页：证据页同时展示“已验证”和“尚未验证”
+
+限定验证只包括固定来源 commit/MIT/原字节审计、三次 manifest-bound live 规划、公共 API/DOM 投影、Snapshot/SSE、桌面/移动截图和自动化。工程数字为 Python `199 passed, 1 skipped in 7.93s`、浏览器 `48 passed (3.6m)`，Ruff、lint、build 通过；六张截图为 3 张 `1440x900` 与 3 张 `390x844`，完整 hash 见 Manifest。浏览器 E2E、截图和溢出断言只证明工程投影，不是目标用户研究。目标用户理解、信任、效率和任务成功需要独立研究。
+
+### 现场演示顺序
+
+1. 打开默认工作现场，先看三个 FORTE 场景与安全文件业务标签。
+2. 选择一个场景，确认前台没有 raw task、rubric、solution、内部路径或 hash。
+3. 开始本轮，观察来源冻结、模型规划、服务端校验逐步发生。
+4. 展开动态 DAG，说明节点数量、依赖和允许工具来自本轮服务端 Plan，不是固定模板。
+5. 在右侧区分“模型已调用”“模型输出已采用”“计划已通过校验”。
+6. 到 `ready_to_execute` 停止，明确任何工具、工件和外部动作都没有发生。
+7. 切换另外两个场景，展示同一 Harness 可以产生不同 DAG；不现场宣称三 Demo 已执行。
+
+最终测试数字、桌面/移动截图 hash 和 live run 只从 [`FORTE-WORKSPACE-AGENT-HARNESS-EVIDENCE-20260824`](evidence/FORTE-WORKSPACE-AGENT-HARNESS-EVIDENCE-20260824.md) 与其 Manifest 读取；实现为 `fdcc3d819686b0d0afd99fcd0b637b5329607835`，PR #23 open 且未合并，文档提交待本次文档提交后回填。PPT 页脚必须写“规划纵切 Limited Verified / 尚未执行 / 用户价值待验证”，不得只写“Demo 已完成”。

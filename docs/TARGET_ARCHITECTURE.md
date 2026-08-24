@@ -4,7 +4,7 @@
 
 最终原始参考集及“下一步重点”逐条覆盖矩阵见 [`docs/final-reference/`](final-reference/README.md)。
 
-当前实现事实仍以源码、`README.md`、`ARCHITECTURE.md`、`WORKSPACE_AND_STREAMING.md` 和 `GOVERNANCE_AND_ACTIONS.md` 为准。固定 Demo 1 已落地 Task Contract、服务端 Task/Branch Snapshot、只读 Artifact Workspace、局部 Conflict、控制状态机、Commit 和顺序 API 进程恢复；DR-0007 落地已验证客户回复到治理 Run 的窄桥；DR-0015 又在固定客户 A、单 API 进程 memory 内落地受控模型 Worker、SharedArtifactVersion、固定事实冲突重排和无外部副作用回执。真正后台持续的 Loop、跨端身份、通用动态 Worker/Conflict Resolver 和真实 Connector 仍是目标能力。
+当前实现事实仍以源码、`README.md`、`ARCHITECTURE.md`、`WORKSPACE_AND_STREAMING.md` 和 `GOVERNANCE_AND_ACTIONS.md` 为准。固定 Demo 1 已落地 Task Contract、服务端 Task/Branch Snapshot、只读 Artifact Workspace、局部 Conflict、控制状态机、Commit 和顺序 API 进程恢复；DR-0007 落地已验证客户回复到治理 Run 的窄桥；DR-0015 又在固定客户 A、单 API 进程 memory 内落地受控模型 Worker、SharedArtifactVersion、固定事实冲突重排和无外部副作用回执。DR-0016 正在把三套固定体验收敛到 FORTE Workspace + 统一 Harness；当前第一纵切仅覆盖来源目录、内部 Planner、确定性计划校验和 `ready_to_execute`，三 Demo 执行迁移仍为 Draft。真正后台持续的 Loop、跨端身份、通用动态 Worker/Conflict Resolver 和真实 Connector 仍是目标能力。
 
 ## 1. 需要解决的问题
 
@@ -33,20 +33,20 @@
 - **证据控制**：Evidence Gate、Verifier、Conflict Resolver。
 - **业务动作控制**：沿用当前 Risk、Policy、Evidence、Approval、Permit 和 Tool Gateway 链路。
 
-## 3. 八个常驻 Runtime 组件
+## 3. 八个统一常驻 Harness 模块
 
 | 组件 | 目标职责 | 当前仓库基础 | 主要缺口 |
 | --- | --- | --- | --- |
-| Task Contract | 定义 Task ID、目标、边界、交付物、来源范围和完成条件 | 固定 Demo 1 已有严格 Task Contract、3 项 Deliverable 与完成条件 | 缺少通用契约模板、修改/取消和生产权限语义 |
-| Durable Task State | 保存事件、分支、版本、控制事件和中间工件 | 固定 Task 状态支持 PostgreSQL 顺序 API 进程恢复；Demo 2 Execution Snapshot/Event 当前为 memory | 缺少 Demo 2 持久化、通用长期执行状态、数据库故障/多实例证据；Thread/Message 仍在内存 |
-| Context State Manager | 按步骤、权限和版本组装最小上下文投影 | `trusted_context`、`workspace_context`、来源引用；Demo 2 Worker 使用固定 allowlisted 文件事实 | 缺少通用按步骤投影、Worker 版本隔离和预算策略 |
-| Execution Loop | Observe → Plan → Act → Verify → Commit | LangGraph 用于治理 Gate；Demo 1 有固定阶段；Demo 2 有单进程执行、并行 Worker、重排、验证和完成事件 | 尚无后台队列、跨进程恢复、暂停/恢复、预算耗尽和通用重规划 |
-| Capability Runtime | 统一模型、工具、Connector、沙箱和临时 Worker 调度 | Tool Gateway、5 个 Simulator capability，以及 Demo 2 受限 `deepseek-v4-pro` Worker 生命周期 | 缺少真实 Connector、通用沙箱、资源账本和跨进程 Worker lease |
-| Evidence & Quality Verifier | 校验来源、一致性、覆盖度、质量与工件冲突 | 固定 Fixture 已有 VerificationReport、局部 Conflict 与重验证；业务动作有 Evidence Resolver | 缺少通用跨工件质量规则、真实来源解析和可扩展冲突策略 |
-| Control Policy | 决定继续、暂停分支、重规划、降级、接管或停止 | Risk/Policy/ControlPlan 覆盖业务动作；固定 Task 有控制状态；Demo 2 固定事实冲突可增派核验 | 缺少通用 Worker 停止/降级/预算/人工接管和跨分支调度 |
-| Trace & Checkpoints | 记录状态提交、工具、证据、版本、控制和恢复点 | TaskEvent/ArtifactVersion/Commit、Audit SSE、Trace API、Postgres checkpoint；Demo 2 有 memory Snapshot/SSE/Receipt | 缺少 Demo 2 持久化、统一恢复 UI 和跨域 Trace 视图 |
+| Scenario Pack & Workspace Catalog | 固定来源版本，校验 manifest、原字节、路径、hash、大小、链接与解析器，冻结只读 Workspace Snapshot | FORTE commit `345c1ec...`、MIT、11 个原始文件、Catalog 与三个公共办公场景；旧 Demo 1 另有仿真来源包 | 任意企业文件夹、生产 Connector、运行时下载与通用解析器 |
+| Task Contract | 绑定目标、交付物、数据边界、允许能力、预算/截止时间和人工 Gate | FORTE 公共场景已有目标/交付物/边界投影；固定 Demo 1 有严格完整契约 | 可编辑通用契约、生产权限、统一预算/截止时间和 Worker 子契约 |
+| Planner | 从内部净化任务与 Workspace Index 生成有界 DAG 候选 | DR-0016 首纵切使用 `deepseek-v4-pro` 严格 JSON Planner；模型调用、采纳与校验分开记录 | 规划质量、任意任务泛化、成本/质量对照与模型降级策略 |
+| Admission & Plan Validator | 确定性校验路径、工具、副作用、Artifact 元数据、依赖、环、预算与 Human Gate | DR-0016 校验路径/tool/side-effect/Artifact/dependency/cycle/gate；Demo 2 另有固定路由 Admission | 统一资源 Admission、生产策略、预算与质量阈值 |
+| Scheduler & Worker Manager | 执行 ready unit，管理 Worker、依赖、并行、暂停、失败和 replan | 固定 Demo 2 有单进程受控 Worker 纵切；DR-0016 首纵切明确不启动 Scheduler/Worker | 三 Demo 迁移、后台队列、跨进程恢复、通用 replan 和 Worker lease |
+| Tool Gateway | 统一模型外工具、Connector、沙箱和最小权限调用 | 既有 Tool Gateway + 5 个 Simulator；DR-0016 首纵切只校验 allowlist，不调用工具 | 公共 Workspace 读写工具执行、真实 Connector、凭据代理和资源账本 |
+| Artifact Workspace & Verifier | 版本化输出、绑定来源/digest，验证覆盖度/一致性并收敛冲突 | 旧 Demo 有 ArtifactVersion/SharedArtifactVersion/VerificationReport；DR-0016 首纵切只校验 Artifact 声明 | FORTE 三场景执行工件、通用验证器、冲突收敛与最终 Commit |
+| Checkpoint, Event & Governance Control | 持久化 Snapshot/事件，承载恢复、分支、Steer、Approval、Permit 与业务回执 | 旧 Task/Audit/Checkpoint 纵切；DR-0016 有单进程 memory Snapshot、Owner、幂等 start 和有序 SSE | Harness 持久化、统一控制协议、跨进程幂等、多实例事件和生产身份 |
 
-这张表是实施边界，不是完成度宣传。扩展时应复用当前成熟的动作治理链路，而不是另建一套可绕过 RunService 的授权系统。
+这八个名称是 DR-0016 之后的唯一常驻模块清单。旧表中的 Durable Task State、Context State Manager、Execution Loop、Capability Runtime、Evidence & Quality Verifier、Control Policy、Trace & Checkpoints 已分别收敛到 Catalog/Contract、Scheduler、Gateway、Artifact/Verifier 和 Checkpoint/Event/Governance 的职责中，不再作为第二套八模块汇报。该表是实施边界，不是完成度宣传；扩展时应复用当前动作治理链路，而不是另建可绕过 RunService 的授权系统。
 
 ## 4. Agent Control Loop
 
@@ -54,9 +54,9 @@
 
 1. **Observe**：读取事件、状态、来源和环境反馈。
 2. **Plan**：根据 Task Contract 生成分支、依赖、预算与完成条件。
-3. **Act**：通过 Capability Runtime 调用能力并提交候选中间工件。
+3. **Act**：通过 Scheduler & Worker Manager 和 Tool Gateway 调用能力并提交候选中间工件。
 4. **Verify**：核对来源、一致性、质量、风险和完成条件。
-5. **Commit**：只把验证通过的状态、工件与 Trace 写入 Durable Task State。
+5. **Commit**：只把 Artifact Workspace & Verifier 通过的状态、工件与 Trace 写入 Checkpoint, Event & Governance Control。
 
 外围控制必须进入每一轮，而不是在最终交付前补一次检查：
 
@@ -214,13 +214,21 @@ Demo 1 的实施决策、场景、协议和前台事实映射已经固定在 [`D
 
 | 模块 | 已有基础 | 仍需补齐 | 汇报不可夸大 |
 | --- | --- | --- | --- |
-| Task Contract | Demo 1 固定任务契约 | 通用模板、修改/取消、Worker 子契约 | 不是全业务通用 |
-| Durable Task State | Task/Event/Artifact/Commit 有固定 PostgreSQL 恢复；Demo 2 Execution 为 memory | Demo 2 持久化、跨进程并发、事件缺口回放 | 不是全系统高可用 |
-| Context State Manager | `trusted_context`、`workspace_context`、来源引用；Demo 2 固定文件事实投影 | 通用最小权限投影、Worker 版本隔离、预算上下文 | 固定来源不等于完整上下文治理 |
-| Execution Loop | Demo 1 固定阶段；Demo 2 单进程执行、并行 Worker、固定冲突重排和事件流 | 后台队列、暂停恢复、预算和任意重排 | 固定纵切不等于无人值守后台 Loop |
-| Capability Runtime | Tool Gateway、5 个 Simulator、Demo 2 受限模型 Worker | Connector、沙箱、资源账本、跨进程 Worker lease | 模型 Worker 不等于真实外部业务执行 |
-| Evidence & Quality Verifier | 固定来源、Conflict、VerificationReport | 跨工件质量规则、真实解析、通用 Resolver | 固定场景不能外推 |
-| Control Policy | Risk/Policy/ControlPlan、Task 控制状态、Demo 2 固定事实冲突增派 | 通用 Worker 停止、降级、预算和重排 | 固定触发不等于通用动态调度 |
-| Trace & Checkpoints | TaskEvent、ArtifactVersion、Commit、Audit SSE、checkpoint；Demo 2 memory Snapshot/SSE/receipt | Demo 2 持久化、统一业务 Trace、可视化恢复点、跨域回放 | 单进程 trace 不等于生产恢复 |
+| Scenario Pack & Workspace Catalog | FORTE 固定 commit/MIT/原字节与只读 Catalog；旧 Demo 1 另有仿真来源校验 | 任意企业文件夹、Connector、通用解析器 | 公开 benchmark 不是生产企业数据 |
+| Task Contract | FORTE 三场景安全业务投影；Demo 1 固定完整契约 | 可编辑通用模板、生产权限、预算/截止时间、Worker 子契约 | 不是全业务通用 |
+| Planner | DR-0016 严格 JSON Planner 首纵切 | 任意任务质量、对照、降级与成本边界 | 模型被调用不等于输出采用或计划通过 |
+| Admission & Plan Validator | DR-0016 路径/工具/副作用/依赖/环/Gate 校验；Demo 2 固定 Admission | 资源/预算/质量统一 Admission | `ready_to_execute` 不等于执行 |
+| Scheduler & Worker Manager | 固定 Demo 2 单进程 Worker 纵切 | FORTE 三 Demo 迁移、后台队列、暂停恢复、通用 replan、lease | 固定纵切不等于通用 Swarm |
+| Tool Gateway | 5 个 Simulator capability；Harness 计划工具 allowlist | Workspace 工具执行、Connector、沙箱、凭据和资源账本 | 当前 Harness 首纵切未调用任何工具 |
+| Artifact Workspace & Verifier | 旧 Demo 的 Artifact/Verification/Conflict 基础 | FORTE 执行工件、跨工件质量规则、通用 Resolver 和 Commit | 首纵切没有生成或验证业务工件 |
+| Checkpoint, Event & Governance Control | Task/Audit/Checkpoint 基础；Harness 单进程 Snapshot/Owner/幂等/SSE | Harness 持久化、统一控制、跨进程/多实例与生产身份 | memory 事件不等于生产恢复 |
 
 上述表格是目标设计和缺口清单。除文中明确标为 Verified 的固定纵切，其余均为 Draft/待验证。
+
+## 12. FORTE Workspace + 统一 Harness 第一纵切（DR-0016，Limited Verified）
+
+本轮用公开 FORTE 固定 commit `345c1ec1487139db9dd319787fa9405ba85d1869`、顶层 MIT 和本地 manifest 中 11 个原始文件作为同一 Scenario Pack 来源。三份 raw `task.md` 只作 provenance；Catalog 提取净化 Prompt 供内部 Planner，不向公共 API、SSE 或普通 UI 返回 `task_instruction`、rubric、solution 或 grading 内容。前台默认从“工作现场”进入：左侧是安全来源与文件业务标签，中间是渐进阶段和动态计划，右侧是服务端活动回执。
+
+第一纵切只实现 `Scenario Pack -> Task Contract -> Planner -> Admission & Plan Validator -> ready_to_execute`。模型是否调用、输出是否采用、计划是否通过服务端校验必须分别由 `HarnessModelReceipt.called`、`output_used` 和 Snapshot/Event 证明。`ready_to_execute` 明确表示 Scheduler/Worker、Tool Gateway 执行、Artifact mutation、Verifier Commit、Connector 和外部副作用都没有发生。Finance-018、pm-014、Operations-008 对 Demo 1/2/3 的真实执行迁移仍为 Draft；旧固定 Demo 的事实不能复制成 FORTE 运行事实。
+
+当前 `Limited Verified` 范围绑定三次 `deepseek-v4-pro` live 规划、六张截图、Python `199 passed, 1 skipped in 7.93s`、浏览器 `48 passed (3.6m)`、Ruff/lint/build 通过、实现 `fdcc3d819686b0d0afd99fcd0b637b5329607835` 和 open、未合并 PR #23；文档提交待本次提交后回填。精确 Manifest 与边界见 [`FORTE-WORKSPACE-AGENT-HARNESS-EVIDENCE-20260824`](evidence/FORTE-WORKSPACE-AGENT-HARNESS-EVIDENCE-20260824.md)。浏览器 E2E 只作为工程代理，不能替代目标用户理解、信任、效率或任务成功研究。
