@@ -9,7 +9,7 @@
 
 ## Trigger and current pain
 
-The user asks the Agent to design an AI-assisted M1 collection-call process. A plausible process diagram alone is unsafe: calling time, recording notice, retry limit, human escalation and terminal-state rules must govern every proposed action. The current Demo 3 begins from a fixed email-send candidate rather than from a policy document in the workspace.
+The user asks the Agent to design an AI-assisted M1 collection-call process. A plausible process diagram alone is unsafe: calling time, recording notice, retry limit, human escalation and terminal-state rules must govern every proposed action. The retired Demo 3 began from a fixed email-send candidate; the current FORTE worksite starts from the public policy document but stops before action execution.
 
 ## Goal and completion condition
 
@@ -45,6 +45,6 @@ The Agent produces a versioned process artifact and a set of bounded action cand
 
 ## Boundary
 
-The current shared Harness vertical slice has one manifest-bound `deepseek-v4-pro` run with 1 public file, 4 dynamic plan units and v6/seq 5 `ready_to_execute` in 10243 ms. It does not draft the process artifact, create an ActionCandidate, run Risk/Policy/Evidence/Approval/Permit or call a Simulator. That execution migration remains `Draft`.
+The DR-0016 foundation Evidence contains one manifest-bound `deepseek-v4-pro` run with 1 public file, 4 dynamic plan units and v6/seq 5 `ready_to_execute` in 10243 ms. DR-0017 makes this Scenario part of the sole current worksite but does not make the retired action path current. It does not draft the process Artifact, create an ActionCandidate, run Risk/Policy/Evidence/Approval/Permit or call a Simulator. That execution migration remains `Draft`.
 
 The task source is a public benchmark requirement document. Raw `task.md`, `task_instruction`, rubric and solution content stay out of the public API/UI. The current project has no real dialer or collection-system Connector. A successful Simulator receipt in a later bounded slice still cannot be reported as a real customer contact or production policy deployment; E2E is not user research.

@@ -1,127 +1,136 @@
-# 决策、推进与汇报治理
+# Decision and Reporting Governance
 
-本文是 Office Agent 后续方案、架构、交互、实现、实验、PR、Demo 和汇报的强制门槛。它把“场景与来源”“前台交互影响”“后端事实映射”固定为同一条决策链，避免后台技术、静态界面和对外叙事彼此脱节。
+This is the hard gate for every design, implementation item, PR, Demo and report. A claim is not complete unless it covers 场景与来源、前台交互影响、后端事实映射、验证与边界.
 
-## 1. 适用范围与状态
+## 1. Claim states
 
-以下内容都必须建立记录：
-
-- 新的用户场景、能力、架构组件、协议、状态、API、事件或前端交互；
-- 影响任务推进、风险、预算、证据、控制、工件或用户决策的实现；
-- PR 的关键行为变化、Demo 路径、阶段里程碑和每一条汇报结论；
-- 竞品、论文、用户反馈、用户研究或工程实践导出的设计判断。
-
-记录状态只允许：
-
-- `Draft`：任一强制字段缺失，或仍是推断、假设、静态原型；
-- `Ready`：场景、来源、前台影响和后端事实映射完整，可以进入实现或验证；
-- `Verified`：实现与证据均已产生，验收结果和限制可复查；
-- `Rejected`：证据不支持、风险不可接受或已被其他方案取代，并保留原因。
-
-`Draft` 不得写成已确认、已完成、已实现或可对外能力。`Ready` 也不等于实现完成；只有 `Verified` 可以进入完成清单，并且仍需保留适用范围与限制。
-
-## 2. 四个强制门槛
-
-### 2.1 场景与来源
-
-每项决策必须记录：
-
-- 目标用户或角色、触发条件、当前流程或痛点、目标、完成条件和关键异常路径；
-- `source_id`、来源类型、精确引用或链接、采集日期或版本、它支持的判断、局限与责任人；
-- 事实、用户反馈、观察、推断和待验证假设之间的边界。
-
-来源类型至少区分：用户反馈、用户访谈或研究、竞品实践、论文、官方文档、源码、测试或运行证据。只有来源名称而无精确引用、版本和支持范围，不算完成留痕。
-
-### 2.2 前台交互影响
-
-每项技术或产品决策都必须说明：
-
-- 用户在哪个界面看见什么状态、来源、版本、预算、冲突、风险或待决定事项；
-- 用户可执行哪些动作，动作影响哪个任务或分支，提交后得到什么即时反馈；
-- 对会改变工件、状态或外部世界的关键动作，提交前必须展示服务端拥有的预期影响，至少区分会改变、会重新核对、保持不变和不会发生；提交后必须以实际 Snapshot、持久事件或执行结果展示变化回执，不能用相同静态文案冒充已发生结果；
-- 动作标签是否准确区分创建、启动、恢复、重试、重置和覆盖；涉及新一轮或重跑时，必须说明旧对象是否保留以及是否有历史选择入口；
-- 等待、断线、过期、失败、冲突、部分完成和恢复时如何表达；
-- 哪些信息必须隐藏，哪些决策理由必须解释。
-
-默认隐藏原始 Prompt、思维链、Worker 内部对话、密钥、Token、底层堆栈、无决策价值的日志、内部调度噪声和普通用户无法解释的内部来源 ID。默认展示与用户决定有关的目标、状态、来源性质与业务标签、版本、影响范围、预算、冲突、验证结果、待办动作和可审计 Trace 摘要。演示、模拟、真实 Connector、用户输入和模型推断必须在来源标签中明确区分；技术审计确需查看内部 ID 时，应进入独立权限受控视图，不能借普通 DOM 隐藏样式代替数据投影。
-
-### 2.3 后端事实映射
-
-每个 UI 状态必须明确映射到：
-
-- 服务端权威实体和字段；
-- 状态或工件版本；
-- 产生变化的命令、REST 响应、`Snapshot` 或有序 SSE 事件；
-- 允许的状态转换、操作者与权限；
-- 幂等、重试、过期、冲突和恢复语义；
-- 进入 Trace 的事件和可复查证据。
-
-前端不得自行宣布任务完成、分支成功、冲突已解决、预算已扣减、风险已判断、Permit 已签发或工具已执行。没有服务端事实映射的视觉状态只能标记为静态原型。
-
-### 2.4 验证与边界
-
-每项记录必须列出：
-
-- 验证问题、成功或失败标准和代表性异常路径；
-- 自动化测试、Trace、状态哈希、截图、录像、指标、用户研究或复现实验的位置；
-- 实际结果、未运行项目、已知限制和下一步；
-- 当前属于已实现、目标设计、静态原型、推断还是待验证假设。
-
-未运行的测试不得写成通过；静态页面不得证明 Runtime 已实现；视觉进度不得证明服务端提交；单次成功不得替代恢复、冲突和失败路径验证。
-
-## 3. 强制记录模板
-
-### 3.1 决策与推进记录
-
-| 字段 | 必填内容 |
+| State | Meaning |
 | --- | --- |
-| Decision ID / Owner / Status | 稳定编号、责任人、`Draft/Ready/Verified/Rejected` |
-| 用户场景与问题 | 用户、触发、当前流程或痛点、目标、完成条件、异常路径 |
-| 来源与依据 | `source_id`、类型、精确引用、日期或版本、支持判断、局限 |
-| 决策与备选 | 采用方案、未采用方案、取舍和影响范围 |
-| 后端事实 | 权威实体、字段、版本、状态转换、权限、幂等和 Trace |
-| 前台输出 | 界面位置、可见状态、用户动作、反馈、失败恢复、隐藏细节 |
-| 验证 | 问题、指标、测试或研究、证据位置、实际结果和限制 |
-| 关联项 | PR、Issue、协议、API、事件、设计稿、Demo 和汇报页 |
+| `Draft` | an idea, target, hypothesis or implementation without all gates |
+| `Ready` | design contract is complete enough to implement; runtime evidence is not implied |
+| `Limited Verified` | evidence supports the claim only inside an explicit fixed scope |
+| `Verified` | all stated acceptance gates passed for the stated scope; production or user value is not implied unless tested |
+| `Rejected` | a considered path is intentionally not pursued, with reason |
+| `Retired` | historical evidence remains valid for its recorded commit but no longer describes the current product |
 
-### 3.2 UI—服务端事实映射
+Never use “completed” as a substitute for one of these states.
 
-| UI 状态或组件 | 用户含义 | 服务端实体与字段 | 来源事件或 Snapshot | 允许动作 | 失败与恢复 | 不展示内容 |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| 示例：分支等待证据 | 该分支暂停，其他分支仍可继续 | `BranchSnapshot.status=waiting_evidence` | `BRANCH_WAITING_EVIDENCE` | 补充依据、Pause、Take over | 过期后刷新 Snapshot | Worker 对话、原始 Prompt |
+## 2. Required decision record
 
-### 3.3 来源台账
+Every Decision Record must contain:
 
-| Source ID | 类型 | 精确引用 | 日期或版本 | 支持的判断 | 局限 | Owner | 使用它的 Decision ID |
-| --- | --- | --- | --- | --- | --- | --- | --- |
+### 场景与来源
 
-## 4. PR、Demo 与汇报完成门槛
+- Source ID and exact traceable location;
+- source category: stakeholder feedback, user research, official product material, literature, repository/code, runtime evidence, or hypothesis;
+- date, version or commit;
+- what judgment it supports;
+- what it cannot support.
 
-行为、协议或交互发生变化的 PR 必须：
+Official product documentation is not competitor hands-on testing. E2E is not user research. A single stakeholder comment is not representative user evidence.
 
-1. 链接或更新对应 Decision ID 和 Source ID；
-2. 同步 Pydantic/TypeScript 协议、API/SSE、前台状态和测试；
-3. 附实际运行的验证结果以及未覆盖边界；
-4. 对用户可见变化提供截图、录像或可运行路径；
-5. 对失败、冲突、等待和恢复路径至少给出一个可复查证据。
+### 前台交互影响
 
-每个 Demo 和汇报项必须展示或链接：用户场景、来源依据、技术决策、后端事实、前台影响、验证证据、当前状态和限制。任何一项缺失时，该项保持 `Draft`，不能进入结论或完成清单。
+- what the user sees before, during and after the state change;
+- which action the user can take;
+- waiting, error, retry and recovery behavior;
+- internal details deliberately hidden;
+- wording that separates preview, request, recorded selection, validated plan, execution and receipt.
 
-## 5. 最小决策链
+### 后端事实映射
 
-```text
-场景问题
-  → 来源证据与局限
-  → 技术/产品决策与备选
-  → 服务端实体、状态和事件
-  → 用户可见状态、动作、反馈与恢复
-  → 测试、Trace、用户研究与边界
-```
+- authoritative Snapshot, field or ordered event for every UI state;
+- transition and terminal semantics;
+- version, sequence, Owner and idempotency rules;
+- source and policy ownership;
+- fail-closed behavior when a fact is missing or contradictory.
 
-这条链路是后续工作的默认交付单位。不能只交后台实现、只交界面、只交引用列表或只交汇报文案。
+### 验证与边界
 
-## 6. Demo 3 动作影响账本门槛（DR-0012 Verified 限定范围）
+- test/run/screenshot/user-study evidence with exact identifier and result;
+- implementation commit, documentation commit when available, and PR state;
+- fixed scope and known untested paths;
+- prohibited inference.
 
-Demo 3 的每个动作推进和汇报必须额外回答四类前台影响：“会改变 / 会重新核对 / 保持不变 / 不会发生”。四类内容必须分别关联服务端 `impact_preview` 或 `execution_receipt` 的 `ImpactItem(item_id/change_kind/label/before/after)`，并遵循固定 `item_id → change_kind` 映射，不能由前端静态文案或 LLM 解释补造。
+If any section is missing, status must remain `Draft`.
 
-`impact_preview` 只能证明服务端当前动作和治理条件下的预计影响；`execution_receipt` 只能证明有序 Run 事件、`ToolExecutionResult` 或终态 Snapshot 已记录的实际事实。Simulator 成功、Permit 签发和审批通过不能被汇报为真实外部系统已写入。当前工程验证覆盖固定四场景、成功/拒绝/缺失 preview、后端失败/未知结果、固定映射和桌面/移动被测路径；真实 Connector、生产身份、跨进程执行幂等/Permit replay、多实例/数据库恢复和用户理解仍保持待验证。
+## 3. Scenario record
+
+Every Scenario must state:
+
+| Field | Required content |
+| --- | --- |
+| target user | role and responsibility |
+| trigger | the concrete business moment |
+| current pain | present workflow or failure |
+| goal | desired business outcome |
+| completion condition | observable success |
+| happy path | ordered user/Agent interaction |
+| exception path | missing source, conflict, offline, denial, stale version or unknown outcome |
+| source | Source IDs and limitations |
+| frontend impact | visible state/action/recovery/hidden detail |
+| backend facts | Snapshot/field/event/version/Owner/idempotency |
+| evidence status | Draft/Ready/Limited Verified/Verified with boundary |
+
+An abstract capability name is not a Scenario.
+
+## 4. 来源台账
+
+`docs/decisions/SOURCE_REGISTER.md` is the canonical 来源台账. New sources are append-only and use stable IDs. Preserve stakeholder wording verbatim where authorized, distinguish a screenshot's visible content from interpretation, and record file hash/size when the local asset is evidence.
+
+Never rewrite an old source to fit a later design. Add a new Source and link supersession or retirement instead.
+
+## 5. UI—服务端事实映射
+
+`docs/contracts/UI_SERVER_FACT_MATRIX.md` is the canonical UI—服务端事实映射. Each row must include:
+
+- UI location and exact user-facing meaning;
+- 服务端权威字段 or ordered event;
+- allowed user action;
+- transition/recovery semantics;
+- 默认隐藏 internal data;
+- verification and current lifecycle.
+
+The frontend must not infer completion, model call, Artifact mutation, risk, approval, Permit, tool success or external effect from animation, elapsed time, prose or configured model name.
+
+## 6. Evidence hierarchy
+
+| Evidence | Supports | Does not automatically support |
+| --- | --- | --- |
+| source hash/manifest check | exact fixed source bytes | data realism or usefulness |
+| unit/integration test | code contract on tested path | visual quality or production reliability |
+| browser E2E | tested UI workflow and DOM assertions | comprehension, trust or adoption |
+| screenshot review | visible state at one viewport/time | backend truth or task success |
+| live model run | that configured call and observed response path | model quality, repeatability, SLA or cost savings |
+| fresh-clone verification | remote branch reproducibility at fixed HEAD | merge status |
+| target-user study | measured task/user outcome for its protocol | broader population without study design |
+
+Negative results and incidents must remain in Evidence. A repair does not erase the pre-fix observation.
+
+## 7. Lifecycle and retirement
+
+Historical Evidence retains its original numbers and scope. When a product surface is removed:
+
+1. create a Decision explaining replacement and retained principles;
+2. add it to `RETIREMENT_REGISTER.md`;
+3. update living docs so old facts are not current;
+4. keep Source, Evidence, screenshots and Git history;
+5. never reuse a retired run as evidence for a new Scenario.
+
+A centralized retirement register is sufficient; mass-editing every historical Evidence file is optional and should be avoided when it adds churn without clarity.
+
+## 8. PR and report checklist
+
+Before delivery, verify:
+
+- Decision and Scenario link exact Source IDs;
+- UI—服务端事实映射 matches current code;
+- implementation commit and PR URL/state are recorded;
+- automatic test numbers are exact and dated;
+- screenshots are identified as current, transitional or negative;
+- Draft future states are not written as implemented;
+- production identity, durable recovery, real Connector and user research are not inferred;
+- living docs and retirement lifecycle are synchronized;
+- governance test, Markdown link check and `git diff --check` pass.
+
+The current FORTE product application of this policy is [DR-0017](decisions/DR-0017-single-forte-worksite-and-legacy-retirement.md).

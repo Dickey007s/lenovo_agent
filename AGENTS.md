@@ -1,105 +1,82 @@
-# Office Agent V0.1 · Agent Handoff
+# Office Agent V0.2 · Agent Handoff
 
-这是 V0.1 定稿基线。后续 Agent 开始修改、分析或制作汇报前，按以下顺序读取：
+这是当前产品基线。开始修改、分析或制作汇报前，依次读取：
 
-1. `README.md`：产品定位、能力边界、运行与验收结论。
-2. `docs/ARCHITECTURE.md`：分层、信任边界、持久化和调用链。
-3. `docs/WORKSPACE_AND_STREAMING.md`：工作区模型、前端交互和 SSE。
-4. `docs/GOVERNANCE_AND_ACTIONS.md`：ActionSpec、风险、策略、证据、审批、Permit。
-5. `docs/API.md`：真实路由、请求和事件协议。
-6. `docs/PRESENTATION_BRIEF.md`：对外叙事、演示路径和不可夸大的边界。
-7. `docs/DECISION_AND_REPORTING_GOVERNANCE.md`：所有决策、推进、PR、Demo 和汇报必须通过的场景、来源、前台与后端事实门槛。
-8. 修改 Demo 1 Task Runtime 时，再读 `docs/decisions/DR-0002-bounded-durable-office-loop.md`、`docs/scenarios/SCENARIO-001-customer-a-durable-report.md` 和 `docs/contracts/` 下的协议与 UI 事实矩阵。
-9. 修改报价工作台、报价上下文或报价问答时，再读 `docs/decisions/DR-0006-deterministic-quote-calculation.md`、对应 Source/Evidence 和 `docs/contracts/UI_SERVER_FACT_MATRIX.md` 的报价映射。
-10. 修改 Task 最终工件进入业务动作的桥接时，再读 `docs/decisions/DR-0007-task-artifact-action-bridge.md`、对应 Evidence、`docs/GOVERNANCE_AND_ACTIONS.md` 与 Task/UI 协议。
-11. 修改 Demo 2 智能工作驾驶舱、Admission、路由选择或 WorkCockpitSnapshot 时，再读 `docs/decisions/DR-0008-demo2-explainable-admission.md`、`docs/decisions/DR-0011-demo2-route-impact.md`、`docs/scenarios/SCENARIO-002-demo2-explainable-admission.md`、对应 Evidence 与 `docs/contracts/UI_SERVER_FACT_MATRIX.md` 的 Demo 2 区域。
-12. 修改 Demo 3 Action Gate、动作影响账本、治理回执或 Simulator 边界时，再读 `docs/decisions/DR-0007-task-artifact-action-bridge.md`、`docs/decisions/DR-0010-visible-agent-impact.md`、`docs/decisions/DR-0012-demo3-action-impact-ledger.md`、`docs/scenarios/SCENARIO-003-demo3-action-impact-ledger.md`、对应 Evidence、`docs/GOVERNANCE_AND_ACTIONS.md`、`docs/API.md` 与 `docs/contracts/UI_SERVER_FACT_MATRIX.md` 的 Demo 3 区域。
-13. 修改主流 Agent 技术对比、汇报故事板、八模块缺口或 Demo 2 受控内部执行时，再读 `docs/research/COMPETITOR-RESEARCH-OPENCLAW-CODEX-CLAUDE-CODE-20260821.md`、`docs/decisions/DR-0015-mainstream-comparison-and-demo2-controlled-execution.md`、`docs/scenarios/SCENARIO-002-demo2-explainable-admission.md`、`docs/contracts/UI_SERVER_FACT_MATRIX.md`、`docs/evidence/DEMO2-CONTROLLED-EXECUTION-EVIDENCE-20260821.md` 与 `docs/PRESENTATION_BRIEF.md`。固定客户 A、单 API 进程 memory、真实模型受控内部执行为 `Limited Verified`；通用 Worker/恢复/Connector、主流差异和用户价值仍是 Draft。
-14. 修改 FORTE 数据、公共场景、统一 Harness、动态 Plan、工作现场或三 Demo 新执行迁移时，再读 `docs/decisions/DR-0016-public-workspace-agent-harness.md`、`docs/research/FORTE-DATASET-AUDIT-20260824.md`、`docs/scenarios/SCENARIO-004-forte-finance-durable-evidence.md`、`SCENARIO-005-forte-release-adaptive-team.md`、`SCENARIO-006-forte-governed-operations-action.md`、`docs/evidence/FORTE-WORKSPACE-AGENT-HARNESS-EVIDENCE-20260824.md` 和 `docs/contracts/UI_SERVER_FACT_MATRIX.md`。当前第一纵切只在固定三场景、单进程 memory 和 `ready_to_execute` 边界为 `Limited Verified`；三 Demo 执行迁移仍为 Draft。
+1. `README.md`：唯一产品入口、能力边界和验收口径。
+2. `docs/ARCHITECTURE.md`：当前分层、信任边界和八模块成熟度。
+3. `docs/WORKSPACE_AND_STREAMING.md`：工作现场、恢复和 SSE 语义。
+4. `docs/GOVERNANCE_AND_ACTIONS.md`：当前计划治理与尚未接入的执行治理。
+5. `docs/API.md`：唯一公开路由与协议。
+6. `docs/contracts/UI_SERVER_FACT_MATRIX.md`：每个前台状态的服务端事实。
+7. `docs/PRESENTATION_BRIEF.md`：汇报叙事和不可夸大边界。
+8. `docs/DECISION_AND_REPORTING_GOVERNANCE.md`：每个决策、PR、Demo 和汇报必须满足的硬门槛。
+9. FORTE 与统一 Harness 变更再读 `docs/decisions/DR-0016-public-workspace-agent-harness.md`、`docs/decisions/DR-0017-single-forte-worksite-and-legacy-retirement.md`、`docs/scenarios/SCENARIO-004-*.md` 至 `SCENARIO-007-*.md`、对应 Source/Evidence 和 `docs/decisions/RETIREMENT_REGISTER.md`。
 
-源码永远高于文档。行为变更后必须同步相关文档；不要只改 README 的宣传描述。关键实现路径：
+源码永远高于文档。行为或叙事变化后必须同步 living docs、Decision、Scenario、Source、Evidence 和 UI—服务端事实映射，不能只改 README。
+
+## 当前产品事实
+
+- 根页面是唯一 FORTE 工作现场；旧邮件、文档、报价、任务、日历、报销、CRM、审计和固定 Demo 入口已从当前产品树退役。
+- 当前 OpenAPI 只有 6 个 path：health、Scenario list/detail、Run start/get/events。
+- FORTE 固定上游 commit `345c1ec1487139db9dd319787fa9405ba85d1869`、顶层 MIT、11 个原始文件、`115352` bytes。任务和输入文件按原字节保留并标记为 binary，禁止 Git 换行归一化改变哈希。
+- raw `task.md` 只作 provenance；净化后的 Planner context 只在服务端内部使用。公共 API/DOM 不得出现 `task_instruction`、rubric、solution、grading、绝对路径或完整 hash。
+- 真实模型调用、模型输出采用、服务端校验通过是三个独立事实，分别依据 `HarnessModelReceipt.called`、`output_used` 和 Snapshot/Event。
+- 当前纵切只到 `ready_to_execute`。没有执行命令、Scheduler/Worker、工具调用、Artifact 写入/验证/Commit、审批、Permit、Connector 或外部副作用。
+- Harness Run、事件和幂等记录仅在单 API 进程 memory 中；重启不恢复。`X-User-Id` 是未签名的演示 Owner 占位。
+- Catalog 完整性失败必须 fail closed 并返回受控 503；前端必须区分服务不可达、Catalog 暂不可用和 Catalog 完整性失败，并提供自动与显式恢复。
+- “事件流实时”只在当前 SSE 已连接时显示；API 健康但无活动流只能显示“服务可用”。
+- `ready_to_execute` 只能显示“计划已就绪，尚未执行”，不得写成任务完成、工件生成或外部动作成功。
+- E2E 是工程代理，不是截图审查或用户研究。当前没有 DR-0017 最终界面的独立新截图；用户理解和价值仍为 `Draft`。
+- 历史 Decision/Evidence 的旧数字仍可审计，但不再描述当前 UI、API、数据或验收套件；以 `RETIREMENT_REGISTER.md` 为准。
+
+## 八个统一模块
+
+后续设计、代码和汇报只能使用这一套名称：
+
+1. Scenario Pack & Workspace Catalog
+2. Task Contract
+3. Planner
+4. Admission & Plan Validator
+5. Scheduler & Worker Manager
+6. Tool Gateway
+7. Artifact Workspace & Verifier
+8. Checkpoint, Event & Governance Control
+
+当前只实现模块 1-4 的规划纵切和模块 8 的 memory 事件/控制子集；模块 5-7、持久化和执行治理仍是目标架构。
+
+## 关键路径
 
 ```text
-apps/web/app/page.tsx                         前端状态、工作区、对话和确认卡
-apps/web/app/harness-workbench.tsx            FORTE 工作现场、动态 Plan 与活动回执
-apps/web/app/styles.css                       布局、滚动、动效和视觉
-services/api/app/api/routes.py                HTTP 与 SSE API
-services/api/app/api/harness_routes.py        统一 Harness REST 与 SSE
-services/api/app/application/benchmark_scenario_catalog.py FORTE 只读来源、安全投影与 Prompt 净化
-services/api/app/application/harness_runtime.py 统一 Planner、Plan Validator 与 memory Snapshot
-services/api/app/application/conversations.py 对话、上下文、Artifact 与流式事件
-services/api/app/application/llm.py           OpenAI-compatible 适配与结构校验
-services/api/app/application/runs.py          治理 Run 和执行编排
-packages/contracts/models.py                  安全边界协议
-packages/risk_core/                           风险、策略和 ControlPlan
-packages/evidence/                            Mock Evidence Resolver
-packages/agent_runtime/workflow.py             LangGraph interrupt/resume
-packages/authorization/service.py             Ed25519 Permit
-packages/tool_gateway/gateway.py               Permit 校验与工具注册
-simulators/                                   非真实副作用工具
-tests/                                        单元与端到端回归
+apps/web/app/page.tsx
+apps/web/app/harness-workbench.tsx
+apps/web/app/styles.css
+services/api/app/main.py
+services/api/app/api/harness_routes.py
+services/api/app/application/benchmark_scenario_catalog.py
+services/api/app/application/harness_runtime.py
+packages/contracts/harness_models.py
+demo-enterprise-data/forte/manifest.json
+tests/unit/test_benchmark_scenario_catalog.py
+tests/unit/test_harness_runtime.py
+apps/web/e2e/harness-workbench.spec.ts
 ```
 
-必须保留的产品与安全不变量：
+Generic risk、authorization、tool gateway 和 simulator 包可以保留为未来构件；只要没有被当前路由和 Runtime 接入，就不能称为当前能力。
 
-- 工作区在左、Agent 在右；双方独立滚动，中间可拖动，切换工作区不重建对话。
-- 用户可以独立编辑和保存；Agent 接收活动视图与未保存的 `workspace_context`。
-- 人工确认使用对话底部非模态 tray，不恢复独立审批页，也不完全遮挡消息区。
-- Demo 1 的冲突决定、候选依据和分支控制只在 Tasks 工作区显示；非 Tasks 工作区只显示后台任务摘要和前往 Tasks 的入口，跳转本身不得提交 Task Control。
-- Demo 1 的文件来源在普通业务 UI 中必须标为“演示数据”并使用可读业务标签；原始 `fixture:` ID 和未知内部标识不得进入 DOM。服务端仍保留稳定控制 ID 用于校验与审计。
-- Demo 1 当前来源包位于 `demo-enterprise-data/customer-a/`，仅是项目生成的仿真文件，不是 Lenovo、真实客户、实时企业数据库或 Connector。服务端必须先以 `manifest.json` 做 allowlist、相对路径、文件大小、非符号链接和 SHA-256 校验，再做受限结构化解析；创建时冻结 `TaskSnapshot.source_documents[]`，冲突以 `ConflictRecord.operation_context` 绑定文件字段事实。文件缺失、篡改、解析失败或摘要变化必须 fail closed；前台只显示文件名、系统标签、记录时间和字段依据，隐藏 `fixture:` 控制 ID、绝对路径和完整摘要。
-- FORTE Scenario Pack 固定上游 commit `345c1ec1487139db9dd319787fa9405ba85d1869`、顶层 MIT 和 manifest 中 11 个原始文件/`115352` bytes。raw `task.md` 只作 provenance；Prompt 净化后只进入内部 Planner。公共 API/UI 不得出现 raw task、`task_instruction`、rubric、solution 或 grading 内容；普通前台只显示“公开办公基准数据”和安全文件业务标签。
-- 统一 Harness 的八模块唯一命名为 Scenario Pack & Workspace Catalog、Task Contract、Planner、Admission & Plan Validator、Scheduler & Worker Manager、Tool Gateway、Artifact Workspace & Verifier、Checkpoint/Event/Governance Control。不得再用另一套八模块成熟度表并行汇报。
-- Harness 第一纵切只允许状态到 `ready_to_execute`。模型是否调用、输出是否采用、服务端计划是否校验通过必须分别依据 `HarnessModelReceipt.called`、`output_used` 和 Snapshot/Event；当前没有 execution command、Scheduler/Worker、工具调用、Artifact 写入/验证/Commit、审批、Permit 或外部动作。
-- 统一前台目标是默认工作现场：左侧来源、中间渐进阶段与动态 Plan、右侧服务端活动回执。所有节点、阶段、模型事实和未执行边界必须来自 Harness Snapshot/SSE；Prompt、CoT、模型原始响应、Key、绝对路径、完整 hash 和 benchmark 内部字段隐藏。浏览器 E2E 不是用户研究。
-- 涉及 Task 决策或副作用的主要动作必须优先展示服务端拥有的影响：提交前说明会改变什么、重新核对什么、保持什么和不会发生什么，提交后只依据实际 Snapshot/Event 回执展示已经发生的变化。前端动画、模型说明或静态文案不得冒充变化事实。
-- 终态入口统一为“开始新一轮汇报”：创建独立 Task 并立即启动，旧 Task、Artifact、Event 与 Commit 不得重置或覆盖。当前没有历史轮次选择入口，不得把后台保留表述成前台可自由切换历史轮次。
-- 报价工作台的行小计、标准总价、折后总价、优惠金额、综合折后比例、优惠率和最低折后比例检查必须由确定性公式产生，LLM 只能解释结果，不能充当计算器。服务端拥有 `quote_id/customer/currency/approved_floor/unit_price/sources`；当前用户只能通过工作区编辑 `name/qty/discount/valid_until`，客户端 `subtotal/total/approval` 永远不是权威事实。
-- 报价任一必需字段无效、越界、超限或行数与服务端版本不一致时必须 fail closed：前台不显示部分总计，Agent 不回退到历史金额，保存接口不写入猜测结果。保存后的规范化报价若相对基线有修改，必须标记 `needs_review` / `requires_recheck`，不能沿用旧审批。
-- 显式发送未保存 `workspace_context` 时必须同时提交服务端 `artifact_id + revision`；保存必须提交 `expected_artifact_id + expected_revision`。版本过期时不得覆盖最新内容：前端保留当前草稿、读取最新 Artifact，并只允许查看最新版本或基于编辑起点/本地草稿/最新版本做有界三方重应用；同字段双改必须交给用户处理。
-- LLM 产生的 Artifact `sources`、Action 参数、目标范围、数据分类、状态变化类型和可逆性都不是权威事实。服务端必须保留/生成受信来源，并从当前可见 Artifact 与 capability 重建可执行动作；内容不匹配、目标不确定或版本在规划期间变化时 fail closed。动作终态说明允许同一 API 进程内幂等重放同一个 `message.completed`，前端按 `message_id` 更新而不是重复追加。
-- 不得把动作自身携带的未知姓名、畸形邮箱或不透明附件当作“已验证证据”。收件人身份未解析、邮箱格式不合法或附件数据类别不明时必须确定性 deny，用户自报同一值不能解锁；格式合法的已知邮箱与可分类附件才沿正常 Evidence/Approval/Permit 链路。Conversation 创建的 Run 必须绑定真实 Thread，同一用户也不能把一个 Thread 的结果续写到另一个 Thread。
-- 用户在等待 Agent 返回 Artifact 期间仍可继续编辑。晚到的 `artifact.updated` 必须以请求发出时版本为 base 做三方处理：不同字段保留双方修改，同字段双改进入显式冲突；不得把晚到 Agent 结果直接覆盖用户新输入。
-- 动作确认后必须继续执行并由 Agent 返回结果，前端不能硬编码“已完成”。
-- LLM 只生成自然语言、ArtifactDraft 与 ActionCandidate；Risk、Policy、Evidence、Approval、Permit 和工具执行由确定性代码决定。
-- 风险规则不能退化为“所有外部动作都是 L5”。普通累计最高 L4；L5 仅由受限能力、受限执行或凭据公开等硬条件触发。
-- 风险判断在确认前的 Agent 文本中只输出一次；确认卡可保留结构化风险，最终结果不重复风险段落。
-- Artifact 绑定动作后若内容改变，旧 Action 必须失效；不能复用旧审批或 Permit。
-- Task 派生动作只能来自当前 Owner 的最终 `TaskCommit` 中、已经 passed 验证的不可变 ArtifactVersion；必须绑定 Task/Commit/Artifact/Verification 的身份、版本和 digest，并在证据、审批、授权与执行前重新校验。前台“准备动作”不得表述为已发送，拒绝或动作失败不得回滚已完成的 Task Commit。
-- `email.send` 等执行结果当前全部来自 Simulator。不得在文档、UI 或汇报中表述为真实邮件、CRM、日历或 OA 写入。
-- 25 类 ActionCandidate 是协议目录，不代表全部可执行；当前只有 5 个 capability 注册了端到端 Simulator。
-- Demo 2 第一纵切只允许使用四项固定演示任务、服务端 `WorkCockpitSnapshot`、固定队列、路由解释和客户 A 的 `this_run` 模式选择；三项简单任务的 Admission 路由是固定演示选择，拖拽调序和长期排序偏好不属于本纵切。
-- Demo 2 的可选路由必须优先展示服务端 `RouteProfile.impact_preview`：右侧选择改变左侧工作组织影响地图，确认后只能依据 `WorkItemSnapshot.selection_receipt` 显示已记录变化。预演不是回执，路由已选不是任务已执行；缺少服务端 preview/receipt 时前端不得自行补造。
-- Demo 2 的 Adaptive Swarm 在路由确认后，`WorkItemSnapshot.execution_status` 仍必须为 `not_started`；只有固定客户 A、`selected_mode=adaptive_swarm`、Owner/版本/幂等/来源校验通过并收到独立 execution command 后，当前 Runtime 的 `Demo2ExecutionSnapshot.status` 才可达 `queued/running/verifying/completed/failed`。协议枚举中的 Execution `cancelled` 尚无当前取消路由/转换，只能算兼容保留或 Draft。Worker 自身只允许 `queued/running/completed/failed/cancelled`，没有 `verifying` 或 `waiting_input`；验证中是整轮 Execution 状态。`selection_source=admission` 表示接受推荐，降级必须为 `selection_source=user_override`，并使用 `override_scope=this_run`。
-- Demo 2 受控内部执行的 Worker/Artifact/事件/回执必须来自 `Demo2ExecutionSnapshot` 与 SSE：三个初始工作单元，文件收入冲突触发 seq 9 `DYNAMIC_REPLAN`、seq 10 `WORKER_ADDED`，最终 seq 15、4 workers、5 artifacts、`external_side_effect=none`。模型只生成受限业务摘要/要点，服务端拥有身份、来源、依赖、状态、版本/digest、验证和回执；普通 UI 隐藏 Prompt、CoT、Worker 对话、原始内部 ID 和日志。
-- Demo 2 的成本/时效预测只能使用 `route_profiles[].forecast.source_type=fixture_policy_forecast` 语义；live `elapsed_ms` 只表示本次模型/整轮观测，不得写成真实账单、节省比例、生产 SLA 或已验证效果。当前执行边界是单 API 进程 memory，API 重启、跨进程恢复、后台队列、分布式 Worker lease、真实 Connector、生产身份和用户研究均无证据。
-- Demo 3 动作影响账本只能使用服务端 `impact_preview` 与 `execution_receipt`。每个 `ImpactItem` 必须包含 `item_id/change_kind/label/before/after`，且固定映射为 `target-change→will_change`、`binding-recheck→will_recheck`、`task-preserved→unchanged`、`real-connector-not-called→no_external_action`；预演不是回执，`ToolExecutionResult.succeeded` 只证明 Simulator 返回结果。
-- Demo 3 的四类前台影响固定为“会改变 / 会重新核对 / 保持不变 / 不会发生”。拒绝、绑定失效、参数篡改、Permit 重放和 Simulator 失败都必须保留已完成 Task/Artifact/Commit 不变的回执。
-- Demo 3 不得表述真实邮箱、CRM、OA、日历或任务系统发生写入；当前仅覆盖固定场景和五个 Simulator capability。RunStore、Permit replay、Thread/Message 与完成消息的跨进程恢复边界必须按证据表述，不能从配置 PostgreSQL 推断为高可用。
-- Demo 3 当前仅在固定客户 A `reply_draft → email.send`、四个治理场景、被测桌面/移动路径内为 `Verified`；无用户研究、真实 Connector、生产身份、跨进程执行幂等/Permit replay、多实例或数据库恢复证据时，不得扩展为通用能力或用户效果结论。实现与文档 commit、PR URL 必须回填到 DR-0012 Evidence 后才能封口。
-- Demo 3 普通业务审计工作台不得渲染 raw `event_type`、`payload`、`trace` 或 `email_simulator`、`email.send`、`PERMIT_ISSUED`、Permit token/内容/permit_id/签名；必须投影为业务标签与服务端摘要，可以显示“Permit Service”“Permit 已签发/未签发”等业务级状态。内部原值只保留在 API/服务端审计与授权技术视图。
-- Demo 1/2/3 的通用完成状态在前台显示“已运行”，只有模型事实显示“模型已调用”；Demo 3 以“执行许可服务”“受控演示工具”为主，Permit/Gateway/Simulator 仅在二级技术元信息出现。unknown 工具结果必须显示“工具结果待核对”，不得写成未调用或未执行。
-- Demo 3 的 proposal 或 Task-derived action 出现时，前端必须全局切换到 Demo 3/审计视图，避免身份仍停留在 Demo 1/2。`TaskStageProcessing` 必须保持跨字段一致：确定性路径不得声称模型调用/模型输出；语言模型路径必须有观测调用和模型名。
+## 治理硬门槛
 
-Demo 1 当前 Runtime 事实（2026-08-20，文件驱动修订）：create 为 v1 `ready / contract`；创建前必须从 `demo-enterprise-data/customer-a/` manifest allowlist/hash 校验并解析文件，冻结 `TaskSnapshot.source_documents[]`；冲突字段来自文件事实与 `ConflictRecord.operation_context`。start 仅进入 v2 `running / observe`；浏览器在 Snapshot 确认后四次调用幂等 advance，依次得到 v3 Plan、v4 Act、v5 Verify、v6 `waiting_input / verify`，固定为 5 个工件、1 个 open conflict、2 个 passed verification；resolve 后 v7 `committed / commit`。`stage_records` 是 UI 事实且旧快照默认空数组。Plan/Act 通过严格 `TaskStageAgent` 调用 `deepseek-v4-pro`，但只有与服务端批准模板逐字段一致的业务文字才记录为 `model`，否则显式 `template_fallback`；Observe/Verify/Commit 确定性，模型不拥有身份、来源、状态、冲突、验证或 Commit。固定渐进路径还要求完整 Demo 契约，包括预算和截止时间。浏览器关闭不会后台继续，预算是 steps/tool calls/runtime 而非 token cost；同进程同 key 有锁，跨实例无分布式 LLM lease。模型 smoke 只证明连通与严格响应，不证明质量。文件证据已由实现 `5b07702`、PR #21、Python `166 passed, 1 skipped`、浏览器 `38 passed` 和桌面/移动截图按限定工程范围封口；精确 hash 与边界见 `docs/evidence/DEMO1-FILE-BACKED-SOURCES-EVIDENCE-20260820.md`。
+每个方案、实现项、PR、Demo 和汇报结论必须同时记录：
 
-Demo 2 当前 Runtime 事实（2026-08-21，受控内部执行修订）：route mutation 只记录本轮方式并保持 `not_started`；固定客户 A 选择 Adaptive Swarm 后可用独立 execution command 启动。服务端在单 API 进程 memory 内创建 `Demo2ExecutionSnapshot`，三个初始 Worker 调用 `deepseek-v4-pro`，文件收入冲突增派第四个核验 Worker，生成 5 个 `SharedArtifactVersion`，sequence 15 完成且 `ExecutionReceipt.external_side_effect=none`。第一轮 live 墙钟 8799 ms、4/4 模型输出采用，四次调用 4956/4268/3590/3665 ms，但只保留为交互式文字记录；第二轮浏览器 manifest 与截图是主要可复核证据。封口为 Python `178 passed, 1 skipped in 6.31s`、浏览器 `41 passed (2.0m)`，Ruff、lint、build、governance 和 diff-check 通过；实现提交为 `252f8d02725f341137f1580d4230003d2477ecca`、PR 为 [#22](https://github.com/Dickey007s/lenovo_agent/pull/22)；长期服务 3000/8010 仍运行，health 为 `deepseek-v4-pro`、checkpoint/task_store memory。该结论只在固定客户 A、项目仿真文件、单进程 memory、无外部动作范围内为 `Limited Verified`。`X-User-Id` 仍是 P0 占位，API 重启不恢复 Demo 2 执行，无后台队列、真实 Connector、生产身份、竞品实测或用户研究。
+- 场景与来源：目标用户、触发、痛点、完成条件、异常路径，以及可追溯 Source ID、日期/版本、支持判断和局限。
+- 前台交互影响：用户看到什么、能做什么、等待/失败如何恢复、哪些内部细节隐藏。
+- 后端事实映射：每个 UI 状态对应的 Snapshot/字段/有序事件、版本、Owner 和幂等语义。
+- 验证与边界：自动化、运行工件、截图或用户研究的证据类型，以及不能推出的结论。
 
-统一 Harness 当前 Runtime 事实（2026-08-24，限定范围 `Limited Verified`）：FORTE 固定 commit/MIT/11 个原始文件的导入审计已在限定来源范围 Verified；公共 Scenario、内部净化 Planner context、严格 `deepseek-v4-pro` DAG、确定性 Plan Validator、Owner/幂等、memory Snapshot、命名 SSE 和默认工作现场已形成第一纵切。可复核 manifest 中三场景均到 v6/seq 5 `ready_to_execute`：Finance-018 为 3 files/10 units/17112 ms，pm-014 为 4 files/6 units/13577 ms，Operations-008 为 1 file/4 units/10243 ms，均 `called=true`、`output_used=true`、`validation_errors=[]`、`execution_started=false`。正常事件均为 `workspace_index/planning_started/planning_completed/plan_validation/ready_to_execute`；终态 SSE 只连接一次并最终 GET，非终态断流才用 `after=N` 恢复；不存在或不属于当前 Owner 的 Run 在建立 SSE 前统一返回 404。封口为 Python `199 passed, 1 skipped in 7.93s`、浏览器 `48 passed (3.6m)`、Ruff/lint/build 通过和六张带 hash 的桌面/移动截图；实现 `fdcc3d819686b0d0afd99fcd0b637b5329607835`，首份证据文档提交 `265ffb6f1e4f35416b0020deff9becee9a3a26a2`，PR #23 open 且未合并。三 Demo execution、Worker/Tool/Artifact mutation/Verifier/Commit、Connector 和外部副作用仍为 Draft；运行仍是单进程 memory，E2E 不是用户研究。最终事实以 `docs/evidence/FORTE-WORKSPACE-AGENT-HARNESS-EVIDENCE-20260824.md` 为准。
+任一项缺失只能标 `Draft`。官方竞品资料不是竞品实测；不能声称竞品“做不到”。自动化不能替代用户研究。
 
-决策、推进与汇报的硬门槛：
+## 技术与验证
 
-- 每个方案、决策、实现项、PR、Demo 和汇报结论都必须同时记录：用户场景与问题、依据来源、前台交互影响、后端事实来源、验证证据与当前边界。
-- 场景记录必须包含目标用户、触发条件、当前流程或痛点、目标与完成条件、关键异常路径；不能只写抽象能力名称。
-- 来源必须给出可追溯的精确引用、日期或版本、它支持的判断以及局限。用户反馈、用户研究、竞品实践、论文、官方文档、源码和运行证据必须分类；推断与假设不得写成已验证事实。
-- 前台影响必须说明用户看见什么状态、可执行什么动作、得到什么反馈、失败或等待时如何恢复，以及哪些内部细节应隐藏。不得把原始 Prompt、思维链、Worker 对话、密钥、底层日志或无决策价值的内部状态直接暴露给用户。
-- 每个 UI 状态必须映射到服务端 `Snapshot`、持久化字段或有序事件，并写清状态转换、版本、权限和幂等语义。前端不得自行推断任务完成、分支真值、预算、风险、Permit 或执行成功。
-- 任一项缺少“场景与来源”“前台交互影响”“后端事实映射”“验证证据”之一时，状态只能标记为 `Draft` 或“待验证”，不得表述为已确认、已完成、已实现或可对外结论。
-- 具体记录格式、强制矩阵和完成门槛以 `docs/DECISION_AND_REPORTING_GOVERNANCE.md` 为准；行为或叙事变化必须同步更新对应记录。
-
-技术约束：Python 固定 `>=3.12,<3.13`；前端使用 Next.js 16、React 19 和 TypeScript；API 使用 FastAPI；持久化使用 PostgreSQL 16；LLM 调用 OpenAI-compatible `/chat/completions`。不要提交 `.env`、真实 Key、真实客户信息或生产凭据。
-
-修改前先搜索现有模式，保持局部改动，不做无关重构。涉及协议时同步检查前端类型、Pydantic 模型、RunService、测试和文档。涉及风险与授权时必须补回归测试，不能只依靠 UI 手测。
+Python 固定 `>=3.12,<3.13`；前端使用 Next.js 16、React 19 和 TypeScript；API 使用 FastAPI；LLM 使用 OpenAI-compatible `/chat/completions`。不要提交 `.env`、Key、生产凭据或真实客户信息。
 
 提交或交付前运行：
 
@@ -108,6 +85,7 @@ uv run pytest -q
 uv run ruff check .
 pnpm --dir apps/web lint
 pnpm --dir apps/web build
+pnpm --dir apps/web exec playwright test e2e/harness-workbench.spec.ts
 ```
 
 本地启动与停止：
@@ -117,6 +95,6 @@ pnpm --dir apps/web build
 .\scripts\stop-demo.ps1
 ```
 
-默认地址为前端 `http://localhost:3000`、API `http://localhost:8010`、OpenAPI `http://localhost:8010/docs`。若运行结果与本文档不一致，以源码和命令输出为准，并修正文档。
+默认地址为前端 `http://localhost:3000`、API `http://localhost:8010`、OpenAPI `http://localhost:8010/docs`。若运行结果与文档不一致，以源码和命令输出为准，并修正文档。
 
-与用户沟通时使用中文直接回答，不复述问题；优先使用连续短段落，减少不必要的标题、列表和空行。
+与用户沟通时使用中文直接回答，优先连续短段落。汇报必须把技术差异落到用户交互影响，并明确当前事实、目标设计和历史证据的生命周期。

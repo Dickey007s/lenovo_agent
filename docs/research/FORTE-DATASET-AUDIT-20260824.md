@@ -40,10 +40,16 @@
 
 这份数据包本身不改变现有 Demo Runtime。DR-0016 的独立 Harness 规划纵切已把来源投影为“公开办公基准数据 / 任务名 / 文件名 / 文件类型 / 短版本”，不显示原始内部路径、solution、rubric、Prompt 或控制 ID。每个 Agent 阶段必须由服务端 Harness 记录读取了哪个 allowlisted 文件、产生了哪个 Artifact、使用了哪个版本；当前只记录文件冻结、动态 Plan 和 validation，尚未产生 Artifact。浏览器只显示业务级事实。
 
-数据校验失败时，前台显示“来源文件待核对”，不得继续调用模型、显示猜测结果或把静态演示文案当成已完成。本文的来源审计只证明来源和只读索引；另由 DR-0016 Evidence 在固定三场景内 `Limited Verified` 到 `ready_to_execute`。Demo 1/2/3 的 Loop、Worker、Artifact mutation、动作治理和用户理解仍需单独实现和验证。
+数据校验失败时，服务端返回受控 503，前台显示 Catalog 完整性专用的“工作场景需要更新”恢复状态，不得继续调用模型、显示猜测结果或把静态演示文案当成已完成。本文的来源审计只证明来源和只读索引；另由 DR-0016/0017 Evidence 在固定三场景内 `Limited Verified` 到 `ready_to_execute`。Demo 1/2/3 的 Loop、Worker、Artifact mutation、动作治理和用户理解仍需单独实现和验证。
 
 ## 验证
 
 - `uv run pytest -q tests/unit/test_benchmark_scenario_catalog.py`：`4 passed`。
 - `uv run ruff check packages/contracts/harness_models.py services/api/app/application/benchmark_scenario_catalog.py tests/unit/test_benchmark_scenario_catalog.py`：通过。
 - manifest 中保存了六个 XLSX、两个输入 Markdown 和三个 task.md provenance record 的 SHA-256；原始第三方许可证保存为 `demo-enterprise-data/forte/THIRD_PARTY_LICENSE.txt`。
+
+## DR-0017 字节完整性修订
+
+一次实际 Catalog 失败揭示：旧 `.gitattributes` 将五个上游 CRLF Markdown 当作文本归一化为 LF，而 manifest 绑定的是上游原字节，因此完整性校验按设计 fail closed。修订恢复上游 bytes，并将 FORTE task/input 文件标记为 binary；manifest 与许可证仍按仓库文本规则管理。
+
+在 PR #24 远端分支的 fresh clone verification 中，HEAD `5fab10fb4f638958ff78b39583a4eace2e99396b` 的 11 个文件、`115352` bytes 全部 size/hash 匹配，且当前树不存在 `demo-enterprise-data/customer-a/`。该检查只证明固定分支的字节可复现，不证明 PR 已合并、数据具备生产代表性或三 Demo 已执行。详见 [DR-0017 Evidence](../evidence/FORTE-ONLY-WORKSITE-RETIREMENT-EVIDENCE-20260824.md)。
