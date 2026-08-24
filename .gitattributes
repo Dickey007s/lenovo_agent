@@ -3,3 +3,4 @@ docs/final-reference/*.html text eol=lf
 docs/prototypes/*.html text eol=lf
 docs/final-reference/*.pptx binary
 demo-enterprise-data/** text eol=lf
+demo-enterprise-data/**/*.xlsx binary

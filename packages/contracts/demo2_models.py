@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from typing import Literal
+from datetime import datetime
+from typing import Any, Literal
 
 from pydantic import Field, model_validator
 
@@ -16,7 +17,15 @@ ExecutionMode = Literal[
 AdmissionStatus = Literal["recommended", "route_selected"]
 RouteSelectionSource = Literal["admission", "user_override"]
 OverrideScope = Literal["this_run"]
-ExecutionStatus = Literal["not_started"]
+ExecutionStatus = Literal[
+    "not_started",
+    "queued",
+    "running",
+    "verifying",
+    "completed",
+    "failed",
+    "cancelled",
+]
 RouteImpactKind = Literal["change", "preserve", "no_external_action"]
 RouteImpactAspect = Literal[
     "route_decision",
@@ -156,11 +165,28 @@ class WorkItemSnapshot(StrictModel):
     selection_source: RouteSelectionSource | None = None
     override_scope: OverrideScope | None = None
     execution_status: ExecutionStatus = "not_started"
+    execution_id: str | None = None
     selection_receipt: RouteSelectionReceipt | None = None
     selection_receipts: list[RouteSelectionReceipt] = Field(default_factory=list)
     version: int = Field(default=1, ge=1)
     last_event_sequence: int = Field(default=1, ge=1)
-    last_event_type: Literal["ADMISSION_EVALUATED", "ROUTE_SELECTED"] = "ADMISSION_EVALUATED"
+    last_event_type: Literal[
+        "ADMISSION_EVALUATED",
+        "ROUTE_SELECTED",
+        "EXECUTION_QUEUED",
+        "EXECUTION_STARTED",
+        "WORKER_STARTED",
+        "WORKER_COMPLETED",
+        "WORKER_FAILED",
+        "WORKER_CANCELLED",
+        "DYNAMIC_REPLAN",
+        "WORKER_ADDED",
+        "EXECUTION_VERIFYING",
+        "ARTIFACT_VERIFIED",
+        "EXECUTION_COMPLETED",
+        "EXECUTION_FAILED",
+        "EXECUTION_CANCELLED",
+    ] = "ADMISSION_EVALUATED"
 
     @model_validator(mode="after")
     def normalize_and_validate_receipt_history(self) -> WorkItemSnapshot:
@@ -199,3 +225,148 @@ class RouteSelectionRequest(StrictModel):
     scope: OverrideScope = "this_run"
     expected_version: int = Field(ge=1)
     idempotency_key: str = Field(min_length=8, max_length=160)
+
+
+WorkerStatus = Literal["queued", "running", "completed", "failed", "cancelled"]
+WorkerRole = Literal[
+    "revenue_analyst",
+    "project_risk_analyst",
+    "request_context_analyst",
+    "reconciliation_analyst",
+    "synthesis_verifier",
+]
+WorkerTrigger = Literal["initial_plan", "dynamic_replan", "verification"]
+ArtifactStatus = Literal["draft", "validated"]
+WorkerProcessingKind = Literal["language_model", "deterministic", "policy_engine"]
+WorkerProcessingPath = Literal["language_model", "deterministic"]
+WorkerOutputUsed = Literal["model", "deterministic", "template_fallback"]
+
+
+class WorkerProcessing(StrictModel):
+    path: WorkerProcessingPath
+    kind: WorkerProcessingKind
+    label: str = Field(min_length=1, max_length=120)
+    model_called: bool = False
+    model: str | None = Field(default=None, max_length=120)
+    elapsed_ms: int | None = Field(default=None, ge=0)
+    output_used: WorkerOutputUsed
+    fallback_reason: str | None = Field(default=None, max_length=120)
+
+    @model_validator(mode="after")
+    def validate_processing_truth(self) -> WorkerProcessing:
+        if self.path == "deterministic":
+            if self.kind != "deterministic":
+                raise ValueError("deterministic path must use deterministic kind")
+            if self.model_called or self.model is not None or self.output_used == "model":
+                raise ValueError("deterministic path cannot claim model facts")
+        else:
+            if self.kind != "language_model" or not self.model_called or not self.model:
+                raise ValueError("language-model path requires an observed model call")
+            if self.output_used == "deterministic":
+                raise ValueError("language-model path cannot claim deterministic output")
+        if self.output_used == "template_fallback" and not self.fallback_reason:
+            raise ValueError("template fallback requires a bounded reason")
+        if self.output_used != "template_fallback" and self.fallback_reason is not None:
+            raise ValueError("fallback reason is only valid for template fallback")
+        return self
+
+
+class Demo2WorkerSpec(StrictModel):
+    worker_run_id: str = Field(min_length=1, max_length=160)
+    work_item_id: str = Field(min_length=1, max_length=120)
+    role: WorkerRole
+    label: str = Field(min_length=1, max_length=160)
+    objective: str = Field(min_length=1, max_length=600)
+    depends_on: list[str] = Field(default_factory=list, max_length=20)
+    source_document_ids: list[str] = Field(min_length=1, max_length=20)
+    trigger: WorkerTrigger = "initial_plan"
+    status: WorkerStatus = "queued"
+    started_at: datetime | None = None
+    completed_at: datetime | None = None
+    artifact_version_id: str | None = None
+    error_code: str | None = None
+    processing: WorkerProcessing | None = None
+
+
+class SharedArtifactVersion(StrictModel):
+    artifact_version_id: str = Field(min_length=1, max_length=160)
+    artifact_id: str = Field(min_length=1, max_length=160)
+    version: int = Field(ge=1)
+    title: str = Field(min_length=1, max_length=240)
+    kind: Literal["worker_finding", "verified_report_bundle"]
+    status: ArtifactStatus
+    produced_by_worker_run_id: str | None = None
+    source_document_ids: list[str] = Field(min_length=1, max_length=20)
+    content: dict[str, Any] = Field(min_length=1, max_length=30)
+    content_digest: str = Field(pattern=r"^sha256:[0-9a-f]{64}$")
+    created_at: datetime
+
+
+class SwarmEvent(StrictModel):
+    execution_id: str = Field(min_length=1, max_length=160)
+    sequence: int = Field(ge=1)
+    event_type: Literal[
+        "EXECUTION_QUEUED",
+        "EXECUTION_STARTED",
+        "WORKER_STARTED",
+        "WORKER_COMPLETED",
+        "WORKER_FAILED",
+        "WORKER_CANCELLED",
+        "DYNAMIC_REPLAN",
+        "WORKER_ADDED",
+        "EXECUTION_VERIFYING",
+        "ARTIFACT_VERIFIED",
+        "EXECUTION_COMPLETED",
+        "EXECUTION_FAILED",
+        "EXECUTION_CANCELLED",
+    ]
+    occurred_at: datetime
+    status: ExecutionStatus
+    worker_run_id: str | None = None
+    artifact_version_id: str | None = None
+    message: str = Field(min_length=1, max_length=600)
+    details: dict[str, str] = Field(default_factory=dict, max_length=20)
+
+
+class ExecutionReceipt(StrictModel):
+    receipt_id: str = Field(min_length=1, max_length=160)
+    execution_id: str = Field(min_length=1, max_length=160)
+    work_item_id: str = Field(min_length=1, max_length=120)
+    status: Literal["completed", "failed", "cancelled"]
+    worker_run_ids: list[str] = Field(min_length=1, max_length=20)
+    artifact_version_ids: list[str] = Field(min_length=1, max_length=20)
+    final_artifact_version_id: str | None = None
+    external_side_effect: Literal["none"] = "none"
+    started_at: datetime
+    completed_at: datetime
+    summary: str = Field(min_length=1, max_length=800)
+
+
+class Demo2ExecutionSnapshot(StrictModel):
+    backend: Literal["memory"] = "memory"
+    execution_id: str = Field(min_length=1, max_length=160)
+    owner_id: str = Field(min_length=1, max_length=120)
+    work_item_id: str = Field(min_length=1, max_length=120)
+    mode: Literal["adaptive_swarm"] = "adaptive_swarm"
+    status: ExecutionStatus
+    version: int = Field(ge=1)
+    last_event_sequence: int = Field(ge=0)
+    source_document_ids: list[str] = Field(min_length=1, max_length=20)
+    worker_runs: list[Demo2WorkerSpec] = Field(default_factory=list, max_length=20)
+    artifacts: list[SharedArtifactVersion] = Field(default_factory=list, max_length=30)
+    events: list[SwarmEvent] = Field(default_factory=list, max_length=200)
+    receipt: ExecutionReceipt | None = None
+    budget_max_workers: int = Field(default=3, ge=1, le=4)
+    budget_max_worker_runs: int = Field(default=4, ge=1, le=6)
+
+
+class Demo2ExecutionStartRequest(StrictModel):
+    expected_version: int = Field(ge=1)
+    idempotency_key: str = Field(min_length=8, max_length=160)
+    max_workers: int = Field(default=3, ge=1, le=3)
+
+
+class Demo2ExecutionStartResult(StrictModel):
+    replayed: bool = False
+    item: WorkItemSnapshot
+    execution: Demo2ExecutionSnapshot

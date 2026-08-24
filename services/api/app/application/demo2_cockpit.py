@@ -41,7 +41,7 @@ class _IdempotentResult:
 
 
 class Demo2CockpitService:
-    """Deterministic Demo 2 admission slice; it does not start execution."""
+    """Admission and selection facts shared with the controlled execution slice."""
 
     backend = "memory"
     policy_version = "demo2-routing-v1"
@@ -65,6 +65,45 @@ class Demo2CockpitService:
             if item.work_item_id == work_item_id:
                 return item
         raise Demo2NotFoundError(work_item_id)
+
+    async def update_execution_state(
+        self,
+        *,
+        work_item_id: str,
+        owner_id: str,
+        execution_id: str,
+        status: str,
+        event_type: str,
+    ) -> WorkItemSnapshot:
+        """Project execution truth into the cockpit snapshot without frontend inference."""
+        async with self._lock:
+            cockpit = self._cockpits.setdefault(owner_id, self._new_cockpit(owner_id))
+            index = next(
+                (i for i, item in enumerate(cockpit.items) if item.work_item_id == work_item_id),
+                None,
+            )
+            if index is None:
+                raise Demo2NotFoundError(work_item_id)
+            current = cockpit.items[index]
+            updated = current.model_copy(
+                update={
+                    "execution_status": status,
+                    "execution_id": execution_id,
+                    "version": current.version + 1,
+                    "last_event_sequence": current.last_event_sequence + 1,
+                    "last_event_type": event_type,
+                }
+            )
+            items = list(cockpit.items)
+            items[index] = updated
+            self._cockpits[owner_id] = cockpit.model_copy(
+                update={
+                    "version": cockpit.version + 1,
+                    "last_event_sequence": cockpit.last_event_sequence + 1,
+                    "items": items,
+                }
+            )
+            return updated.model_copy(deep=True)
 
     async def select_route(
         self,

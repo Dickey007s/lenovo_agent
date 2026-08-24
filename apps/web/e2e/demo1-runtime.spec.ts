@@ -147,6 +147,7 @@ async function expectPrimarySurfaceToHideRuntimeJargon(page: Page) {
 }
 
 async function openLongTask(page: Page) {
+  await page.getByRole("button", { name: "任务", exact: true }).click();
   const tab = page.getByRole("tab", { name: "长任务", exact: true });
   await expect(tab).toBeVisible();
   await tab.click();

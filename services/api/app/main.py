@@ -12,6 +12,7 @@ from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 
 from packages.audit import PostgresAuditLog
+from services.api.app.api.harness_routes import router as harness_router
 from services.api.app.api.routes import build_run_service, router
 from services.api.app.application.storage import (
     InMemoryWorkspaceStore,
@@ -22,7 +23,9 @@ from services.api.app.application.task_storage import InMemoryTaskStore, Postgre
 from services.api.app.application.tasks import TaskService
 from services.api.app.application.task_stage_agent import AutoDLTaskStageAgent
 from services.api.app.application.demo2_cockpit import Demo2CockpitService
+from services.api.app.application.demo2_execution import DeepSeekDemo2WorkerAgent, Demo2ExecutionService
 from services.api.app.application.conversations import ConversationService
+from services.api.app.application.harness_runtime import build_harness_runtime
 from services.api.app.config import get_settings
 
 
@@ -50,9 +53,22 @@ async def lifespan(app: FastAPI):
         app.state.task_store_backend = "memory"
     await task_store.setup()
     app.state.task_service = _build_task_service(task_store, settings)
-    # Demo 2 is intentionally an in-memory admission slice; it does not start workers.
+    # Demo 2 is an in-memory controlled execution slice; process restart discards it.
     app.state.demo2_cockpit_service = Demo2CockpitService()
     await app.state.demo2_cockpit_service.setup()
+    app.state.demo2_execution_service = Demo2ExecutionService(
+        app.state.demo2_cockpit_service,
+        worker_agent=DeepSeekDemo2WorkerAgent(
+            base_url=settings.llm_base_url,
+            api_key=settings.llm_api_key,
+            model=settings.llm_model,
+            timeout=settings.llm_timeout_seconds,
+        ),
+    )
+    await app.state.demo2_execution_service.setup()
+    # Unified Harness indexes public benchmark input folders and stops at a
+    # server-validated ready_to_execute boundary; it never invokes a tool here.
+    app.state.harness_runtime = build_harness_runtime(settings)
 
     if settings.langgraph_checkpoint_dsn:
         database_dsn = settings.database_dsn or settings.langgraph_checkpoint_dsn
@@ -105,6 +121,7 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
     app.include_router(router)
+    app.include_router(harness_router)
     return app
 
 

@@ -1,6 +1,6 @@
 # HTTP API 与 SSE 事件
 
-本文记录 V0.1、Demo 1、`DR-0006` 报价核算、`DR-0007` Task 工件动作桥与 `DR-0008` Demo 2 Admission 纵切实际使用的 FastAPI 接口。运行后以 <http://localhost:8010/docs> 的 OpenAPI 页面和 `services/api/app/api/routes.py` 为最终事实来源。Demo 2 当前只提供固定工作队列、路由解释和路由选择，不启动 Worker 或外部动作。
+本文记录 V0.1、Demo 1、`DR-0006` 报价核算、`DR-0007` Task 工件动作桥、`DR-0008` Demo 2 Admission、`DR-0015` 受控内部执行与 `DR-0016` FORTE Workspace + 统一 Harness 规划纵切使用的 FastAPI 接口。运行后以 <http://localhost:8010/docs> 的 OpenAPI 页面和 `services/api/app/api/` 路由源码为最终事实来源。Demo 2 当前能在固定客户 A、单 API 进程 memory 范围内启动受控模型 Worker；新的 Harness 第一纵切另只到 `ready_to_execute`，不调用任何工具、Worker 或外部 Connector。
 
 ## 1. 约定
 
@@ -13,6 +13,7 @@
 - Task 工件动作幂等头：`POST /tasks/{task_id}/artifacts/{artifact_version_id}/actions/email-send` 必须带 `Idempotency-Key`，长度 8-160。相同用户、相同 key 与完全相同的动作事实返回同一 Run；相同 key 对应不同工件事实时返回 409。
 - Task mutation：`start` 和 `controls` 在 JSON body 中携带 `expected_task_version` 与 `idempotency_key`。版本过期或同一 key 被用于不同命令时返回 409。
 - Workspace revision token：显式提交 `workspace_context` 时同时提交 `workspace_artifact_id + workspace_revision`；保存 `PUT /workspace/{kind}` 时提交 `expected_artifact_id + expected_revision`。这两个字段是当前活动 Artifact 的乐观并发 token，不是权限凭据。
+- Harness start 幂等字段：`POST /harness/runs` 的 JSON body 携带 `idempotency_key`（8-160）与 `expected_version`。同一 Owner、相同 key 和相同 body 重放同一 `run_id`；同 key 用于不同 body 返回 409。该机制只在单 API 进程 memory。
 
 上述身份头没有签名，只是 P0 占位。生产环境必须在 API 边界替换为经过验证的 SSO/JWT，并从可信身份声明映射角色。
 
@@ -65,8 +66,12 @@ Task ID、Owner、契约版本、任务状态、分支状态、事件序号和�
 | GET | `/demo2/cockpit` | 读取当前 Owner 的四项固定演示工作、Admission 建议和路由状态 |
 | GET | `/demo2/work-items/{work_item_id}` | 读取当前 Owner 的单个固定演示工作项 |
 | POST | `/demo2/work-items/{work_item_id}/route` | 以预期版本和幂等键记录本次执行方式；不启动实际执行 |
+| POST | `/demo2/work-items/{work_item_id}/execution` | 以预期版本和幂等键启动固定客户 A 的受控内部执行；返回 202 |
+| GET | `/demo2/work-items/{work_item_id}/execution` | 读取当前 Owner 的完整 `Demo2ExecutionSnapshot` |
+| GET | `/demo2/work-items/{work_item_id}/execution/events?after={sequence}` | 读取某 sequence 之后的有序执行事件 |
+| GET | `/demo2/work-items/{work_item_id}/execution/stream?after={sequence}` | 回放并订阅执行 SSE；支持可选 `execution_id` 对账 |
 
-Demo 2 当前服务端为进程内 memory。API 重启后路由选择会回到固定初始状态；没有 SSE、数据库恢复、Worker 生命周期或跨实例通知。四项工作在每个 Owner 的独立固定队列中生成，普通 UI 只显示“演示数据”业务标签，不显示内部来源 ID。
+Demo 2 当前服务端为进程内 memory。API 重启后路由选择、执行 Snapshot、事件和幂等结果都会丢失；没有数据库恢复、后台任务队列、跨进程 Worker lease 或跨实例通知。四项工作在每个 Owner 的独立固定队列中生成；只有固定客户 A、已选择 `adaptive_swarm` 的当前版本可进入执行纵切。普通 UI 只显示“演示数据”业务标签，不显示内部来源 ID、Prompt、思维链或 Worker 对话。
 
 ### 2.4 场景、治理与审计
 
@@ -84,6 +89,18 @@ Demo 2 当前服务端为进程内 memory。API 重启后路由选择会回到�
 | POST | `/actions/{action_id}/approvals` | 以当前用户拥有的角色批准或拒绝 |
 | POST | `/actions/{action_id}/authorize` | 最终授权、签发 Permit 并调用 Gateway |
 | POST | `/demo3/actions/{action_id}/tamper-check` | 演示参数被篡改时 Gateway 拒绝执行 |
+
+### 2.5 FORTE Workspace + 统一 Harness（DR-0016，Limited Verified 规划纵切）
+
+| 方法 | 路径 | 用途 |
+| --- | --- | --- |
+| GET | `/harness/scenarios` | 返回三个安全公共场景投影；不创建 Run |
+| GET | `/harness/scenarios/{scenario_id}` | 返回一个安全公共场景投影 |
+| POST | `/harness/runs` | 幂等创建规划 Run，异步读取来源、调用 Planner 并校验计划；返回 202 |
+| GET | `/harness/runs/{run_id}` | 读取当前 Owner 的安全 `PublicHarnessRunSnapshot` 投影 |
+| GET | `/harness/runs/{run_id}/events?after={sequence}` | 回放并订阅命名 Harness SSE；不存在或非当前 Owner Run 统一 404 |
+
+公共场景投影只包含 `scenario_id/demo_id/title/goal/deliverables/data_boundary/human_gate_summary/allowed_capabilities/dataset_label/dataset_version/experience_policy/files[]`，其中文件只含 `display_label/display_group/display_summary`。raw `task.md`、内部净化 Prompt、`task_instruction`、rubric、solution、grading、原始路径和完整 hash 不属于该公共协议。
 
 ## 3. 主要请求与示例
 
@@ -125,9 +142,9 @@ Invoke-RestMethod -Method Get -Uri "$base/threads/$($thread.thread_id)" -Headers
 
 ### 2.6 Demo 身份与处理来源投影（DR-0013）
 
-Demo 1/2/3 的名称与目标属于客户端产品级信息架构，不是服务端 Demo descriptor；当前状态副标题仍必须从对应的 Task、WorkCockpit 或 Run Snapshot 对账。工程不新增通用 `call_trace[]` 协议，前端按 Demo 直接投影既有事实：Demo 1 使用 `TaskStageRecord.processing`（`path/model_called/model/elapsed_ms/output_used`），Demo 2 使用 `RouteSelectionReceipt.processing`（`path/model_called/elapsed_ms`），Demo 3 复用 `RunSnapshot.status/control_plan/evidence/approvals/permit/tool_result/impact_preview/execution_receipt` 与 Run SSE/AuditEvent。
+Demo 1/2/3 的名称与目标属于客户端产品级信息架构，不是服务端 Demo descriptor；当前状态副标题仍必须从对应的 Task、WorkCockpit、Demo2Execution 或 Run Snapshot 对账。工程不新增通用 `call_trace[]` 协议，前端按 Demo 直接投影既有事实：Demo 1 使用 `TaskStageRecord.processing`（`path/model_called/model/elapsed_ms/output_used`），Demo 2 的选择使用 `RouteSelectionReceipt.processing`，内部执行使用 `Demo2WorkerSpec.processing` 与 `SwarmEvent`，Demo 3 复用 `RunSnapshot.status/control_plan/evidence/approvals/permit/tool_result/impact_preview/execution_receipt` 与 Run SSE/AuditEvent。
 
-前台统一显示“已运行 / 未调用 / 未执行 / 待核对”，只有模型来源显示“模型已调用”，但不统一后端字段。Demo 1 的 v>1 Snapshot 没有 `stage_records`，或旧 Plan/Act 记录缺少 `processing` 时，模型调用显示“待核对”，不得推断为未调用。Demo 2 `execution_status=not_started` 时，路由已运行不表示 Worker 或 Connector 已运行；Demo 3 以“执行许可服务”“受控演示工具”为主，Permit/Gateway/Simulator 只在二级技术元信息中出现，且不表示真实外部写入。普通业务审计页只显示业务标签与服务端摘要，原始 `event_type/payload/trace`、Prompt、CoT、密钥、Permit token/内容/permit_id/签名和内部 ID 保留在 API/服务端审计边界。Proposal 或 Task-derived action 出现时，前端全局切换到 Demo3/审计视图。
+前台统一显示“已运行 / 未调用 / 未执行 / 待核对”，只有模型来源显示“模型已调用”，但不统一后端字段。Demo 1 的 v>1 Snapshot 没有 `stage_records`，或旧 Plan/Act 记录缺少 `processing` 时，模型调用显示“待核对”，不得推断为未调用。Demo 2 `WorkItemSnapshot.execution_status=not_started` 时，路由已运行不表示 Worker 或 Connector 已运行；启动后只能依据 `Demo2ExecutionSnapshot.status` 显示当前 Runtime 可达的 `queued/running/verifying/completed/failed`。Execution `cancelled` 虽在协议枚举中，但当前没有取消路由或状态转换，不得展示成已实现操作。`Demo2WorkerSpec.status` 只允许 `queued/running/completed/failed/cancelled`，没有 Worker `verifying` 或 Demo 2 `waiting_input`；`verifying` 只表示整轮 Execution 正在核验共享工件。`external_side_effect=none` 表示未触发外部动作。Demo 3 以“执行许可服务”“受控演示工具”为主，Permit/Gateway/Simulator 只在二级技术元信息中出现，且不表示真实外部写入。普通业务审计页只显示业务标签与服务端摘要，原始 `event_type/payload/trace`、Prompt、CoT、密钥、Permit token/内容/permit_id/签名和内部 ID 保留在 API/服务端审计边界。Proposal 或 Task-derived action 出现时，前端全局切换到 Demo3/审计视图。
 
 PowerShell 中可用 `curl.exe -N` 直接观察 SSE：
 
@@ -314,9 +331,30 @@ Invoke-RestMethod -Method Post `
 
 选择成功后的 `RouteSelectionResult.item.selection_receipt` 是最新独立服务端事实，`selection_receipts[]` 按 cockpit/item 版本连续保留当前 memory Snapshot 内的改选历史；只有 latest receipt 的旧 Snapshot 会归一化为一条历史。回执包含版本前后、最终模式、`selection_source`、`override_scope`、固定规则预测和实际记录的 `changes[]`。它证明路由选择已应用，不证明 Agent、协作单元或外部动作已启动；相同幂等命令重放返回同一 receipt，随后 GET 在同一 API 进程内读回同一 receipt。
 
-该 POST 走确定性 `policy_engine`，不调用 LLM。前台主动作因此使用“记录本轮方式”，而不是“执行”；服务端 runtime log 记录 `model_called=false` 与实际毫秒耗时。未来只有新增真实启动协议、执行事件和 Worker/Connector 事实后，才能出现“启动协作”动作。
+路由 POST 走确定性 `policy_engine`，不调用 LLM。前台该动作使用“记录本轮方式”，服务端 runtime log 记录 `model_called=false` 与实际毫秒耗时。只有选择 Adaptive Swarm 且服务端仍返回当前版本后，独立的 execution POST 才允许显示“启动协作”。
 
 `route_profiles[].forecast` 只有 `estimated_tool_calls`、`estimated_runtime_seconds` 和 `max_workers` 三个固定规则预测字段。它们不是模型账单、实际耗时、生产 SLA 或已经创建的 Worker 数。
+
+启动受控内部执行：
+
+```powershell
+$start = @{
+  expected_version = $route.item.version
+  idempotency_key = "demo2-execution-example-001"
+  max_workers = 3
+} | ConvertTo-Json
+$started = Invoke-RestMethod -Method Post `
+  -Uri "$base/demo2/work-items/$($customerA.work_item_id)/execution" `
+  -Headers $headers -ContentType "application/json" -Body $start
+```
+
+启动接口只接受当前 Owner 的固定客户 A、`selected_mode=adaptive_swarm` 和匹配的工作项版本。相同 Owner、work item、key 与同一命令返回同一结果；相同 key 对应不同命令、重复新意图、版本过期或模式不符返回 409。来源文件在启动和执行期间都要通过 manifest/摘要校验；不满足时 fail closed。
+
+`Demo2ExecutionSnapshot` 是执行真值，包含 `execution_id/owner_id/work_item_id/status/version/last_event_sequence/source_documents/workers/artifacts/events/receipt/backend`。三个初始 Worker 分别处理收入事实、项目风险和客户要求；固定文件事实发现确认收入与预测收入冲突时，sequence 9 `DYNAMIC_REPLAN`、sequence 10 `WORKER_ADDED` 增派收入口径核验。最终验证工件后，sequence 15 `EXECUTION_COMPLETED` 与 `ExecutionReceipt.external_side_effect=none` 表示内部汇总完成且未触发外部动作。
+
+Worker 使用固定 `deepseek-v4-pro` 适配器，只允许返回业务 `summary/key_points`；身份、角色、来源、状态、依赖、Artifact 版本/digest、事件和回执由服务端生成。只有模型输出与服务端批准业务文本严格一致时 `processing.output_used=model`，否则显式 `template_fallback`；因此“模型已调用”和“结果被采用”要分别读取 `processing.model_called/output_used`，不能由耗时或模型名推断。
+
+SSE 使用单调 sequence 作为 `id`，事件名为对应 `SwarmEvent.event_type`，`data` 为事件 JSON；支持 `after` 回放和可选 `execution_id` 校验。事件连接断开、序号缺口或 POST 响应未知时，前端重新 GET 完整 Snapshot 对账。当前 Store、执行线程、锁和幂等结果仅在单 API 进程内；API 重启后无恢复证据，且没有真实 Connector 或外部副作用。
 
 ### 3.6 从已验证 Task 工件准备治理 Run
 
@@ -402,6 +440,44 @@ Invoke-RestMethod -Method Post -Uri "$base/actions/$actionId/authorize" -Headers
 ```
 
 前置条件不足、Permit 无法签发或 Gateway 校验失败返回 409。成功响应中的 `tool_result.simulator` 明确指出被调用的是 Simulator。
+
+### 3.9 创建并观察 Harness 规划 Run（DR-0016，Limited Verified 规划纵切）
+
+```json
+{
+  "scenario_id": "Finance-018",
+  "idempotency_key": "harness:finance-018:run-001",
+  "expected_version": 1
+}
+```
+
+`POST /harness/runs` 立即返回 202 和 `{run, replayed}`；`run.status` 初始为 `queued`，随后同一 API 进程的异步任务推进。可达状态只有 `queued/indexing/planning/validating/ready_to_execute/failed`。当前没有 execution、cancel、pause、resume、Worker 或 tool 路由。
+
+`PublicHarnessRunSnapshot` 的主要字段是：
+
+```text
+run_id / owner_id / scenario_id / status / version
+created_at / updated_at / last_event_sequence
+source_documents[] / selection_reason
+plan / model_receipt / validation_errors / events[]
+```
+
+`source_documents[]` 只含 `file_ref/display_label/display_group/display_summary`；公共 `plan.units[]` 使用 `input_file_refs[]` 关联这些文件，不返回内部 `input_paths`。内部 Planner/Validator 仍使用 manifest path/hash，但路由在 start、GET 和 SSE 三处统一转换为安全投影并清理错误文字与 event details。
+
+`HarnessModelReceipt.called/model/elapsed_ms/output_used` 必须分别解释。`called=true` 只证明发起了模型 HTTP 调用；`output_used=true` 只在结构解析与完整服务端 Plan Validator 通过后出现；最终 `status=ready_to_execute` 仍只表示计划已校验。服务端事件固定按本纵切顺序记录：
+
+| event | 含义 | 不能推断 |
+| --- | --- | --- |
+| `workspace_index` | allowlisted input 已冻结为本轮来源范围 | 不是文件业务内容已完成核对 |
+| `planning_started` | Planner 阶段开始 | 不能只凭事件认定模型请求已送达 |
+| `planning_completed` | 模型结果返回或失败事实已记录；查看 `model_called/output_used` | 不是计划已经采用 |
+| `plan_validation` | 路径、工具、副作用、Artifact 元数据、依赖、环和人工 Gate 已通过 | 不是工作单元已经执行 |
+| `ready_to_execute` | 计划等待未来独立执行命令 | `execution_started=false`；无工具、工件写入或外部动作 |
+| `harness_failed` | 规划或校验 fail closed | 失败不触发 fallback 执行 |
+
+Harness SSE 以 `id: sequence`、`event: event_name` 和安全投影后的 `HarnessEvent` JSON 发送，`after` 仅返回 `sequence > after` 的事件；无事件时发送 `: heartbeat`。不存在的 Run 或不属于当前 Owner 的 Run 都在建立 `StreamingResponse` 前统一返回 404，不泄露资源是否属于其他 Owner。客户端在事件后 GET 完整公共 Snapshot 对账，不能用 SSE 文案自行合成计划或完成状态。收到 `ready_to_execute` 或 `harness_failed` 后客户端关闭当前流，并只做一次最终 GET；只有非终态意外断流才携带 `after=N` 重连。Run、事件和幂等结果当前是单 API 进程 memory，重启后返回 404；`X-User-Id` 仍为未签名的 P0 占位。
+
+固定三场景 live manifest 已验证 start/GET/SSE 安全投影、真实 `deepseek-v4-pro` 计划、确定性 validation 和 v6/seq 5 终态；浏览器全量为 `48 passed (3.6m)`。这不扩展路由能力：当前仍没有 execution、cancel、pause、resume、Worker、Tool、Artifact mutation、Connector 或外部副作用 API，详情见 [`FORTE-WORKSPACE-AGENT-HARNESS-EVIDENCE-20260824`](evidence/FORTE-WORKSPACE-AGENT-HARNESS-EVIDENCE-20260824.md)。
 
 ## 4. Conversation SSE
 
@@ -501,8 +577,8 @@ SSE 目前由每个 API 进程轮询 TaskStore，没有 PostgreSQL `LISTEN/NOTIF
 | 状态码 | 含义 |
 | --- | --- |
 | 403 | 当前身份不拥有提交的审批角色 |
-| 404 | Thread、Artifact、Run、Action、Scenario、Trace、Task 或 Demo 2 WorkItem 不存在，或不属于当前用户 |
-| 409 | 授权条件未满足、动作已失效、Permit/Gateway 拒绝，Workspace Artifact/revision 过期，Task 或 Demo 2 WorkItem 版本过期、状态转换/路由非法、Task 工件绑定已变化，或幂等键被用于不同契约/命令/动作事实 |
+| 404 | Thread、Artifact、Run、Action、Scenario、Trace、Task、Demo 2 WorkItem、Harness Scenario 或 Harness Run 不存在，或不属于当前用户 |
+| 409 | 授权条件未满足、动作已失效、Permit/Gateway 拒绝，Workspace Artifact/revision 过期，Task 或 Demo 2 WorkItem 版本过期、状态转换/路由非法、Task 工件绑定已变化，或幂等键被用于不同契约/命令/动作事实；Harness start key 复用于不同 body 同样返回 409 |
 | 422 | 请求 Schema、TaskContractDraft、证据值、报价当前字段或模型结构化输出无效 |
 | 503 | LLM endpoint、Key 或模型配置不可用 |
 
@@ -513,6 +589,7 @@ SSE 在响应已经开始后无法再改变 HTTP 状态码，因此流内错误�
 - 请求模型均 `extra="forbid"`；新增顶层字段会破坏旧服务端，协议变更需同步前端和文档。
 - Task Runtime 当前使用 `schema_version="1.0"`；Python 权威模型在 `packages/contracts/task_models.py`，前端镜像在 `apps/web/app/task-types.ts`。
 - Demo 2 Python 权威模型在 `packages/contracts/demo2_models.py`，前端镜像在 `apps/web/app/demo2-types.ts`；当前没有公开 schema version 或持久化迁移协议。
+- FORTE manifest 与安全场景投影的 Python 权威模型在 `packages/contracts/harness_models.py`；Harness Plan/Run/Event 当前由 `services/api/app/application/harness_runtime.py` 定义，尚无公开 schema version、持久化迁移或 execution 协议。
 - V0.1 没有公开版本协商；`/v1` 是唯一 API 版本。
 - `ActionCandidate`、Permit claims 和哈希规则是安全边界，不能由前端自行构造并绕过 RunService。
 - 文档示例中的邮箱、报价号、用户和 Key 全部是演示值。

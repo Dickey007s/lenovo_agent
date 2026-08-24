@@ -1,0 +1,138 @@
+{
+  "schema_version": "1.0",
+  "captured_at": "2026-08-24T18:19:12+08:00",
+  "runtime": {
+    "frontend": "http://localhost:3000",
+    "api": "http://localhost:8010",
+    "health": {
+      "status": "ok",
+      "model": "deepseek-v4-pro",
+      "checkpoint": "memory",
+      "task_store": "memory"
+    }
+  },
+  "dataset": {
+    "name": "FORTE",
+    "source_url": "https://github.com/AGI-Eval-Official/FORTE",
+    "source_commit": "345c1ec1487139db9dd319787fa9405ba85d1869",
+    "license": "MIT",
+    "scenario_count": 3,
+    "input_file_count": 8,
+    "provenance_file_count": 3
+  },
+  "runs": [
+    {
+      "scenario_id": "Finance-018",
+      "demo": "demo1",
+      "status": "ready_to_execute",
+      "version": 6,
+      "last_event_sequence": 5,
+      "source_document_count": 3,
+      "plan_unit_count": 10,
+      "model_receipt": {
+        "called": true,
+        "model": "deepseek-v4-pro",
+        "elapsed_ms": 17112,
+        "output_used": true
+      },
+      "events": [
+        "workspace_index",
+        "planning_started",
+        "planning_completed",
+        "plan_validation",
+        "ready_to_execute"
+      ]
+    },
+    {
+      "scenario_id": "pm-014",
+      "demo": "demo2",
+      "status": "ready_to_execute",
+      "version": 6,
+      "last_event_sequence": 5,
+      "source_document_count": 4,
+      "plan_unit_count": 6,
+      "model_receipt": {
+        "called": true,
+        "model": "deepseek-v4-pro",
+        "elapsed_ms": 13577,
+        "output_used": true
+      },
+      "events": [
+        "workspace_index",
+        "planning_started",
+        "planning_completed",
+        "plan_validation",
+        "ready_to_execute"
+      ]
+    },
+    {
+      "scenario_id": "Operations-008",
+      "demo": "demo3",
+      "status": "ready_to_execute",
+      "version": 6,
+      "last_event_sequence": 5,
+      "source_document_count": 1,
+      "plan_unit_count": 4,
+      "model_receipt": {
+        "called": true,
+        "model": "deepseek-v4-pro",
+        "elapsed_ms": 10243,
+        "output_used": true
+      },
+      "events": [
+        "workspace_index",
+        "planning_started",
+        "planning_completed",
+        "plan_validation",
+        "ready_to_execute"
+      ]
+    }
+  ],
+  "screenshots": [
+    {
+      "file": "dr-0016-harness-demo1-ready-desktop.png",
+      "width": 1440,
+      "height": 900,
+      "sha256": "78e7424b6e3da1bcc6d350d25ea90933119a85a6c0591a43081dd226870c733c"
+    },
+    {
+      "file": "dr-0016-harness-demo2-ready-desktop.png",
+      "width": 1440,
+      "height": 900,
+      "sha256": "fb9372c8db683972079cb547d51467074255bb7faae576ef4003f47c2ef0bf21"
+    },
+    {
+      "file": "dr-0016-harness-demo3-ready-desktop.png",
+      "width": 1440,
+      "height": 900,
+      "sha256": "367d8eace7f67056b96d9484941d367623be578628e9c11672e3f80125e4b5a9"
+    },
+    {
+      "file": "dr-0016-harness-demo3-ready-mobile.png",
+      "width": 390,
+      "height": 844,
+      "sha256": "05687cb0ded4ccc17fc6afc4d4f3edbbd7636dbce45f421eda6ec8ccaca47424"
+    },
+    {
+      "file": "dr-0016-harness-demo3-plan-mobile.png",
+      "width": 390,
+      "height": 844,
+      "sha256": "4dfe14228eca958b31f3b14cbf9de23418bf9ddd9d9441a3b98fb3630bd80b59"
+    },
+    {
+      "file": "dr-0016-harness-demo3-agent-mobile.png",
+      "width": 390,
+      "height": 844,
+      "sha256": "74aeeaedaa17a9026dbf1527b1ecbad05510d2b8fc561797584575a11f732d6d"
+    }
+  ],
+  "verification": {
+    "python": "199 passed, 1 skipped in 7.93s",
+    "ruff": "passed",
+    "web_lint": "passed",
+    "web_build": "passed; compile 6.7s, TypeScript 7.8s, static generation 619ms",
+    "browser": "48 passed in 3.6m",
+    "mobile_layout": "390px viewport; no horizontal overflow"
+  },
+  "boundary": "These runs prove file-backed scenario loading, a model-generated bounded plan, deterministic validation, ordered events, and truthful frontend receipts. They stop at ready_to_execute: no worker, tool, artifact mutation, connector, or external side effect was executed. Runtime state is memory-only."
+}

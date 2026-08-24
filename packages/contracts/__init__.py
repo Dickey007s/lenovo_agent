@@ -80,6 +80,23 @@ from .demo2_models import (
     WorkCockpitSnapshot,
     WorkItemFacts,
     WorkItemSnapshot,
+    Demo2ExecutionSnapshot,
+    Demo2ExecutionStartRequest,
+    Demo2ExecutionStartResult,
+    Demo2WorkerSpec,
+    ExecutionReceipt,
+    SharedArtifactVersion,
+    SwarmEvent,
+    WorkerProcessing,
+)
+from .harness_models import (
+    BenchmarkContentNature,
+    BenchmarkFileEntry,
+    BenchmarkFileRole,
+    BenchmarkManifest,
+    BenchmarkTaskEntry,
+    BenchmarkDisplayFile,
+    BenchmarkPublicScenario,
 )
 
 __all__ = [
@@ -160,4 +177,19 @@ __all__ = [
     "WorkCockpitSnapshot",
     "WorkItemFacts",
     "WorkItemSnapshot",
+    "Demo2ExecutionSnapshot",
+    "Demo2ExecutionStartRequest",
+    "Demo2ExecutionStartResult",
+    "Demo2WorkerSpec",
+    "ExecutionReceipt",
+    "SharedArtifactVersion",
+    "SwarmEvent",
+    "WorkerProcessing",
+    "BenchmarkContentNature",
+    "BenchmarkFileEntry",
+    "BenchmarkFileRole",
+    "BenchmarkManifest",
+    "BenchmarkTaskEntry",
+    "BenchmarkDisplayFile",
+    "BenchmarkPublicScenario",
 ]

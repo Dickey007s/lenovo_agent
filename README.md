@@ -16,6 +16,16 @@ V0.1 重点验证三件事：
 
 所有产生副作用的工具当前均为 **Simulator**，不会发送真实邮件、写入真实日历、CRM、OA 或任务系统。
 
+## 当前推进：FORTE Workspace + 统一 Agent Harness（DR-0016，Limited Verified）
+
+最新纵切不再为三个 Demo 各画一套固定脚本，而是采用同一条 `Scenario Pack -> Harness Run -> Frontend Projection`：用户默认面对“工作现场”，先看本轮公开来源与文件，再看 Agent 逐步形成动态计划，最后在右侧查看服务端活动回执。统一八模块固定为 Scenario Pack & Workspace Catalog、Task Contract、Planner、Admission & Plan Validator、Scheduler & Worker Manager、Tool Gateway、Artifact Workspace & Verifier、Checkpoint/Event/Governance Control。
+
+来源使用公开 [FORTE](https://github.com/AGI-Eval-Official/FORTE) 固定 commit `345c1ec1487139db9dd319787fa9405ba85d1869` 和顶层 MIT。项目原样保存 11 个导入文件、总计 `115352` bytes，并以 manifest 固定 size/MIME/SHA-256：其中 8 个 input 进入只读场景目录，3 个 raw `task.md` 仅作 provenance。Catalog 只把 Prompt 净化文本送给内部 Planner；公共 API/UI 不得出现 raw task、`task_instruction`、rubric、solution 或 grading 内容。前台必须称“公开办公基准数据”，不能称真实企业文件、Lenovo 数据或实时 Connector。
+
+第一纵切只运行 Catalog、Task Contract、`deepseek-v4-pro` Planner、Plan Validator 和单进程 memory Snapshot/SSE，最终到 `ready_to_execute`。可复核 live manifest 记录 Finance-018、pm-014、Operations-008 分别生成 10/6/4 个计划单元，三者均为 v6/seq 5、`called=true`、`output_used=true`、`validation_errors=[]` 和 `execution_started=false`；模型是否调用、输出是否采用、计划是否通过服务端校验是三个不同事实。当前没有 execution command，Scheduler/Worker、工具调用、Artifact mutation/验证/Commit、审批、Permit、Connector 和任何外部副作用均未发生。
+
+Finance-018、pm-014、Operations-008 分别是 Demo 1/2/3 的新场景来源，但三条执行迁移仍为 `Draft`；旧固定 Demo 的限定 Verified 事实不能复制为 FORTE 运行事实。限定工程封口为 Python `199 passed, 1 skipped in 7.93s`、浏览器 `48 passed (3.6m)`，Ruff、lint、build 通过，并绑定三次 live run、六张桌面/移动截图、实现 [`fdcc3d819686b0d0afd99fcd0b637b5329607835`](https://github.com/Dickey007s/lenovo_agent/commit/fdcc3d819686b0d0afd99fcd0b637b5329607835)、首份证据文档提交 [`265ffb6f1e4f35416b0020deff9becee9a3a26a2`](https://github.com/Dickey007s/lenovo_agent/commit/265ffb6f1e4f35416b0020deff9becee9a3a26a2) 与 open、未合并的 [PR #23](https://github.com/Dickey007s/lenovo_agent/pull/23)。E2E 只能作为工程代理，不能替代目标用户研究。范围、Manifest 和不可夸大边界见 [`DR-0016`](docs/decisions/DR-0016-public-workspace-agent-harness.md) 与 [`Limited Verified Evidence`](docs/evidence/FORTE-WORKSPACE-AGENT-HARNESS-EVIDENCE-20260824.md)。
+
 ## V0.1 已实现能力
 
 ### 办公工作区
@@ -87,9 +97,17 @@ V0.1 重点验证三件事：
 
 路由选择现在采用双时态影响交互：服务端在每个 `RouteProfile.impact_preview` 中说明任务如何分配、哪里并行与等待、什么时候需要用户、规则预测、执行边界和不会发生的外部动作。用户在右侧切换模式时，左侧工作区的影响地图立即使用同一预览变化；确认成功后，服务端把版本、选择来源、范围与实际记录变化写入 `WorkItemSnapshot.selection_receipt/selection_receipts[]`，页面再切换为绿色实际变化地图，右侧显示精简回执。同模式重复确认和缺 route profile/preview 均 fail closed 且版本不变。预演与回执都明确“未执行”，刷新只恢复当前 memory 进程中的服务端回执。
 
-`route_profiles[].forecast.source_type` 固定为 `fixture_policy_forecast`，只表示固定规则预测，不代表真实账单、实测耗时、Worker、Connector 或生产 SLA。当前没有 Demo 2 SSE、PostgreSQL 恢复、动态 Worker、Shared Artifact Workspace 或真实执行。工程证据包含聚焦 Python `6 passed`、专用 system Edge `5 passed`、完整 Python `118 passed, 1 skipped`、完整浏览器 `34 passed` 和三张桌面/移动截图；Ruff、前端 lint、生产构建与 diff-check 通过。实现位于堆叠 PR [#13](https://github.com/Dickey007s/lenovo_agent/pull/13)，依赖 PR #12。详见 [`DR-0008`](docs/decisions/DR-0008-demo2-explainable-admission.md)、[`SCENARIO-002`](docs/scenarios/SCENARIO-002-demo2-explainable-admission.md) 与 [`Demo 2 Evidence`](docs/evidence/DEMO2-PR1-EXPLAINABLE-ADMISSION-EVIDENCE-20260817.md)。
+`route_profiles[].forecast.source_type` 固定为 `fixture_policy_forecast`，只表示固定规则预测，不代表真实账单、实测耗时、Worker、Connector 或生产 SLA。第一纵切当时没有 Demo 2 SSE、Worker 或真实执行；该历史边界不否定下方 2026-08-21 第二纵切。工程证据包含聚焦 Python `6 passed`、专用 system Edge `5 passed`、完整 Python `118 passed, 1 skipped`、完整浏览器 `34 passed` 和三张桌面/移动截图；Ruff、前端 lint、生产构建与 diff-check 通过。实现位于堆叠 PR [#13](https://github.com/Dickey007s/lenovo_agent/pull/13)，依赖 PR #12。详见 [`DR-0008`](docs/decisions/DR-0008-demo2-explainable-admission.md)、[`SCENARIO-002`](docs/scenarios/SCENARIO-002-demo2-explainable-admission.md) 与 [`Demo 2 Evidence`](docs/evidence/DEMO2-PR1-EXPLAINABLE-ADMISSION-EVIDENCE-20260817.md)。
 
 2026-08-20 的路由影响扩展实现为 `db461ec`、PR [#17](https://github.com/Dickey007s/lenovo_agent/pull/17)：已完成聚焦协议/服务 `11 passed`、完整 Python `144 passed, 1 skipped`、专用 Demo 2 浏览器 `5 passed`、完整浏览器 `35 passed`，并保存桌面预演、桌面回执和 `390px` 移动长页截图。该证据只证明固定策略事实、选择回执和被测交互，不证明 Adaptive Swarm 已执行或用户理解提升。详见 [`DR-0011`](docs/decisions/DR-0011-demo2-route-impact.md) 与对应 [`Evidence`](docs/evidence/DEMO2-ROUTE-IMPACT-EVIDENCE-20260820.md)。
+
+### Demo 2 受控内部执行第二纵切（DR-0015，Limited Verified）
+
+固定客户 A 选择 Adaptive Swarm 后，现在由独立启动动作创建 `Demo2ExecutionSnapshot`。服务端并行运行收入事实核对、项目风险提取、客户要求核对三个受限 `deepseek-v4-pro` 工作单元；项目仿真文件中的确认收入/预测收入冲突触发 sequence 9 `DYNAMIC_REPLAN` 和 sequence 10 `WORKER_ADDED`，增派收入口径核验。最终 sequence 15 完成，形成 4 个 Worker、5 个带来源/版本/digest 的 `SharedArtifactVersion`，并返回 `ExecutionReceipt.external_side_effect=none`。
+
+前端将“记录本轮方式”和“启动协作”分开，运行状态、模型调用事实、动态增派、共享工件与完成回执只投影 execution Snapshot/SSE；不靠动画或固定延时宣布完成。模型只生成受限业务摘要/要点，服务端拥有 Worker/Artifact 身份、来源、依赖、状态、事件、验证和回执。两轮 live `deepseek-v4-pro` 运行及 6 张桌面/移动截图已记录：第一轮整轮 8799 ms、4/4 模型输出采用；第二轮为 4 workers、5 artifacts、seq 9/10/15 与无外部动作。封口为 Python `178 passed, 1 skipped in 6.31s`、浏览器 `41 passed (2.0m)`，Ruff、lint、build、governance 与 diff-check 通过。精确事实与截图 hash 见 [`DEMO2-CONTROLLED-EXECUTION-20260821`](docs/evidence/DEMO2-CONTROLLED-EXECUTION-EVIDENCE-20260821.md)。
+
+该纵切只在固定客户 A、单 API 进程、memory、项目生成仿真文件和无外部动作范围内为 `Limited Verified`。实现提交为 [`252f8d02725f341137f1580d4230003d2477ecca`](https://github.com/Dickey007s/lenovo_agent/commit/252f8d02725f341137f1580d4230003d2477ecca)，对应 [PR #22](https://github.com/Dickey007s/lenovo_agent/pull/22)；PR 链接不表示已合并。API 重启不会恢复执行；没有后台任务队列、跨进程 Worker lease、真实 Connector、生产身份、成本/质量基准或用户研究。主流技术差异与用户价值仍是 `Design claim / Draft`，官方材料不是竞品实测。
 
 ### Demo 3 动作影响账本（DR-0012，Verified 限定范围）
 
@@ -101,7 +119,7 @@ Demo 3 的前台重点是“动作影响账本”：用户在 Action Gate 中先
 
 ### Demo 身份导航与调用轨迹（DR-0013，Verified 限定范围）
 
-用户不仅能看到 Demo 1/2/3，还能知道当前业务阶段真实调用了什么。Demo 名称与目标是客户端产品级信息架构；当前状态从服务端 Snapshot、持久化字段或有序事件对账。前端用“已运行 / 未调用 / 未执行 / 待核对”统一投影现有事实，只有模型显示“模型已调用”：Demo 1 使用 `TaskStageRecord.processing`，Demo 2 使用 `RouteSelectionReceipt.processing`，Demo 3 复用 `RunSnapshot` 治理字段。工程没有新增通用 `call_trace` 协议；没有服务端事实时不得自行补造调用结论。
+用户不仅能看到 Demo 1/2/3，还能知道当前业务阶段真实调用了什么。Demo 名称与目标是客户端产品级信息架构；当前状态从服务端 Snapshot、持久化字段或有序事件对账。前端用“已运行 / 未调用 / 未执行 / 待核对”统一投影现有事实，只有模型显示“模型已调用”：Demo 1 使用 `TaskStageRecord.processing`，Demo 2 的路由使用 `RouteSelectionReceipt.processing`、内部执行使用 `Demo2WorkerSpec.processing/events/receipt`，Demo 3 复用 `RunSnapshot` 治理字段。工程没有新增通用 `call_trace` 协议；没有服务端事实时不得自行补造调用结论。
 
 普通业务 UI 只显示业务标签与服务端摘要；Demo3 以“执行许可服务”“受控演示工具”等业务词为主，Permit/Gateway/Simulator 仅作二级技术元信息；Prompt、CoT、原始 payload、密钥、Permit token/内容/permit_id/签名、内部 ID、Worker 对话和底层日志隐藏。Demo 2 的 selected 不等于 running，Demo 3 的技术元信息不等于真实外部系统写入；unknown 工具结果显示“工具结果待核对”。v>1 的 Demo 1 旧阶段缺少 `processing` 时显示“模型调用待核对”，不推断为未调用。固定工程验证与截图见 [`DR-0013`](docs/decisions/DR-0013-demo-identity-and-call-trace.md) 和 [`Evidence`](docs/evidence/DEMO-IDENTITY-AND-CALL-TRACE-EVIDENCE-20260820.md)。
 
@@ -114,6 +132,7 @@ flowchart LR
     UI["Next.js 工作区 + Agent 对话"]
     API["FastAPI Conversation / Run / Task API"]
     TASK["TaskService + TaskStore"]
+    HARNESS["FORTE Catalog + Unified Harness"]
     LLM["OpenAI-compatible LLM"]
     CONTRACT["Pydantic Contracts"]
     GOVERN["Risk + Policy + Evidence + ControlPlan"]
@@ -125,8 +144,10 @@ flowchart LR
 
     UI <-->|"REST + SSE"| API
     API --> TASK
+    API --> HARNESS
     TASK <--> PG
     API --> LLM
+    HARNESS --> LLM
     LLM --> CONTRACT
     CONTRACT --> GOVERN
     GOVERN --> GRAPH
@@ -138,6 +159,8 @@ flowchart LR
 
 核心依赖方向是：**LLM 输出候选业务事实 → 严格协议校验 → 确定性治理 → 人工 Gate → 一次性授权 → Gateway 校验 → Simulator**。模型不能直接签发 Permit、改变风险等级、伪造证据或调用工具。
 
+统一 Harness 的第一纵切另为：**固定来源原字节 → 安全公共场景 / 内部净化 Planner context → 模型 DAG 候选 → 服务端 Plan Validator → `ready_to_execute`**。这条链当前在执行边界前停止，不能与上方既有 Simulator 动作链合并叙述为已经执行。
+
 详细说明见：
 
 - [系统架构与技术路线](docs/ARCHITECTURE.md)
@@ -146,6 +169,13 @@ flowchart LR
 - [HTTP API 与 SSE 事件](docs/API.md)
 - [演示脚本与 Presentation Brief](docs/PRESENTATION_BRIEF.md)
 - [Loop、Swarm 与统一 Agent Runtime 目标架构](docs/TARGET_ARCHITECTURE.md)
+- [公开 Workspace + 统一 Harness 决策（Limited Verified 规划纵切）](docs/decisions/DR-0016-public-workspace-agent-harness.md)
+- [FORTE Workspace + Harness 证据账本（Limited Verified）](docs/evidence/FORTE-WORKSPACE-AGENT-HARNESS-EVIDENCE-20260824.md)
+- [FORTE 数据导入审计](docs/research/FORTE-DATASET-AUDIT-20260824.md)
+- [公开办公数据集选择研究](docs/research/REAL-OFFICE-DATASET-SELECTION-20260824.md)
+- [Demo 1 FORTE 财务证据场景](docs/scenarios/SCENARIO-004-forte-finance-durable-evidence.md)
+- [Demo 2 FORTE 上线协作场景](docs/scenarios/SCENARIO-005-forte-release-adaptive-team.md)
+- [Demo 3 FORTE 受治理运营场景](docs/scenarios/SCENARIO-006-forte-governed-operations-action.md)
 - [决策、推进与汇报治理](docs/DECISION_AND_REPORTING_GOVERNANCE.md)
 - [Demo 1 Task Runtime 协议](docs/contracts/TASK_RUNTIME_PROTOCOL.md)
 - [Demo 1 UI—服务端事实矩阵](docs/contracts/UI_SERVER_FACT_MATRIX.md)
@@ -172,6 +202,9 @@ flowchart LR
 - [Demo 2 PR-1 工程证据](docs/evidence/DEMO2-PR1-EXPLAINABLE-ADMISSION-EVIDENCE-20260817.md)
 - [Demo 2 路由影响预演与选择回执决策](docs/decisions/DR-0011-demo2-route-impact.md)
 - [Demo 2 路由影响预演与选择回执证据](docs/evidence/DEMO2-ROUTE-IMPACT-EVIDENCE-20260820.md)
+- [主流 Agent 对比研究：OpenClaw、Codex、Claude Code、LangGraph](docs/research/COMPETITOR-RESEARCH-OPENCLAW-CODEX-CLAUDE-CODE-20260821.md)
+- [主流对比与 Demo 2 受控执行决策（Draft）](docs/decisions/DR-0015-mainstream-comparison-and-demo2-controlled-execution.md)
+- [2026-08-21 汇报准备与八模块推进反馈](docs/sources/USER-FEEDBACK-20260821-07-reporting-comparison-and-eight-modules.md)
 - [Demo 1 渐进阶段决策（限定范围 Verified）](docs/decisions/DR-0009-progressive-demo1-stages.md)
 - [Demo 1 渐进阶段工程证据](docs/evidence/DEMO1-PROGRESSIVE-STAGES-EVIDENCE-20260817.md)
 - [Demo 1 Agent 影响预演与变化回执决策](docs/decisions/DR-0010-visible-agent-impact.md)
@@ -188,13 +221,14 @@ flowchart LR
 ```text
 apps/web/                         Next.js 16 + React 19 前端
 packages/contracts/               动作与 Task Runtime 协议、哈希
+demo-enterprise-data/forte/       固定 FORTE 原字节、MIT 与 manifest；运行时只读
 packages/risk_core/               风险、策略和 ControlPlan
 packages/evidence/                确定性 Mock Evidence Resolver
 packages/agent_runtime/           LangGraph interrupt/resume 工作流
 packages/authorization/           Ed25519 Permit 签发
 packages/tool_gateway/            Permit 校验与工具路由
 packages/audit/                   内存/PostgreSQL 审计日志
-services/api/app/application/     ConversationService、RunService、TaskService 与存储适配器
+services/api/app/application/     Conversation/Run/Task、FORTE Catalog、Unified Harness 与存储适配器
 services/api/app/api/             FastAPI 路由
 simulators/                       邮件与办公动作 Simulator
 tests/                            单元与集成测试
@@ -277,18 +311,21 @@ V0.1 定稿基线和 Demo 1 各 PR 的实际验证结果记录在 [`DR-0002`](do
 
 2026-08-20 的 Agent 影响交互实现为 `258861f`、PR [#16](https://github.com/Dickey007s/lenovo_agent/pull/16)：服务端为收入口径决定提供结构化影响选项，前台在提交前逐项预演经营分析、回复草稿、风险页和外部发送的变化，提交后再用 `ControlEvent.impact_receipt` 展示实际落地回执。封口结果为 Python `139 passed, 1 skipped (4.74s)`、完整浏览器 `35 passed (1.9m)`、Ruff、前端 lint/build、治理门槛与 diff-check 通过，另有三张带 hash 的桌面/移动截图。该结论只证明固定 Fixture 的前后端事实一致与被测交互，不证明真实用户理解改善或任意真实动作均可准确预演。
 
-处理来源现在是一等前台事实：报价公式回答显示“服务端公式核算，未调用大模型”，Demo 2 使用“记录本轮方式”明确只写路由且保持未执行；真实 Conversation 模型路径在等待时显示配置模型名，完成消息保留模型名与实际调用耗时。后台 runtime log 同时记录 `path/model_called/model/elapsed_ms`，不记录消息正文、Key 或思维链；系统不会为了显得像 AI 人为增加等待。
+处理来源现在是一等前台事实：报价公式回答显示“服务端公式核算，未调用大模型”；Demo 2 使用“记录本轮方式”明确只写路由，独立启动后再按 Worker 的 `processing` 显示真实模型调用与实际耗时；真实 Conversation 模型路径在等待时显示配置模型名，完成消息保留模型名与耗时。后台 runtime log 记录 `path/model_called/model/elapsed_ms/output_used`，不记录消息正文、Key 或思维链；系统不会为了显得像 AI 人为增加等待。
 
 ## 数据、身份与安全边界
 
 - `X-User-Id` 与 `X-User-Roles` 只是 V0.1 Demo 身份头，默认前端使用 `demo_user` 和 `current_user,sales_manager`；生产环境必须替换为经过验证的 SSO/JWT。
 - 内部邮箱、CRM、报价、OA、知识库和日历内容均为确定性演示数据，不是真实企业数据；Demo 1 的 `demo-enterprise-data/customer-a/` 是项目生成的仿真文件包，不是 Lenovo/真实客户数据库或 Connector。普通业务 UI 必须明确标注“演示数据”，不得显示原始 `fixture:` ID、绝对路径或完整摘要。
+- DR-0016 的 `demo-enterprise-data/forte/` 是固定公开 benchmark input，不是内部演示 Fixture，也不是生产企业数据。raw `task.md` 只作 provenance；公共 API/UI 不得返回 `task_instruction`、rubric、solution 或 grading 内容，内部净化 Prompt 也不进入普通 DOM。
 - 报价工作台不访问真实 CRM/CPQ/ERP；当前公式只覆盖数量、标准价和单行折后比例，不含税费、汇率、阶梯价、套餐依赖或真实审批制度。当前模型仍为 `deepseek-v4-pro`，但报价数值问答由确定性代码完成。
 - Workspace revision 校验和 Conversation/Workspace 锁当前只在单个 API 进程内形成一致性保护；没有数据库原子 compare-and-swap、多实例锁或跨实例 Conversation 顺序验证。前端三方重应用也不是通用多人协作文档合并器。
 - 未解析收件人/附件当前采用固定 deny，而不是已接入企业通讯录或内容分类服务；附件名称识别只适用于演示规则。Run/Thread 绑定与结果重放仍随 Conversation 内存边界，API 重启后不恢复。
 - 未配置 Permit PEM 文件时，服务启动会生成进程级 Ed25519 密钥；重启后旧 Permit 失效。
 - 所有副作用工具均为 Simulator；UI 中的“发送成功”“创建成功”只代表 Simulator 成功。
 - 对话 Thread/Message 当前保存在 API 进程内存中，重启后丢失；Workspace、Run、Audit 和 LangGraph checkpoint 在配置 PostgreSQL 时可恢复。
+- Demo 2 的 Cockpit/Execution Snapshot、Worker、SharedArtifactVersion、SwarmEvent、SSE 回放、锁和幂等结果当前都在单 API 进程 memory；API 重启后不恢复，不能从其他 PostgreSQL 路径推断其跨进程能力。
+- Unified Harness 的 Run/Snapshot/Event/start 幂等结果同样只在单 API 进程 memory；第一纵切只到 `ready_to_execute`，没有执行路由、Worker、工具、Artifact Commit 或外部动作。
 - Task 在未配置数据库时同样只保存在 API 进程内存中；Demo 1 mutation 会写 Snapshot、TaskEvent 和 ArtifactVersion。配置 PostgreSQL 后对应表为 `agent_tasks`、`agent_task_events` 和 `agent_task_artifact_versions`。本机 PostgreSQL 16.14 已验证同一数据库上的顺序 API 进程恢复；该结论不覆盖数据库重启/崩溃、多实例并发、迁移或 Conversation Thread/Message。
 - 当前没有 Alembic 迁移、生产级 RBAC、真实 Connector、后台任务队列、分布式 Permit 重放存储、Task 跨实例通知和多实例一致性保障。
 
