@@ -2,7 +2,7 @@
 
 ## 状态
 
-`Limited Verified`。结论严格限定为固定 FORTE revision、当前单 API 进程 memory Runtime、三项固定场景，以及终止于 `ready_to_execute` 的统一规划纵切：公开文件工作区、真实模型动态计划、确定性校验、Snapshot/SSE 和前台业务回执已有可复查运行工件、截图、自动化、实现提交与 PR。文档提交待本次文档提交后回填；三 Demo 的执行迁移仍为 `Draft`。
+`Limited Verified`。结论严格限定为固定 FORTE revision、当前单 API 进程 memory Runtime、三项固定场景，以及终止于 `ready_to_execute` 的统一规划纵切：公开文件工作区、真实模型动态计划、确定性校验、Snapshot/SSE 和前台业务回执已有可复查运行工件、截图、自动化、实现提交、首份证据文档提交与 PR。三 Demo 的执行迁移仍为 `Draft`。
 
 ## 场景与完成条件
 
@@ -109,7 +109,7 @@ public scenario projection
 | 真实 `deepseek-v4-pro` 三场景 | Manifest 已绑定 | 三场景均 `ready_to_execute`、`output_used=true`、`execution_started=false`；精确数字见上表 |
 | 桌面与移动截图 | Manifest 已绑定 6 张 | 3 张 `1440x900` desktop、3 张 `390x844` mobile；逐图 SHA-256 见 Manifest |
 | 实现提交 | [`fdcc3d819686b0d0afd99fcd0b637b5329607835`](https://github.com/Dickey007s/lenovo_agent/commit/fdcc3d819686b0d0afd99fcd0b637b5329607835) | 已 push |
-| 文档提交 | 待本次文档提交后回填 | 当前仍是未提交工作区文档 |
+| 首份证据文档提交 | [`265ffb6f1e4f35416b0020deff9becee9a3a26a2`](https://github.com/Dickey007s/lenovo_agent/commit/265ffb6f1e4f35416b0020deff9becee9a3a26a2) | 当前补丁只回填该已落库提交，不反向改写其历史内容 |
 | PR | [#23](https://github.com/Dickey007s/lenovo_agent/pull/23) | Open，未合并；PR 创建不等于合并 |
 
 截图清单如下；这里登记显示状态，像素和完整 SHA-256 以 Manifest 为准：

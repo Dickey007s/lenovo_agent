@@ -424,4 +424,4 @@ Finance-018 对应 Demo 1 长任务证据；pm-014 对应 Demo 2 动态协作；
 6. 到 `ready_to_execute` 停止，明确任何工具、工件和外部动作都没有发生。
 7. 切换另外两个场景，展示同一 Harness 可以产生不同 DAG；不现场宣称三 Demo 已执行。
 
-最终测试数字、桌面/移动截图 hash 和 live run 只从 [`FORTE-WORKSPACE-AGENT-HARNESS-EVIDENCE-20260824`](evidence/FORTE-WORKSPACE-AGENT-HARNESS-EVIDENCE-20260824.md) 与其 Manifest 读取；实现为 `fdcc3d819686b0d0afd99fcd0b637b5329607835`，PR #23 open 且未合并，文档提交待本次文档提交后回填。PPT 页脚必须写“规划纵切 Limited Verified / 尚未执行 / 用户价值待验证”，不得只写“Demo 已完成”。
+最终测试数字、桌面/移动截图 hash 和 live run 只从 [`FORTE-WORKSPACE-AGENT-HARNESS-EVIDENCE-20260824`](evidence/FORTE-WORKSPACE-AGENT-HARNESS-EVIDENCE-20260824.md) 与其 Manifest 读取；实现为 `fdcc3d819686b0d0afd99fcd0b637b5329607835`，首份证据文档提交为 `265ffb6f1e4f35416b0020deff9becee9a3a26a2`，PR #23 open 且未合并。PPT 页脚必须写“规划纵切 Limited Verified / 尚未执行 / 用户价值待验证”，不得只写“Demo 已完成”。
