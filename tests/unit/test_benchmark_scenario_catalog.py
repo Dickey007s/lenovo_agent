@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 import shutil
@@ -76,6 +77,9 @@ def test_public_projection_hides_planner_prompt_and_raw_paths() -> None:
         assert "/workspace/input" not in serialized
         assert "rubrics" not in serialized
         assert "solution_files" not in serialized
+        assert "customer-a" not in serialized
+        assert "2400" not in serialized
+        assert "2680" not in serialized
         assert not re.search(r"(?<![0-9a-f])[0-9a-f]{40}(?![0-9a-f])", serialized)
         assert not re.search(r"(?<![0-9a-f])[0-9a-f]{64}(?![0-9a-f])", serialized)
         assert "input_dir" not in item
@@ -86,6 +90,17 @@ def test_public_projection_hides_planner_prompt_and_raw_paths() -> None:
     assert any("列：" in file["display_summary"] for file in finance_files)
     assert public[0]["dataset_version"].startswith("FORTE 公开版本 · ")
     assert len(public[0]["dataset_version"].rsplit("· ", 1)[-1]) == 7
+
+
+def test_manifest_matches_checkout_bytes(tmp_path: Path) -> None:
+    copied_root = copy_package(tmp_path)
+    manifest = json.loads((copied_root / "manifest.json").read_text(encoding="utf-8"))
+    for task in manifest["tasks"]:
+        for entry in task["files"]:
+            path = copied_root / entry["path"]
+            raw = path.read_bytes()
+            assert len(raw) == entry["size"]
+            assert hashlib.sha256(raw).hexdigest() == entry["sha256"]
 
 
 def test_internal_task_has_sanitized_prompt_and_raw_input_with_display_projection() -> None:

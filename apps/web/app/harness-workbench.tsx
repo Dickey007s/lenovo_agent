@@ -10,6 +10,7 @@ import {
 export type HarnessDemo = "demo1" | "demo2" | "demo3";
 type HarnessPhase = "read" | "plan" | "validate" | "ready_to_execute";
 type ConnectionState = "connecting" | "live" | "reconnecting" | "offline";
+type CatalogStatus = "checking" | "retrying" | "online" | "offline";
 
 export type HarnessFile = {
   key: string;
@@ -106,6 +107,12 @@ const PHASES: { id: HarnessPhase; label: string; hint: string }[] = [
 
 function asText(value: unknown, fallback = "") { return typeof value === "string" ? value : fallback; }
 function asStrings(value: unknown) { return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : []; }
+async function fetchWithTimeout(input: RequestInfo | URL, init: RequestInit = {}, timeoutMs = 4_000) {
+  const controller = new AbortController();
+  const timer = window.setTimeout(() => controller.abort(), timeoutMs);
+  try { return await fetch(input, { ...init, signal: controller.signal }); }
+  finally { window.clearTimeout(timer); }
+}
 function demoLabel(demo: HarnessDemo) { return demo === "demo1" ? "Demo 1 · 持续任务" : demo === "demo2" ? "Demo 2 · 动态协作" : "Demo 3 · 受控执行"; }
 function toolLabel(tool: string) {
   const labels: Record<string, string> = {
@@ -260,7 +267,7 @@ export function HarnessActivityPane({ state }: { state: HarnessActivityState | n
   </section>;
 }
 
-export function HarnessWorkbench({ initialDemo = "demo1", onClose, onActivityChange }: { initialDemo?: HarnessDemo; onClose?: () => void; onActivityChange?: (state: HarnessActivityState | null) => void }) {
+export function HarnessWorkbench({ initialDemo = "demo1", onActivityChange }: { initialDemo?: HarnessDemo; onActivityChange?: (state: HarnessActivityState | null) => void }) {
   const [scenarios, setScenarios] = useState<HarnessScenario[]>([]);
   const [selectedDemo, setSelectedDemo] = useState<HarnessDemo>(initialDemo);
   const [scenario, setScenario] = useState<HarnessScenario | null>(null);
@@ -268,6 +275,8 @@ export function HarnessWorkbench({ initialDemo = "demo1", onClose, onActivityCha
   const [selectedFile, setSelectedFile] = useState<HarnessFile | null>(null);
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(true);
+  const [catalogStatus, setCatalogStatus] = useState<CatalogStatus>("checking");
+  const [catalogError, setCatalogError] = useState("");
   const [starting, setStarting] = useState(false);
   const [startAttempted, setStartAttempted] = useState(false);
   const [error, setError] = useState("");
@@ -275,6 +284,9 @@ export function HarnessWorkbench({ initialDemo = "demo1", onClose, onActivityCha
   const [activity, setActivity] = useState<HarnessActivityItem[]>([]);
   const eventSourceRef = useRef<EventSource | null>(null);
   const reconnectTimerRef = useRef<number | undefined>(undefined);
+  const catalogRetryTimerRef = useRef<number | undefined>(undefined);
+  const catalogRequestRef = useRef(0);
+  const catalogAttemptRef = useRef(0);
   const generationRef = useRef(0);
   const runRef = useRef<HarnessRun | null>(null);
   const lastSequenceRef = useRef(0);
@@ -344,20 +356,53 @@ export function HarnessWorkbench({ initialDemo = "demo1", onClose, onActivityCha
       });
     };
   }
-  async function loadScenarios() {
-    setLoading(true); setError("");
+  async function loadScenarios(manual = false) {
+    const request = catalogRequestRef.current + 1;
+    catalogRequestRef.current = request;
+    window.clearTimeout(catalogRetryTimerRef.current);
+    catalogRetryTimerRef.current = undefined;
+    if (manual) catalogAttemptRef.current = 0;
+    const attempt = catalogAttemptRef.current + 1;
+    catalogAttemptRef.current = attempt;
+    setLoading(true);
+    setCatalogStatus(attempt === 1 ? "checking" : "retrying");
+    setCatalogError("");
+    if (attempt > 1) setConnection("reconnecting");
     try {
-      const response = await fetch(`${API_BASE}/v1/harness/scenarios`, { headers: HEADERS });
-      if (!response.ok) throw new Error(`场景目录暂时不可用（${response.status}）`);
+      const health = await fetchWithTimeout(`${API_BASE}/v1/health`, { headers: HEADERS });
+      if (!health.ok) throw new Error("health unavailable");
+      const response = await fetchWithTimeout(`${API_BASE}/v1/harness/scenarios`, { headers: HEADERS });
+      if (!response.ok) throw new Error("catalog unavailable");
       const body = await response.json() as unknown;
       const raw = body && typeof body === "object" && Array.isArray((body as { scenarios?: unknown[] }).scenarios) ? (body as { scenarios: unknown[] }).scenarios : [];
-      setScenarios(raw.flatMap((item) => { const value = normalizeScenario(item); return value ? [value] : []; }));
+      const normalized = raw.flatMap((item) => { const value = normalizeScenario(item); return value ? [value] : []; })
+        .filter((item) => item.dataset_label?.toUpperCase().includes("FORTE"));
+      const forteScenarios = (["demo1", "demo2", "demo3"] as HarnessDemo[]).flatMap((demo) => {
+        const item = normalized.find((candidate) => candidate.demo === demo);
+        return item ? [item] : [];
+      });
+      if (forteScenarios.length !== 3) throw new Error("FORTE catalog incomplete");
+      if (request !== catalogRequestRef.current) return;
+      setScenarios(forteScenarios);
+      catalogAttemptRef.current = 0;
+      setCatalogStatus("online");
+      setCatalogError("");
       setConnection("live");
-    } catch (reason) { setError(reason instanceof Error ? reason.message : "无法读取场景目录"); setConnection("offline"); }
-    finally { setLoading(false); }
+    } catch {
+      if (request !== catalogRequestRef.current) return;
+      const offline = attempt >= 3;
+      setCatalogStatus(offline ? "offline" : "retrying");
+      setCatalogError(offline ? "无法连接办公服务，系统会继续自动重试。" : "");
+      setConnection(offline ? "offline" : "reconnecting");
+      const delays = [650, 1_200, 2_500, 5_000];
+      const delay = delays[Math.min(attempt - 1, delays.length - 1)];
+      catalogRetryTimerRef.current = window.setTimeout(() => void loadScenarios(), delay);
+    } finally {
+      if (request === catalogRequestRef.current) setLoading(false);
+    }
   }
 
-  useEffect(() => { void loadScenarios(); return () => closeTransport(); }, []);
+  useEffect(() => { void loadScenarios(); return () => { catalogRequestRef.current += 1; window.clearTimeout(catalogRetryTimerRef.current); closeTransport(); }; }, []);
   useEffect(() => {
     const generation = generationRef.current + 1;
     generationRef.current = generation;
@@ -390,7 +435,7 @@ export function HarnessWorkbench({ initialDemo = "demo1", onClose, onActivityCha
     finally { if (generation === generationRef.current) setStarting(false); }
   }
 
-  const activityState = useMemo<HarnessActivityState>(() => ({ scenarioTitle: scenario?.title ?? "工作现场", runStatus: run?.status ?? null, connection, modelReceipt: run?.model_receipt ?? null, events: activity, readyToExecute: run?.status === "ready_to_execute", error: run?.status === "failed" ? run.validation_errors[0] ?? "本轮计划未通过校验" : error || null }), [activity, connection, error, run, scenario?.title]);
+  const activityState = useMemo<HarnessActivityState>(() => ({ scenarioTitle: scenario?.title ?? "工作现场", runStatus: run?.status ?? null, connection, modelReceipt: run?.model_receipt ?? null, events: activity, readyToExecute: run?.status === "ready_to_execute", error: run?.status === "failed" ? run.validation_errors[0] ?? "本轮计划未通过校验" : error || catalogError || null }), [activity, catalogError, connection, error, run, scenario?.title]);
   useEffect(() => { onActivityChange?.(activityState); }, [activityState, onActivityChange]);
   useEffect(() => () => onActivityChange?.(null), [onActivityChange]);
 
@@ -402,12 +447,12 @@ export function HarnessWorkbench({ initialDemo = "demo1", onClose, onActivityCha
   const groupedFiles = useMemo(() => { const groups = new Map<string, HarnessFile[]>(); files.forEach((item) => { const group = item.display_group || "本轮资料"; groups.set(group, [...(groups.get(group) ?? []), item]); }); return [...groups.entries()]; }, [files]);
   const hasContract = Boolean(scenario?.deliverables?.length || scenario?.data_boundary?.length || scenario?.human_gate_summary || scenario?.allowed_capabilities?.length);
   const startLabel = starting ? "启动中" : run && ["ready_to_execute", "failed"].includes(run.status) ? "开始新一轮" : startAttempted && error ? "重试启动" : "开始本轮";
-  function manualReconnect() { if (!run) { void loadScenarios(); return; } const generation = generationRef.current; closeTransport(); void readSnapshot(run.run_id, generation).finally(() => connectStream(run.run_id, generation)); }
+  function manualReconnect() { if (!run) { void loadScenarios(true); return; } const generation = generationRef.current; closeTransport(); void readSnapshot(run.run_id, generation).finally(() => connectStream(run.run_id, generation)); }
 
   return <section className="harness-workbench" aria-label="工作现场">
-    <header className="harness-header"><div className="harness-title"><div className="harness-mark"><IconRoute aria-hidden="true" /></div><div><span>工作现场</span><h1>{scenario?.title ?? "工作现场"}</h1><p>{scenario?.goal ?? "从公开办公资料开始，形成一份可核对的任务计划。"}</p></div></div><div className="harness-header-actions"><span className={`harness-connection is-${connection}`}><i />{connection === "live" ? "服务端实时" : connection === "reconnecting" ? "正在重连" : connection === "offline" ? "暂时离线" : "连接中"}</span>{onClose && <button type="button" className="harness-close" onClick={onClose}>返回工作区</button>}<button type="button" className="harness-icon-button" onClick={manualReconnect} title="重新连接" aria-label="重新连接"><IconRefresh aria-hidden="true" /></button></div></header>
+    <header className="harness-header"><div className="harness-title"><div className="harness-mark"><IconRoute aria-hidden="true" /></div><div><span>工作现场</span><h1>{scenario?.title ?? "工作现场"}</h1><p>{scenario?.goal ?? "从公开办公资料开始，形成一份可核对的任务计划。"}</p></div></div><div className="harness-header-actions"><span className={`harness-connection is-${connection}`}><i />{connection === "live" ? "服务端实时" : connection === "reconnecting" ? "正在重连" : connection === "offline" ? "暂时离线" : "连接中"}</span><button type="button" className="harness-icon-button" onClick={manualReconnect} title="重新连接" aria-label="重新连接"><IconRefresh aria-hidden="true" /></button></div></header>
     <nav className="harness-demo-tabs" aria-label="演示场景">{(["demo1", "demo2", "demo3"] as HarnessDemo[]).map((demo) => <button key={demo} type="button" aria-current={selectedDemo === demo ? "page" : undefined} className={selectedDemo === demo ? "is-active" : ""} onClick={() => demo !== selectedDemo && setSelectedDemo(demo)}><span>{demoLabel(demo)}</span><small>{scenarios.find((item) => item.demo === demo)?.title ?? "等待服务端场景"}</small><IconChevronRight aria-hidden="true" /></button>)}</nav>
-    {loading ? <div className="harness-empty"><IconLoader2 aria-hidden="true" /><h2>正在读取办公场景</h2><p>场景和文件范围由服务端提供。</p></div> : error && !scenario ? <div className="harness-empty is-error" role="alert"><IconAlertTriangle aria-hidden="true" /><h2>场景暂时无法读取</h2><p>{error}</p><button type="button" className="harness-primary-button" onClick={() => void loadScenarios()}>重新读取</button></div> : <div className="harness-grid">
+    {!scenario && (loading || catalogStatus === "checking" || catalogStatus === "retrying") ? <div className="harness-empty"><IconLoader2 aria-hidden="true" /><h2>{catalogStatus === "retrying" ? "办公服务正在恢复" : "正在连接办公服务"}</h2><p>连接恢复后会自动读取三项 FORTE 办公场景。</p></div> : !scenario && catalogStatus === "offline" ? <div className="harness-empty is-error" role="alert"><IconAlertTriangle aria-hidden="true" /><h2>工作现场暂时离线</h2><p>{catalogError}</p><button type="button" className="harness-primary-button" onClick={() => void loadScenarios(true)}>立即重试</button></div> : <div className="harness-grid">
       <aside className="harness-source-panel" aria-labelledby="harness-source-title"><div className="harness-panel-heading"><div><span>来源工作区</span><h2 id="harness-source-title">{scenario?.dataset_label ?? "公开办公基准数据"}</h2></div><IconFolder aria-hidden="true" /></div>{scenario?.dataset_version && <div className="harness-source-meta"><b>{scenario.dataset_version}</b></div>}<div className="harness-file-tree" role="tree" aria-label="本轮文件来源">{groupedFiles.length === 0 && <div className="harness-muted">启动后显示服务端冻结的文件范围。</div>}{groupedFiles.map(([group, items]) => <div key={group} className="harness-folder"><button type="button" role="treeitem" aria-expanded={expandedGroups[group] ?? true} onClick={() => setExpandedGroups((current) => ({ ...current, [group]: !(current[group] ?? true) }))}><IconChevronDown className={expandedGroups[group] ?? true ? "is-open" : ""} aria-hidden="true" /><IconFolder aria-hidden="true" /><span>{group}</span><small>{items.length}</small></button>{(expandedGroups[group] ?? true) && <div className="harness-files" role="group">{items.map((item) => <button type="button" role="treeitem" aria-selected={selectedFile?.key === item.key} key={item.key} className={selectedFile?.key === item.key ? "is-selected" : ""} onClick={() => setSelectedFile(item)}><IconFile aria-hidden="true" /><span>{item.display_label}</span></button>)}</div>}</div>)}</div>{selectedFile && <FileInspector file={selectedFile} />}</aside>
       <main className="harness-main-panel"><div className="harness-scenario-heading"><div><span>{scenario ? demoLabel(scenario.demo) : "办公场景"}</span><h2>{scenario?.title ?? "等待场景"}</h2><p>{scenario?.goal}</p></div><button type="button" className="harness-primary-button" onClick={() => void startRun(Boolean(run && ["ready_to_execute", "failed"].includes(run.status)))} disabled={!scenario || starting || Boolean(run && !["ready_to_execute", "failed"].includes(run.status))}>{starting && <IconLoader2 aria-hidden="true" />}{!starting && <IconPlayerPlay aria-hidden="true" />}{startLabel}</button></div>
       {hasContract && <TaskContract scenario={scenario!} />}

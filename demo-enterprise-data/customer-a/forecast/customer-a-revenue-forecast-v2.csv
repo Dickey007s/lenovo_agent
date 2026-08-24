@@ -1,2 +1,0 @@
-forecast_id,account_id,account_name,forecast_period,metric,amount_wan,currency,forecast_status,updated_at,owner_role,source_system
-FCST-2026-Q3-0042,CUST-A-042,客户 A（演示企业）,2026-Q3,forecast_revenue,2680,CNY,active,2026-08-18T15:20:00+08:00,客户经理,销售预测工作簿

@@ -1,2 +1,0 @@
-record_id,account_id,account_name,period,metric,amount_wan,currency,record_status,closed_at,approved_by_role,source_system
-CRM-REV-2026-07-0042,CUST-A-042,客户 A（演示企业）,2026-07,recognized_revenue,2400,CNY,closed,2026-08-05T09:30:00+08:00,财务控制岗,CRM 月结档案
