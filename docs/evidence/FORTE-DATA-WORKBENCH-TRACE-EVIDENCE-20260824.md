@@ -23,7 +23,7 @@ At implementation `fffa36a8cc83e895aaba35276568ad79e348f541` plus follow-up `041
 | implementation commits | [`fffa36a8cc83e895aaba35276568ad79e348f541`](https://github.com/Dickey007s/lenovo_agent/commit/fffa36a8cc83e895aaba35276568ad79e348f541) + [`041186d`](https://github.com/Dickey007s/lenovo_agent/commit/041186d) |
 | sanitized live manifest | [`dr-0018-forte-data-workbench-live-run.json`](manifests/dr-0018-forte-data-workbench-live-run.json) |
 | PR | [#25](https://github.com/Dickey007s/lenovo_agent/pull/25), open and not yet merged |
-| documentation commit | pending this documentation delivery |
+| first documentation/evidence commit | [`2bb0e4a6369576e8f4407ab25d3e6a0c0efca6e7`](https://github.com/Dickey007s/lenovo_agent/commit/2bb0e4a6369576e8f4407ab25d3e6a0c0efca6e7) |
 
 ## Current foreground
 
