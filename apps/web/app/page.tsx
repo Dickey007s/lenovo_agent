@@ -46,6 +46,7 @@ import type { ControlIntent } from "./task-runtime-panel";
 import { WorkCockpit, WorkCockpitDecisionPane } from "./work-cockpit";
 import { ActionGovernanceTrace, ActionImpactLedger } from "./action-impact-ledger";
 import { DemoExperienceNav, type DemoExperienceId, type DemoExperienceItem } from "./agent-call-trace";
+import { HarnessActivityPane, HarnessWorkbench, type HarnessActivityState, type HarnessDemo } from "./harness-workbench";
 
 type ViewId = "mail" | "document" | "quote" | "tasks" | "calendar" | "expense" | "crm" | "audit";
 type WorkspaceKind = Exclude<ViewId, "audit">;
@@ -736,6 +737,9 @@ export default function Home() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [assistantStatus, setAssistantStatus] = useState("");
   const [activeView, setActiveView] = useState<ViewId>("tasks");
+  const [harnessOpen, setHarnessOpen] = useState(true);
+  const [harnessDemo, setHarnessDemo] = useState<HarnessDemo>("demo1");
+  const [harnessActivity, setHarnessActivity] = useState<HarnessActivityState | null>(null);
   const [artifacts, setArtifacts] = useState<Partial<Record<WorkspaceKind, WorkspaceArtifact>>>({});
   const [workspaceConflict, setWorkspaceConflict] = useState<WorkspaceConflict | null>(null);
   const [dirty, setDirty] = useState<Partial<Record<WorkspaceKind, boolean>>>({});
@@ -2218,7 +2222,7 @@ export default function Home() {
   const taskWorkspaceActive = activeView === "tasks";
   const effectiveTaskRightMode: TaskRightMode = actionGateOpen ? "conversation" : taskRightMode;
   const cockpitWorkspaceActive = taskWorkspaceActive && taskViewMode === "cockpit";
-  const demoSurfaceActive = taskWorkspaceActive || activeView === "audit";
+  const demoSurfaceActive = taskWorkspaceActive || activeView === "audit" || harnessOpen;
   const activeDemo: DemoExperienceId = activeView === "audit" || actionGateOpen || actionResultPending
     ? "demo3"
     : cockpitWorkspaceActive
@@ -2261,6 +2265,8 @@ export default function Home() {
   }
 
   function openDemoExperience(id: DemoExperienceId) {
+    setHarnessDemo(id);
+    setHarnessOpen(true);
     if (id === "demo3") {
       setActiveView("audit");
       return;
@@ -2268,6 +2274,12 @@ export default function Home() {
     setActiveView("tasks");
     setTaskViewMode(id === "demo2" ? "cockpit" : "director");
     setTaskRightMode("decisions");
+  }
+
+  function openRailWorkspace(view: ViewId) {
+    setHarnessOpen(false);
+    setHarnessActivity(null);
+    setActiveView(view);
   }
 
   return <main className={`app-shell${taskWorkspaceActive ? " is-task-director" : ""}${activeDemo === "demo3" ? " is-demo3-experience" : ""}`} ref={shellRef} style={shellStyle}>
@@ -2278,20 +2290,21 @@ export default function Home() {
           <span>Office Agent</span>
         </div>
         {(Object.keys(VIEW_LABELS) as ViewId[]).map(view => view === "audit"
-          ? <Fragment key={view}><div className="rail-divider"/><button className={activeView === view ? "active" : ""} onClick={() => setActiveView(view)} title={VIEW_LABELS[view]}><Icon name={view}/><span>{VIEW_LABELS[view]}</span></button></Fragment>
-          : <button key={view} className={activeView === view ? "active" : ""} onClick={() => setActiveView(view)} title={VIEW_LABELS[view]}><Icon name={view}/><span>{VIEW_LABELS[view]}</span></button>)}
+          ? <Fragment key={view}><div className="rail-divider"/><button className={!harnessOpen && activeView === view ? "active" : ""} onClick={() => openRailWorkspace(view)} title={VIEW_LABELS[view]}><Icon name={view}/><span>{VIEW_LABELS[view]}</span></button></Fragment>
+          : <button key={view} className={!harnessOpen && activeView === view ? "active" : ""} onClick={() => openRailWorkspace(view)} title={VIEW_LABELS[view]}><Icon name={view}/><span>{VIEW_LABELS[view]}</span></button>)}
         <div className="task-rail-profile">
           <span>OA</span>
           <div><strong>工作区用户</strong><small>{RAIL_CONNECTION_LABELS[taskTransportState]}</small></div>
         </div>
       </nav>
       <div className={`workspace-viewport ${streamingArtifact === activeView ? "is-agent-editing" : ""}`}>
-        {demoSurfaceActive && <DemoExperienceNav active={activeDemo} items={demoExperienceItems} onSelect={openDemoExperience} />}
+        {demoSurfaceActive && !harnessOpen && <DemoExperienceNav active={activeDemo} items={demoExperienceItems} onSelect={openDemoExperience} />}
         {streamingArtifact === activeView && <div className="agent-edit-indicator"><i/><span>Agent 正在编辑{VIEW_LABELS[activeView]}</span></div>}
-        {activeView === "mail" && viewProps && <MailView {...viewProps} onNew={() => void startNewMail()} onSend={() => void triggerWorkspaceAction("发送当前工作区中的邮件")}/>}
-        {activeView === "document" && viewProps && <DocumentView {...viewProps}/>}
-        {activeView === "quote" && viewProps && <QuoteView {...viewProps} onImport={() => setNotice("报价表导入入口已预留")}/>}
-        {activeView === "tasks" && <div className="task-view-shell">
+        {harnessOpen && <HarnessWorkbench initialDemo={harnessDemo} onClose={() => { setHarnessOpen(false); setHarnessActivity(null); }} onActivityChange={setHarnessActivity} />}
+        {!harnessOpen && activeView === "mail" && viewProps && <MailView {...viewProps} onNew={() => void startNewMail()} onSend={() => void triggerWorkspaceAction("发送当前工作区中的邮件")}/>}
+        {!harnessOpen && activeView === "document" && viewProps && <DocumentView {...viewProps}/>}
+        {!harnessOpen && activeView === "quote" && viewProps && <QuoteView {...viewProps} onImport={() => setNotice("报价表导入入口已预留")}/>}
+        {!harnessOpen && activeView === "tasks" && <div className="task-view-shell">
           <TaskWorkspaceHeader
             task={task}
             mode={taskViewMode}
@@ -2343,10 +2356,10 @@ export default function Home() {
             {taskViewMode === "manual" && viewProps && <TasksView {...viewProps}/>}
           </div>
         </div>}
-        {activeView === "calendar" && viewProps && <CalendarView {...viewProps} onInvite={() => void triggerWorkspaceAction("创建当前工作区中的会议邀请")}/>}
-        {activeView === "expense" && viewProps && <ExpenseView {...viewProps}/>}
-        {activeView === "crm" && viewProps && <CrmView {...viewProps}/>}
-        {activeView === "audit" && (
+        {!harnessOpen && activeView === "calendar" && viewProps && <CalendarView {...viewProps} onInvite={() => void triggerWorkspaceAction("创建当前工作区中的会议邀请")}/>}
+        {!harnessOpen && activeView === "expense" && viewProps && <ExpenseView {...viewProps}/>}
+        {!harnessOpen && activeView === "crm" && viewProps && <CrmView {...viewProps}/>}
+        {!harnessOpen && activeView === "audit" && (
           <AuditView events={events} run={run ?? lastActionReceiptRun}/>
         )}
       </div>
@@ -2354,13 +2367,15 @@ export default function Home() {
     </section>
     <div className="resize-divider" role="separator" aria-orientation="vertical" onPointerDown={startResize}><span>•••</span></div>
     <section className={`chat-pane without-task-runtime ${actionGateOpen ? "has-action-gate" : ""} ${actionResultPending ? "has-action-receipt" : ""} ${taskWorkspaceActive ? "task-director-side-pane" : ""} ${activeDemo === "demo3" ? "is-demo3-governance" : ""}`}>
-      {taskWorkspaceActive && (
+      {taskWorkspaceActive && !harnessOpen && (
         <div className="task-side-mode-switch" role="tablist" aria-label="右侧 Agent 模式">
           <button id="task-side-tab-decisions" type="button" role="tab" aria-controls="task-side-panel" aria-selected={effectiveTaskRightMode === "decisions"} tabIndex={effectiveTaskRightMode === "decisions" ? 0 : -1} className={effectiveTaskRightMode === "decisions" ? "active" : ""} onClick={() => setTaskRightMode("decisions")} onKeyDown={(event) => moveTaskSideTab(event, "decisions")}>{cockpitWorkspaceActive ? "执行方式" : "待我决定"}</button>
           <button id="task-side-tab-conversation" type="button" role="tab" aria-controls="task-side-panel" aria-selected={effectiveTaskRightMode === "conversation"} tabIndex={effectiveTaskRightMode === "conversation" ? 0 : -1} className={effectiveTaskRightMode === "conversation" ? "active" : ""} onClick={() => setTaskRightMode("conversation")} onKeyDown={(event) => moveTaskSideTab(event, "conversation")}>Agent 对话</button>
         </div>
       )}
-      {showCockpitDecision ? (
+      {harnessOpen ? (
+        <HarnessActivityPane state={harnessActivity} />
+      ) : showCockpitDecision ? (
         <WorkCockpitDecisionPane
           item={selectedDemo2WorkItem}
           saving={demo2Saving}

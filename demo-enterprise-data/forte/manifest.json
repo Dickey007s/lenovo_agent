@@ -1,0 +1,108 @@
+{
+  "schema_version": "1.0",
+  "dataset": "FORTE",
+  "source_url": "https://github.com/AGI-Eval-Official/FORTE",
+  "source_commit": "345c1ec1487139db9dd319787fa9405ba85d1869",
+  "license": "MIT",
+  "content_nature": "public_benchmark_input",
+  "tasks": [
+    {
+      "task_id": "Finance-018",
+      "category": "Finance",
+      "input_dir": "Finance-018/input",
+      "files": [
+        {
+          "path": "Finance-018/task.md",
+          "sha256": "9beb06c5701bdbd158e7b909a8a8d792157eef4c195015a5e2afd0c783619522",
+          "size": 7173,
+          "mime": "text/markdown",
+          "role": "task_instruction"
+        },
+        {
+          "path": "Finance-018/input/2025往来明细-上半年.xlsx",
+          "sha256": "4ffb7c2d6d3efe6fcae45c2aff755bedd727d9c3467d00e1765a147e5ecab5f3",
+          "size": 13873,
+          "mime": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          "role": "input"
+        },
+        {
+          "path": "Finance-018/input/2025往来明细-下半年.xlsx",
+          "sha256": "4ad841ee36acc3b52aea0c6931a260b69ead7493f0c33056c429c36d70575c31",
+          "size": 12850,
+          "mime": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          "role": "input"
+        },
+        {
+          "path": "Finance-018/input/2026往来明细.xlsx",
+          "sha256": "4ee1f69d3346eea3b99660ab8a2efc946c93f00123ba83e121277bc7be66f4f3",
+          "size": 12746,
+          "mime": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          "role": "input"
+        }
+      ]
+    },
+    {
+      "task_id": "pm-014",
+      "category": "pm",
+      "input_dir": "pm-014/input",
+      "files": [
+        {
+          "path": "pm-014/task.md",
+          "sha256": "bc0f4880863279722edd02057354e63b2aa1a68ce072ca1ce3f025e493768beb",
+          "size": 10789,
+          "mime": "text/markdown",
+          "role": "task_instruction"
+        },
+        {
+          "path": "pm-014/input/功能测试报告.xlsx",
+          "sha256": "1f1867207fa8d5a137a2a70aea79c424762bb806247ecd4f0c1eb1227b9b4cbe",
+          "size": 11963,
+          "mime": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          "role": "input"
+        },
+        {
+          "path": "pm-014/input/上线配置清单.xlsx",
+          "sha256": "5dac25a533a4a2ea1211bbde44914c85947017189e98c8312f94025df9eb6376",
+          "size": 11128,
+          "mime": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          "role": "input"
+        },
+        {
+          "path": "pm-014/input/线上兼容环境测试报告.xlsx",
+          "sha256": "30c3568f67dc24021be6044fb87ba485de9b2b453714be75434a17d93fd146b5",
+          "size": 10935,
+          "mime": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          "role": "input"
+        },
+        {
+          "path": "pm-014/input/PRD_v2.5.md",
+          "sha256": "492518dea158b8a5c9fde62ca654bb0777ad5feceeba80983ef9fd7c1da7b77d",
+          "size": 8407,
+          "mime": "text/markdown",
+          "role": "input"
+        }
+      ]
+    },
+    {
+      "task_id": "Operations-008",
+      "category": "Operations",
+      "input_dir": "Operations-008/input",
+      "files": [
+        {
+          "path": "Operations-008/task.md",
+          "sha256": "988fe23185496b4700b5360b3319ff161f627d091dcb5f1fe1b8dd7e2d77f2f3",
+          "size": 11915,
+          "mime": "text/markdown",
+          "role": "task_instruction"
+        },
+        {
+          "path": "Operations-008/input/专业性说明.md",
+          "sha256": "ad6349474b324e55b49a798aa0151f5cf875dc5e72a65c8ad01f4d3fd2cfee10",
+          "size": 3573,
+          "mime": "text/markdown",
+          "role": "input"
+        }
+      ]
+    }
+  ]
+}

@@ -22,6 +22,10 @@ async function attachScreenshot(page: Page, testInfo: TestInfo, name: string) {
   await testInfo.attach(name, { path, contentType: "image/png" });
 }
 
+async function openLegacyCockpit(page: Page) {
+  await page.getByRole("button", { name: "任务", exact: true }).click();
+}
+
 const impactPreview = (mode: Demo2RouteMode): Demo2RouteImpactPreview => ({
   summary: "选择前先查看工作如何组织、在哪里等待，以及哪些动作不会发生。",
   changes: [
@@ -108,6 +112,7 @@ function cockpitFixture(): Demo2CockpitSnapshot {
 test.describe("Demo 2 work cockpit", () => {
   test("loads the server-backed queue and explains the recommended route without internal identifiers", async ({ page }, testInfo) => {
     await page.goto("/");
+    await openLegacyCockpit(page);
 
     await expect(page.getByRole("heading", { name: "今天的工作，应该怎么处理" })).toBeVisible();
     const demoNav = page.getByRole("navigation", { name: "三个演示能力" });
@@ -155,15 +160,17 @@ test.describe("Demo 2 work cockpit", () => {
     await attachScreenshot(page, testInfo, "demo2-route-impact-preview-desktop");
 
     await demoNav.getByRole("button", { name: /Demo 1.*持续任务/ }).click();
-    await expect(page.getByRole("heading", { name: "准备客户 A 的经营汇报" })).toBeVisible();
-    await demoNav.getByRole("button", { name: /Demo 3.*受控执行/ }).click();
-    await expect(page.getByRole("heading", { name: "受控动作与调用记录" })).toBeVisible();
-    await demoNav.getByRole("button", { name: /Demo 2.*智能调度/ }).click();
-    await expect(page.getByRole("heading", { name: "今天的工作，应该怎么处理" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "跨期间财务证据任务" }).first()).toBeVisible();
+    const harnessNav = page.getByRole("navigation", { name: "演示场景" });
+    await harnessNav.getByRole("button", { name: /Demo 3.*受控执行/ }).click();
+    await expect(page.getByRole("heading", { name: "受约束的运营流程设计任务" }).first()).toBeVisible();
+    await harnessNav.getByRole("button", { name: /Demo 2.*动态协作/ }).click();
+    await expect(page.getByRole("heading", { name: "版本上线合规协作任务" }).first()).toBeVisible();
   });
 
   test("shows fixed lightweight routes as server decisions instead of fake user choices", async ({ page }) => {
     await page.goto("/");
+    await openLegacyCockpit(page);
     await page.getByRole("button", { name: /供应商邮件回复/ }).click();
 
     const decision = page.locator(".work-cockpit-decision-pane");
@@ -188,6 +195,7 @@ test.describe("Demo 2 work cockpit", () => {
       await route.fulfill({ json: { cockpit_version: 2, cockpit_last_event_sequence: 5, item: selected } });
     });
     await page.goto("/");
+    await openLegacyCockpit(page);
     await page.getByRole("radio", { name: /固定流程/ }).check();
     const impactCanvas = page.locator(".work-cockpit-impact-canvas");
     await expect(impactCanvas.getByRole("heading", { name: "如果选择固定流程，工作会怎样展开" })).toBeVisible();
@@ -209,6 +217,7 @@ test.describe("Demo 2 work cockpit", () => {
     expect(typeof submitted.idempotency_key).toBe("string");
 
     await page.reload();
+    await openLegacyCockpit(page);
     await expect(page.getByRole("heading", { name: "本次工作方式已记录" })).toBeVisible();
     await expect(impactCanvas.getByRole("heading", { name: "本次已选择固定流程" })).toBeVisible();
     await expect(page.getByText("尚未执行").first()).toBeVisible();
@@ -238,6 +247,7 @@ test.describe("Demo 2 work cockpit", () => {
     });
 
     await page.goto("/");
+    await openLegacyCockpit(page);
     await page.getByRole("radio", { name: /固定流程/ }).check();
     await page.getByRole("button", { name: /记录本轮方式/ }).click();
 
@@ -253,6 +263,7 @@ test.describe("Demo 2 work cockpit", () => {
     });
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto("/");
+    await openLegacyCockpit(page);
     await expect(page.getByRole("heading", { name: "今天的工作，应该怎么处理" })).toBeVisible();
     const callTrace = page.locator(".work-cockpit-overview .agent-call-trace");
     await callTrace.locator("summary").click();
@@ -368,6 +379,7 @@ test.describe("Demo 2 work cockpit", () => {
 
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto("/");
+    await openLegacyCockpit(page);
     await expect(page.getByRole("button", { name: /启动本次协作/ })).toBeVisible();
     await page.getByRole("button", { name: /启动本次协作/ }).click();
     await expect(page.getByRole("heading", { name: "业务工作包正在收敛" })).toBeVisible();
@@ -427,10 +439,12 @@ test.describe("Demo 2 work cockpit", () => {
     });
 
     await page.goto("/");
+    await openLegacyCockpit(page);
     await expect(page.getByRole("heading", { name: "业务工作包正在收敛" })).toBeVisible();
     await expect.poll(() => streamConnections).toBeGreaterThanOrEqual(1);
     const beforeReload = streamConnections;
     await page.reload();
+    await openLegacyCockpit(page);
     await expect(page.getByRole("heading", { name: "业务工作包正在收敛" })).toBeVisible();
     await expect.poll(() => streamConnections).toBeGreaterThan(beforeReload);
   });
@@ -491,6 +505,7 @@ test.describe("Demo 2 work cockpit", () => {
     });
 
     await page.goto("/");
+    await openLegacyCockpit(page);
     await expect(page.getByRole("article", { name: "经营事实核对 · 失败" })).toBeVisible();
     await expect(page.getByRole("article", { name: "项目风险提取 · 已取消" })).toBeVisible();
     await expect(page.getByRole("article", { name: "经营事实核对 · 失败" }).getByText("处理失败", { exact: true })).toBeVisible();

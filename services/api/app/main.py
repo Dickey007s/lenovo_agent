@@ -12,6 +12,7 @@ from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 
 from packages.audit import PostgresAuditLog
+from services.api.app.api.harness_routes import router as harness_router
 from services.api.app.api.routes import build_run_service, router
 from services.api.app.application.storage import (
     InMemoryWorkspaceStore,
@@ -24,6 +25,7 @@ from services.api.app.application.task_stage_agent import AutoDLTaskStageAgent
 from services.api.app.application.demo2_cockpit import Demo2CockpitService
 from services.api.app.application.demo2_execution import DeepSeekDemo2WorkerAgent, Demo2ExecutionService
 from services.api.app.application.conversations import ConversationService
+from services.api.app.application.harness_runtime import build_harness_runtime
 from services.api.app.config import get_settings
 
 
@@ -64,6 +66,9 @@ async def lifespan(app: FastAPI):
         ),
     )
     await app.state.demo2_execution_service.setup()
+    # Unified Harness indexes public benchmark input folders and stops at a
+    # server-validated ready_to_execute boundary; it never invokes a tool here.
+    app.state.harness_runtime = build_harness_runtime(settings)
 
     if settings.langgraph_checkpoint_dsn:
         database_dsn = settings.database_dsn or settings.langgraph_checkpoint_dsn
@@ -116,6 +121,7 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
     app.include_router(router)
+    app.include_router(harness_router)
     return app
 
 

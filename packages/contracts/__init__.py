@@ -89,6 +89,15 @@ from .demo2_models import (
     SwarmEvent,
     WorkerProcessing,
 )
+from .harness_models import (
+    BenchmarkContentNature,
+    BenchmarkFileEntry,
+    BenchmarkFileRole,
+    BenchmarkManifest,
+    BenchmarkTaskEntry,
+    BenchmarkDisplayFile,
+    BenchmarkPublicScenario,
+)
 
 __all__ = [
     "ActionCandidate",
@@ -176,4 +185,11 @@ __all__ = [
     "SharedArtifactVersion",
     "SwarmEvent",
     "WorkerProcessing",
+    "BenchmarkContentNature",
+    "BenchmarkFileEntry",
+    "BenchmarkFileRole",
+    "BenchmarkManifest",
+    "BenchmarkTaskEntry",
+    "BenchmarkDisplayFile",
+    "BenchmarkPublicScenario",
 ]
