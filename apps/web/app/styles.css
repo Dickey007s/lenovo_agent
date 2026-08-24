@@ -188,14 +188,22 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, summary:focus
 .result-view > header { display: grid; grid-template-columns: 30px minmax(0, 1fr); gap: 10px; padding: 16px; border-bottom: 1px solid #cfe3d7; background: #f4fbf7; }
 .result-view > header > svg { width: 25px; color: var(--green); }
 .result-view h2 { margin: 4px 0 0; font-size: 18px; line-height: 1.45; letter-spacing: 0; }
+.result-view h2.is-clamped { display: -webkit-box; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 3; }
+.result-summary-toggle { min-height: 44px; margin-top: 2px; padding: 0; border: 0; color: var(--blue); background: transparent; font-weight: 700; }
+.result-summary-toggle:hover { text-decoration: underline; }
 .result-findings { padding: 4px 16px; }
 .result-findings > section { display: grid; grid-template-columns: 27px minmax(0, 1fr); gap: 10px; padding: 15px 0; border-bottom: 1px solid #e8ebee; }
 .result-findings > section > b { width: 25px; height: 25px; display: grid; place-items: center; border-radius: 50%; color: var(--green); background: var(--green-soft); }
 .result-findings h3 { margin: 0; font-size: 15px; letter-spacing: 0; }
 .result-findings p { margin: 5px 0 9px; color: var(--ink-soft); line-height: 1.65; }
 .result-findings footer { display: flex; flex-wrap: wrap; gap: 5px; }
-.result-view > aside { margin: 8px 16px 16px; padding: 12px 14px; border-left: 3px solid #c8872d; background: var(--amber-soft); }
-.result-view > aside p { margin: 6px 0 0; line-height: 1.5; }
+.result-expand { min-height: 44px; display: flex; align-items: center; gap: 7px; margin: 2px 16px 14px; padding: 0 10px; border: 1px solid var(--line); border-radius: 5px; color: var(--ink-soft); background: #fff; font-weight: 650; }
+.result-expand:hover { border-color: #aebdce; background: #f7f9fb; }
+.result-expand svg { width: 17px; transition: transform 160ms ease; }
+.result-expand svg.is-open { transform: rotate(180deg); }
+.result-follow-ups { margin: 8px 16px 16px; border-left: 3px solid #c8872d; background: var(--amber-soft); }
+.result-follow-ups summary { min-height: 44px; display: flex; align-items: center; padding: 0 14px; font-weight: 700; cursor: pointer; }
+.result-follow-ups p { margin: 0; padding: 0 14px 9px; line-height: 1.5; }
 .result-view > footer { display: flex; align-items: flex-start; gap: 8px; padding: 12px 16px; color: var(--muted); background: #f7f9fa; font-size: 12px; line-height: 1.5; }
 .result-view > footer svg { width: 17px; flex: 0 0 auto; color: var(--green); }
 .workspace-boundary { margin-top: 10px; border: 1px solid var(--line); background: #fafbfc; }

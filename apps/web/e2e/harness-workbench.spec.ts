@@ -47,7 +47,12 @@ function snapshot(body: { scenario_id: ScenarioId; instruction: string; selected
     plan: status === "queued" || failed ? null : plan(body.selected_file_refs),
     model_receipt: status === "queued" ? null : { called: true, model: "deepseek-v4-pro", elapsed_ms: 1350, output_used: !failed },
     analysis_receipt: status === "completed" ? { called: true, model: "deepseek-v4-pro", elapsed_ms: 2180, output_used: true } : null,
-    result: status === "completed" ? { summary: "核对完成：发现一项跨期余额需要人工关注。", findings: [{ title: "余额连续未变", detail: "黄杉文化传播有限公司的其他应收款期末余额保持不变。", file_refs: body.selected_file_refs }], follow_ups: ["请财务人员确认该余额是否仍应保留"], review_required: true } : null,
+    result: status === "completed" ? { summary: "核对完成：发现多项跨期余额需要人工关注。", findings: [
+      { title: "余额连续未变", detail: "黄杉文化传播有限公司的其他应收款期末余额保持不变。", file_refs: body.selected_file_refs },
+      { title: "保证金长期挂账", detail: "一项租赁保证金在所选期间没有发生额。", file_refs: body.selected_file_refs },
+      { title: "应付款需要复核", detail: "一项应付款在所选期间保持不变。", file_refs: body.selected_file_refs },
+      { title: "第四项默认收起", detail: "详细发现默认收起，避免结果首屏文字过载。", file_refs: body.selected_file_refs },
+    ], follow_ups: ["请财务人员确认该余额是否仍应保留"], review_required: true } : null,
     validation_errors: failed ? ["模型引用了未选择的文件"] : [],
     events: status === "queued" ? [] : [{ sequence, event_name: failed ? "harness_failed" : "task_completed", occurred_at: new Date().toISOString(), status, message: failed ? "本轮未通过服务端校验，已停止且未发生外部动作。" : "本轮只读分析已完成，结果等待用户复核。", details: {} }],
   };
@@ -106,9 +111,13 @@ test("opens real FORTE data, accepts a custom task, and shows a verifiable traje
   expect(state.starts[0].selected_file_refs).toEqual([files.finance2025.file_ref, files.finance2026.file_ref]);
   await expect(page.getByRole("heading", { name: /核对完成/ })).toBeVisible();
   await expect(page.getByText("余额连续未变", { exact: true })).toBeVisible();
+  await expect(page.getByText("第四项默认收起", { exact: true })).toBeHidden();
+  await page.getByRole("button", { name: "查看其余 1 条发现" }).click();
+  await expect(page.getByText("第四项默认收起", { exact: true })).toBeVisible();
+  await expect(page.getByText("仍需你判断 · 1 项")).toBeVisible();
   await expect(page.getByText("规划调用")).toBeVisible();
   await expect(page.getByText("分析调用")).toBeVisible();
-  await expect(page.getByText("只读任务完成")).toBeVisible();
+  await expect(page.getByText("初步结果已形成")).toBeVisible();
   const body = await page.locator("body").innerText();
   expect(body).not.toMatch(/Finance-018\/input|sha256|task_instruction|思维链/);
 });

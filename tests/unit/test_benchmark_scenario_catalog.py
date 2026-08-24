@@ -4,6 +4,7 @@ import hashlib
 import json
 import re
 import shutil
+from decimal import Decimal
 from pathlib import Path
 
 import pytest
@@ -134,6 +135,38 @@ def test_public_file_preview_exposes_real_rows_without_raw_metadata() -> None:
     assert "Finance-018/input" not in serialized
     assert "sha256" not in serialized
     assert "task_instruction" not in serialized
+
+
+def test_finance_cross_period_ground_truth_is_deterministically_reproducible() -> None:
+    catalog = BenchmarkScenarioCatalog(ROOT)
+    files = catalog.public_task("Finance-018")["files"]
+    by_label = {item["display_label"]: item["file_ref"] for item in files}
+    first = catalog.public_file("Finance-018", by_label["2025 年上半年往来明细"])
+    second = catalog.public_file("Finance-018", by_label["2025 年下半年往来明细"])
+
+    def balances(preview: dict[str, object]) -> dict[tuple[str, str, str], Decimal]:
+        rows = preview["rows"]
+        assert isinstance(rows, list)
+        values: dict[tuple[str, str, str], Decimal] = {}
+        for row in rows:
+            assert isinstance(row, dict)
+            cells = row["values"]
+            assert isinstance(cells, list)
+            if len(cells) < 10 or not cells[9]:
+                continue
+            values[(str(cells[0]), str(cells[1]), str(cells[8]))] = Decimal(str(cells[9]))
+        return values
+
+    first_balances = balances(first)
+    second_balances = balances(second)
+    unchanged = [
+        value
+        for key, value in first_balances.items()
+        if second_balances.get(key) == value
+    ]
+
+    assert len(unchanged) == 23
+    assert sum(abs(value) for value in unchanged) == Decimal("1845444.71")
 
 
 def test_public_markdown_preview_never_exposes_task_instruction() -> None:
