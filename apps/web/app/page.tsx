@@ -25,7 +25,7 @@ function bounded(value: number, minimum: number, maximum: number) {
 }
 
 export default function Page() {
-  const shellRef = useRef<HTMLElement | null>(null);
+  const shellRef = useRef<HTMLDivElement | null>(null);
   const [activity, setActivity] = useState<HarnessActivityState | null>(null);
   const [agentWidth, setAgentWidth] = useState(360);
   const [agentHeight, setAgentHeight] = useState(290);
@@ -90,7 +90,7 @@ export default function Page() {
   } as CSSProperties;
 
   return (
-    <main className="harness-app-shell" ref={shellRef} style={style}>
+    <div className="harness-app-shell" ref={shellRef} style={style}>
       <section className="harness-workspace-shell" aria-label="工作现场">
         <HarnessWorkbench onActivityChange={setActivity} />
       </section>
@@ -111,6 +111,6 @@ export default function Page() {
       <aside className="harness-agent-shell" aria-label="Agent 进度">
         <HarnessActivityPane state={activity} />
       </aside>
-    </main>
+    </div>
   );
 }

@@ -49,6 +49,8 @@ button:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
 .harness-workspace-shell { min-width: 0; min-height: 0; overflow-y: auto; padding: 22px; background: #f6f7f8; }
 .harness-agent-shell { min-width: 0; min-height: 0; overflow: hidden; border-left: 1px solid var(--line); background: var(--paper); }
 .harness-app-divider {
+  position: relative;
+  z-index: 2;
   min-width: 0;
   min-height: 0;
   display: grid;
@@ -60,8 +62,9 @@ button:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
   cursor: col-resize;
   touch-action: none;
 }
+.harness-app-divider::before { content: ""; position: absolute; inset: 0 -18px; }
 .harness-app-divider:hover, .harness-app-divider:focus-visible { color: #174f98; background: #dce8f7; outline: 0; }
-.harness-app-divider span { overflow: hidden; font-size: 10px; line-height: 1; writing-mode: vertical-rl; }
+.harness-app-divider span { overflow: hidden; pointer-events: none; font-size: 10px; line-height: 1; writing-mode: vertical-rl; }
 
 .harness-workbench {
   width: min(1500px, 100%);
@@ -90,7 +93,7 @@ button:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
 .harness-header-actions { display: flex; align-items: center; gap: 8px; flex: 0 0 auto; }
 .harness-connection { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-size: 10px; font-weight: 700; white-space: nowrap; }
 .harness-connection i { width: 7px; height: 7px; border-radius: 50%; background: #9ba2ad; }
-.harness-connection.is-live i { background: var(--green); box-shadow: 0 0 0 3px var(--green-soft); }
+.harness-connection.is-live i, .harness-connection.is-available i { background: var(--green); box-shadow: 0 0 0 3px var(--green-soft); }
 .harness-connection.is-reconnecting i { background: #b7791f; box-shadow: 0 0 0 3px #fff3dc; animation: edit-pulse 1.2s infinite; }
 .harness-connection.is-offline i { background: var(--red); }
 .harness-icon-button { width: 44px; min-height: 44px; display: grid; place-items: center; padding: 0; border: 1px solid var(--line-strong); border-radius: 8px; color: #3d4650; background: var(--paper); }
@@ -201,10 +204,11 @@ button:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
 .harness-human-gate { display: flex; align-items: flex-start; gap: 5px; padding: 7px; color: #865b22; background: #fff5e5; font-size: 12px; line-height: 1.45; }
 .harness-human-gate svg { width: 13px; flex: 0 0 auto; }
 .harness-plan-node footer { padding-top: 6px; border-top: 1px solid #e7eaee; }
-.harness-ready-banner, .harness-inline-error { display: flex; align-items: flex-start; gap: 9px; margin-top: 12px; padding: 12px; font-size: 12px; line-height: 1.5; }
+.harness-ready-banner, .harness-inline-notice, .harness-inline-error { display: flex; align-items: flex-start; gap: 9px; margin-top: 12px; padding: 12px; font-size: 12px; line-height: 1.5; }
 .harness-ready-banner { border: 1px solid #b5dcc5; color: var(--green); background: #effaf4; }
+.harness-inline-notice { border: 1px solid #ecd29d; color: var(--amber); background: var(--amber-soft); }
 .harness-inline-error { color: #7b3e2e; background: var(--red-soft); }
-.harness-ready-banner > svg, .harness-inline-error > svg { width: 18px; flex: 0 0 auto; }
+.harness-ready-banner > svg, .harness-inline-notice > svg, .harness-inline-error > svg { width: 18px; flex: 0 0 auto; }
 .harness-ready-banner > div, .harness-inline-error > div { display: grid; gap: 4px; }
 .harness-ready-banner span { color: #5b7666; }
 
@@ -223,7 +227,7 @@ button:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
 .harness-activity-pane > header h2 { overflow-wrap: anywhere; margin: 0; font-size: 15px; letter-spacing: 0; }
 .harness-activity-pane > header > b { display: inline-flex; align-items: center; gap: 6px; color: #59636e; font-size: 10px; }
 .harness-activity-pane > header > b i { width: 7px; height: 7px; border-radius: 50%; background: #9ba2ad; }
-.harness-activity-pane > header > b.is-live i { background: var(--green); box-shadow: 0 0 0 3px var(--green-soft); }
+.harness-activity-pane > header > b.is-live i, .harness-activity-pane > header > b.is-available i { background: var(--green); box-shadow: 0 0 0 3px var(--green-soft); }
 .harness-activity-pane > header > b.is-reconnecting i { background: #b7791f; box-shadow: 0 0 0 3px #fff3dc; }
 .harness-activity-pane > header > b.is-offline i { background: var(--red); }
 .harness-model-receipt { display: grid; grid-template-columns: 28px minmax(0, 1fr); align-items: center; gap: 8px; margin: 12px 13px 4px; padding: 11px; border: 1px solid #d8e4f3; background: #f6f9fd; }
@@ -248,6 +252,7 @@ button:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
 .harness-activity-pane > footer { display: flex; align-items: flex-start; gap: 7px; margin: 0 13px 12px; padding: 10px; font-size: 12px; line-height: 1.45; }
 .harness-activity-pane > footer svg { width: 16px; flex: 0 0 auto; }
 .harness-activity-pane > footer.is-ready { color: var(--green); background: var(--green-soft); }
+.harness-activity-pane > footer.is-notice { color: var(--amber); background: var(--amber-soft); }
 .harness-activity-pane > footer.is-error { color: var(--red); background: var(--red-soft); }
 .harness-activity-pane.is-empty { place-items: center; align-content: center; padding: 30px; text-align: center; }
 .harness-activity-pane.is-empty > svg { width: 27px; color: #86909b; }
@@ -267,6 +272,7 @@ button:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
   .harness-workspace-shell { padding: 12px; }
   .harness-agent-shell { border-top: 1px solid var(--line); border-left: 0; }
   .harness-app-divider { cursor: row-resize; }
+  .harness-app-divider::before { inset: -18px 0; }
   .harness-app-divider span { writing-mode: horizontal-tb; }
   .harness-header { display: grid; }
   .harness-header-actions { justify-content: flex-end; }
