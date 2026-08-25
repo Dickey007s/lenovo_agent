@@ -26,6 +26,10 @@ Agent 实际调用、采用和校验了什么，并能从每条结论返回同�
 汇报必须同时保留“场景与来源”“前台交互影响”“后端事实映射”和
 “验证与边界”。研究来源包见
 [`WORKSPACE-CENTRIC-OFFICE-AGENT-INTERACTION-AND-SOURCES-20260825`](research/WORKSPACE-CENTRIC-OFFICE-AGENT-INTERACTION-AND-SOURCES-20260825.md)。
+Control Loop 的逐模块现状、完成度口径和下一条 Workspace Research Loop 设计见
+[`AGENT-CONTROL-LOOP-IMPLEMENTATION-AUDIT-20260825`](research/AGENT-CONTROL-LOOP-IMPLEMENTATION-AUDIT-20260825.md)。
+完整的项目化讲稿、七个办公场景、七个图示区和 17 页 PPT 结构见
+[`OFFICE-AGENT-DETAILED-CHINESE-REPORT-20260825`](reports/OFFICE-AGENT-DETAILED-CHINESE-REPORT-20260825.md)。
 
 ## 3. PPT 页面卡片
 
@@ -44,7 +48,7 @@ Agent 实际调用、采用和校验了什么，并能从每条结论返回同�
 | 11 | Demo 2 验收多任务自组织、动态调度和共享工件汇聚 | Worker、依赖与动态重排图 | 目标设计；当前产品没有通用 Worker Runtime |
 | 12 | Demo 3 对单任务和多任务统一施加风险与动作控制 | 影响预演 -> 证据 -> 审批 -> Permit -> 回执 | 目标设计；当前没有真实外部动作 |
 | 13 | 当前已经证明工程链路，但也保留模型结果出错的负面证据 | 自动化、截图与 Finance 算术偏差并列 | `completed` 不等于结论正确 |
-| 14 | 下一步是确定性核验、可写 Artifact 工作区和真实用户形成性测试 | 分阶段路线图 | 没有实现证据前保持 `Draft` |
+| 14 | 当前完整 Control Loop 约完成 30%，下一步先让 Agent 在文件夹中形成可见、可停、可核验的多轮研究循环 | 目标 Loop 与当前单次流水的叠加图；11 模块成熟度条 | `30%` 是架构成熟度估计；[`DR-0023`](decisions/DR-0023-workspace-research-control-loop.md) 尚未实现，保持 `Draft` |
 
 ## 4. 现场演示卡片
 

@@ -7,9 +7,10 @@
 3. `docs/WORKSPACE_AND_STREAMING.md`：文件夹、预览、前端交互和 SSE。
 4. `docs/API.md`：当前六路径公开协议。
 5. `docs/contracts/UI_SERVER_FACT_MATRIX.md`：每个 UI 状态的服务端事实。
-6. `docs/PRESENTATION_BRIEF.md`：汇报叙事和禁止夸大的结论。
+6. `docs/PRESENTATION_BRIEF.md`：汇报叙事和禁止夸大的结论；制作会议/PPT 主讲稿时再读 `docs/reports/OFFICE-AGENT-DETAILED-CHINESE-REPORT-20260825.md`。
 7. `docs/DECISION_AND_REPORTING_GOVERNANCE.md`：方案、PR、Demo、汇报的硬门槛。
 8. 当前 whole-folder 变更再读 `docs/decisions/DR-0022-workspace-folder-and-arbitrary-task-contract.md`、`docs/scenarios/SCENARIO-008-whole-folder-office-workspace.md`、`docs/research/WORKSPACE-CENTRIC-OFFICE-AGENT-INTERACTION-AND-SOURCES-20260825.md`、`docs/testing/FORTE-PUBLIC-OFFICE-TASK-TEST-CASES-20260825.md` 与对应 Evidence/Source。
+9. 修改 Control Loop、文件夹自主研究、预算/停止、暂停/调整方向或 Durable State 时，再读 `docs/research/AGENT-CONTROL-LOOP-IMPLEMENTATION-AUDIT-20260825.md` 与 `docs/sources/USER-FEEDBACK-20260825-16-control-loop-and-detailed-report.md`。当前约 `30%` 只表示按目标模块等权得到的架构成熟度估计；现行 Runtime 仍是单次只读分析流水，不得表述为完整长期 Loop。
 
 源码永远高于文档。行为或叙事变化后必须同步 living docs、Decision、Scenario、
 Source、Evidence 和 UI-server fact mapping，不能只更新 README。

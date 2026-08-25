@@ -653,6 +653,8 @@ typecheck、生产 build、治理测试通过，Harness 浏览器 `8 passed`；9
 ## 十一、来源索引
 
 - 主流方案与交互研究：[`WORKSPACE-CENTRIC-OFFICE-AGENT-INTERACTION-AND-SOURCES-20260825`](../research/WORKSPACE-CENTRIC-OFFICE-AGENT-INTERACTION-AND-SOURCES-20260825.md)。
+- Control Loop 源码事实审计与下一纵切：[`AGENT-CONTROL-LOOP-IMPLEMENTATION-AUDIT-20260825`](../research/AGENT-CONTROL-LOOP-IMPLEMENTATION-AUDIT-20260825.md)。
+- 下一纵切决策与场景：[`DR-0023`](../decisions/DR-0023-workspace-research-control-loop.md)、[`SCENARIO-009`](../scenarios/SCENARIO-009-workspace-research-control-loop.md)。
 - 当前决策：[`DR-0022`](../decisions/DR-0022-workspace-folder-and-arbitrary-task-contract.md)。
 - 当前场景：[`SCENARIO-008`](../scenarios/SCENARIO-008-whole-folder-office-workspace.md)。
 - 15 类任务测试目录：[`FORTE-PUBLIC-OFFICE-TASK-TEST-CASES-20260825`](../testing/FORTE-PUBLIC-OFFICE-TASK-TEST-CASES-20260825.md)。

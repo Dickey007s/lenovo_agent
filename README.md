@@ -159,18 +159,22 @@ pnpm --dir apps/web exec playwright test e2e/harness-workbench.spec.ts
 
 ## Living records
 
-- [Architecture](docs/ARCHITECTURE.md)
-- [HTTP API and SSE](docs/API.md)
-- [Workspace and streaming](docs/WORKSPACE_AND_STREAMING.md)
-- [UI-server fact matrix](docs/contracts/UI_SERVER_FACT_MATRIX.md)
-- [Target architecture](docs/TARGET_ARCHITECTURE.md)
-- [Presentation brief](docs/PRESENTATION_BRIEF.md)
-- [Source register](docs/decisions/SOURCE_REGISTER.md)
+- [当前架构](docs/ARCHITECTURE.md)
+- [HTTP API 与 SSE](docs/API.md)
+- [工作区与流式交互](docs/WORKSPACE_AND_STREAMING.md)
+- [前后端事实矩阵](docs/contracts/UI_SERVER_FACT_MATRIX.md)
+- [目标架构](docs/TARGET_ARCHITECTURE.md)
+- [中文汇报卡片](docs/PRESENTATION_BRIEF.md)
+- [详细中文汇报稿与 17 页图文规划](docs/reports/OFFICE-AGENT-DETAILED-CHINESE-REPORT-20260825.md)
+- [来源台账](docs/decisions/SOURCE_REGISTER.md)
 - [DR-0022](docs/decisions/DR-0022-workspace-folder-and-arbitrary-task-contract.md)
 - [SCENARIO-008](docs/scenarios/SCENARIO-008-whole-folder-office-workspace.md)
-- [Mainstream comparison, scenarios and interaction impact](docs/research/WORKSPACE-CENTRIC-OFFICE-AGENT-INTERACTION-AND-SOURCES-20260825.md)
-- [15-case office test catalog](docs/testing/FORTE-PUBLIC-OFFICE-TASK-TEST-CASES-20260825.md)
-- [Public suite inventory](docs/research/FORTE-PUBLIC-SUITE-INVENTORY-20260825.md)
+- [DR-0023：三轮只读 Workspace Research Loop](docs/decisions/DR-0023-workspace-research-control-loop.md)
+- [SCENARIO-009：研究当前文件夹并提出下一步](docs/scenarios/SCENARIO-009-workspace-research-control-loop.md)
+- [主流方案、办公场景与交互影响研究](docs/research/WORKSPACE-CENTRIC-OFFICE-AGENT-INTERACTION-AND-SOURCES-20260825.md)
+- [Agent Control Loop 当前实现审计与下一纵切](docs/research/AGENT-CONTROL-LOOP-IMPLEMENTATION-AUDIT-20260825.md)
+- [15 类办公测试目录](docs/testing/FORTE-PUBLIC-OFFICE-TASK-TEST-CASES-20260825.md)
+- [公开数据套件清单](docs/research/FORTE-PUBLIC-SUITE-INVENTORY-20260825.md)
 
 A dated historical document proves only its recorded commit and scope unless a
 living document explicitly carries the fact forward.
