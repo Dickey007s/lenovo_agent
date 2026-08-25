@@ -112,33 +112,34 @@ function previewFor(fileRef: string) {
   return { ...base, kind: "text", text: "2026-08-24 09:30 service healthy" };
 }
 
-function plan(selectedRefs: string[]) {
-  return { summary: "先读取所选资料，再核对事实并形成带引用的结果。", units: [
-    { unit_id: "read", title: "读取所选资料", objective: "读取用户选择的公开文件。", input_file_refs: selectedRefs, depends_on: [], tool: "file.read", requires_human_gate: false, side_effect: "none", artifact_name: null, artifact_type: null },
-    { unit_id: "answer", title: "形成分析结果", objective: "回答用户问题并标注文件依据。", input_file_refs: selectedRefs, depends_on: ["read"], tool: "artifact.write", requires_human_gate: false, side_effect: "run_workspace_write", artifact_name: "analysis-result", artifact_type: "analysis" },
+function plan(fileRefs: string[]) {
+  return { summary: "先从整个资料库索引中选择相关资料，再核对事实并形成带引用的结果。", selection_reason: "文件名与摘要直接涉及当前目标，先读取这些最小证据。", units: [
+    { unit_id: "read", title: "读取相关资料", objective: "读取 Agent 从整个资料库自主选择的公开文件。", input_file_refs: fileRefs, depends_on: [], tool: "file.read", requires_human_gate: false, side_effect: "none", artifact_name: null, artifact_type: null },
+    { unit_id: "answer", title: "形成分析结果", objective: "回答用户问题并标注文件依据。", input_file_refs: fileRefs, depends_on: ["read"], tool: "artifact.write", requires_human_gate: false, side_effect: "run_workspace_write", artifact_name: "analysis-result", artifact_type: "analysis" },
   ] };
 }
 
 function snapshot(
-  body: { workspace_id: string; instruction: string; selected_file_refs: string[] },
+  body: { workspace_id: string; instruction: string },
   status: "queued" | "planning" | "paused" | "completed" | "stopped" | "failed" = "completed",
   sequence = 16,
 ) {
-  const selected = folders.flatMap((folder) => folder.files).filter((file) => body.selected_file_refs.includes(file.file_ref));
+  const allFiles = folders.flatMap((folder) => folder.files);
+  const selected = [csvFile, pdfFile];
   const failed = status === "failed";
   const terminal = ["completed", "stopped", "failed"].includes(status);
-  const firstRefs = body.selected_file_refs.slice(0, Math.max(1, Math.ceil(body.selected_file_refs.length / 2)));
-  const secondRefs = body.selected_file_refs.slice(firstRefs.length);
+  const firstRefs = [csvFile.file_ref];
+  const secondRefs = [pdfFile.file_ref];
   const finding = (refs: string[], title: string) => ({
     summary: `${title}：已形成带文件引用的只读结论。`,
     findings: [{ title, detail: "该结论只来自本轮实际读取的公开文件。", file_refs: refs }],
-    follow_ups: ["请业务人员复核结论口径"],
+    follow_ups: ["继续核对授权范围与财务往来之间是否存在执行约束，并形成待办清单。"],
     review_required: true,
   });
   const gap = secondRefs.length ? [{
     gap_id: "gap-111111111111",
-    label: `仍有 ${secondRefs.length} 份允许资料缺少可核对引用`,
-    detail: "这些资料仍在用户划定范围内，需要下一轮继续核对。",
+    label: `仍有 ${secondRefs.length} 份本轮选择资料缺少可核对引用`,
+    detail: "这些资料已由 Agent 纳入本轮证据范围，需要下一轮继续核对。",
     candidate_file_refs: secondRefs,
   }] : [];
   const roundOne = {
@@ -156,7 +157,7 @@ function snapshot(
     evidence_gaps: status === "planning" || status === "paused" ? [] : gap,
     next_step: status === "planning" || status === "paused" ? null : {
       decision: secondRefs.length ? "next_round" : "completed",
-      reason: secondRefs.length ? "仍有允许资料未形成引用，预算允许继续一轮。" : "完成条件已满足。",
+      reason: secondRefs.length ? "本轮仍有已选择资料未形成引用，预算允许继续一轮。" : "完成条件已满足。",
       next_question: secondRefs.length ? "继续补齐尚未核对的证据。" : null,
       candidate_file_refs: secondRefs,
     },
@@ -176,7 +177,7 @@ function snapshot(
     analysis_receipt: { called: true, model: "deepseek-v4-pro", elapsed_ms: 1760, output_used: true },
     verified_file_refs: secondRefs,
     evidence_gaps: [],
-    next_step: { decision: "completed", reason: "允许范围内的文件均已形成可核对引用。", next_question: null, candidate_file_refs: [] },
+    next_step: { decision: "completed", reason: "本轮自主选择的证据均已形成可核对引用。", next_question: null, candidate_file_refs: [] },
     started_at: new Date().toISOString(),
     completed_at: new Date().toISOString(),
   } : null;
@@ -195,26 +196,27 @@ function snapshot(
     last_event_sequence: status === "queued" ? 0 : sequence,
     instruction: body.instruction,
     instruction_source: "user",
-    source_documents: status === "queued" ? [] : selected.map(({ file_ref, display_label, display_group, display_summary }) => ({ file_ref, display_label, display_group, display_summary })),
-    selection_reason: `用户划定了 ${selected.length} 份公开文件`,
+    source_documents: status === "queued" ? [] : allFiles.map(({ file_ref, display_label, display_group, display_summary }) => ({ file_ref, display_label, display_group, display_summary })),
+    selection_reason: `已冻结整个资料库的 ${allFiles.length} 份文件索引，Agent 自主检索相关证据`,
     contract: {
       contract_version: "agent-control-loop.v1",
       goal: body.instruction,
-      allowed_file_refs: body.selected_file_refs,
+      scope_mode: "whole_workspace",
+      allowed_file_refs: allFiles.map((file) => file.file_ref),
       completion_criteria: ["所有结论都有文件引用", "剩余缺口和停止原因可见"],
       max_rounds: 3,
-      max_files_per_round: 4,
+      max_files_per_round: 6,
       max_model_calls: 6,
       deadline_seconds: 120,
       external_action: "none",
     },
     budget: {
       max_rounds: 3,
-      max_files_per_round: 4,
+      max_files_per_round: 6,
       max_model_calls: 6,
       deadline_seconds: 120,
       rounds_used: rounds.length,
-      files_verified: status === "completed" ? body.selected_file_refs.length : status === "planning" || status === "paused" ? 0 : firstRefs.length,
+      files_verified: status === "completed" ? selected.length : status === "planning" || status === "paused" ? 0 : firstRefs.length,
       model_calls_used: status === "completed" ? rounds.length * 2 : status === "planning" || status === "paused" ? 1 : 0,
       elapsed_ms: status === "completed" ? 6410 : 1550,
       stop_reason: status === "stopped" ? "用户在安全点停止" : null,
@@ -225,8 +227,8 @@ function snapshot(
     control_events: [],
     brief: status === "completed" ? {
       outcome: "completed",
-      summary: `Agent Control Loop 完成 ${rounds.length} 轮，只读核对了 ${body.selected_file_refs.length} 份允许资料；所有结论仍等待用户复核。`,
-      verified_file_refs: body.selected_file_refs,
+      summary: `Agent Control Loop 完成 ${rounds.length} 轮，从整个资料库中自主选择并只读核对了 ${selected.length} 份相关资料；已形成待用户确认的下一步建议。`,
+      verified_file_refs: selected.map((file) => file.file_ref),
       unresolved_gaps: [],
       rounds_completed: rounds.length,
       external_action: "none",
@@ -244,7 +246,7 @@ function snapshot(
     result: status === "completed" ? {
       summary: `Agent Control Loop 完成 ${rounds.length} 轮，只读核对了允许资料。`,
       findings: allFindings,
-      follow_ups: ["请业务人员复核长期未变的原因"],
+      follow_ups: ["继续核对授权范围与财务往来之间是否存在执行约束，并形成待办清单。"],
       review_required: true,
     } : null,
     validation_errors: failed ? ["规划使用了当前任务范围外的资料或能力，系统已安全停止。请重新规划。"] : [],
@@ -255,7 +257,7 @@ async function fulfillJson(route: Route, body: unknown, status = 200) { await ro
 
 async function mockHarness(page: Page, options: { failFirstStart?: boolean; disconnect?: boolean; failed?: boolean; workspaceFailures?: number; interactiveLoop?: boolean } = {}) {
   let workspaceCalls = 0; let startCalls = 0; let streamCalls = 0;
-  let currentBody = { workspace_id: "forte-public-office", instruction: "", selected_file_refs: [csvFile.file_ref] };
+  let currentBody = { workspace_id: "forte-public-office", instruction: "" };
   let currentSnapshot = snapshot(currentBody, "queued");
   let controlSequence = 2;
   const starts: (typeof currentBody & { idempotency_key: string })[] = [];
@@ -317,19 +319,16 @@ async function mockHarness(page: Page, options: { failFirstStart?: boolean; disc
   return { starts, controls, streams, get startCalls() { return startCalls; }, get streamCalls() { return streamCalls; } };
 }
 
-async function selectFile(page: Page, folder: string, file: string) {
-  const folderButton = page.getByRole("button", { name: new RegExp(folder) }).first();
-  if (await folderButton.getAttribute("aria-expanded") !== "true") await folderButton.click();
-  const row = page.locator(".dataset-files > div").filter({ hasText: file });
-  if (!(await row.locator("input[type=checkbox]").isChecked())) await row.locator("label").click();
-  await row.getByRole("button", { name: new RegExp(file) }).click();
+async function openFile(page: Page, file: string) {
+  await page.locator(".file-manager-list").getByRole("listitem", { name: new RegExp(file) }).click();
 }
 
 test("shows one complete folder workspace instead of registered scenarios", async ({ page }) => {
   await mockHarness(page); await page.goto("/");
   await expect(page.getByRole("heading", { name: "办公资料库" })).toBeVisible();
-  await expect(page.locator(".workspace-facts")).toContainText("15 个业务目录");
+  await expect(page.locator(".workspace-facts")).toContainText("96 份文件统一检索");
   await expect(page.locator(".workspace-facts")).toContainText("96 份可安全预览");
+  await expect(page.locator(".file-manager-list").getByRole("listitem")).toHaveCount(96);
   await expect(page.getByText("星海科技")).toBeVisible();
   const body = await page.locator("body").innerText();
   expect(body).not.toMatch(/注册场景|Demo\s*[123]|scenario_id|task_instruction|sha256/i);
@@ -338,20 +337,18 @@ test("shows one complete folder workspace instead of registered scenarios", asyn
 test("previews CSV, PDF, DOCX and TXT with security facts", async ({ page }) => {
   await mockHarness(page); await page.goto("/");
   await expect(page.getByText("星海科技")).toBeVisible();
-  await selectFile(page, "法务", pdfFile.display_label);
+  await openFile(page, pdfFile.display_label);
   await expect(page.getByText("授权范围：仅限本项目合同审阅。")).toBeVisible();
-  await selectFile(page, "人力招聘", docxFile.display_label);
+  await openFile(page, docxFile.display_label);
   await expect(page.getByText("岗位职责：负责商户拓展与经营分析。")).toBeVisible();
-  await selectFile(page, "可靠性工程", txtFile.display_label);
+  await openFile(page, txtFile.display_label);
   await expect(page.getByText("service healthy")).toBeVisible();
   await expect(page.getByText("安全预览", { exact: true })).toBeVisible();
   await expect(page.getByText(/没有执行宏、脚本或外部资源/)).toBeVisible();
 });
 
-test("runs an arbitrary task over files selected across folders", async ({ page }) => {
+test("runs an arbitrary task while the agent selects evidence from the whole workspace", async ({ page }) => {
   const state = await mockHarness(page); await page.goto("/");
-  await selectFile(page, "财务管理", csvFile.display_label);
-  await selectFile(page, "法务", pdfFile.display_label);
   const instruction = "比较财务往来与授权材料，列出需要人工复核的事实。";
   await page.getByRole("textbox", { name: "任务指令" }).fill(instruction);
   await page.getByRole("button", { name: "启动 Control Loop" }).click();
@@ -359,30 +356,30 @@ test("runs an arbitrary task over files selected across folders", async ({ page 
   expect(state.starts[0]).toMatchObject({
     workspace_id: "forte-public-office",
     instruction,
-    selected_file_refs: [csvFile.file_ref, pdfFile.file_ref],
-    loop: { max_rounds: 3, max_files_per_round: 4, max_model_calls: 6, deadline_seconds: 120 },
+    loop: { max_rounds: 3, max_files_per_round: 6, max_model_calls: 6, deadline_seconds: 120 },
   });
+  expect(state.starts[0]).not.toHaveProperty("selected_file_refs");
   await expect(page.getByText("规划模型")).toBeVisible();
   await expect(page.getByText("分析模型")).toBeVisible();
   await expect(page.locator(".loop-view").getByRole("heading", { name: instruction })).toBeVisible();
   await page.getByRole("button", { name: /第 1 轮/ }).click();
+  await expect(page.getByText("Agent 本轮自主选择")).toBeVisible();
+  await expect(page.getByText("文件名与摘要直接涉及当前目标，先读取这些最小证据。")).toBeVisible();
   await expect(page.getByText("证据缺口")).toBeVisible();
   await expect(page.locator(".loop-round-detail > footer strong")).toHaveText("继续下一轮");
-  await page.getByRole("button", { name: /任务简报/ }).click();
+  await page.getByRole("button", { name: /发现与建议/ }).click();
   await expect(page.getByRole("heading", { name: /完成 2 轮/ })).toBeVisible();
   expect(await page.locator("body").innerText()).not.toContain("forte-");
 });
 
 test("pauses, steers and resumes the same Agent Control Loop from server receipts", async ({ page }) => {
   const state = await mockHarness(page, { interactiveLoop: true }); await page.goto("/");
-  await selectFile(page, "财务管理", csvFile.display_label);
-  await selectFile(page, "法务", pdfFile.display_label);
-  await page.getByRole("textbox", { name: "任务指令" }).fill("核对所选资料，并在证据不足时继续下一轮。");
+  await page.getByRole("textbox", { name: "任务指令" }).fill("研究整个资料库，并在证据不足时继续下一轮。");
   await page.getByRole("button", { name: "启动 Control Loop" }).click();
   await expect(page.locator(".loop-view")).toContainText("第 1 轮");
   await expect(page.getByRole("button", { name: "当前 Loop 运行中" })).toBeDisabled();
   await expect(page.getByRole("textbox", { name: "任务指令" })).toBeDisabled();
-  await expect(page.locator(".dataset-files input[type=checkbox]:checked").first()).toBeDisabled();
+  await expect(page.getByText(/Agent 正在整个资料库中自主检索/)).toBeVisible();
 
   await page.getByLabel("调整下一轮方向").fill("下一轮优先核对授权范围");
   await page.locator(".loop-controls form").getByRole("button", { name: "记录" }).click();
@@ -401,19 +398,30 @@ test("pauses, steers and resumes the same Agent Control Loop from server receipt
 
 test("opens a cited source file from an analysis finding", async ({ page }) => {
   await mockHarness(page); await page.goto("/");
-  await selectFile(page, "财务管理", csvFile.display_label);
   await page.getByRole("textbox", { name: "任务指令" }).fill("核对余额并引用来源文件。");
   await page.getByRole("button", { name: "启动 Control Loop" }).click();
-  await page.getByRole("button", { name: /任务简报/ }).click();
+  await page.getByRole("button", { name: /发现与建议/ }).click();
   await page.getByRole("button", { name: csvFile.display_label }).last().click();
   await expect(page.getByText("星海科技")).toBeVisible();
-  await expect(page.getByRole("button", { name: "文件预览" })).toHaveClass(/is-active/);
+  await expect(page.getByRole("button", { name: "预览" })).toHaveClass(/is-active/);
+});
+
+test("starts a new whole-workspace loop only after the user confirms an agent proposal", async ({ page }) => {
+  const state = await mockHarness(page); await page.goto("/");
+  await page.getByRole("textbox", { name: "任务指令" }).fill("研究整个资料库并提出下一步。");
+  await page.getByRole("button", { name: "启动 Control Loop" }).click();
+  await page.getByRole("button", { name: /发现与建议/ }).click();
+  const proposal = "继续核对授权范围与财务往来之间是否存在执行约束，并形成待办清单。";
+  await expect(page.getByText(proposal)).toBeVisible();
+  await page.getByRole("button", { name: "确认并启动" }).click();
+  await expect.poll(() => state.starts.length).toBe(2);
+  expect(state.starts[1].instruction).toBe(proposal);
+  expect(state.starts[1]).not.toHaveProperty("selected_file_refs");
 });
 
 test("reuses the same command key when a start response is unknown", async ({ page }) => {
   const state = await mockHarness(page, { failFirstStart: true }); await page.goto("/");
-  await selectFile(page, "财务管理", csvFile.display_label);
-  await page.getByRole("textbox", { name: "任务指令" }).fill("核对所选文件中的余额变化。");
+  await page.getByRole("textbox", { name: "任务指令" }).fill("核对资料库中的余额变化。");
   await page.getByRole("button", { name: "启动 Control Loop" }).click();
   await expect(page.getByLabel("工作现场").getByText("任务启动结果未知")).toBeVisible();
   await page.getByRole("button", { name: "启动 Control Loop" }).click();
@@ -423,8 +431,7 @@ test("reuses the same command key when a start response is unknown", async ({ pa
 
 test("reconnects the event stream from the last observed sequence", async ({ page }) => {
   const state = await mockHarness(page, { disconnect: true }); await page.goto("/");
-  await selectFile(page, "财务管理", csvFile.display_label);
-  await page.getByRole("textbox", { name: "任务指令" }).fill("核对所选文件中的余额变化。");
+  await page.getByRole("textbox", { name: "任务指令" }).fill("核对资料库中的余额变化。");
   await page.getByRole("button", { name: "启动 Control Loop" }).click();
   await expect.poll(() => state.streamCalls).toBeGreaterThanOrEqual(2);
   expect(state.streams.some((url) => new URL(url).searchParams.get("after") === "1")).toBeTruthy();
@@ -435,14 +442,13 @@ test("explains an unavailable workspace and fails closed without a result", asyn
   await expect(page.getByRole("heading", { name: "办公资料库暂时无法读取" })).toBeVisible();
   await page.getByRole("button", { name: "重新读取" }).click();
   await expect(page.getByRole("heading", { name: "办公资料库" })).toBeVisible();
-  await selectFile(page, "财务管理", csvFile.display_label);
-  await page.getByRole("textbox", { name: "任务指令" }).fill("核对所选文件中的余额变化。");
+  await page.getByRole("textbox", { name: "任务指令" }).fill("核对资料库中的余额变化。");
   await page.getByRole("button", { name: "启动 Control Loop" }).click();
   await expect(page.getByText("本轮已安全停止")).toBeVisible();
   await expect(page.locator("body")).not.toContainText(/artifact\.write|run_workspace_write/);
 });
 
-test("mobile keeps folder browsing, task input, preview and trajectory usable", async ({ page }) => {
+test("mobile keeps file-manager browsing, task input, preview and trajectory usable", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 }); await mockHarness(page); await page.goto("/");
   await expect(page.getByRole("heading", { name: "办公资料库" })).toBeVisible();
   const metrics = await page.evaluate(() => ({ viewport: document.documentElement.clientWidth, scroll: document.documentElement.scrollWidth }));

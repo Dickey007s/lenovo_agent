@@ -94,10 +94,10 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, summary:focus
 .icon-action:hover { border-color: #79a1d5; color: var(--blue); }
 .icon-action svg { width: 18px; }
 
-.data-workbench-grid { display: grid; grid-template-columns: 264px minmax(0, 1fr); gap: 12px; align-items: start; padding-top: 12px; }
+.data-workbench-grid { display: grid; grid-template-columns: minmax(300px, 360px) minmax(0, 1fr); gap: 12px; align-items: start; padding-top: 12px; }
 .dataset-browser, .data-task-surface { min-width: 0; border: 1px solid var(--line); background: var(--paper); }
 .dataset-browser { position: sticky; top: 0; max-height: calc(100dvh - 68px); overflow: auto; }
-.dataset-browser > header { position: sticky; top: 0; z-index: 2; display: grid; gap: 12px; padding: 14px; border-bottom: 1px solid var(--line); background: var(--paper); }
+.dataset-browser > header { position: sticky; top: 0; z-index: 2; display: grid; gap: 10px; padding: 14px; border-bottom: 1px solid var(--line); background: var(--paper); }
 .dataset-browser > header > div { display: flex; align-items: center; gap: 9px; }
 .dataset-browser > header > div > svg { width: 20px; color: var(--blue); }
 .dataset-browser > header > div > div { display: grid; gap: 2px; }
@@ -107,6 +107,21 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, summary:focus
 .dataset-browser > header label:focus-within { border-color: var(--blue); background: var(--paper); }
 .dataset-browser > header label svg { width: 16px; color: var(--muted); }
 .dataset-browser > header input { min-width: 0; width: 100%; border: 0; outline: 0; background: transparent; }
+.file-type-filters { display: flex; flex-wrap: wrap; gap: 4px; }
+.file-type-filters button { min-height: 30px; padding: 0 8px; border: 1px solid var(--line); border-radius: 4px; color: var(--muted); background: #fff; font-size: 10px; font-weight: 700; }
+.file-type-filters button:hover, .file-type-filters button.is-active { border-color: #83a8d4; color: var(--blue); background: var(--blue-soft); }
+.file-manager-columns { display: grid; grid-template-columns: minmax(0, 1fr) 46px; gap: 8px; padding: 7px 12px; border-bottom: 1px solid var(--line); color: var(--faint); background: #f7f9fb; font-size: 10px; }
+.file-manager-columns span:last-child { text-align: right; }
+.file-manager-list { display: grid; padding: 4px 0 12px; }
+.file-manager-list > button { width: 100%; min-height: 56px; display: grid; grid-template-columns: 22px minmax(0, 1fr) 44px; align-items: center; gap: 8px; padding: 7px 12px; text-align: left; border: 0; border-bottom: 1px solid #edf0f3; background: #fff; }
+.file-manager-list > button:hover { background: #f6f8fa; }
+.file-manager-list > button.is-open { box-shadow: inset 3px 0 var(--blue); background: var(--blue-soft); }
+.file-manager-list > button > svg { width: 18px; color: #4779b4; }
+.file-manager-list > button > span { min-width: 0; display: grid; gap: 3px; }
+.file-manager-list strong, .file-manager-list small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.file-manager-list strong { font-size: 13px; }
+.file-manager-list small { color: var(--muted); font-size: 10px; }
+.file-manager-list > button > b { color: var(--faint); font-size: 9px; text-align: right; }
 .dataset-tree { padding: 6px 0 12px; }
 .dataset-tree > section { border-bottom: 1px solid #edf0f3; }
 .dataset-tree > section.is-active { box-shadow: inset 3px 0 var(--blue); }
@@ -151,6 +166,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, summary:focus
 .task-examples button:hover { border-color: #8baad0; color: var(--blue); }
 .task-composer footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 14px 13px; }
 .selection-summary { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 12px; }
+.selection-summary > svg { width: 17px; flex: 0 0 auto; color: var(--blue); }
 .selection-summary button { min-height: 32px; padding: 0 7px; border: 0; color: var(--blue); background: transparent; }
 .task-composer footer > button, .data-workbench-empty button { min-height: 44px; display: inline-flex; align-items: center; justify-content: center; gap: 7px; padding: 0 16px; border: 1px solid #185caf; border-radius: 5px; color: #fff; background: var(--blue); font-weight: 750; }
 .task-composer footer > button:hover:not(:disabled), .data-workbench-empty button:hover { background: #1557aa; }
@@ -256,6 +272,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, summary:focus
 .loop-phase-rail li.is-active { color: var(--blue); background: var(--blue-soft); }
 .loop-phase-rail li.is-complete { color: var(--green); background: #f5fbf8; }
 .loop-round-files { display: grid; gap: 6px; padding: 10px 0; }
+.loop-round-files > p { margin: 0; color: var(--ink-soft); font-size: 12px; line-height: 1.5; }
 .loop-round-files > div { display: flex; flex-wrap: wrap; gap: 5px; }
 .loop-round-files b { padding: 5px 7px; color: var(--ink-soft); background: #eef2f5; font-size: 11px; }
 .loop-plan { margin-top: 8px; border: 1px solid var(--line); }
@@ -300,6 +317,16 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, summary:focus
 .result-follow-ups { margin: 8px 16px 16px; border-left: 3px solid #c8872d; background: var(--amber-soft); }
 .result-follow-ups summary { min-height: 44px; display: flex; align-items: center; padding: 0 14px; font-weight: 700; cursor: pointer; }
 .result-follow-ups p { margin: 0; padding: 0 14px 9px; line-height: 1.5; }
+.result-proposals { margin: 10px 16px 16px; border: 1px solid #c9d9eb; background: #f8fbff; }
+.result-proposals > header { padding: 12px 13px 9px; border-bottom: 1px solid #dce6f0; }
+.result-proposals > header span { color: var(--blue); font-size: 11px; font-weight: 750; }
+.result-proposals > header h3 { margin: 3px 0 0; font-size: 14px; letter-spacing: 0; }
+.result-proposals > article { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 12px; padding: 12px 13px; border-bottom: 1px solid #e3e9f0; }
+.result-proposals > article:last-child { border-bottom: 0; }
+.result-proposals article b { color: var(--blue); font-size: 11px; }
+.result-proposals article p { margin: 4px 0 0; color: var(--ink-soft); line-height: 1.55; }
+.result-proposals article button { min-height: 40px; display: inline-flex; align-items: center; gap: 6px; padding: 0 11px; border: 1px solid #1a5fb7; border-radius: 5px; color: #fff; background: var(--blue); font-weight: 700; white-space: nowrap; }
+.result-proposals article button svg { width: 16px; }
 .result-view > footer { display: flex; align-items: flex-start; gap: 8px; padding: 12px 16px; color: var(--muted); background: #f7f9fa; font-size: 12px; line-height: 1.5; }
 .result-view > footer svg { width: 17px; flex: 0 0 auto; color: var(--green); }
 .workspace-boundary { margin-top: 10px; border: 1px solid var(--line); background: #fafbfc; }
@@ -372,7 +399,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, summary:focus
 @keyframes spin { to { transform: rotate(360deg); } }
 
 @media (max-width: 1050px) {
-  .data-workbench-grid { grid-template-columns: 230px minmax(0, 1fr); }
+  .data-workbench-grid { grid-template-columns: 280px minmax(0, 1fr); }
   .task-composer footer { align-items: flex-start; }
 }
 
@@ -388,8 +415,9 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, summary:focus
   .data-workbench-header h1 { font-size: 23px; }
   .data-workbench-status { justify-content: space-between; }
   .data-workbench-grid { grid-template-columns: 1fr; }
-  .dataset-browser { position: static; max-height: none; }
+  .dataset-browser { position: static; max-height: min(620px, 68dvh); overflow: auto; }
   .dataset-browser > header { position: static; }
+  .file-manager-columns { position: static; }
   .data-task-surface { grid-row: 1; padding: 10px; }
   .dataset-browser { grid-row: 2; }
   .task-composer footer { display: grid; }
@@ -403,7 +431,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, summary:focus
   .file-preview-empty, .workspace-placeholder { min-height: 360px; }
   .table-preview { max-height: 480px; }
   .trace-pane { height: auto; min-height: 320px; }
-  .dataset-group, .dataset-files > div, .dataset-files label, .dataset-files button, .workspace-boundary summary { min-height: 46px; }
+  .file-type-filters button, .file-manager-list > button, .workspace-boundary summary { min-height: 46px; }
   .result-findings footer button { min-height: 44px; }
   .loop-contract { display: grid; }
   .loop-budget { width: 100%; grid-template-columns: repeat(4, minmax(0, 1fr)); }
@@ -414,6 +442,8 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, summary:focus
   .loop-phase-rail li { min-height: 58px; display: grid; justify-items: center; gap: 3px; padding: 6px 3px; text-align: center; }
   .loop-phase-rail li b { font-size: 10px; }
   .loop-round-tabs > button { min-width: 138px; min-height: 60px; }
+  .result-proposals > article { grid-template-columns: 1fr; }
+  .result-proposals article button { min-height: 44px; justify-self: stretch; justify-content: center; }
 }
 
 @media (max-width: 430px) {

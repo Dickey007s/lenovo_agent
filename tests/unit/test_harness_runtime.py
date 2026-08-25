@@ -124,7 +124,7 @@ class FakeCatalog:
             ],
             "allowed_side_effects": ["none", "run_workspace_write"],
             "deliverables": ["带文件引用的初步分析结果"],
-            "data_boundary": "只读所选公开输入",
+            "data_boundary": "只读整个公开资料库；每轮由 Agent 自主检索相关文件",
             "human_gate_summary": "模型结果必须由用户复核",
             "files": self.files,
         }
@@ -184,15 +184,18 @@ class FakePlanner:
         self.files = files
         if self.invalid == "model":
             raise HarnessModelError("bad model output", called=True, elapsed_ms=12)
-        first_ref = "forte-0000000000000000" if self.invalid == "reference" else files[0]["file_ref"]
+        max_files = scenario.get("control_loop", {}).get("max_files_this_round", len(files))
+        selected = files[:max_files]
+        first_ref = "forte-0000000000000000" if self.invalid == "reference" else selected[0]["file_ref"]
         second_tool = "action.preview" if self.invalid == "external" else "artifact.write"
         return HarnessPlanCandidate(
             summary=f"围绕 {files[0]['file_ref']} 的动态计划 {self.calls}",
+            selection_reason="根据任务中的跨期余额关键词选择最相关的文件。",
             units=[
                 HarnessPlanCandidateUnit(
                     unit_id="u1",
                     title="读取资料",
-                    objective="读取所选文件",
+                    objective="读取 Agent 自主选择的相关文件",
                     input_file_refs=[first_ref],
                     tool="file.read",
                 ),
@@ -200,7 +203,7 @@ class FakePlanner:
                     unit_id="u2",
                     title="形成结果",
                     objective="形成可引用的初步分析",
-                    input_file_refs=[files[-1]["file_ref"]],
+                    input_file_refs=[selected[-1]["file_ref"]],
                     depends_on=["u1"],
                     tool=second_tool,
                     artifact_name="analysis-result" if second_tool == "artifact.write" else None,
@@ -243,7 +246,7 @@ class FakeAnalyst:
             findings=[
                 HarnessFinding(
                     title="发现一项待复核事实",
-                    detail="该结论来自所选公开文件。",
+                    detail="该结论来自 Agent 自主选择的公开文件。",
                     file_refs=[file_ref],
                 )
             ],
@@ -256,8 +259,7 @@ def start_request(**updates) -> HarnessRunStart:
     payload = {
         "workspace_id": "forte-public-office",
         "idempotency_key": "workspace-run-0001",
-        "instruction": "核对所选资料中的跨期余额变化",
-        "selected_file_refs": [REF_ONE, REF_TWO],
+        "instruction": "研究整个资料库中的跨期余额变化",
     }
     payload.update(updates)
     return HarnessRunStart(**payload)
@@ -273,7 +275,7 @@ async def wait_terminal(runtime: HarnessRuntime, owner: str, run_id: str):
 
 
 @pytest.mark.asyncio
-async def test_user_task_runs_over_selected_workspace_files() -> None:
+async def test_user_task_searches_the_whole_workspace_and_selects_evidence() -> None:
     planner = FakePlanner()
     analyst = FakeAnalyst()
     runtime = HarnessRuntime(FakeCatalog(), planner, analyst)
@@ -285,6 +287,9 @@ async def test_user_task_runs_over_selected_workspace_files() -> None:
     assert snapshot.instruction_source == "user"
     assert snapshot.status == "completed"
     assert snapshot.contract.goal == snapshot.instruction
+    assert snapshot.contract.scope_mode == "whole_workspace"
+    assert snapshot.contract.allowed_file_refs == [REF_ONE, REF_TWO]
+    assert "整个公开办公资料库" in (snapshot.selection_reason or "")
     assert planner.calls == 2
     assert planner.workspace and planner.workspace["control_loop"]["round_number"] == 2
     assert planner.files and all("path" not in item and "sha256" not in item for item in planner.files)
@@ -321,7 +326,6 @@ async def test_rejected_plan_is_repaired_once_within_the_same_budget() -> None:
         "alice",
         start_request(
             idempotency_key="repair-plan-0001",
-            selected_file_refs=[REF_ONE],
             loop={
                 "max_rounds": 1,
                 "max_files_per_round": 1,
@@ -352,15 +356,13 @@ async def test_rejected_plan_is_repaired_once_within_the_same_budget() -> None:
     )
 
 
-def test_start_requires_user_instruction_and_selected_files() -> None:
+def test_start_requires_only_a_user_instruction_and_rejects_client_file_scope() -> None:
     with pytest.raises(ValidationError):
         HarnessRunStart(idempotency_key="missing-inputs")
     with pytest.raises(ValidationError):
-        start_request(selected_file_refs=[])
-    with pytest.raises(ValidationError):
         start_request(instruction="  ")
     with pytest.raises(ValidationError):
-        start_request(selected_file_refs=[REF_ONE] * 2)
+        start_request(selected_file_refs=[REF_ONE])
 
 
 @pytest.mark.asyncio
@@ -389,20 +391,18 @@ async def test_invalid_result_citation_fails_closed() -> None:
 
 
 @pytest.mark.asyncio
-async def test_unknown_selected_file_fails_without_leaking_reference() -> None:
-    runtime = HarnessRuntime(FakeCatalog(), FakePlanner())
+async def test_start_freezes_the_complete_server_owned_workspace_scope() -> None:
+    runtime = HarnessRuntime(FakeCatalog(), FakePlanner(), FakeAnalyst())
     started = await runtime.start(
-        "alice",
-        start_request(
-            idempotency_key="unknown-file-0001",
-            selected_file_refs=["forte-0000000000000000"],
-        ),
+        "alice", start_request(idempotency_key="whole-workspace-0001")
     )
     snapshot = await wait_terminal(runtime, "alice", started.run.run_id)
-    public = runtime.public_snapshot(snapshot).model_dump(mode="json")
 
-    assert public["status"] == "failed"
-    assert "0000000000000000" not in json.dumps(public, ensure_ascii=False)
+    assert snapshot.contract.allowed_file_refs == [REF_ONE, REF_TWO]
+    assert [item["file_ref"] for item in snapshot.source_documents] == [
+        REF_ONE,
+        REF_TWO,
+    ]
 
 
 @pytest.mark.asyncio
@@ -721,3 +721,49 @@ def test_server_compiler_owns_artifact_write_effect() -> None:
             artifact_type="analysis",
         )
     ]
+
+
+def test_server_compiler_bounds_model_file_selection_and_repairs_dependencies() -> None:
+    third_ref = "forte-3333333333333333"
+    candidate = HarnessPlanCandidate(
+        summary="研究整个资料库",
+        selection_reason="模型按业务相关性依次选择三份资料。",
+        units=[
+            HarnessPlanCandidateUnit(
+                unit_id="read-one",
+                title="读取一",
+                objective="读取第一份资料",
+                input_file_refs=[REF_ONE],
+                tool="file.read",
+            ),
+            HarnessPlanCandidateUnit(
+                unit_id="read-two",
+                title="读取二",
+                objective="读取第二份资料",
+                input_file_refs=[REF_TWO],
+                tool="file.read",
+            ),
+            HarnessPlanCandidateUnit(
+                unit_id="read-three",
+                title="读取三",
+                objective="读取第三份资料",
+                input_file_refs=[third_ref],
+                tool="file.read",
+            ),
+            HarnessPlanCandidateUnit(
+                unit_id="write",
+                title="形成结果",
+                objective="形成本轮结果",
+                input_file_refs=[REF_ONE, REF_TWO, third_ref],
+                depends_on=["read-one", "read-two", "read-three"],
+                tool="artifact.write",
+            ),
+        ],
+    )
+
+    plan = HarnessRuntime._compile_plan(candidate, max_file_refs=2)
+
+    assert [unit.unit_id for unit in plan.units] == ["read-one", "read-two", "write"]
+    assert plan.units[-1].input_file_refs == [REF_ONE, REF_TWO]
+    assert plan.units[-1].depends_on == ["read-one", "read-two"]
+    assert "服务端按每轮最多 2 份文件" in plan.selection_reason
