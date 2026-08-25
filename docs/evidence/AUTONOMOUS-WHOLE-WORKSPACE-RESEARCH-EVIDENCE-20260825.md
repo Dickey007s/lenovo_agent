@@ -69,4 +69,4 @@
 
 - 实现提交：[`2b8e58c161df02d4f2c09bc2692db76d075f2ae2`](https://github.com/Dickey007s/lenovo_agent/commit/2b8e58c161df02d4f2c09bc2692db76d075f2ae2)
 - Pull Request：[#29](https://github.com/Dickey007s/lenovo_agent/pull/29)，开放、未合并
-- 文档提交：待本文件提交后回填
+- 首份文档提交：[`379b92d`](https://github.com/Dickey007s/lenovo_agent/commit/379b92d)
