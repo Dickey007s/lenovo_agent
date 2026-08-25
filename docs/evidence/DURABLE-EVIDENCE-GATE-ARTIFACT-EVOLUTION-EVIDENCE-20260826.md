@@ -79,5 +79,5 @@ Store 恢复后满足：`status=paused`、未完成轮次被移除、Planner 调
 ## 7. 绑定
 
 - 工作分支：`codex/durable-agent-control-loop-20260825`
-- 实现提交：待本 Evidence 封口提交后补充
-- Pull Request：待创建
+- 实现提交：`edd393a`（`feat: make the agent control loop recoverable and human-gated`）
+- Pull Request：[#30 Agent Control Loop：可恢复证据门与成果演进](https://github.com/Dickey007s/lenovo_agent/pull/30)
