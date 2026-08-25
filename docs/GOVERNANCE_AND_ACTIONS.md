@@ -5,7 +5,7 @@
 The current product governs a read-only analysis result:
 
 ```text
-server-owned Scenario + selected source set
+server-owned whole workspace + user-selected source set
   -> model plan candidate
   -> server-owned policy compilation
   -> deterministic plan validation
@@ -22,7 +22,7 @@ The work policy is generic: `task_topology`, `orchestration` and `control_requir
 
 The server owns:
 
-- Scenario identity, manifest integrity, safe preview and stable `file_ref`;
+- workspace identity, manifest integrity, safe preview and stable `file_ref`;
 - frozen instruction, instruction source and selected file set;
 - allowed tools and compiled effect/gate declarations;
 - Run identity, Owner, version, status and sequence;
@@ -59,10 +59,10 @@ The Analyst is called directly with Catalog previews. This is model inference ov
 
 The current UI must show:
 
-- selected file count and read-only boundary before start;
+- browsable folder/file metadata, selected file count and read-only boundary before start;
 - separate planning and analysis receipts;
 - named server events, not raw reasoning;
-- result citations resolved to visible file labels;
+- result citations resolved to visible file labels and able to reopen source previews;
 - follow-ups under “仍需你判断”;
 - a final statement that the result needs review and no external action occurred.
 
@@ -89,4 +89,4 @@ Future foreground impact should retain the four classes 会改变、会重新核
 
 ## 7. Evidence boundary
 
-[DR-0018 Evidence](evidence/FORTE-DATA-WORKBENCH-TRACE-EVIDENCE-20260824.md) binds two observed Finance-018 read-only Runs, focused automation, three provenance-scoped screenshots, a deterministic negative regression and implementation baseline `fffa36a...`. It does not prove semantic correctness, user value, production identity/durability or any external action.
+[DR-0022 Evidence](evidence/FORTE-FOLDER-WORKSPACE-EVIDENCE-20260825.md) governs the current whole-folder product. Its automation, live runs and screenshots are bound; it remains short of `Limited Verified` only until the implementation commit and delivery PR are recorded. Historical [DR-0018 Evidence](evidence/FORTE-DATA-WORKBENCH-TRACE-EVIDENCE-20260824.md) preserves two observed Finance Runs and the deterministic negative regression. Neither proves semantic correctness, user value, production identity/durability or any external action.

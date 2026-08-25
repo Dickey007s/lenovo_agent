@@ -4,7 +4,7 @@
 
 | Field | Value |
 | --- | --- |
-| Status | `Limited Verified` for public-byte acquisition and integrity inventory; runtime expansion remains `Ready` |
+| Status | `Limited Verified` for public-byte acquisition and integrity inventory; runtime surface is superseded by [`DR-0022`](DR-0022-workspace-folder-and-arbitrary-task-contract.md) |
 | Date | 2026-08-25 |
 | Trigger | `USER-FEEDBACK-20260825-BROADER-FORTE-13` |
 | Source | `FORTE-PUBLIC-SUITE-INVENTORY-20260825` |
@@ -27,8 +27,9 @@ and product capability:
 
 1. `public-suite-manifest.json` records all 15 public task records and 96 input
    files.
-2. The current `manifest.json` continues to register only the three scenarios
-   whose safe projection is already implemented.
+2. At implementation commit `e759736`, `manifest.json` continued to register
+   only three scenarios. That historical staging boundary was later replaced
+   by the whole-folder public workspace in `DR-0022`.
 3. `solution/` and `skills/` are never imported.
 4. `ba-079` and `Misc-AT-003` remain task-only, external-dependency tests. They
    cannot appear as runnable local-file scenarios.
@@ -53,8 +54,9 @@ represents a production enterprise workspace.
 
 ## Frontend impact
 
-This import does not silently add new tabs or claim new runnable scenarios.
-When staged tasks are later surfaced, the browser must distinguish:
+This import did not silently add new tabs or claim new runnable scenarios at
+its implementation commit. `DR-0022` now surfaces the imported local bytes as
+one browsable read-only workspace and distinguishes:
 
 - available now;
 - downloaded but adapter/validator pending;
@@ -73,7 +75,9 @@ not start a model call until the server says the scenario is runnable.
 - Complete public inventory: 15 task records, 96 inputs, 111 files and
   `1,780,445` bytes.
 - Local-input tasks: 13; task-only external-dependency tasks: 2.
-- Current product allowlist: three tasks and 11 original files, unchanged.
+- Historical product allowlist at `e759736`: three tasks and 11 original files.
+- Current product projection under `DR-0022`: 15 folders and 96 input files,
+  with task records excluded from Agent context and ordinary UI.
 - The sync script validates the upstream Git revision, permits only known
   public file types, excludes solution/skills and generates SHA-256 records.
 - Integrity tests compare every imported byte with the full inventory and the
@@ -82,14 +86,14 @@ not start a model call until the server says the scenario is runnable.
 ## Verification and boundary
 
 The import and integrity contract are `Limited Verified` by the evidence file.
-No new parser, file preview, model task, Worker, Tool Gateway, Artifact write,
-Connector or external effect is claimed here. The 15-case test document is
-`Ready`, not execution evidence. Access to the remaining unpublished 165 tasks
-is not claimed.
+This decision alone does not claim parsers or execution. The later `DR-0022`
+Evidence is required for the current preview and arbitrary-task claims. Neither
+decision claims access to the remaining unpublished 165 tasks, task completion
+quality, Worker/Tool execution, Connector access or external effects.
 
 ## Next implementation gate
 
-The first runtime expansion should add CSV/PDF/DOCX/TXT adapters and six
-staged cases: administration, HR, legal, sales, SRE and UI/UX. It must include
-safe preview, citations, deterministic validation, privacy projection and a
-separate run workspace before updating the active manifest.
+CSV/PDF/DOCX/TXT bounded preview, source citations and privacy projection move
+to `DR-0022`. The next gate is task-specific deterministic validation and a
+separate writable Run workspace; browsing bytes and producing a read-only model
+answer do not satisfy those later gates.

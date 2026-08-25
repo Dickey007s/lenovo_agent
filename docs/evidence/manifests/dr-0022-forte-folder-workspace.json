@@ -1,0 +1,148 @@
+{
+  "schema_version": "1.0",
+  "captured_at": "2026-08-25T12:05:15+08:00",
+  "implementation_state": "working-tree-before-delivery-commit",
+  "dataset": {
+    "name": "AGI-Eval-Official/FORTE public demo suite",
+    "source_commit": "345c1ec1487139db9dd319787fa9405ba85d1869",
+    "manifest": "demo-enterprise-data/forte/public-suite-manifest.json",
+    "manifest_bytes": 35927,
+    "manifest_sha256": "bc2bc5ae1c58d5cc9c5983c972326ce4dbb09855fc724be4e1530d66011e2d60",
+    "folder_count": 15,
+    "input_file_count": 96,
+    "preview_distribution": {
+      "text_or_code": 70,
+      "document": 11,
+      "table": 9,
+      "pdf": 6
+    }
+  },
+  "runtime": {
+    "web_url": "http://localhost:3000",
+    "api_url": "http://localhost:8010",
+    "health_status": "ok",
+    "model": "deepseek-v4-pro",
+    "checkpoint": "memory",
+    "task_store": "memory"
+  },
+  "api_live_run": {
+    "run_id": "harness:d214c0d00d654cb199499668aec2e17c",
+    "status": "completed",
+    "version": 9,
+    "last_event_sequence": 8,
+    "selected_file_count": 2,
+    "plan_unit_count": 4,
+    "planning": {
+      "called": true,
+      "model": "deepseek-v4-pro",
+      "elapsed_ms": 10968,
+      "output_used": true
+    },
+    "analysis": {
+      "called": true,
+      "model": "deepseek-v4-pro",
+      "elapsed_ms": 14869,
+      "output_used": true
+    },
+    "finding_count": 6,
+    "review_required": true,
+    "external_action": false,
+    "semantic_quality_evaluated": false
+  },
+  "browser_live_run": {
+    "selected_file_count": 2,
+    "planning_model": "deepseek-v4-pro",
+    "planning_elapsed_ms": 8700,
+    "planning_output_used": true,
+    "analysis_model": "deepseek-v4-pro",
+    "analysis_elapsed_ms": 16700,
+    "analysis_output_used": true,
+    "last_event_sequence": 8,
+    "finding_count": 6,
+    "review_required": true,
+    "viewport_width": 1440,
+    "document_scroll_width": 1440,
+    "console_errors": []
+  },
+  "mobile_check": {
+    "viewport": "390x844",
+    "physical_capture": "390x2884",
+    "document_scroll_width": 390,
+    "document_scroll_height": 2884,
+    "page_level_horizontal_overflow": false
+  },
+  "screenshots": [
+    {
+      "file": "docs/evidence/screenshots/dr-0022-folder-workspace-desktop.png",
+      "purpose": "whole folder workspace and CSV preview",
+      "width": 1440,
+      "height": 900,
+      "bytes": 129587,
+      "sha256": "3f450026d0b7d8d410e2d0d69d777f7b8dd0d229f3d2a5f24a81bc31f248674a"
+    },
+    {
+      "file": "docs/evidence/screenshots/dr-0022-csv-preview-desktop.png",
+      "purpose": "CSV table preview duplicate capture retained for format inventory",
+      "width": 1440,
+      "height": 900,
+      "bytes": 129587,
+      "sha256": "3f450026d0b7d8d410e2d0d69d777f7b8dd0d229f3d2a5f24a81bc31f248674a"
+    },
+    {
+      "file": "docs/evidence/screenshots/dr-0022-pdf-preview-desktop.png",
+      "purpose": "PDF text-layer preview",
+      "width": 1440,
+      "height": 900,
+      "bytes": 127062,
+      "sha256": "deda36e7fda02b3aff9c6f86d55204c8269622e9c99e26a2d783f910fe3557ba"
+    },
+    {
+      "file": "docs/evidence/screenshots/dr-0022-docx-preview-desktop.png",
+      "purpose": "DOCX bounded text preview",
+      "width": 1440,
+      "height": 900,
+      "bytes": 146261,
+      "sha256": "1a806a2d1b6fdd8a120bf1b061a027768449aeef70bdeaf4ed31530d8975ce6f"
+    },
+    {
+      "file": "docs/evidence/screenshots/dr-0022-txt-preview-desktop.png",
+      "purpose": "TXT bounded text preview",
+      "width": 1440,
+      "height": 900,
+      "bytes": 103429,
+      "sha256": "68892de100271b3afad49d8f32352cb3d48fbedf5d557ab90f606ee2c8127911"
+    },
+    {
+      "file": "docs/evidence/screenshots/dr-0022-task-scope-desktop.png",
+      "purpose": "user-authored task and explicit two-file scope",
+      "width": 1440,
+      "height": 900,
+      "bytes": 113684,
+      "sha256": "b004783c797ae26447bef409403dbadaa239f5f5744da652ef8e29f3e3016224"
+    },
+    {
+      "file": "docs/evidence/screenshots/dr-0022-running-desktop.png",
+      "purpose": "real planning trajectory before completion",
+      "width": 1440,
+      "height": 900,
+      "bytes": 120692,
+      "sha256": "6fa626ffa1655b3fdc955673502ba4c0276a2d659b874b4373f6bd06647df91f"
+    },
+    {
+      "file": "docs/evidence/screenshots/dr-0022-result-desktop.png",
+      "purpose": "review-required result, citations and two model receipts",
+      "width": 1440,
+      "height": 900,
+      "bytes": 251551,
+      "sha256": "464de1d8b05bb1c5a1aab995174a3d430b560d9e02468eb501f58de422b87aa1"
+    },
+    {
+      "file": "docs/evidence/screenshots/dr-0022-folder-workspace-mobile.png",
+      "purpose": "mobile folder, task, preview and trace access",
+      "width": 390,
+      "height": 2884,
+      "bytes": 153808,
+      "sha256": "3d8ae98c514809c1b95a53ad3969939e293a3efd2f61da0eb9528ec3a9626cf6"
+    }
+  ]
+}

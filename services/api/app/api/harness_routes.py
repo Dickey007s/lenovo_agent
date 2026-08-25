@@ -10,6 +10,7 @@ from starlette.responses import StreamingResponse
 
 from services.api.app.application.harness_runtime import (
     HarnessConflictError,
+    HarnessError,
     HarnessNotFoundError,
     HarnessRunStart,
     HarnessRuntime,
@@ -43,40 +44,26 @@ async def health(request: Request) -> dict[str, str]:
     }
 
 
-@router.get("/scenarios")
-async def list_harness_scenarios(
+@router.get("/workspace")
+async def get_harness_workspace(
     runtime: Annotated[HarnessRuntime, Depends(get_harness_runtime)],
 ):
     try:
-        return {"scenarios": runtime.list_scenarios()}
-    except BenchmarkScenarioError as exc:
-        raise HTTPException(status_code=503, detail="场景目录完整性校验失败") from exc
+        return runtime.get_workspace()
+    except (BenchmarkScenarioError, HarnessError) as exc:
+        raise HTTPException(status_code=503, detail="办公资料库完整性校验失败") from exc
 
 
-@router.get("/scenarios/{scenario_id}")
-async def get_harness_scenario(
-    scenario_id: str,
-    runtime: Annotated[HarnessRuntime, Depends(get_harness_runtime)],
-):
-    try:
-        return runtime.get_scenario(scenario_id)
-    except HarnessNotFoundError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
-    except BenchmarkScenarioError as exc:
-        raise HTTPException(status_code=503, detail="场景目录完整性校验失败") from exc
-
-
-@router.get("/scenarios/{scenario_id}/files/{file_ref}")
+@router.get("/workspace/files/{file_ref}")
 async def get_harness_file_preview(
-    scenario_id: str,
     file_ref: str,
     runtime: Annotated[HarnessRuntime, Depends(get_harness_runtime)],
 ):
     try:
-        return runtime.get_file_preview(scenario_id, file_ref)
+        return runtime.get_file_preview(file_ref)
     except HarnessNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
-    except BenchmarkScenarioError as exc:
+    except (BenchmarkScenarioError, HarnessError) as exc:
         raise HTTPException(status_code=503, detail="公开文件完整性校验失败") from exc
 
 
@@ -93,8 +80,8 @@ async def start_harness_run(
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except HarnessConflictError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
-    except BenchmarkScenarioError as exc:
-        raise HTTPException(status_code=503, detail="场景目录完整性校验失败") from exc
+    except (BenchmarkScenarioError, HarnessError) as exc:
+        raise HTTPException(status_code=503, detail="办公资料库完整性校验失败") from exc
 
 
 @router.get("/runs/{run_id}")

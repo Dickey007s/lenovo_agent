@@ -1,148 +1,133 @@
-# Office Agent V0.2 Architecture
+# Office Agent V0.2 architecture
 
-## 1. Current boundary
+## 1. Current vertical slice
 
 ```text
-Browser: FORTE data workbench + trace
-  -> seven-path FastAPI surface
-  -> BenchmarkScenarioCatalog
-       -> pinned manifest/upstream bytes/license
-       -> safe Scenario + stable file_ref
-       -> bounded XLSX/Markdown preview
-       -> private Planner policy context
+Browser: whole-folder office workbench + trace
+  -> GET /v1/harness/workspace
+  -> GET /v1/harness/workspace/files/{file_ref}
+  -> POST user instruction + selected refs
+  -> named SSE + Snapshot reconciliation
+
+FastAPI Harness
+  -> BenchmarkWorkspaceCatalog
   -> HarnessRuntime
-       -> freeze user instruction + selected file_ref set
-       -> deepseek-v4-pro Planner
-       -> deterministic plan validation
-       -> deepseek-v4-pro Analyst over safe previews
-       -> deterministic citation-scope validation
-       -> memory Snapshot + ordered SSE + idempotency
-  -> completed + review_required=true
+       -> OpenAI-compatible Planner
+       -> server Policy Compiler + Plan Validator
+       -> OpenAI-compatible Analyst
+       -> Result/Citation Validator
+       -> in-memory Run/Event/Idempotency store
 ```
 
-The current Runtime performs a bounded read-only analysis. It does not invoke Scheduler/Worker, Tool Gateway, ArtifactVersion/Commit, Approval/Permit, Connector or an external action.
+Only `health_router` and the Harness router are mounted. Legacy conversation,
+Task, Demo2, Run/Gate, quote and Customer A runtimes are not initialized by the
+current product app.
 
-## 2. Source and preview boundary
+## 2. Data trust boundary
 
-The source tree has two separate contracts at FORTE commit `345c1ec1487139db9dd319787fa9405ba85d1869`:
+The pinned source is FORTE commit
+`345c1ec1487139db9dd319787fa9405ba85d1869`. The active
+`public-suite-manifest.json` declares 15 task records and 96 input files.
 
-- `public-suite-manifest.json` inventories all public repository demos: 15 task records, 96 inputs, 111 files and `1780445` bytes;
-- the current Catalog `manifest.json` allowlists 11 source files and `115352` bytes for three runnable product scenarios.
+`BenchmarkWorkspaceCatalog`:
 
-Catalog loading uses only the current allowlist and checks declared path, root boundary, symlink, size, SHA-256, type and parser constraints. Downloaded but unregistered tasks cannot be selected or sent to the model. Task/input files retain upstream bytes and are binary-marked against line-ending normalization.
+1. validates manifest schema/totals and every declared task/input byte;
+2. rejects duplicate/undeclared paths, path escape, symlink, size/hash drift,
+   archive explosion and unsupported active content;
+3. exposes only input files as business-labeled stable refs;
+4. produces bounded table/document/PDF/text previews;
+5. never executes macros/scripts or loads external resources;
+6. gives the Analyst bounded text only for the refs selected in this Run.
 
-Raw `task.md` is provenance. It is not previewable and does not enter the public API or Analyst. The Catalog publishes:
+Public projection excludes task instructions, rubric, solution, grading,
+filesystem path and SHA-256. `task.md` is provenance, not hidden context.
 
-- Scenario business fields and safe display metadata;
-- stable opaque `file_ref` values derived from Scenario ID plus the allowlisted relative path;
-- the first visible XLSX sheet, bounded to 30 columns and 120 data rows; or
-- allowlisted input Markdown bounded to 30,000 characters.
+## 3. Workspace and task contract
 
-Filesystem path, full hash, task instruction, rubric, solution, grading metadata, Prompt, chain of thought and raw model response remain outside ordinary UI.
+The public workspace identity is fixed as `forte-public-office`. The browser may
+search, expand folders, preview files and draft selection/instruction. A start
+request must contain:
 
-## 3. User Task Contract
+- workspace id;
+- Owner-scoped idempotency key;
+- expected version 1;
+- a 3-2,000 character user instruction;
+- 1-20 unique stable `file_ref` values.
 
-The start command freezes:
+The server revalidates all refs and freezes selected source documents in the
+Run Snapshot. The model cannot expand the source set. Unknown, duplicate or
+out-of-workspace refs fail closed.
 
-- Scenario ID;
-- user instruction, or a Scenario default;
-- one or more selected `file_ref` values;
-- Owner, expected version and idempotency key.
+## 4. Planning and analysis ownership
 
-The server rejects duplicate/invalid refs and refs outside the current Scenario. `instruction_source=user|dataset_task` remains visible in the Snapshot. An unknown response can be retried with the same command key; changing content under the key returns 409.
+The Planner returns strict JSON business intent. It does not own file identity,
+source allowlist, side-effect scope, human gate or execution fact.
 
-The Scenario policy is expressed as a generic `work_profile`, never a Demo identity:
+The server compiles the candidate into a `HarnessPlan`:
 
-```json
-{
-  "task_topology": "single_task | multi_task",
-  "orchestration": "bounded_loop | adaptive_swarm",
-  "control_requirements": ["evidence_gate", "human_gate", "risk_gate"],
-  "current_runtime_scope": "read_only_analysis"
-}
-```
+- read/inspect/verify intent maps to no side effect;
+- result intent may map to `run_workspace_write`, which means a logical current
+  Run result only and is not an Artifact mutation;
+- external-action preview requires the server-owned human-gate policy;
+- units, dependencies, cycles, selected refs, tools, artifacts and gates are
+  validated deterministically.
 
-The first three fields describe the intended reusable capability composition. `current_runtime_scope` prevents that target policy from being mistaken for current execution. The pinned FORTE Catalog currently supplies the profile; dynamic Admission from arbitrary user work remains `Draft`.
+The Analyst receives the user instruction, validated public plan and safe
+selected-file content. It returns 1-10 findings with at least one selected ref
+per finding and `review_required=true`. Citation membership is checked; semantic
+truth, completeness and arithmetic are not.
 
-## 4. Model and validation boundaries
+## 5. State and streaming
 
-### Planning call
-
-The Planner receives the user goal, safe file metadata and server policy. It returns a restricted candidate with business intent, dependencies, selected refs and allowlisted tool intent; it does not own internal `side_effect` values.
-
-The server compiles that candidate into a strict `HarnessPlan`: workspace-result intent receives the server-owned write scope, action-preview intent receives the external-action scope and required human gate, and read/inspect/verify intent receives no side effect. The validator then checks unit IDs, dependencies/cycles, selected refs, allowlisted tools, compiled effects, logical Artifact names and gates. Compilation is policy normalization, not tool execution or Artifact mutation.
-
-### Analysis call
-
-The Analyst receives the instruction, validated plan and server-produced safe previews. It returns a strict `HarnessTaskResult` with 1-10 findings, optional follow-ups and `review_required=true`.
-
-The server validates that every finding cites only the frozen selected refs. It does not validate semantic correctness, accounting interpretation, arithmetic, exhaustive coverage or whether a cited source proves the precise sentence. A deterministic Finance regression produces 23 / `1,845,444.71` where the observed model response produced 20 / `2,202,000`; this negative result is evidence that citation-scope validation cannot be treated as answer validation.
-
-Both requests use `deepseek-v4-pro`, temperature 0, strict JSON and `thinking.type=disabled`. Public receipts separately expose `called/model/elapsed_ms/output_used`; no chain of thought is projected.
-
-## 5. State and events
-
-The production path is:
+The Snapshot is authoritative. Named events are a readable ordered projection:
 
 ```text
-queued
-  -> indexing
-  -> planning
-  -> validating
-  -> analyzing
-  -> verifying
-  -> completed
+workspace_index -> planning_started -> planning_completed -> plan_validation
+-> analysis_started -> analysis_completed -> result_validation -> task_completed
 ```
 
-The success trace has eight events:
+Each event increments sequence and state transition increments Snapshot version.
+The client applies Snapshot monotonically, reconnects from `after=N`, then uses
+final GET reconciliation. A transport animation or configured model name is not
+evidence that a model call occurred; only `HarnessModelReceipt.called` is.
 
-```text
-workspace_index
-planning_started
-planning_completed
-plan_validation
-analysis_started
-analysis_completed
-result_validation
-task_completed
-```
+All Run state is one-process memory. API restart loses Run/event/idempotency
+state. `X-User-Id` is not signed authentication.
 
-Each event increments Snapshot version and sequence; a new successful Run starts at v1/seq 0 and ends v9/seq 8. `failed` is terminal. `ready_to_execute` remains a compatibility state when no Analyst adapter exists, but is not the current production success path.
+## 6. Frontend architecture
 
-GET and SSE enforce Owner scope; missing and wrong-owner Runs both return 404. Terminal SSE closes and the client performs a final GET. Nonterminal interruptions reconcile Snapshot and resume with `after=N`.
+The root page keeps three independently meaningful regions:
 
-Runs, results, events, in-flight calls and idempotency records live in one API process memory. Restart loses them.
+- folder rail: searchable folder/file inventory, metadata and explicit scope;
+- work area: task composer, safe preview, validated plan and cited result;
+- activity pane: ordered events and two model receipts.
 
-## 6. Frontend projection
+The UI shows business facts and recovery actions, not internal protocol. A
+citation is an interaction: it selects and opens the referenced file preview.
+Preview security and result-review boundaries remain available without turning
+the primary page into an architecture document.
 
-The root page imports one workbench:
+## 7. Eight module maturity
 
-- dataset browser with search and explicit file selection;
-- real bounded file preview;
-- user-owned task composer;
-- validated plan and cited result views;
-- separate planning/analysis receipts;
-- eight-event trajectory and fail-closed recovery.
+| Module | Current implementation | Missing target work |
+| --- | --- | --- |
+| Workspace Catalog & Safe Preview | full public folder, 96 refs, bounded previews and integrity checks | enterprise Connector/data policy |
+| Task Contract | user instruction, selected refs, Owner/key/version | durable task contract and production identity |
+| Planner | strict model candidate and call receipt | quality evaluation and iterative steering |
+| Admission/Policy/Validator | server compilation and deterministic graph/source checks | dynamic topology admission |
+| Scheduler & Worker Manager | not connected | bounded loop, adaptive workers, leases and recovery |
+| Tool Gateway | not connected | governed real/simulated tools and receipts |
+| Artifact Workspace & Verifier | read-only result and citation membership | immutable versions, semantic/numeric validators and Commit |
+| Checkpoint/Event/Governance | ordered memory events and idempotent start | durable checkpoint, replay, policy/approval/Permit integration |
 
-The plan's tool fields are readable intent declarations. The analysis is performed directly by the Harness over Catalog previews; no Tool Gateway or Artifact mutation is implied. `completed` is projected as “初步结果已形成”: a response is ready for review, not that its conclusion is correct or an external business process completed.
+## 8. Security and claim boundary
 
-## 7. Eight canonical modules
+The current slice has no file write, shell, Web, SQL, scheduler, email, CRM or
+other external Connector. Plan tool labels are intent declarations; no Tool
+Gateway is invoked. `completed` means a reviewable response exists, not that an
+office task, artifact or external process completed.
 
-| Module | Current state | Current evidence | Next boundary |
-| --- | --- | --- | --- |
-| 1. Scenario Pack & Workspace Catalog | Limited Verified | manifest, safe Scenario, stable refs, bounded preview | enterprise source adapters and data policy |
-| 2. Task Contract | Limited Verified | user instruction, selected refs, Owner/version/idempotency | editable durable contracts, budget/deadline |
-| 3. Planner | Limited Verified | separate Planner and Analyst receipts | quality evaluation, fallback/model policy |
-| 4. Admission & Plan Validator | Limited Verified | plan checks plus result citation-scope check | deterministic spreadsheet operator, claim verifier, budgets and replanning admission |
-| 5. Scheduler & Worker Manager | Draft | no current execution scheduler | lease, retry, cancellation and recovery |
-| 6. Tool Gateway | Draft | retained package is not invoked | current capability registry and receipts |
-| 7. Artifact Workspace & Verifier | Partial | memory result plus selected-ref validation | immutable Artifact versions, provenance, merge and Commit |
-| 8. Checkpoint, Event & Governance Control | Partial | memory Snapshot, eight ordered events, Owner/idempotency | durable store, production identity and action governance |
-
-Demo 1/2/3 do not add modules. They exercise different compositions of the same modules: Demo 1 uses a single-task bounded loop and pauses on evidence/human gates; Demo 2 uses multi-task adaptive scheduling and shared-artifact convergence; Demo 3 applies the risk gate across either topology before a side effect.
-
-## 8. Lifecycle
-
-[DR-0016](decisions/DR-0016-public-workspace-agent-harness.md) remains the historical planning foundation. [DR-0017](decisions/DR-0017-single-forte-worksite-and-legacy-retirement.md) remains the historical product-convergence decision. [DR-0018](decisions/DR-0018-forte-data-workbench-and-verifiable-trace.md) defines the current workbench. [DR-0019](decisions/DR-0019-capability-composed-agent-runtime.md) defines the generic capability contract and the execution migration boundary.
-
-Current implementation Evidence is [FORTE data workbench and trace](evidence/FORTE-DATA-WORKBENCH-TRACE-EVIDENCE-20260824.md). User comprehension and value remain `Draft`.
+See [`DR-0022`](decisions/DR-0022-workspace-folder-and-arbitrary-task-contract.md),
+[`SCENARIO-008`](scenarios/SCENARIO-008-whole-folder-office-workspace.md),
+[UI-server fact matrix](contracts/UI_SERVER_FACT_MATRIX.md) and
+[current Evidence](evidence/FORTE-FOLDER-WORKSPACE-EVIDENCE-20260825.md).

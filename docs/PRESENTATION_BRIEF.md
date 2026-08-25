@@ -1,88 +1,118 @@
-# Office Agent V0.2 Presentation Brief
+# Office Agent V0.2 presentation brief
 
-## 1. One-sentence position
+## 1. One-sentence story
 
-Office Agent turns a pinned public office dataset into a user-operated workbench: inspect data, choose context, ask a task, then verify two model receipts, server checks, file citations and the no-external-action boundary.
+We are not building three scripted Demos. We are building one general office
+Agent Harness that starts from inspectable files, makes data scope explicit,
+shows what the Agent actually called and accepted, and lets users review every
+result against the same evidence.
 
-## 2. Reporting rule
+## 2. Mandatory reporting frame
 
-Every slide must pass [DECISION_AND_REPORTING_GOVERNANCE.md](DECISION_AND_REPORTING_GOVERNANCE.md): 场景与来源、前台交互影响、后端事实映射、验证与边界. Historical Customer A or DR-0016/0017 facts cannot be presented as the current workbench.
+Every architecture or Demo claim must include:
 
-## 3. Recommended story
+1. concrete user/scenario trigger and exception path;
+2. exact source ID, date/version, supported judgment and limitation;
+3. technical difference from mainstream practice;
+4. resulting change to the user's interaction flow;
+5. visible frontend state/action/feedback/recovery;
+6. authoritative server fact and hidden internals;
+7. Evidence status and claims that remain Draft.
 
-| Slide | Core message | Visual/evidence | Boundary |
+The retained source pack is
+[`WORKSPACE-CENTRIC-OFFICE-AGENT-INTERACTION-AND-SOURCES-20260825`](research/WORKSPACE-CENTRIC-OFFICE-AGENT-INTERACTION-AND-SOURCES-20260825.md).
+所有汇报状态与完成口径还必须遵守
+[`DECISION_AND_REPORTING_GOVERNANCE.md`](DECISION_AND_REPORTING_GOVERNANCE.md)。
+每项结论必须同时写清场景与来源、前台交互影响、后端事实和验证边界。
+
+## 3. Recommended slide story
+
+| Page | Claim | Visual | Evidence/boundary |
 | --- | --- | --- | --- |
-| 1. User problem | too much explanation and Demo framing hide the user's real work | verbatim Feedback 10 | one stakeholder, not research |
-| 2. Mainstream baseline | tools, permissions, sessions and delegation are already mainstream | official-material comparison | not competitor testing |
-| 3. Product thesis | business source, user-owned task, verifiable trace and semantic impact | four-pillar diagram | differentiation/value still Draft |
-| 4. Data workbench | actual benchmark data is the first screen | DR-0018 result desktop screenshot | replayed persisted Snapshot, not a new model call |
-| 5. Real source | pinned FORTE bytes become stable safe refs and previews | source/preview diagram | public benchmark, not enterprise database |
-| 6. Two-call loop | Planner proposes intent; server compiles policy and validates; Analyst then reads safe previews | DR-0020 completed screenshot + eight events | compiler is not tool execution; one live Run is not quality evidence |
-| 7. Result truth | citations can pass while the numerical answer is wrong | desktop/mobile result screenshots + deterministic 23 / `1,845,444.71` versus model 20 / `2,202,000` | `completed` is not a quality pass |
-| 8. Frontend/backend alignment | every state maps to a field or named event | UI—server fact matrix | no animation/CoT as fact |
-| 9. Eight modules | current and target capabilities stay separate | maturity table | modules 5-6 and durable Artifact remain Draft |
-| 10. Three acceptance lenses | Demo 1 single-task bounded loop, Demo 2 multi-task adaptive swarm, Demo 3 cross-cutting Risk Gate share one capability layer | `work_profile` composition map + three FORTE collections | generic contract is implemented; three execution engines are not |
-| 11. Engineering evidence | code, focused tests, live records and screenshots have distinct roles | Evidence ledger | engineering checks do not prove user value |
-| 12. Next proof | semantic verifier, durable Artifact, Scheduler, action governance, user study | phased roadmap | no production/value claim |
+| 1 | Office Agent begins from an office folder, not a Demo button | full current workbench screenshot | `DR-0022`; public benchmark, not enterprise drive |
+| 2 | The problem is hidden context and invisible execution, not lack of another chat box | prior flow vs folder-first flow | Stakeholder feedback; not user research |
+| 3 | One Runtime, eight modules, three acceptance lenses | layered architecture with Demo 1/2 plus cross-cutting Demo 3 | current vs target colors must differ |
+| 4 | Mainstream products prove sessions, tools, subagents and review are now baseline | official-source comparison table | OpenClaw/Codex/Claude official docs; no competitor benchmarking |
+| 5 | Our deliberate emphasis is explicit office evidence scope | browse -> inspect -> select -> instruct -> observe -> cite -> review | implementation difference, not superiority claim |
+| 6 | A pinned public dataset makes the Demo inspectable | 15 folders, 96 files and type distribution | FORTE commit/inventory; not real enterprise data |
+| 7 | Safe preview turns data access into a visible contract | CSV/PDF/DOCX/TXT preview mosaic plus security facts | path/size/hash/symlink/parser tests |
+| 8 | The Harness separates model call, adoption and validation | event/receipt sequence | receipt and Snapshot facts; no CoT exposure |
+| 9 | Citations are navigation, not decoration | result citation reopening source preview | membership check only; not semantic truth |
+| 10 | Demo 1 target is a bounded single task that pauses at evidence/human decisions | checkpoint/branch loop | target design; executor not current |
+| 11 | Demo 2 target is adaptive multi-task organization over shared artifacts | worker/dependency/replan map | target design; current product has no Workers |
+| 12 | Demo 3 governs actions from either topology | impact preview -> evidence -> approval -> permit -> receipt | target design; current no external action |
+| 13 | Current proof and preserved negative result | tests/screenshots plus Finance mismatch | cited result can still be wrong |
+| 14 | Next milestone is deterministic verification plus isolated Artifact workspace | roadmap | Draft until implementation evidence |
 
-## 4. Technical comparison wording
+## 4. Live Demo path
 
-Use:
+1. Open `/` directly into `办公资料库`.
+2. Expand two folders and inspect file type, size and a safe preview before any
+   model call.
+3. Select files from more than one folder and write an original task.
+4. Start the Run and point to separate Planner/Analyst receipts. Do not call an
+   animation a model invocation.
+5. Show the validated plan and explain that business operations are intent,
+   not executed tools.
+6. Open a result citation and return to the exact source preview.
+7. End on the review/no-external-action boundary.
 
-> OpenClaw, Codex and Claude Code official materials show that tool use, permissions, sessions, background work and delegation are already mainstream. Our target distinction is the office user's control surface: choose business data, define the task, inspect what was called and validated, review cited outputs, and see the effect boundary.
+Avoid beginning with eight-module architecture. The user first needs to see the
+data, task and evidence loop the architecture supports.
 
-Do not claim competitors “cannot” support an untested capability, Office Agent is “first”, or the workbench is safer/faster/easier without comparative and user evidence.
+## 5. Mainstream comparison wording
 
-## 5. Current demo narration
+Safe wording:
 
-1. Open `FORTE 数据工作台`; do not begin with architecture prose.
-2. Browse an actual table or Markdown input and point out the public benchmark label.
-3. Check the files that should define the task context.
-4. Write a new question and run it.
-5. Follow eight named stages and distinguish planning call, server-owned policy compilation/plan validation, analysis call and citation validation. Read `已采用` as called-and-accepted and `校验未通过` as called-but-rejected.
-6. Open the result. By default the summary and only three findings are visible; “展开结论” and “查看其余7条发现” are explicit user choices.
-7. Read the title “模型初步结论 · 待复核” and explain that the server checked file references and the read-only boundary, not the numerical conclusion.
-8. Close on `completed`: an initial response exists in memory and passed schema/reference/boundary checks; the negative deterministic comparison shows it was not numerically correct, it requires review, and no external action occurred.
+- OpenClaw foregrounds a self-hosted Gateway, channels, sessions, routing, tools
+  and host approvals in its official material.
+- The Codex app foregrounds parallel project threads, worktrees, change review,
+  Skills and Automation review queues.
+- Claude Code foregrounds project-directory context, agent/tool loops,
+  subagents, permission modes and multiple developer interfaces.
+- This project deliberately foregrounds a server-owned office folder, explicit
+  per-task file scope, visible call/adoption/validation facts and citations that
+  reopen business evidence.
 
-Never call displayed plan operation labels “executed tools”. Never call server policy compilation an Artifact write, and never call the result an Artifact Commit.
+Do not say competitors cannot support these ideas. Official documentation is
+not a controlled product test, and absence from a cited page is not proof that a
+capability does not exist.
 
-When introducing the three Demos, say explicitly: they are three acceptance lenses over one Agent Runtime, not three modes that inject different abilities. Demo 1 proves the single-task loop, Demo 2 proves multi-task self-organization, and Demo 3 proves the risk/action control plane across either topology. The current product has only the generic contract and read-only analysis slice; the three execution proof targets remain `Draft`.
+## 6. Interaction impact to say explicitly
 
-## 6. Screenshot provenance
+| Technical choice | User-flow change | Frontend output |
+| --- | --- | --- |
+| whole-folder server catalog | browse before asking | folders, metadata, availability |
+| explicit selected refs | user owns context boundary | selection chips and count |
+| bounded format adapters | inspect evidence without execution | table/document preview and security footer |
+| policy compiler after model | model cannot silently own side effects | call receipt separate from validated plan |
+| ordered events + Snapshot | progress/recovery is factual | trajectory, reconnecting and final reconciliation |
+| citation membership | review stays inside the task | citation button reopens source |
+| review-required terminal state | completion is not correctness | `模型初步结论 · 待复核`, no external-action statement |
 
-| Screenshot | Provenance | Allowed use | Prohibited inference |
-| --- | --- | --- | --- |
-| [`dr-0018-data-workbench-running-desktop.png`](evidence/screenshots/dr-0018-data-workbench-running-desktop.png) | second real Run `harness:f3a071...`, captured around 1.8s; final Run later completed v9/seq 8 | show real in-progress trajectory and receipt waiting states | not timing benchmark or proof of background execution |
-| [`dr-0018-data-workbench-result-desktop.png`](evidence/screenshots/dr-0018-data-workbench-result-desktop.png) | prior real Run `harness:8c9...` persisted Snapshot replayed into the formal UI by browser POST | show final desktop projection of a real persisted Snapshot | not a third model call or cross-restart/history recovery |
-| [`dr-0018-data-workbench-result-mobile.png`](evidence/screenshots/dr-0018-data-workbench-result-mobile.png) | same replayed `harness:8c9...` Snapshot at 390px; no horizontal overflow | show mobile engineering layout | not a mobile user study |
-| [`dr-0020-safe-plan-compiler-completed.png`](evidence/screenshots/dr-0020-safe-plan-compiler-completed.png) | real browser Run `harness:5dee3a8...`; Planner `15059 ms`, Analyst `13443 ms`, both adopted | show server-compiled plan, readable receipts and completed read-only result | not plan/result quality, tool execution or user comprehension |
+## 7. Evidence status
 
-Console/page errors were 0 for these captures. Exact hashes and dimensions are in [DR-0018 Evidence](evidence/FORTE-DATA-WORKBENCH-TRACE-EVIDENCE-20260824.md).
+Current verification for `DR-0022` before implementation commit/PR binding:
 
-## 7. Evidence ledger
+- focused Python: `26 passed in 15.37s`;
+- full Python: `51 passed in 13.16s`;
+- browser: `8 passed in 22.9s`;
+- Ruff and frontend typecheck: passed;
+- production build: compile `2.4s`, TypeScript `3.2s`, static `682ms`;
+- fresh browser run: `8.7 s` planning + `16.7 s` analysis, both adopted;
+- nine screenshots and their SHA-256 values are manifest-bound; commit/PR is pending.
 
-| Claim | Status | Evidence | Cannot imply |
-| --- | --- | --- | --- |
-| seven-path data workbench | Limited Verified | `fffa36a...` + `041186d`, focused Python `30 passed` | production readiness |
-| browse/select/custom task | Limited Verified | focused browser `8 passed in 26.8s` + screenshots | user comprehension |
-| two real model calls | observed | two live Run records | quality, repeatability or SLA |
-| cited initial result | Limited Verified | v9/seq 8 Snapshot facts and manifest | semantic/numeric correctness |
-| deterministic negative comparison | Verified regression fact | public-preview test reproduces 23 / `1,845,444.71` | a Runtime semantic verifier already exists |
-| no external effect | current boundary | Runtime/events/result footer | future Connector governance |
-| generic capability profile, no Demo identity | Limited Verified | `eef656e`, focused Python `30 passed`, browser `8 passed` | bounded loop, adaptive swarm or Risk Gate execution |
-| server-owned plan policy compilation | Limited Verified | `373b79a`; live v9/seq 8; Python `56 passed`; browser `8 passed` | plan/result quality, Tool Gateway or Artifact mutation |
-| reduced text improves clarity | Draft | no target-user study | usability claim |
+Exact final numbers must be copied from
+[`FORTE-FOLDER-WORKSPACE-EVIDENCE-20260825`](evidence/FORTE-FOLDER-WORKSPACE-EVIDENCE-20260825.md),
+not from an older deck or Evidence file.
 
-Current DR-0020 verification is Python `56 passed in 2.57s`, Harness browser `8 passed in 25.1s`, Ruff and web lint passed, and the production build passed (`2.1s` compile, `3.7s` TypeScript, `656ms` static generation). [PR #25](https://github.com/Dickey007s/lenovo_agent/pull/25) is open and not yet merged.
+## 8. Claims not allowed
 
-## 8. Source trail
-
-- [Source Register](decisions/SOURCE_REGISTER.md)
-- [Stakeholder Feedback 10](sources/USER-FEEDBACK-20260824-10-data-workbench-and-trace.md)
-- [DR-0018](decisions/DR-0018-forte-data-workbench-and-verifiable-trace.md)
-- [DR-0018 Evidence](evidence/FORTE-DATA-WORKBENCH-TRACE-EVIDENCE-20260824.md)
-- [Stakeholder Feedback 11](sources/USER-FEEDBACK-20260824-11-generic-capability-composition.md)
-- [DR-0019](decisions/DR-0019-capability-composed-agent-runtime.md)
-- [DR-0019 Evidence](evidence/AGENT-CAPABILITY-COMPOSITION-EVIDENCE-20260824.md)
-- [FORTE audit](research/FORTE-DATASET-AUDIT-20260824.md)
-- [Competitor research](research/COMPETITOR-RESEARCH-OPENCLAW-CODEX-CLAUDE-CODE-20260821.md)
+- “the full 180-task FORTE dataset was downloaded”;
+- “public FORTE files are real Lenovo or customer enterprise data”;
+- “all 15 FORTE tasks are solved”;
+- “a citation proves a conclusion or number is correct”;
+- “a plan operation means a tool/file write happened”;
+- “Demo 1/2 executors and Demo 3 real action gate are already current”;
+- “API memory state is durable or multi-instance”;
+- “the new UI is clearer, more trusted or more efficient” without user research.

@@ -4,7 +4,7 @@
 | --- | --- |
 | Decision ID | `DR-0018` |
 | Date | 2026-08-24 |
-| Status | `Limited Verified` for the fixed FORTE workbench, bounded preview, read-only analysis and trace; usability and user value remain `Draft` |
+| Status | `Limited Verified` for the recorded three-collection implementation; whole-folder foreground is superseded by [`DR-0022`](DR-0022-workspace-folder-and-arbitrary-task-contract.md); usability and user value remain `Draft` |
 | Trigger | `USER-FEEDBACK-20260824-DATA-WORKBENCH-10` |
 | Scenarios | [SCENARIO-004](../scenarios/SCENARIO-004-forte-finance-durable-evidence.md), [SCENARIO-005](../scenarios/SCENARIO-005-forte-release-adaptive-team.md), [SCENARIO-006](../scenarios/SCENARIO-006-forte-governed-operations-action.md), [SCENARIO-007](../scenarios/SCENARIO-007-single-forte-worksite-entry.md) |
 | Evidence | [FORTE-DATA-WORKBENCH-TRACE-EVIDENCE-20260824](../evidence/FORTE-DATA-WORKBENCH-TRACE-EVIDENCE-20260824.md) |
@@ -16,6 +16,11 @@
 The preceding worksite was still organized around explaining three Demo policies and ended at a plan. The stakeholder could not freely inspect the benchmark data, decide which files mattered, ask an original question, or see an actual answer. Dense explanatory copy also competed with the user's real work.
 
 The next vertical slice must make data and user intent primary. It must remain honest about what happened: two bounded model calls and deterministic checks can produce a cited read-only result, but no Tool Gateway, Artifact mutation, Connector or external action runs.
+
+Current applicability note: this Decision preserves the first data-workbench,
+two-call trace and numerical negative result. Its three registered collections
+and Scenario routes are historical. `DR-0022` now governs one whole folder,
+96 safe file projections and a user-authored selected-file task.
 
 ## 2. Decision
 

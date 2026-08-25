@@ -1,110 +1,157 @@
-# Target Architecture and Delivery Map
+# Office Agent target architecture
 
-> 这是一张目标能力与成熟度地图，**不是当前能力清单**。Current facts are explicitly labeled below.
+本文件描述目标架构，不是当前能力清单。当前实现边界以源码、API、Evidence
+和下表 `Current` 列为准。
+下文标为 target 或 not connected 的项目都是尚未完成的目标能力。历史 Demo
+在其当时的提交范围内，当前执行结果仍全部来自 Simulator；现行 FORTE
+工作区则不挂载任何工具执行或外部动作路由。
 
 ## 1. Product thesis
 
-OpenClaw, Codex and Claude Code official materials already describe tools, permissions, background work, session recovery and agent delegation. Office Agent should not present those primitives alone as novelty.
+The Agent is general; Demo 1/2/3 are acceptance views over one capability
+runtime. The product begins from an inspectable office workspace, not a hidden
+Prompt or Demo switch. Users choose evidence scope, author a task, observe
+server-backed execution facts and review outputs against sources.
 
-The target distinction is an office interaction contract:
+Current implementation reaches a cited read-only response. Every execution,
+write, Worker and Connector statement below is target design unless explicitly
+marked current.
 
-1. users inspect and choose versioned business sources;
-2. users own the task instruction;
-3. every visible stage comes from a server Snapshot or ordered event;
-4. shared outputs carry source citations and explicit verification;
-5. possible side effects receive semantic impact preview and actual receipt.
+## 2. Eight shared modules
 
-This remains a design claim, not a verified superiority claim. Official documentation is not competitor hands-on testing.
-
-## 2. Mainstream comparison and UI impact
-
-| Dimension | Mainstream official-material observation | Office Agent target | User-interaction consequence |
+| Module | Stable responsibility | Current | Target interaction impact |
 | --- | --- | --- | --- |
-| Primary object | session, coding task, channel, repo/worktree or command | business Task, selected source version, Artifact and ControlEvent | user sees which business files and version matter |
-| User intent | prompt/session centered | explicit Task Contract over selected files | user defines the question instead of watching a preset Demo |
-| Multi-agent work | subagents, threads and background jobs documented | Scheduler plus shared Artifact convergence | user reviews one converged work graph, not Worker chat |
-| Permission | command/tool approval and sandbox common | semantic target/data/change/reversibility checks | confirmation explains business impact |
-| Observability | plans, tools, diff, tokens, logs, status | source, call receipts, validation, citations and action receipt | internal reasoning stays hidden; decision facts remain visible |
-| Output | conversational answer, code diff or command result | versioned office Artifact and governance receipt | user can compare citations, versions and downstream effects |
+| 1. Workspace Catalog & Safe Preview | file identity, integrity, safe projection and source policy | 15 folders/96 inputs, bounded preview | users inspect data before invocation and understand capability gaps |
+| 2. Task Contract | goal, selected scope, budget, deadline and completion criteria | user instruction + selected refs | visible editable contract replaces hidden Prompt assumptions |
+| 3. Planner | propose work intent and dependencies | one strict Planner call | users see plan proposal and adoption separately |
+| 4. Admission, Policy Compiler & Validator | choose topology, compile policy, validate graph/sources/gates | server compilation and plan checks | route explanation shows why work stays single, splits or stops |
+| 5. Scheduler & Worker Manager | bounded loop or adaptive workers, leases and replanning | not connected | live work map shows actual units, waiting and replanning without Worker chat |
+| 6. Tool Gateway | capability registry, Permit, idempotency and execution receipts | not connected | proposed impact appears before confirmation; actual impact after receipt |
+| 7. Artifact Workspace & Verifier | immutable versions, evidence, conflict and Commit | read-only result/citation membership | users review changes and evidence instead of trusting final prose |
+| 8. Checkpoint, Event & Governance Control | durable state, ordered events, risk/evidence/approval | memory events/start idempotency | disconnect/restart recovery and human gates become explicit states |
 
-Sources and limitations: [competitor research](research/COMPETITOR-RESEARCH-OPENCLAW-CODEX-CLAUDE-CODE-20260821.md) and [Source Register](decisions/SOURCE_REGISTER.md).
-
-## 3. Eight canonical modules
-
-| # | Module | Current maturity | Current gap | Next evidence gate |
-| --- | --- | --- | --- | --- |
-| 1 | Scenario Pack & Workspace Catalog | Limited Verified | three pinned public collections; bounded preview | enterprise adapter, data policy and source identity |
-| 2 | Task Contract | Limited Verified | instruction/selection are memory-only | versioned contract, budget/deadline and durable recovery |
-| 3 | Planner | Limited Verified | Planner + Analyst on one model; no quality baseline | fixed-set quality/cost study and fallback policy |
-| 4 | Admission, Policy Compiler & Plan Validator | Limited Verified | server-owned intent-to-effect/gate compilation plus structural plan and citation membership; one live Finance answer disagreed with deterministic ground truth | dynamic Admission, spreadsheet operator, claim-level semantic/numeric verifier, budgets and replanning |
-| 5 | Scheduler & Worker Manager | Draft | no Scheduler/Worker execution | queue, lease, retry, cancellation and recovery |
-| 6 | Tool Gateway | Draft | no current invocation | current capability registry, Permit and unknown-outcome receipt |
-| 7 | Artifact Workspace & Verifier | Partial | Snapshot result; no immutable Artifact | version, provenance, merge/conflict, verification and Commit |
-| 8 | Checkpoint, Event & Governance Control | Partial | memory events/idempotency, unsigned Owner | durable store, production identity, audit and action control |
-
-## 4. Capability composition, not Demo runtimes
-
-The Agent owns one reusable capability layer. Admission composes a work policy from the task and available evidence:
+## 3. Shared runtime composition
 
 ```text
-task_topology = single_task | multi_task
-orchestration = bounded_loop | adaptive_swarm
-control_requirements = evidence_gate | human_gate | risk_gate
+Workspace Folder
+  -> Task Contract
+  -> Planner intent
+  -> Admission + Policy Compiler + Plan Validator
+  -> one of:
+       bounded single-task loop
+       adaptive multi-task scheduler/workers
+  -> Artifact versions + deterministic/model verifiers
+  -> cross-cutting Risk/Evidence/Human Gate
+  -> Commit or governed Tool Gateway receipt
+  -> durable Snapshot/Event stream
 ```
 
-The three Demos are acceptance lenses over that layer:
+Demo 1 validates the bounded single-task branch. Demo 2 validates the adaptive
+multi-task branch. Demo 3 validates the same cross-cutting action gate for both.
+Capabilities are registered once; a Demo identity never creates a special
+private executor.
 
-| Demo lens | Composition | User-visible proof target |
-| --- | --- | --- |
-| Demo 1 | one task + bounded loop + evidence/human gates | a task is decomposed, advances checkpoint by checkpoint, pauses at the exact uncertain unit, accepts a human decision, resumes and commits a traceable artifact |
-| Demo 2 | multiple tasks + adaptive swarm + evidence/human gates | real work units self-organize from dependencies, run in parallel when allowed, replan when facts change and converge into a shared verified artifact |
-| Demo 3 | risk gate across either topology | an intended side effect shows semantic impact, deterministic controls and the actual execution/no-execution receipt |
+## 4. Mainstream difference and user flow
 
-Selecting a benchmark collection never grants a capability. Scenario policy constrains sources/tools and can recommend a profile; the Runtime capability registry and control plane are shared. The current code only exposes `current_runtime_scope=read_only_analysis`, so all three execution proof targets remain `Draft`.
+Official OpenClaw material foregrounds Gateway/channel/session/tool control;
+Codex foregrounds project threads, worktrees and review queues; Claude Code
+foregrounds project-directory agent loops, tools, subagents and permissions.
+Those are strong patterns and can be extended. This project deliberately
+foregrounds an office folder, task-scoped evidence and business citations.
 
-## 5. Current cross-scenario slice
+The resulting flow is:
 
-The current workbench applies one interaction contract to three FORTE collections:
+```text
+message/project first
+  -> Agent discovers context and requests permissions as needed
 
-- Finance-018: inspect period workbooks and ask a custom reconciliation question;
-- pm-014: inspect PRD/config/test inputs and ask a release-readiness question;
-- Operations-008: inspect policy Markdown and ask a governed-process question.
+current Office Agent
+  -> browse files
+  -> inspect safe content
+  -> explicitly choose task scope
+  -> write task
+  -> observe call/adoption/validation/receipt
+  -> reopen citations and review
+```
 
-Current completion is a cited, review-required, read-only Snapshot response. It is not a correctness/quality pass, versioned Artifact, multi-Worker execution or governed external action. In the recorded Finance case, the model stated 20 / `2,202,000`; a deterministic regression reproduced 23 / `1,845,444.71`.
+This is an implementation emphasis, not evidence of superior usability. The
+full source comparison and limitations are retained in
+[`WORKSPACE-CENTRIC-OFFICE-AGENT-INTERACTION-AND-SOURCES-20260825`](research/WORKSPACE-CENTRIC-OFFICE-AGENT-INTERACTION-AND-SOURCES-20260825.md).
 
-## 6. 尚未完成的目标能力
+## 5. Demo 1 target: bounded durable office loop
 
-以下迁移都是目标设计，不是现行产品能力。历史动作原型中的**当前执行结果仍全部来自 Simulator**；现行 FORTE 数据工作台没有调用这些旧动作路径，也没有真实 Connector 副作用。
+One user task is decomposed, then advances through observable checkpoints:
 
-### Durable evidence
+```text
+contract -> observe -> plan -> act -> verify -> commit
+```
 
-Add row/field-level evidence, immutable Artifact versions, checkpoints, conflict/branch decisions and Commit. The frontend should progressively accumulate evidence rather than dump a final explanation.
+When evidence is insufficient or a decision is human-owned, only the relevant
+branch pauses. The user sees what is ready, what is blocked, why they are needed
+and what their decision will change. Resume continues from durable state without
+repeating committed work.
 
-### Adaptive collaboration
+Target additions: task budget/deadline, immutable ArtifactVersion, evidence
+records, conflict operation context, branch controls, checkpoint recovery and
+verified Commit. Initial acceptance data comes from FORTE administration,
+finance, sales and SRE folders.
 
-Add Admission, Scheduler, Workers, shared Artifact convergence and visible replanning. Show why work splits or changes, while hiding raw Worker conversations.
+## 6. Demo 2 target: governed adaptive office swarm
 
-### Governed action
+Multiple work units are admitted into an adaptive topology. Scheduler and
+Workers share immutable Artifact versions, add/reorder units when evidence
+changes and converge through a verifier rather than majority prose.
 
-Bind reviewed Artifact to ActionCandidate, Risk/Policy/Evidence, Approval, Permit, Gateway and Simulator/Connector. Show semantic impact before confirmation and actual receipt afterward.
+The user sees business work packages, dependencies, actual model/tool receipts,
+replanning reason and convergence condition. Raw Worker prompts, chain-of-thought
+and private conversations stay hidden. Initial acceptance data comes from FORTE
+release readiness, legal review, recruitment and code-workspace folders.
 
-All three execution migrations remain `Draft`.
+## 7. Demo 3 target: risk and action gate
 
-## 7. Delivery order
+Any write or external action from either topology passes:
 
-1. Preserve the data-first workbench, stable refs, preview integrity and truthful trace.
-2. Add a deterministic spreadsheet operator and claim verification beyond citation membership; the Finance negative regression is the acceptance baseline.
-3. Persist Task Contract, Run/Event and immutable Artifact versions under production identity.
-4. Implement the generic single-task bounded executor and durable evidence/Commit; use Demo 1 only as its first acceptance scenario.
-5. Extend the same Task/Artifact/Event contracts with adaptive Scheduler/Workers and shared convergence; use Demo 2 as the acceptance scenario.
-6. Apply the shared risk/action control plane to both topologies; use Demo 3 to verify impact preview, approval and receipts.
-7. Add governed Simulator, then real Connector only after identity/idempotency/recovery evidence.
-8. Run target-user studies for clarity, trust and task success.
+```text
+ActionCandidate -> Risk -> Policy -> Evidence -> Human approval when required
+-> Permit -> Tool Gateway -> execution receipt -> Artifact/Event update
+```
 
-## 8. Current evidence boundary
+The frontend always answers four questions: what will change, what will be
+rechecked, what stays unchanged and what will not happen. A preview is never an
+execution receipt. Current product performs no external action.
 
-[DR-0018](decisions/DR-0018-forte-data-workbench-and-verifiable-trace.md) is `Limited Verified` for the fixed FORTE workbench, bounded preview, two model calls per observed Run, selected-ref validation, eight-event trace and an initial Finance-018 response. Its two live observations, three provenance-scoped screenshots and deterministic negative regression do not verify semantic correctness, durable recovery, external action or user value.
+## 8. Deterministic verification priorities
 
-[DR-0019](decisions/DR-0019-capability-composed-agent-runtime.md) is `Limited Verified` only for replacing Demo-specific Scenario/Planner identity with a strict generic `work_profile`. It does not verify bounded execution, adaptive self-organization or governed action.
+Citation membership is insufficient. The next verifier layer should add:
 
-[DR-0020](decisions/DR-0020-server-owned-plan-policy-compilation.md) is `Limited Verified` for compiling model intent into server-owned effect/gate policy, retaining deterministic validation and hiding raw protocol failures in the current read-only Harness. It does not verify plan quality, tool execution, Artifact mutation or external action.
+1. spreadsheet row/formula and cross-period total checks;
+2. CSV schema, count preservation and sorting checks;
+3. document-rule coverage and contradiction checks;
+4. log timeline/source-line checks;
+5. code diff, command and test receipts in an isolated workspace;
+6. output-format checks for CSV/DOCX/Markdown artifacts.
+
+The preserved Finance negative result remains an acceptance baseline: a cited
+model answer can still be numerically wrong.
+
+## 9. Delivery order
+
+1. Preserve whole-folder browsing, safe preview, explicit scope and truthful
+   call/validation trace.
+2. Add file-level evidence locations and task-specific deterministic validators.
+3. Add writable isolated Run workspace and immutable Artifact versions.
+4. Implement durable Demo 1 bounded loop with branch pause/resume and Commit.
+5. Add Demo 2 Scheduler/Workers over the same Task/Artifact/Event contracts.
+6. Add Demo 3 Risk/Evidence/Approval/Permit/Gateway control to both topologies.
+7. Add production identity and durable/multi-process recovery.
+8. Add governed Connectors only after impact preview, idempotency and failure
+   receipts are verified.
+9. Run target-user formative studies for comprehension, trust and task success.
+
+## 10. Claim boundary
+
+Current `Limited Verified` facts are folder inventory, bounded preview,
+selected-scope task, model receipts, server plan checks, citation membership,
+ordered memory events and read-only result. Durable loops, adaptive Workers,
+Tool Gateway, real Connectors, production identity and user value are not
+current capabilities.

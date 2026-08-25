@@ -4,81 +4,107 @@ Base URL: `http://localhost:8010`.
 
 ## 1. Public surface
 
-OpenAPI exposes exactly seven paths:
+OpenAPI exposes six paths:
 
 | Method | Path | Purpose |
 | --- | --- | --- |
 | GET | `/v1/health` | process health and configured model/storage labels |
-| GET | `/v1/harness/scenarios` | safe Scenario list |
-| GET | `/v1/harness/scenarios/{scenario_id}` | one safe Scenario |
-| GET | `/v1/harness/scenarios/{scenario_id}/files/{file_ref}` | bounded allowlisted file preview |
+| GET | `/v1/harness/workspace` | whole public office folder projection |
+| GET | `/v1/harness/workspace/files/{file_ref}` | bounded, integrity-checked file preview |
 | POST | `/v1/harness/runs` | start an idempotent read-only task |
 | GET | `/v1/harness/runs/{run_id}` | Owner-scoped public Snapshot |
-| GET | `/v1/harness/runs/{run_id}/events?after=N` | ordered SSE after a sequence |
+| GET | `/v1/harness/runs/{run_id}/events?after=N` | ordered named SSE after a sequence |
 
-Legacy workspace/thread/task/Demo prefixes remain unmounted.
+The former Scenario list/detail/preview routes and legacy
+workspace/thread/task/Demo prefixes are not mounted.
 
 ## 2. Owner and persistence
 
-Harness Run endpoints use `X-User-Id`; omitted requests use demo default `demo_user`. This unsigned header is not production authentication. Missing and wrong-owner Runs both return 404 before SSE StreamingResponse creation.
+Run endpoints use `X-User-Id`; omission uses `demo_user`. This unsigned header
+is a demonstration Owner placeholder, not production authentication. Missing
+and wrong-owner Runs both return 404 before the SSE response is created.
 
-Runs, results, receipts, events, in-flight model calls and idempotency records live in one API process memory and disappear on restart.
+Runs, model receipts, results, events, in-flight calls and idempotency records
+live in one API process memory and disappear on restart.
 
-## 3. Scenario and stable files
+## 3. Whole workspace
 
-Scenario responses contain business fields and:
+```http
+GET /v1/harness/workspace
+```
+
+Representative response:
 
 ```json
 {
-  "work_profile": {
-    "task_topology": "single_task",
-    "orchestration": "bounded_loop",
-    "control_requirements": ["evidence_gate", "human_gate"],
-    "current_runtime_scope": "read_only_analysis"
-  },
-  "files": [
+  "workspace_id": "forte-public-office",
+  "title": "FORTE 公开办公资料库",
+  "dataset_version": "345c1ec1487139db9dd319787fa9405ba85d1869",
+  "license": "MIT",
+  "folder_count": 15,
+  "file_count": 96,
+  "previewable_file_count": 96,
+  "folders": [
     {
-      "file_ref": "forte-a0bccc1df48cc6a1",
-      "display_label": "2025 年上半年往来明细",
-      "display_group": "财务往来",
-      "display_summary": "Excel 表格，共 1 个工作表；..."
+      "folder_id": "forte-folder-...",
+      "display_label": "财务",
+      "availability": "local_input_bundle",
+      "file_count": 3,
+      "files": [
+        {
+          "file_ref": "forte-a0bccc1df48cc6a1",
+          "display_label": "2025 年上半年往来明细",
+          "display_path": "财务/2025 年上半年往来明细.xlsx",
+          "extension": ".xlsx",
+          "size": 12345,
+          "preview_kind": "table",
+          "preview_available": true
+        }
+      ]
     }
   ]
 }
 ```
 
-`work_profile` is a generic capability composition, not a Demo switch. Public, internal and Planner projections omit `demo_id` and `experience_policy`. `current_runtime_scope=read_only_analysis` is authoritative for the current Runtime; `bounded_loop` or `adaptive_swarm` describes the target organization policy and does not prove that executor ran.
-
-`file_ref` is stable for a pinned Scenario/path pair and hides the relative path. Public Scenario payloads omit raw task instruction, rubric, solution, grading, path and hash.
+This projection comes from `public-suite-manifest.json`. It omits benchmark
+task instructions, rubric, solution, grading material, source path and digest.
+Two task-only external-dependency folders may have zero local input files and
+cannot be used to fabricate local data.
 
 ## 4. File preview
 
 ```http
-GET /v1/harness/scenarios/Finance-018/files/forte-a0bccc1df48cc6a1
+GET /v1/harness/workspace/files/forte-a0bccc1df48cc6a1
 ```
 
-Table response:
+All preview responses include business labels, size, bounded content and:
 
 ```json
 {
-  "scenario_id": "Finance-018",
-  "file_ref": "forte-a0bccc1df48cc6a1",
-  "display_label": "2025 年上半年往来明细",
-  "display_group": "财务往来",
-  "display_summary": "...",
-  "kind": "table",
-  "sheet_name": "sheet1",
-  "columns": ["科目名称", "客商名称", "方向"],
-  "rows": [{"row_number": 2, "values": ["...", "...", "..."]}],
-  "total_rows": 75,
-  "text": null,
-  "truncated": false
+  "security": {
+    "integrity_verified": true,
+    "read_only": true,
+    "active_content_executed": false,
+    "external_resources_loaded": false,
+    "notes": ["..."]
+  }
 }
 ```
 
-The Catalog rechecks size/hash before each preview. XLSX output is the first visible sheet, at most 30 columns and 120 data rows. Markdown output is at most 30,000 characters. Unknown Scenario/ref returns 404; source-integrity failure returns controlled 503.
+Preview kinds:
 
-Preview is a bounded projection of public benchmark input, not an arbitrary filesystem read API.
+| Kind | Formats | Bounded output |
+| --- | --- | --- |
+| `table` | XLSX, CSV | at most 30 columns and 120 rows |
+| `document` | DOCX | at most 30,000 extracted characters |
+| `pdf` | PDF text layer | page count plus at most 30,000 characters |
+| `text` | TXT, Markdown, JSON, logs and code | at most 30,000 characters |
+| `unavailable` | encrypted/unsupported/unsafe | safe reason, no guessed content |
+
+Before reading, the Catalog validates relative allowlisted path, declared size,
+SHA-256, non-symlink file and archive expansion bounds. It rejects DOCM/macro
+content, does not run active content and does not fetch external resources.
+Unknown ref is 404; source integrity failure is controlled 503.
 
 ## 5. Start a Run
 
@@ -90,10 +116,10 @@ Content-Type: application/json
 
 ```json
 {
-  "scenario_id": "Finance-018",
+  "workspace_id": "forte-public-office",
   "idempotency_key": "harness:client-generated-key",
   "expected_version": 1,
-  "instruction": "只检查余额连续不变的客商，并说明引用文件。",
+  "instruction": "比较所选文件中的关键变化，并逐条引用依据。",
   "selected_file_refs": [
     "forte-a0bccc1df48cc6a1",
     "forte-b6e701bcf4494076"
@@ -101,24 +127,31 @@ Content-Type: application/json
 }
 ```
 
-`instruction` is optional, 3-2,000 characters; omission uses the Scenario default and records `instruction_source=dataset_task`. `selected_file_refs` is optional; omission selects the Scenario's allowlisted inputs. When supplied, it must be nonempty, unique, well-formed and belong to that Scenario.
+`instruction` is required and contains 3-2,000 characters.
+`selected_file_refs` is required, unique and contains 1-20 stable refs from the
+one workspace. The server rejects unknown refs and supplies no benchmark-task
+fallback.
 
-The response is `202 Accepted` with `{"run": snapshot, "replayed": false}`. Reusing the same Owner/key/request returns the prior start result with `replayed=true`. Reusing the key for different content returns 409.
+The response is `202 Accepted` with `{"run": snapshot, "replayed": false}`.
+Reusing the same Owner/key/request returns the original start result with
+`replayed=true`. Reusing that key for different content returns 409.
 
-## 6. Snapshot
+## 6. Public Snapshot
 
-Important public fields:
+Important fields:
 
 ```json
 {
   "run_id": "harness:...",
-  "scenario_id": "Finance-018",
+  "workspace_id": "forte-public-office",
   "status": "completed",
   "version": 9,
   "last_event_sequence": 8,
   "instruction": "...",
   "instruction_source": "user",
-  "source_documents": [{"file_ref": "...", "display_label": "..."}],
+  "source_documents": [
+    {"file_ref": "forte-...", "display_label": "...", "display_group": "..."}
+  ],
   "plan": {"summary": "...", "units": []},
   "model_receipt": {
     "called": true,
@@ -137,27 +170,32 @@ Important public fields:
     "findings": [
       {"title": "...", "detail": "...", "file_refs": ["forte-..."]}
     ],
-    "follow_ups": ["..."],
+    "follow_ups": [],
     "review_required": true
   },
-  "validation_errors": [],
-  "events": []
+  "validation_errors": []
 }
 ```
 
-Statuses are `queued`, `indexing`, `planning`, `validating`, `analyzing`, `verifying`, `completed`, `failed`, plus compatibility `ready_to_execute` when the Runtime is built without an Analyst.
+Current statuses are `queued`, `indexing`, `planning`, `validating`,
+`analyzing`, `verifying`, `completed` and `failed`; compatibility
+`ready_to_execute` is retained for runtimes built without an Analyst.
 
-For the current Runtime, `completed` means an Analyst response passed schema, citation-scope and read-only-boundary checks. The business UI projects this as “初步结果已形成”. It does not mean the answer is correct, plan-declared tools executed, an ArtifactVersion was committed or an external system changed.
+`completed` means a read-only result passed schema, selected-citation and
+boundary checks. It does not mean the answer is correct, plan-declared tools
+ran, a versioned Artifact was committed or an external system changed.
 
-### Plan candidate compilation
+## 7. Plan policy and result validation
 
-The provider response is not the public `HarnessPlan` and does not own `side_effect`. The server compiles allowlisted intent before validation: result-write intent maps to the current Run workspace, action preview maps to an external-action declaration with a human gate, and read/inspect/verify intent maps to no side effect. Raw candidate fields and internal compiler errors are not public API facts.
+The provider returns a plan candidate, not the public plan. The server compiles
+allowlisted intent into owned effect/gate semantics, then validates unit IDs,
+dependencies, source refs, tools, logical artifacts and human gates. Raw
+candidate fields and compiler errors are not public facts.
 
-## 7. Result validation
-
-`HarnessTaskResult` requires 1-10 findings and `review_required=true`. Each finding needs at least one `file_ref`. The server checks that all cited refs belong to the frozen selected source set.
-
-This is reference-membership validation. The API does not claim semantic proof, formula verification, exhaustive matching or row-level entailment. A preserved Finance-018 regression recomputes 23 unchanged balances totaling `1,845,444.71`, whereas one live model Snapshot stated 20 and `2,202,000`; see [DR-0018 Evidence](evidence/FORTE-DATA-WORKBENCH-TRACE-EVIDENCE-20260824.md). The current server therefore does not present `result_validation` as a quality pass.
+The current Analyst receives safe projections only from selected refs. Each
+finding requires at least one selected `file_ref`; an out-of-scope citation
+fails the Run. This proves reference membership only, not entailment,
+exhaustiveness, arithmetic or policy correctness.
 
 ## 8. SSE
 
@@ -166,7 +204,7 @@ GET /v1/harness/runs/{run_id}/events?after=3
 Accept: text/event-stream
 ```
 
-Successful production order:
+Current success order:
 
 ```text
 workspace_index
@@ -179,20 +217,22 @@ result_validation
 task_completed
 ```
 
-The SSE `id` equals event sequence. `after=N` returns only later events. Heartbeats carry no business state. Terminal event closes the stream and requires final GET reconciliation; nonterminal interruption uses GET plus `after=N` recovery.
+SSE `id` equals the event sequence. `after=N` returns only later events.
+Heartbeats carry no business state. A terminal event is followed by final GET
+reconciliation; a nonterminal interruption uses GET plus `after=N` recovery.
 
-## 9. Error meaning
+## 9. Error semantics
 
-| Result | Meaning | Frontend behavior |
+| Result | Meaning | Frontend response |
 | --- | --- | --- |
-| connection failure | API unreachable | bounded automatic and explicit retry |
-| Scenario 503 | Catalog unavailable/integrity invalid | fail closed; do not invent data |
-| preview 404 | unknown Scenario/ref | keep selection; show explicit preview error |
-| preview 503 | selected source failed integrity | do not show stale/partial preview |
-| Run/SSE 404 | missing or wrong Owner | do not reveal ownership; clear stale Run |
-| start 409 | idempotency/contract conflict | preserve task and reconcile |
-| `status=failed` | plan, model structure, source or citation validation failed | show safe business error; do not enable a result; hide raw tool/effect identifiers |
+| connection failure | API unreachable | keep draft; bounded automatic/explicit retry |
+| workspace 503 | manifest/catalog integrity invalid | show integrity-specific fail-closed state; no model call |
+| preview 404 | unknown ref | keep selection; show explicit preview error |
+| preview 503 | selected byte failed integrity/safe parsing | never show stale/partial content |
+| Run/SSE 404 | missing or wrong Owner | same public response; clear stale Run |
+| start 409 | idempotency/contract conflict | preserve instruction/selection and reconcile |
+| `status=failed` | model/schema/plan/source/citation validation failed | show safe business error and no result |
 
-Public `validation_errors[]` are a fail-closed business projection. Raw validator/compiler details remain internal. A known terminal retry creates a new command/key; only an unknown start outcome with the unchanged command signature reuses the original idempotency key.
-
-See [UI—server fact matrix](contracts/UI_SERVER_FACT_MATRIX.md).
+See [UI-server fact matrix](contracts/UI_SERVER_FACT_MATRIX.md),
+[`DR-0022`](decisions/DR-0022-workspace-folder-and-arbitrary-task-contract.md)
+and [current Evidence](evidence/FORTE-FOLDER-WORKSPACE-EVIDENCE-20260825.md).
