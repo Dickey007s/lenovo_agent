@@ -2,8 +2,8 @@
 
 > 版本说明：本文最初审计的是提交 `3ca0163` 之前的单次只读流水，约 `30%` 是该历史
 > 基线的架构成熟度估计。实现 `8364b1e` 已完成三轮只读纵切；不要继续把 `30%` 当作
-> 当前完成度。当前可验证事实见下方 1.1 与
-> [`AGENT-CONTROL-LOOP-BOUNDED-READONLY-20260825`](../evidence/AGENT-CONTROL-LOOP-BOUNDED-READONLY-EVIDENCE-20260825.md)。
+> 当前完成度。2026-08-26 的恢复、人工 Gate 与成果版本更新见 1.2 和
+> [`DURABLE-EVIDENCE-GATE-ARTIFACT-EVOLUTION-20260826`](../evidence/DURABLE-EVIDENCE-GATE-ARTIFACT-EVOLUTION-EVIDENCE-20260826.md)。
 
 ## 1. 结论
 
@@ -42,6 +42,23 @@ Gate、Budget、Control 和跨轮反馈做成真实主路径，再推进 Durable
 因此应采用“**有界只读 Control Loop 纵切 Limited Verified，完整目标架构仍未完成**”
 的口径，而不是把历史 30% 机械改成一个新的总百分比。各模块下一次统一重估应在
 Durable State 与 Artifact Commit 纵切后进行。
+
+### 1.2 2026-08-26 恢复与成果演进更新
+
+`DR-0025` 已进一步补齐三个限定纵切：证据不足时不再自动进入下一轮，而是进入
+`waiting_input` 等待用户显式 resume；每个完成轮次形成一个可见的逻辑证据简报版本，
+最终 Gate 记录逻辑 Commit；配置 PostgreSQL 时，Snapshot 与命令回执可在 API 启动时
+恢复，未完成轮次回滚且中断的模型调用不会自动重放。浏览器刷新也会对账同一 Run。
+
+2026-08-26 的真实模型冒烟又暴露并修复了一个方向漂移：补证 resume 后 Planner 曾改选
+无关文件。现行服务端把补证轮限定为上一 Gate 的缺失证据，并要求候选计划全部覆盖；
+前台轨迹由 `round_started.details.evidence_recheck=true` 表明这是补核而非新探索。
+
+这提升了 Evidence Gate、Commit、Durable State 和 Trace 的工程成熟度，但仍不能重新
+标成完整目标能力：当前版本/Commit 嵌在可更新 Run JSON 中，不是独立不可变 Artifact/
+TaskCommit；没有跨实例 lease、真实 PostgreSQL 本轮重启运行证据、Tool Gateway、多
+Worker 或外部动作。不要把旧表中的 10%/5% 当作当前数字，也不要用自动化推导一个新的
+总完成百分比。
 
 ![用户提供的 Agent Control Loop 目标参考图](../evidence/assets/user-feedback-20260825-agent-control-loop-reference.png)
 
@@ -223,9 +240,9 @@ Loop 的三轮、只读、可暂停纵切：
 - 文档明确 memory 状态不等于 Durable State；
 - 形成性用户测试之前，不宣称界面更清晰或建议更有价值。
 
-## 9. 当前推进建议
+## 9. 2026-08-26 当前推进建议
 
-1. 下一条纵切把每轮结果写成不可变 ArtifactVersion，并用 PostgreSQL/Checkpoint 证明 API 重启恢复。
+1. 在已实现的 PostgreSQL 适配器上补一次当前 Harness 的真实 API 进程重启验证，再把逻辑版本拆成独立不可变 ArtifactVersion/TaskCommit。
 2. 把引用 membership 校验扩展为格式、确定性数值、跨文件一致性与明确 ConflictRecord。
 3. 在同一 Contract/Event/Artifact 协议上加入 Demo 2 Scheduler/Worker，而不是另造 Demo 专用 Runtime。
 4. 再接 Demo 3 Risk/Evidence/Approval/Permit；真实 Connector 必须最后单独验收。

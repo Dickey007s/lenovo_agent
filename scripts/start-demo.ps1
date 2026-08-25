@@ -13,34 +13,54 @@ function Test-Http([string]$Url) {
     }
 }
 
-Write-Host "[1/4] Starting Docker Desktop..." -ForegroundColor Cyan
+Write-Host "[1/4] Checking durable state backend..." -ForegroundColor Cyan
 $DockerRoot = Join-Path $env:LOCALAPPDATA "Programs\DockerDesktop"
 $DockerDesktop = Join-Path $DockerRoot "Docker Desktop.exe"
 $DockerBin = Join-Path $DockerRoot "resources\bin"
 $Docker = Join-Path $DockerBin "docker.exe"
-if (-not (Test-Path -LiteralPath $Docker)) {
-    throw "Docker CLI not found: $Docker"
+$DockerCommand = Get-Command docker -ErrorAction SilentlyContinue
+if ($DockerCommand) {
+    $Docker = $DockerCommand.Source
+    $DockerBin = Split-Path -Parent $Docker
+} else {
+    $ProgramDocker = Join-Path $env:ProgramFiles "Docker\Docker\resources\bin\docker.exe"
+    if (Test-Path -LiteralPath $ProgramDocker) {
+        $Docker = $ProgramDocker
+        $DockerBin = Split-Path -Parent $Docker
+        $DockerDesktop = Join-Path $env:ProgramFiles "Docker\Docker\Docker Desktop.exe"
+    }
 }
-$env:PATH = "$DockerBin;$env:PATH"
-docker info *> $null
-if ($LASTEXITCODE -ne 0) {
-    Start-Process -FilePath $DockerDesktop -WindowStyle Hidden
-    $Deadline = (Get-Date).AddMinutes(2)
-    do {
-        Start-Sleep -Seconds 3
-        docker info *> $null
-    } while ($LASTEXITCODE -ne 0 -and (Get-Date) -lt $Deadline)
-    if ($LASTEXITCODE -ne 0) { throw "Docker Desktop startup timeout" }
+$UsePostgres = Test-Path -LiteralPath $Docker
+if ($UsePostgres) {
+    $env:PATH = "$DockerBin;$env:PATH"
+    docker info *> $null
+    if ($LASTEXITCODE -ne 0) {
+        if (-not (Test-Path -LiteralPath $DockerDesktop)) {
+            throw "Docker engine is unavailable and Docker Desktop was not found"
+        }
+        Start-Process -FilePath $DockerDesktop -WindowStyle Hidden
+        $Deadline = (Get-Date).AddMinutes(2)
+        do {
+            Start-Sleep -Seconds 3
+            docker info *> $null
+        } while ($LASTEXITCODE -ne 0 -and (Get-Date) -lt $Deadline)
+        if ($LASTEXITCODE -ne 0) { throw "Docker Desktop startup timeout" }
+    }
+} else {
+    $env:DATABASE_DSN = ""
+    Write-Warning "Docker is unavailable; this session will use process-local memory and will not recover after an API restart."
 }
 
-Write-Host "[2/4] Starting PostgreSQL..." -ForegroundColor Cyan
-docker compose --project-directory $Root up -d postgres
-$Deadline = (Get-Date).AddMinutes(1)
-do {
-    Start-Sleep -Seconds 2
-    $DbHealth = docker inspect --format "{{.State.Health.Status}}" agent_v01-postgres-1 2>$null
-} while ($DbHealth -ne "healthy" -and (Get-Date) -lt $Deadline)
-if ($DbHealth -ne "healthy") { throw "PostgreSQL health check timeout" }
+Write-Host "[2/4] Preparing state store..." -ForegroundColor Cyan
+if ($UsePostgres) {
+    docker compose --project-directory $Root up -d postgres
+    $Deadline = (Get-Date).AddMinutes(1)
+    do {
+        Start-Sleep -Seconds 2
+        $DbHealth = docker inspect --format "{{.State.Health.Status}}" agent_v01-postgres-1 2>$null
+    } while ($DbHealth -ne "healthy" -and (Get-Date) -lt $Deadline)
+    if ($DbHealth -ne "healthy") { throw "PostgreSQL health check timeout" }
+}
 
 Write-Host "[3/4] Starting FastAPI on 8010..." -ForegroundColor Cyan
 if (-not (Test-Http "http://127.0.0.1:8010/v1/health")) {
@@ -64,11 +84,21 @@ if (-not (Test-Http "http://127.0.0.1:8010/v1/health")) {
 
 Write-Host "[4/4] Starting Next.js on 3000..." -ForegroundColor Cyan
 if (-not (Test-Http "http://127.0.0.1:3000")) {
-    $Corepack = Join-Path $env:ProgramFiles "nodejs\corepack.cmd"
+    $Corepack = Get-Command corepack -ErrorAction SilentlyContinue
+    $Pnpm = Get-Command pnpm -ErrorAction SilentlyContinue
+    if ($Corepack) {
+        $WebCommand = $Corepack.Source
+        $WebArguments = @("pnpm", "--dir", "apps/web", "dev")
+    } elseif ($Pnpm) {
+        $WebCommand = $Pnpm.Source
+        $WebArguments = @("--dir", "apps/web", "dev")
+    } else {
+        throw "Neither corepack nor pnpm is available"
+    }
     $WebOut = Join-Path $Runtime "web.stdout.log"
     $WebErr = Join-Path $Runtime "web.stderr.log"
-    $Web = Start-Process -FilePath $Corepack `
-        -ArgumentList @("pnpm", "--dir", "apps/web", "dev") `
+    $Web = Start-Process -FilePath $WebCommand `
+        -ArgumentList $WebArguments `
         -WorkingDirectory $Root -WindowStyle Hidden `
         -RedirectStandardOutput $WebOut -RedirectStandardError $WebErr -PassThru
     Set-Content -LiteralPath (Join-Path $Runtime "web.pid") -Value $Web.Id
@@ -83,6 +113,6 @@ if (-not (Test-Http "http://127.0.0.1:3000")) {
 }
 
 Write-Host ""
-Write-Host "Demo 3 is ready: http://localhost:3000" -ForegroundColor Green
+Write-Host "Office Agent is ready: http://localhost:3000" -ForegroundColor Green
 Write-Host "API health:       http://localhost:8010/v1/health" -ForegroundColor Green
 Write-Host "Logs:             $Runtime" -ForegroundColor DarkGray

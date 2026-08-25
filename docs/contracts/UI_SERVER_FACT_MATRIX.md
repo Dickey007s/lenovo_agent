@@ -1,7 +1,7 @@
 # UI-server fact matrix
 
-This is the current `DR-0024` whole-workspace workbench plus `DR-0023` bounded
-Agent Control Loop contract. Historical manual-selection/Scenario/Task mappings
+This is the current `DR-0025` recoverable loop plus the `DR-0024`
+whole-workspace workbench. Historical manual-selection/Scenario/Task mappings
 remain in their dated Evidence only.
 
 下表中的 Authority 列即“服务端权威字段”；浏览器草稿与传输状态会明确另列，
@@ -47,10 +47,12 @@ Prompt、思维链、原始模型响应、绝对路径、哈希和内部策略�
 | Analyst started/returned | provider analysis stage, not completion | `analysis_started/completed` | per round | Prompt, CoT, raw response |
 | Analyst receipt | not called/adopted/not adopted and elapsed time | round `analysis_receipt.*` | independent of result validation | token/provider trace |
 | Citation validation | every finding stays inside this round's approved refs | `result_validation` | before Evidence Gate | false semantic/numeric proof claim |
-| Evidence gap | current evidence is insufficient and another round has a bounded purpose | `evidence_gaps[]`, `evidence_gate`, `next_step=next_round` | prior round remains immutable in Snapshot | claim that the missing file guarantees truth |
+| Evidence gap | current evidence is insufficient and another round has a bounded purpose | `evidence_gaps[]`, `evidence_gate`, `next_step=waiting_input` | prior round/version remains visible; no new call starts until resume | claim that the missing file guarantees truth |
+| Continue confirmation | user authorizes one more bounded round over the displayed missing evidence | control POST `resume`, returned version and ControlEvent; next `round.input_file_refs` equals prior Gate candidates | only valid from server-paused Evidence Gate; validator requires all confirmed refs | a click animation as execution proof or unrelated files silently entering the round |
+| Result version | one completed round formed a logical evidence brief | `artifact_versions[]` and round result | version and parent increase monotonically inside the Run | standalone immutable artifact or source-file write |
 | Read-only Act | the Agent formed an intermediate analysis, not a side effect | round result and `external_side_effect=none` | Verify follows in the same round | tool execution or source-file mutation claim |
-| Completed | server Gate committed a reviewable brief | `status=completed`, `loop_committed`, `brief` | final GET after terminal event | ArtifactVersion, TaskCommit, tool execution, business correctness |
-| Budget stopped | no new provider call may start | `status=budget_exhausted`, `loop_budget_stopped` | preserves completed rounds and partial brief | hard cancellation of an in-flight HTTP call |
+| Completed | server Gate committed the latest logical version and a reviewable brief | `status=completed`, `loop_committed`, `brief`, `last_commit` | final GET after terminal event | standalone TaskCommit, tool execution, business correctness |
+| Budget stopped | no new provider call may start | `status=stopped`, `brief.outcome=bounded`, `loop_budget_stopped` | preserves completed rounds and partial brief | hard cancellation of an in-flight HTTP call |
 | User stopped | stop was applied at a safe point | `status=stopped`, `loop_stopped` | preserves completed rounds | rollback or deletion claim |
 | Safely stopped | model/schema/plan/source/citation check failed | `status=failed`, `harness_failed`, safe errors | no result; fresh retry | raw validator/compiler/provider error |
 | Next-task proposals | Agent suggests up to four follow-up tasks from the current bounded analysis; each proposal is not independently source-verified | terminal `result.follow_ups` | suggestion alone creates no server mutation | claim that work already started or that every proposal has a per-item citation |
@@ -77,7 +79,7 @@ Prompt、思维链、原始模型响应、绝对路径、哈希和内部策略�
 | plan compilation | server-owned effects/gates plus graph/source checks and one bounded repair | plan quality or tool execution |
 | result validation | citation membership in the server-approved round set | entailment, exhaustive matching or arithmetic |
 | Evidence Gate | decides continue/stop from explicit gaps and remaining bounds | semantic truth or human acceptance |
-| completed | reviewable in-memory brief exists | task correctness, durable Artifact, Connector or external process completion |
+| completed | reviewable logical brief/Commit exists in the authoritative Run Snapshot | task correctness, standalone immutable Artifact, Connector or external process completion |
 
 ## 6. Transport and lifecycle
 
@@ -87,16 +89,22 @@ Prompt、思维链、原始模型响应、绝对路径、哈希和内部策略�
 - “trajectory live” requires an open current EventSource; “service available”
   only requires successful HTTP.
 - Missing/wrong-owner Run returns the same 404.
-- `X-User-Id` is unsigned and all Run state is one-process memory.
+- `X-User-Id` is unsigned. With `DATABASE_DSN`, Snapshot and command receipts
+  are PostgreSQL-backed; without it they remain one-process memory.
+- `checkpoint_recovered` proves a persisted Snapshot was restored and paused.
+  It does not prove an interrupted model call was cancelled or replayed.
 - Plan operation labels and read-only Act declare intent/analysis. The current
-  Runtime does not invoke a Tool Gateway or mutate an ArtifactVersion.
+  Runtime does not invoke a Tool Gateway or modify source files. Its logical
+  versions are embedded in the Run, not independently immutable records.
 - Pause/stop apply between provider calls; deadline prevents a new call but does
   not hard-cancel an in-flight request.
-- Browser close does not provide a current history chooser or restart recovery.
+- Browser refresh restores a known Run id; `GET /runs` can discover the latest
+  nonterminal Owner Run. There is not yet a full history chooser.
 
 ## 7. Evidence and applicability
 
-Current contract: [`DR-0024`](../decisions/DR-0024-autonomous-whole-workspace-research.md),
+Current contract: [`DR-0025`](../decisions/DR-0025-durable-evidence-gate-and-artifact-evolution.md),
+[`DR-0024`](../decisions/DR-0024-autonomous-whole-workspace-research.md),
 [`DR-0023`](../decisions/DR-0023-agent-control-loop.md),
 [`SCENARIO-010`](../scenarios/SCENARIO-010-autonomous-whole-workspace-research.md),
 [`SCENARIO-009`](../scenarios/SCENARIO-009-agent-control-loop.md),

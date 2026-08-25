@@ -278,6 +278,34 @@ class AgentControlLoopBrief(StrictModel):
     external_action: Literal["none"] = "none"
 
 
+class AgentControlLoopArtifactVersion(StrictModel):
+    """A user-visible, read-only result version created by one completed loop round."""
+
+    artifact_id: str = Field(pattern=r"^artifact-[0-9a-f]{12}$")
+    version: int = Field(ge=1, le=3)
+    title: str = Field(min_length=1, max_length=240)
+    kind: Literal["evidence_brief"] = "evidence_brief"
+    status: Literal["draft", "verified", "committed"]
+    summary: str = Field(min_length=1, max_length=3_000)
+    source_file_refs: list[str] = Field(default_factory=list, max_length=20)
+    finding_count: int = Field(ge=0, le=10)
+    parent_version: int | None = Field(default=None, ge=1, le=2)
+    created_at: datetime
+    review_required: Literal[True] = True
+    external_action: Literal["none"] = "none"
+
+
+class AgentControlLoopCommit(StrictModel):
+    """Logical commit of the final verified brief; it is not an external action."""
+
+    commit_id: str = Field(pattern=r"^commit-[0-9a-f]{12}$")
+    artifact_id: str = Field(pattern=r"^artifact-[0-9a-f]{12}$")
+    artifact_version: int = Field(ge=1, le=3)
+    summary: str = Field(min_length=1, max_length=1_000)
+    committed_at: datetime
+    external_action: Literal["none"] = "none"
+
+
 class AgentControlLoopControlRequest(StrictModel):
     command: AgentControlLoopCommand
     idempotency_key: str = Field(min_length=8, max_length=160)

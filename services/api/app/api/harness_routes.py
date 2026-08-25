@@ -86,6 +86,16 @@ async def start_harness_run(
         raise HTTPException(status_code=503, detail="办公资料库完整性校验失败") from exc
 
 
+@router.get("/runs")
+async def list_harness_runs(
+    owner_id: Annotated[str, Depends(harness_owner)],
+    runtime: Annotated[HarnessRuntime, Depends(get_harness_runtime)],
+    limit: int = Query(default=10, ge=1, le=20),
+):
+    snapshots = await runtime.list(owner_id)
+    return {"runs": [runtime.public_snapshot(item) for item in snapshots[:limit]]}
+
+
 @router.get("/runs/{run_id}")
 async def get_harness_run(
     run_id: str,

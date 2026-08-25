@@ -24,8 +24,10 @@ import httpx
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
 
 from packages.contracts.harness_models import (
+    AgentControlLoopArtifactVersion,
     AgentControlLoopBrief,
     AgentControlLoopBudget,
+    AgentControlLoopCommit,
     AgentControlLoopContract,
     AgentControlLoopControlEvent,
     AgentControlLoopControlRequest,
@@ -33,6 +35,13 @@ from packages.contracts.harness_models import (
     AgentControlLoopNextStep,
     AgentControlLoopOptions,
     AgentControlLoopRound,
+)
+from services.api.app.application.harness_storage import (
+    HarnessStateStore,
+    InMemoryHarnessStateStore,
+    PostgresHarnessStateStore,
+    StoredHarnessIdempotency,
+    StoredHarnessRun,
 )
 
 runtime_logger = logging.getLogger("uvicorn.error")
@@ -231,6 +240,10 @@ class HarnessRunSnapshot(BaseModel):
     control_events: list[AgentControlLoopControlEvent] = Field(
         default_factory=list, max_length=100
     )
+    artifact_versions: list[AgentControlLoopArtifactVersion] = Field(
+        default_factory=list, max_length=3
+    )
+    last_commit: AgentControlLoopCommit | None = None
     brief: AgentControlLoopBrief | None = None
     plan: HarnessPlan | None = None
     model_receipt: HarnessModelReceipt | None = None
@@ -308,6 +321,8 @@ class PublicHarnessRunSnapshot(BaseModel):
     current_round: int
     control_state: str
     control_events: list[AgentControlLoopControlEvent]
+    artifact_versions: list[AgentControlLoopArtifactVersion]
+    last_commit: AgentControlLoopCommit | None
     brief: AgentControlLoopBrief | None
     plan: PublicHarnessPlan | None
     model_receipt: HarnessModelReceipt | None
@@ -395,6 +410,7 @@ class OpenAICompatibleHarnessPlanner:
             "只输出一个符合 JSON Schema 的 JSON 对象。只能引用 files 中出现的 file_ref；tool 必须来自 allowlisted_tools；"
             "每轮引用的不同文件数不得超过 scenario.control_loop.max_files_this_round；优先选择最能回答当前问题的最小证据集合。"
             "如果 scenario.control_loop.validation_feedback 非空，必须先按反馈修正；文件数超限时只保留优先级最高的文件。"
+            "如果 scenario.control_loop.evidence_recheck 为 true，files 中全部文件都是用户已确认继续核对的缺失证据，计划必须全部覆盖。"
             "selection_reason 必须用业务语言说明为什么选择这些文件，以及它们与目标的关系。"
             "输入文件永远只读，禁止猜测或输出源文件路径、哈希或任意本地路径。"
             "读取文件使用 file.read/table.inspect/evidence.verify；生成结果使用 artifact.write。可以提供不含路径的逻辑 artifact_name 与 artifact_type；缺省时由服务端生成。"
@@ -569,7 +585,7 @@ class _IdempotentControl:
 
 
 class HarnessRuntime:
-    """One owner/version/idempotent in-memory run store with named SSE events."""
+    """Owner/version/idempotent Agent Control Loop with durable snapshot support."""
 
     ALLOWED_STATUSES = {
         "queued",
@@ -592,10 +608,12 @@ class HarnessRuntime:
         catalog: HarnessWorkspaceCatalog,
         planner: HarnessPlanner,
         analyst: HarnessAnalyst | None = None,
+        state_store: HarnessStateStore | None = None,
     ) -> None:
         self.catalog = catalog
         self.planner = planner
         self.analyst = analyst
+        self.state_store = state_store or InMemoryHarnessStateStore()
         self._runs: dict[tuple[str, str], _Run] = {}
         self._idempotent: dict[tuple[str, str], _IdempotentStart] = {}
         self._control_idempotent: dict[
@@ -603,6 +621,143 @@ class HarnessRuntime:
         ] = {}
         self._tasks: dict[str, asyncio.Task[None]] = {}
         self._lock = asyncio.Lock()
+
+    @property
+    def backend_name(self) -> str:
+        return self.state_store.backend_name
+
+    async def setup(self) -> None:
+        """Restore snapshots, but never replay an interrupted model call automatically."""
+
+        await self.state_store.setup()
+        now = datetime.now(timezone.utc)
+        terminal_statuses = {"ready_to_execute", "completed", "stopped", "failed"}
+        async with self._lock:
+            for record in await self.state_store.load_runs():
+                snapshot = HarnessRunSnapshot.model_validate(record.snapshot)
+                resume_status = record.resume_status
+                if snapshot.status not in terminal_statuses:
+                    completed_rounds = [
+                        item for item in snapshot.rounds if item.status == "completed"
+                    ]
+                    recovered_status = (
+                        "waiting_input"
+                        if snapshot.status == "waiting_input"
+                        else "paused"
+                    )
+                    event = HarnessEvent(
+                        sequence=snapshot.last_event_sequence + 1,
+                        event_name="checkpoint_recovered",
+                        occurred_at=now,
+                        status=recovered_status,
+                        message=(
+                            "已从持久化检查点恢复；未完成的模型调用不会自动重放，"
+                            "请确认后从安全点继续。"
+                        ),
+                        details={
+                            "completed_rounds": len(completed_rounds),
+                            "automatic_model_replay": False,
+                        },
+                    )
+                    last_round = completed_rounds[-1] if completed_rounds else None
+                    snapshot = snapshot.model_copy(
+                        update={
+                            "status": recovered_status,
+                            "control_state": "paused",
+                            "rounds": completed_rounds,
+                            "current_round": len(completed_rounds),
+                            "plan": HarnessPlan.model_validate(last_round.plan)
+                            if last_round and last_round.plan
+                            else None,
+                            "model_receipt": HarnessModelReceipt.model_validate(
+                                last_round.model_receipt
+                            )
+                            if last_round and last_round.model_receipt
+                            else None,
+                            "analysis_receipt": HarnessModelReceipt.model_validate(
+                                last_round.analysis_receipt
+                            )
+                            if last_round and last_round.analysis_receipt
+                            else None,
+                            "events": [*snapshot.events, event],
+                            "last_event_sequence": event.sequence,
+                            "version": snapshot.version + 1,
+                            "updated_at": now,
+                        }
+                    )
+                    resume_status = "planning"
+                elapsed_seconds = snapshot.budget.elapsed_ms / 1000
+                run = _Run(
+                    snapshot=snapshot,
+                    condition=asyncio.Condition(),
+                    started_at_perf=perf_counter() - elapsed_seconds,
+                    resume_status=resume_status,
+                )
+                self._runs[(record.owner_id, record.run_id)] = run
+                if snapshot.status not in terminal_statuses:
+                    await self._persist_locked(run)
+
+            for record in await self.state_store.load_idempotency():
+                if record.kind == "start":
+                    self._idempotent[(record.owner_id, record.idempotency_key)] = (
+                        _IdempotentStart(
+                            digest=record.digest,
+                            result=HarnessRunStartResult.model_validate(record.result),
+                        )
+                    )
+                else:
+                    self._control_idempotent[
+                        (record.owner_id, record.idempotency_key)
+                    ] = _IdempotentControl(
+                        digest=record.digest,
+                        result=HarnessControlResult.model_validate(record.result),
+                    )
+
+    async def close(self) -> None:
+        tasks = list(self._tasks.values())
+        for task in tasks:
+            task.cancel()
+        if tasks:
+            await asyncio.gather(*tasks, return_exceptions=True)
+        await self.state_store.close()
+
+    async def list(self, owner_id: str) -> list[HarnessRunSnapshot]:
+        async with self._lock:
+            snapshots = [
+                run.snapshot.model_copy(deep=True)
+                for (candidate_owner, _), run in self._runs.items()
+                if candidate_owner == owner_id
+            ]
+        return sorted(snapshots, key=lambda item: item.updated_at, reverse=True)
+
+    async def _persist_locked(
+        self,
+        run: _Run,
+        idempotency: StoredHarnessIdempotency | None = None,
+    ) -> StoredHarnessIdempotency | None:
+        return await self.state_store.commit(
+            StoredHarnessRun(
+                owner_id=run.snapshot.owner_id,
+                run_id=run.snapshot.run_id,
+                snapshot=run.snapshot.model_dump(mode="json"),
+                resume_status=run.resume_status,
+            ),
+            idempotency,
+        )
+
+    def _schedule_run(
+        self,
+        owner_id: str,
+        run_id: str,
+        workspace: dict[str, Any],
+        instruction: str,
+    ) -> None:
+        active = self._tasks.get(run_id)
+        if active is not None and not active.done():
+            return
+        task = asyncio.create_task(self._run(owner_id, run_id, workspace, instruction))
+        self._tasks[run_id] = task
+        task.add_done_callback(lambda done, rid=run_id: self._tasks.pop(rid, None))
 
     def get_workspace(self) -> dict[str, Any]:
         try:
@@ -671,19 +826,25 @@ class HarnessRuntime:
                 budget=budget,
             )
             current = _Run(snapshot, asyncio.Condition(), perf_counter())
-            self._runs[(owner_id, run_id)] = current
             result = HarnessRunStartResult(run=snapshot)
-            self._idempotent[idem_key] = _IdempotentStart(digest, result)
-            task = asyncio.create_task(
-                self._run(
-                    owner_id,
-                    run_id,
-                    workspace,
-                    instruction,
-                )
+            existing = await self._persist_locked(
+                current,
+                StoredHarnessIdempotency(
+                    owner_id=owner_id,
+                    kind="start",
+                    idempotency_key=request.idempotency_key,
+                    digest=digest,
+                    result=result.model_dump(mode="json"),
+                ),
             )
-            self._tasks[run_id] = task
-            task.add_done_callback(lambda done, rid=run_id: self._tasks.pop(rid, None))
+            if existing is not None:
+                if existing.digest != digest:
+                    raise HarnessConflictError("幂等键已用于不同 Harness 命令")
+                restored = HarnessRunStartResult.model_validate(existing.result)
+                return restored.model_copy(update={"replayed": True}, deep=True)
+            self._runs[(owner_id, run_id)] = current
+            self._idempotent[idem_key] = _IdempotentStart(digest, result)
+            self._schedule_run(owner_id, run_id, workspace, instruction)
             return result.model_copy(deep=True)
 
     async def get(self, owner_id: str, run_id: str) -> HarnessRunSnapshot:
@@ -793,12 +954,37 @@ class HarnessRuntime:
                 }
             )
             result = HarnessControlResult(run=run.snapshot.model_copy(deep=True))
+            existing = await self._persist_locked(
+                run,
+                StoredHarnessIdempotency(
+                    owner_id=owner_id,
+                    kind="control",
+                    idempotency_key=request.idempotency_key,
+                    digest=digest,
+                    result=result.model_dump(mode="json"),
+                ),
+            )
+            if existing is not None:
+                if existing.digest != digest:
+                    run.snapshot = snapshot
+                    raise HarnessConflictError("幂等键已用于不同控制命令")
+                restored = HarnessControlResult.model_validate(existing.result)
+                run.snapshot = restored.run.model_copy(deep=True)
+                return restored.model_copy(update={"replayed": True}, deep=True)
             self._control_idempotent[idempotency_key] = _IdempotentControl(
                 digest=digest, result=result
             )
             condition = run.condition
+            should_schedule = command == "resume" and run_id not in self._tasks
         async with condition:
             condition.notify_all()
+        if should_schedule:
+            self._schedule_run(
+                owner_id,
+                run_id,
+                self.get_internal_workspace(),
+                result.run.instruction,
+            )
         return result.model_copy(deep=True)
 
     def public_start_result(self, result: HarnessRunStartResult) -> PublicHarnessRunStartResult:
@@ -832,6 +1018,16 @@ class HarnessRuntime:
             for round_snapshot in snapshot.rounds
         ]
         public_brief = self._public_brief(snapshot.brief, ref_to_label)
+        public_artifacts = [
+            item.model_copy(
+                update={
+                    "summary": self._project_business_text(
+                        item.summary, ref_to_label
+                    )
+                }
+            )
+            for item in snapshot.artifact_versions
+        ]
         public_contract = snapshot.contract.model_copy(
             update={
                 "allowed_file_refs": [
@@ -861,6 +1057,8 @@ class HarnessRuntime:
             current_round=snapshot.current_round,
             control_state=snapshot.control_state,
             control_events=snapshot.control_events,
+            artifact_versions=public_artifacts,
+            last_commit=snapshot.last_commit,
             brief=public_brief,
             plan=public_plan,
             model_receipt=snapshot.model_receipt,
@@ -1148,37 +1346,67 @@ class HarnessRuntime:
         """Run a bounded, read-only Agent Control Loop over the whole workspace."""
 
         try:
-            files = self._index_files(workspace)
-            selection_reason = (
-                f"已冻结整个公开办公资料库的 {len(files)} 份文件索引；"
-                "Agent 将按任务目标自主检索并选择每轮证据。"
-            )
-            await self._set_source_documents(
-                owner_id, run_id, files, selection_reason
-            )
-            await self._transition(
-                owner_id,
-                run_id,
-                "indexing",
-                "workspace_index",
-                "已核对并冻结整个资料库索引，Agent 将自主检索相关文件。",
-                {"files": files, "reason": selection_reason},
-            )
+            recovered = await self.get(owner_id, run_id)
+            if recovered.source_documents:
+                files = recovered.source_documents
+            else:
+                files = self._index_files(workspace)
+                selection_reason = (
+                    f"已冻结整个公开办公资料库的 {len(files)} 份文件索引；"
+                    "Agent 将按任务目标自主检索并选择每轮证据。"
+                )
+                await self._set_source_documents(
+                    owner_id, run_id, files, selection_reason
+                )
+                await self._transition(
+                    owner_id,
+                    run_id,
+                    "indexing",
+                    "workspace_index",
+                    "已核对并冻结整个资料库索引，Agent 将自主检索相关文件。",
+                    {"files": files, "reason": selection_reason},
+                )
 
-            verified_refs: list[str] = []
-            all_findings: list[HarnessFinding] = []
-            all_follow_ups: list[str] = []
+            recovered = await self.get(owner_id, run_id)
+            verified_refs = self._snapshot_verified_refs(recovered)
+            all_findings = self._snapshot_findings(recovered)
+            all_follow_ups = [
+                follow_up
+                for round_snapshot in recovered.rounds
+                if round_snapshot.result
+                for follow_up in HarnessTaskResult.model_validate(
+                    round_snapshot.result
+                ).follow_ups
+            ]
             next_question = instruction
+            evidence_recheck_refs: set[str] = set()
+            if recovered.rounds and recovered.rounds[-1].next_step:
+                recovered_next_step = recovered.rounds[-1].next_step
+                next_question = recovered_next_step.next_question or instruction
+                if recovered_next_step.decision == "waiting_input":
+                    evidence_recheck_refs = set(
+                        recovered_next_step.candidate_file_refs
+                    )
             terminal_decision = "completed"
 
-            contract = (await self.get(owner_id, run_id)).contract
-            for round_number in range(1, contract.max_rounds + 1):
+            contract = recovered.contract
+            first_round = len(recovered.rounds) + 1
+            for round_number in range(first_round, contract.max_rounds + 1):
                 await self._safe_point(owner_id, run_id)
-                remaining = [
+                all_remaining = [
                     item
                     for item in files
                     if str(item["file_ref"]) not in set(verified_refs)
                 ]
+                remaining = (
+                    [
+                        item
+                        for item in all_remaining
+                        if str(item["file_ref"]) in evidence_recheck_refs
+                    ]
+                    if evidence_recheck_refs
+                    else all_remaining
+                )
                 if not remaining:
                     break
 
@@ -1200,8 +1428,16 @@ class HarnessRuntime:
                     run_id,
                     "planning",
                     "round_started",
-                    f"第 {round_number} 轮开始，正在确定本轮最小证据范围。",
-                    {"round_number": round_number, "remaining_file_count": len(remaining)},
+                    (
+                        f"第 {round_number} 轮开始，正在核对上轮尚未覆盖的证据。"
+                        if evidence_recheck_refs
+                        else f"第 {round_number} 轮开始，正在确定本轮最小证据范围。"
+                    ),
+                    {
+                        "round_number": round_number,
+                        "remaining_file_count": len(remaining),
+                        "evidence_recheck": bool(evidence_recheck_refs),
+                    },
                 )
 
                 plan, adopted_receipt = await self._plan_with_bounded_repair(
@@ -1213,6 +1449,7 @@ class HarnessRuntime:
                     remaining=remaining,
                     contract=contract,
                     steer_instruction=steer,
+                    require_all_files=bool(evidence_recheck_refs),
                 )
                 round_refs = self._plan_file_refs(plan, remaining)
                 round_files = [
@@ -1393,10 +1630,10 @@ class HarnessRuntime:
                     reason = "本轮自主选择的证据均已被结论引用，完成条件已满足。"
                     next_question = ""
                 elif can_continue:
-                    decision = "next_round"
+                    decision = "waiting_input"
                     reason = (
                         f"本轮仍有 {len(outstanding)} 份已选择文件未形成可核对引用，"
-                        "预算允许继续一轮。"
+                        "需要你确认是否再使用一轮预算继续核对。"
                     )
                     next_question = (
                         "继续核对尚未被结论引用的资料，补齐证据缺口并检查是否改变已有结论。"
@@ -1421,18 +1658,25 @@ class HarnessRuntime:
                     gaps=gaps,
                     next_step=next_step,
                 )
+                gate_details = {
+                    "round_number": round_number,
+                    "decision": decision,
+                    "gap_count": len(gaps),
+                    "candidate_file_refs": next_step.candidate_file_refs,
+                }
+                if decision == "waiting_input":
+                    evidence_recheck_refs = set(next_step.candidate_file_refs)
+                    await self._wait_for_evidence_confirmation(
+                        owner_id, run_id, reason, gate_details
+                    )
+                    continue
                 await self._transition(
                     owner_id,
                     run_id,
                     "verifying",
                     "evidence_gate",
                     reason,
-                    {
-                        "round_number": round_number,
-                        "decision": decision,
-                        "gap_count": len(gaps),
-                        "candidate_file_refs": next_step.candidate_file_refs,
-                    },
+                    gate_details,
                 )
                 if decision != "next_round":
                     terminal_decision = decision
@@ -1478,6 +1722,54 @@ class HarnessRuntime:
             await self._mark_current_round_failed(owner_id, run_id)
             await self._fail(owner_id, run_id, str(exc)[:500])
 
+    async def _wait_for_evidence_confirmation(
+        self,
+        owner_id: str,
+        run_id: str,
+        reason: str,
+        details: dict[str, Any],
+    ) -> None:
+        """Pause between rounds so missing evidence never spends budget silently."""
+
+        async with self._lock:
+            run = self._require_run(owner_id, run_id)
+            snapshot = run.snapshot
+            now = datetime.now(timezone.utc)
+            event = HarnessEvent(
+                sequence=snapshot.last_event_sequence + 1,
+                event_name="evidence_gate",
+                occurred_at=now,
+                status="waiting_input",
+                message=reason,
+                details=details,
+            )
+            run.resume_status = "planning"
+            run.snapshot = snapshot.model_copy(
+                update={
+                    "status": "waiting_input",
+                    "control_state": "paused",
+                    "events": [*snapshot.events, event],
+                    "last_event_sequence": event.sequence,
+                    "version": snapshot.version + 1,
+                    "budget": self._budget_with_elapsed(run),
+                    "updated_at": now,
+                }
+            )
+            await self._persist_locked(run)
+            condition = run.condition
+        async with condition:
+            condition.notify_all()
+
+        while True:
+            async with condition:
+                async with self._lock:
+                    state = self._require_run(owner_id, run_id).snapshot.control_state
+                    if state == "stop_requested":
+                        raise HarnessStopped("用户请求停止")
+                    if state == "running":
+                        return
+                await condition.wait()
+
     async def _safe_point(self, owner_id: str, run_id: str) -> None:
         while True:
             async with self._lock:
@@ -1486,6 +1778,7 @@ class HarnessRuntime:
                     update={"budget": self._budget_with_elapsed(run)}
                 )
                 run.snapshot = snapshot
+                await self._persist_locked(run)
                 if snapshot.control_state == "stop_requested":
                     raise HarnessStopped("用户请求停止")
                 if snapshot.control_state == "pause_requested":
@@ -1514,6 +1807,7 @@ class HarnessRuntime:
                             "updated_at": now,
                         }
                     )
+                    await self._persist_locked(run)
                     condition = run.condition
                 elif snapshot.control_state == "paused":
                     condition = run.condition
@@ -1601,6 +1895,7 @@ class HarnessRuntime:
                     "updated_at": now,
                 }
             )
+            await self._persist_locked(run)
             condition = run.condition
         async with condition:
             condition.notify_all()
@@ -1640,6 +1935,7 @@ class HarnessRuntime:
                     "updated_at": now,
                 }
             )
+            await self._persist_locked(run)
 
     async def _plan_with_bounded_repair(
         self,
@@ -1652,6 +1948,7 @@ class HarnessRuntime:
         remaining: list[dict[str, Any]],
         contract: AgentControlLoopContract,
         steer_instruction: str | None,
+        require_all_files: bool = False,
     ) -> tuple[HarnessPlan, HarnessModelReceipt]:
         """Adopt one validated plan, with at most one budgeted repair attempt."""
 
@@ -1680,6 +1977,7 @@ class HarnessRuntime:
                         remaining_file_count=len(remaining),
                         steer_instruction=steer_instruction,
                         validation_feedback=validation_feedback,
+                        evidence_recheck=require_all_files,
                     ),
                     files=self._planner_files(remaining),
                 )
@@ -1769,6 +2067,7 @@ class HarnessRuntime:
                     workspace,
                     remaining,
                     max_file_refs=contract.max_files_per_round,
+                    require_all_files=require_all_files,
                 )
             except HarnessPlanError as exc:
                 last_error = exc
@@ -1813,6 +2112,8 @@ class HarnessRuntime:
                 }
             )
 
+            await self._persist_locked(run)
+
     async def _update_round(
         self,
         owner_id: str,
@@ -1836,6 +2137,8 @@ class HarnessRuntime:
                 }
             )
 
+            await self._persist_locked(run)
+
     async def _complete_round(
         self,
         owner_id: str,
@@ -1855,6 +2158,39 @@ class HarnessRuntime:
             next_step=next_step,
             completed_at=datetime.now(timezone.utc),
         )
+        async with self._lock:
+            run = self._require_run(owner_id, run_id)
+            snapshot = run.snapshot
+            round_snapshot = next(
+                item for item in snapshot.rounds if item.round_number == round_number
+            )
+            result = (
+                HarnessTaskResult.model_validate(round_snapshot.result)
+                if round_snapshot.result
+                else None
+            )
+            artifact_id = "artifact-" + hashlib.sha256(
+                f"{run_id}:evidence-brief".encode("utf-8")
+            ).hexdigest()[:12]
+            version = len(snapshot.artifact_versions) + 1
+            artifact = AgentControlLoopArtifactVersion(
+                artifact_id=artifact_id,
+                version=version,
+                title="任务证据简报",
+                status="draft" if gaps else "verified",
+                summary=result.summary if result else next_step.reason,
+                source_file_refs=round_snapshot.verified_file_refs,
+                finding_count=len(result.findings) if result else 0,
+                parent_version=version - 1 if version > 1 else None,
+                created_at=datetime.now(timezone.utc),
+            )
+            run.snapshot = snapshot.model_copy(
+                update={
+                    "artifact_versions": [*snapshot.artifact_versions, artifact],
+                    "updated_at": datetime.now(timezone.utc),
+                }
+            )
+            await self._persist_locked(run)
 
     async def _set_verified_count(
         self, owner_id: str, run_id: str, count: int
@@ -1867,6 +2203,7 @@ class HarnessRuntime:
             run.snapshot = run.snapshot.model_copy(
                 update={"budget": budget, "updated_at": datetime.now(timezone.utc)}
             )
+            await self._persist_locked(run)
 
     async def _can_start_another_round(
         self,
@@ -2049,17 +2386,40 @@ class HarnessRuntime:
                     "stop_reason": stop_reason,
                 }
             )
+            artifact_versions = list(current.artifact_versions)
+            last_commit = current.last_commit
+            if status == "completed" and artifact_versions:
+                final_artifact = artifact_versions[-1].model_copy(
+                    update={"status": "committed"}
+                )
+                artifact_versions[-1] = final_artifact
+                commit_id = "commit-" + hashlib.sha256(
+                    (
+                        f"{run_id}:{final_artifact.artifact_id}:"
+                        f"{final_artifact.version}:{summary}"
+                    ).encode("utf-8")
+                ).hexdigest()[:12]
+                last_commit = AgentControlLoopCommit(
+                    commit_id=commit_id,
+                    artifact_id=final_artifact.artifact_id,
+                    artifact_version=final_artifact.version,
+                    summary="已提交通过证据门的只读任务简报，仍需用户审阅。",
+                    committed_at=datetime.now(timezone.utc),
+                )
             run.snapshot = current.model_copy(
                 update={
                     "rounds": rounds,
                     "result": result,
                     "brief": brief,
+                    "artifact_versions": artifact_versions,
+                    "last_commit": last_commit,
                     "budget": budget,
                     "control_state": "stopped" if status == "stopped" else "running",
                     "control_events": controls,
                     "updated_at": datetime.now(timezone.utc),
                 }
             )
+            await self._persist_locked(run)
         await self._transition(
             owner_id,
             run_id,
@@ -2112,6 +2472,7 @@ class HarnessRuntime:
                     }
                 )
                 run.snapshot = run.snapshot.model_copy(update={"rounds": rounds})
+                await self._persist_locked(run)
 
     @staticmethod
     def _budget_with_elapsed(run: _Run) -> AgentControlLoopBudget:
@@ -2146,6 +2507,7 @@ class HarnessRuntime:
         remaining_file_count: int | None = None,
         steer_instruction: str | None = None,
         validation_feedback: str | None = None,
+        evidence_recheck: bool = False,
     ) -> dict[str, Any]:
         """Expose only workspace policy and the user's current instruction."""
         return {
@@ -2163,6 +2525,7 @@ class HarnessRuntime:
                 "remaining_file_count": remaining_file_count,
                 "steer_instruction": steer_instruction,
                 "validation_feedback": validation_feedback,
+                "evidence_recheck": evidence_recheck,
                 "external_action": "none",
             },
         }
@@ -2302,6 +2665,7 @@ class HarnessRuntime:
         files: list[dict[str, Any]],
         *,
         max_file_refs: int | None = None,
+        require_all_files: bool = False,
     ) -> None:
         allowed_refs = {str(item["file_ref"]) for item in files}
         allowed_tools = set(workspace.get("allowlisted_tools", []))
@@ -2318,6 +2682,12 @@ class HarnessRuntime:
             raise HarnessPlanError(
                 f"本轮计划引用 {len(referenced_refs)} 份文件，"
                 f"超过最多 {max_file_refs} 份的 Agent Control Loop 预算"
+            )
+        if require_all_files and referenced_refs != allowed_refs:
+            missing_count = len(allowed_refs - referenced_refs)
+            raise HarnessPlanError(
+                "本轮为用户已确认的证据补核，候选计划必须覆盖全部待核对文件；"
+                f"当前仍缺 {missing_count} 份"
             )
         graph: dict[str, list[str]] = {unit.unit_id: list(unit.depends_on) for unit in plan.units}
         for unit in plan.units:
@@ -2377,6 +2747,7 @@ class HarnessRuntime:
                     "budget": self._budget_with_elapsed(run),
                 }
             )
+            await self._persist_locked(run)
             condition = run.condition
         async with condition:
             condition.notify_all()
@@ -2385,6 +2756,7 @@ class HarnessRuntime:
         async with self._lock:
             run = self._require_run(owner_id, run_id)
             run.snapshot = run.snapshot.model_copy(update={"model_receipt": receipt, "updated_at": datetime.now(timezone.utc)})
+            await self._persist_locked(run)
 
     async def _set_analysis_receipt(
         self,
@@ -2400,6 +2772,7 @@ class HarnessRuntime:
                     "updated_at": datetime.now(timezone.utc),
                 }
             )
+            await self._persist_locked(run)
 
     async def _set_result(
         self, owner_id: str, run_id: str, result: HarnessTaskResult
@@ -2409,6 +2782,7 @@ class HarnessRuntime:
             run.snapshot = run.snapshot.model_copy(
                 update={"result": result, "updated_at": datetime.now(timezone.utc)}
             )
+            await self._persist_locked(run)
 
     async def _set_source_documents(
         self, owner_id: str, run_id: str, files: list[dict[str, Any]], reason: str
@@ -2422,11 +2796,13 @@ class HarnessRuntime:
                     "updated_at": datetime.now(timezone.utc),
                 }
             )
+            await self._persist_locked(run)
 
     async def _set_plan(self, owner_id: str, run_id: str, plan: HarnessPlan) -> None:
         async with self._lock:
             run = self._require_run(owner_id, run_id)
             run.snapshot = run.snapshot.model_copy(update={"plan": plan, "updated_at": datetime.now(timezone.utc)})
+            await self._persist_locked(run)
 
     async def _fail(self, owner_id: str, run_id: str, reason: str) -> None:
         async with self._lock:
@@ -2434,6 +2810,7 @@ class HarnessRuntime:
             run.snapshot = run.snapshot.model_copy(
                 update={"validation_errors": [reason], "updated_at": datetime.now(timezone.utc)}
             )
+            await self._persist_locked(run)
             receipt = run.snapshot.model_receipt
         await self._transition(
             owner_id,
@@ -2468,6 +2845,12 @@ def build_harness_runtime(settings: Any | None = None) -> HarnessRuntime:
         BenchmarkWorkspaceCatalog,
     )
 
+    state_store: HarnessStateStore
+    if settings.database_dsn:
+        state_store = PostgresHarnessStateStore(settings.database_dsn)
+    else:
+        state_store = InMemoryHarnessStateStore()
+
     return HarnessRuntime(
         BenchmarkWorkspaceCatalog(),
         OpenAICompatibleHarnessPlanner(
@@ -2482,4 +2865,5 @@ def build_harness_runtime(settings: Any | None = None) -> HarnessRuntime:
             model=settings.llm_model,
             timeout=settings.llm_timeout_seconds,
         ),
+        state_store,
     )
