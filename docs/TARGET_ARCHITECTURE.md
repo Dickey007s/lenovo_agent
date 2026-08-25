@@ -13,22 +13,22 @@ runtime. The product begins from an inspectable office workspace, not a hidden
 Prompt or Demo switch. Users choose evidence scope, author a task, observe
 server-backed execution facts and review outputs against sources.
 
-Current implementation reaches a cited read-only response. Every execution,
-write, Worker and Connector statement below is target design unless explicitly
-marked current.
+Current implementation reaches a cited, bounded multi-round read-only brief.
+Every source mutation, durable Commit, Worker swarm and Connector statement
+below is target design unless explicitly marked current.
 
 ## 2. Eight shared modules
 
 | Module | Stable responsibility | Current | Target interaction impact |
 | --- | --- | --- | --- |
 | 1. Workspace Catalog & Safe Preview | file identity, integrity, safe projection and source policy | 15 folders/96 inputs, bounded preview | users inspect data before invocation and understand capability gaps |
-| 2. Task Contract | goal, selected scope, budget, deadline and completion criteria | user instruction + selected refs | visible editable contract replaces hidden Prompt assumptions |
-| 3. Planner | propose work intent and dependencies | one strict Planner call | users see plan proposal and adoption separately |
+| 2. Task Contract | goal, selected scope, budget, deadline and completion criteria | instruction + selected refs + bounded rounds/files/calls/deadline | visible editable contract replaces hidden Prompt assumptions |
+| 3. Planner | propose work intent and dependencies | strict per-round Planner with one budgeted repair | users see plan proposal, rejection and adoption separately |
 | 4. Admission, Policy Compiler & Validator | choose topology, compile policy, validate graph/sources/gates | server compilation and plan checks | route explanation shows why work stays single, splits or stops |
-| 5. Scheduler & Worker Manager | bounded loop or adaptive workers, leases and replanning | not connected | live work map shows actual units, waiting and replanning without Worker chat |
+| 5. Scheduler & Worker Manager | bounded loop or adaptive workers, leases and replanning | one in-process bounded single-loop controller | live work map shows actual units, waiting and replanning without Worker chat |
 | 6. Tool Gateway | capability registry, Permit, idempotency and execution receipts | not connected | proposed impact appears before confirmation; actual impact after receipt |
-| 7. Artifact Workspace & Verifier | immutable versions, evidence, conflict and Commit | read-only result/citation membership | users review changes and evidence instead of trusting final prose |
-| 8. Checkpoint, Event & Governance Control | durable state, ordered events, risk/evidence/approval | memory events/start idempotency | disconnect/restart recovery and human gates become explicit states |
+| 7. Artifact Workspace & Verifier | immutable versions, evidence, conflict and Commit | per-round findings, citation membership, Evidence Gate and memory Brief | users review changes and evidence instead of trusting final prose |
+| 8. Checkpoint, Event & Governance Control | durable state, ordered events, risk/evidence/approval | memory rounds/events plus versioned pause/resume/steer/stop | disconnect/restart recovery and human gates become explicit states |
 
 ## 3. Shared runtime composition
 
@@ -46,7 +46,9 @@ Workspace Folder
   -> durable Snapshot/Event stream
 ```
 
-Demo 1 validates the bounded single-task branch. Demo 2 validates the adaptive
+The current `DR-0023` vertical slice validates a bounded read-only single-task
+loop, but not durable Artifact/Checkpoint semantics. Demo 1 ultimately validates
+the bounded durable single-task branch. Demo 2 validates the adaptive
 multi-task branch. Demo 3 validates the same cross-cutting action gate for both.
 Capabilities are registered once; a Demo identity never creates a special
 private executor.
@@ -91,10 +93,12 @@ branch pauses. The user sees what is ready, what is blocked, why they are needed
 and what their decision will change. Resume continues from durable state without
 repeating committed work.
 
-Target additions: task budget/deadline, immutable ArtifactVersion, evidence
-records, conflict operation context, branch controls, checkpoint recovery and
-verified Commit. Initial acceptance data comes from FORTE administration,
-finance, sales and SRE folders.
+Current precursor: at most three read-only rounds, explicit file/model/deadline
+bounds, server Evidence Gate, memory round history, one budgeted plan repair and
+safe-point pause/resume/steer/stop. Target additions: immutable ArtifactVersion,
+semantic and numeric evidence records, conflict operation context, branch-level
+controls, checkpoint recovery and verified TaskCommit. Initial acceptance data
+comes from FORTE administration, finance, sales and SRE folders.
 
 ## 6. Demo 2 target: governed adaptive office swarm
 
@@ -138,9 +142,10 @@ model answer can still be numerically wrong.
 
 1. Preserve whole-folder browsing, safe preview, explicit scope and truthful
    call/validation trace.
-2. Add file-level evidence locations and task-specific deterministic validators.
+2. Preserve the bounded read-only Agent Control Loop and add file-level evidence
+   locations plus task-specific deterministic validators.
 3. Add writable isolated Run workspace and immutable Artifact versions.
-4. Implement durable Demo 1 bounded loop with branch pause/resume and Commit.
+4. Upgrade Demo 1 to a durable bounded loop with branch pause/resume and TaskCommit.
 5. Add Demo 2 Scheduler/Workers over the same Task/Artifact/Event contracts.
 6. Add Demo 3 Risk/Evidence/Approval/Permit/Gateway control to both topologies.
 7. Add production identity and durable/multi-process recovery.
@@ -151,7 +156,8 @@ model answer can still be numerically wrong.
 ## 10. Claim boundary
 
 Current `Limited Verified` facts are folder inventory, bounded preview,
-selected-scope task, model receipts, server plan checks, citation membership,
-ordered memory events and read-only result. Durable loops, adaptive Workers,
-Tool Gateway, real Connectors, production identity and user value are not
-current capabilities.
+selected-scope task, bounded multi-round read-only Loop, model receipts, one
+budgeted plan repair, server plan checks, citation membership, Evidence Gate,
+ordered memory events, safe-point controls and an in-memory brief. Durable
+Artifact/Checkpoint recovery, adaptive Workers, Tool Gateway, real Connectors,
+production identity and user value are not current capabilities.

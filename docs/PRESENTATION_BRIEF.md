@@ -26,7 +26,7 @@ Agent 实际调用、采用和校验了什么，并能从每条结论返回同�
 汇报必须同时保留“场景与来源”“前台交互影响”“后端事实映射”和
 “验证与边界”。研究来源包见
 [`WORKSPACE-CENTRIC-OFFICE-AGENT-INTERACTION-AND-SOURCES-20260825`](research/WORKSPACE-CENTRIC-OFFICE-AGENT-INTERACTION-AND-SOURCES-20260825.md)。
-Agent Control Loop 的逐模块现状、完成度口径和下一条三轮只读纵切设计见
+Agent Control Loop 的逐模块历史基线、当前三轮只读纵切和后续缺口见
 [`AGENT-CONTROL-LOOP-IMPLEMENTATION-AUDIT-20260825`](research/AGENT-CONTROL-LOOP-IMPLEMENTATION-AUDIT-20260825.md)。
 完整的项目化讲稿、七个办公场景、七个图示区和 17 页 PPT 结构见
 [`OFFICE-AGENT-DETAILED-CHINESE-REPORT-20260825`](reports/OFFICE-AGENT-DETAILED-CHINESE-REPORT-20260825.md)。
@@ -44,21 +44,21 @@ Agent Control Loop 的逐模块现状、完成度口径和下一条三轮只读�
 | 7 | 安全预览把“Agent 读了什么”变成可见契约 | CSV/PDF/DOCX/TXT 预览拼图和安全说明 | 路径、大小、hash、符号链接和解析器测试 |
 | 8 | Harness 把模型调用、内容采用和服务端校验分开 | 事件与模型回执时序 | Snapshot/Receipt 事实；不展示思维链 |
 | 9 | 引用不是装饰，而是返回证据的导航动作 | 结果引用重新打开来源文件 | 只证明引用范围，不证明语义正确 |
-| 10 | Demo 1 验收单任务拆解、有界循环、证据不足或需要人时暂停 | Checkpoint 与分支循环 | 目标设计；当前执行器尚未完成 |
+| 10 | Agent Control Loop 已能分轮推进、核对证据并在安全点接受控制 | 两轮真实运行、Evidence Gate 与 pause/steer/stop 截图 | 只读、最多三轮、单进程 memory；不是 Durable Runtime |
 | 11 | Demo 2 验收多任务自组织、动态调度和共享工件汇聚 | Worker、依赖与动态重排图 | 目标设计；当前产品没有通用 Worker Runtime |
 | 12 | Demo 3 对单任务和多任务统一施加风险与动作控制 | 影响预演 -> 证据 -> 审批 -> Permit -> 回执 | 目标设计；当前没有真实外部动作 |
 | 13 | 当前已经证明工程链路，但也保留模型结果出错的负面证据 | 自动化、截图与 Finance 算术偏差并列 | `completed` 不等于结论正确 |
-| 14 | 当前完整 Agent Control Loop 约完成 30%，下一步先让 Agent 在文件夹中形成可见、可停、可核验的三轮只读纵切 | 目标 Loop 与当前单次流水的叠加图；11 模块成熟度条 | `30%` 是架构成熟度估计；[`DR-0023`](decisions/DR-0023-agent-control-loop.md) 尚未实现，保持 `Draft` |
+| 14 | 历史审计的约 30% 已升级为可见、可停、可核验的只读 Loop；下一步补 Durable Artifact/Checkpoint | 当前 Loop 与目标 Durable State 叠加图 | `30%` 只代表实现前历史架构估计；当前 [`DR-0023`](decisions/DR-0023-agent-control-loop.md) 为限定范围 `Limited Verified` |
 
 ## 4. 现场演示卡片
 
 1. 直接打开 `/`，进入“办公资料库”。
 2. 展开不同业务文件夹；在调用模型前查看文件类型、大小和安全预览。
-3. 从多个文件夹选择资料，输入一个现场提出的新任务。
-4. 启动 Run，指出 Planner 与 Analyst 的独立模型回执。动画本身不代表模型调用。
-5. 展示服务端校验后的计划，说明当前业务操作只是意图，没有执行工具。
-6. 点击结果引用，返回准确的来源文件预览。
-7. 以“模型初步结论，仍需复核，没有发生外部动作”结束。
+3. 从多个文件夹选择资料，输入一个现场提出的新任务，并设置轮次、每轮文件、模型调用和 deadline 上限。
+4. 启动 Loop，指出活动合同已冻结；Planner 与 Analyst 的独立模型回执才是调用事实，动画本身不是。
+5. 展示候选计划 `未采用` 后的一次预算内修复，再展示服务端校验后的计划。
+6. 在第一轮 Evidence Gate 解释为什么继续；演示 pause/steer/resume 或 stop 在安全点生效。
+7. 点击最终简报的引用返回来源文件，以“只读、待复核、没有外部动作”结束。
 
 演示不要从八模块架构图开始。先让观众看到数据、任务、轨迹和证据闭环，
 再解释支撑它的架构。
@@ -103,22 +103,25 @@ Agent Control Loop 的逐模块现状、完成度口径和下一条三轮只读�
 | 有序事件加权威 Snapshot | 进度和恢复依据事实 | 轨迹、重连中、最终对账 | named SSE 与 Run Snapshot |
 | 引用范围校验 | 复核不离开本轮资料 | 引用按钮重新打开来源 | 结果 `file_refs` 属于冻结范围 |
 | 终态仍要求复核 | 完成不等于正确 | “模型初步结论 · 待复核” | `review_required=true` |
+| 服务端 Evidence Gate | 验证结果可决定继续还是停止 | 本轮缺口、下一轮目的、剩余预算 | `rounds[].evidence_gaps` 与 `next_step` |
+| 版本化人工控制 | 用户不必只能等待模型跑完 | 暂停、继续、调整下一轮、结束并保留 | `ControlEvent`、expected version、幂等回执 |
+| 有界候选修复 | 模型返回未通过时不会静默采用 | `未采用` 与预算内重试 | `plan_validation_rejected`、模型调用计数 |
 
 ## 7. 当前证据卡片
 
-`DR-0022` 当前只在限定工程链路内为 `Limited Verified`：
+`DR-0022` 证明文件夹工作现场基线；`DR-0023` 在此基础上新增限定范围的
+Agent Control Loop `Limited Verified`：
 
-- 聚焦 Python：`26 passed in 15.37s`；
-- 完整 Python：`51 passed in 13.16s`；
-- 浏览器：`8 passed in 22.9s`；
-- Ruff、前端类型检查、生产构建和治理测试通过；
-- 真实浏览器运行：规划 `8.7s`，分析 `16.7s`，两次模型结果均被采用；
-- 9 张截图及 SHA-256 已绑定机器清单；
-- 实现提交 [`0794648`](https://github.com/Dickey007s/lenovo_agent/commit/0794648477ad0061a5460127af8800a021019366)；
-- 当前交付 [PR #27](https://github.com/Dickey007s/lenovo_agent/pull/27) 为开放状态，不能表述为已经合并。
+- 完整 Python：`56 passed in 13.56s`；聚焦 Runtime：`19 passed in 0.95s`；
+- Harness 浏览器：`9 passed in 21.7s`；Ruff、lint、build 与 diff-check 通过；
+- 真实浏览器运行：2 轮、8 份文件、5 次模型调用、21 条事件、`71461 ms`；
+- 第一轮候选计划被拒绝，最多一次预算内修复后通过；第二轮形成只读简报；
+- 6 张桌面/移动截图及 SHA-256 绑定 manifest；390px 无页面横向溢出；
+- 实现提交 [`8364b1e`](https://github.com/Dickey007s/lenovo_agent/commit/8364b1e403ce11c928683f28eb106ce218029315)；
+- 当前交付 [PR #28](https://github.com/Dickey007s/lenovo_agent/pull/28) 为开放状态，不能表述为已经合并。
 
 最终数字必须取自
-[`FORTE-FOLDER-WORKSPACE-EVIDENCE-20260825`](evidence/FORTE-FOLDER-WORKSPACE-EVIDENCE-20260825.md)，
+[`AGENT-CONTROL-LOOP-BOUNDED-READONLY-20260825`](evidence/AGENT-CONTROL-LOOP-BOUNDED-READONLY-EVIDENCE-20260825.md)，
 不得沿用旧版 PPT 或历史 Evidence。
 
 ## 8. 禁止对外表述
@@ -128,6 +131,7 @@ Agent Control Loop 的逐模块现状、完成度口径和下一条三轮只读�
 - “15 类 FORTE 任务已经全部解决”；
 - “有引用就证明结论或数字正确”；
 - “计划里出现操作，就说明工具或文件写入已经发生”；
-- “Demo 1/2 执行器和 Demo 3 真实动作控制已经全部完成”；
+- “当前三轮只读 Loop 已等同完整 Demo 1 Durable Runtime，或 Demo 2/3 已全部完成”；
 - “内存 Snapshot 具备跨进程持久化或多实例高可用”；
+- “Evidence Gate 已验证语义真值、数值正确性或业务完整性”；
 - 在没有用户研究时声称“新界面更清晰、更可信或效率更高”。

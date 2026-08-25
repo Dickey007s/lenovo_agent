@@ -3,7 +3,8 @@
 Office Agent is one FORTE-backed office folder, not a gallery of registered
 Demo scenarios. A user can browse public office files, inspect a bounded safe
 preview, select files across folders, write an original task and follow a
-server-backed path from planning to a cited read-only result.
+server-backed Agent Control Loop from planning, analysis and evidence checking
+to a cited read-only brief.
 
 The current product is deliberately narrow. `completed` means the Planner
 candidate passed server policy/structure checks and the Analyst response passed
@@ -17,8 +18,10 @@ The root page is the only product entry:
 - left: one searchable office folder tree with 15 public FORTE task folders
   and 96 input files;
 - center: file metadata, CSV/XLSX/PDF/DOCX/TXT/code preview, selected-file
-  chips, a free-form task composer, validated plan and cited initial result;
-- right: ordered server events and separate Planner/Analyst call receipts;
+  chips, a free-form task composer, loop budget, round history, evidence gaps,
+  controls and a cited read-only brief;
+- right: current phase, ordered server events and separate Planner/Analyst
+  adoption receipts;
 - boundary: only selected files enter the Run, originals stay read-only,
   results require review and no external action occurs.
 
@@ -29,16 +32,20 @@ browse folders
   -> inspect safe file preview
   -> select 1-20 files
   -> author an original task
-  -> deepseek-v4-pro Planner proposes business intent
-  -> server compiles and validates policy
-  -> deepseek-v4-pro Analyst reads selected safe projections
-  -> server validates citation membership
+  -> freeze an AgentControlLoopContract and budget
+  -> deepseek-v4-pro Planner proposes one bounded round
+  -> server compiles and validates scope, tools, dependencies and effects
+  -> deepseek-v4-pro Analyst reads the approved safe projections
+  -> server validates citation membership and evaluates the Evidence Gate
+  -> next round when evidence is missing and budget remains
   -> ordered SSE + authoritative memory Snapshot
-  -> initial result, review_required=true, external side effect none
+  -> read-only brief, review_required=true, external side effect none
 ```
 
 Model receipts distinguish `未调用`, `已采用` and `未采用`. A returned model
-response that fails server validation is not presented as success. Ordinary UI
+response that fails server validation is not presented as success. A rejected
+plan may be repaired once within the same model-call budget, and both the
+rejection and retry remain visible in the ordered trace. Ordinary UI
 hides Prompt, chain-of-thought, raw provider response, absolute path, digest,
 benchmark task/rubric/solution and internal effect/gate identifiers.
 
@@ -52,9 +59,9 @@ Demo names do not unlock capability or select private code paths:
   convergence;
 - Demo 3 applies a cross-cutting risk/action gate to either topology.
 
-The current Runtime is still `read_only_analysis`. Bounded execution,
-adaptive Workers, versioned Artifact/Commit and governed actions are target
-architecture, not current claims.
+The current Runtime is a `bounded_read_only_control_loop`. Adaptive Workers,
+versioned durable Artifact/Commit, cross-process recovery and governed external
+actions remain target architecture, not current claims.
 
 ## Public data and preview boundary
 
@@ -75,7 +82,7 @@ resources are never executed or loaded.
 does not enter ordinary UI or model-selected context. The user must supply an
 instruction and explicit selected file refs.
 
-## Six-path API
+## Seven-path API
 
 ```text
 GET  /v1/health
@@ -83,6 +90,7 @@ GET  /v1/harness/workspace
 GET  /v1/harness/workspace/files/{file_ref}
 POST /v1/harness/runs
 GET  /v1/harness/runs/{run_id}
+POST /v1/harness/runs/{run_id}/controls
 GET  /v1/harness/runs/{run_id}/events?after={sequence}
 ```
 
@@ -101,10 +109,12 @@ idempotency records live in one API process memory and disappear on restart.
 7. Artifact Workspace & Verifier
 8. Checkpoint, Event & Governance Control
 
-Current implementation covers modules 1-4, a bounded result/citation subset of
-module 7 and the memory event/idempotency subset of module 8. Modules 5-6,
-writable versioned Artifact/Commit, durable checkpointing and governed external
-action remain target work.
+Current implementation covers modules 1-4; a bounded single-loop controller
+subset of module 5; a read-only result, citation and Evidence Gate subset of
+module 7; and the memory event, control and idempotency subset of module 8.
+Distributed Worker scheduling, a real Tool Gateway, writable versioned
+Artifact/Commit, durable checkpointing and governed external action remain
+target work.
 
 ## Evidence status
 
@@ -115,15 +125,21 @@ action remain target work.
   [`0794648`](https://github.com/Dickey007s/lenovo_agent/commit/0794648477ad0061a5460127af8800a021019366)
   and stacked [PR #27](https://github.com/Dickey007s/lenovo_agent/pull/27) are
   bound; the PR is open and this is not a merged-state claim.
-- Current checks: focused Python `26 passed`, full Python `51 passed`, Harness
-  browser `8 passed`; Ruff, frontend typecheck, production build, governance,
-  local-link and diff checks pass. A real configured-model browser run recorded
-  `8.7 s` planning and `16.7 s` analysis before the review-required result.
+- `DR-0023` is `Limited Verified` for the bounded read-only Agent Control Loop.
+  Implementation `8364b1e` and stacked [PR #28](https://github.com/Dickey007s/lenovo_agent/pull/28)
+  are bound; the PR is open and this is not a merged-state claim. A real
+  `deepseek-v4-pro` run completed 2 rounds over 8 FORTE files with 5 model calls
+  and 21 ordered events; the first candidate plan was rejected, visibly retried
+  once within budget, then adopted.
+- Current checks: full Python `56 passed`, focused Harness Python `19 passed`,
+  Harness browser `9 passed`; Ruff, frontend typecheck, production build and
+  diff checks pass.
 - No target-user study has been run. Clarity, trust, efficiency and user value
   remain hypotheses.
 
 Detailed claims and limits live in
-[`FORTE-FOLDER-WORKSPACE-EVIDENCE-20260825`](docs/evidence/FORTE-FOLDER-WORKSPACE-EVIDENCE-20260825.md).
+[`FORTE-FOLDER-WORKSPACE-EVIDENCE-20260825`](docs/evidence/FORTE-FOLDER-WORKSPACE-EVIDENCE-20260825.md)
+and [`AGENT-CONTROL-LOOP-BOUNDED-READONLY-20260825`](docs/evidence/AGENT-CONTROL-LOOP-BOUNDED-READONLY-EVIDENCE-20260825.md).
 
 ## Local run
 
@@ -171,6 +187,7 @@ pnpm --dir apps/web exec playwright test e2e/harness-workbench.spec.ts
 - [SCENARIO-008](docs/scenarios/SCENARIO-008-whole-folder-office-workspace.md)
 - [DR-0023：三轮只读 Agent Control Loop](docs/decisions/DR-0023-agent-control-loop.md)
 - [SCENARIO-009：Agent 研究当前文件夹并提出下一步](docs/scenarios/SCENARIO-009-agent-control-loop.md)
+- [Agent Control Loop 三轮只读纵切证据](docs/evidence/AGENT-CONTROL-LOOP-BOUNDED-READONLY-EVIDENCE-20260825.md)
 - [主流方案、办公场景与交互影响研究](docs/research/WORKSPACE-CENTRIC-OFFICE-AGENT-INTERACTION-AND-SOURCES-20260825.md)
 - [Agent Control Loop 当前实现审计与下一纵切](docs/research/AGENT-CONTROL-LOOP-IMPLEMENTATION-AUDIT-20260825.md)
 - [15 类办公测试目录](docs/testing/FORTE-PUBLIC-OFFICE-TASK-TEST-CASES-20260825.md)

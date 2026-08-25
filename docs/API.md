@@ -4,15 +4,16 @@ Base URL: `http://localhost:8010`.
 
 ## 1. Public surface
 
-OpenAPI exposes six paths:
+OpenAPI exposes seven paths:
 
 | Method | Path | Purpose |
 | --- | --- | --- |
 | GET | `/v1/health` | process health and configured model/storage labels |
 | GET | `/v1/harness/workspace` | whole public office folder projection |
 | GET | `/v1/harness/workspace/files/{file_ref}` | bounded, integrity-checked file preview |
-| POST | `/v1/harness/runs` | start an idempotent read-only task |
+| POST | `/v1/harness/runs` | start an idempotent bounded read-only Agent Control Loop |
 | GET | `/v1/harness/runs/{run_id}` | Owner-scoped public Snapshot |
+| POST | `/v1/harness/runs/{run_id}/controls` | versioned, idempotent pause/resume/steer/stop |
 | GET | `/v1/harness/runs/{run_id}/events?after=N` | ordered named SSE after a sequence |
 
 The former Scenario list/detail/preview routes and legacy
@@ -123,7 +124,13 @@ Content-Type: application/json
   "selected_file_refs": [
     "forte-a0bccc1df48cc6a1",
     "forte-b6e701bcf4494076"
-  ]
+  ],
+  "loop": {
+    "max_rounds": 3,
+    "max_files_per_round": 4,
+    "max_model_calls": 6,
+    "deadline_seconds": 120
+  }
 }
 ```
 
@@ -131,6 +138,11 @@ Content-Type: application/json
 `selected_file_refs` is required, unique and contains 1-20 stable refs from the
 one workspace. The server rejects unknown refs and supplies no benchmark-task
 fallback.
+
+`loop` is optional and defaults to the values above. Bounds are 1-3 rounds,
+1-8 files per round, 2-6 model calls and 20-300 seconds. The server freezes
+these values into `AgentControlLoopContract`; the browser cannot change the
+scope or budget while a Run is active.
 
 The response is `202 Accepted` with `{"run": snapshot, "replayed": false}`.
 Reusing the same Owner/key/request returns the original start result with
@@ -145,13 +157,37 @@ Important fields:
   "run_id": "harness:...",
   "workspace_id": "forte-public-office",
   "status": "completed",
-  "version": 9,
-  "last_event_sequence": 8,
+  "version": 22,
+  "last_event_sequence": 21,
   "instruction": "...",
   "instruction_source": "user",
   "source_documents": [
     {"file_ref": "forte-...", "display_label": "...", "display_group": "..."}
   ],
+  "contract": {
+    "contract_version": "agent-control-loop.v1",
+    "goal": "...",
+    "allowed_file_refs": ["forte-..."],
+    "max_rounds": 3,
+    "max_files_per_round": 4,
+    "max_model_calls": 6,
+    "deadline_seconds": 120,
+    "external_action": "none"
+  },
+  "budget": {
+    "rounds_used": 2,
+    "files_verified": 8,
+    "model_calls_used": 5,
+    "elapsed_ms": 71461
+  },
+  "rounds": [],
+  "control_state": "running",
+  "control_events": [],
+  "brief": {
+    "outcome": "completed",
+    "rounds_completed": 2,
+    "external_action": "none"
+  },
   "plan": {"summary": "...", "units": []},
   "model_receipt": {
     "called": true,
@@ -178,50 +214,90 @@ Important fields:
 ```
 
 Current statuses are `queued`, `indexing`, `planning`, `validating`,
-`analyzing`, `verifying`, `completed` and `failed`; compatibility
-`ready_to_execute` is retained for runtimes built without an Analyst.
+`analyzing`, `verifying`, `paused`, `completed`, `budget_exhausted`, `stopped`
+and `failed`;
+compatibility `ready_to_execute` is retained for runtimes built without an
+Analyst.
 
-`completed` means a read-only result passed schema, selected-citation and
-boundary checks. It does not mean the answer is correct, plan-declared tools
-ran, a versioned Artifact was committed or an external system changed.
+`completed` means the Evidence Gate found no unreferenced allowed files and the
+read-only results passed schema, selected-citation and boundary checks. It does
+not mean the answer is correct, plan-declared tools ran, a versioned Artifact
+was committed or an external system changed.
 
-## 7. Plan policy and result validation
+## 7. Control a Run
+
+```http
+POST /v1/harness/runs/{run_id}/controls
+X-User-Id: demo_user
+Content-Type: application/json
+
+{
+  "command": "steer",
+  "instruction": "下一轮优先核对付款条件",
+  "expected_version": 12,
+  "idempotency_key": "control-client-generated-key"
+}
+```
+
+Commands are `pause`, `resume`, `steer` and `stop`. `steer` requires an
+instruction and applies only to the next round. Pause and stop are accepted
+immediately but applied only at a safe point between model calls. A stale
+version, illegal transition or same key with different content returns 409.
+An identical replay returns the first control result with `replayed=true`.
+
+## 8. Plan policy and result validation
 
 The provider returns a plan candidate, not the public plan. The server compiles
 allowlisted intent into owned effect/gate semantics, then validates unit IDs,
 dependencies, source refs, tools, logical artifacts and human gates. Raw
 candidate fields and compiler errors are not public facts.
 
+A plan that fails structure or deterministic validation is marked `未采用`.
+The server permits at most one repair attempt, only when the same Loop budget
+still has a model call and time available. Both attempts consume the budget and
+produce ordered events. There is no unbounded or hidden retry loop.
+
 The current Analyst receives safe projections only from selected refs. Each
 finding requires at least one selected `file_ref`; an out-of-scope citation
 fails the Run. This proves reference membership only, not entailment,
 exhaustiveness, arithmetic or policy correctness.
 
-## 8. SSE
+## 9. SSE
 
 ```http
 GET /v1/harness/runs/{run_id}/events?after=3
 Accept: text/event-stream
 ```
 
-Current success order:
+Representative two-round success order:
 
 ```text
 workspace_index
+round_started
+planning_started
+planning_completed
+plan_validation_rejected (optional, followed by one retry)
+plan_validation
+analysis_started
+analysis_completed
+result_validation
+evidence_gate
+round_started
 planning_started
 planning_completed
 plan_validation
 analysis_started
 analysis_completed
 result_validation
-task_completed
+evidence_gate
+loop_committed
 ```
 
 SSE `id` equals the event sequence. `after=N` returns only later events.
 Heartbeats carry no business state. A terminal event is followed by final GET
 reconciliation; a nonterminal interruption uses GET plus `after=N` recovery.
 
-## 9. Error semantics
+## 10. Error semantics
 
 | Result | Meaning | Frontend response |
 | --- | --- | --- |
@@ -231,8 +307,10 @@ reconciliation; a nonterminal interruption uses GET plus `after=N` recovery.
 | preview 503 | selected byte failed integrity/safe parsing | never show stale/partial content |
 | Run/SSE 404 | missing or wrong Owner | same public response; clear stale Run |
 | start 409 | idempotency/contract conflict | preserve instruction/selection and reconcile |
+| control 409 | stale version or illegal transition | GET current Snapshot; preserve command draft and let the user retry |
+| `loop_budget_stopped` | round/call/deadline prevents another step | show bounded brief and unresolved gaps |
 | `status=failed` | model/schema/plan/source/citation validation failed | show safe business error and no result |
 
 See [UI-server fact matrix](contracts/UI_SERVER_FACT_MATRIX.md),
 [`DR-0022`](decisions/DR-0022-workspace-folder-and-arbitrary-task-contract.md)
-and [current Evidence](evidence/FORTE-FOLDER-WORKSPACE-EVIDENCE-20260825.md).
+and [current Evidence](evidence/AGENT-CONTROL-LOOP-BOUNDED-READONLY-EVIDENCE-20260825.md).

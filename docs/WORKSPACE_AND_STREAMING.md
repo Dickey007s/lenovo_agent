@@ -6,8 +6,8 @@ The product is one office folder, not a Scenario chooser. The persistent layout
 is:
 
 - left: folders, files, search, metadata and selection checkboxes;
-- center: task composer and tabs for file preview, plan and result;
-- right: actual Agent trajectory and model receipts.
+- center: task composer, Loop contract, file preview, round progress and final brief;
+- right: actual Agent trajectory, budget, controls and model receipts.
 
 These regions answer four user questions in order: what data exists, what will
 the Agent read, what did it actually do, and where did the answer come from.
@@ -30,10 +30,13 @@ The task is always user-authored. Example chips only fill the editable textarea;
 they do not start a task. The Run button remains disabled until the instruction
 contains at least three characters and one file is selected.
 
-Selection chips show the visible context contract. Clearing or changing the
-instruction changes the command signature. If a start response is unknown, the
-client retries the unchanged signature with the same idempotency key; a known
-terminal retry uses a fresh key and independent Run.
+Selection chips show the visible context contract. The user also sets visible
+limits for rounds, files per round, model calls and deadline. Clearing or
+changing the instruction, scope or limits changes the command signature. If a
+start response is unknown, the client retries the unchanged signature with the
+same idempotency key; a known terminal retry uses a fresh key and independent
+Run. Once accepted, the active instruction, scope and limits are frozen in the
+Snapshot and the corresponding controls are disabled until the Run terminates.
 
 ## 4. Preview contract
 
@@ -47,16 +50,24 @@ terminal retry uses a fresh key and independent Run.
 Truncation is explicitly labeled. A parser/integrity error replaces the preview
 with a safe error; stale or partial data is not shown as valid.
 
-## 5. Plan, result and citation
+## 5. Agent Control Loop, result and citation
 
-The plan tab appears only after the server validates the model candidate. It
-uses business operation labels. `只写本轮成果` means a logical Run result in
-the current plan, not that a file or ArtifactVersion was written.
+Each round is a visible `Observe -> Plan -> Act(read-only) -> Verify -> Evidence
+Gate` progression. The plan appears only after the server validates the model
+candidate. It uses business operation labels. `只写本轮成果` means a logical
+read-only Run result in the current round, not that a file or ArtifactVersion
+was written.
 
-The result tab appears only after citation-scope validation. It is labeled
-`模型初步结论 · 待复核`. A citation button resolves against the workspace
-projection, selects that file and switches back to its preview. This keeps
-evidence review inside the main task flow.
+The Evidence Gate shows whether the current evidence is sufficient, which file
+could close a gap and whether another round is allowed by the remaining budget.
+The final brief appears only after citation-scope validation and a server-owned
+terminal decision. It remains labeled for human review. A citation button
+resolves against the workspace projection, selects that file and switches back
+to its preview. This keeps evidence review inside the main task flow.
+
+A model candidate that fails server validation is shown as `未采用`; at most
+one bounded repair attempt may follow and it consumes the same model-call
+budget. The rejected candidate itself never becomes the visible plan.
 
 ## 6. Call receipts and trace
 
@@ -67,9 +78,16 @@ The right pane distinguishes:
 - `未采用`: provider returned but checks rejected the output.
 
 Elapsed milliseconds are an observed call duration, not production SLA or cost.
-The trajectory uses named server events and business summaries. Prompt,
+The trajectory uses named server events and business summaries. It also exposes
+the authoritative round, budget usage and safe-point controls. Prompt,
 chain-of-thought, raw provider response, token traces and validator code stay
 hidden.
+
+`pause` and `stop` take effect only at a safe point between model calls;
+`steer` is recorded for the next round; `resume` continues a paused Run. Each
+command carries Owner, expected version and an idempotency key. The UI waits for
+the returned Snapshot instead of pretending that a click already changed the
+server.
 
 ## 7. Streaming and reconciliation
 
@@ -100,21 +118,27 @@ browser fact, not a server task phase.
 | manifest integrity invalid | integrity-specific unavailable state | no stale catalog | repair/import source then retry |
 | preview error | file-specific safe error | folder/selection/task draft | reopen or choose another file |
 | unknown start result | reconciling | same instruction/refs/key | replay identical request |
-| model/schema/policy failure | safe stop plus receipt | selected scope and instruction | revise or create a fresh Run |
+| model/schema/policy failure | safe stop plus receipt | selected scope, instruction and completed rounds | revise or create a fresh Run |
+| rejected plan candidate | not adopted plus bounded retry | frozen contract and used-call count | server retries once if budget allows; otherwise fails closed |
+| evidence insufficient | next-round purpose and missing evidence | prior rounds and citations | continue automatically within budget or stop at the limit |
+| pause/steer/stop requested | pending until a safe point | current Snapshot and command receipt | reconcile returned version; resume or inspect terminal brief |
 | SSE interruption | reconnecting | current Snapshot and last sequence | GET plus `after=N` |
 
 ## 9. Responsive behavior
 
 Desktop keeps folder, work area and activity pane visible. Narrow layouts stack
 the same functions rather than shrinking the folder tree into an unreadable
-diagram. The tested 390 px path keeps file selection, task input, preview,
-trajectory, plan, result and citation actions touch-usable and avoids page-level
-horizontal overflow. Tables may scroll inside their own preview region.
+diagram. The tested 390 px path keeps file selection, task input, loop bounds,
+rounds, Evidence Gate, controls, final brief and citation actions touch-usable
+and avoids page-level horizontal overflow. Tables may scroll inside their own
+preview region.
 
 ## 10. Hidden details
 
 Ordinary DOM must not contain benchmark task prompt/rubric/solution, raw path,
 digest, model Prompt, chain-of-thought, raw response, credentials, internal
 effect/gate enums or low-level logs. The UI may show business labels, bounded
-content, call receipts, validation status and citations because those facts help
-the user decide or recover.
+content, call receipts, validation status, evidence gaps, controls and citations
+because those facts help the user decide or recover. The current `Commit` is an
+in-memory read-only brief, not an ArtifactVersion, TaskCommit or durable
+checkpoint.
