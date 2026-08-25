@@ -95,6 +95,8 @@ Never rewrite an old source to fit a later design. Add a new Source and link sup
 
 The frontend must not infer completion, model call, Artifact mutation, risk, approval, Permit, tool success or external effect from animation, elapsed time, prose or configured model name.
 
+Model-generated tool names, write scopes, effect classes and gate requirements are proposals, not authority. A server-owned compiler/validator must produce those policy facts before they can appear in a public Snapshot; ordinary UI and reports must use business projections rather than raw protocol identifiers.
+
 For model-generated results, a citation that belongs to the selected source set proves only reference membership unless a separate semantic/numeric verifier exists. Reports must not rename citation-scope validation as factual correctness. `completed` must be qualified by the concrete completed scope, such as “read-only analysis result available for review”.
 
 ## 6. Evidence hierarchy

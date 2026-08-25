@@ -7,6 +7,7 @@ The current product governs a read-only analysis result:
 ```text
 server-owned Scenario + selected source set
   -> model plan candidate
+  -> server-owned policy compilation
   -> deterministic plan validation
   -> model result candidate over safe previews
   -> deterministic selected-file citation validation
@@ -23,19 +24,19 @@ The server owns:
 
 - Scenario identity, manifest integrity, safe preview and stable `file_ref`;
 - frozen instruction, instruction source and selected file set;
-- allowed tools/effect declarations;
+- allowed tools and compiled effect/gate declarations;
 - Run identity, Owner, version, status and sequence;
 - plan validation and result citation-scope validation;
 - separate planning/analysis call receipts and adoption facts;
 - result schema, `review_required=true` and no-external-action terminal message.
 
-The model proposes plan/result text. It does not own source identity, state, sequence, validation, execution or external-effect facts.
+The model proposes plan/result text and allowlisted operation intent. It does not own source identity, state, sequence, validation, write scope, human-gate requirements, execution or external-effect facts.
 
 ## 3. Deterministic checks
 
 ### Before analysis
 
-A plan fails closed for duplicate/unknown units, cycles, unselected file refs, unallowlisted tools/effects, unsafe Artifact names, invalid `artifact.write` mapping, or an external-action declaration without `action.preview` and a human gate.
+Before validation, the server compiles intent into policy facts: result-write intent receives Run-workspace scope, action preview receives external-action scope plus a human gate, and read/inspect/verify intent receives no effect. A plan then fails closed for duplicate/unknown units, cycles, unselected file refs, unallowlisted tools/effects, unsafe Artifact names or inconsistent compiled gates. Raw compiler/validator identifiers stay internal.
 
 ### Before completion
 

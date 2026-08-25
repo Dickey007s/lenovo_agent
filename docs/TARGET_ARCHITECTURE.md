@@ -36,7 +36,7 @@ Sources and limitations: [competitor research](research/COMPETITOR-RESEARCH-OPEN
 | 1 | Scenario Pack & Workspace Catalog | Limited Verified | three pinned public collections; bounded preview | enterprise adapter, data policy and source identity |
 | 2 | Task Contract | Limited Verified | instruction/selection are memory-only | versioned contract, budget/deadline and durable recovery |
 | 3 | Planner | Limited Verified | Planner + Analyst on one model; no quality baseline | fixed-set quality/cost study and fallback policy |
-| 4 | Admission & Plan Validator | Limited Verified | structural plan and citation membership only; one live Finance answer disagreed with deterministic ground truth | spreadsheet operator, claim-level semantic/numeric verifier, budgets and replanning |
+| 4 | Admission, Policy Compiler & Plan Validator | Limited Verified | server-owned intent-to-effect/gate compilation plus structural plan and citation membership; one live Finance answer disagreed with deterministic ground truth | dynamic Admission, spreadsheet operator, claim-level semantic/numeric verifier, budgets and replanning |
 | 5 | Scheduler & Worker Manager | Draft | no Scheduler/Worker execution | queue, lease, retry, cancellation and recovery |
 | 6 | Tool Gateway | Draft | no current invocation | current capability registry, Permit and unknown-outcome receipt |
 | 7 | Artifact Workspace & Verifier | Partial | Snapshot result; no immutable Artifact | version, provenance, merge/conflict, verification and Commit |
@@ -106,3 +106,5 @@ All three execution migrations remain `Draft`.
 [DR-0018](decisions/DR-0018-forte-data-workbench-and-verifiable-trace.md) is `Limited Verified` for the fixed FORTE workbench, bounded preview, two model calls per observed Run, selected-ref validation, eight-event trace and an initial Finance-018 response. Its two live observations, three provenance-scoped screenshots and deterministic negative regression do not verify semantic correctness, durable recovery, external action or user value.
 
 [DR-0019](decisions/DR-0019-capability-composed-agent-runtime.md) is `Limited Verified` only for replacing Demo-specific Scenario/Planner identity with a strict generic `work_profile`. It does not verify bounded execution, adaptive self-organization or governed action.
+
+[DR-0020](decisions/DR-0020-server-owned-plan-policy-compilation.md) is `Limited Verified` for compiling model intent into server-owned effect/gate policy, retaining deterministic validation and hiding raw protocol failures in the current read-only Harness. It does not verify plan quality, tool execution, Artifact mutation or external action.

@@ -82,6 +82,8 @@ The Evidence records contract tests, public-payload leak checks, frontend parsin
 
 It does not prove that the current Agent can yet execute Demo 1 or Demo 2 semantics. It also does not prove task classification quality, dynamic self-organization, durable recovery, external action safety or user value.
 
+The later [DR-0020](DR-0020-server-owned-plan-policy-compilation.md) refines the current module-4 implementation: the model proposes operation intent while a server-owned compiler assigns effect/write/gate policy before deterministic validation. This does not change the Draft status of bounded execution, adaptive swarm or governed action.
+
 ## 7. Rejected alternatives
 
 - **Keep `demo_id` internal only**: rejected because internal coupling still shapes Planner and future runtime branches.

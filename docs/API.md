@@ -149,6 +149,10 @@ Statuses are `queued`, `indexing`, `planning`, `validating`, `analyzing`, `verif
 
 For the current Runtime, `completed` means an Analyst response passed schema, citation-scope and read-only-boundary checks. The business UI projects this as “初步结果已形成”. It does not mean the answer is correct, plan-declared tools executed, an ArtifactVersion was committed or an external system changed.
 
+### Plan candidate compilation
+
+The provider response is not the public `HarnessPlan` and does not own `side_effect`. The server compiles allowlisted intent before validation: result-write intent maps to the current Run workspace, action preview maps to an external-action declaration with a human gate, and read/inspect/verify intent maps to no side effect. Raw candidate fields and internal compiler errors are not public API facts.
+
 ## 7. Result validation
 
 `HarnessTaskResult` requires 1-10 findings and `review_required=true`. Each finding needs at least one `file_ref`. The server checks that all cited refs belong to the frozen selected source set.
@@ -187,6 +191,8 @@ The SSE `id` equals event sequence. `after=N` returns only later events. Heartbe
 | preview 503 | selected source failed integrity | do not show stale/partial preview |
 | Run/SSE 404 | missing or wrong Owner | do not reveal ownership; clear stale Run |
 | start 409 | idempotency/contract conflict | preserve task and reconcile |
-| `status=failed` | plan, model structure, source or citation validation failed | show safe error; do not enable a result |
+| `status=failed` | plan, model structure, source or citation validation failed | show safe business error; do not enable a result; hide raw tool/effect identifiers |
+
+Public `validation_errors[]` are a fail-closed business projection. Raw validator/compiler details remain internal. A known terminal retry creates a new command/key; only an unknown start outcome with the unchanged command signature reuses the original idempotency key.
 
 See [UI—server fact matrix](contracts/UI_SERVER_FACT_MATRIX.md).

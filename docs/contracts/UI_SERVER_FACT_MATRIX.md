@@ -1,6 +1,6 @@
 # UI—Server Fact Matrix
 
-This is the current DR-0018 workbench contract plus the DR-0019 generic capability-profile boundary. Historical Task/Cockpit/Action mappings remain in retired Evidence.
+This is the current DR-0018 workbench contract plus the DR-0019 generic capability-profile boundary and DR-0020 server-owned policy compiler. Historical Task/Cockpit/Action mappings remain in retired Evidence.
 
 ## 1. Data workbench
 
@@ -14,7 +14,7 @@ This is the current DR-0018 workbench contract plus the DR-0019 generic capabili
 | File checkbox | include/exclude a file from this task | POST `selected_file_refs`; server membership validation | UI retains at least one; edits create new command signature | source path/hash | tests/E2E |
 | File preview | actual bounded public benchmark content | preview route by Scenario + `file_ref` | unknown/integrity failure is explicit; no fallback data | path/hash/raw task | tests/E2E |
 | Task composer | user defines the question | POST `instruction`; Snapshot `instruction/instruction_source` | 3-2,000 chars; edit invalidates pending command key | hidden benchmark task substitution | tests/E2E |
-| Run start | create one independent read-only task | POST Owner/key/version/instruction/refs | identical unknown outcome reuses key; different content conflicts | internal task handle | tests/E2E |
+| Run start | create one independent read-only task | POST Owner/key/version/instruction/refs | identical unknown outcome reuses key; known failed/completed retry uses a fresh key | internal task handle | tests/E2E |
 
 ## 2. Plan, result and trace
 
@@ -22,8 +22,8 @@ This is the current DR-0018 workbench contract plus the DR-0019 generic capabili
 | --- | --- | --- | --- | --- | --- |
 | 已锁定所选文件 | Run context frozen | `workspace_index`, public `source_documents[]` | seq 1 / v2 | internal path/hash/summary |
 | 规划模型开始/返回 | Planner call stage | `planning_started/completed` | seq 2-3; not validation | Prompt, CoT, raw response |
-| 规划调用 receipt | whether Planner called/adopted and elapsed observation | `model_receipt.called/model/elapsed_ms/output_used` | independent of Analyst | provider trace/tokens |
-| 已校验的工作图 | public accepted plan | `plan_validation`, public `plan.units[]` | seq 4; tool names are intent only | unvalidated candidate/internal paths |
+| 规划调用 receipt | `未调用` / `已采用` / `校验未通过` plus elapsed observation | `model_receipt.called/model/elapsed_ms/output_used` | independent of Analyst; rejection is not “not called” | provider trace/tokens/raw candidate |
+| 已校验的工作图 | server-compiled and validated public plan | `plan_validation`, public `plan.units[]` | seq 4; operation labels are intent only | raw tool/effect IDs and unvalidated candidate |
 | 分析模型开始/返回 | Analyst call over safe previews | `analysis_started/completed` | seq 5-6; not completion | Prompt, CoT, raw response |
 | 分析调用 receipt | whether Analyst called/adopted and elapsed observation | `analysis_receipt.*` | independent of Planner receipt | provider trace/tokens |
 | 服务端核对文件引用 | each finding cites selected refs | `result_validation` | seq 7; membership only | false claim of semantic proof |
@@ -31,7 +31,7 @@ This is the current DR-0018 workbench contract plus the DR-0019 generic capabili
 | Citation label | which selected file a finding references | `result.findings[].file_refs` resolved against `source_documents[]` | unknown ref fails Run | internal path/hash |
 | 仍需你判断 | follow-up needs human review | `result.follow_ups[]`, `review_required=true` | no automatic approval/action | fabricated decision |
 | 初步结果已形成 | response available in memory and trace terminal | `status=completed`, `task_completed`, result present | seq 8 / v9; terminal GET | correctness, quality-pass, external success or Artifact Commit claim |
-| 本轮已安全停止 | source/model/plan/result validation failed | `status=failed`, `harness_failed`, safe `validation_errors[]` | no result tab enabled | stack/raw response |
+| 本轮已安全停止 | source/model/plan/result validation failed | `status=failed`, `harness_failed`, safe `validation_errors[]` | no result tab; “重新规划” starts a fresh-key Run | stack/raw response/raw tool/effect IDs |
 
 ## 3. Preview and validation limits
 
@@ -40,7 +40,7 @@ This is the current DR-0018 workbench contract plus the DR-0019 generic capabili
 | XLSX preview | first visible sheet, <=30 columns, <=120 data rows | arbitrary workbook features or full-sheet UI |
 | Markdown preview | allowlisted input, <=30,000 chars | raw task instruction |
 | stable `file_ref` | deterministic for pinned Scenario/path | a production enterprise document identity |
-| plan validation | refs/tools/effects/dependencies/gates | plan quality |
+| plan compilation + validation | server-owned effects/gates plus refs/tools/dependencies | plan quality or tool execution |
 | result validation | every citation ref belongs to selected set | claim entailment, exhaustive matching, arithmetic or policy correctness |
 | deterministic spreadsheet check | regression reproduces 23 unchanged items / `1,845,444.71` | not yet part of the Runtime; observed model response stated 20 / `2,202,000` |
 | `completed` | response passed schema/ref/read-only checks and needs review | answer correctness, quality pass, tool, Artifact, Connector or business process completion |

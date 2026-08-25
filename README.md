@@ -13,6 +13,8 @@ The root page is the only product entry:
 - right: eight ordered server events plus separate planning and analysis model receipts;
 - boundary: selected public files are read-only, results require human review, and no external action occurs.
 
+The Planner proposes business intent rather than internal side-effect enums. The server compiles that candidate into allowlisted operation semantics, then validates sources, tools, dependencies and gates. Model receipts say `未调用`, `已采用` or `校验未通过`; ordinary failures do not expose raw tool/effect identifiers.
+
 The ordinary UI and Runtime contract are work-led rather than Demo-led. Public, internal and Planner Scenario projections use a generic `work_profile` (`task_topology`, `orchestration`, `control_requirements`, `current_runtime_scope`); they do not carry `demo_id` or `experience_policy`.
 
 Demo 1/2/3 are acceptance lenses over the same Agent capabilities:
@@ -41,6 +43,8 @@ A deterministic regression over the same safe previews found 23 unchanged balanc
 
 DR-0019 is separately `Limited Verified` for implementation [`eef656e`](https://github.com/Dickey007s/lenovo_agent/commit/eef656e): the current public/internal/Planner contract contains no Demo identity and exposes strict generic work profiles. Focused Python is `30 passed in 2.56s`, full Python is `53 passed in 2.51s`, Harness browser E2E is `8 passed in 52.5s`, and Ruff/lint/build pass. This is contract evidence only, not evidence that bounded execution, adaptive self-organization or governed action already runs.
 
+DR-0020 is `Limited Verified` for implementation [`373b79a`](https://github.com/Dickey007s/lenovo_agent/commit/373b79a): server-owned policy compilation now sits between the model candidate and the plan validator. A final live browser Run reached `completed` v9/seq 8 with Planner `15059 ms` and Analyst `13443 ms`, both adopted, while ordinary DOM contained neither `artifact.write` nor `run_workspace_write`. Current verification is full Python `56 passed in 2.57s`, Harness browser E2E `8 passed in 25.1s`, Ruff/lint/build passed. This does not prove plan or answer quality.
+
 ## Current flow
 
 ```text
@@ -49,6 +53,7 @@ FORTE manifest and bytes
   -> bounded file preview
   -> user instruction + selected file_ref values
   -> deepseek-v4-pro Planner
+  -> server-owned policy compilation
   -> deterministic plan validation
   -> deepseek-v4-pro read-only Analyst over safe previews
   -> deterministic citation-scope validation

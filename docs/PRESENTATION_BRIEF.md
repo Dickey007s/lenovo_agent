@@ -17,7 +17,7 @@ Every slide must pass [DECISION_AND_REPORTING_GOVERNANCE.md](DECISION_AND_REPORT
 | 3. Product thesis | business source, user-owned task, verifiable trace and semantic impact | four-pillar diagram | differentiation/value still Draft |
 | 4. Data workbench | actual benchmark data is the first screen | DR-0018 result desktop screenshot | replayed persisted Snapshot, not a new model call |
 | 5. Real source | pinned FORTE bytes become stable safe refs and previews | source/preview diagram | public benchmark, not enterprise database |
-| 6. Two-call loop | Planner then Analyst, each with independent receipt | running desktop screenshot + eight events | screenshot is second live Run around 1.8s |
+| 6. Two-call loop | Planner proposes intent; server compiles policy and validates; Analyst then reads safe previews | DR-0020 completed screenshot + eight events | compiler is not tool execution; one live Run is not quality evidence |
 | 7. Result truth | citations can pass while the numerical answer is wrong | desktop/mobile result screenshots + deterministic 23 / `1,845,444.71` versus model 20 / `2,202,000` | `completed` is not a quality pass |
 | 8. Frontend/backend alignment | every state maps to a field or named event | UI—server fact matrix | no animation/CoT as fact |
 | 9. Eight modules | current and target capabilities stay separate | maturity table | modules 5-6 and durable Artifact remain Draft |
@@ -39,12 +39,12 @@ Do not claim competitors “cannot” support an untested capability, Office Age
 2. Browse an actual table or Markdown input and point out the public benchmark label.
 3. Check the files that should define the task context.
 4. Write a new question and run it.
-5. Follow eight named stages and distinguish planning call, plan validation, analysis call and citation validation.
+5. Follow eight named stages and distinguish planning call, server-owned policy compilation/plan validation, analysis call and citation validation. Read `已采用` as called-and-accepted and `校验未通过` as called-but-rejected.
 6. Open the result. By default the summary and only three findings are visible; “展开结论” and “查看其余7条发现” are explicit user choices.
 7. Read the title “模型初步结论 · 待复核” and explain that the server checked file references and the read-only boundary, not the numerical conclusion.
 8. Close on `completed`: an initial response exists in memory and passed schema/reference/boundary checks; the negative deterministic comparison shows it was not numerically correct, it requires review, and no external action occurred.
 
-Never call displayed plan tool labels “executed tools”. Never call the result an Artifact Commit.
+Never call displayed plan operation labels “executed tools”. Never call server policy compilation an Artifact write, and never call the result an Artifact Commit.
 
 When introducing the three Demos, say explicitly: they are three acceptance lenses over one Agent Runtime, not three modes that inject different abilities. Demo 1 proves the single-task loop, Demo 2 proves multi-task self-organization, and Demo 3 proves the risk/action control plane across either topology. The current product has only the generic contract and read-only analysis slice; the three execution proof targets remain `Draft`.
 
@@ -55,6 +55,7 @@ When introducing the three Demos, say explicitly: they are three acceptance lens
 | [`dr-0018-data-workbench-running-desktop.png`](evidence/screenshots/dr-0018-data-workbench-running-desktop.png) | second real Run `harness:f3a071...`, captured around 1.8s; final Run later completed v9/seq 8 | show real in-progress trajectory and receipt waiting states | not timing benchmark or proof of background execution |
 | [`dr-0018-data-workbench-result-desktop.png`](evidence/screenshots/dr-0018-data-workbench-result-desktop.png) | prior real Run `harness:8c9...` persisted Snapshot replayed into the formal UI by browser POST | show final desktop projection of a real persisted Snapshot | not a third model call or cross-restart/history recovery |
 | [`dr-0018-data-workbench-result-mobile.png`](evidence/screenshots/dr-0018-data-workbench-result-mobile.png) | same replayed `harness:8c9...` Snapshot at 390px; no horizontal overflow | show mobile engineering layout | not a mobile user study |
+| [`dr-0020-safe-plan-compiler-completed.png`](evidence/screenshots/dr-0020-safe-plan-compiler-completed.png) | real browser Run `harness:5dee3a8...`; Planner `15059 ms`, Analyst `13443 ms`, both adopted | show server-compiled plan, readable receipts and completed read-only result | not plan/result quality, tool execution or user comprehension |
 
 Console/page errors were 0 for these captures. Exact hashes and dimensions are in [DR-0018 Evidence](evidence/FORTE-DATA-WORKBENCH-TRACE-EVIDENCE-20260824.md).
 
@@ -69,9 +70,10 @@ Console/page errors were 0 for these captures. Exact hashes and dimensions are i
 | deterministic negative comparison | Verified regression fact | public-preview test reproduces 23 / `1,845,444.71` | a Runtime semantic verifier already exists |
 | no external effect | current boundary | Runtime/events/result footer | future Connector governance |
 | generic capability profile, no Demo identity | Limited Verified | `eef656e`, focused Python `30 passed`, browser `8 passed` | bounded loop, adaptive swarm or Risk Gate execution |
+| server-owned plan policy compilation | Limited Verified | `373b79a`; live v9/seq 8; Python `56 passed`; browser `8 passed` | plan/result quality, Tool Gateway or Artifact mutation |
 | reduced text improves clarity | Draft | no target-user study | usability claim |
 
-Final verification is Python `53 passed in 2.68s`, Ruff and web lint passed, and the production build passed (`2.5s` compile, `4.4s` TypeScript, `810ms` static generation). [PR #25](https://github.com/Dickey007s/lenovo_agent/pull/25) is open and not yet merged.
+Current DR-0020 verification is Python `56 passed in 2.57s`, Harness browser `8 passed in 25.1s`, Ruff and web lint passed, and the production build passed (`2.1s` compile, `3.7s` TypeScript, `656ms` static generation). [PR #25](https://github.com/Dickey007s/lenovo_agent/pull/25) is open and not yet merged.
 
 ## 8. Source trail
 

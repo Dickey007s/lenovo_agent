@@ -30,6 +30,8 @@ The task composer accepts a free-form instruction and shows how many files are s
 
 If the start response is unknown, the local command retains its key. A retry with unchanged Scenario/instruction/files reuses it. Editing the task or selection creates a new command signature/key.
 
+After a known failed terminal, “重新规划” creates a new command with a fresh key. After a known completed terminal, “再次运行” also creates a new command. These are new Runs, not recovery of the old terminal Run.
+
 The Snapshot echoes `instruction` and `instruction_source`. The frontend must not replace a user instruction with hidden benchmark text.
 
 ## 4. Progressive trajectory
@@ -43,7 +45,7 @@ The Snapshot echoes `instruction` and `instruction_source`. The frontend must no
 | result check | `result_validation` | all finding refs belong to the selected set |
 | initial result | `status=completed`, `task_completed`, result present | “初步结果已形成”; a response is available and still needs human review |
 
-The trace shows observable server stages, not chain of thought or raw logs. “结果采用” comes from the matching receipt's `output_used=true`; elapsed animation is not evidence.
+The trace shows observable server stages, not chain of thought or raw logs. Receipt labels are exact: `未调用` means `called=false`; `已采用` means `called=true/output_used=true`; `校验未通过` means the provider returned a candidate but the server rejected it. Elapsed animation is not evidence.
 
 ## 5. Data, plan and result views
 
@@ -53,7 +55,7 @@ Shows safe display labels, sheet/text content and truncation. It hides internal 
 
 ### Task plan
 
-Shows validated public units, dependencies, selected file labels and business tool labels. A displayed `artifact.write` or `action.preview` is proposed intent only; the current Runtime does not invoke those tools.
+Shows validated public units, dependencies, selected file labels and business operation labels. The model candidate is first compiled by server policy; raw `artifact.write`, `run_workspace_write` and validator protocol strings are hidden from ordinary UI. A displayed operation remains proposed intent only; the current Runtime does not invoke a Tool Gateway or mutate an Artifact.
 
 ### Analysis result
 

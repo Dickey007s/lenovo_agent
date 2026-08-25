@@ -63,7 +63,9 @@ The first three fields describe the intended reusable capability composition. `c
 
 ### Planning call
 
-The Planner receives the user goal, safe file metadata and server policy. It returns a strict `HarnessPlan`. The server validates unit IDs, dependencies/cycles, selected refs, allowlisted tools, side-effect types, logical Artifact names and required human gates.
+The Planner receives the user goal, safe file metadata and server policy. It returns a restricted candidate with business intent, dependencies, selected refs and allowlisted tool intent; it does not own internal `side_effect` values.
+
+The server compiles that candidate into a strict `HarnessPlan`: workspace-result intent receives the server-owned write scope, action-preview intent receives the external-action scope and required human gate, and read/inspect/verify intent receives no side effect. The validator then checks unit IDs, dependencies/cycles, selected refs, allowlisted tools, compiled effects, logical Artifact names and gates. Compilation is policy normalization, not tool execution or Artifact mutation.
 
 ### Analysis call
 
