@@ -91,12 +91,16 @@ from .demo2_models import (
 )
 from .harness_models import (
     BenchmarkContentNature,
+    BenchmarkControlRequirement,
     BenchmarkFileEntry,
     BenchmarkFileRole,
     BenchmarkManifest,
+    BenchmarkOrchestrationMode,
     BenchmarkTaskEntry,
+    BenchmarkTaskTopology,
     BenchmarkDisplayFile,
     BenchmarkPublicScenario,
+    BenchmarkWorkProfile,
 )
 
 __all__ = [
@@ -186,10 +190,14 @@ __all__ = [
     "SwarmEvent",
     "WorkerProcessing",
     "BenchmarkContentNature",
+    "BenchmarkControlRequirement",
     "BenchmarkFileEntry",
     "BenchmarkFileRole",
     "BenchmarkManifest",
+    "BenchmarkOrchestrationMode",
     "BenchmarkTaskEntry",
+    "BenchmarkTaskTopology",
     "BenchmarkDisplayFile",
     "BenchmarkPublicScenario",
+    "BenchmarkWorkProfile",
 ]

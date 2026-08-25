@@ -82,3 +82,7 @@ There is no independent screenshot of the final converged UI in this change. The
 - **Delete historical evidence**: rejected because it destroys traceability and makes older claims impossible to audit.
 - **Rename old evidence as current FORTE evidence**: rejected because Customer A facts cannot be transferred to new runs.
 - **Treat any 503 as an offline API**: rejected because integrity failure requires different user action and must fail closed.
+
+## 8. Current applicability
+
+The sole-FORTE-entry and legacy-retirement decision remains active. DR-0018 supersedes only the current interaction/API/terminal description: the product now has seven paths, safe file preview, a second Analyst call and an eight-event response ending at `completed` v9/seq 8. The six-path/`ready_to_execute` evidence and numbers above remain the historical facts of this decision and must not be rewritten as current behavior.

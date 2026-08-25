@@ -15,6 +15,13 @@ from .models import StrictModel
 
 BenchmarkContentNature = Literal["public_benchmark_input"]
 BenchmarkFileRole = Literal["input", "task_instruction"]
+BenchmarkTaskTopology = Literal["single_task", "multi_task"]
+BenchmarkOrchestrationMode = Literal["bounded_loop", "adaptive_swarm"]
+BenchmarkControlRequirement = Literal[
+    "evidence_gate",
+    "human_gate",
+    "risk_gate",
+]
 
 
 class BenchmarkFileEntry(StrictModel):
@@ -75,16 +82,67 @@ class BenchmarkManifest(StrictModel):
 class BenchmarkDisplayFile(StrictModel):
     """Business-facing file projection; raw path/hash stay server-side."""
 
+    file_ref: str = Field(pattern=r"^forte-[0-9a-f]{16}$")
     display_label: str = Field(min_length=1, max_length=200)
     display_group: str = Field(min_length=1, max_length=120)
     display_summary: str = Field(min_length=1, max_length=500)
+
+
+class BenchmarkPreviewRow(StrictModel):
+    """One bounded row in a public spreadsheet preview."""
+
+    row_number: int = Field(ge=1)
+    values: list[str] = Field(max_length=30)
+
+
+class BenchmarkFilePreview(StrictModel):
+    """Allowlisted file content safe for the foreground data explorer."""
+
+    scenario_id: str = Field(min_length=1, max_length=120)
+    file_ref: str = Field(pattern=r"^forte-[0-9a-f]{16}$")
+    display_label: str = Field(min_length=1, max_length=200)
+    display_group: str = Field(min_length=1, max_length=120)
+    display_summary: str = Field(min_length=1, max_length=500)
+    kind: Literal["table", "markdown"]
+    sheet_name: str | None = Field(default=None, max_length=120)
+    columns: list[str] = Field(default_factory=list, max_length=30)
+    rows: list[BenchmarkPreviewRow] = Field(default_factory=list, max_length=120)
+    total_rows: int | None = Field(default=None, ge=0)
+    text: str | None = Field(default=None, max_length=30_000)
+    truncated: bool = False
+
+
+class BenchmarkWorkProfile(StrictModel):
+    """Scenario-neutral capability composition requested for a business task.
+
+    The profile describes how the general Agent should organize work. It is not
+    a claim that the current read-only Harness already executes that topology.
+    """
+
+    task_topology: BenchmarkTaskTopology
+    orchestration: BenchmarkOrchestrationMode
+    control_requirements: list[BenchmarkControlRequirement] = Field(
+        min_length=1,
+        max_length=3,
+    )
+    current_runtime_scope: Literal["read_only_analysis"] = "read_only_analysis"
+
+    @field_validator("control_requirements")
+    @classmethod
+    def validate_unique_controls(
+        cls,
+        value: list[BenchmarkControlRequirement],
+    ) -> list[BenchmarkControlRequirement]:
+        if len(value) != len(set(value)):
+            raise ValueError("work profile control requirements must be unique")
+        return value
 
 
 class BenchmarkPublicScenario(StrictModel):
     """Safe scenario contract returned to the foreground UI."""
 
     scenario_id: str = Field(min_length=1, max_length=120)
-    demo_id: Literal["demo1", "demo2", "demo3"]
+    work_profile: BenchmarkWorkProfile
     title: str = Field(min_length=1, max_length=200)
     goal: str = Field(min_length=1, max_length=1_000)
     deliverables: list[str] = Field(min_length=1, max_length=12)
@@ -93,5 +151,4 @@ class BenchmarkPublicScenario(StrictModel):
     allowed_capabilities: list[str] = Field(min_length=1, max_length=16)
     dataset_label: str = Field(min_length=1, max_length=200)
     dataset_version: str = Field(min_length=1, max_length=120)
-    experience_policy: str = Field(min_length=1, max_length=120)
     files: list[BenchmarkDisplayFile] = Field(min_length=1, max_length=100)

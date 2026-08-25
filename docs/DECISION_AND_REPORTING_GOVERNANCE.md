@@ -74,6 +74,8 @@ Every Scenario must state:
 
 An abstract capability name is not a Scenario.
 
+Demo names are acceptance/reporting lenses, not runtime feature flags. A Demo may bind a concrete Scenario to a generic task topology, orchestration policy and control requirements, but it must not introduce private capabilities that are unavailable to user-authored tasks. Every Demo report must state which generic modules were exercised and which target capabilities remain Draft.
+
 ## 4. 来源台账
 
 `docs/decisions/SOURCE_REGISTER.md` is the canonical 来源台账. New sources are append-only and use stable IDs. Preserve stakeholder wording verbatim where authorized, distinguish a screenshot's visible content from interpretation, and record file hash/size when the local asset is evidence.
@@ -92,6 +94,10 @@ Never rewrite an old source to fit a later design. Add a new Source and link sup
 - verification and current lifecycle.
 
 The frontend must not infer completion, model call, Artifact mutation, risk, approval, Permit, tool success or external effect from animation, elapsed time, prose or configured model name.
+
+Model-generated tool names, write scopes, effect classes and gate requirements are proposals, not authority. A server-owned compiler/validator must produce those policy facts before they can appear in a public Snapshot; ordinary UI and reports must use business projections rather than raw protocol identifiers.
+
+For model-generated results, a citation that belongs to the selected source set proves only reference membership unless a separate semantic/numeric verifier exists. Reports must not rename citation-scope validation as factual correctness. `completed` must be qualified by the concrete completed scope, such as “read-only analysis result available for review”.
 
 ## 6. Evidence hierarchy
 
@@ -133,4 +139,4 @@ Before delivery, verify:
 - living docs and retirement lifecycle are synchronized;
 - governance test, Markdown link check and `git diff --check` pass.
 
-The current FORTE product application of this policy is [DR-0017](decisions/DR-0017-single-forte-worksite-and-legacy-retirement.md).
+The current FORTE product application of this policy is [DR-0018](decisions/DR-0018-forte-data-workbench-and-verifiable-trace.md). The generic capability-composition rule is [DR-0019](decisions/DR-0019-capability-composed-agent-runtime.md). DR-0016/0017 remain historical foundations with their original evidence scope.

@@ -1,5 +1,7 @@
 # FORTE-only worksite and legacy retirement Evidence (2026-08-24)
 
+> Current applicability: this Evidence remains authoritative for the sole FORTE entry, legacy-route/data retirement and recorded six-path convergence. DR-0018 governs the later seven-path preview/two-call/result UI. The original `ready_to_execute`, test and run facts below remain historical and are not rewritten.
+
 ## Status
 
 `Limited Verified` for the current repository tree, public runtime surface, tested frontend recovery paths, and one observed live planning run. User comprehension, user value, execution, and production readiness remain `Draft`.

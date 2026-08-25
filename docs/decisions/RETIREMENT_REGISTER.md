@@ -4,7 +4,7 @@
 
 This register separates historical validity from current product applicability. `Retired` means an artifact no longer describes the current public UI, API, runtime, data, or acceptance suite. It does not revoke a test result that was valid for the recorded commit. Source records and Git history remain intact.
 
-The retirement decision is [`DR-0017`](DR-0017-single-forte-worksite-and-legacy-retirement.md), dated 2026-08-24. The replacement product surface is the FORTE worksite defined by [`DR-0016`](DR-0016-public-workspace-agent-harness.md) and DR-0017.
+The retirement decision is [`DR-0017`](DR-0017-single-forte-worksite-and-legacy-retirement.md), dated 2026-08-24. [`DR-0018`](DR-0018-forte-data-workbench-and-verifiable-trace.md) now governs the current seven-path data workbench and read-only analysis. DR-0016/0017 retain their historical foundation and convergence facts but no longer describe the current terminal protocol or final UI.
 
 ## Decisions and contracts
 
@@ -18,7 +18,9 @@ The retirement decision is [`DR-0017`](DR-0017-single-forte-worksite-and-legacy-
 | `DR-0013` | legacy Demo identity navigation and call trace | implementation retired; truthful call receipts carried forward | Harness model receipt and activity rail |
 | `DR-0014` | Customer A file-backed sources | Retired from current product | FORTE manifest and Catalog |
 | `DR-0015` | mainstream comparison plus fixed Customer A controlled execution | execution slice retired; research comparison remains Draft reference | competitor research + FORTE target architecture |
-| `DR-0016` | FORTE Catalog, Planner, Validator and worksite | Active foundation | extended by DR-0017 |
+| `DR-0016` | FORTE Catalog, Planner, Validator and transitional worksite | Active historical foundation | extended by DR-0017/0018; its six-path/ready screenshots remain historical |
+| `DR-0017` | sole FORTE product surface and legacy retirement | Active lifecycle decision | current interaction/API/terminal projection extended by DR-0018 |
+| `DR-0018` | data browsing, user task, two-call read-only result and verifiable trace | Active current product contract | current living docs and SCENARIO-004/005/006/007 |
 | `TASK_RUNTIME_PROTOCOL.md` | legacy Task Runtime protocol | Retired historical contract | Harness API and UI fact matrix |
 
 ## Scenarios
@@ -28,8 +30,8 @@ The retirement decision is [`DR-0017`](DR-0017-single-forte-worksite-and-legacy-
 | `SCENARIO-001` Customer A durable report | Retired historical scenario | `SCENARIO-004` |
 | `SCENARIO-002` fixed cockpit/controlled execution | Retired historical scenario | `SCENARIO-005` |
 | `SCENARIO-003` fixed Customer A action ledger | Retired historical scenario | `SCENARIO-006` |
-| `SCENARIO-004/005/006` | Active source scenarios; execution beyond planning remains Draft | current three FORTE tabs |
-| `SCENARIO-007` | Active cross-scenario entry/recovery scenario | current product shell |
+| `SCENARIO-004/005/006` | Active source scenarios under the DR-0018 preview/task/read-only contract; semantic quality and execution remain Draft | current three FORTE collections |
+| `SCENARIO-007` | Active cross-scenario data-workbench/recovery journey | current product shell and trace |
 
 ## Historical evidence
 
@@ -56,7 +58,7 @@ All rows below retain their original claims, commits, test counts, screenshots, 
 | `DEMO1-FILE-BACKED-SOURCES-EVIDENCE-20260820.md` | Customer A source package | Retired |
 | `DEMO2-CONTROLLED-EXECUTION-EVIDENCE-20260821.md` | fixed Customer A Worker execution | Retired |
 
-`LLM-API-SMOKE-EVIDENCE-20260811.md` remains a historical connectivity observation, not current product acceptance evidence. DR-0016 Evidence remains the historical/current foundation for the planning slice; DR-0017 Evidence governs the sole-product-surface and retirement claim.
+`LLM-API-SMOKE-EVIDENCE-20260811.md` remains a historical connectivity observation, not current product acceptance evidence. DR-0016 Evidence remains the historical planning foundation; DR-0017 Evidence governs the sole-product-surface and retirement claim at its recorded six-path boundary. `FORTE-DATA-WORKBENCH-TRACE-EVIDENCE-20260824.md` is the current API/UI/terminal Evidence and preserves the numerical negative result rather than treating `completed` as correctness.
 
 ## Sources, research, and presentations
 

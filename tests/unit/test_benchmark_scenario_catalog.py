@@ -4,6 +4,7 @@ import hashlib
 import json
 import re
 import shutil
+from decimal import Decimal
 from pathlib import Path
 
 import pytest
@@ -35,9 +36,17 @@ def test_catalog_indexes_only_three_public_input_workspaces() -> None:
         "Operations-008",
     ]
     assert [len(item.files) for item in scenarios] == [4, 5, 2]
-    assert scenarios[0].projection["demo_id"] == "demo1"
-    assert scenarios[1].projection["experience_policy"] == "adaptive_team"
-    assert scenarios[2].projection["demo_id"] == "demo3"
+    assert scenarios[0].projection["work_profile"] == {
+        "task_topology": "single_task",
+        "orchestration": "bounded_loop",
+        "control_requirements": ["evidence_gate", "human_gate"],
+        "current_runtime_scope": "read_only_analysis",
+    }
+    assert scenarios[1].projection["work_profile"]["task_topology"] == "multi_task"
+    assert scenarios[1].projection["work_profile"]["orchestration"] == "adaptive_swarm"
+    assert "risk_gate" in scenarios[2].projection["work_profile"][
+        "control_requirements"
+    ]
 
     finance = scenarios[0]
     workbook = finance.file("Finance-018/input/2026往来明细.xlsx")
@@ -65,10 +74,13 @@ def test_catalog_indexes_only_three_public_input_workspaces() -> None:
 def test_public_projection_hides_planner_prompt_and_raw_paths() -> None:
     catalog = BenchmarkScenarioCatalog(ROOT)
     public = catalog.public_scenarios()
-    assert {item["demo_id"] for item in public} == {"demo1", "demo2", "demo3"}
+    assert {item["work_profile"]["task_topology"] for item in public} == {
+        "single_task",
+        "multi_task",
+    }
     required = {
         "title", "goal", "deliverables", "data_boundary", "human_gate_summary",
-        "allowed_capabilities", "files",
+        "allowed_capabilities", "work_profile", "files",
     }
     for item in public:
         assert required.issubset(item)
@@ -80,10 +92,17 @@ def test_public_projection_hides_planner_prompt_and_raw_paths() -> None:
         assert "customer-a" not in serialized
         assert "2400" not in serialized
         assert "2680" not in serialized
+        assert "demo_id" not in serialized
+        assert "experience_policy" not in serialized
         assert not re.search(r"(?<![0-9a-f])[0-9a-f]{40}(?![0-9a-f])", serialized)
         assert not re.search(r"(?<![0-9a-f])[0-9a-f]{64}(?![0-9a-f])", serialized)
         assert "input_dir" not in item
-        assert all(set(file) == {"display_label", "display_group", "display_summary"} for file in item["files"])
+        assert all(
+            set(file)
+            == {"file_ref", "display_label", "display_group", "display_summary"}
+            for file in item["files"]
+        )
+        assert all(re.fullmatch(r"forte-[0-9a-f]{16}", file["file_ref"]) for file in item["files"])
         assert all("/workspace/input" not in file["display_summary"] for file in item["files"])
     finance_files = public[0]["files"]
     assert any("工作表" in file["display_summary"] and "A1:J59" in file["display_summary"] for file in finance_files)
@@ -111,6 +130,70 @@ def test_internal_task_has_sanitized_prompt_and_raw_input_with_display_projectio
     assert internal["files"]
     assert all(file["path"].startswith("Operations-008/input/") for file in internal["files"])
     assert all(file["display_label"] and file["display_group"] and file["display_summary"] for file in internal["files"])
+    assert all(re.fullmatch(r"forte-[0-9a-f]{16}", file["file_ref"]) for file in internal["files"])
+
+
+def test_public_file_preview_exposes_real_rows_without_raw_metadata() -> None:
+    catalog = BenchmarkScenarioCatalog(ROOT)
+    public = catalog.public_task("Finance-018")
+    file_ref = public["files"][0]["file_ref"]
+    preview = catalog.public_file("Finance-018", file_ref)
+
+    assert preview["kind"] == "table"
+    assert preview["columns"][:3] == ["科目名称", "客商名称", "方向"]
+    assert preview["total_rows"] == 75
+    assert preview["rows"][0]["row_number"] == 2
+    assert "黄杉文化传播有限公司" in preview["rows"][0]["values"][1]
+    serialized = json.dumps(preview, ensure_ascii=False)
+    assert "Finance-018/input" not in serialized
+    assert "sha256" not in serialized
+    assert "task_instruction" not in serialized
+
+
+def test_finance_cross_period_ground_truth_is_deterministically_reproducible() -> None:
+    catalog = BenchmarkScenarioCatalog(ROOT)
+    files = catalog.public_task("Finance-018")["files"]
+    by_label = {item["display_label"]: item["file_ref"] for item in files}
+    first = catalog.public_file("Finance-018", by_label["2025 年上半年往来明细"])
+    second = catalog.public_file("Finance-018", by_label["2025 年下半年往来明细"])
+
+    def balances(preview: dict[str, object]) -> dict[tuple[str, str, str], Decimal]:
+        rows = preview["rows"]
+        assert isinstance(rows, list)
+        values: dict[tuple[str, str, str], Decimal] = {}
+        for row in rows:
+            assert isinstance(row, dict)
+            cells = row["values"]
+            assert isinstance(cells, list)
+            if len(cells) < 10 or not cells[9]:
+                continue
+            values[(str(cells[0]), str(cells[1]), str(cells[8]))] = Decimal(str(cells[9]))
+        return values
+
+    first_balances = balances(first)
+    second_balances = balances(second)
+    unchanged = [
+        value
+        for key, value in first_balances.items()
+        if second_balances.get(key) == value
+    ]
+
+    assert len(unchanged) == 23
+    assert sum(abs(value) for value in unchanged) == Decimal("1845444.71")
+
+
+def test_public_markdown_preview_never_exposes_task_instruction() -> None:
+    catalog = BenchmarkScenarioCatalog(ROOT)
+    public = catalog.public_task("Operations-008")
+    assert len(public["files"]) == 1
+    preview = catalog.public_file("Operations-008", public["files"][0]["file_ref"])
+
+    assert preview["kind"] == "markdown"
+    assert "外呼" in preview["text"]
+    assert "## Prompt" not in preview["text"]
+    assert "Grading Criteria" not in preview["text"]
+    with pytest.raises(KeyError):
+        catalog.public_file("Operations-008", "forte-0000000000000000")
 
 
 def test_catalog_fails_closed_when_a_declared_file_is_tampered(tmp_path: Path) -> None:

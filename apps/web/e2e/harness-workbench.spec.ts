@@ -1,299 +1,190 @@
 import { expect, test, type Page, type Route } from "@playwright/test";
 
 const API_URL = process.env.HARNESS_E2E_API_URL ?? "http://localhost:8011";
-type DemoId = "demo1" | "demo2" | "demo3";
+type ScenarioId = "Finance-018" | "pm-014" | "Operations-008";
 
-const scenarioData: Record<DemoId, { scenario_id: string; title: string; goal: string; display: string; summary: string }> = {
-  demo1: { scenario_id: "Finance-018", title: "核对跨年度往来账款", goal: "识别未收款与长期不变账款。", display: "2025 年往来明细", summary: "Excel 表格，共 1 个工作表；明细（A1:F18，列：客户、日期、金额）" },
-  demo2: { scenario_id: "pm-014", title: "核对产品上线条件", goal: "并行核对配置、功能和兼容性测试。", display: "功能测试报告", summary: "Excel 表格，共 1 个工作表；功能测试（A1:J59，列：模块、用例、结果）" },
-  demo3: { scenario_id: "Operations-008", title: "审核外呼流程边界", goal: "在准备动作前核对时间和人工升级规则。", display: "外呼流程说明", summary: "Markdown 业务说明，包含 6 个标题" },
+const files = {
+  finance2025: { file_ref: "forte-a0bccc1df48cc6a1", display_label: "2025 年上半年往来明细", display_group: "财务往来", display_summary: "Excel 表格，共 1 个工作表；sheet1（A1:J76）" },
+  finance2026: { file_ref: "forte-32eda8bd1465bd22", display_label: "2026 年往来明细", display_group: "财务往来", display_summary: "Excel 表格，共 1 个工作表；sheet1（A1:J59）" },
+  releaseConfig: { file_ref: "forte-8190a8f0f714c421", display_label: "上线配置清单", display_group: "版本上线资料", display_summary: "Excel 表格，共 1 个工作表；配置清单" },
+  releaseTest: { file_ref: "forte-8c3dc9b1239e42d1", display_label: "功能测试报告", display_group: "版本上线资料", display_summary: "Excel 表格，共 1 个工作表；功能测试" },
+  operations: { file_ref: "forte-b43bfccfe810c0aa", display_label: "外呼合规规则说明", display_group: "运营合规资料", display_summary: "Markdown 业务说明，包含 6 个标题" },
 };
 
-function publicFiles(demo: DemoId, withRefs = false) {
-  const item = scenarioData[demo];
-  return [{
-    ...(withRefs ? { file_ref: "file-01" } : {}),
-    display_label: item.display,
-    display_group: demo === "demo1" ? "财务往来" : demo === "demo2" ? "版本上线资料" : "运营合规资料",
-    display_summary: item.summary,
-  }];
+const scenarios = [
+  { scenario_id: "Finance-018", work_profile: { task_topology: "single_task", orchestration: "bounded_loop", control_requirements: ["evidence_gate", "human_gate"], current_runtime_scope: "read_only_analysis" }, title: "核对跨年度往来账款", goal: "识别未收款与长期不变账款。", dataset_label: "公开办公基准数据 · FORTE", dataset_version: "FORTE 公开版本 · 345c1ec", data_boundary: "仅限所选 FORTE 文件", human_gate_summary: "任何外部动作不在本轮范围内", files: [files.finance2025, files.finance2026] },
+  { scenario_id: "pm-014", work_profile: { task_topology: "multi_task", orchestration: "adaptive_swarm", control_requirements: ["evidence_gate", "human_gate"], current_runtime_scope: "read_only_analysis" }, title: "核对产品上线条件", goal: "并行核对配置、功能和兼容性测试。", dataset_label: "公开办公基准数据 · FORTE", dataset_version: "FORTE 公开版本 · 345c1ec", data_boundary: "仅限所选 FORTE 文件", human_gate_summary: "任何外部动作不在本轮范围内", files: [files.releaseConfig, files.releaseTest] },
+  { scenario_id: "Operations-008", work_profile: { task_topology: "single_task", orchestration: "bounded_loop", control_requirements: ["evidence_gate", "human_gate", "risk_gate"], current_runtime_scope: "read_only_analysis" }, title: "审核外呼流程边界", goal: "核对时间和人工升级规则。", dataset_label: "公开办公基准数据 · FORTE", dataset_version: "FORTE 公开版本 · 345c1ec", data_boundary: "仅限所选 FORTE 文件", human_gate_summary: "任何外部动作不在本轮范围内", files: [files.operations] },
+] as const;
+
+function tablePreview(file = files.finance2025) {
+  return { scenario_id: "Finance-018", ...file, kind: "table", sheet_name: "sheet1", columns: ["科目名称", "客商名称", "方向", "期末余额"], rows: [{ row_number: 2, values: ["其他应收款", "黄杉文化传播有限公司", "借", "1500000"] }, { row_number: 3, values: ["应付账款", "魔典引擎", "贷", "305630.12"] }], total_rows: 75, text: null, truncated: false };
 }
 
-function scenario(demo: DemoId) {
-  const item = scenarioData[demo];
-  return {
-    ...item,
-    demo_id: demo,
-    dataset_label: "公开办公基准数据 · FORTE",
-    dataset_version: "FORTE · pinned",
-    deliverables: [demo === "demo2" ? "上线核对结论" : "可复核业务结论"],
-    data_boundary: "仅限本轮公开基准输入文件",
-    human_gate_summary: demo === "demo3" ? "产生外部影响前需要人工确认" : "形成结论后由用户确认是否进入后续动作",
-    allowed_capabilities: demo === "demo3" ? ["读取规则", "核对动作边界", "生成流程工件"] : ["读取表格", "核对业务事实", "生成分析工件"],
-    files: publicFiles(demo),
-  };
+function previewFor(path: string) {
+  if (path.endsWith(files.operations.file_ref)) return { scenario_id: "Operations-008", ...files.operations, kind: "markdown", sheet_name: null, columns: [], rows: [], total_rows: null, text: "# 外呼合规规则\n\n工作日 9:00 前禁止外呼。无法确认身份时必须转人工。", truncated: false };
+  if (path.endsWith(files.releaseConfig.file_ref)) return { ...tablePreview(files.releaseConfig), scenario_id: "pm-014", columns: ["配置项", "期望值", "当前值"], rows: [{ row_number: 2, values: ["灰度比例", "10%", "10%"] }], total_rows: 1 };
+  if (path.endsWith(files.releaseTest.file_ref)) return { ...tablePreview(files.releaseTest), scenario_id: "pm-014", columns: ["模块", "用例", "结果"], rows: [{ row_number: 2, values: ["登录", "正常登录", "通过"] }], total_rows: 1 };
+  return tablePreview(path.endsWith(files.finance2026.file_ref) ? files.finance2026 : files.finance2025);
 }
 
-function planFor(demo: DemoId, suffix = "本轮") {
-  return {
-    summary: `${suffix}动态计划`,
-    units: [
-      { unit_id: `read-${suffix}`, title: `${suffix}读取资料`, objective: "读取服务端允许的本轮输入。", input_file_refs: ["file-01"], depends_on: [], tool: "file.read", requires_human_gate: false, side_effect: "none", artifact_name: null, artifact_type: null },
-      { unit_id: `review-${suffix}`, title: `${suffix}形成结论`, objective: "形成计划产出并等待后续执行。", input_file_refs: ["file-01"], depends_on: [`read-${suffix}`], tool: demo === "demo3" ? "action.preview" : "artifact.write", requires_human_gate: demo === "demo3", side_effect: demo === "demo3" ? "external_action" : "run_workspace_write", artifact_name: demo === "demo3" ? null : `${demo}-business-summary`, artifact_type: demo === "demo3" ? null : "summary" },
-    ],
-  };
+function plan(selectedRefs: string[]) {
+  return { summary: "先读取所选资料，再核对关键事实并形成引用结论。", units: [
+    { unit_id: "read", title: "读取所选资料", objective: "读取并检查用户选择的公开文件。", input_file_refs: selectedRefs, depends_on: [], tool: "table.inspect", requires_human_gate: false, side_effect: "none", artifact_name: null, artifact_type: null },
+    { unit_id: "analyze", title: "形成核对结论", objective: "回答用户问题并标注文件依据。", input_file_refs: selectedRefs, depends_on: ["read"], tool: "artifact.write", requires_human_gate: false, side_effect: "run_workspace_write", artifact_name: "read-only-result", artifact_type: "analysis" },
+  ] };
 }
 
-function snapshot(demo: DemoId, options: { sequence?: number; version?: number; outputUsed?: boolean; failed?: boolean; suffix?: string } = {}) {
-  const item = scenarioData[demo];
-  const sequence = options.sequence ?? 4;
-  const failed = Boolean(options.failed);
-  const eventName = failed ? "harness_failed" : "ready_to_execute";
+function snapshot(body: { scenario_id: ScenarioId; instruction: string; selected_file_refs: string[] }, status: "queued" | "completed" | "failed" = "completed", sequence = 8) {
+  const scenario = scenarios.find((item) => item.scenario_id === body.scenario_id)!;
+  const selected = scenario.files.filter((file) => body.selected_file_refs.includes(file.file_ref));
+  const failed = status === "failed";
   return {
-    run_id: `harness:${item.scenario_id}`,
-    owner_id: "demo_user",
-    scenario_id: item.scenario_id,
-    status: failed ? "failed" : "ready_to_execute",
-    version: options.version ?? 5,
-    created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
-    last_event_sequence: sequence,
-    source_documents: publicFiles(demo, true),
-    plan: failed ? null : planFor(demo, options.suffix),
-    model_receipt: { called: true, model: "deepseek-v4-pro", elapsed_ms: 1280, output_used: options.outputUsed ?? true },
-    validation_errors: failed ? ["测试错误"] : [],
-    events: sequence > 0 ? [
-      ...(failed && sequence > 1 ? [{ sequence: sequence - 1, event_name: "plan_validation", occurred_at: new Date().toISOString(), status: "validating", message: "正在校验计划。", details: {} }] : []),
-      { sequence, event_name: eventName, occurred_at: new Date().toISOString(), status: failed ? "failed" : "ready_to_execute", message: failed ? "计划未通过安全校验，执行未启动。" : "计划通过服务端校验，执行未启动。", details: {} },
-    ] : [],
+    run_id: `harness:${body.scenario_id}`, owner_id: "demo_user", scenario_id: body.scenario_id,
+    status, version: status === "queued" ? 1 : 9, created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
+    last_event_sequence: status === "queued" ? 0 : sequence, instruction: body.instruction, instruction_source: "user",
+    source_documents: status === "queued" ? [] : selected, selection_reason: `用户选择了 ${selected.length} 份公开文件`,
+    plan: status === "queued" || failed ? null : plan(body.selected_file_refs),
+    model_receipt: status === "queued" ? null : { called: true, model: "deepseek-v4-pro", elapsed_ms: 1350, output_used: !failed },
+    analysis_receipt: status === "completed" ? { called: true, model: "deepseek-v4-pro", elapsed_ms: 2180, output_used: true } : null,
+    result: status === "completed" ? { summary: "核对完成：发现多项跨期余额需要人工关注。", findings: [
+      { title: "余额连续未变", detail: "黄杉文化传播有限公司的其他应收款期末余额保持不变。", file_refs: body.selected_file_refs },
+      { title: "保证金长期挂账", detail: "一项租赁保证金在所选期间没有发生额。", file_refs: body.selected_file_refs },
+      { title: "应付款需要复核", detail: "一项应付款在所选期间保持不变。", file_refs: body.selected_file_refs },
+      { title: "第四项默认收起", detail: "详细发现默认收起，避免结果首屏文字过载。", file_refs: body.selected_file_refs },
+    ], follow_ups: ["请财务人员确认该余额是否仍应保留"], review_required: true } : null,
+    validation_errors: failed ? ["规划使用了当前任务范围外的资料或能力，系统已安全停止。请重新规划。"] : [],
+    events: status === "queued" ? [] : [{ sequence, event_name: failed ? "harness_failed" : "task_completed", occurred_at: new Date().toISOString(), status, message: failed ? "本轮未通过服务端校验，已停止且未发生外部动作。" : "本轮只读分析已完成，结果等待用户复核。", details: {} }],
   };
 }
 
 async function fulfillJson(route: Route, body: unknown, status = 200) { await route.fulfill({ status, contentType: "application/json", body: JSON.stringify(body) }); }
 
-async function mockHarness(page: Page, options: { outputUsed?: boolean; failed?: boolean; disconnect?: boolean; failFirstStart?: boolean; delayedFinanceDetail?: boolean; detailFailure?: boolean; outOfOrderGet?: boolean; healthFailures?: number; catalogFailures?: number; catalogInvalidFailures?: number } = {}) {
-  let activeDemo: DemoId = "demo1";
-  let healthCalls = 0;
-  let catalogCalls = 0;
-  let startCalls = 0;
-  let getCalls = 0;
-  let streamCalls = 0;
-  const startKeys: string[] = [];
-  const streamUrls: string[] = [];
+async function mockHarness(page: Page, options: { failFirstStart?: boolean; disconnect?: boolean; failed?: boolean; catalogFailures?: number } = {}) {
+  let catalogCalls = 0; let startCalls = 0; let streamCalls = 0;
+  let currentBody = { scenario_id: "Finance-018" as ScenarioId, instruction: "", selected_file_refs: [files.finance2025.file_ref, files.finance2026.file_ref] };
+  const starts: { scenario_id: ScenarioId; instruction: string; selected_file_refs: string[]; idempotency_key: string }[] = [];
+  const streams: string[] = [];
   await page.route(`${API_URL}/v1/**`, async (route) => {
-    const url = new URL(route.request().url());
-    const path = url.pathname;
-    if (path === "/v1/health") {
-      healthCalls += 1;
-      return healthCalls <= (options.healthFailures ?? 0)
-        ? fulfillJson(route, { status: "starting" }, 503)
-        : fulfillJson(route, { status: "ok" });
-    }
+    const url = new URL(route.request().url()); const path = url.pathname;
+    if (path === "/v1/health") return fulfillJson(route, { status: "ok" });
     if (path === "/v1/harness/scenarios") {
       catalogCalls += 1;
-      if (catalogCalls <= (options.catalogFailures ?? 0)) return fulfillJson(route, { detail: "catalog unavailable" }, 503);
-      if (catalogCalls <= (options.catalogInvalidFailures ?? 0)) return fulfillJson(route, { detail: "场景目录完整性校验失败" }, 503);
-      return fulfillJson(route, { scenarios: (["demo1", "demo2", "demo3"] as DemoId[]).map(scenario) });
+      if (catalogCalls <= (options.catalogFailures ?? 0)) return fulfillJson(route, { detail: "temporary" }, 503);
+      return fulfillJson(route, { scenarios });
     }
-    const detailDemo = (["demo1", "demo2", "demo3"] as DemoId[]).find((demo) => path === `/v1/harness/scenarios/${scenarioData[demo].scenario_id}`);
-    if (detailDemo) {
-      if (detailDemo === "demo1" && options.delayedFinanceDetail) await new Promise((resolve) => setTimeout(resolve, 500));
-      if (options.detailFailure) return fulfillJson(route, { detail: "detail unavailable" }, 503);
-      return fulfillJson(route, scenario(detailDemo));
-    }
+    if (path.includes("/files/")) return fulfillJson(route, previewFor(path));
     if (path === "/v1/harness/runs" && route.request().method() === "POST") {
-      startCalls += 1;
-      const body = route.request().postDataJSON() as { scenario_id: string; idempotency_key: string };
-      startKeys.push(body.idempotency_key);
-      activeDemo = (["demo1", "demo2", "demo3"] as DemoId[]).find((demo) => scenarioData[demo].scenario_id === body.scenario_id) ?? "demo1";
+      startCalls += 1; const body = route.request().postDataJSON() as typeof currentBody & { idempotency_key: string };
+      currentBody = body; starts.push(body);
       if (options.failFirstStart && startCalls === 1) return fulfillJson(route, { detail: "unknown" }, 503);
-      const queued = { ...snapshot(activeDemo, { sequence: 0, version: 1, outputUsed: options.outputUsed, failed: options.failed }), status: "queued", plan: null, model_receipt: null, events: [] };
-      return fulfillJson(route, { run: queued, replayed: startCalls > 1 }, 202);
+      return fulfillJson(route, { run: snapshot(body, "queued"), replayed: startCalls > 1 }, 202);
     }
-    if (path.startsWith("/v1/harness/runs/") && path.endsWith("/events")) {
-      streamCalls += 1; streamUrls.push(url.toString());
-      const after = Number(url.searchParams.get("after") ?? "0");
-      const names = options.disconnect && streamCalls === 1 ? ["workspace_index"] : ["planning_started", "planning_completed", "plan_validation", options.failed ? "harness_failed" : "ready_to_execute"];
-      const body = names.map((name, index) => {
-        const sequence = after + index + 1;
-        const event = { sequence, event_name: name, occurred_at: new Date().toISOString(), status: options.failed ? "failed" : name === "ready_to_execute" ? "ready_to_execute" : name === "plan_validation" ? "validating" : "planning", message: name === "planning_started" ? "正在根据文件生成计划。" : name === "planning_completed" ? "模型计划已返回。" : name === "harness_failed" ? "计划未通过安全校验。" : name === "ready_to_execute" ? "计划已就绪，执行未启动。" : "服务端状态已更新。", details: {} };
-        return `id: ${sequence}\nevent: ${name}\ndata: ${JSON.stringify(event)}\n\n`;
-      }).join("");
+    if (path.endsWith("/events")) {
+      streamCalls += 1; streams.push(url.toString()); const after = Number(url.searchParams.get("after") ?? "0");
+      const allEventNames = ["workspace_index", "planning_started", "planning_completed", "plan_validation", "analysis_started", "analysis_completed", "result_validation", options.failed ? "harness_failed" : "task_completed"];
+      const eventNames = options.disconnect && streamCalls === 1 ? ["workspace_index"] : allEventNames.slice(after);
+      const body = eventNames.map((eventName, index) => { const sequence = after + index + 1; const message = eventName === "workspace_index" ? "已读取并冻结场景文件索引。" : eventName === "planning_started" ? "正在根据文件索引生成工作计划。" : eventName === "planning_completed" ? "模型计划已返回，等待服务端校验。" : eventName === "plan_validation" ? "计划通过路径、工具、依赖与人工确认校验。" : eventName === "analysis_started" ? "正在读取所选公开文件并执行只读分析。" : eventName === "analysis_completed" ? "只读分析结果已返回，等待服务端核对文件引用。" : eventName === "result_validation" ? "结果已通过所选文件引用与只读边界校验。" : eventName === "task_completed" ? "本轮只读分析已完成，结果等待用户复核。" : "本轮未通过服务端校验。"; return `id: ${sequence}\nevent: ${eventName}\ndata: ${JSON.stringify({ sequence, event_name: eventName, occurred_at: new Date().toISOString(), status: eventName === "task_completed" ? "completed" : eventName === "harness_failed" ? "failed" : "running", message, details: {} })}\n\n`; }).join("");
       return route.fulfill({ status: 200, contentType: "text/event-stream", body });
     }
     if (path.startsWith("/v1/harness/runs/")) {
-      getCalls += 1;
-      if (options.disconnect && streamCalls === 1) {
-        const indexed = snapshot(activeDemo, { sequence: 1, version: 2, outputUsed: options.outputUsed });
-        return fulfillJson(route, {
-          ...indexed,
-          status: "indexing",
-          plan: null,
-          model_receipt: null,
-          events: [{ sequence: 1, event_name: "workspace_index", occurred_at: new Date().toISOString(), status: "indexing", message: "已读取本轮文件范围。", details: {} }],
-        });
-      }
-      if (options.outOfOrderGet && getCalls === 1) { await new Promise((resolve) => setTimeout(resolve, 350)); return fulfillJson(route, snapshot(activeDemo, { sequence: 1, version: 2, suffix: "迟到旧版" })); }
-      return fulfillJson(route, snapshot(activeDemo, { sequence: Math.max(4, getCalls), version: 5, outputUsed: options.outputUsed, failed: options.failed, suffix: "最新" }));
+      if (options.disconnect && streamCalls === 1) return fulfillJson(route, { ...snapshot(currentBody, "queued"), status: "indexing", last_event_sequence: 1, version: 2 });
+      return fulfillJson(route, snapshot(currentBody, options.failed ? "failed" : "completed"));
     }
-    return fulfillJson(route, {});
+    return fulfillJson(route, { detail: "not found" }, 404);
   });
-  return { startKeys, streamUrls, getHealthCalls: () => healthCalls, getCatalogCalls: () => catalogCalls, getStartCalls: () => startCalls, getStreamCalls: () => streamCalls };
+  return { starts, streams, get startCalls() { return startCalls; }, get streamCalls() { return streamCalls; } };
 }
 
-test("renders the FORTE work site as the only application experience", async ({ page }) => {
-  await mockHarness(page);
-  await page.setViewportSize({ width: 1440, height: 900 });
+test("opens real FORTE data, accepts a custom task, and shows a verifiable trajectory", async ({ page }) => {
+  const state = await mockHarness(page);
   await page.goto("/");
-  await expect(page.getByText("工作现场", { exact: true }).first()).toBeVisible();
-  await expect(page.getByRole("heading", { name: "核对跨年度往来账款" }).first()).toBeVisible();
-  await expect(page.locator(".harness-workbench")).toBeVisible();
-  await expect(page.locator(".harness-agent-shell")).toBeVisible();
-  await expect(page.locator("main")).toHaveCount(1);
-  await expect(page.locator(".view-rail, .demo-experience-nav")).toHaveCount(0);
-  await expect(page.getByText("返回工作区", { exact: true })).toHaveCount(0);
-  const demoTabs = page.getByRole("navigation", { name: "演示场景" }).getByRole("button");
-  await expect(demoTabs).toHaveCount(3);
-  await expect(page.getByText("公开办公基准数据 · FORTE")).toBeVisible();
-  await expect(page.getByText("服务可用", { exact: true })).toHaveCount(2);
-  await expect(page.getByText(/实时/)).toHaveCount(0);
-  const bodyText = await page.locator("body").innerText();
-  expect(bodyText).not.toMatch(/客户 A|2400|2680|邮件工作台|报价工作台|今天的工作，应该怎么处理|受控动作与调用记录/);
-  const overflow = await page.locator(".harness-app-shell").evaluate((element) => ({ clientWidth: element.clientWidth, scrollWidth: element.scrollWidth }));
-  expect(overflow.scrollWidth).toBeLessThanOrEqual(overflow.clientWidth + 1);
+  await expect(page.getByRole("heading", { name: "FORTE 数据工作台" })).toBeVisible();
+  await expect(page.getByText("黄杉文化传播有限公司")).toBeVisible();
+  await expect(page.locator("body")).not.toContainText(/Demo\s*[123]/);
+
+  const instruction = "只检查余额连续不变的客商，并告诉我依据来自哪些文件。";
+  await page.getByRole("textbox", { name: "你想从这些数据里知道什么？" }).fill(instruction);
+  await page.getByRole("button", { name: "运行任务" }).click();
+  await expect.poll(() => state.starts.length).toBe(1);
+  expect(state.starts[0].instruction).toBe(instruction);
+  expect(state.starts[0].selected_file_refs).toEqual([files.finance2025.file_ref, files.finance2026.file_ref]);
+  await expect(page.getByRole("heading", { name: /核对完成/ })).toBeVisible();
+  await expect(page.getByText("余额连续未变", { exact: true })).toBeVisible();
+  await expect(page.getByText("第四项默认收起", { exact: true })).toBeHidden();
+  await page.getByRole("button", { name: "查看其余 1 条发现" }).click();
+  await expect(page.getByText("第四项默认收起", { exact: true })).toBeVisible();
+  await expect(page.getByText("仍需你判断 · 1 项")).toBeVisible();
+  await expect(page.getByText("规划调用")).toBeVisible();
+  await expect(page.getByText("分析调用")).toBeVisible();
+  await expect(page.getByText("初步结果已形成")).toBeVisible();
+  const body = await page.locator("body").innerText();
+  expect(body).not.toMatch(/Finance-018\/input|sha256|task_instruction|思维链/);
 });
 
-test("recovers automatically after the API is initially unavailable and clears the offline state", async ({ page }) => {
-  const state = await mockHarness(page, { healthFailures: 3 });
-  await page.goto("/");
-  await expect(page.getByRole("heading", { name: "办公服务正在恢复" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "工作现场暂时离线" })).toBeVisible();
-  await expect.poll(() => state.getHealthCalls()).toBeGreaterThan(3);
-  await expect(page.getByRole("heading", { name: "核对跨年度往来账款" }).first()).toBeVisible();
-  await expect(page.getByRole("heading", { name: "工作现场暂时离线" })).toHaveCount(0);
-  await expect(page.getByText("无法连接办公服务，系统会继续自动重试。")).toHaveCount(0);
+test("freely browses all three collections and previews markdown content", async ({ page }) => {
+  await mockHarness(page); await page.goto("/");
+  await page.getByRole("button", { name: /运营规则/ }).click();
+  await page.getByRole("button", { name: files.operations.display_label }).click();
+  await expect(page.getByText("工作日 9:00 前禁止外呼")).toBeVisible();
+  await expect(page.getByText("1 份文件已选")).toBeVisible();
+  await expect(page.getByRole("textbox", { name: "你想从这些数据里知道什么？" })).toHaveValue(/必须转人工/);
 });
 
-test("keeps the API available while a transient scenario catalog failure recovers", async ({ page }) => {
-  const state = await mockHarness(page, { catalogFailures: 3 });
-  await page.goto("/");
-  await expect(page.getByRole("heading", { name: "正在重新读取工作场景" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "工作场景暂时不可用" })).toBeVisible();
-  await expect(page.getByText("办公服务已连接，但场景目录暂时无法读取；系统会继续自动重试。").first()).toBeVisible();
-  await expect(page.getByRole("heading", { name: "工作现场暂时离线" })).toHaveCount(0);
-  await expect.poll(() => state.getCatalogCalls()).toBeGreaterThan(3);
-  await expect(page.getByRole("heading", { name: "核对跨年度往来账款" }).first()).toBeVisible();
-  await expect(page.getByText("服务可用", { exact: true })).toHaveCount(2);
+test("file selection is explicit and scoped to the active collection", async ({ page }) => {
+  const state = await mockHarness(page); await page.goto("/");
+  const checkboxes = page.locator(".dataset-tree section.is-active input[type=checkbox]");
+  await expect(checkboxes).toHaveCount(2); await checkboxes.nth(1).uncheck();
+  await expect(page.getByText("1 份文件已选")).toBeVisible();
+  await page.getByRole("button", { name: "运行任务" }).click();
+  await expect.poll(() => state.starts.length).toBe(1);
+  expect(state.starts[0].selected_file_refs).toEqual([files.finance2025.file_ref]);
 });
 
-test("reports an invalid scenario catalog separately from an offline API", async ({ page }) => {
-  await mockHarness(page, { catalogInvalidFailures: 3 });
-  await page.goto("/");
-  await expect(page.getByRole("heading", { name: "工作场景需要更新" })).toBeVisible();
-  await expect(page.getByText("办公服务已连接，但场景目录未通过完整性检查；系统会继续自动重试。").first()).toBeVisible();
-  await expect(page.getByRole("heading", { name: "工作现场暂时离线" })).toHaveCount(0);
-  await expect(page.getByRole("heading", { name: "核对跨年度往来账款" }).first()).toBeVisible();
+test("reuses the same idempotency key when a start response is unknown", async ({ page }) => {
+  const state = await mockHarness(page, { failFirstStart: true }); await page.goto("/");
+  await page.getByRole("button", { name: "运行任务" }).click();
+  await expect(page.getByText(/任务启动结果未知/)).toBeVisible();
+  await page.getByRole("button", { name: "运行任务" }).click();
+  await expect.poll(() => state.starts.length).toBe(2);
+  expect(state.starts[0].idempotency_key).toBe(state.starts[1].idempotency_key);
+  await expect(page.getByRole("heading", { name: /核对完成/ })).toBeVisible();
 });
 
-test("shows an explicit catalog-preview fallback when scenario detail cannot be read", async ({ page }) => {
-  await mockHarness(page, { detailFailure: true });
-  await page.goto("/");
-  await expect(page.getByRole("heading", { name: "核对跨年度往来账款" }).first()).toBeVisible();
-  await expect(page.getByText("场景详情暂时不可用，当前使用目录中的公开信息。").first()).toBeVisible();
-  await expect(page.getByRole("button", { name: "开始本轮" })).toBeEnabled();
-  await expect(page.getByText("服务可用", { exact: true })).toHaveCount(2);
-  await expect(page.getByText(/实时/)).toHaveCount(0);
+test("reconnects the named event stream from the last observed sequence", async ({ page }) => {
+  const state = await mockHarness(page, { disconnect: true }); await page.goto("/");
+  await page.getByRole("button", { name: "运行任务" }).click();
+  await expect(page.getByRole("heading", { name: /核对完成/ })).toBeVisible();
+  await expect.poll(() => state.streamCalls).toBeGreaterThanOrEqual(2);
+  expect(state.streams.some((url) => new URL(url).searchParams.get("after") === "1")).toBeTruthy();
 });
 
-test("projects all three real scenarios and rejects a late previous-scenario detail", async ({ page }) => {
-  await mockHarness(page, { delayedFinanceDetail: true });
-  await page.goto("/");
-  await page.getByRole("button", { name: /Demo 2/ }).click();
-  await expect(page.getByRole("heading", { name: "核对产品上线条件" }).first()).toBeVisible();
-  await page.waitForTimeout(600);
-  await expect(page.getByRole("heading", { name: "核对产品上线条件" }).first()).toBeVisible();
-  await page.getByRole("button", { name: /Demo 3/ }).click();
-  await expect(page.getByRole("heading", { name: "审核外呼流程边界" }).first()).toBeVisible();
-  await expect(page.getByText("产生外部影响前需要人工确认")).toBeVisible();
-  await page.getByRole("treeitem", { name: "外呼流程说明" }).click();
-  await expect(page.getByText("Markdown 业务说明，包含 6 个标题")).toBeVisible();
+test("keeps a catalog outage understandable and recovers automatically", async ({ page }) => {
+  await mockHarness(page, { catalogFailures: 2 }); await page.goto("/");
+  await expect(page.getByRole("heading", { name: "FORTE 数据工作台" })).toBeVisible({ timeout: 12_000 });
+  await expect(page.getByText("黄杉文化传播有限公司")).toBeVisible();
 });
 
-test("renders the final server plan in the left workspace and receipts in the persistent right Agent pane", async ({ page }) => {
-  const state = await mockHarness(page, { outOfOrderGet: true });
-  await page.goto("/");
-  await page.getByRole("button", { name: "开始本轮" }).click();
-  await expect(page.getByText("最新读取资料")).toBeVisible();
-  await page.waitForTimeout(450);
-  await expect(page.getByText("迟到旧版读取资料")).toHaveCount(0);
-  await expect(page.locator(".harness-agent-shell").getByText("模型计划已采纳")).toBeVisible();
-  await expect(page.locator(".harness-agent-shell").getByText("计划已通过校验，任务尚未执行")).toBeVisible();
-  await expect(page.getByText("2025 年往来明细").last()).toBeVisible();
-  await expect(page.getByText("task.md")).toHaveCount(0);
-  await expect(page.getByText(/Finance-018\/input/)).toHaveCount(0);
-  await expect(page.getByText("file-01", { exact: true })).toHaveCount(0);
-  await page.waitForTimeout(1_200);
-  expect(state.getStreamCalls()).toBe(1);
+test("fails closed without fabricating a result", async ({ page }) => {
+  const state = await mockHarness(page, { failed: true }); await page.goto("/");
+  await page.getByRole("button", { name: "运行任务" }).click();
+  await expect(page.getByText("本轮已安全停止")).toBeVisible();
+  await expect(page.getByText("规划使用了当前任务范围外的资料或能力，系统已安全停止。请重新规划。")).toBeVisible();
+  await expect(page.getByText("校验未通过")).toBeVisible();
+  await expect(page.locator("body")).not.toContainText(/artifact\.write|run_workspace_write/);
+  await expect(page.getByRole("button", { name: "分析结果" })).toBeDisabled();
+  await page.getByRole("button", { name: "重新规划" }).click();
+  await expect.poll(() => state.starts.length).toBe(2);
+  expect(state.starts[1].idempotency_key).not.toBe(state.starts[0].idempotency_key);
 });
 
-test("shows rejected model output and reuses the same idempotency key after an unknown start result", async ({ page }) => {
-  const state = await mockHarness(page, { outputUsed: false, failFirstStart: true });
-  await page.goto("/");
-  await page.getByRole("button", { name: "开始本轮" }).click();
-  await expect(page.getByRole("button", { name: "重试启动" })).toBeVisible();
-  await page.getByRole("button", { name: "重试启动" }).click();
-  await expect(page.locator(".harness-agent-shell").getByText("模型计划未采纳")).toBeVisible();
-  expect(state.getStartCalls()).toBe(2);
-  expect(state.startKeys[0]).toBe(state.startKeys[1]);
-});
-
-test("keeps a failed plan unexecuted and creates a fresh command only for a new round", async ({ page }) => {
-  const state = await mockHarness(page, { failed: true });
-  await page.goto("/");
-  await page.getByRole("button", { name: "开始本轮" }).click();
-  await expect(page.getByText("计划未通过服务端校验").first()).toBeVisible();
-  await expect(page.getByText("计划已通过服务端校验，尚未执行任务")).toHaveCount(0);
-  await expect(page.locator(".harness-phase").nth(2)).toHaveClass(/is-active/);
-  await expect(page.locator(".harness-phase").first()).not.toHaveClass(/is-active/);
-  await page.getByRole("button", { name: "开始新一轮" }).click();
-  await expect.poll(() => state.getStartCalls()).toBe(2);
-  expect(state.startKeys[0]).not.toBe(state.startKeys[1]);
-});
-
-test("reconnects a closed named SSE from the last sequence", async ({ page }) => {
-  const state = await mockHarness(page, { disconnect: true });
-  await page.goto("/");
-  await page.getByRole("button", { name: "开始本轮" }).click();
-  await expect.poll(() => state.streamUrls.length).toBeGreaterThan(1);
-  expect(state.streamUrls.some((url) => /after=[1-9]/.test(url))).toBeTruthy();
-  const terminalConnections = state.getStreamCalls();
-  await page.waitForTimeout(1_200);
-  expect(state.getStreamCalls()).toBe(terminalConnections);
-});
-
-test("keeps the 390px work site private, touchable and free from horizontal overflow", async ({ page }) => {
-  await mockHarness(page);
-  await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto("/");
-  await expect(page.locator(".harness-workbench")).toBeVisible();
-  const privateText = await page.locator("body").innerText();
-  expect(privateText).not.toMatch(/task\.md|rubric|prompt|sha256|Finance-018\/input|file-01|harness:|\b[0-9a-f]{40}\b|\b[0-9a-f]{64}\b|客户 A|2400|2680|返回工作区|邮件工作台|报价工作台/i);
-  const overflow = await page.evaluate(() => ["html", "body", ".harness-app-shell", ".harness-workspace-shell", ".harness-workbench"].map((selector) => {
-    const element = document.querySelector<HTMLElement>(selector);
-    if (!element) throw new Error(`Missing responsive surface: ${selector}`);
-    return { selector, clientWidth: element.clientWidth, scrollWidth: element.scrollWidth };
-  }));
-  for (const item of overflow) expect(item.scrollWidth, `${item.selector} should not overflow`).toBeLessThanOrEqual(item.clientWidth + 1);
-  const small = await page.locator(".harness-workbench button").evaluateAll((elements) => elements.flatMap((element) => { const rect = element.getBoundingClientRect(); return rect.width && rect.height < 44 ? [{ text: element.textContent, height: rect.height }] : []; }));
-  expect(small).toEqual([]);
-  const separator = page.getByRole("separator", { name: "调整 Agent 面板大小" });
-  const expandedHitTarget = await separator.evaluate((element) => {
-    const rect = element.getBoundingClientRect();
-    const target = document.elementFromPoint(rect.left + rect.width / 2, rect.top - 15);
-    return target === element || target?.closest(".harness-app-divider") === element;
-  });
-  expect(expandedHitTarget).toBeTruthy();
-  const before = Number(await separator.getAttribute("aria-valuenow"));
-  await separator.focus();
-  await separator.press("ArrowUp");
-  await expect(separator).toHaveAttribute("aria-valuenow", String(before + 20));
+test("mobile keeps the dataset, composer, preview, and trajectory usable", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 }); await mockHarness(page); await page.goto("/");
+  await expect(page.getByRole("heading", { name: "FORTE 数据工作台" })).toBeVisible();
+  const metrics = await page.evaluate(() => ({ viewport: document.documentElement.clientWidth, scroll: document.documentElement.scrollWidth }));
+  expect(metrics.scroll).toBeLessThanOrEqual(metrics.viewport);
+  const shortControls = await page.locator("button:visible, summary:visible").evaluateAll((nodes) => nodes.filter((node) => (node as HTMLElement).getBoundingClientRect().height < 44).map((node) => ({ text: node.textContent, height: (node as HTMLElement).getBoundingClientRect().height })));
+  expect(shortControls).toEqual([]);
+  await expect(page.getByRole("textbox", { name: "你想从这些数据里知道什么？" })).toBeVisible();
+  await expect(page.locator(".table-preview")).toBeVisible();
 });

@@ -2,14 +2,15 @@
 
 | Field | Value |
 | --- | --- |
-| Related Demo | Demo 1 |
-| Status | shared planning slice `Limited Verified`; execution migration `Draft` |
+| Acceptance lens | Demo 1; not a runtime identity |
+| Generic work profile | `single_task + bounded_loop + evidence_gate + human_gate`; current scope `read_only_analysis` |
+| Status | bounded data preview/read-only analysis `Limited Verified`; durable Artifact/Commit migration `Draft` |
 | Source | FORTE `Finance-018`, commit `345c1ec1487139db9dd319787fa9405ba85d1869`, top-level MIT; original bytes pinned by `DR-0016` |
 | Target user | Finance operations lead or account reconciliation owner |
 
 ## Trigger and current pain
 
-The user receives three period workbooks and must identify unpaid, uncollected, and long-lived balances. The retired Customer A prototype began with a predetermined conflict and deliverables. The current FORTE worksite instead exposes the real public file set and a dynamic validated plan, but it still does not execute row-level inspection or produce the evidence Artifact.
+The user receives three period workbooks and must identify unpaid, uncollected, and long-lived balances. The retired Customer A prototype began with a predetermined conflict and deliverables. The current FORTE workbench lets the user inspect actual rows, select files, ask an original question and obtain a cited review-required result. It still does not produce a durable evidence Artifact or prove the accounting interpretation.
 
 ## Goal and completion condition
 
@@ -25,13 +26,15 @@ The Agent must produce versioned unpaid and uncollected summaries, identify bala
 6. Mapping ambiguity or conflicting entity identity creates a server conflict and a user decision; otherwise the Agent continues without interruption.
 7. Commit contains the output versions, evidence bindings, verification reports and workspace fingerprint.
 
+This flow must be implemented by the reusable single-task executor. Selecting the Finance collection or calling the scenario “Demo 1” must not enable a private Demo-only code path.
+
 ## Frontend experience
 
-- Workspace shelf: three original workbooks with public-benchmark label and workbook metadata.
-- Agent journey: file inspection, schema mapping, period normalization, reconciliation, verification and commit appear progressively.
-- Evidence table: each flagged balance links back to a workbook/sheet/row reference.
-- Live activity: actual model and table-tool receipts with duration; no Prompt or chain of thought.
-- Decision tray: appears only for a recorded ambiguity and explains what the decision will change, recheck, preserve and not do.
+- Data browser: three original workbooks with public-benchmark label and bounded real rows.
+- Task composer: the user selects source files and asks the reconciliation question.
+- Current trace: Planner/Analyst receipts and eight server events; no Prompt or chain of thought.
+- Current result: findings link to selected file labels, show only three by default, and remain explicitly pending review.
+- Target evidence table/decision tray: row-level entailment, ambiguity decisions and Commit remain `Draft`.
 
 ## Key exceptions
 
@@ -45,6 +48,6 @@ The Agent must produce versioned unpaid and uncollected summaries, identify bala
 
 ## Boundary
 
-The current sole FORTE worksite is governed by DR-0017. One final observed `deepseek-v4-pro` Finance-018 run used 3 public files, produced 10 dynamic plan units and reached v6/seq 5 `ready_to_execute` in 16838 ms with `called=true/output_used=true`. It did not read workbook rows through tools, create the finance artifacts above or Commit the task. That execution migration remains `Draft`; the observation is not a quality or SLA benchmark.
+The current workbench is governed by DR-0018. One live Finance-018 Run over two selected workbooks reached `completed` v9/seq 8: Planner and Analyst were both adopted, 10 findings cited only the two selected stable refs, `review_required=true`, and no external side effect occurred. The server checked citation membership, not the semantic or numerical correctness of those findings. No Tool Gateway, ArtifactVersion or Commit was created; durable execution remains `Draft`.
 
 The files are public benchmark inputs, not production finance records. Raw `task.md`, `task_instruction`, rubric and solution content stay out of the public API/UI. This scenario does not prove arbitrary workbook understanding, cross-process recovery, accounting correctness, or user-value improvement until corresponding evidence exists; E2E is not user research.
