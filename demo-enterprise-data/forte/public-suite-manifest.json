@@ -1,0 +1,1024 @@
+{
+  "schema_version": "1.0",
+  "dataset": "FORTE public demo suite",
+  "source_url": "https://github.com/AGI-Eval-Official/FORTE",
+  "source_commit": "345c1ec1487139db9dd319787fa9405ba85d1869",
+  "license": "MIT",
+  "content_nature": "public_benchmark_demo_inputs",
+  "scope": {
+    "full_benchmark_task_count_reported_by_upstream": 180,
+    "public_demo_task_count": 15,
+    "local_input_bundle_task_count": 13,
+    "task_only_external_dependency_count": 2,
+    "task_instruction_file_count": 15,
+    "input_file_count": 96,
+    "task_instruction_bytes": 143462,
+    "input_bytes": 1636983,
+    "imported_bytes": 1780445
+  },
+  "excluded_upstream_material": [
+    "data/assets/*/solution/**",
+    "data/assets/*/skills/**"
+  ],
+  "tasks": [
+    {
+      "task_id": "administration-001",
+      "category": "administration",
+      "availability": "local_input_bundle",
+      "external_dependency": null,
+      "task_file": {
+        "path": "administration-001/task.md",
+        "sha256": "a46c789aff8e43bcb8bb0caf49367759c3507ee1bcc9ccf2c4277d1baa49eccf",
+        "size": 2709,
+        "mime": "text/markdown",
+        "role": "task_instruction"
+      },
+      "input_dir": "administration-001/input",
+      "input_file_count": 2,
+      "input_bytes": 142253,
+      "file_extensions": [
+        ".csv",
+        ".pdf"
+      ],
+      "input_files": [
+        {
+          "path": "administration-001/input/3月20日-4月20日入职时间表.csv",
+          "sha256": "2f02cdcb8363d515f656a60a0fb8dff82e162fef4d0a93c39eef304e897ba21a",
+          "size": 1590,
+          "mime": "text/csv",
+          "role": "input"
+        },
+        {
+          "path": "administration-001/input/入职物资权限软件分配.pdf",
+          "sha256": "033d90e1aac8d3429d3c2cab5badf870b684fc5fa5c38e9a6dab9f59c3ef983d",
+          "size": 140663,
+          "mime": "application/pdf",
+          "role": "input"
+        }
+      ]
+    },
+    {
+      "task_id": "algorithm-013",
+      "category": "algorithm",
+      "availability": "local_input_bundle",
+      "external_dependency": null,
+      "task_file": {
+        "path": "algorithm-013/task.md",
+        "sha256": "8edd73b9392e616fdb69076cb367c93294f2575576f2c16de7d913aeb40d93ef",
+        "size": 30661,
+        "mime": "text/markdown",
+        "role": "task_instruction"
+      },
+      "input_dir": "algorithm-013/input",
+      "input_file_count": 7,
+      "input_bytes": 68511,
+      "file_extensions": [
+        ".log",
+        ".py",
+        ".txt"
+      ],
+      "input_files": [
+        {
+          "path": "algorithm-013/input/search_agent_workflow/config.py",
+          "sha256": "aae59b27d13e5da6f0f432f07662e035c2de6c8ce52a7f53836bad860eff2c18",
+          "size": 2169,
+          "mime": "text/x-python",
+          "role": "input"
+        },
+        {
+          "path": "algorithm-013/input/search_agent_workflow/llm.py",
+          "sha256": "d25fdfa4e10d5c547ee45344bcfe1cf1b0c74a79342d430b1b78a9d1fd143de0",
+          "size": 4895,
+          "mime": "text/x-python",
+          "role": "input"
+        },
+        {
+          "path": "algorithm-013/input/search_agent_workflow/main.py",
+          "sha256": "37aad7ad5ce7178269fca9917228c20add3d135974a651b5d73ea9c639694fd7",
+          "size": 3440,
+          "mime": "text/x-python",
+          "role": "input"
+        },
+        {
+          "path": "algorithm-013/input/search_agent_workflow/requirements.txt",
+          "sha256": "9f8aa1714c1f707df8a67b1fd7348685be352135e51408f8d6e0176d515174a8",
+          "size": 48,
+          "mime": "text/plain",
+          "role": "input"
+        },
+        {
+          "path": "algorithm-013/input/search_agent_workflow/search_agent.log",
+          "sha256": "3981d030094fe5aa884bc8bc44d9c24d0e69b342d7ab3483efcc4648fccf7623",
+          "size": 25211,
+          "mime": "text/plain",
+          "role": "input"
+        },
+        {
+          "path": "algorithm-013/input/search_agent_workflow/tools.py",
+          "sha256": "0f22d0fe1e41306a04b0d2d6a77c27d1c018b9cefaa9dac8b378c2ad2bfb3cd5",
+          "size": 6562,
+          "mime": "text/x-python",
+          "role": "input"
+        },
+        {
+          "path": "algorithm-013/input/search_agent_workflow/workflow.py",
+          "sha256": "713aada8148fe9268081b517b941b2aabf683e865c11f123514fa4c620f0c163",
+          "size": 26186,
+          "mime": "text/x-python",
+          "role": "input"
+        }
+      ]
+    },
+    {
+      "task_id": "ba-079",
+      "category": "ba",
+      "availability": "task_only_requires_external_system",
+      "external_dependency": "remote_datasette",
+      "task_file": {
+        "path": "ba-079/task.md",
+        "sha256": "eadef2b2f3fefba115874b6d630fb716f8cd3a6b591adfbcb1776bb092016c73",
+        "size": 6386,
+        "mime": "text/markdown",
+        "role": "task_instruction"
+      },
+      "input_dir": null,
+      "input_file_count": 0,
+      "input_bytes": 0,
+      "file_extensions": [],
+      "input_files": []
+    },
+    {
+      "task_id": "dev-015",
+      "category": "dev",
+      "availability": "local_input_bundle",
+      "external_dependency": null,
+      "task_file": {
+        "path": "dev-015/task.md",
+        "sha256": "644ae65c9ecc424c615fb5c0210604a1369f61ac9f137763bed5576cb78350f6",
+        "size": 19278,
+        "mime": "text/markdown",
+        "role": "task_instruction"
+      },
+      "input_dir": "dev-015/input",
+      "input_file_count": 46,
+      "input_bytes": 194005,
+      "file_extensions": [
+        ".css",
+        ".html",
+        ".json",
+        ".md",
+        ".py",
+        ".sh",
+        ".ts",
+        ".tsx",
+        ".txt"
+      ],
+      "input_files": [
+        {
+          "path": "dev-015/input/PRD.md",
+          "sha256": "497f40b967ff0cd61e5c5fbe99d7c784e0cc6b52820fbf9a61af71c46a3ffe86",
+          "size": 6140,
+          "mime": "text/markdown",
+          "role": "input"
+        },
+        {
+          "path": "dev-015/input/source-code/app/config.py",
+          "sha256": "2dd644cfe8087cf39294d7d59386293964a57dbc1cdac533c415458fab3d9876",
+          "size": 1305,
+          "mime": "text/x-python",
+          "role": "input"
+        },
+        {
+          "path": "dev-015/input/source-code/app/database.py",
+          "sha256": "fa6b435e0dd4280c4a6f308ddc95b4695d261c35073588318a9dcf2f6fee3bc9",
+          "size": 1656,
+          "mime": "text/x-python",
+          "role": "input"
+        },
+        {
+          "path": "dev-015/input/source-code/app/engine/__init__.py",
+          "sha256": "3d3e6e304e5ba80ecd3144f19e3b8677d82a805487a729248f3afc31dc16cc20",
+          "size": 29,
+          "mime": "text/x-python",
+          "role": "input"
+        },
+        {
+          "path": "dev-015/input/source-code/app/engine/evaluation_engine.py",
+          "sha256": "f491cf32cb416b55dcdc321bb8ffbcca5aaf68489814c8f0e3b4a6995a4d0902",
+          "size": 13133,
+          "mime": "text/x-python",
+          "role": "input"
+        },
+        {
+          "path": "dev-015/input/source-code/app/main.py",
+          "sha256": "65733a8f68dd0b194ab68dd814eb1be895ba8a04be74eb90cd0dc35e5db6416f",
+          "size": 3535,
+          "mime": "text/x-python",
+          "role": "input"
+        },
+        {
+          "path": "dev-015/input/source-code/app/models/__init__.py",
+          "sha256": "56f9598f1e32ae6efd2ba2efc8fffe9571ae4d7b28fca7f44bfbef4e4ce08d66",
+          "size": 563,
+          "mime": "text/x-python",
+          "role": "input"
+        },
+        {
+          "path": "dev-015/input/source-code/app/models/audit_log.py",
+          "sha256": "1433380e5147979847be08dfa2f5aef385e08dd342e771c7285ad06cf94e2b8f",
+          "size": 1341,
+          "mime": "text/x-python",
+          "role": "input"
+        },
+        {
+          "path": "dev-015/input/source-code/app/models/dataset.py",
+          "sha256": "c9b7285c67d8eea25bdecc58798732860e421c100a26e287c6b65491ad4ea9e9",
+          "size": 1658,
+          "mime": "text/x-python",
+          "role": "input"
+        },
+        {
+          "path": "dev-015/input/source-code/app/models/dataset_item.py",
+          "sha256": "7cf13909c4a9d6c54134eb665c29b58bf79097be0c946fb0b94d5ba66b05a538",
+          "size": 1184,
+          "mime": "text/x-python",
+          "role": "input"
+        },
+        {
+          "path": "dev-015/input/source-code/app/models/experiment.py",
+          "sha256": "7e1da5c197eea3aa69e50b906b3653e195d9a111fe9e4a15f29e156e2c2c436d",
+          "size": 3100,
+          "mime": "text/x-python",
+          "role": "input"
+        },
+        {
+          "path": "dev-015/input/source-code/app/models/experiment_result.py",
+          "sha256": "4c7072296edc60a6bb4216919321f86b744e66897da2c27939b76c34bb781aa7",
+          "size": 2060,
+          "mime": "text/x-python",
+          "role": "input"
+        },
+        {
+          "path": "dev-015/input/source-code/app/models/model.py",
+          "sha256": "39e84e64099df0fcf9e2e2f5e262d4b5c8759f0c4ae468aeb6466ebbe89ca574",
+          "size": 2224,
+          "mime": "text/x-python",
+          "role": "input"
+        },
+        {
+          "path": "dev-015/input/source-code/app/routers/__init__.py",
+          "sha256": "bf0b35d4da1e79d1c6f3736ab76755b20591e678d090d340ef2f7a4ad5501fc6",
+          "size": 24,
+          "mime": "text/x-python",
+          "role": "input"
+        },
+        {
+          "path": "dev-015/input/source-code/app/routers/datasets.py",
+          "sha256": "af908fe9fedfa281d962fc542a8f1a8081744c6875cf3b81b7a5cc885ee9fa24",
+          "size": 4080,
+          "mime": "text/x-python",
+          "role": "input"
+        },
+        {
+          "path": "dev-015/input/source-code/app/routers/experiments.py",
+          "sha256": "d7a5a3f54c3d9428f85a724b46c15e8c7fb4251bad8cddea8c80a42e92469d19",
+          "size": 4103,
+          "mime": "text/x-python",
+          "role": "input"
+        },
+        {
+          "path": "dev-015/input/source-code/app/routers/models.py",
+          "sha256": "4d1cd112f664f9f3da027d7956a8259b1a921de2e0dd3389391299000c92e4f2",
+          "size": 3059,
+          "mime": "text/x-python",
+          "role": "input"
+        },
+        {
+          "path": "dev-015/input/source-code/app/schemas/__init__.py",
+          "sha256": "07d94a501844e3ae36bedb9af34c1f27f14f02d327624dd366cf563f22d98577",
+          "size": 27,
+          "mime": "text/x-python",
+          "role": "input"
+        },
+        {
+          "path": "dev-015/input/source-code/app/schemas/dataset.py",
+          "sha256": "2f71a291a95aa3cf5e09a93e9a2607a5722291f2677fdbf94b066578d0426cd7",
+          "size": 2022,
+          "mime": "text/x-python",
+          "role": "input"
+        },
+        {
+          "path": "dev-015/input/source-code/app/schemas/experiment.py",
+          "sha256": "2d30de6a4e09a16ba3fdbd0c046ae5cd9a0df7d644ac1f34d7da1bf966a79b7a",
+          "size": 2566,
+          "mime": "text/x-python",
+          "role": "input"
+        },
+        {
+          "path": "dev-015/input/source-code/app/schemas/model.py",
+          "sha256": "dc4d3c5c446544af82147033f6a5b7802c54c5164bd0b02a7bc7ba789b825074",
+          "size": 3877,
+          "mime": "text/x-python",
+          "role": "input"
+        },
+        {
+          "path": "dev-015/input/source-code/app/services/__init__.py",
+          "sha256": "5c00f2fcc5177e771cbe67ea50ee42df3295fc7e0538b4f7e12a7c478655d7c4",
+          "size": 26,
+          "mime": "text/x-python",
+          "role": "input"
+        },
+        {
+          "path": "dev-015/input/source-code/app/services/dataset_service.py",
+          "sha256": "c21b484a3c2829b8fcb86bb8aa15710c2ce7fa33888b7ff297434f3259828b28",
+          "size": 11765,
+          "mime": "text/x-python",
+          "role": "input"
+        },
+        {
+          "path": "dev-015/input/source-code/app/services/experiment_service.py",
+          "sha256": "e2759d22ee1f3d6ccbccb1c1b45a8cce95f18c47a8aa4a1f2a3c79d8aacecf2a",
+          "size": 12376,
+          "mime": "text/x-python",
+          "role": "input"
+        },
+        {
+          "path": "dev-015/input/source-code/app/services/model_service.py",
+          "sha256": "aab0c005c6e430b50f7454bb11c1074abd40894397673b2407568b81df71ce8c",
+          "size": 8367,
+          "mime": "text/x-python",
+          "role": "input"
+        },
+        {
+          "path": "dev-015/input/source-code/app/utils/__init__.py",
+          "sha256": "5adb96c2bc9a472819d2c0fdd4085ebd21cec0090045725d44f8c4cfbb229337",
+          "size": 20,
+          "mime": "text/x-python",
+          "role": "input"
+        },
+        {
+          "path": "dev-015/input/source-code/app/utils/audit.py",
+          "sha256": "0d3ab4810fe4b7b3a8a1ddeca3f83d076e667318b3a7c0810f346b8416ea80b7",
+          "size": 1349,
+          "mime": "text/x-python",
+          "role": "input"
+        },
+        {
+          "path": "dev-015/input/source-code/app/utils/crypto.py",
+          "sha256": "9cd27bc8fcc92b2cc159183026931b823c247302adb30d01ee8f543969bfbd07",
+          "size": 2311,
+          "mime": "text/x-python",
+          "role": "input"
+        },
+        {
+          "path": "dev-015/input/source-code/app/utils/pagination.py",
+          "sha256": "835f6b60492a989b13016c14a16f6bced970b101fe5654636303131e2d833092",
+          "size": 1162,
+          "mime": "text/x-python",
+          "role": "input"
+        },
+        {
+          "path": "dev-015/input/source-code/app/utils/response.py",
+          "sha256": "2208d564a3e6569beb7d915f3627e3ea3df74133e1ee138f6f15a0ba4a9d5de4",
+          "size": 1384,
+          "mime": "text/x-python",
+          "role": "input"
+        },
+        {
+          "path": "dev-015/input/source-code/frontend/index.html",
+          "sha256": "3a8cad4a4687cf53883102c5555b66f58f65fb0647b8e60f5ac124b1ec54d349",
+          "size": 377,
+          "mime": "text/html",
+          "role": "input"
+        },
+        {
+          "path": "dev-015/input/source-code/frontend/package.json",
+          "sha256": "5834a515b5d7016c71b2c1576e3c4bb0682ecb3f7efc59622ff4d19cdfc1ba29",
+          "size": 629,
+          "mime": "application/json",
+          "role": "input"
+        },
+        {
+          "path": "dev-015/input/source-code/frontend/src/App.tsx",
+          "sha256": "15351420de2a10dffb9e6b4982d858f05f578034bc5e7a893ca27b4e6906bdcc",
+          "size": 2322,
+          "mime": "text/typescript-jsx",
+          "role": "input"
+        },
+        {
+          "path": "dev-015/input/source-code/frontend/src/api/index.ts",
+          "sha256": "e1282eaf1b58cf20ce7296b6715087bbd5b5ae2c9d15c443faa96f95e87ef21b",
+          "size": 5607,
+          "mime": "text/typescript",
+          "role": "input"
+        },
+        {
+          "path": "dev-015/input/source-code/frontend/src/index.css",
+          "sha256": "85c468ce0e918e5b4800217a5659a9fd85eab1f0f39f0b9da07f888532f8057a",
+          "size": 511,
+          "mime": "text/css",
+          "role": "input"
+        },
+        {
+          "path": "dev-015/input/source-code/frontend/src/main.tsx",
+          "sha256": "ccf09357982b662e93dfeaafd90da723b845f941ca82f07117adc33e37a6d16b",
+          "size": 380,
+          "mime": "text/typescript-jsx",
+          "role": "input"
+        },
+        {
+          "path": "dev-015/input/source-code/frontend/src/pages/DatasetsPage.tsx",
+          "sha256": "75c35d96a899b0d519b54d85f52aecb8f713365c3f4f5ce6101eed51e642c3fc",
+          "size": 13077,
+          "mime": "text/typescript-jsx",
+          "role": "input"
+        },
+        {
+          "path": "dev-015/input/source-code/frontend/src/pages/ExperimentDetailPage.tsx",
+          "sha256": "c516e1a15ee3e8e95b84b1fe06a6b91dacaad40210cc5d1dc8e3915e8625e2a2",
+          "size": 10043,
+          "mime": "text/typescript-jsx",
+          "role": "input"
+        },
+        {
+          "path": "dev-015/input/source-code/frontend/src/pages/ExperimentsPage.tsx",
+          "sha256": "79808b7742bb9ff84307c98c562e8e50a91b43fba0594e1c818e47f1a468ca22",
+          "size": 8746,
+          "mime": "text/typescript-jsx",
+          "role": "input"
+        },
+        {
+          "path": "dev-015/input/source-code/frontend/src/pages/ModelsPage.tsx",
+          "sha256": "c7b60479b75c927eef478dbaf7971c14248a98101f52965e069c796a275ec6c6",
+          "size": 11236,
+          "mime": "text/typescript-jsx",
+          "role": "input"
+        },
+        {
+          "path": "dev-015/input/source-code/frontend/tsconfig.json",
+          "sha256": "70030395f435733c163b7eaafba9766dc1a8c1dea640c5eaa495207a3344cb23",
+          "size": 585,
+          "mime": "application/json",
+          "role": "input"
+        },
+        {
+          "path": "dev-015/input/source-code/frontend/tsconfig.node.json",
+          "sha256": "6ec602b8aa146888c76f0b41ca3515f91f95919f6e6417a4670decaba8fcb982",
+          "size": 223,
+          "mime": "application/json",
+          "role": "input"
+        },
+        {
+          "path": "dev-015/input/source-code/frontend/vite.config.ts",
+          "sha256": "d88b5f49329505bf51d8f73668c0b1a4703fdc7c2589b94de279326f297afdb4",
+          "size": 357,
+          "mime": "text/typescript",
+          "role": "input"
+        },
+        {
+          "path": "dev-015/input/source-code/requirements.txt",
+          "sha256": "b4668b33b3d9c036fe0f76f9672817c54269d5647a9e752ac463e69603cbfa05",
+          "size": 202,
+          "mime": "text/plain",
+          "role": "input"
+        },
+        {
+          "path": "dev-015/input/source-code/start.sh",
+          "sha256": "fde7f12652c30c3f6b9dd4b7509e97cb640ab50356c6ae3196e7eb2845423df2",
+          "size": 2775,
+          "mime": "text/x-shellscript",
+          "role": "input"
+        },
+        {
+          "path": "dev-015/input/technical-design.md",
+          "sha256": "a613314f1325e51c4c079fb8af4858e0caab7b425f04ece879cbf9156081260f",
+          "size": 40489,
+          "mime": "text/markdown",
+          "role": "input"
+        }
+      ]
+    },
+    {
+      "task_id": "Finance-018",
+      "category": "Finance",
+      "availability": "local_input_bundle",
+      "external_dependency": null,
+      "task_file": {
+        "path": "Finance-018/task.md",
+        "sha256": "9beb06c5701bdbd158e7b909a8a8d792157eef4c195015a5e2afd0c783619522",
+        "size": 7173,
+        "mime": "text/markdown",
+        "role": "task_instruction"
+      },
+      "input_dir": "Finance-018/input",
+      "input_file_count": 3,
+      "input_bytes": 39469,
+      "file_extensions": [
+        ".xlsx"
+      ],
+      "input_files": [
+        {
+          "path": "Finance-018/input/2025往来明细-上半年.xlsx",
+          "sha256": "4ffb7c2d6d3efe6fcae45c2aff755bedd727d9c3467d00e1765a147e5ecab5f3",
+          "size": 13873,
+          "mime": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          "role": "input"
+        },
+        {
+          "path": "Finance-018/input/2025往来明细-下半年.xlsx",
+          "sha256": "4ad841ee36acc3b52aea0c6931a260b69ead7493f0c33056c429c36d70575c31",
+          "size": 12850,
+          "mime": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          "role": "input"
+        },
+        {
+          "path": "Finance-018/input/2026往来明细.xlsx",
+          "sha256": "4ee1f69d3346eea3b99660ab8a2efc946c93f00123ba83e121277bc7be66f4f3",
+          "size": 12746,
+          "mime": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          "role": "input"
+        }
+      ]
+    },
+    {
+      "task_id": "hr-001",
+      "category": "hr",
+      "availability": "local_input_bundle",
+      "external_dependency": null,
+      "task_file": {
+        "path": "hr-001/task.md",
+        "sha256": "2adaa5bfaa2e14eee03c081a1a1725a7a19aa7e8320b41f0aaf501f45d4b3e0a",
+        "size": 8036,
+        "mime": "text/markdown",
+        "role": "task_instruction"
+      },
+      "input_dir": "hr-001/input",
+      "input_file_count": 7,
+      "input_bytes": 939500,
+      "file_extensions": [
+        ".docx",
+        ".pdf"
+      ],
+      "input_files": [
+        {
+          "path": "hr-001/input/周伦简历.pdf",
+          "sha256": "f07176282cee6e59516a9c22d6d754eb057998cc2d0e333676bf45940c04c6dc",
+          "size": 195641,
+          "mime": "application/pdf",
+          "role": "input"
+        },
+        {
+          "path": "hr-001/input/外卖商户BD岗位JD.docx",
+          "sha256": "32373d3428b09dc3cef95be35cad86230256708c537aea1e1148b21f33ddd08b",
+          "size": 19162,
+          "mime": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+          "role": "input"
+        },
+        {
+          "path": "hr-001/input/孙博文简历.pdf",
+          "sha256": "c759fb803b49534b967b324499d6cc992123ae20e61803dbd86bf4adaadceb67",
+          "size": 172012,
+          "mime": "application/pdf",
+          "role": "input"
+        },
+        {
+          "path": "hr-001/input/文本评测岗位JD.docx",
+          "sha256": "fbb47dc6f1062121e38faff41d01f9924e3b8719189759736997bb0621567c4c",
+          "size": 15398,
+          "mime": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+          "role": "input"
+        },
+        {
+          "path": "hr-001/input/李雨桐简历.pdf",
+          "sha256": "29d4f44bb174f17bbb41166350d31e7d5bb09cc1228c13c4af3f907f4c735552",
+          "size": 196370,
+          "mime": "application/pdf",
+          "role": "input"
+        },
+        {
+          "path": "hr-001/input/王琳达简历.pdf",
+          "sha256": "d87854490992cadfe78bd23c5011d2ab8f986317bcab47a800b9df062ce1777b",
+          "size": 174764,
+          "mime": "application/pdf",
+          "role": "input"
+        },
+        {
+          "path": "hr-001/input/赵晨曦简历.pdf",
+          "sha256": "4270e5a06211cb29b0a5948af7626649c483eb3cb85f63f892ce2c51d61be597",
+          "size": 166153,
+          "mime": "application/pdf",
+          "role": "input"
+        }
+      ]
+    },
+    {
+      "task_id": "Legal-020",
+      "category": "Legal",
+      "availability": "local_input_bundle",
+      "external_dependency": null,
+      "task_file": {
+        "path": "Legal-020/task.md",
+        "sha256": "349d19cff174926671553e71477bfe9b282a0490e078e0e101555f215e3d087b",
+        "size": 8915,
+        "mime": "text/markdown",
+        "role": "task_instruction"
+      },
+      "input_dir": "Legal-020/input",
+      "input_file_count": 7,
+      "input_bytes": 81153,
+      "file_extensions": [
+        ".docx",
+        ".md"
+      ],
+      "input_files": [
+        {
+          "path": "Legal-020/input/委托书/委托书1.docx",
+          "sha256": "c14bbbf751d7246aba08b700edf4a8c9fcb0f3dbffc8ac2ced5c11912abf1b9e",
+          "size": 11042,
+          "mime": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+          "role": "input"
+        },
+        {
+          "path": "Legal-020/input/委托书/委托书2.docx",
+          "sha256": "b4aa7d122266c3311c9aa93c47fade81115649ef17abbea99f449192a17b55c2",
+          "size": 11069,
+          "mime": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+          "role": "input"
+        },
+        {
+          "path": "Legal-020/input/委托书/委托书3.docx",
+          "sha256": "bd81ae42e98b5d7067ef739481c46134466d540579da11bf3cc12951832adcd3",
+          "size": 10985,
+          "mime": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+          "role": "input"
+        },
+        {
+          "path": "Legal-020/input/委托书/委托书4.docx",
+          "sha256": "6792d10d9b83c1c712c9de0f0a0e28025e7f3c11f0b61a0d2c3b9e0be60c79a4",
+          "size": 10947,
+          "mime": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+          "role": "input"
+        },
+        {
+          "path": "Legal-020/input/委托书/委托书5.docx",
+          "sha256": "159f32d1198af94432d2e0ab8be466c5ee9ea3cb79707c239e157c072e69c588",
+          "size": 10957,
+          "mime": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+          "role": "input"
+        },
+        {
+          "path": "Legal-020/input/委托书/委托书6.docx",
+          "sha256": "fe8cefaf645f9fe02ddfd74e9b02cf5795aabc6ac4b21c72d4da80b2469859db",
+          "size": 11101,
+          "mime": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+          "role": "input"
+        },
+        {
+          "path": "Legal-020/input/授权委托书风控校验规则.md",
+          "sha256": "2cd50f24c1e2d45db9f38bb57e096d31e1f97b436124690bd6115b2ef4c81eeb",
+          "size": 15052,
+          "mime": "text/markdown",
+          "role": "input"
+        }
+      ]
+    },
+    {
+      "task_id": "Marketing-012",
+      "category": "Marketing",
+      "availability": "local_input_bundle",
+      "external_dependency": null,
+      "task_file": {
+        "path": "Marketing-012/task.md",
+        "sha256": "9babec5b44b5d6caf76d451b5ed2d2f4fdcc80ba09c38f41121d7a9ad1474c28",
+        "size": 3946,
+        "mime": "text/markdown",
+        "role": "task_instruction"
+      },
+      "input_dir": "Marketing-012/input",
+      "input_file_count": 2,
+      "input_bytes": 23197,
+      "file_extensions": [
+        ".docx"
+      ],
+      "input_files": [
+        {
+          "path": "Marketing-012/input/广告识别规则.docx",
+          "sha256": "9e43ec51f3262fe3dec7ff6564e25d3d902cea543519b8ea84a77e4777fd80b4",
+          "size": 11075,
+          "mime": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+          "role": "input"
+        },
+        {
+          "path": "Marketing-012/input/竞品广告监测任务说明.docx",
+          "sha256": "ae59ac7f2b6bb1f3de72d0ed32e7d9c5f106750e9e1e6b7f2cebe081cb1d48ae",
+          "size": 12122,
+          "mime": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+          "role": "input"
+        }
+      ]
+    },
+    {
+      "task_id": "Misc-AT-003",
+      "category": "Misc",
+      "availability": "task_only_requires_external_system",
+      "external_dependency": "web_search_and_cron",
+      "task_file": {
+        "path": "Misc-AT-003/task.md",
+        "sha256": "ed78cea121d84af1d948370c5cdabffaf8ca1f03ae4e215dfdc263b8cdf21b5a",
+        "size": 4505,
+        "mime": "text/markdown",
+        "role": "task_instruction"
+      },
+      "input_dir": null,
+      "input_file_count": 0,
+      "input_bytes": 0,
+      "file_extensions": [],
+      "input_files": []
+    },
+    {
+      "task_id": "Operations-008",
+      "category": "Operations",
+      "availability": "local_input_bundle",
+      "external_dependency": null,
+      "task_file": {
+        "path": "Operations-008/task.md",
+        "sha256": "988fe23185496b4700b5360b3319ff161f627d091dcb5f1fe1b8dd7e2d77f2f3",
+        "size": 11915,
+        "mime": "text/markdown",
+        "role": "task_instruction"
+      },
+      "input_dir": "Operations-008/input",
+      "input_file_count": 1,
+      "input_bytes": 3573,
+      "file_extensions": [
+        ".md"
+      ],
+      "input_files": [
+        {
+          "path": "Operations-008/input/专业性说明.md",
+          "sha256": "ad6349474b324e55b49a798aa0151f5cf875dc5e72a65c8ad01f4d3fd2cfee10",
+          "size": 3573,
+          "mime": "text/markdown",
+          "role": "input"
+        }
+      ]
+    },
+    {
+      "task_id": "pm-014",
+      "category": "pm",
+      "availability": "local_input_bundle",
+      "external_dependency": null,
+      "task_file": {
+        "path": "pm-014/task.md",
+        "sha256": "bc0f4880863279722edd02057354e63b2aa1a68ce072ca1ce3f025e493768beb",
+        "size": 10789,
+        "mime": "text/markdown",
+        "role": "task_instruction"
+      },
+      "input_dir": "pm-014/input",
+      "input_file_count": 4,
+      "input_bytes": 42433,
+      "file_extensions": [
+        ".md",
+        ".xlsx"
+      ],
+      "input_files": [
+        {
+          "path": "pm-014/input/PRD_v2.5.md",
+          "sha256": "492518dea158b8a5c9fde62ca654bb0777ad5feceeba80983ef9fd7c1da7b77d",
+          "size": 8407,
+          "mime": "text/markdown",
+          "role": "input"
+        },
+        {
+          "path": "pm-014/input/上线配置清单.xlsx",
+          "sha256": "5dac25a533a4a2ea1211bbde44914c85947017189e98c8312f94025df9eb6376",
+          "size": 11128,
+          "mime": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          "role": "input"
+        },
+        {
+          "path": "pm-014/input/功能测试报告.xlsx",
+          "sha256": "1f1867207fa8d5a137a2a70aea79c424762bb806247ecd4f0c1eb1227b9b4cbe",
+          "size": 11963,
+          "mime": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          "role": "input"
+        },
+        {
+          "path": "pm-014/input/线上兼容环境测试报告.xlsx",
+          "sha256": "30c3568f67dc24021be6044fb87ba485de9b2b453714be75434a17d93fd146b5",
+          "size": 10935,
+          "mime": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          "role": "input"
+        }
+      ]
+    },
+    {
+      "task_id": "qa-003",
+      "category": "qa",
+      "availability": "local_input_bundle",
+      "external_dependency": null,
+      "task_file": {
+        "path": "qa-003/task.md",
+        "sha256": "628d46d8820abd227e96b0664d23492efa7ad5ae4a2c3f27d289486174eac046",
+        "size": 9696,
+        "mime": "text/markdown",
+        "role": "task_instruction"
+      },
+      "input_dir": "qa-003/input",
+      "input_file_count": 11,
+      "input_bytes": 36852,
+      "file_extensions": [
+        ".js",
+        ".json"
+      ],
+      "input_files": [
+        {
+          "path": "qa-003/input/dashboard-toolkit/package.json",
+          "sha256": "8c79a2b935644c917ab138659db4460011d85d97be33333a6c0a76826b5e377a",
+          "size": 303,
+          "mime": "application/json",
+          "role": "input"
+        },
+        {
+          "path": "qa-003/input/dashboard-toolkit/src/constants/index.js",
+          "sha256": "8ef5486f722ae27c40980827aadf7a946408a73eb123af090a146c504873d0e8",
+          "size": 1334,
+          "mime": "text/javascript",
+          "role": "input"
+        },
+        {
+          "path": "qa-003/input/dashboard-toolkit/src/utils/chartHelper.js",
+          "sha256": "c88998a7eb54c0d18c6b72e8c0bc88293269ea187f2335d446d13f682c8d84bb",
+          "size": 4788,
+          "mime": "text/javascript",
+          "role": "input"
+        },
+        {
+          "path": "qa-003/input/dashboard-toolkit/src/utils/dataTransformer.js",
+          "sha256": "4c49f2f463000bba9f6f0bd97d2d5e4e0dd3ee797908ee82e2bb5a284036e9c8",
+          "size": 4589,
+          "mime": "text/javascript",
+          "role": "input"
+        },
+        {
+          "path": "qa-003/input/dashboard-toolkit/src/utils/dateUtils.js",
+          "sha256": "0656b1d77fef36597bbacae1a278efd3c46991c6ab463506b06f1f3e19c94dd7",
+          "size": 4125,
+          "mime": "text/javascript",
+          "role": "input"
+        },
+        {
+          "path": "qa-003/input/dashboard-toolkit/src/utils/exportHelper.js",
+          "sha256": "cefbf9da8d68eebcfd132edfb647b56d1a6a7713270e20517e96d75c742e759d",
+          "size": 3738,
+          "mime": "text/javascript",
+          "role": "input"
+        },
+        {
+          "path": "qa-003/input/dashboard-toolkit/src/utils/filterEngine.js",
+          "sha256": "b3f3e56dc2d19804a7983d0318eb087e25227c9ffbf4085f6af8d44d355e4593",
+          "size": 3659,
+          "mime": "text/javascript",
+          "role": "input"
+        },
+        {
+          "path": "qa-003/input/dashboard-toolkit/src/utils/metricsCalculator.js",
+          "sha256": "0594102938e813993468a84cb9fecdae069261f74264175904027ab6f99caa5d",
+          "size": 3573,
+          "mime": "text/javascript",
+          "role": "input"
+        },
+        {
+          "path": "qa-003/input/dashboard-toolkit/src/utils/statisticsEngine.js",
+          "sha256": "2a3cb8aaf777e5d8ebf53a5f6a1b860ffb77d9306a28f83c7f99adba6bfa2c10",
+          "size": 5439,
+          "mime": "text/javascript",
+          "role": "input"
+        },
+        {
+          "path": "qa-003/input/dashboard-toolkit/src/utils/validatorUtils.js",
+          "sha256": "b58ee7ccd96185b182d2adbb1a0045c3b61e8e4fe01caf17edb463ebd33c400e",
+          "size": 5016,
+          "mime": "text/javascript",
+          "role": "input"
+        },
+        {
+          "path": "qa-003/input/dashboard-toolkit/vitest.config.js",
+          "sha256": "e16a473fe7b1630d55763e669d6302447ad2e3e456a1973d7ce6b1d0c540cd3e",
+          "size": 288,
+          "mime": "text/javascript",
+          "role": "input"
+        }
+      ]
+    },
+    {
+      "task_id": "sales-020",
+      "category": "sales",
+      "availability": "local_input_bundle",
+      "external_dependency": null,
+      "task_file": {
+        "path": "sales-020/task.md",
+        "sha256": "67bdff009496dbd3944db42e3126f3f283f1ed1ef3380e46125e42974750ea85",
+        "size": 5770,
+        "mime": "text/markdown",
+        "role": "task_instruction"
+      },
+      "input_dir": "sales-020/input",
+      "input_file_count": 2,
+      "input_bytes": 2304,
+      "file_extensions": [
+        ".csv",
+        ".md"
+      ],
+      "input_files": [
+        {
+          "path": "sales-020/input/客户分类画像与差异化销售策略生成规则.md",
+          "sha256": "b10bf0cfb272352788267e6195f1f9b5e31ae9dc4f17cbc63ea7b579aea33565",
+          "size": 1720,
+          "mime": "text/markdown",
+          "role": "input"
+        },
+        {
+          "path": "sales-020/input/客户画像调研问卷.csv",
+          "sha256": "a56e118eabd1ef5fd718b946887058f998b73117f3b6d56b5349b73bb4a3fff0",
+          "size": 584,
+          "mime": "text/csv",
+          "role": "input"
+        }
+      ]
+    },
+    {
+      "task_id": "sre-010",
+      "category": "sre",
+      "availability": "local_input_bundle",
+      "external_dependency": null,
+      "task_file": {
+        "path": "sre-010/task.md",
+        "sha256": "bfd01324eef8f3d64814e58636b3eb2339df8bcc7c5ba7591ab4201d72c0ebc0",
+        "size": 9995,
+        "mime": "text/markdown",
+        "role": "task_instruction"
+      },
+      "input_dir": "sre-010/input",
+      "input_file_count": 1,
+      "input_bytes": 21026,
+      "file_extensions": [
+        ".txt"
+      ],
+      "input_files": [
+        {
+          "path": "sre-010/input/log.txt",
+          "sha256": "5a36d2dfc54a0507a4ddc41a44ff4b021fef0182f98b8dc515d1ee422967233a",
+          "size": 21026,
+          "mime": "text/plain",
+          "role": "input"
+        }
+      ]
+    },
+    {
+      "task_id": "uiux-021",
+      "category": "uiux",
+      "availability": "local_input_bundle",
+      "external_dependency": null,
+      "task_file": {
+        "path": "uiux-021/task.md",
+        "sha256": "354b04ed3cddb861ea7cef9221e0de36343f55c54fdd52fce4f945ad7b57c0f7",
+        "size": 3688,
+        "mime": "text/markdown",
+        "role": "task_instruction"
+      },
+      "input_dir": "uiux-021/input",
+      "input_file_count": 3,
+      "input_bytes": 42707,
+      "file_extensions": [
+        ".docx",
+        ".md",
+        ".xlsx"
+      ],
+      "input_files": [
+        {
+          "path": "uiux-021/input/交互行为痛点及优化规则.md",
+          "sha256": "321a1563cd90362f0e36fc0a3ca902b51f78a9f93b484064d3b4df2841c4a5ff",
+          "size": 4458,
+          "mime": "text/markdown",
+          "role": "input"
+        },
+        {
+          "path": "uiux-021/input/用户交互行为日志.xlsx",
+          "sha256": "173ce493ab2b7ab916a0caa0ca2c8c58ff90e7a4a1295afc43f875420672a08b",
+          "size": 21921,
+          "mime": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          "role": "input"
+        },
+        {
+          "path": "uiux-021/input/页面级交互规范.docx",
+          "sha256": "ae744e2eb4444fbaaf82d87bf7c71b8725d043d369c69d3158835e2d728cd059",
+          "size": 16328,
+          "mime": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+          "role": "input"
+        }
+      ]
+    }
+  ]
+}

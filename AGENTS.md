@@ -10,7 +10,7 @@
 6. `docs/contracts/UI_SERVER_FACT_MATRIX.md`：每个前台状态的服务端事实。
 7. `docs/PRESENTATION_BRIEF.md`：汇报叙事和不可夸大边界。
 8. `docs/DECISION_AND_REPORTING_GOVERNANCE.md`：每个决策、PR、Demo 和汇报必须满足的硬门槛。
-9. FORTE、数据预览、只读分析与统一 Harness 变更再读 `docs/decisions/DR-0016-public-workspace-agent-harness.md`、`DR-0017-single-forte-worksite-and-legacy-retirement.md`、`DR-0018-forte-data-workbench-and-verifiable-trace.md`、`DR-0019-capability-composed-agent-runtime.md`、`DR-0020-server-owned-plan-policy-compilation.md`、`docs/scenarios/SCENARIO-004-*.md` 至 `SCENARIO-007-*.md`、对应 Source/Evidence 和 `docs/decisions/RETIREMENT_REGISTER.md`。
+9. FORTE、数据预览、只读分析与统一 Harness 变更再读 `docs/decisions/DR-0016-public-workspace-agent-harness.md`、`DR-0017-single-forte-worksite-and-legacy-retirement.md`、`DR-0018-forte-data-workbench-and-verifiable-trace.md`、`DR-0019-capability-composed-agent-runtime.md`、`DR-0020-server-owned-plan-policy-compilation.md`、`DR-0021-forte-public-suite-expansion.md`、`docs/testing/FORTE-PUBLIC-OFFICE-TASK-TEST-CASES-20260825.md`、`docs/scenarios/SCENARIO-004-*.md` 至 `SCENARIO-007-*.md`、对应 Source/Evidence 和 `docs/decisions/RETIREMENT_REGISTER.md`。
 
 源码永远高于文档。行为或叙事变化后必须同步 living docs、Decision、Scenario、Source、Evidence 和 UI—服务端事实映射，不能只改 README。
 
@@ -21,7 +21,7 @@
 - Demo 1/2/3 只是通用能力的验收视角，不是三套 Runtime。公共、内部与 Planner Scenario 契约不得使用 `demo_id` 或 `experience_policy` 分流；统一使用 `work_profile.task_topology/orchestration/control_requirements/current_runtime_scope`。
 - Demo 1 对应“单任务拆解 + 有界循环 + 证据/人工暂停”；Demo 2 对应“多任务自组织 + 自适应调度 + 共享工件收敛”；Demo 3 是可叠加到两种拓扑的 Risk Gate，不是第三种编排引擎。
 - 当前 `current_runtime_scope` 固定为 `read_only_analysis`。不得把 Catalog 中的目标 `bounded_loop` / `adaptive_swarm` 配置、前端动画或 Demo 名称表述为执行已经发生。
-- FORTE 固定上游 commit `345c1ec1487139db9dd319787fa9405ba85d1869`、顶层 MIT、11 个原始文件、`115352` bytes。任务和输入文件按原字节保留并标记为 binary，禁止 Git 换行归一化改变哈希。
+- FORTE 固定上游 commit `345c1ec1487139db9dd319787fa9405ba85d1869`、顶层 MIT。`public-suite-manifest.json` 记录官方公开的 15 个职业示例、96 个 input、111 个 task/input 文件和 `1780445` bytes；当前产品 `manifest.json` 仍只 allowlist 三个场景、11 个原始文件和 `115352` bytes。下载不等于 Runtime 支持，禁止把待适配任务显示为可运行。
 - raw `task.md` 只作 provenance；公共预览和 Analyst 输入由 Catalog 重新校验并安全投影。公共 API/DOM/Analyst 不得出现原始 `task_instruction`、rubric、solution、grading、绝对路径或完整 hash。
 - 每个文件使用稳定的 `file_ref`。用户可以选择当前 Scenario 中的文件并提交自己的 `instruction`；服务端必须拒绝重复、畸形、未知或跨 Scenario 引用。
 - 当前成功路径调用两次 `deepseek-v4-pro`：Planner 生成工作图，Analyst 读取安全预览生成引用结果。两次 `called/output_used/elapsed_ms` 必须分别显示；配置模型名或动画不是调用事实。

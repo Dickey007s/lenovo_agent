@@ -1,0 +1,231 @@
+2026-05-12 10:31:50,647 [INFO] __main__: Starting AI Search Agent (Workflow Architecture)
+2026-05-12 10:31:50,647 [INFO] llm: LLMClient initialized: model=gpt-4, temp=0.7
+2026-05-12 10:31:50,647 [INFO] tools: WebSearchTool initialized with engine=google, top_k=5, date_restrict_days=0
+2026-05-12 10:31:50,647 [INFO] tools: Tool registered: web_search
+2026-05-12 10:31:50,647 [INFO] tools: KnowledgeBaseTool initialized with top_k=3
+2026-05-12 10:31:50,647 [INFO] tools: Tool registered: knowledge_base
+2026-05-12 10:31:50,647 [INFO] tools: ArxivSearchTool initialized with top_k=3
+2026-05-12 10:31:50,647 [INFO] tools: Tool registered: arxiv_search
+2026-05-12 10:31:50,647 [INFO] workflow: ============================================================
+2026-05-12 10:31:50,647 [INFO] workflow: SearchWorkflow started: query='What is the difference between React and Vue.js?'
+2026-05-12 10:31:50,647 [INFO] workflow: ============================================================
+2026-05-12 10:31:50,647 [INFO] workflow: [QueryAnalysis] Analyzing query: 'What is the difference between React and Vue.js?'
+2026-05-12 10:31:50,647 [INFO] workflow: [QueryAnalysis] Intent classified: factual
+2026-05-12 10:31:50,647 [INFO] workflow: [QueryAnalysis] rewritten_query='detailed explanation of What is the difference between React and Vue.js?', accepted=True
+2026-05-12 10:31:50,647 [INFO] workflow: Node [QueryAnalysis] completed in 0.000s with status=success
+2026-05-12 10:31:50,647 [INFO] workflow: [SearchPlan] Planning search for intent: 'factual'
+2026-05-12 10:31:50,647 [INFO] workflow: [SearchPlan] Selected tools: ['web_search', 'knowledge_base']
+2026-05-12 10:31:50,647 [INFO] workflow: Node [SearchPlan] completed in 0.000s with status=success
+2026-05-12 10:31:50,647 [INFO] workflow: [SearchExecution] Executing search with tools: ['web_search', 'knowledge_base']
+2026-05-12 10:31:50,647 [INFO] tools: WebSearch: query='detailed explanation of What is the difference between React and Vue.js?', date_restrict_days=0
+2026-05-12 10:31:50,751 [INFO] workflow: [SearchExecution] web_search returned 5 results for query: 'detailed explanation of What is the difference between React and Vue.js?'
+2026-05-12 10:31:50,751 [INFO] tools: KnowledgeBaseSearch: query='detailed explanation of What is the difference between React and Vue.js?'
+2026-05-12 10:31:50,806 [INFO] workflow: [SearchExecution] knowledge_base returned 3 results for query: 'detailed explanation of What is the difference between React and Vue.js?'
+2026-05-12 10:31:50,806 [INFO] workflow: [SearchExecution] Total raw results: 8
+2026-05-12 10:31:50,806 [INFO] workflow: [SearchExecution] After quality filter (threshold=0.5): 8 results
+2026-05-12 10:31:50,806 [INFO] workflow: Node [SearchExecution] completed in 0.159s with status=success
+2026-05-12 10:31:50,806 [INFO] workflow: [ResultRanking] Ranking 8 filtered results
+2026-05-12 10:31:50,806 [INFO] workflow: [ResultRanking] source='web': 5 results, keeping top 3 (quota=3)
+2026-05-12 10:31:50,807 [INFO] workflow: [ResultRanking] source='knowledge_base': 3 results, keeping top 3 (quota=3)
+2026-05-12 10:31:50,807 [INFO] workflow: [ResultRanking] Final ranked results: 6
+2026-05-12 10:31:50,807 [INFO] workflow: Node [ResultRanking] completed in 0.000s with status=success
+2026-05-12 10:31:50,807 [INFO] workflow: [SummaryGeneration] Generating answer from 6 results
+2026-05-12 10:31:50,807 [INFO] workflow: Node [SummaryGeneration] completed in 0.000s with status=success
+2026-05-12 10:31:50,807 [INFO] workflow: SearchWorkflow completed in 0.160s
+2026-05-12 10:31:50,807 [INFO] workflow: ============================================================
+2026-05-12 10:31:50,807 [INFO] workflow: SearchWorkflow started: query='Latest advances in large language models 2024'
+2026-05-12 10:31:50,807 [INFO] workflow: ============================================================
+2026-05-12 10:31:50,807 [INFO] workflow: [QueryAnalysis] Analyzing query: 'Latest advances in large language models 2024'
+2026-05-12 10:31:50,807 [INFO] workflow: [QueryAnalysis] Intent classified: factual
+2026-05-12 10:31:50,807 [INFO] workflow: [QueryAnalysis] rewritten_query='detailed explanation of Latest advances in large language models 2024', accepted=True
+2026-05-12 10:31:50,807 [INFO] workflow: Node [QueryAnalysis] completed in 0.000s with status=success
+2026-05-12 10:31:50,807 [INFO] workflow: [SearchPlan] Planning search for intent: 'factual'
+2026-05-12 10:31:50,807 [INFO] workflow: [SearchPlan] Selected tools: ['web_search', 'knowledge_base']
+2026-05-12 10:31:50,807 [INFO] workflow: Node [SearchPlan] completed in 0.000s with status=success
+2026-05-12 10:31:50,807 [INFO] workflow: [SearchExecution] Executing search with tools: ['web_search', 'knowledge_base']
+2026-05-12 10:31:50,807 [INFO] tools: WebSearch: query='detailed explanation of Latest advances in large language models 2024', date_restrict_days=0
+2026-05-12 10:31:50,909 [INFO] workflow: [SearchExecution] web_search returned 5 results for query: 'detailed explanation of Latest advances in large language models 2024'
+2026-05-12 10:31:50,909 [INFO] tools: KnowledgeBaseSearch: query='detailed explanation of Latest advances in large language models 2024'
+2026-05-12 10:31:50,964 [INFO] workflow: [SearchExecution] knowledge_base returned 3 results for query: 'detailed explanation of Latest advances in large language models 2024'
+2026-05-12 10:31:50,964 [INFO] workflow: [SearchExecution] Total raw results: 8
+2026-05-12 10:31:50,965 [INFO] workflow: [SearchExecution] After quality filter (threshold=0.5): 8 results
+2026-05-12 10:31:50,965 [INFO] workflow: Node [SearchExecution] completed in 0.157s with status=success
+2026-05-12 10:31:50,965 [INFO] workflow: [ResultRanking] Ranking 8 filtered results
+2026-05-12 10:31:50,965 [INFO] workflow: [ResultRanking] source='web': 5 results, keeping top 3 (quota=3)
+2026-05-12 10:31:50,965 [INFO] workflow: [ResultRanking] source='knowledge_base': 3 results, keeping top 3 (quota=3)
+2026-05-12 10:31:50,965 [INFO] workflow: [ResultRanking] Final ranked results: 6
+2026-05-12 10:31:50,965 [INFO] workflow: Node [ResultRanking] completed in 0.000s with status=success
+2026-05-12 10:31:50,965 [INFO] workflow: [SummaryGeneration] Generating answer from 6 results
+2026-05-12 10:31:50,965 [INFO] workflow: Node [SummaryGeneration] completed in 0.000s with status=success
+2026-05-12 10:31:50,965 [INFO] workflow: SearchWorkflow completed in 0.158s
+2026-05-12 10:31:50,965 [INFO] workflow: ============================================================
+2026-05-12 10:31:50,965 [INFO] workflow: SearchWorkflow started: query='How to implement a binary search tree in Python?'
+2026-05-12 10:31:50,965 [INFO] workflow: ============================================================
+2026-05-12 10:31:50,965 [INFO] workflow: [QueryAnalysis] Analyzing query: 'How to implement a binary search tree in Python?'
+2026-05-12 10:31:50,965 [INFO] workflow: [QueryAnalysis] Intent classified: factual
+2026-05-12 10:31:50,965 [INFO] workflow: [QueryAnalysis] rewritten_query='detailed explanation of How to implement a binary search tree in Python?', accepted=True
+2026-05-12 10:31:50,965 [INFO] workflow: Node [QueryAnalysis] completed in 0.000s with status=success
+2026-05-12 10:31:50,965 [INFO] workflow: [SearchPlan] Planning search for intent: 'factual'
+2026-05-12 10:31:50,965 [INFO] workflow: [SearchPlan] Selected tools: ['web_search', 'knowledge_base']
+2026-05-12 10:31:50,965 [INFO] workflow: Node [SearchPlan] completed in 0.000s with status=success
+2026-05-12 10:31:50,965 [INFO] workflow: [SearchExecution] Executing search with tools: ['web_search', 'knowledge_base']
+2026-05-12 10:31:50,966 [INFO] tools: WebSearch: query='detailed explanation of How to implement a binary search tree in Python?', date_restrict_days=0
+2026-05-12 10:31:51,067 [INFO] workflow: [SearchExecution] web_search returned 5 results for query: 'detailed explanation of How to implement a binary search tree in Python?'
+2026-05-12 10:31:51,068 [INFO] tools: KnowledgeBaseSearch: query='detailed explanation of How to implement a binary search tree in Python?'
+2026-05-12 10:31:51,123 [INFO] workflow: [SearchExecution] knowledge_base returned 3 results for query: 'detailed explanation of How to implement a binary search tree in Python?'
+2026-05-12 10:31:51,123 [INFO] workflow: [SearchExecution] Total raw results: 8
+2026-05-12 10:31:51,123 [INFO] workflow: [SearchExecution] After quality filter (threshold=0.5): 8 results
+2026-05-12 10:31:51,123 [INFO] workflow: Node [SearchExecution] completed in 0.158s with status=success
+2026-05-12 10:31:51,123 [INFO] workflow: [ResultRanking] Ranking 8 filtered results
+2026-05-12 10:31:51,123 [INFO] workflow: [ResultRanking] source='web': 5 results, keeping top 3 (quota=3)
+2026-05-12 10:31:51,123 [INFO] workflow: [ResultRanking] source='knowledge_base': 3 results, keeping top 3 (quota=3)
+2026-05-12 10:31:51,123 [INFO] workflow: [ResultRanking] Final ranked results: 6
+2026-05-12 10:31:51,123 [INFO] workflow: Node [ResultRanking] completed in 0.000s with status=success
+2026-05-12 10:31:51,123 [INFO] workflow: [SummaryGeneration] Generating answer from 6 results
+2026-05-12 10:31:51,124 [INFO] workflow: Node [SummaryGeneration] completed in 0.000s with status=success
+2026-05-12 10:31:51,124 [INFO] workflow: SearchWorkflow completed in 0.158s
+2026-05-12 10:31:51,124 [INFO] workflow: ============================================================
+2026-05-12 10:31:51,124 [INFO] workflow: SearchWorkflow started: query='Breaking news about AI regulation today'
+2026-05-12 10:31:51,124 [INFO] workflow: ============================================================
+2026-05-12 10:31:51,124 [INFO] workflow: [QueryAnalysis] Analyzing query: 'Breaking news about AI regulation today'
+2026-05-12 10:31:51,124 [INFO] workflow: [QueryAnalysis] Intent classified: factual
+2026-05-12 10:31:51,124 [INFO] workflow: [QueryAnalysis] rewritten_query='detailed explanation of Breaking news about AI regulation today', accepted=True
+2026-05-12 10:31:51,124 [INFO] workflow: Node [QueryAnalysis] completed in 0.000s with status=success
+2026-05-12 10:31:51,124 [INFO] workflow: [SearchPlan] Planning search for intent: 'factual'
+2026-05-12 10:31:51,124 [INFO] workflow: [SearchPlan] Selected tools: ['web_search', 'knowledge_base']
+2026-05-12 10:31:51,124 [INFO] workflow: Node [SearchPlan] completed in 0.000s with status=success
+2026-05-12 10:31:51,124 [INFO] workflow: [SearchExecution] Executing search with tools: ['web_search', 'knowledge_base']
+2026-05-12 10:31:51,124 [INFO] tools: WebSearch: query='detailed explanation of Breaking news about AI regulation today', date_restrict_days=0
+2026-05-12 10:31:51,226 [INFO] workflow: [SearchExecution] web_search returned 5 results for query: 'detailed explanation of Breaking news about AI regulation today'
+2026-05-12 10:31:51,226 [INFO] tools: KnowledgeBaseSearch: query='detailed explanation of Breaking news about AI regulation today'
+2026-05-12 10:31:51,281 [INFO] workflow: [SearchExecution] knowledge_base returned 3 results for query: 'detailed explanation of Breaking news about AI regulation today'
+2026-05-12 10:31:51,281 [INFO] workflow: [SearchExecution] Total raw results: 8
+2026-05-12 10:31:51,282 [INFO] workflow: [SearchExecution] After quality filter (threshold=0.5): 8 results
+2026-05-12 10:31:51,282 [INFO] workflow: Node [SearchExecution] completed in 0.157s with status=success
+2026-05-12 10:31:51,282 [INFO] workflow: [ResultRanking] Ranking 8 filtered results
+2026-05-12 10:31:51,282 [INFO] workflow: [ResultRanking] source='web': 5 results, keeping top 3 (quota=3)
+2026-05-12 10:31:51,282 [INFO] workflow: [ResultRanking] source='knowledge_base': 3 results, keeping top 3 (quota=3)
+2026-05-12 10:31:51,282 [INFO] workflow: [ResultRanking] Final ranked results: 6
+2026-05-12 10:31:51,282 [INFO] workflow: Node [ResultRanking] completed in 0.000s with status=success
+2026-05-12 10:31:51,282 [INFO] workflow: [SummaryGeneration] Generating answer from 6 results
+2026-05-12 10:31:51,282 [INFO] workflow: Node [SummaryGeneration] completed in 0.000s with status=success
+2026-05-12 10:31:51,282 [INFO] workflow: SearchWorkflow completed in 0.158s
+2026-05-12 10:32:20,263 [INFO] __main__: Starting AI Search Agent (Workflow Architecture)
+2026-05-12 10:32:20,264 [INFO] llm: LLMClient initialized: model=gpt-4, temp=0.7
+2026-05-12 10:32:20,264 [INFO] tools: WebSearchTool initialized with engine=google, top_k=5, date_restrict_days=0
+2026-05-12 10:32:20,264 [INFO] tools: Tool registered: web_search
+2026-05-12 10:32:20,264 [INFO] tools: KnowledgeBaseTool initialized with top_k=3
+2026-05-12 10:32:20,264 [INFO] tools: Tool registered: knowledge_base
+2026-05-12 10:32:20,264 [INFO] tools: ArxivSearchTool initialized with top_k=3
+2026-05-12 10:32:20,264 [INFO] tools: Tool registered: arxiv_search
+2026-05-12 10:32:20,264 [INFO] workflow: ============================================================
+2026-05-12 10:32:20,264 [INFO] workflow: SearchWorkflow started: query='What is the difference between React and Vue.js?'
+2026-05-12 10:32:20,264 [INFO] workflow: ============================================================
+2026-05-12 10:32:20,264 [INFO] workflow: [QueryAnalysis] Analyzing query: 'What is the difference between React and Vue.js?'
+2026-05-12 10:32:20,264 [INFO] workflow: [QueryAnalysis] Intent classified: comparison
+2026-05-12 10:32:20,264 [INFO] workflow: [QueryAnalysis] rewritten_query='detailed explanation of What is the difference between React and Vue.js?', accepted=True
+2026-05-12 10:32:20,264 [INFO] workflow: Node [QueryAnalysis] completed in 0.001s with status=success
+2026-05-12 10:32:20,264 [INFO] workflow: [SearchPlan] Planning search for intent: 'comparison'
+2026-05-12 10:32:20,264 [INFO] workflow: [SearchPlan] Selected tools: ['web_search', 'knowledge_base']
+2026-05-12 10:32:20,265 [INFO] workflow: Node [SearchPlan] completed in 0.000s with status=success
+2026-05-12 10:32:20,265 [INFO] workflow: [SearchExecution] Executing search with tools: ['web_search', 'knowledge_base']
+2026-05-12 10:32:20,265 [INFO] tools: WebSearch: query='sub-query 1 about detailed explanation of What i', date_restrict_days=0
+2026-05-12 10:32:20,370 [INFO] workflow: [SearchExecution] web_search returned 5 results for query: 'sub-query 1 about detailed explanation of What i'
+2026-05-12 10:32:20,370 [INFO] tools: KnowledgeBaseSearch: query='sub-query 1 about detailed explanation of What i'
+2026-05-12 10:32:20,425 [INFO] workflow: [SearchExecution] knowledge_base returned 3 results for query: 'sub-query 1 about detailed explanation of What i'
+2026-05-12 10:32:20,425 [INFO] tools: WebSearch: query='sub-query 2 about detailed explanation of What i', date_restrict_days=0
+2026-05-12 10:32:20,531 [INFO] workflow: [SearchExecution] web_search returned 5 results for query: 'sub-query 2 about detailed explanation of What i'
+2026-05-12 10:32:20,531 [INFO] tools: KnowledgeBaseSearch: query='sub-query 2 about detailed explanation of What i'
+2026-05-12 10:32:20,586 [INFO] workflow: [SearchExecution] knowledge_base returned 3 results for query: 'sub-query 2 about detailed explanation of What i'
+2026-05-12 10:32:20,586 [INFO] workflow: [SearchExecution] Total raw results: 16
+2026-05-12 10:32:20,586 [INFO] workflow: [SearchExecution] After quality filter (threshold=0.5): 16 results
+2026-05-12 10:32:20,586 [INFO] workflow: Node [SearchExecution] completed in 0.322s with status=success
+2026-05-12 10:32:20,586 [INFO] workflow: [ResultRanking] Ranking 16 filtered results
+2026-05-12 10:32:20,586 [INFO] workflow: [ResultRanking] source='web': 5 results, keeping top 3 (quota=3)
+2026-05-12 10:32:20,587 [INFO] workflow: [ResultRanking] source='knowledge_base': 3 results, keeping top 3 (quota=3)
+2026-05-12 10:32:20,587 [INFO] workflow: [ResultRanking] Final ranked results: 6
+2026-05-12 10:32:20,587 [INFO] workflow: Node [ResultRanking] completed in 0.000s with status=success
+2026-05-12 10:32:20,587 [INFO] workflow: [SummaryGeneration] Generating answer from 6 results
+2026-05-12 10:32:20,587 [INFO] workflow: Node [SummaryGeneration] completed in 0.000s with status=success
+2026-05-12 10:32:20,587 [INFO] workflow: SearchWorkflow completed in 0.323s
+2026-05-12 10:32:20,587 [INFO] workflow: ============================================================
+2026-05-12 10:32:20,587 [INFO] workflow: SearchWorkflow started: query='Latest advances in large language models 2024'
+2026-05-12 10:32:20,587 [INFO] workflow: ============================================================
+2026-05-12 10:32:20,587 [INFO] workflow: [QueryAnalysis] Analyzing query: 'Latest advances in large language models 2024'
+2026-05-12 10:32:20,587 [INFO] workflow: [QueryAnalysis] Intent classified: news
+2026-05-12 10:32:20,587 [INFO] workflow: [QueryAnalysis] rewritten_query='detailed explanation of Latest advances in large language models 2024', accepted=True
+2026-05-12 10:32:20,587 [INFO] workflow: Node [QueryAnalysis] completed in 0.000s with status=success
+2026-05-12 10:32:20,587 [INFO] workflow: [SearchPlan] Planning search for intent: 'news'
+2026-05-12 10:32:20,587 [INFO] tools: WebSearchTool initialized with engine=google, top_k=5, date_restrict_days=7
+2026-05-12 10:32:20,587 [INFO] tools: Tool registered: web_search_news
+2026-05-12 10:32:20,587 [INFO] workflow: [SearchPlan] Registered web_search_news with date_restrict_days=7
+2026-05-12 10:32:20,587 [INFO] workflow: [SearchPlan] Selected tools: ['web_search_news']
+2026-05-12 10:32:20,587 [INFO] workflow: Node [SearchPlan] completed in 0.000s with status=success
+2026-05-12 10:32:20,587 [INFO] workflow: [SearchExecution] Executing search with tools: ['web_search_news']
+2026-05-12 10:32:20,587 [INFO] tools: WebSearch: query='detailed explanation of Latest advances in large language models 2024', date_restrict_days=7
+2026-05-12 10:32:20,693 [INFO] tools: WebSearch: 3 results after date filter (cutoff=2026-05-05)
+2026-05-12 10:32:20,693 [INFO] workflow: [SearchExecution] web_search_news returned 3 results for query: 'detailed explanation of Latest advances in large language models 2024'
+2026-05-12 10:32:20,693 [INFO] workflow: [SearchExecution] Total raw results: 3
+2026-05-12 10:32:20,693 [INFO] workflow: [SearchExecution] After quality filter (threshold=0.5): 3 results
+2026-05-12 10:32:20,693 [INFO] workflow: Node [SearchExecution] completed in 0.106s with status=success
+2026-05-12 10:32:20,693 [INFO] workflow: [ResultRanking] Ranking 3 filtered results
+2026-05-12 10:32:20,693 [INFO] workflow: [ResultRanking] source='web': 3 results, keeping top 3 (quota=3)
+2026-05-12 10:32:20,693 [INFO] workflow: [ResultRanking] Final ranked results: 3
+2026-05-12 10:32:20,693 [INFO] workflow: Node [ResultRanking] completed in 0.000s with status=success
+2026-05-12 10:32:20,693 [INFO] workflow: [SummaryGeneration] Generating answer from 3 results
+2026-05-12 10:32:20,693 [INFO] workflow: Node [SummaryGeneration] completed in 0.000s with status=success
+2026-05-12 10:32:20,693 [INFO] workflow: SearchWorkflow completed in 0.106s
+2026-05-12 10:32:20,694 [INFO] workflow: ============================================================
+2026-05-12 10:32:20,694 [INFO] workflow: SearchWorkflow started: query='How to implement a binary search tree in Python?'
+2026-05-12 10:32:20,694 [INFO] workflow: ============================================================
+2026-05-12 10:32:20,694 [INFO] workflow: [QueryAnalysis] Analyzing query: 'How to implement a binary search tree in Python?'
+2026-05-12 10:32:20,694 [INFO] workflow: [QueryAnalysis] Intent classified: tutorial
+2026-05-12 10:32:20,694 [INFO] workflow: [QueryAnalysis] rewritten_query='detailed explanation of How to implement a binary search tree in Python?', accepted=True
+2026-05-12 10:32:20,694 [INFO] workflow: Node [QueryAnalysis] completed in 0.000s with status=success
+2026-05-12 10:32:20,694 [INFO] workflow: [SearchPlan] Planning search for intent: 'tutorial'
+2026-05-12 10:32:20,694 [INFO] workflow: [SearchPlan] Selected tools: ['web_search', 'knowledge_base']
+2026-05-12 10:32:20,694 [INFO] workflow: Node [SearchPlan] completed in 0.000s with status=success
+2026-05-12 10:32:20,694 [INFO] workflow: [SearchExecution] Executing search with tools: ['web_search', 'knowledge_base']
+2026-05-12 10:32:20,694 [INFO] tools: WebSearch: query='sub-query 1 about detailed explanation of How to', date_restrict_days=0
+2026-05-12 10:32:20,799 [INFO] workflow: [SearchExecution] web_search returned 5 results for query: 'sub-query 1 about detailed explanation of How to'
+2026-05-12 10:32:20,799 [INFO] tools: KnowledgeBaseSearch: query='sub-query 1 about detailed explanation of How to'
+2026-05-12 10:32:20,850 [INFO] workflow: [SearchExecution] knowledge_base returned 3 results for query: 'sub-query 1 about detailed explanation of How to'
+2026-05-12 10:32:20,851 [INFO] tools: WebSearch: query='sub-query 2 about detailed explanation of How to', date_restrict_days=0
+2026-05-12 10:32:20,956 [INFO] workflow: [SearchExecution] web_search returned 5 results for query: 'sub-query 2 about detailed explanation of How to'
+2026-05-12 10:32:20,956 [INFO] tools: KnowledgeBaseSearch: query='sub-query 2 about detailed explanation of How to'
+2026-05-12 10:32:21,011 [INFO] workflow: [SearchExecution] knowledge_base returned 3 results for query: 'sub-query 2 about detailed explanation of How to'
+2026-05-12 10:32:21,011 [INFO] workflow: [SearchExecution] Total raw results: 16
+2026-05-12 10:32:21,012 [INFO] workflow: [SearchExecution] After quality filter (threshold=0.5): 16 results
+2026-05-12 10:32:21,012 [INFO] workflow: Node [SearchExecution] completed in 0.318s with status=success
+2026-05-12 10:32:21,012 [INFO] workflow: [ResultRanking] Ranking 16 filtered results
+2026-05-12 10:32:21,012 [INFO] workflow: [ResultRanking] source='web': 5 results, keeping top 3 (quota=3)
+2026-05-12 10:32:21,012 [INFO] workflow: [ResultRanking] source='knowledge_base': 3 results, keeping top 3 (quota=3)
+2026-05-12 10:32:21,012 [INFO] workflow: [ResultRanking] Final ranked results: 6
+2026-05-12 10:32:21,012 [INFO] workflow: Node [ResultRanking] completed in 0.000s with status=success
+2026-05-12 10:32:21,012 [INFO] workflow: [SummaryGeneration] Generating answer from 6 results
+2026-05-12 10:32:21,012 [INFO] workflow: Node [SummaryGeneration] completed in 0.000s with status=success
+2026-05-12 10:32:21,012 [INFO] workflow: SearchWorkflow completed in 0.318s
+2026-05-12 10:32:21,012 [INFO] workflow: ============================================================
+2026-05-12 10:32:21,012 [INFO] workflow: SearchWorkflow started: query='Breaking news about AI regulation today'
+2026-05-12 10:32:21,012 [INFO] workflow: ============================================================
+2026-05-12 10:32:21,012 [INFO] workflow: [QueryAnalysis] Analyzing query: 'Breaking news about AI regulation today'
+2026-05-12 10:32:21,012 [INFO] workflow: [QueryAnalysis] Intent classified: news
+2026-05-12 10:32:21,012 [INFO] workflow: [QueryAnalysis] rewritten_query='detailed explanation of Breaking news about AI regulation today', accepted=True
+2026-05-12 10:32:21,012 [INFO] workflow: Node [QueryAnalysis] completed in 0.000s with status=success
+2026-05-12 10:32:21,012 [INFO] workflow: [SearchPlan] Planning search for intent: 'news'
+2026-05-12 10:32:21,012 [INFO] workflow: [SearchPlan] Selected tools: ['web_search_news']
+2026-05-12 10:32:21,012 [INFO] workflow: Node [SearchPlan] completed in 0.000s with status=success
+2026-05-12 10:32:21,013 [INFO] workflow: [SearchExecution] Executing search with tools: ['web_search_news']
+2026-05-12 10:32:21,013 [INFO] tools: WebSearch: query='detailed explanation of Breaking news about AI regulation today', date_restrict_days=7
+2026-05-12 10:32:21,118 [INFO] tools: WebSearch: 3 results after date filter (cutoff=2026-05-05)
+2026-05-12 10:32:21,118 [INFO] workflow: [SearchExecution] web_search_news returned 3 results for query: 'detailed explanation of Breaking news about AI regulation today'
+2026-05-12 10:32:21,118 [INFO] workflow: [SearchExecution] Total raw results: 3
+2026-05-12 10:32:21,118 [INFO] workflow: [SearchExecution] After quality filter (threshold=0.5): 3 results
+2026-05-12 10:32:21,118 [INFO] workflow: Node [SearchExecution] completed in 0.106s with status=success
+2026-05-12 10:32:21,118 [INFO] workflow: [ResultRanking] Ranking 3 filtered results
+2026-05-12 10:32:21,118 [INFO] workflow: [ResultRanking] source='web': 3 results, keeping top 3 (quota=3)
+2026-05-12 10:32:21,118 [INFO] workflow: [ResultRanking] Final ranked results: 3
+2026-05-12 10:32:21,118 [INFO] workflow: Node [ResultRanking] completed in 0.000s with status=success
+2026-05-12 10:32:21,118 [INFO] workflow: [SummaryGeneration] Generating answer from 3 results
+2026-05-12 10:32:21,118 [INFO] workflow: Node [SummaryGeneration] completed in 0.000s with status=success
+2026-05-12 10:32:21,119 [INFO] workflow: SearchWorkflow completed in 0.106s

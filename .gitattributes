@@ -5,5 +5,6 @@ docs/final-reference/*.pptx binary
 demo-enterprise-data/forte/*/task.md binary
 demo-enterprise-data/forte/*/input/** binary
 demo-enterprise-data/forte/manifest.json text eol=lf
+demo-enterprise-data/forte/public-suite-manifest.json text eol=lf
 demo-enterprise-data/forte/README.md text eol=lf
 demo-enterprise-data/forte/THIRD_PARTY_LICENSE.txt text eol=lf

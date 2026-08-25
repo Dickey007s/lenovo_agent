@@ -24,7 +24,12 @@ The current Runtime performs a bounded read-only analysis. It does not invoke Sc
 
 ## 2. Source and preview boundary
 
-`demo-enterprise-data/forte/manifest.json` binds 11 source files at FORTE commit `345c1ec1487139db9dd319787fa9405ba85d1869`, totaling `115352` bytes. Catalog loading checks declared path, root boundary, symlink, size, SHA-256, type and parser constraints. Task/input files retain upstream bytes and are binary-marked against line-ending normalization.
+The source tree has two separate contracts at FORTE commit `345c1ec1487139db9dd319787fa9405ba85d1869`:
+
+- `public-suite-manifest.json` inventories all public repository demos: 15 task records, 96 inputs, 111 files and `1780445` bytes;
+- the current Catalog `manifest.json` allowlists 11 source files and `115352` bytes for three runnable product scenarios.
+
+Catalog loading uses only the current allowlist and checks declared path, root boundary, symlink, size, SHA-256, type and parser constraints. Downloaded but unregistered tasks cannot be selected or sent to the model. Task/input files retain upstream bytes and are binary-marked against line-ending normalization.
 
 Raw `task.md` is provenance. It is not previewable and does not enter the public API or Analyst. The Catalog publishes:
 

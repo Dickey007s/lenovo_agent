@@ -78,7 +78,12 @@ Model call, output adoption, plan validation, result citation validation and tas
 
 ## Data and citation boundary
 
-The vendored FORTE subset is pinned to commit `345c1ec1487139db9dd319787fa9405ba85d1869` under the upstream top-level MIT license. Its manifest binds 8 input files plus 3 raw `task.md` provenance records: 11 files and `115352` bytes.
+The FORTE source is pinned to commit `345c1ec1487139db9dd319787fa9405ba85d1869` under the upstream top-level MIT license. Two inventories deliberately coexist:
+
+- `public-suite-manifest.json` binds the complete public repository demo suite: 15 task records plus 96 input files, 111 files and `1780445` bytes;
+- the current runtime `manifest.json` binds 8 inputs plus 3 raw task records: 11 files and `115352` bytes for the three product scenarios.
+
+The official repository reports a 180-task benchmark but publishes only one demo per profession. The complete public suite is downloaded for staged testing; the product does not claim access to the unpublished tasks or runtime support for every downloaded format.
 
 Each input gets a stable opaque `file_ref`. The preview endpoint revalidates the manifest and exposes only:
 
@@ -168,5 +173,8 @@ pnpm --dir apps/web exec playwright test e2e/harness-workbench.spec.ts
 - [DR-0018 Evidence](docs/evidence/FORTE-DATA-WORKBENCH-TRACE-EVIDENCE-20260824.md)
 - [DR-0019](docs/decisions/DR-0019-capability-composed-agent-runtime.md)
 - [DR-0019 Evidence](docs/evidence/AGENT-CAPABILITY-COMPOSITION-EVIDENCE-20260824.md)
+- [DR-0021 public suite expansion](docs/decisions/DR-0021-forte-public-suite-expansion.md)
+- [15-case office test catalog](docs/testing/FORTE-PUBLIC-OFFICE-TASK-TEST-CASES-20260825.md)
+- [public suite inventory](docs/research/FORTE-PUBLIC-SUITE-INVENTORY-20260825.md)
 
 A dated historical document is not a current product contract unless a living doc explicitly says so.
