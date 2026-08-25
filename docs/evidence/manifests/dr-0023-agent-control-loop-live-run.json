@@ -1,0 +1,131 @@
+{
+  "evidence_id": "DR-0023-AGENT-CONTROL-LOOP-LIVE-20260825",
+  "captured_at": "2026-08-25T07:49:31.710Z",
+  "runtime": {
+    "web": "http://localhost:3000",
+    "api": "http://localhost:8010",
+    "model": "deepseek-v4-pro",
+    "checkpoint": "memory",
+    "task_store": "memory"
+  },
+  "instruction": "比较财务、人力、法务和研发资料，找出相互矛盾或缺少依据的事项，分轮核对并给出下一步建议。",
+  "selected_public_files": [
+    "财务管理/2025往来明细-上半年.xlsx",
+    "财务管理/2025往来明细-下半年.xlsx",
+    "人力招聘/周伦简历.pdf",
+    "人力招聘/外卖商户BD岗位JD.docx",
+    "法务/委托书1.docx",
+    "法务/委托书2.docx",
+    "研发交付/PRD.md",
+    "研发交付/config.py"
+  ],
+  "result": {
+    "status": "completed",
+    "rounds": 2,
+    "files_verified": 8,
+    "model_calls": 5,
+    "elapsed_ms": 71461,
+    "event_count": 21,
+    "external_action": "none",
+    "brief": "Agent Control Loop 完成 2 轮，只读核对了 8 份允许资料；所有结论仍等待用户复核。"
+  },
+  "rounds": [
+    {
+      "round": 1,
+      "input_files": 4,
+      "planning_elapsed_ms": 7357,
+      "analysis_elapsed_ms": 24822,
+      "findings": 7,
+      "verified_files": 4,
+      "evidence_gaps": 1,
+      "decision": "next_round"
+    },
+    {
+      "round": 2,
+      "input_files": 4,
+      "planning_elapsed_ms": 11435,
+      "analysis_elapsed_ms": 17308,
+      "findings": 4,
+      "verified_files": 4,
+      "evidence_gaps": 0,
+      "decision": "completed"
+    }
+  ],
+  "bounded_repair": {
+    "occurred": true,
+    "sequence": 5,
+    "attempt": 1,
+    "public_message": "候选计划未通过服务端校验，未采用；正在进行预算内的受控重试。",
+    "public_reason": "本轮未通过服务端安全校验，且未发生外部动作。请重新运行。",
+    "adopted_after_retry": true
+  },
+  "event_sequence": [
+    "workspace_index",
+    "round_started",
+    "planning_started",
+    "planning_completed",
+    "plan_validation_rejected",
+    "planning_started",
+    "planning_completed",
+    "plan_validation",
+    "analysis_started",
+    "analysis_completed",
+    "result_validation",
+    "evidence_gate",
+    "round_started",
+    "planning_started",
+    "planning_completed",
+    "plan_validation",
+    "analysis_started",
+    "analysis_completed",
+    "result_validation",
+    "evidence_gate",
+    "loop_committed"
+  ],
+  "screenshots": [
+    {
+      "file": "../screenshots/dr-0023-agent-control-loop-ready-desktop.png",
+      "dimensions": "1440x1000",
+      "sha256": "4ec66e7bd5961640ca2a86d9b53964cd0f5cecbb76e65896c5dd3061ac1cf85f"
+    },
+    {
+      "file": "../screenshots/dr-0023-agent-control-loop-round1-running-desktop.png",
+      "dimensions": "1440x1000",
+      "sha256": "727aca12aec3956de454fea241ccc61c8914060ba3f8f2bd2c94da7d65d667ad"
+    },
+    {
+      "file": "../screenshots/dr-0023-agent-control-loop-evidence-gate-desktop.png",
+      "dimensions": "1440x1000",
+      "sha256": "61f4f311b7f87fa8d461373f6b7675c6c4b80b1f81636e75037189c81eadb1ed"
+    },
+    {
+      "file": "../screenshots/dr-0023-agent-control-loop-completed-desktop.png",
+      "dimensions": "1440x1000",
+      "sha256": "d9cda68cec2d161df61c99973b1469da67bd281b65911c22356c43bf3a1911a0"
+    },
+    {
+      "file": "../screenshots/dr-0023-agent-control-loop-completed-mobile.png",
+      "dimensions": "390x7558",
+      "sha256": "2d855ff906b083eb84d767563df9736ef57b0c21a31a4c47e8ad515489cc0564"
+    },
+    {
+      "file": "../screenshots/dr-0023-agent-control-loop-trace-mobile.png",
+      "dimensions": "390x1027",
+      "sha256": "4745aa8510122b522a1e447f308e9985eb3973264b9423ad0d0623cdbc3af4d3"
+    }
+  ],
+  "browser_observation": {
+    "desktop_horizontal_overflow": false,
+    "mobile_horizontal_overflow": false,
+    "mobile_scroll_width": 390,
+    "console_errors": []
+  },
+  "boundaries": [
+    "固定 FORTE 公开输入、只读分析，不修改原文件，不执行外部动作。",
+    "当前 Run、事件和控制状态仅保存在单个 API 进程内；API 重启后不恢复。",
+    "暂停与停止只在模型调用之间的安全点生效，不会中断正在进行的模型请求。",
+    "deadline 阻止新的模型调用，但不是对在途 HTTP 请求的硬取消。",
+    "证据门验证的是结论是否引用本轮允许文件，不等同于业务事实已经由真人确认。",
+    "一次 live run 只能证明该配置下链路可运行，不能证明模型质量、用户价值、生产可靠性或成本收益。"
+  ]
+}
