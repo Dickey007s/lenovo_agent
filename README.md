@@ -110,9 +110,11 @@ action remain target work.
 
 - `DR-0021` is `Limited Verified` for importing and inventorying the complete
   pinned public demo suite.
-- `DR-0022` has final engineering checks and fresh-service screenshots for the
-  one-folder product, 96 safe previews, arbitrary selected-file task and current
-  browser path; implementation commit/PR binding is the remaining delivery step.
+- `DR-0022` is `Limited Verified` for the one-folder product, 96 safe previews,
+  arbitrary selected-file task and current browser path. Implementation
+  [`0794648`](https://github.com/Dickey007s/lenovo_agent/commit/0794648477ad0061a5460127af8800a021019366)
+  and stacked [PR #27](https://github.com/Dickey007s/lenovo_agent/pull/27) are
+  bound; the PR is open and this is not a merged-state claim.
 - Current checks: focused Python `26 passed`, full Python `51 passed`, Harness
   browser `8 passed`; Ruff, frontend typecheck, production build, governance,
   local-link and diff checks pass. A real configured-model browser run recorded

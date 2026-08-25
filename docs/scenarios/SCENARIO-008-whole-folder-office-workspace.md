@@ -3,7 +3,7 @@
 | Field | Value |
 | --- | --- |
 | Scenario ID | `SCENARIO-008` |
-| Status | `Ready for final evidence`; user comprehension and value remain `Draft` |
+| Status | `Limited Verified` for the tested engineering path; user comprehension and value remain `Draft` |
 | Decision | [`DR-0022`](../decisions/DR-0022-workspace-folder-and-arbitrary-task-contract.md) |
 | Sources | `USER-FEEDBACK-20260825-WHOLE-FOLDER-14`, `FORTE-PUBLIC-SUITE-INVENTORY-20260825` |
 

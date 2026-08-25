@@ -92,7 +92,7 @@ capability does not exist.
 
 ## 7. Evidence status
 
-Current verification for `DR-0022` before implementation commit/PR binding:
+Current `Limited Verified` engineering evidence for `DR-0022`:
 
 - focused Python: `26 passed in 15.37s`;
 - full Python: `51 passed in 13.16s`;
@@ -100,7 +100,10 @@ Current verification for `DR-0022` before implementation commit/PR binding:
 - Ruff and frontend typecheck: passed;
 - production build: compile `2.4s`, TypeScript `3.2s`, static `682ms`;
 - fresh browser run: `8.7 s` planning + `16.7 s` analysis, both adopted;
-- nine screenshots and their SHA-256 values are manifest-bound; commit/PR is pending.
+- nine screenshots and their SHA-256 values are manifest-bound;
+- implementation [`0794648`](https://github.com/Dickey007s/lenovo_agent/commit/0794648477ad0061a5460127af8800a021019366)
+  and open stacked [PR #27](https://github.com/Dickey007s/lenovo_agent/pull/27)
+  are bound; the PR is not a merged-state claim.
 
 Exact final numbers must be copied from
 [`FORTE-FOLDER-WORKSPACE-EVIDENCE-20260825`](evidence/FORTE-FOLDER-WORKSPACE-EVIDENCE-20260825.md),

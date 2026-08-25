@@ -4,14 +4,14 @@
 
 | Field | Value |
 | --- | --- |
-| Status | `Ready for final evidence` |
+| Status | `Limited Verified` for the bounded engineering path; user comprehension and value remain `Draft` |
 | Date | 2026-08-25 |
 | Trigger | `USER-FEEDBACK-20260825-WHOLE-FOLDER-14` |
 | Research | [`WORKSPACE-CENTRIC-OFFICE-AGENT-INTERACTION-AND-SOURCES-20260825`](../research/WORKSPACE-CENTRIC-OFFICE-AGENT-INTERACTION-AND-SOURCES-20260825.md) |
 | Scenario | [`SCENARIO-008`](../scenarios/SCENARIO-008-whole-folder-office-workspace.md) |
 | Evidence | [`FORTE-FOLDER-WORKSPACE-EVIDENCE-20260825`](../evidence/FORTE-FOLDER-WORKSPACE-EVIDENCE-20260825.md) |
-| Implementation | To be bound after commit |
-| Delivery | To be bound after PR creation |
+| Implementation | [`0794648477ad0061a5460127af8800a021019366`](https://github.com/Dickey007s/lenovo_agent/commit/0794648477ad0061a5460127af8800a021019366) |
+| Delivery | [PR #27](https://github.com/Dickey007s/lenovo_agent/pull/27), stacked on open [PR #26](https://github.com/Dickey007s/lenovo_agent/pull/26); not yet merged |
 
 ## Problem
 
@@ -87,6 +87,7 @@ durable recovery, distributed workers, file mutation, real Connector calls,
 production identity or user value. FORTE is public benchmark data, not a live
 enterprise database.
 
-The decision becomes `Limited Verified` only after code commit, focused and
-full automation, desktop/mobile browser evidence, manifest/hash checks and a
-delivery PR are bound in the Evidence record.
+The code commit, focused and full automation, desktop/mobile browser evidence,
+manifest/hash checks and delivery PR are bound in the Evidence record. This
+supports `Limited Verified` only for the stated engineering path; it does not
+promote the unresolved quality, durability, production or user-value claims.

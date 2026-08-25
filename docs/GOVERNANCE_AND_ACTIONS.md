@@ -89,4 +89,4 @@ Future foreground impact should retain the four classes 会改变、会重新核
 
 ## 7. Evidence boundary
 
-[DR-0022 Evidence](evidence/FORTE-FOLDER-WORKSPACE-EVIDENCE-20260825.md) governs the current whole-folder product. Its automation, live runs and screenshots are bound; it remains short of `Limited Verified` only until the implementation commit and delivery PR are recorded. Historical [DR-0018 Evidence](evidence/FORTE-DATA-WORKBENCH-TRACE-EVIDENCE-20260824.md) preserves two observed Finance Runs and the deterministic negative regression. Neither proves semantic correctness, user value, production identity/durability or any external action.
+[DR-0022 Evidence](evidence/FORTE-FOLDER-WORKSPACE-EVIDENCE-20260825.md) governs the current whole-folder product. Its automation, live runs, screenshots, implementation commit and open delivery PR are bound, so the stated engineering path is `Limited Verified`. Historical [DR-0018 Evidence](evidence/FORTE-DATA-WORKBENCH-TRACE-EVIDENCE-20260824.md) preserves two observed Finance Runs and the deterministic negative regression. Neither proves semantic correctness, user value, production identity/durability or any external action.

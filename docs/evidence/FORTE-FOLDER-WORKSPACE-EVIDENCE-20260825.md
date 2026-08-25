@@ -2,10 +2,10 @@
 
 ## Status
 
-`Ready for delivery binding`: implementation, fresh-service live runs,
-screenshots and final automation are recorded below. The implementation commit
-and delivery PR still need to be bound before this record becomes
-`Limited Verified`.
+`Limited Verified` for the bounded engineering path described below.
+Implementation, fresh-service live runs, screenshots, final automation and the
+delivery PR are bound in this record. Semantic correctness, target-user value
+and production readiness remain unverified.
 
 ## Scope
 
@@ -85,9 +85,12 @@ in ordinary visible copy.
 
 ## Delivery
 
-- Implementation commit: pending.
+- Implementation commit:
+  [`0794648477ad0061a5460127af8800a021019366`](https://github.com/Dickey007s/lenovo_agent/commit/0794648477ad0061a5460127af8800a021019366).
 - Documentation commit: pending.
-- Pull request: pending.
+- Pull request: [#27](https://github.com/Dickey007s/lenovo_agent/pull/27),
+  stacked on the still-open public-suite [#26](https://github.com/Dickey007s/lenovo_agent/pull/26).
+  A PR link is delivery traceability, not proof that the change is merged.
 
 ## Boundaries
 
