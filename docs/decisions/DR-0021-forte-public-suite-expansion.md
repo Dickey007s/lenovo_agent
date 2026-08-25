@@ -9,6 +9,8 @@
 | Trigger | `USER-FEEDBACK-20260825-BROADER-FORTE-13` |
 | Source | `FORTE-PUBLIC-SUITE-INVENTORY-20260825` |
 | Evidence | [`FORTE-PUBLIC-DEMO-SUITE-IMPORT-EVIDENCE-20260825`](../evidence/FORTE-PUBLIC-DEMO-SUITE-IMPORT-EVIDENCE-20260825.md) |
+| Implementation | [`e7597369d5cfbab59082e8af2d5a822e691a12cc`](https://github.com/Dickey007s/lenovo_agent/commit/e7597369d5cfbab59082e8af2d5a822e691a12cc) |
+| Delivery | [PR #26](https://github.com/Dickey007s/lenovo_agent/pull/26), open and stacked on PR #25; not merged |
 
 ## Problem
 

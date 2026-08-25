@@ -45,6 +45,8 @@ DR-0019 is separately `Limited Verified` for implementation [`eef656e`](https://
 
 DR-0020 is `Limited Verified` for implementation [`373b79a`](https://github.com/Dickey007s/lenovo_agent/commit/373b79a): server-owned policy compilation now sits between the model candidate and the plan validator. A final live browser Run reached `completed` v9/seq 8 with Planner `15059 ms` and Analyst `13443 ms`, both adopted, while ordinary DOM contained neither `artifact.write` nor `run_workspace_write`. Current verification is full Python `56 passed in 2.57s`, Harness browser E2E `8 passed in 25.1s`, Ruff/lint/build passed. This does not prove plan or answer quality.
 
+DR-0021 is `Limited Verified` for public-data acquisition and integrity only. Implementation [`e759736`](https://github.com/Dickey007s/lenovo_agent/commit/e7597369d5cfbab59082e8af2d5a822e691a12cc) and open stacked [PR #26](https://github.com/Dickey007s/lenovo_agent/pull/26) import all 15 public FORTE demos and 96 inputs, add a 15-case test catalog, and preserve the three-scenario runtime boundary. Full Python is `58 passed in 2.42s`; Ruff, web lint and build pass. This is not evidence that the ten newly staged local-input tasks or two external-dependency tasks execute.
+
 ## Current flow
 
 ```text

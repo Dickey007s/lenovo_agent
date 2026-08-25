@@ -13,6 +13,8 @@
 | Reproducible import | [`scripts/sync-forte-public-demos.py`](../../scripts/sync-forte-public-demos.py) |
 | Complete inventory | [`public-suite-manifest.json`](../../demo-enterprise-data/forte/public-suite-manifest.json) |
 | Test design | [`FORTE-PUBLIC-OFFICE-TASK-TEST-CASES-20260825.md`](../testing/FORTE-PUBLIC-OFFICE-TASK-TEST-CASES-20260825.md) |
+| Implementation | [`e7597369d5cfbab59082e8af2d5a822e691a12cc`](https://github.com/Dickey007s/lenovo_agent/commit/e7597369d5cfbab59082e8af2d5a822e691a12cc) |
+| Pull request | [#26](https://github.com/Dickey007s/lenovo_agent/pull/26), open, based on the open PR #25 branch, not merged |
 
 The inventory manifest is `35,927` bytes with SHA-256
 `BC2BC5AE1C58D5CC9C5983C972326CE4DBB09855FC724BE4E1530D66011E2D60`.
@@ -46,8 +48,8 @@ The inventory manifest is `35,927` bytes with SHA-256
 - staged `git diff --check`: passed; all 111 manifest-declared source files are
   tracked or staged. The imported `.log` fixture is explicitly unignored while
   ordinary runtime logs remain ignored.
-- Implementation commit and PR are pending final commit/push and must be
-  appended rather than guessed.
+- Implementation commit and the open stacked PR are bound above. Their links
+  prove delivery state only; they do not imply merge or task execution.
 
 The integrity test verifies every imported path, size and SHA-256, rejects
 solution/skills leakage by inventory equality, and proves the current
