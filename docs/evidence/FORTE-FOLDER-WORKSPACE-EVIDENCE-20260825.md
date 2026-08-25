@@ -87,7 +87,8 @@ in ordinary visible copy.
 
 - Implementation commit:
   [`0794648477ad0061a5460127af8800a021019366`](https://github.com/Dickey007s/lenovo_agent/commit/0794648477ad0061a5460127af8800a021019366).
-- Documentation commit: pending.
+- Documentation binding commit:
+  [`df802e1b01b90e99ee7a47eb4e7e8fdeefecfe69`](https://github.com/Dickey007s/lenovo_agent/commit/df802e1b01b90e99ee7a47eb4e7e8fdeefecfe69).
 - Pull request: [#27](https://github.com/Dickey007s/lenovo_agent/pull/27),
   stacked on the still-open public-suite [#26](https://github.com/Dickey007s/lenovo_agent/pull/26).
   A PR link is delivery traceability, not proof that the change is merged.
