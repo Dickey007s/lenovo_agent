@@ -257,6 +257,104 @@ async def test_model_returning_free_text_side_effect_is_not_marked_used():
     assert [event.event_name for event in snapshot.events][-2:] == ["planning_completed", "harness_failed"]
 
 
+class UnscopedArtifactPlanner:
+    model = "deepseek-v4-pro"
+
+    async def plan(self, *, scenario, files):
+        return HarnessPlan(
+            summary="读取资料并形成核对结果",
+            units=[
+                HarnessPlanUnit(
+                    unit_id="read",
+                    title="读取资料",
+                    objective="读取所选公开文件",
+                    input_file_refs=[files[0]["file_ref"]],
+                    tool="spreadsheet.read",
+                ),
+                HarnessPlanUnit(
+                    unit_id="result",
+                    title="形成核对结果",
+                    objective="整理本轮只读分析结果",
+                    input_file_refs=[files[0]["file_ref"]],
+                    depends_on=["read"],
+                    tool="artifact.write",
+                ),
+            ],
+        )
+
+
+@pytest.mark.asyncio
+async def test_runtime_compiles_artifact_write_scope_instead_of_trusting_the_model():
+    catalog = FakeCatalog()
+    catalog.scenario = catalog.scenario | {
+        "allowlisted_tools": ["spreadsheet.read", "artifact.write"],
+        "allowed_side_effects": ["none", "run_workspace_write"],
+    }
+    runtime = HarnessRuntime(catalog, UnscopedArtifactPlanner())
+
+    started = await runtime.start(
+        "alice",
+        HarnessRunStart(
+            scenario_id="finance-018",
+            idempotency_key="server-owned-artifact-scope-1",
+        ),
+    )
+    snapshot = await wait_terminal(runtime, "alice", started.run.run_id)
+
+    assert snapshot.status == "ready_to_execute"
+    assert snapshot.plan is not None
+    assert snapshot.plan.units[0].side_effect == "none"
+    assert snapshot.plan.units[1].side_effect == "run_workspace_write"
+    assert snapshot.plan.units[1].artifact_name == "run-result-2"
+    assert snapshot.plan.units[1].artifact_type == "analysis"
+    assert snapshot.model_receipt is not None
+    assert snapshot.model_receipt.output_used is True
+
+
+@pytest.mark.asyncio
+async def test_public_failure_projection_hides_internal_effect_contract_names():
+    class UnknownToolPlanner:
+        model = "deepseek-v4-pro"
+
+        async def plan(self, *, scenario, files):
+            return HarnessPlan(
+                summary="形成结果",
+                units=[
+                    HarnessPlanUnit(
+                        unit_id="result",
+                        title="形成结果",
+                        objective="整理本轮结果",
+                        input_file_refs=[files[0]["file_ref"]],
+                        tool="shell.exec",
+                    )
+                ],
+            )
+
+    catalog = FakeCatalog()
+    catalog.scenario = catalog.scenario | {
+        "allowlisted_tools": ["artifact.write"],
+        "allowed_side_effects": ["none", "run_workspace_write"],
+    }
+    runtime = HarnessRuntime(catalog, UnknownToolPlanner())
+    started = await runtime.start(
+        "alice",
+        HarnessRunStart(
+            scenario_id="finance-018",
+            idempotency_key="safe-public-plan-error-1",
+        ),
+    )
+    snapshot = await wait_terminal(runtime, "alice", started.run.run_id)
+    public = runtime.public_snapshot(snapshot)
+    serialized = public.model_dump_json()
+
+    assert snapshot.status == "failed"
+    assert "未允许的工具" in snapshot.validation_errors[0]
+    assert public.validation_errors == [
+        "规划使用了当前任务范围外的资料或能力，系统已安全停止。请重新规划。"
+    ]
+    assert "shell.exec" not in serialized
+
+
 @pytest.mark.asyncio
 async def test_unconfigured_planner_reports_not_called():
     planner = OpenAICompatibleHarnessPlanner(base_url="", api_key="")
@@ -321,6 +419,29 @@ def test_plan_validator_rejects_unknown_tool_and_cycle():
     ])
     with pytest.raises(HarnessPlanError, match="存在环"):
         HarnessRuntime._validate_plan(cyclic, scenario, files)
+
+
+def test_plan_compiler_strips_model_artifact_metadata_from_non_write_tools():
+    candidate = HarnessPlan(
+        summary="核对证据",
+        units=[
+            HarnessPlanUnit(
+                unit_id="verify",
+                title="核对证据",
+                objective="检查引用依据",
+                input_file_refs=["forte-a0bccc1df48cc6a1"],
+                tool="evidence.verify",
+                artifact_name="model-proposed-evidence",
+                artifact_type="evidence",
+            )
+        ],
+    )
+
+    compiled = HarnessRuntime._compile_plan(candidate)
+
+    assert compiled.units[0].side_effect == "none"
+    assert compiled.units[0].artifact_name is None
+    assert compiled.units[0].artifact_type is None
 
 
 @pytest.mark.asyncio
@@ -426,7 +547,6 @@ async def test_capability_side_effect_allowlist_is_per_business_scenario():
                 units=[HarnessPlanUnit(
                     unit_id="candidate", title="动作候选", objective="需要确认的受控动作",
                     input_file_refs=[files[0]["file_ref"]], tool="action.preview",
-                    side_effect="external_action", requires_human_gate=True,
                 )],
             )
 
@@ -446,6 +566,7 @@ async def test_capability_side_effect_allowlist_is_per_business_scenario():
     snapshot = await wait_terminal(runtime, "alice", result.run.run_id)
     assert snapshot.status == "ready_to_execute"
     assert snapshot.plan and snapshot.plan.units[0].requires_human_gate is True
+    assert snapshot.plan.units[0].side_effect == "external_action"
     assert snapshot.events[-1].details["execution_started"] is False
 
 

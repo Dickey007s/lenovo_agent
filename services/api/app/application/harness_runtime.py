@@ -98,6 +98,41 @@ class HarnessPlanUnit(BaseModel):
         return value
 
 
+class HarnessPlanCandidateUnit(BaseModel):
+    """Model-owned work intent before server policy compilation."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    unit_id: str = Field(min_length=1, max_length=120)
+    title: str = Field(min_length=1, max_length=240)
+    objective: str = Field(min_length=1, max_length=1_000)
+    input_file_refs: list[str] = Field(min_length=1, max_length=100)
+    depends_on: list[str] = Field(default_factory=list, max_length=100)
+    tool: str = Field(min_length=1, max_length=120)
+    requires_human_gate: bool = False
+    artifact_name: str | None = Field(default=None, min_length=1, max_length=120)
+    artifact_type: HarnessArtifactType | None = None
+
+    @field_validator("unit_id", "tool")
+    @classmethod
+    def no_control_chars(cls, value: str) -> str:
+        if any(ord(ch) < 32 for ch in value):
+            raise ValueError("control characters are not allowed")
+        return value
+
+    @field_validator("artifact_name")
+    @classmethod
+    def artifact_name_is_server_safe(cls, value: str | None) -> str | None:
+        return HarnessPlanUnit.artifact_name_is_server_safe(value)
+
+
+class HarnessPlanCandidate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    summary: str = Field(min_length=1, max_length=1_000)
+    units: list[HarnessPlanCandidateUnit] = Field(min_length=1, max_length=12)
+
+
 class HarnessPlan(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -272,7 +307,9 @@ class HarnessScenarioCatalog(Protocol):
 
 
 class HarnessPlanner(Protocol):
-    async def plan(self, *, scenario: dict[str, Any], files: list[dict[str, Any]]) -> HarnessPlan: ...
+    async def plan(
+        self, *, scenario: dict[str, Any], files: list[dict[str, Any]]
+    ) -> HarnessPlanCandidate | HarnessPlan: ...
 
 
 class HarnessAnalyst(Protocol):
@@ -298,22 +335,23 @@ class OpenAICompatibleHarnessPlanner:
         self.model = model
         self.timeout = timeout
 
-    async def plan(self, *, scenario: dict[str, Any], files: list[dict[str, Any]]) -> HarnessPlan:
+    async def plan(
+        self, *, scenario: dict[str, Any], files: list[dict[str, Any]]
+    ) -> HarnessPlanCandidate:
         if not self.base_url or not self.api_key:
             raise HarnessModelError(
                 "LLM_BASE_URL 和 LLM_API_KEY 尚未配置",
                 called=False,
                 model=self.model,
             )
-        schema = json.dumps(HarnessPlan.model_json_schema(), ensure_ascii=False)
+        schema = json.dumps(HarnessPlanCandidate.model_json_schema(), ensure_ascii=False)
         system = (
             "你是企业办公 Agent Harness 的规划器。根据公开办公任务和文件索引生成最小可执行 DAG。"
             "只输出一个符合 JSON Schema 的 JSON 对象。只能引用 files 中出现的 file_ref；tool 必须来自 allowlisted_tools；"
             "输入文件永远只读，禁止猜测或输出源文件路径、哈希或任意本地路径。"
-            "读取文件使用 file.read/table.inspect/evidence.verify；生成结果只能写入本次 run 的受控 artifact。"
-            "artifact.write 必须使用 side_effect=run_workspace_write，并填写逻辑 artifact_name 与 artifact_type，不能填写路径。"
-            "外部动作使用 side_effect=external_action，必须 requires_human_gate=true；本阶段只规划，不执行任何工具。"
-            "none、run_workspace_write、external_action 是唯一合法副作用。不得生成身份、来源、状态、执行结果、Permit 或隐藏推理。"
+            "读取文件使用 file.read/table.inspect/evidence.verify；生成结果使用 artifact.write。可以提供不含路径的逻辑 artifact_name 与 artifact_type；缺省时由服务端生成。"
+            "只选择工作意图和 tool，不得输出 side_effect；写入范围、外部动作范围与强制人工确认由服务端根据能力确定。"
+            "action.preview 只能表示待审查的外部动作候选，本阶段不执行任何工具。不得生成身份、来源、状态、执行结果、Permit 或隐藏推理。"
             "禁止输出 Markdown、代码围栏或额外字段。JSON Schema：" + schema
         )
         user = json.dumps({"scenario": scenario, "files": files}, ensure_ascii=False)
@@ -343,7 +381,7 @@ class OpenAICompatibleHarnessPlanner:
             content = content.strip()
             if content.startswith("```"):
                 content = content.removeprefix("```json").removeprefix("```").removesuffix("```").strip()
-            return HarnessPlan.model_validate(json.loads(content))
+            return HarnessPlanCandidate.model_validate(json.loads(content))
         except (httpx.HTTPError, KeyError, IndexError, TypeError, json.JSONDecodeError, ValidationError) as exc:
             raise HarnessModelError(
                 "模型未返回合法的 Harness DAG JSON",
@@ -764,11 +802,6 @@ class HarnessRuntime:
         )
 
     def public_snapshot(self, snapshot: HarnessRunSnapshot) -> PublicHarnessRunSnapshot:
-        path_to_ref = {
-            document.get("path"): document.get("file_ref")
-            for document in snapshot.source_documents
-            if document.get("path")
-        }
         public_documents = []
         for document in snapshot.source_documents:
             public_documents.append(
@@ -817,7 +850,9 @@ class HarnessRuntime:
             model_receipt=snapshot.model_receipt,
             analysis_receipt=snapshot.analysis_receipt,
             result=snapshot.result,
-            validation_errors=[self._redact_text(error, path_to_ref) for error in snapshot.validation_errors],
+            validation_errors=[
+                self._public_failure_message(error) for error in snapshot.validation_errors
+            ],
             events=public_events,
         )
 
@@ -839,9 +874,40 @@ class HarnessRuntime:
                     }
                 )
             details = {"files": files, "reason": event.details.get("reason", "")}
+        elif event.event_name == "harness_failed":
+            details = self._sanitize_details(event.details, path_to_ref)
+            if isinstance(details, dict) and "reason" in details:
+                details["reason"] = self._public_failure_message(
+                    str(event.details.get("reason", ""))
+                )
         else:
             details = self._sanitize_details(event.details, path_to_ref)
         return event.model_copy(update={"details": details})
+
+    @staticmethod
+    def _public_failure_message(reason: str) -> str:
+        if "所选文件不属于" in reason or "场景没有可用输入文件" in reason:
+            return "所选资料当前不可用，系统已安全停止。请重新选择资料后再运行。"
+        if "分析结果引用了未选择的文件" in reason:
+            return "分析结果引用了本轮范围外的资料，系统未采用该结果。请重新运行。"
+        if any(
+            marker in reason
+            for marker in (
+                "未允许的工具",
+                "未允许的副作用",
+                "external_action",
+                "action.preview",
+            )
+        ):
+            return "规划使用了当前任务范围外的资料或能力，系统已安全停止。请重新规划。"
+        if any(
+            marker in reason
+            for marker in ("artifact.write", "run_workspace_write", "artifact_name", "artifact_type")
+        ):
+            return "规划中的成果保存信息不完整，系统已安全停止。请重新规划。"
+        if "模型未返回合法" in reason or "invalid JSON" in reason:
+            return "模型没有返回可用的结构化结果，本轮未继续处理。请重新运行。"
+        return "本轮未通过服务端安全校验，且未发生外部动作。请重新运行。"
 
     @classmethod
     def _sanitize_details(cls, value: Any, path_to_ref: dict[str, str]) -> Any:
@@ -918,10 +984,11 @@ class HarnessRuntime:
             await self._transition(owner_id, run_id, "planning", "planning_started", "正在根据文件索引生成工作计划。", {})
             started = perf_counter()
             try:
-                plan = await self.planner.plan(
+                candidate = await self.planner.plan(
                     scenario=self._planner_scenario(scenario, instruction),
                     files=self._planner_files(files),
                 )
+                plan = self._compile_plan(candidate)
             except HarnessModelError as exc:
                 elapsed = exc.elapsed_ms or max(0, round((perf_counter() - started) * 1000))
                 receipt = HarnessModelReceipt(
@@ -1131,7 +1198,6 @@ class HarnessRuntime:
             "data_boundary": scenario.get("data_boundary"),
             "human_gate_summary": scenario.get("human_gate_summary"),
             "allowlisted_tools": scenario.get("allowlisted_tools", []),
-            "allowed_side_effects": scenario.get("allowed_side_effects", []),
         }
 
     @staticmethod
@@ -1203,6 +1269,30 @@ class HarnessRuntime:
         for finding in result.findings:
             if not set(finding.file_refs).issubset(allowed_refs):
                 raise HarnessPlanError("分析结果引用了未选择的文件")
+
+    @staticmethod
+    def _compile_plan(candidate: HarnessPlanCandidate | HarnessPlan) -> HarnessPlan:
+        """Compile model intent into server-owned effect and gate policy."""
+
+        units: list[HarnessPlanUnit] = []
+        for index, candidate_unit in enumerate(candidate.units, start=1):
+            payload = candidate_unit.model_dump(exclude={"side_effect"})
+            tool = str(payload["tool"])
+            if tool == "artifact.write":
+                side_effect: HarnessSideEffect = "run_workspace_write"
+                payload["artifact_name"] = payload.get("artifact_name") or f"run-result-{index}"
+                payload["artifact_type"] = payload.get("artifact_type") or "analysis"
+            elif tool == "action.preview":
+                side_effect = "external_action"
+                payload["requires_human_gate"] = True
+                payload["artifact_name"] = None
+                payload["artifact_type"] = None
+            else:
+                side_effect = "none"
+                payload["artifact_name"] = None
+                payload["artifact_type"] = None
+            units.append(HarnessPlanUnit(**payload, side_effect=side_effect))
+        return HarnessPlan(summary=candidate.summary, units=units)
 
     @classmethod
     def _validate_plan(cls, plan: HarnessPlan, scenario: dict[str, Any], files: list[dict[str, Any]]) -> None:

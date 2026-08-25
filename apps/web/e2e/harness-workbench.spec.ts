@@ -53,7 +53,7 @@ function snapshot(body: { scenario_id: ScenarioId; instruction: string; selected
       { title: "应付款需要复核", detail: "一项应付款在所选期间保持不变。", file_refs: body.selected_file_refs },
       { title: "第四项默认收起", detail: "详细发现默认收起，避免结果首屏文字过载。", file_refs: body.selected_file_refs },
     ], follow_ups: ["请财务人员确认该余额是否仍应保留"], review_required: true } : null,
-    validation_errors: failed ? ["模型引用了未选择的文件"] : [],
+    validation_errors: failed ? ["规划使用了当前任务范围外的资料或能力，系统已安全停止。请重新规划。"] : [],
     events: status === "queued" ? [] : [{ sequence, event_name: failed ? "harness_failed" : "task_completed", occurred_at: new Date().toISOString(), status, message: failed ? "本轮未通过服务端校验，已停止且未发生外部动作。" : "本轮只读分析已完成，结果等待用户复核。", details: {} }],
   };
 }
@@ -166,11 +166,16 @@ test("keeps a catalog outage understandable and recovers automatically", async (
 });
 
 test("fails closed without fabricating a result", async ({ page }) => {
-  await mockHarness(page, { failed: true }); await page.goto("/");
+  const state = await mockHarness(page, { failed: true }); await page.goto("/");
   await page.getByRole("button", { name: "运行任务" }).click();
   await expect(page.getByText("本轮已安全停止")).toBeVisible();
-  await expect(page.getByText("模型引用了未选择的文件")).toBeVisible();
+  await expect(page.getByText("规划使用了当前任务范围外的资料或能力，系统已安全停止。请重新规划。")).toBeVisible();
+  await expect(page.getByText("校验未通过")).toBeVisible();
+  await expect(page.locator("body")).not.toContainText(/artifact\.write|run_workspace_write/);
   await expect(page.getByRole("button", { name: "分析结果" })).toBeDisabled();
+  await page.getByRole("button", { name: "重新规划" }).click();
+  await expect.poll(() => state.starts.length).toBe(2);
+  expect(state.starts[1].idempotency_key).not.toBe(state.starts[0].idempotency_key);
 });
 
 test("mobile keeps the dataset, composer, preview, and trajectory usable", async ({ page }) => {
