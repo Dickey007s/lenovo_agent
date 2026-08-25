@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   IconAlertTriangle,
+  IconArrowRight,
+  IconAdjustments,
   IconCheck,
   IconChevronDown,
   IconCircleCheck,
@@ -13,6 +15,9 @@ import {
   IconFileDescription,
   IconFileSpreadsheet,
   IconLoader2,
+  IconPlayerPause,
+  IconPlayerPlay,
+  IconPlayerStop,
   IconRefresh,
   IconRoute,
   IconSearch,
@@ -24,8 +29,10 @@ import {
 
 type ConnectionState = "connecting" | "available" | "live" | "reconnecting" | "offline";
 type WorkspaceStatus = "checking" | "online" | "unavailable";
-type WorkspaceView = "data" | "plan" | "result";
+type WorkspaceView = "data" | "loop" | "result";
 type PreviewKind = "table" | "document" | "pdf" | "text" | "unavailable";
+type LoopPhase = "observe" | "plan" | "act" | "verify" | "evidence_gate" | "commit";
+type LoopCommand = "pause" | "resume" | "steer" | "stop";
 
 export type HarnessFile = {
   file_ref: string;
@@ -100,6 +107,70 @@ type HarnessFinding = { title: string; detail: string; file_refs: string[] };
 type HarnessResult = { summary: string; findings: HarnessFinding[]; follow_ups: string[]; review_required: boolean };
 type HarnessServerEvent = { sequence: number; event_name: string; occurred_at?: string; message?: string };
 
+type LoopContract = {
+  contract_version: string;
+  goal: string;
+  allowed_file_refs: string[];
+  completion_criteria: string[];
+  max_rounds: number;
+  max_files_per_round: number;
+  max_model_calls: number;
+  deadline_seconds: number;
+  external_action: "none";
+};
+
+type LoopBudget = {
+  max_rounds: number;
+  max_files_per_round: number;
+  max_model_calls: number;
+  deadline_seconds: number;
+  rounds_used: number;
+  files_verified: number;
+  model_calls_used: number;
+  elapsed_ms: number;
+  stop_reason: string | null;
+};
+
+type EvidenceGap = {
+  gap_id: string;
+  label: string;
+  detail: string;
+  candidate_file_refs: string[];
+};
+
+type LoopNextStep = {
+  decision: "pending" | "next_round" | "completed" | "budget_exhausted" | "waiting_input" | "user_stopped" | "failed";
+  reason: string;
+  next_question: string | null;
+  candidate_file_refs: string[];
+};
+
+type LoopRound = {
+  round_number: number;
+  status: "running" | "completed" | "stopped" | "failed";
+  phase: LoopPhase;
+  question: string;
+  steer_instruction: string | null;
+  input_file_refs: string[];
+  plan: HarnessPlanNode[];
+  plan_summary: string | null;
+  model_receipt: ModelReceipt | null;
+  result: HarnessResult | null;
+  analysis_receipt: ModelReceipt | null;
+  verified_file_refs: string[];
+  evidence_gaps: EvidenceGap[];
+  next_step: LoopNextStep | null;
+};
+
+type LoopBrief = {
+  outcome: "completed" | "bounded" | "user_stopped";
+  summary: string;
+  verified_file_refs: string[];
+  unresolved_gaps: EvidenceGap[];
+  rounds_completed: number;
+  external_action: "none";
+};
+
 export type HarnessPlanNode = {
   node_id: string;
   label: string;
@@ -119,6 +190,12 @@ export type HarnessRun = {
   last_event_sequence: number;
   instruction: string;
   source_documents: HarnessFile[];
+  contract: LoopContract;
+  budget: LoopBudget;
+  rounds: LoopRound[];
+  current_round: number;
+  control_state: "running" | "pause_requested" | "paused" | "stop_requested" | "stopped";
+  brief: LoopBrief | null;
   plan: HarnessPlanNode[];
   plan_summary?: string;
   model_receipt: ModelReceipt | null;
@@ -145,6 +222,12 @@ export type HarnessActivityState = {
   analysisReceipt: ModelReceipt | null;
   events: HarnessActivityItem[];
   resultReady: boolean;
+  contract: LoopContract | null;
+  budget: LoopBudget | null;
+  rounds: LoopRound[];
+  currentRound: number;
+  controlState: HarnessRun["control_state"] | null;
+  brief: LoopBrief | null;
   error: string | null;
 };
 
@@ -152,18 +235,29 @@ const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8010"
 const HEADERS = { "Content-Type": "application/json", "X-User-Id": "demo_user" };
 const NAMED_EVENTS = [
   "workspace_index",
+  "round_started",
   "planning_started",
   "planning_completed",
+  "plan_validation_rejected",
   "plan_validation",
   "ready_to_execute",
   "analysis_started",
   "analysis_completed",
   "result_validation",
-  "task_completed",
+  "evidence_gate",
+  "control_pause_recorded",
+  "control_paused",
+  "control_resume_recorded",
+  "control_steer_recorded",
+  "control_steer_applied",
+  "control_stop_recorded",
+  "loop_committed",
+  "loop_budget_stopped",
+  "loop_stopped",
   "harness_failed",
 ];
-const TERMINAL_EVENTS = new Set(["ready_to_execute", "task_completed", "harness_failed"]);
-const TERMINAL_STATUSES = new Set(["ready_to_execute", "completed", "failed"]);
+const TERMINAL_EVENTS = new Set(["ready_to_execute", "loop_committed", "loop_budget_stopped", "loop_stopped", "harness_failed"]);
+const TERMINAL_STATUSES = new Set(["ready_to_execute", "completed", "stopped", "failed"]);
 const TASK_EXAMPLES = [
   "比较所选文件中的关键变化，并列出每条结论的依据。",
   "检查这些资料是否存在矛盾、缺失或需要人工确认的地方。",
@@ -319,20 +413,102 @@ function normalizeResult(value: unknown): HarnessResult | null {
     : null;
 }
 
+function normalizePlan(value: unknown) {
+  const raw = value && typeof value === "object" ? value as Record<string, unknown> : null;
+  const units = Array.isArray(raw?.units) ? raw.units.flatMap((item): HarnessPlanNode[] => {
+    if (!item || typeof item !== "object") return [];
+    const unit = item as Record<string, unknown>;
+    const nodeId = asText(unit.unit_id);
+    if (!nodeId) return [];
+    const sideEffect = asText(unit.side_effect);
+    return [{
+      node_id: nodeId,
+      label: asText(unit.title, "工作单元"),
+      description: asText(unit.objective),
+      depends_on: asStrings(unit.depends_on),
+      source_refs: asStrings(unit.input_file_refs),
+      tool: asText(unit.tool),
+      needs_human: unit.requires_human_gate === true,
+      side_effect: ["run_workspace_write", "external_action"].includes(sideEffect)
+        ? sideEffect as HarnessPlanNode["side_effect"]
+        : "none",
+    }];
+  }) : [];
+  return { units, summary: raw ? asText(raw.summary) || null : null };
+}
+
+function normalizeGap(value: unknown): EvidenceGap | null {
+  if (!value || typeof value !== "object") return null;
+  const raw = value as Record<string, unknown>;
+  const gapId = asText(raw.gap_id);
+  const label = asText(raw.label);
+  const detail = asText(raw.detail);
+  return gapId && label && detail
+    ? { gap_id: gapId, label, detail, candidate_file_refs: asStrings(raw.candidate_file_refs) }
+    : null;
+}
+
+function normalizeLoopRound(value: unknown): LoopRound | null {
+  if (!value || typeof value !== "object") return null;
+  const raw = value as Record<string, unknown>;
+  const roundNumber = asNumber(raw.round_number);
+  const phase = asText(raw.phase);
+  const status = asText(raw.status);
+  if (!roundNumber || !["observe", "plan", "act", "verify", "evidence_gate", "commit"].includes(phase)) return null;
+  const plan = normalizePlan(raw.plan);
+  const nextRaw = raw.next_step && typeof raw.next_step === "object" ? raw.next_step as Record<string, unknown> : null;
+  const decision = asText(nextRaw?.decision, "pending") as LoopNextStep["decision"];
+  const nextStep = nextRaw ? {
+    decision,
+    reason: asText(nextRaw.reason),
+    next_question: asText(nextRaw.next_question) || null,
+    candidate_file_refs: asStrings(nextRaw.candidate_file_refs),
+  } : null;
+  return {
+    round_number: roundNumber,
+    status: ["completed", "stopped", "failed"].includes(status) ? status as LoopRound["status"] : "running",
+    phase: phase as LoopPhase,
+    question: asText(raw.question, "核对本轮允许资料"),
+    steer_instruction: asText(raw.steer_instruction) || null,
+    input_file_refs: asStrings(raw.input_file_refs),
+    plan: plan.units,
+    plan_summary: plan.summary,
+    model_receipt: normalizeReceipt(raw.model_receipt),
+    result: normalizeResult(raw.result),
+    analysis_receipt: normalizeReceipt(raw.analysis_receipt),
+    verified_file_refs: asStrings(raw.verified_file_refs),
+    evidence_gaps: Array.isArray(raw.evidence_gaps)
+      ? raw.evidence_gaps.map(normalizeGap).filter((item): item is EvidenceGap => item !== null)
+      : [],
+    next_step: nextStep,
+  };
+}
+
 function activityItem(event: HarnessServerEvent): HarnessActivityItem {
   const labels: Record<string, string> = {
     workspace_index: "已锁定所选文件",
     planning_started: "规划模型开始组织任务",
     planning_completed: "规划模型返回工作计划",
+    plan_validation_rejected: "候选计划未通过，正在受控重试",
     plan_validation: "服务端校验工作计划",
     ready_to_execute: "工作计划已准备",
     analysis_started: "分析模型开始读取内容",
     analysis_completed: "分析模型返回初步结果",
     result_validation: "服务端核对文件引用",
-    task_completed: "初步结果已形成",
+    round_started: "新一轮开始",
+    evidence_gate: "证据门决定下一步",
+    control_pause_recorded: "暂停请求已记录",
+    control_paused: "已在安全点暂停",
+    control_resume_recorded: "已恢复继续运行",
+    control_steer_recorded: "方向指令已记录",
+    control_steer_applied: "方向指令已应用",
+    control_stop_recorded: "停止请求已记录",
+    loop_committed: "只读任务简报已提交",
+    loop_budget_stopped: "已在预算边界停止",
+    loop_stopped: "已按你的要求停止",
     harness_failed: "本轮已安全停止",
   };
-  const tone = event.event_name === "harness_failed" ? "warning"
+  const tone = event.event_name === "harness_failed" || event.event_name === "plan_validation_rejected" || event.event_name.includes("stopped") ? "warning"
     : event.event_name.includes("planning") || event.event_name.includes("analysis") ? "model"
       : event.event_name.includes("validation") || TERMINAL_EVENTS.has(event.event_name) ? "success" : "neutral";
   return {
@@ -350,25 +526,7 @@ function normalizeRun(value: unknown): HarnessRun | null {
   const raw = outer.run && typeof outer.run === "object" ? outer.run as Record<string, unknown> : outer;
   const runId = asText(raw.run_id); const workspaceId = asText(raw.workspace_id);
   if (!runId || workspaceId !== "forte-public-office") return null;
-  const planRaw = raw.plan && typeof raw.plan === "object" ? raw.plan as Record<string, unknown> : null;
-  const plan = Array.isArray(planRaw?.units) ? planRaw.units.flatMap((item): HarnessPlanNode[] => {
-    if (!item || typeof item !== "object") return [];
-    const unit = item as Record<string, unknown>; const nodeId = asText(unit.unit_id);
-    if (!nodeId) return [];
-    const sideEffect = asText(unit.side_effect);
-    return [{
-      node_id: nodeId,
-      label: asText(unit.title, "工作单元"),
-      description: asText(unit.objective),
-      depends_on: asStrings(unit.depends_on),
-      source_refs: asStrings(unit.input_file_refs),
-      tool: asText(unit.tool),
-      needs_human: unit.requires_human_gate === true,
-      side_effect: ["run_workspace_write", "external_action"].includes(sideEffect)
-        ? sideEffect as HarnessPlanNode["side_effect"]
-        : "none",
-    }];
-  }) : [];
+  const plan = normalizePlan(raw.plan);
   const serverEvents = Array.isArray(raw.events) ? raw.events.flatMap((item): HarnessServerEvent[] => {
     if (!item || typeof item !== "object") return [];
     const event = item as Record<string, unknown>;
@@ -401,6 +559,27 @@ function normalizeRun(value: unknown): HarnessRun | null {
         }] : [];
       })
     : [];
+  const contractRaw = raw.contract && typeof raw.contract === "object" ? raw.contract as Record<string, unknown> : {};
+  const budgetRaw = raw.budget && typeof raw.budget === "object" ? raw.budget as Record<string, unknown> : {};
+  const maxRounds = asNumber(contractRaw.max_rounds, asNumber(budgetRaw.max_rounds, 3));
+  const maxFilesPerRound = asNumber(contractRaw.max_files_per_round, asNumber(budgetRaw.max_files_per_round, 4));
+  const maxModelCalls = asNumber(contractRaw.max_model_calls, asNumber(budgetRaw.max_model_calls, 6));
+  const deadlineSeconds = asNumber(contractRaw.deadline_seconds, asNumber(budgetRaw.deadline_seconds, 120));
+  const rounds = Array.isArray(raw.rounds)
+    ? raw.rounds.map(normalizeLoopRound).filter((item): item is LoopRound => item !== null)
+    : [];
+  const briefRaw = raw.brief && typeof raw.brief === "object" ? raw.brief as Record<string, unknown> : null;
+  const brief = briefRaw ? {
+    outcome: (["bounded", "user_stopped"].includes(asText(briefRaw.outcome)) ? asText(briefRaw.outcome) : "completed") as LoopBrief["outcome"],
+    summary: asText(briefRaw.summary),
+    verified_file_refs: asStrings(briefRaw.verified_file_refs),
+    unresolved_gaps: Array.isArray(briefRaw.unresolved_gaps)
+      ? briefRaw.unresolved_gaps.map(normalizeGap).filter((item): item is EvidenceGap => item !== null)
+      : [],
+    rounds_completed: asNumber(briefRaw.rounds_completed),
+    external_action: "none" as const,
+  } : null;
+  const controlState = asText(raw.control_state);
   return {
     run_id: runId,
     workspace_id: workspaceId,
@@ -409,8 +588,34 @@ function normalizeRun(value: unknown): HarnessRun | null {
     last_event_sequence: asNumber(raw.last_event_sequence),
     instruction: asText(raw.instruction),
     source_documents: sourceDocuments,
-    plan,
-    plan_summary: planRaw ? asText(planRaw.summary) || undefined : undefined,
+    contract: {
+      contract_version: asText(contractRaw.contract_version, "agent-control-loop.v1"),
+      goal: asText(contractRaw.goal, asText(raw.instruction)),
+      allowed_file_refs: asStrings(contractRaw.allowed_file_refs),
+      completion_criteria: asStrings(contractRaw.completion_criteria),
+      max_rounds: maxRounds,
+      max_files_per_round: maxFilesPerRound,
+      max_model_calls: maxModelCalls,
+      deadline_seconds: deadlineSeconds,
+      external_action: "none",
+    },
+    budget: {
+      max_rounds: asNumber(budgetRaw.max_rounds, maxRounds),
+      max_files_per_round: asNumber(budgetRaw.max_files_per_round, maxFilesPerRound),
+      max_model_calls: asNumber(budgetRaw.max_model_calls, maxModelCalls),
+      deadline_seconds: asNumber(budgetRaw.deadline_seconds, deadlineSeconds),
+      rounds_used: asNumber(budgetRaw.rounds_used),
+      files_verified: asNumber(budgetRaw.files_verified),
+      model_calls_used: asNumber(budgetRaw.model_calls_used),
+      elapsed_ms: asNumber(budgetRaw.elapsed_ms),
+      stop_reason: asText(budgetRaw.stop_reason) || null,
+    },
+    rounds,
+    current_round: asNumber(raw.current_round),
+    control_state: (["pause_requested", "paused", "stop_requested", "stopped"].includes(controlState) ? controlState : "running") as HarnessRun["control_state"],
+    brief,
+    plan: plan.units,
+    plan_summary: plan.summary ?? undefined,
     model_receipt: normalizeReceipt(raw.model_receipt),
     analysis_receipt: normalizeReceipt(raw.analysis_receipt),
     result: normalizeResult(raw.result),
@@ -427,6 +632,28 @@ function toolLabel(tool: string) {
     "evidence.verify": "核对引用",
   };
   return labels[tool] ?? "受控办公工具";
+}
+
+const LOOP_PHASES: { key: LoopPhase; label: string }[] = [
+  { key: "observe", label: "读取" },
+  { key: "plan", label: "规划" },
+  { key: "act", label: "分析" },
+  { key: "verify", label: "核对" },
+  { key: "evidence_gate", label: "证据门" },
+  { key: "commit", label: "提交" },
+];
+
+function gateLabel(decision: LoopNextStep["decision"] | undefined) {
+  const labels: Record<LoopNextStep["decision"], string> = {
+    pending: "等待服务端决定",
+    next_round: "继续下一轮",
+    completed: "完成条件已满足",
+    budget_exhausted: "到达预算边界",
+    waiting_input: "等待人工输入",
+    user_stopped: "用户已停止",
+    failed: "本轮未通过校验",
+  };
+  return labels[decision ?? "pending"];
 }
 
 function Receipt({ receipt, label }: { receipt: ModelReceipt | null; label: string }) {
@@ -446,8 +673,11 @@ function Receipt({ receipt, label }: { receipt: ModelReceipt | null; label: stri
 
 export function HarnessActivityPane({ state }: { state: HarnessActivityState | null }) {
   if (!state) return <section className="trace-pane is-empty">
-    <IconRoute aria-hidden="true" /><h2>执行轨迹</h2><p>选择文件并提交任务后，这里会显示 Agent 实际尝试的每一步。</p>
+    <IconRoute aria-hidden="true" /><h2>Agent Control Loop</h2><p>任务开始后，这里会显示每轮读了什么、为什么继续，以及何时需要你介入。</p>
   </section>;
+  const latestRound = state.rounds.at(-1) ?? null;
+  const phaseIndex = latestRound ? LOOP_PHASES.findIndex((item) => item.key === latestRound.phase) : -1;
+  const visibleEvents = state.events.slice(-5);
   const connectionLabel = state.connection === "live" ? "实时"
     : state.connection === "available" ? "可用"
       : state.connection === "reconnecting" ? "重连"
@@ -455,25 +685,36 @@ export function HarnessActivityPane({ state }: { state: HarnessActivityState | n
   return <section className="trace-pane" aria-labelledby="trace-title">
     <header>
       <div className="trace-avatar"><IconSparkles aria-hidden="true" /></div>
-      <div><span>可核对的 Agent 路径</span><h2 id="trace-title">执行轨迹</h2></div>
+      <div><span>可核对的执行路径</span><h2 id="trace-title">Agent Control Loop</h2></div>
       <b className={`is-${state.connection}`}><i />{connectionLabel}</b>
     </header>
-    {state.instruction && <div className="trace-task"><span>本轮任务</span><p>{state.instruction}</p></div>}
+    {state.instruction && <div className="trace-task"><span>任务目标</span><p>{state.instruction}</p></div>}
+    {state.budget && <div className="trace-loop-facts" aria-label="循环预算">
+      <span><b>{state.currentRound || 0}/{state.budget.max_rounds}</b>轮次</span>
+      <span><b>{state.budget.files_verified}/{state.contract?.allowed_file_refs.length ?? 0}</b>文件已核对</span>
+      <span><b>{state.budget.model_calls_used}/{state.budget.max_model_calls}</b>模型调用</span>
+      <span><b>{Math.ceil(Math.max(0, state.budget.deadline_seconds * 1000 - state.budget.elapsed_ms) / 1000)}</b>秒剩余</span>
+    </div>}
+    {latestRound && <section className="trace-current-round" aria-label={`第 ${latestRound.round_number} 轮`}>
+      <header><span>第 {latestRound.round_number} 轮</span><b>{gateLabel(latestRound.next_step?.decision)}</b></header>
+      <ol>{LOOP_PHASES.slice(0, 5).map((phase, index) => <li key={phase.key} className={index < phaseIndex || latestRound.status === "completed" ? "is-complete" : index === phaseIndex ? "is-active" : ""}><span>{index < phaseIndex || latestRound.status === "completed" ? <IconCheck aria-hidden="true" /> : index + 1}</span><b>{phase.label}</b></li>)}</ol>
+      {latestRound.evidence_gaps[0] && <p><IconAlertTriangle aria-hidden="true" />{latestRound.evidence_gaps[0].label}</p>}
+    </section>}
     <div className="trace-receipts">
       <Receipt receipt={state.planningReceipt} label="规划模型" />
       <Receipt receipt={state.analysisReceipt} label="分析模型" />
     </div>
     <ol className="trace-list" aria-live="polite">
-      {state.events.length ? state.events.map((item) => <li key={item.sequence} className={`is-${item.tone}`}>
+      {visibleEvents.length ? visibleEvents.map((item) => <li key={item.sequence} className={`is-${item.tone}`}>
         <span>{item.tone === "model" ? <IconSparkles aria-hidden="true" /> : item.tone === "success" ? <IconCheck aria-hidden="true" /> : item.tone === "warning" ? <IconAlertTriangle aria-hidden="true" /> : <IconCircleDot aria-hidden="true" />}</span>
         <div><strong>{item.label}</strong><p>{item.detail}</p>{item.occurred_at && <small>{new Date(item.occurred_at).toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}</small>}</div>
       </li>) : <li><span><IconClock aria-hidden="true" /></span><div><strong>等待任务</strong><p>先从资料库选择文件，再告诉 Agent 你想完成什么。</p></div></li>}
     </ol>
-    {state.resultReady && <footer className="is-success"><IconCircleCheck aria-hidden="true" /><span>只读结果已形成，等待你的复核</span></footer>}
+    {state.events.length > visibleEvents.length && <details className="trace-history"><summary>查看全部 {state.events.length} 条服务端轨迹</summary><ol>{state.events.map((item) => <li key={item.sequence}><b>{item.label}</b><span>{item.detail}</span></li>)}</ol></details>}
+    {state.brief && <footer className={state.brief.outcome === "completed" ? "is-success" : "is-warning"}><IconCircleCheck aria-hidden="true" /><span>{state.brief.summary}</span></footer>}
     {state.error && <footer className="is-error" role="alert"><IconAlertTriangle aria-hidden="true" /><span>{state.error}</span></footer>}
   </section>;
 }
-
 export function HarnessWorkbench({ onActivityChange }: { onActivityChange?: (state: HarnessActivityState | null) => void }) {
   const [workspace, setWorkspace] = useState<HarnessWorkspace | null>(null);
   const [selectedRefs, setSelectedRefs] = useState<string[]>([]);
@@ -482,6 +723,10 @@ export function HarnessWorkbench({ onActivityChange }: { onActivityChange?: (sta
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewError, setPreviewError] = useState("");
   const [instruction, setInstruction] = useState("");
+  const [maxRounds, setMaxRounds] = useState(3);
+  const [maxFilesPerRound, setMaxFilesPerRound] = useState(4);
+  const [maxModelCalls, setMaxModelCalls] = useState(6);
+  const [deadlineSeconds, setDeadlineSeconds] = useState(120);
   const [fileSearch, setFileSearch] = useState("");
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [view, setView] = useState<WorkspaceView>("data");
@@ -489,6 +734,7 @@ export function HarnessWorkbench({ onActivityChange }: { onActivityChange?: (sta
   const [workspaceStatus, setWorkspaceStatus] = useState<WorkspaceStatus>("checking");
   const [workspaceError, setWorkspaceError] = useState("");
   const [starting, setStarting] = useState(false);
+  const [controlBusy, setControlBusy] = useState<LoopCommand | null>(null);
   const [error, setError] = useState("");
   const [connection, setConnection] = useState<ConnectionState>("connecting");
   const eventSourceRef = useRef<EventSource | null>(null);
@@ -499,6 +745,7 @@ export function HarnessWorkbench({ onActivityChange }: { onActivityChange?: (sta
   const runRef = useRef<HarnessRun | null>(null);
   const lastSequenceRef = useRef(0);
   const startCommandRef = useRef<{ signature: string; key: string } | null>(null);
+  const controlCommandRef = useRef<{ signature: string; key: string } | null>(null);
 
   const allFiles = useMemo(() => workspace?.folders.flatMap((folder) => folder.files) ?? [], [workspace]);
   const activeFile = allFiles.find((file) => file.file_ref === activeFileRef) ?? null;
@@ -627,6 +874,12 @@ export function HarnessWorkbench({ onActivityChange }: { onActivityChange?: (sta
       analysisReceipt: run?.analysis_receipt ?? null,
       events: run?.events ?? [],
       resultReady: Boolean(run?.result),
+      contract: run?.contract ?? null,
+      budget: run?.budget ?? null,
+      rounds: run?.rounds ?? [],
+      currentRound: run?.current_round ?? 0,
+      controlState: run?.control_state ?? null,
+      brief: run?.brief ?? null,
       error: error || run?.validation_errors[0] || null,
     });
   }, [workspace, run, connection, error, onActivityChange]);
@@ -642,7 +895,7 @@ export function HarnessWorkbench({ onActivityChange }: { onActivityChange?: (sta
   function toggleFile(fileRef: string) {
     setSelectedRefs((current) => {
       if (current.includes(fileRef)) return current.filter((item) => item !== fileRef);
-      if (current.length >= 20) { setError("每轮最多选择 20 份文件，请先移除一份。"); return current; }
+      if (current.length >= 20) { setError("一次任务最多允许 20 份文件，请先移除一份。"); return current; }
       setError(""); return [...current, fileRef];
     });
   }
@@ -651,7 +904,11 @@ export function HarnessWorkbench({ onActivityChange }: { onActivityChange?: (sta
 
   async function startTask() {
     if (!workspace || selectedRefs.length === 0 || instruction.trim().length < 3) return;
-    const signature = JSON.stringify({ instruction: instruction.trim(), files: selectedRefs });
+    const signature = JSON.stringify({
+      instruction: instruction.trim(),
+      files: selectedRefs,
+      loop: { maxRounds, maxFilesPerRound, maxModelCalls, deadlineSeconds },
+    });
     const command = startCommandRef.current?.signature === signature
       ? startCommandRef.current
       : { signature, key: randomKey() };
@@ -669,13 +926,19 @@ export function HarnessWorkbench({ onActivityChange }: { onActivityChange?: (sta
           expected_version: 1,
           instruction: instruction.trim(),
           selected_file_refs: selectedRefs,
+          loop: {
+            max_rounds: maxRounds,
+            max_files_per_round: maxFilesPerRound,
+            max_model_calls: maxModelCalls,
+            deadline_seconds: deadlineSeconds,
+          },
         }),
       });
       const payload = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(asText((payload as Record<string, unknown>).detail, "任务没有启动"));
       const snapshot = normalizeRun(payload);
       if (!snapshot || !applySnapshot(snapshot, generation)) throw new Error("任务回执格式无效");
-      setView("plan");
+      setView("loop");
       if (!TERMINAL_STATUSES.has(snapshot.status)) connectEvents(snapshot.run_id, generation, snapshot.last_event_sequence);
       else setConnection("available");
     } catch (caught) {
@@ -684,12 +947,55 @@ export function HarnessWorkbench({ onActivityChange }: { onActivityChange?: (sta
     } finally { setStarting(false); }
   }
 
+  async function controlLoop(command: LoopCommand, steerInstruction?: string) {
+    const current = runRef.current;
+    if (!current || TERMINAL_STATUSES.has(current.status)) return false;
+    const normalizedInstruction = steerInstruction?.trim() || undefined;
+    const signature = JSON.stringify({ command, instruction: normalizedInstruction, runId: current.run_id });
+    const controlCommand = controlCommandRef.current?.signature === signature
+      ? controlCommandRef.current
+      : { signature, key: `control-${randomKey()}` };
+    controlCommandRef.current = controlCommand;
+    setControlBusy(command); setError("");
+    try {
+      const response = await fetch(`${API_BASE}/v1/harness/runs/${encodeURIComponent(current.run_id)}/controls`, {
+        method: "POST",
+        headers: HEADERS,
+        body: JSON.stringify({
+          command,
+          idempotency_key: controlCommand.key,
+          expected_version: current.version,
+          instruction: normalizedInstruction,
+        }),
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        if (response.status === 409) await refreshRun(current.run_id, generationRef.current).catch(() => null);
+        throw new Error(asText((payload as Record<string, unknown>).detail, "控制命令没有被服务端接受"));
+      }
+      const snapshot = normalizeRun(payload);
+      if (!snapshot || !applySnapshot(snapshot, generationRef.current)) throw new Error("控制回执格式无效");
+      controlCommandRef.current = null;
+      if (!eventSourceRef.current && !TERMINAL_STATUSES.has(snapshot.status)) {
+        connectEvents(snapshot.run_id, generationRef.current, snapshot.last_event_sequence);
+      }
+      return true;
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "控制命令没有被服务端接受");
+      return false;
+    } finally {
+      setControlBusy(null);
+    }
+  }
+
   if (workspaceStatus !== "online" || !workspace) return <div className={`data-workbench-empty ${workspaceStatus === "unavailable" ? "is-error" : ""}`}>
     {workspaceStatus === "checking" ? <IconLoader2 aria-hidden="true" /> : <IconAlertTriangle aria-hidden="true" />}
     <h1>{workspaceStatus === "checking" ? "正在核对办公资料库" : "办公资料库暂时无法读取"}</h1>
     <p>{workspaceStatus === "checking" ? "服务端正在校验公开文件清单、大小与完整性。" : workspaceError}</p>
     {workspaceStatus === "unavailable" && <button type="button" onClick={() => void loadWorkspace()}><IconRefresh aria-hidden="true" />重新读取</button>}
   </div>;
+
+  const runActive = Boolean(run && !TERMINAL_STATUSES.has(run.status));
 
   return <main className="data-workbench">
     <header className="data-workbench-header">
@@ -719,7 +1025,7 @@ export function HarnessWorkbench({ onActivityChange }: { onActivityChange?: (sta
             </button>
             {(expanded[folder.folder_id] ?? false) && <div className="dataset-files">
               {folder.files.length ? folder.files.map((file) => <div key={file.file_ref} className={file.file_ref === activeFileRef ? "is-open" : ""}>
-                <label title="纳入本轮任务"><input type="checkbox" checked={selectedRefs.includes(file.file_ref)} onChange={() => toggleFile(file.file_ref)} /><span aria-hidden="true"><IconCheck /></span></label>
+                <label title={runActive ? "当前任务运行中，文件范围已经冻结" : "允许 Agent Control Loop 读取"}><input type="checkbox" checked={selectedRefs.includes(file.file_ref)} disabled={runActive} onChange={() => toggleFile(file.file_ref)} /><span aria-hidden="true"><IconCheck /></span></label>
                 <button type="button" onClick={() => openFile(file)} title={file.display_label}><IconFile aria-hidden="true" /><span>{file.display_label}</span><small>{file.extension}</small></button>
               </div>) : <p className="dataset-unavailable">{folder.external_dependency_label ?? "当前没有本地公开文件"}</p>}
             </div>}
@@ -729,28 +1035,37 @@ export function HarnessWorkbench({ onActivityChange }: { onActivityChange?: (sta
       <section className="data-task-surface">
         <section className="task-composer" aria-labelledby="task-composer-title">
           <div><span>给 Agent 一项工作</span><h2 id="task-composer-title">你想从这些文件里知道什么？</h2></div>
-          <textarea value={instruction} onChange={(event) => setInstruction(event.target.value)} placeholder="例如：比较所选文件中的关键变化，并逐条引用依据" aria-label="任务指令" />
-          <div className="task-examples" aria-label="任务示例">{TASK_EXAMPLES.map((example) => <button type="button" key={example} onClick={() => setInstruction(example)}>{example}</button>)}</div>
+          <textarea value={instruction} disabled={runActive} onChange={(event) => setInstruction(event.target.value)} placeholder="例如：比较所选文件中的关键变化，并逐条引用依据" aria-label="任务指令" />
+          <details className="loop-contract-settings">
+            <summary><IconAdjustments aria-hidden="true" />Agent Control Loop · 最多 {maxRounds} 轮 / {maxModelCalls} 次模型调用 / {deadlineSeconds} 秒</summary>
+            <div>
+              <label><span>最大轮次</span><input type="number" min="1" max="3" value={maxRounds} disabled={runActive} onChange={(event) => setMaxRounds(Math.max(1, Math.min(3, Number(event.target.value) || 1)))} /></label>
+              <label><span>每轮文件</span><input type="number" min="1" max="8" value={maxFilesPerRound} disabled={runActive} onChange={(event) => setMaxFilesPerRound(Math.max(1, Math.min(8, Number(event.target.value) || 1)))} /></label>
+              <label><span>模型调用</span><input type="number" min="2" max="6" value={maxModelCalls} disabled={runActive} onChange={(event) => setMaxModelCalls(Math.max(2, Math.min(6, Number(event.target.value) || 2)))} /></label>
+              <label><span>时间上限</span><input type="number" min="20" max="300" step="10" value={deadlineSeconds} disabled={runActive} onChange={(event) => setDeadlineSeconds(Math.max(20, Math.min(300, Number(event.target.value) || 20)))} /></label>
+            </div>
+          </details>
+          <div className="task-examples" aria-label="任务示例">{TASK_EXAMPLES.map((example) => <button type="button" key={example} disabled={runActive} onClick={() => setInstruction(example)}>{example}</button>)}</div>
           <footer>
-            <div className="selection-summary"><span>{selectedRefs.length} 份文件已选 · 最多 20 份</span>{selectedRefs.length > 0 && <button type="button" onClick={clearSelection}>清空</button>}</div>
-            <button type="button" onClick={() => void startTask()} disabled={starting || selectedRefs.length === 0 || instruction.trim().length < 3}>{starting ? <IconLoader2 aria-hidden="true" /> : <IconSend aria-hidden="true" />}{starting ? "正在启动" : "运行任务"}</button>
+            <div className="selection-summary"><span>{runActive ? `${run?.contract.allowed_file_refs.length ?? selectedRefs.length} 份文件已冻结为当前任务范围` : `${selectedRefs.length} 份文件进入允许范围 · 最多 20 份`}</span>{selectedRefs.length > 0 && !runActive && <button type="button" onClick={clearSelection}>清空</button>}</div>
+            <button type="button" onClick={() => void startTask()} disabled={runActive || starting || selectedRefs.length === 0 || instruction.trim().length < 3}>{starting ? <IconLoader2 aria-hidden="true" /> : <IconSend aria-hidden="true" />}{starting ? "正在启动" : runActive ? "当前 Loop 运行中" : "启动 Control Loop"}</button>
           </footer>
         </section>
         {selectedRefs.length > 0 && <div className="selected-files" aria-label="本轮所选文件">{selectedRefs.map((ref) => {
           const file = allFiles.find((item) => item.file_ref === ref);
-          return file ? <span key={ref}><button type="button" onClick={() => openFile(file)}>{file.display_label}</button><button type="button" aria-label={`移除 ${file.display_label}`} onClick={() => toggleFile(ref)}><IconX aria-hidden="true" /></button></span> : null;
+          return file ? <span key={ref}><button type="button" onClick={() => openFile(file)}>{file.display_label}</button><button type="button" aria-label={`移除 ${file.display_label}`} disabled={runActive} onClick={() => toggleFile(ref)}><IconX aria-hidden="true" /></button></span> : null;
         })}</div>}
         <nav className="workspace-tabs" aria-label="工作区视图">
           <button type="button" className={view === "data" ? "is-active" : ""} onClick={() => setView("data")}><IconFileDescription aria-hidden="true" />文件预览</button>
-          <button type="button" className={view === "plan" ? "is-active" : ""} onClick={() => setView("plan")}><IconRoute aria-hidden="true" />任务计划{run?.plan.length ? <b>{run.plan.length}</b> : null}</button>
-          <button type="button" className={view === "result" ? "is-active" : ""} onClick={() => setView("result")}><IconCircleCheck aria-hidden="true" />分析结果{run?.result ? <b>{run.result.findings.length}</b> : null}</button>
+          <button type="button" className={view === "loop" ? "is-active" : ""} onClick={() => setView("loop")}><IconRoute aria-hidden="true" />循环进展{run?.rounds.length ? <b>{run.rounds.length}</b> : null}</button>
+          <button type="button" className={view === "result" ? "is-active" : ""} onClick={() => setView("result")}><IconCircleCheck aria-hidden="true" />任务简报{run?.result ? <b>{run.result.findings.length}</b> : null}</button>
         </nav>
         <div className="workspace-content">
           {view === "data" && <FilePreview preview={preview} file={activeFile} loading={previewLoading} error={previewError} />}
-          {view === "plan" && <PlanView run={run} files={allFiles} />}
+          {view === "loop" && <LoopView run={run} files={allFiles} controlBusy={controlBusy} onControl={controlLoop} />}
           {view === "result" && <ResultView result={run?.result ?? null} files={allFiles} onOpenFile={openFile} />}
         </div>
-        <details className="workspace-boundary"><summary><IconShieldCheck aria-hidden="true" />数据与执行边界</summary><p>{workspace.data_boundary} Agent 只读取你本轮选择的文件，结果仅写入本轮工作成果；模型不能扩展文件范围或执行外部动作。</p></details>
+        <details className="workspace-boundary"><summary><IconShieldCheck aria-hidden="true" />数据与执行边界</summary><p>{workspace.data_boundary} Agent Control Loop 只读取你允许的文件；服务端拥有轮次、证据门、预算和停止状态。本轮不会修改原文件或执行外部动作。</p></details>
         {error && <div className="workspace-error" role="alert"><IconAlertTriangle aria-hidden="true" /><span>{error}</span></div>}
       </section>
     </div>
@@ -768,14 +1083,93 @@ function FilePreview({ preview, file, loading, error }: { preview: HarnessPrevie
   </article>;
 }
 
-function PlanView({ run, files }: { run: HarnessRun | null; files: HarnessFile[] }) {
-  if (!run?.plan.length) return <div className="workspace-placeholder"><IconRoute aria-hidden="true" /><h2>任务计划尚未形成</h2><p>运行任务后，规划模型返回的工作图会先经过服务端校验，再显示在这里。</p></div>;
-  return <div className="plan-view"><header><span>服务端已校验</span><h2>{run.plan_summary ?? "本轮工作计划"}</h2></header><ol>{run.plan.map((node, index) => <li key={node.node_id}><b>{index + 1}</b><div><strong>{node.label}</strong><p>{node.description}</p><footer>{node.source_refs.map((ref) => <span key={ref}>{files.find((file) => file.file_ref === ref)?.display_label ?? "所选文件"}</span>)}<span>{toolLabel(node.tool)}</span>{node.side_effect === "run_workspace_write" && <span>只写本轮成果</span>}{node.needs_human && <span className="is-gate">需要人工确认</span>}</footer></div></li>)}</ol></div>;
-}
+function LoopView({
+  run,
+  files,
+  controlBusy,
+  onControl,
+}: {
+  run: HarnessRun | null;
+  files: HarnessFile[];
+  controlBusy: LoopCommand | null;
+  onControl: (command: LoopCommand, instruction?: string) => Promise<boolean>;
+}) {
+  const [selectedRoundNumber, setSelectedRoundNumber] = useState(1);
+  const [steerDraft, setSteerDraft] = useState("");
+  useEffect(() => {
+    if (run?.current_round) setSelectedRoundNumber(run.current_round);
+  }, [run?.current_round, run?.rounds.length]);
 
+  if (!run) return <div className="workspace-placeholder"><IconRoute aria-hidden="true" /><h2>Agent Control Loop 尚未启动</h2><p>划定允许文件并提交任务后，每一轮的读取、规划、分析、核对和证据门决定都会显示在这里。</p></div>;
+
+  const selectedRound = run.rounds.find((item) => item.round_number === selectedRoundNumber) ?? run.rounds.at(-1) ?? null;
+  const terminal = TERMINAL_STATUSES.has(run.status);
+  const canResume = run.control_state === "paused" || run.control_state === "pause_requested";
+  const canPause = !terminal && run.control_state === "running";
+  const canSteer = !terminal && ![ "stop_requested", "stopped" ].includes(run.control_state);
+  const fileLabel = (fileRef: string) => files.find((file) => file.file_ref === fileRef)?.display_label ?? "允许范围内的文件";
+
+  return <section className="loop-view" aria-labelledby="loop-view-title">
+    <header className="loop-contract">
+      <div><span>Agent Control Loop</span><h2 id="loop-view-title">{run.contract.goal}</h2></div>
+      <div className="loop-budget">
+        <span><b>{run.budget.rounds_used}/{run.budget.max_rounds}</b>轮</span>
+        <span><b>{run.budget.files_verified}/{run.contract.allowed_file_refs.length}</b>文件</span>
+        <span><b>{run.budget.model_calls_used}/{run.budget.max_model_calls}</b>调用</span>
+        <span><b>{Math.ceil(run.budget.elapsed_ms / 1000)}</b>秒</span>
+      </div>
+    </header>
+    <section className="loop-controls" aria-label="人工控制">
+      <div className="loop-control-actions">
+        <button type="button" onClick={() => void onControl(canResume ? "resume" : "pause")} disabled={controlBusy !== null || terminal || (!canResume && !canPause)}>
+          {canResume ? <IconPlayerPlay aria-hidden="true" /> : <IconPlayerPause aria-hidden="true" />}
+          {controlBusy === "pause" || controlBusy === "resume" ? "正在提交" : canResume ? "继续" : "暂停"}
+        </button>
+        <button type="button" className="is-stop" onClick={() => void onControl("stop")} disabled={controlBusy !== null || terminal}><IconPlayerStop aria-hidden="true" />结束并保留现有结果</button>
+      </div>
+      <form onSubmit={async (event) => {
+        event.preventDefault();
+        if (!steerDraft.trim()) return;
+        if (await onControl("steer", steerDraft)) setSteerDraft("");
+      }}>
+        <label htmlFor="loop-steer">调整下一轮方向</label>
+        <div><input id="loop-steer" value={steerDraft} onChange={(event) => setSteerDraft(event.target.value)} placeholder="例如：下一轮优先核对付款条件" disabled={!canSteer || controlBusy !== null} /><button type="submit" disabled={!canSteer || controlBusy !== null || steerDraft.trim().length < 3}><IconArrowRight aria-hidden="true" /><span>记录</span></button></div>
+      </form>
+      {run.control_state === "pause_requested" && <p>暂停请求已记录，当前模型调用结束后会在安全点暂停。</p>}
+      {run.control_state === "paused" && <p>Loop 已暂停，现有轮次、引用和预算都已保留。</p>}
+      {run.control_state === "stop_requested" && <p>正在到达停止安全点，不会启动新的模型调用。</p>}
+    </section>
+    <nav className="loop-round-tabs" aria-label="研究轮次">
+      {run.rounds.length ? run.rounds.map((round) => <button type="button" key={round.round_number} className={round.round_number === selectedRound?.round_number ? "is-active" : ""} onClick={() => setSelectedRoundNumber(round.round_number)}>
+        <span>{round.status === "completed" ? <IconCheck aria-hidden="true" /> : round.round_number}</span>
+        <b>第 {round.round_number} 轮</b>
+        <small>{round.next_step ? gateLabel(round.next_step.decision) : LOOP_PHASES.find((phase) => phase.key === round.phase)?.label}</small>
+      </button>) : <span>服务端正在建立第一轮。</span>}
+    </nav>
+    {selectedRound && <article className="loop-round-detail">
+      <header><div><span>本轮问题</span><h3>{selectedRound.question}</h3></div><b>{gateLabel(selectedRound.next_step?.decision)}</b></header>
+      <ol className="loop-phase-rail">
+        {LOOP_PHASES.slice(0, 5).map((phase, index) => {
+          const activeIndex = LOOP_PHASES.findIndex((item) => item.key === selectedRound.phase);
+          const complete = index < activeIndex || selectedRound.status === "completed";
+          return <li key={phase.key} className={complete ? "is-complete" : index === activeIndex ? "is-active" : ""}><span>{complete ? <IconCheck aria-hidden="true" /> : index + 1}</span><b>{phase.label}</b></li>;
+        })}
+      </ol>
+      {selectedRound.input_file_refs.length > 0 && <section className="loop-round-files"><span>本轮实际读取</span><div>{selectedRound.input_file_refs.map((ref) => <b key={ref}>{fileLabel(ref)}</b>)}</div></section>}
+      {selectedRound.plan.length > 0 && <details className="loop-plan" open={selectedRound.status === "running"}>
+        <summary>服务端已采用的本轮计划 · {selectedRound.plan.length} 个工作单元</summary>
+        <ol>{selectedRound.plan.map((node, index) => <li key={node.node_id}><span>{index + 1}</span><div><b>{node.label}</b><p>{node.description}</p></div></li>)}</ol>
+      </details>}
+      {selectedRound.result && <section className="loop-round-result"><span>本轮核对结果</span><h3>{selectedRound.result.summary}</h3><p>{selectedRound.result.findings.length} 条发现，引用 {selectedRound.verified_file_refs.length} 份文件。</p></section>}
+      {selectedRound.evidence_gaps.length > 0 && <section className="loop-gap"><IconAlertTriangle aria-hidden="true" /><div><span>证据缺口</span><h3>{selectedRound.evidence_gaps[0].label}</h3><p>{selectedRound.evidence_gaps[0].detail}</p></div></section>}
+      {selectedRound.next_step && <footer className={selectedRound.next_step.decision === "completed" ? "is-complete" : "is-next"}><div><span>服务端决定</span><strong>{gateLabel(selectedRound.next_step.decision)}</strong><p>{selectedRound.next_step.reason}</p></div>{selectedRound.next_step.decision === "next_round" && <IconArrowRight aria-hidden="true" />}</footer>}
+    </article>}
+    {run.brief && <section className={`loop-brief is-${run.brief.outcome}`}><IconCircleCheck aria-hidden="true" /><div><span>任务简报</span><h3>{run.brief.summary}</h3><p>外部动作：未发生 · 结果仍需人工复核</p></div></section>}
+  </section>;
+}
 function ResultView({ result, files, onOpenFile }: { result: HarnessResult | null; files: HarnessFile[]; onOpenFile: (file: HarnessFile) => void }) {
   const [expanded, setExpanded] = useState(false);
-  if (!result) return <div className="workspace-placeholder"><IconClock aria-hidden="true" /><h2>分析结果尚未形成</h2><p>Agent 完成只读分析并通过文件引用校验后，结果会出现在这里。</p></div>;
+  if (!result) return <div className="workspace-placeholder"><IconClock aria-hidden="true" /><h2>任务简报尚未形成</h2><p>Agent Control Loop 完成只读分析并通过文件引用校验后，简报会出现在这里。</p></div>;
   const visibleFindings = expanded ? result.findings : result.findings.slice(0, 3);
   return <article className="result-view"><header><IconCircleCheck aria-hidden="true" /><div><span>模型初步结论 · 待复核</span><h2>{result.summary}</h2></div></header><div className="result-findings">{visibleFindings.map((finding, index) => <section key={`${finding.title}:${index}`}><b>{index + 1}</b><div><h3>{finding.title}</h3><p>{finding.detail}</p><footer>{finding.file_refs.map((ref) => {
     const file = files.find((item) => item.file_ref === ref);

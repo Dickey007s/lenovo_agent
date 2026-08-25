@@ -8,6 +8,8 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, status
 from starlette.responses import StreamingResponse
 
+from packages.contracts.harness_models import AgentControlLoopControlRequest
+
 from services.api.app.application.harness_runtime import (
     HarnessConflictError,
     HarnessError,
@@ -95,6 +97,22 @@ async def get_harness_run(
         return runtime.public_snapshot(snapshot)
     except HarnessNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@router.post("/runs/{run_id}/controls", status_code=status.HTTP_202_ACCEPTED)
+async def control_harness_run(
+    run_id: str,
+    body: AgentControlLoopControlRequest,
+    owner_id: Annotated[str, Depends(harness_owner)],
+    runtime: Annotated[HarnessRuntime, Depends(get_harness_runtime)],
+):
+    try:
+        result = await runtime.control(owner_id, run_id, body)
+        return runtime.public_control_result(result)
+    except HarnessNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except HarnessConflictError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
 
 
 @router.get("/runs/{run_id}/events")

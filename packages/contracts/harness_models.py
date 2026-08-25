@@ -7,7 +7,8 @@ benchmark prompts, rubrics and solutions stay behind the catalog boundary.
 
 from __future__ import annotations
 
-from typing import Literal
+from datetime import datetime
+from typing import Any, Literal
 
 from pydantic import Field, field_validator
 
@@ -20,6 +21,31 @@ BenchmarkAvailability = Literal[
     "task_only_requires_external_system",
 ]
 BenchmarkPreviewKind = Literal["table", "document", "pdf", "text", "unavailable"]
+AgentControlLoopPhase = Literal[
+    "observe",
+    "plan",
+    "act",
+    "verify",
+    "evidence_gate",
+    "commit",
+]
+AgentControlLoopGateDecision = Literal[
+    "pending",
+    "next_round",
+    "completed",
+    "budget_exhausted",
+    "waiting_input",
+    "user_stopped",
+    "failed",
+]
+AgentControlLoopControlState = Literal[
+    "running",
+    "pause_requested",
+    "paused",
+    "stop_requested",
+    "stopped",
+]
+AgentControlLoopCommand = Literal["pause", "resume", "steer", "stop"]
 
 
 def _validate_relative_path(value: str, label: str) -> str:
@@ -161,6 +187,118 @@ class BenchmarkFilePreview(StrictModel):
     page_count: int | None = Field(default=None, ge=0, le=1_000)
     truncated: bool = False
     security: BenchmarkPreviewSecurity
+
+
+class AgentControlLoopOptions(StrictModel):
+    """User-adjustable bounds; the server expands these into a frozen contract."""
+
+    max_rounds: int = Field(default=3, ge=1, le=3)
+    max_files_per_round: int = Field(default=4, ge=1, le=8)
+    max_model_calls: int = Field(default=6, ge=2, le=6)
+    deadline_seconds: int = Field(default=120, ge=20, le=300)
+
+
+class AgentControlLoopContract(StrictModel):
+    contract_version: Literal["agent-control-loop.v1"] = "agent-control-loop.v1"
+    goal: str = Field(min_length=3, max_length=2_000)
+    allowed_file_refs: list[str] = Field(default_factory=list, max_length=20)
+    completion_criteria: list[str] = Field(min_length=1, max_length=6)
+    max_rounds: int = Field(ge=1, le=3)
+    max_files_per_round: int = Field(ge=1, le=8)
+    max_model_calls: int = Field(ge=2, le=6)
+    deadline_seconds: int = Field(ge=20, le=300)
+    external_action: Literal["none"] = "none"
+
+
+class AgentControlLoopBudget(StrictModel):
+    max_rounds: int = Field(ge=1, le=3)
+    max_files_per_round: int = Field(ge=1, le=8)
+    max_model_calls: int = Field(ge=2, le=6)
+    deadline_seconds: int = Field(ge=20, le=300)
+    rounds_used: int = Field(default=0, ge=0, le=3)
+    files_verified: int = Field(default=0, ge=0, le=20)
+    model_calls_used: int = Field(default=0, ge=0, le=6)
+    elapsed_ms: int = Field(default=0, ge=0)
+    stop_reason: str | None = Field(default=None, max_length=240)
+
+
+class AgentControlLoopEvidenceGap(StrictModel):
+    gap_id: str = Field(pattern=r"^gap-[0-9a-f]{12}$")
+    label: str = Field(min_length=1, max_length=240)
+    detail: str = Field(min_length=1, max_length=1_000)
+    candidate_file_refs: list[str] = Field(default_factory=list, max_length=20)
+
+
+class AgentControlLoopNextStep(StrictModel):
+    decision: AgentControlLoopGateDecision
+    reason: str = Field(min_length=1, max_length=1_000)
+    next_question: str | None = Field(default=None, max_length=2_000)
+    candidate_file_refs: list[str] = Field(default_factory=list, max_length=20)
+
+
+class AgentControlLoopRound(StrictModel):
+    round_number: int = Field(ge=1, le=3)
+    status: Literal["running", "completed", "stopped", "failed"]
+    phase: AgentControlLoopPhase
+    question: str = Field(min_length=3, max_length=2_000)
+    steer_instruction: str | None = Field(default=None, max_length=2_000)
+    input_file_refs: list[str] = Field(default_factory=list, max_length=8)
+    plan: dict[str, Any] | None = None
+    model_receipt: dict[str, Any] | None = None
+    result: dict[str, Any] | None = None
+    analysis_receipt: dict[str, Any] | None = None
+    verified_file_refs: list[str] = Field(default_factory=list, max_length=20)
+    evidence_gaps: list[AgentControlLoopEvidenceGap] = Field(
+        default_factory=list, max_length=20
+    )
+    next_step: AgentControlLoopNextStep | None = None
+    started_at: datetime
+    completed_at: datetime | None = None
+
+
+class AgentControlLoopControlEvent(StrictModel):
+    control_id: str = Field(pattern=r"^control-[0-9a-f]{12}$")
+    command: AgentControlLoopCommand
+    instruction: str | None = Field(default=None, max_length=2_000)
+    accepted_at: datetime
+    accepted_task_version: int = Field(ge=1)
+    applied_task_version: int | None = Field(default=None, ge=1)
+    status: Literal["accepted", "applied", "rejected"]
+
+
+class AgentControlLoopBrief(StrictModel):
+    outcome: Literal["completed", "bounded", "user_stopped"]
+    summary: str = Field(min_length=1, max_length=3_000)
+    verified_file_refs: list[str] = Field(default_factory=list, max_length=20)
+    unresolved_gaps: list[AgentControlLoopEvidenceGap] = Field(
+        default_factory=list, max_length=20
+    )
+    rounds_completed: int = Field(ge=0, le=3)
+    external_action: Literal["none"] = "none"
+
+
+class AgentControlLoopControlRequest(StrictModel):
+    command: AgentControlLoopCommand
+    idempotency_key: str = Field(min_length=8, max_length=160)
+    expected_version: int = Field(ge=1)
+    instruction: str | None = Field(default=None, max_length=2_000)
+
+    @field_validator("instruction")
+    @classmethod
+    def validate_instruction(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        normalized = value.strip()
+        if len(normalized) < 3:
+            raise ValueError("steer instruction is too short")
+        return normalized
+
+    @field_validator("idempotency_key")
+    @classmethod
+    def validate_control_key(cls, value: str) -> str:
+        if any(ord(character) < 32 for character in value):
+            raise ValueError("idempotency_key contains invalid content")
+        return value
 
 
 # Compatibility aliases for modules that import the former scenario contracts.

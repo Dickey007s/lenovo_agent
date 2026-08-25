@@ -1,10 +1,10 @@
 """Unified, file-backed Agent Harness runtime.
 
-The runtime supports a bounded read-only workspace task: it freezes public
-FORTE inputs, asks one model call for a validated plan, and asks a second model
-call for a cited answer over safe file previews.  It never executes external
-actions or exposes benchmark task instructions, paths, hashes, or hidden
-reasoning to the foreground.
+The runtime supports a bounded read-only Agent Control Loop: it freezes public
+FORTE inputs, plans and analyzes in evidence-gated rounds, and may retry one
+rejected plan while the frozen model-call budget allows it. It never executes
+external actions or exposes benchmark task instructions, paths, hashes, or
+hidden reasoning to the foreground.
 """
 
 from __future__ import annotations
@@ -22,6 +22,18 @@ from uuid import uuid4
 
 import httpx
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
+
+from packages.contracts.harness_models import (
+    AgentControlLoopBrief,
+    AgentControlLoopBudget,
+    AgentControlLoopContract,
+    AgentControlLoopControlEvent,
+    AgentControlLoopControlRequest,
+    AgentControlLoopEvidenceGap,
+    AgentControlLoopNextStep,
+    AgentControlLoopOptions,
+    AgentControlLoopRound,
+)
 
 runtime_logger = logging.getLogger("uvicorn.error")
 
@@ -55,6 +67,14 @@ class HarnessModelError(HarnessError):
         self.called = called
         self.elapsed_ms = max(0, elapsed_ms)
         self.model = model
+
+
+class HarnessStopped(HarnessError):
+    """Internal signal raised after a user stop reaches a safe point."""
+
+
+class HarnessBudgetExhausted(HarnessError):
+    """Internal signal raised when another bounded model call is not allowed."""
 
 
 HarnessSideEffect = Literal["none", "run_workspace_write", "external_action"]
@@ -191,6 +211,21 @@ class HarnessRunSnapshot(BaseModel):
     selection_reason: str | None = None
     instruction: str = Field(min_length=1, max_length=2_000)
     instruction_source: Literal["user"] = "user"
+    contract: AgentControlLoopContract
+    budget: AgentControlLoopBudget
+    rounds: list[AgentControlLoopRound] = Field(default_factory=list, max_length=3)
+    current_round: int = Field(default=0, ge=0, le=3)
+    control_state: Literal[
+        "running",
+        "pause_requested",
+        "paused",
+        "stop_requested",
+        "stopped",
+    ] = "running"
+    control_events: list[AgentControlLoopControlEvent] = Field(
+        default_factory=list, max_length=100
+    )
+    brief: AgentControlLoopBrief | None = None
     plan: HarnessPlan | None = None
     model_receipt: HarnessModelReceipt | None = None
     analysis_receipt: HarnessModelReceipt | None = None
@@ -207,6 +242,7 @@ class HarnessRunStart(BaseModel):
     expected_version: int = Field(default=1, ge=1)
     instruction: str = Field(min_length=3, max_length=2_000)
     selected_file_refs: list[str] = Field(min_length=1, max_length=20)
+    loop: AgentControlLoopOptions = Field(default_factory=AgentControlLoopOptions)
 
     @field_validator("instruction")
     @classmethod
@@ -270,6 +306,13 @@ class PublicHarnessRunSnapshot(BaseModel):
     selection_reason: str | None
     instruction: str
     instruction_source: Literal["user"]
+    contract: AgentControlLoopContract
+    budget: AgentControlLoopBudget
+    rounds: list[AgentControlLoopRound]
+    current_round: int
+    control_state: str
+    control_events: list[AgentControlLoopControlEvent]
+    brief: AgentControlLoopBrief | None
     plan: PublicHarnessPlan | None
     model_receipt: HarnessModelReceipt | None
     analysis_receipt: HarnessModelReceipt | None
@@ -279,6 +322,20 @@ class PublicHarnessRunSnapshot(BaseModel):
 
 
 class PublicHarnessRunStartResult(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    run: PublicHarnessRunSnapshot
+    replayed: bool = False
+
+
+class HarnessControlResult(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    run: HarnessRunSnapshot
+    replayed: bool = False
+
+
+class PublicHarnessControlResult(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     run: PublicHarnessRunSnapshot
@@ -339,6 +396,7 @@ class OpenAICompatibleHarnessPlanner:
         system = (
             "你是企业办公 Agent Harness 的规划器。根据公开办公任务和文件索引生成最小可执行 DAG。"
             "只输出一个符合 JSON Schema 的 JSON 对象。只能引用 files 中出现的 file_ref；tool 必须来自 allowlisted_tools；"
+            "每轮引用的不同文件数不得超过 scenario.control_loop.max_files_this_round；优先选择最能回答当前问题的最小证据集合。"
             "输入文件永远只读，禁止猜测或输出源文件路径、哈希或任意本地路径。"
             "读取文件使用 file.read/table.inspect/evidence.verify；生成结果使用 artifact.write。可以提供不含路径的逻辑 artifact_name 与 artifact_type；缺省时由服务端生成。"
             "只选择工作意图和 tool，不得输出 side_effect；写入范围、外部动作范围与强制人工确认由服务端根据能力确定。"
@@ -494,12 +552,20 @@ class OpenAICompatibleHarnessAnalyst:
 class _Run:
     snapshot: HarnessRunSnapshot
     condition: asyncio.Condition
+    started_at_perf: float
+    resume_status: str | None = None
 
 
 @dataclass(frozen=True)
 class _IdempotentStart:
     digest: str
     result: HarnessRunStartResult
+
+
+@dataclass(frozen=True)
+class _IdempotentControl:
+    digest: str
+    result: HarnessControlResult
 
 
 class HarnessRuntime:
@@ -513,7 +579,10 @@ class HarnessRuntime:
         "ready_to_execute",
         "analyzing",
         "verifying",
+        "waiting_input",
+        "paused",
         "completed",
+        "stopped",
         "failed",
     }
     MAX_UNITS = 12
@@ -529,6 +598,9 @@ class HarnessRuntime:
         self.analyst = analyst
         self._runs: dict[tuple[str, str], _Run] = {}
         self._idempotent: dict[tuple[str, str], _IdempotentStart] = {}
+        self._control_idempotent: dict[
+            tuple[str, str], _IdempotentControl
+        ] = {}
         self._tasks: dict[str, asyncio.Task[None]] = {}
         self._lock = asyncio.Lock()
 
@@ -567,6 +639,25 @@ class HarnessRuntime:
                 return replay.result.model_copy(update={"replayed": True}, deep=True)
             run_id = f"harness:{uuid4().hex}"
             now = datetime.now(timezone.utc)
+            contract = AgentControlLoopContract(
+                goal=instruction,
+                allowed_file_refs=request.selected_file_refs,
+                completion_criteria=[
+                    "本轮允许范围内的文件均已被核对或明确列为未解决证据缺口",
+                    "所有结论都引用本轮实际读取的公开文件",
+                    "输出停止原因、剩余缺口且不发生外部动作",
+                ],
+                max_rounds=request.loop.max_rounds,
+                max_files_per_round=request.loop.max_files_per_round,
+                max_model_calls=request.loop.max_model_calls,
+                deadline_seconds=request.loop.deadline_seconds,
+            )
+            budget = AgentControlLoopBudget(
+                max_rounds=contract.max_rounds,
+                max_files_per_round=contract.max_files_per_round,
+                max_model_calls=contract.max_model_calls,
+                deadline_seconds=contract.deadline_seconds,
+            )
             snapshot = HarnessRunSnapshot(
                 run_id=run_id,
                 owner_id=owner_id,
@@ -575,8 +666,10 @@ class HarnessRuntime:
                 version=request.expected_version, created_at=now, updated_at=now,
                 instruction=instruction,
                 instruction_source="user",
+                contract=contract,
+                budget=budget,
             )
-            current = _Run(snapshot, asyncio.Condition())
+            current = _Run(snapshot, asyncio.Condition(), perf_counter())
             self._runs[(owner_id, run_id)] = current
             result = HarnessRunStartResult(run=snapshot)
             self._idempotent[idem_key] = _IdempotentStart(digest, result)
@@ -599,6 +692,114 @@ class HarnessRuntime:
             if run is None:
                 raise HarnessNotFoundError("Harness run 不存在")
             return run.snapshot.model_copy(deep=True)
+
+    async def control(
+        self,
+        owner_id: str,
+        run_id: str,
+        request: AgentControlLoopControlRequest,
+    ) -> HarnessControlResult:
+        digest = hashlib.sha256(
+            json.dumps(
+                {"run_id": run_id, **request.model_dump()},
+                ensure_ascii=False,
+                sort_keys=True,
+            ).encode("utf-8")
+        ).hexdigest()
+        idempotency_key = (owner_id, request.idempotency_key)
+        async with self._lock:
+            replay = self._control_idempotent.get(idempotency_key)
+            if replay is not None:
+                if replay.digest != digest:
+                    raise HarnessConflictError("幂等键已用于不同控制命令")
+                return replay.result.model_copy(update={"replayed": True}, deep=True)
+
+            run = self._require_run(owner_id, run_id)
+            snapshot = run.snapshot
+            if snapshot.version != request.expected_version:
+                raise HarnessConflictError(
+                    f"任务版本已更新，当前为 v{snapshot.version}，请刷新后重试"
+                )
+            if snapshot.status in {"ready_to_execute", "completed", "stopped", "failed"}:
+                raise HarnessConflictError("当前任务已经结束，不能再提交控制命令")
+
+            command = request.command
+            if command == "pause" and snapshot.control_state != "running":
+                raise HarnessConflictError("当前任务已经处于暂停或停止流程")
+            if command == "resume" and snapshot.control_state not in {
+                "pause_requested",
+                "paused",
+            }:
+                raise HarnessConflictError("当前任务没有处于可恢复的暂停状态")
+            if command == "steer" and request.instruction is None:
+                raise HarnessConflictError("调整方向必须提供一条明确指令")
+
+            now = datetime.now(timezone.utc)
+            control_id = f"control-{uuid4().hex[:12]}"
+            next_version = snapshot.version + 1
+            control_status: Literal["accepted", "applied", "rejected"] = "accepted"
+            applied_version: int | None = None
+            next_state = snapshot.control_state
+            next_status = snapshot.status
+            event_name = f"control_{command}_recorded"
+            message = "控制命令已记录，将在下一个安全点处理。"
+
+            if command == "pause":
+                next_state = "pause_requested"
+                message = "暂停请求已记录；当前模型调用结束后将在安全点暂停。"
+            elif command == "resume":
+                next_state = "running"
+                control_status = "applied"
+                applied_version = next_version
+                if snapshot.control_state == "paused":
+                    next_status = run.resume_status or "planning"
+                message = "Agent Control Loop 已恢复，将从安全点继续。"
+            elif command == "steer":
+                message = "方向指令已记录，将应用于下一轮规划。"
+            elif command == "stop":
+                next_state = "stop_requested"
+                message = "停止请求已记录；系统会保留已核对结果并在安全点结束。"
+
+            control_event = AgentControlLoopControlEvent(
+                control_id=control_id,
+                command=command,
+                instruction=request.instruction,
+                accepted_at=now,
+                accepted_task_version=next_version,
+                applied_task_version=applied_version,
+                status=control_status,
+            )
+            event = HarnessEvent(
+                sequence=snapshot.last_event_sequence + 1,
+                event_name=event_name,
+                occurred_at=now,
+                status=next_status,
+                message=message,
+                details={
+                    "command": command,
+                    "control_id": control_id,
+                    "applied": control_status == "applied",
+                },
+            )
+            run.snapshot = snapshot.model_copy(
+                update={
+                    "status": next_status,
+                    "control_state": next_state,
+                    "control_events": [*snapshot.control_events, control_event],
+                    "events": [*snapshot.events, event],
+                    "last_event_sequence": event.sequence,
+                    "version": next_version,
+                    "updated_at": now,
+                }
+            )
+            result = HarnessControlResult(run=run.snapshot.model_copy(deep=True))
+            self._control_idempotent[idempotency_key] = _IdempotentControl(
+                digest=digest, result=result
+            )
+            condition = run.condition
+        async with condition:
+            condition.notify_all()
+        return result.model_copy(deep=True)
 
     def public_start_result(self, result: HarnessRunStartResult) -> PublicHarnessRunStartResult:
         return PublicHarnessRunStartResult(
@@ -624,44 +825,22 @@ class HarnessRuntime:
                     "display_summary": document.get("display_summary", "公开办公输入文件"),
                 }
             )
-        public_plan = None
-        if snapshot.plan is not None:
-            public_plan = PublicHarnessPlan(
-                summary=self._project_business_text(snapshot.plan.summary, ref_to_label),
-                units=[
-                    PublicHarnessPlanUnit(
-                        unit_id=unit.unit_id,
-                        title=self._project_business_text(unit.title, ref_to_label),
-                        objective=self._project_business_text(unit.objective, ref_to_label),
-                        input_file_refs=unit.input_file_refs,
-                        depends_on=unit.depends_on,
-                        tool=unit.tool,
-                        requires_human_gate=unit.requires_human_gate,
-                        side_effect=unit.side_effect,
-                        artifact_name=unit.artifact_name,
-                        artifact_type=unit.artifact_type,
-                    )
-                    for unit in snapshot.plan.units
-                ],
-            )
-        public_result = None
-        if snapshot.result is not None:
-            public_result = HarnessTaskResult(
-                summary=self._project_business_text(snapshot.result.summary, ref_to_label),
-                findings=[
-                    HarnessFinding(
-                        title=self._project_business_text(finding.title, ref_to_label),
-                        detail=self._project_business_text(finding.detail, ref_to_label),
-                        file_refs=finding.file_refs,
-                    )
-                    for finding in snapshot.result.findings
-                ],
-                follow_ups=[
-                    self._project_business_text(item, ref_to_label)
-                    for item in snapshot.result.follow_ups
-                ],
-                review_required=True,
-            )
+        public_plan = self._public_plan(snapshot.plan, ref_to_label)
+        public_result = self._public_result(snapshot.result, ref_to_label)
+        public_rounds = [
+            self._public_round(round_snapshot, ref_to_label)
+            for round_snapshot in snapshot.rounds
+        ]
+        public_brief = self._public_brief(snapshot.brief, ref_to_label)
+        public_contract = snapshot.contract.model_copy(
+            update={
+                "allowed_file_refs": [
+                    file_ref
+                    for file_ref in snapshot.contract.allowed_file_refs
+                    if file_ref in ref_to_label
+                ]
+            }
+        )
         public_events = [self.public_event(event, snapshot) for event in snapshot.events]
         return PublicHarnessRunSnapshot(
             run_id=snapshot.run_id,
@@ -676,6 +855,13 @@ class HarnessRuntime:
             selection_reason=snapshot.selection_reason,
             instruction=snapshot.instruction,
             instruction_source=snapshot.instruction_source,
+            contract=public_contract,
+            budget=snapshot.budget,
+            rounds=public_rounds,
+            current_round=snapshot.current_round,
+            control_state=snapshot.control_state,
+            control_events=snapshot.control_events,
+            brief=public_brief,
             plan=public_plan,
             model_receipt=snapshot.model_receipt,
             analysis_receipt=snapshot.analysis_receipt,
@@ -684,6 +870,142 @@ class HarnessRuntime:
                 self._public_failure_message(error) for error in snapshot.validation_errors
             ],
             events=public_events,
+        )
+
+    def public_control_result(
+        self, result: HarnessControlResult
+    ) -> PublicHarnessControlResult:
+        return PublicHarnessControlResult(
+            run=self.public_snapshot(result.run), replayed=result.replayed
+        )
+
+    def _public_plan(
+        self,
+        plan: HarnessPlan | None,
+        ref_to_label: dict[str, str],
+    ) -> PublicHarnessPlan | None:
+        if plan is None:
+            return None
+        return PublicHarnessPlan(
+            summary=self._project_business_text(plan.summary, ref_to_label),
+            units=[
+                PublicHarnessPlanUnit(
+                    unit_id=unit.unit_id,
+                    title=self._project_business_text(unit.title, ref_to_label),
+                    objective=self._project_business_text(unit.objective, ref_to_label),
+                    input_file_refs=unit.input_file_refs,
+                    depends_on=unit.depends_on,
+                    tool=unit.tool,
+                    requires_human_gate=unit.requires_human_gate,
+                    side_effect=unit.side_effect,
+                    artifact_name=unit.artifact_name,
+                    artifact_type=unit.artifact_type,
+                )
+                for unit in plan.units
+            ],
+        )
+
+    def _public_result(
+        self,
+        result: HarnessTaskResult | None,
+        ref_to_label: dict[str, str],
+    ) -> HarnessTaskResult | None:
+        if result is None:
+            return None
+        return HarnessTaskResult(
+            summary=self._project_business_text(result.summary, ref_to_label),
+            findings=[
+                HarnessFinding(
+                    title=self._project_business_text(finding.title, ref_to_label),
+                    detail=self._project_business_text(finding.detail, ref_to_label),
+                    file_refs=finding.file_refs,
+                )
+                for finding in result.findings
+            ],
+            follow_ups=[
+                self._project_business_text(item, ref_to_label)
+                for item in result.follow_ups
+            ],
+            review_required=True,
+        )
+
+    def _public_round(
+        self,
+        round_snapshot: AgentControlLoopRound,
+        ref_to_label: dict[str, str],
+    ) -> AgentControlLoopRound:
+        plan = None
+        if round_snapshot.plan is not None:
+            plan_model = HarnessPlan.model_validate(round_snapshot.plan)
+            public_plan = self._public_plan(plan_model, ref_to_label)
+            plan = public_plan.model_dump(mode="json") if public_plan else None
+        result = None
+        if round_snapshot.result is not None:
+            result_model = HarnessTaskResult.model_validate(round_snapshot.result)
+            public_result = self._public_result(result_model, ref_to_label)
+            result = public_result.model_dump(mode="json") if public_result else None
+        gaps = [
+            gap.model_copy(
+                update={
+                    "label": self._project_business_text(gap.label, ref_to_label),
+                    "detail": self._project_business_text(gap.detail, ref_to_label),
+                }
+            )
+            for gap in round_snapshot.evidence_gaps
+        ]
+        next_step = round_snapshot.next_step
+        if next_step is not None:
+            next_step = next_step.model_copy(
+                update={
+                    "reason": self._project_business_text(next_step.reason, ref_to_label),
+                    "next_question": self._project_business_text(
+                        next_step.next_question, ref_to_label
+                    )
+                    if next_step.next_question
+                    else None,
+                }
+            )
+        return round_snapshot.model_copy(
+            update={
+                "question": self._project_business_text(
+                    round_snapshot.question, ref_to_label
+                ),
+                "steer_instruction": self._project_business_text(
+                    round_snapshot.steer_instruction, ref_to_label
+                )
+                if round_snapshot.steer_instruction
+                else None,
+                "plan": plan,
+                "result": result,
+                "evidence_gaps": gaps,
+                "next_step": next_step,
+            }
+        )
+
+    def _public_brief(
+        self,
+        brief: AgentControlLoopBrief | None,
+        ref_to_label: dict[str, str],
+    ) -> AgentControlLoopBrief | None:
+        if brief is None:
+            return None
+        return brief.model_copy(
+            update={
+                "summary": self._project_business_text(brief.summary, ref_to_label),
+                "unresolved_gaps": [
+                    gap.model_copy(
+                        update={
+                            "label": self._project_business_text(
+                                gap.label, ref_to_label
+                            ),
+                            "detail": self._project_business_text(
+                                gap.detail, ref_to_label
+                            ),
+                        }
+                    )
+                    for gap in brief.unresolved_gaps
+                ],
+            }
         )
 
     def public_event(self, event: HarnessEvent, snapshot: HarnessRunSnapshot) -> HarnessEvent:
@@ -704,7 +1026,7 @@ class HarnessRuntime:
                     }
                 )
             details = {"files": files, "reason": event.details.get("reason", "")}
-        elif event.event_name == "harness_failed":
+        elif event.event_name in {"harness_failed", "plan_validation_rejected"}:
             details = self._sanitize_details(event.details, path_to_ref)
             if isinstance(details, dict) and "reason" in details:
                 details["reason"] = self._public_failure_message(
@@ -786,7 +1108,12 @@ class HarnessRuntime:
                     raise HarnessNotFoundError("Harness run 不存在")
                 current = run.snapshot.model_copy(deep=True)
                 pending = [event for event in current.events if event.sequence > sequence]
-                terminal = current.status in {"ready_to_execute", "completed", "failed"}
+                terminal = current.status in {
+                    "ready_to_execute",
+                    "completed",
+                    "stopped",
+                    "failed",
+                }
                 condition = run.condition
             for event in pending:
                 sequence = event.sequence
@@ -794,6 +1121,15 @@ class HarnessRuntime:
             if terminal:
                 return
             async with condition:
+                async with self._lock:
+                    latest = self._require_run(owner_id, run_id).snapshot
+                    if latest.status in {
+                        "ready_to_execute",
+                        "completed",
+                        "stopped",
+                        "failed",
+                    } or latest.last_event_sequence > sequence:
+                        continue
                 try:
                     await asyncio.wait_for(condition.wait(), timeout=15)
                 except TimeoutError:
@@ -807,122 +1143,181 @@ class HarnessRuntime:
         instruction: str,
         selected_file_refs: list[str],
     ) -> None:
+        """Run a bounded, read-only Agent Control Loop over the allowed files."""
+
         try:
             files = self._index_files(workspace, selected_file_refs)
-            selection_reason = f"用户从完整办公资料库中选择了 {len(files)} 份公开文件"
+            selection_reason = (
+                f"用户为 Agent Control Loop 划定了 {len(files)} 份公开文件"
+            )
             await self._set_source_documents(
                 owner_id, run_id, files, selection_reason
             )
-            await self._transition(owner_id, run_id, "indexing", "workspace_index", "已读取并冻结所选文件索引。", {
-                "files": files, "reason": selection_reason,
-            })
-            await self._transition(owner_id, run_id, "planning", "planning_started", "正在根据文件索引生成工作计划。", {})
-            started = perf_counter()
-            try:
-                candidate = await self.planner.plan(
-                    scenario=self._planner_workspace(workspace, instruction),
-                    files=self._planner_files(files),
-                )
-                plan = self._compile_plan(candidate)
-            except HarnessModelError as exc:
-                elapsed = exc.elapsed_ms or max(0, round((perf_counter() - started) * 1000))
-                receipt = HarnessModelReceipt(
-                    called=exc.called,
-                    model=exc.model,
-                    elapsed_ms=elapsed,
-                    output_used=False,
-                )
-                await self._set_model_receipt(owner_id, run_id, receipt)
-                await self._transition(
-                    owner_id,
-                    run_id,
-                    "planning",
-                    "planning_completed",
-                    "模型返回的计划未通过结构校验，未采用模型输出。",
-                    {
-                        "model": receipt.model,
-                        "elapsed_ms": receipt.elapsed_ms,
-                        "model_called": receipt.called,
-                        "output_used": False,
-                    },
-                )
-                raise
-            except Exception:
-                elapsed = max(0, round((perf_counter() - started) * 1000))
-                receipt = HarnessModelReceipt(
-                    called=False,
-                    model=getattr(self.planner, "model", self.MODEL),
-                    elapsed_ms=elapsed,
-                    output_used=False,
-                )
-                await self._set_model_receipt(owner_id, run_id, receipt)
-                await self._transition(
-                    owner_id,
-                    run_id,
-                    "planning",
-                    "planning_completed",
-                    "规划器未返回可用计划，未采用模型输出。",
-                    {
-                        "model": receipt.model,
-                        "elapsed_ms": receipt.elapsed_ms,
-                        "model_called": receipt.called,
-                        "output_used": False,
-                    },
-                )
-                raise
-            elapsed = max(0, round((perf_counter() - started) * 1000))
-            receipt = HarnessModelReceipt(called=True, model=getattr(self.planner, "model", self.MODEL), elapsed_ms=elapsed, output_used=False)
-            await self._set_model_receipt(owner_id, run_id, receipt)
-            await self._transition(owner_id, run_id, "planning", "planning_completed", "模型计划已返回，等待服务端校验。", {
-                "model": receipt.model,
-                "elapsed_ms": receipt.elapsed_ms,
-                "model_called": receipt.called,
-                "output_used": False,
-            })
-            self._validate_plan(plan, workspace, files)
-            await self._set_plan(owner_id, run_id, plan)
-            await self._set_model_receipt(owner_id, run_id, receipt.model_copy(update={"output_used": True}))
-            await self._transition(owner_id, run_id, "validating", "plan_validation", "计划通过路径、工具、依赖与人工确认校验。", {
-                "unit_count": len(plan.units),
-                "execution_started": False,
-                "model_called": receipt.called,
-                "output_used": True,
-            })
-            if self.analyst is None:
-                await self._transition(owner_id, run_id, "ready_to_execute", "ready_to_execute", "计划已就绪，等待用户确认后才可进入执行。", {
-                    "execution_started": False,
-                    "model_called": receipt.called,
-                    "output_used": True,
-                })
-                return
-
             await self._transition(
                 owner_id,
                 run_id,
-                "analyzing",
-                "analysis_started",
-                "正在读取所选公开文件并执行只读分析。",
-                {
-                    "file_count": len(files),
-                    "external_action": False,
-                },
+                "indexing",
+                "workspace_index",
+                "已核对并冻结本轮允许读取的文件范围。",
+                {"files": files, "reason": selection_reason},
             )
-            analysis_inputs = self._analysis_inputs(files)
-            analysis_started = perf_counter()
-            try:
-                result = await self.analyst.analyze(
-                    instruction=instruction,
-                    plan=plan,
-                    files=analysis_inputs,
+
+            verified_refs: list[str] = []
+            all_findings: list[HarnessFinding] = []
+            all_follow_ups: list[str] = []
+            next_question = instruction
+            terminal_decision = "completed"
+
+            contract = (await self.get(owner_id, run_id)).contract
+            for round_number in range(1, contract.max_rounds + 1):
+                await self._safe_point(owner_id, run_id)
+                remaining = [
+                    item
+                    for item in files
+                    if str(item["file_ref"]) not in set(verified_refs)
+                ]
+                if not remaining:
+                    break
+
+                steer = await self._consume_pending_steer(owner_id, run_id)
+                question = (
+                    f"{next_question}\n本轮方向调整：{steer}"
+                    if steer
+                    else next_question
                 )
-            except HarnessModelError as exc:
-                elapsed = exc.elapsed_ms or max(
-                    0, round((perf_counter() - analysis_started) * 1000)
+                await self._start_round(
+                    owner_id,
+                    run_id,
+                    round_number=round_number,
+                    question=question,
+                    steer_instruction=steer,
                 )
+                await self._transition(
+                    owner_id,
+                    run_id,
+                    "planning",
+                    "round_started",
+                    f"第 {round_number} 轮开始，正在确定本轮最小证据范围。",
+                    {"round_number": round_number, "remaining_file_count": len(remaining)},
+                )
+
+                plan, adopted_receipt = await self._plan_with_bounded_repair(
+                    owner_id,
+                    run_id,
+                    workspace=workspace,
+                    question=question,
+                    round_number=round_number,
+                    remaining=remaining,
+                    contract=contract,
+                    steer_instruction=steer,
+                )
+                round_refs = self._plan_file_refs(plan, remaining)
+                round_files = [
+                    item for item in remaining if str(item["file_ref"]) in round_refs
+                ]
+                await self._set_plan(owner_id, run_id, plan)
+                await self._set_model_receipt(owner_id, run_id, adopted_receipt)
+                await self._update_round(
+                    owner_id,
+                    run_id,
+                    round_number,
+                    phase="plan",
+                    input_file_refs=[str(item["file_ref"]) for item in round_files],
+                    plan=plan.model_dump(mode="json"),
+                    model_receipt=adopted_receipt.model_dump(mode="json"),
+                )
+                await self._transition(
+                    owner_id,
+                    run_id,
+                    "validating",
+                    "plan_validation",
+                    "服务端已校验本轮文件范围、工具、依赖与只读边界。",
+                    {
+                        "round_number": round_number,
+                        "unit_count": len(plan.units),
+                        "file_count": len(round_files),
+                        "output_used": True,
+                    },
+                )
+                await self._safe_point(owner_id, run_id)
+
+                if self.analyst is None:
+                    await self._transition(
+                        owner_id,
+                        run_id,
+                        "ready_to_execute",
+                        "ready_to_execute",
+                        "本轮计划已校验，但分析执行器尚未配置。",
+                        {"round_number": round_number, "external_action": False},
+                    )
+                    return
+
+                await self._update_round(
+                    owner_id, run_id, round_number, phase="act"
+                )
+                await self._transition(
+                    owner_id,
+                    run_id,
+                    "analyzing",
+                    "analysis_started",
+                    f"第 {round_number} 轮正在读取 {len(round_files)} 份文件并形成只读分析。",
+                    {
+                        "round_number": round_number,
+                        "file_count": len(round_files),
+                        "external_action": False,
+                    },
+                )
+                await self._reserve_model_call(owner_id, run_id)
+                analysis_started = perf_counter()
+                try:
+                    result = await self.analyst.analyze(
+                        instruction=question,
+                        plan=plan,
+                        files=self._analysis_inputs(round_files),
+                    )
+                except HarnessModelError as exc:
+                    analysis_receipt = HarnessModelReceipt(
+                        called=exc.called,
+                        model=exc.model,
+                        elapsed_ms=exc.elapsed_ms
+                        or max(
+                            0,
+                            round((perf_counter() - analysis_started) * 1000),
+                        ),
+                        output_used=False,
+                    )
+                    await self._set_analysis_receipt(
+                        owner_id, run_id, analysis_receipt
+                    )
+                    await self._update_round(
+                        owner_id,
+                        run_id,
+                        round_number,
+                        phase="act",
+                        analysis_receipt=analysis_receipt.model_dump(mode="json"),
+                    )
+                    await self._transition(
+                        owner_id,
+                        run_id,
+                        "analyzing",
+                        "analysis_completed",
+                        "分析模型返回内容未通过结构校验，未采用。",
+                        {
+                            "round_number": round_number,
+                            "model": analysis_receipt.model,
+                            "elapsed_ms": analysis_receipt.elapsed_ms,
+                            "model_called": analysis_receipt.called,
+                            "output_used": False,
+                        },
+                    )
+                    raise
+
                 analysis_receipt = HarnessModelReceipt(
-                    called=exc.called,
-                    model=exc.model,
-                    elapsed_ms=elapsed,
+                    called=True,
+                    model=getattr(self.analyst, "model", self.MODEL),
+                    elapsed_ms=max(
+                        0, round((perf_counter() - analysis_started) * 1000)
+                    ),
                     output_used=False,
                 )
                 await self._set_analysis_receipt(
@@ -933,72 +1328,787 @@ class HarnessRuntime:
                     run_id,
                     "analyzing",
                     "analysis_completed",
-                    "模型返回的分析结果未通过结构校验，未采用模型输出。",
+                    "分析模型已返回候选结论，等待服务端核对引用。",
                     {
+                        "round_number": round_number,
                         "model": analysis_receipt.model,
                         "elapsed_ms": analysis_receipt.elapsed_ms,
-                        "model_called": analysis_receipt.called,
+                        "model_called": True,
                         "output_used": False,
                     },
                 )
-                raise
-            elapsed = max(
-                0, round((perf_counter() - analysis_started) * 1000)
+                await self._safe_point(owner_id, run_id)
+                self._validate_result(result, round_files)
+                adopted_analysis = analysis_receipt.model_copy(
+                    update={"output_used": True}
+                )
+                await self._set_analysis_receipt(
+                    owner_id, run_id, adopted_analysis
+                )
+                round_verified = self._result_file_refs(result, round_files)
+                for file_ref in round_verified:
+                    if file_ref not in verified_refs:
+                        verified_refs.append(file_ref)
+                all_findings.extend(result.findings)
+                all_follow_ups.extend(result.follow_ups)
+                await self._update_round(
+                    owner_id,
+                    run_id,
+                    round_number,
+                    phase="verify",
+                    result=result.model_dump(mode="json"),
+                    analysis_receipt=adopted_analysis.model_dump(mode="json"),
+                    verified_file_refs=round_verified,
+                )
+                await self._set_verified_count(owner_id, run_id, len(verified_refs))
+                await self._transition(
+                    owner_id,
+                    run_id,
+                    "verifying",
+                    "result_validation",
+                    "服务端已核对本轮结论的文件引用与只读边界。",
+                    {
+                        "round_number": round_number,
+                        "finding_count": len(result.findings),
+                        "verified_file_count": len(round_verified),
+                        "output_used": True,
+                    },
+                )
+                await self._safe_point(owner_id, run_id)
+
+                outstanding = [
+                    item
+                    for item in files
+                    if str(item["file_ref"]) not in set(verified_refs)
+                ]
+                gaps = self._evidence_gaps(run_id, outstanding)
+                can_continue = await self._can_start_another_round(
+                    owner_id, run_id, round_number, bool(outstanding)
+                )
+                if not outstanding:
+                    decision = "completed"
+                    reason = "允许范围内的文件均已被结论引用，完成条件已满足。"
+                    next_question = ""
+                elif can_continue:
+                    decision = "next_round"
+                    reason = (
+                        f"仍有 {len(outstanding)} 份允许文件未形成可核对引用，"
+                        "预算允许继续一轮。"
+                    )
+                    next_question = (
+                        "继续核对尚未被结论引用的资料，补齐证据缺口并检查是否改变已有结论。"
+                    )
+                else:
+                    decision = "budget_exhausted"
+                    reason = (
+                        f"仍有 {len(outstanding)} 份允许文件未形成可核对引用，"
+                        "但轮次、模型调用或时间预算已到边界。"
+                    )
+                    terminal_decision = decision
+                next_step = AgentControlLoopNextStep(
+                    decision=decision,
+                    reason=reason,
+                    next_question=next_question or None,
+                    candidate_file_refs=[str(item["file_ref"]) for item in outstanding],
+                )
+                await self._complete_round(
+                    owner_id,
+                    run_id,
+                    round_number,
+                    gaps=gaps,
+                    next_step=next_step,
+                )
+                await self._transition(
+                    owner_id,
+                    run_id,
+                    "verifying",
+                    "evidence_gate",
+                    reason,
+                    {
+                        "round_number": round_number,
+                        "decision": decision,
+                        "gap_count": len(gaps),
+                        "candidate_file_refs": next_step.candidate_file_refs,
+                    },
+                )
+                if decision != "next_round":
+                    terminal_decision = decision
+                    break
+
+            await self._safe_point(owner_id, run_id)
+            await self._finalize_loop(
+                owner_id,
+                run_id,
+                findings=all_findings,
+                follow_ups=all_follow_ups,
+                verified_refs=verified_refs,
+                decision=terminal_decision,
             )
-            analysis_receipt = HarnessModelReceipt(
-                called=True,
-                model=getattr(self.analyst, "model", self.MODEL),
-                elapsed_ms=elapsed,
-                output_used=False,
+        except HarnessStopped:
+            await self._finalize_loop(
+                owner_id,
+                run_id,
+                findings=self._snapshot_findings(await self.get(owner_id, run_id)),
+                follow_ups=[],
+                verified_refs=self._snapshot_verified_refs(
+                    await self.get(owner_id, run_id)
+                ),
+                decision="user_stopped",
             )
-            await self._set_analysis_receipt(owner_id, run_id, analysis_receipt)
+        except HarnessBudgetExhausted:
+            snapshot = await self.get(owner_id, run_id)
+            await self._finalize_loop(
+                owner_id,
+                run_id,
+                findings=self._snapshot_findings(snapshot),
+                follow_ups=[],
+                verified_refs=self._snapshot_verified_refs(snapshot),
+                decision="budget_exhausted",
+            )
+        except Exception as exc:
+            runtime_logger.warning(
+                "harness_run_failed run_id=%s error=%s",
+                run_id,
+                type(exc).__name__,
+            )
+            await self._mark_current_round_failed(owner_id, run_id)
+            await self._fail(owner_id, run_id, str(exc)[:500])
+
+    async def _safe_point(self, owner_id: str, run_id: str) -> None:
+        while True:
+            async with self._lock:
+                run = self._require_run(owner_id, run_id)
+                snapshot = run.snapshot.model_copy(
+                    update={"budget": self._budget_with_elapsed(run)}
+                )
+                run.snapshot = snapshot
+                if snapshot.control_state == "stop_requested":
+                    raise HarnessStopped("用户请求停止")
+                if snapshot.control_state == "pause_requested":
+                    now = datetime.now(timezone.utc)
+                    next_version = snapshot.version + 1
+                    run.resume_status = snapshot.status
+                    controls = self._apply_control_event(
+                        snapshot.control_events, "pause", next_version
+                    )
+                    event = HarnessEvent(
+                        sequence=snapshot.last_event_sequence + 1,
+                        event_name="control_paused",
+                        occurred_at=now,
+                        status="paused",
+                        message="Agent Control Loop 已在安全点暂停。",
+                        details={"applied": True},
+                    )
+                    run.snapshot = snapshot.model_copy(
+                        update={
+                            "status": "paused",
+                            "control_state": "paused",
+                            "control_events": controls,
+                            "events": [*snapshot.events, event],
+                            "last_event_sequence": event.sequence,
+                            "version": next_version,
+                            "updated_at": now,
+                        }
+                    )
+                    condition = run.condition
+                elif snapshot.control_state == "paused":
+                    condition = run.condition
+                else:
+                    return
+            async with condition:
+                async with self._lock:
+                    latest_state = self._require_run(
+                        owner_id, run_id
+                    ).snapshot.control_state
+                    if latest_state != "paused":
+                        continue
+                await condition.wait()
+
+    @staticmethod
+    def _apply_control_event(
+        events: list[AgentControlLoopControlEvent],
+        command: str,
+        applied_version: int,
+    ) -> list[AgentControlLoopControlEvent]:
+        updated = list(events)
+        for index in range(len(updated) - 1, -1, -1):
+            event = updated[index]
+            if (
+                event.command == command
+                and event.status == "accepted"
+                and event.applied_task_version is None
+            ):
+                updated[index] = event.model_copy(
+                    update={
+                        "status": "applied",
+                        "applied_task_version": applied_version,
+                    }
+                )
+                break
+        return updated
+
+    async def _consume_pending_steer(
+        self, owner_id: str, run_id: str
+    ) -> str | None:
+        async with self._lock:
+            run = self._require_run(owner_id, run_id)
+            snapshot = run.snapshot
+            pending = [
+                item
+                for item in snapshot.control_events
+                if item.command == "steer"
+                and item.status == "accepted"
+                and item.applied_task_version is None
+                and item.instruction
+            ]
+            if not pending:
+                return None
+            instruction = "；".join(
+                item.instruction for item in pending if item.instruction
+            )
+            now = datetime.now(timezone.utc)
+            next_version = snapshot.version + 1
+            pending_ids = {item.control_id for item in pending}
+            controls = [
+                item.model_copy(
+                    update={
+                        "status": "applied",
+                        "applied_task_version": next_version,
+                    }
+                )
+                if item.control_id in pending_ids
+                else item
+                for item in snapshot.control_events
+            ]
+            event = HarnessEvent(
+                sequence=snapshot.last_event_sequence + 1,
+                event_name="control_steer_applied",
+                occurred_at=now,
+                status=snapshot.status,
+                message="已将方向指令纳入本轮规划上下文。",
+                details={"control_count": len(pending)},
+            )
+            run.snapshot = snapshot.model_copy(
+                update={
+                    "control_events": controls,
+                    "events": [*snapshot.events, event],
+                    "last_event_sequence": event.sequence,
+                    "version": next_version,
+                    "updated_at": now,
+                }
+            )
+            condition = run.condition
+        async with condition:
+            condition.notify_all()
+        return instruction
+
+    async def _start_round(
+        self,
+        owner_id: str,
+        run_id: str,
+        *,
+        round_number: int,
+        question: str,
+        steer_instruction: str | None,
+    ) -> None:
+        async with self._lock:
+            run = self._require_run(owner_id, run_id)
+            snapshot = run.snapshot
+            if round_number != len(snapshot.rounds) + 1:
+                raise HarnessConflictError("Agent Control Loop 轮次不连续")
+            now = datetime.now(timezone.utc)
+            round_snapshot = AgentControlLoopRound(
+                round_number=round_number,
+                status="running",
+                phase="observe",
+                question=question,
+                steer_instruction=steer_instruction,
+                started_at=now,
+            )
+            budget = self._budget_with_elapsed(run).model_copy(
+                update={"rounds_used": round_number}
+            )
+            run.snapshot = snapshot.model_copy(
+                update={
+                    "rounds": [*snapshot.rounds, round_snapshot],
+                    "current_round": round_number,
+                    "budget": budget,
+                    "updated_at": now,
+                }
+            )
+
+    async def _plan_with_bounded_repair(
+        self,
+        owner_id: str,
+        run_id: str,
+        *,
+        workspace: dict[str, Any],
+        question: str,
+        round_number: int,
+        remaining: list[dict[str, Any]],
+        contract: AgentControlLoopContract,
+        steer_instruction: str | None,
+    ) -> tuple[HarnessPlan, HarnessModelReceipt]:
+        """Adopt one validated plan, with at most one budgeted repair attempt."""
+
+        validation_feedback: str | None = None
+        last_error: HarnessError | None = None
+        for attempt in (1, 2):
+            await self._reserve_model_call(owner_id, run_id)
             await self._transition(
                 owner_id,
                 run_id,
-                "analyzing",
-                "analysis_completed",
-                "只读分析结果已返回，等待服务端核对文件引用。",
+                "planning",
+                "planning_started",
+                "规划模型正在组织本轮任务。"
+                if attempt == 1
+                else "上一候选计划未通过校验，正在进行一次受控重试。",
+                {"round_number": round_number, "attempt": attempt},
+            )
+            started = perf_counter()
+            try:
+                candidate = await self.planner.plan(
+                    scenario=self._planner_workspace(
+                        workspace,
+                        question,
+                        round_number=round_number,
+                        max_files_this_round=contract.max_files_per_round,
+                        remaining_file_count=len(remaining),
+                        steer_instruction=steer_instruction,
+                        validation_feedback=validation_feedback,
+                    ),
+                    files=self._planner_files(remaining),
+                )
+                plan = self._compile_plan(candidate)
+            except HarnessModelError as exc:
+                last_error = exc
+                receipt = HarnessModelReceipt(
+                    called=exc.called,
+                    model=exc.model,
+                    elapsed_ms=exc.elapsed_ms
+                    or max(0, round((perf_counter() - started) * 1000)),
+                    output_used=False,
+                )
+                await self._set_model_receipt(owner_id, run_id, receipt)
+                await self._update_round(
+                    owner_id,
+                    run_id,
+                    round_number,
+                    phase="plan",
+                    model_receipt=receipt.model_dump(mode="json"),
+                )
+                await self._transition(
+                    owner_id,
+                    run_id,
+                    "planning",
+                    "planning_completed",
+                    "规划模型返回内容未通过结构校验，未采用。",
+                    {
+                        "round_number": round_number,
+                        "attempt": attempt,
+                        "model": receipt.model,
+                        "elapsed_ms": receipt.elapsed_ms,
+                        "model_called": receipt.called,
+                        "output_used": False,
+                    },
+                )
+                if attempt == 2:
+                    raise
+                validation_feedback = "上一候选没有返回合法 JSON，请严格按 Schema 重建本轮计划。"
+                await self._transition(
+                    owner_id,
+                    run_id,
+                    "planning",
+                    "plan_validation_rejected",
+                    "候选计划未通过服务端校验，未采用；正在进行预算内的受控重试。",
+                    {"round_number": round_number, "attempt": attempt},
+                )
+                await self._safe_point(owner_id, run_id)
+                continue
+
+            receipt = HarnessModelReceipt(
+                called=True,
+                model=getattr(self.planner, "model", self.MODEL),
+                elapsed_ms=max(0, round((perf_counter() - started) * 1000)),
+                output_used=False,
+            )
+            await self._set_model_receipt(owner_id, run_id, receipt)
+            await self._update_round(
+                owner_id,
+                run_id,
+                round_number,
+                phase="plan",
+                model_receipt=receipt.model_dump(mode="json"),
+            )
+            await self._transition(
+                owner_id,
+                run_id,
+                "planning",
+                "planning_completed",
+                "规划模型已返回候选工作图，等待服务端校验。",
                 {
-                    "model": analysis_receipt.model,
-                    "elapsed_ms": analysis_receipt.elapsed_ms,
+                    "round_number": round_number,
+                    "attempt": attempt,
+                    "model": receipt.model,
+                    "elapsed_ms": receipt.elapsed_ms,
                     "model_called": True,
                     "output_used": False,
                 },
             )
-            self._validate_result(result, files)
-            await self._set_result(owner_id, run_id, result)
-            await self._set_analysis_receipt(
-                owner_id,
-                run_id,
-                analysis_receipt.model_copy(update={"output_used": True}),
+            await self._safe_point(owner_id, run_id)
+            try:
+                self._validate_plan(
+                    plan,
+                    workspace,
+                    remaining,
+                    max_file_refs=contract.max_files_per_round,
+                )
+            except HarnessPlanError as exc:
+                last_error = exc
+                if attempt == 2:
+                    raise
+                validation_feedback = str(exc)
+                await self._transition(
+                    owner_id,
+                    run_id,
+                    "planning",
+                    "plan_validation_rejected",
+                    "候选计划未通过服务端校验，未采用；正在进行预算内的受控重试。",
+                    {
+                        "round_number": round_number,
+                        "attempt": attempt,
+                        "reason": str(exc),
+                    },
+                )
+                await self._safe_point(owner_id, run_id)
+                continue
+
+            adopted_receipt = receipt.model_copy(update={"output_used": True})
+            return plan, adopted_receipt
+
+        raise last_error or HarnessPlanError("本轮规划未形成可采用结果")
+
+    async def _reserve_model_call(self, owner_id: str, run_id: str) -> None:
+        async with self._lock:
+            run = self._require_run(owner_id, run_id)
+            budget = self._budget_with_elapsed(run)
+            if (
+                budget.model_calls_used >= budget.max_model_calls
+                or budget.elapsed_ms >= budget.deadline_seconds * 1000
+            ):
+                raise HarnessBudgetExhausted("模型调用或时间预算已经耗尽")
+            run.snapshot = run.snapshot.model_copy(
+                update={
+                    "budget": budget.model_copy(
+                        update={"model_calls_used": budget.model_calls_used + 1}
+                    ),
+                    "updated_at": datetime.now(timezone.utc),
+                }
             )
-            await self._transition(
-                owner_id,
-                run_id,
-                "verifying",
-                "result_validation",
-                "结果已通过所选文件引用与只读边界校验。",
-                {
-                    "finding_count": len(result.findings),
-                    "external_action": False,
-                    "output_used": True,
-                },
+
+    async def _update_round(
+        self,
+        owner_id: str,
+        run_id: str,
+        round_number: int,
+        **updates: Any,
+    ) -> None:
+        async with self._lock:
+            run = self._require_run(owner_id, run_id)
+            rounds = [
+                item.model_copy(update=updates)
+                if item.round_number == round_number
+                else item
+                for item in run.snapshot.rounds
+            ]
+            run.snapshot = run.snapshot.model_copy(
+                update={
+                    "rounds": rounds,
+                    "budget": self._budget_with_elapsed(run),
+                    "updated_at": datetime.now(timezone.utc),
+                }
             )
-            await self._transition(
-                owner_id,
-                run_id,
-                "completed",
-                "task_completed",
-                "本轮只读分析已完成，结果等待用户复核。",
-                {
-                    "finding_count": len(result.findings),
-                    "review_required": True,
-                    "external_action": False,
-                },
+
+    async def _complete_round(
+        self,
+        owner_id: str,
+        run_id: str,
+        round_number: int,
+        *,
+        gaps: list[AgentControlLoopEvidenceGap],
+        next_step: AgentControlLoopNextStep,
+    ) -> None:
+        await self._update_round(
+            owner_id,
+            run_id,
+            round_number,
+            status="completed",
+            phase="evidence_gate",
+            evidence_gaps=gaps,
+            next_step=next_step,
+            completed_at=datetime.now(timezone.utc),
+        )
+
+    async def _set_verified_count(
+        self, owner_id: str, run_id: str, count: int
+    ) -> None:
+        async with self._lock:
+            run = self._require_run(owner_id, run_id)
+            budget = self._budget_with_elapsed(run).model_copy(
+                update={"files_verified": count}
             )
-        except Exception as exc:
-            runtime_logger.warning("harness_run_failed run_id=%s error=%s", run_id, type(exc).__name__)
-            await self._fail(owner_id, run_id, str(exc)[:500])
+            run.snapshot = run.snapshot.model_copy(
+                update={"budget": budget, "updated_at": datetime.now(timezone.utc)}
+            )
+
+    async def _can_start_another_round(
+        self,
+        owner_id: str,
+        run_id: str,
+        round_number: int,
+        has_gap: bool,
+    ) -> bool:
+        if not has_gap:
+            return False
+        async with self._lock:
+            run = self._require_run(owner_id, run_id)
+            budget = self._budget_with_elapsed(run)
+            return (
+                round_number < budget.max_rounds
+                and budget.model_calls_used + 2 <= budget.max_model_calls
+                and budget.elapsed_ms < budget.deadline_seconds * 1000
+                and run.snapshot.control_state not in {"stop_requested", "stopped"}
+            )
+
+    @staticmethod
+    def _plan_file_refs(
+        plan: HarnessPlan, files: list[dict[str, Any]]
+    ) -> list[str]:
+        referenced = {
+            file_ref for unit in plan.units for file_ref in unit.input_file_refs
+        }
+        ordered = [
+            str(item["file_ref"])
+            for item in files
+            if str(item["file_ref"]) in referenced
+        ]
+        if not ordered:
+            raise HarnessPlanError("本轮计划没有引用任何允许文件")
+        return ordered
+
+    @staticmethod
+    def _result_file_refs(
+        result: HarnessTaskResult, files: list[dict[str, Any]]
+    ) -> list[str]:
+        cited = {
+            file_ref for finding in result.findings for file_ref in finding.file_refs
+        }
+        return [
+            str(item["file_ref"])
+            for item in files
+            if str(item["file_ref"]) in cited
+        ]
+
+    @staticmethod
+    def _evidence_gaps(
+        run_id: str, outstanding: list[dict[str, Any]]
+    ) -> list[AgentControlLoopEvidenceGap]:
+        if not outstanding:
+            return []
+        refs = [str(item["file_ref"]) for item in outstanding]
+        digest = hashlib.sha256(f"{run_id}:{','.join(refs)}".encode()).hexdigest()
+        return [
+            AgentControlLoopEvidenceGap(
+                gap_id=f"gap-{digest[:12]}",
+                label=f"仍有 {len(refs)} 份允许资料缺少可核对引用",
+                detail="这些资料仍在用户划定范围内，但尚未进入已通过服务端引用核对的结论。",
+                candidate_file_refs=refs,
+            )
+        ]
+
+    async def _finalize_loop(
+        self,
+        owner_id: str,
+        run_id: str,
+        *,
+        findings: list[HarnessFinding],
+        follow_ups: list[str],
+        verified_refs: list[str],
+        decision: str,
+    ) -> None:
+        snapshot = await self.get(owner_id, run_id)
+        unresolved_files = [
+            item
+            for item in snapshot.source_documents
+            if str(item.get("file_ref")) not in set(verified_refs)
+        ]
+        gaps = self._evidence_gaps(run_id, unresolved_files)
+        unique_findings: list[HarnessFinding] = []
+        finding_keys: set[str] = set()
+        for finding in findings:
+            key = json.dumps(finding.model_dump(), ensure_ascii=False, sort_keys=True)
+            if key not in finding_keys:
+                finding_keys.add(key)
+                unique_findings.append(finding)
+        unique_follow_ups = list(
+            dict.fromkeys([*follow_ups, *(gap.label for gap in gaps)])
+        )
+
+        if decision == "completed" and not gaps:
+            outcome: Literal["completed", "bounded", "user_stopped"] = "completed"
+            status = "completed"
+            summary = (
+                f"Agent Control Loop 完成 {len(snapshot.rounds)} 轮，只读核对了 "
+                f"{len(verified_refs)} 份允许资料；所有结论仍等待用户复核。"
+            )
+            stop_reason = None
+            event_name = "loop_committed"
+            message = "证据门已满足，已提交可追溯的只读任务简报。"
+        elif decision == "user_stopped":
+            outcome = "user_stopped"
+            status = "stopped"
+            summary = (
+                f"用户在 {len(snapshot.rounds)} 轮内停止了 Agent Control Loop；"
+                f"已保留 {len(verified_refs)} 份资料的核对结果和剩余缺口。"
+            )
+            stop_reason = "用户在安全点停止"
+            event_name = "loop_stopped"
+            message = "Agent Control Loop 已按用户请求停止，已保留现有证据。"
+        else:
+            outcome = "bounded"
+            status = "stopped"
+            summary = (
+                f"Agent Control Loop 到达预算边界；已核对 {len(verified_refs)} 份资料，"
+                f"仍有 {len(unresolved_files)} 份资料需要后续处理。"
+            )
+            stop_reason = "轮次、模型调用或时间预算已耗尽"
+            event_name = "loop_budget_stopped"
+            message = "Agent Control Loop 已在预算边界停止，并保留未完成项。"
+
+        brief = AgentControlLoopBrief(
+            outcome=outcome,
+            summary=summary,
+            verified_file_refs=verified_refs,
+            unresolved_gaps=gaps,
+            rounds_completed=len(
+                [item for item in snapshot.rounds if item.status == "completed"]
+            ),
+        )
+        result = None
+        if unique_findings:
+            result = HarnessTaskResult(
+                summary=summary,
+                findings=unique_findings[:10],
+                follow_ups=unique_follow_ups[:8],
+                review_required=True,
+            )
+
+        async with self._lock:
+            run = self._require_run(owner_id, run_id)
+            current = run.snapshot
+            rounds = list(current.rounds)
+            if rounds and rounds[-1].status == "running":
+                fallback_step = AgentControlLoopNextStep(
+                    decision="user_stopped"
+                    if decision == "user_stopped"
+                    else "budget_exhausted",
+                    reason=stop_reason or message,
+                    candidate_file_refs=[
+                        str(item.get("file_ref")) for item in unresolved_files
+                    ],
+                )
+                rounds[-1] = rounds[-1].model_copy(
+                    update={
+                        "status": "stopped",
+                        "phase": "evidence_gate",
+                        "evidence_gaps": gaps,
+                        "next_step": fallback_step,
+                        "completed_at": datetime.now(timezone.utc),
+                    }
+                )
+            next_version = current.version + 1
+            controls = current.control_events
+            if decision == "user_stopped":
+                controls = self._apply_control_event(controls, "stop", next_version)
+            budget = self._budget_with_elapsed(run).model_copy(
+                update={
+                    "files_verified": len(verified_refs),
+                    "stop_reason": stop_reason,
+                }
+            )
+            run.snapshot = current.model_copy(
+                update={
+                    "rounds": rounds,
+                    "result": result,
+                    "brief": brief,
+                    "budget": budget,
+                    "control_state": "stopped" if status == "stopped" else "running",
+                    "control_events": controls,
+                    "updated_at": datetime.now(timezone.utc),
+                }
+            )
+        await self._transition(
+            owner_id,
+            run_id,
+            status,
+            event_name,
+            message,
+            {
+                "outcome": outcome,
+                "rounds_completed": brief.rounds_completed,
+                "verified_file_count": len(verified_refs),
+                "gap_count": len(gaps),
+                "external_action": False,
+            },
+        )
+
+    @staticmethod
+    def _snapshot_findings(snapshot: HarnessRunSnapshot) -> list[HarnessFinding]:
+        findings: list[HarnessFinding] = []
+        for round_snapshot in snapshot.rounds:
+            if round_snapshot.result:
+                findings.extend(
+                    HarnessTaskResult.model_validate(round_snapshot.result).findings
+                )
+        return findings
+
+    @staticmethod
+    def _snapshot_verified_refs(snapshot: HarnessRunSnapshot) -> list[str]:
+        refs: list[str] = []
+        for round_snapshot in snapshot.rounds:
+            for file_ref in round_snapshot.verified_file_refs:
+                if file_ref not in refs:
+                    refs.append(file_ref)
+        return refs
+
+    async def _mark_current_round_failed(
+        self, owner_id: str, run_id: str
+    ) -> None:
+        async with self._lock:
+            run = self._require_run(owner_id, run_id)
+            rounds = list(run.snapshot.rounds)
+            if rounds and rounds[-1].status == "running":
+                rounds[-1] = rounds[-1].model_copy(
+                    update={
+                        "status": "failed",
+                        "next_step": AgentControlLoopNextStep(
+                            decision="failed",
+                            reason="本轮未通过服务端校验，未继续进入下一轮。",
+                        ),
+                        "completed_at": datetime.now(timezone.utc),
+                    }
+                )
+                run.snapshot = run.snapshot.model_copy(update={"rounds": rounds})
+
+    @staticmethod
+    def _budget_with_elapsed(run: _Run) -> AgentControlLoopBudget:
+        return run.snapshot.budget.model_copy(
+            update={
+                "elapsed_ms": max(
+                    0, round((perf_counter() - run.started_at_perf) * 1000)
+                )
+            }
+        )
 
     def _analysis_inputs(self, files: list[dict[str, Any]]) -> list[dict[str, Any]]:
         method = getattr(self.catalog, "agent_file_inputs", None)
@@ -1015,7 +2125,14 @@ class HarnessRuntime:
 
     @staticmethod
     def _planner_workspace(
-        workspace: dict[str, Any], instruction: str
+        workspace: dict[str, Any],
+        instruction: str,
+        *,
+        round_number: int = 1,
+        max_files_this_round: int = 8,
+        remaining_file_count: int | None = None,
+        steer_instruction: str | None = None,
+        validation_feedback: str | None = None,
     ) -> dict[str, Any]:
         """Expose only workspace policy and the user's current instruction."""
         return {
@@ -1027,6 +2144,14 @@ class HarnessRuntime:
             "data_boundary": workspace.get("data_boundary"),
             "human_gate_summary": workspace.get("human_gate_summary"),
             "allowlisted_tools": workspace.get("allowlisted_tools", []),
+            "control_loop": {
+                "round_number": round_number,
+                "max_files_this_round": max_files_this_round,
+                "remaining_file_count": remaining_file_count,
+                "steer_instruction": steer_instruction,
+                "validation_feedback": validation_feedback,
+                "external_action": "none",
+            },
         }
 
     @staticmethod
@@ -1120,7 +2245,14 @@ class HarnessRuntime:
         return HarnessPlan(summary=candidate.summary, units=units)
 
     @classmethod
-    def _validate_plan(cls, plan: HarnessPlan, workspace: dict[str, Any], files: list[dict[str, Any]]) -> None:
+    def _validate_plan(
+        cls,
+        plan: HarnessPlan,
+        workspace: dict[str, Any],
+        files: list[dict[str, Any]],
+        *,
+        max_file_refs: int | None = None,
+    ) -> None:
         allowed_refs = {str(item["file_ref"]) for item in files}
         allowed_tools = set(workspace.get("allowlisted_tools", []))
         allowed_effects = set(workspace.get("allowed_side_effects", ["none", "run_workspace_write"]))
@@ -1129,6 +2261,11 @@ class HarnessRuntime:
         ids = [unit.unit_id for unit in plan.units]
         if len(ids) != len(set(ids)):
             raise HarnessPlanError("工作单元 ID 重复")
+        referenced_refs = {
+            file_ref for unit in plan.units for file_ref in unit.input_file_refs
+        }
+        if max_file_refs is not None and len(referenced_refs) > max_file_refs:
+            raise HarnessPlanError("本轮计划引用的文件数量超过 Agent Control Loop 预算")
         graph: dict[str, list[str]] = {unit.unit_id: list(unit.depends_on) for unit in plan.units}
         for unit in plan.units:
             unknown_refs = set(unit.input_file_refs) - allowed_refs
@@ -1171,6 +2308,8 @@ class HarnessRuntime:
             visit(node)
 
     async def _transition(self, owner_id: str, run_id: str, status: str, name: str, message: str, details: dict[str, Any]) -> None:
+        if status not in self.ALLOWED_STATUSES:
+            raise HarnessConflictError(f"未知 Harness 状态: {status}")
         async with self._lock:
             run = self._require_run(owner_id, run_id)
             now = datetime.now(timezone.utc)
@@ -1182,6 +2321,7 @@ class HarnessRuntime:
                     "events": [*run.snapshot.events, event],
                     "last_event_sequence": event.sequence,
                     "version": run.snapshot.version + 1,
+                    "budget": self._budget_with_elapsed(run),
                 }
             )
             condition = run.condition

@@ -6,7 +6,8 @@
 Browser: whole-folder office workbench + trace
   -> GET /v1/harness/workspace
   -> GET /v1/harness/workspace/files/{file_ref}
-  -> POST user instruction + selected refs
+  -> POST user instruction + selected refs + loop bounds
+  -> POST versioned pause/resume/steer/stop controls
   -> named SSE + Snapshot reconciliation
 
 FastAPI Harness
@@ -16,7 +17,8 @@ FastAPI Harness
        -> server Policy Compiler + Plan Validator
        -> OpenAI-compatible Analyst
        -> Result/Citation Validator
-       -> in-memory Run/Event/Idempotency store
+       -> Evidence Gate + bounded Loop Controller
+       -> in-memory Run/Round/Event/Control/Idempotency store
 ```
 
 Only `health_router` and the Harness router are mounted. Legacy conversation,
@@ -53,10 +55,13 @@ request must contain:
 - expected version 1;
 - a 3-2,000 character user instruction;
 - 1-20 unique stable `file_ref` values.
+- 1-3 rounds, 1-8 files per round, 2-6 model calls and a 20-300 second deadline.
 
-The server revalidates all refs and freezes selected source documents in the
-Run Snapshot. The model cannot expand the source set. Unknown, duplicate or
-out-of-workspace refs fail closed.
+The server revalidates all refs and freezes selected source documents and loop
+bounds in the Run Snapshot. The model cannot expand the source set or budget.
+Unknown, duplicate or out-of-workspace refs fail closed. During a Run, the UI
+freezes the task composer and selection rather than pretending those edits
+would affect the active contract.
 
 ## 4. Planning and analysis ownership
 
@@ -72,18 +77,28 @@ The server compiles the candidate into a `HarnessPlan`:
 - units, dependencies, cycles, selected refs, tools, artifacts and gates are
   validated deterministically.
 
-The Analyst receives the user instruction, validated public plan and safe
+Each round's Planner receives the current question, remaining allowed files,
+budget and any accepted steer instruction. A rejected candidate may be repaired
+once within the same budget; rejection and retry are ordered facts. The Analyst
+receives the user instruction, validated public plan and safe
 selected-file content. It returns 1-10 findings with at least one selected ref
 per finding and `review_required=true`. Citation membership is checked; semantic
 truth, completeness and arithmetic are not.
+
+The Evidence Gate compares referenced files with the frozen allowed set. It
+alone decides `next_round`, `completed` or `budget_exhausted`; the model does
+not write terminal state. The current Commit is an in-memory read-only Brief,
+not an immutable ArtifactVersion or TaskCommit.
 
 ## 5. State and streaming
 
 The Snapshot is authoritative. Named events are a readable ordered projection:
 
 ```text
-workspace_index -> planning_started -> planning_completed -> plan_validation
--> analysis_started -> analysis_completed -> result_validation -> task_completed
+workspace_index -> round_started -> planning_started -> planning_completed
+-> optional plan_validation_rejected/retry -> plan_validation
+-> analysis_started -> analysis_completed -> result_validation -> evidence_gate
+-> next round or loop_committed/loop_budget_stopped/loop_stopped
 ```
 
 Each event increments sequence and state transition increments Snapshot version.
@@ -91,16 +106,19 @@ The client applies Snapshot monotonically, reconnects from `after=N`, then uses
 final GET reconciliation. A transport animation or configured model name is not
 evidence that a model call occurred; only `HarnessModelReceipt.called` is.
 
-All Run state is one-process memory. API restart loses Run/event/idempotency
-state. `X-User-Id` is not signed authentication.
+Control commands use expected version and owner-scoped idempotency. Pause and
+stop apply at safe points between calls; steer applies to the next round.
+All Run state is one-process memory. API restart loses Run/round/event/control/
+idempotency state. `X-User-Id` is not signed authentication.
 
 ## 6. Frontend architecture
 
 The root page keeps three independently meaningful regions:
 
 - folder rail: searchable folder/file inventory, metadata and explicit scope;
-- work area: task composer, safe preview, validated plan and cited result;
-- activity pane: ordered events and two model receipts.
+- work area: task composer, loop contract, safe preview, round canvas, evidence
+  gaps, controls and cited brief;
+- activity pane: current phase, budget, ordered events and model adoption receipts.
 
 The UI shows business facts and recovery actions, not internal protocol. A
 citation is an interaction: it selects and opens the referenced file preview.
@@ -112,13 +130,13 @@ the primary page into an architecture document.
 | Module | Current implementation | Missing target work |
 | --- | --- | --- |
 | Workspace Catalog & Safe Preview | full public folder, 96 refs, bounded previews and integrity checks | enterprise Connector/data policy |
-| Task Contract | user instruction, selected refs, Owner/key/version | durable task contract and production identity |
-| Planner | strict model candidate and call receipt | quality evaluation and iterative steering |
+| Task Contract | user instruction, selected refs, loop bounds, Owner/key/version | durable task contract and production identity |
+| Planner | strict candidate, per-round receipt and one bounded repair | quality evaluation and richer replanning policy |
 | Admission/Policy/Validator | server compilation and deterministic graph/source checks | dynamic topology admission |
-| Scheduler & Worker Manager | not connected | bounded loop, adaptive workers, leases and recovery |
+| Scheduler & Worker Manager | one bounded single-loop controller | adaptive workers, leases and recovery |
 | Tool Gateway | not connected | governed real/simulated tools and receipts |
-| Artifact Workspace & Verifier | read-only result and citation membership | immutable versions, semantic/numeric validators and Commit |
-| Checkpoint/Event/Governance | ordered memory events and idempotent start | durable checkpoint, replay, policy/approval/Permit integration |
+| Artifact Workspace & Verifier | per-round read-only result, citation membership, Evidence Gate and Brief | immutable versions, semantic/numeric validators and TaskCommit |
+| Checkpoint/Event/Governance | ordered memory events, controls and idempotent commands | durable checkpoint, cross-process replay, policy/approval/Permit integration |
 
 ## 8. Security and claim boundary
 
@@ -130,4 +148,4 @@ office task, artifact or external process completed.
 See [`DR-0022`](decisions/DR-0022-workspace-folder-and-arbitrary-task-contract.md),
 [`SCENARIO-008`](scenarios/SCENARIO-008-whole-folder-office-workspace.md),
 [UI-server fact matrix](contracts/UI_SERVER_FACT_MATRIX.md) and
-[current Evidence](evidence/FORTE-FOLDER-WORKSPACE-EVIDENCE-20260825.md).
+[current Evidence](evidence/AGENT-CONTROL-LOOP-BOUNDED-READONLY-EVIDENCE-20260825.md).
