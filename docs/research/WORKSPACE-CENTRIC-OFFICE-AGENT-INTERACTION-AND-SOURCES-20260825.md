@@ -1,165 +1,158 @@
-# Workspace-centric Office Agent: mainstream comparison, scenarios and interaction impact
+# 以办公文件夹为中心的 Office Agent：技术对比、场景来源与交互影响
 
-## 1. Document purpose
+## 1. 文档用途
 
-This is the retained source record for the next report. It connects technical
-architecture to user flow and frontend output. It separates official product
-facts, research inspiration, Stakeholder requirements, current implementation
-evidence and unverified hypotheses.
+这是后续汇报长期保留的中文研究与设计记录。它把技术架构连接到用户流程
+和前台输出，并严格区分：
 
-Status: `Research and design record`. Product facts are source-backed at the
-versions below. Claims about relative usability, trust, speed or user value are
-`Draft` until target-user research is run.
+- 官方产品事实；
+- 论文或工程实践启发；
+- Stakeholder 需求；
+- 当前实现与运行证据；
+- 尚未验证的设计假设。
 
-## 2. Sources and what they support
+状态：`Research and design record`。下列产品事实绑定到指定来源和访问日期；
+关于易用性、信任、速度或用户价值的相对判断，在完成目标用户研究前一律为
+`Draft`。
 
-| Source ID | Type and exact source | Version/date | Supported fact | Limitation |
+## 2. 来源台账
+
+| Source ID | 类型与精确来源 | 版本/日期 | 支持的判断 | 局限 |
 | --- | --- | --- | --- | --- |
-| `OPENCLAW-OFFICIAL-20260825` | [OpenClaw overview](https://docs.openclaw.ai/), [runtime architecture](https://docs.openclaw.ai/agent-runtime-architecture), [exec approvals](https://docs.openclaw.ai/tools/exec-approvals) | accessed 2026-08-25 | self-hosted Gateway, sessions/routing, built-in/plugin Harnesses, tools and host execution approvals | does not prove an office-folder evidence UX or that this project outperforms it |
-| `OPENAI-CODEX-APP-20260202` | OpenAI, [Introducing the Codex app](https://openai.com/index/introducing-the-codex-app/) | 2026-02-02 | parallel Agent threads, worktrees, review of changes, Skills and Automation review queue | software-development product description; not a direct office-work benchmark |
-| `CLAUDE-CODE-OFFICIAL-20260825` | Anthropic, [How Claude Code works](https://code.claude.com/docs/en/how-claude-code-works), [subagents](https://code.claude.com/docs/en/sub-agents), [permissions](https://code.claude.com/docs/en/permissions) | accessed 2026-08-25 | project-directory context, tool loop, subagents, permissions and multiple interfaces | code/project workflow; official docs do not establish this project's usability |
-| `REACT-ICLR-2023` | Yao et al., [ReAct](https://arxiv.org/abs/2210.03629) | ICLR 2023, arXiv v3 | interleaving reasoning, action and observation can organize an Agent trajectory | does not prescribe durable state, office file UI, policy compiler or citation controls |
-| `FORTE-PINNED-20260825` | [AGI-Eval-Official/FORTE](https://github.com/AGI-Eval-Official/FORTE), commit `345c1ec1487139db9dd319787fa9405ba85d1869` | pinned 2026-08-25 | public office benchmark spans 15 professions; public repo contains one demo per profession | public benchmark, not a production enterprise database or user study |
-| `USER-FEEDBACK-20260825-WHOLE-FOLDER-14` | [Stakeholder feedback](../sources/USER-FEEDBACK-20260825-14-folder-workspace-and-interaction-reporting.md) | 2026-08-25 | whole-folder browsing, file information, four-format preview/control and report traceability are required | one Stakeholder, not representative user research |
+| `OPENCLAW-OFFICIAL-20260825` | [OpenClaw overview](https://docs.openclaw.ai/)、[runtime architecture](https://docs.openclaw.ai/agent-runtime-architecture)、[exec approvals](https://docs.openclaw.ai/tools/exec-approvals) | 2026-08-25 访问 | 官方材料描述自托管 Gateway、Session/Route、内置或插件 Harness、Tool 和主机执行审批 | 不证明其没有办公文件证据交互，也不证明本项目优于它 |
+| `OPENAI-CODEX-APP-20260202` | OpenAI，[Introducing the Codex app](https://openai.com/index/introducing-the-codex-app/) | 2026-02-02 | 官方材料描述并行 Agent Task、Worktree、变更审查、Skill 和 Automation 审查队列 | 面向软件开发，不是直接办公任务基准 |
+| `CLAUDE-CODE-OFFICIAL-20260825` | Anthropic，[How Claude Code works](https://code.claude.com/docs/en/how-claude-code-works)、[subagents](https://code.claude.com/docs/en/sub-agents)、[permissions](https://code.claude.com/docs/en/permissions) | 2026-08-25 访问 | 官方材料描述项目目录上下文、Tool Loop、Subagent、Permission 和多种界面 | 面向代码与项目工作流，不能证明本项目的易用性 |
+| `REACT-ICLR-2023` | Yao 等，[ReAct](https://arxiv.org/abs/2210.03629) | ICLR 2023，arXiv v3 | Reasoning、Action、Observation 交替可用于组织 Agent 轨迹 | 不直接给出持久状态、办公文件 UI、策略编译或引用控制 |
+| `FORTE-PINNED-20260825` | [AGI-Eval-Official/FORTE](https://github.com/AGI-Eval-Official/FORTE)，commit `345c1ec1487139db9dd319787fa9405ba85d1869` | 2026-08-25 固定 | 公开办公基准覆盖 15 类职业，公开仓库每类提供一个 Demo | 公开基准不是真实企业生产数据库或用户研究 |
+| `USER-FEEDBACK-20260825-WHOLE-FOLDER-14` | [Stakeholder 反馈](../sources/USER-FEEDBACK-20260825-14-folder-workspace-and-interaction-reporting.md) | 2026-08-25 | 要求完整文件夹浏览、文件信息、四类格式预览/控制和汇报留痕 | 单一 Stakeholder，不代表目标用户研究 |
 
-## 3. Mainstream comparison and interaction consequences
+## 3. 主流方案差异及其交互后果
 
-The comparison is about emphasis, not an exclusivity claim. OpenClaw, Codex and
-Claude Code continue to evolve and can be extended. We do not claim that they
-cannot implement any pattern below.
+这里比较的是官方材料中的设计侧重点，不是排他性能力声明。OpenClaw、
+Codex 和 Claude Code 仍在持续迭代，也可以扩展。本文不声称它们无法实现
+下列任何模式。
 
-| Approach | Primary interaction object in cited material | Strong design emphasis | This project's deliberate difference | User-flow consequence |
+| 方案 | 官方材料中的主要交互对象 | 强调的设计能力 | 本项目刻意强调的差异 | 对用户流程的影响 |
 | --- | --- | --- | --- | --- |
-| OpenClaw | message, session, channel and Gateway | always-available multi-channel Agent, routing, tools and host approvals | one server-owned office folder, explicit per-task file scope and evidence citations are the foreground | users inspect data and scope first, rather than beginning from a message channel |
-| Codex app | project thread, worktree and review queue | parallel software tasks, isolated changes and result review | public office files are read-only source evidence; plans/results are reviewed against selected business files | users review citations and business findings rather than code diffs/worktree changes |
-| Claude Code | project directory plus terminal/IDE Agent loop | broad project context, tool use, subagents, permission modes and checkpoints | the model does not receive silent whole-workspace authority; the user chooses bounded files and server policy validates the plan | an extra scope-selection step appears before execution, reducing hidden context expansion |
-| ReAct-style Agent | reasoning/action/observation trajectory | iterative plan updates through environment interaction | ordinary UI shows receipts, validated operations and server events, not chain-of-thought | users see what was called and accepted without exposing private reasoning traces |
-| Current Office Agent | folder, selected files, user-authored task, Run Snapshot and citations | provenance-first office analysis with server-owned policy | one interface supports arbitrary cross-folder questions; Demo identities are acceptance lenses only | browse -> inspect -> select -> instruct -> observe -> cite -> review |
+| OpenClaw | Message、Session、Channel、Gateway | 常驻多 Channel Agent、路由、工具和主机审批 | 把服务端拥有的办公文件夹、任务级文件范围和证据引用放到交互主路径 | 用户先检查数据与范围，再开始任务，而不是先从消息 Channel 开始 |
+| Codex App | 项目 Task、Worktree、审查队列 | 并行软件任务、隔离改动和结果审查 | 公开办公文件是只读证据，计划与结论需要回到用户选定的业务文件核对 | 用户审查业务结论和引用，而不是代码 Diff 或 Worktree |
+| Claude Code | 项目目录、Terminal/IDE Agent Loop | 广泛项目上下文、Tool、Subagent、Permission 和 Checkpoint | 模型不静默获得整个工作区；用户选择有限文件，服务端校验计划和引用 | 执行前增加一次可见范围选择，减少隐藏上下文扩张 |
+| ReAct 类 Agent | Reasoning、Action、Observation 轨迹 | 通过环境反馈迭代更新计划 | 普通 UI 展示调用、业务操作、校验和回执，不展示思维链 | 用户能看见什么被调用、采用和拒绝，同时避免暴露私有推理 |
+| 当前 Office Agent | 文件夹、选定文件、用户任务、Run Snapshot、引用 | 以来源为先的办公分析与服务端策略 | 一个界面支持跨文件夹原创任务；Demo 只作为验收视角 | 浏览 -> 预览 -> 选择 -> 下达任务 -> 观察 -> 引用 -> 复核 |
 
-## 4. Why the architecture changes the UI
+## 4. 为什么架构会改变界面
 
-### 4.1 Server-owned workspace catalog
+### 4.1 服务端拥有文件目录
 
-Technical difference: public file identity, manifest integrity, preview parsing
-and safe projection are owned by the server, not inferred from filenames in the
-browser or supplied by the model.
+**技术差异：** 文件身份、manifest 完整性、格式解析和安全投影由服务端拥有，
+而不是由浏览器根据文件名猜测，也不是由模型生成。
 
-Frontend effect: the user sees a normal folder tree, type, size, row/page count
-and a security note. Integrity failure is distinct from network failure. Raw
-paths and hashes stay in the audit layer.
+**前台影响：** 用户看到普通文件夹树、文件类型、大小、行数或页数及安全说明。
+完整性失败与网络失败分开显示；路径和 hash 只进入审计层。
 
-### 4.2 Explicit task-scoped context
+### 4.2 显式任务级上下文
 
-Technical difference: a Run freezes user-selected `file_ref` values, and both
-plan and result validation reject references outside that set.
+**技术差异：** 每个 Run 冻结用户选定的 `file_ref`；计划和结果引用超出该
+集合时确定性拒绝。
 
-Frontend effect: selected-file chips form a visible contract. The user can
-remove scope before the model call and reopen citations afterward. This makes
-context control inspectable, at the cost of one deliberate selection step.
+**前台影响：** 选中文件标签形成可见契约。用户可以在模型调用前缩减范围，
+并在结果出来后重新打开来源。代价是用户需要主动做一次范围选择。
 
-### 4.3 Model intent plus deterministic policy compiler
+### 4.3 模型意图与确定性策略编译分离
 
-Technical difference: a model proposes business intent; the server compiles
-effect/gate policy and validates dependencies, tools, sources and citations.
+**技术差异：** 模型只提出业务意图；服务端编译 effect/gate 策略，并校验依赖、
+工具、来源和引用。
 
-Frontend effect: “模型已调用” is separate from “内容已采用” and “服务端已校验”.
-A returned but rejected model response is visible as not adopted, not disguised
-as a successful step or a generic failure.
+**前台影响：** “模型已调用”“内容已采用”“服务端已校验”分别展示。模型已经
+返回但校验不通过时，前台显示“未采用”，不会伪装成成功步骤或模糊网络错误。
 
-### 4.4 Ordered events plus authoritative Snapshot
+### 4.4 有序事件与权威 Snapshot
 
-Technical difference: named events explain progress while the Run Snapshot is
-the state authority. Sequence numbers support reconnect without fabricating
-progress.
+**技术差异：** named SSE 解释进度，Run Snapshot 是状态权威；sequence 用于
+断线恢复，前端不得补造进度。
 
-Frontend effect: users see a business trajectory, elapsed call receipts,
-reconnecting state and final reconciliation. Animation alone never proves a
-model call or task completion.
+**前台影响：** 用户看到业务轨迹、调用耗时回执、重连状态和最终对账。
+单纯动画永远不能证明模型调用或任务完成。
 
-### 4.5 Evidence-in-place results
+### 4.5 结果中的原位证据
 
-Technical difference: every finding must cite one or more frozen selected
-files. Membership validation is deterministic; semantic correctness is not.
+**技术差异：** 每项 Finding 必须引用一个或多个已冻结文件。文件集合成员关系
+可以确定性校验，但语义正确性不能仅靠引用验证。
 
-Frontend effect: citations are actions, not footnote decoration. Clicking one
-returns the user to the same safe preview. The result remains “待复核” because
-membership is weaker than entailment or numerical verification.
+**前台影响：** 引用是可操作按钮，而不是脚注装饰。点击后返回同一个安全预览。
+终态仍标记“待复核”，因为引用范围正确弱于事实蕴含或数值正确。
 
-## 5. Concrete use scenarios
+## 5. 具体办公场景
 
-| Scenario | Trigger | Agent topology lens | Human role | Completion evidence |
+| 场景 | 触发条件 | Demo 验收视角 | 人的角色 | 完成证据 |
 | --- | --- | --- | --- | --- |
-| Finance cross-period reconciliation | three period workbooks need comparison | Demo 1 bounded single-task loop | decide ambiguous accounting definitions; verify totals | selected sheets, deterministic totals, cited rows, reviewed output |
-| Onboarding asset allocation | roster CSV must be matched to PDF policy | Demo 1 with evidence pause | resolve conflicting or missing allocation rule | mapping table, exception list and source rule citations |
-| Resume and JD comparison | two jobs and multiple candidate documents | Demo 2 multi-task organization | own the hiring decision and sensitive-data review | per-candidate evidence, cross-worker consistency and review receipt |
-| Release readiness | PRD, configuration and test reports disagree | Demo 2 adaptive reconciliation | decide unresolved release conflicts | worker graph, conflict reconciliation and cited report set |
-| Incident diagnosis | a log needs a timeline and mitigation options | Demo 1 plus Demo 3 Risk Gate | approve any real command; current product stays read-only | cited log lines, proposed actions and explicit no-execution receipt |
-| External SQL or scheduled Web task | task has no local input and needs a Connector | Demo 3 governed capability boundary | approve scope, credentials and side effect | current expected result is a deterministic capability block |
+| 跨期财务核对 | 三个期间工作簿需要比较 | Demo 1 单任务有界循环 | 决定有歧义的会计口径并复核总额 | 选定 Sheet、确定性总额、引用行、人工确认输出 |
+| 入职物资匹配 | 人员 CSV 需要匹配 PDF 制度 | Demo 1 加证据暂停 | 解决缺失或冲突的分配规则 | 匹配表、异常清单、规则引用 |
+| 简历与 JD 对比 | 两份岗位说明和多份候选人材料 | Demo 2 多任务组织 | 保留招聘决定权并审查敏感信息 | 候选人证据、跨 Worker 一致性、人工回执 |
+| 上线准备核对 | PRD、配置和测试报告存在冲突 | Demo 2 自适应汇聚 | 决定未解决的上线冲突 | Worker 图、冲突汇聚、被引用报告集合 |
+| 故障诊断 | 日志需要整理时间线和修复建议 | Demo 1 加 Demo 3 Risk Gate | 任何真实命令都需要人批准；当前保持只读 | 日志行引用、动作建议、明确未执行回执 |
+| 外部 SQL 或定时 Web 任务 | 没有本地输入，需要 Connector | Demo 3 能力边界 | 批准范围、凭据和副作用 | 当前预期结果是确定性能力阻断 |
 
-The detailed 15-case catalog remains in
-[`FORTE-PUBLIC-OFFICE-TASK-TEST-CASES-20260825`](../testing/FORTE-PUBLIC-OFFICE-TASK-TEST-CASES-20260825.md).
+15 类任务测试目录见
+[`FORTE-PUBLIC-OFFICE-TASK-TEST-CASES-20260825`](../testing/FORTE-PUBLIC-OFFICE-TASK-TEST-CASES-20260825.md)。
 
-## 6. HCI directions carried into the product
+## 6. 纳入产品的人机交互方向
 
-1. **Mixed-initiative scoping**: the Agent can suggest a plan, but the user owns
-   the initial data boundary and any later high-impact expansion.
-2. **Progressive disclosure**: folder and result summaries lead; security,
-   validation and detailed trace remain available without dominating the page.
-3. **Legibility without chain-of-thought**: show calls, operations, validations,
-   receipts and citations instead of private reasoning text.
-4. **Provenance as navigation**: evidence links return to the exact source
-   preview and make review part of the primary path.
-5. **Recoverable collaboration**: idempotent start, monotonic Snapshot and SSE
-   resume prevent a retry from silently starting a second task or rolling back.
-6. **Topology-independent capability**: the same workspace, source, policy,
-   event and evidence components serve single-task, swarm and governed-action
-   flows. Demo names do not gate capabilities.
-7. **Human authority at uncertainty**: schema/policy failure stops safely;
-   semantic or numerical uncertainty is shown as review work, not hidden behind
-   a completed animation.
+1. **混合主动的数据范围控制**：Agent 可以建议计划，但用户拥有初始数据边界，
+   高影响范围扩张必须再次确认。
+2. **渐进披露**：先展示文件和结果摘要；安全、校验和详细轨迹可展开，但不占据
+   第一注意层。
+3. **不暴露思维链的可理解执行**：展示调用、操作、校验、回执和引用，不展示
+   私有推理文本。
+4. **把来源变成导航**：引用返回准确文件预览，让复核成为主路径而不是附加说明。
+5. **可恢复协作**：幂等启动、单调 Snapshot 和 SSE resume，避免重试时静默创建
+   第二任务或回退状态。
+6. **与拓扑无关的通用能力**：Workspace、Source、Policy、Event 和 Evidence
+   组件同时服务单任务、Swarm 和受控动作；Demo 名称不是能力开关。
+7. **不确定性下保留人的权力**：Schema/Policy 失败时安全停止；语义或数值不确定
+   显示为待复核工作，不藏在完成动画后面。
 
-## 7. Frontend output contract
+## 7. 前台输出契约
 
-| State | What the user sees | What produces it | What remains hidden |
+| 状态 | 用户看到什么 | 服务端事实来源 | 默认隐藏 |
 | --- | --- | --- | --- |
-| workspace ready | folder/file count and searchable tree | validated public workspace projection | benchmark task prompt, rubric, solution, raw manifest |
-| file selected/open | metadata, safe preview and security statement | file preview route after integrity validation | full binary, macros, external loads, path/hash |
-| task draft | selected-file chips and user instruction | browser draft only | no claim that server accepted it |
-| task accepted | frozen scope and first trajectory event | POST Run response and seq 1 | internal Run IDs in primary copy |
-| model running/returned | called model, elapsed time, adopted/not-adopted | model receipt | Prompt, chain-of-thought, raw output |
-| plan accepted | readable ordered work plan | server-compiled and validated plan | raw effect/gate identifiers |
-| result ready | initial findings, clickable citations, review warning | validated result with selected `file_ref` membership | correctness claim, external-action claim |
-| stream interrupted | reconnecting and retry state | transport fact plus last event sequence | invented progress |
-| integrity invalid | source-specific fail-closed message | controlled 503 from Catalog | partial/stale folder data |
+| 文件库可用 | 文件夹/文件数量和可搜索树 | 校验后的 Workspace 公共投影 | benchmark 任务、rubric、solution、原始 manifest |
+| 文件打开 | 元信息、安全预览和安全说明 | 完整性校验后的文件预览接口 | 完整二进制、宏、外部加载、路径、hash |
+| 任务草稿 | 选中文件和用户输入 | 浏览器草稿 | 不声称服务端已接受 |
+| 任务已接受 | 冻结范围和第一条轨迹 | POST Run 响应与 seq 1 | 主文案隐藏内部 Run ID |
+| 模型运行或返回 | 模型名、耗时、已采用或未采用 | Model Receipt | Prompt、思维链、原始返回 |
+| 计划已接受 | 可读的有序工作计划 | 服务端编译并校验的 Plan | 原始 effect/gate 标识 |
+| 结果可复核 | 初步结论、引用按钮、复核提醒 | 引用属于冻结 `file_ref` 的校验结果 | 正确性或外部动作声明 |
+| 事件流中断 | 重连中和重试入口 | Transport 事实与最后 sequence | 补造的进度 |
+| 完整性异常 | 明确的来源异常与安全停止 | Catalog 控制的 503 | 部分或陈旧目录 |
 
-## 8. Current implementation facts and open hypotheses
+## 8. 当前实现事实与未验证假设
 
-### Implemented and testable
+### 已实现并有工程证据
 
-- one public workspace with 15 folders and 96 files;
-- bounded previews for XLSX/CSV, PDF, DOCX and text/code formats;
-- manifest, size, hash, path, symlink, archive and active-content controls;
-- arbitrary cross-folder selected scope and user-authored instruction;
-- server-compiled plan policy, separate model receipts, ordered events and
-  selected-scope citations;
-- read-only result and no external side effect.
+- 一个包含 15 个文件夹、96 份文件的公开 Workspace；
+- XLSX/CSV、PDF、DOCX、TXT/代码的有界预览；
+- manifest、大小、hash、路径、符号链接、压缩结构和 active content 控制；
+- 跨文件夹自由选择范围与用户原创任务；
+- 服务端策略编译、模型回执、有序事件和任务范围内引用；
+- 只读结果和“没有外部副作用”边界。
 
-### Not yet proved
+### 尚未证明
 
-- users understand the folder-first flow faster than the prior Scenario UI;
-- explicit selection creates the right balance between control and effort;
-- citations improve calibrated trust or error detection;
-- the model completes all 15 FORTE tasks correctly;
-- persistent recovery, distributed workers, real file writes or Connectors;
-- production identity, enterprise data policy or representative user value.
+- 用户理解文件夹优先流程是否快于旧 Scenario UI；
+- 显式选择是否在控制感与操作成本之间达到合适平衡；
+- 引用是否提高校准后的信任或错误发现率；
+- 模型是否能正确完成全部 15 类 FORTE 任务；
+- 持久化恢复、分布式 Worker、真实文件写入或 Connector；
+- 生产身份、企业数据策略和代表性用户价值。
 
-## 9. Report checklist
+## 9. 后续汇报检查表
 
-Every slide or Demo claim derived from this document must include:
+从本文产生的每一页 PPT 或 Demo 结论都必须包含：
 
-- one concrete user scenario and its exception path;
-- one precise source ID and its limitation;
-- the technical difference and the resulting user-flow change;
-- the visible frontend state/action/feedback/recovery;
-- the authoritative server fact and hidden internal details;
-- current Evidence status and the claims it does not support.
+- 一个具体用户场景和异常路径；
+- 一个精确 Source ID 及其局限；
+- 技术差异以及由此产生的用户流程变化；
+- 前台可见状态、动作、反馈和恢复方式；
+- 对应后端事实与默认隐藏的内部细节；
+- 当前 Evidence 状态和它不能支持的结论。

@@ -40,6 +40,8 @@ The current product exposes one server-owned FORTE public office workspace:
    the validated plan and clickable citations. It does not show Prompt,
    chain-of-thought, raw provider output, absolute paths, hashes or validator
    protocol strings.
+7. 面向用户、会议和 PPT 的汇报卡片采用中文主叙事；产品名、接口/协议字段
+   和原始来源标题可以保留英文，但英文技术稿不能直接作为用户汇报稿。
 
 This is a general workspace contract. Demo 1, Demo 2 and Demo 3 remain
 acceptance lenses for single-task loops, multi-task organization and governed
