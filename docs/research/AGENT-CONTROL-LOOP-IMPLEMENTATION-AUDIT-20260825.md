@@ -92,13 +92,13 @@ Take over 或“只继续某个研究方向”的动作。
 目标不是把 96 份文件一次性塞进 Prompt，而是让 Agent 在有界预算内循环决定：
 下一轮需要研究什么、为什么、读取哪些文件、得到了什么、还缺什么。
 
-`Research Contract
+`Task Contract
 -> Observe 目录与已有证据
 -> Plan 本轮研究问题和文件范围
 -> Act 调用安全读取/表格检查工具
 -> Verify 来源、覆盖率、数值与冲突
 -> Evidence Gate
-   -> 证据足够：Commit Research Brief
+   -> 证据足够：Commit Agent Control Loop Brief
    -> 需要人：等待确认
    -> 证据不足且预算允许：进入下一轮
    -> 预算耗尽：停止并说明未完成项`
