@@ -60,19 +60,18 @@ path/size/MIME/SHA-256 inventory is
 
 ## Runtime boundary
 
-The downloaded suite and the current product allowlist are deliberately
-separate:
+`DR-0022` now uses `public-suite-manifest.json` as the active read-only product
+inventory: 15 folders and 96 input files enter one safe public workspace.
+`task.md` files remain provenance records and are not user task prompts or
+Agent-selected context. The older three-Scenario `manifest.json` is a historical
+artifact and is not the current public route contract.
 
-- `public-suite-manifest.json`: all 15 public task records and 96 public input
-  files, for audit and staged test development;
-- `manifest.json`: the current runtime allowlist for `Finance-018`, `pm-014`
-  and `Operations-008` only.
-
-Downloading a DOCX, PDF or source tree is not equivalent to safely previewing,
-editing, executing or grading it. The ten newly staged local-input tasks need
-format adapters, privacy projection, deterministic validators, run-workspace
-writes and policy gates before they can enter the product Catalog. The two
-external tasks need real governed Connectors and remain disabled.
+All 96 inputs have bounded preview adapters, including DOCX, PDF, CSV/XLSX and
+text/code. That does not mean they are safely editable, executable or graded.
+Task-specific deterministic validators, writable Run artifacts, code sandbox,
+Worker orchestration and policy gates remain separate implementation work. The
+two task-only external examples still need governed Connectors and have no local
+file payload to select.
 
 ## Source and limitations
 

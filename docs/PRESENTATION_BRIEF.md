@@ -1,88 +1,133 @@
-# Office Agent V0.2 Presentation Brief
+# Office Agent V0.2 中文汇报卡片
 
-## 1. One-sentence position
+本文件记录面向会议、PPT 和产品评审的中文表述。英文只保留产品名、
+接口名、协议字段和原始来源标题。
 
-Office Agent turns a pinned public office dataset into a user-operated workbench: inspect data, choose context, ask a task, then verify two model receipts, server checks, file citations and the no-external-action boundary.
+## 1. 一句话定位
 
-## 2. Reporting rule
+我们不是在制作三套写死的 Demo，而是在建设一个通用 Office Agent
+Harness：它从可检查的办公文件出发，让用户明确控制数据范围，看见
+Agent 实际调用、采用和校验了什么，并能从每条结论返回同一份来源证据。
 
-Every slide must pass [DECISION_AND_REPORTING_GOVERNANCE.md](DECISION_AND_REPORTING_GOVERNANCE.md): 场景与来源、前台交互影响、后端事实映射、验证与边界. Historical Customer A or DR-0016/0017 facts cannot be presented as the current workbench.
+## 2. 汇报硬门槛
 
-## 3. Recommended story
+每个架构、Demo 或产品结论必须同时回答：
 
-| Slide | Core message | Visual/evidence | Boundary |
+1. 用户是谁，在什么办公场景下触发，异常路径是什么；
+2. 设计来源是什么，Source ID、日期或版本、支持判断和局限是什么；
+3. 与主流方案相比，技术侧重点有什么不同；
+4. 这种技术差异怎样改变用户交互流程；
+5. 前台显示什么状态、提供什么动作、如何反馈和恢复；
+6. 每个 UI 状态由哪个后端事实产生，哪些内部细节默认隐藏；
+7. 当前 Evidence 状态是什么，还有哪些结论只能标为 `Draft`。
+
+完整门槛遵循
+[`DECISION_AND_REPORTING_GOVERNANCE.md`](DECISION_AND_REPORTING_GOVERNANCE.md)。
+汇报必须同时保留“场景与来源”“前台交互影响”“后端事实映射”和
+“验证与边界”。研究来源包见
+[`WORKSPACE-CENTRIC-OFFICE-AGENT-INTERACTION-AND-SOURCES-20260825`](research/WORKSPACE-CENTRIC-OFFICE-AGENT-INTERACTION-AND-SOURCES-20260825.md)。
+Agent Control Loop 的逐模块现状、完成度口径和下一条三轮只读纵切设计见
+[`AGENT-CONTROL-LOOP-IMPLEMENTATION-AUDIT-20260825`](research/AGENT-CONTROL-LOOP-IMPLEMENTATION-AUDIT-20260825.md)。
+完整的项目化讲稿、七个办公场景、七个图示区和 17 页 PPT 结构见
+[`OFFICE-AGENT-DETAILED-CHINESE-REPORT-20260825`](reports/OFFICE-AGENT-DETAILED-CHINESE-REPORT-20260825.md)。
+
+## 3. PPT 页面卡片
+
+| 页码 | 中文结论 | 建议画面 | 证据与边界 |
 | --- | --- | --- | --- |
-| 1. User problem | too much explanation and Demo framing hide the user's real work | verbatim Feedback 10 | one stakeholder, not research |
-| 2. Mainstream baseline | tools, permissions, sessions and delegation are already mainstream | official-material comparison | not competitor testing |
-| 3. Product thesis | business source, user-owned task, verifiable trace and semantic impact | four-pillar diagram | differentiation/value still Draft |
-| 4. Data workbench | actual benchmark data is the first screen | DR-0018 result desktop screenshot | replayed persisted Snapshot, not a new model call |
-| 5. Real source | pinned FORTE bytes become stable safe refs and previews | source/preview diagram | public benchmark, not enterprise database |
-| 6. Two-call loop | Planner proposes intent; server compiles policy and validates; Analyst then reads safe previews | DR-0020 completed screenshot + eight events | compiler is not tool execution; one live Run is not quality evidence |
-| 7. Result truth | citations can pass while the numerical answer is wrong | desktop/mobile result screenshots + deterministic 23 / `1,845,444.71` versus model 20 / `2,202,000` | `completed` is not a quality pass |
-| 8. Frontend/backend alignment | every state maps to a field or named event | UI—server fact matrix | no animation/CoT as fact |
-| 9. Eight modules | current and target capabilities stay separate | maturity table | modules 5-6 and durable Artifact remain Draft |
-| 10. Three acceptance lenses | Demo 1 single-task bounded loop, Demo 2 multi-task adaptive swarm, Demo 3 cross-cutting Risk Gate share one capability layer | `work_profile` composition map + three FORTE collections | generic contract is implemented; three execution engines are not |
-| 11. Engineering evidence | code, focused tests, live records and screenshots have distinct roles | Evidence ledger | engineering checks do not prove user value |
-| 12. Next proof | semantic verifier, durable Artifact, Scheduler, action governance, user study | phased roadmap | no production/value claim |
+| 1 | Office Agent 从一个办公文件夹开始，而不是从 Demo 按钮开始 | 当前完整工作台截图 | `DR-0022`；公开基准数据，不是真实企业网盘 |
+| 2 | 真正的问题不是缺少聊天框，而是上下文不可见、执行过程不可核对 | 旧流程与文件夹优先流程对比 | Stakeholder 反馈，不是用户研究 |
+| 3 | 一个 Runtime、八个通用模块、三种验收视角 | 分层架构图；Demo 1/2 加跨拓扑 Demo 3 | 当前能力与目标能力必须用不同颜色 |
+| 4 | 会话、工具、Subagent 和人工审查已经是主流基线 | OpenClaw、Codex、Claude Code 官方资料对比 | 官方文档研究，不是竞品实测 |
+| 5 | 我们刻意把办公证据范围放到交互主路径 | 浏览 -> 预览 -> 选择 -> 下达任务 -> 观察 -> 引用 -> 复核 | 实现侧重点差异，不是优越性结论 |
+| 6 | 固定公开数据版本，让演示中的每份材料都能被现场检查 | 15 个文件夹、96 份文件、格式分布 | FORTE 固定 commit；不是真实企业数据 |
+| 7 | 安全预览把“Agent 读了什么”变成可见契约 | CSV/PDF/DOCX/TXT 预览拼图和安全说明 | 路径、大小、hash、符号链接和解析器测试 |
+| 8 | Harness 把模型调用、内容采用和服务端校验分开 | 事件与模型回执时序 | Snapshot/Receipt 事实；不展示思维链 |
+| 9 | 引用不是装饰，而是返回证据的导航动作 | 结果引用重新打开来源文件 | 只证明引用范围，不证明语义正确 |
+| 10 | Demo 1 验收单任务拆解、有界循环、证据不足或需要人时暂停 | Checkpoint 与分支循环 | 目标设计；当前执行器尚未完成 |
+| 11 | Demo 2 验收多任务自组织、动态调度和共享工件汇聚 | Worker、依赖与动态重排图 | 目标设计；当前产品没有通用 Worker Runtime |
+| 12 | Demo 3 对单任务和多任务统一施加风险与动作控制 | 影响预演 -> 证据 -> 审批 -> Permit -> 回执 | 目标设计；当前没有真实外部动作 |
+| 13 | 当前已经证明工程链路，但也保留模型结果出错的负面证据 | 自动化、截图与 Finance 算术偏差并列 | `completed` 不等于结论正确 |
+| 14 | 当前完整 Agent Control Loop 约完成 30%，下一步先让 Agent 在文件夹中形成可见、可停、可核验的三轮只读纵切 | 目标 Loop 与当前单次流水的叠加图；11 模块成熟度条 | `30%` 是架构成熟度估计；[`DR-0023`](decisions/DR-0023-agent-control-loop.md) 尚未实现，保持 `Draft` |
 
-## 4. Technical comparison wording
+## 4. 现场演示卡片
 
-Use:
+1. 直接打开 `/`，进入“办公资料库”。
+2. 展开不同业务文件夹；在调用模型前查看文件类型、大小和安全预览。
+3. 从多个文件夹选择资料，输入一个现场提出的新任务。
+4. 启动 Run，指出 Planner 与 Analyst 的独立模型回执。动画本身不代表模型调用。
+5. 展示服务端校验后的计划，说明当前业务操作只是意图，没有执行工具。
+6. 点击结果引用，返回准确的来源文件预览。
+7. 以“模型初步结论，仍需复核，没有发生外部动作”结束。
 
-> OpenClaw, Codex and Claude Code official materials show that tool use, permissions, sessions, background work and delegation are already mainstream. Our target distinction is the office user's control surface: choose business data, define the task, inspect what was called and validated, review cited outputs, and see the effect boundary.
+演示不要从八模块架构图开始。先让观众看到数据、任务、轨迹和证据闭环，
+再解释支撑它的架构。
 
-Do not claim competitors “cannot” support an untested capability, Office Agent is “first”, or the workbench is safer/faster/easier without comparative and user evidence.
+## 5. 主流方案对比卡片
 
-## 5. Current demo narration
+### OpenClaw
 
-1. Open `FORTE 数据工作台`; do not begin with architecture prose.
-2. Browse an actual table or Markdown input and point out the public benchmark label.
-3. Check the files that should define the task context.
-4. Write a new question and run it.
-5. Follow eight named stages and distinguish planning call, server-owned policy compilation/plan validation, analysis call and citation validation. Read `已采用` as called-and-accepted and `校验未通过` as called-but-rejected.
-6. Open the result. By default the summary and only three findings are visible; “展开结论” and “查看其余7条发现” are explicit user choices.
-7. Read the title “模型初步结论 · 待复核” and explain that the server checked file references and the read-only boundary, not the numerical conclusion.
-8. Close on `completed`: an initial response exists in memory and passed schema/reference/boundary checks; the negative deterministic comparison shows it was not numerically correct, it requires review, and no external action occurred.
+- 官方资料重点：自托管 Gateway、Channel、Session、Routing、Tool 和主机执行审批。
+- 我们的侧重点：把一个服务端拥有的办公文件夹、任务级文件范围和证据引用放到第一屏。
+- 交互影响：用户先检查数据和范围，再提交任务，而不是先从消息 Channel 开始。
 
-Never call displayed plan operation labels “executed tools”. Never call server policy compilation an Artifact write, and never call the result an Artifact Commit.
+### Codex App
 
-When introducing the three Demos, say explicitly: they are three acceptance lenses over one Agent Runtime, not three modes that inject different abilities. Demo 1 proves the single-task loop, Demo 2 proves multi-task self-organization, and Demo 3 proves the risk/action control plane across either topology. The current product has only the generic contract and read-only analysis slice; the three execution proof targets remain `Draft`.
+- 官方资料重点：并行项目任务、Worktree、变更审查、Skill 和 Automation 审查队列。
+- 我们的侧重点：办公文件是只读业务证据，计划与结果需要回到用户选择的文件核对。
+- 交互影响：用户主要审查业务结论和引用，而不是代码 Diff 或 Worktree。
 
-## 6. Screenshot provenance
+### Claude Code
 
-| Screenshot | Provenance | Allowed use | Prohibited inference |
+- 官方资料重点：项目目录上下文、Agent/Tool Loop、Subagent、Permission Mode 和多种开发界面。
+- 我们的侧重点：模型不能静默获得整个工作区权限；用户明确选择文件，服务端再校验计划。
+- 交互影响：执行前增加一次可见的数据范围确认，减少隐藏上下文扩张。
+
+### ReAct 与当前 Office Agent
+
+- ReAct 启发：以 Reasoning、Action、Observation 交替组织执行轨迹。
+- 当前落地：普通前台只展示模型调用、业务操作、服务端校验、回执和引用，不暴露私有思维链。
+- 用户流程：浏览 -> 预览 -> 选择 -> 下达任务 -> 查看轨迹 -> 打开引用 -> 人工复核。
+
+不能表述为“竞品没有这些能力”或“本方案优于竞品”。官方文档不是受控竞品测试，
+引用页面没有提及某项能力，也不能证明产品绝对不具备它。
+
+## 6. 技术差异到交互影响卡片
+
+| 技术选择 | 用户流程变化 | 前台输出 | 后端事实 |
 | --- | --- | --- | --- |
-| [`dr-0018-data-workbench-running-desktop.png`](evidence/screenshots/dr-0018-data-workbench-running-desktop.png) | second real Run `harness:f3a071...`, captured around 1.8s; final Run later completed v9/seq 8 | show real in-progress trajectory and receipt waiting states | not timing benchmark or proof of background execution |
-| [`dr-0018-data-workbench-result-desktop.png`](evidence/screenshots/dr-0018-data-workbench-result-desktop.png) | prior real Run `harness:8c9...` persisted Snapshot replayed into the formal UI by browser POST | show final desktop projection of a real persisted Snapshot | not a third model call or cross-restart/history recovery |
-| [`dr-0018-data-workbench-result-mobile.png`](evidence/screenshots/dr-0018-data-workbench-result-mobile.png) | same replayed `harness:8c9...` Snapshot at 390px; no horizontal overflow | show mobile engineering layout | not a mobile user study |
-| [`dr-0020-safe-plan-compiler-completed.png`](evidence/screenshots/dr-0020-safe-plan-compiler-completed.png) | real browser Run `harness:5dee3a8...`; Planner `15059 ms`, Analyst `13443 ms`, both adopted | show server-compiled plan, readable receipts and completed read-only result | not plan/result quality, tool execution or user comprehension |
+| 服务端拥有完整文件目录 | 用户可以先浏览再提问 | 文件夹、文件信息、可用状态 | `GET /v1/harness/workspace` |
+| 显式选择 `file_ref` | 用户拥有本轮上下文边界 | 选择标签、数量、可移除范围 | Run 冻结的 `selected_file_refs` |
+| 有界格式适配器 | 不执行文件也能检查证据 | 表格/文档预览和安全说明 | 文件预览路由与完整性校验 |
+| 模型之后还有策略编译器 | 模型不能静默决定副作用 | “模型已调用”与“计划已校验”分开 | Model Receipt 与服务端 Plan |
+| 有序事件加权威 Snapshot | 进度和恢复依据事实 | 轨迹、重连中、最终对账 | named SSE 与 Run Snapshot |
+| 引用范围校验 | 复核不离开本轮资料 | 引用按钮重新打开来源 | 结果 `file_refs` 属于冻结范围 |
+| 终态仍要求复核 | 完成不等于正确 | “模型初步结论 · 待复核” | `review_required=true` |
 
-Console/page errors were 0 for these captures. Exact hashes and dimensions are in [DR-0018 Evidence](evidence/FORTE-DATA-WORKBENCH-TRACE-EVIDENCE-20260824.md).
+## 7. 当前证据卡片
 
-## 7. Evidence ledger
+`DR-0022` 当前只在限定工程链路内为 `Limited Verified`：
 
-| Claim | Status | Evidence | Cannot imply |
-| --- | --- | --- | --- |
-| seven-path data workbench | Limited Verified | `fffa36a...` + `041186d`, focused Python `30 passed` | production readiness |
-| browse/select/custom task | Limited Verified | focused browser `8 passed in 26.8s` + screenshots | user comprehension |
-| two real model calls | observed | two live Run records | quality, repeatability or SLA |
-| cited initial result | Limited Verified | v9/seq 8 Snapshot facts and manifest | semantic/numeric correctness |
-| deterministic negative comparison | Verified regression fact | public-preview test reproduces 23 / `1,845,444.71` | a Runtime semantic verifier already exists |
-| no external effect | current boundary | Runtime/events/result footer | future Connector governance |
-| generic capability profile, no Demo identity | Limited Verified | `eef656e`, focused Python `30 passed`, browser `8 passed` | bounded loop, adaptive swarm or Risk Gate execution |
-| server-owned plan policy compilation | Limited Verified | `373b79a`; live v9/seq 8; Python `56 passed`; browser `8 passed` | plan/result quality, Tool Gateway or Artifact mutation |
-| reduced text improves clarity | Draft | no target-user study | usability claim |
+- 聚焦 Python：`26 passed in 15.37s`；
+- 完整 Python：`51 passed in 13.16s`；
+- 浏览器：`8 passed in 22.9s`；
+- Ruff、前端类型检查、生产构建和治理测试通过；
+- 真实浏览器运行：规划 `8.7s`，分析 `16.7s`，两次模型结果均被采用；
+- 9 张截图及 SHA-256 已绑定机器清单；
+- 实现提交 [`0794648`](https://github.com/Dickey007s/lenovo_agent/commit/0794648477ad0061a5460127af8800a021019366)；
+- 当前交付 [PR #27](https://github.com/Dickey007s/lenovo_agent/pull/27) 为开放状态，不能表述为已经合并。
 
-Current DR-0020 verification is Python `56 passed in 2.57s`, Harness browser `8 passed in 25.1s`, Ruff and web lint passed, and the production build passed (`2.1s` compile, `3.7s` TypeScript, `656ms` static generation). [PR #25](https://github.com/Dickey007s/lenovo_agent/pull/25) is open and not yet merged.
+最终数字必须取自
+[`FORTE-FOLDER-WORKSPACE-EVIDENCE-20260825`](evidence/FORTE-FOLDER-WORKSPACE-EVIDENCE-20260825.md)，
+不得沿用旧版 PPT 或历史 Evidence。
 
-## 8. Source trail
+## 8. 禁止对外表述
 
-- [Source Register](decisions/SOURCE_REGISTER.md)
-- [Stakeholder Feedback 10](sources/USER-FEEDBACK-20260824-10-data-workbench-and-trace.md)
-- [DR-0018](decisions/DR-0018-forte-data-workbench-and-verifiable-trace.md)
-- [DR-0018 Evidence](evidence/FORTE-DATA-WORKBENCH-TRACE-EVIDENCE-20260824.md)
-- [Stakeholder Feedback 11](sources/USER-FEEDBACK-20260824-11-generic-capability-composition.md)
-- [DR-0019](decisions/DR-0019-capability-composed-agent-runtime.md)
-- [DR-0019 Evidence](evidence/AGENT-CAPABILITY-COMPOSITION-EVIDENCE-20260824.md)
-- [FORTE audit](research/FORTE-DATASET-AUDIT-20260824.md)
-- [Competitor research](research/COMPETITOR-RESEARCH-OPENCLAW-CODEX-CLAUDE-CODE-20260821.md)
+- “已经下载 FORTE 未公开的完整 180 条任务”；
+- “FORTE 公开文件是真实 Lenovo 或客户企业数据”；
+- “15 类 FORTE 任务已经全部解决”；
+- “有引用就证明结论或数字正确”；
+- “计划里出现操作，就说明工具或文件写入已经发生”；
+- “Demo 1/2 执行器和 Demo 3 真实动作控制已经全部完成”；
+- “内存 Snapshot 具备跨进程持久化或多实例高可用”；
+- 在没有用户研究时声称“新界面更清晰、更可信或效率更高”。

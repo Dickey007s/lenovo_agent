@@ -16,7 +16,6 @@ import logging
 import re
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from pathlib import Path
 from time import perf_counter
 from typing import Any, Literal, Protocol
 from uuid import uuid4
@@ -182,7 +181,7 @@ class HarnessRunSnapshot(BaseModel):
 
     run_id: str
     owner_id: str
-    scenario_id: str
+    workspace_id: Literal["forte-public-office"] = "forte-public-office"
     status: str
     version: int = Field(ge=1)
     created_at: datetime
@@ -191,7 +190,7 @@ class HarnessRunSnapshot(BaseModel):
     source_documents: list[dict[str, Any]] = Field(default_factory=list)
     selection_reason: str | None = None
     instruction: str = Field(min_length=1, max_length=2_000)
-    instruction_source: Literal["dataset_task", "user"] = "dataset_task"
+    instruction_source: Literal["user"] = "user"
     plan: HarnessPlan | None = None
     model_receipt: HarnessModelReceipt | None = None
     analysis_receipt: HarnessModelReceipt | None = None
@@ -203,19 +202,15 @@ class HarnessRunSnapshot(BaseModel):
 class HarnessRunStart(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    scenario_id: str = Field(min_length=1, max_length=120)
+    workspace_id: Literal["forte-public-office"] = "forte-public-office"
     idempotency_key: str = Field(min_length=8, max_length=160)
     expected_version: int = Field(default=1, ge=1)
-    instruction: str | None = Field(default=None, min_length=3, max_length=2_000)
-    selected_file_refs: list[str] | None = Field(
-        default=None, min_length=1, max_length=100
-    )
+    instruction: str = Field(min_length=3, max_length=2_000)
+    selected_file_refs: list[str] = Field(min_length=1, max_length=20)
 
     @field_validator("instruction")
     @classmethod
-    def validate_instruction(cls, value: str | None) -> str | None:
-        if value is None:
-            return None
+    def validate_instruction(cls, value: str) -> str:
         normalized = value.strip()
         if len(normalized) < 3 or any(ord(character) < 32 and character not in "\n\t" for character in normalized):
             raise ValueError("instruction contains invalid content")
@@ -223,9 +218,7 @@ class HarnessRunStart(BaseModel):
 
     @field_validator("selected_file_refs")
     @classmethod
-    def validate_file_refs(cls, value: list[str] | None) -> list[str] | None:
-        if value is None:
-            return None
+    def validate_file_refs(cls, value: list[str]) -> list[str]:
         if len(value) != len(set(value)):
             raise ValueError("selected_file_refs contains duplicates")
         if any(not re.fullmatch(r"forte-[0-9a-f]{16}", item) for item in value):
@@ -267,7 +260,7 @@ class PublicHarnessRunSnapshot(BaseModel):
 
     run_id: str
     owner_id: str
-    scenario_id: str
+    workspace_id: Literal["forte-public-office"]
     status: str
     version: int
     created_at: datetime
@@ -276,7 +269,7 @@ class PublicHarnessRunSnapshot(BaseModel):
     source_documents: list[dict[str, Any]]
     selection_reason: str | None
     instruction: str
-    instruction_source: Literal["dataset_task", "user"]
+    instruction_source: Literal["user"]
     plan: PublicHarnessPlan | None
     model_receipt: HarnessModelReceipt | None
     analysis_receipt: HarnessModelReceipt | None
@@ -292,18 +285,16 @@ class PublicHarnessRunStartResult(BaseModel):
     replayed: bool = False
 
 
-class HarnessScenarioCatalog(Protocol):
+class HarnessWorkspaceCatalog(Protocol):
     """Small adapter boundary used by the runtime and easy to fake in tests."""
 
-    def list_scenarios(self) -> list[dict[str, Any]]: ...
+    def public_workspace(self) -> dict[str, Any]: ...
 
-    def get_scenario(self, scenario_id: str) -> dict[str, Any]: ...
+    def internal_workspace(self) -> dict[str, Any]: ...
 
-    def public_file(self, scenario_id: str, file_ref: str) -> dict[str, Any]: ...
+    def public_file(self, file_ref: str) -> dict[str, Any]: ...
 
-    def agent_file_inputs(
-        self, scenario_id: str, file_refs: list[str]
-    ) -> list[dict[str, Any]]: ...
+    def agent_file_inputs(self, file_refs: list[str]) -> list[dict[str, Any]]: ...
 
 
 class HarnessPlanner(Protocol):
@@ -529,7 +520,7 @@ class HarnessRuntime:
 
     def __init__(
         self,
-        catalog: HarnessScenarioCatalog,
+        catalog: HarnessWorkspaceCatalog,
         planner: HarnessPlanner,
         analyst: HarnessAnalyst | None = None,
     ) -> None:
@@ -541,218 +532,29 @@ class HarnessRuntime:
         self._tasks: dict[str, asyncio.Task[None]] = {}
         self._lock = asyncio.Lock()
 
-    def list_scenarios(self) -> list[dict[str, Any]]:
-        public_method = getattr(self.catalog, "public_scenarios", None)
-        if callable(public_method):
-            return public_method()
-        list_method = getattr(self.catalog, "list_scenarios", None)
-        if callable(list_method):
-            return [self._public_dict(item) for item in list_method()]
-        load_method = getattr(self.catalog, "load", None)
-        if not callable(load_method):
-            raise HarnessError("Harness catalog 没有 list/load 接口")
-        _, scenarios = load_method()
-        return [self._public_dict(item) for item in scenarios]
-
-    def get_scenario(self, scenario_id: str) -> dict[str, Any]:
-        public_method = getattr(self.catalog, "public_task", None)
-        if callable(public_method):
-            try:
-                return public_method(scenario_id)
-            except KeyError as exc:
-                raise HarnessNotFoundError("场景不存在") from exc
-        return self._public_dict(self._get_catalog_item(scenario_id))
-
-    def get_file_preview(self, scenario_id: str, file_ref: str) -> dict[str, Any]:
-        public_file = getattr(self.catalog, "public_file", None)
-        if not callable(public_file):
-            raise HarnessNotFoundError("文件预览不可用")
+    def get_workspace(self) -> dict[str, Any]:
         try:
-            return public_file(scenario_id, file_ref)
+            return self.catalog.public_workspace()
+        except Exception as exc:
+            raise HarnessError("FORTE 办公资料库暂时无法读取") from exc
+
+    def get_file_preview(self, file_ref: str) -> dict[str, Any]:
+        try:
+            return self.catalog.public_file(file_ref)
         except KeyError as exc:
             raise HarnessNotFoundError("文件不存在") from exc
 
-    def get_internal_scenario(self, scenario_id: str) -> dict[str, Any]:
-        internal_method = getattr(self.catalog, "internal_task", None)
-        if callable(internal_method):
-            try:
-                return internal_method(scenario_id)
-            except KeyError as exc:
-                raise HarnessNotFoundError("场景不存在") from exc
-        return self._catalog_scenario_dict(self._get_catalog_item(scenario_id))
-
-    def _get_catalog_item(self, scenario_id: str) -> Any:
-        get_method = getattr(self.catalog, "get_scenario", None)
-        if callable(get_method):
-            try:
-                return get_method(scenario_id)
-            except KeyError as exc:
-                raise HarnessNotFoundError("场景不存在") from exc
-        task_method = getattr(self.catalog, "task", None)
-        if not callable(task_method):
-            raise HarnessError("Harness catalog 没有 get/task 接口")
+    def get_internal_workspace(self) -> dict[str, Any]:
         try:
-            return task_method(scenario_id)
-        except (KeyError, HarnessError) as exc:
-            raise HarnessNotFoundError("场景不存在") from exc
-
-    @staticmethod
-    def _public_dict(item: Any) -> dict[str, Any]:
-        if isinstance(item, dict):
-            blocked = {"task_instruction", "input_dir", "files"}
-            public = {key: value for key, value in item.items() if key not in blocked}
-            public_files = []
-            for index, file in enumerate(item.get("files", []), start=1):
-                if not isinstance(file, dict) or "display_label" not in file:
-                    continue
-                fallback_identity = str(
-                    file.get("path")
-                    or f"{file.get('display_group', 'group')}:{file['display_label']}:{index}"
-                )
-                public_files.append(
-                    {
-                        "file_ref": file.get("file_ref")
-                        or HarnessRuntime._stable_file_ref(
-                            str(item.get("scenario_id", "scenario")),
-                            fallback_identity,
-                        ),
-                        "display_label": file["display_label"],
-                        "display_group": file.get(
-                            "display_group", "公开办公输入"
-                        ),
-                        "display_summary": file.get(
-                            "display_summary", "公开办公输入文件"
-                        ),
-                    }
-                )
-            public["files"] = public_files
-            return public
-        return HarnessRuntime._catalog_public_object_dict(item)
-
-    @staticmethod
-    def _catalog_public_object_dict(scenario: Any) -> dict[str, Any]:
-        projection = getattr(scenario, "projection", {})
-        if not isinstance(projection, dict):
-            raise HarnessError("Harness catalog 缺少公共场景投影")
-        files = []
-        for item in getattr(scenario, "files", ()):
-            if item.role != "input" or item.provenance_only:
-                continue
-            files.append(
-                {
-                    "file_ref": HarnessRuntime._stable_file_ref(
-                        scenario.task_id, item.path
-                    ),
-                    "display_label": Path(item.path).name,
-                    "display_group": "公开办公输入",
-                    "display_summary": "公开办公输入文件",
-                }
-            )
-        return {
-            "scenario_id": scenario.task_id,
-            "work_profile": projection["work_profile"],
-            "title": projection["title"],
-            "goal": projection["goal"],
-            "deliverables": projection["deliverables"],
-            "data_boundary": projection["data_boundary"],
-            "human_gate_summary": projection["human_gate_summary"],
-            "allowed_capabilities": projection["allowed_capabilities"],
-            "dataset_label": projection["dataset_label"],
-            "dataset_version": projection["dataset_version"],
-            "files": files,
-        }
-
-    @staticmethod
-    def _catalog_scenario_dict(scenario: Any) -> dict[str, Any]:
-        """Project the immutable catalog into the planner's read-only context.
-
-        The catalog owns bytes, paths and hashes. The harness only adds a
-        conservative tool allowlist; the model cannot expand it.
-        """
-        if isinstance(scenario, dict):
-            return scenario
-        task_id = str(getattr(scenario, "task_id", ""))
-        category = str(getattr(scenario, "category", ""))
-        projection = getattr(scenario, "projection", None)
-        if not isinstance(projection, dict):
-            projection = {
-                key: getattr(scenario, key, None)
-                for key in (
-                    "work_profile",
-                    "title",
-                    "goal",
-                    "dataset_label",
-                    "dataset_version",
-                    "selection_reason",
-                    "allowed_tools",
-                    "task_instruction",
-                    "deliverables",
-                    "data_boundary",
-                    "human_gate_summary",
-                    "allowed_capabilities",
-                    "allowed_side_effects",
-                )
-            }
-            if any(value is None for value in projection.values()):
-                projection = None
-        if not isinstance(projection, dict):
-            raise HarnessError("Harness catalog 缺少稳定的产品场景投影")
-        files = []
-        for item in getattr(scenario, "files", ()):
-            if item.role != "input" or item.provenance_only:
-                continue
-            files.append(
-                {
-                    "file_ref": HarnessRuntime._stable_file_ref(task_id, item.path),
-                    "path": item.path,
-                    "role": item.role,
-                    "mime": item.mime,
-                    "size": item.size,
-                    "sha256": item.sha256,
-                    "summary": item.summary,
-                }
-            )
-        return {
-            "scenario_id": task_id,
-            "work_profile": projection["work_profile"],
-            "title": projection["title"],
-            "goal": projection["goal"],
-            "category": category,
-            "dataset_label": projection["dataset_label"],
-            "dataset_version": projection["dataset_version"],
-            "input_dir": getattr(scenario, "input_dir", ""),
-            "selection_reason": projection["selection_reason"],
-            "allowlisted_tools": projection["allowed_tools"],
-            "allowed_side_effects": projection["allowed_side_effects"],
-            "task_instruction": projection["task_instruction"],
-            "deliverables": projection["deliverables"],
-            "data_boundary": projection["data_boundary"],
-            "human_gate_summary": projection["human_gate_summary"],
-            "allowed_capabilities": projection["allowed_capabilities"],
-            "files": [item for item in files if item["role"] == "input"],
-        }
-
-    @staticmethod
-    def _stable_file_ref(scenario_id: str, path: str) -> str:
-        digest = hashlib.sha256(f"{scenario_id}:{path}".encode("utf-8")).hexdigest()
-        return f"forte-{digest[:16]}"
+            return self.catalog.internal_workspace()
+        except Exception as exc:
+            raise HarnessError("FORTE 办公资料库暂时无法读取") from exc
 
     async def start(self, owner_id: str, request: HarnessRunStart) -> HarnessRunStartResult:
-        scenario = self.get_internal_scenario(request.scenario_id)
-        default_instruction = str(
-            scenario.get("goal")
-            or scenario.get("title")
-            or "核对所选公开办公资料并形成可复核结论"
-        ).strip()
-        instruction = request.instruction or default_instruction
-        instruction_source: Literal["dataset_task", "user"] = (
-            "user" if request.instruction else "dataset_task"
-        )
-        scenario = {
-            **scenario,
-            "task_instruction": instruction,
-            "goal": instruction,
-        }
+        workspace = self.get_internal_workspace()
+        if workspace.get("workspace_id") != request.workspace_id:
+            raise HarnessNotFoundError("办公资料库不存在")
+        instruction = request.instruction
         digest = hashlib.sha256(
             json.dumps(request.model_dump(), ensure_ascii=False, sort_keys=True).encode("utf-8")
         ).hexdigest()
@@ -766,10 +568,13 @@ class HarnessRuntime:
             run_id = f"harness:{uuid4().hex}"
             now = datetime.now(timezone.utc)
             snapshot = HarnessRunSnapshot(
-                run_id=run_id, owner_id=owner_id, scenario_id=request.scenario_id, status="queued",
+                run_id=run_id,
+                owner_id=owner_id,
+                workspace_id=request.workspace_id,
+                status="queued",
                 version=request.expected_version, created_at=now, updated_at=now,
                 instruction=instruction,
-                instruction_source=instruction_source,
+                instruction_source="user",
             )
             current = _Run(snapshot, asyncio.Condition())
             self._runs[(owner_id, run_id)] = current
@@ -779,7 +584,7 @@ class HarnessRuntime:
                 self._run(
                     owner_id,
                     run_id,
-                    scenario,
+                    workspace,
                     instruction,
                     request.selected_file_refs,
                 )
@@ -802,6 +607,13 @@ class HarnessRuntime:
         )
 
     def public_snapshot(self, snapshot: HarnessRunSnapshot) -> PublicHarnessRunSnapshot:
+        ref_to_label = {
+            str(document.get("file_ref")): str(
+                document.get("display_label", "所选公开办公文件")
+            )
+            for document in snapshot.source_documents
+            if document.get("file_ref")
+        }
         public_documents = []
         for document in snapshot.source_documents:
             public_documents.append(
@@ -815,12 +627,12 @@ class HarnessRuntime:
         public_plan = None
         if snapshot.plan is not None:
             public_plan = PublicHarnessPlan(
-                summary=snapshot.plan.summary,
+                summary=self._project_business_text(snapshot.plan.summary, ref_to_label),
                 units=[
                     PublicHarnessPlanUnit(
                         unit_id=unit.unit_id,
-                        title=unit.title,
-                        objective=unit.objective,
+                        title=self._project_business_text(unit.title, ref_to_label),
+                        objective=self._project_business_text(unit.objective, ref_to_label),
                         input_file_refs=unit.input_file_refs,
                         depends_on=unit.depends_on,
                         tool=unit.tool,
@@ -832,11 +644,29 @@ class HarnessRuntime:
                     for unit in snapshot.plan.units
                 ],
             )
+        public_result = None
+        if snapshot.result is not None:
+            public_result = HarnessTaskResult(
+                summary=self._project_business_text(snapshot.result.summary, ref_to_label),
+                findings=[
+                    HarnessFinding(
+                        title=self._project_business_text(finding.title, ref_to_label),
+                        detail=self._project_business_text(finding.detail, ref_to_label),
+                        file_refs=finding.file_refs,
+                    )
+                    for finding in snapshot.result.findings
+                ],
+                follow_ups=[
+                    self._project_business_text(item, ref_to_label)
+                    for item in snapshot.result.follow_ups
+                ],
+                review_required=True,
+            )
         public_events = [self.public_event(event, snapshot) for event in snapshot.events]
         return PublicHarnessRunSnapshot(
             run_id=snapshot.run_id,
             owner_id=snapshot.owner_id,
-            scenario_id=snapshot.scenario_id,
+            workspace_id=snapshot.workspace_id,
             status=snapshot.status,
             version=snapshot.version,
             created_at=snapshot.created_at,
@@ -849,7 +679,7 @@ class HarnessRuntime:
             plan=public_plan,
             model_receipt=snapshot.model_receipt,
             analysis_receipt=snapshot.analysis_receipt,
-            result=snapshot.result,
+            result=public_result,
             validation_errors=[
                 self._public_failure_message(error) for error in snapshot.validation_errors
             ],
@@ -886,7 +716,7 @@ class HarnessRuntime:
 
     @staticmethod
     def _public_failure_message(reason: str) -> str:
-        if "所选文件不属于" in reason or "场景没有可用输入文件" in reason:
+        if "所选文件不属于" in reason or "办公资料库没有可用输入文件" in reason:
             return "所选资料当前不可用，系统已安全停止。请重新选择资料后再运行。"
         if "分析结果引用了未选择的文件" in reason:
             return "分析结果引用了本轮范围外的资料，系统未采用该结果。请重新运行。"
@@ -938,6 +768,15 @@ class HarnessRuntime:
             .replace("rubrics", "内部评测元数据")
         )
 
+    @staticmethod
+    def _project_business_text(value: str, ref_to_label: dict[str, str]) -> str:
+        """Replace control references in model-authored copy with business labels."""
+
+        projected = value
+        for file_ref, label in ref_to_label.items():
+            projected = projected.replace(file_ref, label)
+        return re.sub(r"forte-[0-9a-f]{16}", "所选公开办公文件", projected)
+
     async def events(self, owner_id: str, run_id: str, after: int = 0):
         sequence = after
         while True:
@@ -964,28 +803,24 @@ class HarnessRuntime:
         self,
         owner_id: str,
         run_id: str,
-        scenario: dict[str, Any],
+        workspace: dict[str, Any],
         instruction: str,
-        selected_file_refs: list[str] | None,
+        selected_file_refs: list[str],
     ) -> None:
         try:
-            files = self._index_files(scenario, selected_file_refs)
-            selection_reason = (
-                f"用户选择了 {len(files)} 份公开文件"
-                if selected_file_refs
-                else str(scenario.get("selection_reason", "按任务说明选择输入文件"))
-            )
+            files = self._index_files(workspace, selected_file_refs)
+            selection_reason = f"用户从完整办公资料库中选择了 {len(files)} 份公开文件"
             await self._set_source_documents(
                 owner_id, run_id, files, selection_reason
             )
-            await self._transition(owner_id, run_id, "indexing", "workspace_index", "已读取并冻结场景文件索引。", {
+            await self._transition(owner_id, run_id, "indexing", "workspace_index", "已读取并冻结所选文件索引。", {
                 "files": files, "reason": selection_reason,
             })
             await self._transition(owner_id, run_id, "planning", "planning_started", "正在根据文件索引生成工作计划。", {})
             started = perf_counter()
             try:
                 candidate = await self.planner.plan(
-                    scenario=self._planner_scenario(scenario, instruction),
+                    scenario=self._planner_workspace(workspace, instruction),
                     files=self._planner_files(files),
                 )
                 plan = self._compile_plan(candidate)
@@ -1044,7 +879,7 @@ class HarnessRuntime:
                 "model_called": receipt.called,
                 "output_used": False,
             })
-            self._validate_plan(plan, scenario, files)
+            self._validate_plan(plan, workspace, files)
             await self._set_plan(owner_id, run_id, plan)
             await self._set_model_receipt(owner_id, run_id, receipt.model_copy(update={"output_used": True}))
             await self._transition(owner_id, run_id, "validating", "plan_validation", "计划通过路径、工具、依赖与人工确认校验。", {
@@ -1072,7 +907,7 @@ class HarnessRuntime:
                     "external_action": False,
                 },
             )
-            analysis_inputs = self._analysis_inputs(scenario, files)
+            analysis_inputs = self._analysis_inputs(files)
             analysis_started = perf_counter()
             try:
                 result = await self.analyst.analyze(
@@ -1165,15 +1000,10 @@ class HarnessRuntime:
             runtime_logger.warning("harness_run_failed run_id=%s error=%s", run_id, type(exc).__name__)
             await self._fail(owner_id, run_id, str(exc)[:500])
 
-    def _analysis_inputs(
-        self, scenario: dict[str, Any], files: list[dict[str, Any]]
-    ) -> list[dict[str, Any]]:
+    def _analysis_inputs(self, files: list[dict[str, Any]]) -> list[dict[str, Any]]:
         method = getattr(self.catalog, "agent_file_inputs", None)
         if callable(method):
-            return method(
-                str(scenario["scenario_id"]),
-                [str(item["file_ref"]) for item in files],
-            )
+            return method([str(item["file_ref"]) for item in files])
         return [
             {
                 "file_ref": item["file_ref"],
@@ -1184,20 +1014,19 @@ class HarnessRuntime:
         ]
 
     @staticmethod
-    def _planner_scenario(
-        scenario: dict[str, Any], instruction: str
+    def _planner_workspace(
+        workspace: dict[str, Any], instruction: str
     ) -> dict[str, Any]:
-        """Expose only the planning policy, never catalog paths or hidden tasks."""
+        """Expose only workspace policy and the user's current instruction."""
         return {
-            "scenario_id": scenario.get("scenario_id"),
-            "work_profile": scenario.get("work_profile"),
-            "title": scenario.get("title"),
+            "workspace_id": workspace.get("workspace_id"),
+            "title": workspace.get("title"),
             "goal": instruction,
             "task_instruction": instruction,
-            "deliverables": scenario.get("deliverables", []),
-            "data_boundary": scenario.get("data_boundary"),
-            "human_gate_summary": scenario.get("human_gate_summary"),
-            "allowlisted_tools": scenario.get("allowlisted_tools", []),
+            "deliverables": workspace.get("deliverables", []),
+            "data_boundary": workspace.get("data_boundary"),
+            "human_gate_summary": workspace.get("human_gate_summary"),
+            "allowlisted_tools": workspace.get("allowlisted_tools", []),
         }
 
     @staticmethod
@@ -1215,11 +1044,11 @@ class HarnessRuntime:
 
     @staticmethod
     def _index_files(
-        scenario: dict[str, Any], selected_file_refs: list[str] | None = None
+        workspace: dict[str, Any], selected_file_refs: list[str]
     ) -> list[dict[str, Any]]:
-        files = scenario.get("files")
+        files = workspace.get("files")
         if not isinstance(files, list) or not files:
-            raise HarnessPlanError("场景没有可用输入文件")
+            raise HarnessPlanError("办公资料库没有可用输入文件")
         available = []
         for item in files:
             if not isinstance(item, dict) or not isinstance(item.get("path"), str):
@@ -1228,9 +1057,7 @@ class HarnessRuntime:
                 continue
             file_ref = item.get("file_ref")
             if not isinstance(file_ref, str):
-                file_ref = HarnessRuntime._stable_file_ref(
-                    str(scenario.get("scenario_id", "scenario")), item["path"]
-                )
+                raise HarnessPlanError("文件索引缺少稳定引用")
             available.append(
                 {
                     "file_ref": file_ref,
@@ -1252,14 +1079,12 @@ class HarnessRuntime:
                 }
             )
         if not available:
-            raise HarnessPlanError("场景没有可用输入文件")
-        if selected_file_refs is not None:
-            selected_by_ref = {item["file_ref"]: item for item in available}
-            unknown = set(selected_file_refs) - set(selected_by_ref)
-            if unknown:
-                raise HarnessPlanError("所选文件不属于当前公开场景")
-            return [selected_by_ref[file_ref] for file_ref in selected_file_refs]
-        return available
+            raise HarnessPlanError("办公资料库没有可用输入文件")
+        selected_by_ref = {item["file_ref"]: item for item in available}
+        unknown = set(selected_file_refs) - set(selected_by_ref)
+        if unknown:
+            raise HarnessPlanError("所选文件不属于当前办公资料库")
+        return [selected_by_ref[file_ref] for file_ref in selected_file_refs]
 
     @staticmethod
     def _validate_result(
@@ -1295,12 +1120,12 @@ class HarnessRuntime:
         return HarnessPlan(summary=candidate.summary, units=units)
 
     @classmethod
-    def _validate_plan(cls, plan: HarnessPlan, scenario: dict[str, Any], files: list[dict[str, Any]]) -> None:
+    def _validate_plan(cls, plan: HarnessPlan, workspace: dict[str, Any], files: list[dict[str, Any]]) -> None:
         allowed_refs = {str(item["file_ref"]) for item in files}
-        allowed_tools = set(scenario.get("allowlisted_tools", []))
-        allowed_effects = set(scenario.get("allowed_side_effects", ["none", "run_workspace_write", "external_action"]))
+        allowed_tools = set(workspace.get("allowlisted_tools", []))
+        allowed_effects = set(workspace.get("allowed_side_effects", ["none", "run_workspace_write"]))
         if not allowed_tools:
-            raise HarnessPlanError("场景没有工具 allowlist")
+            raise HarnessPlanError("办公资料库没有工具 allowlist")
         ids = [unit.unit_id for unit in plan.units]
         if len(ids) != len(set(ids)):
             raise HarnessPlanError("工作单元 ID 重复")
@@ -1446,12 +1271,12 @@ def build_harness_runtime(settings: Any | None = None) -> HarnessRuntime:
         from services.api.app.config import get_settings
 
         settings = get_settings()
-    from services.api.app.application.benchmark_scenario_catalog import (
-        BenchmarkScenarioCatalog,
+    from services.api.app.application.benchmark_workspace_catalog import (
+        BenchmarkWorkspaceCatalog,
     )
 
     return HarnessRuntime(
-        BenchmarkScenarioCatalog(),
+        BenchmarkWorkspaceCatalog(),
         OpenAICompatibleHarnessPlanner(
             base_url=settings.llm_base_url,
             api_key=settings.llm_api_key,

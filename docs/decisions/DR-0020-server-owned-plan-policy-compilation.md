@@ -6,7 +6,7 @@
 | Date | 2026-08-25 |
 | Status | `Limited Verified` in the current FORTE read-only Harness |
 | Trigger | `USER-FEEDBACK-20260825-PLAN-POLICY-12` |
-| Scenarios | [SCENARIO-004](../scenarios/SCENARIO-004-forte-finance-durable-evidence.md), [SCENARIO-005](../scenarios/SCENARIO-005-forte-release-adaptive-team.md), [SCENARIO-006](../scenarios/SCENARIO-006-forte-governed-operations-action.md), [SCENARIO-007](../scenarios/SCENARIO-007-single-forte-worksite-entry.md) |
+| Scenarios | Historical [SCENARIO-004/005/006/007](../scenarios/SCENARIO-007-single-forte-worksite-entry.md); current whole-folder application in [SCENARIO-008](../scenarios/SCENARIO-008-whole-folder-office-workspace.md) |
 | Source | [Stakeholder feedback and screenshot](../sources/USER-FEEDBACK-20260825-12-plan-policy-and-readable-failure.md) |
 | Evidence | [Plan policy compiler recovery evidence](../evidence/PLAN-POLICY-COMPILER-RECOVERY-EVIDENCE-20260825.md) |
 | Implementation | [`373b79a`](https://github.com/Dickey007s/lenovo_agent/commit/373b79a) |
@@ -17,6 +17,10 @@
 The Planner was asked to generate server-internal `side_effect` values. A valid business plan could therefore be rejected because the model omitted or mismatched an internal enum. The failure was then projected verbatim to the business UI as `artifact.write 必须映射为 run_workspace_write`, while the call receipt said only “未采用”. The user could neither understand the failure nor tell whether the model had actually run.
 
 This was an ownership error, not merely a copy problem. Source scope, operation scope, write boundary and human-gate requirements are policy facts and cannot be delegated to model prose.
+
+Current applicability note: the same server-owned compiler remains on the
+whole-folder `DR-0022` Run path. Only the surrounding Scenario API and source
+selection contract changed.
 
 ## 2. Decision
 

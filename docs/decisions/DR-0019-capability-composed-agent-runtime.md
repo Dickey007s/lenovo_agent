@@ -4,7 +4,7 @@
 | --- | --- |
 | Decision ID | `DR-0019` |
 | Date | 2026-08-24 |
-| Status | generic contract migration `Limited Verified`; bounded execution, adaptive swarm and governed action runtime `Draft` |
+| Status | generic capability principle carried forward; the recorded public `work_profile` projection is historical; bounded execution, adaptive swarm and governed action remain `Draft` |
 | Trigger | `USER-FEEDBACK-20260824-CAPABILITY-COMPOSITION-11` |
 | Scenarios | [SCENARIO-004](../scenarios/SCENARIO-004-forte-finance-durable-evidence.md), [SCENARIO-005](../scenarios/SCENARIO-005-forte-release-adaptive-team.md), [SCENARIO-006](../scenarios/SCENARIO-006-forte-governed-operations-action.md) |
 | Source | [Stakeholder clarification](../sources/USER-FEEDBACK-20260824-11-generic-capability-composition.md) and the historical [Demo architecture reference](../evidence/assets/user-feedback-20260824-generic-capability-composition.png) |
@@ -15,6 +15,11 @@
 ## 1. Problem
 
 The data-first workbench already removed Demo navigation from the foreground, but the public Scenario, internal Catalog and Planner policy still carried `demo_id` and `experience_policy`. That made the architecture say that a capability belongs to a presentation mode. It also made a future runtime likely to branch on “Demo 1/2/3” instead of choosing reusable mechanisms from the task.
+
+Current applicability note: `DR-0022` removes the public Scenario/profile
+projection entirely and keeps Demo identities out of the product surface. The
+principle that one Runtime composes reusable capabilities remains active; the
+target topology executors are still not implemented.
 
 ## 2. Decision
 

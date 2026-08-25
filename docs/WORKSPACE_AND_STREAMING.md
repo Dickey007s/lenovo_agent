@@ -1,101 +1,120 @@
-# FORTE Data Workbench and Streaming
+# Whole-folder workspace and streaming
 
-## 1. Work-led layout
+## 1. Interaction model
 
-The root page is one data workbench, not a Demo selector or internal log console.
+The product is one office folder, not a Scenario chooser. The persistent layout
+is:
 
-- left: searchable FORTE collections and explicit file checkboxes;
-- center: task composer plus data, plan and result views;
-- right: compact Agent trajectory and two model receipts;
-- mobile: the same facts remain usable at 390px without horizontal overflow.
+- left: folders, files, search, metadata and selection checkboxes;
+- center: task composer and tabs for file preview, plan and result;
+- right: actual Agent trajectory and model receipts.
 
-The interface prioritizes actual data and the user's task. Explanatory policy text is secondary and collapsible.
+These regions answer four user questions in order: what data exists, what will
+the Agent read, what did it actually do, and where did the answer come from.
 
-Demo 1/2/3 are not navigation modes and do not grant capabilities. The public Scenario contract carries a generic `work_profile`; ordinary UI may later show a compact server Admission receipt such as “单任务有界推进” or “多任务自适应协作”, but only when the corresponding executor has produced a Snapshot/event. The current scope remains `read_only_analysis`, so no loop or swarm animation may imply execution.
+## 2. Browse before invocation
 
-## 2. Browse and select
+`GET /v1/harness/workspace` returns 15 business folders and 96 file projections.
+Opening a file calls the preview route but does not create a Run or invoke a
+model. The preview header shows business path, extension, size and row/page
+count. A security footer explains integrity, read-only, active-content and
+external-resource behavior.
 
-1. Health and Scenario list load.
-2. The first business collection opens with all its files selected.
-3. Clicking a file requests `/scenarios/{scenario_id}/files/{file_ref}`.
-4. XLSX preview shows a bounded real table; Markdown preview shows bounded input text.
-5. A user can search collections and uncheck files, but the UI keeps at least one selected.
-6. Changing collection resets the current Run/trace and selects that collection's file set.
+The user may inspect unselected files. Only explicit checkbox selection enters
+the task scope. Search and expansion are client presentation state and do not
+change server truth.
 
-Preview state is independent from Run state. A preview error must not fabricate data or silently substitute another file.
+## 3. Task composer
 
-## 3. User-owned task
+The task is always user-authored. Example chips only fill the editable textarea;
+they do not start a task. The Run button remains disabled until the instruction
+contains at least three characters and one file is selected.
 
-The task composer accepts a free-form instruction and shows how many files are selected. Starting sends the exact trimmed instruction and selected `file_ref` values with an idempotency key.
+Selection chips show the visible context contract. Clearing or changing the
+instruction changes the command signature. If a start response is unknown, the
+client retries the unchanged signature with the same idempotency key; a known
+terminal retry uses a fresh key and independent Run.
 
-If the start response is unknown, the local command retains its key. A retry with unchanged Scenario/instruction/files reuses it. Editing the task or selection creates a new command signature/key.
+## 4. Preview contract
 
-After a known failed terminal, “重新规划” creates a new command with a fresh key. After a known completed terminal, “再次运行” also creates a new command. These are new Runs, not recovery of the old terminal Run.
-
-The Snapshot echoes `instruction` and `instruction_source`. The frontend must not replace a user instruction with hidden benchmark text.
-
-## 4. Progressive trajectory
-
-| Stage | Server fact | User meaning |
+| Preview | User-visible projection | Safety boundary |
 | --- | --- | --- |
-| selected sources frozen | `workspace_index` | these files define the current context |
-| planning call | `planning_started/completed` + `model_receipt` | a work graph candidate was requested/returned |
-| plan check | `plan_validation` | paths, refs, tools, dependencies and gates passed |
-| analysis call | `analysis_started/completed` + `analysis_receipt` | a structured read-only result candidate was requested/returned |
-| result check | `result_validation` | all finding refs belong to the selected set |
-| initial result | `status=completed`, `task_completed`, result present | “初步结果已形成”; a response is available and still needs human review |
+| XLSX/CSV | bounded table with row numbers | formulas/macros not executed; first visible sheet for XLSX |
+| DOCX | extracted text | no macros; relationship scan; external resources not loaded |
+| PDF | page count and extracted text layer | encrypted/oversized input fails closed; active resources not run |
+| TXT/MD/JSON/log/code | bounded decoded text | content displayed as text, never executed |
 
-The trace shows observable server stages, not chain of thought or raw logs. Receipt labels are exact: `未调用` means `called=false`; `已采用` means `called=true/output_used=true`; `校验未通过` means the provider returned a candidate but the server rejected it. Elapsed animation is not evidence.
+Truncation is explicitly labeled. A parser/integrity error replaces the preview
+with a safe error; stale or partial data is not shown as valid.
 
-## 5. Data, plan and result views
+## 5. Plan, result and citation
 
-### Data preview
+The plan tab appears only after the server validates the model candidate. It
+uses business operation labels. `只写本轮成果` means a logical Run result in
+the current plan, not that a file or ArtifactVersion was written.
 
-Shows safe display labels, sheet/text content and truncation. It hides internal path/hash and task/grading metadata.
+The result tab appears only after citation-scope validation. It is labeled
+`模型初步结论 · 待复核`. A citation button resolves against the workspace
+projection, selects that file and switches back to its preview. This keeps
+evidence review inside the main task flow.
 
-### Task plan
+## 6. Call receipts and trace
 
-Shows validated public units, dependencies, selected file labels and business operation labels. The model candidate is first compiled by server policy; raw `artifact.write`, `run_workspace_write` and validator protocol strings are hidden from ordinary UI. A displayed operation remains proposed intent only; the current Runtime does not invoke a Tool Gateway or mutate an Artifact.
+The right pane distinguishes:
 
-### Analysis result
+- `未调用`: no provider request occurred;
+- `已采用`: provider returned and server checks accepted the output;
+- `未采用`: provider returned but checks rejected the output.
 
-Shows “模型初步结论 · 待复核”, a three-line summary, three findings by default, file-label citations and follow-ups. “展开结论” and “查看其余7条发现” are explicit user actions for the observed ten-finding result. The footer says the result is model-generated, reference-scope checked, subject to human review, and has no external action.
+Elapsed milliseconds are an observed call duration, not production SLA or cost.
+The trajectory uses named server events and business summaries. Prompt,
+chain-of-thought, raw provider response, token traces and validator code stay
+hidden.
 
-The server did not recompute the displayed numbers. A deterministic Finance regression found 23 / `1,845,444.71` while the observed model response stated 20 / `2,202,000`. The UI must therefore describe `result_validation` as a file-reference and read-only-boundary check, never as numerical or semantic verification.
+## 7. Streaming and reconciliation
 
-The view switches to result only after a `completed` Snapshot with a valid result. Failure must keep the result tab disabled.
+For a nonterminal Run the client opens:
 
-## 6. Connection semantics
+```text
+GET /v1/harness/runs/{run_id}/events?after={last_observed_sequence}
+```
 
-| UI label | Exact fact |
-| --- | --- |
-| 连接中 | initial transport unresolved |
-| 服务可用 | API/Catalog reachable; no active EventSource |
-| 轨迹实时 | current nonterminal EventSource open |
-| 正在重连 | nonterminal recovery active |
-| 暂时离线 | retry budget reached with API unreachable |
+Rules:
 
-Catalog loading distinguishes service unreachable, temporary Catalog failure and integrity failure. It uses bounded automatic retry plus explicit retry and never invents a fallback Scenario.
+1. apply only events for the current Run;
+2. never decrease Snapshot version or last event sequence;
+3. use SSE only as ordered change notification;
+4. read the current Snapshot after business events;
+5. on nonterminal failure, reconnect from `after=N`;
+6. after a terminal event, close the stream and perform final GET.
 
-## 7. SSE recovery
+The header says the service is available when HTTP is reachable. It says the
+trajectory is live only while an EventSource is open. Transport state is a
+browser fact, not a server task phase.
 
-- apply only events with sequence greater than the last applied;
-- after each nonterminal event, GET the Snapshot;
-- on nonterminal stream error, GET then reconnect with `after=N`;
-- on `task_completed`, `harness_failed` or compatibility `ready_to_execute`, close SSE and perform one final GET;
-- treat heartbeat as transport liveness only;
-- missing/wrong-owner Run returns 404 before stream creation.
+## 8. Failure and recovery
 
-Snapshot version and event sequence are server facts. The client cannot promote a task to completed.
+| Failure | Visible state | Preserved | Recovery |
+| --- | --- | --- | --- |
+| API offline | workspace unavailable/offline | local task draft when possible | bounded retry and explicit retry |
+| manifest integrity invalid | integrity-specific unavailable state | no stale catalog | repair/import source then retry |
+| preview error | file-specific safe error | folder/selection/task draft | reopen or choose another file |
+| unknown start result | reconciling | same instruction/refs/key | replay identical request |
+| model/schema/policy failure | safe stop plus receipt | selected scope and instruction | revise or create a fresh Run |
+| SSE interruption | reconnecting | current Snapshot and last sequence | GET plus `after=N` |
 
-## 8. Privacy and current limits
+## 9. Responsive behavior
 
-Ordinary UI hides raw `task.md`, Planner policy context, Prompt, chain of thought, raw model response, path, hash, rubric, solution, credentials and lower-level logs. The Analyst receives safe previews only.
+Desktop keeps folder, work area and activity pane visible. Narrow layouts stack
+the same functions rather than shrinking the folder tree into an unreadable
+diagram. The tested 390 px path keeps file selection, task input, preview,
+trajectory, plan, result and citation actions touch-usable and avoids page-level
+horizontal overflow. Tables may scroll inside their own preview region.
 
-All Run state is memory-only. There is no background Scheduler/Worker, Tool Gateway execution, versioned Artifact, durable recovery, production identity, Connector or external action.
+## 10. Hidden details
 
-Target interaction after those engines exist is capability-driven: single-task work progressively reveals decomposition, current checkpoint and a precise pause reason; multi-task work reveals real units, dependencies, additions/cancellations and shared-artifact convergence; the Risk Gate appears only when a proposed side effect requires it. None of these target views may expose Prompt, chain of thought or raw Worker chat.
-
-DR-0018 includes one actual running screenshot and two result screenshots produced by replaying a real persisted Snapshot through the same formal UI. Replay is not another model call or product history/restart recovery. These screenshots and browser E2E support tested engineering behavior, not the claim that users find the page clearer or the trajectory easier to understand; no target-user study exists.
-
-See [DR-0019](decisions/DR-0019-capability-composed-agent-runtime.md) for the generic capability contract and the distinction between target orchestration policy and current execution fact.
+Ordinary DOM must not contain benchmark task prompt/rubric/solution, raw path,
+digest, model Prompt, chain-of-thought, raw response, credentials, internal
+effect/gate enums or low-level logs. The UI may show business labels, bounded
+content, call receipts, validation status and citations because those facts help
+the user decide or recover.

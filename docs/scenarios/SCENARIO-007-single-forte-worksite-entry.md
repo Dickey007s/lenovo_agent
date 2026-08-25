@@ -3,7 +3,7 @@
 | Field | Value |
 | --- | --- |
 | Scenario ID | `SCENARIO-007` |
-| Status | `Limited Verified` for the current engineering path; comprehension, result quality and user value `Draft` |
+| Status | `Historical three-collection path`; superseded by [`SCENARIO-008`](SCENARIO-008-whole-folder-office-workspace.md) for the current product |
 | Decisions | [`DR-0017`](../decisions/DR-0017-single-forte-worksite-and-legacy-retirement.md), [`DR-0018`](../decisions/DR-0018-forte-data-workbench-and-verifiable-trace.md) |
 | Sources | `USER-FEEDBACK-20260824-FORTE-ONLY-09`, `USER-FEEDBACK-20260824-DATA-WORKBENCH-10` |
 
@@ -17,7 +17,11 @@ The former product led with Demo framing and explanatory copy. It did not make b
 
 ## Goal and completion condition
 
-The first screen is one FORTE data workbench. The user can browse a bounded preview, choose files, write an instruction, follow two independently receipted model calls and inspect a cited read-only result. The current successful Run ends at `completed` v9/seq 8 only after schema and selected-reference checks; it still requires human review and performs no external action. Completion does not mean the finding text or arithmetic is correct.
+At the historical implementation scope, the first screen was one FORTE data
+workbench over three registered collections. The current whole-folder goal and
+completion contract are defined by `SCENARIO-008`. Historical Run evidence here
+still proves only schema/source-membership checks, human review and no external
+action; it never proved the finding text or arithmetic correct.
 
 ## Frontend journey
 
