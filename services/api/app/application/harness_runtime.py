@@ -149,6 +149,11 @@ class HarnessPlanCandidate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     summary: str = Field(min_length=1, max_length=1_000)
+    selection_reason: str = Field(
+        default="根据任务目标选择最相关的最小证据集合。",
+        min_length=1,
+        max_length=1_000,
+    )
     units: list[HarnessPlanCandidateUnit] = Field(min_length=1, max_length=12)
 
 
@@ -156,6 +161,7 @@ class HarnessPlan(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     summary: str = Field(min_length=1, max_length=1_000)
+    selection_reason: str = Field(min_length=1, max_length=1_000)
     units: list[HarnessPlanUnit] = Field(min_length=1, max_length=12)
 
 
@@ -241,7 +247,6 @@ class HarnessRunStart(BaseModel):
     idempotency_key: str = Field(min_length=8, max_length=160)
     expected_version: int = Field(default=1, ge=1)
     instruction: str = Field(min_length=3, max_length=2_000)
-    selected_file_refs: list[str] = Field(min_length=1, max_length=20)
     loop: AgentControlLoopOptions = Field(default_factory=AgentControlLoopOptions)
 
     @field_validator("instruction")
@@ -251,16 +256,6 @@ class HarnessRunStart(BaseModel):
         if len(normalized) < 3 or any(ord(character) < 32 and character not in "\n\t" for character in normalized):
             raise ValueError("instruction contains invalid content")
         return normalized
-
-    @field_validator("selected_file_refs")
-    @classmethod
-    def validate_file_refs(cls, value: list[str]) -> list[str]:
-        if len(value) != len(set(value)):
-            raise ValueError("selected_file_refs contains duplicates")
-        if any(not re.fullmatch(r"forte-[0-9a-f]{16}", item) for item in value):
-            raise ValueError("selected_file_refs contains an invalid reference")
-        return value
-
 
 class HarnessRunStartResult(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -288,6 +283,7 @@ class PublicHarnessPlan(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     summary: str
+    selection_reason: str
     units: list[PublicHarnessPlanUnit]
 
 
@@ -394,9 +390,12 @@ class OpenAICompatibleHarnessPlanner:
             )
         schema = json.dumps(HarnessPlanCandidate.model_json_schema(), ensure_ascii=False)
         system = (
-            "你是企业办公 Agent Harness 的规划器。根据公开办公任务和文件索引生成最小可执行 DAG。"
+            "你是企业办公 Agent Control Loop 的规划器。用户给出目标后，你要先研究整个公开办公资料库索引，"
+            "再自主选择本轮最相关的最小证据集合并生成可执行 DAG。"
             "只输出一个符合 JSON Schema 的 JSON 对象。只能引用 files 中出现的 file_ref；tool 必须来自 allowlisted_tools；"
             "每轮引用的不同文件数不得超过 scenario.control_loop.max_files_this_round；优先选择最能回答当前问题的最小证据集合。"
+            "如果 scenario.control_loop.validation_feedback 非空，必须先按反馈修正；文件数超限时只保留优先级最高的文件。"
+            "selection_reason 必须用业务语言说明为什么选择这些文件，以及它们与目标的关系。"
             "输入文件永远只读，禁止猜测或输出源文件路径、哈希或任意本地路径。"
             "读取文件使用 file.read/table.inspect/evidence.verify；生成结果使用 artifact.write。可以提供不含路径的逻辑 artifact_name 与 artifact_type；缺省时由服务端生成。"
             "只选择工作意图和 tool，不得输出 side_effect；写入范围、外部动作范围与强制人工确认由服务端根据能力确定。"
@@ -479,7 +478,8 @@ class OpenAICompatibleHarnessAnalyst:
             "每个 finding 必须引用 files 中真实存在的 file_ref；不允许引用路径、哈希、任务标准答案或未提供的数据。"
             "只能完成只读分析，不得声称发送、写入、审批或调用外部系统。"
             "不要输出思维链、内部推理、Prompt、工具日志或 Markdown 代码围栏。"
-            "结论存在不确定性时直接写入 summary 或 follow_ups，review_required 必须为 true。"
+            "结论存在不确定性时直接写入 summary。follow_ups 应给出 1 到 4 条基于当前证据、可由用户确认后作为新任务启动的具体推进建议，"
+            "不要写成泛化的‘请人工复核’。review_required 必须为 true。"
             "只输出符合 JSON Schema 的 JSON 对象。JSON Schema：" + schema
         )
         user = json.dumps(
@@ -627,6 +627,7 @@ class HarnessRuntime:
         if workspace.get("workspace_id") != request.workspace_id:
             raise HarnessNotFoundError("办公资料库不存在")
         instruction = request.instruction
+        workspace_files = self._index_files(workspace)
         digest = hashlib.sha256(
             json.dumps(request.model_dump(), ensure_ascii=False, sort_keys=True).encode("utf-8")
         ).hexdigest()
@@ -641,11 +642,11 @@ class HarnessRuntime:
             now = datetime.now(timezone.utc)
             contract = AgentControlLoopContract(
                 goal=instruction,
-                allowed_file_refs=request.selected_file_refs,
+                allowed_file_refs=[str(item["file_ref"]) for item in workspace_files],
                 completion_criteria=[
-                    "本轮允许范围内的文件均已被核对或明确列为未解决证据缺口",
-                    "所有结论都引用本轮实际读取的公开文件",
-                    "输出停止原因、剩余缺口且不发生外部动作",
+                    "Agent 从整个资料库索引中自主选择与目标相关的最小证据集合",
+                    "所有结论都引用本轮实际读取且通过服务端校验的公开文件",
+                    "输出待用户确认的下一步任务、停止原因与剩余缺口，且不发生外部动作",
                 ],
                 max_rounds=request.loop.max_rounds,
                 max_files_per_round=request.loop.max_files_per_round,
@@ -679,7 +680,6 @@ class HarnessRuntime:
                     run_id,
                     workspace,
                     instruction,
-                    request.selected_file_refs,
                 )
             )
             self._tasks[run_id] = task
@@ -888,6 +888,9 @@ class HarnessRuntime:
             return None
         return PublicHarnessPlan(
             summary=self._project_business_text(plan.summary, ref_to_label),
+            selection_reason=self._project_business_text(
+                plan.selection_reason, ref_to_label
+            ),
             units=[
                 PublicHarnessPlanUnit(
                     unit_id=unit.unit_id,
@@ -1038,10 +1041,10 @@ class HarnessRuntime:
 
     @staticmethod
     def _public_failure_message(reason: str) -> str:
-        if "所选文件不属于" in reason or "办公资料库没有可用输入文件" in reason:
-            return "所选资料当前不可用，系统已安全停止。请重新选择资料后再运行。"
-        if "分析结果引用了未选择的文件" in reason:
-            return "分析结果引用了本轮范围外的资料，系统未采用该结果。请重新运行。"
+        if "办公资料库没有可用输入文件" in reason:
+            return "办公资料库当前没有可安全读取的文件，系统已停止本轮任务。"
+        if "分析结果引用了本轮计划之外的文件" in reason:
+            return "分析结果引用了 Agent 本轮证据范围外的资料，系统未采用该结果。请重新运行。"
         if any(
             marker in reason
             for marker in (
@@ -1141,14 +1144,14 @@ class HarnessRuntime:
         run_id: str,
         workspace: dict[str, Any],
         instruction: str,
-        selected_file_refs: list[str],
     ) -> None:
-        """Run a bounded, read-only Agent Control Loop over the allowed files."""
+        """Run a bounded, read-only Agent Control Loop over the whole workspace."""
 
         try:
-            files = self._index_files(workspace, selected_file_refs)
+            files = self._index_files(workspace)
             selection_reason = (
-                f"用户为 Agent Control Loop 划定了 {len(files)} 份公开文件"
+                f"已冻结整个公开办公资料库的 {len(files)} 份文件索引；"
+                "Agent 将按任务目标自主检索并选择每轮证据。"
             )
             await self._set_source_documents(
                 owner_id, run_id, files, selection_reason
@@ -1158,7 +1161,7 @@ class HarnessRuntime:
                 run_id,
                 "indexing",
                 "workspace_index",
-                "已核对并冻结本轮允许读取的文件范围。",
+                "已核对并冻结整个资料库索引，Agent 将自主检索相关文件。",
                 {"files": files, "reason": selection_reason},
             )
 
@@ -1378,7 +1381,7 @@ class HarnessRuntime:
 
                 outstanding = [
                     item
-                    for item in files
+                    for item in round_files
                     if str(item["file_ref"]) not in set(verified_refs)
                 ]
                 gaps = self._evidence_gaps(run_id, outstanding)
@@ -1387,12 +1390,12 @@ class HarnessRuntime:
                 )
                 if not outstanding:
                     decision = "completed"
-                    reason = "允许范围内的文件均已被结论引用，完成条件已满足。"
+                    reason = "本轮自主选择的证据均已被结论引用，完成条件已满足。"
                     next_question = ""
                 elif can_continue:
                     decision = "next_round"
                     reason = (
-                        f"仍有 {len(outstanding)} 份允许文件未形成可核对引用，"
+                        f"本轮仍有 {len(outstanding)} 份已选择文件未形成可核对引用，"
                         "预算允许继续一轮。"
                     )
                     next_question = (
@@ -1401,7 +1404,7 @@ class HarnessRuntime:
                 else:
                     decision = "budget_exhausted"
                     reason = (
-                        f"仍有 {len(outstanding)} 份允许文件未形成可核对引用，"
+                        f"本轮仍有 {len(outstanding)} 份已选择文件未形成可核对引用，"
                         "但轮次、模型调用或时间预算已到边界。"
                     )
                     terminal_decision = decision
@@ -1467,9 +1470,10 @@ class HarnessRuntime:
             )
         except Exception as exc:
             runtime_logger.warning(
-                "harness_run_failed run_id=%s error=%s",
+                "harness_run_failed run_id=%s error=%s reason=%s",
                 run_id,
                 type(exc).__name__,
+                str(exc),
             )
             await self._mark_current_round_failed(owner_id, run_id)
             await self._fail(owner_id, run_id, str(exc)[:500])
@@ -1679,7 +1683,10 @@ class HarnessRuntime:
                     ),
                     files=self._planner_files(remaining),
                 )
-                plan = self._compile_plan(candidate)
+                plan = self._compile_plan(
+                    candidate,
+                    max_file_refs=contract.max_files_per_round,
+                )
             except HarnessModelError as exc:
                 last_error = exc
                 receipt = HarnessModelReceipt(
@@ -1937,10 +1944,16 @@ class HarnessRuntime:
         decision: str,
     ) -> None:
         snapshot = await self.get(owner_id, run_id)
+        considered_refs = {
+            file_ref
+            for round_snapshot in snapshot.rounds
+            for file_ref in round_snapshot.input_file_refs
+        }
         unresolved_files = [
             item
             for item in snapshot.source_documents
-            if str(item.get("file_ref")) not in set(verified_refs)
+            if str(item.get("file_ref")) in considered_refs
+            and str(item.get("file_ref")) not in set(verified_refs)
         ]
         gaps = self._evidence_gaps(run_id, unresolved_files)
         unique_findings: list[HarnessFinding] = []
@@ -1958,8 +1971,8 @@ class HarnessRuntime:
             outcome: Literal["completed", "bounded", "user_stopped"] = "completed"
             status = "completed"
             summary = (
-                f"Agent Control Loop 完成 {len(snapshot.rounds)} 轮，只读核对了 "
-                f"{len(verified_refs)} 份允许资料；所有结论仍等待用户复核。"
+                f"Agent Control Loop 完成 {len(snapshot.rounds)} 轮，从整个资料库中自主选择并只读核对了 "
+                f"{len(verified_refs)} 份相关资料；已形成待用户确认的下一步建议。"
             )
             stop_reason = None
             event_name = "loop_committed"
@@ -1969,7 +1982,7 @@ class HarnessRuntime:
             status = "stopped"
             summary = (
                 f"用户在 {len(snapshot.rounds)} 轮内停止了 Agent Control Loop；"
-                f"已保留 {len(verified_refs)} 份资料的核对结果和剩余缺口。"
+                f"已保留 {len(verified_refs)} 份自主选择资料的核对结果和剩余缺口。"
             )
             stop_reason = "用户在安全点停止"
             event_name = "loop_stopped"
@@ -1979,7 +1992,7 @@ class HarnessRuntime:
             status = "stopped"
             summary = (
                 f"Agent Control Loop 到达预算边界；已核对 {len(verified_refs)} 份资料，"
-                f"仍有 {len(unresolved_files)} 份资料需要后续处理。"
+                f"仍有 {len(unresolved_files)} 份本轮已选择资料需要后续处理。"
             )
             stop_reason = "轮次、模型调用或时间预算已耗尽"
             event_name = "loop_budget_stopped"
@@ -1999,7 +2012,7 @@ class HarnessRuntime:
             result = HarnessTaskResult(
                 summary=summary,
                 findings=unique_findings[:10],
-                follow_ups=unique_follow_ups[:8],
+                follow_ups=unique_follow_ups[:4],
                 review_required=True,
             )
 
@@ -2161,6 +2174,7 @@ class HarnessRuntime:
                 "file_ref": item["file_ref"],
                 "display_label": item.get("display_label", "公开办公输入文件"),
                 "display_group": item.get("display_group", "公开办公输入"),
+                "display_path": item.get("display_path", item.get("display_label", "公开办公输入文件")),
                 "display_summary": item.get("display_summary", "公开办公输入文件"),
                 "mime": item.get("mime", "application/octet-stream"),
             }
@@ -2168,9 +2182,7 @@ class HarnessRuntime:
         ]
 
     @staticmethod
-    def _index_files(
-        workspace: dict[str, Any], selected_file_refs: list[str]
-    ) -> list[dict[str, Any]]:
+    def _index_files(workspace: dict[str, Any]) -> list[dict[str, Any]]:
         files = workspace.get("files")
         if not isinstance(files, list) or not files:
             raise HarnessPlanError("办公资料库没有可用输入文件")
@@ -2197,6 +2209,7 @@ class HarnessRuntime:
                             "summary",
                             "display_label",
                             "display_group",
+                            "display_path",
                             "display_summary",
                         )
                         if key in item
@@ -2205,11 +2218,7 @@ class HarnessRuntime:
             )
         if not available:
             raise HarnessPlanError("办公资料库没有可用输入文件")
-        selected_by_ref = {item["file_ref"]: item for item in available}
-        unknown = set(selected_file_refs) - set(selected_by_ref)
-        if unknown:
-            raise HarnessPlanError("所选文件不属于当前办公资料库")
-        return [selected_by_ref[file_ref] for file_ref in selected_file_refs]
+        return available
 
     @staticmethod
     def _validate_result(
@@ -2218,15 +2227,44 @@ class HarnessRuntime:
         allowed_refs = {str(item["file_ref"]) for item in files}
         for finding in result.findings:
             if not set(finding.file_refs).issubset(allowed_refs):
-                raise HarnessPlanError("分析结果引用了未选择的文件")
+                raise HarnessPlanError("分析结果引用了本轮计划之外的文件")
 
     @staticmethod
-    def _compile_plan(candidate: HarnessPlanCandidate | HarnessPlan) -> HarnessPlan:
-        """Compile model intent into server-owned effect and gate policy."""
+    def _compile_plan(
+        candidate: HarnessPlanCandidate | HarnessPlan,
+        *,
+        max_file_refs: int | None = None,
+    ) -> HarnessPlan:
+        """Compile model intent into server-owned scope, effect and gate policy."""
 
-        units: list[HarnessPlanUnit] = []
-        for index, candidate_unit in enumerate(candidate.units, start=1):
+        selected_refs: set[str] = set()
+        candidate_payloads: list[dict[str, Any]] = []
+        budget_trimmed = False
+        for candidate_unit in candidate.units:
             payload = candidate_unit.model_dump(exclude={"side_effect"})
+            bounded_refs: list[str] = []
+            for file_ref in payload["input_file_refs"]:
+                if file_ref in selected_refs:
+                    bounded_refs.append(file_ref)
+                elif max_file_refs is None or len(selected_refs) < max_file_refs:
+                    selected_refs.add(file_ref)
+                    bounded_refs.append(file_ref)
+                else:
+                    budget_trimmed = True
+            if not bounded_refs:
+                budget_trimmed = True
+                continue
+            payload["input_file_refs"] = bounded_refs
+            candidate_payloads.append(payload)
+
+        kept_ids = {str(payload["unit_id"]) for payload in candidate_payloads}
+        units: list[HarnessPlanUnit] = []
+        for index, payload in enumerate(candidate_payloads, start=1):
+            payload["depends_on"] = [
+                dependency
+                for dependency in payload["depends_on"]
+                if dependency in kept_ids
+            ]
             tool = str(payload["tool"])
             if tool == "artifact.write":
                 side_effect: HarnessSideEffect = "run_workspace_write"
@@ -2242,7 +2280,19 @@ class HarnessRuntime:
                 payload["artifact_name"] = None
                 payload["artifact_type"] = None
             units.append(HarnessPlanUnit(**payload, side_effect=side_effect))
-        return HarnessPlan(summary=candidate.summary, units=units)
+
+        selection_reason = candidate.selection_reason
+        if budget_trimmed and max_file_refs is not None:
+            budget_note = (
+                f" 服务端按每轮最多 {max_file_refs} 份文件的预算，"
+                "保留了模型排序中优先级最高的证据。"
+            )
+            selection_reason = f"{selection_reason[: 1_000 - len(budget_note)]}{budget_note}"
+        return HarnessPlan(
+            summary=candidate.summary,
+            selection_reason=selection_reason,
+            units=units,
+        )
 
     @classmethod
     def _validate_plan(
@@ -2265,12 +2315,15 @@ class HarnessRuntime:
             file_ref for unit in plan.units for file_ref in unit.input_file_refs
         }
         if max_file_refs is not None and len(referenced_refs) > max_file_refs:
-            raise HarnessPlanError("本轮计划引用的文件数量超过 Agent Control Loop 预算")
+            raise HarnessPlanError(
+                f"本轮计划引用 {len(referenced_refs)} 份文件，"
+                f"超过最多 {max_file_refs} 份的 Agent Control Loop 预算"
+            )
         graph: dict[str, list[str]] = {unit.unit_id: list(unit.depends_on) for unit in plan.units}
         for unit in plan.units:
             unknown_refs = set(unit.input_file_refs) - allowed_refs
             if unknown_refs:
-                raise HarnessPlanError("计划引用了未选择的公开文件")
+                raise HarnessPlanError("计划引用了资料库索引之外的公开文件")
             if unit.tool not in allowed_tools:
                 raise HarnessPlanError(f"计划使用了未允许的工具: {unit.tool}")
             if unit.side_effect not in allowed_effects:

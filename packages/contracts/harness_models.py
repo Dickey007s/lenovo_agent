@@ -201,7 +201,8 @@ class AgentControlLoopOptions(StrictModel):
 class AgentControlLoopContract(StrictModel):
     contract_version: Literal["agent-control-loop.v1"] = "agent-control-loop.v1"
     goal: str = Field(min_length=3, max_length=2_000)
-    allowed_file_refs: list[str] = Field(default_factory=list, max_length=20)
+    scope_mode: Literal["whole_workspace"] = "whole_workspace"
+    allowed_file_refs: list[str] = Field(default_factory=list, max_length=100)
     completion_criteria: list[str] = Field(min_length=1, max_length=6)
     max_rounds: int = Field(ge=1, le=3)
     max_files_per_round: int = Field(ge=1, le=8)
@@ -216,7 +217,7 @@ class AgentControlLoopBudget(StrictModel):
     max_model_calls: int = Field(ge=2, le=6)
     deadline_seconds: int = Field(ge=20, le=300)
     rounds_used: int = Field(default=0, ge=0, le=3)
-    files_verified: int = Field(default=0, ge=0, le=20)
+    files_verified: int = Field(default=0, ge=0, le=100)
     model_calls_used: int = Field(default=0, ge=0, le=6)
     elapsed_ms: int = Field(default=0, ge=0)
     stop_reason: str | None = Field(default=None, max_length=240)

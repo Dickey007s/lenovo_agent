@@ -13,7 +13,6 @@ import {
   IconDatabase,
   IconFile,
   IconFileDescription,
-  IconFileSpreadsheet,
   IconLoader2,
   IconPlayerPause,
   IconPlayerPlay,
@@ -24,12 +23,12 @@ import {
   IconSend,
   IconShieldCheck,
   IconSparkles,
-  IconX,
 } from "@tabler/icons-react";
 
 type ConnectionState = "connecting" | "available" | "live" | "reconnecting" | "offline";
 type WorkspaceStatus = "checking" | "online" | "unavailable";
 type WorkspaceView = "data" | "loop" | "result";
+type FileTypeFilter = string;
 type PreviewKind = "table" | "document" | "pdf" | "text" | "unavailable";
 type LoopPhase = "observe" | "plan" | "act" | "verify" | "evidence_gate" | "commit";
 type LoopCommand = "pause" | "resume" | "steer" | "stop";
@@ -110,6 +109,7 @@ type HarnessServerEvent = { sequence: number; event_name: string; occurred_at?: 
 type LoopContract = {
   contract_version: string;
   goal: string;
+  scope_mode: "whole_workspace";
   allowed_file_refs: string[];
   completion_criteria: string[];
   max_rounds: number;
@@ -154,6 +154,7 @@ type LoopRound = {
   input_file_refs: string[];
   plan: HarnessPlanNode[];
   plan_summary: string | null;
+  selection_reason: string | null;
   model_receipt: ModelReceipt | null;
   result: HarnessResult | null;
   analysis_receipt: ModelReceipt | null;
@@ -198,6 +199,7 @@ export type HarnessRun = {
   brief: LoopBrief | null;
   plan: HarnessPlanNode[];
   plan_summary?: string;
+  selection_reason?: string;
   model_receipt: ModelReceipt | null;
   analysis_receipt: ModelReceipt | null;
   result: HarnessResult | null;
@@ -259,9 +261,9 @@ const NAMED_EVENTS = [
 const TERMINAL_EVENTS = new Set(["ready_to_execute", "loop_committed", "loop_budget_stopped", "loop_stopped", "harness_failed"]);
 const TERMINAL_STATUSES = new Set(["ready_to_execute", "completed", "stopped", "failed"]);
 const TASK_EXAMPLES = [
-  "比较所选文件中的关键变化，并列出每条结论的依据。",
-  "检查这些资料是否存在矛盾、缺失或需要人工确认的地方。",
-  "根据所选文件形成一份简明摘要，并标出后续需要核对的事项。",
+  "研究整个资料库，找出跨文件值得继续推进的问题，并提出有证据依据的下一步任务。",
+  "核对资料库中可能互相矛盾的信息，说明影响并提出下一步核查任务。",
+  "查找影响近期工作的变更、风险和待办，并逐条引用文件依据。",
 ];
 
 function asText(value: unknown, fallback = "") { return typeof value === "string" ? value : fallback; }
@@ -434,7 +436,11 @@ function normalizePlan(value: unknown) {
         : "none",
     }];
   }) : [];
-  return { units, summary: raw ? asText(raw.summary) || null : null };
+  return {
+    units,
+    summary: raw ? asText(raw.summary) || null : null,
+    selectionReason: raw ? asText(raw.selection_reason) || null : null,
+  };
 }
 
 function normalizeGap(value: unknown): EvidenceGap | null {
@@ -473,6 +479,7 @@ function normalizeLoopRound(value: unknown): LoopRound | null {
     input_file_refs: asStrings(raw.input_file_refs),
     plan: plan.units,
     plan_summary: plan.summary,
+    selection_reason: plan.selectionReason,
     model_receipt: normalizeReceipt(raw.model_receipt),
     result: normalizeResult(raw.result),
     analysis_receipt: normalizeReceipt(raw.analysis_receipt),
@@ -486,7 +493,7 @@ function normalizeLoopRound(value: unknown): LoopRound | null {
 
 function activityItem(event: HarnessServerEvent): HarnessActivityItem {
   const labels: Record<string, string> = {
-    workspace_index: "已锁定所选文件",
+    workspace_index: "已建立整个资料库索引",
     planning_started: "规划模型开始组织任务",
     planning_completed: "规划模型返回工作计划",
     plan_validation_rejected: "候选计划未通过，正在受控重试",
@@ -591,6 +598,7 @@ function normalizeRun(value: unknown): HarnessRun | null {
     contract: {
       contract_version: asText(contractRaw.contract_version, "agent-control-loop.v1"),
       goal: asText(contractRaw.goal, asText(raw.instruction)),
+      scope_mode: "whole_workspace",
       allowed_file_refs: asStrings(contractRaw.allowed_file_refs),
       completion_criteria: asStrings(contractRaw.completion_criteria),
       max_rounds: maxRounds,
@@ -616,6 +624,7 @@ function normalizeRun(value: unknown): HarnessRun | null {
     brief,
     plan: plan.units,
     plan_summary: plan.summary ?? undefined,
+    selection_reason: plan.selectionReason ?? undefined,
     model_receipt: normalizeReceipt(raw.model_receipt),
     analysis_receipt: normalizeReceipt(raw.analysis_receipt),
     result: normalizeResult(raw.result),
@@ -691,7 +700,7 @@ export function HarnessActivityPane({ state }: { state: HarnessActivityState | n
     {state.instruction && <div className="trace-task"><span>任务目标</span><p>{state.instruction}</p></div>}
     {state.budget && <div className="trace-loop-facts" aria-label="循环预算">
       <span><b>{state.currentRound || 0}/{state.budget.max_rounds}</b>轮次</span>
-      <span><b>{state.budget.files_verified}/{state.contract?.allowed_file_refs.length ?? 0}</b>文件已核对</span>
+      <span><b>{state.budget.files_verified}</b>文件已核对</span>
       <span><b>{state.budget.model_calls_used}/{state.budget.max_model_calls}</b>模型调用</span>
       <span><b>{Math.ceil(Math.max(0, state.budget.deadline_seconds * 1000 - state.budget.elapsed_ms) / 1000)}</b>秒剩余</span>
     </div>}
@@ -708,7 +717,7 @@ export function HarnessActivityPane({ state }: { state: HarnessActivityState | n
       {visibleEvents.length ? visibleEvents.map((item) => <li key={item.sequence} className={`is-${item.tone}`}>
         <span>{item.tone === "model" ? <IconSparkles aria-hidden="true" /> : item.tone === "success" ? <IconCheck aria-hidden="true" /> : item.tone === "warning" ? <IconAlertTriangle aria-hidden="true" /> : <IconCircleDot aria-hidden="true" />}</span>
         <div><strong>{item.label}</strong><p>{item.detail}</p>{item.occurred_at && <small>{new Date(item.occurred_at).toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}</small>}</div>
-      </li>) : <li><span><IconClock aria-hidden="true" /></span><div><strong>等待任务</strong><p>先从资料库选择文件，再告诉 Agent 你想完成什么。</p></div></li>}
+      </li>) : <li><span><IconClock aria-hidden="true" /></span><div><strong>等待任务</strong><p>你只需给出目标，Agent 会在整个资料库中自行寻找证据。</p></div></li>}
     </ol>
     {state.events.length > visibleEvents.length && <details className="trace-history"><summary>查看全部 {state.events.length} 条服务端轨迹</summary><ol>{state.events.map((item) => <li key={item.sequence}><b>{item.label}</b><span>{item.detail}</span></li>)}</ol></details>}
     {state.brief && <footer className={state.brief.outcome === "completed" ? "is-success" : "is-warning"}><IconCircleCheck aria-hidden="true" /><span>{state.brief.summary}</span></footer>}
@@ -717,18 +726,17 @@ export function HarnessActivityPane({ state }: { state: HarnessActivityState | n
 }
 export function HarnessWorkbench({ onActivityChange }: { onActivityChange?: (state: HarnessActivityState | null) => void }) {
   const [workspace, setWorkspace] = useState<HarnessWorkspace | null>(null);
-  const [selectedRefs, setSelectedRefs] = useState<string[]>([]);
   const [activeFileRef, setActiveFileRef] = useState("");
   const [preview, setPreview] = useState<HarnessPreview | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewError, setPreviewError] = useState("");
   const [instruction, setInstruction] = useState("");
   const [maxRounds, setMaxRounds] = useState(3);
-  const [maxFilesPerRound, setMaxFilesPerRound] = useState(4);
+  const [maxFilesPerRound, setMaxFilesPerRound] = useState(6);
   const [maxModelCalls, setMaxModelCalls] = useState(6);
   const [deadlineSeconds, setDeadlineSeconds] = useState(120);
   const [fileSearch, setFileSearch] = useState("");
-  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+  const [fileTypeFilter, setFileTypeFilter] = useState<FileTypeFilter>("ALL");
   const [view, setView] = useState<WorkspaceView>("data");
   const [run, setRun] = useState<HarnessRun | null>(null);
   const [workspaceStatus, setWorkspaceStatus] = useState<WorkspaceStatus>("checking");
@@ -749,16 +757,16 @@ export function HarnessWorkbench({ onActivityChange }: { onActivityChange?: (sta
 
   const allFiles = useMemo(() => workspace?.folders.flatMap((folder) => folder.files) ?? [], [workspace]);
   const activeFile = allFiles.find((file) => file.file_ref === activeFileRef) ?? null;
-  const filteredFolders = useMemo(() => {
-    if (!workspace) return [];
+  const availableFileTypes = useMemo(() => {
+    return Array.from(new Set(allFiles.map((file) => file.extension))).sort((left, right) => left.localeCompare(right));
+  }, [allFiles]);
+  const filteredFiles = useMemo(() => {
     const query = fileSearch.trim().toLocaleLowerCase("zh-CN");
-    if (!query) return workspace.folders;
-    return workspace.folders.flatMap((folder) => {
-      const folderMatches = `${folder.display_label} ${folder.display_summary}`.toLocaleLowerCase("zh-CN").includes(query);
-      const files = folderMatches ? folder.files : folder.files.filter((file) => `${file.display_label} ${file.display_summary} ${file.extension}`.toLocaleLowerCase("zh-CN").includes(query));
-      return folderMatches || files.length ? [{ ...folder, files }] : [];
+    return allFiles.filter((file) => {
+      if (fileTypeFilter !== "ALL" && file.extension !== fileTypeFilter) return false;
+      return !query || `${file.display_label} ${file.display_path} ${file.display_summary} ${file.extension}`.toLocaleLowerCase("zh-CN").includes(query);
     });
-  }, [workspace, fileSearch]);
+  }, [allFiles, fileSearch, fileTypeFilter]);
 
   function closeTransport() {
     eventSourceRef.current?.close();
@@ -834,7 +842,6 @@ export function HarnessWorkbench({ onActivityChange }: { onActivityChange?: (sta
       setWorkspace(normalized); setWorkspaceStatus("online"); setConnection("available");
       const firstFolder = normalized.folders.find((folder) => folder.files.length > 0);
       const firstFile = firstFolder?.files[0];
-      setExpanded(firstFolder ? { [firstFolder.folder_id]: true } : {});
       setActiveFileRef((current) => current || firstFile?.file_ref || "");
     } catch (caught) {
       if (requestId !== requestRef.current) return;
@@ -884,29 +891,16 @@ export function HarnessWorkbench({ onActivityChange }: { onActivityChange?: (sta
     });
   }, [workspace, run, connection, error, onActivityChange]);
 
-  function toggleFolder(folderId: string) {
-    setExpanded((current) => ({ ...current, [folderId]: !(current[folderId] ?? false) }));
-  }
-
   function openFile(file: HarnessFile) {
     setActiveFileRef(file.file_ref); setView("data");
   }
 
-  function toggleFile(fileRef: string) {
-    setSelectedRefs((current) => {
-      if (current.includes(fileRef)) return current.filter((item) => item !== fileRef);
-      if (current.length >= 20) { setError("一次任务最多允许 20 份文件，请先移除一份。"); return current; }
-      setError(""); return [...current, fileRef];
-    });
-  }
-
-  function clearSelection() { setSelectedRefs([]); }
-
-  async function startTask() {
-    if (!workspace || selectedRefs.length === 0 || instruction.trim().length < 3) return;
+  async function startTask(suggestedInstruction?: string) {
+    const taskInstruction = suggestedInstruction?.trim() || instruction.trim();
+    if (!workspace || taskInstruction.length < 3) return;
+    if (suggestedInstruction) setInstruction(taskInstruction);
     const signature = JSON.stringify({
-      instruction: instruction.trim(),
-      files: selectedRefs,
+      instruction: taskInstruction,
       loop: { maxRounds, maxFilesPerRound, maxModelCalls, deadlineSeconds },
     });
     const command = startCommandRef.current?.signature === signature
@@ -924,8 +918,7 @@ export function HarnessWorkbench({ onActivityChange }: { onActivityChange?: (sta
           workspace_id: workspace.workspace_id,
           idempotency_key: command.key,
           expected_version: 1,
-          instruction: instruction.trim(),
-          selected_file_refs: selectedRefs,
+          instruction: taskInstruction,
           loop: {
             max_rounds: maxRounds,
             max_files_per_round: maxFilesPerRound,
@@ -999,14 +992,14 @@ export function HarnessWorkbench({ onActivityChange }: { onActivityChange?: (sta
 
   return <main className="data-workbench">
     <header className="data-workbench-header">
-      <div><span>公开办公数据</span><h1>办公资料库</h1><p>{workspace.file_count} 份文件，按真实办公目录自由查看、选择和提问。</p></div>
+      <div><span>FORTE 公开办公数据</span><h1>办公资料库</h1><p>像文件管理器一样自由查看资料；下达目标后，Agent 会从整个资料库自主检索证据。</p></div>
       <div className="data-workbench-status">
         <b className={`is-${connection}`}><i />{connection === "offline" ? "服务离线" : connection === "reconnecting" ? "正在恢复" : "资料可用"}</b>
         <button type="button" className="icon-action" title="重新核对资料库" aria-label="重新核对资料库" onClick={() => void loadWorkspace()}><IconRefresh aria-hidden="true" /></button>
       </div>
     </header>
     <div className="workspace-facts" aria-label="资料库信息">
-      <span><strong>{workspace.folder_count}</strong> 个业务目录</span>
+      <span><strong>{workspace.file_count}</strong> 份文件统一检索</span>
       <span><strong>{workspace.previewable_file_count}</strong> 份可安全预览</span>
       <span><strong>只读</strong> 不改原文件</span>
       <span><strong>{workspace.license}</strong> 公开许可</span>
@@ -1014,28 +1007,25 @@ export function HarnessWorkbench({ onActivityChange }: { onActivityChange?: (sta
     <div className="data-workbench-grid">
       <aside className="dataset-browser" aria-label="FORTE 文件目录">
         <header>
-          <div><IconDatabase aria-hidden="true" /><div><strong>文件目录</strong><span>{workspace.dataset_version}</span></div></div>
-          <label><IconSearch aria-hidden="true" /><input value={fileSearch} onChange={(event) => setFileSearch(event.target.value)} placeholder="查找文件或目录" aria-label="查找文件或目录" /></label>
+          <div><IconDatabase aria-hidden="true" /><div><strong>全部文件</strong><span>办公资料库 / {workspace.file_count} 项</span></div></div>
+          <label><IconSearch aria-hidden="true" /><input value={fileSearch} onChange={(event) => setFileSearch(event.target.value)} placeholder="查找文件" aria-label="查找文件" /></label>
+          <nav className="file-type-filters" aria-label="按文件类型筛选">
+            {["ALL", ...availableFileTypes].map((extension) => <button type="button" key={extension} className={fileTypeFilter === extension ? "is-active" : ""} onClick={() => setFileTypeFilter(extension)}>{extension === "ALL" ? "全部" : extension}</button>)}
+          </nav>
         </header>
-        <div className="dataset-tree">
-          {filteredFolders.map((folder) => <section key={folder.folder_id}>
-            <button type="button" className="dataset-group" onClick={() => toggleFolder(folder.folder_id)} aria-expanded={expanded[folder.folder_id] ?? false}>
-              <IconChevronDown className={(expanded[folder.folder_id] ?? false) ? "is-open" : ""} aria-hidden="true" />
-              <div><strong>{folder.display_label}</strong><span>{folder.display_summary}</span></div><b>{folder.file_count}</b>
-            </button>
-            {(expanded[folder.folder_id] ?? false) && <div className="dataset-files">
-              {folder.files.length ? folder.files.map((file) => <div key={file.file_ref} className={file.file_ref === activeFileRef ? "is-open" : ""}>
-                <label title={runActive ? "当前任务运行中，文件范围已经冻结" : "允许 Agent Control Loop 读取"}><input type="checkbox" checked={selectedRefs.includes(file.file_ref)} disabled={runActive} onChange={() => toggleFile(file.file_ref)} /><span aria-hidden="true"><IconCheck /></span></label>
-                <button type="button" onClick={() => openFile(file)} title={file.display_label}><IconFile aria-hidden="true" /><span>{file.display_label}</span><small>{file.extension}</small></button>
-              </div>) : <p className="dataset-unavailable">{folder.external_dependency_label ?? "当前没有本地公开文件"}</p>}
-            </div>}
-          </section>)}
+        <div className="file-manager-columns" aria-hidden="true"><span>名称</span><span>类型</span></div>
+        <div className="file-manager-list" role="list">
+          {filteredFiles.length ? filteredFiles.map((file) => <button type="button" role="listitem" key={file.file_ref} className={file.file_ref === activeFileRef ? "is-open" : ""} onClick={() => openFile(file)} title={file.display_path}>
+            <IconFile aria-hidden="true" />
+            <span><strong>{file.display_label}</strong><small>{file.display_summary}</small></span>
+            <b>{file.extension}</b>
+          </button>) : <p className="dataset-unavailable">没有符合当前筛选条件的文件。</p>}
         </div>
       </aside>
       <section className="data-task-surface">
         <section className="task-composer" aria-labelledby="task-composer-title">
-          <div><span>给 Agent 一项工作</span><h2 id="task-composer-title">你想从这些文件里知道什么？</h2></div>
-          <textarea value={instruction} disabled={runActive} onChange={(event) => setInstruction(event.target.value)} placeholder="例如：比较所选文件中的关键变化，并逐条引用依据" aria-label="任务指令" />
+          <div><span>研究整个资料库</span><h2 id="task-composer-title">你想让 Agent 找什么，或推进什么？</h2></div>
+          <textarea value={instruction} disabled={runActive} onChange={(event) => setInstruction(event.target.value)} placeholder="例如：研究整个资料库，找出需要继续推动的工作，并逐条说明文件依据" aria-label="任务指令" />
           <details className="loop-contract-settings">
             <summary><IconAdjustments aria-hidden="true" />Agent Control Loop · 最多 {maxRounds} 轮 / {maxModelCalls} 次模型调用 / {deadlineSeconds} 秒</summary>
             <div>
@@ -1047,25 +1037,21 @@ export function HarnessWorkbench({ onActivityChange }: { onActivityChange?: (sta
           </details>
           <div className="task-examples" aria-label="任务示例">{TASK_EXAMPLES.map((example) => <button type="button" key={example} disabled={runActive} onClick={() => setInstruction(example)}>{example}</button>)}</div>
           <footer>
-            <div className="selection-summary"><span>{runActive ? `${run?.contract.allowed_file_refs.length ?? selectedRefs.length} 份文件已冻结为当前任务范围` : `${selectedRefs.length} 份文件进入允许范围 · 最多 20 份`}</span>{selectedRefs.length > 0 && !runActive && <button type="button" onClick={clearSelection}>清空</button>}</div>
-            <button type="button" onClick={() => void startTask()} disabled={runActive || starting || selectedRefs.length === 0 || instruction.trim().length < 3}>{starting ? <IconLoader2 aria-hidden="true" /> : <IconSend aria-hidden="true" />}{starting ? "正在启动" : runActive ? "当前 Loop 运行中" : "启动 Control Loop"}</button>
+            <div className="selection-summary"><IconSearch aria-hidden="true" /><span>{runActive ? `Agent 正在整个资料库中自主检索 · 每轮最多 ${run?.contract.max_files_per_round ?? maxFilesPerRound} 份` : `整个资料库已纳入检索范围 · Agent 每轮自主选择最多 ${maxFilesPerRound} 份`}</span></div>
+            <button type="button" onClick={() => void startTask()} disabled={runActive || starting || instruction.trim().length < 3}>{starting ? <IconLoader2 aria-hidden="true" /> : <IconSend aria-hidden="true" />}{starting ? "正在启动" : runActive ? "当前 Loop 运行中" : "启动 Control Loop"}</button>
           </footer>
         </section>
-        {selectedRefs.length > 0 && <div className="selected-files" aria-label="本轮所选文件">{selectedRefs.map((ref) => {
-          const file = allFiles.find((item) => item.file_ref === ref);
-          return file ? <span key={ref}><button type="button" onClick={() => openFile(file)}>{file.display_label}</button><button type="button" aria-label={`移除 ${file.display_label}`} disabled={runActive} onClick={() => toggleFile(ref)}><IconX aria-hidden="true" /></button></span> : null;
-        })}</div>}
         <nav className="workspace-tabs" aria-label="工作区视图">
-          <button type="button" className={view === "data" ? "is-active" : ""} onClick={() => setView("data")}><IconFileDescription aria-hidden="true" />文件预览</button>
-          <button type="button" className={view === "loop" ? "is-active" : ""} onClick={() => setView("loop")}><IconRoute aria-hidden="true" />循环进展{run?.rounds.length ? <b>{run.rounds.length}</b> : null}</button>
-          <button type="button" className={view === "result" ? "is-active" : ""} onClick={() => setView("result")}><IconCircleCheck aria-hidden="true" />任务简报{run?.result ? <b>{run.result.findings.length}</b> : null}</button>
+          <button type="button" className={view === "data" ? "is-active" : ""} onClick={() => setView("data")}><IconFileDescription aria-hidden="true" />预览</button>
+          <button type="button" className={view === "loop" ? "is-active" : ""} onClick={() => setView("loop")}><IconRoute aria-hidden="true" />Agent 路径{run?.rounds.length ? <b>{run.rounds.length}</b> : null}</button>
+          <button type="button" className={view === "result" ? "is-active" : ""} onClick={() => setView("result")}><IconCircleCheck aria-hidden="true" />发现与建议{run?.result ? <b>{run.result.findings.length}</b> : null}</button>
         </nav>
         <div className="workspace-content">
           {view === "data" && <FilePreview preview={preview} file={activeFile} loading={previewLoading} error={previewError} />}
           {view === "loop" && <LoopView run={run} files={allFiles} controlBusy={controlBusy} onControl={controlLoop} />}
-          {view === "result" && <ResultView result={run?.result ?? null} files={allFiles} onOpenFile={openFile} />}
+          {view === "result" && <ResultView result={run?.result ?? null} files={allFiles} onOpenFile={openFile} onStartTask={startTask} starting={starting} />}
         </div>
-        <details className="workspace-boundary"><summary><IconShieldCheck aria-hidden="true" />数据与执行边界</summary><p>{workspace.data_boundary} Agent Control Loop 只读取你允许的文件；服务端拥有轮次、证据门、预算和停止状态。本轮不会修改原文件或执行外部动作。</p></details>
+        <details className="workspace-boundary"><summary><IconShieldCheck aria-hidden="true" />数据与执行边界</summary><p>{workspace.data_boundary} Agent 可以检索整个资料库，但每轮只读取服务端校验通过且受预算约束的文件；本轮不会修改原文件或执行外部动作。</p></details>
         {error && <div className="workspace-error" role="alert"><IconAlertTriangle aria-hidden="true" /><span>{error}</span></div>}
       </section>
     </div>
@@ -1073,11 +1059,11 @@ export function HarnessWorkbench({ onActivityChange }: { onActivityChange?: (sta
 }
 
 function FilePreview({ preview, file, loading, error }: { preview: HarnessPreview | null; file: HarnessFile | null; loading: boolean; error: string }) {
-  if (!file) return <div className="file-preview-empty"><IconFile aria-hidden="true" /><h2>从左侧打开一份文件</h2><p>你可以先查看文件，再决定是否把它纳入本轮任务。</p></div>;
+  if (!file) return <div className="file-preview-empty"><IconFile aria-hidden="true" /><h2>从文件列表打开一份资料</h2><p>浏览文件不会限制 Agent 的检索范围；任务启动后由 Agent 自己选择相关证据。</p></div>;
   if (loading) return <div className="file-preview-empty"><IconLoader2 aria-hidden="true" /><h2>正在安全读取</h2><p>服务端正在核对完整性并生成只读预览。</p></div>;
   if (error || !preview) return <div className="file-preview-empty is-error"><IconAlertTriangle aria-hidden="true" /><h2>文件预览不可用</h2><p>{error || "没有收到可用的预览。"}</p></div>;
   return <article className="file-preview">
-    <header><div><span>{preview.display_group}</span><h2>{preview.display_label}</h2><p>{preview.display_path}</p></div><div className="file-meta"><b>{file.extension}</b><span>{formatSize(preview.size)}</span>{preview.page_count !== null && <span>{preview.page_count} 页</span>}{preview.total_rows !== null && <span>{preview.total_rows} 行</span>}</div></header>
+    <header><div><span>办公资料库</span><h2>{preview.display_label}</h2><p>{preview.display_path}</p></div><div className="file-meta"><b>{file.extension}</b><span>{formatSize(preview.size)}</span>{preview.page_count !== null && <span>{preview.page_count} 页</span>}{preview.total_rows !== null && <span>{preview.total_rows} 行</span>}</div></header>
     {preview.kind === "table" ? <div className="table-preview"><table><thead><tr><th className="row-number">#</th>{preview.columns.map((column, index) => <th key={`${column}:${index}`}>{column || `列 ${index + 1}`}</th>)}</tr></thead><tbody>{preview.rows.map((row) => <tr key={row.row_number}><td className="row-number">{row.row_number}</td>{preview.columns.map((_, index) => <td key={index}>{row.values[index] ?? ""}</td>)}</tr>)}</tbody></table></div> : <pre className="document-preview">{preview.text || "此文件没有可提取的文本层。"}</pre>}
     <footer className="preview-security"><IconShieldCheck aria-hidden="true" /><div><strong>安全预览</strong><span>{preview.security.notes.join(" · ")}</span>{preview.truncated && <span>当前仅显示部分内容</span>}</div></footer>
   </article>;
@@ -1100,7 +1086,7 @@ function LoopView({
     if (run?.current_round) setSelectedRoundNumber(run.current_round);
   }, [run?.current_round, run?.rounds.length]);
 
-  if (!run) return <div className="workspace-placeholder"><IconRoute aria-hidden="true" /><h2>Agent Control Loop 尚未启动</h2><p>划定允许文件并提交任务后，每一轮的读取、规划、分析、核对和证据门决定都会显示在这里。</p></div>;
+  if (!run) return <div className="workspace-placeholder"><IconRoute aria-hidden="true" /><h2>Agent Control Loop 尚未启动</h2><p>提交目标后，Agent 会先搜索整个资料库，再公开每轮选了什么、为什么选、得到什么和下一步怎么走。</p></div>;
 
   const selectedRound = run.rounds.find((item) => item.round_number === selectedRoundNumber) ?? run.rounds.at(-1) ?? null;
   const terminal = TERMINAL_STATUSES.has(run.status);
@@ -1114,7 +1100,7 @@ function LoopView({
       <div><span>Agent Control Loop</span><h2 id="loop-view-title">{run.contract.goal}</h2></div>
       <div className="loop-budget">
         <span><b>{run.budget.rounds_used}/{run.budget.max_rounds}</b>轮</span>
-        <span><b>{run.budget.files_verified}/{run.contract.allowed_file_refs.length}</b>文件</span>
+        <span><b>{run.budget.files_verified}</b>文件已核对</span>
         <span><b>{run.budget.model_calls_used}/{run.budget.max_model_calls}</b>调用</span>
         <span><b>{Math.ceil(run.budget.elapsed_ms / 1000)}</b>秒</span>
       </div>
@@ -1155,7 +1141,7 @@ function LoopView({
           return <li key={phase.key} className={complete ? "is-complete" : index === activeIndex ? "is-active" : ""}><span>{complete ? <IconCheck aria-hidden="true" /> : index + 1}</span><b>{phase.label}</b></li>;
         })}
       </ol>
-      {selectedRound.input_file_refs.length > 0 && <section className="loop-round-files"><span>本轮实际读取</span><div>{selectedRound.input_file_refs.map((ref) => <b key={ref}>{fileLabel(ref)}</b>)}</div></section>}
+      {selectedRound.input_file_refs.length > 0 && <section className="loop-round-files"><span>Agent 本轮自主选择</span>{selectedRound.selection_reason && <p>{selectedRound.selection_reason}</p>}<div>{selectedRound.input_file_refs.map((ref) => <b key={ref}>{fileLabel(ref)}</b>)}</div></section>}
       {selectedRound.plan.length > 0 && <details className="loop-plan" open={selectedRound.status === "running"}>
         <summary>服务端已采用的本轮计划 · {selectedRound.plan.length} 个工作单元</summary>
         <ol>{selectedRound.plan.map((node, index) => <li key={node.node_id}><span>{index + 1}</span><div><b>{node.label}</b><p>{node.description}</p></div></li>)}</ol>
@@ -1167,12 +1153,24 @@ function LoopView({
     {run.brief && <section className={`loop-brief is-${run.brief.outcome}`}><IconCircleCheck aria-hidden="true" /><div><span>任务简报</span><h3>{run.brief.summary}</h3><p>外部动作：未发生 · 结果仍需人工复核</p></div></section>}
   </section>;
 }
-function ResultView({ result, files, onOpenFile }: { result: HarnessResult | null; files: HarnessFile[]; onOpenFile: (file: HarnessFile) => void }) {
+function ResultView({
+  result,
+  files,
+  onOpenFile,
+  onStartTask,
+  starting,
+}: {
+  result: HarnessResult | null;
+  files: HarnessFile[];
+  onOpenFile: (file: HarnessFile) => void;
+  onStartTask: (instruction: string) => Promise<void>;
+  starting: boolean;
+}) {
   const [expanded, setExpanded] = useState(false);
   if (!result) return <div className="workspace-placeholder"><IconClock aria-hidden="true" /><h2>任务简报尚未形成</h2><p>Agent Control Loop 完成只读分析并通过文件引用校验后，简报会出现在这里。</p></div>;
   const visibleFindings = expanded ? result.findings : result.findings.slice(0, 3);
-  return <article className="result-view"><header><IconCircleCheck aria-hidden="true" /><div><span>模型初步结论 · 待复核</span><h2>{result.summary}</h2></div></header><div className="result-findings">{visibleFindings.map((finding, index) => <section key={`${finding.title}:${index}`}><b>{index + 1}</b><div><h3>{finding.title}</h3><p>{finding.detail}</p><footer>{finding.file_refs.map((ref) => {
+  return <article className="result-view"><header><IconCircleCheck aria-hidden="true" /><div><span>资料库研究结果 · 待复核</span><h2>{result.summary}</h2></div></header><div className="result-findings">{visibleFindings.map((finding, index) => <section key={`${finding.title}:${index}`}><b>{index + 1}</b><div><h3>{finding.title}</h3><p>{finding.detail}</p><footer>{finding.file_refs.map((ref) => {
     const file = files.find((item) => item.file_ref === ref);
     return file ? <button type="button" key={ref} onClick={() => onOpenFile(file)}><IconFile aria-hidden="true" />{file.display_label}</button> : null;
-  })}</footer></div></section>)}</div>{result.findings.length > 3 && <button type="button" className="result-expand" aria-expanded={expanded} onClick={() => setExpanded((current) => !current)}><IconChevronDown className={expanded ? "is-open" : ""} aria-hidden="true" />{expanded ? "收起详细发现" : `查看其余 ${result.findings.length - 3} 条发现`}</button>}{result.follow_ups.length > 0 && <details className="result-follow-ups"><summary>仍需你判断 · {result.follow_ups.length} 项</summary>{result.follow_ups.map((item) => <p key={item}>{item}</p>)}</details>}<footer><IconShieldCheck aria-hidden="true" />服务端只核对文件引用与只读边界，结论和数值仍需人工复核；本轮没有外部动作。</footer></article>;
+  })}</footer></div></section>)}</div>{result.findings.length > 3 && <button type="button" className="result-expand" aria-expanded={expanded} onClick={() => setExpanded((current) => !current)}><IconChevronDown className={expanded ? "is-open" : ""} aria-hidden="true" />{expanded ? "收起详细发现" : `查看其余 ${result.findings.length - 3} 条发现`}</button>}{result.follow_ups.length > 0 && <section className="result-proposals" aria-labelledby="result-proposals-title"><header><span>Agent 建议的下一步</span><h3 id="result-proposals-title">由你确认后，才会成为新的 Control Loop</h3></header>{result.follow_ups.map((item, index) => <article key={`${item}:${index}`}><div><b>建议 {index + 1}</b><p>{item}</p></div><button type="button" disabled={starting} onClick={() => void onStartTask(item)}><IconPlayerPlay aria-hidden="true" />{starting ? "正在启动" : "确认并启动"}</button></article>)}</section>}<footer><IconShieldCheck aria-hidden="true" />这些建议由模型基于本轮已读取资料生成，尚未逐项验证；只有你点击确认后才会启动新任务，本轮没有修改原文件或执行外部动作。</footer></article>;
 }

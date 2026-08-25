@@ -205,10 +205,10 @@ class BenchmarkWorkspaceCatalog(BenchmarkScenarioCatalog):
         return {
             "workspace_id": self.WORKSPACE_ID,
             "title": "FORTE 公开办公资料库",
-            "goal": "根据用户选择的公开办公文件完成一项可引用、可复核的只读任务。",
+            "goal": "根据用户目标自主检索整个公开办公资料库，完成可引用、可复核的只读任务。",
             "dataset_label": "公开办公基准数据 · FORTE",
             "dataset_version": manifest.source_commit,
-            "selection_reason": "用户从完整 FORTE 公开输入目录中选择文件",
+            "selection_reason": "Agent 面向完整 FORTE 公开输入目录自主检索相关文件",
             "allowlisted_tools": [
                 "file.read",
                 "table.inspect",
@@ -217,7 +217,7 @@ class BenchmarkWorkspaceCatalog(BenchmarkScenarioCatalog):
             ],
             "allowed_side_effects": ["none", "run_workspace_write"],
             "deliverables": ["带文件引用的初步分析结果"],
-            "data_boundary": "只读所选公开输入；只可写入本轮结果，不执行外部动作。",
+            "data_boundary": "只读完整公开输入目录；每轮仅向模型提供受预算约束的相关文件，不执行外部动作。",
             "human_gate_summary": "模型结果必须由用户复核，任何外部动作不在当前 Runtime 范围内。",
             "files": files,
         }
@@ -313,7 +313,7 @@ class BenchmarkWorkspaceCatalog(BenchmarkScenarioCatalog):
                 payload["rows"] = payload["rows"][:60]
             encoded = json.dumps(payload, ensure_ascii=False).encode("utf-8")
             if used + len(encoded) > self.MAX_AGENT_CONTEXT_BYTES:
-                raise BenchmarkScenarioError("所选文件内容超过本轮安全上下文上限，请减少文件后重试")
+                raise BenchmarkScenarioError("Agent 本轮选择的文件内容超过安全上下文上限，请缩小本轮证据范围后重试")
             used += len(encoded)
             results.append(payload)
         return results

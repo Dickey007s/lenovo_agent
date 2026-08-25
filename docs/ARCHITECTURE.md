@@ -3,10 +3,10 @@
 ## 1. Current vertical slice
 
 ```text
-Browser: whole-folder office workbench + trace
+Browser: unified file manager + task composer + trace
   -> GET /v1/harness/workspace
   -> GET /v1/harness/workspace/files/{file_ref}
-  -> POST user instruction + selected refs + loop bounds
+  -> POST user instruction + loop bounds
   -> POST versioned pause/resume/steer/stop controls
   -> named SSE + Snapshot reconciliation
 
@@ -39,7 +39,8 @@ The pinned source is FORTE commit
 3. exposes only input files as business-labeled stable refs;
 4. produces bounded table/document/PDF/text previews;
 5. never executes macros/scripts or loads external resources;
-6. gives the Analyst bounded text only for the refs selected in this Run.
+6. gives the Planner safe metadata for the complete input index, then gives the
+   Analyst bounded text only for refs selected and approved in the current round.
 
 Public projection excludes task instructions, rubric, solution, grading,
 filesystem path and SHA-256. `task.md` is provenance, not hidden context.
@@ -47,21 +48,19 @@ filesystem path and SHA-256. `task.md` is provenance, not hidden context.
 ## 3. Workspace and task contract
 
 The public workspace identity is fixed as `forte-public-office`. The browser may
-search, expand folders, preview files and draft selection/instruction. A start
+search, filter and preview files, but those actions do not constrain Agent scope. A start
 request must contain:
 
 - workspace id;
 - Owner-scoped idempotency key;
 - expected version 1;
 - a 3-2,000 character user instruction;
-- 1-20 unique stable `file_ref` values.
 - 1-3 rounds, 1-8 files per round, 2-6 model calls and a 20-300 second deadline.
 
-The server revalidates all refs and freezes selected source documents and loop
-bounds in the Run Snapshot. The model cannot expand the source set or budget.
-Unknown, duplicate or out-of-workspace refs fail closed. During a Run, the UI
-freezes the task composer and selection rather than pretending those edits
-would affect the active contract.
+The server freezes all 96 allowlisted input refs, `scope_mode=whole_workspace`
+and loop bounds in the Run Snapshot. Client-owned `selected_file_refs` are not
+accepted. During a Run, the UI freezes the task composer rather than pretending
+new text would affect the active contract.
 
 ## 4. Planning and analysis ownership
 
@@ -74,21 +73,24 @@ The server compiles the candidate into a `HarnessPlan`:
 - result intent may map to `run_workspace_write`, which means a logical current
   Run result only and is not an Artifact mutation;
 - external-action preview requires the server-owned human-gate policy;
-- units, dependencies, cycles, selected refs, tools, artifacts and gates are
+- units, dependencies, cycles, per-round refs, tools, artifacts and gates are
   validated deterministically.
 
-Each round's Planner receives the current question, remaining allowed files,
+Each round's Planner receives the current question, safe metadata for remaining files,
 budget and any accepted steer instruction. A rejected candidate may be repaired
-once within the same budget; rejection and retry are ordered facts. The Analyst
-receives the user instruction, validated public plan and safe
-selected-file content. It returns 1-10 findings with at least one selected ref
-per finding and `review_required=true`. Citation membership is checked; semantic
+once within the same budget; rejection and retry are ordered facts. The server
+also caps the union of model-selected refs at `max_files_per_round`, preserving
+the model's highest-priority order and repairing dependencies. The Analyst
+receives the user instruction, validated public plan and safe content only for
+that approved round. It returns 1-10 findings with at least one approved ref per
+finding and `review_required=true`. Citation membership is checked; semantic
 truth, completeness and arithmetic are not.
 
-The Evidence Gate compares referenced files with the frozen allowed set. It
+The Evidence Gate compares referenced files with the current round's approved set. It
 alone decides `next_round`, `completed` or `budget_exhausted`; the model does
 not write terminal state. The current Commit is an in-memory read-only Brief,
-not an immutable ArtifactVersion or TaskCommit.
+not an immutable ArtifactVersion or TaskCommit. Final `follow_ups` are capped at
+four and remain suggestions until a user explicitly starts a separate Run.
 
 ## 5. State and streaming
 
@@ -115,7 +117,7 @@ idempotency state. `X-User-Id` is not signed authentication.
 
 The root page keeps three independently meaningful regions:
 
-- folder rail: searchable folder/file inventory, metadata and explicit scope;
+- file-manager rail: one flat searchable inventory, type filters and metadata;
 - work area: task composer, loop contract, safe preview, round canvas, evidence
   gaps, controls and cited brief;
 - activity pane: current phase, budget, ordered events and model adoption receipts.
@@ -130,8 +132,8 @@ the primary page into an architecture document.
 | Module | Current implementation | Missing target work |
 | --- | --- | --- |
 | Workspace Catalog & Safe Preview | full public folder, 96 refs, bounded previews and integrity checks | enterprise Connector/data policy |
-| Task Contract | user instruction, selected refs, loop bounds, Owner/key/version | durable task contract and production identity |
-| Planner | strict candidate, per-round receipt and one bounded repair | quality evaluation and richer replanning policy |
+| Task Contract | user instruction, complete workspace scope, loop bounds, Owner/key/version | durable task contract and production identity |
+| Planner | strict candidate, autonomous evidence selection, per-round receipt and one bounded repair | retrieval-quality evaluation and richer replanning policy |
 | Admission/Policy/Validator | server compilation and deterministic graph/source checks | dynamic topology admission |
 | Scheduler & Worker Manager | one bounded single-loop controller | adaptive workers, leases and recovery |
 | Tool Gateway | not connected | governed real/simulated tools and receipts |
@@ -145,7 +147,7 @@ other external Connector. Plan tool labels are intent declarations; no Tool
 Gateway is invoked. `completed` means a reviewable response exists, not that an
 office task, artifact or external process completed.
 
-See [`DR-0022`](decisions/DR-0022-workspace-folder-and-arbitrary-task-contract.md),
-[`SCENARIO-008`](scenarios/SCENARIO-008-whole-folder-office-workspace.md),
+See [`DR-0024`](decisions/DR-0024-autonomous-whole-workspace-research.md),
+[`SCENARIO-010`](scenarios/SCENARIO-010-autonomous-whole-workspace-research.md),
 [UI-server fact matrix](contracts/UI_SERVER_FACT_MATRIX.md) and
-[current Evidence](evidence/AGENT-CONTROL-LOOP-BOUNDED-READONLY-EVIDENCE-20260825.md).
+[current Evidence](evidence/AUTONOMOUS-WHOLE-WORKSPACE-RESEARCH-EVIDENCE-20260825.md).

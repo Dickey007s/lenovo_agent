@@ -1,27 +1,26 @@
 # UI-server fact matrix
 
-This is the current `DR-0022` whole-folder workbench plus `DR-0023` bounded
-Agent Control Loop contract. Historical Scenario/Task/Cockpit/Action mappings
+This is the current `DR-0024` whole-workspace workbench plus `DR-0023` bounded
+Agent Control Loop contract. Historical manual-selection/Scenario/Task mappings
 remain in their dated Evidence only.
 
 下表中的 Authority 列即“服务端权威字段”；浏览器草稿与传输状态会明确另列，
 不能冒充业务事实。
 Prompt、思维链、原始模型响应、绝对路径、哈希和内部策略标识在普通界面默认隐藏。
 
-## 1. Folder workspace and task draft
+## 1. File-manager workspace and task draft
 
 | UI state/action | User-visible meaning | Authority | Transition/recovery/idempotency | Hidden |
 | --- | --- | --- | --- | --- |
 | Service available | HTTP API and workspace projection succeeded | health/workspace response | may browse or start; not an SSE fact | previous stream, network stack |
 | Workspace unavailable | service or catalog cannot provide authoritative files | fetch failure or controlled 503 | retry; no static fallback files | stack trace, partial/stale catalog |
-| Whole folder tree | 15 public business folders and 96 inputs | `GET /v1/harness/workspace` | read-only until refreshed | task prompt, rubric, solution, path/hash |
-| External-dependency folder | public task record has no local input | folder `availability/external_dependency_label` | cannot be selected as invented local data | remote credentials/endpoints |
-| Search/expand | client filters visible folder tree | browser state | no server mutation | no capability claim |
-| File checkbox/chip | include/remove file from task draft | browser draft; POST revalidation | 1-20 unique refs; changing scope changes command signature | unselected content |
+| Whole repository | one flat list of 96 public inputs | `GET /v1/harness/workspace` | read-only until refreshed | task prompt, rubric, solution, role partitions, path/hash |
+| Search/type filter | client filters the visible file-manager list | browser state | no server mutation and no scope change | no capability claim |
+| File preview selection | choose what the user is looking at | browser state + preview GET | does not constrain Agent evidence | internal ref/path/hash |
 | Task composer | user writes the actual instruction | browser draft; POST/Snapshot `instruction` | required 3-2,000 chars | hidden benchmark-task fallback is forbidden |
 | Loop bounds | user chooses hard limits before invocation | browser draft; Snapshot `contract.options` | rounds 1-3, files/round 1-8, model calls 2-6, deadline 20-300s | token/cost estimates not owned by server |
-| Run start | server accepted one independent read-only contract | POST Owner/key/version/instruction/refs/options | unknown response reuses same key; changed or known retry uses new key | internal command signature |
-| Frozen active contract | current instruction, files and limits cannot silently change | Snapshot contract and run-active state | composer/selection/options disabled until terminal | local edits pretending to affect active Run |
+| Run start | server accepted one independent read-only whole-workspace contract | POST Owner/key/version/instruction/options | unknown response reuses same key; changed or known retry uses new key | internal command signature |
+| Frozen active contract | current instruction, all stable refs and limits cannot silently change | Snapshot `scope_mode/allowed_file_refs` and run-active state | composer/options disabled until terminal | local edits pretending to affect active Run |
 
 ## 2. File preview
 
@@ -38,21 +37,24 @@ Prompt、思维链、原始模型响应、绝对路径、哈希和内部策略�
 
 | UI state | User-visible meaning | Authority | Ordered transition | Hidden |
 | --- | --- | --- | --- | --- |
-| Selected files frozen | the Run context is fixed | `workspace_index`, `source_documents[]` | seq 1 | internal path/hash/safe content |
+| Whole index frozen | the Run can search the complete allowlisted repository | `workspace_index`, `contract.scope_mode`, `source_documents[]` | seq 1 | internal path/hash/file bodies |
 | Round started | another bounded Observe cycle began | `round_started`, `rounds[]` | round number and remaining budget increase monotonically | hidden subtask prompt |
 | Planner started/returned | provider call stage, not acceptance | `planning_started/completed` | per round | Prompt, CoT, raw candidate |
 | Planner receipt | not called/adopted/not adopted and elapsed time | round `model_receipt.called/output_used/elapsed_ms` | independent of plan validation | token/provider trace |
 | Candidate rejected | returned candidate was not adopted | `plan_validation_rejected` | at most one repair using the same call budget | raw validator/provider error |
 | Validated plan | server compiled/accepted this round's work intent | `plan_validation`, round public plan | after accepted candidate only | raw tool/effect/gate IDs |
+| Agent-selected evidence | files chosen for this round and business reason | `round.input_file_refs`, `plan.selection_reason` | after server budget/compiler validation | full metadata index, model ranking internals |
 | Analyst started/returned | provider analysis stage, not completion | `analysis_started/completed` | per round | Prompt, CoT, raw response |
 | Analyst receipt | not called/adopted/not adopted and elapsed time | round `analysis_receipt.*` | independent of result validation | token/provider trace |
-| Citation validation | every finding stays inside frozen refs | `result_validation` | before Evidence Gate | false semantic/numeric proof claim |
+| Citation validation | every finding stays inside this round's approved refs | `result_validation` | before Evidence Gate | false semantic/numeric proof claim |
 | Evidence gap | current evidence is insufficient and another round has a bounded purpose | `evidence_gaps[]`, `evidence_gate`, `next_step=next_round` | prior round remains immutable in Snapshot | claim that the missing file guarantees truth |
 | Read-only Act | the Agent formed an intermediate analysis, not a side effect | round result and `external_side_effect=none` | Verify follows in the same round | tool execution or source-file mutation claim |
 | Completed | server Gate committed a reviewable brief | `status=completed`, `loop_committed`, `brief` | final GET after terminal event | ArtifactVersion, TaskCommit, tool execution, business correctness |
 | Budget stopped | no new provider call may start | `status=budget_exhausted`, `loop_budget_stopped` | preserves completed rounds and partial brief | hard cancellation of an in-flight HTTP call |
 | User stopped | stop was applied at a safe point | `status=stopped`, `loop_stopped` | preserves completed rounds | rollback or deletion claim |
 | Safely stopped | model/schema/plan/source/citation check failed | `status=failed`, `harness_failed`, safe errors | no result; fresh retry | raw validator/compiler/provider error |
+| Next-task proposals | Agent suggests up to four follow-up tasks from the current bounded analysis; each proposal is not independently source-verified | terminal `result.follow_ups` | suggestion alone creates no server mutation | claim that work already started or that every proposal has a per-item citation |
+| Confirm proposal | user turns one suggestion into an independent new Loop | new POST `/v1/harness/runs` with exact proposal text | new idempotency key; previous Run/result preserved | nonexistent proposal-accept state |
 
 ## 4. Human control
 
@@ -73,7 +75,7 @@ Prompt、思维链、原始模型响应、绝对路径、哈希和内部策略�
 | DOCX/PDF/TXT | bounded extracted/read text, <=30,000 chars | OCR completeness, layout fidelity or semantic accuracy |
 | stable ref | deterministic for pinned public input path | production document identity |
 | plan compilation | server-owned effects/gates plus graph/source checks and one bounded repair | plan quality or tool execution |
-| result validation | citation membership in frozen selected set | entailment, exhaustive matching or arithmetic |
+| result validation | citation membership in the server-approved round set | entailment, exhaustive matching or arithmetic |
 | Evidence Gate | decides continue/stop from explicit gaps and remaining bounds | semantic truth or human acceptance |
 | completed | reviewable in-memory brief exists | task correctness, durable Artifact, Connector or external process completion |
 
@@ -94,12 +96,12 @@ Prompt、思维链、原始模型响应、绝对路径、哈希和内部策略�
 
 ## 7. Evidence and applicability
 
-Current contract: [`DR-0022`](../decisions/DR-0022-workspace-folder-and-arbitrary-task-contract.md),
+Current contract: [`DR-0024`](../decisions/DR-0024-autonomous-whole-workspace-research.md),
 [`DR-0023`](../decisions/DR-0023-agent-control-loop.md),
-[`SCENARIO-008`](../scenarios/SCENARIO-008-whole-folder-office-workspace.md),
+[`SCENARIO-010`](../scenarios/SCENARIO-010-autonomous-whole-workspace-research.md),
 [`SCENARIO-009`](../scenarios/SCENARIO-009-agent-control-loop.md),
 [workspace interaction/source record](../research/WORKSPACE-CENTRIC-OFFICE-AGENT-INTERACTION-AND-SOURCES-20260825.md)
-and [current Loop Evidence](../evidence/AGENT-CONTROL-LOOP-BOUNDED-READONLY-EVIDENCE-20260825.md).
+and [current whole-workspace Evidence](../evidence/AUTONOMOUS-WHOLE-WORKSPACE-RESEARCH-EVIDENCE-20260825.md).
 
 Automated checks are engineering proxies, not user research. User
 comprehension, calibrated trust and task value remain `Draft`.
