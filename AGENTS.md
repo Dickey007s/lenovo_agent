@@ -10,7 +10,7 @@
 6. `docs/PRESENTATION_BRIEF.md`：汇报叙事和禁止夸大的结论；制作会议/PPT 主讲稿时再读 `docs/reports/OFFICE-AGENT-DETAILED-CHINESE-REPORT-20260825.md`。
 7. `docs/DECISION_AND_REPORTING_GOVERNANCE.md`：方案、PR、Demo、汇报的硬门槛。
 8. 当前整库文件管理器与自主检索变更再读 `docs/decisions/DR-0024-autonomous-whole-workspace-research.md`、`docs/scenarios/SCENARIO-010-autonomous-whole-workspace-research.md`、`docs/research/WORKSPACE-CENTRIC-OFFICE-AGENT-INTERACTION-AND-SOURCES-20260825.md`、`docs/testing/FORTE-PUBLIC-OFFICE-TASK-TEST-CASES-20260825.md` 与对应 Evidence/Source。`DR-0022` 的客户端手工 `selected_file_refs` 已由 `DR-0024` 取代，但其公开数据、安全预览与来源边界继续有效。
-9. 修改 Agent Control Loop、文件夹自主研究、预算/停止、暂停/调整方向或 Durable State 时，再读 `docs/research/AGENT-CONTROL-LOOP-IMPLEMENTATION-AUDIT-20260825.md`、`docs/decisions/DR-0023-agent-control-loop.md`、`docs/decisions/DR-0024-autonomous-whole-workspace-research.md` 与对应 Evidence/Scenario。对外和设计文档统一称 `Agent Control Loop`；Workspace 是循环处理的办公资料环境，不另立 `Workspace Research Loop` 或 `Research Loop` 产品名称。历史约 `30%` 只表示实现 `8364b1e` 之前的架构成熟度基线；现行 Runtime 已有最多三轮的只读 Control Loop 纵切，但 Durable State、Artifact Commit、跨进程恢复、多 Worker 与外部动作仍未实现。
+9. 修改 Agent Control Loop、文件夹自主研究、预算/停止、暂停/调整方向或 Durable State 时，再读 `docs/research/AGENT-CONTROL-LOOP-IMPLEMENTATION-AUDIT-20260825.md`、`docs/decisions/DR-0023-agent-control-loop.md`、`docs/decisions/DR-0024-autonomous-whole-workspace-research.md`、`docs/decisions/DR-0025-durable-evidence-gate-and-artifact-evolution.md` 与对应 Evidence/Scenario。对外和设计文档统一称 `Agent Control Loop`；Workspace 是循环处理的办公资料环境，不另立 `Workspace Research Loop` 或 `Research Loop` 产品名称。历史约 `30%` 只表示实现 `8364b1e` 之前的架构成熟度基线；现行 Runtime 已有最多三轮的只读 Control Loop、轮次间人工 Evidence Gate、逻辑成果版本和可选 PostgreSQL 重启恢复，但独立不可变 Artifact/TaskCommit、多实例协调、多 Worker 与外部动作仍未实现。
 
 源码永远高于文档。行为或叙事变化后必须同步 living docs、Decision、Scenario、
 Source、Evidence 和 UI-server fact mapping，不能只更新 README。
@@ -18,7 +18,7 @@ Source、Evidence 和 UI-server fact mapping，不能只更新 README。
 ## 当前产品事实
 
 - 根页面是唯一 FORTE 办公资料库。产品没有注册 Scenario/Demo 选择器；旧邮件、文档、报价、任务、日历、报销、CRM、审计和固定 Customer A 入口均已退休。
-- 当前 OpenAPI 只有七个 path：health、whole workspace、workspace file preview、Run start/get/control/events。旧 `/v1/harness/scenarios*` 不挂载。
+- 当前 OpenAPI 只有七个 path、八个 operation：health、whole workspace、workspace file preview、Run start/list/get/control/events。旧 `/v1/harness/scenarios*` 不挂载。
 - FORTE 固定 commit `345c1ec1487139db9dd319787fa9405ba85d1869`。`public-suite-manifest.json` 是当前只读清单：15 个公开任务目录、96 个 input、111 个 task/input 文件、`1780445` bytes。官方完整 benchmark 报告 180 条，但公开仓库只提供每职业一个 demo；不得声称拿到未公开 165 条。
 - `task.md` 只作 provenance，不能进入普通 UI、Analyst 输入或成为隐藏默认任务。用户只需自己写 `instruction`；浏览器不得要求或提交客户端 `selected_file_refs`。
 - 用户可在一个文件管理器式资料库中自由搜索、按类型筛选和查看文件，不按职业/角色建立产品入口。当前 96/96 输入可 bounded preview：XLSX/CSV、PDF、DOCX、TXT/Markdown/JSON/log/code。预览前必须校验 allowlist relative path、size、SHA-256、非 symlink、archive/format bounds；不得执行 macro/script 或加载 external resources。
@@ -27,10 +27,10 @@ Source、Evidence 和 UI-server fact mapping，不能只更新 README。
 - Run 创建时服务端冻结完整 allowlisted 输入索引，`scope_mode=whole_workspace`。Planner 只看到安全元数据并自主选择本轮证据；服务端拥有每轮文件预算、source scope、side effect、human gate、unit/dependency/tool/source validation。`run_workspace_write` 在当前仅表示逻辑本轮结果，不证明 Artifact/File 写入。
 - 每个 finding 必须引用服务端批准的本轮 `file_ref`，引用按钮能回开对应安全预览。这只证明 membership，不证明 entailment、穷举或算术正确。
 - 终态 `result.follow_ups` 最多显示 4 条 Agent 下一步建议。建议不是执行事实；只有用户点击“确认并启动”后才创建新的独立 Run，旧 Run/结果不得被覆盖。
-- 当前可在最多 3 轮内到 `completed/stopped/failed`；Evidence Gate 只有在引用覆盖完成时提交只读 Brief，证据不足会进入下一轮或按预算停止。`completed` 代表 schema/ref/read-only checks 通过且 `review_required=true`；不代表任务正确、质量通过、Artifact Commit、Tool/Worker/Connector 或外部动作发生。
+- 当前可在最多 3 轮内到 `completed/stopped/failed`；Evidence Gate 只有在引用覆盖完成时提交只读 Brief，证据不足且预算允许时进入 `waiting_input/paused`，收到用户 idempotent resume 后才开始下一轮。补证轮由服务端限定为上一 Gate 的 `candidate_file_refs`，Plan Validator 要求全部覆盖，不能转去无关资料。每个完成轮次生成逻辑 evidence-brief 版本，成功终态记录逻辑 Commit。`completed` 代表 schema/ref/read-only checks 通过且 `review_required=true`；不代表任务正确、质量通过、独立不可变 Artifact/TaskCommit、Tool/Worker/Connector 或外部动作发生。
 - `pause/resume/steer/stop` 必须携带 expected version 与幂等键。pause/stop 只在模型调用之间的安全点生效；steer 只影响下一轮；deadline 阻止新调用但不硬取消在途 HTTP 请求。
 - Snapshot 是状态权威，SSE 是有序变更投影。浏览器只单调应用 version/sequence，nonterminal 断线用 GET + `after=N`，terminal event 后 final GET。
-- Run、事件和幂等记录仅在单 API 进程 memory；重启不恢复。`X-User-Id` 是未签名演示 Owner。
+- 配置 `DATABASE_DSN` 时，Run Snapshot、事件和 start/control 幂等回执写入 PostgreSQL；重启恢复会删除未完成轮次、追加 `checkpoint_recovered` 并暂停，绝不自动重放中断的模型调用。未配置数据库时明确使用单进程 memory 且重启不恢复。`X-User-Id` 是未签名演示 Owner，当前没有多实例 lease/通知。
 - Catalog/preview 完整性失败必须 fail closed。前台区分 API 离线、workspace integrity failure、file preview failure 和 Run failure，不得填充静态假数据。
 - Demo 1/2/3 只是通用能力的验收镜头：当前最多三轮只读 Agent Control Loop 已覆盖 Demo 1 的部分单任务有界循环；Demo 2 多任务自组织与 Demo 3 跨拓扑 Risk Gate 仍是目标能力。不得因 Demo 名或目标 profile 宣称未实现能力已经执行。
 - 自动化和截图是工程代理，不是用户研究。界面是否更清晰、信任/效率/价值是否提升均为 `Draft`。
@@ -49,10 +49,10 @@ Source、Evidence 和 UI-server fact mapping，不能只更新 README。
 8. Checkpoint, Event & Governance Control
 
 当前实现模块 1-4、模块 5 的有界单 Loop Controller 子集、模块 7 的受限 read-only
-Result/citation/Evidence Gate 子集，以及模块 8 的 memory event/control/idempotency
-子集。分布式 Scheduler/Worker、模块 6 的真实 Tool Gateway、immutable
-Artifact/Commit、durable checkpoint、Risk/Evidence/Approval/Permit 和 Connector
-均是目标架构。
+Result/citation/Evidence Gate/逻辑版本与 Commit 子集，以及模块 8 的 Snapshot、event、
+control、idempotency 和可选 PostgreSQL restart-recovery 子集。分布式 Scheduler/Worker、
+模块 6 的真实 Tool Gateway、独立 immutable Artifact/TaskCommit、多实例协调、
+Risk/Evidence/Approval/Permit 和 Connector 均是目标架构。
 
 ## 关键路径
 

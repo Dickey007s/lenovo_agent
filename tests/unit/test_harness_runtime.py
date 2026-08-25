@@ -21,11 +21,13 @@ from services.api.app.application.harness_runtime import (
     HarnessTaskResult,
     build_harness_runtime,
 )
+from services.api.app.application.harness_storage import InMemoryHarnessStateStore
 from services.api.app.main import create_app
 
 
 REF_ONE = "forte-1111111111111111"
 REF_TWO = "forte-2222222222222222"
+REF_THREE = "forte-3333333333333333"
 
 
 class FakeCatalog:
@@ -169,6 +171,26 @@ class FakeCatalog:
         ]
 
 
+class FakeCatalogWithDistractor(FakeCatalog):
+    def __init__(self) -> None:
+        super().__init__()
+        self.files.append(
+            {
+                "file_ref": REF_THREE,
+                "folder_id": "forte-folder-333333333333",
+                "path": "Legal-003/input/unrelated.txt",
+                "role": "input",
+                "mime": "text/plain",
+                "size": 12,
+                "sha256": "c" * 64,
+                "display_label": "无关法务说明.txt",
+                "display_group": "法务",
+                "display_path": "法务/无关法务说明.txt",
+                "display_summary": "文本文件 · 12 B",
+            }
+        )
+
+
 class FakePlanner:
     model = "deepseek-v4-pro"
 
@@ -274,6 +296,32 @@ async def wait_terminal(runtime: HarnessRuntime, owner: str, run_id: str):
     raise AssertionError("harness run did not reach a terminal state")
 
 
+async def wait_status(
+    runtime: HarnessRuntime, owner: str, run_id: str, expected: str
+):
+    for _ in range(300):
+        snapshot = await runtime.get(owner, run_id)
+        if snapshot.status == expected:
+            return snapshot
+        await asyncio.sleep(0)
+    raise AssertionError(f"harness run did not reach {expected}")
+
+
+async def confirm_evidence_gate(
+    runtime: HarnessRuntime, owner: str, run_id: str, key: str
+):
+    waiting = await wait_status(runtime, owner, run_id, "waiting_input")
+    return await runtime.control(
+        owner,
+        run_id,
+        AgentControlLoopControlRequest(
+            command="resume",
+            idempotency_key=key,
+            expected_version=waiting.version,
+        ),
+    )
+
+
 @pytest.mark.asyncio
 async def test_user_task_searches_the_whole_workspace_and_selects_evidence() -> None:
     planner = FakePlanner()
@@ -281,6 +329,13 @@ async def test_user_task_searches_the_whole_workspace_and_selects_evidence() -> 
     runtime = HarnessRuntime(FakeCatalog(), planner, analyst)
 
     started = await runtime.start("alice", start_request())
+    waiting = await wait_status(runtime, "alice", started.run.run_id, "waiting_input")
+    assert waiting.control_state == "paused"
+    assert waiting.rounds[0].next_step
+    assert waiting.rounds[0].next_step.decision == "waiting_input"
+    await confirm_evidence_gate(
+        runtime, "alice", started.run.run_id, "evidence-confirm-0001"
+    )
     snapshot = await wait_terminal(runtime, "alice", started.run.run_id)
 
     assert snapshot.workspace_id == "forte-public-office"
@@ -308,7 +363,7 @@ async def test_user_task_searches_the_whole_workspace_and_selects_evidence() -> 
     assert snapshot.budget.model_calls_used == 4
     assert len(snapshot.rounds) == 2
     assert snapshot.rounds[0].next_step
-    assert snapshot.rounds[0].next_step.decision == "next_round"
+    assert snapshot.rounds[0].next_step.decision == "waiting_input"
     assert snapshot.rounds[0].evidence_gaps
     assert snapshot.rounds[1].next_step
     assert snapshot.rounds[1].next_step.decision == "completed"
@@ -316,6 +371,48 @@ async def test_user_task_searches_the_whole_workspace_and_selects_evidence() -> 
     assert event_names.count("round_started") == 2
     assert event_names.count("evidence_gate") == 2
     assert event_names[-1] == "loop_committed"
+    assert [item.status for item in snapshot.artifact_versions] == [
+        "draft",
+        "committed",
+    ]
+    assert snapshot.last_commit
+    assert snapshot.last_commit.artifact_version == 2
+
+
+@pytest.mark.asyncio
+async def test_confirmed_evidence_round_cannot_drift_to_unrelated_files() -> None:
+    planner = FakePlanner()
+    runtime = HarnessRuntime(FakeCatalogWithDistractor(), planner, FakeAnalyst())
+    started = await runtime.start(
+        "alice",
+        start_request(
+            idempotency_key="evidence-scope-0001",
+            loop={
+                "max_rounds": 2,
+                "max_files_per_round": 2,
+                "max_model_calls": 4,
+                "deadline_seconds": 120,
+            },
+        ),
+    )
+
+    waiting = await wait_status(runtime, "alice", started.run.run_id, "waiting_input")
+    assert waiting.rounds[0].next_step
+    assert waiting.rounds[0].next_step.candidate_file_refs == [REF_TWO]
+    await confirm_evidence_gate(
+        runtime, "alice", started.run.run_id, "evidence-scope-confirm-0001"
+    )
+    snapshot = await wait_terminal(runtime, "alice", started.run.run_id)
+
+    assert snapshot.status == "completed"
+    assert snapshot.rounds[1].input_file_refs == [REF_TWO]
+    assert planner.files and [item["file_ref"] for item in planner.files] == [REF_TWO]
+    assert planner.workspace
+    assert planner.workspace["control_loop"]["evidence_recheck"] is True
+    second_round_event = [
+        event for event in snapshot.events if event.event_name == "round_started"
+    ][1]
+    assert second_round_event.details["evidence_recheck"] is True
 
 
 @pytest.mark.asyncio
@@ -394,7 +491,16 @@ async def test_invalid_result_citation_fails_closed() -> None:
 async def test_start_freezes_the_complete_server_owned_workspace_scope() -> None:
     runtime = HarnessRuntime(FakeCatalog(), FakePlanner(), FakeAnalyst())
     started = await runtime.start(
-        "alice", start_request(idempotency_key="whole-workspace-0001")
+        "alice",
+        start_request(
+            idempotency_key="whole-workspace-0001",
+            loop={
+                "max_rounds": 1,
+                "max_files_per_round": 1,
+                "max_model_calls": 2,
+                "deadline_seconds": 120,
+            },
+        ),
     )
     snapshot = await wait_terminal(runtime, "alice", started.run.run_id)
 
@@ -506,6 +612,9 @@ async def test_pause_steer_resume_applies_at_safe_points_and_replays_control() -
         ),
     )
     assert resumed.run.control_state == "running"
+    await confirm_evidence_gate(
+        runtime, "alice", started.run.run_id, "gate-after-pause-0001"
+    )
     terminal = await wait_terminal(runtime, "alice", started.run.run_id)
 
     assert terminal.status == "completed"
@@ -574,13 +683,24 @@ async def test_http_contract_exposes_one_workspace_not_scenarios() -> None:
         started = await client.post(
             "/v1/harness/runs",
             headers=headers,
-            json=start_request(idempotency_key="route-start-0001").model_dump(),
+            json=start_request(
+                idempotency_key="route-start-0001",
+                loop={
+                    "max_rounds": 1,
+                    "max_files_per_round": 1,
+                    "max_model_calls": 2,
+                    "deadline_seconds": 120,
+                },
+            ).model_dump(),
         )
 
         assert workspace.status_code == 200 and workspace.json()["folder_count"] == 1
         assert preview.status_code == 200 and preview.json()["security"]["read_only"] is True
         assert retired.status_code == 404
         assert started.status_code == 202
+        recent = await client.get("/v1/harness/runs?limit=5", headers=headers)
+        assert recent.status_code == 200
+        assert recent.json()["runs"][0]["run_id"] == started.json()["run"]["run_id"]
         run_id = started.json()["run"]["run_id"]
         for _ in range(200):
             current = await client.get(f"/v1/harness/runs/{run_id}", headers=headers)
@@ -661,9 +781,16 @@ async def test_http_control_route_pauses_replays_and_resumes_same_loop() -> None
         assert resumed.status_code == 202
         assert resumed.json()["run"]["control_state"] == "running"
 
+    await confirm_evidence_gate(
+        runtime, "alice", run_id, "route-gate-confirm-0001"
+    )
     terminal = await wait_terminal(runtime, "alice", run_id)
     assert terminal.status == "completed"
-    assert [item.command for item in terminal.control_events] == ["pause", "resume"]
+    assert [item.command for item in terminal.control_events] == [
+        "pause",
+        "resume",
+        "resume",
+    ]
 
 
 @pytest.mark.asyncio
@@ -678,12 +805,68 @@ async def test_http_workspace_integrity_failure_is_503() -> None:
     assert response.json()["detail"] == "办公资料库完整性校验失败"
 
 
+@pytest.mark.asyncio
+async def test_checkpoint_restore_pauses_without_replaying_interrupted_model_call() -> None:
+    store = InMemoryHarnessStateStore()
+    blocking_planner = BlockingPlanner()
+    first_runtime = HarnessRuntime(
+        FakeCatalog(), blocking_planner, FakeAnalyst(), store
+    )
+    await first_runtime.setup()
+    request = start_request(idempotency_key="durable-start-0001")
+    started = await first_runtime.start("alice", request)
+    await asyncio.wait_for(blocking_planner.started.wait(), timeout=1)
+    await first_runtime.close()
+
+    recovered_planner = FakePlanner()
+    recovered_runtime = HarnessRuntime(
+        FakeCatalog(), recovered_planner, FakeAnalyst(), store
+    )
+    await recovered_runtime.setup()
+    recovered = await recovered_runtime.get("alice", started.run.run_id)
+
+    assert recovered.status == "paused"
+    assert recovered.control_state == "paused"
+    assert recovered.rounds == []
+    assert recovered_planner.calls == 0
+    assert recovered.events[-1].event_name == "checkpoint_recovered"
+    assert (await recovered_runtime.list("alice"))[0].run_id == started.run.run_id
+    replay = await recovered_runtime.start("alice", request)
+    assert replay.replayed is True
+    assert replay.run.run_id == started.run.run_id
+
+    await recovered_runtime.control(
+        "alice",
+        started.run.run_id,
+        AgentControlLoopControlRequest(
+            command="resume",
+            idempotency_key="durable-resume-0001",
+            expected_version=recovered.version,
+        ),
+    )
+    await confirm_evidence_gate(
+        recovered_runtime,
+        "alice",
+        started.run.run_id,
+        "durable-evidence-confirm-0001",
+    )
+    terminal = await wait_terminal(
+        recovered_runtime, "alice", started.run.run_id
+    )
+
+    assert terminal.status == "completed"
+    assert recovered_planner.calls == 2
+    assert terminal.last_commit is not None
+    await recovered_runtime.close()
+
+
 def test_production_builder_uses_complete_workspace_catalog(monkeypatch) -> None:
     class Settings:
         llm_base_url = "https://example.invalid/v1"
         llm_api_key = "test-key"
         llm_model = "deepseek-v4-pro"
         llm_timeout_seconds = 10
+        database_dsn = ""
 
     runtime = build_harness_runtime(Settings())
     workspace = runtime.get_workspace()

@@ -154,6 +154,9 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, summary:focus
 .task-composer { border: 1px solid #cbd9eb; border-left: 3px solid var(--blue); background: #f9fbfe; }
 .task-composer > div { padding: 13px 14px 8px; }
 .task-composer h2 { margin: 3px 0 0; font-size: 18px; letter-spacing: 0; }
+.task-composer > .checkpoint-restored { display: flex; align-items: center; gap: 8px; margin: 0 14px 9px; padding: 8px 10px; border-left: 3px solid var(--green); color: var(--ink-soft); background: var(--green-soft); font-size: 11px; line-height: 1.45; }
+.checkpoint-restored svg { width: 17px; flex: 0 0 auto; color: var(--green); }
+.checkpoint-restored b { display: block; color: var(--green); }
 .task-composer textarea { width: calc(100% - 28px); min-height: 78px; resize: vertical; margin: 0 14px; padding: 10px 11px; border: 1px solid var(--line-strong); border-radius: 4px; color: var(--ink); background: var(--paper); font-size: 15px; line-height: 1.5; }
 .loop-contract-settings { margin: 8px 14px 0; border: 1px solid #d6e0ec; background: #fff; }
 .loop-contract-settings summary { min-height: 38px; display: flex; align-items: center; gap: 7px; padding: 0 10px; color: var(--ink-soft); font-size: 12px; font-weight: 700; cursor: pointer; }
@@ -290,7 +293,22 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, summary:focus
 .loop-round-detail > footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 10px; padding: 11px 12px; border: 1px solid #cad9ea; background: #f6f9fd; }
 .loop-round-detail > footer.is-complete { border-color: #c6dfd0; background: #f4fbf7; }
 .loop-round-detail > footer > svg { width: 20px; flex: 0 0 auto; color: var(--blue); }
+.loop-round-detail > footer > button { min-height: 40px; display: inline-flex; align-items: center; gap: 6px; flex: 0 0 auto; padding: 0 11px; border: 1px solid #185caf; border-radius: 4px; color: #fff; background: var(--blue); font-weight: 750; }
+.loop-round-detail > footer > button svg { width: 16px; }
 .loop-round-detail > footer strong { display: block; margin-top: 3px; font-size: 13px; }
+.artifact-evolution { margin: 0 15px 14px; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+.artifact-evolution > header { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 11px 0; }
+.artifact-evolution > header span { color: var(--blue); font-size: 11px; font-weight: 750; }
+.artifact-evolution > header h3 { margin: 3px 0 0; font-size: 14px; letter-spacing: 0; }
+.artifact-evolution > header > b { padding: 4px 6px; color: var(--green); background: var(--green-soft); font-size: 10px; }
+.artifact-evolution ol { display: flex; overflow-x: auto; margin: 0; padding: 0 0 10px; list-style: none; }
+.artifact-evolution li { min-width: 145px; display: grid; grid-template-columns: 32px minmax(0, 1fr); gap: 8px; padding: 8px 10px; border-left: 2px solid #90afd2; background: #f6f9fd; }
+.artifact-evolution li + li { margin-left: 7px; }
+.artifact-evolution li > span { width: 30px; height: 30px; display: grid; place-items: center; color: var(--blue); background: var(--blue-soft); font-size: 11px; font-weight: 750; }
+.artifact-evolution li b { font-size: 12px; }
+.artifact-evolution li p { margin: 3px 0 0; color: var(--muted); font-size: 10px; }
+.artifact-evolution > footer { display: flex; align-items: center; gap: 7px; padding: 9px 0; border-top: 1px solid var(--line); color: var(--green); font-size: 11px; }
+.artifact-evolution > footer svg { width: 16px; flex: 0 0 auto; }
 .loop-brief { display: grid; grid-template-columns: 25px minmax(0, 1fr); gap: 9px; margin: 0 15px 15px; padding: 12px; border: 1px solid #c6dfd0; background: #f4fbf7; }
 .loop-brief.is-bounded, .loop-brief.is-user_stopped { border-color: #e5c38d; background: var(--amber-soft); }
 .loop-brief > svg { width: 21px; color: var(--green); }
@@ -442,6 +460,8 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, summary:focus
   .loop-phase-rail li { min-height: 58px; display: grid; justify-items: center; gap: 3px; padding: 6px 3px; text-align: center; }
   .loop-phase-rail li b { font-size: 10px; }
   .loop-round-tabs > button { min-width: 138px; min-height: 60px; }
+  .loop-round-detail > footer { align-items: stretch; flex-direction: column; }
+  .loop-round-detail > footer > button { width: 100%; justify-content: center; }
   .result-proposals > article { grid-template-columns: 1fr; }
   .result-proposals article button { min-height: 44px; justify-self: stretch; justify-content: center; }
 }

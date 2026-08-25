@@ -11,12 +11,15 @@ from services.api.app.config import get_settings
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     settings = get_settings()
-    # The current product surface is the read-only FORTE Harness planning
-    # slice. It owns no legacy workspace, task, conversation, or demo store.
-    app.state.harness_runtime = build_harness_runtime(settings)
-    app.state.checkpoint_backend = "memory"
-    app.state.task_store_backend = "memory"
-    yield
+    runtime = build_harness_runtime(settings)
+    await runtime.setup()
+    app.state.harness_runtime = runtime
+    app.state.checkpoint_backend = runtime.backend_name
+    app.state.task_store_backend = runtime.backend_name
+    try:
+        yield
+    finally:
+        await runtime.close()
 
 
 def create_app() -> FastAPI:

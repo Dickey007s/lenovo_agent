@@ -38,9 +38,11 @@ browse or search the whole repository
   -> server compiles and validates scope, tools, dependencies and effects
   -> deepseek-v4-pro Analyst reads the approved safe projections
   -> server validates citation membership and evaluates the Evidence Gate
-  -> next round when evidence is missing and budget remains
-  -> ordered SSE + authoritative memory Snapshot
-  -> read-only brief + proposed next tasks
+  -> evidence missing: pause and ask the user before spending another round
+  -> user confirms: next round is bound to those displayed missing sources
+  -> ordered SSE + authoritative Snapshot
+  -> one logical evidence-brief version per completed round
+  -> verified final version + logical Commit + proposed next tasks
   -> human confirms one proposal -> independent new Control Loop
 ```
 
@@ -61,9 +63,12 @@ Demo names do not unlock capability or select private code paths:
   convergence;
 - Demo 3 applies a cross-cutting risk/action gate to either topology.
 
-The current Runtime is a `bounded_read_only_control_loop`. Adaptive Workers,
-versioned durable Artifact/Commit, cross-process recovery and governed external
-actions remain target architecture, not current claims.
+The current Runtime is a `bounded_read_only_control_loop`. It now creates
+user-visible logical result versions and can restore accepted snapshots and
+idempotency receipts after an API restart when `DATABASE_DSN` points to
+PostgreSQL. Adaptive Workers, independently immutable Artifact storage,
+multi-instance leases and governed external actions remain target architecture,
+not current claims.
 
 ## Public data and preview boundary
 
@@ -92,14 +97,19 @@ GET  /v1/health
 GET  /v1/harness/workspace
 GET  /v1/harness/workspace/files/{file_ref}
 POST /v1/harness/runs
+GET  /v1/harness/runs?limit={1..20}
 GET  /v1/harness/runs/{run_id}
 POST /v1/harness/runs/{run_id}/controls
 GET  /v1/harness/runs/{run_id}/events?after={sequence}
 ```
 
-The former Scenario list/detail routes are not mounted. `X-User-Id` remains an
-unsigned demonstration Owner placeholder. Runs, receipts, events and
-idempotency records live in one API process memory and disappear on restart.
+The former Scenario list/detail routes are not mounted. There are eight public
+operations over seven OpenAPI paths because `GET` and `POST` share `/runs`.
+`X-User-Id` remains an unsigned demonstration Owner placeholder. With
+`DATABASE_DSN`, accepted Run snapshots and command receipts are stored in
+PostgreSQL. Recovery rolls an interrupted model call back to the last completed
+round and pauses for the user; it never silently replays the call. Without a
+database, health reports `memory` and process-restart recovery is unavailable.
 
 ## Eight modules
 
@@ -113,11 +123,12 @@ idempotency records live in one API process memory and disappear on restart.
 8. Checkpoint, Event & Governance Control
 
 Current implementation covers modules 1-4; a bounded single-loop controller
-subset of module 5; a read-only result, citation and Evidence Gate subset of
-module 7; and the memory event, control and idempotency subset of module 8.
-Distributed Worker scheduling, a real Tool Gateway, writable versioned
-Artifact/Commit, durable checkpointing and governed external action remain
-target work.
+subset of module 5; a read-only result, citation, Evidence Gate, logical
+ArtifactVersion and logical Commit subset of module 7; and a Snapshot/event,
+control, idempotency and optional PostgreSQL restart-recovery subset of module
+8. Distributed Worker scheduling, a real Tool Gateway, independently immutable
+Artifact records, multi-instance coordination and governed external action
+remain target work.
 
 ## Evidence status
 
@@ -127,11 +138,11 @@ target work.
   product, 96 safe previews and its former selected-file browser path. That
   manual-scope interaction is superseded by `DR-0024`. Implementation
   [`0794648`](https://github.com/Dickey007s/lenovo_agent/commit/0794648477ad0061a5460127af8800a021019366)
-  and stacked [PR #27](https://github.com/Dickey007s/lenovo_agent/pull/27) are
-  bound; the PR is open and this is not a merged-state claim.
+  and [PR #27](https://github.com/Dickey007s/lenovo_agent/pull/27) are bound;
+  the stacked series #25-#29 was consolidated into `master` on 2026-08-25.
 - `DR-0023` is `Limited Verified` for the bounded read-only Agent Control Loop.
   Implementation `8364b1e` and stacked [PR #28](https://github.com/Dickey007s/lenovo_agent/pull/28)
-  are bound; the PR is open and this is not a merged-state claim. A real
+  are bound and now merged through the consolidated series. A real
   `deepseek-v4-pro` run completed 2 rounds over 8 FORTE files with 5 model calls
   and 21 ordered events; the first candidate plan was rejected, visibly retried
   once within budget, then adopted.
@@ -139,6 +150,10 @@ target work.
   whole-workspace contract, Agent-owned per-round evidence selection and
   human-confirmed next-task proposals. Its final verification is recorded in
   the linked Evidence ledger.
+- `DR-0025` adds the human-confirmed between-round Evidence Gate, logical result
+  versions, current-Run restoration and optional PostgreSQL restart recovery.
+  Its engineering scope and remaining durability limits are recorded in the
+  linked Evidence ledger.
 - Current checks are recorded in the dated Evidence ledgers rather than copied
   here before the final run.
 - No target-user study has been run. Clarity, trust, efficiency and user value
@@ -198,6 +213,9 @@ pnpm --dir apps/web exec playwright test e2e/harness-workbench.spec.ts
 - [SCENARIO-009：Agent 研究当前文件夹并提出下一步](docs/scenarios/SCENARIO-009-agent-control-loop.md)
 - [DR-0024：整库自主研究与人工确认下一轮](docs/decisions/DR-0024-autonomous-whole-workspace-research.md)
 - [SCENARIO-010：Agent 自主研究整个办公资料库](docs/scenarios/SCENARIO-010-autonomous-whole-workspace-research.md)
+- [DR-0025：可恢复检查点、人工证据门与成果演进](docs/decisions/DR-0025-durable-evidence-gate-and-artifact-evolution.md)
+- [SCENARIO-011：中断恢复与逐轮补证](docs/scenarios/SCENARIO-011-recover-and-confirm-evidence-round.md)
+- [可恢复 Control Loop Evidence](docs/evidence/DURABLE-EVIDENCE-GATE-ARTIFACT-EVOLUTION-EVIDENCE-20260826.md)
 - [整库自主研究 Evidence](docs/evidence/AUTONOMOUS-WHOLE-WORKSPACE-RESEARCH-EVIDENCE-20260825.md)
 - [Agent Control Loop 三轮只读纵切证据](docs/evidence/AGENT-CONTROL-LOOP-BOUNDED-READONLY-EVIDENCE-20260825.md)
 - [主流方案、办公场景与交互影响研究](docs/research/WORKSPACE-CENTRIC-OFFICE-AGENT-INTERACTION-AND-SOURCES-20260825.md)

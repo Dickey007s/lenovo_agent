@@ -172,6 +172,30 @@ type LoopBrief = {
   external_action: "none";
 };
 
+type ArtifactVersion = {
+  artifact_id: string;
+  version: number;
+  title: string;
+  kind: "evidence_brief";
+  status: "draft" | "verified" | "committed";
+  summary: string;
+  source_file_refs: string[];
+  finding_count: number;
+  parent_version: number | null;
+  created_at: string;
+  review_required: true;
+  external_action: "none";
+};
+
+type LoopCommit = {
+  commit_id: string;
+  artifact_id: string;
+  artifact_version: number;
+  summary: string;
+  committed_at: string;
+  external_action: "none";
+};
+
 export type HarnessPlanNode = {
   node_id: string;
   label: string;
@@ -196,6 +220,9 @@ export type HarnessRun = {
   rounds: LoopRound[];
   current_round: number;
   control_state: "running" | "pause_requested" | "paused" | "stop_requested" | "stopped";
+  artifact_versions: ArtifactVersion[];
+  last_commit: LoopCommit | null;
+  recovered: boolean;
   brief: LoopBrief | null;
   plan: HarnessPlanNode[];
   plan_summary?: string;
@@ -235,8 +262,10 @@ export type HarnessActivityState = {
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8010";
 const HEADERS = { "Content-Type": "application/json", "X-User-Id": "demo_user" };
+const RUN_SESSION_KEY = "office-agent:forte-public-office:active-run";
 const NAMED_EVENTS = [
   "workspace_index",
+  "checkpoint_recovered",
   "round_started",
   "planning_started",
   "planning_completed",
@@ -494,6 +523,7 @@ function normalizeLoopRound(value: unknown): LoopRound | null {
 function activityItem(event: HarnessServerEvent): HarnessActivityItem {
   const labels: Record<string, string> = {
     workspace_index: "已建立整个资料库索引",
+    checkpoint_recovered: "已从服务端检查点恢复",
     planning_started: "规划模型开始组织任务",
     planning_completed: "规划模型返回工作计划",
     plan_validation_rejected: "候选计划未通过，正在受控重试",
@@ -524,6 +554,44 @@ function activityItem(event: HarnessServerEvent): HarnessActivityItem {
     detail: event.message ?? "本轮状态来自服务端回执。",
     occurred_at: event.occurred_at,
     tone,
+  };
+}
+
+function normalizeArtifactVersion(value: unknown): ArtifactVersion | null {
+  if (!value || typeof value !== "object") return null;
+  const raw = value as Record<string, unknown>;
+  const status = asText(raw.status);
+  const artifactId = asText(raw.artifact_id);
+  if (!artifactId || !["draft", "verified", "committed"].includes(status)) return null;
+  return {
+    artifact_id: artifactId,
+    version: asNumber(raw.version, 1),
+    title: asText(raw.title, "任务证据简报"),
+    kind: "evidence_brief",
+    status: status as ArtifactVersion["status"],
+    summary: asText(raw.summary),
+    source_file_refs: asStrings(raw.source_file_refs),
+    finding_count: asNumber(raw.finding_count),
+    parent_version: typeof raw.parent_version === "number" ? raw.parent_version : null,
+    created_at: asText(raw.created_at),
+    review_required: true,
+    external_action: "none",
+  };
+}
+
+function normalizeCommit(value: unknown): LoopCommit | null {
+  if (!value || typeof value !== "object") return null;
+  const raw = value as Record<string, unknown>;
+  const commitId = asText(raw.commit_id);
+  const artifactId = asText(raw.artifact_id);
+  if (!commitId || !artifactId) return null;
+  return {
+    commit_id: commitId,
+    artifact_id: artifactId,
+    artifact_version: asNumber(raw.artifact_version, 1),
+    summary: asText(raw.summary),
+    committed_at: asText(raw.committed_at),
+    external_action: "none",
   };
 }
 
@@ -587,6 +655,9 @@ function normalizeRun(value: unknown): HarnessRun | null {
     external_action: "none" as const,
   } : null;
   const controlState = asText(raw.control_state);
+  const artifactVersions = Array.isArray(raw.artifact_versions)
+    ? raw.artifact_versions.map(normalizeArtifactVersion).filter((item): item is ArtifactVersion => item !== null)
+    : [];
   return {
     run_id: runId,
     workspace_id: workspaceId,
@@ -621,6 +692,9 @@ function normalizeRun(value: unknown): HarnessRun | null {
     rounds,
     current_round: asNumber(raw.current_round),
     control_state: (["pause_requested", "paused", "stop_requested", "stopped"].includes(controlState) ? controlState : "running") as HarnessRun["control_state"],
+    artifact_versions: artifactVersions,
+    last_commit: normalizeCommit(raw.last_commit),
+    recovered: serverEvents.some((event) => event.event_name === "checkpoint_recovered"),
     brief,
     plan: plan.units,
     plan_summary: plan.summary ?? undefined,
@@ -754,6 +828,7 @@ export function HarnessWorkbench({ onActivityChange }: { onActivityChange?: (sta
   const lastSequenceRef = useRef(0);
   const startCommandRef = useRef<{ signature: string; key: string } | null>(null);
   const controlCommandRef = useRef<{ signature: string; key: string } | null>(null);
+  const restoreAttemptedRef = useRef(false);
 
   const allFiles = useMemo(() => workspace?.folders.flatMap((folder) => folder.files) ?? [], [workspace]);
   const activeFile = allFiles.find((file) => file.file_ref === activeFileRef) ?? null;
@@ -782,6 +857,7 @@ export function HarnessWorkbench({ onActivityChange }: { onActivityChange?: (sta
     if (snapshot.last_event_sequence < lastSequenceRef.current || (current && snapshot.version < current.version)) return false;
     runRef.current = snapshot;
     lastSequenceRef.current = Math.max(lastSequenceRef.current, snapshot.last_event_sequence);
+    window.sessionStorage.setItem(RUN_SESSION_KEY, snapshot.run_id);
     setRun(snapshot);
     if (snapshot.events.length) setConnection(TERMINAL_STATUSES.has(snapshot.status) ? "available" : "live");
     return true;
@@ -850,7 +926,48 @@ export function HarnessWorkbench({ onActivityChange }: { onActivityChange?: (sta
     }
   }
 
+  async function restoreLatestRun() {
+    if (restoreAttemptedRef.current) return;
+    restoreAttemptedRef.current = true;
+    try {
+      let snapshot: HarnessRun | null = null;
+      const storedRunId = window.sessionStorage.getItem(RUN_SESSION_KEY);
+      if (storedRunId) {
+        const response = await fetch(`${API_BASE}/v1/harness/runs/${encodeURIComponent(storedRunId)}`, { headers: HEADERS });
+        if (response.ok) snapshot = normalizeRun(await response.json());
+        else if (response.status === 404) window.sessionStorage.removeItem(RUN_SESSION_KEY);
+      }
+      if (!snapshot) {
+        const response = await fetch(`${API_BASE}/v1/harness/runs?limit=10`, { headers: HEADERS });
+        if (response.ok) {
+          const payload = await response.json() as { runs?: unknown[] };
+          const candidates = Array.isArray(payload.runs)
+            ? payload.runs.map(normalizeRun).filter((item): item is HarnessRun => item !== null)
+            : [];
+          snapshot = candidates.find((item) => !TERMINAL_STATUSES.has(item.status)) ?? null;
+        }
+      }
+      if (!snapshot) return;
+      const generation = generationRef.current + 1;
+      generationRef.current = generation;
+      runRef.current = null;
+      lastSequenceRef.current = 0;
+      if (!applySnapshot(snapshot, generation)) return;
+      setInstruction(snapshot.instruction);
+      setView(snapshot.result && TERMINAL_STATUSES.has(snapshot.status) ? "result" : "loop");
+      if (!TERMINAL_STATUSES.has(snapshot.status)) {
+        connectEvents(snapshot.run_id, generation, snapshot.last_event_sequence);
+      }
+    } catch {
+      setConnection("available");
+    }
+  }
+
   useEffect(() => { void loadWorkspace(); return closeTransport; }, []);
+
+  useEffect(() => {
+    if (workspaceStatus === "online") void restoreLatestRun();
+  }, [workspaceStatus]);
 
   useEffect(() => {
     if (!activeFileRef) { setPreview(null); return; }
@@ -1025,6 +1142,7 @@ export function HarnessWorkbench({ onActivityChange }: { onActivityChange?: (sta
       <section className="data-task-surface">
         <section className="task-composer" aria-labelledby="task-composer-title">
           <div><span>研究整个资料库</span><h2 id="task-composer-title">你想让 Agent 找什么，或推进什么？</h2></div>
+          {run?.recovered && <div className="checkpoint-restored"><IconRefresh aria-hidden="true" /><span><b>服务端检查点已恢复</b> 未完成的模型调用没有重放，你可以检查轨迹后继续。</span></div>}
           <textarea value={instruction} disabled={runActive} onChange={(event) => setInstruction(event.target.value)} placeholder="例如：研究整个资料库，找出需要继续推动的工作，并逐条说明文件依据" aria-label="任务指令" />
           <details className="loop-contract-settings">
             <summary><IconAdjustments aria-hidden="true" />Agent Control Loop · 最多 {maxRounds} 轮 / {maxModelCalls} 次模型调用 / {deadlineSeconds} 秒</summary>
@@ -1049,7 +1167,7 @@ export function HarnessWorkbench({ onActivityChange }: { onActivityChange?: (sta
         <div className="workspace-content">
           {view === "data" && <FilePreview preview={preview} file={activeFile} loading={previewLoading} error={previewError} />}
           {view === "loop" && <LoopView run={run} files={allFiles} controlBusy={controlBusy} onControl={controlLoop} />}
-          {view === "result" && <ResultView result={run?.result ?? null} files={allFiles} onOpenFile={openFile} onStartTask={startTask} starting={starting} />}
+          {view === "result" && <ResultView result={run?.result ?? null} artifacts={run?.artifact_versions ?? []} commit={run?.last_commit ?? null} files={allFiles} onOpenFile={openFile} onStartTask={startTask} starting={starting} />}
         </div>
         <details className="workspace-boundary"><summary><IconShieldCheck aria-hidden="true" />数据与执行边界</summary><p>{workspace.data_boundary} Agent 可以检索整个资料库，但每轮只读取服务端校验通过且受预算约束的文件；本轮不会修改原文件或执行外部动作。</p></details>
         {error && <div className="workspace-error" role="alert"><IconAlertTriangle aria-hidden="true" /><span>{error}</span></div>}
@@ -1148,19 +1266,28 @@ function LoopView({
       </details>}
       {selectedRound.result && <section className="loop-round-result"><span>本轮核对结果</span><h3>{selectedRound.result.summary}</h3><p>{selectedRound.result.findings.length} 条发现，引用 {selectedRound.verified_file_refs.length} 份文件。</p></section>}
       {selectedRound.evidence_gaps.length > 0 && <section className="loop-gap"><IconAlertTriangle aria-hidden="true" /><div><span>证据缺口</span><h3>{selectedRound.evidence_gaps[0].label}</h3><p>{selectedRound.evidence_gaps[0].detail}</p></div></section>}
-      {selectedRound.next_step && <footer className={selectedRound.next_step.decision === "completed" ? "is-complete" : "is-next"}><div><span>服务端决定</span><strong>{gateLabel(selectedRound.next_step.decision)}</strong><p>{selectedRound.next_step.reason}</p></div>{selectedRound.next_step.decision === "next_round" && <IconArrowRight aria-hidden="true" />}</footer>}
+      {selectedRound.next_step && <footer className={selectedRound.next_step.decision === "completed" ? "is-complete" : "is-next"}><div><span>服务端决定</span><strong>{gateLabel(selectedRound.next_step.decision)}</strong><p>{selectedRound.next_step.reason}</p></div>{selectedRound.next_step.decision === "waiting_input" ? <button type="button" onClick={() => void onControl("resume")} disabled={!canResume || controlBusy !== null}><IconPlayerPlay aria-hidden="true" />{controlBusy === "resume" ? "正在继续" : "确认并继续核对"}</button> : selectedRound.next_step.decision === "next_round" ? <IconArrowRight aria-hidden="true" /> : null}</footer>}
     </article>}
+    {run.artifact_versions.length > 0 && <section className="artifact-evolution" aria-label="成果版本">
+      <header><div><span>成果演进</span><h3>任务证据简报 v{run.artifact_versions.at(-1)?.version}</h3></div><b>{run.last_commit ? "已提交" : "待证据门"}</b></header>
+      <ol>{run.artifact_versions.map((artifact) => <li key={`${artifact.artifact_id}:${artifact.version}`}><span>v{artifact.version}</span><div><b>{artifact.status === "committed" ? "已提交" : artifact.status === "verified" ? "已核对" : "草稿"}</b><p>{artifact.finding_count} 条发现 · {artifact.source_file_refs.length} 份引用</p></div></li>)}</ol>
+      {run.last_commit && <footer><IconCircleCheck aria-hidden="true" /><span>{run.last_commit.summary}</span></footer>}
+    </section>}
     {run.brief && <section className={`loop-brief is-${run.brief.outcome}`}><IconCircleCheck aria-hidden="true" /><div><span>任务简报</span><h3>{run.brief.summary}</h3><p>外部动作：未发生 · 结果仍需人工复核</p></div></section>}
   </section>;
 }
 function ResultView({
   result,
+  artifacts,
+  commit,
   files,
   onOpenFile,
   onStartTask,
   starting,
 }: {
   result: HarnessResult | null;
+  artifacts: ArtifactVersion[];
+  commit: LoopCommit | null;
   files: HarnessFile[];
   onOpenFile: (file: HarnessFile) => void;
   onStartTask: (instruction: string) => Promise<void>;
@@ -1169,7 +1296,7 @@ function ResultView({
   const [expanded, setExpanded] = useState(false);
   if (!result) return <div className="workspace-placeholder"><IconClock aria-hidden="true" /><h2>任务简报尚未形成</h2><p>Agent Control Loop 完成只读分析并通过文件引用校验后，简报会出现在这里。</p></div>;
   const visibleFindings = expanded ? result.findings : result.findings.slice(0, 3);
-  return <article className="result-view"><header><IconCircleCheck aria-hidden="true" /><div><span>资料库研究结果 · 待复核</span><h2>{result.summary}</h2></div></header><div className="result-findings">{visibleFindings.map((finding, index) => <section key={`${finding.title}:${index}`}><b>{index + 1}</b><div><h3>{finding.title}</h3><p>{finding.detail}</p><footer>{finding.file_refs.map((ref) => {
+  return <article className="result-view"><header><IconCircleCheck aria-hidden="true" /><div><span>{commit ? `任务证据简报 v${commit.artifact_version} · 已提交` : artifacts.length ? `任务证据简报 v${artifacts.at(-1)?.version} · 待证据门` : "资料库研究结果 · 待复核"}</span><h2>{result.summary}</h2></div></header><div className="result-findings">{visibleFindings.map((finding, index) => <section key={`${finding.title}:${index}`}><b>{index + 1}</b><div><h3>{finding.title}</h3><p>{finding.detail}</p><footer>{finding.file_refs.map((ref) => {
     const file = files.find((item) => item.file_ref === ref);
     return file ? <button type="button" key={ref} onClick={() => onOpenFile(file)}><IconFile aria-hidden="true" />{file.display_label}</button> : null;
   })}</footer></div></section>)}</div>{result.findings.length > 3 && <button type="button" className="result-expand" aria-expanded={expanded} onClick={() => setExpanded((current) => !current)}><IconChevronDown className={expanded ? "is-open" : ""} aria-hidden="true" />{expanded ? "收起详细发现" : `查看其余 ${result.findings.length - 3} 条发现`}</button>}{result.follow_ups.length > 0 && <section className="result-proposals" aria-labelledby="result-proposals-title"><header><span>Agent 建议的下一步</span><h3 id="result-proposals-title">由你确认后，才会成为新的 Control Loop</h3></header>{result.follow_ups.map((item, index) => <article key={`${item}:${index}`}><div><b>建议 {index + 1}</b><p>{item}</p></div><button type="button" disabled={starting} onClick={() => void onStartTask(item)}><IconPlayerPlay aria-hidden="true" />{starting ? "正在启动" : "确认并启动"}</button></article>)}</section>}<footer><IconShieldCheck aria-hidden="true" />这些建议由模型基于本轮已读取资料生成，尚未逐项验证；只有你点击确认后才会启动新任务，本轮没有修改原文件或执行外部动作。</footer></article>;

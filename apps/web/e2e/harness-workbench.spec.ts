@@ -121,7 +121,7 @@ function plan(fileRefs: string[]) {
 
 function snapshot(
   body: { workspace_id: string; instruction: string },
-  status: "queued" | "planning" | "paused" | "completed" | "stopped" | "failed" = "completed",
+  status: "queued" | "planning" | "waiting_input" | "paused" | "completed" | "stopped" | "failed" = "completed",
   sequence = 16,
 ) {
   const allFiles = folders.flatMap((folder) => folder.files);
@@ -156,8 +156,8 @@ function snapshot(
     verified_file_refs: status === "planning" || status === "paused" ? [] : firstRefs,
     evidence_gaps: status === "planning" || status === "paused" ? [] : gap,
     next_step: status === "planning" || status === "paused" ? null : {
-      decision: secondRefs.length ? "next_round" : "completed",
-      reason: secondRefs.length ? "本轮仍有已选择资料未形成引用，预算允许继续一轮。" : "完成条件已满足。",
+      decision: secondRefs.length ? "waiting_input" : "completed",
+      reason: secondRefs.length ? "本轮仍有已选择资料未形成引用，需要你确认是否继续使用下一轮预算。" : "完成条件已满足。",
       next_question: secondRefs.length ? "继续补齐尚未核对的证据。" : null,
       candidate_file_refs: secondRefs,
     },
@@ -223,8 +223,30 @@ function snapshot(
     },
     rounds,
     current_round: rounds.length,
-    control_state: status === "paused" ? "paused" : status === "stopped" ? "stopped" : "running",
+    control_state: status === "paused" || status === "waiting_input" ? "paused" : status === "stopped" ? "stopped" : "running",
     control_events: [],
+    artifact_versions: rounds.map((round, index) => ({
+      artifact_id: "artifact-111111111111",
+      version: index + 1,
+      title: "任务证据简报",
+      kind: "evidence_brief",
+      status: status === "completed" && index === rounds.length - 1 ? "committed" : round.evidence_gaps.length ? "draft" : "verified",
+      summary: round.result?.summary ?? "本轮成果正在形成。",
+      source_file_refs: round.verified_file_refs,
+      finding_count: round.result?.findings.length ?? 0,
+      parent_version: index ? index : null,
+      created_at: new Date().toISOString(),
+      review_required: true,
+      external_action: "none",
+    })),
+    last_commit: status === "completed" ? {
+      commit_id: "commit-111111111111",
+      artifact_id: "artifact-111111111111",
+      artifact_version: rounds.length,
+      summary: "已提交通过证据门的只读任务简报，仍需用户审阅。",
+      committed_at: new Date().toISOString(),
+      external_action: "none",
+    } : null,
     brief: status === "completed" ? {
       outcome: "completed",
       summary: `Agent Control Loop 完成 ${rounds.length} 轮，从整个资料库中自主选择并只读核对了 ${selected.length} 份相关资料；已形成待用户确认的下一步建议。`,
@@ -250,12 +272,12 @@ function snapshot(
       review_required: true,
     } : null,
     validation_errors: failed ? ["规划使用了当前任务范围外的资料或能力，系统已安全停止。请重新规划。"] : [],
-    events: status === "queued" ? [] : [{ sequence, event_name: failed ? "harness_failed" : status === "completed" ? "loop_committed" : status === "stopped" ? "loop_stopped" : "round_started", occurred_at: new Date().toISOString(), status, message: failed ? "本轮未通过服务端校验，已停止且未发生外部动作。" : "服务端状态已更新。", details: {} }],
+    events: status === "queued" ? [] : [{ sequence, event_name: failed ? "harness_failed" : status === "completed" ? "loop_committed" : status === "stopped" ? "loop_stopped" : status === "waiting_input" ? "evidence_gate" : "round_started", occurred_at: new Date().toISOString(), status, message: failed ? "本轮未通过服务端校验，已停止且未发生外部动作。" : "服务端状态已更新。", details: {} }],
   };
 }
 async function fulfillJson(route: Route, body: unknown, status = 200) { await route.fulfill({ status, contentType: "application/json", body: JSON.stringify(body) }); }
 
-async function mockHarness(page: Page, options: { failFirstStart?: boolean; disconnect?: boolean; failed?: boolean; workspaceFailures?: number; interactiveLoop?: boolean } = {}) {
+async function mockHarness(page: Page, options: { failFirstStart?: boolean; disconnect?: boolean; failed?: boolean; workspaceFailures?: number; interactiveLoop?: boolean; evidenceGate?: boolean } = {}) {
   let workspaceCalls = 0; let startCalls = 0; let streamCalls = 0;
   let currentBody = { workspace_id: "forte-public-office", instruction: "" };
   let currentSnapshot = snapshot(currentBody, "queued");
@@ -272,12 +294,15 @@ async function mockHarness(page: Page, options: { failFirstStart?: boolean; disc
       return fulfillJson(route, workspace);
     }
     if (path.startsWith("/v1/harness/workspace/files/")) return fulfillJson(route, previewFor(path.split("/").at(-1)!));
+    if (path === "/v1/harness/runs" && route.request().method() === "GET") {
+      return fulfillJson(route, { runs: [] });
+    }
     if (path === "/v1/harness/runs" && route.request().method() === "POST") {
       startCalls += 1;
       const body = route.request().postDataJSON() as typeof currentBody & { idempotency_key: string };
       currentBody = body; starts.push(body);
       if (options.failFirstStart && startCalls === 1) return fulfillJson(route, { detail: "任务启动结果未知" }, 503);
-      currentSnapshot = snapshot(body, options.interactiveLoop ? "planning" : "queued", options.interactiveLoop ? controlSequence : 16);
+      currentSnapshot = snapshot(body, options.evidenceGate ? "waiting_input" : options.interactiveLoop ? "planning" : "queued", options.interactiveLoop || options.evidenceGate ? controlSequence : 16);
       return fulfillJson(route, { run: currentSnapshot, replayed: startCalls > 1 }, 202);
     }
     if (path.endsWith("/controls") && route.request().method() === "POST") {
@@ -296,9 +321,9 @@ async function mockHarness(page: Page, options: { failFirstStart?: boolean; disc
       streamCalls += 1; streams.push(url.toString());
       const after = Number(url.searchParams.get("after") ?? "0");
       const all = ["workspace_index", "round_started", "planning_started", "planning_completed", "plan_validation", "analysis_started", "analysis_completed", "result_validation", "evidence_gate", "round_started", "planning_started", "planning_completed", "analysis_started", "analysis_completed", "evidence_gate", options.failed ? "harness_failed" : "loop_committed"];
-      if (options.interactiveLoop) {
+      if (options.interactiveLoop || options.evidenceGate) {
         const sequence = Math.max(after + 1, currentSnapshot.last_event_sequence);
-        const terminalEvent = currentSnapshot.status === "completed" ? "loop_committed" : currentSnapshot.status === "stopped" ? "loop_stopped" : "round_started";
+        const terminalEvent = currentSnapshot.status === "completed" ? "loop_committed" : currentSnapshot.status === "stopped" ? "loop_stopped" : currentSnapshot.status === "waiting_input" ? "evidence_gate" : "round_started";
         const body = `id: ${sequence}\nevent: ${terminalEvent}\ndata: ${JSON.stringify({ sequence, event_name: terminalEvent, occurred_at: new Date().toISOString(), message: "服务端状态已更新。" })}\n\n`;
         return route.fulfill({ status: 200, contentType: "text/event-stream", body });
       }
@@ -311,7 +336,7 @@ async function mockHarness(page: Page, options: { failFirstStart?: boolean; disc
     }
     if (path.startsWith("/v1/harness/runs/")) {
       if (options.disconnect && streamCalls === 1) return fulfillJson(route, { ...snapshot(currentBody, "queued"), status: "indexing", last_event_sequence: 1, version: 2 });
-      if (options.interactiveLoop) return fulfillJson(route, currentSnapshot);
+      if (options.interactiveLoop || options.evidenceGate) return fulfillJson(route, currentSnapshot);
       return fulfillJson(route, snapshot(currentBody, options.failed ? "failed" : "completed"));
     }
     return fulfillJson(route, { detail: "not found" }, 404);
@@ -366,7 +391,9 @@ test("runs an arbitrary task while the agent selects evidence from the whole wor
   await expect(page.getByText("Agent 本轮自主选择")).toBeVisible();
   await expect(page.getByText("文件名与摘要直接涉及当前目标，先读取这些最小证据。")).toBeVisible();
   await expect(page.getByText("证据缺口")).toBeVisible();
-  await expect(page.locator(".loop-round-detail > footer strong")).toHaveText("继续下一轮");
+  await expect(page.locator(".loop-round-detail > footer strong")).toHaveText("等待人工输入");
+  await expect(page.locator(".artifact-evolution")).toContainText("任务证据简报 v2");
+  await expect(page.locator(".artifact-evolution")).toContainText("已提交");
   await page.getByRole("button", { name: /发现与建议/ }).click();
   await expect(page.getByRole("heading", { name: /完成 2 轮/ })).toBeVisible();
   expect(await page.locator("body").innerText()).not.toContain("forte-");
@@ -394,6 +421,31 @@ test("pauses, steers and resumes the same Agent Control Loop from server receipt
   await expect(page.locator(".loop-brief")).toContainText("外部动作：未发生");
   await expect(page.getByRole("button", { name: "启动 Control Loop" })).toBeEnabled();
   expect(state.controls.map((control) => control.command)).toEqual(["steer", "pause", "resume"]);
+});
+
+test("holds an evidence gap until the user confirms another round", async ({ page }) => {
+  const state = await mockHarness(page, { evidenceGate: true }); await page.goto("/");
+  await page.getByRole("textbox", { name: "任务指令" }).fill("核对跨文件事实，证据不足时先停下来。 ");
+  await page.getByRole("button", { name: "启动 Control Loop" }).click();
+  await expect(page.locator(".loop-round-detail > footer strong")).toHaveText("等待人工输入");
+  await expect(page.getByRole("button", { name: "确认并继续核对" })).toBeEnabled();
+  expect(state.controls).toHaveLength(0);
+
+  await page.getByRole("button", { name: "确认并继续核对" }).click();
+  await expect.poll(() => state.controls.map((item) => item.command)).toEqual(["resume"]);
+  await expect(page.locator(".loop-brief")).toContainText("完成 2 轮");
+});
+
+test("restores the current server run after a page reload", async ({ page }) => {
+  await mockHarness(page, { interactiveLoop: true }); await page.goto("/");
+  const instruction = "研究整个资料库并保留可恢复轨迹。";
+  await page.getByRole("textbox", { name: "任务指令" }).fill(instruction);
+  await page.getByRole("button", { name: "启动 Control Loop" }).click();
+  await expect(page.locator(".loop-view")).toContainText(instruction);
+
+  await page.reload();
+  await expect(page.locator(".loop-view")).toContainText(instruction);
+  await expect(page.getByRole("button", { name: "当前 Loop 运行中" })).toBeDisabled();
 });
 
 test("opens a cited source file from an analysis finding", async ({ page }) => {

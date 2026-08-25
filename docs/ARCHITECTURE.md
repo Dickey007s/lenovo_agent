@@ -17,8 +17,11 @@ FastAPI Harness
        -> server Policy Compiler + Plan Validator
        -> OpenAI-compatible Analyst
        -> Result/Citation Validator
-       -> Evidence Gate + bounded Loop Controller
-       -> in-memory Run/Round/Event/Control/Idempotency store
+       -> human-confirmed Evidence Gate + bounded Loop Controller
+       -> logical ArtifactVersion + final logical Commit
+       -> HarnessStateStore
+            -> PostgreSQL snapshots/receipts when DATABASE_DSN is configured
+            -> process-local memory fallback otherwise
 ```
 
 Only `health_router` and the Harness router are mounted. Legacy conversation,
@@ -86,11 +89,18 @@ that approved round. It returns 1-10 findings with at least one approved ref per
 finding and `review_required=true`. Citation membership is checked; semantic
 truth, completeness and arithmetic are not.
 
-The Evidence Gate compares referenced files with the current round's approved set. It
-alone decides `next_round`, `completed` or `budget_exhausted`; the model does
-not write terminal state. The current Commit is an in-memory read-only Brief,
-not an immutable ArtifactVersion or TaskCommit. Final `follow_ups` are capped at
-four and remain suggestions until a user explicitly starts a separate Run.
+The Evidence Gate compares referenced files with the current round's approved
+set. It alone decides `waiting_input`, `completed` or `budget_exhausted`; the
+model does not write terminal state. When another round could close a gap, the
+server pauses before spending that budget and requires an idempotent `resume`.
+The resumed evidence round is scoped to the prior Gate's candidate refs, and the
+Plan Validator requires all of them to remain in the plan; confirmation cannot
+silently turn into unrelated workspace exploration.
+Each completed round creates a logical read-only evidence-brief version. A
+successful final Gate marks the latest version `committed` and records a logical
+Commit. These records are part of the Run Snapshot, not independently immutable
+Artifact/TaskCommit rows. Final `follow_ups` remain suggestions until a user
+explicitly starts a separate Run.
 
 ## 5. State and streaming
 
@@ -100,7 +110,7 @@ The Snapshot is authoritative. Named events are a readable ordered projection:
 workspace_index -> round_started -> planning_started -> planning_completed
 -> optional plan_validation_rejected/retry -> plan_validation
 -> analysis_started -> analysis_completed -> result_validation -> evidence_gate
--> next round or loop_committed/loop_budget_stopped/loop_stopped
+-> optional human resume -> next round or loop_committed/loop_budget_stopped/loop_stopped
 ```
 
 Each event increments sequence and state transition increments Snapshot version.
@@ -110,8 +120,14 @@ evidence that a model call occurred; only `HarnessModelReceipt.called` is.
 
 Control commands use expected version and owner-scoped idempotency. Pause and
 stop apply at safe points between calls; steer applies to the next round.
-All Run state is one-process memory. API restart loses Run/round/event/control/
-idempotency state. `X-User-Id` is not signed authentication.
+`HarnessStateStore` atomically stores the accepted Snapshot with start/control
+receipts. On PostgreSQL startup, terminal and paused Runs are restored. Any
+interrupted round is removed, a `checkpoint_recovered` event is appended and
+the Run pauses at the last completed round; model calls are not automatically
+replayed. The browser restores its known Run id, or discovers the most recent
+nonterminal Owner Run via `GET /runs`. Memory fallback does not survive an API
+restart. `X-User-Id` is not signed authentication, and there is no multi-instance
+lease or notification channel.
 
 ## 6. Frontend architecture
 
@@ -119,7 +135,7 @@ The root page keeps three independently meaningful regions:
 
 - file-manager rail: one flat searchable inventory, type filters and metadata;
 - work area: task composer, loop contract, safe preview, round canvas, evidence
-  gaps, controls and cited brief;
+  gaps, explicit continue decision, result-version history and cited brief;
 - activity pane: current phase, budget, ordered events and model adoption receipts.
 
 The UI shows business facts and recovery actions, not internal protocol. A
@@ -137,8 +153,8 @@ the primary page into an architecture document.
 | Admission/Policy/Validator | server compilation and deterministic graph/source checks | dynamic topology admission |
 | Scheduler & Worker Manager | one bounded single-loop controller | adaptive workers, leases and recovery |
 | Tool Gateway | not connected | governed real/simulated tools and receipts |
-| Artifact Workspace & Verifier | per-round read-only result, citation membership, Evidence Gate and Brief | immutable versions, semantic/numeric validators and TaskCommit |
-| Checkpoint/Event/Governance | ordered memory events, controls and idempotent commands | durable checkpoint, cross-process replay, policy/approval/Permit integration |
+| Artifact Workspace & Verifier | per-round logical evidence-brief versions, citation membership, human Evidence Gate and final logical Commit | independently immutable records, semantic/numeric validators and TaskCommit |
+| Checkpoint/Event/Governance | ordered events, controls, idempotent commands and optional PostgreSQL restart recovery | multi-instance lease/notification, in-flight cancellation, policy/approval/Permit integration |
 
 ## 8. Security and claim boundary
 

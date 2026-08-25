@@ -67,8 +67,15 @@ Analyst.
 
 The Evidence Gate shows whether the current evidence is sufficient, which file
 could close a gap and whether another round is allowed by the remaining budget.
-The final brief appears only after citation-scope validation and a server-owned
-terminal decision. It remains labeled for human review. A citation button
+If more work is possible, the Run enters `waiting_input` instead of spending the
+next round automatically. “确认并继续核对” sends a versioned `resume`; until
+that server receipt returns, nothing else is claimed to have happened. The
+confirmed evidence round is restricted to the prior Gate's displayed candidate
+files, and its plan must cover all of them rather than starting unrelated
+exploration. Each
+completed round creates a visible evidence-brief version. The final brief and
+logical Commit appear only after citation-scope validation and a server-owned
+terminal decision. They remain labeled for human review. A citation button
 resolves against the workspace projection, selects that file and switches back
 to its preview. This keeps evidence review inside the main task flow.
 
@@ -101,6 +108,11 @@ command carries Owner, expected version and an idempotency key. The UI waits for
 the returned Snapshot instead of pretending that a click already changed the
 server.
 
+The current Run id is kept in browser session state. After refresh, the client
+first reconciles that id with `GET /runs/{run_id}`; when no local id exists it
+may discover the most recent nonterminal Owner Run through `GET /runs`. A
+`checkpoint_recovered` badge is shown only when that server event exists.
+
 ## 7. Streaming and reconciliation
 
 For a nonterminal Run the client opens:
@@ -132,9 +144,12 @@ browser fact, not a server task phase.
 | unknown start result | reconciling | same instruction/limits/key | replay identical request |
 | model/schema/policy failure | safe stop plus receipt | whole-workspace contract, instruction and completed rounds | revise or create a fresh Run |
 | rejected plan candidate | not adopted plus bounded retry | frozen contract and used-call count | server retries once if budget allows; otherwise fails closed |
-| evidence insufficient | next-round purpose and missing evidence | prior rounds and citations | continue automatically within budget or stop at the limit |
+| evidence insufficient | next-round purpose, missing evidence and explicit confirmation | prior rounds, versions and citations | confirm `resume`, adjust direction first or stop at the limit |
 | pause/steer/stop requested | pending until a safe point | current Snapshot and command receipt | reconcile returned version; resume or inspect terminal brief |
 | SSE interruption | reconnecting | current Snapshot and last sequence | GET plus `after=N` |
+| browser refresh | current Run and sequence restored | task, rounds, receipts and controls | GET current Run, then SSE `after=N` |
+| API restart with PostgreSQL | recovered checkpoint, paused | completed rounds, events, command receipts and result versions | inspect trace, then explicitly resume |
+| API restart without PostgreSQL | no recoverable Run | browser task draft only | start a new Run or configure `DATABASE_DSN` |
 
 ## 9. Responsive behavior
 
@@ -151,6 +166,7 @@ Ordinary DOM must not contain benchmark task prompt/rubric/solution, raw path,
 digest, model Prompt, chain-of-thought, raw response, credentials, internal
 effect/gate enums or low-level logs. The UI may show business labels, bounded
 content, call receipts, validation status, evidence gaps, controls and citations
-because those facts help the user decide or recover. The current `Commit` is an
-in-memory read-only brief, not an ArtifactVersion, TaskCommit or durable
-checkpoint.
+because those facts help the user decide or recover. The current result versions
+and Commit are logical records inside the Run Snapshot. With PostgreSQL they
+survive API restart, but they are not independently immutable ArtifactVersion or
+TaskCommit rows and do not prove a file write or external action.

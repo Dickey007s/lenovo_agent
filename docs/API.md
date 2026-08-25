@@ -12,6 +12,7 @@ OpenAPI exposes seven paths:
 | GET | `/v1/harness/workspace` | whole public office folder projection |
 | GET | `/v1/harness/workspace/files/{file_ref}` | bounded, integrity-checked file preview |
 | POST | `/v1/harness/runs` | start an idempotent bounded read-only Agent Control Loop |
+| GET | `/v1/harness/runs?limit=10` | list recent Owner-scoped Runs for recovery |
 | GET | `/v1/harness/runs/{run_id}` | Owner-scoped public Snapshot |
 | POST | `/v1/harness/runs/{run_id}/controls` | versioned, idempotent pause/resume/steer/stop |
 | GET | `/v1/harness/runs/{run_id}/events?after=N` | ordered named SSE after a sequence |
@@ -25,8 +26,14 @@ Run endpoints use `X-User-Id`; omission uses `demo_user`. This unsigned header
 is a demonstration Owner placeholder, not production authentication. Missing
 and wrong-owner Runs both return 404 before the SSE response is created.
 
-Runs, model receipts, results, events, in-flight calls and idempotency records
-live in one API process memory and disappear on restart.
+There are eight operations over seven OpenAPI paths because `GET` and `POST`
+share `/runs`. With `DATABASE_DSN`, accepted Run snapshots and start/control
+idempotency receipts are stored in PostgreSQL. On startup, an interrupted
+nonterminal Run is rolled back to completed rounds, receives
+`checkpoint_recovered` and pauses; an in-flight provider request is never
+automatically replayed. In-flight HTTP requests, asyncio tasks and conditions
+remain process-local. Without `DATABASE_DSN`, the state store is memory and all
+Run state disappears on restart.
 
 ## 3. Whole workspace
 
@@ -145,6 +152,11 @@ The response is `202 Accepted` with `{"run": snapshot, "replayed": false}`.
 Reusing the same Owner/key/request returns the original start result with
 `replayed=true`. Reusing that key for different content returns 409.
 
+`GET /v1/harness/runs?limit=10` returns `{"runs": [...]}` ordered by the
+latest server update. It is Owner-scoped and exists so a browser without local
+session state can discover a recoverable nonterminal Run. The client must still
+GET the selected Run and reconnect SSE from its authoritative sequence.
+
 ## 6. Public Snapshot
 
 Important fields:
@@ -181,6 +193,22 @@ Important fields:
   "rounds": [],
   "control_state": "running",
   "control_events": [],
+  "artifact_versions": [
+    {
+      "artifact_id": "artifact-...",
+      "version": 1,
+      "status": "committed",
+      "kind": "evidence_brief",
+      "source_file_refs": ["forte-..."],
+      "review_required": true,
+      "external_action": "none"
+    }
+  ],
+  "last_commit": {
+    "commit_id": "commit-...",
+    "artifact_version": 1,
+    "external_action": "none"
+  },
   "brief": {
     "outcome": "completed",
     "rounds_completed": 2,
@@ -226,15 +254,20 @@ server-side acceptance record. The current browser starts a separate Run only
 after the user confirms one proposal.
 
 Current statuses are `queued`, `indexing`, `planning`, `validating`,
-`analyzing`, `verifying`, `paused`, `completed`, `budget_exhausted`, `stopped`
+`analyzing`, `verifying`, `waiting_input`, `paused`, `completed`, `stopped`
 and `failed`;
 compatibility `ready_to_execute` is retained for runtimes built without an
 Analyst.
 
-`completed` means the Evidence Gate found no unreferenced allowed files and the
-read-only results passed schema, selected-citation and boundary checks. It does
-not mean the answer is correct, plan-declared tools ran, a versioned Artifact
-was committed or an external system changed.
+`artifact_versions` are logical read-only result versions inside the Run
+Snapshot. `last_commit` means the server's final Evidence Gate committed the
+latest logical version. Neither means an original file changed, a standalone
+immutable Artifact/TaskCommit record exists or an external system changed.
+
+`completed` means the Evidence Gate found no unresolved citation gap in the
+selected evidence and the read-only results passed schema, selected-citation
+and boundary checks. It does not mean the answer is semantically correct or a
+plan-declared tool executed.
 
 ## 7. Control a Run
 
@@ -256,6 +289,11 @@ instruction and applies only to the next round. Pause and stop are accepted
 immediately but applied only at a safe point between model calls. A stale
 version, illegal transition or same key with different content returns 409.
 An identical replay returns the first control result with `replayed=true`.
+When the Evidence Gate emits `next_step.decision=waiting_input`, the Snapshot
+already has `control_state=paused`; `resume` is the explicit user authorization
+to spend the next round's budget. That evidence-recheck round is restricted to
+the prior `next_step.candidate_file_refs`, and its validated plan must cover all
+of those refs. It cannot silently switch to unrelated workspace files.
 
 ## 8. Plan policy and result validation
 
@@ -294,6 +332,7 @@ analysis_started
 analysis_completed
 result_validation
 evidence_gate
+control_resume_recorded (required when evidence_gate waits for the user)
 round_started
 planning_started
 planning_completed
@@ -304,6 +343,10 @@ result_validation
 evidence_gate
 loop_committed
 ```
+
+`checkpoint_recovered` may appear after an API restart backed by PostgreSQL.
+It proves a persisted Snapshot was restored and the Run paused; it does not
+prove an interrupted model call was resumed or replayed.
 
 SSE `id` equals the event sequence. `after=N` returns only later events.
 Heartbeats carry no business state. A terminal event is followed by final GET
@@ -320,6 +363,8 @@ reconciliation; a nonterminal interruption uses GET plus `after=N` recovery.
 | Run/SSE 404 | missing or wrong Owner | same public response; clear stale Run |
 | start 409 | idempotency/contract conflict | preserve instruction/selection and reconcile |
 | control 409 | stale version or illegal transition | GET current Snapshot; preserve command draft and let the user retry |
+| `status=waiting_input` | another round could close a visible evidence gap | inspect sources, optionally steer, then explicitly resume or stop |
+| `checkpoint_recovered` | server restored a PostgreSQL Snapshot and paused | reconcile the trace; explicitly resume from the safe checkpoint |
 | `loop_budget_stopped` | round/call/deadline prevents another step | show bounded brief and unresolved gaps |
 | `status=failed` | model/schema/plan/source/citation validation failed | show safe business error and no result |
 

@@ -45,11 +45,11 @@ Agent Control Loop 的逐模块历史基线、当前三轮只读纵切和后续�
 | 7 | 安全预览把“Agent 读了什么”变成可见契约 | CSV/PDF/DOCX/TXT 预览拼图和安全说明 | 路径、大小、hash、符号链接和解析器测试 |
 | 8 | Harness 把模型调用、内容采用和服务端校验分开 | 事件与模型回执时序 | Snapshot/Receipt 事实；不展示思维链 |
 | 9 | 引用不是装饰，而是返回证据的导航动作 | 结果引用重新打开来源文件 | 只证明引用范围，不证明语义正确 |
-| 10 | Agent Control Loop 能分轮核对并提出下一步；只有人确认后才开始新工作 | 真实运行、Evidence Gate、控制与“确认并启动”截图 | 只读、最多三轮、单进程 memory；建议不是自动执行 |
+| 10 | Agent Control Loop 会在证据不足时停在轮次之间；人确认后才继续消耗预算 | Evidence Gate、“确认并继续核对”、成果 v1→v2 与恢复轨迹 | 只读、最多三轮；PostgreSQL 可恢复 Snapshot，但不是多实例高可用 |
 | 11 | Demo 2 验收多任务自组织、动态调度和共享工件汇聚 | Worker、依赖与动态重排图 | 目标设计；当前产品没有通用 Worker Runtime |
 | 12 | Demo 3 对单任务和多任务统一施加风险与动作控制 | 影响预演 -> 证据 -> 审批 -> Permit -> 回执 | 目标设计；当前没有真实外部动作 |
 | 13 | 当前已经证明工程链路，但也保留模型结果出错的负面证据 | 自动化、截图与 Finance 算术偏差并列 | `completed` 不等于结论正确 |
-| 14 | 历史审计的约 30% 已升级为可见、可停、可核验的只读 Loop；下一步补 Durable Artifact/Checkpoint | 当前 Loop 与目标 Durable State 叠加图 | `30%` 只代表实现前历史架构估计；当前 [`DR-0023`](decisions/DR-0023-agent-control-loop.md) 为限定范围 `Limited Verified` |
+| 14 | 历史审计的约 30% 已升级为可见、可停、可恢复的只读 Loop；下一步是独立不可变工件与多 Worker | 当前恢复路径、成果版本与目标架构叠加图 | `30%` 只代表历史基线；当前 [`DR-0025`](decisions/DR-0025-durable-evidence-gate-and-artifact-evolution.md) 仍是限定范围工程证据 |
 
 ## 4. 现场演示卡片
 
@@ -58,8 +58,9 @@ Agent Control Loop 的逐模块历史基线、当前三轮只读纵切和后续�
 3. 不勾选文件，只输入一个现场提出的新目标，并设置轮次、每轮文件、模型调用和 deadline 上限。
 4. 启动 Loop，指出合同已冻结完整 96 文件索引；Planner 与 Analyst 的独立模型回执才是调用事实。
 5. 展示 Agent 本轮选择了哪些文件、为什么选择，以及服务端如何把超预算候选限制在本轮上限内。
-6. 在 Evidence Gate 解释为什么继续或停止；演示 pause/steer/resume 或 stop 在安全点生效。
-7. 点击结论引用返回来源文件，再展示最多四条下一步建议；只有点击“确认并启动”才创建新 Loop。
+6. 在 Evidence Gate 停下来，先检查缺口，再点击“确认并继续核对”；强调没有这次回执就不会开始下一轮，而且下一轮只能补核刚才展示的缺失证据，不能悄悄换题。
+7. 展示成果简报从 v1 草稿到最终已提交版本；刷新或 API 恢复后，从服务端检查点继续而不重放中断调用。
+8. 点击结论引用返回来源文件，再展示最多四条下一步建议；只有点击“确认并启动”才创建新 Loop。
 
 演示不要从八模块架构图开始。先让观众看到数据、任务、轨迹和证据闭环，
 再解释支撑它的架构。
@@ -105,21 +106,24 @@ Agent Control Loop 的逐模块历史基线、当前三轮只读纵切和后续�
 | 引用范围校验 | 复核不离开 Agent 本轮采用的资料 | 引用按钮重新打开来源 | 结果 `file_refs` 属于本轮批准范围 |
 | 终态仍要求复核 | 完成不等于正确 | “模型初步结论 · 待复核” | `review_required=true` |
 | 服务端 Evidence Gate | 验证结果可决定继续还是停止 | 本轮缺口、下一轮目的、剩余预算 | `rounds[].evidence_gaps` 与 `next_step` |
+| 轮次间人工证据门 | 证据不足时由人决定是否继续花预算 | “确认并继续核对”、调整方向或停止 | `status=waiting_input`、`control_state=paused`、resume 回执 |
 | 版本化人工控制 | 用户不必只能等待模型跑完 | 暂停、继续、调整下一轮、结束并保留 | `ControlEvent`、expected version、幂等回执 |
+| Snapshot 持久化与安全恢复 | 刷新/进程重启不必把已完成轮次当作丢失 | “检查点已恢复”、原轮次/预算/版本、显式继续 | PostgreSQL `HarnessStateStore`、`checkpoint_recovered` |
+| 逐轮成果演进 | 用户看见 Agent 每轮对结果造成的变化 | 简报 v1/v2、草稿/已核对/已提交 | `artifact_versions[]`、`last_commit` |
 | 有界候选修复 | 模型返回未通过时不会静默采用 | `未采用` 与预算内重试 | `plan_validation_rejected`、模型调用计数 |
 | 人工确认下一步 | Agent 建议不会自动扩张任务 | 最多四条建议与“确认并启动” | 终态 `follow_ups` + 新 Run POST |
 
 ## 7. 当前证据卡片
 
-`DR-0022` 是历史手工选文件基线；`DR-0023` 证明限定范围的 Agent Control
-Loop；`DR-0024` 记录当前整库自主检索与人工确认下一步：
+`DR-0022` 是历史手工选文件基线；`DR-0023/24` 证明整库只读 Loop；
+`DR-0025` 记录当前轮次间确认、恢复和成果演进：
 
-- 完整 Python：`57 passed in 13.36s`；聚焦 Runtime：`20 passed in 0.80s`；
-- Harness 浏览器：`10 passed in 40.5s`；Ruff、lint、build、governance 与 diff-check 通过；
+- 完整 Python：`58 passed`；聚焦 Runtime：`21 passed`；
+- Harness 浏览器：`12 passed`；Ruff、lint 与 build 通过；最终 Evidence 记录完整时长；
 - 最终截图绑定的真实浏览器运行：整库冻结 96 份索引，Agent 自主选择并核对 3 份文件，2 次 `deepseek-v4-pro` 调用，形成 5 条发现和 4 条待确认建议；
 - 3 张最终文件管理器/建议截图及 SHA-256 写入 Evidence；1440px 与 390px 无页面横向溢出；
 - 实现提交 [`2b8e58c`](https://github.com/Dickey007s/lenovo_agent/commit/2b8e58c161df02d4f2c09bc2692db76d075f2ae2)；
-- 当前交付 [PR #29](https://github.com/Dickey007s/lenovo_agent/pull/29) 为开放状态，不能表述为已经合并。
+- PR #25-#29 已依次合并到 `master`；`DR-0025` 当前位于待提交分支，不能在新 PR 合并前表述为主分支能力。
 
 `DR-0023` 的历史数字仍只证明当时的手工范围版本。当前最终数字必须取自
 [`AUTONOMOUS-WHOLE-WORKSPACE-RESEARCH-20260825`](evidence/AUTONOMOUS-WHOLE-WORKSPACE-RESEARCH-EVIDENCE-20260825.md)，
@@ -134,5 +138,7 @@ Loop；`DR-0024` 记录当前整库自主检索与人工确认下一步：
 - “计划里出现操作，就说明工具或文件写入已经发生”；
 - “当前三轮只读 Loop 已等同完整 Demo 1 Durable Runtime，或 Demo 2/3 已全部完成”；
 - “内存 Snapshot 具备跨进程持久化或多实例高可用”；
+- “PostgreSQL Snapshot 恢复等于在途模型调用可续跑、跨实例调度或多实例高可用”；
+- “逻辑成果版本与 Commit 等于独立不可变 ArtifactVersion/TaskCommit 或真实文件写入”；
 - “Evidence Gate 已验证语义真值、数值正确性或业务完整性”；
 - 在没有用户研究时声称“新界面更清晰、更可信或效率更高”。

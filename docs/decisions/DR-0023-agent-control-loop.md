@@ -1,5 +1,9 @@
 # DR-0023：先实现 Agent Control Loop 的三轮只读纵切
 
+> 生命周期说明：本决策定义的通用只读 Control Loop 继续有效；`memory`、自动
+> `next_round` 和无成果版本的历史限制已由 [`DR-0025`](DR-0025-durable-evidence-gate-and-artifact-evolution.md)
+> 更新。本文数字和 Evidence 仍只描述当时实现。
+
 ## 决策元数据
 
 | 字段 | 内容 |

@@ -1,5 +1,9 @@
 # DR-0024：整库自主研究取代手工文件范围选择
 
+> 生命周期说明：本决策的整库检索交互继续有效；其中“单进程 memory、自动进入
+> 下一轮、没有逻辑成果版本”的历史边界已由 [`DR-0025`](DR-0025-durable-evidence-gate-and-artifact-evolution.md)
+> 更新。 dated Evidence 仍只证明当时提交。
+
 ## 决策元数据
 
 | 字段 | 内容 |
