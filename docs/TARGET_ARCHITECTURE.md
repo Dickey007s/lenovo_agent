@@ -11,7 +11,9 @@
 The Agent is general; Demo 1/2/3 are acceptance views over one capability
 runtime. The product begins from an inspectable office workspace, not a hidden
 Prompt or Demo switch. Users choose evidence scope, author a task, observe
-server-backed execution facts and review outputs against sources.
+server-backed execution facts and review outputs against sources. In the
+current interaction, users choose the goal while the Agent chooses a bounded
+evidence set from the complete safe workspace index.
 
 Current implementation reaches a cited, bounded multi-round read-only brief.
 Every source mutation, durable Commit, Worker swarm and Connector statement
@@ -22,8 +24,8 @@ below is target design unless explicitly marked current.
 | Module | Stable responsibility | Current | Target interaction impact |
 | --- | --- | --- | --- |
 | 1. Workspace Catalog & Safe Preview | file identity, integrity, safe projection and source policy | 15 folders/96 inputs, bounded preview | users inspect data before invocation and understand capability gaps |
-| 2. Task Contract | goal, selected scope, budget, deadline and completion criteria | instruction + selected refs + bounded rounds/files/calls/deadline | visible editable contract replaces hidden Prompt assumptions |
-| 3. Planner | propose work intent and dependencies | strict per-round Planner with one budgeted repair | users see plan proposal, rejection and adoption separately |
+| 2. Task Contract | goal, workspace scope, budget, deadline and completion criteria | instruction + whole-workspace refs + bounded rounds/files/calls/deadline | user states intent without doing retrieval first |
+| 3. Planner | retrieve evidence, propose work intent and dependencies | strict per-round Planner with autonomous evidence selection and one budgeted repair | users see what the Agent chose, why, and whether the plan was adopted |
 | 4. Admission, Policy Compiler & Validator | choose topology, compile policy, validate graph/sources/gates | server compilation and plan checks | route explanation shows why work stays single, splits or stops |
 | 5. Scheduler & Worker Manager | bounded loop or adaptive workers, leases and replanning | one in-process bounded single-loop controller | live work map shows actual units, waiting and replanning without Worker chat |
 | 6. Tool Gateway | capability registry, Permit, idempotency and execution receipts | not connected | proposed impact appears before confirmation; actual impact after receipt |
@@ -59,7 +61,7 @@ Official OpenClaw material foregrounds Gateway/channel/session/tool control;
 Codex foregrounds project threads, worktrees and review queues; Claude Code
 foregrounds project-directory agent loops, tools, subagents and permissions.
 Those are strong patterns and can be extended. This project deliberately
-foregrounds an office folder, task-scoped evidence and business citations.
+foregrounds an office repository, Agent-selected evidence and business citations.
 
 The resulting flow is:
 
@@ -70,10 +72,11 @@ message/project first
 current Office Agent
   -> browse files
   -> inspect safe content
-  -> explicitly choose task scope
-  -> write task
-  -> observe call/adoption/validation/receipt
+  -> write a goal without preselecting files
+  -> Agent searches the complete safe index
+  -> observe selected evidence/call/adoption/validation/receipt
   -> reopen citations and review
+  -> confirm one proposed next task to start a new Loop
 ```
 
 This is an implementation emphasis, not evidence of superior usability. The
@@ -140,7 +143,7 @@ model answer can still be numerically wrong.
 
 ## 9. Delivery order
 
-1. Preserve whole-folder browsing, safe preview, explicit scope and truthful
+1. Preserve whole-workspace browsing, safe preview, autonomous bounded evidence selection and truthful
    call/validation trace.
 2. Preserve the bounded read-only Agent Control Loop and add file-level evidence
    locations plus task-specific deterministic validators.
@@ -155,9 +158,11 @@ model answer can still be numerically wrong.
 
 ## 10. Claim boundary
 
-Current `Limited Verified` facts are folder inventory, bounded preview,
-selected-scope task, bounded multi-round read-only Loop, model receipts, one
-budgeted plan repair, server plan checks, citation membership, Evidence Gate,
-ordered memory events, safe-point controls and an in-memory brief. Durable
+Current `Limited Verified` facts are folder inventory and bounded preview. The
+whole-workspace autonomous-scope change remains bound to `DR-0024` evidence.
+The underlying bounded multi-round read-only Loop, model receipts, one budgeted
+plan repair, server plan checks, citation membership, Evidence Gate, ordered
+memory events, safe-point controls and an in-memory brief remain current.
+Durable
 Artifact/Checkpoint recovery, adaptive Workers, Tool Gateway, real Connectors,
 production identity and user value are not current capabilities.

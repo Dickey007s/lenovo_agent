@@ -120,29 +120,26 @@ Content-Type: application/json
   "workspace_id": "forte-public-office",
   "idempotency_key": "harness:client-generated-key",
   "expected_version": 1,
-  "instruction": "比较所选文件中的关键变化，并逐条引用依据。",
-  "selected_file_refs": [
-    "forte-a0bccc1df48cc6a1",
-    "forte-b6e701bcf4494076"
-  ],
+  "instruction": "研究整个资料库，找出值得继续推动的工作，并逐条引用依据。",
   "loop": {
     "max_rounds": 3,
-    "max_files_per_round": 4,
+    "max_files_per_round": 6,
     "max_model_calls": 6,
     "deadline_seconds": 120
   }
 }
 ```
 
-`instruction` is required and contains 3-2,000 characters.
-`selected_file_refs` is required, unique and contains 1-20 stable refs from the
-one workspace. The server rejects unknown refs and supplies no benchmark-task
-fallback.
+`instruction` is required and contains 3-2,000 characters. The request does not
+accept `selected_file_refs`: the server freezes the complete allowlisted input
+index and the Planner autonomously selects a bounded evidence set for each
+round. Sending a client-owned file scope is rejected as an unknown field.
 
 `loop` is optional and defaults to the values above. Bounds are 1-3 rounds,
 1-8 files per round, 2-6 model calls and 20-300 seconds. The server freezes
-these values into `AgentControlLoopContract`; the browser cannot change the
-scope or budget while a Run is active.
+these values plus `scope_mode=whole_workspace` and all stable input refs into
+`AgentControlLoopContract`; the browser cannot change the scope or budget while
+a Run is active.
 
 The response is `202 Accepted` with `{"run": snapshot, "replayed": false}`.
 Reusing the same Owner/key/request returns the original start result with
@@ -167,9 +164,10 @@ Important fields:
   "contract": {
     "contract_version": "agent-control-loop.v1",
     "goal": "...",
-    "allowed_file_refs": ["forte-..."],
+    "scope_mode": "whole_workspace",
+    "allowed_file_refs": ["forte-...", "... all 96 stable refs ..."],
     "max_rounds": 3,
-    "max_files_per_round": 4,
+    "max_files_per_round": 6,
     "max_model_calls": 6,
     "deadline_seconds": 120,
     "external_action": "none"
@@ -188,7 +186,11 @@ Important fields:
     "rounds_completed": 2,
     "external_action": "none"
   },
-  "plan": {"summary": "...", "units": []},
+  "plan": {
+    "summary": "...",
+    "selection_reason": "为什么本轮选择这些文件",
+    "units": []
+  },
   "model_receipt": {
     "called": true,
     "model": "deepseek-v4-pro",
@@ -206,12 +208,22 @@ Important fields:
     "findings": [
       {"title": "...", "detail": "...", "file_refs": ["forte-..."]}
     ],
-    "follow_ups": [],
+    "follow_ups": ["由用户确认后可作为新 Run 启动的下一步任务"],
     "review_required": true
   },
   "validation_errors": []
 }
 ```
+
+`source_documents` and `contract.allowed_file_refs` are the full safe workspace
+index. They are not the files read by the Analyst. The authoritative per-round
+evidence scope is `rounds[].input_file_refs`, and the public reason is
+`rounds[].plan.selection_reason`. The server compiler caps the union of those
+refs at `max_files_per_round` before any file content reaches the Analyst.
+
+`result.follow_ups` contains at most four model-proposed next tasks. It is not a
+server-side acceptance record. The current browser starts a separate Run only
+after the user confirms one proposal.
 
 Current statuses are `queued`, `indexing`, `planning`, `validating`,
 `analyzing`, `verifying`, `paused`, `completed`, `budget_exhausted`, `stopped`

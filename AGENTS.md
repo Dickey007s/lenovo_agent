@@ -9,8 +9,8 @@
 5. `docs/contracts/UI_SERVER_FACT_MATRIX.md`：每个 UI 状态的服务端事实。
 6. `docs/PRESENTATION_BRIEF.md`：汇报叙事和禁止夸大的结论；制作会议/PPT 主讲稿时再读 `docs/reports/OFFICE-AGENT-DETAILED-CHINESE-REPORT-20260825.md`。
 7. `docs/DECISION_AND_REPORTING_GOVERNANCE.md`：方案、PR、Demo、汇报的硬门槛。
-8. 当前 whole-folder 变更再读 `docs/decisions/DR-0022-workspace-folder-and-arbitrary-task-contract.md`、`docs/scenarios/SCENARIO-008-whole-folder-office-workspace.md`、`docs/research/WORKSPACE-CENTRIC-OFFICE-AGENT-INTERACTION-AND-SOURCES-20260825.md`、`docs/testing/FORTE-PUBLIC-OFFICE-TASK-TEST-CASES-20260825.md` 与对应 Evidence/Source。
-9. 修改 Agent Control Loop、文件夹自主研究、预算/停止、暂停/调整方向或 Durable State 时，再读 `docs/research/AGENT-CONTROL-LOOP-IMPLEMENTATION-AUDIT-20260825.md`、`docs/decisions/DR-0023-agent-control-loop.md`、`docs/evidence/AGENT-CONTROL-LOOP-BOUNDED-READONLY-EVIDENCE-20260825.md` 与对应 Source/Scenario。对外和设计文档统一称 `Agent Control Loop`；Workspace 是循环处理的办公资料环境，不另立 `Workspace Research Loop` 或 `Research Loop` 产品名称。历史约 `30%` 只表示实现 `8364b1e` 之前的架构成熟度基线；现行 Runtime 已有最多三轮的只读 Control Loop 纵切，但 Durable State、Artifact Commit、跨进程恢复、多 Worker 与外部动作仍未实现。
+8. 当前整库文件管理器与自主检索变更再读 `docs/decisions/DR-0024-autonomous-whole-workspace-research.md`、`docs/scenarios/SCENARIO-010-autonomous-whole-workspace-research.md`、`docs/research/WORKSPACE-CENTRIC-OFFICE-AGENT-INTERACTION-AND-SOURCES-20260825.md`、`docs/testing/FORTE-PUBLIC-OFFICE-TASK-TEST-CASES-20260825.md` 与对应 Evidence/Source。`DR-0022` 的客户端手工 `selected_file_refs` 已由 `DR-0024` 取代，但其公开数据、安全预览与来源边界继续有效。
+9. 修改 Agent Control Loop、文件夹自主研究、预算/停止、暂停/调整方向或 Durable State 时，再读 `docs/research/AGENT-CONTROL-LOOP-IMPLEMENTATION-AUDIT-20260825.md`、`docs/decisions/DR-0023-agent-control-loop.md`、`docs/decisions/DR-0024-autonomous-whole-workspace-research.md` 与对应 Evidence/Scenario。对外和设计文档统一称 `Agent Control Loop`；Workspace 是循环处理的办公资料环境，不另立 `Workspace Research Loop` 或 `Research Loop` 产品名称。历史约 `30%` 只表示实现 `8364b1e` 之前的架构成熟度基线；现行 Runtime 已有最多三轮的只读 Control Loop 纵切，但 Durable State、Artifact Commit、跨进程恢复、多 Worker 与外部动作仍未实现。
 
 源码永远高于文档。行为或叙事变化后必须同步 living docs、Decision、Scenario、
 Source、Evidence 和 UI-server fact mapping，不能只更新 README。
@@ -20,12 +20,13 @@ Source、Evidence 和 UI-server fact mapping，不能只更新 README。
 - 根页面是唯一 FORTE 办公资料库。产品没有注册 Scenario/Demo 选择器；旧邮件、文档、报价、任务、日历、报销、CRM、审计和固定 Customer A 入口均已退休。
 - 当前 OpenAPI 只有七个 path：health、whole workspace、workspace file preview、Run start/get/control/events。旧 `/v1/harness/scenarios*` 不挂载。
 - FORTE 固定 commit `345c1ec1487139db9dd319787fa9405ba85d1869`。`public-suite-manifest.json` 是当前只读清单：15 个公开任务目录、96 个 input、111 个 task/input 文件、`1780445` bytes。官方完整 benchmark 报告 180 条，但公开仓库只提供每职业一个 demo；不得声称拿到未公开 165 条。
-- `task.md` 只作 provenance，不能进入普通 UI、Analyst 输入或成为隐藏默认任务。用户必须自己写 `instruction` 并显式选择 1-20 个 `file_ref`。
-- 用户可自由搜索、查看和跨目录选择文件。当前 96/96 输入可 bounded preview：XLSX/CSV、PDF、DOCX、TXT/Markdown/JSON/log/code。预览前必须校验 allowlist relative path、size、SHA-256、非 symlink、archive/format bounds；不得执行 macro/script 或加载 external resources。
+- `task.md` 只作 provenance，不能进入普通 UI、Analyst 输入或成为隐藏默认任务。用户只需自己写 `instruction`；浏览器不得要求或提交客户端 `selected_file_refs`。
+- 用户可在一个文件管理器式资料库中自由搜索、按类型筛选和查看文件，不按职业/角色建立产品入口。当前 96/96 输入可 bounded preview：XLSX/CSV、PDF、DOCX、TXT/Markdown/JSON/log/code。预览前必须校验 allowlist relative path、size、SHA-256、非 symlink、archive/format bounds；不得执行 macro/script 或加载 external resources。
 - 公共 API/DOM/模型输入不得暴露 raw task/rubric/solution、绝对/内部路径、完整 hash、Prompt、CoT、raw provider response、密钥或内部 validator/effect 字符串。
 - 当前成功路径按轮真实调用 Planner 和 Analyst。`called/output_used/elapsed_ms` 必须分开显示；动画和配置模型名不是调用证据。`未采用` 表示模型已返回但服务端校验拒绝，不是未调用。Plan 可在同一预算内进行最多一次受控修复，拒绝与重试都必须进入有序 Trace。
-- Planner 只提出业务意图。服务端拥有 source scope、side effect、human gate、unit/dependency/tool/source validation。`run_workspace_write` 在当前仅表示逻辑本轮结果，不证明 Artifact/File 写入。
-- 每个 finding 必须引用冻结选择集内的 `file_ref`，引用按钮能回开对应安全预览。这只证明 membership，不证明 entailment、穷举或算术正确。
+- Run 创建时服务端冻结完整 allowlisted 输入索引，`scope_mode=whole_workspace`。Planner 只看到安全元数据并自主选择本轮证据；服务端拥有每轮文件预算、source scope、side effect、human gate、unit/dependency/tool/source validation。`run_workspace_write` 在当前仅表示逻辑本轮结果，不证明 Artifact/File 写入。
+- 每个 finding 必须引用服务端批准的本轮 `file_ref`，引用按钮能回开对应安全预览。这只证明 membership，不证明 entailment、穷举或算术正确。
+- 终态 `result.follow_ups` 最多显示 4 条 Agent 下一步建议。建议不是执行事实；只有用户点击“确认并启动”后才创建新的独立 Run，旧 Run/结果不得被覆盖。
 - 当前可在最多 3 轮内到 `completed/stopped/failed`；Evidence Gate 只有在引用覆盖完成时提交只读 Brief，证据不足会进入下一轮或按预算停止。`completed` 代表 schema/ref/read-only checks 通过且 `review_required=true`；不代表任务正确、质量通过、Artifact Commit、Tool/Worker/Connector 或外部动作发生。
 - `pause/resume/steer/stop` 必须携带 expected version 与幂等键。pause/stop 只在模型调用之间的安全点生效；steer 只影响下一轮；deadline 阻止新调用但不硬取消在途 HTTP 请求。
 - Snapshot 是状态权威，SSE 是有序变更投影。浏览器只单调应用 version/sequence，nonterminal 断线用 GET + `after=N`，terminal event 后 final GET。

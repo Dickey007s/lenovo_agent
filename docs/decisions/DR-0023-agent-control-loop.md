@@ -11,6 +11,8 @@
 | 场景 | [`SCENARIO-009`](../scenarios/SCENARIO-009-agent-control-loop.md) |
 | Evidence | [`AGENT-CONTROL-LOOP-BOUNDED-READONLY-20260825`](../evidence/AGENT-CONTROL-LOOP-BOUNDED-READONLY-EVIDENCE-20260825.md)；实现 `8364b1e`；open PR [#28](https://github.com/Dickey007s/lenovo_agent/pull/28) |
 
+> 当前适用性：`DR-0023` 的 Loop 状态、预算、控制和 Evidence Gate 继续有效；其中“用户先选允许文件”的范围交互已由 [`DR-0024`](DR-0024-autonomous-whole-workspace-research.md) 取代。历史 Evidence 仍只证明当时提交。
+
 ## 问题
 
 本决策形成前，Workspace Harness 能让用户浏览文件、限定范围、调用 Planner 与
@@ -24,7 +26,7 @@ Analyst、查看顺序轨迹并回开引用，但服务端只执行一次单向�
 本轮实现 Agent Control Loop 中一个最多三轮、严格只读、可暂停的路径，暂不同时引入
 真实文件写入、Adaptive Swarm 或外部动作：
 
-1. 用户以 `AgentControlLoopContract` 指定研究目标、允许文件范围、完成条件和预算；
+1. 用户以 `AgentControlLoopContract` 指定研究目标和预算；当前合同由服务端冻结完整资料库索引，Planner 自主选择每轮证据；
 2. Agent 先读取目录索引，再由服务端批准本轮实际读取的文件；
 3. 每轮固定经过 `Observe -> Plan -> Act(read-only) -> Verify -> Evidence Gate`；
 4. Verifier 只能输出 `commit / wait_for_human / next_round / stop` 四类决定；
@@ -39,7 +41,7 @@ Analyst、查看顺序轨迹并回开引用，但服务端只执行一次单向�
 
 ## 当前实现事实
 
-- `POST /v1/harness/runs` 冻结 Goal、允许文件、最大轮次、每轮文件、模型调用和 deadline；
+- `POST /v1/harness/runs` 冻结 Goal、完整资料库索引、最大轮次、每轮文件、模型调用和 deadline；
 - 每轮都持久在当前进程 Snapshot 的 `rounds[]` 中，不覆盖上一轮；
 - Evidence Gate 仅由服务端决定 `next_round / completed / budget_exhausted`；
 - `POST /v1/harness/runs/{run_id}/controls` 支持 `pause / resume / steer / stop`，携带
