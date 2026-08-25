@@ -1,4 +1,4 @@
-# DR-0023：先实现三轮只读 Workspace Research Loop
+# DR-0023：先实现 Agent Control Loop 的三轮只读纵切
 
 ## 决策元数据
 
@@ -6,9 +6,9 @@
 | --- | --- |
 | 状态 | `Draft`；尚无实现或运行证据 |
 | 日期 | 2026-08-25 |
-| 触发来源 | `USER-FEEDBACK-20260825-CONTROL-LOOP-16` |
+| 触发来源 | `USER-FEEDBACK-20260825-CONTROL-LOOP-16`、`USER-FEEDBACK-20260825-CONTROL-LOOP-NAMING-17` |
 | 研究审计 | [`AGENT-CONTROL-LOOP-IMPLEMENTATION-AUDIT-20260825`](../research/AGENT-CONTROL-LOOP-IMPLEMENTATION-AUDIT-20260825.md) |
-| 场景 | [`SCENARIO-009`](../scenarios/SCENARIO-009-workspace-research-control-loop.md) |
+| 场景 | [`SCENARIO-009`](../scenarios/SCENARIO-009-agent-control-loop.md) |
 | Evidence | 待实现后新增；当前没有可升级状态的运行证据 |
 
 ## 问题
@@ -20,16 +20,16 @@
 
 ## 决策
 
-下一条工程纵切先实现一个最多三轮、严格只读、可暂停的 Workspace Research Loop，
+下一条工程纵切先实现 Agent Control Loop 中一个最多三轮、严格只读、可暂停的路径，
 暂不同时引入真实文件写入、Adaptive Swarm 或外部动作：
 
-1. 用户以 `WorkspaceResearchContract` 指定研究目标、允许目录范围、完成条件和预算；
+1. 用户以 `AgentControlLoopContract` 指定研究目标、允许目录范围、完成条件和预算；
 2. Agent 先读取目录索引，再由服务端批准本轮实际读取的文件；
 3. 每轮固定经过 `Observe -> Plan -> Act(read-only) -> Verify -> Evidence Gate`；
 4. Verifier 只能输出 `commit / wait_for_human / next_round / stop` 四类决定；
 5. 只有证据缺口存在且预算仍允许时才能进入下一轮；
 6. 用户可以 `pause / resume / steer / stop`，所有命令携带 expected version 与幂等键；
-7. 最终 `WorkspaceResearchBrief` 逐项绑定来源，并明确已覆盖、未覆盖、冲突和剩余风险；
+7. 最终 `AgentControlLoopBrief` 逐项绑定来源，并明确已覆盖、未覆盖、冲突和剩余风险；
 8. 第一版允许使用 memory Store，但前台和文档不得称为 Durable State。
 
 ## 为什么先做只读三轮
@@ -43,17 +43,17 @@
 
 | 用户问题 | 前台输出 | 目标服务端事实 | 默认隐藏 |
 | --- | --- | --- | --- |
-| Agent 为什么读这些文件？ | 本轮问题、候选范围和选择理由 | `ResearchRoundSnapshot.selected_file_refs` 与批准理由 | Prompt、思维链、绝对路径 |
+| Agent 为什么读这些文件？ | 本轮问题、候选范围和选择理由 | `ControlLoopRoundSnapshot.selected_file_refs` 与批准理由 | Prompt、思维链、绝对路径 |
 | 它发现了什么？ | 新证据、冲突、引用与相对上一轮的变化 | `RoundFinding`、`EvidenceGap`、验证回执 | 原始 provider response |
 | 为什么还要继续？ | “证据缺口 + 下一轮目的 + 剩余预算” | `GateDecision=next_round` | 内部策略枚举和调试日志 |
 | 为什么停下？ | 完成、等待人、预算耗尽或用户停止 | 终态、停止原因和 Event | 含糊的完成动画 |
 | 我能改变方向吗？ | 暂停、继续、调整方向、结束并提交 | `ControlEvent`、expected version 和回执 | 未确认即生效的本地假状态 |
-| 最终得到什么？ | 有来源的推进建议、未解决问题和覆盖范围 | `WorkspaceResearchBrief` | 无证据的自动结论 |
+| 最终得到什么？ | 有来源的推进建议、未解决问题和覆盖范围 | `AgentControlLoopBrief` | 无证据的自动结论 |
 
 ## 后端所有权
 
-- `WorkspaceResearchContract` 拥有目标、范围、验收条件、预算和截止时间；
-- `ResearchRoundSnapshot` 拥有每轮文件、工具/模型回执、发现、验证和证据缺口；
+- `AgentControlLoopContract` 拥有目标、范围、验收条件、预算和截止时间；
+- `ControlLoopRoundSnapshot` 拥有每轮文件、工具/模型回执、发现、验证和证据缺口；
 - Loop Controller 拥有状态转换，模型不能直接写 `next_round` 或终态；
 - Budget Controller 拥有轮次、文件、模型调用、工具调用和墙钟上限；
 - Control Event 拥有 pause/resume/steer/stop 的版本与幂等语义；

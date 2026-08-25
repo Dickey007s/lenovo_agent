@@ -1,4 +1,4 @@
-# Agent Control Loop 当前实现审计与 Workspace Research Loop 设计
+# Agent Control Loop 当前实现审计与下一纵切设计
 
 ## 1. 结论
 
@@ -87,7 +87,7 @@ Snapshot、Event 和 Idempotency 都在一个 API 进程内。浏览器可以按
 当前用户只能在开始前选择文件和任务。开始后没有 Steer、Pause、Resume、
 Take over 或“只继续某个研究方向”的动作。
 
-## 5. Workspace Research Loop：让 Agent 自己研究文件夹
+## 5. Agent Control Loop 下一纵切：让 Agent 自己研究文件夹
 
 目标不是把 96 份文件一次性塞进 Prompt，而是让 Agent 在有界预算内循环决定：
 下一轮需要研究什么、为什么、读取哪些文件、得到了什么、还缺什么。
@@ -105,7 +105,7 @@ Take over 或“只继续某个研究方向”的动作。
 
 ### 5.1 新契约
 
-`WorkspaceResearchContract` 至少包含：
+`AgentControlLoopContract` 至少包含：
 
 - `goal`：用户希望 Agent 研究的问题；
 - `workspace_id` 与初始目录范围；
@@ -118,7 +118,7 @@ Take over 或“只继续某个研究方向”的动作。
 
 ### 5.2 每轮状态
 
-`ResearchRoundSnapshot` 记录：
+`ControlLoopRoundSnapshot` 记录：
 
 - 本轮问题与假设；
 - 为什么选择这些文件；
@@ -142,7 +142,7 @@ Take over 或“只继续某个研究方向”的动作。
 - 是否需要扩大文件范围；
 - 用户可以选择“继续研究 / 调整方向 / 暂停 / 结束并提交”。
 
-最终 `WorkspaceResearchBrief` 还应包含已覆盖目录、未覆盖目录、关键发现、
+最终 `AgentControlLoopBrief` 还应包含已覆盖目录、未覆盖目录、关键发现、
 相互矛盾的证据、确定性验证结果和明确边界。
 
 ## 6. 前台交互设计
@@ -169,9 +169,9 @@ Take over 或“只继续某个研究方向”的动作。
 
 ## 7. 第一条实现纵切
 
-建议下一 PR 只实现一个三轮、只读、可暂停的 Workspace Research Loop：
+建议下一 PR 只实现 Agent Control Loop 的三轮、只读、可暂停纵切：
 
-1. 增加 `WorkspaceResearchContract`、`ResearchRoundSnapshot`、
+1. 增加 `AgentControlLoopContract`、`ControlLoopRoundSnapshot`、
    `EvidenceGap`、`NextStepProposal` 和 `LoopBudget`；
 2. 把现有 Catalog/Preview 适配为实际 `catalog.search`、`file.read`、
    `table.inspect` 和 `evidence.verify` 工具回执；
@@ -184,7 +184,7 @@ Take over 或“只继续某个研究方向”的动作。
 
 ## 8. 完成门槛
 
-这条纵切只有同时满足下列条件，才能称“Research Loop 已实现”：
+这条纵切只有同时满足下列条件，才能称“Agent Control Loop 三轮纵切已实现”：
 
 - 至少一个 Run 由 Verify 产生 Evidence Gap 并真实触发第二轮；
 - 每轮文件范围、工具回执、模型回执、验证和预算都来自服务端事实；
@@ -196,7 +196,7 @@ Take over 或“只继续某个研究方向”的动作。
 
 ## 9. 当前推进建议
 
-1. 先实现三轮只读 Research Loop，不同时引入外部动作和 Adaptive Swarm。
+1. 先实现 Agent Control Loop 的三轮只读纵切，不同时引入外部动作和 Adaptive Swarm。
 2. 把确定性 Verifier 做成 Loop 的决策输入，而不是完成后的附属标签。
 3. 第二阶段再把中间结果写成不可变 ArtifactVersion，并接 PostgreSQL Checkpoint。
 4. 第三阶段复用同一 Contract/Event/Artifact 协议加入 Demo 2 Scheduler/Worker。

@@ -4,7 +4,7 @@
 | --- | --- |
 | Scenario ID | `SCENARIO-009` |
 | 状态 | `Draft`；尚未实现 |
-| 决策 | [`DR-0023`](../decisions/DR-0023-workspace-research-control-loop.md) |
+| 决策 | [`DR-0023`](../decisions/DR-0023-agent-control-loop.md) |
 | 来源 | `USER-FEEDBACK-20260825-CONTROL-LOOP-16` |
 
 ## 目标用户与触发条件

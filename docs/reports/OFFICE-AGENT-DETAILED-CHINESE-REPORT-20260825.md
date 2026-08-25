@@ -502,10 +502,10 @@ flowchart LR
 **图 5 讲解词：** 实线是当前真实主路径，虚线是目标执行闭环。当前 Analyst 产生只读结果，
 不能代替 Act；引用成员校验不能代替业务 Verify；memory Snapshot 不能代替 Durable State。
 
-### 6.2 下一步：三轮只读 Workspace Research Loop
+### 6.2 下一步：Agent Control Loop 的三轮只读纵切
 
 下一步不应直接跳到文件写入或真实 Connector。更稳妥的中间目标是在现有 Workspace-first
-边界上实现一个**三轮、只读、有预算、可停止的研究循环**。它不是当前能力，下面全部为
+边界上实现一个**三轮、只读、有预算、可停止的 Agent Control Loop 纵切**。它不是当前能力，下面全部为
 `Draft` 目标设计；“三轮”是硬上限，不是要求每个任务必须消耗三轮。
 
 **第一轮：建立证据地图。** 用户仍然先写任务并选择初始文件。Agent 把问题拆成可核对的
@@ -530,7 +530,7 @@ flowchart LR
    `human_takeover` 或 `unresolved_conflict`，普通 UI 显示中文业务投影。
 6. 三轮之间需要可恢复状态；在 Durable State 完成前只能声明单进程内实验能力，不能宣称跨重启恢复。
 
-### 图示区六：三轮只读研究循环目标
+### 图示区六：Agent Control Loop 三轮只读纵切目标
 
 ```mermaid
 flowchart LR
@@ -611,12 +611,12 @@ Gateway receipt，就不能出现“已执行”；没有 ArtifactVersion 和 Co
 | 9 | 轨迹来自 named SSE，状态来自 Snapshot | seq 1-8 时序图 | 断线恢复与 final GET，动画不是事实 | 仅单进程 memory，重启丢失 |
 | 10 | 引用是复核入口，不是正确性徽章 | 图 4 结果截图与点击回开箭头 | Finding 回到准确来源文件 | 只验证 membership，不验证 entailment/算术 |
 | 11 | Control Loop 架构成熟度约 30% | 图 5 与 11 模块分值条 | 这是等权架构估计，不是覆盖率、质量分或上线进度 | 当前本质是单次只读分析流水 |
-| 12 | 下一步先做三轮只读 Workspace Research Loop | 图 6 证据地图 -> 反证补证 -> 综合停机 | 先补 Observe、Verify、Evidence Gate、Budget & Stop 和用户控制点 | 目标设计为 `Draft`，当前没有迭代循环 |
+| 12 | 下一步先做 Agent Control Loop 的三轮只读纵切 | 图 6 证据地图 -> 反证补证 -> 综合停机 | 先补 Observe、Verify、Evidence Gate、Budget & Stop 和用户控制点 | 目标设计为 `Draft`，当前没有迭代循环 |
 | 13 | 单任务场景首先需要确定性业务 Verify | 财务、入职、SRE 三个场景卡片 | 算术、规则、日志行与风险命令分别核验 | 当前只有通用只读分析 |
 | 14 | 多任务场景需要 Worker、共享 Artifact 与冲突汇聚 | 招聘、法务、上线准备依赖图 | 不能用一次 Planner 冒充 Adaptive Worker | 模块 5、可写模块 7 尚未连接 |
 | 15 | 外部任务当前正确结果是能力阻断 | SQL/Web/cron Gate 图 | 没有 Connector receipt 就没有采集或调度结果 | `TC-03`、`TC-09` 当前无本地 input |
 | 16 | 工程链路已验证，业务价值尚未验证 | 自动化、真实运行、截图三列 | 展示 `51 passed`、`8 passed` 与一次模型耗时 | 数字取当前 Evidence；不是质量、SLA 或用户研究 |
-| 17 | 从只读 Research Loop 再走向 Artifact 与受控执行 | 路线图：三轮研究 -> 验证器 -> Artifact -> Demo 1 -> Worker -> Risk Gate -> Connector | 每层都先形成 receipt 和失败路径，再扩大能力 | 未实现项保持 `Draft` |
+| 17 | 从 Agent Control Loop 的只读纵切再走向 Artifact 与受控执行 | 路线图：三轮研究 -> 验证器 -> Artifact -> Demo 1 -> Worker -> Risk Gate -> Connector | 每层都先形成 receipt 和失败路径，再扩大能力 | 未实现项保持 `Draft` |
 
 页面设计建议：
 
@@ -654,7 +654,7 @@ typecheck、生产 build、治理测试通过，Harness 浏览器 `8 passed`；9
 
 - 主流方案与交互研究：[`WORKSPACE-CENTRIC-OFFICE-AGENT-INTERACTION-AND-SOURCES-20260825`](../research/WORKSPACE-CENTRIC-OFFICE-AGENT-INTERACTION-AND-SOURCES-20260825.md)。
 - Control Loop 源码事实审计与下一纵切：[`AGENT-CONTROL-LOOP-IMPLEMENTATION-AUDIT-20260825`](../research/AGENT-CONTROL-LOOP-IMPLEMENTATION-AUDIT-20260825.md)。
-- 下一纵切决策与场景：[`DR-0023`](../decisions/DR-0023-workspace-research-control-loop.md)、[`SCENARIO-009`](../scenarios/SCENARIO-009-workspace-research-control-loop.md)。
+- 下一纵切决策与场景：[`DR-0023`](../decisions/DR-0023-agent-control-loop.md)、[`SCENARIO-009`](../scenarios/SCENARIO-009-agent-control-loop.md)。
 - 当前决策：[`DR-0022`](../decisions/DR-0022-workspace-folder-and-arbitrary-task-contract.md)。
 - 当前场景：[`SCENARIO-008`](../scenarios/SCENARIO-008-whole-folder-office-workspace.md)。
 - 15 类任务测试目录：[`FORTE-PUBLIC-OFFICE-TASK-TEST-CASES-20260825`](../testing/FORTE-PUBLIC-OFFICE-TASK-TEST-CASES-20260825.md)。
