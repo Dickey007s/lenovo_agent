@@ -77,4 +77,4 @@ It does not prove model plan quality, result correctness, universal plan compila
 
 - implementation commit: [`373b79a`](https://github.com/Dickey007s/lenovo_agent/commit/373b79a)
 - delivery PR: [#25](https://github.com/Dickey007s/lenovo_agent/pull/25), open and not yet merged
-- documentation commit: to be filled after this evidence is committed
+- first documentation/evidence commit: [`07e4684`](https://github.com/Dickey007s/lenovo_agent/commit/07e4684)
