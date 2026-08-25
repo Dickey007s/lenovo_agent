@@ -1,0 +1,679 @@
+# Office Agent V0.2 详细中文汇报稿与图文规划
+
+> 日期：2026-08-25
+>
+> 用途：会议主讲稿、产品评审底稿与后续 PPT 页面规划
+>
+> 当前结论状态：限定工程链路为 `Limited Verified`；任务正确性、生产可用性与用户价值仍未验证
+>
+> 当前事实基线：源码、[`ARCHITECTURE.md`](../ARCHITECTURE.md)、[`UI_SERVER_FACT_MATRIX.md`](../contracts/UI_SERVER_FACT_MATRIX.md) 与 [`FORTE-FOLDER-WORKSPACE-EVIDENCE-20260825`](../evidence/FORTE-FOLDER-WORKSPACE-EVIDENCE-20260825.md)
+
+## 一、开场：我们真正要解决的不是“再加一个聊天框”
+
+今天汇报的核心不是做一张 OpenClaw、Codex App、Claude Code、ReAct 和
+Office Agent 的功能对比表，也不是证明哪一种方案“更先进”。我们要回答的是：
+当 Agent 从代码或消息场景进入办公资料场景后，用户最先需要控制和核对的对象
+发生了什么变化；这种变化为什么要求我们重新安排交互顺序；当前项目究竟已经
+实现到了哪一步。
+
+主流 Agent 方案已经证明了几类重要模式：OpenClaw 把常驻 Gateway、Channel、
+Session、Tool 和主机执行审批连成长期运行入口；Codex App 把项目 Task、Worktree、
+并行 Agent 和变更审查组织成软件交付工作台；Claude Code 把项目目录、Tool Loop、
+Subagent 和 Permission 放进开发者熟悉的 Terminal 与 IDE；ReAct 则提供了
+Reasoning、Action、Observation 交替推进的通用方法。
+
+当前 Office Agent 没有否定这些模式。它做了一个针对办公工作的刻意选择：
+**先把文件、范围和证据摆到用户面前，再让 Agent 开始工作。** 用户先看见一个
+可检查的办公资料库，打开文件的安全预览，明确选择本轮允许读取的材料，写出自己的
+任务，然后才进入规划、服务端校验、只读分析、引用回看和人工复核。
+
+这条路径目前已经在固定公开数据和单 API 进程内形成工程证据，但还不是完整的
+Agent Control Loop。它能形成待复核的只读结论，不能执行工具、修改文件、提交工件、
+恢复跨进程任务或证明结论正确。这不是附加在演示末尾的免责声明，而是产品当前的
+组成部分：前台必须让用户看见“初步结论、待复核、没有外部动作”。
+
+## 二、当前产品：一个办公资料库，一条可核对的只读路径
+
+当前根页面不是 Scenario 或 Demo 选择器，而是唯一的 FORTE 公开办公资料库。
+数据固定在 FORTE commit
+`345c1ec1487139db9dd319787fa9405ba85d1869`：15 个公开任务目录、96 份
+`input/` 文件，共 111 个任务说明与输入文件、`1,780,445` bytes。FORTE 官方
+完整 benchmark 报告 180 条任务，但公开仓库只给出每类职业一个示例；本项目没有
+取得、也不能声称取得其余 165 条未公开任务。
+
+普通用户只看到 96 份公开输入。`task.md` 只保留为 provenance，不进入普通 UI，
+不进入 Analyst 输入，也不会成为隐藏默认任务。每轮任务都必须由用户自己写
+`instruction`，并显式选择 1 到 20 个 `file_ref`。
+
+### 图示区一：当前工作台全景
+
+![当前 Office Agent 文件夹优先工作台](../evidence/screenshots/dr-0022-folder-workspace-desktop.png)
+
+**图 1 讲解词：** 左侧是 15 个业务目录与可搜索文件树，中间是任务输入、安全
+预览、计划和结果，右侧是执行轨迹与模型回执。图中可见的 15 个目录、96 份文件、
+只读状态和预览内容均来自服务端投影，不是静态演示数据。截图只能证明这一时刻的
+可见界面；后端事实由 Snapshot、接口返回与自动化共同约束。
+
+当前六条公开接口把交互分成三个层次：Workspace 接口回答“有什么资料”，文件预览
+接口回答“这份资料里能安全看到什么”，Run 与 named SSE 接口回答“本轮 Agent
+实际走到了哪里”。公开接口不挂载旧 Scenario 路径，也不挂载 Scheduler、Tool
+Gateway、Connector 或外部动作路由。
+
+当前成功路径按以下顺序发生：
+
+1. `GET /v1/harness/workspace` 返回 15 个目录和 96 个文件的公共投影。
+2. 用户打开文件，服务端重新校验 allowlist 相对路径、大小、SHA-256、非 symlink、
+   压缩结构与格式边界，再返回 XLSX/CSV、PDF、DOCX、文本或代码的有界预览。
+3. 用户选择 1 到 20 个文件，写出 3 到 2,000 个字符的原创任务。
+4. `POST /v1/harness/runs` 以 Owner、`idempotency_key`、`expected_version=1`、
+   `instruction` 和 `selected_file_refs` 接受一个独立 Run。
+5. Planner 返回严格 JSON 的业务意图；服务端拥有来源范围、副作用、人工 Gate、
+   单元、依赖、工具与引用规则，并负责编译与校验公开 Plan。
+6. Analyst 只接收本轮冻结文件的安全内容投影，形成 1 到 10 条带引用的 Finding。
+7. 服务端检查每条引用是否属于冻结范围，随后以 `review_required=true` 返回只读结果。
+8. 浏览器用 named SSE 展示有序变化，用 Snapshot 做最终权威对账；引用按钮重新打开
+   同一份来源文件的安全预览。
+
+在当前成功链路中，Snapshot 最多到 v9、事件 sequence 到 8。`completed` 只表示
+Schema、引用范围和只读边界检查通过，不表示答案正确、数值正确、Artifact 已写入、
+Tool 或 Worker 已运行，更不表示外部业务动作已经发生。
+
+## 三、五种方案到底在组织什么工作
+
+### 3.1 OpenClaw：从消息、会话和常驻 Gateway 组织 Agent
+
+OpenClaw 官方材料首先解决的是“Agent 如何常驻、如何从多个 Channel 接收消息、
+如何把 Session 路由到 Agent、如何调用 Tool，以及主机执行如何进入审批”。它的
+主要交互对象是 Message、Channel、Session 和 Gateway；用户通常先从消息入口发起
+意图，再在任务推进中处理工具和执行边界。
+
+这套模式对长期在线、多入口触达和主机工具控制非常重要。它带来的交互后果是：
+会话连续性与 Channel 身份天然处于第一层，文件或业务资料可以成为 Tool 的输入，
+但不必天然成为首屏的可见契约。
+
+当前 Office Agent 选择不同的首要对象：不是先建立消息会话，而是先展示服务端拥有的
+办公资料库。用户在模型调用前看文件、看格式、看安全说明、选定范围，再开始 Run。
+这并不证明 OpenClaw 不能实现文件夹优先交互，只说明本项目把“数据范围确认”放到了
+默认主路径，而不是把它留给后续 Tool 调用。
+
+**来源绑定：** `OPENCLAW-OFFICIAL-20260825`，包括 [OpenClaw overview](https://docs.openclaw.ai/)、
+[runtime architecture](https://docs.openclaw.ai/agent-runtime-architecture) 与
+[exec approvals](https://docs.openclaw.ai/tools/exec-approvals)。这些来源支持上述官方
+设计侧重点，不是竞品实测，也不能支持“OpenClaw 没有办公证据能力”的推断。
+
+### 3.2 Codex App：从项目 Task、Worktree 和变更审查组织软件工作
+
+Codex App 官方材料重点解决“多个软件任务如何并行推进、不同 Agent 如何在隔离
+Worktree 中工作、用户如何审查代码改动，以及 Skill 和 Automation 如何进入审查
+队列”。其核心交互对象是项目 Task、代码仓库、Worktree、Diff 与审查结果。
+
+这使软件任务的结束条件很自然：用户可以检查改了哪些文件、测试是否通过、Diff 是否
+可接受。交互通常从一个项目任务开始，Agent 在隔离环境中产出变更，用户随后围绕代码
+结果审查。
+
+当前 Office Agent 面对的不是代码 Diff，而是业务文件与业务结论。原始文件保持只读，
+当前也没有可写 Artifact；因此它不能借用“有 Diff 可审”来代表任务完成。用户要审查的
+是本轮选择了哪些资料、Planner 和 Analyst 是否真实调用、服务端是否采用其输出、每条
+结论引用了哪份文件，以及结论是否仍需人工复核。
+
+**来源绑定：** `OPENAI-CODEX-APP-20260202`，OpenAI 官方文章
+[Introducing the Codex app](https://openai.com/index/introducing-the-codex-app/)。该来源
+支持并行 Task、Worktree、Skill、Automation 与变更审查等描述，不是办公任务效果比较。
+
+### 3.3 Claude Code：从项目目录、Tool Loop 和 Permission 组织开发协作
+
+Claude Code 官方材料重点解决“Agent 如何理解项目目录、如何在工具调用与环境反馈中
+循环、如何用 Subagent 拆分工作、如何通过 Permission Mode 控制操作，并在 Terminal、
+IDE 等界面中协作”。其主要交互对象是项目目录、命令、Tool 调用、代码变更与权限请求。
+
+项目目录上下文让开发者能够以整个代码库为工作现场。交互后果是：用户可以先给出目标，
+Agent 在目录和 Tool Loop 中逐步发现需要的上下文，并在敏感操作前请求权限。
+
+当前 Office Agent 刻意不让模型静默扩张到整个资料库。浏览器可以展示全部 96 份文件，
+但 Run 只冻结用户显式选择的 `file_ref`；Planner 不能增加来源，Analyst 也只收到这组
+文件的安全投影。代价是用户多做一次范围选择，收益假设是上下文边界更可见、更容易复核。
+“这一取舍是否真的提高理解或信任”仍需用户研究，不能从架构本身推出。
+
+**来源绑定：** `CLAUDE-CODE-OFFICIAL-20260825`，包括 [How Claude Code works](https://code.claude.com/docs/en/how-claude-code-works)、
+[subagents](https://code.claude.com/docs/en/sub-agents) 与
+[permissions](https://code.claude.com/docs/en/permissions)。这些来源支持项目目录、Tool
+Loop、Subagent 与 Permission 的官方描述，不证明本项目更易用。
+
+### 3.4 ReAct：从 Reasoning、Action、Observation 组织循环
+
+ReAct 不是一个与上述产品同层级的办公 UI，而是一种 Agent 组织方法。它强调让
+Reasoning、Action 与 Observation 交替出现，使下一步计划能够吸收环境反馈，而不是
+一次性生成完整答案后停止。
+
+这对 Office Agent 的启发不是把私有思维链完整展示给用户，而是把可审计的业务事实
+组织成循环：当前观察了什么来源、提出了什么动作、环境或验证器返回了什么、是否需要
+调整计划、何时应该停止。
+
+当前 Office Agent 只实现了线性的只读近似：Workspace 观察、一次 Planner、服务端
+校验、一次 Analyst、引用范围验证、待复核结果。它没有连接 Act、Tool Observation、
+迭代重规划、Budget Stop 或分支恢复，因此不能称为完整 ReAct 执行器。普通 UI 展示
+named SSE、模型回执、业务 Plan 和引用，明确不展示 Prompt、chain-of-thought 或原始
+模型响应。
+
+**来源绑定：** `REACT-ICLR-2023`，Yao 等，[ReAct: Synergizing Reasoning and Acting in Language Models](https://arxiv.org/abs/2210.03629)。
+该论文支持 Reasoning、Action、Observation 交替组织的判断，不直接定义持久状态、
+办公文件 UI、策略编译、Evidence Gate 或 Commit。
+
+### 3.5 当前 Office Agent：从可检查来源组织办公分析
+
+当前 Office Agent 解决的是一个更窄但可核对的问题：当用户面对一组混合格式办公
+资料时，能否在 Agent 调用前知道有哪些文件、看见文件的安全投影、明确本轮来源范围，
+并在只读结果形成后回到同一来源复核。
+
+它的主要交互对象依次是 Workspace、文件预览、选择标签、用户任务、Run Snapshot、
+named SSE、Planner/Analyst 回执、Plan、Finding 与引用。Demo 1、Demo 2、Demo 3
+只是未来通用能力的验收视角，不是当前产品入口，也不会解锁隐藏执行器。
+
+### 图示区二：不同首要对象如何改变默认流程
+
+```mermaid
+flowchart LR
+    A[OpenClaw<br/>Message / Channel / Session] --> A1[Gateway 路由] --> A2[Tool 与执行审批]
+    B[Codex App<br/>项目 Task] --> B1[Worktree 并行工作] --> B2[Diff 与结果审查]
+    C[Claude Code<br/>项目目录与目标] --> C1[Tool Loop / Subagent] --> C2[Permission 与变更检查]
+    D[ReAct<br/>Reasoning] --> D1[Action] --> D2[Observation] --> D
+    E[当前 Office Agent<br/>办公资料库] --> E1[安全预览与显式范围] --> E2[规划 / 校验 / 只读分析] --> E3[引用回开与人工复核]
+```
+
+**图 2 讲解词：** 这张图比较的是“默认从什么对象开始”，不是排他性能力。前三种
+产品模式都可能扩展到办公文件；Office Agent 也需要吸收它们的 Tool、并行、权限和
+循环能力。当前差异只在于：我们把来源范围置于任务之前，把复核动作置于终态之后。
+
+## 四、为什么选择 Workspace-first：技术选择如何逐步改写用户流程
+
+### 4.1 从“先提问”改为“先知道手里有什么”
+
+服务端持有 `public-suite-manifest.json`，而不是让浏览器根据文件名拼目录，也不是让
+模型临时发现未知文件。用户进入页面后先得到 15 个业务目录、96 份输入、格式、大小和
+预览可用性。两类只依赖外部系统且没有本地输入的目录会明确显示能力缺口，不能伪造本地
+数据。
+
+交互结果是：调用模型之前就可以浏览与判断。Catalog 完整性失败返回受控 503，前台显示
+“资料库完整性校验未通过”，不回退到静态假数据；API 离线与文件预览失败也分别呈现，
+避免把所有问题都写成“Agent 正在思考”。
+
+### 4.2 从“整个目录可能都被读取”改为“本轮范围可见并冻结”
+
+用户用 checkbox 选择文件，选择标签显示当前范围，可跨目录组合，最多 20 份。Run 启动
+时服务端重新验证所有 `file_ref`，将所选来源冻结到 Snapshot 的
+`source_documents[]`。未选择文件不会进入 Analyst 上下文；未知、重复或越界引用会
+fail closed。
+
+交互结果是：用户付出一次明确选择的操作成本，却换来一个可以在提交前检查、提交后回看的
+上下文契约。任务示例只填入可编辑文本，不会自动运行，也不会替代用户任务。
+
+### 图示区三：安全预览与显式任务范围
+
+![用户原创任务与两份文件的显式范围](../evidence/screenshots/dr-0022-task-scope-desktop.png)
+
+**图 3 讲解词：** 截图展示任务文本由用户输入，两份已选文件以标签出现。左侧目录仍可
+自由浏览，但只有标签中的文件进入本轮 Run。截图不能证明模型理解了文件，只能证明前台
+范围和当前交互路径；真正的来源冻结由 POST 请求与 Snapshot 负责。
+
+### 4.3 从“模型写了计划”改为“模型提出，服务端拥有政策”
+
+Planner 只提出业务意图。服务端编译并校验来源、依赖、环、Tool 标识、逻辑成果、副作用
+与人工 Gate，再决定是否公开 Plan。`model_receipt.called` 说明是否发起模型请求，
+`output_used` 说明返回内容是否被采用；两者与动画、配置中的模型名相互独立。
+
+交互结果是：右侧回执区分“未调用”“已采用”“未采用”。“未采用”不是“没有调用”，而是
+模型已经返回但服务端拒绝其输出。计划页只显示服务端接受后的业务表述；内部 effect、
+gate、Prompt、chain-of-thought 与 raw provider response 默认隐藏。
+
+### 4.4 从“进度动画”改为“named SSE 加权威 Snapshot”
+
+当前成功事件顺序为：
+
+```text
+workspace_index -> planning_started -> planning_completed -> plan_validation
+-> analysis_started -> analysis_completed -> result_validation -> task_completed
+```
+
+named SSE 是有序变更投影，Snapshot 才是状态权威。浏览器只单调应用 version 和 sequence。
+非终态断线后先 GET 当前 Snapshot，再从 `after=N` 继续；终态事件后关闭流并做 final GET。
+“服务可用”只表示 HTTP 可达，“轨迹实时”必须有当前 EventSource 连接。
+
+交互结果是：用户看到的是“已锁定文件”“规划模型返回”“服务端校验计划”“分析模型返回”
+等业务节点，而不是补造的百分比。中断时显示恢复状态，并保留当前 Snapshot 与最后 sequence。
+
+### 4.5 从“引用作为脚注”改为“引用作为复核入口”
+
+Analyst 的每条 Finding 至少要引用一个本轮已选 `file_ref`。服务端检查成员关系，前台把
+引用投影成业务文件名；用户点击后，界面选中该文件并回到安全预览。
+
+交互结果是：复核不需要离开任务现场寻找附件。但引用成员关系只说明“引用的是允许范围内
+的文件”，不证明该文件蕴含结论，也不证明检索完整、计算正确或政策判断正确。因此终态始终
+显示“模型初步结论 · 待复核”。
+
+### 图示区四：运行轨迹、模型回执与引用回看
+
+![真实运行中的规划轨迹](../evidence/screenshots/dr-0022-running-desktop.png)
+
+![待复核结果、两次模型回执与引用](../evidence/screenshots/dr-0022-result-desktop.png)
+
+**图 4 讲解词：** 第一张图展示终态前的真实规划阶段，第二张图展示两次模型回执、八个
+有序事件和带引用的待复核结果。Evidence 记录的浏览器运行中，规划约 `8.7 s`、分析约
+`16.7 s`，两次输出均被采用；这只是一次观测，不是 SLA、成本或质量结论。结果截图也不
+证明六条 Finding 正确，当前服务端只核对 Schema、引用范围与只读边界。
+
+## 五、七个办公场景：同一底座如何工作，又在哪里停下
+
+以下场景来自固定 FORTE 公开示例和现有测试目录。它们不是七条已经完成的业务任务，
+而是用同一 Workspace-first Harness 说明当前可用路径、应当停顿的位置和目标能力缺口。
+
+### 5.1 入职物资与权限匹配
+
+**触发：** 行政同事拿到入职人员 CSV 和物资权限分配 PDF，需要核对指定日期范围内的人员，
+并识别缺失、冲突或涉及敏感字段的情况。
+
+**用户动作：** 先打开 CSV 表格预览和 PDF 文本层，检查字段与规则，再显式选择两份文件，
+输入“说明两份文件提供什么信息，并指出哪些字段需要隐藏或人工复核”的原创任务。
+
+**Agent 路径：** 服务端冻结两份 `file_ref`；Planner 提出读取与核对意图；服务端编译并
+校验来源与只读边界；Analyst 只读两份安全投影，生成带引用的初步 Finding。
+
+**停顿或失败：** 文件 hash、路径或解析异常时在预览前 fail closed；模型返回越界引用或
+不合规计划时显示“未采用”并安全停止。岗位规则互斥或字段缺失时，当前只能在结果中列为
+待人工判断，还不能暂停某个执行分支后继续。
+
+**前台输出：** 表格行、PDF 规则文本、安全说明、两份选择标签、Planner/Analyst 回执、
+业务 Plan、待复核结论和可回开的文件引用。
+
+**后端事实：** Workspace/preview 响应、Run `source_documents[]`、seq 1-8、两份
+`HarnessModelReceipt`、结果 `file_refs` 与 `review_required=true`。
+
+**证据来源：** `TC-01`、`SCENARIO-008`、`FORTE-PINNED-20260825`，以及当前
+Evidence 中绑定的两文件真实浏览器 Run。
+
+**当前边界：** 没有确定性日期过滤、规则匹配、敏感列删除验证或 CSV Artifact 写入；
+不会创建账号、分配权限或发起采购。
+
+### 5.2 三期财务往来与僵尸账款核对
+
+**触发：** 财务人员需要比较三个期间的 XLSX，统计未收、未付，并找出跨三期余额不变的
+往来款。
+
+**用户动作：** 分别打开三个工作簿的有界表格预览，确认期间与字段，再选择三份文件，写出
+比较口径和需要逐条引用的任务。
+
+**Agent 路径：** 当前路径仍是一次 Planner、一次服务端 Plan 校验、一次 Analyst 与引用
+范围检查。模型可以提出分期解析、归一和比较意图，并生成带三份来源引用的初步分析。
+
+**停顿或失败：** 加密、超限或完整性异常的工作簿不可进入 Run；Planner 引用未选文件或
+生成未允许 Tool 时拒绝。模型对科目符号、期末余额或客商映射产生歧义时，当前没有分支级
+Evidence Gate，只能要求人工复核或发起新 Run。
+
+**前台输出：** 首个可见 Sheet 的最多 30 列、120 行预览，Plan 单元、模型回执、每条 Finding
+的工作簿引用与“结论和数值仍需人工复核”。
+
+**后端事实：** Catalog 完整性检查、三个冻结 `file_ref`、Plan graph/source validation、
+结果 citation membership、`status=completed` 与 `review_required=true`。
+
+**证据来源：** `TC-05`、`SCENARIO-008`、`FORTE-PINNED-20260825`；历史 Finance
+负面结果被保留为“有引用仍可能算错”的验收基线。
+
+**当前边界：** 没有逐行公式、跨期三元组、总额与排序的确定性核验，也没有两个 CSV 的
+可写 Artifact 和 Commit。当前 `completed` 不能翻译为“财务核对完成”。
+
+### 5.3 双岗位与多份简历匹配
+
+**触发：** 招聘人员需要把两份 JD 与五份简历逐项对照，同时保留最终招聘决定权。
+
+**用户动作：** 打开 DOCX/PDF 安全预览，选择岗位与候选人资料，明确要求逐条说明证据与
+不确定项，不让 Agent 把未选简历纳入比较。
+
+**Agent 路径：** 当前可以在一个 Run 内对选择集做只读分析，并用引用返回 JD 或简历文件。
+目标架构中的多 Worker 拆分、候选人分支并行和跨 Worker 一致性核验尚未接入。
+
+**停顿或失败：** 某份简历解析失败时前台显示文件级预览错误，其他选择和任务草稿保留；
+超出 20 份或引用未选文件时确定性拒绝。敏感决策目前依靠 `review_required` 边界，而不是
+已经实现的招聘 Decision Gate。
+
+**前台输出：** 文档文本投影、已选范围、单一验证 Plan、带 JD/简历文件引用的初步匹配与
+人工复核提醒。
+
+**后端事实：** preview security、Run 来源冻结、Planner/Analyst receipt、引用范围验证和
+无外部副作用的终态 Snapshot。
+
+**证据来源：** `TC-06`、`SCENARIO-008`、`FORTE-PINNED-20260825`。
+
+**当前边界：** 没有 Adaptive Worker、跨候选人一致性验证、字段级敏感信息策略或正式招聘
+审批；结果只能作为辅助材料，不能自动筛除候选人。
+
+### 5.4 六份授权委托书风险核查
+
+**触发：** 法务人员需要按统一规则检查六份委托书，并识别缺失条款、授权范围冲突和风险项。
+
+**用户动作：** 先预览 DOCX 与规则 Markdown，选择六份文档和规则文件，输入检查目标；
+结果出来后按引用逐份回开原文。
+
+**Agent 路径：** 当前 Harness 能冻结这组文件，形成只读 Plan 和带引用的 Finding。目标路径
+应当把六份文档拆成独立工作单元，再做跨文档一致性复核和报告汇聚，但 Scheduler 与 Worker
+Manager 尚未连接。
+
+**停顿或失败：** 关系文件包含未允许外部资源、压缩结构越界或内容解析失败时安全停止预览；
+规则互斥时当前不能只暂停一份文档分支，只能把冲突暴露给用户或结束本轮。
+
+**前台输出：** 每份文档的有界文本、安全说明、服务端接受后的计划、引用返回按钮和
+“模型初步结论 · 待复核”。
+
+**后端事实：** 文件 manifest 校验、DOCX relationship scan、选定来源冻结、Plan source
+validation、Result citation membership 与 memory Snapshot。
+
+**证据来源：** `TC-07`、`FORTE-PINNED-20260825`、`REACT-ICLR-2023` 仅作为未来
+分支观察与迭代设计启发。
+
+**当前边界：** 没有法务规则确定性验证、风险等级校准、DOCX 报告写入或正式法律审批；
+不能把草稿审查表述为法律意见。
+
+### 5.5 上线准备与报告冲突核对
+
+**触发：** 产品负责人需要综合 PRD、上线配置、功能测试和兼容测试报告，识别冲突并判断
+是否具备上线条件。
+
+**用户动作：** 跨目录选择 Markdown 与三份 XLSX，先查看各文件结构，再写明需要核对的
+覆盖率、通过率和冲突点。
+
+**Agent 路径：** 当前 Planner 可以提出需求、配置、测试和风险核对单元，Analyst 可以形成
+引用各报告的初步结论。服务端只校验 Plan 结构、来源与结果引用，没有启动并行 Worker，也
+不会因为报告冲突自动新增 reconciliation 单元。
+
+**停顿或失败：** SSE 中断时浏览器以 Snapshot 和 `after=N` 恢复；模型输出未通过 Schema、
+Plan 或引用校验时安全失败。业务报告相互矛盾时没有自动分支暂停或人工接管点。
+
+**前台输出：** 跨目录选择标签、有序轨迹、验证后的 Plan、每条结论的报告引用、重连状态和
+待复核终态。
+
+**后端事实：** Owner-scoped Run、幂等启动、Snapshot version/sequence 单调规则、named
+SSE、Plan validation 与 `review_required=true`。
+
+**证据来源：** `TC-11`、`SCENARIO-008`、`FORTE-PINNED-20260825`。
+
+**当前边界：** 没有 P0 覆盖率、各等级通过率和综合通过率的确定性复算，没有动态 Worker、
+共享 Artifact 或上线审批；不能把“Plan 已形成”说成“上线核验已完成”。
+
+### 5.6 SRE 日志诊断与高风险止损建议
+
+**触发：** SRE 在大促故障中需要从 TXT log 形成时间线、根因假设与止损建议，但任何真实
+集群命令都必须由人控制。
+
+**用户动作：** 打开日志文本预览，选择日志文件，要求 Agent 给出带来源的时间线和建议，
+并明确不得执行命令。
+
+**Agent 路径：** 当前可以只读日志、规划分析步骤并生成带文件引用的建议。计划中的 Tool
+标签只是业务意图，不会调用 shell、Elasticsearch 或外部集群。
+
+**停顿或失败：** 文件不完整、引用越界或模型计划请求未允许外部动作时安全停止。当前没有
+真实 Risk/Evidence/Approval/Permit 链路，因此不是“等待审批后可执行”，而是根本没有接入
+执行路径。
+
+**前台输出：** 有界日志文本、模型调用与采用状态、服务端校验事件、建议性结果、引用按钮和
+“本轮没有外部动作”。
+
+**后端事实：** text preview、冻结来源、Plan allowlist、无 Tool Gateway 路由、citation
+membership 与终态 Snapshot。
+
+**证据来源：** `TC-14`、`FORTE-PINNED-20260825`；Demo 3 只作为目标 Risk Gate 的验收视角。
+
+**当前边界：** 没有日志行级证据定位、命令参数验证、真实审批、Permit 或 execution receipt；
+绝不能演示或宣称已在本机或集群执行止损命令。
+
+### 5.7 外部 SQL 或定时 Web 任务的能力阻断
+
+**触发：** 用户希望分析远程 Datasette，或设置周期 Web 搜索并追加文件；对应公开任务目录
+只有 provenance，没有本地 `input/`。
+
+**用户动作：** 用户可以在目录树看到“需要外部系统”的业务说明，但找不到可选择的本地文件；
+由于 Run 要求至少一个有效 `file_ref`，当前不能凭任务说明或前端示例伪造任务输入。
+
+**Agent 路径：** 当前正确路径是停在能力边界，不调用模型猜测远程数据，不创建假查询结果，
+也不把静态任务文案当成已设置的定时任务。
+
+**停顿或失败：** 没有获批 SQL/Web/Scheduler Connector、查询预算、凭据范围、幂等批次和
+外部动作回执时确定性阻断。未来即使接入，也应先显示影响范围和人工 Gate。
+
+**前台输出：** 外部依赖目录与“当前没有本地公开文件”，Run 按钮保持不可用；不出现虚构
+进度、结果或 execution receipt。
+
+**后端事实：** folder `availability=task_only_requires_external_system`、零本地文件、
+`selected_file_refs` 最少 1 个的 Task Contract，以及当前未连接的模块 5、6。
+
+**证据来源：** `TC-03`、`TC-09`、`FORTE-PINNED-20260825`。
+
+**当前边界：** 没有 SQL、Web、cron Connector，没有生产凭据治理、查询预算、持久调度或
+撤销入口。这里的“安全停止”才是当前可辩护结果。
+
+## 六、Agent Control Loop 模块级完成度
+
+### 6.1 统一口径：约 30% 是架构成熟度估计
+
+按 11 个 Control Loop 模块等权估算，当前完整架构成熟度为
+`(45+55+65+15+35+10+30+10+0+5+65) / 11 = 30.45%`，汇报时取约 30%。
+这是基于当前源码事实与目标职责之间距离做出的**架构成熟度估计**，不是代码覆盖率、
+需求完成率、自动化通过率、模型质量分、业务正确率或上线进度。分值的用途是帮助团队看清
+结构性短板，不能替代逐项验收。
+
+当前本质是一条单次只读分析流水：初始 Observe -> 一次 Plan -> 服务端校验 -> 一次
+Analyst -> 有限 Verify -> 待复核结果。它没有 Action 后的新 Observation，也没有根据
+验证结果重新规划，因此不能称为反馈驱动 Loop。
+
+下表中的状态只使用“当前真实实现 / 部分近似 / 尚未实现”。“部分近似”表示已有相关事实，
+但还不能承担该 Control Loop 模块的完整职责。百分比分值衡量面向完整目标职责的成熟度，
+所以“当前真实实现”仍可能低于 100%，例如当前 Task Contract 和 Plan 都缺少目标闭环所需
+的预算、完成条件或迭代重规划。
+
+| Control Loop 模块 | 成熟度估计 | 状态 | 当前真实事实 | 还缺什么 | 对用户交互的直接影响 |
+| --- | ---: | --- | --- | --- | --- |
+| Task Contract | 45% | 当前真实实现 | 用户原创 `instruction`、1-20 个 `selected_file_refs`、Owner、`idempotency_key`、`expected_version=1`；服务端重新校验并冻结来源 | 预算、截止时间、验收标准、生产身份与持久合同 | 用户在开始前看见并控制本轮资料范围；当前不能声明预算或完成条件已被系统执行 |
+| Observe | 55% | 部分近似 | 15 个目录、96 份文件的安全预览；Analyst 读取冻结文件的有界投影 | Tool/环境动作后的新 Observation、字段/行级证据、增量观察与循环反馈 | 用户能核对初始输入，但看不到“执行动作后环境发生了什么”，因为当前没有 Act |
+| Plan | 65% | 当前真实实现 | 一次严格 Planner 调用；服务端编译来源、依赖、工具、副作用与 Gate，并确定性校验 | 基于 Observation 的迭代重规划、动态拓扑与质量评估 | 用户能区分模型返回、输出采用和计划通过；不能把一次 Plan 当成自适应循环 |
+| Act | 15% | 尚未实现 | 当前只有动作意图和逻辑成果标签，没有连接 Scheduler、Worker Manager、Tool Gateway 或 Connector | 受控文件操作、shell、Web、SQL、业务系统调用、执行幂等与 receipt | 前台只能显示业务意图和只读分析，不能显示“已执行”或“已修改” |
+| Verify | 35% | 部分近似 | Plan schema/graph/source/tool 校验；Result schema、引用成员关系与只读边界校验 | 语义蕴含、算术、规则覆盖、代码测试、格式与副作用核验 | 用户得到可回看的引用，但结果仍标待复核；`completed` 不等于正确 |
+| Commit | 10% | 尚未实现 | `run_workspace_write` 仅表示逻辑本轮成果，不存在 ArtifactVersion 或文件写入 | 隔离可写工作区、不可变版本、冲突检测、验证后 Commit 与回滚 | 用户当前没有可下载或可审查的正式工件版本，也不能看到提交回执 |
+| Evidence Gate | 30% | 部分近似 | 选定来源冻结、Finding 必须引用范围内文件、`review_required=true` | 独立 Evidence 记录、充分性/冲突判断、分支级暂停和人工决策回执 | 当前引用可导航但不能证明结论；证据不足只能写进结果或让 Run 失败 |
+| Budget & Stop | 10% | 部分近似 | 文件数、指令长度、预览大小、格式与 Schema 有界；校验失败安全停止 | token/时间/工具/迭代预算、可解释停止条件、分支预算与成本回执 | 当前不会无限执行，因为根本没有执行循环；也没有面向用户的任务预算控制 |
+| Steer/Pause/Takeover | 0% | 尚未实现 | 开始前可修改范围和指令，终态由人复核；运行中没有控制点 | 运行中 steer、分支 pause/resume、takeover、决策版本与恢复 | 用户不能在 Planner/Analyst 之间修改本轮，只能等待、停止于失败或新建 Run |
+| Durable State | 5% | 部分近似 | Snapshot、sequence、Owner-scoped 读取、同进程幂等启动与 SSE `after=N` 恢复 | 数据库、跨进程 checkpoint、重启恢复、Worker lease、多实例一致性 | 网络短断可对账；API 重启后 Run、事件和幂等记录全部丢失 |
+| Trace | 65% | 当前真实实现 | named SSE、单调 Snapshot、Planner/Analyst `called/output_used/elapsed_ms`、验证事件与安全错误 | Tool/Worker/Artifact/Permit 的真实执行轨迹、长期审计存储与成本统计 | 用户能核对当前只读链路实际发生了什么；普通 UI 仍隐藏 Prompt、CoT 和 raw response |
+
+### 图示区五：当前 Control Loop 与目标缺口
+
+```mermaid
+flowchart LR
+    T[Task Contract<br/>当前真实实现] --> O[Observe 初始文件<br/>部分近似]
+    O --> P[Plan + 服务端校验<br/>当前真实实现]
+    P -. 未连接 .-> A[Act<br/>尚未实现]
+    A -. 未连接 .-> V[Verify 业务结果<br/>部分近似]
+    V -. 未连接 .-> C[Commit<br/>尚未实现]
+    P --> R[Analyst 只读结果]
+    R --> M[引用成员校验<br/>部分近似]
+    M --> H[人工复核]
+    E[Memory Snapshot + named SSE<br/>当前真实实现] --- T
+    E --- P
+    E --- R
+    D[Durable State / Pause / Takeover<br/>尚未实现] -. 目标 .-> E
+```
+
+**图 5 讲解词：** 实线是当前真实主路径，虚线是目标执行闭环。当前 Analyst 产生只读结果，
+不能代替 Act；引用成员校验不能代替业务 Verify；memory Snapshot 不能代替 Durable State。
+
+### 6.2 下一步：三轮只读 Workspace Research Loop
+
+下一步不应直接跳到文件写入或真实 Connector。更稳妥的中间目标是在现有 Workspace-first
+边界上实现一个**三轮、只读、有预算、可停止的研究循环**。它不是当前能力，下面全部为
+`Draft` 目标设计；“三轮”是硬上限，不是要求每个任务必须消耗三轮。
+
+**第一轮：建立证据地图。** 用户仍然先写任务并选择初始文件。Agent 把问题拆成可核对的
+研究子问题，输出“已读来源、初步判断、直接引用、证据缺口和冲突”，不形成最终业务结论。
+服务端要求每个判断绑定冻结范围内的文件，并记录本轮调用、耗时和验证结果。
+
+**第二轮：反证与补证。** 系统根据第一轮证据缺口提出“建议增加哪些 Workspace 文件、
+为什么需要、预计改变哪个判断”。范围不能由模型静默扩张；用户明确接受后才冻结新版本的
+来源合同。第二轮优先寻找反例、跨文件冲突、数值不一致和缺失条件，而不是重复生成更长摘要。
+
+**第三轮：收敛与停机。** 系统只基于前两轮已接受的来源和验证记录形成综合结论，逐项区分
+“已有直接证据”“存在冲突”“证据不足”“需要人工判断”。达到三轮上限、预算上限、来源无
+新增信息或关键事实仍冲突时必须停止；输出仍是只读研究包，不写原文件、不执行外部动作。
+
+三轮 Loop 的最小交互合同应包括：
+
+1. 每轮开始前显示本轮问题、文件范围、剩余轮次和预算，不在后台静默扩张上下文。
+2. 每轮结束显示新增证据、被推翻判断、未解决冲突和下一轮建议，而不是只展示一段总结。
+3. 用户可以“继续下一轮”“拒绝扩展范围”“直接停止并接管”，每个选择进入新的 Snapshot 版本。
+4. 每条判断保留文件引用；表格场景增加行、列、Sheet 或确定性计算回执，文档场景增加段落定位。
+5. 停止原因必须是服务端事实，例如 `round_limit`、`budget_exhausted`、`no_new_evidence`、
+   `human_takeover` 或 `unresolved_conflict`，普通 UI 显示中文业务投影。
+6. 三轮之间需要可恢复状态；在 Durable State 完成前只能声明单进程内实验能力，不能宣称跨重启恢复。
+
+### 图示区六：三轮只读研究循环目标
+
+```mermaid
+flowchart LR
+    U[用户任务 + 初始文件范围] --> R1[第一轮<br/>证据地图]
+    R1 --> G1{证据是否充分}
+    G1 -- 是 --> S[收敛输出<br/>待人工复核]
+    G1 -- 否 --> H[用户审查补证建议]
+    H -- 拒绝或接管 --> S
+    H -- 接受新范围 --> R2[第二轮<br/>反证与补证]
+    R2 --> G2{冲突是否解决}
+    G2 -- 是 --> S
+    G2 -- 否且预算允许 --> R3[第三轮<br/>综合与停机]
+    G2 -- 否且预算不足 --> S
+    R3 --> S
+```
+
+**图 6 讲解词：** 这个目标保持原文件只读，也不引入外部动作。它优先补齐 Observe、Verify、
+Evidence Gate、Budget & Stop 和最低限度 Steer/Pause，而不是用更多 Agent 数量掩盖闭环
+缺失。实现证据出现前，不能把这张目标图当作当前运行截图或已完成流程。
+
+## 七、前台反馈为什么必须逐项对应服务端事实
+
+当前前端把页面分成三个独立区域，不是为了做视觉上的“三栏”，而是分别回答三个问题：
+左侧回答“有哪些资料、我选择了什么”，中间回答“文件里有什么、计划和结果是什么”，右侧
+回答“Agent 实际调用、采用和校验了什么”。在窄屏下这些区域改为纵向排列，功能不被删除。
+
+关键 UI 文案必须按以下事实解释：
+
+| 前台状态 | 用户可理解的含义 | 服务端权威 | 不能推断 |
+| --- | --- | --- | --- |
+| “资料可用” | HTTP 与 Workspace 投影可读取 | health/workspace 响应 | SSE 正在连接、模型已调用 |
+| “安全预览” | 本次返回经过完整性和有界解析 | preview response `security` | 文件内容完整、公式或宏已执行 |
+| 已选文件标签 | 浏览器当前任务草稿范围 | POST 后由 `source_documents[]` 冻结 | 浏览器勾选已经被服务端接受 |
+| “已采用 / 未采用” | 模型返回是否通过服务端检查并进入下一步 | receipt `called/output_used` | 模型质量已经通过业务评估 |
+| “服务端已校验” | 当前 Plan 通过结构、来源与政策检查 | `plan_validation` 与公开 Plan | Tool、Worker、文件写入已经执行 |
+| “初步结果已形成” | 只读结果通过 Schema、引用范围和边界检查 | `task_completed`、result、`review_required=true` | 结论、算术、业务任务正确完成 |
+| 引用按钮 | 返回本轮冻结范围内的业务文件 | Finding `file_refs` 与 Workspace 投影 | 被引内容必然支持结论 |
+| “正在恢复” | 当前 EventSource 中断，浏览器正在对账 | transport state、GET、`after=N` | 服务端任务失败或已经完成 |
+
+失败也必须分开呈现。API 离线时保留本地任务草稿并重试；manifest 完整性失败时不显示陈旧
+目录、不调用模型；单文件预览失败时保留目录、选择和任务；Run 启动结果未知时对完全相同的
+指令和文件范围复用同一幂等 key；已知终态后再次运行则用新 key；模型或校验失败时显示安全
+业务错误，不显示伪造结果。
+
+## 八、从技术对比到 UI 影响的汇报图
+
+### 图示区七：不是功能清单，而是因果链
+
+```mermaid
+flowchart TB
+    S1[服务端拥有 Workspace 与文件身份] --> U1[先浏览与安全预览]
+    S2[Run 冻结 selected_file_refs] --> U2[提交前看见本轮范围]
+    S3[Planner 意图与策略编译分离] --> U3[调用 / 采用 / 校验分开显示]
+    S4[named SSE + Snapshot] --> U4[有序轨迹、断线恢复、最终对账]
+    S5[Finding 引用成员校验] --> U5[点击引用回到来源]
+    S6[无 Act / Commit / 业务 Verify] --> U6[待复核、无外部动作、不宣称任务完成]
+```
+
+**图 7 讲解词：** 每个界面动作都来自一个明确的技术所有权。反过来也一样：没有 Tool
+Gateway receipt，就不能出现“已执行”；没有 ArtifactVersion 和 Commit，就不能出现“文件已
+保存”；没有语义或数值 verifier，就必须保留“待复核”。
+
+## 九、会议与 PPT 图文规划
+
+建议用 17 页完成从问题、主流模式、当前实现、场景、缺口到路线图的叙事。每页都要同时标注
+“当前事实 / 目标设计 / 证据边界”，不要用一种颜色把它们混成同一完成度。
+
+| 页码 | 页面结论 | 建议画面 | 主讲重点 | 证据与边界 |
+| --- | --- | --- | --- | --- |
+| 1 | Office Agent 从办公资料库开始 | 图 1 全景截图，裁出下一页内容提示 | 首屏不是 Demo，也不是聊天占位页 | `DR-0022`；公开基准数据，不是真实企业网盘 |
+| 2 | 办公 Agent 的首要问题是来源范围不可见 | “先提问”与“先看资料”两条流程 | 不是否定聊天，而是把证据控制提前 | Stakeholder 来源；用户价值仍为 `Draft` |
+| 3 | 主流方案在组织不同的工作对象 | 图 2 五路流程 | OpenClaw、Codex App、Claude Code、ReAct 的官方侧重点 | 官方资料研究，不是竞品实测 |
+| 4 | Workspace-first 是交互顺序，不是优越性口号 | 文件 -> 范围 -> Run -> 引用 | 用户多一次选择，也获得可见边界 | 尚无目标用户效率或信任研究 |
+| 5 | 15 个目录、96 份文件形成固定演示现场 | 目录与格式分布数字、图 1 局部 | 111 个任务说明/输入文件共 `1,780,445` bytes | FORTE 固定 commit；未公开 165 条未取得 |
+| 6 | 安全预览让“Agent 能读什么”可检查 | CSV、PDF、DOCX、TXT 四张现有截图拼图 | 完整性、有界解析、不执行 active content | 96/96 preview smoke；不证明内容语义完整 |
+| 7 | 显式文件范围是本轮上下文合同 | 图 3 任务范围截图 | `task.md` 不作隐藏任务，用户选 1-20 份文件 | UI 草稿需经 POST 重新验证 |
+| 8 | 模型提出计划，服务端拥有政策 | Planner -> compiler -> validator | called、output_used、plan_validation 分开 | 当前不执行计划中的 Tool |
+| 9 | 轨迹来自 named SSE，状态来自 Snapshot | seq 1-8 时序图 | 断线恢复与 final GET，动画不是事实 | 仅单进程 memory，重启丢失 |
+| 10 | 引用是复核入口，不是正确性徽章 | 图 4 结果截图与点击回开箭头 | Finding 回到准确来源文件 | 只验证 membership，不验证 entailment/算术 |
+| 11 | Control Loop 架构成熟度约 30% | 图 5 与 11 模块分值条 | 这是等权架构估计，不是覆盖率、质量分或上线进度 | 当前本质是单次只读分析流水 |
+| 12 | 下一步先做三轮只读 Workspace Research Loop | 图 6 证据地图 -> 反证补证 -> 综合停机 | 先补 Observe、Verify、Evidence Gate、Budget & Stop 和用户控制点 | 目标设计为 `Draft`，当前没有迭代循环 |
+| 13 | 单任务场景首先需要确定性业务 Verify | 财务、入职、SRE 三个场景卡片 | 算术、规则、日志行与风险命令分别核验 | 当前只有通用只读分析 |
+| 14 | 多任务场景需要 Worker、共享 Artifact 与冲突汇聚 | 招聘、法务、上线准备依赖图 | 不能用一次 Planner 冒充 Adaptive Worker | 模块 5、可写模块 7 尚未连接 |
+| 15 | 外部任务当前正确结果是能力阻断 | SQL/Web/cron Gate 图 | 没有 Connector receipt 就没有采集或调度结果 | `TC-03`、`TC-09` 当前无本地 input |
+| 16 | 工程链路已验证，业务价值尚未验证 | 自动化、真实运行、截图三列 | 展示 `51 passed`、`8 passed` 与一次模型耗时 | 数字取当前 Evidence；不是质量、SLA 或用户研究 |
+| 17 | 从只读 Research Loop 再走向 Artifact 与受控执行 | 路线图：三轮研究 -> 验证器 -> Artifact -> Demo 1 -> Worker -> Risk Gate -> Connector | 每层都先形成 receipt 和失败路径，再扩大能力 | 未实现项保持 `Draft` |
+
+页面设计建议：
+
+1. 截图使用仓库 `docs/evidence/screenshots/dr-0022-*.png`，保留原始比例，不伪造运行结果。
+2. 当前实现用实线和深色，部分近似用点线和尚未闭合的节点，目标设计用空心轮廓；每页图例固定。
+3. 关键数字只出现一次主展示，页脚标数据 commit、Evidence 名称和当前 PR 状态，避免旧 PPT 数字混入。
+4. 场景页不写抽象“能力卡”，而写触发、人的决定点、失败路径、前台输出和服务端事实。
+5. 竞品页保留官方产品名和原始来源标题，不使用“做不到”“全面领先”等排他性文案。
+6. 演示结束停在“引用回开 + 待复核 + 没有外部动作”，不要用完成动画替代结论边界。
+
+## 十、验证证据与禁止推断
+
+当前 [`FORTE-FOLDER-WORKSPACE-EVIDENCE-20260825`](../evidence/FORTE-FOLDER-WORKSPACE-EVIDENCE-20260825.md)
+绑定的工程结果包括：聚焦 Python `26 passed`，完整 Python `51 passed`，Ruff、前端
+typecheck、生产 build、治理测试通过，Harness 浏览器 `8 passed`；9 张截图绑定机器清单；
+一次 API 真实 Run 到达 v9/seq8，另一次浏览器真实 Run 展示中间轨迹、两次模型输出被采用
+且无 console error。
+
+这些证据能够支持：固定公开文件清单、安全有界预览、显式来源范围、Planner/Analyst 真实
+调用回执、服务端 Plan 检查、named SSE、Snapshot 对账、引用成员关系和当前桌面/移动被测
+路径。
+
+这些证据不能支持：
+
+- 15 类 FORTE 原任务都已正确完成；
+- 引用能够证明语义、算术、完整性或政策判断正确；
+- Planner 中出现 Tool 或 `run_workspace_write` 就表示工具或文件写入发生；
+- 当前已经有 Demo 1 有界执行器、Demo 2 Adaptive Worker 或 Demo 3 真实动作 Gate；
+- 单进程 memory Run 能够跨重启恢复或支持多实例；
+- 公开 FORTE 数据等于 Lenovo 或真实客户企业数据；
+- 新界面已经提升理解、信任、效率、采纳率或业务价值；
+- 开放 PR 已经合并，或一次模型耗时可以代表 SLA 与成本。
+
+## 十一、来源索引
+
+- 主流方案与交互研究：[`WORKSPACE-CENTRIC-OFFICE-AGENT-INTERACTION-AND-SOURCES-20260825`](../research/WORKSPACE-CENTRIC-OFFICE-AGENT-INTERACTION-AND-SOURCES-20260825.md)。
+- 当前决策：[`DR-0022`](../decisions/DR-0022-workspace-folder-and-arbitrary-task-contract.md)。
+- 当前场景：[`SCENARIO-008`](../scenarios/SCENARIO-008-whole-folder-office-workspace.md)。
+- 15 类任务测试目录：[`FORTE-PUBLIC-OFFICE-TASK-TEST-CASES-20260825`](../testing/FORTE-PUBLIC-OFFICE-TASK-TEST-CASES-20260825.md)。
+- 当前架构：[`ARCHITECTURE.md`](../ARCHITECTURE.md)。
+- 目标架构：[`TARGET_ARCHITECTURE.md`](../TARGET_ARCHITECTURE.md)。
+- UI 与服务端事实：[`UI_SERVER_FACT_MATRIX.md`](../contracts/UI_SERVER_FACT_MATRIX.md)。
+- 当前 Evidence：[`FORTE-FOLDER-WORKSPACE-EVIDENCE-20260825`](../evidence/FORTE-FOLDER-WORKSPACE-EVIDENCE-20260825.md)。
+- 当前截图机器清单：[`dr-0022-forte-folder-workspace.json`](../evidence/manifests/dr-0022-forte-folder-workspace.json)。
+
+## 十二、收束讲稿
+
+Office Agent 当前最值得汇报的，不是它已经“自动完成了多少办公任务”，而是它把办公 Agent
+最容易被模糊处理的四件事放到了同一条用户路径里：**资料从哪里来、本轮到底读什么、模型
+输出是否被服务端采用、结论怎样返回来源复核。**
+
+我们已经用 15 个公开目录、96 份文件、安全预览、显式文件范围、Planner/Analyst 回执、
+服务端策略编译、named SSE、权威 Snapshot、引用回开和 `review_required=true` 做出了
+可运行的只读基础。但真正的执行闭环还在前面：确定性 Verify、可写 Artifact、Commit、
+Budget & Stop、Pause/Takeover、Durable State、Worker、Risk/Evidence/Approval/Permit
+与真实 Connector 都必须逐层建立事实和回执。
+
+因此这版汇报的结论不是“我们已经拥有完整 Office Agent”，而是：**我们已经把一个可检查、
+可限定、可追踪、可回到证据的办公 Agent 起点做实，并且清楚知道下一步不能靠演示文案跳过
+哪些工程门槛。**
