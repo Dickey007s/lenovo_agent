@@ -166,6 +166,11 @@ multi-instance coordination and governed external action remain target work.
   PR #31 also passed the PostgreSQL 17.11 four-Runtime restart integration gate;
   it is merged into `master` as `697e38b`, and the job URL plus exact boundary
   are bound in the dated Evidence.
+- `DR-0028` projects the server-owned workspace paths as a collapsible folder
+  tree and adds an in-context review page for Branch gaps, Findings and
+  next-task proposals. It reuses the existing safe Preview API, makes citation
+  limits explicit and does not add semantic verification or per-proposal
+  citations.
 - No target-user study has been run. Clarity, trust, efficiency and user value
   remain hypotheses.
 
@@ -176,6 +181,8 @@ The current whole-workspace interaction is tracked in
 [`AUTONOMOUS-WHOLE-WORKSPACE-RESEARCH-20260825`](docs/evidence/AUTONOMOUS-WHOLE-WORKSPACE-RESEARCH-EVIDENCE-20260825.md).
 The current Demo 1 branch/artifact increment is tracked in
 [`DEMO1-BRANCH-ARTIFACT-CONTROL-20260826`](docs/evidence/DEMO1-BRANCH-ARTIFACT-CONTROL-EVIDENCE-20260826.md).
+The current folder hierarchy and issue-review interaction is tracked in
+[`WORKSPACE-TREE-AND-EVIDENCE-REVIEW-20260826`](docs/evidence/WORKSPACE-TREE-AND-EVIDENCE-REVIEW-EVIDENCE-20260826.md).
 
 ## Local run
 
@@ -239,6 +246,9 @@ pnpm --dir apps/web exec playwright test e2e/harness-workbench.spec.ts
 - [DR-0027：本地启动状态库选择](docs/decisions/DR-0027-truthful-local-state-store-selection.md)
 - [SCENARIO-013：真实的本地状态库回退](docs/scenarios/SCENARIO-013-truthful-local-state-store-fallback.md)
 - [本地启动状态库优先级 Evidence](docs/evidence/START-DEMO-DSN-PRECEDENCE-EVIDENCE-20260826.md)
+- [DR-0028：分层文件目录与问题审查页](docs/decisions/DR-0028-hierarchical-workspace-and-evidence-review.md)
+- [SCENARIO-014：在原始资料中核对 Agent 问题](docs/scenarios/SCENARIO-014-inspect-agent-issue-in-context.md)
+- [分层文件目录与问题审查页 Evidence](docs/evidence/WORKSPACE-TREE-AND-EVIDENCE-REVIEW-EVIDENCE-20260826.md)
 - [可恢复 Control Loop Evidence](docs/evidence/DURABLE-EVIDENCE-GATE-ARTIFACT-EVOLUTION-EVIDENCE-20260826.md)
 - [整库自主研究 Evidence](docs/evidence/AUTONOMOUS-WHOLE-WORKSPACE-RESEARCH-EVIDENCE-20260825.md)
 - [Agent Control Loop 三轮只读纵切证据](docs/evidence/AGENT-CONTROL-LOOP-BOUNDED-READONLY-EVIDENCE-20260825.md)

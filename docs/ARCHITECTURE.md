@@ -144,16 +144,21 @@ or notification channel.
 
 The root page keeps three independently meaningful regions:
 
-- file-manager rail: one flat searchable inventory, type filters and metadata;
+- file-manager rail: a collapsible hierarchy projected from server-owned
+  `folders[]/display_path`, plus search, type filters and safe file opening;
 - work area: task composer, loop contract, safe preview, round canvas, evidence
   gaps, server-backed task-branch state, branch-specific continue decision,
-  immutable result history, restore actions and cited brief;
+  immutable result history, restore actions, cited brief and a full-page issue
+  review surface for Gap, Branch, Finding and next-task proposals;
 - activity pane: current phase, budget, ordered events and model adoption receipts.
 
 The UI shows business facts and recovery actions, not internal protocol. A
 citation is an interaction: it selects and opens the referenced file preview.
-Preview security and result-review boundaries remain available without turning
-the primary page into an architecture document.
+The issue-review surface reuses the same preview route and organizes authoritative
+Snapshot facts as Agent proposal -> server record -> human review. It does not
+invent line-level diffs or semantic verification. Proposal context is explicitly
+not a per-proposal citation. Preview security and result-review boundaries remain
+available without turning the primary page into an architecture document.
 
 ## 7. Eight module maturity
 
@@ -175,7 +180,9 @@ other external Connector. Plan tool labels are intent declarations; no Tool
 Gateway is invoked. `completed` means a reviewable response exists, not that an
 office task, artifact or external process completed.
 
-See [`DR-0026`](decisions/DR-0026-selective-branch-and-immutable-artifact-history.md),
+See [`DR-0028`](decisions/DR-0028-hierarchical-workspace-and-evidence-review.md),
+[`SCENARIO-014`](scenarios/SCENARIO-014-inspect-agent-issue-in-context.md),
+[`DR-0026`](decisions/DR-0026-selective-branch-and-immutable-artifact-history.md),
 [`SCENARIO-012`](scenarios/SCENARIO-012-selective-branch-and-artifact-restore.md),
 [UI-server fact matrix](contracts/UI_SERVER_FACT_MATRIX.md) and
 [current Evidence](evidence/DEMO1-BRANCH-ARTIFACT-CONTROL-EVIDENCE-20260826.md).
