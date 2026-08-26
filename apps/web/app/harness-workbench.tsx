@@ -7,12 +7,17 @@ import {
   IconAdjustments,
   IconCheck,
   IconChevronDown,
+  IconChevronRight,
   IconCircleCheck,
   IconCircleDot,
   IconClock,
   IconDatabase,
+  IconEye,
   IconFile,
   IconFileDescription,
+  IconFolder,
+  IconFolderOpen,
+  IconGitCommit,
   IconLoader2,
   IconPlayerPause,
   IconPlayerPlay,
@@ -23,6 +28,7 @@ import {
   IconSend,
   IconShieldCheck,
   IconSparkles,
+  IconX,
 } from "@tabler/icons-react";
 
 type ConnectionState = "connecting" | "available" | "live" | "reconnecting" | "offline";
@@ -33,6 +39,30 @@ type PreviewKind = "table" | "document" | "pdf" | "text" | "unavailable";
 type LoopPhase = "observe" | "plan" | "act" | "verify" | "evidence_gate" | "commit";
 type LoopCommand = "pause" | "resume" | "steer" | "stop" | "rollback";
 type LoopControlOptions = { instruction?: string; branchId?: string; artifactVersion?: number };
+
+type WorkspaceTreeFolder = {
+  path: string;
+  label: string;
+  summary: string;
+  availability: HarnessFolder["availability"];
+  files: HarnessFile[];
+  folders: WorkspaceTreeFolder[];
+  fileCount: number;
+};
+
+type EvidenceReviewRequest = {
+  reviewKey: string;
+  kind: "finding" | "gap" | "proposal";
+  eyebrow: string;
+  title: string;
+  detail: string;
+  status: string;
+  roundNumber: number | null;
+  branchTitle: string | null;
+  fileRefs: string[];
+  serverFact: string;
+  boundary: string;
+};
 
 export type HarnessFile = {
   file_ref: string;
@@ -335,6 +365,142 @@ function formatSize(value: number) {
 }
 function randomKey() {
   return `workspace-${Date.now()}-${globalThis.crypto?.randomUUID?.() ?? Math.random().toString(16).slice(2)}`;
+}
+
+function splitDisplayPath(path: string) {
+  return path.split("/").map((part) => part.trim()).filter(Boolean);
+}
+
+function fileAncestorPaths(file: HarnessFile) {
+  const parts = splitDisplayPath(file.display_path).slice(0, -1);
+  return parts.map((_, index) => parts.slice(0, index + 1).join("/"));
+}
+
+function buildWorkspaceTree(workspace: HarnessWorkspace) {
+  return workspace.folders.map((folder): WorkspaceTreeFolder => {
+    const root: WorkspaceTreeFolder = {
+      path: folder.display_label,
+      label: folder.display_label,
+      summary: folder.display_summary,
+      availability: folder.availability,
+      files: [],
+      folders: [],
+      fileCount: folder.files.length,
+    };
+    for (const file of folder.files) {
+      const parts = splitDisplayPath(file.display_path);
+      const nestedParts = parts[0] === folder.display_label || parts[0] === file.display_group
+        ? parts.slice(1, -1)
+        : parts.slice(0, -1);
+      let parent = root;
+      for (const part of nestedParts) {
+        const childPath = `${parent.path}/${part}`;
+        let child = parent.folders.find((candidate) => candidate.path === childPath);
+        if (!child) {
+          child = {
+            path: childPath,
+            label: part,
+            summary: "资料子目录",
+            availability: folder.availability,
+            files: [],
+            folders: [],
+            fileCount: 0,
+          };
+          parent.folders.push(child);
+        }
+        child.fileCount += 1;
+        parent = child;
+      }
+      parent.files.push(file);
+    }
+    return root;
+  });
+}
+
+function filterWorkspaceTree(node: WorkspaceTreeFolder, query: string, extension: FileTypeFilter, ancestorMatches = false): WorkspaceTreeFolder | null {
+  const normalizedQuery = query.trim().toLocaleLowerCase("zh-CN");
+  const folderMatches = !normalizedQuery || `${node.label} ${node.path} ${node.summary}`.toLocaleLowerCase("zh-CN").includes(normalizedQuery);
+  const includeDescendants = ancestorMatches || folderMatches;
+  const files = node.files.filter((file) => {
+    if (extension !== "ALL" && file.extension !== extension) return false;
+    if (includeDescendants) return true;
+    return `${file.display_label} ${file.display_path} ${file.display_summary} ${file.extension}`.toLocaleLowerCase("zh-CN").includes(normalizedQuery);
+  });
+  const folders = node.folders
+    .map((folder) => filterWorkspaceTree(folder, query, extension, includeDescendants))
+    .filter((folder): folder is WorkspaceTreeFolder => folder !== null);
+  if (!files.length && !folders.length && !(folderMatches && node.fileCount === 0 && extension === "ALL")) return null;
+  return { ...node, files, folders };
+}
+
+function uniqueFileRefs(refs: string[]) {
+  return Array.from(new Set(refs));
+}
+
+function findingReviewRequest(finding: HarnessFinding, index: number, roundNumber: number | null): EvidenceReviewRequest {
+  return {
+    reviewKey: `finding:${roundNumber ?? "final"}:${index}:${finding.title}`,
+    kind: "finding",
+    eyebrow: "Agent 发现",
+    title: finding.title,
+    detail: finding.detail,
+    status: "待人工复核",
+    roundNumber,
+    branchTitle: null,
+    fileRefs: uniqueFileRefs(finding.file_refs),
+    serverFact: "相关 file_ref 已通过本轮允许范围与引用成员关系校验。",
+    boundary: "引用校验只证明 Agent 指向了允许读取的文件，不证明该结论正确，也不证明文件内容必然支持这句话。",
+  };
+}
+
+function gapReviewRequest(gap: EvidenceGap, index: number, roundNumber: number, branchTitle: string | null): EvidenceReviewRequest {
+  return {
+    reviewKey: `gap:${roundNumber}:${gap.gap_id}:${index}`,
+    kind: "gap",
+    eyebrow: "Evidence Gate",
+    title: gap.label,
+    detail: gap.detail,
+    status: "证据不足",
+    roundNumber,
+    branchTitle,
+    fileRefs: uniqueFileRefs(gap.candidate_file_refs),
+    serverFact: "服务端 Evidence Gate 已保留缺口，并阻止受影响分支在缺少证据时继续提交。",
+    boundary: "候选文件只是下一步核对范围；在用户确认或 Agent 完成下一轮前，系统不会把缺口包装成已解决事实。",
+  };
+}
+
+function branchReviewRequest(branch: LoopBranch, gaps: EvidenceGap[]): EvidenceReviewRequest {
+  const gap = gaps.find((candidate) => candidate.branch_id === branch.branch_id);
+  if (gap) return gapReviewRequest(gap, gaps.indexOf(gap), branch.round_number, branch.title);
+  return {
+    reviewKey: `branch:${branch.branch_id}`,
+    kind: "gap",
+    eyebrow: "待处理分支",
+    title: `${branch.title}仍缺少证据`,
+    detail: branch.objective,
+    status: "等待你决定",
+    roundNumber: branch.round_number,
+    branchTitle: branch.title,
+    fileRefs: uniqueFileRefs(branch.missing_file_refs),
+    serverFact: "服务端 Snapshot 将该分支标记为 waiting_input，并保留了 missing_file_refs。",
+    boundary: "这些文件是分支当前缺少或待核对的引用，不代表问题已经成立。",
+  };
+}
+
+function proposalReviewRequest(proposal: string, index: number, result: HarnessResult, roundNumber: number | null): EvidenceReviewRequest {
+  return {
+    reviewKey: `proposal:${roundNumber ?? "final"}:${index}:${proposal}`,
+    kind: "proposal",
+    eyebrow: "Agent 下一步建议",
+    title: `建议 ${index + 1}`,
+    detail: proposal,
+    status: "尚未逐项验证",
+    roundNumber,
+    branchTitle: null,
+    fileRefs: uniqueFileRefs(result.findings.flatMap((finding) => finding.file_refs)),
+    serverFact: "该建议来自本轮已读取资料和已形成的发现；只有用户确认后，服务端才会创建新的独立 Run。",
+    boundary: "当前协议没有为每条 follow_up 单独绑定引用。下方文件是本轮结果上下文，不应被理解为这条建议的直接证据。",
+  };
 }
 
 async function fetchWithTimeout(input: RequestInfo | URL, init: RequestInit = {}, timeoutMs = 8_000) {
@@ -888,6 +1054,175 @@ export function HarnessActivityPane({ state }: { state: HarnessActivityState | n
     {state.error && <footer className="is-error" role="alert"><IconAlertTriangle aria-hidden="true" /><span>{state.error}</span></footer>}
   </section>;
 }
+
+function treeFileCount(node: WorkspaceTreeFolder): number {
+  return node.files.length + node.folders.reduce((total, folder) => total + treeFileCount(folder), 0);
+}
+
+function WorkspaceTreeNode({
+  node,
+  depth,
+  activeFileRef,
+  expandedPaths,
+  filterCollapsedPaths,
+  forceExpanded,
+  onToggle,
+  onOpenFile,
+}: {
+  node: WorkspaceTreeFolder;
+  depth: number;
+  activeFileRef: string;
+  expandedPaths: Set<string>;
+  filterCollapsedPaths: Set<string>;
+  forceExpanded: boolean;
+  onToggle: (path: string) => void;
+  onOpenFile: (file: HarnessFile) => void;
+}) {
+  const expanded = forceExpanded ? !filterCollapsedPaths.has(node.path) : expandedPaths.has(node.path);
+  const visibleCount = treeFileCount(node);
+  const hasChildren = node.files.length > 0 || node.folders.length > 0;
+  return <li className="workspace-tree-folder" role="none">
+    <button
+      type="button"
+      className="workspace-tree-folder-row"
+      role="treeitem"
+      aria-level={depth + 1}
+      aria-expanded={expanded}
+      aria-label={`${expanded ? "收起" : "展开"}文件夹 ${node.path}`}
+      onClick={() => onToggle(node.path)}
+      style={{ paddingLeft: `${10 + depth * 17}px` }}
+    >
+      <IconChevronRight className={expanded ? "is-open" : ""} aria-hidden="true" />
+      {expanded ? <IconFolderOpen aria-hidden="true" /> : <IconFolder aria-hidden="true" />}
+      <span>{node.label}</span>
+      <b>{visibleCount}</b>
+    </button>
+    {expanded && <ul role="group">
+      {node.folders.map((folder) => <WorkspaceTreeNode
+        key={folder.path}
+        node={folder}
+        depth={depth + 1}
+        activeFileRef={activeFileRef}
+        expandedPaths={expandedPaths}
+        filterCollapsedPaths={filterCollapsedPaths}
+        forceExpanded={forceExpanded}
+        onToggle={onToggle}
+        onOpenFile={onOpenFile}
+      />)}
+      {node.files.map((file) => <li key={file.file_ref} role="none">
+        <button
+          type="button"
+          className={`workspace-tree-file${file.file_ref === activeFileRef ? " is-open" : ""}`}
+          role="treeitem"
+          aria-level={depth + 2}
+          aria-label={`打开 ${file.display_path}`}
+          title={file.display_path}
+          onClick={() => onOpenFile(file)}
+          style={{ paddingLeft: `${31 + depth * 17}px` }}
+        >
+          <IconFile aria-hidden="true" />
+          <span>{file.display_label}</span>
+          <b>{file.extension}</b>
+        </button>
+      </li>)}
+      {!hasChildren && <li className="workspace-tree-empty">{node.availability === "task_only_requires_external_system" ? "公开仓库未提供本地输入" : "空目录"}</li>}
+    </ul>}
+  </li>;
+}
+
+function EvidenceReviewDialog({
+  request,
+  files,
+  onClose,
+  onOpenFile,
+}: {
+  request: EvidenceReviewRequest;
+  files: HarnessFile[];
+  onClose: () => void;
+  onOpenFile: (file: HarnessFile) => void;
+}) {
+  const closeButtonRef = useRef<HTMLButtonElement | null>(null);
+  const reviewFiles = useMemo(() => request.fileRefs
+    .map((ref) => files.find((file) => file.file_ref === ref))
+    .filter((file): file is HarnessFile => file !== undefined), [files, request.fileRefs]);
+  const [selectedFileRef, setSelectedFileRef] = useState(reviewFiles[0]?.file_ref ?? "");
+  const [preview, setPreview] = useState<HarnessPreview | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewError, setPreviewError] = useState("");
+  const selectedFile = reviewFiles.find((file) => file.file_ref === selectedFileRef) ?? null;
+
+  useEffect(() => {
+    setSelectedFileRef(reviewFiles[0]?.file_ref ?? "");
+    closeButtonRef.current?.focus();
+  }, [request.reviewKey, reviewFiles]);
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [onClose]);
+
+  useEffect(() => {
+    if (!selectedFileRef) { setPreview(null); setPreviewError(""); return; }
+    let current = true;
+    setPreviewLoading(true); setPreviewError("");
+    void fetch(`${API_BASE}/v1/harness/workspace/files/${encodeURIComponent(selectedFileRef)}`, { headers: HEADERS })
+      .then(async (response) => {
+        if (!response.ok) throw new Error(response.status === 503 ? "文件完整性校验未通过" : "文件预览暂时不可用");
+        const normalized = normalizePreview(await response.json());
+        if (!normalized) throw new Error("文件预览格式无效");
+        if (current) setPreview(normalized);
+      })
+      .catch((caught) => {
+        if (current) { setPreview(null); setPreviewError(caught instanceof Error ? caught.message : "文件预览暂时不可用"); }
+      })
+      .finally(() => { if (current) setPreviewLoading(false); });
+    return () => { current = false; };
+  }, [selectedFileRef]);
+
+  const tone = request.kind === "gap" ? "warning" : request.kind === "proposal" ? "proposal" : "finding";
+  return <div className="evidence-review-backdrop" role="presentation">
+    <section className={`evidence-review-page is-${tone}`} role="dialog" aria-modal="true" aria-labelledby="evidence-review-title">
+      <header className="evidence-review-header">
+        <div><IconGitCommit aria-hidden="true" /><div><span>问题审查页</span><h2 id="evidence-review-title">{request.title}</h2></div></div>
+        <button ref={closeButtonRef} type="button" className="icon-action" onClick={onClose} aria-label="关闭问题审查页" title="关闭"><IconX aria-hidden="true" /></button>
+      </header>
+      <div className="evidence-review-layout">
+        <aside className="evidence-review-history" aria-label="审查记录">
+          <header><span>{request.eyebrow}</span><b className={`is-${tone}`}>{request.status}</b></header>
+          <dl>
+            {request.roundNumber !== null && <><dt>发生位置</dt><dd>第 {request.roundNumber} 轮{request.branchTitle ? ` / ${request.branchTitle}` : ""}</dd></>}
+            <dt>关联资料</dt><dd>{reviewFiles.length} 份</dd>
+          </dl>
+          <ol>
+            <li><span><IconGitCommit aria-hidden="true" /></span><div><b>Agent 提出</b><p>{request.kind === "proposal" ? "形成一条待确认的下一步建议" : request.kind === "gap" ? "发现证据缺口并停止受影响分支" : "形成一条待复核发现"}</p></div></li>
+            <li><span><IconShieldCheck aria-hidden="true" /></span><div><b>服务端记录</b><p>{request.serverFact}</p></div></li>
+            <li className="is-current"><span><IconEye aria-hidden="true" /></span><div><b>等待你核对</b><p>对照右侧原始资料，判断 Agent 描述是否成立。</p></div></li>
+          </ol>
+          <footer><IconAlertTriangle aria-hidden="true" /><p>{request.boundary}</p></footer>
+        </aside>
+        <main className="evidence-review-main">
+          <section className="evidence-review-claim">
+            <span>需要核对什么</span>
+            <h3>{request.title}</h3>
+            <p>{request.detail}</p>
+          </section>
+          <section className="evidence-review-source" aria-label="相关资料">
+            <header><div><span>相关资料</span><h3>点击文件，直接对照实际内容</h3></div><b>{reviewFiles.length} 份</b></header>
+            {reviewFiles.length > 0 ? <div className="evidence-review-files">{reviewFiles.map((file) => <button type="button" key={file.file_ref} className={file.file_ref === selectedFileRef ? "is-active" : ""} onClick={() => setSelectedFileRef(file.file_ref)}><IconFile aria-hidden="true" /><span><b>{file.display_label}</b><small>{file.display_path}</small></span></button>)}</div> : <p className="evidence-review-no-source">当前服务端事实没有提供可打开的关联文件。系统不会用静态示例补齐。</p>}
+          </section>
+          <section className="evidence-review-preview" aria-label="资料原文预览">
+            <FilePreview preview={preview} file={selectedFile} loading={previewLoading} error={previewError} />
+            {selectedFile && <button type="button" className="evidence-review-open-workspace" onClick={() => { onClose(); onOpenFile(selectedFile); }}><IconArrowRight aria-hidden="true" />回到资料库中打开</button>}
+          </section>
+        </main>
+      </div>
+    </section>
+  </div>;
+}
+
 export function HarnessWorkbench({ onActivityChange }: { onActivityChange?: (state: HarnessActivityState | null) => void }) {
   const [workspace, setWorkspace] = useState<HarnessWorkspace | null>(null);
   const [activeFileRef, setActiveFileRef] = useState("");
@@ -901,6 +1236,9 @@ export function HarnessWorkbench({ onActivityChange }: { onActivityChange?: (sta
   const [deadlineSeconds, setDeadlineSeconds] = useState(120);
   const [fileSearch, setFileSearch] = useState("");
   const [fileTypeFilter, setFileTypeFilter] = useState<FileTypeFilter>("ALL");
+  const [expandedFolderPaths, setExpandedFolderPaths] = useState<Set<string>>(() => new Set());
+  const [filterCollapsedPaths, setFilterCollapsedPaths] = useState<Set<string>>(() => new Set());
+  const [reviewRequest, setReviewRequest] = useState<EvidenceReviewRequest | null>(null);
   const [view, setView] = useState<WorkspaceView>("data");
   const [run, setRun] = useState<HarnessRun | null>(null);
   const [workspaceStatus, setWorkspaceStatus] = useState<WorkspaceStatus>("checking");
@@ -925,13 +1263,12 @@ export function HarnessWorkbench({ onActivityChange }: { onActivityChange?: (sta
   const availableFileTypes = useMemo(() => {
     return Array.from(new Set(allFiles.map((file) => file.extension))).sort((left, right) => left.localeCompare(right));
   }, [allFiles]);
-  const filteredFiles = useMemo(() => {
-    const query = fileSearch.trim().toLocaleLowerCase("zh-CN");
-    return allFiles.filter((file) => {
-      if (fileTypeFilter !== "ALL" && file.extension !== fileTypeFilter) return false;
-      return !query || `${file.display_label} ${file.display_path} ${file.display_summary} ${file.extension}`.toLocaleLowerCase("zh-CN").includes(query);
-    });
-  }, [allFiles, fileSearch, fileTypeFilter]);
+  const workspaceTree = useMemo(() => workspace ? buildWorkspaceTree(workspace) : [], [workspace]);
+  const filteredWorkspaceTree = useMemo(() => workspaceTree
+    .map((folder) => filterWorkspaceTree(folder, fileSearch, fileTypeFilter))
+    .filter((folder): folder is WorkspaceTreeFolder => folder !== null), [workspaceTree, fileSearch, fileTypeFilter]);
+  const visibleFileCount = useMemo(() => filteredWorkspaceTree.reduce((total, folder) => total + treeFileCount(folder), 0), [filteredWorkspaceTree]);
+  const forceTreeExpanded = Boolean(fileSearch.trim() || fileTypeFilter !== "ALL");
 
   function closeTransport() {
     eventSourceRef.current?.close();
@@ -1009,6 +1346,7 @@ export function HarnessWorkbench({ onActivityChange }: { onActivityChange?: (sta
       const firstFolder = normalized.folders.find((folder) => folder.files.length > 0);
       const firstFile = firstFolder?.files[0];
       setActiveFileRef((current) => current || firstFile?.file_ref || "");
+      if (firstFile) setExpandedFolderPaths((current) => current.size ? current : new Set(fileAncestorPaths(firstFile)));
     } catch (caught) {
       if (requestId !== requestRef.current) return;
       const message = caught instanceof Error ? caught.message : "办公资料库暂时无法读取";
@@ -1055,6 +1393,8 @@ export function HarnessWorkbench({ onActivityChange }: { onActivityChange?: (sta
 
   useEffect(() => { void loadWorkspace(); return closeTransport; }, []);
 
+  useEffect(() => { setFilterCollapsedPaths(new Set()); }, [fileSearch, fileTypeFilter]);
+
   useEffect(() => {
     if (workspaceStatus === "online") void restoreLatestRun();
   }, [workspaceStatus]);
@@ -1099,7 +1439,30 @@ export function HarnessWorkbench({ onActivityChange }: { onActivityChange?: (sta
   }, [workspace, run, connection, error, onActivityChange]);
 
   function openFile(file: HarnessFile) {
+    setExpandedFolderPaths((current) => {
+      const next = new Set(current);
+      for (const path of fileAncestorPaths(file)) next.add(path);
+      return next;
+    });
     setActiveFileRef(file.file_ref); setView("data");
+  }
+
+  function toggleFolder(path: string) {
+    if (forceTreeExpanded) {
+      setFilterCollapsedPaths((current) => {
+        const next = new Set(current);
+        if (next.has(path)) next.delete(path);
+        else next.add(path);
+        return next;
+      });
+      return;
+    }
+    setExpandedFolderPaths((current) => {
+      const next = new Set(current);
+      if (next.has(path)) next.delete(path);
+      else next.add(path);
+      return next;
+    });
   }
 
   async function startTask(suggestedInstruction?: string) {
@@ -1216,20 +1579,26 @@ export function HarnessWorkbench({ onActivityChange }: { onActivityChange?: (sta
     <div className="data-workbench-grid">
       <aside className="dataset-browser" aria-label="FORTE 文件目录">
         <header>
-          <div><IconDatabase aria-hidden="true" /><div><strong>全部文件</strong><span>办公资料库 / {workspace.file_count} 项</span></div></div>
-          <label><IconSearch aria-hidden="true" /><input value={fileSearch} onChange={(event) => setFileSearch(event.target.value)} placeholder="查找文件" aria-label="查找文件" /></label>
+          <div><IconDatabase aria-hidden="true" /><div><strong>文件目录</strong><span>办公资料库 / {workspace.folder_count} 个目录</span></div></div>
+          <label><IconSearch aria-hidden="true" /><input value={fileSearch} onChange={(event) => setFileSearch(event.target.value)} placeholder="搜索文件或目录" aria-label="搜索文件或目录" /></label>
           <nav className="file-type-filters" aria-label="按文件类型筛选">
             {["ALL", ...availableFileTypes].map((extension) => <button type="button" key={extension} className={fileTypeFilter === extension ? "is-active" : ""} onClick={() => setFileTypeFilter(extension)}>{extension === "ALL" ? "全部" : extension}</button>)}
           </nav>
         </header>
-        <div className="file-manager-columns" aria-hidden="true"><span>名称</span><span>类型</span></div>
-        <div className="file-manager-list" role="list">
-          {filteredFiles.length ? filteredFiles.map((file) => <button type="button" role="listitem" key={file.file_ref} className={file.file_ref === activeFileRef ? "is-open" : ""} onClick={() => openFile(file)} title={file.display_path}>
-            <IconFile aria-hidden="true" />
-            <span><strong>{file.display_label}</strong><small>{file.display_summary}</small></span>
-            <b>{file.extension}</b>
-          </button>) : <p className="dataset-unavailable">没有符合当前筛选条件的文件。</p>}
-        </div>
+        <div className="file-manager-columns" aria-hidden="true"><span>目录 / 文件</span><span>{forceTreeExpanded ? `${visibleFileCount} 个结果` : `${workspace.file_count} 份文件`}</span></div>
+        {filteredWorkspaceTree.length ? <ul className="workspace-tree" role="tree" aria-label="办公资料库目录树">
+          {filteredWorkspaceTree.map((folder) => <WorkspaceTreeNode
+            key={folder.path}
+            node={folder}
+            depth={0}
+            activeFileRef={activeFileRef}
+            expandedPaths={expandedFolderPaths}
+            filterCollapsedPaths={filterCollapsedPaths}
+            forceExpanded={forceTreeExpanded}
+            onToggle={toggleFolder}
+            onOpenFile={openFile}
+          />)}
+        </ul> : <p className="dataset-unavailable">没有符合当前筛选条件的文件或目录。</p>}
       </aside>
       <section className="data-task-surface">
         <section className="task-composer" aria-labelledby="task-composer-title">
@@ -1258,13 +1627,14 @@ export function HarnessWorkbench({ onActivityChange }: { onActivityChange?: (sta
         </nav>
         <div className="workspace-content">
           {view === "data" && <FilePreview preview={preview} file={activeFile} loading={previewLoading} error={previewError} />}
-          {view === "loop" && <LoopView run={run} files={allFiles} controlBusy={controlBusy} onControl={controlLoop} />}
-          {view === "result" && <ResultView result={run?.result ?? null} artifacts={run?.artifact_versions ?? []} commit={run?.last_commit ?? null} files={allFiles} onOpenFile={openFile} onStartTask={startTask} starting={starting} />}
+          {view === "loop" && <LoopView run={run} files={allFiles} controlBusy={controlBusy} onControl={controlLoop} onReview={setReviewRequest} />}
+          {view === "result" && <ResultView result={run?.result ?? null} artifacts={run?.artifact_versions ?? []} commit={run?.last_commit ?? null} files={allFiles} onOpenFile={openFile} onReview={setReviewRequest} onStartTask={startTask} starting={starting} />}
         </div>
         <details className="workspace-boundary"><summary><IconShieldCheck aria-hidden="true" />数据与执行边界</summary><p>{workspace.data_boundary} Agent 可以检索整个资料库，但每轮只读取服务端校验通过且受预算约束的文件；本轮不会修改原文件或执行外部动作。</p></details>
         {error && <div className="workspace-error" role="alert"><IconAlertTriangle aria-hidden="true" /><span>{error}</span></div>}
       </section>
     </div>
+    {reviewRequest && <EvidenceReviewDialog request={reviewRequest} files={allFiles} onClose={() => setReviewRequest(null)} onOpenFile={openFile} />}
   </main>;
 }
 
@@ -1284,11 +1654,13 @@ function LoopView({
   files,
   controlBusy,
   onControl,
+  onReview,
 }: {
   run: HarnessRun | null;
   files: HarnessFile[];
   controlBusy: LoopCommand | null;
   onControl: (command: LoopCommand, options?: LoopControlOptions) => Promise<boolean>;
+  onReview: (request: EvidenceReviewRequest) => void;
 }) {
   const [selectedRoundNumber, setSelectedRoundNumber] = useState(1);
   const [steerDraft, setSteerDraft] = useState("");
@@ -1360,11 +1732,14 @@ function LoopView({
         <ol>{roundBranches.map((branch, index) => <li key={branch.branch_id} className={`is-${branch.status}${run.active_branch_id === branch.branch_id ? " is-selected" : ""}`}>
           <span>{branch.status === "completed" ? <IconCheck aria-hidden="true" /> : index + 1}</span>
           <div><header><b>{branch.title}</b><small>{branchStatusLabel(branch.status)}</small></header><p>{branch.objective}</p><footer><span>{branch.input_file_refs.length} 份资料</span>{branch.depends_on.length > 0 && <span>{branch.depends_on.length} 条前序依赖</span>}{branch.parent_branch_id && <span>续自上一轮</span>}{branch.missing_file_refs.length > 0 && <strong>缺 {branch.missing_file_refs.length} 份引用</strong>}</footer></div>
-          {branch.status === "waiting_input" && waitingForBranch && <button type="button" onClick={() => void onControl("resume", { branchId: branch.branch_id })} disabled={!canResume || controlBusy !== null}><IconPlayerPlay aria-hidden="true" />{controlBusy === "resume" ? "正在启动" : "继续此分支"}</button>}
+          {branch.status === "waiting_input" && waitingForBranch && <div className="loop-branch-actions"><button type="button" className="is-review" onClick={() => onReview(branchReviewRequest(branch, selectedRound.evidence_gaps))}><IconEye aria-hidden="true" />查看问题</button><button type="button" onClick={() => void onControl("resume", { branchId: branch.branch_id })} disabled={!canResume || controlBusy !== null}><IconPlayerPlay aria-hidden="true" />{controlBusy === "resume" ? "正在启动" : "继续此分支"}</button></div>}
         </li>)}</ol>
       </section>}
-      {selectedRound.result && <section className="loop-round-result"><span>本轮核对结果</span><h3>{selectedRound.result.summary}</h3><p>{selectedRound.result.findings.length} 条发现，引用 {selectedRound.verified_file_refs.length} 份文件。</p></section>}
-      {selectedRound.evidence_gaps.length > 0 && <section className="loop-gap"><IconAlertTriangle aria-hidden="true" /><div><span>证据缺口</span><h3>{selectedRound.evidence_gaps.length} 条分支尚未完成</h3><p>上方橙色分支明确显示缺口；只有你选择的那条会进入下一轮。</p></div></section>}
+      {selectedRound.result && <section className="loop-round-result"><span>本轮核对结果</span><h3>{selectedRound.result.summary}</h3><p>{selectedRound.result.findings.length} 条发现，引用 {selectedRound.verified_file_refs.length} 份文件。</p>{selectedRound.result.findings.length > 0 && <div className="loop-review-links">{selectedRound.result.findings.map((finding, index) => <button type="button" key={`${finding.title}:${index}`} onClick={() => onReview(findingReviewRequest(finding, index, selectedRound.round_number))}><IconEye aria-hidden="true" />核对：{finding.title}</button>)}</div>}</section>}
+      {selectedRound.evidence_gaps.length > 0 && <section className="loop-gap"><IconAlertTriangle aria-hidden="true" /><div><span>证据缺口</span><h3>{selectedRound.evidence_gaps.length} 条分支尚未完成</h3><p>点击缺口即可查看具体描述、候选文件和原始内容；只有你确认的分支会进入下一轮。</p><div className="loop-review-links">{selectedRound.evidence_gaps.map((gap, index) => {
+        const branchTitle = roundBranches.find((branch) => branch.branch_id === gap.branch_id)?.title ?? null;
+        return <button type="button" key={gap.gap_id} onClick={() => onReview(gapReviewRequest(gap, index, selectedRound.round_number, branchTitle))}><IconEye aria-hidden="true" />{gap.label}</button>;
+      })}</div></div></section>}
       {selectedRound.next_step && <footer className={selectedRound.next_step.decision === "completed" ? "is-complete" : "is-next"}><div><span>服务端决定</span><strong>{gateLabel(selectedRound.next_step.decision)}</strong><p>{selectedRound.next_step.reason}</p></div>{selectedRound.next_step.decision === "waiting_input" ? <b>选择上方分支继续</b> : selectedRound.next_step.decision === "next_round" ? <IconArrowRight aria-hidden="true" /> : null}</footer>}
     </article>}
     {run.artifact_versions.length > 0 && <section className="artifact-evolution" aria-label="成果版本">
@@ -1381,6 +1756,7 @@ function ResultView({
   commit,
   files,
   onOpenFile,
+  onReview,
   onStartTask,
   starting,
 }: {
@@ -1389,14 +1765,34 @@ function ResultView({
   commit: LoopCommit | null;
   files: HarnessFile[];
   onOpenFile: (file: HarnessFile) => void;
+  onReview: (request: EvidenceReviewRequest) => void;
   onStartTask: (instruction: string) => Promise<void>;
   starting: boolean;
 }) {
   const [expanded, setExpanded] = useState(false);
   if (!result) return <div className="workspace-placeholder"><IconClock aria-hidden="true" /><h2>任务简报尚未形成</h2><p>Agent Control Loop 完成只读分析并通过文件引用校验后，简报会出现在这里。</p></div>;
   const visibleFindings = expanded ? result.findings : result.findings.slice(0, 3);
-  return <article className="result-view"><header><IconCircleCheck aria-hidden="true" /><div><span>{commit ? `任务证据简报 v${commit.artifact_version} · ${commit.operation === "rollback" ? "已恢复" : "已提交"}` : artifacts.length ? `任务证据简报 v${artifacts.at(-1)?.version} · 待证据门` : "资料库研究结果 · 待复核"}</span><h2>{result.summary}</h2></div></header><div className="result-findings">{visibleFindings.map((finding, index) => <section key={`${finding.title}:${index}`}><b>{index + 1}</b><div><h3>{finding.title}</h3><p>{finding.detail}</p><footer>{finding.file_refs.map((ref) => {
-    const file = files.find((item) => item.file_ref === ref);
-    return file ? <button type="button" key={ref} onClick={() => onOpenFile(file)}><IconFile aria-hidden="true" />{file.display_label}</button> : null;
-  })}</footer></div></section>)}</div>{result.findings.length > 3 && <button type="button" className="result-expand" aria-expanded={expanded} onClick={() => setExpanded((current) => !current)}><IconChevronDown className={expanded ? "is-open" : ""} aria-hidden="true" />{expanded ? "收起详细发现" : `查看其余 ${result.findings.length - 3} 条发现`}</button>}{result.follow_ups.length > 0 && <section className="result-proposals" aria-labelledby="result-proposals-title"><header><span>Agent 建议的下一步</span><h3 id="result-proposals-title">由你确认后，才会成为新的 Control Loop</h3></header>{result.follow_ups.map((item, index) => <article key={`${item}:${index}`}><div><b>建议 {index + 1}</b><p>{item}</p></div><button type="button" disabled={starting} onClick={() => void onStartTask(item)}><IconPlayerPlay aria-hidden="true" />{starting ? "正在启动" : "确认并启动"}</button></article>)}</section>}<footer><IconShieldCheck aria-hidden="true" />这些建议由模型基于本轮已读取资料生成，尚未逐项验证；只有你点击确认后才会启动新任务，本轮没有修改原文件或执行外部动作。</footer></article>;
+  const latestRoundNumber = artifacts.at(-1)?.round_number ?? null;
+  return <article className="result-view">
+    <header><IconCircleCheck aria-hidden="true" /><div><span>{commit ? `任务证据简报 v${commit.artifact_version} · ${commit.operation === "rollback" ? "已恢复" : "已提交"}` : artifacts.length ? `任务证据简报 v${artifacts.at(-1)?.version} · 待证据门` : "资料库研究结果 · 待复核"}</span><h2>{result.summary}</h2></div></header>
+    <div className="result-findings">{visibleFindings.map((finding, index) => {
+      const findingArtifact = artifacts.find((artifact) => artifact.findings.some((candidate) => candidate.title === finding.title && candidate.detail === finding.detail));
+      return <section key={`${finding.title}:${index}`}>
+        <b>{index + 1}</b>
+        <div><h3>{finding.title}</h3><p>{finding.detail}</p><footer>
+          <button type="button" className="is-review" onClick={() => onReview(findingReviewRequest(finding, index, findingArtifact?.round_number ?? null))}><IconEye aria-hidden="true" />打开审查页</button>
+          {finding.file_refs.map((ref) => {
+            const file = files.find((item) => item.file_ref === ref);
+            return file ? <button type="button" key={ref} onClick={() => onOpenFile(file)}><IconFile aria-hidden="true" />{file.display_label}</button> : null;
+          })}
+        </footer></div>
+      </section>;
+    })}</div>
+    {result.findings.length > 3 && <button type="button" className="result-expand" aria-expanded={expanded} onClick={() => setExpanded((current) => !current)}><IconChevronDown className={expanded ? "is-open" : ""} aria-hidden="true" />{expanded ? "收起详细发现" : `查看其余 ${result.findings.length - 3} 条发现`}</button>}
+    {result.follow_ups.length > 0 && <section className="result-proposals" aria-labelledby="result-proposals-title">
+      <header><span>Agent 建议的下一步</span><h3 id="result-proposals-title">先看形成依据，再决定是否启动新的 Control Loop</h3></header>
+      {result.follow_ups.map((item, index) => <article key={`${item}:${index}`}><div><b>建议 {index + 1}</b><p>{item}</p></div><div className="result-proposal-actions"><button type="button" className="is-review" onClick={() => onReview(proposalReviewRequest(item, index, result, latestRoundNumber))}><IconEye aria-hidden="true" />查看形成依据</button><button type="button" disabled={starting} onClick={() => void onStartTask(item)}><IconPlayerPlay aria-hidden="true" />{starting ? "正在启动" : "确认并启动"}</button></div></article>)}
+    </section>}
+    <footer><IconShieldCheck aria-hidden="true" />这些建议由模型基于本轮已读取资料生成，尚未逐项验证；只有你点击确认后才会启动新任务，本轮没有修改原文件或执行外部动作。</footer>
+  </article>;
 }

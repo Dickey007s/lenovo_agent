@@ -5,9 +5,11 @@
 The product is one office folder, not a Scenario chooser. The persistent layout
 is:
 
-- left: one flat file-manager list, search, type filters and file metadata;
+- left: one hierarchical file tree projected from safe business paths, with
+  nested-folder expansion, search, type filters and file metadata;
 - center: task composer, Loop contract, file preview, round/branch progress,
-  immutable brief history, restore actions and next-task proposals;
+  immutable brief history, restore actions, next-task proposals and an
+  in-context issue-review page;
 - right: actual Agent trajectory, budget, controls and model receipts.
 
 These regions answer five user questions in order: what data exists, what goal
@@ -22,9 +24,12 @@ model. The preview header shows business path, extension, size and row/page
 count. A security footer explains integrity, read-only, active-content and
 external-resource behavior.
 
-The user may inspect any file. Search, type filters and the open preview are
-client presentation state and do not change server truth or Agent scope. The UI
-does not expose profession/role partitions or file-selection checkboxes.
+The user may inspect any file. The browser projects `folders[]` and each safe
+`display_path` into top-level and nested directories. Expand/collapse, search,
+type filters and the open preview are client presentation state and do not
+change server truth or Agent scope. Search keeps matching ancestors visible and
+temporarily expands them. The UI does not expose profession/role partitions or
+file-selection checkboxes, raw internal paths or complete hashes.
 
 ## 3. Task composer
 
@@ -82,16 +87,22 @@ version. Restoring a historical version creates another TaskCommit and moves the
 current pointer without deleting any version or changing an original office
 file. Every result remains labeled for human review. A citation button resolves
 against the workspace projection, selects that file and switches back to its
-preview. This keeps evidence review inside the main task flow.
+preview. A Finding, Branch or Evidence Gap can also open a full-page review
+surface: it presents the business claim, round/branch location, authoritative
+server record, associated refs and the same safe Preview response together. The
+Git-like history is an information structure, not a source-file diff or a claim
+that semantic correctness has been proven.
 
 A model candidate that fails server validation is shown as `未采用`; at most
 one bounded repair attempt may follow and it consumes the same model-call
 budget. The rejected candidate itself never becomes the visible plan.
 
 The final result may contain up to four proposed next tasks. They do not change
-server state by themselves. Clicking `确认并启动` copies the exact proposal into
-a new start request and creates an independent Run; dismissing or editing a
-proposal has no side effect on the completed Run.
+server state by themselves. `查看形成依据` shows the current result's Finding
+refs as context and explicitly states that `follow_ups` has no per-item citation
+contract. Clicking `确认并启动` copies the exact proposal into a new start request
+and creates an independent Run; dismissing, reviewing or editing a proposal has
+no side effect on the completed Run.
 
 ## 6. Call receipts and trace
 

@@ -1,8 +1,9 @@
 # UI-server fact matrix
 
-This is the current `DR-0026` branch-selective, append-only result loop plus the
-`DR-0024` whole-workspace workbench. `DR-0025` group-resume and embedded-artifact
-facts remain a historical baseline in their dated Evidence only.
+This is the current `DR-0028` hierarchical workspace and issue-review surface,
+on top of the `DR-0026` branch-selective append-only result loop and `DR-0024`
+whole-workspace contract. `DR-0025` group-resume and embedded-artifact facts
+remain a historical baseline in their dated Evidence only.
 
 下表中的 Authority 列即“服务端权威字段”；浏览器草稿与传输状态会明确另列，
 不能冒充业务事实。
@@ -14,8 +15,8 @@ Prompt、思维链、原始模型响应、绝对路径、哈希和内部策略�
 | --- | --- | --- | --- | --- |
 | Service available | HTTP API and workspace projection succeeded | health/workspace response | may browse or start; not an SSE fact | previous stream, network stack |
 | Workspace unavailable | service or catalog cannot provide authoritative files | fetch failure or controlled 503 | retry; no static fallback files | stack trace, partial/stale catalog |
-| Whole repository | one flat list of 96 public inputs | `GET /v1/harness/workspace` | read-only until refreshed | task prompt, rubric, solution, role partitions, path/hash |
-| Search/type filter | client filters the visible file-manager list | browser state | no server mutation and no scope change | no capability claim |
+| Whole repository tree | 15 top-level folders, nested subfolders and 96 public inputs | `GET /v1/harness/workspace` `folders[]` + safe file `display_path` | tree projection is read-only until refreshed | task prompt, rubric, solution, role partitions, raw path/hash |
+| Expand/search/type filter | client changes visible branches of the file tree; search keeps matching ancestors open | browser state over server projection | no server mutation and no Agent scope change | no claim that visible files are the Run input |
 | File preview selection | choose what the user is looking at | browser state + preview GET | does not constrain Agent evidence | internal ref/path/hash |
 | Task composer | user writes the actual instruction | browser draft; POST/Snapshot `instruction` | required 3-2,000 chars | hidden benchmark-task fallback is forbidden |
 | Loop bounds | user chooses hard limits before invocation | browser draft; Snapshot `contract.options` | rounds 1-3, files/round 1-8, model calls 2-6, deadline 20-300s | token/cost estimates not owned by server |
@@ -32,6 +33,7 @@ Prompt、思维链、原始模型响应、绝对路径、哈希和内部策略�
 | Text preview | bounded TXT/MD/JSON/log/code | preview response | displayed only, never executed | shell/script execution |
 | Security footer | integrity verified, read-only, no active/external resource execution | `BenchmarkPreviewSecurity` | cannot be inferred from extension alone | scanner implementation details |
 | Citation click | reopen a finding's selected source | result `file_ref` resolved through workspace | selects file and switches to preview | source path/hash |
+| Review-page source switch | compare one Gap/Finding with an associated safe file | Gap/Finding refs resolved through workspace + Preview GET | changes only the review-page preview; Run version is unchanged | source file mutation, semantic proof, raw ref/path/hash |
 
 ## 3. Agent Control Loop, plan and result
 
@@ -49,6 +51,7 @@ Prompt、思维链、原始模型响应、绝对路径、哈希和内部策略�
 | Analyst receipt | not called/adopted/not adopted and elapsed time | round `analysis_receipt.*` | independent of result validation | token/provider trace |
 | Citation validation | every finding stays inside this round's approved refs | `result_validation` | before Evidence Gate | false semantic/numeric proof claim |
 | Evidence gap | current evidence is insufficient and one or more Branches have bounded missing refs | branch `status=waiting_input`, `evidence_gaps[].branch_id`, `evidence_gate`, `next_step.candidate_branch_ids` | prior rounds/branches/versions remain visible; no new call starts until a Branch resume | claim that the missing file guarantees truth |
+| Gap/Branch review page | user can inspect where the gap occurred, what it says and which candidate/missing files are available | `round_number`, business Branch title, `evidence_gaps[]`, Branch `missing_file_refs`, Preview GET | open/close has no server mutation; resume remains a separate versioned command | raw Branch ID, claim that candidate files solve the gap, invented diff |
 | Continue one Branch | user authorizes one more bounded round only for the selected Branch | control POST `resume` with `branch_id`, returned ControlEvent, `active_branch_id`; next `round.input_file_refs` equals that Branch's missing refs | only valid for a waiting Branch; all other waiting Branches remain unchanged | a click animation as execution proof or unrelated files silently entering the round |
 | Result version | one completed round formed an independent append-only logical evidence brief | `artifact_versions[]` safe projection plus Store ArtifactVersion row | version and parent increase monotonically; content is not overwritten | source-file write, semantic correctness or mutable current-result fiction |
 | Read-only Act | the Agent formed an intermediate analysis, not a side effect | round result and `external_side_effect=none` | Verify follows in the same round | tool execution or source-file mutation claim |
@@ -58,6 +61,8 @@ Prompt、思维链、原始模型响应、绝对路径、哈希和内部策略�
 | User stopped | stop was applied at a safe point | `status=stopped`, `loop_stopped` | preserves completed rounds | rollback or deletion claim |
 | Safely stopped | model/schema/plan/source/citation check failed | `status=failed`, `harness_failed`, safe errors | no result; fresh retry | raw validator/compiler/provider error |
 | Next-task proposals | Agent suggests up to four follow-up tasks from the current bounded analysis; each proposal is not independently source-verified | terminal `result.follow_ups` | suggestion alone creates no server mutation | claim that work already started or that every proposal has a per-item citation |
+| Finding review page | user compares one Agent finding with the actual files it cited | `result.findings[].title/detail/file_refs`, matching Artifact round when available, Preview GET | open/close has no server mutation | semantic/numeric correctness, entailment, exact line location |
+| Proposal context review | user sees the result context before deciding whether to start the suggestion | one `result.follow_ups[]` string + union of current Finding refs | explicitly labeled not independently source-verified; no mutation | direct per-proposal citation or accepted-proposal state |
 | Confirm proposal | user turns one suggestion into an independent new Loop | new POST `/v1/harness/runs` with exact proposal text | new idempotency key; previous Run/result preserved | nonexistent proposal-accept state |
 
 ## 4. Human control

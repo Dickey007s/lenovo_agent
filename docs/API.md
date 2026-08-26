@@ -80,6 +80,12 @@ task instructions, rubric, solution, grading material, source path and digest.
 Two task-only external-dependency folders may have zero local input files and
 cannot be used to fabricate local data.
 
+`display_path` is a safe business path and may contain nested segments, for
+example `算法研发/search_agent_workflow/main.py`. The browser may project these
+segments as a folder tree. Expand, search and type-filter state is client-owned;
+it does not change the server workspace projection or a Run's whole-workspace
+scope. `display_path` is not an operating-system absolute path.
+
 ## 4. File preview
 
 ```http
@@ -289,7 +295,15 @@ interpretations. `rounds[].branch_ids` connects a round to its Branch records;
 
 `result.follow_ups` contains at most four model-proposed next tasks. It is not a
 server-side acceptance record. The current browser starts a separate Run only
-after the user confirms one proposal.
+after the user confirms one proposal. There is no per-follow-up citation field
+in the current contract. A review UI may show the current result's Finding refs
+as explicitly labeled context, but must not present them as direct evidence for
+an individual proposal.
+
+The issue-review page adds no endpoint. Finding review uses its own `file_refs`;
+Gap/Branch review uses `candidate_file_refs` or `missing_file_refs`; actual
+content still comes from the preview endpoint. Opening or closing review is a
+client action and does not change Run version or create a ControlEvent.
 
 Current statuses are `queued`, `indexing`, `planning`, `validating`,
 `analyzing`, `verifying`, `waiting_input`, `paused`, `completed`, `stopped`

@@ -15,17 +15,17 @@ type FileItem = {
 };
 
 const csvFile = fileItem("forte-1111111111111111", "forte-folder-111111111111", "往来余额.csv", "财务管理", "CSV", "table");
-const pdfFile = fileItem("forte-2222222222222222", "forte-folder-222222222222", "授权委托书.pdf", "法务", "PDF", "pdf");
+const pdfFile = fileItem("forte-2222222222222222", "forte-folder-222222222222", "授权委托书.pdf", "法务", "PDF", "pdf", "合同与授权/授权委托书.pdf");
 const docxFile = fileItem("forte-3333333333333333", "forte-folder-333333333333", "岗位说明.docx", "人力招聘", "DOCX", "document");
 const txtFile = fileItem("forte-4444444444444444", "forte-folder-444444444444", "运行日志.txt", "可靠性工程", "TXT", "text");
 
-function fileItem(fileRef: string, folderId: string, label: string, group: string, extension: FileItem["extension"], kind: FileItem["preview_kind"]): FileItem {
+function fileItem(fileRef: string, folderId: string, label: string, group: string, extension: FileItem["extension"], kind: FileItem["preview_kind"], nestedPath?: string): FileItem {
   return {
     file_ref: fileRef,
     folder_id: folderId,
     display_label: label,
     display_group: group,
-    display_path: `${group}/${label}`,
+    display_path: `${group}/${nestedPath ?? label}`,
     display_summary: `${extension} 办公文件 · 12 KB`,
     extension,
     mime: extension === "CSV" ? "text/csv" : extension === "TXT" ? "text/plain" : "application/octet-stream",
@@ -419,7 +419,8 @@ async function mockHarness(page: Page, options: { failFirstStart?: boolean; disc
 }
 
 async function openFile(page: Page, file: string) {
-  await page.locator(".file-manager-list").getByRole("listitem", { name: new RegExp(file) }).click();
+  await page.getByRole("textbox", { name: "搜索文件或目录" }).fill(file);
+  await page.locator(".workspace-tree-file").filter({ hasText: file }).click();
 }
 
 test("shows one complete folder workspace instead of registered scenarios", async ({ page }) => {
@@ -427,8 +428,16 @@ test("shows one complete folder workspace instead of registered scenarios", asyn
   await expect(page.getByRole("heading", { name: "办公资料库" })).toBeVisible();
   await expect(page.locator(".workspace-facts")).toContainText("96 份文件统一检索");
   await expect(page.locator(".workspace-facts")).toContainText("96 份可安全预览");
-  await expect(page.locator(".file-manager-list").getByRole("listitem")).toHaveCount(96);
+  await expect(page.locator('.workspace-tree-folder-row[aria-level="1"]')).toHaveCount(15);
+  await expect(page.getByRole("treeitem", { name: "展开文件夹 法务" })).toBeVisible();
+  await page.getByRole("treeitem", { name: "展开文件夹 法务" }).click();
+  await expect(page.getByRole("treeitem", { name: "展开文件夹 法务/合同与授权" })).toBeVisible();
+  await page.getByRole("treeitem", { name: "展开文件夹 法务/合同与授权" }).click();
+  await expect(page.getByRole("treeitem", { name: `打开 ${pdfFile.display_path}` })).toBeVisible();
   await expect(page.getByText("星海科技")).toBeVisible();
+  if (process.env.CAPTURE_DR0028_EVIDENCE === "1") {
+    await page.locator(".data-workbench-grid").screenshot({ path: "../../docs/evidence/screenshots/dr-0028-hierarchical-workspace.png" });
+  }
   const body = await page.locator("body").innerText();
   expect(body).not.toMatch(/注册场景|Demo\s*[123]|scenario_id|task_instruction|sha256/i);
 });
@@ -527,6 +536,15 @@ test("holds an evidence gap until the user confirms another round", async ({ pag
   await expect(page.locator(".loop-round-detail > footer strong")).toHaveText("等待人工输入");
   await expect(page.getByRole("button", { name: "继续此分支" })).toBeEnabled();
   expect(state.controls).toHaveLength(0);
+  await page.getByRole("button", { name: "查看问题" }).click();
+  await expect(page.getByRole("dialog", { name: /仍有 1 份本轮选择资料缺少可核对引用/ })).toBeVisible();
+  await expect(page.getByRole("dialog")).toContainText("第 1 轮 / 形成分析结果");
+  await expect(page.getByRole("dialog")).toContainText("Evidence Gate 已保留缺口");
+  await expect(page.getByRole("dialog")).toContainText("授权范围：仅限本项目合同审阅。");
+  if (process.env.CAPTURE_DR0028_EVIDENCE === "1") {
+    await page.getByRole("dialog").screenshot({ path: "../../docs/evidence/screenshots/dr-0028-evidence-gap-review.png" });
+  }
+  await page.getByRole("button", { name: "关闭问题审查页" }).click();
   if (process.env.CAPTURE_DR0026_EVIDENCE === "1") {
     await page.locator(".loop-branches").screenshot({
       path: "../../docs/evidence/screenshots/dr-0026-branch-control.png",
@@ -556,6 +574,14 @@ test("opens a cited source file from an analysis finding", async ({ page }) => {
   await page.getByRole("textbox", { name: "任务指令" }).fill("核对余额并引用来源文件。");
   await page.getByRole("button", { name: "启动 Control Loop" }).click();
   await page.getByRole("button", { name: /发现与建议/ }).click();
+  await page.getByRole("button", { name: "打开审查页" }).first().click();
+  await expect(page.getByRole("dialog", { name: "第一轮核对完成" })).toBeVisible();
+  await expect(page.getByRole("dialog")).toContainText("引用校验只证明 Agent 指向了允许读取的文件");
+  await expect(page.getByRole("dialog")).toContainText("星海科技");
+  if (process.env.CAPTURE_DR0028_EVIDENCE === "1") {
+    await page.getByRole("dialog").screenshot({ path: "../../docs/evidence/screenshots/dr-0028-finding-review.png" });
+  }
+  await page.getByRole("button", { name: "关闭问题审查页" }).click();
   await page.getByRole("button", { name: csvFile.display_label }).last().click();
   await expect(page.getByText("星海科技")).toBeVisible();
   await expect(page.getByRole("button", { name: "预览" })).toHaveClass(/is-active/);
@@ -568,6 +594,10 @@ test("starts a new whole-workspace loop only after the user confirms an agent pr
   await page.getByRole("button", { name: /发现与建议/ }).click();
   const proposal = "继续核对授权范围与财务往来之间是否存在执行约束，并形成待办清单。";
   await expect(page.getByText(proposal)).toBeVisible();
+  await page.getByRole("button", { name: "查看形成依据" }).click();
+  await expect(page.getByRole("dialog", { name: "建议 1" })).toBeVisible();
+  await expect(page.getByRole("dialog")).toContainText("当前协议没有为每条 follow_up 单独绑定引用");
+  await page.getByRole("button", { name: "关闭问题审查页" }).click();
   await page.getByRole("button", { name: "确认并启动" }).click();
   await expect.poll(() => state.starts.length).toBe(2);
   expect(state.starts[1].instruction).toBe(proposal);
@@ -612,4 +642,15 @@ test("mobile keeps file-manager browsing, task input, preview and trajectory usa
   await expect(page.locator(".table-preview")).toBeVisible();
   const shortControls = await page.locator("button:visible, summary:visible").evaluateAll((nodes) => nodes.filter((node) => (node as HTMLElement).getBoundingClientRect().height < 44).map((node) => ({ text: node.textContent, height: (node as HTMLElement).getBoundingClientRect().height })));
   expect(shortControls).toEqual([]);
+  await page.getByRole("textbox", { name: "任务指令" }).fill("核对余额并打开问题审查页。");
+  await page.getByRole("button", { name: "启动 Control Loop" }).click();
+  await page.getByRole("button", { name: /发现与建议/ }).click();
+  await page.getByRole("button", { name: "打开审查页" }).first().click();
+  await expect(page.getByRole("dialog")).toBeVisible();
+  await expect(page.getByRole("dialog")).toContainText("点击文件，直接对照实际内容");
+  const reviewMetrics = await page.evaluate(() => ({ viewport: document.documentElement.clientWidth, scroll: document.documentElement.scrollWidth }));
+  expect(reviewMetrics.scroll).toBeLessThanOrEqual(reviewMetrics.viewport);
+  const closeBox = await page.getByRole("button", { name: "关闭问题审查页" }).boundingBox();
+  expect(closeBox?.width).toBeGreaterThanOrEqual(44);
+  expect(closeBox?.height).toBeGreaterThanOrEqual(44);
 });
