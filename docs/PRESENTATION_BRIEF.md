@@ -44,7 +44,7 @@ Agent Control Loop 的逐模块历史基线、当前三轮只读纵切和后续�
 | 6 | 固定公开数据版本，让演示中的每份材料都能被现场检查 | 15 个文件夹、96 份文件、格式分布 | FORTE 固定 commit；不是真实企业数据 |
 | 7 | 安全预览把“Agent 读了什么”变成可见契约 | CSV/PDF/DOCX/TXT 预览拼图和安全说明 | 路径、大小、hash、符号链接和解析器测试 |
 | 8 | Harness 把模型调用、内容采用和服务端校验分开 | 事件与模型回执时序 | Snapshot/Receipt 事实；不展示思维链 |
-| 9 | Agent 说“有问题”之后，用户必须能一键看到问题位置、服务端记录和实际原文 | Git 提交记录式问题审查页：Agent 提出 -> 服务端记录 -> 人工核对 | `DR-0028`；引用只证明范围，建议上下文不是逐项直接证据 |
+| 9 | Agent 说“有问题”之后，用户要同时看懂事实、影响、真实原文和自己必须决定的下一步 | 问题处置单：1 事实 -> 2 影响 -> 3 人工动作；证据与实际文件并排；A/B/C + 反馈 | `DR-0030/29`；推荐是模型候选，确认只创建新只读 Run |
 | 10 | Agent Control Loop 会把计划变成可核对任务分支；证据不足时，人只选择一条分支继续 | 任务分支现场、分支 Evidence Gate、成果 v1→v2 与恢复轨迹 | 只读、最多三轮、顺序 Controller；Branch 不等于并行 Worker |
 | 11 | Demo 2 验收多任务自组织、动态调度和共享工件汇聚 | Worker、依赖与动态重排图 | 目标设计；当前产品没有通用 Worker Runtime |
 | 12 | Demo 3 对单任务和多任务统一施加风险与动作控制 | 影响预演 -> 证据 -> 审批 -> Permit -> 回执 | 目标设计；当前没有真实外部动作 |
@@ -60,8 +60,10 @@ Agent Control Loop 的逐模块历史基线、当前三轮只读纵切和后续�
 5. 展示 Agent 本轮选择了哪些文件、为什么选择，以及服务端如何把超预算候选限制在本轮上限内。
 6. 在 Evidence Gate 停下来，先点“查看问题”：在审查页核对第几轮、哪条分支、问题描述、候选文件和实际原文；关闭后再只点一条“继续此分支”。
 7. 展示成果简报从 v1 到 v2；再恢复 v1，说明系统只新增一条 TaskCommit、当前指针改变，v2 与原文件都没有被覆盖。
-8. 对 Finding 点“打开审查页”：先展示“设计预期/实际观测”证据链，再点击其中一项，让预览自动切换文件、跳到并高亮原文位置；强调位置匹配不等于结论正确。
-9. 对建议点“查看形成依据”，说明建议尚未逐项绑定引用；只有点击“确认并启动”才创建新 Loop。
+8. 对 Finding 点“打开审查页”：先按 1/2/3 讲事实、影响和人工动作，再在左侧选择“设计预期/实际观测”，让右侧真实文件跳到并高亮原文；强调位置匹配不等于结论正确。
+9. 先选择 A/B/C 中自己的初始口径，再点“对照 Agent 建议”；补充“同时核对发布记录中的代码版本”后确认。指出推荐默认隐藏以减少锚定，确认只创建新只读 Loop，不会直接改源文件。
+10. 再展示一次无法唯一定位的恢复态：“已保留/未采用/未发生”，只选择一个分支继续，而不是让整个任务卡死。
+11. 对建议点“查看形成依据”，说明建议尚未逐项绑定引用；只有点击“确认并启动”才创建新 Loop。
 
 演示不要从八模块架构图开始。先让观众看到数据、任务、轨迹和证据闭环，
 再解释支撑它的架构。
@@ -106,6 +108,8 @@ Agent Control Loop 的逐模块历史基线、当前三轮只读纵切和后续�
 | 有序事件加权威 Snapshot | 进度和恢复依据事实 | 轨迹、重连中、最终对账 | named SSE 与 Run Snapshot |
 | 引用范围校验 + 问题审查页 | 用户不用在缺口卡和 96 份文件之间来回猜，可以从问题直接对照原文 | 轮次/分支定位、审查记录、关联文件、安全预览 | Gap/Branch/Finding refs + Preview GET；不等于语义正确 |
 | 服务端 Evidence Anchor | 用户不用在整份代码、日志或表格中手工搜索 Agent 的依据，可以在预期与观测之间逐项切换 | 编号证据链、证据角色、行范围、原文摘录、自动跳转与高亮 | Finding `evidence_anchors[]` + Preview GET；模型 quote 需唯一匹配，位置不等于 entailment |
+| 结构化问题处置单 | 用户不用从一段长解释中自行提炼事实、影响和操作 | 1/2/3 摘要、是否需要人工决断 | Finding `fact_summary/impact/review`；不证明模型判断正确 |
+| 人工处理选项与反馈 | 用户能明确告诉 Agent 接受、否决还是暂缓，采用哪种口径，还要核对什么 | A/B/C、影响预演、反馈框、决定回执 | `decision_records[]` + 新 Run POST；当前没有文件写入或外部动作 |
 | 终态仍要求复核 | 完成不等于正确 | “模型初步结论 · 待复核” | `review_required=true` |
 | 服务端 Evidence Gate | 验证结果可决定继续还是停止 | 本轮缺口、下一轮目的、剩余预算 | `rounds[].evidence_gaps` 与 `next_step` |
 | 轮次间人工证据门 | 证据不足时由人决定是否继续花预算 | “确认并继续核对”、调整方向或停止 | `status=waiting_input`、`control_state=paused`、resume 回执 |
@@ -115,18 +119,24 @@ Agent Control Loop 的逐模块历史基线、当前三轮只读纵切和后续�
 | 独立不可变成果记录 | 用户看见每轮成果，提交不再通过改写版本表达 | 简报 v1/v2、草稿/已核对、当前版本指针 | append-only `ArtifactVersion`、独立 `TaskCommit` |
 | 受控成果恢复 | 用户可以恢复旧简报且不丢掉新版 | “恢复”、当前 vN、“已恢复历史成果版本” | rollback ControlEvent、新 TaskCommit、`artifact_version_restored` |
 | 有界候选修复 | 模型返回未通过时不会静默采用 | `未采用` 与预算内重试 | `plan_validation_rejected` / `analysis_validation_rejected`、模型调用计数 |
+| EvidenceResolution + Finding 级恢复 | 一条坏引用不再抹掉全部有效结果；多候选或无候选都有明确下一步 | exact/ambiguous/unavailable、已保留/未采用/未发生 | `evidence_resolutions[]`、`partial_artifact_saved`、`next_step.recovery_kind` |
+| 版本化人工决定 | 关闭不再等于“什么都没发生”，重连后仍能对账 | 接受/否决/暂缓、回执版本、无外部动作 | `decision_records[]`、`decision_recorded`、expected version + idempotency |
 | 人工确认下一步 | Agent 建议不会自动扩张任务；用户先看形成上下文 | “尚未逐项验证”“查看形成依据”“确认并启动” | 终态 `follow_ups` + Finding refs 上下文 + 新 Run POST |
 
 ## 7. 当前证据卡片
 
 `DR-0022` 是历史手工选文件基线；`DR-0023/24` 证明整库只读 Loop；
 `DR-0025` 是整组补证与 Snapshot 内成果版本的已合并历史基线；`DR-0026`
-记录分支选择、独立不可变成果与恢复；`DR-0028` 记录当前分层目录和问题审查页：
+记录分支选择、独立不可变成果与恢复；`DR-0028/29` 记录目录、问题审查页和原文定位；
+`DR-0030` 记录可处置 Finding 与可恢复分析门：
 
-- 完整 Python：`63 passed, 1 skipped`；聚焦 Runtime：`26 passed`；
-- Harness 浏览器：`13 passed`；Ruff、lint 与 build 通过；最终 Evidence 记录完整时长；
+- 完整 Python：`73 passed, 1 skipped`；聚焦 Runtime：`35 passed`；
+- Harness 浏览器：`19 passed`；覆盖接受/暂缓回执、候选消歧、只恢复目标 Branch 和重连恢复；
+- Ruff、lint 与生产 build 通过；准确命令、时长和最终 PR 记录在 `DR-0030` Evidence；
 - PR #31 的 PostgreSQL 17.11 workflow `1 passed in 1.84s`，四个顺序 Runtime 覆盖中断、恢复完成、历史版本恢复和再次读取当前指针；这不是多实例高可用；
 - 两条等待分支可逐条继续，未选分支保持等待；ArtifactVersion 与 TaskCommit 分表 append-only，恢复只新增 Commit；
+- 新的 DecisionRecord 把 accept/decline/defer 绑定到 Finding/Resolution/Branch；它证明回执存在，不证明业务审批正确；
+- `exact/ambiguous/unavailable` 是原文位置状态，不是 Finding 真值；`stale/rejected` 仍是预留状态；
 - 两张确定性浏览器图分别展示“继续此分支”与“恢复 v1”；它们证明 UI/服务端字段映射，不是真实模型运行；
 - 最终截图绑定的真实浏览器运行：整库冻结 96 份索引，Agent 自主选择并核对 3 份文件，2 次 `deepseek-v4-pro` 调用，形成 5 条发现和 4 条待确认建议；
 - 3 张最终文件管理器/建议截图及 SHA-256 写入 Evidence；1440px 与 390px 无页面横向溢出；

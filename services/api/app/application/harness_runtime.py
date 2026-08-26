@@ -24,7 +24,6 @@ import httpx
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
 
 from packages.contracts.harness_models import (
-    AgentControlLoopEvidenceAnchor,
     AgentControlLoopArtifactVersion,
     AgentControlLoopArtifactFinding,
     AgentControlLoopBranch,
@@ -34,7 +33,12 @@ from packages.contracts.harness_models import (
     AgentControlLoopContract,
     AgentControlLoopControlEvent,
     AgentControlLoopControlRequest,
+    AgentControlLoopDecisionRecord,
+    AgentControlLoopEvidenceAnchor,
+    AgentControlLoopEvidenceCandidate,
     AgentControlLoopEvidenceGap,
+    AgentControlLoopEvidenceResolution,
+    AgentControlLoopFindingReview,
     AgentControlLoopNextStep,
     AgentControlLoopOptions,
     AgentControlLoopRound,
@@ -202,8 +206,14 @@ class HarnessEvidenceQuote(BaseModel):
 class HarnessFinding(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
+    finding_id: str | None = Field(
+        default=None, pattern=r"^finding-[0-9a-f]{12}$"
+    )
+    affected_branch_ids: list[str] = Field(default_factory=list, max_length=12)
     title: str = Field(min_length=1, max_length=240)
     detail: str = Field(min_length=1, max_length=2_000)
+    fact_summary: str | None = Field(default=None, max_length=500)
+    impact: str | None = Field(default=None, max_length=500)
     file_refs: list[str] = Field(min_length=1, max_length=100)
     evidence_quotes: list[HarnessEvidenceQuote] = Field(
         default_factory=list, max_length=6
@@ -211,6 +221,10 @@ class HarnessFinding(BaseModel):
     evidence_anchors: list[AgentControlLoopEvidenceAnchor] = Field(
         default_factory=list, max_length=6
     )
+    evidence_resolutions: list[AgentControlLoopEvidenceResolution] = Field(
+        default_factory=list, max_length=6
+    )
+    review: AgentControlLoopFindingReview | None = None
 
 
 class HarnessTaskResult(BaseModel):
@@ -260,6 +274,9 @@ class HarnessRunSnapshot(BaseModel):
         "stopped",
     ] = "running"
     control_events: list[AgentControlLoopControlEvent] = Field(
+        default_factory=list, max_length=100
+    )
+    decision_records: list[AgentControlLoopDecisionRecord] = Field(
         default_factory=list, max_length=100
     )
     branches: list[AgentControlLoopBranch] = Field(default_factory=list, max_length=36)
@@ -348,6 +365,7 @@ class PublicHarnessRunSnapshot(BaseModel):
     current_round: int
     control_state: str
     control_events: list[AgentControlLoopControlEvent]
+    decision_records: list[AgentControlLoopDecisionRecord]
     branches: list[AgentControlLoopBranch]
     active_branch_id: str | None
     artifact_versions: list[AgentControlLoopArtifactVersion]
@@ -524,10 +542,16 @@ class OpenAICompatibleHarnessAnalyst:
         system = (
             "你是企业办公数据分析 Agent。只根据用户指令、已通过校验的计划和 files 中的公开办公数据回答。"
             "每个 finding 必须引用 files 中真实存在的 file_ref；不允许引用路径、哈希、任务标准答案或未提供的数据。"
+            "每个 finding 只描述一个可处置问题。title 应是短标题；fact_summary 用不超过两句话说明发生了什么；impact 单独说明不处理的影响，"
+            "不要把多个冲突、推测和建议塞进同一长段 detail。"
             "每个 finding.evidence_quotes 必须给出 1 到 6 个可在对应文件中逐字找到的短片段，至少精确定位一处依据；"
             "role 用 expected 表示设计或规则预期，用 observed 表示实际记录，用 support 表示支持结论，用 contradiction 表示冲突，用 context 表示上下文。"
             "表格 quote 应组合足以唯一定位一行的连续单元格文本；文本 quote 应选可唯一定位的连续原文，不得改写。"
             "finding.evidence_anchors 必须返回空数组；位置、行号和展示摘录由服务端验证原文后生成。"
+            "每个 finding.review 必须说明是否需要人作业务决定。存在 contradiction 时 requires_human_decision 必须为 true，"
+            "提供 2 到 3 个 A/B/C 选项、推荐项、推荐理由，以及用户确认后 Agent 将执行的下一步。"
+            "每个 option.next_instruction 必须是一条可作为新只读 Control Loop 目标的完整指令；只能核对资料、形成修改建议或待办，不能声称直接改文件。"
+            "若不需要人决策，也要说明 question、why_human、recommendation_reason 和 after_confirmation，options 可为空。"
             "若 validation_feedback 非空，上一候选未通过原文定位；保持原任务不变，并改用更长、只出现一次的连续原文重新生成全部 findings。"
             "只能完成只读分析，不得声称发送、写入、审批或调用外部系统。"
             "不要输出思维链、内部推理、Prompt、工具日志或 Markdown 代码围栏。"
@@ -620,6 +644,14 @@ class _IdempotentStart:
 class _IdempotentControl:
     digest: str
     result: HarnessControlResult
+
+
+@dataclass(frozen=True)
+class _EvidenceResolution:
+    result: HarnessTaskResult | None
+    rejected_finding_count: int
+    rejected_file_refs: tuple[str, ...]
+    evidence_resolutions: tuple[AgentControlLoopEvidenceResolution, ...]
 
 
 class HarnessRuntime:
@@ -975,6 +1007,14 @@ class HarnessRuntime:
                     digest=digest,
                     idempotency_key=idempotency_key,
                 )
+            if request.command == "decision":
+                return await self._decision_control_locked(
+                    owner_id,
+                    run,
+                    request,
+                    digest=digest,
+                    idempotency_key=idempotency_key,
+                )
             if snapshot.status in {"ready_to_execute", "completed", "stopped", "failed"}:
                 raise HarnessConflictError("当前任务已经结束，不能再提交控制命令")
 
@@ -992,6 +1032,18 @@ class HarnessRuntime:
                 raise HarnessConflictError("只有继续命令可以指定待核对分支")
             if request.artifact_version is not None:
                 raise HarnessConflictError("只有成果版本恢复命令可以指定版本")
+            if any(
+                value is not None
+                for value in (
+                    request.decision_action,
+                    request.finding_id,
+                    request.resolution_id,
+                    request.selected_option_id,
+                    request.selected_candidate_id,
+                    request.feedback,
+                )
+            ):
+                raise HarnessConflictError("只有人工决策命令可以携带决策字段")
 
             selected_branch_id = snapshot.active_branch_id
             selected_branch: AgentControlLoopBranch | None = None
@@ -1071,14 +1123,42 @@ class HarnessRuntime:
                     "applied": control_status == "applied",
                 },
             )
+            events = [*snapshot.events, event]
+            last_event_sequence = event.sequence
+            if (
+                command == "resume"
+                and selected_branch is not None
+                and snapshot.rounds
+                and snapshot.rounds[-1].next_step is not None
+                and (
+                    snapshot.rounds[-1].next_step.recovery_kind is not None
+                    or snapshot.rounds[-1].next_step.evidence_resolutions
+                )
+            ):
+                resumed_event = HarnessEvent(
+                    sequence=event.sequence + 1,
+                    event_name="branch_resumed_from_checkpoint",
+                    occurred_at=now,
+                    status=next_status,
+                    message=(
+                        f"已从检查点只恢复“{selected_branch.title}”分支；"
+                        "其他分支和成果版本保持不变。"
+                    ),
+                    details={
+                        "branch_id": selected_branch.branch_id,
+                        "external_action": False,
+                    },
+                )
+                events.append(resumed_event)
+                last_event_sequence = resumed_event.sequence
             run.snapshot = snapshot.model_copy(
                 update={
                     "status": next_status,
                     "control_state": next_state,
                     "control_events": [*snapshot.control_events, control_event],
                     "active_branch_id": selected_branch_id,
-                    "events": [*snapshot.events, event],
-                    "last_event_sequence": event.sequence,
+                    "events": events,
+                    "last_event_sequence": last_event_sequence,
                     "version": next_version,
                     "updated_at": now,
                 }
@@ -1117,6 +1197,177 @@ class HarnessRuntime:
             )
         return result.model_copy(deep=True)
 
+    async def _decision_control_locked(
+        self,
+        owner_id: str,
+        run: _Run,
+        request: AgentControlLoopControlRequest,
+        *,
+        digest: str,
+        idempotency_key: tuple[str, str],
+    ) -> HarnessControlResult:
+        snapshot = run.snapshot
+        if snapshot.status == "failed":
+            raise HarnessConflictError("失败任务没有可绑定的人工决策事实")
+        if request.decision_action is None:
+            raise HarnessConflictError("人工决策必须说明接受、否决或暂缓")
+        if request.artifact_version is not None or request.instruction is not None:
+            raise HarnessConflictError("人工决策不接受成果版本或方向字段")
+        if request.finding_id is None and request.resolution_id is None:
+            raise HarnessConflictError("人工决策必须绑定一条发现或证据定位")
+
+        findings = self._snapshot_findings(snapshot)
+        finding = next(
+            (
+                item
+                for item in findings
+                if item.finding_id == request.finding_id
+            ),
+            None,
+        )
+        resolutions = self._snapshot_evidence_resolutions(snapshot)
+        resolution = next(
+            (
+                item
+                for item in resolutions
+                if item.resolution_id == request.resolution_id
+            ),
+            None,
+        )
+        if resolution is not None:
+            if request.finding_id not in {None, resolution.finding_id}:
+                raise HarnessConflictError("证据定位与发现不属于同一条记录")
+            finding_id = resolution.finding_id
+        elif finding is not None:
+            finding_id = finding.finding_id
+        else:
+            raise HarnessConflictError("目标发现或证据定位已经不存在")
+        if finding_id is None:
+            raise HarnessConflictError("旧结果缺少可审计的发现标识，请重新核对")
+
+        if request.decision_action == "accept":
+            if resolution is not None:
+                candidate_ids = {
+                    item.candidate_id for item in resolution.candidates
+                }
+                if request.selected_candidate_id not in candidate_ids:
+                    raise HarnessConflictError("请选择该证据定位中的一个候选位置")
+                if request.selected_option_id is not None:
+                    raise HarnessConflictError("证据位置选择不能同时提交业务选项")
+            else:
+                option_ids = {
+                    item.option_id
+                    for item in (finding.review.options if finding and finding.review else [])
+                }
+                if request.selected_option_id not in option_ids:
+                    raise HarnessConflictError("请选择该发现中的一个处理口径")
+                if request.selected_candidate_id is not None:
+                    raise HarnessConflictError("业务口径选择不能同时提交证据候选")
+        elif any(
+            value is not None
+            for value in (
+                request.selected_option_id,
+                request.selected_candidate_id,
+            )
+        ):
+            raise HarnessConflictError("否决或暂缓不接受已选候选")
+
+        affected_branch_ids = (
+            [resolution.branch_id]
+            if resolution is not None and resolution.branch_id
+            else finding.affected_branch_ids
+            if finding is not None
+            else []
+        )
+        branch_id = request.branch_id or (
+            affected_branch_ids[0] if affected_branch_ids else None
+        )
+        if (
+            request.branch_id is not None
+            and affected_branch_ids
+            and request.branch_id not in affected_branch_ids
+        ):
+            raise HarnessConflictError("人工决策不能绑定到无关分支")
+
+        now = datetime.now(timezone.utc)
+        next_version = snapshot.version + 1
+        decision_id = f"decision-{uuid4().hex[:12]}"
+        record = AgentControlLoopDecisionRecord(
+            decision_id=decision_id,
+            action=request.decision_action,
+            finding_id=finding_id,
+            resolution_id=resolution.resolution_id if resolution else None,
+            branch_id=branch_id,
+            selected_option_id=request.selected_option_id,
+            selected_candidate_id=request.selected_candidate_id,
+            feedback=request.feedback,
+            recorded_at=now,
+            accepted_task_version=next_version,
+        )
+        control_id = f"control-{uuid4().hex[:12]}"
+        control_event = AgentControlLoopControlEvent(
+            control_id=control_id,
+            command="decision",
+            branch_id=branch_id,
+            instruction=request.feedback,
+            accepted_at=now,
+            accepted_task_version=next_version,
+            applied_task_version=next_version,
+            status="applied",
+        )
+        action_label = {
+            "accept": "已接受",
+            "decline": "已否决",
+            "defer": "已暂缓",
+        }[request.decision_action]
+        event = HarnessEvent(
+            sequence=snapshot.last_event_sequence + 1,
+            event_name="decision_recorded",
+            occurred_at=now,
+            status=snapshot.status,
+            message=f"人工决定{action_label}并已写入版本化回执；尚未发生外部动作。",
+            details={
+                "decision_id": decision_id,
+                "action": request.decision_action,
+                "finding_id": finding_id,
+                "resolution_id": resolution.resolution_id if resolution else None,
+                "branch_id": branch_id,
+                "external_action": False,
+            },
+        )
+        run.snapshot = snapshot.model_copy(
+            update={
+                "decision_records": [*snapshot.decision_records, record],
+                "control_events": [*snapshot.control_events, control_event],
+                "events": [*snapshot.events, event],
+                "last_event_sequence": event.sequence,
+                "version": next_version,
+                "updated_at": now,
+            }
+        )
+        result = HarnessControlResult(run=run.snapshot.model_copy(deep=True))
+        existing = await self._persist_locked(
+            run,
+            StoredHarnessIdempotency(
+                owner_id=owner_id,
+                kind="control",
+                idempotency_key=request.idempotency_key,
+                digest=digest,
+                result=result.model_dump(mode="json"),
+            ),
+        )
+        if existing is not None:
+            if existing.digest != digest:
+                run.snapshot = snapshot
+                raise HarnessConflictError("幂等键已用于不同控制命令")
+            restored = HarnessControlResult.model_validate(existing.result)
+            run.snapshot = restored.run.model_copy(deep=True)
+            return restored.model_copy(update={"replayed": True}, deep=True)
+        self._control_idempotent[idempotency_key] = _IdempotentControl(
+            digest=digest, result=result
+        )
+        return result.model_copy(deep=True)
+
     async def _rollback_control_locked(
         self,
         owner_id: str,
@@ -1131,7 +1382,17 @@ class HarnessRuntime:
             raise HarnessConflictError("只有已提交的任务简报可以恢复历史版本")
         if request.artifact_version is None:
             raise HarnessConflictError("恢复成果版本时必须指定目标版本")
-        if request.branch_id is not None or request.instruction is not None:
+        if request.branch_id is not None or request.instruction is not None or any(
+            value is not None
+            for value in (
+                request.decision_action,
+                request.finding_id,
+                request.resolution_id,
+                request.selected_option_id,
+                request.selected_candidate_id,
+                request.feedback,
+            )
+        ):
             raise HarnessConflictError("成果版本恢复不接受分支或方向指令")
         if len(snapshot.commits) >= 20:
             raise HarnessConflictError("成果提交记录已达上限，请启动新的独立任务")
@@ -1215,8 +1476,11 @@ class HarnessRuntime:
                     HarnessFinding(
                         title=item.title,
                         detail=item.detail,
+                        fact_summary=item.fact_summary,
+                        impact=item.impact,
                         file_refs=item.file_refs,
                         evidence_anchors=item.evidence_anchors,
+                        review=item.review,
                     )
                     for item in target.findings
                 ],
@@ -1316,6 +1580,25 @@ class HarnessRuntime:
                                 "detail": self._project_business_text(
                                     finding.detail, ref_to_label
                                 ),
+                                "fact_summary": self._project_business_text(
+                                    finding.fact_summary, ref_to_label
+                                )
+                                if finding.fact_summary
+                                else None,
+                                "impact": self._project_business_text(
+                                    finding.impact, ref_to_label
+                                )
+                                if finding.impact
+                                else None,
+                                "evidence_resolutions": [
+                                    self._public_evidence_resolution(
+                                        resolution, ref_to_label
+                                    )
+                                    for resolution in finding.evidence_resolutions
+                                ],
+                                "review": self._public_finding_review(
+                                    finding.review, ref_to_label
+                                ),
                             }
                         )
                         for finding in item.findings
@@ -1381,6 +1664,7 @@ class HarnessRuntime:
             current_round=snapshot.current_round,
             control_state=snapshot.control_state,
             control_events=snapshot.control_events,
+            decision_records=snapshot.decision_records,
             branches=public_branches,
             active_branch_id=snapshot.active_branch_id,
             artifact_versions=public_artifacts,
@@ -1444,10 +1728,25 @@ class HarnessRuntime:
             summary=self._project_business_text(result.summary, ref_to_label),
             findings=[
                 HarnessFinding(
+                    finding_id=finding.finding_id,
+                    affected_branch_ids=finding.affected_branch_ids,
                     title=self._project_business_text(finding.title, ref_to_label),
                     detail=self._project_business_text(finding.detail, ref_to_label),
+                    fact_summary=self._project_business_text(
+                        finding.fact_summary, ref_to_label
+                    )
+                    if finding.fact_summary
+                    else None,
+                    impact=self._project_business_text(finding.impact, ref_to_label)
+                    if finding.impact
+                    else None,
                     file_refs=finding.file_refs,
                     evidence_anchors=finding.evidence_anchors,
+                    evidence_resolutions=[
+                        self._public_evidence_resolution(item, ref_to_label)
+                        for item in finding.evidence_resolutions
+                    ],
+                    review=self._public_finding_review(finding.review, ref_to_label),
                 )
                 for finding in result.findings
             ],
@@ -1456,6 +1755,86 @@ class HarnessRuntime:
                 for item in result.follow_ups
             ],
             review_required=True,
+        )
+
+    def _public_finding_review(
+        self,
+        review: AgentControlLoopFindingReview | None,
+        ref_to_label: dict[str, str],
+    ) -> AgentControlLoopFindingReview | None:
+        if review is None:
+            return None
+        return review.model_copy(
+            update={
+                "question": self._project_business_text(review.question, ref_to_label),
+                "why_human": self._project_business_text(
+                    review.why_human, ref_to_label
+                ),
+                "recommendation_reason": self._project_business_text(
+                    review.recommendation_reason, ref_to_label
+                ),
+                "after_confirmation": self._project_business_text(
+                    review.after_confirmation, ref_to_label
+                ),
+                "options": [
+                    option.model_copy(
+                        update={
+                            "label": self._project_business_text(
+                                option.label, ref_to_label
+                            ),
+                            "meaning": self._project_business_text(
+                                option.meaning, ref_to_label
+                            ),
+                            "agent_next_step": self._project_business_text(
+                                option.agent_next_step, ref_to_label
+                            ),
+                            "next_instruction": self._project_business_text(
+                                option.next_instruction, ref_to_label
+                            ),
+                        }
+                    )
+                    for option in review.options
+                ],
+            }
+        )
+
+    def _public_evidence_resolution(
+        self,
+        resolution: AgentControlLoopEvidenceResolution,
+        ref_to_label: dict[str, str],
+    ) -> AgentControlLoopEvidenceResolution:
+        return resolution.model_copy(
+            update={
+                "finding_title": self._project_business_text(
+                    resolution.finding_title, ref_to_label
+                ),
+                "fact_summary": self._project_business_text(
+                    resolution.fact_summary, ref_to_label
+                )
+                if resolution.fact_summary
+                else None,
+                "impact": self._project_business_text(
+                    resolution.impact, ref_to_label
+                )
+                if resolution.impact
+                else None,
+                "query_excerpt": self._project_business_text(
+                    resolution.query_excerpt, ref_to_label
+                ),
+                "reason": self._project_business_text(
+                    resolution.reason, ref_to_label
+                ),
+                "candidates": [
+                    candidate.model_copy(
+                        update={
+                            "excerpt": self._project_business_text(
+                                candidate.excerpt, ref_to_label
+                            )
+                        }
+                    )
+                    for candidate in resolution.candidates
+                ],
+            }
         )
 
     def _public_round(
@@ -1492,6 +1871,10 @@ class HarnessRuntime:
                     )
                     if next_step.next_question
                     else None,
+                    "evidence_resolutions": [
+                        self._public_evidence_resolution(item, ref_to_label)
+                        for item in next_step.evidence_resolutions
+                    ],
                 }
             )
         return round_snapshot.model_copy(
@@ -1840,24 +2223,67 @@ class HarnessRuntime:
                 result: HarnessTaskResult | None = None
                 analysis_receipt: HarnessModelReceipt | None = None
                 validation_feedback: str | None = None
+                best_result: HarnessTaskResult | None = None
+                best_receipt: HarnessModelReceipt | None = None
+                best_rejected_count = 0
+                best_evidence_resolutions: list[
+                    AgentControlLoopEvidenceResolution
+                ] = []
+                pending_evidence_resolutions: list[
+                    AgentControlLoopEvidenceResolution
+                ] = []
+                omitted_finding_count = 0
+                recovery_kind: Literal["source_location", "analysis_output"] = (
+                    "source_location"
+                )
                 for analysis_attempt in (1, 2):
-                    candidate, candidate_receipt = await self._invoke_analyst(
-                        owner_id=owner_id,
-                        run_id=run_id,
-                        round_number=round_number,
-                        instruction=question,
-                        plan=plan,
-                        files=analysis_files,
-                        attempt=analysis_attempt,
-                        validation_feedback=validation_feedback,
-                    )
+                    try:
+                        candidate, candidate_receipt = await self._invoke_analyst(
+                            owner_id=owner_id,
+                            run_id=run_id,
+                            round_number=round_number,
+                            instruction=question,
+                            plan=plan,
+                            files=analysis_files,
+                            attempt=analysis_attempt,
+                            validation_feedback=validation_feedback,
+                        )
+                    except HarnessModelError as exc:
+                        recovery_kind = "analysis_output"
+                        await self._transition(
+                            owner_id,
+                            run_id,
+                            "analyzing",
+                            "analysis_structure_rejected",
+                            (
+                                "分析模型返回内容不符合可核对格式，正在受控重试。"
+                                if analysis_attempt == 1
+                                else "修复后的分析内容仍不符合可核对格式，未采用。"
+                            ),
+                            {
+                                "round_number": round_number,
+                                "attempt": analysis_attempt,
+                                "model_called": exc.called,
+                                "output_used": False,
+                            },
+                        )
+                        if analysis_attempt == 1:
+                            validation_feedback = (
+                                "上一候选没有通过严格 JSON 结构校验。请只输出 schema 要求的 JSON，"
+                                "每条 Finding 只描述一个问题；若不能生成完整 review，请省略 review，"
+                                "不要添加 Markdown、解释文字或额外字段。"
+                            )
+                            continue
+                        break
                     await self._safe_point(owner_id, run_id)
                     try:
-                        resolved = self._resolve_evidence_anchors(
+                        self._validate_candidate_result_scope(candidate, round_files)
+                        resolution = self._resolve_evidence_anchors(
                             candidate, analysis_files
                         )
-                        self._validate_result(resolved, round_files)
-                    except HarnessPlanError:
+                        if resolution.result is not None:
+                            self._validate_result(resolution.result, round_files)
+                    except HarnessPlanError as exc:
                         await self._transition(
                             owner_id,
                             run_id,
@@ -1874,6 +2300,7 @@ class HarnessRuntime:
                                 "model": candidate_receipt.model,
                                 "model_called": True,
                                 "output_used": False,
+                                "reason": str(exc)[:240],
                             },
                         )
                         if analysis_attempt == 2:
@@ -1884,13 +2311,240 @@ class HarnessRuntime:
                             "不要复用会在日志中重复出现的短句。"
                         )
                         continue
-                    result = resolved
-                    analysis_receipt = candidate_receipt
-                    break
+                    if resolution.result is not None and (
+                        best_result is None
+                        or len(resolution.result.findings) > len(best_result.findings)
+                    ):
+                        best_result = resolution.result
+                        best_receipt = candidate_receipt
+                        best_rejected_count = resolution.rejected_finding_count
+                        best_evidence_resolutions = list(
+                            resolution.evidence_resolutions
+                        )
+                    elif resolution.result is None:
+                        pending_evidence_resolutions = list(
+                            resolution.evidence_resolutions
+                        )
+                    if resolution.result is not None and not resolution.rejected_finding_count:
+                        result = resolution.result
+                        analysis_receipt = candidate_receipt
+                        pending_evidence_resolutions = list(
+                            resolution.evidence_resolutions
+                        )
+                        break
+                    await self._transition(
+                        owner_id,
+                        run_id,
+                        "analyzing",
+                        "analysis_validation_rejected",
+                        (
+                            "候选结论中仍有部分内容无法唯一定位，正在重新定位。"
+                            if analysis_attempt == 1
+                            else "修复后仍有内容无法唯一定位，服务端只保留可核对部分。"
+                        ),
+                        {
+                            "round_number": round_number,
+                            "attempt": analysis_attempt,
+                            "model": candidate_receipt.model,
+                            "model_called": True,
+                            "output_used": False,
+                            "adoptable_finding_count": len(resolution.result.findings)
+                            if resolution.result
+                            else 0,
+                            "rejected_finding_count": resolution.rejected_finding_count,
+                        },
+                    )
+                    if analysis_attempt == 1:
+                        validation_feedback = (
+                            "上一候选有 Finding 没有任何 quote 能在对应文件中唯一匹配。"
+                            "请保留任务目标并重新生成全部 findings；每条至少选择一段更长、连续、只出现一次的原文，"
+                            "表格请组合能唯一定位整行的关键单元格，不要复用日志中的重复短句。"
+                        )
+                        continue
+                    result = best_result
+                    analysis_receipt = best_receipt
+                    omitted_finding_count = best_rejected_count
+                    pending_evidence_resolutions = best_evidence_resolutions
+
                 if result is None or analysis_receipt is None:
-                    raise HarnessPlanError("分析结果未通过服务端原文定位校验")
+                    branches = await self._reconcile_branches(
+                        owner_id,
+                        run_id,
+                        verified_refs=verified_refs,
+                        through_round=round_number,
+                    )
+                    waiting_branches = [
+                        item for item in branches if item.status == "waiting_input"
+                    ]
+                    pending_evidence_resolutions = (
+                        self._bind_evidence_resolutions_to_branches(
+                            pending_evidence_resolutions, branches
+                        )
+                    )
+                    outstanding_refs = list(
+                        dict.fromkeys(
+                            file_ref
+                            for branch in waiting_branches
+                            for file_ref in branch.missing_file_refs
+                        )
+                    )
+                    gaps = self._branch_evidence_gaps(waiting_branches)
+                    can_continue = await self._can_start_another_round(
+                        owner_id, run_id, round_number, bool(waiting_branches)
+                    )
+                    decision = "waiting_input" if can_continue else "budget_exhausted"
+                    if recovery_kind == "analysis_output":
+                        reason = (
+                            "分析模型已经响应，但返回内容未形成服务端可核对的结构。"
+                            "本轮计划、文件范围和调用记录已保留；请缩小到一个分支后继续。"
+                            if can_continue
+                            else "分析模型已经响应，但返回内容仍未形成可核对结构；当前预算不足以再次核对，"
+                            "系统已保留计划与调用记录并安全停止。"
+                        )
+                    else:
+                        reason = (
+                            "模型已返回候选结论，但服务端无法把原文片段唯一定位到安全预览。"
+                            "本轮计划、文件范围和模型调用记录已保留；请缩小到一个分支后继续。"
+                            if can_continue
+                            else "模型已返回候选结论，但原文仍无法唯一定位；当前预算不足以再次核对，"
+                            "系统已保留计划与调用记录并安全停止。"
+                        )
+                    next_step = AgentControlLoopNextStep(
+                        decision=decision,
+                        reason=reason,
+                        next_question=(
+                            "只核对所选分支，用更长且唯一的原文定位关键事实；若仍无法定位，明确列出缺少的版本、字段或记录。"
+                            if can_continue
+                            else None
+                        ),
+                        candidate_file_refs=outstanding_refs[:20],
+                        candidate_branch_ids=[
+                            item.branch_id for item in waiting_branches
+                        ],
+                        recovery_kind=recovery_kind,
+                        evidence_resolutions=pending_evidence_resolutions[:20],
+                    )
+                    ambiguous_count = len(
+                        [
+                            item
+                            for item in pending_evidence_resolutions
+                            if item.status == "ambiguous"
+                        ]
+                    )
+                    if ambiguous_count:
+                        await self._transition(
+                            owner_id,
+                            run_id,
+                            "analyzing",
+                            "evidence_disambiguation_required",
+                            (
+                                f"有 {ambiguous_count} 条引用匹配到多个原文位置；"
+                                "只暂停受影响分支，等待用户选择。"
+                            ),
+                            {
+                                "round_number": round_number,
+                                "resolution_ids": [
+                                    item.resolution_id
+                                    for item in pending_evidence_resolutions
+                                    if item.status == "ambiguous"
+                                ],
+                                "external_action": False,
+                            },
+                        )
+                    await self._transition(
+                        owner_id,
+                        run_id,
+                        "analyzing",
+                        "analysis_recovery_required",
+                        reason,
+                        {
+                            "round_number": round_number,
+                            "decision": decision,
+                            "candidate_file_refs": next_step.candidate_file_refs,
+                            "candidate_branch_ids": next_step.candidate_branch_ids,
+                            "external_action": False,
+                        },
+                    )
+                    await self._complete_round(
+                        owner_id,
+                        run_id,
+                        round_number,
+                        gaps=gaps,
+                        next_step=next_step,
+                    )
+                    gate_details = {
+                        "round_number": round_number,
+                        "decision": decision,
+                        "gap_count": len(gaps),
+                        "candidate_file_refs": next_step.candidate_file_refs,
+                        "candidate_branch_ids": next_step.candidate_branch_ids,
+                        "recovery_kind": recovery_kind,
+                    }
+                    if decision == "waiting_input":
+                        await self._wait_for_evidence_confirmation(
+                            owner_id, run_id, reason, gate_details
+                        )
+                        resumed = await self.get(owner_id, run_id)
+                        target_branch_id = resumed.active_branch_id
+                        target_branch = self._branch_by_id(
+                            resumed.branches, target_branch_id
+                        )
+                        evidence_recheck_refs = set(
+                            target_branch.missing_file_refs
+                            if target_branch
+                            else next_step.candidate_file_refs
+                        )
+                        next_question = (
+                            f"只核对‘{target_branch.title}’分支，用更长且唯一的原文定位关键事实；"
+                            "若仍无法定位，明确列出缺少的版本、字段或记录。"
+                            if target_branch
+                            else next_step.next_question or instruction
+                        )
+                        continue
+                    await self._transition(
+                        owner_id,
+                        run_id,
+                        "verifying",
+                        "evidence_gate",
+                        reason,
+                        gate_details,
+                    )
+                    terminal_decision = decision
+                    break
+
+                if omitted_finding_count:
+                    await self._transition(
+                        owner_id,
+                        run_id,
+                        "analyzing",
+                        "analysis_partial_adopted",
+                        (
+                            f"服务端采用 {len(result.findings)} 条可唯一定位的发现，"
+                            f"省略 {omitted_finding_count} 条无法核对的候选内容。"
+                        ),
+                        {
+                            "round_number": round_number,
+                            "adopted_finding_count": len(result.findings),
+                            "omitted_finding_count": omitted_finding_count,
+                            "output_used": True,
+                        },
+                    )
                 adopted_analysis = analysis_receipt.model_copy(
                     update={"output_used": True}
+                )
+                binding_snapshot = await self.get(owner_id, run_id)
+                result = self._bind_result_to_branches(
+                    result,
+                    binding_snapshot.branches,
+                    estimated_additional_rounds=max(
+                        0, contract.max_rounds - round_number
+                    ),
+                )
+                pending_evidence_resolutions = (
+                    self._bind_evidence_resolutions_to_branches(
+                        pending_evidence_resolutions,
+                        binding_snapshot.branches,
+                    )
                 )
                 await self._set_analysis_receipt(
                     owner_id, run_id, adopted_analysis
@@ -1903,6 +2557,16 @@ class HarnessRuntime:
                     analysis_receipt=adopted_analysis.model_dump(mode="json"),
                 )
                 round_verified = self._result_file_refs(result, round_files)
+                unresolved_file_refs = {
+                    item.file_ref
+                    for item in pending_evidence_resolutions
+                    if item.status != "exact"
+                }
+                round_verified = [
+                    item
+                    for item in round_verified
+                    if item not in unresolved_file_refs
+                ]
                 for file_ref in round_verified:
                     if file_ref not in verified_refs:
                         verified_refs.append(file_ref)
@@ -1938,6 +2602,7 @@ class HarnessRuntime:
                             len(finding.evidence_anchors)
                             for finding in result.findings
                         ),
+                        "omitted_finding_count": omitted_finding_count,
                         "output_used": True,
                     },
                 )
@@ -1985,7 +2650,56 @@ class HarnessRuntime:
                     candidate_branch_ids=[
                         item.branch_id for item in waiting_branches
                     ],
+                    recovery_kind=(
+                        "source_location"
+                        if pending_evidence_resolutions
+                        else None
+                    ),
+                    evidence_resolutions=pending_evidence_resolutions[:20],
                 )
+                if any(
+                    item.status == "ambiguous"
+                    for item in pending_evidence_resolutions
+                ):
+                    await self._transition(
+                        owner_id,
+                        run_id,
+                        "verifying",
+                        "evidence_disambiguation_required",
+                        "部分引用匹配到多个位置；可核对发现与已有成果已保留，只暂停受影响分支。",
+                        {
+                            "round_number": round_number,
+                            "resolution_ids": [
+                                item.resolution_id
+                                for item in pending_evidence_resolutions
+                                if item.status == "ambiguous"
+                            ],
+                            "external_action": False,
+                        },
+                    )
+                if any(
+                    finding.review
+                    and finding.review.requires_human_decision
+                    for finding in result.findings
+                ):
+                    await self._transition(
+                        owner_id,
+                        run_id,
+                        "verifying",
+                        "decision_requested",
+                        "已形成需要人工判断的处置单；Agent 不会替用户批准或执行。",
+                        {
+                            "round_number": round_number,
+                            "finding_ids": [
+                                finding.finding_id
+                                for finding in result.findings
+                                if finding.finding_id
+                                and finding.review
+                                and finding.review.requires_human_decision
+                            ],
+                            "external_action": False,
+                        },
+                    )
                 await self._complete_round(
                     owner_id,
                     run_id,
@@ -1993,6 +2707,22 @@ class HarnessRuntime:
                     gaps=gaps,
                     next_step=next_step,
                 )
+                if omitted_finding_count:
+                    await self._transition(
+                        owner_id,
+                        run_id,
+                        "verifying",
+                        "partial_artifact_saved",
+                        "可核对发现已写入新的只读成果版本；未定位内容保留为待处理证据状态。",
+                        {
+                            "round_number": round_number,
+                            "adopted_finding_count": len(result.findings),
+                            "pending_resolution_count": len(
+                                pending_evidence_resolutions
+                            ),
+                            "external_action": False,
+                        },
+                    )
                 gate_details = {
                     "round_number": round_number,
                     "decision": decision,
@@ -2533,10 +3263,16 @@ class HarnessRuntime:
                 summary=result.summary if result else next_step.reason,
                 findings=[
                     AgentControlLoopArtifactFinding(
+                        finding_id=item.finding_id,
+                        affected_branch_ids=item.affected_branch_ids,
                         title=item.title,
                         detail=item.detail,
+                        fact_summary=item.fact_summary,
+                        impact=item.impact,
                         file_refs=item.file_refs,
                         evidence_anchors=item.evidence_anchors,
+                        evidence_resolutions=item.evidence_resolutions,
+                        review=item.review,
                     )
                     for item in result.findings
                 ]
@@ -2609,14 +3345,113 @@ class HarnessRuntime:
     def _result_file_refs(
         result: HarnessTaskResult, files: list[dict[str, Any]]
     ) -> list[str]:
-        cited = {
-            file_ref for finding in result.findings for file_ref in finding.file_refs
+        anchored = {
+            anchor.file_ref
+            for finding in result.findings
+            for anchor in finding.evidence_anchors
         }
+        unresolved = {
+            resolution.file_ref
+            for finding in result.findings
+            for resolution in finding.evidence_resolutions
+            if resolution.status != "exact"
+        }
+        verified = anchored - unresolved
         return [
             str(item["file_ref"])
             for item in files
-            if str(item["file_ref"]) in cited
+            if str(item["file_ref"]) in verified
         ]
+
+    @staticmethod
+    def _matching_branch_ids(
+        file_refs: list[str], branches: list[AgentControlLoopBranch]
+    ) -> list[str]:
+        referenced = set(file_refs)
+        ranked = sorted(
+            (
+                (len(referenced.intersection(branch.input_file_refs)), branch)
+                for branch in branches
+            ),
+            key=lambda item: (-item[0], item[1].branch_id),
+        )
+        return [branch.branch_id for overlap, branch in ranked if overlap > 0]
+
+    @classmethod
+    def _bind_result_to_branches(
+        cls,
+        result: HarnessTaskResult,
+        branches: list[AgentControlLoopBranch],
+        *,
+        estimated_additional_rounds: int,
+    ) -> HarnessTaskResult:
+        findings: list[HarnessFinding] = []
+        for finding in result.findings:
+            branch_ids = cls._matching_branch_ids(finding.file_refs, branches)[:12]
+            resolutions = [
+                item.model_copy(
+                    update={
+                        "branch_id": next(
+                            (
+                                branch_id
+                                for branch_id in branch_ids
+                                if item.file_ref
+                                in next(
+                                    branch.input_file_refs
+                                    for branch in branches
+                                    if branch.branch_id == branch_id
+                                )
+                            ),
+                            branch_ids[0] if branch_ids else None,
+                        )
+                    }
+                )
+                for item in finding.evidence_resolutions
+            ]
+            review = finding.review
+            if review is not None:
+                review = review.model_copy(
+                    update={
+                        "options": [
+                            option.model_copy(
+                                update={
+                                    "affected_branch_ids": branch_ids,
+                                    "required_file_refs": finding.file_refs[:20],
+                                    "estimated_additional_rounds": min(
+                                        3, max(1, estimated_additional_rounds)
+                                    ),
+                                }
+                            )
+                            for option in review.options
+                        ]
+                    }
+                )
+            findings.append(
+                finding.model_copy(
+                    update={
+                        "affected_branch_ids": branch_ids,
+                        "evidence_resolutions": resolutions,
+                        "review": review,
+                    }
+                )
+            )
+        return result.model_copy(update={"findings": findings})
+
+    @classmethod
+    def _bind_evidence_resolutions_to_branches(
+        cls,
+        resolutions: list[AgentControlLoopEvidenceResolution],
+        branches: list[AgentControlLoopBranch],
+    ) -> list[AgentControlLoopEvidenceResolution]:
+        bound: list[AgentControlLoopEvidenceResolution] = []
+        for resolution in resolutions:
+            branch_ids = cls._matching_branch_ids([resolution.file_ref], branches)
+            bound.append(
+                resolution.model_copy(
+                    update={"branch_id": branch_ids[0] if branch_ids else None}
+                )
+            )
+        return bound
 
     @staticmethod
     def _evidence_gaps(
@@ -2903,6 +3738,27 @@ class HarnessRuntime:
         return findings
 
     @staticmethod
+    def _snapshot_evidence_resolutions(
+        snapshot: HarnessRunSnapshot,
+    ) -> list[AgentControlLoopEvidenceResolution]:
+        resolutions: list[AgentControlLoopEvidenceResolution] = []
+        seen: set[str] = set()
+        for round_snapshot in snapshot.rounds:
+            if round_snapshot.result:
+                result = HarnessTaskResult.model_validate(round_snapshot.result)
+                for finding in result.findings:
+                    for resolution in finding.evidence_resolutions:
+                        if resolution.resolution_id not in seen:
+                            seen.add(resolution.resolution_id)
+                            resolutions.append(resolution)
+            if round_snapshot.next_step:
+                for resolution in round_snapshot.next_step.evidence_resolutions:
+                    if resolution.resolution_id not in seen:
+                        seen.add(resolution.resolution_id)
+                        resolutions.append(resolution)
+        return resolutions
+
+    @staticmethod
     def _snapshot_verified_refs(snapshot: HarnessRunSnapshot) -> list[str]:
         refs: list[str] = []
         for round_snapshot in snapshot.rounds:
@@ -3158,8 +4014,12 @@ class HarnessRuntime:
     def _normalized_evidence_text(value: str) -> str:
         return " ".join(value.split())
 
+    @staticmethod
+    def _compact_evidence_text(value: str) -> str:
+        return re.sub(r"[^\w]+", "", value, flags=re.UNICODE).replace("_", "").casefold()
+
     @classmethod
-    def _resolve_text_anchor(
+    def _resolve_text_anchor_candidates(
         cls,
         *,
         file_ref: str,
@@ -3169,7 +4029,7 @@ class HarnessRuntime:
         label: str,
         quote: str,
         text: str,
-    ) -> AgentControlLoopEvidenceAnchor | None:
+    ) -> list[AgentControlLoopEvidenceAnchor]:
         normalized_chars: list[str] = []
         line_map: list[int] = []
         previous_was_space = True
@@ -3195,7 +4055,7 @@ class HarnessRuntime:
         normalized_text = "".join(normalized_chars)
         normalized_quote = cls._normalized_evidence_text(quote)
         if not normalized_quote:
-            return None
+            return []
         positions: list[int] = []
         cursor = 0
         while True:
@@ -3204,26 +4064,40 @@ class HarnessRuntime:
                 break
             positions.append(position)
             cursor = position + 1
-        if len(positions) != 1:
-            return None
-        position = positions[0]
-        start = line_map[position]
-        end = line_map[position + len(normalized_quote) - 1]
-        excerpt = "\n".join(lines[start - 1 : end])[:1_200].strip()
-        if not excerpt:
-            return None
-        return AgentControlLoopEvidenceAnchor(
-            file_ref=file_ref,
-            role=role,
-            label=label,
-            locator_kind="text_lines",
-            start=start,
-            end=end,
-            excerpt=excerpt,
-        )
+        anchors: list[AgentControlLoopEvidenceAnchor] = []
+        seen_ranges: set[tuple[int, int]] = set()
+        for position in positions[:6]:
+            start = line_map[position]
+            end = line_map[position + len(normalized_quote) - 1]
+            if (start, end) in seen_ranges:
+                continue
+            seen_ranges.add((start, end))
+            excerpt = "\n".join(lines[start - 1 : end])[:1_200].strip()
+            if not excerpt:
+                continue
+            anchors.append(
+                AgentControlLoopEvidenceAnchor(
+                    file_ref=file_ref,
+                    role=role,
+                    label=label,
+                    locator_kind="text_lines",
+                    start=start,
+                    end=end,
+                    excerpt=excerpt,
+                )
+            )
+        return anchors
 
     @classmethod
-    def _resolve_table_anchor(
+    def _resolve_text_anchor(
+        cls,
+        **kwargs: Any,
+    ) -> AgentControlLoopEvidenceAnchor | None:
+        candidates = cls._resolve_text_anchor_candidates(**kwargs)
+        return candidates[0] if len(candidates) == 1 else None
+
+    @classmethod
+    def _resolve_table_anchor_candidates(
         cls,
         *,
         file_ref: str,
@@ -3234,10 +4108,11 @@ class HarnessRuntime:
         quote: str,
         columns: list[Any],
         rows: list[Any],
-    ) -> AgentControlLoopEvidenceAnchor | None:
+    ) -> list[AgentControlLoopEvidenceAnchor]:
         normalized_quote = cls._normalized_evidence_text(quote)
         if not normalized_quote:
-            return None
+            return []
+        compact_quote = cls._compact_evidence_text(quote)
         matches: list[tuple[int, list[str]]] = []
         safe_columns = [str(item) for item in columns]
         for raw_row in rows:
@@ -3254,51 +4129,71 @@ class HarnessRuntime:
                 for index, value in enumerate(values)
             )
             candidates = [joined, named, *values]
-            if any(
+            exact_match = any(
                 normalized_quote in cls._normalized_evidence_text(candidate)
                 for candidate in candidates
-            ):
+            )
+            compact_match = len(compact_quote) >= 8 and any(
+                compact_quote in cls._compact_evidence_text(candidate)
+                for candidate in (joined, named)
+            )
+            if exact_match or compact_match:
                 matches.append((row_number, values))
-        if len(matches) != 1:
-            return None
-        row_number, values = matches[0]
-        excerpt = "；".join(
-            f"{safe_columns[index] if index < len(safe_columns) and safe_columns[index] else f'列 {index + 1}'}：{value}"
-            for index, value in enumerate(values)
-        )[:1_200].strip()
-        if not excerpt:
-            return None
-        return AgentControlLoopEvidenceAnchor(
-            file_ref=file_ref,
-            role=role,
-            label=label,
-            locator_kind="table_rows",
-            start=row_number,
-            end=row_number,
-            excerpt=excerpt,
-        )
+        anchors: list[AgentControlLoopEvidenceAnchor] = []
+        for row_number, values in matches[:6]:
+            excerpt = "；".join(
+                f"{safe_columns[index] if index < len(safe_columns) and safe_columns[index] else f'列 {index + 1}'}：{value}"
+                for index, value in enumerate(values)
+            )[:1_200].strip()
+            if not excerpt:
+                continue
+            anchors.append(
+                AgentControlLoopEvidenceAnchor(
+                    file_ref=file_ref,
+                    role=role,
+                    label=label,
+                    locator_kind="table_rows",
+                    start=row_number,
+                    end=row_number,
+                    excerpt=excerpt,
+                )
+            )
+        return anchors
+
+    @classmethod
+    def _resolve_table_anchor(
+        cls,
+        **kwargs: Any,
+    ) -> AgentControlLoopEvidenceAnchor | None:
+        candidates = cls._resolve_table_anchor_candidates(**kwargs)
+        return candidates[0] if len(candidates) == 1 else None
 
     @classmethod
     def _resolve_evidence_anchors(
         cls,
         result: HarnessTaskResult,
         files: list[dict[str, Any]],
-    ) -> HarnessTaskResult:
+    ) -> _EvidenceResolution:
         files_by_ref = {str(item.get("file_ref")): item for item in files}
         resolved_findings: list[HarnessFinding] = []
+        evidence_resolutions: list[AgentControlLoopEvidenceResolution] = []
+        rejected_finding_count = 0
+        rejected_file_refs: list[str] = []
         for finding in result.findings:
+            finding_id = finding.finding_id or cls._finding_id(finding)
             anchors: list[AgentControlLoopEvidenceAnchor] = []
+            finding_resolutions: list[AgentControlLoopEvidenceResolution] = []
             seen: set[tuple[str, str, int, int]] = set()
-            for candidate in finding.evidence_quotes:
+            for quote_index, candidate in enumerate(finding.evidence_quotes):
                 if (
                     candidate.file_ref not in finding.file_refs
                     or candidate.file_ref not in files_by_ref
                 ):
                     continue
                 source = files_by_ref[candidate.file_ref]
-                resolved: AgentControlLoopEvidenceAnchor | None = None
+                matches: list[AgentControlLoopEvidenceAnchor] = []
                 if source.get("kind") == "table":
-                    resolved = cls._resolve_table_anchor(
+                    matches = cls._resolve_table_anchor_candidates(
                         file_ref=candidate.file_ref,
                         role=candidate.role,
                         label=candidate.label,
@@ -3307,35 +4202,154 @@ class HarnessRuntime:
                         rows=list(source.get("rows") or []),
                     )
                 elif isinstance(source.get("text"), str):
-                    resolved = cls._resolve_text_anchor(
+                    matches = cls._resolve_text_anchor_candidates(
                         file_ref=candidate.file_ref,
                         role=candidate.role,
                         label=candidate.label,
                         quote=candidate.quote,
                         text=str(source["text"]),
                     )
-                if resolved is None:
-                    continue
-                key = (
-                    resolved.file_ref,
-                    resolved.locator_kind,
-                    resolved.start,
-                    resolved.end,
+                resolution_id = cls._evidence_resolution_id(
+                    finding_id,
+                    quote_index,
+                    candidate.file_ref,
+                    candidate.label,
                 )
-                if key in seen:
-                    continue
-                seen.add(key)
-                anchors.append(resolved)
+                public_candidates = [
+                    AgentControlLoopEvidenceCandidate(
+                        candidate_id=cls._evidence_candidate_id(
+                            resolution_id, match
+                        ),
+                        file_ref=match.file_ref,
+                        locator_kind=match.locator_kind,
+                        start=match.start,
+                        end=match.end,
+                        excerpt=match.excerpt,
+                    )
+                    for match in matches
+                ]
+                if len(matches) == 1:
+                    status: Literal["exact", "ambiguous", "unavailable"] = "exact"
+                    reason = "服务端在本轮安全预览中找到唯一匹配位置。"
+                    resolved = matches[0]
+                    key = (
+                        resolved.file_ref,
+                        resolved.locator_kind,
+                        resolved.start,
+                        resolved.end,
+                    )
+                    if key not in seen:
+                        seen.add(key)
+                        anchors.append(resolved)
+                elif matches:
+                    status = "ambiguous"
+                    reason = (
+                        f"同一片段在安全预览中匹配到 {len(matches)} 个位置，"
+                        "服务端不能替用户选择。"
+                    )
+                else:
+                    status = "unavailable"
+                    reason = "服务端在本轮安全预览中没有找到可核对的位置。"
+                finding_resolutions.append(
+                    AgentControlLoopEvidenceResolution(
+                        resolution_id=resolution_id,
+                        finding_id=finding_id,
+                        finding_title=finding.title,
+                        fact_summary=finding.fact_summary,
+                        impact=finding.impact,
+                        file_ref=candidate.file_ref,
+                        role=candidate.role,
+                        label=candidate.label,
+                        query_excerpt=candidate.quote,
+                        status=status,
+                        reason=reason,
+                        candidates=public_candidates,
+                    )
+                )
+            unresolved = [
+                item for item in finding_resolutions if item.status != "exact"
+            ]
+            evidence_resolutions.extend(unresolved)
             if not anchors:
-                raise HarnessPlanError(
-                    "分析结果没有可在服务端安全预览中唯一定位的证据片段"
-                )
+                rejected_finding_count += 1
+                for file_ref in finding.file_refs:
+                    if file_ref in files_by_ref and file_ref not in rejected_file_refs:
+                        rejected_file_refs.append(file_ref)
+                continue
             resolved_findings.append(
                 finding.model_copy(
-                    update={"evidence_quotes": [], "evidence_anchors": anchors}
+                    update={
+                        "finding_id": finding_id,
+                        "evidence_quotes": [],
+                        "evidence_anchors": anchors,
+                        "evidence_resolutions": finding_resolutions,
+                    }
                 )
             )
-        return result.model_copy(update={"findings": resolved_findings})
+        resolved_result = (
+            result.model_copy(update={"findings": resolved_findings})
+            if resolved_findings
+            else None
+        )
+        return _EvidenceResolution(
+            result=resolved_result,
+            rejected_finding_count=rejected_finding_count,
+            rejected_file_refs=tuple(rejected_file_refs),
+            evidence_resolutions=tuple(evidence_resolutions),
+        )
+
+    @staticmethod
+    def _finding_id(finding: HarnessFinding) -> str:
+        digest = hashlib.sha256(
+            json.dumps(
+                {
+                    "title": finding.title,
+                    "fact_summary": finding.fact_summary,
+                    "file_refs": finding.file_refs,
+                },
+                ensure_ascii=False,
+                sort_keys=True,
+            ).encode("utf-8")
+        ).hexdigest()
+        return f"finding-{digest[:12]}"
+
+    @staticmethod
+    def _evidence_resolution_id(
+        finding_id: str, quote_index: int, file_ref: str, label: str
+    ) -> str:
+        digest = hashlib.sha256(
+            f"{finding_id}:{quote_index}:{file_ref}:{label}".encode("utf-8")
+        ).hexdigest()
+        return f"resolution-{digest[:12]}"
+
+    @staticmethod
+    def _evidence_candidate_id(
+        resolution_id: str, anchor: AgentControlLoopEvidenceAnchor
+    ) -> str:
+        digest = hashlib.sha256(
+            (
+                f"{resolution_id}:{anchor.file_ref}:{anchor.locator_kind}:"
+                f"{anchor.start}:{anchor.end}:{anchor.excerpt}"
+            ).encode("utf-8")
+        ).hexdigest()
+        return f"candidate-{digest[:12]}"
+
+    @staticmethod
+    def _validate_candidate_result_scope(
+        result: HarnessTaskResult, files: list[dict[str, Any]]
+    ) -> None:
+        """Reject out-of-scope model references before attempting location repair."""
+
+        allowed_refs = {str(item["file_ref"]) for item in files}
+        for finding in result.findings:
+            if not set(finding.file_refs).issubset(allowed_refs):
+                raise HarnessPlanError("分析结果引用了本轮计划之外的文件")
+            if any(
+                quote.file_ref not in finding.file_refs
+                or quote.file_ref not in allowed_refs
+                for quote in finding.evidence_quotes
+            ):
+                raise HarnessPlanError("分析结果的逐字引用超出本轮允许范围")
 
     @staticmethod
     def _validate_result(
@@ -3353,6 +4367,18 @@ class HarnessRuntime:
                 for anchor in finding.evidence_anchors
             ):
                 raise HarnessPlanError("分析结果的证据锚点超出本轮允许范围")
+            review = finding.review
+            if review is not None:
+                option_ids = [option.option_id for option in review.options]
+                if len(option_ids) != len(set(option_ids)):
+                    raise HarnessPlanError("分析结果包含重复的人工决策选项")
+                if review.requires_human_decision and not 2 <= len(option_ids) <= 3:
+                    raise HarnessPlanError("需要人工决策的发现必须提供 2 到 3 个选项")
+                if (
+                    review.requires_human_decision
+                    and review.recommended_option_id not in option_ids
+                ):
+                    raise HarnessPlanError("人工决策建议没有对应的可选项")
 
     @staticmethod
     def _compile_plan(

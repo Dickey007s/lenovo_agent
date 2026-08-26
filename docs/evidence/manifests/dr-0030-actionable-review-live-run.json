@@ -1,0 +1,33 @@
+{
+  "evidence_id": "ACTIONABLE-REVIEW-AND-RECOVERY-20260826",
+  "captured_at": "2026-08-26T08:44:21Z",
+  "provider_model": "deepseek-v4-pro",
+  "state_store": "memory",
+  "run": {
+    "run_id": "harness:55fda5f836fa4e478948f837e38f653a",
+    "status": "stopped",
+    "outcome": "bounded",
+    "rounds_completed": 2,
+    "model_calls_used": 5,
+    "verified_file_count": 4,
+    "remaining_gap_count": 1,
+    "external_action": false,
+    "ordered_events_observed": [
+      "evidence_gate:waiting_input",
+      "control_resume_recorded",
+      "analysis_validation_rejected",
+      "analysis_started:attempt_2",
+      "result_validation",
+      "evidence_gate:budget_exhausted",
+      "loop_budget_stopped"
+    ]
+  },
+  "negative_before_fix": {
+    "run_id": "harness:176339bab30c45659067d925986bb840",
+    "status": "failed",
+    "model_calls_used": 2,
+    "reason_class": "analysis_output_schema",
+    "external_action": false
+  },
+  "boundary": "This manifest records sanitized control-plane facts only. It does not contain provider output, prompts, file bodies, internal paths, credentials or semantic-quality claims."
+}

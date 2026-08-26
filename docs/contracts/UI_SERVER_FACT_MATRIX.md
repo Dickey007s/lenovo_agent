@@ -1,9 +1,10 @@
 # UI-server fact matrix
 
-This is the current `DR-0028` hierarchical workspace and issue-review surface,
-on top of the `DR-0026` branch-selective append-only result loop and `DR-0024`
-whole-workspace contract. `DR-0025` group-resume and embedded-artifact facts
-remain a historical baseline in their dated Evidence only.
+This is the current `DR-0030` actionable issue-review and recoverable-analysis
+surface, on top of the `DR-0029` server-verified Evidence Anchors, `DR-0026`
+branch-selective append-only result loop and `DR-0024` whole-workspace contract.
+`DR-0025` group-resume and embedded-artifact facts remain a historical baseline
+in their dated Evidence only.
 
 下表中的 Authority 列即“服务端权威字段”；浏览器草稿与传输状态会明确另列，
 不能冒充业务事实。
@@ -63,6 +64,16 @@ Prompt、思维链、原始模型响应、绝对路径、哈希和内部策略�
 | Safely stopped | model/schema/plan/source/citation check failed | `status=failed`, `harness_failed`, safe errors | no result; fresh retry | raw validator/compiler/provider error |
 | Next-task proposals | Agent suggests up to four follow-up tasks from the current bounded analysis; each proposal is not independently source-verified | terminal `result.follow_ups` | suggestion alone creates no server mutation | claim that work already started or that every proposal has a per-item citation |
 | Finding review page | user compares one Agent finding with exact server-resolved safe-preview locations | `result.findings[].title/detail/file_refs/evidence_anchors`, matching Artifact round when available, Preview GET | select Anchor/open/close has no server mutation | semantic/numeric correctness, entailment, native PDF/DOCX coordinates |
+| Finding handling sheet | user scans fact, impact and whether a human business choice is required | Finding `fact_summary`, `impact`, `review.requires_human_decision/question/why_human` | view/expand does not mutate the Run | claim that the model framing or impact is correct |
+| Finding decision options | user first chooses a handling path, then may reveal and compare the Agent recommendation | Finding `review.options[]` with Branch/source/round/action impacts, `recommended_option_id`, `recommendation_reason`; browser selection/reveal state | selecting/revealing is browser draft only; recommendation is hidden before initial choice | approval, policy-optimality, source-file change or action execution |
+| Record a Finding choice | user accepts, declines or defers one Finding and may add feedback | versioned/idempotent `command=decision`; `decision_records[]`; `decision_recorded` | close/Escape records `defer`; decline records no selected option; accept binds one owned option | file edit, external action, approval correctness or automatic follow-up |
+| Start accepted Finding work | an accepted option becomes a new independent task | new Run POST containing selected `next_instruction`, decision label and feedback after the receipt succeeds | new idempotency key; prior Run/result/DecisionRecord stays immutable | mutation of the old Run or continuation of an in-flight provider call |
+| Evidence location state | user sees whether a quote has one, many or no safe-preview matches | `next_step.evidence_resolutions[]`: `exact/ambiguous/unavailable`; stable Finding/Resolution/Candidate IDs | select a real candidate or preserve/decline the unresolved item | semantic entailment, invented coordinates, `stale/rejected` currently emitted |
+| Partial analysis adopted | only Findings with server-resolved Anchors become public; unresolved records stay actionable | `analysis_partial_adopted`, `partial_artifact_saved`, Artifact findings, EvidenceResolution and Branch status | review retained Findings; open unresolved candidates separately | content or correctness of omitted Findings |
+| Analysis recovery required | two bounded attempts yielded no adoptable Finding/structure but legal scope and prior work remain | `analysis_recovery_required`, Round `next_step.recovery_kind`, candidate Branches, `status=waiting_input` | add steer text and resume one waiting Branch | result acceptance, model not called or file modified |
+| Candidate disambiguation | one quote matches multiple real positions | `evidence_disambiguation_required`, `EvidenceResolution(status=ambiguous).candidates[]` | compare source positions; accept one with version/idempotency; then steer/resume only bound Branch | server or Agent chose for the user, other Branches reran |
+| Resume recovery Branch | selected evidence decision is consumed at a safe checkpoint | `decision_recorded` then `control_steer_recorded`, `control_resume_recorded`, `branch_resumed_from_checkpoint` | continue only the bound waiting Branch; reconnect from Snapshot/SSE | lost ArtifactVersion, replay of completed Branches or external action |
+| Legacy terminal analysis failure | an older Run stopped before the recoverable protocol existed | `status=failed`, safe validation error, preserved instruction/Plan/Branch/call facts | create a new smallest-scope Run | interrupted call resumed or failed output adopted |
 | Proposal context review | user sees the result context before deciding whether to start the suggestion | one `result.follow_ups[]` string + union of current Finding refs | explicitly labeled not independently source-verified; no mutation | direct per-proposal citation or accepted-proposal state |
 | Confirm proposal | user turns one suggestion into an independent new Loop | new POST `/v1/harness/runs` with exact proposal text | new idempotency key; previous Run/result preserved | nonexistent proposal-accept state |
 
@@ -87,6 +98,7 @@ Prompt、思维链、原始模型响应、绝对路径、哈希和内部策略�
 | stable ref | deterministic for pinned public input path | production document identity |
 | plan compilation | server-owned effects/gates plus graph/source checks and one bounded repair | plan quality or tool execution |
 | result validation | citation membership plus at least one uniquely resolved safe-preview Anchor per new Finding | entailment, exhaustive matching, arithmetic, native page coordinates or cell semantics |
+| structured review | required fields/options and recommendation membership pass schema/runtime checks | recommendation quality, correct risk framing or human acceptance |
 | Evidence Gate | decides continue/stop from explicit gaps and remaining bounds | semantic truth or human acceptance |
 | completed | reviewable logical brief plus an independent TaskCommit pointer exists | task correctness, source-file Artifact, Connector or external process completion |
 
@@ -119,7 +131,9 @@ Prompt、思维链、原始模型响应、绝对路径、哈希和内部策略�
 
 ## 7. Evidence and applicability
 
-Current contract: [`DR-0026`](../decisions/DR-0026-selective-branch-and-immutable-artifact-history.md),
+Current contract: [`DR-0030`](../decisions/DR-0030-actionable-review-and-recoverable-analysis.md),
+[`SCENARIO-016`](../scenarios/SCENARIO-016-actionable-finding-and-recoverable-analysis.md),
+[`DR-0026`](../decisions/DR-0026-selective-branch-and-immutable-artifact-history.md),
 [`DR-0025`](../decisions/DR-0025-durable-evidence-gate-and-artifact-evolution.md),
 [`DR-0024`](../decisions/DR-0024-autonomous-whole-workspace-research.md),
 [`DR-0023`](../decisions/DR-0023-agent-control-loop.md),

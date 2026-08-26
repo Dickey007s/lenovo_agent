@@ -29,6 +29,16 @@ AgentControlLoopEvidenceRole = Literal[
     "context",
 ]
 AgentControlLoopEvidenceLocatorKind = Literal["text_lines", "table_rows"]
+AgentControlLoopEvidenceResolutionStatus = Literal[
+    "exact",
+    "ambiguous",
+    "unavailable",
+    "stale",
+    "rejected",
+]
+AgentControlLoopDecisionOptionId = Literal["A", "B", "C"]
+AgentControlLoopDecisionAction = Literal["accept", "decline", "defer"]
+AgentControlLoopRecoveryKind = Literal["source_location", "analysis_output"]
 AgentControlLoopPhase = Literal[
     "observe",
     "plan",
@@ -53,7 +63,14 @@ AgentControlLoopControlState = Literal[
     "stop_requested",
     "stopped",
 ]
-AgentControlLoopCommand = Literal["pause", "resume", "steer", "stop", "rollback"]
+AgentControlLoopCommand = Literal[
+    "pause",
+    "resume",
+    "steer",
+    "stop",
+    "rollback",
+    "decision",
+]
 AgentControlLoopBranchStatus = Literal[
     "running",
     "completed",
@@ -248,12 +265,60 @@ class AgentControlLoopEvidenceGap(StrictModel):
     candidate_file_refs: list[str] = Field(default_factory=list, max_length=20)
 
 
+class AgentControlLoopEvidenceCandidate(StrictModel):
+    """One server-located candidate; it is not adopted until uniquely resolved."""
+
+    candidate_id: str = Field(pattern=r"^candidate-[0-9a-f]{12}$")
+    file_ref: str = Field(pattern=r"^forte-[0-9a-f]{16}$")
+    locator_kind: AgentControlLoopEvidenceLocatorKind
+    start: int = Field(ge=1)
+    end: int = Field(ge=1)
+    excerpt: str = Field(min_length=1, max_length=1_200)
+
+    @field_validator("end")
+    @classmethod
+    def validate_end(cls, value: int, info) -> int:
+        start = info.data.get("start")
+        if isinstance(start, int) and value < start:
+            raise ValueError("evidence candidate end must not precede start")
+        return value
+
+
+class AgentControlLoopEvidenceResolution(StrictModel):
+    """Server fact describing whether one model quote can locate source evidence."""
+
+    resolution_id: str = Field(pattern=r"^resolution-[0-9a-f]{12}$")
+    finding_id: str = Field(pattern=r"^finding-[0-9a-f]{12}$")
+    finding_title: str = Field(min_length=1, max_length=240)
+    fact_summary: str | None = Field(default=None, max_length=500)
+    impact: str | None = Field(default=None, max_length=500)
+    branch_id: str | None = Field(
+        default=None, pattern=r"^branch-[0-9a-f]{12}$"
+    )
+    file_ref: str = Field(pattern=r"^forte-[0-9a-f]{16}$")
+    role: AgentControlLoopEvidenceRole
+    label: str = Field(min_length=1, max_length=120)
+    query_excerpt: str = Field(min_length=4, max_length=600)
+    status: AgentControlLoopEvidenceResolutionStatus
+    reason: str = Field(min_length=1, max_length=500)
+    candidates: list[AgentControlLoopEvidenceCandidate] = Field(
+        default_factory=list, max_length=6
+    )
+    selected_candidate_id: str | None = Field(
+        default=None, pattern=r"^candidate-[0-9a-f]{12}$"
+    )
+
+
 class AgentControlLoopNextStep(StrictModel):
     decision: AgentControlLoopGateDecision
     reason: str = Field(min_length=1, max_length=1_000)
     next_question: str | None = Field(default=None, max_length=2_000)
     candidate_file_refs: list[str] = Field(default_factory=list, max_length=20)
     candidate_branch_ids: list[str] = Field(default_factory=list, max_length=36)
+    recovery_kind: AgentControlLoopRecoveryKind | None = None
+    evidence_resolutions: list[AgentControlLoopEvidenceResolution] = Field(
+        default_factory=list, max_length=20
+    )
 
 
 class AgentControlLoopBranch(StrictModel):
@@ -312,6 +377,28 @@ class AgentControlLoopControlEvent(StrictModel):
     status: Literal["accepted", "applied", "rejected"]
 
 
+class AgentControlLoopDecisionRecord(StrictModel):
+    """Versioned, idempotent human receipt bound to a Finding or Resolution."""
+
+    decision_id: str = Field(pattern=r"^decision-[0-9a-f]{12}$")
+    action: AgentControlLoopDecisionAction
+    finding_id: str = Field(pattern=r"^finding-[0-9a-f]{12}$")
+    resolution_id: str | None = Field(
+        default=None, pattern=r"^resolution-[0-9a-f]{12}$"
+    )
+    branch_id: str | None = Field(
+        default=None, pattern=r"^branch-[0-9a-f]{12}$"
+    )
+    selected_option_id: AgentControlLoopDecisionOptionId | None = None
+    selected_candidate_id: str | None = Field(
+        default=None, pattern=r"^candidate-[0-9a-f]{12}$"
+    )
+    feedback: str | None = Field(default=None, max_length=2_000)
+    recorded_at: datetime
+    accepted_task_version: int = Field(ge=1)
+    external_action: Literal["none"] = "none"
+
+
 class AgentControlLoopBrief(StrictModel):
     outcome: Literal["completed", "bounded", "user_stopped"]
     summary: str = Field(min_length=1, max_length=3_000)
@@ -343,13 +430,49 @@ class AgentControlLoopEvidenceAnchor(StrictModel):
         return value
 
 
+class AgentControlLoopFindingDecisionOption(StrictModel):
+    option_id: AgentControlLoopDecisionOptionId
+    label: str = Field(min_length=1, max_length=80)
+    meaning: str = Field(min_length=1, max_length=400)
+    agent_next_step: str = Field(min_length=1, max_length=500)
+    next_instruction: str = Field(min_length=3, max_length=1_200)
+    affected_branch_ids: list[str] = Field(default_factory=list, max_length=12)
+    required_file_refs: list[str] = Field(default_factory=list, max_length=20)
+    estimated_additional_rounds: int = Field(default=1, ge=0, le=3)
+    external_action: Literal["none"] = "none"
+
+
+class AgentControlLoopFindingReview(StrictModel):
+    """Model-proposed handling choices; choosing one remains an explicit user act."""
+
+    requires_human_decision: bool
+    question: str = Field(min_length=1, max_length=500)
+    why_human: str = Field(min_length=1, max_length=500)
+    options: list[AgentControlLoopFindingDecisionOption] = Field(
+        default_factory=list, max_length=3
+    )
+    recommended_option_id: AgentControlLoopDecisionOptionId | None = None
+    recommendation_reason: str = Field(min_length=1, max_length=500)
+    after_confirmation: str = Field(min_length=1, max_length=500)
+
+
 class AgentControlLoopArtifactFinding(StrictModel):
+    finding_id: str | None = Field(
+        default=None, pattern=r"^finding-[0-9a-f]{12}$"
+    )
+    affected_branch_ids: list[str] = Field(default_factory=list, max_length=12)
     title: str = Field(min_length=1, max_length=240)
     detail: str = Field(min_length=1, max_length=2_000)
+    fact_summary: str | None = Field(default=None, max_length=500)
+    impact: str | None = Field(default=None, max_length=500)
     file_refs: list[str] = Field(min_length=1, max_length=20)
     evidence_anchors: list[AgentControlLoopEvidenceAnchor] = Field(
         default_factory=list, max_length=6
     )
+    evidence_resolutions: list[AgentControlLoopEvidenceResolution] = Field(
+        default_factory=list, max_length=6
+    )
+    review: AgentControlLoopFindingReview | None = None
 
 
 class AgentControlLoopArtifactVersion(StrictModel):
@@ -401,6 +524,18 @@ class AgentControlLoopControlRequest(StrictModel):
         default=None, pattern=r"^branch-[0-9a-f]{12}$"
     )
     artifact_version: int | None = Field(default=None, ge=1, le=3)
+    decision_action: AgentControlLoopDecisionAction | None = None
+    finding_id: str | None = Field(
+        default=None, pattern=r"^finding-[0-9a-f]{12}$"
+    )
+    resolution_id: str | None = Field(
+        default=None, pattern=r"^resolution-[0-9a-f]{12}$"
+    )
+    selected_option_id: AgentControlLoopDecisionOptionId | None = None
+    selected_candidate_id: str | None = Field(
+        default=None, pattern=r"^candidate-[0-9a-f]{12}$"
+    )
+    feedback: str | None = Field(default=None, max_length=2_000)
 
     @field_validator("instruction")
     @classmethod
@@ -418,6 +553,21 @@ class AgentControlLoopControlRequest(StrictModel):
         if any(ord(character) < 32 for character in value):
             raise ValueError("idempotency_key contains invalid content")
         return value
+
+    @field_validator("feedback")
+    @classmethod
+    def validate_feedback(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        normalized = value.strip()
+        if not normalized:
+            return None
+        if any(
+            ord(character) < 32 and character not in "\n\t"
+            for character in normalized
+        ):
+            raise ValueError("decision feedback contains invalid content")
+        return normalized
 
 
 # Compatibility aliases for modules that import the former scenario contracts.

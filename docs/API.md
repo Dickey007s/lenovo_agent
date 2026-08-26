@@ -276,6 +276,8 @@ Important fields:
       {
         "title": "...",
         "detail": "...",
+        "fact_summary": "发生了什么",
+        "impact": "不处理会影响什么",
         "file_refs": ["forte-..."],
         "evidence_anchors": [
           {
@@ -287,7 +289,39 @@ Important fields:
             "end": 45,
             "excerpt": "...server-copied bounded source text..."
           }
-        ]
+        ],
+        "review": {
+          "requires_human_decision": true,
+          "question": "需要按哪一种口径继续？",
+          "why_human": "两个业务来源冲突，服务端不能替用户选择权威口径。",
+          "options": [
+            {
+              "option_id": "A",
+              "label": "先核对版本",
+              "meaning": "先确认测试使用的代码版本。",
+              "agent_next_step": "只读核对版本与时间记录。",
+              "next_instruction": "核对测试记录与发布记录是否属于同一代码版本。",
+              "affected_branch_ids": ["branch-0123456789ab"],
+              "required_file_refs": ["forte-0123456789abcdef"],
+              "estimated_additional_rounds": 1,
+              "external_action": "none"
+            },
+            {
+              "option_id": "B",
+              "label": "先形成修复建议",
+              "meaning": "按现有设计基线形成只读修改建议。",
+              "agent_next_step": "输出待修改位置和验证清单。",
+              "next_instruction": "基于当前设计基线形成只读修复建议和验证清单。",
+              "affected_branch_ids": ["branch-0123456789ab"],
+              "required_file_refs": ["forte-0123456789abcdef"],
+              "estimated_additional_rounds": 1,
+              "external_action": "none"
+            }
+          ],
+          "recommended_option_id": "A",
+          "recommendation_reason": "先消除版本差异可避免错误归因。",
+          "after_confirmation": "创建新的只读 Control Loop 继续核对。"
+        }
       }
     ],
     "follow_ups": ["由用户确认后可作为新 Run 启动的下一步任务"],
@@ -315,11 +349,12 @@ in the current contract. A review UI may show the current result's Finding refs
 as explicitly labeled context, but must not present them as direct evidence for
 an individual proposal.
 
-The issue-review page adds no endpoint. Finding review uses its own `file_refs`
-and server-resolved `evidence_anchors`; Gap/Branch review uses
-`candidate_file_refs` or `missing_file_refs`; actual content still comes from
-the preview endpoint. Opening, selecting an Anchor or closing review is a client
-action and does not change Run version or create a ControlEvent.
+The issue-review page reuses the Preview endpoint. Finding review uses its own
+`file_refs` and server-resolved `evidence_anchors`; Gap/Branch review uses
+`candidate_file_refs` or `missing_file_refs`. Opening or selecting an Anchor is
+client-only. Closing a pending human-decision sheet is different: the browser
+records `command=decision`, `decision_action=defer` before closing, so omission
+is not confused with rejection and the versioned receipt survives reconnect.
 
 The Analyst supplies verbatim quote candidates, not trusted line numbers. The
 server resolves each accepted candidate against the exact bounded table/text
@@ -331,14 +366,38 @@ Each newly adopted Finding needs at least one resolved Anchor. Anchor membership
 and location do not prove entailment, arithmetic, completeness or correctness.
 If the first Analyst candidate cannot be uniquely located, the Runtime may spend
 one additional Analyst call inside the same Run budget. It emits
-`analysis_validation_rejected` before retrying and never publishes the rejected
-candidate. A second failure ends through the normal fail-closed path.
+`analysis_validation_rejected` before retrying and never publishes rejected
+content. Each quote receives a server-owned EvidenceResolution: `exact` means one
+bounded Preview location, `ambiguous` means multiple candidates and `unavailable`
+means none. `stale` and `rejected` are reserved contract states and are not emitted
+by the current resolver. A second attempt may retain only uniquely anchored
+Findings and emit `analysis_partial_adopted` plus `partial_artifact_saved`. The
+unresolved Finding and candidates remain in `next_step.evidence_resolutions`; only
+their affected Branches wait. If no Finding can be adopted, the round is still
+preserved with `recovery_kind=source_location`. Repeated schema failures use
+`analysis_output`. Scope or integrity violations still fail closed.
+
+`review.options[]` is model-proposed handling context, not a server decision or
+approval. Every option projects `affected_branch_ids`, `required_file_refs`,
+`estimated_additional_rounds` and `external_action=none`. The browser first posts
+a versioned and idempotent `decision` command bound to the Finding/Resolution and
+Branch. `accept`, `decline` and `defer` become `decision_records[]`; they do not
+alter source files or perform an external action. Accepting a business option then
+combines its `next_instruction`, label and optional feedback in a new independent
+Run. Accepting an ambiguous source candidate instead records the candidate, steers
+the current Run and resumes only the affected waiting Branch.
 
 Current statuses are `queued`, `indexing`, `planning`, `validating`,
 `analyzing`, `verifying`, `waiting_input`, `paused`, `completed`, `stopped`
 and `failed`;
 compatibility `ready_to_execute` is retained for runtimes built without an
 Analyst.
+
+`decision_records[]` is append-only Snapshot state. Each record carries a stable
+Decision ID, `action`, Finding/Resolution/Branch binding, selected option or
+candidate when applicable, optional user feedback, accepted task version and
+`external_action=none`. It is the reconciliation fact after reconnect; a toast or
+button animation is not a decision receipt.
 
 `artifact_versions` and `commits` are safe Snapshot projections of independent
 append-only Store records. ArtifactVersion contains the complete logical
@@ -368,11 +427,34 @@ Content-Type: application/json
 }
 ```
 
-Commands are `pause`, `resume`, `steer`, `stop` and `rollback`. `steer` requires
-an instruction and applies only to the next round. Pause and stop are accepted
-immediately but applied only at a safe point between model calls. A stale
-version, illegal transition or same key with different content returns 409. An
-identical replay returns the first control result with `replayed=true`.
+Commands are `pause`, `resume`, `steer`, `stop`, `rollback` and `decision`.
+`steer` requires an instruction and applies only to the next round. Pause and
+stop are accepted immediately but applied only at a safe point between model
+calls. A stale version, illegal transition or same key with different content
+returns 409. An identical replay returns the first control result with
+`replayed=true`.
+
+Human decisions use the same version/idempotency rules:
+
+```json
+{
+  "command": "decision",
+  "decision_action": "accept",
+  "finding_id": "finding-0123456789ab",
+  "resolution_id": "resolution-0123456789ab",
+  "branch_id": "branch-0123456789ab",
+  "selected_candidate_id": "candidate-0123456789ab",
+  "feedback": "只核对这个分支，不重跑已完成分支。",
+  "expected_version": 13,
+  "idempotency_key": "decision-client-generated-key"
+}
+```
+
+An accepted Finding decision must select one of that Finding's A/B/C options; an
+accepted EvidenceResolution must select one of its server candidate IDs. Decline
+or defer cannot carry a selected option/candidate. The server validates all
+Finding/Resolution/Branch bindings and appends `decision_records[]` without
+changing Branch, ArtifactVersion or external state.
 
 When the Evidence Gate emits `next_step.decision=waiting_input`, the Snapshot
 already has `control_state=paused`. `resume` must carry one waiting
@@ -425,9 +507,18 @@ plan_validation_rejected (optional, followed by one retry)
 plan_validation
 analysis_started
 analysis_completed
+analysis_structure_rejected (optional, followed by one bounded retry)
+analysis_validation_rejected (optional, followed by one bounded retry)
+analysis_partial_adopted (optional when only verified Findings remain)
+analysis_recovery_required (optional before a guided waiting state)
+evidence_disambiguation_required (optional for multiple real source positions)
+partial_artifact_saved (optional when valid work is preserved)
+decision_requested (optional for a human business choice)
 result_validation
 evidence_gate
+decision_recorded (after accept / decline / defer)
 control_resume_recorded (required when evidence_gate waits for the user)
+branch_resumed_from_checkpoint (when only one recovery Branch continues)
 round_started
 planning_started
 planning_completed
@@ -459,13 +550,16 @@ reconciliation; a nonterminal interruption uses GET plus `after=N` recovery.
 | Run/SSE 404 | missing or wrong Owner | same public response; clear stale Run |
 | start 409 | idempotency/contract conflict | preserve instruction/selection and reconcile |
 | control 409 | stale version or illegal transition | GET current Snapshot; preserve command draft and let the user retry |
+| decision 409 | Finding/Resolution/Branch binding is stale, or option/candidate is not owned by that record | GET current Snapshot; keep the user's feedback draft and choose from current facts |
 | branch control 409 | selected Branch is missing, no longer waiting or outside the current Gate | GET current Snapshot and choose a still-waiting Branch |
 | artifact restore 409 | version is current, missing or fails independent-record verification | keep current pointer and history; do not fabricate restore |
 | `status=waiting_input` | one or more Branches could close a visible evidence gap | inspect sources, optionally steer, then explicitly resume one Branch or stop |
+| `next_step.recovery_kind=source_location` | legal-scope candidate could not be uniquely mapped to safe Preview | show preserved/not-adopted/no-action facts; select the smallest Branch and resume |
+| `next_step.recovery_kind=analysis_output` | provider responded twice without a usable public result structure | keep raw output hidden; select a minimal Branch and retry or stop |
 | `checkpoint_recovered` | server restored a PostgreSQL Snapshot and paused | reconcile the trace; explicitly resume from the safe checkpoint |
 | `loop_budget_stopped` | round/call/deadline prevents another step | show bounded brief and unresolved gaps |
 | `status=failed` | model/schema/plan/source/citation validation failed | show safe business error and no result |
 
 See [UI-server fact matrix](contracts/UI_SERVER_FACT_MATRIX.md),
-[`DR-0026`](decisions/DR-0026-selective-branch-and-immutable-artifact-history.md)
-and [current Evidence](evidence/DEMO1-BRANCH-ARTIFACT-CONTROL-EVIDENCE-20260826.md).
+[`DR-0030`](decisions/DR-0030-actionable-review-and-recoverable-analysis.md)
+and [current Evidence](evidence/ACTIONABLE-REVIEW-AND-RECOVERY-EVIDENCE-20260826.md).

@@ -102,6 +102,16 @@ states that only file-level review is available and does not invent a highlight.
 The Git-like history is an information structure, not a source-file diff or a
 claim that semantic correctness has been proven.
 
+An adopted Finding may also carry `fact_summary`, `impact` and a structured
+`review`. The review page presents these as `1 发生了什么 -> 2 不处理的影响 ->
+3 现在需要谁做什么`, with the evidence index and actual Preview side by side.
+When human judgment is required, A/B/C choices state what each choice means,
+which Branches and sources will be revisited, the estimated additional rounds
+and `external_action=none`. Optional feedback is recorded with a versioned
+`decision` receipt. Accepting then starts an independent read-only Run; declining
+does not start work, and closing records `defer`. No path claims that an office
+file was modified.
+
 A model candidate that fails server validation is shown as `未采用`; at most
 one bounded repair attempt may follow and it consumes the same model-call
 budget. The rejected candidate itself never becomes the visible plan.
@@ -171,6 +181,10 @@ browser fact, not a server task phase.
 | unknown start result | reconciling | same instruction/limits/key | replay identical request |
 | model/schema/policy failure | safe stop plus receipt | whole-workspace contract, instruction and completed rounds | revise or create a fresh Run |
 | rejected plan candidate | not adopted plus bounded retry | frozen contract and used-call count | server retries once if budget allows; otherwise fails closed |
+| one or more source locations cannot be resolved | rejected/partial-adoption trace | valid Findings, approved Plan, files, Branches and receipts | retry once; adopt the valid subset or pause one candidate Branch with `recovery_kind=source_location` |
+| one source quote has multiple real matches | `evidence_disambiguation_required` + `EvidenceResolution(status=ambiguous)` | completed Branches, ArtifactVersion and all candidates | compare candidates; record the selected candidate; steer and resume only its Branch |
+| pending human decision is closed | `decision_recorded(action=defer)` | Finding, evidence, user feedback draft and all execution facts | reopen from Snapshot and accept, decline or defer again with a fresh version |
+| repeated malformed analysis output | structure-rejected trace | approved Plan, files, Branches and both call receipts | pause one candidate Branch with `recovery_kind=analysis_output`; do not expose raw response |
 | evidence insufficient | waiting Branch, missing evidence and explicit per-branch confirmation | prior rounds, all Branch states, versions and citations | choose one Branch to `resume`, adjust direction first or stop at the limit |
 | pause/steer/stop requested | pending until a safe point | current Snapshot and command receipt | reconcile returned version; resume or inspect terminal brief |
 | SSE interruption | reconnecting | current Snapshot and last sequence | GET plus `after=N` |

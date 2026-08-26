@@ -112,7 +112,7 @@ function previewFor(fileRef: string) {
   if (fileRef === csvFile.file_ref) return { ...base, kind: "table", columns: ["客商", "方向", "期末余额"], rows: [{ row_number: 2, values: ["星海科技", "借", "1500000"] }], total_rows: 30 };
   if (fileRef === pdfFile.file_ref) return { ...base, kind: "pdf", text: "授权范围：仅限本项目合同审阅。", page_count: 2 };
   if (fileRef === docxFile.file_ref) return { ...base, kind: "document", text: "岗位职责：负责商户拓展与经营分析。" };
-  if (fileRef === workflowFile.file_ref) return { ...base, kind: "text", text: "AI 搜索 Agent - Workflow 核心模块\n\nclass QueryAnalysisNode:\n    intent = llm.classify(query)\n    rewritten = llm.rewrite(query)\n    drift_score = semantic_drift(query, rewritten)\n\nclass SearchPlanNode:\n    route = choose(intent, rewritten)\n    if intent == 'news':\n        route.append('web_search_news')" };
+  if (fileRef === workflowFile.file_ref) return { ...base, kind: "text", text: "AI 搜索 Agent - Workflow 核心模块\n\nclass QueryAnalysisNode:\n    intent = llm.classify(query)\n    rewritten = llm.rewrite(query)\n    drift_score = semantic_drift(query, rewritten)\n\nclass SearchPlanNode:\n    route = choose(intent, rewritten)\n    if intent == 'news':\n        route.append('web_search_news')\n\nclass FallbackPlanNode:\n    route = choose(intent, rewritten)" };
   if (fileRef === searchLogFile.file_ref) return { ...base, kind: "text", text: "2026-08-24 request=Breaking news about AI regulation today\nintent=factual\nrewrite=detailed explanation of AI regulation\nroute=web_search+knowledge_base\nweb_search_news_called=false" };
   return { ...base, kind: "text", text: "2026-08-24 09:30 service healthy" };
 }
@@ -142,8 +142,12 @@ function snapshot(
   const finding = (refs: string[], title: string) => ({
     summary: `${title}：已形成带文件引用和精确位置的只读结论。`,
     findings: [{
+      finding_id: title === "第一轮核对完成" ? "finding-111111111111" : "finding-222222222222",
+      affected_branch_ids: title === "第一轮核对完成" ? [roundOneReadBranch] : [roundTwoAnswerBranch],
       title,
       detail: title === "第一轮核对完成" ? "设计要求新闻意图进入 web_search_news，但运行记录显示该请求被判为 factual，最终没有调用新闻搜索。" : "授权范围只覆盖本项目合同审阅。",
+      fact_summary: title === "第一轮核对完成" ? "新闻类请求被识别为事实查询，专用新闻搜索没有被调用。" : "授权文件仅覆盖本项目合同审阅。",
+      impact: title === "第一轮核对完成" ? "时效性查询可能使用不适合的检索路径，结果需要重新核对。" : "超出授权范围的后续动作不能直接推进。",
       file_refs: refs,
       evidence_anchors: title === "第一轮核对完成" ? [
         { file_ref: workflowFile.file_ref, role: "expected", label: "新闻意图应进入专用搜索", locator_kind: "text_lines", start: 8, end: 11, excerpt: "class SearchPlanNode:\n    route = choose(intent, rewritten)\n    if intent == 'news':\n        route.append('web_search_news')" },
@@ -151,6 +155,27 @@ function snapshot(
       ] : [
         { file_ref: pdfFile.file_ref, role: "support", label: "授权范围原文", locator_kind: "text_lines", start: 1, end: 1, excerpt: "授权范围：仅限本项目合同审阅。" },
       ],
+      evidence_resolutions: [],
+      review: title === "第一轮核对完成" ? {
+        requires_human_decision: true,
+        question: "下一步应按设计修正路由，还是先补充版本与运行证据？",
+        why_human: "现有文件能证明设计与运行记录不一致，但不能替业务负责人决定修复优先级。",
+        options: [
+          { option_id: "A", label: "先核对版本", meaning: "先确认代码与日志来自同一版本，再决定是否修改。", agent_next_step: "核对代码版本、日志时间和发布记录，形成差异清单。", next_instruction: "核对 workflow.py 与 search_agent.log 是否来自同一代码版本，列出可唯一定位的版本与时间证据。", affected_branch_ids: [roundOneReadBranch], required_file_refs: refs, estimated_additional_rounds: 1, external_action: "none" },
+          { option_id: "B", label: "按设计提修复建议", meaning: "暂以设计文件为准，先形成路由修复建议，但不直接改文件。", agent_next_step: "形成路由修改建议、影响范围和待验证项。", next_instruction: "以 workflow.py 的新闻路由设计为准，核对 search_agent.log 并形成只读修复建议与待验证清单。", affected_branch_ids: [roundOneReadBranch], required_file_refs: refs, estimated_additional_rounds: 1, external_action: "none" },
+        ],
+        recommended_option_id: "A",
+        recommendation_reason: "先核对版本可以避免把跨版本差异误判为当前缺陷。",
+        after_confirmation: "Agent 将把你的选择作为新任务目标，继续只读核对并形成可审查结果。",
+      } : {
+        requires_human_decision: false,
+        question: "授权范围是否已被准确引用？",
+        why_human: "这一步只需核对原文，不涉及业务口径选择。",
+        options: [],
+        recommended_option_id: null,
+        recommendation_reason: "按原文复核即可。",
+        after_confirmation: "复核通过后可再决定是否启动后续任务。",
+      },
     }],
     follow_ups: ["继续核对授权范围与财务往来之间是否存在执行约束，并形成待办清单。"],
     review_required: true,
@@ -182,6 +207,7 @@ function snapshot(
       next_question: secondRefs.length ? "继续补齐尚未核对的证据。" : null,
       candidate_file_refs: secondRefs,
       candidate_branch_ids: [roundOneAnswerBranch],
+      evidence_resolutions: [],
     },
     started_at: new Date().toISOString(),
     completed_at: status === "planning" || status === "paused" ? null : new Date().toISOString(),
@@ -200,7 +226,7 @@ function snapshot(
     analysis_receipt: { called: true, model: "deepseek-v4-pro", elapsed_ms: 1760, output_used: true },
     verified_file_refs: secondRefs,
     evidence_gaps: [],
-    next_step: { decision: "completed", reason: "本轮自主选择的证据均已形成可核对引用。", next_question: null, candidate_file_refs: [], candidate_branch_ids: [] },
+    next_step: { decision: "completed", reason: "本轮自主选择的证据均已形成可核对引用。", next_question: null, candidate_file_refs: [], candidate_branch_ids: [], evidence_resolutions: [] },
     started_at: new Date().toISOString(),
     completed_at: new Date().toISOString(),
   } : null;
@@ -273,6 +299,7 @@ function snapshot(
     current_round: rounds.length,
     control_state: status === "paused" || status === "waiting_input" ? "paused" : status === "stopped" ? "stopped" : "running",
     control_events: [],
+    decision_records: [],
     branches,
     active_branch_id: status === "waiting_input" || status === "completed" ? roundOneAnswerBranch : null,
     artifact_versions: rounds.map((round, index) => ({
@@ -341,15 +368,105 @@ function snapshot(
     events: status === "queued" ? [] : [{ sequence, event_name: failed ? "harness_failed" : status === "completed" ? "loop_committed" : status === "stopped" ? "loop_stopped" : status === "waiting_input" ? "evidence_gate" : "round_started", occurred_at: new Date().toISOString(), status, message: failed ? "本轮未通过服务端校验，已停止且未发生外部动作。" : "服务端状态已更新。", details: {} }],
   };
 }
+
+function sourceLocationRecoverySnapshot(body: { workspace_id: string; instruction: string }) {
+  const base = snapshot(body, "waiting_input", 12);
+  const branches = base.branches.map((branch) => ({
+    ...branch,
+    status: "waiting_input",
+    verified_file_refs: [],
+    missing_file_refs: branch.input_file_refs,
+  }));
+  const gaps = branches.map((branch, index) => ({
+    gap_id: `gap-${String(index + 1).padStart(12, "0")}`,
+    branch_id: branch.branch_id,
+    label: `“${branch.title}”分支的原文尚未唯一定位`,
+    detail: "模型已返回候选内容，但服务端不能把引用唯一匹配到安全预览。",
+    candidate_file_refs: branch.missing_file_refs,
+  }));
+  const round = {
+    ...base.rounds[0],
+    status: "completed",
+    phase: "evidence_gate",
+    result: null,
+    analysis_receipt: { called: true, model: "deepseek-v4-pro", elapsed_ms: 2230, output_used: false },
+    verified_file_refs: [],
+    evidence_gaps: gaps,
+    next_step: {
+      decision: "waiting_input",
+      reason: "模型已返回候选结论，但服务端无法把原文片段唯一定位到安全预览。本轮计划、文件范围和模型调用记录已保留；请缩小到一个分支后继续。",
+      next_question: "只核对所选分支，用更长且唯一的原文定位关键事实。",
+      candidate_file_refs: branches.flatMap((branch) => branch.missing_file_refs),
+      candidate_branch_ids: branches.map((branch) => branch.branch_id),
+      recovery_kind: "source_location",
+      evidence_resolutions: [{
+        resolution_id: "resolution-111111111111",
+        finding_id: "finding-333333333333",
+        finding_title: "新闻路由候选原文位置不唯一",
+        fact_summary: "Agent 引用的 route = choose 语句在同一文件出现两次。",
+        impact: "服务端不能确定 Agent 指的是主路由还是回退路由。",
+        branch_id: branches[0].branch_id,
+        file_ref: workflowFile.file_ref,
+        role: "contradiction",
+        label: "路由选择语句",
+        query_excerpt: "route = choose(intent, rewritten)",
+        status: "ambiguous",
+        reason: "同一片段在安全预览中匹配到 2 个位置，服务端不能替用户选择。",
+        candidates: [
+          { candidate_id: "candidate-111111111111", file_ref: workflowFile.file_ref, locator_kind: "text_lines", start: 9, end: 9, excerpt: "route = choose(intent, rewritten)" },
+          { candidate_id: "candidate-222222222222", file_ref: workflowFile.file_ref, locator_kind: "text_lines", start: 14, end: 14, excerpt: "route = choose(intent, rewritten)" },
+        ],
+        selected_candidate_id: null,
+      }],
+    },
+  };
+  return {
+    ...base,
+    version: 13,
+    last_event_sequence: 12,
+    budget: { ...base.budget, rounds_used: 1, files_verified: 0, model_calls_used: 3, elapsed_ms: 6100 },
+    rounds: [round],
+    current_round: 1,
+    branches,
+    active_branch_id: null,
+    artifact_versions: [{ ...base.artifact_versions[0], summary: round.next_step.reason, findings: [], follow_ups: [], evidence_gaps: gaps, source_file_refs: [], finding_count: 0 }],
+    analysis_receipt: round.analysis_receipt,
+    result: null,
+    validation_errors: [],
+    events: [
+      { sequence: 10, event_name: "analysis_validation_rejected", occurred_at: new Date().toISOString(), status: "analyzing", message: "修复后的候选结论仍无法唯一定位原文，未采用。", details: {} },
+      { sequence: 11, event_name: "analysis_recovery_required", occurred_at: new Date().toISOString(), status: "analyzing", message: round.next_step.reason, details: {} },
+      { sequence: 12, event_name: "evidence_gate", occurred_at: new Date().toISOString(), status: "waiting_input", message: round.next_step.reason, details: {} },
+    ],
+  };
+}
+
+function locationFailureSnapshot(body: { workspace_id: string; instruction: string }) {
+  const base = sourceLocationRecoverySnapshot(body);
+  return {
+    ...base,
+    status: "failed",
+    control_state: "running",
+    rounds: base.rounds.map((round) => ({ ...round, status: "failed", next_step: null })),
+    branches: base.branches.map((branch) => ({ ...branch, status: "failed" })),
+    artifact_versions: [],
+    validation_errors: ["本轮未通过服务端安全校验，且未发生外部动作。请重新运行。"],
+    events: [
+      { sequence: 11, event_name: "analysis_validation_rejected", occurred_at: new Date().toISOString(), status: "analyzing", message: "修复后的候选结论仍无法唯一定位原文，未采用。", details: {} },
+      { sequence: 12, event_name: "harness_failed", occurred_at: new Date().toISOString(), status: "failed", message: "本轮未通过服务端校验，已停止且未发生外部动作。", details: {} },
+    ],
+  };
+}
 async function fulfillJson(route: Route, body: unknown, status = 200) { await route.fulfill({ status, contentType: "application/json", body: JSON.stringify(body) }); }
 
-async function mockHarness(page: Page, options: { failFirstStart?: boolean; disconnect?: boolean; failed?: boolean; workspaceFailures?: number; interactiveLoop?: boolean; evidenceGate?: boolean } = {}) {
+async function mockHarness(page: Page, options: { failFirstStart?: boolean; disconnect?: boolean; failed?: boolean; locationFailure?: boolean; sourceRecovery?: boolean; workspaceFailures?: number; interactiveLoop?: boolean; evidenceGate?: boolean } = {}) {
   let workspaceCalls = 0; let startCalls = 0; let streamCalls = 0;
   let currentBody = { workspace_id: "forte-public-office", instruction: "" };
-  let currentSnapshot = snapshot(currentBody, "queued");
+  // Mock snapshots intentionally cover several server state shapes in one route.
+  let currentSnapshot: any = snapshot(currentBody, "queued");
   let controlSequence = 2;
   const starts: (typeof currentBody & { idempotency_key: string })[] = [];
-  const controls: { command: string; instruction?: string; branch_id?: string; artifact_version?: number; idempotency_key: string; expected_version: number }[] = [];
+  const controls: { command: string; instruction?: string; branch_id?: string; artifact_version?: number; decision_action?: string; finding_id?: string; resolution_id?: string; selected_option_id?: string; selected_candidate_id?: string; feedback?: string; idempotency_key: string; expected_version: number }[] = [];
   const streams: string[] = [];
   await page.route("**/v1/**", async (route) => {
     const url = new URL(route.request().url()); const path = url.pathname;
@@ -368,14 +485,42 @@ async function mockHarness(page: Page, options: { failFirstStart?: boolean; disc
       const body = route.request().postDataJSON() as typeof currentBody & { idempotency_key: string };
       currentBody = body; starts.push(body);
       if (options.failFirstStart && startCalls === 1) return fulfillJson(route, { detail: "任务启动结果未知" }, 503);
-      currentSnapshot = snapshot(body, options.evidenceGate ? "waiting_input" : options.interactiveLoop ? "planning" : "queued", options.interactiveLoop || options.evidenceGate ? controlSequence : 16);
+      currentSnapshot = options.locationFailure
+        ? locationFailureSnapshot(body)
+        : options.sourceRecovery
+          ? sourceLocationRecoverySnapshot(body)
+          : snapshot(body, options.evidenceGate ? "waiting_input" : options.interactiveLoop ? "planning" : "queued", options.interactiveLoop || options.evidenceGate ? controlSequence : 16);
+      controlSequence = Math.max(controlSequence, currentSnapshot.last_event_sequence);
       return fulfillJson(route, { run: currentSnapshot, replayed: startCalls > 1 }, 202);
     }
     if (path.endsWith("/controls") && route.request().method() === "POST") {
-      const control = route.request().postDataJSON() as { command: "pause" | "resume" | "steer" | "stop" | "rollback"; instruction?: string; branch_id?: string; artifact_version?: number; idempotency_key: string; expected_version: number };
+      const control = route.request().postDataJSON() as { command: "pause" | "resume" | "steer" | "stop" | "rollback" | "decision"; instruction?: string; branch_id?: string; artifact_version?: number; decision_action?: "accept" | "decline" | "defer"; finding_id?: string; resolution_id?: string; selected_option_id?: string; selected_candidate_id?: string; feedback?: string; idempotency_key: string; expected_version: number };
       controls.push(control);
       const command = control.command;
-      controlSequence += 1;
+      controlSequence = Math.max(controlSequence + 1, currentSnapshot.last_event_sequence + 1);
+      if (command === "decision") {
+        const record = {
+          decision_id: `decision-${String(controls.length).padStart(12, "0")}`,
+          action: control.decision_action ?? "defer",
+          finding_id: control.finding_id ?? "finding-111111111111",
+          resolution_id: control.resolution_id ?? null,
+          branch_id: control.branch_id ?? null,
+          selected_option_id: control.selected_option_id ?? null,
+          selected_candidate_id: control.selected_candidate_id ?? null,
+          feedback: control.feedback ?? null,
+          recorded_at: new Date().toISOString(),
+          accepted_task_version: control.expected_version + 1,
+          external_action: "none",
+        };
+        currentSnapshot = {
+          ...currentSnapshot,
+          version: control.expected_version + 1,
+          last_event_sequence: controlSequence,
+          decision_records: [...currentSnapshot.decision_records, record],
+          events: [...currentSnapshot.events, { sequence: controlSequence, event_name: "decision_recorded", occurred_at: new Date().toISOString(), status: currentSnapshot.status, message: "人工决定已写入版本化回执；尚未发生外部动作。", details: {} }],
+        };
+        return fulfillJson(route, { run: currentSnapshot, replayed: false }, 202);
+      }
       if (command === "rollback") {
         const completed = snapshot(currentBody, "completed", control.expected_version);
         const targetVersion = control.artifact_version ?? 1;
@@ -399,18 +544,31 @@ async function mockHarness(page: Page, options: { failFirstStart?: boolean; disc
         };
         return fulfillJson(route, { run: currentSnapshot, replayed: false }, 202);
       }
-      currentSnapshot = snapshot(
+      if (command === "steer" && currentSnapshot.status === "waiting_input") {
+        currentSnapshot = {
+          ...currentSnapshot,
+          version: control.expected_version + 1,
+          last_event_sequence: controlSequence,
+          events: [...currentSnapshot.events, { sequence: controlSequence, event_name: "control_steer_recorded", occurred_at: new Date().toISOString(), status: "waiting_input", message: "方向指令已记录，将应用于目标分支。", details: {} }],
+        };
+        return fulfillJson(route, { run: currentSnapshot, replayed: false }, 202);
+      }
+      const priorDecisions = currentSnapshot.decision_records;
+      currentSnapshot = {
+        ...snapshot(
         currentBody,
         command === "pause" ? "paused" : command === "stop" ? "stopped" : command === "resume" ? "completed" : "planning",
         command === "resume" ? 16 : controlSequence,
-      );
+        ),
+        decision_records: priorDecisions,
+      };
       return fulfillJson(route, { run: currentSnapshot, replayed: false }, 202);
     }
     if (path.endsWith("/events")) {
       streamCalls += 1; streams.push(url.toString());
       const after = Number(url.searchParams.get("after") ?? "0");
       const all = ["workspace_index", "round_started", "planning_started", "planning_completed", "plan_validation", "analysis_started", "analysis_completed", "result_validation", "evidence_gate", "round_started", "planning_started", "planning_completed", "analysis_started", "analysis_completed", "evidence_gate", options.failed ? "harness_failed" : "loop_committed"];
-      if (options.interactiveLoop || options.evidenceGate) {
+      if (options.interactiveLoop || options.evidenceGate || options.sourceRecovery) {
         const sequence = Math.max(after + 1, currentSnapshot.last_event_sequence);
         const terminalEvent = currentSnapshot.status === "completed" ? "loop_committed" : currentSnapshot.status === "stopped" ? "loop_stopped" : currentSnapshot.status === "waiting_input" ? "evidence_gate" : "round_started";
         const body = `id: ${sequence}\nevent: ${terminalEvent}\ndata: ${JSON.stringify({ sequence, event_name: terminalEvent, occurred_at: new Date().toISOString(), message: "服务端状态已更新。" })}\n\n`;
@@ -425,8 +583,9 @@ async function mockHarness(page: Page, options: { failFirstStart?: boolean; disc
     }
     if (path.startsWith("/v1/harness/runs/")) {
       if (options.disconnect && streamCalls === 1) return fulfillJson(route, { ...snapshot(currentBody, "queued"), status: "indexing", last_event_sequence: 1, version: 2 });
-      if (options.interactiveLoop || options.evidenceGate) return fulfillJson(route, currentSnapshot);
-      return fulfillJson(route, snapshot(currentBody, options.failed ? "failed" : "completed"));
+      if (options.interactiveLoop || options.evidenceGate || options.sourceRecovery || options.locationFailure) return fulfillJson(route, currentSnapshot);
+      currentSnapshot = snapshot(currentBody, options.failed ? "failed" : "completed");
+      return fulfillJson(route, currentSnapshot);
     }
     return fulfillJson(route, { detail: "not found" }, 404);
   });
@@ -591,7 +750,7 @@ test("opens a cited source file from an analysis finding", async ({ page }) => {
   await page.getByRole("button", { name: "启动 Control Loop" }).click();
   await page.getByRole("button", { name: /发现与建议/ }).click();
   await page.getByRole("button", { name: "打开审查页" }).first().click();
-  await expect(page.getByRole("dialog", { name: "第一轮核对完成" })).toBeVisible();
+  await expect(page.getByRole("dialog", { name: "需要你核对并决定下一步" })).toBeVisible();
   await expect(page.getByRole("dialog")).toContainText("高亮位置由服务端从逐字引用解析");
   await expect(page.getByRole("dialog")).toContainText("设计预期");
   await expect(page.getByRole("dialog")).toContainText("实际观测");
@@ -611,6 +770,142 @@ test("opens a cited source file from an analysis finding", async ({ page }) => {
   await page.getByRole("button", { name: workflowFile.display_label }).last().click();
   await expect(page.getByText("class QueryAnalysisNode:")).toBeVisible();
   await expect(page.getByRole("button", { name: "预览" })).toHaveClass(/is-active/);
+});
+
+test("turns a finding into an evidence-backed human decision and a new task", async ({ page }) => {
+  const state = await mockHarness(page); await page.goto("/");
+  await page.getByRole("textbox", { name: "任务指令" }).fill("核对新闻搜索路由并说明如何处理。");
+  await page.getByRole("button", { name: "启动 Control Loop" }).click();
+  await page.getByRole("button", { name: /发现与建议/ }).click();
+  await page.getByRole("button", { name: "打开审查页" }).first().click();
+
+  const dialog = page.getByRole("dialog", { name: "需要你核对并决定下一步" });
+  if (process.env.CAPTURE_DR0030_EVIDENCE === "1") {
+    await dialog.screenshot({ path: "../../docs/evidence/screenshots/dr-0030-actionable-finding-evidence.png" });
+  }
+  await expect(dialog).toContainText("1发生了什么");
+  await expect(dialog).toContainText("2不处理的影响");
+  await expect(dialog).toContainText("3现在需要谁做什么");
+  await expect(dialog).toContainText("需要你决断");
+  await expect(dialog).toContainText("来自 workflow.py · 第 8-11 行 · 服务端逐字匹配");
+  await expect(dialog).toContainText("下方黄色区域是这段内容在文件预览中的实际位置");
+  await expect(dialog.getByText(/Agent 推荐/)).toHaveCount(0);
+
+  await dialog.locator(".decision-options label").filter({ hasText: "按设计提修复建议" }).click();
+  await dialog.getByRole("button", { name: "对照 Agent 建议" }).click();
+  await expect(dialog).toContainText("你的选择是 B，系统不会替你改选");
+  await dialog.getByRole("textbox", { name: "补充给 Agent 的反馈（可选）" }).fill("同时核对发布记录中的代码版本。");
+  if (process.env.CAPTURE_DR0030_EVIDENCE === "1") {
+    await dialog.screenshot({ path: "../../docs/evidence/screenshots/dr-0030-actionable-finding-review.png" });
+  }
+  await dialog.getByRole("button", { name: "接受并交给 Agent" }).click();
+
+  await expect.poll(() => state.controls.length).toBeGreaterThanOrEqual(1);
+  expect(state.controls[0]).toMatchObject({
+    command: "decision",
+    decision_action: "accept",
+    finding_id: "finding-111111111111",
+    selected_option_id: "B",
+    feedback: "同时核对发布记录中的代码版本。",
+  });
+  await expect.poll(() => state.starts.length).toBe(2);
+  expect(state.starts[1].instruction).toContain("形成只读修复建议与待验证清单");
+  expect(state.starts[1].instruction).toContain("用户决定：B · 按设计提修复建议");
+  expect(state.starts[1].instruction).toContain("同时核对发布记录中的代码版本");
+});
+
+test("records closing a pending decision as defer and restores the receipt", async ({ page }) => {
+  const state = await mockHarness(page); await page.goto("/");
+  await page.getByRole("textbox", { name: "任务指令" }).fill("核对新闻搜索路由并说明如何处理。");
+  await page.getByRole("button", { name: "启动 Control Loop" }).click();
+  await page.getByRole("button", { name: /发现与建议/ }).click();
+  await page.getByRole("button", { name: "打开审查页" }).first().click();
+  await page.getByRole("button", { name: "关闭问题审查页" }).click();
+
+  await expect.poll(() => state.controls.length).toBe(1);
+  expect(state.controls[0]).toMatchObject({
+    command: "decision",
+    decision_action: "defer",
+    finding_id: "finding-111111111111",
+  });
+
+  await page.getByRole("button", { name: /发现与建议/ }).click();
+  await page.getByRole("button", { name: "打开审查页" }).first().click();
+  await expect(page.getByRole("dialog")).toContainText("人工决定已记录");
+  await expect(page.getByRole("dialog")).toContainText("已暂缓");
+  if (process.env.CAPTURE_DR0030_EVIDENCE === "1") {
+    await page.locator(".decision-record-receipt").screenshot({ path: "../../docs/evidence/screenshots/dr-0030-decision-receipt.png" });
+  }
+  await page.getByRole("button", { name: "否决这条发现" }).click();
+  await expect.poll(() => state.controls.length).toBe(2);
+  expect(state.controls[1]).toMatchObject({
+    command: "decision",
+    decision_action: "decline",
+    finding_id: "finding-111111111111",
+  });
+});
+
+test("disambiguates a source candidate and resumes only the affected branch", async ({ page }) => {
+  const state = await mockHarness(page, { sourceRecovery: true }); await page.goto("/");
+  await page.getByRole("textbox", { name: "任务指令" }).fill("核对跨文件版本冲突并逐条定位原文。");
+  await page.getByRole("button", { name: "启动 Control Loop" }).click();
+
+  const recovery = page.locator(".loop-source-recovery");
+  await expect(recovery).toContainText("1 处多候选");
+  await recovery.getByRole("button", { name: "选择原文位置" }).click();
+  const dialog = page.getByRole("dialog", { name: "需要你确认原文位置" });
+  await expect(dialog).toContainText("2 个位置都匹配，需要你选择");
+  await dialog.getByRole("button", { name: "定位证据 2：路由选择语句" }).click();
+  if (process.env.CAPTURE_DR0030_EVIDENCE === "1") {
+    await dialog.screenshot({ path: "../../docs/evidence/screenshots/dr-0030-evidence-disambiguation.png" });
+    await dialog.locator(".evidence-resolution-decision").screenshot({ path: "../../docs/evidence/screenshots/dr-0030-evidence-disambiguation-action.png" });
+  }
+  await dialog.getByRole("textbox", { name: "补充给重跑分支的反馈（可选）" }).fill("同时核对版本字段。" );
+  await dialog.getByRole("button", { name: "采用此位置并只重跑本分支" }).click();
+
+  await expect.poll(() => state.controls.map((item) => item.command)).toEqual(["decision", "steer", "resume"]);
+  expect(state.controls[0]).toMatchObject({
+    decision_action: "accept",
+    resolution_id: "resolution-111111111111",
+    selected_candidate_id: "candidate-222222222222",
+    branch_id: "branch-111111111111",
+  });
+  expect(state.controls[2].branch_id).toBe("branch-111111111111");
+});
+
+test("restores a pending source disambiguation after reconnect", async ({ page }) => {
+  const state = await mockHarness(page, { sourceRecovery: true }); await page.goto("/");
+  await page.getByRole("textbox", { name: "任务指令" }).fill("核对跨文件版本冲突并逐条定位原文。");
+  await page.getByRole("button", { name: "启动 Control Loop" }).click();
+  await expect(page.getByRole("button", { name: "选择原文位置" })).toBeVisible();
+
+  await page.reload();
+  await expect(page.getByRole("button", { name: "选择原文位置" })).toBeVisible();
+  await page.getByRole("button", { name: "选择原文位置" }).click();
+  await expect(page.getByRole("dialog", { name: "需要你确认原文位置" })).toContainText("2 个位置都匹配，需要你选择");
+  expect(state.controls).toHaveLength(0);
+});
+
+test("pauses an unlocatable result with a guided branch recovery", async ({ page }) => {
+  const state = await mockHarness(page, { sourceRecovery: true }); await page.goto("/");
+  await page.getByRole("textbox", { name: "任务指令" }).fill("核对跨文件版本冲突并逐条定位原文。");
+  await page.getByRole("button", { name: "启动 Control Loop" }).click();
+
+  const recovery = page.locator(".loop-source-recovery");
+  await expect(recovery).toContainText("同一段候选原文匹配到多个真实位置");
+  await expect(recovery).toContainText("已保留");
+  await expect(recovery).toContainText("未采用");
+  await expect(recovery).toContainText("未发生");
+  await recovery.getByRole("textbox", { name: "补充给下一轮的方向（可选）" }).fill("优先核对版本字段和测试时间。");
+  if (process.env.CAPTURE_DR0030_EVIDENCE === "1") {
+    await recovery.screenshot({ path: "../../docs/evidence/screenshots/dr-0030-source-location-recovery.png" });
+  }
+  await recovery.getByRole("button", { name: "只重试本分支" }).first().click();
+
+  await expect.poll(() => state.controls.map((control) => control.command)).toEqual(["steer", "resume"]);
+  expect(state.controls[0].instruction).toBe("优先核对版本字段和测试时间。");
+  expect(state.controls[1].branch_id).toBe("branch-222222222222");
+  await expect(page.locator(".loop-brief")).toContainText("完成 2 轮");
 });
 
 test("starts a new whole-workspace loop only after the user confirms an agent proposal", async ({ page }) => {
@@ -649,14 +944,34 @@ test("reconnects the event stream from the last observed sequence", async ({ pag
 });
 
 test("explains an unavailable workspace and fails closed without a result", async ({ page }) => {
-  await mockHarness(page, { workspaceFailures: 1, failed: true }); await page.goto("/");
+  const state = await mockHarness(page, { workspaceFailures: 1, failed: true }); await page.goto("/");
   await expect(page.getByRole("heading", { name: "办公资料库暂时无法读取" })).toBeVisible();
   await page.getByRole("button", { name: "重新读取" }).click();
   await expect(page.getByRole("heading", { name: "办公资料库" })).toBeVisible();
   await page.getByRole("textbox", { name: "任务指令" }).fill("核对资料库中的余额变化。");
   await page.getByRole("button", { name: "启动 Control Loop" }).click();
   await expect(page.getByText("本轮已安全停止")).toBeVisible();
+  await expect(page.locator(".loop-failure-recovery")).toContainText("这次运行已停下，但不是死路");
+  await expect(page.getByRole("button", { name: "缩小范围重新核对" })).toBeEnabled();
+  await page.getByRole("button", { name: "缩小范围重新核对" }).click();
+  await expect.poll(() => state.starts.length).toBe(2);
   await expect(page.locator("body")).not.toContainText(/artifact\.write|run_workspace_write/);
+});
+
+test("explains a legacy location failure and offers the smallest retry", async ({ page }) => {
+  const state = await mockHarness(page, { locationFailure: true }); await page.goto("/");
+  await page.getByRole("textbox", { name: "任务指令" }).fill("核对 F07 测试结论与代码版本。");
+  await page.getByRole("button", { name: "启动 Control Loop" }).click();
+
+  const recovery = page.locator(".loop-failure-recovery");
+  await expect(recovery).toContainText("候选结论无法唯一定位到原文");
+  await expect(recovery).toContainText("任务目标、服务端计划、3 次模型调用记录和已选文件范围都还在");
+  if (process.env.CAPTURE_DR0030_EVIDENCE === "1") {
+    await recovery.screenshot({ path: "../../docs/evidence/screenshots/dr-0030-legacy-failure-recovery.png" });
+  }
+  await recovery.getByRole("button", { name: "缩小范围重新核对" }).click();
+  await expect.poll(() => state.starts.length).toBe(2);
+  expect(state.starts[1].instruction).toContain("恢复策略：先只核对");
 });
 
 test("mobile keeps file-manager browsing, task input, preview and trajectory usable", async ({ page }) => {
@@ -673,7 +988,7 @@ test("mobile keeps file-manager browsing, task input, preview and trajectory usa
   await page.getByRole("button", { name: /发现与建议/ }).click();
   await page.getByRole("button", { name: "打开审查页" }).first().click();
   await expect(page.getByRole("dialog")).toBeVisible();
-  await expect(page.getByRole("dialog")).toContainText("点一处，原文立即跳到对应行");
+  await expect(page.getByRole("dialog")).toContainText("选择一条，右侧打开真实文件并高亮对应位置");
   const reviewMetrics = await page.evaluate(() => ({ viewport: document.documentElement.clientWidth, scroll: document.documentElement.scrollWidth }));
   expect(reviewMetrics.scroll).toBeLessThanOrEqual(reviewMetrics.viewport);
   const closeBox = await page.getByRole("button", { name: "关闭问题审查页" }).boundingBox();
