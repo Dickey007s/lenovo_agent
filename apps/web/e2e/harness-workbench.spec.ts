@@ -18,6 +18,8 @@ const csvFile = fileItem("forte-1111111111111111", "forte-folder-111111111111", 
 const pdfFile = fileItem("forte-2222222222222222", "forte-folder-222222222222", "授权委托书.pdf", "法务", "PDF", "pdf", "合同与授权/授权委托书.pdf");
 const docxFile = fileItem("forte-3333333333333333", "forte-folder-333333333333", "岗位说明.docx", "人力招聘", "DOCX", "document");
 const txtFile = fileItem("forte-4444444444444444", "forte-folder-444444444444", "运行日志.txt", "可靠性工程", "TXT", "text");
+const workflowFile = fileItem("forte-5555555555555555", "forte-folder-555555555555", "workflow.py", "算法研发", "PY", "text", "search_agent_workflow/workflow.py");
+const searchLogFile = fileItem("forte-6666666666666666", "forte-folder-555555555555", "search_agent.log", "算法研发", "LOG", "text", "search_agent_workflow/search_agent.log");
 
 function fileItem(fileRef: string, folderId: string, label: string, group: string, extension: FileItem["extension"], kind: FileItem["preview_kind"], nestedPath?: string): FileItem {
   return {
@@ -40,6 +42,7 @@ const seedFolders = [
   { folder_id: pdfFile.folder_id, display_label: "法务", display_summary: "合同与授权材料", files: [pdfFile] },
   { folder_id: docxFile.folder_id, display_label: "人力招聘", display_summary: "岗位与候选人材料", files: [docxFile] },
   { folder_id: txtFile.folder_id, display_label: "可靠性工程", display_summary: "运行日志与服务资料", files: [txtFile] },
+  { folder_id: workflowFile.folder_id, display_label: "算法研发", display_summary: "搜索 Agent 代码与运行记录", files: [workflowFile, searchLogFile] },
 ];
 
 const folders = Array.from({ length: 15 }, (_, folderIndex) => {
@@ -109,6 +112,8 @@ function previewFor(fileRef: string) {
   if (fileRef === csvFile.file_ref) return { ...base, kind: "table", columns: ["客商", "方向", "期末余额"], rows: [{ row_number: 2, values: ["星海科技", "借", "1500000"] }], total_rows: 30 };
   if (fileRef === pdfFile.file_ref) return { ...base, kind: "pdf", text: "授权范围：仅限本项目合同审阅。", page_count: 2 };
   if (fileRef === docxFile.file_ref) return { ...base, kind: "document", text: "岗位职责：负责商户拓展与经营分析。" };
+  if (fileRef === workflowFile.file_ref) return { ...base, kind: "text", text: "AI 搜索 Agent - Workflow 核心模块\n\nclass QueryAnalysisNode:\n    intent = llm.classify(query)\n    rewritten = llm.rewrite(query)\n    drift_score = semantic_drift(query, rewritten)\n\nclass SearchPlanNode:\n    route = choose(intent, rewritten)\n    if intent == 'news':\n        route.append('web_search_news')" };
+  if (fileRef === searchLogFile.file_ref) return { ...base, kind: "text", text: "2026-08-24 request=Breaking news about AI regulation today\nintent=factual\nrewrite=detailed explanation of AI regulation\nroute=web_search+knowledge_base\nweb_search_news_called=false" };
   return { ...base, kind: "text", text: "2026-08-24 09:30 service healthy" };
 }
 
@@ -125,18 +130,28 @@ function snapshot(
   sequence = 16,
 ) {
   const allFiles = folders.flatMap((folder) => folder.files);
-  const selected = [csvFile, pdfFile];
   const failed = status === "failed";
   const terminal = ["completed", "stopped", "failed"].includes(status);
-  const firstRefs = [csvFile.file_ref];
+  const firstRefs = [workflowFile.file_ref, searchLogFile.file_ref];
   const secondRefs = [pdfFile.file_ref];
+  const selected = [workflowFile, searchLogFile, pdfFile];
   const roundOneReadBranch = "branch-111111111111";
   const roundOneAnswerBranch = "branch-222222222222";
   const roundTwoReadBranch = "branch-333333333333";
   const roundTwoAnswerBranch = "branch-444444444444";
   const finding = (refs: string[], title: string) => ({
-    summary: `${title}：已形成带文件引用的只读结论。`,
-    findings: [{ title, detail: "该结论只来自本轮实际读取的公开文件。", file_refs: refs }],
+    summary: `${title}：已形成带文件引用和精确位置的只读结论。`,
+    findings: [{
+      title,
+      detail: title === "第一轮核对完成" ? "设计要求新闻意图进入 web_search_news，但运行记录显示该请求被判为 factual，最终没有调用新闻搜索。" : "授权范围只覆盖本项目合同审阅。",
+      file_refs: refs,
+      evidence_anchors: title === "第一轮核对完成" ? [
+        { file_ref: workflowFile.file_ref, role: "expected", label: "新闻意图应进入专用搜索", locator_kind: "text_lines", start: 8, end: 11, excerpt: "class SearchPlanNode:\n    route = choose(intent, rewritten)\n    if intent == 'news':\n        route.append('web_search_news')" },
+        { file_ref: searchLogFile.file_ref, role: "observed", label: "实际没有调用新闻搜索", locator_kind: "text_lines", start: 2, end: 5, excerpt: "intent=factual\nrewrite=detailed explanation of AI regulation\nroute=web_search+knowledge_base\nweb_search_news_called=false" },
+      ] : [
+        { file_ref: pdfFile.file_ref, role: "support", label: "授权范围原文", locator_kind: "text_lines", start: 1, end: 1, excerpt: "授权范围：仅限本项目合同审阅。" },
+      ],
+    }],
     follow_ups: ["继续核对授权范围与财务往来之间是否存在执行约束，并形成待办清单。"],
     review_required: true,
   });
@@ -570,20 +585,31 @@ test("restores the current server run after a page reload", async ({ page }) => 
 });
 
 test("opens a cited source file from an analysis finding", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 1000 });
   await mockHarness(page); await page.goto("/");
   await page.getByRole("textbox", { name: "任务指令" }).fill("核对余额并引用来源文件。");
   await page.getByRole("button", { name: "启动 Control Loop" }).click();
   await page.getByRole("button", { name: /发现与建议/ }).click();
   await page.getByRole("button", { name: "打开审查页" }).first().click();
   await expect(page.getByRole("dialog", { name: "第一轮核对完成" })).toBeVisible();
-  await expect(page.getByRole("dialog")).toContainText("引用校验只证明 Agent 指向了允许读取的文件");
-  await expect(page.getByRole("dialog")).toContainText("星海科技");
+  await expect(page.getByRole("dialog")).toContainText("高亮位置由服务端从逐字引用解析");
+  await expect(page.getByRole("dialog")).toContainText("设计预期");
+  await expect(page.getByRole("dialog")).toContainText("实际观测");
+  await expect(page.locator('[data-evidence-focus="true"]')).toHaveCount(4);
+  if (process.env.CAPTURE_DR0029_EVIDENCE === "1") {
+    await page.getByRole("dialog").screenshot({ path: "../../docs/evidence/screenshots/dr-0029-pinpoint-evidence-review.png" });
+  }
+  await page.getByRole("button", { name: "定位证据 2：实际没有调用新闻搜索" }).click();
+  await expect(page.getByText("正在核对：实际没有调用新闻搜索")).toBeVisible();
+  await expect(page.locator('[data-evidence-focus="true"]')).toHaveCount(4);
+  await expect(page.locator('[data-evidence-focus="true"]').last()).toContainText("web_search_news_called=false");
   if (process.env.CAPTURE_DR0028_EVIDENCE === "1") {
     await page.getByRole("dialog").screenshot({ path: "../../docs/evidence/screenshots/dr-0028-finding-review.png" });
   }
+  if (process.env.CAPTURE_DR0029_EVIDENCE === "1") await page.getByRole("dialog").screenshot({ path: "../../docs/evidence/screenshots/dr-0029-observed-source-highlight.png" });
   await page.getByRole("button", { name: "关闭问题审查页" }).click();
-  await page.getByRole("button", { name: csvFile.display_label }).last().click();
-  await expect(page.getByText("星海科技")).toBeVisible();
+  await page.getByRole("button", { name: workflowFile.display_label }).last().click();
+  await expect(page.getByText("class QueryAnalysisNode:")).toBeVisible();
   await expect(page.getByRole("button", { name: "预览" })).toHaveClass(/is-active/);
 });
 
@@ -647,7 +673,7 @@ test("mobile keeps file-manager browsing, task input, preview and trajectory usa
   await page.getByRole("button", { name: /发现与建议/ }).click();
   await page.getByRole("button", { name: "打开审查页" }).first().click();
   await expect(page.getByRole("dialog")).toBeVisible();
-  await expect(page.getByRole("dialog")).toContainText("点击文件，直接对照实际内容");
+  await expect(page.getByRole("dialog")).toContainText("点一处，原文立即跳到对应行");
   const reviewMetrics = await page.evaluate(() => ({ viewport: document.documentElement.clientWidth, scroll: document.documentElement.scrollWidth }));
   expect(reviewMetrics.scroll).toBeLessThanOrEqual(reviewMetrics.viewport);
   const closeBox = await page.getByRole("button", { name: "关闭问题审查页" }).boundingBox();

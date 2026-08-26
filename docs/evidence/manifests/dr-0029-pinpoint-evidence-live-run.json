@@ -1,0 +1,65 @@
+{
+  "evidence_id": "PINPOINT-EVIDENCE-LIVE-RUN-20260826",
+  "captured_at": "2026-08-26T07:42:00Z",
+  "run_id": "harness:44cf128b1f344b6b993a4dc8841a22f9",
+  "provider_model": "deepseek-v4-pro",
+  "status": "completed",
+  "review_required": true,
+  "external_action": "none",
+  "state_store": "process_local_memory",
+  "budget": {
+    "max_rounds": 3,
+    "max_files_per_round": 4,
+    "max_model_calls": 6,
+    "deadline_seconds": 240,
+    "rounds_used": 2,
+    "model_calls_used": 4,
+    "files_verified": 4,
+    "elapsed_ms": 222696,
+    "stop_reason": null
+  },
+  "interaction": {
+    "round_1_gate": "waiting_input",
+    "confirmed_branch_title": "对照设计预期与实际观测",
+    "round_2_gate": "completed"
+  },
+  "verified_sources": [
+    { "file_ref": "forte-7b13238f78667944", "display_label": "config.py" },
+    { "file_ref": "forte-daa8f1fbdd343272", "display_label": "search_agent.log" },
+    { "file_ref": "forte-2f73463ddf941c94", "display_label": "workflow.py" },
+    { "file_ref": "forte-04c603e979388bbe", "display_label": "tools.py" }
+  ],
+  "rounds": [
+    {
+      "round_number": 1,
+      "provider_calls": 2,
+      "finding_count": 4,
+      "evidence_anchor_count": 16,
+      "analysis_output_used": true,
+      "gate_decision": "waiting_input"
+    },
+    {
+      "round_number": 2,
+      "provider_calls": 2,
+      "finding_count": 4,
+      "evidence_anchor_count": 7,
+      "analysis_output_used": true,
+      "gate_decision": "completed"
+    }
+  ],
+  "pre_repair_negative_run": {
+    "run_id": "harness:0bb945be781c4552bc5930500367dd2f",
+    "status": "failed",
+    "rounds_started": 1,
+    "provider_calls": 2,
+    "last_event_sequence": 8,
+    "failure_class": "no_unique_source_location_for_at_least_one_finding",
+    "effect": "none",
+    "retention": "sanitized_observation_only; in-memory snapshot was lost on restart"
+  },
+  "assertion_boundary": [
+    "The run proves that provider-supplied verbatim candidates were accepted only after server-side bounded source matching.",
+    "The run does not prove semantic entailment, finding correctness, production reliability, or user-value improvement.",
+    "The in-memory snapshot was not recoverable after the subsequent API restart."
+  ]
+}

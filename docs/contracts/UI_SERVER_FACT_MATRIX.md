@@ -34,6 +34,7 @@ Prompt、思维链、原始模型响应、绝对路径、哈希和内部策略�
 | Security footer | integrity verified, read-only, no active/external resource execution | `BenchmarkPreviewSecurity` | cannot be inferred from extension alone | scanner implementation details |
 | Citation click | reopen a finding's selected source | result `file_ref` resolved through workspace | selects file and switches to preview | source path/hash |
 | Review-page source switch | compare one Gap/Finding with an associated safe file | Gap/Finding refs resolved through workspace + Preview GET | changes only the review-page preview; Run version is unchanged | source file mutation, semantic proof, raw ref/path/hash |
+| Finding evidence selection | jump to one server-verified source location | Finding `evidence_anchors[].file_ref/locator_kind/start/end` + Preview GET | browser switches file, scrolls and highlights; Run version is unchanged | client-guessed position, source Diff or semantic proof |
 
 ## 3. Agent Control Loop, plan and result
 
@@ -49,7 +50,7 @@ Prompt、思维链、原始模型响应、绝对路径、哈希和内部策略�
 | Agent-selected evidence | files chosen for this round and business reason | `round.input_file_refs`, `plan.selection_reason` | after server budget/compiler validation | full metadata index, model ranking internals |
 | Analyst started/returned | provider analysis stage, not completion | `analysis_started/completed` | per round | Prompt, CoT, raw response |
 | Analyst receipt | not called/adopted/not adopted and elapsed time | round `analysis_receipt.*` | independent of result validation | token/provider trace |
-| Citation validation | every finding stays inside this round's approved refs | `result_validation` | before Evidence Gate | false semantic/numeric proof claim |
+| Citation and location validation | every Finding stays inside this round's approved refs and has at least one quote uniquely resolved in the exact bounded source | `result_validation`, `result.findings[].evidence_anchors` | before Evidence Gate; model quote candidates are removed before public projection | false semantic/numeric proof claim, raw quote candidate or model-supplied line number |
 | Evidence gap | current evidence is insufficient and one or more Branches have bounded missing refs | branch `status=waiting_input`, `evidence_gaps[].branch_id`, `evidence_gate`, `next_step.candidate_branch_ids` | prior rounds/branches/versions remain visible; no new call starts until a Branch resume | claim that the missing file guarantees truth |
 | Gap/Branch review page | user can inspect where the gap occurred, what it says and which candidate/missing files are available | `round_number`, business Branch title, `evidence_gaps[]`, Branch `missing_file_refs`, Preview GET | open/close has no server mutation; resume remains a separate versioned command | raw Branch ID, claim that candidate files solve the gap, invented diff |
 | Continue one Branch | user authorizes one more bounded round only for the selected Branch | control POST `resume` with `branch_id`, returned ControlEvent, `active_branch_id`; next `round.input_file_refs` equals that Branch's missing refs | only valid for a waiting Branch; all other waiting Branches remain unchanged | a click animation as execution proof or unrelated files silently entering the round |
@@ -61,7 +62,7 @@ Prompt、思维链、原始模型响应、绝对路径、哈希和内部策略�
 | User stopped | stop was applied at a safe point | `status=stopped`, `loop_stopped` | preserves completed rounds | rollback or deletion claim |
 | Safely stopped | model/schema/plan/source/citation check failed | `status=failed`, `harness_failed`, safe errors | no result; fresh retry | raw validator/compiler/provider error |
 | Next-task proposals | Agent suggests up to four follow-up tasks from the current bounded analysis; each proposal is not independently source-verified | terminal `result.follow_ups` | suggestion alone creates no server mutation | claim that work already started or that every proposal has a per-item citation |
-| Finding review page | user compares one Agent finding with the actual files it cited | `result.findings[].title/detail/file_refs`, matching Artifact round when available, Preview GET | open/close has no server mutation | semantic/numeric correctness, entailment, exact line location |
+| Finding review page | user compares one Agent finding with exact server-resolved safe-preview locations | `result.findings[].title/detail/file_refs/evidence_anchors`, matching Artifact round when available, Preview GET | select Anchor/open/close has no server mutation | semantic/numeric correctness, entailment, native PDF/DOCX coordinates |
 | Proposal context review | user sees the result context before deciding whether to start the suggestion | one `result.follow_ups[]` string + union of current Finding refs | explicitly labeled not independently source-verified; no mutation | direct per-proposal citation or accepted-proposal state |
 | Confirm proposal | user turns one suggestion into an independent new Loop | new POST `/v1/harness/runs` with exact proposal text | new idempotency key; previous Run/result preserved | nonexistent proposal-accept state |
 
@@ -85,7 +86,7 @@ Prompt、思维链、原始模型响应、绝对路径、哈希和内部策略�
 | DOCX/PDF/TXT | bounded extracted/read text, <=30,000 chars | OCR completeness, layout fidelity or semantic accuracy |
 | stable ref | deterministic for pinned public input path | production document identity |
 | plan compilation | server-owned effects/gates plus graph/source checks and one bounded repair | plan quality or tool execution |
-| result validation | citation membership in the server-approved round set | entailment, exhaustive matching or arithmetic |
+| result validation | citation membership plus at least one uniquely resolved safe-preview Anchor per new Finding | entailment, exhaustive matching, arithmetic, native page coordinates or cell semantics |
 | Evidence Gate | decides continue/stop from explicit gaps and remaining bounds | semantic truth or human acceptance |
 | completed | reviewable logical brief plus an independent TaskCommit pointer exists | task correctness, source-file Artifact, Connector or external process completion |
 

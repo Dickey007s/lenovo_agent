@@ -185,7 +185,17 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, summary:focus
 .table-preview .row-number { position: sticky; left: 0; z-index: 1; width: 46px; color: #8a939d; background: #f8f9fa; text-align: right; font-variant-numeric: tabular-nums; }
 .table-preview thead .row-number { z-index: 3; background: #eef1f4; }
 .table-preview tr:hover td { background: #f8fbff; }
+.table-preview tr.is-evidence-focus td { background: #fff7d6; box-shadow: inset 0 1px #d79a22, inset 0 -1px #d79a22; }
+.table-preview tr.is-evidence-focus td:first-child { box-shadow: inset 4px 0 #c47813, inset 0 1px #d79a22, inset 0 -1px #d79a22; color: #6f4714; background: #ffefb5; font-weight: 800; }
 .document-preview { max-height: 510px; overflow: auto; margin: 0; padding: 18px 20px; color: #303840; background: #fff; font-family: inherit; font-size: 14px; line-height: 1.75; white-space: pre-wrap; overflow-wrap: anywhere; }
+.document-preview.is-annotated { padding: 8px 0; white-space: normal; }
+.document-line { min-width: 0; display: grid; grid-template-columns: 52px minmax(0, 1fr) auto; align-items: start; border-left: 4px solid transparent; }
+.document-line > span { padding: 4px 10px 4px 4px; color: #8a939d; background: #f7f8fa; text-align: right; font-family: Consolas, monospace; font-size: 11px; line-height: 1.65; user-select: none; }
+.document-line > code { min-width: 0; padding: 4px 12px; color: #303840; font-family: Consolas, "Microsoft YaHei UI", monospace; font-size: 12px; line-height: 1.65; white-space: pre-wrap; overflow-wrap: anywhere; }
+.document-line > b { align-self: center; margin: 4px 9px 0 0; padding: 2px 5px; color: #74490e; background: #ffedac; font-size: 10px; white-space: nowrap; }
+.document-line.is-evidence-focus { border-left-color: #c47813; background: #fff8df; }
+.document-line.is-evidence-focus > span { color: #74490e; background: #ffedac; font-weight: 800; }
+.document-line.is-evidence-focus > code { color: #191f26; background: #fff8df; font-weight: 650; }
 .file-preview > footer { padding: 10px 14px; color: var(--muted); background: #f8fafb; font-size: 12px; }
 .preview-security { display: flex; align-items: flex-start; gap: 8px; }
 .preview-security > svg { width: 17px; flex: 0 0 auto; color: var(--green); }
@@ -398,6 +408,32 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, summary:focus
 .evidence-review-claim > span, .evidence-review-source > header span { color: var(--blue); font-size: 11px; font-weight: 750; }
 .evidence-review-claim h3 { margin: 5px 0 0; font-size: 20px; line-height: 1.4; letter-spacing: 0; }
 .evidence-review-claim p { max-width: 900px; margin: 8px 0 0; color: var(--ink-soft); font-size: 14px; line-height: 1.7; }
+.evidence-review-pinpoint { padding: 14px 0; border-bottom: 1px solid var(--line); }
+.evidence-review-pinpoint > header { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; }
+.evidence-review-pinpoint > header span { color: var(--blue); font-size: 11px; font-weight: 750; }
+.evidence-review-pinpoint > header h3 { margin: 3px 0 0; font-size: 14px; letter-spacing: 0; }
+.evidence-review-pinpoint > header > b { color: var(--green); font-size: 11px; }
+.evidence-anchor-map { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 10px; }
+.evidence-anchor-item { min-width: 0; display: grid; grid-template-columns: 28px minmax(0, 1fr); align-items: start; gap: 8px; padding: 10px; text-align: left; border: 1px solid #cdd6df; border-radius: 4px; background: #fff; }
+.evidence-anchor-item:hover, .evidence-anchor-item.is-active { border-color: #4c84c7; box-shadow: inset 4px 0 var(--blue); background: #f5f9ff; }
+.evidence-anchor-item > b { width: 25px; height: 25px; display: grid; place-items: center; border-radius: 50%; color: #fff; background: #607489; font-size: 11px; }
+.evidence-anchor-item.is-expected > b { background: var(--blue); }
+.evidence-anchor-item.is-observed > b, .evidence-anchor-item.is-support > b { background: var(--green); }
+.evidence-anchor-item.is-contradiction > b { background: var(--red); }
+.evidence-anchor-item > span { min-width: 0; display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 3px 7px; }
+.evidence-anchor-item small { align-self: center; justify-self: start; padding: 2px 5px; color: #3f5f82; background: #e9f1fa; font-size: 10px; font-weight: 750; }
+.evidence-anchor-item.is-observed small, .evidence-anchor-item.is-support small { color: var(--green); background: var(--green-soft); }
+.evidence-anchor-item.is-contradiction small { color: var(--red); background: var(--red-soft); }
+.evidence-anchor-item strong { min-width: 0; align-self: center; overflow: hidden; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.evidence-anchor-item em { grid-column: 1 / -1; color: var(--muted); font-size: 10px; font-style: normal; }
+.evidence-anchor-item q { grid-column: 1 / -1; display: -webkit-box; margin-top: 3px; overflow: hidden; color: var(--ink-soft); font-size: 11px; line-height: 1.55; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+.evidence-anchor-conclusion { grid-column: 1 / -1; display: flex; align-items: center; justify-content: center; gap: 7px; min-height: 30px; color: #5a6672; background: #f4f6f8; font-size: 11px; font-weight: 650; }
+.evidence-anchor-conclusion svg { width: 15px; color: var(--blue); }
+.evidence-review-unlocated { display: grid; grid-template-columns: 20px minmax(0, 1fr); gap: 8px; margin: 12px 0 0; padding: 10px; border-left: 3px solid var(--amber); color: #714b18; background: var(--amber-soft); }
+.evidence-review-unlocated svg { width: 17px; }
+.evidence-review-unlocated p { display: grid; gap: 2px; margin: 0; }
+.evidence-review-unlocated b { font-size: 12px; }
+.evidence-review-unlocated span { font-size: 11px; line-height: 1.5; }
 .evidence-review-source { padding: 14px 0; border-bottom: 1px solid var(--line); }
 .evidence-review-source > header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .evidence-review-source > header h3 { margin: 3px 0 0; font-size: 14px; letter-spacing: 0; }
@@ -414,6 +450,11 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, summary:focus
 .evidence-review-preview { position: relative; margin-top: 14px; border: 1px solid var(--line); }
 .evidence-review-preview .table-preview, .evidence-review-preview .document-preview { max-height: min(46dvh, 520px); }
 .evidence-review-preview .file-preview-empty { min-height: 300px; }
+.evidence-preview-locator { min-height: 46px; display: grid; grid-template-columns: 22px minmax(0, 1fr); align-items: center; gap: 8px; padding: 7px 12px; border-bottom: 1px solid #dfc169; color: #5f4315; background: #fff7d6; }
+.evidence-preview-locator > svg { width: 18px; color: #a8610a; }
+.evidence-preview-locator > span { min-width: 0; display: grid; gap: 2px; }
+.evidence-preview-locator b { overflow: hidden; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.evidence-preview-locator small { color: #7a633d; font-size: 10px; }
 .evidence-review-open-workspace { position: sticky; right: 12px; bottom: 12px; min-height: 40px; display: flex; align-items: center; gap: 6px; margin: 10px 12px 12px auto; padding: 0 11px; border: 1px solid #1b5da9; border-radius: 4px; color: #fff; background: var(--blue); font-weight: 700; }
 .evidence-review-open-workspace svg { width: 16px; }
 .workspace-boundary { margin-top: 10px; border: 1px solid var(--line); background: #fafbfc; }
@@ -539,6 +580,8 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, summary:focus
   .evidence-review-layout { grid-template-columns: 1fr; overflow: auto; }
   .evidence-review-history { overflow: visible; border-right: 0; border-bottom: 1px solid var(--line); }
   .evidence-review-main { overflow: visible; }
+  .evidence-anchor-map { grid-template-columns: 1fr; }
+  .evidence-anchor-item { min-height: 64px; }
   .evidence-review-preview .table-preview, .evidence-review-preview .document-preview { max-height: 480px; }
 }
 
@@ -563,4 +606,6 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, summary:focus
   .evidence-review-header h2 { font-size: 16px; }
   .evidence-review-history, .evidence-review-main { padding: 13px; }
   .evidence-review-files button { min-width: 190px; }
+  .document-line { grid-template-columns: 42px minmax(0, 1fr); }
+  .document-line > b { grid-column: 2; justify-self: start; margin: 0 10px 4px 12px; }
 }

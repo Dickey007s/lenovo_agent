@@ -39,6 +39,16 @@ type PreviewKind = "table" | "document" | "pdf" | "text" | "unavailable";
 type LoopPhase = "observe" | "plan" | "act" | "verify" | "evidence_gate" | "commit";
 type LoopCommand = "pause" | "resume" | "steer" | "stop" | "rollback";
 type LoopControlOptions = { instruction?: string; branchId?: string; artifactVersion?: number };
+type EvidenceRole = "expected" | "observed" | "support" | "contradiction" | "context";
+type EvidenceAnchor = {
+  file_ref: string;
+  role: EvidenceRole;
+  label: string;
+  locator_kind: "text_lines" | "table_rows";
+  start: number;
+  end: number;
+  excerpt: string;
+};
 
 type WorkspaceTreeFolder = {
   path: string;
@@ -60,6 +70,7 @@ type EvidenceReviewRequest = {
   roundNumber: number | null;
   branchTitle: string | null;
   fileRefs: string[];
+  anchors: EvidenceAnchor[];
   serverFact: string;
   boundary: string;
 };
@@ -133,7 +144,7 @@ type HarnessPreview = {
 };
 
 type ModelReceipt = { called: boolean; model: string; elapsed_ms: number; output_used: boolean };
-type HarnessFinding = { title: string; detail: string; file_refs: string[] };
+type HarnessFinding = { title: string; detail: string; file_refs: string[]; evidence_anchors: EvidenceAnchor[] };
 type HarnessResult = { summary: string; findings: HarnessFinding[]; follow_ups: string[]; review_required: boolean };
 type HarnessServerEvent = { sequence: number; event_name: string; occurred_at?: string; message?: string };
 
@@ -447,9 +458,12 @@ function findingReviewRequest(finding: HarnessFinding, index: number, roundNumbe
     status: "待人工复核",
     roundNumber,
     branchTitle: null,
-    fileRefs: uniqueFileRefs(finding.file_refs),
-    serverFact: "相关 file_ref 已通过本轮允许范围与引用成员关系校验。",
-    boundary: "引用校验只证明 Agent 指向了允许读取的文件，不证明该结论正确，也不证明文件内容必然支持这句话。",
+    fileRefs: uniqueFileRefs([...finding.file_refs, ...finding.evidence_anchors.map((anchor) => anchor.file_ref)]),
+    anchors: finding.evidence_anchors,
+    serverFact: finding.evidence_anchors.length
+      ? `服务端已把 ${finding.evidence_anchors.length} 处原文片段唯一定位到本轮安全预览，并核对文件范围。`
+      : "相关 file_ref 已通过本轮允许范围与引用成员关系校验，但旧结果没有精确位置。",
+    boundary: "高亮位置由服务端从逐字引用解析，只证明原文位置和引用成员关系；结论是否成立仍由你复核。",
   };
 }
 
@@ -464,6 +478,7 @@ function gapReviewRequest(gap: EvidenceGap, index: number, roundNumber: number, 
     roundNumber,
     branchTitle,
     fileRefs: uniqueFileRefs(gap.candidate_file_refs),
+    anchors: [],
     serverFact: "服务端 Evidence Gate 已保留缺口，并阻止受影响分支在缺少证据时继续提交。",
     boundary: "候选文件只是下一步核对范围；在用户确认或 Agent 完成下一轮前，系统不会把缺口包装成已解决事实。",
   };
@@ -482,6 +497,7 @@ function branchReviewRequest(branch: LoopBranch, gaps: EvidenceGap[]): EvidenceR
     roundNumber: branch.round_number,
     branchTitle: branch.title,
     fileRefs: uniqueFileRefs(branch.missing_file_refs),
+    anchors: [],
     serverFact: "服务端 Snapshot 将该分支标记为 waiting_input，并保留了 missing_file_refs。",
     boundary: "这些文件是分支当前缺少或待核对的引用，不代表问题已经成立。",
   };
@@ -498,6 +514,7 @@ function proposalReviewRequest(proposal: string, index: number, result: HarnessR
     roundNumber,
     branchTitle: null,
     fileRefs: uniqueFileRefs(result.findings.flatMap((finding) => finding.file_refs)),
+    anchors: [],
     serverFact: "该建议来自本轮已读取资料和已形成的发现；只有用户确认后，服务端才会创建新的独立 Run。",
     boundary: "当前协议没有为每条 follow_up 单独绑定引用。下方文件是本轮结果上下文，不应被理解为这条建议的直接证据。",
   };
@@ -624,6 +641,36 @@ function normalizeReceipt(value: unknown): ModelReceipt | null {
   };
 }
 
+function normalizeEvidenceAnchor(value: unknown): EvidenceAnchor | null {
+  if (!value || typeof value !== "object") return null;
+  const raw = value as Record<string, unknown>;
+  const fileRef = asText(raw.file_ref);
+  const role = asText(raw.role);
+  const locatorKind = asText(raw.locator_kind);
+  const start = asNumber(raw.start);
+  const end = asNumber(raw.end);
+  const label = asText(raw.label);
+  const excerpt = asText(raw.excerpt);
+  if (
+    !fileRef
+    || !["expected", "observed", "support", "contradiction", "context"].includes(role)
+    || !["text_lines", "table_rows"].includes(locatorKind)
+    || start < 1
+    || end < start
+    || !label
+    || !excerpt
+  ) return null;
+  return {
+    file_ref: fileRef,
+    role: role as EvidenceRole,
+    label,
+    locator_kind: locatorKind as EvidenceAnchor["locator_kind"],
+    start,
+    end,
+    excerpt,
+  };
+}
+
 function normalizeResult(value: unknown): HarnessResult | null {
   if (!value || typeof value !== "object") return null;
   const raw = value as Record<string, unknown>;
@@ -632,7 +679,10 @@ function normalizeResult(value: unknown): HarnessResult | null {
     const finding = item as Record<string, unknown>;
     const title = asText(finding.title); const detail = asText(finding.detail);
     const fileRefs = asStrings(finding.file_refs);
-    return title && detail && fileRefs.length ? [{ title, detail, file_refs: fileRefs }] : [];
+    const anchors = Array.isArray(finding.evidence_anchors)
+      ? finding.evidence_anchors.map(normalizeEvidenceAnchor).filter((anchor): anchor is EvidenceAnchor => anchor !== null)
+      : [];
+    return title && detail && fileRefs.length ? [{ title, detail, file_refs: fileRefs, evidence_anchors: anchors }] : [];
   }) : [];
   const summary = asText(raw.summary);
   return summary && findings.length
@@ -753,7 +803,8 @@ function activityItem(event: HarnessServerEvent): HarnessActivityItem {
     ready_to_execute: "工作计划已准备",
     analysis_started: "分析模型开始读取内容",
     analysis_completed: "分析模型返回初步结果",
-    result_validation: "服务端核对文件引用",
+    analysis_validation_rejected: "原文位置未通过，正在受控重试",
+    result_validation: "服务端核对引用与原文位置",
     round_started: "新一轮开始",
     evidence_gate: "证据门决定下一步",
     control_pause_recorded: "暂停请求已记录",
@@ -768,7 +819,7 @@ function activityItem(event: HarnessServerEvent): HarnessActivityItem {
     loop_stopped: "已按你的要求停止",
     harness_failed: "本轮已安全停止",
   };
-  const tone = event.event_name === "harness_failed" || event.event_name === "plan_validation_rejected" || event.event_name.includes("stopped") ? "warning"
+  const tone = event.event_name === "harness_failed" || event.event_name === "plan_validation_rejected" || event.event_name === "analysis_validation_rejected" || event.event_name.includes("stopped") ? "warning"
     : event.event_name.includes("planning") || event.event_name.includes("analysis") ? "model"
       : event.event_name.includes("validation") || TERMINAL_EVENTS.has(event.event_name) ? "success" : "neutral";
   return {
@@ -790,7 +841,10 @@ function normalizeArtifactVersion(value: unknown): ArtifactVersion | null {
     if (!item || typeof item !== "object") return [];
     const finding = item as Record<string, unknown>;
     const title = asText(finding.title); const detail = asText(finding.detail); const refs = asStrings(finding.file_refs);
-    return title && detail && refs.length ? [{ title, detail, file_refs: refs }] : [];
+    const anchors = Array.isArray(finding.evidence_anchors)
+      ? finding.evidence_anchors.map(normalizeEvidenceAnchor).filter((anchor): anchor is EvidenceAnchor => anchor !== null)
+      : [];
+    return title && detail && refs.length ? [{ title, detail, file_refs: refs, evidence_anchors: anchors }] : [];
   }) : [];
   return {
     artifact_id: artifactId,
@@ -1130,6 +1184,21 @@ function WorkspaceTreeNode({
   </li>;
 }
 
+const EVIDENCE_ROLE_LABELS: Record<EvidenceRole, string> = {
+  expected: "设计预期",
+  observed: "实际观测",
+  support: "支持证据",
+  contradiction: "矛盾证据",
+  context: "相关上下文",
+};
+
+function evidenceLocationLabel(anchor: EvidenceAnchor, file: HarnessFile | undefined) {
+  const range = anchor.start === anchor.end ? `${anchor.start}` : `${anchor.start}-${anchor.end}`;
+  if (anchor.locator_kind === "table_rows") return `数据第 ${range} 行`;
+  if (file?.preview_kind === "text") return `第 ${range} 行`;
+  return `安全预览第 ${range} 行`;
+}
+
 function EvidenceReviewDialog({
   request,
   files,
@@ -1145,16 +1214,22 @@ function EvidenceReviewDialog({
   const reviewFiles = useMemo(() => request.fileRefs
     .map((ref) => files.find((file) => file.file_ref === ref))
     .filter((file): file is HarnessFile => file !== undefined), [files, request.fileRefs]);
-  const [selectedFileRef, setSelectedFileRef] = useState(reviewFiles[0]?.file_ref ?? "");
+  const reviewAnchors = useMemo(() => request.anchors.filter((anchor) => files.some((file) => file.file_ref === anchor.file_ref)), [files, request.anchors]);
+  const [activeAnchorIndex, setActiveAnchorIndex] = useState(reviewAnchors.length ? 0 : -1);
+  const [selectedFileRef, setSelectedFileRef] = useState(reviewAnchors[0]?.file_ref ?? reviewFiles[0]?.file_ref ?? "");
   const [preview, setPreview] = useState<HarnessPreview | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewError, setPreviewError] = useState("");
   const selectedFile = reviewFiles.find((file) => file.file_ref === selectedFileRef) ?? null;
+  const activeAnchor = activeAnchorIndex >= 0 && reviewAnchors[activeAnchorIndex]?.file_ref === selectedFileRef
+    ? reviewAnchors[activeAnchorIndex]
+    : null;
 
   useEffect(() => {
-    setSelectedFileRef(reviewFiles[0]?.file_ref ?? "");
+    setActiveAnchorIndex(reviewAnchors.length ? 0 : -1);
+    setSelectedFileRef(reviewAnchors[0]?.file_ref ?? reviewFiles[0]?.file_ref ?? "");
     closeButtonRef.current?.focus();
-  }, [request.reviewKey, reviewFiles]);
+  }, [request.reviewKey, reviewAnchors, reviewFiles]);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -1183,6 +1258,16 @@ function EvidenceReviewDialog({
   }, [selectedFileRef]);
 
   const tone = request.kind === "gap" ? "warning" : request.kind === "proposal" ? "proposal" : "finding";
+  const selectAnchor = (index: number) => {
+    const anchor = reviewAnchors[index];
+    if (!anchor) return;
+    setActiveAnchorIndex(index);
+    setSelectedFileRef(anchor.file_ref);
+  };
+  const selectFile = (fileRef: string) => {
+    setSelectedFileRef(fileRef);
+    setActiveAnchorIndex(reviewAnchors.findIndex((anchor) => anchor.file_ref === fileRef));
+  };
   return <div className="evidence-review-backdrop" role="presentation">
     <section className={`evidence-review-page is-${tone}`} role="dialog" aria-modal="true" aria-labelledby="evidence-review-title">
       <header className="evidence-review-header">
@@ -1205,16 +1290,35 @@ function EvidenceReviewDialog({
         </aside>
         <main className="evidence-review-main">
           <section className="evidence-review-claim">
-            <span>需要核对什么</span>
+            <span>Agent 判断</span>
             <h3>{request.title}</h3>
             <p>{request.detail}</p>
           </section>
+          {reviewAnchors.length > 0 ? <section className="evidence-review-pinpoint" aria-labelledby="evidence-pinpoint-title">
+            <header><div><span>证据定位</span><h3 id="evidence-pinpoint-title">点一处，原文立即跳到对应行</h3></div><b>{reviewAnchors.length} 处已定位</b></header>
+            <div className="evidence-anchor-map">
+              {reviewAnchors.map((anchor, index) => {
+                const file = files.find((item) => item.file_ref === anchor.file_ref);
+                return <button
+                  type="button"
+                  key={`${anchor.file_ref}:${anchor.locator_kind}:${anchor.start}:${anchor.end}:${index}`}
+                  className={`evidence-anchor-item is-${anchor.role}${index === activeAnchorIndex ? " is-active" : ""}`}
+                  onClick={() => selectAnchor(index)}
+                  aria-label={`定位证据 ${index + 1}：${anchor.label}`}
+                >
+                  <b>{index + 1}</b>
+                  <span><small>{EVIDENCE_ROLE_LABELS[anchor.role]}</small><strong>{anchor.label}</strong><em>{file?.display_label ?? "允许范围内文件"} · {evidenceLocationLabel(anchor, file)}</em><q>{anchor.excerpt}</q></span>
+                </button>;
+              })}
+              <div className="evidence-anchor-conclusion"><IconArrowRight aria-hidden="true" /><span>Agent 据此提出上方判断，等待你确认语义是否成立</span></div>
+            </div>
+          </section> : <div className="evidence-review-unlocated"><IconAlertTriangle aria-hidden="true" /><p><b>当前只能定位到文件</b><span>{request.kind === "finding" ? "这是旧结果或服务端未找到唯一原文片段，系统不会伪造高亮。" : "该记录没有逐段证据锚点，请按关联文件或下一轮候选范围核对。"}</span></p></div>}
           <section className="evidence-review-source" aria-label="相关资料">
-            <header><div><span>相关资料</span><h3>点击文件，直接对照实际内容</h3></div><b>{reviewFiles.length} 份</b></header>
-            {reviewFiles.length > 0 ? <div className="evidence-review-files">{reviewFiles.map((file) => <button type="button" key={file.file_ref} className={file.file_ref === selectedFileRef ? "is-active" : ""} onClick={() => setSelectedFileRef(file.file_ref)}><IconFile aria-hidden="true" /><span><b>{file.display_label}</b><small>{file.display_path}</small></span></button>)}</div> : <p className="evidence-review-no-source">当前服务端事实没有提供可打开的关联文件。系统不会用静态示例补齐。</p>}
+            <header><div><span>相关资料</span><h3>{reviewAnchors.length ? "已标出具体位置，也可切换查看整份文件" : "点击文件，直接对照实际内容"}</h3></div><b>{reviewFiles.length} 份</b></header>
+            {reviewFiles.length > 0 ? <div className="evidence-review-files">{reviewFiles.map((file) => { const anchorCount = reviewAnchors.filter((anchor) => anchor.file_ref === file.file_ref).length; return <button type="button" key={file.file_ref} className={file.file_ref === selectedFileRef ? "is-active" : ""} onClick={() => selectFile(file.file_ref)}><IconFile aria-hidden="true" /><span><b>{file.display_label}</b><small>{file.display_path}{anchorCount ? ` · ${anchorCount} 处定位` : ""}</small></span></button>; })}</div> : <p className="evidence-review-no-source">当前服务端事实没有提供可打开的关联文件。系统不会用静态示例补齐。</p>}
           </section>
           <section className="evidence-review-preview" aria-label="资料原文预览">
-            <FilePreview preview={preview} file={selectedFile} loading={previewLoading} error={previewError} />
+            <FilePreview preview={preview} file={selectedFile} loading={previewLoading} error={previewError} anchor={activeAnchor} />
             {selectedFile && <button type="button" className="evidence-review-open-workspace" onClick={() => { onClose(); onOpenFile(selectedFile); }}><IconArrowRight aria-hidden="true" />回到资料库中打开</button>}
           </section>
         </main>
@@ -1638,13 +1742,29 @@ export function HarnessWorkbench({ onActivityChange }: { onActivityChange?: (sta
   </main>;
 }
 
-function FilePreview({ preview, file, loading, error }: { preview: HarnessPreview | null; file: HarnessFile | null; loading: boolean; error: string }) {
+function FilePreview({ preview, file, loading, error, anchor = null }: { preview: HarnessPreview | null; file: HarnessFile | null; loading: boolean; error: string; anchor?: EvidenceAnchor | null }) {
+  const focusNodeRef = useRef<HTMLElement | null>(null);
+  useEffect(() => {
+    if (!anchor || !preview || anchor.file_ref !== preview.file_ref) return;
+    const frame = window.requestAnimationFrame(() => {
+      const node = focusNodeRef.current;
+      const container = node?.closest<HTMLElement>(".table-preview, .document-preview");
+      if (!node || !container) return;
+      const nodeBox = node.getBoundingClientRect();
+      const containerBox = container.getBoundingClientRect();
+      container.scrollTop += nodeBox.top - containerBox.top - (container.clientHeight - nodeBox.height) / 2;
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [anchor, preview]);
   if (!file) return <div className="file-preview-empty"><IconFile aria-hidden="true" /><h2>从文件列表打开一份资料</h2><p>浏览文件不会限制 Agent 的检索范围；任务启动后由 Agent 自己选择相关证据。</p></div>;
   if (loading) return <div className="file-preview-empty"><IconLoader2 aria-hidden="true" /><h2>正在安全读取</h2><p>服务端正在核对完整性并生成只读预览。</p></div>;
   if (error || !preview) return <div className="file-preview-empty is-error"><IconAlertTriangle aria-hidden="true" /><h2>文件预览不可用</h2><p>{error || "没有收到可用的预览。"}</p></div>;
+  const activeAnchor = anchor?.file_ref === preview.file_ref ? anchor : null;
+  const textLines = (preview.text || "此文件没有可提取的文本层。").split("\n");
   return <article className="file-preview">
     <header><div><span>办公资料库</span><h2>{preview.display_label}</h2><p>{preview.display_path}</p></div><div className="file-meta"><b>{file.extension}</b><span>{formatSize(preview.size)}</span>{preview.page_count !== null && <span>{preview.page_count} 页</span>}{preview.total_rows !== null && <span>{preview.total_rows} 行</span>}</div></header>
-    {preview.kind === "table" ? <div className="table-preview"><table><thead><tr><th className="row-number">#</th>{preview.columns.map((column, index) => <th key={`${column}:${index}`}>{column || `列 ${index + 1}`}</th>)}</tr></thead><tbody>{preview.rows.map((row) => <tr key={row.row_number}><td className="row-number">{row.row_number}</td>{preview.columns.map((_, index) => <td key={index}>{row.values[index] ?? ""}</td>)}</tr>)}</tbody></table></div> : <pre className="document-preview">{preview.text || "此文件没有可提取的文本层。"}</pre>}
+    {activeAnchor && <div className="evidence-preview-locator" role="status"><IconEye aria-hidden="true" /><span><b>正在核对：{activeAnchor.label}</b><small>{evidenceLocationLabel(activeAnchor, file)} · 服务端已匹配原文</small></span></div>}
+    {preview.kind === "table" ? <div className="table-preview"><table><thead><tr><th className="row-number">#</th>{preview.columns.map((column, index) => <th key={`${column}:${index}`}>{column || `列 ${index + 1}`}</th>)}</tr></thead><tbody>{preview.rows.map((row) => { const focused = activeAnchor?.locator_kind === "table_rows" && row.row_number >= activeAnchor.start && row.row_number <= activeAnchor.end; return <tr key={row.row_number} className={focused ? "is-evidence-focus" : ""} data-evidence-focus={focused ? "true" : undefined} ref={focused && row.row_number === activeAnchor?.start ? (node) => { focusNodeRef.current = node; } : undefined}><td className="row-number">{row.row_number}</td>{preview.columns.map((_, index) => <td key={index}>{row.values[index] ?? ""}</td>)}</tr>; })}</tbody></table></div> : activeAnchor?.locator_kind === "text_lines" ? <div className="document-preview is-annotated" role="document">{textLines.map((line, index) => { const lineNumber = index + 1; const focused = lineNumber >= activeAnchor.start && lineNumber <= activeAnchor.end; return <div key={lineNumber} className={`document-line${focused ? " is-evidence-focus" : ""}`} data-evidence-focus={focused ? "true" : undefined} ref={focused && lineNumber === activeAnchor.start ? (node) => { focusNodeRef.current = node; } : undefined}><span>{lineNumber}</span><code>{line || " "}</code>{focused && lineNumber === activeAnchor.start && <b>{EVIDENCE_ROLE_LABELS[activeAnchor.role]}</b>}</div>; })}</div> : <pre className="document-preview">{preview.text || "此文件没有可提取的文本层。"}</pre>}
     <footer className="preview-security"><IconShieldCheck aria-hidden="true" /><div><strong>安全预览</strong><span>{preview.security.notes.join(" · ")}</span>{preview.truncated && <span>当前仅显示部分内容</span>}</div></footer>
   </article>;
 }

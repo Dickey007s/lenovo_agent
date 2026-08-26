@@ -9,7 +9,7 @@
 5. `docs/contracts/UI_SERVER_FACT_MATRIX.md`：每个 UI 状态的服务端事实。
 6. `docs/PRESENTATION_BRIEF.md`：汇报叙事和禁止夸大的结论；制作会议/PPT 主讲稿时再读 `docs/reports/OFFICE-AGENT-DETAILED-CHINESE-REPORT-20260825.md`。
 7. `docs/DECISION_AND_REPORTING_GOVERNANCE.md`：方案、PR、Demo、汇报的硬门槛。
-8. 当前整库文件管理器与自主检索变更再读 `docs/decisions/DR-0024-autonomous-whole-workspace-research.md`、`docs/decisions/DR-0028-hierarchical-workspace-and-evidence-review.md`、`docs/scenarios/SCENARIO-010-autonomous-whole-workspace-research.md`、`docs/scenarios/SCENARIO-014-inspect-agent-issue-in-context.md`、`docs/research/WORKSPACE-CENTRIC-OFFICE-AGENT-INTERACTION-AND-SOURCES-20260825.md`、`docs/testing/FORTE-PUBLIC-OFFICE-TASK-TEST-CASES-20260825.md` 与对应 Evidence/Source。`DR-0022` 的客户端手工 `selected_file_refs` 已由 `DR-0024` 取代，但其公开数据、安全预览与来源边界继续有效。
+8. 当前整库文件管理器、自主检索和原文定位变更再读 `docs/decisions/DR-0024-autonomous-whole-workspace-research.md`、`docs/decisions/DR-0028-hierarchical-workspace-and-evidence-review.md`、`docs/decisions/DR-0029-server-verified-evidence-anchors.md`、`docs/scenarios/SCENARIO-010-autonomous-whole-workspace-research.md`、`docs/scenarios/SCENARIO-014-inspect-agent-issue-in-context.md`、`docs/scenarios/SCENARIO-015-pinpoint-and-compare-agent-evidence.md`、`docs/research/WORKSPACE-CENTRIC-OFFICE-AGENT-INTERACTION-AND-SOURCES-20260825.md`、`docs/testing/FORTE-PUBLIC-OFFICE-TASK-TEST-CASES-20260825.md` 与对应 Evidence/Source。`DR-0022` 的客户端手工 `selected_file_refs` 已由 `DR-0024` 取代，但其公开数据、安全预览与来源边界继续有效。
 9. 修改 Agent Control Loop、文件夹自主研究、预算/停止、分支控制、成果恢复或 Durable State 时，再读 `docs/research/AGENT-CONTROL-LOOP-IMPLEMENTATION-AUDIT-20260825.md`、`docs/decisions/DR-0023-agent-control-loop.md`、`docs/decisions/DR-0024-autonomous-whole-workspace-research.md`、`docs/decisions/DR-0026-selective-branch-and-immutable-artifact-history.md`、`docs/scenarios/SCENARIO-012-selective-branch-and-artifact-restore.md` 与对应 Evidence/Source；`DR-0025` 只作整组补证和 Snapshot 内成果的历史基线。对外和设计文档统一称 `Agent Control Loop`；Workspace 是循环处理的办公资料环境，不另立 `Workspace Research Loop` 或 `Research Loop` 产品名称。历史约 `30%` 只表示实现 `8364b1e` 之前的架构成熟度基线；现行 Runtime 已有最多三轮的只读 Control Loop、服务端 Branch、分支级 Evidence Gate、独立 append-only 逻辑 ArtifactVersion/TaskCommit、历史成果恢复和可选 PostgreSQL 重启恢复，但可写办公 Artifact、多实例协调、多 Worker 与外部动作仍未实现。
 
 源码永远高于文档。行为或叙事变化后必须同步 living docs、Decision、Scenario、
@@ -25,7 +25,7 @@ Source、Evidence 和 UI-server fact mapping，不能只更新 README。
 - 公共 API/DOM/模型输入不得暴露 raw task/rubric/solution、绝对/内部路径、完整 hash、Prompt、CoT、raw provider response、密钥或内部 validator/effect 字符串。
 - 当前成功路径按轮真实调用 Planner 和 Analyst。`called/output_used/elapsed_ms` 必须分开显示；动画和配置模型名不是调用证据。`未采用` 表示模型已返回但服务端校验拒绝，不是未调用。Plan 可在同一预算内进行最多一次受控修复，拒绝与重试都必须进入有序 Trace。
 - Run 创建时服务端冻结完整 allowlisted 输入索引，`scope_mode=whole_workspace`。Planner 只看到安全元数据并自主选择本轮证据；服务端拥有每轮文件预算、source scope、side effect、human gate、unit/dependency/tool/source validation。`run_workspace_write` 在当前仅表示逻辑本轮结果，不证明 Artifact/File 写入。
-- 每个 finding 必须引用服务端批准的本轮 `file_ref`，引用按钮和“打开审查页”都能回开对应安全预览。Gap/Branch/Finding 必须提供可直接核对问题描述、轮次/业务分支和关联文件的入口；Git 风格只表示审查记录结构，不得伪造行级 Diff。这些引用只证明 membership，不证明 entailment、穷举或算术正确。
+- 每个新 finding 必须引用服务端批准的本轮 `file_ref`，并至少包含一处由 Runtime 从 Analyst 逐字 quote 候选中唯一匹配得到的 `evidence_anchor`。审查页按证据角色展示文件、文本行/表格行和服务端摘录，点击后回开并高亮对应安全预览；浏览器不得从 Finding 文案猜测位置，旧成果无 Anchor 时必须明确退化为文件级核对。Gap/Branch/Finding 必须提供问题描述、轮次/业务分支和关联文件入口；Git 风格只表示审查记录结构，不得伪造源文件 Diff。这些位置和引用只证明 location/membership，不证明 entailment、穷举或算术正确。
 - 终态 `result.follow_ups` 最多显示 4 条 Agent 下一步建议。建议不是执行事实；当前协议没有逐项引用，审查页只能把 Finding refs 并集标为本轮上下文，不得冒充直接证据。只有用户点击“确认并启动”后才创建新的独立 Run，旧 Run/结果不得被覆盖。
 - 当前可在最多 3 轮内到 `completed/stopped/failed`。validated plan unit 由服务端编译为稳定 Branch；Evidence Gate 按 Branch 维护已核对/缺失引用。证据不足且预算允许时进入 `waiting_input/paused`，用户只选择一条 waiting Branch 继续，下一轮范围严格等于该 Branch 的 `missing_file_refs`，其他 Branch 保持等待。每个完成轮次生成独立 append-only 逻辑 evidence-brief ArtifactVersion，成功终态新增 TaskCommit 指针而不改写版本。`completed` 代表 schema/ref/read-only/branch-record checks 通过且 `review_required=true`；不代表任务正确、质量通过、源文件写入、Tool/Worker/Connector 或外部动作发生。
 - `pause/resume/steer/stop/rollback` 必须携带 expected version 与幂等键。Branch resume 还携带 `branch_id`；rollback 还携带 `artifact_version`，只新增 TaskCommit 并恢复逻辑 Brief，不删除历史或回滚源文件。pause/stop 只在模型调用之间的安全点生效；steer 只影响下一轮；deadline 阻止新调用但不硬取消在途 HTTP 请求。
@@ -50,7 +50,7 @@ Source、Evidence 和 UI-server fact mapping，不能只更新 README。
 8. Checkpoint, Event & Governance Control
 
 当前实现模块 1-4、模块 5 的有界单 Loop Controller 子集、模块 7 的受限 read-only
-Result/citation/Branch Evidence Gate/独立 append-only 逻辑 ArtifactVersion/TaskCommit 与恢复子集，
+Result/citation/服务端 Preview Evidence Anchor/Branch Evidence Gate/独立 append-only 逻辑 ArtifactVersion/TaskCommit 与恢复子集，
 以及模块 8 的 Snapshot、event、branch/rollback control、idempotency 和可选 PostgreSQL
 restart-recovery 子集。分布式 Scheduler/Worker、模块 6 的真实 Tool Gateway、可写办公
 Artifact 与语义/数值 Verifier、多实例协调、Risk/Evidence/Approval/Permit 和 Connector

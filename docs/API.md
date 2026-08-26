@@ -273,7 +273,22 @@ Important fields:
   "result": {
     "summary": "...",
     "findings": [
-      {"title": "...", "detail": "...", "file_refs": ["forte-..."]}
+      {
+        "title": "...",
+        "detail": "...",
+        "file_refs": ["forte-..."],
+        "evidence_anchors": [
+          {
+            "file_ref": "forte-...",
+            "role": "observed",
+            "label": "实际运行记录",
+            "locator_kind": "text_lines",
+            "start": 42,
+            "end": 45,
+            "excerpt": "...server-copied bounded source text..."
+          }
+        ]
+      }
     ],
     "follow_ups": ["由用户确认后可作为新 Run 启动的下一步任务"],
     "review_required": true
@@ -300,10 +315,24 @@ in the current contract. A review UI may show the current result's Finding refs
 as explicitly labeled context, but must not present them as direct evidence for
 an individual proposal.
 
-The issue-review page adds no endpoint. Finding review uses its own `file_refs`;
-Gap/Branch review uses `candidate_file_refs` or `missing_file_refs`; actual
-content still comes from the preview endpoint. Opening or closing review is a
-client action and does not change Run version or create a ControlEvent.
+The issue-review page adds no endpoint. Finding review uses its own `file_refs`
+and server-resolved `evidence_anchors`; Gap/Branch review uses
+`candidate_file_refs` or `missing_file_refs`; actual content still comes from
+the preview endpoint. Opening, selecting an Anchor or closing review is a client
+action and does not change Run version or create a ControlEvent.
+
+The Analyst supplies verbatim quote candidates, not trusted line numbers. The
+server resolves each accepted candidate against the exact bounded table/text
+projection used in that round, requires a unique row or text match, removes the
+raw candidate and publishes only `evidence_anchors`. `text_lines` refers to
+safe extracted preview lines; for PDF/DOCX it is not an original page or native
+paragraph coordinate. `table_rows` is row-level, not cell-level semantic proof.
+Each newly adopted Finding needs at least one resolved Anchor. Anchor membership
+and location do not prove entailment, arithmetic, completeness or correctness.
+If the first Analyst candidate cannot be uniquely located, the Runtime may spend
+one additional Analyst call inside the same Run budget. It emits
+`analysis_validation_rejected` before retrying and never publishes the rejected
+candidate. A second failure ends through the normal fail-closed path.
 
 Current statuses are `queued`, `indexing`, `planning`, `validating`,
 `analyzing`, `verifying`, `waiting_input`, `paused`, `completed`, `stopped`
@@ -320,9 +349,9 @@ historical version by creating another Commit. None of these facts means an
 original office file or external system changed.
 
 `completed` means the Evidence Gate found no unresolved citation gap in the
-selected evidence and the read-only results passed schema, selected-citation
-and boundary checks. It does not mean the answer is semantically correct or a
-plan-declared tool executed.
+selected evidence and the read-only results passed schema, selected-citation,
+evidence-location and boundary checks. It does not mean the answer is
+semantically correct or a plan-declared tool executed.
 
 ## 7. Control a Run
 

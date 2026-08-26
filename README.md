@@ -9,15 +9,16 @@ only after human confirmation.
 
 The current product is deliberately narrow. `completed` means the Planner
 candidate passed server policy/structure checks and the Analyst response passed
-schema, selected-reference and read-only-boundary checks. It does not mean the
-answer is correct, a file was changed or an external business action happened.
+schema, selected-reference, server-resolved evidence-location and read-only
+boundary checks. It does not mean the answer is correct, a file was changed or
+an external business action happened.
 
 ## Current product
 
 The root page is the only product entry:
 
-- left: one searchable file-manager list containing all 96 public FORTE input
-  files, with file-type filters and no role or Demo partition;
+- left: one searchable, collapsible folder tree containing all 96 public FORTE
+  input files, with file-type filters and no role or Demo partition;
 - center: file metadata, CSV/XLSX/PDF/DOCX/TXT/code preview, a free-form task
   composer, loop budget, round history, server-owned task branches, evidence
   gaps, controls, append-only result history, a cited read-only brief and up to
@@ -38,7 +39,8 @@ browse or search the whole repository
   -> deepseek-v4-pro Planner selects a minimal evidence set and explains why
   -> server compiles and validates scope, tools, dependencies and effects
   -> deepseek-v4-pro Analyst reads the approved safe projections
-  -> server validates citation membership and evaluates the Evidence Gate
+  -> Analyst returns exact quote candidates; server uniquely resolves safe-preview locations
+  -> server validates citation membership, evidence anchors and the Evidence Gate
   -> evidence missing: pause the affected task branches before spending another round
   -> user chooses one branch: next round is bound to that branch's missing sources
   -> ordered SSE + authoritative Snapshot
@@ -171,6 +173,10 @@ multi-instance coordination and governed external action remain target work.
   next-task proposals. It reuses the existing safe Preview API, makes citation
   limits explicit and does not add semantic verification or per-proposal
   citations.
+- `DR-0029` adds server-verified Evidence Anchors. A Finding now carries exact
+  safe-preview text lines or table rows resolved from verbatim model quotes;
+  the review page compares evidence roles and jumps to highlighted source
+  locations. Location verification still does not prove semantic correctness.
 - No target-user study has been run. Clarity, trust, efficiency and user value
   remain hypotheses.
 
@@ -183,6 +189,8 @@ The current Demo 1 branch/artifact increment is tracked in
 [`DEMO1-BRANCH-ARTIFACT-CONTROL-20260826`](docs/evidence/DEMO1-BRANCH-ARTIFACT-CONTROL-EVIDENCE-20260826.md).
 The current folder hierarchy and issue-review interaction is tracked in
 [`WORKSPACE-TREE-AND-EVIDENCE-REVIEW-20260826`](docs/evidence/WORKSPACE-TREE-AND-EVIDENCE-REVIEW-EVIDENCE-20260826.md).
+The current exact evidence-location interaction is tracked in
+[`PINPOINT-EVIDENCE-REVIEW-20260826`](docs/evidence/PINPOINT-EVIDENCE-REVIEW-EVIDENCE-20260826.md).
 
 ## Local run
 
@@ -249,6 +257,9 @@ pnpm --dir apps/web exec playwright test e2e/harness-workbench.spec.ts
 - [DR-0028：分层文件目录与问题审查页](docs/decisions/DR-0028-hierarchical-workspace-and-evidence-review.md)
 - [SCENARIO-014：在原始资料中核对 Agent 问题](docs/scenarios/SCENARIO-014-inspect-agent-issue-in-context.md)
 - [分层文件目录与问题审查页 Evidence](docs/evidence/WORKSPACE-TREE-AND-EVIDENCE-REVIEW-EVIDENCE-20260826.md)
+- [DR-0029：服务端验证的证据锚点](docs/decisions/DR-0029-server-verified-evidence-anchors.md)
+- [SCENARIO-015：定位并对照 Agent 证据](docs/scenarios/SCENARIO-015-pinpoint-and-compare-agent-evidence.md)
+- [原文定位审查 Evidence](docs/evidence/PINPOINT-EVIDENCE-REVIEW-EVIDENCE-20260826.md)
 - [可恢复 Control Loop Evidence](docs/evidence/DURABLE-EVIDENCE-GATE-ARTIFACT-EVOLUTION-EVIDENCE-20260826.md)
 - [整库自主研究 Evidence](docs/evidence/AUTONOMOUS-WHOLE-WORKSPACE-RESEARCH-EVIDENCE-20260825.md)
 - [Agent Control Loop 三轮只读纵切证据](docs/evidence/AGENT-CONTROL-LOOP-BOUNDED-READONLY-EVIDENCE-20260825.md)

@@ -89,9 +89,18 @@ file. Every result remains labeled for human review. A citation button resolves
 against the workspace projection, selects that file and switches back to its
 preview. A Finding, Branch or Evidence Gap can also open a full-page review
 surface: it presents the business claim, round/branch location, authoritative
-server record, associated refs and the same safe Preview response together. The
-Git-like history is an information structure, not a source-file diff or a claim
-that semantic correctness has been proven.
+server record, associated refs and the same safe Preview response together.
+
+For a new Finding, the Analyst also supplies short verbatim quote candidates.
+The server resolves them against the exact bounded content used in that round,
+requires a unique text/table match and publishes `evidence_anchors`. The review
+surface renders those Anchors as a numbered evidence chain. Selecting one
+switches to its file, displays the server locator and highlights the matching
+safe-preview lines or table row. The browser never derives positions from the
+Finding prose. If an old result or non-Finding record has no Anchor, the page
+states that only file-level review is available and does not invent a highlight.
+The Git-like history is an information structure, not a source-file diff or a
+claim that semantic correctness has been proven.
 
 A model candidate that fails server validation is shown as `未采用`; at most
 one bounded repair attempt may follow and it consumes the same model-call
@@ -183,9 +192,10 @@ preview region.
 
 Ordinary DOM must not contain benchmark task prompt/rubric/solution, raw path,
 digest, model Prompt, chain-of-thought, raw response, credentials, internal
-effect/gate enums or low-level logs. The UI may show business labels, bounded
-content, call receipts, validation status, Branch states, evidence gaps,
-controls and citations because those facts help the user decide or recover.
+effect/gate enums, unvalidated quote candidates or low-level logs. The UI may
+show business labels, bounded content, server-resolved Evidence Anchors, call
+receipts, validation status, Branch states, evidence gaps, controls and
+citations because those facts help the user decide or recover.
 The current logical evidence briefs and TaskCommits are independent append-only
 records and their safe projections are also present in the Run Snapshot. This
 proves result-history preservation, not a source-file write, semantic truth,

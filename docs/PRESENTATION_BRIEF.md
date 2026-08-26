@@ -60,7 +60,8 @@ Agent Control Loop 的逐模块历史基线、当前三轮只读纵切和后续�
 5. 展示 Agent 本轮选择了哪些文件、为什么选择，以及服务端如何把超预算候选限制在本轮上限内。
 6. 在 Evidence Gate 停下来，先点“查看问题”：在审查页核对第几轮、哪条分支、问题描述、候选文件和实际原文；关闭后再只点一条“继续此分支”。
 7. 展示成果简报从 v1 到 v2；再恢复 v1，说明系统只新增一条 TaskCommit、当前指针改变，v2 与原文件都没有被覆盖。
-8. 对 Finding 点“打开审查页”；对建议点“查看形成依据”，说明建议尚未逐项绑定引用；只有点击“确认并启动”才创建新 Loop。
+8. 对 Finding 点“打开审查页”：先展示“设计预期/实际观测”证据链，再点击其中一项，让预览自动切换文件、跳到并高亮原文位置；强调位置匹配不等于结论正确。
+9. 对建议点“查看形成依据”，说明建议尚未逐项绑定引用；只有点击“确认并启动”才创建新 Loop。
 
 演示不要从八模块架构图开始。先让观众看到数据、任务、轨迹和证据闭环，
 再解释支撑它的架构。
@@ -104,6 +105,7 @@ Agent Control Loop 的逐模块历史基线、当前三轮只读纵切和后续�
 | 模型之后还有策略编译器 | 模型不能静默决定副作用 | “模型已调用”与“计划已校验”分开 | Model Receipt 与服务端 Plan |
 | 有序事件加权威 Snapshot | 进度和恢复依据事实 | 轨迹、重连中、最终对账 | named SSE 与 Run Snapshot |
 | 引用范围校验 + 问题审查页 | 用户不用在缺口卡和 96 份文件之间来回猜，可以从问题直接对照原文 | 轮次/分支定位、审查记录、关联文件、安全预览 | Gap/Branch/Finding refs + Preview GET；不等于语义正确 |
+| 服务端 Evidence Anchor | 用户不用在整份代码、日志或表格中手工搜索 Agent 的依据，可以在预期与观测之间逐项切换 | 编号证据链、证据角色、行范围、原文摘录、自动跳转与高亮 | Finding `evidence_anchors[]` + Preview GET；模型 quote 需唯一匹配，位置不等于 entailment |
 | 终态仍要求复核 | 完成不等于正确 | “模型初步结论 · 待复核” | `review_required=true` |
 | 服务端 Evidence Gate | 验证结果可决定继续还是停止 | 本轮缺口、下一轮目的、剩余预算 | `rounds[].evidence_gaps` 与 `next_step` |
 | 轮次间人工证据门 | 证据不足时由人决定是否继续花预算 | “确认并继续核对”、调整方向或停止 | `status=waiting_input`、`control_state=paused`、resume 回执 |
@@ -112,7 +114,7 @@ Agent Control Loop 的逐模块历史基线、当前三轮只读纵切和后续�
 | Snapshot 持久化与安全恢复 | 刷新/进程重启不必把已完成轮次当作丢失 | “检查点已恢复”、原轮次/预算/版本、显式继续 | PostgreSQL `HarnessStateStore`、`checkpoint_recovered` |
 | 独立不可变成果记录 | 用户看见每轮成果，提交不再通过改写版本表达 | 简报 v1/v2、草稿/已核对、当前版本指针 | append-only `ArtifactVersion`、独立 `TaskCommit` |
 | 受控成果恢复 | 用户可以恢复旧简报且不丢掉新版 | “恢复”、当前 vN、“已恢复历史成果版本” | rollback ControlEvent、新 TaskCommit、`artifact_version_restored` |
-| 有界候选修复 | 模型返回未通过时不会静默采用 | `未采用` 与预算内重试 | `plan_validation_rejected`、模型调用计数 |
+| 有界候选修复 | 模型返回未通过时不会静默采用 | `未采用` 与预算内重试 | `plan_validation_rejected` / `analysis_validation_rejected`、模型调用计数 |
 | 人工确认下一步 | Agent 建议不会自动扩张任务；用户先看形成上下文 | “尚未逐项验证”“查看形成依据”“确认并启动” | 终态 `follow_ups` + Finding refs 上下文 + 新 Run POST |
 
 ## 7. 当前证据卡片

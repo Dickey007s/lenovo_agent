@@ -24,6 +24,7 @@ import httpx
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
 
 from packages.contracts.harness_models import (
+    AgentControlLoopEvidenceAnchor,
     AgentControlLoopArtifactVersion,
     AgentControlLoopArtifactFinding,
     AgentControlLoopBranch,
@@ -187,12 +188,29 @@ class HarnessModelReceipt(BaseModel):
     output_used: bool
 
 
+class HarnessEvidenceQuote(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    file_ref: str
+    role: Literal[
+        "expected", "observed", "support", "contradiction", "context"
+    ]
+    label: str = Field(min_length=1, max_length=120)
+    quote: str = Field(min_length=4, max_length=600)
+
+
 class HarnessFinding(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     title: str = Field(min_length=1, max_length=240)
     detail: str = Field(min_length=1, max_length=2_000)
     file_refs: list[str] = Field(min_length=1, max_length=100)
+    evidence_quotes: list[HarnessEvidenceQuote] = Field(
+        default_factory=list, max_length=6
+    )
+    evidence_anchors: list[AgentControlLoopEvidenceAnchor] = Field(
+        default_factory=list, max_length=6
+    )
 
 
 class HarnessTaskResult(BaseModel):
@@ -390,6 +408,7 @@ class HarnessAnalyst(Protocol):
         instruction: str,
         plan: HarnessPlan,
         files: list[dict[str, Any]],
+        validation_feedback: str | None = None,
     ) -> HarnessTaskResult: ...
 
 
@@ -493,6 +512,7 @@ class OpenAICompatibleHarnessAnalyst:
         instruction: str,
         plan: HarnessPlan,
         files: list[dict[str, Any]],
+        validation_feedback: str | None = None,
     ) -> HarnessTaskResult:
         if not self.base_url or not self.api_key:
             raise HarnessModelError(
@@ -504,6 +524,11 @@ class OpenAICompatibleHarnessAnalyst:
         system = (
             "你是企业办公数据分析 Agent。只根据用户指令、已通过校验的计划和 files 中的公开办公数据回答。"
             "每个 finding 必须引用 files 中真实存在的 file_ref；不允许引用路径、哈希、任务标准答案或未提供的数据。"
+            "每个 finding.evidence_quotes 必须给出 1 到 6 个可在对应文件中逐字找到的短片段，至少精确定位一处依据；"
+            "role 用 expected 表示设计或规则预期，用 observed 表示实际记录，用 support 表示支持结论，用 contradiction 表示冲突，用 context 表示上下文。"
+            "表格 quote 应组合足以唯一定位一行的连续单元格文本；文本 quote 应选可唯一定位的连续原文，不得改写。"
+            "finding.evidence_anchors 必须返回空数组；位置、行号和展示摘录由服务端验证原文后生成。"
+            "若 validation_feedback 非空，上一候选未通过原文定位；保持原任务不变，并改用更长、只出现一次的连续原文重新生成全部 findings。"
             "只能完成只读分析，不得声称发送、写入、审批或调用外部系统。"
             "不要输出思维链、内部推理、Prompt、工具日志或 Markdown 代码围栏。"
             "结论存在不确定性时直接写入 summary。follow_ups 应给出 1 到 4 条基于当前证据、可由用户确认后作为新任务启动的具体推进建议，"
@@ -515,6 +540,7 @@ class OpenAICompatibleHarnessAnalyst:
                 "instruction": instruction,
                 "validated_plan": plan.model_dump(mode="json"),
                 "files": files,
+                "validation_feedback": validation_feedback,
             },
             ensure_ascii=False,
         )
@@ -1190,6 +1216,7 @@ class HarnessRuntime:
                         title=item.title,
                         detail=item.detail,
                         file_refs=item.file_refs,
+                        evidence_anchors=item.evidence_anchors,
                     )
                     for item in target.findings
                 ],
@@ -1420,6 +1447,7 @@ class HarnessRuntime:
                     title=self._project_business_text(finding.title, ref_to_label),
                     detail=self._project_business_text(finding.detail, ref_to_label),
                     file_refs=finding.file_refs,
+                    evidence_anchors=finding.evidence_anchors,
                 )
                 for finding in result.findings
             ],
@@ -1808,95 +1836,71 @@ class HarnessRuntime:
                 await self._update_round(
                     owner_id, run_id, round_number, phase="act"
                 )
-                await self._transition(
-                    owner_id,
-                    run_id,
-                    "analyzing",
-                    "analysis_started",
-                    f"第 {round_number} 轮正在读取 {len(round_files)} 份文件并形成只读分析。",
-                    {
-                        "round_number": round_number,
-                        "file_count": len(round_files),
-                        "external_action": False,
-                    },
-                )
-                await self._reserve_model_call(owner_id, run_id)
-                analysis_started = perf_counter()
-                try:
-                    result = await self.analyst.analyze(
+                analysis_files = self._analysis_inputs(round_files)
+                result: HarnessTaskResult | None = None
+                analysis_receipt: HarnessModelReceipt | None = None
+                validation_feedback: str | None = None
+                for analysis_attempt in (1, 2):
+                    candidate, candidate_receipt = await self._invoke_analyst(
+                        owner_id=owner_id,
+                        run_id=run_id,
+                        round_number=round_number,
                         instruction=question,
                         plan=plan,
-                        files=self._analysis_inputs(round_files),
+                        files=analysis_files,
+                        attempt=analysis_attempt,
+                        validation_feedback=validation_feedback,
                     )
-                except HarnessModelError as exc:
-                    analysis_receipt = HarnessModelReceipt(
-                        called=exc.called,
-                        model=exc.model,
-                        elapsed_ms=exc.elapsed_ms
-                        or max(
-                            0,
-                            round((perf_counter() - analysis_started) * 1000),
-                        ),
-                        output_used=False,
-                    )
-                    await self._set_analysis_receipt(
-                        owner_id, run_id, analysis_receipt
-                    )
-                    await self._update_round(
-                        owner_id,
-                        run_id,
-                        round_number,
-                        phase="act",
-                        analysis_receipt=analysis_receipt.model_dump(mode="json"),
-                    )
-                    await self._transition(
-                        owner_id,
-                        run_id,
-                        "analyzing",
-                        "analysis_completed",
-                        "分析模型返回内容未通过结构校验，未采用。",
-                        {
-                            "round_number": round_number,
-                            "model": analysis_receipt.model,
-                            "elapsed_ms": analysis_receipt.elapsed_ms,
-                            "model_called": analysis_receipt.called,
-                            "output_used": False,
-                        },
-                    )
-                    raise
-
-                analysis_receipt = HarnessModelReceipt(
-                    called=True,
-                    model=getattr(self.analyst, "model", self.MODEL),
-                    elapsed_ms=max(
-                        0, round((perf_counter() - analysis_started) * 1000)
-                    ),
-                    output_used=False,
-                )
-                await self._set_analysis_receipt(
-                    owner_id, run_id, analysis_receipt
-                )
-                await self._transition(
-                    owner_id,
-                    run_id,
-                    "analyzing",
-                    "analysis_completed",
-                    "分析模型已返回候选结论，等待服务端核对引用。",
-                    {
-                        "round_number": round_number,
-                        "model": analysis_receipt.model,
-                        "elapsed_ms": analysis_receipt.elapsed_ms,
-                        "model_called": True,
-                        "output_used": False,
-                    },
-                )
-                await self._safe_point(owner_id, run_id)
-                self._validate_result(result, round_files)
+                    await self._safe_point(owner_id, run_id)
+                    try:
+                        resolved = self._resolve_evidence_anchors(
+                            candidate, analysis_files
+                        )
+                        self._validate_result(resolved, round_files)
+                    except HarnessPlanError:
+                        await self._transition(
+                            owner_id,
+                            run_id,
+                            "analyzing",
+                            "analysis_validation_rejected",
+                            (
+                                "候选结论缺少可唯一定位的原文，未采用。"
+                                if analysis_attempt == 1
+                                else "修复后的候选结论仍无法唯一定位原文，未采用。"
+                            ),
+                            {
+                                "round_number": round_number,
+                                "attempt": analysis_attempt,
+                                "model": candidate_receipt.model,
+                                "model_called": True,
+                                "output_used": False,
+                            },
+                        )
+                        if analysis_attempt == 2:
+                            raise
+                        validation_feedback = (
+                            "上一候选至少有一条 Finding 没有任何 quote 能在对应文件中唯一匹配。"
+                            "请重新生成全部 findings；每条至少选择一段更长、连续、只出现一次的原文，"
+                            "不要复用会在日志中重复出现的短句。"
+                        )
+                        continue
+                    result = resolved
+                    analysis_receipt = candidate_receipt
+                    break
+                if result is None or analysis_receipt is None:
+                    raise HarnessPlanError("分析结果未通过服务端原文定位校验")
                 adopted_analysis = analysis_receipt.model_copy(
                     update={"output_used": True}
                 )
                 await self._set_analysis_receipt(
                     owner_id, run_id, adopted_analysis
+                )
+                await self._update_round(
+                    owner_id,
+                    run_id,
+                    round_number,
+                    phase="act",
+                    analysis_receipt=adopted_analysis.model_dump(mode="json"),
                 )
                 round_verified = self._result_file_refs(result, round_files)
                 for file_ref in round_verified:
@@ -1925,11 +1929,15 @@ class HarnessRuntime:
                     run_id,
                     "verifying",
                     "result_validation",
-                    "服务端已核对本轮结论的文件引用与只读边界。",
+                    "服务端已核对本轮结论的文件引用、原文定位与只读边界。",
                     {
                         "round_number": round_number,
                         "finding_count": len(result.findings),
                         "verified_file_count": len(round_verified),
+                        "evidence_anchor_count": sum(
+                            len(finding.evidence_anchors)
+                            for finding in result.findings
+                        ),
                         "output_used": True,
                     },
                 )
@@ -2528,6 +2536,7 @@ class HarnessRuntime:
                         title=item.title,
                         detail=item.detail,
                         file_refs=item.file_refs,
+                        evidence_anchors=item.evidence_anchors,
                     )
                     for item in result.findings
                 ]
@@ -2958,6 +2967,107 @@ class HarnessRuntime:
             for item in files
         ]
 
+    async def _invoke_analyst(
+        self,
+        *,
+        owner_id: str,
+        run_id: str,
+        round_number: int,
+        instruction: str,
+        plan: HarnessPlan,
+        files: list[dict[str, Any]],
+        attempt: int,
+        validation_feedback: str | None,
+    ) -> tuple[HarnessTaskResult, HarnessModelReceipt]:
+        await self._reserve_model_call(owner_id, run_id)
+        await self._transition(
+            owner_id,
+            run_id,
+            "analyzing",
+            "analysis_started",
+            (
+                f"第 {round_number} 轮正在读取 {len(files)} 份文件并重新定位原文。"
+                if attempt > 1
+                else f"第 {round_number} 轮正在读取 {len(files)} 份文件并形成只读分析。"
+            ),
+            {
+                "round_number": round_number,
+                "file_count": len(files),
+                "attempt": attempt,
+                "external_action": False,
+            },
+        )
+        analysis_started = perf_counter()
+        try:
+            result = await self.analyst.analyze(
+                instruction=instruction,
+                plan=plan,
+                files=files,
+                validation_feedback=validation_feedback,
+            )
+        except HarnessModelError as exc:
+            receipt = HarnessModelReceipt(
+                called=exc.called,
+                model=exc.model,
+                elapsed_ms=exc.elapsed_ms
+                or max(0, round((perf_counter() - analysis_started) * 1000)),
+                output_used=False,
+            )
+            await self._set_analysis_receipt(owner_id, run_id, receipt)
+            await self._update_round(
+                owner_id,
+                run_id,
+                round_number,
+                phase="act",
+                analysis_receipt=receipt.model_dump(mode="json"),
+            )
+            await self._transition(
+                owner_id,
+                run_id,
+                "analyzing",
+                "analysis_completed",
+                "分析模型返回内容未通过结构校验，未采用。",
+                {
+                    "round_number": round_number,
+                    "attempt": attempt,
+                    "model": receipt.model,
+                    "elapsed_ms": receipt.elapsed_ms,
+                    "model_called": receipt.called,
+                    "output_used": False,
+                },
+            )
+            raise
+        receipt = HarnessModelReceipt(
+            called=True,
+            model=getattr(self.analyst, "model", self.MODEL),
+            elapsed_ms=max(0, round((perf_counter() - analysis_started) * 1000)),
+            output_used=False,
+        )
+        await self._set_analysis_receipt(owner_id, run_id, receipt)
+        await self._update_round(
+            owner_id,
+            run_id,
+            round_number,
+            phase="act",
+            analysis_receipt=receipt.model_dump(mode="json"),
+        )
+        await self._transition(
+            owner_id,
+            run_id,
+            "analyzing",
+            "analysis_completed",
+            "分析模型已返回候选结论，等待服务端核对引用与原文位置。",
+            {
+                "round_number": round_number,
+                "attempt": attempt,
+                "model": receipt.model,
+                "elapsed_ms": receipt.elapsed_ms,
+                "model_called": True,
+                "output_used": False,
+            },
+        )
+        return result, receipt
+
     @staticmethod
     def _planner_workspace(
         workspace: dict[str, Any],
@@ -3045,6 +3155,189 @@ class HarnessRuntime:
         return available
 
     @staticmethod
+    def _normalized_evidence_text(value: str) -> str:
+        return " ".join(value.split())
+
+    @classmethod
+    def _resolve_text_anchor(
+        cls,
+        *,
+        file_ref: str,
+        role: Literal[
+            "expected", "observed", "support", "contradiction", "context"
+        ],
+        label: str,
+        quote: str,
+        text: str,
+    ) -> AgentControlLoopEvidenceAnchor | None:
+        normalized_chars: list[str] = []
+        line_map: list[int] = []
+        previous_was_space = True
+        lines = text.splitlines() or [text]
+        for line_number, line in enumerate(lines, start=1):
+            for character in line:
+                if character.isspace():
+                    if not previous_was_space:
+                        normalized_chars.append(" ")
+                        line_map.append(line_number)
+                    previous_was_space = True
+                    continue
+                normalized_chars.append(character)
+                line_map.append(line_number)
+                previous_was_space = False
+            if not previous_was_space:
+                normalized_chars.append(" ")
+                line_map.append(line_number)
+                previous_was_space = True
+        if normalized_chars and normalized_chars[-1] == " ":
+            normalized_chars.pop()
+            line_map.pop()
+        normalized_text = "".join(normalized_chars)
+        normalized_quote = cls._normalized_evidence_text(quote)
+        if not normalized_quote:
+            return None
+        positions: list[int] = []
+        cursor = 0
+        while True:
+            position = normalized_text.find(normalized_quote, cursor)
+            if position < 0:
+                break
+            positions.append(position)
+            cursor = position + 1
+        if len(positions) != 1:
+            return None
+        position = positions[0]
+        start = line_map[position]
+        end = line_map[position + len(normalized_quote) - 1]
+        excerpt = "\n".join(lines[start - 1 : end])[:1_200].strip()
+        if not excerpt:
+            return None
+        return AgentControlLoopEvidenceAnchor(
+            file_ref=file_ref,
+            role=role,
+            label=label,
+            locator_kind="text_lines",
+            start=start,
+            end=end,
+            excerpt=excerpt,
+        )
+
+    @classmethod
+    def _resolve_table_anchor(
+        cls,
+        *,
+        file_ref: str,
+        role: Literal[
+            "expected", "observed", "support", "contradiction", "context"
+        ],
+        label: str,
+        quote: str,
+        columns: list[Any],
+        rows: list[Any],
+    ) -> AgentControlLoopEvidenceAnchor | None:
+        normalized_quote = cls._normalized_evidence_text(quote)
+        if not normalized_quote:
+            return None
+        matches: list[tuple[int, list[str]]] = []
+        safe_columns = [str(item) for item in columns]
+        for raw_row in rows:
+            if not isinstance(raw_row, dict):
+                continue
+            row_number = raw_row.get("row_number")
+            raw_values = raw_row.get("values")
+            if not isinstance(row_number, int) or not isinstance(raw_values, list):
+                continue
+            values = [str(item) for item in raw_values]
+            joined = " | ".join(values)
+            named = " | ".join(
+                f"{safe_columns[index] if index < len(safe_columns) and safe_columns[index] else f'列 {index + 1}'}={value}"
+                for index, value in enumerate(values)
+            )
+            candidates = [joined, named, *values]
+            if any(
+                normalized_quote in cls._normalized_evidence_text(candidate)
+                for candidate in candidates
+            ):
+                matches.append((row_number, values))
+        if len(matches) != 1:
+            return None
+        row_number, values = matches[0]
+        excerpt = "；".join(
+            f"{safe_columns[index] if index < len(safe_columns) and safe_columns[index] else f'列 {index + 1}'}：{value}"
+            for index, value in enumerate(values)
+        )[:1_200].strip()
+        if not excerpt:
+            return None
+        return AgentControlLoopEvidenceAnchor(
+            file_ref=file_ref,
+            role=role,
+            label=label,
+            locator_kind="table_rows",
+            start=row_number,
+            end=row_number,
+            excerpt=excerpt,
+        )
+
+    @classmethod
+    def _resolve_evidence_anchors(
+        cls,
+        result: HarnessTaskResult,
+        files: list[dict[str, Any]],
+    ) -> HarnessTaskResult:
+        files_by_ref = {str(item.get("file_ref")): item for item in files}
+        resolved_findings: list[HarnessFinding] = []
+        for finding in result.findings:
+            anchors: list[AgentControlLoopEvidenceAnchor] = []
+            seen: set[tuple[str, str, int, int]] = set()
+            for candidate in finding.evidence_quotes:
+                if (
+                    candidate.file_ref not in finding.file_refs
+                    or candidate.file_ref not in files_by_ref
+                ):
+                    continue
+                source = files_by_ref[candidate.file_ref]
+                resolved: AgentControlLoopEvidenceAnchor | None = None
+                if source.get("kind") == "table":
+                    resolved = cls._resolve_table_anchor(
+                        file_ref=candidate.file_ref,
+                        role=candidate.role,
+                        label=candidate.label,
+                        quote=candidate.quote,
+                        columns=list(source.get("columns") or []),
+                        rows=list(source.get("rows") or []),
+                    )
+                elif isinstance(source.get("text"), str):
+                    resolved = cls._resolve_text_anchor(
+                        file_ref=candidate.file_ref,
+                        role=candidate.role,
+                        label=candidate.label,
+                        quote=candidate.quote,
+                        text=str(source["text"]),
+                    )
+                if resolved is None:
+                    continue
+                key = (
+                    resolved.file_ref,
+                    resolved.locator_kind,
+                    resolved.start,
+                    resolved.end,
+                )
+                if key in seen:
+                    continue
+                seen.add(key)
+                anchors.append(resolved)
+            if not anchors:
+                raise HarnessPlanError(
+                    "分析结果没有可在服务端安全预览中唯一定位的证据片段"
+                )
+            resolved_findings.append(
+                finding.model_copy(
+                    update={"evidence_quotes": [], "evidence_anchors": anchors}
+                )
+            )
+        return result.model_copy(update={"findings": resolved_findings})
+
+    @staticmethod
     def _validate_result(
         result: HarnessTaskResult, files: list[dict[str, Any]]
     ) -> None:
@@ -3052,6 +3345,14 @@ class HarnessRuntime:
         for finding in result.findings:
             if not set(finding.file_refs).issubset(allowed_refs):
                 raise HarnessPlanError("分析结果引用了本轮计划之外的文件")
+            if not finding.evidence_anchors:
+                raise HarnessPlanError("分析结果缺少服务端已定位的证据锚点")
+            if any(
+                anchor.file_ref not in finding.file_refs
+                or anchor.file_ref not in allowed_refs
+                for anchor in finding.evidence_anchors
+            ):
+                raise HarnessPlanError("分析结果的证据锚点超出本轮允许范围")
 
     @staticmethod
     def _compile_plan(
@@ -3340,7 +3641,11 @@ class HarnessRuntime:
                 update={"validation_errors": [reason], "updated_at": datetime.now(timezone.utc)}
             )
             await self._persist_locked(run)
-            receipt = run.snapshot.model_receipt
+            receipt = (
+                run.snapshot.analysis_receipt
+                if run.snapshot.status in {"analyzing", "verifying", "committing"}
+                else run.snapshot.model_receipt
+            )
         await self._transition(
             owner_id,
             run_id,
