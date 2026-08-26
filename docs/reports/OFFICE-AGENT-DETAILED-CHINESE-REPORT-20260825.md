@@ -98,6 +98,82 @@ Branch，必要时补充方向后继续。暂时不处理也不会静默消失�
 这组设计的交互主张是“把判断权交给人，同时把查找和恢复成本留给 Harness”。当前工程证据
 只证明 `accept/decline/defer` 回执、候选消歧和 Branch 局部恢复可运行，不证明模型推荐正确；
 可写 Artifact、Tool Gateway 和外部动作仍未实现，清晰度、效率与信任提升仍需目标用户实验。
+## 2026-08-26 竞争性修订：不只问“哪里不同”，要验证“为什么必须选我们”
+
+最新 Stakeholder 反馈把汇报问题再推进了一步：技术差异只有改变了用户选择，才有竞争
+意义。我们不能满足于说 Office Agent 的 Workspace-first 流程“更透明”或“更可靠”，而要
+提出一组可证伪的问题：**当前 Office Agent 能完成什么；最接近的主流产品能否在同一数据、
+同一异常和同一验收条件下完成；失败发生在哪里。**
+
+这一修订同时推翻了几种过时说法。Microsoft 365 Copilot 已能引用文件、文件夹、站点、
+邮件和工作内容，并提供内联引用与来源侧栏；Copilot Notebooks 可用数百个 References。
+NotebookLM（当前官方帮助页重定向为 Gemini Notebook）、ChatGPT deep research 和 Claude Research 都能在多来源上进行带引用研究；
+ChatGPT deep research 还允许审查计划、跟踪进度和中途调整。OpenAI 2026 年官方资料也已将
+Codex 明确扩展到报告、表格、演示文稿、合同与跨职能知识工作。Claude Code 与 OpenClaw
+分别具有 Workspace、Checkpoint、并行 Agent、Permission，以及持久 Task Ledger、revision、
+Question/Approval。所以下文第三章仍可用于解释各方案的**交互起点**，但不得再把 Codex
+描述为“只能做代码”，也不得把整库、引用、暂停、恢复或并行本身写成独占能力。
+
+当前最值得验证的独占候选是一条**可验证办公结论合同**：
+
+```text
+用户只给业务目标
+  -> 服务端冻结 96 份安全索引和硬预算
+  -> Planner 自主提出本轮来源
+  -> 服务端编译实际可读范围、依赖、副作用和人工门
+  -> Analyst 只读批准正文
+  -> 每条 Finding 必须回到批准来源的服务端位置
+  -> 模型已调用与输出被采用分开回执
+  -> Branch Evidence Gate
+  -> append-only ArtifactVersion + TaskCommit 当前指针
+  -> completed 仍固定 review_required=true / external_action=none
+```
+
+这条合同的用户价值不是“回答下面多了几个引用”。它让用户能检查：Agent 本轮实际读了
+什么；哪些模型候选被服务端拒绝；每条进入成果的结论来自哪里；补证后 v1/v2 是否都保留；
+恢复旧版有没有覆盖新版；绿色完成是否仍明确表示待复核、未改文件、未执行外部动作。
+
+| 差异化候选 | 当前本项目能证明什么 | 最接近的主流替代 | 当前允许的竞争结论 |
+| --- | --- | --- | --- |
+| 冻结整库、逐轮开放最小正文范围 | 96 份索引冻结；Analyst 每轮只读服务端批准的 1-8 份安全投影 | Copilot、NotebookLM、deep research、Claude Research 均有多来源检索 | 本项目原生提供逐轮范围合同；竞品是否满足同一保证待实测 |
+| 模型调用与结果采用分离 | Planner/Analyst 的 `called/output_used/elapsed_ms` 分开，服务端可拒绝候选 | Hook、Approval、审查队列可控制通用动作 | 本项目把业务结果采用做成服务端回执；不得说竞品没有审批 |
+| Finding 进入成果前必须有服务端 Anchor | 引用在批准 `file_ref` 内唯一解析后才能采用并回开高亮 | 多个研究产品已有引用和来源回开 | 候选差异是“采用门”，不是“有引用”；竞品是否同样 fail closed 待实测 |
+| 证据简报版本与当前指针分离 | append-only `ArtifactVersion`，恢复只新增 `TaskCommit` | Checkpoint、Git、Task revision、活动历史 | 本项目原生保存证据约束业务成果版本；不等于竞品无法定制 |
+| 完成仍证明待复核和未执行 | `review_required=true`、`external_action=none`，原文件只读 | 主流产品也有只读与审批模式 | 本项目把非动作边界纳入终态合同；完整挑战结果待实测 |
+
+### 图示区零：从市场入场能力收敛到独占候选
+
+```mermaid
+flowchart LR
+    A[整库 / 多来源] --> M[市场入场能力]
+    B[引用 / 来源回开] --> M
+    C[计划 / 进度 / 暂停] --> M
+    D[工具 / 审批 / 检查点] --> M
+    M --> Q{为什么选我们?}
+    Q --> E[结论采用由服务端裁决]
+    Q --> F[每条采用结论有可复查证据]
+    Q --> G[业务成果不可覆盖并可恢复]
+    Q --> H[完成边界和未执行事实可验证]
+```
+
+**图 0 讲解词：** 左侧已经是主流产品共同能力，不能再作为领先结论。右侧是本项目已经
+形成受限纵切、但仍需竞品同场挑战的候选保证。
+
+对应的前台也要改变。首页不以更长的 Agent 回答为中心，而固定提供“合同回执、来源采用
+账、结论证明、问题处置、成果版本链、完成边界”六类对象。尤其是“已调用、未采用”、
+“4 条结论保留、1 条定位待处理”、“当前 v1，v2 仍保留”、“未修改文件、未发送消息”这些
+负状态，才是本项目区别于只展示最终答案的可见价值。
+
+在竞品实测完成前，汇报只使用“本项目原生提供”“公开产品工作流的首要对象不同”“待同场
+验证”。测试必须固定 FORTE commit、15 个目录和 96 份输入，覆盖不知道资料位置、跨文件
+冲突、重复 quote、多分支部分失败、清单完整性失败、成果恢复、研究与发送混合指令、外部
+数据缺失八个挑战。只有记录产品版本、账户、入口、允许配置、真实运行输出和截图后，才允许
+写：“在该固定配置下，该竞品当前不能满足某项验收条件。”
+
+完整官方链接、六项候选、八个挑战、前台输出和研发优先级见
+[`Office Agent 可证伪差异化研究`](../research/COMPETITIVE-WHITE-SPACE-AND-FALSIFIABLE-DIFFERENTIATORS-20260826.md)。
+该研究当前仍为 `Draft`；它校正竞争叙事，不把目标设计、官方资料或未运行的竞品挑战冒充
+实现 Evidence。
 
 ## 2026-08-26 增补：用户控制的对象从“整轮继续”变成“选择工作分支”
 
@@ -266,24 +342,27 @@ Run 启动后再监督 Agent 如何从整库缩小到本轮证据。这并不证
 [exec approvals](https://docs.openclaw.ai/tools/exec-approvals)。这些来源支持上述官方
 设计侧重点，不是竞品实测，也不能支持“OpenClaw 没有办公证据能力”的推断。
 
-### 3.2 Codex App：从项目 Task、Worktree 和变更审查组织软件工作
+### 3.2 Codex App：从项目 Task、隔离工作区和结果审查组织长任务
 
-Codex App 官方材料重点解决“多个软件任务如何并行推进、不同 Agent 如何在隔离
-Worktree 中工作、用户如何审查代码改动，以及 Skill 和 Automation 如何进入审查
-队列”。其核心交互对象是项目 Task、代码仓库、Worktree、Diff 与审查结果。
+Codex App 最初以软件任务、Worktree、Diff、Skill、Automation 和审查队列建立交互模型，
+但 2026 年官方定位已经扩展到报告、表格、演示文稿、合同、研究与跨职能知识工作。因而
+这里能比较的不是“Codex 只做代码”，而是它仍以项目 Task、隔离工作区、产出物和审查队列
+作为重要组织对象。
 
-这使软件任务的结束条件很自然：用户可以检查改了哪些文件、测试是否通过、Diff 是否
-可接受。交互通常从一个项目任务开始，Agent 在隔离环境中产出变更，用户随后围绕代码
-结果审查。
+这种模式让任务的结束条件围绕可见产出组织：在代码场景中审 Diff 与测试，在知识工作中
+审报告、表格或页面。用户可以并行委派、查看进度、Steer，并围绕结果进行审查。
 
 当前 Office Agent 面对的不是代码 Diff，而是业务文件与业务结论。原始文件保持只读，
-当前也没有可写 Artifact；因此它不能借用“有 Diff 可审”来代表任务完成。用户要审查的
+当前也没有可写 Office Artifact；因此它不能借用“有 Diff 可审”来代表任务完成。用户要审查的
 是 Agent 本轮选择了哪些资料、Planner 和 Analyst 是否真实调用、服务端是否采用其输出、每条
 结论引用了哪份文件，以及结论是否仍需人工复核。
 
-**来源绑定：** `OPENAI-CODEX-APP-20260202`，OpenAI 官方文章
-[Introducing the Codex app](https://openai.com/index/introducing-the-codex-app/)。该来源
-支持并行 Task、Worktree、Skill、Automation 与变更审查等描述，不是办公任务效果比较。
+**来源绑定：** `OPENAI-CODEX-APP-20260826`，OpenAI 官方文章
+[Introducing the Codex app](https://openai.com/index/introducing-the-codex-app/)、
+[Codex is becoming a productivity tool](https://openai.com/index/codex-for-knowledge-work/) 与
+[Codex for every role, tool, and workflow](https://openai.com/index/codex-for-every-role-tool-workflow/)。
+这些来源支持并行 Task、Worktree、Skill、Automation、审查和知识工作扩展，不是 FORTE
+办公任务的竞品实测。
 
 ### 3.3 Claude Code：从项目目录、Tool Loop 和 Permission 组织开发协作
 
@@ -315,10 +394,11 @@ Reasoning、Action 与 Observation 交替出现，使下一步计划能够吸收
 调整计划、何时应该停止。
 
 当前 Office Agent 已实现最多三轮的只读近似：Workspace 观察、每轮 Planner、服务端
-校验、Analyst、引用验证和 Evidence Gate，并支持预算停止与安全点控制。它仍没有真实
-Tool Observation、Durable Artifact、跨进程恢复或分支级 Commit，因此不能称为完整 ReAct 执行器。普通 UI 展示
-named SSE、模型回执、业务 Plan 和引用，明确不展示 Prompt、chain-of-thought 或原始
-模型响应。
+校验、Analyst、引用验证和 Branch Evidence Gate，并支持预算停止、安全点控制、独立逻辑
+ArtifactVersion、TaskCommit 与配置 PostgreSQL 时的顺序 Runtime 恢复。它仍没有真实 Tool
+Observation、可写办公 Artifact、并行 Worker 或多实例调度，因此不能称为完整 ReAct
+执行器。普通 UI 展示 named SSE、模型回执、业务 Plan 和引用，明确不展示 Prompt、
+chain-of-thought 或原始模型响应。
 
 **来源绑定：** `REACT-ICLR-2023`，Yao 等，[ReAct: Synergizing Reasoning and Acting in Language Models](https://arxiv.org/abs/2210.03629)。
 该论文支持 Reasoning、Action、Observation 交替组织的判断，不直接定义持久状态、
@@ -339,7 +419,7 @@ named SSE、Planner/Analyst 回执、Plan、Finding、引用与下一步建议�
 ```mermaid
 flowchart LR
     A[OpenClaw<br/>Message / Channel / Session] --> A1[Gateway 路由] --> A2[Tool 与执行审批]
-    B[Codex App<br/>项目 Task] --> B1[Worktree 并行工作] --> B2[Diff 与结果审查]
+    B[Codex App<br/>项目 Task] --> B1[隔离工作区 / 并行委派] --> B2[产出物与结果审查]
     C[Claude Code<br/>项目目录与目标] --> C1[Tool Loop / Subagent] --> C2[Permission 与变更检查]
     D[ReAct<br/>Reasoning] --> D1[Action] --> D2[Observation] --> D
     E[当前 Office Agent<br/>办公资料库] --> E1[安全预览与用户目标] --> E2[Agent 选证据 / 服务端限权 / 只读分析] --> E3[引用回开 / 人工确认下一步]
@@ -794,21 +874,21 @@ Gateway receipt，就不能出现“已执行”；没有 ArtifactVersion 和 Co
 | --- | --- | --- | --- | --- |
 | 1 | Office Agent 从办公资料库开始 | 图 1 全景截图，裁出下一页内容提示 | 首屏不是 Demo，也不是聊天占位页 | `DR-0022`；公开基准数据，不是真实企业网盘 |
 | 2 | 办公 Agent 的首要问题是来源范围不可见 | “先提问”与“先看资料”两条流程 | 不是否定聊天，而是把证据控制提前 | Stakeholder 来源；用户价值仍为 `Draft` |
-| 3 | 主流方案在组织不同的工作对象 | 图 2 五路流程 | OpenClaw、Codex App、Claude Code、ReAct 的官方侧重点 | 官方资料研究，不是竞品实测 |
-| 4 | Workspace-first 是交互顺序，不是优越性口号 | 文件 -> 目标 -> Agent 选证据 -> Run -> 引用 | 用户少做检索，但需要监督选择理由和范围 | 尚无目标用户效率或信任研究 |
-| 5 | 15 个目录、96 份文件形成固定演示现场 | 目录与格式分布数字、图 1 局部 | 111 个任务说明/输入文件共 `1,780,445` bytes | FORTE 固定 commit；未公开 165 条未取得 |
-| 6 | 安全预览让“Agent 能读什么”可检查 | CSV、PDF、DOCX、TXT 四张现有截图拼图 | 完整性、有界解析、不执行 active content | 96/96 preview smoke；不证明内容语义完整 |
-| 7 | 整库索引与逐轮证据范围是两层合同 | 图 3 文件管理器与本轮选择 | `task.md` 不作隐藏任务；服务端冻结 96 refs，Planner 每轮选小集合 | 不证明选择最优 |
-| 8 | 模型提出计划，服务端拥有政策 | Planner -> compiler -> validator | called、output_used、plan_validation 分开 | 当前不执行计划中的 Tool |
-| 9 | 轨迹来自 named SSE，状态来自 Snapshot | 多轮事件时序图 | 断线恢复与 final GET，动画不是事实 | 仅单进程 memory，重启丢失 |
-| 10 | 引用是复核入口，不是正确性徽章 | 图 4 结果截图与点击回开箭头 | Finding 回到准确来源文件 | 只验证 membership，不验证 entailment/算术 |
-| 11 | 约 30% 是实现前历史基线，不是当前完成度 | 历史模块分值与当前纵切对照 | 不为完整目标架构编造新的总百分比 | 审计基线必须和提交 `8364b1e` 后的 Evidence 分开 |
-| 12 | 当前 Agent Control Loop 能分轮核对、说明为什么继续并接受安全点控制 | 图 6 + 真实两轮 Evidence Gate 截图 | Observe、只读 Act、有限 Verify、Evidence Gate、预算和控制已成纵切 | 单进程 memory、文件级引用、无 Durable Artifact |
-| 13 | 单任务场景首先需要确定性业务 Verify | 财务、入职、SRE 三个场景卡片 | 算术、规则、日志行与风险命令分别核验 | 当前只有通用只读分析 |
-| 14 | 多任务场景需要 Worker、共享 Artifact 与冲突汇聚 | 招聘、法务、上线准备依赖图 | 不能用一次 Planner 冒充 Adaptive Worker | 模块 5、可写模块 7 尚未连接 |
-| 15 | 外部任务当前正确结果是能力阻断 | SQL/Web/cron Gate 图 | 没有 Connector receipt 就没有采集或调度结果 | `TC-03`、`TC-09` 当前无本地 input |
-| 16 | 工程链路已验证，业务价值尚未验证 | 自动化、真实运行、截图三列 | 展示 `57 passed`、`10 passed` 与整库真实运行 | 数字取当前 Evidence；不是质量、SLA 或用户研究 |
-| 17 | 从 Agent Control Loop 的只读纵切再走向 Durable Artifact 与受控执行 | 路线图：业务验证器 -> ArtifactVersion -> Checkpoint -> Demo 1 分支 -> Worker -> Risk Gate -> Connector | 每层都先形成 receipt 和失败路径，再扩大能力 | 未实现项保持 `Draft` |
+| 3 | 整库、多来源、引用、暂停与知识成果已是主流基线 | Microsoft 365 Copilot、NotebookLM、deep research、Codex、Claude、OpenClaw 能力底线 | 不再把旧“代码工具/聊天工具”定位当作能力上限 | 官方资料研究，不是竞品实测 |
+| 4 | 候选差异是一条可验证办公结论合同 | 图 0：模型候选 -> 服务端采用 -> Evidence Anchor -> 版本 -> 待复核 | 为什么选我们必须落到服务端保证 | 当前是差异化候选，未完成同场挑战 |
+| 5 | 15 个目录、96 份文件形成固定挑战现场 | 目录、格式分布与安全预览拼图 | 111 个任务说明/输入文件共 `1,780,445` bytes；普通 UI 只见 96 inputs | FORTE 固定 commit；未公开 165 条未取得 |
+| 6 | 冻结整库与逐轮最小正文范围是两层合同 | 文件管理器、合同回执、本轮采用来源 | `task.md` 不作隐藏任务；服务端冻结 96 refs，Analyst 每轮只读 1-8 份 | 不证明 Agent 选得最优 |
+| 7 | 模型提出，服务端决定能否采用 | Planner/Analyst Receipt 与 Policy Compiler | `called`、`output_used`、校验拒绝分开 | 当前不执行计划中的 Tool |
+| 8 | 轨迹来自 named SSE，状态来自权威 Snapshot | sequence/version、断线 GET 和 final GET 时序 | 动画不创建事实；控制有版本和幂等回执 | memory 仍会随进程丢失；PostgreSQL 只证明顺序 Runtime 恢复 |
+| 9 | 每条采用 Finding 必须回到服务端验证的位置 | `DR-0029` 证据链、跨文件切换与高亮 | 引用是成果采用门，不是正确性徽章 | 只证明范围和位置，不证明 entailment/算术；PDF/DOCX 非原生坐标 |
+| 10 | Evidence Gate 把任务编译成可选择 Branch | 完成分支、缺证分支与“继续此分支”截图 | 人只把预算给目标工作线，其他 Branch 保持等待 | 顺序 Controller，不是并行 Worker |
+| 11 | 证据简报不可覆盖，恢复只新增 TaskCommit | v1/v2 和 rollback 指针图 | 恢复不删新版、不改源文件 | 逻辑 Artifact，不是可写 Word/Excel |
+| 12 | 当前最大缺口是问题不可决断、locator 失败不可局部恢复 | 两张真实负例 + EvidenceResolution/DecisionRecord 图 | 已完成工作应保留，人的决定只恢复受影响 Branch | 新协议仍为 `Draft` |
+| 13 | 八个同场挑战才能把候选升级为“竞品当前不能完成” | 未知来源、冲突、重复 quote、部分失败、完整性、恢复、混合动作、外部数据 | 固定产品版本、账户、入口、配置和截图 | 未实测前禁止排他性结论 |
+| 14 | 外部任务当前正确结果是能力阻断 | SQL/Web/发送动作的“已完成/未执行”清单 | 没有 Connector receipt 就没有采集、发送或调度结果 | 本项目当前执行力不领先 |
+| 15 | 工程链路已验证，结论质量和用户价值未验证 | `DR-0029` 自动化、真实 Run 与截图三列 | 当前 Python `67 passed, 1 skipped`、Harness 浏览器 `13 passed`；远端 PostgreSQL restart gate 通过 | 自动化不是质量、SLA 或用户研究 |
+| 16 | 约 30% 只是实现前历史成熟度估计，当前纵切也不是完整 Loop | 历史 11 模块分值与当前 Branch/Artifact/Anchor 纵切 | 当前已有明显增量，但不编造新总分 | 无 Tool/Worker/Connector、业务 Verify、局部恢复、多实例 |
+| 17 | 路线图围绕可证伪差异推进 | EvidenceResolution -> DecisionRecord -> 携证成果/未执行回执 -> 竞品挑战 -> Worker/Tool/Connector | 先闭合可信失败路径，再扩执行能力 | 未实现项保持 `Draft` |
 
 页面设计建议：
 
@@ -816,38 +896,46 @@ Gateway receipt，就不能出现“已执行”；没有 ArtifactVersion 和 Co
 2. 当前实现用实线和深色，部分近似用点线和尚未闭合的节点，目标设计用空心轮廓；每页图例固定。
 3. 关键数字只出现一次主展示，页脚标数据 commit、Evidence 名称和当前 PR 状态，避免旧 PPT 数字混入。
 4. 场景页不写抽象“能力卡”，而写触发、人的决定点、失败路径、前台输出和服务端事实。
-5. 竞品页保留官方产品名和原始来源标题，不使用“做不到”“全面领先”等排他性文案。
+5. 竞品页先区分市场基线、原生保证差异和固定配置实测；只有同场挑战真实失败后才使用
+   “该配置当前不能完成”，不使用无边界的“做不到”或“全面领先”。
 6. 演示结束停在“引用回开 + 待复核 + 没有外部动作”，不要用完成动画替代结论边界。
-7. 本轮问题处置与恢复截图使用 `docs/evidence/screenshots/dr-0030-*.png`，并在页脚绑定
-   `ACTIONABLE-REVIEW-AND-RECOVERY-20260826` Evidence；历史 `DR-0023` 图只用于说明演进。
+7. 当前问题处置与恢复截图优先使用 `dr-0031-*`、`dr-0030-*` 和 `dr-0029-*`，并在页脚绑定
+   `ACTIVE-BUDGET-AND-AGENT-GAP-RECOVERY-20260826` 与
+   `ACTIONABLE-REVIEW-AND-RECOVERY-20260826`；历史 `dr-0022/23-*` 只能用于说明演进。
 
 ## 十、验证证据与禁止推断
 
-当前以 [`ACTIONABLE-REVIEW-AND-RECOVERY-20260826`](../evidence/ACTIONABLE-REVIEW-AND-RECOVERY-EVIDENCE-20260826.md)
-为最新证据入口，并保留早期 [`AGENT-CONTROL-LOOP-BOUNDED-READONLY-20260825`](../evidence/AGENT-CONTROL-LOOP-BOUNDED-READONLY-EVIDENCE-20260825.md)
-作为历史基线。当前工程结果包括：聚焦 Runtime `35 passed`，完整 Python `73 passed, 1 skipped`，
-Ruff、前端 lint 与生产 build 通过，Harness 浏览器 `20 passed`。两次真实 Provider Run 分别
-覆盖“定位拒绝后部分采用并有界停止”和“结构拒绝两次后以 `analysis_output` 有界停止”；
-确定性浏览器测试覆盖处置单、DecisionRecord、候选消歧、目标 Branch 恢复与预算终态新 Run。
+当前以 [`ACTIVE-BUDGET-AND-AGENT-GAP-RECOVERY-20260826`](../evidence/ACTIVE-BUDGET-AND-AGENT-GAP-RECOVERY-EVIDENCE-20260826.md)
+为最新实现证据入口，并结合
+[`ACTIONABLE-REVIEW-AND-RECOVERY-20260826`](../evidence/ACTIONABLE-REVIEW-AND-RECOVERY-EVIDENCE-20260826.md)
+与早期 [`AGENT-CONTROL-LOOP-BOUNDED-READONLY-20260825`](../evidence/AGENT-CONTROL-LOOP-BOUNDED-READONLY-EVIDENCE-20260825.md)。
+当前本地门为完整 Python `75 passed, 1 skipped`，Runtime 定向 `37 passed`，Ruff、前端 lint、
+生产 build 通过，Harness 浏览器 `20 passed`。前序真实 Provider Run 覆盖定位拒绝后部分采用、
+结构拒绝两次和预算终态；本轮 active deadline 的真实 Provider 恢复路径仍需单独补证。竞争
+差异研究是 `Draft`，固定配置的八个同场挑战尚未运行，不能据此声称主流竞品做不到。
 
-这些证据能够支持：固定公开文件清单、安全有界预览、整库合同与逐轮来源范围、Planner/Analyst 真实
-调用回执、服务端 Plan 检查、最多三轮的只读推进、Evidence Gate、安全点控制、named SSE、
-Snapshot 对账、引用成员关系和当前桌面/移动被测路径。
+这些证据能够支持：固定公开文件清单、安全有界预览、整库合同与逐轮来源范围、
+Planner/Analyst 调用与采用回执、服务端 Plan 检查、最多三轮的只读推进、Branch Evidence
+Gate、安全点控制、append-only 逻辑 ArtifactVersion/TaskCommit、配置 PostgreSQL 时的顺序
+Runtime 恢复、named SSE、Snapshot 对账、引用成员和服务端原文位置，以及当前被测前台路径。
 
 这些证据不能支持：
 
 - 15 类 FORTE 原任务都已正确完成；
 - 引用能够证明语义、算术、完整性或政策判断正确；
 - Planner 中出现 Tool 或 `run_workspace_write` 就表示工具或文件写入发生；
-- 当前只读 Loop 已等同 Demo 1 Durable Artifact/Checkpoint、Demo 2 Adaptive Worker 或 Demo 3 真实动作 Gate；
-- 单进程 memory Run 能够跨重启恢复或支持多实例；
+- 当前逻辑 ArtifactVersion 已等同可写办公文件、Demo 2 Adaptive Worker 或 Demo 3 真实动作 Gate；
+- memory Run 能够跨重启恢复，或 PostgreSQL 顺序 Runtime 门已经证明多实例 lease、高可用和在途模型续跑；
 - 公开 FORTE 数据等于 Lenovo 或真实客户企业数据；
 - 新界面已经提升理解、信任、效率、采纳率或业务价值；
-- 开放 PR 已经合并，或一次模型耗时可以代表 SLA 与成本。
+- 一次模型耗时可以代表 SLA 与成本；
+- 主流竞品在未完成固定版本、账户和入口的同场挑战时“不能完成”这些任务。
 
 ## 十一、来源索引
 
 - 主流方案与交互研究：[`WORKSPACE-CENTRIC-OFFICE-AGENT-INTERACTION-AND-SOURCES-20260825`](../research/WORKSPACE-CENTRIC-OFFICE-AGENT-INTERACTION-AND-SOURCES-20260825.md)。
+- 可证伪竞争差异、八个同场挑战与官方来源：[`COMPETITIVE-WHITE-SPACE-AND-FALSIFIABLE-DIFFERENTIATORS-20260826`](../research/COMPETITIVE-WHITE-SPACE-AND-FALSIFIABLE-DIFFERENTIATORS-20260826.md)。
+- 可处置人工决策与局部失败恢复：[`ACTIONABLE-HUMAN-DECISION-AND-FAILURE-RECOVERY-20260826`](../research/ACTIONABLE-HUMAN-DECISION-AND-FAILURE-RECOVERY-20260826.md)。
 - Control Loop 历史审计与当前更新：[`AGENT-CONTROL-LOOP-IMPLEMENTATION-AUDIT-20260825`](../research/AGENT-CONTROL-LOOP-IMPLEMENTATION-AUDIT-20260825.md)。
 - 当前 Loop 决策与场景：[`DR-0023`](../decisions/DR-0023-agent-control-loop.md)、[`SCENARIO-009`](../scenarios/SCENARIO-009-agent-control-loop.md)。
 - 文件夹基线决策与场景：[`DR-0022`](../decisions/DR-0022-workspace-folder-and-arbitrary-task-contract.md)、[`SCENARIO-008`](../scenarios/SCENARIO-008-whole-folder-office-workspace.md)。
@@ -860,16 +948,17 @@ Snapshot 对账、引用成员关系和当前桌面/移动被测路径。
 
 ## 十二、收束讲稿
 
-Office Agent 当前最值得汇报的，不是它已经“自动完成了多少办公任务”，而是它把办公 Agent
-最容易被模糊处理的四件事放到了同一条用户路径里：**资料从哪里来、本轮到底读什么、模型
-输出是否被服务端采用、结论怎样返回来源复核。**
+Office Agent 当前最值得汇报的，不是它已经“自动完成了多少办公任务”，而是它开始形成一条
+可验证办公结论合同：**资料从哪里来、本轮到底读什么、模型输出是否被服务端采用、每条采用
+结论能否回到批准来源、成果如何留版、完成时什么仍未验证或未执行。**
 
-我们已经用 96 份统一文件、安全预览、整库索引与逐轮证据选择、Planner/Analyst 回执、
-服务端策略编译、named SSE、权威 Snapshot、引用回开和 `review_required=true` 做出了
-可运行的只读基础。但真正的执行闭环还在前面：确定性 Verify、可写 Artifact、Commit、
-Budget & Stop、Pause/Takeover、Durable State、Worker、Risk/Evidence/Approval/Permit
-与真实 Connector 都必须逐层建立事实和回执。
+我们已经用 96 份统一文件、安全预览、整库索引与逐轮最小正文范围、Planner/Analyst 回执、
+服务端策略编译、named SSE、权威 Snapshot、Branch Evidence Gate、Evidence Anchor、
+append-only 逻辑 ArtifactVersion/TaskCommit 和 `review_required=true` 做出了受限只读纵切。
+但确定性业务 Verify、EvidenceResolution、DecisionRecord、locator 局部恢复、携证成果导出、
+可写 Office Artifact、Worker、Tool Gateway、Risk/Approval/Permit、真实 Connector 和多实例
+调度仍在前面。
 
-因此这版汇报的结论不是“我们已经拥有完整 Office Agent”，而是：**我们已经把一个可检查、
-可限定、可追踪、可回到证据的办公 Agent 起点做实，并且清楚知道下一步不能靠演示文案跳过
-哪些工程门槛。**
+因此这版汇报的竞争结论也不是“主流竞品做不到”。更准确的说法是：**我们已经做实一组
+值得同场验证的原生保证，并设计了八个固定挑战。只有竞品在注明版本、账户、入口和配置下
+真实失败，我们才把某一项升级为‘该配置当前不能完成’；其余都继续诚实地写成设计差异。**

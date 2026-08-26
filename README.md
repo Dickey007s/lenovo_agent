@@ -268,6 +268,8 @@ pnpm --dir apps/web exec playwright test e2e/harness-workbench.spec.ts
 - [目标架构](docs/TARGET_ARCHITECTURE.md)
 - [中文汇报卡片](docs/PRESENTATION_BRIEF.md)
 - [详细中文汇报稿与 17 页图文规划](docs/reports/OFFICE-AGENT-DETAILED-CHINESE-REPORT-20260825.md)
+- [可证伪竞争差异、八个同场挑战与前台影响研究](docs/research/COMPETITIVE-WHITE-SPACE-AND-FALSIFIABLE-DIFFERENTIATORS-20260826.md)
+- [可处置人工决策与失败恢复研究](docs/research/ACTIONABLE-HUMAN-DECISION-AND-FAILURE-RECOVERY-20260826.md)
 - [来源台账](docs/decisions/SOURCE_REGISTER.md)
 - [DR-0022](docs/decisions/DR-0022-workspace-folder-and-arbitrary-task-contract.md)
 - [SCENARIO-008](docs/scenarios/SCENARIO-008-whole-folder-office-workspace.md)
