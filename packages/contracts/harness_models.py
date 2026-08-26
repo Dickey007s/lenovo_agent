@@ -21,6 +21,14 @@ BenchmarkAvailability = Literal[
     "task_only_requires_external_system",
 ]
 BenchmarkPreviewKind = Literal["table", "document", "pdf", "text", "unavailable"]
+AgentControlLoopEvidenceRole = Literal[
+    "expected",
+    "observed",
+    "support",
+    "contradiction",
+    "context",
+]
+AgentControlLoopEvidenceLocatorKind = Literal["text_lines", "table_rows"]
 AgentControlLoopPhase = Literal[
     "observe",
     "plan",
@@ -315,10 +323,33 @@ class AgentControlLoopBrief(StrictModel):
     external_action: Literal["none"] = "none"
 
 
+class AgentControlLoopEvidenceAnchor(StrictModel):
+    """A server-resolved location inside the exact bounded preview seen by the Analyst."""
+
+    file_ref: str = Field(pattern=r"^forte-[0-9a-f]{16}$")
+    role: AgentControlLoopEvidenceRole
+    label: str = Field(min_length=1, max_length=120)
+    locator_kind: AgentControlLoopEvidenceLocatorKind
+    start: int = Field(ge=1)
+    end: int = Field(ge=1)
+    excerpt: str = Field(min_length=1, max_length=1_200)
+
+    @field_validator("end")
+    @classmethod
+    def validate_end(cls, value: int, info) -> int:
+        start = info.data.get("start")
+        if isinstance(start, int) and value < start:
+            raise ValueError("evidence anchor end must not precede start")
+        return value
+
+
 class AgentControlLoopArtifactFinding(StrictModel):
     title: str = Field(min_length=1, max_length=240)
     detail: str = Field(min_length=1, max_length=2_000)
     file_refs: list[str] = Field(min_length=1, max_length=20)
+    evidence_anchors: list[AgentControlLoopEvidenceAnchor] = Field(
+        default_factory=list, max_length=6
+    )
 
 
 class AgentControlLoopArtifactVersion(StrictModel):

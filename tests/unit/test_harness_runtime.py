@@ -11,8 +11,10 @@ from packages.contracts.harness_models import AgentControlLoopControlRequest
 
 from services.api.app.application.harness_runtime import (
     HarnessConflictError,
+    HarnessEvidenceQuote,
     HarnessFinding,
     HarnessModelError,
+    HarnessPlanError,
     HarnessPlanCandidate,
     HarnessPlanCandidateUnit,
     HarnessPlanUnit,
@@ -170,7 +172,9 @@ class FakeCatalog:
                 "file_ref": file_ref,
                 "display_label": next(item["display_label"] for item in self.files if item["file_ref"] == file_ref),
                 "kind": "table" if file_ref == REF_ONE else "text",
-                "text": "复核说明" if file_ref == REF_TWO else None,
+                "columns": ["客商", "余额"] if file_ref == REF_ONE else [],
+                "rows": [{"row_number": 2, "values": ["A", "100"]}] if file_ref == REF_ONE else [],
+                "text": None if file_ref == REF_ONE else "复核说明" if file_ref == REF_TWO else "无关法务说明",
             }
             for file_ref in file_refs
         ]
@@ -323,7 +327,7 @@ class FakeAnalyst:
         self.invalid_reference = invalid_reference
         self.instruction: str | None = None
 
-    async def analyze(self, *, instruction, plan, files):
+    async def analyze(self, *, instruction, plan, files, validation_feedback=None):
         self.instruction = instruction
         file_ref = "forte-0000000000000000" if self.invalid_reference else files[0]["file_ref"]
         return HarnessTaskResult(
@@ -333,6 +337,14 @@ class FakeAnalyst:
                     title="发现一项待复核事实",
                     detail="该结论来自 Agent 自主选择的公开文件。",
                     file_refs=[file_ref],
+                    evidence_quotes=[
+                        HarnessEvidenceQuote(
+                            file_ref=file_ref,
+                            role="support",
+                            label="本轮直接依据",
+                            quote="A | 100" if file_ref == REF_ONE else "复核说明" if file_ref == REF_TWO else "无关法务说明",
+                        )
+                    ],
                 )
             ],
             follow_ups=["请人工复核业务口径"],
@@ -346,12 +358,47 @@ class BlockingAnalyst(FakeAnalyst):
         self.started = asyncio.Event()
         self.release = asyncio.Event()
 
-    async def analyze(self, *, instruction, plan, files):
+    async def analyze(self, *, instruction, plan, files, validation_feedback=None):
         self.started.set()
         await self.release.wait()
         return await super().analyze(
-            instruction=instruction, plan=plan, files=files
+            instruction=instruction,
+            plan=plan,
+            files=files,
+            validation_feedback=validation_feedback,
         )
+
+
+class RepairableAnalyst(FakeAnalyst):
+    def __init__(self) -> None:
+        super().__init__()
+        self.calls = 0
+        self.feedback: list[str | None] = []
+
+    async def analyze(self, *, instruction, plan, files, validation_feedback=None):
+        self.calls += 1
+        self.feedback.append(validation_feedback)
+        result = await super().analyze(
+            instruction=instruction,
+            plan=plan,
+            files=files,
+            validation_feedback=validation_feedback,
+        )
+        if self.calls != 1:
+            return result
+        finding = result.findings[0].model_copy(
+            update={
+                "evidence_quotes": [
+                    HarnessEvidenceQuote(
+                        file_ref=result.findings[0].file_refs[0],
+                        role="support",
+                        label="无法定位的短句",
+                        quote="preview does not contain this quote",
+                    )
+                ]
+            }
+        )
+        return result.model_copy(update={"findings": [finding]})
 
 
 def start_request(**updates) -> HarnessRunStart:
@@ -466,6 +513,31 @@ async def test_user_task_searches_the_whole_workspace_and_selects_evidence() -> 
         for item in snapshot.branches
         if item.round_number == 2
     )
+
+
+@pytest.mark.asyncio
+async def test_analyst_repairs_unlocatable_quotes_within_the_same_budget() -> None:
+    analyst = RepairableAnalyst()
+    runtime = HarnessRuntime(FakeCatalog(), FakePlanner(), analyst)
+    started = await runtime.start(
+        "alice",
+        start_request(idempotency_key="analysis-anchor-repair-0001"),
+    )
+    await confirm_evidence_gate(
+        runtime, "alice", started.run.run_id, "analysis-anchor-repair-confirm-0001"
+    )
+    snapshot = await wait_terminal(runtime, "alice", started.run.run_id)
+
+    assert snapshot.status == "completed"
+    assert analyst.calls == 3
+    assert analyst.feedback[0] is None
+    assert analyst.feedback[1] and "唯一匹配" in analyst.feedback[1]
+    assert snapshot.budget.model_calls_used == 5
+    assert [event.event_name for event in snapshot.events].count(
+        "analysis_validation_rejected"
+    ) == 1
+    assert snapshot.result
+    assert snapshot.result.findings[0].evidence_anchors
 
 
 @pytest.mark.asyncio
@@ -632,6 +704,7 @@ async def test_invalid_model_plan_fails_closed(invalid: str) -> None:
     assert snapshot.result is None
     assert snapshot.events[-1].event_name == "harness_failed"
     assert snapshot.events[-1].details["execution_started"] is False
+    assert snapshot.events[-1].details["output_used"] is False
     assert runtime.public_snapshot(snapshot).validation_errors
 
 
@@ -644,6 +717,7 @@ async def test_invalid_result_citation_fails_closed() -> None:
     assert snapshot.status == "failed"
     assert snapshot.result is None
     assert snapshot.analysis_receipt and not snapshot.analysis_receipt.output_used
+    assert snapshot.events[-1].details["output_used"] is False
 
 
 @pytest.mark.asyncio
@@ -1206,6 +1280,96 @@ def test_server_compiler_owns_artifact_write_effect() -> None:
             artifact_type="analysis",
         )
     ]
+
+
+def test_server_resolves_model_quotes_to_exact_preview_locations() -> None:
+    result = HarnessTaskResult(
+        summary="发现设计预期与运行记录不一致",
+        findings=[
+            HarnessFinding(
+                title="新闻搜索未按设计触发",
+                detail="代码要求新闻意图进入专用搜索，但日志没有发生该调用。",
+                file_refs=[REF_ONE, REF_TWO],
+                evidence_quotes=[
+                    HarnessEvidenceQuote(
+                        file_ref=REF_ONE,
+                        role="expected",
+                        label="设计预期",
+                        quote="intent=news | route=web_search_news",
+                    ),
+                    HarnessEvidenceQuote(
+                        file_ref=REF_TWO,
+                        role="observed",
+                        label="实际观测",
+                        quote="web_search_news_called=false",
+                    ),
+                ],
+            )
+        ],
+        review_required=True,
+    )
+    files = [
+        {
+            "file_ref": REF_ONE,
+            "kind": "table",
+            "columns": ["intent", "route"],
+            "rows": [
+                {
+                    "row_number": 7,
+                    "values": ["intent=news", "route=web_search_news"],
+                }
+            ],
+        },
+        {
+            "file_ref": REF_TWO,
+            "kind": "text",
+            "text": "request started\nintent=factual\nweb_search_news_called=false\nrequest ended",
+        },
+    ]
+
+    resolved = HarnessRuntime._resolve_evidence_anchors(result, files)
+
+    anchors = resolved.findings[0].evidence_anchors
+    assert [(item.locator_kind, item.start, item.end) for item in anchors] == [
+        ("table_rows", 7, 7),
+        ("text_lines", 3, 3),
+    ]
+    assert resolved.findings[0].evidence_quotes == []
+    assert "web_search_news_called=false" in anchors[1].excerpt
+
+
+def test_server_rejects_a_finding_without_a_unique_preview_location() -> None:
+    result = HarnessTaskResult(
+        summary="候选结论",
+        findings=[
+            HarnessFinding(
+                title="重复片段无法唯一定位",
+                detail="相同文本在多个位置出现。",
+                file_refs=[REF_TWO],
+                evidence_quotes=[
+                    HarnessEvidenceQuote(
+                        file_ref=REF_TWO,
+                        role="support",
+                        label="重复片段",
+                        quote="same value",
+                    )
+                ],
+            )
+        ],
+        review_required=True,
+    )
+
+    with pytest.raises(HarnessPlanError, match="唯一定位"):
+        HarnessRuntime._resolve_evidence_anchors(
+            result,
+            [
+                {
+                    "file_ref": REF_TWO,
+                    "kind": "text",
+                    "text": "same value\nother\nsame value",
+                }
+            ],
+        )
 
 
 def test_server_compiler_bounds_model_file_selection_and_repairs_dependencies() -> None:
