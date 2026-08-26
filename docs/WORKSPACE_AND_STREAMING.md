@@ -79,6 +79,10 @@ spending the next round automatically. The user chooses one “继续此分支�
 versioned `resume` carries that `branch_id`, and nothing is claimed to have
 happened until the receipt returns. The next round is restricted to that
 Branch's displayed missing files; unselected branches keep their waiting state.
+If the same recovery reaches `stopped/bounded`, there is no next round inside the
+old Run. The UI replaces resume controls with unfinished Branch cards. Selecting
+one combines its objective with optional user direction and creates a new
+whole-workspace Run; the old Snapshot, receipts and ArtifactVersions stay intact.
 
 Each completed round creates an independent append-only logical evidence-brief
 ArtifactVersion. The final brief appears only after citation-scope validation
@@ -186,6 +190,7 @@ browser fact, not a server task phase.
 | pending human decision is closed | `decision_recorded(action=defer)` | Finding, evidence, user feedback draft and all execution facts | reopen from Snapshot and accept, decline or defer again with a fresh version |
 | repeated malformed analysis output | structure-rejected trace | approved Plan, files, Branches and both call receipts | pause one candidate Branch with `recovery_kind=analysis_output`; do not expose raw response |
 | evidence insufficient | waiting Branch, missing evidence and explicit per-branch confirmation | prior rounds, all Branch states, versions and citations | choose one Branch to `resume`, adjust direction first or stop at the limit |
+| recovery reaches budget terminal | `status=stopped`, `brief.outcome=bounded`, candidate Branches and `recovery_kind` | old Run, Plan, call receipts, Branch state and ArtifactVersions | choose one unfinished Branch, add optional direction and POST a new Task Contract; never resume the terminal Run |
 | pause/steer/stop requested | pending until a safe point | current Snapshot and command receipt | reconcile returned version; resume or inspect terminal brief |
 | SSE interruption | reconnecting | current Snapshot and last sequence | GET plus `after=N` |
 | browser refresh | current Run and sequence restored | task, rounds, receipts and controls | GET current Run, then SSE `after=N` |

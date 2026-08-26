@@ -441,6 +441,56 @@ function sourceLocationRecoverySnapshot(body: { workspace_id: string; instructio
   };
 }
 
+function boundedAnalysisRecoverySnapshot(body: { workspace_id: string; instruction: string }) {
+  const base = sourceLocationRecoverySnapshot(body);
+  const branches = base.branches.map((branch) => ({ ...branch, status: "stopped" }));
+  const gaps = branches.map((branch, index) => ({
+    gap_id: `gap-bounded-${String(index + 1).padStart(7, "0")}`,
+    branch_id: branch.branch_id,
+    label: `“${branch.title}”分支仍缺少可核对结果`,
+    detail: `该分支还有 ${branch.missing_file_refs.length} 份已选资料没有进入通过服务端核对的结论。`,
+    candidate_file_refs: branch.missing_file_refs,
+  }));
+  const reason = "分析模型已经响应，但返回内容仍未形成可核对结构；当前预算不足以再次核对，系统已保留计划与调用记录并安全停止。";
+  const round = {
+    ...base.rounds[0],
+    evidence_gaps: gaps,
+    next_step: {
+      decision: "budget_exhausted",
+      reason,
+      next_question: null,
+      candidate_file_refs: branches.flatMap((branch) => branch.missing_file_refs),
+      candidate_branch_ids: branches.map((branch) => branch.branch_id),
+      recovery_kind: "analysis_output",
+      evidence_resolutions: [],
+    },
+  };
+  return {
+    ...base,
+    status: "stopped",
+    control_state: "stopped",
+    version: 15,
+    last_event_sequence: 14,
+    budget: { ...base.budget, stop_reason: "budget_exhausted" },
+    rounds: [round],
+    branches,
+    artifact_versions: [{ ...base.artifact_versions[0], summary: reason, evidence_gaps: gaps }],
+    brief: {
+      outcome: "bounded",
+      summary: `Agent Control Loop 到达预算边界；仍有 ${gaps.length} 条分支需要后续处理。`,
+      verified_file_refs: [],
+      unresolved_gaps: gaps,
+      rounds_completed: 1,
+      external_action: "none",
+    },
+    events: [
+      { sequence: 12, event_name: "analysis_recovery_required", occurred_at: new Date().toISOString(), status: "analyzing", message: reason, details: {} },
+      { sequence: 13, event_name: "evidence_gate", occurred_at: new Date().toISOString(), status: "verifying", message: reason, details: { recovery_kind: "analysis_output" } },
+      { sequence: 14, event_name: "loop_budget_stopped", occurred_at: new Date().toISOString(), status: "stopped", message: "Agent Control Loop 已在预算边界停止，并保留未完成项。", details: { outcome: "bounded", external_action: false } },
+    ],
+  };
+}
+
 function locationFailureSnapshot(body: { workspace_id: string; instruction: string }) {
   const base = sourceLocationRecoverySnapshot(body);
   return {
@@ -459,7 +509,7 @@ function locationFailureSnapshot(body: { workspace_id: string; instruction: stri
 }
 async function fulfillJson(route: Route, body: unknown, status = 200) { await route.fulfill({ status, contentType: "application/json", body: JSON.stringify(body) }); }
 
-async function mockHarness(page: Page, options: { failFirstStart?: boolean; disconnect?: boolean; failed?: boolean; locationFailure?: boolean; sourceRecovery?: boolean; workspaceFailures?: number; interactiveLoop?: boolean; evidenceGate?: boolean } = {}) {
+async function mockHarness(page: Page, options: { failFirstStart?: boolean; disconnect?: boolean; failed?: boolean; locationFailure?: boolean; sourceRecovery?: boolean; boundedRecovery?: boolean; workspaceFailures?: number; interactiveLoop?: boolean; evidenceGate?: boolean } = {}) {
   let workspaceCalls = 0; let startCalls = 0; let streamCalls = 0;
   let currentBody = { workspace_id: "forte-public-office", instruction: "" };
   // Mock snapshots intentionally cover several server state shapes in one route.
@@ -487,6 +537,8 @@ async function mockHarness(page: Page, options: { failFirstStart?: boolean; disc
       if (options.failFirstStart && startCalls === 1) return fulfillJson(route, { detail: "任务启动结果未知" }, 503);
       currentSnapshot = options.locationFailure
         ? locationFailureSnapshot(body)
+        : options.boundedRecovery
+          ? boundedAnalysisRecoverySnapshot(body)
         : options.sourceRecovery
           ? sourceLocationRecoverySnapshot(body)
           : snapshot(body, options.evidenceGate ? "waiting_input" : options.interactiveLoop ? "planning" : "queued", options.interactiveLoop || options.evidenceGate ? controlSequence : 16);
@@ -568,7 +620,7 @@ async function mockHarness(page: Page, options: { failFirstStart?: boolean; disc
       streamCalls += 1; streams.push(url.toString());
       const after = Number(url.searchParams.get("after") ?? "0");
       const all = ["workspace_index", "round_started", "planning_started", "planning_completed", "plan_validation", "analysis_started", "analysis_completed", "result_validation", "evidence_gate", "round_started", "planning_started", "planning_completed", "analysis_started", "analysis_completed", "evidence_gate", options.failed ? "harness_failed" : "loop_committed"];
-      if (options.interactiveLoop || options.evidenceGate || options.sourceRecovery) {
+      if (options.interactiveLoop || options.evidenceGate || options.sourceRecovery || options.boundedRecovery) {
         const sequence = Math.max(after + 1, currentSnapshot.last_event_sequence);
         const terminalEvent = currentSnapshot.status === "completed" ? "loop_committed" : currentSnapshot.status === "stopped" ? "loop_stopped" : currentSnapshot.status === "waiting_input" ? "evidence_gate" : "round_started";
         const body = `id: ${sequence}\nevent: ${terminalEvent}\ndata: ${JSON.stringify({ sequence, event_name: terminalEvent, occurred_at: new Date().toISOString(), message: "服务端状态已更新。" })}\n\n`;
@@ -583,7 +635,7 @@ async function mockHarness(page: Page, options: { failFirstStart?: boolean; disc
     }
     if (path.startsWith("/v1/harness/runs/")) {
       if (options.disconnect && streamCalls === 1) return fulfillJson(route, { ...snapshot(currentBody, "queued"), status: "indexing", last_event_sequence: 1, version: 2 });
-      if (options.interactiveLoop || options.evidenceGate || options.sourceRecovery || options.locationFailure) return fulfillJson(route, currentSnapshot);
+      if (options.interactiveLoop || options.evidenceGate || options.sourceRecovery || options.boundedRecovery || options.locationFailure) return fulfillJson(route, currentSnapshot);
       currentSnapshot = snapshot(currentBody, options.failed ? "failed" : "completed");
       return fulfillJson(route, currentSnapshot);
     }
@@ -906,6 +958,35 @@ test("pauses an unlocatable result with a guided branch recovery", async ({ page
   expect(state.controls[0].instruction).toBe("优先核对版本字段和测试时间。");
   expect(state.controls[1].branch_id).toBe("branch-222222222222");
   await expect(page.locator(".loop-brief")).toContainText("完成 2 轮");
+});
+
+test("creates a new scoped task instead of pretending a budget-stopped run can resume", async ({ page }) => {
+  const state = await mockHarness(page, { boundedRecovery: true }); await page.goto("/");
+  const originalInstruction = "核对资料库中的上线条件和测试结论。";
+  await page.getByRole("textbox", { name: "任务指令" }).fill(originalInstruction);
+  await page.getByRole("button", { name: "启动 Control Loop" }).click();
+
+  const recovery = page.locator(".loop-terminal-recovery");
+  await expect(recovery).toContainText("当前 Run 已到预算边界，不能继续原地运行");
+  await expect(recovery).toContainText("旧 Run、调用回执和成果版本保持不变");
+  await expect(recovery).toContainText("原文件修改或外部动作");
+  await expect(page.locator(".trace-recovery-hint")).toContainText("本次 Run 已结束");
+  await recovery.getByRole("textbox", { name: "补充给新任务的方向（可选）" }).fill("优先核对版本号和测试日期。" );
+  if (process.env.CAPTURE_DR0030_EVIDENCE === "1") {
+    await recovery.screenshot({ path: "../../docs/evidence/screenshots/dr-0030-bounded-branch-recovery.png" });
+  }
+  await page.setViewportSize({ width: 390, height: 844 });
+  const mobileMetrics = await page.evaluate(() => ({ viewport: document.documentElement.clientWidth, scroll: document.documentElement.scrollWidth }));
+  expect(mobileMetrics.scroll).toBeLessThanOrEqual(mobileMetrics.viewport);
+  await recovery.locator(".source-recovery-branches article").filter({ hasText: "读取相关资料" }).getByRole("button", { name: "用此分支创建新任务" }).click();
+
+  await expect.poll(() => state.starts.length).toBe(2);
+  expect(state.controls).toHaveLength(0);
+  expect(state.starts[1].instruction).toContain(originalInstruction);
+  expect(state.starts[1].instruction).toContain("续办分支：读取相关资料");
+  expect(state.starts[1].instruction).toContain("优先核对版本号和测试日期");
+  expect(state.starts[1].instruction).toContain("这些只是历史选择，不限制新 Run 重新检索整个资料库");
+  expect(state.starts[1].instruction).toContain("只读分析，不修改原文件，不执行外部动作");
 });
 
 test("starts a new whole-workspace loop only after the user confirms an agent proposal", async ({ page }) => {

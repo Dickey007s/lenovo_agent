@@ -36,6 +36,9 @@
 5. 前台展示“已保留、未采用、未发生”三类事实。多候选时用户先选择真实位置，系统记录
    DecisionRecord，再按 versioned `steer` 和 `resume` 只继续该 Branch；其他分支与成果不变。
 6. 若轮次、调用或时间预算不足，Run 以 `stopped/bounded` 结束并保留缺口，不转成通用失败。
+   前台不再显示不可用的“继续”暗示，而是明确说明旧 Run 已结束，列出未完成 Branch、已保留
+   的 Plan/调用回执/ArtifactVersion 和无外部动作边界。用户可补充方向，并以其中一条 Branch
+   作为目标创建新的独立 Run；新 Run 重新冻结整库索引和自主选证，不假装续跑旧调用。
 7. 对升级前的历史 `failed` Snapshot，前台用原任务和已保留范围构造明确的缩小范围重试入口；
    这是新 Run，不是假装恢复旧模型调用。
 
@@ -46,6 +49,8 @@
 - 人工选项明确显示确认后 Agent 做什么，DecisionRecord 留下 accept/decline/defer 与反馈，
   接受业务选项后反馈进入新 Run 指令。
 - 原文定位或结构失败不会静默重试，也不会留下没有动作入口的页面；重连后待决状态仍可恢复。
+- `stopped/bounded` 页面提供每条候选 Branch 的“用此分支创建新任务”，并验证不会向 terminal
+  Run 发送 `resume/steer`。
 - 已验证 Finding、分支状态、文件范围、调用回执和 ArtifactVersion 不因局部失败丢失。
 - 所有页面都明确“只读、新 Run、未修改文件、未发生外部动作”。
 

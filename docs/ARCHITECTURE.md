@@ -104,7 +104,10 @@ and `rejected` are reserved future states. A valid subset is adopted with
 Finding/Resolution facts pause only their bound Branches. If neither attempt
 yields a usable Finding, the Runtime preserves Plan/Branch/call facts and pauses
 with `next_step.recovery_kind=source_location`; repeated schema failures use
-`analysis_output`. Out-of-scope references remain a fail-closed security error.
+`analysis_output`. If another round does not fit the budget, the same facts end
+as `stopped/bounded`: the terminal Run is not resumable, but its candidate Branch
+may seed a new Task Contract and whole-workspace Run. Out-of-scope references
+remain a fail-closed security error.
 
 The Evidence Gate compares referenced files with each Branch's approved set. It
 alone decides which branches are `completed`, `waiting_input` or stopped, and
@@ -179,7 +182,10 @@ idempotent DecisionRecord bound to Finding/Resolution/Branch. Accepting a busine
 option then creates a new read-only Run; accepting an ambiguous source position
 steers and resumes only its current waiting Branch. Closing a pending sheet means
 defer, not silent dismissal. None of these operations edits the source. The
-browser never derives a location from claim text.
+browser never derives a location from claim text. A budget-stopped recovery view
+similarly creates a new Run for one unresolved Branch objective and never sends
+`resume` or `steer` to the terminal Run; prior ArtifactVersions remain attached
+to the old Snapshot.
 This is not a source-file Diff or semantic verification. Proposal context is
 explicitly not a per-proposal citation. Preview security and result-review
 boundaries remain available without turning the primary page into an

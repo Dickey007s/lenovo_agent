@@ -1,0 +1,49 @@
+{
+  "evidence_id": "DR-0030-BOUNDED-TERMINAL-RECOVERY-LIVE-RUN-20260826",
+  "captured_at": "2026-08-26T09:54:19.154856Z",
+  "run_id": "harness:1e1f45d47a4c4099912b7369b19f2f0d",
+  "provider_model": "deepseek-v4-pro",
+  "task": "核对资料库中可能互相矛盾的上线条件和测试结论，并逐条引用真实文件位置。",
+  "terminal_fact": {
+    "status": "stopped",
+    "version": 15,
+    "outcome": "bounded",
+    "recovery_kind": "analysis_output",
+    "next_step_decision": "budget_exhausted",
+    "rounds_used": 1,
+    "model_calls_used": 3,
+    "files_verified": 0,
+    "candidate_file_count": 4,
+    "unfinished_branch_count": 5,
+    "artifact_versions": [
+      {
+        "version": 1,
+        "status": "draft",
+        "finding_count": 0
+      }
+    ],
+    "external_action": "none"
+  },
+  "ordered_event_names": [
+    "workspace_index",
+    "round_started",
+    "planning_started",
+    "planning_completed",
+    "plan_validation",
+    "analysis_started",
+    "analysis_completed",
+    "analysis_structure_rejected",
+    "analysis_started",
+    "analysis_completed",
+    "analysis_structure_rejected",
+    "analysis_recovery_required",
+    "evidence_gate",
+    "loop_budget_stopped"
+  ],
+  "interaction_finding": "The pre-fix UI projected recovery_kind as a continue hint even though the authoritative Snapshot was terminal stopped. The repair replaces terminal resume semantics with a new Run seeded from one candidate Branch objective.",
+  "limits": [
+    "This was one real provider run and does not establish model quality, semantic correctness, SLA or user value.",
+    "The Run used the process-local memory store. The API was later restarted, so this manifest is an evidence capture rather than a currently queryable durable Snapshot.",
+    "The follow-up UI screenshot is deterministic Playwright evidence; it is not a second provider run."
+  ]
+}

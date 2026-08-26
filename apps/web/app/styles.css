@@ -308,6 +308,17 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, summary:focus
 .loop-source-recovery > label { display: grid; gap: 5px; padding: 11px 12px; border-bottom: 1px solid #ead5b5; }
 .loop-source-recovery > label > span { color: #705b42; font-size: 11px; font-weight: 700; }
 .loop-source-recovery textarea { width: 100%; min-height: 66px; resize: vertical; padding: 8px 9px; border: 1px solid #cfb58e; border-radius: 4px; background: #fff; line-height: 1.5; }
+.loop-terminal-recovery { margin: 12px 15px; border: 1px solid #d49d57; border-left: 4px solid #a85d0c; background: #fffbf3; }
+.loop-terminal-recovery > header { display: grid; grid-template-columns: 25px minmax(0, 1fr); gap: 9px; padding: 12px; border-bottom: 1px solid #ead5b5; }
+.loop-terminal-recovery > header svg { width: 20px; color: #a7610d; }
+.loop-terminal-recovery > header span { color: #945507; font-size: 11px; font-weight: 750; }
+.loop-terminal-recovery > header h3 { margin: 3px 0 0; font-size: 15px; line-height: 1.45; letter-spacing: 0; }
+.loop-terminal-recovery > header p { margin: 4px 0 0; color: #705b42; font-size: 11px; line-height: 1.5; }
+.loop-terminal-recovery > label { display: grid; gap: 5px; padding: 11px 12px; border-bottom: 1px solid #ead5b5; }
+.loop-terminal-recovery > label > span { color: #705b42; font-size: 11px; font-weight: 700; }
+.loop-terminal-recovery textarea { width: 100%; min-height: 66px; resize: vertical; padding: 8px 9px; border: 1px solid #cfb58e; border-radius: 4px; background: #fff; line-height: 1.5; }
+.loop-terminal-recovery > footer { display: flex; align-items: center; gap: 7px; padding: 9px 12px; border-top: 1px solid #ead5b5; color: #675842; background: #fff8ec; font-size: 10px; line-height: 1.45; }
+.loop-terminal-recovery > footer svg { width: 16px; flex: 0 0 auto; color: var(--green); }
 .source-recovery-branches { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 7px; padding: 10px 12px 12px; }
 .source-recovery-branches article { min-width: 0; display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 10px; border: 1px solid #d8c3a3; background: #fff; }
 .source-recovery-branches article > div { min-width: 0; }

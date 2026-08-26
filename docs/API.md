@@ -387,6 +387,14 @@ combines its `next_instruction`, label and optional feedback in a new independen
 Run. Accepting an ambiguous source candidate instead records the candidate, steers
 the current Run and resumes only the affected waiting Branch.
 
+`recovery_kind` does not imply that every Run is resumable. When the same
+recoverable gap reaches `status=stopped` with `next_step.decision=budget_exhausted`,
+the old Run is terminal and must not receive `resume` or `steer`. The client may
+use one ID from `candidate_branch_ids`, the matching Branch objective and optional
+user direction to POST a new whole-workspace Run. Prior Branches, receipts and
+ArtifactVersions remain on the old Snapshot; the new Planner autonomously selects
+and validates evidence again rather than inheriting the old file set as authority.
+
 Current statuses are `queued`, `indexing`, `planning`, `validating`,
 `analyzing`, `verifying`, `waiting_input`, `paused`, `completed`, `stopped`
 and `failed`;
@@ -557,7 +565,7 @@ reconciliation; a nonterminal interruption uses GET plus `after=N` recovery.
 | `next_step.recovery_kind=source_location` | legal-scope candidate could not be uniquely mapped to safe Preview | show preserved/not-adopted/no-action facts; select the smallest Branch and resume |
 | `next_step.recovery_kind=analysis_output` | provider responded twice without a usable public result structure | keep raw output hidden; select a minimal Branch and retry or stop |
 | `checkpoint_recovered` | server restored a PostgreSQL Snapshot and paused | reconcile the trace; explicitly resume from the safe checkpoint |
-| `loop_budget_stopped` | round/call/deadline prevents another step | show bounded brief and unresolved gaps |
+| `loop_budget_stopped` | round/call/deadline prevents another step | show bounded brief, preserved facts and candidate Branches; create a new Branch-scoped task instead of resuming the terminal Run |
 | `status=failed` | model/schema/plan/source/citation validation failed | show safe business error and no result |
 
 See [UI-server fact matrix](contracts/UI_SERVER_FACT_MATRIX.md),

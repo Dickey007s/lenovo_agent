@@ -1397,6 +1397,7 @@ export function HarnessActivityPane({ state }: { state: HarnessActivityState | n
     <IconRoute aria-hidden="true" /><h2>Agent Control Loop</h2><p>任务开始后，这里会显示每轮读了什么、为什么继续，以及何时需要你介入。</p>
   </section>;
   const latestRound = state.rounds.at(-1) ?? null;
+  const terminalRecovery = state.runStatus === "stopped" && Boolean(latestRound?.next_step?.recovery_kind);
   const phaseIndex = latestRound ? LOOP_PHASES.findIndex((item) => item.key === latestRound.phase) : -1;
   const visibleEvents = state.events.slice(-5);
   const connectionLabel = state.connection === "live" ? "实时"
@@ -1421,7 +1422,7 @@ export function HarnessActivityPane({ state }: { state: HarnessActivityState | n
       <ol>{LOOP_PHASES.slice(0, 5).map((phase, index) => <li key={phase.key} className={index < phaseIndex || latestRound.status === "completed" ? "is-complete" : index === phaseIndex ? "is-active" : ""}><span>{index < phaseIndex || latestRound.status === "completed" ? <IconCheck aria-hidden="true" /> : index + 1}</span><b>{phase.label}</b></li>)}</ol>
       {latestRound.evidence_gaps[0] && <p><IconAlertTriangle aria-hidden="true" />{latestRound.evidence_gaps[0].label}</p>}
     </section>}
-    {latestRound?.next_step?.recovery_kind && <div className="trace-recovery-hint"><IconArrowRight aria-hidden="true" /><span><b>下一步已准备好</b>回到主区选择一个最小分支，可补充方向后继续。</span></div>}
+    {latestRound?.next_step?.recovery_kind && <div className="trace-recovery-hint"><IconArrowRight aria-hidden="true" /><span><b>{terminalRecovery ? "本次 Run 已结束" : "下一步已准备好"}</b>{terminalRecovery ? "回到主区选择一个未完成分支，以它为目标创建新的独立 Run。" : "回到主区选择一个最小分支，可补充方向后继续。"}</span></div>}
     <div className="trace-receipts">
       <Receipt receipt={state.planningReceipt} label="规划模型" />
       <Receipt receipt={state.analysisReceipt} label="分析模型" />
@@ -2303,10 +2304,21 @@ function LoopView({
   const fileLabel = (fileRef: string) => files.find((file) => file.file_ref === fileRef)?.display_label ?? "允许范围内的文件";
   const roundBranches = selectedRound ? run.branches.filter((branch) => selectedRound.branch_ids.includes(branch.branch_id)) : [];
   const currentArtifactVersion = run.last_commit?.artifact_version ?? null;
+  const preservedArtifactVersion = run.artifact_versions.at(-1)?.version ?? currentArtifactVersion;
   const recoveryKind = selectedRound?.next_step?.recovery_kind ?? null;
   const guidedRecovery = Boolean(recoveryKind) && waitingForBranch;
+  const boundedTerminalRecovery = run.status === "stopped"
+    && selectedRound?.round_number === run.current_round
+    && selectedRound?.next_step?.decision === "budget_exhausted"
+    && Boolean(recoveryKind);
   const pendingResolutions = selectedRound?.next_step?.evidence_resolutions ?? [];
   const recoveryBranches = roundBranches.filter((branch) => branch.status === "waiting_input").sort((left, right) => left.missing_file_refs.length - right.missing_file_refs.length);
+  const terminalCandidateBranches = new Set(selectedRound?.next_step?.candidate_branch_ids ?? []);
+  const terminalRecoveryBranches = roundBranches
+    .filter((branch) => terminalCandidateBranches.size > 0
+      ? terminalCandidateBranches.has(branch.branch_id)
+      : ["waiting_input", "stopped", "failed"].includes(branch.status))
+    .sort((left, right) => left.missing_file_refs.length - right.missing_file_refs.length || left.input_file_refs.length - right.input_file_refs.length);
   const failedAtSourceLocation = run.status === "failed" && run.events.some((event) => event.eventName === "analysis_validation_rejected");
   const retryBranch = [...roundBranches].sort((left, right) => left.input_file_refs.length - right.input_file_refs.length)[0] ?? null;
   const retryInstruction = `${run.instruction}\n恢复策略：先只核对${retryBranch ? `“${retryBranch.title}”` : "一个最小证据分支"}，逐条使用可唯一定位的原文；若资料不足，明确列出缺少的版本、字段或记录，不要输出无法核对的结论。`;
@@ -2316,6 +2328,20 @@ function LoopView({
       if (!steered) return;
     }
     await onControl("resume", { branchId: branch.branch_id });
+  };
+  const startBranchRecoveryRun = async (branch: LoopBranch) => {
+    const sourceLabels = branch.input_file_refs.map(fileLabel);
+    const userDirection = recoveryDraft.trim();
+    const branchInstruction = [
+      run.instruction,
+      `续办分支：${branch.title}`,
+      `本次以“${branch.objective}”作为任务目标。请从整个资料库自主查找完成这一目标所需的最小证据，逐条提供可唯一定位的原文位置。`,
+      sourceLabels.length > 0 ? `上次 Run 为该分支选择过：${sourceLabels.join("、")}。这些只是历史选择，不限制新 Run 重新检索整个资料库。` : "新 Run 仍可自主检索整个资料库。",
+      "若仍无法核对，请明确列出缺少的文件、版本、字段或记录，不要生成无法回到原文的结论。",
+      userDirection ? `用户补充：${userDirection}` : "",
+      "边界：只读分析，不修改原文件，不执行外部动作。",
+    ].filter(Boolean).join("\n");
+    await onStartTask(branchInstruction);
   };
 
   return <section className="loop-view" aria-labelledby="loop-view-title">
@@ -2337,7 +2363,14 @@ function LoopView({
       </ol>
       <footer><span>{run.validation_errors[0] || "服务端已安全停止本轮任务。"}</span><button type="button" disabled={starting} onClick={() => void onStartTask(retryInstruction)}><IconRefresh aria-hidden="true" />{starting ? "正在重建任务" : "缩小范围重新核对"}</button></footer>
     </section>}
-    <section className="loop-controls" aria-label="人工控制">
+    {boundedTerminalRecovery && <section className="loop-terminal-recovery" aria-labelledby="terminal-recovery-title">
+      <header><IconAlertTriangle aria-hidden="true" /><div><span>预算停止后的下一步</span><h3 id="terminal-recovery-title">当前 Run 已到预算边界，不能继续原地运行</h3><p>这不是整项工作丢失。旧 Run、调用回执和成果版本保持不变；请选择一个未完成分支，以它为目标创建新的独立 Run。</p></div></header>
+      <div className="source-recovery-facts"><span><b>只影响</b>{terminalRecoveryBranches.length} 条尚未完成的分支</span><span><b>已保留</b>Plan、调用回执、分支状态与{preservedArtifactVersion ? `成果 v${preservedArtifactVersion}` : "阶段成果"}</span><span><b>未发生</b>原文件修改或外部动作</span></div>
+      <label><span>补充给新任务的方向（可选）</span><textarea value={recoveryDraft} onChange={(event) => setRecoveryDraft(event.target.value)} placeholder="例如：先核对上线配置清单与功能测试报告中的版本和日期字段" /></label>
+      <div className="source-recovery-branches">{terminalRecoveryBranches.map((branch, index) => <article key={branch.branch_id}><div><b>{index === 0 ? "最小续办分支" : "可单独续办"}</b><h4>{branch.title}</h4><p>{branch.objective}</p><small>{branch.input_file_refs.length > 0 ? branch.input_file_refs.map(fileLabel).join(" · ") : "由 Agent 在整个资料库中重新选证"}</small></div><button type="button" disabled={starting} onClick={() => void startBranchRecoveryRun(branch)}><IconRefresh aria-hidden="true" />{starting ? "正在创建" : "用此分支创建新任务"}</button></article>)}</div>
+      <footer><IconShieldCheck aria-hidden="true" /><span>这是新的 Task Contract，不会覆盖或假装续跑旧 Run；新 Run 仍由服务端冻结整库索引并重新校验证据。</span></footer>
+    </section>}
+    {!boundedTerminalRecovery && <section className="loop-controls" aria-label="人工控制">
       <div className="loop-control-actions">
         <button type="button" onClick={() => void onControl(canResume ? "resume" : "pause")} disabled={controlBusy !== null || terminal || waitingForBranch || (!canResume && !canPause)}>
           {canResume ? <IconPlayerPlay aria-hidden="true" /> : <IconPlayerPause aria-hidden="true" />}
@@ -2356,7 +2389,7 @@ function LoopView({
       {run.control_state === "pause_requested" && <p>暂停请求已记录，当前模型调用结束后会在安全点暂停。</p>}
       {run.control_state === "paused" && <p>Loop 已暂停，现有轮次、引用和预算都已保留。</p>}
       {run.control_state === "stop_requested" && <p>正在到达停止安全点，不会启动新的模型调用。</p>}
-    </section>
+    </section>}
     <nav className="loop-round-tabs" aria-label="研究轮次">
       {run.rounds.length ? run.rounds.map((round) => <button type="button" key={round.round_number} className={round.round_number === selectedRound?.round_number ? "is-active" : ""} onClick={() => setSelectedRoundNumber(round.round_number)}>
         <span>{round.status === "completed" ? <IconCheck aria-hidden="true" /> : round.round_number}</span>
@@ -2397,11 +2430,11 @@ function LoopView({
         </li>)}</ol>
       </section>}
       {selectedRound.result && <section className="loop-round-result"><span>本轮核对结果</span><h3>{selectedRound.result.summary}</h3><p>{selectedRound.result.findings.length} 条发现，引用 {selectedRound.verified_file_refs.length} 份文件。</p>{selectedRound.result.findings.length > 0 && <div className="loop-review-links">{selectedRound.result.findings.map((finding, index) => <button type="button" key={`${finding.title}:${index}`} onClick={() => onReview(findingReviewRequest(finding, index, selectedRound.round_number, run.decision_records))}><IconEye aria-hidden="true" />核对：{finding.title}</button>)}</div>}</section>}
-      {selectedRound.evidence_gaps.length > 0 && <section className="loop-gap"><IconAlertTriangle aria-hidden="true" /><div><span>证据缺口</span><h3>{selectedRound.evidence_gaps.length} 条分支尚未完成</h3><p>点击缺口即可查看具体描述、候选文件和原始内容；只有你确认的分支会进入下一轮。</p><div className="loop-review-links">{selectedRound.evidence_gaps.map((gap, index) => {
+      {selectedRound.evidence_gaps.length > 0 && <section className="loop-gap"><IconAlertTriangle aria-hidden="true" /><div><span>证据缺口</span><h3>{selectedRound.evidence_gaps.length} 条分支尚未完成</h3><p>{boundedTerminalRecovery ? "当前 Run 已结束。点击缺口可查看具体描述与候选文件，再从上方选择一个分支创建新的独立 Run。" : "点击缺口即可查看具体描述、候选文件和原始内容；只有你确认的分支会进入下一轮。"}</p><div className="loop-review-links">{selectedRound.evidence_gaps.map((gap, index) => {
         const branchTitle = roundBranches.find((branch) => branch.branch_id === gap.branch_id)?.title ?? null;
         return <button type="button" key={gap.gap_id} onClick={() => onReview(gapReviewRequest(gap, index, selectedRound.round_number, branchTitle))}><IconEye aria-hidden="true" />{gap.label}</button>;
       })}</div></div></section>}
-      {selectedRound.next_step && <footer className={selectedRound.next_step.decision === "completed" ? "is-complete" : "is-next"}><div><span>服务端决定</span><strong>{gateLabel(selectedRound.next_step.decision)}</strong><p>{selectedRound.next_step.reason}</p></div>{selectedRound.next_step.decision === "waiting_input" ? <b>{guidedRecovery ? "选择恢复分支继续" : "选择上方分支继续"}</b> : selectedRound.next_step.decision === "next_round" ? <IconArrowRight aria-hidden="true" /> : null}</footer>}
+      {selectedRound.next_step && <footer className={selectedRound.next_step.decision === "completed" ? "is-complete" : "is-next"}><div><span>服务端决定</span><strong>{gateLabel(selectedRound.next_step.decision)}</strong><p>{selectedRound.next_step.reason}</p></div>{selectedRound.next_step.decision === "waiting_input" ? <b>{guidedRecovery ? "选择恢复分支继续" : "选择上方分支继续"}</b> : boundedTerminalRecovery ? <b>选择上方分支创建新任务</b> : selectedRound.next_step.decision === "next_round" ? <IconArrowRight aria-hidden="true" /> : null}</footer>}
     </article>}
     {run.artifact_versions.length > 0 && <section className="artifact-evolution" aria-label="成果版本">
       <header><div><span>不可变成果历史</span><h3>每轮形成一个可追溯版本</h3></div><b>{currentArtifactVersion ? `当前 v${currentArtifactVersion}` : "尚未提交"}</b></header>
