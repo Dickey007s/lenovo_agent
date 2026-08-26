@@ -911,8 +911,10 @@ Gateway receipt，就不能出现“已执行”；没有 ArtifactVersion 和 Co
 与早期 [`AGENT-CONTROL-LOOP-BOUNDED-READONLY-20260825`](../evidence/AGENT-CONTROL-LOOP-BOUNDED-READONLY-EVIDENCE-20260825.md)。
 当前本地门为完整 Python `75 passed, 1 skipped`，Runtime 定向 `37 passed`，Ruff、前端 lint、
 生产 build 通过，Harness 浏览器 `20 passed`。前序真实 Provider Run 覆盖定位拒绝后部分采用、
-结构拒绝两次和预算终态；本轮 active deadline 的真实 Provider 恢复路径仍需单独补证。竞争
-差异研究是 `Draft`，固定配置的八个同场挑战尚未运行，不能据此声称主流竞品做不到。
+结构拒绝两次和预算终态；本轮新增一条真实 `deepseek-v4-pro` 恢复 Run：首轮进入
+`waiting_input` 后观察 12 秒，active elapsed 保持 `51758 ms`；只恢复目标 Branch 后第 2 轮
+完成，总 active `96512 ms`、4 次调用。该证据只证明控制路径，不证明 Finding 正确。竞争差异
+研究仍是 `Draft`，固定配置的八个同场挑战尚未运行，不能据此声称主流竞品做不到。
 
 这些证据能够支持：固定公开文件清单、安全有界预览、整库合同与逐轮来源范围、
 Planner/Analyst 调用与采用回执、服务端 Plan 检查、最多三轮的只读推进、Branch Evidence

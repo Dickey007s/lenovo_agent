@@ -201,7 +201,10 @@ multi-instance coordination and governed external action remain target work.
   “missing evidence” copy with an Agent-owned recovery sheet: failure type,
   affected Branch, attempted files, call/adoption receipt, preserved work and a
   direct “retry only this Branch” action. Terminal Runs create a new task rather
-  than pretending to resume.
+  than pretending to resume. A sanitized real `deepseek-v4-pro` run records a
+  12-second human wait with unchanged active elapsed, followed by one-Branch
+  recovery and completion; this is control-path evidence, not an answer-quality
+  claim.
 - No target-user study has been run. Clarity, trust, efficiency and user value
   remain hypotheses.
 

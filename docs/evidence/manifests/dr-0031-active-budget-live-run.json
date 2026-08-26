@@ -1,0 +1,100 @@
+{
+  "evidence_id": "ACTIVE-BUDGET-AND-AGENT-GAP-RECOVERY-20260826",
+  "captured_at": "2026-08-26T15:45:40.7107405Z",
+  "provider_model": "deepseek-v4-pro",
+  "checkpoint": "memory",
+  "task_store": "memory",
+  "run": {
+    "run_id": "harness:85afc8f0270640ae915a94a5e10dbeef",
+    "status": "completed",
+    "version": 21,
+    "contract": {
+      "max_rounds": 3,
+      "max_files_per_round": 6,
+      "max_model_calls": 6,
+      "deadline_seconds": 1200,
+      "external_action": "none"
+    },
+    "budget": {
+      "rounds_used": 2,
+      "files_verified": 4,
+      "model_calls_used": 4,
+      "active_elapsed_ms": 96512,
+      "stop_reason": null
+    },
+    "waiting_checkpoint": {
+      "status": "waiting_input",
+      "version": 11,
+      "active_elapsed_ms": 51758,
+      "observation_window_seconds": 12,
+      "active_elapsed_after_wait_ms": 51758,
+      "elapsed_was_frozen": true,
+      "completed_branches_preserved": 3,
+      "waiting_branches": 2,
+      "artifact_versions_preserved": 1,
+      "task_commits_preserved": 1
+    },
+    "branch_resume": {
+      "branch_title": "读取产品需求文档",
+      "expected_version": 11,
+      "accepted_version": 12,
+      "resumed_from_checkpoint": true
+    },
+    "round_receipts": [
+      {
+        "round": 1,
+        "planner": {
+          "called": true,
+          "output_used": true,
+          "elapsed_ms": 14418
+        },
+        "analyst": {
+          "called": true,
+          "output_used": true,
+          "elapsed_ms": 36876
+        },
+        "verified_file_count": 3,
+        "evidence_gap_count": 2
+      },
+      {
+        "round": 2,
+        "planner": {
+          "called": true,
+          "output_used": true,
+          "elapsed_ms": 7356
+        },
+        "analyst": {
+          "called": true,
+          "output_used": true,
+          "elapsed_ms": 37189
+        },
+        "verified_file_count": 1,
+        "evidence_gap_count": 0
+      }
+    ],
+    "final_facts": {
+      "completed_branches": 6,
+      "artifact_versions": 2,
+      "task_commits": 1,
+      "finding_count": 6,
+      "review_required": true,
+      "external_action": "none"
+    },
+    "ordered_events_observed": [
+      "decision_requested",
+      "evidence_gate",
+      "control_resume_recorded",
+      "branch_resumed_from_checkpoint",
+      "round_started",
+      "planning_started",
+      "planning_completed",
+      "plan_validation",
+      "analysis_started",
+      "analysis_completed",
+      "result_validation",
+      "evidence_gate",
+      "loop_committed"
+    ]
+  },
+  "boundary": "This sanitized manifest records one real provider control-path run. It omits prompts, provider output, file bodies, full source hashes, credentials and internal paths. Completion means schema, reference, evidence-location, branch-record and read-only checks passed with review_required=true; it does not prove semantic correctness, model quality, production SLA, user value or external action."
+}

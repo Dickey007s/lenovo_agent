@@ -42,6 +42,7 @@
 | Playwright 完整 Harness | `20 passed` | waiting Gap 可留空只重试，terminal Gap 创建新 Run，其余文件管理器/证据/控制路径未回归 | 真实用户理解 |
 | `dr-0031-actionable-gap-recovery.png` | 已捕获 | 首屏显示 Agent 自有缺口、保留项、可选线索和只重试 Branch 主动作 | 下一轮一定成功 |
 | `dr-0031-terminal-gap-recovery.png` | 已捕获 | terminal 状态显示创建新 Run，而非伪 resume | 新 Run 沿用旧调用 |
+| 真实 Provider 恢复 Run | [`dr-0031-active-budget-live-run.json`](manifests/dr-0031-active-budget-live-run.json)；`deepseek-v4-pro`；最终 `completed` | 1200 秒 active deadline 已冻结；首轮在 `waiting_input` 停留 12 秒期间 `elapsed_ms=51758` 未增长；按 Branch 恢复后完成第 2 轮，总 active 96512 ms、4 次真实调用、4 份文件核对、2 个 ArtifactVersion | Finding 的语义正确、模型质量、延迟 SLA 或用户价值 |
 
 新界面截图 SHA-256：
 
@@ -50,11 +51,14 @@
 - `dr-0031-terminal-gap-recovery.png`：
   `B8C93DFE0456318A56DE9F27AF356EDE9F46A2CABBA9360F217B77608DEBAE48`
 
-## 待交付补证
+## 交付绑定
 
-- 实现提交、PR 与远端 CI 结果将在推送后回填。
-- 应运行一次真实 Provider 路径，验证人工等待后恢复不会因为 wall-clock 立即到达 deadline；
-  该运行仍只能证明控制路径，不证明 Finding 正确。
+- 主体实现提交：`449b3a8`；竞争边界研究提交：`94e5d96`；汇报门同步提交：`4f9925c`。
+- PR：[#40](https://github.com/Dickey007s/lenovo_agent/pull/40)。本轮远端没有配置或返回
+  status checks；不得写成“远端 CI 通过”。
+- 真实 Provider Run：`harness:85afc8f0270640ae915a94a5e10dbeef`。首轮 3 个 Branch
+  已完成、2 个 Branch 等待；人工等待不计 active elapsed；恢复“读取产品需求文档”分支后第 2 轮
+  完成。该 Run 使用 `memory` Store，API 重启后不能恢复。
 
 ## 事实边界
 
