@@ -139,7 +139,7 @@ Content-Type: application/json
     "max_rounds": 3,
     "max_files_per_round": 6,
     "max_model_calls": 6,
-    "deadline_seconds": 120
+    "deadline_seconds": 1200
   }
 }
 ```
@@ -150,10 +150,13 @@ index and the Planner autonomously selects a bounded evidence set for each
 round. Sending a client-owned file scope is rejected as an unknown field.
 
 `loop` is optional and defaults to the values above. Bounds are 1-3 rounds,
-1-8 files per round, 2-6 model calls and 20-300 seconds. The server freezes
+1-8 files per round, 2-6 model calls and 20-3000 seconds. The server freezes
 these values plus `scope_mode=whole_workspace` and all stable input refs into
 `AgentControlLoopContract`; the browser cannot change the scope or budget while
-a Run is active.
+a Run is active. `deadline_seconds` is an active execution deadline: elapsed
+time is frozen during `waiting_input`, explicit pause and terminal states, then
+continues from the accumulated active elapsed on a legal resume. It does not
+hard-cancel an in-flight provider HTTP request.
 
 The response is `202 Accepted` with `{"run": snapshot, "replayed": false}`.
 Reusing the same Owner/key/request returns the original start result with
@@ -188,14 +191,15 @@ Important fields:
     "max_rounds": 3,
     "max_files_per_round": 6,
     "max_model_calls": 6,
-    "deadline_seconds": 120,
+    "deadline_seconds": 1200,
     "external_action": "none"
   },
   "budget": {
     "rounds_used": 2,
     "files_verified": 8,
     "model_calls_used": 5,
-    "elapsed_ms": 71461
+    "elapsed_ms": 71461,
+    "stop_reason": null
   },
   "rounds": [],
   "branches": [
@@ -395,6 +399,14 @@ user direction to POST a new whole-workspace Run. Prior Branches, receipts and
 ArtifactVersions remain on the old Snapshot; the new Planner autonomously selects
 and validates evidence again rather than inheriting the old file set as authority.
 
+For a nonterminal Gap, the client derives its recovery sheet only from the latest
+Snapshot: `next_step.recovery_kind`, the bound Branch objective/status and refs,
+Gap candidates, plus Planner/Analyst `called/output_used` receipts. A missing
+Anchor means the server has no unique source position; it is not permission for
+the browser to invent a row or ask the user to edit the candidate file. Feedback
+is optional. A waiting Branch may be resumed directly; if feedback is supplied,
+the client records a versioned steer before the versioned Branch resume.
+
 Current statuses are `queued`, `indexing`, `planning`, `validating`,
 `analyzing`, `verifying`, `waiting_input`, `paused`, `completed`, `stopped`
 and `failed`;
@@ -565,9 +577,9 @@ reconciliation; a nonterminal interruption uses GET plus `after=N` recovery.
 | `next_step.recovery_kind=source_location` | legal-scope candidate could not be uniquely mapped to safe Preview | show preserved/not-adopted/no-action facts; select the smallest Branch and resume |
 | `next_step.recovery_kind=analysis_output` | provider responded twice without a usable public result structure | keep raw output hidden; select a minimal Branch and retry or stop |
 | `checkpoint_recovered` | server restored a PostgreSQL Snapshot and paused | reconcile the trace; explicitly resume from the safe checkpoint |
-| `loop_budget_stopped` | round/call/deadline prevents another step | show bounded brief, preserved facts and candidate Branches; create a new Branch-scoped task instead of resuming the terminal Run |
+| `loop_budget_stopped` | round/call/active deadline prevents another step; `budget.stop_reason` names the actual boundary | show the precise Chinese reason, bounded brief, preserved facts and candidate Branches; create a new Branch-scoped task instead of resuming the terminal Run |
 | `status=failed` | model/schema/plan/source/citation validation failed | show safe business error and no result |
 
 See [UI-server fact matrix](contracts/UI_SERVER_FACT_MATRIX.md),
-[`DR-0030`](decisions/DR-0030-actionable-review-and-recoverable-analysis.md)
-and [current Evidence](evidence/ACTIONABLE-REVIEW-AND-RECOVERY-EVIDENCE-20260826.md).
+[`DR-0031`](decisions/DR-0031-active-budget-and-agent-owned-gap-recovery.md)
+and [current Evidence](evidence/ACTIVE-BUDGET-AND-AGENT-GAP-RECOVERY-EVIDENCE-20260826.md).

@@ -630,7 +630,8 @@ class OpenAICompatibleHarnessAnalyst:
 class _Run:
     snapshot: HarnessRunSnapshot
     condition: asyncio.Condition
-    started_at_perf: float
+    active_elapsed_base_ms: int = 0
+    active_since_perf: float | None = None
     resume_status: str | None = None
 
 
@@ -771,11 +772,11 @@ class HarnessRuntime:
                         }
                     )
                     resume_status = "planning"
-                elapsed_seconds = snapshot.budget.elapsed_ms / 1000
                 run = _Run(
                     snapshot=snapshot,
                     condition=asyncio.Condition(),
-                    started_at_perf=perf_counter() - elapsed_seconds,
+                    active_elapsed_base_ms=snapshot.budget.elapsed_ms,
+                    active_since_perf=None,
                     resume_status=resume_status,
                 )
                 self._runs[(record.owner_id, record.run_id)] = run
@@ -943,7 +944,11 @@ class HarnessRuntime:
                 contract=contract,
                 budget=budget,
             )
-            current = _Run(snapshot, asyncio.Condition(), perf_counter())
+            current = _Run(
+                snapshot=snapshot,
+                condition=asyncio.Condition(),
+                active_since_perf=perf_counter(),
+            )
             result = HarnessRunStartResult(run=snapshot)
             existing = await self._persist_locked(
                 current,
@@ -1089,6 +1094,7 @@ class HarnessRuntime:
                 applied_version = next_version
                 if snapshot.control_state == "paused":
                     next_status = run.resume_status or "planning"
+                    self._resume_active_budget(run)
                 message = (
                     f"已确认继续“{selected_branch.title}”分支，将只核对该分支缺少的证据。"
                     if selected_branch
@@ -2783,7 +2789,7 @@ class HarnessRuntime:
                 ),
                 decision="user_stopped",
             )
-        except HarnessBudgetExhausted:
+        except HarnessBudgetExhausted as exc:
             snapshot = await self.get(owner_id, run_id)
             await self._finalize_loop(
                 owner_id,
@@ -2792,6 +2798,7 @@ class HarnessRuntime:
                 follow_ups=[],
                 verified_refs=self._snapshot_verified_refs(snapshot),
                 decision="budget_exhausted",
+                budget_reason=str(exc),
             )
         except Exception as exc:
             runtime_logger.warning(
@@ -2825,6 +2832,7 @@ class HarnessRuntime:
                 details=details,
             )
             run.resume_status = "planning"
+            budget = self._freeze_active_budget(run)
             run.snapshot = snapshot.model_copy(
                 update={
                     "status": "waiting_input",
@@ -2832,7 +2840,7 @@ class HarnessRuntime:
                     "events": [*snapshot.events, event],
                     "last_event_sequence": event.sequence,
                     "version": snapshot.version + 1,
-                    "budget": self._budget_with_elapsed(run),
+                    "budget": budget,
                     "updated_at": now,
                 }
             )
@@ -2855,9 +2863,10 @@ class HarnessRuntime:
         while True:
             async with self._lock:
                 run = self._require_run(owner_id, run_id)
-                snapshot = run.snapshot.model_copy(
-                    update={"budget": self._budget_with_elapsed(run)}
-                )
+                budget = self._budget_with_elapsed(run)
+                if run.snapshot.control_state == "pause_requested":
+                    budget = self._freeze_active_budget(run)
+                snapshot = run.snapshot.model_copy(update={"budget": budget})
                 run.snapshot = snapshot
                 await self._persist_locked(run)
                 if snapshot.control_state == "stop_requested":
@@ -3179,11 +3188,10 @@ class HarnessRuntime:
         async with self._lock:
             run = self._require_run(owner_id, run_id)
             budget = self._budget_with_elapsed(run)
-            if (
-                budget.model_calls_used >= budget.max_model_calls
-                or budget.elapsed_ms >= budget.deadline_seconds * 1000
-            ):
-                raise HarnessBudgetExhausted("模型调用或时间预算已经耗尽")
+            if budget.model_calls_used >= budget.max_model_calls:
+                raise HarnessBudgetExhausted("模型调用预算已耗尽")
+            if budget.elapsed_ms >= budget.deadline_seconds * 1000:
+                raise HarnessBudgetExhausted("Agent 执行时间预算已耗尽")
             run.snapshot = run.snapshot.model_copy(
                 update={
                     "budget": budget.model_copy(
@@ -3546,6 +3554,7 @@ class HarnessRuntime:
         follow_ups: list[str],
         verified_refs: list[str],
         decision: str,
+        budget_reason: str | None = None,
     ) -> None:
         snapshot = await self.get(owner_id, run_id)
         considered_refs = {
@@ -3605,7 +3614,7 @@ class HarnessRuntime:
                 f"Agent Control Loop 到达预算边界；已核对 {len(verified_refs)} 份资料，"
                 f"仍有 {len(unresolved_files)} 份本轮已选择资料需要后续处理。"
             )
-            stop_reason = "轮次、模型调用或时间预算已耗尽"
+            stop_reason = budget_reason or self._budget_stop_reason(snapshot.budget)
             event_name = "loop_budget_stopped"
             message = "Agent Control Loop 已在预算边界停止，并保留未完成项。"
 
@@ -3657,7 +3666,7 @@ class HarnessRuntime:
             controls = current.control_events
             if decision == "user_stopped":
                 controls = self._apply_control_event(controls, "stop", next_version)
-            budget = self._budget_with_elapsed(run).model_copy(
+            budget = self._freeze_active_budget(run).model_copy(
                 update={
                     "files_verified": len(verified_refs),
                     "stop_reason": stop_reason,
@@ -3723,9 +3732,20 @@ class HarnessRuntime:
                 "rounds_completed": brief.rounds_completed,
                 "verified_file_count": len(verified_refs),
                 "gap_count": len(gaps),
+                "stop_reason": stop_reason,
                 "external_action": False,
             },
         )
+
+    @staticmethod
+    def _budget_stop_reason(budget: AgentControlLoopBudget) -> str:
+        if budget.elapsed_ms >= budget.deadline_seconds * 1000:
+            return "Agent 执行时间预算已耗尽"
+        if budget.model_calls_used >= budget.max_model_calls:
+            return "模型调用预算已耗尽"
+        if budget.rounds_used >= budget.max_rounds:
+            return "轮次预算已耗尽"
+        return "本轮剩余预算不足以完成下一次受控调用"
 
     @staticmethod
     def _snapshot_findings(snapshot: HarnessRunSnapshot) -> list[HarnessFinding]:
@@ -3802,13 +3822,28 @@ class HarnessRuntime:
 
     @staticmethod
     def _budget_with_elapsed(run: _Run) -> AgentControlLoopBudget:
+        active_delta_ms = (
+            max(0, round((perf_counter() - run.active_since_perf) * 1000))
+            if run.active_since_perf is not None
+            else 0
+        )
         return run.snapshot.budget.model_copy(
             update={
-                "elapsed_ms": max(
-                    0, round((perf_counter() - run.started_at_perf) * 1000)
-                )
+                "elapsed_ms": max(0, run.active_elapsed_base_ms + active_delta_ms)
             }
         )
+
+    @classmethod
+    def _freeze_active_budget(cls, run: _Run) -> AgentControlLoopBudget:
+        budget = cls._budget_with_elapsed(run)
+        run.active_elapsed_base_ms = budget.elapsed_ms
+        run.active_since_perf = None
+        return budget
+
+    @staticmethod
+    def _resume_active_budget(run: _Run) -> None:
+        if run.active_since_perf is None:
+            run.active_since_perf = perf_counter()
 
     def _analysis_inputs(self, files: list[dict[str, Any]]) -> list[dict[str, Any]]:
         method = getattr(self.catalog, "agent_file_inputs", None)
@@ -4663,8 +4698,13 @@ class HarnessRuntime:
     async def _fail(self, owner_id: str, run_id: str, reason: str) -> None:
         async with self._lock:
             run = self._require_run(owner_id, run_id)
+            budget = self._freeze_active_budget(run)
             run.snapshot = run.snapshot.model_copy(
-                update={"validation_errors": [reason], "updated_at": datetime.now(timezone.utc)}
+                update={
+                    "validation_errors": [reason],
+                    "budget": budget,
+                    "updated_at": datetime.now(timezone.utc),
+                }
             )
             await self._persist_locked(run)
             receipt = (

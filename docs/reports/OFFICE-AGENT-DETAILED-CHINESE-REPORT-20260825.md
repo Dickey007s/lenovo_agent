@@ -6,7 +6,7 @@
 >
 > 当前结论状态：限定工程链路为 `Limited Verified`；任务正确性、生产可用性与用户价值仍未验证
 >
-> 当前事实基线：源码、[`ARCHITECTURE.md`](../ARCHITECTURE.md)、[`UI_SERVER_FACT_MATRIX.md`](../contracts/UI_SERVER_FACT_MATRIX.md) 与 [`DR-0026`](../decisions/DR-0026-selective-branch-and-immutable-artifact-history.md)
+> 当前事实基线：源码、[`ARCHITECTURE.md`](../ARCHITECTURE.md)、[`UI_SERVER_FACT_MATRIX.md`](../contracts/UI_SERVER_FACT_MATRIX.md) 与 [`DR-0031`](../decisions/DR-0031-active-budget-and-agent-owned-gap-recovery.md)
 
 > 2026-08-25 最新交互修订：`DR-0024` 已取代本文早期 `DR-0022` 的“用户勾选 1-20 个文件 / selected_file_refs”方案。当前产品是一个统一文件管理器；用户只给目标，Agent 面向完整安全索引自主选择每轮证据。本文后文如引用旧勾选流程，均只表示历史设计对照，不得作为当前演示口径。
 
@@ -18,6 +18,38 @@
 > 2026-08-26 问题处置与恢复修订：`DR-0030` 在 `DR-0029` 的精确原文定位上继续前进。
 > 当前 Finding 会把事实、影响和人工动作分开，人工选择与反馈只会创建新的只读 Run；
 > 合法范围内的原文定位或结构问题先有界修复，再保留有效工作并暂停最小 Branch。
+
+> 2026-08-26 预算与缺口恢复修订：`DR-0031` 把默认 deadline 从 120 秒提高为 1200 秒，
+> 并改为只累计 Agent active 时间；人工阅读和暂停不消耗它。无 Anchor 的 Gap 不再暗示用户
+> 修改源文件，而是明确为 Agent 执行缺口，并提供留空线索也能只重试受影响 Branch 的入口。
+
+## 2026-08-26 增补：把等待时间还给人，把失败责任留给 Agent
+
+真实运行暴露了一个典型的人机协作反模式：Agent 第 1 轮已经花了接近一分钟完成 Planner、
+Analyst 和一次结构修复，然后在 Evidence Gate 等待用户。用户阅读文件和思考两分钟后选择
+继续，旧 Runtime 却把这段人工等待也算进 deadline，导致第 2 轮尚未真正工作就到达预算边界。
+这不是“模型做了很多”，而是预算的时钟选错了。
+
+修订后的 deadline 默认从 120 秒提高十倍到 1200 秒，上限为 3000 秒，并只统计 Agent active
+区间。进入 `waiting_input`、用户 pause 或终态时冻结 `budget.elapsed_ms`；合法 resume 后从
+已有 active elapsed 继续。轮次、模型调用数和每轮 1 到 8 份文件仍是独立边界，避免用更长
+时间换取无界检索。前台停止原因也不再统一说“到达预算边界”，而是区分模型调用耗尽与 Agent
+执行时间耗尽。这改变了用户流程：用户可以真正停下来核对，而不必为了抢预算匆忙点击继续。
+
+第二个修订针对“缺少证据”。旧页面只给一份候选表格和整表预览，用户自然会追问“到底哪
+一行错了，我要改什么”。但服务端事实可能只是 Analyst 没返回合法结构，或逐字引用无法唯一
+定位，并没有证据证明源文件有错。新处置单把它命名为“Agent 执行缺口”，第一屏固定回答：
+原本要确认什么、Agent 尝试过哪些文件和调用、已经保留什么、不会发生什么。用户不懂业务
+细节也能把线索留空，直接让 Agent 只重试这一 Branch；没有 Anchor 就明确不高亮，也不让人
+替 Agent 猜行号。若旧 Run 已终止，同一位置改为创建独立新任务，而不是伪装成 resume。
+
+![等待态的 Agent 执行缺口可以留空线索并只重试本分支](../evidence/screenshots/dr-0031-actionable-gap-recovery.png)
+
+![预算终态明确创建新任务而不是续跑旧 Run](../evidence/screenshots/dr-0031-terminal-gap-recovery.png)
+
+这轮的核心交互主张是：人的时间不等于 Agent 成本，Agent 没交付可核对证据也不等于用户
+必须修文件。当前自动化只证明 active elapsed、状态投影和按钮路径按协议工作；它不证明更大
+预算提高任务正确率，也不证明目标用户已经理解这套处置方式。
 
 ## 2026-08-26 增补：Agent 不只指出问题，还要把问题交给人处理
 

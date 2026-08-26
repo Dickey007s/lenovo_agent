@@ -29,6 +29,10 @@ The root page is the only product entry:
   only the Agent-selected, server-budgeted files to analysis. Originals stay
   read-only, results require review and no external action occurs.
 
+The visible deadline defaults to 1,200 seconds and is an Agent-active-time
+budget, not wall-clock time. Human review in `waiting_input` and an explicit
+pause do not consume it. Round, file and model-call caps remain independent.
+
 The primary flow is:
 
 ```text
@@ -43,6 +47,7 @@ browse or search the whole repository
   -> server uniquely resolves safe-preview locations and keeps only reviewable findings
   -> server validates citation membership, evidence anchors and the Evidence Gate
   -> location/structure cannot be adopted: one bounded repair, then preserve valid work and pause one branch
+  -> gap review explains the Agent failure type and lets the user retry only that branch without editing sources
   -> evidence missing: pause the affected task branches before spending another round
   -> user chooses one branch: next round is bound to that branch's missing sources
   -> ordered SSE + authoritative Snapshot
@@ -191,6 +196,12 @@ multi-instance coordination and governed external action remain target work.
   can resume: it lists unfinished Branches and creates a new whole-workspace Run
   for the selected Branch objective, preserving the old Run and artifacts.
   Security-scope violations still fail closed.
+- `DR-0031` raises the default active deadline from 120 to 1,200 seconds and
+  excludes human waiting/pause from elapsed time. It also replaces vague
+  “missing evidence” copy with an Agent-owned recovery sheet: failure type,
+  affected Branch, attempted files, call/adoption receipt, preserved work and a
+  direct “retry only this Branch” action. Terminal Runs create a new task rather
+  than pretending to resume.
 - No target-user study has been run. Clarity, trust, efficiency and user value
   remain hypotheses.
 
@@ -203,6 +214,8 @@ The current Demo 1 branch/artifact increment is tracked in
 [`DEMO1-BRANCH-ARTIFACT-CONTROL-20260826`](docs/evidence/DEMO1-BRANCH-ARTIFACT-CONTROL-EVIDENCE-20260826.md).
 The current folder hierarchy and issue-review interaction is tracked in
 [`WORKSPACE-TREE-AND-EVIDENCE-REVIEW-20260826`](docs/evidence/WORKSPACE-TREE-AND-EVIDENCE-REVIEW-EVIDENCE-20260826.md).
+The current active-budget and Agent-gap recovery increment is tracked in
+[`ACTIVE-BUDGET-AND-AGENT-GAP-RECOVERY-20260826`](docs/evidence/ACTIVE-BUDGET-AND-AGENT-GAP-RECOVERY-EVIDENCE-20260826.md).
 The current exact evidence-location interaction is tracked in
 [`PINPOINT-EVIDENCE-REVIEW-20260826`](docs/evidence/PINPOINT-EVIDENCE-REVIEW-EVIDENCE-20260826.md).
 The current actionable review and recoverable-analysis interaction is tracked in

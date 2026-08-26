@@ -45,7 +45,7 @@ Agent Control Loop 的逐模块历史基线、当前三轮只读纵切和后续�
 | 7 | 安全预览把“Agent 读了什么”变成可见契约 | CSV/PDF/DOCX/TXT 预览拼图和安全说明 | 路径、大小、hash、符号链接和解析器测试 |
 | 8 | Harness 把模型调用、内容采用和服务端校验分开 | 事件与模型回执时序 | Snapshot/Receipt 事实；不展示思维链 |
 | 9 | Agent 说“有问题”之后，用户要同时看懂事实、影响、真实原文和自己必须决定的下一步 | 问题处置单：1 事实 -> 2 影响 -> 3 人工动作；证据与实际文件并排；A/B/C + 反馈 | `DR-0030/29`；推荐是模型候选，确认只创建新只读 Run |
-| 10 | Agent Control Loop 会把计划变成可核对任务分支；等待态只恢复一条分支，预算终态则以该分支创建新 Run | 任务分支现场、分支 Evidence Gate、成果 v1→v2、恢复轨迹与预算终态续办卡 | 只读、最多三轮、顺序 Controller；Branch 不等于并行 Worker，terminal Run 不可 resume |
+| 10 | Agent Control Loop 会把计划变成可核对任务分支；人阅读时不消耗 Agent 执行预算，缺口只恢复受影响分支 | active elapsed 与 wall-clock 对比、Agent 执行缺口处置单、成果 v1→v2、终态新 Run | `DR-0031/30`；只读、最多三轮、顺序 Controller；Branch 不等于并行 Worker，terminal Run 不可 resume |
 | 11 | Demo 2 验收多任务自组织、动态调度和共享工件汇聚 | Worker、依赖与动态重排图 | 目标设计；当前产品没有通用 Worker Runtime |
 | 12 | Demo 3 对单任务和多任务统一施加风险与动作控制 | 影响预演 -> 证据 -> 审批 -> Permit -> 回执 | 目标设计；当前没有真实外部动作 |
 | 13 | 当前已经证明工程链路，但也保留模型结果出错的负面证据 | 自动化、截图与 Finance 算术偏差并列 | `completed` 不等于结论正确 |
@@ -55,10 +55,10 @@ Agent Control Loop 的逐模块历史基线、当前三轮只读纵切和后续�
 
 1. 直接打开 `/`，进入“办公资料库”。
 2. 从左侧文件夹逐级展开顶层目录和嵌套子目录，也可搜索或按类型筛选；打开文件并强调浏览不会限制 Agent 范围。
-3. 不勾选文件，只输入一个现场提出的新目标，并设置轮次、每轮文件、模型调用和 deadline 上限。
+3. 不勾选文件，只输入一个现场提出的新目标，并设置轮次、每轮文件、模型调用和 Agent 执行时间；说明默认 1200 秒只统计 active 时间，人工阅读和暂停不计入。
 4. 启动 Loop，指出合同已冻结完整 96 文件索引；Planner 与 Analyst 的独立模型回执才是调用事实。
 5. 展示 Agent 本轮选择了哪些文件、为什么选择，以及服务端如何把超预算候选限制在本轮上限内。
-6. 在 Evidence Gate 停下来，先点“查看问题”：在审查页核对第几轮、哪条分支、问题描述、候选文件和实际原文；关闭后再只点一条“继续此分支”。
+6. 在 Evidence Gate 停下来，先点“查看问题”：第一屏先说明问题在 Agent 的结构/定位/覆盖交付，不等于源文件有错；用户可以不填线索，直接“让 Agent 只重试此分支”。再打开候选文件，说明没有 Anchor 就不伪造高亮。
 7. 展示成果简报从 v1 到 v2；再恢复 v1，说明系统只新增一条 TaskCommit、当前指针改变，v2 与原文件都没有被覆盖。
 8. 对 Finding 点“打开审查页”：先按 1/2/3 讲事实、影响和人工动作，再在左侧选择“设计预期/实际观测”，让右侧真实文件跳到并高亮原文；强调位置匹配不等于结论正确。
 9. 先选择 A/B/C 中自己的初始口径，再点“对照 Agent 建议”；补充“同时核对发布记录中的代码版本”后确认。指出推荐默认隐藏以减少锚定，确认只创建新只读 Loop，不会直接改源文件。
@@ -113,6 +113,8 @@ Agent Control Loop 的逐模块历史基线、当前三轮只读纵切和后续�
 | 终态仍要求复核 | 完成不等于正确 | “模型初步结论 · 待复核” | `review_required=true` |
 | 服务端 Evidence Gate | 验证结果可决定继续还是停止 | 本轮缺口、下一轮目的、剩余预算 | `rounds[].evidence_gaps` 与 `next_step` |
 | 轮次间人工证据门 | 证据不足时由人决定是否继续花预算 | “确认并继续核对”、调整方向或停止 | `status=waiting_input`、`control_state=paused`、resume 回执 |
+| active deadline | 用户阅读、开会或暂停时不会把 Agent 预算烧光 | “Agent 执行时间”、已用 active 秒数、精确停止原因 | 默认 1200 秒、上限 3000 秒；`budget.elapsed_ms/stop_reason`，waiting/pause 冻结 |
+| Agent 自有缺口处置 | 用户不再被要求替 Agent 猜行号或修改候选文件 | 原目标、尝试文件、模型调用/采用、保留项、无外部动作、只重试本分支 | `recovery_kind` + Branch/Gap + model receipt；无 Anchor 不高亮 |
 | 服务端任务 Branch | 用户不用把整组缺口一次性全放行，可只推进一条工作线 | 分支状态、依赖、资料/缺口数量、“继续此分支” | `branches[]`、`candidate_branch_ids`、`active_branch_id`、带 `branch_id` 的 resume |
 | 版本化人工控制 | 用户不必只能等待模型跑完 | 暂停、继续、调整下一轮、结束并保留 | `ControlEvent`、expected version、幂等回执 |
 | Snapshot 持久化与安全恢复 | 刷新/进程重启不必把已完成轮次当作丢失 | “检查点已恢复”、原轮次/预算/版本、显式继续 | PostgreSQL `HarnessStateStore`、`checkpoint_recovered` |

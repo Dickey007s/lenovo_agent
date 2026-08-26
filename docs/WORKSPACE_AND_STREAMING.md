@@ -38,7 +38,10 @@ they do not start a task. The Run button remains disabled until the instruction
 contains at least three characters.
 
 The user sets visible limits for rounds, files per round, model calls and
-deadline. The context contract is the entire allowlisted workspace; the Agent
+Agent execution time. The default is 1,200 seconds and the accepted range is
+20 to 3,000 seconds. This limit counts only active Agent execution:
+`waiting_input` and explicit pause time are excluded. The context contract is
+the entire allowlisted workspace; the Agent
 chooses a smaller evidence set each round. Changing the instruction or limits
 changes the command signature. If a
 start response is unknown, the client retries the unchanged signature with the
@@ -83,6 +86,14 @@ If the same recovery reaches `stopped/bounded`, there is no next round inside th
 old Run. The UI replaces resume controls with unfinished Branch cards. Selecting
 one combines its objective with optional user direction and creates a new
 whole-workspace Run; the old Snapshot, receipts and ArtifactVersions stay intact.
+
+Opening a Gap first shows an Agent-owned recovery sheet, not a request to edit a
+source file. `next_step.recovery_kind` distinguishes malformed analysis,
+unresolved source location and ordinary evidence coverage; Branch refs and model
+receipts show what was attempted and adopted. A user may inspect candidate files,
+but without an Evidence Anchor the page never invents a row highlight. Guidance
+is optional: a waiting Run can retry only the affected Branch with an empty
+feedback field, while a terminal Run must create a new independent task.
 
 Each completed round creates an independent append-only logical evidence-brief
 ArtifactVersion. The final brief appears only after citation-scope validation
@@ -189,9 +200,10 @@ browser fact, not a server task phase.
 | one source quote has multiple real matches | `evidence_disambiguation_required` + `EvidenceResolution(status=ambiguous)` | completed Branches, ArtifactVersion and all candidates | compare candidates; record the selected candidate; steer and resume only its Branch |
 | pending human decision is closed | `decision_recorded(action=defer)` | Finding, evidence, user feedback draft and all execution facts | reopen from Snapshot and accept, decline or defer again with a fresh version |
 | repeated malformed analysis output | structure-rejected trace | approved Plan, files, Branches and both call receipts | pause one candidate Branch with `recovery_kind=analysis_output`; do not expose raw response |
-| evidence insufficient | waiting Branch, missing evidence and explicit per-branch confirmation | prior rounds, all Branch states, versions and citations | choose one Branch to `resume`, adjust direction first or stop at the limit |
+| evidence insufficient | Agent execution-gap sheet, waiting Branch, missing evidence and model adoption receipt | prior rounds, all Branch states, versions and citations | leave guidance empty and retry one Branch, optionally add direction, or preserve the gap |
 | recovery reaches budget terminal | `status=stopped`, `brief.outcome=bounded`, candidate Branches and `recovery_kind` | old Run, Plan, call receipts, Branch state and ArtifactVersions | choose one unfinished Branch, add optional direction and POST a new Task Contract; never resume the terminal Run |
 | pause/steer/stop requested | pending until a safe point | current Snapshot and command receipt | reconcile returned version; resume or inspect terminal brief |
+| human reviews or pauses for a long time | active elapsed is frozen while waiting/paused | consumed active time, Branch state, versions and receipts | resume from the same active budget; wall-clock waiting does not force an immediate stop |
 | SSE interruption | reconnecting | current Snapshot and last sequence | GET plus `after=N` |
 | browser refresh | current Run and sequence restored | task, rounds, receipts and controls | GET current Run, then SSE `after=N` |
 | API restart with PostgreSQL | recovered checkpoint, paused | completed rounds, Branch states, events, command receipts and independent ArtifactVersion/TaskCommit rows | inspect trace, then explicitly resume the intended Branch |

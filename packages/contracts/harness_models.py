@@ -227,7 +227,7 @@ class AgentControlLoopOptions(StrictModel):
     max_rounds: int = Field(default=3, ge=1, le=3)
     max_files_per_round: int = Field(default=4, ge=1, le=8)
     max_model_calls: int = Field(default=6, ge=2, le=6)
-    deadline_seconds: int = Field(default=120, ge=20, le=300)
+    deadline_seconds: int = Field(default=1_200, ge=20, le=3_000)
 
 
 class AgentControlLoopContract(StrictModel):
@@ -239,7 +239,7 @@ class AgentControlLoopContract(StrictModel):
     max_rounds: int = Field(ge=1, le=3)
     max_files_per_round: int = Field(ge=1, le=8)
     max_model_calls: int = Field(ge=2, le=6)
-    deadline_seconds: int = Field(ge=20, le=300)
+    deadline_seconds: int = Field(ge=20, le=3_000)
     external_action: Literal["none"] = "none"
 
 
@@ -247,7 +247,7 @@ class AgentControlLoopBudget(StrictModel):
     max_rounds: int = Field(ge=1, le=3)
     max_files_per_round: int = Field(ge=1, le=8)
     max_model_calls: int = Field(ge=2, le=6)
-    deadline_seconds: int = Field(ge=20, le=300)
+    deadline_seconds: int = Field(ge=20, le=3_000)
     rounds_used: int = Field(default=0, ge=0, le=3)
     files_verified: int = Field(default=0, ge=0, le=100)
     model_calls_used: int = Field(default=0, ge=0, le=6)
