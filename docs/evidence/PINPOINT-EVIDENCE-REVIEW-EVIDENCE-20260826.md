@@ -25,6 +25,7 @@
 | `uv run ruff check .` | 通过 | Python 静态规范 | 运行时行为 |
 | `pnpm --dir apps/web lint` / `build` | 通过 | TypeScript 与生产构建 | 浏览器交互正确 |
 | Playwright | `13 passed` | 证据角色、点击切换、跨文件高亮、移动路径和既有工作流 | 真实 Provider 输出或用户价值 |
+| [PR #35](https://github.com/Dickey007s/lenovo_agent/pull/35) / [PostgreSQL job](https://github.com/Dickey007s/lenovo_agent/actions/runs/32944740436/job/98102969157) | 实现 `0c2af7e`、merge `98b8add`、远端门通过 | 变更已进入统一 `master`，既有 PostgreSQL restart gate 未回归 | 本地 memory Run 获得数据库持久化 |
 | `dr-0029-pinpoint-evidence-review.png` | 已捕获 | 固定 Snapshot 下“设计预期”证据的视觉状态 | 真实模型调用、可用性提升 |
 | `dr-0029-observed-source-highlight.png` | 已捕获 | 点击“实际观测”后跨文件定位与高亮 | 用户理解或语义成立 |
 | live `deepseek-v4-pro` Run | 完成 2 轮、4 次调用、4 份文件、23 处 Anchor | Provider 返回逐字候选并被服务端定位采用，人工确认一条 Branch 后继续完成 | Finding 正确、生产稳定或普遍质量 |
