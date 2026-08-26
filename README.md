@@ -195,6 +195,12 @@ Never commit `.env`, API keys, production credentials or real customer data.
 .\scripts\stop-demo.ps1
 ```
 
+本地启动器只把当前 PowerShell 进程中显式设置的 `DATABASE_DSN` 视为外部
+PostgreSQL 授权；没有 Docker 且没有该显式变量时，会覆盖 `.env` 中可能残留的
+数据库地址并明确回退到单进程 memory。模型端点、Key 与模型名仍可从 `.env`
+读取。启动后以 `/v1/health` 的 `checkpoint`、`task_store` 为最终事实，不能只看
+启动提示推断是否具备重启恢复。
+
 - Web: <http://localhost:3000>
 - API: <http://localhost:8010>
 - OpenAPI: <http://localhost:8010/docs>
@@ -227,6 +233,12 @@ pnpm --dir apps/web exec playwright test e2e/harness-workbench.spec.ts
 - [SCENARIO-010：Agent 自主研究整个办公资料库](docs/scenarios/SCENARIO-010-autonomous-whole-workspace-research.md)
 - [DR-0025：可恢复检查点、人工证据门与成果演进](docs/decisions/DR-0025-durable-evidence-gate-and-artifact-evolution.md)
 - [SCENARIO-011：中断恢复与逐轮补证](docs/scenarios/SCENARIO-011-recover-and-confirm-evidence-round.md)
+- [DR-0026：可选择任务分支与不可变成果历史](docs/decisions/DR-0026-selective-branch-and-immutable-artifact-history.md)
+- [SCENARIO-012：按分支补证并恢复历史成果](docs/scenarios/SCENARIO-012-selective-branch-and-artifact-restore.md)
+- [Demo 1 分支与成果控制 Evidence](docs/evidence/DEMO1-BRANCH-ARTIFACT-CONTROL-EVIDENCE-20260826.md)
+- [DR-0027：本地启动状态库选择](docs/decisions/DR-0027-truthful-local-state-store-selection.md)
+- [SCENARIO-013：真实的本地状态库回退](docs/scenarios/SCENARIO-013-truthful-local-state-store-fallback.md)
+- [本地启动状态库优先级 Evidence](docs/evidence/START-DEMO-DSN-PRECEDENCE-EVIDENCE-20260826.md)
 - [可恢复 Control Loop Evidence](docs/evidence/DURABLE-EVIDENCE-GATE-ARTIFACT-EVOLUTION-EVIDENCE-20260826.md)
 - [整库自主研究 Evidence](docs/evidence/AUTONOMOUS-WHOLE-WORKSPACE-RESEARCH-EVIDENCE-20260825.md)
 - [Agent Control Loop 三轮只读纵切证据](docs/evidence/AGENT-CONTROL-LOOP-BOUNDED-READONLY-EVIDENCE-20260825.md)

@@ -51,6 +51,9 @@ if ($UseDockerPostgres) {
     if ($UseConfiguredPostgres) {
         Write-Host "Using the configured external PostgreSQL state store." -ForegroundColor DarkGray
     } else {
+        # Process environment must override a stale DATABASE_DSN from .env so the
+        # launcher and API agree that this session is using the memory store.
+        $env:DATABASE_DSN = ""
         Write-Warning "Docker and DATABASE_DSN are unavailable; this session will use process-local memory and will not recover after an API restart."
     }
 }

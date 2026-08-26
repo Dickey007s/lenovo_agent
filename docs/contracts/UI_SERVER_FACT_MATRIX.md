@@ -95,6 +95,11 @@ Prompt、思维链、原始模型响应、绝对路径、哈希和内部策略�
 - `X-User-Id` is unsigned. With `DATABASE_DSN`, Snapshot, command receipts,
   ArtifactVersions and TaskCommits are PostgreSQL-backed; without it they remain
   one-process memory.
+- Local `start-demo.ps1` chooses Docker first, then a `DATABASE_DSN` explicitly
+  present in the launching PowerShell process, otherwise memory. In the final
+  case it overrides a stale `.env` database value. UI/service availability and
+  restart-recovery claims must use `/v1/health.checkpoint` and `task_store`, not
+  the launcher message or the mere presence of `.env`.
 - `checkpoint_recovered` proves a persisted Snapshot was restored and paused.
   It does not prove an interrupted model call was cancelled or replayed.
 - Plan operation labels and read-only Act declare intent/analysis. The current
