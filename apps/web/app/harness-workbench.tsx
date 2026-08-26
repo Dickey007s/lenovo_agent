@@ -31,7 +31,8 @@ type WorkspaceView = "data" | "loop" | "result";
 type FileTypeFilter = string;
 type PreviewKind = "table" | "document" | "pdf" | "text" | "unavailable";
 type LoopPhase = "observe" | "plan" | "act" | "verify" | "evidence_gate" | "commit";
-type LoopCommand = "pause" | "resume" | "steer" | "stop";
+type LoopCommand = "pause" | "resume" | "steer" | "stop" | "rollback";
+type LoopControlOptions = { instruction?: string; branchId?: string; artifactVersion?: number };
 
 export type HarnessFile = {
   file_ref: string;
@@ -133,6 +134,7 @@ type LoopBudget = {
 
 type EvidenceGap = {
   gap_id: string;
+  branch_id: string | null;
   label: string;
   detail: string;
   candidate_file_refs: string[];
@@ -143,6 +145,7 @@ type LoopNextStep = {
   reason: string;
   next_question: string | null;
   candidate_file_refs: string[];
+  candidate_branch_ids: string[];
 };
 
 type LoopRound = {
@@ -152,6 +155,7 @@ type LoopRound = {
   question: string;
   steer_instruction: string | null;
   input_file_refs: string[];
+  branch_ids: string[];
   plan: HarnessPlanNode[];
   plan_summary: string | null;
   selection_reason: string | null;
@@ -161,6 +165,23 @@ type LoopRound = {
   verified_file_refs: string[];
   evidence_gaps: EvidenceGap[];
   next_step: LoopNextStep | null;
+};
+
+type LoopBranch = {
+  branch_id: string;
+  unit_id: string;
+  round_number: number;
+  parent_branch_id: string | null;
+  title: string;
+  objective: string;
+  depends_on: string[];
+  input_file_refs: string[];
+  verified_file_refs: string[];
+  missing_file_refs: string[];
+  status: "running" | "completed" | "waiting_input" | "stopped" | "failed";
+  requires_human_gate: boolean;
+  created_at: string;
+  updated_at: string;
 };
 
 type LoopBrief = {
@@ -178,7 +199,11 @@ type ArtifactVersion = {
   title: string;
   kind: "evidence_brief";
   status: "draft" | "verified" | "committed";
+  round_number: number;
   summary: string;
+  findings: HarnessFinding[];
+  follow_ups: string[];
+  evidence_gaps: EvidenceGap[];
   source_file_refs: string[];
   finding_count: number;
   parent_version: number | null;
@@ -191,6 +216,8 @@ type LoopCommit = {
   commit_id: string;
   artifact_id: string;
   artifact_version: number;
+  operation: "commit" | "rollback";
+  parent_commit_id: string | null;
   summary: string;
   committed_at: string;
   external_action: "none";
@@ -220,7 +247,10 @@ export type HarnessRun = {
   rounds: LoopRound[];
   current_round: number;
   control_state: "running" | "pause_requested" | "paused" | "stop_requested" | "stopped";
+  branches: LoopBranch[];
+  active_branch_id: string | null;
   artifact_versions: ArtifactVersion[];
+  commits: LoopCommit[];
   last_commit: LoopCommit | null;
   recovered: boolean;
   brief: LoopBrief | null;
@@ -479,8 +509,32 @@ function normalizeGap(value: unknown): EvidenceGap | null {
   const label = asText(raw.label);
   const detail = asText(raw.detail);
   return gapId && label && detail
-    ? { gap_id: gapId, label, detail, candidate_file_refs: asStrings(raw.candidate_file_refs) }
+    ? { gap_id: gapId, branch_id: asText(raw.branch_id) || null, label, detail, candidate_file_refs: asStrings(raw.candidate_file_refs) }
     : null;
+}
+
+function normalizeBranch(value: unknown): LoopBranch | null {
+  if (!value || typeof value !== "object") return null;
+  const raw = value as Record<string, unknown>;
+  const branchId = asText(raw.branch_id);
+  const status = asText(raw.status);
+  if (!branchId || !["running", "completed", "waiting_input", "stopped", "failed"].includes(status)) return null;
+  return {
+    branch_id: branchId,
+    unit_id: asText(raw.unit_id),
+    round_number: asNumber(raw.round_number, 1),
+    parent_branch_id: asText(raw.parent_branch_id) || null,
+    title: asText(raw.title, "任务分支"),
+    objective: asText(raw.objective),
+    depends_on: asStrings(raw.depends_on),
+    input_file_refs: asStrings(raw.input_file_refs),
+    verified_file_refs: asStrings(raw.verified_file_refs),
+    missing_file_refs: asStrings(raw.missing_file_refs),
+    status: status as LoopBranch["status"],
+    requires_human_gate: raw.requires_human_gate === true,
+    created_at: asText(raw.created_at),
+    updated_at: asText(raw.updated_at),
+  };
 }
 
 function normalizeLoopRound(value: unknown): LoopRound | null {
@@ -498,6 +552,7 @@ function normalizeLoopRound(value: unknown): LoopRound | null {
     reason: asText(nextRaw.reason),
     next_question: asText(nextRaw.next_question) || null,
     candidate_file_refs: asStrings(nextRaw.candidate_file_refs),
+    candidate_branch_ids: asStrings(nextRaw.candidate_branch_ids),
   } : null;
   return {
     round_number: roundNumber,
@@ -506,6 +561,7 @@ function normalizeLoopRound(value: unknown): LoopRound | null {
     question: asText(raw.question, "核对本轮允许资料"),
     steer_instruction: asText(raw.steer_instruction) || null,
     input_file_refs: asStrings(raw.input_file_refs),
+    branch_ids: asStrings(raw.branch_ids),
     plan: plan.units,
     plan_summary: plan.summary,
     selection_reason: plan.selectionReason,
@@ -541,6 +597,7 @@ function activityItem(event: HarnessServerEvent): HarnessActivityItem {
     control_steer_applied: "方向指令已应用",
     control_stop_recorded: "停止请求已记录",
     loop_committed: "只读任务简报已提交",
+    artifact_version_restored: "已恢复历史成果版本",
     loop_budget_stopped: "已在预算边界停止",
     loop_stopped: "已按你的要求停止",
     harness_failed: "本轮已安全停止",
@@ -563,13 +620,25 @@ function normalizeArtifactVersion(value: unknown): ArtifactVersion | null {
   const status = asText(raw.status);
   const artifactId = asText(raw.artifact_id);
   if (!artifactId || !["draft", "verified", "committed"].includes(status)) return null;
+  const findings = Array.isArray(raw.findings) ? raw.findings.flatMap((item): HarnessFinding[] => {
+    if (!item || typeof item !== "object") return [];
+    const finding = item as Record<string, unknown>;
+    const title = asText(finding.title); const detail = asText(finding.detail); const refs = asStrings(finding.file_refs);
+    return title && detail && refs.length ? [{ title, detail, file_refs: refs }] : [];
+  }) : [];
   return {
     artifact_id: artifactId,
     version: asNumber(raw.version, 1),
     title: asText(raw.title, "任务证据简报"),
     kind: "evidence_brief",
     status: status as ArtifactVersion["status"],
+    round_number: asNumber(raw.round_number, asNumber(raw.version, 1)),
     summary: asText(raw.summary),
+    findings,
+    follow_ups: asStrings(raw.follow_ups),
+    evidence_gaps: Array.isArray(raw.evidence_gaps)
+      ? raw.evidence_gaps.map(normalizeGap).filter((item): item is EvidenceGap => item !== null)
+      : [],
     source_file_refs: asStrings(raw.source_file_refs),
     finding_count: asNumber(raw.finding_count),
     parent_version: typeof raw.parent_version === "number" ? raw.parent_version : null,
@@ -589,6 +658,8 @@ function normalizeCommit(value: unknown): LoopCommit | null {
     commit_id: commitId,
     artifact_id: artifactId,
     artifact_version: asNumber(raw.artifact_version, 1),
+    operation: asText(raw.operation) === "rollback" ? "rollback" : "commit",
+    parent_commit_id: asText(raw.parent_commit_id) || null,
     summary: asText(raw.summary),
     committed_at: asText(raw.committed_at),
     external_action: "none",
@@ -658,6 +729,12 @@ function normalizeRun(value: unknown): HarnessRun | null {
   const artifactVersions = Array.isArray(raw.artifact_versions)
     ? raw.artifact_versions.map(normalizeArtifactVersion).filter((item): item is ArtifactVersion => item !== null)
     : [];
+  const branches = Array.isArray(raw.branches)
+    ? raw.branches.map(normalizeBranch).filter((item): item is LoopBranch => item !== null)
+    : [];
+  const commits = Array.isArray(raw.commits)
+    ? raw.commits.map(normalizeCommit).filter((item): item is LoopCommit => item !== null)
+    : [];
   return {
     run_id: runId,
     workspace_id: workspaceId,
@@ -692,7 +769,10 @@ function normalizeRun(value: unknown): HarnessRun | null {
     rounds,
     current_round: asNumber(raw.current_round),
     control_state: (["pause_requested", "paused", "stop_requested", "stopped"].includes(controlState) ? controlState : "running") as HarnessRun["control_state"],
+    branches,
+    active_branch_id: asText(raw.active_branch_id) || null,
     artifact_versions: artifactVersions,
+    commits,
     last_commit: normalizeCommit(raw.last_commit),
     recovered: serverEvents.some((event) => event.event_name === "checkpoint_recovered"),
     brief,
@@ -737,6 +817,16 @@ function gateLabel(decision: LoopNextStep["decision"] | undefined) {
     failed: "本轮未通过校验",
   };
   return labels[decision ?? "pending"];
+}
+
+function branchStatusLabel(status: LoopBranch["status"]) {
+  return {
+    running: "正在处理",
+    completed: "已核对",
+    waiting_input: "等你决定",
+    stopped: "已停止",
+    failed: "未通过",
+  }[status];
 }
 
 function Receipt({ receipt, label }: { receipt: ModelReceipt | null; label: string }) {
@@ -1057,11 +1147,11 @@ export function HarnessWorkbench({ onActivityChange }: { onActivityChange?: (sta
     } finally { setStarting(false); }
   }
 
-  async function controlLoop(command: LoopCommand, steerInstruction?: string) {
+  async function controlLoop(command: LoopCommand, options: LoopControlOptions = {}) {
     const current = runRef.current;
-    if (!current || TERMINAL_STATUSES.has(current.status)) return false;
-    const normalizedInstruction = steerInstruction?.trim() || undefined;
-    const signature = JSON.stringify({ command, instruction: normalizedInstruction, runId: current.run_id });
+    if (!current || (TERMINAL_STATUSES.has(current.status) && command !== "rollback")) return false;
+    const normalizedInstruction = options.instruction?.trim() || undefined;
+    const signature = JSON.stringify({ command, instruction: normalizedInstruction, branchId: options.branchId, artifactVersion: options.artifactVersion, runId: current.run_id });
     const controlCommand = controlCommandRef.current?.signature === signature
       ? controlCommandRef.current
       : { signature, key: `control-${randomKey()}` };
@@ -1076,6 +1166,8 @@ export function HarnessWorkbench({ onActivityChange }: { onActivityChange?: (sta
           idempotency_key: controlCommand.key,
           expected_version: current.version,
           instruction: normalizedInstruction,
+          branch_id: options.branchId,
+          artifact_version: options.artifactVersion,
         }),
       });
       const payload = await response.json().catch(() => ({}));
@@ -1196,7 +1288,7 @@ function LoopView({
   run: HarnessRun | null;
   files: HarnessFile[];
   controlBusy: LoopCommand | null;
-  onControl: (command: LoopCommand, instruction?: string) => Promise<boolean>;
+  onControl: (command: LoopCommand, options?: LoopControlOptions) => Promise<boolean>;
 }) {
   const [selectedRoundNumber, setSelectedRoundNumber] = useState(1);
   const [steerDraft, setSteerDraft] = useState("");
@@ -1209,9 +1301,12 @@ function LoopView({
   const selectedRound = run.rounds.find((item) => item.round_number === selectedRoundNumber) ?? run.rounds.at(-1) ?? null;
   const terminal = TERMINAL_STATUSES.has(run.status);
   const canResume = run.control_state === "paused" || run.control_state === "pause_requested";
+  const waitingForBranch = run.status === "waiting_input";
   const canPause = !terminal && run.control_state === "running";
   const canSteer = !terminal && ![ "stop_requested", "stopped" ].includes(run.control_state);
   const fileLabel = (fileRef: string) => files.find((file) => file.file_ref === fileRef)?.display_label ?? "允许范围内的文件";
+  const roundBranches = selectedRound ? run.branches.filter((branch) => selectedRound.branch_ids.includes(branch.branch_id)) : [];
+  const currentArtifactVersion = run.last_commit?.artifact_version ?? null;
 
   return <section className="loop-view" aria-labelledby="loop-view-title">
     <header className="loop-contract">
@@ -1225,16 +1320,16 @@ function LoopView({
     </header>
     <section className="loop-controls" aria-label="人工控制">
       <div className="loop-control-actions">
-        <button type="button" onClick={() => void onControl(canResume ? "resume" : "pause")} disabled={controlBusy !== null || terminal || (!canResume && !canPause)}>
+        <button type="button" onClick={() => void onControl(canResume ? "resume" : "pause")} disabled={controlBusy !== null || terminal || waitingForBranch || (!canResume && !canPause)}>
           {canResume ? <IconPlayerPlay aria-hidden="true" /> : <IconPlayerPause aria-hidden="true" />}
-          {controlBusy === "pause" || controlBusy === "resume" ? "正在提交" : canResume ? "继续" : "暂停"}
+          {waitingForBranch ? "请选择待处理分支" : controlBusy === "pause" || controlBusy === "resume" ? "正在提交" : canResume ? "继续" : "暂停"}
         </button>
         <button type="button" className="is-stop" onClick={() => void onControl("stop")} disabled={controlBusy !== null || terminal}><IconPlayerStop aria-hidden="true" />结束并保留现有结果</button>
       </div>
       <form onSubmit={async (event) => {
         event.preventDefault();
         if (!steerDraft.trim()) return;
-        if (await onControl("steer", steerDraft)) setSteerDraft("");
+        if (await onControl("steer", { instruction: steerDraft })) setSteerDraft("");
       }}>
         <label htmlFor="loop-steer">调整下一轮方向</label>
         <div><input id="loop-steer" value={steerDraft} onChange={(event) => setSteerDraft(event.target.value)} placeholder="例如：下一轮优先核对付款条件" disabled={!canSteer || controlBusy !== null} /><button type="submit" disabled={!canSteer || controlBusy !== null || steerDraft.trim().length < 3}><IconArrowRight aria-hidden="true" /><span>记录</span></button></div>
@@ -1260,18 +1355,22 @@ function LoopView({
         })}
       </ol>
       {selectedRound.input_file_refs.length > 0 && <section className="loop-round-files"><span>Agent 本轮自主选择</span>{selectedRound.selection_reason && <p>{selectedRound.selection_reason}</p>}<div>{selectedRound.input_file_refs.map((ref) => <b key={ref}>{fileLabel(ref)}</b>)}</div></section>}
-      {selectedRound.plan.length > 0 && <details className="loop-plan" open={selectedRound.status === "running"}>
-        <summary>服务端已采用的本轮计划 · {selectedRound.plan.length} 个工作单元</summary>
-        <ol>{selectedRound.plan.map((node, index) => <li key={node.node_id}><span>{index + 1}</span><div><b>{node.label}</b><p>{node.description}</p></div></li>)}</ol>
-      </details>}
+      {roundBranches.length > 0 && <section className="loop-branches" aria-label={`第 ${selectedRound.round_number} 轮任务分支`}>
+        <header><div><span>任务分支现场</span><h3>{roundBranches.length} 条分支，分别保留证据状态</h3></div><b>{roundBranches.filter((branch) => branch.status === "completed").length}/{roundBranches.length} 已核对</b></header>
+        <ol>{roundBranches.map((branch, index) => <li key={branch.branch_id} className={`is-${branch.status}${run.active_branch_id === branch.branch_id ? " is-selected" : ""}`}>
+          <span>{branch.status === "completed" ? <IconCheck aria-hidden="true" /> : index + 1}</span>
+          <div><header><b>{branch.title}</b><small>{branchStatusLabel(branch.status)}</small></header><p>{branch.objective}</p><footer><span>{branch.input_file_refs.length} 份资料</span>{branch.depends_on.length > 0 && <span>{branch.depends_on.length} 条前序依赖</span>}{branch.parent_branch_id && <span>续自上一轮</span>}{branch.missing_file_refs.length > 0 && <strong>缺 {branch.missing_file_refs.length} 份引用</strong>}</footer></div>
+          {branch.status === "waiting_input" && waitingForBranch && <button type="button" onClick={() => void onControl("resume", { branchId: branch.branch_id })} disabled={!canResume || controlBusy !== null}><IconPlayerPlay aria-hidden="true" />{controlBusy === "resume" ? "正在启动" : "继续此分支"}</button>}
+        </li>)}</ol>
+      </section>}
       {selectedRound.result && <section className="loop-round-result"><span>本轮核对结果</span><h3>{selectedRound.result.summary}</h3><p>{selectedRound.result.findings.length} 条发现，引用 {selectedRound.verified_file_refs.length} 份文件。</p></section>}
-      {selectedRound.evidence_gaps.length > 0 && <section className="loop-gap"><IconAlertTriangle aria-hidden="true" /><div><span>证据缺口</span><h3>{selectedRound.evidence_gaps[0].label}</h3><p>{selectedRound.evidence_gaps[0].detail}</p></div></section>}
-      {selectedRound.next_step && <footer className={selectedRound.next_step.decision === "completed" ? "is-complete" : "is-next"}><div><span>服务端决定</span><strong>{gateLabel(selectedRound.next_step.decision)}</strong><p>{selectedRound.next_step.reason}</p></div>{selectedRound.next_step.decision === "waiting_input" ? <button type="button" onClick={() => void onControl("resume")} disabled={!canResume || controlBusy !== null}><IconPlayerPlay aria-hidden="true" />{controlBusy === "resume" ? "正在继续" : "确认并继续核对"}</button> : selectedRound.next_step.decision === "next_round" ? <IconArrowRight aria-hidden="true" /> : null}</footer>}
+      {selectedRound.evidence_gaps.length > 0 && <section className="loop-gap"><IconAlertTriangle aria-hidden="true" /><div><span>证据缺口</span><h3>{selectedRound.evidence_gaps.length} 条分支尚未完成</h3><p>上方橙色分支明确显示缺口；只有你选择的那条会进入下一轮。</p></div></section>}
+      {selectedRound.next_step && <footer className={selectedRound.next_step.decision === "completed" ? "is-complete" : "is-next"}><div><span>服务端决定</span><strong>{gateLabel(selectedRound.next_step.decision)}</strong><p>{selectedRound.next_step.reason}</p></div>{selectedRound.next_step.decision === "waiting_input" ? <b>选择上方分支继续</b> : selectedRound.next_step.decision === "next_round" ? <IconArrowRight aria-hidden="true" /> : null}</footer>}
     </article>}
     {run.artifact_versions.length > 0 && <section className="artifact-evolution" aria-label="成果版本">
-      <header><div><span>成果演进</span><h3>任务证据简报 v{run.artifact_versions.at(-1)?.version}</h3></div><b>{run.last_commit ? "已提交" : "待证据门"}</b></header>
-      <ol>{run.artifact_versions.map((artifact) => <li key={`${artifact.artifact_id}:${artifact.version}`}><span>v{artifact.version}</span><div><b>{artifact.status === "committed" ? "已提交" : artifact.status === "verified" ? "已核对" : "草稿"}</b><p>{artifact.finding_count} 条发现 · {artifact.source_file_refs.length} 份引用</p></div></li>)}</ol>
-      {run.last_commit && <footer><IconCircleCheck aria-hidden="true" /><span>{run.last_commit.summary}</span></footer>}
+      <header><div><span>不可变成果历史</span><h3>每轮形成一个可追溯版本</h3></div><b>{currentArtifactVersion ? `当前 v${currentArtifactVersion}` : "尚未提交"}</b></header>
+      <ol>{run.artifact_versions.map((artifact) => <li key={`${artifact.artifact_id}:${artifact.version}`} className={currentArtifactVersion === artifact.version ? "is-current" : ""}><span>v{artifact.version}</span><div><b>{currentArtifactVersion === artifact.version ? "当前版本" : artifact.status === "verified" ? "已核对" : "阶段草稿"}</b><p>第 {artifact.round_number} 轮 · {artifact.finding_count} 条发现 · {artifact.source_file_refs.length} 份引用</p></div>{terminal && currentArtifactVersion !== artifact.version && <button type="button" title={`恢复为成果版本 v${artifact.version}`} onClick={() => void onControl("rollback", { artifactVersion: artifact.version })} disabled={controlBusy !== null}><IconRefresh aria-hidden="true" />{controlBusy === "rollback" ? "恢复中" : "恢复"}</button>}</li>)}</ol>
+      {run.last_commit && <footer><IconCircleCheck aria-hidden="true" /><span>{run.last_commit.summary}</span><b>{run.commits.length} 次提交记录</b></footer>}
     </section>}
     {run.brief && <section className={`loop-brief is-${run.brief.outcome}`}><IconCircleCheck aria-hidden="true" /><div><span>任务简报</span><h3>{run.brief.summary}</h3><p>外部动作：未发生 · 结果仍需人工复核</p></div></section>}
   </section>;
@@ -1296,7 +1395,7 @@ function ResultView({
   const [expanded, setExpanded] = useState(false);
   if (!result) return <div className="workspace-placeholder"><IconClock aria-hidden="true" /><h2>任务简报尚未形成</h2><p>Agent Control Loop 完成只读分析并通过文件引用校验后，简报会出现在这里。</p></div>;
   const visibleFindings = expanded ? result.findings : result.findings.slice(0, 3);
-  return <article className="result-view"><header><IconCircleCheck aria-hidden="true" /><div><span>{commit ? `任务证据简报 v${commit.artifact_version} · 已提交` : artifacts.length ? `任务证据简报 v${artifacts.at(-1)?.version} · 待证据门` : "资料库研究结果 · 待复核"}</span><h2>{result.summary}</h2></div></header><div className="result-findings">{visibleFindings.map((finding, index) => <section key={`${finding.title}:${index}`}><b>{index + 1}</b><div><h3>{finding.title}</h3><p>{finding.detail}</p><footer>{finding.file_refs.map((ref) => {
+  return <article className="result-view"><header><IconCircleCheck aria-hidden="true" /><div><span>{commit ? `任务证据简报 v${commit.artifact_version} · ${commit.operation === "rollback" ? "已恢复" : "已提交"}` : artifacts.length ? `任务证据简报 v${artifacts.at(-1)?.version} · 待证据门` : "资料库研究结果 · 待复核"}</span><h2>{result.summary}</h2></div></header><div className="result-findings">{visibleFindings.map((finding, index) => <section key={`${finding.title}:${index}`}><b>{index + 1}</b><div><h3>{finding.title}</h3><p>{finding.detail}</p><footer>{finding.file_refs.map((ref) => {
     const file = files.find((item) => item.file_ref === ref);
     return file ? <button type="button" key={ref} onClick={() => onOpenFile(file)}><IconFile aria-hidden="true" />{file.display_label}</button> : null;
   })}</footer></div></section>)}</div>{result.findings.length > 3 && <button type="button" className="result-expand" aria-expanded={expanded} onClick={() => setExpanded((current) => !current)}><IconChevronDown className={expanded ? "is-open" : ""} aria-hidden="true" />{expanded ? "收起详细发现" : `查看其余 ${result.findings.length - 3} 条发现`}</button>}{result.follow_ups.length > 0 && <section className="result-proposals" aria-labelledby="result-proposals-title"><header><span>Agent 建议的下一步</span><h3 id="result-proposals-title">由你确认后，才会成为新的 Control Loop</h3></header>{result.follow_ups.map((item, index) => <article key={`${item}:${index}`}><div><b>建议 {index + 1}</b><p>{item}</p></div><button type="button" disabled={starting} onClick={() => void onStartTask(item)}><IconPlayerPlay aria-hidden="true" />{starting ? "正在启动" : "确认并启动"}</button></article>)}</section>}<footer><IconShieldCheck aria-hidden="true" />这些建议由模型基于本轮已读取资料生成，尚未逐项验证；只有你点击确认后才会启动新任务，本轮没有修改原文件或执行外部动作。</footer></article>;

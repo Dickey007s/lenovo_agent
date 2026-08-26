@@ -130,6 +130,10 @@ function snapshot(
   const terminal = ["completed", "stopped", "failed"].includes(status);
   const firstRefs = [csvFile.file_ref];
   const secondRefs = [pdfFile.file_ref];
+  const roundOneReadBranch = "branch-111111111111";
+  const roundOneAnswerBranch = "branch-222222222222";
+  const roundTwoReadBranch = "branch-333333333333";
+  const roundTwoAnswerBranch = "branch-444444444444";
   const finding = (refs: string[], title: string) => ({
     summary: `${title}：已形成带文件引用的只读结论。`,
     findings: [{ title, detail: "该结论只来自本轮实际读取的公开文件。", file_refs: refs }],
@@ -138,6 +142,7 @@ function snapshot(
   });
   const gap = secondRefs.length ? [{
     gap_id: "gap-111111111111",
+    branch_id: roundOneAnswerBranch,
     label: `仍有 ${secondRefs.length} 份本轮选择资料缺少可核对引用`,
     detail: "这些资料已由 Agent 纳入本轮证据范围，需要下一轮继续核对。",
     candidate_file_refs: secondRefs,
@@ -148,8 +153,9 @@ function snapshot(
     phase: status === "planning" || status === "paused" ? "plan" : "evidence_gate",
     question: body.instruction,
     steer_instruction: null,
-    input_file_refs: firstRefs,
-    plan: plan(firstRefs),
+    input_file_refs: [...firstRefs, ...secondRefs],
+    branch_ids: [roundOneReadBranch, roundOneAnswerBranch],
+    plan: plan([...firstRefs, ...secondRefs]),
     model_receipt: { called: true, model: "deepseek-v4-pro", elapsed_ms: 1350, output_used: true },
     result: status === "planning" || status === "paused" ? null : finding(firstRefs, "第一轮核对完成"),
     analysis_receipt: status === "planning" || status === "paused" ? null : { called: true, model: "deepseek-v4-pro", elapsed_ms: 2180, output_used: true },
@@ -160,6 +166,7 @@ function snapshot(
       reason: secondRefs.length ? "本轮仍有已选择资料未形成引用，需要你确认是否继续使用下一轮预算。" : "完成条件已满足。",
       next_question: secondRefs.length ? "继续补齐尚未核对的证据。" : null,
       candidate_file_refs: secondRefs,
+      candidate_branch_ids: [roundOneAnswerBranch],
     },
     started_at: new Date().toISOString(),
     completed_at: status === "planning" || status === "paused" ? null : new Date().toISOString(),
@@ -171,13 +178,14 @@ function snapshot(
     question: "继续补齐尚未核对的证据。",
     steer_instruction: null,
     input_file_refs: secondRefs,
+    branch_ids: [roundTwoReadBranch, roundTwoAnswerBranch],
     plan: plan(secondRefs),
     model_receipt: { called: true, model: "deepseek-v4-pro", elapsed_ms: 1120, output_used: true },
     result: finding(secondRefs, "第二轮补证完成"),
     analysis_receipt: { called: true, model: "deepseek-v4-pro", elapsed_ms: 1760, output_used: true },
     verified_file_refs: secondRefs,
     evidence_gaps: [],
-    next_step: { decision: "completed", reason: "本轮自主选择的证据均已形成可核对引用。", next_question: null, candidate_file_refs: [] },
+    next_step: { decision: "completed", reason: "本轮自主选择的证据均已形成可核对引用。", next_question: null, candidate_file_refs: [], candidate_branch_ids: [] },
     started_at: new Date().toISOString(),
     completed_at: new Date().toISOString(),
   } : null;
@@ -185,6 +193,31 @@ function snapshot(
   const allFindings = status === "completed"
     ? [finding(firstRefs, "第一轮核对完成").findings[0], ...(secondRefs.length ? [finding(secondRefs, "第二轮补证完成").findings[0]] : [])]
     : [];
+  const branchState = status === "planning" || status === "paused" ? "running" : status === "stopped" ? "stopped" : "completed";
+  const branch = (branchId: string, unitId: string, roundNumber: number, title: string, refs: string[], branchStatus: string, parentBranchId: string | null, dependencies: string[] = []) => ({
+    branch_id: branchId,
+    unit_id: unitId,
+    round_number: roundNumber,
+    parent_branch_id: parentBranchId,
+    title,
+    objective: `核对“${title}”所需的公开办公资料。`,
+    depends_on: dependencies,
+    input_file_refs: refs,
+    verified_file_refs: branchStatus === "completed" ? refs : [],
+    missing_file_refs: branchStatus === "completed" ? [] : refs,
+    status: branchStatus,
+    requires_human_gate: false,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  });
+  const branches = status === "queued" || failed ? [] : [
+    branch(roundOneReadBranch, "read", 1, "读取相关资料", firstRefs, branchState === "running" ? "running" : "completed", null),
+    branch(roundOneAnswerBranch, "answer", 1, "形成分析结果", secondRefs, status === "completed" ? "completed" : status === "waiting_input" ? "waiting_input" : branchState, null, [roundOneReadBranch]),
+    ...(roundTwo ? [
+      branch(roundTwoReadBranch, "read", 2, "继续读取缺口资料", secondRefs, "completed", roundOneAnswerBranch),
+      branch(roundTwoAnswerBranch, "answer", 2, "补齐分支证据", secondRefs, "completed", roundOneAnswerBranch, [roundTwoReadBranch]),
+    ] : []),
+  ];
   return {
     run_id: "harness:workspace-run",
     owner_id: "demo_user",
@@ -225,13 +258,19 @@ function snapshot(
     current_round: rounds.length,
     control_state: status === "paused" || status === "waiting_input" ? "paused" : status === "stopped" ? "stopped" : "running",
     control_events: [],
+    branches,
+    active_branch_id: status === "waiting_input" || status === "completed" ? roundOneAnswerBranch : null,
     artifact_versions: rounds.map((round, index) => ({
       artifact_id: "artifact-111111111111",
       version: index + 1,
       title: "任务证据简报",
       kind: "evidence_brief",
-      status: status === "completed" && index === rounds.length - 1 ? "committed" : round.evidence_gaps.length ? "draft" : "verified",
+      status: round.evidence_gaps.length ? "draft" : "verified",
+      round_number: round.round_number,
       summary: round.result?.summary ?? "本轮成果正在形成。",
+      findings: round.result?.findings ?? [],
+      follow_ups: round.result?.follow_ups ?? [],
+      evidence_gaps: round.evidence_gaps,
       source_file_refs: round.verified_file_refs,
       finding_count: round.result?.findings.length ?? 0,
       parent_version: index ? index : null,
@@ -239,10 +278,22 @@ function snapshot(
       review_required: true,
       external_action: "none",
     })),
+    commits: status === "completed" ? [{
+      commit_id: "commit-111111111111",
+      artifact_id: "artifact-111111111111",
+      artifact_version: rounds.length,
+      operation: "commit",
+      parent_commit_id: null as string | null,
+      summary: "已提交通过证据门的只读任务简报，仍需用户审阅。",
+      committed_at: new Date().toISOString(),
+      external_action: "none",
+    }] : [],
     last_commit: status === "completed" ? {
       commit_id: "commit-111111111111",
       artifact_id: "artifact-111111111111",
       artifact_version: rounds.length,
+      operation: "commit",
+      parent_commit_id: null as string | null,
       summary: "已提交通过证据门的只读任务简报，仍需用户审阅。",
       committed_at: new Date().toISOString(),
       external_action: "none",
@@ -283,7 +334,7 @@ async function mockHarness(page: Page, options: { failFirstStart?: boolean; disc
   let currentSnapshot = snapshot(currentBody, "queued");
   let controlSequence = 2;
   const starts: (typeof currentBody & { idempotency_key: string })[] = [];
-  const controls: { command: string; instruction?: string; idempotency_key: string; expected_version: number }[] = [];
+  const controls: { command: string; instruction?: string; branch_id?: string; artifact_version?: number; idempotency_key: string; expected_version: number }[] = [];
   const streams: string[] = [];
   await page.route("**/v1/**", async (route) => {
     const url = new URL(route.request().url()); const path = url.pathname;
@@ -306,10 +357,33 @@ async function mockHarness(page: Page, options: { failFirstStart?: boolean; disc
       return fulfillJson(route, { run: currentSnapshot, replayed: startCalls > 1 }, 202);
     }
     if (path.endsWith("/controls") && route.request().method() === "POST") {
-      const control = route.request().postDataJSON() as { command: "pause" | "resume" | "steer" | "stop"; instruction?: string; idempotency_key: string; expected_version: number };
+      const control = route.request().postDataJSON() as { command: "pause" | "resume" | "steer" | "stop" | "rollback"; instruction?: string; branch_id?: string; artifact_version?: number; idempotency_key: string; expected_version: number };
       controls.push(control);
       const command = control.command;
       controlSequence += 1;
+      if (command === "rollback") {
+        const completed = snapshot(currentBody, "completed", control.expected_version);
+        const targetVersion = control.artifact_version ?? 1;
+        const target = completed.artifact_versions.find((item) => item.version === targetVersion)!;
+        const rollbackCommit = {
+          commit_id: `commit-rollback-${targetVersion}`,
+          artifact_id: target.artifact_id,
+          artifact_version: targetVersion,
+          operation: "rollback",
+          parent_commit_id: completed.last_commit?.commit_id ?? null,
+          summary: `已将当前任务简报恢复为 v${targetVersion}；历史版本均保留，原始办公文件未修改。`,
+          committed_at: new Date().toISOString(),
+          external_action: "none",
+        };
+        currentSnapshot = {
+          ...completed,
+          result: { summary: target.summary, findings: target.findings, follow_ups: target.follow_ups, review_required: true },
+          last_commit: rollbackCommit,
+          commits: [...completed.commits, rollbackCommit],
+          events: [{ sequence: control.expected_version, event_name: "artifact_version_restored", occurred_at: new Date().toISOString(), status: "completed", message: rollbackCommit.summary, details: {} }],
+        };
+        return fulfillJson(route, { run: currentSnapshot, replayed: false }, 202);
+      }
       currentSnapshot = snapshot(
         currentBody,
         command === "pause" ? "paused" : command === "stop" ? "stopped" : command === "resume" ? "completed" : "planning",
@@ -392,11 +466,34 @@ test("runs an arbitrary task while the agent selects evidence from the whole wor
   await expect(page.getByText("文件名与摘要直接涉及当前目标，先读取这些最小证据。")).toBeVisible();
   await expect(page.getByText("证据缺口")).toBeVisible();
   await expect(page.locator(".loop-round-detail > footer strong")).toHaveText("等待人工输入");
-  await expect(page.locator(".artifact-evolution")).toContainText("任务证据简报 v2");
-  await expect(page.locator(".artifact-evolution")).toContainText("已提交");
+  await expect(page.locator(".loop-branches")).toContainText("任务分支现场");
+  await expect(page.locator(".loop-branches")).toContainText("形成分析结果");
+  await expect(page.locator(".artifact-evolution")).toContainText("不可变成果历史");
+  await expect(page.locator(".artifact-evolution")).toContainText("当前 v2");
   await page.getByRole("button", { name: /发现与建议/ }).click();
   await expect(page.getByRole("heading", { name: /完成 2 轮/ })).toBeVisible();
   expect(await page.locator("body").innerText()).not.toContain("forte-");
+});
+
+test("restores an immutable artifact version without overwriting history", async ({ page }) => {
+  const state = await mockHarness(page); await page.goto("/");
+  await page.getByRole("textbox", { name: "任务指令" }).fill("核对两轮证据并保留成果版本。");
+  await page.getByRole("button", { name: "启动 Control Loop" }).click();
+  await expect(page.locator(".artifact-evolution")).toContainText("当前 v2");
+
+  const versionOne = page.locator(".artifact-evolution li").filter({ hasText: "v1" });
+  await versionOne.getByRole("button", { name: "恢复" }).click();
+
+  await expect(page.locator(".artifact-evolution")).toContainText("当前 v1");
+  await expect(page.getByText("已恢复历史成果版本")).toBeVisible();
+  expect(state.controls.at(-1)).toMatchObject({ command: "rollback", artifact_version: 1 });
+  if (process.env.CAPTURE_DR0026_EVIDENCE === "1") {
+    await page.locator(".artifact-evolution").screenshot({
+      path: "../../docs/evidence/screenshots/dr-0026-artifact-restore.png",
+    });
+  }
+  await page.getByRole("button", { name: /发现与建议/ }).click();
+  await expect(page.getByText("任务证据简报 v1 · 已恢复")).toBeVisible();
 });
 
 test("pauses, steers and resumes the same Agent Control Loop from server receipts", async ({ page }) => {
@@ -428,11 +525,17 @@ test("holds an evidence gap until the user confirms another round", async ({ pag
   await page.getByRole("textbox", { name: "任务指令" }).fill("核对跨文件事实，证据不足时先停下来。 ");
   await page.getByRole("button", { name: "启动 Control Loop" }).click();
   await expect(page.locator(".loop-round-detail > footer strong")).toHaveText("等待人工输入");
-  await expect(page.getByRole("button", { name: "确认并继续核对" })).toBeEnabled();
+  await expect(page.getByRole("button", { name: "继续此分支" })).toBeEnabled();
   expect(state.controls).toHaveLength(0);
+  if (process.env.CAPTURE_DR0026_EVIDENCE === "1") {
+    await page.locator(".loop-branches").screenshot({
+      path: "../../docs/evidence/screenshots/dr-0026-branch-control.png",
+    });
+  }
 
-  await page.getByRole("button", { name: "确认并继续核对" }).click();
+  await page.getByRole("button", { name: "继续此分支" }).click();
   await expect.poll(() => state.controls.map((item) => item.command)).toEqual(["resume"]);
+  expect(state.controls[0].branch_id).toBe("branch-222222222222");
   await expect(page.locator(".loop-brief")).toContainText("完成 2 轮");
 });
 

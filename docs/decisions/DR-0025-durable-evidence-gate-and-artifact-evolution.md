@@ -1,5 +1,10 @@
 # DR-0025：可恢复检查点、人工证据门与成果演进
 
+> 生命周期：本决策已随 [PR #30](https://github.com/Dickey007s/lenovo_agent/pull/30)
+> 合并为 `8c55422`，保留为整组补证和 Snapshot 内逻辑版本的历史基线。2026-08-26
+> 起，分支级继续、独立 append-only ArtifactVersion/TaskCommit 与受控恢复的当前事实
+> 由 [`DR-0026`](DR-0026-selective-branch-and-immutable-artifact-history.md) 替代。
+
 ## 决策元数据
 
 | 字段 | 内容 |

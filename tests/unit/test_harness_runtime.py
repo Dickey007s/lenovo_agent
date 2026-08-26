@@ -21,7 +21,12 @@ from services.api.app.application.harness_runtime import (
     HarnessTaskResult,
     build_harness_runtime,
 )
-from services.api.app.application.harness_storage import InMemoryHarnessStateStore
+from services.api.app.application.harness_storage import (
+    InMemoryHarnessStateStore,
+    StoredHarnessArtifactVersion,
+    StoredHarnessIdempotency,
+    StoredHarnessRun,
+)
 from services.api.app.main import create_app
 
 
@@ -235,6 +240,64 @@ class FakePlanner:
         )
 
 
+class MultiBranchPlanner(FakePlanner):
+    def __init__(self) -> None:
+        super().__init__()
+        self.file_ref_history: list[list[str]] = []
+
+    async def plan(self, *, scenario, files):
+        self.calls += 1
+        self.workspace = scenario
+        self.files = files
+        refs = [str(item["file_ref"]) for item in files]
+        self.file_ref_history.append(refs)
+        if self.calls == 1:
+            return HarnessPlanCandidate(
+                summary="把跨期资料拆成三个可独立核对的分支",
+                selection_reason="三个文件分别承载独立证据。",
+                units=[
+                    HarnessPlanCandidateUnit(
+                        unit_id="base",
+                        title="核对基础明细",
+                        objective="核对第一份基础资料",
+                        input_file_refs=[refs[0]],
+                        tool="file.read",
+                    ),
+                    HarnessPlanCandidateUnit(
+                        unit_id="review",
+                        title="核对复核说明",
+                        objective="核对第二份复核资料",
+                        input_file_refs=[refs[1]],
+                        depends_on=["base"],
+                        tool="evidence.verify",
+                    ),
+                    HarnessPlanCandidateUnit(
+                        unit_id="legal",
+                        title="核对法务说明",
+                        objective="核对第三份法务资料",
+                        input_file_refs=[refs[2]],
+                        depends_on=["base"],
+                        tool="artifact.write",
+                        artifact_name="branch-result",
+                        artifact_type="evidence",
+                    ),
+                ],
+            )
+        return HarnessPlanCandidate(
+            summary="只继续用户确认的证据分支",
+            selection_reason="服务端已把本轮范围限制为所选分支的缺口。",
+            units=[
+                HarnessPlanCandidateUnit(
+                    unit_id=f"recheck-{self.calls}",
+                    title="继续核对所选分支",
+                    objective="补齐所选分支缺少的引用",
+                    input_file_refs=[refs[0]],
+                    tool="evidence.verify",
+                )
+            ],
+        )
+
+
 class BlockingPlanner(FakePlanner):
     def __init__(self) -> None:
         super().__init__()
@@ -274,6 +337,20 @@ class FakeAnalyst:
             ],
             follow_ups=["请人工复核业务口径"],
             review_required=True,
+        )
+
+
+class BlockingAnalyst(FakeAnalyst):
+    def __init__(self) -> None:
+        super().__init__()
+        self.started = asyncio.Event()
+        self.release = asyncio.Event()
+
+    async def analyze(self, *, instruction, plan, files):
+        self.started.set()
+        await self.release.wait()
+        return await super().analyze(
+            instruction=instruction, plan=plan, files=files
         )
 
 
@@ -373,10 +450,22 @@ async def test_user_task_searches_the_whole_workspace_and_selects_evidence() -> 
     assert event_names[-1] == "loop_committed"
     assert [item.status for item in snapshot.artifact_versions] == [
         "draft",
-        "committed",
+        "verified",
     ]
     assert snapshot.last_commit
     assert snapshot.last_commit.artifact_version == 2
+    assert snapshot.commits == [snapshot.last_commit]
+    assert snapshot.rounds[0].branch_ids
+    assert all(item.status == "completed" for item in snapshot.branches)
+    resumed_parent = next(
+        item for item in snapshot.branches if item.round_number == 1 and item.unit_id == "u2"
+    )
+    assert snapshot.active_branch_id == resumed_parent.branch_id
+    assert all(
+        item.parent_branch_id == resumed_parent.branch_id
+        for item in snapshot.branches
+        if item.round_number == 2
+    )
 
 
 @pytest.mark.asyncio
@@ -413,6 +502,76 @@ async def test_confirmed_evidence_round_cannot_drift_to_unrelated_files() -> Non
         event for event in snapshot.events if event.event_name == "round_started"
     ][1]
     assert second_round_event.details["evidence_recheck"] is True
+
+
+@pytest.mark.asyncio
+async def test_user_can_continue_one_waiting_branch_without_spending_other_branch() -> None:
+    planner = MultiBranchPlanner()
+    runtime = HarnessRuntime(FakeCatalogWithDistractor(), planner, FakeAnalyst())
+    started = await runtime.start(
+        "alice",
+        start_request(
+            idempotency_key="branch-local-start-0001",
+            loop={
+                "max_rounds": 3,
+                "max_files_per_round": 3,
+                "max_model_calls": 6,
+                "deadline_seconds": 120,
+            },
+        ),
+    )
+
+    first_wait = await wait_status(
+        runtime, "alice", started.run.run_id, "waiting_input"
+    )
+    waiting = [item for item in first_wait.branches if item.status == "waiting_input"]
+    assert {tuple(item.missing_file_refs) for item in waiting} == {
+        (REF_TWO,),
+        (REF_THREE,),
+    }
+    legal_branch = next(item for item in waiting if item.missing_file_refs == [REF_THREE])
+    await runtime.control(
+        "alice",
+        started.run.run_id,
+        AgentControlLoopControlRequest(
+            command="resume",
+            branch_id=legal_branch.branch_id,
+            idempotency_key="branch-local-legal-0001",
+            expected_version=first_wait.version,
+        ),
+    )
+
+    second_wait = await wait_status(
+        runtime, "alice", started.run.run_id, "waiting_input"
+    )
+    assert planner.file_ref_history[1] == [REF_THREE]
+    still_waiting = [
+        item for item in second_wait.branches if item.status == "waiting_input"
+    ]
+    assert len(still_waiting) == 1
+    assert still_waiting[0].missing_file_refs == [REF_TWO]
+    await runtime.control(
+        "alice",
+        started.run.run_id,
+        AgentControlLoopControlRequest(
+            command="resume",
+            branch_id=still_waiting[0].branch_id,
+            idempotency_key="branch-local-review-0001",
+            expected_version=second_wait.version,
+        ),
+    )
+    terminal = await wait_terminal(runtime, "alice", started.run.run_id)
+
+    assert terminal.status == "completed"
+    assert planner.file_ref_history[2] == [REF_TWO]
+    assert all(item.status == "completed" for item in terminal.branches)
+    resume_controls = [
+        item for item in terminal.control_events if item.command == "resume"
+    ]
+    assert [item.branch_id for item in resume_controls] == [
+        legal_branch.branch_id,
+        still_waiting[0].branch_id,
+    ]
 
 
 @pytest.mark.asyncio
@@ -858,6 +1017,149 @@ async def test_checkpoint_restore_pauses_without_replaying_interrupted_model_cal
     assert recovered_planner.calls == 2
     assert terminal.last_commit is not None
     await recovered_runtime.close()
+
+
+@pytest.mark.asyncio
+async def test_checkpoint_restore_discards_branches_from_an_interrupted_round() -> None:
+    store = InMemoryHarnessStateStore()
+    blocking_analyst = BlockingAnalyst()
+    first_runtime = HarnessRuntime(
+        FakeCatalog(), FakePlanner(), blocking_analyst, store
+    )
+    await first_runtime.setup()
+    started = await first_runtime.start(
+        "alice", start_request(idempotency_key="branch-recovery-start-0001")
+    )
+    await asyncio.wait_for(blocking_analyst.started.wait(), timeout=1)
+    interrupted = await first_runtime.get("alice", started.run.run_id)
+    assert interrupted.rounds[-1].status == "running"
+    assert interrupted.branches
+    await first_runtime.close()
+
+    recovered_runtime = HarnessRuntime(
+        FakeCatalog(), FakePlanner(), FakeAnalyst(), store
+    )
+    await recovered_runtime.setup()
+    recovered = await recovered_runtime.get("alice", started.run.run_id)
+
+    assert recovered.status == "paused"
+    assert recovered.rounds == []
+    assert recovered.branches == []
+    assert recovered.active_branch_id is None
+    await recovered_runtime.close()
+
+
+@pytest.mark.asyncio
+async def test_artifact_versions_are_append_only_and_restore_moves_only_commit_pointer() -> None:
+    store = InMemoryHarnessStateStore()
+    runtime = HarnessRuntime(FakeCatalog(), FakePlanner(), FakeAnalyst(), store)
+    await runtime.setup()
+    started = await runtime.start(
+        "alice", start_request(idempotency_key="artifact-history-start-0001")
+    )
+    await confirm_evidence_gate(
+        runtime, "alice", started.run.run_id, "artifact-history-gate-0001"
+    )
+    terminal = await wait_terminal(runtime, "alice", started.run.run_id)
+
+    stored_versions = await store.load_artifact_versions(
+        "alice", started.run.run_id
+    )
+    stored_commits = await store.load_task_commits("alice", started.run.run_id)
+    assert [item.version for item in stored_versions] == [1, 2]
+    assert len(stored_commits) == 1
+    assert terminal.last_commit and terminal.last_commit.artifact_version == 2
+
+    rollback_request = AgentControlLoopControlRequest(
+        command="rollback",
+        artifact_version=1,
+        idempotency_key="artifact-history-rollback-0001",
+        expected_version=terminal.version,
+    )
+    restored = await runtime.control(
+        "alice", started.run.run_id, rollback_request
+    )
+
+    assert restored.run.status == "completed"
+    assert restored.run.last_commit
+    assert restored.run.last_commit.operation == "rollback"
+    assert restored.run.last_commit.artifact_version == 1
+    assert restored.run.last_commit.parent_commit_id == terminal.last_commit.commit_id
+    assert restored.run.result
+    assert restored.run.result.summary == terminal.artifact_versions[0].summary
+    assert restored.run.events[-1].event_name == "artifact_version_restored"
+    assert len(await store.load_artifact_versions("alice", started.run.run_id)) == 2
+    assert len(await store.load_task_commits("alice", started.run.run_id)) == 2
+
+    replay = await runtime.control("alice", started.run.run_id, rollback_request)
+    assert replay.replayed is True
+    restored_latest = await runtime.control(
+        "alice",
+        started.run.run_id,
+        AgentControlLoopControlRequest(
+            command="rollback",
+            artifact_version=2,
+            idempotency_key="artifact-history-restore-latest-0001",
+            expected_version=restored.run.version,
+        ),
+    )
+    assert restored_latest.run.last_commit
+    assert restored_latest.run.last_commit.artifact_version == 2
+    assert len(restored_latest.run.commits) == 3
+    assert len(await store.load_task_commits("alice", started.run.run_id)) == 3
+    await runtime.close()
+
+
+@pytest.mark.asyncio
+async def test_memory_store_rejects_immutable_conflict_without_partial_commit() -> None:
+    store = InMemoryHarnessStateStore()
+    await store.setup()
+    original_run = StoredHarnessRun(
+        owner_id="alice",
+        run_id="harness:atomic",
+        snapshot={"version": 1},
+        resume_status=None,
+    )
+    original_artifact = StoredHarnessArtifactVersion(
+        owner_id="alice",
+        run_id=original_run.run_id,
+        artifact_id="artifact-atomic000001",
+        version=1,
+        payload_digest="digest-one",
+        payload={"summary": "original"},
+    )
+    await store.commit(original_run, artifact_version=original_artifact)
+
+    with pytest.raises(RuntimeError, match="immutable artifact version conflict"):
+        await store.commit(
+            StoredHarnessRun(
+                owner_id="alice",
+                run_id=original_run.run_id,
+                snapshot={"version": 2},
+                resume_status=None,
+            ),
+            idempotency=StoredHarnessIdempotency(
+                owner_id="alice",
+                kind="control",
+                idempotency_key="atomic-conflict-key",
+                digest="command-digest",
+                result={"version": 2},
+            ),
+            artifact_version=StoredHarnessArtifactVersion(
+                owner_id="alice",
+                run_id=original_run.run_id,
+                artifact_id=original_artifact.artifact_id,
+                version=1,
+                payload_digest="digest-two",
+                payload={"summary": "mutated"},
+            ),
+        )
+
+    assert (await store.load_runs())[0].snapshot == {"version": 1}
+    assert await store.load_idempotency() == []
+    assert (await store.load_artifact_versions("alice", original_run.run_id))[
+        0
+    ].payload_digest == "digest-one"
 
 
 def test_production_builder_uses_complete_workspace_catalog(monkeypatch) -> None:

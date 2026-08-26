@@ -25,6 +25,8 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_valida
 
 from packages.contracts.harness_models import (
     AgentControlLoopArtifactVersion,
+    AgentControlLoopArtifactFinding,
+    AgentControlLoopBranch,
     AgentControlLoopBrief,
     AgentControlLoopBudget,
     AgentControlLoopCommit,
@@ -40,8 +42,10 @@ from services.api.app.application.harness_storage import (
     HarnessStateStore,
     InMemoryHarnessStateStore,
     PostgresHarnessStateStore,
+    StoredHarnessArtifactVersion,
     StoredHarnessIdempotency,
     StoredHarnessRun,
+    StoredHarnessTaskCommit,
 )
 
 runtime_logger = logging.getLogger("uvicorn.error")
@@ -240,9 +244,14 @@ class HarnessRunSnapshot(BaseModel):
     control_events: list[AgentControlLoopControlEvent] = Field(
         default_factory=list, max_length=100
     )
+    branches: list[AgentControlLoopBranch] = Field(default_factory=list, max_length=36)
+    active_branch_id: str | None = Field(
+        default=None, pattern=r"^branch-[0-9a-f]{12}$"
+    )
     artifact_versions: list[AgentControlLoopArtifactVersion] = Field(
         default_factory=list, max_length=3
     )
+    commits: list[AgentControlLoopCommit] = Field(default_factory=list, max_length=20)
     last_commit: AgentControlLoopCommit | None = None
     brief: AgentControlLoopBrief | None = None
     plan: HarnessPlan | None = None
@@ -321,7 +330,10 @@ class PublicHarnessRunSnapshot(BaseModel):
     current_round: int
     control_state: str
     control_events: list[AgentControlLoopControlEvent]
+    branches: list[AgentControlLoopBranch]
+    active_branch_id: str | None
     artifact_versions: list[AgentControlLoopArtifactVersion]
+    commits: list[AgentControlLoopCommit]
     last_commit: AgentControlLoopCommit | None
     brief: AgentControlLoopBrief | None
     plan: PublicHarnessPlan | None
@@ -640,6 +652,17 @@ class HarnessRuntime:
                     completed_rounds = [
                         item for item in snapshot.rounds if item.status == "completed"
                     ]
+                    completed_round_numbers = {
+                        item.round_number for item in completed_rounds
+                    }
+                    recovered_branches = [
+                        item
+                        for item in snapshot.branches
+                        if item.round_number in completed_round_numbers
+                    ]
+                    recovered_branch_ids = {
+                        item.branch_id for item in recovered_branches
+                    }
                     recovered_status = (
                         "waiting_input"
                         if snapshot.status == "waiting_input"
@@ -665,6 +688,10 @@ class HarnessRuntime:
                             "status": recovered_status,
                             "control_state": "paused",
                             "rounds": completed_rounds,
+                            "branches": recovered_branches,
+                            "active_branch_id": snapshot.active_branch_id
+                            if snapshot.active_branch_id in recovered_branch_ids
+                            else None,
                             "current_round": len(completed_rounds),
                             "plan": HarnessPlan.model_validate(last_round.plan)
                             if last_round and last_round.plan
@@ -734,7 +761,30 @@ class HarnessRuntime:
         self,
         run: _Run,
         idempotency: StoredHarnessIdempotency | None = None,
+        artifact_version: AgentControlLoopArtifactVersion | None = None,
+        task_commit: AgentControlLoopCommit | None = None,
     ) -> StoredHarnessIdempotency | None:
+        stored_artifact = None
+        if artifact_version is not None:
+            payload = artifact_version.model_dump(mode="json")
+            stored_artifact = StoredHarnessArtifactVersion(
+                owner_id=run.snapshot.owner_id,
+                run_id=run.snapshot.run_id,
+                artifact_id=artifact_version.artifact_id,
+                version=artifact_version.version,
+                payload_digest=self._payload_digest(payload),
+                payload=payload,
+            )
+        stored_commit = None
+        if task_commit is not None:
+            payload = task_commit.model_dump(mode="json")
+            stored_commit = StoredHarnessTaskCommit(
+                owner_id=run.snapshot.owner_id,
+                run_id=run.snapshot.run_id,
+                commit_id=task_commit.commit_id,
+                payload_digest=self._payload_digest(payload),
+                payload=payload,
+            )
         return await self.state_store.commit(
             StoredHarnessRun(
                 owner_id=run.snapshot.owner_id,
@@ -743,7 +793,17 @@ class HarnessRuntime:
                 resume_status=run.resume_status,
             ),
             idempotency,
+            stored_artifact,
+            stored_commit,
         )
+
+    @staticmethod
+    def _payload_digest(payload: dict[str, Any]) -> str:
+        return hashlib.sha256(
+            json.dumps(
+                payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+            ).encode("utf-8")
+        ).hexdigest()
 
     def _schedule_run(
         self,
@@ -881,6 +941,14 @@ class HarnessRuntime:
                 raise HarnessConflictError(
                     f"任务版本已更新，当前为 v{snapshot.version}，请刷新后重试"
                 )
+            if request.command == "rollback":
+                return await self._rollback_control_locked(
+                    owner_id,
+                    run,
+                    request,
+                    digest=digest,
+                    idempotency_key=idempotency_key,
+                )
             if snapshot.status in {"ready_to_execute", "completed", "stopped", "failed"}:
                 raise HarnessConflictError("当前任务已经结束，不能再提交控制命令")
 
@@ -894,6 +962,35 @@ class HarnessRuntime:
                 raise HarnessConflictError("当前任务没有处于可恢复的暂停状态")
             if command == "steer" and request.instruction is None:
                 raise HarnessConflictError("调整方向必须提供一条明确指令")
+            if request.branch_id is not None and command != "resume":
+                raise HarnessConflictError("只有继续命令可以指定待核对分支")
+            if request.artifact_version is not None:
+                raise HarnessConflictError("只有成果版本恢复命令可以指定版本")
+
+            selected_branch_id = snapshot.active_branch_id
+            selected_branch: AgentControlLoopBranch | None = None
+            if command == "resume" and snapshot.status == "waiting_input":
+                waiting_branches = [
+                    item
+                    for item in snapshot.branches
+                    if item.status == "waiting_input"
+                ]
+                if request.branch_id is not None:
+                    selected_branch = next(
+                        (
+                            item
+                            for item in waiting_branches
+                            if item.branch_id == request.branch_id
+                        ),
+                        None,
+                    )
+                    if selected_branch is None:
+                        raise HarnessConflictError("该分支已经完成或不属于当前任务")
+                elif waiting_branches:
+                    selected_branch = waiting_branches[0]
+                selected_branch_id = (
+                    selected_branch.branch_id if selected_branch else None
+                )
 
             now = datetime.now(timezone.utc)
             control_id = f"control-{uuid4().hex[:12]}"
@@ -914,7 +1011,11 @@ class HarnessRuntime:
                 applied_version = next_version
                 if snapshot.control_state == "paused":
                     next_status = run.resume_status or "planning"
-                message = "Agent Control Loop 已恢复，将从安全点继续。"
+                message = (
+                    f"已确认继续“{selected_branch.title}”分支，将只核对该分支缺少的证据。"
+                    if selected_branch
+                    else "Agent Control Loop 已恢复，将从安全点继续。"
+                )
             elif command == "steer":
                 message = "方向指令已记录，将应用于下一轮规划。"
             elif command == "stop":
@@ -924,6 +1025,7 @@ class HarnessRuntime:
             control_event = AgentControlLoopControlEvent(
                 control_id=control_id,
                 command=command,
+                branch_id=selected_branch_id if command == "resume" else None,
                 instruction=request.instruction,
                 accepted_at=now,
                 accepted_task_version=next_version,
@@ -939,6 +1041,7 @@ class HarnessRuntime:
                 details={
                     "command": command,
                     "control_id": control_id,
+                    "branch_id": selected_branch_id,
                     "applied": control_status == "applied",
                 },
             )
@@ -947,6 +1050,7 @@ class HarnessRuntime:
                     "status": next_status,
                     "control_state": next_state,
                     "control_events": [*snapshot.control_events, control_event],
+                    "active_branch_id": selected_branch_id,
                     "events": [*snapshot.events, event],
                     "last_event_sequence": event.sequence,
                     "version": next_version,
@@ -987,6 +1091,158 @@ class HarnessRuntime:
             )
         return result.model_copy(deep=True)
 
+    async def _rollback_control_locked(
+        self,
+        owner_id: str,
+        run: _Run,
+        request: AgentControlLoopControlRequest,
+        *,
+        digest: str,
+        idempotency_key: tuple[str, str],
+    ) -> HarnessControlResult:
+        snapshot = run.snapshot
+        if snapshot.status != "completed" or snapshot.last_commit is None:
+            raise HarnessConflictError("只有已提交的任务简报可以恢复历史版本")
+        if request.artifact_version is None:
+            raise HarnessConflictError("恢复成果版本时必须指定目标版本")
+        if request.branch_id is not None or request.instruction is not None:
+            raise HarnessConflictError("成果版本恢复不接受分支或方向指令")
+        if len(snapshot.commits) >= 20:
+            raise HarnessConflictError("成果提交记录已达上限，请启动新的独立任务")
+        target = next(
+            (
+                item
+                for item in snapshot.artifact_versions
+                if item.version == request.artifact_version
+            ),
+            None,
+        )
+        if target is None:
+            raise HarnessConflictError("目标成果版本不存在")
+        if snapshot.last_commit.artifact_version == target.version:
+            raise HarnessConflictError("该成果版本已经是当前版本")
+
+        stored_versions = await self.state_store.load_artifact_versions(
+            owner_id, snapshot.run_id
+        )
+        stored = next(
+            (
+                item
+                for item in stored_versions
+                if item.artifact_id == target.artifact_id
+                and item.version == target.version
+            ),
+            None,
+        )
+        target_payload = target.model_dump(mode="json")
+        if stored is None or stored.payload_digest != self._payload_digest(
+            target_payload
+        ):
+            raise HarnessConflictError("成果版本的不可变记录不完整，已拒绝恢复")
+
+        now = datetime.now(timezone.utc)
+        next_version = snapshot.version + 1
+        commit_id = "commit-" + hashlib.sha256(
+            (
+                f"{snapshot.run_id}:rollback:{snapshot.last_commit.commit_id}:"
+                f"{target.artifact_id}:{target.version}"
+            ).encode("utf-8")
+        ).hexdigest()[:12]
+        task_commit = AgentControlLoopCommit(
+            commit_id=commit_id,
+            artifact_id=target.artifact_id,
+            artifact_version=target.version,
+            operation="rollback",
+            parent_commit_id=snapshot.last_commit.commit_id,
+            summary=(
+                f"已将当前任务简报恢复为 v{target.version}；历史版本均保留，"
+                "原始办公文件未修改。"
+            ),
+            committed_at=now,
+        )
+        control_id = f"control-{uuid4().hex[:12]}"
+        control_event = AgentControlLoopControlEvent(
+            control_id=control_id,
+            command="rollback",
+            artifact_version=target.version,
+            accepted_at=now,
+            accepted_task_version=next_version,
+            applied_task_version=next_version,
+            status="applied",
+        )
+        event = HarnessEvent(
+            sequence=snapshot.last_event_sequence + 1,
+            event_name="artifact_version_restored",
+            occurred_at=now,
+            status="completed",
+            message=task_commit.summary,
+            details={
+                "artifact_version": target.version,
+                "previous_artifact_version": snapshot.last_commit.artifact_version,
+                "external_action": False,
+            },
+        )
+        restored_result = (
+            HarnessTaskResult(
+                summary=target.summary,
+                findings=[
+                    HarnessFinding(
+                        title=item.title,
+                        detail=item.detail,
+                        file_refs=item.file_refs,
+                    )
+                    for item in target.findings
+                ],
+                follow_ups=target.follow_ups,
+                review_required=True,
+            )
+            if target.findings
+            else None
+        )
+        restored_brief = AgentControlLoopBrief(
+            outcome="bounded" if target.evidence_gaps else "completed",
+            summary=target.summary,
+            verified_file_refs=target.source_file_refs,
+            unresolved_gaps=target.evidence_gaps,
+            rounds_completed=target.round_number,
+        )
+        run.snapshot = snapshot.model_copy(
+            update={
+                "result": restored_result,
+                "brief": restored_brief,
+                "commits": [*snapshot.commits, task_commit],
+                "last_commit": task_commit,
+                "control_events": [*snapshot.control_events, control_event],
+                "events": [*snapshot.events, event],
+                "last_event_sequence": event.sequence,
+                "version": next_version,
+                "updated_at": now,
+            }
+        )
+        result = HarnessControlResult(run=run.snapshot.model_copy(deep=True))
+        existing = await self._persist_locked(
+            run,
+            StoredHarnessIdempotency(
+                owner_id=owner_id,
+                kind="control",
+                idempotency_key=request.idempotency_key,
+                digest=digest,
+                result=result.model_dump(mode="json"),
+            ),
+            task_commit=task_commit,
+        )
+        if existing is not None:
+            if existing.digest != digest:
+                run.snapshot = snapshot
+                raise HarnessConflictError("幂等键已用于不同控制命令")
+            restored = HarnessControlResult.model_validate(existing.result)
+            run.snapshot = restored.run.model_copy(deep=True)
+            return restored.model_copy(update={"replayed": True}, deep=True)
+        self._control_idempotent[idempotency_key] = _IdempotentControl(
+            digest=digest, result=result
+        )
+        return result.model_copy(deep=True)
+
     def public_start_result(self, result: HarnessRunStartResult) -> PublicHarnessRunStartResult:
         return PublicHarnessRunStartResult(
             run=self.public_snapshot(result.run),
@@ -1023,10 +1279,51 @@ class HarnessRuntime:
                 update={
                     "summary": self._project_business_text(
                         item.summary, ref_to_label
-                    )
+                    ),
+                    "findings": [
+                        finding.model_copy(
+                            update={
+                                "title": self._project_business_text(
+                                    finding.title, ref_to_label
+                                ),
+                                "detail": self._project_business_text(
+                                    finding.detail, ref_to_label
+                                ),
+                            }
+                        )
+                        for finding in item.findings
+                    ],
+                    "follow_ups": [
+                        self._project_business_text(follow_up, ref_to_label)
+                        for follow_up in item.follow_ups
+                    ],
+                    "evidence_gaps": [
+                        gap.model_copy(
+                            update={
+                                "label": self._project_business_text(
+                                    gap.label, ref_to_label
+                                ),
+                                "detail": self._project_business_text(
+                                    gap.detail, ref_to_label
+                                ),
+                            }
+                        )
+                        for gap in item.evidence_gaps
+                    ],
                 }
             )
             for item in snapshot.artifact_versions
+        ]
+        public_branches = [
+            item.model_copy(
+                update={
+                    "title": self._project_business_text(item.title, ref_to_label),
+                    "objective": self._project_business_text(
+                        item.objective, ref_to_label
+                    ),
+                }
+            )
+            for item in snapshot.branches
         ]
         public_contract = snapshot.contract.model_copy(
             update={
@@ -1057,7 +1354,10 @@ class HarnessRuntime:
             current_round=snapshot.current_round,
             control_state=snapshot.control_state,
             control_events=snapshot.control_events,
+            branches=public_branches,
+            active_branch_id=snapshot.active_branch_id,
             artifact_versions=public_artifacts,
+            commits=snapshot.commits,
             last_commit=snapshot.last_commit,
             brief=public_brief,
             plan=public_plan,
@@ -1380,12 +1680,18 @@ class HarnessRuntime:
             ]
             next_question = instruction
             evidence_recheck_refs: set[str] = set()
+            target_branch_id = recovered.active_branch_id
             if recovered.rounds and recovered.rounds[-1].next_step:
                 recovered_next_step = recovered.rounds[-1].next_step
                 next_question = recovered_next_step.next_question or instruction
                 if recovered_next_step.decision == "waiting_input":
+                    target_branch = self._branch_by_id(
+                        recovered.branches, target_branch_id
+                    )
                     evidence_recheck_refs = set(
-                        recovered_next_step.candidate_file_refs
+                        target_branch.missing_file_refs
+                        if target_branch
+                        else recovered_next_step.candidate_file_refs
                     )
             terminal_decision = "completed"
 
@@ -1455,7 +1761,13 @@ class HarnessRuntime:
                 round_files = [
                     item for item in remaining if str(item["file_ref"]) in round_refs
                 ]
-                await self._set_plan(owner_id, run_id, plan)
+                branch_ids = await self._set_plan(
+                    owner_id,
+                    run_id,
+                    plan,
+                    round_number=round_number,
+                    parent_branch_id=target_branch_id,
+                )
                 await self._set_model_receipt(owner_id, run_id, adopted_receipt)
                 await self._update_round(
                     owner_id,
@@ -1463,6 +1775,7 @@ class HarnessRuntime:
                     round_number,
                     phase="plan",
                     input_file_refs=[str(item["file_ref"]) for item in round_files],
+                    branch_ids=branch_ids,
                     plan=plan.model_dump(mode="json"),
                     model_receipt=adopted_receipt.model_dump(mode="json"),
                 )
@@ -1600,6 +1913,12 @@ class HarnessRuntime:
                     analysis_receipt=adopted_analysis.model_dump(mode="json"),
                     verified_file_refs=round_verified,
                 )
+                branches = await self._reconcile_branches(
+                    owner_id,
+                    run_id,
+                    verified_refs=verified_refs,
+                    through_round=round_number,
+                )
                 await self._set_verified_count(owner_id, run_id, len(verified_refs))
                 await self._transition(
                     owner_id,
@@ -1616,24 +1935,29 @@ class HarnessRuntime:
                 )
                 await self._safe_point(owner_id, run_id)
 
-                outstanding = [
-                    item
-                    for item in round_files
-                    if str(item["file_ref"]) not in set(verified_refs)
+                waiting_branches = [
+                    item for item in branches if item.status == "waiting_input"
                 ]
-                gaps = self._evidence_gaps(run_id, outstanding)
-                can_continue = await self._can_start_another_round(
-                    owner_id, run_id, round_number, bool(outstanding)
+                outstanding_refs = list(
+                    dict.fromkeys(
+                        file_ref
+                        for branch in waiting_branches
+                        for file_ref in branch.missing_file_refs
+                    )
                 )
-                if not outstanding:
+                gaps = self._branch_evidence_gaps(waiting_branches)
+                can_continue = await self._can_start_another_round(
+                    owner_id, run_id, round_number, bool(waiting_branches)
+                )
+                if not waiting_branches:
                     decision = "completed"
-                    reason = "本轮自主选择的证据均已被结论引用，完成条件已满足。"
+                    reason = "所有任务分支的证据均已核对，完成条件已满足。"
                     next_question = ""
                 elif can_continue:
                     decision = "waiting_input"
                     reason = (
-                        f"本轮仍有 {len(outstanding)} 份已选择文件未形成可核对引用，"
-                        "需要你确认是否再使用一轮预算继续核对。"
+                        f"仍有 {len(waiting_branches)} 个任务分支缺少可核对证据，"
+                        "需要你选择一个分支，再使用一轮预算继续。"
                     )
                     next_question = (
                         "继续核对尚未被结论引用的资料，补齐证据缺口并检查是否改变已有结论。"
@@ -1641,7 +1965,7 @@ class HarnessRuntime:
                 else:
                     decision = "budget_exhausted"
                     reason = (
-                        f"本轮仍有 {len(outstanding)} 份已选择文件未形成可核对引用，"
+                        f"仍有 {len(waiting_branches)} 个任务分支缺少可核对证据，"
                         "但轮次、模型调用或时间预算已到边界。"
                     )
                     terminal_decision = decision
@@ -1649,7 +1973,10 @@ class HarnessRuntime:
                     decision=decision,
                     reason=reason,
                     next_question=next_question or None,
-                    candidate_file_refs=[str(item["file_ref"]) for item in outstanding],
+                    candidate_file_refs=outstanding_refs[:20],
+                    candidate_branch_ids=[
+                        item.branch_id for item in waiting_branches
+                    ],
                 )
                 await self._complete_round(
                     owner_id,
@@ -1663,11 +1990,27 @@ class HarnessRuntime:
                     "decision": decision,
                     "gap_count": len(gaps),
                     "candidate_file_refs": next_step.candidate_file_refs,
+                    "candidate_branch_ids": next_step.candidate_branch_ids,
                 }
                 if decision == "waiting_input":
-                    evidence_recheck_refs = set(next_step.candidate_file_refs)
                     await self._wait_for_evidence_confirmation(
                         owner_id, run_id, reason, gate_details
+                    )
+                    resumed = await self.get(owner_id, run_id)
+                    target_branch_id = resumed.active_branch_id
+                    target_branch = self._branch_by_id(
+                        resumed.branches, target_branch_id
+                    )
+                    evidence_recheck_refs = set(
+                        target_branch.missing_file_refs
+                        if target_branch
+                        else next_step.candidate_file_refs
+                    )
+                    next_question = (
+                        f"继续核对“{target_branch.title}”分支缺少的证据，"
+                        "检查是否改变已有结论。"
+                        if target_branch
+                        else next_question
                     )
                     continue
                 await self._transition(
@@ -2178,7 +2521,20 @@ class HarnessRuntime:
                 version=version,
                 title="任务证据简报",
                 status="draft" if gaps else "verified",
+                round_number=round_number,
                 summary=result.summary if result else next_step.reason,
+                findings=[
+                    AgentControlLoopArtifactFinding(
+                        title=item.title,
+                        detail=item.detail,
+                        file_refs=item.file_refs,
+                    )
+                    for item in result.findings
+                ]
+                if result
+                else [],
+                follow_ups=result.follow_ups[:4] if result else [],
+                evidence_gaps=gaps,
                 source_file_refs=round_snapshot.verified_file_refs,
                 finding_count=len(result.findings) if result else 0,
                 parent_version=version - 1 if version > 1 else None,
@@ -2190,7 +2546,7 @@ class HarnessRuntime:
                     "updated_at": datetime.now(timezone.utc),
                 }
             )
-            await self._persist_locked(run)
+            await self._persist_locked(run, artifact_version=artifact)
 
     async def _set_verified_count(
         self, owner_id: str, run_id: str, count: int
@@ -2270,6 +2626,73 @@ class HarnessRuntime:
             )
         ]
 
+    @staticmethod
+    def _branch_evidence_gaps(
+        branches: list[AgentControlLoopBranch],
+    ) -> list[AgentControlLoopEvidenceGap]:
+        gaps: list[AgentControlLoopEvidenceGap] = []
+        for branch in branches[:20]:
+            digest = hashlib.sha256(
+                f"{branch.branch_id}:{','.join(branch.missing_file_refs)}".encode(
+                    "utf-8"
+                )
+            ).hexdigest()
+            gaps.append(
+                AgentControlLoopEvidenceGap(
+                    gap_id=f"gap-{digest[:12]}",
+                    branch_id=branch.branch_id,
+                    label=f"“{branch.title}”分支仍缺少证据",
+                    detail=(
+                        f"该分支还有 {len(branch.missing_file_refs)} 份已选资料"
+                        "没有进入通过服务端引用核对的结论。"
+                    ),
+                    candidate_file_refs=branch.missing_file_refs,
+                )
+            )
+        return gaps
+
+    async def _reconcile_branches(
+        self,
+        owner_id: str,
+        run_id: str,
+        *,
+        verified_refs: list[str],
+        through_round: int,
+    ) -> list[AgentControlLoopBranch]:
+        verified = set(verified_refs)
+        async with self._lock:
+            run = self._require_run(owner_id, run_id)
+            now = datetime.now(timezone.utc)
+            branches: list[AgentControlLoopBranch] = []
+            for branch in run.snapshot.branches:
+                if branch.status in {"failed", "stopped"}:
+                    branches.append(branch)
+                    continue
+                branch_verified = [
+                    item for item in branch.input_file_refs if item in verified
+                ]
+                missing = [
+                    item for item in branch.input_file_refs if item not in verified
+                ]
+                status = branch.status
+                if branch.round_number <= through_round:
+                    status = "completed" if not missing else "waiting_input"
+                branches.append(
+                    branch.model_copy(
+                        update={
+                            "verified_file_refs": branch_verified,
+                            "missing_file_refs": missing,
+                            "status": status,
+                            "updated_at": now,
+                        }
+                    )
+                )
+            run.snapshot = run.snapshot.model_copy(
+                update={"branches": branches, "updated_at": now}
+            )
+            await self._persist_locked(run)
+            return [item.model_copy(deep=True) for item in branches]
+
     async def _finalize_loop(
         self,
         owner_id: str,
@@ -2292,7 +2715,14 @@ class HarnessRuntime:
             if str(item.get("file_ref")) in considered_refs
             and str(item.get("file_ref")) not in set(verified_refs)
         ]
-        gaps = self._evidence_gaps(run_id, unresolved_files)
+        waiting_branches = [
+            item for item in snapshot.branches if item.status == "waiting_input"
+        ]
+        gaps = (
+            self._branch_evidence_gaps(waiting_branches)
+            if waiting_branches
+            else self._evidence_gaps(run_id, unresolved_files)
+        )
         unique_findings: list[HarnessFinding] = []
         finding_keys: set[str] = set()
         for finding in findings:
@@ -2365,6 +2795,9 @@ class HarnessRuntime:
                     reason=stop_reason or message,
                     candidate_file_refs=[
                         str(item.get("file_ref")) for item in unresolved_files
+                    ][:20],
+                    candidate_branch_ids=[
+                        item.branch_id for item in waiting_branches
                     ],
                 )
                 rounds[-1] = rounds[-1].model_copy(
@@ -2387,39 +2820,54 @@ class HarnessRuntime:
                 }
             )
             artifact_versions = list(current.artifact_versions)
+            commits = list(current.commits)
             last_commit = current.last_commit
+            new_commit: AgentControlLoopCommit | None = None
+            branches = list(current.branches)
+            if status == "stopped":
+                now = datetime.now(timezone.utc)
+                branches = [
+                    item.model_copy(
+                        update={"status": "stopped", "updated_at": now}
+                    )
+                    if item.status in {"running", "waiting_input"}
+                    else item
+                    for item in branches
+                ]
             if status == "completed" and artifact_versions:
-                final_artifact = artifact_versions[-1].model_copy(
-                    update={"status": "committed"}
-                )
-                artifact_versions[-1] = final_artifact
+                final_artifact = artifact_versions[-1]
                 commit_id = "commit-" + hashlib.sha256(
                     (
                         f"{run_id}:{final_artifact.artifact_id}:"
                         f"{final_artifact.version}:{summary}"
                     ).encode("utf-8")
                 ).hexdigest()[:12]
-                last_commit = AgentControlLoopCommit(
+                new_commit = AgentControlLoopCommit(
                     commit_id=commit_id,
                     artifact_id=final_artifact.artifact_id,
                     artifact_version=final_artifact.version,
+                    operation="commit",
                     summary="已提交通过证据门的只读任务简报，仍需用户审阅。",
                     committed_at=datetime.now(timezone.utc),
                 )
+                commits.append(new_commit)
+                last_commit = new_commit
             run.snapshot = current.model_copy(
                 update={
                     "rounds": rounds,
                     "result": result,
                     "brief": brief,
                     "artifact_versions": artifact_versions,
+                    "commits": commits,
                     "last_commit": last_commit,
+                    "branches": branches,
                     "budget": budget,
                     "control_state": "stopped" if status == "stopped" else "running",
                     "control_events": controls,
                     "updated_at": datetime.now(timezone.utc),
                 }
             )
-            await self._persist_locked(run)
+            await self._persist_locked(run, task_commit=new_commit)
         await self._transition(
             owner_id,
             run_id,
@@ -2471,7 +2919,20 @@ class HarnessRuntime:
                         "completed_at": datetime.now(timezone.utc),
                     }
                 )
-                run.snapshot = run.snapshot.model_copy(update={"rounds": rounds})
+                now = datetime.now(timezone.utc)
+                current_round = rounds[-1].round_number
+                branches = [
+                    item.model_copy(
+                        update={"status": "failed", "updated_at": now}
+                    )
+                    if item.round_number == current_round
+                    and item.status == "running"
+                    else item
+                    for item in run.snapshot.branches
+                ]
+                run.snapshot = run.snapshot.model_copy(
+                    update={"rounds": rounds, "branches": branches}
+                )
                 await self._persist_locked(run)
 
     @staticmethod
@@ -2798,11 +3259,79 @@ class HarnessRuntime:
             )
             await self._persist_locked(run)
 
-    async def _set_plan(self, owner_id: str, run_id: str, plan: HarnessPlan) -> None:
+    async def _set_plan(
+        self,
+        owner_id: str,
+        run_id: str,
+        plan: HarnessPlan,
+        *,
+        round_number: int,
+        parent_branch_id: str | None,
+    ) -> list[str]:
         async with self._lock:
             run = self._require_run(owner_id, run_id)
-            run.snapshot = run.snapshot.model_copy(update={"plan": plan, "updated_at": datetime.now(timezone.utc)})
+            now = datetime.now(timezone.utc)
+            branches = self._branches_for_plan(
+                run.snapshot.run_id,
+                plan,
+                round_number=round_number,
+                parent_branch_id=parent_branch_id,
+                now=now,
+            )
+            run.snapshot = run.snapshot.model_copy(
+                update={
+                    "plan": plan,
+                    "branches": [*run.snapshot.branches, *branches],
+                    "updated_at": now,
+                }
+            )
             await self._persist_locked(run)
+            return [item.branch_id for item in branches]
+
+    @staticmethod
+    def _branch_by_id(
+        branches: list[AgentControlLoopBranch], branch_id: str | None
+    ) -> AgentControlLoopBranch | None:
+        if branch_id is None:
+            return None
+        return next(
+            (item for item in branches if item.branch_id == branch_id), None
+        )
+
+    @staticmethod
+    def _branches_for_plan(
+        run_id: str,
+        plan: HarnessPlan,
+        *,
+        round_number: int,
+        parent_branch_id: str | None,
+        now: datetime,
+    ) -> list[AgentControlLoopBranch]:
+        branch_ids = {
+            unit.unit_id: "branch-"
+            + hashlib.sha256(
+                f"{run_id}:{round_number}:{unit.unit_id}".encode("utf-8")
+            ).hexdigest()[:12]
+            for unit in plan.units
+        }
+        return [
+            AgentControlLoopBranch(
+                branch_id=branch_ids[unit.unit_id],
+                unit_id=unit.unit_id,
+                round_number=round_number,
+                parent_branch_id=parent_branch_id,
+                title=unit.title,
+                objective=unit.objective,
+                depends_on=[branch_ids[item] for item in unit.depends_on],
+                input_file_refs=list(dict.fromkeys(unit.input_file_refs)),
+                missing_file_refs=list(dict.fromkeys(unit.input_file_refs)),
+                status="running",
+                requires_human_gate=unit.requires_human_gate,
+                created_at=now,
+                updated_at=now,
+            )
+            for unit in plan.units
+        ]
 
     async def _fail(self, owner_id: str, run_id: str, reason: str) -> None:
         async with self._lock:

@@ -6,7 +6,8 @@ The product is one office folder, not a Scenario chooser. The persistent layout
 is:
 
 - left: one flat file-manager list, search, type filters and file metadata;
-- center: task composer, Loop contract, file preview, round progress, final brief and next-task proposals;
+- center: task composer, Loop contract, file preview, round/branch progress,
+  immutable brief history, restore actions and next-task proposals;
 - right: actual Agent trajectory, budget, controls and model receipts.
 
 These regions answer five user questions in order: what data exists, what goal
@@ -65,19 +66,23 @@ Before analysis, the round displays `input_file_refs` and `selection_reason` as
 entered the model; only the server-approved, budgeted round files reach the
 Analyst.
 
-The Evidence Gate shows whether the current evidence is sufficient, which file
-could close a gap and whether another round is allowed by the remaining budget.
-If more work is possible, the Run enters `waiting_input` instead of spending the
-next round automatically. “确认并继续核对” sends a versioned `resume`; until
-that server receipt returns, nothing else is claimed to have happened. The
-confirmed evidence round is restricted to the prior Gate's displayed candidate
-files, and its plan must cover all of them rather than starting unrelated
-exploration. Each
-completed round creates a visible evidence-brief version. The final brief and
-logical Commit appear only after citation-scope validation and a server-owned
-terminal decision. They remain labeled for human review. A citation button
-resolves against the workspace projection, selects that file and switches back
-to its preview. This keeps evidence review inside the main task flow.
+The server compiles every validated plan unit into a stable Branch and reconciles
+its verified/missing refs after analysis. The Evidence Gate shows which branches
+are complete, which are waiting and whether another round fits the remaining
+budget. If more work is possible, the Run enters `waiting_input` instead of
+spending the next round automatically. The user chooses one “继续此分支”; the
+versioned `resume` carries that `branch_id`, and nothing is claimed to have
+happened until the receipt returns. The next round is restricted to that
+Branch's displayed missing files; unselected branches keep their waiting state.
+
+Each completed round creates an independent append-only logical evidence-brief
+ArtifactVersion. The final brief appears only after citation-scope validation
+and a server-owned terminal decision; a separate TaskCommit selects the current
+version. Restoring a historical version creates another TaskCommit and moves the
+current pointer without deleting any version or changing an original office
+file. Every result remains labeled for human review. A citation button resolves
+against the workspace projection, selects that file and switches back to its
+preview. This keeps evidence review inside the main task flow.
 
 A model candidate that fails server validation is shown as `未采用`; at most
 one bounded repair attempt may follow and it consumes the same model-call
@@ -103,10 +108,12 @@ chain-of-thought, raw provider response, token traces and validator code stay
 hidden.
 
 `pause` and `stop` take effect only at a safe point between model calls;
-`steer` is recorded for the next round; `resume` continues a paused Run. Each
-command carries Owner, expected version and an idempotency key. The UI waits for
-the returned Snapshot instead of pretending that a click already changed the
-server.
+`steer` is recorded for the next round; `resume` continues a selected waiting
+branch; `rollback` restores a historical logical brief only after completion.
+Each command carries Owner, expected version and an idempotency key. Branch
+resume additionally carries `branch_id`, and restore carries `artifact_version`.
+The UI waits for the returned Snapshot instead of pretending that a click
+already changed the server.
 
 The current Run id is kept in browser session state. After refresh, the client
 first reconciles that id with `GET /runs/{run_id}`; when no local id exists it
@@ -144,11 +151,12 @@ browser fact, not a server task phase.
 | unknown start result | reconciling | same instruction/limits/key | replay identical request |
 | model/schema/policy failure | safe stop plus receipt | whole-workspace contract, instruction and completed rounds | revise or create a fresh Run |
 | rejected plan candidate | not adopted plus bounded retry | frozen contract and used-call count | server retries once if budget allows; otherwise fails closed |
-| evidence insufficient | next-round purpose, missing evidence and explicit confirmation | prior rounds, versions and citations | confirm `resume`, adjust direction first or stop at the limit |
+| evidence insufficient | waiting Branch, missing evidence and explicit per-branch confirmation | prior rounds, all Branch states, versions and citations | choose one Branch to `resume`, adjust direction first or stop at the limit |
 | pause/steer/stop requested | pending until a safe point | current Snapshot and command receipt | reconcile returned version; resume or inspect terminal brief |
 | SSE interruption | reconnecting | current Snapshot and last sequence | GET plus `after=N` |
 | browser refresh | current Run and sequence restored | task, rounds, receipts and controls | GET current Run, then SSE `after=N` |
-| API restart with PostgreSQL | recovered checkpoint, paused | completed rounds, events, command receipts and result versions | inspect trace, then explicitly resume |
+| API restart with PostgreSQL | recovered checkpoint, paused | completed rounds, Branch states, events, command receipts and independent ArtifactVersion/TaskCommit rows | inspect trace, then explicitly resume the intended Branch |
+| historical result restored | current pointer changes to a verified old brief | every ArtifactVersion and prior TaskCommit | review restored brief or select another version; original files stay unchanged |
 | API restart without PostgreSQL | no recoverable Run | browser task draft only | start a new Run or configure `DATABASE_DSN` |
 
 ## 9. Responsive behavior
@@ -165,8 +173,9 @@ preview region.
 Ordinary DOM must not contain benchmark task prompt/rubric/solution, raw path,
 digest, model Prompt, chain-of-thought, raw response, credentials, internal
 effect/gate enums or low-level logs. The UI may show business labels, bounded
-content, call receipts, validation status, evidence gaps, controls and citations
-because those facts help the user decide or recover. The current result versions
-and Commit are logical records inside the Run Snapshot. With PostgreSQL they
-survive API restart, but they are not independently immutable ArtifactVersion or
-TaskCommit rows and do not prove a file write or external action.
+content, call receipts, validation status, Branch states, evidence gaps,
+controls and citations because those facts help the user decide or recover.
+The current logical evidence briefs and TaskCommits are independent append-only
+records and their safe projections are also present in the Run Snapshot. This
+proves result-history preservation, not a source-file write, semantic truth,
+Tool Gateway call or external action.

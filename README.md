@@ -19,8 +19,9 @@ The root page is the only product entry:
 - left: one searchable file-manager list containing all 96 public FORTE input
   files, with file-type filters and no role or Demo partition;
 - center: file metadata, CSV/XLSX/PDF/DOCX/TXT/code preview, a free-form task
-  composer, loop budget, round history, evidence gaps, controls, a cited
-  read-only brief and up to four proposed next tasks;
+  composer, loop budget, round history, server-owned task branches, evidence
+  gaps, controls, append-only result history, a cited read-only brief and up to
+  four proposed next tasks;
 - right: current phase, ordered server events and separate Planner/Analyst
   adoption receipts;
 - boundary: the Run freezes the complete allowlisted index; each round exposes
@@ -38,11 +39,12 @@ browse or search the whole repository
   -> server compiles and validates scope, tools, dependencies and effects
   -> deepseek-v4-pro Analyst reads the approved safe projections
   -> server validates citation membership and evaluates the Evidence Gate
-  -> evidence missing: pause and ask the user before spending another round
-  -> user confirms: next round is bound to those displayed missing sources
+  -> evidence missing: pause the affected task branches before spending another round
+  -> user chooses one branch: next round is bound to that branch's missing sources
   -> ordered SSE + authoritative Snapshot
-  -> one logical evidence-brief version per completed round
-  -> verified final version + logical Commit + proposed next tasks
+  -> one append-only logical evidence-brief ArtifactVersion per completed round
+  -> separate TaskCommit selects the current version + proposed next tasks
+  -> user may restore an older brief by creating another TaskCommit; history remains
   -> human confirms one proposal -> independent new Control Loop
 ```
 
@@ -63,12 +65,14 @@ Demo names do not unlock capability or select private code paths:
   convergence;
 - Demo 3 applies a cross-cutting risk/action gate to either topology.
 
-The current Runtime is a `bounded_read_only_control_loop`. It now creates
-user-visible logical result versions and can restore accepted snapshots and
-idempotency receipts after an API restart when `DATABASE_DSN` points to
-PostgreSQL. Adaptive Workers, independently immutable Artifact storage,
-multi-instance leases and governed external actions remain target architecture,
-not current claims.
+The current Runtime is a `bounded_read_only_control_loop`. Validated plan units
+become server-owned task branches; a user can continue one waiting branch while
+the others keep their state. Logical evidence briefs and TaskCommits are stored
+as independent append-only records, and a versioned rollback command can move
+the current result pointer without deleting history or modifying source files.
+PostgreSQL also restores accepted snapshots and idempotency receipts after API
+restart. Adaptive Workers, writable office artifacts, multi-instance leases and
+governed external actions remain target architecture, not current claims.
 
 ## Public data and preview boundary
 
@@ -106,10 +110,11 @@ GET  /v1/harness/runs/{run_id}/events?after={sequence}
 The former Scenario list/detail routes are not mounted. There are eight public
 operations over seven OpenAPI paths because `GET` and `POST` share `/runs`.
 `X-User-Id` remains an unsigned demonstration Owner placeholder. With
-`DATABASE_DSN`, accepted Run snapshots and command receipts are stored in
-PostgreSQL. Recovery rolls an interrupted model call back to the last completed
-round and pauses for the user; it never silently replays the call. Without a
-database, health reports `memory` and process-restart recovery is unavailable.
+`DATABASE_DSN`, accepted Run snapshots, command receipts, ArtifactVersions and
+TaskCommits are stored in PostgreSQL. Recovery rolls an interrupted model call
+back to the last completed round and pauses for the user; it never silently
+replays the call. Without a database, health reports `memory` and process-
+restart recovery is unavailable.
 
 ## Eight modules
 
@@ -124,11 +129,11 @@ database, health reports `memory` and process-restart recovery is unavailable.
 
 Current implementation covers modules 1-4; a bounded single-loop controller
 subset of module 5; a read-only result, citation, Evidence Gate, logical
-ArtifactVersion and logical Commit subset of module 7; and a Snapshot/event,
-control, idempotency and optional PostgreSQL restart-recovery subset of module
-8. Distributed Worker scheduling, a real Tool Gateway, independently immutable
-Artifact records, multi-instance coordination and governed external action
-remain target work.
+append-only ArtifactVersion and TaskCommit pointer/restore subset of module 7;
+and a Snapshot/event, branch control, idempotency and optional PostgreSQL
+restart-recovery subset of module 8. Distributed Worker scheduling, a real Tool
+Gateway, writable office artifacts, semantic/numeric verification,
+multi-instance coordination and governed external action remain target work.
 
 ## Evidence status
 
@@ -152,10 +157,13 @@ remain target work.
   the linked Evidence ledger.
 - `DR-0025` adds the human-confirmed between-round Evidence Gate, logical result
   versions, current-Run restoration and optional PostgreSQL restart recovery.
-  Its engineering scope and remaining durability limits are recorded in the
-  linked Evidence ledger.
-- Current checks are recorded in the dated Evidence ledgers rather than copied
-  here before the final run.
+  PR #30 is merged through `8c55422`; its group-resume and Snapshot-embedded
+  artifact conclusions are retained as historical baseline.
+- `DR-0026` adds server-owned task branches, branch-selective continuation,
+  independent append-only logical ArtifactVersion/TaskCommit records and a
+  history-preserving restore command. Current local checks are `63 passed,
+  1 skipped`, Runtime `26 passed`, browser `13 passed`, plus Ruff/lint/build;
+  the PostgreSQL integration result is bound in its dated Evidence after PR CI.
 - No target-user study has been run. Clarity, trust, efficiency and user value
   remain hypotheses.
 
@@ -164,6 +172,8 @@ Detailed claims and limits live in
 and [`AGENT-CONTROL-LOOP-BOUNDED-READONLY-20260825`](docs/evidence/AGENT-CONTROL-LOOP-BOUNDED-READONLY-EVIDENCE-20260825.md).
 The current whole-workspace interaction is tracked in
 [`AUTONOMOUS-WHOLE-WORKSPACE-RESEARCH-20260825`](docs/evidence/AUTONOMOUS-WHOLE-WORKSPACE-RESEARCH-EVIDENCE-20260825.md).
+The current Demo 1 branch/artifact increment is tracked in
+[`DEMO1-BRANCH-ARTIFACT-CONTROL-20260826`](docs/evidence/DEMO1-BRANCH-ARTIFACT-CONTROL-EVIDENCE-20260826.md).
 
 ## Local run
 

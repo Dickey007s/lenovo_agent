@@ -14,7 +14,7 @@ OpenAPI exposes seven paths:
 | POST | `/v1/harness/runs` | start an idempotent bounded read-only Agent Control Loop |
 | GET | `/v1/harness/runs?limit=10` | list recent Owner-scoped Runs for recovery |
 | GET | `/v1/harness/runs/{run_id}` | Owner-scoped public Snapshot |
-| POST | `/v1/harness/runs/{run_id}/controls` | versioned, idempotent pause/resume/steer/stop |
+| POST | `/v1/harness/runs/{run_id}/controls` | versioned, idempotent pause/resume/steer/stop/rollback |
 | GET | `/v1/harness/runs/{run_id}/events?after=N` | ordered named SSE after a sequence |
 
 The former Scenario list/detail/preview routes and legacy
@@ -27,9 +27,10 @@ is a demonstration Owner placeholder, not production authentication. Missing
 and wrong-owner Runs both return 404 before the SSE response is created.
 
 There are eight operations over seven OpenAPI paths because `GET` and `POST`
-share `/runs`. With `DATABASE_DSN`, accepted Run snapshots and start/control
-idempotency receipts are stored in PostgreSQL. On startup, an interrupted
-nonterminal Run is rolled back to completed rounds, receives
+share `/runs`. With `DATABASE_DSN`, accepted Run snapshots, start/control
+idempotency receipts, ArtifactVersions and TaskCommits are stored in
+PostgreSQL; the latter two are independent append-only rows. On startup, an
+interrupted nonterminal Run is rolled back to completed rounds, receives
 `checkpoint_recovered` and pauses; an in-flight provider request is never
 automatically replayed. In-flight HTTP requests, asyncio tasks and conditions
 remain process-local. Without `DATABASE_DSN`, the state store is memory and all
@@ -191,22 +192,54 @@ Important fields:
     "elapsed_ms": 71461
   },
   "rounds": [],
+  "branches": [
+    {
+      "branch_id": "branch-...",
+      "unit_id": "verify-revenue",
+      "round_number": 1,
+      "parent_branch_id": null,
+      "title": "核对收入证据",
+      "depends_on": [],
+      "input_file_refs": ["forte-..."],
+      "verified_file_refs": ["forte-..."],
+      "missing_file_refs": [],
+      "status": "completed",
+      "requires_human_gate": false
+    }
+  ],
+  "active_branch_id": null,
   "control_state": "running",
   "control_events": [],
   "artifact_versions": [
     {
       "artifact_id": "artifact-...",
       "version": 1,
-      "status": "committed",
+      "status": "verified",
       "kind": "evidence_brief",
+      "round_number": 1,
+      "summary": "...",
+      "findings": [],
+      "follow_ups": [],
+      "evidence_gaps": [],
       "source_file_refs": ["forte-..."],
       "review_required": true,
+      "external_action": "none"
+    }
+  ],
+  "commits": [
+    {
+      "commit_id": "commit-...",
+      "artifact_id": "artifact-...",
+      "artifact_version": 1,
+      "operation": "commit",
+      "parent_commit_id": null,
       "external_action": "none"
     }
   ],
   "last_commit": {
     "commit_id": "commit-...",
     "artifact_version": 1,
+    "operation": "commit",
     "external_action": "none"
   },
   "brief": {
@@ -249,6 +282,11 @@ evidence scope is `rounds[].input_file_refs`, and the public reason is
 `rounds[].plan.selection_reason`. The server compiler caps the union of those
 refs at `max_files_per_round` before any file content reaches the Analyst.
 
+`branches[]` is the server-owned projection of validated plan units. Branch
+identity, dependency, verified/missing refs and status are not model-owned UI
+interpretations. `rounds[].branch_ids` connects a round to its Branch records;
+`active_branch_id` identifies the branch selected for a resumed evidence round.
+
 `result.follow_ups` contains at most four model-proposed next tasks. It is not a
 server-side acceptance record. The current browser starts a separate Run only
 after the user confirms one proposal.
@@ -259,10 +297,13 @@ and `failed`;
 compatibility `ready_to_execute` is retained for runtimes built without an
 Analyst.
 
-`artifact_versions` are logical read-only result versions inside the Run
-Snapshot. `last_commit` means the server's final Evidence Gate committed the
-latest logical version. Neither means an original file changed, a standalone
-immutable Artifact/TaskCommit record exists or an external system changed.
+`artifact_versions` and `commits` are safe Snapshot projections of independent
+append-only Store records. ArtifactVersion contains the complete logical
+read-only brief for one completed round; it remains `draft` or `verified` and is
+not mutated to represent submission. TaskCommit separately selects the current
+version. `operation=rollback` means the current brief pointer was restored to a
+historical version by creating another Commit. None of these facts means an
+original office file or external system changed.
 
 `completed` means the Evidence Gate found no unresolved citation gap in the
 selected evidence and the read-only results passed schema, selected-citation
@@ -284,16 +325,27 @@ Content-Type: application/json
 }
 ```
 
-Commands are `pause`, `resume`, `steer` and `stop`. `steer` requires an
-instruction and applies only to the next round. Pause and stop are accepted
+Commands are `pause`, `resume`, `steer`, `stop` and `rollback`. `steer` requires
+an instruction and applies only to the next round. Pause and stop are accepted
 immediately but applied only at a safe point between model calls. A stale
-version, illegal transition or same key with different content returns 409.
-An identical replay returns the first control result with `replayed=true`.
+version, illegal transition or same key with different content returns 409. An
+identical replay returns the first control result with `replayed=true`.
+
 When the Evidence Gate emits `next_step.decision=waiting_input`, the Snapshot
-already has `control_state=paused`; `resume` is the explicit user authorization
-to spend the next round's budget. That evidence-recheck round is restricted to
-the prior `next_step.candidate_file_refs`, and its validated plan must cover all
-of those refs. It cannot silently switch to unrelated workspace files.
+already has `control_state=paused`. `resume` must carry one waiting
+`branch_id`; it authorizes only that branch's next evidence round. The round is
+restricted to that Branch's `missing_file_refs`, its validated plan must cover
+all of them, and other waiting branches remain unchanged. A missing, unknown or
+non-waiting Branch returns 409. For backward compatibility, a resume without a
+Branch selects only the first waiting branch; it never advances all branches.
+
+`rollback` applies only to a terminal committed Run and requires
+`artifact_version`. The server loads and verifies that independent
+ArtifactVersion, rejects restoring the already-current version, then appends a
+new `operation=rollback` TaskCommit and returns the restored brief. It does not
+delete versions, undo a model call or modify workspace files. A Run retains at
+most 20 TaskCommit records; reaching that bound fails closed and requires a new
+independent Run instead of truncating history.
 
 ## 8. Plan policy and result validation
 
@@ -342,6 +394,7 @@ analysis_completed
 result_validation
 evidence_gate
 loop_committed
+artifact_version_restored (optional later human restore)
 ```
 
 `checkpoint_recovered` may appear after an API restart backed by PostgreSQL.
@@ -363,11 +416,13 @@ reconciliation; a nonterminal interruption uses GET plus `after=N` recovery.
 | Run/SSE 404 | missing or wrong Owner | same public response; clear stale Run |
 | start 409 | idempotency/contract conflict | preserve instruction/selection and reconcile |
 | control 409 | stale version or illegal transition | GET current Snapshot; preserve command draft and let the user retry |
-| `status=waiting_input` | another round could close a visible evidence gap | inspect sources, optionally steer, then explicitly resume or stop |
+| branch control 409 | selected Branch is missing, no longer waiting or outside the current Gate | GET current Snapshot and choose a still-waiting Branch |
+| artifact restore 409 | version is current, missing or fails independent-record verification | keep current pointer and history; do not fabricate restore |
+| `status=waiting_input` | one or more Branches could close a visible evidence gap | inspect sources, optionally steer, then explicitly resume one Branch or stop |
 | `checkpoint_recovered` | server restored a PostgreSQL Snapshot and paused | reconcile the trace; explicitly resume from the safe checkpoint |
 | `loop_budget_stopped` | round/call/deadline prevents another step | show bounded brief and unresolved gaps |
 | `status=failed` | model/schema/plan/source/citation validation failed | show safe business error and no result |
 
 See [UI-server fact matrix](contracts/UI_SERVER_FACT_MATRIX.md),
-[`DR-0022`](decisions/DR-0022-workspace-folder-and-arbitrary-task-contract.md)
-and [current Evidence](evidence/AGENT-CONTROL-LOOP-BOUNDED-READONLY-EVIDENCE-20260825.md).
+[`DR-0026`](decisions/DR-0026-selective-branch-and-immutable-artifact-history.md)
+and [current Evidence](evidence/DEMO1-BRANCH-ARTIFACT-CONTROL-EVIDENCE-20260826.md).

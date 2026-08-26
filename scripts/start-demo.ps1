@@ -30,8 +30,9 @@ if ($DockerCommand) {
         $DockerDesktop = Join-Path $env:ProgramFiles "Docker\Docker\Docker Desktop.exe"
     }
 }
-$UsePostgres = Test-Path -LiteralPath $Docker
-if ($UsePostgres) {
+$UseDockerPostgres = Test-Path -LiteralPath $Docker
+$UseConfiguredPostgres = -not [string]::IsNullOrWhiteSpace($env:DATABASE_DSN)
+if ($UseDockerPostgres) {
     $env:PATH = "$DockerBin;$env:PATH"
     docker info *> $null
     if ($LASTEXITCODE -ne 0) {
@@ -47,12 +48,15 @@ if ($UsePostgres) {
         if ($LASTEXITCODE -ne 0) { throw "Docker Desktop startup timeout" }
     }
 } else {
-    $env:DATABASE_DSN = ""
-    Write-Warning "Docker is unavailable; this session will use process-local memory and will not recover after an API restart."
+    if ($UseConfiguredPostgres) {
+        Write-Host "Using the configured external PostgreSQL state store." -ForegroundColor DarkGray
+    } else {
+        Write-Warning "Docker and DATABASE_DSN are unavailable; this session will use process-local memory and will not recover after an API restart."
+    }
 }
 
 Write-Host "[2/4] Preparing state store..." -ForegroundColor Cyan
-if ($UsePostgres) {
+if ($UseDockerPostgres) {
     docker compose --project-directory $Root up -d postgres
     $Deadline = (Get-Date).AddMinutes(1)
     do {

@@ -10,14 +10,15 @@
 
 The Agent is general; Demo 1/2/3 are acceptance views over one capability
 runtime. The product begins from an inspectable office workspace, not a hidden
-Prompt or Demo switch. Users choose evidence scope, author a task, observe
+Prompt or Demo switch. Users author a task and bounds, observe
 server-backed execution facts and review outputs against sources. In the
 current interaction, users choose the goal while the Agent chooses a bounded
 evidence set from the complete safe workspace index.
 
-Current implementation reaches a cited, bounded multi-round read-only brief.
-Every source mutation, durable Commit, Worker swarm and Connector statement
-below is target design unless explicitly marked current.
+Current implementation reaches a cited, bounded multi-round read-only brief,
+server-owned task Branches and independent append-only logical result history.
+Every source-file mutation, multi-instance coordination, Worker swarm and
+Connector statement below is target design unless explicitly marked current.
 
 ## 2. Eight shared modules
 
@@ -27,10 +28,10 @@ below is target design unless explicitly marked current.
 | 2. Task Contract | goal, workspace scope, budget, deadline and completion criteria | instruction + whole-workspace refs + bounded rounds/files/calls/deadline | user states intent without doing retrieval first |
 | 3. Planner | retrieve evidence, propose work intent and dependencies | strict per-round Planner with autonomous evidence selection and one budgeted repair | users see what the Agent chose, why, and whether the plan was adopted |
 | 4. Admission, Policy Compiler & Validator | choose topology, compile policy, validate graph/sources/gates | server compilation and plan checks | route explanation shows why work stays single, splits or stops |
-| 5. Scheduler & Worker Manager | bounded loop or adaptive workers, leases and replanning | one in-process bounded single-loop controller | live work map shows actual units, waiting and replanning without Worker chat |
+| 5. Scheduler & Worker Manager | bounded loop or adaptive workers, leases and replanning | one in-process bounded Controller with Branch states and selective resume | live work map shows actual units, waiting and replanning without Worker chat |
 | 6. Tool Gateway | capability registry, Permit, idempotency and execution receipts | not connected | proposed impact appears before confirmation; actual impact after receipt |
-| 7. Artifact Workspace & Verifier | immutable versions, evidence, conflict and Commit | per-round findings, citation membership, Evidence Gate and memory Brief | users review changes and evidence instead of trusting final prose |
-| 8. Checkpoint, Event & Governance Control | durable state, ordered events, risk/evidence/approval | memory rounds/events plus versioned pause/resume/steer/stop | disconnect/restart recovery and human gates become explicit states |
+| 7. Artifact Workspace & Verifier | immutable versions, evidence, conflict and Commit | append-only logical evidence briefs/TaskCommits, citation membership, Branch Evidence Gate and result restore | users review versions and evidence instead of trusting final prose |
+| 8. Checkpoint, Event & Governance Control | durable state, ordered events, risk/evidence/approval | ordered controls/events, memory or PostgreSQL Snapshot/records, safe restart recovery | disconnect/restart recovery and human gates become explicit states |
 
 ## 3. Shared runtime composition
 
@@ -48,9 +49,11 @@ Workspace Folder
   -> durable Snapshot/Event stream
 ```
 
-The current `DR-0023` vertical slice validates a bounded read-only single-task
-loop, but not durable Artifact/Checkpoint semantics. Demo 1 ultimately validates
-the bounded durable single-task branch. Demo 2 validates the adaptive
+The current `DR-0026` vertical slice validates a bounded read-only single-task
+loop with Branch-selective continuation, append-only logical ArtifactVersion/
+TaskCommit records and PostgreSQL restart integration. It does not validate
+writable office artifacts, multi-instance leases or parallel Workers. Demo 1
+ultimately validates the bounded durable single-task branch. Demo 2 validates the adaptive
 multi-task branch. Demo 3 validates the same cross-cutting action gate for both.
 Capabilities are registered once; a Demo identity never creates a special
 private executor.
@@ -97,11 +100,13 @@ and what their decision will change. Resume continues from durable state without
 repeating committed work.
 
 Current precursor: at most three read-only rounds, explicit file/model/deadline
-bounds, server Evidence Gate, memory round history, one budgeted plan repair and
-safe-point pause/resume/steer/stop. Target additions: immutable ArtifactVersion,
-semantic and numeric evidence records, conflict operation context, branch-level
-controls, checkpoint recovery and verified TaskCommit. Initial acceptance data
-comes from FORTE administration, finance, sales and SRE folders.
+bounds, server-owned Branch DAG, branch-selective Evidence Gate, one budgeted
+plan repair, safe-point controls, independent append-only logical
+ArtifactVersion/TaskCommit records and history-preserving restore. PostgreSQL can
+recover the single-Controller checkpoint and records. Target additions: writable
+isolated office artifacts, semantic/numeric evidence, explicit conflicts,
+multi-instance lease/notification and verified source-file Commit. Initial
+acceptance data comes from FORTE administration, finance, sales and SRE folders.
 
 ## 6. Demo 2 target: governed adaptive office swarm
 
@@ -145,11 +150,13 @@ model answer can still be numerically wrong.
 
 1. Preserve whole-workspace browsing, safe preview, autonomous bounded evidence selection and truthful
    call/validation trace.
-2. Preserve the bounded read-only Agent Control Loop and add file-level evidence
-   locations plus task-specific deterministic validators.
-3. Add writable isolated Run workspace and immutable Artifact versions.
-4. Upgrade Demo 1 to a durable bounded loop with branch pause/resume and TaskCommit.
-5. Add Demo 2 Scheduler/Workers over the same Task/Artifact/Event contracts.
+2. Preserve the bounded read-only Agent Control Loop, server-owned Branches and
+   append-only logical result history.
+3. Add file-level evidence locations plus task-specific deterministic validators.
+4. Add a writable isolated Run workspace and immutable office-file Artifacts;
+   keep source-file Commit separate from the current logical brief TaskCommit.
+5. Add Demo 2 Scheduler/Workers and multi-instance leases over the same
+   Task/Branch/Artifact/Event contracts.
 6. Add Demo 3 Risk/Evidence/Approval/Permit/Gateway control to both topologies.
 7. Add production identity and durable/multi-process recovery.
 8. Add governed Connectors only after impact preview, idempotency and failure
@@ -158,11 +165,11 @@ model answer can still be numerically wrong.
 
 ## 10. Claim boundary
 
-Current `Limited Verified` facts are folder inventory and bounded preview. The
-whole-workspace autonomous-scope change remains bound to `DR-0024` evidence.
-The underlying bounded multi-round read-only Loop, model receipts, one budgeted
-plan repair, server plan checks, citation membership, Evidence Gate, ordered
-memory events, safe-point controls and an in-memory brief remain current.
-Durable
-Artifact/Checkpoint recovery, adaptive Workers, Tool Gateway, real Connectors,
-production identity and user value are not current capabilities.
+Current `Limited Verified` facts are folder inventory, bounded preview,
+whole-workspace autonomous scope, bounded multi-round read-only Loop, model
+receipts, one budgeted plan repair, server plan/Branch checks, citation
+membership, branch Evidence Gate, ordered events, controls, PostgreSQL-backed
+single-Controller recovery and independent append-only logical brief/TaskCommit
+history. Writable office Artifacts, semantic correctness, multi-instance leases,
+adaptive Workers, Tool Gateway, real Connectors, production identity and user
+value are not current capabilities.
