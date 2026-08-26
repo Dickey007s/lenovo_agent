@@ -99,6 +99,16 @@ Model-generated tool names, write scopes, effect classes and gate requirements a
 
 For model-generated results, a citation that belongs to the selected source set proves only reference membership unless a separate semantic/numeric verifier exists. Reports must not rename citation-scope validation as factual correctness. `completed` must be qualified by the concrete completed scope, such as “read-only analysis result available for review”.
 
+A user-facing Finding must not end at “Agent says there is a problem”. The living
+fact matrix must record its source location, whether human judgment is required,
+what each visible choice causes, how feedback enters a new command and what does
+not happen. Recoverable model location/structure failures must preserve valid
+work and expose a next action; security-scope and integrity violations remain
+fail closed. Any recommendation is model-proposed context, not approval evidence.
+An accept/decline/defer interaction counts as implemented only when the server
+returns a versioned, idempotent DecisionRecord bound to the current Finding or
+EvidenceResolution. A client-only selected radio button or toast is a Draft.
+
 ## 6. Evidence hierarchy
 
 | Evidence | Supports | Does not automatically support |

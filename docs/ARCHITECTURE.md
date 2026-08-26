@@ -88,7 +88,8 @@ once within the same budget; rejection and retry are ordered facts. The server
 also caps the union of model-selected refs at `max_files_per_round`, preserving
 the model's highest-priority order and repairing dependencies. The Analyst
 receives the user instruction, validated public plan and safe content only for
-that approved round. It returns 1-10 findings with approved refs, verbatim quote
+that approved round. It returns 1-10 findings with approved refs, a short fact,
+separate impact, optional structured human-decision options, verbatim quote
 candidates and `review_required=true`. The Runtime ignores model-supplied
 locations, uniquely resolves each candidate against that same bounded safe
 content, and publishes server-owned `evidence_anchors`. Every newly adopted
@@ -96,7 +97,14 @@ Finding needs at least one Anchor. Citation membership and source location are
 checked; semantic truth, completeness and arithmetic are not. If the first
 Analyst output cannot be uniquely located, the Runtime records
 `analysis_validation_rejected` and permits at most one new Analyst call within
-the same budget; the browser never receives the rejected candidate.
+the same budget; the browser never receives rejected prose as an adopted result.
+The resolver records `exact`, `ambiguous` or `unavailable` for each quote; `stale`
+and `rejected` are reserved future states. A valid subset is adopted with
+`analysis_partial_adopted` and an append-only partial ArtifactVersion. Unresolved
+Finding/Resolution facts pause only their bound Branches. If neither attempt
+yields a usable Finding, the Runtime preserves Plan/Branch/call facts and pauses
+with `next_step.recovery_kind=source_location`; repeated schema failures use
+`analysis_output`. Out-of-scope references remain a fail-closed security error.
 
 The Evidence Gate compares referenced files with each Branch's approved set. It
 alone decides which branches are `completed`, `waiting_input` or stopped, and
@@ -162,8 +170,16 @@ The UI shows business facts and recovery actions, not internal protocol. A
 citation is an interaction: it selects and opens the referenced file preview.
 The issue-review surface reuses the same preview route and organizes authoritative
 Snapshot facts as Agent proposal -> server record -> human review. For Findings,
-it renders the server-owned Anchor roles and jumps to highlighted safe-preview
-text/table rows; it never derives a location from the claim text in the browser.
+it first separates fact, impact and the required human action, then renders the
+server-owned Anchor roles beside the actual safe Preview and jumps to highlighted
+text/table rows. A structured decision exposes mutually exclusive choices and
+user feedback. The Agent recommendation stays hidden until the user selects an
+initial option and asks to compare. Accept/decline/defer first become a versioned,
+idempotent DecisionRecord bound to Finding/Resolution/Branch. Accepting a business
+option then creates a new read-only Run; accepting an ambiguous source position
+steers and resumes only its current waiting Branch. Closing a pending sheet means
+defer, not silent dismissal. None of these operations edits the source. The
+browser never derives a location from claim text.
 This is not a source-file Diff or semantic verification. Proposal context is
 explicitly not a per-proposal citation. Preview security and result-review
 boundaries remain available without turning the primary page into an
@@ -189,11 +205,13 @@ other external Connector. Plan tool labels are intent declarations; no Tool
 Gateway is invoked. `completed` means a reviewable response exists, not that an
 office task, artifact or external process completed.
 
-See [`DR-0028`](decisions/DR-0028-hierarchical-workspace-and-evidence-review.md),
+See [`DR-0030`](decisions/DR-0030-actionable-review-and-recoverable-analysis.md),
+[`SCENARIO-016`](scenarios/SCENARIO-016-actionable-finding-and-recoverable-analysis.md),
+[`DR-0028`](decisions/DR-0028-hierarchical-workspace-and-evidence-review.md),
 [`SCENARIO-014`](scenarios/SCENARIO-014-inspect-agent-issue-in-context.md),
 [`DR-0029`](decisions/DR-0029-server-verified-evidence-anchors.md),
 [`SCENARIO-015`](scenarios/SCENARIO-015-pinpoint-and-compare-agent-evidence.md),
 [`DR-0026`](decisions/DR-0026-selective-branch-and-immutable-artifact-history.md),
 [`SCENARIO-012`](scenarios/SCENARIO-012-selective-branch-and-artifact-restore.md),
 [UI-server fact matrix](contracts/UI_SERVER_FACT_MATRIX.md) and
-[current Evidence](evidence/DEMO1-BRANCH-ARTIFACT-CONTROL-EVIDENCE-20260826.md).
+[current Evidence](evidence/ACTIONABLE-REVIEW-AND-RECOVERY-EVIDENCE-20260826.md).

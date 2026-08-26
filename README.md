@@ -39,8 +39,10 @@ browse or search the whole repository
   -> deepseek-v4-pro Planner selects a minimal evidence set and explains why
   -> server compiles and validates scope, tools, dependencies and effects
   -> deepseek-v4-pro Analyst reads the approved safe projections
-  -> Analyst returns exact quote candidates; server uniquely resolves safe-preview locations
+  -> Analyst separates fact, impact and human decision options, then returns exact quote candidates
+  -> server uniquely resolves safe-preview locations and keeps only reviewable findings
   -> server validates citation membership, evidence anchors and the Evidence Gate
+  -> location/structure cannot be adopted: one bounded repair, then preserve valid work and pause one branch
   -> evidence missing: pause the affected task branches before spending another round
   -> user chooses one branch: next round is bound to that branch's missing sources
   -> ordered SSE + authoritative Snapshot
@@ -177,6 +179,15 @@ multi-instance coordination and governed external action remain target work.
   safe-preview text lines or table rows resolved from verbatim model quotes;
   the review page compares evidence roles and jumps to highlighted source
   locations. Location verification still does not prove semantic correctness.
+- `DR-0030` turns an anchored Finding into a Chinese problem-handling sheet:
+  fact, impact, human-decision need, mutually exclusive choices, Agent next step
+  and user feedback are separate. Accept, decline and defer are versioned,
+  idempotent receipts bound to a Finding/Resolution/Branch; an accepted business
+  choice then starts a new read-only Run. Location results are `exact`,
+  `ambiguous` or `unavailable`; one bounded repair preserves valid Findings,
+  completed Branches and ArtifactVersions, while only affected Branches wait for
+  candidate selection or guided recovery. Security-scope violations still fail
+  closed.
 - No target-user study has been run. Clarity, trust, efficiency and user value
   remain hypotheses.
 
@@ -191,6 +202,8 @@ The current folder hierarchy and issue-review interaction is tracked in
 [`WORKSPACE-TREE-AND-EVIDENCE-REVIEW-20260826`](docs/evidence/WORKSPACE-TREE-AND-EVIDENCE-REVIEW-EVIDENCE-20260826.md).
 The current exact evidence-location interaction is tracked in
 [`PINPOINT-EVIDENCE-REVIEW-20260826`](docs/evidence/PINPOINT-EVIDENCE-REVIEW-EVIDENCE-20260826.md).
+The current actionable review and recoverable-analysis interaction is tracked in
+[`ACTIONABLE-REVIEW-AND-RECOVERY-20260826`](docs/evidence/ACTIONABLE-REVIEW-AND-RECOVERY-EVIDENCE-20260826.md).
 
 ## Local run
 
@@ -260,6 +273,9 @@ pnpm --dir apps/web exec playwright test e2e/harness-workbench.spec.ts
 - [DR-0029：服务端验证的证据锚点](docs/decisions/DR-0029-server-verified-evidence-anchors.md)
 - [SCENARIO-015：定位并对照 Agent 证据](docs/scenarios/SCENARIO-015-pinpoint-and-compare-agent-evidence.md)
 - [原文定位审查 Evidence](docs/evidence/PINPOINT-EVIDENCE-REVIEW-EVIDENCE-20260826.md)
+- [DR-0030：可处置问题审查与可恢复分析门](docs/decisions/DR-0030-actionable-review-and-recoverable-analysis.md)
+- [SCENARIO-016：从可定位问题到人工决断，并从分析失败继续](docs/scenarios/SCENARIO-016-actionable-finding-and-recoverable-analysis.md)
+- [可处置问题与失败恢复 Evidence](docs/evidence/ACTIONABLE-REVIEW-AND-RECOVERY-EVIDENCE-20260826.md)
 - [可恢复 Control Loop Evidence](docs/evidence/DURABLE-EVIDENCE-GATE-ARTIFACT-EVOLUTION-EVIDENCE-20260826.md)
 - [整库自主研究 Evidence](docs/evidence/AUTONOMOUS-WHOLE-WORKSPACE-RESEARCH-EVIDENCE-20260825.md)
 - [Agent Control Loop 三轮只读纵切证据](docs/evidence/AGENT-CONTROL-LOOP-BOUNDED-READONLY-EVIDENCE-20260825.md)

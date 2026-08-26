@@ -7,14 +7,17 @@ import httpx
 import pytest
 from pydantic import ValidationError
 
-from packages.contracts.harness_models import AgentControlLoopControlRequest
+from packages.contracts.harness_models import (
+    AgentControlLoopControlRequest,
+    AgentControlLoopFindingDecisionOption,
+    AgentControlLoopFindingReview,
+)
 
 from services.api.app.application.harness_runtime import (
     HarnessConflictError,
     HarnessEvidenceQuote,
     HarnessFinding,
     HarnessModelError,
-    HarnessPlanError,
     HarnessPlanCandidate,
     HarnessPlanCandidateUnit,
     HarnessPlanUnit,
@@ -401,6 +404,164 @@ class RepairableAnalyst(FakeAnalyst):
         return result.model_copy(update={"findings": [finding]})
 
 
+class AlwaysUnlocatableAnalyst(FakeAnalyst):
+    def __init__(self) -> None:
+        super().__init__()
+        self.calls = 0
+
+    async def analyze(self, *, instruction, plan, files, validation_feedback=None):
+        self.calls += 1
+        result = await super().analyze(
+            instruction=instruction,
+            plan=plan,
+            files=files,
+            validation_feedback=validation_feedback,
+        )
+        finding = result.findings[0].model_copy(
+            update={
+                "evidence_quotes": [
+                    HarnessEvidenceQuote(
+                        file_ref=result.findings[0].file_refs[0],
+                        role="support",
+                        label="无法定位的候选原文",
+                        quote="preview never contains this unique sentence",
+                    )
+                ]
+            }
+        )
+        return result.model_copy(update={"findings": [finding]})
+
+
+class AmbiguousCatalog(FakeCatalog):
+    def agent_file_inputs(self, file_refs: list[str]) -> list[dict[str, object]]:
+        inputs = super().agent_file_inputs(file_refs)
+        for item in inputs:
+            if item["file_ref"] == REF_TWO:
+                item["text"] = "复核说明\n其他内容\n复核说明"
+        return inputs
+
+
+class MixedEvidenceAnalyst(FakeAnalyst):
+    def __init__(self) -> None:
+        super().__init__()
+        self.calls = 0
+
+    async def analyze(self, *, instruction, plan, files, validation_feedback=None):
+        self.calls += 1
+        return HarnessTaskResult(
+            summary="一条发现可核对，另一条需要消歧",
+            findings=[
+                HarnessFinding(
+                    title="已定位的财务事实",
+                    detail="表格中的余额行可以唯一定位。",
+                    fact_summary="客商 A 的余额记录为 100。",
+                    file_refs=[REF_ONE],
+                    evidence_quotes=[
+                        HarnessEvidenceQuote(
+                            file_ref=REF_ONE,
+                            role="support",
+                            label="唯一余额行",
+                            quote="A | 100",
+                        )
+                    ],
+                ),
+                HarnessFinding(
+                    title="复核说明位置不唯一",
+                    detail="相同短句在文件中出现两次。",
+                    fact_summary="Agent 引用了复核说明，但位置不唯一。",
+                    impact="需要确认具体段落后才能继续该分支。",
+                    file_refs=[REF_TWO],
+                    evidence_quotes=[
+                        HarnessEvidenceQuote(
+                            file_ref=REF_TWO,
+                            role="contradiction",
+                            label="重复复核说明",
+                            quote="复核说明",
+                        )
+                    ],
+                ),
+            ],
+            review_required=True,
+        )
+
+
+class HumanDecisionAnalyst(FakeAnalyst):
+    async def analyze(self, *, instruction, plan, files, validation_feedback=None):
+        result = await super().analyze(
+            instruction=instruction,
+            plan=plan,
+            files=files,
+            validation_feedback=validation_feedback,
+        )
+        review = AgentControlLoopFindingReview(
+            requires_human_decision=True,
+            question="是否以当前文件作为后续核对口径？",
+            why_human="两个业务口径需要责任人选择。",
+            options=[
+                AgentControlLoopFindingDecisionOption(
+                    option_id="A",
+                    label="采用当前口径",
+                    meaning="以当前文件继续只读核对。",
+                    agent_next_step="创建一条独立只读任务。",
+                    next_instruction="按当前文件口径继续核对并保留引用。",
+                ),
+                AgentControlLoopFindingDecisionOption(
+                    option_id="B",
+                    label="暂不采用",
+                    meaning="保留现有结果并补充来源。",
+                    agent_next_step="创建一条补充来源任务。",
+                    next_instruction="先寻找补充来源，再重新判断当前口径。",
+                ),
+            ],
+            recommended_option_id="A",
+            recommendation_reason="当前文件可唯一定位。",
+            after_confirmation="决定将先写入当前任务回执。",
+        )
+        finding = result.findings[0].model_copy(update={"review": review})
+        return result.model_copy(update={"findings": [finding]})
+
+
+class RepairableStructureAnalyst(FakeAnalyst):
+    def __init__(self) -> None:
+        super().__init__()
+        self.calls = 0
+        self.feedback: list[str | None] = []
+
+    async def analyze(self, *, instruction, plan, files, validation_feedback=None):
+        self.calls += 1
+        self.feedback.append(validation_feedback)
+        if self.calls == 1:
+            raise HarnessModelError(
+                "模型未返回合法的只读分析结果",
+                called=True,
+                elapsed_ms=10,
+                model=self.model,
+            )
+        return await super().analyze(
+            instruction=instruction,
+            plan=plan,
+            files=files,
+            validation_feedback=validation_feedback,
+        )
+
+
+class AlwaysMalformedStructureAnalyst(FakeAnalyst):
+    def __init__(self) -> None:
+        super().__init__()
+        self.calls = 0
+        self.feedback: list[str | None] = []
+
+    async def analyze(self, *, instruction, plan, files, validation_feedback=None):
+        self.calls += 1
+        self.feedback.append(validation_feedback)
+        raise HarnessModelError(
+            "模型未返回合法的只读分析结果",
+            called=True,
+            elapsed_ms=10,
+            model=self.model,
+        )
+
+
 def start_request(**updates) -> HarnessRunStart:
     payload = {
         "workspace_id": "forte-public-office",
@@ -538,6 +699,270 @@ async def test_analyst_repairs_unlocatable_quotes_within_the_same_budget() -> No
     ) == 1
     assert snapshot.result
     assert snapshot.result.findings[0].evidence_anchors
+
+
+@pytest.mark.asyncio
+async def test_unlocatable_analysis_pauses_with_an_explicit_recovery_path() -> None:
+    analyst = AlwaysUnlocatableAnalyst()
+    runtime = HarnessRuntime(FakeCatalog(), FakePlanner(), analyst)
+    started = await runtime.start(
+        "alice",
+        start_request(
+            idempotency_key="analysis-location-recovery-0001",
+            loop={
+                "max_rounds": 2,
+                "max_files_per_round": 2,
+                "max_model_calls": 6,
+                "deadline_seconds": 120,
+            },
+        ),
+    )
+
+    waiting = await wait_status(runtime, "alice", started.run.run_id, "waiting_input")
+
+    assert waiting.control_state == "paused"
+    assert analyst.calls == 2
+    assert waiting.rounds[0].status == "completed"
+    assert waiting.rounds[0].result is None
+    assert waiting.rounds[0].next_step
+    assert waiting.rounds[0].next_step.decision == "waiting_input"
+    assert waiting.rounds[0].next_step.recovery_kind == "source_location"
+    assert waiting.rounds[0].next_step.candidate_branch_ids
+    assert all(branch.status == "waiting_input" for branch in waiting.branches)
+    assert "analysis_recovery_required" in [
+        event.event_name for event in waiting.events
+    ]
+    assert waiting.validation_errors == []
+
+    stopped = await runtime.control(
+        "alice",
+        started.run.run_id,
+        AgentControlLoopControlRequest(
+            command="stop",
+            idempotency_key="analysis-location-recovery-stop-0001",
+            expected_version=waiting.version,
+        ),
+    )
+    assert stopped.run.control_state == "stop_requested"
+    terminal = await wait_terminal(runtime, "alice", started.run.run_id)
+    assert terminal.status == "stopped"
+
+
+@pytest.mark.asyncio
+async def test_ambiguous_finding_pauses_only_its_branch_and_preserves_artifact() -> None:
+    analyst = MixedEvidenceAnalyst()
+    runtime = HarnessRuntime(AmbiguousCatalog(), FakePlanner(), analyst)
+    started = await runtime.start(
+        "alice",
+        start_request(idempotency_key="ambiguous-branch-recovery-start-0001"),
+    )
+    waiting = await wait_status(
+        runtime, "alice", started.run.run_id, "waiting_input"
+    )
+
+    assert analyst.calls == 2
+    assert [item.status for item in waiting.branches] == [
+        "completed",
+        "waiting_input",
+    ]
+    assert waiting.artifact_versions
+    assert waiting.artifact_versions[0].finding_count == 1
+    assert waiting.artifact_versions[0].findings[0].title == "已定位的财务事实"
+    assert waiting.rounds[0].result is not None
+    assert len(HarnessTaskResult.model_validate(waiting.rounds[0].result).findings) == 1
+    resolution = waiting.rounds[0].next_step.evidence_resolutions[0]
+    assert resolution.status == "ambiguous"
+    assert resolution.branch_id == waiting.branches[1].branch_id
+    assert len(resolution.candidates) == 2
+    assert {
+        "analysis_partial_adopted",
+        "evidence_disambiguation_required",
+        "partial_artifact_saved",
+    }.issubset({event.event_name for event in waiting.events})
+
+    deferred_request = AgentControlLoopControlRequest(
+        command="decision",
+        decision_action="defer",
+        finding_id=resolution.finding_id,
+        resolution_id=resolution.resolution_id,
+        branch_id=resolution.branch_id,
+        idempotency_key="ambiguous-defer-decision-0001",
+        expected_version=waiting.version,
+    )
+    deferred = await runtime.control(
+        "alice", started.run.run_id, deferred_request
+    )
+    replayed = await runtime.control(
+        "alice", started.run.run_id, deferred_request
+    )
+    assert replayed.replayed is True
+    assert deferred.run.decision_records[-1].action == "defer"
+    assert deferred.run.status == "waiting_input"
+    assert deferred.run.artifact_versions[0] == waiting.artifact_versions[0]
+
+    accepted = await runtime.control(
+        "alice",
+        started.run.run_id,
+        AgentControlLoopControlRequest(
+            command="decision",
+            decision_action="accept",
+            finding_id=resolution.finding_id,
+            resolution_id=resolution.resolution_id,
+            branch_id=resolution.branch_id,
+            selected_candidate_id=resolution.candidates[0].candidate_id,
+            feedback="采用第一处，并核对版本字段。",
+            idempotency_key="ambiguous-accept-decision-0001",
+            expected_version=deferred.run.version,
+        ),
+    )
+    assert accepted.run.decision_records[-1].action == "accept"
+    assert (
+        accepted.run.decision_records[-1].selected_candidate_id
+        == resolution.candidates[0].candidate_id
+    )
+    assert accepted.run.events[-1].event_name == "decision_recorded"
+    assert accepted.run.branches[0].status == "completed"
+    assert accepted.run.artifact_versions[0] == waiting.artifact_versions[0]
+
+    declined = await runtime.control(
+        "alice",
+        started.run.run_id,
+        AgentControlLoopControlRequest(
+            command="decision",
+            decision_action="decline",
+            finding_id=resolution.finding_id,
+            resolution_id=resolution.resolution_id,
+            branch_id=resolution.branch_id,
+            feedback="不采用当前候选，保留现有结果。",
+            idempotency_key="ambiguous-decline-decision-0001",
+            expected_version=accepted.run.version,
+        ),
+    )
+    assert declined.run.decision_records[-1].action == "decline"
+    assert declined.run.decision_records[-1].selected_candidate_id is None
+    assert declined.run.artifact_versions[0] == waiting.artifact_versions[0]
+
+    stopped = await runtime.control(
+        "alice",
+        started.run.run_id,
+        AgentControlLoopControlRequest(
+            command="stop",
+            idempotency_key="ambiguous-branch-recovery-stop-0001",
+            expected_version=declined.run.version,
+        ),
+    )
+    assert stopped.run.control_state == "stop_requested"
+    terminal = await wait_terminal(runtime, "alice", started.run.run_id)
+    assert terminal.status == "stopped"
+
+
+@pytest.mark.asyncio
+async def test_terminal_finding_decision_is_versioned_before_follow_up_work() -> None:
+    runtime = HarnessRuntime(FakeCatalog(), FakePlanner(), HumanDecisionAnalyst())
+    started = await runtime.start(
+        "alice",
+        start_request(idempotency_key="terminal-decision-start-0001"),
+    )
+    await confirm_evidence_gate(
+        runtime, "alice", started.run.run_id, "terminal-decision-gate-0001"
+    )
+    terminal = await wait_terminal(runtime, "alice", started.run.run_id)
+    assert terminal.status == "completed"
+    assert terminal.result is not None
+    finding = terminal.result.findings[0]
+    assert finding.finding_id is not None
+    assert finding.review is not None
+    assert finding.review.options[0].affected_branch_ids
+    assert finding.review.options[0].required_file_refs == finding.file_refs
+
+    accepted = await runtime.control(
+        "alice",
+        started.run.run_id,
+        AgentControlLoopControlRequest(
+            command="decision",
+            decision_action="accept",
+            finding_id=finding.finding_id,
+            branch_id=finding.affected_branch_ids[0],
+            selected_option_id="A",
+            feedback="先保留原文件，只形成核对清单。",
+            idempotency_key="terminal-decision-accept-0001",
+            expected_version=terminal.version,
+        ),
+    )
+    assert accepted.run.status == "completed"
+    assert accepted.run.version == terminal.version + 1
+    assert accepted.run.decision_records[-1].selected_option_id == "A"
+    assert accepted.run.decision_records[-1].external_action == "none"
+    assert accepted.run.events[-1].event_name == "decision_recorded"
+
+
+@pytest.mark.asyncio
+async def test_malformed_analysis_is_retried_before_requesting_user_recovery() -> None:
+    analyst = RepairableStructureAnalyst()
+    runtime = HarnessRuntime(FakeCatalog(), FakePlanner(), analyst)
+    started = await runtime.start(
+        "alice",
+        start_request(idempotency_key="analysis-structure-repair-0001"),
+    )
+    await confirm_evidence_gate(
+        runtime, "alice", started.run.run_id, "analysis-structure-confirm-0001"
+    )
+    snapshot = await wait_terminal(runtime, "alice", started.run.run_id)
+
+    assert snapshot.status == "completed"
+    assert analyst.calls == 3
+    assert analyst.feedback[0] is None
+    assert analyst.feedback[1] and "严格 JSON" in analyst.feedback[1]
+    assert snapshot.budget.model_calls_used == 5
+    assert [event.event_name for event in snapshot.events].count(
+        "analysis_structure_rejected"
+    ) == 1
+    assert snapshot.result
+
+
+@pytest.mark.asyncio
+async def test_repeated_malformed_analysis_pauses_with_a_recovery_path() -> None:
+    analyst = AlwaysMalformedStructureAnalyst()
+    runtime = HarnessRuntime(FakeCatalog(), FakePlanner(), analyst)
+    started = await runtime.start(
+        "alice",
+        start_request(
+            idempotency_key="analysis-structure-recovery-0001",
+            loop={
+                "max_rounds": 2,
+                "max_files_per_round": 2,
+                "max_model_calls": 6,
+                "deadline_seconds": 120,
+            },
+        ),
+    )
+
+    waiting = await wait_status(runtime, "alice", started.run.run_id, "waiting_input")
+
+    assert waiting.control_state == "paused"
+    assert analyst.calls == 2
+    assert analyst.feedback[0] is None
+    assert analyst.feedback[1] and "严格 JSON" in analyst.feedback[1]
+    assert waiting.rounds[0].status == "completed"
+    assert waiting.rounds[0].result is None
+    assert waiting.rounds[0].next_step
+    assert waiting.rounds[0].next_step.recovery_kind == "analysis_output"
+    assert waiting.validation_errors == []
+    assert [event.event_name for event in waiting.events].count(
+        "analysis_structure_rejected"
+    ) == 2
+
+    await runtime.control(
+        "alice",
+        started.run.run_id,
+        AgentControlLoopControlRequest(
+            command="stop",
+            idempotency_key="analysis-structure-recovery-stop-0001",
+            expected_version=waiting.version,
+        ),
+    )
+    terminal = await wait_terminal(runtime, "alice", started.run.run_id)
+    assert terminal.status == "stopped"
 
 
 @pytest.mark.asyncio
@@ -1327,8 +1752,11 @@ def test_server_resolves_model_quotes_to_exact_preview_locations() -> None:
         },
     ]
 
-    resolved = HarnessRuntime._resolve_evidence_anchors(result, files)
+    resolution = HarnessRuntime._resolve_evidence_anchors(result, files)
 
+    assert resolution.result
+    assert resolution.rejected_finding_count == 0
+    resolved = resolution.result
     anchors = resolved.findings[0].evidence_anchors
     assert [(item.locator_kind, item.start, item.end) for item in anchors] == [
         ("table_rows", 7, 7),
@@ -1338,7 +1766,7 @@ def test_server_resolves_model_quotes_to_exact_preview_locations() -> None:
     assert "web_search_news_called=false" in anchors[1].excerpt
 
 
-def test_server_rejects_a_finding_without_a_unique_preview_location() -> None:
+def test_server_omits_a_finding_without_a_unique_preview_location() -> None:
     result = HarnessTaskResult(
         summary="候选结论",
         findings=[
@@ -1359,17 +1787,74 @@ def test_server_rejects_a_finding_without_a_unique_preview_location() -> None:
         review_required=True,
     )
 
-    with pytest.raises(HarnessPlanError, match="唯一定位"):
-        HarnessRuntime._resolve_evidence_anchors(
-            result,
-            [
-                {
-                    "file_ref": REF_TWO,
-                    "kind": "text",
-                    "text": "same value\nother\nsame value",
-                }
-            ],
-        )
+    resolution = HarnessRuntime._resolve_evidence_anchors(
+        result,
+        [
+            {
+                "file_ref": REF_TWO,
+                "kind": "text",
+                "text": "same value\nother\nsame value",
+            }
+        ],
+    )
+
+    assert resolution.result is None
+    assert resolution.rejected_finding_count == 1
+    assert resolution.rejected_file_refs == (REF_TWO,)
+    assert len(resolution.evidence_resolutions) == 1
+    assert resolution.evidence_resolutions[0].status == "ambiguous"
+    assert len(resolution.evidence_resolutions[0].candidates) == 2
+
+
+def test_server_salvages_locatable_findings_without_publishing_unlocated_ones() -> None:
+    result = HarnessTaskResult(
+        summary="同时包含可核对与不可核对候选",
+        findings=[
+            HarnessFinding(
+                title="可定位",
+                detail="该发现有唯一原文。",
+                file_refs=[REF_TWO],
+                evidence_quotes=[
+                    HarnessEvidenceQuote(
+                        file_ref=REF_TWO,
+                        role="support",
+                        label="唯一片段",
+                        quote="unique evidence",
+                    )
+                ],
+            ),
+            HarnessFinding(
+                title="不可定位",
+                detail="该发现引用重复原文。",
+                file_refs=[REF_TWO],
+                evidence_quotes=[
+                    HarnessEvidenceQuote(
+                        file_ref=REF_TWO,
+                        role="support",
+                        label="重复片段",
+                        quote="same value",
+                    )
+                ],
+            ),
+        ],
+        review_required=True,
+    )
+
+    resolution = HarnessRuntime._resolve_evidence_anchors(
+        result,
+        [
+            {
+                "file_ref": REF_TWO,
+                "kind": "text",
+                "text": "unique evidence\nsame value\nother\nsame value",
+            }
+        ],
+    )
+
+    assert resolution.result
+    assert [finding.title for finding in resolution.result.findings] == ["可定位"]
+    assert resolution.rejected_finding_count == 1
+    assert resolution.evidence_resolutions[0].status == "ambiguous"
 
 
 def test_server_compiler_bounds_model_file_selection_and_repairs_dependencies() -> None:
