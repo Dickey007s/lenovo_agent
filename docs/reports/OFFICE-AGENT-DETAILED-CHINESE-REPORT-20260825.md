@@ -55,7 +55,7 @@ v2 仍留在历史中，恢复轨迹也有服务端事件。这里的 Artifact �
 工作线上；以前恢复意味着担心覆盖结果，现在恢复是可审计的新 Commit。前台新增的是
 可决策的业务状态，而不是展示 Branch hash、数据库表、完整 digest、Prompt、思维链或
 raw provider response。当前本地门为 Python `63 passed, 1 skipped`、Runtime `26 passed`、
-浏览器 `13 passed`、Ruff/lint/build 通过；PR #31 的 PostgreSQL 17.11 顺序 Runtime
+浏览器 `13 passed`、Ruff/lint/build 通过；PR #31 已合并为 `697e38b`，其 PostgreSQL 17.11 顺序 Runtime
 workflow 为 `1 passed in 1.84s`。自动化和截图仍不是用户研究，理解、信任、效率和任务价值继续标
 `Draft`。
 

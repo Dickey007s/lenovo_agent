@@ -164,7 +164,8 @@ multi-instance coordination and governed external action remain target work.
   history-preserving restore command. Current local checks are `63 passed,
   1 skipped`, Runtime `26 passed`, browser `13 passed`, plus Ruff/lint/build.
   PR #31 also passed the PostgreSQL 17.11 four-Runtime restart integration gate;
-  its job URL and exact boundary are bound in the dated Evidence.
+  it is merged into `master` as `697e38b`, and the job URL plus exact boundary
+  are bound in the dated Evidence.
 - No target-user study has been run. Clarity, trust, efficiency and user value
   remain hypotheses.
 

@@ -129,7 +129,7 @@ Agent Control Loop 的逐模块历史基线、当前三轮只读纵切和后续�
 - 最终截图绑定的真实浏览器运行：整库冻结 96 份索引，Agent 自主选择并核对 3 份文件，2 次 `deepseek-v4-pro` 调用，形成 5 条发现和 4 条待确认建议；
 - 3 张最终文件管理器/建议截图及 SHA-256 写入 Evidence；1440px 与 390px 无页面横向溢出；
 - 实现提交 [`2b8e58c`](https://github.com/Dickey007s/lenovo_agent/commit/2b8e58c161df02d4f2c09bc2692db76d075f2ae2)；
-- PR #25-#30 已合并到 `master`；`DR-0026` 位于 [PR #31](https://github.com/Dickey007s/lenovo_agent/pull/31)，PostgreSQL 门已通过，但合并前仍不能表述为主分支能力。
+- PR #25-#31 已合并到 `master`；`DR-0026` 由 [PR #31](https://github.com/Dickey007s/lenovo_agent/pull/31) 合并为 `697e38b`，PostgreSQL 门已通过。
 
 `DR-0023` 的历史数字仍只证明当时的手工范围版本。当前最终数字必须取自
 [`AUTONOMOUS-WHOLE-WORKSPACE-RESEARCH-20260825`](evidence/AUTONOMOUS-WHOLE-WORKSPACE-RESEARCH-EVIDENCE-20260825.md)，
