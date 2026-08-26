@@ -4,7 +4,7 @@
 
 | 字段 | 内容 |
 | --- | --- |
-| 状态 | `Limited Verified`，实现 `3d902cf`、PR #33；限 Windows 本地启动器与当前单 API 进程 |
+| 状态 | `Limited Verified`，实现 `3d902cf`、PR #33，本地 memory 启动与远端 PostgreSQL 门通过；限 Windows 本地启动器与当前单 API 进程 |
 | 日期 | 2026-08-26 |
 | 触发来源 | [`RUNTIME-OBSERVATION-20260826-21`](../sources/RUNTIME-OBSERVATION-20260826-21-startup-dsn-precedence.md) |
 | 场景 | [`SCENARIO-013`](../scenarios/SCENARIO-013-truthful-local-state-store-fallback.md) |
@@ -48,4 +48,5 @@ API 却依据 `.env` 读到另一个 DSN。用户看到的不是可解释的 mem
 - Python 静态回归确认 fallback 在 warning 前显式清空且仅清空一次。
 - 同一台机器保留 `.env`、无 Docker、无进程级 DSN 时，真实启动 API/Web 成功；health 明确返回 memory。
 - PR 回归覆盖 Python/Ruff；此前完整前端 E2E 与 PostgreSQL integration 证据不被本修复替代。
+- PR #33 的 PostgreSQL 17.11 job 通过：`1 passed in 1.88s`；该门只证明既有顺序 Runtime 数据库路径未回归。
 - 本决策不证明 PostgreSQL 高可用、多实例 lease、跨机器启动、用户理解或 Agent 任务质量。

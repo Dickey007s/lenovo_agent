@@ -27,8 +27,9 @@ PostgreSQL 恢复或生产部署可靠性。
   `TEST_DATABASE_DSN` 的真实 PostgreSQL integration test。
 - Ruff：`All checks passed!`。
 - 实现提交：`3d902cf`；[PR #33](https://github.com/Dickey007s/lenovo_agent/pull/33)。
-- 远端 PostgreSQL CI 的运行链接与结果待完成后绑定；此前 PR #31 的真实 PostgreSQL
-  证据不被本轮 memory 启动替代。
+- [远端 PostgreSQL job](https://github.com/Dickey007s/lenovo_agent/actions/runs/32927922687/job/98054420194)：
+  PostgreSQL 17.11，`1 passed in 1.88s`。它确认 launcher 修复没有破坏顺序 Runtime
+  的真实数据库恢复门；此前 PR #31 的范围更完整 Evidence 仍然有效。
 
 ## 能证明什么
 
