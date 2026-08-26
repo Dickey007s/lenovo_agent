@@ -2,8 +2,8 @@
 
 > 版本说明：本文最初审计的是提交 `3ca0163` 之前的单次只读流水，约 `30%` 是该历史
 > 基线的架构成熟度估计。实现 `8364b1e` 已完成三轮只读纵切；不要继续把 `30%` 当作
-> 当前完成度。2026-08-26 的恢复、人工 Gate 与成果版本更新见 1.2 和
-> [`DURABLE-EVIDENCE-GATE-ARTIFACT-EVOLUTION-20260826`](../evidence/DURABLE-EVIDENCE-GATE-ARTIFACT-EVOLUTION-EVIDENCE-20260826.md)。
+> 当前完成度。2026-08-26 的整组恢复基线见 1.2；现行分支级控制与独立成果历史见
+> 1.3 和 [`DEMO1-BRANCH-ARTIFACT-CONTROL-20260826`](../evidence/DEMO1-BRANCH-ARTIFACT-CONTROL-EVIDENCE-20260826.md)。
 
 ## 1. 结论
 
@@ -59,6 +59,24 @@ Durable State 与 Artifact Commit 纵切后进行。
 TaskCommit；没有跨实例 lease、真实 PostgreSQL 本轮重启运行证据、Tool Gateway、多
 Worker 或外部动作。不要把旧表中的 10%/5% 当作当前数字，也不要用自动化推导一个新的
 总完成百分比。
+
+### 1.3 2026-08-26 分支控制与不可变成果历史更新
+
+`DR-0026` 替代 1.2 中两项当前结论：Evidence Gate 不再只能整组 resume，成果版本也
+不再只嵌入 Snapshot。服务端现在把 validated plan unit 编译为稳定 Branch，并按引用
+核对结果维护 `completed/waiting_input`。有多个缺口时，用户只选择一条 Branch 继续；
+下一轮严格绑定该 Branch 的缺失引用，其他分支继续等待。Branch 仍由一个顺序 Controller
+处理，不是并行 Worker 或 Demo 2 swarm。
+
+逻辑 evidence brief 现在作为独立 append-only ArtifactVersion 存储，TaskCommit 作为
+另一条 append-only 记录选择当前版本。最终 Gate 不再改写 ArtifactVersion 状态；恢复旧版
+只新增 `operation=rollback` TaskCommit，历史版本和 FORTE 原文件不变。真实 PostgreSQL
+顺序 Runtime 集成测试被固定为 PR workflow；它能验证跨进程读取/恢复和 append-only
+语义，不能证明多实例 lease、高可用或在途 HTTP 续跑。
+
+因此当前可表述为“**Demo 1 有界只读分支控制与逻辑成果历史 Limited Verified**”。仍缺
+可写隔离工件、语义/数值 Verifier、多实例协调、真实 Tool Gateway、生产身份与用户研究；
+仍不应把成熟度压缩为一个新的总百分比。
 
 ![用户提供的 Agent Control Loop 目标参考图](../evidence/assets/user-feedback-20260825-agent-control-loop-reference.png)
 
@@ -118,13 +136,16 @@ Verify 不会产生新的 Evidence Gap，也不会让 Planner 基于缺口生成
 ### 4.2 Act 仍是只读模型分析
 
 计划中的 `artifact.write` 会被服务端翻译为 `run_workspace_write`，表示“结果
-只属于本轮工作空间”。至今仍没有真正创建 ArtifactVersion，也没有 Tool Gateway
-执行。因此它不能作为“已经 Act 或 Commit”的证据。
+只属于本轮工作空间”。现行 Runtime 会在结果验证后创建独立的逻辑 evidence-brief
+ArtifactVersion，但计划标签本身仍不是创建记录的回执，更不代表源文件写入或 Tool
+Gateway 执行。因此它不能作为“真实办公动作已经发生”的证据。
 
-### 4.3 完成状态至今仍不耐久
+### 4.3 历史内存基线与现行恢复边界
 
-Snapshot、Event 和 Idempotency 都在一个 API 进程内。浏览器可以按 sequence
-恢复 SSE，但 API 重启后 Run 消失。这里实现的是传输恢复，不是 Durable State。
+历史基线中 Snapshot、Event 和 Idempotency 都在一个 API 进程内。现行 Runtime 在配置
+PostgreSQL 时可以恢复 Snapshot、命令回执、ArtifactVersion 和 TaskCommit，并把中断轮
+回滚到安全点；memory fallback 仍会随进程消失。这里仍没有多实例 lease、通知或在途
+模型 HTTP 续跑，不能称生产级 Durable State。
 
 ### 4.4 当时用户没有中途控制权
 
@@ -242,12 +263,17 @@ Loop 的三轮、只读、可暂停纵切：
 
 ## 9. 2026-08-26 当前推进建议
 
-1. 在已实现的 PostgreSQL 适配器上补一次当前 Harness 的真实 API 进程重启验证，再把逻辑版本拆成独立不可变 ArtifactVersion/TaskCommit。
+1. 在已建立的真实 PostgreSQL PR 门上继续补多实例 lease/CAS 与通知，不把顺序 Runtime
+   重启测试夸大为高可用。
 2. 把引用 membership 校验扩展为格式、确定性数值、跨文件一致性与明确 ConflictRecord。
-3. 在同一 Contract/Event/Artifact 协议上加入 Demo 2 Scheduler/Worker，而不是另造 Demo 专用 Runtime。
-4. 再接 Demo 3 Risk/Evidence/Approval/Permit；真实 Connector 必须最后单独验收。
-5. 以至少 5 人无引导形成性测试验证“为什么继续/为什么停/如何干预”是否真的更易理解。
+3. 增加可写隔离 Run workspace，把逻辑 evidence brief 与真实办公文件 Artifact/Commit
+   分开验收。
+4. 在同一 Contract/Branch/Artifact/Event 协议上加入 Demo 2 Scheduler/Worker，而不是
+   另造 Demo 专用 Runtime。
+5. 再接 Demo 3 Risk/Evidence/Approval/Permit；真实 Connector 必须最后单独验收。
+6. 以至少 5 人无引导形成性测试验证“为什么继续/为什么停/如何选择分支和恢复版本”
+   是否真的更易理解。
 
-当前纵切已经让前台出现“Agent 为什么继续、为什么停、哪次模型结果未采用、下一步需要
-什么”的可见影响；下一阶段的重点是让这些状态在进程重启后仍可信，并让 Commit 从内存
-Brief 变成可恢复、可追溯、可继续消费的业务工件。
+当前纵切已经让前台出现“哪条任务分支完成、哪条缺证、继续哪一条、恢复哪个成果版本”
+的可见影响；下一阶段的重点不再是把同一概念画得更多，而是补确定性验证、可写隔离工件
+与 Demo 2 的真实 Scheduler/Worker。

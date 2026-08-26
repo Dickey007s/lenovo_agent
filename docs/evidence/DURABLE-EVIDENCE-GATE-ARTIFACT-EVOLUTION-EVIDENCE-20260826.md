@@ -1,5 +1,11 @@
 # 可恢复 Evidence Gate 与成果演进 Evidence
 
+> 生命周期：本 Evidence 绑定 [PR #30](https://github.com/Dickey007s/lenovo_agent/pull/30)，
+> 已合并为 `8c55422`。其中 `59 passed`、Runtime `22 passed`、浏览器 `12 passed` 和
+> “无本轮真实 PostgreSQL”均是该提交生命周期内的历史观测。现行分支级 Gate、独立
+> append-only 成果记录和真实 PostgreSQL PR 门见
+> [`DEMO1-BRANCH-ARTIFACT-CONTROL-20260826`](DEMO1-BRANCH-ARTIFACT-CONTROL-EVIDENCE-20260826.md)。
+
 > 状态：`Limited Verified`。只证明固定 FORTE、单 Runtime、最多三轮、只读
 > Control Loop 的自动化路径。PostgreSQL 代码路径已实现，但本机缺少 Docker/
 > PostgreSQL，尚无本轮真实数据库进程重启运行证据。

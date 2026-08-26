@@ -6,9 +6,58 @@
 >
 > 当前结论状态：限定工程链路为 `Limited Verified`；任务正确性、生产可用性与用户价值仍未验证
 >
-> 当前事实基线：源码、[`ARCHITECTURE.md`](../ARCHITECTURE.md)、[`UI_SERVER_FACT_MATRIX.md`](../contracts/UI_SERVER_FACT_MATRIX.md) 与 [`DR-0024`](../decisions/DR-0024-autonomous-whole-workspace-research.md)
+> 当前事实基线：源码、[`ARCHITECTURE.md`](../ARCHITECTURE.md)、[`UI_SERVER_FACT_MATRIX.md`](../contracts/UI_SERVER_FACT_MATRIX.md) 与 [`DR-0026`](../decisions/DR-0026-selective-branch-and-immutable-artifact-history.md)
 
 > 2026-08-25 最新交互修订：`DR-0024` 已取代本文早期 `DR-0022` 的“用户勾选 1-20 个文件 / selected_file_refs”方案。当前产品是一个统一文件管理器；用户只给目标，Agent 面向完整安全索引自主选择每轮证据。本文后文如引用旧勾选流程，均只表示历史设计对照，不得作为当前演示口径。
+
+> 2026-08-26 当前能力修订：`DR-0026` 已取代本文后文“只能整组补证、成果只在
+> Snapshot、没有分支级控制/独立 ArtifactVersion/TaskCommit”的旧结论。后文的约
+> `30%` 表格和缺口描述继续作为历史基线，不得覆盖本增补。现行能力与边界以本节、
+> `PRESENTATION_BRIEF.md` 和 DR-0026 Evidence 为准。
+
+## 2026-08-26 增补：用户控制的对象从“整轮继续”变成“选择工作分支”
+
+上一版已经做到证据不足先停下来，但前台只能问用户“要不要全部继续”。这仍然把模型
+生成的一组缺口当作一个黑箱：用户看不出哪条工作线已经完成，也无法只把预算花在最重要
+的一条。现在服务端会把通过校验的 plan unit 编译为稳定 Branch，再根据已批准引用计算
+每条 Branch 的完成和缺证状态。模型不拥有 Branch ID，也不能自己宣布分支完成。
+
+```text
+用户目标
+  -> 服务端校验 Plan 并建立 Branch DAG
+  -> Analyst 只读分析
+  -> 服务端按 Branch 核对引用
+  -> 多条缺证：统一暂停，不自动继续
+  -> 人选择一条 Branch
+  -> 下一轮只补该 Branch 的 missing_file_refs
+  -> 其他 Branch 保持等待
+```
+
+![任务分支现场：完成分支保留，缺证分支由人选择](../evidence/screenshots/dr-0026-branch-control.png)
+
+**图 C 讲解词：** 绿色分支是服务端已经核对完成的工作，琥珀色分支仍缺一份引用。
+“继续此分支”不是 Demo 播放按钮，而是携带当前 version、幂等键和 `branch_id` 的服务端
+控制。回执返回前，前台不会把点击动画说成下一轮已经发生。Branch 仍由一个顺序
+Controller 推进，因此这张图不能用来宣称 Demo 2 的多个 Worker 已经并行执行。
+
+第二个变化是成果历史不再靠修改 Run JSON 表达。每个完成轮次的完整只读简报写入独立
+append-only ArtifactVersion；最终 Gate 另建 TaskCommit 指向当前版本。用户恢复旧版本时，
+系统不会覆盖新版，而是再建一条 `operation=rollback` TaskCommit，移动当前指针。
+
+![恢复历史成果只移动当前指针，全部版本继续保留](../evidence/screenshots/dr-0026-artifact-restore.png)
+
+**图 D 讲解词：** “当前 v1”来自 `last_commit.artifact_version`，不是浏览器本地选择。
+v2 仍留在历史中，恢复轨迹也有服务端事件。这里的 Artifact 是 Agent 只读证据简报，
+不是 XLSX/DOCX 源文件；所以可以汇报“成果历史不可变、当前指针可恢复”，不能汇报
+“办公文件已经写回、回滚或提交”。
+
+这两处技术变化直接改写用户流程：以前用户只能批准整轮，现在可以判断预算应该花在哪条
+工作线上；以前恢复意味着担心覆盖结果，现在恢复是可审计的新 Commit。前台新增的是
+可决策的业务状态，而不是展示 Branch hash、数据库表、完整 digest、Prompt、思维链或
+raw provider response。当前本地门为 Python `63 passed, 1 skipped`、Runtime `26 passed`、
+浏览器 `13 passed`、Ruff/lint/build 通过；PR #31 的 PostgreSQL 17.11 顺序 Runtime
+workflow 为 `1 passed in 1.84s`。自动化和截图仍不是用户研究，理解、信任、效率和任务价值继续标
+`Draft`。
 
 ## 最新增补：从“用户先找文件”改为“Agent 找证据，人确认下一步”
 
@@ -51,11 +100,13 @@ Reasoning、Action、Observation 交替推进的通用方法。
 用户可以打开安全预览，但只需写出自己的任务；Planner 从完整安全索引中选择本轮材料，
 服务端按预算和策略校验后才允许 Analyst 读取正文，最后由人复核结论并确认下一步。
 
-这条路径目前已经在固定公开数据和单 API 进程内形成一个有界的 Agent Control Loop
-工程纵切：最多三轮、有预算、服务端 Evidence Gate，并支持安全点暂停、继续、调整下一轮
-和停止。它仍不能执行真实工具、修改文件、提交 Durable Artifact、恢复跨进程任务或证明
-结论正确。这不是附加在演示末尾的免责声明，而是产品当前的组成部分：前台必须让用户
-看见“为什么继续、为什么停止、待复核、没有外部动作”。
+这条路径目前已经在固定公开数据上形成一个有界的 Agent Control Loop 工程纵切：最多
+三轮、有预算、服务端 Branch/Evidence Gate，并支持安全点暂停、选择一条分支继续、
+调整下一轮、停止和恢复逻辑成果版本。配置 PostgreSQL 时，Snapshot、命令回执、逻辑
+ArtifactVersion 与 TaskCommit 可跨顺序 Runtime 恢复。它仍不能执行真实工具、修改办公
+文件、完成多 Worker 调度、保证多实例高可用或证明结论正确。这不是附加在演示末尾的
+免责声明，而是产品当前的组成部分：前台必须让用户看见“为什么继续、继续哪一条、当前
+成果是哪版、待复核、没有外部动作”。
 
 ## 二、当前产品：一个办公资料库，一条可核对的只读路径
 
@@ -311,8 +362,8 @@ Analyst 的每条 Finding 至少要引用一个本轮批准的 `file_ref`。服�
 原因；服务端编译、限额并校验；Analyst 只读批准的安全投影，生成带引用的初步 Finding。
 
 **停顿或失败：** 文件 hash、路径或解析异常时在预览前 fail closed；模型返回越界引用或
-不合规计划时显示“未采用”并安全停止。岗位规则互斥或字段缺失时，当前只能在结果中列为
-待人工判断，还不能暂停某个执行分支后继续。
+不合规计划时显示“未采用”并安全停止。当前可以把缺少引用的工作单元停为 Branch 并由人
+选择继续，但岗位规则互斥或字段缺失尚无语义 Verifier，仍只能在结果中列为待人工判断。
 
 **前台输出：** 表格行、PDF 规则文本、安全说明、Agent 本轮选择理由、Planner/Analyst 回执、
 业务 Plan、待复核结论、可回开的文件引用和人工确认的下一步任务。
@@ -338,8 +389,8 @@ Agent 负责在整库中找到对应期间的工作簿。
 预算允许时进入下一轮。模型可以提出分期解析、归一和比较意图，并生成带来源引用的初步分析。
 
 **停顿或失败：** 加密、超限或完整性异常的工作簿不可进入 Run；Planner 引用整库外或本轮未批准文件、
-生成未允许 Tool 时拒绝。模型对科目符号、期末余额或客商映射产生歧义时，当前没有分支级
-Evidence Gate，只能要求人工复核或发起新 Run。
+生成未允许 Tool 时拒绝。当前分支级 Evidence Gate 能处理“该工作单元缺少批准引用”，
+但不能判断科目符号、期末余额或客商映射是否算对；这些语义/数值歧义仍需人工复核。
 
 **前台输出：** 首个可见 Sheet 的最多 30 列、120 行预览，Plan 单元、模型回执、每条 Finding
 的工作簿引用与“结论和数值仍需人工复核”。
@@ -390,13 +441,14 @@ Planner 超过每轮文件预算时由服务端限额，引用本轮范围外文
 Manager 尚未连接。
 
 **停顿或失败：** 关系文件包含未允许外部资源、压缩结构越界或内容解析失败时安全停止预览；
-规则互斥时当前不能只暂停一份文档分支，只能把冲突暴露给用户或结束本轮。
+规则互斥时当前可以保留文档 Branch 的引用缺口，却没有 ConflictRecord 或法务规则
+Verifier 自动证明冲突；前台只能把模型发现暴露给用户复核。
 
 **前台输出：** 每份文档的有界文本、安全说明、服务端接受后的计划、引用返回按钮和
 “模型初步结论 · 待复核”。
 
-**后端事实：** 文件 manifest 校验、DOCX relationship scan、选定来源冻结、Plan source
-validation、Result citation membership 与 memory Snapshot。
+**后端事实：** 文件 manifest 校验、DOCX relationship scan、整库范围冻结、Plan source/
+Branch validation、Result citation membership，以及 memory 或 PostgreSQL Snapshot。
 
 **证据来源：** `TC-07`、`FORTE-PINNED-20260825`、`REACT-ICLR-2023` 仅作为未来
 分支观察与迭代设计启发。
@@ -417,7 +469,8 @@ validation、Result citation membership 与 memory Snapshot。
 不会因为报告冲突自动新增 reconciliation 单元。
 
 **停顿或失败：** SSE 中断时浏览器以 Snapshot 和 `after=N` 恢复；模型输出未通过 Schema、
-Plan 或引用校验时安全失败。业务报告相互矛盾时没有自动分支暂停或人工接管点。
+Plan 或引用校验时安全失败。引用缺口可以形成待确认 Branch；业务报告相互矛盾时仍没有
+确定性冲突判定或自动新增 reconciliation Worker。
 
 **前台输出：** Agent 跨目录选证据的理由、有序轨迹、验证后的 Plan、每条结论的报告引用、重连状态和
 待复核终态。
@@ -522,8 +575,9 @@ Analyst -> 有限 Verify -> 待复核结果。它没有 Action 后的新 Observa
 | 可见预算与停止条件 | 最大轮次、每轮文件、模型调用和 deadline；运行中合同冻结 | token/cost 计量、在途请求硬取消、生产 SLA |
 | 服务端 Evidence Gate | 证据缺口、下一轮目的、完成/预算耗尽/停止原因 | 语义蕴含、算术、业务规则和人工真值验证 |
 | 一次预算内计划修复 | 候选计划“未采用”，只有服务端校验后的计划进入执行 | 通用自适应重规划和计划质量评估 |
-| `pause / resume / steer / stop` | 用户可在安全点暂停、调整下一轮或结束并保留 | 分支级控制、接管写入、跨进程恢复 |
-| 内存 Brief Commit | 最终建议、引用、未解决项和“无外部动作” | ArtifactVersion、TaskCommit、可回滚文件和 Durable Checkpoint |
+| `pause / resume / steer / stop / rollback` | 用户可在安全点暂停、选择一条 Branch 继续、调整下一轮、停止或恢复成果版本 | 接管写入、在途硬取消和多实例协调 |
+| append-only 逻辑 ArtifactVersion/TaskCommit | 最终建议、引用、历史版本、当前指针和“无外部动作” | 可写办公文件、语义 Verifier、源文件 Commit |
+| PostgreSQL 顺序 Runtime 恢复 | 检查点恢复后显式继续；中断调用不重放 | 多实例 lease、通知、高可用和远端 HTTP 续跑 |
 
 ### 图示区五：实现前基线与当前纵切
 
@@ -533,30 +587,33 @@ flowchart LR
     O --> P[Plan<br/>候选 + 服务端校验]
     P --> A[Act read-only<br/>形成中间分析]
     A --> V[Verify<br/>引用范围核对]
-    V --> G{Evidence Gate}
-    G -- 证据不足且预算允许 --> O
-    G -- 完成/预算/停止 --> C[内存 Brief Commit<br/>待人工复核]
-    E[Memory Snapshot + named SSE] --- O
-    U[pause / resume / steer / stop<br/>安全点控制] -. 控制信号 .-> E
-    D[Durable Artifact + Checkpoint<br/>仍是目标] -. 尚未连接 .-> C
+    V --> G{Branch Evidence Gate}
+    G -- 证据不足 --> B[人选择一条 Branch]
+    B --> O
+    G -- 完成/预算/停止 --> C[TaskCommit 指向逻辑 ArtifactVersion<br/>待人工复核]
+    E[Memory/PostgreSQL Snapshot + named SSE] --- O
+    U[pause / resume(branch) / steer / stop / rollback<br/>版本化幂等控制] -. 控制信号 .-> E
+    D[可写办公 Artifact + 多 Worker<br/>仍是目标] -. 尚未连接 .-> C
 ```
 
-**图 5 讲解词：** 实线是提交 `8364b1e` 后的当前只读纵切，虚线是控制或仍未连接的目标。
+**图 5 讲解词：** 实线是 `DR-0026` 的当前只读纵切，虚线是控制或仍未连接的目标。
 这里的 Act 只形成中间分析，不执行工具；Evidence Gate 只核对引用范围和显式缺口，不能代替
-业务真值验证；memory Snapshot 和 Brief 也不能代替 Durable State 与 TaskCommit。
+业务真值验证；PostgreSQL 顺序恢复和逻辑 TaskCommit 也不能代替多实例高可用或源文件提交。
 
 ### 6.2 当前：Agent Control Loop 的三轮只读纵切
 
-当前已经在 Workspace-first 边界上实现一个**最多三轮、只读、有预算、可停止的 Agent
-Control Loop 纵切**。“三轮”是硬上限，不是要求每个任务必须消耗三轮。它只在 FORTE
-公开输入、单 API 进程 memory、无外部动作范围内为 `Limited Verified`。
+当前已经在 Workspace-first 边界上实现一个**最多三轮、只读、有预算、可选择分支和恢复
+逻辑成果的 Agent Control Loop 纵切**。“三轮”是硬上限，不是要求每个任务必须消耗
+三轮。它只在 FORTE 公开输入、顺序单 Controller、无外部动作范围内为 `Limited Verified`；
+配置 PostgreSQL 时可跨顺序 Runtime 恢复，但不是多实例高可用。
 
 **第一轮：建立证据地图。** 用户写任务，服务端冻结完整安全索引。Agent 把问题拆成可核对的
 研究子问题，自主选择本轮最小证据集合，输出“选择理由、已读来源、初步判断、直接引用、证据缺口和冲突”。
 服务端要求每个判断绑定本轮批准文件，并记录调用、耗时和验证结果。
 
-**第二轮：反证与补证。** 系统根据第一轮证据缺口，从完整索引中尚未核对的文件选择下一批，
-并说明“为什么需要、预计改变哪个判断”。正文访问不能越过每轮预算和服务端批准范围。
+**第二轮：人选择一条分支补证。** 系统把第一轮缺口落到服务端 Branch；用户决定先继续
+哪一条，下一轮只获得该 Branch 的 `missing_file_refs`，其他 Branch 保持等待。系统说明
+“为什么需要、预计改变哪个判断”，正文访问不能越过每轮预算和服务端批准范围。
 第二轮优先寻找反例、跨文件冲突、数值不一致和缺失条件，而不是重复生成更长摘要。
 
 **第三轮：收敛与停机。** 系统只基于前两轮已接受的来源和验证记录形成综合结论，逐项区分

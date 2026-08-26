@@ -7,7 +7,7 @@ Browser: unified file manager + task composer + trace
   -> GET /v1/harness/workspace
   -> GET /v1/harness/workspace/files/{file_ref}
   -> POST user instruction + loop bounds
-  -> POST versioned pause/resume/steer/stop controls
+  -> POST versioned pause/resume/steer/stop/rollback controls
   -> named SSE + Snapshot reconciliation
 
 FastAPI Harness
@@ -17,10 +17,10 @@ FastAPI Harness
        -> server Policy Compiler + Plan Validator
        -> OpenAI-compatible Analyst
        -> Result/Citation Validator
-       -> human-confirmed Evidence Gate + bounded Loop Controller
-       -> logical ArtifactVersion + final logical Commit
+       -> server-owned Branch DAG + branch Evidence Gate + bounded Loop Controller
+       -> append-only logical ArtifactVersion + TaskCommit pointer/restore
        -> HarnessStateStore
-            -> PostgreSQL snapshots/receipts when DATABASE_DSN is configured
+            -> PostgreSQL snapshots/receipts/artifacts/commits when DATABASE_DSN is configured
             -> process-local memory fallback otherwise
 ```
 
@@ -78,6 +78,9 @@ The server compiles the candidate into a `HarnessPlan`:
 - external-action preview requires the server-owned human-gate policy;
 - units, dependencies, cycles, per-round refs, tools, artifacts and gates are
   validated deterministically.
+- every validated unit becomes a stable server-owned Branch with dependencies,
+  evidence state and human-gate state; model output cannot assign Branch identity
+  or completion.
 
 Each round's Planner receives the current question, safe metadata for remaining files,
 budget and any accepted steer instruction. A rejected candidate may be repaired
@@ -89,18 +92,22 @@ that approved round. It returns 1-10 findings with at least one approved ref per
 finding and `review_required=true`. Citation membership is checked; semantic
 truth, completeness and arithmetic are not.
 
-The Evidence Gate compares referenced files with the current round's approved
-set. It alone decides `waiting_input`, `completed` or `budget_exhausted`; the
-model does not write terminal state. When another round could close a gap, the
-server pauses before spending that budget and requires an idempotent `resume`.
-The resumed evidence round is scoped to the prior Gate's candidate refs, and the
-Plan Validator requires all of them to remain in the plan; confirmation cannot
-silently turn into unrelated workspace exploration.
-Each completed round creates a logical read-only evidence-brief version. A
-successful final Gate marks the latest version `committed` and records a logical
-Commit. These records are part of the Run Snapshot, not independently immutable
-Artifact/TaskCommit rows. Final `follow_ups` remain suggestions until a user
-explicitly starts a separate Run.
+The Evidence Gate compares referenced files with each Branch's approved set. It
+alone decides which branches are `completed`, `waiting_input` or stopped, and
+then decides the Run state; the model does not write either fact. When more than
+one branch could close a gap, the server pauses before spending another round.
+The user selects one waiting `branch_id`; the next round is scoped only to that
+Branch's `missing_file_refs`, while unselected branches remain waiting. The Plan
+Validator requires all confirmed refs to remain in the plan, so confirmation
+cannot silently become unrelated workspace exploration.
+
+Each completed round creates an independent append-only logical evidence-brief
+ArtifactVersion. A successful final Gate creates a separate TaskCommit that
+selects the latest verified version; it does not mutate that version to express
+commit state. A versioned/idempotent `rollback` verifies an existing immutable
+record, creates another TaskCommit and moves the current brief pointer. It never
+deletes history or changes a FORTE source file. Final `follow_ups` remain
+suggestions until a user explicitly starts a separate Run.
 
 ## 5. State and streaming
 
@@ -110,7 +117,8 @@ The Snapshot is authoritative. Named events are a readable ordered projection:
 workspace_index -> round_started -> planning_started -> planning_completed
 -> optional plan_validation_rejected/retry -> plan_validation
 -> analysis_started -> analysis_completed -> result_validation -> evidence_gate
--> optional human resume -> next round or loop_committed/loop_budget_stopped/loop_stopped
+-> optional branch-selected human resume -> next round or loop_committed/loop_budget_stopped/loop_stopped
+-> optional artifact_version_restored after terminal human restore
 ```
 
 Each event increments sequence and state transition increments Snapshot version.
@@ -119,15 +127,18 @@ final GET reconciliation. A transport animation or configured model name is not
 evidence that a model call occurred; only `HarnessModelReceipt.called` is.
 
 Control commands use expected version and owner-scoped idempotency. Pause and
-stop apply at safe points between calls; steer applies to the next round.
-`HarnessStateStore` atomically stores the accepted Snapshot with start/control
-receipts. On PostgreSQL startup, terminal and paused Runs are restored. Any
-interrupted round is removed, a `checkpoint_recovered` event is appended and
-the Run pauses at the last completed round; model calls are not automatically
-replayed. The browser restores its known Run id, or discovers the most recent
-nonterminal Owner Run via `GET /runs`. Memory fallback does not survive an API
-restart. `X-User-Id` is not signed authentication, and there is no multi-instance
-lease or notification channel.
+stop apply at safe points between calls; steer applies to the next round;
+rollback applies only to a terminal committed Run. `HarnessStateStore`
+atomically stores the accepted Snapshot and receipts, optionally with new
+append-only ArtifactVersion/TaskCommit rows. On PostgreSQL startup, terminal and
+paused Runs plus their independent artifact history are restored. Any interrupted
+round and its uncommitted Branch records are removed, a `checkpoint_recovered`
+event is appended and the Run pauses
+at the last completed round; model calls are not automatically replayed. The
+browser restores its known Run id, or discovers the most recent nonterminal
+Owner Run via `GET /runs`. Memory fallback does not survive an API restart.
+`X-User-Id` is not signed authentication, and there is no multi-instance lease
+or notification channel.
 
 ## 6. Frontend architecture
 
@@ -135,7 +146,8 @@ The root page keeps three independently meaningful regions:
 
 - file-manager rail: one flat searchable inventory, type filters and metadata;
 - work area: task composer, loop contract, safe preview, round canvas, evidence
-  gaps, explicit continue decision, result-version history and cited brief;
+  gaps, server-backed task-branch state, branch-specific continue decision,
+  immutable result history, restore actions and cited brief;
 - activity pane: current phase, budget, ordered events and model adoption receipts.
 
 The UI shows business facts and recovery actions, not internal protocol. A
@@ -151,10 +163,10 @@ the primary page into an architecture document.
 | Task Contract | user instruction, complete workspace scope, loop bounds, Owner/key/version | durable task contract and production identity |
 | Planner | strict candidate, autonomous evidence selection, per-round receipt and one bounded repair | retrieval-quality evaluation and richer replanning policy |
 | Admission/Policy/Validator | server compilation and deterministic graph/source checks | dynamic topology admission |
-| Scheduler & Worker Manager | one bounded single-loop controller | adaptive workers, leases and recovery |
+| Scheduler & Worker Manager | one bounded single-loop controller with server-owned Branch states and selective continuation | parallel/adaptive workers, leases and multi-instance recovery |
 | Tool Gateway | not connected | governed real/simulated tools and receipts |
-| Artifact Workspace & Verifier | per-round logical evidence-brief versions, citation membership, human Evidence Gate and final logical Commit | independently immutable records, semantic/numeric validators and TaskCommit |
-| Checkpoint/Event/Governance | ordered events, controls, idempotent commands and optional PostgreSQL restart recovery | multi-instance lease/notification, in-flight cancellation, policy/approval/Permit integration |
+| Artifact Workspace & Verifier | independent append-only logical evidence-brief versions, citation membership, branch Evidence Gate, TaskCommit pointer and restore | writable isolated office artifacts, semantic/numeric validators and conflict records |
+| Checkpoint/Event/Governance | ordered events, branch/rollback controls, idempotent commands, independent records and optional PostgreSQL restart recovery | multi-instance lease/notification, in-flight cancellation, policy/approval/Permit integration |
 
 ## 8. Security and claim boundary
 
@@ -163,7 +175,7 @@ other external Connector. Plan tool labels are intent declarations; no Tool
 Gateway is invoked. `completed` means a reviewable response exists, not that an
 office task, artifact or external process completed.
 
-See [`DR-0024`](decisions/DR-0024-autonomous-whole-workspace-research.md),
-[`SCENARIO-010`](scenarios/SCENARIO-010-autonomous-whole-workspace-research.md),
+See [`DR-0026`](decisions/DR-0026-selective-branch-and-immutable-artifact-history.md),
+[`SCENARIO-012`](scenarios/SCENARIO-012-selective-branch-and-artifact-restore.md),
 [UI-server fact matrix](contracts/UI_SERVER_FACT_MATRIX.md) and
-[current Evidence](evidence/AUTONOMOUS-WHOLE-WORKSPACE-RESEARCH-EVIDENCE-20260825.md).
+[current Evidence](evidence/DEMO1-BRANCH-ARTIFACT-CONTROL-EVIDENCE-20260826.md).

@@ -45,7 +45,14 @@ AgentControlLoopControlState = Literal[
     "stop_requested",
     "stopped",
 ]
-AgentControlLoopCommand = Literal["pause", "resume", "steer", "stop"]
+AgentControlLoopCommand = Literal["pause", "resume", "steer", "stop", "rollback"]
+AgentControlLoopBranchStatus = Literal[
+    "running",
+    "completed",
+    "waiting_input",
+    "stopped",
+    "failed",
+]
 
 
 def _validate_relative_path(value: str, label: str) -> str:
@@ -225,6 +232,9 @@ class AgentControlLoopBudget(StrictModel):
 
 class AgentControlLoopEvidenceGap(StrictModel):
     gap_id: str = Field(pattern=r"^gap-[0-9a-f]{12}$")
+    branch_id: str | None = Field(
+        default=None, pattern=r"^branch-[0-9a-f]{12}$"
+    )
     label: str = Field(min_length=1, max_length=240)
     detail: str = Field(min_length=1, max_length=1_000)
     candidate_file_refs: list[str] = Field(default_factory=list, max_length=20)
@@ -235,6 +245,28 @@ class AgentControlLoopNextStep(StrictModel):
     reason: str = Field(min_length=1, max_length=1_000)
     next_question: str | None = Field(default=None, max_length=2_000)
     candidate_file_refs: list[str] = Field(default_factory=list, max_length=20)
+    candidate_branch_ids: list[str] = Field(default_factory=list, max_length=36)
+
+
+class AgentControlLoopBranch(StrictModel):
+    """Server-owned task branch compiled from one validated plan unit."""
+
+    branch_id: str = Field(pattern=r"^branch-[0-9a-f]{12}$")
+    unit_id: str = Field(min_length=1, max_length=120)
+    round_number: int = Field(ge=1, le=3)
+    parent_branch_id: str | None = Field(
+        default=None, pattern=r"^branch-[0-9a-f]{12}$"
+    )
+    title: str = Field(min_length=1, max_length=240)
+    objective: str = Field(min_length=1, max_length=1_000)
+    depends_on: list[str] = Field(default_factory=list, max_length=12)
+    input_file_refs: list[str] = Field(min_length=1, max_length=8)
+    verified_file_refs: list[str] = Field(default_factory=list, max_length=8)
+    missing_file_refs: list[str] = Field(default_factory=list, max_length=8)
+    status: AgentControlLoopBranchStatus
+    requires_human_gate: bool = False
+    created_at: datetime
+    updated_at: datetime
 
 
 class AgentControlLoopRound(StrictModel):
@@ -244,6 +276,7 @@ class AgentControlLoopRound(StrictModel):
     question: str = Field(min_length=3, max_length=2_000)
     steer_instruction: str | None = Field(default=None, max_length=2_000)
     input_file_refs: list[str] = Field(default_factory=list, max_length=8)
+    branch_ids: list[str] = Field(default_factory=list, max_length=12)
     plan: dict[str, Any] | None = None
     model_receipt: dict[str, Any] | None = None
     result: dict[str, Any] | None = None
@@ -260,6 +293,10 @@ class AgentControlLoopRound(StrictModel):
 class AgentControlLoopControlEvent(StrictModel):
     control_id: str = Field(pattern=r"^control-[0-9a-f]{12}$")
     command: AgentControlLoopCommand
+    branch_id: str | None = Field(
+        default=None, pattern=r"^branch-[0-9a-f]{12}$"
+    )
+    artifact_version: int | None = Field(default=None, ge=1, le=3)
     instruction: str | None = Field(default=None, max_length=2_000)
     accepted_at: datetime
     accepted_task_version: int = Field(ge=1)
@@ -278,6 +315,12 @@ class AgentControlLoopBrief(StrictModel):
     external_action: Literal["none"] = "none"
 
 
+class AgentControlLoopArtifactFinding(StrictModel):
+    title: str = Field(min_length=1, max_length=240)
+    detail: str = Field(min_length=1, max_length=2_000)
+    file_refs: list[str] = Field(min_length=1, max_length=20)
+
+
 class AgentControlLoopArtifactVersion(StrictModel):
     """A user-visible, read-only result version created by one completed loop round."""
 
@@ -286,7 +329,15 @@ class AgentControlLoopArtifactVersion(StrictModel):
     title: str = Field(min_length=1, max_length=240)
     kind: Literal["evidence_brief"] = "evidence_brief"
     status: Literal["draft", "verified", "committed"]
+    round_number: int = Field(default=1, ge=1, le=3)
     summary: str = Field(min_length=1, max_length=3_000)
+    findings: list[AgentControlLoopArtifactFinding] = Field(
+        default_factory=list, max_length=10
+    )
+    follow_ups: list[str] = Field(default_factory=list, max_length=4)
+    evidence_gaps: list[AgentControlLoopEvidenceGap] = Field(
+        default_factory=list, max_length=20
+    )
     source_file_refs: list[str] = Field(default_factory=list, max_length=20)
     finding_count: int = Field(ge=0, le=10)
     parent_version: int | None = Field(default=None, ge=1, le=2)
@@ -301,6 +352,10 @@ class AgentControlLoopCommit(StrictModel):
     commit_id: str = Field(pattern=r"^commit-[0-9a-f]{12}$")
     artifact_id: str = Field(pattern=r"^artifact-[0-9a-f]{12}$")
     artifact_version: int = Field(ge=1, le=3)
+    operation: Literal["commit", "rollback"] = "commit"
+    parent_commit_id: str | None = Field(
+        default=None, pattern=r"^commit-[0-9a-f]{12}$"
+    )
     summary: str = Field(min_length=1, max_length=1_000)
     committed_at: datetime
     external_action: Literal["none"] = "none"
@@ -311,6 +366,10 @@ class AgentControlLoopControlRequest(StrictModel):
     idempotency_key: str = Field(min_length=8, max_length=160)
     expected_version: int = Field(ge=1)
     instruction: str | None = Field(default=None, max_length=2_000)
+    branch_id: str | None = Field(
+        default=None, pattern=r"^branch-[0-9a-f]{12}$"
+    )
+    artifact_version: int | None = Field(default=None, ge=1, le=3)
 
     @field_validator("instruction")
     @classmethod

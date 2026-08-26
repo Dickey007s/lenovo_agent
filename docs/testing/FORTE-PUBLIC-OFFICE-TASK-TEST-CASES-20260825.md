@@ -192,16 +192,20 @@ CSS、HTML、shell、log 等。它们覆盖结构化表格、长文档、扫描/
 5. 结果只有来源成员校验而无语义/数值检查时，UI 必须标“待核对”。
 6. 写入只允许进入独立 run workspace；原始公开输入始终只读。
 7. 高风险命令、外发、定时任务、账号权限、招聘决定和法律结论必须展示影响并经过相应 Gate。
+8. 两条 Branch 同时缺证时，只允许用户选择的一条进入下一轮；未选 Branch 必须保持等待。
+9. 恢复历史成果只能新增 TaskCommit 并移动当前指针；ArtifactVersion 数量、内容和原始输入不得减少或改写。
 
 ## 9. 实施顺序
 
 第一层文件接入已经完成：全部 96 个输入都有 bounded safe preview，CSV/PDF/
-DOCX/TXT、XLSX 和代码文本可在同一资料库中查看；用户可跨目录选文件发起自由任务，
-结果引用可以回到源预览。这只证明读取、投影和引用范围。
+DOCX/TXT、XLSX 和代码文本可在同一资料库中查看；用户只写目标和预算，Agent 从冻结
+整库索引自主选择每轮文件，结果引用可以回到源预览。这只证明读取、投影和引用范围。
 
-下一层优先为 `administration-001`、`Finance-018`、`sales-020`、`sre-010`、
-`uiux-021` 增加任务专用确定性 validator 与独立 run workspace 写入，形成 Demo 1
-有界循环，而不是让通用 LLM 文本冒充完成。
+Demo 1 的顺序单 Controller 已增加服务端 Branch、分支级继续、独立 append-only
+逻辑 ArtifactVersion/TaskCommit 和历史成果恢复。下一层优先为
+`administration-001`、`Finance-018`、`sales-020`、`sre-010`、`uiux-021`
+增加任务专用确定性 validator 与独立 run workspace 写入；逻辑简报版本不能冒充真实
+办公文件 Artifact 或源文件 Commit。
 
 随后接入代码工作区：`algorithm-013`、`dev-015`、`qa-003`，需要受控 shell、
 依赖策略、文件 diff 和真实测试 receipt。
