@@ -123,13 +123,13 @@ Agent Control Loop 的逐模块历史基线、当前三轮只读纵切和后续�
 
 - 完整 Python：`63 passed, 1 skipped`；聚焦 Runtime：`26 passed`；
 - Harness 浏览器：`13 passed`；Ruff、lint 与 build 通过；最终 Evidence 记录完整时长；
-- PostgreSQL integration test 已写入 PR workflow；本机无数据库时明确 skip，远端真实容器结果必须绑定 CI URL 后才能作为重启证据；
+- PR #31 的 PostgreSQL 17.11 workflow `1 passed in 1.84s`，四个顺序 Runtime 覆盖中断、恢复完成、历史版本恢复和再次读取当前指针；这不是多实例高可用；
 - 两条等待分支可逐条继续，未选分支保持等待；ArtifactVersion 与 TaskCommit 分表 append-only，恢复只新增 Commit；
 - 两张确定性浏览器图分别展示“继续此分支”与“恢复 v1”；它们证明 UI/服务端字段映射，不是真实模型运行；
 - 最终截图绑定的真实浏览器运行：整库冻结 96 份索引，Agent 自主选择并核对 3 份文件，2 次 `deepseek-v4-pro` 调用，形成 5 条发现和 4 条待确认建议；
 - 3 张最终文件管理器/建议截图及 SHA-256 写入 Evidence；1440px 与 390px 无页面横向溢出；
 - 实现提交 [`2b8e58c`](https://github.com/Dickey007s/lenovo_agent/commit/2b8e58c161df02d4f2c09bc2692db76d075f2ae2)；
-- PR #25-#30 已合并到 `master`；`DR-0026` 当前位于待提交分支，不能在新 PR 合并前表述为主分支能力。
+- PR #25-#30 已合并到 `master`；`DR-0026` 位于 [PR #31](https://github.com/Dickey007s/lenovo_agent/pull/31)，PostgreSQL 门已通过，但合并前仍不能表述为主分支能力。
 
 `DR-0023` 的历史数字仍只证明当时的手工范围版本。当前最终数字必须取自
 [`AUTONOMOUS-WHOLE-WORKSPACE-RESEARCH-20260825`](evidence/AUTONOMOUS-WHOLE-WORKSPACE-RESEARCH-EVIDENCE-20260825.md)，

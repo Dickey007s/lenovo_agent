@@ -54,7 +54,7 @@ Run Snapshot；最终提交会修改最新版本的状态，无法证明版本�
 - 后端测试覆盖两个等待分支按用户选择分别推进，未选分支不被消耗；ControlEvent 记录所选 Branch。
 - append-only Store 测试覆盖两版 Artifact、初始 Commit、恢复 v1、幂等重放、再恢复 v2，并核对版本数量不减少。
 - Playwright 覆盖分支现场、指定分支继续、成果当前指针和恢复交互；390px 路径仍需满足最小触控尺寸和无横向溢出。
-- PostgreSQL integration test 用真实服务覆盖中断恢复、完成、独立记录和恢复指针；其最终结论以对应 CI run 为准。
+- PostgreSQL integration test 已在 PR #31 的 PostgreSQL 17.11 服务中通过：四个顺序 Runtime 覆盖中断恢复、完成、独立记录和恢复指针；仍不覆盖同时运行的多实例。
 - `completed` 仍只证明 schema/ref/read-only/branch-record checks 通过且需要人工复核，不证明语义、穷举或算术正确。
 - Branch 是单任务内部工作单元，不是 Demo 2 的多任务 Adaptive Swarm；Artifact 是逻辑只读简报，不是源办公文件或 Connector 写入。
 - 自动化不是用户研究；交互理解、信任、效率和价值仍为 `Draft`。

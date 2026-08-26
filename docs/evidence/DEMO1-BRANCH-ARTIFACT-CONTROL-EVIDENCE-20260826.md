@@ -39,10 +39,12 @@ Scheduler/Worker。
 | `pnpm --dir apps/web lint` | 通过 | TypeScript 类型检查通过 | 浏览器行为与用户理解 |
 | `pnpm --dir apps/web build` | 通过 | Next.js 生产构建成功 | 生产部署 |
 | Harness Playwright | `13 passed in 30.3s` | 分支现场、指定分支继续、成果恢复、文件预览、SSE、390px 路径 | 真实用户理解、真实模型或数据库调用 |
+| PR PostgreSQL integration | PostgreSQL 17.11，`1 passed in 1.84s` | 四个顺序 Runtime 的中断、显式恢复、独立记录、rollback 与再次启动读取 | 并发实例、lease、数据库高可用或在途 HTTP 续跑 |
 
-本地没有 PostgreSQL 服务，所以集成测试按 `TEST_DATABASE_DSN` 显式跳过；这不是通过
-真实数据库验证。远端 PR workflow 使用 `postgres:17-alpine`，最终运行 URL、结果和
-提交绑定在 PR 创建后补入本文件。
+本地没有 PostgreSQL 服务，所以本地全量中的集成测试按 `TEST_DATABASE_DSN` 显式跳过；
+这项 skip 不是通过。真实数据库证据来自 PR #31 的
+[GitHub Actions job](https://github.com/Dickey007s/lenovo_agent/actions/runs/32926860106/job/98051424823)，
+服务端实际报告 PostgreSQL `17.11`，绑定实现提交 `95ab752`。
 
 ## 4. 分支级事实
 
@@ -84,8 +86,8 @@ Scheduler/Worker。
 3. 第三个重新读取独立 ArtifactVersion/TaskCommit，并恢复历史版本；
 4. 第四个再次启动，核对恢复后的当前 Commit 指针与全部历史记录。
 
-这一门验证进程间持久化与 append-only 语义，不验证同时运行的多个实例、lease、通知、
-远端 HTTP 硬取消或数据库高可用。
+该门已在 PR #31 通过：`1 passed in 1.84s`。它验证进程间持久化与 append-only 语义，
+不验证同时运行的多个实例、lease、通知、远端 HTTP 硬取消或数据库高可用。
 
 ## 7. 前台事实与隐藏边界
 
@@ -104,4 +106,6 @@ Scheduler/Worker。
 - Decision：[`DR-0026`](../decisions/DR-0026-selective-branch-and-immutable-artifact-history.md)
 - Scenario：[`SCENARIO-012`](../scenarios/SCENARIO-012-selective-branch-and-artifact-restore.md)
 - Source：[`USER-FEEDBACK-20260826-20`](../sources/USER-FEEDBACK-20260826-20-demo1-branch-artifact-completion.md)
-- 实现提交、PR、远端 PostgreSQL workflow：待提交后绑定
+- 实现提交：`95ab752`（`feat: add branch-level control and immutable result history`）
+- Pull Request：[#31 Demo 1：分支级继续与不可变成果历史](https://github.com/Dickey007s/lenovo_agent/pull/31)
+- PostgreSQL workflow：[run `32926860106` / job `98051424823`](https://github.com/Dickey007s/lenovo_agent/actions/runs/32926860106/job/98051424823)，PostgreSQL 17.11，`1 passed in 1.84s`
