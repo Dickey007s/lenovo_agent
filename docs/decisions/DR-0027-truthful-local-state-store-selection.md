@@ -4,7 +4,7 @@
 
 | 字段 | 内容 |
 | --- | --- |
-| 状态 | `Limited Verified`，限 Windows 本地启动器与当前单 API 进程 |
+| 状态 | `Limited Verified`，实现 `3d902cf`、PR #33；限 Windows 本地启动器与当前单 API 进程 |
 | 日期 | 2026-08-26 |
 | 触发来源 | [`RUNTIME-OBSERVATION-20260826-21`](../sources/RUNTIME-OBSERVATION-20260826-21-startup-dsn-precedence.md) |
 | 场景 | [`SCENARIO-013`](../scenarios/SCENARIO-013-truthful-local-state-store-fallback.md) |

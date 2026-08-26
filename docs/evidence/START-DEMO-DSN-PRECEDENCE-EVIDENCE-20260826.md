@@ -26,8 +26,9 @@ PostgreSQL 恢复或生产部署可靠性。
 - Python 全量：`64 passed, 1 skipped in 15.03s`；跳过项仍是本机没有
   `TEST_DATABASE_DSN` 的真实 PostgreSQL integration test。
 - Ruff：`All checks passed!`。
-- 实现提交、PR 与远端 PostgreSQL CI 在创建后补入本记录；此前 PR #31 的真实
-  PostgreSQL 证据不被本轮 memory 启动替代。
+- 实现提交：`3d902cf`；[PR #33](https://github.com/Dickey007s/lenovo_agent/pull/33)。
+- 远端 PostgreSQL CI 的运行链接与结果待完成后绑定；此前 PR #31 的真实 PostgreSQL
+  证据不被本轮 memory 启动替代。
 
 ## 能证明什么
 
