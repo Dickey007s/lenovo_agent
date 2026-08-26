@@ -3,6 +3,12 @@
   "captured_at": "2026-08-26T07:42:00Z",
   "run_id": "harness:44cf128b1f344b6b993a4dc8841a22f9",
   "provider_model": "deepseek-v4-pro",
+  "implementation": {
+    "commit": "0c2af7e7d784c509925ec5b7ce9728b33f4a18dc",
+    "pull_request": 35,
+    "merge_commit": "98b8add715a9cbc87aae3bc65973904989208607",
+    "remote_gate": "https://github.com/Dickey007s/lenovo_agent/actions/runs/32944740436/job/98102969157"
+  },
   "status": "completed",
   "review_required": true,
   "external_action": "none",
