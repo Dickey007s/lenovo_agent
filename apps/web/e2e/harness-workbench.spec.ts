@@ -281,14 +281,14 @@ function snapshot(
       max_rounds: 3,
       max_files_per_round: 6,
       max_model_calls: 6,
-      deadline_seconds: 120,
+      deadline_seconds: 1200,
       external_action: "none",
     },
     budget: {
       max_rounds: 3,
       max_files_per_round: 6,
       max_model_calls: 6,
-      deadline_seconds: 120,
+      deadline_seconds: 1200,
       rounds_used: rounds.length,
       files_verified: status === "completed" ? selected.length : status === "planning" || status === "paused" ? 0 : firstRefs.length,
       model_calls_used: status === "completed" ? rounds.length * 2 : status === "planning" || status === "paused" ? 1 : 0,
@@ -471,7 +471,7 @@ function boundedAnalysisRecoverySnapshot(body: { workspace_id: string; instructi
     control_state: "stopped",
     version: 15,
     last_event_sequence: 14,
-    budget: { ...base.budget, stop_reason: "budget_exhausted" },
+    budget: { ...base.budget, stop_reason: "Agent 执行时间预算已耗尽" },
     rounds: [round],
     branches,
     artifact_versions: [{ ...base.artifact_versions[0], summary: reason, evidence_gaps: gaps }],
@@ -690,7 +690,7 @@ test("runs an arbitrary task while the agent selects evidence from the whole wor
   expect(state.starts[0]).toMatchObject({
     workspace_id: "forte-public-office",
     instruction,
-    loop: { max_rounds: 3, max_files_per_round: 6, max_model_calls: 6, deadline_seconds: 120 },
+    loop: { max_rounds: 3, max_files_per_round: 6, max_model_calls: 6, deadline_seconds: 1200 },
   });
   expect(state.starts[0]).not.toHaveProperty("selected_file_refs");
   await expect(page.getByText("规划模型")).toBeVisible();
@@ -763,21 +763,23 @@ test("holds an evidence gap until the user confirms another round", async ({ pag
   await expect(page.getByRole("button", { name: "继续此分支" })).toBeEnabled();
   expect(state.controls).toHaveLength(0);
   await page.getByRole("button", { name: "查看问题" }).click();
-  await expect(page.getByRole("dialog", { name: /仍有 1 份本轮选择资料缺少可核对引用/ })).toBeVisible();
+  await expect(page.getByRole("dialog", { name: "Agent 尚未完成：形成分析结果" })).toBeVisible();
   await expect(page.getByRole("dialog")).toContainText("第 1 轮 / 形成分析结果");
-  await expect(page.getByRole("dialog")).toContainText("Evidence Gate 已保留缺口");
+  await expect(page.getByRole("dialog")).toContainText("问题在 Agent 的交付，不在源文件");
+  await expect(page.getByRole("dialog")).toContainText("这里没有高亮，不是让你猜哪一行");
+  await expect(page.getByRole("dialog")).toContainText("你不需要修改源文件");
+  await expect(page.getByRole("dialog")).toContainText("给 Agent 的线索（可选，不清楚可以留空）");
   await expect(page.getByRole("dialog")).toContainText("授权范围：仅限本项目合同审阅。");
-  if (process.env.CAPTURE_DR0028_EVIDENCE === "1") {
-    await page.getByRole("dialog").screenshot({ path: "../../docs/evidence/screenshots/dr-0028-evidence-gap-review.png" });
+  if (process.env.CAPTURE_DR0031_EVIDENCE === "1") {
+    await page.getByRole("dialog").screenshot({ path: "../../docs/evidence/screenshots/dr-0031-actionable-gap-recovery.png" });
   }
-  await page.getByRole("button", { name: "关闭问题审查页" }).click();
+  await page.getByRole("button", { name: "让 Agent 只重试此分支" }).click();
   if (process.env.CAPTURE_DR0026_EVIDENCE === "1") {
     await page.locator(".loop-branches").screenshot({
       path: "../../docs/evidence/screenshots/dr-0026-branch-control.png",
     });
   }
 
-  await page.getByRole("button", { name: "继续此分支" }).click();
   await expect.poll(() => state.controls.map((item) => item.command)).toEqual(["resume"]);
   expect(state.controls[0].branch_id).toBe("branch-222222222222");
   await expect(page.locator(".loop-brief")).toContainText("完成 2 轮");
@@ -971,6 +973,15 @@ test("creates a new scoped task instead of pretending a budget-stopped run can r
   await expect(recovery).toContainText("旧 Run、调用回执和成果版本保持不变");
   await expect(recovery).toContainText("原文件修改或外部动作");
   await expect(page.locator(".trace-recovery-hint")).toContainText("本次 Run 已结束");
+  await page.locator(".loop-gap").getByRole("button").first().click();
+  const gapDialog = page.getByRole("dialog", { name: /Agent 尚未完成/ });
+  await expect(gapDialog).toContainText("旧 Run 已结束；你可让 Agent 用这个分支创建新任务");
+  await expect(gapDialog).toContainText("创建新任务继续此分支");
+  await expect(gapDialog).toContainText("问题在 Agent 的交付，不在源文件");
+  if (process.env.CAPTURE_DR0031_EVIDENCE === "1") {
+    await gapDialog.screenshot({ path: "../../docs/evidence/screenshots/dr-0031-terminal-gap-recovery.png" });
+  }
+  await gapDialog.getByRole("button", { name: "关闭问题审查页" }).click();
   await recovery.getByRole("textbox", { name: "补充给新任务的方向（可选）" }).fill("优先核对版本号和测试日期。" );
   if (process.env.CAPTURE_DR0030_EVIDENCE === "1") {
     await recovery.screenshot({ path: "../../docs/evidence/screenshots/dr-0030-bounded-branch-recovery.png" });

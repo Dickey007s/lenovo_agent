@@ -118,6 +118,14 @@ Branch's `missing_file_refs`, while unselected branches remain waiting. The Plan
 Validator requires all confirmed refs to remain in the plan, so confirmation
 cannot silently become unrelated workspace exploration.
 
+The deadline is an active execution budget, not Run wall-clock age. The default
+is 1,200 seconds and the public bound is 20 to 3,000 seconds. The Runtime freezes
+`budget.elapsed_ms` when it enters `waiting_input`, applies a user pause or
+reaches a terminal state, then resumes from the accumulated active elapsed at a
+legal Branch resume. Human reading time therefore does not consume model work
+budget. The model-call and round caps remain separate, and the deadline still
+blocks only a new call rather than hard-cancelling an in-flight HTTP request.
+
 Each completed round creates an independent append-only logical evidence-brief
 ArtifactVersion. A successful final Gate creates a separate TaskCommit that
 selects the latest verified version; it does not mutate that version to express
@@ -185,7 +193,11 @@ defer, not silent dismissal. None of these operations edits the source. The
 browser never derives a location from claim text. A budget-stopped recovery view
 similarly creates a new Run for one unresolved Branch objective and never sends
 `resume` or `steer` to the terminal Run; prior ArtifactVersions remain attached
-to the old Snapshot.
+to the old Snapshot. A Gap without an Anchor is presented as an Agent execution
+gap, not a source-file defect: the sheet derives structure/location/coverage type,
+attempted refs and model adoption from Snapshot facts, keeps feedback optional,
+and exposes “retry only this Branch” as the primary nonterminal action. No Anchor
+means no invented row number or highlight.
 This is not a source-file Diff or semantic verification. Proposal context is
 explicitly not a per-proposal citation. Preview security and result-review
 boundaries remain available without turning the primary page into an

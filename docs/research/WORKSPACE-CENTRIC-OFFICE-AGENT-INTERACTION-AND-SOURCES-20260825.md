@@ -15,6 +15,14 @@
 关于易用性、信任、速度或用户价值的相对判断，在完成目标用户研究前一律为
 `Draft`。
 
+> 2026-08-26 竞争事实修订：本文保留为 Workspace-first 交互来源记录，不再作为当前
+> 竞品能力上限。OpenAI 已将 Codex 明确扩展到报告、表格、演示文稿、合同、研究与跨职能
+> 知识工作；Microsoft 365 Copilot、NotebookLM（当前官方帮助页重定向为 Gemini Notebook）、
+> ChatGPT deep research 和 Claude Research 也覆盖多来源研究与引用。当前能力底线、可证伪
+> 差异候选和八个同场挑战以
+> [`COMPETITIVE-WHITE-SPACE-AND-FALSIFIABLE-DIFFERENTIATORS-20260826`](COMPETITIVE-WHITE-SPACE-AND-FALSIFIABLE-DIFFERENTIATORS-20260826.md)
+> 为准。本文后文的产品定位只解释交互来源，不能用于“竞品不能做”的结论。
+
 ## 2. 来源台账
 
 | Source ID | 类型与精确来源 | 版本/日期 | 支持的判断 | 局限 |

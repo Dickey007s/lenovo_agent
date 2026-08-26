@@ -5,10 +5,10 @@
 
 ## 1. 一句话定位
 
-我们不是在制作三套写死的 Demo，而是在建设一个通用 Office Agent
-Harness：它从可检查的办公文件出发，让用户明确控制数据范围，看见
-Agent 如何在完整资料库中自主寻找证据、实际调用和校验了什么，并能从
-每条结论返回来源、由人确认下一步任务。
+我们不是在制作三套写死的 Demo，而是在建设一个证据编译型 Office Agent
+Harness：用户只给业务目标，Agent 在完整资料库中自主找证据，但模型候选必须
+经过服务端范围、计划和来源位置校验才能进入不可覆盖的逻辑成果；最终仍明确
+待复核、没有修改原文件、没有执行外部动作。
 
 ## 2. 汇报硬门槛
 
@@ -31,6 +31,8 @@ Agent Control Loop 的逐模块历史基线、当前三轮只读纵切和后续�
 [`AGENT-CONTROL-LOOP-IMPLEMENTATION-AUDIT-20260825`](research/AGENT-CONTROL-LOOP-IMPLEMENTATION-AUDIT-20260825.md)。
 完整的项目化讲稿、七个办公场景、七个图示区和 17 页 PPT 结构见
 [`OFFICE-AGENT-DETAILED-CHINESE-REPORT-20260825`](reports/OFFICE-AGENT-DETAILED-CHINESE-REPORT-20260825.md)。
+最新“为什么必须选我们”的候选能力、八个竞品同场挑战和官方来源见
+[`COMPETITIVE-WHITE-SPACE-AND-FALSIFIABLE-DIFFERENTIATORS-20260826`](research/COMPETITIVE-WHITE-SPACE-AND-FALSIFIABLE-DIFFERENTIATORS-20260826.md)。
 
 ## 3. PPT 页面卡片
 
@@ -39,13 +41,13 @@ Agent Control Loop 的逐模块历史基线、当前三轮只读纵切和后续�
 | 1 | Office Agent 从一个可逐级展开的统一办公资料库开始，而不是从 Demo 或职业按钮开始 | 15 个顶层目录、嵌套子目录与文件预览同屏截图 | `DR-0028/24`；目录来自安全路径投影，公开基准数据不是真实企业网盘 |
 | 2 | 真正的问题不是缺少聊天框，而是上下文不可见、执行过程不可核对 | 旧流程与文件夹优先流程对比 | Stakeholder 反馈，不是用户研究 |
 | 3 | 一个 Runtime、八个通用模块、三种验收视角 | 分层架构图；Demo 1/2 加跨拓扑 Demo 3 | 当前能力与目标能力必须用不同颜色 |
-| 4 | 会话、工具、Subagent 和人工审查已经是主流基线 | OpenClaw、Codex、Claude Code 官方资料对比 | 官方文档研究，不是竞品实测 |
+| 4 | 整库、多来源、引用、计划、暂停、恢复和知识成果已经是主流基线；我们的候选差异是“结论采用由服务端裁决” | Microsoft 365 Copilot、NotebookLM、deep research、Codex、Claude、OpenClaw 的能力底线汇入证据采用合同 | 官方文档研究，不是竞品实测；独占结论必须通过同场挑战 |
 | 5 | 用户给目标，Agent 负责从整库找证据，但选择过程必须可见、可限、可复核 | 浏览 -> 下达目标 -> Agent 选证据 -> 观察 -> 引用 -> 复核 | 实现侧重点差异，不是优越性结论 |
 | 6 | 固定公开数据版本，让演示中的每份材料都能被现场检查 | 15 个文件夹、96 份文件、格式分布 | FORTE 固定 commit；不是真实企业数据 |
 | 7 | 安全预览把“Agent 读了什么”变成可见契约 | CSV/PDF/DOCX/TXT 预览拼图和安全说明 | 路径、大小、hash、符号链接和解析器测试 |
 | 8 | Harness 把模型调用、内容采用和服务端校验分开 | 事件与模型回执时序 | Snapshot/Receipt 事实；不展示思维链 |
 | 9 | Agent 说“有问题”之后，用户要同时看懂事实、影响、真实原文和自己必须决定的下一步 | 问题处置单：1 事实 -> 2 影响 -> 3 人工动作；证据与实际文件并排；A/B/C + 反馈 | `DR-0030/29`；推荐是模型候选，确认只创建新只读 Run |
-| 10 | Agent Control Loop 会把计划变成可核对任务分支；等待态只恢复一条分支，预算终态则以该分支创建新 Run | 任务分支现场、分支 Evidence Gate、成果 v1→v2、恢复轨迹与预算终态续办卡 | 只读、最多三轮、顺序 Controller；Branch 不等于并行 Worker，terminal Run 不可 resume |
+| 10 | Agent Control Loop 会把计划变成可核对任务分支；人阅读时不消耗 Agent 执行预算，缺口只恢复受影响分支 | active elapsed 与 wall-clock 对比、Agent 执行缺口处置单、成果 v1→v2、终态新 Run | `DR-0031/30`；只读、最多三轮、顺序 Controller；Branch 不等于并行 Worker，terminal Run 不可 resume |
 | 11 | Demo 2 验收多任务自组织、动态调度和共享工件汇聚 | Worker、依赖与动态重排图 | 目标设计；当前产品没有通用 Worker Runtime |
 | 12 | Demo 3 对单任务和多任务统一施加风险与动作控制 | 影响预演 -> 证据 -> 审批 -> Permit -> 回执 | 目标设计；当前没有真实外部动作 |
 | 13 | 当前已经证明工程链路，但也保留模型结果出错的负面证据 | 自动化、截图与 Finance 算术偏差并列 | `completed` 不等于结论正确 |
@@ -55,10 +57,10 @@ Agent Control Loop 的逐模块历史基线、当前三轮只读纵切和后续�
 
 1. 直接打开 `/`，进入“办公资料库”。
 2. 从左侧文件夹逐级展开顶层目录和嵌套子目录，也可搜索或按类型筛选；打开文件并强调浏览不会限制 Agent 范围。
-3. 不勾选文件，只输入一个现场提出的新目标，并设置轮次、每轮文件、模型调用和 deadline 上限。
+3. 不勾选文件，只输入一个现场提出的新目标，并设置轮次、每轮文件、模型调用和 Agent 执行时间；说明默认 1200 秒只统计 active 时间，人工阅读和暂停不计入。
 4. 启动 Loop，指出合同已冻结完整 96 文件索引；Planner 与 Analyst 的独立模型回执才是调用事实。
 5. 展示 Agent 本轮选择了哪些文件、为什么选择，以及服务端如何把超预算候选限制在本轮上限内。
-6. 在 Evidence Gate 停下来，先点“查看问题”：在审查页核对第几轮、哪条分支、问题描述、候选文件和实际原文；关闭后再只点一条“继续此分支”。
+6. 在 Evidence Gate 停下来，先点“查看问题”：第一屏先说明问题在 Agent 的结构/定位/覆盖交付，不等于源文件有错；用户可以不填线索，直接“让 Agent 只重试此分支”。再打开候选文件，说明没有 Anchor 就不伪造高亮。
 7. 展示成果简报从 v1 到 v2；再恢复 v1，说明系统只新增一条 TaskCommit、当前指针改变，v2 与原文件都没有被覆盖。
 8. 对 Finding 点“打开审查页”：先按 1/2/3 讲事实、影响和人工动作，再在左侧选择“设计预期/实际观测”，让右侧真实文件跳到并高亮原文；强调位置匹配不等于结论正确。
 9. 先选择 A/B/C 中自己的初始口径，再点“对照 Agent 建议”；补充“同时核对发布记录中的代码版本”后确认。指出推荐默认隐藏以减少锚定，确认只创建新只读 Loop，不会直接改源文件。
@@ -70,6 +72,16 @@ Agent Control Loop 的逐模块历史基线、当前三轮只读纵切和后续�
 
 ## 5. 主流方案对比卡片
 
+### 办公与研究型竞品底线
+
+- Microsoft 365 Copilot 可以引用文件、文件夹、站点、邮件、会议和工作内容，Copilot Chat
+  提供内联引用与来源侧栏，Copilot Notebooks 可用数百个 References。
+- NotebookLM（当前官方帮助页重定向为 Gemini Notebook）、ChatGPT deep research 和
+  Claude Research 都已提供多来源带引用研究；ChatGPT deep research 还允许审查计划、
+  查看进度和中途调整。
+- 因此“96 份文件、自动找资料、有引用、能暂停”都不能单独作为独占点。汇报必须转向
+  Finding 怎样被服务端采用、成果版本如何保存、完成边界是否可验证。
+
 ### OpenClaw
 
 - 官方资料重点：自托管 Gateway、Channel、Session、Routing、Tool 和主机执行审批。
@@ -78,9 +90,10 @@ Agent Control Loop 的逐模块历史基线、当前三轮只读纵切和后续�
 
 ### Codex App
 
-- 官方资料重点：并行项目任务、Worktree、变更审查、Skill 和 Automation 审查队列。
+- 官方资料重点：并行项目任务、隔离工作区、结果审查、Skill 和 Automation；2026 年已明确
+  扩展到报告、表格、演示文稿、合同、研究和跨职能知识工作。
 - 我们的侧重点：办公文件是只读业务证据，计划与结果需要回到 Agent 实际采用的文件核对。
-- 交互影响：用户主要审查业务结论和引用，而不是代码 Diff 或 Worktree。
+- 交互影响：用户主要审查业务结论的采用回执、证据和版本，而不只审产出文件或 Diff。
 
 ### Claude Code
 
@@ -95,7 +108,21 @@ Agent Control Loop 的逐模块历史基线、当前三轮只读纵切和后续�
 - 用户流程：浏览 -> 下达目标 -> Agent 自主选证据 -> 查看轨迹 -> 打开引用 -> 确认下一步。
 
 不能表述为“竞品没有这些能力”或“本方案优于竞品”。官方文档不是受控竞品测试，
-引用页面没有提及某项能力，也不能证明产品绝对不具备它。
+引用页面没有提及某项能力，也不能证明产品绝对不具备它。只有固定产品版本、账户、入口、
+允许配置和同一 FORTE 挑战的真实失败记录，才能限定地写“该配置当前不能完成”。
+
+### 当前可证伪独占候选
+
+- 冻结完整 96 份安全索引，同时让 Analyst 每轮只读服务端批准的 1-8 份正文投影。
+- Planner/Analyst 的 `called`、`output_used`、`elapsed_ms` 分开，模型真实返回也可能被服务端拒绝。
+- 每条进入成果的 Finding 必须有批准 `file_ref` 内的服务端 Evidence Anchor；引用是采用门，
+  不是生成后的装饰。
+- 证据简报按 append-only `ArtifactVersion` 演进，`TaskCommit` 只选择当前版本，恢复不覆盖新版。
+- `completed` 仍固定 `review_required=true`、`external_action=none`，完成页同时证明待复核和未执行。
+
+这些是本项目当前原生保证的组合，但还不是“已验证独占”。下一步用不知道资料位置、跨文件
+冲突、重复 quote、部分分支失败、完整性失败、成果恢复、混合执行指令和外部数据缺失八个
+场景做同场挑战。
 
 ## 6. 技术差异到交互影响卡片
 
@@ -113,6 +140,8 @@ Agent Control Loop 的逐模块历史基线、当前三轮只读纵切和后续�
 | 终态仍要求复核 | 完成不等于正确 | “模型初步结论 · 待复核” | `review_required=true` |
 | 服务端 Evidence Gate | 验证结果可决定继续还是停止 | 本轮缺口、下一轮目的、剩余预算 | `rounds[].evidence_gaps` 与 `next_step` |
 | 轮次间人工证据门 | 证据不足时由人决定是否继续花预算 | “确认并继续核对”、调整方向或停止 | `status=waiting_input`、`control_state=paused`、resume 回执 |
+| active deadline | 用户阅读、开会或暂停时不会把 Agent 预算烧光 | “Agent 执行时间”、已用 active 秒数、精确停止原因 | 默认 1200 秒、上限 3000 秒；`budget.elapsed_ms/stop_reason`，waiting/pause 冻结 |
+| Agent 自有缺口处置 | 用户不再被要求替 Agent 猜行号或修改候选文件 | 原目标、尝试文件、模型调用/采用、保留项、无外部动作、只重试本分支 | `recovery_kind` + Branch/Gap + model receipt；无 Anchor 不高亮 |
 | 服务端任务 Branch | 用户不用把整组缺口一次性全放行，可只推进一条工作线 | 分支状态、依赖、资料/缺口数量、“继续此分支” | `branches[]`、`candidate_branch_ids`、`active_branch_id`、带 `branch_id` 的 resume |
 | 版本化人工控制 | 用户不必只能等待模型跑完 | 暂停、继续、调整下一轮、结束并保留 | `ControlEvent`、expected version、幂等回执 |
 | Snapshot 持久化与安全恢复 | 刷新/进程重启不必把已完成轮次当作丢失 | “检查点已恢复”、原轮次/预算/版本、显式继续 | PostgreSQL `HarnessStateStore`、`checkpoint_recovered` |
@@ -164,4 +193,6 @@ Agent Control Loop 的逐模块历史基线、当前三轮只读纵切和后续�
 - “独立 append-only 逻辑 ArtifactVersion/TaskCommit 等于真实办公文件写入、源文件回滚或 Tool Gateway 动作”；
 - “Branch 状态与逐条继续等于多个 Worker 已并行、自组织或动态调度”；
 - “Evidence Gate 已验证语义真值、数值正确性或业务完整性”；
+- “整库、引用、计划、暂停、恢复或知识工作是本项目独有”；
+- 在没有固定配置竞品实测时声称“主流竞品做不到”或“全面领先”；
 - 在没有用户研究时声称“新界面更清晰、更可信或效率更高”。

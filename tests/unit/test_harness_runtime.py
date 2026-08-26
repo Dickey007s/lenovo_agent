@@ -11,6 +11,7 @@ from packages.contracts.harness_models import (
     AgentControlLoopControlRequest,
     AgentControlLoopFindingDecisionOption,
     AgentControlLoopFindingReview,
+    AgentControlLoopOptions,
 )
 
 from services.api.app.application.harness_runtime import (
@@ -605,6 +606,41 @@ async def confirm_evidence_gate(
             expected_version=waiting.version,
         ),
     )
+
+
+def test_default_active_deadline_is_ten_times_larger() -> None:
+    assert AgentControlLoopOptions().deadline_seconds == 1_200
+    assert AgentControlLoopOptions(deadline_seconds=3_000).deadline_seconds == 3_000
+    with pytest.raises(ValidationError):
+        AgentControlLoopOptions(deadline_seconds=3_001)
+
+
+@pytest.mark.asyncio
+async def test_waiting_for_human_does_not_spend_active_deadline() -> None:
+    runtime = HarnessRuntime(FakeCatalog(), FakePlanner(), FakeAnalyst())
+    started = await runtime.start(
+        "alice",
+        start_request(idempotency_key="active-deadline-wait-0001"),
+    )
+    waiting = await wait_status(runtime, "alice", started.run.run_id, "waiting_input")
+    internal = runtime._runs[("alice", started.run.run_id)]
+
+    assert internal.active_since_perf is None
+    frozen_elapsed = waiting.budget.elapsed_ms
+    await asyncio.sleep(0.02)
+    assert runtime._budget_with_elapsed(internal).elapsed_ms == frozen_elapsed
+
+    await runtime.control(
+        "alice",
+        started.run.run_id,
+        AgentControlLoopControlRequest(
+            command="stop",
+            idempotency_key="active-deadline-wait-stop-0001",
+            expected_version=waiting.version,
+        ),
+    )
+    terminal = await wait_terminal(runtime, "alice", started.run.run_id)
+    assert terminal.status == "stopped"
 
 
 @pytest.mark.asyncio
@@ -1217,6 +1253,7 @@ async def test_loop_stops_at_budget_boundary_with_explicit_evidence_gap() -> Non
     assert snapshot.brief.unresolved_gaps
     assert snapshot.rounds[0].next_step
     assert snapshot.rounds[0].next_step.decision == "budget_exhausted"
+    assert snapshot.budget.stop_reason == "模型调用预算已耗尽"
     assert snapshot.events[-1].event_name == "loop_budget_stopped"
 
 

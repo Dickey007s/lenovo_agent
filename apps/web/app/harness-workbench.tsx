@@ -134,6 +134,21 @@ type EvidenceReviewRequest = {
   decisionRecord: DecisionRecord | null;
   serverFact: string;
   boundary: string;
+  gapRecovery: GapRecoveryContext | null;
+};
+
+type GapRecoveryContext = {
+  cause: "analysis_output" | "source_location" | "evidence_missing";
+  branchId: string | null;
+  branchTitle: string;
+  branchObjective: string;
+  attemptedFileRefs: string[];
+  verifiedFileRefs: string[];
+  analysisCalled: boolean;
+  analysisOutputUsed: boolean;
+  mode: "resume_branch" | "new_run" | "inspect_only";
+  nextInstruction: string;
+  newRunInstruction: string;
 };
 
 export type HarnessFile = {
@@ -571,57 +586,92 @@ function findingReviewRequest(finding: HarnessFinding, index: number, roundNumbe
       ? `服务端已把 ${finding.evidence_anchors.length} 处原文片段唯一定位到本轮安全预览，并核对文件范围。`
       : "相关 file_ref 已通过本轮允许范围与引用成员关系校验，但旧结果没有精确位置。",
     boundary: "高亮位置由服务端从逐字引用解析，只证明原文位置和引用成员关系；结论是否成立仍由你复核。",
+    gapRecovery: null,
   };
 }
 
-function gapReviewRequest(gap: EvidenceGap, index: number, roundNumber: number, branchTitle: string | null): EvidenceReviewRequest {
+function buildGapRecoveryContext(run: HarnessRun, round: LoopRound, branch: LoopBranch | null, gap: EvidenceGap): GapRecoveryContext {
+  const cause = round.next_step?.recovery_kind ?? "evidence_missing";
+  const branchTitle = branch?.title ?? "当前证据分支";
+  const branchObjective = branch?.objective ?? gap.detail;
+  const attemptedFileRefs = uniqueFileRefs(branch?.input_file_refs.length ? branch.input_file_refs : gap.candidate_file_refs);
+  const verifiedFileRefs = uniqueFileRefs(branch?.verified_file_refs ?? []);
+  const terminal = TERMINAL_STATUSES.has(run.status);
+  const mode = terminal
+    ? "new_run"
+    : run.status === "waiting_input" && branch?.status === "waiting_input"
+      ? "resume_branch"
+      : "inspect_only";
+  const nextInstruction = cause === "analysis_output"
+    ? `只重试“${branchTitle}”分支。重新读取相关文件，把结果整理为可校验的事实、影响和逐字引用；若仍无法形成结构，请明确缺少的字段、版本或记录。`
+    : cause === "source_location"
+      ? `只重试“${branchTitle}”分支。为每条候选结论寻找更长、唯一且可逐字匹配的原文；若找不到，保留缺口并说明缺少什么。`
+      : `只重试“${branchTitle}”分支，围绕“${branchObjective}”补齐可唯一定位的原文证据。`;
+  const newRunInstruction = [
+    run.instruction,
+    `续办分支：${branchTitle}`,
+    `本次只聚焦“${branchObjective}”。请从整个资料库自主重新检索所需证据，不受上次候选文件限制。`,
+    nextInstruction,
+    "边界：只读分析，不修改原文件，不执行外部动作。",
+  ].join("\n");
   return {
-    reviewKey: `gap:${roundNumber}:${gap.gap_id}:${index}`,
-    kind: "gap",
-    eyebrow: "Evidence Gate",
-    title: gap.label,
-    detail: gap.detail,
-    factSummary: null,
-    impact: null,
-    review: null,
-    status: "证据不足",
-    roundNumber,
+    cause,
+    branchId: branch?.branch_id ?? gap.branch_id,
     branchTitle,
-    fileRefs: uniqueFileRefs(gap.candidate_file_refs),
+    branchObjective,
+    attemptedFileRefs,
+    verifiedFileRefs,
+    analysisCalled: Boolean(round.analysis_receipt?.called),
+    analysisOutputUsed: Boolean(round.analysis_receipt?.output_used),
+    mode,
+    nextInstruction,
+    newRunInstruction,
+  };
+}
+
+function gapReviewRequest(gap: EvidenceGap, index: number, round: LoopRound, branch: LoopBranch | null, run: HarnessRun): EvidenceReviewRequest {
+  const recovery = buildGapRecoveryContext(run, round, branch, gap);
+  const factSummary = recovery.cause === "analysis_output"
+    ? "Agent 已读取候选文件并调用分析模型，但返回内容没有通过结构校验，因此没有形成可核对结论。"
+    : recovery.cause === "source_location"
+      ? "Agent 已形成候选内容，但服务端无法把候选原文唯一定位到文件中的具体位置。"
+      : "Agent 尚未为这个分支形成通过服务端校验的逐字引用。";
+  return {
+    reviewKey: `gap:${round.round_number}:${gap.gap_id}:${index}`,
+    kind: "gap",
+    eyebrow: "Agent 执行缺口",
+    title: `Agent 尚未完成：${recovery.branchTitle}`,
+    detail: gap.detail,
+    factSummary,
+    impact: `只影响“${recovery.branchTitle}”分支。它不表示源文件有错，也不会撤销其他已完成分支或已有成果。`,
+    review: null,
+    status: recovery.mode === "new_run" ? "旧 Run 已结束" : "可恢复",
+    roundNumber: round.round_number,
+    branchTitle: recovery.branchTitle,
+    fileRefs: uniqueFileRefs([...gap.candidate_file_refs, ...recovery.attemptedFileRefs]),
     anchors: [],
     findingId: null,
     affectedBranchIds: gap.branch_id ? [gap.branch_id] : [],
     resolution: null,
     decisionRecord: null,
-    serverFact: "服务端 Evidence Gate 已保留缺口，并阻止受影响分支在缺少证据时继续提交。",
-    boundary: "候选文件只是下一步核对范围；在用户确认或 Agent 完成下一轮前，系统不会把缺口包装成已解决事实。",
+    serverFact: recovery.analysisCalled
+      ? `分析模型已经调用，服务端${recovery.analysisOutputUsed ? "采用了可核对部分" : "未采用未通过校验的返回内容"}；候选文件和分支状态均已保留。`
+      : "服务端尚未采用任何分析结果；候选文件和分支状态均已保留。",
+    boundary: "这是一条 Agent 执行缺口，不是文件修改请求。没有服务端 Evidence Anchor 时系统不会伪造行号，也不要求你在表格里猜答案。",
+    gapRecovery: recovery,
   };
 }
 
-function branchReviewRequest(branch: LoopBranch, gaps: EvidenceGap[]): EvidenceReviewRequest {
+function branchReviewRequest(branch: LoopBranch, gaps: EvidenceGap[], round: LoopRound, run: HarnessRun): EvidenceReviewRequest {
   const gap = gaps.find((candidate) => candidate.branch_id === branch.branch_id);
-  if (gap) return gapReviewRequest(gap, gaps.indexOf(gap), branch.round_number, branch.title);
-  return {
-    reviewKey: `branch:${branch.branch_id}`,
-    kind: "gap",
-    eyebrow: "待处理分支",
-    title: `${branch.title}仍缺少证据`,
+  const fallbackGap: EvidenceGap = gap ?? {
+    gap_id: `gap-${branch.branch_id.slice(-12)}`,
+    branch_id: branch.branch_id,
+    label: `“${branch.title}”尚未形成可核对证据`,
     detail: branch.objective,
-    factSummary: null,
-    impact: null,
-    review: null,
-    status: "等待你决定",
-    roundNumber: branch.round_number,
-    branchTitle: branch.title,
-    fileRefs: uniqueFileRefs(branch.missing_file_refs),
-    anchors: [],
-    findingId: null,
-    affectedBranchIds: [branch.branch_id],
-    resolution: null,
-    decisionRecord: null,
-    serverFact: "服务端 Snapshot 将该分支标记为 waiting_input，并保留了 missing_file_refs。",
-    boundary: "这些文件是分支当前缺少或待核对的引用，不代表问题已经成立。",
+    candidate_file_refs: branch.missing_file_refs,
   };
+  return gapReviewRequest(fallbackGap, gap ? gaps.indexOf(gap) : 0, round, branch, run);
 }
 
 function proposalReviewRequest(proposal: string, index: number, result: HarnessResult, roundNumber: number | null): EvidenceReviewRequest {
@@ -645,6 +695,7 @@ function proposalReviewRequest(proposal: string, index: number, result: HarnessR
     decisionRecord: null,
     serverFact: "该建议来自本轮已读取资料和已形成的发现；只有用户确认后，服务端才会创建新的独立 Run。",
     boundary: "当前协议没有为每条 follow_up 单独绑定引用。下方文件是本轮结果上下文，不应被理解为这条建议的直接证据。",
+    gapRecovery: null,
   };
 }
 
@@ -885,6 +936,7 @@ function resolutionReviewRequest(
       ? `服务端找到 ${resolution.candidates.length} 个真实位置，但不能替用户判断哪一个支撑当前结论。`
       : "服务端没有在本轮安全预览中找到该候选片段，受影响分支已暂停，其他结果保持不变。",
     boundary: "选择候选只确认原文位置，不等于批准结论；继续后只重跑受影响分支，且不会修改文件或执行外部动作。",
+    gapRecovery: null,
   };
 }
 
@@ -1254,7 +1306,7 @@ function normalizeRun(value: unknown): HarnessRun | null {
   const maxRounds = asNumber(contractRaw.max_rounds, asNumber(budgetRaw.max_rounds, 3));
   const maxFilesPerRound = asNumber(contractRaw.max_files_per_round, asNumber(budgetRaw.max_files_per_round, 4));
   const maxModelCalls = asNumber(contractRaw.max_model_calls, asNumber(budgetRaw.max_model_calls, 6));
-  const deadlineSeconds = asNumber(contractRaw.deadline_seconds, asNumber(budgetRaw.deadline_seconds, 120));
+  const deadlineSeconds = asNumber(contractRaw.deadline_seconds, asNumber(budgetRaw.deadline_seconds, 1200));
   const rounds = Array.isArray(raw.rounds)
     ? raw.rounds.map(normalizeLoopRound).filter((item): item is LoopRound => item !== null)
     : [];
@@ -1706,6 +1758,28 @@ function EvidenceReviewDialog({
     }
     onClose();
   };
+  const recoverGap = async () => {
+    const recovery = request.gapRecovery;
+    if (!recovery) return;
+    if (recovery.mode === "resume_branch" && recovery.branchId) {
+      if (decisionFeedback.trim()) {
+        const steered = await onControl("steer", {
+          instruction: `${recovery.nextInstruction}\n用户补充：${decisionFeedback.trim()}`,
+        });
+        if (!steered) return;
+      }
+      const resumed = await onControl("resume", { branchId: recovery.branchId });
+      if (resumed) onClose();
+      return;
+    }
+    if (recovery.mode === "new_run") {
+      const instruction = [
+        recovery.newRunInstruction,
+        decisionFeedback.trim() ? `用户补充：${decisionFeedback.trim()}` : "",
+      ].filter(Boolean).join("\n");
+      if (await onStartTask(instruction)) onClose();
+    }
+  };
   const startStructuredReview = async () => {
     const instruction = `复核以下问题，逐条定位原文并给出需要人工决定的处理选项：${request.title}`;
     if (await onStartTask(instruction)) onClose();
@@ -1724,9 +1798,9 @@ function EvidenceReviewDialog({
             <dt>关联资料</dt><dd>{reviewFiles.length} 份</dd>
           </dl>
           <ol>
-            <li><span><IconGitCommit aria-hidden="true" /></span><div><b>Agent 提出</b><p>{request.kind === "proposal" ? "形成一条待确认的下一步建议" : request.kind === "gap" ? "发现证据缺口并停止受影响分支" : "形成一条待复核发现"}</p></div></li>
+            <li><span><IconGitCommit aria-hidden="true" /></span><div><b>{request.kind === "gap" ? "Agent 未完成" : "Agent 提出"}</b><p>{request.kind === "proposal" ? "形成一条待确认的下一步建议" : request.kind === "gap" ? "本轮没有交付可定位的证据，只停止受影响分支" : "形成一条待复核发现"}</p></div></li>
             <li><span><IconShieldCheck aria-hidden="true" /></span><div><b>服务端记录</b><p>{request.serverFact}</p></div></li>
-            <li className="is-current"><span><IconEye aria-hidden="true" /></span><div><b>等待你核对</b><p>对照右侧原始资料，判断 Agent 描述是否成立。</p></div></li>
+            <li className="is-current"><span><IconEye aria-hidden="true" /></span><div><b>{request.kind === "gap" ? "选择恢复方式" : "等待你核对"}</b><p>{request.kind === "gap" ? "你不需要修改源文件；可直接让 Agent 只重试这个分支。" : "对照右侧原始资料，判断 Agent 描述是否成立。"}</p></div></li>
           </ol>
           <footer><IconAlertTriangle aria-hidden="true" /><p>{request.boundary}</p></footer>
         </aside>
@@ -1736,10 +1810,21 @@ function EvidenceReviewDialog({
             <ol className="review-summary-steps">
               <li><b>1</b><div><span>发生了什么</span><strong>{request.factSummary || request.title}</strong></div></li>
               <li><b>2</b><div><span>不处理的影响</span><strong>{request.impact || "影响尚未单独结构化，请先核对下方证据后再作判断。"}</strong></div></li>
-              <li className={request.review?.requires_human_decision ? "is-decision" : ""}><b>3</b><div><span>现在需要谁做什么</span><strong>{request.review?.requires_human_decision ? "需要你选择处理口径，Agent 不会替你决定。" : request.review ? "无需业务裁决，但结果仍需人工复核。" : "这是旧结果，尚未生成结构化处置选项。"}</strong></div></li>
+              <li className={request.review?.requires_human_decision || request.kind === "gap" ? "is-decision" : ""}><b>3</b><div><span>现在需要谁做什么</span><strong>{request.kind === "gap" ? request.gapRecovery?.mode === "new_run" ? "旧 Run 已结束；你可让 Agent 用这个分支创建新任务，仍无需修改源文件。" : request.gapRecovery?.mode === "resume_branch" ? "直接让 Agent 只重试此分支即可；补充线索是可选的，不懂可以留空。" : "先查看候选文件；系统不会要求你替 Agent 猜具体行。" : request.review?.requires_human_decision ? "需要你选择处理口径，Agent 不会替你决定。" : request.review ? "无需业务裁决，但结果仍需人工复核。" : "这是旧结果，尚未生成结构化处置选项。"}</strong></div></li>
             </ol>
             <details><summary>查看 Agent 的完整说明</summary><p>{request.detail}</p></details>
           </section>
+          {request.kind === "gap" && request.gapRecovery && <section className="evidence-gap-recovery" aria-labelledby="gap-recovery-title">
+            <header><div><span>恢复这个分支</span><h3 id="gap-recovery-title">问题在 Agent 的交付，不在源文件</h3><p>系统已经把未通过校验的内容拦下。你可以不填写任何内容，直接让 Agent 重新完成这一步。</p></div><b>{request.gapRecovery.mode === "new_run" ? "创建新 Run" : request.gapRecovery.mode === "resume_branch" ? "只重试本分支" : "仅查看"}</b></header>
+            <ol className="gap-recovery-facts">
+              <li><b>1</b><span><strong>原本要确认</strong>{request.gapRecovery.branchObjective}</span></li>
+              <li><b>2</b><span><strong>Agent 已尝试</strong>{request.gapRecovery.attemptedFileRefs.length} 份文件 · {request.gapRecovery.analysisCalled ? "模型已调用" : "尚未完成模型调用"} · {request.gapRecovery.analysisOutputUsed ? "可核对部分已保留" : "返回内容未采用"}</span></li>
+              <li><b>3</b><span><strong>已经保留</strong>{request.gapRecovery.verifiedFileRefs.length} 份已核对来源、其他分支和已有成果版本均不回退。</span></li>
+              <li><b>4</b><span><strong>不会发生</strong>不会要求你改源文件，也不会执行外部动作。</span></li>
+            </ol>
+            <label className="decision-feedback"><span>给 Agent 的线索（可选，不清楚可以留空）</span><textarea value={decisionFeedback} onChange={(event) => setDecisionFeedback(event.target.value)} placeholder="例如：优先检查 F07、版本号和测试日期；不知道时可直接留空" /></label>
+            <footer><button type="button" onClick={() => void deferAndClose()} disabled={controlBusy !== null || starting}>保留缺口，暂不处理</button>{request.gapRecovery.mode !== "inspect_only" && <button type="button" className="is-primary" onClick={() => void recoverGap()} disabled={controlBusy !== null || starting}><IconRefresh aria-hidden="true" />{starting || controlBusy ? "正在提交" : request.gapRecovery.mode === "new_run" ? "创建新任务继续此分支" : "让 Agent 只重试此分支"}</button>}</footer>
+          </section>}
           <div className="evidence-review-workbench">
             <div className="evidence-review-index">
               {reviewAnchors.length > 0 ? <section className="evidence-review-pinpoint" aria-labelledby="evidence-pinpoint-title">
@@ -1760,7 +1845,7 @@ function EvidenceReviewDialog({
                     </button>;
                   })}
                 </div>
-              </section> : <div className="evidence-review-unlocated"><IconAlertTriangle aria-hidden="true" /><p><b>当前只能定位到文件，不能定位到具体原文</b><span>{request.kind === "finding" ? "这是旧结果或服务端没有找到唯一片段；系统不会伪造行号或高亮。" : "该记录没有逐段证据锚点，请按关联文件或下一轮候选范围核对。"}</span></p></div>}
+              </section> : <div className="evidence-review-unlocated"><IconAlertTriangle aria-hidden="true" /><p><b>{request.kind === "gap" ? "这里没有高亮，不是让你猜哪一行" : "当前只能定位到文件，不能定位到具体原文"}</b><span>{request.kind === "gap" ? "Agent 本轮没有交付可唯一定位的引用。源文件没有被判错，你也不需要代替 Agent 在文件中找答案。" : request.kind === "finding" ? "这是旧结果或服务端没有找到唯一片段；系统不会伪造行号或高亮。" : "该记录没有逐段证据锚点，请按关联文件或下一轮候选范围核对。"}</span></p></div>}
               <section className="evidence-review-source" aria-label="相关资料">
                 <header><div><span>关联文件</span><h3>{reviewAnchors.length ? "每处证据都来自下列真实文件" : "点击文件查看完整内容"}</h3></div><b>{reviewFiles.length} 份</b></header>
                 {reviewFiles.length > 0 ? <div className="evidence-review-files">{reviewFiles.map((file) => { const anchorCount = reviewAnchors.filter((anchor) => anchor.file_ref === file.file_ref).length; return <button type="button" key={file.file_ref} className={file.file_ref === selectedFileRef ? "is-active" : ""} onClick={() => selectFile(file.file_ref)}><IconFile aria-hidden="true" /><span><b>{file.display_label}</b><small>{file.display_path}{anchorCount ? ` · ${anchorCount} 处定位` : ""}</small></span></button>; })}</div> : <p className="evidence-review-no-source">当前服务端事实没有提供可打开的关联文件。系统不会用静态示例补齐。</p>}
@@ -1768,6 +1853,7 @@ function EvidenceReviewDialog({
             </div>
             <section className="evidence-review-preview" aria-label="资料原文预览">
               {activeAnchor && selectedFile && <div className="active-evidence-callout"><span>正在核对第 {activeAnchorIndex + 1} 处</span><b>{selectedFile.display_label} · {evidenceLocationLabel(activeAnchor, selectedFile)}</b><q>{activeAnchor.excerpt}</q><small>下方黄色区域是这段内容在文件预览中的实际位置。</small></div>}
+              {request.kind === "gap" && selectedFile && !activeAnchor && <div className="gap-preview-callout"><span>本轮尝试过的文件</span><b>{selectedFile.display_label}</b><small>下方展示原始内容，但不会高亮：服务端尚未收到可唯一定位的逐字引用。</small></div>}
               <FilePreview preview={preview} file={selectedFile} loading={previewLoading} error={previewError} anchor={activeAnchor} />
               {selectedFile && <button type="button" className="evidence-review-open-workspace" onClick={async () => { await deferAndClose(); onOpenFile(selectedFile); }}><IconArrowRight aria-hidden="true" />回到资料库中打开</button>}
             </section>
@@ -1828,7 +1914,7 @@ export function HarnessWorkbench({ onActivityChange }: { onActivityChange?: (sta
   const [maxRounds, setMaxRounds] = useState(3);
   const [maxFilesPerRound, setMaxFilesPerRound] = useState(6);
   const [maxModelCalls, setMaxModelCalls] = useState(6);
-  const [deadlineSeconds, setDeadlineSeconds] = useState(120);
+  const [deadlineSeconds, setDeadlineSeconds] = useState(1200);
   const [fileSearch, setFileSearch] = useState("");
   const [fileTypeFilter, setFileTypeFilter] = useState<FileTypeFilter>("ALL");
   const [expandedFolderPaths, setExpandedFolderPaths] = useState<Set<string>>(() => new Set());
@@ -2215,7 +2301,7 @@ export function HarnessWorkbench({ onActivityChange }: { onActivityChange?: (sta
               <label><span>最大轮次</span><input type="number" min="1" max="3" value={maxRounds} disabled={runActive} onChange={(event) => setMaxRounds(Math.max(1, Math.min(3, Number(event.target.value) || 1)))} /></label>
               <label><span>每轮文件</span><input type="number" min="1" max="8" value={maxFilesPerRound} disabled={runActive} onChange={(event) => setMaxFilesPerRound(Math.max(1, Math.min(8, Number(event.target.value) || 1)))} /></label>
               <label><span>模型调用</span><input type="number" min="2" max="6" value={maxModelCalls} disabled={runActive} onChange={(event) => setMaxModelCalls(Math.max(2, Math.min(6, Number(event.target.value) || 2)))} /></label>
-              <label><span>时间上限</span><input type="number" min="20" max="300" step="10" value={deadlineSeconds} disabled={runActive} onChange={(event) => setDeadlineSeconds(Math.max(20, Math.min(300, Number(event.target.value) || 20)))} /></label>
+              <label><span>Agent 执行时间</span><input type="number" min="20" max="3000" step="60" value={deadlineSeconds} disabled={runActive} onChange={(event) => setDeadlineSeconds(Math.max(20, Math.min(3000, Number(event.target.value) || 20)))} /></label>
             </div>
           </details>
           <div className="task-examples" aria-label="任务示例">{TASK_EXAMPLES.map((example) => <button type="button" key={example} disabled={runActive} onClick={() => setInstruction(example)}>{example}</button>)}</div>
@@ -2364,7 +2450,7 @@ function LoopView({
       <footer><span>{run.validation_errors[0] || "服务端已安全停止本轮任务。"}</span><button type="button" disabled={starting} onClick={() => void onStartTask(retryInstruction)}><IconRefresh aria-hidden="true" />{starting ? "正在重建任务" : "缩小范围重新核对"}</button></footer>
     </section>}
     {boundedTerminalRecovery && <section className="loop-terminal-recovery" aria-labelledby="terminal-recovery-title">
-      <header><IconAlertTriangle aria-hidden="true" /><div><span>预算停止后的下一步</span><h3 id="terminal-recovery-title">当前 Run 已到预算边界，不能继续原地运行</h3><p>这不是整项工作丢失。旧 Run、调用回执和成果版本保持不变；请选择一个未完成分支，以它为目标创建新的独立 Run。</p></div></header>
+      <header><IconAlertTriangle aria-hidden="true" /><div><span>预算停止后的下一步</span><h3 id="terminal-recovery-title">当前 Run 已到预算边界，不能继续原地运行</h3><p><b>停止原因：{run.budget.stop_reason || "剩余预算不足以完成下一步"}。</b> 这不是整项工作丢失。旧 Run、调用回执和成果版本保持不变；请选择一个未完成分支，以它为目标创建新的独立 Run。</p></div></header>
       <div className="source-recovery-facts"><span><b>只影响</b>{terminalRecoveryBranches.length} 条尚未完成的分支</span><span><b>已保留</b>Plan、调用回执、分支状态与{preservedArtifactVersion ? `成果 v${preservedArtifactVersion}` : "阶段成果"}</span><span><b>未发生</b>原文件修改或外部动作</span></div>
       <label><span>补充给新任务的方向（可选）</span><textarea value={recoveryDraft} onChange={(event) => setRecoveryDraft(event.target.value)} placeholder="例如：先核对上线配置清单与功能测试报告中的版本和日期字段" /></label>
       <div className="source-recovery-branches">{terminalRecoveryBranches.map((branch, index) => <article key={branch.branch_id}><div><b>{index === 0 ? "最小续办分支" : "可单独续办"}</b><h4>{branch.title}</h4><p>{branch.objective}</p><small>{branch.input_file_refs.length > 0 ? branch.input_file_refs.map(fileLabel).join(" · ") : "由 Agent 在整个资料库中重新选证"}</small></div><button type="button" disabled={starting} onClick={() => void startBranchRecoveryRun(branch)}><IconRefresh aria-hidden="true" />{starting ? "正在创建" : "用此分支创建新任务"}</button></article>)}</div>
@@ -2426,13 +2512,13 @@ function LoopView({
         <ol>{roundBranches.map((branch, index) => <li key={branch.branch_id} className={`is-${branch.status}${run.active_branch_id === branch.branch_id ? " is-selected" : ""}`}>
           <span>{branch.status === "completed" ? <IconCheck aria-hidden="true" /> : index + 1}</span>
           <div><header><b>{branch.title}</b><small>{branchStatusLabel(branch.status)}</small></header><p>{branch.objective}</p><footer><span>{branch.input_file_refs.length} 份资料</span>{branch.depends_on.length > 0 && <span>{branch.depends_on.length} 条前序依赖</span>}{branch.parent_branch_id && <span>续自上一轮</span>}{branch.missing_file_refs.length > 0 && <strong>缺 {branch.missing_file_refs.length} 份引用</strong>}</footer></div>
-          {branch.status === "waiting_input" && waitingForBranch && !guidedRecovery && <div className="loop-branch-actions"><button type="button" className="is-review" onClick={() => onReview(branchReviewRequest(branch, selectedRound.evidence_gaps))}><IconEye aria-hidden="true" />查看问题</button><button type="button" onClick={() => void onControl("resume", { branchId: branch.branch_id })} disabled={!canResume || controlBusy !== null}><IconPlayerPlay aria-hidden="true" />{controlBusy === "resume" ? "正在启动" : "继续此分支"}</button></div>}
+          {branch.status === "waiting_input" && waitingForBranch && !guidedRecovery && <div className="loop-branch-actions"><button type="button" className="is-review" onClick={() => onReview(branchReviewRequest(branch, selectedRound.evidence_gaps, selectedRound, run))}><IconEye aria-hidden="true" />查看问题</button><button type="button" onClick={() => void onControl("resume", { branchId: branch.branch_id })} disabled={!canResume || controlBusy !== null}><IconPlayerPlay aria-hidden="true" />{controlBusy === "resume" ? "正在启动" : "继续此分支"}</button></div>}
         </li>)}</ol>
       </section>}
       {selectedRound.result && <section className="loop-round-result"><span>本轮核对结果</span><h3>{selectedRound.result.summary}</h3><p>{selectedRound.result.findings.length} 条发现，引用 {selectedRound.verified_file_refs.length} 份文件。</p>{selectedRound.result.findings.length > 0 && <div className="loop-review-links">{selectedRound.result.findings.map((finding, index) => <button type="button" key={`${finding.title}:${index}`} onClick={() => onReview(findingReviewRequest(finding, index, selectedRound.round_number, run.decision_records))}><IconEye aria-hidden="true" />核对：{finding.title}</button>)}</div>}</section>}
       {selectedRound.evidence_gaps.length > 0 && <section className="loop-gap"><IconAlertTriangle aria-hidden="true" /><div><span>证据缺口</span><h3>{selectedRound.evidence_gaps.length} 条分支尚未完成</h3><p>{boundedTerminalRecovery ? "当前 Run 已结束。点击缺口可查看具体描述与候选文件，再从上方选择一个分支创建新的独立 Run。" : "点击缺口即可查看具体描述、候选文件和原始内容；只有你确认的分支会进入下一轮。"}</p><div className="loop-review-links">{selectedRound.evidence_gaps.map((gap, index) => {
-        const branchTitle = roundBranches.find((branch) => branch.branch_id === gap.branch_id)?.title ?? null;
-        return <button type="button" key={gap.gap_id} onClick={() => onReview(gapReviewRequest(gap, index, selectedRound.round_number, branchTitle))}><IconEye aria-hidden="true" />{gap.label}</button>;
+        const branch = roundBranches.find((item) => item.branch_id === gap.branch_id) ?? null;
+        return <button type="button" key={gap.gap_id} onClick={() => onReview(gapReviewRequest(gap, index, selectedRound, branch, run))}><IconEye aria-hidden="true" />{gap.label}</button>;
       })}</div></div></section>}
       {selectedRound.next_step && <footer className={selectedRound.next_step.decision === "completed" ? "is-complete" : "is-next"}><div><span>服务端决定</span><strong>{gateLabel(selectedRound.next_step.decision)}</strong><p>{selectedRound.next_step.reason}</p></div>{selectedRound.next_step.decision === "waiting_input" ? <b>{guidedRecovery ? "选择恢复分支继续" : "选择上方分支继续"}</b> : boundedTerminalRecovery ? <b>选择上方分支创建新任务</b> : selectedRound.next_step.decision === "next_round" ? <IconArrowRight aria-hidden="true" /> : null}</footer>}
     </article>}
