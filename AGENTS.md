@@ -31,6 +31,7 @@ Source、Evidence 和 UI-server fact mapping，不能只更新 README。
 - `pause/resume/steer/stop/rollback` 必须携带 expected version 与幂等键。Branch resume 还携带 `branch_id`；rollback 还携带 `artifact_version`，只新增 TaskCommit 并恢复逻辑 Brief，不删除历史或回滚源文件。pause/stop 只在模型调用之间的安全点生效；steer 只影响下一轮；deadline 阻止新调用但不硬取消在途 HTTP 请求。
 - Snapshot 是状态权威，SSE 是有序变更投影。浏览器只单调应用 version/sequence，nonterminal 断线用 GET + `after=N`，terminal event 后 final GET。
 - 配置 `DATABASE_DSN` 时，Run Snapshot、事件、start/control 幂等回执以及独立 ArtifactVersion/TaskCommit 写入 PostgreSQL；重启恢复会删除未完成轮次、追加 `checkpoint_recovered` 并暂停，绝不自动重放中断的模型调用。真实 PostgreSQL 顺序 Runtime 由 PR integration workflow 验证；这不等于多实例 lease、高可用或在途 HTTP 续跑。未配置数据库时明确使用单进程 memory 且重启不恢复。`X-User-Id` 是未签名演示 Owner。
+- `start-demo.ps1` 的状态库优先级是 Docker、本轮 PowerShell 进程显式 `DATABASE_DSN`、memory。没有前两者时必须用空进程变量覆盖 `.env` 残留 DSN；模型配置仍可从 `.env` 读取。前台/汇报只以 `/v1/health.checkpoint/task_store` 判断本轮是否可恢复。
 - Catalog/preview 完整性失败必须 fail closed。前台区分 API 离线、workspace integrity failure、file preview failure 和 Run failure，不得填充静态假数据。
 - Demo 1/2/3 只是通用能力的验收镜头：当前最多三轮只读 Agent Control Loop 已覆盖 Demo 1 的单 Controller 分支级推进、成果历史和恢复纵切，但仍缺可写工件、确定性验证和多实例协调；Demo 2 多任务自组织与 Demo 3 跨拓扑 Risk Gate 仍是目标能力。不得因 Demo 名或目标 profile 宣称未实现能力已经执行。
 - 自动化和截图是工程代理，不是用户研究。界面是否更清晰、信任/效率/价值是否提升均为 `Draft`。
