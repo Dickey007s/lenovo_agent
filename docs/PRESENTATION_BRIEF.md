@@ -45,7 +45,7 @@ Agent Control Loop 的逐模块历史基线、当前三轮只读纵切和后续�
 | 7 | 安全预览把“Agent 读了什么”变成可见契约 | CSV/PDF/DOCX/TXT 预览拼图和安全说明 | 路径、大小、hash、符号链接和解析器测试 |
 | 8 | Harness 把模型调用、内容采用和服务端校验分开 | 事件与模型回执时序 | Snapshot/Receipt 事实；不展示思维链 |
 | 9 | Agent 说“有问题”之后，用户要同时看懂事实、影响、真实原文和自己必须决定的下一步 | 问题处置单：1 事实 -> 2 影响 -> 3 人工动作；证据与实际文件并排；A/B/C + 反馈 | `DR-0030/29`；推荐是模型候选，确认只创建新只读 Run |
-| 10 | Agent Control Loop 会把计划变成可核对任务分支；证据不足时，人只选择一条分支继续 | 任务分支现场、分支 Evidence Gate、成果 v1→v2 与恢复轨迹 | 只读、最多三轮、顺序 Controller；Branch 不等于并行 Worker |
+| 10 | Agent Control Loop 会把计划变成可核对任务分支；等待态只恢复一条分支，预算终态则以该分支创建新 Run | 任务分支现场、分支 Evidence Gate、成果 v1→v2、恢复轨迹与预算终态续办卡 | 只读、最多三轮、顺序 Controller；Branch 不等于并行 Worker，terminal Run 不可 resume |
 | 11 | Demo 2 验收多任务自组织、动态调度和共享工件汇聚 | Worker、依赖与动态重排图 | 目标设计；当前产品没有通用 Worker Runtime |
 | 12 | Demo 3 对单任务和多任务统一施加风险与动作控制 | 影响预演 -> 证据 -> 审批 -> Permit -> 回执 | 目标设计；当前没有真实外部动作 |
 | 13 | 当前已经证明工程链路，但也保留模型结果出错的负面证据 | 自动化、截图与 Finance 算术偏差并列 | `completed` 不等于结论正确 |
@@ -62,7 +62,7 @@ Agent Control Loop 的逐模块历史基线、当前三轮只读纵切和后续�
 7. 展示成果简报从 v1 到 v2；再恢复 v1，说明系统只新增一条 TaskCommit、当前指针改变，v2 与原文件都没有被覆盖。
 8. 对 Finding 点“打开审查页”：先按 1/2/3 讲事实、影响和人工动作，再在左侧选择“设计预期/实际观测”，让右侧真实文件跳到并高亮原文；强调位置匹配不等于结论正确。
 9. 先选择 A/B/C 中自己的初始口径，再点“对照 Agent 建议”；补充“同时核对发布记录中的代码版本”后确认。指出推荐默认隐藏以减少锚定，确认只创建新只读 Loop，不会直接改源文件。
-10. 再展示一次无法唯一定位的恢复态：“已保留/未采用/未发生”，只选择一个分支继续，而不是让整个任务卡死。
+10. 再展示一次无法唯一定位的恢复态：“已保留/未采用/未发生”。若状态是 `waiting_input`，只恢复一个 Branch；若预算已到 `stopped/bounded`，明确说明旧 Run 不可继续，并用一条 Branch 创建新的独立任务。
 11. 对建议点“查看形成依据”，说明建议尚未逐项绑定引用；只有点击“确认并启动”才创建新 Loop。
 
 演示不要从八模块架构图开始。先让观众看到数据、任务、轨迹和证据闭环，
@@ -120,6 +120,7 @@ Agent Control Loop 的逐模块历史基线、当前三轮只读纵切和后续�
 | 受控成果恢复 | 用户可以恢复旧简报且不丢掉新版 | “恢复”、当前 vN、“已恢复历史成果版本” | rollback ControlEvent、新 TaskCommit、`artifact_version_restored` |
 | 有界候选修复 | 模型返回未通过时不会静默采用 | `未采用` 与预算内重试 | `plan_validation_rejected` / `analysis_validation_rejected`、模型调用计数 |
 | EvidenceResolution + Finding 级恢复 | 一条坏引用不再抹掉全部有效结果；多候选或无候选都有明确下一步 | exact/ambiguous/unavailable、已保留/未采用/未发生 | `evidence_resolutions[]`、`partial_artifact_saved`、`next_step.recovery_kind` |
+| 预算终态分支续办 | 用户不会在不可恢复的页面里反复点“继续” | 旧 Run 已结束、保留项、未完成 Branch、用此分支创建新任务 | `status=stopped`、`brief.outcome=bounded`、candidate Branch + 新 Run POST；不向旧 Run 发送 control |
 | 版本化人工决定 | 关闭不再等于“什么都没发生”，重连后仍能对账 | 接受/否决/暂缓、回执版本、无外部动作 | `decision_records[]`、`decision_recorded`、expected version + idempotency |
 | 人工确认下一步 | Agent 建议不会自动扩张任务；用户先看形成上下文 | “尚未逐项验证”“查看形成依据”“确认并启动” | 终态 `follow_ups` + Finding refs 上下文 + 新 Run POST |
 
@@ -131,7 +132,8 @@ Agent Control Loop 的逐模块历史基线、当前三轮只读纵切和后续�
 `DR-0030` 记录可处置 Finding 与可恢复分析门：
 
 - 完整 Python：`73 passed, 1 skipped`；聚焦 Runtime：`35 passed`；
-- Harness 浏览器：`19 passed`；覆盖接受/暂缓回执、候选消歧、只恢复目标 Branch 和重连恢复；
+- Harness 浏览器：`20 passed`；覆盖接受/暂缓回执、候选消歧、只恢复目标 Branch、重连恢复，
+  以及预算终态以一条 Branch 创建新 Run 且不控制旧 Run；
 - Ruff、lint 与生产 build 通过；准确命令、时长和最终 PR 记录在 `DR-0030` Evidence；
 - PR #31 的 PostgreSQL 17.11 workflow `1 passed in 1.84s`，四个顺序 Runtime 覆盖中断、恢复完成、历史版本恢复和再次读取当前指针；这不是多实例高可用；
 - 两条等待分支可逐条继续，未选分支保持等待；ArtifactVersion 与 TaskCommit 分表 append-only，恢复只新增 Commit；

@@ -50,9 +50,18 @@
 Branch，必要时补充方向后继续。暂时不处理也不会静默消失：关闭页面会记录 `defer`，重连后
 仍能看见决定回执。预算不足则有界停止并保留缺口。范围越权和文件完整性错误仍 fail closed。
 
+真实模型运行又暴露出一个更细的交互陷阱：`stopped/bounded` 已经是终态，如果页面仍说
+“选择分支后继续”，用户会误以为旧 Run 能恢复。现在终态卡明确回答三件事：当前只影响哪些
+未完成 Branch，Plan、调用回执和 ArtifactVersion 保留了什么，以及没有发生哪些外部动作。
+用户可以补充方向，再用某一条 Branch 创建新的 Task Contract。新 Run 仍重新冻结整库索引并
+自主选证；旧 Run 不接收 `resume/steer`，也不会被覆盖。这把“恢复”从模糊按钮变成了可审计
+的任务交接。
+
 ![暂缓决定会留下可重连的版本化回执](../evidence/screenshots/dr-0030-decision-receipt.png)
 
 ![原文定位失败后的最小分支恢复](../evidence/screenshots/dr-0030-source-location-recovery.png)
+
+![预算终态按一条未完成分支创建新任务](../evidence/screenshots/dr-0030-bounded-branch-recovery.png)
 
 这组设计的交互主张是“把判断权交给人，同时把查找和恢复成本留给 Harness”。当前工程证据
 只证明 `accept/decline/defer` 回执、候选消歧和 Branch 局部恢复可运行，不证明模型推荐正确；
@@ -777,15 +786,17 @@ Gateway receipt，就不能出现“已执行”；没有 ArtifactVersion 和 Co
 4. 场景页不写抽象“能力卡”，而写触发、人的决定点、失败路径、前台输出和服务端事实。
 5. 竞品页保留官方产品名和原始来源标题，不使用“做不到”“全面领先”等排他性文案。
 6. 演示结束停在“引用回开 + 待复核 + 没有外部动作”，不要用完成动画替代结论边界。
-7. 本轮 Loop 截图使用 `docs/evidence/screenshots/dr-0023-agent-control-loop-*.png`，并在页脚绑定实现 `8364b1e` 与 open PR #28。
+7. 本轮问题处置与恢复截图使用 `docs/evidence/screenshots/dr-0030-*.png`，并在页脚绑定
+   `ACTIONABLE-REVIEW-AND-RECOVERY-20260826` Evidence；历史 `DR-0023` 图只用于说明演进。
 
 ## 十、验证证据与禁止推断
 
-当前 [`AGENT-CONTROL-LOOP-BOUNDED-READONLY-20260825`](../evidence/AGENT-CONTROL-LOOP-BOUNDED-READONLY-EVIDENCE-20260825.md)
-当前整库修订绑定的工程结果包括：聚焦 Runtime `20 passed`，完整 Python `57 passed`，
-Ruff、前端 lint、生产 build、governance 与 diff-check 通过，Harness 浏览器 `10 passed`；
-最终真实浏览器 Run 冻结 96 份文件索引，1 轮自主选择并核对 3 份文件，执行 2 次
-`deepseek-v4-pro` 调用，形成 5 条发现和 4 条待确认建议；3 张截图绑定尺寸与 SHA-256。
+当前以 [`ACTIONABLE-REVIEW-AND-RECOVERY-20260826`](../evidence/ACTIONABLE-REVIEW-AND-RECOVERY-EVIDENCE-20260826.md)
+为最新证据入口，并保留早期 [`AGENT-CONTROL-LOOP-BOUNDED-READONLY-20260825`](../evidence/AGENT-CONTROL-LOOP-BOUNDED-READONLY-EVIDENCE-20260825.md)
+作为历史基线。当前工程结果包括：聚焦 Runtime `35 passed`，完整 Python `73 passed, 1 skipped`，
+Ruff、前端 lint 与生产 build 通过，Harness 浏览器 `20 passed`。两次真实 Provider Run 分别
+覆盖“定位拒绝后部分采用并有界停止”和“结构拒绝两次后以 `analysis_output` 有界停止”；
+确定性浏览器测试覆盖处置单、DecisionRecord、候选消歧、目标 Branch 恢复与预算终态新 Run。
 
 这些证据能够支持：固定公开文件清单、安全有界预览、整库合同与逐轮来源范围、Planner/Analyst 真实
 调用回执、服务端 Plan 检查、最多三轮的只读推进、Evidence Gate、安全点控制、named SSE、

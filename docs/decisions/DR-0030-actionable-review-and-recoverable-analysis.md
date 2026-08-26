@@ -34,8 +34,10 @@
 5. 若没有任何可采用 Finding，Runtime 保留计划、文件范围、调用回执和 Branch，在预算允许时
    以 `waiting_input` 暂停。`next_step.recovery_kind` 区分 `source_location` 与
    `analysis_output`，并给出候选 Branch 和下一轮最小目标。
-6. 若已无预算，使用 `stopped/bounded`，不生成伪结果。升级前遗留的 `failed` Run 由前台显示
-   已保留事实、未发生动作和“缩小范围重新核对”入口。
+6. 若已无预算，使用 `stopped/bounded`，不生成伪结果，也不得继续显示会让人误以为旧 Run
+   可以 `resume` 的控件。前台必须列出尚未完成的候选 Branch；用户可补充方向，并把其中一条
+   变成新的 Task Contract 与独立 Run。旧 Run、调用回执、Branch 状态和 ArtifactVersion 保持
+   不变。升级前遗留的 `failed` Run 同样显示已保留事实、未发生动作和“缩小范围重新核对”入口。
 7. 普通 UI 不显示 raw quote、Prompt、CoT、provider response、内部路径或 validator 字符串。
 8. `ambiguous` 必须给出所有服务端候选位置。用户接受一个候选后，系统先记录 DecisionRecord，
    再 steer 并只 resume 绑定的 waiting Branch；关闭处置页记录 `defer`，不能静默丢弃。
@@ -49,7 +51,7 @@
 | Agent 建议 -> 互斥人工选项 | 不知道该怎么回应 Agent | 先选初判，再展开建议；接受、否决或暂缓都有回执 | A/B/C、影响预演、反馈框、DecisionRecord |
 | 局部定位失败 -> Finding 级有界修复 | 任一坏引用令整个 Run 失败 | 自动修复一次，保留可核对部分 | 未采用、受控重试、省略数 |
 | terminal failed -> EvidenceResolution + Branch 级恢复 | 只能猜测是否重跑全部 | 比较真实候选位置，或选择最小 Branch 补证 | exact/ambiguous/unavailable、已保留/未采用/未发生 |
-| 无预算 -> 明确有界停止 | 错误与预算停止混淆 | 看见边界和未完成项，决定新任务 | `stopped/bounded`、缺口、无外部动作 |
+| 无预算 -> 终态分支续办 | 页面说“继续”但终态不能恢复，只能重新输入任务 | 看见边界、保留项和未完成 Branch；补充方向后以一条 Branch 创建新 Run | `stopped/bounded`、候选 Branch、ArtifactVersion、新 Task Contract、无外部动作 |
 
 ## 前后台统一事实
 
@@ -63,6 +65,7 @@
 | 定位恢复 | `EvidenceResolution`、`evidence_disambiguation_required`、waiting Branch | 比较候选；确认后 steer/resume 一条 Branch | 候选结论已成立、其他分支重跑 |
 | 结构恢复 | `recovery_kind=analysis_output`、两条 rejected event | 选择最小 Branch 重试 | 模型没有调用、失败内容已采用 |
 | 部分采用 | `analysis_partial_adopted` + result/artifact findings | 查看保留结果和省略数 | 被省略 Finding 的内容或正确性 |
+| 预算终态续办 | `status=stopped`、`brief.outcome=bounded`、`next_step.candidate_branch_ids/recovery_kind`、旧 ArtifactVersion | 补充方向，以一条未完成 Branch 创建新 Task Contract | 对 terminal Run 调用 resume、覆盖旧 Run、保证复用旧文件范围 |
 | 历史失败恢复 | `status=failed`、validation error、原 instruction/branch/call facts | 创建缩小范围的新 Run | 旧调用被续跑或错误结果被提交 |
 
 ## 验证与边界
@@ -70,7 +73,8 @@
 - 单测覆盖合法 Anchor、部分采用、连续两次定位失败、首次结构失败后修复、连续两次结构失败后
   暂停，以及既有安全范围违规 fail closed。
 - Playwright 覆盖三步处置单、真实文件高亮、A/B/C、accept/defer 回执、反馈生成新 Run、
-  候选消歧、只恢复目标 Branch、断线后恢复待决状态和历史失败恢复。
+  候选消歧、只恢复目标 Branch、断线后恢复待决状态、历史失败恢复，以及预算终态按 Branch
+  创建新 Run 且不发送旧 Run control。
 - 一次真实 `deepseek-v4-pro` Run 在第一轮进入人工 Branch 选择，第二轮首次定位部分拒绝、
   自动重试后采用，最终按预算有界停止。它不证明 Finding 正确或推荐合理。
 - 当前已有 `accept/decline/defer` 的版本化幂等回执，但没有文件修改建议 Diff、可写 Artifact、

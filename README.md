@@ -186,8 +186,11 @@ multi-instance coordination and governed external action remain target work.
   choice then starts a new read-only Run. Location results are `exact`,
   `ambiguous` or `unavailable`; one bounded repair preserves valid Findings,
   completed Branches and ArtifactVersions, while only affected Branches wait for
-  candidate selection or guided recovery. Security-scope violations still fail
-  closed.
+  candidate selection or guided recovery. When recovery reaches a
+  `stopped/bounded` budget terminal, the UI no longer suggests that the old Run
+  can resume: it lists unfinished Branches and creates a new whole-workspace Run
+  for the selected Branch objective, preserving the old Run and artifacts.
+  Security-scope violations still fail closed.
 - No target-user study has been run. Clarity, trust, efficiency and user value
   remain hypotheses.
 
