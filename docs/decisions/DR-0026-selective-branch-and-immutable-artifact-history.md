@@ -4,7 +4,7 @@
 
 | 字段 | 内容 |
 | --- | --- |
-| 状态 | `Limited Verified`，限固定 FORTE、最多三轮、顺序单 Controller、只读结果路径 |
+| 状态 | `Limited Verified`，已由 PR #31 合并为 `697e38b`；限固定 FORTE、最多三轮、顺序单 Controller、只读结果路径 |
 | 日期 | 2026-08-26 |
 | 触发来源 | [`USER-FEEDBACK-20260826-20`](../sources/USER-FEEDBACK-20260826-20-demo1-branch-artifact-completion.md) |
 | 场景 | [`SCENARIO-012`](../scenarios/SCENARIO-012-selective-branch-and-artifact-restore.md) |

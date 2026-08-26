@@ -108,4 +108,5 @@ Scheduler/Worker。
 - Source：[`USER-FEEDBACK-20260826-20`](../sources/USER-FEEDBACK-20260826-20-demo1-branch-artifact-completion.md)
 - 实现提交：`95ab752`（`feat: add branch-level control and immutable result history`）
 - Pull Request：[#31 Demo 1：分支级继续与不可变成果历史](https://github.com/Dickey007s/lenovo_agent/pull/31)
+- 合并提交：`697e38b`（`master`）
 - PostgreSQL workflow：[run `32926860106` / job `98051424823`](https://github.com/Dickey007s/lenovo_agent/actions/runs/32926860106/job/98051424823)，PostgreSQL 17.11，`1 passed in 1.84s`
