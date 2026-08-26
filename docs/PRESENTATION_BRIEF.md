@@ -135,6 +135,8 @@ Agent Control Loop 的逐模块历史基线、当前三轮只读纵切和后续�
 - Harness 浏览器：`20 passed`；覆盖接受/暂缓回执、候选消歧、只恢复目标 Branch、重连恢复，
   以及预算终态以一条 Branch 创建新 Run 且不控制旧 Run；
 - Ruff、lint 与生产 build 通过；准确命令、时长和最终 PR 记录在 `DR-0030` Evidence；
+- 预算终态续办经 [PR #38](https://github.com/Dickey007s/lenovo_agent/pull/38) 合并为
+  [`5445000`](https://github.com/Dickey007s/lenovo_agent/commit/54450007617527971b98c229bcd25aaa9ee1de45)，远端检查通过；
 - PR #31 的 PostgreSQL 17.11 workflow `1 passed in 1.84s`，四个顺序 Runtime 覆盖中断、恢复完成、历史版本恢复和再次读取当前指针；这不是多实例高可用；
 - 两条等待分支可逐条继续，未选分支保持等待；ArtifactVersion 与 TaskCommit 分表 append-only，恢复只新增 Commit；
 - 新的 DecisionRecord 把 accept/decline/defer 绑定到 Finding/Resolution/Branch；它证明回执存在，不证明业务审批正确；
