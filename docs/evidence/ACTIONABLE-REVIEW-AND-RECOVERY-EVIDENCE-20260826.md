@@ -4,6 +4,8 @@
 
 `Limited Verified`。覆盖结构化问题处置、服务端原文定位、有界 Analyst 修复、部分结果保留、
 Branch 恢复和确定性浏览器交互；不升级为语义正确、推荐质量或用户价值证据。
+实现提交 [`dbd6469`](https://github.com/Dickey007s/lenovo_agent/commit/dbd6469)，交付见
+[PR #37](https://github.com/Dickey007s/lenovo_agent/pull/37)。
 
 ## 变更与可观察事实
 
