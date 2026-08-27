@@ -220,6 +220,8 @@ Important fields:
   "active_branch_id": null,
   "control_state": "running",
   "control_events": [],
+  "decision_requests": [],
+  "decision_records": [],
   "artifact_versions": [
     {
       "artifact_id": "artifact-...",
@@ -418,6 +420,13 @@ Decision ID, `action`, Finding/Resolution/Branch binding, selected option or
 candidate when applicable, optional user feedback, accepted task version and
 `external_action=none`. It is the reconciliation fact after reconnect; a toast or
 button animation is not a decision receipt.
+
+Open `decision_requests[]` are authoritative at the Run Snapshot top level.
+Any round-level copy is a compatibility projection and may be absent. Clients
+must bind decisions with the packet's Finding, Resolution, Branch, public source
+revision and current expected version. Closing a UI may happen before a best-effort
+`defer`; a failed control response does not change packet state and must not be
+presented as a DecisionRecord.
 
 The current PostgreSQL adapter persists these records only as part of the Run
 Snapshot JSONB. Runtime validation enforces current source revision and candidate

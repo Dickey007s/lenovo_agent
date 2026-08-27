@@ -416,6 +416,7 @@ export type HarnessRun = {
   current_round: number;
   control_state: "running" | "pause_requested" | "paused" | "stop_requested" | "stopped";
   decision_records: DecisionRecord[];
+  decision_requests: DecisionRequest[];
   branches: LoopBranch[];
   active_branch_id: string | null;
   artifact_versions: ArtifactVersion[];
@@ -539,6 +540,7 @@ function normalizeDecisionRequest(value: unknown): DecisionRequest | null {
 
 function normalizeDecisionState(value: unknown): DecisionRequest["state"] {
   const state = asText(value).toLowerCase();
+  if (state === "open") return "pending";
   if (state === "canceled") return "cancelled";
   return ["pending", "deferred", "accepted", "declined", "cancelled", "rejected"].includes(state)
     ? state as DecisionRequest["state"]
@@ -621,6 +623,10 @@ function filterWorkspaceTree(node: WorkspaceTreeFolder, query: string, extension
 
 function uniqueFileRefs(refs: string[]) {
   return Array.from(new Set(refs));
+}
+
+function uniqueDecisionRequests(requests: DecisionRequest[]) {
+  return Array.from(new Map(requests.map((request) => [request.request_id, request])).values());
 }
 
 function findingReviewRequest(finding: HarnessFinding, index: number, roundNumber: number | null, decisions: DecisionRecord[] = [], decisionRequests: DecisionRequest[] = []): EvidenceReviewRequest {
@@ -1412,6 +1418,9 @@ function normalizeRun(value: unknown): HarnessRun | null {
   const decisionRecords = Array.isArray(raw.decision_records)
     ? raw.decision_records.map(normalizeDecisionRecord).filter((item): item is DecisionRecord => item !== null)
     : [];
+  const decisionRequests = Array.isArray(raw.decision_requests)
+    ? raw.decision_requests.map(normalizeDecisionRequest).filter((item): item is DecisionRequest => item !== null)
+    : [];
   return {
     run_id: runId,
     workspace_id: workspaceId,
@@ -1447,6 +1456,7 @@ function normalizeRun(value: unknown): HarnessRun | null {
     current_round: asNumber(raw.current_round),
     control_state: (["pause_requested", "paused", "stop_requested", "stopped"].includes(controlState) ? controlState : "running") as HarnessRun["control_state"],
     decision_records: decisionRecords,
+    decision_requests: decisionRequests,
     branches,
     active_branch_id: asText(raw.active_branch_id) || null,
     artifact_versions: artifactVersions,
@@ -1726,20 +1736,21 @@ function EvidenceReviewDialog({
   }, [request.reviewKey, request.review, request.resolution, reviewAnchors, reviewFiles]);
 
   const deferAndClose = useCallback(async () => {
-    if ((request.decisionRecord && request.decisionRecord.action !== "defer") || !request.findingId || (request.kind !== "resolution" && !request.review?.requires_human_decision)) {
-      onClose();
-      return;
-    }
-    const recorded = await onControl("decision", {
+    const shouldRecordDefer = !request.decisionRecord
+      && request.decisionRequest?.state !== "deferred"
+      && Boolean(request.findingId)
+      && (request.kind === "resolution" || Boolean(request.review?.requires_human_decision));
+    onClose();
+    if (!shouldRecordDefer || !request.findingId) return true;
+    return onControl("decision", {
       decisionAction: "defer",
       findingId: request.findingId,
       resolutionId: request.resolution?.resolution_id,
-      branchId: request.affectedBranchIds[0],
+      branchId: request.decisionRequest?.branch_id ?? request.resolution?.branch_id ?? request.affectedBranchIds[0],
       decisionRequestId: request.decisionRequest?.request_id,
       sourceRevision: request.decisionRequest?.source_revision || request.resolution?.source_revision || undefined,
       feedback: decisionFeedback,
     });
-    if (recorded) onClose();
   }, [decisionFeedback, onClose, onControl, request.affectedBranchIds, request.decisionRecord, request.decisionRequest, request.findingId, request.kind, request.resolution, request.review?.requires_human_decision]);
 
   useEffect(() => {
@@ -1789,7 +1800,7 @@ function EvidenceReviewDialog({
     const recorded = await onControl("decision", {
       decisionAction: "accept",
       findingId: request.findingId,
-      branchId: selectedOption.affected_branch_ids[0] ?? request.affectedBranchIds[0],
+      branchId: request.decisionRequest?.branch_id ?? selectedOption.affected_branch_ids[0] ?? request.affectedBranchIds[0],
       selectedOptionId: selectedOption.option_id,
       decisionRequestId: request.decisionRequest?.request_id,
       sourceRevision: request.decisionRequest?.source_revision || undefined,
@@ -1808,7 +1819,7 @@ function EvidenceReviewDialog({
     const recorded = await onControl("decision", {
       decisionAction: "decline",
       findingId: request.findingId,
-      branchId: request.affectedBranchIds[0],
+      branchId: request.decisionRequest?.branch_id ?? request.resolution?.branch_id ?? request.affectedBranchIds[0],
       decisionRequestId: request.decisionRequest?.request_id,
       sourceRevision: request.decisionRequest?.source_revision || request.resolution?.source_revision || undefined,
       feedback: decisionFeedback,
@@ -2449,7 +2460,7 @@ export function HarnessWorkbench({ onActivityChange }: { onActivityChange?: (sta
         <div className="workspace-content">
           {view === "data" && <FilePreview preview={preview} file={activeFile} loading={previewLoading} error={previewError} />}
           {view === "loop" && <LoopView run={run} files={allFiles} controlBusy={controlBusy} onControl={controlLoop} onReview={setReviewRequest} onStartTask={startTask} starting={starting} />}
-          {view === "result" && <ResultView result={run?.result ?? null} artifacts={run?.artifact_versions ?? []} commit={run?.last_commit ?? null} decisions={run?.decision_records ?? []} files={allFiles} onOpenFile={openFile} onReview={setReviewRequest} onStartTask={startTask} starting={starting} />}
+          {view === "result" && <ResultView result={run?.result ?? null} artifacts={run?.artifact_versions ?? []} commit={run?.last_commit ?? null} decisions={run?.decision_records ?? []} decisionRequests={run?.decision_requests ?? []} files={allFiles} onOpenFile={openFile} onReview={setReviewRequest} onStartTask={startTask} starting={starting} />}
         </div>
         <details className="workspace-boundary"><summary><IconShieldCheck aria-hidden="true" />数据与执行边界</summary><p>{workspace.data_boundary} Agent 可以检索整个资料库，但每轮只读取服务端校验通过且受预算约束的文件；本轮不会修改原文件或执行外部动作。</p></details>
         {error && run?.status !== "failed" && <div className="workspace-error" role="alert"><IconAlertTriangle aria-hidden="true" /><span>{error}</span></div>}
@@ -2528,7 +2539,10 @@ function LoopView({
     && selectedRound?.round_number === run.current_round
     && selectedRound?.next_step?.decision === "budget_exhausted"
     && Boolean(recoveryKind);
-  const decisionRequests = selectedRound?.next_step?.decision_requests ?? [];
+  const decisionRequests = uniqueDecisionRequests([
+    ...run.decision_requests,
+    ...(selectedRound?.next_step?.decision_requests ?? []),
+  ]);
   const pendingResolutions = (selectedRound?.next_step?.evidence_resolutions ?? []).filter((resolution) => {
     const request = resolution.decision_request ?? decisionRequests.find((item) => item.resolution_id === resolution.resolution_id || item.finding_id === resolution.finding_id);
     const record = [...run.decision_records].reverse().find((item) => item.resolution_id === resolution.resolution_id);
@@ -2637,12 +2651,12 @@ function LoopView({
           <ol>{pendingResolutions.map((resolution, index) => {
             const branch = recoveryBranches.find((item) => item.branch_id === resolution.branch_id);
             const source = files.find((item) => item.file_ref === resolution.file_ref);
-             return <li key={resolution.resolution_id} className={`is-${resolution.status}`}><b>{index + 1}</b><div><span>{resolutionStatusLabel(resolution.status)}</span><h5>{resolution.finding_title}</h5><p>{resolution.fact_summary || resolution.reason}</p><small>{source?.display_label ?? "允许范围内文件"} · {branch?.title ?? "受影响分支"}{resolution.source_revision ? ` · ${evidenceRevisionLabel(resolution.source_revision)}` : ""}</small></div><button type="button" onClick={() => onReview(resolutionReviewRequest(resolution, selectedRound.round_number, branch?.title ?? null, run.decision_records, selectedRound.next_step?.decision_requests))}><IconEye aria-hidden="true" />{resolution.status === "ambiguous" ? "选择原文位置" : resolution.status === "stale" ? "刷新后恢复" : "查看并恢复"}</button></li>;
+             return <li key={resolution.resolution_id} className={`is-${resolution.status}`}><b>{index + 1}</b><div><span>{resolutionStatusLabel(resolution.status)}</span><h5>{resolution.finding_title}</h5><p>{resolution.fact_summary || resolution.reason}</p><small>{source?.display_label ?? "允许范围内文件"} · {branch?.title ?? "受影响分支"}{resolution.source_revision ? ` · ${evidenceRevisionLabel(resolution.source_revision)}` : ""}</small></div><button type="button" onClick={() => onReview(resolutionReviewRequest(resolution, selectedRound.round_number, branch?.title ?? null, run.decision_records, decisionRequests))}><IconEye aria-hidden="true" />{resolution.status === "ambiguous" ? "选择原文位置" : resolution.status === "stale" ? "刷新后恢复" : "查看并恢复"}</button></li>;
           })}</ol>
         </section>}
         <div className="source-recovery-facts"><span><b>已保留</b>本轮计划、文件范围、调用记录</span><span><b>未采用</b>无法定位的候选结论</span><span><b>未发生</b>文件修改或外部动作</span></div>
         <label><span>补充给下一轮的方向（可选）</span><textarea value={recoveryDraft} onChange={(event) => setRecoveryDraft(event.target.value)} placeholder="例如：优先核对功能测试报告与兼容测试报告中的代码版本字段" /></label>
-        <div className="source-recovery-branches">{recoveryBranches.map((branch, index) => { const resolution = pendingResolutions.find((item) => item.branch_id === branch.branch_id); return <article key={branch.branch_id}><div><b>{index === 0 ? "最小受影响分支" : "其他待处理分支"}</b><h4>{branch.title}</h4><p>{branch.objective}</p><small>{branch.missing_file_refs.length} 份待核对资料</small></div>{resolution ? <button type="button" className="is-review" onClick={() => onReview(resolutionReviewRequest(resolution, selectedRound.round_number, branch.title, run.decision_records, selectedRound.next_step?.decision_requests))}><IconEye aria-hidden="true" />先看具体问题</button> : <button type="button" disabled={!canResume || controlBusy !== null} onClick={() => void recoverBranch(branch)}><IconPlayerPlay aria-hidden="true" />{controlBusy ? "正在提交" : "只重试本分支"}</button>}</article>; })}</div>
+        <div className="source-recovery-branches">{recoveryBranches.map((branch, index) => { const resolution = pendingResolutions.find((item) => item.branch_id === branch.branch_id); return <article key={branch.branch_id}><div><b>{index === 0 ? "最小受影响分支" : "其他待处理分支"}</b><h4>{branch.title}</h4><p>{branch.objective}</p><small>{branch.missing_file_refs.length} 份待核对资料</small></div>{resolution ? <button type="button" className="is-review" onClick={() => onReview(resolutionReviewRequest(resolution, selectedRound.round_number, branch.title, run.decision_records, decisionRequests))}><IconEye aria-hidden="true" />先看具体问题</button> : <button type="button" disabled={!canResume || controlBusy !== null} onClick={() => void recoverBranch(branch)}><IconPlayerPlay aria-hidden="true" />{controlBusy ? "正在提交" : "只重试本分支"}</button>}</article>; })}</div>
       </section>}
       {roundBranches.length > 0 && <section className="loop-branches" aria-label={`第 ${selectedRound.round_number} 轮任务分支`}>
         <header><div><span>任务分支现场</span><h3>{roundBranches.length} 条分支，分别保留证据状态</h3></div><b>{roundBranches.filter((branch) => branch.status === "completed").length}/{roundBranches.length} 已核对</b></header>
@@ -2652,11 +2666,46 @@ function LoopView({
           {branch.status === "waiting_input" && waitingForBranch && !guidedRecovery && <div className="loop-branch-actions"><button type="button" className="is-review" onClick={() => onReview(branchReviewRequest(branch, selectedRound.evidence_gaps, selectedRound, run))}><IconEye aria-hidden="true" />查看问题</button><button type="button" onClick={() => void onControl("resume", { branchId: branch.branch_id })} disabled={!canResume || controlBusy !== null}><IconPlayerPlay aria-hidden="true" />{controlBusy === "resume" ? "正在启动" : "继续此分支"}</button></div>}
         </li>)}</ol>
       </section>}
-      {selectedRound.result && <section className="loop-round-result"><span>本轮核对结果</span><h3>{selectedRound.result.summary}</h3><p>{selectedRound.result.findings.length} 条发现，引用 {selectedRound.verified_file_refs.length} 份文件。</p>{selectedRound.result.findings.length > 0 && <div className="loop-review-links">{selectedRound.result.findings.map((finding, index) => <button type="button" key={`${finding.title}:${index}`} onClick={() => onReview(findingReviewRequest(finding, index, selectedRound.round_number, run.decision_records, selectedRound.next_step?.decision_requests))}><IconEye aria-hidden="true" />核对：{finding.title}</button>)}</div>}</section>}
-      {selectedRound.evidence_gaps.length > 0 && <section className="loop-gap"><IconAlertTriangle aria-hidden="true" /><div><span>证据缺口</span><h3>{selectedRound.evidence_gaps.length} 条分支尚未完成</h3><p>{boundedTerminalRecovery ? "当前 Run 已结束。点击缺口可查看具体描述与候选文件，再从上方选择一个分支创建新的独立 Run。" : "点击缺口即可查看具体描述、候选文件和原始内容；只有你确认的分支会进入下一轮。"}</p><div className="loop-review-links">{selectedRound.evidence_gaps.map((gap, index) => {
-        const branch = roundBranches.find((item) => item.branch_id === gap.branch_id) ?? null;
-        return <button type="button" key={gap.gap_id} onClick={() => onReview(gapReviewRequest(gap, index, selectedRound, branch, run))}><IconEye aria-hidden="true" />{gap.label}</button>;
-      })}</div></div></section>}
+      {selectedRound.result && <section className="loop-round-result"><span>本轮核对结果</span><h3>{selectedRound.result.summary}</h3><p>{selectedRound.result.findings.length} 条发现，引用 {selectedRound.verified_file_refs.length} 份文件。</p>{selectedRound.result.findings.length > 0 && <div className="loop-review-links">{selectedRound.result.findings.map((finding, index) => <button type="button" key={`${finding.title}:${index}`} onClick={() => onReview(findingReviewRequest(finding, index, selectedRound.round_number, run.decision_records, decisionRequests))}><IconEye aria-hidden="true" />核对：{finding.title}</button>)}</div>}</section>}
+      {selectedRound.evidence_gaps.length > 0 && <section className="loop-gap" aria-labelledby={`loop-gap-title-${selectedRound.round_number}`}>
+        <header><IconRoute aria-hidden="true" /><div><span>待处理分支</span><h3 id={`loop-gap-title-${selectedRound.round_number}`}>{selectedRound.evidence_gaps.length} 条路径停在证据门</h3><p>{boundedTerminalRecovery ? "旧 Run 已结束；每条路径和已有结果仍保留，可分别查看后创建新任务。" : "每条路径独立保留材料、缺口和下一步；处理一条不会清空其他分支。"}</p></div><b>{selectedRound.evidence_gaps.length} 条待处理</b></header>
+        <ol className="loop-gap-branches">{selectedRound.evidence_gaps.map((gap, index) => {
+          const branch = run.branches.find((item) => item.branch_id === gap.branch_id) ?? null;
+          const branchRequests = decisionRequests.filter((item) => item.branch_id === gap.branch_id && ["pending", "deferred"].includes(item.state ?? "pending"));
+          const openRequest = branchRequests.find((item) => Boolean(item.resolution_id)) ?? branchRequests[0] ?? null;
+          const unresolvedResolutions = run.rounds.flatMap((round) => round.next_step?.evidence_resolutions ?? []);
+          const resolution = unresolvedResolutions.find((item) => item.resolution_id === openRequest?.resolution_id)
+            ?? unresolvedResolutions.find((item) => item.branch_id === gap.branch_id && ["ambiguous", "unavailable", "stale"].includes(item.status))
+            ?? null;
+          const sourceRefs = uniqueFileRefs([...(branch?.input_file_refs ?? []), ...gap.candidate_file_refs]);
+          const primarySource = sourceRefs[0] ? fileLabel(sourceRefs[0]) : null;
+          const gateLabel = resolution?.status === "ambiguous"
+            ? `${resolution.candidates.length} 个原文位置待确认`
+            : resolution?.status === "unavailable"
+              ? "原文位置尚未找到"
+              : resolution?.status === "stale"
+                ? "来源版本已变化"
+                : `${branch?.missing_file_refs.length ?? gap.candidate_file_refs.length} 份引用待补齐`;
+          const reviewRequest = resolution
+            ? resolutionReviewRequest(resolution, selectedRound.round_number, branch?.title ?? null, run.decision_records, decisionRequests)
+            : gapReviewRequest(gap, index, selectedRound, branch, run);
+          const nextLabel = openRequest
+            ? "需要你确认"
+            : boundedTerminalRecovery
+              ? "查看后创建新任务"
+              : "可单独检查或继续";
+          return <li key={gap.gap_id} className={`is-${branch?.status ?? "waiting_input"}`} aria-label={`分支：${branch?.title ?? gap.label}`}>
+            <section className="loop-gap-branch-identity"><span>分支 {index + 1}</span><h4>{branch?.title ?? gap.label}</h4><b>{branch ? branchStatusLabel(branch.status) : "等待处理"}</b></section>
+            <IconArrowRight className="loop-gap-branch-arrow" aria-hidden="true" />
+            <section className="loop-gap-branch-stage"><span>当前材料</span><strong>{primarySource ?? "等待 Agent 重新检索"}</strong><small>{sourceRefs.length > 1 ? `另有 ${sourceRefs.length - 1} 份 · ` : ""}{branch?.verified_file_refs.length ?? 0}/{sourceRefs.length} 份已形成引用</small></section>
+            <IconArrowRight className="loop-gap-branch-arrow" aria-hidden="true" />
+            <section className="loop-gap-branch-stage is-gate"><span>证据门</span><strong>{gateLabel}</strong><small>{gap.detail}</small></section>
+            <IconArrowRight className="loop-gap-branch-arrow" aria-hidden="true" />
+            <section className="loop-gap-branch-next"><span>下一步</span><strong>{nextLabel}</strong><button type="button" onClick={() => onReview(reviewRequest)}><IconEye aria-hidden="true" />{openRequest ? "确认原文位置" : "查看并处理"}</button></section>
+          </li>;
+        })}</ol>
+        <footer><IconShieldCheck aria-hidden="true" /><span>已有成果版本和已完成分支不会被覆盖；当前仍是只读核对，不修改文件，也不执行外部动作。</span></footer>
+      </section>}
       {selectedRound.next_step && <footer className={selectedRound.next_step.decision === "completed" ? "is-complete" : "is-next"}><div><span>服务端决定</span><strong>{gateLabel(selectedRound.next_step.decision)}</strong><p>{selectedRound.next_step.reason}</p></div>{selectedRound.next_step.decision === "waiting_input" ? <b>{guidedRecovery ? "选择恢复分支继续" : "选择上方分支继续"}</b> : boundedTerminalRecovery ? <b>选择上方分支创建新任务</b> : selectedRound.next_step.decision === "next_round" ? <IconArrowRight aria-hidden="true" /> : null}</footer>}
     </article>}
     {run.artifact_versions.length > 0 && <section className="artifact-evolution" aria-label="成果版本">
@@ -2672,6 +2721,7 @@ function ResultView({
   artifacts,
   commit,
   decisions,
+  decisionRequests,
   files,
   onOpenFile,
   onReview,
@@ -2682,6 +2732,7 @@ function ResultView({
   artifacts: ArtifactVersion[];
   commit: LoopCommit | null;
   decisions: DecisionRecord[];
+  decisionRequests: DecisionRequest[];
   files: HarnessFile[];
   onOpenFile: (file: HarnessFile) => void;
   onReview: (request: EvidenceReviewRequest) => void;
@@ -2699,7 +2750,7 @@ function ResultView({
       return <section key={`${finding.title}:${index}`}>
         <b>{index + 1}</b>
         <div><h3>{finding.title}</h3><p>{finding.fact_summary || finding.detail}</p>{finding.impact && <small className="finding-impact">影响：{finding.impact}</small>}{finding.review?.requires_human_decision && <b className="finding-decision-badge">需要你决定</b>}<footer>
-          <button type="button" className="is-review" onClick={() => onReview(findingReviewRequest(finding, index, findingArtifact?.round_number ?? null, decisions))}><IconEye aria-hidden="true" />打开审查页</button>
+          <button type="button" className="is-review" onClick={() => onReview(findingReviewRequest(finding, index, findingArtifact?.round_number ?? null, decisions, decisionRequests))}><IconEye aria-hidden="true" />打开审查页</button>
           {finding.file_refs.map((ref) => {
             const file = files.find((item) => item.file_ref === ref);
             return file ? <button type="button" key={ref} onClick={() => onOpenFile(file)}><IconFile aria-hidden="true" />{file.display_label}</button> : null;

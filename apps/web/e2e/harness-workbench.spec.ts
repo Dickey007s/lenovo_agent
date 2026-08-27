@@ -300,6 +300,7 @@ function snapshot(
     control_state: status === "paused" || status === "waiting_input" ? "paused" : status === "stopped" ? "stopped" : "running",
     control_events: [],
     decision_records: [],
+    decision_requests: [],
     branches,
     active_branch_id: status === "waiting_input" || status === "completed" ? roundOneAnswerBranch : null,
     artifact_versions: rounds.map((round, index) => ({
@@ -384,6 +385,18 @@ function sourceLocationRecoverySnapshot(body: { workspace_id: string; instructio
     detail: "模型已返回候选内容，但服务端不能把引用唯一匹配到安全预览。",
     candidate_file_refs: branch.missing_file_refs,
   }));
+  const decisionRequests = [{
+    decision_request_id: "request-111111111111",
+    finding_id: "finding-333333333333",
+    resolution_id: "resolution-111111111111",
+    branch_id: branches[0].branch_id,
+    source_revision: "rev-20260827-a",
+    expected_version: 13,
+    idempotency_ref: "idem-111111",
+    candidate_ids: ["candidate-111111111111", "candidate-222222222222", ...(candidateCount >= 3 ? ["candidate-333333333333"] : [])],
+    consequence: "只重跑受影响分支，不修改源文件，不执行外部动作。",
+    state: "open",
+  }];
   const round = {
     ...base.rounds[0],
     status: "completed",
@@ -420,18 +433,6 @@ function sourceLocationRecoverySnapshot(body: { workspace_id: string; instructio
         ],
         selected_candidate_id: null,
       }],
-      decision_requests: [{
-        decision_request_id: "request-111111111111",
-        finding_id: "finding-333333333333",
-        resolution_id: "resolution-111111111111",
-        branch_id: branches[0].branch_id,
-        source_revision: "rev-20260827-a",
-        expected_version: 13,
-        idempotency_ref: "idem-111111",
-        candidate_ids: ["candidate-111111111111", "candidate-222222222222", ...(candidateCount >= 3 ? ["candidate-333333333333"] : [])],
-        consequence: "只重跑受影响分支，不修改源文件，不执行外部动作。",
-        state: "pending",
-      }],
     },
   };
   return {
@@ -441,6 +442,7 @@ function sourceLocationRecoverySnapshot(body: { workspace_id: string; instructio
     budget: { ...base.budget, rounds_used: 1, files_verified: 0, model_calls_used: 3, elapsed_ms: 6100 },
     rounds: [round],
     current_round: 1,
+    decision_requests: decisionRequests,
     branches,
     active_branch_id: null,
     artifact_versions: [{ ...base.artifact_versions[0], summary: round.next_step.reason, findings: [], follow_ups: [], evidence_gaps: gaps, source_file_refs: [], finding_count: 0 }],
@@ -523,7 +525,7 @@ function locationFailureSnapshot(body: { workspace_id: string; instruction: stri
 }
 async function fulfillJson(route: Route, body: unknown, status = 200) { await route.fulfill({ status, contentType: "application/json", body: JSON.stringify(body) }); }
 
-async function mockHarness(page: Page, options: { failFirstStart?: boolean; disconnect?: boolean; failed?: boolean; locationFailure?: boolean; sourceRecovery?: boolean; sourceRecoveryThreeCandidates?: boolean; boundedRecovery?: boolean; workspaceFailures?: number; interactiveLoop?: boolean; evidenceGate?: boolean } = {}) {
+async function mockHarness(page: Page, options: { failFirstStart?: boolean; failDecisionDefer?: boolean; disconnect?: boolean; failed?: boolean; locationFailure?: boolean; sourceRecovery?: boolean; sourceRecoveryThreeCandidates?: boolean; boundedRecovery?: boolean; workspaceFailures?: number; interactiveLoop?: boolean; evidenceGate?: boolean } = {}) {
   let workspaceCalls = 0; let startCalls = 0; let streamCalls = 0;
   let currentBody = { workspace_id: "forte-public-office", instruction: "" };
   // Mock snapshots intentionally cover several server state shapes in one route.
@@ -564,6 +566,9 @@ async function mockHarness(page: Page, options: { failFirstStart?: boolean; disc
       controls.push(control);
       const command = control.command;
       controlSequence = Math.max(controlSequence + 1, currentSnapshot.last_event_sequence + 1);
+      if (command === "decision" && control.decision_action === "defer" && options.failDecisionDefer) {
+        return fulfillJson(route, { detail: "待决项版本已经变化，暂缓回执未写入；页面已刷新到最新状态。" }, 409);
+      }
       if (command === "decision") {
         const record = {
           decision_id: `decision-${String(controls.length).padStart(12, "0")}`,
@@ -714,7 +719,7 @@ test("runs an arbitrary task while the agent selects evidence from the whole wor
   await page.getByRole("button", { name: /第 1 轮/ }).click();
   await expect(page.getByText("Agent 本轮自主选择")).toBeVisible();
   await expect(page.getByText("文件名与摘要直接涉及当前目标，先读取这些最小证据。")).toBeVisible();
-  await expect(page.getByText("证据缺口")).toBeVisible();
+  await expect(page.getByText("待处理分支")).toBeVisible();
   await expect(page.locator(".loop-round-detail > footer strong")).toHaveText("等待人工输入");
   await expect(page.locator(".loop-branches")).toContainText("任务分支现场");
   await expect(page.locator(".loop-branches")).toContainText("形成分析结果");
@@ -914,6 +919,24 @@ test("records closing a pending decision as defer and restores the receipt", asy
   });
 });
 
+test("always closes the review page even when the defer receipt conflicts", async ({ page }) => {
+  const state = await mockHarness(page, { failDecisionDefer: true }); await page.goto("/");
+  await page.getByRole("textbox", { name: "任务指令" }).fill("核对新闻搜索路由并说明如何处理。");
+  await page.getByRole("button", { name: "启动 Control Loop" }).click();
+  await page.getByRole("button", { name: /发现与建议/ }).click();
+  await page.getByRole("button", { name: "打开审查页" }).first().click();
+
+  const dialog = page.getByRole("dialog", { name: "需要你核对并决定下一步" });
+  await dialog.getByRole("button", { name: "关闭问题审查页" }).click();
+
+  await expect(dialog).toBeHidden();
+  await expect.poll(() => state.controls.length).toBe(1);
+  await expect(page.locator(".workspace-error")).toContainText("暂缓回执未写入");
+  if (process.env.CAPTURE_DR0033_EVIDENCE === "1") {
+    await page.screenshot({ path: "../../docs/evidence/screenshots/dr-0033-review-closed-after-conflict.png", fullPage: true });
+  }
+});
+
 test("accepts a source candidate for bounded branch recovery", async ({ page }) => {
   const state = await mockHarness(page, { sourceRecovery: true }); await page.goto("/");
   await page.getByRole("textbox", { name: "任务指令" }).fill("核对跨文件版本冲突并逐条定位原文。");
@@ -1046,6 +1069,16 @@ test("pauses an unlocatable result with a guided branch recovery", async ({ page
   await expect(recovery).toContainText("已保留");
   await expect(recovery).toContainText("未采用");
   await expect(recovery).toContainText("未发生");
+  const branchLanes = page.locator(".loop-gap-branches > li");
+  await expect(branchLanes).toHaveCount(2);
+  await expect(branchLanes.first()).toContainText("当前材料");
+  await expect(branchLanes.first()).toContainText("证据门");
+  await expect(branchLanes.first()).toContainText("下一步");
+  await expect(branchLanes.first().getByRole("button", { name: "确认原文位置" })).toBeVisible();
+  if (process.env.CAPTURE_DR0033_EVIDENCE === "1") {
+    await page.setViewportSize({ width: 1600, height: 1000 });
+    await page.locator(".loop-gap").screenshot({ path: "../../docs/evidence/screenshots/dr-0033-branch-evidence-lanes.png" });
+  }
   await recovery.getByRole("textbox", { name: "补充给下一轮的方向（可选）" }).fill("优先核对版本字段和测试时间。");
   if (process.env.CAPTURE_DR0030_EVIDENCE === "1") {
     await recovery.screenshot({ path: "../../docs/evidence/screenshots/dr-0030-source-location-recovery.png" });
