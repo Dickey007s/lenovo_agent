@@ -2,10 +2,14 @@ from __future__ import annotations
 
 import asyncio
 import os
+import sys
 from uuid import uuid4
 
 import psycopg
 import pytest
+
+if sys.platform == "win32":
+    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
 from packages.contracts.harness_models import AgentControlLoopControlRequest
 from services.api.app.application.harness_runtime import HarnessRuntime
@@ -173,9 +177,7 @@ class PostgresRecoveryAnalyst(MixedEvidenceAnalyst):
                 ]
             }
         )
-        return result.model_copy(
-            update={"findings": [result.findings[0], finding]}
-        )
+        return result.model_copy(update={"findings": [finding]})
 
 
 @pytest.mark.asyncio
@@ -233,6 +235,9 @@ async def test_postgres_restarts_with_pending_decision_and_resumes_only_target_b
         restored_requests = getattr(restored, "decision_requests", ())
         assert restored_requests and restored_requests[0].state == "open"
 
+        public_restored = second.public_snapshot(restored)
+        public_request = public_restored.decision_requests[0]
+
         selected = restored_resolution.candidates[0].candidate_id
         decision = await second.control(
             owner,
@@ -240,10 +245,12 @@ async def test_postgres_restarts_with_pending_decision_and_resumes_only_target_b
             AgentControlLoopControlRequest(
                 command="decision",
                 decision_action="accept",
+                decision_request_id=public_request.decision_request_id,
                 finding_id=restored_resolution.finding_id,
                 resolution_id=restored_resolution.resolution_id,
                 branch_id=restored_resolution.branch_id,
                 selected_candidate_id=selected,
+                source_revision=public_request.source_revision,
                 expected_version=restored.version,
                 idempotency_key=f"decision-accept-{uuid4().hex}",
             ),
@@ -258,21 +265,6 @@ async def test_postgres_restarts_with_pending_decision_and_resumes_only_target_b
             if branch.branch_id != target_branch_id
         )
 
-        after_decision = decision.run
-        target_branch = next(
-            branch for branch in after_decision.branches if branch.branch_id == target_branch_id
-        )
-        if target_branch.status != "completed":
-            await second.control(
-                owner,
-                run_id,
-                AgentControlLoopControlRequest(
-                    command="resume",
-                    branch_id=target_branch_id,
-                    expected_version=after_decision.version,
-                    idempotency_key=f"decision-resume-{uuid4().hex}",
-                ),
-            )
         terminal = await wait_terminal(second, owner, run_id)
         assert terminal.status == "completed"
         assert terminal.last_commit and terminal.last_commit.artifact_version == 2

@@ -34,6 +34,7 @@ from packages.contracts.harness_models import (
     AgentControlLoopControlEvent,
     AgentControlLoopControlRequest,
     AgentControlLoopDecisionRecord,
+    AgentControlLoopDecisionRequest,
     AgentControlLoopEvidenceAnchor,
     AgentControlLoopEvidenceCandidate,
     AgentControlLoopEvidenceGap,
@@ -209,6 +210,7 @@ class HarnessFinding(BaseModel):
     finding_id: str | None = Field(
         default=None, pattern=r"^finding-[0-9a-f]{12}$"
     )
+    plan_unit_id: str | None = Field(default=None, min_length=1, max_length=120)
     affected_branch_ids: list[str] = Field(default_factory=list, max_length=12)
     title: str = Field(min_length=1, max_length=240)
     detail: str = Field(min_length=1, max_length=2_000)
@@ -277,6 +279,9 @@ class HarnessRunSnapshot(BaseModel):
         default_factory=list, max_length=100
     )
     decision_records: list[AgentControlLoopDecisionRecord] = Field(
+        default_factory=list, max_length=100
+    )
+    decision_requests: list[AgentControlLoopDecisionRequest] = Field(
         default_factory=list, max_length=100
     )
     branches: list[AgentControlLoopBranch] = Field(default_factory=list, max_length=36)
@@ -366,6 +371,7 @@ class PublicHarnessRunSnapshot(BaseModel):
     control_state: str
     control_events: list[AgentControlLoopControlEvent]
     decision_records: list[AgentControlLoopDecisionRecord]
+    decision_requests: list[AgentControlLoopDecisionRequest]
     branches: list[AgentControlLoopBranch]
     active_branch_id: str | None
     artifact_versions: list[AgentControlLoopArtifactVersion]
@@ -542,6 +548,8 @@ class OpenAICompatibleHarnessAnalyst:
         system = (
             "你是企业办公数据分析 Agent。只根据用户指令、已通过校验的计划和 files 中的公开办公数据回答。"
             "每个 finding 必须引用 files 中真实存在的 file_ref；不允许引用路径、哈希、任务标准答案或未提供的数据。"
+            "每个 finding.plan_unit_id 必须填写 validated_plan.units 中直接产生该发现的 unit_id；"
+            "即使多个任务单元共享同一文件，也不能省略或猜测所属单元。"
             "每个 finding 只描述一个可处置问题。title 应是短标题；fact_summary 用不超过两句话说明发生了什么；impact 单独说明不处理的影响，"
             "不要把多个冲突、推测和建议塞进同一长段 detail。"
             "每个 finding.evidence_quotes 必须给出 1 到 6 个可在对应文件中逐字找到的短片段，至少精确定位一处依据；"
@@ -1041,6 +1049,7 @@ class HarnessRuntime:
                 value is not None
                 for value in (
                     request.decision_action,
+                    request.decision_request_id,
                     request.finding_id,
                     request.resolution_id,
                     request.selected_option_id,
@@ -1216,7 +1225,7 @@ class HarnessRuntime:
         if snapshot.status == "failed":
             raise HarnessConflictError("失败任务没有可绑定的人工决策事实")
         if request.decision_action is None:
-            raise HarnessConflictError("人工决策必须说明接受、否决或暂缓")
+            raise HarnessConflictError("人工决策必须说明接受、否决、暂缓或取消")
         if request.artifact_version is not None or request.instruction is not None:
             raise HarnessConflictError("人工决策不接受成果版本或方向字段")
         if request.finding_id is None and request.resolution_id is None:
@@ -1251,13 +1260,160 @@ class HarnessRuntime:
         if finding_id is None:
             raise HarnessConflictError("旧结果缺少可审计的发现标识，请重新核对")
 
+        packet = next(
+            (
+                item
+                for item in snapshot.decision_requests
+                if item.resolution_id == (resolution.resolution_id if resolution else None)
+                and item.finding_id == finding_id
+            ),
+            None,
+        )
+        if packet is not None:
+            if packet.decision_request_id != request.decision_request_id:
+                raise HarnessConflictError("该发现已有人工决策单，必须引用 decision_request_id")
+            if packet.state not in {"open", "deferred"}:
+                raise HarnessConflictError("人工决策单已经关闭")
+        elif request.decision_request_id is not None:
+            raise HarnessConflictError("人工决策单已经不存在或不属于当前发现")
+
+        async def reject_resolution(
+            message: str, status: Literal["stale", "rejected"]
+        ) -> None:
+            if resolution is not None:
+                now = datetime.now(timezone.utc)
+                updated = self._update_resolution_in_snapshot(
+                    snapshot,
+                    resolution.resolution_id,
+                    {"status": status},
+                )
+                event = HarnessEvent(
+                    sequence=updated.last_event_sequence + 1,
+                    event_name=(
+                        "evidence_resolution_stale"
+                        if status == "stale"
+                        else "evidence_resolution_rejected"
+                    ),
+                    occurred_at=now,
+                    status=updated.status,
+                    message=message,
+                    details={
+                        "resolution_id": resolution.resolution_id,
+                        "status": status,
+                        "external_action": False,
+                    },
+                )
+                run.snapshot = updated.model_copy(
+                    update={
+                        "events": [*updated.events, event],
+                        "last_event_sequence": event.sequence,
+                        "version": updated.version + 1,
+                        "updated_at": now,
+                    }
+                )
+                await self._persist_locked(run)
+            raise HarnessConflictError(message)
+
         if request.decision_action == "accept":
             if resolution is not None:
+                if resolution.status not in {"ambiguous", "unavailable"}:
+                    raise HarnessConflictError("该证据定位已经不是待决状态")
+                if not request.source_revision:
+                    raise HarnessConflictError("接受证据候选必须携带资料版本令牌")
                 candidate_ids = {
                     item.candidate_id for item in resolution.candidates
                 }
                 if request.selected_candidate_id not in candidate_ids:
-                    raise HarnessConflictError("请选择该证据定位中的一个候选位置")
+                    await reject_resolution(
+                        "候选位置不属于服务端决策单，已拒绝本次选择", "rejected"
+                    )
+                selected_candidate = next(
+                    item
+                    for item in resolution.candidates
+                    if item.candidate_id == request.selected_candidate_id
+                )
+                expected_revision = resolution.source_revision
+                supplied_revision = request.source_revision
+                # Re-read the current allowlisted preview and require the same
+                # server-owned candidate to still exist. A persisted quote is
+                # not sufficient proof after the source revision changes.
+                current_file = next(
+                    (
+                        item
+                        for item in self.get_internal_workspace().get("files", [])
+                        if str(item.get("file_ref")) == selected_candidate.file_ref
+                    ),
+                    None,
+                )
+                if current_file is None:
+                    await reject_resolution(
+                        "证据候选对应的资料已经不可用，已标记为 stale", "stale"
+                    )
+                current_revision = self._source_revision(current_file)
+                if current_revision != expected_revision:
+                    await reject_resolution(
+                        "证据候选对应的资料版本已经变化，已标记为 stale", "stale"
+                    )
+                if supplied_revision not in {
+                    expected_revision,
+                    self._public_source_revision(expected_revision),
+                }:
+                    raise HarnessConflictError("资料版本令牌不匹配，请刷新后重试")
+                refreshed = self._analysis_inputs([current_file])
+                current_payload = refreshed[0] if refreshed else {}
+                if current_payload.get("kind") == "table":
+                    current_matches = self._resolve_table_anchor_candidates(
+                        file_ref=selected_candidate.file_ref,
+                        role=resolution.role,
+                        label=resolution.label,
+                        quote=selected_candidate.excerpt,
+                        columns=list(current_payload.get("columns") or []),
+                        rows=list(current_payload.get("rows") or []),
+                    )
+                else:
+                    current_matches = self._resolve_text_anchor_candidates(
+                        file_ref=selected_candidate.file_ref,
+                        role=resolution.role,
+                        label=resolution.label,
+                        quote=selected_candidate.excerpt,
+                        text=str(current_payload.get("text") or ""),
+                    )
+                refreshed_match = next(
+                    (
+                        match
+                        for match in current_matches
+                        if match.start == selected_candidate.start
+                        and match.end == selected_candidate.end
+                        and match.excerpt == selected_candidate.excerpt
+                    ),
+                    None,
+                )
+                if refreshed_match is None:
+                    await reject_resolution(
+                        "证据候选在当前资料中已无法唯一定位，已标记为 stale", "stale"
+                    )
+                refreshed_id = self._evidence_candidate_id(
+                    resolution.resolution_id, refreshed_match
+                )
+                if refreshed_id != selected_candidate.candidate_id:
+                    await reject_resolution(
+                        "证据候选标识已变化，已拒绝本次篡改选择", "rejected"
+                    )
+                expected_digest = self._candidate_digest(
+                    resolution_id=resolution.resolution_id,
+                    file_ref=selected_candidate.file_ref,
+                    locator_kind=selected_candidate.locator_kind,
+                    start=selected_candidate.start,
+                    end=selected_candidate.end,
+                    excerpt=selected_candidate.excerpt,
+                    source_revision=expected_revision,
+                )
+                supplied_digest = request.candidate_digest
+                if supplied_digest and supplied_digest not in {
+                    expected_digest,
+                    self._public_candidate_digest(expected_digest),
+                }:
+                    raise HarnessConflictError("证据候选校验摘要不匹配")
                 if request.selected_option_id is not None:
                     raise HarnessConflictError("证据位置选择不能同时提交业务选项")
             else:
@@ -1278,13 +1434,20 @@ class HarnessRuntime:
         ):
             raise HarnessConflictError("否决或暂缓不接受已选候选")
 
-        affected_branch_ids = (
-            [resolution.branch_id]
-            if resolution is not None and resolution.branch_id
-            else finding.affected_branch_ids
-            if finding is not None
-            else []
-        )
+        if resolution is not None and resolution.affected_branch_ids:
+            affected_branch_ids = resolution.affected_branch_ids
+        elif resolution is not None and resolution.branch_id:
+            affected_branch_ids = [resolution.branch_id]
+        elif finding is not None:
+            affected_branch_ids = finding.affected_branch_ids
+        else:
+            affected_branch_ids = []
+        if (
+            resolution is not None
+            and len(affected_branch_ids) > 1
+            and request.branch_id is None
+        ):
+            raise HarnessConflictError("共享资料同时属于多个分支，请明确选择要恢复的分支")
         branch_id = request.branch_id or (
             affected_branch_ids[0] if affected_branch_ids else None
         )
@@ -1298,8 +1461,41 @@ class HarnessRuntime:
         now = datetime.now(timezone.utc)
         next_version = snapshot.version + 1
         decision_id = f"decision-{uuid4().hex[:12]}"
+        effect: Literal[
+            "branch_resumed", "preserved", "deferred", "cancelled", "none"
+        ] = {
+            "accept": "branch_resumed" if snapshot.status == "waiting_input" else "preserved",
+            "decline": "preserved",
+            "defer": "deferred",
+            "cancel": "cancelled",
+        }[request.decision_action]
+        candidate_digest = None
+        if resolution is not None and request.selected_candidate_id is not None:
+            candidate_digest = next(
+                item.candidate_digest
+                for item in resolution.candidates
+                if item.candidate_id == request.selected_candidate_id
+            )
+        resolution_updates: dict[str, Any] = {
+            "decision_status": {
+                "accept": "accepted",
+                "decline": "declined",
+                "defer": "deferred",
+                "cancel": "cancelled",
+            }[request.decision_action],
+        }
+        if request.decision_action == "accept" and resolution is not None:
+            resolution_updates.update(
+                {
+                    "status": "exact",
+                    "selected_candidate_id": request.selected_candidate_id,
+                }
+            )
+        elif request.decision_action == "decline" and resolution is not None:
+            resolution_updates["status"] = "rejected"
         record = AgentControlLoopDecisionRecord(
             decision_id=decision_id,
+            decision_request_id=packet.decision_request_id if packet else None,
             action=request.decision_action,
             finding_id=finding_id,
             resolution_id=resolution.resolution_id if resolution else None,
@@ -1308,7 +1504,16 @@ class HarnessRuntime:
             selected_candidate_id=request.selected_candidate_id,
             feedback=request.feedback,
             recorded_at=now,
+            source_revision=resolution.source_revision if resolution else "",
+            candidate_digest=candidate_digest,
+            expected_version=snapshot.version,
+            idempotency_key=request.idempotency_key,
+            idempotency_ref=self._public_idempotency_ref(request.idempotency_key),
             accepted_task_version=next_version,
+            applied_task_version=next_version,
+            affected_branch_ids=affected_branch_ids,
+            required_file_refs=[resolution.file_ref] if resolution else finding.file_refs,
+            effect=effect,
         )
         control_id = f"control-{uuid4().hex[:12]}"
         control_event = AgentControlLoopControlEvent(
@@ -1325,6 +1530,7 @@ class HarnessRuntime:
             "accept": "已接受",
             "decline": "已否决",
             "defer": "已暂缓",
+            "cancel": "已取消",
         }[request.decision_action]
         event = HarnessEvent(
             sequence=snapshot.last_event_sequence + 1,
@@ -1341,7 +1547,7 @@ class HarnessRuntime:
                 "external_action": False,
             },
         )
-        run.snapshot = snapshot.model_copy(
+        updated_snapshot = snapshot.model_copy(
             update={
                 "decision_records": [*snapshot.decision_records, record],
                 "control_events": [*snapshot.control_events, control_event],
@@ -1351,6 +1557,42 @@ class HarnessRuntime:
                 "updated_at": now,
             }
         )
+        if resolution is not None or packet is not None:
+            updated_snapshot = self._update_resolution_in_snapshot(
+                updated_snapshot,
+                resolution.resolution_id if resolution is not None else None,
+                resolution_updates,
+                finding_id=finding_id,
+            )
+        should_schedule = (
+            request.decision_action == "accept"
+            and resolution is not None
+            and snapshot.status == "waiting_input"
+            and branch_id is not None
+        )
+        if should_schedule:
+            updated_snapshot = updated_snapshot.model_copy(
+                update={
+                    "status": "planning",
+                    "control_state": "running",
+                    "active_branch_id": branch_id,
+                }
+            )
+            resumed_event = HarnessEvent(
+                sequence=updated_snapshot.last_event_sequence + 1,
+                event_name="branch_resumed_from_checkpoint",
+                occurred_at=now,
+                status="planning",
+                message="已从检查点只恢复目标分支；其他分支和成果版本保持不变。",
+                details={"branch_id": branch_id, "external_action": False},
+            )
+            updated_snapshot = updated_snapshot.model_copy(
+                update={
+                    "events": [*updated_snapshot.events, resumed_event],
+                    "last_event_sequence": resumed_event.sequence,
+                }
+            )
+        run.snapshot = updated_snapshot
         result = HarnessControlResult(run=run.snapshot.model_copy(deep=True))
         existing = await self._persist_locked(
             run,
@@ -1372,6 +1614,19 @@ class HarnessRuntime:
         self._control_idempotent[idempotency_key] = _IdempotentControl(
             digest=digest, result=result
         )
+        condition = run.condition
+        needs_new_task = should_schedule and run.snapshot.run_id not in self._tasks
+        if should_schedule:
+            self._resume_active_budget(run)
+            if needs_new_task:
+                self._schedule_run(
+                    owner_id,
+                    run.snapshot.run_id,
+                    self.get_internal_workspace(),
+                    run.snapshot.instruction,
+                )
+            async with condition:
+                condition.notify_all()
         return result.model_copy(deep=True)
 
     async def _rollback_control_locked(
@@ -1651,6 +1906,27 @@ class HarnessRuntime:
             }
         )
         public_events = [self.public_event(event, snapshot) for event in snapshot.events]
+        public_decision_records = [
+            item.model_copy(
+                update={
+                    "idempotency_key": None,
+                    "idempotency_ref": self._public_idempotency_ref(
+                        item.idempotency_key or item.idempotency_ref
+                    ),
+                    "source_revision": self._public_source_revision(
+                        item.source_revision
+                    )
+                    if item.source_revision
+                    else "",
+                    "candidate_digest": None,
+                }
+            )
+            for item in snapshot.decision_records
+        ]
+        public_decision_requests = [
+            self._public_decision_request(item, ref_to_label, snapshot.version)
+            for item in snapshot.decision_requests
+        ]
         return PublicHarnessRunSnapshot(
             run_id=snapshot.run_id,
             owner_id=snapshot.owner_id,
@@ -1670,7 +1946,8 @@ class HarnessRuntime:
             current_round=snapshot.current_round,
             control_state=snapshot.control_state,
             control_events=snapshot.control_events,
-            decision_records=snapshot.decision_records,
+            decision_records=public_decision_records,
+            decision_requests=public_decision_requests,
             branches=public_branches,
             active_branch_id=snapshot.active_branch_id,
             artifact_versions=public_artifacts,
@@ -1735,6 +2012,7 @@ class HarnessRuntime:
             findings=[
                 HarnessFinding(
                     finding_id=finding.finding_id,
+                    plan_unit_id=finding.plan_unit_id,
                     affected_branch_ids=finding.affected_branch_ids,
                     title=self._project_business_text(finding.title, ref_to_label),
                     detail=self._project_business_text(finding.detail, ref_to_label),
@@ -1833,12 +2111,81 @@ class HarnessRuntime:
                 "candidates": [
                     candidate.model_copy(
                         update={
-                            "excerpt": self._project_business_text(
+                        "excerpt": self._project_business_text(
                                 candidate.excerpt, ref_to_label
                             )
+                            ,
+                            "source_revision": self._public_source_revision(
+                                candidate.source_revision
+                            )
+                            if candidate.source_revision
+                            else "",
+                            "candidate_digest": "",
                         }
                     )
                     for candidate in resolution.candidates
+                ],
+                "source_revision": self._public_source_revision(
+                    resolution.source_revision
+                )
+                if resolution.source_revision
+                else "",
+            }
+        )
+
+    def _public_decision_request(
+        self,
+        decision_request: AgentControlLoopDecisionRequest,
+        ref_to_label: dict[str, str],
+        expected_version: int,
+    ) -> AgentControlLoopDecisionRequest:
+        return decision_request.model_copy(
+            update={
+                "expected_version": expected_version,
+                "reason": self._project_business_text(
+                    decision_request.reason, ref_to_label
+                ),
+                "consequence": self._project_business_text(
+                    decision_request.consequence, ref_to_label
+                ),
+                "options": [
+                    {
+                        **option,
+                        **{
+                            key: self._project_business_text(
+                                str(option[key]), ref_to_label
+                            )
+                            for key in (
+                                "label",
+                                "meaning",
+                                "agent_next_step",
+                                "next_instruction",
+                            )
+                            if key in option
+                        },
+                    }
+                    for option in decision_request.options
+                ],
+                "source_revision": self._public_source_revision(
+                    decision_request.source_revision
+                )
+                if decision_request.source_revision
+                else "",
+                "candidates": [
+                    candidate.model_copy(
+                        update={
+                            "excerpt": self._project_business_text(
+                                candidate.excerpt, ref_to_label
+                            ),
+                            "source_revision": self._public_source_revision(
+                                candidate.source_revision
+                            )
+                            if candidate.source_revision
+                            else "",
+                            "candidate_digest": "",
+                        }
+                    )
+                    for candidate in decision_request.candidates
                 ],
             }
         )
@@ -2283,9 +2630,16 @@ class HarnessRuntime:
                         break
                     await self._safe_point(owner_id, run_id)
                     try:
-                        self._validate_candidate_result_scope(candidate, round_files)
+                        self._validate_candidate_result_scope(
+                            candidate, round_files, plan
+                        )
                         resolution = self._resolve_evidence_anchors(
-                            candidate, analysis_files
+                            candidate,
+                            analysis_files,
+                            {
+                                str(item["file_ref"]): self._source_revision(item)
+                                for item in round_files
+                            },
                         )
                         if resolution.result is not None:
                             self._validate_result(resolution.result, round_files)
@@ -2833,13 +3187,21 @@ class HarnessRuntime:
             )
             run.resume_status = "planning"
             budget = self._freeze_active_budget(run)
+            next_version = snapshot.version + 1
+            decision_requests = [
+                packet.model_copy(update={"expected_version": next_version})
+                if packet.state in {"open", "deferred"}
+                else packet
+                for packet in snapshot.decision_requests
+            ]
             run.snapshot = snapshot.model_copy(
                 update={
                     "status": "waiting_input",
                     "control_state": "paused",
                     "events": [*snapshot.events, event],
                     "last_event_sequence": event.sequence,
-                    "version": snapshot.version + 1,
+                    "version": next_version,
+                    "decision_requests": decision_requests,
                     "budget": budget,
                     "updated_at": now,
                 }
@@ -3272,6 +3634,7 @@ class HarnessRuntime:
                 findings=[
                     AgentControlLoopArtifactFinding(
                         finding_id=item.finding_id,
+                        plan_unit_id=item.plan_unit_id,
                         affected_branch_ids=item.affected_branch_ids,
                         title=item.title,
                         detail=item.detail,
@@ -3293,9 +3656,95 @@ class HarnessRuntime:
                 parent_version=version - 1 if version > 1 else None,
                 created_at=datetime.now(timezone.utc),
             )
+            packets = list(snapshot.decision_requests)
+            current_contract = snapshot.contract
+            for resolution in next_step.evidence_resolutions:
+                if resolution.status == "exact":
+                    continue
+                request_id = "decision-request-" + hashlib.sha256(
+                    f"{run_id}:{resolution.resolution_id}".encode("utf-8")
+                ).hexdigest()[:12]
+                packet = AgentControlLoopDecisionRequest(
+                    decision_request_id=request_id,
+                    run_id=run_id,
+                    finding_id=resolution.finding_id,
+                    resolution_id=resolution.resolution_id,
+                    plan_unit_id=resolution.plan_unit_id,
+                    branch_id=resolution.branch_id,
+                    state="open",
+                    reason=(
+                        f"{resolution.reason} 需要你确认原文位置；"
+                        "Agent 不会把候选位置当作事实，也不会发生外部动作。"
+                    ),
+                    candidates=resolution.candidates,
+                    source_revision=resolution.source_revision,
+                    expected_version=snapshot.version,
+                    affected_branch_ids=resolution.affected_branch_ids
+                    or ([resolution.branch_id] if resolution.branch_id else []),
+                    required_file_refs=[resolution.file_ref],
+                    estimated_additional_rounds=max(
+                        0, min(3, current_contract.max_rounds - round_number)
+                    ),
+                    consequence=(
+                        "接受后只重跑受影响分支并生成新的逻辑成果版本；"
+                        "不会修改原始文件、发送消息或执行外部动作。"
+                    ),
+                    requested_at=datetime.now(timezone.utc),
+                )
+                existing = next(
+                    (item for item in packets if item.decision_request_id == request_id),
+                    None,
+                )
+                if existing is None:
+                    packets.append(packet)
+                elif existing.state == "open":
+                    packets[packets.index(existing)] = packet
+            if result is not None:
+                for finding in result.findings:
+                    review = finding.review
+                    if review is None or not review.requires_human_decision:
+                        continue
+                    request_id = "decision-request-" + hashlib.sha256(
+                        f"{run_id}:{finding.finding_id}:review".encode("utf-8")
+                    ).hexdigest()[:12]
+                    branch_ids = list(finding.affected_branch_ids)
+                    packet = AgentControlLoopDecisionRequest(
+                        decision_request_id=request_id,
+                        run_id=run_id,
+                        finding_id=finding.finding_id,
+                        plan_unit_id=finding.plan_unit_id,
+                        branch_id=branch_ids[0] if len(branch_ids) == 1 else None,
+                        state="open",
+                        reason=review.why_human,
+                        options=[
+                            option.model_dump(mode="json") for option in review.options
+                        ],
+                        source_revision="",
+                        expected_version=snapshot.version,
+                        affected_branch_ids=branch_ids,
+                        required_file_refs=finding.file_refs[:20],
+                        estimated_additional_rounds=max(
+                            (
+                                option.estimated_additional_rounds
+                                for option in review.options
+                            ),
+                            default=0,
+                        ),
+                        consequence=review.after_confirmation,
+                        requested_at=datetime.now(timezone.utc),
+                    )
+                    existing = next(
+                        (item for item in packets if item.decision_request_id == request_id),
+                        None,
+                    )
+                    if existing is None:
+                        packets.append(packet)
+                    elif existing.state == "open":
+                        packets[packets.index(existing)] = packet
             run.snapshot = snapshot.model_copy(
                 update={
                     "artifact_versions": [*snapshot.artifact_versions, artifact],
+                    "decision_requests": packets,
                     "updated_at": datetime.now(timezone.utc),
                 }
             )
@@ -3395,23 +3844,31 @@ class HarnessRuntime:
     ) -> HarnessTaskResult:
         findings: list[HarnessFinding] = []
         for finding in result.findings:
-            branch_ids = cls._matching_branch_ids(finding.file_refs, branches)[:12]
+            exact_unit_candidates = [
+                branch
+                for branch in branches
+                if finding.plan_unit_id is not None
+                and branch.unit_id == finding.plan_unit_id
+            ]
+            latest_unit_round = max(
+                (branch.round_number for branch in exact_unit_candidates),
+                default=None,
+            )
+            exact_unit_branches = [
+                branch.branch_id
+                for branch in exact_unit_candidates
+                if branch.round_number == latest_unit_round
+            ]
+            branch_ids = (
+                exact_unit_branches
+                if exact_unit_branches
+                else cls._matching_branch_ids(finding.file_refs, branches)[:12]
+            )
             resolutions = [
                 item.model_copy(
                     update={
-                        "branch_id": next(
-                            (
-                                branch_id
-                                for branch_id in branch_ids
-                                if item.file_ref
-                                in next(
-                                    branch.input_file_refs
-                                    for branch in branches
-                                    if branch.branch_id == branch_id
-                                )
-                            ),
-                            branch_ids[0] if branch_ids else None,
-                        )
+                        "branch_id": branch_ids[0] if len(branch_ids) == 1 else None,
+                        "affected_branch_ids": branch_ids,
                     }
                 )
                 for item in finding.evidence_resolutions
@@ -3453,10 +3910,32 @@ class HarnessRuntime:
     ) -> list[AgentControlLoopEvidenceResolution]:
         bound: list[AgentControlLoopEvidenceResolution] = []
         for resolution in resolutions:
-            branch_ids = cls._matching_branch_ids([resolution.file_ref], branches)
+            exact_unit_candidates = [
+                branch
+                for branch in branches
+                if resolution.plan_unit_id is not None
+                and branch.unit_id == resolution.plan_unit_id
+            ]
+            latest_unit_round = max(
+                (branch.round_number for branch in exact_unit_candidates),
+                default=None,
+            )
+            exact_unit_branches = [
+                branch.branch_id
+                for branch in exact_unit_candidates
+                if branch.round_number == latest_unit_round
+            ]
+            branch_ids = (
+                exact_unit_branches
+                if exact_unit_branches
+                else cls._matching_branch_ids([resolution.file_ref], branches)
+            )
             bound.append(
                 resolution.model_copy(
-                    update={"branch_id": branch_ids[0] if branch_ids else None}
+                    update={
+                        "branch_id": branch_ids[0] if len(branch_ids) == 1 else None,
+                        "affected_branch_ids": branch_ids,
+                    }
                 )
             )
         return bound
@@ -3787,6 +4266,97 @@ class HarnessRuntime:
                     refs.append(file_ref)
         return refs
 
+    @staticmethod
+    def _update_resolution_in_snapshot(
+        snapshot: HarnessRunSnapshot,
+        resolution_id: str | None,
+        updates: dict[str, Any],
+        *,
+        finding_id: str | None = None,
+    ) -> HarnessRunSnapshot:
+        """Update one pending resolution without rewriting other findings/branches."""
+
+        def update_result(payload: dict[str, Any] | None) -> dict[str, Any] | None:
+            if payload is None:
+                return None
+            result = HarnessTaskResult.model_validate(payload)
+            findings = []
+            for finding in result.findings:
+                resolutions = [
+                    resolution.model_copy(update=updates)
+                    if resolution_id is not None
+                    and resolution.resolution_id == resolution_id
+                    else resolution
+                    for resolution in finding.evidence_resolutions
+                ]
+                findings.append(finding.model_copy(update={"evidence_resolutions": resolutions}))
+            return result.model_copy(update={"findings": findings}).model_dump(mode="json")
+
+        rounds: list[AgentControlLoopRound] = []
+        for round_snapshot in snapshot.rounds:
+            next_step = round_snapshot.next_step
+            if next_step is not None:
+                next_step = next_step.model_copy(
+                    update={
+                        "evidence_resolutions": [
+                            resolution.model_copy(update=updates)
+                            if resolution_id is not None
+                            and resolution.resolution_id == resolution_id
+                            else resolution
+                            for resolution in next_step.evidence_resolutions
+                        ]
+                    }
+                )
+            rounds.append(
+                round_snapshot.model_copy(
+                    update={
+                        "result": update_result(round_snapshot.result),
+                        "next_step": next_step,
+                    }
+                )
+            )
+        top_result = snapshot.result
+        if top_result is not None:
+            top_result = HarnessTaskResult.model_validate(
+                update_result(top_result.model_dump(mode="json"))
+            )
+        request_updates = []
+        for packet in snapshot.decision_requests:
+            if packet.resolution_id == resolution_id and (
+                resolution_id is not None or packet.finding_id == finding_id
+            ):
+                state = {
+                    "accepted": "accepted",
+                    "declined": "declined",
+                    "deferred": "deferred",
+                    "cancelled": "cancelled",
+                }.get(str(updates.get("decision_status")))
+                if state is None and updates.get("status") in {"stale", "rejected"}:
+                    state = str(updates["status"])
+                request_updates.append(
+                    packet.model_copy(
+                        update={
+                            "state": state or packet.state,
+                            "expected_version": snapshot.version,
+                            "selected_candidate_id": updates.get(
+                                "selected_candidate_id", packet.selected_candidate_id
+                            ),
+                            "selected_option_id": updates.get(
+                                "selected_option_id", packet.selected_option_id
+                            ),
+                        }
+                    )
+                )
+            else:
+                request_updates.append(packet)
+        return snapshot.model_copy(
+            update={
+                "rounds": rounds,
+                "result": top_result,
+                "decision_requests": request_updates,
+            }
+        )
+
     async def _mark_current_round_failed(
         self, owner_id: str, run_id: str
     ) -> None:
@@ -3857,6 +4427,49 @@ class HarnessRuntime:
             }
             for item in files
         ]
+
+    @staticmethod
+    def _source_revision(file: dict[str, Any]) -> str:
+        """Use the frozen catalog content digest as the source revision."""
+        return str(file.get("source_revision") or file.get("sha256") or "")
+
+    @staticmethod
+    def _public_source_revision(value: str) -> str:
+        """Expose a short opaque revision, never the catalog hash itself."""
+        return "rev-" + hashlib.sha256(value.encode("utf-8")).hexdigest()[:16]
+
+    @staticmethod
+    def _public_candidate_digest(value: str) -> str:
+        """Expose no candidate digest; retained for old private callers only."""
+        return "cand-" + hashlib.sha256(value.encode("utf-8")).hexdigest()[:16]
+
+    @staticmethod
+    def _public_idempotency_ref(value: str) -> str:
+        return "idem-" + hashlib.sha256(value.encode("utf-8")).hexdigest()[:12]
+
+    @staticmethod
+    def _candidate_digest(
+        *,
+        resolution_id: str,
+        file_ref: str,
+        locator_kind: str,
+        start: int,
+        end: int,
+        excerpt: str,
+        source_revision: str,
+    ) -> str:
+        payload = "|".join(
+            (
+                resolution_id,
+                file_ref,
+                locator_kind,
+                str(start),
+                str(end),
+                excerpt,
+                source_revision,
+            )
+        )
+        return "sha256:" + hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
     async def _invoke_analyst(
         self,
@@ -4208,8 +4821,12 @@ class HarnessRuntime:
         cls,
         result: HarnessTaskResult,
         files: list[dict[str, Any]],
+        source_revisions: dict[str, str] | None = None,
     ) -> _EvidenceResolution:
         files_by_ref = {str(item.get("file_ref")): item for item in files}
+        revisions = source_revisions or {
+            str(item.get("file_ref")): cls._source_revision(item) for item in files
+        }
         resolved_findings: list[HarnessFinding] = []
         evidence_resolutions: list[AgentControlLoopEvidenceResolution] = []
         rejected_finding_count = 0
@@ -4260,6 +4877,16 @@ class HarnessRuntime:
                         start=match.start,
                         end=match.end,
                         excerpt=match.excerpt,
+                        source_revision=revisions.get(candidate.file_ref, ""),
+                        candidate_digest=cls._candidate_digest(
+                            resolution_id=resolution_id,
+                            file_ref=match.file_ref,
+                            locator_kind=match.locator_kind,
+                            start=match.start,
+                            end=match.end,
+                            excerpt=match.excerpt,
+                            source_revision=revisions.get(candidate.file_ref, ""),
+                        ),
                     )
                     for match in matches
                 ]
@@ -4289,6 +4916,7 @@ class HarnessRuntime:
                     AgentControlLoopEvidenceResolution(
                         resolution_id=resolution_id,
                         finding_id=finding_id,
+                        plan_unit_id=finding.plan_unit_id,
                         finding_title=finding.title,
                         fact_summary=finding.fact_summary,
                         impact=finding.impact,
@@ -4299,6 +4927,29 @@ class HarnessRuntime:
                         status=status,
                         reason=reason,
                         candidates=public_candidates,
+                        source_revision=revisions.get(candidate.file_ref, ""),
+                    )
+                )
+            if not finding_resolutions:
+                missing_ref = finding.file_refs[0]
+                resolution_id = cls._evidence_resolution_id(
+                    finding_id, 0, missing_ref, "未提供逐字引用"
+                )
+                finding_resolutions.append(
+                    AgentControlLoopEvidenceResolution(
+                        resolution_id=resolution_id,
+                        finding_id=finding_id,
+                        plan_unit_id=finding.plan_unit_id,
+                        finding_title=finding.title,
+                        fact_summary=finding.fact_summary,
+                        impact=finding.impact,
+                        file_ref=missing_ref,
+                        role="context",
+                        label="模型未提供逐字引用",
+                        query_excerpt="未提供逐字引用",
+                        status="unavailable",
+                        reason="模型没有为该发现提供可供服务端核对的逐字引用。",
+                        source_revision=revisions.get(missing_ref, ""),
                     )
                 )
             unresolved = [
@@ -4371,11 +5022,14 @@ class HarnessRuntime:
 
     @staticmethod
     def _validate_candidate_result_scope(
-        result: HarnessTaskResult, files: list[dict[str, Any]]
+        result: HarnessTaskResult,
+        files: list[dict[str, Any]],
+        plan: HarnessPlan | None = None,
     ) -> None:
         """Reject out-of-scope model references before attempting location repair."""
 
         allowed_refs = {str(item["file_ref"]) for item in files}
+        plan_units = {unit.unit_id: unit for unit in plan.units} if plan else {}
         for finding in result.findings:
             if not set(finding.file_refs).issubset(allowed_refs):
                 raise HarnessPlanError("分析结果引用了本轮计划之外的文件")
@@ -4385,6 +5039,24 @@ class HarnessRuntime:
                 for quote in finding.evidence_quotes
             ):
                 raise HarnessPlanError("分析结果的逐字引用超出本轮允许范围")
+            if not plan:
+                continue
+            if finding.plan_unit_id is not None:
+                unit = plan_units.get(finding.plan_unit_id)
+                if unit is None:
+                    raise HarnessPlanError("分析结果绑定了不存在的计划单元")
+                if not set(finding.file_refs).issubset(unit.input_file_refs):
+                    raise HarnessPlanError("分析结果引用超出其绑定计划单元的文件范围")
+                continue
+            matching_units = [
+                unit
+                for unit in plan.units
+                if set(finding.file_refs).issubset(unit.input_file_refs)
+            ]
+            if len(matching_units) != 1:
+                raise HarnessPlanError(
+                    "共享资料对应多个任务分支，Finding 必须提供 plan_unit_id"
+                )
 
     @staticmethod
     def _validate_result(

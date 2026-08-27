@@ -608,6 +608,12 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, summary:focus
 .evidence-resolution-decision > header h3 { margin: 3px 0 0; font-size: 15px; letter-spacing: 0; }
 .evidence-resolution-decision > header p { margin: 4px 0 0; color: var(--ink-soft); font-size: 11px; line-height: 1.5; }
 .evidence-resolution-decision > header > b { flex: 0 0 auto; padding: 4px 6px; color: #8c570f; background: #ffedca; font-size: 10px; }
+.evidence-revision-note { margin: 4px 0 0; color: var(--muted); font-size: 10px; }
+.decision-request-meta { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1px; margin: 0; padding: 0; background: #d8e2ec; }
+.decision-request-meta > div { min-width: 0; display: grid; gap: 3px; padding: 9px 10px; background: #fff; }
+.decision-request-meta dt { color: var(--muted); font-size: 10px; }
+.decision-request-meta dd { min-width: 0; margin: 0; overflow: hidden; color: var(--ink-soft); font-size: 10px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
+.evidence-candidate-difference { grid-column: 1 / -1; margin-top: 3px; padding-top: 4px; border-top: 1px solid #e2e8ee; color: #4d6477 !important; line-height: 1.45; }
 .resolution-impact-list { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1px; margin: 0; padding: 0; list-style: none; background: #d8e2ec; }
 .resolution-impact-list li { min-width: 0; display: grid; grid-template-columns: 24px minmax(0, 1fr); gap: 7px; padding: 9px; background: #fff; }
 .resolution-impact-list li > b { width: 22px; height: 22px; display: grid; place-items: center; color: var(--blue); background: var(--blue-soft); font-size: 9px; }
@@ -736,7 +742,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, summary:focus
   .loop-budget { width: 100%; grid-template-columns: repeat(4, minmax(0, 1fr)); }
   .loop-budget span { justify-content: center; }
   .loop-controls { grid-template-columns: 1fr; }
-  .loop-failure-recovery ol, .source-recovery-facts, .review-summary-steps, .resolution-impact-list, .gap-recovery-facts { grid-template-columns: 1fr; }
+  .loop-failure-recovery ol, .source-recovery-facts, .review-summary-steps, .resolution-impact-list, .gap-recovery-facts, .decision-request-meta { grid-template-columns: 1fr; }
   .gap-recovery-facts li { border-right: 0; border-bottom: 1px solid #dce5ee; }
   .gap-recovery-facts li:last-child { border-bottom: 0; }
   .loop-failure-recovery > footer, .evidence-review-decision > footer, .evidence-resolution-decision > footer, .evidence-gap-recovery > footer, .decision-recommendation-gate { align-items: stretch; flex-direction: column; }
