@@ -82,6 +82,11 @@ spending the next round automatically. The user chooses one “继续此分支�
 versioned `resume` carries that `branch_id`, and nothing is claimed to have
 happened until the receipt returns. The next round is restricted to that
 Branch's displayed missing files; unselected branches keep their waiting state.
+The Gap area projects each unresolved item as one Branch lane rather than a flat
+button list: Branch identity and status lead to current safe file labels, then the
+Evidence Gate reason and the next available action. These cells join only by
+server-owned `branch_id`; they do not imply parallel Workers or successful use of
+every listed file.
 If the same recovery reaches `stopped/bounded`, there is no next round inside the
 old Run. The UI replaces resume controls with unfinished Branch cards. Selecting
 one combines its objective with optional user direction and creates a new
@@ -94,6 +99,14 @@ receipts show what was attempted and adopted. A user may inspect candidate files
 but without an Evidence Anchor the page never invents a row highlight. Guidance
 is optional: a waiting Run can retry only the affected Branch with an empty
 feedback field, while a terminal Run must create a new independent task.
+
+Open human decisions are authoritative in the Snapshot-level
+`decision_requests[]`; round-level copies are compatibility projections only.
+Closing or pressing Escape exits the review surface before the browser attempts a
+versioned `defer`. A successful receipt keeps the packet actionable as deferred;
+a 409 or transport failure is displayed outside the closed review surface and the
+browser refreshes the Snapshot. The UI never traps the user until a network write
+succeeds and never labels a failed defer as recorded.
 
 Each completed round creates an independent append-only logical evidence-brief
 ArtifactVersion. The final brief appears only after citation-scope validation

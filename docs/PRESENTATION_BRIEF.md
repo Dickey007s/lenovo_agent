@@ -60,7 +60,7 @@ Agent Control Loop 的逐模块历史基线、当前三轮只读纵切和后续�
 3. 不勾选文件，只输入一个现场提出的新目标，并设置轮次、每轮文件、模型调用和 Agent 执行时间；说明默认 1200 秒只统计 active 时间，人工阅读和暂停不计入。
 4. 启动 Loop，指出合同已冻结完整 96 文件索引；Planner 与 Analyst 的独立模型回执才是调用事实。
 5. 展示 Agent 本轮选择了哪些文件、为什么选择，以及服务端如何把超预算候选限制在本轮上限内。
-6. 在 Evidence Gate 停下来，先点“查看问题”：第一屏先说明问题在 Agent 的结构/定位/覆盖交付，不等于源文件有错；用户可以不填线索，直接“让 Agent 只重试此分支”。再打开候选文件，说明没有 Anchor 就不伪造高亮。
+6. 在 Evidence Gate 停下来，先让观众读一条 Branch lane：从分支、当前材料、证据门原因一路看到下一步；再点“查看并处理”。第一屏说明问题在 Agent 的结构/定位/覆盖交付，不等于源文件有错。关闭审查页应立即返回 Loop；即使 defer 回执冲突也只显示可恢复提示，不能把用户困在弹窗。没有 Anchor 就不伪造高亮。
 7. 展示成果简报从 v1 到 v2；再恢复 v1，说明系统只新增一条 TaskCommit、当前指针改变，v2 与原文件都没有被覆盖。
 8. 对 Finding 点“打开审查页”：先按 1/2/3 讲事实、影响和人工动作，再在左侧选择“设计预期/实际观测”，让右侧真实文件跳到并高亮原文；强调位置匹配不等于结论正确。
 9. 先选择 A/B/C 中自己的初始口径，再点“对照 Agent 建议”；补充“同时核对发布记录中的代码版本”后确认。指出推荐默认隐藏以减少锚定，确认只创建新只读 Loop，不会直接改源文件。
@@ -143,6 +143,8 @@ Agent Control Loop 的逐模块历史基线、当前三轮只读纵切和后续�
 | active deadline | 用户阅读、开会或暂停时不会把 Agent 预算烧光 | “Agent 执行时间”、已用 active 秒数、精确停止原因 | 默认 1200 秒、上限 3000 秒；`budget.elapsed_ms/stop_reason`，waiting/pause 冻结 |
 | Agent 自有缺口处置 | 用户不再被要求替 Agent 猜行号或修改候选文件 | 原目标、尝试文件、模型调用/采用、保留项、无外部动作、只重试本分支 | `recovery_kind` + Branch/Gap + model receipt；无 Anchor 不高亮 |
 | 服务端任务 Branch | 用户不用把整组缺口一次性全放行，可只推进一条工作线 | 分支状态、依赖、资料/缺口数量、“继续此分支” | `branches[]`、`candidate_branch_ids`、`active_branch_id`、带 `branch_id` 的 resume |
+| 分支状 Evidence Gap | 用户无需逐个打开扁平按钮猜任务结构，可在一行内看见“分支 -> 材料 -> 证据门 -> 下一步” | Branch lane、当前安全文件标签、Gate 原因、确认/处理入口 | `branches[]` + `evidence_gaps[].branch_id` + 顶层 `decision_requests[]`；不代表多 Worker 并行 |
+| 可退出的问题审查 | 用户可以先离开再回来，不会被暂缓回执的 409 或断网困在模态页 | 立即关闭、回执失败提示、待决项仍可重开 | 浏览器退出状态 + versioned `decision` 回执 + Snapshot 刷新；失败不得显示为已 defer |
 | 版本化人工控制 | 用户不必只能等待模型跑完 | 暂停、继续、调整下一轮、结束并保留 | `ControlEvent`、expected version、幂等回执 |
 | Snapshot 持久化与安全恢复 | 刷新/进程重启不必把已完成轮次当作丢失 | “检查点已恢复”、原轮次/预算/版本、显式继续 | PostgreSQL `HarnessStateStore`、`checkpoint_recovered` |
 | 独立不可变成果记录 | 用户看见每轮成果，提交不再通过改写版本表达 | 简报 v1/v2、草稿/已核对、当前版本指针 | append-only `ArtifactVersion`、独立 `TaskCommit` |

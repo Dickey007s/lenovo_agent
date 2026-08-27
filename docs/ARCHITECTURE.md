@@ -184,7 +184,8 @@ The root page keeps three independently meaningful regions:
 - file-manager rail: a collapsible hierarchy projected from server-owned
   `folders[]/display_path`, plus search, type filters and safe file opening;
 - work area: task composer, loop contract, safe preview, round canvas, evidence
-  gaps, server-backed task-branch state, branch-specific continue decision,
+  gaps projected as Branch lanes (Branch -> current material -> Evidence Gate ->
+  next action), server-backed task-branch state, branch-specific continue decision,
   immutable result history, restore actions, cited brief and a full-page issue
   review surface for Gap, Branch, Finding and next-task proposals;
 - activity pane: current phase, budget, ordered events and model adoption receipts.
@@ -200,8 +201,10 @@ user feedback. The Agent recommendation stays hidden until the user selects an
 initial option and asks to compare. Accept/decline/defer first become a versioned,
 idempotent DecisionRecord bound to Finding/Resolution/Branch. Accepting a business
 option then creates a new read-only Run; accepting an ambiguous source position
-steers and resumes only its current waiting Branch. Closing a pending sheet means
-defer, not silent dismissal. None of these operations edits the source. The
+steers and resumes only its current waiting Branch. Closing a pending sheet exits
+the modal immediately and then attempts a versioned defer; a 409 or transport
+failure remains a visible non-blocking error and cannot be called a recorded
+decision. None of these operations edits the source. The
 browser never derives a location from claim text. A budget-stopped recovery view
 similarly creates a new Run for one unresolved Branch objective and never sends
 `resume` or `steer` to the terminal Run; prior ArtifactVersions remain attached

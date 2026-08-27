@@ -20,6 +20,15 @@ Evidence before changing those paths. Snapshot JSONB persistence is not an
 independent decision ledger or multi-instance CAS; report the real PostgreSQL gate
 and any skipped condition explicitly.
 
+DR-0033 governs review exit and Evidence Gap presentation. Read
+`docs/decisions/DR-0033-closable-review-and-branch-lanes.md` and
+`docs/scenarios/SCENARIO-019-close-review-and-handle-one-branch.md` before changing
+these paths. A review must close immediately even when its best-effort `defer`
+receipt gets 409 or a transport error; the error remains visible and must not be
+presented as recorded. Evidence Gaps must be projected as Branch lanes joining
+Branch, current material, Evidence Gate and next action by server-owned IDs, not
+as a flat pill list and not as proof of parallel Workers.
+
 源码永远高于文档。行为或叙事变化后必须同步 living docs、Decision、Scenario、
 Source、Evidence 和 UI-server fact mapping，不能只更新 README。
 
@@ -37,6 +46,7 @@ Source、Evidence 和 UI-server fact mapping，不能只更新 README。
 - 终态 `result.follow_ups` 最多显示 4 条 Agent 下一步建议。建议不是执行事实；当前协议没有逐项引用，审查页只能把 Finding refs 并集标为本轮上下文，不得冒充直接证据。只有用户点击“确认并启动”后才创建新的独立 Run，旧 Run/结果不得被覆盖。
 - 当前可在最多 3 轮内到 `completed/stopped/failed`。默认 deadline 为 1200 秒、允许范围 20-3000 秒，只累计 Agent active 时间；`waiting_input`、显式 pause 和 terminal 状态冻结 elapsed，合法 resume 从已用 active elapsed 继续。validated plan unit 由服务端编译为稳定 Branch；Evidence Gate 按 Branch 维护已核对/缺失引用。证据不足且预算允许时进入 `waiting_input/paused`，用户只选择一条 waiting Branch 继续，下一轮范围严格等于该 Branch 的 `missing_file_refs`，其他 Branch 保持等待。合法范围内的 Analyst 原文定位或结构输出失败最多受控重试一次：可定位 Finding 可部分采用；全不可用时保留 Plan/Branch/调用事实，并以 `next_step.recovery_kind=source_location|analysis_output` 暂停最小分支；范围越权和完整性错误仍 fail closed。每个完成轮次生成独立 append-only 逻辑 evidence-brief ArtifactVersion，成功终态新增 TaskCommit 指针而不改写版本。`completed` 代表 schema/ref/read-only/branch-record checks 通过且 `review_required=true`；不代表任务正确、质量通过、源文件写入、Tool/Worker/Connector 或外部动作发生。
 - `pause/resume/steer/stop/rollback/decision` 必须携带 expected version 与幂等键。Branch resume 还携带 `branch_id`；rollback 还携带 `artifact_version`，只新增 TaskCommit 并恢复逻辑 Brief，不删除历史或回滚源文件。decision 把 `accept/decline/defer/cancel` 绑定到当前 DecisionRequest/Finding/Resolution/Branch；accept 证据候选还必须携带 source revision，服务端重新读取 Catalog 并重算 candidate。关闭待决页记录 defer，defer 后仍可继续最终决定；cancel 不冒充 rejected。它们不改变原文件或外部状态。pause/stop 只在模型调用之间的安全点生效；steer 只影响下一轮；deadline 阻止新调用但不硬取消在途 HTTP 请求。预算终态必须显示 `budget.stop_reason` 的具体中文原因，不得只显示 raw `budget_exhausted`；terminal Run 不得 resume，只能按 Branch 创建新 Run。
+- 开放待决单以 Snapshot 顶层 `decision_requests[]` 为权威，旧轮次投影只作兼容读取。关闭或 Escape 必须先退出审查页，再尝试写入 defer；409/断网只显示非阻塞错误并刷新 Snapshot，不能把用户困在弹窗，也不能伪造回执成功。Evidence Gap 区固定使用“分支 -> 当前材料 -> Evidence Gate -> 下一步”的 Branch lane；各单元只能来自 Branch/Gap/Resolution/Decision 服务端事实，不得把可视分支解释成并行 Worker。
 - Snapshot 是状态权威，SSE 是有序变更投影。浏览器只单调应用 version/sequence，nonterminal 断线用 GET + `after=N`，terminal event 后 final GET。
 - 配置 `DATABASE_DSN` 时，Run Snapshot、事件、start/control 幂等回执以及独立 ArtifactVersion/TaskCommit 写入 PostgreSQL；重启恢复会删除未完成轮次、追加 `checkpoint_recovered` 并暂停，绝不自动重放中断的模型调用。真实 PostgreSQL 顺序 Runtime 由 PR integration workflow 验证；这不等于多实例 lease、高可用或在途 HTTP 续跑。未配置数据库时明确使用单进程 memory 且重启不恢复。`X-User-Id` 是未签名演示 Owner。
 - `start-demo.ps1` 的状态库优先级是 Docker、本轮 PowerShell 进程显式 `DATABASE_DSN`、memory。没有前两者时必须用空进程变量覆盖 `.env` 残留 DSN；模型配置仍可从 `.env` 读取。前台/汇报只以 `/v1/health.checkpoint/task_store` 判断本轮是否可恢复。

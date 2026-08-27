@@ -213,6 +213,12 @@ multi-instance coordination and governed external action remain target work.
   candidate resumes only its Branch, preserves v1 and appends v2. These records
   remain nested in Snapshot JSONB, not an independently queryable decision ledger;
   no database CAS, multi-instance lease or in-flight model replay is claimed.
+- `DR-0033` fixes the front-end projection of that contract. Open
+  `DecisionRequest` packets come from the Snapshot top level; closing a review
+  exits immediately and only then attempts a truthful `defer` receipt, so a 409
+  can never trap the user. Evidence Gaps are shown as Branch lanes connecting
+  Branch, current materials, Evidence Gate and next action. This is a UI fact
+  projection, not proof of parallel Workers or improved user outcomes.
 - No target-user study has been run. Clarity, trust, efficiency and user value
   remain hypotheses.
 
@@ -233,6 +239,8 @@ The current actionable review and recoverable-analysis interaction is tracked in
 [`ACTIONABLE-REVIEW-AND-RECOVERY-20260826`](docs/evidence/ACTIONABLE-REVIEW-AND-RECOVERY-EVIDENCE-20260826.md).
 The current persistent decision and Finding/Branch-local recovery increment is tracked in
 [`DR-0032-POSTGRES-DECISION-RECOVERY-EVIDENCE-20260827`](docs/evidence/DR-0032-POSTGRES-DECISION-RECOVERY-EVIDENCE-20260827.md).
+The current closable-review and Branch-lane interaction increment is tracked in
+[`DR-0033-CLOSABLE-REVIEW-BRANCH-LANES-EVIDENCE-20260827`](docs/evidence/DR-0033-CLOSABLE-REVIEW-BRANCH-LANES-EVIDENCE-20260827.md).
 
 ## Local run
 
