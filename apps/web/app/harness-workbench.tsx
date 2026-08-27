@@ -42,11 +42,13 @@ type LoopControlOptions = {
   instruction?: string;
   branchId?: string;
   artifactVersion?: number;
-  decisionAction?: "accept" | "decline" | "defer";
+  decisionAction?: "accept" | "decline" | "defer" | "cancel";
   findingId?: string;
   resolutionId?: string;
   selectedOptionId?: FindingDecisionOption["option_id"];
   selectedCandidateId?: string;
+  decisionRequestId?: string;
+  sourceRevision?: string;
   feedback?: string;
 };
 type EvidenceRole = "expected" | "observed" | "support" | "contradiction" | "context";
@@ -66,6 +68,21 @@ type EvidenceCandidate = {
   start: number;
   end: number;
   excerpt: string;
+  source_revision?: string | null;
+  context_before?: string | null;
+  context_after?: string | null;
+};
+type DecisionRequest = {
+  request_id: string;
+  finding_id: string;
+  resolution_id: string | null;
+  branch_id: string | null;
+  source_revision: string | null;
+  expected_version: number | null;
+  idempotency_ref: string | null;
+  candidate_ids: string[];
+  consequence: string;
+  state: "pending" | "deferred" | "accepted" | "declined" | "cancelled" | "rejected" | null;
 };
 type EvidenceResolution = {
   resolution_id: string;
@@ -82,6 +99,9 @@ type EvidenceResolution = {
   reason: string;
   candidates: EvidenceCandidate[];
   selected_candidate_id: string | null;
+  source_revision?: string | null;
+  decision_request?: DecisionRequest | null;
+  decision_status?: "pending" | "deferred" | "accepted" | "declined" | "cancelled" | "rejected" | null;
 };
 type FindingDecisionOption = {
   option_id: "A" | "B" | "C";
@@ -132,6 +152,7 @@ type EvidenceReviewRequest = {
   affectedBranchIds: string[];
   resolution: EvidenceResolution | null;
   decisionRecord: DecisionRecord | null;
+  decisionRequest: DecisionRequest | null;
   serverFact: string;
   boundary: string;
   gapRecovery: GapRecoveryContext | null;
@@ -230,6 +251,7 @@ type HarnessFinding = {
   file_refs: string[];
   evidence_anchors: EvidenceAnchor[];
   evidence_resolutions: EvidenceResolution[];
+  decision_request: DecisionRequest | null;
   review: FindingReview | null;
 };
 type HarnessResult = { summary: string; findings: HarnessFinding[]; follow_ups: string[]; review_required: boolean };
@@ -276,6 +298,7 @@ type LoopNextStep = {
   candidate_branch_ids: string[];
   recovery_kind: "source_location" | "analysis_output" | null;
   evidence_resolutions: EvidenceResolution[];
+  decision_requests: DecisionRequest[];
 };
 
 type LoopRound = {
@@ -355,13 +378,14 @@ type LoopCommit = {
 
 type DecisionRecord = {
   decision_id: string;
-  action: "accept" | "decline" | "defer";
+  action: "accept" | "decline" | "defer" | "cancel";
   finding_id: string;
   resolution_id: string | null;
   branch_id: string | null;
   selected_option_id: FindingDecisionOption["option_id"] | null;
   selected_candidate_id: string | null;
   feedback: string | null;
+  idempotency_ref: string | null;
   recorded_at: string;
   accepted_task_version: number;
   external_action: "none";
@@ -483,6 +507,43 @@ const TASK_EXAMPLES = [
 function asText(value: unknown, fallback = "") { return typeof value === "string" ? value : fallback; }
 function asStrings(value: unknown) { return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : []; }
 function asNumber(value: unknown, fallback = 0) { return typeof value === "number" && Number.isFinite(value) ? value : fallback; }
+
+function normalizeDecisionRequest(value: unknown): DecisionRequest | null {
+  if (!value || typeof value !== "object") return null;
+  const raw = value as Record<string, unknown>;
+  const requestId = asText(raw.decision_request_id || raw.request_id);
+  const findingId = asText(raw.finding_id);
+  if (!requestId || !findingId) return null;
+  const expectedVersion = typeof raw.expected_version === "number"
+    ? raw.expected_version
+    : typeof raw.accepted_task_version === "number" ? raw.accepted_task_version : null;
+  const rawCandidateIds = asStrings(raw.candidate_ids);
+  const candidateIds = rawCandidateIds.length
+    ? rawCandidateIds
+    : Array.isArray(raw.candidates)
+      ? raw.candidates.flatMap((candidate) => candidate && typeof candidate === "object" ? [asText((candidate as Record<string, unknown>).candidate_id)] : []).filter(Boolean)
+      : [];
+  return {
+    request_id: requestId,
+    finding_id: findingId,
+    resolution_id: asText(raw.resolution_id) || null,
+    branch_id: asText(raw.branch_id) || null,
+    source_revision: asText(raw.source_revision || raw.sourceRevision) || null,
+    expected_version: expectedVersion,
+    idempotency_ref: asText(raw.idempotency_ref) || null,
+    candidate_ids: candidateIds,
+    consequence: asText(raw.consequence || raw.after_confirmation || raw.next_step, "只重跑受影响分支，不修改源文件，不执行外部动作。"),
+    state: normalizeDecisionState(raw.state || raw.decision_status || raw.status),
+  };
+}
+
+function normalizeDecisionState(value: unknown): DecisionRequest["state"] {
+  const state = asText(value).toLowerCase();
+  if (state === "canceled") return "cancelled";
+  return ["pending", "deferred", "accepted", "declined", "cancelled", "rejected"].includes(state)
+    ? state as DecisionRequest["state"]
+    : null;
+}
 function formatSize(value: number) {
   if (value < 1024) return `${value} B`;
   if (value < 1024 * 1024) return `${(value / 1024).toFixed(1)} KB`;
@@ -562,7 +623,7 @@ function uniqueFileRefs(refs: string[]) {
   return Array.from(new Set(refs));
 }
 
-function findingReviewRequest(finding: HarnessFinding, index: number, roundNumber: number | null, decisions: DecisionRecord[] = []): EvidenceReviewRequest {
+function findingReviewRequest(finding: HarnessFinding, index: number, roundNumber: number | null, decisions: DecisionRecord[] = [], decisionRequests: DecisionRequest[] = []): EvidenceReviewRequest {
   const decisionRecord = [...decisions].reverse().find((item) => item.finding_id === finding.finding_id && item.resolution_id === null) ?? null;
   return {
     reviewKey: `finding:${roundNumber ?? "final"}:${index}:${finding.title}`,
@@ -582,6 +643,7 @@ function findingReviewRequest(finding: HarnessFinding, index: number, roundNumbe
     affectedBranchIds: finding.affected_branch_ids,
     resolution: null,
     decisionRecord,
+    decisionRequest: finding.decision_request ?? decisionRequests.find((item) => item.finding_id === finding.finding_id) ?? null,
     serverFact: finding.evidence_anchors.length
       ? `服务端已把 ${finding.evidence_anchors.length} 处原文片段唯一定位到本轮安全预览，并核对文件范围。`
       : "相关 file_ref 已通过本轮允许范围与引用成员关系校验，但旧结果没有精确位置。",
@@ -654,6 +716,7 @@ function gapReviewRequest(gap: EvidenceGap, index: number, round: LoopRound, bra
     affectedBranchIds: gap.branch_id ? [gap.branch_id] : [],
     resolution: null,
     decisionRecord: null,
+    decisionRequest: null,
     serverFact: recovery.analysisCalled
       ? `分析模型已经调用，服务端${recovery.analysisOutputUsed ? "采用了可核对部分" : "未采用未通过校验的返回内容"}；候选文件和分支状态均已保留。`
       : "服务端尚未采用任何分析结果；候选文件和分支状态均已保留。",
@@ -693,6 +756,7 @@ function proposalReviewRequest(proposal: string, index: number, result: HarnessR
     affectedBranchIds: [],
     resolution: null,
     decisionRecord: null,
+    decisionRequest: null,
     serverFact: "该建议来自本轮已读取资料和已形成的发现；只有用户确认后，服务端才会创建新的独立 Run。",
     boundary: "当前协议没有为每条 follow_up 单独绑定引用。下方文件是本轮结果上下文，不应被理解为这条建议的直接证据。",
     gapRecovery: null,
@@ -867,6 +931,9 @@ function normalizeEvidenceCandidate(value: unknown): EvidenceCandidate | null {
     start,
     end,
     excerpt,
+    source_revision: asText(raw.source_revision || raw.sourceRevision) || null,
+    context_before: asText(raw.context_before) || null,
+    context_after: asText(raw.context_after) || null,
   };
 }
 
@@ -896,6 +963,9 @@ function normalizeEvidenceResolution(value: unknown): EvidenceResolution | null 
       ? raw.candidates.map(normalizeEvidenceCandidate).filter((item): item is EvidenceCandidate => item !== null)
       : [],
     selected_candidate_id: asText(raw.selected_candidate_id) || null,
+    source_revision: asText(raw.source_revision || raw.sourceRevision) || null,
+    decision_request: normalizeDecisionRequest(raw.decision_request) ?? (Array.isArray(raw.decision_requests) ? raw.decision_requests.map(normalizeDecisionRequest).find((item): item is DecisionRequest => item !== null) ?? null : null),
+    decision_status: normalizeDecisionState(raw.decision_status || raw.decisionState),
   };
 }
 
@@ -904,6 +974,7 @@ function resolutionReviewRequest(
   roundNumber: number,
   branchTitle: string | null,
   decisions: DecisionRecord[],
+  decisionRequests: DecisionRequest[] = [],
 ): EvidenceReviewRequest {
   const anchors = resolution.candidates.map((candidate): EvidenceAnchor => ({
     file_ref: candidate.file_ref,
@@ -932,6 +1003,7 @@ function resolutionReviewRequest(
     affectedBranchIds: resolution.branch_id ? [resolution.branch_id] : [],
     resolution,
     decisionRecord: [...decisions].reverse().find((item) => item.resolution_id === resolution.resolution_id) ?? null,
+    decisionRequest: resolution.decision_request ?? decisionRequests.find((item) => item.resolution_id === resolution.resolution_id || item.finding_id === resolution.finding_id) ?? null,
     serverFact: resolution.status === "ambiguous"
       ? `服务端找到 ${resolution.candidates.length} 个真实位置，但不能替用户判断哪一个支撑当前结论。`
       : "服务端没有在本轮安全预览中找到该候选片段，受影响分支已暂停，其他结果保持不变。",
@@ -1006,6 +1078,7 @@ function normalizeResult(value: unknown): HarnessResult | null {
       evidence_resolutions: Array.isArray(finding.evidence_resolutions)
         ? finding.evidence_resolutions.map(normalizeEvidenceResolution).filter((item): item is EvidenceResolution => item !== null)
         : [],
+      decision_request: normalizeDecisionRequest(finding.decision_request) ?? (Array.isArray(finding.decision_requests) ? finding.decision_requests.map(normalizeDecisionRequest).find((item): item is DecisionRequest => item !== null) ?? null : null),
       review: normalizeFindingReview(finding.review),
     }] : [];
   }) : [];
@@ -1099,6 +1172,9 @@ function normalizeLoopRound(value: unknown): LoopRound | null {
       : null,
     evidence_resolutions: Array.isArray(nextRaw.evidence_resolutions)
       ? nextRaw.evidence_resolutions.map(normalizeEvidenceResolution).filter((item): item is EvidenceResolution => item !== null)
+      : [],
+    decision_requests: Array.isArray(nextRaw.decision_requests)
+      ? nextRaw.decision_requests.map(normalizeDecisionRequest).filter((item): item is DecisionRequest => item !== null)
       : [],
   } : null;
   return {
@@ -1196,6 +1272,7 @@ function normalizeArtifactVersion(value: unknown): ArtifactVersion | null {
       evidence_resolutions: Array.isArray(finding.evidence_resolutions)
         ? finding.evidence_resolutions.map(normalizeEvidenceResolution).filter((item): item is EvidenceResolution => item !== null)
         : [],
+      decision_request: normalizeDecisionRequest(finding.decision_request) ?? (Array.isArray(finding.decision_requests) ? finding.decision_requests.map(normalizeDecisionRequest).find((item): item is DecisionRequest => item !== null) ?? null : null),
       review: normalizeFindingReview(finding.review),
     }] : [];
   }) : [];
@@ -1245,7 +1322,7 @@ function normalizeDecisionRecord(value: unknown): DecisionRecord | null {
   const decisionId = asText(raw.decision_id);
   const action = asText(raw.action);
   const findingId = asText(raw.finding_id);
-  if (!decisionId || !findingId || !["accept", "decline", "defer"].includes(action)) return null;
+  if (!decisionId || !findingId || !["accept", "decline", "defer", "cancel"].includes(action)) return null;
   const optionId = asText(raw.selected_option_id);
   return {
     decision_id: decisionId,
@@ -1256,6 +1333,7 @@ function normalizeDecisionRecord(value: unknown): DecisionRecord | null {
     selected_option_id: ["A", "B", "C"].includes(optionId) ? optionId as FindingDecisionOption["option_id"] : null,
     selected_candidate_id: asText(raw.selected_candidate_id) || null,
     feedback: asText(raw.feedback) || null,
+    idempotency_ref: asText(raw.idempotency_ref) || null,
     recorded_at: asText(raw.recorded_at),
     accepted_task_version: asNumber(raw.accepted_task_version),
     external_action: "none",
@@ -1574,11 +1652,27 @@ const EVIDENCE_ROLE_LABELS: Record<EvidenceRole, string> = {
   context: "相关上下文",
 };
 
-function evidenceLocationLabel(anchor: EvidenceAnchor, file: HarnessFile | undefined) {
+function evidenceLocationLabel(anchor: Pick<EvidenceAnchor, "locator_kind" | "start" | "end">, file: HarnessFile | undefined) {
   const range = anchor.start === anchor.end ? `${anchor.start}` : `${anchor.start}-${anchor.end}`;
   if (anchor.locator_kind === "table_rows") return `数据第 ${range} 行`;
   if (file?.preview_kind === "text") return `第 ${range} 行`;
   return `安全预览第 ${range} 行`;
+}
+
+function evidenceRevisionLabel(revision: string | null | undefined) {
+  if (!revision) return "本轮安全预览版本未提供";
+  return `源文件版本 ${revision.length > 14 ? `${revision.slice(0, 14)}…` : revision}`;
+}
+
+function resolutionStatusLabel(status: EvidenceResolution["status"]) {
+  const labels: Record<EvidenceResolution["status"], string> = {
+    exact: "已唯一定位",
+    ambiguous: "多个位置匹配",
+    unavailable: "未找到位置",
+    stale: "源版本已变化",
+    rejected: "候选被拒绝",
+  };
+  return labels[status];
 }
 
 function EvidenceReviewDialog({
@@ -1613,6 +1707,7 @@ function EvidenceReviewDialog({
   const [selectedOptionId, setSelectedOptionId] = useState<FindingDecisionOption["option_id"] | null>(null);
   const [selectedCandidateId, setSelectedCandidateId] = useState<string | null>(request.resolution?.selected_candidate_id ?? null);
   const [showRecommendation, setShowRecommendation] = useState(false);
+  const [sourceHintMode, setSourceHintMode] = useState(false);
   const [decisionFeedback, setDecisionFeedback] = useState("");
   const selectedFile = reviewFiles.find((file) => file.file_ref === selectedFileRef) ?? null;
   const activeAnchor = activeAnchorIndex >= 0 && reviewAnchors[activeAnchorIndex]?.file_ref === selectedFileRef
@@ -1625,12 +1720,13 @@ function EvidenceReviewDialog({
     setSelectedOptionId(null);
     setSelectedCandidateId(request.resolution?.selected_candidate_id ?? null);
     setShowRecommendation(false);
+    setSourceHintMode(false);
     setDecisionFeedback("");
     closeButtonRef.current?.focus();
   }, [request.reviewKey, request.review, request.resolution, reviewAnchors, reviewFiles]);
 
   const deferAndClose = useCallback(async () => {
-    if (request.decisionRecord || !request.findingId || (request.kind !== "resolution" && !request.review?.requires_human_decision)) {
+    if ((request.decisionRecord && request.decisionRecord.action !== "defer") || !request.findingId || (request.kind !== "resolution" && !request.review?.requires_human_decision)) {
       onClose();
       return;
     }
@@ -1639,10 +1735,12 @@ function EvidenceReviewDialog({
       findingId: request.findingId,
       resolutionId: request.resolution?.resolution_id,
       branchId: request.affectedBranchIds[0],
+      decisionRequestId: request.decisionRequest?.request_id,
+      sourceRevision: request.decisionRequest?.source_revision || request.resolution?.source_revision || undefined,
       feedback: decisionFeedback,
     });
     if (recorded) onClose();
-  }, [decisionFeedback, onClose, onControl, request.affectedBranchIds, request.decisionRecord, request.findingId, request.kind, request.resolution, request.review?.requires_human_decision]);
+  }, [decisionFeedback, onClose, onControl, request.affectedBranchIds, request.decisionRecord, request.decisionRequest, request.findingId, request.kind, request.resolution, request.review?.requires_human_decision]);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -1693,6 +1791,8 @@ function EvidenceReviewDialog({
       findingId: request.findingId,
       branchId: selectedOption.affected_branch_ids[0] ?? request.affectedBranchIds[0],
       selectedOptionId: selectedOption.option_id,
+      decisionRequestId: request.decisionRequest?.request_id,
+      sourceRevision: request.decisionRequest?.source_revision || undefined,
       feedback: decisionFeedback,
     });
     if (!recorded) return;
@@ -1709,6 +1809,21 @@ function EvidenceReviewDialog({
       decisionAction: "decline",
       findingId: request.findingId,
       branchId: request.affectedBranchIds[0],
+      decisionRequestId: request.decisionRequest?.request_id,
+      sourceRevision: request.decisionRequest?.source_revision || request.resolution?.source_revision || undefined,
+      feedback: decisionFeedback,
+    });
+    if (recorded) onClose();
+  };
+  const cancelDecision = async () => {
+    if (!request.findingId || (request.decisionRecord && request.decisionRecord.action !== "defer")) { onClose(); return; }
+    const recorded = await onControl("decision", {
+      decisionAction: "cancel",
+      findingId: request.findingId,
+      resolutionId: request.resolution?.resolution_id,
+      branchId: request.resolution?.branch_id ?? request.affectedBranchIds[0],
+      decisionRequestId: request.decisionRequest?.request_id,
+      sourceRevision: request.decisionRequest?.source_revision || request.resolution?.source_revision || undefined,
       feedback: decisionFeedback,
     });
     if (recorded) onClose();
@@ -1724,17 +1839,11 @@ function EvidenceReviewDialog({
       resolutionId: resolution.resolution_id,
       branchId: resolution.branch_id ?? undefined,
       selectedCandidateId,
+      decisionRequestId: request.decisionRequest?.request_id,
+      sourceRevision: request.decisionRequest?.source_revision || resolution.source_revision || candidate.source_revision || undefined,
       feedback: decisionFeedback,
     });
     if (!recorded) return;
-    const steered = await onControl("steer", {
-      instruction: `用户确认候选原文位于${candidate.locator_kind === "table_rows" ? `数据第 ${candidate.start} 行` : `安全预览第 ${candidate.start}-${candidate.end} 行`}。仅重跑受影响分支，并重新核对该位置是否支撑结论。${decisionFeedback.trim()}`,
-    });
-    if (!steered) return;
-    if (resolution.branch_id) {
-      const resumed = await onControl("resume", { branchId: resolution.branch_id });
-      if (!resumed) return;
-    }
     onClose();
   };
   const retryUnavailable = async () => {
@@ -1745,6 +1854,8 @@ function EvidenceReviewDialog({
       findingId: request.findingId,
       resolutionId: resolution.resolution_id,
       branchId: resolution.branch_id ?? undefined,
+      decisionRequestId: request.decisionRequest?.request_id,
+      sourceRevision: request.decisionRequest?.source_revision || resolution.source_revision || undefined,
       feedback: decisionFeedback,
     });
     if (!recorded) return;
@@ -1827,21 +1938,36 @@ function EvidenceReviewDialog({
           </section>}
           <div className="evidence-review-workbench">
             <div className="evidence-review-index">
-              {reviewAnchors.length > 0 ? <section className="evidence-review-pinpoint" aria-labelledby="evidence-pinpoint-title">
+              {request.kind === "resolution" && request.resolution?.status !== "rejected" && request.resolution?.candidates.length ? <section className="evidence-review-pinpoint" aria-labelledby="evidence-pinpoint-title">
+                <header><div><span>候选原文对照</span><h3 id="evidence-pinpoint-title">先比较真实位置，再选择要恢复的候选</h3><p className="evidence-revision-note">{evidenceRevisionLabel(request.resolution.source_revision || request.resolution.candidates[0]?.source_revision)} · 候选不会自动替你选择</p></div><b>{request.resolution.candidates.length} 个候选</b></header>
+                <div className="evidence-anchor-map resolution-candidate-map">
+                  {request.resolution.candidates.map((candidate, index) => {
+                    const file = files.find((item) => item.file_ref === candidate.file_ref);
+                    const anchorIndex = reviewAnchors.findIndex((anchor) => anchor.file_ref === candidate.file_ref && anchor.start === candidate.start && anchor.end === candidate.end && anchor.excerpt === candidate.excerpt);
+                    const active = anchorIndex === activeAnchorIndex;
+                    const selected = selectedCandidateId === candidate.candidate_id;
+                    const difference = candidate.context_before || candidate.context_after
+                      ? `上下文：${[candidate.context_before, candidate.context_after].filter(Boolean).join(" … ")}`
+                      : `区别依据：${file?.display_label ?? "文件"} · ${evidenceLocationLabel(candidate, file)}`;
+                    return <button
+                      type="button"
+                      key={candidate.candidate_id}
+                      className={`evidence-anchor-item is-${request.resolution?.role ?? "context"}${active ? " is-active" : ""}${selected ? " is-chosen" : ""}`}
+                      onClick={() => { if (anchorIndex >= 0) selectAnchor(anchorIndex); else setSelectedFileRef(candidate.file_ref); setSelectedCandidateId(candidate.candidate_id); }}
+                      aria-label={`选择候选原文 ${index + 1}：${file?.display_label ?? "允许范围内文件"} ${evidenceLocationLabel(candidate, file)}`}
+                    >
+                      <b>{selected ? <IconCheck aria-hidden="true" /> : index + 1}</b>
+                      <span><small>{resolutionStatusLabel(request.resolution?.status ?? "ambiguous")} · 候选 {index + 1}</small><strong>{file?.display_label ?? "允许范围内文件"} · {evidenceLocationLabel(candidate, file)}</strong><em>{evidenceRevisionLabel(candidate.source_revision || request.resolution?.source_revision)}</em><q>{candidate.excerpt}</q><small className="evidence-candidate-difference">{difference}</small></span>
+                    </button>;
+                  })}
+                </div>
+              </section> : reviewAnchors.length > 0 ? <section className="evidence-review-pinpoint" aria-labelledby="evidence-pinpoint-title">
                 <header><div><span>证据定位</span><h3 id="evidence-pinpoint-title">选择一条，右侧打开真实文件并高亮对应位置</h3></div><b>{reviewAnchors.length} 处</b></header>
                 <div className="evidence-anchor-map">
                   {reviewAnchors.map((anchor, index) => {
                     const file = files.find((item) => item.file_ref === anchor.file_ref);
-                    const candidate = request.resolution?.candidates[index];
-                    return <button
-                      type="button"
-                      key={`${anchor.file_ref}:${anchor.locator_kind}:${anchor.start}:${anchor.end}:${index}`}
-                      className={`evidence-anchor-item is-${anchor.role}${index === activeAnchorIndex ? " is-active" : ""}${candidate && selectedCandidateId === candidate.candidate_id ? " is-chosen" : ""}`}
-                      onClick={() => { selectAnchor(index); if (candidate) setSelectedCandidateId(candidate.candidate_id); }}
-                      aria-label={`定位证据 ${index + 1}：${anchor.label}`}
-                    >
-                      <b>{candidate && selectedCandidateId === candidate.candidate_id ? <IconCheck aria-hidden="true" /> : index + 1}</b>
-                      <span><small>{EVIDENCE_ROLE_LABELS[anchor.role]}</small><strong>{anchor.label}</strong><em>来自 {file?.display_label ?? "允许范围内文件"} · {evidenceLocationLabel(anchor, file)} · 服务端逐字匹配</em><q>{anchor.excerpt}</q></span>
+                    return <button type="button" key={`${anchor.file_ref}:${anchor.locator_kind}:${anchor.start}:${anchor.end}:${index}`} className={`evidence-anchor-item is-${anchor.role}${index === activeAnchorIndex ? " is-active" : ""}`} onClick={() => selectAnchor(index)} aria-label={`定位证据 ${index + 1}：${anchor.label}`}>
+                      <b>{index + 1}</b><span><small>{EVIDENCE_ROLE_LABELS[anchor.role]}</small><strong>{anchor.label}</strong><em>来自 {file?.display_label ?? "允许范围内文件"} · {evidenceLocationLabel(anchor, file)} · 服务端逐字匹配</em><q>{anchor.excerpt}</q></span>
                     </button>;
                   })}
                 </div>
@@ -1860,10 +1986,11 @@ function EvidenceReviewDialog({
           </div>
           {request.decisionRecord && <section className="decision-record-receipt" role="status">
             <IconCircleCheck aria-hidden="true" />
-            <div><span>人工决定已记录 · v{request.decisionRecord.accepted_task_version}</span><b>{request.decisionRecord.action === "accept" ? "已接受" : request.decisionRecord.action === "decline" ? "已否决" : "已暂缓"}</b><p>回执 {request.decisionRecord.decision_id} · 外部动作：无</p></div>
+            <div><span>人工决定已记录 · v{request.decisionRecord.accepted_task_version}</span><b>{request.decisionRecord.action === "accept" ? "已接受" : request.decisionRecord.action === "decline" ? "已否决" : request.decisionRecord.action === "cancel" ? "已取消" : "已暂缓"}</b><p>回执 {request.decisionRecord.decision_id}{request.decisionRecord.idempotency_ref ? ` · 幂等 ${request.decisionRecord.idempotency_ref}` : ""} · 外部动作：无</p></div>
           </section>}
           {request.kind === "resolution" && request.resolution ? <section className="evidence-resolution-decision" aria-labelledby="resolution-decision-title">
-            <header><div><span>证据定位状态</span><h3 id="resolution-decision-title">{request.resolution.status === "ambiguous" ? `${request.resolution.candidates.length} 个位置都匹配，需要你选择` : "没有找到可核对位置，需要决定恢复方式"}</h3><p>{request.resolution.reason}</p></div><b>{request.resolution.status === "ambiguous" ? `${request.resolution.candidates.length} 个候选` : "0 个候选"}</b></header>
+            <header><div><span>证据定位状态</span><h3 id="resolution-decision-title">{request.resolution.status === "ambiguous" ? `${request.resolution.candidates.length} 个位置都匹配，需要你选择` : `${resolutionStatusLabel(request.resolution.status)}，需要决定恢复方式`}</h3><p>{request.resolution.reason}</p></div><b>{request.resolution.status === "ambiguous" ? `${request.resolution.candidates.length} 个候选` : resolutionStatusLabel(request.resolution.status)}</b></header>
+            {request.decisionRequest && <dl className="decision-request-meta"><div><dt>待决编号</dt><dd>{request.decisionRequest.request_id}</dd></div><div><dt>基于版本</dt><dd>Run v{request.decisionRequest.expected_version ?? "当前"} · {evidenceRevisionLabel(request.decisionRequest.source_revision || request.resolution.source_revision)}</dd></div><div><dt>绑定对象</dt><dd>受影响分支 · {request.decisionRequest.candidate_ids.length || request.resolution.candidates.length} 个候选</dd></div></dl>}
             <ol className="resolution-impact-list">
               <li><b>1</b><span><strong>只影响哪里</strong>{request.branchTitle || "当前待处理分支"}</span></li>
               <li><b>2</b><span><strong>已经保留什么</strong>已完成分支、可核对发现和已有成果版本均不回退。</span></li>
@@ -1871,10 +1998,12 @@ function EvidenceReviewDialog({
               <li><b>4</b><span><strong>不会发生什么</strong>不会改原文件，不会调用外部业务系统。</span></li>
             </ol>
             {request.resolution.status === "ambiguous" && <p className="resolution-choice-status">{selectedCandidateId ? "已选择一个真实位置；请再确认是否从这里继续。" : "请先在上方候选原文中选择一个位置。"}</p>}
-            <label className="decision-feedback"><span>补充给重跑分支的反馈（可选）</span><textarea value={decisionFeedback} onChange={(event) => setDecisionFeedback(event.target.value)} placeholder="例如：同时核对版本号和测试日期，不要只比较结论字段" /></label>
+            <label className="decision-feedback"><span>{sourceHintMode ? "补充来源线索（可选，不要填写内部路径）" : "补充给重跑分支的反馈（可选）"}</span><textarea value={decisionFeedback} onChange={(event) => setDecisionFeedback(event.target.value)} placeholder={sourceHintMode ? "例如：优先查找与 F07 同一版本的兼容测试记录" : "例如：同时核对版本号和测试日期，不要只比较结论字段"} /></label>
             <footer>
               <div className="resolution-secondary-actions">
                 <button type="button" onClick={() => void deferAndClose()} disabled={controlBusy !== null}>保留现有结果，稍后处理</button>
+                <button type="button" onClick={() => setSourceHintMode(true)} disabled={controlBusy !== null || sourceHintMode}>补充来源</button>
+                <button type="button" onClick={() => void cancelDecision()} disabled={controlBusy !== null}>取消这次待决</button>
                 <button type="button" onClick={async () => { if (await onControl("stop")) onClose(); }} disabled={controlBusy !== null}><IconPlayerStop aria-hidden="true" />结束并保留</button>
               </div>
               {request.resolution.status === "ambiguous"
@@ -1894,7 +2023,7 @@ function EvidenceReviewDialog({
             {request.review.recommended_option_id && !showRecommendation && <div className="decision-recommendation-gate"><span><b>先形成你的判断</b><small>为避免 Agent 的解释先影响你的选择，推荐项默认隐藏。</small></span><button type="button" disabled={!selectedOptionId} onClick={() => setShowRecommendation(true)}><IconEye aria-hidden="true" />{selectedOptionId ? "对照 Agent 建议" : "先选择一个口径"}</button></div>}
             {request.review.recommended_option_id && showRecommendation && <p className="decision-reason"><b>Agent 推荐 {request.review.recommended_option_id}</b>{request.review.recommendation_reason}{selectedOptionId && selectedOptionId !== request.review.recommended_option_id ? ` 你的选择是 ${selectedOptionId}，系统不会替你改选。` : ""}</p>}
             <label className="decision-feedback"><span>补充给 Agent 的反馈（可选）</span><textarea value={decisionFeedback} onChange={(event) => setDecisionFeedback(event.target.value)} placeholder="例如：先以 PRD 为准，但把兼容测试的代码版本也核对清楚" /></label>
-            <footer><div><IconShieldCheck aria-hidden="true" /><span><b>{request.review.after_confirmation}</b><small>决定会先写入当前 Run 的版本化回执；接受后才启动新的只读 Control Loop。</small></span></div><div className="decision-footer-actions"><button type="button" onClick={() => void deferAndClose()} disabled={controlBusy !== null}>暂缓处理</button><button type="button" onClick={() => void declineFinding()} disabled={controlBusy !== null}>否决这条发现</button><button type="button" className="is-primary" disabled={!selectedOption || starting || controlBusy !== null} onClick={() => void startDecisionTask()}><IconPlayerPlay aria-hidden="true" />{starting || controlBusy === "decision" ? "正在记录" : "接受并交给 Agent"}</button></div></footer>
+            <footer><div><IconShieldCheck aria-hidden="true" /><span><b>{request.review.after_confirmation}</b><small>决定会先写入当前 Run 的版本化回执；接受后才启动新的只读 Control Loop。</small></span></div><div className="decision-footer-actions"><button type="button" onClick={() => void deferAndClose()} disabled={controlBusy !== null}>暂缓处理</button><button type="button" onClick={() => void cancelDecision()} disabled={controlBusy !== null}>取消这次待决</button><button type="button" onClick={() => void declineFinding()} disabled={controlBusy !== null}>否决这条发现</button><button type="button" className="is-primary" disabled={!selectedOption || starting || controlBusy !== null} onClick={() => void startDecisionTask()}><IconPlayerPlay aria-hidden="true" />{starting || controlBusy === "decision" ? "正在记录" : "接受并交给 Agent"}</button></div></footer>
           </section> : request.kind === "finding" ? <section className="evidence-review-legacy">
             <IconAlertTriangle aria-hidden="true" /><div><b>{request.review ? "这条发现只需复核，不需要业务裁决" : "旧结果没有结构化处置选项"}</b><p>{request.review?.after_confirmation || "你仍可查看现有证据；重新核对后，Agent 会按新协议给出事实、影响和可确认的处理选项。"}</p></div>{!request.review && <button type="button" disabled={starting} onClick={() => void startStructuredReview()}><IconRefresh aria-hidden="true" />{starting ? "正在启动" : "重新核对并生成处置方案"}</button>}
           </section> : null}
@@ -2198,7 +2327,7 @@ export function HarnessWorkbench({ onActivityChange }: { onActivityChange?: (sta
     if (!current || (TERMINAL_STATUSES.has(current.status) && !["rollback", "decision"].includes(command))) return false;
     const normalizedInstruction = options.instruction?.trim() || undefined;
     const normalizedFeedback = options.feedback?.trim() || undefined;
-    const signature = JSON.stringify({ command, instruction: normalizedInstruction, branchId: options.branchId, artifactVersion: options.artifactVersion, decisionAction: options.decisionAction, findingId: options.findingId, resolutionId: options.resolutionId, selectedOptionId: options.selectedOptionId, selectedCandidateId: options.selectedCandidateId, feedback: normalizedFeedback, runId: current.run_id });
+    const signature = JSON.stringify({ command, instruction: normalizedInstruction, branchId: options.branchId, artifactVersion: options.artifactVersion, decisionAction: options.decisionAction, findingId: options.findingId, resolutionId: options.resolutionId, selectedOptionId: options.selectedOptionId, selectedCandidateId: options.selectedCandidateId, decisionRequestId: options.decisionRequestId, sourceRevision: options.sourceRevision, feedback: normalizedFeedback, runId: current.run_id });
     const controlCommand = controlCommandRef.current?.signature === signature
       ? controlCommandRef.current
       : { signature, key: `control-${randomKey()}` };
@@ -2220,6 +2349,8 @@ export function HarnessWorkbench({ onActivityChange }: { onActivityChange?: (sta
           resolution_id: options.resolutionId,
           selected_option_id: options.selectedOptionId,
           selected_candidate_id: options.selectedCandidateId,
+          decision_request_id: options.decisionRequestId,
+          source_revision: options.sourceRevision,
           feedback: normalizedFeedback,
         }),
       });
@@ -2397,7 +2528,13 @@ function LoopView({
     && selectedRound?.round_number === run.current_round
     && selectedRound?.next_step?.decision === "budget_exhausted"
     && Boolean(recoveryKind);
-  const pendingResolutions = selectedRound?.next_step?.evidence_resolutions ?? [];
+  const decisionRequests = selectedRound?.next_step?.decision_requests ?? [];
+  const pendingResolutions = (selectedRound?.next_step?.evidence_resolutions ?? []).filter((resolution) => {
+    const request = resolution.decision_request ?? decisionRequests.find((item) => item.resolution_id === resolution.resolution_id || item.finding_id === resolution.finding_id);
+    const record = [...run.decision_records].reverse().find((item) => item.resolution_id === resolution.resolution_id);
+    const decisionState = resolution.decision_status ?? request?.state ?? (record?.action === "accept" ? "accepted" : record?.action === "decline" ? "declined" : record?.action === "cancel" ? "cancelled" : record?.action === "defer" ? "deferred" : null);
+    return !["accepted", "declined", "cancelled", "rejected"].includes(decisionState ?? "");
+  });
   const recoveryBranches = roundBranches.filter((branch) => branch.status === "waiting_input").sort((left, right) => left.missing_file_refs.length - right.missing_file_refs.length);
   const terminalCandidateBranches = new Set(selectedRound?.next_step?.candidate_branch_ids ?? []);
   const terminalRecoveryBranches = roundBranches
@@ -2500,12 +2637,12 @@ function LoopView({
           <ol>{pendingResolutions.map((resolution, index) => {
             const branch = recoveryBranches.find((item) => item.branch_id === resolution.branch_id);
             const source = files.find((item) => item.file_ref === resolution.file_ref);
-            return <li key={resolution.resolution_id} className={`is-${resolution.status}`}><b>{index + 1}</b><div><span>{resolution.status === "ambiguous" ? "多个位置都匹配" : "没有找到原文位置"}</span><h5>{resolution.finding_title}</h5><p>{resolution.fact_summary || resolution.reason}</p><small>{source?.display_label ?? "允许范围内文件"} · {branch?.title ?? "受影响分支"}</small></div><button type="button" onClick={() => onReview(resolutionReviewRequest(resolution, selectedRound.round_number, branch?.title ?? null, run.decision_records))}><IconEye aria-hidden="true" />{resolution.status === "ambiguous" ? "选择原文位置" : "查看并恢复"}</button></li>;
+             return <li key={resolution.resolution_id} className={`is-${resolution.status}`}><b>{index + 1}</b><div><span>{resolutionStatusLabel(resolution.status)}</span><h5>{resolution.finding_title}</h5><p>{resolution.fact_summary || resolution.reason}</p><small>{source?.display_label ?? "允许范围内文件"} · {branch?.title ?? "受影响分支"}{resolution.source_revision ? ` · ${evidenceRevisionLabel(resolution.source_revision)}` : ""}</small></div><button type="button" onClick={() => onReview(resolutionReviewRequest(resolution, selectedRound.round_number, branch?.title ?? null, run.decision_records, selectedRound.next_step?.decision_requests))}><IconEye aria-hidden="true" />{resolution.status === "ambiguous" ? "选择原文位置" : resolution.status === "stale" ? "刷新后恢复" : "查看并恢复"}</button></li>;
           })}</ol>
         </section>}
         <div className="source-recovery-facts"><span><b>已保留</b>本轮计划、文件范围、调用记录</span><span><b>未采用</b>无法定位的候选结论</span><span><b>未发生</b>文件修改或外部动作</span></div>
         <label><span>补充给下一轮的方向（可选）</span><textarea value={recoveryDraft} onChange={(event) => setRecoveryDraft(event.target.value)} placeholder="例如：优先核对功能测试报告与兼容测试报告中的代码版本字段" /></label>
-        <div className="source-recovery-branches">{recoveryBranches.map((branch, index) => { const resolution = pendingResolutions.find((item) => item.branch_id === branch.branch_id); return <article key={branch.branch_id}><div><b>{index === 0 ? "最小受影响分支" : "其他待处理分支"}</b><h4>{branch.title}</h4><p>{branch.objective}</p><small>{branch.missing_file_refs.length} 份待核对资料</small></div>{resolution ? <button type="button" className="is-review" onClick={() => onReview(resolutionReviewRequest(resolution, selectedRound.round_number, branch.title, run.decision_records))}><IconEye aria-hidden="true" />先看具体问题</button> : <button type="button" disabled={!canResume || controlBusy !== null} onClick={() => void recoverBranch(branch)}><IconPlayerPlay aria-hidden="true" />{controlBusy ? "正在提交" : "只重试本分支"}</button>}</article>; })}</div>
+        <div className="source-recovery-branches">{recoveryBranches.map((branch, index) => { const resolution = pendingResolutions.find((item) => item.branch_id === branch.branch_id); return <article key={branch.branch_id}><div><b>{index === 0 ? "最小受影响分支" : "其他待处理分支"}</b><h4>{branch.title}</h4><p>{branch.objective}</p><small>{branch.missing_file_refs.length} 份待核对资料</small></div>{resolution ? <button type="button" className="is-review" onClick={() => onReview(resolutionReviewRequest(resolution, selectedRound.round_number, branch.title, run.decision_records, selectedRound.next_step?.decision_requests))}><IconEye aria-hidden="true" />先看具体问题</button> : <button type="button" disabled={!canResume || controlBusy !== null} onClick={() => void recoverBranch(branch)}><IconPlayerPlay aria-hidden="true" />{controlBusy ? "正在提交" : "只重试本分支"}</button>}</article>; })}</div>
       </section>}
       {roundBranches.length > 0 && <section className="loop-branches" aria-label={`第 ${selectedRound.round_number} 轮任务分支`}>
         <header><div><span>任务分支现场</span><h3>{roundBranches.length} 条分支，分别保留证据状态</h3></div><b>{roundBranches.filter((branch) => branch.status === "completed").length}/{roundBranches.length} 已核对</b></header>
@@ -2515,7 +2652,7 @@ function LoopView({
           {branch.status === "waiting_input" && waitingForBranch && !guidedRecovery && <div className="loop-branch-actions"><button type="button" className="is-review" onClick={() => onReview(branchReviewRequest(branch, selectedRound.evidence_gaps, selectedRound, run))}><IconEye aria-hidden="true" />查看问题</button><button type="button" onClick={() => void onControl("resume", { branchId: branch.branch_id })} disabled={!canResume || controlBusy !== null}><IconPlayerPlay aria-hidden="true" />{controlBusy === "resume" ? "正在启动" : "继续此分支"}</button></div>}
         </li>)}</ol>
       </section>}
-      {selectedRound.result && <section className="loop-round-result"><span>本轮核对结果</span><h3>{selectedRound.result.summary}</h3><p>{selectedRound.result.findings.length} 条发现，引用 {selectedRound.verified_file_refs.length} 份文件。</p>{selectedRound.result.findings.length > 0 && <div className="loop-review-links">{selectedRound.result.findings.map((finding, index) => <button type="button" key={`${finding.title}:${index}`} onClick={() => onReview(findingReviewRequest(finding, index, selectedRound.round_number, run.decision_records))}><IconEye aria-hidden="true" />核对：{finding.title}</button>)}</div>}</section>}
+      {selectedRound.result && <section className="loop-round-result"><span>本轮核对结果</span><h3>{selectedRound.result.summary}</h3><p>{selectedRound.result.findings.length} 条发现，引用 {selectedRound.verified_file_refs.length} 份文件。</p>{selectedRound.result.findings.length > 0 && <div className="loop-review-links">{selectedRound.result.findings.map((finding, index) => <button type="button" key={`${finding.title}:${index}`} onClick={() => onReview(findingReviewRequest(finding, index, selectedRound.round_number, run.decision_records, selectedRound.next_step?.decision_requests))}><IconEye aria-hidden="true" />核对：{finding.title}</button>)}</div>}</section>}
       {selectedRound.evidence_gaps.length > 0 && <section className="loop-gap"><IconAlertTriangle aria-hidden="true" /><div><span>证据缺口</span><h3>{selectedRound.evidence_gaps.length} 条分支尚未完成</h3><p>{boundedTerminalRecovery ? "当前 Run 已结束。点击缺口可查看具体描述与候选文件，再从上方选择一个分支创建新的独立 Run。" : "点击缺口即可查看具体描述、候选文件和原始内容；只有你确认的分支会进入下一轮。"}</p><div className="loop-review-links">{selectedRound.evidence_gaps.map((gap, index) => {
         const branch = roundBranches.find((item) => item.branch_id === gap.branch_id) ?? null;
         return <button type="button" key={gap.gap_id} onClick={() => onReview(gapReviewRequest(gap, index, selectedRound, branch, run))}><IconEye aria-hidden="true" />{gap.label}</button>;

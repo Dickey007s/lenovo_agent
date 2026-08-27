@@ -109,6 +109,13 @@ An accept/decline/defer interaction counts as implemented only when the server
 returns a versioned, idempotent DecisionRecord bound to the current Finding or
 EvidenceResolution. A client-only selected radio button or toast is a Draft.
 
+For DR-0032, the record must also retain the expected version, idempotency key,
+source revision and selected candidate/effect snapshot. Persistence claims must
+name whether these facts are nested in Snapshot JSONB or independently journaled;
+only a real PostgreSQL restart gate can support a claim that an open DecisionRequest
+survives restart. `cancel` remains distinct from `decline`, and neither action is
+an approval or an external effect.
+
 ## 6. Evidence hierarchy
 
 | Evidence | Supports | Does not automatically support |

@@ -1,0 +1,119 @@
+{
+  "evidence_id": "DR-0032-EVIDENCE-RESOLUTION-AND-LOCAL-RECOVERY-20260827",
+  "captured_at": "2026-08-27T03:47:37.140487Z",
+  "provider_model": "deepseek-v4-pro",
+  "checkpoint": "postgres",
+  "task_store": "postgres",
+  "run": {
+    "run_id": "harness:a7731c08f8934b0391dcf6127951ae00",
+    "status": "stopped",
+    "version": 29,
+    "contract": {
+      "max_rounds": 3,
+      "max_files_per_round": 8,
+      "max_model_calls": 6,
+      "deadline_seconds": 1200,
+      "external_action": "none"
+    },
+    "budget": {
+      "rounds_used": 2,
+      "files_verified": 2,
+      "model_calls_used": 6,
+      "active_elapsed_ms": 202939,
+      "stop_reason": "模型调用预算已耗尽"
+    },
+    "waiting_checkpoint": {
+      "status": "waiting_input",
+      "version": 14,
+      "recovery_kind": "analysis_output",
+      "completed_branches_preserved": 0,
+      "waiting_branches": 2,
+      "artifact_versions_preserved": 1,
+      "model_calls_used": 3
+    },
+    "branch_resume": {
+      "branch_title": "核对行政办公入职信息",
+      "expected_version_before_steer": 14,
+      "accepted_version_after_resume": 16,
+      "resumed_from_checkpoint": true,
+      "next_round_input_file_count": 2,
+      "other_round_one_branch_not_replayed": true
+    },
+    "round_receipts": [
+      {
+        "round": 1,
+        "input_file_count": 8,
+        "verified_file_count": 0,
+        "finding_count": 0,
+        "planner": {
+          "called": true,
+          "output_used": true,
+          "elapsed_ms": 25533
+        },
+        "analyst": {
+          "called": true,
+          "output_used": false,
+          "elapsed_ms": 49668
+        },
+        "next_decision": "waiting_input",
+        "recovery_kind": "analysis_output"
+      },
+      {
+        "round": 2,
+        "input_file_count": 2,
+        "verified_file_count": 2,
+        "finding_count": 4,
+        "planner": {
+          "called": true,
+          "output_used": true,
+          "elapsed_ms": 9967
+        },
+        "analyst": {
+          "called": true,
+          "output_used": true,
+          "elapsed_ms": 29944
+        },
+        "next_decision": "budget_exhausted"
+      }
+    ],
+    "artifact_versions": [
+      {
+        "version": 1,
+        "finding_count": 0,
+        "status": "draft"
+      },
+      {
+        "version": 2,
+        "finding_count": 4,
+        "status": "draft",
+        "parent_version": 1
+      }
+    ],
+    "final_facts": {
+      "finding_count": 4,
+      "review_required": true,
+      "external_action": "none",
+      "completed_round_two_branches": 3,
+      "preserved_unselected_branch_status": "stopped"
+    },
+    "ordered_events_observed": [
+      "analysis_structure_rejected",
+      "analysis_recovery_required",
+      "evidence_gate",
+      "control_steer_recorded",
+      "control_resume_recorded",
+      "branch_resumed_from_checkpoint",
+      "control_steer_applied",
+      "round_started",
+      "planning_started",
+      "planning_completed",
+      "plan_validation",
+      "analysis_started",
+      "analysis_completed",
+      "result_validation",
+      "evidence_gate",
+      "loop_budget_stopped"
+    ]
+  },
+  "boundary": "This sanitized manifest records one real deepseek-v4-pro provider control-path run against the fixed FORTE workspace using PostgreSQL. It omits prompts, provider output, file bodies, full source hashes, credentials and internal paths. The run first preserved a bounded analysis-output failure, then resumed one selected Branch and appended v2. It stopped at the model-call budget; it does not prove finding semantics, completeness, model quality, production SLA, user value, multi-instance safety, file mutation or external action."
+}

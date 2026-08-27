@@ -37,7 +37,7 @@ AgentControlLoopEvidenceResolutionStatus = Literal[
     "rejected",
 ]
 AgentControlLoopDecisionOptionId = Literal["A", "B", "C"]
-AgentControlLoopDecisionAction = Literal["accept", "decline", "defer"]
+AgentControlLoopDecisionAction = Literal["accept", "decline", "defer", "cancel"]
 AgentControlLoopRecoveryKind = Literal["source_location", "analysis_output"]
 AgentControlLoopPhase = Literal[
     "observe",
@@ -274,6 +274,8 @@ class AgentControlLoopEvidenceCandidate(StrictModel):
     start: int = Field(ge=1)
     end: int = Field(ge=1)
     excerpt: str = Field(min_length=1, max_length=1_200)
+    source_revision: str = Field(default="", max_length=128)
+    candidate_digest: str = Field(default="", max_length=128)
 
     @field_validator("end")
     @classmethod
@@ -289,12 +291,14 @@ class AgentControlLoopEvidenceResolution(StrictModel):
 
     resolution_id: str = Field(pattern=r"^resolution-[0-9a-f]{12}$")
     finding_id: str = Field(pattern=r"^finding-[0-9a-f]{12}$")
+    plan_unit_id: str | None = Field(default=None, min_length=1, max_length=120)
     finding_title: str = Field(min_length=1, max_length=240)
     fact_summary: str | None = Field(default=None, max_length=500)
     impact: str | None = Field(default=None, max_length=500)
     branch_id: str | None = Field(
         default=None, pattern=r"^branch-[0-9a-f]{12}$"
     )
+    affected_branch_ids: list[str] = Field(default_factory=list, max_length=12)
     file_ref: str = Field(pattern=r"^forte-[0-9a-f]{16}$")
     role: AgentControlLoopEvidenceRole
     label: str = Field(min_length=1, max_length=120)
@@ -307,6 +311,10 @@ class AgentControlLoopEvidenceResolution(StrictModel):
     selected_candidate_id: str | None = Field(
         default=None, pattern=r"^candidate-[0-9a-f]{12}$"
     )
+    source_revision: str = Field(default="", max_length=128)
+    decision_status: Literal[
+        "pending", "accepted", "declined", "deferred", "cancelled"
+    ] = "pending"
 
 
 class AgentControlLoopNextStep(StrictModel):
@@ -381,6 +389,9 @@ class AgentControlLoopDecisionRecord(StrictModel):
     """Versioned, idempotent human receipt bound to a Finding or Resolution."""
 
     decision_id: str = Field(pattern=r"^decision-[0-9a-f]{12}$")
+    decision_request_id: str | None = Field(
+        default=None, pattern=r"^decision-request-[0-9a-f]{12}$"
+    )
     action: AgentControlLoopDecisionAction
     finding_id: str = Field(pattern=r"^finding-[0-9a-f]{12}$")
     resolution_id: str | None = Field(
@@ -395,7 +406,58 @@ class AgentControlLoopDecisionRecord(StrictModel):
     )
     feedback: str | None = Field(default=None, max_length=2_000)
     recorded_at: datetime
+    source_revision: str = Field(default="", max_length=128)
+    candidate_digest: str | None = Field(default=None, max_length=128)
+    expected_version: int = Field(default=1, ge=1)
+    # The raw key is retained only in the private state store; public snapshots
+    # project it to this stable opaque reference.
+    idempotency_key: str | None = Field(default=None, max_length=160)
+    idempotency_ref: str = Field(default="", max_length=40)
     accepted_task_version: int = Field(ge=1)
+    applied_task_version: int | None = Field(default=None, ge=1)
+    affected_branch_ids: list[str] = Field(default_factory=list, max_length=12)
+    required_file_refs: list[str] = Field(default_factory=list, max_length=20)
+    effect: Literal[
+        "branch_resumed", "preserved", "deferred", "cancelled", "none"
+    ] = "none"
+    external_action: Literal["none"] = "none"
+
+
+class AgentControlLoopDecisionRequest(StrictModel):
+    """Server-owned pending decision packet exposed by a run Snapshot."""
+
+    decision_request_id: str = Field(pattern=r"^decision-request-[0-9a-f]{12}$")
+    run_id: str = Field(min_length=1, max_length=120)
+    finding_id: str = Field(pattern=r"^finding-[0-9a-f]{12}$")
+    resolution_id: str | None = Field(
+        default=None, pattern=r"^resolution-[0-9a-f]{12}$"
+    )
+    plan_unit_id: str | None = Field(default=None, min_length=1, max_length=120)
+    branch_id: str | None = Field(
+        default=None, pattern=r"^branch-[0-9a-f]{12}$"
+    )
+    state: Literal[
+        "open", "accepted", "declined", "deferred", "cancelled", "stale", "rejected"
+    ] = "open"
+    reason: str = Field(min_length=1, max_length=1_000)
+    allowed_actions: list[AgentControlLoopDecisionAction] = Field(
+        default_factory=lambda: ["accept", "decline", "defer", "cancel"], max_length=4
+    )
+    options: list[dict[str, Any]] = Field(default_factory=list, max_length=3)
+    selected_option_id: AgentControlLoopDecisionOptionId | None = None
+    selected_candidate_id: str | None = Field(
+        default=None, pattern=r"^candidate-[0-9a-f]{12}$"
+    )
+    candidates: list[AgentControlLoopEvidenceCandidate] = Field(
+        default_factory=list, max_length=6
+    )
+    source_revision: str = Field(default="", max_length=128)
+    expected_version: int = Field(ge=1)
+    affected_branch_ids: list[str] = Field(default_factory=list, max_length=12)
+    required_file_refs: list[str] = Field(default_factory=list, max_length=20)
+    estimated_additional_rounds: int = Field(default=0, ge=0, le=3)
+    consequence: str = Field(min_length=1, max_length=1_000)
+    requested_at: datetime
     external_action: Literal["none"] = "none"
 
 
@@ -460,6 +522,7 @@ class AgentControlLoopArtifactFinding(StrictModel):
     finding_id: str | None = Field(
         default=None, pattern=r"^finding-[0-9a-f]{12}$"
     )
+    plan_unit_id: str | None = Field(default=None, min_length=1, max_length=120)
     affected_branch_ids: list[str] = Field(default_factory=list, max_length=12)
     title: str = Field(min_length=1, max_length=240)
     detail: str = Field(min_length=1, max_length=2_000)
@@ -525,6 +588,9 @@ class AgentControlLoopControlRequest(StrictModel):
     )
     artifact_version: int | None = Field(default=None, ge=1, le=3)
     decision_action: AgentControlLoopDecisionAction | None = None
+    decision_request_id: str | None = Field(
+        default=None, pattern=r"^decision-request-[0-9a-f]{12}$"
+    )
     finding_id: str | None = Field(
         default=None, pattern=r"^finding-[0-9a-f]{12}$"
     )
@@ -535,6 +601,8 @@ class AgentControlLoopControlRequest(StrictModel):
     selected_candidate_id: str | None = Field(
         default=None, pattern=r"^candidate-[0-9a-f]{12}$"
     )
+    candidate_digest: str | None = Field(default=None, max_length=128)
+    source_revision: str | None = Field(default=None, max_length=128)
     feedback: str | None = Field(default=None, max_length=2_000)
 
     @field_validator("instruction")

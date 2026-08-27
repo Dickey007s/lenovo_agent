@@ -306,6 +306,50 @@ class MultiBranchPlanner(FakePlanner):
         )
 
 
+class FiveBranchPlanner(FakePlanner):
+    """Five independent units intentionally share one of two source files."""
+
+    async def plan(self, *, scenario, files):
+        self.calls += 1
+        self.workspace = scenario
+        self.files = files
+        available = {str(item["file_ref"]) for item in files}
+        if available == {REF_TWO}:
+            units = [
+                HarnessPlanCandidateUnit(
+                    unit_id="u5",
+                    title="核对复核说明",
+                    objective="定位复核说明中的关键记录",
+                    input_file_refs=[REF_TWO],
+                    tool="evidence.verify",
+                )
+            ]
+        else:
+            units = [
+                HarnessPlanCandidateUnit(
+                    unit_id=f"u{index}",
+                    title=f"核对事实 {index}",
+                    objective="核对一条可追溯办公事实",
+                    input_file_refs=[REF_ONE],
+                    tool="file.read",
+                )
+                for index in range(1, 5)
+            ] + [
+                HarnessPlanCandidateUnit(
+                    unit_id="u5",
+                    title="核对复核说明",
+                    objective="定位复核说明中的关键记录",
+                    input_file_refs=[REF_TWO],
+                    tool="evidence.verify",
+                )
+            ]
+        return HarnessPlanCandidate(
+            summary="把资料库核对拆成五个独立证据分支",
+            selection_reason="每个事实由一个独立计划单元负责，便于局部恢复。",
+            units=units,
+        )
+
+
 class BlockingPlanner(FakePlanner):
     def __init__(self) -> None:
         super().__init__()
@@ -334,10 +378,12 @@ class FakeAnalyst:
     async def analyze(self, *, instruction, plan, files, validation_feedback=None):
         self.instruction = instruction
         file_ref = "forte-0000000000000000" if self.invalid_reference else files[0]["file_ref"]
+        plan_unit_id = plan.units[0].unit_id if plan.units else "u1"
         return HarnessTaskResult(
             summary=f"{file_ref} 只读核查完成",
             findings=[
                 HarnessFinding(
+                    plan_unit_id=plan_unit_id,
                     title="发现一项待复核事实",
                     detail="该结论来自 Agent 自主选择的公开文件。",
                     file_refs=[file_ref],
@@ -442,6 +488,15 @@ class AmbiguousCatalog(FakeCatalog):
         return inputs
 
 
+class TripleAmbiguousCatalog(AmbiguousCatalog):
+    def agent_file_inputs(self, file_refs: list[str]) -> list[dict[str, object]]:
+        inputs = super().agent_file_inputs(file_refs)
+        for item in inputs:
+            if item["file_ref"] == REF_TWO:
+                item["text"] = "复核说明\n其他内容\n复核说明\n附加说明\n复核说明"
+        return inputs
+
+
 class MixedEvidenceAnalyst(FakeAnalyst):
     def __init__(self) -> None:
         super().__init__()
@@ -453,6 +508,7 @@ class MixedEvidenceAnalyst(FakeAnalyst):
             summary="一条发现可核对，另一条需要消歧",
             findings=[
                 HarnessFinding(
+                    plan_unit_id="u1",
                     title="已定位的财务事实",
                     detail="表格中的余额行可以唯一定位。",
                     fact_summary="客商 A 的余额记录为 100。",
@@ -467,6 +523,7 @@ class MixedEvidenceAnalyst(FakeAnalyst):
                     ],
                 ),
                 HarnessFinding(
+                    plan_unit_id="u2",
                     title="复核说明位置不唯一",
                     detail="相同短句在文件中出现两次。",
                     fact_summary="Agent 引用了复核说明，但位置不唯一。",
@@ -482,6 +539,79 @@ class MixedEvidenceAnalyst(FakeAnalyst):
                     ],
                 ),
             ],
+            review_required=True,
+        )
+
+
+class FiveFindingAnalyst(FakeAnalyst):
+    """Four exact findings plus one three-way ambiguous finding, then repair."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.calls = 0
+
+    async def analyze(self, *, instruction, plan, files, validation_feedback=None):
+        self.calls += 1
+        refs = {str(item["file_ref"]) for item in files}
+        if refs == {REF_TWO} and self.calls >= 3:
+            return HarnessTaskResult(
+                summary="第五个分支已补齐唯一定位",
+                findings=[
+                    HarnessFinding(
+                        plan_unit_id="u5",
+                        title="复核说明已唯一定位",
+                        detail="补核后使用唯一的附加说明作为证据。",
+                        file_refs=[REF_TWO],
+                        evidence_quotes=[
+                            HarnessEvidenceQuote(
+                                file_ref=REF_TWO,
+                                role="support",
+                                label="唯一附加说明",
+                                quote="附加说明",
+                            )
+                        ],
+                    )
+                ],
+                review_required=True,
+            )
+
+        findings = [
+            HarnessFinding(
+                plan_unit_id=f"u{index}",
+                title=f"已定位事实 {index}",
+                detail="表格中的余额记录可以唯一定位。",
+                file_refs=[REF_ONE],
+                evidence_quotes=[
+                    HarnessEvidenceQuote(
+                        file_ref=REF_ONE,
+                        role="support",
+                        label="唯一余额行",
+                        quote="A | 100",
+                    )
+                ],
+            )
+            for index in range(1, 5)
+        ]
+        findings.append(
+            HarnessFinding(
+                plan_unit_id="u5",
+                title="复核说明位置不唯一",
+                detail="相同短句在文件中出现三次。",
+                impact="需要确认具体段落后才能继续该分支。",
+                file_refs=[REF_TWO],
+                evidence_quotes=[
+                    HarnessEvidenceQuote(
+                        file_ref=REF_TWO,
+                        role="contradiction",
+                        label="重复复核说明",
+                        quote="复核说明",
+                    )
+                ],
+            )
+        )
+        return HarnessTaskResult(
+            summary="四条发现可核对，另一条需要消歧",
+            findings=findings,
             review_required=True,
         )
 
@@ -765,6 +895,7 @@ async def test_unlocatable_analysis_pauses_with_an_explicit_recovery_path() -> N
     assert waiting.rounds[0].next_step.recovery_kind == "source_location"
     assert waiting.rounds[0].next_step.candidate_branch_ids
     assert all(branch.status == "waiting_input" for branch in waiting.branches)
+    assert not any(event.event_name == "harness_failed" for event in waiting.events)
     assert "analysis_recovery_required" in [
         event.event_name for event in waiting.events
     ]
@@ -782,6 +913,117 @@ async def test_unlocatable_analysis_pauses_with_an_explicit_recovery_path() -> N
     assert stopped.run.control_state == "stop_requested"
     terminal = await wait_terminal(runtime, "alice", started.run.run_id)
     assert terminal.status == "stopped"
+
+
+@pytest.mark.asyncio
+async def test_decision_packet_id_and_source_revision_mismatch_do_not_change_resolution() -> None:
+    runtime = HarnessRuntime(AmbiguousCatalog(), FakePlanner(), MixedEvidenceAnalyst())
+    started = await runtime.start(
+        "alice", start_request(idempotency_key="decision-negative-start-0001")
+    )
+    waiting = await wait_status(runtime, "alice", started.run.run_id, "waiting_input")
+    resolution = waiting.rounds[0].next_step.evidence_resolutions[0]
+    packet = waiting.decision_requests[0]
+    candidate = resolution.candidates[0]
+
+    with pytest.raises(HarnessConflictError, match="decision_request_id"):
+        await runtime.control(
+            "alice",
+            started.run.run_id,
+            AgentControlLoopControlRequest(
+                command="decision",
+                decision_action="accept",
+                finding_id=resolution.finding_id,
+                resolution_id=resolution.resolution_id,
+                branch_id=resolution.branch_id,
+                selected_candidate_id=candidate.candidate_id,
+                source_revision=packet.source_revision,
+                idempotency_key="decision-negative-missing-id-0001",
+                expected_version=waiting.version,
+            ),
+        )
+
+    with pytest.raises(HarnessConflictError, match="资料版本令牌不匹配"):
+        await runtime.control(
+            "alice",
+            started.run.run_id,
+            AgentControlLoopControlRequest(
+                command="decision",
+                decision_action="accept",
+                decision_request_id=packet.decision_request_id,
+                finding_id=resolution.finding_id,
+                resolution_id=resolution.resolution_id,
+                branch_id=resolution.branch_id,
+                selected_candidate_id=candidate.candidate_id,
+                source_revision="rev-0000000000000000",
+                idempotency_key="decision-negative-stale-token-0001",
+                expected_version=waiting.version,
+            ),
+        )
+
+    unchanged = await runtime.get("alice", started.run.run_id)
+    assert unchanged.version == waiting.version
+    assert unchanged.rounds[0].next_step.evidence_resolutions[0].status == "ambiguous"
+    assert unchanged.decision_requests[0].state == "open"
+    assert not any(
+        event.event_name in {"evidence_resolution_stale", "evidence_resolution_rejected"}
+        for event in unchanged.events
+    )
+    await runtime.control(
+        "alice",
+        started.run.run_id,
+        AgentControlLoopControlRequest(
+            command="stop",
+            idempotency_key="decision-negative-stop-0001",
+            expected_version=unchanged.version,
+        ),
+    )
+    await wait_terminal(runtime, "alice", started.run.run_id)
+
+
+@pytest.mark.asyncio
+async def test_decline_rejects_only_resolution_and_preserves_other_branch_and_v1() -> None:
+    runtime = HarnessRuntime(AmbiguousCatalog(), FakePlanner(), MixedEvidenceAnalyst())
+    started = await runtime.start(
+        "alice", start_request(idempotency_key="decision-decline-start-0001")
+    )
+    waiting = await wait_status(runtime, "alice", started.run.run_id, "waiting_input")
+    resolution = waiting.rounds[0].next_step.evidence_resolutions[0]
+    packet = waiting.decision_requests[0]
+    declined = await runtime.control(
+        "alice",
+        started.run.run_id,
+        AgentControlLoopControlRequest(
+            command="decision",
+            decision_action="decline",
+            decision_request_id=packet.decision_request_id,
+            finding_id=resolution.finding_id,
+            resolution_id=resolution.resolution_id,
+            branch_id=resolution.branch_id,
+            idempotency_key="decision-decline-control-0001",
+            expected_version=waiting.version,
+        ),
+    )
+
+    assert declined.run.status == "waiting_input"
+    assert declined.run.rounds[0].next_step.evidence_resolutions[0].status == "rejected"
+    assert declined.run.decision_requests[0].state == "declined"
+    assert declined.run.artifact_versions == waiting.artifact_versions
+    assert declined.run.branches[0].status == "completed"
+    assert not any(
+        event.event_name == "branch_resumed_from_checkpoint"
+        for event in declined.run.events
+    )
+    await runtime.control(
+        "alice",
+        started.run.run_id,
+        AgentControlLoopControlRequest(
+            command="stop",
+            idempotency_key="decision-decline-stop-0001",
+            expected_version=declined.run.version,
+        ),
+    )
+    await wait_terminal(runtime, "alice", started.run.run_id)
 
 
 @pytest.mark.asyncio
@@ -819,6 +1061,7 @@ async def test_ambiguous_finding_pauses_only_its_branch_and_preserves_artifact()
     deferred_request = AgentControlLoopControlRequest(
         command="decision",
         decision_action="defer",
+        decision_request_id=waiting.decision_requests[0].decision_request_id,
         finding_id=resolution.finding_id,
         resolution_id=resolution.resolution_id,
         branch_id=resolution.branch_id,
@@ -842,11 +1085,13 @@ async def test_ambiguous_finding_pauses_only_its_branch_and_preserves_artifact()
         AgentControlLoopControlRequest(
             command="decision",
             decision_action="accept",
+            decision_request_id=waiting.decision_requests[0].decision_request_id,
             finding_id=resolution.finding_id,
             resolution_id=resolution.resolution_id,
             branch_id=resolution.branch_id,
-            selected_candidate_id=resolution.candidates[0].candidate_id,
-            feedback="采用第一处，并核对版本字段。",
+                selected_candidate_id=resolution.candidates[0].candidate_id,
+                source_revision=resolution.source_revision,
+                feedback="采用第一处，并核对版本字段。",
             idempotency_key="ambiguous-accept-decision-0001",
             expected_version=deferred.run.version,
         ),
@@ -856,27 +1101,10 @@ async def test_ambiguous_finding_pauses_only_its_branch_and_preserves_artifact()
         accepted.run.decision_records[-1].selected_candidate_id
         == resolution.candidates[0].candidate_id
     )
-    assert accepted.run.events[-1].event_name == "decision_recorded"
+    assert any(event.event_name == "decision_recorded" for event in accepted.run.events)
+    assert accepted.run.events[-1].event_name == "branch_resumed_from_checkpoint"
     assert accepted.run.branches[0].status == "completed"
     assert accepted.run.artifact_versions[0] == waiting.artifact_versions[0]
-
-    declined = await runtime.control(
-        "alice",
-        started.run.run_id,
-        AgentControlLoopControlRequest(
-            command="decision",
-            decision_action="decline",
-            finding_id=resolution.finding_id,
-            resolution_id=resolution.resolution_id,
-            branch_id=resolution.branch_id,
-            feedback="不采用当前候选，保留现有结果。",
-            idempotency_key="ambiguous-decline-decision-0001",
-            expected_version=accepted.run.version,
-        ),
-    )
-    assert declined.run.decision_records[-1].action == "decline"
-    assert declined.run.decision_records[-1].selected_candidate_id is None
-    assert declined.run.artifact_versions[0] == waiting.artifact_versions[0]
 
     stopped = await runtime.control(
         "alice",
@@ -884,12 +1112,76 @@ async def test_ambiguous_finding_pauses_only_its_branch_and_preserves_artifact()
         AgentControlLoopControlRequest(
             command="stop",
             idempotency_key="ambiguous-branch-recovery-stop-0001",
-            expected_version=declined.run.version,
+            expected_version=accepted.run.version,
         ),
     )
     assert stopped.run.control_state == "stop_requested"
     terminal = await wait_terminal(runtime, "alice", started.run.run_id)
     assert terminal.status == "stopped"
+
+
+@pytest.mark.asyncio
+async def test_five_findings_keep_four_v1_and_append_v2_for_only_ambiguous_branch() -> None:
+    analyst = FiveFindingAnalyst()
+    runtime = HarnessRuntime(TripleAmbiguousCatalog(), FiveBranchPlanner(), analyst)
+    started = await runtime.start(
+        "alice", start_request(idempotency_key="five-finding-start-0001")
+    )
+    waiting = await wait_status(runtime, "alice", started.run.run_id, "waiting_input")
+
+    resolution = waiting.rounds[0].next_step.evidence_resolutions[0]
+    assert resolution.status == "ambiguous"
+    assert len(resolution.candidates) == 3
+    assert len(waiting.artifact_versions) == 1
+    v1 = waiting.artifact_versions[0]
+    assert v1.version == 1
+    assert v1.finding_count == 4
+    assert [branch.status for branch in waiting.branches[:5]] == [
+        "completed",
+        "completed",
+        "completed",
+        "completed",
+        "waiting_input",
+    ]
+    packet = next(
+        item
+        for item in waiting.decision_requests
+        if item.resolution_id == resolution.resolution_id
+    )
+    target_branch_id = resolution.branch_id
+    assert target_branch_id
+    accepted = await runtime.control(
+        "alice",
+        started.run.run_id,
+        AgentControlLoopControlRequest(
+            command="decision",
+            decision_action="accept",
+            decision_request_id=packet.decision_request_id,
+            finding_id=resolution.finding_id,
+            resolution_id=resolution.resolution_id,
+            branch_id=target_branch_id,
+            selected_candidate_id=resolution.candidates[0].candidate_id,
+            source_revision=packet.source_revision,
+            idempotency_key="five-finding-accept-0001",
+            expected_version=waiting.version,
+        ),
+    )
+    assert any(
+        event.event_name == "branch_resumed_from_checkpoint"
+        and event.details.get("branch_id") == target_branch_id
+        for event in accepted.run.events
+    )
+    assert all(
+        branch.status == "completed"
+        for branch in accepted.run.branches[:4]
+    )
+    terminal = await wait_terminal(runtime, "alice", started.run.run_id)
+    assert terminal.status == "completed"
+    assert [item.version for item in terminal.artifact_versions] == [1, 2]
+    assert terminal.artifact_versions[0] == v1
+    assert terminal.artifact_versions[0].finding_count == 4
+    assert terminal.artifact_versions[1].finding_count == 1
+    assert all(branch.status == "completed" for branch in terminal.branches)
 
 
 @pytest.mark.asyncio
@@ -917,6 +1209,7 @@ async def test_terminal_finding_decision_is_versioned_before_follow_up_work() ->
         AgentControlLoopControlRequest(
             command="decision",
             decision_action="accept",
+            decision_request_id=terminal.decision_requests[0].decision_request_id,
             finding_id=finding.finding_id,
             branch_id=finding.affected_branch_ids[0],
             selected_option_id="A",
@@ -1938,3 +2231,173 @@ def test_server_compiler_bounds_model_file_selection_and_repairs_dependencies() 
     assert plan.units[-1].input_file_refs == [REF_ONE, REF_TWO]
     assert plan.units[-1].depends_on == ["read-one", "read-two"]
     assert "服务端按每轮最多 2 份文件" in plan.selection_reason
+
+
+def test_unquoted_finding_creates_unavailable_resolution_instead_of_silent_drop() -> None:
+    result = HarnessTaskResult(
+        summary="没有逐字引用的发现",
+        findings=[
+            HarnessFinding(
+                title="缺少原文",
+                detail="模型只返回了摘要，没有返回可核对片段。",
+                file_refs=[REF_TWO],
+                evidence_quotes=[],
+            )
+        ],
+        review_required=True,
+    )
+    resolution = HarnessRuntime._resolve_evidence_anchors(
+        result,
+        [{"file_ref": REF_TWO, "kind": "text", "text": "复核说明"}],
+    )
+    assert resolution.result is None
+    assert resolution.evidence_resolutions[0].status == "unavailable"
+    assert resolution.evidence_resolutions[0].label == "模型未提供逐字引用"
+
+
+@pytest.mark.asyncio
+async def test_decision_packet_round_trip_and_public_projection_hide_raw_tokens() -> None:
+    runtime = HarnessRuntime(AmbiguousCatalog(), FakePlanner(), MixedEvidenceAnalyst())
+    started = await runtime.start(
+        "alice", start_request(idempotency_key="decision-packet-start-0001")
+    )
+    waiting = await wait_status(runtime, "alice", started.run.run_id, "waiting_input")
+    assert waiting.decision_requests
+    packet = waiting.decision_requests[0]
+    assert packet.state == "open"
+    assert packet.run_id == waiting.run_id
+    restored = type(packet).model_validate(packet.model_dump(mode="json"))
+    assert restored.decision_request_id == packet.decision_request_id
+    public = runtime.public_snapshot(waiting)
+    public_packet = public.decision_requests[0]
+    assert public_packet.source_revision.startswith("rev-")
+    assert public_packet.candidates[0].candidate_digest == ""
+    assert public_packet.candidates[0].source_revision.startswith("rev-")
+    await runtime.control(
+        "alice",
+        started.run.run_id,
+        AgentControlLoopControlRequest(
+            command="stop",
+            idempotency_key="decision-packet-stop-0001",
+            expected_version=waiting.version,
+        ),
+    )
+    await wait_terminal(runtime, "alice", started.run.run_id)
+
+
+@pytest.mark.asyncio
+async def test_tampered_candidate_marks_resolution_rejected_without_resuming_run() -> None:
+    runtime = HarnessRuntime(AmbiguousCatalog(), FakePlanner(), MixedEvidenceAnalyst())
+    started = await runtime.start(
+        "alice", start_request(idempotency_key="tamper-candidate-start-0001")
+    )
+    waiting = await wait_status(runtime, "alice", started.run.run_id, "waiting_input")
+    resolution = waiting.rounds[0].next_step.evidence_resolutions[0]
+    with pytest.raises(HarnessConflictError, match="候选位置不属于"):
+        await runtime.control(
+            "alice",
+            started.run.run_id,
+            AgentControlLoopControlRequest(
+                command="decision",
+                decision_action="accept",
+                decision_request_id=waiting.decision_requests[0].decision_request_id,
+                finding_id=resolution.finding_id,
+                resolution_id=resolution.resolution_id,
+                branch_id=resolution.branch_id,
+                selected_candidate_id="candidate-000000000000",
+                source_revision=resolution.source_revision,
+                idempotency_key="tamper-candidate-control-0001",
+                expected_version=waiting.version,
+            ),
+        )
+    changed = await runtime.get("alice", started.run.run_id)
+    assert changed.rounds[0].next_step.evidence_resolutions[0].status == "rejected"
+    assert changed.events[-1].event_name == "evidence_resolution_rejected"
+    await runtime.control(
+        "alice",
+        started.run.run_id,
+        AgentControlLoopControlRequest(
+            command="stop",
+            idempotency_key="tamper-candidate-stop-0001",
+            expected_version=changed.version,
+        ),
+    )
+    await wait_terminal(runtime, "alice", started.run.run_id)
+
+
+@pytest.mark.asyncio
+async def test_stale_revision_is_actionable_and_cancel_closes_packet_without_rejecting_fact() -> None:
+    runtime = HarnessRuntime(AmbiguousCatalog(), FakePlanner(), MixedEvidenceAnalyst())
+    started = await runtime.start(
+        "alice", start_request(idempotency_key="stale-revision-start-0001")
+    )
+    waiting = await wait_status(runtime, "alice", started.run.run_id, "waiting_input")
+    resolution = waiting.rounds[0].next_step.evidence_resolutions[0]
+    runtime.catalog.files[1]["sha256"] = "c" * 64
+    with pytest.raises(HarnessConflictError, match="版本已经变化"):
+        await runtime.control(
+            "alice",
+            started.run.run_id,
+            AgentControlLoopControlRequest(
+                command="decision",
+                decision_action="accept",
+                decision_request_id=waiting.decision_requests[0].decision_request_id,
+                finding_id=resolution.finding_id,
+                resolution_id=resolution.resolution_id,
+                branch_id=resolution.branch_id,
+                selected_candidate_id=resolution.candidates[0].candidate_id,
+                source_revision="rev-0000000000000000",
+                idempotency_key="stale-revision-control-0001",
+                expected_version=waiting.version,
+            ),
+        )
+    changed = await runtime.get("alice", started.run.run_id)
+    assert changed.rounds[0].next_step.evidence_resolutions[0].status == "stale"
+    assert changed.events[-1].event_name == "evidence_resolution_stale"
+    await runtime.control(
+        "alice",
+        started.run.run_id,
+        AgentControlLoopControlRequest(
+            command="stop",
+            idempotency_key="stale-revision-stop-0001",
+            expected_version=changed.version,
+        ),
+    )
+    await wait_terminal(runtime, "alice", started.run.run_id)
+
+
+@pytest.mark.asyncio
+async def test_cancel_keeps_ambiguous_resolution_but_closes_decision_packet() -> None:
+    runtime = HarnessRuntime(AmbiguousCatalog(), FakePlanner(), MixedEvidenceAnalyst())
+    started = await runtime.start(
+        "alice", start_request(idempotency_key="cancel-decision-start-0001")
+    )
+    waiting = await wait_status(runtime, "alice", started.run.run_id, "waiting_input")
+    resolution = waiting.rounds[0].next_step.evidence_resolutions[0]
+    cancelled = await runtime.control(
+        "alice",
+        started.run.run_id,
+        AgentControlLoopControlRequest(
+            command="decision",
+            decision_action="cancel",
+            decision_request_id=waiting.decision_requests[0].decision_request_id,
+            finding_id=resolution.finding_id,
+            resolution_id=resolution.resolution_id,
+            branch_id=resolution.branch_id,
+            idempotency_key="cancel-decision-control-0001",
+            expected_version=waiting.version,
+        ),
+    )
+    assert cancelled.run.rounds[0].next_step.evidence_resolutions[0].status == "ambiguous"
+    assert cancelled.run.decision_requests[0].state == "cancelled"
+    assert cancelled.run.decision_records[-1].effect == "cancelled"
+    await runtime.control(
+        "alice",
+        started.run.run_id,
+        AgentControlLoopControlRequest(
+            command="stop",
+            idempotency_key="cancel-decision-stop-0001",
+            expected_version=cancelled.run.version,
+        ),
+    )
+    await wait_terminal(runtime, "alice", started.run.run_id)

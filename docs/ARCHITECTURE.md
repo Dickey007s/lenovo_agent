@@ -58,7 +58,7 @@ request must contain:
 - Owner-scoped idempotency key;
 - expected version 1;
 - a 3-2,000 character user instruction;
-- 1-3 rounds, 1-8 files per round, 2-6 model calls and a 20-300 second deadline.
+- 1-3 rounds, 1-8 files per round, 2-6 model calls and a 20-3,000 second deadline.
 
 The server freezes all 96 allowlisted input refs, `scope_mode=whole_workspace`
 and loop bounds in the Run Snapshot. Client-owned `selected_file_refs` are not
@@ -98,8 +98,9 @@ checked; semantic truth, completeness and arithmetic are not. If the first
 Analyst output cannot be uniquely located, the Runtime records
 `analysis_validation_rejected` and permits at most one new Analyst call within
 the same budget; the browser never receives rejected prose as an adopted result.
-The resolver records `exact`, `ambiguous` or `unavailable` for each quote; `stale`
-and `rejected` are reserved future states. A valid subset is adopted with
+The resolver records `exact`, `ambiguous`, `unavailable`, `stale` or `rejected`
+for each quote. Source revision changes produce `stale`; a server-recomputed
+candidate mismatch produces `rejected`. A valid subset is adopted with
 `analysis_partial_adopted` and an append-only partial ArtifactVersion. Unresolved
 Finding/Resolution facts pause only their bound Branches. If neither attempt
 yields a usable Finding, the Runtime preserves Plan/Branch/call facts and pauses
@@ -164,6 +165,17 @@ browser restores its known Run id, or discovers the most recent nonterminal
 Owner Run via `GET /runs`. Memory fallback does not survive an API restart.
 `X-User-Id` is not signed authentication, and there is no multi-instance lease
 or notification channel.
+
+`EvidenceResolution` and human decisions are currently nested in the authoritative
+Snapshot JSONB. This preserves records committed before a restart, but is not an
+independent append-only decision ledger and has no database-level source-revision
+or compare-and-swap constraint. An interrupted running round is still discarded
+by the recovery policy; only completed rounds and their artifacts are restored.
+DR-0032's real PostgreSQL 17.11 sequential Runtime gate verifies that an open
+three-candidate DecisionRequest survives restart, accept resumes only the bound
+Branch, v1 remains immutable and v2 is appended, and the final Snapshot survives
+another restart. This still does not establish an independent decision ledger,
+database CAS or multi-instance safety.
 
 ## 6. Frontend architecture
 

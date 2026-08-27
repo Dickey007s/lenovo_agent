@@ -373,8 +373,8 @@ one additional Analyst call inside the same Run budget. It emits
 `analysis_validation_rejected` before retrying and never publishes rejected
 content. Each quote receives a server-owned EvidenceResolution: `exact` means one
 bounded Preview location, `ambiguous` means multiple candidates and `unavailable`
-means none. `stale` and `rejected` are reserved contract states and are not emitted
-by the current resolver. A second attempt may retain only uniquely anchored
+means none. A source revision change emits `stale`; a candidate that fails the
+server's current-source recomputation emits `rejected`. A second attempt may retain only uniquely anchored
 Findings and emit `analysis_partial_adopted` plus `partial_artifact_saved`. The
 unresolved Finding and candidates remain in `next_step.evidence_resolutions`; only
 their affected Branches wait. If no Finding can be adopted, the round is still
@@ -419,6 +419,13 @@ candidate when applicable, optional user feedback, accepted task version and
 `external_action=none`. It is the reconciliation fact after reconnect; a toast or
 button animation is not a decision receipt.
 
+The current PostgreSQL adapter persists these records only as part of the Run
+Snapshot JSONB. Runtime validation enforces current source revision and candidate
+recomputation, but the database has no independent DecisionRecord/EvidenceResolution
+table, source-revision foreign-key constraint or multi-instance CAS. The DR-0032
+restart gate verifies sequential Runtime recovery of one pending decision; it is
+not a claim that an interrupted provider call or concurrent writer is durable.
+
 `artifact_versions` and `commits` are safe Snapshot projections of independent
 append-only Store records. ArtifactVersion contains the complete logical
 read-only brief for one completed round; it remains `draft` or `verified` and is
@@ -460,10 +467,12 @@ Human decisions use the same version/idempotency rules:
 {
   "command": "decision",
   "decision_action": "accept",
+  "decision_request_id": "decision-request-0123456789ab",
   "finding_id": "finding-0123456789ab",
   "resolution_id": "resolution-0123456789ab",
   "branch_id": "branch-0123456789ab",
   "selected_candidate_id": "candidate-0123456789ab",
+  "source_revision": "rev-0123456789abcdef",
   "feedback": "只核对这个分支，不重跑已完成分支。",
   "expected_version": 13,
   "idempotency_key": "decision-client-generated-key"
@@ -471,8 +480,9 @@ Human decisions use the same version/idempotency rules:
 ```
 
 An accepted Finding decision must select one of that Finding's A/B/C options; an
-accepted EvidenceResolution must select one of its server candidate IDs. Decline
-or defer cannot carry a selected option/candidate. The server validates all
+accepted EvidenceResolution must reference its current server DecisionRequest,
+select one owned candidate ID and carry the public source-revision token. Decline,
+defer or cancel cannot carry a selected option/candidate. The server validates all
 Finding/Resolution/Branch bindings and appends `decision_records[]` without
 changing Branch, ArtifactVersion or external state.
 
@@ -536,7 +546,9 @@ partial_artifact_saved (optional when valid work is preserved)
 decision_requested (optional for a human business choice)
 result_validation
 evidence_gate
-decision_recorded (after accept / decline / defer)
+decision_recorded (after accept / decline / defer / cancel)
+evidence_resolution_stale (when the frozen source revision changed)
+evidence_resolution_rejected (when the server-recomputed candidate is invalid)
 control_resume_recorded (required when evidence_gate waits for the user)
 branch_resumed_from_checkpoint (when only one recovery Branch continues)
 round_started

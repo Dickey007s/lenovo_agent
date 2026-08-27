@@ -369,7 +369,7 @@ function snapshot(
   };
 }
 
-function sourceLocationRecoverySnapshot(body: { workspace_id: string; instruction: string }) {
+function sourceLocationRecoverySnapshot(body: { workspace_id: string; instruction: string }, candidateCount = 2) {
   const base = snapshot(body, "waiting_input", 12);
   const branches = base.branches.map((branch) => ({
     ...branch,
@@ -411,12 +411,26 @@ function sourceLocationRecoverySnapshot(body: { workspace_id: string; instructio
         label: "路由选择语句",
         query_excerpt: "route = choose(intent, rewritten)",
         status: "ambiguous",
-        reason: "同一片段在安全预览中匹配到 2 个位置，服务端不能替用户选择。",
+        reason: `同一片段在安全预览中匹配到 ${candidateCount} 个位置，服务端不能替用户选择。`,
+        source_revision: "rev-20260827-a",
         candidates: [
-          { candidate_id: "candidate-111111111111", file_ref: workflowFile.file_ref, locator_kind: "text_lines", start: 9, end: 9, excerpt: "route = choose(intent, rewritten)" },
-          { candidate_id: "candidate-222222222222", file_ref: workflowFile.file_ref, locator_kind: "text_lines", start: 14, end: 14, excerpt: "route = choose(intent, rewritten)" },
+          { candidate_id: "candidate-111111111111", file_ref: workflowFile.file_ref, locator_kind: "text_lines", start: 9, end: 9, excerpt: "route = choose(intent, rewritten)", source_revision: "rev-20260827-a", context_before: "# 主路由", context_after: "return route" },
+          { candidate_id: "candidate-222222222222", file_ref: workflowFile.file_ref, locator_kind: "text_lines", start: 14, end: 14, excerpt: "route = choose(intent, rewritten)", source_revision: "rev-20260827-a", context_before: "# 回退路由", context_after: "return fallback" },
+          ...(candidateCount >= 3 ? [{ candidate_id: "candidate-333333333333", file_ref: workflowFile.file_ref, locator_kind: "text_lines", start: 19, end: 19, excerpt: "route = choose(intent, rewritten)", source_revision: "rev-20260827-a", context_before: "# 兼容路由", context_after: "return compat" }] : []),
         ],
         selected_candidate_id: null,
+      }],
+      decision_requests: [{
+        decision_request_id: "request-111111111111",
+        finding_id: "finding-333333333333",
+        resolution_id: "resolution-111111111111",
+        branch_id: branches[0].branch_id,
+        source_revision: "rev-20260827-a",
+        expected_version: 13,
+        idempotency_ref: "idem-111111",
+        candidate_ids: ["candidate-111111111111", "candidate-222222222222", ...(candidateCount >= 3 ? ["candidate-333333333333"] : [])],
+        consequence: "只重跑受影响分支，不修改源文件，不执行外部动作。",
+        state: "pending",
       }],
     },
   };
@@ -509,14 +523,14 @@ function locationFailureSnapshot(body: { workspace_id: string; instruction: stri
 }
 async function fulfillJson(route: Route, body: unknown, status = 200) { await route.fulfill({ status, contentType: "application/json", body: JSON.stringify(body) }); }
 
-async function mockHarness(page: Page, options: { failFirstStart?: boolean; disconnect?: boolean; failed?: boolean; locationFailure?: boolean; sourceRecovery?: boolean; boundedRecovery?: boolean; workspaceFailures?: number; interactiveLoop?: boolean; evidenceGate?: boolean } = {}) {
+async function mockHarness(page: Page, options: { failFirstStart?: boolean; disconnect?: boolean; failed?: boolean; locationFailure?: boolean; sourceRecovery?: boolean; sourceRecoveryThreeCandidates?: boolean; boundedRecovery?: boolean; workspaceFailures?: number; interactiveLoop?: boolean; evidenceGate?: boolean } = {}) {
   let workspaceCalls = 0; let startCalls = 0; let streamCalls = 0;
   let currentBody = { workspace_id: "forte-public-office", instruction: "" };
   // Mock snapshots intentionally cover several server state shapes in one route.
   let currentSnapshot: any = snapshot(currentBody, "queued");
   let controlSequence = 2;
   const starts: (typeof currentBody & { idempotency_key: string })[] = [];
-  const controls: { command: string; instruction?: string; branch_id?: string; artifact_version?: number; decision_action?: string; finding_id?: string; resolution_id?: string; selected_option_id?: string; selected_candidate_id?: string; feedback?: string; idempotency_key: string; expected_version: number }[] = [];
+  const controls: { command: string; instruction?: string; branch_id?: string; artifact_version?: number; decision_action?: string; finding_id?: string; resolution_id?: string; selected_option_id?: string; selected_candidate_id?: string; decision_request_id?: string; source_revision?: string; feedback?: string; idempotency_key: string; expected_version: number }[] = [];
   const streams: string[] = [];
   await page.route("**/v1/**", async (route) => {
     const url = new URL(route.request().url()); const path = url.pathname;
@@ -540,13 +554,13 @@ async function mockHarness(page: Page, options: { failFirstStart?: boolean; disc
         : options.boundedRecovery
           ? boundedAnalysisRecoverySnapshot(body)
         : options.sourceRecovery
-          ? sourceLocationRecoverySnapshot(body)
+          ? sourceLocationRecoverySnapshot(body, options.sourceRecoveryThreeCandidates ? 3 : 2)
           : snapshot(body, options.evidenceGate ? "waiting_input" : options.interactiveLoop ? "planning" : "queued", options.interactiveLoop || options.evidenceGate ? controlSequence : 16);
       controlSequence = Math.max(controlSequence, currentSnapshot.last_event_sequence);
       return fulfillJson(route, { run: currentSnapshot, replayed: startCalls > 1 }, 202);
     }
     if (path.endsWith("/controls") && route.request().method() === "POST") {
-      const control = route.request().postDataJSON() as { command: "pause" | "resume" | "steer" | "stop" | "rollback" | "decision"; instruction?: string; branch_id?: string; artifact_version?: number; decision_action?: "accept" | "decline" | "defer"; finding_id?: string; resolution_id?: string; selected_option_id?: string; selected_candidate_id?: string; feedback?: string; idempotency_key: string; expected_version: number };
+      const control = route.request().postDataJSON() as { command: "pause" | "resume" | "steer" | "stop" | "rollback" | "decision"; instruction?: string; branch_id?: string; artifact_version?: number; decision_action?: "accept" | "decline" | "defer" | "cancel"; finding_id?: string; resolution_id?: string; selected_option_id?: string; selected_candidate_id?: string; decision_request_id?: string; source_revision?: string; feedback?: string; idempotency_key: string; expected_version: number };
       controls.push(control);
       const command = control.command;
       controlSequence = Math.max(controlSequence + 1, currentSnapshot.last_event_sequence + 1);
@@ -560,6 +574,7 @@ async function mockHarness(page: Page, options: { failFirstStart?: boolean; disc
           selected_option_id: control.selected_option_id ?? null,
           selected_candidate_id: control.selected_candidate_id ?? null,
           feedback: control.feedback ?? null,
+          idempotency_ref: "idem-111111",
           recorded_at: new Date().toISOString(),
           accepted_task_version: control.expected_version + 1,
           external_action: "none",
@@ -899,7 +914,7 @@ test("records closing a pending decision as defer and restores the receipt", asy
   });
 });
 
-test("disambiguates a source candidate and resumes only the affected branch", async ({ page }) => {
+test("accepts a source candidate for bounded branch recovery", async ({ page }) => {
   const state = await mockHarness(page, { sourceRecovery: true }); await page.goto("/");
   await page.getByRole("textbox", { name: "任务指令" }).fill("核对跨文件版本冲突并逐条定位原文。");
   await page.getByRole("button", { name: "启动 Control Loop" }).click();
@@ -909,7 +924,11 @@ test("disambiguates a source candidate and resumes only the affected branch", as
   await recovery.getByRole("button", { name: "选择原文位置" }).click();
   const dialog = page.getByRole("dialog", { name: "需要你确认原文位置" });
   await expect(dialog).toContainText("2 个位置都匹配，需要你选择");
-  await dialog.getByRole("button", { name: "定位证据 2：路由选择语句" }).click();
+  await dialog.getByRole("button", { name: /选择候选原文 2：workflow\.py/ }).click();
+  if (process.env.CAPTURE_DR0032_EVIDENCE === "1") {
+    await page.setViewportSize({ width: 1440, height: 1100 });
+    await page.screenshot({ path: "../../docs/evidence/screenshots/dr-0032-decision-packet-desktop.png", fullPage: true });
+  }
   if (process.env.CAPTURE_DR0030_EVIDENCE === "1") {
     await dialog.screenshot({ path: "../../docs/evidence/screenshots/dr-0030-evidence-disambiguation.png" });
     await dialog.locator(".evidence-resolution-decision").screenshot({ path: "../../docs/evidence/screenshots/dr-0030-evidence-disambiguation-action.png" });
@@ -917,14 +936,91 @@ test("disambiguates a source candidate and resumes only the affected branch", as
   await dialog.getByRole("textbox", { name: "补充给重跑分支的反馈（可选）" }).fill("同时核对版本字段。" );
   await dialog.getByRole("button", { name: "采用此位置并只重跑本分支" }).click();
 
-  await expect.poll(() => state.controls.map((item) => item.command)).toEqual(["decision", "steer", "resume"]);
+  await expect.poll(() => state.controls.map((item) => item.command)).toEqual(["decision"]);
   expect(state.controls[0]).toMatchObject({
     decision_action: "accept",
     resolution_id: "resolution-111111111111",
     selected_candidate_id: "candidate-222222222222",
+    decision_request_id: "request-111111111111",
+    source_revision: "rev-20260827-a",
     branch_id: "branch-111111111111",
   });
-  expect(state.controls[2].branch_id).toBe("branch-111111111111");
+});
+
+test("keeps three ambiguous locations comparable on mobile and records a bounded decision", async ({ page }) => {
+  const state = await mockHarness(page, { sourceRecovery: true, sourceRecoveryThreeCandidates: true });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/");
+  await page.getByRole("textbox", { name: "任务指令" }).fill("在整库中核对新闻路由的真实实现位置。");
+  await page.getByRole("button", { name: "启动 Control Loop" }).click();
+
+  const recovery = page.locator(".loop-source-recovery");
+  await expect(recovery).toContainText("1 处多候选");
+  await recovery.getByRole("button", { name: "选择原文位置" }).click();
+  const dialog = page.getByRole("dialog", { name: "需要你确认原文位置" });
+  await expect(dialog).toContainText("3 个位置都匹配，需要你选择");
+  await expect(dialog).toContainText("待决编号");
+  await expect(dialog).toContainText("源文件版本 rev-20260827-a");
+  await expect(dialog).toContainText("只重跑受影响分支");
+  await expect(dialog).toContainText("不会改原文件，不会调用外部业务系统");
+  await expect(dialog.getByRole("button", { name: /选择候选原文 1：workflow\.py/ })).toBeVisible();
+  await expect(dialog.getByRole("button", { name: /选择候选原文 2：workflow\.py/ })).toBeVisible();
+  await expect(dialog.getByRole("button", { name: /选择候选原文 3：workflow\.py/ })).toBeVisible();
+
+  const mobileMetrics = await page.evaluate(() => ({ viewport: document.documentElement.clientWidth, scroll: document.documentElement.scrollWidth }));
+  expect(mobileMetrics.scroll).toBeLessThanOrEqual(mobileMetrics.viewport);
+  await dialog.getByRole("button", { name: /选择候选原文 3：workflow\.py/ }).click();
+  await expect(dialog).toContainText("已选择一个真实位置");
+  if (process.env.CAPTURE_DR0032_EVIDENCE === "1") {
+    await page.screenshot({ path: "../../docs/evidence/screenshots/dr-0032-decision-packet-mobile.png", fullPage: true });
+  }
+  await dialog.getByRole("button", { name: "采用此位置并只重跑本分支" }).click();
+
+  await expect.poll(() => state.controls.map((item) => item.command)).toEqual(["decision"]);
+  expect(state.controls[0]).toMatchObject({
+    command: "decision",
+    decision_action: "accept",
+    selected_candidate_id: "candidate-333333333333",
+    decision_request_id: "request-111111111111",
+    source_revision: "rev-20260827-a",
+    resolution_id: "resolution-111111111111",
+  });
+});
+
+test("cancels an unresolved evidence request without presenting it as rejected", async ({ page }) => {
+  const state = await mockHarness(page, { sourceRecovery: true });
+  await page.goto("/");
+  await page.getByRole("textbox", { name: "任务指令" }).fill("核对路由证据，但暂不作出来源选择。");
+  await page.getByRole("button", { name: "启动 Control Loop" }).click();
+  await page.locator(".loop-source-recovery").getByRole("button", { name: "选择原文位置" }).click();
+
+  const dialog = page.getByRole("dialog", { name: "需要你确认原文位置" });
+  await dialog.getByRole("button", { name: "取消这次待决" }).click();
+  await expect.poll(() => state.controls.length).toBe(1);
+  expect(state.controls[0]).toMatchObject({ command: "decision", decision_action: "cancel", resolution_id: "resolution-111111111111" });
+  expect(state.controls[0].selected_candidate_id).toBeUndefined();
+});
+
+test("keeps a deferred evidence request actionable until a final decision", async ({ page }) => {
+  const state = await mockHarness(page, { sourceRecovery: true });
+  await page.goto("/");
+  await page.getByRole("textbox", { name: "任务指令" }).fill("先保留路由证据问题，稍后再确认原文位置。");
+  await page.getByRole("button", { name: "启动 Control Loop" }).click();
+
+  const recovery = page.locator(".loop-source-recovery");
+  await recovery.getByRole("button", { name: "选择原文位置" }).click();
+  let dialog = page.getByRole("dialog", { name: "需要你确认原文位置" });
+  await dialog.getByRole("button", { name: "保留现有结果，稍后处理" }).click();
+  await expect.poll(() => state.controls.length).toBe(1);
+  expect(state.controls[0].decision_action).toBe("defer");
+
+  await recovery.getByRole("button", { name: "选择原文位置" }).click();
+  dialog = page.getByRole("dialog", { name: "需要你确认原文位置" });
+  await expect(dialog.getByRole("button", { name: "采用此位置并只重跑本分支" })).toBeVisible();
+  await dialog.getByRole("button", { name: /选择候选原文 1：workflow\.py/ }).click();
+  await dialog.getByRole("button", { name: "采用此位置并只重跑本分支" }).click();
+  await expect.poll(() => state.controls.length).toBe(2);
+  expect(state.controls[1]).toMatchObject({ command: "decision", decision_action: "accept", selected_candidate_id: "candidate-111111111111" });
 });
 
 test("restores a pending source disambiguation after reconnect", async ({ page }) => {
