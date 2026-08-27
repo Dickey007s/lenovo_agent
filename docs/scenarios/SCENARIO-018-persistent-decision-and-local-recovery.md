@@ -33,3 +33,6 @@ Finding 的逐字片段在同一文件中出现三次。Agent 不能替用户随
 - Stakeholder 负例与两张截图：`USER-FEEDBACK-20260826-ACTIONABLE-RECOVERY`。
 - 研究依据、五态 Resolution、Decision Packet 和验证设计：`ACTIONABLE-HITL-RECOVERY-RESEARCH-20260826`。
 - 本场景验证的是状态、定位和恢复协议，不证明 Finding 语义正确、用户价值或外部动作能力。
+- 确定性竞争挑战已验证 5 条 Finding 中 4 条 `exact`、1 条三候选 `ambiguous`：v1 保留四条，
+  接受候选后只恢复第五条 Branch 并 append v2。真实 Provider 运行另验证结构失败后只恢复一条
+  Branch，但不把该运行当作模型质量证据。

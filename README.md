@@ -205,12 +205,14 @@ multi-instance coordination and governed external action remain target work.
   12-second human wait with unchanged active elapsed, followed by one-Branch
   recovery and completion; this is control-path evidence, not an answer-quality
   claim.
-- `DR-0032` defines the next persistence boundary. `EvidenceResolution` and
-  `DecisionRequest/DecisionRecord` are currently nested in the PostgreSQL Run
-  Snapshot JSONB, not an independent decision ledger. A real restart gate must
-  prove that an open decision and its candidates survive, then only the selected
-  Branch creates ArtifactVersion v2 while v1 remains immutable. No source-revision
-  freshness, CAS, multi-instance lease, or in-flight model replay is claimed.
+- `DR-0032` makes evidence ambiguity and human decisions recoverable server facts.
+  `EvidenceResolution` now emits `exact/ambiguous/unavailable/stale/rejected`;
+  `DecisionRequest/DecisionRecord` bind the current source revision, candidate,
+  Branch, expected version and idempotency receipt. A real PostgreSQL 17.11 gate
+  proves that an open three-candidate decision survives restart, accepting one
+  candidate resumes only its Branch, preserves v1 and appends v2. These records
+  remain nested in Snapshot JSONB, not an independently queryable decision ledger;
+  no database CAS, multi-instance lease or in-flight model replay is claimed.
 - No target-user study has been run. Clarity, trust, efficiency and user value
   remain hypotheses.
 
@@ -229,6 +231,8 @@ The current exact evidence-location interaction is tracked in
 [`PINPOINT-EVIDENCE-REVIEW-20260826`](docs/evidence/PINPOINT-EVIDENCE-REVIEW-EVIDENCE-20260826.md).
 The current actionable review and recoverable-analysis interaction is tracked in
 [`ACTIONABLE-REVIEW-AND-RECOVERY-20260826`](docs/evidence/ACTIONABLE-REVIEW-AND-RECOVERY-EVIDENCE-20260826.md).
+The current persistent decision and Finding/Branch-local recovery increment is tracked in
+[`DR-0032-POSTGRES-DECISION-RECOVERY-EVIDENCE-20260827`](docs/evidence/DR-0032-POSTGRES-DECISION-RECOVERY-EVIDENCE-20260827.md).
 
 ## Local run
 

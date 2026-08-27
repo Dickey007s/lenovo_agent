@@ -198,7 +198,7 @@ browser fact, not a server task phase.
 | rejected plan candidate | not adopted plus bounded retry | frozen contract and used-call count | server retries once if budget allows; otherwise fails closed |
 | one or more source locations cannot be resolved | rejected/partial-adoption trace | valid Findings, approved Plan, files, Branches and receipts | retry once; adopt the valid subset or pause one candidate Branch with `recovery_kind=source_location` |
 | one source quote has multiple real matches | `evidence_disambiguation_required` + `EvidenceResolution(status=ambiguous)` | completed Branches, ArtifactVersion and all candidates | compare candidates; record the selected candidate; steer and resume only its Branch |
-| pending human decision is closed | `decision_recorded(action=defer)` | Finding, evidence, user feedback draft and all execution facts | reopen from Snapshot and accept, decline or defer again with a fresh version |
+| pending human decision is closed | `decision_recorded(action=defer|cancel)` | Finding, evidence, user feedback draft and all execution facts | defer stays actionable; cancel closes the packet without marking the source rejected; use a fresh version for any later control |
 | repeated malformed analysis output | structure-rejected trace | approved Plan, files, Branches and both call receipts | pause one candidate Branch with `recovery_kind=analysis_output`; do not expose raw response |
 | evidence insufficient | Agent execution-gap sheet, waiting Branch, missing evidence and model adoption receipt | prior rounds, all Branch states, versions and citations | leave guidance empty and retry one Branch, optionally add direction, or preserve the gap |
 | recovery reaches budget terminal | `status=stopped`, `brief.outcome=bounded`, candidate Branches and `recovery_kind` | old Run, Plan, call receipts, Branch state and ArtifactVersions | choose one unfinished Branch, add optional direction and POST a new Task Contract; never resume the terminal Run |
@@ -216,6 +216,10 @@ because they are nested in the Run Snapshot JSONB. ArtifactVersion and TaskCommi
 remain separate append-only rows. This is not an independent decision ledger,
 source-revision constraint, CAS or multi-instance guarantee. A running round
 interrupted by restart is intentionally not replayed.
+The real PostgreSQL 17.11 sequential gate now verifies pending-decision restart,
+target-Branch-only resume, v1/v2 preservation and a second restart. The browser
+path separately verifies desktop and 390 px candidate comparison, defer-then-final
+decision, cancel and reconnect; neither gate is a user study.
 
 ## 9. Responsive behavior
 

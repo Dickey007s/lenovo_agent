@@ -4,7 +4,7 @@
 
 | 字段 | 内容 |
 | --- | --- |
-| 状态 | `Draft`；等待真实 PostgreSQL 门与 Runtime 实现完成 |
+| 状态 | `Limited Verified`；顺序 Runtime、真实 PostgreSQL 重启门与前台处置路径已验证 |
 | 日期 | 2026-08-27 |
 | 触发来源 | [`USER-FEEDBACK-20260826-ACTIONABLE-RECOVERY`](../sources/USER-FEEDBACK-20260826-actionable-conflict-and-recovery.md) |
 | 研究依据 | [`ACTIONABLE-HUMAN-DECISION-AND-FAILURE-RECOVERY-20260826`](../research/ACTIONABLE-HUMAN-DECISION-AND-FAILURE-RECOVERY-20260826.md)、`COMPETITIVE-WHITE-SPACE-AND-FALSIFIABLE-DIFFERENTIATORS-20260826` |
@@ -13,7 +13,7 @@
 
 ## 问题定位
 
-当前 PostgreSQL 将完整 Run Snapshot 写入 JSONB，所以已写入 Snapshot 的
+此前 PostgreSQL 将完整 Run Snapshot 写入 JSONB，所以已写入 Snapshot 的
 `EvidenceResolution` 与 `DecisionRecord` 会随 Run 一起恢复；但两者不是独立的追加账本，
 也没有来源修订、候选版本和决定回执之间的数据库约束。进程在 running round 中断时，恢复逻辑
 会丢弃该轮尚未提交的 Branch 与结果，只回到最后完成轮次。没有专门的重启门，不能把这种行为
@@ -35,8 +35,9 @@
 
 ## 验证门
 
-真实 PostgreSQL 测试必须覆盖：三处相同 quote 的候选消歧；重启后 pending DecisionRequest、
+真实 PostgreSQL 测试覆盖：三处相同 quote 的候选消歧；重启后 pending DecisionRequest、
 EvidenceResolution 和已完成 ArtifactVersion 保留；接受后只恢复目标 Branch 并追加 v2；再次
 重启后 v1/v2 与 DecisionRecord 一致；重复幂等键、旧版本、来源修订、篡改候选、拒绝候选、
-全部不可用和完整性失败均不改变错误边界。没有 `TEST_DATABASE_DSN` 时测试只能标记 skipped，
-不能升级为 Verified。
+全部不可用和完整性失败保持既定错误边界。2026-08-27 本机 PostgreSQL 17.11 得到 `2 passed`；
+完整 Python `85 passed`，Runtime 定向 `45 passed`，浏览器 `23 passed`。这些结果只把本纵切
+升级为 `Limited Verified`，不证明 Finding 语义、多实例安全或用户价值。

@@ -56,7 +56,7 @@ Durable State 与 Artifact Commit 纵切后进行。
 
 这提升了 Evidence Gate、Commit、Durable State 和 Trace 的工程成熟度，但仍不能重新
 标成完整目标能力：当前版本/Commit 嵌在可更新 Run JSON 中，不是独立不可变 Artifact/
-TaskCommit；没有跨实例 lease、真实 PostgreSQL 本轮重启运行证据、Tool Gateway、多
+TaskCommit；当时还没有跨实例 lease、真实 PostgreSQL 本轮重启运行证据、Tool Gateway、多
 Worker 或外部动作。不要把旧表中的 10%/5% 当作当前数字，也不要用自动化推导一个新的
 总完成百分比。
 
@@ -77,6 +77,23 @@ Worker 或外部动作。不要把旧表中的 10%/5% 当作当前数字，也�
 因此当前可表述为“**Demo 1 有界只读分支控制与逻辑成果历史 Limited Verified**”。仍缺
 可写隔离工件、语义/数值 Verifier、多实例协调、真实 Tool Gateway、生产身份与用户研究；
 仍不应把成熟度压缩为一个新的总百分比。
+
+### 1.4 2026-08-27 可处置证据定位与局部恢复更新
+
+`DR-0032` 把合法范围内的 locator 问题从 broad failure 降为 Finding/Branch 状态。Runtime
+拥有 `EvidenceResolution(exact/ambiguous/unavailable/stale/rejected)`、source revision、
+候选摘要和 Branch/Finding 绑定；模型只提出逐字 quote。DecisionRequest/DecisionRecord
+记录 expected version、幂等键、accept/decline/defer/cancel、影响 Branch、所需来源与
+`external_action=none`。接受 ambiguous 候选前，服务端重新读取当前 Catalog 并重算位置。
+
+确定性门覆盖 5 Finding/5 Branch：4 条 exact 进入 v1，1 条三候选 ambiguous 等待人；accept
+后只恢复第五条 Branch 并 append v2。真实 PostgreSQL 17.11 门覆盖两次重启，完整 Python
+`85 passed`、Runtime `45 passed`、浏览器 `23 passed`。真实 `deepseek-v4-pro` 控制路径另记录
+首轮结构失败、单 Branch 恢复、第二轮 4 条 Finding 与 v2，以及模型调用预算有界停止。
+
+这仍不是完整 Durable Agent：Decision/Resolution 仅嵌在 Snapshot JSONB，数据库无 CAS；
+Evidence Anchor 不证明语义；没有独立可查询决策账本、可写 Office Artifact、多实例 lease、
+多 Worker、Tool Gateway 或外部动作。模块成熟度继续用分层事实描述，不生成新的单一百分比。
 
 ![用户提供的 Agent Control Loop 目标参考图](../evidence/assets/user-feedback-20260825-agent-control-loop-reference.png)
 

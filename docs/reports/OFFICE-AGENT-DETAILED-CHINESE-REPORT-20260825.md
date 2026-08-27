@@ -23,6 +23,30 @@
 > 并改为只累计 Agent active 时间；人工阅读和暂停不消耗它。无 Anchor 的 Gap 不再暗示用户
 > 修改源文件，而是明确为 Agent 执行缺口，并提供留空线索也能只重试受影响 Branch 的入口。
 
+## 2026-08-27 增补：把“卡住”改造成可判断、可重启、可局部恢复
+
+`DR-0032` 继续修复一个更具体的失败体验：同一段原文出现多次，或当前来源已经变化时，旧系统
+要么随机指一个位置，要么整轮失败。现在模型只负责给出逐字 quote 候选，服务端把定位结果编译
+为 `exact/ambiguous/unavailable/stale/rejected`。一条 Finding 无法唯一定位时，只暂停绑定 Branch；
+已采用 Finding、已完成 Branch、Planner/Analyst 回执与 ArtifactVersion v1 都保留。范围越权、
+Catalog 完整性或任务合同损坏仍整 Run fail closed，没有把安全失败放宽成“尽量继续”。
+
+前台不再只显示“缺少证据”。Decision Packet 先列发生了什么、只影响哪里、已经保留什么和为什么
+必须由人判断；随后把每个候选的文件、行号、前后文与真实 Preview 并排。用户可以选择候选、
+暂不采用、补充来源线索、只重试目标 Branch、取消待决或结束并保留。每个动作都绑定当前
+DecisionRequest、expected version 与幂等键，回执明确 `external_action=none`。`defer` 不是死状态，
+断线或刷新后仍能继续作最终选择；`cancel` 也不会伪装成“候选已被否决”。
+
+![桌面端 Decision Packet：候选位置与真实文件并排](../evidence/screenshots/dr-0032-decision-packet-desktop.png)
+
+![390 px 端保留候选、动作、Branch 与轨迹](../evidence/screenshots/dr-0032-decision-packet-mobile.png)
+
+真实 PostgreSQL 17.11 顺序门验证开放的三候选 DecisionRequest 可跨重启保留，accept 后只恢复
+目标 Branch，v1 不变并 append v2，再次重启仍一致；确定性五 Finding 挑战验证 4 条 exact 与
+1 条 ambiguous 的部分成果不会互相拖垮。真实 `deepseek-v4-pro` 运行则记录首轮两次结构输出
+未采用后保留 v1，只恢复一个行政办公 Branch，第二轮采用 4 条 Finding 并 append v2，最终按
+“模型调用预算已耗尽”有界停止。它证明的是控制链路，不证明这些 Finding 的语义正确。
+
 ## 2026-08-26 增补：把等待时间还给人，把失败责任留给 Agent
 
 真实运行暴露了一个典型的人机协作反模式：Agent 第 1 轮已经花了接近一分钟完成 Planner、
@@ -947,6 +971,7 @@ Runtime 恢复、named SSE、Snapshot 对账、引用成员和服务端原文位
 - UI 与服务端事实：[`UI_SERVER_FACT_MATRIX.md`](../contracts/UI_SERVER_FACT_MATRIX.md)。
 - 当前 Evidence：[`AGENT-CONTROL-LOOP-BOUNDED-READONLY-20260825`](../evidence/AGENT-CONTROL-LOOP-BOUNDED-READONLY-EVIDENCE-20260825.md)。
 - 当前截图机器清单：[`dr-0023-agent-control-loop-live-run.json`](../evidence/manifests/dr-0023-agent-control-loop-live-run.json)。
+- 当前局部恢复 Evidence：[`DR-0032-POSTGRES-DECISION-RECOVERY-EVIDENCE-20260827`](../evidence/DR-0032-POSTGRES-DECISION-RECOVERY-EVIDENCE-20260827.md)。
 
 ## 十二、收束讲稿
 
@@ -957,9 +982,9 @@ Office Agent 当前最值得汇报的，不是它已经“自动完成了多少�
 我们已经用 96 份统一文件、安全预览、整库索引与逐轮最小正文范围、Planner/Analyst 回执、
 服务端策略编译、named SSE、权威 Snapshot、Branch Evidence Gate、Evidence Anchor、
 append-only 逻辑 ArtifactVersion/TaskCommit 和 `review_required=true` 做出了受限只读纵切。
-但确定性业务 Verify、EvidenceResolution、DecisionRecord、locator 局部恢复、携证成果导出、
-可写 Office Artifact、Worker、Tool Gateway、Risk/Approval/Permit、真实 Connector 和多实例
-调度仍在前面。
+`DR-0032` 又补齐了五态 EvidenceResolution、持久化 DecisionRequest/DecisionRecord 与
+Finding/Branch 局部恢复。仍未完成的是确定性业务 Verify、携证成果导出、可写 Office Artifact、
+Worker、Tool Gateway、Risk/Approval/Permit、真实 Connector、独立决策账本和多实例调度。
 
 因此这版汇报的竞争结论也不是“主流竞品做不到”。更准确的说法是：**我们已经做实一组
 值得同场验证的原生保证，并设计了八个固定挑战。只有竞品在注明版本、账户、入口和配置下
