@@ -37,7 +37,7 @@
 - 真实 PostgreSQL 顺序重启测试：`test_postgres_restart_preserves_verified_run_workspace_artifact`。它验证 Snapshot 中 Artifact/EffectReceipt、稳定运行工作区文件字节、Owner 下载和公开投影隐藏 digest 在 Runtime 重启后保持一致。本机直接门为 `3 passed`，完整 Python 门为 `115 passed`。API 进程重启后再次读取 TC-05 的 completed Snapshot，三份 Artifact 下载均为 `200` 且大小一致，见 [`scenario-effect-gate-api-postgres-restart-20260827.json`](manifests/scenario-effect-gate-api-postgres-restart-20260827.json)。这仍只证明同机顺序恢复。
 - 浏览器 E2E 为 `27 passed`，覆盖真实成果卡、逐项检查、效果回执、下载、外部边界和 390 px 无页面级横向溢出。四张桌面/移动截图的尺寸、字节数和 SHA-256 登记在 [`scenario-effect-gate-screenshots-20260827.json`](manifests/scenario-effect-gate-screenshots-20260827.json)，截图不是用户研究。
 - Ruff、Web lint 和 Next.js production build 均已通过。固定代码验证子进程只接收 OS 启动所需的环境变量 allowlist，明确不继承 API Key、Token、数据库 DSN、`PYTHONPATH` 或用户 shell hook；TC-02、TC-04、TC-12 的本地测试在该边界下重新通过。
-- 最终 PR、远端检查与合并 SHA 在 PR 实际完成后追加；在此之前不把分支状态写成已合并。
+- 远端审查载体为 [PR #44](https://github.com/Dickey007s/lenovo_agent/pull/44)。初始实现 head `a4fa2028b3072b0b50a9ccb34ae61363e1bfd63a` 的实际 `durable-agent-control-loop` check 已通过；本节更新后的最终 head 仍须等待同一远端检查通过才允许合并。合并 SHA 以 PR 和最终交付为准，在完成前不把分支状态写成已合并。
 
 ## 6. 能证明与不能证明
 
