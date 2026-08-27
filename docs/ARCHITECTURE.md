@@ -213,6 +213,13 @@ gap, not a source-file defect: the sheet derives structure/location/coverage typ
 attempted refs and model adoption from Snapshot facts, keeps feedback optional,
 and exposes “retry only this Branch” as the primary nonterminal action. No Anchor
 means no invented row number or highlight.
+The front end does not treat every waiting Branch as the same human job. A
+retry-only `source_location/analysis_output` state puts one recommended Branch
+resume first and collapses optional clues, stop reasons and Preview. An
+`ambiguous` EvidenceResolution instead explains why a human is needed, requires
+one explicit candidate choice and disables accept until that choice exists. This
+changes information order only; version, idempotency, budget and recovery remain
+server-owned.
 This is not a source-file Diff or semantic verification. Proposal context is
 explicitly not a per-proposal citation. Preview security and result-review
 boundaries remain available without turning the primary page into an
@@ -238,7 +245,9 @@ other external Connector. Plan tool labels are intent declarations; no Tool
 Gateway is invoked. `completed` means a reviewable response exists, not that an
 office task, artifact or external process completed.
 
-See [`DR-0030`](decisions/DR-0030-actionable-review-and-recoverable-analysis.md),
+See [`DR-0034`](decisions/DR-0034-one-action-recovery-and-explicit-source-choice.md),
+[`SCENARIO-020`](scenarios/SCENARIO-020-retry-or-select-one-source.md),
+[`DR-0030`](decisions/DR-0030-actionable-review-and-recoverable-analysis.md),
 [`SCENARIO-016`](scenarios/SCENARIO-016-actionable-finding-and-recoverable-analysis.md),
 [`DR-0028`](decisions/DR-0028-hierarchical-workspace-and-evidence-review.md),
 [`SCENARIO-014`](scenarios/SCENARIO-014-inspect-agent-issue-in-context.md),
@@ -247,4 +256,4 @@ See [`DR-0030`](decisions/DR-0030-actionable-review-and-recoverable-analysis.md)
 [`DR-0026`](decisions/DR-0026-selective-branch-and-immutable-artifact-history.md),
 [`SCENARIO-012`](scenarios/SCENARIO-012-selective-branch-and-artifact-restore.md),
 [UI-server fact matrix](contracts/UI_SERVER_FACT_MATRIX.md) and
-[current Evidence](evidence/ACTIONABLE-REVIEW-AND-RECOVERY-EVIDENCE-20260826.md).
+[current Evidence](evidence/DR-0034-ONE-ACTION-RECOVERY-EVIDENCE-20260827.md).
