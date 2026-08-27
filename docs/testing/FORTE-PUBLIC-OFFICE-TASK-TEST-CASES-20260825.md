@@ -2,10 +2,11 @@
 
 ## 1. 文档状态
 
-`Active test catalog`。当前产品已把 15 个公开任务目录和 96 个输入文件投影为
-一个可浏览的只读办公资料库，并能在用户选择的文件范围内发起自由任务。本文仍不
-表示 15 个 FORTE 原任务均执行成功，也不表示 task-specific validator、文件写入、
-代码执行或外部 Connector 已实现。
+`Active executable effect catalog`。当前产品已把 15 个公开任务目录和 96 个输入
+文件投影为一个可浏览的只读办公资料库，用户只写目标，服务端冻结整库索引。十二个
+固定本地能力现可在隔离 Run Workspace 生成真实文件并经过确定性 validator；TC-03、
+TC-08、TC-09 因 SQL/Web/cron 外部依赖明确阻断。本文不表示 15 个 FORTE 原任务全部
+通过，也不表示通用 Tool Gateway、Connector、多 Worker 或任意任务执行已经实现。
 
 来源为 FORTE 官方公开仓库固定版本
 `345c1ec1487139db9dd319787fa9405ba85d1869`。官方说明完整 benchmark 有
@@ -17,10 +18,10 @@
 
 | 划分 | 数量 | 用途 | 当前边界 |
 | --- | ---: | --- | --- |
-| 本地文件型任务 | 13 | 文件浏览、只读分析、后续写工作区/代码测试/受控命令 | 96 个输入均可安全预览；当前仅通用只读分析，任务专用执行与验证待实现 |
-| 外部依赖型任务 | 2 | SQL Connector、Web 搜索、定时任务与外部动作 Gate | 只有任务说明，没有本地 input；当前必须阻断或进入 Connector 设计 |
+| 本地文件型任务 | 13 | 文件浏览、分析、隔离工作区文件、代码测试/受控命令 | 96 个输入均可安全预览；十二个固定能力已通过效果门，TC-08 的 Web 部分仍阻断 |
+| 外部依赖型效果 | 3 | SQL Connector、Web 搜索、定时任务与外部动作 Gate | TC-03/08/09 记录 `blocked_external_boundary`，不伪造外部结果 |
 | 任务说明 | 15 | 测试来源与用户目标 | 原始文件仅作 provenance，普通 UI 不显示 Prompt/rubric |
-| 输入文件 | 96 | 真实格式办公环境 | 共 `1,636,983` bytes；`solution/` 与 `skills/` 明确排除 |
+| 输入文件 | 96 | 真实格式办公环境 | 96/96 可安全预览；清单共 111 个 task/input 文件、`1,780,445` bytes；`solution/` 与 `skills/` 排除 |
 
 输入格式覆盖：34 个 Python、11 个 DOCX、10 个 JavaScript、7 个 Markdown、
 7 个 XLSX、6 个 PDF、6 个 TS/TSX、4 个 JSON、3 个 TXT、2 个 CSV，以及
@@ -43,21 +44,21 @@ CSS、HTML、shell、log 等。它们覆盖结构化表格、长文档、扫描/
 
 | ID | FORTE Task | 办公任务 | 文件/依赖 | 主要拓扑 | 主要 Gate | 当前状态 |
 | --- | --- | --- | --- | --- | --- | --- |
-| `TC-01` | `administration-001` | 入职员工物资与权限匹配 | CSV + PDF | Demo 1 单任务 | 隐私字段、工作区写入 | 可预览/只读分析；确定性匹配与写入待实现 |
-| `TC-02` | `algorithm-013` | 搜索 Agent 从 Workflow 重构为 ReAct | Python + log + text | Demo 1 单任务 | 代码修改、测试执行 | 可预览/只读分析；代码沙箱待实现 |
-| `TC-03` | `ba-079` | 网约车经营数据 SQL 分析 | 远程 Datasette | Demo 2 多查询 | Connector、查询预算 | 任务说明已下载，外部依赖阻断 |
-| `TC-04` | `dev-015` | 为评测平台补单测并修复缺陷 | 46 个混合代码文件 | Demo 2 多任务 | 沙箱执行、代码写入 | 可预览/只读分析；代码沙箱待实现 |
-| `TC-05` | `Finance-018` | 跨三期往来款与僵尸账款核对 | 3 个 XLSX | Demo 1 单任务 | 数值验证、CSV 写入 | 可预览/只读分析；确定性财务验算仍需专用 Gate |
-| `TC-06` | `hr-001` | 两个岗位与五份简历匹配 | DOCX + PDF | Demo 2 多任务 | 敏感信息、人工复核 | 可预览/只读分析；招聘决策 Gate 待实现 |
-| `TC-07` | `Legal-020` | 六份授权委托书风控核查 | DOCX + MD | Demo 2 多任务 | 法务风险、报告写入 | 可预览/只读分析；法务规则验证待实现 |
-| `TC-08` | `Marketing-012` | 按规则采集竞品广告 | DOCX + Web | Demo 2 多任务 | Web 来源、时间范围 | 本地规则可预览；外部采集不可运行 |
-| `TC-09` | `Misc-AT-003` | 周期搜索新闻并追加文件 | Web + cron | 单任务持续运行 | 全局定时、副作用 | 任务说明已下载，外部依赖阻断 |
-| `TC-10` | `Operations-008` | 设计合规催收外呼流程 | MD | Demo 1 + Demo 3 | 合规规则、禁止真实外呼 | 可预览/只读分析；不执行外呼 |
-| `TC-11` | `pm-014` | 上线合规与风险评估 | MD + 3 个 XLSX | Demo 2 多任务 | 冲突汇聚、报告写入 | 可预览/只读分析；Adaptive Worker 待实现 |
-| `TC-12` | `qa-003` | 为看板工具库补测试并修复源码 | JS + JSON | Demo 2 多任务 | 沙箱执行、代码写入 | 可预览/只读分析；代码沙箱待实现 |
-| `TC-13` | `sales-020` | 客户画像清洗与销售策略 | CSV + MD | Demo 1/2 | 分群依据、人工复核 | 可预览/只读分析；分群验证待实现 |
-| `TC-14` | `sre-010` | 大促 ES 故障诊断与止损建议 | TXT log | Demo 1 + Demo 3 | 高风险命令、禁止自动执行 | 可预览/只读分析；命令执行被禁用 |
-| `TC-15` | `uiux-021` | 交互痛点归因与优先级排序 | XLSX + MD + DOCX | Demo 2 多任务 | 排序验证、CSV 写入 | 可预览/只读分析；排序验证/写入待实现 |
+| `TC-01` | `administration-001` | 入职员工物资与权限匹配 | CSV + PDF | Demo 1 单任务 | 隐私字段、工作区写入 | `Limited Verified`：真实 CSV + 5 项确定性检查 |
+| `TC-02` | `algorithm-013` | 搜索 Agent 从 Workflow 重构为 ReAct | Python + log + text | Demo 1 单任务 | 代码修改、测试执行 | `Limited Verified`：隔离 ZIP/报告，8 项 unittest 通过；非通用代码沙箱 |
+| `TC-03` | `ba-079` | 网约车经营数据 SQL 分析 | 远程 Datasette | Demo 2 多查询 | Connector、查询预算 | `blocked_external_boundary`：未授权 Datasette/SQL Connector |
+| `TC-04` | `dev-015` | 为评测平台补单测并修复缺陷 | 46 个混合代码文件 | Demo 2 多任务 | 沙箱执行、代码写入 | `Limited Verified`：隔离 ZIP/报告，105 项 unittest 与标准库 trace 覆盖检查；不等于完整 DB/HTTP 集成 |
+| `TC-05` | `Finance-018` | 跨三期往来款与僵尸账款核对 | 3 个 XLSX | Demo 1 单任务 | 数值验证、CSV 写入 | `Limited Verified`：两个 CSV + 说明，10 项确定性数值检查 |
+| `TC-06` | `hr-001` | 两个岗位与五份简历匹配 | DOCX + PDF | Demo 2 多任务 | 敏感信息、人工复核 | `Limited Verified`：两个 DOCX、每岗 5 名候选、敏感字段隐藏并保留人工 Gate |
+| `TC-07` | `Legal-020` | 六份授权委托书风控核查 | DOCX + MD | Demo 2 多任务 | 法务风险、报告写入 | `Limited Verified`：规则化 DOCX 与确定性完整性检查；非正式法律意见 |
+| `TC-08` | `Marketing-012` | 按规则采集竞品广告 | DOCX + Web | Demo 2 多任务 | Web 来源、时间范围 | `blocked_external_boundary`：本地规则可读，未伪造 Web 采集 |
+| `TC-09` | `Misc-AT-003` | 周期搜索新闻并追加文件 | Web + cron | 单任务持续运行 | 全局定时、副作用 | `blocked_external_boundary`：未创建 cron/未发起 Web 任务 |
+| `TC-10` | `Operations-008` | 设计合规催收外呼流程 | MD | Demo 1 + Demo 3 | 合规规则、禁止真实外呼 | `Limited Verified`：真实 DOCX + 13 项规则/终态检查；未拨号、未写 CRM |
+| `TC-11` | `pm-014` | 上线合规与风险评估 | MD + 3 个 XLSX | Demo 2 多任务 | 冲突汇聚、报告写入 | `Limited Verified`：DOCX 与确定性指标复算；没有多 Worker 或真实发布 |
+| `TC-12` | `qa-003` | 为看板工具库补测试并修复源码 | JS + JSON | Demo 2 多任务 | 沙箱执行、代码写入 | `Limited Verified`：隔离 ZIP/报告，Vitest 9/9；无网络或任意 package script |
+| `TC-13` | `sales-020` | 客户画像清洗与销售策略 | CSV + MD | Demo 1/2 | 分群依据、人工复核 | `Limited Verified`：Markdown 报告 + 6 项分群/守恒检查 |
+| `TC-14` | `sre-010` | 大促 ES 故障诊断与止损建议 | TXT log | Demo 1 + Demo 3 | 高风险命令、禁止自动执行 | `Limited Verified`：Markdown 诊断 + 9 项日志/地址/禁执行检查 |
+| `TC-15` | `uiux-021` | 交互痛点归因与优先级排序 | XLSX + MD + DOCX | Demo 2 多任务 | 排序验证、CSV 写入 | `Limited Verified`：真实 CSV + 6 项 P0-P4/稳定排序检查 |
 
 ## 5. 单任务有界循环用例
 
@@ -201,14 +202,16 @@ CSS、HTML、shell、log 等。它们覆盖结构化表格、长文档、扫描/
 DOCX/TXT、XLSX 和代码文本可在同一资料库中查看；用户只写目标和预算，Agent 从冻结
 整库索引自主选择每轮文件，结果引用可以回到源预览。这只证明读取、投影和引用范围。
 
-Demo 1 的顺序单 Controller 已增加服务端 Branch、分支级继续、独立 append-only
-逻辑 ArtifactVersion/TaskCommit 和历史成果恢复。下一层优先为
-`administration-001`、`Finance-018`、`sales-020`、`sre-010`、`uiux-021`
-增加任务专用确定性 validator 与独立 run workspace 写入；逻辑简报版本不能冒充真实
-办公文件 Artifact 或源文件 Commit。
+第二层固定 Scenario Effect Gate 已完成十二个本地能力：它们在计划校验后读取固定
+FORTE 输入、写入隔离 Run Workspace、运行命名 validator，并把真实文件、检查清单、
+下载入口和 `state -> action -> observation -> cost -> result` 回执投影到 Snapshot。
+模型调用/采用、确定性效果、Loop 终态仍分别报告；逻辑 ArtifactVersion 也不能冒充
+真实办公文件或源文件 Commit。
 
-随后接入代码工作区：`algorithm-013`、`dev-015`、`qa-003`，需要受控 shell、
-依赖策略、文件 diff 和真实测试 receipt。
+代码型 TC-02/04/12 只证明固定适配器的隔离副本和已记录测试，不是任意命令沙箱；
+TC-04 的标准库 trace 覆盖也不等于完整 DB/HTTP 集成。下一层才是通用 Tool Gateway、
+命令策略、依赖治理、Diff 审查与可复用 verifier。
 
-最后接入外部依赖：`Marketing-012`、`ba-079`、`Misc-AT-003`。只有 Web、SQL、
-Scheduler Connector 和治理闭环真正存在后才能启用，不能为了演示先写死结果。
+外部 TC-03/08/09 继续保持阻断。只有 Web、SQL、Scheduler Connector、身份授权、
+影响预演、可撤销回执和真实外部依赖都存在后才能启用，不能为了演示先写死结果。
+完整运行证据见 [`SCENARIO-EFFECT-GATE-20260827`](../evidence/SCENARIO-EFFECT-GATE-20260827.md)。

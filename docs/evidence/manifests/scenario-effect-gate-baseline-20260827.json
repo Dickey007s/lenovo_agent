@@ -1,0 +1,1010 @@
+{
+  "schema_version": "scenario-effect-gate-run.v1",
+  "phase": "baseline",
+  "generated_at": "2026-08-27T06:36:57.619455+00:00",
+  "dataset": {
+    "name": "FORTE public demo inputs",
+    "source_commit": "345c1ec1487139db9dd319787fa9405ba85d1869",
+    "input_tree_sha256": "2c19e31a8e437f8ccb0ab811ba20a940f022a5bea69bcc750574d753f10a250d",
+    "original_inputs_modified": false
+  },
+  "summary": {
+    "passed": 6,
+    "unsupported_local_capability": 6,
+    "blocked_external_boundary": 3
+  },
+  "scenarios": [
+    {
+      "scenario_id": "TC-01",
+      "capability_id": "office-onboarding-assets",
+      "title": "入职资产匹配",
+      "instruction": "根据入职时间表和分配规则，生成 3 月 20 日至 4 月 20 日的入职资产匹配表。",
+      "input_facts": [
+        {
+          "folder": "行政办公",
+          "file": "3月20日-4月20日入职时间表.csv"
+        },
+        {
+          "folder": "行政办公",
+          "file": "入职物资权限软件分配.pdf"
+        }
+      ],
+      "expected_artifacts": [
+        "入职资产匹配表.csv"
+      ],
+      "deterministic_validator": "validator-onboarding-assets-v1",
+      "frontend_effect": "成果区显示真实 CSV、来源范围、逐项确定性检查和下载入口。",
+      "snapshot_event_receipt": [
+        "workspace_artifacts[]",
+        "effect_receipts[]",
+        "deterministic_verification_completed"
+      ],
+      "prohibited_side_effects": [
+        "不覆盖原始 CSV",
+        "不创建账号",
+        "不创建采购单"
+      ],
+      "expected_lifecycle": "implemented",
+      "actual_status": "passed",
+      "state_action_observation_cost_result": {
+        "state": "已冻结 2 份 FORTE 输入，原始文件保持只读。",
+        "action": "调用 office-onboarding-assets 确定性办公工具并写入隔离运行工作区。",
+        "observation": "生成 1 份真实成果文件，执行 5 项确定性检查。",
+        "cost": "0 次额外模型调用；仅消耗本机确定性解析、计算与文件写入。",
+        "result": "所有确定性效果门通过，成果仍需用户复核。"
+      },
+      "source_file_refs": [
+        "forte-48f4a8c4d30d94e7",
+        "forte-9ddfec8a799cb9f2"
+      ],
+      "artifacts": [
+        {
+          "file_name": "入职资产匹配表.csv",
+          "media_type": "text/csv",
+          "size": 1678,
+          "validator_id": "validator-onboarding-assets-v1",
+          "verifier_status": "passed",
+          "checks": [
+            {
+              "check_id": "check-onboarding-date",
+              "label": "日期范围与排序",
+              "passed": true,
+              "detail": "9 名员工均在闭区间内并按入职日期排序。"
+            },
+            {
+              "check_id": "check-onboarding-privacy",
+              "label": "删除紧急联系人",
+              "passed": true,
+              "detail": "成果表不包含紧急联系人列。"
+            },
+            {
+              "check_id": "check-onboarding-columns",
+              "label": "新增五类资产与权限列",
+              "passed": true,
+              "detail": "表头由服务端按固定顺序复核。"
+            },
+            {
+              "check_id": "check-onboarding-mapping",
+              "label": "岗位规则和备注覆盖",
+              "passed": true,
+              "detail": "逐行映射字段完整，特殊备注优先覆盖默认规则。"
+            },
+            {
+              "check_id": "check-onboarding-delimiter",
+              "label": "列举项使用半角逗号",
+              "passed": true,
+              "detail": "所有列举值均使用半角逗号。"
+            }
+          ]
+        }
+      ],
+      "effect_gate_passed": true,
+      "evidence_file": "docs/evidence/manifests/scenario-effect-gate-baseline-20260827.json"
+    },
+    {
+      "scenario_id": "TC-02",
+      "capability_id": "office-code-react-refactor",
+      "title": "搜索 Agent ReAct 重构",
+      "instruction": "把固定 Workflow 搜索代码改造成有迭代上限和轨迹的 ReAct 结构，并运行测试。",
+      "input_facts": [
+        {
+          "folder": "算法研发",
+          "file": "workflow.py"
+        }
+      ],
+      "expected_artifacts": [
+        "代码变更包",
+        "测试回执"
+      ],
+      "deterministic_validator": "validator-code-sandbox-v1",
+      "frontend_effect": "展示真实 diff、命令回执和失败位置。",
+      "snapshot_event_receipt": [
+        "effect_receipts[]"
+      ],
+      "prohibited_side_effects": [
+        "不修改 FORTE 原始源码",
+        "不运行未批准命令",
+        "不访问网络"
+      ],
+      "expected_lifecycle": "unsupported_local_capability",
+      "actual_status": "unsupported_local_capability",
+      "state_action_observation_cost_result": {
+        "state": "已识别用户目标并冻结当前公开资料库范围。",
+        "action": "检查本地受控写入、沙箱执行和确定性验证能力。",
+        "observation": "当前 Runtime 尚未提供该任务需要的受控执行器或确定性 Verifier。",
+        "cost": "0 次模型调用；0 个外部动作。",
+        "result": "固定 baseline 为红灯；保留缺口，不能把安全阻断写成效果通过。"
+      },
+      "source_file_refs": [],
+      "artifacts": [],
+      "effect_gate_passed": false,
+      "evidence_file": "docs/evidence/manifests/scenario-effect-gate-baseline-20260827.json"
+    },
+    {
+      "scenario_id": "TC-03",
+      "capability_id": "office-remote-sql-analysis",
+      "title": "远程 SQL 经营分析",
+      "instruction": "连接只读 Datasette，分析网约车经营数据并复核指标。",
+      "input_facts": [],
+      "expected_artifacts": [
+        "SQL 查询回执",
+        "经营分析报告"
+      ],
+      "deterministic_validator": "validator-remote-sql-v1",
+      "frontend_effect": "明确显示 Connector 未授权和未产生经营结论。",
+      "snapshot_event_receipt": [
+        "effect_receipts[].status=blocked_external_boundary"
+      ],
+      "prohibited_side_effects": [
+        "不伪造 SQL 结果",
+        "不连接未授权数据库"
+      ],
+      "expected_lifecycle": "blocked_external_boundary",
+      "actual_status": "blocked_external_boundary",
+      "state_action_observation_cost_result": {
+        "state": "已识别用户目标并冻结当前公开资料库范围。",
+        "action": "检查外部 Connector、授权和稳定依赖。",
+        "observation": "所需外部依赖未获授权，未调用模型猜测外部数据。",
+        "cost": "0 次模型调用；0 个外部动作。",
+        "result": "按外部事实边界阻断；没有生成伪造结果。"
+      },
+      "source_file_refs": [],
+      "artifacts": [],
+      "effect_gate_passed": false,
+      "evidence_file": "docs/evidence/manifests/scenario-effect-gate-baseline-20260827.json"
+    },
+    {
+      "scenario_id": "TC-04",
+      "capability_id": "office-code-test-and-fix",
+      "title": "评测平台测试与修复",
+      "instruction": "为评测平台补充测试、修复缺陷并给出真实测试与覆盖率回执。",
+      "input_facts": [
+        {
+          "folder": "研发交付",
+          "file": "PRD.md"
+        }
+      ],
+      "expected_artifacts": [
+        "代码变更包",
+        "测试与覆盖率回执"
+      ],
+      "deterministic_validator": "validator-code-sandbox-v1",
+      "frontend_effect": "展示分支、diff、命令和覆盖率事实。",
+      "snapshot_event_receipt": [
+        "effect_receipts[]"
+      ],
+      "prohibited_side_effects": [
+        "不修改 FORTE 原始源码",
+        "不伪造测试通过"
+      ],
+      "expected_lifecycle": "unsupported_local_capability",
+      "actual_status": "unsupported_local_capability",
+      "state_action_observation_cost_result": {
+        "state": "已识别用户目标并冻结当前公开资料库范围。",
+        "action": "检查本地受控写入、沙箱执行和确定性验证能力。",
+        "observation": "当前 Runtime 尚未提供该任务需要的受控执行器或确定性 Verifier。",
+        "cost": "0 次模型调用；0 个外部动作。",
+        "result": "固定 baseline 为红灯；保留缺口，不能把安全阻断写成效果通过。"
+      },
+      "source_file_refs": [],
+      "artifacts": [],
+      "effect_gate_passed": false,
+      "evidence_file": "docs/evidence/manifests/scenario-effect-gate-baseline-20260827.json"
+    },
+    {
+      "scenario_id": "TC-05",
+      "capability_id": "office-finance-reconciliation",
+      "title": "财务跨期核对",
+      "instruction": "核对三期往来明细，生成未付统计、未收统计，并判断是否存在僵尸账款。",
+      "input_facts": [
+        {
+          "folder": "财务管理",
+          "file": "2025往来明细-上半年.xlsx"
+        },
+        {
+          "folder": "财务管理",
+          "file": "2025往来明细-下半年.xlsx"
+        },
+        {
+          "folder": "财务管理",
+          "file": "2026往来明细.xlsx"
+        }
+      ],
+      "expected_artifacts": [
+        "未付统计.csv",
+        "未收统计.csv",
+        "跨期核对说明.md"
+      ],
+      "deterministic_validator": "validator-finance-reconciliation-v1",
+      "frontend_effect": "成果区显示两个真实 CSV、跨期结论、金额复算和下载入口。",
+      "snapshot_event_receipt": [
+        "workspace_artifacts[]",
+        "effect_receipts[]",
+        "deterministic_verification_completed"
+      ],
+      "prohibited_side_effects": [
+        "不覆盖原始账表",
+        "不记账",
+        "不发起付款"
+      ],
+      "expected_lifecycle": "implemented",
+      "actual_status": "passed",
+      "state_action_observation_cost_result": {
+        "state": "已冻结 3 份 FORTE 输入，原始文件保持只读。",
+        "action": "调用 office-finance-reconciliation 确定性办公工具并写入隔离运行工作区。",
+        "observation": "生成 3 份真实成果文件，执行 10 项确定性检查。",
+        "cost": "0 次额外模型调用；仅消耗本机确定性解析、计算与文件写入。",
+        "result": "所有确定性效果门通过，成果仍需用户复核。"
+      },
+      "source_file_refs": [
+        "forte-81f51a0aa85b5c3c",
+        "forte-8261a3b36e7370da",
+        "forte-8691e8a3837debd3"
+      ],
+      "artifacts": [
+        {
+          "file_name": "未付统计.csv",
+          "media_type": "text/csv",
+          "size": 2399,
+          "validator_id": "validator-finance-reconciliation-v1",
+          "verifier_status": "passed",
+          "checks": [
+            {
+              "check_id": "check-finance-source",
+              "label": "三期来源完整",
+              "passed": true,
+              "detail": "三个固定期间工作簿均通过 Catalog 完整性检查。"
+            },
+            {
+              "check_id": "check-finance-zombie",
+              "label": "跨期僵尸账款复算",
+              "passed": true,
+              "detail": "按同一客商、同一科目、三期借方期末余额逐项比较，结果为无僵尸账款。"
+            },
+            {
+              "check_id": "check-finance-unpaid-rows",
+              "label": "未付逐行复算",
+              "passed": true,
+              "detail": "31 条贷方期末余额逐行相等。"
+            },
+            {
+              "check_id": "check-finance-unpaid-sort",
+              "label": "未付排序",
+              "passed": true,
+              "detail": "按客商升序、同客商金额降序。"
+            }
+          ]
+        },
+        {
+          "file_name": "未收统计.csv",
+          "media_type": "text/csv",
+          "size": 206,
+          "validator_id": "validator-finance-reconciliation-v1",
+          "verifier_status": "passed",
+          "checks": [
+            {
+              "check_id": "check-finance-source",
+              "label": "三期来源完整",
+              "passed": true,
+              "detail": "三个固定期间工作簿均通过 Catalog 完整性检查。"
+            },
+            {
+              "check_id": "check-finance-zombie",
+              "label": "跨期僵尸账款复算",
+              "passed": true,
+              "detail": "按同一客商、同一科目、三期借方期末余额逐项比较，结果为无僵尸账款。"
+            },
+            {
+              "check_id": "check-finance-unreceived-rows",
+              "label": "未收逐行复算",
+              "passed": true,
+              "detail": "2 条借方期末余额逐行相等。"
+            },
+            {
+              "check_id": "check-finance-unreceived-sort",
+              "label": "未收排序",
+              "passed": true,
+              "detail": "按客商升序、同客商金额降序。"
+            }
+          ]
+        },
+        {
+          "file_name": "跨期核对说明.md",
+          "media_type": "text/markdown",
+          "size": 255,
+          "validator_id": "validator-finance-reconciliation-v1",
+          "verifier_status": "passed",
+          "checks": [
+            {
+              "check_id": "check-finance-source",
+              "label": "三期来源完整",
+              "passed": true,
+              "detail": "三个固定期间工作簿均通过 Catalog 完整性检查。"
+            },
+            {
+              "check_id": "check-finance-zombie",
+              "label": "跨期僵尸账款复算",
+              "passed": true,
+              "detail": "按同一客商、同一科目、三期借方期末余额逐项比较，结果为无僵尸账款。"
+            }
+          ]
+        }
+      ],
+      "effect_gate_passed": true,
+      "evidence_file": "docs/evidence/manifests/scenario-effect-gate-baseline-20260827.json"
+    },
+    {
+      "scenario_id": "TC-06",
+      "capability_id": "office-candidate-review",
+      "title": "双岗位简历筛选",
+      "instruction": "依据两个岗位说明分别审阅五份简历，保留逐条证据并输出辅助筛选结果。",
+      "input_facts": [
+        {
+          "folder": "人力招聘",
+          "file": "外卖商户BD岗位JD.docx"
+        },
+        {
+          "folder": "人力招聘",
+          "file": "文本评测岗位JD.docx"
+        }
+      ],
+      "expected_artifacts": [
+        "候选人辅助筛选报告"
+      ],
+      "deterministic_validator": "validator-candidate-review-v1",
+      "frontend_effect": "逐人显示岗位证据、缺失项和人工决定入口。",
+      "snapshot_event_receipt": [
+        "effect_receipts[]"
+      ],
+      "prohibited_side_effects": [
+        "不作自动录用决定",
+        "默认隐藏非必要敏感信息"
+      ],
+      "expected_lifecycle": "unsupported_local_capability",
+      "actual_status": "unsupported_local_capability",
+      "state_action_observation_cost_result": {
+        "state": "已识别用户目标并冻结当前公开资料库范围。",
+        "action": "检查本地受控写入、沙箱执行和确定性验证能力。",
+        "observation": "当前 Runtime 尚未提供该任务需要的受控执行器或确定性 Verifier。",
+        "cost": "0 次模型调用；0 个外部动作。",
+        "result": "固定 baseline 为红灯；保留缺口，不能把安全阻断写成效果通过。"
+      },
+      "source_file_refs": [],
+      "artifacts": [],
+      "effect_gate_passed": false,
+      "evidence_file": "docs/evidence/manifests/scenario-effect-gate-baseline-20260827.json"
+    },
+    {
+      "scenario_id": "TC-07",
+      "capability_id": "office-legal-delegation-review",
+      "title": "授权委托书风控核查",
+      "instruction": "依据统一规则核查六份授权委托书并形成风险报告。",
+      "input_facts": [
+        {
+          "folder": "法务",
+          "file": "授权委托书风控校验规则.md"
+        }
+      ],
+      "expected_artifacts": [
+        "授权委托书风控报告.docx"
+      ],
+      "deterministic_validator": "validator-legal-delegation-v1",
+      "frontend_effect": "按文档分支显示规则、证据和待复核风险。",
+      "snapshot_event_receipt": [
+        "effect_receipts[]"
+      ],
+      "prohibited_side_effects": [
+        "不替代正式法律意见",
+        "不签署文档"
+      ],
+      "expected_lifecycle": "unsupported_local_capability",
+      "actual_status": "unsupported_local_capability",
+      "state_action_observation_cost_result": {
+        "state": "已识别用户目标并冻结当前公开资料库范围。",
+        "action": "检查本地受控写入、沙箱执行和确定性验证能力。",
+        "observation": "当前 Runtime 尚未提供该任务需要的受控执行器或确定性 Verifier。",
+        "cost": "0 次模型调用；0 个外部动作。",
+        "result": "固定 baseline 为红灯；保留缺口，不能把安全阻断写成效果通过。"
+      },
+      "source_file_refs": [],
+      "artifacts": [],
+      "effect_gate_passed": false,
+      "evidence_file": "docs/evidence/manifests/scenario-effect-gate-baseline-20260827.json"
+    },
+    {
+      "scenario_id": "TC-08",
+      "capability_id": "office-web-ad-collection",
+      "title": "竞品广告采集",
+      "instruction": "根据本地规则从 Web 采集竞品广告，保留 URL、时间和去重键。",
+      "input_facts": [
+        {
+          "folder": "市场营销",
+          "file": "广告识别规则.docx"
+        }
+      ],
+      "expected_artifacts": [
+        "竞品广告记录"
+      ],
+      "deterministic_validator": "validator-web-source-v1",
+      "frontend_effect": "显示 Web Connector 未授权且没有伪造采集记录。",
+      "snapshot_event_receipt": [
+        "effect_receipts[].status=blocked_external_boundary"
+      ],
+      "prohibited_side_effects": [
+        "不访问未授权 Web",
+        "不伪造 URL"
+      ],
+      "expected_lifecycle": "blocked_external_boundary",
+      "actual_status": "blocked_external_boundary",
+      "state_action_observation_cost_result": {
+        "state": "已识别用户目标并冻结当前公开资料库范围。",
+        "action": "检查外部 Connector、授权和稳定依赖。",
+        "observation": "所需外部依赖未获授权，未调用模型猜测外部数据。",
+        "cost": "0 次模型调用；0 个外部动作。",
+        "result": "按外部事实边界阻断；没有生成伪造结果。"
+      },
+      "source_file_refs": [],
+      "artifacts": [],
+      "effect_gate_passed": false,
+      "evidence_file": "docs/evidence/manifests/scenario-effect-gate-baseline-20260827.json"
+    },
+    {
+      "scenario_id": "TC-09",
+      "capability_id": "office-scheduled-news",
+      "title": "周期资讯任务",
+      "instruction": "定时搜索新闻并以幂等批次追加到工作文件。",
+      "input_facts": [],
+      "expected_artifacts": [
+        "计划回执",
+        "追加文件"
+      ],
+      "deterministic_validator": "validator-scheduler-v1",
+      "frontend_effect": "显示 Scheduler/Web Connector 缺失且没有伪装定时成功。",
+      "snapshot_event_receipt": [
+        "effect_receipts[].status=blocked_external_boundary"
+      ],
+      "prohibited_side_effects": [
+        "不创建系统定时任务",
+        "不访问未授权 Web"
+      ],
+      "expected_lifecycle": "blocked_external_boundary",
+      "actual_status": "blocked_external_boundary",
+      "state_action_observation_cost_result": {
+        "state": "已识别用户目标并冻结当前公开资料库范围。",
+        "action": "检查外部 Connector、授权和稳定依赖。",
+        "observation": "所需外部依赖未获授权，未调用模型猜测外部数据。",
+        "cost": "0 次模型调用；0 个外部动作。",
+        "result": "按外部事实边界阻断；没有生成伪造结果。"
+      },
+      "source_file_refs": [],
+      "artifacts": [],
+      "effect_gate_passed": false,
+      "evidence_file": "docs/evidence/manifests/scenario-effect-gate-baseline-20260827.json"
+    },
+    {
+      "scenario_id": "TC-10",
+      "capability_id": "office-compliant-outbound-flow",
+      "title": "合规外呼流程",
+      "instruction": "根据专业性说明生成信用卡 M1 逾期用户 AI 外呼催收流程图文档。",
+      "input_facts": [
+        {
+          "folder": "运营管理",
+          "file": "专业性说明.md"
+        }
+      ],
+      "expected_artifacts": [
+        "外呼流程-M1逾期用户AI外呼催收流程图.docx"
+      ],
+      "deterministic_validator": "validator-compliant-outbound-flow-v1",
+      "frontend_effect": "成果区显示真实 DOCX、13 项流程验证和未发生外呼回执。",
+      "snapshot_event_receipt": [
+        "workspace_artifacts[]",
+        "effect_receipts[]",
+        "deterministic_verification_completed"
+      ],
+      "prohibited_side_effects": [
+        "不拨号",
+        "不写 CRM",
+        "不发送短信"
+      ],
+      "expected_lifecycle": "implemented",
+      "actual_status": "passed",
+      "state_action_observation_cost_result": {
+        "state": "已冻结 1 份 FORTE 输入，原始文件保持只读。",
+        "action": "调用 office-compliant-outbound-flow 确定性办公工具并写入隔离运行工作区。",
+        "observation": "生成 1 份真实成果文件，执行 13 项确定性检查。",
+        "cost": "0 次额外模型调用；仅消耗本机确定性解析、计算与文件写入。",
+        "result": "所有确定性效果门通过，成果仍需用户复核。"
+      },
+      "source_file_refs": [
+        "forte-ba23e986a9c7e8d8"
+      ],
+      "artifacts": [
+        {
+          "file_name": "外呼流程-M1逾期用户AI外呼催收流程图.docx",
+          "media_type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+          "size": 1692,
+          "validator_id": "validator-compliant-outbound-flow-v1",
+          "verifier_status": "passed",
+          "checks": [
+            {
+              "check_id": "check-outbound-source",
+              "label": "规则来源完整",
+              "passed": true,
+              "detail": "外呼时段、频次与录音规则均来自安全预览。"
+            },
+            {
+              "check_id": "check-outbound-start",
+              "label": "唯一开始节点",
+              "passed": true,
+              "detail": "状态机只有一个 START。"
+            },
+            {
+              "check_id": "check-outbound-time-gate",
+              "label": "拨号前时段 Gate",
+              "passed": true,
+              "detail": "不合规路径直接停止，不进入拨号。"
+            },
+            {
+              "check_id": "check-outbound-connect",
+              "label": "接通与未接通分支",
+              "passed": true,
+              "detail": "接通状态具有两条互斥路径。"
+            },
+            {
+              "check_id": "check-outbound-retry",
+              "label": "重拨频次上限",
+              "passed": true,
+              "detail": "仅未达上限时进入安排重拨。"
+            },
+            {
+              "check_id": "check-outbound-recording",
+              "label": "录音告知先于身份确认",
+              "passed": true,
+              "detail": "先告知录音，再询问身份。"
+            },
+            {
+              "check_id": "check-outbound-identity",
+              "label": "身份确认先于欠款引导",
+              "passed": true,
+              "detail": "身份确认前不披露欠款信息。"
+            },
+            {
+              "check_id": "check-outbound-third-party",
+              "label": "第三方禁呼",
+              "passed": true,
+              "detail": "第三方要求停止联系时进入禁呼终态。"
+            },
+            {
+              "check_id": "check-outbound-attitude",
+              "label": "本人态度分支",
+              "passed": true,
+              "detail": "承诺、软拒绝和硬拒绝均有路径。"
+            },
+            {
+              "check_id": "check-outbound-invalid",
+              "label": "无效通话回到频次判断",
+              "passed": true,
+              "detail": "无效通话不会绕过重拨上限。"
+            },
+            {
+              "check_id": "check-outbound-human",
+              "label": "高风险情况转人工",
+              "passed": true,
+              "detail": "三类强制情况均进入人工。"
+            },
+            {
+              "check_id": "check-outbound-terminals",
+              "label": "六类终态齐全",
+              "passed": true,
+              "detail": "所有路径只落入六类业务终态。"
+            },
+            {
+              "check_id": "check-outbound-no-action",
+              "label": "未发生真实外呼",
+              "passed": true,
+              "detail": "只生成 DOCX；拨号、CRM 与短信动作均为 none。"
+            }
+          ]
+        }
+      ],
+      "effect_gate_passed": true,
+      "evidence_file": "docs/evidence/manifests/scenario-effect-gate-baseline-20260827.json"
+    },
+    {
+      "scenario_id": "TC-11",
+      "capability_id": "office-release-readiness",
+      "title": "上线合规核验",
+      "instruction": "综合 PRD、上线配置、功能测试和兼容测试，给出上线结论与改进计划。",
+      "input_facts": [
+        {
+          "folder": "产品管理",
+          "file": "PRD_v2.5.md"
+        },
+        {
+          "folder": "产品管理",
+          "file": "上线配置清单.xlsx"
+        }
+      ],
+      "expected_artifacts": [
+        "上线合规与风险报告"
+      ],
+      "deterministic_validator": "validator-release-readiness-v1",
+      "frontend_effect": "显示跨文档冲突、确定性指标和各分支状态。",
+      "snapshot_event_receipt": [
+        "effect_receipts[]"
+      ],
+      "prohibited_side_effects": [
+        "不执行上线",
+        "不改配置"
+      ],
+      "expected_lifecycle": "unsupported_local_capability",
+      "actual_status": "unsupported_local_capability",
+      "state_action_observation_cost_result": {
+        "state": "已识别用户目标并冻结当前公开资料库范围。",
+        "action": "检查本地受控写入、沙箱执行和确定性验证能力。",
+        "observation": "当前 Runtime 尚未提供该任务需要的受控执行器或确定性 Verifier。",
+        "cost": "0 次模型调用；0 个外部动作。",
+        "result": "固定 baseline 为红灯；保留缺口，不能把安全阻断写成效果通过。"
+      },
+      "source_file_refs": [],
+      "artifacts": [],
+      "effect_gate_passed": false,
+      "evidence_file": "docs/evidence/manifests/scenario-effect-gate-baseline-20260827.json"
+    },
+    {
+      "scenario_id": "TC-12",
+      "capability_id": "office-js-test-and-fix",
+      "title": "看板工具库测试与修复",
+      "instruction": "为三个看板工具模块编写 Vitest，修复源码并真实运行测试。",
+      "input_facts": [
+        {
+          "folder": "质量保障",
+          "file": "package.json"
+        }
+      ],
+      "expected_artifacts": [
+        "代码变更包",
+        "Vitest 回执"
+      ],
+      "deterministic_validator": "validator-code-sandbox-v1",
+      "frontend_effect": "显示真实 diff、Vitest 输出和零失败事实。",
+      "snapshot_event_receipt": [
+        "effect_receipts[]"
+      ],
+      "prohibited_side_effects": [
+        "不修改 FORTE 原始源码",
+        "不伪造测试通过"
+      ],
+      "expected_lifecycle": "unsupported_local_capability",
+      "actual_status": "unsupported_local_capability",
+      "state_action_observation_cost_result": {
+        "state": "已识别用户目标并冻结当前公开资料库范围。",
+        "action": "检查本地受控写入、沙箱执行和确定性验证能力。",
+        "observation": "当前 Runtime 尚未提供该任务需要的受控执行器或确定性 Verifier。",
+        "cost": "0 次模型调用；0 个外部动作。",
+        "result": "固定 baseline 为红灯；保留缺口，不能把安全阻断写成效果通过。"
+      },
+      "source_file_refs": [],
+      "artifacts": [],
+      "effect_gate_passed": false,
+      "evidence_file": "docs/evidence/manifests/scenario-effect-gate-baseline-20260827.json"
+    },
+    {
+      "scenario_id": "TC-13",
+      "capability_id": "office-customer-segmentation",
+      "title": "客户画像与销售策略",
+      "instruction": "清洗问卷、完成客户画像分类，并生成差异化销售策略 Markdown 报告。",
+      "input_facts": [
+        {
+          "folder": "销售运营",
+          "file": "客户画像调研问卷.csv"
+        },
+        {
+          "folder": "销售运营",
+          "file": "客户分类画像与差异化销售策略生成规则.md"
+        }
+      ],
+      "expected_artifacts": [
+        "客户画像及销售策略.md"
+      ],
+      "deterministic_validator": "validator-customer-segmentation-v1",
+      "frontend_effect": "成果区显示真实 Markdown、分群守恒检查和未联系客户回执。",
+      "snapshot_event_receipt": [
+        "workspace_artifacts[]",
+        "effect_receipts[]",
+        "deterministic_verification_completed"
+      ],
+      "prohibited_side_effects": [
+        "不联系客户",
+        "不写 CRM",
+        "不把公开样本当真实线索"
+      ],
+      "expected_lifecycle": "implemented",
+      "actual_status": "passed",
+      "state_action_observation_cost_result": {
+        "state": "已冻结 2 份 FORTE 输入，原始文件保持只读。",
+        "action": "调用 office-customer-segmentation 确定性办公工具并写入隔离运行工作区。",
+        "observation": "生成 1 份真实成果文件，执行 6 项确定性检查。",
+        "cost": "0 次额外模型调用；仅消耗本机确定性解析、计算与文件写入。",
+        "result": "所有确定性效果门通过，成果仍需用户复核。"
+      },
+      "source_file_refs": [
+        "forte-30f5e044f5d7a199",
+        "forte-8d86fcca3891dabb"
+      ],
+      "artifacts": [
+        {
+          "file_name": "客户画像及销售策略.md",
+          "media_type": "text/markdown",
+          "size": 1597,
+          "validator_id": "validator-customer-segmentation-v1",
+          "verifier_status": "passed",
+          "checks": [
+            {
+              "check_id": "check-segmentation-clean",
+              "label": "清洗、中文数字和缺失值",
+              "passed": true,
+              "detail": "重复样本 111、无法归类样本 106/110 已排除。"
+            },
+            {
+              "check_id": "check-segmentation-priority",
+              "label": "安全型优先级",
+              "passed": true,
+              "detail": "安全型为 102、105、107。"
+            },
+            {
+              "check_id": "check-segmentation-technical",
+              "label": "技术型分类",
+              "passed": true,
+              "detail": "技术型为 101、104、109。"
+            },
+            {
+              "check_id": "check-segmentation-agile",
+              "label": "敏捷型分类",
+              "passed": true,
+              "detail": "敏捷型为 103、108。"
+            },
+            {
+              "check_id": "check-segmentation-conservation",
+              "label": "记录数守恒",
+              "passed": true,
+              "detail": "11 条输入 = 8 条分类 + 3 条排除。"
+            },
+            {
+              "check_id": "check-segmentation-sections",
+              "label": "报告结构",
+              "passed": true,
+              "detail": "报告标题和必需小节完整。"
+            }
+          ]
+        }
+      ],
+      "effect_gate_passed": true,
+      "evidence_file": "docs/evidence/manifests/scenario-effect-gate-baseline-20260827.json"
+    },
+    {
+      "scenario_id": "TC-14",
+      "capability_id": "office-sre-log-diagnosis",
+      "title": "SRE 日志诊断",
+      "instruction": "分析双十一 Elasticsearch 日志，给出根因与两个层面的紧急止损建议。",
+      "input_facts": [
+        {
+          "folder": "可靠性工程",
+          "file": "log.txt"
+        }
+      ],
+      "expected_artifacts": [
+        "ES故障诊断与止损建议.md"
+      ],
+      "deterministic_validator": "validator-sre-log-diagnosis-v1",
+      "frontend_effect": "成果区显示真实 Markdown、日志事实复核和命令未执行回执。",
+      "snapshot_event_receipt": [
+        "workspace_artifacts[]",
+        "effect_receipts[]",
+        "deterministic_verification_completed"
+      ],
+      "prohibited_side_effects": [
+        "不执行 ES 命令",
+        "不连接集群",
+        "不自动限流"
+      ],
+      "expected_lifecycle": "implemented",
+      "actual_status": "passed",
+      "state_action_observation_cost_result": {
+        "state": "已冻结 1 份 FORTE 输入，原始文件保持只读。",
+        "action": "调用 office-sre-log-diagnosis 确定性办公工具并写入隔离运行工作区。",
+        "observation": "生成 1 份真实成果文件，执行 9 项确定性检查。",
+        "cost": "0 次额外模型调用；仅消耗本机确定性解析、计算与文件写入。",
+        "result": "所有确定性效果门通过，成果仍需用户复核。"
+      },
+      "source_file_refs": [
+        "forte-df5ae9b9a1273380"
+      ],
+      "artifacts": [
+        {
+          "file_name": "ES故障诊断与止损建议.md",
+          "media_type": "text/markdown",
+          "size": 1480,
+          "validator_id": "validator-sre-log-diagnosis-v1",
+          "verifier_status": "passed",
+          "checks": [
+            {
+              "check_id": "check-sre-qps",
+              "label": "QPS 触发链",
+              "passed": true,
+              "detail": "查询和写入 QPS 基线、峰值与倍数均由日志复核。"
+            },
+            {
+              "check_id": "check-sre-resources",
+              "label": "资源瓶颈",
+              "passed": true,
+              "detail": "磁盘、CPU 与堆内存范围均写入因果链。"
+            },
+            {
+              "check_id": "check-sre-gc",
+              "label": "GC 与慢查询",
+              "passed": true,
+              "detail": "GC、深度分页和重聚合被识别为放大因素。"
+            },
+            {
+              "check_id": "check-sre-shards",
+              "label": "队列和副本",
+              "passed": true,
+              "detail": "线程池与分片状态均来自日志。"
+            },
+            {
+              "check_id": "check-sre-distractors",
+              "label": "干扰项排除",
+              "passed": true,
+              "detail": "干扰项明确标为伴随或次生现象。"
+            },
+            {
+              "check_id": "check-sre-address",
+              "label": "命令地址来自日志",
+              "passed": true,
+              "detail": "命令使用日志中的 10.1.1.1:9200。"
+            },
+            {
+              "check_id": "check-sre-es-actions",
+              "label": "ES 侧三类操作",
+              "passed": true,
+              "detail": "分片重试、refresh 调整和缓存清理均给出建议命令。"
+            },
+            {
+              "check_id": "check-sre-business",
+              "label": "业务侧降级",
+              "passed": true,
+              "detail": "限流和停止重查询两条业务措施齐全。"
+            },
+            {
+              "check_id": "check-sre-no-exec",
+              "label": "命令未执行",
+              "passed": true,
+              "detail": "Tool Gateway 未接入，external_action=none。"
+            }
+          ]
+        }
+      ],
+      "effect_gate_passed": true,
+      "evidence_file": "docs/evidence/manifests/scenario-effect-gate-baseline-20260827.json"
+    },
+    {
+      "scenario_id": "TC-15",
+      "capability_id": "office-ux-pain-prioritization",
+      "title": "交互痛点排序",
+      "instruction": "根据交互日志、痛点规则和页面规范，生成排序正确的交互规范优化方案 CSV。",
+      "input_facts": [
+        {
+          "folder": "用户体验",
+          "file": "用户交互行为日志.xlsx"
+        },
+        {
+          "folder": "用户体验",
+          "file": "交互行为痛点及优化规则.md"
+        },
+        {
+          "folder": "用户体验",
+          "file": "页面级交互规范.docx"
+        }
+      ],
+      "expected_artifacts": [
+        "交互规范优化方案.csv"
+      ],
+      "deterministic_validator": "validator-ux-pain-prioritization-v1",
+      "frontend_effect": "成果区显示真实 CSV、排序检查、失败原因与下载入口。",
+      "snapshot_event_receipt": [
+        "workspace_artifacts[]",
+        "effect_receipts[]",
+        "deterministic_verification_completed"
+      ],
+      "prohibited_side_effects": [
+        "不修改生产界面",
+        "不自动发布建议"
+      ],
+      "expected_lifecycle": "implemented",
+      "actual_status": "passed",
+      "state_action_observation_cost_result": {
+        "state": "已冻结 3 份 FORTE 输入，原始文件保持只读。",
+        "action": "调用 office-ux-pain-prioritization 确定性办公工具并写入隔离运行工作区。",
+        "observation": "生成 1 份真实成果文件，执行 6 项确定性检查。",
+        "cost": "0 次额外模型调用；仅消耗本机确定性解析、计算与文件写入。",
+        "result": "所有确定性效果门通过，成果仍需用户复核。"
+      },
+      "source_file_refs": [
+        "forte-3913d2ccb62b9b02",
+        "forte-0506a266b89dfef4",
+        "forte-3f48165dbc47276d"
+      ],
+      "artifacts": [
+        {
+          "file_name": "交互规范优化方案.csv",
+          "media_type": "text/csv",
+          "size": 18089,
+          "validator_id": "validator-ux-pain-prioritization-v1",
+          "verifier_status": "passed",
+          "checks": [
+            {
+              "check_id": "check-ux-headers",
+              "label": "表头顺序",
+              "passed": true,
+              "detail": "六列表头与任务合同完全一致。"
+            },
+            {
+              "check_id": "check-ux-coverage",
+              "label": "痛点聚合完整",
+              "passed": true,
+              "detail": "66 个页面、元素、痛点组合均有一行。"
+            },
+            {
+              "check_id": "check-ux-priority",
+              "label": "P0-P4 计算",
+              "passed": true,
+              "detail": "频次和严重度矩阵逐项计算。"
+            },
+            {
+              "check_id": "check-ux-order",
+              "label": "三级排序",
+              "passed": true,
+              "detail": "先优先级、再页面规范元素顺序、最后痛点类型顺序。"
+            },
+            {
+              "check_id": "check-ux-reasons",
+              "label": "失败原因可复查",
+              "passed": true,
+              "detail": "每行保留次数、占比和失败原因。"
+            },
+            {
+              "check_id": "check-ux-no-apply",
+              "label": "建议未自动应用",
+              "passed": true,
+              "detail": "只生成运行工作区 CSV，不修改产品界面。"
+            }
+          ]
+        }
+      ],
+      "effect_gate_passed": true,
+      "evidence_file": "docs/evidence/manifests/scenario-effect-gate-baseline-20260827.json"
+    }
+  ]
+}

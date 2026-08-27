@@ -15,10 +15,12 @@ FastAPI Harness
   -> HarnessRuntime
        -> OpenAI-compatible Planner
        -> server Policy Compiler + Plan Validator
+       -> admitted deterministic office adapter + run-workspace Artifact Verifier
        -> OpenAI-compatible Analyst
        -> Result/Citation Validator
        -> server-owned Branch DAG + branch Evidence Gate + bounded Loop Controller
        -> append-only logical ArtifactVersion + TaskCommit pointer/restore
+       -> isolated real office Artifact store + Owner-scoped download
        -> HarnessStateStore
             -> PostgreSQL snapshots/receipts/artifacts/commits when DATABASE_DSN is configured
             -> process-local memory fallback otherwise
@@ -58,7 +60,11 @@ request must contain:
 - Owner-scoped idempotency key;
 - expected version 1;
 - a 3-2,000 character user instruction;
-- 1-3 rounds, 1-8 files per round, 2-6 model calls and a 20-3,000 second deadline.
+- 1-24 rounds, 1-24 files per round, 2-60 model calls and a 20-14,400 second deadline.
+
+Defaults are 12 rounds, 16 files per round, 30 model calls and 7,200 active
+seconds. The larger bounds remove the historical fixed-three-round assumption;
+they do not remove explicit stop, model-call, file or active-time governance.
 
 The server freezes all 96 allowlisted input refs, `scope_mode=whole_workspace`
 and loop bounds in the Run Snapshot. Client-owned `selected_file_refs` are not
@@ -73,14 +79,25 @@ source allowlist, side-effect scope, human gate or execution fact.
 The server compiles the candidate into a `HarnessPlan`:
 
 - read/inspect/verify intent maps to no side effect;
-- result intent may map to `run_workspace_write`, which means a logical current
-  Run result only and is not an Artifact mutation;
+- result intent may map to `run_workspace_write`, which remains a server-owned
+  write intent and is not execution evidence by itself;
 - external-action preview requires the server-owned human-gate policy;
 - units, dependencies, cycles, per-round refs, tools, artifacts and gates are
   validated deterministically.
 - every validated unit becomes a stable server-owned Branch with dependencies,
   evidence state and human-gate state; model output cannot assign Branch identity
   or completion.
+
+After the Plan Validator accepts a plan, the Scenario Effect Gate may admit one
+of twelve fixed, server-owned local office capabilities by matching the original
+user instruction and the frozen FORTE input set. This is not a hidden Scenario
+selector and the model cannot name a validator into existence. The adapter reads
+only Catalog-approved bytes, writes new CSV/Markdown/DOCX/ZIP files into the
+isolated Run Workspace, runs a deterministic validator, stores immutable file
+metadata and emits an EffectReceipt. TC-03/08/09 remain explicit
+`blocked_external_boundary` because their SQL/Web/cron dependencies are not
+authorized. The original FORTE bytes are checked before and after the gate and
+are never modified.
 
 Each round's Planner receives the current question, safe metadata for remaining files,
 budget and any accepted steer instruction. A rejected candidate may be repaired
@@ -120,7 +137,7 @@ Validator requires all confirmed refs to remain in the plan, so confirmation
 cannot silently become unrelated workspace exploration.
 
 The deadline is an active execution budget, not Run wall-clock age. The default
-is 1,200 seconds and the public bound is 20 to 3,000 seconds. The Runtime freezes
+is 7,200 seconds and the public bound is 20 to 14,400 seconds. The Runtime freezes
 `budget.elapsed_ms` when it enters `waiting_input`, applies a user pause or
 reaches a terminal state, then resumes from the accumulated active elapsed at a
 legal Branch resume. Human reading time therefore does not consume model work
@@ -142,6 +159,10 @@ The Snapshot is authoritative. Named events are a readable ordered projection:
 ```text
 workspace_index -> round_started -> planning_started -> planning_completed
 -> optional plan_validation_rejected/retry -> plan_validation
+-> optional deterministic_office_tool_started
+   -> run_workspace_artifact_written
+   -> deterministic_verification_completed
+   or scenario_effect_bounded
 -> analysis_started -> analysis_completed -> result_validation -> evidence_gate
 -> optional branch-selected human resume -> next round or loop_committed/loop_budget_stopped/loop_stopped
 -> optional artifact_version_restored after terminal human restore
@@ -166,6 +187,14 @@ Owner Run via `GET /runs`. Memory fallback does not survive an API restart.
 `X-User-Id` is not signed authentication, and there is no multi-instance lease
 or notification channel.
 
+Run Workspace Artifact metadata and EffectReceipts are part of the authoritative
+Snapshot. Artifact bytes are stored outside the public FORTE tree in an isolated,
+Owner/Run-scoped directory and are rechecked against the private digest before
+download. PostgreSQL restart restores the metadata through the Snapshot; the
+separate Artifact store preserves the bytes on the same host. This is not an
+object store, a general Tool Gateway, multi-host durability or transactional
+coordination between database and filesystem.
+
 `EvidenceResolution` and human decisions are currently nested in the authoritative
 Snapshot JSONB. This preserves records committed before a restart, but is not an
 independent append-only decision ledger and has no database-level source-revision
@@ -186,12 +215,17 @@ The root page keeps three independently meaningful regions:
 - work area: task composer, loop contract, safe preview, round canvas, evidence
   gaps projected as Branch lanes (Branch -> current material -> Evidence Gate ->
   next action), server-backed task-branch state, branch-specific continue decision,
-  immutable result history, restore actions, cited brief and a full-page issue
+  immutable result history, restore actions, verified Run Workspace files with
+  deterministic checks/downloads, cited brief and a full-page issue
   review surface for Gap, Branch, Finding and next-task proposals;
 - activity pane: current phase, budget, ordered events and model adoption receipts.
 
 The UI shows business facts and recovery actions, not internal protocol. A
 citation is an interaction: it selects and opens the referenced file preview.
+The Artifact area independently shows whether the model call happened, whether
+its output was adopted, whether a deterministic local effect passed, what file
+was written and which side effects did not occur. It never collapses these into
+one green “completed” state.
 The issue-review surface reuses the same preview route and organizes authoritative
 Snapshot facts as Agent proposal -> server record -> human review. For Findings,
 it first separates fact, impact and the required human action, then renders the
@@ -234,18 +268,25 @@ architecture document.
 | Planner | strict candidate, autonomous evidence selection, per-round receipt and one bounded repair | retrieval-quality evaluation and richer replanning policy |
 | Admission/Policy/Validator | server compilation and deterministic graph/source checks | dynamic topology admission |
 | Scheduler & Worker Manager | one bounded single-loop controller with server-owned Branch states and selective continuation | parallel/adaptive workers, leases and multi-instance recovery |
-| Tool Gateway | not connected | governed real/simulated tools and receipts |
-| Artifact Workspace & Verifier | independent append-only logical evidence-brief versions, citation membership, server-resolved preview Anchors, branch Evidence Gate, TaskCommit pointer and restore | writable isolated office artifacts, semantic/numeric validators and conflict records |
+| Tool Gateway | twelve fixed local deterministic office adapters with EffectReceipts; no model-owned dispatch | reusable governed tool registry, arbitrary safe commands, Web/SQL/Scheduler/Connector receipts |
+| Artifact Workspace & Verifier | independent append-only logical evidence-brief versions, citation membership, server-resolved preview Anchors, branch Evidence Gate, TaskCommit pointer/restore, plus isolated CSV/Markdown/DOCX/ZIP files and named deterministic validators for twelve fixed capabilities | general writable office workspace, reusable semantic/numeric verifier framework, conflict-aware edits and multi-host Artifact durability |
 | Checkpoint/Event/Governance | ordered events, branch/rollback controls, idempotent commands, independent records and optional PostgreSQL restart recovery | multi-instance lease/notification, in-flight cancellation, policy/approval/Permit integration |
 
 ## 8. Security and claim boundary
 
-The current slice has no file write, shell, Web, SQL, scheduler, email, CRM or
-other external Connector. Plan tool labels are intent declarations; no Tool
-Gateway is invoked. `completed` means a reviewable response exists, not that an
-office task, artifact or external process completed.
+The current slice can write only new files in an isolated Run Workspace through
+twelve fixed server-owned adapters. It never modifies FORTE sources and has no
+general shell, Web, SQL, scheduler, email, CRM or external Connector. Fixed code
+validators run only service-owned commands in one-use temporary directories and
+receive a minimal OS environment allowlist; provider keys, tokens, database DSNs,
+`PYTHONPATH` and user shell hooks are not inherited. Plan tool labels remain
+intent declarations; only Artifact/Effect receipts prove a fixed adapter ran.
+`completed` means a reviewable logical response exists, not that a deterministic
+Artifact or external process completed.
 
-See [`DR-0034`](decisions/DR-0034-one-action-recovery-and-explicit-source-choice.md),
+See [`DR-0035`](decisions/DR-0035-scenario-effect-gate-and-run-workspace-artifacts.md),
+[`SCENARIO-021`](scenarios/SCENARIO-021-verifiable-office-artifact-effect.md),
+[`DR-0034`](decisions/DR-0034-one-action-recovery-and-explicit-source-choice.md),
 [`SCENARIO-020`](scenarios/SCENARIO-020-retry-or-select-one-source.md),
 [`DR-0030`](decisions/DR-0030-actionable-review-and-recoverable-analysis.md),
 [`SCENARIO-016`](scenarios/SCENARIO-016-actionable-finding-and-recoverable-analysis.md),
@@ -256,4 +297,4 @@ See [`DR-0034`](decisions/DR-0034-one-action-recovery-and-explicit-source-choice
 [`DR-0026`](decisions/DR-0026-selective-branch-and-immutable-artifact-history.md),
 [`SCENARIO-012`](scenarios/SCENARIO-012-selective-branch-and-artifact-restore.md),
 [UI-server fact matrix](contracts/UI_SERVER_FACT_MATRIX.md) and
-[current Evidence](evidence/DR-0034-ONE-ACTION-RECOVERY-EVIDENCE-20260827.md).
+[current Evidence](evidence/SCENARIO-EFFECT-GATE-20260827.md).

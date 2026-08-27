@@ -21,6 +21,7 @@
     "@types/react": "latest",
     "@types/react-dom": "latest",
     "cross-env": "10.1.0",
-    "typescript": "5.9.3"
+    "typescript": "5.9.3",
+    "vitest": "1.6.1"
   }
 }

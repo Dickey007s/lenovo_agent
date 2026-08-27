@@ -280,6 +280,25 @@ class BenchmarkWorkspaceCatalog(BenchmarkScenarioCatalog):
             text="此文件已通过完整性校验，但当前没有安全预览器。",
         ).model_dump(mode="json")
 
+    def checked_input_bytes(self, file_ref: str) -> bytes:
+        """Return one allowlisted input after the same path, size and digest checks.
+
+        This is an internal capability for bounded run-workspace tools. It is not
+        mounted as a download API and must never be used for ``task.md`` or
+        benchmark solution material.
+        """
+
+        manifest, folders = self.load()
+        item = self._find_file(manifest, folders, file_ref)
+        entry = BenchmarkFileEntry(
+            path=item.path,
+            sha256=item.sha256,
+            size=item.size,
+            mime=item.mime,
+            role="input",
+        )
+        return self._read_checked(self._safe_path(item.path), entry)
+
     def agent_file_inputs(self, file_refs: list[str]) -> list[dict[str, Any]]:
         """Bound the material passed to the model independently of UI previews."""
         results: list[dict[str, Any]] = []

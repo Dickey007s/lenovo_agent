@@ -4,7 +4,7 @@ Base URL: `http://localhost:8010`.
 
 ## 1. Public surface
 
-OpenAPI exposes seven paths:
+OpenAPI exposes eight paths and nine operations:
 
 | Method | Path | Purpose |
 | --- | --- | --- |
@@ -14,6 +14,7 @@ OpenAPI exposes seven paths:
 | POST | `/v1/harness/runs` | start an idempotent bounded read-only Agent Control Loop |
 | GET | `/v1/harness/runs?limit=10` | list recent Owner-scoped Runs for recovery |
 | GET | `/v1/harness/runs/{run_id}` | Owner-scoped public Snapshot |
+| GET | `/v1/harness/runs/{run_id}/artifacts/{artifact_id}` | Owner-scoped download of one verified Run Workspace file |
 | POST | `/v1/harness/runs/{run_id}/controls` | versioned, idempotent pause/resume/steer/stop/rollback |
 | GET | `/v1/harness/runs/{run_id}/events?after=N` | ordered named SSE after a sequence |
 
@@ -26,10 +27,12 @@ Run endpoints use `X-User-Id`; omission uses `demo_user`. This unsigned header
 is a demonstration Owner placeholder, not production authentication. Missing
 and wrong-owner Runs both return 404 before the SSE response is created.
 
-There are eight operations over seven OpenAPI paths because `GET` and `POST`
+There are nine operations over eight OpenAPI paths because `GET` and `POST`
 share `/runs`. With `DATABASE_DSN`, accepted Run snapshots, start/control
 idempotency receipts, ArtifactVersions and TaskCommits are stored in
-PostgreSQL; the latter two are independent append-only rows. On startup, an
+PostgreSQL; the latter two are independent append-only rows. Verified Run
+Workspace file metadata remains in the Snapshot, while the bytes live in the
+isolated server Artifact store and are rechecked on download. On startup, an
 interrupted nonterminal Run is rolled back to completed rounds, receives
 `checkpoint_recovered` and pauses; an in-flight provider request is never
 automatically replayed. In-flight HTTP requests, asyncio tasks and conditions
@@ -136,10 +139,10 @@ Content-Type: application/json
   "expected_version": 1,
   "instruction": "研究整个资料库，找出值得继续推动的工作，并逐条引用依据。",
   "loop": {
-    "max_rounds": 3,
-    "max_files_per_round": 6,
-    "max_model_calls": 6,
-    "deadline_seconds": 1200
+    "max_rounds": 12,
+    "max_files_per_round": 16,
+    "max_model_calls": 30,
+    "deadline_seconds": 7200
   }
 }
 ```
@@ -149,8 +152,8 @@ accept `selected_file_refs`: the server freezes the complete allowlisted input
 index and the Planner autonomously selects a bounded evidence set for each
 round. Sending a client-owned file scope is rejected as an unknown field.
 
-`loop` is optional and defaults to the values above. Bounds are 1-3 rounds,
-1-8 files per round, 2-6 model calls and 20-3000 seconds. The server freezes
+`loop` is optional and defaults to the values above. Bounds are 1-24 rounds,
+1-24 files per round, 2-60 model calls and 20-14400 seconds. The server freezes
 these values plus `scope_mode=whole_workspace` and all stable input refs into
 `AgentControlLoopContract`; the browser cannot change the scope or budget while
 a Run is active. `deadline_seconds` is an active execution deadline: elapsed
@@ -188,10 +191,10 @@ Important fields:
     "goal": "...",
     "scope_mode": "whole_workspace",
     "allowed_file_refs": ["forte-...", "... all 96 stable refs ..."],
-    "max_rounds": 3,
-    "max_files_per_round": 6,
-    "max_model_calls": 6,
-    "deadline_seconds": 1200,
+    "max_rounds": 12,
+    "max_files_per_round": 16,
+    "max_model_calls": 30,
+    "deadline_seconds": 7200,
     "external_action": "none"
   },
   "budget": {
@@ -222,6 +225,44 @@ Important fields:
   "control_events": [],
   "decision_requests": [],
   "decision_records": [],
+  "workspace_artifacts": [
+    {
+      "artifact_id": "workspace-artifact-0123456789ab",
+      "capability_id": "office-finance-reconciliation",
+      "scenario_id": "TC-05",
+      "title": "跨期往来款核对结果",
+      "file_name": "跨期往来款核对结果.csv",
+      "media_type": "text/csv",
+      "size": 4821,
+      "version": 1,
+      "round_number": 1,
+      "source_file_refs": ["forte-..."],
+      "validator_id": "validator-finance-reconciliation-v1",
+      "verifier_status": "passed",
+      "checks": [
+        {"check_id": "check-row-formula", "label": "逐行公式复算", "passed": true, "detail": "全部通过"}
+      ],
+      "download_path": "/v1/harness/runs/harness:.../artifacts/workspace-artifact-0123456789ab",
+      "original_inputs_modified": false,
+      "review_required": true,
+      "external_action": "none"
+    }
+  ],
+  "effect_receipts": [
+    {
+      "receipt_id": "effect-receipt-0123456789ab",
+      "capability_id": "office-finance-reconciliation",
+      "scenario_id": "TC-05",
+      "status": "passed",
+      "state": "冻结三个只读工作簿",
+      "action": "在隔离 Run Workspace 生成核对表并复算",
+      "observation": "三个 Artifact 的确定性检查通过",
+      "cost": "本地确定性处理；没有外部调用",
+      "result": "工件可下载，原始输入未修改",
+      "artifact_ids": ["workspace-artifact-0123456789ab"],
+      "external_action": "none"
+    }
+  ],
   "artifact_versions": [
     {
       "artifact_id": "artifact-...",
@@ -442,6 +483,14 @@ table, source-revision foreign-key constraint or multi-instance CAS. The DR-0032
 restart gate verifies sequential Runtime recovery of one pending decision; it is
 not a claim that an interrupted provider call or concurrent writer is durable.
 
+`workspace_artifacts[]` and `effect_receipts[]` are separate from the model's
+logical evidence brief. An effect receipt records
+`state -> action -> observation -> cost -> result`; an Artifact record names the
+server-owned validator and its checks. Only `verifier_status=passed`, verified
+bytes and a successful Owner-scoped download prove that the fixed local adapter
+created a real Run Workspace file. They do not prove arbitrary instructions are
+implemented, and they never authorize a source-file or external-system mutation.
+
 `artifact_versions` and `commits` are safe Snapshot projections of independent
 append-only Store records. ArtifactVersion contains the complete logical
 read-only brief for one completed round; it remains `draft` or `verified` and is
@@ -453,9 +502,26 @@ original office file or external system changed.
 `completed` means the Evidence Gate found no unresolved citation gap in the
 selected evidence and the read-only results passed schema, selected-citation,
 evidence-location and boundary checks. It does not mean the answer is
-semantically correct or a plan-declared tool executed.
+semantically correct or a plan-declared tool executed. Conversely, a verified
+Run Workspace Artifact can survive a later Analyst rejection or waiting state;
+the UI must show model adoption, Loop state and deterministic effect as three
+different facts.
 
-## 7. Control a Run
+## 7. Download a verified Run Workspace Artifact
+
+```http
+GET /v1/harness/runs/{run_id}/artifacts/{artifact_id}
+X-User-Id: demo_user
+```
+
+The route accepts only an Artifact ID already bound to the same Owner and Run.
+Before returning bytes it verifies the stored record, file size and private
+digest. Success uses the recorded media type, `Content-Disposition: attachment`,
+`X-Content-Type-Options: nosniff` and `Cache-Control: private, no-store`.
+Unknown Owner/Run/Artifact returns 404; missing or drifted bytes fail closed with
+503. The public Snapshot and DOM never expose the private digest or storage path.
+
+## 8. Control a Run
 
 ```http
 POST /v1/harness/runs/{run_id}/controls
@@ -518,7 +584,7 @@ delete versions, undo a model call or modify workspace files. A Run retains at
 most 20 TaskCommit records; reaching that bound fails closed and requires a new
 independent Run instead of truncating history.
 
-## 8. Plan policy and result validation
+## 9. Plan policy and result validation
 
 The provider returns a plan candidate, not the public plan. The server compiles
 allowlisted intent into owned effect/gate semantics, then validates unit IDs,
@@ -535,7 +601,7 @@ finding requires at least one selected `file_ref`; an out-of-scope citation
 fails the Run. This proves reference membership only, not entailment,
 exhaustiveness, arithmetic or policy correctness.
 
-## 9. SSE
+## 10. SSE
 
 ```http
 GET /v1/harness/runs/{run_id}/events?after=3
@@ -551,6 +617,10 @@ planning_started
 planning_completed
 plan_validation_rejected (optional, followed by one retry)
 plan_validation
+deterministic_office_tool_started (when one fixed local capability is admitted)
+run_workspace_artifact_written (for each isolated file)
+deterministic_verification_completed (after all deterministic checks)
+scenario_effect_bounded (for an explicit external/unsupported boundary)
 analysis_started
 analysis_completed
 analysis_structure_rejected (optional, followed by one bounded retry)
@@ -587,7 +657,7 @@ SSE `id` equals the event sequence. `after=N` returns only later events.
 Heartbeats carry no business state. A terminal event is followed by final GET
 reconciliation; a nonterminal interruption uses GET plus `after=N` recovery.
 
-## 10. Error semantics
+## 11. Error semantics
 
 | Result | Meaning | Frontend response |
 | --- | --- | --- |
@@ -601,6 +671,8 @@ reconciliation; a nonterminal interruption uses GET plus `after=N` recovery.
 | decision 409 | Finding/Resolution/Branch binding is stale, or option/candidate is not owned by that record | GET current Snapshot; keep the user's feedback draft and choose from current facts |
 | branch control 409 | selected Branch is missing, no longer waiting or outside the current Gate | GET current Snapshot and choose a still-waiting Branch |
 | artifact restore 409 | version is current, missing or fails independent-record verification | keep current pointer and history; do not fabricate restore |
+| Artifact download 404 | Artifact is not owned by this Run/Owner | keep Snapshot state; do not guess another file |
+| Artifact download 503 | stored bytes are missing or fail size/digest verification | show a fail-closed download error; never return partial/drifted bytes |
 | `status=waiting_input` | one or more Branches could close a visible evidence gap | inspect sources, optionally steer, then explicitly resume one Branch or stop |
 | `next_step.recovery_kind=source_location` | legal-scope candidate could not be uniquely mapped to safe Preview | for unavailable: show one recommended Branch retry with optional details collapsed; for ambiguous: require one explicit candidate choice before accept |
 | `next_step.recovery_kind=analysis_output` | provider responded twice without a usable public result structure | keep raw output hidden; show one recommended minimal-Branch retry, optional feedback or stop |

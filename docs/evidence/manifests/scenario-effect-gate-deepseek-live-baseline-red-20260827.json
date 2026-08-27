@@ -1,0 +1,455 @@
+{
+  "schema_version": "scenario-effect-gate-live.v1",
+  "generated_at": "2026-08-27T07:18:05.695803+00:00",
+  "api_base": "http://127.0.0.1:8010",
+  "service": {
+    "model": "deepseek-v4-pro",
+    "checkpoint": "postgres",
+    "task_store": "postgres"
+  },
+  "dataset": {
+    "name": "FORTE public demo inputs",
+    "source_commit": "345c1ec1487139db9dd319787fa9405ba85d1869",
+    "input_tree_sha256": "2c19e31a8e437f8ccb0ab811ba20a940f022a5bea69bcc750574d753f10a250d",
+    "original_inputs_modified": false
+  },
+  "summary": {
+    "requested": 6,
+    "passed": 0,
+    "failed": 6
+  },
+  "scenarios": [
+    {
+      "scenario_id": "TC-01",
+      "capability_id": "office-onboarding-assets",
+      "title": "入职资产匹配",
+      "instruction": "根据入职时间表和分配规则，生成 3 月 20 日至 4 月 20 日的入职资产匹配表。",
+      "run_id": "harness:44688248b7d24850a83b80d2fc5fa19b",
+      "started_at": "2026-08-27T07:06:39.164180+00:00",
+      "observed_at": "2026-08-27T07:08:27.017466+00:00",
+      "run_status": "failed",
+      "snapshot_version": 13,
+      "current_round": 1,
+      "budget": {
+        "max_rounds": 12,
+        "max_files_per_round": 16,
+        "max_model_calls": 30,
+        "deadline_seconds": 7200,
+        "rounds_used": 1,
+        "files_verified": 0,
+        "model_calls_used": 3,
+        "elapsed_ms": 105901,
+        "stop_reason": null
+      },
+      "model_calls": [
+        {
+          "round": 1,
+          "role": "planner",
+          "called": true,
+          "model": "deepseek-v4-pro",
+          "elapsed_ms": 7673,
+          "output_used": true
+        },
+        {
+          "round": 1,
+          "role": "analyst",
+          "called": true,
+          "model": "deepseek-v4-pro",
+          "elapsed_ms": 43064,
+          "output_used": false
+        }
+      ],
+      "model_gate_passed": false,
+      "effect_receipts": [],
+      "artifacts": [],
+      "artifact_downloads": [],
+      "expected_artifacts": [
+        "入职资产匹配表.csv"
+      ],
+      "events": [
+        {
+          "sequence": 12,
+          "event_name": "harness_failed",
+          "status": "failed"
+        }
+      ],
+      "waiting_branches": [],
+      "validation_errors": [
+        "本轮未通过服务端安全校验，且未发生外部动作。请重新运行。"
+      ],
+      "timed_out": false,
+      "effect_gate_passed": false,
+      "failure_reason": "真实 Planner/Analyst、确定性成果、下载或副作用边界中至少一项未通过。"
+    },
+    {
+      "scenario_id": "TC-05",
+      "capability_id": "office-finance-reconciliation",
+      "title": "财务跨期核对",
+      "instruction": "核对三期往来明细，生成未付统计、未收统计，并判断是否存在僵尸账款。",
+      "run_id": "harness:a4e3c2fe3b29411db10f3b7cef5084d4",
+      "started_at": "2026-08-27T07:08:27.017466+00:00",
+      "observed_at": "2026-08-27T07:10:02.455907+00:00",
+      "run_status": "failed",
+      "snapshot_version": 13,
+      "current_round": 1,
+      "budget": {
+        "max_rounds": 12,
+        "max_files_per_round": 16,
+        "max_model_calls": 30,
+        "deadline_seconds": 7200,
+        "rounds_used": 1,
+        "files_verified": 0,
+        "model_calls_used": 3,
+        "elapsed_ms": 94647,
+        "stop_reason": null
+      },
+      "model_calls": [
+        {
+          "round": 1,
+          "role": "planner",
+          "called": true,
+          "model": "deepseek-v4-pro",
+          "elapsed_ms": 16158,
+          "output_used": true
+        },
+        {
+          "round": 1,
+          "role": "analyst",
+          "called": true,
+          "model": "deepseek-v4-pro",
+          "elapsed_ms": 31864,
+          "output_used": false
+        }
+      ],
+      "model_gate_passed": false,
+      "effect_receipts": [],
+      "artifacts": [],
+      "artifact_downloads": [],
+      "expected_artifacts": [
+        "未付统计.csv",
+        "未收统计.csv",
+        "跨期核对说明.md"
+      ],
+      "events": [
+        {
+          "sequence": 12,
+          "event_name": "harness_failed",
+          "status": "failed"
+        }
+      ],
+      "waiting_branches": [],
+      "validation_errors": [
+        "本轮未通过服务端安全校验，且未发生外部动作。请重新运行。"
+      ],
+      "timed_out": false,
+      "effect_gate_passed": false,
+      "failure_reason": "真实 Planner/Analyst、确定性成果、下载或副作用边界中至少一项未通过。"
+    },
+    {
+      "scenario_id": "TC-10",
+      "capability_id": "office-compliant-outbound-flow",
+      "title": "合规外呼流程",
+      "instruction": "根据专业性说明生成信用卡 M1 逾期用户 AI 外呼催收流程图文档。",
+      "run_id": "harness:67891007ba9e47d597ce9099fa0d3726",
+      "started_at": "2026-08-27T07:10:02.455907+00:00",
+      "observed_at": "2026-08-27T07:12:01.658582+00:00",
+      "run_status": "waiting_input",
+      "snapshot_version": 14,
+      "current_round": 1,
+      "budget": {
+        "max_rounds": 12,
+        "max_files_per_round": 16,
+        "max_model_calls": 30,
+        "deadline_seconds": 7200,
+        "rounds_used": 1,
+        "files_verified": 0,
+        "model_calls_used": 3,
+        "elapsed_ms": 118514,
+        "stop_reason": null
+      },
+      "model_calls": [
+        {
+          "round": 1,
+          "role": "planner",
+          "called": true,
+          "model": "deepseek-v4-pro",
+          "elapsed_ms": 14179,
+          "output_used": true
+        },
+        {
+          "round": 1,
+          "role": "analyst",
+          "called": true,
+          "model": "deepseek-v4-pro",
+          "elapsed_ms": 41144,
+          "output_used": false
+        }
+      ],
+      "model_gate_passed": false,
+      "effect_receipts": [],
+      "artifacts": [],
+      "artifact_downloads": [],
+      "expected_artifacts": [
+        "外呼流程-M1逾期用户AI外呼催收流程图.docx"
+      ],
+      "events": [],
+      "waiting_branches": [
+        {
+          "branch_id": "branch-3c22161d3062",
+          "title": "读取专业性说明",
+          "status": "waiting_input",
+          "missing_file_count": 1
+        },
+        {
+          "branch_id": "branch-ed0259be6b0e",
+          "title": "读取产品需求文档",
+          "status": "waiting_input",
+          "missing_file_count": 1
+        },
+        {
+          "branch_id": "branch-d70ae44ea344",
+          "title": "读取上线配置清单",
+          "status": "waiting_input",
+          "missing_file_count": 1
+        },
+        {
+          "branch_id": "branch-389d712ceffc",
+          "title": "生成 AI 外呼催收流程图文档",
+          "status": "waiting_input",
+          "missing_file_count": 3
+        }
+      ],
+      "validation_errors": [],
+      "timed_out": false,
+      "effect_gate_passed": false,
+      "failure_reason": "真实 Planner/Analyst、确定性成果、下载或副作用边界中至少一项未通过。"
+    },
+    {
+      "scenario_id": "TC-13",
+      "capability_id": "office-customer-segmentation",
+      "title": "客户画像与销售策略",
+      "instruction": "清洗问卷、完成客户画像分类，并生成差异化销售策略 Markdown 报告。",
+      "run_id": "harness:27097b40b85f4044a0e10d1cb891e33b",
+      "started_at": "2026-08-27T07:12:01.658582+00:00",
+      "observed_at": "2026-08-27T07:13:49.199821+00:00",
+      "run_status": "failed",
+      "snapshot_version": 13,
+      "current_round": 1,
+      "budget": {
+        "max_rounds": 12,
+        "max_files_per_round": 16,
+        "max_model_calls": 30,
+        "deadline_seconds": 7200,
+        "rounds_used": 1,
+        "files_verified": 0,
+        "model_calls_used": 3,
+        "elapsed_ms": 105874,
+        "stop_reason": null
+      },
+      "model_calls": [
+        {
+          "round": 1,
+          "role": "planner",
+          "called": true,
+          "model": "deepseek-v4-pro",
+          "elapsed_ms": 9974,
+          "output_used": true
+        },
+        {
+          "round": 1,
+          "role": "analyst",
+          "called": true,
+          "model": "deepseek-v4-pro",
+          "elapsed_ms": 32944,
+          "output_used": false
+        }
+      ],
+      "model_gate_passed": false,
+      "effect_receipts": [],
+      "artifacts": [],
+      "artifact_downloads": [],
+      "expected_artifacts": [
+        "客户画像及销售策略.md"
+      ],
+      "events": [
+        {
+          "sequence": 12,
+          "event_name": "harness_failed",
+          "status": "failed"
+        }
+      ],
+      "waiting_branches": [],
+      "validation_errors": [
+        "本轮未通过服务端安全校验，且未发生外部动作。请重新运行。"
+      ],
+      "timed_out": false,
+      "effect_gate_passed": false,
+      "failure_reason": "真实 Planner/Analyst、确定性成果、下载或副作用边界中至少一项未通过。"
+    },
+    {
+      "scenario_id": "TC-14",
+      "capability_id": "office-sre-log-diagnosis",
+      "title": "SRE 日志诊断",
+      "instruction": "分析双十一 Elasticsearch 日志，给出根因与两个层面的紧急止损建议。",
+      "run_id": "harness:7ba430ebd1654119bf68afe63848a159",
+      "started_at": "2026-08-27T07:13:49.199821+00:00",
+      "observed_at": "2026-08-27T07:16:10.604594+00:00",
+      "run_status": "waiting_input",
+      "snapshot_version": 14,
+      "current_round": 1,
+      "budget": {
+        "max_rounds": 12,
+        "max_files_per_round": 16,
+        "max_model_calls": 30,
+        "deadline_seconds": 7200,
+        "rounds_used": 1,
+        "files_verified": 0,
+        "model_calls_used": 3,
+        "elapsed_ms": 140892,
+        "stop_reason": null
+      },
+      "model_calls": [
+        {
+          "round": 1,
+          "role": "planner",
+          "called": true,
+          "model": "deepseek-v4-pro",
+          "elapsed_ms": 16358,
+          "output_used": true
+        },
+        {
+          "round": 1,
+          "role": "analyst",
+          "called": true,
+          "model": "deepseek-v4-pro",
+          "elapsed_ms": 61378,
+          "output_used": false
+        }
+      ],
+      "model_gate_passed": false,
+      "effect_receipts": [],
+      "artifacts": [],
+      "artifact_downloads": [],
+      "expected_artifacts": [
+        "ES故障诊断与止损建议.md"
+      ],
+      "events": [],
+      "waiting_branches": [
+        {
+          "branch_id": "branch-d875b634821d",
+          "title": "读取可靠性工程日志",
+          "status": "waiting_input",
+          "missing_file_count": 1
+        },
+        {
+          "branch_id": "branch-a64d7d2a0c65",
+          "title": "读取搜索代理运行日志",
+          "status": "waiting_input",
+          "missing_file_count": 1
+        },
+        {
+          "branch_id": "branch-13ab471165cb",
+          "title": "读取搜索代理配置",
+          "status": "waiting_input",
+          "missing_file_count": 1
+        },
+        {
+          "branch_id": "branch-af9c5c96f852",
+          "title": "读取技术设计文档",
+          "status": "waiting_input",
+          "missing_file_count": 1
+        },
+        {
+          "branch_id": "branch-b8989a142981",
+          "title": "汇总根因与止损建议",
+          "status": "waiting_input",
+          "missing_file_count": 4
+        }
+      ],
+      "validation_errors": [],
+      "timed_out": false,
+      "effect_gate_passed": false,
+      "failure_reason": "真实 Planner/Analyst、确定性成果、下载或副作用边界中至少一项未通过。"
+    },
+    {
+      "scenario_id": "TC-15",
+      "capability_id": "office-ux-pain-prioritization",
+      "title": "交互痛点排序",
+      "instruction": "根据交互日志、痛点规则和页面规范，生成排序正确的交互规范优化方案 CSV。",
+      "run_id": "harness:db477d0f9f5e4fd5b994cde65b534f2a",
+      "started_at": "2026-08-27T07:16:10.604594+00:00",
+      "observed_at": "2026-08-27T07:18:05.657908+00:00",
+      "run_status": "waiting_input",
+      "snapshot_version": 14,
+      "current_round": 1,
+      "budget": {
+        "max_rounds": 12,
+        "max_files_per_round": 16,
+        "max_model_calls": 30,
+        "deadline_seconds": 7200,
+        "rounds_used": 1,
+        "files_verified": 0,
+        "model_calls_used": 3,
+        "elapsed_ms": 114302,
+        "stop_reason": null
+      },
+      "model_calls": [
+        {
+          "round": 1,
+          "role": "planner",
+          "called": true,
+          "model": "deepseek-v4-pro",
+          "elapsed_ms": 14031,
+          "output_used": true
+        },
+        {
+          "round": 1,
+          "role": "analyst",
+          "called": true,
+          "model": "deepseek-v4-pro",
+          "elapsed_ms": 58565,
+          "output_used": false
+        }
+      ],
+      "model_gate_passed": false,
+      "effect_receipts": [],
+      "artifacts": [],
+      "artifact_downloads": [],
+      "expected_artifacts": [
+        "交互规范优化方案.csv"
+      ],
+      "events": [],
+      "waiting_branches": [
+        {
+          "branch_id": "branch-9d95326df7c5",
+          "title": "核验交互行为痛点及优化规则",
+          "status": "waiting_input",
+          "missing_file_count": 1
+        },
+        {
+          "branch_id": "branch-c27b6aeddd60",
+          "title": "核验用户交互行为日志",
+          "status": "waiting_input",
+          "missing_file_count": 1
+        },
+        {
+          "branch_id": "branch-726df561edb8",
+          "title": "核验页面级交互规范",
+          "status": "waiting_input",
+          "missing_file_count": 1
+        },
+        {
+          "branch_id": "branch-e7e5f64b5aeb",
+          "title": "生成交互规范优化方案初步分析",
+          "status": "waiting_input",
+          "missing_file_count": 3
+        }
+      ],
+      "validation_errors": [],
+      "timed_out": false,
+      "effect_gate_passed": false,
+      "failure_reason": "真实 Planner/Analyst、确定性成果、下载或副作用边界中至少一项未通过。"
+    }
+  ],
+  "claim_boundary": "该证据仅证明固定服务配置下真实模型调用、运行工作区文件和确定性检查；不证明真实用户理解、生产安全沙箱或外部动作能力。"
+}

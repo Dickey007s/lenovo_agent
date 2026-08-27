@@ -10,8 +10,10 @@ only after human confirmation.
 The current product is deliberately narrow. `completed` means the Planner
 candidate passed server policy/structure checks and the Analyst response passed
 schema, selected-reference, server-resolved evidence-location and read-only
-boundary checks. It does not mean the answer is correct, a file was changed or
-an external business action happened.
+boundary checks. Separately, 12 fixed local office capabilities can now produce
+real isolated run-workspace files with deterministic verifier receipts. Neither
+fact means an arbitrary answer is correct, a FORTE source was changed or an
+external business action happened.
 
 ## Current product
 
@@ -21,17 +23,19 @@ The root page is the only product entry:
   input files, with file-type filters and no role or Demo partition;
 - center: file metadata, CSV/XLSX/PDF/DOCX/TXT/code preview, a free-form task
   composer, loop budget, round history, server-owned task branches, evidence
-  gaps, controls, append-only result history, a cited read-only brief and up to
-  four proposed next tasks;
+  gaps, controls, append-only result history, real run-workspace Artifact
+  downloads and verifier receipts, a cited read-only brief and up to four
+  proposed next tasks;
 - right: current phase, ordered server events and separate Planner/Analyst
   adoption receipts;
 - boundary: the Run freezes the complete allowlisted index; each round exposes
   only the Agent-selected, server-budgeted files to analysis. Originals stay
   read-only, results require review and no external action occurs.
 
-The visible deadline defaults to 1,200 seconds and is an Agent-active-time
-budget, not wall-clock time. Human review in `waiting_input` and an explicit
-pause do not consume it. Round, file and model-call caps remain independent.
+The default complete-task budget is 12 rounds, 16 files per round, 30 model
+calls and 7,200 Agent-active seconds. Public maxima are 24/24/60/14,400. Human
+review in `waiting_input` and an explicit pause do not consume active time. The
+four caps remain independent.
 
 The primary flow is:
 
@@ -42,6 +46,8 @@ browse or search the whole repository
   -> freeze a whole-workspace AgentControlLoopContract and budget
   -> deepseek-v4-pro Planner selects a minimal evidence set and explains why
   -> server compiles and validates scope, tools, dependencies and effects
+  -> an admitted deterministic office tool may write a real isolated Artifact
+  -> server verifies fields/numbers/order/rules/tests and records an EffectReceipt
   -> deepseek-v4-pro Analyst reads the approved safe projections
   -> Analyst separates fact, impact and human decision options, then returns exact quote candidates
   -> server uniquely resolves safe-preview locations and keeps only reviewable findings
@@ -104,7 +110,7 @@ does not enter ordinary UI or model-selected context. The user supplies an
 instruction; the server freezes all 96 stable refs, while the Planner sees only
 safe metadata and autonomously selects a bounded set for each round.
 
-## Seven-path API
+## Eight-path API
 
 ```text
 GET  /v1/health
@@ -113,12 +119,13 @@ GET  /v1/harness/workspace/files/{file_ref}
 POST /v1/harness/runs
 GET  /v1/harness/runs?limit={1..20}
 GET  /v1/harness/runs/{run_id}
+GET  /v1/harness/runs/{run_id}/artifacts/{artifact_id}
 POST /v1/harness/runs/{run_id}/controls
 GET  /v1/harness/runs/{run_id}/events?after={sequence}
 ```
 
-The former Scenario list/detail routes are not mounted. There are eight public
-operations over seven OpenAPI paths because `GET` and `POST` share `/runs`.
+The former Scenario list/detail routes are not mounted. There are nine public
+operations over eight OpenAPI paths because `GET` and `POST` share `/runs`.
 `X-User-Id` remains an unsigned demonstration Owner placeholder. With
 `DATABASE_DSN`, accepted Run snapshots, command receipts, ArtifactVersions and
 TaskCommits are stored in PostgreSQL. Recovery rolls an interrupted model call
@@ -138,11 +145,13 @@ restart recovery is unavailable.
 8. Checkpoint, Event & Governance Control
 
 Current implementation covers modules 1-4; a bounded single-loop controller
-subset of module 5; a read-only result, citation, Evidence Gate, logical
-append-only ArtifactVersion and TaskCommit pointer/restore subset of module 7;
+subset of module 5; a 12-capability deterministic local adapter subset of
+module 6; a read-only result, citation, Evidence Gate, logical append-only
+ArtifactVersion, TaskCommit pointer/restore, isolated run-workspace file and
+deterministic verifier subset of module 7;
 and a Snapshot/event, branch control, idempotency and optional PostgreSQL
-restart-recovery subset of module 8. Distributed Worker scheduling, a real Tool
-Gateway, writable office artifacts, semantic/numeric verification,
+restart-recovery subset of module 8. Distributed Worker scheduling, a general
+Tool Gateway, arbitrary source-file mutation, general semantic verification,
 multi-instance coordination and governed external action remain target work.
 
 ## Evidence status
@@ -226,6 +235,14 @@ multi-instance coordination and governed external action remain target work.
   Branch instead requires an explicit candidate choice and keeps accept disabled
   until the user selects one real location. No Runtime protocol or budget rule
   changed, and the claimed clarity benefit remains a user-study hypothesis.
+- `DR-0035` replaces the fixed three-round product assumption with a 12-round
+  default and adds a Scenario Effect Gate. Twelve local FORTE tasks now generate
+  real CSV/Markdown/DOCX/ZIP files in an isolated Run Workspace with deterministic
+  checks and Owner-scoped download; three SQL/Web/Scheduler tasks stay
+  `blocked_external_boundary`. The first real six-scenario run failed `0/6` and
+  is retained; after moving deterministic work before Analyst narration and
+  simplifying the model contract, all six priority effects passed. Model
+  adoption, deterministic effect and Run terminal status remain separate facts.
 - No target-user study has been run. Clarity, trust, efficiency and user value
   remain hypotheses.
 

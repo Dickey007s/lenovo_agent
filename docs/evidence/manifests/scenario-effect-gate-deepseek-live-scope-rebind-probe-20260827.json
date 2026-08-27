@@ -1,0 +1,434 @@
+{
+  "schema_version": "scenario-effect-gate-live.v1",
+  "generated_at": "2026-08-27T07:47:57.185199+00:00",
+  "api_base": "http://127.0.0.1:8010",
+  "service": {
+    "model": "deepseek-v4-pro",
+    "checkpoint": "postgres",
+    "task_store": "postgres"
+  },
+  "dataset": {
+    "name": "FORTE public demo inputs",
+    "source_commit": "345c1ec1487139db9dd319787fa9405ba85d1869",
+    "input_tree_sha256": "2c19e31a8e437f8ccb0ab811ba20a940f022a5bea69bcc750574d753f10a250d",
+    "original_inputs_modified": false
+  },
+  "summary": {
+    "requested": 2,
+    "passed": 2,
+    "failed": 0,
+    "model_output_adopted": 2,
+    "run_completed": 1
+  },
+  "scenarios": [
+    {
+      "scenario_id": "TC-10",
+      "capability_id": "office-compliant-outbound-flow",
+      "title": "合规外呼流程",
+      "instruction": "根据专业性说明生成信用卡 M1 逾期用户 AI 外呼催收流程图文档。",
+      "run_id": "harness:725be696eecc47c4aae18d5b408b28da",
+      "started_at": "2026-08-27T07:46:37.610793+00:00",
+      "observed_at": "2026-08-27T07:47:18.442593+00:00",
+      "run_status": "completed",
+      "snapshot_version": 12,
+      "current_round": 1,
+      "budget": {
+        "max_rounds": 12,
+        "max_files_per_round": 16,
+        "max_model_calls": 30,
+        "deadline_seconds": 7200,
+        "rounds_used": 1,
+        "files_verified": 3,
+        "model_calls_used": 2,
+        "elapsed_ms": 39399,
+        "stop_reason": null
+      },
+      "model_calls": [
+        {
+          "round": 1,
+          "role": "planner",
+          "called": true,
+          "model": "deepseek-v4-pro",
+          "elapsed_ms": 12074,
+          "output_used": true
+        },
+        {
+          "round": 1,
+          "role": "analyst",
+          "called": true,
+          "model": "deepseek-v4-pro",
+          "elapsed_ms": 25039,
+          "output_used": true
+        }
+      ],
+      "model_execution_gate_passed": true,
+      "model_output_adopted": true,
+      "effect_receipts": [
+        {
+          "receipt_id": "effect-receipt-c908993b7bf2",
+          "capability_id": "office-compliant-outbound-flow",
+          "scenario_id": "TC-10",
+          "status": "passed",
+          "state": "已冻结 1 份 FORTE 输入，原始文件保持只读。",
+          "action": "调用 office-compliant-outbound-flow 确定性办公工具并写入隔离运行工作区。",
+          "observation": "生成 1 份真实成果文件，执行 13 项确定性检查。",
+          "cost": "0 次额外模型调用；仅消耗本机确定性解析、计算与文件写入。",
+          "result": "所有确定性效果门通过，成果仍需用户复核。",
+          "source_file_refs": [
+            "forte-ba23e986a9c7e8d8"
+          ],
+          "artifact_ids": [
+            "workspace-artifact-59c4fbf45dec"
+          ],
+          "prohibited_side_effects": [
+            "不拨号",
+            "不写 CRM",
+            "不发送短信"
+          ],
+          "created_at": "2026-08-27T07:46:50.841826Z",
+          "external_action": "none"
+        }
+      ],
+      "artifacts": [
+        {
+          "artifact_id": "workspace-artifact-59c4fbf45dec",
+          "file_name": "外呼流程-M1逾期用户AI外呼催收流程图.docx",
+          "media_type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+          "size": 1692,
+          "validator_id": "validator-compliant-outbound-flow-v1",
+          "verifier_status": "passed",
+          "checks": [
+            {
+              "check_id": "check-outbound-source",
+              "label": "规则来源完整",
+              "passed": true,
+              "detail": "外呼时段、频次与录音规则均来自安全预览。"
+            },
+            {
+              "check_id": "check-outbound-start",
+              "label": "唯一开始节点",
+              "passed": true,
+              "detail": "状态机只有一个 START。"
+            },
+            {
+              "check_id": "check-outbound-time-gate",
+              "label": "拨号前时段 Gate",
+              "passed": true,
+              "detail": "不合规路径直接停止，不进入拨号。"
+            },
+            {
+              "check_id": "check-outbound-connect",
+              "label": "接通与未接通分支",
+              "passed": true,
+              "detail": "接通状态具有两条互斥路径。"
+            },
+            {
+              "check_id": "check-outbound-retry",
+              "label": "重拨频次上限",
+              "passed": true,
+              "detail": "仅未达上限时进入安排重拨。"
+            },
+            {
+              "check_id": "check-outbound-recording",
+              "label": "录音告知先于身份确认",
+              "passed": true,
+              "detail": "先告知录音，再询问身份。"
+            },
+            {
+              "check_id": "check-outbound-identity",
+              "label": "身份确认先于欠款引导",
+              "passed": true,
+              "detail": "身份确认前不披露欠款信息。"
+            },
+            {
+              "check_id": "check-outbound-third-party",
+              "label": "第三方禁呼",
+              "passed": true,
+              "detail": "第三方要求停止联系时进入禁呼终态。"
+            },
+            {
+              "check_id": "check-outbound-attitude",
+              "label": "本人态度分支",
+              "passed": true,
+              "detail": "承诺、软拒绝和硬拒绝均有路径。"
+            },
+            {
+              "check_id": "check-outbound-invalid",
+              "label": "无效通话回到频次判断",
+              "passed": true,
+              "detail": "无效通话不会绕过重拨上限。"
+            },
+            {
+              "check_id": "check-outbound-human",
+              "label": "高风险情况转人工",
+              "passed": true,
+              "detail": "三类强制情况均进入人工。"
+            },
+            {
+              "check_id": "check-outbound-terminals",
+              "label": "六类终态齐全",
+              "passed": true,
+              "detail": "所有路径只落入六类业务终态。"
+            },
+            {
+              "check_id": "check-outbound-no-action",
+              "label": "未发生真实外呼",
+              "passed": true,
+              "detail": "只生成 DOCX；拨号、CRM 与短信动作均为 none。"
+            }
+          ],
+          "review_required": true,
+          "external_action": "none",
+          "original_inputs_modified": false
+        }
+      ],
+      "artifact_downloads": [
+        {
+          "artifact_id": "workspace-artifact-59c4fbf45dec",
+          "file_name": "外呼流程-M1逾期用户AI外呼催收流程图.docx",
+          "status_code": 200,
+          "content_type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+          "declared_size": 1692,
+          "downloaded_size": 1692,
+          "size_matches": true
+        }
+      ],
+      "expected_artifacts": [
+        "外呼流程-M1逾期用户AI外呼催收流程图.docx"
+      ],
+      "events": [
+        {
+          "sequence": 3,
+          "event_name": "planning_started",
+          "status": "planning"
+        },
+        {
+          "sequence": 4,
+          "event_name": "planning_completed",
+          "status": "planning"
+        },
+        {
+          "sequence": 6,
+          "event_name": "deterministic_office_tool_started",
+          "status": "validating"
+        },
+        {
+          "sequence": 7,
+          "event_name": "run_workspace_artifact_written",
+          "status": "validating"
+        },
+        {
+          "sequence": 8,
+          "event_name": "deterministic_verification_completed",
+          "status": "validating"
+        },
+        {
+          "sequence": 9,
+          "event_name": "analysis_started",
+          "status": "analyzing"
+        },
+        {
+          "sequence": 10,
+          "event_name": "analysis_completed",
+          "status": "analyzing"
+        }
+      ],
+      "waiting_branches": [],
+      "validation_errors": [],
+      "timed_out": false,
+      "effect_gate_passed": true,
+      "failure_reason": null
+    },
+    {
+      "scenario_id": "TC-15",
+      "capability_id": "office-ux-pain-prioritization",
+      "title": "交互痛点排序",
+      "instruction": "根据交互日志、痛点规则和页面规范，生成排序正确的交互规范优化方案 CSV。",
+      "run_id": "harness:4fdd0db5083d4cfca3b0f4d8f653083a",
+      "started_at": "2026-08-27T07:47:18.442593+00:00",
+      "observed_at": "2026-08-27T07:47:57.142922+00:00",
+      "run_status": "waiting_input",
+      "snapshot_version": 11,
+      "current_round": 1,
+      "budget": {
+        "max_rounds": 12,
+        "max_files_per_round": 16,
+        "max_model_calls": 30,
+        "deadline_seconds": 7200,
+        "rounds_used": 1,
+        "files_verified": 2,
+        "model_calls_used": 2,
+        "elapsed_ms": 38199,
+        "stop_reason": null
+      },
+      "model_calls": [
+        {
+          "round": 1,
+          "role": "planner",
+          "called": true,
+          "model": "deepseek-v4-pro",
+          "elapsed_ms": 8052,
+          "output_used": true
+        },
+        {
+          "round": 1,
+          "role": "analyst",
+          "called": true,
+          "model": "deepseek-v4-pro",
+          "elapsed_ms": 27912,
+          "output_used": true
+        }
+      ],
+      "model_execution_gate_passed": true,
+      "model_output_adopted": true,
+      "effect_receipts": [
+        {
+          "receipt_id": "effect-receipt-b41740148cc1",
+          "capability_id": "office-ux-pain-prioritization",
+          "scenario_id": "TC-15",
+          "status": "passed",
+          "state": "已冻结 3 份 FORTE 输入，原始文件保持只读。",
+          "action": "调用 office-ux-pain-prioritization 确定性办公工具并写入隔离运行工作区。",
+          "observation": "生成 1 份真实成果文件，执行 6 项确定性检查。",
+          "cost": "0 次额外模型调用；仅消耗本机确定性解析、计算与文件写入。",
+          "result": "所有确定性效果门通过，成果仍需用户复核。",
+          "source_file_refs": [
+            "forte-3913d2ccb62b9b02",
+            "forte-0506a266b89dfef4",
+            "forte-3f48165dbc47276d"
+          ],
+          "artifact_ids": [
+            "workspace-artifact-6378bc2ea59c"
+          ],
+          "prohibited_side_effects": [
+            "不修改生产界面",
+            "不自动发布建议"
+          ],
+          "created_at": "2026-08-27T07:47:27.781408Z",
+          "external_action": "none"
+        }
+      ],
+      "artifacts": [
+        {
+          "artifact_id": "workspace-artifact-6378bc2ea59c",
+          "file_name": "交互规范优化方案.csv",
+          "media_type": "text/csv",
+          "size": 18089,
+          "validator_id": "validator-ux-pain-prioritization-v1",
+          "verifier_status": "passed",
+          "checks": [
+            {
+              "check_id": "check-ux-headers",
+              "label": "表头顺序",
+              "passed": true,
+              "detail": "六列表头与任务合同完全一致。"
+            },
+            {
+              "check_id": "check-ux-coverage",
+              "label": "痛点聚合完整",
+              "passed": true,
+              "detail": "66 个页面、元素、痛点组合均有一行。"
+            },
+            {
+              "check_id": "check-ux-priority",
+              "label": "P0-P4 计算",
+              "passed": true,
+              "detail": "频次和严重度矩阵逐项计算。"
+            },
+            {
+              "check_id": "check-ux-order",
+              "label": "三级排序",
+              "passed": true,
+              "detail": "先优先级、再页面规范元素顺序、最后痛点类型顺序。"
+            },
+            {
+              "check_id": "check-ux-reasons",
+              "label": "失败原因可复查",
+              "passed": true,
+              "detail": "每行保留次数、占比和失败原因。"
+            },
+            {
+              "check_id": "check-ux-no-apply",
+              "label": "建议未自动应用",
+              "passed": true,
+              "detail": "只生成运行工作区 CSV，不修改产品界面。"
+            }
+          ],
+          "review_required": true,
+          "external_action": "none",
+          "original_inputs_modified": false
+        }
+      ],
+      "artifact_downloads": [
+        {
+          "artifact_id": "workspace-artifact-6378bc2ea59c",
+          "file_name": "交互规范优化方案.csv",
+          "status_code": 200,
+          "content_type": "text/csv",
+          "declared_size": 18089,
+          "downloaded_size": 18089,
+          "size_matches": true
+        }
+      ],
+      "expected_artifacts": [
+        "交互规范优化方案.csv"
+      ],
+      "events": [
+        {
+          "sequence": 3,
+          "event_name": "planning_started",
+          "status": "planning"
+        },
+        {
+          "sequence": 4,
+          "event_name": "planning_completed",
+          "status": "planning"
+        },
+        {
+          "sequence": 6,
+          "event_name": "deterministic_office_tool_started",
+          "status": "validating"
+        },
+        {
+          "sequence": 7,
+          "event_name": "run_workspace_artifact_written",
+          "status": "validating"
+        },
+        {
+          "sequence": 8,
+          "event_name": "deterministic_verification_completed",
+          "status": "validating"
+        },
+        {
+          "sequence": 9,
+          "event_name": "analysis_started",
+          "status": "analyzing"
+        },
+        {
+          "sequence": 10,
+          "event_name": "analysis_completed",
+          "status": "analyzing"
+        }
+      ],
+      "waiting_branches": [
+        {
+          "branch_id": "branch-97f9688be8af",
+          "title": "读取痛点规则",
+          "status": "waiting_input",
+          "missing_file_count": 1
+        },
+        {
+          "branch_id": "branch-405bc5d7b421",
+          "title": "生成优化方案 CSV",
+          "status": "waiting_input",
+          "missing_file_count": 1
+        }
+      ],
+      "validation_errors": [],
+      "timed_out": false,
+      "effect_gate_passed": true,
+      "failure_reason": null
+    }
+  ],
+  "claim_boundary": "该证据仅证明固定服务配置下真实模型调用、运行工作区文件和确定性检查；不证明真实用户理解、生产安全沙箱或外部动作能力。"
+}

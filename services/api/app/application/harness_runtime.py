@@ -16,6 +16,7 @@ import logging
 import re
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from pathlib import Path
 from time import perf_counter
 from typing import Any, Literal, Protocol
 from uuid import uuid4
@@ -26,6 +27,7 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_valida
 from packages.contracts.harness_models import (
     AgentControlLoopArtifactVersion,
     AgentControlLoopArtifactFinding,
+    AgentControlLoopEffectReceipt,
     AgentControlLoopBranch,
     AgentControlLoopBrief,
     AgentControlLoopBudget,
@@ -43,6 +45,15 @@ from packages.contracts.harness_models import (
     AgentControlLoopNextStep,
     AgentControlLoopOptions,
     AgentControlLoopRound,
+    AgentControlLoopWorkspaceArtifact,
+)
+from services.api.app.application.run_workspace_artifact_store import (
+    RunWorkspaceArtifactError,
+    RunWorkspaceArtifactStore,
+)
+from services.api.app.application.scenario_effects import (
+    ScenarioEffectEngine,
+    ScenarioEffectExecution,
 )
 from services.api.app.application.harness_storage import (
     HarnessStateStore,
@@ -249,6 +260,12 @@ class HarnessEvent(BaseModel):
     details: dict[str, Any] = Field(default_factory=dict)
 
 
+class HarnessWorkspaceArtifactRecord(AgentControlLoopWorkspaceArtifact):
+    """Private persisted record; the full digest never enters the public projection."""
+
+    content_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+
+
 class HarnessRunSnapshot(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -266,8 +283,8 @@ class HarnessRunSnapshot(BaseModel):
     instruction_source: Literal["user"] = "user"
     contract: AgentControlLoopContract
     budget: AgentControlLoopBudget
-    rounds: list[AgentControlLoopRound] = Field(default_factory=list, max_length=3)
-    current_round: int = Field(default=0, ge=0, le=3)
+    rounds: list[AgentControlLoopRound] = Field(default_factory=list, max_length=24)
+    current_round: int = Field(default=0, ge=0, le=24)
     control_state: Literal[
         "running",
         "pause_requested",
@@ -289,7 +306,13 @@ class HarnessRunSnapshot(BaseModel):
         default=None, pattern=r"^branch-[0-9a-f]{12}$"
     )
     artifact_versions: list[AgentControlLoopArtifactVersion] = Field(
-        default_factory=list, max_length=3
+        default_factory=list, max_length=24
+    )
+    workspace_artifacts: list[HarnessWorkspaceArtifactRecord] = Field(
+        default_factory=list, max_length=24
+    )
+    effect_receipts: list[AgentControlLoopEffectReceipt] = Field(
+        default_factory=list, max_length=15
     )
     commits: list[AgentControlLoopCommit] = Field(default_factory=list, max_length=20)
     last_commit: AgentControlLoopCommit | None = None
@@ -375,6 +398,8 @@ class PublicHarnessRunSnapshot(BaseModel):
     branches: list[AgentControlLoopBranch]
     active_branch_id: str | None
     artifact_versions: list[AgentControlLoopArtifactVersion]
+    workspace_artifacts: list[AgentControlLoopWorkspaceArtifact]
+    effect_receipts: list[AgentControlLoopEffectReceipt]
     commits: list[AgentControlLoopCommit]
     last_commit: AgentControlLoopCommit | None
     brief: AgentControlLoopBrief | None
@@ -556,14 +581,17 @@ class OpenAICompatibleHarnessAnalyst:
             "role 用 expected 表示设计或规则预期，用 observed 表示实际记录，用 support 表示支持结论，用 contradiction 表示冲突，用 context 表示上下文。"
             "表格 quote 应组合足以唯一定位一行的连续单元格文本；文本 quote 应选可唯一定位的连续原文，不得改写。"
             "finding.evidence_anchors 必须返回空数组；位置、行号和展示摘录由服务端验证原文后生成。"
-            "每个 finding.review 必须说明是否需要人作业务决定。存在 contradiction 时 requires_human_decision 必须为 true，"
-            "提供 2 到 3 个 A/B/C 选项、推荐项、推荐理由，以及用户确认后 Agent 将执行的下一步。"
+            "只有存在真实业务冲突且必须由人选择口径时才输出 finding.review；其余情况必须省略 review。"
+            "存在 contradiction 时 requires_human_decision 必须为 true，提供 2 个 A/B 互斥选项、推荐项、推荐理由，"
+            "以及用户确认后 Agent 将执行的下一步。"
             "每个 option.next_instruction 必须是一条可作为新只读 Control Loop 目标的完整指令；只能核对资料、形成修改建议或待办，不能声称直接改文件。"
-            "若不需要人决策，也要说明 question、why_human、recommendation_reason 和 after_confirmation，options 可为空。"
             "若 validation_feedback 非空，上一候选未通过原文定位；保持原任务不变，并改用更长、只出现一次的连续原文重新生成全部 findings。"
             "只能完成只读分析，不得声称发送、写入、审批或调用外部系统。"
             "不要输出思维链、内部推理、Prompt、工具日志或 Markdown 代码围栏。"
-            "结论存在不确定性时直接写入 summary。follow_ups 应给出 1 到 4 条基于当前证据、可由用户确认后作为新任务启动的具体推进建议，"
+            "为避免结构截断，最多输出 3 条 findings 和 2 条 follow_ups；没有必要时不要输出默认值字段。"
+            "每条 finding 只输出 plan_unit_id、title、detail、fact_summary、impact、file_refs、evidence_quotes，"
+            "仅在人必须决策时再加 review；不要输出 finding_id、affected_branch_ids、evidence_anchors 或 evidence_resolutions。"
+            "结论存在不确定性时直接写入 summary。follow_ups 应给出基于当前证据、可由用户确认后作为新任务启动的具体推进建议，"
             "不要写成泛化的‘请人工复核’。review_required 必须为 true。"
             "只输出符合 JSON Schema 的 JSON 对象。JSON Schema：" + schema
         )
@@ -584,7 +612,7 @@ class OpenAICompatibleHarnessAnalyst:
             ],
             "response_format": {"type": "json_object"},
             "temperature": 0,
-            "max_tokens": 4_000,
+            "max_tokens": 5_000,
             "thinking": {"type": "disabled"},
         }
         headers = {"Authorization": f"Bearer {self.api_key}"}
@@ -688,11 +716,15 @@ class HarnessRuntime:
         planner: HarnessPlanner,
         analyst: HarnessAnalyst | None = None,
         state_store: HarnessStateStore | None = None,
+        effect_engine: ScenarioEffectEngine | None = None,
+        artifact_store: RunWorkspaceArtifactStore | None = None,
     ) -> None:
         self.catalog = catalog
         self.planner = planner
         self.analyst = analyst
         self.state_store = state_store or InMemoryHarnessStateStore()
+        self.effect_engine = effect_engine
+        self.artifact_store = artifact_store
         self._runs: dict[tuple[str, str], _Run] = {}
         self._idempotent: dict[tuple[str, str], _IdempotentStart] = {}
         self._control_idempotent: dict[
@@ -897,6 +929,37 @@ class HarnessRuntime:
             return self.catalog.public_file(file_ref)
         except KeyError as exc:
             raise HarnessNotFoundError("文件不存在") from exc
+
+    async def get_workspace_artifact(
+        self, owner_id: str, run_id: str, artifact_id: str
+    ) -> tuple[AgentControlLoopWorkspaceArtifact, bytes]:
+        snapshot = await self.get(owner_id, run_id)
+        record = next(
+            (
+                item
+                for item in snapshot.workspace_artifacts
+                if item.artifact_id == artifact_id
+            ),
+            None,
+        )
+        if record is None:
+            raise HarnessNotFoundError("运行成果不存在")
+        if self.artifact_store is None:
+            raise HarnessError("运行成果存储尚未配置")
+        try:
+            content = self.artifact_store.read(
+                owner_id=owner_id,
+                run_id=run_id,
+                artifact_id=record.artifact_id,
+                file_name=record.file_name,
+                expected_sha256=record.content_sha256,
+            )
+        except RunWorkspaceArtifactError as exc:
+            raise HarnessError(str(exc)) from exc
+        public = AgentControlLoopWorkspaceArtifact.model_validate(
+            record.model_dump(exclude={"content_sha256"})
+        )
+        return public, content
 
     def get_internal_workspace(self) -> dict[str, Any]:
         try:
@@ -1927,6 +1990,12 @@ class HarnessRuntime:
             self._public_decision_request(item, ref_to_label, snapshot.version)
             for item in snapshot.decision_requests
         ]
+        public_workspace_artifacts = [
+            AgentControlLoopWorkspaceArtifact.model_validate(
+                item.model_dump(exclude={"content_sha256"})
+            )
+            for item in snapshot.workspace_artifacts
+        ]
         return PublicHarnessRunSnapshot(
             run_id=snapshot.run_id,
             owner_id=snapshot.owner_id,
@@ -1951,6 +2020,8 @@ class HarnessRuntime:
             branches=public_branches,
             active_branch_id=snapshot.active_branch_id,
             artifact_versions=public_artifacts,
+            workspace_artifacts=public_workspace_artifacts,
+            effect_receipts=snapshot.effect_receipts,
             commits=snapshot.commits,
             last_commit=snapshot.last_commit,
             brief=public_brief,
@@ -2556,6 +2627,13 @@ class HarnessRuntime:
                         "output_used": True,
                     },
                 )
+                # Deterministic office tools are admitted by the validated task
+                # contract, not by the Analyst's prose.  Persist their files and
+                # verifier receipts before narrative analysis so a rejected model
+                # response cannot erase already completed, server-checked work.
+                await self._apply_scenario_effect(
+                    owner_id, run_id, round_number=round_number
+                )
                 await self._safe_point(owner_id, run_id)
 
                 if self.analyst is None:
@@ -2630,9 +2708,35 @@ class HarnessRuntime:
                         break
                     await self._safe_point(owner_id, run_id)
                     try:
-                        self._validate_candidate_result_scope(
+                        original_unit_ids = [
+                            finding.plan_unit_id for finding in candidate.findings
+                        ]
+                        candidate = self._validate_candidate_result_scope(
                             candidate, round_files, plan
                         )
+                        rebound_count = sum(
+                            before != finding.plan_unit_id
+                            for before, finding in zip(
+                                original_unit_ids, candidate.findings, strict=True
+                            )
+                        )
+                        if rebound_count:
+                            await self._transition(
+                                owner_id,
+                                run_id,
+                                "analyzing",
+                                "analysis_scope_normalized",
+                                (
+                                    f"服务端根据文件范围重新绑定 {rebound_count} 条发现的任务分支；"
+                                    "没有扩大本轮允许范围。"
+                                ),
+                                {
+                                    "round_number": round_number,
+                                    "attempt": analysis_attempt,
+                                    "rebound_finding_count": rebound_count,
+                                    "external_action": False,
+                                },
+                            )
                         resolution = self._resolve_evidence_anchors(
                             candidate,
                             analysis_files,
@@ -3164,6 +3268,191 @@ class HarnessRuntime:
             await self._mark_current_round_failed(owner_id, run_id)
             await self._fail(owner_id, run_id, str(exc)[:500])
 
+    async def _apply_scenario_effect(
+        self, owner_id: str, run_id: str, *, round_number: int
+    ) -> None:
+        """Run one deterministic office adapter without spending model budget."""
+
+        if self.effect_engine is None or self.artifact_store is None:
+            return
+        snapshot = await self.get(owner_id, run_id)
+        spec = self.effect_engine.match(snapshot.instruction)
+        if spec is None or any(
+            receipt.capability_id == spec.capability_id
+            for receipt in snapshot.effect_receipts
+        ):
+            return
+        execution = self.effect_engine.execute(snapshot.instruction, self.catalog)
+        if execution is None:
+            return
+        await self._record_scenario_effect(
+            owner_id,
+            run_id,
+            round_number=round_number,
+            execution=execution,
+        )
+
+    async def _record_scenario_effect(
+        self,
+        owner_id: str,
+        run_id: str,
+        *,
+        round_number: int,
+        execution: ScenarioEffectExecution,
+    ) -> None:
+        if self.artifact_store is None:
+            raise HarnessError("运行成果存储尚未配置")
+        now = datetime.now(timezone.utc)
+        records: list[HarnessWorkspaceArtifactRecord] = []
+        for generated in execution.artifacts:
+            artifact_id = "workspace-artifact-" + hashlib.sha256(
+                f"{run_id}:{execution.scenario_id}:{generated.file_name}:v1".encode(
+                    "utf-8"
+                )
+            ).hexdigest()[:12]
+            try:
+                stored = self.artifact_store.write(
+                    owner_id=owner_id,
+                    run_id=run_id,
+                    artifact_id=artifact_id,
+                    file_name=generated.file_name,
+                    content=generated.content,
+                )
+            except RunWorkspaceArtifactError as exc:
+                raise HarnessError(str(exc)) from exc
+            records.append(
+                HarnessWorkspaceArtifactRecord(
+                    artifact_id=artifact_id,
+                    capability_id=execution.capability_id,
+                    scenario_id=execution.scenario_id,
+                    title=generated.title,
+                    file_name=generated.file_name,
+                    media_type=generated.media_type,
+                    size=stored.size,
+                    version=1,
+                    round_number=round_number,
+                    source_file_refs=list(generated.source_file_refs),
+                    validator_id=generated.validator_id,
+                    verifier_status=generated.verifier_status,
+                    checks=list(generated.checks),
+                    summary=generated.summary,
+                    download_path=(
+                        f"/v1/harness/runs/{run_id}/artifacts/{artifact_id}"
+                    ),
+                    created_at=now,
+                    content_sha256=stored.sha256,
+                )
+            )
+
+        receipt_id = "effect-receipt-" + hashlib.sha256(
+            f"{run_id}:{execution.scenario_id}:{execution.capability_id}".encode(
+                "utf-8"
+            )
+        ).hexdigest()[:12]
+        receipt = AgentControlLoopEffectReceipt(
+            receipt_id=receipt_id,
+            capability_id=execution.capability_id,
+            scenario_id=execution.scenario_id,
+            status=execution.status,
+            state=execution.state,
+            action=execution.action,
+            observation=execution.observation,
+            cost=execution.cost,
+            result=execution.result,
+            source_file_refs=list(execution.source_file_refs),
+            artifact_ids=[item.artifact_id for item in records],
+            prohibited_side_effects=list(execution.prohibited_side_effects),
+            created_at=now,
+        )
+
+        async with self._lock:
+            run = self._require_run(owner_id, run_id)
+            snapshot = run.snapshot
+            if any(
+                item.capability_id == execution.capability_id
+                for item in snapshot.effect_receipts
+            ):
+                return
+            sequence = snapshot.last_event_sequence
+            events = list(snapshot.events)
+            sequence += 1
+            events.append(
+                HarnessEvent(
+                    sequence=sequence,
+                    event_name="deterministic_office_tool_started",
+                    occurred_at=now,
+                    status=snapshot.status,
+                    message="已调用确定性办公工具；本次不额外调用模型。",
+                    details={
+                        "capability_id": execution.capability_id,
+                        "scenario_id": execution.scenario_id,
+                        "source_file_count": len(execution.source_file_refs),
+                        "external_action": False,
+                    },
+                )
+            )
+            for record in records:
+                sequence += 1
+                events.append(
+                    HarnessEvent(
+                        sequence=sequence,
+                        event_name="run_workspace_artifact_written",
+                        occurred_at=now,
+                        status=snapshot.status,
+                        message=f"已在隔离运行工作区生成“{record.file_name}”。",
+                        details={
+                            "artifact_id": record.artifact_id,
+                            "file_name": record.file_name,
+                            "size": record.size,
+                            "original_inputs_modified": False,
+                            "external_action": False,
+                        },
+                    )
+                )
+            sequence += 1
+            events.append(
+                HarnessEvent(
+                    sequence=sequence,
+                    event_name=(
+                        "deterministic_verification_completed"
+                        if execution.status == "passed"
+                        else "scenario_effect_bounded"
+                    ),
+                    occurred_at=now,
+                    status=snapshot.status,
+                    message=(
+                        "真实成果文件已通过确定性效果门，仍需用户复核。"
+                        if execution.status == "passed"
+                        else execution.result
+                    ),
+                    details={
+                        "capability_id": execution.capability_id,
+                        "scenario_id": execution.scenario_id,
+                        "effect_status": execution.status,
+                        "artifact_count": len(records),
+                        "check_count": sum(len(item.checks) for item in records),
+                        "external_action": False,
+                    },
+                )
+            )
+            run.snapshot = snapshot.model_copy(
+                update={
+                    "workspace_artifacts": [
+                        *snapshot.workspace_artifacts,
+                        *records,
+                    ],
+                    "effect_receipts": [*snapshot.effect_receipts, receipt],
+                    "events": events,
+                    "last_event_sequence": sequence,
+                    "version": snapshot.version + 1,
+                    "updated_at": now,
+                }
+            )
+            await self._persist_locked(run)
+            condition = run.condition
+        async with condition:
+            condition.notify_all()
+
     async def _wait_for_evidence_confirmation(
         self,
         owner_id: str,
@@ -3683,7 +3972,7 @@ class HarnessRuntime:
                     or ([resolution.branch_id] if resolution.branch_id else []),
                     required_file_refs=[resolution.file_ref],
                     estimated_additional_rounds=max(
-                        0, min(3, current_contract.max_rounds - round_number)
+                        0, current_contract.max_rounds - round_number
                     ),
                     consequence=(
                         "接受后只重跑受影响分支并生成新的逻辑成果版本；"
@@ -5025,11 +5314,12 @@ class HarnessRuntime:
         result: HarnessTaskResult,
         files: list[dict[str, Any]],
         plan: HarnessPlan | None = None,
-    ) -> None:
-        """Reject out-of-scope model references before attempting location repair."""
+    ) -> HarnessTaskResult:
+        """Validate file scope and rebind only a uniquely implied plan unit."""
 
         allowed_refs = {str(item["file_ref"]) for item in files}
         plan_units = {unit.unit_id: unit for unit in plan.units} if plan else {}
+        normalized_findings: list[HarnessFinding] = []
         for finding in result.findings:
             if not set(finding.file_refs).issubset(allowed_refs):
                 raise HarnessPlanError("分析结果引用了本轮计划之外的文件")
@@ -5040,23 +5330,36 @@ class HarnessRuntime:
             ):
                 raise HarnessPlanError("分析结果的逐字引用超出本轮允许范围")
             if not plan:
+                normalized_findings.append(finding)
                 continue
-            if finding.plan_unit_id is not None:
-                unit = plan_units.get(finding.plan_unit_id)
-                if unit is None:
-                    raise HarnessPlanError("分析结果绑定了不存在的计划单元")
-                if not set(finding.file_refs).issubset(unit.input_file_refs):
-                    raise HarnessPlanError("分析结果引用超出其绑定计划单元的文件范围")
+            refs = set(finding.file_refs)
+            bound_unit = plan_units.get(finding.plan_unit_id or "")
+            if bound_unit is not None and refs.issubset(bound_unit.input_file_refs):
+                normalized_findings.append(finding)
                 continue
             matching_units = [
                 unit
                 for unit in plan.units
-                if set(finding.file_refs).issubset(unit.input_file_refs)
+                if refs.issubset(unit.input_file_refs)
             ]
+            if len(matching_units) == 1:
+                normalized_findings.append(
+                    finding.model_copy(
+                        update={"plan_unit_id": matching_units[0].unit_id}
+                    )
+                )
+                continue
+            if finding.plan_unit_id is not None and bound_unit is None:
+                reason = "分析结果绑定了不存在的计划单元"
+            elif finding.plan_unit_id is not None:
+                reason = "分析结果引用超出其绑定计划单元的文件范围"
+            else:
+                reason = "共享资料对应多个任务分支，Finding 必须提供 plan_unit_id"
             if len(matching_units) != 1:
                 raise HarnessPlanError(
-                    "共享资料对应多个任务分支，Finding 必须提供 plan_unit_id"
+                    reason
                 )
+        return result.model_copy(update={"findings": normalized_findings})
 
     @staticmethod
     def _validate_result(
@@ -5438,4 +5741,6 @@ def build_harness_runtime(settings: Any | None = None) -> HarnessRuntime:
             timeout=settings.llm_timeout_seconds,
         ),
         state_store,
+        ScenarioEffectEngine(),
+        RunWorkspaceArtifactStore(Path.cwd() / ".runtime" / "run-workspaces"),
     )

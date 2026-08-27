@@ -1,7 +1,8 @@
 # UI-server fact matrix
 
-This is the current `DR-0034` one-action recovery and explicit source-choice
-surface, on top of the `DR-0033` closable Branch-lane review, `DR-0032`
+This is the current `DR-0035` Scenario Effect Gate and Run Workspace Artifact
+surface, on top of the `DR-0034` one-action recovery, `DR-0033` closable
+Branch-lane review, `DR-0032`
 persistent decision/recovery contract, `DR-0029`
 server-verified Evidence Anchors and `DR-0026`
 branch-selective append-only result loop and `DR-0024` whole-workspace contract.
@@ -22,8 +23,8 @@ Prompt、思维链、原始模型响应、绝对路径、哈希和内部策略�
 | Expand/search/type filter | client changes visible branches of the file tree; search keeps matching ancestors open | browser state over server projection | no server mutation and no Agent scope change | no claim that visible files are the Run input |
 | File preview selection | choose what the user is looking at | browser state + preview GET | does not constrain Agent evidence | internal ref/path/hash |
 | Task composer | user writes the actual instruction | browser draft; POST/Snapshot `instruction` | required 3-2,000 chars | hidden benchmark-task fallback is forbidden |
-| Loop bounds | user chooses hard limits before invocation | browser draft; Snapshot `contract.options` | rounds 1-3, files/round 1-8, model calls 2-6, deadline 20-3000s | token/cost estimates not owned by server |
-| Run start | server accepted one independent read-only whole-workspace contract | POST Owner/key/version/instruction/options | unknown response reuses same key; changed or known retry uses new key | internal command signature |
+| Loop bounds | user chooses hard limits before invocation | browser draft; Snapshot `contract.options` | defaults 12 rounds/16 files/30 calls/7200s; bounds 1-24/1-24/2-60/20-14400s | token/cost estimates not owned by server |
+| Run start | server accepted one independent bounded whole-workspace contract | POST Owner/key/version/instruction/options | unknown response reuses same key; changed or known retry uses new key | internal command signature |
 | Frozen active contract | current instruction, all stable refs and limits cannot silently change | Snapshot `scope_mode/allowed_file_refs` and run-active state | composer/options disabled until terminal | local edits pretending to affect active Run |
 
 ## 2. File preview
@@ -49,6 +50,10 @@ Prompt、思维链、原始模型响应、绝对路径、哈希和内部策略�
 | Planner receipt | not called/adopted/not adopted and elapsed time | round `model_receipt.called/output_used/elapsed_ms` | independent of plan validation | token/provider trace |
 | Candidate rejected | returned candidate was not adopted | `plan_validation_rejected` | at most one repair using the same call budget | raw validator/provider error |
 | Validated plan | server compiled/accepted this round's work intent | `plan_validation`, round public plan | after accepted candidate only | raw tool/effect/gate IDs |
+| Deterministic local effect started | one fixed server-owned capability matched the user instruction and frozen FORTE inputs | `deterministic_office_tool_started`, EffectReceipt capability/scenario | after plan validation; no model field can create this authority | private adapter implementation and input bytes |
+| Run Workspace file available | a real isolated file was written and can be downloaded | `workspace_artifacts[]`, `run_workspace_artifact_written`, Owner/Run-scoped Artifact GET | file appears only after store write; download rechecks private size/digest | storage path, private digest, claim that FORTE source changed |
+| Deterministic verification | named checks passed or failed for the exact Artifact | Artifact `validator_id/verifier_status/checks[]`, `deterministic_verification_completed` | effect success requires all checks; failure remains visible and does not become model prose | validator internals and unsupported general correctness claims |
+| External effect boundary | SQL/Web/cron/real external action was not authorized or available | EffectReceipt `status=blocked_external_boundary`, `scenario_effect_bounded`, prohibited side effects | preserve instruction/scope/receipts; do not fabricate an Artifact or success | credentials, fake Connector result or scheduled job |
 | Task branches | validated work units now have server-owned identity, dependency and evidence state | `branches[]`, `round.branch_ids` | created after plan validation; state changes only through server verification/control | Branch ID generation and validator internals |
 | Agent-selected evidence | files chosen for this round and business reason | `round.input_file_refs`, `plan.selection_reason` | after server budget/compiler validation | full metadata index, model ranking internals |
 | Analyst started/returned | provider analysis stage, not completion | `analysis_started/completed` | per round | Prompt, CoT, raw response |
@@ -60,10 +65,10 @@ Prompt、思维链、原始模型响应、绝对路径、哈希和内部策略�
 | Gap/Branch review page | user can inspect where the gap occurred, what it says and which candidate/missing files are available | `round_number`, business Branch title, `evidence_gaps[]`, Branch `missing_file_refs`, Preview GET | open has no mutation; close/Escape exits immediately, then attempts a versioned `defer` only for an open structured decision; a 409/error stays visible outside the closed dialog and does not claim a receipt | raw Branch ID, claim that candidate files solve the gap, invented diff or trapping the user until a network write succeeds |
 | Continue one Branch | user authorizes one more bounded round only for the selected Branch | control POST `resume` with `branch_id`, returned ControlEvent, `active_branch_id`; next `round.input_file_refs` equals that Branch's missing refs | only valid for a waiting Branch; all other waiting Branches remain unchanged | a click animation as execution proof or unrelated files silently entering the round |
 | Result version | one completed round formed an independent append-only logical evidence brief | `artifact_versions[]` safe projection plus Store ArtifactVersion row | version and parent increase monotonically; content is not overwritten | source-file write, semantic correctness or mutable current-result fiction |
-| Read-only Act | the Agent formed an intermediate analysis, not a side effect | round result and `external_side_effect=none` | Verify follows in the same round | tool execution or source-file mutation claim |
-| Completed | server Gate created a separate TaskCommit selecting the latest verified logical brief | `status=completed`, `loop_committed`, `brief`, `commits[]`, `last_commit` | final GET after terminal event; ArtifactVersion is not mutated | source-file commit, tool execution or business correctness |
+| Read-only Act | the Agent formed an intermediate analysis and no admitted local adapter ran | round result and `external_side_effect=none`, empty `workspace_artifacts[]` | Verify follows in the same round | tool execution or source-file mutation claim |
+| Completed | server Gate created a separate TaskCommit selecting the latest verified logical brief | `status=completed`, `loop_committed`, `brief`, `commits[]`, `last_commit` | final GET after terminal event; ArtifactVersion is not mutated | source-file commit, arbitrary task correctness or external effect; deterministic Artifact success is a separate fact |
 | Historical version restored | current brief pointer moved to an existing version and history remains | `artifact_version_restored`, rollback TaskCommit, `last_commit.artifact_version` | versioned/idempotent control; versions and prior Commits never decrease | file rollback, deleted work or model-call undo |
-| Active-time budget | time is charged only while the Agent is running | Contract `deadline_seconds`, Snapshot `budget.elapsed_ms`, Runtime active/frozen state | defaults to 1,200 seconds; freezes in waiting/pause/terminal and resumes from accumulated active elapsed | wall-clock age, reset-on-resume or hard cancellation of an in-flight HTTP call |
+| Active-time budget | time is charged only while the Agent is running | Contract `deadline_seconds`, Snapshot `budget.elapsed_ms`, Runtime active/frozen state | defaults to 7,200 seconds, max 14,400; freezes in waiting/pause/terminal and resumes from accumulated active elapsed | wall-clock age, reset-on-resume or hard cancellation of an in-flight HTTP call |
 | Budget stopped | no new provider call may start and the concrete boundary is visible | `status=stopped`, `brief.outcome=bounded`, `budget.stop_reason`, `loop_budget_stopped` | preserves completed rounds and partial brief | raw `budget_exhausted` as the only explanation, hard cancellation of an in-flight HTTP call |
 | Continue after bounded stop | the terminal Run cannot resume; one unresolved Branch may seed a new Task Contract | `status=stopped`, latest `next_step.recovery_kind/candidate_branch_ids`, Branch objectives/refs, preserved `artifact_versions[]`; then a new Run POST | add optional direction and create an independent whole-workspace Run for one Branch objective | `resume` on the terminal Run, mutation of the old Run, guaranteed reuse of prior file selection or external action |
 | User stopped | stop was applied at a safe point | `status=stopped`, `loop_stopped` | preserves completed rounds | rollback or deletion claim |
@@ -103,10 +108,12 @@ Prompt、思维链、原始模型响应、绝对路径、哈希和内部策略�
 | DOCX/PDF/TXT | bounded extracted/read text, <=30,000 chars | OCR completeness, layout fidelity or semantic accuracy |
 | stable ref | deterministic for pinned public input path | production document identity |
 | plan compilation | server-owned effects/gates plus graph/source checks and one bounded repair | plan quality or tool execution |
+| fixed local office effect | twelve named FORTE capabilities create isolated CSV/Markdown/DOCX/ZIP outputs with deterministic checks | arbitrary instruction execution, a general Tool Gateway, source mutation or external action |
+| external-boundary receipt | TC-03/08/09 explicitly record that SQL/Web/cron effects did not run | successful task effect, Connector availability or scheduling |
 | result validation | citation membership plus at least one uniquely resolved safe-preview Anchor per new Finding | entailment, exhaustive matching, arithmetic, native page coordinates or cell semantics |
 | structured review | required fields/options and recommendation membership pass schema/runtime checks | recommendation quality, correct risk framing or human acceptance |
 | Evidence Gate | decides continue/stop from explicit gaps and remaining bounds | semantic truth or human acceptance |
-| completed | reviewable logical brief plus an independent TaskCommit pointer exists | task correctness, source-file Artifact, Connector or external process completion |
+| completed | reviewable logical brief plus an independent TaskCommit pointer exists | task correctness, deterministic Artifact success, Connector or external process completion |
 
 ## 6. Transport and lifecycle
 
@@ -119,6 +126,9 @@ Prompt、思维链、原始模型响应、绝对路径、哈希和内部策略�
 - `X-User-Id` is unsigned. With `DATABASE_DSN`, Snapshot, command receipts,
   ArtifactVersions and TaskCommits are PostgreSQL-backed; without it they remain
   one-process memory.
+- Run Workspace Artifact metadata/effect receipts live in the Snapshot; same-host
+  Artifact bytes live in a separate isolated store and are rechecked on download.
+  This is not a transactional database/filesystem commit or multi-host durability.
 - Local `start-demo.ps1` chooses Docker first, then a `DATABASE_DSN` explicitly
   present in the launching PowerShell process, otherwise memory. In the final
   case it overrides a stale `.env` database value. UI/service availability and
@@ -126,10 +136,11 @@ Prompt、思维链、原始模型响应、绝对路径、哈希和内部策略�
   the launcher message or the mere presence of `.env`.
 - `checkpoint_recovered` proves a persisted Snapshot was restored and paused.
   It does not prove an interrupted model call was cancelled or replayed.
-- Plan operation labels and read-only Act declare intent/analysis. The current
-  Runtime does not invoke a Tool Gateway or modify source files. Its logical
-  evidence briefs and TaskCommits are independent append-only records, but they
-  are not writable office files or external-action receipts.
+- Plan operation labels declare intent only. Twelve fixed server-owned local
+  adapters can create verified isolated office/code files; the current Runtime
+  still has no general Tool Gateway and never modifies FORTE source files. Logical
+  evidence briefs/TaskCommits, real Run Workspace files and external-action
+  receipts remain three different facts.
 - Pause/stop apply between provider calls; deadline prevents a new call but does
   not hard-cancel an in-flight request.
 - Browser refresh restores a known Run id; `GET /runs` can discover the latest
@@ -137,7 +148,9 @@ Prompt、思维链、原始模型响应、绝对路径、哈希和内部策略�
 
 ## 7. Evidence and applicability
 
-Current contract: [`DR-0030`](../decisions/DR-0030-actionable-review-and-recoverable-analysis.md),
+Current contract: [`DR-0035`](../decisions/DR-0035-scenario-effect-gate-and-run-workspace-artifacts.md),
+[`SCENARIO-021`](../scenarios/SCENARIO-021-verifiable-office-artifact-effect.md),
+[`DR-0030`](../decisions/DR-0030-actionable-review-and-recoverable-analysis.md),
 [`SCENARIO-016`](../scenarios/SCENARIO-016-actionable-finding-and-recoverable-analysis.md),
 [`DR-0026`](../decisions/DR-0026-selective-branch-and-immutable-artifact-history.md),
 [`DR-0025`](../decisions/DR-0025-durable-evidence-gate-and-artifact-evolution.md),
@@ -147,7 +160,7 @@ Current contract: [`DR-0030`](../decisions/DR-0030-actionable-review-and-recover
 [`SCENARIO-010`](../scenarios/SCENARIO-010-autonomous-whole-workspace-research.md),
 [`SCENARIO-009`](../scenarios/SCENARIO-009-agent-control-loop.md),
 [workspace interaction/source record](../research/WORKSPACE-CENTRIC-OFFICE-AGENT-INTERACTION-AND-SOURCES-20260825.md)
-and [current branch/artifact Evidence](../evidence/DEMO1-BRANCH-ARTIFACT-CONTROL-EVIDENCE-20260826.md).
+and [current Scenario Effect Evidence](../evidence/SCENARIO-EFFECT-GATE-20260827.md).
 
 Automated checks are engineering proxies, not user research. User
 comprehension, calibrated trust and task value remain `Draft`.

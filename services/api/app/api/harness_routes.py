@@ -4,9 +4,10 @@ from __future__ import annotations
 
 import json
 from typing import Annotated
+from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, status
-from starlette.responses import StreamingResponse
+from starlette.responses import Response, StreamingResponse
 
 from packages.contracts.harness_models import AgentControlLoopControlRequest
 
@@ -107,6 +108,34 @@ async def get_harness_run(
         return runtime.public_snapshot(snapshot)
     except HarnessNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@router.get("/runs/{run_id}/artifacts/{artifact_id}")
+async def get_harness_run_artifact(
+    run_id: str,
+    artifact_id: str,
+    owner_id: Annotated[str, Depends(harness_owner)],
+    runtime: Annotated[HarnessRuntime, Depends(get_harness_runtime)],
+):
+    try:
+        artifact, content = await runtime.get_workspace_artifact(
+            owner_id, run_id, artifact_id
+        )
+    except HarnessNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except HarnessError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    return Response(
+        content=content,
+        media_type=artifact.media_type,
+        headers={
+            "Content-Disposition": (
+                "attachment; filename*=UTF-8''" + quote(artifact.file_name)
+            ),
+            "X-Content-Type-Options": "nosniff",
+            "Cache-Control": "private, no-store",
+        },
+    )
 
 
 @router.post("/runs/{run_id}/controls", status_code=status.HTTP_202_ACCEPTED)

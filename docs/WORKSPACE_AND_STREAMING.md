@@ -8,7 +8,8 @@ is:
 - left: one hierarchical file tree projected from safe business paths, with
   nested-folder expansion, search, type filters and file metadata;
 - center: task composer, Loop contract, file preview, round/branch progress,
-  immutable brief history, restore actions, next-task proposals and an
+  verified Run Workspace files, immutable brief history, restore actions,
+  next-task proposals and an
   in-context issue-review page;
 - right: actual Agent trajectory, budget, controls and model receipts.
 
@@ -38,8 +39,9 @@ they do not start a task. The Run button remains disabled until the instruction
 contains at least three characters.
 
 The user sets visible limits for rounds, files per round, model calls and
-Agent execution time. The default is 1,200 seconds and the accepted range is
-20 to 3,000 seconds. This limit counts only active Agent execution:
+Agent execution time. Defaults are 12 rounds, 16 files per round, 30 model
+calls and 7,200 seconds; accepted maxima are 24/24/60/14,400. The time limit
+counts only active Agent execution:
 `waiting_input` and explicit pause time are excluded. The context contract is
 the entire allowlisted workspace; the Agent
 chooses a smaller evidence set each round. Changing the instruction or limits
@@ -63,11 +65,13 @@ with a safe error; stale or partial data is not shown as valid.
 
 ## 5. Agent Control Loop, result and citation
 
-Each round is a visible `Observe -> Plan -> Act(read-only) -> Verify -> Evidence
-Gate` progression. The plan appears only after the server validates the model
-candidate. It uses business operation labels. `只写本轮成果` means a logical
-read-only Run result in the current round, not that a file or ArtifactVersion
-was written.
+Each round is a visible `Observe -> Plan -> Act -> Verify -> Evidence Gate`
+progression. The plan appears only after the server validates the model
+candidate. A model plan label such as `只写本轮成果` remains intent, not execution
+evidence. For twelve fixed local capabilities, the admitted server adapter may
+then create a real isolated Run Workspace file and run a deterministic verifier.
+Only `workspace_artifacts[]`, `effect_receipts[]` and downloadable bytes prove
+that bounded effect; other plans remain read-only analysis.
 
 Before analysis, the round displays `input_file_refs` and `selection_reason` as
 “Agent 本轮自主选择”. Planner metadata access does not mean all 96 file bodies
@@ -160,6 +164,23 @@ contract. Clicking `确认并启动` copies the exact proposal into a new start 
 and creates an independent Run; dismissing, reviewing or editing a proposal has
 no side effect on the completed Run.
 
+### 5.1 Verified Run Workspace files
+
+When a fixed local capability is admitted, the center pane adds a compact
+Artifact section that answers four separate questions: what file was created,
+which deterministic checks passed, which FORTE sources were read, and what did
+not happen. CSV/Markdown/DOCX/ZIP files download through the Owner/Run-scoped
+Artifact route. The public UI never receives the server storage path or private
+digest. The original FORTE source remains read-only and every receipt states
+`external_action=none`.
+
+The section deliberately keeps three statuses separate: Planner/Analyst
+`called/output_used`, deterministic effect `passed/failed/blocked`, and overall
+Loop `waiting/completed/failed`. A verified Artifact remains visible if the later
+Analyst result is rejected; conversely, an adopted model answer without a passed
+Artifact validator is not presented as task-effect success. TC-03/08/09 show an
+external-boundary receipt instead of fabricated SQL/Web/cron execution.
+
 ## 6. Call receipts and trace
 
 The right pane distinguishes:
@@ -167,6 +188,11 @@ The right pane distinguishes:
 - `未调用`: no provider request occurred;
 - `已采用`: provider returned and server checks accepted the output;
 - `未采用`: provider returned but checks rejected the output.
+
+The trace also projects `deterministic_office_tool_started`,
+`run_workspace_artifact_written`, `deterministic_verification_completed` and
+`scenario_effect_bounded`. These events are ordered change notifications; the
+Snapshot remains authoritative.
 
 Elapsed milliseconds are an observed call duration, not production SLA or cost.
 The trajectory uses named server events and business summaries. It also exposes
@@ -226,6 +252,9 @@ browser fact, not a server task phase.
 | recovery reaches budget terminal | `status=stopped`, `brief.outcome=bounded`, candidate Branches and `recovery_kind` | old Run, Plan, call receipts, Branch state and ArtifactVersions | choose one unfinished Branch, add optional direction and POST a new Task Contract; never resume the terminal Run |
 | pause/steer/stop requested | pending until a safe point | current Snapshot and command receipt | reconcile returned version; resume or inspect terminal brief |
 | human reviews or pauses for a long time | active elapsed is frozen while waiting/paused | consumed active time, Branch state, versions and receipts | resume from the same active budget; wall-clock waiting does not force an immediate stop |
+| deterministic local effect fails | failed EffectReceipt and check details | source bytes, model receipts, prior Branches and any earlier verified Artifact | inspect the failed check; fix the owned adapter/validator and start a fresh run without altering FORTE inputs |
+| task requires SQL/Web/cron authority | `blocked_external_boundary` receipt | user instruction, frozen scope, model receipts and prohibited-side-effect list | configure and authorize a real Connector later; do not treat safe blocking as effect success |
+| Artifact download fails integrity | file-specific fail-closed error | Snapshot metadata and all other Run facts | keep the failed bytes hidden; repair the Artifact store and retry the same Owner/Run-scoped download |
 | SSE interruption | reconnecting | current Snapshot and last sequence | GET plus `after=N` |
 | browser refresh | current Run and sequence restored | task, rounds, receipts and controls | GET current Run, then SSE `after=N` |
 | API restart with PostgreSQL | recovered checkpoint, paused | completed rounds, Branch states, events, command receipts and independent ArtifactVersion/TaskCommit rows | inspect trace, then explicitly resume the intended Branch |
@@ -238,6 +267,10 @@ because they are nested in the Run Snapshot JSONB. ArtifactVersion and TaskCommi
 remain separate append-only rows. This is not an independent decision ledger,
 source-revision constraint, CAS or multi-instance guarantee. A running round
 interrupted by restart is intentionally not replayed.
+Run Workspace Artifact metadata is likewise restored through Snapshot JSONB;
+same-host bytes persist in the separate isolated Artifact store and are rechecked
+at download. This does not prove transactional database/filesystem commit,
+multi-host durability or object-store replication.
 The real PostgreSQL 17.11 sequential gate now verifies pending-decision restart,
 target-Branch-only resume, v1/v2 preservation and a second restart. The browser
 path separately verifies desktop and 390 px candidate comparison, defer-then-final
@@ -263,8 +296,11 @@ digest, model Prompt, chain-of-thought, raw response, credentials, internal
 effect/gate enums, unvalidated quote candidates or low-level logs. The UI may
 show business labels, bounded content, server-resolved Evidence Anchors, call
 receipts, validation status, Branch states, evidence gaps, controls and
-citations because those facts help the user decide or recover.
+citations because those facts help the user decide or recover. Verified Artifact
+metadata, checks, downloads and bounded effect receipts are also public because
+they are the execution evidence for the twelve fixed local capabilities.
 The current logical evidence briefs and TaskCommits are independent append-only
 records and their safe projections are also present in the Run Snapshot. This
-proves result-history preservation, not a source-file write, semantic truth,
-Tool Gateway call or external action.
+proves result-history preservation, not a source-file write or semantic truth.
+The fixed local adapters prove only their named validators and isolated output;
+they are not a general Tool Gateway, Connector or external action.
