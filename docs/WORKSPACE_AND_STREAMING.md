@@ -210,6 +210,13 @@ browser fact, not a server task phase.
 | historical result restored | current pointer changes to a verified old brief | every ArtifactVersion and prior TaskCommit | review restored brief or select another version; original files stay unchanged |
 | API restart without PostgreSQL | no recoverable Run | browser task draft only | start a new Run or configure `DATABASE_DSN` |
 
+DR-0032 clarifies the PostgreSQL boundary: an open `DecisionRequest`, its
+`EvidenceResolution` candidates and a recorded `DecisionRecord` are durable only
+because they are nested in the Run Snapshot JSONB. ArtifactVersion and TaskCommit
+remain separate append-only rows. This is not an independent decision ledger,
+source-revision constraint, CAS or multi-instance guarantee. A running round
+interrupted by restart is intentionally not replayed.
+
 ## 9. Responsive behavior
 
 Desktop keeps file manager, work area and activity pane visible. Narrow layouts

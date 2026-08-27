@@ -12,6 +12,14 @@
 8. 当前整库文件管理器、自主检索和原文定位变更再读 `docs/decisions/DR-0024-autonomous-whole-workspace-research.md`、`docs/decisions/DR-0028-hierarchical-workspace-and-evidence-review.md`、`docs/decisions/DR-0029-server-verified-evidence-anchors.md`、`docs/scenarios/SCENARIO-010-autonomous-whole-workspace-research.md`、`docs/scenarios/SCENARIO-014-inspect-agent-issue-in-context.md`、`docs/scenarios/SCENARIO-015-pinpoint-and-compare-agent-evidence.md`、`docs/research/WORKSPACE-CENTRIC-OFFICE-AGENT-INTERACTION-AND-SOURCES-20260825.md`、`docs/testing/FORTE-PUBLIC-OFFICE-TASK-TEST-CASES-20260825.md` 与对应 Evidence/Source。`DR-0022` 的客户端手工 `selected_file_refs` 已由 `DR-0024` 取代，但其公开数据、安全预览与来源边界继续有效。
 9. 修改 Agent Control Loop、文件夹自主研究、预算/停止、分支控制、成果恢复或 Durable State 时，再读 `docs/research/AGENT-CONTROL-LOOP-IMPLEMENTATION-AUDIT-20260825.md`、`docs/decisions/DR-0023-agent-control-loop.md`、`docs/decisions/DR-0024-autonomous-whole-workspace-research.md`、`docs/decisions/DR-0026-selective-branch-and-immutable-artifact-history.md`、`docs/decisions/DR-0031-active-budget-and-agent-owned-gap-recovery.md`、`docs/scenarios/SCENARIO-012-selective-branch-and-artifact-restore.md`、`docs/scenarios/SCENARIO-017-resume-agent-owned-evidence-gap.md` 与对应 Evidence/Source；`DR-0025` 只作整组补证和 Snapshot 内成果的历史基线。对外和设计文档统一称 `Agent Control Loop`；Workspace 是循环处理的办公资料环境，不另立 `Workspace Research Loop` 或 `Research Loop` 产品名称。历史约 `30%` 只表示实现 `8364b1e` 之前的架构成熟度基线；现行 Runtime 已有最多三轮的只读 Control Loop、服务端 Branch、分支级 Evidence Gate、独立 append-only 逻辑 ArtifactVersion/TaskCommit、历史成果恢复和可选 PostgreSQL 重启恢复，但可写办公 Artifact、多实例协调、多 Worker 与外部动作仍未实现。
 
+DR-0032 additionally governs EvidenceResolution source revisions, DecisionRequest/
+DecisionRecord persistence and Finding/Branch-local restart recovery. Read
+`docs/decisions/DR-0032-persistent-decision-and-local-recovery.md`,
+`docs/scenarios/SCENARIO-018-persistent-decision-and-local-recovery.md` and its
+Evidence before changing those paths. Snapshot JSONB persistence is not an
+independent decision ledger or multi-instance CAS; report the real PostgreSQL gate
+and skipped conditions explicitly.
+
 源码永远高于文档。行为或叙事变化后必须同步 living docs、Decision、Scenario、
 Source、Evidence 和 UI-server fact mapping，不能只更新 README。
 

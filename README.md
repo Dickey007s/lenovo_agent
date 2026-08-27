@@ -205,6 +205,12 @@ multi-instance coordination and governed external action remain target work.
   12-second human wait with unchanged active elapsed, followed by one-Branch
   recovery and completion; this is control-path evidence, not an answer-quality
   claim.
+- `DR-0032` defines the next persistence boundary. `EvidenceResolution` and
+  `DecisionRequest/DecisionRecord` are currently nested in the PostgreSQL Run
+  Snapshot JSONB, not an independent decision ledger. A real restart gate must
+  prove that an open decision and its candidates survive, then only the selected
+  Branch creates ArtifactVersion v2 while v1 remains immutable. No source-revision
+  freshness, CAS, multi-instance lease, or in-flight model replay is claimed.
 - No target-user study has been run. Clarity, trust, efficiency and user value
   remain hypotheses.
 

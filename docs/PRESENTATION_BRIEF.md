@@ -152,6 +152,7 @@ Agent Control Loop 的逐模块历史基线、当前三轮只读纵切和后续�
 | 预算终态分支续办 | 用户不会在不可恢复的页面里反复点“继续” | 旧 Run 已结束、保留项、未完成 Branch、用此分支创建新任务 | `status=stopped`、`brief.outcome=bounded`、candidate Branch + 新 Run POST；不向旧 Run 发送 control |
 | 版本化人工决定 | 关闭不再等于“什么都没发生”，重连后仍能对账 | 接受/否决/暂缓、回执版本、无外部动作 | `decision_records[]`、`decision_recorded`、expected version + idempotency |
 | 人工确认下一步 | Agent 建议不会自动扩张任务；用户先看形成上下文 | “尚未逐项验证”“查看形成依据”“确认并启动” | 终态 `follow_ups` + Finding refs 上下文 + 新 Run POST |
+| 决定与证据重启恢复（DR-0032） | 用户不因 API 重启丢失待决候选或已完成成果 | 重启后继续同一 Decision Packet；接受后只恢复目标 Branch 并生成 v2 | 当前仅由 Snapshot JSONB 保存，必须有真实 PostgreSQL 门；无独立 ledger/CAS |
 
 ## 7. 当前证据卡片
 
@@ -170,6 +171,7 @@ Agent Control Loop 的逐模块历史基线、当前三轮只读纵切和后续�
 - 两条等待分支可逐条继续，未选分支保持等待；ArtifactVersion 与 TaskCommit 分表 append-only，恢复只新增 Commit；
 - 新的 DecisionRecord 把 accept/decline/defer 绑定到 Finding/Resolution/Branch；它证明回执存在，不证明业务审批正确；
 - `exact/ambiguous/unavailable` 是原文位置状态，不是 Finding 真值；`stale/rejected` 仍是预留状态；
+- DR-0032 的 `DecisionRequest`、来源修订和 `stale/rejected` 仍属于待实现/待验证边界；当前不能宣称独立决定账本、并发 CAS 或在途调用恢复。
 - 两张确定性浏览器图分别展示“继续此分支”与“恢复 v1”；它们证明 UI/服务端字段映射，不是真实模型运行；
 - 最终截图绑定的真实浏览器运行：整库冻结 96 份索引，Agent 自主选择并核对 3 份文件，2 次 `deepseek-v4-pro` 调用，形成 5 条发现和 4 条待确认建议；
 - 3 张最终文件管理器/建议截图及 SHA-256 写入 Evidence；1440px 与 390px 无页面横向溢出；

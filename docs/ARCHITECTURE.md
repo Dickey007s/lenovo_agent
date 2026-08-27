@@ -98,8 +98,9 @@ checked; semantic truth, completeness and arithmetic are not. If the first
 Analyst output cannot be uniquely located, the Runtime records
 `analysis_validation_rejected` and permits at most one new Analyst call within
 the same budget; the browser never receives rejected prose as an adopted result.
-The resolver records `exact`, `ambiguous` or `unavailable` for each quote; `stale`
-and `rejected` are reserved future states. A valid subset is adopted with
+The resolver currently records `exact`, `ambiguous` or `unavailable` for each quote;
+`stale` and `rejected` are reserved until source revisions and rejection reasons
+are implemented. A valid subset is adopted with
 `analysis_partial_adopted` and an append-only partial ArtifactVersion. Unresolved
 Finding/Resolution facts pause only their bound Branches. If neither attempt
 yields a usable Finding, the Runtime preserves Plan/Branch/call facts and pauses
@@ -164,6 +165,14 @@ browser restores its known Run id, or discovers the most recent nonterminal
 Owner Run via `GET /runs`. Memory fallback does not survive an API restart.
 `X-User-Id` is not signed authentication, and there is no multi-instance lease
 or notification channel.
+
+`EvidenceResolution` and human decisions are currently nested in the authoritative
+Snapshot JSONB. This preserves records committed before a restart, but is not an
+independent append-only decision ledger and has no database-level source-revision
+or compare-and-swap constraint. An interrupted running round is still discarded
+by the recovery policy; only completed rounds and their artifacts are restored.
+DR-0032 requires a real PostgreSQL gate before this is reported as a verified
+pending-decision recovery path.
 
 ## 6. Frontend architecture
 

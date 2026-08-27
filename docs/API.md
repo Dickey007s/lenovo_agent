@@ -419,6 +419,12 @@ candidate when applicable, optional user feedback, accepted task version and
 `external_action=none`. It is the reconciliation fact after reconnect; a toast or
 button animation is not a decision receipt.
 
+The current PostgreSQL adapter persists these records only as part of the Run
+Snapshot JSONB. It does not yet provide an independent DecisionRecord or
+EvidenceResolution table, source-revision constraint, or multi-instance CAS.
+The DR-0032 restart test is therefore a required evidence gate, not a claim that
+every pending decision or interrupted round is already durable.
+
 `artifact_versions` and `commits` are safe Snapshot projections of independent
 append-only Store records. ArtifactVersion contains the complete logical
 read-only brief for one completed round; it remains `draft` or `verified` and is
