@@ -278,17 +278,17 @@ function snapshot(
       scope_mode: "whole_workspace",
       allowed_file_refs: allFiles.map((file) => file.file_ref),
       completion_criteria: ["所有结论都有文件引用", "剩余缺口和停止原因可见"],
-      max_rounds: 3,
-      max_files_per_round: 6,
-      max_model_calls: 6,
-      deadline_seconds: 1200,
+      max_rounds: 12,
+      max_files_per_round: 16,
+      max_model_calls: 30,
+      deadline_seconds: 7200,
       external_action: "none",
     },
     budget: {
-      max_rounds: 3,
-      max_files_per_round: 6,
-      max_model_calls: 6,
-      deadline_seconds: 1200,
+      max_rounds: 12,
+      max_files_per_round: 16,
+      max_model_calls: 30,
+      deadline_seconds: 7200,
       rounds_used: rounds.length,
       files_verified: status === "completed" ? selected.length : status === "planning" || status === "paused" ? 0 : firstRefs.length,
       model_calls_used: status === "completed" ? rounds.length * 2 : status === "planning" || status === "paused" ? 1 : 0,
@@ -321,6 +321,8 @@ function snapshot(
       review_required: true,
       external_action: "none",
     })),
+    workspace_artifacts: [],
+    effect_receipts: [],
     commits: status === "completed" ? [{
       commit_id: "commit-111111111111",
       artifact_id: "artifact-111111111111",
@@ -367,6 +369,91 @@ function snapshot(
     } : null,
     validation_errors: failed ? ["规划使用了当前任务范围外的资料或能力，系统已安全停止。请重新规划。"] : [],
     events: status === "queued" ? [] : [{ sequence, event_name: failed ? "harness_failed" : status === "completed" ? "loop_committed" : status === "stopped" ? "loop_stopped" : status === "waiting_input" ? "evidence_gate" : "round_started", occurred_at: new Date().toISOString(), status, message: failed ? "本轮未通过服务端校验，已停止且未发生外部动作。" : "服务端状态已更新。", details: {} }],
+  };
+}
+
+function verifiedEffectSnapshot(body: { workspace_id: string; instruction: string }) {
+  const base = snapshot(body, "completed", 20);
+  const artifactId = "workspace-artifact-111111111111";
+  return {
+    ...base,
+    workspace_artifacts: [{
+      artifact_id: artifactId,
+      capability_id: "office-finance-reconciliation",
+      scenario_id: "TC-05",
+      title: "未付统计",
+      file_name: "未付统计.csv",
+      media_type: "text/csv",
+      size: 2399,
+      version: 1,
+      round_number: 1,
+      source_file_refs: [csvFile.file_ref, pdfFile.file_ref],
+      validator_id: "validator-finance-reconciliation-v1",
+      verifier_status: "passed",
+      checks: [
+        { check_id: "check-finance-source", label: "三期来源完整", passed: true, detail: "三个固定期间工作簿均通过 Catalog 完整性检查。" },
+        { check_id: "check-finance-unpaid-rows", label: "未付逐行复算", passed: true, detail: "31 条贷方期末余额逐行相等。" },
+        { check_id: "check-finance-unpaid-sort", label: "未付排序", passed: true, detail: "按客商升序、同客商金额降序。" },
+      ],
+      summary: "31 条未付记录已逐行复算。",
+      download_path: `/v1/harness/runs/${base.run_id}/artifacts/${artifactId}`,
+      created_at: new Date().toISOString(),
+      original_inputs_modified: false,
+      review_required: true,
+      external_action: "none",
+    }],
+    effect_receipts: [{
+      receipt_id: "effect-receipt-111111111111",
+      capability_id: "office-finance-reconciliation",
+      scenario_id: "TC-05",
+      status: "passed",
+      state: "已冻结 3 份 FORTE 输入，原始文件保持只读。",
+      action: "调用确定性财务核对工具并写入隔离运行工作区。",
+      observation: "生成 1 份真实成果文件，执行 3 项确定性检查。",
+      cost: "0 次额外模型调用；仅消耗本机确定性计算。",
+      result: "所有确定性效果门通过，成果仍需用户复核。",
+      source_file_refs: [csvFile.file_ref, pdfFile.file_ref],
+      artifact_ids: [artifactId],
+      prohibited_side_effects: ["不覆盖原始账表", "不记账", "不发起付款"],
+      created_at: new Date().toISOString(),
+      external_action: "none",
+    }],
+    events: [
+      ...base.events,
+      { sequence: 17, event_name: "deterministic_office_tool_started", occurred_at: new Date().toISOString(), status: "verifying", message: "已调用确定性办公工具；本次不额外调用模型。", details: {} },
+      { sequence: 18, event_name: "run_workspace_artifact_written", occurred_at: new Date().toISOString(), status: "verifying", message: "已在隔离运行工作区生成“未付统计.csv”。", details: {} },
+      { sequence: 19, event_name: "deterministic_verification_completed", occurred_at: new Date().toISOString(), status: "verifying", message: "真实成果文件已通过确定性效果门，仍需用户复核。", details: {} },
+    ],
+    last_event_sequence: 20,
+  };
+}
+
+function boundedEffectSnapshot(body: { workspace_id: string; instruction: string }) {
+  const base = snapshot(body, "completed", 18);
+  return {
+    ...base,
+    workspace_artifacts: [],
+    effect_receipts: [{
+      receipt_id: "effect-receipt-222222222222",
+      capability_id: "office-remote-sql-analysis",
+      scenario_id: "TC-03",
+      status: "blocked_external_boundary",
+      state: "已识别用户目标并冻结当前公开资料库范围。",
+      action: "检查外部 Connector、授权和稳定依赖。",
+      observation: "所需外部依赖未获授权，未调用模型猜测外部数据。",
+      cost: "0 次模型调用；0 个外部动作。",
+      result: "按外部事实边界阻断；没有生成伪造结果。",
+      source_file_refs: [],
+      artifact_ids: [],
+      prohibited_side_effects: ["不伪造 SQL 结果", "不连接未授权数据库"],
+      created_at: new Date().toISOString(),
+      external_action: "none",
+    }],
+    events: [
+      ...base.events,
+      { sequence: 17, event_name: "scenario_effect_bounded", occurred_at: new Date().toISOString(), status: "verifying", message: "按外部事实边界阻断；没有生成伪造结果。", details: {} },
+    ],
+    last_event_sequence: 18,
   };
 }
 
@@ -525,7 +612,7 @@ function locationFailureSnapshot(body: { workspace_id: string; instruction: stri
 }
 async function fulfillJson(route: Route, body: unknown, status = 200) { await route.fulfill({ status, contentType: "application/json", body: JSON.stringify(body) }); }
 
-async function mockHarness(page: Page, options: { failFirstStart?: boolean; failDecisionDefer?: boolean; disconnect?: boolean; failed?: boolean; locationFailure?: boolean; sourceRecovery?: boolean; sourceRecoveryThreeCandidates?: boolean; boundedRecovery?: boolean; workspaceFailures?: number; interactiveLoop?: boolean; evidenceGate?: boolean } = {}) {
+async function mockHarness(page: Page, options: { failFirstStart?: boolean; failDecisionDefer?: boolean; disconnect?: boolean; failed?: boolean; locationFailure?: boolean; sourceRecovery?: boolean; sourceRecoveryThreeCandidates?: boolean; boundedRecovery?: boolean; effectArtifact?: boolean; effectBoundary?: boolean; workspaceFailures?: number; interactiveLoop?: boolean; evidenceGate?: boolean } = {}) {
   let workspaceCalls = 0; let startCalls = 0; let streamCalls = 0;
   let currentBody = { workspace_id: "forte-public-office", instruction: "" };
   // Mock snapshots intentionally cover several server state shapes in one route.
@@ -543,6 +630,9 @@ async function mockHarness(page: Page, options: { failFirstStart?: boolean; fail
       return fulfillJson(route, workspace);
     }
     if (path.startsWith("/v1/harness/workspace/files/")) return fulfillJson(route, previewFor(path.split("/").at(-1)!));
+    if (path.includes("/artifacts/") && route.request().method() === "GET") {
+      return route.fulfill({ status: 200, contentType: "text/csv; charset=utf-8", body: "科目名称,客商名称,未付款项\n应付账款,星海科技,100.00\n", headers: { "Content-Disposition": "attachment; filename*=UTF-8''%E6%9C%AA%E4%BB%98%E7%BB%9F%E8%AE%A1.csv" } });
+    }
     if (path === "/v1/harness/runs" && route.request().method() === "GET") {
       return fulfillJson(route, { runs: [] });
     }
@@ -551,7 +641,11 @@ async function mockHarness(page: Page, options: { failFirstStart?: boolean; fail
       const body = route.request().postDataJSON() as typeof currentBody & { idempotency_key: string };
       currentBody = body; starts.push(body);
       if (options.failFirstStart && startCalls === 1) return fulfillJson(route, { detail: "任务启动结果未知" }, 503);
-      currentSnapshot = options.locationFailure
+      currentSnapshot = options.effectArtifact
+        ? verifiedEffectSnapshot(body)
+        : options.effectBoundary
+          ? boundedEffectSnapshot(body)
+        : options.locationFailure
         ? locationFailureSnapshot(body)
         : options.boundedRecovery
           ? boundedAnalysisRecoverySnapshot(body)
@@ -655,7 +749,7 @@ async function mockHarness(page: Page, options: { failFirstStart?: boolean; fail
     }
     if (path.startsWith("/v1/harness/runs/")) {
       if (options.disconnect && streamCalls === 1) return fulfillJson(route, { ...snapshot(currentBody, "queued"), status: "indexing", last_event_sequence: 1, version: 2 });
-      if (options.interactiveLoop || options.evidenceGate || options.sourceRecovery || options.boundedRecovery || options.locationFailure) return fulfillJson(route, currentSnapshot);
+      if (options.interactiveLoop || options.evidenceGate || options.sourceRecovery || options.boundedRecovery || options.locationFailure || options.effectArtifact || options.effectBoundary) return fulfillJson(route, currentSnapshot);
       currentSnapshot = snapshot(currentBody, options.failed ? "failed" : "completed");
       return fulfillJson(route, currentSnapshot);
     }
@@ -710,7 +804,7 @@ test("runs an arbitrary task while the agent selects evidence from the whole wor
   expect(state.starts[0]).toMatchObject({
     workspace_id: "forte-public-office",
     instruction,
-    loop: { max_rounds: 3, max_files_per_round: 6, max_model_calls: 6, deadline_seconds: 1200 },
+    loop: { max_rounds: 12, max_files_per_round: 16, max_model_calls: 30, deadline_seconds: 7200 },
   });
   expect(state.starts[0]).not.toHaveProperty("selected_file_refs");
   await expect(page.getByText("规划模型")).toBeVisible();
@@ -728,6 +822,55 @@ test("runs an arbitrary task while the agent selects evidence from the whole wor
   await page.getByRole("button", { name: /发现与建议/ }).click();
   await expect(page.getByRole("heading", { name: /完成 2 轮/ })).toBeVisible();
   expect(await page.locator("body").innerText()).not.toContain("forte-");
+});
+
+test("shows a real run-workspace file, deterministic checks and a download", async ({ page }) => {
+  await mockHarness(page, { effectArtifact: true });
+  await page.goto("/");
+  await page.getByRole("textbox", { name: "任务指令" }).fill("核对三期往来明细，生成未付统计、未收统计，并判断是否存在僵尸账款。");
+  await page.getByRole("button", { name: "启动 Control Loop" }).click();
+
+  const artifacts = page.locator(".workspace-artifacts");
+  await expect(artifacts).toContainText("Agent 已生成 1 份真实成果文件");
+  await expect(artifacts).toContainText("未付统计.csv");
+  await expect(artifacts).toContainText("3/3 项检查通过");
+  await expect(artifacts).toContainText("原始 FORTE 文件没有被修改");
+  await artifacts.getByText("查看逐项检查").click();
+  await expect(artifacts).toContainText("31 条贷方期末余额逐行相等");
+  await artifacts.getByText("查看效果回执").click();
+  await expect(artifacts).toContainText("0 次额外模型调用");
+
+  const downloadPromise = page.waitForEvent("download");
+  await artifacts.getByRole("button", { name: "下载成果" }).click();
+  const download = await downloadPromise;
+  expect(download.suggestedFilename()).toBe("未付统计.csv");
+
+  if (process.env.CAPTURE_SCENARIO_EFFECT_GATE === "1") {
+    await page.screenshot({ path: "../../docs/evidence/screenshots/scenario-effect-gate-desktop.png", fullPage: true });
+    await artifacts.screenshot({ path: "../../docs/evidence/screenshots/scenario-effect-gate-artifact-desktop.png" });
+  }
+  await page.setViewportSize({ width: 390, height: 844 });
+  const metrics = await page.evaluate(() => ({ viewport: document.documentElement.clientWidth, scroll: document.documentElement.scrollWidth }));
+  expect(metrics.scroll).toBeLessThanOrEqual(metrics.viewport);
+  const artifactMetrics = await artifacts.evaluate((element) => ({ width: element.clientWidth, scroll: element.scrollWidth }));
+  expect(artifactMetrics.scroll).toBeLessThanOrEqual(artifactMetrics.width);
+  if (process.env.CAPTURE_SCENARIO_EFFECT_GATE === "1") {
+    await artifacts.screenshot({ path: "../../docs/evidence/screenshots/scenario-effect-gate-artifact-mobile.png" });
+    await page.screenshot({ path: "../../docs/evidence/screenshots/scenario-effect-gate-mobile.png", fullPage: true });
+  }
+});
+
+test("shows an external boundary instead of a fabricated result", async ({ page }) => {
+  await mockHarness(page, { effectBoundary: true });
+  await page.goto("/");
+  await page.getByRole("textbox", { name: "任务指令" }).fill("连接只读 Datasette，分析网约车经营数据并复核指标。");
+  await page.getByRole("button", { name: "启动 Control Loop" }).click();
+
+  const boundary = page.locator(".workspace-artifacts.is-bounded");
+  await expect(boundary).toContainText("这项任务尚不能生成可信成果");
+  await expect(boundary).toContainText("缺少已授权的外部连接");
+  await expect(boundary).toContainText("没有生成伪造结果");
+  await expect(boundary.getByRole("button", { name: "下载成果" })).toHaveCount(0);
 });
 
 test("restores an immutable artifact version without overwriting history", async ({ page }) => {

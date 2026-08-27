@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import os
 import sys
+from pathlib import Path
 from uuid import uuid4
 
 import psycopg
@@ -14,6 +15,19 @@ if sys.platform == "win32":
 from packages.contracts.harness_models import AgentControlLoopControlRequest
 from services.api.app.application.harness_runtime import HarnessRuntime
 from services.api.app.application.harness_storage import PostgresHarnessStateStore
+from services.api.app.application.benchmark_workspace_catalog import (
+    BenchmarkWorkspaceCatalog,
+)
+from services.api.app.application.run_workspace_artifact_store import (
+    RunWorkspaceArtifactStore,
+)
+from services.api.app.application.scenario_effects import ScenarioEffectEngine
+from tests.unit.test_scenario_effect_runtime import (
+    FORTE_ROOT,
+    ONBOARDING_INSTRUCTION,
+    OnboardingAnalyst,
+    OnboardingPlanner,
+)
 from tests.unit.test_harness_runtime import (
     AmbiguousCatalog,
     BlockingPlanner,
@@ -33,6 +47,82 @@ pytestmark = pytest.mark.skipif(
     not DATABASE_DSN,
     reason="TEST_DATABASE_DSN is required for real PostgreSQL restart validation",
 )
+
+
+@pytest.mark.asyncio
+async def test_postgres_restart_preserves_verified_run_workspace_artifact(
+    tmp_path: Path,
+) -> None:
+    owner = f"postgres-workspace-artifact-{uuid4().hex}"
+    run_id = ""
+    runtimes: list[HarnessRuntime] = []
+    workspace_root = tmp_path / "run-workspaces"
+    try:
+        first = HarnessRuntime(
+            BenchmarkWorkspaceCatalog(FORTE_ROOT),
+            OnboardingPlanner(),
+            OnboardingAnalyst(),
+            PostgresHarnessStateStore(DATABASE_DSN),
+            effect_engine=ScenarioEffectEngine(),
+            artifact_store=RunWorkspaceArtifactStore(workspace_root),
+        )
+        runtimes.append(first)
+        await first.setup()
+        started = await first.start(
+            owner,
+            start_request(
+                idempotency_key=f"postgres-workspace-start-{uuid4().hex}",
+                instruction=ONBOARDING_INSTRUCTION,
+            ),
+        )
+        run_id = started.run.run_id
+        terminal = await wait_terminal(first, owner, run_id)
+        assert terminal.status == "completed"
+        assert terminal.effect_receipts[0].status == "passed"
+        assert terminal.workspace_artifacts[0].verifier_status == "passed"
+        artifact_id = terminal.workspace_artifacts[0].artifact_id
+        _, original_content = await first.get_workspace_artifact(
+            owner, run_id, artifact_id
+        )
+        await first.close()
+
+        second = HarnessRuntime(
+            BenchmarkWorkspaceCatalog(FORTE_ROOT),
+            OnboardingPlanner(),
+            OnboardingAnalyst(),
+            PostgresHarnessStateStore(DATABASE_DSN),
+            effect_engine=ScenarioEffectEngine(),
+            artifact_store=RunWorkspaceArtifactStore(workspace_root),
+        )
+        runtimes.append(second)
+        await second.setup()
+        restored = await second.get(owner, run_id)
+        assert restored.status == "completed"
+        assert restored.effect_receipts[0].status == "passed"
+        assert restored.workspace_artifacts[0].artifact_id == artifact_id
+        metadata, restored_content = await second.get_workspace_artifact(
+            owner, run_id, artifact_id
+        )
+        assert restored_content == original_content
+        assert metadata.original_inputs_modified is False
+        assert metadata.external_action == "none"
+        assert "content_sha256" not in second.public_snapshot(restored).model_dump_json()
+    finally:
+        for runtime in reversed(runtimes):
+            await runtime.close()
+        if DATABASE_DSN and run_id:
+            async with await psycopg.AsyncConnection.connect(DATABASE_DSN) as connection:
+                async with connection.cursor() as cursor:
+                    for table in (
+                        "harness_idempotency",
+                        "harness_task_commit",
+                        "harness_artifact_version",
+                        "harness_run_state",
+                    ):
+                        await cursor.execute(
+                            f"DELETE FROM {table} WHERE owner_id = %s",  # nosec B608
+                            (owner,),
+                        )
 
 
 @pytest.mark.asyncio

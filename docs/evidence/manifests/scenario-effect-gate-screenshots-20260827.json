@@ -1,0 +1,40 @@
+{
+  "captured_at": "2026-08-27T16:13:35+08:00",
+  "capture_mode": "deterministic_playwright_projection",
+  "user_research": false,
+  "screenshots": [
+    {
+      "file": "docs/evidence/screenshots/scenario-effect-gate-desktop.png",
+      "bytes": 112804,
+      "width": 1280,
+      "height": 720,
+      "sha256": "D240F8BDB4603E4AA8164C26466766CD60BBC6D11A1C2591740C2101981A5493",
+      "shows": "文件树、真实工件、确定性检查、效果回执与执行轨迹同屏"
+    },
+    {
+      "file": "docs/evidence/screenshots/scenario-effect-gate-artifact-desktop.png",
+      "bytes": 42015,
+      "width": 441,
+      "height": 605,
+      "sha256": "99BDA09958D8ED739D698736406F29F6E0C42E110638595BA20EB7B4FDFC73E9",
+      "shows": "桌面端工件卡、下载入口、逐项检查与 state-action-observation-cost-result 回执"
+    },
+    {
+      "file": "docs/evidence/screenshots/scenario-effect-gate-mobile.png",
+      "bytes": 266186,
+      "width": 390,
+      "height": 4889,
+      "sha256": "6540A0148E5B5008EF047DEF4C1824EF6A00B92C76F6FE257235CE1B6826CB82",
+      "shows": "390 px 全路径，无页面级横向溢出"
+    },
+    {
+      "file": "docs/evidence/screenshots/scenario-effect-gate-artifact-mobile.png",
+      "bytes": 43868,
+      "width": 334,
+      "height": 882,
+      "sha256": "93802EE1067981A12F40A37CE93E6B1678257F30FCF28220EA70813F83DC0C7B",
+      "shows": "390 px 工件卡与下载/检查控件"
+    }
+  ],
+  "boundary": "截图证明确定性 DOM 投影和固定视口可见性，不证明真实模型质量、目标用户理解或业务价值。"
+}

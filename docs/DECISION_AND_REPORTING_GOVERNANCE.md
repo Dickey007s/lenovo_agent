@@ -99,6 +99,15 @@ Model-generated tool names, write scopes, effect classes and gate requirements a
 
 For model-generated results, a citation that belongs to the selected source set proves only reference membership unless a separate semantic/numeric verifier exists. Reports must not rename citation-scope validation as factual correctness. `completed` must be qualified by the concrete completed scope, such as “read-only analysis result available for review”.
 
+A claim that an office task effect was achieved requires all of the following:
+an actual isolated Run Workspace file, a named server-owned deterministic
+validator with passing checks, an EffectReceipt recording
+`state -> action -> observation -> cost -> result`, and an explicit list of
+prohibited side effects that did not occur. Model text, citation membership,
+Planner intent and Loop `completed` cannot substitute for that evidence. A safe
+block at an unauthorized SQL/Web/cron/Connector boundary is a correct control
+outcome, not a successful task effect.
+
 A user-facing Finding must not end at “Agent says there is a problem”. The living
 fact matrix must record its source location, whether human judgment is required,
 what each visible choice causes, how feedback enters a new command and what does
@@ -125,10 +134,16 @@ an approval or an external effect.
 | browser E2E | tested UI workflow and DOM assertions | comprehension, trust or adoption |
 | screenshot review | visible state at one viewport/time | backend truth or task success |
 | live model run | that configured call and observed response path | model quality, repeatability, SLA or cost savings |
+| verified Run Workspace Artifact | exact bytes passed the named validator in the fixed capability scope | arbitrary task correctness, source-file mutation, Connector or user value |
+| `blocked_external_boundary` receipt | prohibited external effect did not run in that observation | requested business result or Connector availability |
 | fresh-clone verification | remote branch reproducibility at fixed HEAD | merge status |
 | target-user study | measured task/user outcome for its protocol | broader population without study design |
 
 Negative results and incidents must remain in Evidence. A repair does not erase the pre-fix observation.
+Scenario effect evidence must retain both the first fixed baseline and each
+repair run. The ledger reports `passed`, `failed_then_fixed` and
+`blocked_external_boundary` separately; it must never rewrite a red baseline as
+if the capability passed on its first attempt.
 
 ## 7. Lifecycle and retirement
 

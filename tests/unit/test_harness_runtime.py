@@ -738,11 +738,32 @@ async def confirm_evidence_gate(
     )
 
 
-def test_default_active_deadline_is_ten_times_larger() -> None:
-    assert AgentControlLoopOptions().deadline_seconds == 1_200
-    assert AgentControlLoopOptions(deadline_seconds=3_000).deadline_seconds == 3_000
-    with pytest.raises(ValidationError):
-        AgentControlLoopOptions(deadline_seconds=3_001)
+def test_default_complete_task_budget_and_server_bounds() -> None:
+    defaults = AgentControlLoopOptions()
+    assert defaults.max_rounds == 12
+    assert defaults.max_files_per_round == 16
+    assert defaults.max_model_calls == 30
+    assert defaults.deadline_seconds == 7_200
+
+    maximum = AgentControlLoopOptions(
+        max_rounds=24,
+        max_files_per_round=24,
+        max_model_calls=60,
+        deadline_seconds=14_400,
+    )
+    assert maximum.max_rounds == 24
+    assert maximum.max_files_per_round == 24
+    assert maximum.max_model_calls == 60
+    assert maximum.deadline_seconds == 14_400
+
+    for invalid in (
+        {"max_rounds": 25},
+        {"max_files_per_round": 25},
+        {"max_model_calls": 61},
+        {"deadline_seconds": 14_401},
+    ):
+        with pytest.raises(ValidationError):
+            AgentControlLoopOptions(**invalid)
 
 
 @pytest.mark.asyncio

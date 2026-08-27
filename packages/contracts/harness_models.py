@@ -224,10 +224,10 @@ class BenchmarkFilePreview(StrictModel):
 class AgentControlLoopOptions(StrictModel):
     """User-adjustable bounds; the server expands these into a frozen contract."""
 
-    max_rounds: int = Field(default=3, ge=1, le=3)
-    max_files_per_round: int = Field(default=4, ge=1, le=8)
-    max_model_calls: int = Field(default=6, ge=2, le=6)
-    deadline_seconds: int = Field(default=1_200, ge=20, le=3_000)
+    max_rounds: int = Field(default=12, ge=1, le=24)
+    max_files_per_round: int = Field(default=16, ge=1, le=24)
+    max_model_calls: int = Field(default=30, ge=2, le=60)
+    deadline_seconds: int = Field(default=7_200, ge=20, le=14_400)
 
 
 class AgentControlLoopContract(StrictModel):
@@ -236,21 +236,21 @@ class AgentControlLoopContract(StrictModel):
     scope_mode: Literal["whole_workspace"] = "whole_workspace"
     allowed_file_refs: list[str] = Field(default_factory=list, max_length=100)
     completion_criteria: list[str] = Field(min_length=1, max_length=6)
-    max_rounds: int = Field(ge=1, le=3)
-    max_files_per_round: int = Field(ge=1, le=8)
-    max_model_calls: int = Field(ge=2, le=6)
-    deadline_seconds: int = Field(ge=20, le=3_000)
+    max_rounds: int = Field(ge=1, le=24)
+    max_files_per_round: int = Field(ge=1, le=24)
+    max_model_calls: int = Field(ge=2, le=60)
+    deadline_seconds: int = Field(ge=20, le=14_400)
     external_action: Literal["none"] = "none"
 
 
 class AgentControlLoopBudget(StrictModel):
-    max_rounds: int = Field(ge=1, le=3)
-    max_files_per_round: int = Field(ge=1, le=8)
-    max_model_calls: int = Field(ge=2, le=6)
-    deadline_seconds: int = Field(ge=20, le=3_000)
-    rounds_used: int = Field(default=0, ge=0, le=3)
+    max_rounds: int = Field(ge=1, le=24)
+    max_files_per_round: int = Field(ge=1, le=24)
+    max_model_calls: int = Field(ge=2, le=60)
+    deadline_seconds: int = Field(ge=20, le=14_400)
+    rounds_used: int = Field(default=0, ge=0, le=24)
     files_verified: int = Field(default=0, ge=0, le=100)
-    model_calls_used: int = Field(default=0, ge=0, le=6)
+    model_calls_used: int = Field(default=0, ge=0, le=60)
     elapsed_ms: int = Field(default=0, ge=0)
     stop_reason: str | None = Field(default=None, max_length=240)
 
@@ -334,16 +334,16 @@ class AgentControlLoopBranch(StrictModel):
 
     branch_id: str = Field(pattern=r"^branch-[0-9a-f]{12}$")
     unit_id: str = Field(min_length=1, max_length=120)
-    round_number: int = Field(ge=1, le=3)
+    round_number: int = Field(ge=1, le=24)
     parent_branch_id: str | None = Field(
         default=None, pattern=r"^branch-[0-9a-f]{12}$"
     )
     title: str = Field(min_length=1, max_length=240)
     objective: str = Field(min_length=1, max_length=1_000)
     depends_on: list[str] = Field(default_factory=list, max_length=12)
-    input_file_refs: list[str] = Field(min_length=1, max_length=8)
-    verified_file_refs: list[str] = Field(default_factory=list, max_length=8)
-    missing_file_refs: list[str] = Field(default_factory=list, max_length=8)
+    input_file_refs: list[str] = Field(min_length=1, max_length=24)
+    verified_file_refs: list[str] = Field(default_factory=list, max_length=24)
+    missing_file_refs: list[str] = Field(default_factory=list, max_length=24)
     status: AgentControlLoopBranchStatus
     requires_human_gate: bool = False
     created_at: datetime
@@ -351,12 +351,12 @@ class AgentControlLoopBranch(StrictModel):
 
 
 class AgentControlLoopRound(StrictModel):
-    round_number: int = Field(ge=1, le=3)
+    round_number: int = Field(ge=1, le=24)
     status: Literal["running", "completed", "stopped", "failed"]
     phase: AgentControlLoopPhase
     question: str = Field(min_length=3, max_length=2_000)
     steer_instruction: str | None = Field(default=None, max_length=2_000)
-    input_file_refs: list[str] = Field(default_factory=list, max_length=8)
+    input_file_refs: list[str] = Field(default_factory=list, max_length=24)
     branch_ids: list[str] = Field(default_factory=list, max_length=12)
     plan: dict[str, Any] | None = None
     model_receipt: dict[str, Any] | None = None
@@ -377,7 +377,7 @@ class AgentControlLoopControlEvent(StrictModel):
     branch_id: str | None = Field(
         default=None, pattern=r"^branch-[0-9a-f]{12}$"
     )
-    artifact_version: int | None = Field(default=None, ge=1, le=3)
+    artifact_version: int | None = Field(default=None, ge=1, le=24)
     instruction: str | None = Field(default=None, max_length=2_000)
     accepted_at: datetime
     accepted_task_version: int = Field(ge=1)
@@ -455,7 +455,7 @@ class AgentControlLoopDecisionRequest(StrictModel):
     expected_version: int = Field(ge=1)
     affected_branch_ids: list[str] = Field(default_factory=list, max_length=12)
     required_file_refs: list[str] = Field(default_factory=list, max_length=20)
-    estimated_additional_rounds: int = Field(default=0, ge=0, le=3)
+    estimated_additional_rounds: int = Field(default=0, ge=0, le=24)
     consequence: str = Field(min_length=1, max_length=1_000)
     requested_at: datetime
     external_action: Literal["none"] = "none"
@@ -468,7 +468,7 @@ class AgentControlLoopBrief(StrictModel):
     unresolved_gaps: list[AgentControlLoopEvidenceGap] = Field(
         default_factory=list, max_length=20
     )
-    rounds_completed: int = Field(ge=0, le=3)
+    rounds_completed: int = Field(ge=0, le=24)
     external_action: Literal["none"] = "none"
 
 
@@ -500,7 +500,7 @@ class AgentControlLoopFindingDecisionOption(StrictModel):
     next_instruction: str = Field(min_length=3, max_length=1_200)
     affected_branch_ids: list[str] = Field(default_factory=list, max_length=12)
     required_file_refs: list[str] = Field(default_factory=list, max_length=20)
-    estimated_additional_rounds: int = Field(default=1, ge=0, le=3)
+    estimated_additional_rounds: int = Field(default=1, ge=0, le=24)
     external_action: Literal["none"] = "none"
 
 
@@ -542,11 +542,11 @@ class AgentControlLoopArtifactVersion(StrictModel):
     """A user-visible, read-only result version created by one completed loop round."""
 
     artifact_id: str = Field(pattern=r"^artifact-[0-9a-f]{12}$")
-    version: int = Field(ge=1, le=3)
+    version: int = Field(ge=1, le=24)
     title: str = Field(min_length=1, max_length=240)
     kind: Literal["evidence_brief"] = "evidence_brief"
     status: Literal["draft", "verified", "committed"]
-    round_number: int = Field(default=1, ge=1, le=3)
+    round_number: int = Field(default=1, ge=1, le=24)
     summary: str = Field(min_length=1, max_length=3_000)
     findings: list[AgentControlLoopArtifactFinding] = Field(
         default_factory=list, max_length=10
@@ -557,9 +557,71 @@ class AgentControlLoopArtifactVersion(StrictModel):
     )
     source_file_refs: list[str] = Field(default_factory=list, max_length=20)
     finding_count: int = Field(ge=0, le=10)
-    parent_version: int | None = Field(default=None, ge=1, le=2)
+    parent_version: int | None = Field(default=None, ge=1, le=23)
     created_at: datetime
     review_required: Literal[True] = True
+    external_action: Literal["none"] = "none"
+
+
+class AgentControlLoopArtifactCheck(StrictModel):
+    """One deterministic verifier assertion for a run-workspace file."""
+
+    check_id: str = Field(pattern=r"^check-[a-z0-9-]{3,80}$")
+    label: str = Field(min_length=1, max_length=240)
+    passed: bool
+    detail: str = Field(min_length=1, max_length=1_000)
+
+
+class AgentControlLoopWorkspaceArtifact(StrictModel):
+    """A real file written only inside an isolated run workspace."""
+
+    artifact_id: str = Field(pattern=r"^workspace-artifact-[0-9a-f]{12}$")
+    capability_id: str = Field(pattern=r"^office-[a-z0-9-]{3,80}$")
+    scenario_id: str = Field(pattern=r"^TC-[0-9]{2}$")
+    title: str = Field(min_length=1, max_length=240)
+    file_name: str = Field(min_length=1, max_length=180)
+    media_type: Literal[
+        "text/csv",
+        "text/markdown",
+        "application/zip",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    ]
+    size: int = Field(gt=0, le=10 * 1024 * 1024)
+    version: int = Field(default=1, ge=1, le=24)
+    round_number: int = Field(ge=1, le=24)
+    source_file_refs: list[str] = Field(min_length=1, max_length=24)
+    validator_id: str = Field(pattern=r"^validator-[a-z0-9-]{3,100}$")
+    verifier_status: Literal["passed", "failed"]
+    checks: list[AgentControlLoopArtifactCheck] = Field(min_length=1, max_length=30)
+    summary: str = Field(min_length=1, max_length=1_000)
+    download_path: str = Field(min_length=1, max_length=300)
+    created_at: datetime
+    original_inputs_modified: Literal[False] = False
+    review_required: Literal[True] = True
+    external_action: Literal["none"] = "none"
+
+
+class AgentControlLoopEffectReceipt(StrictModel):
+    """Auditable state-action-observation-cost-result receipt for one office tool."""
+
+    receipt_id: str = Field(pattern=r"^effect-receipt-[0-9a-f]{12}$")
+    capability_id: str = Field(pattern=r"^office-[a-z0-9-]{3,80}$")
+    scenario_id: str = Field(pattern=r"^TC-[0-9]{2}$")
+    status: Literal[
+        "passed",
+        "failed",
+        "blocked_external_boundary",
+        "unsupported_local_capability",
+    ]
+    state: str = Field(min_length=1, max_length=500)
+    action: str = Field(min_length=1, max_length=500)
+    observation: str = Field(min_length=1, max_length=1_000)
+    cost: str = Field(min_length=1, max_length=500)
+    result: str = Field(min_length=1, max_length=1_000)
+    source_file_refs: list[str] = Field(default_factory=list, max_length=24)
+    artifact_ids: list[str] = Field(default_factory=list, max_length=8)
+    prohibited_side_effects: list[str] = Field(default_factory=list, max_length=12)
+    created_at: datetime
     external_action: Literal["none"] = "none"
 
 
@@ -568,7 +630,7 @@ class AgentControlLoopCommit(StrictModel):
 
     commit_id: str = Field(pattern=r"^commit-[0-9a-f]{12}$")
     artifact_id: str = Field(pattern=r"^artifact-[0-9a-f]{12}$")
-    artifact_version: int = Field(ge=1, le=3)
+    artifact_version: int = Field(ge=1, le=24)
     operation: Literal["commit", "rollback"] = "commit"
     parent_commit_id: str | None = Field(
         default=None, pattern=r"^commit-[0-9a-f]{12}$"
@@ -586,7 +648,7 @@ class AgentControlLoopControlRequest(StrictModel):
     branch_id: str | None = Field(
         default=None, pattern=r"^branch-[0-9a-f]{12}$"
     )
-    artifact_version: int | None = Field(default=None, ge=1, le=3)
+    artifact_version: int | None = Field(default=None, ge=1, le=24)
     decision_action: AgentControlLoopDecisionAction | None = None
     decision_request_id: str | None = Field(
         default=None, pattern=r"^decision-request-[0-9a-f]{12}$"

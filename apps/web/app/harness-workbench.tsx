@@ -12,6 +12,7 @@ import {
   IconCircleDot,
   IconClock,
   IconDatabase,
+  IconDownload,
   IconEye,
   IconFile,
   IconFileDescription,
@@ -365,6 +366,52 @@ type ArtifactVersion = {
   external_action: "none";
 };
 
+type ArtifactCheck = {
+  check_id: string;
+  label: string;
+  passed: boolean;
+  detail: string;
+};
+
+type WorkspaceArtifact = {
+  artifact_id: string;
+  capability_id: string;
+  scenario_id: string;
+  title: string;
+  file_name: string;
+  media_type: "text/csv" | "text/markdown" | "application/zip" | "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+  size: number;
+  version: number;
+  round_number: number;
+  source_file_refs: string[];
+  validator_id: string;
+  verifier_status: "passed" | "failed";
+  checks: ArtifactCheck[];
+  summary: string;
+  download_path: string;
+  created_at: string;
+  original_inputs_modified: false;
+  review_required: true;
+  external_action: "none";
+};
+
+type EffectReceipt = {
+  receipt_id: string;
+  capability_id: string;
+  scenario_id: string;
+  status: "passed" | "failed" | "blocked_external_boundary" | "unsupported_local_capability";
+  state: string;
+  action: string;
+  observation: string;
+  cost: string;
+  result: string;
+  source_file_refs: string[];
+  artifact_ids: string[];
+  prohibited_side_effects: string[];
+  created_at: string;
+  external_action: "none";
+};
+
 type LoopCommit = {
   commit_id: string;
   artifact_id: string;
@@ -420,6 +467,8 @@ export type HarnessRun = {
   branches: LoopBranch[];
   active_branch_id: string | null;
   artifact_versions: ArtifactVersion[];
+  workspace_artifacts: WorkspaceArtifact[];
+  effect_receipts: EffectReceipt[];
   commits: LoopCommit[];
   last_commit: LoopCommit | null;
   recovered: boolean;
@@ -484,6 +533,10 @@ const NAMED_EVENTS = [
   "decision_requested",
   "decision_recorded",
   "branch_resumed_from_checkpoint",
+  "deterministic_office_tool_started",
+  "run_workspace_artifact_written",
+  "deterministic_verification_completed",
+  "scenario_effect_bounded",
   "result_validation",
   "evidence_gate",
   "control_pause_recorded",
@@ -1225,6 +1278,10 @@ function activityItem(event: HarnessServerEvent): HarnessActivityItem {
     decision_requested: "需要人工决定处理口径",
     decision_recorded: "人工决定已写入回执",
     branch_resumed_from_checkpoint: "仅恢复受影响分支",
+    deterministic_office_tool_started: "确定性办公工具开始处理",
+    run_workspace_artifact_written: "真实成果文件已生成",
+    deterministic_verification_completed: "成果已通过确定性检查",
+    scenario_effect_bounded: "场景效果在能力边界停止",
     result_validation: "服务端核对引用与原文位置",
     round_started: "新一轮开始",
     evidence_gate: "证据门决定下一步",
@@ -1240,7 +1297,7 @@ function activityItem(event: HarnessServerEvent): HarnessActivityItem {
     loop_stopped: "已按你的要求停止",
     harness_failed: "本轮已安全停止",
   };
-  const tone = event.event_name === "harness_failed" || event.event_name === "plan_validation_rejected" || event.event_name === "analysis_structure_rejected" || event.event_name === "analysis_validation_rejected" || event.event_name === "analysis_recovery_required" || event.event_name === "evidence_disambiguation_required" || event.event_name.includes("stopped") ? "warning"
+  const tone = event.event_name === "harness_failed" || event.event_name === "plan_validation_rejected" || event.event_name === "analysis_structure_rejected" || event.event_name === "analysis_validation_rejected" || event.event_name === "analysis_recovery_required" || event.event_name === "evidence_disambiguation_required" || event.event_name === "scenario_effect_bounded" || event.event_name.includes("stopped") ? "warning"
     : event.event_name.includes("planning") || event.event_name.includes("analysis") ? "model"
       : event.event_name.includes("validation") || TERMINAL_EVENTS.has(event.event_name) ? "success" : "neutral";
   return {
@@ -1300,6 +1357,73 @@ function normalizeArtifactVersion(value: unknown): ArtifactVersion | null {
     parent_version: typeof raw.parent_version === "number" ? raw.parent_version : null,
     created_at: asText(raw.created_at),
     review_required: true,
+    external_action: "none",
+  };
+}
+
+function normalizeArtifactCheck(value: unknown): ArtifactCheck | null {
+  if (!value || typeof value !== "object") return null;
+  const raw = value as Record<string, unknown>;
+  const checkId = asText(raw.check_id);
+  const label = asText(raw.label);
+  const detail = asText(raw.detail);
+  if (!checkId || !label || !detail || typeof raw.passed !== "boolean") return null;
+  return { check_id: checkId, label, passed: raw.passed, detail };
+}
+
+function normalizeWorkspaceArtifact(value: unknown): WorkspaceArtifact | null {
+  if (!value || typeof value !== "object") return null;
+  const raw = value as Record<string, unknown>;
+  const artifactId = asText(raw.artifact_id);
+  const mediaType = asText(raw.media_type);
+  const verifierStatus = asText(raw.verifier_status);
+  if (!artifactId || !["text/csv", "text/markdown", "application/zip", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"].includes(mediaType) || !["passed", "failed"].includes(verifierStatus)) return null;
+  const checks = Array.isArray(raw.checks)
+    ? raw.checks.map(normalizeArtifactCheck).filter((item): item is ArtifactCheck => item !== null)
+    : [];
+  return {
+    artifact_id: artifactId,
+    capability_id: asText(raw.capability_id),
+    scenario_id: asText(raw.scenario_id),
+    title: asText(raw.title, "运行成果"),
+    file_name: asText(raw.file_name, "运行成果"),
+    media_type: mediaType as WorkspaceArtifact["media_type"],
+    size: asNumber(raw.size),
+    version: asNumber(raw.version, 1),
+    round_number: asNumber(raw.round_number, 1),
+    source_file_refs: asStrings(raw.source_file_refs),
+    validator_id: asText(raw.validator_id),
+    verifier_status: verifierStatus as WorkspaceArtifact["verifier_status"],
+    checks,
+    summary: asText(raw.summary),
+    download_path: asText(raw.download_path),
+    created_at: asText(raw.created_at),
+    original_inputs_modified: false,
+    review_required: true,
+    external_action: "none",
+  };
+}
+
+function normalizeEffectReceipt(value: unknown): EffectReceipt | null {
+  if (!value || typeof value !== "object") return null;
+  const raw = value as Record<string, unknown>;
+  const receiptId = asText(raw.receipt_id);
+  const status = asText(raw.status);
+  if (!receiptId || !["passed", "failed", "blocked_external_boundary", "unsupported_local_capability"].includes(status)) return null;
+  return {
+    receipt_id: receiptId,
+    capability_id: asText(raw.capability_id),
+    scenario_id: asText(raw.scenario_id),
+    status: status as EffectReceipt["status"],
+    state: asText(raw.state),
+    action: asText(raw.action),
+    observation: asText(raw.observation),
+    cost: asText(raw.cost),
+    result: asText(raw.result),
+    source_file_refs: asStrings(raw.source_file_refs),
+    artifact_ids: asStrings(raw.artifact_ids),
+    prohibited_side_effects: asStrings(raw.prohibited_side_effects),
+    created_at: asText(raw.created_at),
     external_action: "none",
   };
 }
@@ -1387,10 +1511,10 @@ function normalizeRun(value: unknown): HarnessRun | null {
     : [];
   const contractRaw = raw.contract && typeof raw.contract === "object" ? raw.contract as Record<string, unknown> : {};
   const budgetRaw = raw.budget && typeof raw.budget === "object" ? raw.budget as Record<string, unknown> : {};
-  const maxRounds = asNumber(contractRaw.max_rounds, asNumber(budgetRaw.max_rounds, 3));
-  const maxFilesPerRound = asNumber(contractRaw.max_files_per_round, asNumber(budgetRaw.max_files_per_round, 4));
-  const maxModelCalls = asNumber(contractRaw.max_model_calls, asNumber(budgetRaw.max_model_calls, 6));
-  const deadlineSeconds = asNumber(contractRaw.deadline_seconds, asNumber(budgetRaw.deadline_seconds, 1200));
+  const maxRounds = asNumber(contractRaw.max_rounds, asNumber(budgetRaw.max_rounds, 12));
+  const maxFilesPerRound = asNumber(contractRaw.max_files_per_round, asNumber(budgetRaw.max_files_per_round, 16));
+  const maxModelCalls = asNumber(contractRaw.max_model_calls, asNumber(budgetRaw.max_model_calls, 30));
+  const deadlineSeconds = asNumber(contractRaw.deadline_seconds, asNumber(budgetRaw.deadline_seconds, 7200));
   const rounds = Array.isArray(raw.rounds)
     ? raw.rounds.map(normalizeLoopRound).filter((item): item is LoopRound => item !== null)
     : [];
@@ -1408,6 +1532,12 @@ function normalizeRun(value: unknown): HarnessRun | null {
   const controlState = asText(raw.control_state);
   const artifactVersions = Array.isArray(raw.artifact_versions)
     ? raw.artifact_versions.map(normalizeArtifactVersion).filter((item): item is ArtifactVersion => item !== null)
+    : [];
+  const workspaceArtifacts = Array.isArray(raw.workspace_artifacts)
+    ? raw.workspace_artifacts.map(normalizeWorkspaceArtifact).filter((item): item is WorkspaceArtifact => item !== null)
+    : [];
+  const effectReceipts = Array.isArray(raw.effect_receipts)
+    ? raw.effect_receipts.map(normalizeEffectReceipt).filter((item): item is EffectReceipt => item !== null)
     : [];
   const branches = Array.isArray(raw.branches)
     ? raw.branches.map(normalizeBranch).filter((item): item is LoopBranch => item !== null)
@@ -1460,6 +1590,8 @@ function normalizeRun(value: unknown): HarnessRun | null {
     branches,
     active_branch_id: asText(raw.active_branch_id) || null,
     artifact_versions: artifactVersions,
+    workspace_artifacts: workspaceArtifacts,
+    effect_receipts: effectReceipts,
     commits,
     last_commit: normalizeCommit(raw.last_commit),
     recovered: serverEvents.some((event) => event.event_name === "checkpoint_recovered"),
@@ -2078,10 +2210,10 @@ export function HarnessWorkbench({ onActivityChange }: { onActivityChange?: (sta
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewError, setPreviewError] = useState("");
   const [instruction, setInstruction] = useState("");
-  const [maxRounds, setMaxRounds] = useState(3);
-  const [maxFilesPerRound, setMaxFilesPerRound] = useState(6);
-  const [maxModelCalls, setMaxModelCalls] = useState(6);
-  const [deadlineSeconds, setDeadlineSeconds] = useState(1200);
+  const [maxRounds, setMaxRounds] = useState(12);
+  const [maxFilesPerRound, setMaxFilesPerRound] = useState(16);
+  const [maxModelCalls, setMaxModelCalls] = useState(30);
+  const [deadlineSeconds, setDeadlineSeconds] = useState(7200);
   const [fileSearch, setFileSearch] = useState("");
   const [fileTypeFilter, setFileTypeFilter] = useState<FileTypeFilter>("ALL");
   const [expandedFolderPaths, setExpandedFolderPaths] = useState<Set<string>>(() => new Set());
@@ -2467,10 +2599,10 @@ export function HarnessWorkbench({ onActivityChange }: { onActivityChange?: (sta
           <details className="loop-contract-settings">
             <summary><IconAdjustments aria-hidden="true" />Agent Control Loop · 最多 {maxRounds} 轮 / {maxModelCalls} 次模型调用 / {deadlineSeconds} 秒</summary>
             <div>
-              <label><span>最大轮次</span><input type="number" min="1" max="3" value={maxRounds} disabled={runActive} onChange={(event) => setMaxRounds(Math.max(1, Math.min(3, Number(event.target.value) || 1)))} /></label>
-              <label><span>每轮文件</span><input type="number" min="1" max="8" value={maxFilesPerRound} disabled={runActive} onChange={(event) => setMaxFilesPerRound(Math.max(1, Math.min(8, Number(event.target.value) || 1)))} /></label>
-              <label><span>模型调用</span><input type="number" min="2" max="6" value={maxModelCalls} disabled={runActive} onChange={(event) => setMaxModelCalls(Math.max(2, Math.min(6, Number(event.target.value) || 2)))} /></label>
-              <label><span>Agent 执行时间</span><input type="number" min="20" max="3000" step="60" value={deadlineSeconds} disabled={runActive} onChange={(event) => setDeadlineSeconds(Math.max(20, Math.min(3000, Number(event.target.value) || 20)))} /></label>
+              <label><span>最大轮次</span><input type="number" min="1" max="24" value={maxRounds} disabled={runActive} onChange={(event) => setMaxRounds(Math.max(1, Math.min(24, Number(event.target.value) || 1)))} /></label>
+              <label><span>每轮文件</span><input type="number" min="1" max="24" value={maxFilesPerRound} disabled={runActive} onChange={(event) => setMaxFilesPerRound(Math.max(1, Math.min(24, Number(event.target.value) || 1)))} /></label>
+              <label><span>模型调用</span><input type="number" min="2" max="60" value={maxModelCalls} disabled={runActive} onChange={(event) => setMaxModelCalls(Math.max(2, Math.min(60, Number(event.target.value) || 2)))} /></label>
+              <label><span>Agent 执行时间</span><input type="number" min="20" max="14400" step="60" value={deadlineSeconds} disabled={runActive} onChange={(event) => setDeadlineSeconds(Math.max(20, Math.min(14400, Number(event.target.value) || 20)))} /></label>
             </div>
           </details>
           <div className="task-examples" aria-label="任务示例">{TASK_EXAMPLES.map((example) => <button type="button" key={example} disabled={runActive} onClick={() => setInstruction(example)}>{example}</button>)}</div>
@@ -2715,6 +2847,7 @@ function LoopView({
       </section>}
       {selectedRound.next_step && <footer className={selectedRound.next_step.decision === "completed" ? "is-complete" : "is-next"}><div><span>服务端决定</span><strong>{gateLabel(selectedRound.next_step.decision)}</strong><p>{selectedRound.next_step.reason}</p></div>{selectedRound.next_step.decision === "waiting_input" ? <b>{guidedRecovery ? "选择恢复分支继续" : "选择上方分支继续"}</b> : boundedTerminalRecovery ? <b>选择上方分支创建新任务</b> : selectedRound.next_step.decision === "next_round" ? <IconArrowRight aria-hidden="true" /> : null}</footer>}
     </article>}
+    {(run.workspace_artifacts.length > 0 || run.effect_receipts.length > 0) && <WorkspaceArtifactSection artifacts={run.workspace_artifacts} receipts={run.effect_receipts} />}
     {run.artifact_versions.length > 0 && <section className="artifact-evolution" aria-label="成果版本">
       <header><div><span>不可变成果历史</span><h3>每轮形成一个可追溯版本</h3></div><b>{currentArtifactVersion ? `当前 v${currentArtifactVersion}` : "尚未提交"}</b></header>
       <ol>{run.artifact_versions.map((artifact) => <li key={`${artifact.artifact_id}:${artifact.version}`} className={currentArtifactVersion === artifact.version ? "is-current" : ""}><span>v{artifact.version}</span><div><b>{currentArtifactVersion === artifact.version ? "当前版本" : artifact.status === "verified" ? "已核对" : "阶段草稿"}</b><p>第 {artifact.round_number} 轮 · {artifact.finding_count} 条发现 · {artifact.source_file_refs.length} 份引用</p></div>{terminal && currentArtifactVersion !== artifact.version && <button type="button" title={`恢复为成果版本 v${artifact.version}`} onClick={() => void onControl("rollback", { artifactVersion: artifact.version })} disabled={controlBusy !== null}><IconRefresh aria-hidden="true" />{controlBusy === "rollback" ? "恢复中" : "恢复"}</button>}</li>)}</ol>
@@ -2723,6 +2856,57 @@ function LoopView({
     {run.brief && <section className={`loop-brief is-${run.brief.outcome}`}><IconCircleCheck aria-hidden="true" /><div><span>任务简报</span><h3>{run.brief.summary}</h3><p>外部动作：未发生 · 结果仍需人工复核</p></div></section>}
   </section>;
 }
+
+function WorkspaceArtifactSection({ artifacts, receipts }: { artifacts: WorkspaceArtifact[]; receipts: EffectReceipt[] }) {
+  const [downloading, setDownloading] = useState<string | null>(null);
+  const [downloadError, setDownloadError] = useState("");
+  const passedChecks = artifacts.reduce((total, artifact) => total + artifact.checks.filter((check) => check.passed).length, 0);
+  const totalChecks = artifacts.reduce((total, artifact) => total + artifact.checks.length, 0);
+  const latestReceipt = receipts.at(-1) ?? null;
+  const boundary = latestReceipt && latestReceipt.status !== "passed" ? latestReceipt : null;
+  const downloadArtifact = async (artifact: WorkspaceArtifact) => {
+    if (!artifact.download_path.startsWith("/v1/harness/runs/")) {
+      setDownloadError("成果下载地址未通过客户端边界检查。");
+      return;
+    }
+    setDownloading(artifact.artifact_id);
+    setDownloadError("");
+    try {
+      const response = await fetch(`${API_BASE}${artifact.download_path}`, { headers: { "X-User-Id": "demo_user" } });
+      if (!response.ok) throw new Error("成果文件完整性校验或下载失败。");
+      const blobUrl = URL.createObjectURL(await response.blob());
+      const link = document.createElement("a");
+      link.href = blobUrl;
+      link.download = artifact.file_name;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(blobUrl);
+    } catch (error) {
+      setDownloadError(error instanceof Error ? error.message : "成果文件下载失败。");
+    } finally {
+      setDownloading(null);
+    }
+  };
+  return <section className={`workspace-artifacts${boundary ? " is-bounded" : ""}`} aria-labelledby="workspace-artifacts-title">
+    <header>
+      <IconFileDescription aria-hidden="true" />
+      <div><span>运行工作区</span><h3 id="workspace-artifacts-title">{artifacts.length > 0 ? `Agent 已生成 ${artifacts.length} 份真实成果文件` : "这项任务尚不能生成可信成果"}</h3><p>{artifacts.length > 0 ? "文件已写入本次 Run 的隔离目录，原始 FORTE 文件没有被修改。" : boundary?.result}</p></div>
+      <b>{artifacts.length > 0 ? `${passedChecks}/${totalChecks} 项检查通过` : "未伪造结果"}</b>
+    </header>
+    {artifacts.length > 0 && <ol>{artifacts.map((artifact) => <li key={artifact.artifact_id} className={artifact.verifier_status === "passed" ? "is-passed" : "is-failed"}>
+      <div className="workspace-artifact-file"><span><IconFile aria-hidden="true" /></span><div><h4>{artifact.file_name}</h4><p>{artifact.summary}</p><small>第 {artifact.round_number} 轮 · {formatSize(artifact.size)} · {artifact.source_file_refs.length} 份来源</small></div></div>
+      <div className="workspace-artifact-status"><b>{artifact.verifier_status === "passed" ? <><IconCheck aria-hidden="true" />确定性检查通过</> : <><IconAlertTriangle aria-hidden="true" />检查未通过</>}</b><span>{artifact.checks.filter((check) => check.passed).length}/{artifact.checks.length} 项</span></div>
+      <button type="button" onClick={() => void downloadArtifact(artifact)} disabled={downloading !== null}><IconDownload aria-hidden="true" />{downloading === artifact.artifact_id ? "正在下载" : "下载成果"}</button>
+      <details><summary><IconEye aria-hidden="true" />查看逐项检查</summary><ul>{artifact.checks.map((check) => <li key={check.check_id} className={check.passed ? "is-passed" : "is-failed"}><span>{check.passed ? <IconCheck aria-hidden="true" /> : <IconAlertTriangle aria-hidden="true" />}</span><div><b>{check.label}</b><p>{check.detail}</p></div></li>)}</ul></details>
+    </li>)}</ol>}
+    {boundary && <article className="workspace-effect-boundary"><IconAlertTriangle aria-hidden="true" /><div><b>{boundary.status === "blocked_external_boundary" ? "缺少已授权的外部连接" : boundary.status === "unsupported_local_capability" ? "本地能力仍未实现" : "确定性效果门未通过"}</b><p>{boundary.observation}</p><strong>{boundary.result}</strong></div></article>}
+    {latestReceipt && <details className="workspace-effect-receipt"><summary><IconRoute aria-hidden="true" />查看效果回执</summary><ol><li><b>状态</b><span>{latestReceipt.state}</span></li><li><b>动作</b><span>{latestReceipt.action}</span></li><li><b>观察</b><span>{latestReceipt.observation}</span></li><li><b>成本</b><span>{latestReceipt.cost}</span></li><li><b>结果</b><span>{latestReceipt.result}</span></li></ol></details>}
+    <footer><IconShieldCheck aria-hidden="true" /><span>原始输入未修改 · 外部动作未发生 · 成果仍需人工复核</span></footer>
+    {downloadError && <p className="workspace-artifact-error" role="alert">{downloadError}</p>}
+  </section>;
+}
+
 function ResultView({
   result,
   artifacts,

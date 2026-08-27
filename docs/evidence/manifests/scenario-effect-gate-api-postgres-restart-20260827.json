@@ -1,0 +1,43 @@
+{
+  "observed_at": "2026-08-27T16:16:40.6024735+08:00",
+  "restart_kind": "API process restart against existing PostgreSQL and same-host Artifact store",
+  "health": {
+    "status": "ok",
+    "model": "deepseek-v4-pro",
+    "checkpoint": "postgres",
+    "task_store": "postgres"
+  },
+  "run_id": "harness:7ef0fcf28e3e48b8a07845764a13b330",
+  "run_status": "completed",
+  "snapshot_version": 15,
+  "artifact_count": 3,
+  "effect_receipt_count": 1,
+  "artifacts": [
+    {
+      "artifact_id": "workspace-artifact-c2c6506a6707",
+      "file_name": "未付统计.csv",
+      "declared_size": 2399,
+      "downloaded_size": 2399,
+      "status_code": 200,
+      "verifier_status": "passed"
+    },
+    {
+      "artifact_id": "workspace-artifact-ce0f1588809c",
+      "file_name": "未收统计.csv",
+      "declared_size": 206,
+      "downloaded_size": 206,
+      "status_code": 200,
+      "verifier_status": "passed"
+    },
+    {
+      "artifact_id": "workspace-artifact-7695b03ca0c0",
+      "file_name": "跨期核对说明.md",
+      "declared_size": 255,
+      "downloaded_size": 255,
+      "status_code": 200,
+      "verifier_status": "passed"
+    }
+  ],
+  "private_digest_exposed": false,
+  "boundary": "证明同机 PostgreSQL Snapshot 与隔离 Artifact bytes 在 API 进程重启后可读取；不证明多实例、CAS、数据库/文件系统事务或多主机持久化。"
+}

@@ -1,0 +1,1406 @@
+{
+  "schema_version": "scenario-effect-gate-live.v1",
+  "generated_at": "2026-08-27T07:32:20.347216+00:00",
+  "api_base": "http://127.0.0.1:8010",
+  "service": {
+    "model": "deepseek-v4-pro",
+    "checkpoint": "postgres",
+    "task_store": "postgres"
+  },
+  "dataset": {
+    "name": "FORTE public demo inputs",
+    "source_commit": "345c1ec1487139db9dd319787fa9405ba85d1869",
+    "input_tree_sha256": "2c19e31a8e437f8ccb0ab811ba20a940f022a5bea69bcc750574d753f10a250d",
+    "original_inputs_modified": false
+  },
+  "summary": {
+    "requested": 6,
+    "passed": 6,
+    "failed": 0,
+    "model_output_adopted": 1,
+    "run_completed": 1
+  },
+  "scenarios": [
+    {
+      "scenario_id": "TC-01",
+      "capability_id": "office-onboarding-assets",
+      "title": "入职资产匹配",
+      "instruction": "根据入职时间表和分配规则，生成 3 月 20 日至 4 月 20 日的入职资产匹配表。",
+      "run_id": "harness:571d189b3e9e4bfd93dce86fd6ce0a29",
+      "started_at": "2026-08-27T07:24:06.098826+00:00",
+      "observed_at": "2026-08-27T07:24:30.706863+00:00",
+      "run_status": "completed",
+      "snapshot_version": 12,
+      "current_round": 1,
+      "budget": {
+        "max_rounds": 12,
+        "max_files_per_round": 16,
+        "max_model_calls": 30,
+        "deadline_seconds": 7200,
+        "rounds_used": 1,
+        "files_verified": 2,
+        "model_calls_used": 2,
+        "elapsed_ms": 23933,
+        "stop_reason": null
+      },
+      "model_calls": [
+        {
+          "round": 1,
+          "role": "planner",
+          "called": true,
+          "model": "deepseek-v4-pro",
+          "elapsed_ms": 7761,
+          "output_used": true
+        },
+        {
+          "round": 1,
+          "role": "analyst",
+          "called": true,
+          "model": "deepseek-v4-pro",
+          "elapsed_ms": 13837,
+          "output_used": true
+        }
+      ],
+      "model_execution_gate_passed": true,
+      "model_output_adopted": true,
+      "effect_receipts": [
+        {
+          "receipt_id": "effect-receipt-35f570f0dba2",
+          "capability_id": "office-onboarding-assets",
+          "scenario_id": "TC-01",
+          "status": "passed",
+          "state": "已冻结 2 份 FORTE 输入，原始文件保持只读。",
+          "action": "调用 office-onboarding-assets 确定性办公工具并写入隔离运行工作区。",
+          "observation": "生成 1 份真实成果文件，执行 5 项确定性检查。",
+          "cost": "0 次额外模型调用；仅消耗本机确定性解析、计算与文件写入。",
+          "result": "所有确定性效果门通过，成果仍需用户复核。",
+          "source_file_refs": [
+            "forte-48f4a8c4d30d94e7",
+            "forte-9ddfec8a799cb9f2"
+          ],
+          "artifact_ids": [
+            "workspace-artifact-1fc52f54ada7"
+          ],
+          "prohibited_side_effects": [
+            "不覆盖原始 CSV",
+            "不创建账号",
+            "不创建采购单"
+          ],
+          "created_at": "2026-08-27T07:24:15.122209Z",
+          "external_action": "none"
+        }
+      ],
+      "artifacts": [
+        {
+          "artifact_id": "workspace-artifact-1fc52f54ada7",
+          "file_name": "入职资产匹配表.csv",
+          "media_type": "text/csv",
+          "size": 1678,
+          "validator_id": "validator-onboarding-assets-v1",
+          "verifier_status": "passed",
+          "checks": [
+            {
+              "check_id": "check-onboarding-date",
+              "label": "日期范围与排序",
+              "passed": true,
+              "detail": "9 名员工均在闭区间内并按入职日期排序。"
+            },
+            {
+              "check_id": "check-onboarding-privacy",
+              "label": "删除紧急联系人",
+              "passed": true,
+              "detail": "成果表不包含紧急联系人列。"
+            },
+            {
+              "check_id": "check-onboarding-columns",
+              "label": "新增五类资产与权限列",
+              "passed": true,
+              "detail": "表头由服务端按固定顺序复核。"
+            },
+            {
+              "check_id": "check-onboarding-mapping",
+              "label": "岗位规则和备注覆盖",
+              "passed": true,
+              "detail": "逐行映射字段完整，特殊备注优先覆盖默认规则。"
+            },
+            {
+              "check_id": "check-onboarding-delimiter",
+              "label": "列举项使用半角逗号",
+              "passed": true,
+              "detail": "所有列举值均使用半角逗号。"
+            }
+          ],
+          "review_required": true,
+          "external_action": "none",
+          "original_inputs_modified": false
+        }
+      ],
+      "artifact_downloads": [
+        {
+          "artifact_id": "workspace-artifact-1fc52f54ada7",
+          "file_name": "入职资产匹配表.csv",
+          "status_code": 200,
+          "content_type": "text/csv",
+          "declared_size": 1678,
+          "downloaded_size": 1678,
+          "size_matches": true
+        }
+      ],
+      "expected_artifacts": [
+        "入职资产匹配表.csv"
+      ],
+      "events": [
+        {
+          "sequence": 3,
+          "event_name": "planning_started",
+          "status": "planning"
+        },
+        {
+          "sequence": 4,
+          "event_name": "planning_completed",
+          "status": "planning"
+        },
+        {
+          "sequence": 6,
+          "event_name": "deterministic_office_tool_started",
+          "status": "validating"
+        },
+        {
+          "sequence": 7,
+          "event_name": "run_workspace_artifact_written",
+          "status": "validating"
+        },
+        {
+          "sequence": 8,
+          "event_name": "deterministic_verification_completed",
+          "status": "validating"
+        },
+        {
+          "sequence": 9,
+          "event_name": "analysis_started",
+          "status": "analyzing"
+        },
+        {
+          "sequence": 10,
+          "event_name": "analysis_completed",
+          "status": "analyzing"
+        }
+      ],
+      "waiting_branches": [],
+      "validation_errors": [],
+      "timed_out": false,
+      "effect_gate_passed": true,
+      "failure_reason": null
+    },
+    {
+      "scenario_id": "TC-05",
+      "capability_id": "office-finance-reconciliation",
+      "title": "财务跨期核对",
+      "instruction": "核对三期往来明细，生成未付统计、未收统计，并判断是否存在僵尸账款。",
+      "run_id": "harness:b08cc0915c654dc2abcc1bfb5127206c",
+      "started_at": "2026-08-27T07:24:30.706863+00:00",
+      "observed_at": "2026-08-27T07:26:16.662983+00:00",
+      "run_status": "waiting_input",
+      "snapshot_version": 15,
+      "current_round": 1,
+      "budget": {
+        "max_rounds": 12,
+        "max_files_per_round": 16,
+        "max_model_calls": 30,
+        "deadline_seconds": 7200,
+        "rounds_used": 1,
+        "files_verified": 0,
+        "model_calls_used": 3,
+        "elapsed_ms": 105287,
+        "stop_reason": null
+      },
+      "model_calls": [
+        {
+          "round": 1,
+          "role": "planner",
+          "called": true,
+          "model": "deepseek-v4-pro",
+          "elapsed_ms": 10218,
+          "output_used": true
+        },
+        {
+          "round": 1,
+          "role": "analyst",
+          "called": true,
+          "model": "deepseek-v4-pro",
+          "elapsed_ms": 45265,
+          "output_used": false
+        }
+      ],
+      "model_execution_gate_passed": true,
+      "model_output_adopted": false,
+      "effect_receipts": [
+        {
+          "receipt_id": "effect-receipt-36c4fbd18767",
+          "capability_id": "office-finance-reconciliation",
+          "scenario_id": "TC-05",
+          "status": "passed",
+          "state": "已冻结 3 份 FORTE 输入，原始文件保持只读。",
+          "action": "调用 office-finance-reconciliation 确定性办公工具并写入隔离运行工作区。",
+          "observation": "生成 3 份真实成果文件，执行 10 项确定性检查。",
+          "cost": "0 次额外模型调用；仅消耗本机确定性解析、计算与文件写入。",
+          "result": "所有确定性效果门通过，成果仍需用户复核。",
+          "source_file_refs": [
+            "forte-81f51a0aa85b5c3c",
+            "forte-8261a3b36e7370da",
+            "forte-8691e8a3837debd3"
+          ],
+          "artifact_ids": [
+            "workspace-artifact-1d54a5efbbad",
+            "workspace-artifact-81a06012a6f4",
+            "workspace-artifact-573c6ce6df40"
+          ],
+          "prohibited_side_effects": [
+            "不覆盖原始账表",
+            "不记账",
+            "不发起付款"
+          ],
+          "created_at": "2026-08-27T07:24:42.310504Z",
+          "external_action": "none"
+        }
+      ],
+      "artifacts": [
+        {
+          "artifact_id": "workspace-artifact-1d54a5efbbad",
+          "file_name": "未付统计.csv",
+          "media_type": "text/csv",
+          "size": 2399,
+          "validator_id": "validator-finance-reconciliation-v1",
+          "verifier_status": "passed",
+          "checks": [
+            {
+              "check_id": "check-finance-source",
+              "label": "三期来源完整",
+              "passed": true,
+              "detail": "三个固定期间工作簿均通过 Catalog 完整性检查。"
+            },
+            {
+              "check_id": "check-finance-zombie",
+              "label": "跨期僵尸账款复算",
+              "passed": true,
+              "detail": "按同一客商、同一科目、三期借方期末余额逐项比较，结果为无僵尸账款。"
+            },
+            {
+              "check_id": "check-finance-unpaid-rows",
+              "label": "未付逐行复算",
+              "passed": true,
+              "detail": "31 条贷方期末余额逐行相等。"
+            },
+            {
+              "check_id": "check-finance-unpaid-sort",
+              "label": "未付排序",
+              "passed": true,
+              "detail": "按客商升序、同客商金额降序。"
+            }
+          ],
+          "review_required": true,
+          "external_action": "none",
+          "original_inputs_modified": false
+        },
+        {
+          "artifact_id": "workspace-artifact-81a06012a6f4",
+          "file_name": "未收统计.csv",
+          "media_type": "text/csv",
+          "size": 206,
+          "validator_id": "validator-finance-reconciliation-v1",
+          "verifier_status": "passed",
+          "checks": [
+            {
+              "check_id": "check-finance-source",
+              "label": "三期来源完整",
+              "passed": true,
+              "detail": "三个固定期间工作簿均通过 Catalog 完整性检查。"
+            },
+            {
+              "check_id": "check-finance-zombie",
+              "label": "跨期僵尸账款复算",
+              "passed": true,
+              "detail": "按同一客商、同一科目、三期借方期末余额逐项比较，结果为无僵尸账款。"
+            },
+            {
+              "check_id": "check-finance-unreceived-rows",
+              "label": "未收逐行复算",
+              "passed": true,
+              "detail": "2 条借方期末余额逐行相等。"
+            },
+            {
+              "check_id": "check-finance-unreceived-sort",
+              "label": "未收排序",
+              "passed": true,
+              "detail": "按客商升序、同客商金额降序。"
+            }
+          ],
+          "review_required": true,
+          "external_action": "none",
+          "original_inputs_modified": false
+        },
+        {
+          "artifact_id": "workspace-artifact-573c6ce6df40",
+          "file_name": "跨期核对说明.md",
+          "media_type": "text/markdown",
+          "size": 255,
+          "validator_id": "validator-finance-reconciliation-v1",
+          "verifier_status": "passed",
+          "checks": [
+            {
+              "check_id": "check-finance-source",
+              "label": "三期来源完整",
+              "passed": true,
+              "detail": "三个固定期间工作簿均通过 Catalog 完整性检查。"
+            },
+            {
+              "check_id": "check-finance-zombie",
+              "label": "跨期僵尸账款复算",
+              "passed": true,
+              "detail": "按同一客商、同一科目、三期借方期末余额逐项比较，结果为无僵尸账款。"
+            }
+          ],
+          "review_required": true,
+          "external_action": "none",
+          "original_inputs_modified": false
+        }
+      ],
+      "artifact_downloads": [
+        {
+          "artifact_id": "workspace-artifact-1d54a5efbbad",
+          "file_name": "未付统计.csv",
+          "status_code": 200,
+          "content_type": "text/csv",
+          "declared_size": 2399,
+          "downloaded_size": 2399,
+          "size_matches": true
+        },
+        {
+          "artifact_id": "workspace-artifact-81a06012a6f4",
+          "file_name": "未收统计.csv",
+          "status_code": 200,
+          "content_type": "text/csv",
+          "declared_size": 206,
+          "downloaded_size": 206,
+          "size_matches": true
+        },
+        {
+          "artifact_id": "workspace-artifact-573c6ce6df40",
+          "file_name": "跨期核对说明.md",
+          "status_code": 200,
+          "content_type": "text/markdown",
+          "declared_size": 255,
+          "downloaded_size": 255,
+          "size_matches": true
+        }
+      ],
+      "expected_artifacts": [
+        "未付统计.csv",
+        "未收统计.csv",
+        "跨期核对说明.md"
+      ],
+      "events": [
+        {
+          "sequence": 3,
+          "event_name": "planning_started",
+          "status": "planning"
+        },
+        {
+          "sequence": 4,
+          "event_name": "planning_completed",
+          "status": "planning"
+        },
+        {
+          "sequence": 6,
+          "event_name": "deterministic_office_tool_started",
+          "status": "validating"
+        },
+        {
+          "sequence": 7,
+          "event_name": "run_workspace_artifact_written",
+          "status": "validating"
+        },
+        {
+          "sequence": 8,
+          "event_name": "run_workspace_artifact_written",
+          "status": "validating"
+        },
+        {
+          "sequence": 9,
+          "event_name": "run_workspace_artifact_written",
+          "status": "validating"
+        },
+        {
+          "sequence": 10,
+          "event_name": "deterministic_verification_completed",
+          "status": "validating"
+        },
+        {
+          "sequence": 11,
+          "event_name": "analysis_started",
+          "status": "analyzing"
+        },
+        {
+          "sequence": 12,
+          "event_name": "analysis_completed",
+          "status": "analyzing"
+        },
+        {
+          "sequence": 13,
+          "event_name": "analysis_structure_rejected",
+          "status": "analyzing"
+        },
+        {
+          "sequence": 14,
+          "event_name": "analysis_started",
+          "status": "analyzing"
+        },
+        {
+          "sequence": 15,
+          "event_name": "analysis_completed",
+          "status": "analyzing"
+        },
+        {
+          "sequence": 16,
+          "event_name": "analysis_structure_rejected",
+          "status": "analyzing"
+        }
+      ],
+      "waiting_branches": [
+        {
+          "branch_id": "branch-921301f01f82",
+          "title": "读取2025上半年往来明细",
+          "status": "waiting_input",
+          "missing_file_count": 1
+        },
+        {
+          "branch_id": "branch-c6ebc82fde53",
+          "title": "读取2025下半年往来明细",
+          "status": "waiting_input",
+          "missing_file_count": 1
+        },
+        {
+          "branch_id": "branch-56ed440b07dd",
+          "title": "读取2026往来明细",
+          "status": "waiting_input",
+          "missing_file_count": 1
+        },
+        {
+          "branch_id": "branch-ff7fd0479e3a",
+          "title": "生成未付统计、未收统计并判断僵尸账款",
+          "status": "waiting_input",
+          "missing_file_count": 3
+        }
+      ],
+      "validation_errors": [],
+      "timed_out": false,
+      "effect_gate_passed": true,
+      "failure_reason": null
+    },
+    {
+      "scenario_id": "TC-10",
+      "capability_id": "office-compliant-outbound-flow",
+      "title": "合规外呼流程",
+      "instruction": "根据专业性说明生成信用卡 M1 逾期用户 AI 外呼催收流程图文档。",
+      "run_id": "harness:c1feb7d820e44b018927a5f7066eccf6",
+      "started_at": "2026-08-27T07:26:16.662983+00:00",
+      "observed_at": "2026-08-27T07:27:34.016773+00:00",
+      "run_status": "waiting_input",
+      "snapshot_version": 15,
+      "current_round": 1,
+      "budget": {
+        "max_rounds": 12,
+        "max_files_per_round": 16,
+        "max_model_calls": 30,
+        "deadline_seconds": 7200,
+        "rounds_used": 1,
+        "files_verified": 0,
+        "model_calls_used": 3,
+        "elapsed_ms": 76940,
+        "stop_reason": null
+      },
+      "model_calls": [
+        {
+          "round": 1,
+          "role": "planner",
+          "called": true,
+          "model": "deepseek-v4-pro",
+          "elapsed_ms": 8159,
+          "output_used": true
+        },
+        {
+          "round": 1,
+          "role": "analyst",
+          "called": true,
+          "model": "deepseek-v4-pro",
+          "elapsed_ms": 18266,
+          "output_used": false
+        }
+      ],
+      "model_execution_gate_passed": true,
+      "model_output_adopted": false,
+      "effect_receipts": [
+        {
+          "receipt_id": "effect-receipt-40f4d0dec1fb",
+          "capability_id": "office-compliant-outbound-flow",
+          "scenario_id": "TC-10",
+          "status": "passed",
+          "state": "已冻结 1 份 FORTE 输入，原始文件保持只读。",
+          "action": "调用 office-compliant-outbound-flow 确定性办公工具并写入隔离运行工作区。",
+          "observation": "生成 1 份真实成果文件，执行 13 项确定性检查。",
+          "cost": "0 次额外模型调用；仅消耗本机确定性解析、计算与文件写入。",
+          "result": "所有确定性效果门通过，成果仍需用户复核。",
+          "source_file_refs": [
+            "forte-ba23e986a9c7e8d8"
+          ],
+          "artifact_ids": [
+            "workspace-artifact-31e8c2e8a31f"
+          ],
+          "prohibited_side_effects": [
+            "不拨号",
+            "不写 CRM",
+            "不发送短信"
+          ],
+          "created_at": "2026-08-27T07:26:25.844877Z",
+          "external_action": "none"
+        }
+      ],
+      "artifacts": [
+        {
+          "artifact_id": "workspace-artifact-31e8c2e8a31f",
+          "file_name": "外呼流程-M1逾期用户AI外呼催收流程图.docx",
+          "media_type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+          "size": 1692,
+          "validator_id": "validator-compliant-outbound-flow-v1",
+          "verifier_status": "passed",
+          "checks": [
+            {
+              "check_id": "check-outbound-source",
+              "label": "规则来源完整",
+              "passed": true,
+              "detail": "外呼时段、频次与录音规则均来自安全预览。"
+            },
+            {
+              "check_id": "check-outbound-start",
+              "label": "唯一开始节点",
+              "passed": true,
+              "detail": "状态机只有一个 START。"
+            },
+            {
+              "check_id": "check-outbound-time-gate",
+              "label": "拨号前时段 Gate",
+              "passed": true,
+              "detail": "不合规路径直接停止，不进入拨号。"
+            },
+            {
+              "check_id": "check-outbound-connect",
+              "label": "接通与未接通分支",
+              "passed": true,
+              "detail": "接通状态具有两条互斥路径。"
+            },
+            {
+              "check_id": "check-outbound-retry",
+              "label": "重拨频次上限",
+              "passed": true,
+              "detail": "仅未达上限时进入安排重拨。"
+            },
+            {
+              "check_id": "check-outbound-recording",
+              "label": "录音告知先于身份确认",
+              "passed": true,
+              "detail": "先告知录音，再询问身份。"
+            },
+            {
+              "check_id": "check-outbound-identity",
+              "label": "身份确认先于欠款引导",
+              "passed": true,
+              "detail": "身份确认前不披露欠款信息。"
+            },
+            {
+              "check_id": "check-outbound-third-party",
+              "label": "第三方禁呼",
+              "passed": true,
+              "detail": "第三方要求停止联系时进入禁呼终态。"
+            },
+            {
+              "check_id": "check-outbound-attitude",
+              "label": "本人态度分支",
+              "passed": true,
+              "detail": "承诺、软拒绝和硬拒绝均有路径。"
+            },
+            {
+              "check_id": "check-outbound-invalid",
+              "label": "无效通话回到频次判断",
+              "passed": true,
+              "detail": "无效通话不会绕过重拨上限。"
+            },
+            {
+              "check_id": "check-outbound-human",
+              "label": "高风险情况转人工",
+              "passed": true,
+              "detail": "三类强制情况均进入人工。"
+            },
+            {
+              "check_id": "check-outbound-terminals",
+              "label": "六类终态齐全",
+              "passed": true,
+              "detail": "所有路径只落入六类业务终态。"
+            },
+            {
+              "check_id": "check-outbound-no-action",
+              "label": "未发生真实外呼",
+              "passed": true,
+              "detail": "只生成 DOCX；拨号、CRM 与短信动作均为 none。"
+            }
+          ],
+          "review_required": true,
+          "external_action": "none",
+          "original_inputs_modified": false
+        }
+      ],
+      "artifact_downloads": [
+        {
+          "artifact_id": "workspace-artifact-31e8c2e8a31f",
+          "file_name": "外呼流程-M1逾期用户AI外呼催收流程图.docx",
+          "status_code": 200,
+          "content_type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+          "declared_size": 1692,
+          "downloaded_size": 1692,
+          "size_matches": true
+        }
+      ],
+      "expected_artifacts": [
+        "外呼流程-M1逾期用户AI外呼催收流程图.docx"
+      ],
+      "events": [
+        {
+          "sequence": 3,
+          "event_name": "planning_started",
+          "status": "planning"
+        },
+        {
+          "sequence": 4,
+          "event_name": "planning_completed",
+          "status": "planning"
+        },
+        {
+          "sequence": 6,
+          "event_name": "deterministic_office_tool_started",
+          "status": "validating"
+        },
+        {
+          "sequence": 7,
+          "event_name": "run_workspace_artifact_written",
+          "status": "validating"
+        },
+        {
+          "sequence": 8,
+          "event_name": "deterministic_verification_completed",
+          "status": "validating"
+        },
+        {
+          "sequence": 9,
+          "event_name": "analysis_started",
+          "status": "analyzing"
+        },
+        {
+          "sequence": 10,
+          "event_name": "analysis_completed",
+          "status": "analyzing"
+        },
+        {
+          "sequence": 11,
+          "event_name": "analysis_validation_rejected",
+          "status": "analyzing"
+        },
+        {
+          "sequence": 12,
+          "event_name": "analysis_started",
+          "status": "analyzing"
+        },
+        {
+          "sequence": 13,
+          "event_name": "analysis_completed",
+          "status": "analyzing"
+        },
+        {
+          "sequence": 14,
+          "event_name": "analysis_structure_rejected",
+          "status": "analyzing"
+        }
+      ],
+      "waiting_branches": [
+        {
+          "branch_id": "branch-3d1a95671132",
+          "title": "读取专业性说明",
+          "status": "waiting_input",
+          "missing_file_count": 1
+        },
+        {
+          "branch_id": "branch-8b04ba3d1099",
+          "title": "生成流程图文档",
+          "status": "waiting_input",
+          "missing_file_count": 1
+        }
+      ],
+      "validation_errors": [],
+      "timed_out": false,
+      "effect_gate_passed": true,
+      "failure_reason": null
+    },
+    {
+      "scenario_id": "TC-13",
+      "capability_id": "office-customer-segmentation",
+      "title": "客户画像与销售策略",
+      "instruction": "清洗问卷、完成客户画像分类，并生成差异化销售策略 Markdown 报告。",
+      "run_id": "harness:87421cbb5a434686a0c4083c4f7f2d1e",
+      "started_at": "2026-08-27T07:27:34.016773+00:00",
+      "observed_at": "2026-08-27T07:28:47.384679+00:00",
+      "run_status": "waiting_input",
+      "snapshot_version": 15,
+      "current_round": 1,
+      "budget": {
+        "max_rounds": 12,
+        "max_files_per_round": 16,
+        "max_model_calls": 30,
+        "deadline_seconds": 7200,
+        "rounds_used": 1,
+        "files_verified": 0,
+        "model_calls_used": 3,
+        "elapsed_ms": 73156,
+        "stop_reason": null
+      },
+      "model_calls": [
+        {
+          "round": 1,
+          "role": "planner",
+          "called": true,
+          "model": "deepseek-v4-pro",
+          "elapsed_ms": 8516,
+          "output_used": true
+        },
+        {
+          "round": 1,
+          "role": "analyst",
+          "called": true,
+          "model": "deepseek-v4-pro",
+          "elapsed_ms": 23574,
+          "output_used": false
+        }
+      ],
+      "model_execution_gate_passed": true,
+      "model_output_adopted": false,
+      "effect_receipts": [
+        {
+          "receipt_id": "effect-receipt-f69eacf38bad",
+          "capability_id": "office-customer-segmentation",
+          "scenario_id": "TC-13",
+          "status": "passed",
+          "state": "已冻结 2 份 FORTE 输入，原始文件保持只读。",
+          "action": "调用 office-customer-segmentation 确定性办公工具并写入隔离运行工作区。",
+          "observation": "生成 1 份真实成果文件，执行 6 项确定性检查。",
+          "cost": "0 次额外模型调用；仅消耗本机确定性解析、计算与文件写入。",
+          "result": "所有确定性效果门通过，成果仍需用户复核。",
+          "source_file_refs": [
+            "forte-30f5e044f5d7a199",
+            "forte-8d86fcca3891dabb"
+          ],
+          "artifact_ids": [
+            "workspace-artifact-22bfd4395708"
+          ],
+          "prohibited_side_effects": [
+            "不联系客户",
+            "不写 CRM",
+            "不把公开样本当真实线索"
+          ],
+          "created_at": "2026-08-27T07:27:43.660250Z",
+          "external_action": "none"
+        }
+      ],
+      "artifacts": [
+        {
+          "artifact_id": "workspace-artifact-22bfd4395708",
+          "file_name": "客户画像及销售策略.md",
+          "media_type": "text/markdown",
+          "size": 1597,
+          "validator_id": "validator-customer-segmentation-v1",
+          "verifier_status": "passed",
+          "checks": [
+            {
+              "check_id": "check-segmentation-clean",
+              "label": "清洗、中文数字和缺失值",
+              "passed": true,
+              "detail": "重复样本 111、无法归类样本 106/110 已排除。"
+            },
+            {
+              "check_id": "check-segmentation-priority",
+              "label": "安全型优先级",
+              "passed": true,
+              "detail": "安全型为 102、105、107。"
+            },
+            {
+              "check_id": "check-segmentation-technical",
+              "label": "技术型分类",
+              "passed": true,
+              "detail": "技术型为 101、104、109。"
+            },
+            {
+              "check_id": "check-segmentation-agile",
+              "label": "敏捷型分类",
+              "passed": true,
+              "detail": "敏捷型为 103、108。"
+            },
+            {
+              "check_id": "check-segmentation-conservation",
+              "label": "记录数守恒",
+              "passed": true,
+              "detail": "11 条输入 = 8 条分类 + 3 条排除。"
+            },
+            {
+              "check_id": "check-segmentation-sections",
+              "label": "报告结构",
+              "passed": true,
+              "detail": "报告标题和必需小节完整。"
+            }
+          ],
+          "review_required": true,
+          "external_action": "none",
+          "original_inputs_modified": false
+        }
+      ],
+      "artifact_downloads": [
+        {
+          "artifact_id": "workspace-artifact-22bfd4395708",
+          "file_name": "客户画像及销售策略.md",
+          "status_code": 200,
+          "content_type": "text/markdown",
+          "declared_size": 1597,
+          "downloaded_size": 1597,
+          "size_matches": true
+        }
+      ],
+      "expected_artifacts": [
+        "客户画像及销售策略.md"
+      ],
+      "events": [
+        {
+          "sequence": 3,
+          "event_name": "planning_started",
+          "status": "planning"
+        },
+        {
+          "sequence": 4,
+          "event_name": "planning_completed",
+          "status": "planning"
+        },
+        {
+          "sequence": 6,
+          "event_name": "deterministic_office_tool_started",
+          "status": "validating"
+        },
+        {
+          "sequence": 7,
+          "event_name": "run_workspace_artifact_written",
+          "status": "validating"
+        },
+        {
+          "sequence": 8,
+          "event_name": "deterministic_verification_completed",
+          "status": "validating"
+        },
+        {
+          "sequence": 9,
+          "event_name": "analysis_started",
+          "status": "analyzing"
+        },
+        {
+          "sequence": 10,
+          "event_name": "analysis_completed",
+          "status": "analyzing"
+        },
+        {
+          "sequence": 11,
+          "event_name": "analysis_validation_rejected",
+          "status": "analyzing"
+        },
+        {
+          "sequence": 12,
+          "event_name": "analysis_started",
+          "status": "analyzing"
+        },
+        {
+          "sequence": 13,
+          "event_name": "analysis_completed",
+          "status": "analyzing"
+        },
+        {
+          "sequence": 14,
+          "event_name": "analysis_structure_rejected",
+          "status": "analyzing"
+        }
+      ],
+      "waiting_branches": [
+        {
+          "branch_id": "branch-0ccb5c394f6a",
+          "title": "清洗问卷并生成客户画像分类",
+          "status": "waiting_input",
+          "missing_file_count": 2
+        },
+        {
+          "branch_id": "branch-469a58e891c9",
+          "title": "生成差异化销售策略报告",
+          "status": "waiting_input",
+          "missing_file_count": 2
+        }
+      ],
+      "validation_errors": [],
+      "timed_out": false,
+      "effect_gate_passed": true,
+      "failure_reason": null
+    },
+    {
+      "scenario_id": "TC-14",
+      "capability_id": "office-sre-log-diagnosis",
+      "title": "SRE 日志诊断",
+      "instruction": "分析双十一 Elasticsearch 日志，给出根因与两个层面的紧急止损建议。",
+      "run_id": "harness:ec635909ef9a4956a22f31abc1118b3c",
+      "started_at": "2026-08-27T07:28:47.384679+00:00",
+      "observed_at": "2026-08-27T07:30:44.758582+00:00",
+      "run_status": "waiting_input",
+      "snapshot_version": 15,
+      "current_round": 1,
+      "budget": {
+        "max_rounds": 12,
+        "max_files_per_round": 16,
+        "max_model_calls": 30,
+        "deadline_seconds": 7200,
+        "rounds_used": 1,
+        "files_verified": 0,
+        "model_calls_used": 3,
+        "elapsed_ms": 116492,
+        "stop_reason": null
+      },
+      "model_calls": [
+        {
+          "round": 1,
+          "role": "planner",
+          "called": true,
+          "model": "deepseek-v4-pro",
+          "elapsed_ms": 7725,
+          "output_used": true
+        },
+        {
+          "round": 1,
+          "role": "analyst",
+          "called": true,
+          "model": "deepseek-v4-pro",
+          "elapsed_ms": 54320,
+          "output_used": false
+        }
+      ],
+      "model_execution_gate_passed": true,
+      "model_output_adopted": false,
+      "effect_receipts": [
+        {
+          "receipt_id": "effect-receipt-7a4bf10a07bd",
+          "capability_id": "office-sre-log-diagnosis",
+          "scenario_id": "TC-14",
+          "status": "passed",
+          "state": "已冻结 1 份 FORTE 输入，原始文件保持只读。",
+          "action": "调用 office-sre-log-diagnosis 确定性办公工具并写入隔离运行工作区。",
+          "observation": "生成 1 份真实成果文件，执行 9 项确定性检查。",
+          "cost": "0 次额外模型调用；仅消耗本机确定性解析、计算与文件写入。",
+          "result": "所有确定性效果门通过，成果仍需用户复核。",
+          "source_file_refs": [
+            "forte-df5ae9b9a1273380"
+          ],
+          "artifact_ids": [
+            "workspace-artifact-46ceaa5982e5"
+          ],
+          "prohibited_side_effects": [
+            "不执行 ES 命令",
+            "不连接集群",
+            "不自动限流"
+          ],
+          "created_at": "2026-08-27T07:28:56.205065Z",
+          "external_action": "none"
+        }
+      ],
+      "artifacts": [
+        {
+          "artifact_id": "workspace-artifact-46ceaa5982e5",
+          "file_name": "ES故障诊断与止损建议.md",
+          "media_type": "text/markdown",
+          "size": 1480,
+          "validator_id": "validator-sre-log-diagnosis-v1",
+          "verifier_status": "passed",
+          "checks": [
+            {
+              "check_id": "check-sre-qps",
+              "label": "QPS 触发链",
+              "passed": true,
+              "detail": "查询和写入 QPS 基线、峰值与倍数均由日志复核。"
+            },
+            {
+              "check_id": "check-sre-resources",
+              "label": "资源瓶颈",
+              "passed": true,
+              "detail": "磁盘、CPU 与堆内存范围均写入因果链。"
+            },
+            {
+              "check_id": "check-sre-gc",
+              "label": "GC 与慢查询",
+              "passed": true,
+              "detail": "GC、深度分页和重聚合被识别为放大因素。"
+            },
+            {
+              "check_id": "check-sre-shards",
+              "label": "队列和副本",
+              "passed": true,
+              "detail": "线程池与分片状态均来自日志。"
+            },
+            {
+              "check_id": "check-sre-distractors",
+              "label": "干扰项排除",
+              "passed": true,
+              "detail": "干扰项明确标为伴随或次生现象。"
+            },
+            {
+              "check_id": "check-sre-address",
+              "label": "命令地址来自日志",
+              "passed": true,
+              "detail": "命令使用日志中的 10.1.1.1:9200。"
+            },
+            {
+              "check_id": "check-sre-es-actions",
+              "label": "ES 侧三类操作",
+              "passed": true,
+              "detail": "分片重试、refresh 调整和缓存清理均给出建议命令。"
+            },
+            {
+              "check_id": "check-sre-business",
+              "label": "业务侧降级",
+              "passed": true,
+              "detail": "限流和停止重查询两条业务措施齐全。"
+            },
+            {
+              "check_id": "check-sre-no-exec",
+              "label": "命令未执行",
+              "passed": true,
+              "detail": "Tool Gateway 未接入，external_action=none。"
+            }
+          ],
+          "review_required": true,
+          "external_action": "none",
+          "original_inputs_modified": false
+        }
+      ],
+      "artifact_downloads": [
+        {
+          "artifact_id": "workspace-artifact-46ceaa5982e5",
+          "file_name": "ES故障诊断与止损建议.md",
+          "status_code": 200,
+          "content_type": "text/markdown",
+          "declared_size": 1480,
+          "downloaded_size": 1480,
+          "size_matches": true
+        }
+      ],
+      "expected_artifacts": [
+        "ES故障诊断与止损建议.md"
+      ],
+      "events": [
+        {
+          "sequence": 3,
+          "event_name": "planning_started",
+          "status": "planning"
+        },
+        {
+          "sequence": 4,
+          "event_name": "planning_completed",
+          "status": "planning"
+        },
+        {
+          "sequence": 6,
+          "event_name": "deterministic_office_tool_started",
+          "status": "validating"
+        },
+        {
+          "sequence": 7,
+          "event_name": "run_workspace_artifact_written",
+          "status": "validating"
+        },
+        {
+          "sequence": 8,
+          "event_name": "deterministic_verification_completed",
+          "status": "validating"
+        },
+        {
+          "sequence": 9,
+          "event_name": "analysis_started",
+          "status": "analyzing"
+        },
+        {
+          "sequence": 10,
+          "event_name": "analysis_completed",
+          "status": "analyzing"
+        },
+        {
+          "sequence": 11,
+          "event_name": "analysis_structure_rejected",
+          "status": "analyzing"
+        },
+        {
+          "sequence": 12,
+          "event_name": "analysis_started",
+          "status": "analyzing"
+        },
+        {
+          "sequence": 13,
+          "event_name": "analysis_completed",
+          "status": "analyzing"
+        },
+        {
+          "sequence": 14,
+          "event_name": "analysis_structure_rejected",
+          "status": "analyzing"
+        }
+      ],
+      "waiting_branches": [
+        {
+          "branch_id": "branch-3b860ae21246",
+          "title": "读取 Elasticsearch 日志",
+          "status": "waiting_input",
+          "missing_file_count": 1
+        }
+      ],
+      "validation_errors": [],
+      "timed_out": false,
+      "effect_gate_passed": true,
+      "failure_reason": null
+    },
+    {
+      "scenario_id": "TC-15",
+      "capability_id": "office-ux-pain-prioritization",
+      "title": "交互痛点排序",
+      "instruction": "根据交互日志、痛点规则和页面规范，生成排序正确的交互规范优化方案 CSV。",
+      "run_id": "harness:cf79371b6c644ef0a1297a72d02d486a",
+      "started_at": "2026-08-27T07:30:44.758582+00:00",
+      "observed_at": "2026-08-27T07:32:20.307572+00:00",
+      "run_status": "waiting_input",
+      "snapshot_version": 15,
+      "current_round": 1,
+      "budget": {
+        "max_rounds": 12,
+        "max_files_per_round": 16,
+        "max_model_calls": 30,
+        "deadline_seconds": 7200,
+        "rounds_used": 1,
+        "files_verified": 0,
+        "model_calls_used": 3,
+        "elapsed_ms": 95341,
+        "stop_reason": null
+      },
+      "model_calls": [
+        {
+          "round": 1,
+          "role": "planner",
+          "called": true,
+          "model": "deepseek-v4-pro",
+          "elapsed_ms": 10095,
+          "output_used": true
+        },
+        {
+          "round": 1,
+          "role": "analyst",
+          "called": true,
+          "model": "deepseek-v4-pro",
+          "elapsed_ms": 39811,
+          "output_used": false
+        }
+      ],
+      "model_execution_gate_passed": true,
+      "model_output_adopted": false,
+      "effect_receipts": [
+        {
+          "receipt_id": "effect-receipt-2e0a584a0714",
+          "capability_id": "office-ux-pain-prioritization",
+          "scenario_id": "TC-15",
+          "status": "passed",
+          "state": "已冻结 3 份 FORTE 输入，原始文件保持只读。",
+          "action": "调用 office-ux-pain-prioritization 确定性办公工具并写入隔离运行工作区。",
+          "observation": "生成 1 份真实成果文件，执行 6 项确定性检查。",
+          "cost": "0 次额外模型调用；仅消耗本机确定性解析、计算与文件写入。",
+          "result": "所有确定性效果门通过，成果仍需用户复核。",
+          "source_file_refs": [
+            "forte-3913d2ccb62b9b02",
+            "forte-0506a266b89dfef4",
+            "forte-3f48165dbc47276d"
+          ],
+          "artifact_ids": [
+            "workspace-artifact-bcc9c9271d66"
+          ],
+          "prohibited_side_effects": [
+            "不修改生产界面",
+            "不自动发布建议"
+          ],
+          "created_at": "2026-08-27T07:30:56.110030Z",
+          "external_action": "none"
+        }
+      ],
+      "artifacts": [
+        {
+          "artifact_id": "workspace-artifact-bcc9c9271d66",
+          "file_name": "交互规范优化方案.csv",
+          "media_type": "text/csv",
+          "size": 18089,
+          "validator_id": "validator-ux-pain-prioritization-v1",
+          "verifier_status": "passed",
+          "checks": [
+            {
+              "check_id": "check-ux-headers",
+              "label": "表头顺序",
+              "passed": true,
+              "detail": "六列表头与任务合同完全一致。"
+            },
+            {
+              "check_id": "check-ux-coverage",
+              "label": "痛点聚合完整",
+              "passed": true,
+              "detail": "66 个页面、元素、痛点组合均有一行。"
+            },
+            {
+              "check_id": "check-ux-priority",
+              "label": "P0-P4 计算",
+              "passed": true,
+              "detail": "频次和严重度矩阵逐项计算。"
+            },
+            {
+              "check_id": "check-ux-order",
+              "label": "三级排序",
+              "passed": true,
+              "detail": "先优先级、再页面规范元素顺序、最后痛点类型顺序。"
+            },
+            {
+              "check_id": "check-ux-reasons",
+              "label": "失败原因可复查",
+              "passed": true,
+              "detail": "每行保留次数、占比和失败原因。"
+            },
+            {
+              "check_id": "check-ux-no-apply",
+              "label": "建议未自动应用",
+              "passed": true,
+              "detail": "只生成运行工作区 CSV，不修改产品界面。"
+            }
+          ],
+          "review_required": true,
+          "external_action": "none",
+          "original_inputs_modified": false
+        }
+      ],
+      "artifact_downloads": [
+        {
+          "artifact_id": "workspace-artifact-bcc9c9271d66",
+          "file_name": "交互规范优化方案.csv",
+          "status_code": 200,
+          "content_type": "text/csv",
+          "declared_size": 18089,
+          "downloaded_size": 18089,
+          "size_matches": true
+        }
+      ],
+      "expected_artifacts": [
+        "交互规范优化方案.csv"
+      ],
+      "events": [
+        {
+          "sequence": 3,
+          "event_name": "planning_started",
+          "status": "planning"
+        },
+        {
+          "sequence": 4,
+          "event_name": "planning_completed",
+          "status": "planning"
+        },
+        {
+          "sequence": 6,
+          "event_name": "deterministic_office_tool_started",
+          "status": "validating"
+        },
+        {
+          "sequence": 7,
+          "event_name": "run_workspace_artifact_written",
+          "status": "validating"
+        },
+        {
+          "sequence": 8,
+          "event_name": "deterministic_verification_completed",
+          "status": "validating"
+        },
+        {
+          "sequence": 9,
+          "event_name": "analysis_started",
+          "status": "analyzing"
+        },
+        {
+          "sequence": 10,
+          "event_name": "analysis_completed",
+          "status": "analyzing"
+        },
+        {
+          "sequence": 11,
+          "event_name": "analysis_structure_rejected",
+          "status": "analyzing"
+        },
+        {
+          "sequence": 12,
+          "event_name": "analysis_started",
+          "status": "analyzing"
+        },
+        {
+          "sequence": 13,
+          "event_name": "analysis_completed",
+          "status": "analyzing"
+        },
+        {
+          "sequence": 14,
+          "event_name": "analysis_structure_rejected",
+          "status": "analyzing"
+        }
+      ],
+      "waiting_branches": [
+        {
+          "branch_id": "branch-05f34fbb68d5",
+          "title": "读取用户交互行为日志",
+          "status": "waiting_input",
+          "missing_file_count": 1
+        },
+        {
+          "branch_id": "branch-58b8f829ae39",
+          "title": "读取交互行为痛点及优化规则",
+          "status": "waiting_input",
+          "missing_file_count": 1
+        },
+        {
+          "branch_id": "branch-55225ce522f6",
+          "title": "读取页面级交互规范",
+          "status": "waiting_input",
+          "missing_file_count": 1
+        },
+        {
+          "branch_id": "branch-cfd8c094d6e3",
+          "title": "生成交互规范优化方案 CSV",
+          "status": "waiting_input",
+          "missing_file_count": 3
+        }
+      ],
+      "validation_errors": [],
+      "timed_out": false,
+      "effect_gate_passed": true,
+      "failure_reason": null
+    }
+  ],
+  "claim_boundary": "该证据仅证明固定服务配置下真实模型调用、运行工作区文件和确定性检查；不证明真实用户理解、生产安全沙箱或外部动作能力。"
+}

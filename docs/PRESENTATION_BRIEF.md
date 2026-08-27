@@ -7,8 +7,9 @@
 
 我们不是在制作三套写死的 Demo，而是在建设一个证据编译型 Office Agent
 Harness：用户只给业务目标，Agent 在完整资料库中自主找证据，但模型候选必须
-经过服务端范围、计划和来源位置校验才能进入不可覆盖的逻辑成果；最终仍明确
-待复核、没有修改原文件、没有执行外部动作。
+经过服务端范围、计划和来源位置校验才能进入不可覆盖的逻辑成果；十二个固定
+本地能力还能生成隔离 Run Workspace 文件并接受确定性复核。最终仍明确待复核、
+没有修改 FORTE 原件、没有执行外部动作。
 
 ## 2. 汇报硬门槛
 
@@ -27,12 +28,15 @@ Harness：用户只给业务目标，Agent 在完整资料库中自主找证据�
 汇报必须同时保留“场景与来源”“前台交互影响”“后端事实映射”和
 “验证与边界”。研究来源包见
 [`WORKSPACE-CENTRIC-OFFICE-AGENT-INTERACTION-AND-SOURCES-20260825`](research/WORKSPACE-CENTRIC-OFFICE-AGENT-INTERACTION-AND-SOURCES-20260825.md)。
-Agent Control Loop 的逐模块历史基线、当前三轮只读纵切和后续缺口见
+Agent Control Loop 的逐模块历史基线、当前有界效果纵切和后续缺口见
 [`AGENT-CONTROL-LOOP-IMPLEMENTATION-AUDIT-20260825`](research/AGENT-CONTROL-LOOP-IMPLEMENTATION-AUDIT-20260825.md)。
 完整的项目化讲稿、七个办公场景、七个图示区和 17 页 PPT 结构见
 [`OFFICE-AGENT-DETAILED-CHINESE-REPORT-20260825`](reports/OFFICE-AGENT-DETAILED-CHINESE-REPORT-20260825.md)。
 最新“为什么必须选我们”的候选能力、八个竞品同场挑战和官方来源见
 [`COMPETITIVE-WHITE-SPACE-AND-FALSIFIABLE-DIFFERENTIATORS-20260826`](research/COMPETITIVE-WHITE-SPACE-AND-FALSIFIABLE-DIFFERENTIATORS-20260826.md)。
+十五条场景的实际效果、失败修复轨迹、真实模型运行和外部边界见
+[`SCENARIO-EFFECT-GATE-20260827`](evidence/SCENARIO-EFFECT-GATE-20260827.md)
+与[中文效果账本](reports/SCENARIO-EFFECT-GATE-LEDGER-20260827.md)。
 
 ## 3. PPT 页面卡片
 
@@ -45,19 +49,19 @@ Agent Control Loop 的逐模块历史基线、当前三轮只读纵切和后续�
 | 5 | 用户给目标，Agent 负责从整库找证据，但选择过程必须可见、可限、可复核 | 浏览 -> 下达目标 -> Agent 选证据 -> 观察 -> 引用 -> 复核 | 实现侧重点差异，不是优越性结论 |
 | 6 | 固定公开数据版本，让演示中的每份材料都能被现场检查 | 15 个文件夹、96 份文件、格式分布 | FORTE 固定 commit；不是真实企业数据 |
 | 7 | 安全预览把“Agent 读了什么”变成可见契约 | CSV/PDF/DOCX/TXT 预览拼图和安全说明 | 路径、大小、hash、符号链接和解析器测试 |
-| 8 | Harness 把模型调用、内容采用和服务端校验分开 | 事件与模型回执时序 | Snapshot/Receipt 事实；不展示思维链 |
+| 8 | Harness 把模型调用、内容采用、确定性办公效果和整体 Loop 状态分开 | 事件、模型回执、可下载工件与检查结果时序 | Snapshot/Receipt/Artifact 事实；不展示思维链，也不把 `completed` 当作效果通过 |
 | 9 | Agent 说“有问题”之后，用户要同时看懂事实、影响、真实原文和自己必须决定的下一步 | 问题处置单：1 事实 -> 2 影响 -> 3 人工动作；证据与实际文件并排；A/B/C + 反馈 | `DR-0030/29`；推荐是模型候选，确认只创建新只读 Run |
 | 10 | Agent Control Loop 会把计划变成可核对任务分支；前台先区分“授权重试”与“必须由人选择原文”，人阅读时不消耗 Agent 执行预算 | 单一推荐重试按钮、三候选原文且未选前禁用、active elapsed、成果 v1→v2、终态新 Run | `DR-0034/32/31/30`；真实 PostgreSQL 只证明顺序 Runtime；Branch 不等于并行 Worker，terminal Run 不可 resume |
 | 11 | Demo 2 验收多任务自组织、动态调度和共享工件汇聚 | Worker、依赖与动态重排图 | 目标设计；当前产品没有通用 Worker Runtime |
 | 12 | Demo 3 对单任务和多任务统一施加风险与动作控制 | 影响预演 -> 证据 -> 审批 -> Permit -> 回执 | 目标设计；当前没有真实外部动作 |
-| 13 | 当前已经证明工程链路，但也保留模型结果出错的负面证据 | 自动化、截图与 Finance 算术偏差并列 | `completed` 不等于结论正确 |
-| 14 | 历史审计的约 30% 已升级为可见、可选分支、可恢复成果的只读 Loop；下一步转向可写隔离工件、确定性验证和多 Worker | Branch/Artifact 当前纵切与 Demo 2 目标架构叠加图 | `30%` 只代表历史基线；当前 [`DR-0026`](decisions/DR-0026-selective-branch-and-immutable-artifact-history.md) 仍是限定范围工程证据 |
+| 13 | 当前 12 个本地 FORTE 场景已有真实隔离工件与确定性验证；3 个外部依赖场景明确阻断 | 12 通过、3 `blocked_external_boundary` 的效果账本；六个真实 `deepseek-v4-pro` 运行 | `DR-0035` 限定能力，不等于任意办公任务或用户价值；模型质量、效果验证、Loop 终态分开报告 |
+| 14 | 历史约 30% 审计基线已升级为可见分支、可恢复逻辑成果和固定本地可写工件；下一步仍是通用 Tool Gateway、多 Worker 与外部动作治理 | Branch、Run Workspace Artifact 与 Demo 2/3 目标架构叠加图 | `30%` 只代表历史基线；当前真实工件仅来自十二个服务端固定适配器，不是通用 Agent 执行环境 |
 
 ## 4. 现场演示卡片
 
 1. 直接打开 `/`，进入“办公资料库”。
 2. 从左侧文件夹逐级展开顶层目录和嵌套子目录，也可搜索或按类型筛选；打开文件并强调浏览不会限制 Agent 范围。
-3. 不勾选文件，只输入一个现场提出的新目标，并设置轮次、每轮文件、模型调用和 Agent 执行时间；说明默认 1200 秒只统计 active 时间，人工阅读和暂停不计入。
+3. 不勾选文件，只输入一个现场提出的新目标，并设置轮次、每轮文件、模型调用和 Agent 执行时间；说明默认 `12/16/30/7200`，人工阅读和暂停不计入 active 时间。
 4. 启动 Loop，指出合同已冻结完整 96 文件索引；Planner 与 Analyst 的独立模型回执才是调用事实。
 5. 展示 Agent 本轮选择了哪些文件、为什么选择，以及服务端如何把超预算候选限制在本轮上限内。
 6. 在 Evidence Gate 停下来，先让观众读 Branch 总览中的两类动作：普通缺口标“无需核对文件，建议重试”，点开后首屏只有“继续任务，只重试此分支”；额外线索和停下原因默认折叠。关闭审查页应立即返回 Loop；即使 defer 回执冲突也不能把用户困在弹窗。
@@ -65,7 +69,8 @@ Agent Control Loop 的逐模块历史基线、当前三轮只读纵切和后续�
 8. 对 Finding 点“打开审查页”：先按 1/2/3 讲事实、影响和人工动作，再在左侧选择“设计预期/实际观测”，让右侧真实文件跳到并高亮原文；强调位置匹配不等于结论正确。
 9. 先选择 A/B/C 中自己的初始口径，再点“对照 Agent 建议”；补充“同时核对发布记录中的代码版本”后确认。指出推荐默认隐藏以减少锚定，确认只创建新只读 Loop，不会直接改源文件。
 10. 再展示一次 ambiguous 恢复态：首屏只回答为什么需要人、从几个真实位置中选哪一个、选择后只恢复哪条 Branch；不预选候选，未选择前主按钮禁用。若预算已到 `stopped/bounded`，明确说明旧 Run 不可继续，并用一条 Branch 创建新的独立任务。
-11. 对建议点“查看形成依据”，说明建议尚未逐项绑定引用；只有点击“确认并启动”才创建新 Loop。
+11. 运行 TC-05 或 TC-14：展示模型是否调用/采用、隔离工件、逐项确定性检查和下载按钮；指出即使 Analyst 未采用，已通过的工件仍保留。再展示 TC-03/08/09 的外部边界回执，证明系统没有伪造 SQL/Web/cron。
+12. 对建议点“查看形成依据”，说明建议尚未逐项绑定引用；只有点击“确认并启动”才创建新 Loop。
 
 演示不要从八模块架构图开始。先让观众看到数据、任务、轨迹和证据闭环，
 再解释支撑它的架构。
@@ -113,12 +118,14 @@ Agent Control Loop 的逐模块历史基线、当前三轮只读纵切和后续�
 
 ### 当前可证伪独占候选
 
-- 冻结完整 96 份安全索引，同时让 Analyst 每轮只读服务端批准的 1-8 份正文投影。
+- 冻结完整 96 份安全索引，同时让 Analyst 每轮只读服务端批准的 1-24 份正文投影；默认上限 16。
 - Planner/Analyst 的 `called`、`output_used`、`elapsed_ms` 分开，模型真实返回也可能被服务端拒绝。
 - 每条进入成果的 Finding 必须有批准 `file_ref` 内的服务端 Evidence Anchor；引用是采用门，
   不是生成后的装饰。
 - 证据简报按 append-only `ArtifactVersion` 演进，`TaskCommit` 只选择当前版本，恢复不覆盖新版。
 - `completed` 仍固定 `review_required=true`、`external_action=none`，完成页同时证明待复核和未执行。
+- 十二个固定本地办公能力额外要求真实 Run Workspace bytes、服务端确定性 validator 和
+  EffectReceipt；模型文本、引用或 `completed` 都不能替代效果门。
 
 这些是本项目当前原生保证的组合，但还不是“已验证独占”。下一步用不知道资料位置、跨文件
 冲突、重复 quote、部分分支失败、完整性失败、成果恢复、混合执行指令和外部数据缺失八个
@@ -132,6 +139,8 @@ Agent Control Loop 的逐模块历史基线、当前三轮只读纵切和后续�
 | 整库合同 + 每轮自主选证据 | 用户不用先猜文件，但能监督 Agent 缩小范围 | 96 文件统一检索、本轮文件与选择理由 | `scope_mode`、`allowed_file_refs`、`round.input_file_refs` |
 | 有界格式适配器 | 不执行文件也能检查证据 | 表格/文档预览和安全说明 | 文件预览路由与完整性校验 |
 | 模型之后还有策略编译器 | 模型不能静默决定副作用 | “模型已调用”与“计划已校验”分开 | Model Receipt 与服务端 Plan |
+| 固定本地 Scenario Effect Gate | 用户看到的“已完成”必须落到真实文件和可复算检查，而不是一段模型回答 | 可下载 CSV/MD/DOCX/ZIP、检查清单、原件未修改、外部动作未发生 | `workspace_artifacts[]`、`effect_receipts[]`、Artifact GET 与 named SSE |
+| 外部依赖显式阻断 | 用户不会把缺 Connector/权限的安全停止误读为任务成功 | `blocked_external_boundary`、缺失依赖与禁止副作用 | EffectReceipt + `scenario_effect_bounded`；不生成伪 Artifact |
 | 有序事件加权威 Snapshot | 进度和恢复依据事实 | 轨迹、重连中、最终对账 | named SSE 与 Run Snapshot |
 | 引用范围校验 + 问题审查页 | 用户不用在缺口卡和 96 份文件之间来回猜，可以从问题直接对照原文 | 轮次/分支定位、审查记录、关联文件、安全预览 | Gap/Branch/Finding refs + Preview GET；不等于语义正确 |
 | 服务端 Evidence Anchor | 用户不用在整份代码、日志或表格中手工搜索 Agent 的依据，可以在预期与观测之间逐项切换 | 编号证据链、证据角色、行范围、原文摘录、自动跳转与高亮 | Finding `evidence_anchors[]` + Preview GET；模型 quote 需唯一匹配，位置不等于 entailment |
@@ -140,7 +149,7 @@ Agent Control Loop 的逐模块历史基线、当前三轮只读纵切和后续�
 | 终态仍要求复核 | 完成不等于正确 | “模型初步结论 · 待复核” | `review_required=true` |
 | 服务端 Evidence Gate | 验证结果可决定继续还是停止 | 本轮缺口、下一轮目的、剩余预算 | `rounds[].evidence_gaps` 与 `next_step` |
 | 轮次间人工证据门 | 证据不足时由人决定是否继续花预算 | “确认并继续核对”、调整方向或停止 | `status=waiting_input`、`control_state=paused`、resume 回执 |
-| active deadline | 用户阅读、开会或暂停时不会把 Agent 预算烧光 | “Agent 执行时间”、已用 active 秒数、精确停止原因 | 默认 1200 秒、上限 3000 秒；`budget.elapsed_ms/stop_reason`，waiting/pause 冻结 |
+| active deadline | 用户阅读、开会或暂停时不会把 Agent 预算烧光 | “Agent 执行时间”、已用 active 秒数、精确停止原因 | 默认 7200 秒、上限 14400 秒；`budget.elapsed_ms/stop_reason`，waiting/pause 冻结 |
 | Agent 自有缺口处置 | 用户不再被要求替 Agent 猜行号或修改候选文件 | 原目标、尝试文件、模型调用/采用、保留项、无外部动作、只重试本分支 | `recovery_kind` + Branch/Gap + model receipt；无 Anchor 不高亮 |
 | 两类待处理分流 | 用户先知道自己只是授权 Agent 重试，还是必须提供一个原文位置判断 | “无需核对文件，建议重试”/“从 N 个位置中选 1 个”；输入和技术回执渐进披露 | `recovery_kind` + `EvidenceResolution.status/candidates[]` + DecisionRequest；打开页面不调用模型、不消耗下一轮预算 |
 | 服务端任务 Branch | 用户不用把整组缺口一次性全放行，可只推进一条工作线 | 分支状态、依赖、资料/缺口数量、“继续此分支” | `branches[]`、`candidate_branch_ids`、`active_branch_id`、带 `branch_id` 的 resume |
