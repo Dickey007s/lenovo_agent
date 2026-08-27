@@ -4,6 +4,8 @@
 
 `Limited Verified`。确定性浏览器回归、全量静态/构建门和真实 PostgreSQL 顺序回归支持本轮前台
 事实投影；不升级为用户理解、业务价值、模型质量或新 Runtime 能力证据。
+实现提交 [`6fd16aa`](https://github.com/Dickey007s/lenovo_agent/commit/6fd16aa)，交付见
+[PR #43](https://github.com/Dickey007s/lenovo_agent/pull/43)。
 
 ## 变更与可观察事实
 
@@ -23,6 +25,7 @@
 | Stakeholder 两张负例截图 | 已登记 | 旧页面把两类人机任务混在一起，解释和输入压过下一步 | 新设计有效 |
 | Python | `83 passed, 2 skipped` | 既有契约与 Runtime 单元回归未退化 | PostgreSQL 路径、前端理解 |
 | PostgreSQL 顺序门 | `2 passed in 8.92s` | Decision/Resolution/Branch 局部恢复与重启路径未因前台改动退化 | CAS、多实例高可用 |
+| GitHub `durable-agent-control-loop` | [PR #43 job](https://github.com/Dickey007s/lenovo_agent/actions/runs/33043617726/job/98422508640) `passed`，30 秒 | 远端 PostgreSQL workflow 在提交 `6fd16aa` 上通过 | 生产部署、并发安全或用户效果 |
 | Ruff / Web lint / build | 通过 | 静态检查、TypeScript 和生产构建成立 | 浏览器动作和用户效果 |
 | Playwright | `25 passed` | retry/ambiguous 分流、默认折叠、禁用态、terminal 新 Run、关闭/重连和 390 px 回归成立 | 真实模型质量或用户理解 |
 | `dr-0034-mixed-branch-actions-desktop.png` | 已捕获 | 一个分支组内的两类 Gate 和动作被明确区分 | 多 Worker 并行或任务完成 |
