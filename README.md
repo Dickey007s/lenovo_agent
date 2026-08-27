@@ -47,7 +47,8 @@ browse or search the whole repository
   -> server uniquely resolves safe-preview locations and keeps only reviewable findings
   -> server validates citation membership, evidence anchors and the Evidence Gate
   -> location/structure cannot be adopted: one bounded repair, then preserve valid work and pause one branch
-  -> gap review explains the Agent failure type and lets the user retry only that branch without editing sources
+  -> retry-only gap shows one recommended Branch action; optional clues and audit details stay collapsed
+  -> ambiguous quote requires the user to choose one real source position before Branch recovery
   -> evidence missing: pause the affected task branches before spending another round
   -> user chooses one branch: next round is bound to that branch's missing sources
   -> ordered SSE + authoritative Snapshot
@@ -219,6 +220,12 @@ multi-instance coordination and governed external action remain target work.
   can never trap the user. Evidence Gaps are shown as Branch lanes connecting
   Branch, current materials, Evidence Gate and next action. This is a UI fact
   projection, not proof of parallel Workers or improved user outcomes.
+- `DR-0034` separates two human jobs that previously looked alike. A retry-only
+  Branch now presents one recommended action without requiring file edits or
+  input; optional clues and audit details are collapsed. An ambiguous source
+  Branch instead requires an explicit candidate choice and keeps accept disabled
+  until the user selects one real location. No Runtime protocol or budget rule
+  changed, and the claimed clarity benefit remains a user-study hypothesis.
 - No target-user study has been run. Clarity, trust, efficiency and user value
   remain hypotheses.
 
@@ -241,6 +248,8 @@ The current persistent decision and Finding/Branch-local recovery increment is t
 [`DR-0032-POSTGRES-DECISION-RECOVERY-EVIDENCE-20260827`](docs/evidence/DR-0032-POSTGRES-DECISION-RECOVERY-EVIDENCE-20260827.md).
 The current closable-review and Branch-lane interaction increment is tracked in
 [`DR-0033-CLOSABLE-REVIEW-BRANCH-LANES-EVIDENCE-20260827`](docs/evidence/DR-0033-CLOSABLE-REVIEW-BRANCH-LANES-EVIDENCE-20260827.md).
+The current one-action recovery and explicit source-choice increment is tracked in
+[`DR-0034-ONE-ACTION-RECOVERY-EVIDENCE-20260827`](docs/evidence/DR-0034-ONE-ACTION-RECOVERY-EVIDENCE-20260827.md).
 
 ## Local run
 

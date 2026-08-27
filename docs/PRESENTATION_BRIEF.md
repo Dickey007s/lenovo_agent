@@ -47,7 +47,7 @@ Agent Control Loop 的逐模块历史基线、当前三轮只读纵切和后续�
 | 7 | 安全预览把“Agent 读了什么”变成可见契约 | CSV/PDF/DOCX/TXT 预览拼图和安全说明 | 路径、大小、hash、符号链接和解析器测试 |
 | 8 | Harness 把模型调用、内容采用和服务端校验分开 | 事件与模型回执时序 | Snapshot/Receipt 事实；不展示思维链 |
 | 9 | Agent 说“有问题”之后，用户要同时看懂事实、影响、真实原文和自己必须决定的下一步 | 问题处置单：1 事实 -> 2 影响 -> 3 人工动作；证据与实际文件并排；A/B/C + 反馈 | `DR-0030/29`；推荐是模型候选，确认只创建新只读 Run |
-| 10 | Agent Control Loop 会把计划变成可核对任务分支；人阅读时不消耗 Agent 执行预算，证据歧义成为可决定、可重启、只恢复目标 Branch 的状态 | active elapsed 对比、Decision Packet、三候选原文、成果 v1→v2、终态新 Run | `DR-0032/31/30`；真实 PostgreSQL 只证明顺序 Runtime；Branch 不等于并行 Worker，terminal Run 不可 resume |
+| 10 | Agent Control Loop 会把计划变成可核对任务分支；前台先区分“授权重试”与“必须由人选择原文”，人阅读时不消耗 Agent 执行预算 | 单一推荐重试按钮、三候选原文且未选前禁用、active elapsed、成果 v1→v2、终态新 Run | `DR-0034/32/31/30`；真实 PostgreSQL 只证明顺序 Runtime；Branch 不等于并行 Worker，terminal Run 不可 resume |
 | 11 | Demo 2 验收多任务自组织、动态调度和共享工件汇聚 | Worker、依赖与动态重排图 | 目标设计；当前产品没有通用 Worker Runtime |
 | 12 | Demo 3 对单任务和多任务统一施加风险与动作控制 | 影响预演 -> 证据 -> 审批 -> Permit -> 回执 | 目标设计；当前没有真实外部动作 |
 | 13 | 当前已经证明工程链路，但也保留模型结果出错的负面证据 | 自动化、截图与 Finance 算术偏差并列 | `completed` 不等于结论正确 |
@@ -60,11 +60,11 @@ Agent Control Loop 的逐模块历史基线、当前三轮只读纵切和后续�
 3. 不勾选文件，只输入一个现场提出的新目标，并设置轮次、每轮文件、模型调用和 Agent 执行时间；说明默认 1200 秒只统计 active 时间，人工阅读和暂停不计入。
 4. 启动 Loop，指出合同已冻结完整 96 文件索引；Planner 与 Analyst 的独立模型回执才是调用事实。
 5. 展示 Agent 本轮选择了哪些文件、为什么选择，以及服务端如何把超预算候选限制在本轮上限内。
-6. 在 Evidence Gate 停下来，先让观众读一条 Branch lane：从分支、当前材料、证据门原因一路看到下一步；再点“查看并处理”。第一屏说明问题在 Agent 的结构/定位/覆盖交付，不等于源文件有错。关闭审查页应立即返回 Loop；即使 defer 回执冲突也只显示可恢复提示，不能把用户困在弹窗。没有 Anchor 就不伪造高亮。
+6. 在 Evidence Gate 停下来，先让观众读 Branch 总览中的两类动作：普通缺口标“无需核对文件，建议重试”，点开后首屏只有“继续任务，只重试此分支”；额外线索和停下原因默认折叠。关闭审查页应立即返回 Loop；即使 defer 回执冲突也不能把用户困在弹窗。
 7. 展示成果简报从 v1 到 v2；再恢复 v1，说明系统只新增一条 TaskCommit、当前指针改变，v2 与原文件都没有被覆盖。
 8. 对 Finding 点“打开审查页”：先按 1/2/3 讲事实、影响和人工动作，再在左侧选择“设计预期/实际观测”，让右侧真实文件跳到并高亮原文；强调位置匹配不等于结论正确。
 9. 先选择 A/B/C 中自己的初始口径，再点“对照 Agent 建议”；补充“同时核对发布记录中的代码版本”后确认。指出推荐默认隐藏以减少锚定，确认只创建新只读 Loop，不会直接改源文件。
-10. 再展示一次无法唯一定位的恢复态：“已保留/未采用/未发生”。若状态是 `waiting_input`，只恢复一个 Branch；若预算已到 `stopped/bounded`，明确说明旧 Run 不可继续，并用一条 Branch 创建新的独立任务。
+10. 再展示一次 ambiguous 恢复态：首屏只回答为什么需要人、从几个真实位置中选哪一个、选择后只恢复哪条 Branch；不预选候选，未选择前主按钮禁用。若预算已到 `stopped/bounded`，明确说明旧 Run 不可继续，并用一条 Branch 创建新的独立任务。
 11. 对建议点“查看形成依据”，说明建议尚未逐项绑定引用；只有点击“确认并启动”才创建新 Loop。
 
 演示不要从八模块架构图开始。先让观众看到数据、任务、轨迹和证据闭环，
@@ -142,6 +142,7 @@ Agent Control Loop 的逐模块历史基线、当前三轮只读纵切和后续�
 | 轮次间人工证据门 | 证据不足时由人决定是否继续花预算 | “确认并继续核对”、调整方向或停止 | `status=waiting_input`、`control_state=paused`、resume 回执 |
 | active deadline | 用户阅读、开会或暂停时不会把 Agent 预算烧光 | “Agent 执行时间”、已用 active 秒数、精确停止原因 | 默认 1200 秒、上限 3000 秒；`budget.elapsed_ms/stop_reason`，waiting/pause 冻结 |
 | Agent 自有缺口处置 | 用户不再被要求替 Agent 猜行号或修改候选文件 | 原目标、尝试文件、模型调用/采用、保留项、无外部动作、只重试本分支 | `recovery_kind` + Branch/Gap + model receipt；无 Anchor 不高亮 |
+| 两类待处理分流 | 用户先知道自己只是授权 Agent 重试，还是必须提供一个原文位置判断 | “无需核对文件，建议重试”/“从 N 个位置中选 1 个”；输入和技术回执渐进披露 | `recovery_kind` + `EvidenceResolution.status/candidates[]` + DecisionRequest；打开页面不调用模型、不消耗下一轮预算 |
 | 服务端任务 Branch | 用户不用把整组缺口一次性全放行，可只推进一条工作线 | 分支状态、依赖、资料/缺口数量、“继续此分支” | `branches[]`、`candidate_branch_ids`、`active_branch_id`、带 `branch_id` 的 resume |
 | 分支状 Evidence Gap | 用户无需逐个打开扁平按钮猜任务结构，可在一行内看见“分支 -> 材料 -> 证据门 -> 下一步” | Branch lane、当前安全文件标签、Gate 原因、确认/处理入口 | `branches[]` + `evidence_gaps[].branch_id` + 顶层 `decision_requests[]`；不代表多 Worker 并行 |
 | 可退出的问题审查 | 用户可以先离开再回来，不会被暂缓回执的 409 或断网困在模态页 | 立即关闭、回执失败提示、待决项仍可重开 | 浏览器退出状态 + versioned `decision` 回执 + Snapshot 刷新；失败不得显示为已 defer |
@@ -174,6 +175,7 @@ Agent Control Loop 的逐模块历史基线、当前三轮只读纵切和后续�
 - 新的 DecisionRecord 把 accept/decline/defer 绑定到 Finding/Resolution/Branch；它证明回执存在，不证明业务审批正确；
 - `exact/ambiguous/unavailable/stale/rejected` 是服务端拥有的原文位置状态，不是 Finding 真值；来源变化会进入 `stale`，候选重算不一致会进入 `rejected`；
 - DR-0032 的 `DecisionRequest`、来源修订校验、五态 EvidenceResolution、局部 Branch 恢复与 PostgreSQL 顺序重启门已在限定范围内实现；当前仍不能宣称独立决定账本、并发 CAS、多实例协调或在途调用恢复。
+- DR-0034 的全量门为 Python `83 passed, 2 skipped`、PostgreSQL `2 passed`、Harness browser `25 passed`，Ruff/lint/build 通过；它证明两类待处理动作的前台映射和 390 px 回归，不证明“3 秒内理解”或用户价值。
 - 两张确定性浏览器图分别展示“继续此分支”与“恢复 v1”；它们证明 UI/服务端字段映射，不是真实模型运行；
 - 最终截图绑定的真实浏览器运行：整库冻结 96 份索引，Agent 自主选择并核对 3 份文件，2 次 `deepseek-v4-pro` 调用，形成 5 条发现和 4 条待确认建议；
 - 3 张最终文件管理器/建议截图及 SHA-256 写入 Evidence；1440px 与 390px 无页面横向溢出；

@@ -100,6 +100,15 @@ but without an Evidence Anchor the page never invents a row highlight. Guidance
 is optional: a waiting Run can retry only the affected Branch with an empty
 feedback field, while a terminal Run must create a new independent task.
 
+The Branch overview and review sheet distinguish two human jobs before showing
+technical detail. A retry-only Branch says “无需核对文件，建议重试”; its first
+screen offers one recommended “继续任务，只重试此分支” action, while optional
+clues and “为什么停下 / 查看相关文件” stay collapsed. An ambiguous Resolution
+says “需要从 N 个原文位置中选 1 个”; no candidate is preselected and accept is
+disabled until the user chooses. Neither surface starts another call or charges
+the next-round budget before an explicit control receipt. A terminal Run uses a
+separate new-task label rather than pretending to resume.
+
 Open human decisions are authoritative in the Snapshot-level
 `decision_requests[]`; round-level copies are compatibility projections only.
 Closing or pressing Escape exits the review surface before the browser attempts a
@@ -233,6 +242,10 @@ The real PostgreSQL 17.11 sequential gate now verifies pending-decision restart,
 target-Branch-only resume, v1/v2 preservation and a second restart. The browser
 path separately verifies desktop and 390 px candidate comparison, defer-then-final
 decision, cancel and reconnect; neither gate is a user study.
+DR-0034 adds only a browser projection gate: deterministic E2E checks retry-first
+and ambiguous-choice-first screens, disabled accept before selection, collapsed
+optional details and 390 px overflow. It does not change the DR-0032 persistence
+or recovery state machine.
 
 ## 9. Responsive behavior
 

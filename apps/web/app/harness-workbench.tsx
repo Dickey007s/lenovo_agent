@@ -1791,9 +1791,22 @@ function EvidenceReviewDialog({
     setActiveAnchorIndex(reviewAnchors.findIndex((anchor) => anchor.file_ref === fileRef));
   };
   const selectedOption = request.review?.options.find((option) => option.option_id === selectedOptionId) ?? null;
+  const isAmbiguousResolution = request.kind === "resolution" && request.resolution?.status === "ambiguous";
+  const isDirectRetryResolution = request.kind === "resolution"
+    && request.resolution !== null
+    && ["unavailable", "stale"].includes(request.resolution.status);
+  const isDirectRetryGap = request.kind === "gap"
+    && request.gapRecovery !== null
+    && request.gapRecovery.mode !== "inspect_only"
+    && ["source_location", "analysis_output"].includes(request.gapRecovery.cause);
   const dialogTitle = request.kind === "finding" && request.review?.requires_human_decision
     ? "需要你核对并决定下一步"
+    : isAmbiguousResolution ? `从 ${request.resolution?.candidates.length ?? 0} 个原文位置中选 1 个`
+    : isDirectRetryResolution ? `下一步：只重试“${request.branchTitle ?? "当前"}”分支`
     : request.kind === "resolution" ? "需要你确认原文位置"
+    : isDirectRetryGap ? request.gapRecovery?.mode === "new_run"
+      ? `下一步：用“${request.branchTitle ?? "当前"}”分支新建任务`
+      : `下一步：只重试“${request.branchTitle ?? "当前"}”分支`
     : request.title;
   const startDecisionTask = async () => {
     if (!selectedOption || !request.findingId) return;
@@ -1927,27 +1940,38 @@ function EvidenceReviewDialog({
           <footer><IconAlertTriangle aria-hidden="true" /><p>{request.boundary}</p></footer>
         </aside>
         <main className="evidence-review-main">
-          <section className="evidence-review-claim" aria-labelledby="review-summary-title">
-            <header><span>问题处置单</span><h3 id="review-summary-title">先看事实，再看影响，最后决定下一步</h3></header>
-            <ol className="review-summary-steps">
+          {request.kind !== "gap" && !isDirectRetryResolution && <section className={`evidence-review-claim${isAmbiguousResolution ? " is-ambiguous" : ""}`} aria-labelledby="review-summary-title">
+            <header><span>{isAmbiguousResolution ? "下一步只做 1 件事" : "问题处置单"}</span><h3 id="review-summary-title">{isAmbiguousResolution ? `从 ${request.resolution?.candidates.length ?? 0} 个真实位置中选 1 个` : "先看事实，再看影响，最后决定下一步"}</h3></header>
+            {isAmbiguousResolution ? <ol className="review-summary-steps">
+              <li><b>1</b><div><span>为什么需要你</span><strong>同一段原文匹配到多个位置，Agent 不能替你选择。</strong></div></li>
+              <li className="is-decision"><b>2</b><div><span>你只需要选什么</span><strong>从下方候选位置中选 1 个真实位置。</strong></div></li>
+              <li><b>3</b><div><span>选完发生什么</span><strong>只重跑“{request.branchTitle || "当前"}”分支；不修改文件，不执行外部动作。</strong></div></li>
+            </ol> : <ol className="review-summary-steps">
               <li><b>1</b><div><span>发生了什么</span><strong>{request.factSummary || request.title}</strong></div></li>
               <li><b>2</b><div><span>不处理的影响</span><strong>{request.impact || "影响尚未单独结构化，请先核对下方证据后再作判断。"}</strong></div></li>
-              <li className={request.review?.requires_human_decision || request.kind === "gap" ? "is-decision" : ""}><b>3</b><div><span>现在需要谁做什么</span><strong>{request.kind === "gap" ? request.gapRecovery?.mode === "new_run" ? "旧 Run 已结束；你可让 Agent 用这个分支创建新任务，仍无需修改源文件。" : request.gapRecovery?.mode === "resume_branch" ? "直接让 Agent 只重试此分支即可；补充线索是可选的，不懂可以留空。" : "先查看候选文件；系统不会要求你替 Agent 猜具体行。" : request.review?.requires_human_decision ? "需要你选择处理口径，Agent 不会替你决定。" : request.review ? "无需业务裁决，但结果仍需人工复核。" : "这是旧结果，尚未生成结构化处置选项。"}</strong></div></li>
-            </ol>
+              <li className={request.review?.requires_human_decision ? "is-decision" : ""}><b>3</b><div><span>现在需要谁做什么</span><strong>{request.review?.requires_human_decision ? "需要你选择处理口径，Agent 不会替你决定。" : request.review ? "无需业务裁决，但结果仍需人工复核。" : "这是旧结果，尚未生成结构化处置选项。"}</strong></div></li>
+            </ol>}
             <details><summary>查看 Agent 的完整说明</summary><p>{request.detail}</p></details>
-          </section>
+          </section>}
           {request.kind === "gap" && request.gapRecovery && <section className="evidence-gap-recovery" aria-labelledby="gap-recovery-title">
-            <header><div><span>恢复这个分支</span><h3 id="gap-recovery-title">问题在 Agent 的交付，不在源文件</h3><p>系统已经把未通过校验的内容拦下。你可以不填写任何内容，直接让 Agent 重新完成这一步。</p></div><b>{request.gapRecovery.mode === "new_run" ? "创建新 Run" : request.gapRecovery.mode === "resume_branch" ? "只重试本分支" : "仅查看"}</b></header>
-            <ol className="gap-recovery-facts">
+            <header><div><span>{request.gapRecovery.mode === "inspect_only" ? "当前只能查看" : "下一步只做 1 件事"}</span><h3 id="gap-recovery-title">{request.gapRecovery.mode === "inspect_only" ? "查看停下原因，暂不启动新调用" : request.gapRecovery.mode === "new_run" ? "用此分支新建任务继续" : "直接让 Agent 重试此分支"}</h3><p>{request.gapRecovery.mode === "inspect_only" ? "当前状态没有可证明的原地恢复入口。" : request.gapRecovery.mode === "new_run" ? "旧 Run 已结束，不能原地续跑。不需要修改文件，也不需要填写内容；点击后会创建一个只处理此分支的新任务。" : "不需要修改文件，也不需要填写内容。只有你点击后，Agent 才会继续。"}</p></div><b>{request.gapRecovery.mode === "inspect_only" ? "仅查看" : "推荐"}</b></header>
+            <footer>{request.gapRecovery.mode !== "inspect_only" && <button type="button" className="is-primary" onClick={() => void recoverGap()} disabled={controlBusy !== null || starting}><IconRefresh aria-hidden="true" />{starting || controlBusy ? "正在提交" : request.gapRecovery.mode === "new_run" ? "新建任务，只续办此分支" : "继续任务，只重试此分支"}</button>}<button type="button" onClick={() => void deferAndClose()} disabled={controlBusy !== null || starting}>暂不处理此分支</button></footer>
+            {request.gapRecovery.mode !== "inspect_only" && <details className="gap-extra-hint"><summary>我有额外线索</summary><label className="decision-feedback"><span>给 Agent 的线索（可选）</span><textarea value={decisionFeedback} onChange={(event) => setDecisionFeedback(event.target.value)} placeholder="例如：优先检查 F07、版本号和测试日期" /></label></details>}
+          </section>}
+          {isDirectRetryResolution && request.resolution && <section className="evidence-gap-recovery" aria-labelledby="resolution-retry-title">
+            <header><div><span>下一步只做 1 件事</span><h3 id="resolution-retry-title">直接让 Agent 重试此分支</h3><p>不需要修改文件，也不需要填写内容。只有你点击后，Agent 才会继续。</p></div><b>推荐</b></header>
+            <footer><button type="button" className="is-primary" disabled={controlBusy !== null} onClick={() => void retryUnavailable()}><IconRefresh aria-hidden="true" />继续任务，只重试此分支</button><button type="button" onClick={() => void deferAndClose()} disabled={controlBusy !== null}>暂不处理此分支</button></footer>
+            <details className="gap-extra-hint"><summary>我有额外线索</summary><label className="decision-feedback"><span>给 Agent 的线索（可选）</span><textarea value={decisionFeedback} onChange={(event) => setDecisionFeedback(event.target.value)} placeholder="例如：同时核对版本号和测试日期" /></label></details>
+          </section>}
+          <details className={`evidence-workbench-disclosure${request.kind === "gap" || isDirectRetryResolution ? " is-gap" : ""}`} open={request.kind === "gap" || isDirectRetryResolution ? undefined : true}>
+            <summary>{request.kind === "gap" || isDirectRetryResolution ? "为什么停下 / 查看相关文件" : "证据与资料"}</summary>
+            {request.kind === "gap" && request.gapRecovery && <ol className="gap-recovery-facts">
               <li><b>1</b><span><strong>原本要确认</strong>{request.gapRecovery.branchObjective}</span></li>
               <li><b>2</b><span><strong>Agent 已尝试</strong>{request.gapRecovery.attemptedFileRefs.length} 份文件 · {request.gapRecovery.analysisCalled ? "模型已调用" : "尚未完成模型调用"} · {request.gapRecovery.analysisOutputUsed ? "可核对部分已保留" : "返回内容未采用"}</span></li>
               <li><b>3</b><span><strong>已经保留</strong>{request.gapRecovery.verifiedFileRefs.length} 份已核对来源、其他分支和已有成果版本均不回退。</span></li>
               <li><b>4</b><span><strong>不会发生</strong>不会要求你改源文件，也不会执行外部动作。</span></li>
-            </ol>
-            <label className="decision-feedback"><span>给 Agent 的线索（可选，不清楚可以留空）</span><textarea value={decisionFeedback} onChange={(event) => setDecisionFeedback(event.target.value)} placeholder="例如：优先检查 F07、版本号和测试日期；不知道时可直接留空" /></label>
-            <footer><button type="button" onClick={() => void deferAndClose()} disabled={controlBusy !== null || starting}>保留缺口，暂不处理</button>{request.gapRecovery.mode !== "inspect_only" && <button type="button" className="is-primary" onClick={() => void recoverGap()} disabled={controlBusy !== null || starting}><IconRefresh aria-hidden="true" />{starting || controlBusy ? "正在提交" : request.gapRecovery.mode === "new_run" ? "创建新任务继续此分支" : "让 Agent 只重试此分支"}</button>}</footer>
-          </section>}
-          <div className="evidence-review-workbench">
+            </ol>}
+            <div className="evidence-review-workbench">
             <div className="evidence-review-index">
               {request.kind === "resolution" && request.resolution?.status !== "rejected" && request.resolution?.candidates.length ? <section className="evidence-review-pinpoint" aria-labelledby="evidence-pinpoint-title">
                 <header><div><span>候选原文对照</span><h3 id="evidence-pinpoint-title">先比较真实位置，再选择要恢复的候选</h3><p className="evidence-revision-note">{evidenceRevisionLabel(request.resolution.source_revision || request.resolution.candidates[0]?.source_revision)} · 候选不会自动替你选择</p></div><b>{request.resolution.candidates.length} 个候选</b></header>
@@ -1972,6 +1996,7 @@ function EvidenceReviewDialog({
                     </button>;
                   })}
                 </div>
+                {isAmbiguousResolution && <div className="resolution-choice-action" role="status"><span>{selectedCandidateId ? "已选 1 个位置。确认后只重跑这个分支。" : `请先从上方 ${request.resolution?.candidates.length ?? 0} 个位置中选 1 个。`}</span><button type="button" className="is-primary" disabled={!selectedCandidateId || controlBusy !== null} onClick={() => void resolveEvidence()}><IconPlayerPlay aria-hidden="true" />采用此位置并只重跑本分支</button></div>}
               </section> : reviewAnchors.length > 0 ? <section className="evidence-review-pinpoint" aria-labelledby="evidence-pinpoint-title">
                 <header><div><span>证据定位</span><h3 id="evidence-pinpoint-title">选择一条，右侧打开真实文件并高亮对应位置</h3></div><b>{reviewAnchors.length} 处</b></header>
                 <div className="evidence-anchor-map">
@@ -1994,12 +2019,15 @@ function EvidenceReviewDialog({
               <FilePreview preview={preview} file={selectedFile} loading={previewLoading} error={previewError} anchor={activeAnchor} />
               {selectedFile && <button type="button" className="evidence-review-open-workspace" onClick={async () => { await deferAndClose(); onOpenFile(selectedFile); }}><IconArrowRight aria-hidden="true" />回到资料库中打开</button>}
             </section>
-          </div>
+            </div>
+          </details>
           {request.decisionRecord && <section className="decision-record-receipt" role="status">
             <IconCircleCheck aria-hidden="true" />
             <div><span>人工决定已记录 · v{request.decisionRecord.accepted_task_version}</span><b>{request.decisionRecord.action === "accept" ? "已接受" : request.decisionRecord.action === "decline" ? "已否决" : request.decisionRecord.action === "cancel" ? "已取消" : "已暂缓"}</b><p>回执 {request.decisionRecord.decision_id}{request.decisionRecord.idempotency_ref ? ` · 幂等 ${request.decisionRecord.idempotency_ref}` : ""} · 外部动作：无</p></div>
           </section>}
-          {request.kind === "resolution" && request.resolution ? <section className="evidence-resolution-decision" aria-labelledby="resolution-decision-title">
+          {request.kind === "resolution" && request.resolution ? <details className={`resolution-audit-details${isAmbiguousResolution || isDirectRetryResolution ? " is-collapsed" : ""}`} open={isAmbiguousResolution || isDirectRetryResolution ? undefined : true}>
+            <summary>{isAmbiguousResolution || isDirectRetryResolution ? "查看技术回执与其他处理方式" : "证据定位处理"}</summary>
+            <section className="evidence-resolution-decision" aria-labelledby="resolution-decision-title">
             <header><div><span>证据定位状态</span><h3 id="resolution-decision-title">{request.resolution.status === "ambiguous" ? `${request.resolution.candidates.length} 个位置都匹配，需要你选择` : `${resolutionStatusLabel(request.resolution.status)}，需要决定恢复方式`}</h3><p>{request.resolution.reason}</p></div><b>{request.resolution.status === "ambiguous" ? `${request.resolution.candidates.length} 个候选` : resolutionStatusLabel(request.resolution.status)}</b></header>
             {request.decisionRequest && <dl className="decision-request-meta"><div><dt>待决编号</dt><dd>{request.decisionRequest.request_id}</dd></div><div><dt>基于版本</dt><dd>Run v{request.decisionRequest.expected_version ?? "当前"} · {evidenceRevisionLabel(request.decisionRequest.source_revision || request.resolution.source_revision)}</dd></div><div><dt>绑定对象</dt><dd>受影响分支 · {request.decisionRequest.candidate_ids.length || request.resolution.candidates.length} 个候选</dd></div></dl>}
             <ol className="resolution-impact-list">
@@ -2017,11 +2045,10 @@ function EvidenceReviewDialog({
                 <button type="button" onClick={() => void cancelDecision()} disabled={controlBusy !== null}>取消这次待决</button>
                 <button type="button" onClick={async () => { if (await onControl("stop")) onClose(); }} disabled={controlBusy !== null}><IconPlayerStop aria-hidden="true" />结束并保留</button>
               </div>
-              {request.resolution.status === "ambiguous"
-                ? <button type="button" className="is-primary" disabled={!selectedCandidateId || controlBusy !== null} onClick={() => void resolveEvidence()}><IconPlayerPlay aria-hidden="true" />采用此位置并只重跑本分支</button>
-                : <button type="button" className="is-primary" disabled={controlBusy !== null} onClick={() => void retryUnavailable()}><IconRefresh aria-hidden="true" />只重试本分支</button>}
+              {!isAmbiguousResolution && !isDirectRetryResolution && <button type="button" className="is-primary" disabled={controlBusy !== null} onClick={() => void retryUnavailable()}><IconRefresh aria-hidden="true" />继续任务，只重试此分支</button>}
             </footer>
-          </section> : null}
+            </section>
+          </details> : null}
           {request.review?.requires_human_decision ? <section className="evidence-review-decision" aria-labelledby="review-decision-title">
             <header><div><span>需要你决断</span><h3 id="review-decision-title">{request.review.question}</h3><p>{request.review.why_human}</p></div><b>后续尚未执行</b></header>
             <div className="decision-options" role="radiogroup" aria-label="处理口径">
@@ -2559,13 +2586,6 @@ function LoopView({
   const failedAtSourceLocation = run.status === "failed" && run.events.some((event) => event.eventName === "analysis_validation_rejected");
   const retryBranch = [...roundBranches].sort((left, right) => left.input_file_refs.length - right.input_file_refs.length)[0] ?? null;
   const retryInstruction = `${run.instruction}\n恢复策略：先只核对${retryBranch ? `“${retryBranch.title}”` : "一个最小证据分支"}，逐条使用可唯一定位的原文；若资料不足，明确列出缺少的版本、字段或记录，不要输出无法核对的结论。`;
-  const recoverBranch = async (branch: LoopBranch) => {
-    if (recoveryDraft.trim()) {
-      const steered = await onControl("steer", { instruction: recoveryDraft.trim() });
-      if (!steered) return;
-    }
-    await onControl("resume", { branchId: branch.branch_id });
-  };
   const startBranchRecoveryRun = async (branch: LoopBranch) => {
     const sourceLabels = branch.input_file_refs.map(fileLabel);
     const userDirection = recoveryDraft.trim();
@@ -2645,18 +2665,8 @@ function LoopView({
       </ol>
       {selectedRound.input_file_refs.length > 0 && <section className="loop-round-files"><span>Agent 本轮自主选择</span>{selectedRound.selection_reason && <p>{selectedRound.selection_reason}</p>}<div>{selectedRound.input_file_refs.map((ref) => <b key={ref}>{fileLabel(ref)}</b>)}</div></section>}
       {guidedRecovery && <section className="loop-source-recovery" aria-labelledby="source-recovery-title">
-        <header><IconAlertTriangle aria-hidden="true" /><div><span>需要你处理一个可恢复状态</span><h3 id="source-recovery-title">{recoveryKind === "analysis_output" ? "模型已经响应，但结果还不是服务端可核对的结构" : pendingResolutions.some((item) => item.status === "ambiguous") ? "同一段候选原文匹配到多个真实位置" : "Agent 找到了候选内容，但服务端无法确认它对应文件中的位置"}</h3><p>系统没有丢掉任务，也没有把不可靠内容当结果。已完成分支和已有成果版本保持不变。</p></div></header>
-        {pendingResolutions.length > 0 && <section className="resolution-recovery-list" aria-label="待处理证据定位">
-          <header><div><span>可观察覆盖</span><h4>{selectedRound?.result?.findings.reduce((total, finding) => total + finding.evidence_anchors.length, 0) ?? 0} 处已定位 · {pendingResolutions.filter((item) => item.status === "ambiguous").length} 处多候选 · {pendingResolutions.filter((item) => item.status === "unavailable").length} 处未找到</h4></div><b>{pendingResolutions.length} 项待处理</b></header>
-          <ol>{pendingResolutions.map((resolution, index) => {
-            const branch = recoveryBranches.find((item) => item.branch_id === resolution.branch_id);
-            const source = files.find((item) => item.file_ref === resolution.file_ref);
-             return <li key={resolution.resolution_id} className={`is-${resolution.status}`}><b>{index + 1}</b><div><span>{resolutionStatusLabel(resolution.status)}</span><h5>{resolution.finding_title}</h5><p>{resolution.fact_summary || resolution.reason}</p><small>{source?.display_label ?? "允许范围内文件"} · {branch?.title ?? "受影响分支"}{resolution.source_revision ? ` · ${evidenceRevisionLabel(resolution.source_revision)}` : ""}</small></div><button type="button" onClick={() => onReview(resolutionReviewRequest(resolution, selectedRound.round_number, branch?.title ?? null, run.decision_records, decisionRequests))}><IconEye aria-hidden="true" />{resolution.status === "ambiguous" ? "选择原文位置" : resolution.status === "stale" ? "刷新后恢复" : "查看并恢复"}</button></li>;
-          })}</ol>
-        </section>}
+        <header><IconAlertTriangle aria-hidden="true" /><div><span>这轮需要分支级处理</span><h3 id="source-recovery-title">共有 {recoveryBranches.length} 个待处理，每次处理 1 个</h3><p>{pendingResolutions.some((item) => item.status === "ambiguous") ? "需要选择原文的分支与可以直接重试的分支已经分开标注。" : "这些分支都不需要你修改文件；选择一条后才会继续。"}</p></div></header>
         <div className="source-recovery-facts"><span><b>已保留</b>本轮计划、文件范围、调用记录</span><span><b>未采用</b>无法定位的候选结论</span><span><b>未发生</b>文件修改或外部动作</span></div>
-        <label><span>补充给下一轮的方向（可选）</span><textarea value={recoveryDraft} onChange={(event) => setRecoveryDraft(event.target.value)} placeholder="例如：优先核对功能测试报告与兼容测试报告中的代码版本字段" /></label>
-        <div className="source-recovery-branches">{recoveryBranches.map((branch, index) => { const resolution = pendingResolutions.find((item) => item.branch_id === branch.branch_id); return <article key={branch.branch_id}><div><b>{index === 0 ? "最小受影响分支" : "其他待处理分支"}</b><h4>{branch.title}</h4><p>{branch.objective}</p><small>{branch.missing_file_refs.length} 份待核对资料</small></div>{resolution ? <button type="button" className="is-review" onClick={() => onReview(resolutionReviewRequest(resolution, selectedRound.round_number, branch.title, run.decision_records, decisionRequests))}><IconEye aria-hidden="true" />先看具体问题</button> : <button type="button" disabled={!canResume || controlBusy !== null} onClick={() => void recoverBranch(branch)}><IconPlayerPlay aria-hidden="true" />{controlBusy ? "正在提交" : "只重试本分支"}</button>}</article>; })}</div>
       </section>}
       {roundBranches.length > 0 && <section className="loop-branches" aria-label={`第 ${selectedRound.round_number} 轮任务分支`}>
         <header><div><span>任务分支现场</span><h3>{roundBranches.length} 条分支，分别保留证据状态</h3></div><b>{roundBranches.filter((branch) => branch.status === "completed").length}/{roundBranches.length} 已核对</b></header>
@@ -2668,7 +2678,7 @@ function LoopView({
       </section>}
       {selectedRound.result && <section className="loop-round-result"><span>本轮核对结果</span><h3>{selectedRound.result.summary}</h3><p>{selectedRound.result.findings.length} 条发现，引用 {selectedRound.verified_file_refs.length} 份文件。</p>{selectedRound.result.findings.length > 0 && <div className="loop-review-links">{selectedRound.result.findings.map((finding, index) => <button type="button" key={`${finding.title}:${index}`} onClick={() => onReview(findingReviewRequest(finding, index, selectedRound.round_number, run.decision_records, decisionRequests))}><IconEye aria-hidden="true" />核对：{finding.title}</button>)}</div>}</section>}
       {selectedRound.evidence_gaps.length > 0 && <section className="loop-gap" aria-labelledby={`loop-gap-title-${selectedRound.round_number}`}>
-        <header><IconRoute aria-hidden="true" /><div><span>待处理分支</span><h3 id={`loop-gap-title-${selectedRound.round_number}`}>{selectedRound.evidence_gaps.length} 条路径停在证据门</h3><p>{boundedTerminalRecovery ? "旧 Run 已结束；每条路径和已有结果仍保留，可分别查看后创建新任务。" : "每条路径独立保留材料、缺口和下一步；处理一条不会清空其他分支。"}</p></div><b>{selectedRound.evidence_gaps.length} 条待处理</b></header>
+        <header><IconRoute aria-hidden="true" /><div><span>待处理分支</span><h3 id={`loop-gap-title-${selectedRound.round_number}`}>共有 {selectedRound.evidence_gaps.length} 个待处理，每次处理 1 个</h3><p>{boundedTerminalRecovery ? "旧 Run 已结束；先选一条路径创建新任务，其他结果保持不变。" : "先选一条路径继续；没有被选择的分支不会启动，也不会消耗下一轮预算。"}</p></div><b>每次 1 个</b></header>
         <ol className="loop-gap-branches">{selectedRound.evidence_gaps.map((gap, index) => {
           const branch = run.branches.find((item) => item.branch_id === gap.branch_id) ?? null;
           const branchRequests = decisionRequests.filter((item) => item.branch_id === gap.branch_id && ["pending", "deferred"].includes(item.state ?? "pending"));
@@ -2679,21 +2689,18 @@ function LoopView({
             ?? null;
           const sourceRefs = uniqueFileRefs([...(branch?.input_file_refs ?? []), ...gap.candidate_file_refs]);
           const primarySource = sourceRefs[0] ? fileLabel(sourceRefs[0]) : null;
-          const gateLabel = resolution?.status === "ambiguous"
-            ? `${resolution.candidates.length} 个原文位置待确认`
-            : resolution?.status === "unavailable"
-              ? "原文位置尚未找到"
-              : resolution?.status === "stale"
-                ? "来源版本已变化"
-                : `${branch?.missing_file_refs.length ?? gap.candidate_file_refs.length} 份引用待补齐`;
+          const requiresSourceChoice = resolution?.status === "ambiguous";
+          const gateLabel = requiresSourceChoice
+            ? `需要从 ${resolution.candidates.length} 个原文位置中选 1 个`
+            : "无需核对文件，建议重试";
           const reviewRequest = resolution
             ? resolutionReviewRequest(resolution, selectedRound.round_number, branch?.title ?? null, run.decision_records, decisionRequests)
             : gapReviewRequest(gap, index, selectedRound, branch, run);
-          const nextLabel = openRequest
-            ? "需要你确认"
+          const nextLabel = requiresSourceChoice
+            ? "需要你选 1 个位置"
             : boundedTerminalRecovery
               ? "查看后创建新任务"
-              : "可单独检查或继续";
+              : "建议只重试此分支";
           return <li key={gap.gap_id} className={`is-${branch?.status ?? "waiting_input"}`} aria-label={`分支：${branch?.title ?? gap.label}`}>
             <section className="loop-gap-branch-identity"><span>分支 {index + 1}</span><h4>{branch?.title ?? gap.label}</h4><b>{branch ? branchStatusLabel(branch.status) : "等待处理"}</b></section>
             <IconArrowRight className="loop-gap-branch-arrow" aria-hidden="true" />
@@ -2701,7 +2708,7 @@ function LoopView({
             <IconArrowRight className="loop-gap-branch-arrow" aria-hidden="true" />
             <section className="loop-gap-branch-stage is-gate"><span>证据门</span><strong>{gateLabel}</strong><small>{gap.detail}</small></section>
             <IconArrowRight className="loop-gap-branch-arrow" aria-hidden="true" />
-            <section className="loop-gap-branch-next"><span>下一步</span><strong>{nextLabel}</strong><button type="button" onClick={() => onReview(reviewRequest)}><IconEye aria-hidden="true" />{openRequest ? "确认原文位置" : "查看并处理"}</button></section>
+            <section className="loop-gap-branch-next"><span>下一步</span><strong>{nextLabel}</strong><button type="button" onClick={() => onReview(reviewRequest)}>{requiresSourceChoice ? <IconEye aria-hidden="true" /> : <IconPlayerPlay aria-hidden="true" />}{requiresSourceChoice ? "选择原文位置" : boundedTerminalRecovery ? "查看如何续办" : "继续此分支"}</button></section>
           </li>;
         })}</ol>
         <footer><IconShieldCheck aria-hidden="true" /><span>已有成果版本和已完成分支不会被覆盖；当前仍是只读核对，不修改文件，也不执行外部动作。</span></footer>

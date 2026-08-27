@@ -409,6 +409,13 @@ the browser to invent a row or ask the user to edit the candidate file. Feedback
 is optional. A waiting Branch may be resumed directly; if feedback is supplied,
 the client records a versioned steer before the versioned Branch resume.
 
+The API does not add a separate “retry modal” state. The browser derives the
+interaction from the same Snapshot facts: non-ambiguous recoverable Branches show
+one recommended resume and keep optional feedback/audit detail collapsed;
+`EvidenceResolution(status=ambiguous)` shows the candidate count and requires an
+explicit selection before `decision_action=accept` can be submitted. No request is
+sent and no next-round budget is consumed merely by opening either surface.
+
 Current statuses are `queued`, `indexing`, `planning`, `validating`,
 `analyzing`, `verifying`, `waiting_input`, `paused`, `completed`, `stopped`
 and `failed`;
@@ -595,12 +602,13 @@ reconciliation; a nonterminal interruption uses GET plus `after=N` recovery.
 | branch control 409 | selected Branch is missing, no longer waiting or outside the current Gate | GET current Snapshot and choose a still-waiting Branch |
 | artifact restore 409 | version is current, missing or fails independent-record verification | keep current pointer and history; do not fabricate restore |
 | `status=waiting_input` | one or more Branches could close a visible evidence gap | inspect sources, optionally steer, then explicitly resume one Branch or stop |
-| `next_step.recovery_kind=source_location` | legal-scope candidate could not be uniquely mapped to safe Preview | show preserved/not-adopted/no-action facts; select the smallest Branch and resume |
-| `next_step.recovery_kind=analysis_output` | provider responded twice without a usable public result structure | keep raw output hidden; select a minimal Branch and retry or stop |
+| `next_step.recovery_kind=source_location` | legal-scope candidate could not be uniquely mapped to safe Preview | for unavailable: show one recommended Branch retry with optional details collapsed; for ambiguous: require one explicit candidate choice before accept |
+| `next_step.recovery_kind=analysis_output` | provider responded twice without a usable public result structure | keep raw output hidden; show one recommended minimal-Branch retry, optional feedback or stop |
 | `checkpoint_recovered` | server restored a PostgreSQL Snapshot and paused | reconcile the trace; explicitly resume from the safe checkpoint |
 | `loop_budget_stopped` | round/call/active deadline prevents another step; `budget.stop_reason` names the actual boundary | show the precise Chinese reason, bounded brief, preserved facts and candidate Branches; create a new Branch-scoped task instead of resuming the terminal Run |
 | `status=failed` | model/schema/plan/source/citation validation failed | show safe business error and no result |
 
 See [UI-server fact matrix](contracts/UI_SERVER_FACT_MATRIX.md),
+[`DR-0034`](decisions/DR-0034-one-action-recovery-and-explicit-source-choice.md),
 [`DR-0031`](decisions/DR-0031-active-budget-and-agent-owned-gap-recovery.md)
-and [current Evidence](evidence/ACTIVE-BUDGET-AND-AGENT-GAP-RECOVERY-EVIDENCE-20260826.md).
+and [current Evidence](evidence/DR-0034-ONE-ACTION-RECOVERY-EVIDENCE-20260827.md).
