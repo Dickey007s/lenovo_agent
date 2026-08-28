@@ -72,6 +72,19 @@ class OnboardingPlanner:
         )
 
 
+class WaitingPlanner:
+    model = "deepseek-v4-pro"
+
+    def __init__(self) -> None:
+        self.started = asyncio.Event()
+        self.release = asyncio.Event()
+
+    async def plan(self, *, scenario, files):
+        self.started.set()
+        await self.release.wait()
+        raise AssertionError("the close lifecycle test must cancel the pending plan")
+
+
 class OnboardingAnalyst:
     model = "deepseek-v4-pro"
 
@@ -424,64 +437,106 @@ async def test_runtime_writes_downloadable_verified_artifact_without_touching_fo
         effect_engine=ScenarioEffectEngine(),
         artifact_store=RunWorkspaceArtifactStore(tmp_path / "run-workspaces"),
     )
-    started = await runtime.start(
-        "alice",
-        HarnessRunStart(
-            idempotency_key="scenario-effect-runtime-onboarding-0001",
-            instruction=ONBOARDING_INSTRUCTION,
-        ),
-    )
-    snapshot = await _wait_for_effect(runtime, "alice", started.run.run_id)
-
-    assert snapshot.effect_receipts[0].status == "passed"
-    assert snapshot.effect_receipts[0].scenario_id == "TC-01"
-    assert len(snapshot.workspace_artifacts) == 1
-    record = snapshot.workspace_artifacts[0]
-    assert record.file_name == "入职资产匹配表.csv"
-    assert record.verifier_status == "passed"
-    assert all(check.passed for check in record.checks)
-    assert record.original_inputs_modified is False
-    assert record.external_action == "none"
-    assert _forte_digests() == before
-
-    public = runtime.public_snapshot(snapshot)
-    serialized = public.model_dump_json()
-    assert "content_sha256" not in serialized
-    assert record.content_sha256 not in serialized
-    assert public.workspace_artifacts[0].download_path.endswith(record.artifact_id)
-
-    metadata, content = await runtime.get_workspace_artifact(
-        "alice", snapshot.run_id, record.artifact_id
-    )
-    assert metadata.file_name == "入职资产匹配表.csv"
-    assert content.startswith(b"\xef\xbb\xbf")
-    assert "紧急联系人" not in content.decode("utf-8-sig")
-    with pytest.raises(Exception):
-        await runtime.get_workspace_artifact("bob", snapshot.run_id, record.artifact_id)
-
-    event_names = [item.event_name for item in snapshot.events]
-    assert "deterministic_office_tool_started" in event_names
-    assert "run_workspace_artifact_written" in event_names
-    assert "deterministic_verification_completed" in event_names
-
-    app = create_app()
-    app.state.harness_runtime = runtime
-    transport = httpx.ASGITransport(app=app)
-    async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
-        response = await client.get(
-            record.download_path,
-            headers={"X-User-Id": "alice"},
+    try:
+        started = await runtime.start(
+            "alice",
+            HarnessRunStart(
+                idempotency_key="scenario-effect-runtime-onboarding-0001",
+                instruction=ONBOARDING_INSTRUCTION,
+            ),
         )
-        denied = await client.get(
-            record.download_path,
-            headers={"X-User-Id": "bob"},
+        snapshot = await _wait_for_effect(runtime, "alice", started.run.run_id)
+
+        assert snapshot.effect_receipts[0].status == "passed"
+        assert snapshot.effect_receipts[0].scenario_id == "TC-01"
+        assert len(snapshot.workspace_artifacts) == 1
+        record = snapshot.workspace_artifacts[0]
+        assert record.file_name == "入职资产匹配表.csv"
+        assert record.verifier_status == "passed"
+        assert all(check.passed for check in record.checks)
+        assert record.original_inputs_modified is False
+        assert record.external_action == "none"
+        assert _forte_digests() == before
+
+        public = runtime.public_snapshot(snapshot)
+        serialized = public.model_dump_json()
+        assert "content_sha256" not in serialized
+        assert record.content_sha256 not in serialized
+        assert public.workspace_artifacts[0].download_path.endswith(record.artifact_id)
+
+        metadata, content = await runtime.get_workspace_artifact(
+            "alice", snapshot.run_id, record.artifact_id
         )
-    assert response.status_code == 200
-    assert response.content == content
-    assert response.headers["cache-control"] == "private, no-store"
-    assert response.headers["x-content-type-options"] == "nosniff"
-    assert denied.status_code == 404
-    json.dumps(public.model_dump(mode="json"), ensure_ascii=False)
+        assert metadata.file_name == "入职资产匹配表.csv"
+        assert content.startswith(b"\xef\xbb\xbf")
+        assert "紧急联系人" not in content.decode("utf-8-sig")
+        with pytest.raises(Exception):
+            await runtime.get_workspace_artifact(
+                "bob", snapshot.run_id, record.artifact_id
+            )
+
+        event_names = [item.event_name for item in snapshot.events]
+        assert "deterministic_office_tool_started" in event_names
+        assert "run_workspace_artifact_written" in event_names
+        assert "deterministic_verification_completed" in event_names
+
+        app = create_app()
+        app.state.harness_runtime = runtime
+        transport = httpx.ASGITransport(app=app)
+        async with httpx.AsyncClient(
+            transport=transport, base_url="http://test"
+        ) as client:
+            response = await client.get(
+                record.download_path,
+                headers={"X-User-Id": "alice"},
+            )
+            denied = await client.get(
+                record.download_path,
+                headers={"X-User-Id": "bob"},
+            )
+        assert response.status_code == 200
+        assert response.content == content
+        assert response.headers["cache-control"] == "private, no-store"
+        assert response.headers["x-content-type-options"] == "nosniff"
+        assert denied.status_code == 404
+        json.dumps(public.model_dump(mode="json"), ensure_ascii=False)
+    finally:
+        await runtime.close()
+
+
+@pytest.mark.asyncio
+async def test_runtime_close_cancels_and_awaits_pending_run_task() -> None:
+    planner = WaitingPlanner()
+    runtime = HarnessRuntime(
+        BenchmarkWorkspaceCatalog(FORTE_ROOT),
+        planner,
+        OnboardingAnalyst(),
+    )
+    closed = False
+    try:
+        started = await runtime.start(
+            "alice",
+            HarnessRunStart(
+                idempotency_key="runtime-close-pending-task-0001",
+                instruction=ONBOARDING_INSTRUCTION,
+            ),
+        )
+        await asyncio.wait_for(planner.started.wait(), timeout=1)
+        run_task = runtime._tasks[started.run.run_id]
+        assert run_task.get_coro().__qualname__ == "HarnessRuntime._run"
+        assert not run_task.done()
+
+        await runtime.close()
+        closed = True
+        await asyncio.sleep(0)
+
+        assert run_task.done()
+        assert run_task.cancelled()
+        assert started.run.run_id not in runtime._tasks
+    finally:
+        planner.release.set()
+        if not closed:
+            await runtime.close()
 
 
 @pytest.mark.asyncio
@@ -623,32 +678,37 @@ async def test_tc01_verified_artifact_is_not_blocked_by_pdf_layout_or_scope_nois
         effect_engine=ScenarioEffectEngine(),
         artifact_store=RunWorkspaceArtifactStore(tmp_path / "run-workspaces"),
     )
-    started = await runtime.start(
-        "alice",
-        HarnessRunStart(
-            idempotency_key="tc01-layout-scope-regression-0001",
-            instruction=ONBOARDING_INSTRUCTION,
-        ),
-    )
-    snapshot = await _wait_for_settled(runtime, "alice", started.run.run_id)
+    try:
+        started = await runtime.start(
+            "alice",
+            HarnessRunStart(
+                idempotency_key="tc01-layout-scope-regression-0001",
+                instruction=ONBOARDING_INSTRUCTION,
+            ),
+        )
+        snapshot = await _wait_for_settled(runtime, "alice", started.run.run_id)
 
-    assert snapshot.status == "completed"
-    assert analyst.calls == 1
-    assert len(snapshot.workspace_artifacts) == 1
-    assert snapshot.workspace_artifacts[0].verifier_status == "passed"
-    assert len(snapshot.workspace_artifacts[0].checks) == 5
-    assert all(check.passed for check in snapshot.workspace_artifacts[0].checks)
-    assert snapshot.effect_receipts[0].status == "passed"
-    assert all(branch.status == "completed" for branch in snapshot.branches)
-    assert all(not round_item.evidence_gaps for round_item in snapshot.rounds)
-    assert not snapshot.decision_requests
-    assert snapshot.result is not None
-    assert len(snapshot.result.findings) == 3
-    assert all("范围外" not in finding.title for finding in snapshot.result.findings)
-    assert all(finding.review is None for finding in snapshot.result.findings)
-    event_names = [event.event_name for event in snapshot.events]
-    assert "analysis_scope_filtered" in event_names
-    assert "decision_gate_suppressed" in event_names
+        assert snapshot.status == "completed"
+        assert analyst.calls == 1
+        assert len(snapshot.workspace_artifacts) == 1
+        assert snapshot.workspace_artifacts[0].verifier_status == "passed"
+        assert len(snapshot.workspace_artifacts[0].checks) == 5
+        assert all(check.passed for check in snapshot.workspace_artifacts[0].checks)
+        assert snapshot.effect_receipts[0].status == "passed"
+        assert all(branch.status == "completed" for branch in snapshot.branches)
+        assert all(not round_item.evidence_gaps for round_item in snapshot.rounds)
+        assert not snapshot.decision_requests
+        assert snapshot.result is not None
+        assert len(snapshot.result.findings) == 3
+        assert all(
+            "范围外" not in finding.title for finding in snapshot.result.findings
+        )
+        assert all(finding.review is None for finding in snapshot.result.findings)
+        event_names = [event.event_name for event in snapshot.events]
+        assert "analysis_scope_filtered" in event_names
+        assert "decision_gate_suppressed" in event_names
+    finally:
+        await runtime.close()
 
 
 @pytest.mark.asyncio
@@ -660,26 +720,29 @@ async def test_verified_artifact_survives_rejected_analyst_output(tmp_path: Path
         effect_engine=ScenarioEffectEngine(),
         artifact_store=RunWorkspaceArtifactStore(tmp_path / "run-workspaces"),
     )
-    started = await runtime.start(
-        "alice",
-        HarnessRunStart(
-            idempotency_key="scenario-effect-runtime-rejected-analysis-0001",
-            instruction=ONBOARDING_INSTRUCTION,
-        ),
-    )
-    snapshot = await _wait_for_settled(runtime, "alice", started.run.run_id)
+    try:
+        started = await runtime.start(
+            "alice",
+            HarnessRunStart(
+                idempotency_key="scenario-effect-runtime-rejected-analysis-0001",
+                instruction=ONBOARDING_INSTRUCTION,
+            ),
+        )
+        snapshot = await _wait_for_settled(runtime, "alice", started.run.run_id)
 
-    assert snapshot.analysis_receipt is not None
-    assert snapshot.analysis_receipt.called is True
-    assert snapshot.analysis_receipt.output_used is False
-    assert snapshot.effect_receipts[0].status == "passed"
-    assert snapshot.workspace_artifacts[0].verifier_status == "passed"
-    assert snapshot.workspace_artifacts[0].original_inputs_modified is False
-    assert [item.event_name for item in snapshot.events].index(
-        "deterministic_verification_completed"
-    ) < [item.event_name for item in snapshot.events].index(
-        "analysis_structure_rejected"
-    )
+        assert snapshot.analysis_receipt is not None
+        assert snapshot.analysis_receipt.called is True
+        assert snapshot.analysis_receipt.output_used is False
+        assert snapshot.effect_receipts[0].status == "passed"
+        assert snapshot.workspace_artifacts[0].verifier_status == "passed"
+        assert snapshot.workspace_artifacts[0].original_inputs_modified is False
+        assert [item.event_name for item in snapshot.events].index(
+            "deterministic_verification_completed"
+        ) < [item.event_name for item in snapshot.events].index(
+            "analysis_structure_rejected"
+        )
+    finally:
+        await runtime.close()
 
 
 def test_scope_validator_rebinds_only_a_uniquely_implied_plan_unit() -> None:
