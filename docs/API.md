@@ -539,6 +539,17 @@ projections. If two files share the same twelve IDs, the EffectReceipt and UI
 must say that two deliverables share twelve checks, not report twenty-four
 independent checks.
 
+For code artifacts, optional `self_test.test_suites[]` is a public projection of
+the server-owned test manifest. Each suite has `suite_id`, Chinese `label`,
+`test_files`, `test_count` and public `test_ids`. Optional
+`test_manifest_file` names the downloadable manifest and
+`test_manifest_matches_collected=true` means the server compared those IDs with
+the actual collected set. Clients must reject a suite whose count and ID length
+differ, and must not infer test names from prose. Artifact and EffectReceipt
+`source_file_refs` each allow at most 96 entries so a complete Workspace-backed
+artifact is not silently truncated; ordinary clients still receive only approved
+opaque `file_ref` values, never internal paths or digests.
+
 `artifact_versions` and `commits` are safe Snapshot projections of independent
 append-only Store records. ArtifactVersion contains the complete logical
 read-only brief for one completed round; it remains `draft` or `verified` and is
@@ -668,6 +679,7 @@ plan_validation
 deterministic_office_tool_started (when one fixed local capability is admitted)
 run_workspace_artifact_written (for each isolated file)
 deterministic_verification_completed (after all deterministic checks)
+scenario_effect_failed (when the fixed builder or verifier did not complete)
 scenario_effect_bounded (for an explicit external/unsupported boundary)
 analysis_started
 analysis_completed
@@ -698,6 +710,19 @@ evidence_gate
 loop_committed
 artifact_version_restored (optional later human restore)
 ```
+
+For a long fixed effect such as TC-04, `deterministic_office_tool_started` is
+persisted before the synchronous builder is moved to an in-process worker
+thread. Its details expose the frozen source count and `external_action=false`,
+but never a fabricated percentage. While the builder runs, Run GET, health and
+SSE remain available. `scenario_effect_failed` records a builder/verifier
+failure before the Run fail-closed path; it does not create an Artifact or an
+EffectReceipt.
+
+The worker thread receives only bytes and safe previews frozen from the
+allowlisted Catalog before dispatch. It is not a durable execution lease: an
+API process restart cannot resume an in-flight subprocess, and PostgreSQL
+recovery still pauses at the existing checkpoint rather than replaying it.
 
 `checkpoint_recovered` may appear after an API restart backed by PostgreSQL.
 It proves a persisted Snapshot was restored and the Run paused; it does not

@@ -173,6 +173,7 @@ workspace_index -> round_started -> planning_started -> planning_completed
 -> optional deterministic_office_tool_started
    -> run_workspace_artifact_written
    -> deterministic_verification_completed
+   or scenario_effect_failed
    or scenario_effect_bounded
 -> analysis_started -> analysis_completed -> result_validation -> evidence_gate
 -> optional branch-selected human resume -> next round or loop_committed/loop_budget_stopped/loop_stopped
@@ -197,6 +198,23 @@ browser restores its known Run id, or discovers the most recent nonterminal
 Owner Run via `GET /runs`. Memory fallback does not survive an API restart.
 `X-User-Id` is not signed authentication, and there is no multi-instance lease
 or notification channel.
+
+Long fixed Scenario Effects do not execute their synchronous builders on the
+FastAPI event loop. The Runtime first verifies and freezes the exact allowlisted
+bytes and safe previews, persists `deterministic_office_tool_started`, then runs
+the builder through `asyncio.to_thread`. TC-04 freezes 46 inputs: 44 project
+files plus PRD and technical-design context. The worker cannot re-read the live
+Catalog. An in-process `(owner, run, capability)` claim prevents duplicate
+dispatch while the first effect is active; Artifact IDs and receipts remain
+server-owned.
+
+This preserves health, Run GET, workspace browsing and SSE responsiveness while
+the roughly one-minute test subprocesses run. It is still a single Controller
+with an in-process worker thread, not a Scheduler/Worker implementation. A
+process restart cannot continue the thread or its subprocess; PostgreSQL only
+recovers the last committed Snapshot and pauses according to the existing
+checkpoint rule. `scenario_effect_failed` records failure without fabricating an
+Artifact or durable tool-execution receipt.
 
 Run Workspace Artifact metadata and EffectReceipts are part of the authoritative
 Snapshot. Artifact bytes are stored outside the public FORTE tree in an isolated,
@@ -317,6 +335,15 @@ OS-level network isolation. Artifact cards keep their own `checks[]` projection,
 but Run-level counts and EffectReceipt wording deduplicate repeated `check_id`
 values. Two files using one checklist are therefore twelve unique checks, not
 twenty-four independent checks.
+
+DR-0041 extends `self_test` with service-owned `test_suites[]`,
+`test_manifest_file` and a manifest/collected-set receipt. The fixed TC-04
+adapter copies all 44 files under dev-015 `input/source-code`, runs one 117-case
+test set on the unpatched copy, applies three real-source fixes, then reruns the
+same collected IDs. Each changed file has its own >=80% coverage gate; aggregate
+coverage is separate. Artifact and EffectReceipt source arrays allow up to the
+96-file Workspace so the 44 real content refs are not truncated. This is a
+bounded deterministic adapter, not a general Scheduler/Worker, shell or sandbox.
 
 ## 7. Eight module maturity
 

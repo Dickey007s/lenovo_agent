@@ -1,4 +1,5 @@
 import { expect, test, type Page, type Route } from "@playwright/test";
+import tc04TestManifest from "../../../docs/evidence/manifests/tc04-public-test-manifest-20260828.json";
 
 type FileItem = {
   file_ref: string;
@@ -661,6 +662,108 @@ function reactRefactorEffectSnapshot(body: { workspace_id: string; instruction: 
   };
 }
 
+function evaluationPlatformEffectSnapshot(body: { workspace_id: string; instruction: string }) {
+  const base = snapshot(body, "completed", 20);
+  const sourceRefs = folders.flatMap((folder) => folder.files).slice(0, 44).map((file) => file.file_ref);
+  const artifactIds = ["workspace-artifact-404040404040", "workspace-artifact-414141414141"];
+  const checks = [
+    ["check-eval-full-copy", "完整复制真实评测平台", "隔离副本包含 source-code 全部 44 个前后端文件。"],
+    ["check-eval-baseline-red", "修复前先复现缺陷", "覆盖三类缺陷的五个回归均先出现红灯。"],
+    ["check-eval-real-diff", "三处真实源码可审查", "模型删除、追加序号和 P99 均有 unified diff。"],
+    ["check-eval-five-test-areas", "五类真实对象均有测试", "五类测试直接导入真实 Service、Engine 与 Utils。"],
+    ["check-eval-compile", "完整后端与测试可编译", "compileall 退出码 0。"],
+    ["check-eval-test-manifest", "声明与实际测试 ID 一致", "117 个具名测试与 manifest 完全一致。"],
+    ["check-eval-real-tests", "真实项目测试零失败", "117/117 通过，0 失败，0 错误。"],
+    ["check-eval-changed-source-coverage", "变更源码逐文件覆盖率", "model_service.py 97.9%；dataset_service.py 97.8%；evaluation_engine.py 89.2%。"],
+    ["check-eval-aggregate-coverage", "真实模块汇总覆盖率", "选定 Service、Engine、Utils 汇总语句覆盖率 95.7%。"],
+    ["check-eval-mock-http", "外部 HTTP 只使用 Mock", "没有调用真实模型 endpoint。"],
+    ["check-eval-review-package", "下载包可独立复跑", "完整副本、diff、清单、双阶段回执和自测卡均在 ZIP 中。"],
+    ["check-eval-source-unchanged", "FORTE 原始项目保持只读", "生成与测试后 44 个 source-code 文件字节不变。"],
+  ].map(([check_id, label, detail]) => ({ check_id, label, passed: true, detail }));
+  const selfTest = {
+    instruction: "为评测平台补充单元测试，覆盖 Service、执行引擎和工具类；真实运行测试，修复失败，并给出覆盖率与修改文件。",
+    expected_files: ["evaluation-platform/app/", "evaluation-platform/frontend/", "evaluation-platform/tests/", "evaluation-platform/changes.patch", "evaluation-platform/test-manifest.json", "evaluation-platform/test-results.json"],
+    commands: ["python -m compileall -q app tests run_self_test.py", "python run_self_test.py"],
+    expected_checks: [
+      "当前 117 个具名测试与 manifest 完全一致且全部通过",
+      "模型 Service 15 项、数据集 Service 16 项、实验 Service 15 项",
+      "执行引擎 23 项、工具类与事务 48 项",
+      "三份变更源码逐文件覆盖率均不低于 80%",
+      "HTTP 使用 MockTransport，Session 回滚隔离可核对",
+    ],
+    failure_signals: ["命令退出码非 0", "声明测试 ID 与实际集合不一致", "任一变更源码覆盖率低于 80%", "ZIP 缺完整真实项目副本"],
+    test_manifest_file: "evaluation-platform/test-manifest.json",
+    test_manifest_matches_collected: true,
+    test_suites: tc04TestManifest.categories,
+  };
+  const common = {
+    capability_id: "office-code-test-and-fix",
+    scenario_id: "TC-04",
+    version: 1,
+    round_number: 1,
+    source_file_refs: sourceRefs,
+    validator_id: "validator-evaluation-platform-project-v2",
+    verifier_status: "passed",
+    checks,
+    covered_period: "dev-015/source-code 完整 44 文件隔离副本",
+    statistic_basis: "五类共 117 项具名测试；三份变更源码逐文件覆盖率均不低于 80%；选定真实模块汇总覆盖率 95.7%",
+    purpose: "用于下载、复跑、审查 diff 后由人工合并；FORTE 原件未覆盖，未调用真实模型端点，未运行前端脚本，也未自动创建 PR。",
+    record_count: null,
+    key_outputs_label: "真实修复与测试范围",
+    review_guidance: "先审查 changes.patch 与修复前后回执，再在已有依赖环境复跑自测命令；通过后由人工决定如何合并。",
+    execution_summary: "未修复完整副本先出现 5 个红灯；修复后运行 117 项具名测试，117/117 通过；三份变更源码覆盖率均超过 80%。",
+    created_at: new Date().toISOString(),
+    original_inputs_modified: false,
+    review_required: true,
+    external_action: "none",
+  };
+  return {
+    ...base,
+    workspace_artifacts: [{
+      ...common,
+      artifact_id: artifactIds[0],
+      title: "评测平台修复包",
+      file_name: "评测平台真实修复包.zip",
+      media_type: "application/zip",
+      size: 264000,
+      summary: "完整复制 44 个真实项目文件，包含三处源码修复、117 项测试、逐文件覆盖率和复跑入口。",
+      deliverable_type: "完整真实工程隔离副本（ZIP）",
+      key_outputs: ["修复模型删除状态：只阻止 RUNNING 实验", "修复追加导入序号：从 max_seq + 1 开始", "修复 P99 小样本最近秩索引", "五类测试直接导入真实 Service、Engine 与 Utils", "117 个测试 ID 与 manifest 一致，117/117 通过", "model_service.py 97.9%；dataset_service.py 97.8%；evaluation_engine.py 89.2%"],
+      self_test: selfTest,
+      download_path: `/v1/harness/runs/${base.run_id}/artifacts/${artifactIds[0]}`,
+    }, {
+      ...common,
+      artifact_id: artifactIds[1],
+      title: "TC-04 真实测试报告",
+      file_name: "TC-04真实测试报告.md",
+      media_type: "text/markdown",
+      size: 5400,
+      summary: "分别记录旧 105 项替身 false green、真实未修复副本红灯和修复后 117 项绿灯。",
+      deliverable_type: "真实命令、测试清单与覆盖率报告（Markdown）",
+      key_outputs: ["修复前真实副本：5 个失败或错误", "修复后真实副本：117/117 通过", "三份变更源码逐文件覆盖率均超过 80%", "原 FORTE 44 个 source-code 文件未改动"],
+      self_test: null,
+      download_path: `/v1/harness/runs/${base.run_id}/artifacts/${artifactIds[1]}`,
+    }],
+    effect_receipts: [{
+      receipt_id: "effect-receipt-404040404040",
+      capability_id: "office-code-test-and-fix",
+      scenario_id: "TC-04",
+      status: "passed",
+      state: "已冻结完整 source-code 的 44 个 FORTE 输入，原始文件保持只读。",
+      action: "复制真实项目到隔离 Run Workspace，先跑红灯，再修复三处真实源码并复跑。",
+      observation: "生成 2 份真实成果文件，共享 12 项确定性检查，12/12 通过。",
+      cost: "0 次额外模型调用；本地测试进程未安装依赖。",
+      result: "真实项目修复包与报告可下载，等待人工代码评审与合并。",
+      source_file_refs: sourceRefs,
+      artifact_ids: artifactIds,
+      prohibited_side_effects: ["不修改 FORTE 原始源码", "不调用真实模型 endpoint", "不运行前端 package script", "不自动创建 PR"],
+      created_at: new Date().toISOString(),
+      external_action: "none",
+    }],
+    last_event_sequence: 20,
+  };
+}
+
 function boundedEffectSnapshot(body: { workspace_id: string; instruction: string }) {
   const base = snapshot(body, "completed", 18);
   return {
@@ -1039,7 +1142,7 @@ function locationFailureSnapshot(body: { workspace_id: string; instruction: stri
 }
 async function fulfillJson(route: Route, body: unknown, status = 200) { await route.fulfill({ status, contentType: "application/json", body: JSON.stringify(body) }); }
 
-async function mockHarness(page: Page, options: { failFirstStart?: boolean; failDecisionDefer?: boolean; disconnect?: boolean; failed?: boolean; locationFailure?: boolean; sourceRecovery?: boolean; sourceRecoveryThreeCandidates?: boolean; verifiedArtifactAuditPending?: boolean; verifiedArtifactAuditPendingDistinct?: boolean; verifiedFinanceArtifactAuditPending?: boolean; unverifiedArtifactLocationPending?: boolean; terminalArtifactLocationPending?: boolean; boundedRecovery?: boolean; effectArtifact?: boolean; outboundEffect?: boolean; reactEffect?: boolean; effectBoundary?: boolean; reviewTable?: boolean; workspaceFailures?: number; interactiveLoop?: boolean; evidenceGate?: boolean } = {}) {
+async function mockHarness(page: Page, options: { failFirstStart?: boolean; failDecisionDefer?: boolean; disconnect?: boolean; failed?: boolean; locationFailure?: boolean; sourceRecovery?: boolean; sourceRecoveryThreeCandidates?: boolean; verifiedArtifactAuditPending?: boolean; verifiedArtifactAuditPendingDistinct?: boolean; verifiedFinanceArtifactAuditPending?: boolean; unverifiedArtifactLocationPending?: boolean; terminalArtifactLocationPending?: boolean; boundedRecovery?: boolean; effectArtifact?: boolean; outboundEffect?: boolean; reactEffect?: boolean; evaluationEffect?: boolean; effectBoundary?: boolean; reviewTable?: boolean; workspaceFailures?: number; interactiveLoop?: boolean; evidenceGate?: boolean } = {}) {
   let workspaceCalls = 0; let startCalls = 0; let streamCalls = 0;
   let currentBody = { workspace_id: "forte-public-office", instruction: "" };
   // Mock snapshots intentionally cover several server state shapes in one route.
@@ -1060,6 +1163,7 @@ async function mockHarness(page: Page, options: { failFirstStart?: boolean; fail
     if (path.includes("/artifacts/") && route.request().method() === "GET") {
       if (options.outboundEffect) return route.fulfill({ status: 200, contentType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document", body: "mock-docx-bytes", headers: { "Content-Disposition": "attachment; filename*=UTF-8''%E5%A4%96%E5%91%BC%E6%B5%81%E7%A8%8B-M1%E9%80%BE%E6%9C%9F%E7%94%A8%E6%88%B7AI%E5%A4%96%E5%91%BC%E5%82%AC%E6%94%B6%E6%B5%81%E7%A8%8B%E5%9B%BE.docx" } });
       if (options.reactEffect) return route.fulfill({ status: 200, contentType: "application/zip", body: "mock-zip-bytes" });
+      if (options.evaluationEffect) return route.fulfill({ status: 200, contentType: "application/zip", body: "mock-evaluation-zip-bytes", headers: { "Content-Disposition": "attachment; filename*=UTF-8''%E8%AF%84%E6%B5%8B%E5%B9%B3%E5%8F%B0%E7%9C%9F%E5%AE%9E%E4%BF%AE%E5%A4%8D%E5%8C%85.zip" } });
       return route.fulfill({ status: 200, contentType: "text/csv; charset=utf-8", body: "科目名称,客商名称,未付款项\n应付账款,星海科技,100.00\n", headers: { "Content-Disposition": "attachment; filename*=UTF-8''%E6%9C%AA%E4%BB%98%E7%BB%9F%E8%AE%A1.csv" } });
     }
     if (path === "/v1/harness/runs" && route.request().method() === "GET") {
@@ -1086,6 +1190,8 @@ async function mockHarness(page: Page, options: { failFirstStart?: boolean; fail
         ? outboundEffectSnapshot(body)
         : options.reactEffect
         ? reactRefactorEffectSnapshot(body)
+        : options.evaluationEffect
+        ? evaluationPlatformEffectSnapshot(body)
         : options.effectBoundary
           ? boundedEffectSnapshot(body)
         : options.locationFailure
@@ -1450,6 +1556,115 @@ test("explains the real TC-02 project copy, diff, self-test and merge boundary",
   await expect(selfTest).toContainText("TC-02 自测卡");
   if (process.env.CAPTURE_TC02_EFFECT_EVIDENCE === "1") {
     await artifacts.screenshot({ path: "../../docs/evidence/screenshots/tc02-real-project-refactor-mobile.png" });
+  }
+});
+
+test("shows the real TC-04 project tests, per-file coverage and manual merge boundary", async ({ page }) => {
+  await mockHarness(page, { evaluationEffect: true });
+  await page.goto("/");
+  await page.getByRole("textbox", { name: "任务指令" }).fill("为评测平台补充单元测试，覆盖 Service、执行引擎和工具类；真实运行测试，修复失败，并给出覆盖率与修改文件。");
+  await page.getByRole("button", { name: "启动 Control Loop" }).click();
+
+  const artifacts = page.locator(".workspace-artifacts");
+  const selfTest = page.getByRole("region", { name: "TC-04 自测卡" });
+  const testSuites = page.getByRole("region", { name: "真实测试清单" });
+  await expect(artifacts).toContainText("Agent 已生成 2 份真实成果文件");
+  await expect(artifacts).toContainText("2 份成果共享 12 项确定性检查，12/12 通过");
+  await expect(artifacts).not.toContainText("24/24");
+  await expect(artifacts).toContainText("评测平台修复包");
+  await expect(artifacts).toContainText("TC-04 真实测试报告");
+  await expect(artifacts).toContainText("完整真实工程隔离副本");
+  await expect(artifacts).toContainText("完整 44 文件隔离副本");
+  await expect(artifacts).toContainText("44 份内容来源");
+  await expect(artifacts).toContainText("117/117 通过");
+  await expect(artifacts).toContainText("model_service.py 97.9%");
+  await expect(artifacts).toContainText("dataset_service.py 97.8%");
+  await expect(artifacts).toContainText("evaluation_engine.py 89.2%");
+  await expect(artifacts).toContainText("FORTE 原件未覆盖");
+  await expect(artifacts).toContainText("未自动创建 PR");
+  await expect(page.locator(".workspace-action-result")).toContainText("未修复完整副本先出现 5 个红灯");
+  await expect(page.locator(".loop-effect-conclusion")).toContainText("三份变更源码覆盖率均超过 80%");
+
+  await expect(selfTest).toContainText("TC-04 自测卡");
+  await expect(selfTest).not.toContainText("TC-02 自测卡");
+  await expect(selfTest).toContainText("python -m compileall -q app tests run_self_test.py");
+  await expect(selfTest).toContainText("python run_self_test.py");
+  await expect(testSuites).toContainText("117 项");
+  await expect(testSuites).toContainText("页面测试 ID、evaluation-platform/test-manifest.json 与实际 collected IDs 是同一集合");
+  for (const [label, count, files, representative] of [
+    ["模型 Service", "15 项", "tests/test_model_service.py · tests/test_model_service_matrix.py", "test_model_service.ModelServiceTests.test_delete_rejects_running_experiment"],
+    ["数据集 Service", "16 项", "tests/test_dataset_service.py · tests/test_dataset_service_matrix.py", "test_dataset_service.DatasetServiceTests.test_append_uses_next_sequence_after_current_maximum"],
+    ["实验 Service", "15 项", "tests/test_experiment_service.py · tests/test_experiment_service_matrix.py", "test_experiment_service.ExperimentServiceTests.test_create_experiment_commits_and_starts_real_engine_contract"],
+    ["执行引擎", "23 项", "tests/test_evaluation_engine.py · tests/test_evaluation_engine_matrix.py", "test_evaluation_engine.EvaluationEngineTests.test_execute_never_exceeds_experiment_concurrency"],
+    ["工具类与事务", "48 项", "tests/test_utils.py · tests/test_utils_boundaries.py", "test_utils.UtilityTests.test_rollback_is_isolated_from_a_new_session"],
+  ] as const) {
+    const suite = testSuites.locator("details").filter({ hasText: label });
+    await expect(suite).toContainText(count);
+    await expect(suite).toContainText(files);
+    await suite.locator("summary").click();
+    await expect(suite).toContainText(representative);
+    await suite.locator("summary").click();
+  }
+  const testListType = await testSuites.evaluate((element) => ({
+    explanation: Number.parseFloat(getComputedStyle(element.querySelector(":scope > header p")!).fontSize),
+    suiteTitle: Number.parseFloat(getComputedStyle(element.querySelector("summary b")!).fontSize),
+    suiteCount: Number.parseFloat(getComputedStyle(element.querySelector("summary strong")!).fontSize),
+    fileName: Number.parseFloat(getComputedStyle(element.querySelector("summary small")!).fontSize),
+    testId: Number.parseFloat(getComputedStyle(element.querySelector("ol code")!).fontSize),
+  }));
+  expect(testListType.explanation).toBeGreaterThanOrEqual(11);
+  expect(testListType.suiteTitle).toBeGreaterThanOrEqual(12);
+  expect(testListType.suiteCount).toBeGreaterThanOrEqual(12);
+  expect(testListType.fileName).toBeGreaterThanOrEqual(11);
+  expect(testListType.testId).toBeGreaterThanOrEqual(11);
+  await selfTest.getByText("查看应通过的测试与失败信号").click();
+  await expect(selfTest).toContainText("模型 Service 15 项");
+  await expect(selfTest).toContainText("执行引擎 23 项");
+  await expect(selfTest).toContainText("工具类与事务 48 项");
+  await expect(selfTest).toContainText("任一变更源码覆盖率低于 80%");
+
+  await artifacts.getByText("查看逐项检查").first().click();
+  await expect(artifacts).toContainText("修复前先复现缺陷");
+  await expect(artifacts).toContainText("117 个具名测试与 manifest 完全一致");
+
+  const downloadPromise = page.waitForEvent("download");
+  await artifacts.getByRole("button", { name: "下载成果" }).first().click();
+  const download = await downloadPromise;
+  expect(download.suggestedFilename()).toBe("评测平台真实修复包.zip");
+
+  const commandSize = await selfTest.locator("code").first().evaluate((element) => Number.parseFloat(getComputedStyle(element).fontSize));
+  expect(commandSize).toBeGreaterThanOrEqual(10);
+  if (process.env.CAPTURE_TC04_EFFECT_EVIDENCE === "1") {
+    await page.setViewportSize({ width: 1440, height: 1100 });
+    await artifacts.scrollIntoViewIfNeeded();
+    await page.screenshot({ path: "../../docs/evidence/screenshots/tc04-real-platform-tests-desktop.png" });
+    const evidenceStyle = await page.addStyleTag({ content: `
+      .harness-app-shell { display: block !important; }
+      .harness-workspace-shell { overflow: visible !important; }
+      .harness-agent-shell, .harness-app-divider, .dataset-browser { display: none !important; }
+      .data-workbench { width: 1400px !important; }
+      .data-workbench-grid { grid-template-columns: minmax(0, 1fr) !important; }
+      .workspace-artifacts { align-self: start !important; height: max-content !important; }
+    ` });
+    const evidenceHeight = await artifacts.evaluate((element) => element.scrollHeight);
+    await page.setViewportSize({ width: 1440, height: Math.min(6000, evidenceHeight + 40) });
+    await artifacts.screenshot({ path: "../../docs/evidence/screenshots/tc04-real-platform-tests-artifact-focus.png" });
+    await evidenceStyle.evaluate((element) => element.parentNode?.removeChild(element));
+  }
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  const pageMetrics = await page.evaluate(() => ({ viewport: document.documentElement.clientWidth, scroll: document.documentElement.scrollWidth }));
+  const artifactMetrics = await artifacts.evaluate((element) => ({ width: element.clientWidth, scroll: element.scrollWidth }));
+  expect(pageMetrics.scroll).toBeLessThanOrEqual(pageMetrics.viewport);
+  expect(artifactMetrics.scroll).toBeLessThanOrEqual(artifactMetrics.width);
+  await expect(selfTest).toContainText("TC-04 自测卡");
+  await expect(testSuites).toContainText("117 项");
+  await testSuites.locator("details").filter({ hasText: "工具类与事务" }).locator("summary").click();
+  await expect(testSuites).toContainText("test_utils.UtilityTests.test_rollback_is_isolated_from_a_new_session");
+  const suiteMetrics = await testSuites.evaluate((element) => ({ width: element.clientWidth, scroll: element.scrollWidth }));
+  expect(suiteMetrics.scroll).toBeLessThanOrEqual(suiteMetrics.width);
+  if (process.env.CAPTURE_TC04_EFFECT_EVIDENCE === "1") {
+    await artifacts.screenshot({ path: "../../docs/evidence/screenshots/tc04-real-platform-tests-mobile.png" });
   }
 });
 

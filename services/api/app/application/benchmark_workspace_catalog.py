@@ -299,6 +299,23 @@ class BenchmarkWorkspaceCatalog(BenchmarkScenarioCatalog):
         )
         return self._read_checked(self._safe_path(item.path), entry)
 
+    def checked_input_bytes_many(self, file_refs: list[str] | tuple[str, ...]) -> dict[str, bytes]:
+        """Verify one immutable batch after loading the allowlist exactly once."""
+
+        manifest, folders = self.load()
+        results: dict[str, bytes] = {}
+        for file_ref in dict.fromkeys(file_refs):
+            item = self._find_file(manifest, folders, file_ref)
+            entry = BenchmarkFileEntry(
+                path=item.path,
+                sha256=item.sha256,
+                size=item.size,
+                mime=item.mime,
+                role="input",
+            )
+            results[file_ref] = self._read_checked(self._safe_path(item.path), entry)
+        return results
+
     def agent_file_inputs(self, file_refs: list[str]) -> list[dict[str, Any]]:
         """Bound the material passed to the model independently of UI previews."""
         results: list[dict[str, Any]] = []

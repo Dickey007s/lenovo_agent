@@ -283,6 +283,20 @@ multi-instance coordination and governed external action remain target work.
   Run-level UI and receipts therefore report one shared 12-item checklist rather
   than inflating it to 24 checks. This is one fixed adapter, not an arbitrary code
   sandbox, automatic PR path or OS-level network isolation.
+- `DR-0041` replaces TC-04's historical 105-test `contracts.py` false green
+  with the complete 44-file dev-015 project copy. The same 117 named tests run
+  before and after three real-source fixes; the unpatched copy must expose five
+  target failures, while the fixed copy must pass 117/117 and keep each changed
+  file above 80% statement coverage. The self-test card shows five real suites,
+  files, counts and expandable collected IDs from the same public manifest used
+  by the ZIP. Before the roughly one-minute builder starts, the Runtime freezes
+  all 46 allowlisted inputs and persists a started event; the synchronous build
+  and test subprocesses then run through an in-process worker thread so health,
+  Run GET, workspace browsing and SSE remain available. A duplicate dispatch for
+  the same Run/capability is ignored, and failure emits `scenario_effect_failed`
+  without a green Artifact. This remains one fixed adapter, not an arbitrary
+  test sandbox, OS-level network isolation, real endpoint integration, automatic
+  PR path, multi Worker scheduler or resumable Tool Gateway.
 - No target-user study has been run. Clarity, trust, efficiency and user value
   remain hypotheses.
 

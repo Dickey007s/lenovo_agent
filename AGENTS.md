@@ -80,6 +80,21 @@ generated project's default action policy deterministically follows planned
 tools; its interface is replaceable, but this does not prove model-driven ReAct
 inside the project. Outer Planner/Analyst receipts must remain separate.
 
+DR-0041 governs TC-04 real-platform testing. Read
+`docs/decisions/DR-0041-tc04-real-evaluation-platform-tests.md`,
+`docs/scenarios/SCENARIO-027-test-and-fix-real-evaluation-platform-copy.md`
+and its Evidence before changing the fixed dev-015 adapter or test-inventory UI.
+TC-04 must copy all 44 source-code files, preserve the old 105-test false green
+and the unpatched real-project red baseline separately, run the same >=100 real
+module tests before/after fixes, gate each changed file at >=80% statement
+coverage and expose the exact collected IDs from one public manifest. It is not
+an arbitrary sandbox, OS network isolation, real endpoint integration or auto PR.
+TC-04 freezes 46 allowlisted inputs before moving its synchronous builder to an
+in-process worker thread. The started event precedes the long work; health, Run
+GET and SSE must remain responsive, and `scenario_effect_failed` creates no green
+Artifact. This is not multi Worker scheduling or durable subprocess execution;
+restart follows the existing checkpoint pause rule.
+
 DR-0037 governs TC-05 Artifact meaning and review typography. Read
 `docs/decisions/DR-0037-tc05-artifact-semantics-and-review-readability.md` and
 `docs/scenarios/SCENARIO-023-understand-finance-artifacts-and-review-evidence.md`

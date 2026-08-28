@@ -1,0 +1,35 @@
+{
+  "schema_version": "tc04-ui-screenshot-manifest.v1",
+  "generated_at": "2026-08-28T18:58:34.9521174+08:00",
+  "scenario_id": "TC-04",
+  "screenshots": [
+    {
+      "path": "docs/evidence/screenshots/tc04-real-platform-tests-desktop.png",
+      "capture_mode": "normal page viewport; no CSS injection",
+      "viewport": "1440x1100 CSS viewport",
+      "width": 1440,
+      "height": 1100,
+      "bytes": 187051,
+      "sha256": "b150da49e731f02ab6eed281652f9136aac09c2a71746e90ef6f4e4a99c35747"
+    },
+    {
+      "path": "docs/evidence/screenshots/tc04-real-platform-tests-artifact-focus.png",
+      "capture_mode": "artifact focus crop; side regions hidden and content column widened without changing artifact text or state",
+      "viewport": "derived from 1440px browser viewport",
+      "width": 1338,
+      "height": 2279,
+      "bytes": 234515,
+      "sha256": "745a0f3367bec82bb79166ae270cadde60a5629a0541570d9356814fc8191210"
+    },
+    {
+      "path": "docs/evidence/screenshots/tc04-real-platform-tests-mobile.png",
+      "capture_mode": "artifact region in the unmodified responsive page layout",
+      "viewport": "390x844 CSS viewport; captured artifact region is 334px wide",
+      "width": 334,
+      "height": 4239,
+      "bytes": 235536,
+      "sha256": "b47776e04158fded997df8d1391773a5e692131a471fd1dfa51cabf33812a686"
+    }
+  ],
+  "claim_boundary": "截图和浏览器自动化证明被测布局、字号与公开事实投影，不证明真实用户理解、测试质量或任意仓库适配能力。"
+}

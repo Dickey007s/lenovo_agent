@@ -99,6 +99,8 @@ def _tc02_zip_content_gate(content: bytes) -> dict[str, Any]:
                     env=env,
                     capture_output=True,
                     text=True,
+                    encoding="utf-8",
+                    errors="replace",
                     check=False,
                     timeout=30,
                 )
@@ -110,6 +112,8 @@ def _tc02_zip_content_gate(content: bytes) -> dict[str, Any]:
                     env=env,
                     capture_output=True,
                     text=True,
+                    encoding="utf-8",
+                    errors="replace",
                     check=False,
                     timeout=30,
                 )
@@ -148,6 +152,231 @@ def _tc02_zip_content_gate(content: bytes) -> dict[str, Any]:
             "network_boundary": "本次固定测试未调用网络或生产搜索；没有 OS 级 socket 隔离。",
         }
     except (KeyError, OSError, ValueError, json.JSONDecodeError, zipfile.BadZipFile, subprocess.SubprocessError) as exc:
+        return {
+            "passed": False,
+            "valid_zip": False,
+            "error": type(exc).__name__,
+            "detail": str(exc),
+        }
+
+
+def _tc04_zip_content_gate(content: bytes) -> dict[str, Any]:
+    project_prefix = "evaluation-platform/"
+    source_root = FORTE_ROOT / "dev-015" / "input" / "source-code"
+    source_files = {
+        path.relative_to(source_root).as_posix(): path
+        for path in source_root.rglob("*")
+        if path.is_file()
+    }
+    changed_files = {
+        "app/services/model_service.py",
+        "app/services/dataset_service.py",
+        "app/engine/evaluation_engine.py",
+    }
+    required_support_files = {
+        "run_self_test.py",
+        "requirements-test.txt",
+        "test-manifest.json",
+        "test-results.json",
+        "baseline-test-results.json",
+        "changes.patch",
+        "changes.json",
+        "修复说明.md",
+        "TC-04自测卡.md",
+        "test-report.md",
+    }
+    expected_project_members = {
+        f"{project_prefix}{name}" for name in source_files
+    }
+    expected_support_members = {
+        f"{project_prefix}{name}" for name in required_support_files
+    }
+    try:
+        with zipfile.ZipFile(io.BytesIO(content)) as archive:
+            members = archive.infolist()
+            unsafe = [
+                item.filename
+                for item in members
+                if Path(item.filename).is_absolute()
+                or ".." in Path(item.filename).parts
+                or stat.S_ISLNK(item.external_attr >> 16)
+            ]
+            names = {item.filename for item in members if not item.is_dir()}
+            missing = sorted(
+                (expected_project_members | expected_support_members) - names
+            )
+            if unsafe or missing:
+                return {
+                    "passed": False,
+                    "valid_zip": True,
+                    "unsafe_members": unsafe,
+                    "missing_members": missing,
+                }
+
+            unchanged_source_files = {
+                name: (
+                    hashlib.sha256(archive.read(f"{project_prefix}{name}")).hexdigest()
+                    == hashlib.sha256(path.read_bytes()).hexdigest()
+                )
+                for name, path in source_files.items()
+                if name not in changed_files
+            }
+            changed_source_files = {
+                name: (
+                    hashlib.sha256(archive.read(f"{project_prefix}{name}")).hexdigest()
+                    != hashlib.sha256(source_files[name].read_bytes()).hexdigest()
+                )
+                for name in changed_files
+            }
+            manifest = json.loads(
+                archive.read(f"{project_prefix}test-manifest.json")
+            )
+            declared_result = json.loads(
+                archive.read(f"{project_prefix}test-results.json")
+            )
+            baseline_result = json.loads(
+                archive.read(f"{project_prefix}baseline-test-results.json")
+            )
+            changes = json.loads(archive.read(f"{project_prefix}changes.json"))
+
+            with tempfile.TemporaryDirectory(prefix="tc04-live-download-") as directory:
+                root = Path(directory)
+                archive.extractall(root)
+                project_root = root / "evaluation-platform"
+                env = {
+                    "PATH": os.environ.get("PATH", ""),
+                    "SYSTEMROOT": os.environ.get("SYSTEMROOT", ""),
+                    "WINDIR": os.environ.get("WINDIR", ""),
+                    "TEMP": os.environ.get("TEMP", directory),
+                    "TMP": os.environ.get("TMP", directory),
+                    "PYTHONNOUSERSITE": "1",
+                    "HTTP_PROXY": "",
+                    "HTTPS_PROXY": "",
+                    "ALL_PROXY": "",
+                    "NO_PROXY": "*",
+                }
+                compile_started = time.monotonic()
+                compiled = subprocess.run(
+                    [
+                        sys.executable,
+                        "-m",
+                        "compileall",
+                        "-q",
+                        "app",
+                        "tests",
+                        "run_self_test.py",
+                    ],
+                    cwd=project_root,
+                    env=env,
+                    capture_output=True,
+                    text=True,
+                    encoding="utf-8",
+                    errors="replace",
+                    check=False,
+                    timeout=120,
+                )
+                compile_ms = int((time.monotonic() - compile_started) * 1000)
+                test_started = time.monotonic()
+                tested = subprocess.run(
+                    [sys.executable, "run_self_test.py"],
+                    cwd=project_root,
+                    env=env,
+                    capture_output=True,
+                    text=True,
+                    encoding="utf-8",
+                    errors="replace",
+                    check=False,
+                    timeout=120,
+                )
+                test_ms = int((time.monotonic() - test_started) * 1000)
+                rerun_result = json.loads(
+                    (project_root / "test-results.json").read_text(encoding="utf-8")
+                )
+
+        declared_ids = sorted(manifest.get("declared_test_ids", []))
+        archived_ids = sorted(declared_result.get("collected_test_ids", []))
+        rerun_ids = sorted(rerun_result.get("collected_test_ids", []))
+        manifest_consistent = (
+            len(declared_ids) == 117
+            and declared_ids == archived_ids == rerun_ids
+            and declared_result.get("manifest_consistent") is True
+            and rerun_result.get("manifest_consistent") is True
+        )
+        baseline_red_count = int(baseline_result.get("failed", 0)) + int(
+            baseline_result.get("errors", 0)
+        )
+        changed_coverage = changes.get("changed_source_coverage_percent", {})
+        changed_coverage_ok = (
+            set(changed_coverage) == changed_files
+            and all(float(value) >= 80.0 for value in changed_coverage.values())
+        )
+        final_results_match = all(
+            result.get("status") == "passed"
+            and result.get("collected") == 117
+            and result.get("passed") == 117
+            and result.get("failed") == 0
+            and result.get("errors") == 0
+            for result in (declared_result, rerun_result)
+        )
+        source_copy_ok = (
+            len(source_files) == 44
+            and all(unchanged_source_files.values())
+            and all(changed_source_files.values())
+            and set(changes.get("modified_files", [])) == changed_files
+            and changes.get("source_file_count") == 44
+            and changes.get("source_input_modified") is False
+        )
+        passed = (
+            compiled.returncode == 0
+            and tested.returncode == 0
+            and source_copy_ok
+            and manifest_consistent
+            and final_results_match
+            and baseline_red_count == 5
+            and changed_coverage_ok
+        )
+        return {
+            "passed": passed,
+            "valid_zip": True,
+            "file_count": len(names),
+            "source_file_count": len(source_files),
+            "missing_members": [],
+            "unsafe_members": [],
+            "source_copy": {
+                "unchanged_file_count": sum(unchanged_source_files.values()),
+                "expected_unchanged_file_count": len(source_files) - len(changed_files),
+                "changed_files": sorted(
+                    name for name, changed in changed_source_files.items() if changed
+                ),
+                "passed": source_copy_ok,
+            },
+            "compile": {"exit_code": compiled.returncode, "elapsed_ms": compile_ms},
+            "tests": {
+                "exit_code": tested.returncode,
+                "elapsed_ms": test_ms,
+                "collected": rerun_result.get("collected"),
+                "passed": rerun_result.get("passed"),
+                "failed": rerun_result.get("failed"),
+                "errors": rerun_result.get("errors"),
+                "manifest_consistent": manifest_consistent,
+            },
+            "baseline_red_count": baseline_red_count,
+            "changed_source_coverage_percent": changed_coverage,
+            "changed_source_coverage_gate_passed": changed_coverage_ok,
+            "network_boundary": (
+                "复跑进程阻断非 loopback socket.connect，HTTP 测试使用 MockTransport；"
+                "这不是 OS 级断网或通用代码沙箱。"
+            ),
+        }
+    except (
+        KeyError,
+        OSError,
+        TypeError,
+        ValueError,
+        json.JSONDecodeError,
+        zipfile.BadZipFile,
+        subprocess.SubprocessError,
+    ) as exc:
         return {
             "passed": False,
             "valid_zip": False,
@@ -246,6 +475,7 @@ def _event_projection(snapshot: dict[str, Any]) -> list[dict[str, Any]]:
         "analysis_structure_rejected",
         "analysis_validation_rejected",
         "deterministic_office_tool_started",
+        "scenario_effect_failed",
         "run_workspace_artifact_written",
         "deterministic_verification_completed",
         "scenario_effect_bounded",
@@ -285,6 +515,12 @@ def _download_artifacts(
             and artifact.get("media_type") == "application/zip"
         ):
             content_gate = _tc02_zip_content_gate(response.content)
+        elif (
+            response.status_code == 200
+            and artifact.get("scenario_id") == "TC-04"
+            and artifact.get("media_type") == "application/zip"
+        ):
+            content_gate = _tc04_zip_content_gate(response.content)
         downloads.append(
             {
                 "artifact_id": artifact["artifact_id"],
@@ -309,31 +545,55 @@ def _run_one(
     scenario_id: str,
     timeout_seconds: int,
     poll_seconds: float,
+    existing_run_id: str | None = None,
 ) -> dict[str, Any]:
     spec = next(item for item in SCENARIO_EFFECT_SPECS if item.scenario_id == scenario_id)
     started_at = datetime.now(timezone.utc)
-    idempotency_key = f"scenario-effect-live-{scenario_id.lower()}-{uuid.uuid4().hex}"
-    response = client.post(
-        f"{api_base}/v1/harness/runs",
-        json={
-            "idempotency_key": idempotency_key,
-            "instruction": spec.instruction,
-            "loop": {
-                "max_rounds": 12,
-                "max_files_per_round": 16,
-                "max_model_calls": 30,
-                "deadline_seconds": 7200,
+    if existing_run_id is None:
+        idempotency_key = (
+            f"scenario-effect-live-{scenario_id.lower()}-{uuid.uuid4().hex}"
+        )
+        response = client.post(
+            f"{api_base}/v1/harness/runs",
+            json={
+                "idempotency_key": idempotency_key,
+                "instruction": spec.instruction,
+                "loop": {
+                    "max_rounds": 12,
+                    "max_files_per_round": 16,
+                    "max_model_calls": 30,
+                    "deadline_seconds": 7200,
+                },
             },
-        },
-    )
-    response.raise_for_status()
-    snapshot = response.json()["run"]
-    run_id = snapshot["run_id"]
+        )
+        response.raise_for_status()
+        snapshot = response.json()["run"]
+        run_id = snapshot["run_id"]
+    else:
+        run_id = existing_run_id
+        response = client.get(f"{api_base}/v1/harness/runs/{run_id}")
+        response.raise_for_status()
+        snapshot = response.json()
+        if snapshot.get("instruction") != spec.instruction:
+            raise RuntimeError(
+                f"Run {run_id} 的用户指令与 {scenario_id} 固定效果门不一致"
+            )
+        created_at = snapshot.get("created_at")
+        if created_at:
+            started_at = datetime.fromisoformat(created_at.replace("Z", "+00:00"))
     deadline = time.monotonic() + timeout_seconds
+    run_started_monotonic = time.monotonic()
     previous_marker: tuple[Any, ...] | None = None
     timed_out = False
+    run_get_latencies_ms: list[int] = []
+    active_run_get_latencies_ms: list[int] = []
+    active_health_latencies_ms: list[int] = []
+    sse_probe: dict[str, Any] | None = None
     while True:
+        snapshot_started = time.monotonic()
         snapshot_response = client.get(f"{api_base}/v1/harness/runs/{run_id}")
+        snapshot_elapsed_ms = int((time.monotonic() - snapshot_started) * 1_000)
+        run_get_latencies_ms.append(snapshot_elapsed_ms)
         snapshot_response.raise_for_status()
         snapshot = snapshot_response.json()
         marker = (
@@ -355,6 +615,43 @@ def _run_one(
             for item in snapshot.get("effect_receipts", [])
             if item.get("scenario_id") == scenario_id
         ]
+        started_events = [
+            item
+            for item in snapshot.get("events", [])
+            if item.get("event_name") == "deterministic_office_tool_started"
+            and item.get("details", {}).get("scenario_id") == scenario_id
+        ]
+        effect_active = bool(started_events) and not receipts and not any(
+            item.get("event_name") == "scenario_effect_failed"
+            and item.get("details", {}).get("scenario_id") == scenario_id
+            for item in snapshot.get("events", [])
+        )
+        if effect_active:
+            active_run_get_latencies_ms.append(snapshot_elapsed_ms)
+            health_started = time.monotonic()
+            health_response = client.get(f"{api_base}/v1/health")
+            health_elapsed_ms = int((time.monotonic() - health_started) * 1_000)
+            health_response.raise_for_status()
+            active_health_latencies_ms.append(health_elapsed_ms)
+            if sse_probe is None:
+                started_sequence = int(started_events[-1]["sequence"])
+                stream_started = time.monotonic()
+                observed_event: str | None = None
+                with client.stream(
+                    "GET",
+                    f"{api_base}/v1/harness/runs/{run_id}/events",
+                    params={"after": max(0, started_sequence - 1)},
+                ) as stream_response:
+                    stream_response.raise_for_status()
+                    for line in stream_response.iter_lines():
+                        if line.startswith("event: "):
+                            observed_event = line.removeprefix("event: ").strip()
+                            break
+                sse_probe = {
+                    "event_name": observed_event,
+                    "elapsed_ms": int((time.monotonic() - stream_started) * 1_000),
+                    "after_sequence": max(0, started_sequence - 1),
+                }
         if snapshot.get("status") in SETTLED_STATUSES and receipts:
             break
         if snapshot.get("status") in {"failed", "stopped"}:
@@ -397,6 +694,19 @@ def _run_one(
         any(item["output_used"] for item in planner_calls)
         and any(item["output_used"] for item in analyst_calls)
     )
+    request_latency_limit_ms = 5_000
+    responsiveness_gate_passed = scenario_id != "TC-04" or (
+        bool(active_run_get_latencies_ms)
+        and bool(active_health_latencies_ms)
+        and max(run_get_latencies_ms, default=request_latency_limit_ms + 1)
+        <= request_latency_limit_ms
+        and max(active_health_latencies_ms, default=request_latency_limit_ms + 1)
+        <= request_latency_limit_ms
+        and sse_probe is not None
+        and sse_probe.get("event_name") == "deterministic_office_tool_started"
+        and int(sse_probe.get("elapsed_ms", request_latency_limit_ms + 1))
+        <= request_latency_limit_ms
+    )
     effect_gate_passed = (
         not timed_out
         and receipt_passed
@@ -410,6 +720,7 @@ def _run_one(
             for item in downloads
         )
         and model_execution_gate
+        and responsiveness_gate_passed
         and all(item.get("external_action") == "none" for item in receipts)
         and all(item.get("original_inputs_modified") is False for item in artifacts)
     )
@@ -428,6 +739,29 @@ def _run_one(
         "model_calls": calls,
         "model_execution_gate_passed": model_execution_gate,
         "model_output_adopted": model_output_adopted,
+        "api_responsiveness": {
+            "client_total_timeout_seconds": 180,
+            "request_latency_gate_ms": request_latency_limit_ms,
+            "run_get_sample_count": len(run_get_latencies_ms),
+            "run_get_max_ms": max(run_get_latencies_ms, default=None),
+            "effect_active_run_get_sample_count": len(active_run_get_latencies_ms),
+            "effect_active_run_get_max_ms": max(
+                active_run_get_latencies_ms, default=None
+            ),
+            "effect_active_health_sample_count": len(active_health_latencies_ms),
+            "effect_active_health_max_ms": max(
+                active_health_latencies_ms, default=None
+            ),
+            "sse_probe": sse_probe,
+            "scenario_elapsed_ms": int(
+                (time.monotonic() - run_started_monotonic) * 1_000
+            ),
+            "passed": responsiveness_gate_passed,
+            "boundary": (
+                "总任务可持续约一分钟；这里验证的是单次 Run GET、health 与 SSE 请求"
+                "未被同步构建阻塞，不证明线程内子进程可跨进程续跑。"
+            ),
+        },
         "effect_receipts": receipts,
         "artifacts": [
             {
@@ -481,23 +815,30 @@ def main() -> None:
     parser.add_argument("--scenarios", nargs="+", default=list(DEFAULT_SCENARIOS))
     parser.add_argument("--timeout-seconds", type=int, default=1_200)
     parser.add_argument("--poll-seconds", type=float, default=2.0)
+    parser.add_argument(
+        "--run-id",
+        help="复用一个已经创建的 Run；仅允许与单个 --scenarios 一起使用。",
+    )
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
     unknown = sorted(set(args.scenarios) - {item.scenario_id for item in SCENARIO_EFFECT_SPECS})
     if unknown:
         raise SystemExit(f"未知场景: {', '.join(unknown)}")
+    if args.run_id and len(args.scenarios) != 1:
+        raise SystemExit("--run-id 只能与单个 --scenarios 一起使用")
 
-    health = httpx.get(f"{args.api_base}/v1/health", timeout=10.0)
-    health.raise_for_status()
-    health_payload = health.json()
-    if health_payload.get("model") != "deepseek-v4-pro":
-        raise SystemExit("当前服务未配置 deepseek-v4-pro，拒绝生成伪 live evidence")
     before = _input_tree_digest()
     results: list[dict[str, Any]] = []
     with httpx.Client(
         headers={"X-User-Id": args.owner},
-        timeout=httpx.Timeout(30.0, connect=10.0),
+        timeout=httpx.Timeout(180.0, connect=10.0),
+        trust_env=False,
     ) as client:
+        health = client.get(f"{args.api_base}/v1/health")
+        health.raise_for_status()
+        health_payload = health.json()
+        if health_payload.get("model") != "deepseek-v4-pro":
+            raise SystemExit("当前服务未配置 deepseek-v4-pro，拒绝生成伪 live evidence")
         for scenario_id in args.scenarios:
             results.append(
                 _run_one(
@@ -506,6 +847,7 @@ def main() -> None:
                     scenario_id=scenario_id,
                     timeout_seconds=args.timeout_seconds,
                     poll_seconds=args.poll_seconds,
+                    existing_run_id=args.run_id,
                 )
             )
     after = _input_tree_digest()
