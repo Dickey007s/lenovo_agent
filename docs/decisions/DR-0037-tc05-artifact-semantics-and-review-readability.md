@@ -1,6 +1,6 @@
 # DR-0037：TC-05 成果语义与问题审查可读性
 
-- 状态：Accepted；本地确定性门 `Limited Verified`，PR 门待绑定
+- 状态：Accepted；本地确定性门与 PR #47 PostgreSQL 顺序恢复门 `Limited Verified`
 - 日期：2026-08-28
 - Owner：Office Agent 项目组
 - Source：`USER-FEEDBACK-20260828-TC05-ARTIFACT-MEANING-AND-REVIEW-READABILITY`

@@ -1,7 +1,8 @@
 # DR-0037 TC-05 成果语义与审查可读性 Evidence
 
 - 日期：2026-08-28
-- 状态：`Limited Verified`（本地确定性门）；等待最终提交与 PR 门绑定
+- 状态：`Limited Verified`（本地确定性门与远端 PostgreSQL 顺序恢复门）
+- 实现：[`5aa04d806e3c4d68803ede0357a005ea7c995684`](https://github.com/Dickey007s/lenovo_agent/commit/5aa04d806e3c4d68803ede0357a005ea7c995684)；[`PR #47`](https://github.com/Dickey007s/lenovo_agent/pull/47)
 - Decision：[`DR-0037`](../decisions/DR-0037-tc05-artifact-semantics-and-review-readability.md)
 - Scenario：[`SCENARIO-023`](../scenarios/SCENARIO-023-understand-finance-artifacts-and-review-evidence.md)
 - 反馈来源：[`USER-FEEDBACK-20260828-TC05-ARTIFACT-MEANING-AND-REVIEW-READABILITY`](../sources/USER-FEEDBACK-20260828-tc05-artifact-meaning-and-review-readability.md)
@@ -22,14 +23,15 @@
 
 ## 本地验证
 
-- `uv run pytest -q`：`116 passed, 3 skipped in 38.49s`。三个 skip 是需要显式
-  `TEST_DATABASE_DSN` 的 PostgreSQL 集成门；本轮字段保持 Snapshot JSONB 兼容，仍等待
-  PR 的真实 PostgreSQL workflow 结论。
+- `uv run pytest -q`：`116 passed, 3 skipped in 31.66s`。三个 skip 是需要显式
+  `TEST_DATABASE_DSN` 的 PostgreSQL 集成门。
 - `uv run ruff check .`：通过。
 - `pnpm --dir apps/web lint`：通过。
 - `pnpm --dir apps/web build`：通过。
 - `pnpm --dir apps/web exec playwright test e2e/harness-workbench.spec.ts`：
-  `30 passed in 58.5s`。
+  `30 passed in 54.8s`。
+- PR #47 远端 [`PostgreSQL restart evidence`](https://github.com/Dickey007s/lenovo_agent/actions/runs/33150243142/job/98780289683)：
+  PostgreSQL 17.11，`3 passed in 4.41s`，check `durable-agent-control-loop` passed。
 - TC-05 后端事实测试断言：未付/未收为 31/2 条真实数据行；两个 CSV 都只绑定 2026
   `file_ref` 与各自三项检查；三期说明绑定三个期间与两项跨期检查。
 - 浏览器回归断言：三张成果卡的期间、口径、用途、内容来源和记录数；问题审查页 fact
@@ -42,10 +44,6 @@
 - [`dr-0037-tc05-artifact-semantics-mobile.png`](screenshots/dr-0037-tc05-artifact-semantics-mobile.png)，`334 x 1747` 的 390 px 视口成果区，92885 bytes，SHA-256 `AC82537DD16AE8059B5E07A8837576FE1FB3E87C04929F56A769E0556278B012`。
 - [`dr-0037-review-readability-desktop.png`](screenshots/dr-0037-review-readability-desktop.png)，`1380 x 972`，142220 bytes，SHA-256 `16A128846C02685AFE5C6CEA12D6D5D1460ADC7428A8C44CF2D240D5421FEF79`。
 - [`dr-0037-review-readability-mobile.png`](screenshots/dr-0037-review-readability-mobile.png)，`390 x 844`，46142 bytes，SHA-256 `669FC66706B380FCD3FD79D1F67565145259048DC03D7B77254CA355B6C5057A`。
-
-## 待绑定
-
-- 最终代码 SHA、PR、远端 PostgreSQL/check 状态和最新 master 本地服务状态。
 
 ## 证明边界
 
