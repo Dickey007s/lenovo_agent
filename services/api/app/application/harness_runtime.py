@@ -209,9 +209,7 @@ class HarnessEvidenceQuote(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     file_ref: str
-    role: Literal[
-        "expected", "observed", "support", "contradiction", "context"
-    ]
+    role: Literal["expected", "observed", "support", "contradiction", "context"]
     label: str = Field(min_length=1, max_length=120)
     quote: str = Field(min_length=4, max_length=600)
 
@@ -219,9 +217,7 @@ class HarnessEvidenceQuote(BaseModel):
 class HarnessFinding(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    finding_id: str | None = Field(
-        default=None, pattern=r"^finding-[0-9a-f]{12}$"
-    )
+    finding_id: str | None = Field(default=None, pattern=r"^finding-[0-9a-f]{12}$")
     plan_unit_id: str | None = Field(default=None, min_length=1, max_length=120)
     affected_branch_ids: list[str] = Field(default_factory=list, max_length=12)
     title: str = Field(min_length=1, max_length=240)
@@ -229,9 +225,7 @@ class HarnessFinding(BaseModel):
     fact_summary: str | None = Field(default=None, max_length=500)
     impact: str | None = Field(default=None, max_length=500)
     file_refs: list[str] = Field(min_length=1, max_length=100)
-    evidence_quotes: list[HarnessEvidenceQuote] = Field(
-        default_factory=list, max_length=6
-    )
+    evidence_quotes: list[HarnessEvidenceQuote] = Field(default_factory=list, max_length=6)
     evidence_anchors: list[AgentControlLoopEvidenceAnchor] = Field(
         default_factory=list, max_length=6
     )
@@ -293,9 +287,7 @@ class HarnessRunSnapshot(BaseModel):
         "stop_requested",
         "stopped",
     ] = "running"
-    control_events: list[AgentControlLoopControlEvent] = Field(
-        default_factory=list, max_length=100
-    )
+    control_events: list[AgentControlLoopControlEvent] = Field(default_factory=list, max_length=100)
     decision_records: list[AgentControlLoopDecisionRecord] = Field(
         default_factory=list, max_length=100
     )
@@ -303,9 +295,7 @@ class HarnessRunSnapshot(BaseModel):
         default_factory=list, max_length=100
     )
     branches: list[AgentControlLoopBranch] = Field(default_factory=list, max_length=36)
-    active_branch_id: str | None = Field(
-        default=None, pattern=r"^branch-[0-9a-f]{12}$"
-    )
+    active_branch_id: str | None = Field(default=None, pattern=r"^branch-[0-9a-f]{12}$")
     artifact_versions: list[AgentControlLoopArtifactVersion] = Field(
         default_factory=list, max_length=24
     )
@@ -339,9 +329,12 @@ class HarnessRunStart(BaseModel):
     @classmethod
     def validate_instruction(cls, value: str) -> str:
         normalized = value.strip()
-        if len(normalized) < 3 or any(ord(character) < 32 and character not in "\n\t" for character in normalized):
+        if len(normalized) < 3 or any(
+            ord(character) < 32 and character not in "\n\t" for character in normalized
+        ):
             raise ValueError("instruction contains invalid content")
         return normalized
+
 
 class HarnessRunStartResult(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -467,7 +460,9 @@ class OpenAICompatibleHarnessPlanner:
 
     MODEL = "deepseek-v4-pro"
 
-    def __init__(self, *, base_url: str, api_key: str, model: str = MODEL, timeout: float = 60) -> None:
+    def __init__(
+        self, *, base_url: str, api_key: str, model: str = MODEL, timeout: float = 60
+    ) -> None:
         if model != self.MODEL:
             raise ValueError(f"Harness 只允许使用 {self.MODEL}")
         self.base_url = base_url.rstrip("/")
@@ -514,20 +509,33 @@ class OpenAICompatibleHarnessPlanner:
         try:
             async with httpx.AsyncClient(timeout=self.timeout) as client:
                 request_started = True
-                response = await client.post(f"{self.base_url}/chat/completions", json=payload, headers=headers)
+                response = await client.post(
+                    f"{self.base_url}/chat/completions", json=payload, headers=headers
+                )
                 if response.status_code == 400 and "response_format" in response.text.lower():
                     payload.pop("response_format", None)
                     request_started = True
-                    response = await client.post(f"{self.base_url}/chat/completions", json=payload, headers=headers)
+                    response = await client.post(
+                        f"{self.base_url}/chat/completions", json=payload, headers=headers
+                    )
                 response.raise_for_status()
             content = response.json()["choices"][0]["message"]["content"]
             if not isinstance(content, str):
                 raise TypeError("model content is not text")
             content = content.strip()
             if content.startswith("```"):
-                content = content.removeprefix("```json").removeprefix("```").removesuffix("```").strip()
+                content = (
+                    content.removeprefix("```json").removeprefix("```").removesuffix("```").strip()
+                )
             return HarnessPlanCandidate.model_validate(json.loads(content))
-        except (httpx.HTTPError, KeyError, IndexError, TypeError, json.JSONDecodeError, ValidationError) as exc:
+        except (
+            httpx.HTTPError,
+            KeyError,
+            IndexError,
+            TypeError,
+            json.JSONDecodeError,
+            ValidationError,
+        ) as exc:
             raise HarnessModelError(
                 "模型未返回合法的 Harness DAG JSON",
                 called=request_started,
@@ -643,10 +651,7 @@ class OpenAICompatibleHarnessAnalyst:
             content = content.strip()
             if content.startswith("```"):
                 content = (
-                    content.removeprefix("```json")
-                    .removeprefix("```")
-                    .removesuffix("```")
-                    .strip()
+                    content.removeprefix("```json").removeprefix("```").removesuffix("```").strip()
                 )
             return HarnessTaskResult.model_validate(json.loads(content))
         except (
@@ -732,9 +737,7 @@ class HarnessRuntime:
         self.artifact_store = artifact_store
         self._runs: dict[tuple[str, str], _Run] = {}
         self._idempotent: dict[tuple[str, str], _IdempotentStart] = {}
-        self._control_idempotent: dict[
-            tuple[str, str], _IdempotentControl
-        ] = {}
+        self._control_idempotent: dict[tuple[str, str], _IdempotentControl] = {}
         self._tasks: dict[str, asyncio.Task[None]] = {}
         self._effect_inflight: set[tuple[str, str, str]] = set()
         self._lock = asyncio.Lock()
@@ -757,21 +760,15 @@ class HarnessRuntime:
                     completed_rounds = [
                         item for item in snapshot.rounds if item.status == "completed"
                     ]
-                    completed_round_numbers = {
-                        item.round_number for item in completed_rounds
-                    }
+                    completed_round_numbers = {item.round_number for item in completed_rounds}
                     recovered_branches = [
                         item
                         for item in snapshot.branches
                         if item.round_number in completed_round_numbers
                     ]
-                    recovered_branch_ids = {
-                        item.branch_id for item in recovered_branches
-                    }
+                    recovered_branch_ids = {item.branch_id for item in recovered_branches}
                     recovered_status = (
-                        "waiting_input"
-                        if snapshot.status == "waiting_input"
-                        else "paused"
+                        "waiting_input" if snapshot.status == "waiting_input" else "paused"
                     )
                     event = HarnessEvent(
                         sequence=snapshot.last_event_sequence + 1,
@@ -831,18 +828,16 @@ class HarnessRuntime:
 
             for record in await self.state_store.load_idempotency():
                 if record.kind == "start":
-                    self._idempotent[(record.owner_id, record.idempotency_key)] = (
-                        _IdempotentStart(
-                            digest=record.digest,
-                            result=HarnessRunStartResult.model_validate(record.result),
-                        )
+                    self._idempotent[(record.owner_id, record.idempotency_key)] = _IdempotentStart(
+                        digest=record.digest,
+                        result=HarnessRunStartResult.model_validate(record.result),
                     )
                 else:
-                    self._control_idempotent[
-                        (record.owner_id, record.idempotency_key)
-                    ] = _IdempotentControl(
-                        digest=record.digest,
-                        result=HarnessControlResult.model_validate(record.result),
+                    self._control_idempotent[(record.owner_id, record.idempotency_key)] = (
+                        _IdempotentControl(
+                            digest=record.digest,
+                            result=HarnessControlResult.model_validate(record.result),
+                        )
                     )
 
     async def close(self) -> None:
@@ -905,9 +900,9 @@ class HarnessRuntime:
     @staticmethod
     def _payload_digest(payload: dict[str, Any]) -> str:
         return hashlib.sha256(
-            json.dumps(
-                payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")
-            ).encode("utf-8")
+            json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode(
+                "utf-8"
+            )
         ).hexdigest()
 
     def _schedule_run(
@@ -941,11 +936,7 @@ class HarnessRuntime:
     ) -> tuple[AgentControlLoopWorkspaceArtifact, bytes]:
         snapshot = await self.get(owner_id, run_id)
         record = next(
-            (
-                item
-                for item in snapshot.workspace_artifacts
-                if item.artifact_id == artifact_id
-            ),
+            (item for item in snapshot.workspace_artifacts if item.artifact_id == artifact_id),
             None,
         )
         if record is None:
@@ -1015,7 +1006,9 @@ class HarnessRuntime:
                 owner_id=owner_id,
                 workspace_id=request.workspace_id,
                 status="queued",
-                version=request.expected_version, created_at=now, updated_at=now,
+                version=request.expected_version,
+                created_at=now,
+                updated_at=now,
                 instruction=instruction,
                 instruction_source="user",
                 contract=contract,
@@ -1132,26 +1125,18 @@ class HarnessRuntime:
             selected_branch: AgentControlLoopBranch | None = None
             if command == "resume" and snapshot.status == "waiting_input":
                 waiting_branches = [
-                    item
-                    for item in snapshot.branches
-                    if item.status == "waiting_input"
+                    item for item in snapshot.branches if item.status == "waiting_input"
                 ]
                 if request.branch_id is not None:
                     selected_branch = next(
-                        (
-                            item
-                            for item in waiting_branches
-                            if item.branch_id == request.branch_id
-                        ),
+                        (item for item in waiting_branches if item.branch_id == request.branch_id),
                         None,
                     )
                     if selected_branch is None:
                         raise HarnessConflictError("该分支已经完成或不属于当前任务")
                 elif waiting_branches:
                     selected_branch = waiting_branches[0]
-                selected_branch_id = (
-                    selected_branch.branch_id if selected_branch else None
-                )
+                selected_branch_id = selected_branch.branch_id if selected_branch else None
 
             now = datetime.now(timezone.utc)
             control_id = f"control-{uuid4().hex[:12]}"
@@ -1302,20 +1287,12 @@ class HarnessRuntime:
 
         findings = self._snapshot_findings(snapshot)
         finding = next(
-            (
-                item
-                for item in findings
-                if item.finding_id == request.finding_id
-            ),
+            (item for item in findings if item.finding_id == request.finding_id),
             None,
         )
         resolutions = self._snapshot_evidence_resolutions(snapshot)
         resolution = next(
-            (
-                item
-                for item in resolutions
-                if item.resolution_id == request.resolution_id
-            ),
+            (item for item in resolutions if item.resolution_id == request.resolution_id),
             None,
         )
         if resolution is not None:
@@ -1346,9 +1323,7 @@ class HarnessRuntime:
         elif request.decision_request_id is not None:
             raise HarnessConflictError("人工决策单已经不存在或不属于当前发现")
 
-        async def reject_resolution(
-            message: str, status: Literal["stale", "rejected"]
-        ) -> None:
+        async def reject_resolution(message: str, status: Literal["stale", "rejected"]) -> None:
             if resolution is not None:
                 now = datetime.now(timezone.utc)
                 updated = self._update_resolution_in_snapshot(
@@ -1389,9 +1364,7 @@ class HarnessRuntime:
                     raise HarnessConflictError("该证据定位已经不是待决状态")
                 if not request.source_revision:
                     raise HarnessConflictError("接受证据候选必须携带资料版本令牌")
-                candidate_ids = {
-                    item.candidate_id for item in resolution.candidates
-                }
+                candidate_ids = {item.candidate_id for item in resolution.candidates}
                 if request.selected_candidate_id not in candidate_ids:
                     await reject_resolution(
                         "候选位置不属于服务端决策单，已拒绝本次选择", "rejected"
@@ -1415,9 +1388,7 @@ class HarnessRuntime:
                     None,
                 )
                 if current_file is None:
-                    await reject_resolution(
-                        "证据候选对应的资料已经不可用，已标记为 stale", "stale"
-                    )
+                    await reject_resolution("证据候选对应的资料已经不可用，已标记为 stale", "stale")
                 current_revision = self._source_revision(current_file)
                 if current_revision != expected_revision:
                     await reject_resolution(
@@ -1465,9 +1436,7 @@ class HarnessRuntime:
                     resolution.resolution_id, refreshed_match
                 )
                 if refreshed_id != selected_candidate.candidate_id:
-                    await reject_resolution(
-                        "证据候选标识已变化，已拒绝本次篡改选择", "rejected"
-                    )
+                    await reject_resolution("证据候选标识已变化，已拒绝本次篡改选择", "rejected")
                 expected_digest = self._candidate_digest(
                     resolution_id=resolution.resolution_id,
                     file_ref=selected_candidate.file_ref,
@@ -1511,15 +1480,9 @@ class HarnessRuntime:
             affected_branch_ids = finding.affected_branch_ids
         else:
             affected_branch_ids = []
-        if (
-            resolution is not None
-            and len(affected_branch_ids) > 1
-            and request.branch_id is None
-        ):
+        if resolution is not None and len(affected_branch_ids) > 1 and request.branch_id is None:
             raise HarnessConflictError("共享资料同时属于多个分支，请明确选择要恢复的分支")
-        branch_id = request.branch_id or (
-            affected_branch_ids[0] if affected_branch_ids else None
-        )
+        branch_id = request.branch_id or (affected_branch_ids[0] if affected_branch_ids else None)
         if (
             request.branch_id is not None
             and affected_branch_ids
@@ -1530,9 +1493,7 @@ class HarnessRuntime:
         now = datetime.now(timezone.utc)
         next_version = snapshot.version + 1
         decision_id = f"decision-{uuid4().hex[:12]}"
-        effect: Literal[
-            "branch_resumed", "preserved", "deferred", "cancelled", "none"
-        ] = {
+        effect: Literal["branch_resumed", "preserved", "deferred", "cancelled", "none"] = {
             "accept": "branch_resumed" if snapshot.status == "waiting_input" else "preserved",
             "decline": "preserved",
             "defer": "deferred",
@@ -1680,9 +1641,7 @@ class HarnessRuntime:
             restored = HarnessControlResult.model_validate(existing.result)
             run.snapshot = restored.run.model_copy(deep=True)
             return restored.model_copy(update={"replayed": True}, deep=True)
-        self._control_idempotent[idempotency_key] = _IdempotentControl(
-            digest=digest, result=result
-        )
+        self._control_idempotent[idempotency_key] = _IdempotentControl(digest=digest, result=result)
         condition = run.condition
         needs_new_task = should_schedule and run.snapshot.run_id not in self._tasks
         if should_schedule:
@@ -1712,15 +1671,19 @@ class HarnessRuntime:
             raise HarnessConflictError("只有已提交的任务简报可以恢复历史版本")
         if request.artifact_version is None:
             raise HarnessConflictError("恢复成果版本时必须指定目标版本")
-        if request.branch_id is not None or request.instruction is not None or any(
-            value is not None
-            for value in (
-                request.decision_action,
-                request.finding_id,
-                request.resolution_id,
-                request.selected_option_id,
-                request.selected_candidate_id,
-                request.feedback,
+        if (
+            request.branch_id is not None
+            or request.instruction is not None
+            or any(
+                value is not None
+                for value in (
+                    request.decision_action,
+                    request.finding_id,
+                    request.resolution_id,
+                    request.selected_option_id,
+                    request.selected_candidate_id,
+                    request.feedback,
+                )
             )
         ):
             raise HarnessConflictError("成果版本恢复不接受分支或方向指令")
@@ -1739,32 +1702,30 @@ class HarnessRuntime:
         if snapshot.last_commit.artifact_version == target.version:
             raise HarnessConflictError("该成果版本已经是当前版本")
 
-        stored_versions = await self.state_store.load_artifact_versions(
-            owner_id, snapshot.run_id
-        )
+        stored_versions = await self.state_store.load_artifact_versions(owner_id, snapshot.run_id)
         stored = next(
             (
                 item
                 for item in stored_versions
-                if item.artifact_id == target.artifact_id
-                and item.version == target.version
+                if item.artifact_id == target.artifact_id and item.version == target.version
             ),
             None,
         )
         target_payload = target.model_dump(mode="json")
-        if stored is None or stored.payload_digest != self._payload_digest(
-            target_payload
-        ):
+        if stored is None or stored.payload_digest != self._payload_digest(target_payload):
             raise HarnessConflictError("成果版本的不可变记录不完整，已拒绝恢复")
 
         now = datetime.now(timezone.utc)
         next_version = snapshot.version + 1
-        commit_id = "commit-" + hashlib.sha256(
-            (
-                f"{snapshot.run_id}:rollback:{snapshot.last_commit.commit_id}:"
-                f"{target.artifact_id}:{target.version}"
-            ).encode("utf-8")
-        ).hexdigest()[:12]
+        commit_id = (
+            "commit-"
+            + hashlib.sha256(
+                (
+                    f"{snapshot.run_id}:rollback:{snapshot.last_commit.commit_id}:"
+                    f"{target.artifact_id}:{target.version}"
+                ).encode("utf-8")
+            ).hexdigest()[:12]
+        )
         task_commit = AgentControlLoopCommit(
             commit_id=commit_id,
             artifact_id=target.artifact_id,
@@ -1772,8 +1733,7 @@ class HarnessRuntime:
             operation="rollback",
             parent_commit_id=snapshot.last_commit.commit_id,
             summary=(
-                f"已将当前任务简报恢复为 v{target.version}；历史版本均保留，"
-                "原始办公文件未修改。"
+                f"已将当前任务简报恢复为 v{target.version}；历史版本均保留，原始办公文件未修改。"
             ),
             committed_at=now,
         )
@@ -1859,9 +1819,7 @@ class HarnessRuntime:
             restored = HarnessControlResult.model_validate(existing.result)
             run.snapshot = restored.run.model_copy(deep=True)
             return restored.model_copy(update={"replayed": True}, deep=True)
-        self._control_idempotent[idempotency_key] = _IdempotentControl(
-            digest=digest, result=result
-        )
+        self._control_idempotent[idempotency_key] = _IdempotentControl(digest=digest, result=result)
         return result.model_copy(deep=True)
 
     def public_start_result(self, result: HarnessRunStartResult) -> PublicHarnessRunStartResult:
@@ -1872,9 +1830,7 @@ class HarnessRuntime:
 
     def public_snapshot(self, snapshot: HarnessRunSnapshot) -> PublicHarnessRunSnapshot:
         ref_to_label = {
-            str(document.get("file_ref")): str(
-                document.get("display_label", "所选公开办公文件")
-            )
+            str(document.get("file_ref")): str(document.get("display_label", "所选公开办公文件"))
             for document in snapshot.source_documents
             if document.get("file_ref")
         }
@@ -1891,44 +1847,31 @@ class HarnessRuntime:
         public_plan = self._public_plan(snapshot.plan, ref_to_label)
         public_result = self._public_result(snapshot.result, ref_to_label)
         public_rounds = [
-            self._public_round(round_snapshot, ref_to_label)
-            for round_snapshot in snapshot.rounds
+            self._public_round(round_snapshot, ref_to_label) for round_snapshot in snapshot.rounds
         ]
         public_brief = self._public_brief(snapshot.brief, ref_to_label)
         public_artifacts = [
             item.model_copy(
                 update={
-                    "summary": self._project_business_text(
-                        item.summary, ref_to_label
-                    ),
+                    "summary": self._project_business_text(item.summary, ref_to_label),
                     "findings": [
                         finding.model_copy(
                             update={
-                                "title": self._project_business_text(
-                                    finding.title, ref_to_label
-                                ),
-                                "detail": self._project_business_text(
-                                    finding.detail, ref_to_label
-                                ),
+                                "title": self._project_business_text(finding.title, ref_to_label),
+                                "detail": self._project_business_text(finding.detail, ref_to_label),
                                 "fact_summary": self._project_business_text(
                                     finding.fact_summary, ref_to_label
                                 )
                                 if finding.fact_summary
                                 else None,
-                                "impact": self._project_business_text(
-                                    finding.impact, ref_to_label
-                                )
+                                "impact": self._project_business_text(finding.impact, ref_to_label)
                                 if finding.impact
                                 else None,
                                 "evidence_resolutions": [
-                                    self._public_evidence_resolution(
-                                        resolution, ref_to_label
-                                    )
+                                    self._public_evidence_resolution(resolution, ref_to_label)
                                     for resolution in finding.evidence_resolutions
                                 ],
-                                "review": self._public_finding_review(
-                                    finding.review, ref_to_label
-                                ),
+                                "review": self._public_finding_review(finding.review, ref_to_label),
                             }
                         )
                         for finding in item.findings
@@ -1940,12 +1883,8 @@ class HarnessRuntime:
                     "evidence_gaps": [
                         gap.model_copy(
                             update={
-                                "label": self._project_business_text(
-                                    gap.label, ref_to_label
-                                ),
-                                "detail": self._project_business_text(
-                                    gap.detail, ref_to_label
-                                ),
+                                "label": self._project_business_text(gap.label, ref_to_label),
+                                "detail": self._project_business_text(gap.detail, ref_to_label),
                             }
                         )
                         for gap in item.evidence_gaps
@@ -1958,9 +1897,7 @@ class HarnessRuntime:
             item.model_copy(
                 update={
                     "title": self._project_business_text(item.title, ref_to_label),
-                    "objective": self._project_business_text(
-                        item.objective, ref_to_label
-                    ),
+                    "objective": self._project_business_text(item.objective, ref_to_label),
                 }
             )
             for item in snapshot.branches
@@ -1982,9 +1919,7 @@ class HarnessRuntime:
                     "idempotency_ref": self._public_idempotency_ref(
                         item.idempotency_key or item.idempotency_ref
                     ),
-                    "source_revision": self._public_source_revision(
-                        item.source_revision
-                    )
+                    "source_revision": self._public_source_revision(item.source_revision)
                     if item.source_revision
                     else "",
                     "candidate_digest": None,
@@ -2041,9 +1976,7 @@ class HarnessRuntime:
             events=public_events,
         )
 
-    def public_control_result(
-        self, result: HarnessControlResult
-    ) -> PublicHarnessControlResult:
+    def public_control_result(self, result: HarnessControlResult) -> PublicHarnessControlResult:
         return PublicHarnessControlResult(
             run=self.public_snapshot(result.run), replayed=result.replayed
         )
@@ -2057,9 +1990,7 @@ class HarnessRuntime:
             return None
         return PublicHarnessPlan(
             summary=self._project_business_text(plan.summary, ref_to_label),
-            selection_reason=self._project_business_text(
-                plan.selection_reason, ref_to_label
-            ),
+            selection_reason=self._project_business_text(plan.selection_reason, ref_to_label),
             units=[
                 PublicHarnessPlanUnit(
                     unit_id=unit.unit_id,
@@ -2093,9 +2024,7 @@ class HarnessRuntime:
                     affected_branch_ids=finding.affected_branch_ids,
                     title=self._project_business_text(finding.title, ref_to_label),
                     detail=self._project_business_text(finding.detail, ref_to_label),
-                    fact_summary=self._project_business_text(
-                        finding.fact_summary, ref_to_label
-                    )
+                    fact_summary=self._project_business_text(finding.fact_summary, ref_to_label)
                     if finding.fact_summary
                     else None,
                     impact=self._project_business_text(finding.impact, ref_to_label)
@@ -2112,8 +2041,7 @@ class HarnessRuntime:
                 for finding in result.findings
             ],
             follow_ups=[
-                self._project_business_text(item, ref_to_label)
-                for item in result.follow_ups
+                self._project_business_text(item, ref_to_label) for item in result.follow_ups
             ],
             review_required=True,
         )
@@ -2128,9 +2056,7 @@ class HarnessRuntime:
         return review.model_copy(
             update={
                 "question": self._project_business_text(review.question, ref_to_label),
-                "why_human": self._project_business_text(
-                    review.why_human, ref_to_label
-                ),
+                "why_human": self._project_business_text(review.why_human, ref_to_label),
                 "recommendation_reason": self._project_business_text(
                     review.recommendation_reason, ref_to_label
                 ),
@@ -2140,12 +2066,8 @@ class HarnessRuntime:
                 "options": [
                     option.model_copy(
                         update={
-                            "label": self._project_business_text(
-                                option.label, ref_to_label
-                            ),
-                            "meaning": self._project_business_text(
-                                option.meaning, ref_to_label
-                            ),
+                            "label": self._project_business_text(option.label, ref_to_label),
+                            "meaning": self._project_business_text(option.meaning, ref_to_label),
                             "agent_next_step": self._project_business_text(
                                 option.agent_next_step, ref_to_label
                             ),
@@ -2169,29 +2091,20 @@ class HarnessRuntime:
                 "finding_title": self._project_business_text(
                     resolution.finding_title, ref_to_label
                 ),
-                "fact_summary": self._project_business_text(
-                    resolution.fact_summary, ref_to_label
-                )
+                "fact_summary": self._project_business_text(resolution.fact_summary, ref_to_label)
                 if resolution.fact_summary
                 else None,
-                "impact": self._project_business_text(
-                    resolution.impact, ref_to_label
-                )
+                "impact": self._project_business_text(resolution.impact, ref_to_label)
                 if resolution.impact
                 else None,
                 "query_excerpt": self._project_business_text(
                     resolution.query_excerpt, ref_to_label
                 ),
-                "reason": self._project_business_text(
-                    resolution.reason, ref_to_label
-                ),
+                "reason": self._project_business_text(resolution.reason, ref_to_label),
                 "candidates": [
                     candidate.model_copy(
                         update={
-                        "excerpt": self._project_business_text(
-                                candidate.excerpt, ref_to_label
-                            )
-                            ,
+                            "excerpt": self._project_business_text(candidate.excerpt, ref_to_label),
                             "source_revision": self._public_source_revision(
                                 candidate.source_revision
                             )
@@ -2202,9 +2115,7 @@ class HarnessRuntime:
                     )
                     for candidate in resolution.candidates
                 ],
-                "source_revision": self._public_source_revision(
-                    resolution.source_revision
-                )
+                "source_revision": self._public_source_revision(resolution.source_revision)
                 if resolution.source_revision
                 else "",
             }
@@ -2219,9 +2130,7 @@ class HarnessRuntime:
         return decision_request.model_copy(
             update={
                 "expected_version": expected_version,
-                "reason": self._project_business_text(
-                    decision_request.reason, ref_to_label
-                ),
+                "reason": self._project_business_text(decision_request.reason, ref_to_label),
                 "consequence": self._project_business_text(
                     decision_request.consequence, ref_to_label
                 ),
@@ -2229,9 +2138,7 @@ class HarnessRuntime:
                     {
                         **option,
                         **{
-                            key: self._project_business_text(
-                                str(option[key]), ref_to_label
-                            )
+                            key: self._project_business_text(str(option[key]), ref_to_label)
                             for key in (
                                 "label",
                                 "meaning",
@@ -2243,17 +2150,13 @@ class HarnessRuntime:
                     }
                     for option in decision_request.options
                 ],
-                "source_revision": self._public_source_revision(
-                    decision_request.source_revision
-                )
+                "source_revision": self._public_source_revision(decision_request.source_revision)
                 if decision_request.source_revision
                 else "",
                 "candidates": [
                     candidate.model_copy(
                         update={
-                            "excerpt": self._project_business_text(
-                                candidate.excerpt, ref_to_label
-                            ),
+                            "excerpt": self._project_business_text(candidate.excerpt, ref_to_label),
                             "source_revision": self._public_source_revision(
                                 candidate.source_revision
                             )
@@ -2309,9 +2212,7 @@ class HarnessRuntime:
             )
         return round_snapshot.model_copy(
             update={
-                "question": self._project_business_text(
-                    round_snapshot.question, ref_to_label
-                ),
+                "question": self._project_business_text(round_snapshot.question, ref_to_label),
                 "steer_instruction": self._project_business_text(
                     round_snapshot.steer_instruction, ref_to_label
                 )
@@ -2337,12 +2238,8 @@ class HarnessRuntime:
                 "unresolved_gaps": [
                     gap.model_copy(
                         update={
-                            "label": self._project_business_text(
-                                gap.label, ref_to_label
-                            ),
-                            "detail": self._project_business_text(
-                                gap.detail, ref_to_label
-                            ),
+                            "label": self._project_business_text(gap.label, ref_to_label),
+                            "detail": self._project_business_text(gap.detail, ref_to_label),
                         }
                     )
                     for gap in brief.unresolved_gaps
@@ -2396,7 +2293,12 @@ class HarnessRuntime:
             return "规划使用了当前任务范围外的资料或能力，系统已安全停止。请重新规划。"
         if any(
             marker in reason
-            for marker in ("artifact.write", "run_workspace_write", "artifact_name", "artifact_type")
+            for marker in (
+                "artifact.write",
+                "run_workspace_write",
+                "artifact_name",
+                "artifact_type",
+            )
         ):
             return "规划中的成果保存信息不完整，系统已安全停止。请重新规划。"
         if "模型未返回合法" in reason or "invalid JSON" in reason:
@@ -2465,12 +2367,16 @@ class HarnessRuntime:
             async with condition:
                 async with self._lock:
                     latest = self._require_run(owner_id, run_id).snapshot
-                    if latest.status in {
-                        "ready_to_execute",
-                        "completed",
-                        "stopped",
-                        "failed",
-                    } or latest.last_event_sequence > sequence:
+                    if (
+                        latest.status
+                        in {
+                            "ready_to_execute",
+                            "completed",
+                            "stopped",
+                            "failed",
+                        }
+                        or latest.last_event_sequence > sequence
+                    ):
                         continue
                 try:
                     await asyncio.wait_for(condition.wait(), timeout=15)
@@ -2496,9 +2402,7 @@ class HarnessRuntime:
                     f"已冻结整个公开办公资料库的 {len(files)} 份文件索引；"
                     "Agent 将按任务目标自主检索并选择每轮证据。"
                 )
-                await self._set_source_documents(
-                    owner_id, run_id, files, selection_reason
-                )
+                await self._set_source_documents(owner_id, run_id, files, selection_reason)
                 await self._transition(
                     owner_id,
                     run_id,
@@ -2515,9 +2419,7 @@ class HarnessRuntime:
                 follow_up
                 for round_snapshot in recovered.rounds
                 if round_snapshot.result
-                for follow_up in HarnessTaskResult.model_validate(
-                    round_snapshot.result
-                ).follow_ups
+                for follow_up in HarnessTaskResult.model_validate(round_snapshot.result).follow_ups
             ]
             next_question = instruction
             evidence_recheck_refs: set[str] = set()
@@ -2526,9 +2428,7 @@ class HarnessRuntime:
                 recovered_next_step = recovered.rounds[-1].next_step
                 next_question = recovered_next_step.next_question or instruction
                 if recovered_next_step.decision == "waiting_input":
-                    target_branch = self._branch_by_id(
-                        recovered.branches, target_branch_id
-                    )
+                    target_branch = self._branch_by_id(recovered.branches, target_branch_id)
                     evidence_recheck_refs = set(
                         target_branch.missing_file_refs
                         if target_branch
@@ -2541,9 +2441,7 @@ class HarnessRuntime:
             for round_number in range(first_round, contract.max_rounds + 1):
                 await self._safe_point(owner_id, run_id)
                 all_remaining = [
-                    item
-                    for item in files
-                    if str(item["file_ref"]) not in set(verified_refs)
+                    item for item in files if str(item["file_ref"]) not in set(verified_refs)
                 ]
                 remaining = (
                     [
@@ -2558,11 +2456,7 @@ class HarnessRuntime:
                     break
 
                 steer = await self._consume_pending_steer(owner_id, run_id)
-                question = (
-                    f"{next_question}\n本轮方向调整：{steer}"
-                    if steer
-                    else next_question
-                )
+                question = f"{next_question}\n本轮方向调整：{steer}" if steer else next_question
                 await self._start_round(
                     owner_id,
                     run_id,
@@ -2599,9 +2493,7 @@ class HarnessRuntime:
                     require_all_files=bool(evidence_recheck_refs),
                 )
                 round_refs = self._plan_file_refs(plan, remaining)
-                round_files = [
-                    item for item in remaining if str(item["file_ref"]) in round_refs
-                ]
+                round_files = [item for item in remaining if str(item["file_ref"]) in round_refs]
                 branch_ids = await self._set_plan(
                     owner_id,
                     run_id,
@@ -2637,9 +2529,7 @@ class HarnessRuntime:
                 # contract, not by the Analyst's prose.  Persist their files and
                 # verifier receipts before narrative analysis so a rejected model
                 # response cannot erase already completed, server-checked work.
-                await self._apply_scenario_effect(
-                    owner_id, run_id, round_number=round_number
-                )
+                await self._apply_scenario_effect(owner_id, run_id, round_number=round_number)
                 await self._safe_point(owner_id, run_id)
 
                 if self.analyst is None:
@@ -2653,9 +2543,7 @@ class HarnessRuntime:
                     )
                     return
 
-                await self._update_round(
-                    owner_id, run_id, round_number, phase="act"
-                )
+                await self._update_round(owner_id, run_id, round_number, phase="act")
                 analysis_files = self._analysis_inputs(round_files)
                 result: HarnessTaskResult | None = None
                 analysis_receipt: HarnessModelReceipt | None = None
@@ -2666,18 +2554,12 @@ class HarnessRuntime:
                 best_score: tuple[int, int, int, int] | None = None
                 best_out_of_scope_count = 0
                 best_downgraded_review_count = 0
-                best_evidence_resolutions: list[
-                    AgentControlLoopEvidenceResolution
-                ] = []
-                pending_evidence_resolutions: list[
-                    AgentControlLoopEvidenceResolution
-                ] = []
+                best_evidence_resolutions: list[AgentControlLoopEvidenceResolution] = []
+                pending_evidence_resolutions: list[AgentControlLoopEvidenceResolution] = []
                 omitted_finding_count = 0
                 scope_filtered_finding_count = 0
                 downgraded_review_count = 0
-                recovery_kind: Literal["source_location", "analysis_output"] = (
-                    "source_location"
-                )
+                recovery_kind: Literal["source_location", "analysis_output"] = "source_location"
                 for analysis_attempt in (1, 2):
                     try:
                         candidate, candidate_receipt = await self._invoke_analyst(
@@ -2719,9 +2601,7 @@ class HarnessRuntime:
                         break
                     await self._safe_point(owner_id, run_id)
                     try:
-                        original_unit_ids = [
-                            finding.plan_unit_id for finding in candidate.findings
-                        ]
+                        original_unit_ids = [finding.plan_unit_id for finding in candidate.findings]
                         candidate = self._validate_candidate_result_scope(
                             candidate, round_files, plan
                         )
@@ -2802,19 +2682,11 @@ class HarnessRuntime:
                             best_result = resolution.result
                             best_receipt = candidate_receipt
                             best_rejected_count = resolution.rejected_finding_count
-                            best_out_of_scope_count = (
-                                resolution.out_of_scope_finding_count
-                            )
-                            best_downgraded_review_count = (
-                                resolution.downgraded_review_count
-                            )
-                            best_evidence_resolutions = list(
-                                resolution.evidence_resolutions
-                            )
+                            best_out_of_scope_count = resolution.out_of_scope_finding_count
+                            best_downgraded_review_count = resolution.downgraded_review_count
+                            best_evidence_resolutions = list(resolution.evidence_resolutions)
                     elif resolution.result is None:
-                        pending_evidence_resolutions = list(
-                            resolution.evidence_resolutions
-                        )
+                        pending_evidence_resolutions = list(resolution.evidence_resolutions)
                     if (
                         resolution.result is not None
                         and not resolution.rejected_finding_count
@@ -2823,9 +2695,7 @@ class HarnessRuntime:
                         result = resolution.result
                         analysis_receipt = candidate_receipt
                         pending_evidence_resolutions = []
-                        scope_filtered_finding_count = (
-                            resolution.out_of_scope_finding_count
-                        )
+                        scope_filtered_finding_count = resolution.out_of_scope_finding_count
                         downgraded_review_count = resolution.downgraded_review_count
                         break
                     await self._transition(
@@ -2848,9 +2718,7 @@ class HarnessRuntime:
                             if resolution.result
                             else 0,
                             "rejected_finding_count": resolution.rejected_finding_count,
-                            "pending_resolution_count": len(
-                                resolution.evidence_resolutions
-                            ),
+                            "pending_resolution_count": len(resolution.evidence_resolutions),
                         },
                     )
                     if analysis_attempt == 1:
@@ -2874,13 +2742,9 @@ class HarnessRuntime:
                         verified_refs=verified_refs,
                         through_round=round_number,
                     )
-                    waiting_branches = [
-                        item for item in branches if item.status == "waiting_input"
-                    ]
-                    pending_evidence_resolutions = (
-                        self._bind_evidence_resolutions_to_branches(
-                            pending_evidence_resolutions, branches
-                        )
+                    waiting_branches = [item for item in branches if item.status == "waiting_input"]
+                    pending_evidence_resolutions = self._bind_evidence_resolutions_to_branches(
+                        pending_evidence_resolutions, branches
                     )
                     outstanding_refs = list(
                         dict.fromkeys(
@@ -2919,9 +2783,7 @@ class HarnessRuntime:
                             else None
                         ),
                         candidate_file_refs=outstanding_refs[:20],
-                        candidate_branch_ids=[
-                            item.branch_id for item in waiting_branches
-                        ],
+                        candidate_branch_ids=[item.branch_id for item in waiting_branches],
                         recovery_kind=recovery_kind,
                         evidence_resolutions=pending_evidence_resolutions[:20],
                     )
@@ -2987,9 +2849,7 @@ class HarnessRuntime:
                         )
                         resumed = await self.get(owner_id, run_id)
                         target_branch_id = resumed.active_branch_id
-                        target_branch = self._branch_by_id(
-                            resumed.branches, target_branch_id
-                        )
+                        target_branch = self._branch_by_id(resumed.branches, target_branch_id)
                         evidence_recheck_refs = set(
                             target_branch.missing_file_refs
                             if target_branch
@@ -3064,26 +2924,18 @@ class HarnessRuntime:
                             "output_used": True,
                         },
                     )
-                adopted_analysis = analysis_receipt.model_copy(
-                    update={"output_used": True}
-                )
+                adopted_analysis = analysis_receipt.model_copy(update={"output_used": True})
                 binding_snapshot = await self.get(owner_id, run_id)
                 result = self._bind_result_to_branches(
                     result,
                     binding_snapshot.branches,
-                    estimated_additional_rounds=max(
-                        0, contract.max_rounds - round_number
-                    ),
+                    estimated_additional_rounds=max(0, contract.max_rounds - round_number),
                 )
-                pending_evidence_resolutions = (
-                    self._bind_evidence_resolutions_to_branches(
-                        pending_evidence_resolutions,
-                        binding_snapshot.branches,
-                    )
+                pending_evidence_resolutions = self._bind_evidence_resolutions_to_branches(
+                    pending_evidence_resolutions,
+                    binding_snapshot.branches,
                 )
-                await self._set_analysis_receipt(
-                    owner_id, run_id, adopted_analysis
-                )
+                await self._set_analysis_receipt(owner_id, run_id, adopted_analysis)
                 await self._update_round(
                     owner_id,
                     run_id,
@@ -3093,14 +2945,10 @@ class HarnessRuntime:
                 )
                 round_verified = self._result_file_refs(result, round_files)
                 unresolved_file_refs = {
-                    item.file_ref
-                    for item in pending_evidence_resolutions
-                    if item.status != "exact"
+                    item.file_ref for item in pending_evidence_resolutions if item.status != "exact"
                 }
                 round_verified = [
-                    item
-                    for item in round_verified
-                    if item not in unresolved_file_refs
+                    item for item in round_verified if item not in unresolved_file_refs
                 ]
                 for file_ref in round_verified:
                     if file_ref not in verified_refs:
@@ -3134,8 +2982,7 @@ class HarnessRuntime:
                         "finding_count": len(result.findings),
                         "verified_file_count": len(round_verified),
                         "evidence_anchor_count": sum(
-                            len(finding.evidence_anchors)
-                            for finding in result.findings
+                            len(finding.evidence_anchors) for finding in result.findings
                         ),
                         "omitted_finding_count": omitted_finding_count,
                         "output_used": True,
@@ -3143,9 +2990,7 @@ class HarnessRuntime:
                 )
                 await self._safe_point(owner_id, run_id)
 
-                waiting_branches = [
-                    item for item in branches if item.status == "waiting_input"
-                ]
+                waiting_branches = [item for item in branches if item.status == "waiting_input"]
                 outstanding_refs = list(
                     dict.fromkeys(
                         file_ref
@@ -3182,20 +3027,11 @@ class HarnessRuntime:
                     reason=reason,
                     next_question=next_question or None,
                     candidate_file_refs=outstanding_refs[:20],
-                    candidate_branch_ids=[
-                        item.branch_id for item in waiting_branches
-                    ],
-                    recovery_kind=(
-                        "source_location"
-                        if pending_evidence_resolutions
-                        else None
-                    ),
+                    candidate_branch_ids=[item.branch_id for item in waiting_branches],
+                    recovery_kind=("source_location" if pending_evidence_resolutions else None),
                     evidence_resolutions=pending_evidence_resolutions[:20],
                 )
-                if any(
-                    item.status == "ambiguous"
-                    for item in pending_evidence_resolutions
-                ):
+                if any(item.status == "ambiguous" for item in pending_evidence_resolutions):
                     await self._transition(
                         owner_id,
                         run_id,
@@ -3213,8 +3049,7 @@ class HarnessRuntime:
                         },
                     )
                 if any(
-                    finding.review
-                    and finding.review.requires_human_decision
+                    finding.review and finding.review.requires_human_decision
                     for finding in result.findings
                 ):
                     await self._transition(
@@ -3252,9 +3087,7 @@ class HarnessRuntime:
                         {
                             "round_number": round_number,
                             "adopted_finding_count": len(result.findings),
-                            "pending_resolution_count": len(
-                                pending_evidence_resolutions
-                            ),
+                            "pending_resolution_count": len(pending_evidence_resolutions),
                             "external_action": False,
                         },
                     )
@@ -3271,17 +3104,14 @@ class HarnessRuntime:
                     )
                     resumed = await self.get(owner_id, run_id)
                     target_branch_id = resumed.active_branch_id
-                    target_branch = self._branch_by_id(
-                        resumed.branches, target_branch_id
-                    )
+                    target_branch = self._branch_by_id(resumed.branches, target_branch_id)
                     evidence_recheck_refs = set(
                         target_branch.missing_file_refs
                         if target_branch
                         else next_step.candidate_file_refs
                     )
                     next_question = (
-                        f"继续核对“{target_branch.title}”分支缺少的证据，"
-                        "检查是否改变已有结论。"
+                        f"继续核对“{target_branch.title}”分支缺少的证据，检查是否改变已有结论。"
                         if target_branch
                         else next_question
                     )
@@ -3313,9 +3143,7 @@ class HarnessRuntime:
                 run_id,
                 findings=self._snapshot_findings(await self.get(owner_id, run_id)),
                 follow_ups=[],
-                verified_refs=self._snapshot_verified_refs(
-                    await self.get(owner_id, run_id)
-                ),
+                verified_refs=self._snapshot_verified_refs(await self.get(owner_id, run_id)),
                 decision="user_stopped",
             )
         except HarnessBudgetExhausted as exc:
@@ -3353,10 +3181,13 @@ class HarnessRuntime:
         inflight_key = (owner_id, run_id, spec.capability_id)
         async with self._lock:
             current = self._require_run(owner_id, run_id).snapshot
-            if any(
-                receipt.capability_id == spec.capability_id
-                for receipt in current.effect_receipts
-            ) or inflight_key in self._effect_inflight:
+            if (
+                any(
+                    receipt.capability_id == spec.capability_id
+                    for receipt in current.effect_receipts
+                )
+                or inflight_key in self._effect_inflight
+            ):
                 return
             self._effect_inflight.add(inflight_key)
 
@@ -3371,8 +3202,7 @@ class HarnessRuntime:
                 latest.status,
                 "deterministic_office_tool_started",
                 (
-                    "正在复制隔离副本并运行修复前、修复后真实测试；"
-                    "期间仍可查看资料与任务状态。"
+                    "正在复制隔离副本并运行修复前、修复后真实测试；期间仍可查看资料与任务状态。"
                     if spec.scenario_id == "TC-04"
                     else "正在读取冻结资料并生成隔离工作区成果；本次不额外调用模型。"
                 ),
@@ -3408,8 +3238,7 @@ class HarnessRuntime:
                 latest.status,
                 "scenario_effect_failed",
                 (
-                    "隔离副本复制或真实测试未完成；未生成可验证成果，"
-                    "此前状态已保留。"
+                    "隔离副本复制或真实测试未完成；未生成可验证成果，此前状态已保留。"
                     if spec.scenario_id == "TC-04"
                     else "确定性办公工具未完成；未生成可验证成果，此前状态已保留。"
                 ),
@@ -3438,11 +3267,12 @@ class HarnessRuntime:
         now = datetime.now(timezone.utc)
         records: list[HarnessWorkspaceArtifactRecord] = []
         for generated in execution.artifacts:
-            artifact_id = "workspace-artifact-" + hashlib.sha256(
-                f"{run_id}:{execution.scenario_id}:{generated.file_name}:v1".encode(
-                    "utf-8"
-                )
-            ).hexdigest()[:12]
+            artifact_id = (
+                "workspace-artifact-"
+                + hashlib.sha256(
+                    f"{run_id}:{execution.scenario_id}:{generated.file_name}:v1".encode("utf-8")
+                ).hexdigest()[:12]
+            )
             try:
                 stored = self.artifact_store.write(
                     owner_id=owner_id,
@@ -3481,39 +3311,39 @@ class HarnessRuntime:
                     self_test=generated.self_test,
                     business_gate_outcome=generated.business_gate_outcome,
                     legal_review_outcome=generated.legal_review_outcome,
-                    download_path=(
-                        f"/v1/harness/runs/{run_id}/artifacts/{artifact_id}"
-                    ),
+                    candidate_review_outcome=generated.candidate_review_outcome,
+                    download_path=(f"/v1/harness/runs/{run_id}/artifacts/{artifact_id}"),
                     created_at=now,
                     content_sha256=stored.sha256,
                 )
             )
 
-        receipt_id = "effect-receipt-" + hashlib.sha256(
-            f"{run_id}:{execution.scenario_id}:{execution.capability_id}".encode(
-                "utf-8"
-            )
-        ).hexdigest()[:12]
+        receipt_id = (
+            "effect-receipt-"
+            + hashlib.sha256(
+                f"{run_id}:{execution.scenario_id}:{execution.capability_id}".encode("utf-8")
+            ).hexdigest()[:12]
+        )
         business_outcomes = [
-            item.business_gate_outcome
-            for item in records
-            if item.business_gate_outcome is not None
+            item.business_gate_outcome for item in records if item.business_gate_outcome is not None
         ]
         business_outcome = business_outcomes[0] if business_outcomes else None
-        if business_outcomes and any(
-            item != business_outcome for item in business_outcomes[1:]
-        ):
+        if business_outcomes and any(item != business_outcome for item in business_outcomes[1:]):
             raise HarnessError("同一效果的业务 Gate 事实不一致")
         legal_outcomes = [
-            item.legal_review_outcome
-            for item in records
-            if item.legal_review_outcome is not None
+            item.legal_review_outcome for item in records if item.legal_review_outcome is not None
         ]
         legal_outcome = legal_outcomes[0] if legal_outcomes else None
-        if legal_outcomes and any(
-            item != legal_outcome for item in legal_outcomes[1:]
-        ):
+        if legal_outcomes and any(item != legal_outcome for item in legal_outcomes[1:]):
             raise HarnessError("同一效果的法务核查事实不一致")
+        candidate_outcomes = [
+            item.candidate_review_outcome
+            for item in records
+            if item.candidate_review_outcome is not None
+        ]
+        candidate_outcome = candidate_outcomes[0] if candidate_outcomes else None
+        if candidate_outcomes and any(item != candidate_outcome for item in candidate_outcomes[1:]):
+            raise HarnessError("同一效果的候选人辅助筛选事实不一致")
         receipt = AgentControlLoopEffectReceipt(
             receipt_id=receipt_id,
             capability_id=execution.capability_id,
@@ -3529,6 +3359,7 @@ class HarnessRuntime:
             prohibited_side_effects=list(execution.prohibited_side_effects),
             business_gate_outcome=business_outcome,
             legal_review_outcome=legal_outcome,
+            candidate_review_outcome=candidate_outcome,
             created_at=now,
         )
 
@@ -3536,14 +3367,13 @@ class HarnessRuntime:
             run = self._require_run(owner_id, run_id)
             snapshot = run.snapshot
             if any(
-                item.capability_id == execution.capability_id
-                for item in snapshot.effect_receipts
+                item.capability_id == execution.capability_id for item in snapshot.effect_receipts
             ):
                 return
             sequence = snapshot.last_event_sequence
             events = list(snapshot.events)
-            _, unique_check_count, passed_check_count, _ = (
-                summarize_artifact_check_groups(record.checks for record in records)
+            _, unique_check_count, passed_check_count, _ = summarize_artifact_check_groups(
+                record.checks for record in records
             )
             for record in records:
                 sequence += 1
@@ -3711,9 +3541,7 @@ class HarnessRuntime:
                     return
             async with condition:
                 async with self._lock:
-                    latest_state = self._require_run(
-                        owner_id, run_id
-                    ).snapshot.control_state
+                    latest_state = self._require_run(owner_id, run_id).snapshot.control_state
                     if latest_state != "paused":
                         continue
                 await condition.wait()
@@ -3741,9 +3569,7 @@ class HarnessRuntime:
                 break
         return updated
 
-    async def _consume_pending_steer(
-        self, owner_id: str, run_id: str
-    ) -> str | None:
+    async def _consume_pending_steer(self, owner_id: str, run_id: str) -> str | None:
         async with self._lock:
             run = self._require_run(owner_id, run_id)
             snapshot = run.snapshot
@@ -3757,9 +3583,7 @@ class HarnessRuntime:
             ]
             if not pending:
                 return None
-            instruction = "；".join(
-                item.instruction for item in pending if item.instruction
-            )
+            instruction = "；".join(item.instruction for item in pending if item.instruction)
             now = datetime.now(timezone.utc)
             next_version = snapshot.version + 1
             pending_ids = {item.control_id for item in pending}
@@ -3820,9 +3644,7 @@ class HarnessRuntime:
                 steer_instruction=steer_instruction,
                 started_at=now,
             )
-            budget = self._budget_with_elapsed(run).model_copy(
-                update={"rounds_used": round_number}
-            )
+            budget = self._budget_with_elapsed(run).model_copy(update={"rounds_used": round_number})
             run.snapshot = snapshot.model_copy(
                 update={
                     "rounds": [*snapshot.rounds, round_snapshot],
@@ -3886,8 +3708,7 @@ class HarnessRuntime:
                 receipt = HarnessModelReceipt(
                     called=exc.called,
                     model=exc.model,
-                    elapsed_ms=exc.elapsed_ms
-                    or max(0, round((perf_counter() - started) * 1000)),
+                    elapsed_ms=exc.elapsed_ms or max(0, round((perf_counter() - started) * 1000)),
                     output_used=False,
                 )
                 await self._set_model_receipt(owner_id, run_id, receipt)
@@ -4019,9 +3840,7 @@ class HarnessRuntime:
         async with self._lock:
             run = self._require_run(owner_id, run_id)
             rounds = [
-                item.model_copy(update=updates)
-                if item.round_number == round_number
-                else item
+                item.model_copy(update=updates) if item.round_number == round_number else item
                 for item in run.snapshot.rounds
             ]
             run.snapshot = run.snapshot.model_copy(
@@ -4064,9 +3883,10 @@ class HarnessRuntime:
                 if round_snapshot.result
                 else None
             )
-            artifact_id = "artifact-" + hashlib.sha256(
-                f"{run_id}:evidence-brief".encode("utf-8")
-            ).hexdigest()[:12]
+            artifact_id = (
+                "artifact-"
+                + hashlib.sha256(f"{run_id}:evidence-brief".encode("utf-8")).hexdigest()[:12]
+            )
             version = len(snapshot.artifact_versions) + 1
             artifact = AgentControlLoopArtifactVersion(
                 artifact_id=artifact_id,
@@ -4105,9 +3925,12 @@ class HarnessRuntime:
             for resolution in next_step.evidence_resolutions:
                 if resolution.status == "exact":
                     continue
-                request_id = "decision-request-" + hashlib.sha256(
-                    f"{run_id}:{resolution.resolution_id}".encode("utf-8")
-                ).hexdigest()[:12]
+                request_id = (
+                    "decision-request-"
+                    + hashlib.sha256(
+                        f"{run_id}:{resolution.resolution_id}".encode("utf-8")
+                    ).hexdigest()[:12]
+                )
                 packet = AgentControlLoopDecisionRequest(
                     decision_request_id=request_id,
                     run_id=run_id,
@@ -4126,9 +3949,7 @@ class HarnessRuntime:
                     affected_branch_ids=resolution.affected_branch_ids
                     or ([resolution.branch_id] if resolution.branch_id else []),
                     required_file_refs=[resolution.file_ref],
-                    estimated_additional_rounds=max(
-                        0, current_contract.max_rounds - round_number
-                    ),
+                    estimated_additional_rounds=max(0, current_contract.max_rounds - round_number),
                     consequence=(
                         "接受后只重跑受影响分支并生成新的逻辑成果版本；"
                         "不会修改原始文件、发送消息或执行外部动作。"
@@ -4148,9 +3969,12 @@ class HarnessRuntime:
                     review = finding.review
                     if review is None or not review.requires_human_decision:
                         continue
-                    request_id = "decision-request-" + hashlib.sha256(
-                        f"{run_id}:{finding.finding_id}:review".encode("utf-8")
-                    ).hexdigest()[:12]
+                    request_id = (
+                        "decision-request-"
+                        + hashlib.sha256(
+                            f"{run_id}:{finding.finding_id}:review".encode("utf-8")
+                        ).hexdigest()[:12]
+                    )
                     branch_ids = list(finding.affected_branch_ids)
                     packet = AgentControlLoopDecisionRequest(
                         decision_request_id=request_id,
@@ -4160,18 +3984,13 @@ class HarnessRuntime:
                         branch_id=branch_ids[0] if len(branch_ids) == 1 else None,
                         state="open",
                         reason=review.why_human,
-                        options=[
-                            option.model_dump(mode="json") for option in review.options
-                        ],
+                        options=[option.model_dump(mode="json") for option in review.options],
                         source_revision="",
                         expected_version=snapshot.version,
                         affected_branch_ids=branch_ids,
                         required_file_refs=finding.file_refs[:20],
                         estimated_additional_rounds=max(
-                            (
-                                option.estimated_additional_rounds
-                                for option in review.options
-                            ),
+                            (option.estimated_additional_rounds for option in review.options),
                             default=0,
                         ),
                         consequence=review.after_confirmation,
@@ -4194,14 +4013,10 @@ class HarnessRuntime:
             )
             await self._persist_locked(run, artifact_version=artifact)
 
-    async def _set_verified_count(
-        self, owner_id: str, run_id: str, count: int
-    ) -> None:
+    async def _set_verified_count(self, owner_id: str, run_id: str, count: int) -> None:
         async with self._lock:
             run = self._require_run(owner_id, run_id)
-            budget = self._budget_with_elapsed(run).model_copy(
-                update={"files_verified": count}
-            )
+            budget = self._budget_with_elapsed(run).model_copy(update={"files_verified": count})
             run.snapshot = run.snapshot.model_copy(
                 update={"budget": budget, "updated_at": datetime.now(timezone.utc)}
             )
@@ -4227,29 +4042,17 @@ class HarnessRuntime:
             )
 
     @staticmethod
-    def _plan_file_refs(
-        plan: HarnessPlan, files: list[dict[str, Any]]
-    ) -> list[str]:
-        referenced = {
-            file_ref for unit in plan.units for file_ref in unit.input_file_refs
-        }
-        ordered = [
-            str(item["file_ref"])
-            for item in files
-            if str(item["file_ref"]) in referenced
-        ]
+    def _plan_file_refs(plan: HarnessPlan, files: list[dict[str, Any]]) -> list[str]:
+        referenced = {file_ref for unit in plan.units for file_ref in unit.input_file_refs}
+        ordered = [str(item["file_ref"]) for item in files if str(item["file_ref"]) in referenced]
         if not ordered:
             raise HarnessPlanError("本轮计划没有引用任何允许文件")
         return ordered
 
     @staticmethod
-    def _result_file_refs(
-        result: HarnessTaskResult, files: list[dict[str, Any]]
-    ) -> list[str]:
+    def _result_file_refs(result: HarnessTaskResult, files: list[dict[str, Any]]) -> list[str]:
         anchored = {
-            anchor.file_ref
-            for finding in result.findings
-            for anchor in finding.evidence_anchors
+            anchor.file_ref for finding in result.findings for anchor in finding.evidence_anchors
         }
         unresolved = {
             resolution.file_ref
@@ -4258,11 +4061,7 @@ class HarnessRuntime:
             if resolution.status != "exact"
         }
         verified = anchored - unresolved
-        return [
-            str(item["file_ref"])
-            for item in files
-            if str(item["file_ref"]) in verified
-        ]
+        return [str(item["file_ref"]) for item in files if str(item["file_ref"]) in verified]
 
     @staticmethod
     def _matching_branch_ids(
@@ -4270,10 +4069,7 @@ class HarnessRuntime:
     ) -> list[str]:
         referenced = set(file_refs)
         ranked = sorted(
-            (
-                (len(referenced.intersection(branch.input_file_refs)), branch)
-                for branch in branches
-            ),
+            ((len(referenced.intersection(branch.input_file_refs)), branch) for branch in branches),
             key=lambda item: (-item[0], item[1].branch_id),
         )
         return [branch.branch_id for overlap, branch in ranked if overlap > 0]
@@ -4291,8 +4087,7 @@ class HarnessRuntime:
             exact_unit_candidates = [
                 branch
                 for branch in branches
-                if finding.plan_unit_id is not None
-                and branch.unit_id == finding.plan_unit_id
+                if finding.plan_unit_id is not None and branch.unit_id == finding.plan_unit_id
             ]
             latest_unit_round = max(
                 (branch.round_number for branch in exact_unit_candidates),
@@ -4357,8 +4152,7 @@ class HarnessRuntime:
             exact_unit_candidates = [
                 branch
                 for branch in branches
-                if resolution.plan_unit_id is not None
-                and branch.unit_id == resolution.plan_unit_id
+                if resolution.plan_unit_id is not None and branch.unit_id == resolution.plan_unit_id
             ]
             latest_unit_round = max(
                 (branch.round_number for branch in exact_unit_candidates),
@@ -4408,9 +4202,7 @@ class HarnessRuntime:
         gaps: list[AgentControlLoopEvidenceGap] = []
         for branch in branches[:20]:
             digest = hashlib.sha256(
-                f"{branch.branch_id}:{','.join(branch.missing_file_refs)}".encode(
-                    "utf-8"
-                )
+                f"{branch.branch_id}:{','.join(branch.missing_file_refs)}".encode("utf-8")
             ).hexdigest()
             gaps.append(
                 AgentControlLoopEvidenceGap(
@@ -4443,12 +4235,8 @@ class HarnessRuntime:
                 if branch.status in {"failed", "stopped"}:
                     branches.append(branch)
                     continue
-                branch_verified = [
-                    item for item in branch.input_file_refs if item in verified
-                ]
-                missing = [
-                    item for item in branch.input_file_refs if item not in verified
-                ]
+                branch_verified = [item for item in branch.input_file_refs if item in verified]
+                missing = [item for item in branch.input_file_refs if item not in verified]
                 status = branch.status
                 if branch.round_number <= through_round:
                     status = "completed" if not missing else "waiting_input"
@@ -4462,9 +4250,7 @@ class HarnessRuntime:
                         }
                     )
                 )
-            run.snapshot = run.snapshot.model_copy(
-                update={"branches": branches, "updated_at": now}
-            )
+            run.snapshot = run.snapshot.model_copy(update={"branches": branches, "updated_at": now})
             await self._persist_locked(run)
             return [item.model_copy(deep=True) for item in branches]
 
@@ -4491,9 +4277,7 @@ class HarnessRuntime:
             if str(item.get("file_ref")) in considered_refs
             and str(item.get("file_ref")) not in set(verified_refs)
         ]
-        waiting_branches = [
-            item for item in snapshot.branches if item.status == "waiting_input"
-        ]
+        waiting_branches = [item for item in snapshot.branches if item.status == "waiting_input"]
         gaps = (
             self._branch_evidence_gaps(waiting_branches)
             if waiting_branches
@@ -4506,9 +4290,7 @@ class HarnessRuntime:
             if key not in finding_keys:
                 finding_keys.add(key)
                 unique_findings.append(finding)
-        unique_follow_ups = list(
-            dict.fromkeys([*follow_ups, *(gap.label for gap in gaps)])
-        )
+        unique_follow_ups = list(dict.fromkeys([*follow_ups, *(gap.label for gap in gaps)]))
 
         if decision == "completed" and not gaps:
             outcome: Literal["completed", "bounded", "user_stopped"] = "completed"
@@ -4546,9 +4328,7 @@ class HarnessRuntime:
             summary=summary,
             verified_file_refs=verified_refs,
             unresolved_gaps=gaps,
-            rounds_completed=len(
-                [item for item in snapshot.rounds if item.status == "completed"]
-            ),
+            rounds_completed=len([item for item in snapshot.rounds if item.status == "completed"]),
         )
         result = None
         if unique_findings:
@@ -4565,16 +4345,12 @@ class HarnessRuntime:
             rounds = list(current.rounds)
             if rounds and rounds[-1].status == "running":
                 fallback_step = AgentControlLoopNextStep(
-                    decision="user_stopped"
-                    if decision == "user_stopped"
-                    else "budget_exhausted",
+                    decision="user_stopped" if decision == "user_stopped" else "budget_exhausted",
                     reason=stop_reason or message,
-                    candidate_file_refs=[
-                        str(item.get("file_ref")) for item in unresolved_files
-                    ][:20],
-                    candidate_branch_ids=[
-                        item.branch_id for item in waiting_branches
+                    candidate_file_refs=[str(item.get("file_ref")) for item in unresolved_files][
+                        :20
                     ],
+                    candidate_branch_ids=[item.branch_id for item in waiting_branches],
                 )
                 rounds[-1] = rounds[-1].model_copy(
                     update={
@@ -4603,21 +4379,22 @@ class HarnessRuntime:
             if status == "stopped":
                 now = datetime.now(timezone.utc)
                 branches = [
-                    item.model_copy(
-                        update={"status": "stopped", "updated_at": now}
-                    )
+                    item.model_copy(update={"status": "stopped", "updated_at": now})
                     if item.status in {"running", "waiting_input"}
                     else item
                     for item in branches
                 ]
             if status == "completed" and artifact_versions:
                 final_artifact = artifact_versions[-1]
-                commit_id = "commit-" + hashlib.sha256(
-                    (
-                        f"{run_id}:{final_artifact.artifact_id}:"
-                        f"{final_artifact.version}:{summary}"
-                    ).encode("utf-8")
-                ).hexdigest()[:12]
+                commit_id = (
+                    "commit-"
+                    + hashlib.sha256(
+                        (
+                            f"{run_id}:{final_artifact.artifact_id}:"
+                            f"{final_artifact.version}:{summary}"
+                        ).encode("utf-8")
+                    ).hexdigest()[:12]
+                )
                 new_commit = AgentControlLoopCommit(
                     commit_id=commit_id,
                     artifact_id=final_artifact.artifact_id,
@@ -4675,9 +4452,7 @@ class HarnessRuntime:
         findings: list[HarnessFinding] = []
         for round_snapshot in snapshot.rounds:
             if round_snapshot.result:
-                findings.extend(
-                    HarnessTaskResult.model_validate(round_snapshot.result).findings
-                )
+                findings.extend(HarnessTaskResult.model_validate(round_snapshot.result).findings)
         return findings
 
     @staticmethod
@@ -4728,8 +4503,7 @@ class HarnessRuntime:
             for finding in result.findings:
                 resolutions = [
                     resolution.model_copy(update=updates)
-                    if resolution_id is not None
-                    and resolution.resolution_id == resolution_id
+                    if resolution_id is not None and resolution.resolution_id == resolution_id
                     else resolution
                     for resolution in finding.evidence_resolutions
                 ]
@@ -4801,9 +4575,7 @@ class HarnessRuntime:
             }
         )
 
-    async def _mark_current_round_failed(
-        self, owner_id: str, run_id: str
-    ) -> None:
+    async def _mark_current_round_failed(self, owner_id: str, run_id: str) -> None:
         async with self._lock:
             run = self._require_run(owner_id, run_id)
             rounds = list(run.snapshot.rounds)
@@ -4821,11 +4593,8 @@ class HarnessRuntime:
                 now = datetime.now(timezone.utc)
                 current_round = rounds[-1].round_number
                 branches = [
-                    item.model_copy(
-                        update={"status": "failed", "updated_at": now}
-                    )
-                    if item.round_number == current_round
-                    and item.status == "running"
+                    item.model_copy(update={"status": "failed", "updated_at": now})
+                    if item.round_number == current_round and item.status == "running"
                     else item
                     for item in run.snapshot.branches
                 ]
@@ -4842,9 +4611,7 @@ class HarnessRuntime:
             else 0
         )
         return run.snapshot.budget.model_copy(
-            update={
-                "elapsed_ms": max(0, run.active_elapsed_base_ms + active_delta_ms)
-            }
+            update={"elapsed_ms": max(0, run.active_elapsed_base_ms + active_delta_ms)}
         )
 
     @classmethod
@@ -5056,7 +4823,9 @@ class HarnessRuntime:
                 "file_ref": item["file_ref"],
                 "display_label": item.get("display_label", "公开办公输入文件"),
                 "display_group": item.get("display_group", "公开办公输入"),
-                "display_path": item.get("display_path", item.get("display_label", "公开办公输入文件")),
+                "display_path": item.get(
+                    "display_path", item.get("display_label", "公开办公输入文件")
+                ),
                 "display_summary": item.get("display_summary", "公开办公输入文件"),
                 "mime": item.get("mime", "application/octet-stream"),
             }
@@ -5131,9 +4900,7 @@ class HarnessRuntime:
         cls,
         *,
         file_ref: str,
-        role: Literal[
-            "expected", "observed", "support", "contradiction", "context"
-        ],
+        role: Literal["expected", "observed", "support", "contradiction", "context"],
         label: str,
         quote: str,
         text: str,
@@ -5177,9 +4944,7 @@ class HarnessRuntime:
         if not positions:
             compact_quote = cls._compact_evidence_text(quote)
             if len(compact_quote) >= 12:
-                compact_text, compact_line_map, lines = cls._compact_text_with_line_map(
-                    text
-                )
+                compact_text, compact_line_map, lines = cls._compact_text_with_line_map(text)
                 cursor = 0
                 while True:
                     position = compact_text.find(compact_quote, cursor)
@@ -5226,9 +4991,7 @@ class HarnessRuntime:
         cls,
         *,
         file_ref: str,
-        role: Literal[
-            "expected", "observed", "support", "contradiction", "context"
-        ],
+        role: Literal["expected", "observed", "support", "contradiction", "context"],
         label: str,
         quote: str,
         columns: list[Any],
@@ -5326,9 +5089,7 @@ class HarnessRuntime:
                 continue
             observed_dates.extend(
                 (int(month), int(day))
-                for month, day in re.findall(
-                    r"(\d{1,2})\s*月\s*(\d{1,2})\s*日", anchor.excerpt
-                )
+                for month, day in re.findall(r"(\d{1,2})\s*月\s*(\d{1,2})\s*日", anchor.excerpt)
             )
         if not observed_dates:
             return False
@@ -5391,9 +5152,7 @@ class HarnessRuntime:
                 )
                 public_candidates = [
                     AgentControlLoopEvidenceCandidate(
-                        candidate_id=cls._evidence_candidate_id(
-                            resolution_id, match
-                        ),
+                        candidate_id=cls._evidence_candidate_id(resolution_id, match),
                         file_ref=match.file_ref,
                         locator_kind=match.locator_kind,
                         start=match.start,
@@ -5428,8 +5187,7 @@ class HarnessRuntime:
                 elif matches:
                     status = "ambiguous"
                     reason = (
-                        f"同一片段在安全预览中匹配到 {len(matches)} 个位置，"
-                        "服务端不能替用户选择。"
+                        f"同一片段在安全预览中匹配到 {len(matches)} 个位置，服务端不能替用户选择。"
                     )
                 else:
                     status = "unavailable"
@@ -5476,9 +5234,7 @@ class HarnessRuntime:
                 )
             if not anchors:
                 evidence_resolutions.extend(
-                    item
-                    for item in finding_resolutions
-                    if item.status != "exact"
+                    item for item in finding_resolutions if item.status != "exact"
                 )
                 rejected_finding_count += 1
                 for file_ref in finding.file_refs:
@@ -5493,9 +5249,7 @@ class HarnessRuntime:
                     "evidence_resolutions": finding_resolutions,
                 }
             )
-            if cls._finding_outside_instruction_date_window(
-                resolved_finding, instruction
-            ):
+            if cls._finding_outside_instruction_date_window(resolved_finding, instruction):
                 out_of_scope_finding_count += 1
                 continue
             review = resolved_finding.review
@@ -5511,9 +5265,7 @@ class HarnessRuntime:
             )
             resolved_findings.append(resolved_finding)
         resolved_result = (
-            result.model_copy(update={"findings": resolved_findings})
-            if resolved_findings
-            else None
+            result.model_copy(update={"findings": resolved_findings}) if resolved_findings else None
         )
         return _EvidenceResolution(
             result=resolved_result,
@@ -5549,9 +5301,7 @@ class HarnessRuntime:
         return f"resolution-{digest[:12]}"
 
     @staticmethod
-    def _evidence_candidate_id(
-        resolution_id: str, anchor: AgentControlLoopEvidenceAnchor
-    ) -> str:
+    def _evidence_candidate_id(resolution_id: str, anchor: AgentControlLoopEvidenceAnchor) -> str:
         digest = hashlib.sha256(
             (
                 f"{resolution_id}:{anchor.file_ref}:{anchor.locator_kind}:"
@@ -5575,8 +5325,7 @@ class HarnessRuntime:
             if not set(finding.file_refs).issubset(allowed_refs):
                 raise HarnessPlanError("分析结果引用了本轮计划之外的文件")
             if any(
-                quote.file_ref not in finding.file_refs
-                or quote.file_ref not in allowed_refs
+                quote.file_ref not in finding.file_refs or quote.file_ref not in allowed_refs
                 for quote in finding.evidence_quotes
             ):
                 raise HarnessPlanError("分析结果的逐字引用超出本轮允许范围")
@@ -5588,16 +5337,10 @@ class HarnessRuntime:
             if bound_unit is not None and refs.issubset(bound_unit.input_file_refs):
                 normalized_findings.append(finding)
                 continue
-            matching_units = [
-                unit
-                for unit in plan.units
-                if refs.issubset(unit.input_file_refs)
-            ]
+            matching_units = [unit for unit in plan.units if refs.issubset(unit.input_file_refs)]
             if len(matching_units) == 1:
                 normalized_findings.append(
-                    finding.model_copy(
-                        update={"plan_unit_id": matching_units[0].unit_id}
-                    )
+                    finding.model_copy(update={"plan_unit_id": matching_units[0].unit_id})
                 )
                 continue
             if finding.plan_unit_id is not None and bound_unit is None:
@@ -5607,15 +5350,11 @@ class HarnessRuntime:
             else:
                 reason = "共享资料对应多个任务分支，Finding 必须提供 plan_unit_id"
             if len(matching_units) != 1:
-                raise HarnessPlanError(
-                    reason
-                )
+                raise HarnessPlanError(reason)
         return result.model_copy(update={"findings": normalized_findings})
 
     @staticmethod
-    def _validate_result(
-        result: HarnessTaskResult, files: list[dict[str, Any]]
-    ) -> None:
+    def _validate_result(result: HarnessTaskResult, files: list[dict[str, Any]]) -> None:
         allowed_refs = {str(item["file_ref"]) for item in files}
         for finding in result.findings:
             if not set(finding.file_refs).issubset(allowed_refs):
@@ -5623,8 +5362,7 @@ class HarnessRuntime:
             if not finding.evidence_anchors:
                 raise HarnessPlanError("分析结果缺少服务端已定位的证据锚点")
             if any(
-                anchor.file_ref not in finding.file_refs
-                or anchor.file_ref not in allowed_refs
+                anchor.file_ref not in finding.file_refs or anchor.file_ref not in allowed_refs
                 for anchor in finding.evidence_anchors
             ):
                 raise HarnessPlanError("分析结果的证据锚点超出本轮允许范围")
@@ -5673,9 +5411,7 @@ class HarnessRuntime:
         units: list[HarnessPlanUnit] = []
         for index, payload in enumerate(candidate_payloads, start=1):
             payload["depends_on"] = [
-                dependency
-                for dependency in payload["depends_on"]
-                if dependency in kept_ids
+                dependency for dependency in payload["depends_on"] if dependency in kept_ids
             ]
             tool = str(payload["tool"])
             if tool == "artifact.write":
@@ -5718,15 +5454,15 @@ class HarnessRuntime:
     ) -> None:
         allowed_refs = {str(item["file_ref"]) for item in files}
         allowed_tools = set(workspace.get("allowlisted_tools", []))
-        allowed_effects = set(workspace.get("allowed_side_effects", ["none", "run_workspace_write"]))
+        allowed_effects = set(
+            workspace.get("allowed_side_effects", ["none", "run_workspace_write"])
+        )
         if not allowed_tools:
             raise HarnessPlanError("办公资料库没有工具 allowlist")
         ids = [unit.unit_id for unit in plan.units]
         if len(ids) != len(set(ids)):
             raise HarnessPlanError("工作单元 ID 重复")
-        referenced_refs = {
-            file_ref for unit in plan.units for file_ref in unit.input_file_refs
-        }
+        referenced_refs = {file_ref for unit in plan.units for file_ref in unit.input_file_refs}
         if max_file_refs is not None and len(referenced_refs) > max_file_refs:
             raise HarnessPlanError(
                 f"本轮计划引用 {len(referenced_refs)} 份文件，"
@@ -5751,7 +5487,9 @@ class HarnessRuntime:
                 if unit.side_effect != "run_workspace_write":
                     raise HarnessPlanError("artifact.write 必须映射为 run_workspace_write")
                 if not unit.artifact_name or not unit.artifact_type:
-                    raise HarnessPlanError("artifact.write 必须声明受控 artifact_name 和 artifact_type")
+                    raise HarnessPlanError(
+                        "artifact.write 必须声明受控 artifact_name 和 artifact_type"
+                    )
             elif unit.artifact_name is not None or unit.artifact_type is not None:
                 raise HarnessPlanError("只有 artifact.write 可以声明 artifact 元数据")
             if unit.side_effect == "run_workspace_write" and unit.tool != "artifact.write":
@@ -5766,6 +5504,7 @@ class HarnessRuntime:
                 raise HarnessPlanError("计划包含未知依赖")
         visiting: set[str] = set()
         visited: set[str] = set()
+
         def visit(node: str) -> None:
             if node in visiting:
                 raise HarnessPlanError("计划依赖存在环")
@@ -5776,16 +5515,32 @@ class HarnessRuntime:
                 visit(dep)
             visiting.remove(node)
             visited.add(node)
+
         for node in graph:
             visit(node)
 
-    async def _transition(self, owner_id: str, run_id: str, status: str, name: str, message: str, details: dict[str, Any]) -> None:
+    async def _transition(
+        self,
+        owner_id: str,
+        run_id: str,
+        status: str,
+        name: str,
+        message: str,
+        details: dict[str, Any],
+    ) -> None:
         if status not in self.ALLOWED_STATUSES:
             raise HarnessConflictError(f"未知 Harness 状态: {status}")
         async with self._lock:
             run = self._require_run(owner_id, run_id)
             now = datetime.now(timezone.utc)
-            event = HarnessEvent(sequence=len(run.snapshot.events) + 1, event_name=name, occurred_at=now, status=status, message=message, details=details)
+            event = HarnessEvent(
+                sequence=len(run.snapshot.events) + 1,
+                event_name=name,
+                occurred_at=now,
+                status=status,
+                message=message,
+                details=details,
+            )
             run.snapshot = run.snapshot.model_copy(
                 update={
                     "status": status,
@@ -5801,10 +5556,14 @@ class HarnessRuntime:
         async with condition:
             condition.notify_all()
 
-    async def _set_model_receipt(self, owner_id: str, run_id: str, receipt: HarnessModelReceipt) -> None:
+    async def _set_model_receipt(
+        self, owner_id: str, run_id: str, receipt: HarnessModelReceipt
+    ) -> None:
         async with self._lock:
             run = self._require_run(owner_id, run_id)
-            run.snapshot = run.snapshot.model_copy(update={"model_receipt": receipt, "updated_at": datetime.now(timezone.utc)})
+            run.snapshot = run.snapshot.model_copy(
+                update={"model_receipt": receipt, "updated_at": datetime.now(timezone.utc)}
+            )
             await self._persist_locked(run)
 
     async def _set_analysis_receipt(
@@ -5823,9 +5582,7 @@ class HarnessRuntime:
             )
             await self._persist_locked(run)
 
-    async def _set_result(
-        self, owner_id: str, run_id: str, result: HarnessTaskResult
-    ) -> None:
+    async def _set_result(self, owner_id: str, run_id: str, result: HarnessTaskResult) -> None:
         async with self._lock:
             run = self._require_run(owner_id, run_id)
             run.snapshot = run.snapshot.model_copy(
@@ -5882,9 +5639,7 @@ class HarnessRuntime:
     ) -> AgentControlLoopBranch | None:
         if branch_id is None:
             return None
-        return next(
-            (item for item in branches if item.branch_id == branch_id), None
-        )
+        return next((item for item in branches if item.branch_id == branch_id), None)
 
     @staticmethod
     def _branches_for_plan(
@@ -5897,9 +5652,9 @@ class HarnessRuntime:
     ) -> list[AgentControlLoopBranch]:
         branch_ids = {
             unit.unit_id: "branch-"
-            + hashlib.sha256(
-                f"{run_id}:{round_number}:{unit.unit_id}".encode("utf-8")
-            ).hexdigest()[:12]
+            + hashlib.sha256(f"{run_id}:{round_number}:{unit.unit_id}".encode("utf-8")).hexdigest()[
+                :12
+            ]
             for unit in plan.units
         }
         return [

@@ -503,6 +503,71 @@ type LegalReviewOutcome = {
   external_action: "none";
 };
 
+type CandidateConditionAssessment = {
+  assessment_id: string;
+  role_id: "merchant_bd" | "text_evaluation";
+  candidate_id: string;
+  candidate_name: string;
+  condition_id: string;
+  condition_type: "responsibility" | "default_threshold" | "required" | "preferred" | "bonus";
+  condition_label: string;
+  jd_source_file_ref: string;
+  jd_locator: string;
+  jd_excerpt: string;
+  resume_source_file_ref: string;
+  resume_locator: string;
+  resume_excerpt: string;
+  resume_evidence_present: boolean;
+  status: "met" | "not_met" | "unverifiable" | "human_exception_required";
+  fact: string;
+  judgment: string;
+  reason: string;
+  owner: string;
+  review_action: string;
+  exit_condition: string;
+};
+
+type CandidateRoleReview = {
+  review_id: string;
+  role_id: "merchant_bd" | "text_evaluation";
+  role_name: string;
+  jd_source_file_ref: string;
+  candidate_id: string;
+  candidate_name: string;
+  resume_source_file_ref: string;
+  recommendation: "recommended_for_human_review" | "explicit_hard_gap" | "insufficient_evidence" | "exception_review_required";
+  condition_count: number;
+  met_count: number;
+  not_met_count: number;
+  unverifiable_count: number;
+  human_exception_count: number;
+  summary: string;
+  assessments: CandidateConditionAssessment[];
+};
+
+type CandidateReviewOutcome = {
+  outcome_id: string;
+  status: "review_required" | "invalid";
+  decision: string;
+  summary: string;
+  role_count: number;
+  candidate_count: number;
+  review_count: number;
+  assessment_count: number;
+  met_count: number;
+  not_met_count: number;
+  unverifiable_count: number;
+  human_exception_count: number;
+  recommended_for_human_review_count: number;
+  explicit_hard_gap_count: number;
+  insufficient_evidence_count: number;
+  exception_review_required_count: number;
+  human_review_required: true;
+  fairness_evaluated: false;
+  reviews: CandidateRoleReview[];
+  external_action: "none";
+};
+
 type WorkspaceArtifact = {
   artifact_id: string;
   capability_id: string;
@@ -530,6 +595,7 @@ type WorkspaceArtifact = {
   self_test: ArtifactSelfTest | null;
   business_gate_outcome: BusinessGateOutcome | null;
   legal_review_outcome: LegalReviewOutcome | null;
+  candidate_review_outcome: CandidateReviewOutcome | null;
   download_path: string;
   created_at: string;
   original_inputs_modified: false;
@@ -552,6 +618,7 @@ type EffectReceipt = {
   prohibited_side_effects: string[];
   business_gate_outcome: BusinessGateOutcome | null;
   legal_review_outcome: LegalReviewOutcome | null;
+  candidate_review_outcome: CandidateReviewOutcome | null;
   created_at: string;
   external_action: "none";
 };
@@ -1759,6 +1826,125 @@ function normalizeLegalReviewOutcome(value: unknown): LegalReviewOutcome | null 
   };
 }
 
+function normalizeCandidateConditionAssessment(value: unknown): CandidateConditionAssessment | null {
+  if (!value || typeof value !== "object") return null;
+  const raw = value as Record<string, unknown>;
+  const assessmentId = asText(raw.assessment_id);
+  const roleId = asText(raw.role_id);
+  const candidateId = asText(raw.candidate_id);
+  const conditionType = asText(raw.condition_type);
+  const status = asText(raw.status);
+  if (
+    !assessmentId
+    || !["merchant_bd", "text_evaluation"].includes(roleId)
+    || !/^CAND-[0-9]{2}$/.test(candidateId)
+    || !["responsibility", "default_threshold", "required", "preferred", "bonus"].includes(conditionType)
+    || !["met", "not_met", "unverifiable", "human_exception_required"].includes(status)
+  ) return null;
+  return {
+    assessment_id: assessmentId,
+    role_id: roleId as CandidateConditionAssessment["role_id"],
+    candidate_id: candidateId,
+    candidate_name: asText(raw.candidate_name),
+    condition_id: asText(raw.condition_id),
+    condition_type: conditionType as CandidateConditionAssessment["condition_type"],
+    condition_label: asText(raw.condition_label),
+    jd_source_file_ref: asText(raw.jd_source_file_ref),
+    jd_locator: asText(raw.jd_locator),
+    jd_excerpt: asText(raw.jd_excerpt),
+    resume_source_file_ref: asText(raw.resume_source_file_ref),
+    resume_locator: asText(raw.resume_locator),
+    resume_excerpt: asText(raw.resume_excerpt),
+    resume_evidence_present: raw.resume_evidence_present === true,
+    status: status as CandidateConditionAssessment["status"],
+    fact: asText(raw.fact),
+    judgment: asText(raw.judgment),
+    reason: asText(raw.reason),
+    owner: asText(raw.owner),
+    review_action: asText(raw.review_action),
+    exit_condition: asText(raw.exit_condition),
+  };
+}
+
+function normalizeCandidateRoleReview(value: unknown): CandidateRoleReview | null {
+  if (!value || typeof value !== "object") return null;
+  const raw = value as Record<string, unknown>;
+  const reviewId = asText(raw.review_id);
+  const roleId = asText(raw.role_id);
+  const candidateId = asText(raw.candidate_id);
+  const recommendation = asText(raw.recommendation);
+  const assessments = Array.isArray(raw.assessments)
+    ? raw.assessments.map(normalizeCandidateConditionAssessment).filter((item): item is CandidateConditionAssessment => item !== null)
+    : [];
+  const conditionCount = asNumber(raw.condition_count);
+  if (
+    !reviewId
+    || !["merchant_bd", "text_evaluation"].includes(roleId)
+    || !/^CAND-[0-9]{2}$/.test(candidateId)
+    || !["recommended_for_human_review", "explicit_hard_gap", "insufficient_evidence", "exception_review_required"].includes(recommendation)
+    || assessments.length !== conditionCount
+  ) return null;
+  return {
+    review_id: reviewId,
+    role_id: roleId as CandidateRoleReview["role_id"],
+    role_name: asText(raw.role_name),
+    jd_source_file_ref: asText(raw.jd_source_file_ref),
+    candidate_id: candidateId,
+    candidate_name: asText(raw.candidate_name),
+    resume_source_file_ref: asText(raw.resume_source_file_ref),
+    recommendation: recommendation as CandidateRoleReview["recommendation"],
+    condition_count: conditionCount,
+    met_count: asNumber(raw.met_count),
+    not_met_count: asNumber(raw.not_met_count),
+    unverifiable_count: asNumber(raw.unverifiable_count),
+    human_exception_count: asNumber(raw.human_exception_count),
+    summary: asText(raw.summary),
+    assessments,
+  };
+}
+
+function normalizeCandidateReviewOutcome(value: unknown): CandidateReviewOutcome | null {
+  if (!value || typeof value !== "object") return null;
+  const raw = value as Record<string, unknown>;
+  const outcomeId = asText(raw.outcome_id);
+  const status = asText(raw.status);
+  const reviews = Array.isArray(raw.reviews)
+    ? raw.reviews.map(normalizeCandidateRoleReview).filter((item): item is CandidateRoleReview => item !== null)
+    : [];
+  const reviewCount = asNumber(raw.review_count);
+  const assessmentCount = asNumber(raw.assessment_count);
+  if (
+    !outcomeId
+    || !["review_required", "invalid"].includes(status)
+    || reviews.length !== reviewCount
+    || reviews.reduce((sum, review) => sum + review.condition_count, 0) !== assessmentCount
+    || raw.human_review_required !== true
+    || raw.fairness_evaluated !== false
+  ) return null;
+  return {
+    outcome_id: outcomeId,
+    status: status as CandidateReviewOutcome["status"],
+    decision: asText(raw.decision),
+    summary: asText(raw.summary),
+    role_count: asNumber(raw.role_count),
+    candidate_count: asNumber(raw.candidate_count),
+    review_count: reviewCount,
+    assessment_count: assessmentCount,
+    met_count: asNumber(raw.met_count),
+    not_met_count: asNumber(raw.not_met_count),
+    unverifiable_count: asNumber(raw.unverifiable_count),
+    human_exception_count: asNumber(raw.human_exception_count),
+    recommended_for_human_review_count: asNumber(raw.recommended_for_human_review_count),
+    explicit_hard_gap_count: asNumber(raw.explicit_hard_gap_count),
+    insufficient_evidence_count: asNumber(raw.insufficient_evidence_count),
+    exception_review_required_count: asNumber(raw.exception_review_required_count),
+    human_review_required: true,
+    fairness_evaluated: false,
+    reviews,
+    external_action: "none",
+  };
+}
+
 function normalizeBusinessGateOutcome(value: unknown): BusinessGateOutcome | null {
   if (!value || typeof value !== "object") return null;
   const raw = value as Record<string, unknown>;
@@ -1834,6 +2020,7 @@ function normalizeWorkspaceArtifact(value: unknown): WorkspaceArtifact | null {
     self_test: selfTest && selfTest.instruction && selfTest.commands.length > 0 ? selfTest : null,
     business_gate_outcome: normalizeBusinessGateOutcome(raw.business_gate_outcome),
     legal_review_outcome: normalizeLegalReviewOutcome(raw.legal_review_outcome),
+    candidate_review_outcome: normalizeCandidateReviewOutcome(raw.candidate_review_outcome),
     download_path: asText(raw.download_path),
     created_at: asText(raw.created_at),
     original_inputs_modified: false,
@@ -1863,6 +2050,7 @@ function normalizeEffectReceipt(value: unknown): EffectReceipt | null {
     prohibited_side_effects: asStrings(raw.prohibited_side_effects),
     business_gate_outcome: normalizeBusinessGateOutcome(raw.business_gate_outcome),
     legal_review_outcome: normalizeLegalReviewOutcome(raw.legal_review_outcome),
+    candidate_review_outcome: normalizeCandidateReviewOutcome(raw.candidate_review_outcome),
     created_at: asText(raw.created_at),
     external_action: "none",
   };
@@ -3173,6 +3361,9 @@ function LoopView({
   const businessGateOutcome = run.workspace_artifacts.find((artifact) => artifact.business_gate_outcome)?.business_gate_outcome
     ?? run.effect_receipts.find((receipt) => receipt.business_gate_outcome)?.business_gate_outcome
     ?? null;
+  const candidateReviewOutcome = run.workspace_artifacts.find((artifact) => artifact.candidate_review_outcome)?.candidate_review_outcome
+    ?? run.effect_receipts.find((receipt) => receipt.candidate_review_outcome)?.candidate_review_outcome
+    ?? null;
   const artifactCheckSummary = summarizeArtifactChecks(run.workspace_artifacts);
   const passedArtifactChecks = artifactCheckSummary.passed;
   const totalArtifactChecks = artifactCheckSummary.total;
@@ -3403,7 +3594,7 @@ function LoopView({
       {run.last_commit && <footer><IconCircleCheck aria-hidden="true" /><span>{run.last_commit.summary}</span><b>{run.commits.length} 次提交记录</b></footer>}
     </section>}
     {run.brief && <section className={`loop-brief is-${run.brief.outcome}`}><IconCircleCheck aria-hidden="true" /><div><span>任务简报</span><h3>{run.brief.summary}</h3><p>外部动作：未发生 · 结果仍需人工复核</p></div></section>}
-    {verifiedEffectReady && effectConclusionArtifact && <section className={`loop-effect-conclusion${businessGateOutcome && businessGateOutcome.status !== "passed" ? " is-business-blocked" : ""}`} aria-label="本次任务结语">{businessGateOutcome && businessGateOutcome.status !== "passed" ? <IconAlertTriangle aria-hidden="true" /> : <IconShieldCheck aria-hidden="true" />}<div><span>{businessGateOutcome && businessGateOutcome.status !== "passed" ? "业务结论" : "本次任务结语"}</span><h3>{businessGateOutcome && businessGateOutcome.status !== "passed" ? businessGateOutcome.decision : effectConclusionArtifact.execution_summary}</h3><p>{businessGateOutcome && businessGateOutcome.status !== "passed" ? businessGateOutcome.summary : effectConclusionArtifact.review_guidance}</p></div><b>{businessGateOutcome && businessGateOutcome.status !== "passed" ? `业务 Gate ${businessGateOutcome.failed_gate_count}/${businessGateOutcome.total_gate_count} 未通过` : artifactCheckSummary.sameChecklist ? `${run.workspace_artifacts.length} 份成果共享 ${totalArtifactChecks} 项规则检查，${passedArtifactChecks}/${totalArtifactChecks} 通过` : artifactCheckSummary.shared ? `${run.workspace_artifacts.length} 份成果共 ${totalArtifactChecks} 项唯一规则检查，${passedArtifactChecks}/${totalArtifactChecks} 通过` : `${passedArtifactChecks}/${totalArtifactChecks} 项规则检查通过`}</b></section>}
+    {verifiedEffectReady && effectConclusionArtifact && <section className={`loop-effect-conclusion${businessGateOutcome && businessGateOutcome.status !== "passed" ? " is-business-blocked" : candidateReviewOutcome ? " is-human-review" : ""}`} aria-label="本次任务结语">{businessGateOutcome && businessGateOutcome.status !== "passed" || candidateReviewOutcome ? <IconAlertTriangle aria-hidden="true" /> : <IconShieldCheck aria-hidden="true" />}<div><span>{businessGateOutcome && businessGateOutcome.status !== "passed" ? "业务结论" : candidateReviewOutcome ? "招聘辅助结论" : "本次任务结语"}</span><h3>{businessGateOutcome && businessGateOutcome.status !== "passed" ? businessGateOutcome.decision : candidateReviewOutcome ? candidateReviewOutcome.decision : effectConclusionArtifact.execution_summary}</h3><p>{businessGateOutcome && businessGateOutcome.status !== "passed" ? businessGateOutcome.summary : candidateReviewOutcome ? candidateReviewOutcome.summary : effectConclusionArtifact.review_guidance}</p></div><b>{businessGateOutcome && businessGateOutcome.status !== "passed" ? `业务 Gate ${businessGateOutcome.failed_gate_count}/${businessGateOutcome.total_gate_count} 未通过` : candidateReviewOutcome ? "最终 HR 决定尚未发生" : artifactCheckSummary.sameChecklist ? `${run.workspace_artifacts.length} 份成果共享 ${totalArtifactChecks} 项规则检查，${passedArtifactChecks}/${totalArtifactChecks} 通过` : artifactCheckSummary.shared ? `${run.workspace_artifacts.length} 份成果共 ${totalArtifactChecks} 项唯一规则检查，${passedArtifactChecks}/${totalArtifactChecks} 通过` : `${passedArtifactChecks}/${totalArtifactChecks} 项规则检查通过`}</b></section>}
   </section>;
 }
 
@@ -3491,6 +3682,83 @@ function LegalReviewOutcomePanel({ outcome, deterministicPassed }: { outcome: Le
   </section>;
 }
 
+function candidateAssessmentStatusLabel(status: CandidateConditionAssessment["status"]): string {
+  return {
+    met: "有来源支持",
+    not_met: "明确不满足",
+    unverifiable: "资料不足",
+    human_exception_required: "需人工例外判断",
+  }[status];
+}
+
+function candidateRecommendationLabel(recommendation: CandidateRoleReview["recommendation"]): string {
+  return {
+    recommended_for_human_review: "建议进入人工复核",
+    explicit_hard_gap: "存在明确硬条件缺口",
+    insufficient_evidence: "资料不足，需补证",
+    exception_review_required: "需决定是否适用例外",
+  }[recommendation];
+}
+
+function candidateConditionTypeLabel(type: CandidateConditionAssessment["condition_type"]): string {
+  return {
+    responsibility: "岗位职责",
+    default_threshold: "默认门槛",
+    required: "必要项",
+    preferred: "优先项",
+    bonus: "加分项",
+  }[type];
+}
+
+function CandidateReviewOutcomePanel({ outcome, deterministicPassed }: { outcome: CandidateReviewOutcome; deterministicPassed: boolean }) {
+  const roles = Array.from(new Set(outcome.reviews.map((review) => review.role_id)));
+  return <section className={`candidate-review-outcome is-${outcome.status}`} aria-label="双岗位候选人辅助筛选结论">
+    <header>
+      <IconAlertTriangle aria-hidden="true" />
+      <div><span>招聘辅助筛选</span><h3>{outcome.decision}</h3><p>{outcome.summary}</p></div>
+      <b>{outcome.review_count} 组岗位匹配 · 全部待 HR 决定</b>
+    </header>
+    <ol className="candidate-review-statuses" aria-label="确定性验证、岗位建议与最终招聘决定">
+      <li className={deterministicPassed ? "is-passed" : "is-failed"}><span>1</span><div><b>来源与成果</b><strong>{deterministicPassed ? "确定性检查通过" : "确定性检查未通过"}</strong><p>{deterministicPassed ? `${outcome.role_count} 份 JD、${outcome.candidate_count} 份简历与 ${outcome.assessment_count} 条条件已由服务端重算。` : "来源、解析或成果结构未通过验证，当前建议不能采用。"}</p></div></li>
+      <li className="is-review"><span>2</span><div><b>岗位匹配建议</b><strong>有依据，也有缺口</strong><p>有来源支持 {outcome.met_count} 条 · 明确不满足 {outcome.not_met_count} 条 · 资料不足 {outcome.unverifiable_count} 条 · 需例外判断 {outcome.human_exception_count} 条</p></div></li>
+      <li className="is-pending"><span>3</span><div><b>最终 HR 决定</b><strong>尚未发生</strong><p>本轮没有录用、淘汰、通知候选人或写入 ATS；所有建议都要由招聘人员复核。</p></div></li>
+    </ol>
+    <section className="candidate-review-summary" aria-label="岗位匹配建议汇总">
+      <div><span>建议人工复核</span><strong>{outcome.recommended_for_human_review_count}</strong><p>只表示必要项已有来源支持</p></div>
+      <div><span>明确硬条件缺口</span><strong>{outcome.explicit_hard_gap_count}</strong><p>仍不是自动淘汰决定</p></div>
+      <div><span>资料不足</span><strong>{outcome.insufficient_evidence_count}</strong><p>缺失不会被推断为否定</p></div>
+      <div><span>人工例外</span><strong>{outcome.exception_review_required_count}</strong><p>服务端不会替 HR 适用例外</p></div>
+    </section>
+    <div className="candidate-review-roles">{roles.map((roleId) => {
+      const reviews = outcome.reviews.filter((review) => review.role_id === roleId);
+      const roleName = reviews[0]?.role_name ?? roleId;
+      return <section key={roleId} aria-label={`${roleName}岗位候选人建议`}>
+        <header><div><span>岗位</span><h4>{roleName}</h4></div><b>{reviews.length} 名候选人</b></header>
+        <div className="candidate-review-candidates">{reviews.map((review) => <details key={review.review_id} className={`is-${review.recommendation}`}>
+          <summary>
+            <span><b>{review.candidate_id}</b><strong>{review.candidate_name}</strong></span>
+            <span><em>{candidateRecommendationLabel(review.recommendation)}</em><small>支持 {review.met_count} · 缺口 {review.not_met_count} · 资料不足 {review.unverifiable_count} · 例外 {review.human_exception_count}</small></span>
+            <IconChevronDown aria-hidden="true" />
+          </summary>
+          <p>{review.summary}</p>
+          <ol aria-label={`${review.candidate_name}在${roleName}岗位的逐条件核对`}>{review.assessments.map((assessment) => <li key={assessment.assessment_id} className={`is-${assessment.status}`}>
+            <header><span><b>{assessment.condition_id}</b><strong>{assessment.condition_label}</strong></span><span><em>{candidateConditionTypeLabel(assessment.condition_type)}</em><mark>{candidateAssessmentStatusLabel(assessment.status)}</mark></span></header>
+            <dl>
+              <div><dt>JD 原文</dt><dd><b>{assessment.jd_locator}</b>{assessment.jd_excerpt}</dd></div>
+              <div><dt>简历原文</dt><dd><b>{assessment.resume_locator}</b>{assessment.resume_excerpt}</dd></div>
+              <div><dt>来源事实</dt><dd>{assessment.fact}</dd></div>
+              <div><dt>服务端判断</dt><dd>{assessment.judgment} {assessment.reason}</dd></div>
+              <div><dt>面试或补证</dt><dd>{assessment.review_action}</dd></div>
+              <div><dt>责任与退出</dt><dd>{assessment.owner}：{assessment.exit_condition}</dd></div>
+            </dl>
+          </li>)}</ol>
+        </details>)}</div>
+      </section>;
+    })}</div>
+    <footer><IconShieldCheck aria-hidden="true" /><span>固定 hr-001 辅助筛选只核对公开 JD 与简历事实。它不是正式录用决定、背景调查或公平性证明。</span></footer>
+  </section>;
+}
+
 function WorkspaceArtifactSection({ artifacts, receipts }: { artifacts: WorkspaceArtifact[]; receipts: EffectReceipt[] }) {
   const [downloading, setDownloading] = useState<string | null>(null);
   const [downloadError, setDownloadError] = useState("");
@@ -3508,6 +3776,9 @@ function WorkspaceArtifactSection({ artifacts, receipts }: { artifacts: Workspac
     ?? null;
   const legalReviewOutcome = artifacts.find((artifact) => artifact.legal_review_outcome)?.legal_review_outcome
     ?? latestReceipt?.legal_review_outcome
+    ?? null;
+  const candidateReviewOutcome = artifacts.find((artifact) => artifact.candidate_review_outcome)?.candidate_review_outcome
+    ?? latestReceipt?.candidate_review_outcome
     ?? null;
   const businessBlocked = Boolean(businessGateOutcome && businessGateOutcome.status !== "passed");
   const deterministicPassed = artifacts.length > 0 && artifacts.every((artifact) => artifact.verifier_status === "passed");
@@ -3539,14 +3810,15 @@ function WorkspaceArtifactSection({ artifacts, receipts }: { artifacts: Workspac
     <header>
       <IconFileDescription aria-hidden="true" />
       <div><span>运行工作区</span><h3 id="workspace-artifacts-title">{artifacts.length > 0 ? `Agent 已生成 ${artifacts.length} 份真实成果文件` : "这项任务尚不能生成可信成果"}</h3><p>{artifacts.length > 0 ? "文件已写入本次 Run 的隔离目录，原始 FORTE 文件没有被修改。" : boundary?.result}</p></div>
-      <b>{businessGateOutcome?.status === "failed" ? `业务 Gate ${businessGateOutcome.failed_gate_count}/${businessGateOutcome.total_gate_count} 未通过` : businessGateOutcome?.status === "invalid" ? "来源校验失败" : artifacts.length > 0 ? checkSummary.sameChecklist ? `${artifacts.length} 份成果共享 ${checkSummary.total} 项确定性检查，${checkSummary.passed}/${checkSummary.total} 通过` : checkSummary.shared ? `${artifacts.length} 份成果共 ${checkSummary.total} 项唯一确定性检查，${checkSummary.passed}/${checkSummary.total} 通过` : `${checkSummary.passed}/${checkSummary.total} 项检查通过` : "未伪造结果"}</b>
+      <b>{businessGateOutcome?.status === "failed" ? `业务 Gate ${businessGateOutcome.failed_gate_count}/${businessGateOutcome.total_gate_count} 未通过` : businessGateOutcome?.status === "invalid" ? "来源校验失败" : candidateReviewOutcome ? "最终 HR 决定待人工处理" : artifacts.length > 0 ? checkSummary.sameChecklist ? `${artifacts.length} 份成果共享 ${checkSummary.total} 项确定性检查，${checkSummary.passed}/${checkSummary.total} 通过` : checkSummary.shared ? `${artifacts.length} 份成果共 ${checkSummary.total} 项唯一确定性检查，${checkSummary.passed}/${checkSummary.total} 通过` : `${checkSummary.passed}/${checkSummary.total} 项检查通过` : "未伪造结果"}</b>
     </header>
+    {candidateReviewOutcome && <CandidateReviewOutcomePanel outcome={candidateReviewOutcome} deterministicPassed={deterministicPassed} />}
     {legalReviewOutcome && <LegalReviewOutcomePanel outcome={legalReviewOutcome} deterministicPassed={deterministicPassed} />}
     {businessGateOutcome && <BusinessGateOutcomePanel outcome={businessGateOutcome} />}
     {executionArtifact && <article className={`workspace-action-result${executionArtifact.verifier_status === "failed" ? " is-failed" : ""}`} aria-label="实际执行边界"><IconShieldCheck aria-hidden="true" /><div><span>这次实际发生了什么</span><h4>{executionArtifact.execution_summary}</h4><p>{executionArtifact.purpose}</p>{latestReceipt && <ul>{latestReceipt.prohibited_side_effects.map((item) => <li key={item}>{item}</li>)}</ul>}</div></article>}
     {artifacts.length > 0 && <ol>{artifacts.map((artifact) => <li key={artifact.artifact_id} className={artifact.verifier_status === "passed" ? "is-passed" : "is-failed"}>
       <div className="workspace-artifact-file"><span><IconFile aria-hidden="true" /></span><div><h4>{artifact.title}</h4><p>{artifact.summary}</p><small>文件：{artifact.file_name} · 第 {artifact.round_number} 轮 · {formatSize(artifact.size)} · {artifact.source_file_refs.length} 份内容来源</small></div></div>
-      <div className="workspace-artifact-status"><b>{artifact.verifier_status === "passed" ? <><IconCheck aria-hidden="true" />确定性检查通过</> : <><IconAlertTriangle aria-hidden="true" />检查未通过</>}</b><span>{artifact.record_count !== null ? `${artifact.record_count} 条记录 · ` : ""}{artifact.checks.filter((check) => check.passed).length}/{artifact.checks.length} 项检查{(checklistUsage.get(artifactChecklistKey(artifact)) ?? 0) > 1 ? " · 使用同一验证清单" : ""}</span>{artifact.business_gate_outcome && <small>只代表公式、来源和文件结构已复核，不代表业务 Gate 通过。</small>}</div>
+      <div className="workspace-artifact-status"><b>{artifact.verifier_status === "passed" ? <><IconCheck aria-hidden="true" />确定性检查通过</> : <><IconAlertTriangle aria-hidden="true" />检查未通过</>}</b><span>{artifact.record_count !== null ? `${artifact.record_count} 条记录 · ` : ""}{artifact.checks.filter((check) => check.passed).length}/{artifact.checks.length} 项检查{(checklistUsage.get(artifactChecklistKey(artifact)) ?? 0) > 1 ? " · 使用同一验证清单" : ""}</span>{artifact.business_gate_outcome && <small>只代表公式、来源和文件结构已复核，不代表业务 Gate 通过。</small>}{artifact.candidate_review_outcome && <small>只代表来源、条件计算和成果结构已复核，不代表录用或淘汰。</small>}</div>
       <button type="button" onClick={() => void downloadArtifact(artifact)} disabled={downloading !== null}><IconDownload aria-hidden="true" />{downloading === artifact.artifact_id ? "正在下载" : "下载成果"}</button>
       {(artifact.deliverable_type || artifact.covered_period || artifact.statistic_basis || artifact.purpose) && <dl className={`workspace-artifact-semantics${artifact.deliverable_type ? " has-deliverable-type" : ""}`}>
         {artifact.deliverable_type && <div><dt>成果类型</dt><dd>{artifact.deliverable_type}</dd></div>}

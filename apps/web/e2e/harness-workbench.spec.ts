@@ -1,5 +1,6 @@
 import { expect, test, type Page, type Route } from "@playwright/test";
 import tc04TestManifest from "../../../docs/evidence/manifests/tc04-public-test-manifest-20260828.json";
+import tc06CandidateReviewManifest from "../../../docs/evidence/manifests/tc06-public-candidate-review-outcome-20260829.json";
 import tc07LegalReviewManifest from "../../../docs/evidence/manifests/tc07-public-legal-review-outcome-20260828.json";
 import tc11BusinessOutcome from "../../../docs/evidence/manifests/tc11-business-gate-outcome-20260828.json";
 import tc12TestManifest from "../../../docs/evidence/manifests/tc12-public-test-manifest-20260828.json";
@@ -20,7 +21,19 @@ type FileItem = {
 
 const csvFile = fileItem("forte-1111111111111111", "forte-folder-111111111111", "2026往来明细.xlsx", "财务管理", "XLSX", "table");
 const pdfFile = fileItem("forte-2222222222222222", "forte-folder-222222222222", "授权委托书.pdf", "法务", "PDF", "pdf", "合同与授权/授权委托书.pdf");
-const docxFile = fileItem("forte-3333333333333333", "forte-folder-333333333333", "岗位说明.docx", "人力招聘", "DOCX", "document");
+const docxFile = fileItem("forte-3333333333333333", "forte-folder-333333333333", "外卖商户BD岗位JD.docx", "人力招聘", "DOCX", "document");
+const candidateFiles = [
+  docxFile,
+  fileItem("forte-candidate-jd-text", docxFile.folder_id, "文本评测岗位JD.docx", "人力招聘", "DOCX", "document"),
+  ...["周伦", "孙博文", "李雨桐", "王琳达", "赵晨曦"].map((name, index) => fileItem(
+    `forte-candidate-resume-0${index + 1}`,
+    docxFile.folder_id,
+    `${name}简历.pdf`,
+    "人力招聘",
+    "PDF",
+    "pdf",
+  )),
+];
 const txtFile = fileItem("forte-4444444444444444", "forte-folder-444444444444", "运行日志.txt", "可靠性工程", "TXT", "text");
 const workflowFile = fileItem("forte-5555555555555555", "forte-folder-555555555555", "workflow.py", "算法研发", "PY", "text", "search_agent_workflow/workflow.py");
 const searchLogFile = fileItem("forte-6666666666666666", "forte-folder-555555555555", "search_agent.log", "算法研发", "LOG", "text", "search_agent_workflow/search_agent.log");
@@ -53,7 +66,7 @@ function fileItem(fileRef: string, folderId: string, label: string, group: strin
 const seedFolders = [
   { folder_id: csvFile.folder_id, display_label: "财务管理", display_summary: "跨期间往来资料", files: [csvFile] },
   { folder_id: pdfFile.folder_id, display_label: "法务", display_summary: "合同与授权材料", files: [legalRuleFile, ...legalDelegationFiles, pdfFile] },
-  { folder_id: docxFile.folder_id, display_label: "人力招聘", display_summary: "岗位与候选人材料", files: [docxFile] },
+  { folder_id: docxFile.folder_id, display_label: "人力招聘", display_summary: "岗位与候选人材料", files: candidateFiles },
   { folder_id: txtFile.folder_id, display_label: "可靠性工程", display_summary: "运行日志与服务资料", files: [txtFile] },
   { folder_id: workflowFile.folder_id, display_label: "算法研发", display_summary: "搜索 Agent 代码与运行记录", files: [workflowFile, searchLogFile] },
 ];
@@ -1068,6 +1081,156 @@ function failedReleaseReadinessEffectSnapshot(body: { workspace_id: string; inst
   };
 }
 
+function candidateReviewEffectSnapshot(
+  body: { workspace_id: string; instruction: string },
+  options: { improvedSunExperience?: boolean } = {},
+) {
+  const base = snapshot(body, "completed", 19);
+  const manifest = structuredClone(tc06CandidateReviewManifest);
+  const outcome = manifest.candidate_review_outcome;
+  if (options.improvedSunExperience) {
+    const review = outcome.reviews.find((item) => item.role_id === "text_evaluation" && item.candidate_name === "孙博文");
+    if (!review) throw new Error("TC-06 public manifest is missing Sun Bowen text review");
+    const assessment = review.assessments.find((item) => item.condition_id === "TEXT-REQ-AI-EXPERIENCE");
+    if (!assessment) throw new Error("TC-06 public manifest is missing AI experience assessment");
+    assessment.status = "met";
+    assessment.fact = "测试来源副本可复算 AI 相关经历为 16 个月。";
+    assessment.judgment = "该条件有来源支持，但仍需核验陈述真实性和实际负责范围。";
+    assessment.reason = "达到 JD 的 12 个月必要门槛。";
+    assessment.resume_locator = `${assessment.resume_locator}；第 2 页 · 非空行 1`;
+    assessment.resume_excerpt = `${assessment.resume_excerpt}；2024.01 - 2024.08 AI evaluation engineer (8 months)`;
+    review.met_count += 1;
+    review.not_met_count -= 1;
+    review.recommendation = "recommended_for_human_review";
+    review.summary = `建议进入人工复核；有来源支持 ${review.met_count} 项，明确不满足 ${review.not_met_count} 项，资料不足 ${review.unverifiable_count} 项，需人工例外判断 ${review.human_exception_count} 项。`;
+    outcome.met_count += 1;
+    outcome.not_met_count -= 1;
+    outcome.recommended_for_human_review_count += 1;
+    outcome.explicit_hard_gap_count -= 1;
+    outcome.summary = `${outcome.role_count} 个岗位、${outcome.candidate_count} 名候选人、${outcome.assessment_count} 条来源推导条件；有来源支持 ${outcome.met_count} 条，明确不满足 ${outcome.not_met_count} 条，资料不足 ${outcome.unverifiable_count} 条，需人工例外判断 ${outcome.human_exception_count} 条。`;
+  }
+  const sourceRefs = Array.from(new Set(outcome.reviews.flatMap((review) => [review.jd_source_file_ref, review.resume_source_file_ref])));
+  const resumeRefs = Array.from(new Set(outcome.reviews.map((review) => review.resume_source_file_ref)));
+  const bdJdRef = outcome.reviews.find((review) => review.role_id === "merchant_bd")?.jd_source_file_ref ?? sourceRefs[0];
+  const textJdRef = outcome.reviews.find((review) => review.role_id === "text_evaluation")?.jd_source_file_ref ?? sourceRefs[1];
+  const artifactIds = ["workspace-artifact-606060606001", "workspace-artifact-606060606002", "workspace-artifact-606060606003"];
+  const common = {
+    capability_id: "office-candidate-review",
+    scenario_id: "TC-06",
+    version: 1,
+    round_number: 1,
+    validator_id: "validator-candidate-review-v2",
+    verifier_status: "passed",
+    checks: manifest.checks,
+    covered_period: "FORTE 公开 hr-001 固定资料版本",
+    deliverable_type: "来源推导的招聘辅助筛选成果",
+    key_outputs: [
+      `${outcome.role_count} 个岗位 × ${outcome.candidate_count} 名候选人`,
+      `${outcome.assessment_count} 条岗位条件与简历事实逐项台账`,
+      `支持 ${outcome.met_count} · 不满足 ${outcome.not_met_count} · 资料不足 ${outcome.unverifiable_count} · 例外 ${outcome.human_exception_count}`,
+    ],
+    key_outputs_label: "本次来源推导结果",
+    review_guidance: "辅助筛选不作自动录用或淘汰决定；招聘负责人需核对来源事实、资料不足与例外项。本轮没有公平性用户研究，不能声称无偏。",
+    execution_summary: "已从七份冻结来源生成并校验两份岗位报告和一份逐项台账；没有通知候选人、写入 ATS 或执行录用淘汰。",
+    self_test: null,
+    business_gate_outcome: null,
+    legal_review_outcome: null,
+    candidate_review_outcome: outcome,
+    created_at: new Date().toISOString(),
+    original_inputs_modified: false,
+    review_required: true,
+    external_action: "none",
+  };
+  const artifacts = [{
+    ...common,
+    artifact_id: artifactIds[0],
+    title: "外卖商户BD岗位辅助筛选报告",
+    file_name: "外卖商户BD岗位辅助筛选报告.docx",
+    media_type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    size: 39422,
+    source_file_refs: [bdJdRef, ...resumeRefs],
+    summary: "五名候选人已按外卖商户BD岗位来源条件逐项核对。",
+    statistic_basis: "5 名候选人 × 14 条外卖商户BD岗位条件。",
+    purpose: "供招聘人员复核外卖商户BD岗位条件，不代表录用或淘汰。",
+    record_count: 5,
+    download_path: `/v1/harness/runs/${base.run_id}/artifacts/${artifactIds[0]}`,
+  }, {
+    ...common,
+    artifact_id: artifactIds[1],
+    title: "文本评测岗位辅助筛选报告",
+    file_name: "文本评测岗位辅助筛选报告.docx",
+    media_type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    size: 36610,
+    source_file_refs: [textJdRef, ...resumeRefs],
+    summary: "五名候选人已按文本评测岗位来源条件逐项核对。",
+    statistic_basis: "5 名候选人 × 8 条文本评测岗位条件。",
+    purpose: "供招聘人员复核文本评测岗位条件，不代表录用或淘汰。",
+    record_count: 5,
+    download_path: `/v1/harness/runs/${base.run_id}/artifacts/${artifactIds[1]}`,
+  }, {
+    ...common,
+    artifact_id: artifactIds[2],
+    title: "候选人岗位条件逐项台账",
+    file_name: "候选人岗位条件逐项台账.csv",
+    media_type: "text/csv",
+    size: 78420,
+    source_file_refs: sourceRefs,
+    summary: `${outcome.assessment_count} 条岗位、候选人、条件记录可独立复算。`,
+    statistic_basis: `5 名候选人 × (14 条 BD 条件 + 8 条文本评测条件)，共 ${outcome.assessment_count} 条。`,
+    purpose: "审计 JD 位置、简历位置、事实、判断、人工动作与退出条件。",
+    record_count: outcome.assessment_count,
+    download_path: `/v1/harness/runs/${base.run_id}/artifacts/${artifactIds[2]}`,
+  }];
+  return {
+    ...base,
+    workspace_artifacts: artifacts,
+    effect_receipts: [{
+      receipt_id: "effect-receipt-606060606060",
+      capability_id: "office-candidate-review",
+      scenario_id: "TC-06",
+      status: "passed",
+      state: "已冻结 hr-001 的 2 份 JD 和 5 份简历，原件保持只读。",
+      action: "解析 JD 与简历，生成两份报告和逐项台账。",
+      observation: `生成 3 份成果，共享 ${manifest.checks.length} 项确定性检查；${outcome.review_count} 组匹配等待 HR 人工决定。`,
+      cost: "0 次额外模型调用；仅消耗本机确定性解析、计算与文件写入。",
+      result: "确定性检查通过；只形成辅助筛选建议，最终录用或淘汰仍待 HR 人工决定。",
+      source_file_refs: sourceRefs,
+      artifact_ids: artifactIds,
+      prohibited_side_effects: ["不作自动录用或淘汰决定", "不通知候选人", "不写入 ATS", "不声称无偏"],
+      business_gate_outcome: null,
+      legal_review_outcome: null,
+      candidate_review_outcome: outcome,
+      created_at: new Date().toISOString(),
+      external_action: "none",
+    }],
+    last_event_sequence: 19,
+  };
+}
+
+function failedCandidateReviewEffectSnapshot(body: { workspace_id: string; instruction: string }) {
+  const base = candidateReviewEffectSnapshot(body);
+  const checks = base.workspace_artifacts[0].checks.map((check) => check.check_id === "check-candidate-ledger-content"
+    ? { ...check, passed: false, label: "逐项台账未通过", detail: "台账中的一条状态与批准来源重算不一致。" }
+    : check);
+  return {
+    ...base,
+    status: "failed",
+    workspace_artifacts: base.workspace_artifacts.map((artifact) => ({
+      ...artifact,
+      verifier_status: "failed",
+      checks,
+      summary: "失败证据已保留，但成果未通过服务端来源重算。",
+      review_guidance: "当前成果不得用于招聘复核；请检查失败项并重新启动新的 TC-06 Run。",
+    })),
+    effect_receipts: base.effect_receipts.map((receipt) => ({
+      ...receipt,
+      status: "failed",
+      observation: "至少一项来源或成果检查未通过，失败证据已保留。",
+      result: "当前成果不得采用；没有录用、淘汰、通知或 ATS 写入。",
+    })),
+  };
+}
+
 function legalDelegationEffectSnapshot(body: { workspace_id: string; instruction: string }, options: { repairedDocumentFour?: boolean } = {}) {
   const base = snapshot(body, "completed", 18);
   const sourceRefs = [
@@ -1590,7 +1753,7 @@ function locationFailureSnapshot(body: { workspace_id: string; instruction: stri
 }
 async function fulfillJson(route: Route, body: unknown, status = 200) { await route.fulfill({ status, contentType: "application/json", body: JSON.stringify(body) }); }
 
-async function mockHarness(page: Page, options: { failFirstStart?: boolean; failDecisionDefer?: boolean; disconnect?: boolean; failed?: boolean; locationFailure?: boolean; sourceRecovery?: boolean; sourceRecoveryThreeCandidates?: boolean; verifiedArtifactAuditPending?: boolean; verifiedArtifactAuditPendingDistinct?: boolean; verifiedFinanceArtifactAuditPending?: boolean; unverifiedArtifactLocationPending?: boolean; terminalArtifactLocationPending?: boolean; boundedRecovery?: boolean; effectArtifact?: boolean; outboundEffect?: boolean; reactEffect?: boolean; evaluationEffect?: boolean; dashboardEffect?: boolean; dashboardEffectFailed?: boolean; releaseEffect?: boolean; releaseEffectRepaired?: boolean; releaseEffectFailed?: boolean; legalEffect?: boolean; legalEffectRepaired?: boolean; legalEffectFailed?: boolean; effectBoundary?: boolean; reviewTable?: boolean; workspaceFailures?: number; interactiveLoop?: boolean; evidenceGate?: boolean } = {}) {
+async function mockHarness(page: Page, options: { failFirstStart?: boolean; failDecisionDefer?: boolean; disconnect?: boolean; failed?: boolean; locationFailure?: boolean; sourceRecovery?: boolean; sourceRecoveryThreeCandidates?: boolean; verifiedArtifactAuditPending?: boolean; verifiedArtifactAuditPendingDistinct?: boolean; verifiedFinanceArtifactAuditPending?: boolean; unverifiedArtifactLocationPending?: boolean; terminalArtifactLocationPending?: boolean; boundedRecovery?: boolean; effectArtifact?: boolean; outboundEffect?: boolean; reactEffect?: boolean; evaluationEffect?: boolean; dashboardEffect?: boolean; dashboardEffectFailed?: boolean; releaseEffect?: boolean; releaseEffectRepaired?: boolean; releaseEffectFailed?: boolean; candidateEffect?: boolean; candidateEffectImproved?: boolean; candidateEffectFailed?: boolean; legalEffect?: boolean; legalEffectRepaired?: boolean; legalEffectFailed?: boolean; effectBoundary?: boolean; reviewTable?: boolean; workspaceFailures?: number; interactiveLoop?: boolean; evidenceGate?: boolean } = {}) {
   let workspaceCalls = 0; let startCalls = 0; let streamCalls = 0;
   let currentBody = { workspace_id: "forte-public-office", instruction: "" };
   // Mock snapshots intentionally cover several server state shapes in one route.
@@ -1651,6 +1814,12 @@ async function mockHarness(page: Page, options: { failFirstStart?: boolean; fail
           ? releaseReadinessEffectSnapshot(body, { repairedF02: true })
         : options.releaseEffect
         ? releaseReadinessEffectSnapshot(body)
+        : options.candidateEffectFailed
+          ? failedCandidateReviewEffectSnapshot(body)
+        : options.candidateEffectImproved
+          ? candidateReviewEffectSnapshot(body, { improvedSunExperience: true })
+        : options.candidateEffect
+          ? candidateReviewEffectSnapshot(body)
         : options.legalEffectFailed
           ? failedLegalDelegationEffectSnapshot(body)
         : options.legalEffectRepaired
@@ -1763,7 +1932,7 @@ async function mockHarness(page: Page, options: { failFirstStart?: boolean; fail
     }
     if (path.startsWith("/v1/harness/runs/")) {
       if (options.disconnect && streamCalls === 1) return fulfillJson(route, { ...snapshot(currentBody, "queued"), status: "indexing", last_event_sequence: 1, version: 2 });
-      if (options.interactiveLoop || options.evidenceGate || options.sourceRecovery || options.verifiedArtifactAuditPending || options.verifiedArtifactAuditPendingDistinct || options.verifiedFinanceArtifactAuditPending || options.unverifiedArtifactLocationPending || options.terminalArtifactLocationPending || options.boundedRecovery || options.locationFailure || options.effectArtifact || options.outboundEffect || options.reactEffect || options.evaluationEffect || options.dashboardEffect || options.dashboardEffectFailed || options.releaseEffect || options.releaseEffectRepaired || options.releaseEffectFailed || options.legalEffect || options.legalEffectRepaired || options.legalEffectFailed || options.effectBoundary) return fulfillJson(route, currentSnapshot);
+      if (options.interactiveLoop || options.evidenceGate || options.sourceRecovery || options.verifiedArtifactAuditPending || options.verifiedArtifactAuditPendingDistinct || options.verifiedFinanceArtifactAuditPending || options.unverifiedArtifactLocationPending || options.terminalArtifactLocationPending || options.boundedRecovery || options.locationFailure || options.effectArtifact || options.outboundEffect || options.reactEffect || options.evaluationEffect || options.dashboardEffect || options.dashboardEffectFailed || options.releaseEffect || options.releaseEffectRepaired || options.releaseEffectFailed || options.candidateEffect || options.candidateEffectImproved || options.candidateEffectFailed || options.legalEffect || options.legalEffectRepaired || options.legalEffectFailed || options.effectBoundary) return fulfillJson(route, currentSnapshot);
       currentSnapshot = snapshot(currentBody, options.failed ? "failed" : "completed");
       return fulfillJson(route, currentSnapshot);
     }
@@ -2283,6 +2452,136 @@ test("keeps deterministic verification separate from the TC-11 business release 
   if (process.env.CAPTURE_TC11_EFFECT_EVIDENCE === "1") {
     await page.screenshot({ path: "../../docs/evidence/screenshots/tc11-release-gate-mobile.png", fullPage: true });
   }
+});
+
+test("shows TC-06 source verification, role advice and the pending HR decision as separate facts", async ({ page }) => {
+  await mockHarness(page, { candidateEffect: true });
+  await page.goto("/");
+  await page.getByRole("textbox", { name: "任务指令" }).fill("依据两个岗位说明分别审阅五份简历，保留逐条证据并输出辅助筛选结果。");
+  await page.getByRole("button", { name: "启动 Control Loop" }).click();
+
+  const artifacts = page.locator(".workspace-artifacts");
+  const outcome = page.getByRole("region", { name: "双岗位候选人辅助筛选结论" });
+  await expect(artifacts).toContainText("Agent 已生成 3 份真实成果文件");
+  await expect(artifacts.locator(":scope > header > b")).toHaveText("最终 HR 决定待人工处理");
+  await expect(outcome.getByRole("heading", { name: "这是人工复核建议，不是录用或淘汰决定" })).toBeVisible();
+  await expect(outcome.locator(".candidate-review-statuses > li")).toHaveCount(3);
+  await expect(outcome).toContainText("确定性检查通过");
+  await expect(outcome).toContainText("最终 HR 决定");
+  await expect(outcome).toContainText("尚未发生");
+  await expect(outcome).toContainText("有来源支持 32 条 · 明确不满足 6 条 · 资料不足 71 条 · 需例外判断 1 条");
+  await expect(outcome.locator(".candidate-review-roles > section")).toHaveCount(2);
+  await expect(outcome.locator(".candidate-review-candidates > details")).toHaveCount(10);
+  await expect(artifacts).toContainText("外卖商户BD岗位辅助筛选报告");
+  await expect(artifacts).toContainText("文本评测岗位辅助筛选报告");
+  await expect(artifacts).toContainText("候选人岗位条件逐项台账");
+  await expect(artifacts).toContainText("没有公平性用户研究，不能声称无偏");
+
+  const bdRole = outcome.getByRole("region", { name: "外卖商户BD岗位候选人建议" });
+  const wang = bdRole.locator(".candidate-review-candidates > details").filter({ hasText: "王琳达" });
+  await wang.locator("summary").click();
+  const education = wang.locator(":scope > ol > li").filter({ hasText: "BD-EDUCATION" });
+  await expect(education).toContainText("需人工例外判断");
+  await expect(education).toContainText("大专及以上学历");
+  await expect(education).toContainText("优秀者可放宽");
+  await expect(education).toContainText("面试或补证");
+  await expect(education).toContainText("招聘负责人");
+
+  const textRole = outcome.getByRole("region", { name: "文本评测岗位候选人建议" });
+  const sun = textRole.locator(".candidate-review-candidates > details").filter({ hasText: "孙博文" });
+  await sun.locator("summary").click();
+  const experience = sun.locator(":scope > ol > li").filter({ hasText: "TEXT-REQ-AI-EXPERIENCE" });
+  await expect(experience).toContainText("明确不满足");
+  await expect(experience).toContainText("8 个月");
+  await expect(experience).toContainText("低于 JD 的 12 个月必要门槛");
+
+  await page.setViewportSize({ width: 1440, height: 1100 });
+  const typeSizes = await outcome.evaluate((element) => ({
+    conclusion: Number.parseFloat(getComputedStyle(element.querySelector(":scope > header h3")!).fontSize),
+    statusTitle: Number.parseFloat(getComputedStyle(element.querySelector(".candidate-review-statuses strong")!).fontSize),
+    candidateTitle: Number.parseFloat(getComputedStyle(element.querySelector(".candidate-review-candidates summary strong")!).fontSize),
+    assessmentText: Number.parseFloat(getComputedStyle(element.querySelector(".candidate-review-candidates dd")!).fontSize),
+  }));
+  expect(typeSizes.conclusion).toBeGreaterThanOrEqual(20);
+  expect(typeSizes.statusTitle).toBeGreaterThanOrEqual(14);
+  expect(typeSizes.candidateTitle).toBeGreaterThanOrEqual(13);
+  expect(typeSizes.assessmentText).toBeGreaterThanOrEqual(12);
+  const desktopGeometry = await outcome.evaluate((element) => {
+    const cards = Array.from(element.querySelectorAll<HTMLElement>(".candidate-review-candidates > details"));
+    const titles = Array.from(element.querySelectorAll<HTMLElement>(".candidate-review-candidates > details > summary strong"));
+    const titleLineCounts = titles.map((title) => title.getBoundingClientRect().height / Number.parseFloat(getComputedStyle(title).lineHeight));
+    return {
+      minCardWidth: Math.min(...cards.map((card) => card.getBoundingClientRect().width)),
+      maxTitleLines: Math.max(...titleLineCounts),
+      overflow: element.scrollWidth - element.clientWidth,
+    };
+  });
+  expect(desktopGeometry.minCardWidth).toBeGreaterThanOrEqual(320);
+  expect(desktopGeometry.maxTitleLines).toBeLessThanOrEqual(2.05);
+  expect(desktopGeometry.overflow).toBeLessThanOrEqual(0);
+  let pageOverflow = await page.evaluate(() => ({ width: document.documentElement.clientWidth, scroll: document.documentElement.scrollWidth }));
+  expect(pageOverflow.scroll).toBeLessThanOrEqual(pageOverflow.width);
+
+  if (process.env.CAPTURE_TC06_EFFECT_EVIDENCE === "1") {
+    const collapsedHr = page.getByRole("treeitem", { name: "展开文件夹 人力招聘" });
+    if (await collapsedHr.isVisible()) await collapsedHr.click();
+    for (const fileName of ["外卖商户BD岗位JD.docx", "文本评测岗位JD.docx", "周伦简历.pdf", "孙博文简历.pdf", "李雨桐简历.pdf", "王琳达简历.pdf", "赵晨曦简历.pdf"]) {
+      await expect(page.getByRole("treeitem", { name: `打开 人力招聘/${fileName}` })).toBeVisible();
+    }
+    await outcome.evaluate((element) => element.scrollIntoView({ block: "start" }));
+    await page.screenshot({ path: "../../docs/evidence/screenshots/tc06-source-derived-candidate-review-desktop.png", fullPage: true });
+  }
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(outcome.getByRole("heading", { name: "这是人工复核建议，不是录用或淘汰决定" })).toBeVisible();
+  pageOverflow = await page.evaluate(() => ({ width: document.documentElement.clientWidth, scroll: document.documentElement.scrollWidth }));
+  expect(pageOverflow.scroll).toBeLessThanOrEqual(pageOverflow.width);
+  const mobileGeometry = await outcome.evaluate((element) => ({
+    width: element.clientWidth,
+    scroll: element.scrollWidth,
+    candidateColumns: getComputedStyle(element.querySelector<HTMLElement>(".candidate-review-candidates")!).gridTemplateColumns.split(/\s+/).filter(Boolean).length,
+  }));
+  expect(mobileGeometry.scroll).toBeLessThanOrEqual(mobileGeometry.width);
+  expect(mobileGeometry.candidateColumns).toBe(1);
+  if (process.env.CAPTURE_TC06_EFFECT_EVIDENCE === "1") {
+    await outcome.evaluate((element) => element.scrollIntoView({ block: "start" }));
+    await page.screenshot({ path: "../../docs/evidence/screenshots/tc06-source-derived-candidate-review-mobile.png", fullPage: true });
+  }
+});
+
+test("projects a TC-06 source mutation without stale fixed candidate counts", async ({ page }) => {
+  await mockHarness(page, { candidateEffectImproved: true });
+  await page.goto("/");
+  await page.getByRole("textbox", { name: "任务指令" }).fill("依据两个岗位说明分别审阅五份简历，保留逐条证据并输出辅助筛选结果。");
+  await page.getByRole("button", { name: "启动 Control Loop" }).click();
+
+  const outcome = page.getByRole("region", { name: "双岗位候选人辅助筛选结论" });
+  await expect(outcome).toContainText("有来源支持 33 条 · 明确不满足 5 条 · 资料不足 71 条 · 需例外判断 1 条");
+  await expect(outcome).not.toContainText("有来源支持 32 条 · 明确不满足 6 条");
+  const textRole = outcome.getByRole("region", { name: "文本评测岗位候选人建议" });
+  const sun = textRole.locator(".candidate-review-candidates > details").filter({ hasText: "孙博文" });
+  await expect(sun.locator("summary")).toContainText("建议进入人工复核");
+  await sun.locator("summary").click();
+  const experience = sun.locator(":scope > ol > li").filter({ hasText: "TEXT-REQ-AI-EXPERIENCE" });
+  await expect(experience).toContainText("有来源支持");
+  await expect(experience).toContainText("16 个月");
+});
+
+test("keeps a failed TC-06 source verifier red and blocks use of the reports", async ({ page }) => {
+  await mockHarness(page, { candidateEffectFailed: true });
+  await page.goto("/");
+  await page.getByRole("textbox", { name: "任务指令" }).fill("依据两个岗位说明分别审阅五份简历，保留逐条证据并输出辅助筛选结果。");
+  await page.getByRole("button", { name: "启动 Control Loop" }).click();
+
+  const artifacts = page.locator(".workspace-artifacts");
+  const outcome = page.getByRole("region", { name: "双岗位候选人辅助筛选结论" });
+  await expect(outcome).toContainText("确定性检查未通过");
+  await expect(outcome).toContainText("最终 HR 决定");
+  await expect(artifacts).toContainText("逐项台账未通过");
+  await expect(artifacts).toContainText("当前成果不得用于招聘复核");
+  await expect(artifacts).not.toContainText("11/11 通过");
+  await expect(artifacts.locator(":scope > ol > li.is-failed")).toHaveCount(3);
+  await expect(artifacts.locator(":scope > ol > li.is-passed")).toHaveCount(0);
 });
 
 test("shows TC-07 file verification, legal gate and human review as three separate states", async ({ page }) => {

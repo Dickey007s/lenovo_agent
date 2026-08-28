@@ -379,6 +379,21 @@ license string without a Registry/Connector receipt remains `unverifiable`. This
 is not legal advice, signature validation, authorization effectiveness or a
 general contract-review engine.
 
+DR-0045 adds the same truth separation to fixed hr-001 candidate review without
+turning the system into an ATS. A source-derived builder validates two unique JD
+DOCX files and five unique resume PDFs, parses 14 BD conditions and 8 text-
+evaluation conditions, and produces one assessment for every role/candidate/
+condition combination. Each assessment carries both JD and resume source refs,
+safe locators and excerpts; identity, education, experience and skills remain
+bound to one resume. Missing facts are `unverifiable`, explicit gaps can be
+`not_met`, and an explicit JD exception becomes `human_exception_required`.
+The same `candidate_review_outcome` is stored on all three Artifacts and the
+EffectReceipt, so `verifier_status=passed`, incomplete evidence and a pending HR
+decision can all be true at once. The two role reports bind only their own JD
+plus five resumes; the joint ledger binds all seven sources. This is not a
+general hiring engine, fairness proof, background check, identity verifier or
+candidate-notification system.
+
 ## 7. Eight module maturity
 
 | Module | Current implementation | Missing target work |

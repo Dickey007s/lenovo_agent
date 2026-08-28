@@ -1,0 +1,175 @@
+{
+  "schema_version": "tc06-live-artifact-evidence.v1",
+  "captured_at": "2026-08-28T17:44:34.803318+00:00",
+  "request": {
+    "api_header": {
+      "X-User-Id": "tc06-live-20260829"
+    },
+    "run_id": "harness:fa72afd2610040deba68671233936b47",
+    "idempotency_key": "tc06-live-source-derived-20260829-0001",
+    "instruction": "依据两个岗位说明分别审阅五份简历，保留逐条证据并输出辅助筛选结果。"
+  },
+  "runtime": {
+    "health": {
+      "status": "ok",
+      "model": "deepseek-v4-pro",
+      "checkpoint": "postgres",
+      "task_store": "postgres"
+    },
+    "status": "waiting_input",
+    "version": 13,
+    "round_count": 1,
+    "evidence_gap_count": 3,
+    "planner_receipt": {
+      "model": "deepseek-v4-pro",
+      "called": true,
+      "elapsed_ms": 13602,
+      "output_used": true
+    },
+    "analyst_receipt": {
+      "model": "deepseek-v4-pro",
+      "called": true,
+      "elapsed_ms": 24881,
+      "output_used": true
+    },
+    "deterministic_effect_status": "passed",
+    "external_action": "none",
+    "original_inputs_modified": false,
+    "unique_check_count": 11,
+    "passed_unique_check_count": 11,
+    "candidate_review_counts": {
+      "role_count": 2,
+      "candidate_count": 5,
+      "assessment_count": 110,
+      "met_count": 32,
+      "not_met_count": 6,
+      "unverifiable_count": 71,
+      "human_exception_count": 1
+    },
+    "event_names": [
+      "workspace_index",
+      "round_started",
+      "planning_started",
+      "planning_completed",
+      "plan_validation",
+      "deterministic_office_tool_started",
+      "run_workspace_artifact_written",
+      "run_workspace_artifact_written",
+      "run_workspace_artifact_written",
+      "deterministic_verification_completed",
+      "analysis_started",
+      "analysis_completed",
+      "result_validation",
+      "evidence_gate",
+      "checkpoint_recovered"
+    ]
+  },
+  "artifacts": [
+    {
+      "artifact_id": "workspace-artifact-71292c5b8c9e",
+      "file_name": "候选人岗位条件逐项台账.csv",
+      "size": 85322,
+      "declared_size": 85322,
+      "sha256": "17283e6fc1e5c673203ca96003d83193d725f150af68b15a32c24d08916aa20c",
+      "size_matches_snapshot": true,
+      "verifier_status": "passed",
+      "source_file_ref_count": 7,
+      "parsed": {
+        "row_count": 110,
+        "unique_key_count": 110,
+        "status_counts": {
+          "human_exception_required": 1,
+          "met": 32,
+          "not_met": 6,
+          "unverifiable": 71
+        },
+        "role_row_counts": {
+          "merchant_bd": 70,
+          "text_evaluation": 40
+        },
+        "role_condition_counts": {
+          "merchant_bd": 14,
+          "text_evaluation": 8
+        },
+        "role_candidates": {
+          "merchant_bd": [
+            "周伦",
+            "孙博文",
+            "李雨桐",
+            "王琳达",
+            "赵晨曦"
+          ],
+          "text_evaluation": [
+            "周伦",
+            "孙博文",
+            "李雨桐",
+            "王琳达",
+            "赵晨曦"
+          ]
+        },
+        "candidate_role_recommendation_count": 10,
+        "all_rows_have_both_source_refs": true,
+        "all_rows_have_both_locators": true,
+        "all_rows_have_action_and_exit": true,
+        "privacy_findings": []
+      }
+    },
+    {
+      "artifact_id": "workspace-artifact-2783564732b8",
+      "file_name": "外卖商户BD岗位辅助筛选报告.docx",
+      "size": 6922,
+      "declared_size": 6922,
+      "sha256": "07a9f003979a02ebf6833a1826bdd8dd04356bbb1072dcb486df5ef87c8a9ffe",
+      "size_matches_snapshot": true,
+      "verifier_status": "passed",
+      "source_file_ref_count": 6,
+      "parsed": {
+        "paragraph_count": 1049,
+        "table_count": 8,
+        "text_length": 15240,
+        "contains_human_decision_boundary": true,
+        "contains_no_fairness_claim_boundary": true,
+        "contains_no_external_action_boundary": true,
+        "contains_five_candidate_summary": true,
+        "candidate_names_present": [
+          "周伦",
+          "孙博文",
+          "李雨桐",
+          "王琳达",
+          "赵晨曦"
+        ]
+      }
+    },
+    {
+      "artifact_id": "workspace-artifact-76c638d56824",
+      "file_name": "文本评测岗位辅助筛选报告.docx",
+      "size": 5036,
+      "declared_size": 5036,
+      "sha256": "471baf69d224b7b020d80400b68fed26b095e4c4bc83efde339d0a05a49b936a",
+      "size_matches_snapshot": true,
+      "verifier_status": "passed",
+      "source_file_ref_count": 6,
+      "parsed": {
+        "paragraph_count": 635,
+        "table_count": 8,
+        "text_length": 9277,
+        "contains_human_decision_boundary": true,
+        "contains_no_fairness_claim_boundary": true,
+        "contains_no_external_action_boundary": true,
+        "contains_five_candidate_summary": true,
+        "candidate_names_present": [
+          "周伦",
+          "孙博文",
+          "李雨桐",
+          "王琳达",
+          "赵晨曦"
+        ]
+      }
+    }
+  ],
+  "restart_verification": {
+    "before_manifest": "outputs\\tc06-live-source-derived-20260829\\pre-restart-manifest.json",
+    "hashes_match": true
+  },
+  "verified": true
+}

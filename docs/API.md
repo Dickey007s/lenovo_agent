@@ -559,6 +559,19 @@ approval or `unverifiable` into pass/fail. In particular, a lawyer license numbe
 without a Registry/Connector receipt remains `unverifiable`, and a package
 signature object would still not prove authenticity or authorization effect.
 
+Optional `candidate_review_outcome` is the source-derived projection for the
+fixed hr-001 adapter. It contains the dynamic role/candidate/assessment counts
+and ten `reviews[]`; every review carries one role JD ref, one resume ref, a
+human-review-only recommendation and bounded `assessments[]`. Each assessment
+contains `condition_type`, `met/not_met/unverifiable/human_exception_required`,
+both approved source refs, both safe locators/excerpts, fact, judgment, reason,
+owner, interview-or-evidence action and exit condition. Clients must not infer
+`not_met` from an omitted resume fact, treat an explicit JD exception as an
+automatic waiver, or turn any recommendation into hiring/rejection. The same
+outcome is stored on all three TC-06 Artifacts and the EffectReceipt so it can be
+restored from the authoritative Snapshot; it is not a separate ATS decision
+ledger.
+
 For code artifacts, optional `self_test.test_suites[]` is a public projection of
 the server-owned test manifest. Each suite has `suite_id`, Chinese `label`,
 `test_files`, `test_count` and public `test_ids`. Optional
@@ -774,6 +787,17 @@ checks completed. It does not mean a document was signed, a signature was
 authenticated, a lawyer qualification was confirmed or an authorization became
 effective. Any source-contract or Verifier failure keeps both Artifacts and the
 receipt failed even when a legal-risk summary can still be displayed for audit.
+
+TC-06 uses the same ordinary protocol for three downloads. The fixed source
+contract is two role-specific JD DOCX files plus five unique resume PDFs. The BD
+report binds only the BD JD and five resumes; the text-evaluation report binds
+only that JD and five resumes; the joint CSV binds all seven sources. A passed
+EffectReceipt proves eleven unique source/parse/structure/privacy checks and a
+110-row service-derived ledger. It does not prove resume statements are true,
+the advice is fair, a candidate was hired or rejected, ATS state changed, a
+background check ran or a notification was sent. A source-contract, privacy or
+Verifier failure keeps all three Artifacts and the receipt failed even when old
+model prose remains in an earlier Run event.
 
 `checkpoint_recovered` may appear after an API restart backed by PostgreSQL.
 It proves a persisted Snapshot was restored and the Run paused; it does not

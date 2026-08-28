@@ -3,7 +3,9 @@ from __future__ import annotations
 import asyncio
 import csv
 import io
+import json
 import os
+import re
 import sys
 import zipfile
 from pathlib import Path
@@ -26,9 +28,12 @@ from services.api.app.application.run_workspace_artifact_store import (
 )
 from services.api.app.application.scenario_effects import ScenarioEffectEngine
 from tests.unit.test_scenario_effect_runtime import (
+    CandidateReviewAnalyst,
+    CandidateReviewPlanner,
     DashboardAnalyst,
     DashboardPlanner,
     FORTE_ROOT,
+    TC06_INSTRUCTION,
     TC07_INSTRUCTION,
     ONBOARDING_INSTRUCTION,
     TC11_INSTRUCTION,
@@ -342,6 +347,158 @@ async def test_postgres_restart_preserves_tc11_artifacts_and_business_gates(
         assert "content_sha256" not in second.public_snapshot(
             restored
         ).model_dump_json()
+    finally:
+        for runtime in reversed(runtimes):
+            await runtime.close()
+        if DATABASE_DSN and run_id:
+            async with await psycopg.AsyncConnection.connect(DATABASE_DSN) as connection:
+                async with connection.cursor() as cursor:
+                    for table in (
+                        "harness_idempotency",
+                        "harness_task_commit",
+                        "harness_artifact_version",
+                        "harness_run_state",
+                    ):
+                        await cursor.execute(
+                            f"DELETE FROM {table} WHERE owner_id = %s",  # nosec B608
+                            (owner,),
+                        )
+
+
+@pytest.mark.asyncio
+async def test_postgres_restart_preserves_tc06_candidate_outcome_and_three_artifacts(
+    tmp_path: Path,
+) -> None:
+    owner = f"postgres-tc06-candidate-{uuid4().hex}"
+    run_id = ""
+    runtimes: list[HarnessRuntime] = []
+    workspace_root = tmp_path / "tc06-run-workspaces"
+    try:
+        first = HarnessRuntime(
+            BenchmarkWorkspaceCatalog(FORTE_ROOT),
+            CandidateReviewPlanner(),
+            CandidateReviewAnalyst(),
+            PostgresHarnessStateStore(DATABASE_DSN),
+            effect_engine=ScenarioEffectEngine(),
+            artifact_store=RunWorkspaceArtifactStore(workspace_root),
+        )
+        runtimes.append(first)
+        await first.setup()
+        started = await first.start(
+            owner,
+            start_request(
+                idempotency_key=f"postgres-tc06-start-{uuid4().hex}",
+                instruction=TC06_INSTRUCTION,
+            ),
+        )
+        run_id = started.run.run_id
+        terminal = await wait_for_effect_run(first, owner, run_id)
+        assert terminal.status == "completed"
+        assert len(terminal.workspace_artifacts) == 3
+        receipt = terminal.effect_receipts[0]
+        assert receipt.status == "passed"
+        assert receipt.scenario_id == "TC-06"
+        assert receipt.candidate_review_outcome is not None
+        outcome = receipt.candidate_review_outcome
+        assert outcome.status == "review_required"
+        assert outcome.assessment_count == 110
+        assert (
+            outcome.met_count,
+            outcome.not_met_count,
+            outcome.unverifiable_count,
+            outcome.human_exception_count,
+        ) == (32, 6, 71, 1)
+
+        originals: dict[str, bytes] = {}
+        for artifact in terminal.workspace_artifacts:
+            assert artifact.verifier_status == "passed"
+            assert artifact.candidate_review_outcome == outcome
+            _, originals[artifact.file_name] = await first.get_workspace_artifact(
+                owner, run_id, artifact.artifact_id
+            )
+        await first.close()
+
+        second = HarnessRuntime(
+            BenchmarkWorkspaceCatalog(FORTE_ROOT),
+            CandidateReviewPlanner(),
+            CandidateReviewAnalyst(),
+            PostgresHarnessStateStore(DATABASE_DSN),
+            effect_engine=ScenarioEffectEngine(),
+            artifact_store=RunWorkspaceArtifactStore(workspace_root),
+        )
+        runtimes.append(second)
+        await second.setup()
+        restored = await second.get(owner, run_id)
+        restored_receipt = restored.effect_receipts[0]
+        assert restored_receipt.candidate_review_outcome == outcome
+        assert len(restored.workspace_artifacts) == 3
+        restored_by_name = {
+            item.file_name: item for item in restored.workspace_artifacts
+        }
+        for file_name, content in originals.items():
+            artifact = restored_by_name[file_name]
+            assert artifact.candidate_review_outcome == outcome
+            _, restored_content = await second.get_workspace_artifact(
+                owner, run_id, artifact.artifact_id
+            )
+            assert restored_content == content
+
+        for report_name in (
+            "外卖商户BD岗位辅助筛选报告.docx",
+            "文本评测岗位辅助筛选报告.docx",
+        ):
+            with zipfile.ZipFile(io.BytesIO(originals[report_name])) as package:
+                document = package.read("word/document.xml").decode("utf-8")
+            assert document.count("<w:tbl>") >= 8
+            assert "不是录用或淘汰决定" in document
+        rows = list(
+            csv.DictReader(
+                io.StringIO(
+                    originals["候选人岗位条件逐项台账.csv"].decode("utf-8-sig")
+                )
+            )
+        )
+        assert len(rows) == 110
+        assert len({(row["岗位ID"], row["候选人ID"], row["条件ID"]) for row in rows}) == 110
+        public_snapshot = second.public_snapshot(restored)
+        public_json = public_snapshot.model_dump_json()
+        assert "content_sha256" not in public_json
+        candidate_projection = json.dumps(
+            {
+                "artifacts": [
+                    {
+                        "summary": artifact.summary,
+                        "key_outputs": artifact.key_outputs,
+                        "review_guidance": artifact.review_guidance,
+                        "execution_summary": artifact.execution_summary,
+                        "candidate_review_outcome": (
+                            artifact.candidate_review_outcome.model_dump(mode="json")
+                            if artifact.candidate_review_outcome
+                            else None
+                        ),
+                    }
+                    for artifact in public_snapshot.workspace_artifacts
+                ],
+                "receipts": [
+                    {
+                        "observation": receipt.observation,
+                        "result": receipt.result,
+                        "candidate_review_outcome": (
+                            receipt.candidate_review_outcome.model_dump(mode="json")
+                            if receipt.candidate_review_outcome
+                            else None
+                        ),
+                    }
+                    for receipt in public_snapshot.effect_receipts
+                ],
+            },
+            ensure_ascii=False,
+        )
+        assert not re.search(r"(?<!\d)1[3-9]\d{9}(?!\d)", candidate_projection)
+        assert not re.search(
+            r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}",
+            candidate_projection,
+        )
     finally:
         for runtime in reversed(runtimes):
             await runtime.close()

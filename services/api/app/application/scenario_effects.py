@@ -35,7 +35,16 @@ from packages.contracts.harness_models import (
     AgentControlLoopArtifactSelfTest,
     AgentControlLoopArtifactTestSuite,
     AgentControlLoopBusinessGateOutcome,
+    AgentControlLoopCandidateReviewOutcome,
     AgentControlLoopLegalReviewOutcome,
+)
+from services.api.app.application.candidate_review_effect import (
+    CANDIDATE_LOGICAL_IDS,
+    JD_BD_ID,
+    JD_TEXT_ID,
+    CandidateReviewValidationError,
+    CandidateSourceInput,
+    build_candidate_review,
 )
 from services.api.app.application.react_refactor_effect import (
     build_real_react_refactor,
@@ -94,6 +103,7 @@ class GeneratedOfficeArtifact:
     self_test: AgentControlLoopArtifactSelfTest | None = None
     business_gate_outcome: AgentControlLoopBusinessGateOutcome | None = None
     legal_review_outcome: AgentControlLoopLegalReviewOutcome | None = None
+    candidate_review_outcome: AgentControlLoopCandidateReviewOutcome | None = None
 
     @property
     def verifier_status(self) -> str:
@@ -185,9 +195,7 @@ def summarize_artifact_check_groups(
         checklist_signatures.add(tuple(sorted({check.check_id for check in checks})))
         for check in checks:
             projected_count += 1
-            checks_by_id[check.check_id] = (
-                checks_by_id.get(check.check_id, True) and check.passed
-            )
+            checks_by_id[check.check_id] = checks_by_id.get(check.check_id, True) and check.passed
     same_checklist = (
         len(materialized_groups) > 1
         and len(checklist_signatures) == 1
@@ -289,7 +297,11 @@ SCENARIO_EFFECT_SPECS: tuple[ScenarioEffectSpec, ...] = (
         "office-finance-reconciliation",
         "财务跨期核对",
         "核对三期往来明细，生成未付统计、未收统计，并判断是否存在僵尸账款。",
-        (("财务管理", "2025往来明细-上半年.xlsx"), ("财务管理", "2025往来明细-下半年.xlsx"), ("财务管理", "2026往来明细.xlsx")),
+        (
+            ("财务管理", "2025往来明细-上半年.xlsx"),
+            ("财务管理", "2025往来明细-下半年.xlsx"),
+            ("财务管理", "2026往来明细.xlsx"),
+        ),
         ("未付统计.csv", "未收统计.csv", "跨期核对说明.md"),
         "validator-finance-reconciliation-v1",
         "成果区显示两个真实 CSV、跨期结论、金额复算和下载入口。",
@@ -312,11 +324,22 @@ SCENARIO_EFFECT_SPECS: tuple[ScenarioEffectSpec, ...] = (
             ("人力招聘", "王琳达简历.pdf"),
             ("人力招聘", "赵晨曦简历.pdf"),
         ),
-        ("外卖商户BD岗位辅助筛选报告.docx", "文本评测岗位辅助筛选报告.docx"),
-        "validator-candidate-review-v1",
-        "逐人显示岗位证据、缺失项和人工决定入口。",
-        ("effect_receipts[]",),
-        ("不作自动录用决定", "默认隐藏非必要敏感信息"),
+        (
+            "外卖商户BD岗位辅助筛选报告.docx",
+            "文本评测岗位辅助筛选报告.docx",
+            "候选人岗位条件逐项台账.csv",
+        ),
+        "validator-candidate-review-v2",
+        "先区分确定性验证、岗位匹配建议与最终 HR 决定，再按岗位和候选人展开双来源证据。",
+        (
+            "workspace_artifacts[].candidate_review_outcome",
+            "effect_receipts[].candidate_review_outcome",
+        ),
+        (
+            "不作自动录用或淘汰决定",
+            "默认隐藏非必要敏感信息",
+            "不声称已完成公平性评估",
+        ),
         "implemented",
         _contains_any(("简历", "岗位"), ("候选人", "筛选")),
     ),
@@ -441,7 +464,10 @@ SCENARIO_EFFECT_SPECS: tuple[ScenarioEffectSpec, ...] = (
         "office-customer-segmentation",
         "客户画像与销售策略",
         "清洗问卷、完成客户画像分类，并生成差异化销售策略 Markdown 报告。",
-        (("销售运营", "客户画像调研问卷.csv"), ("销售运营", "客户分类画像与差异化销售策略生成规则.md")),
+        (
+            ("销售运营", "客户画像调研问卷.csv"),
+            ("销售运营", "客户分类画像与差异化销售策略生成规则.md"),
+        ),
         ("客户画像及销售策略.md",),
         "validator-customer-segmentation-v1",
         "成果区显示真实 Markdown、分群守恒检查和未联系客户回执。",
@@ -469,7 +495,11 @@ SCENARIO_EFFECT_SPECS: tuple[ScenarioEffectSpec, ...] = (
         "office-ux-pain-prioritization",
         "交互痛点排序",
         "根据交互日志、痛点规则和页面规范，生成排序正确的交互规范优化方案 CSV。",
-        (("用户体验", "用户交互行为日志.xlsx"), ("用户体验", "交互行为痛点及优化规则.md"), ("用户体验", "页面级交互规范.docx")),
+        (
+            ("用户体验", "用户交互行为日志.xlsx"),
+            ("用户体验", "交互行为痛点及优化规则.md"),
+            ("用户体验", "页面级交互规范.docx"),
+        ),
         ("交互规范优化方案.csv",),
         "validator-ux-pain-prioritization-v1",
         "成果区显示真实 CSV、排序检查、失败原因与下载入口。",
@@ -503,56 +533,54 @@ class ScenarioEffectEngine:
         workspace = copy.deepcopy(catalog.public_workspace())
         folders = list(workspace.get("folders") or [])
         requested_keys = set(spec.source_labels)
-        matches: dict[tuple[str, str], list[str]] = {
-            key: [] for key in requested_keys
-        }
+        matches: dict[tuple[str, str], list[str]] = {key: [] for key in requested_keys}
         for folder in folders:
             group = str(folder.get("display_label"))
             for item in list(folder.get("files") or []):
                 key = (group, str(item.get("display_label")))
                 if key in requested_keys:
                     matches[key].append(str(item.get("file_ref")))
-        if spec.scenario_id == "TC-07":
+        if spec.scenario_id in {"TC-06", "TC-07"}:
+            folder_label = "人力招聘" if spec.scenario_id == "TC-06" else "法务"
+            expected_count = 7
             legal_folder = next(
-                (folder for folder in folders if folder.get("display_label") == "法务"),
+                (folder for folder in folders if folder.get("display_label") == folder_label),
                 None,
             )
-            expected_labels = {label for group, label in spec.source_labels if group == "法务"}
+            expected_labels = {
+                label for group, label in spec.source_labels if group == folder_label
+            }
             actual_labels = [
                 str(item.get("display_label"))
                 for item in list((legal_folder or {}).get("files") or [])
             ]
             if (
                 legal_folder is None
-                or len(actual_labels) != 7
+                or len(actual_labels) != expected_count
                 or set(actual_labels) != expected_labels
             ):
                 raise ScenarioEffectError(
-                    "Legal-020 法务目录必须恰好包含一份规则和六份委托书"
+                    (
+                        "hr-001 人力招聘目录必须恰好包含两份 JD 和五份简历"
+                        if spec.scenario_id == "TC-06"
+                        else "Legal-020 法务目录必须恰好包含一份规则和六份委托书"
+                    )
                 )
         preview_refs: list[str] = []
         source_refs: list[str] = []
         for group, label in spec.source_labels:
             candidates = matches[(group, label)]
             if not candidates:
-                raise ScenarioEffectError(
-                    f"确定性办公工具缺少来源：{group}/{label}"
-                )
+                raise ScenarioEffectError(f"确定性办公工具缺少来源：{group}/{label}")
             if len(candidates) != 1:
-                raise ScenarioEffectError(
-                    f"确定性办公工具来源逻辑名称重复：{group}/{label}"
-                )
+                raise ScenarioEffectError(f"确定性办公工具来源逻辑名称重复：{group}/{label}")
             file_ref = candidates[0]
             preview_refs.append(file_ref)
             source_refs.append(file_ref)
 
         if spec.scenario_id == "TC-04":
             group = next(
-                (
-                    item
-                    for item in folders
-                    if item.get("display_label") == "研发交付"
-                ),
+                (item for item in folders if item.get("display_label") == "研发交付"),
                 None,
             )
             if group is None:
@@ -571,13 +599,11 @@ class ScenarioEffectEngine:
         batch_reader = getattr(catalog, "checked_input_bytes_many", None)
         if callable(batch_reader):
             frozen_bytes = {
-                file_ref: bytes(content)
-                for file_ref, content in batch_reader(unique_refs).items()
+                file_ref: bytes(content) for file_ref, content in batch_reader(unique_refs).items()
             }
         else:
             frozen_bytes = {
-                file_ref: bytes(catalog.checked_input_bytes(file_ref))
-                for file_ref in unique_refs
+                file_ref: bytes(catalog.checked_input_bytes(file_ref)) for file_ref in unique_refs
             }
         if tuple(frozen_bytes) != unique_refs:
             raise ScenarioEffectError("冻结的确定性工具输入集合不完整或顺序不一致")
@@ -619,9 +645,7 @@ class ScenarioEffectEngine:
         artifacts = handlers[spec.scenario_id](catalog, spec)
         source_refs = tuple(
             dict.fromkeys(
-                file_ref
-                for artifact in artifacts
-                for file_ref in artifact.source_file_refs
+                file_ref for artifact in artifacts for file_ref in artifact.source_file_refs
             )
         )
         (
@@ -629,11 +653,7 @@ class ScenarioEffectEngine:
             unique_check_count,
             passed_check_count,
             shared_checklist,
-        ) = (
-            summarize_artifact_check_groups(
-                artifact.checks for artifact in artifacts
-            )
-        )
+        ) = summarize_artifact_check_groups(artifact.checks for artifact in artifacts)
         repeated_projection = projected_check_count > unique_check_count
         passed = all(artifact.verifier_status == "passed" for artifact in artifacts)
         business_outcomes = [
@@ -642,10 +662,16 @@ class ScenarioEffectEngine:
             if artifact.business_gate_outcome is not None
         ]
         business_outcome = business_outcomes[0] if business_outcomes else None
-        if business_outcomes and any(
-            item != business_outcome for item in business_outcomes[1:]
-        ):
+        if business_outcomes and any(item != business_outcome for item in business_outcomes[1:]):
             raise ScenarioEffectError("同一效果的业务 Gate 事实不一致")
+        candidate_outcomes = [
+            artifact.candidate_review_outcome
+            for artifact in artifacts
+            if artifact.candidate_review_outcome is not None
+        ]
+        candidate_outcome = candidate_outcomes[0] if candidate_outcomes else None
+        if candidate_outcomes and any(item != candidate_outcome for item in candidate_outcomes[1:]):
+            raise ScenarioEffectError("同一效果的候选人辅助筛选事实不一致")
         return ScenarioEffectExecution(
             scenario_id=spec.scenario_id,
             capability_id=spec.capability_id,
@@ -658,8 +684,7 @@ class ScenarioEffectEngine:
                     f"共享 {unique_check_count} 项确定性检查，"
                     if shared_checklist
                     else (
-                        f"共 {unique_check_count} 项唯一确定性检查"
-                        "（重复 ID 已合并），"
+                        f"共 {unique_check_count} 项唯一确定性检查（重复 ID 已合并），"
                         if repeated_projection
                         else f"执行 {unique_check_count} 项确定性检查，"
                     )
@@ -670,13 +695,22 @@ class ScenarioEffectEngine:
                     if business_outcome and business_outcome.status == "failed"
                     else ""
                 )
+                + (
+                    f" {candidate_outcome.review_count} 组岗位与候选人匹配均等待 HR 人工决定。"
+                    if candidate_outcome
+                    else ""
+                )
             ),
             cost="0 次额外模型调用；仅消耗本机确定性解析、计算与文件写入。",
             result=(
                 (
                     f"确定性检查通过；业务 Gate 未通过，结论为“{business_outcome.decision}”。"
                     if business_outcome and business_outcome.status == "failed"
-                    else "所有确定性效果门通过，成果仍需用户复核。"
+                    else (
+                        "确定性检查通过；只形成辅助筛选建议，最终录用或淘汰仍待 HR 人工决定。"
+                        if candidate_outcome
+                        else "所有确定性效果门通过，成果仍需用户复核。"
+                    )
                 )
                 if passed
                 else "至少一项确定性效果门失败，成果不得标为验证通过。"
@@ -722,9 +756,11 @@ class ScenarioEffectEngine:
         schedule = previews["3月20日-4月20日入职时间表.csv"]
         rules = previews["入职物资权限软件分配.pdf"]
         source_refs = self._source_refs(previews)
-        compact_rules = re.sub(
-            r"[^\w]+", "", str(rules.get("text") or ""), flags=re.UNICODE
-        ).replace("_", "").casefold()
+        compact_rules = (
+            re.sub(r"[^\w]+", "", str(rules.get("text") or ""), flags=re.UNICODE)
+            .replace("_", "")
+            .casefold()
+        )
         required_rule_fragments = (
             "研发开发工程师程序员技术devengineer技术研发",
             "产品设计视觉uiuxdesignproduct产品视觉设计",
@@ -755,9 +791,14 @@ class ScenarioEffectEngine:
                 continue
             role = row["岗位系列"].lower()
             note = row["特殊备注"]
-            if any(token in role for token in ("研发", "开发", "工程师", "程序员", "技术", "dev", "engineer")):
+            if any(
+                token in role
+                for token in ("研发", "开发", "工程师", "程序员", "技术", "dev", "engineer")
+            ):
                 category = "tech"
-            elif any(token in role for token in ("产品", "设计", "视觉", "ui", "ux", "design", "product")):
+            elif any(
+                token in role for token in ("产品", "设计", "视觉", "ui", "ux", "design", "product")
+            ):
                 category = "product"
             else:
                 category = "operations"
@@ -766,7 +807,9 @@ class ScenarioEffectEngine:
                 computer = "Apple MacBook Pro 16"
                 monitor = "Dell UltraSharp U2723QE"
                 extras = "Logitech MX Master 3S,Keychron K2,Type-C 100W 线"
-                software = "大象 IM,学城文档,Microsoft 365,GitHub Enterprise,Linear,AWS Console,Sentry"
+                software = (
+                    "大象 IM,学城文档,Microsoft 365,GitHub Enterprise,Linear,AWS Console,Sentry"
+                )
                 desk = "是"
             elif category == "product":
                 computer = "Apple MacBook Pro 14"
@@ -813,11 +856,41 @@ class ScenarioEffectEngine:
         content = self._csv_bytes(headers, output_rows)
         parsed_headers, parsed_rows = self._parse_csv(content)
         checks = (
-            self._check("check-onboarding-date", "日期范围与排序", all((3, 20) <= self._month_day(row[1]) <= (4, 20) for row in parsed_rows) and parsed_rows == sorted(parsed_rows, key=lambda item: (*self._month_day(item[1]), item[0])), f"{len(parsed_rows)} 名员工均在闭区间内并按入职日期排序。"),
-            self._check("check-onboarding-privacy", "删除紧急联系人", "紧急联系人" not in parsed_headers, "成果表不包含紧急联系人列。"),
-            self._check("check-onboarding-columns", "新增五类资产与权限列", parsed_headers == headers, "表头由服务端按固定顺序复核。"),
-            self._check("check-onboarding-mapping", "岗位规则和备注覆盖", rule_contract_verified and all(len(row) == len(headers) and row[-1] in {"是", "否"} for row in parsed_rows), "已从 PDF 核对分类关键词、优先级和多备注同时生效规则；逐行映射字段完整。"),
-            self._check("check-onboarding-delimiter", "列举项使用半角逗号", all("，" not in cell for row in parsed_rows for cell in row), "所有列举值均使用半角逗号。"),
+            self._check(
+                "check-onboarding-date",
+                "日期范围与排序",
+                all((3, 20) <= self._month_day(row[1]) <= (4, 20) for row in parsed_rows)
+                and parsed_rows
+                == sorted(parsed_rows, key=lambda item: (*self._month_day(item[1]), item[0])),
+                f"{len(parsed_rows)} 名员工均在闭区间内并按入职日期排序。",
+            ),
+            self._check(
+                "check-onboarding-privacy",
+                "删除紧急联系人",
+                "紧急联系人" not in parsed_headers,
+                "成果表不包含紧急联系人列。",
+            ),
+            self._check(
+                "check-onboarding-columns",
+                "新增五类资产与权限列",
+                parsed_headers == headers,
+                "表头由服务端按固定顺序复核。",
+            ),
+            self._check(
+                "check-onboarding-mapping",
+                "岗位规则和备注覆盖",
+                rule_contract_verified
+                and all(
+                    len(row) == len(headers) and row[-1] in {"是", "否"} for row in parsed_rows
+                ),
+                "已从 PDF 核对分类关键词、优先级和多备注同时生效规则；逐行映射字段完整。",
+            ),
+            self._check(
+                "check-onboarding-delimiter",
+                "列举项使用半角逗号",
+                all("，" not in cell for row in parsed_rows for cell in row),
+                "所有列举值均使用半角逗号。",
+            ),
         )
         return (
             GeneratedOfficeArtifact(
@@ -1242,13 +1315,61 @@ class ScenarioEffectEngine:
         archive = self._zip_bytes(package_files)
         source_workflow = sources["workflow.py"].decode("utf-8", errors="replace")
         checks = (
-            self._check("check-react-source", "原固定 Workflow 已核对", all(token in source_workflow for token in ("QueryAnalysisNode", "SearchPlanNode", "SummaryGenerationNode")), "改造基于实际 workflow.py，而非空模板。"),
-            self._check("check-react-compile", "代码编译", compile_rc == 0, compile_output or "compileall 无错误输出。"),
-            self._check("check-react-tests", "八项回归测试", test_rc == 0 and "Ran 8 tests" in test_output and "OK" in test_output, "真实 unittest 回执必须显示 8 tests、0 failure。"),
-            self._check("check-react-cap", "迭代上限", "max_iterations" in generated["react_agent.py"] and "range(1, self.config.max_iterations + 1)" in generated["react_agent.py"], "最大迭代次数由 ReActConfig 控制。"),
-            self._check("check-react-trace", "可审计轨迹", '"action": name' in generated["react_agent.py"] and '"observation"' in generated["react_agent.py"], "只记录动作与观察摘要，不输出私有 CoT。"),
-            self._check("check-react-regressions", "原业务逻辑保留", all(token in generated["react_agent.py"] for token in ("token_overlap", "threshold / 2", "source_quota_per_type", "_truncate")), "漂移检测、质量降级、来源配额和句界截断均有测试。"),
-            self._check("check-react-no-network", "无网络副作用", "example.com" not in generated["main.py"] and "0 次" not in receipt, "固定命令只编译并运行本地单元测试，不调用搜索网络。"),
+            self._check(
+                "check-react-source",
+                "原固定 Workflow 已核对",
+                all(
+                    token in source_workflow
+                    for token in ("QueryAnalysisNode", "SearchPlanNode", "SummaryGenerationNode")
+                ),
+                "改造基于实际 workflow.py，而非空模板。",
+            ),
+            self._check(
+                "check-react-compile",
+                "代码编译",
+                compile_rc == 0,
+                compile_output or "compileall 无错误输出。",
+            ),
+            self._check(
+                "check-react-tests",
+                "八项回归测试",
+                test_rc == 0 and "Ran 8 tests" in test_output and "OK" in test_output,
+                "真实 unittest 回执必须显示 8 tests、0 failure。",
+            ),
+            self._check(
+                "check-react-cap",
+                "迭代上限",
+                "max_iterations" in generated["react_agent.py"]
+                and "range(1, self.config.max_iterations + 1)" in generated["react_agent.py"],
+                "最大迭代次数由 ReActConfig 控制。",
+            ),
+            self._check(
+                "check-react-trace",
+                "可审计轨迹",
+                '"action": name' in generated["react_agent.py"]
+                and '"observation"' in generated["react_agent.py"],
+                "只记录动作与观察摘要，不输出私有 CoT。",
+            ),
+            self._check(
+                "check-react-regressions",
+                "原业务逻辑保留",
+                all(
+                    token in generated["react_agent.py"]
+                    for token in (
+                        "token_overlap",
+                        "threshold / 2",
+                        "source_quota_per_type",
+                        "_truncate",
+                    )
+                ),
+                "漂移检测、质量降级、来源配额和句界截断均有测试。",
+            ),
+            self._check(
+                "check-react-no-network",
+                "无网络副作用",
+                "example.com" not in generated["main.py"] and "0 次" not in receipt,
+                "固定命令只编译并运行本地单元测试，不调用搜索网络。",
+            ),
         )
         common = dict(
             source_file_refs=source_refs,
@@ -1280,15 +1401,12 @@ class ScenarioEffectEngine:
         project_sources, project_refs = self._checked_group_tree(
             catalog, group="研发交付", relative_prefix="source-code/"
         )
-        build = build_real_evaluation_platform_fix(
-            project_sources, self._run_fixed_command
-        )
+        build = build_real_evaluation_platform_fix(project_sources, self._run_fixed_command)
         project_sources_after, project_refs_after = self._checked_group_tree(
             catalog, group="研发交付", relative_prefix="source-code/"
         )
         original_inputs_unchanged = (
-            project_sources_after == project_sources
-            and project_refs_after == project_refs
+            project_sources_after == project_sources and project_refs_after == project_refs
         )
         source_refs = project_refs
         checks = tuple(
@@ -1341,9 +1459,7 @@ class ScenarioEffectEngine:
                 AgentControlLoopArtifactTestSuite(
                     suite_id=str(suite["id"]),
                     label=str(suite["label"]),
-                    test_files=[
-                        f"tests/{module}.py" for module in suite["modules"]
-                    ],
+                    test_files=[f"tests/{module}.py" for module in suite["modules"]],
                     test_count=int(suite["test_count"]),
                     test_ids=[str(test_id) for test_id in suite["test_ids"]],
                 )
@@ -1425,10 +1541,13 @@ class ScenarioEffectEngine:
         self, catalog: ScenarioEffectCatalog, spec: ScenarioEffectSpec
     ) -> tuple[GeneratedOfficeArtifact, ...]:
         sources, source_refs = self._checked_source_bytes(catalog, spec)
-        text_sources = {name: value.decode("utf-8", errors="strict") for name, value in sources.items()}
+        text_sources = {
+            name: value.decode("utf-8", errors="strict") for name, value in sources.items()
+        }
         patched = dict(text_sources)
-        patched["vitest.config.js"] = textwrap.dedent(
-            """
+        patched["vitest.config.js"] = (
+            textwrap.dedent(
+                """
             import { fileURLToPath, URL } from 'node:url'
 
             export default {
@@ -1443,7 +1562,9 @@ class ScenarioEffectEngine:
               }
             }
             """
-        ).strip() + "\n"
+            ).strip()
+            + "\n"
+        )
         patched["metricsCalculator.js"] = patched["metricsCalculator.js"].replace(
             "((newValue - oldValue) / newValue) * 100",
             "((newValue - oldValue) / oldValue) * 100",
@@ -1454,14 +1575,18 @@ class ScenarioEffectEngine:
             "const sorted = [...data].sort((a, b) => {",
             1,
         )
-        patched["filterEngine.js"] = patched["filterEngine.js"].replace(
-            "function filterByDateRange(data, dateField, startDate, endDate) {",
-            "export function filterByDateRange(data, dateField, startDate, endDate) {",
-            1,
-        ).replace(
-            "return d > start && d < end",
-            "return d >= start && d <= end",
-            1,
+        patched["filterEngine.js"] = (
+            patched["filterEngine.js"]
+            .replace(
+                "function filterByDateRange(data, dateField, startDate, endDate) {",
+                "export function filterByDateRange(data, dateField, startDate, endDate) {",
+                1,
+            )
+            .replace(
+                "return d > start && d < end",
+                "return d >= start && d <= end",
+                1,
+            )
         )
         tests = {
             "tests/metricsCalculator.test.js": textwrap.dedent(
@@ -1480,7 +1605,8 @@ class ScenarioEffectEngine:
                   })
                 })
                 """
-            ).strip() + "\n",
+            ).strip()
+            + "\n",
             "tests/dataTransformer.test.js": textwrap.dedent(
                 """
                 import { sortByField } from '@/utils/dataTransformer.js'
@@ -1499,7 +1625,8 @@ class ScenarioEffectEngine:
                   })
                 })
                 """
-            ).strip() + "\n",
+            ).strip()
+            + "\n",
             "tests/filterEngine.test.js": textwrap.dedent(
                 """
                 import { filterByDateRange } from '@/utils/filterEngine.js'
@@ -1522,7 +1649,8 @@ class ScenarioEffectEngine:
                   })
                 })
                 """
-            ).strip() + "\n",
+            ).strip()
+            + "\n",
         }
         layout = {
             "package.json": patched["package.json"],
@@ -1561,8 +1689,12 @@ class ScenarioEffectEngine:
                 "--reporter=json",
                 f"--outputFile={result_path}",
             ]
-            test_rc, test_output, test_ms = self._run_fixed_command(command, cwd=root, timeout_seconds=60)
-            result_payload = json.loads(result_path.read_text(encoding="utf-8")) if result_path.is_file() else {}
+            test_rc, test_output, test_ms = self._run_fixed_command(
+                command, cwd=root, timeout_seconds=60
+            )
+            result_payload = (
+                json.loads(result_path.read_text(encoding="utf-8")) if result_path.is_file() else {}
+            )
         total_tests = int(result_payload.get("numTotalTests", 0))
         passed_tests = int(result_payload.get("numPassedTests", 0))
         failed_tests = int(result_payload.get("numFailedTests", 0))
@@ -1585,14 +1717,61 @@ class ScenarioEffectEngine:
         )
         package = self._zip_bytes({**layout, "VITEST_RECEIPT.md": receipt})
         checks = (
-            self._check("check-vitest-alias", "别名目录修复", "new URL('./src', import.meta.url)" in patched["vitest.config.js"], "@ 别名指向实际存在的 src 目录。"),
-            self._check("check-vitest-growth", "增长率公式", "/ oldValue" in patched["metricsCalculator.js"], "增长率以基期值为分母。"),
-            self._check("check-vitest-sort", "排序无副作用", "[...data].sort" in patched["dataTransformer.js"], "排序前复制数组，不改变调用方输入。"),
-            self._check("check-vitest-date", "日期筛选导出与边界", "export function filterByDateRange" in patched["filterEngine.js"] and "d >= start && d <= end" in patched["filterEngine.js"], "函数可导入，起止日期均按闭区间处理。"),
-            self._check("check-vitest-files", "三模块测试文件", test_files == 3 and len(tests) == 3, "指标、转换和筛选三个模块分别有独立测试文件。"),
-            self._check("check-vitest-count", "至少八个场景", total_tests >= 8 and passed_tests == total_tests and failed_tests == 0 and test_rc == 0, f"真实 Vitest JSON 回执：{passed_tests}/{total_tests} 通过。"),
-            self._check("check-vitest-assertions", "断言和边界覆盖", all(token in "\n".join(tests.values()) for token in ("toBe(", "toEqual(", "toHaveLength(", "not.toThrow()")), "至少四种断言，覆盖零值、负增长、边界日期和输入不可变。"),
-            self._check("check-vitest-no-script", "固定命令边界", "未运行 package scripts" in receipt, "Runtime 未执行来源 package.json 中的任意脚本。"),
+            self._check(
+                "check-vitest-alias",
+                "别名目录修复",
+                "new URL('./src', import.meta.url)" in patched["vitest.config.js"],
+                "@ 别名指向实际存在的 src 目录。",
+            ),
+            self._check(
+                "check-vitest-growth",
+                "增长率公式",
+                "/ oldValue" in patched["metricsCalculator.js"],
+                "增长率以基期值为分母。",
+            ),
+            self._check(
+                "check-vitest-sort",
+                "排序无副作用",
+                "[...data].sort" in patched["dataTransformer.js"],
+                "排序前复制数组，不改变调用方输入。",
+            ),
+            self._check(
+                "check-vitest-date",
+                "日期筛选导出与边界",
+                "export function filterByDateRange" in patched["filterEngine.js"]
+                and "d >= start && d <= end" in patched["filterEngine.js"],
+                "函数可导入，起止日期均按闭区间处理。",
+            ),
+            self._check(
+                "check-vitest-files",
+                "三模块测试文件",
+                test_files == 3 and len(tests) == 3,
+                "指标、转换和筛选三个模块分别有独立测试文件。",
+            ),
+            self._check(
+                "check-vitest-count",
+                "至少八个场景",
+                total_tests >= 8
+                and passed_tests == total_tests
+                and failed_tests == 0
+                and test_rc == 0,
+                f"真实 Vitest JSON 回执：{passed_tests}/{total_tests} 通过。",
+            ),
+            self._check(
+                "check-vitest-assertions",
+                "断言和边界覆盖",
+                all(
+                    token in "\n".join(tests.values())
+                    for token in ("toBe(", "toEqual(", "toHaveLength(", "not.toThrow()")
+                ),
+                "至少四种断言，覆盖零值、负增长、边界日期和输入不可变。",
+            ),
+            self._check(
+                "check-vitest-no-script",
+                "固定命令边界",
+                "未运行 package scripts" in receipt,
+                "Runtime 未执行来源 package.json 中的任意脚本。",
+            ),
         )
         common = dict(
             source_file_refs=source_refs,
@@ -1628,29 +1807,18 @@ class ScenarioEffectEngine:
         node_modules_root = repo_root / "apps" / "web" / "node_modules"
         vitest_entry = node_modules_root / "vitest" / "vitest.mjs"
         vitest_package = node_modules_root / "vitest" / "package.json"
-        coverage_package = (
-            node_modules_root / "@vitest" / "coverage-v8" / "package.json"
-        )
+        coverage_package = node_modules_root / "@vitest" / "coverage-v8" / "package.json"
         node = shutil.which("node")
         if node is None or not all(
-            path.is_file()
-            for path in (vitest_entry, vitest_package, coverage_package)
+            path.is_file() for path in (vitest_entry, vitest_package, coverage_package)
         ):
-            raise ScenarioEffectError(
-                "本地 Vitest 1.6.1 与 coverage-v8 1.6.1 固定执行器不可用"
-            )
+            raise ScenarioEffectError("本地 Vitest 1.6.1 与 coverage-v8 1.6.1 固定执行器不可用")
         versions = {
-            "vitest": json.loads(vitest_package.read_text(encoding="utf-8"))[
-                "version"
-            ],
-            "coverage": json.loads(
-                coverage_package.read_text(encoding="utf-8")
-            )["version"],
+            "vitest": json.loads(vitest_package.read_text(encoding="utf-8"))["version"],
+            "coverage": json.loads(coverage_package.read_text(encoding="utf-8"))["version"],
         }
         if versions != {"vitest": "1.6.1", "coverage": "1.6.1"}:
-            raise ScenarioEffectError(
-                "TC-12 只允许匹配的 Vitest 1.6.1 与 coverage-v8 1.6.1"
-            )
+            raise ScenarioEffectError("TC-12 只允许匹配的 Vitest 1.6.1 与 coverage-v8 1.6.1")
         build = build_real_dashboard_toolkit_fix(
             project_sources,
             self._run_fixed_command,
@@ -1661,9 +1829,7 @@ class ScenarioEffectEngine:
         sources_after, refs_after = self._checked_group_tree(
             catalog, group="质量保障", relative_prefix="dashboard-toolkit/"
         )
-        source_tree_unchanged = (
-            sources_after == project_sources and refs_after == project_refs
-        )
+        source_tree_unchanged = sources_after == project_sources and refs_after == project_refs
         checks = tuple(
             self._check(check_id, label, passed, detail)
             for check_id, label, passed, detail in build.checks
@@ -1850,9 +2016,7 @@ class ScenarioEffectEngine:
                         f"{build.test_count} 通过和逐文件覆盖率门。"
                     )
                     if artifact_ready
-                    else (
-                        "报告保留分阶段失败、coverage 和复跑证据；当前未形成测试全绿结论。"
-                    )
+                    else ("报告保留分阶段失败、coverage 和复跑证据；当前未形成测试全绿结论。")
                 ),
                 deliverable_type="分阶段 Vitest、覆盖率与独立复跑报告（Markdown）",
                 self_test=None,
@@ -1880,14 +2044,15 @@ class ScenarioEffectEngine:
                 unpaid.append(output)
             elif direction == "借":
                 unreceived.append(output)
+
         def sort_key(item: list[str]) -> tuple[str, Decimal]:
             return item[1], -self._decimal(item[2])
+
         unpaid.sort(key=sort_key)
         unreceived.sort(key=sort_key)
 
         period_records = {
-            label: self._table_records(preview)
-            for label, preview in previews.items()
+            label: self._table_records(preview) for label, preview in previews.items()
         }
         balances: dict[tuple[str, str], list[Decimal | None]] = defaultdict(list)
         for label in (
@@ -1921,10 +2086,14 @@ class ScenarioEffectEngine:
             "",
             f"- 当前未付记录：{len(unpaid)} 条，合计 {self._format_amount(sum((self._decimal(row[2]) for row in unpaid), Decimal(0)))}。",
             f"- 当前未收记录：{len(unreceived)} 条，合计 {self._format_amount(sum((self._decimal(row[2]) for row in unreceived), Decimal(0)))}。",
-            "- 僵尸账款判断：" + (
+            "- 僵尸账款判断："
+            + (
                 "无僵尸账款。"
                 if not zombie
-                else "；".join(f"{customer} / {subject} / {self._format_amount(amount or Decimal(0))}" for subject, customer, amount in zombie)
+                else "；".join(
+                    f"{customer} / {subject} / {self._format_amount(amount or Decimal(0))}"
+                    for subject, customer, amount in zombie
+                )
             ),
             "",
             "> 仅核对 FORTE 公开样本；未发起付款、记账或外部动作。",
@@ -1932,42 +2101,111 @@ class ScenarioEffectEngine:
         conclusion_content = "\n".join(conclusion_lines).encode("utf-8")
 
         current_map = {
-            (row["科目名称"], row["客商名称"], row.get("方向#2", row.get("方向", ""))): self._decimal(row["期末余额"])
+            (
+                row["科目名称"],
+                row["客商名称"],
+                row.get("方向#2", row.get("方向", "")),
+            ): self._decimal(row["期末余额"])
             for row in current_records
             if self._decimal(row["期末余额"]) > 0
         }
         cross_period_checks = (
-            self._check("check-finance-source", "三期来源完整", len(previews) == 3, "三个固定期间工作簿均通过 Catalog 完整性检查。"),
-            self._check("check-finance-zombie", "跨期僵尸账款复算", not zombie, "按同一客商、同一科目、三期借方期末余额逐项比较，结果为无僵尸账款。"),
+            self._check(
+                "check-finance-source",
+                "三期来源完整",
+                len(previews) == 3,
+                "三个固定期间工作簿均通过 Catalog 完整性检查。",
+            ),
+            self._check(
+                "check-finance-zombie",
+                "跨期僵尸账款复算",
+                not zombie,
+                "按同一客商、同一科目、三期借方期末余额逐项比较，结果为无僵尸账款。",
+            ),
         )
         unpaid_checks = (
-            self._check("check-finance-current-source", "2026 内容来源", len(current_source_refs) == 1, "明细行只取自 2026 往来工作簿，不是三期合并表。"),
-            self._check("check-finance-unpaid-rows", "未付逐行复算", all(current_map.get((row[0], row[1], "贷")) == self._decimal(row[2]) for row in unpaid), f"{len(unpaid)} 条贷方期末余额逐行相等。"),
-            self._check("check-finance-unpaid-sort", "未付排序", unpaid == sorted(unpaid, key=sort_key), "按客商升序、同客商金额降序。"),
+            self._check(
+                "check-finance-current-source",
+                "2026 内容来源",
+                len(current_source_refs) == 1,
+                "明细行只取自 2026 往来工作簿，不是三期合并表。",
+            ),
+            self._check(
+                "check-finance-unpaid-rows",
+                "未付逐行复算",
+                all(
+                    current_map.get((row[0], row[1], "贷")) == self._decimal(row[2])
+                    for row in unpaid
+                ),
+                f"{len(unpaid)} 条贷方期末余额逐行相等。",
+            ),
+            self._check(
+                "check-finance-unpaid-sort",
+                "未付排序",
+                unpaid == sorted(unpaid, key=sort_key),
+                "按客商升序、同客商金额降序。",
+            ),
         )
         unreceived_checks = (
-            self._check("check-finance-current-source", "2026 内容来源", len(current_source_refs) == 1, "明细行只取自 2026 往来工作簿，不是三期合并表。"),
-            self._check("check-finance-unreceived-rows", "未收逐行复算", all(current_map.get((row[0], row[1], "借")) == self._decimal(row[2]) for row in unreceived), f"{len(unreceived)} 条借方期末余额逐行相等。"),
-            self._check("check-finance-unreceived-sort", "未收排序", unreceived == sorted(unreceived, key=sort_key), "按客商升序、同客商金额降序。"),
+            self._check(
+                "check-finance-current-source",
+                "2026 内容来源",
+                len(current_source_refs) == 1,
+                "明细行只取自 2026 往来工作簿，不是三期合并表。",
+            ),
+            self._check(
+                "check-finance-unreceived-rows",
+                "未收逐行复算",
+                all(
+                    current_map.get((row[0], row[1], "借")) == self._decimal(row[2])
+                    for row in unreceived
+                ),
+                f"{len(unreceived)} 条借方期末余额逐行相等。",
+            ),
+            self._check(
+                "check-finance-unreceived-sort",
+                "未收排序",
+                unreceived == sorted(unreceived, key=sort_key),
+                "按客商升序、同客商金额降序。",
+            ),
         )
         return (
             GeneratedOfficeArtifact(
-                "2026 期末未付明细", "未付统计.csv", "text/csv", unpaid_content,
-                current_source_refs, "validator-finance-reconciliation-v1", unpaid_checks,
-                f"{len(unpaid)} 条记录已逐行复算。", covered_period="2026 年期末",
+                "2026 期末未付明细",
+                "未付统计.csv",
+                "text/csv",
+                unpaid_content,
+                current_source_refs,
+                "validator-finance-reconciliation-v1",
+                unpaid_checks,
+                f"{len(unpaid)} 条记录已逐行复算。",
+                covered_period="2026 年期末",
                 statistic_basis="筛选期末余额大于 0 且方向为“贷”的行；每行代表一个科目与客商组合。",
-                purpose="查看 2026 年期末待付款项；不是三期合并表。", record_count=len(unpaid),
+                purpose="查看 2026 年期末待付款项；不是三期合并表。",
+                record_count=len(unpaid),
             ),
             GeneratedOfficeArtifact(
-                "2026 期末未收明细", "未收统计.csv", "text/csv", unreceived_content,
-                current_source_refs, "validator-finance-reconciliation-v1", unreceived_checks,
-                f"{len(unreceived)} 条记录已逐行复算。", covered_period="2026 年期末",
+                "2026 期末未收明细",
+                "未收统计.csv",
+                "text/csv",
+                unreceived_content,
+                current_source_refs,
+                "validator-finance-reconciliation-v1",
+                unreceived_checks,
+                f"{len(unreceived)} 条记录已逐行复算。",
+                covered_period="2026 年期末",
                 statistic_basis="筛选期末余额大于 0 且方向为“借”的行；每行代表一个科目与客商组合。",
-                purpose="查看 2026 年期末待收款项；2 表示记录数，不是期间数。", record_count=len(unreceived),
+                purpose="查看 2026 年期末待收款项；2 表示记录数，不是期间数。",
+                record_count=len(unreceived),
             ),
             GeneratedOfficeArtifact(
-                "三期僵尸账款核对说明", "跨期核对说明.md", "text/markdown", conclusion_content,
-                source_refs, "validator-finance-reconciliation-v1", cross_period_checks,
+                "三期僵尸账款核对说明",
+                "跨期核对说明.md",
+                "text/markdown",
+                conclusion_content,
+                source_refs,
+                "validator-finance-reconciliation-v1",
+                cross_period_checks,
                 "三期借方未收余额已比较，结论为无僵尸账款。",
                 covered_period="2025 年上半年、2025 年下半年、2026 年",
                 statistic_basis="按同一科目名称与客商名称，对三期正数借方期末余额逐项比较。",
@@ -1978,88 +2216,171 @@ class ScenarioEffectEngine:
     def _candidate_review(
         self, catalog: ScenarioEffectCatalog, spec: ScenarioEffectSpec
     ) -> tuple[GeneratedOfficeArtifact, ...]:
-        previews = self._previews(catalog, spec)
-        source_refs = self._source_refs(previews)
-        resumes = {
-            name.removesuffix("简历.pdf"): previews[name].get("text") or ""
-            for name in (
-                "周伦简历.pdf",
-                "孙博文简历.pdf",
-                "李雨桐简历.pdf",
-                "王琳达简历.pdf",
-                "赵晨曦简历.pdf",
-            )
-        }
-        candidates = tuple(resumes)
-        evaluations = {
-            "外卖商户BD": {
-                "周伦": ("不通过", "缺少商户拓展或销售经历", "简历仅有 NLP 评测经历", "岗位经验不匹配"),
-                "孙博文": ("不通过", "缺少商户拓展或销售经历", "简历仅有算法与数据清洗经历", "岗位经验不匹配"),
-                "李雨桐": ("通过", "满足学历、BD、经营诊断与资源整合要求", "3 年 5 个月外卖平台区域 BD；负责 200+ 商户", "结果需招聘人员复核"),
-                "王琳达": ("不通过", "学历未达到大专及以上", "简历学历为高中", "硬性学历条件不满足"),
-                "赵晨曦": ("不通过", "缺少 BD、数据分析和餐饮行业经历", "简历明确无销售/BD经验", "核心经验缺失"),
-            },
-            "文本评测": {
-                "周伦": ("通过", "满足 Python、评测经验、数据处理与前端加分项", "1 年 9 个月 NLP 评测；设计 rubric；开发 Vue/Flask 工具", "结果需招聘人员复核"),
-                "孙博文": ("不通过", "AI 相关经验不足 1 年", "简历仅有 8 个月算法实习转正经历", "硬性年限条件不满足"),
-                "李雨桐": ("不通过", "缺少 Python 与 AI 评测经历", "简历为外卖平台区域 BD 经历", "必要技能缺失"),
-                "王琳达": ("不通过", "缺少 Python 与 AI 评测经历", "简历为快消区域销售经历", "必要技能缺失"),
-                "赵晨曦": ("不通过", "缺少 Python 与 AI 经验", "简历明确 Python 无基础、AI 经验无", "两项必要条件缺失"),
-            },
-        }
+        sources = self._candidate_source_inputs(catalog, spec)
+        source_by_id = {source.logical_id: source for source in sources}
+        source_bytes_before = {source.file_ref: source.content for source in sources}
+        try:
+            build = build_candidate_review(sources)
+        except CandidateReviewValidationError as exc:
+            raise ScenarioEffectError(
+                f"TC-06 来源或解析合同失败：{exc.code}：{exc.detail}"
+            ) from exc
 
-        def report(role: str, jd_name: str, file_name: str) -> GeneratedOfficeArtifact:
-            decisions = evaluations[role]
-            passed = sum(item[0] == "通过" for item in decisions.values())
-            paragraphs = [
-                f"通过{passed}人，不通过{len(decisions) - passed}人。",
-                f"{role}岗位辅助筛选报告",
-                "边界：仅依据 FORTE 公开样本形成辅助意见，不作自动录用决定。",
-            ]
-            for name in candidates:
-                conclusion, match, evidence, risk = decisions[name]
-                paragraphs.extend(
-                    [
-                        f"候选人：{name}",
-                        f"结论：{conclusion}",
-                        f"JD 匹配：{match}",
-                        f"简历证据：{evidence}",
-                        f"风险：{risk}",
-                    ]
-                )
-                if conclusion == "通过":
-                    paragraphs.extend(
-                        [
-                            "面试问题：请结合一个真实项目说明你如何验证结果并处理异常。",
-                            "面试重点：核对证据真实性、独立负责范围与岗位核心能力。",
-                        ]
-                    )
-            content = self._docx_bytes(paragraphs)
-            rendered = "\n".join(paragraphs)
-            jd_text = previews[jd_name].get("text") or ""
-            checks = (
-                self._check(f"check-hr-{role}-count".replace("外卖商户BD", "bd").replace("文本评测", "text"), "人数守恒", len(decisions) == 5 and rendered.startswith(f"通过{passed}人，不通过{5 - passed}人。"), "首句人数与五名候选人逐项结论一致。"),
-                self._check(f"check-hr-{role}-names".replace("外卖商户BD", "bd").replace("文本评测", "text"), "五人完整", all(rendered.count(f"候选人：{name}") == 1 for name in candidates), "五名候选人各出现且只出现一次。"),
-                self._check(f"check-hr-{role}-labels".replace("外卖商户BD", "bd").replace("文本评测", "text"), "结论枚举", all(item[0] in {"通过", "不通过"} for item in decisions.values()), "结论只使用通过或不通过。"),
-                self._check(f"check-hr-{role}-fields".replace("外卖商户BD", "bd").replace("文本评测", "text"), "字段合同", all(all(field in rendered for field in (f"候选人：{name}", "JD 匹配：", "简历证据：", "风险：")) for name in candidates), "每人保留结论、岗位匹配、简历证据和风险；通过者另含面试项。"),
-                self._check(f"check-hr-{role}-source".replace("外卖商户BD", "bd").replace("文本评测", "text"), "关键硬条件复核", ("大专及以上" in jd_text if role == "外卖商户BD" else "1 年以上" in jd_text) and all(resumes.values()), "岗位硬条件和五份简历均来自安全预览。"),
-                self._check(f"check-hr-{role}-privacy".replace("外卖商户BD", "bd").replace("文本评测", "text"), "默认隐藏非必要敏感信息", "@" not in rendered and "性别" not in rendered and "年龄" not in rendered, "报告不输出联系方式、性别或年龄。"),
-                self._check(f"check-hr-{role}-human".replace("外卖商户BD", "bd").replace("文本评测", "text"), "人工决定边界", "不作自动录用决定" in rendered, "通过仅表示辅助筛选，最终决定属于招聘人员。"),
-            )
-            return GeneratedOfficeArtifact(
-                f"{role}岗位辅助筛选报告",
-                file_name,
-                "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                content,
-                source_refs,
-                "validator-candidate-review-v1",
-                checks,
-                f"五名候选人已逐项核对；{passed} 人进入人工复核，不含自动录用动作。",
+        source_unchanged = all(
+            catalog.checked_input_bytes(file_ref) == content
+            for file_ref, content in source_bytes_before.items()
+        )
+        checks = tuple(
+            self._check(item.check_id, item.label, item.passed, item.detail)
+            for item in build.checks
+        ) + (
+            self._check(
+                "check-candidate-originals-read-only",
+                "FORTE 原件未修改",
+                source_unchanged,
+                "构建前后重新读取七份批准来源，原始字节保持一致。",
+            ),
+        )
+        artifact_ready = all(check.passed for check in checks)
+        outcome = build.analysis.outcome
+        reviews_by_role = {
+            role_id: tuple(review for review in outcome.reviews if review.role_id == role_id)
+            for role_id in ("merchant_bd", "text_evaluation")
+        }
+        resume_refs = tuple(
+            source_by_id[candidate_id].file_ref for candidate_id in CANDIDATE_LOGICAL_IDS
+        )
+        bd_refs = (source_by_id[JD_BD_ID].file_ref, *resume_refs)
+        text_refs = (source_by_id[JD_TEXT_ID].file_ref, *resume_refs)
+        all_refs = tuple(source.file_ref for source in sources)
+
+        def role_summary(role_id: str) -> str:
+            reviews = reviews_by_role[role_id]
+            counts = Counter(review.recommendation for review in reviews)
+            return (
+                f"5 名候选人已按来源逐条件核对；建议人工复核 "
+                f"{counts['recommended_for_human_review']} 人，明确硬条件缺口 "
+                f"{counts['explicit_hard_gap']} 人，资料不足 "
+                f"{counts['insufficient_evidence']} 人，需例外判断 "
+                f"{counts['exception_review_required']} 人。"
             )
 
+        common_outputs = (
+            (
+                f"{outcome.role_count} 个岗位 × {outcome.candidate_count} 名候选人",
+                f"{outcome.assessment_count} 条岗位条件与简历事实逐项台账",
+                (
+                    f"有来源支持 {outcome.met_count} 条，明确不满足 "
+                    f"{outcome.not_met_count} 条，资料不足 {outcome.unverifiable_count} 条，"
+                    f"需人工例外判断 {outcome.human_exception_count} 条"
+                ),
+            )
+            if artifact_ready
+            else (
+                "至少一项来源、逐项台账或成果结构检查未通过。",
+                "失败证据和隔离成果已保留，但当前匹配建议不得采用。",
+                "未通知候选人、未写入 ATS，也未执行录用或淘汰。",
+            )
+        )
+        common_review = (
+            (
+                "辅助筛选不作自动录用或淘汰决定。招聘负责人需核对来源事实、资料不足和"
+                "例外项后记录人工决定；本轮未做人群属性公平性研究，不能声称结果无偏。"
+            )
+            if artifact_ready
+            else (
+                "当前成果未通过服务端来源重算，不能用于招聘复核。请查看失败检查，修复"
+                "来源或成果生成问题后重新启动新的 TC-06 Run。"
+            )
+        )
+        common_execution = (
+            (
+                "服务端只读解析七份 FORTE 公开资料，在隔离 Run Workspace 生成三份成果；"
+                "未修改原件、未通知候选人、未写入 ATS，也未执行录用或淘汰。"
+            )
+            if artifact_ready
+            else (
+                "服务端已保留失败检查与隔离成果，但当前文件未通过来源重算；原件未修改，"
+                "也没有通知、ATS 写入、录用或淘汰动作。"
+            )
+        )
         return (
-            report("外卖商户BD", "外卖商户BD岗位JD.docx", "外卖商户BD岗位辅助筛选报告.docx"),
-            report("文本评测", "文本评测岗位JD.docx", "文本评测岗位辅助筛选报告.docx"),
+            GeneratedOfficeArtifact(
+                title="外卖商户BD岗位辅助筛选报告",
+                file_name="外卖商户BD岗位辅助筛选报告.docx",
+                media_type=(
+                    "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                ),
+                content=build.bd_report_docx,
+                source_file_refs=bd_refs,
+                validator_id="validator-candidate-review-v2",
+                checks=checks,
+                summary=role_summary("merchant_bd"),
+                covered_period="FORTE 公开 hr-001 固定资料版本",
+                statistic_basis=(
+                    f"5 名候选人 × {len(build.analysis.jobs[0].conditions)} 条外卖商户BD岗位条件，"
+                    "逐条对照 JD 与同一候选人的简历原文。"
+                ),
+                purpose="供招聘人员复核外卖商户BD岗位条件，不代表录用或淘汰。",
+                record_count=5,
+                deliverable_type="来源推导的岗位辅助筛选报告",
+                key_outputs=common_outputs,
+                key_outputs_label="本报告回答什么",
+                review_guidance=common_review,
+                execution_summary=common_execution,
+                candidate_review_outcome=outcome,
+            ),
+            GeneratedOfficeArtifact(
+                title="文本评测岗位辅助筛选报告",
+                file_name="文本评测岗位辅助筛选报告.docx",
+                media_type=(
+                    "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                ),
+                content=build.text_report_docx,
+                source_file_refs=text_refs,
+                validator_id="validator-candidate-review-v2",
+                checks=checks,
+                summary=role_summary("text_evaluation"),
+                covered_period="FORTE 公开 hr-001 固定资料版本",
+                statistic_basis=(
+                    f"5 名候选人 × {len(build.analysis.jobs[1].conditions)} 条文本评测岗位条件，"
+                    "逐条对照 JD 与同一候选人的简历原文。"
+                ),
+                purpose="供招聘人员复核文本评测岗位条件，不代表录用或淘汰。",
+                record_count=5,
+                deliverable_type="来源推导的岗位辅助筛选报告",
+                key_outputs=common_outputs,
+                key_outputs_label="本报告回答什么",
+                review_guidance=common_review,
+                execution_summary=common_execution,
+                candidate_review_outcome=outcome,
+            ),
+            GeneratedOfficeArtifact(
+                title="候选人岗位条件逐项台账",
+                file_name="候选人岗位条件逐项台账.csv",
+                media_type="text/csv",
+                content=build.ledger_csv,
+                source_file_refs=all_refs,
+                validator_id="validator-candidate-review-v2",
+                checks=checks,
+                summary=(
+                    f"{outcome.assessment_count} 条岗位 × 候选人 × 条件记录可独立复算，"
+                    "缺失事实保持为资料不足。"
+                ),
+                covered_period="FORTE 公开 hr-001 固定资料版本",
+                statistic_basis=(
+                    f"5 名候选人 × ({len(build.analysis.jobs[0].conditions)} 条 BD 条件 + "
+                    f"{len(build.analysis.jobs[1].conditions)} 条文本评测条件)。"
+                ),
+                purpose="逐条审计 JD 位置、简历位置、事实、判断、人工动作与退出条件。",
+                record_count=outcome.assessment_count,
+                deliverable_type="岗位条件逐项可复算台账",
+                key_outputs=common_outputs,
+                key_outputs_label="台账覆盖范围",
+                review_guidance=common_review,
+                execution_summary=common_execution,
+                candidate_review_outcome=outcome,
+            ),
         )
 
     def _legal_delegation_review(
@@ -2067,9 +2388,7 @@ class ScenarioEffectEngine:
     ) -> tuple[GeneratedOfficeArtifact, ...]:
         sources = self._legal_source_inputs(catalog, spec)
         source_refs = tuple(source.file_ref for source in sources)
-        source_bytes_before = {
-            source.file_ref: source.content for source in sources
-        }
+        source_bytes_before = {source.file_ref: source.content for source in sources}
         try:
             build = build_legal_delegation_review(sources)
         except LegalDelegationValidationError as exc:
@@ -2208,8 +2527,7 @@ class ScenarioEffectEngine:
         risk_ledger_valid = (
             len({record.record_id for record in records}) == len(records)
             and build.risk_counts == derived_risk_counts
-            and build.risk_total
-            == sum(record.final_risk_level != "none" for record in records)
+            and build.risk_total == sum(record.final_risk_level != "none" for record in records)
             and all(
                 record.final_risk_level
                 == max(
@@ -2242,19 +2560,71 @@ class ScenarioEffectEngine:
             build.docx_table_count >= 6
             and document_xml.count("<w:tbl>") >= 6
             and f"四、{build.risk_total} 项风险" in document_xml
-            and f"五、{len(build.missing_feature_codes)} 项未提测功能"
-            in document_xml
+            and f"五、{len(build.missing_feature_codes)} 项未提测功能" in document_xml
         )
         checks = (
-            self._check("check-release-source-contract", "四份来源结构与交叉引用", len(records) == 18 and len(source_refs) == 4, "PRD 18 项、三张执行表各 13 项；表头、编号、名称、优先级、状态、数字和八环境均由服务端逐项校验。"),
-            self._check("check-release-gate-formulas", "四项正式上线 Gate 逐式复算", len(gates) == 4 and all(gate.denominator > 0 for gate in gates), "每项保留分子、分母、运算符、阈值、实际值和 PRD 来源规则；零分母会直接失败。"),
-            self._check("check-release-risk-ledger", "逐功能风险按规则取唯一最高等级", risk_ledger_valid, "逐项复核记录唯一性、基础风险与兼容风险的最高等级，并动态核对各等级计数与台账；不检查固定风险总数。"),
-            self._check("check-release-gate-aggregation", "上线结论由 Gate 聚合", build.outcome.failed_gate_count == sum(not gate.passed for gate in gates) and build.outcome.status == ("passed" if all(gate.passed for gate in gates) else "failed"), "结论取决于四项 Gate 的布尔聚合，不检查固定功能名称或固定结论文案。"),
-            self._check("check-release-auxiliary-separation", "辅助指标不冒充上线 Gate", all("辅助质量指标" in metric.source_note for metric in build.outcome.auxiliary_metrics), "分级与综合用例通过率单独标为辅助指标。"),
-            self._check("check-release-ledger-csv", "CSV 18 行与动态风险计数可独立复算", ledger_csv_valid, "台账一行一个 PRD 功能，包含用例数、异常环境、规则、风险、来源和退出条件；各风险等级计数必须与服务端 records 一致。"),
-            self._check("check-release-report-tables", "DOCX 包含结构化核验表与动态数量", report_structure_valid, f"报告包含四项 Gate、辅助指标、18 项矩阵、{build.risk_total} 项风险、{len(build.missing_feature_codes)} 项未提测和整改计划表。"),
-            self._check("check-release-remediation", "整改项有负责人和退出条件", all(record.owner and record.remediation_action and record.exit_condition for record in records), "每项整改绑定功能编号、研发负责人、来源问题、动作和可验证退出条件。"),
-            self._check("check-release-no-action", "四份原件未改且没有外部动作", source_bytes_unchanged, "生成前后重新读取四份 allowlisted 原件并逐字节比较；只在隔离运行工作区写入 DOCX/CSV，没有上线、配置写入或通知动作。"),
+            self._check(
+                "check-release-source-contract",
+                "四份来源结构与交叉引用",
+                len(records) == 18 and len(source_refs) == 4,
+                "PRD 18 项、三张执行表各 13 项；表头、编号、名称、优先级、状态、数字和八环境均由服务端逐项校验。",
+            ),
+            self._check(
+                "check-release-gate-formulas",
+                "四项正式上线 Gate 逐式复算",
+                len(gates) == 4 and all(gate.denominator > 0 for gate in gates),
+                "每项保留分子、分母、运算符、阈值、实际值和 PRD 来源规则；零分母会直接失败。",
+            ),
+            self._check(
+                "check-release-risk-ledger",
+                "逐功能风险按规则取唯一最高等级",
+                risk_ledger_valid,
+                "逐项复核记录唯一性、基础风险与兼容风险的最高等级，并动态核对各等级计数与台账；不检查固定风险总数。",
+            ),
+            self._check(
+                "check-release-gate-aggregation",
+                "上线结论由 Gate 聚合",
+                build.outcome.failed_gate_count == sum(not gate.passed for gate in gates)
+                and build.outcome.status
+                == ("passed" if all(gate.passed for gate in gates) else "failed"),
+                "结论取决于四项 Gate 的布尔聚合，不检查固定功能名称或固定结论文案。",
+            ),
+            self._check(
+                "check-release-auxiliary-separation",
+                "辅助指标不冒充上线 Gate",
+                all(
+                    "辅助质量指标" in metric.source_note
+                    for metric in build.outcome.auxiliary_metrics
+                ),
+                "分级与综合用例通过率单独标为辅助指标。",
+            ),
+            self._check(
+                "check-release-ledger-csv",
+                "CSV 18 行与动态风险计数可独立复算",
+                ledger_csv_valid,
+                "台账一行一个 PRD 功能，包含用例数、异常环境、规则、风险、来源和退出条件；各风险等级计数必须与服务端 records 一致。",
+            ),
+            self._check(
+                "check-release-report-tables",
+                "DOCX 包含结构化核验表与动态数量",
+                report_structure_valid,
+                f"报告包含四项 Gate、辅助指标、18 项矩阵、{build.risk_total} 项风险、{len(build.missing_feature_codes)} 项未提测和整改计划表。",
+            ),
+            self._check(
+                "check-release-remediation",
+                "整改项有负责人和退出条件",
+                all(
+                    record.owner and record.remediation_action and record.exit_condition
+                    for record in records
+                ),
+                "每项整改绑定功能编号、研发负责人、来源问题、动作和可验证退出条件。",
+            ),
+            self._check(
+                "check-release-no-action",
+                "四份原件未改且没有外部动作",
+                source_bytes_unchanged,
+                "生成前后重新读取四份 allowlisted 原件并逐字节比较；只在隔离运行工作区写入 DOCX/CSV，没有上线、配置写入或通知动作。",
+            ),
         )
         common = {
             "source_file_refs": source_refs,
@@ -2350,9 +2720,7 @@ class ScenarioEffectEngine:
             "情绪持续激动超过 30 秒",
             *terminal_states,
         )
-        execution_summary = (
-            "本次只生成流程设计 DOCX。文档中的“发起外呼拨号”“写 CRM”等是流程节点描述，不是执行回执；实际没有拨号、没有写 CRM、没有发送短信。"
-        )
+        execution_summary = "本次只生成流程设计 DOCX。文档中的“发起外呼拨号”“写 CRM”等是流程节点描述，不是执行回执；实际没有拨号、没有写 CRM、没有发送短信。"
         paragraphs = [
             "信用卡 M1 逾期用户 AI 外呼催收流程设计",
             "这份文档负责回答：何时允许拨号、接通后如何确认身份、不同客户状态如何分流，以及每条路径如何结束。",
@@ -2369,19 +2737,96 @@ class ScenarioEffectEngine:
         content = self._docx_bytes(paragraphs)
         reached_targets = {edge.split(" -> ", 1)[1] for edge in flow}
         checks = (
-            self._check("check-outbound-source", "专业说明来源完整", all(token in source for token in source_requirements), "时段、频次、录音、身份、第三方、人工升级和六类终态均从《专业性说明.md》逐项核对。"),
-            self._check("check-outbound-start", "唯一开始节点", sum(line.startswith("START") for line in flow) == 1, "状态机只有一个 START。"),
-            self._check("check-outbound-time-gate", "拨号前时段 Gate", flow.index("START -> 外呼时段合规判断") < flow.index("外呼时段合规 -> 发起外呼拨号") and "外呼时段不合规 -> 停止外呼（达上限）" in flow, "不合规路径直接停止，不进入拨号。"),
-            self._check("check-outbound-connect", "接通与未接通互斥", "发起外呼拨号 -> 是否接通" in flow and "未接通 -> 今日已拨次数与一小时频次判断" in flow and "接通 -> 录音告知（本次通话将被录音）" in flow, "是否接通后只有接通、未接通两类业务入口。"),
-            self._check("check-outbound-retry", "每日 3 次 / 每小时 1 次上限", "达到每日3次或1小时1次上限 -> 停止外呼（达上限）" in flow and "未达上限 -> 安排重拨" in flow, "仅未达两项频次上限时进入安排重拨。"),
-            self._check("check-outbound-recording", "录音告知先于身份确认", flow.index("接通 -> 录音告知（本次通话将被录音）") < flow.index("录音告知 -> 身份确认"), "先告知录音，再询问身份。"),
-            self._check("check-outbound-identity", "身份确认先于欠款引导", flow.index("录音告知 -> 身份确认") < flow.index("本人 -> 开场告知与还款引导"), "身份确认前不披露欠款信息。"),
-            self._check("check-outbound-third-party", "第三方禁呼", "第三方要求不再联系 -> 加入禁呼名单" in flow, "第三方要求停止联系时进入禁呼终态。"),
-            self._check("check-outbound-attitude", "本人态度分支", all(any(line.startswith(token) for line in flow) for token in ("承诺还款", "软拒绝", "硬拒绝")), "承诺、软拒绝和硬拒绝均有路径。"),
-            self._check("check-outbound-invalid", "无效通话回到频次判断", "接通后立即挂断或无法沟通 -> 今日已拨次数与一小时频次判断" in flow, "无效通话不会绕过重拨上限。"),
-            self._check("check-outbound-human", "高风险情况转人工", all(f"{token} -> 转人工跟进" in flow for token in ("硬拒绝", "投诉或异议", "情绪激动超过30秒")), "三类强制情况均进入人工。"),
-            self._check("check-outbound-terminals", "六类终态齐全", len(terminal_states) == 6 and set(terminal_states).issubset(reached_targets), "六类业务终态均由至少一条流程路径到达。"),
-            self._check("check-outbound-no-action", "外部动作均未发生", any(execution_summary in paragraph for paragraph in paragraphs) and spec.prohibited_side_effects == ("不拨号", "不写 CRM", "不发送短信"), "只在隔离 Run Workspace 生成 DOCX；拨号、CRM 与短信回执均为 none。"),
+            self._check(
+                "check-outbound-source",
+                "专业说明来源完整",
+                all(token in source for token in source_requirements),
+                "时段、频次、录音、身份、第三方、人工升级和六类终态均从《专业性说明.md》逐项核对。",
+            ),
+            self._check(
+                "check-outbound-start",
+                "唯一开始节点",
+                sum(line.startswith("START") for line in flow) == 1,
+                "状态机只有一个 START。",
+            ),
+            self._check(
+                "check-outbound-time-gate",
+                "拨号前时段 Gate",
+                flow.index("START -> 外呼时段合规判断") < flow.index("外呼时段合规 -> 发起外呼拨号")
+                and "外呼时段不合规 -> 停止外呼（达上限）" in flow,
+                "不合规路径直接停止，不进入拨号。",
+            ),
+            self._check(
+                "check-outbound-connect",
+                "接通与未接通互斥",
+                "发起外呼拨号 -> 是否接通" in flow
+                and "未接通 -> 今日已拨次数与一小时频次判断" in flow
+                and "接通 -> 录音告知（本次通话将被录音）" in flow,
+                "是否接通后只有接通、未接通两类业务入口。",
+            ),
+            self._check(
+                "check-outbound-retry",
+                "每日 3 次 / 每小时 1 次上限",
+                "达到每日3次或1小时1次上限 -> 停止外呼（达上限）" in flow
+                and "未达上限 -> 安排重拨" in flow,
+                "仅未达两项频次上限时进入安排重拨。",
+            ),
+            self._check(
+                "check-outbound-recording",
+                "录音告知先于身份确认",
+                flow.index("接通 -> 录音告知（本次通话将被录音）")
+                < flow.index("录音告知 -> 身份确认"),
+                "先告知录音，再询问身份。",
+            ),
+            self._check(
+                "check-outbound-identity",
+                "身份确认先于欠款引导",
+                flow.index("录音告知 -> 身份确认") < flow.index("本人 -> 开场告知与还款引导"),
+                "身份确认前不披露欠款信息。",
+            ),
+            self._check(
+                "check-outbound-third-party",
+                "第三方禁呼",
+                "第三方要求不再联系 -> 加入禁呼名单" in flow,
+                "第三方要求停止联系时进入禁呼终态。",
+            ),
+            self._check(
+                "check-outbound-attitude",
+                "本人态度分支",
+                all(
+                    any(line.startswith(token) for line in flow)
+                    for token in ("承诺还款", "软拒绝", "硬拒绝")
+                ),
+                "承诺、软拒绝和硬拒绝均有路径。",
+            ),
+            self._check(
+                "check-outbound-invalid",
+                "无效通话回到频次判断",
+                "接通后立即挂断或无法沟通 -> 今日已拨次数与一小时频次判断" in flow,
+                "无效通话不会绕过重拨上限。",
+            ),
+            self._check(
+                "check-outbound-human",
+                "高风险情况转人工",
+                all(
+                    f"{token} -> 转人工跟进" in flow
+                    for token in ("硬拒绝", "投诉或异议", "情绪激动超过30秒")
+                ),
+                "三类强制情况均进入人工。",
+            ),
+            self._check(
+                "check-outbound-terminals",
+                "六类终态齐全",
+                len(terminal_states) == 6 and set(terminal_states).issubset(reached_targets),
+                "六类业务终态均由至少一条流程路径到达。",
+            ),
+            self._check(
+                "check-outbound-no-action",
+                "外部动作均未发生",
+                any(execution_summary in paragraph for paragraph in paragraphs)
+                and spec.prohibited_side_effects == ("不拨号", "不写 CRM", "不发送短信"),
+                "只在隔离 Run Workspace 生成 DOCX；拨号、CRM 与短信回执均为 none。",
+            ),
         )
         return (
             GeneratedOfficeArtifact(
@@ -2411,7 +2856,19 @@ class ScenarioEffectEngine:
         source_refs = self._source_refs(previews)
         survey = previews["客户画像调研问卷.csv"]
         records = self._table_records(survey)
-        chinese_digits = {"零": 0, "一": 1, "二": 2, "三": 3, "四": 4, "五": 5, "六": 6, "七": 7, "八": 8, "九": 9, "十": 10}
+        chinese_digits = {
+            "零": 0,
+            "一": 1,
+            "二": 2,
+            "三": 3,
+            "四": 4,
+            "五": 5,
+            "六": 6,
+            "七": 7,
+            "八": 8,
+            "九": 9,
+            "十": 10,
+        }
         seen_payloads: set[tuple[str, ...]] = set()
         classified: list[tuple[str, str, str, str]] = []
         excluded: list[str] = []
@@ -2421,6 +2878,7 @@ class ScenarioEffectEngine:
                 excluded.append(row["样本ID"])
                 continue
             seen_payloads.add(payload)
+
             def score(column: str) -> int:
                 raw = row[column].strip()
                 if not raw:
@@ -2428,6 +2886,7 @@ class ScenarioEffectEngine:
                 if raw in chinese_digits:
                     return chinese_digits[raw]
                 return int(raw)
+
             tech = score("专业 (Stech)")
             safe = score("安全 (Ssafe)")
             budget = score("预算 (Sbudget)")
@@ -2451,7 +2910,10 @@ class ScenarioEffectEngine:
             "",
             "| 样本ID | 企业所在行业 | 企业规模 | 客户画像 |",
             "| --- | --- | --- | --- |",
-            *[f"| {sample_id} | {industry} | {scale} | {label} |" for sample_id, industry, scale, label in classified],
+            *[
+                f"| {sample_id} | {industry} | {scale} | {label} |"
+                for sample_id, industry, scale, label in classified
+            ],
             "",
             "## 销售策略",
             "",
@@ -2476,7 +2938,8 @@ class ScenarioEffectEngine:
             "## 客户分析",
             "",
             "### 画像分布",
-            "；".join(f"{label} {counts[label]} 家" for label in ("安全型", "技术型", "敏捷型")) + "。",
+            "；".join(f"{label} {counts[label]} 家" for label in ("安全型", "技术型", "敏捷型"))
+            + "。",
             "",
             "### 行业与规模特征",
             "安全型集中在强监管和大型组织；技术型偏工程团队；敏捷型偏小型、快速迭代组织。",
@@ -2497,12 +2960,54 @@ class ScenarioEffectEngine:
             "敏捷型": {"103", "108"},
         }
         checks = (
-            self._check("check-segmentation-clean", "清洗、中文数字和缺失值", set(excluded) == {"106", "110", "111"}, "重复样本 111、无法归类样本 106/110 已排除。"),
-            self._check("check-segmentation-priority", "安全型优先级", actual_sets["安全型"] == expected_sets["安全型"], "安全型为 102、105、107。"),
-            self._check("check-segmentation-technical", "技术型分类", actual_sets["技术型"] == expected_sets["技术型"], "技术型为 101、104、109。"),
-            self._check("check-segmentation-agile", "敏捷型分类", actual_sets["敏捷型"] == expected_sets["敏捷型"], "敏捷型为 103、108。"),
-            self._check("check-segmentation-conservation", "记录数守恒", len(classified) + len(excluded) == len(records), f"{len(records)} 条输入 = {len(classified)} 条分类 + {len(excluded)} 条排除。"),
-            self._check("check-segmentation-sections", "报告结构", all(heading in lines for heading in ("## 客户画像", "## 销售策略", "## 客户分析", "#### 推荐话术", "#### 主推功能", "### 画像分布", "### 行业与规模特征", "### 销售优先级建议")), "报告标题和必需小节完整。"),
+            self._check(
+                "check-segmentation-clean",
+                "清洗、中文数字和缺失值",
+                set(excluded) == {"106", "110", "111"},
+                "重复样本 111、无法归类样本 106/110 已排除。",
+            ),
+            self._check(
+                "check-segmentation-priority",
+                "安全型优先级",
+                actual_sets["安全型"] == expected_sets["安全型"],
+                "安全型为 102、105、107。",
+            ),
+            self._check(
+                "check-segmentation-technical",
+                "技术型分类",
+                actual_sets["技术型"] == expected_sets["技术型"],
+                "技术型为 101、104、109。",
+            ),
+            self._check(
+                "check-segmentation-agile",
+                "敏捷型分类",
+                actual_sets["敏捷型"] == expected_sets["敏捷型"],
+                "敏捷型为 103、108。",
+            ),
+            self._check(
+                "check-segmentation-conservation",
+                "记录数守恒",
+                len(classified) + len(excluded) == len(records),
+                f"{len(records)} 条输入 = {len(classified)} 条分类 + {len(excluded)} 条排除。",
+            ),
+            self._check(
+                "check-segmentation-sections",
+                "报告结构",
+                all(
+                    heading in lines
+                    for heading in (
+                        "## 客户画像",
+                        "## 销售策略",
+                        "## 客户分析",
+                        "#### 推荐话术",
+                        "#### 主推功能",
+                        "### 画像分布",
+                        "### 行业与规模特征",
+                        "### 销售优先级建议",
+                    )
+                ),
+                "报告标题和必需小节完整。",
+            ),
         )
         return (
             GeneratedOfficeArtifact(
@@ -2558,15 +3063,86 @@ class ScenarioEffectEngine:
         content = "\n".join(lines).encode("utf-8")
         rendered = content.decode("utf-8")
         checks = (
-            self._check("check-sre-qps", "QPS 触发链", all(token in log_text and token in rendered for token in ("4800/s", "600/s", "3200/s", "400/s", "8 倍")), "查询和写入 QPS 基线、峰值与倍数均由日志复核。"),
-            self._check("check-sre-resources", "资源瓶颈", all(token in rendered for token in ("SATA", "97%~99%", "93%~97%", "87%~91%")), "磁盘、CPU 与堆内存范围均写入因果链。"),
-            self._check("check-sre-gc", "GC 与慢查询", all(token in rendered for token in ("Young/Old GC", "9.8s~14.2s", "from=5000", "terms/range")), "GC、深度分页和重聚合被识别为放大因素。"),
-            self._check("check-sre-shards", "队列和副本", all(token in rendered for token in ("write/search", "rejected", "48 个副本分片", "UNASSIGNED")), "线程池与分片状态均来自日志。"),
-            self._check("check-sre-distractors", "干扰项排除", all(token in rendered for token in ("master 心跳重试", "License", "snapshot", "circuit breaker", "shard lock")), "干扰项明确标为伴随或次生现象。"),
-            self._check("check-sre-address", "命令地址来自日志", api_host in node_ips and f"{api_host}:9200" in rendered, f"命令使用日志中的 {api_host}:9200。"),
-            self._check("check-sre-es-actions", "ES 侧三类操作", all(token in rendered for token in ("/_cluster/settings", "retry_failed=true", "refresh_interval", "fielddata=true")), "分片重试、refresh 调整和缓存清理均给出建议命令。"),
-            self._check("check-sre-business", "业务侧降级", all(token in rendered for token in ("600/s", "400/s", "停止或熔断", "from=5000")), "限流和停止重查询两条业务措施齐全。"),
-            self._check("check-sre-no-exec", "命令未执行", "仅建议，未执行" in rendered and "没有连接集群" in rendered, "Tool Gateway 未接入，external_action=none。"),
+            self._check(
+                "check-sre-qps",
+                "QPS 触发链",
+                all(
+                    token in log_text and token in rendered
+                    for token in ("4800/s", "600/s", "3200/s", "400/s", "8 倍")
+                ),
+                "查询和写入 QPS 基线、峰值与倍数均由日志复核。",
+            ),
+            self._check(
+                "check-sre-resources",
+                "资源瓶颈",
+                all(token in rendered for token in ("SATA", "97%~99%", "93%~97%", "87%~91%")),
+                "磁盘、CPU 与堆内存范围均写入因果链。",
+            ),
+            self._check(
+                "check-sre-gc",
+                "GC 与慢查询",
+                all(
+                    token in rendered
+                    for token in ("Young/Old GC", "9.8s~14.2s", "from=5000", "terms/range")
+                ),
+                "GC、深度分页和重聚合被识别为放大因素。",
+            ),
+            self._check(
+                "check-sre-shards",
+                "队列和副本",
+                all(
+                    token in rendered
+                    for token in ("write/search", "rejected", "48 个副本分片", "UNASSIGNED")
+                ),
+                "线程池与分片状态均来自日志。",
+            ),
+            self._check(
+                "check-sre-distractors",
+                "干扰项排除",
+                all(
+                    token in rendered
+                    for token in (
+                        "master 心跳重试",
+                        "License",
+                        "snapshot",
+                        "circuit breaker",
+                        "shard lock",
+                    )
+                ),
+                "干扰项明确标为伴随或次生现象。",
+            ),
+            self._check(
+                "check-sre-address",
+                "命令地址来自日志",
+                api_host in node_ips and f"{api_host}:9200" in rendered,
+                f"命令使用日志中的 {api_host}:9200。",
+            ),
+            self._check(
+                "check-sre-es-actions",
+                "ES 侧三类操作",
+                all(
+                    token in rendered
+                    for token in (
+                        "/_cluster/settings",
+                        "retry_failed=true",
+                        "refresh_interval",
+                        "fielddata=true",
+                    )
+                ),
+                "分片重试、refresh 调整和缓存清理均给出建议命令。",
+            ),
+            self._check(
+                "check-sre-business",
+                "业务侧降级",
+                all(token in rendered for token in ("600/s", "400/s", "停止或熔断", "from=5000")),
+                "限流和停止重查询两条业务措施齐全。",
+            ),
+            self._check(
+                "check-sre-no-exec",
+                "命令未执行",
+                "仅建议，未执行" in rendered and "没有连接集群" in rendered,
+                "Tool Gateway 未接入，external_action=none。",
+            ),
         )
         return (
             GeneratedOfficeArtifact(
@@ -2591,33 +3167,84 @@ class ScenarioEffectEngine:
         total = len(records)
         scenario_counts = Counter((row["页面名称"], row["操作动作"]) for row in records)
         severity = {
-            "操作卡顿": "严重", "渲染失败": "严重", "反馈迟钝": "严重", "操作失败": "严重", "跳转失败": "严重",
-            "排版错乱": "中等", "视觉抖动": "中等", "文案截断": "中等", "动效缺失": "轻微",
+            "操作卡顿": "严重",
+            "渲染失败": "严重",
+            "反馈迟钝": "严重",
+            "操作失败": "严重",
+            "跳转失败": "严重",
+            "排版错乱": "中等",
+            "视觉抖动": "中等",
+            "文案截断": "中等",
+            "动效缺失": "轻微",
         }
         pain_order = {label: index for index, label in enumerate(severity)}
         priority_matrix = {
-            ("高频", "严重"): "P0", ("高频", "中等"): "P1", ("高频", "轻微"): "P2",
-            ("中频", "严重"): "P1", ("中频", "中等"): "P2", ("中频", "轻微"): "P3",
-            ("低频", "严重"): "P2", ("低频", "中等"): "P3", ("低频", "轻微"): "P4",
+            ("高频", "严重"): "P0",
+            ("高频", "中等"): "P1",
+            ("高频", "轻微"): "P2",
+            ("中频", "严重"): "P1",
+            ("中频", "中等"): "P2",
+            ("中频", "轻微"): "P3",
+            ("低频", "严重"): "P2",
+            ("低频", "中等"): "P3",
+            ("低频", "轻微"): "P4",
         }
         element_map = {
-            ("首页", "点击功能入口图标"): "功能入口区", ("首页", "点击Banner轮播图"): "Banner轮播", ("首页", "点击最近阅读书籍"): "最近阅读", ("首页", "点击底部导航Tab"): "底部导航", ("首页", "点击搜索框"): "搜索入口",
-            ("阅读页", "左右滑动翻页"): "翻页手势", ("阅读页", "点击屏幕中央显示工具栏"): "工具栏显示", ("阅读页", "点击笔记按钮"): "笔记按钮", ("阅读页", "点击字体设置按钮"): "字体设置", ("阅读页", "拖拽进度条跳转章节"): "进度条", ("阅读页", "点击退出按钮"): "退出保护",
-            ("笔记编辑页", "点击保存按钮"): "保存操作", ("笔记编辑页", "关联书摘"): "关联书摘", ("笔记编辑页", "选择标签"): "标签选择", ("笔记编辑页", "输入笔记内容"): "输入笔记", ("笔记编辑页", "点击取消按钮"): "取消操作",
-            ("书籍详情页", "点击加入书架按钮"): "加入书架按钮", ("书籍详情页", "展开章节目录"): "章节目录", ("书籍详情页", "展开书籍简介"): "书籍简介", ("书籍详情页", "点击相关推荐书籍"): "相关推荐", ("书籍详情页", "点击返回按钮"): "返回导航",
-            ("书架页", "切换网格/列表视图"): "书籍列表", ("书架页", "点击分类Tab筛选"): "分类筛选", ("书架页", "点击搜索图标"): "搜索入口", ("书架页", "长按书籍进入编辑模式"): "编辑操作",
+            ("首页", "点击功能入口图标"): "功能入口区",
+            ("首页", "点击Banner轮播图"): "Banner轮播",
+            ("首页", "点击最近阅读书籍"): "最近阅读",
+            ("首页", "点击底部导航Tab"): "底部导航",
+            ("首页", "点击搜索框"): "搜索入口",
+            ("阅读页", "左右滑动翻页"): "翻页手势",
+            ("阅读页", "点击屏幕中央显示工具栏"): "工具栏显示",
+            ("阅读页", "点击笔记按钮"): "笔记按钮",
+            ("阅读页", "点击字体设置按钮"): "字体设置",
+            ("阅读页", "拖拽进度条跳转章节"): "进度条",
+            ("阅读页", "点击退出按钮"): "退出保护",
+            ("笔记编辑页", "点击保存按钮"): "保存操作",
+            ("笔记编辑页", "关联书摘"): "关联书摘",
+            ("笔记编辑页", "选择标签"): "标签选择",
+            ("笔记编辑页", "输入笔记内容"): "输入笔记",
+            ("笔记编辑页", "点击取消按钮"): "取消操作",
+            ("书籍详情页", "点击加入书架按钮"): "加入书架按钮",
+            ("书籍详情页", "展开章节目录"): "章节目录",
+            ("书籍详情页", "展开书籍简介"): "书籍简介",
+            ("书籍详情页", "点击相关推荐书籍"): "相关推荐",
+            ("书籍详情页", "点击返回按钮"): "返回导航",
+            ("书架页", "切换网格/列表视图"): "书籍列表",
+            ("书架页", "点击分类Tab筛选"): "分类筛选",
+            ("书架页", "点击搜索图标"): "搜索入口",
+            ("书架页", "长按书籍进入编辑模式"): "编辑操作",
         }
-        spec_order = [
-            ("首页", item) for item in ("功能入口区", "Banner轮播", "最近阅读", "底部导航", "搜索入口")
-        ] + [
-            ("阅读页", item) for item in ("翻页手势", "工具栏显示", "笔记按钮", "字体设置", "进度条", "退出保护")
-        ] + [
-            ("笔记编辑页", item) for item in ("保存操作", "关联书摘", "标签选择", "输入笔记", "取消操作")
-        ] + [
-            ("书籍详情页", item) for item in ("封面展示区", "加入书架按钮", "章节目录", "书籍简介", "相关推荐", "返回导航")
-        ] + [
-            ("书架页", item) for item in ("书籍列表", "书籍卡片", "分类筛选", "搜索入口", "编辑操作", "空状态")
-        ]
+        spec_order = (
+            [
+                ("首页", item)
+                for item in ("功能入口区", "Banner轮播", "最近阅读", "底部导航", "搜索入口")
+            ]
+            + [
+                ("阅读页", item)
+                for item in ("翻页手势", "工具栏显示", "笔记按钮", "字体设置", "进度条", "退出保护")
+            ]
+            + [
+                ("笔记编辑页", item)
+                for item in ("保存操作", "关联书摘", "标签选择", "输入笔记", "取消操作")
+            ]
+            + [
+                ("书籍详情页", item)
+                for item in (
+                    "封面展示区",
+                    "加入书架按钮",
+                    "章节目录",
+                    "书籍简介",
+                    "相关推荐",
+                    "返回导航",
+                )
+            ]
+            + [
+                ("书架页", item)
+                for item in ("书籍列表", "书籍卡片", "分类筛选", "搜索入口", "编辑操作", "空状态")
+            ]
+        )
         order_index = {key: index for index, key in enumerate(spec_order)}
         grouped: dict[tuple[str, str, str], list[str]] = defaultdict(list)
         operation_for_group: dict[tuple[str, str, str], str] = {}
@@ -2647,19 +3274,66 @@ class ScenarioEffectEngine:
             ratio = scenario_counts[(page, operation)] / total
             frequency = "高频" if ratio >= 0.05 else "中频" if ratio >= 0.03 else "低频"
             priority = priority_matrix[(frequency, severity[pain])]
-            analysis = f"{page}“{operation}”出现 {scenario_counts[(page, operation)]} 次，占 {ratio:.1%}，为{frequency}；" + "；".join(reasons)
+            analysis = (
+                f"{page}“{operation}”出现 {scenario_counts[(page, operation)]} 次，占 {ratio:.1%}，为{frequency}；"
+                + "；".join(reasons)
+            )
             output_rows.append([page, element, pain, priority, analysis, suggestions[pain]])
-        output_rows.sort(key=lambda row: (priority_order[row[3]], order_index[(row[0], row[1])], pain_order[row[2]]))
+        output_rows.sort(
+            key=lambda row: (
+                priority_order[row[3]],
+                order_index[(row[0], row[1])],
+                pain_order[row[2]],
+            )
+        )
         headers = ["页面名称", "交互元素", "痛点类型", "优先级", "痛点分析", "优化建议"]
         content = self._csv_bytes(headers, output_rows)
         parsed_headers, parsed_rows = self._parse_csv(content)
         checks = (
-            self._check("check-ux-headers", "表头顺序", parsed_headers == headers, "六列表头与任务合同完全一致。"),
-            self._check("check-ux-coverage", "痛点聚合完整", len(parsed_rows) == len(grouped), f"{len(grouped)} 个页面、元素、痛点组合均有一行。"),
-            self._check("check-ux-priority", "P0-P4 计算", all(row[3] in priority_order for row in parsed_rows), "频次和严重度矩阵逐项计算。"),
-            self._check("check-ux-order", "三级排序", parsed_rows == sorted(parsed_rows, key=lambda row: (priority_order[row[3]], order_index[(row[0], row[1])], pain_order[row[2]])), "先优先级、再页面规范元素顺序、最后痛点类型顺序。"),
-            self._check("check-ux-reasons", "失败原因可复查", all("出现 " in row[4] and "占 " in row[4] for row in parsed_rows), "每行保留次数、占比和失败原因。"),
-            self._check("check-ux-no-apply", "建议未自动应用", True, "只生成运行工作区 CSV，不修改产品界面。"),
+            self._check(
+                "check-ux-headers",
+                "表头顺序",
+                parsed_headers == headers,
+                "六列表头与任务合同完全一致。",
+            ),
+            self._check(
+                "check-ux-coverage",
+                "痛点聚合完整",
+                len(parsed_rows) == len(grouped),
+                f"{len(grouped)} 个页面、元素、痛点组合均有一行。",
+            ),
+            self._check(
+                "check-ux-priority",
+                "P0-P4 计算",
+                all(row[3] in priority_order for row in parsed_rows),
+                "频次和严重度矩阵逐项计算。",
+            ),
+            self._check(
+                "check-ux-order",
+                "三级排序",
+                parsed_rows
+                == sorted(
+                    parsed_rows,
+                    key=lambda row: (
+                        priority_order[row[3]],
+                        order_index[(row[0], row[1])],
+                        pain_order[row[2]],
+                    ),
+                ),
+                "先优先级、再页面规范元素顺序、最后痛点类型顺序。",
+            ),
+            self._check(
+                "check-ux-reasons",
+                "失败原因可复查",
+                all("出现 " in row[4] and "占 " in row[4] for row in parsed_rows),
+                "每行保留次数、占比和失败原因。",
+            ),
+            self._check(
+                "check-ux-no-apply",
+                "建议未自动应用",
+                True,
+                "只生成运行工作区 CSV，不修改产品界面。",
+            ),
         )
         return (
             GeneratedOfficeArtifact(
@@ -2675,10 +3349,66 @@ class ScenarioEffectEngine:
         )
 
     @staticmethod
-    def _check(check_id: str, label: str, passed: bool, detail: str) -> AgentControlLoopArtifactCheck:
+    def _check(
+        check_id: str, label: str, passed: bool, detail: str
+    ) -> AgentControlLoopArtifactCheck:
         return AgentControlLoopArtifactCheck(
             check_id=check_id, label=label, passed=bool(passed), detail=detail
         )
+
+    @staticmethod
+    def _candidate_source_inputs(
+        catalog: ScenarioEffectCatalog, spec: ScenarioEffectSpec
+    ) -> tuple[CandidateSourceInput, ...]:
+        workspace = catalog.public_workspace()
+        folders = [
+            folder
+            for folder in workspace.get("folders") or []
+            if folder.get("display_label") == "人力招聘"
+        ]
+        if len(folders) != 1:
+            raise ScenarioEffectError("hr-001 人力招聘目录必须唯一")
+        items = list(folders[0].get("files") or [])
+        expected_labels = [label for group, label in spec.source_labels if group == "人力招聘"]
+        if len(items) != 7 or sorted(str(item.get("display_label")) for item in items) != sorted(
+            expected_labels
+        ):
+            raise ScenarioEffectError("hr-001 人力招聘目录必须恰好包含两份 JD 和五份简历")
+        by_label: dict[str, dict[str, Any]] = {}
+        for item in items:
+            label = str(item.get("display_label"))
+            if label in by_label:
+                raise ScenarioEffectError(f"hr-001 来源逻辑名称重复：{label}")
+            by_label[label] = item
+        logical_ids = {
+            "外卖商户BD岗位JD.docx": JD_BD_ID,
+            "文本评测岗位JD.docx": JD_TEXT_ID,
+            **{
+                f"{name}简历.pdf": logical_id
+                for name, logical_id in zip(
+                    ("周伦", "孙博文", "李雨桐", "王琳达", "赵晨曦"),
+                    CANDIDATE_LOGICAL_IDS,
+                    strict=True,
+                )
+            },
+        }
+        result: list[CandidateSourceInput] = []
+        for label in expected_labels:
+            item = by_label[label]
+            file_ref = str(item.get("file_ref"))
+            content = catalog.checked_input_bytes(file_ref)
+            result.append(
+                CandidateSourceInput(
+                    logical_id=logical_ids[label],
+                    file_name=label,
+                    display_path=str(item.get("display_path")),
+                    file_ref=file_ref,
+                    content=content,
+                    declared_size=int(item.get("size") or 0),
+                    allowlist_verified=True,
+                )
+            )
+        return tuple(result)
 
     @staticmethod
     def _legal_source_inputs(
@@ -2694,10 +3424,10 @@ class ScenarioEffectEngine:
             raise ScenarioEffectError("Legal-020 法务目录必须唯一")
         items = list(legal_folders[0].get("files") or [])
         expected_labels = [label for group, label in spec.source_labels if group == "法务"]
-        if len(items) != 7 or sorted(str(item.get("display_label")) for item in items) != sorted(expected_labels):
-            raise ScenarioEffectError(
-                "Legal-020 法务目录必须恰好包含一份规则和六份委托书"
-            )
+        if len(items) != 7 or sorted(str(item.get("display_label")) for item in items) != sorted(
+            expected_labels
+        ):
+            raise ScenarioEffectError("Legal-020 法务目录必须恰好包含一份规则和六份委托书")
         by_label: dict[str, dict[str, Any]] = {}
         for item in items:
             label = str(item.get("display_label"))
@@ -2840,11 +3570,7 @@ class ScenarioEffectEngine:
             "USERPROFILE",
             "WINDIR",
         }
-        env = {
-            key: value
-            for key, value in os.environ.items()
-            if key.upper() in allowed
-        }
+        env = {key: value for key, value in os.environ.items() if key.upper() in allowed}
         env.update(
             {
                 "PYTHONNOUSERSITE": "1",
@@ -2910,11 +3636,7 @@ class ScenarioEffectEngine:
         display_prefix = f"{group}/{normalized_prefix}"
         workspace = catalog.public_workspace()
         folder = next(
-            (
-                item
-                for item in workspace["folders"]
-                if item["display_label"] == group
-            ),
+            (item for item in workspace["folders"] if item["display_label"] == group),
             None,
         )
         if folder is None:
@@ -2932,26 +3654,18 @@ class ScenarioEffectEngine:
                 or ".." in relative_path.split("/")
                 or relative_path in sources
             ):
-                raise ScenarioEffectError(
-                    f"确定性办公工具遇到不合法的资料路径：{display_path}"
-                )
+                raise ScenarioEffectError(f"确定性办公工具遇到不合法的资料路径：{display_path}")
             file_ref = str(item["file_ref"])
             sources[relative_path] = catalog.checked_input_bytes(file_ref)
             refs.append(file_ref)
         if not sources:
-            raise ScenarioEffectError(
-                f"确定性办公工具缺少资料子目录：{group}/{normalized_prefix}"
-            )
+            raise ScenarioEffectError(f"确定性办公工具缺少资料子目录：{group}/{normalized_prefix}")
         return sources, tuple(refs)
 
     @staticmethod
     def _docx_bytes(paragraphs: list[str]) -> bytes:
         def paragraph(value: str) -> str:
-            return (
-                '<w:p><w:r><w:t xml:space="preserve">'
-                + escape(value)
-                + "</w:t></w:r></w:p>"
-            )
+            return '<w:p><w:r><w:t xml:space="preserve">' + escape(value) + "</w:t></w:r></w:p>"
 
         document = (
             '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
