@@ -1,0 +1,31 @@
+{
+  "schema_version": "office-agent-ui-screenshot-manifest.v1",
+  "scenario_id": "TC-12",
+  "captured_at": "2026-08-28T20:56:49+08:00",
+  "capture": {
+    "runner": "Playwright system-browser",
+    "source": "controlled public Snapshot fixture generated from tc12-public-test-manifest-20260828.json",
+    "css_injection": false,
+    "claim_boundary": "截图证明被测前台投影、字号和布局，不证明真实 Provider 调用、用户理解或业务效果。"
+  },
+  "files": [
+    {
+      "path": "docs/evidence/screenshots/tc12-real-vitest-desktop.png",
+      "viewport": "1440x1100",
+      "width": 1440,
+      "height": 1100,
+      "bytes": 185357,
+      "sha256": "11fd5a173416d391614c1d3c525fbfcbb63a2f4ef300dcb7711b47b711383a70",
+      "mode": "full page, normal three-column workspace, no CSS injection"
+    },
+    {
+      "path": "docs/evidence/screenshots/tc12-real-vitest-mobile.png",
+      "viewport": "390x844",
+      "width": 390,
+      "height": 8092,
+      "bytes": 466488,
+      "sha256": "b57fed91aa156b17b058ac877050a3e61769f410ff1c0930b19e8946f293c957",
+      "mode": "390px full page, normal responsive layout, no CSS injection"
+    }
+  ]
+}

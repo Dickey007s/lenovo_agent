@@ -20,6 +20,7 @@
     "@types/node": "latest",
     "@types/react": "latest",
     "@types/react-dom": "latest",
+    "@vitest/coverage-v8": "1.6.1",
     "cross-env": "10.1.0",
     "typescript": "5.9.3",
     "vitest": "1.6.1"

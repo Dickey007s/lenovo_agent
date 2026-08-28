@@ -5,6 +5,7 @@ import hashlib
 import io
 import json
 import os
+import shutil
 import subprocess
 import sys
 import zipfile
@@ -14,6 +15,9 @@ import pytest
 
 from services.api.app.application.benchmark_workspace_catalog import (
     BenchmarkWorkspaceCatalog,
+)
+from services.api.app.application.dashboard_toolkit_effect import (
+    dashboard_toolkit_public_test_manifest,
 )
 from services.api.app.application.run_workspace_artifact_store import (
     RunWorkspaceArtifactError,
@@ -419,6 +423,244 @@ def test_tc04_command_failure_keeps_both_artifacts_red_and_blocks_merge(
     assert all(artifact.verifier_status == "failed" for artifact in execution.artifacts)
     assert all("当前包不得合并" in artifact.review_guidance for artifact in execution.artifacts)
     assert "所有确定性效果门通过" not in execution.result
+
+
+def test_tc12_proves_real_red_to_green_vitest_and_independent_rerun(
+    catalog: BenchmarkWorkspaceCatalog, tmp_path: Path
+) -> None:
+    source_root = FORTE_ROOT / "qa-003" / "input" / "dashboard-toolkit"
+    source_files = sorted(
+        path.relative_to(source_root).as_posix()
+        for path in source_root.rglob("*")
+        if path.is_file()
+    )
+    assert len(source_files) == 11
+    source_digest_before = {
+        name: hashlib.sha256((source_root / name).read_bytes()).hexdigest()
+        for name in source_files
+    }
+
+    spec, execution = _execute("TC-12", catalog)
+    assert execution.status == "passed"
+    assert spec.instruction == "为三个看板工具模块编写 Vitest，修复源码并真实运行测试。"
+    assert [item.file_name for item in execution.artifacts] == [
+        "看板工具库修复包.zip",
+        "TC-12真实测试报告.md",
+    ]
+    archive = execution.artifacts[0]
+    report = execution.artifacts[1].content.decode("utf-8")
+    assert archive.validator_id == "validator-dashboard-toolkit-project-v2"
+    assert len(archive.source_file_refs) == 11
+    assert archive.self_test is not None
+    assert [suite.test_count for suite in archive.self_test.test_suites] == [
+        23,
+        20,
+        28,
+    ]
+    assert "网络访问：禁用" not in report
+    assert "没有进程或 OS 级 socket 隔离" in report
+    assert "FORTE 原始源码：未修改" in report
+
+    with zipfile.ZipFile(io.BytesIO(archive.content)) as package:
+        names = set(package.namelist())
+        required = {
+            *(f"dashboard-toolkit/{name}" for name in source_files),
+            "dashboard-toolkit/tests/metricsCalculator.test.js",
+            "dashboard-toolkit/tests/dataTransformer.test.js",
+            "dashboard-toolkit/tests/filterEngine.test.js",
+            "dashboard-toolkit/changes.patch",
+            "dashboard-toolkit/changes.json",
+            "dashboard-toolkit/test-manifest.json",
+            "dashboard-toolkit/run-self-test.mjs",
+            "dashboard-toolkit/TC-12测试报告.md",
+            "dashboard-toolkit/TC-12改动说明.md",
+            "dashboard-toolkit/TC-12自测卡.md",
+            "dashboard-toolkit/evidence/stage-a-original-result.json",
+            "dashboard-toolkit/evidence/stage-b-config-only-result.json",
+            "dashboard-toolkit/evidence/stage-c-export-only-result.json",
+            "dashboard-toolkit/evidence/stage-d-final-result.json",
+            "dashboard-toolkit/evidence/coverage-summary.json",
+            "dashboard-toolkit/evidence/independent-unpack-rerun.json",
+        }
+        assert required <= names
+        assert not any(
+            token in name.lower()
+            for name in names
+            for token in ("task.md", "rubric", "solution")
+        )
+        manifest = json.loads(
+            package.read("dashboard-toolkit/test-manifest.json")
+        )
+        stages = {
+            stage: json.loads(
+                package.read(f"dashboard-toolkit/evidence/{stage}-result.json")
+            )
+            for stage in (
+                "stage-a-original",
+                "stage-b-config-only",
+                "stage-c-export-only",
+                "stage-d-final",
+            )
+        }
+        changes = json.loads(package.read("dashboard-toolkit/changes.json"))
+        independent = json.loads(
+            package.read("dashboard-toolkit/evidence/independent-unpack-rerun.json")
+        )
+        patch_text = package.read("dashboard-toolkit/changes.patch").decode(
+            "utf-8"
+        )
+        package.extractall(tmp_path)
+
+    assert len(manifest["declared_test_ids"]) == 71
+    assert manifest["declared_test_ids"] == stages["stage-d-final"][
+        "collected_test_ids"
+    ]
+    assert sorted(
+        test_id
+        for suite in archive.self_test.test_suites
+        for test_id in suite.test_ids
+    ) == manifest["declared_test_ids"]
+    assert stages["stage-a-original"]["exit_code"] != 0
+    assert stages["stage-a-original"]["num_total_tests"] == 0
+    assert stages["stage-b-config-only"]["num_failed_tests"] == 7
+    assert stages["stage-c-export-only"]["num_failed_tests"] == 6
+    assert stages["stage-d-final"]["exit_code"] == 0
+    assert stages["stage-d-final"]["num_passed_tests"] == 71
+    assert stages["stage-d-final"]["num_failed_tests"] == 0
+    assert changes["changed_files"] == [
+        "vitest.config.js",
+        "src/utils/metricsCalculator.js",
+        "src/utils/dataTransformer.js",
+        "src/utils/filterEngine.js",
+    ]
+    for changed_file in changes["changed_files"]:
+        assert f"a/{changed_file}" in patch_text
+        assert f"b/{changed_file}" in patch_text
+    assert independent["status"] == "passed"
+    assert independent["manifest_consistent"] is True
+    assert independent["coverage_ok"] is True
+    for item in independent["coverage_files"]:
+        assert item["statements"]["pct"] >= 85
+        assert item["lines"]["pct"] >= 85
+        assert item["branches"]["pct"] >= 75
+
+    extracted = tmp_path / "dashboard-toolkit"
+    node = shutil.which("node")
+    assert node is not None
+    vitest_entry = (
+        Path(__file__).resolve().parents[2]
+        / "apps"
+        / "web"
+        / "node_modules"
+        / "vitest"
+        / "vitest.mjs"
+    )
+    rerun = subprocess.run(
+        [node, str(extracted / "run-self-test.mjs"), str(vitest_entry)],
+        cwd=tmp_path,
+        env=ScenarioEffectEngine._fixed_command_env(),
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        timeout=90,
+        check=False,
+    )
+    rerun_result = json.loads(
+        (extracted / "self-test-results.json").read_text(encoding="utf-8")
+    )
+    assert rerun.returncode == 0, rerun.stdout + rerun.stderr
+    assert rerun_result["status"] == "passed"
+    assert rerun_result["collected_test_ids"] == manifest["declared_test_ids"]
+    assert source_digest_before == {
+        name: hashlib.sha256((source_root / name).read_bytes()).hexdigest()
+        for name in source_files
+    }
+
+
+def test_tc12_fixed_command_failure_keeps_artifacts_red_and_blocks_merge(
+    catalog: BenchmarkWorkspaceCatalog, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    run_fixed_command = ScenarioEffectEngine._run_fixed_command
+
+    def fail_final_coverage(
+        command: list[str], *, cwd: Path, timeout_seconds: int = 30
+    ) -> tuple[int, str, int]:
+        if cwd.name == "stage-d-final" and "--coverage" in command:
+            return 9, "injected final coverage command failure", 12
+        return run_fixed_command(
+            command, cwd=cwd, timeout_seconds=timeout_seconds
+        )
+
+    monkeypatch.setattr(
+        ScenarioEffectEngine,
+        "_run_fixed_command",
+        staticmethod(fail_final_coverage),
+    )
+    spec = next(item for item in SCENARIO_EFFECT_SPECS if item.scenario_id == "TC-12")
+    execution = ScenarioEffectEngine().execute(spec.instruction, catalog)
+
+    assert execution is not None and execution.status == "failed"
+    assert len(execution.artifacts) == 2
+    assert all(
+        artifact.verifier_status == "failed" for artifact in execution.artifacts
+    )
+    assert "所有确定性效果门通过" not in execution.result
+    for artifact in execution.artifacts:
+        visible_text = "\n".join(
+            (
+                artifact.summary,
+                artifact.execution_summary or "",
+                artifact.review_guidance or "",
+                *artifact.key_outputs,
+                *(check.label for check in artifact.checks),
+                *(check.detail for check in artifact.checks),
+            )
+        )
+        assert "71/71" not in visible_text
+        assert "当前包不得合并" in visible_text
+        assert "stage-d-final-result.json" in (artifact.review_guidance or "")
+        assert "coverage-summary.json" in (artifact.review_guidance or "")
+        assert "重新启动一项新的 TC-12 Run" in (artifact.review_guidance or "")
+
+    archive, report_artifact = execution.artifacts
+    report = report_artifact.content.decode("utf-8")
+    assert "71/71" not in report
+    assert "固定测试命令未完成全部验证" in report
+    assert "当前包不得合并" in report
+    assert "stage-d-final-result.json" in report
+    with zipfile.ZipFile(io.BytesIO(archive.content)) as package:
+        stage_d = json.loads(
+            package.read(
+                "dashboard-toolkit/evidence/stage-d-final-result.json"
+            )
+        )
+        packaged_report = package.read(
+            "dashboard-toolkit/TC-12测试报告.md"
+        ).decode("utf-8")
+        self_test_card = package.read(
+            "dashboard-toolkit/TC-12自测卡.md"
+        ).decode("utf-8")
+        changes = json.loads(package.read("dashboard-toolkit/changes.json"))
+    assert stage_d["exit_code"] == 9
+    assert "71/71" not in packaged_report
+    assert "71/71" not in self_test_card
+    assert changes["execution_ok"] is False
+    assert changes["merge_allowed"] is False
+
+
+def test_tc12_e2e_fixture_uses_the_same_public_test_manifest() -> None:
+    fixture = json.loads(
+        (
+            Path(__file__).resolve().parents[2]
+            / "docs"
+            / "evidence"
+            / "manifests"
+            / "tc12-public-test-manifest-20260828.json"
+        ).read_text(encoding="utf-8")
+    )
+
+    assert fixture == dashboard_toolkit_public_test_manifest()
 
 
 def test_candidate_legal_and_release_outputs_keep_human_gates_and_fixed_facts(

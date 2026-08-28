@@ -168,6 +168,13 @@ collected IDs are one set. The UI never invents placeholder names, never reads
 benchmark task/rubric/solution files, and opening the list does not execute tests
 or spend model budget. Desktop uses at most three columns and 390 px uses one.
 
+DR-0042 uses the same progressive disclosure for TC-12. The Artifact summary
+first shows Stage A/B/C red evidence, Stage D `71/71`, four changed files,
+per-file coverage and the manual-merge boundary. Its `self_test.test_suites[]`
+then shows the real metrics/data/filter files and 23/20/28 counts; test IDs are
+collapsed and scroll inside the card. Opening the list or downloading the ZIP
+does not rerun a model, edit FORTE input or create a PR.
+
 Open human decisions are authoritative in the Snapshot-level
 `decision_requests[]`; round-level copies are compatibility projections only.
 Closing or pressing Escape exits the review surface before the browser attempts a

@@ -50,6 +50,7 @@ TC04_INSTRUCTION = (
     "为评测平台补充单元测试，覆盖 Service、执行引擎和工具类；"
     "真实运行测试，修复失败，并给出覆盖率与修改文件。"
 )
+TC12_INSTRUCTION = "为三个看板工具模块编写 Vitest，修复源码并真实运行测试。"
 
 
 class OnboardingPlanner:
@@ -105,6 +106,60 @@ class OnboardingAnalyst:
                             role="observed",
                             label="一条可唯一定位的入职记录",
                             quote="王子涵 | 3月23日 (周一) | 设计",
+                        )
+                    ],
+                )
+            ],
+            follow_ups=[],
+            review_required=True,
+        )
+
+
+class DashboardPlanner:
+    model = "deepseek-v4-pro"
+
+    async def plan(self, *, scenario, files):
+        source = next(
+            item
+            for item in files
+            if str(item["display_path"]).endswith(
+                "dashboard-toolkit/src/utils/metricsCalculator.js"
+            )
+        )
+        return HarnessPlanCandidate(
+            summary="核对真实看板工具源码并形成隔离修复包",
+            selection_reason="增长率源码可用于形成一条可定位的模型分析；确定性效果门另行冻结完整 11 文件项目。",
+            units=[
+                HarnessPlanCandidateUnit(
+                    unit_id="read-dashboard-source",
+                    title="读取看板工具源码",
+                    objective="核对增长率实现并为确定性修复提供分析上下文",
+                    input_file_refs=[source["file_ref"]],
+                    tool="file.read",
+                )
+            ],
+        )
+
+
+class DashboardAnalyst:
+    model = "deepseek-v4-pro"
+
+    async def analyze(self, *, instruction, plan, files, validation_feedback=None):
+        source = files[0]
+        return HarnessTaskResult(
+            summary="已定位增长率实现；真实测试、修复和覆盖率由服务端固定 TC-12 效果门执行。",
+            findings=[
+                HarnessFinding(
+                    plan_unit_id=plan.units[0].unit_id,
+                    title="增长率实现使用了报告期值作分母",
+                    detail="固定测试将先复现该业务红灯，再在隔离副本中修复。",
+                    file_refs=[source["file_ref"]],
+                    evidence_quotes=[
+                        HarnessEvidenceQuote(
+                            file_ref=source["file_ref"],
+                            role="observed",
+                            label="增长率原实现",
+                            quote="return ((newValue - oldValue) / newValue) * 100",
                         )
                     ],
                 )

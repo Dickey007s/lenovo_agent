@@ -724,6 +724,15 @@ allowlisted Catalog before dispatch. It is not a durable execution lease: an
 API process restart cannot resume an in-flight subprocess, and PostgreSQL
 recovery still pauses at the existing checkpoint rather than replaying it.
 
+TC-12 uses the same Artifact and EffectReceipt protocol rather than adding a
+Scenario API. A matching ordinary instruction may produce two downloadable
+Artifacts whose `source_file_refs` bind all 11 qa-003 dashboard-toolkit inputs.
+`self_test.test_suites[]` is the authoritative public inventory (23/20/28,
+71 total); `key_outputs` and `checks[]` project the four Vitest stages, four-file
+diff, per-file coverage and independent rerun. These fields are evidence for the
+fixed adapter only. They do not mean the API accepts arbitrary JavaScript or has
+created a PR.
+
 `checkpoint_recovered` may appear after an API restart backed by PostgreSQL.
 It proves a persisted Snapshot was restored and the Run paused; it does not
 prove an interrupted model call was resumed or replayed.

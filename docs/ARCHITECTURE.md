@@ -345,6 +345,14 @@ coverage is separate. Artifact and EffectReceipt source arrays allow up to the
 96-file Workspace so the 44 real content refs are not truncated. This is a
 bounded deterministic adapter, not a general Scheduler/Worker, shell or sandbox.
 
+DR-0042 applies the same inspectable-test contract to the fixed qa-003
+dashboard-toolkit adapter. It freezes and copies all 11 public inputs, runs one
+71-case manifest through three intentional red stages and one final green stage,
+then independently unpacks and reruns the ZIP. The four-file diff and per-file V8
+coverage are server-owned facts; the UI projects three suites of 23/20/28 without
+inventing IDs. This proves one bounded JavaScript repair effect, not a general
+repository executor, automatic PR path or OS-level network sandbox.
+
 ## 7. Eight module maturity
 
 | Module | Current implementation | Missing target work |
