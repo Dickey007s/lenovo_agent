@@ -32,7 +32,7 @@
 - 下载解析：[`tc07-live-artifact-download-review-20260829.json`](manifests/tc07-live-artifact-download-review-20260829.json) 记录 DOCX `9` 张表、CSV `126` 行与 `126` 个唯一文档/规则组合、六条 R05、DOC-04 M03 和五条 M03 `unverifiable`；两份下载 SHA 与重启前 live manifest 一致。
 - PostgreSQL 重启复读：服务重启后 health 为 `deepseek-v4-pro + postgres`，Snapshot version `13`、两份 Artifact、一份 EffectReceipt 与法务结论仍可按同一 Owner 读取。这只证明顺序 Runtime 恢复，不证明多实例 CAS 或在途工具续跑。
 - 视觉证据：[`tc07-ui-screenshots-20260829.json`](manifests/tc07-ui-screenshots-20260829.json) 记录普通三栏桌面和 390 px 截图。桌面左栏展开法务规则与六份委托书；目录展开只是浏览器查看状态，不提交 `selected_file_refs`，也不改变 `whole_workspace` Run scope。
-- PR、远端 `durable-agent-control-loop`：[PR #59](https://github.com/Dickey007s/lenovo_agent/pull/59) 的 [run `33189927042` / job `98912504839`](https://github.com/Dickey007s/lenovo_agent/actions/runs/33189927042/job/98912504839) 通过，真实 PostgreSQL 17.11 集成 `6 passed in 14.26s`。最终文档提交仍需再跑同一远端门后合并。
+- PR、远端 `durable-agent-control-loop`：[PR #59](https://github.com/Dickey007s/lenovo_agent/pull/59) 的实现门 [run `33189927042` / job `98912504839`](https://github.com/Dickey007s/lenovo_agent/actions/runs/33189927042/job/98912504839) 为 `6 passed in 14.26s`；Evidence 回写门 [run `33190097561` / job `98913087056`](https://github.com/Dickey007s/lenovo_agent/actions/runs/33190097561/job/98913087056) 为 `6 passed in 14.82s`，两轮均使用真实 PostgreSQL 17.11。
 
 ## 不能支持的结论
 
