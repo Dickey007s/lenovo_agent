@@ -54,6 +54,10 @@ class GeneratedOfficeArtifact:
     validator_id: str
     checks: tuple[AgentControlLoopArtifactCheck, ...]
     summary: str
+    covered_period: str | None = None
+    statistic_basis: str | None = None
+    purpose: str | None = None
+    record_count: int | None = None
 
     @property
     def verifier_status(self) -> str:
@@ -1316,6 +1320,7 @@ class ScenarioEffectEngine:
         previews = self._previews(catalog, spec)
         source_refs = self._source_refs(previews)
         current = previews["2026往来明细.xlsx"]
+        current_source_refs = (str(current["file_ref"]),)
         current_records = self._table_records(current)
         unpaid: list[list[str]] = []
         unreceived: list[list[str]] = []
@@ -1385,24 +1390,43 @@ class ScenarioEffectEngine:
             for row in current_records
             if self._decimal(row["期末余额"]) > 0
         }
-        common_checks = (
+        cross_period_checks = (
             self._check("check-finance-source", "三期来源完整", len(previews) == 3, "三个固定期间工作簿均通过 Catalog 完整性检查。"),
             self._check("check-finance-zombie", "跨期僵尸账款复算", not zombie, "按同一客商、同一科目、三期借方期末余额逐项比较，结果为无僵尸账款。"),
         )
         unpaid_checks = (
-            *common_checks,
+            self._check("check-finance-current-source", "2026 内容来源", len(current_source_refs) == 1, "明细行只取自 2026 往来工作簿，不是三期合并表。"),
             self._check("check-finance-unpaid-rows", "未付逐行复算", all(current_map.get((row[0], row[1], "贷")) == self._decimal(row[2]) for row in unpaid), f"{len(unpaid)} 条贷方期末余额逐行相等。"),
             self._check("check-finance-unpaid-sort", "未付排序", unpaid == sorted(unpaid, key=sort_key), "按客商升序、同客商金额降序。"),
         )
         unreceived_checks = (
-            *common_checks,
+            self._check("check-finance-current-source", "2026 内容来源", len(current_source_refs) == 1, "明细行只取自 2026 往来工作簿，不是三期合并表。"),
             self._check("check-finance-unreceived-rows", "未收逐行复算", all(current_map.get((row[0], row[1], "借")) == self._decimal(row[2]) for row in unreceived), f"{len(unreceived)} 条借方期末余额逐行相等。"),
             self._check("check-finance-unreceived-sort", "未收排序", unreceived == sorted(unreceived, key=sort_key), "按客商升序、同客商金额降序。"),
         )
         return (
-            GeneratedOfficeArtifact("未付统计", "未付统计.csv", "text/csv", unpaid_content, source_refs, "validator-finance-reconciliation-v1", unpaid_checks, f"{len(unpaid)} 条未付记录已逐行复算。"),
-            GeneratedOfficeArtifact("未收统计", "未收统计.csv", "text/csv", unreceived_content, source_refs, "validator-finance-reconciliation-v1", unreceived_checks, f"{len(unreceived)} 条未收记录已逐行复算。"),
-            GeneratedOfficeArtifact("跨期核对说明", "跨期核对说明.md", "text/markdown", conclusion_content, source_refs, "validator-finance-reconciliation-v1", common_checks, "三期未收余额已比较，结论为无僵尸账款。"),
+            GeneratedOfficeArtifact(
+                "2026 期末未付明细", "未付统计.csv", "text/csv", unpaid_content,
+                current_source_refs, "validator-finance-reconciliation-v1", unpaid_checks,
+                f"{len(unpaid)} 条记录已逐行复算。", covered_period="2026 年期末",
+                statistic_basis="筛选期末余额大于 0 且方向为“贷”的行；每行代表一个科目与客商组合。",
+                purpose="查看 2026 年期末待付款项；不是三期合并表。", record_count=len(unpaid),
+            ),
+            GeneratedOfficeArtifact(
+                "2026 期末未收明细", "未收统计.csv", "text/csv", unreceived_content,
+                current_source_refs, "validator-finance-reconciliation-v1", unreceived_checks,
+                f"{len(unreceived)} 条记录已逐行复算。", covered_period="2026 年期末",
+                statistic_basis="筛选期末余额大于 0 且方向为“借”的行；每行代表一个科目与客商组合。",
+                purpose="查看 2026 年期末待收款项；2 表示记录数，不是期间数。", record_count=len(unreceived),
+            ),
+            GeneratedOfficeArtifact(
+                "三期僵尸账款核对说明", "跨期核对说明.md", "text/markdown", conclusion_content,
+                source_refs, "validator-finance-reconciliation-v1", cross_period_checks,
+                "三期借方未收余额已比较，结论为无僵尸账款。",
+                covered_period="2025 年上半年、2025 年下半年、2026 年",
+                statistic_basis="按同一科目名称与客商名称，对三期正数借方期末余额逐项比较。",
+                purpose="识别三期借方未收余额连续不变的僵尸账款候选。",
+            ),
         )
 
     def _candidate_review(

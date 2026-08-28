@@ -594,6 +594,10 @@ class AgentControlLoopWorkspaceArtifact(StrictModel):
     verifier_status: Literal["passed", "failed"]
     checks: list[AgentControlLoopArtifactCheck] = Field(min_length=1, max_length=30)
     summary: str = Field(min_length=1, max_length=1_000)
+    covered_period: str | None = Field(default=None, min_length=1, max_length=300)
+    statistic_basis: str | None = Field(default=None, min_length=1, max_length=800)
+    purpose: str | None = Field(default=None, min_length=1, max_length=500)
+    record_count: int | None = Field(default=None, ge=0, le=1_000_000)
     download_path: str = Field(min_length=1, max_length=300)
     created_at: datetime
     original_inputs_modified: Literal[False] = False

@@ -53,6 +53,9 @@ Prompt、思维链、原始模型响应、绝对路径、哈希和内部策略�
 | Validated plan | server compiled/accepted this round's work intent | `plan_validation`, round public plan | after accepted candidate only | raw tool/effect/gate IDs |
 | Deterministic local effect started | one fixed server-owned capability matched the user instruction and frozen FORTE inputs | `deterministic_office_tool_started`, EffectReceipt capability/scenario | after plan validation; no model field can create this authority | private adapter implementation and input bytes |
 | Run Workspace file available | a real isolated file was written and can be downloaded | `workspace_artifacts[]`, `run_workspace_artifact_written`, Owner/Run-scoped Artifact GET | file appears only after store write; download rechecks private size/digest | storage path, private digest, claim that FORTE source changed |
+| Artifact meaning before download | exact period, row basis, use and optional record count declared by the fixed server adapter | Artifact `covered_period/statistic_basis/purpose/record_count` | projected only when fields are present; `record_count` is checked against generated content | inference from filename, summary or number of refs; claim of general finance semantics |
+| Artifact content sources | files whose values actually form this one Artifact | Artifact `source_file_refs` | TC-05 CSVs bind only 2026; cross-period note binds all three periods | treating EffectReceipt task context as per-file content coverage |
+| Fixed-adapter task context | all source files admitted to deterministic capability execution | EffectReceipt `source_file_refs` | receipt remains separate from each Artifact | displaying three task inputs as though every output merged three periods |
 | Deterministic verification | named checks passed or failed for the exact Artifact | Artifact `validator_id/verifier_status/checks[]`, `deterministic_verification_completed` | effect success requires all checks; failure remains visible and does not become model prose | validator internals and unsupported general correctness claims |
 | External effect boundary | SQL/Web/cron/real external action was not authorized or available | EffectReceipt `status=blocked_external_boundary`, `scenario_effect_bounded`, prohibited side effects | preserve instruction/scope/receipts; do not fabricate an Artifact or success | credentials, fake Connector result or scheduled job |
 | Task branches | validated work units now have server-owned identity, dependency and evidence state | `branches[]`, `round.branch_ids` | created after plan validation; state changes only through server verification/control | Branch ID generation and validator internals |
@@ -168,6 +171,10 @@ Current contract: [`DR-0036`](../decisions/DR-0036-outcome-first-and-layout-tole
 [`SCENARIO-009`](../scenarios/SCENARIO-009-agent-control-loop.md),
 [workspace interaction/source record](../research/WORKSPACE-CENTRIC-OFFICE-AGENT-INTERACTION-AND-SOURCES-20260825.md)
 and [current TC-01 outcome/evidence localization Evidence](../evidence/DR-0036-TC01-OUTCOME-EVIDENCE-LOCALIZATION-EVIDENCE-20260828.md).
+TC-05 Artifact meaning and review typography additionally follow
+[`DR-0037`](../decisions/DR-0037-tc05-artifact-semantics-and-review-readability.md),
+[`SCENARIO-023`](../scenarios/SCENARIO-023-understand-finance-artifacts-and-review-evidence.md)
+and [current TC-05 Evidence](../evidence/DR-0037-TC05-ARTIFACT-SEMANTICS-AND-REVIEW-READABILITY-EVIDENCE-20260828.md).
 
 Automated checks are engineering proxies, not user research. User
 comprehension, calibrated trust and task value remain `Draft`.

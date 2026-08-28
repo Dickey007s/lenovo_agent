@@ -614,17 +614,22 @@ Agent 负责在整库中找到对应期间的工作簿。
 生成未允许 Tool 时拒绝。当前分支级 Evidence Gate 能处理“该工作单元缺少批准引用”，
 但不能判断科目符号、期末余额或客商映射是否算对；这些语义/数值歧义仍需人工复核。
 
-**前台输出：** 首个可见 Sheet 的最多 30 列、120 行预览，Plan 单元、模型回执、每条 Finding
-的工作簿引用与“结论和数值仍需人工复核”。
+**前台输出：** 首个可见 Sheet 的最多 30 列、120 行预览，Plan 单元、模型回执和三张真实
+成果卡。两张 CSV 分别显示“2026 期末未付明细”“2026 期末未收明细”，直接写明涵盖期间、
+贷/借方正数期末余额口径、用途和 31/2 条记录；“三期僵尸账款核对说明”显示三个期间与借方
+未收余额比较。问题审查页以更大字号展示事实、影响、证据摘录与安全预览。
 
-**后端事实：** Catalog 完整性检查、三个冻结 `file_ref`、Plan graph/source validation、
-结果 citation membership、`status=completed` 与 `review_required=true`。
+**后端事实：** 两个 CSV 的 Artifact `source_file_refs` 只绑定 2026，分别拥有本期来源、逐行
+复算与排序检查；跨期说明绑定三个冻结 `file_ref` 和三期/僵尸比较检查。`covered_period`、
+`statistic_basis`、`purpose`、`record_count` 由固定适配器生成；整项任务上下文仍保留在
+EffectReceipt，结果继续 `review_required=true`。
 
 **证据来源：** `TC-05`、`SCENARIO-008`、`FORTE-PINNED-20260825`；历史 Finance
 负面结果被保留为“有引用仍可能算错”的验收基线。
 
-**当前边界：** 没有逐行公式、跨期三元组、总额与排序的确定性核验，也没有两个 CSV 的
-可写 Artifact 和 Commit。当前 `completed` 不能翻译为“财务核对完成”。
+**当前边界：** 这是固定 FORTE `Finance-018` 的隔离 Artifact 与确定性检查，不是通用财务
+Verifier，也不定义生产企业的僵尸账款政策。引用只证明来源/位置；`completed` 或检查通过仍
+不能翻译成生产财务核对已完成，且没有记账、付款或原表修改。
 
 ### 5.3 双岗位与多份简历匹配
 

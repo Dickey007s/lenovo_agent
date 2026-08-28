@@ -122,6 +122,15 @@ the Agent's exact source location, not a missing file or incorrect date. Differe
 failures in the same file stay separate. This grouping is client-only; one real
 Branch ID is still used for any resume, and the Run is not presented as `completed`.
 
+DR-0037 makes each Run Workspace file explain itself before download. The card
+shows service-owned `covered_period`, `statistic_basis`, `purpose` and optional
+`record_count`; its `source_file_refs` are labeled as content sources. The TC-05
+CSVs therefore each show one 2026 content source, while the cross-period note
+shows all three periods. The EffectReceipt still exposes the adapter's full task
+context. Review text, evidence excerpts and safe previews use a larger tested
+type scale; tables retain inner scrolling so 390 px does not create page-level
+overflow.
+
 Open human decisions are authoritative in the Snapshot-level
 `decision_requests[]`; round-level copies are compatibility projections only.
 Closing or pressing Escape exits the review surface before the browser attempts a
@@ -295,6 +304,8 @@ or recovery state machine.
 DR-0036 adds deterministic Anchor/scope/Gate admission rules plus a browser-only
 same-source/same-failure audit grouping for verified outcomes. It does not add semantic proof,
 a generic task-filter compiler or an Artifact-driven override of Loop terminal state.
+DR-0037 adds Artifact meaning fields and corrects TC-05 attribution. It does not
+turn Finance-018 into a reusable accounting ontology or prove user comprehension.
 
 ## 9. Responsive behavior
 

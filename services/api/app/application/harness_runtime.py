@@ -3405,6 +3405,10 @@ class HarnessRuntime:
                     verifier_status=generated.verifier_status,
                     checks=list(generated.checks),
                     summary=generated.summary,
+                    covered_period=generated.covered_period,
+                    statistic_basis=generated.statistic_basis,
+                    purpose=generated.purpose,
+                    record_count=generated.record_count,
                     download_path=(
                         f"/v1/harness/runs/{run_id}/artifacts/{artifact_id}"
                     ),
