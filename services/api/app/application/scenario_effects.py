@@ -58,6 +58,10 @@ class GeneratedOfficeArtifact:
     statistic_basis: str | None = None
     purpose: str | None = None
     record_count: int | None = None
+    deliverable_type: str | None = None
+    key_outputs: tuple[str, ...] = ()
+    review_guidance: str | None = None
+    execution_summary: str | None = None
 
     @property
     def verifier_status(self) -> str:
@@ -1696,47 +1700,81 @@ class ScenarioEffectEngine:
             "情绪激动超过30秒 -> 转人工跟进",
             "接通后立即挂断或无法沟通 -> 今日已拨次数与一小时频次判断",
         ]
-        terminal_states = {
+        terminal_states = (
             "PTP登记",
             "转人工跟进",
             "安排重拨",
             "停止外呼（达上限）",
             "加入禁呼名单",
             "案件升级",
-        }
+        )
+        source_requirements = (
+            "22:00",
+            "08:00",
+            "每日拨打不得超过 3 次",
+            "1小时内不得超过 1 次",
+            "至少保存 2 年",
+            "先确认是否本人",
+            "严禁透露欠款金额",
+            "明确要求不再联系",
+            "承诺还款（PTP）",
+            "软拒绝",
+            "硬拒绝",
+            "投诉/异议",
+            "无效通话",
+            "情绪持续激动超过 30 秒",
+            *terminal_states,
+        )
+        execution_summary = (
+            "本次只生成流程设计 DOCX。文档中的“发起外呼拨号”“写 CRM”等是流程节点描述，不是执行回执；实际没有拨号、没有写 CRM、没有发送短信。"
+        )
         paragraphs = [
-            "信用卡 M1 逾期用户 AI 外呼催收流程图",
-            "流程边界：本文件只描述合规状态机，不拨号、不写 CRM、不发送短信。",
-            "流程图",
+            "信用卡 M1 逾期用户 AI 外呼催收流程设计",
+            "这份文档负责回答：何时允许拨号、接通后如何确认身份、不同客户状态如何分流，以及每条路径如何结束。",
+            "采用依据：《专业性说明.md》中的外呼时段、频次、录音、身份确认、第三方禁呼、转人工和六类终态规则。",
+            "实际执行边界：" + execution_summary,
+            "采用前请复核：业务负责人确认流程可执行性，合规负责人确认规则口径与当前制度一致。",
+            "一、流程节点",
             *[f"{index + 1}. {edge}" for index, edge in enumerate(flow)],
-            "六类终态：" + "、".join(sorted(terminal_states)),
+            "二、六类终态",
+            "、".join(terminal_states),
+            "三、文档中的动作如何理解",
+            "“发起外呼拨号”“写 CRM”等名称只描述未来流程节点，不是本次 Run 的执行回执。",
         ]
         content = self._docx_bytes(paragraphs)
+        reached_targets = {edge.split(" -> ", 1)[1] for edge in flow}
         checks = (
-            self._check("check-outbound-source", "规则来源完整", all(token in source for token in ("22:00", "08:00", "每日拨打不得超过 3 次", "至少保存 2 年")), "外呼时段、频次与录音规则均来自安全预览。"),
+            self._check("check-outbound-source", "专业说明来源完整", all(token in source for token in source_requirements), "时段、频次、录音、身份、第三方、人工升级和六类终态均从《专业性说明.md》逐项核对。"),
             self._check("check-outbound-start", "唯一开始节点", sum(line.startswith("START") for line in flow) == 1, "状态机只有一个 START。"),
             self._check("check-outbound-time-gate", "拨号前时段 Gate", flow.index("START -> 外呼时段合规判断") < flow.index("外呼时段合规 -> 发起外呼拨号") and "外呼时段不合规 -> 停止外呼（达上限）" in flow, "不合规路径直接停止，不进入拨号。"),
-            self._check("check-outbound-connect", "接通与未接通分支", "发起外呼拨号 -> 是否接通" in flow and any(line.startswith("未接通") for line in flow) and any(line.startswith("接通") for line in flow), "接通状态具有两条互斥路径。"),
-            self._check("check-outbound-retry", "重拨频次上限", any("每日3次或1小时1次" in line for line in flow), "仅未达上限时进入安排重拨。"),
+            self._check("check-outbound-connect", "接通与未接通互斥", "发起外呼拨号 -> 是否接通" in flow and "未接通 -> 今日已拨次数与一小时频次判断" in flow and "接通 -> 录音告知（本次通话将被录音）" in flow, "是否接通后只有接通、未接通两类业务入口。"),
+            self._check("check-outbound-retry", "每日 3 次 / 每小时 1 次上限", "达到每日3次或1小时1次上限 -> 停止外呼（达上限）" in flow and "未达上限 -> 安排重拨" in flow, "仅未达两项频次上限时进入安排重拨。"),
             self._check("check-outbound-recording", "录音告知先于身份确认", flow.index("接通 -> 录音告知（本次通话将被录音）") < flow.index("录音告知 -> 身份确认"), "先告知录音，再询问身份。"),
             self._check("check-outbound-identity", "身份确认先于欠款引导", flow.index("录音告知 -> 身份确认") < flow.index("本人 -> 开场告知与还款引导"), "身份确认前不披露欠款信息。"),
             self._check("check-outbound-third-party", "第三方禁呼", "第三方要求不再联系 -> 加入禁呼名单" in flow, "第三方要求停止联系时进入禁呼终态。"),
             self._check("check-outbound-attitude", "本人态度分支", all(any(line.startswith(token) for line in flow) for token in ("承诺还款", "软拒绝", "硬拒绝")), "承诺、软拒绝和硬拒绝均有路径。"),
             self._check("check-outbound-invalid", "无效通话回到频次判断", "接通后立即挂断或无法沟通 -> 今日已拨次数与一小时频次判断" in flow, "无效通话不会绕过重拨上限。"),
             self._check("check-outbound-human", "高风险情况转人工", all(f"{token} -> 转人工跟进" in flow for token in ("硬拒绝", "投诉或异议", "情绪激动超过30秒")), "三类强制情况均进入人工。"),
-            self._check("check-outbound-terminals", "六类终态齐全", terminal_states == {"PTP登记", "转人工跟进", "安排重拨", "停止外呼（达上限）", "加入禁呼名单", "案件升级"}, "所有路径只落入六类业务终态。"),
-            self._check("check-outbound-no-action", "未发生真实外呼", True, "只生成 DOCX；拨号、CRM 与短信动作均为 none。"),
+            self._check("check-outbound-terminals", "六类终态齐全", len(terminal_states) == 6 and set(terminal_states).issubset(reached_targets), "六类业务终态均由至少一条流程路径到达。"),
+            self._check("check-outbound-no-action", "外部动作均未发生", any(execution_summary in paragraph for paragraph in paragraphs) and spec.prohibited_side_effects == ("不拨号", "不写 CRM", "不发送短信"), "只在隔离 Run Workspace 生成 DOCX；拨号、CRM 与短信回执均为 none。"),
         )
         return (
             GeneratedOfficeArtifact(
-                "M1 逾期用户合规外呼流程图",
+                "M1 逾期用户合规外呼流程设计",
                 "外呼流程-M1逾期用户AI外呼催收流程图.docx",
                 "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
                 content,
                 source_refs,
                 "validator-compliant-outbound-flow-v1",
                 checks,
-                "合规状态机和六类终态已写入 DOCX，未发生真实外呼。",
+                "依据《专业性说明.md》生成完整流程设计，覆盖六类终态；本次没有执行外呼。",
+                covered_period="信用卡 M1 逾期阶段",
+                statistic_basis="只采用《专业性说明.md》中的时段、频次、录音、身份确认、第三方禁呼、转人工和终态规则。",
+                purpose="供业务与合规负责人审阅流程是否可采用；不是拨号、CRM 或短信执行工具。",
+                deliverable_type="流程设计 DOCX",
+                key_outputs=terminal_states,
+                review_guidance="13 项确定性规则检查通过后，仍需业务与合规负责人复核当前制度口径、话术和实际系统接入方案。",
+                execution_summary=execution_summary,
             ),
         )
 

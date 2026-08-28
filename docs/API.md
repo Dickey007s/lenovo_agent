@@ -247,6 +247,10 @@ Important fields:
       "statistic_basis": "筛选期末余额大于 0 且方向为‘贷’的行；每行代表一个科目与客商组合。",
       "purpose": "查看 2026 年期末待付款项；不是三期合并表。",
       "record_count": 31,
+      "deliverable_type": null,
+      "key_outputs": [],
+      "review_guidance": null,
+      "execution_summary": null,
       "download_path": "/v1/harness/runs/harness:.../artifacts/workspace-artifact-0123456789ab",
       "original_inputs_modified": false,
       "review_required": true,
@@ -382,6 +386,13 @@ Important fields:
   "validation_errors": []
 }
 ```
+
+`deliverable_type`, `key_outputs`, `review_guidance` and `execution_summary` are
+optional fixed-adapter facts. TC-10 uses them to identify a flow-design DOCX,
+list its six terminal states, explain why business/compliance review remains,
+and state that dialing, CRM writes and SMS did not occur. The browser must not
+infer those facts from a file name or model prose; EffectReceipt
+`prohibited_side_effects[]` and `external_action=none` remain the action receipt.
 
 `source_documents` and `contract.allowed_file_refs` are the full safe workspace
 index. They are not the files read by the Analyst. The authoritative per-round

@@ -1,0 +1,53 @@
+{
+  "schema_version": "tc10-live-effect.v1",
+  "captured_at": "2026-08-28T08:05:43Z",
+  "instruction": "根据专业性说明生成信用卡 M1 逾期用户 AI 外呼催收流程图文档。",
+  "source": {
+    "dataset": "FORTE public office benchmark",
+    "scenario": "Operations-008",
+    "input": "专业性说明.md"
+  },
+  "before": {
+    "run_id": "harness:e9741612bba44444abc15c82d6246dc8",
+    "status": "waiting_input",
+    "rounds": 1,
+    "model_calls": 2,
+    "artifact_checks": "13/13",
+    "docx_sha256": "5ea7d59ad84082f9ea7fc438337f20b5c0d56861f0c534f14322277f011b6ba8",
+    "observed_gap": "未执行边界主要位于摘要、折叠检查或页脚，DOCX 首部缺少用途、依据与复核责任。"
+  },
+  "after": {
+    "run_id": "harness:d1bae6a41cc84004b8db2b1c5be8147b",
+    "status": "completed",
+    "version": 13,
+    "rounds": 1,
+    "model_calls": 2,
+    "planner": {"model": "deepseek-v4-pro", "called": true, "output_used": true, "elapsed_ms": 10465},
+    "analyst": {"model": "deepseek-v4-pro", "called": true, "output_used": true, "elapsed_ms": 34239},
+    "artifact": {
+      "artifact_id": "workspace-artifact-8f60487282df",
+      "file_name": "外呼流程-M1逾期用户AI外呼催收流程图.docx",
+      "size": 2047,
+      "sha256": "083f99a496e9ef2bb3e27e4dcd4c8f73e41d0459a47ce39439f6d017bc4ad00e",
+      "zip_valid": true,
+      "paragraphs": 30,
+      "deterministic_checks_passed": 13,
+      "deterministic_checks_total": 13,
+      "independent_docx_gates_passed": 13,
+      "independent_docx_gates_total": 13,
+      "key_outputs": ["PTP登记", "转人工跟进", "安排重拨", "停止外呼（达上限）", "加入禁呼名单", "案件升级"],
+      "external_action": "none"
+    },
+    "effect_receipt": {
+      "status": "passed",
+      "external_action": "none",
+      "prohibited_side_effects": ["不拨号", "不写 CRM", "不发送短信"]
+    }
+  },
+  "boundaries": [
+    "单次真实 Provider Run 不证明模型稳定质量或 SLA",
+    "固定 Operations-008 适配器不是通用外呼引擎",
+    "确定性规则检查不替代业务与合规负责人复核",
+    "没有拨号、CRM 或短信 Connector，也没有发生外部动作"
+  ]
+}

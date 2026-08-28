@@ -139,6 +139,14 @@ the Run is terminal, the status and action change. Branch/Gap/Resolution facts
 remain in collapsed technical details; only an explicit primary action spends the
 next Branch budget.
 
+DR-0039 gives process-design Artifacts an explicit execution boundary. Optional
+Artifact facts `deliverable_type`, `key_outputs`, `review_guidance` and
+`execution_summary` appear before technical receipts. For TC-10 the card and the
+task close say that only a flow-design DOCX was generated; “发起外呼拨号” and
+“写 CRM” are document nodes, while EffectReceipt proves no dialing, CRM write or
+SMS action occurred. The DOCX itself repeats its question, source, boundary and
+review responsibility before the full flow.
+
 Open human decisions are authoritative in the Snapshot-level
 `decision_requests[]`; round-level copies are compatibility projections only.
 Closing or pressing Escape exits the review surface before the browser attempts a

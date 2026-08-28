@@ -293,6 +293,14 @@ Decision protocol, and a terminal Run still creates a new Task Contract. Interna
 Branch/Gap/Resolution facts remain auditable under progressive disclosure. This
 projection does not mutate Snapshot truth or spend budget before an explicit action.
 
+DR-0039 adds optional `deliverable_type`, `key_outputs`, `review_guidance` and
+`execution_summary` to the service-owned Run Workspace Artifact. TC-10 uses them
+to distinguish a flow-design DOCX from execution: the document and browser state
+say that dialing, CRM and SMS are described nodes but did not occur. The fixed
+verifier still owns the 13 checks, while the EffectReceipt owns prohibited side
+effects and `external_action=none`. These fields do not create a Connector,
+Permit, general outbound engine or production compliance approval.
+
 ## 7. Eight module maturity
 
 | Module | Current implementation | Missing target work |

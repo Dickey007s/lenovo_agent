@@ -392,6 +392,10 @@ type WorkspaceArtifact = {
   statistic_basis: string | null;
   purpose: string | null;
   record_count: number | null;
+  deliverable_type: string | null;
+  key_outputs: string[];
+  review_guidance: string | null;
+  execution_summary: string | null;
   download_path: string;
   created_at: string;
   original_inputs_modified: false;
@@ -1433,6 +1437,10 @@ function normalizeWorkspaceArtifact(value: unknown): WorkspaceArtifact | null {
     statistic_basis: asText(raw.statistic_basis) || null,
     purpose: asText(raw.purpose) || null,
     record_count: typeof raw.record_count === "number" && Number.isInteger(raw.record_count) && raw.record_count >= 0 ? raw.record_count : null,
+    deliverable_type: asText(raw.deliverable_type) || null,
+    key_outputs: asStrings(raw.key_outputs),
+    review_guidance: asText(raw.review_guidance) || null,
+    execution_summary: asText(raw.execution_summary) || null,
     download_path: asText(raw.download_path),
     created_at: asText(raw.created_at),
     original_inputs_modified: false,
@@ -2765,6 +2773,7 @@ function LoopView({
   const verifiedEffectReady = run.effect_receipts.some((receipt) => receipt.status === "passed")
     && run.workspace_artifacts.length > 0
     && run.workspace_artifacts.every((artifact) => artifact.verifier_status === "passed");
+  const effectConclusionArtifact = run.workspace_artifacts.find((artifact) => artifact.execution_summary) ?? null;
   const passedArtifactChecks = run.workspace_artifacts.reduce((total, artifact) => total + artifact.checks.filter((check) => check.passed).length, 0);
   const totalArtifactChecks = run.workspace_artifacts.reduce((total, artifact) => total + artifact.checks.length, 0);
   const verifiedOutcomeWithAuditPending = verifiedEffectReady
@@ -2994,6 +3003,7 @@ function LoopView({
       {run.last_commit && <footer><IconCircleCheck aria-hidden="true" /><span>{run.last_commit.summary}</span><b>{run.commits.length} 次提交记录</b></footer>}
     </section>}
     {run.brief && <section className={`loop-brief is-${run.brief.outcome}`}><IconCircleCheck aria-hidden="true" /><div><span>任务简报</span><h3>{run.brief.summary}</h3><p>外部动作：未发生 · 结果仍需人工复核</p></div></section>}
+    {verifiedEffectReady && effectConclusionArtifact && <section className="loop-effect-conclusion" aria-label="本次任务结语"><IconShieldCheck aria-hidden="true" /><div><span>本次任务结语</span><h3>{effectConclusionArtifact.execution_summary}</h3><p>{effectConclusionArtifact.review_guidance}</p></div><b>{passedArtifactChecks}/{totalArtifactChecks} 项规则检查通过</b></section>}
   </section>;
 }
 
@@ -3004,6 +3014,7 @@ function WorkspaceArtifactSection({ artifacts, receipts }: { artifacts: Workspac
   const totalChecks = artifacts.reduce((total, artifact) => total + artifact.checks.length, 0);
   const latestReceipt = receipts.at(-1) ?? null;
   const boundary = latestReceipt && latestReceipt.status !== "passed" ? latestReceipt : null;
+  const executionArtifact = artifacts.find((artifact) => artifact.execution_summary) ?? null;
   const downloadArtifact = async (artifact: WorkspaceArtifact) => {
     if (!artifact.download_path.startsWith("/v1/harness/runs/")) {
       setDownloadError("成果下载地址未通过客户端边界检查。");
@@ -3034,15 +3045,19 @@ function WorkspaceArtifactSection({ artifacts, receipts }: { artifacts: Workspac
       <div><span>运行工作区</span><h3 id="workspace-artifacts-title">{artifacts.length > 0 ? `Agent 已生成 ${artifacts.length} 份真实成果文件` : "这项任务尚不能生成可信成果"}</h3><p>{artifacts.length > 0 ? "文件已写入本次 Run 的隔离目录，原始 FORTE 文件没有被修改。" : boundary?.result}</p></div>
       <b>{artifacts.length > 0 ? `${passedChecks}/${totalChecks} 项检查通过` : "未伪造结果"}</b>
     </header>
+    {executionArtifact && <article className="workspace-action-result" aria-label="实际执行边界"><IconShieldCheck aria-hidden="true" /><div><span>这次实际发生了什么</span><h4>{executionArtifact.execution_summary}</h4><p>{executionArtifact.purpose}</p>{latestReceipt && <ul>{latestReceipt.prohibited_side_effects.map((item) => <li key={item}>{item}</li>)}</ul>}</div></article>}
     {artifacts.length > 0 && <ol>{artifacts.map((artifact) => <li key={artifact.artifact_id} className={artifact.verifier_status === "passed" ? "is-passed" : "is-failed"}>
       <div className="workspace-artifact-file"><span><IconFile aria-hidden="true" /></span><div><h4>{artifact.title}</h4><p>{artifact.summary}</p><small>文件：{artifact.file_name} · 第 {artifact.round_number} 轮 · {formatSize(artifact.size)} · {artifact.source_file_refs.length} 份内容来源</small></div></div>
       <div className="workspace-artifact-status"><b>{artifact.verifier_status === "passed" ? <><IconCheck aria-hidden="true" />确定性检查通过</> : <><IconAlertTriangle aria-hidden="true" />检查未通过</>}</b><span>{artifact.record_count !== null ? `${artifact.record_count} 条记录 · ` : ""}{artifact.checks.filter((check) => check.passed).length}/{artifact.checks.length} 项检查</span></div>
       <button type="button" onClick={() => void downloadArtifact(artifact)} disabled={downloading !== null}><IconDownload aria-hidden="true" />{downloading === artifact.artifact_id ? "正在下载" : "下载成果"}</button>
-      {(artifact.covered_period || artifact.statistic_basis || artifact.purpose) && <dl className="workspace-artifact-semantics">
-        {artifact.covered_period && <div><dt>涵盖期间</dt><dd>{artifact.covered_period}</dd></div>}
-        {artifact.statistic_basis && <div><dt>统计口径</dt><dd>{artifact.statistic_basis}</dd></div>}
-        {artifact.purpose && <div><dt>用途</dt><dd>{artifact.purpose}</dd></div>}
+      {(artifact.deliverable_type || artifact.covered_period || artifact.statistic_basis || artifact.purpose) && <dl className={`workspace-artifact-semantics${artifact.deliverable_type ? " has-deliverable-type" : ""}`}>
+        {artifact.deliverable_type && <div><dt>成果类型</dt><dd>{artifact.deliverable_type}</dd></div>}
+        {artifact.covered_period && <div><dt>{artifact.deliverable_type ? "适用范围" : "涵盖期间"}</dt><dd>{artifact.covered_period}</dd></div>}
+        {artifact.statistic_basis && <div><dt>{artifact.deliverable_type ? "采用依据" : "统计口径"}</dt><dd>{artifact.statistic_basis}</dd></div>}
+        {artifact.purpose && <div><dt>{artifact.deliverable_type ? "使用边界" : "用途"}</dt><dd>{artifact.purpose}</dd></div>}
       </dl>}
+      {artifact.key_outputs.length > 0 && <section className="workspace-artifact-key-outputs" aria-label="六类终态"><span>{artifact.key_outputs.length} 类关键终态</span><ul>{artifact.key_outputs.map((item) => <li key={item}>{item}</li>)}</ul></section>}
+      {artifact.review_guidance && <aside className="workspace-artifact-review"><IconAlertTriangle aria-hidden="true" /><div><b>为什么仍需人工复核</b><p>{artifact.review_guidance}</p></div></aside>}
       <details><summary><IconEye aria-hidden="true" />查看逐项检查</summary><ul>{artifact.checks.map((check) => <li key={check.check_id} className={check.passed ? "is-passed" : "is-failed"}><span>{check.passed ? <IconCheck aria-hidden="true" /> : <IconAlertTriangle aria-hidden="true" />}</span><div><b>{check.label}</b><p>{check.detail}</p></div></li>)}</ul></details>
     </li>)}</ol>}
     {boundary && <article className="workspace-effect-boundary"><IconAlertTriangle aria-hidden="true" /><div><b>{boundary.status === "blocked_external_boundary" ? "缺少已授权的外部连接" : boundary.status === "unsupported_local_capability" ? "本地能力仍未实现" : "确定性效果门未通过"}</b><p>{boundary.observation}</p><strong>{boundary.result}</strong></div></article>}

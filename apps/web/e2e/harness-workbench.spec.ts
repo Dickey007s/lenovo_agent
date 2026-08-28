@@ -492,6 +492,88 @@ function verifiedEffectSnapshot(body: { workspace_id: string; instruction: strin
   };
 }
 
+function outboundEffectSnapshot(body: { workspace_id: string; instruction: string }) {
+  const base = snapshot(body, "completed", 20);
+  const artifactId = "workspace-artifact-101010101010";
+  const terminalStates = ["PTP登记", "转人工跟进", "安排重拨", "停止外呼（达上限）", "加入禁呼名单", "案件升级"];
+  const checks = [
+    "专业说明来源完整",
+    "唯一开始节点",
+    "拨号前时段 Gate",
+    "接通与未接通互斥",
+    "每日 3 次 / 每小时 1 次上限",
+    "录音告知先于身份确认",
+    "身份确认先于欠款引导",
+    "第三方禁呼",
+    "本人态度分支",
+    "无效通话回到频次判断",
+    "高风险情况转人工",
+    "六类终态齐全",
+    "外部动作均未发生",
+  ].map((label, index) => ({
+    check_id: `check-outbound-${String(index + 1).padStart(2, "0")}`,
+    label,
+    passed: true,
+    detail: index === 12 ? "只在隔离 Run Workspace 生成 DOCX；拨号、CRM 与短信回执均为 none。" : `${label}已由固定规则复核。`,
+  }));
+  const executionSummary = "本次只生成流程设计 DOCX。文档中的“发起外呼拨号”“写 CRM”等是流程节点描述，不是执行回执；实际没有拨号、没有写 CRM、没有发送短信。";
+  return {
+    ...base,
+    workspace_artifacts: [{
+      artifact_id: artifactId,
+      capability_id: "office-compliant-outbound-flow",
+      scenario_id: "TC-10",
+      title: "M1 逾期用户合规外呼流程设计",
+      file_name: "外呼流程-M1逾期用户AI外呼催收流程图.docx",
+      media_type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      size: 2840,
+      version: 1,
+      round_number: 1,
+      source_file_refs: [docxFile.file_ref],
+      validator_id: "validator-compliant-outbound-flow-v1",
+      verifier_status: "passed",
+      checks,
+      summary: "依据《专业性说明.md》生成完整流程设计，覆盖六类终态；本次没有执行外呼。",
+      covered_period: "信用卡 M1 逾期阶段",
+      statistic_basis: "只采用《专业性说明.md》中的时段、频次、录音、身份确认、第三方禁呼、转人工和终态规则。",
+      purpose: "供业务与合规负责人审阅流程是否可采用；不是拨号、CRM 或短信执行工具。",
+      record_count: null,
+      deliverable_type: "流程设计 DOCX",
+      key_outputs: terminalStates,
+      review_guidance: "13 项确定性规则检查通过后，仍需业务与合规负责人复核当前制度口径、话术和实际系统接入方案。",
+      execution_summary: executionSummary,
+      download_path: `/v1/harness/runs/${base.run_id}/artifacts/${artifactId}`,
+      created_at: new Date().toISOString(),
+      original_inputs_modified: false,
+      review_required: true,
+      external_action: "none",
+    }],
+    effect_receipts: [{
+      receipt_id: "effect-receipt-101010101010",
+      capability_id: "office-compliant-outbound-flow",
+      scenario_id: "TC-10",
+      status: "passed",
+      state: "已冻结《专业性说明.md》，原始文件保持只读。",
+      action: "生成流程设计 DOCX，并执行 13 项确定性规则检查。",
+      observation: "1 份 DOCX 可下载，13/13 项规则检查通过。",
+      cost: "0 次额外模型调用；仅消耗本机确定性计算。",
+      result: "流程设计文件已生成，仍需业务与合规负责人复核。",
+      source_file_refs: [docxFile.file_ref],
+      artifact_ids: [artifactId],
+      prohibited_side_effects: ["不拨号", "不写 CRM", "不发送短信"],
+      created_at: new Date().toISOString(),
+      external_action: "none",
+    }],
+    events: [
+      ...base.events,
+      { sequence: 17, event_name: "deterministic_office_tool_started", occurred_at: new Date().toISOString(), status: "verifying", message: "固定合规流程工具开始生成文档。", details: {} },
+      { sequence: 18, event_name: "run_workspace_artifact_written", occurred_at: new Date().toISOString(), status: "verifying", message: "流程设计 DOCX 已写入隔离运行工作区。", details: {} },
+      { sequence: 19, event_name: "deterministic_verification_completed", occurred_at: new Date().toISOString(), status: "verifying", message: "13 项规则检查通过；没有外部动作。", details: {} },
+    ],
+    last_event_sequence: 20,
+  };
+}
+
 function boundedEffectSnapshot(body: { workspace_id: string; instruction: string }) {
   const base = snapshot(body, "completed", 18);
   return {
@@ -870,7 +952,7 @@ function locationFailureSnapshot(body: { workspace_id: string; instruction: stri
 }
 async function fulfillJson(route: Route, body: unknown, status = 200) { await route.fulfill({ status, contentType: "application/json", body: JSON.stringify(body) }); }
 
-async function mockHarness(page: Page, options: { failFirstStart?: boolean; failDecisionDefer?: boolean; disconnect?: boolean; failed?: boolean; locationFailure?: boolean; sourceRecovery?: boolean; sourceRecoveryThreeCandidates?: boolean; verifiedArtifactAuditPending?: boolean; verifiedArtifactAuditPendingDistinct?: boolean; verifiedFinanceArtifactAuditPending?: boolean; unverifiedArtifactLocationPending?: boolean; terminalArtifactLocationPending?: boolean; boundedRecovery?: boolean; effectArtifact?: boolean; effectBoundary?: boolean; reviewTable?: boolean; workspaceFailures?: number; interactiveLoop?: boolean; evidenceGate?: boolean } = {}) {
+async function mockHarness(page: Page, options: { failFirstStart?: boolean; failDecisionDefer?: boolean; disconnect?: boolean; failed?: boolean; locationFailure?: boolean; sourceRecovery?: boolean; sourceRecoveryThreeCandidates?: boolean; verifiedArtifactAuditPending?: boolean; verifiedArtifactAuditPendingDistinct?: boolean; verifiedFinanceArtifactAuditPending?: boolean; unverifiedArtifactLocationPending?: boolean; terminalArtifactLocationPending?: boolean; boundedRecovery?: boolean; effectArtifact?: boolean; outboundEffect?: boolean; effectBoundary?: boolean; reviewTable?: boolean; workspaceFailures?: number; interactiveLoop?: boolean; evidenceGate?: boolean } = {}) {
   let workspaceCalls = 0; let startCalls = 0; let streamCalls = 0;
   let currentBody = { workspace_id: "forte-public-office", instruction: "" };
   // Mock snapshots intentionally cover several server state shapes in one route.
@@ -889,6 +971,7 @@ async function mockHarness(page: Page, options: { failFirstStart?: boolean; fail
     }
     if (path.startsWith("/v1/harness/workspace/files/")) return fulfillJson(route, previewFor(path.split("/").at(-1)!));
     if (path.includes("/artifacts/") && route.request().method() === "GET") {
+      if (options.outboundEffect) return route.fulfill({ status: 200, contentType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document", body: "mock-docx-bytes", headers: { "Content-Disposition": "attachment; filename*=UTF-8''%E5%A4%96%E5%91%BC%E6%B5%81%E7%A8%8B-M1%E9%80%BE%E6%9C%9F%E7%94%A8%E6%88%B7AI%E5%A4%96%E5%91%BC%E5%82%AC%E6%94%B6%E6%B5%81%E7%A8%8B%E5%9B%BE.docx" } });
       return route.fulfill({ status: 200, contentType: "text/csv; charset=utf-8", body: "科目名称,客商名称,未付款项\n应付账款,星海科技,100.00\n", headers: { "Content-Disposition": "attachment; filename*=UTF-8''%E6%9C%AA%E4%BB%98%E7%BB%9F%E8%AE%A1.csv" } });
     }
     if (path === "/v1/harness/runs" && route.request().method() === "GET") {
@@ -911,6 +994,8 @@ async function mockHarness(page: Page, options: { failFirstStart?: boolean; fail
         ? tableEvidenceReviewSnapshot(body)
         : options.effectArtifact
         ? verifiedEffectSnapshot(body)
+        : options.outboundEffect
+        ? outboundEffectSnapshot(body)
         : options.effectBoundary
           ? boundedEffectSnapshot(body)
         : options.locationFailure
@@ -1017,7 +1102,7 @@ async function mockHarness(page: Page, options: { failFirstStart?: boolean; fail
     }
     if (path.startsWith("/v1/harness/runs/")) {
       if (options.disconnect && streamCalls === 1) return fulfillJson(route, { ...snapshot(currentBody, "queued"), status: "indexing", last_event_sequence: 1, version: 2 });
-      if (options.interactiveLoop || options.evidenceGate || options.sourceRecovery || options.verifiedArtifactAuditPending || options.verifiedArtifactAuditPendingDistinct || options.verifiedFinanceArtifactAuditPending || options.unverifiedArtifactLocationPending || options.terminalArtifactLocationPending || options.boundedRecovery || options.locationFailure || options.effectArtifact || options.effectBoundary) return fulfillJson(route, currentSnapshot);
+      if (options.interactiveLoop || options.evidenceGate || options.sourceRecovery || options.verifiedArtifactAuditPending || options.verifiedArtifactAuditPendingDistinct || options.verifiedFinanceArtifactAuditPending || options.unverifiedArtifactLocationPending || options.terminalArtifactLocationPending || options.boundedRecovery || options.locationFailure || options.effectArtifact || options.outboundEffect || options.effectBoundary) return fulfillJson(route, currentSnapshot);
       currentSnapshot = snapshot(currentBody, options.failed ? "failed" : "completed");
       return fulfillJson(route, currentSnapshot);
     }
@@ -1142,6 +1227,69 @@ test("shows a real run-workspace file, deterministic checks and a download", asy
   if (process.env.CAPTURE_SCENARIO_EFFECT_GATE === "1") {
     await artifacts.screenshot({ path: "../../docs/evidence/screenshots/scenario-effect-gate-artifact-mobile.png" });
     await page.screenshot({ path: "../../docs/evidence/screenshots/scenario-effect-gate-mobile.png", fullPage: true });
+  }
+});
+
+test("distinguishes a TC-10 flow document from real outbound execution", async ({ page }) => {
+  await mockHarness(page, { outboundEffect: true });
+  await page.goto("/");
+  await page.getByRole("textbox", { name: "任务指令" }).fill("根据专业性说明生成信用卡 M1 逾期用户 AI 外呼催收流程图文档。");
+  await page.getByRole("button", { name: "启动 Control Loop" }).click();
+
+  const artifacts = page.locator(".workspace-artifacts");
+  const actionBoundary = page.locator(".workspace-action-result");
+  const conclusion = page.locator(".loop-effect-conclusion");
+  await expect(artifacts).toContainText("Agent 已生成 1 份真实成果文件");
+  await expect(actionBoundary).toContainText("这次实际发生了什么");
+  await expect(actionBoundary).toContainText("本次只生成流程设计 DOCX");
+  await expect(actionBoundary).toContainText("流程节点描述，不是执行回执");
+  await expect(actionBoundary).toContainText("实际没有拨号、没有写 CRM、没有发送短信");
+  await expect(actionBoundary).toContainText("不拨号");
+  await expect(actionBoundary).toContainText("不写 CRM");
+  await expect(actionBoundary).toContainText("不发送短信");
+
+  await expect(artifacts).toContainText("成果类型");
+  await expect(artifacts).toContainText("流程设计 DOCX");
+  await expect(artifacts).toContainText("适用范围");
+  await expect(artifacts).toContainText("信用卡 M1 逾期阶段");
+  await expect(artifacts).toContainText("采用依据");
+  await expect(artifacts).toContainText("《专业性说明.md》");
+  await expect(artifacts).toContainText("使用边界");
+  await expect(artifacts).toContainText("6 类关键终态");
+  for (const state of ["PTP登记", "转人工跟进", "安排重拨", "停止外呼（达上限）", "加入禁呼名单", "案件升级"]) {
+    await expect(artifacts).toContainText(state);
+  }
+  await expect(artifacts).toContainText("为什么仍需人工复核");
+  await expect(artifacts).toContainText("业务与合规负责人复核当前制度口径、话术和实际系统接入方案");
+  await artifacts.getByText("查看逐项检查").click();
+  await expect(artifacts).toContainText("13/13 项检查");
+  await expect(artifacts).toContainText("每日 3 次 / 每小时 1 次上限");
+  await expect(artifacts).toContainText("外部动作均未发生");
+
+  await expect(conclusion).toContainText("本次任务结语");
+  await expect(conclusion).toContainText("本次只生成流程设计 DOCX");
+  await expect(conclusion).toContainText("13/13 项规则检查通过");
+
+  const downloadPromise = page.waitForEvent("download");
+  await artifacts.getByRole("button", { name: "下载成果" }).click();
+  const download = await downloadPromise;
+  expect(download.suggestedFilename()).toBe("外呼流程-M1逾期用户AI外呼催收流程图.docx");
+
+  const actionHeadingSize = await actionBoundary.locator("h4").evaluate((element) => Number.parseFloat(getComputedStyle(element).fontSize));
+  expect(actionHeadingSize).toBeGreaterThanOrEqual(14);
+  if (process.env.CAPTURE_TC10_EFFECT_EVIDENCE === "1") {
+    await artifacts.screenshot({ path: "../../docs/evidence/screenshots/tc10-outbound-effect-desktop.png" });
+    await conclusion.screenshot({ path: "../../docs/evidence/screenshots/tc10-outbound-conclusion-desktop.png" });
+  }
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  const pageMetrics = await page.evaluate(() => ({ viewport: document.documentElement.clientWidth, scroll: document.documentElement.scrollWidth }));
+  const artifactMetrics = await artifacts.evaluate((element) => ({ width: element.clientWidth, scroll: element.scrollWidth }));
+  expect(pageMetrics.scroll).toBeLessThanOrEqual(pageMetrics.viewport);
+  expect(artifactMetrics.scroll).toBeLessThanOrEqual(artifactMetrics.width);
+  await expect(actionBoundary).toContainText("实际没有拨号、没有写 CRM、没有发送短信");
+  if (process.env.CAPTURE_TC10_EFFECT_EVIDENCE === "1") {
+    await artifacts.screenshot({ path: "../../docs/evidence/screenshots/tc10-outbound-effect-mobile.png" });
   }
 });
 

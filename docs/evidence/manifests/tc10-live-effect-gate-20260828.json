@@ -1,0 +1,264 @@
+{
+  "schema_version": "scenario-effect-gate-live.v1",
+  "generated_at": "2026-08-28T08:12:00.552277+00:00",
+  "api_base": "http://127.0.0.1:8010",
+  "service": {
+    "model": "deepseek-v4-pro",
+    "checkpoint": "memory",
+    "task_store": "memory"
+  },
+  "dataset": {
+    "name": "FORTE public demo inputs",
+    "source_commit": "345c1ec1487139db9dd319787fa9405ba85d1869",
+    "input_tree_sha256": "2c19e31a8e437f8ccb0ab811ba20a940f022a5bea69bcc750574d753f10a250d",
+    "original_inputs_modified": false
+  },
+  "summary": {
+    "requested": 1,
+    "passed": 1,
+    "failed": 0,
+    "model_output_adopted": 1,
+    "run_completed": 1
+  },
+  "scenarios": [
+    {
+      "scenario_id": "TC-10",
+      "capability_id": "office-compliant-outbound-flow",
+      "title": "合规外呼流程",
+      "instruction": "根据专业性说明生成信用卡 M1 逾期用户 AI 外呼催收流程图文档。",
+      "run_id": "harness:bd76d2c8107441f6b4537d00c0242853",
+      "started_at": "2026-08-28T08:11:17.305631+00:00",
+      "observed_at": "2026-08-28T08:12:00.514493+00:00",
+      "run_status": "completed",
+      "snapshot_version": 13,
+      "current_round": 1,
+      "budget": {
+        "max_rounds": 12,
+        "max_files_per_round": 16,
+        "max_model_calls": 30,
+        "deadline_seconds": 7200,
+        "rounds_used": 1,
+        "files_verified": 1,
+        "model_calls_used": 2,
+        "elapsed_ms": 42417,
+        "stop_reason": null
+      },
+      "model_calls": [
+        {
+          "round": 1,
+          "role": "planner",
+          "called": true,
+          "model": "deepseek-v4-pro",
+          "elapsed_ms": 9846,
+          "output_used": true
+        },
+        {
+          "round": 1,
+          "role": "analyst",
+          "called": true,
+          "model": "deepseek-v4-pro",
+          "elapsed_ms": 32230,
+          "output_used": true
+        }
+      ],
+      "model_execution_gate_passed": true,
+      "model_output_adopted": true,
+      "effect_receipts": [
+        {
+          "receipt_id": "effect-receipt-3dbdfeb2c683",
+          "capability_id": "office-compliant-outbound-flow",
+          "scenario_id": "TC-10",
+          "status": "passed",
+          "state": "已冻结 1 份 FORTE 输入，原始文件保持只读。",
+          "action": "调用 office-compliant-outbound-flow 确定性办公工具并写入隔离运行工作区。",
+          "observation": "生成 1 份真实成果文件，执行 13 项确定性检查。",
+          "cost": "0 次额外模型调用；仅消耗本机确定性解析、计算与文件写入。",
+          "result": "所有确定性效果门通过，成果仍需用户复核。",
+          "source_file_refs": [
+            "forte-ba23e986a9c7e8d8"
+          ],
+          "artifact_ids": [
+            "workspace-artifact-b4be7265f477"
+          ],
+          "prohibited_side_effects": [
+            "不拨号",
+            "不写 CRM",
+            "不发送短信"
+          ],
+          "created_at": "2026-08-28T08:11:27.449831Z",
+          "external_action": "none"
+        }
+      ],
+      "artifacts": [
+        {
+          "artifact_id": "workspace-artifact-b4be7265f477",
+          "file_name": "外呼流程-M1逾期用户AI外呼催收流程图.docx",
+          "media_type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+          "size": 2047,
+          "validator_id": "validator-compliant-outbound-flow-v1",
+          "verifier_status": "passed",
+          "checks": [
+            {
+              "check_id": "check-outbound-source",
+              "label": "专业说明来源完整",
+              "passed": true,
+              "detail": "时段、频次、录音、身份、第三方、人工升级和六类终态均从《专业性说明.md》逐项核对。"
+            },
+            {
+              "check_id": "check-outbound-start",
+              "label": "唯一开始节点",
+              "passed": true,
+              "detail": "状态机只有一个 START。"
+            },
+            {
+              "check_id": "check-outbound-time-gate",
+              "label": "拨号前时段 Gate",
+              "passed": true,
+              "detail": "不合规路径直接停止，不进入拨号。"
+            },
+            {
+              "check_id": "check-outbound-connect",
+              "label": "接通与未接通互斥",
+              "passed": true,
+              "detail": "是否接通后只有接通、未接通两类业务入口。"
+            },
+            {
+              "check_id": "check-outbound-retry",
+              "label": "每日 3 次 / 每小时 1 次上限",
+              "passed": true,
+              "detail": "仅未达两项频次上限时进入安排重拨。"
+            },
+            {
+              "check_id": "check-outbound-recording",
+              "label": "录音告知先于身份确认",
+              "passed": true,
+              "detail": "先告知录音，再询问身份。"
+            },
+            {
+              "check_id": "check-outbound-identity",
+              "label": "身份确认先于欠款引导",
+              "passed": true,
+              "detail": "身份确认前不披露欠款信息。"
+            },
+            {
+              "check_id": "check-outbound-third-party",
+              "label": "第三方禁呼",
+              "passed": true,
+              "detail": "第三方要求停止联系时进入禁呼终态。"
+            },
+            {
+              "check_id": "check-outbound-attitude",
+              "label": "本人态度分支",
+              "passed": true,
+              "detail": "承诺、软拒绝和硬拒绝均有路径。"
+            },
+            {
+              "check_id": "check-outbound-invalid",
+              "label": "无效通话回到频次判断",
+              "passed": true,
+              "detail": "无效通话不会绕过重拨上限。"
+            },
+            {
+              "check_id": "check-outbound-human",
+              "label": "高风险情况转人工",
+              "passed": true,
+              "detail": "三类强制情况均进入人工。"
+            },
+            {
+              "check_id": "check-outbound-terminals",
+              "label": "六类终态齐全",
+              "passed": true,
+              "detail": "六类业务终态均由至少一条流程路径到达。"
+            },
+            {
+              "check_id": "check-outbound-no-action",
+              "label": "外部动作均未发生",
+              "passed": true,
+              "detail": "只在隔离 Run Workspace 生成 DOCX；拨号、CRM 与短信回执均为 none。"
+            }
+          ],
+          "review_required": true,
+          "deliverable_type": "流程设计 DOCX",
+          "key_outputs": [
+            "PTP登记",
+            "转人工跟进",
+            "安排重拨",
+            "停止外呼（达上限）",
+            "加入禁呼名单",
+            "案件升级"
+          ],
+          "review_guidance": "13 项确定性规则检查通过后，仍需业务与合规负责人复核当前制度口径、话术和实际系统接入方案。",
+          "execution_summary": "本次只生成流程设计 DOCX。文档中的“发起外呼拨号”“写 CRM”等是流程节点描述，不是执行回执；实际没有拨号、没有写 CRM、没有发送短信。",
+          "external_action": "none",
+          "original_inputs_modified": false
+        }
+      ],
+      "artifact_downloads": [
+        {
+          "artifact_id": "workspace-artifact-b4be7265f477",
+          "file_name": "外呼流程-M1逾期用户AI外呼催收流程图.docx",
+          "status_code": 200,
+          "content_type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+          "declared_size": 2047,
+          "downloaded_size": 2047,
+          "sha256": "b1e54160d72de8b79096e3df73633d6bfbb3196d69f2b2c00950013162b1de22",
+          "size_matches": true,
+          "content_gate": {
+            "passed": true,
+            "valid_docx": true,
+            "paragraph_count": 30,
+            "unique_start": true,
+            "required_token_count": 18,
+            "missing_tokens": []
+          }
+        }
+      ],
+      "expected_artifacts": [
+        "外呼流程-M1逾期用户AI外呼催收流程图.docx"
+      ],
+      "events": [
+        {
+          "sequence": 3,
+          "event_name": "planning_started",
+          "status": "planning"
+        },
+        {
+          "sequence": 4,
+          "event_name": "planning_completed",
+          "status": "planning"
+        },
+        {
+          "sequence": 6,
+          "event_name": "deterministic_office_tool_started",
+          "status": "validating"
+        },
+        {
+          "sequence": 7,
+          "event_name": "run_workspace_artifact_written",
+          "status": "validating"
+        },
+        {
+          "sequence": 8,
+          "event_name": "deterministic_verification_completed",
+          "status": "validating"
+        },
+        {
+          "sequence": 9,
+          "event_name": "analysis_started",
+          "status": "analyzing"
+        },
+        {
+          "sequence": 10,
+          "event_name": "analysis_completed",
+          "status": "analyzing"
+        }
+      ],
+      "waiting_branches": [],
+      "validation_errors": [],
+      "timed_out": false,
+      "effect_gate_passed": true,
+      "failure_reason": null
+    }
+  ],
+  "claim_boundary": "该证据仅证明固定服务配置下真实模型调用、运行工作区文件和确定性检查；不证明真实用户理解、生产安全沙箱或外部动作能力。"
+}
