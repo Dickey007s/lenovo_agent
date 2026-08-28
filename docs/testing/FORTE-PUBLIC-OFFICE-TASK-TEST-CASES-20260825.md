@@ -47,7 +47,7 @@ CSS、HTML、shell、log 等。它们覆盖结构化表格、长文档、扫描/
 | `TC-01` | `administration-001` | 入职员工物资与权限匹配 | CSV + PDF | Demo 1 单任务 | 隐私字段、工作区写入 | `Limited Verified`：真实 CSV + 5 项确定性检查 |
 | `TC-02` | `algorithm-013` | 搜索 Agent 从 Workflow 重构为有界 ReAct 控制结构 | Python + log + text | Demo 1 单任务 | 真实副本、代码修改、测试执行 | `Limited Verified`：完整项目 ZIP/说明，当前 20 项声明测试与实际执行一致；默认策略非模型自主决策，且非通用代码沙箱 |
 | `TC-03` | `ba-079` | 网约车经营数据 SQL 分析 | 远程 Datasette | Demo 2 多查询 | Connector、查询预算 | `blocked_external_boundary`：未授权 Datasette/SQL Connector |
-| `TC-04` | `dev-015` | 为评测平台补单测并修复缺陷 | 44 个 source-code 文件；PRD/设计稿另作任务上下文 | Demo 2 多任务 | 固定副本测试、代码写入 | `Draft`：完整隔离 ZIP/报告，未修复副本 5 个目标红灯，修复后 117 项真实模块测试与逐文件 coverage.py 门；待真实 Run/PR 收尾 |
+| `TC-04` | `dev-015` | 为评测平台补单测并修复缺陷 | 44 个 source-code 文件；PRD/设计稿另作任务上下文 | Demo 2 多任务 | 固定副本测试、代码写入 | `Limited Verified`（DR-0041、PR #52、Run `harness:c4bd926b13a44665aa49429d177305a9`）：完整隔离 ZIP/报告，未修复副本 5 个目标红灯，修复后 117 项真实模块测试与逐文件 coverage.py 门；固定 dev-015 适配器，不是通用代码沙箱或自动 PR |
 | `TC-05` | `Finance-018` | 跨三期往来款与僵尸账款核对 | 3 个 XLSX | Demo 1 单任务 | 数值验证、CSV 写入 | `Limited Verified`：两个 2026 CSV + 三期说明，8 项归属明确的确定性检查 |
 | `TC-06` | `hr-001` | 两个岗位与五份简历匹配 | DOCX + PDF | Demo 2 多任务 | 敏感信息、人工复核 | `Limited Verified`：两个 DOCX、每岗 5 名候选、敏感字段隐藏并保留人工 Gate |
 | `TC-07` | `Legal-020` | 六份授权委托书风控核查 | DOCX + MD | Demo 2 多任务 | 法务风险、报告写入 | `Limited Verified`：规则化 DOCX 与确定性完整性检查；非正式法律意见 |
@@ -55,7 +55,7 @@ CSS、HTML、shell、log 等。它们覆盖结构化表格、长文档、扫描/
 | `TC-09` | `Misc-AT-003` | 周期搜索新闻并追加文件 | Web + cron | 单任务持续运行 | 全局定时、副作用 | `blocked_external_boundary`：未创建 cron/未发起 Web 任务 |
 | `TC-10` | `Operations-008` | 设计合规催收外呼流程 | MD | Demo 1 + Demo 3 | 合规规则、禁止真实外呼 | `Limited Verified`：真实 DOCX + 13 项规则/终态检查；未拨号、未写 CRM |
 | `TC-11` | `pm-014` | 上线合规与风险评估 | MD + 3 个 XLSX | Demo 2 多任务 | 冲突汇聚、报告写入 | `Limited Verified`：DOCX 与确定性指标复算；没有多 Worker 或真实发布 |
-| `TC-12` | `qa-003` | 为看板工具库补测试并修复源码 | JS + JSON | Demo 2 多任务 | 固定测试执行、隔离代码写入 | `Limited Verified` 收尾中：完整 11 文件副本，同一 71 项 Vitest 先红后绿、逐文件 coverage、独立复跑；没有自动 PR 或 OS 级断网 |
+| `TC-12` | `qa-003` | 为看板工具库补测试并修复源码 | JS + JSON | Demo 2 多任务 | 固定测试执行、隔离代码写入 | `Limited Verified`（DR-0042、PR #54/#55、Run `harness:d9355005af924d57bb1e9c526adca072`）：完整 11 文件副本，同一 71 项 Vitest 先红后绿、逐文件 coverage、独立复跑；固定 qa-003 适配器，没有自动 PR 或 OS 级断网 |
 | `TC-13` | `sales-020` | 客户画像清洗与销售策略 | CSV + MD | Demo 1/2 | 分群依据、人工复核 | `Limited Verified`：Markdown 报告 + 6 项分群/守恒检查 |
 | `TC-14` | `sre-010` | 大促 ES 故障诊断与止损建议 | TXT log | Demo 1 + Demo 3 | 高风险命令、禁止自动执行 | `Limited Verified`：Markdown 诊断 + 9 项日志/地址/禁执行检查 |
 | `TC-15` | `uiux-021` | 交互痛点归因与优先级排序 | XLSX + MD + DOCX | Demo 2 多任务 | 排序验证、CSV 写入 | `Limited Verified`：真实 CSV + 6 项 P0-P4/稳定排序检查 |
