@@ -14,7 +14,7 @@ type FileItem = {
   preview_available: true;
 };
 
-const csvFile = fileItem("forte-1111111111111111", "forte-folder-111111111111", "往来余额.csv", "财务管理", "CSV", "table");
+const csvFile = fileItem("forte-1111111111111111", "forte-folder-111111111111", "2026往来明细.xlsx", "财务管理", "XLSX", "table");
 const pdfFile = fileItem("forte-2222222222222222", "forte-folder-222222222222", "授权委托书.pdf", "法务", "PDF", "pdf", "合同与授权/授权委托书.pdf");
 const docxFile = fileItem("forte-3333333333333333", "forte-folder-333333333333", "岗位说明.docx", "人力招聘", "DOCX", "document");
 const txtFile = fileItem("forte-4444444444444444", "forte-folder-444444444444", "运行日志.txt", "可靠性工程", "TXT", "text");
@@ -709,6 +709,99 @@ function verifiedArtifactAuditPendingSnapshot(body: { workspace_id: string; inst
   };
 }
 
+function verifiedFinanceArtifactAuditPendingSnapshot(body: { workspace_id: string; instruction: string }) {
+  const base = verifiedArtifactAuditPendingSnapshot(body);
+  const effect = verifiedEffectSnapshot(body);
+  const branches = base.branches.map((branch, index) => ({
+    ...branch,
+    title: index === 0 ? "核对 2026 未付说明" : "核对 2026 未收说明",
+    objective: index === 0 ? "核对未付明细说明所依据的原表格位置" : "核对未收明细说明所依据的原表格位置",
+    input_file_refs: [csvFile.file_ref],
+    verified_file_refs: [],
+    missing_file_refs: [csvFile.file_ref],
+  }));
+  const gaps = branches.map((branch, index) => ({
+    gap_id: `gap-finance-${String(index + 1).padStart(4, "0")}`,
+    branch_id: branch.branch_id,
+    label: `“${branch.title}”的原表格位置尚未找到`,
+    detail: "Agent 已引用 2026 往来明细，但没有返回可唯一跳转到行或单元格的位置。",
+    candidate_file_refs: [csvFile.file_ref],
+  }));
+  const round = {
+    ...base.rounds[0],
+    question: body.instruction,
+    input_file_refs: [csvFile.file_ref],
+    branch_ids: branches.map((branch) => branch.branch_id),
+    evidence_gaps: gaps,
+    next_step: {
+      ...base.rounds[0].next_step,
+      reason: "成果检查已经通过；一条 Agent 说明仍缺少可跳转到原表格的具体位置。",
+      candidate_file_refs: [csvFile.file_ref],
+      candidate_branch_ids: branches.map((branch) => branch.branch_id),
+    },
+  };
+  return {
+    ...base,
+    rounds: [round],
+    branches,
+    workspace_artifacts: effect.workspace_artifacts,
+    effect_receipts: effect.effect_receipts,
+    artifact_versions: [{
+      ...base.artifact_versions[0],
+      summary: round.next_step.reason,
+      evidence_gaps: gaps,
+      source_file_refs: [csvFile.file_ref],
+    }],
+  };
+}
+
+function unverifiedArtifactLocationPendingSnapshot(body: { workspace_id: string; instruction: string }) {
+  const base = verifiedFinanceArtifactAuditPendingSnapshot(body);
+  const branch = { ...base.branches[0], status: "waiting_input" };
+  const gap = base.rounds[0].evidence_gaps[0];
+  const round = {
+    ...base.rounds[0],
+    branch_ids: [branch.branch_id],
+    evidence_gaps: [gap],
+    next_step: {
+      ...base.rounds[0].next_step,
+      reason: "相关文件已经找到，但说明尚未定位到具体行或单元格，成果仍需继续检查。",
+      candidate_branch_ids: [branch.branch_id],
+    },
+  };
+  return {
+    ...base,
+    workspace_artifacts: [],
+    effect_receipts: [],
+    branches: [branch],
+    rounds: [round],
+    artifact_versions: [],
+  };
+}
+
+function terminalArtifactLocationPendingSnapshot(body: { workspace_id: string; instruction: string }) {
+  const base = unverifiedArtifactLocationPendingSnapshot(body);
+  const branch = { ...base.branches[0], status: "stopped" };
+  const round = {
+    ...base.rounds[0],
+    branch_ids: [branch.branch_id],
+    next_step: {
+      ...base.rounds[0].next_step,
+      decision: "budget_exhausted",
+      reason: "旧任务已到预算边界，说明的原表格位置尚未找到。",
+      candidate_branch_ids: [branch.branch_id],
+    },
+  };
+  return {
+    ...base,
+    status: "stopped",
+    control_state: "stopped",
+    branches: [branch],
+    rounds: [round],
+    budget: { ...base.budget, stop_reason: "Agent 执行时间预算已耗尽" },
+  };
+}
+
 function boundedAnalysisRecoverySnapshot(body: { workspace_id: string; instruction: string }) {
   const base = sourceLocationRecoverySnapshot(body);
   const branches = base.branches.map((branch) => ({ ...branch, status: "stopped" }));
@@ -777,7 +870,7 @@ function locationFailureSnapshot(body: { workspace_id: string; instruction: stri
 }
 async function fulfillJson(route: Route, body: unknown, status = 200) { await route.fulfill({ status, contentType: "application/json", body: JSON.stringify(body) }); }
 
-async function mockHarness(page: Page, options: { failFirstStart?: boolean; failDecisionDefer?: boolean; disconnect?: boolean; failed?: boolean; locationFailure?: boolean; sourceRecovery?: boolean; sourceRecoveryThreeCandidates?: boolean; verifiedArtifactAuditPending?: boolean; verifiedArtifactAuditPendingDistinct?: boolean; boundedRecovery?: boolean; effectArtifact?: boolean; effectBoundary?: boolean; reviewTable?: boolean; workspaceFailures?: number; interactiveLoop?: boolean; evidenceGate?: boolean } = {}) {
+async function mockHarness(page: Page, options: { failFirstStart?: boolean; failDecisionDefer?: boolean; disconnect?: boolean; failed?: boolean; locationFailure?: boolean; sourceRecovery?: boolean; sourceRecoveryThreeCandidates?: boolean; verifiedArtifactAuditPending?: boolean; verifiedArtifactAuditPendingDistinct?: boolean; verifiedFinanceArtifactAuditPending?: boolean; unverifiedArtifactLocationPending?: boolean; terminalArtifactLocationPending?: boolean; boundedRecovery?: boolean; effectArtifact?: boolean; effectBoundary?: boolean; reviewTable?: boolean; workspaceFailures?: number; interactiveLoop?: boolean; evidenceGate?: boolean } = {}) {
   let workspaceCalls = 0; let startCalls = 0; let streamCalls = 0;
   let currentBody = { workspace_id: "forte-public-office", instruction: "" };
   // Mock snapshots intentionally cover several server state shapes in one route.
@@ -806,7 +899,13 @@ async function mockHarness(page: Page, options: { failFirstStart?: boolean; fail
       const body = route.request().postDataJSON() as typeof currentBody & { idempotency_key: string };
       currentBody = body; starts.push(body);
       if (options.failFirstStart && startCalls === 1) return fulfillJson(route, { detail: "任务启动结果未知" }, 503);
-      currentSnapshot = options.verifiedArtifactAuditPending || options.verifiedArtifactAuditPendingDistinct
+      currentSnapshot = options.terminalArtifactLocationPending
+        ? terminalArtifactLocationPendingSnapshot(body)
+        : options.unverifiedArtifactLocationPending
+          ? unverifiedArtifactLocationPendingSnapshot(body)
+        : options.verifiedFinanceArtifactAuditPending
+          ? verifiedFinanceArtifactAuditPendingSnapshot(body)
+      : options.verifiedArtifactAuditPending || options.verifiedArtifactAuditPendingDistinct
         ? verifiedArtifactAuditPendingSnapshot(body, options.verifiedArtifactAuditPendingDistinct)
         : options.reviewTable
         ? tableEvidenceReviewSnapshot(body)
@@ -903,7 +1002,7 @@ async function mockHarness(page: Page, options: { failFirstStart?: boolean; fail
       streamCalls += 1; streams.push(url.toString());
       const after = Number(url.searchParams.get("after") ?? "0");
       const all = ["workspace_index", "round_started", "planning_started", "planning_completed", "plan_validation", "analysis_started", "analysis_completed", "result_validation", "evidence_gate", "round_started", "planning_started", "planning_completed", "analysis_started", "analysis_completed", "evidence_gate", options.failed ? "harness_failed" : "loop_committed"];
-      if (options.interactiveLoop || options.evidenceGate || options.sourceRecovery || options.verifiedArtifactAuditPending || options.verifiedArtifactAuditPendingDistinct || options.boundedRecovery) {
+      if (options.interactiveLoop || options.evidenceGate || options.sourceRecovery || options.verifiedArtifactAuditPending || options.verifiedArtifactAuditPendingDistinct || options.verifiedFinanceArtifactAuditPending || options.unverifiedArtifactLocationPending || options.terminalArtifactLocationPending || options.boundedRecovery) {
         const sequence = Math.max(after + 1, currentSnapshot.last_event_sequence);
         const terminalEvent = currentSnapshot.status === "completed" ? "loop_committed" : currentSnapshot.status === "stopped" ? "loop_stopped" : currentSnapshot.status === "waiting_input" ? "evidence_gate" : "round_started";
         const body = `id: ${sequence}\nevent: ${terminalEvent}\ndata: ${JSON.stringify({ sequence, event_name: terminalEvent, occurred_at: new Date().toISOString(), message: "服务端状态已更新。" })}\n\n`;
@@ -918,7 +1017,7 @@ async function mockHarness(page: Page, options: { failFirstStart?: boolean; fail
     }
     if (path.startsWith("/v1/harness/runs/")) {
       if (options.disconnect && streamCalls === 1) return fulfillJson(route, { ...snapshot(currentBody, "queued"), status: "indexing", last_event_sequence: 1, version: 2 });
-      if (options.interactiveLoop || options.evidenceGate || options.sourceRecovery || options.verifiedArtifactAuditPending || options.verifiedArtifactAuditPendingDistinct || options.boundedRecovery || options.locationFailure || options.effectArtifact || options.effectBoundary) return fulfillJson(route, currentSnapshot);
+      if (options.interactiveLoop || options.evidenceGate || options.sourceRecovery || options.verifiedArtifactAuditPending || options.verifiedArtifactAuditPendingDistinct || options.verifiedFinanceArtifactAuditPending || options.unverifiedArtifactLocationPending || options.terminalArtifactLocationPending || options.boundedRecovery || options.locationFailure || options.effectArtifact || options.effectBoundary) return fulfillJson(route, currentSnapshot);
       currentSnapshot = snapshot(currentBody, options.failed ? "failed" : "completed");
       return fulfillJson(route, currentSnapshot);
     }
@@ -1046,25 +1145,30 @@ test("shows a real run-workspace file, deterministic checks and a download", asy
   }
 });
 
-test("puts a verified TC-01 outcome before one grouped audit-location gap", async ({ page }) => {
-  await mockHarness(page, { verifiedArtifactAuditPending: true });
+test("explains a verified finance result in user language and resumes only the location branch", async ({ page }) => {
+  const state = await mockHarness(page, { verifiedFinanceArtifactAuditPending: true });
   await page.goto("/");
-  await page.getByRole("textbox", { name: "任务指令" }).fill("根据入职时间表和分配规则，生成 3 月 20 日至 4 月 20 日的入职资产匹配表。");
+  await page.getByRole("textbox", { name: "任务指令" }).fill("核对三期往来明细，生成未付、未收和僵尸账款说明。");
   await page.getByRole("button", { name: "启动 Control Loop" }).click();
 
   const artifacts = page.locator(".workspace-artifacts");
   const recovery = page.locator(".loop-source-recovery");
-  const auditItems = page.locator(".loop-gap-branches > li");
-  await expect(artifacts).toContainText("Agent 已生成 1 份真实成果文件");
-  await expect(artifacts).toContainText("入职资产匹配表.csv");
-  await expect(artifacts).toContainText("5/5 项检查通过");
-  await expect(recovery).toContainText("成果已生成，1 处来源定位待补充");
-  await expect(recovery).toContainText("不是源文件，也不是日期结果");
-  await expect(page.locator(".trace-current-round")).toContainText("成果可用，审计待补充");
-  await expect(auditItems).toHaveCount(1);
-  await expect(auditItems.first()).toContainText("同一来源影响 2 个内部步骤");
-  await expect(auditItems.first()).toContainText("不影响成果");
-  await expect(auditItems.first().getByRole("button", { name: "补齐来源定位" })).toBeVisible();
+  const locationCard = page.locator(".loop-gap-branches > li");
+  const technicalDetails = page.locator(".loop-gap-technical-details");
+  await expect(artifacts).toContainText("Agent 已生成 3 份真实成果文件");
+  await expect(artifacts).toContainText("2026 期末未付明细");
+  await expect(recovery).toContainText("成果已生成，还有 1 条说明缺少原表格位置");
+  await expect(page.locator(".loop-gap")).toContainText("成果已生成，还有 1 条说明缺少原表格位置");
+  await expect(locationCard).toHaveCount(1);
+  await expect(locationCard).toContainText("系统知道这条说明来自《2026往来明细.xlsx》，但还没定位到具体行或单元格。");
+  await expect(locationCard).toContainText("不影响已经生成的成果文件；这条 Agent 说明仍需人工复核。");
+  await expect(locationCard.getByRole("button", { name: "查找原表格位置" })).toBeVisible();
+  await expect(locationCard.getByRole("button", { name: "查看已生成成果" })).toBeVisible();
+  await expect(page.locator(".trace-current-round")).toContainText("成果已生成，说明位置待查找");
+  await expect(page.locator(".loop-branches")).toHaveCount(0);
+  await expect(technicalDetails).not.toHaveAttribute("open", "");
+  await expect(technicalDetails.getByText("2 个 Branch / 2 个 Gap")).not.toBeVisible();
+  await expect(page.getByText("同一来源影响 2 个内部步骤")).toHaveCount(0);
   await expect(page.locator(".loop-view")).not.toContainText("缺 1 份引用");
   await expect(page.locator(".loop-view")).not.toContainText("建议重试此分支");
   await expect(page.locator(".loop-view")).not.toContainText("共有 2 个待处理");
@@ -1075,17 +1179,50 @@ test("puts a verified TC-01 outcome before one grouped audit-location gap", asyn
   });
   expect(outcomeFirst).toBe(true);
 
-  if (process.env.CAPTURE_DR0036_EVIDENCE === "1") {
+  if (process.env.CAPTURE_DR0038_EVIDENCE === "1") {
     await page.setViewportSize({ width: 1600, height: 1000 });
-    await page.locator(".loop-view").screenshot({ path: "../../docs/evidence/screenshots/dr-0036-tc01-outcome-first-desktop.png" });
-    await page.locator(".loop-gap").screenshot({ path: "../../docs/evidence/screenshots/dr-0036-tc01-grouped-audit-desktop.png" });
+    await page.locator(".loop-gap").screenshot({ path: "../../docs/evidence/screenshots/dr-0038-source-location-user-language-desktop.png" });
   }
   await page.setViewportSize({ width: 390, height: 844 });
   const metrics = await page.evaluate(() => ({ viewport: document.documentElement.clientWidth, scroll: document.documentElement.scrollWidth }));
   expect(metrics.scroll).toBeLessThanOrEqual(metrics.viewport);
-  if (process.env.CAPTURE_DR0036_EVIDENCE === "1") {
-    await page.locator(".loop-view").screenshot({ path: "../../docs/evidence/screenshots/dr-0036-tc01-outcome-first-mobile.png" });
+  if (process.env.CAPTURE_DR0038_EVIDENCE === "1") {
+    await page.locator(".loop-gap").screenshot({ path: "../../docs/evidence/screenshots/dr-0038-source-location-user-language-mobile.png" });
   }
+  await technicalDetails.getByText("技术详情").click();
+  await expect(technicalDetails.getByText("2 个 Branch / 2 个 Gap")).toBeVisible();
+  await locationCard.getByRole("button", { name: "查看已生成成果" }).click();
+  await expect(artifacts).toBeInViewport();
+  await locationCard.getByRole("button", { name: "查找原表格位置" }).click();
+  expect(state.controls.at(-1)).toMatchObject({ command: "resume", branch_id: "branch-111111111111" });
+});
+
+test("states clearly when an unverified result still needs an original table position", async ({ page }) => {
+  await mockHarness(page, { unverifiedArtifactLocationPending: true });
+  await page.goto("/");
+  await page.getByRole("textbox", { name: "任务指令" }).fill("核对财务说明并定位原表格位置。");
+  await page.getByRole("button", { name: "启动 Control Loop" }).click();
+
+  const gap = page.locator(".loop-gap");
+  await expect(gap).toContainText("成果尚未通过，还有 1 条说明缺少原表格位置");
+  await expect(gap).toContainText("当前还不能确认成果；这不是文件缺失、日期错误或金额验算失败。");
+  await expect(gap.getByRole("button", { name: "查找原表格位置" })).toBeVisible();
+  await expect(gap.getByRole("button", { name: "查看已生成成果" })).toHaveCount(0);
+  await expect(gap).not.toContainText("成果已生成，还有 1 条说明缺少原表格位置");
+});
+
+test("requires a new task when an old run ended before locating the table position", async ({ page }) => {
+  await mockHarness(page, { terminalArtifactLocationPending: true });
+  await page.goto("/");
+  await page.getByRole("textbox", { name: "任务指令" }).fill("继续核对旧任务中的财务说明。");
+  await page.getByRole("button", { name: "启动 Control Loop" }).click();
+
+  const gap = page.locator(".loop-gap");
+  await expect(gap).toContainText("这次任务已结束，还有 1 条说明未定位");
+  await expect(gap).toContainText("旧 Run 不能原地继续");
+  await expect(gap.getByRole("button", { name: "创建新任务查找位置" })).toBeVisible();
+  await gap.getByRole("button", { name: "创建新任务查找位置" }).click();
+  await expect(page.getByRole("dialog")).toContainText("新建任务，只续办此分支");
 });
 
 test("keeps distinct audit failures separate even when they reference the same file", async ({ page }) => {
@@ -1095,8 +1232,8 @@ test("keeps distinct audit failures separate even when they reference the same f
   await page.getByRole("button", { name: "启动 Control Loop" }).click();
 
   await expect(page.locator(".loop-gap-branches > li")).toHaveCount(2);
-  await expect(page.locator(".loop-gap")).toContainText("还有 2 处来源定位待补充");
-  await expect(page.locator(".loop-gap")).not.toContainText("同一来源影响 2 个内部步骤");
+  await expect(page.locator(".loop-gap")).toContainText("成果已生成，还有 2 条说明缺少原表格位置");
+  await expect(page.getByText("同一来源影响 2 个内部步骤")).toHaveCount(0);
 });
 
 test("shows an external boundary instead of a fabricated result", async ({ page }) => {

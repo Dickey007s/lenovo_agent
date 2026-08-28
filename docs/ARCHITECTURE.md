@@ -285,6 +285,14 @@ only the cross-period note owns the three-period comparison. These fields are
 service-owned deterministic facts, not model narration or a general finance
 ontology. The larger review typography changes only the browser projection.
 
+DR-0038 changes only the browser projection and action hierarchy for
+`source_location`. The UI derives verified/unverified/terminal presentation from
+server-owned Artifact/EffectReceipt, Run status and Gap facts. A nonterminal
+retry-only Gap resumes one bound Branch; a structured Resolution still uses the
+Decision protocol, and a terminal Run still creates a new Task Contract. Internal
+Branch/Gap/Resolution facts remain auditable under progressive disclosure. This
+projection does not mutate Snapshot truth or spend budget before an explicit action.
+
 ## 7. Eight module maturity
 
 | Module | Current implementation | Missing target work |
@@ -314,6 +322,8 @@ See [`DR-0036`](decisions/DR-0036-outcome-first-and-layout-tolerant-evidence.md)
 [`SCENARIO-022`](scenarios/SCENARIO-022-verified-outcome-and-audit-location.md),
 [`DR-0037`](decisions/DR-0037-tc05-artifact-semantics-and-review-readability.md),
 [`SCENARIO-023`](scenarios/SCENARIO-023-understand-finance-artifacts-and-review-evidence.md),
+[`DR-0038`](decisions/DR-0038-user-language-source-location-recovery.md),
+[`SCENARIO-024`](scenarios/SCENARIO-024-understand-and-recover-missing-table-location.md),
 [`DR-0035`](decisions/DR-0035-scenario-effect-gate-and-run-workspace-artifacts.md),
 [`SCENARIO-021`](scenarios/SCENARIO-021-verifiable-office-artifact-effect.md),
 [`DR-0034`](decisions/DR-0034-one-action-recovery-and-explicit-source-choice.md),
@@ -328,4 +338,5 @@ See [`DR-0036`](decisions/DR-0036-outcome-first-and-layout-tolerant-evidence.md)
 [`SCENARIO-012`](scenarios/SCENARIO-012-selective-branch-and-artifact-restore.md),
 [UI-server fact matrix](contracts/UI_SERVER_FACT_MATRIX.md) and
 [current TC-01 Evidence](evidence/DR-0036-TC01-OUTCOME-EVIDENCE-LOCALIZATION-EVIDENCE-20260828.md) and
-[current TC-05 Evidence](evidence/DR-0037-TC05-ARTIFACT-SEMANTICS-AND-REVIEW-READABILITY-EVIDENCE-20260828.md).
+[current TC-05 Evidence](evidence/DR-0037-TC05-ARTIFACT-SEMANTICS-AND-REVIEW-READABILITY-EVIDENCE-20260828.md),
+plus [current source-location language Evidence](evidence/DR-0038-USER-LANGUAGE-SOURCE-LOCATION-RECOVERY-EVIDENCE-20260828.md).
