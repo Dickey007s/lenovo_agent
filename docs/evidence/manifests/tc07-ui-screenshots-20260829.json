@@ -1,7 +1,7 @@
 {
   "schema_version": "tc07-ui-screenshots.v1",
-  "captured_at": "2026-08-29T00:09:37+08:00",
-  "capture_method": "Playwright system-browser on the ordinary three-column page; no CSS injection or content rewrite. The main workspace was scrolled to the server-derived legal outcome. For the desktop capture, the browser-only folder view was switched from 财务管理 to 法务 so the rule file and six delegation documents are visible; this display state does not submit selected_file_refs or change the whole_workspace Run scope.",
+  "captured_at": "2026-08-29T00:40:15+08:00",
+  "capture_method": "Playwright system-browser on the ordinary three-column page; no CSS injection or content rewrite. The main workspace was scrolled to the server-derived legal outcome. For the desktop capture, the browser-only folder view was switched from 财务管理 to 法务 so the rule file and six delegation documents are visible; exactly one legal document is expanded. This display state does not submit selected_file_refs or change the whole_workspace Run scope.",
   "source_fixture": "docs/evidence/manifests/tc07-public-legal-review-outcome-20260828.json",
   "screenshots": [
     {
@@ -9,8 +9,8 @@
       "viewport": "1440x1100",
       "width": 1440,
       "height": 1100,
-      "bytes": 172064,
-      "sha256": "26585bdb0e7b645db272400c7b5326b1c36e9968101d5a4246e6d80d9d7ab1a2"
+      "bytes": 172100,
+      "sha256": "a87a6886ed3dc0d725c2417a9e77f3ffe912f849f3b67be01f0d0886e4124faa"
     },
     {
       "path": "docs/evidence/screenshots/tc07-source-derived-legal-review-mobile.png",
@@ -25,6 +25,8 @@
     "The legal decision is visible before per-document detail.",
     "Deterministic verification, legal Gate and signing/human review are separate visible states.",
     "The desktop capture visibly expands the 法务 folder and shows the rule file plus six delegation documents without changing the server-owned whole_workspace scope.",
+    "At the tested 1440 px three-column layout, the approximately 570 px legal result container falls back to one readable document column; expanded rule facts are also one column at that content width.",
+    "Document names occupy no more than two lines, and each desktop document card is at least 320 px wide in the measured state.",
     "Six document sections and dynamic 126/126, 0/6 and mandatory-review facts fit the tested layouts.",
     "The 390 px viewport has no page-level horizontal overflow in the tested state."
   ],
