@@ -718,22 +718,53 @@ def _forte_digests() -> dict[str, str]:
     }
 
 
-async def _wait_for_effect(runtime: HarnessRuntime, owner: str, run_id: str):
-    for _ in range(500):
+async def _wait_for_effect(
+    runtime: HarnessRuntime,
+    owner: str,
+    run_id: str,
+    *,
+    timeout_seconds: float = 10.0,
+    poll_interval_seconds: float = 0.01,
+):
+    loop = asyncio.get_running_loop()
+    deadline = loop.time() + timeout_seconds
+    while True:
         snapshot = await runtime.get(owner, run_id)
         if snapshot.effect_receipts:
             return snapshot
-        await asyncio.sleep(0)
-    raise AssertionError("scenario effect was not recorded")
+        remaining = deadline - loop.time()
+        if remaining <= 0:
+            raise AssertionError(
+                "scenario effect was not recorded before the monotonic deadline; "
+                f"timeout={timeout_seconds:.2f}s status={snapshot.status} "
+                f"version={snapshot.version} receipts={len(snapshot.effect_receipts)} "
+                f"artifacts={len(snapshot.workspace_artifacts)}"
+            )
+        await asyncio.sleep(min(poll_interval_seconds, remaining))
 
 
-async def _wait_for_settled(runtime: HarnessRuntime, owner: str, run_id: str):
-    for _ in range(1_000):
+async def _wait_for_settled(
+    runtime: HarnessRuntime,
+    owner: str,
+    run_id: str,
+    *,
+    timeout_seconds: float = 10.0,
+    poll_interval_seconds: float = 0.01,
+):
+    loop = asyncio.get_running_loop()
+    deadline = loop.time() + timeout_seconds
+    while True:
         snapshot = await runtime.get(owner, run_id)
         if snapshot.status in {"waiting_input", "completed", "stopped", "failed"}:
             return snapshot
-        await asyncio.sleep(0)
-    raise AssertionError("run did not settle")
+        remaining = deadline - loop.time()
+        if remaining <= 0:
+            raise AssertionError(
+                "run did not settle before the monotonic deadline; "
+                f"timeout={timeout_seconds:.2f}s status={snapshot.status} "
+                f"version={snapshot.version} receipts={len(snapshot.effect_receipts)}"
+            )
+        await asyncio.sleep(min(poll_interval_seconds, remaining))
 
 
 @pytest.mark.asyncio

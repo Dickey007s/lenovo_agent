@@ -333,6 +333,143 @@ def _source_lines(content: bytes) -> tuple[_SourceLine, ...]:
     return tuple(result)
 
 
+_KNOWN_FRAGMENT_TOKENS: dict[str, tuple[tuple[str, ...], ...]] = {
+    "time": (("严禁拨打", "拨号前判断"),),
+    "freq": (
+        ("每日拨打不得超过", "小时内不得超过"),
+        ("达到上限后停止当日外呼",),
+    ),
+    "record": (
+        ("全程录音", "至少保存"),
+        ("必须告知", "录音"),
+    ),
+    "third": (
+        ("接通后必须", "接听"),
+        ("只能请其转告", "严禁透露欠款金额"),
+        ("第三方", "不再联系", "禁呼名单"),
+    ),
+    "prohibit": (
+        ("严禁威胁", "恐吓", "辱骂"),
+        ("M1", "不得使用", "法律行动"),
+    ),
+    "unconnected": (("无人接听", "关机空号", "主动拒接", "重拨队列"),),
+    "connected": (("本人接听", "非本人接听"),),
+    "ptp": (("承诺金额", "承诺日期", "短信提醒"),),
+    "soft": (("分期方案", "后续跟进"),),
+    "hard": (("案件升级", "人工或法务处理"),),
+    "dispute": (("必须转人工", "不得自行处理"),),
+    "invalid": (("记录", "今日已拨次数判断", "安排重拨"),),
+    "terminals": (("PTP登记", "转人工跟进", "安排重拨", "案件升级"),),
+    "identity": (
+        ("接通后第一步", "询问是否本人"),
+        ("确认是本人", "催收话术"),
+        ("非本人只请转告",),
+        ("无法确认", "结束通话"),
+    ),
+    "intro": (("自我介绍", "告知录音", "说明来电目的", "欠款金额"),),
+    "payment": (("逾期天数", "最低还款额", "APP/网银/柜台", "分期方案"),),
+    "force_human": (("投诉", "情绪持续激动", "必须立即转人工"),),
+    "redial": (
+        ("未接通后查询今日已拨次数", "间隔至少", "重拨"),
+        ("已达上限", "今日完成", "次日重新评估"),
+    ),
+}
+
+
+def _split_rule_fragments(line: _SourceLine, prefix: str = "") -> tuple[_SourceLine, ...]:
+    text = line.text[len(prefix) :].strip() if prefix and line.text.startswith(prefix) else line.text
+    parts = [item.strip() for item in re.split(r"(?<=[。！？；;])\s*", text) if item.strip()]
+    return tuple(_SourceLine(number=line.number, text=item, section=line.section) for item in parts)
+
+
+def _unconsumed_selected_fragments(
+    selected: dict[str, _SourceLine], selectors: dict[str, str]
+) -> tuple[_SourceLine, ...]:
+    remaining: list[_SourceLine] = []
+    for key, line in selected.items():
+        patterns = _KNOWN_FRAGMENT_TOKENS[key]
+        consumed = [False] * len(patterns)
+        for fragment in _split_rule_fragments(line, selectors[key]):
+            matches = [
+                index
+                for index, tokens in enumerate(patterns)
+                if all(token in fragment.text for token in tokens)
+            ]
+            if len(matches) == 1 and not consumed[matches[0]]:
+                consumed[matches[0]] = True
+                continue
+            remaining.append(fragment)
+        if not all(consumed):
+            missing = [str(index + 1) for index, value in enumerate(consumed) if not value]
+            raise OutboundFlowValidationError(
+                "outbound_required_semantics",
+                f"{line.locator} 的 {key} 规则存在未消费的必需片段：{','.join(missing)}",
+            )
+    return tuple(remaining)
+
+
+def _is_supported_extra_human_trigger(fragment: _SourceLine) -> bool:
+    text = fragment.text
+    if "必须" not in text or "转人工" not in text:
+        return False
+    return bool(
+        re.search(r"高龄|重病|重大疾病|严重疾病", text)
+        or re.match(r"^\*\*[^*]*转人工触发条件\*\*：", text)
+    )
+
+
+def _raise_residual_conflict(
+    fragments: Iterable[_SourceLine],
+    *,
+    order_relation: str,
+    start: str,
+    end: str,
+    daily_max: int,
+    hourly_window: int,
+    hourly_max: int,
+) -> None:
+    for fragment in fragments:
+        text = fragment.text
+        if "接通后第一步" in text and "录音" in text:
+            relation = (
+                "recording_before_identity"
+                if re.search(r"接通后第一步.*(?:先)?(?:告知)?录音", text)
+                else "identity_before_recording"
+            )
+            if relation != order_relation:
+                raise OutboundFlowValidationError(
+                    "outbound_identity_order_conflict",
+                    f"{fragment.locator} 新增片段与已解析的身份/录音顺序相互冲突：{text}",
+                )
+        time_match = re.search(
+            r"每日\s*(\d{1,2}):(\d{2})\s*至次日\s*(\d{1,2}):(\d{2})\s*严禁拨打",
+            text,
+        )
+        if time_match:
+            observed_start = _clock(time_match.group(1), time_match.group(2), fragment)
+            observed_end = _clock(time_match.group(3), time_match.group(4), fragment)
+            if (observed_start, observed_end) != (start, end):
+                raise OutboundFlowValidationError(
+                    "outbound_time_conflict",
+                    f"{fragment.locator} 新增片段与禁呼时段冲突：{text}",
+                )
+        daily_match = re.search(r"每日拨打不得超过\s*(\d+)\s*次", text)
+        hourly_match = re.search(r"(\d+)小时内不得超过\s*(\d+)\s*次", text)
+        if daily_match or hourly_match:
+            observed_daily = int(daily_match.group(1)) if daily_match else daily_max
+            observed_window = int(hourly_match.group(1)) if hourly_match else hourly_window
+            observed_hourly = int(hourly_match.group(2)) if hourly_match else hourly_max
+            if (observed_daily, observed_window, observed_hourly) != (
+                daily_max,
+                hourly_window,
+                hourly_max,
+            ):
+                raise OutboundFlowValidationError(
+                    "outbound_frequency_conflict",
+                    f"{fragment.locator} 新增片段与外呼频次参数冲突：{text}",
+                )
+
+
 def _parse_rules(
     lines: tuple[_SourceLine, ...],
 ) -> tuple[
@@ -430,23 +567,37 @@ def _parse_rules(
     order_relation = _parse_order_relation(selected)
     _validate_required_phrases(selected)
 
-    extra_triggers = [
-        line
-        for line in lines
-        if line.section == "behavior"
-        and line.number not in recognized_numbers
-        and re.match(r"^\*\*[^*]*转人工触发条件\*\*：.+必须.*转人工", line.text)
-    ]
-    recognized_numbers.update(line.number for line in extra_triggers)
-    unknown = [
-        line
+    residual_fragments = list(_unconsumed_selected_fragments(selected, selectors))
+    residual_fragments.extend(
+        fragment
         for line in lines
         if line.section in {"regulatory", "branches", "behavior"}
         and _is_normative_line(line)
         and line.number not in recognized_numbers
+        for fragment in _split_rule_fragments(line)
+    )
+    _raise_residual_conflict(
+        residual_fragments,
+        order_relation=order_relation,
+        start=start,
+        end=end,
+        daily_max=daily_max,
+        hourly_window=hourly_window,
+        hourly_max=hourly_max,
+    )
+    extra_triggers = [
+        fragment
+        for fragment in residual_fragments
+        if _is_supported_extra_human_trigger(fragment)
+    ]
+    extra_trigger_keys = {(item.number, item.text) for item in extra_triggers}
+    unknown = [
+        fragment
+        for fragment in residual_fragments
+        if (fragment.number, fragment.text) not in extra_trigger_keys
     ]
     if unknown:
-        sample = "；".join(f"L{line.number} {line.text}" for line in unknown[:3])
+        sample = "；".join(f"L{fragment.number} {fragment.text}" for fragment in unknown[:3])
         raise OutboundFlowValidationError(
             "outbound_unsupported_rule",
             f"发现适配器不认识的规范性要求，不能静默忽略：{sample}",

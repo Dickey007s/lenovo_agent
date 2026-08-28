@@ -2172,7 +2172,7 @@ test("shows TC-10 source coverage, approval and non-execution as separate facts"
   }
 });
 
-test("projects TC-10 time and frequency source mutations without stale baseline numbers", async ({ page }) => {
+test("projects TC-10 time, frequency and inline human-trigger mutations without stale baseline numbers", async ({ page }) => {
   await mockHarness(page, { outboundEffectDynamic: true });
   await page.goto("/");
   await page.getByRole("textbox", { name: "任务指令" }).fill("根据专业性说明生成信用卡 M1 逾期用户 AI 外呼催收流程图文档。");
@@ -2185,6 +2185,12 @@ test("projects TC-10 time and frequency source mutations without stale baseline 
   await expect(panel).toContainText("5 次/日");
   await expect(panel).toContainText("2 小时");
   await expect(panel.locator(".outbound-flow-summary")).toContainText(`${dynamic.source_rule_group_count} 组 · ${dynamic.atomic_requirement_count} 条`);
+  await panel.getByText("逐条查看来源规则与流程映射").click();
+  const disputeGroup = panel.locator(".outbound-flow-rule-groups > details").filter({ hasText: "投诉与异议" });
+  await disputeGroup.click();
+  await expect(disputeGroup).toContainText("高龄客户必须立即转人工");
+  await expect(disputeGroup).toContainText("out-guard-extra-human-1");
+  await expect(disputeGroup).toContainText("out-edge-response-extra-human-1");
   await expect(panel).not.toContainText("3 次/日");
   await expect(panel).not.toContainText("22:00");
 });

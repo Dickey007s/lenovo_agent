@@ -407,7 +407,7 @@ write-off, posting or source-workbook edit.
 
 DR-0047 applies the same source-derived pattern to the fixed Operations-008
 process-design adapter. The server freezes exactly one approved Markdown file,
-parses each normative line into a rule ledger and builds stable node, edge,
+parses each normative fragment into a rule ledger and builds stable node, edge,
 guard and terminal records. Graph admission verifies one START, reachability,
 terminal closure, identity/recording/debt order, third-party disclosure limits
 and rule coverage. The generated DOCX is parsed again and compared with a fresh
@@ -416,6 +416,14 @@ EffectReceipt, so deterministic verification, complete source coverage,
 pending business/compliance approval and zero external actions remain distinct
 facts. This does not add a Connector, legal opinion, current-regulation registry
 or production outbound engine.
+
+DR-0048 makes that fragment boundary enforceable. A line selected for one known
+rule is not treated as fully consumed: every normative sentence fragment must
+match one expected semantic pattern, compile to a supported extra-human guard,
+or fail closed as unsupported/conflicting. The original line locator remains
+the audit anchor. This avoids both whole-line false green and browser-side
+keyword inference; it is still a fixed Operations-008 parser rather than a
+general policy language.
 
 ## 7. Eight module maturity
 
