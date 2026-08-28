@@ -2128,18 +2128,69 @@ class ScenarioEffectEngine:
         gates = build.outcome.gates
         records = build.outcome.records
         csv_rows = list(csv.reader(io.StringIO(build.ledger_csv.decode("utf-8-sig"))))
+        csv_risk_counts: dict[str, int] = {}
+        if csv_rows and "最终等级" in csv_rows[0]:
+            risk_column = csv_rows[0].index("最终等级")
+            csv_risk_counts = {
+                label: sum(row[risk_column] == label for row in csv_rows[1:])
+                for label in ("严重", "主要", "次要", "无")
+            }
         with zipfile.ZipFile(io.BytesIO(build.report_docx)) as archive:
             document_xml = archive.read("word/document.xml").decode("utf-8")
         source_bytes_after, _ = self._checked_source_bytes(catalog, spec)
         source_bytes_unchanged = source_bytes_before == source_bytes_after
+        derived_risk_counts = {
+            level: sum(record.final_risk_level == level for record in records)
+            for level in ("severe", "major", "minor")
+        }
+        risk_ledger_valid = (
+            len({record.record_id for record in records}) == len(records)
+            and build.risk_counts == derived_risk_counts
+            and build.risk_total
+            == sum(record.final_risk_level != "none" for record in records)
+            and all(
+                record.final_risk_level
+                == max(
+                    (record.base_risk_level, record.compatibility_risk_level),
+                    key=lambda level: {
+                        "none": 0,
+                        "minor": 1,
+                        "major": 2,
+                        "severe": 3,
+                    }[level],
+                )
+                for record in records
+            )
+        )
+        expected_csv_risk_counts = {
+            label: sum(record.final_risk_level == level for record in records)
+            for level, label in (
+                ("severe", "严重"),
+                ("major", "主要"),
+                ("minor", "次要"),
+                ("none", "无"),
+            )
+        }
+        ledger_csv_valid = (
+            len(csv_rows) == 19
+            and len(csv_rows[0]) == 20
+            and csv_risk_counts == expected_csv_risk_counts
+        )
+        report_structure_valid = (
+            build.docx_table_count >= 6
+            and document_xml.count("<w:tbl>") >= 6
+            and f"四、{build.risk_total} 项风险" in document_xml
+            and f"五、{len(build.missing_feature_codes)} 项未提测功能"
+            in document_xml
+        )
         checks = (
             self._check("check-release-source-contract", "四份来源结构与交叉引用", len(records) == 18 and len(source_refs) == 4, "PRD 18 项、三张执行表各 13 项；表头、编号、名称、优先级、状态、数字和八环境均由服务端逐项校验。"),
             self._check("check-release-gate-formulas", "四项正式上线 Gate 逐式复算", len(gates) == 4 and all(gate.denominator > 0 for gate in gates), "每项保留分子、分母、运算符、阈值、实际值和 PRD 来源规则；零分母会直接失败。"),
-            self._check("check-release-risk-ledger", "逐功能风险按规则取唯一最高等级", sum(build.risk_counts.values()) == 8 and all(record.final_risk_level == max((record.base_risk_level, record.compatibility_risk_level), key=lambda level: {"none": 0, "minor": 1, "major": 2, "severe": 3}[level]) for record in records), "风险由 P0、原因类型和异常环境数推导；同一功能只保留最高等级。"),
+            self._check("check-release-risk-ledger", "逐功能风险按规则取唯一最高等级", risk_ledger_valid, "逐项复核记录唯一性、基础风险与兼容风险的最高等级，并动态核对各等级计数与台账；不检查固定风险总数。"),
             self._check("check-release-gate-aggregation", "上线结论由 Gate 聚合", build.outcome.failed_gate_count == sum(not gate.passed for gate in gates) and build.outcome.status == ("passed" if all(gate.passed for gate in gates) else "failed"), "结论取决于四项 Gate 的布尔聚合，不检查固定功能名称或固定结论文案。"),
             self._check("check-release-auxiliary-separation", "辅助指标不冒充上线 Gate", all("辅助质量指标" in metric.source_note for metric in build.outcome.auxiliary_metrics), "分级与综合用例通过率单独标为辅助指标。"),
-            self._check("check-release-ledger-csv", "CSV 18 行可独立复算", len(csv_rows) == 19 and len(csv_rows[0]) == 20, "台账一行一个 PRD 功能，包含用例数、异常环境、规则、风险、来源和退出条件。"),
-            self._check("check-release-report-tables", "DOCX 包含结构化核验表", build.docx_table_count >= 6 and document_xml.count("<w:tbl>") >= 6, "报告包含四项 Gate、辅助指标、18 项矩阵、风险、未提测和整改计划表。"),
+            self._check("check-release-ledger-csv", "CSV 18 行与动态风险计数可独立复算", ledger_csv_valid, "台账一行一个 PRD 功能，包含用例数、异常环境、规则、风险、来源和退出条件；各风险等级计数必须与服务端 records 一致。"),
+            self._check("check-release-report-tables", "DOCX 包含结构化核验表与动态数量", report_structure_valid, f"报告包含四项 Gate、辅助指标、18 项矩阵、{build.risk_total} 项风险、{len(build.missing_feature_codes)} 项未提测和整改计划表。"),
             self._check("check-release-remediation", "整改项有负责人和退出条件", all(record.owner and record.remediation_action and record.exit_condition for record in records), "每项整改绑定功能编号、研发负责人、来源问题、动作和可验证退出条件。"),
             self._check("check-release-no-action", "四份原件未改且没有外部动作", source_bytes_unchanged, "生成前后重新读取四份 allowlisted 原件并逐字节比较；只在隔离运行工作区写入 DOCX/CSV，没有上线、配置写入或通知动作。"),
         )
@@ -2157,7 +2208,7 @@ class ScenarioEffectEngine:
                 "辅助指标：P0/P1/P2 用例通过率与综合用例通过率不作为正式上线 Gate",
             ),
             "key_outputs_label": "上线复核要点",
-            "review_guidance": "请由发布、研发和测试负责人逐项确认四条未通过 Gate、8 项风险与 5 项未提测功能；本次没有执行上线或修改配置。",
+            "review_guidance": f"请由发布、研发和测试负责人逐项确认四条上线 Gate、{build.risk_total} 项风险与 {len(build.missing_feature_codes)} 项未提测功能；本次没有执行上线或修改配置。",
             "execution_summary": "已在隔离运行工作区生成并校验上线报告和逐功能台账；没有执行上线、没有修改配置。",
             "business_gate_outcome": build.outcome,
         }
@@ -2167,7 +2218,7 @@ class ScenarioEffectEngine:
                 "上线合规与风险报告.docx",
                 "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
                 build.report_docx,
-                summary="结构化报告包含正式 Gate、18 项矩阵、8 项风险、5 项未提测功能和整改计划。",
+                summary=f"结构化报告包含正式 Gate、18 项矩阵、{build.risk_total} 项风险、{len(build.missing_feature_codes)} 项未提测功能和整改计划。",
                 record_count=18,
                 deliverable_type="上线合规与风险报告 DOCX",
                 **common,

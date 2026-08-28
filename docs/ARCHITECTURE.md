@@ -357,6 +357,9 @@ DR-0043 adds a generic business-outcome layer without weakening deterministic
 Artifact verification. The fixed pm-014 adapter validates four source-table
 contracts, derives one 18-row feature ledger and four formal release Gates, then
 stores the same `business_gate_outcome` on both Artifacts and the EffectReceipt.
+Reason base levels come from the PRD rule cells, while risk totals and all user-
+facing counts are recomputed from the ledger; unknown/ambiguous levels and any
+count mismatch fail closed rather than falling back to sample constants.
 `verifier_status=passed` means the source/formula/file checks passed;
 `business_gate_outcome.status=failed` independently means the source-derived
 release conditions failed. The browser projects both rather than converting a

@@ -746,6 +746,10 @@ created a PR.
 TC-11 likewise uses the ordinary Artifact and EffectReceipt protocol. Its two
 downloads carry one shared `business_gate_outcome`: 18 source-derived feature
 records, four formal release Gates and separate auxiliary quality metrics. A
+client must derive displayed risk counts from `records[]`; report summaries are
+already server-derived from that same ledger and must not assume the pinned
+sample always has eight risks. PRD reason levels are source facts, not enum
+defaults inferred from reason names. A
 passed EffectReceipt proves nine unique deterministic checks completed; it does
 not turn `business_gate_outcome.status=failed` into a release approval. A source
 contract or Verifier failure keeps the Artifact and receipt failed and must not

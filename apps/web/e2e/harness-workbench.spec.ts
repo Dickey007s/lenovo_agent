@@ -922,18 +922,47 @@ function failedDashboardToolkitEffectSnapshot(body: { workspace_id: string; inst
   };
 }
 
-function releaseReadinessEffectSnapshot(body: { workspace_id: string; instruction: string }) {
+function releaseReadinessEffectSnapshot(
+  body: { workspace_id: string; instruction: string },
+  options: { repairedF02?: boolean } = {},
+) {
   const base = snapshot(body, "completed", 20);
   const artifactIds = ["workspace-artifact-111122223333", "workspace-artifact-444455556666"];
   const sourceRefs = [csvFile.file_ref, pdfFile.file_ref, docxFile.file_ref, txtFile.file_ref];
+  const businessOutcome = structuredClone(tc11BusinessOutcome);
+  const riskTotal = options.repairedF02 ? 7 : 8;
+  const missingTotal = 5;
+  if (options.repairedF02) {
+    const severeGate = businessOutcome.gates.find((gate) => gate.gate_id === "business-gate-severe-zero")!;
+    severeGate.numerator = 3;
+    severeGate.actual = 3;
+    severeGate.result = "3 项严重问题未清零，不满足上线条件。";
+    const p0Metric = businessOutcome.auxiliary_metrics.find((metric) => metric.metric_id === "business-metric-p0-case-pass")!;
+    p0Metric.numerator = 58;
+    p0Metric.value = 95.1;
+    const overallMetric = businessOutcome.auxiliary_metrics.find((metric) => metric.metric_id === "business-metric-overall-case-pass")!;
+    overallMetric.numerator = 114;
+    overallMetric.value = 90.5;
+    const f02 = businessOutcome.records.find((record) => record.record_id === "F02")!;
+    f02.test_status = "通过";
+    f02.test_reason = "无";
+    f02.passed_cases = f02.total_cases;
+    f02.compatibility_issue_count = 0;
+    f02.compatibility_issue_environments = [];
+    f02.rules_hit = [];
+    f02.base_risk_level = "none";
+    f02.compatibility_risk_level = "none";
+    f02.final_risk_level = "none";
+    f02.affected_gate_ids = [];
+  }
   const checks = [
     ["check-release-source-contract", "四份来源结构与交叉引用", "PRD 18 项、三张执行表各 13 项；表头、编号、名称、优先级、状态、数字和八环境均由服务端逐项校验。"],
     ["check-release-gate-formulas", "四项正式上线 Gate 逐式复算", "每项保留分子、分母、运算符、阈值、实际值和 PRD 来源规则；零分母会直接失败。"],
     ["check-release-risk-ledger", "逐功能风险按规则取唯一最高等级", "风险由 P0、原因类型和异常环境数推导；同一功能只保留最高等级。"],
     ["check-release-gate-aggregation", "上线结论由 Gate 聚合", "结论取决于四项 Gate 的布尔聚合，不检查固定功能名称或固定结论文案。"],
     ["check-release-auxiliary-separation", "辅助指标不冒充上线 Gate", "分级与综合用例通过率单独标为辅助指标。"],
-    ["check-release-ledger-csv", "CSV 18 行可独立复算", "台账一行一个 PRD 功能，包含用例数、异常环境、规则、风险、来源和退出条件。"],
-    ["check-release-report-tables", "DOCX 包含结构化核验表", "报告包含四项 Gate、辅助指标、18 项矩阵、风险、未提测和整改计划表。"],
+    ["check-release-ledger-csv", "CSV 18 行与动态风险计数可独立复算", "台账一行一个 PRD 功能，各风险等级计数必须与服务端 records 一致。"],
+    ["check-release-report-tables", "DOCX 包含结构化核验表与动态数量", `报告包含四项 Gate、辅助指标、18 项矩阵、${riskTotal} 项风险、${missingTotal} 项未提测和整改计划表。`],
     ["check-release-remediation", "整改项有负责人和退出条件", "每项整改绑定功能编号、研发负责人、来源问题、动作和可验证退出条件。"],
     ["check-release-no-action", "四份原件未改且没有外部动作", "生成前后重新读取四份 allowlisted 原件并逐字节比较；只在隔离运行工作区写入 DOCX/CSV，没有上线、配置写入或通知动作。"],
   ].map(([check_id, label, detail]) => ({ check_id, label, passed: true, detail }));
@@ -950,11 +979,11 @@ function releaseReadinessEffectSnapshot(body: { workspace_id: string; instructio
     statistic_basis: "PRD 18 项功能为全集；上线配置、功能测试和兼容测试各 13 项，按功能编号交叉核对并由 PRD 规则计算。",
     purpose: "支持发布负责人复核是否满足上线条件；不代替人工审批，不执行上线或修改配置。",
     record_count: 18,
-    key_outputs: ["正式上线 Gate：4/4 未通过，结论为不得上线", "风险：严重 4、主要 2、次要 2", "未提测功能：5 项", "用例通过率是辅助质量指标，不作为正式上线 Gate"],
+    key_outputs: ["正式上线 Gate：4/4 未通过，结论为不得上线", `风险：严重 ${options.repairedF02 ? 3 : 4}、主要 2、次要 2`, `未提测功能：${missingTotal} 项`, "用例通过率是辅助质量指标，不作为正式上线 Gate"],
     key_outputs_label: "上线复核要点",
-    review_guidance: "请由发布、研发和测试负责人逐项确认四条未通过 Gate、8 项风险与 5 项未提测功能；本次没有执行上线或修改配置。",
+    review_guidance: `请由发布、研发和测试负责人逐项确认四条上线 Gate、${riskTotal} 项风险与 ${missingTotal} 项未提测功能；本次没有执行上线或修改配置。`,
     execution_summary: "已在隔离运行工作区生成并校验上线报告和逐功能台账；没有执行上线、没有修改配置。",
-    business_gate_outcome: tc11BusinessOutcome,
+    business_gate_outcome: businessOutcome,
     created_at: new Date().toISOString(),
     original_inputs_modified: false,
     review_required: true,
@@ -969,7 +998,7 @@ function releaseReadinessEffectSnapshot(body: { workspace_id: string; instructio
       file_name: "上线合规与风险报告.docx",
       media_type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
       size: 28140,
-      summary: "结构化报告包含正式 Gate、18 项矩阵、8 项风险、5 项未提测功能和整改计划。",
+      summary: `结构化报告包含正式 Gate、18 项矩阵、${riskTotal} 项风险、${missingTotal} 项未提测功能和整改计划。`,
       deliverable_type: "上线合规与风险报告 DOCX",
       download_path: `/v1/harness/runs/${base.run_id}/artifacts/${artifactIds[0]}`,
     }, {
@@ -996,7 +1025,7 @@ function releaseReadinessEffectSnapshot(body: { workspace_id: string; instructio
       source_file_refs: sourceRefs,
       artifact_ids: artifactIds,
       prohibited_side_effects: ["不执行上线", "不改配置"],
-      business_gate_outcome: tc11BusinessOutcome,
+      business_gate_outcome: businessOutcome,
       created_at: new Date().toISOString(),
       external_action: "none",
     }],
@@ -1407,7 +1436,7 @@ function locationFailureSnapshot(body: { workspace_id: string; instruction: stri
 }
 async function fulfillJson(route: Route, body: unknown, status = 200) { await route.fulfill({ status, contentType: "application/json", body: JSON.stringify(body) }); }
 
-async function mockHarness(page: Page, options: { failFirstStart?: boolean; failDecisionDefer?: boolean; disconnect?: boolean; failed?: boolean; locationFailure?: boolean; sourceRecovery?: boolean; sourceRecoveryThreeCandidates?: boolean; verifiedArtifactAuditPending?: boolean; verifiedArtifactAuditPendingDistinct?: boolean; verifiedFinanceArtifactAuditPending?: boolean; unverifiedArtifactLocationPending?: boolean; terminalArtifactLocationPending?: boolean; boundedRecovery?: boolean; effectArtifact?: boolean; outboundEffect?: boolean; reactEffect?: boolean; evaluationEffect?: boolean; dashboardEffect?: boolean; dashboardEffectFailed?: boolean; releaseEffect?: boolean; releaseEffectFailed?: boolean; effectBoundary?: boolean; reviewTable?: boolean; workspaceFailures?: number; interactiveLoop?: boolean; evidenceGate?: boolean } = {}) {
+async function mockHarness(page: Page, options: { failFirstStart?: boolean; failDecisionDefer?: boolean; disconnect?: boolean; failed?: boolean; locationFailure?: boolean; sourceRecovery?: boolean; sourceRecoveryThreeCandidates?: boolean; verifiedArtifactAuditPending?: boolean; verifiedArtifactAuditPendingDistinct?: boolean; verifiedFinanceArtifactAuditPending?: boolean; unverifiedArtifactLocationPending?: boolean; terminalArtifactLocationPending?: boolean; boundedRecovery?: boolean; effectArtifact?: boolean; outboundEffect?: boolean; reactEffect?: boolean; evaluationEffect?: boolean; dashboardEffect?: boolean; dashboardEffectFailed?: boolean; releaseEffect?: boolean; releaseEffectRepaired?: boolean; releaseEffectFailed?: boolean; effectBoundary?: boolean; reviewTable?: boolean; workspaceFailures?: number; interactiveLoop?: boolean; evidenceGate?: boolean } = {}) {
   let workspaceCalls = 0; let startCalls = 0; let streamCalls = 0;
   let currentBody = { workspace_id: "forte-public-office", instruction: "" };
   // Mock snapshots intentionally cover several server state shapes in one route.
@@ -1463,7 +1492,9 @@ async function mockHarness(page: Page, options: { failFirstStart?: boolean; fail
         : options.dashboardEffect
         ? dashboardToolkitEffectSnapshot(body)
         : options.releaseEffectFailed
-        ? failedReleaseReadinessEffectSnapshot(body)
+          ? failedReleaseReadinessEffectSnapshot(body)
+        : options.releaseEffectRepaired
+          ? releaseReadinessEffectSnapshot(body, { repairedF02: true })
         : options.releaseEffect
         ? releaseReadinessEffectSnapshot(body)
         : options.effectBoundary
@@ -1572,7 +1603,7 @@ async function mockHarness(page: Page, options: { failFirstStart?: boolean; fail
     }
     if (path.startsWith("/v1/harness/runs/")) {
       if (options.disconnect && streamCalls === 1) return fulfillJson(route, { ...snapshot(currentBody, "queued"), status: "indexing", last_event_sequence: 1, version: 2 });
-      if (options.interactiveLoop || options.evidenceGate || options.sourceRecovery || options.verifiedArtifactAuditPending || options.verifiedArtifactAuditPendingDistinct || options.verifiedFinanceArtifactAuditPending || options.unverifiedArtifactLocationPending || options.terminalArtifactLocationPending || options.boundedRecovery || options.locationFailure || options.effectArtifact || options.outboundEffect || options.reactEffect || options.evaluationEffect || options.dashboardEffect || options.dashboardEffectFailed || options.releaseEffect || options.releaseEffectFailed || options.effectBoundary) return fulfillJson(route, currentSnapshot);
+      if (options.interactiveLoop || options.evidenceGate || options.sourceRecovery || options.verifiedArtifactAuditPending || options.verifiedArtifactAuditPendingDistinct || options.verifiedFinanceArtifactAuditPending || options.unverifiedArtifactLocationPending || options.terminalArtifactLocationPending || options.boundedRecovery || options.locationFailure || options.effectArtifact || options.outboundEffect || options.reactEffect || options.evaluationEffect || options.dashboardEffect || options.dashboardEffectFailed || options.releaseEffect || options.releaseEffectRepaired || options.releaseEffectFailed || options.effectBoundary) return fulfillJson(route, currentSnapshot);
       currentSnapshot = snapshot(currentBody, options.failed ? "failed" : "completed");
       return fulfillJson(route, currentSnapshot);
     }
@@ -2092,6 +2123,23 @@ test("keeps deterministic verification separate from the TC-11 business release 
   if (process.env.CAPTURE_TC11_EFFECT_EVIDENCE === "1") {
     await page.screenshot({ path: "../../docs/evidence/screenshots/tc11-release-gate-mobile.png", fullPage: true });
   }
+});
+
+test("renders a source-derived seven-risk TC-11 summary without a stale fixed total", async ({ page }) => {
+  await mockHarness(page, { releaseEffectRepaired: true });
+  await page.goto("/");
+  await page.getByRole("textbox", { name: "任务指令" }).fill("综合 PRD、上线配置、功能测试和兼容测试，给出上线结论与改进计划。");
+  await page.getByRole("button", { name: "启动 Control Loop" }).click();
+
+  const artifacts = page.locator(".workspace-artifacts");
+  const outcome = page.getByRole("status", { name: "业务 Gate 结论" });
+  await expect(artifacts.locator(":scope > header > b")).toHaveText("业务 Gate 4/4 未通过");
+  await expect(artifacts).toContainText("7 项风险");
+  await expect(artifacts).not.toContainText("8 项风险");
+  await outcome.getByText("查看 18 项逐功能台账").click();
+  await expect(outcome).toContainText("严重 3 · 主要 2 · 次要 2 · 无风险项 11");
+  const f02 = outcome.locator(".business-ledger > ol > li").filter({ hasText: "F02" });
+  await expect(f02).toContainText("无风险项");
 });
 
 test("keeps a failed TC-11 verifier red instead of presenting a reliable report", async ({ page }) => {

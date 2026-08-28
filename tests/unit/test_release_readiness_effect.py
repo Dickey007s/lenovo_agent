@@ -51,6 +51,43 @@ def _record(build, code: str):
     return next(item for item in build.outcome.records if item.record_id == code)
 
 
+def _repair_f02_preview(preview: dict) -> None:
+    label = preview.get("display_label")
+    if label == "功能测试报告.xlsx":
+        f02 = next(
+            row
+            for row in preview["rows"]
+            if row["values"] and row["values"][0] == "F02"
+        )
+        f02["values"][8] = f02["values"][7]
+        f02["values"][9] = "通过"
+        f02["values"][10] = "—"
+        f02["values"][11] = "—"
+    elif label == "线上兼容环境测试报告.xlsx":
+        f02 = next(
+            row
+            for row in preview["rows"]
+            if row["values"] and row["values"][0] == "F02"
+        )
+        f02["values"][4:] = ["通过"] * 8
+
+
+def _replace_prd_reason_level(
+    previews: dict[str, dict], reason: str, level_text: str
+) -> None:
+    text = previews["PRD_v2.5.md"]["text"]
+    lines = text.splitlines()
+    for index, line in enumerate(lines):
+        if not line.startswith(f"| {reason} |"):
+            continue
+        cells = [cell.strip() for cell in line.strip().strip("|").split("|")]
+        cells[1] = level_text
+        lines[index] = "| " + " | ".join(cells) + " |"
+        previews["PRD_v2.5.md"]["text"] = "\n".join(lines)
+        return
+    raise AssertionError(f"PRD reason rule not found: {reason}")
+
+
 def test_tc11_derives_gates_ledger_and_two_parseable_artifacts_from_sources(
     catalog: BenchmarkWorkspaceCatalog,
 ) -> None:
@@ -167,14 +204,92 @@ def test_tc11_risk_mutations_change_results_without_expected_name_constants(
     assert _record(build_release_readiness(f05_previews), "F05").final_risk_level == "minor"
 
     f02_previews = _previews(catalog)
-    f02_test = _row(f02_previews, "功能测试报告.xlsx", "F02")
-    f02_test["values"][8] = f02_test["values"][7]
-    f02_test["values"][9] = "通过"
-    f02_test["values"][10] = "—"
-    f02_test["values"][11] = "—"
-    f02_compat = _row(f02_previews, "线上兼容环境测试报告.xlsx", "F02")
-    f02_compat["values"][4:] = ["通过"] * 8
+    for preview in f02_previews.values():
+        _repair_f02_preview(preview)
     assert _record(build_release_readiness(f02_previews), "F02").final_risk_level == "none"
+
+
+def test_tc11_engine_accepts_a_source_derived_seven_risk_ledger_after_f02_repair(
+    catalog: BenchmarkWorkspaceCatalog,
+) -> None:
+    class RepairedF02Catalog:
+        def public_workspace(self):
+            return catalog.public_workspace()
+
+        def public_file(self, file_ref: str):
+            preview = copy.deepcopy(catalog.public_file(file_ref))
+            _repair_f02_preview(preview)
+            return preview
+
+        def checked_input_bytes(self, file_ref: str):
+            return catalog.checked_input_bytes(file_ref)
+
+    execution = ScenarioEffectEngine().execute(
+        _spec().instruction, RepairedF02Catalog()
+    )
+
+    assert execution is not None
+    assert execution.status == "passed"
+    assert len(execution.artifacts) == 2
+    assert all(artifact.verifier_status == "passed" for artifact in execution.artifacts)
+    outcome = execution.artifacts[0].business_gate_outcome
+    assert outcome is not None
+    assert outcome.status == "failed"
+    assert outcome.failed_gate_count == 4
+    assert sum(record.final_risk_level != "none" for record in outcome.records) == 7
+    assert next(
+        record for record in outcome.records if record.record_id == "F02"
+    ).final_risk_level == "none"
+    assert sum(record.final_risk_level == "severe" for record in outcome.records) == 3
+    assert all("8 项风险" not in artifact.summary for artifact in execution.artifacts)
+    assert all(
+        "8 项风险" not in (artifact.review_guidance or "")
+        for artifact in execution.artifacts
+    )
+    assert all("7 项风险" in (artifact.review_guidance or "") for artifact in execution.artifacts)
+
+    report = next(
+        artifact for artifact in execution.artifacts if artifact.file_name.endswith(".docx")
+    )
+    with zipfile.ZipFile(io.BytesIO(report.content)) as package:
+        document = package.read("word/document.xml").decode("utf-8")
+    assert "四、7 项风险" in document
+    assert "四、8 项风险" not in document
+    ledger_artifact = next(
+        artifact for artifact in execution.artifacts if artifact.file_name.endswith(".csv")
+    )
+    ledger = list(
+        csv.DictReader(io.StringIO(ledger_artifact.content.decode("utf-8-sig")))
+    )
+    assert len(ledger) == 18
+    assert sum(row["最终等级"] != "无" for row in ledger) == 7
+    assert next(row for row in ledger if row["功能编号"] == "F02")["最终等级"] == "无"
+
+
+def test_tc11_prd_reason_level_cell_drives_the_base_risk(
+    catalog: BenchmarkWorkspaceCatalog,
+) -> None:
+    previews = _previews(catalog)
+    _replace_prd_reason_level(previews, "功能缺陷", "🟡 次要")
+
+    build = build_release_readiness(previews)
+
+    assert _record(build, "F05").base_risk_level == "minor"
+    assert _record(build, "F05").final_risk_level == "minor"
+
+
+@pytest.mark.parametrize("level_text", ["🟣 待定", "主要/次要"])
+def test_tc11_rejects_unknown_or_ambiguous_prd_reason_levels(
+    catalog: BenchmarkWorkspaceCatalog,
+    level_text: str,
+) -> None:
+    previews = _previews(catalog)
+    _replace_prd_reason_level(previews, "功能缺陷", level_text)
+
+    with pytest.raises(ReleaseReadinessValidationError) as exc_info:
+        build_release_readiness(previews)
+
+    assert exc_info.value.code == "prd-reason-level-invalid"
 
 
 @pytest.mark.parametrize(

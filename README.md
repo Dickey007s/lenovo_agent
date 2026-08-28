@@ -309,7 +309,10 @@ multi-instance coordination and governed external action remain target work.
   multi-tenant execution.
 - `DR-0043` replaces TC-11's historical name-list risk check with a strict
   four-source contract and an 18-row service-owned ledger. Risk levels now
-  derive from PRD priority, test reason and compatibility exceptions; four
+  derive from PRD priority, the reason rule's own level cell, test facts and
+  compatibility exceptions; unknown or ambiguous rule levels fail closed. Risk
+  totals and the report/review summaries are recomputed from the ledger rather
+  than fixed at the current sample's eight risks. Four
   formal business Gates retain numerator, denominator, operator and threshold.
   The UI can therefore show two simultaneous truths: both files passed nine
   deterministic source/formula/structure checks, while the business decision is
