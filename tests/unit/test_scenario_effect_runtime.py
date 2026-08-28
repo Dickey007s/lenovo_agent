@@ -58,6 +58,7 @@ TC11_INSTRUCTION = "综合 PRD、上线配置、功能测试和兼容测试，�
 TC05_INSTRUCTION = "核对三期往来明细，生成未付统计、未收统计，并判断是否存在僵尸账款。"
 TC07_INSTRUCTION = "依据统一规则核查六份授权委托书，逐项说明风险、资料不足和复核动作。"
 TC06_INSTRUCTION = "依据两个岗位说明分别审阅五份简历，保留逐条证据并输出辅助筛选结果。"
+TC10_INSTRUCTION = "根据专业性说明生成信用卡 M1 逾期用户 AI 外呼催收流程图文档。"
 
 
 class OnboardingPlanner:
@@ -363,6 +364,57 @@ class FinanceReconciliationAnalyst:
                             quote=(
                                 "其他应收款\\其他应收往来 | 【绵阳长城发展融资担保有限公司】 | "
                                 "借 | 1500000 | 200000 |  | 200000 |  | 借 | 1700000"
+                            ),
+                        )
+                    ],
+                )
+            ],
+            follow_ups=[],
+            review_required=True,
+        )
+
+
+class OutboundFlowPlanner:
+    model = "deepseek-v4-pro"
+
+    async def plan(self, *, scenario, files):
+        source = next(item for item in files if item["display_label"] == "专业性说明.md")
+        return HarnessPlanCandidate(
+            summary="读取批准的专业性说明并形成可定位的流程规则上下文",
+            selection_reason="固定 TC-10 效果门会另行冻结批准 Markdown，并从来源行重新推导规则账本和状态图。",
+            units=[
+                HarnessPlanCandidateUnit(
+                    unit_id="read-outbound-guidance",
+                    title="读取专业性说明",
+                    objective="核对身份确认与欠款披露的来源顺序",
+                    input_file_refs=[source["file_ref"]],
+                    tool="file.read",
+                )
+            ],
+        )
+
+
+class OutboundFlowAnalyst:
+    model = "deepseek-v4-pro"
+
+    async def analyze(self, *, instruction, plan, files, validation_feedback=None):
+        source = files[0]
+        return HarnessTaskResult(
+            summary="已读取一条身份确认规则；完整规则账本、状态图和 DOCX 由服务端固定 TC-10 效果门独立重算。",
+            findings=[
+                HarnessFinding(
+                    plan_unit_id=plan.units[0].unit_id,
+                    title="身份确认必须早于欠款披露",
+                    detail="这条模型分析只作可回开的上下文；规则覆盖与图可达性由确定性效果门验证。",
+                    file_refs=[source["file_ref"]],
+                    evidence_quotes=[
+                        HarnessEvidenceQuote(
+                            file_ref=source["file_ref"],
+                            role="expected",
+                            label="身份确认顺序",
+                            quote=(
+                                "接通后第一步，询问是否本人。确认是本人才进入催收话术；"
+                                "非本人只请转告；无法确认则结束通话。"
                             ),
                         )
                     ],
@@ -1042,6 +1094,76 @@ async def test_tc05_runtime_keeps_calculation_candidates_and_finance_decision_se
         assert public_outcome["unpaid_count"] == 31
         assert public_outcome["candidate_count"] == 0
         assert public_outcome["original_inputs_modified"] is False
+        assert "content_sha256" not in json.dumps(public, ensure_ascii=False)
+    finally:
+        await runtime.close()
+
+
+@pytest.mark.asyncio
+async def test_tc10_runtime_keeps_flow_verification_approval_and_actions_separate(
+    tmp_path: Path,
+) -> None:
+    before = _forte_digests()
+    runtime = HarnessRuntime(
+        BenchmarkWorkspaceCatalog(FORTE_ROOT),
+        OutboundFlowPlanner(),
+        OutboundFlowAnalyst(),
+        effect_engine=ScenarioEffectEngine(),
+        artifact_store=RunWorkspaceArtifactStore(tmp_path / "run-workspaces"),
+    )
+    try:
+        started = await runtime.start(
+            "outbound-owner",
+            HarnessRunStart(
+                idempotency_key="tc10-source-derived-outbound-runtime-0001",
+                instruction=TC10_INSTRUCTION,
+            ),
+        )
+        snapshot = None
+        for _ in range(1_000):
+            candidate = await runtime.get("outbound-owner", started.run.run_id)
+            if candidate.status in {"waiting_input", "completed", "stopped", "failed"}:
+                snapshot = candidate
+                break
+            await asyncio.sleep(0.01)
+        assert snapshot is not None
+        assert snapshot.status == "completed"
+        assert len(snapshot.workspace_artifacts) == 1
+        assert len(snapshot.effect_receipts) == 1
+
+        artifact = snapshot.workspace_artifacts[0]
+        receipt = snapshot.effect_receipts[0]
+        assert artifact.verifier_status == receipt.status == "passed"
+        assert artifact.outbound_flow_outcome is not None
+        assert receipt.outbound_flow_outcome == artifact.outbound_flow_outcome
+        outcome = artifact.outbound_flow_outcome
+        assert outcome.status == "approval_required"
+        assert outcome.atomic_requirement_count == len(outcome.rules)
+        assert outcome.covered_count == outcome.atomic_requirement_count
+        assert outcome.unsupported_count == outcome.conflict_count == 0
+        assert outcome.reachable_terminal_count == outcome.terminal_count
+        assert outcome.human_approval_required is True
+        assert outcome.legal_opinion is False
+        assert outcome.original_inputs_modified is False
+        assert outcome.external_action == "none"
+        assert all(check.passed for check in artifact.checks)
+        assert artifact.source_file_refs == ["forte-ba23e986a9c7e8d8"]
+
+        _, content = await runtime.get_workspace_artifact(
+            "outbound-owner", snapshot.run_id, artifact.artifact_id
+        )
+        with zipfile.ZipFile(io.BytesIO(content)) as package:
+            document = package.read("word/document.xml").decode("utf-8")
+        assert document.count("<w:tbl>") >= 6
+        assert "来源规则账本" in document
+        assert "最终合规审批未发生" in document
+        assert "这是流程设计，不是拨号、CRM/短信执行，也不是法律意见" in document
+        assert _forte_digests() == before
+
+        public = runtime.public_snapshot(snapshot).model_dump(mode="json")
+        public_outcome = public["effect_receipts"][0]["outbound_flow_outcome"]
+        assert public_outcome["atomic_requirement_count"] == outcome.atomic_requirement_count
+        assert public_outcome["external_action"] == "none"
         assert "content_sha256" not in json.dumps(public, ensure_ascii=False)
     finally:
         await runtime.close()

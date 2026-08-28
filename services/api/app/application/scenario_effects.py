@@ -38,6 +38,7 @@ from packages.contracts.harness_models import (
     AgentControlLoopCandidateReviewOutcome,
     AgentControlLoopFinanceReviewOutcome,
     AgentControlLoopLegalReviewOutcome,
+    AgentControlLoopOutboundFlowOutcome,
 )
 from services.api.app.application.candidate_review_effect import (
     CANDIDATE_LOGICAL_IDS,
@@ -73,6 +74,12 @@ from services.api.app.application.finance_reconciliation_effect import (
     FinanceReconciliationValidationError,
     FinanceSourceInput,
     build_finance_reconciliation,
+)
+from services.api.app.application.outbound_flow_effect import (
+    SOURCE_LOGICAL_ID as OUTBOUND_SOURCE_LOGICAL_ID,
+    OutboundFlowValidationError,
+    OutboundSourceInput,
+    build_outbound_flow,
 )
 
 
@@ -112,6 +119,7 @@ class GeneratedOfficeArtifact:
     legal_review_outcome: AgentControlLoopLegalReviewOutcome | None = None
     candidate_review_outcome: AgentControlLoopCandidateReviewOutcome | None = None
     finance_review_outcome: AgentControlLoopFinanceReviewOutcome | None = None
+    outbound_flow_outcome: AgentControlLoopOutboundFlowOutcome | None = None
 
     @property
     def verifier_status(self) -> str:
@@ -412,10 +420,14 @@ SCENARIO_EFFECT_SPECS: tuple[ScenarioEffectSpec, ...] = (
         "根据专业性说明生成信用卡 M1 逾期用户 AI 外呼催收流程图文档。",
         (("运营管理", "专业性说明.md"),),
         ("外呼流程-M1逾期用户AI外呼催收流程图.docx",),
-        "validator-compliant-outbound-flow-v1",
-        "成果区显示真实 DOCX、13 项流程验证和未发生外呼回执。",
-        ("workspace_artifacts[]", "effect_receipts[]", "deterministic_verification_completed"),
-        ("不拨号", "不写 CRM", "不发送短信"),
+        "validator-compliant-outbound-flow-v2",
+        "成果区分开显示来源与图结构验证、规则覆盖、合规审批和未发生的外部动作。",
+        (
+            "workspace_artifacts[].outbound_flow_outcome",
+            "effect_receipts[].outbound_flow_outcome",
+            "deterministic_verification_completed",
+        ),
+        ("不拨号", "不写 CRM", "不发送短信", "不写禁呼名单", "不实际转人工"),
         "implemented",
         _contains_any(("M1", "外呼"), ("催收", "流程")),
     ),
@@ -548,14 +560,17 @@ class ScenarioEffectEngine:
                 key = (group, str(item.get("display_label")))
                 if key in requested_keys:
                     matches[key].append(str(item.get("file_ref")))
-        if spec.scenario_id in {"TC-05", "TC-06", "TC-07"}:
+        if spec.scenario_id in {"TC-05", "TC-06", "TC-07", "TC-10"}:
             folder_label = {
                 "TC-05": "财务管理",
                 "TC-06": "人力招聘",
                 "TC-07": "法务",
+                "TC-10": "运营管理",
             }[spec.scenario_id]
-            expected_count = 3 if spec.scenario_id == "TC-05" else 7
-            legal_folder = next(
+            expected_count = {"TC-05": 3, "TC-06": 7, "TC-07": 7, "TC-10": 1}[
+                spec.scenario_id
+            ]
+            source_folder = next(
                 (folder for folder in folders if folder.get("display_label") == folder_label),
                 None,
             )
@@ -564,10 +579,10 @@ class ScenarioEffectEngine:
             }
             actual_labels = [
                 str(item.get("display_label"))
-                for item in list((legal_folder or {}).get("files") or [])
+                for item in list((source_folder or {}).get("files") or [])
             ]
             if (
-                legal_folder is None
+                source_folder is None
                 or len(actual_labels) != expected_count
                 or set(actual_labels) != expected_labels
             ):
@@ -576,6 +591,7 @@ class ScenarioEffectEngine:
                         "TC-05": "Finance-018 财务管理目录必须恰好包含三个固定期间工作簿",
                         "TC-06": "hr-001 人力招聘目录必须恰好包含两份 JD 和五份简历",
                         "TC-07": "Legal-020 法务目录必须恰好包含一份规则和六份委托书",
+                        "TC-10": "Operations-008 运营管理目录必须恰好包含一份专业性说明",
                     }[spec.scenario_id]
                 )
         preview_refs: list[str] = []
@@ -692,6 +708,14 @@ class ScenarioEffectEngine:
         finance_outcome = finance_outcomes[0] if finance_outcomes else None
         if finance_outcomes and any(item != finance_outcome for item in finance_outcomes[1:]):
             raise ScenarioEffectError("同一效果的财务复核事实不一致")
+        outbound_outcomes = [
+            artifact.outbound_flow_outcome
+            for artifact in artifacts
+            if artifact.outbound_flow_outcome is not None
+        ]
+        outbound_outcome = outbound_outcomes[0] if outbound_outcomes else None
+        if outbound_outcomes and any(item != outbound_outcome for item in outbound_outcomes[1:]):
+            raise ScenarioEffectError("同一效果的外呼流程覆盖事实不一致")
         return ScenarioEffectExecution(
             scenario_id=spec.scenario_id,
             capability_id=spec.capability_id,
@@ -725,6 +749,16 @@ class ScenarioEffectEngine:
                     if finance_outcome
                     else ""
                 )
+                + (
+                    f" 来源推导 {outbound_outcome.atomic_requirement_count} 条原子要求，"
+                    f"覆盖 {outbound_outcome.covered_count} 条、"
+                    f"不支持 {outbound_outcome.unsupported_count} 条、"
+                    f"冲突 {outbound_outcome.conflict_count} 条；"
+                    f"可达终态 {outbound_outcome.reachable_terminal_count}/"
+                    f"{outbound_outcome.terminal_count}。"
+                    if outbound_outcome
+                    else ""
+                )
             ),
             cost="0 次额外模型调用；仅消耗本机确定性解析、计算与文件写入。",
             result=(
@@ -737,7 +771,11 @@ class ScenarioEffectEngine:
                         else (
                             "确定性计算与三份成果结构通过；只形成跨期风险候选，最终财务处置仍待人工复核。"
                             if finance_outcome
-                            else "所有确定性效果门通过，成果仍需用户复核。"
+                            else (
+                                "来源规则、DOCX 与状态图结构通过；这仍只是流程设计，最终合规审批及拨号、CRM、短信等动作均未发生。"
+                                if outbound_outcome
+                                else "所有确定性效果门通过，成果仍需用户复核。"
+                            )
                         )
                     )
                 )
@@ -2611,185 +2649,70 @@ class ScenarioEffectEngine:
     def _compliant_outbound_flow(
         self, catalog: ScenarioEffectCatalog, spec: ScenarioEffectSpec
     ) -> tuple[GeneratedOfficeArtifact, ...]:
-        previews = self._previews(catalog, spec)
-        source_refs = self._source_refs(previews)
-        source = previews["专业性说明.md"].get("text") or ""
-        flow = [
-            "START -> 外呼时段合规判断",
-            "外呼时段不合规 -> 停止外呼（达上限）",
-            "外呼时段合规 -> 发起外呼拨号",
-            "发起外呼拨号 -> 是否接通",
-            "未接通 -> 今日已拨次数与一小时频次判断",
-            "达到每日3次或1小时1次上限 -> 停止外呼（达上限）",
-            "未达上限 -> 安排重拨",
-            "接通 -> 录音告知（本次通话将被录音）",
-            "录音告知 -> 身份确认",
-            "非本人 -> 第三方是否要求不再联系",
-            "第三方要求不再联系 -> 加入禁呼名单",
-            "第三方未要求 -> 案件升级",
-            "本人 -> 开场告知与还款引导",
-            "开场告知与还款引导 -> 用户态度判断",
-            "承诺还款 -> PTP登记",
-            "软拒绝 -> 转人工跟进",
-            "硬拒绝 -> 转人工跟进",
-            "投诉或异议 -> 转人工跟进",
-            "情绪激动超过30秒 -> 转人工跟进",
-            "接通后立即挂断或无法沟通 -> 今日已拨次数与一小时频次判断",
-        ]
-        terminal_states = (
-            "PTP登记",
-            "转人工跟进",
-            "安排重拨",
-            "停止外呼（达上限）",
-            "加入禁呼名单",
-            "案件升级",
+        source = self._outbound_source_input(catalog, spec)
+        original_bytes = bytes(source.content)
+        try:
+            build = build_outbound_flow(source)
+        except OutboundFlowValidationError as exc:
+            raise ScenarioEffectError(
+                f"Operations-008 来源或流程验证失败 [{exc.code}]：{exc.detail}"
+            ) from exc
+        source_unchanged = catalog.checked_input_bytes(source.file_ref) == original_bytes
+        checks = tuple(
+            self._check(item.check_id, item.label, item.passed, item.detail)
+            for item in build.checks
+        ) + (
+            self._check(
+                "check-outbound-original-source-read-only-v2",
+                "批准来源保持只读",
+                source_unchanged,
+                "生成后重新读取冻结 Catalog 字节；本工具只写隔离运行工作区，不修改 Operations-008 原件。",
+            ),
         )
-        source_requirements = (
-            "22:00",
-            "08:00",
-            "每日拨打不得超过 3 次",
-            "1小时内不得超过 1 次",
-            "至少保存 2 年",
-            "先确认是否本人",
-            "严禁透露欠款金额",
-            "明确要求不再联系",
-            "承诺还款（PTP）",
-            "软拒绝",
-            "硬拒绝",
-            "投诉/异议",
-            "无效通话",
-            "情绪持续激动超过 30 秒",
-            *terminal_states,
-        )
-        execution_summary = "本次只生成流程设计 DOCX。文档中的“发起外呼拨号”“写 CRM”等是流程节点描述，不是执行回执；实际没有拨号、没有写 CRM、没有发送短信。"
-        paragraphs = [
-            "信用卡 M1 逾期用户 AI 外呼催收流程设计",
-            "这份文档负责回答：何时允许拨号、接通后如何确认身份、不同客户状态如何分流，以及每条路径如何结束。",
-            "采用依据：《专业性说明.md》中的外呼时段、频次、录音、身份确认、第三方禁呼、转人工和六类终态规则。",
-            "实际执行边界：" + execution_summary,
-            "采用前请复核：业务负责人确认流程可执行性，合规负责人确认规则口径与当前制度一致。",
-            "一、流程节点",
-            *[f"{index + 1}. {edge}" for index, edge in enumerate(flow)],
-            "二、六类终态",
-            "、".join(terminal_states),
-            "三、文档中的动作如何理解",
-            "“发起外呼拨号”“写 CRM”等名称只描述未来流程节点，不是本次 Run 的执行回执。",
-        ]
-        content = self._docx_bytes(paragraphs)
-        reached_targets = {edge.split(" -> ", 1)[1] for edge in flow}
-        checks = (
-            self._check(
-                "check-outbound-source",
-                "专业说明来源完整",
-                all(token in source for token in source_requirements),
-                "时段、频次、录音、身份、第三方、人工升级和六类终态均从《专业性说明.md》逐项核对。",
-            ),
-            self._check(
-                "check-outbound-start",
-                "唯一开始节点",
-                sum(line.startswith("START") for line in flow) == 1,
-                "状态机只有一个 START。",
-            ),
-            self._check(
-                "check-outbound-time-gate",
-                "拨号前时段 Gate",
-                flow.index("START -> 外呼时段合规判断") < flow.index("外呼时段合规 -> 发起外呼拨号")
-                and "外呼时段不合规 -> 停止外呼（达上限）" in flow,
-                "不合规路径直接停止，不进入拨号。",
-            ),
-            self._check(
-                "check-outbound-connect",
-                "接通与未接通互斥",
-                "发起外呼拨号 -> 是否接通" in flow
-                and "未接通 -> 今日已拨次数与一小时频次判断" in flow
-                and "接通 -> 录音告知（本次通话将被录音）" in flow,
-                "是否接通后只有接通、未接通两类业务入口。",
-            ),
-            self._check(
-                "check-outbound-retry",
-                "每日 3 次 / 每小时 1 次上限",
-                "达到每日3次或1小时1次上限 -> 停止外呼（达上限）" in flow
-                and "未达上限 -> 安排重拨" in flow,
-                "仅未达两项频次上限时进入安排重拨。",
-            ),
-            self._check(
-                "check-outbound-recording",
-                "录音告知先于身份确认",
-                flow.index("接通 -> 录音告知（本次通话将被录音）")
-                < flow.index("录音告知 -> 身份确认"),
-                "先告知录音，再询问身份。",
-            ),
-            self._check(
-                "check-outbound-identity",
-                "身份确认先于欠款引导",
-                flow.index("录音告知 -> 身份确认") < flow.index("本人 -> 开场告知与还款引导"),
-                "身份确认前不披露欠款信息。",
-            ),
-            self._check(
-                "check-outbound-third-party",
-                "第三方禁呼",
-                "第三方要求不再联系 -> 加入禁呼名单" in flow,
-                "第三方要求停止联系时进入禁呼终态。",
-            ),
-            self._check(
-                "check-outbound-attitude",
-                "本人态度分支",
-                all(
-                    any(line.startswith(token) for line in flow)
-                    for token in ("承诺还款", "软拒绝", "硬拒绝")
-                ),
-                "承诺、软拒绝和硬拒绝均有路径。",
-            ),
-            self._check(
-                "check-outbound-invalid",
-                "无效通话回到频次判断",
-                "接通后立即挂断或无法沟通 -> 今日已拨次数与一小时频次判断" in flow,
-                "无效通话不会绕过重拨上限。",
-            ),
-            self._check(
-                "check-outbound-human",
-                "高风险情况转人工",
-                all(
-                    f"{token} -> 转人工跟进" in flow
-                    for token in ("硬拒绝", "投诉或异议", "情绪激动超过30秒")
-                ),
-                "三类强制情况均进入人工。",
-            ),
-            self._check(
-                "check-outbound-terminals",
-                "六类终态齐全",
-                len(terminal_states) == 6 and set(terminal_states).issubset(reached_targets),
-                "六类业务终态均由至少一条流程路径到达。",
-            ),
-            self._check(
-                "check-outbound-no-action",
-                "外部动作均未发生",
-                any(execution_summary in paragraph for paragraph in paragraphs)
-                and spec.prohibited_side_effects == ("不拨号", "不写 CRM", "不发送短信"),
-                "只在隔离 Run Workspace 生成 DOCX；拨号、CRM 与短信回执均为 none。",
-            ),
+        outcome = build.outcome
+        terminal_labels = tuple(item.label for item in outcome.terminals if item.source_listed)
+        execution_summary = (
+            "已从批准 Markdown 推导规则账本并生成可遍历流程设计 DOCX。"
+            "拨号、CRM、短信、禁呼写入和转人工均为未来流程节点；"
+            "本次 external_action=none，最终合规审批未发生。"
         )
         return (
             GeneratedOfficeArtifact(
                 "M1 逾期用户合规外呼流程设计",
                 "外呼流程-M1逾期用户AI外呼催收流程图.docx",
                 "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                content,
-                source_refs,
-                "validator-compliant-outbound-flow-v1",
+                build.report_docx,
+                (source.file_ref,),
+                "validator-compliant-outbound-flow-v2",
                 checks,
-                "依据《专业性说明.md》生成完整流程设计，覆盖六类终态；本次没有执行外呼。",
-                covered_period="信用卡 M1 逾期阶段",
-                statistic_basis="只采用《专业性说明.md》中的时段、频次、录音、身份确认、第三方禁呼、转人工和终态规则。",
-                purpose="供业务与合规负责人审阅流程是否可采用；不是拨号、CRM 或短信执行工具。",
-                deliverable_type="流程设计 DOCX",
-                key_outputs=terminal_states,
-                key_outputs_label="6 类关键终态",
-                review_guidance="13 项确定性规则检查通过后，仍需业务与合规负责人复核当前制度口径、话术和实际系统接入方案。",
+                (
+                    f"从来源动态推导 {outcome.source_rule_group_count} 组、"
+                    f"{outcome.atomic_requirement_count} 条原子要求，"
+                    f"构建 {outcome.node_count} 个节点与 {outcome.edge_count} 条边；"
+                    "这是一份待审批的流程设计，不是外呼执行回执。"
+                ),
+                covered_period="信用卡 M1 逾期流程设计；来源未提供制度版本或批准主体",
+                statistic_basis=(
+                    "只使用《专业性说明.md》的安全行号与冻结原始字节，"
+                    "动态解析时段、频次、录音、身份、第三方、态度分支、终态和重拨规则。"
+                ),
+                purpose=(
+                    "供业务与合规负责人核对规则覆盖和状态图可达性；"
+                    "不是外呼系统、法律意见或最新监管有效性验证。"
+                ),
+                record_count=outcome.atomic_requirement_count,
+                deliverable_type="来源推导的流程设计 DOCX",
+                key_outputs=terminal_labels,
+                key_outputs_label=f"来源列出的 {len(terminal_labels)} 类终态",
+                review_guidance=(
+                    f"请复核 {outcome.atomic_requirement_count} 条来源要求、"
+                    f"{outcome.reachable_terminal_count}/{outcome.terminal_count} 个可达终态，"
+                    "并由业务与合规负责人完成最终审批；当前没有拨号、写 CRM 或发送短信。"
+                ),
                 execution_summary=execution_summary,
+                outbound_flow_outcome=outcome,
             ),
         )
-
     def _customer_segmentation(
         self, catalog: ScenarioEffectCatalog, spec: ScenarioEffectSpec
     ) -> tuple[GeneratedOfficeArtifact, ...]:
@@ -3295,6 +3218,36 @@ class ScenarioEffectEngine:
     ) -> AgentControlLoopArtifactCheck:
         return AgentControlLoopArtifactCheck(
             check_id=check_id, label=label, passed=bool(passed), detail=detail
+        )
+
+    @staticmethod
+    def _outbound_source_input(
+        catalog: ScenarioEffectCatalog, spec: ScenarioEffectSpec
+    ) -> OutboundSourceInput:
+        workspace = catalog.public_workspace()
+        folders = [
+            folder
+            for folder in workspace.get("folders") or []
+            if folder.get("display_label") == "运营管理"
+        ]
+        if len(folders) != 1:
+            raise ScenarioEffectError("Operations-008 运营管理目录必须唯一")
+        items = list(folders[0].get("files") or [])
+        expected_labels = [label for group, label in spec.source_labels if group == "运营管理"]
+        if len(items) != 1 or expected_labels != ["专业性说明.md"]:
+            raise ScenarioEffectError("Operations-008 运营管理目录必须恰好包含一份专业性说明")
+        item = items[0]
+        if str(item.get("display_label")) != "专业性说明.md":
+            raise ScenarioEffectError("Operations-008 来源逻辑名称不匹配")
+        file_ref = str(item.get("file_ref"))
+        return OutboundSourceInput(
+            logical_id=OUTBOUND_SOURCE_LOGICAL_ID,
+            file_name="专业性说明.md",
+            display_path=str(item.get("display_path")),
+            file_ref=file_ref,
+            content=catalog.checked_input_bytes(file_ref),
+            declared_size=int(item.get("size") or 0),
+            allowlist_verified=True,
         )
 
     @staticmethod

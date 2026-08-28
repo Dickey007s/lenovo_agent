@@ -919,59 +919,57 @@ def test_finance_outputs_match_known_fixed_input_totals(
     assert outcome.external_action == "none"
 
 
-def test_outbound_flow_is_a_valid_docx_and_never_claims_execution(
+def test_outbound_flow_is_source_derived_and_never_claims_execution(
     catalog: BenchmarkWorkspaceCatalog,
 ) -> None:
     spec, execution = _execute("TC-10", catalog)
     artifact = execution.artifacts[0]
+    outcome = artifact.outbound_flow_outcome
+
+    assert outcome is not None
+    assert outcome.status == "approval_required"
+    assert outcome.source_rule_group_count == len({rule.group for rule in outcome.rules})
+    assert outcome.atomic_requirement_count == len(outcome.rules)
+    assert outcome.covered_count == len(outcome.rules)
+    assert outcome.unsupported_count == outcome.conflict_count == 0
+    assert outcome.node_count == len(outcome.nodes)
+    assert outcome.edge_count == len(outcome.edges)
+    assert outcome.guard_count == len(outcome.guards)
+    assert outcome.terminal_count == len(outcome.terminals)
+    assert outcome.reachable_terminal_count == outcome.terminal_count
+    assert all(outcome.graph_integrity.model_dump().values())
 
     with zipfile.ZipFile(io.BytesIO(artifact.content)) as archive:
         assert {"[Content_Types].xml", "_rels/.rels", "word/document.xml"}.issubset(
             archive.namelist()
         )
         document = archive.read("word/document.xml").decode("utf-8")
-    expected_terminals = (
-        "PTP登记",
-        "转人工跟进",
-        "安排重拨",
-        "停止外呼（达上限）",
-        "加入禁呼名单",
-        "案件升级",
+    expected_terminals = tuple(
+        terminal.label for terminal in outcome.terminals if terminal.source_listed
     )
-    assert document.count("START") == 1
     assert all(token in document for token in expected_terminals)
-    assert "这份文档负责回答" in document
-    assert "采用依据：《专业性说明.md》" in document
-    assert "流程节点描述，不是执行回执" in document
-    assert "没有拨号、没有写 CRM、没有发送短信" in document
-    assert len(artifact.checks) == 13
+    assert "来源规则账本" in document
+    assert "边与守卫表" in document
+    assert "这是流程设计，不是拨号、CRM/短信执行，也不是法律意见" in document
+    assert "最终合规审批未发生" in document
     assert all(check.passed for check in artifact.checks)
-    assert {check.check_id for check in artifact.checks} == {
-        "check-outbound-source",
-        "check-outbound-start",
-        "check-outbound-time-gate",
-        "check-outbound-connect",
-        "check-outbound-retry",
-        "check-outbound-recording",
-        "check-outbound-identity",
-        "check-outbound-third-party",
-        "check-outbound-attitude",
-        "check-outbound-invalid",
-        "check-outbound-human",
-        "check-outbound-terminals",
-        "check-outbound-no-action",
-    }
+    assert len(artifact.checks) == 12
     assert artifact.source_file_refs == execution.source_file_refs
     assert spec.source_labels == (("运营管理", "专业性说明.md"),)
-    assert artifact.covered_period == "信用卡 M1 逾期阶段"
-    assert artifact.deliverable_type == "流程设计 DOCX"
+    assert artifact.deliverable_type == "来源推导的流程设计 DOCX"
+    assert artifact.record_count == outcome.atomic_requirement_count
     assert artifact.key_outputs == expected_terminals
-    assert "专业性说明.md" in (artifact.statistic_basis or "")
-    assert "不是拨号" in (artifact.purpose or "")
-    assert "业务与合规负责人" in (artifact.review_guidance or "")
-    assert "流程节点描述，不是执行回执" in (artifact.execution_summary or "")
-    assert execution.prohibited_side_effects == ("不拨号", "不写 CRM", "不发送短信")
-
+    assert "安全行号" in (artifact.statistic_basis or "")
+    assert "不是外呼系统" in (artifact.purpose or "")
+    assert "最终审批" in (artifact.review_guidance or "")
+    assert "external_action=none" in (artifact.execution_summary or "")
+    assert execution.prohibited_side_effects == (
+        "不拨号",
+        "不写 CRM",
+        "不发送短信",
+        "不写禁呼名单",
+        "不实际转人工",
+    )
 
 def test_customer_sre_and_ux_outputs_retain_deterministic_business_facts(
     catalog: BenchmarkWorkspaceCatalog,

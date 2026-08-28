@@ -405,6 +405,18 @@ pending finance decision may therefore coexist. Candidate enumeration is an
 exact-balance heuristic, not a bad-debt conclusion, accounting policy, payment,
 write-off, posting or source-workbook edit.
 
+DR-0047 applies the same source-derived pattern to the fixed Operations-008
+process-design adapter. The server freezes exactly one approved Markdown file,
+parses each normative line into a rule ledger and builds stable node, edge,
+guard and terminal records. Graph admission verifies one START, reachability,
+terminal closure, identity/recording/debt order, third-party disclosure limits
+and rule coverage. The generated DOCX is parsed again and compared with a fresh
+source derivation. `outbound_flow_outcome` is stored on the Artifact and
+EffectReceipt, so deterministic verification, complete source coverage,
+pending business/compliance approval and zero external actions remain distinct
+facts. This does not add a Connector, legal opinion, current-regulation registry
+or production outbound engine.
+
 ## 7. Eight module maturity
 
 | Module | Current implementation | Missing target work |

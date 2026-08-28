@@ -1,0 +1,3936 @@
+{
+  "schema_version": "scenario-effect-gate-live.v1",
+  "generated_at": "2026-08-28T20:26:13.954245+00:00",
+  "api_base": "http://127.0.0.1:8010",
+  "service": {
+    "model": "deepseek-v4-pro",
+    "checkpoint": "postgres",
+    "task_store": "postgres"
+  },
+  "dataset": {
+    "name": "FORTE public demo inputs",
+    "source_commit": "345c1ec1487139db9dd319787fa9405ba85d1869",
+    "input_tree_sha256": "2c19e31a8e437f8ccb0ab811ba20a940f022a5bea69bcc750574d753f10a250d",
+    "original_inputs_modified": false
+  },
+  "summary": {
+    "requested": 1,
+    "passed": 1,
+    "failed": 0,
+    "model_output_adopted": 1,
+    "run_completed": 1
+  },
+  "scenarios": [
+    {
+      "scenario_id": "TC-10",
+      "capability_id": "office-compliant-outbound-flow",
+      "title": "合规外呼流程",
+      "instruction": "根据专业性说明生成信用卡 M1 逾期用户 AI 外呼催收流程图文档。",
+      "run_id": "harness:072fb8485f634fefb057716cc6a5065a",
+      "started_at": "2026-08-28T20:25:14.015074+00:00",
+      "observed_at": "2026-08-28T20:26:13.916402+00:00",
+      "run_status": "completed",
+      "snapshot_version": 13,
+      "current_round": 1,
+      "budget": {
+        "max_rounds": 12,
+        "max_files_per_round": 16,
+        "max_model_calls": 30,
+        "deadline_seconds": 7200,
+        "rounds_used": 1,
+        "files_verified": 1,
+        "model_calls_used": 2,
+        "elapsed_ms": 27229,
+        "stop_reason": null
+      },
+      "model_calls": [
+        {
+          "round": 1,
+          "role": "planner",
+          "called": true,
+          "model": "deepseek-v4-pro",
+          "elapsed_ms": 7849,
+          "output_used": true
+        },
+        {
+          "round": 1,
+          "role": "analyst",
+          "called": true,
+          "model": "deepseek-v4-pro",
+          "elapsed_ms": 17086,
+          "output_used": true
+        }
+      ],
+      "model_execution_gate_passed": true,
+      "model_output_adopted": true,
+      "api_responsiveness": {
+        "client_total_timeout_seconds": 180,
+        "request_latency_gate_ms": 5000,
+        "run_get_sample_count": 1,
+        "run_get_max_ms": 15,
+        "effect_active_run_get_sample_count": 0,
+        "effect_active_run_get_max_ms": null,
+        "effect_active_health_sample_count": 0,
+        "effect_active_health_max_ms": null,
+        "sse_probe": null,
+        "scenario_elapsed_ms": 47,
+        "passed": true,
+        "boundary": "总任务可持续约一分钟；这里验证的是单次 Run GET、health 与 SSE 请求未被同步构建阻塞，不证明线程内子进程可跨进程续跑。"
+      },
+      "effect_receipts": [
+        {
+          "receipt_id": "effect-receipt-5caa5605aff8",
+          "capability_id": "office-compliant-outbound-flow",
+          "scenario_id": "TC-10",
+          "status": "passed",
+          "state": "已冻结 1 份 FORTE 输入，原始文件保持只读。",
+          "action": "调用 office-compliant-outbound-flow 确定性办公工具并写入隔离运行工作区。",
+          "observation": "生成 1 份真实成果文件，执行 12 项确定性检查，12/12 通过。 来源推导 34 条原子要求，覆盖 34 条、不支持 0 条、冲突 0 条；可达终态 7/7。",
+          "cost": "0 次额外模型调用；仅消耗本机确定性解析、计算与文件写入。",
+          "result": "来源规则、DOCX 与状态图结构通过；这仍只是流程设计，最终合规审批及拨号、CRM、短信等动作均未发生。",
+          "source_file_refs": [
+            "forte-ba23e986a9c7e8d8"
+          ],
+          "artifact_ids": [
+            "workspace-artifact-636ec9d4725a"
+          ],
+          "prohibited_side_effects": [
+            "不拨号",
+            "不写 CRM",
+            "不发送短信",
+            "不写禁呼名单",
+            "不实际转人工"
+          ],
+          "business_gate_outcome": null,
+          "legal_review_outcome": null,
+          "candidate_review_outcome": null,
+          "finance_review_outcome": null,
+          "outbound_flow_outcome": {
+            "outcome_id": "outbound-flow-outcome-operations-008",
+            "status": "approval_required",
+            "decision": "来源规则和流程图结构已由服务端重算，仍需业务与合规负责人批准；真实外呼及系统写入均未发生。",
+            "summary": "从批准 Markdown 推导 15 组、34 条原子要求；构建 31 个节点、36 条边和 7 个终态，可达终态 7/7。",
+            "source_rule_group_count": 15,
+            "atomic_requirement_count": 34,
+            "covered_count": 34,
+            "unsupported_count": 0,
+            "conflict_count": 0,
+            "node_count": 31,
+            "edge_count": 36,
+            "guard_count": 7,
+            "terminal_count": 7,
+            "reachable_terminal_count": 7,
+            "parameters": [
+              {
+                "name": "prohibited_start",
+                "value": "22:00",
+                "unit": null
+              },
+              {
+                "name": "prohibited_end",
+                "value": "08:00",
+                "unit": null
+              },
+              {
+                "name": "daily_call_max",
+                "value": "3",
+                "unit": "次/日"
+              },
+              {
+                "name": "hourly_window",
+                "value": "1",
+                "unit": "小时"
+              },
+              {
+                "name": "hourly_call_max",
+                "value": "1",
+                "unit": "次/窗口"
+              },
+              {
+                "name": "recording_retention",
+                "value": "2",
+                "unit": "年"
+              },
+              {
+                "name": "emotion_transfer_threshold",
+                "value": "30",
+                "unit": "秒"
+              },
+              {
+                "name": "redial_min_interval",
+                "value": "1",
+                "unit": "小时"
+              },
+              {
+                "name": "source_terminal_count",
+                "value": "6",
+                "unit": "个"
+              },
+              {
+                "name": "identity_recording_order",
+                "value": "identity_before_recording",
+                "unit": null
+              }
+            ],
+            "rules": [
+              {
+                "rule_id": "OUT-TIME-01",
+                "group": "TIME",
+                "source_file_ref": "forte-ba23e986a9c7e8d8",
+                "locator": "专业性说明.md:L22",
+                "excerpt": "**外呼时间**：每日 22:00 至次日 08:00 严禁拨打，流程中必须在拨号前判断当前时段。",
+                "parameters": [
+                  {
+                    "name": "prohibited_start",
+                    "value": "22:00",
+                    "unit": null
+                  },
+                  {
+                    "name": "prohibited_end",
+                    "value": "08:00",
+                    "unit": null
+                  }
+                ],
+                "expected_relation": "当前时刻不得落入禁呼窗口",
+                "expected_action": "在 future dial 前阻断禁呼时段",
+                "coverage_state": "covered",
+                "mapped_node_ids": [
+                  "out-node-gate-time-window",
+                  "out-node-hold-until-window"
+                ],
+                "mapped_edge_ids": [
+                  "out-edge-time-denied",
+                  "out-edge-time-hold-redial",
+                  "out-edge-time-allowed"
+                ],
+                "mapped_guard_ids": [
+                  "out-guard-time-window"
+                ],
+                "mapped_terminal_ids": []
+              },
+              {
+                "rule_id": "OUT-TIME-02",
+                "group": "TIME",
+                "source_file_ref": "forte-ba23e986a9c7e8d8",
+                "locator": "专业性说明.md:L22",
+                "excerpt": "**外呼时间**：每日 22:00 至次日 08:00 严禁拨打，流程中必须在拨号前判断当前时段。",
+                "parameters": [],
+                "expected_relation": "TIME Gate 必须早于 future dial",
+                "expected_action": "先校验时段，再允许未来拨号节点",
+                "coverage_state": "covered",
+                "mapped_node_ids": [
+                  "out-node-gate-time-window",
+                  "out-node-future-dial"
+                ],
+                "mapped_edge_ids": [
+                  "out-edge-start-time"
+                ],
+                "mapped_guard_ids": [],
+                "mapped_terminal_ids": []
+              },
+              {
+                "rule_id": "OUT-FREQ-01",
+                "group": "FREQ",
+                "source_file_ref": "forte-ba23e986a9c7e8d8",
+                "locator": "专业性说明.md:L24",
+                "excerpt": "**外呼频次**：对同一客户每日拨打不得超过 3 次，1小时内不得超过 1 次；达到上限后停止当日外呼。",
+                "parameters": [
+                  {
+                    "name": "daily_call_max",
+                    "value": "3",
+                    "unit": "次/日"
+                  }
+                ],
+                "expected_relation": "同一客户每日次数不得超过来源上限",
+                "expected_action": "达日上限后停止当日外呼",
+                "coverage_state": "covered",
+                "mapped_node_ids": [
+                  "out-node-gate-pre-dial-frequency",
+                  "out-node-gate-post-call-frequency"
+                ],
+                "mapped_edge_ids": [
+                  "out-edge-pre-frequency-denied",
+                  "out-edge-pre-frequency-allowed",
+                  "out-edge-post-frequency-denied"
+                ],
+                "mapped_guard_ids": [
+                  "out-guard-frequency"
+                ],
+                "mapped_terminal_ids": []
+              },
+              {
+                "rule_id": "OUT-FREQ-02",
+                "group": "FREQ",
+                "source_file_ref": "forte-ba23e986a9c7e8d8",
+                "locator": "专业性说明.md:L24",
+                "excerpt": "**外呼频次**：对同一客户每日拨打不得超过 3 次，1小时内不得超过 1 次；达到上限后停止当日外呼。",
+                "parameters": [
+                  {
+                    "name": "hourly_window",
+                    "value": "1",
+                    "unit": "小时"
+                  },
+                  {
+                    "name": "hourly_call_max",
+                    "value": "1",
+                    "unit": "次/窗口"
+                  }
+                ],
+                "expected_relation": "窗口内次数不得超过来源上限",
+                "expected_action": "达小时窗口上限后停止当日外呼",
+                "coverage_state": "covered",
+                "mapped_node_ids": [
+                  "out-node-gate-pre-dial-frequency",
+                  "out-node-gate-post-call-frequency"
+                ],
+                "mapped_edge_ids": [
+                  "out-edge-pre-frequency-denied",
+                  "out-edge-pre-frequency-allowed",
+                  "out-edge-post-frequency-denied"
+                ],
+                "mapped_guard_ids": [
+                  "out-guard-frequency"
+                ],
+                "mapped_terminal_ids": []
+              },
+              {
+                "rule_id": "OUT-FREQ-03",
+                "group": "FREQ",
+                "source_file_ref": "forte-ba23e986a9c7e8d8",
+                "locator": "专业性说明.md:L24",
+                "excerpt": "**外呼频次**：对同一客户每日拨打不得超过 3 次，1小时内不得超过 1 次；达到上限后停止当日外呼。",
+                "parameters": [],
+                "expected_relation": "任一频次上限命中即停止",
+                "expected_action": "进入频次达限终态",
+                "coverage_state": "covered",
+                "mapped_node_ids": [
+                  "out-node-gate-pre-dial-frequency",
+                  "out-node-mark-daily-limit"
+                ],
+                "mapped_edge_ids": [
+                  "out-edge-pre-frequency-denied",
+                  "out-edge-limit-stop",
+                  "out-edge-post-frequency-denied"
+                ],
+                "mapped_guard_ids": [],
+                "mapped_terminal_ids": []
+              },
+              {
+                "rule_id": "OUT-RECORD-01",
+                "group": "RECORD",
+                "source_file_ref": "forte-ba23e986a9c7e8d8",
+                "locator": "专业性说明.md:L26",
+                "excerpt": "**录音存证**：每通电话必须全程录音，至少保存 2 年；接通后必须告知客户\"本次通话将被录音\"。",
+                "parameters": [
+                  {
+                    "name": "recording_retention",
+                    "value": "2",
+                    "unit": "年"
+                  }
+                ],
+                "expected_relation": "每通电话全程录音并按来源年限保存",
+                "expected_action": "在本人通话节点标明录音及保留要求",
+                "coverage_state": "covered",
+                "mapped_node_ids": [
+                  "out-node-recording-notice"
+                ],
+                "mapped_edge_ids": [],
+                "mapped_guard_ids": [],
+                "mapped_terminal_ids": []
+              },
+              {
+                "rule_id": "OUT-RECORD-02",
+                "group": "RECORD",
+                "source_file_ref": "forte-ba23e986a9c7e8d8",
+                "locator": "专业性说明.md:L26",
+                "excerpt": "**录音存证**：每通电话必须全程录音，至少保存 2 年；接通后必须告知客户\"本次通话将被录音\"。",
+                "parameters": [],
+                "expected_relation": "通话中必须告知录音",
+                "expected_action": "录音告知节点受身份顺序约束",
+                "coverage_state": "covered",
+                "mapped_node_ids": [
+                  "out-node-recording-notice"
+                ],
+                "mapped_edge_ids": [
+                  "out-edge-recording-introduction"
+                ],
+                "mapped_guard_ids": [],
+                "mapped_terminal_ids": []
+              },
+              {
+                "rule_id": "OUT-IDENTITY-01",
+                "group": "IDENTITY",
+                "source_file_ref": "forte-ba23e986a9c7e8d8",
+                "locator": "专业性说明.md:L57",
+                "excerpt": "**身份确认**：接通后第一步，询问是否本人。确认是本人才进入催收话术；非本人只请转告；无法确认则结束通话。",
+                "parameters": [
+                  {
+                    "name": "identity_recording_order",
+                    "value": "identity_before_recording",
+                    "unit": null
+                  }
+                ],
+                "expected_relation": "identity_before_recording",
+                "expected_action": "按来源顺序执行身份确认和录音告知",
+                "coverage_state": "covered",
+                "mapped_node_ids": [
+                  "out-node-decision-identity"
+                ],
+                "mapped_edge_ids": [
+                  "out-edge-connected-identity",
+                  "out-edge-identity-self",
+                  "out-edge-recording-introduction"
+                ],
+                "mapped_guard_ids": [
+                  "out-guard-identity"
+                ],
+                "mapped_terminal_ids": []
+              },
+              {
+                "rule_id": "OUT-IDENTITY-02",
+                "group": "IDENTITY",
+                "source_file_ref": "forte-ba23e986a9c7e8d8",
+                "locator": "专业性说明.md:L57",
+                "excerpt": "**身份确认**：接通后第一步，询问是否本人。确认是本人才进入催收话术；非本人只请转告；无法确认则结束通话。",
+                "parameters": [],
+                "expected_relation": "只有确认本人后才能进入欠款话术",
+                "expected_action": "阻断非本人和身份不明路径的欠款披露",
+                "coverage_state": "covered",
+                "mapped_node_ids": [
+                  "out-node-decision-identity",
+                  "out-node-introduce-purpose"
+                ],
+                "mapped_edge_ids": [
+                  "out-edge-identity-self",
+                  "out-edge-introduction-payment"
+                ],
+                "mapped_guard_ids": [
+                  "out-guard-identity"
+                ],
+                "mapped_terminal_ids": []
+              },
+              {
+                "rule_id": "OUT-IDENTITY-03",
+                "group": "IDENTITY",
+                "source_file_ref": "forte-ba23e986a9c7e8d8",
+                "locator": "专业性说明.md:L57",
+                "excerpt": "**身份确认**：接通后第一步，询问是否本人。确认是本人才进入催收话术；非本人只请转告；无法确认则结束通话。",
+                "parameters": [],
+                "expected_relation": "无法确认身份时结束通话",
+                "expected_action": "进入身份无法确认终态",
+                "coverage_state": "covered",
+                "mapped_node_ids": [
+                  "out-node-decision-identity",
+                  "out-node-end-unconfirmed-identity",
+                  "out-node-terminal-identity-unconfirmed"
+                ],
+                "mapped_edge_ids": [
+                  "out-edge-identity-unconfirmed",
+                  "out-edge-unconfirmed-terminal"
+                ],
+                "mapped_guard_ids": [
+                  "out-guard-identity"
+                ],
+                "mapped_terminal_ids": [
+                  "out-terminal-identity-unconfirmed"
+                ]
+              },
+              {
+                "rule_id": "OUT-THIRD_PARTY-01",
+                "group": "THIRD_PARTY",
+                "source_file_ref": "forte-ba23e986a9c7e8d8",
+                "locator": "专业性说明.md:L28",
+                "excerpt": "**第三方限制**：接通后必须先确认是否本人接听。非本人接听时，只能请其转告，严禁透露欠款金额；若第三方明确要求不再联系，立即加入禁呼名单。",
+                "parameters": [],
+                "expected_relation": "非本人只能请其转告",
+                "expected_action": "进入仅转告节点",
+                "coverage_state": "covered",
+                "mapped_node_ids": [
+                  "out-node-relay-only",
+                  "out-node-end-unconfirmed-identity"
+                ],
+                "mapped_edge_ids": [
+                  "out-edge-unconfirmed-terminal",
+                  "out-edge-identity-third-party",
+                  "out-edge-relay-stop-decision",
+                  "out-edge-third-party-end"
+                ],
+                "mapped_guard_ids": [],
+                "mapped_terminal_ids": []
+              },
+              {
+                "rule_id": "OUT-THIRD_PARTY-02",
+                "group": "THIRD_PARTY",
+                "source_file_ref": "forte-ba23e986a9c7e8d8",
+                "locator": "专业性说明.md:L28",
+                "excerpt": "**第三方限制**：接通后必须先确认是否本人接听。非本人接听时，只能请其转告，严禁透露欠款金额；若第三方明确要求不再联系，立即加入禁呼名单。",
+                "parameters": [],
+                "expected_relation": "非本人不得披露欠款金额",
+                "expected_action": "第三方路径不得到达欠款引导",
+                "coverage_state": "covered",
+                "mapped_node_ids": [
+                  "out-node-relay-only"
+                ],
+                "mapped_edge_ids": [
+                  "out-edge-identity-third-party",
+                  "out-edge-relay-stop-decision"
+                ],
+                "mapped_guard_ids": [],
+                "mapped_terminal_ids": []
+              },
+              {
+                "rule_id": "OUT-THIRD_PARTY-03",
+                "group": "THIRD_PARTY",
+                "source_file_ref": "forte-ba23e986a9c7e8d8",
+                "locator": "专业性说明.md:L28",
+                "excerpt": "**第三方限制**：接通后必须先确认是否本人接听。非本人接听时，只能请其转告，严禁透露欠款金额；若第三方明确要求不再联系，立即加入禁呼名单。",
+                "parameters": [],
+                "expected_relation": "第三方要求停止联系时必须禁呼",
+                "expected_action": "进入加入禁呼名单终态",
+                "coverage_state": "covered",
+                "mapped_node_ids": [
+                  "out-node-decision-third-party-stop"
+                ],
+                "mapped_edge_ids": [
+                  "out-edge-third-party-dnc"
+                ],
+                "mapped_guard_ids": [
+                  "out-guard-third-party-stop"
+                ],
+                "mapped_terminal_ids": []
+              },
+              {
+                "rule_id": "OUT-PROHIBIT-01",
+                "group": "PROHIBIT",
+                "source_file_ref": "forte-ba23e986a9c7e8d8",
+                "locator": "专业性说明.md:L30",
+                "excerpt": "**禁止行为**：严禁威胁、恐吓、辱骂；M1 阶段不得使用\"将采取法律行动\"等表述（尚未进入法律程序）。",
+                "parameters": [],
+                "expected_relation": "禁止威胁、恐吓和辱骂",
+                "expected_action": "话术守卫拒绝禁止行为",
+                "coverage_state": "covered",
+                "mapped_node_ids": [
+                  "out-node-introduce-purpose"
+                ],
+                "mapped_edge_ids": [
+                  "out-edge-introduction-payment"
+                ],
+                "mapped_guard_ids": [
+                  "out-guard-prohibited-content"
+                ],
+                "mapped_terminal_ids": []
+              },
+              {
+                "rule_id": "OUT-PROHIBIT-02",
+                "group": "PROHIBIT",
+                "source_file_ref": "forte-ba23e986a9c7e8d8",
+                "locator": "专业性说明.md:L30",
+                "excerpt": "**禁止行为**：严禁威胁、恐吓、辱骂；M1 阶段不得使用\"将采取法律行动\"等表述（尚未进入法律程序）。",
+                "parameters": [],
+                "expected_relation": "M1 阶段不得使用法律行动话术",
+                "expected_action": "话术守卫拒绝法律程序暗示",
+                "coverage_state": "covered",
+                "mapped_node_ids": [
+                  "out-node-introduce-purpose"
+                ],
+                "mapped_edge_ids": [
+                  "out-edge-introduction-payment"
+                ],
+                "mapped_guard_ids": [
+                  "out-guard-prohibited-content"
+                ],
+                "mapped_terminal_ids": []
+              },
+              {
+                "rule_id": "OUT-CONNECT-01",
+                "group": "CONNECT",
+                "source_file_ref": "forte-ba23e986a9c7e8d8",
+                "locator": "专业性说明.md:L38",
+                "excerpt": "- 未接通：无人接听 / 关机空号 / 主动拒接 → 判断今日次数，未超限则加入重拨队列",
+                "parameters": [],
+                "expected_relation": "拨号结果必须区分接通与未接通",
+                "expected_action": "进入连接状态决策",
+                "coverage_state": "covered",
+                "mapped_node_ids": [
+                  "out-node-decision-connection"
+                ],
+                "mapped_edge_ids": [
+                  "out-edge-future-dial-connection",
+                  "out-edge-not-connected",
+                  "out-edge-connected-identity"
+                ],
+                "mapped_guard_ids": [],
+                "mapped_terminal_ids": []
+              },
+              {
+                "rule_id": "OUT-CONNECT-02",
+                "group": "CONNECT",
+                "source_file_ref": "forte-ba23e986a9c7e8d8",
+                "locator": "专业性说明.md:L38",
+                "excerpt": "- 未接通：无人接听 / 关机空号 / 主动拒接 → 判断今日次数，未超限则加入重拨队列",
+                "parameters": [],
+                "expected_relation": "无人接听、关机空号或主动拒接进入频次 Gate",
+                "expected_action": "记录未接通分类并判断重拨",
+                "coverage_state": "covered",
+                "mapped_node_ids": [
+                  "out-node-classify-unanswered",
+                  "out-node-gate-post-call-frequency"
+                ],
+                "mapped_edge_ids": [
+                  "out-edge-not-connected",
+                  "out-edge-unanswered-frequency",
+                  "out-edge-post-frequency-allowed"
+                ],
+                "mapped_guard_ids": [],
+                "mapped_terminal_ids": []
+              },
+              {
+                "rule_id": "OUT-PTP-01",
+                "group": "PTP",
+                "source_file_ref": "forte-ba23e986a9c7e8d8",
+                "locator": "专业性说明.md:L43",
+                "excerpt": "- **承诺还款（PTP）**：记录承诺金额（全额或最低还款额）和承诺日期，安排到期前短信提醒",
+                "parameters": [],
+                "expected_relation": "承诺还款必须记录金额和日期",
+                "expected_action": "在 PTP 终态前记录承诺字段",
+                "coverage_state": "covered",
+                "mapped_node_ids": [
+                  "out-node-decision-response",
+                  "out-node-record-ptp"
+                ],
+                "mapped_edge_ids": [
+                  "out-edge-response-ptp",
+                  "out-edge-ptp-sms"
+                ],
+                "mapped_guard_ids": [
+                  "out-guard-response"
+                ],
+                "mapped_terminal_ids": []
+              },
+              {
+                "rule_id": "OUT-PTP-02",
+                "group": "PTP",
+                "source_file_ref": "forte-ba23e986a9c7e8d8",
+                "locator": "专业性说明.md:L43",
+                "excerpt": "- **承诺还款（PTP）**：记录承诺金额（全额或最低还款额）和承诺日期，安排到期前短信提醒",
+                "parameters": [],
+                "expected_relation": "到期前短信提醒是未来受控动作",
+                "expected_action": "只写入未来短信提醒节点，不发送短信",
+                "coverage_state": "covered",
+                "mapped_node_ids": [
+                  "out-node-future-sms"
+                ],
+                "mapped_edge_ids": [
+                  "out-edge-ptp-sms",
+                  "out-edge-sms-ptp-terminal"
+                ],
+                "mapped_guard_ids": [],
+                "mapped_terminal_ids": []
+              },
+              {
+                "rule_id": "OUT-SOFT-01",
+                "group": "SOFT",
+                "source_file_ref": "forte-ba23e986a9c7e8d8",
+                "locator": "专业性说明.md:L44",
+                "excerpt": "- **软拒绝**：申请延期或表示暂时困难 → 引导分期方案，安排后续跟进",
+                "parameters": [],
+                "expected_relation": "软拒绝进入分期方案和后续跟进",
+                "expected_action": "进入分期跟进节点后安排后续联系",
+                "coverage_state": "covered",
+                "mapped_node_ids": [
+                  "out-node-decision-response",
+                  "out-node-installment-follow-up"
+                ],
+                "mapped_edge_ids": [
+                  "out-edge-response-soft",
+                  "out-edge-soft-redial-terminal"
+                ],
+                "mapped_guard_ids": [
+                  "out-guard-response"
+                ],
+                "mapped_terminal_ids": []
+              },
+              {
+                "rule_id": "OUT-HARD-01",
+                "group": "HARD",
+                "source_file_ref": "forte-ba23e986a9c7e8d8",
+                "locator": "专业性说明.md:L45",
+                "excerpt": "- **硬拒绝**：明确拒绝或否认债务 → 案件升级，转人工或法务处理",
+                "parameters": [],
+                "expected_relation": "硬拒绝或否认债务必须升级",
+                "expected_action": "进入人工或法务案件升级终态",
+                "coverage_state": "covered",
+                "mapped_node_ids": [
+                  "out-node-decision-response",
+                  "out-node-case-escalation"
+                ],
+                "mapped_edge_ids": [
+                  "out-edge-response-hard",
+                  "out-edge-hard-escalation-terminal"
+                ],
+                "mapped_guard_ids": [
+                  "out-guard-response"
+                ],
+                "mapped_terminal_ids": []
+              },
+              {
+                "rule_id": "OUT-DISPUTE-01",
+                "group": "DISPUTE",
+                "source_file_ref": "forte-ba23e986a9c7e8d8",
+                "locator": "专业性说明.md:L63",
+                "excerpt": "**强制转人工触发条件**：客户说\"我要投诉\"\"这笔钱不是我的\"\"我要找你们领导\"\"我要起诉你们\"等类似话语，或情绪持续激动超过 30 秒，AI 必须立即转人工。",
+                "parameters": [],
+                "expected_relation": "投诉、异议及来源短语触发人工",
+                "expected_action": "立即进入转人工终态",
+                "coverage_state": "covered",
+                "mapped_node_ids": [
+                  "out-node-decision-response",
+                  "out-node-human-transfer"
+                ],
+                "mapped_edge_ids": [
+                  "out-edge-response-dispute",
+                  "out-edge-human-terminal"
+                ],
+                "mapped_guard_ids": [
+                  "out-guard-response"
+                ],
+                "mapped_terminal_ids": []
+              },
+              {
+                "rule_id": "OUT-DISPUTE-02",
+                "group": "DISPUTE",
+                "source_file_ref": "forte-ba23e986a9c7e8d8",
+                "locator": "专业性说明.md:L63",
+                "excerpt": "**强制转人工触发条件**：客户说\"我要投诉\"\"这笔钱不是我的\"\"我要找你们领导\"\"我要起诉你们\"等类似话语，或情绪持续激动超过 30 秒，AI 必须立即转人工。",
+                "parameters": [
+                  {
+                    "name": "emotion_transfer_threshold",
+                    "value": "30",
+                    "unit": "秒"
+                  }
+                ],
+                "expected_relation": "情绪持续超过来源阈值触发人工",
+                "expected_action": "立即进入转人工终态",
+                "coverage_state": "covered",
+                "mapped_node_ids": [
+                  "out-node-decision-response",
+                  "out-node-human-transfer"
+                ],
+                "mapped_edge_ids": [
+                  "out-edge-response-emotion",
+                  "out-edge-human-terminal"
+                ],
+                "mapped_guard_ids": [
+                  "out-guard-response"
+                ],
+                "mapped_terminal_ids": []
+              },
+              {
+                "rule_id": "OUT-INVALID-01",
+                "group": "INVALID",
+                "source_file_ref": "forte-ba23e986a9c7e8d8",
+                "locator": "专业性说明.md:L47",
+                "excerpt": "- **无效通话**：接通后立即挂断或无法沟通 → 记录并进入今日已拨次数判断，通过后安排重拨",
+                "parameters": [],
+                "expected_relation": "无效通话必须记录并重新经过频次 Gate",
+                "expected_action": "记录后只在未达限时安排重拨",
+                "coverage_state": "covered",
+                "mapped_node_ids": [
+                  "out-node-gate-post-call-frequency",
+                  "out-node-record-invalid-call"
+                ],
+                "mapped_edge_ids": [
+                  "out-edge-post-frequency-allowed",
+                  "out-edge-response-invalid",
+                  "out-edge-invalid-frequency"
+                ],
+                "mapped_guard_ids": [],
+                "mapped_terminal_ids": []
+              },
+              {
+                "rule_id": "OUT-TERMINAL-01",
+                "group": "TERMINAL",
+                "source_file_ref": "forte-ba23e986a9c7e8d8",
+                "locator": "专业性说明.md:L51",
+                "excerpt": "每条路径必须落到以下状态之一：PTP登记、转人工跟进、安排重拨、停止外呼（达上限）、加入禁呼名单、案件升级。",
+                "parameters": [
+                  {
+                    "name": "terminal_label",
+                    "value": "PTP登记",
+                    "unit": null
+                  }
+                ],
+                "expected_relation": "每条业务路径必须进入一个来源终态",
+                "expected_action": "提供可达终态：PTP登记",
+                "coverage_state": "covered",
+                "mapped_node_ids": [
+                  "out-node-terminal-ptp"
+                ],
+                "mapped_edge_ids": [],
+                "mapped_guard_ids": [],
+                "mapped_terminal_ids": [
+                  "out-terminal-ptp"
+                ]
+              },
+              {
+                "rule_id": "OUT-TERMINAL-02",
+                "group": "TERMINAL",
+                "source_file_ref": "forte-ba23e986a9c7e8d8",
+                "locator": "专业性说明.md:L51",
+                "excerpt": "每条路径必须落到以下状态之一：PTP登记、转人工跟进、安排重拨、停止外呼（达上限）、加入禁呼名单、案件升级。",
+                "parameters": [
+                  {
+                    "name": "terminal_label",
+                    "value": "转人工跟进",
+                    "unit": null
+                  }
+                ],
+                "expected_relation": "每条业务路径必须进入一个来源终态",
+                "expected_action": "提供可达终态：转人工跟进",
+                "coverage_state": "covered",
+                "mapped_node_ids": [
+                  "out-node-terminal-human"
+                ],
+                "mapped_edge_ids": [],
+                "mapped_guard_ids": [],
+                "mapped_terminal_ids": [
+                  "out-terminal-human"
+                ]
+              },
+              {
+                "rule_id": "OUT-TERMINAL-03",
+                "group": "TERMINAL",
+                "source_file_ref": "forte-ba23e986a9c7e8d8",
+                "locator": "专业性说明.md:L51",
+                "excerpt": "每条路径必须落到以下状态之一：PTP登记、转人工跟进、安排重拨、停止外呼（达上限）、加入禁呼名单、案件升级。",
+                "parameters": [
+                  {
+                    "name": "terminal_label",
+                    "value": "安排重拨",
+                    "unit": null
+                  }
+                ],
+                "expected_relation": "每条业务路径必须进入一个来源终态",
+                "expected_action": "提供可达终态：安排重拨",
+                "coverage_state": "covered",
+                "mapped_node_ids": [
+                  "out-node-terminal-redial"
+                ],
+                "mapped_edge_ids": [],
+                "mapped_guard_ids": [],
+                "mapped_terminal_ids": [
+                  "out-terminal-redial"
+                ]
+              },
+              {
+                "rule_id": "OUT-TERMINAL-04",
+                "group": "TERMINAL",
+                "source_file_ref": "forte-ba23e986a9c7e8d8",
+                "locator": "专业性说明.md:L51",
+                "excerpt": "每条路径必须落到以下状态之一：PTP登记、转人工跟进、安排重拨、停止外呼（达上限）、加入禁呼名单、案件升级。",
+                "parameters": [
+                  {
+                    "name": "terminal_label",
+                    "value": "停止外呼（达上限）",
+                    "unit": null
+                  }
+                ],
+                "expected_relation": "每条业务路径必须进入一个来源终态",
+                "expected_action": "提供可达终态：停止外呼（达上限）",
+                "coverage_state": "covered",
+                "mapped_node_ids": [
+                  "out-node-terminal-limit"
+                ],
+                "mapped_edge_ids": [],
+                "mapped_guard_ids": [],
+                "mapped_terminal_ids": [
+                  "out-terminal-limit"
+                ]
+              },
+              {
+                "rule_id": "OUT-TERMINAL-05",
+                "group": "TERMINAL",
+                "source_file_ref": "forte-ba23e986a9c7e8d8",
+                "locator": "专业性说明.md:L51",
+                "excerpt": "每条路径必须落到以下状态之一：PTP登记、转人工跟进、安排重拨、停止外呼（达上限）、加入禁呼名单、案件升级。",
+                "parameters": [
+                  {
+                    "name": "terminal_label",
+                    "value": "加入禁呼名单",
+                    "unit": null
+                  }
+                ],
+                "expected_relation": "每条业务路径必须进入一个来源终态",
+                "expected_action": "提供可达终态：加入禁呼名单",
+                "coverage_state": "covered",
+                "mapped_node_ids": [
+                  "out-node-terminal-dnc"
+                ],
+                "mapped_edge_ids": [],
+                "mapped_guard_ids": [],
+                "mapped_terminal_ids": [
+                  "out-terminal-dnc"
+                ]
+              },
+              {
+                "rule_id": "OUT-TERMINAL-06",
+                "group": "TERMINAL",
+                "source_file_ref": "forte-ba23e986a9c7e8d8",
+                "locator": "专业性说明.md:L51",
+                "excerpt": "每条路径必须落到以下状态之一：PTP登记、转人工跟进、安排重拨、停止外呼（达上限）、加入禁呼名单、案件升级。",
+                "parameters": [
+                  {
+                    "name": "terminal_label",
+                    "value": "案件升级",
+                    "unit": null
+                  }
+                ],
+                "expected_relation": "每条业务路径必须进入一个来源终态",
+                "expected_action": "提供可达终态：案件升级",
+                "coverage_state": "covered",
+                "mapped_node_ids": [
+                  "out-node-terminal-escalation"
+                ],
+                "mapped_edge_ids": [],
+                "mapped_guard_ids": [],
+                "mapped_terminal_ids": [
+                  "out-terminal-escalation"
+                ]
+              },
+              {
+                "rule_id": "OUT-PAYMENT-01",
+                "group": "PAYMENT",
+                "source_file_ref": "forte-ba23e986a9c7e8d8",
+                "locator": "专业性说明.md:L61",
+                "excerpt": "**还款引导**：告知逾期天数和最低还款额，提供还款方式（APP/网银/柜台），询问是否可近期还款或需要分期方案。",
+                "parameters": [],
+                "expected_relation": "本人确认后才可告知逾期天数和最低还款额",
+                "expected_action": "进入欠款信息与最低还款额节点",
+                "coverage_state": "covered",
+                "mapped_node_ids": [
+                  "out-node-payment-guidance"
+                ],
+                "mapped_edge_ids": [
+                  "out-edge-introduction-payment"
+                ],
+                "mapped_guard_ids": [],
+                "mapped_terminal_ids": []
+              },
+              {
+                "rule_id": "OUT-PAYMENT-02",
+                "group": "PAYMENT",
+                "source_file_ref": "forte-ba23e986a9c7e8d8",
+                "locator": "专业性说明.md:L61",
+                "excerpt": "**还款引导**：告知逾期天数和最低还款额，提供还款方式（APP/网银/柜台），询问是否可近期还款或需要分期方案。",
+                "parameters": [],
+                "expected_relation": "提供来源列出的还款渠道并询问近期还款或分期",
+                "expected_action": "进入还款渠道与分期询问节点",
+                "coverage_state": "covered",
+                "mapped_node_ids": [
+                  "out-node-payment-guidance"
+                ],
+                "mapped_edge_ids": [
+                  "out-edge-payment-response"
+                ],
+                "mapped_guard_ids": [],
+                "mapped_terminal_ids": []
+              },
+              {
+                "rule_id": "OUT-REDIAL-01",
+                "group": "REDIAL",
+                "source_file_ref": "forte-ba23e986a9c7e8d8",
+                "locator": "专业性说明.md:L65",
+                "excerpt": "**重拨调度**：未接通后查询今日已拨次数，未超限则间隔至少 1 小时后重拨；已达上限则标记为今日完成，次日重新评估。",
+                "parameters": [
+                  {
+                    "name": "redial_min_interval",
+                    "value": "1",
+                    "unit": "小时"
+                  }
+                ],
+                "expected_relation": "未接通重拨至少间隔来源小时数",
+                "expected_action": "未达限时进入未来重拨终态",
+                "coverage_state": "covered",
+                "mapped_node_ids": [
+                  "out-node-future-redial"
+                ],
+                "mapped_edge_ids": [
+                  "out-edge-time-hold-redial",
+                  "out-edge-post-frequency-allowed",
+                  "out-edge-redial-terminal"
+                ],
+                "mapped_guard_ids": [
+                  "out-guard-redial-interval"
+                ],
+                "mapped_terminal_ids": []
+              },
+              {
+                "rule_id": "OUT-REDIAL-02",
+                "group": "REDIAL",
+                "source_file_ref": "forte-ba23e986a9c7e8d8",
+                "locator": "专业性说明.md:L65",
+                "excerpt": "**重拨调度**：未接通后查询今日已拨次数，未超限则间隔至少 1 小时后重拨；已达上限则标记为今日完成，次日重新评估。",
+                "parameters": [],
+                "expected_relation": "达限标记今日完成并在次日重新评估",
+                "expected_action": "频次达限终态保留次日复核动作",
+                "coverage_state": "covered",
+                "mapped_node_ids": [
+                  "out-node-mark-daily-limit"
+                ],
+                "mapped_edge_ids": [
+                  "out-edge-limit-stop"
+                ],
+                "mapped_guard_ids": [],
+                "mapped_terminal_ids": []
+              }
+            ],
+            "nodes": [
+              {
+                "node_id": "out-node-start",
+                "label": "START",
+                "kind": "start",
+                "source_rule_ids": [],
+                "future_action": false
+              },
+              {
+                "node_id": "out-node-gate-time-window",
+                "label": "拨号前禁呼时段判断",
+                "kind": "gate",
+                "source_rule_ids": [
+                  "OUT-TIME-01",
+                  "OUT-TIME-02"
+                ],
+                "future_action": false
+              },
+              {
+                "node_id": "out-node-hold-until-window",
+                "label": "等待进入允许外呼时段",
+                "kind": "action",
+                "source_rule_ids": [
+                  "OUT-TIME-01"
+                ],
+                "future_action": true
+              },
+              {
+                "node_id": "out-node-gate-pre-dial-frequency",
+                "label": "拨号前每日/窗口频次判断",
+                "kind": "gate",
+                "source_rule_ids": [
+                  "OUT-FREQ-01",
+                  "OUT-FREQ-02",
+                  "OUT-FREQ-03"
+                ],
+                "future_action": false
+              },
+              {
+                "node_id": "out-node-mark-daily-limit",
+                "label": "标记当日频次已达上限并等待次日重评",
+                "kind": "action",
+                "source_rule_ids": [
+                  "OUT-FREQ-03",
+                  "OUT-REDIAL-02"
+                ],
+                "future_action": false
+              },
+              {
+                "node_id": "out-node-future-dial",
+                "label": "未来拨号尝试（本次未执行）",
+                "kind": "action",
+                "source_rule_ids": [
+                  "OUT-TIME-02"
+                ],
+                "future_action": true
+              },
+              {
+                "node_id": "out-node-decision-connection",
+                "label": "判断是否接通",
+                "kind": "decision",
+                "source_rule_ids": [
+                  "OUT-CONNECT-01"
+                ],
+                "future_action": false
+              },
+              {
+                "node_id": "out-node-classify-unanswered",
+                "label": "记录无人接听/关机空号/主动拒接",
+                "kind": "action",
+                "source_rule_ids": [
+                  "OUT-CONNECT-02"
+                ],
+                "future_action": false
+              },
+              {
+                "node_id": "out-node-gate-post-call-frequency",
+                "label": "无效或未接通后的频次判断",
+                "kind": "gate",
+                "source_rule_ids": [
+                  "OUT-CONNECT-02",
+                  "OUT-INVALID-01",
+                  "OUT-FREQ-01",
+                  "OUT-FREQ-02"
+                ],
+                "future_action": false
+              },
+              {
+                "node_id": "out-node-future-redial",
+                "label": "安排至少来源间隔后的未来重拨",
+                "kind": "action",
+                "source_rule_ids": [
+                  "OUT-REDIAL-01"
+                ],
+                "future_action": true
+              },
+              {
+                "node_id": "out-node-decision-identity",
+                "label": "确认是否本人接听",
+                "kind": "decision",
+                "source_rule_ids": [
+                  "OUT-IDENTITY-01",
+                  "OUT-IDENTITY-02",
+                  "OUT-IDENTITY-03"
+                ],
+                "future_action": false
+              },
+              {
+                "node_id": "out-node-recording-notice",
+                "label": "告知录音并标明全程录音与保留年限",
+                "kind": "action",
+                "source_rule_ids": [
+                  "OUT-RECORD-01",
+                  "OUT-RECORD-02"
+                ],
+                "future_action": false
+              },
+              {
+                "node_id": "out-node-relay-only",
+                "label": "非本人仅请转告且不披露欠款",
+                "kind": "action",
+                "source_rule_ids": [
+                  "OUT-THIRD_PARTY-01",
+                  "OUT-THIRD_PARTY-02"
+                ],
+                "future_action": false
+              },
+              {
+                "node_id": "out-node-decision-third-party-stop",
+                "label": "第三方是否要求停止联系",
+                "kind": "decision",
+                "source_rule_ids": [
+                  "OUT-THIRD_PARTY-03"
+                ],
+                "future_action": false
+              },
+              {
+                "node_id": "out-node-end-unconfirmed-identity",
+                "label": "结束身份无法确认或非本人通话",
+                "kind": "action",
+                "source_rule_ids": [
+                  "OUT-IDENTITY-03",
+                  "OUT-THIRD_PARTY-01"
+                ],
+                "future_action": false
+              },
+              {
+                "node_id": "out-node-introduce-purpose",
+                "label": "自我介绍、说明来意并应用禁止话术守卫",
+                "kind": "action",
+                "source_rule_ids": [
+                  "OUT-IDENTITY-02",
+                  "OUT-PROHIBIT-01",
+                  "OUT-PROHIBIT-02"
+                ],
+                "future_action": false
+              },
+              {
+                "node_id": "out-node-payment-guidance",
+                "label": "告知逾期/最低还款额、渠道并询问还款或分期",
+                "kind": "action",
+                "source_rule_ids": [
+                  "OUT-PAYMENT-01",
+                  "OUT-PAYMENT-02"
+                ],
+                "future_action": false
+              },
+              {
+                "node_id": "out-node-decision-response",
+                "label": "判断本人态度、投诉异议与情绪状态",
+                "kind": "decision",
+                "source_rule_ids": [
+                  "OUT-PTP-01",
+                  "OUT-SOFT-01",
+                  "OUT-HARD-01",
+                  "OUT-DISPUTE-01",
+                  "OUT-DISPUTE-02"
+                ],
+                "future_action": false
+              },
+              {
+                "node_id": "out-node-record-ptp",
+                "label": "记录承诺金额和日期",
+                "kind": "action",
+                "source_rule_ids": [
+                  "OUT-PTP-01"
+                ],
+                "future_action": false
+              },
+              {
+                "node_id": "out-node-future-sms",
+                "label": "安排到期前短信提醒（本次未发送）",
+                "kind": "action",
+                "source_rule_ids": [
+                  "OUT-PTP-02"
+                ],
+                "future_action": true
+              },
+              {
+                "node_id": "out-node-installment-follow-up",
+                "label": "引导分期并安排后续跟进",
+                "kind": "action",
+                "source_rule_ids": [
+                  "OUT-SOFT-01"
+                ],
+                "future_action": true
+              },
+              {
+                "node_id": "out-node-case-escalation",
+                "label": "案件升级并等待人工或法务处理",
+                "kind": "action",
+                "source_rule_ids": [
+                  "OUT-HARD-01"
+                ],
+                "future_action": true
+              },
+              {
+                "node_id": "out-node-human-transfer",
+                "label": "转人工处理投诉、异议或高风险状态",
+                "kind": "action",
+                "source_rule_ids": [
+                  "OUT-DISPUTE-01",
+                  "OUT-DISPUTE-02"
+                ],
+                "future_action": true
+              },
+              {
+                "node_id": "out-node-record-invalid-call",
+                "label": "记录立即挂断或无法沟通",
+                "kind": "action",
+                "source_rule_ids": [
+                  "OUT-INVALID-01"
+                ],
+                "future_action": false
+              },
+              {
+                "node_id": "out-node-terminal-ptp",
+                "label": "PTP登记",
+                "kind": "terminal",
+                "source_rule_ids": [
+                  "OUT-TERMINAL-01"
+                ],
+                "future_action": false
+              },
+              {
+                "node_id": "out-node-terminal-human",
+                "label": "转人工跟进",
+                "kind": "terminal",
+                "source_rule_ids": [
+                  "OUT-TERMINAL-02"
+                ],
+                "future_action": false
+              },
+              {
+                "node_id": "out-node-terminal-redial",
+                "label": "安排重拨",
+                "kind": "terminal",
+                "source_rule_ids": [
+                  "OUT-TERMINAL-03"
+                ],
+                "future_action": false
+              },
+              {
+                "node_id": "out-node-terminal-limit",
+                "label": "停止外呼（达上限）",
+                "kind": "terminal",
+                "source_rule_ids": [
+                  "OUT-TERMINAL-04"
+                ],
+                "future_action": false
+              },
+              {
+                "node_id": "out-node-terminal-dnc",
+                "label": "加入禁呼名单",
+                "kind": "terminal",
+                "source_rule_ids": [
+                  "OUT-TERMINAL-05"
+                ],
+                "future_action": false
+              },
+              {
+                "node_id": "out-node-terminal-escalation",
+                "label": "案件升级",
+                "kind": "terminal",
+                "source_rule_ids": [
+                  "OUT-TERMINAL-06"
+                ],
+                "future_action": false
+              },
+              {
+                "node_id": "out-node-terminal-identity-unconfirmed",
+                "label": "结束通话（身份无法确认）",
+                "kind": "terminal",
+                "source_rule_ids": [
+                  "OUT-IDENTITY-03"
+                ],
+                "future_action": false
+              }
+            ],
+            "edges": [
+              {
+                "edge_id": "out-edge-start-time",
+                "from_node_id": "out-node-start",
+                "to_node_id": "out-node-gate-time-window",
+                "label": "开始后先检查时段",
+                "guard_ids": [],
+                "source_rule_ids": [
+                  "OUT-TIME-02"
+                ],
+                "future_action": false
+              },
+              {
+                "edge_id": "out-edge-time-denied",
+                "from_node_id": "out-node-gate-time-window",
+                "to_node_id": "out-node-hold-until-window",
+                "label": "处于禁呼窗口",
+                "guard_ids": [
+                  "out-guard-time-window"
+                ],
+                "source_rule_ids": [
+                  "OUT-TIME-01"
+                ],
+                "future_action": false
+              },
+              {
+                "edge_id": "out-edge-time-hold-redial",
+                "from_node_id": "out-node-hold-until-window",
+                "to_node_id": "out-node-terminal-redial",
+                "label": "等待允许时段后重新安排",
+                "guard_ids": [],
+                "source_rule_ids": [
+                  "OUT-TIME-01",
+                  "OUT-REDIAL-01"
+                ],
+                "future_action": true
+              },
+              {
+                "edge_id": "out-edge-time-allowed",
+                "from_node_id": "out-node-gate-time-window",
+                "to_node_id": "out-node-gate-pre-dial-frequency",
+                "label": "当前时段允许",
+                "guard_ids": [
+                  "out-guard-time-window"
+                ],
+                "source_rule_ids": [
+                  "OUT-TIME-01"
+                ],
+                "future_action": false
+              },
+              {
+                "edge_id": "out-edge-pre-frequency-denied",
+                "from_node_id": "out-node-gate-pre-dial-frequency",
+                "to_node_id": "out-node-mark-daily-limit",
+                "label": "达到每日或窗口上限",
+                "guard_ids": [
+                  "out-guard-frequency"
+                ],
+                "source_rule_ids": [
+                  "OUT-FREQ-01",
+                  "OUT-FREQ-02",
+                  "OUT-FREQ-03"
+                ],
+                "future_action": false
+              },
+              {
+                "edge_id": "out-edge-limit-stop",
+                "from_node_id": "out-node-mark-daily-limit",
+                "to_node_id": "out-node-terminal-limit",
+                "label": "停止当日外呼并次日重评",
+                "guard_ids": [],
+                "source_rule_ids": [
+                  "OUT-FREQ-03",
+                  "OUT-REDIAL-02"
+                ],
+                "future_action": false
+              },
+              {
+                "edge_id": "out-edge-pre-frequency-allowed",
+                "from_node_id": "out-node-gate-pre-dial-frequency",
+                "to_node_id": "out-node-future-dial",
+                "label": "未达到频次上限",
+                "guard_ids": [
+                  "out-guard-frequency"
+                ],
+                "source_rule_ids": [
+                  "OUT-FREQ-01",
+                  "OUT-FREQ-02"
+                ],
+                "future_action": true
+              },
+              {
+                "edge_id": "out-edge-future-dial-connection",
+                "from_node_id": "out-node-future-dial",
+                "to_node_id": "out-node-decision-connection",
+                "label": "未来拨号返回连接状态",
+                "guard_ids": [],
+                "source_rule_ids": [
+                  "OUT-CONNECT-01"
+                ],
+                "future_action": true
+              },
+              {
+                "edge_id": "out-edge-not-connected",
+                "from_node_id": "out-node-decision-connection",
+                "to_node_id": "out-node-classify-unanswered",
+                "label": "未接通",
+                "guard_ids": [],
+                "source_rule_ids": [
+                  "OUT-CONNECT-01",
+                  "OUT-CONNECT-02"
+                ],
+                "future_action": false
+              },
+              {
+                "edge_id": "out-edge-unanswered-frequency",
+                "from_node_id": "out-node-classify-unanswered",
+                "to_node_id": "out-node-gate-post-call-frequency",
+                "label": "记录后检查频次",
+                "guard_ids": [],
+                "source_rule_ids": [
+                  "OUT-CONNECT-02"
+                ],
+                "future_action": false
+              },
+              {
+                "edge_id": "out-edge-post-frequency-denied",
+                "from_node_id": "out-node-gate-post-call-frequency",
+                "to_node_id": "out-node-mark-daily-limit",
+                "label": "达到每日或窗口上限",
+                "guard_ids": [
+                  "out-guard-frequency"
+                ],
+                "source_rule_ids": [
+                  "OUT-FREQ-01",
+                  "OUT-FREQ-02",
+                  "OUT-FREQ-03"
+                ],
+                "future_action": false
+              },
+              {
+                "edge_id": "out-edge-post-frequency-allowed",
+                "from_node_id": "out-node-gate-post-call-frequency",
+                "to_node_id": "out-node-future-redial",
+                "label": "未达到频次上限",
+                "guard_ids": [
+                  "out-guard-frequency",
+                  "out-guard-redial-interval"
+                ],
+                "source_rule_ids": [
+                  "OUT-CONNECT-02",
+                  "OUT-INVALID-01",
+                  "OUT-REDIAL-01"
+                ],
+                "future_action": true
+              },
+              {
+                "edge_id": "out-edge-redial-terminal",
+                "from_node_id": "out-node-future-redial",
+                "to_node_id": "out-node-terminal-redial",
+                "label": "形成未来重拨安排",
+                "guard_ids": [],
+                "source_rule_ids": [
+                  "OUT-REDIAL-01"
+                ],
+                "future_action": true
+              },
+              {
+                "edge_id": "out-edge-connected-identity",
+                "from_node_id": "out-node-decision-connection",
+                "to_node_id": "out-node-decision-identity",
+                "label": "接通后第一业务步骤是身份确认",
+                "guard_ids": [],
+                "source_rule_ids": [
+                  "OUT-CONNECT-01",
+                  "OUT-IDENTITY-01"
+                ],
+                "future_action": false
+              },
+              {
+                "edge_id": "out-edge-identity-self",
+                "from_node_id": "out-node-decision-identity",
+                "to_node_id": "out-node-recording-notice",
+                "label": "确认本人",
+                "guard_ids": [
+                  "out-guard-identity"
+                ],
+                "source_rule_ids": [
+                  "OUT-IDENTITY-01",
+                  "OUT-IDENTITY-02"
+                ],
+                "future_action": false
+              },
+              {
+                "edge_id": "out-edge-recording-introduction",
+                "from_node_id": "out-node-recording-notice",
+                "to_node_id": "out-node-introduce-purpose",
+                "label": "告知录音后说明来意",
+                "guard_ids": [],
+                "source_rule_ids": [
+                  "OUT-RECORD-02",
+                  "OUT-IDENTITY-01"
+                ],
+                "future_action": false
+              },
+              {
+                "edge_id": "out-edge-identity-unconfirmed",
+                "from_node_id": "out-node-decision-identity",
+                "to_node_id": "out-node-end-unconfirmed-identity",
+                "label": "无法确认身份",
+                "guard_ids": [
+                  "out-guard-identity"
+                ],
+                "source_rule_ids": [
+                  "OUT-IDENTITY-03"
+                ],
+                "future_action": false
+              },
+              {
+                "edge_id": "out-edge-unconfirmed-terminal",
+                "from_node_id": "out-node-end-unconfirmed-identity",
+                "to_node_id": "out-node-terminal-identity-unconfirmed",
+                "label": "结束通话",
+                "guard_ids": [],
+                "source_rule_ids": [
+                  "OUT-IDENTITY-03",
+                  "OUT-THIRD_PARTY-01"
+                ],
+                "future_action": false
+              },
+              {
+                "edge_id": "out-edge-identity-third-party",
+                "from_node_id": "out-node-decision-identity",
+                "to_node_id": "out-node-relay-only",
+                "label": "非本人接听",
+                "guard_ids": [
+                  "out-guard-identity"
+                ],
+                "source_rule_ids": [
+                  "OUT-THIRD_PARTY-01",
+                  "OUT-THIRD_PARTY-02"
+                ],
+                "future_action": false
+              },
+              {
+                "edge_id": "out-edge-relay-stop-decision",
+                "from_node_id": "out-node-relay-only",
+                "to_node_id": "out-node-decision-third-party-stop",
+                "label": "只请转告，不披露欠款",
+                "guard_ids": [],
+                "source_rule_ids": [
+                  "OUT-THIRD_PARTY-01",
+                  "OUT-THIRD_PARTY-02"
+                ],
+                "future_action": false
+              },
+              {
+                "edge_id": "out-edge-third-party-dnc",
+                "from_node_id": "out-node-decision-third-party-stop",
+                "to_node_id": "out-node-terminal-dnc",
+                "label": "要求停止联系",
+                "guard_ids": [
+                  "out-guard-third-party-stop"
+                ],
+                "source_rule_ids": [
+                  "OUT-THIRD_PARTY-03"
+                ],
+                "future_action": true
+              },
+              {
+                "edge_id": "out-edge-third-party-end",
+                "from_node_id": "out-node-decision-third-party-stop",
+                "to_node_id": "out-node-end-unconfirmed-identity",
+                "label": "未要求停止联系，转告后结束",
+                "guard_ids": [
+                  "out-guard-third-party-stop"
+                ],
+                "source_rule_ids": [
+                  "OUT-THIRD_PARTY-01"
+                ],
+                "future_action": false
+              },
+              {
+                "edge_id": "out-edge-introduction-payment",
+                "from_node_id": "out-node-introduce-purpose",
+                "to_node_id": "out-node-payment-guidance",
+                "label": "身份确认后才披露欠款并提供还款信息",
+                "guard_ids": [
+                  "out-guard-prohibited-content"
+                ],
+                "source_rule_ids": [
+                  "OUT-IDENTITY-02",
+                  "OUT-PAYMENT-01",
+                  "OUT-PROHIBIT-01",
+                  "OUT-PROHIBIT-02"
+                ],
+                "future_action": false
+              },
+              {
+                "edge_id": "out-edge-payment-response",
+                "from_node_id": "out-node-payment-guidance",
+                "to_node_id": "out-node-decision-response",
+                "label": "询问还款或分期意向",
+                "guard_ids": [],
+                "source_rule_ids": [
+                  "OUT-PAYMENT-02"
+                ],
+                "future_action": false
+              },
+              {
+                "edge_id": "out-edge-response-ptp",
+                "from_node_id": "out-node-decision-response",
+                "to_node_id": "out-node-record-ptp",
+                "label": "承诺还款",
+                "guard_ids": [
+                  "out-guard-response"
+                ],
+                "source_rule_ids": [
+                  "OUT-PTP-01"
+                ],
+                "future_action": false
+              },
+              {
+                "edge_id": "out-edge-ptp-sms",
+                "from_node_id": "out-node-record-ptp",
+                "to_node_id": "out-node-future-sms",
+                "label": "安排未来短信提醒",
+                "guard_ids": [],
+                "source_rule_ids": [
+                  "OUT-PTP-01",
+                  "OUT-PTP-02"
+                ],
+                "future_action": true
+              },
+              {
+                "edge_id": "out-edge-sms-ptp-terminal",
+                "from_node_id": "out-node-future-sms",
+                "to_node_id": "out-node-terminal-ptp",
+                "label": "完成 PTP 登记",
+                "guard_ids": [],
+                "source_rule_ids": [
+                  "OUT-PTP-02"
+                ],
+                "future_action": true
+              },
+              {
+                "edge_id": "out-edge-response-soft",
+                "from_node_id": "out-node-decision-response",
+                "to_node_id": "out-node-installment-follow-up",
+                "label": "软拒绝或暂时困难",
+                "guard_ids": [
+                  "out-guard-response"
+                ],
+                "source_rule_ids": [
+                  "OUT-SOFT-01"
+                ],
+                "future_action": false
+              },
+              {
+                "edge_id": "out-edge-soft-redial-terminal",
+                "from_node_id": "out-node-installment-follow-up",
+                "to_node_id": "out-node-terminal-redial",
+                "label": "安排分期沟通和后续跟进",
+                "guard_ids": [],
+                "source_rule_ids": [
+                  "OUT-SOFT-01"
+                ],
+                "future_action": true
+              },
+              {
+                "edge_id": "out-edge-response-hard",
+                "from_node_id": "out-node-decision-response",
+                "to_node_id": "out-node-case-escalation",
+                "label": "硬拒绝或否认债务",
+                "guard_ids": [
+                  "out-guard-response"
+                ],
+                "source_rule_ids": [
+                  "OUT-HARD-01"
+                ],
+                "future_action": false
+              },
+              {
+                "edge_id": "out-edge-hard-escalation-terminal",
+                "from_node_id": "out-node-case-escalation",
+                "to_node_id": "out-node-terminal-escalation",
+                "label": "等待人工或法务处理",
+                "guard_ids": [],
+                "source_rule_ids": [
+                  "OUT-HARD-01"
+                ],
+                "future_action": true
+              },
+              {
+                "edge_id": "out-edge-response-dispute",
+                "from_node_id": "out-node-decision-response",
+                "to_node_id": "out-node-human-transfer",
+                "label": "投诉、异议或指定高风险短语",
+                "guard_ids": [
+                  "out-guard-response"
+                ],
+                "source_rule_ids": [
+                  "OUT-DISPUTE-01"
+                ],
+                "future_action": true
+              },
+              {
+                "edge_id": "out-edge-response-emotion",
+                "from_node_id": "out-node-decision-response",
+                "to_node_id": "out-node-human-transfer",
+                "label": "情绪持续超过来源阈值",
+                "guard_ids": [
+                  "out-guard-response"
+                ],
+                "source_rule_ids": [
+                  "OUT-DISPUTE-02"
+                ],
+                "future_action": true
+              },
+              {
+                "edge_id": "out-edge-human-terminal",
+                "from_node_id": "out-node-human-transfer",
+                "to_node_id": "out-node-terminal-human",
+                "label": "进入人工跟进",
+                "guard_ids": [],
+                "source_rule_ids": [
+                  "OUT-DISPUTE-01",
+                  "OUT-DISPUTE-02"
+                ],
+                "future_action": true
+              },
+              {
+                "edge_id": "out-edge-response-invalid",
+                "from_node_id": "out-node-decision-response",
+                "to_node_id": "out-node-record-invalid-call",
+                "label": "立即挂断或无法沟通",
+                "guard_ids": [
+                  "out-guard-response"
+                ],
+                "source_rule_ids": [
+                  "OUT-INVALID-01"
+                ],
+                "future_action": false
+              },
+              {
+                "edge_id": "out-edge-invalid-frequency",
+                "from_node_id": "out-node-record-invalid-call",
+                "to_node_id": "out-node-gate-post-call-frequency",
+                "label": "记录后返回频次 Gate",
+                "guard_ids": [],
+                "source_rule_ids": [
+                  "OUT-INVALID-01"
+                ],
+                "future_action": false
+              }
+            ],
+            "guards": [
+              {
+                "guard_id": "out-guard-time-window",
+                "label": "当前时间不在来源禁呼窗口",
+                "parameters": [
+                  {
+                    "name": "prohibited_start",
+                    "value": "22:00",
+                    "unit": null
+                  },
+                  {
+                    "name": "prohibited_end",
+                    "value": "08:00",
+                    "unit": null
+                  }
+                ],
+                "source_rule_ids": [
+                  "OUT-TIME-01"
+                ]
+              },
+              {
+                "guard_id": "out-guard-frequency",
+                "label": "每日与窗口频次均未达到来源上限",
+                "parameters": [
+                  {
+                    "name": "daily_call_max",
+                    "value": "3",
+                    "unit": "次/日"
+                  },
+                  {
+                    "name": "hourly_window",
+                    "value": "1",
+                    "unit": "小时"
+                  },
+                  {
+                    "name": "hourly_call_max",
+                    "value": "1",
+                    "unit": "次/窗口"
+                  }
+                ],
+                "source_rule_ids": [
+                  "OUT-FREQ-01",
+                  "OUT-FREQ-02"
+                ]
+              },
+              {
+                "guard_id": "out-guard-identity",
+                "label": "本人/第三方/无法确认三态互斥",
+                "parameters": [],
+                "source_rule_ids": [
+                  "OUT-IDENTITY-01",
+                  "OUT-IDENTITY-02",
+                  "OUT-IDENTITY-03"
+                ]
+              },
+              {
+                "guard_id": "out-guard-third-party-stop",
+                "label": "第三方停止联系请求",
+                "parameters": [],
+                "source_rule_ids": [
+                  "OUT-THIRD_PARTY-03"
+                ]
+              },
+              {
+                "guard_id": "out-guard-prohibited-content",
+                "label": "禁止威胁、辱骂和 M1 法律行动暗示",
+                "parameters": [],
+                "source_rule_ids": [
+                  "OUT-PROHIBIT-01",
+                  "OUT-PROHIBIT-02"
+                ]
+              },
+              {
+                "guard_id": "out-guard-response",
+                "label": "本人态度、投诉、异议、无效通话与高风险触发互斥投影",
+                "parameters": [
+                  {
+                    "name": "emotion_transfer_threshold",
+                    "value": "30",
+                    "unit": "秒"
+                  }
+                ],
+                "source_rule_ids": [
+                  "OUT-PTP-01",
+                  "OUT-SOFT-01",
+                  "OUT-HARD-01",
+                  "OUT-DISPUTE-01",
+                  "OUT-DISPUTE-02"
+                ]
+              },
+              {
+                "guard_id": "out-guard-redial-interval",
+                "label": "未来重拨不得早于来源最小间隔",
+                "parameters": [
+                  {
+                    "name": "redial_min_interval",
+                    "value": "1",
+                    "unit": "小时"
+                  }
+                ],
+                "source_rule_ids": [
+                  "OUT-REDIAL-01"
+                ]
+              }
+            ],
+            "terminals": [
+              {
+                "terminal_id": "out-terminal-ptp",
+                "node_id": "out-node-terminal-ptp",
+                "label": "PTP登记",
+                "source_rule_ids": [
+                  "OUT-TERMINAL-01"
+                ],
+                "source_listed": true
+              },
+              {
+                "terminal_id": "out-terminal-human",
+                "node_id": "out-node-terminal-human",
+                "label": "转人工跟进",
+                "source_rule_ids": [
+                  "OUT-TERMINAL-02"
+                ],
+                "source_listed": true
+              },
+              {
+                "terminal_id": "out-terminal-redial",
+                "node_id": "out-node-terminal-redial",
+                "label": "安排重拨",
+                "source_rule_ids": [
+                  "OUT-TERMINAL-03"
+                ],
+                "source_listed": true
+              },
+              {
+                "terminal_id": "out-terminal-limit",
+                "node_id": "out-node-terminal-limit",
+                "label": "停止外呼（达上限）",
+                "source_rule_ids": [
+                  "OUT-TERMINAL-04"
+                ],
+                "source_listed": true
+              },
+              {
+                "terminal_id": "out-terminal-dnc",
+                "node_id": "out-node-terminal-dnc",
+                "label": "加入禁呼名单",
+                "source_rule_ids": [
+                  "OUT-TERMINAL-05"
+                ],
+                "source_listed": true
+              },
+              {
+                "terminal_id": "out-terminal-escalation",
+                "node_id": "out-node-terminal-escalation",
+                "label": "案件升级",
+                "source_rule_ids": [
+                  "OUT-TERMINAL-06"
+                ],
+                "source_listed": true
+              },
+              {
+                "terminal_id": "out-terminal-identity-unconfirmed",
+                "node_id": "out-node-terminal-identity-unconfirmed",
+                "label": "结束通话（身份无法确认）",
+                "source_rule_ids": [
+                  "OUT-IDENTITY-03"
+                ],
+                "source_listed": false
+              }
+            ],
+            "graph_integrity": {
+              "unique_start": true,
+              "unique_ids": true,
+              "no_dangling_edges": true,
+              "all_nodes_reachable": true,
+              "all_terminals_reachable": true,
+              "every_nonterminal_has_outgoing": true,
+              "every_node_can_reach_terminal": true,
+              "critical_order_valid": true,
+              "third_party_boundary_valid": true,
+              "all_rules_mapped": true
+            },
+            "human_approval_required": true,
+            "legal_opinion": false,
+            "original_inputs_modified": false,
+            "external_action": "none"
+          },
+          "created_at": "2026-08-28T20:25:23.034495Z",
+          "external_action": "none"
+        }
+      ],
+      "artifacts": [
+        {
+          "artifact_id": "workspace-artifact-636ec9d4725a",
+          "file_name": "外呼流程-M1逾期用户AI外呼催收流程图.docx",
+          "media_type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+          "size": 10095,
+          "validator_id": "validator-compliant-outbound-flow-v2",
+          "verifier_status": "passed",
+          "checks": [
+            {
+              "check_id": "check-outbound-source-contract-v2",
+              "label": "批准来源合同",
+              "passed": true,
+              "detail": "运营管理/专业性说明.md 的逻辑 ID、file_ref、声明大小和冻结字节已校验；DOCX 可解析，共 6 个结构化表格"
+            },
+            {
+              "check_id": "check-outbound-rule-ledger-v2",
+              "label": "来源规则账本",
+              "passed": true,
+              "detail": "DOCX 中的来源规则账本必须与批准 Markdown 的服务端重算结果逐字段一致。"
+            },
+            {
+              "check_id": "check-outbound-nodes-v2",
+              "label": "流程节点表",
+              "passed": true,
+              "detail": "DOCX 中的流程节点表必须与批准 Markdown 的服务端重算结果逐字段一致。"
+            },
+            {
+              "check_id": "check-outbound-edges-v2",
+              "label": "边与守卫表",
+              "passed": true,
+              "detail": "DOCX 中的边与守卫表必须与批准 Markdown 的服务端重算结果逐字段一致。"
+            },
+            {
+              "check_id": "check-outbound-guards-v2",
+              "label": "守卫参数表",
+              "passed": true,
+              "detail": "DOCX 中的守卫参数表必须与批准 Markdown 的服务端重算结果逐字段一致。"
+            },
+            {
+              "check_id": "check-outbound-terminals-v2",
+              "label": "终态表",
+              "passed": true,
+              "detail": "DOCX 中的终态表必须与批准 Markdown 的服务端重算结果逐字段一致。"
+            },
+            {
+              "check_id": "check-outbound-integrity-summary-v2",
+              "label": "完整性摘要",
+              "passed": true,
+              "detail": "DOCX 中的完整性摘要必须与批准 Markdown 的服务端重算结果逐字段一致。"
+            },
+            {
+              "check_id": "check-outbound-graph-integrity-v2",
+              "label": "流程图可遍历且终态可达",
+              "passed": true,
+              "detail": "节点 31、边 36、终态 7/7 可达；无 dangling edge，所有节点均可到达终态。"
+            },
+            {
+              "check_id": "check-outbound-critical-order-v2",
+              "label": "身份、告知与欠款信息顺序",
+              "passed": true,
+              "detail": "顺序由来源重算；当前批准版本要求先确认身份，再告知录音与来意，最后进入欠款引导。"
+            },
+            {
+              "check_id": "check-outbound-rule-coverage-v2",
+              "label": "全部规范性要求均有图映射",
+              "passed": true,
+              "detail": "34/34 条原子要求已绑定节点、边、守卫或终态；未知或冲突规则不得静默忽略。"
+            },
+            {
+              "check_id": "check-outbound-boundary-v2",
+              "label": "审批、法律与执行边界",
+              "passed": true,
+              "detail": "DOCX 明确仅为固定 Operations-008 流程设计，不是法律意见，也没有拨号或写入外部系统。"
+            },
+            {
+              "check_id": "check-outbound-original-source-read-only-v2",
+              "label": "批准来源保持只读",
+              "passed": true,
+              "detail": "生成后重新读取冻结 Catalog 字节；本工具只写隔离运行工作区，不修改 Operations-008 原件。"
+            }
+          ],
+          "review_required": true,
+          "deliverable_type": "来源推导的流程设计 DOCX",
+          "key_outputs": [
+            "PTP登记",
+            "转人工跟进",
+            "安排重拨",
+            "停止外呼（达上限）",
+            "加入禁呼名单",
+            "案件升级"
+          ],
+          "key_outputs_label": "来源列出的 6 类终态",
+          "review_guidance": "请复核 34 条来源要求、7/7 个可达终态，并由业务与合规负责人完成最终审批；当前没有拨号、写 CRM 或发送短信。",
+          "execution_summary": "已从批准 Markdown 推导规则账本并生成可遍历流程设计 DOCX。拨号、CRM、短信、禁呼写入和转人工均为未来流程节点；本次 external_action=none，最终合规审批未发生。",
+          "outbound_flow_outcome": {
+            "outcome_id": "outbound-flow-outcome-operations-008",
+            "status": "approval_required",
+            "decision": "来源规则和流程图结构已由服务端重算，仍需业务与合规负责人批准；真实外呼及系统写入均未发生。",
+            "summary": "从批准 Markdown 推导 15 组、34 条原子要求；构建 31 个节点、36 条边和 7 个终态，可达终态 7/7。",
+            "source_rule_group_count": 15,
+            "atomic_requirement_count": 34,
+            "covered_count": 34,
+            "unsupported_count": 0,
+            "conflict_count": 0,
+            "node_count": 31,
+            "edge_count": 36,
+            "guard_count": 7,
+            "terminal_count": 7,
+            "reachable_terminal_count": 7,
+            "parameters": [
+              {
+                "name": "prohibited_start",
+                "value": "22:00",
+                "unit": null
+              },
+              {
+                "name": "prohibited_end",
+                "value": "08:00",
+                "unit": null
+              },
+              {
+                "name": "daily_call_max",
+                "value": "3",
+                "unit": "次/日"
+              },
+              {
+                "name": "hourly_window",
+                "value": "1",
+                "unit": "小时"
+              },
+              {
+                "name": "hourly_call_max",
+                "value": "1",
+                "unit": "次/窗口"
+              },
+              {
+                "name": "recording_retention",
+                "value": "2",
+                "unit": "年"
+              },
+              {
+                "name": "emotion_transfer_threshold",
+                "value": "30",
+                "unit": "秒"
+              },
+              {
+                "name": "redial_min_interval",
+                "value": "1",
+                "unit": "小时"
+              },
+              {
+                "name": "source_terminal_count",
+                "value": "6",
+                "unit": "个"
+              },
+              {
+                "name": "identity_recording_order",
+                "value": "identity_before_recording",
+                "unit": null
+              }
+            ],
+            "rules": [
+              {
+                "rule_id": "OUT-TIME-01",
+                "group": "TIME",
+                "source_file_ref": "forte-ba23e986a9c7e8d8",
+                "locator": "专业性说明.md:L22",
+                "excerpt": "**外呼时间**：每日 22:00 至次日 08:00 严禁拨打，流程中必须在拨号前判断当前时段。",
+                "parameters": [
+                  {
+                    "name": "prohibited_start",
+                    "value": "22:00",
+                    "unit": null
+                  },
+                  {
+                    "name": "prohibited_end",
+                    "value": "08:00",
+                    "unit": null
+                  }
+                ],
+                "expected_relation": "当前时刻不得落入禁呼窗口",
+                "expected_action": "在 future dial 前阻断禁呼时段",
+                "coverage_state": "covered",
+                "mapped_node_ids": [
+                  "out-node-gate-time-window",
+                  "out-node-hold-until-window"
+                ],
+                "mapped_edge_ids": [
+                  "out-edge-time-denied",
+                  "out-edge-time-hold-redial",
+                  "out-edge-time-allowed"
+                ],
+                "mapped_guard_ids": [
+                  "out-guard-time-window"
+                ],
+                "mapped_terminal_ids": []
+              },
+              {
+                "rule_id": "OUT-TIME-02",
+                "group": "TIME",
+                "source_file_ref": "forte-ba23e986a9c7e8d8",
+                "locator": "专业性说明.md:L22",
+                "excerpt": "**外呼时间**：每日 22:00 至次日 08:00 严禁拨打，流程中必须在拨号前判断当前时段。",
+                "parameters": [],
+                "expected_relation": "TIME Gate 必须早于 future dial",
+                "expected_action": "先校验时段，再允许未来拨号节点",
+                "coverage_state": "covered",
+                "mapped_node_ids": [
+                  "out-node-gate-time-window",
+                  "out-node-future-dial"
+                ],
+                "mapped_edge_ids": [
+                  "out-edge-start-time"
+                ],
+                "mapped_guard_ids": [],
+                "mapped_terminal_ids": []
+              },
+              {
+                "rule_id": "OUT-FREQ-01",
+                "group": "FREQ",
+                "source_file_ref": "forte-ba23e986a9c7e8d8",
+                "locator": "专业性说明.md:L24",
+                "excerpt": "**外呼频次**：对同一客户每日拨打不得超过 3 次，1小时内不得超过 1 次；达到上限后停止当日外呼。",
+                "parameters": [
+                  {
+                    "name": "daily_call_max",
+                    "value": "3",
+                    "unit": "次/日"
+                  }
+                ],
+                "expected_relation": "同一客户每日次数不得超过来源上限",
+                "expected_action": "达日上限后停止当日外呼",
+                "coverage_state": "covered",
+                "mapped_node_ids": [
+                  "out-node-gate-pre-dial-frequency",
+                  "out-node-gate-post-call-frequency"
+                ],
+                "mapped_edge_ids": [
+                  "out-edge-pre-frequency-denied",
+                  "out-edge-pre-frequency-allowed",
+                  "out-edge-post-frequency-denied"
+                ],
+                "mapped_guard_ids": [
+                  "out-guard-frequency"
+                ],
+                "mapped_terminal_ids": []
+              },
+              {
+                "rule_id": "OUT-FREQ-02",
+                "group": "FREQ",
+                "source_file_ref": "forte-ba23e986a9c7e8d8",
+                "locator": "专业性说明.md:L24",
+                "excerpt": "**外呼频次**：对同一客户每日拨打不得超过 3 次，1小时内不得超过 1 次；达到上限后停止当日外呼。",
+                "parameters": [
+                  {
+                    "name": "hourly_window",
+                    "value": "1",
+                    "unit": "小时"
+                  },
+                  {
+                    "name": "hourly_call_max",
+                    "value": "1",
+                    "unit": "次/窗口"
+                  }
+                ],
+                "expected_relation": "窗口内次数不得超过来源上限",
+                "expected_action": "达小时窗口上限后停止当日外呼",
+                "coverage_state": "covered",
+                "mapped_node_ids": [
+                  "out-node-gate-pre-dial-frequency",
+                  "out-node-gate-post-call-frequency"
+                ],
+                "mapped_edge_ids": [
+                  "out-edge-pre-frequency-denied",
+                  "out-edge-pre-frequency-allowed",
+                  "out-edge-post-frequency-denied"
+                ],
+                "mapped_guard_ids": [
+                  "out-guard-frequency"
+                ],
+                "mapped_terminal_ids": []
+              },
+              {
+                "rule_id": "OUT-FREQ-03",
+                "group": "FREQ",
+                "source_file_ref": "forte-ba23e986a9c7e8d8",
+                "locator": "专业性说明.md:L24",
+                "excerpt": "**外呼频次**：对同一客户每日拨打不得超过 3 次，1小时内不得超过 1 次；达到上限后停止当日外呼。",
+                "parameters": [],
+                "expected_relation": "任一频次上限命中即停止",
+                "expected_action": "进入频次达限终态",
+                "coverage_state": "covered",
+                "mapped_node_ids": [
+                  "out-node-gate-pre-dial-frequency",
+                  "out-node-mark-daily-limit"
+                ],
+                "mapped_edge_ids": [
+                  "out-edge-pre-frequency-denied",
+                  "out-edge-limit-stop",
+                  "out-edge-post-frequency-denied"
+                ],
+                "mapped_guard_ids": [],
+                "mapped_terminal_ids": []
+              },
+              {
+                "rule_id": "OUT-RECORD-01",
+                "group": "RECORD",
+                "source_file_ref": "forte-ba23e986a9c7e8d8",
+                "locator": "专业性说明.md:L26",
+                "excerpt": "**录音存证**：每通电话必须全程录音，至少保存 2 年；接通后必须告知客户\"本次通话将被录音\"。",
+                "parameters": [
+                  {
+                    "name": "recording_retention",
+                    "value": "2",
+                    "unit": "年"
+                  }
+                ],
+                "expected_relation": "每通电话全程录音并按来源年限保存",
+                "expected_action": "在本人通话节点标明录音及保留要求",
+                "coverage_state": "covered",
+                "mapped_node_ids": [
+                  "out-node-recording-notice"
+                ],
+                "mapped_edge_ids": [],
+                "mapped_guard_ids": [],
+                "mapped_terminal_ids": []
+              },
+              {
+                "rule_id": "OUT-RECORD-02",
+                "group": "RECORD",
+                "source_file_ref": "forte-ba23e986a9c7e8d8",
+                "locator": "专业性说明.md:L26",
+                "excerpt": "**录音存证**：每通电话必须全程录音，至少保存 2 年；接通后必须告知客户\"本次通话将被录音\"。",
+                "parameters": [],
+                "expected_relation": "通话中必须告知录音",
+                "expected_action": "录音告知节点受身份顺序约束",
+                "coverage_state": "covered",
+                "mapped_node_ids": [
+                  "out-node-recording-notice"
+                ],
+                "mapped_edge_ids": [
+                  "out-edge-recording-introduction"
+                ],
+                "mapped_guard_ids": [],
+                "mapped_terminal_ids": []
+              },
+              {
+                "rule_id": "OUT-IDENTITY-01",
+                "group": "IDENTITY",
+                "source_file_ref": "forte-ba23e986a9c7e8d8",
+                "locator": "专业性说明.md:L57",
+                "excerpt": "**身份确认**：接通后第一步，询问是否本人。确认是本人才进入催收话术；非本人只请转告；无法确认则结束通话。",
+                "parameters": [
+                  {
+                    "name": "identity_recording_order",
+                    "value": "identity_before_recording",
+                    "unit": null
+                  }
+                ],
+                "expected_relation": "identity_before_recording",
+                "expected_action": "按来源顺序执行身份确认和录音告知",
+                "coverage_state": "covered",
+                "mapped_node_ids": [
+                  "out-node-decision-identity"
+                ],
+                "mapped_edge_ids": [
+                  "out-edge-connected-identity",
+                  "out-edge-identity-self",
+                  "out-edge-recording-introduction"
+                ],
+                "mapped_guard_ids": [
+                  "out-guard-identity"
+                ],
+                "mapped_terminal_ids": []
+              },
+              {
+                "rule_id": "OUT-IDENTITY-02",
+                "group": "IDENTITY",
+                "source_file_ref": "forte-ba23e986a9c7e8d8",
+                "locator": "专业性说明.md:L57",
+                "excerpt": "**身份确认**：接通后第一步，询问是否本人。确认是本人才进入催收话术；非本人只请转告；无法确认则结束通话。",
+                "parameters": [],
+                "expected_relation": "只有确认本人后才能进入欠款话术",
+                "expected_action": "阻断非本人和身份不明路径的欠款披露",
+                "coverage_state": "covered",
+                "mapped_node_ids": [
+                  "out-node-decision-identity",
+                  "out-node-introduce-purpose"
+                ],
+                "mapped_edge_ids": [
+                  "out-edge-identity-self",
+                  "out-edge-introduction-payment"
+                ],
+                "mapped_guard_ids": [
+                  "out-guard-identity"
+                ],
+                "mapped_terminal_ids": []
+              },
+              {
+                "rule_id": "OUT-IDENTITY-03",
+                "group": "IDENTITY",
+                "source_file_ref": "forte-ba23e986a9c7e8d8",
+                "locator": "专业性说明.md:L57",
+                "excerpt": "**身份确认**：接通后第一步，询问是否本人。确认是本人才进入催收话术；非本人只请转告；无法确认则结束通话。",
+                "parameters": [],
+                "expected_relation": "无法确认身份时结束通话",
+                "expected_action": "进入身份无法确认终态",
+                "coverage_state": "covered",
+                "mapped_node_ids": [
+                  "out-node-decision-identity",
+                  "out-node-end-unconfirmed-identity",
+                  "out-node-terminal-identity-unconfirmed"
+                ],
+                "mapped_edge_ids": [
+                  "out-edge-identity-unconfirmed",
+                  "out-edge-unconfirmed-terminal"
+                ],
+                "mapped_guard_ids": [
+                  "out-guard-identity"
+                ],
+                "mapped_terminal_ids": [
+                  "out-terminal-identity-unconfirmed"
+                ]
+              },
+              {
+                "rule_id": "OUT-THIRD_PARTY-01",
+                "group": "THIRD_PARTY",
+                "source_file_ref": "forte-ba23e986a9c7e8d8",
+                "locator": "专业性说明.md:L28",
+                "excerpt": "**第三方限制**：接通后必须先确认是否本人接听。非本人接听时，只能请其转告，严禁透露欠款金额；若第三方明确要求不再联系，立即加入禁呼名单。",
+                "parameters": [],
+                "expected_relation": "非本人只能请其转告",
+                "expected_action": "进入仅转告节点",
+                "coverage_state": "covered",
+                "mapped_node_ids": [
+                  "out-node-relay-only",
+                  "out-node-end-unconfirmed-identity"
+                ],
+                "mapped_edge_ids": [
+                  "out-edge-unconfirmed-terminal",
+                  "out-edge-identity-third-party",
+                  "out-edge-relay-stop-decision",
+                  "out-edge-third-party-end"
+                ],
+                "mapped_guard_ids": [],
+                "mapped_terminal_ids": []
+              },
+              {
+                "rule_id": "OUT-THIRD_PARTY-02",
+                "group": "THIRD_PARTY",
+                "source_file_ref": "forte-ba23e986a9c7e8d8",
+                "locator": "专业性说明.md:L28",
+                "excerpt": "**第三方限制**：接通后必须先确认是否本人接听。非本人接听时，只能请其转告，严禁透露欠款金额；若第三方明确要求不再联系，立即加入禁呼名单。",
+                "parameters": [],
+                "expected_relation": "非本人不得披露欠款金额",
+                "expected_action": "第三方路径不得到达欠款引导",
+                "coverage_state": "covered",
+                "mapped_node_ids": [
+                  "out-node-relay-only"
+                ],
+                "mapped_edge_ids": [
+                  "out-edge-identity-third-party",
+                  "out-edge-relay-stop-decision"
+                ],
+                "mapped_guard_ids": [],
+                "mapped_terminal_ids": []
+              },
+              {
+                "rule_id": "OUT-THIRD_PARTY-03",
+                "group": "THIRD_PARTY",
+                "source_file_ref": "forte-ba23e986a9c7e8d8",
+                "locator": "专业性说明.md:L28",
+                "excerpt": "**第三方限制**：接通后必须先确认是否本人接听。非本人接听时，只能请其转告，严禁透露欠款金额；若第三方明确要求不再联系，立即加入禁呼名单。",
+                "parameters": [],
+                "expected_relation": "第三方要求停止联系时必须禁呼",
+                "expected_action": "进入加入禁呼名单终态",
+                "coverage_state": "covered",
+                "mapped_node_ids": [
+                  "out-node-decision-third-party-stop"
+                ],
+                "mapped_edge_ids": [
+                  "out-edge-third-party-dnc"
+                ],
+                "mapped_guard_ids": [
+                  "out-guard-third-party-stop"
+                ],
+                "mapped_terminal_ids": []
+              },
+              {
+                "rule_id": "OUT-PROHIBIT-01",
+                "group": "PROHIBIT",
+                "source_file_ref": "forte-ba23e986a9c7e8d8",
+                "locator": "专业性说明.md:L30",
+                "excerpt": "**禁止行为**：严禁威胁、恐吓、辱骂；M1 阶段不得使用\"将采取法律行动\"等表述（尚未进入法律程序）。",
+                "parameters": [],
+                "expected_relation": "禁止威胁、恐吓和辱骂",
+                "expected_action": "话术守卫拒绝禁止行为",
+                "coverage_state": "covered",
+                "mapped_node_ids": [
+                  "out-node-introduce-purpose"
+                ],
+                "mapped_edge_ids": [
+                  "out-edge-introduction-payment"
+                ],
+                "mapped_guard_ids": [
+                  "out-guard-prohibited-content"
+                ],
+                "mapped_terminal_ids": []
+              },
+              {
+                "rule_id": "OUT-PROHIBIT-02",
+                "group": "PROHIBIT",
+                "source_file_ref": "forte-ba23e986a9c7e8d8",
+                "locator": "专业性说明.md:L30",
+                "excerpt": "**禁止行为**：严禁威胁、恐吓、辱骂；M1 阶段不得使用\"将采取法律行动\"等表述（尚未进入法律程序）。",
+                "parameters": [],
+                "expected_relation": "M1 阶段不得使用法律行动话术",
+                "expected_action": "话术守卫拒绝法律程序暗示",
+                "coverage_state": "covered",
+                "mapped_node_ids": [
+                  "out-node-introduce-purpose"
+                ],
+                "mapped_edge_ids": [
+                  "out-edge-introduction-payment"
+                ],
+                "mapped_guard_ids": [
+                  "out-guard-prohibited-content"
+                ],
+                "mapped_terminal_ids": []
+              },
+              {
+                "rule_id": "OUT-CONNECT-01",
+                "group": "CONNECT",
+                "source_file_ref": "forte-ba23e986a9c7e8d8",
+                "locator": "专业性说明.md:L38",
+                "excerpt": "- 未接通：无人接听 / 关机空号 / 主动拒接 → 判断今日次数，未超限则加入重拨队列",
+                "parameters": [],
+                "expected_relation": "拨号结果必须区分接通与未接通",
+                "expected_action": "进入连接状态决策",
+                "coverage_state": "covered",
+                "mapped_node_ids": [
+                  "out-node-decision-connection"
+                ],
+                "mapped_edge_ids": [
+                  "out-edge-future-dial-connection",
+                  "out-edge-not-connected",
+                  "out-edge-connected-identity"
+                ],
+                "mapped_guard_ids": [],
+                "mapped_terminal_ids": []
+              },
+              {
+                "rule_id": "OUT-CONNECT-02",
+                "group": "CONNECT",
+                "source_file_ref": "forte-ba23e986a9c7e8d8",
+                "locator": "专业性说明.md:L38",
+                "excerpt": "- 未接通：无人接听 / 关机空号 / 主动拒接 → 判断今日次数，未超限则加入重拨队列",
+                "parameters": [],
+                "expected_relation": "无人接听、关机空号或主动拒接进入频次 Gate",
+                "expected_action": "记录未接通分类并判断重拨",
+                "coverage_state": "covered",
+                "mapped_node_ids": [
+                  "out-node-classify-unanswered",
+                  "out-node-gate-post-call-frequency"
+                ],
+                "mapped_edge_ids": [
+                  "out-edge-not-connected",
+                  "out-edge-unanswered-frequency",
+                  "out-edge-post-frequency-allowed"
+                ],
+                "mapped_guard_ids": [],
+                "mapped_terminal_ids": []
+              },
+              {
+                "rule_id": "OUT-PTP-01",
+                "group": "PTP",
+                "source_file_ref": "forte-ba23e986a9c7e8d8",
+                "locator": "专业性说明.md:L43",
+                "excerpt": "- **承诺还款（PTP）**：记录承诺金额（全额或最低还款额）和承诺日期，安排到期前短信提醒",
+                "parameters": [],
+                "expected_relation": "承诺还款必须记录金额和日期",
+                "expected_action": "在 PTP 终态前记录承诺字段",
+                "coverage_state": "covered",
+                "mapped_node_ids": [
+                  "out-node-decision-response",
+                  "out-node-record-ptp"
+                ],
+                "mapped_edge_ids": [
+                  "out-edge-response-ptp",
+                  "out-edge-ptp-sms"
+                ],
+                "mapped_guard_ids": [
+                  "out-guard-response"
+                ],
+                "mapped_terminal_ids": []
+              },
+              {
+                "rule_id": "OUT-PTP-02",
+                "group": "PTP",
+                "source_file_ref": "forte-ba23e986a9c7e8d8",
+                "locator": "专业性说明.md:L43",
+                "excerpt": "- **承诺还款（PTP）**：记录承诺金额（全额或最低还款额）和承诺日期，安排到期前短信提醒",
+                "parameters": [],
+                "expected_relation": "到期前短信提醒是未来受控动作",
+                "expected_action": "只写入未来短信提醒节点，不发送短信",
+                "coverage_state": "covered",
+                "mapped_node_ids": [
+                  "out-node-future-sms"
+                ],
+                "mapped_edge_ids": [
+                  "out-edge-ptp-sms",
+                  "out-edge-sms-ptp-terminal"
+                ],
+                "mapped_guard_ids": [],
+                "mapped_terminal_ids": []
+              },
+              {
+                "rule_id": "OUT-SOFT-01",
+                "group": "SOFT",
+                "source_file_ref": "forte-ba23e986a9c7e8d8",
+                "locator": "专业性说明.md:L44",
+                "excerpt": "- **软拒绝**：申请延期或表示暂时困难 → 引导分期方案，安排后续跟进",
+                "parameters": [],
+                "expected_relation": "软拒绝进入分期方案和后续跟进",
+                "expected_action": "进入分期跟进节点后安排后续联系",
+                "coverage_state": "covered",
+                "mapped_node_ids": [
+                  "out-node-decision-response",
+                  "out-node-installment-follow-up"
+                ],
+                "mapped_edge_ids": [
+                  "out-edge-response-soft",
+                  "out-edge-soft-redial-terminal"
+                ],
+                "mapped_guard_ids": [
+                  "out-guard-response"
+                ],
+                "mapped_terminal_ids": []
+              },
+              {
+                "rule_id": "OUT-HARD-01",
+                "group": "HARD",
+                "source_file_ref": "forte-ba23e986a9c7e8d8",
+                "locator": "专业性说明.md:L45",
+                "excerpt": "- **硬拒绝**：明确拒绝或否认债务 → 案件升级，转人工或法务处理",
+                "parameters": [],
+                "expected_relation": "硬拒绝或否认债务必须升级",
+                "expected_action": "进入人工或法务案件升级终态",
+                "coverage_state": "covered",
+                "mapped_node_ids": [
+                  "out-node-decision-response",
+                  "out-node-case-escalation"
+                ],
+                "mapped_edge_ids": [
+                  "out-edge-response-hard",
+                  "out-edge-hard-escalation-terminal"
+                ],
+                "mapped_guard_ids": [
+                  "out-guard-response"
+                ],
+                "mapped_terminal_ids": []
+              },
+              {
+                "rule_id": "OUT-DISPUTE-01",
+                "group": "DISPUTE",
+                "source_file_ref": "forte-ba23e986a9c7e8d8",
+                "locator": "专业性说明.md:L63",
+                "excerpt": "**强制转人工触发条件**：客户说\"我要投诉\"\"这笔钱不是我的\"\"我要找你们领导\"\"我要起诉你们\"等类似话语，或情绪持续激动超过 30 秒，AI 必须立即转人工。",
+                "parameters": [],
+                "expected_relation": "投诉、异议及来源短语触发人工",
+                "expected_action": "立即进入转人工终态",
+                "coverage_state": "covered",
+                "mapped_node_ids": [
+                  "out-node-decision-response",
+                  "out-node-human-transfer"
+                ],
+                "mapped_edge_ids": [
+                  "out-edge-response-dispute",
+                  "out-edge-human-terminal"
+                ],
+                "mapped_guard_ids": [
+                  "out-guard-response"
+                ],
+                "mapped_terminal_ids": []
+              },
+              {
+                "rule_id": "OUT-DISPUTE-02",
+                "group": "DISPUTE",
+                "source_file_ref": "forte-ba23e986a9c7e8d8",
+                "locator": "专业性说明.md:L63",
+                "excerpt": "**强制转人工触发条件**：客户说\"我要投诉\"\"这笔钱不是我的\"\"我要找你们领导\"\"我要起诉你们\"等类似话语，或情绪持续激动超过 30 秒，AI 必须立即转人工。",
+                "parameters": [
+                  {
+                    "name": "emotion_transfer_threshold",
+                    "value": "30",
+                    "unit": "秒"
+                  }
+                ],
+                "expected_relation": "情绪持续超过来源阈值触发人工",
+                "expected_action": "立即进入转人工终态",
+                "coverage_state": "covered",
+                "mapped_node_ids": [
+                  "out-node-decision-response",
+                  "out-node-human-transfer"
+                ],
+                "mapped_edge_ids": [
+                  "out-edge-response-emotion",
+                  "out-edge-human-terminal"
+                ],
+                "mapped_guard_ids": [
+                  "out-guard-response"
+                ],
+                "mapped_terminal_ids": []
+              },
+              {
+                "rule_id": "OUT-INVALID-01",
+                "group": "INVALID",
+                "source_file_ref": "forte-ba23e986a9c7e8d8",
+                "locator": "专业性说明.md:L47",
+                "excerpt": "- **无效通话**：接通后立即挂断或无法沟通 → 记录并进入今日已拨次数判断，通过后安排重拨",
+                "parameters": [],
+                "expected_relation": "无效通话必须记录并重新经过频次 Gate",
+                "expected_action": "记录后只在未达限时安排重拨",
+                "coverage_state": "covered",
+                "mapped_node_ids": [
+                  "out-node-gate-post-call-frequency",
+                  "out-node-record-invalid-call"
+                ],
+                "mapped_edge_ids": [
+                  "out-edge-post-frequency-allowed",
+                  "out-edge-response-invalid",
+                  "out-edge-invalid-frequency"
+                ],
+                "mapped_guard_ids": [],
+                "mapped_terminal_ids": []
+              },
+              {
+                "rule_id": "OUT-TERMINAL-01",
+                "group": "TERMINAL",
+                "source_file_ref": "forte-ba23e986a9c7e8d8",
+                "locator": "专业性说明.md:L51",
+                "excerpt": "每条路径必须落到以下状态之一：PTP登记、转人工跟进、安排重拨、停止外呼（达上限）、加入禁呼名单、案件升级。",
+                "parameters": [
+                  {
+                    "name": "terminal_label",
+                    "value": "PTP登记",
+                    "unit": null
+                  }
+                ],
+                "expected_relation": "每条业务路径必须进入一个来源终态",
+                "expected_action": "提供可达终态：PTP登记",
+                "coverage_state": "covered",
+                "mapped_node_ids": [
+                  "out-node-terminal-ptp"
+                ],
+                "mapped_edge_ids": [],
+                "mapped_guard_ids": [],
+                "mapped_terminal_ids": [
+                  "out-terminal-ptp"
+                ]
+              },
+              {
+                "rule_id": "OUT-TERMINAL-02",
+                "group": "TERMINAL",
+                "source_file_ref": "forte-ba23e986a9c7e8d8",
+                "locator": "专业性说明.md:L51",
+                "excerpt": "每条路径必须落到以下状态之一：PTP登记、转人工跟进、安排重拨、停止外呼（达上限）、加入禁呼名单、案件升级。",
+                "parameters": [
+                  {
+                    "name": "terminal_label",
+                    "value": "转人工跟进",
+                    "unit": null
+                  }
+                ],
+                "expected_relation": "每条业务路径必须进入一个来源终态",
+                "expected_action": "提供可达终态：转人工跟进",
+                "coverage_state": "covered",
+                "mapped_node_ids": [
+                  "out-node-terminal-human"
+                ],
+                "mapped_edge_ids": [],
+                "mapped_guard_ids": [],
+                "mapped_terminal_ids": [
+                  "out-terminal-human"
+                ]
+              },
+              {
+                "rule_id": "OUT-TERMINAL-03",
+                "group": "TERMINAL",
+                "source_file_ref": "forte-ba23e986a9c7e8d8",
+                "locator": "专业性说明.md:L51",
+                "excerpt": "每条路径必须落到以下状态之一：PTP登记、转人工跟进、安排重拨、停止外呼（达上限）、加入禁呼名单、案件升级。",
+                "parameters": [
+                  {
+                    "name": "terminal_label",
+                    "value": "安排重拨",
+                    "unit": null
+                  }
+                ],
+                "expected_relation": "每条业务路径必须进入一个来源终态",
+                "expected_action": "提供可达终态：安排重拨",
+                "coverage_state": "covered",
+                "mapped_node_ids": [
+                  "out-node-terminal-redial"
+                ],
+                "mapped_edge_ids": [],
+                "mapped_guard_ids": [],
+                "mapped_terminal_ids": [
+                  "out-terminal-redial"
+                ]
+              },
+              {
+                "rule_id": "OUT-TERMINAL-04",
+                "group": "TERMINAL",
+                "source_file_ref": "forte-ba23e986a9c7e8d8",
+                "locator": "专业性说明.md:L51",
+                "excerpt": "每条路径必须落到以下状态之一：PTP登记、转人工跟进、安排重拨、停止外呼（达上限）、加入禁呼名单、案件升级。",
+                "parameters": [
+                  {
+                    "name": "terminal_label",
+                    "value": "停止外呼（达上限）",
+                    "unit": null
+                  }
+                ],
+                "expected_relation": "每条业务路径必须进入一个来源终态",
+                "expected_action": "提供可达终态：停止外呼（达上限）",
+                "coverage_state": "covered",
+                "mapped_node_ids": [
+                  "out-node-terminal-limit"
+                ],
+                "mapped_edge_ids": [],
+                "mapped_guard_ids": [],
+                "mapped_terminal_ids": [
+                  "out-terminal-limit"
+                ]
+              },
+              {
+                "rule_id": "OUT-TERMINAL-05",
+                "group": "TERMINAL",
+                "source_file_ref": "forte-ba23e986a9c7e8d8",
+                "locator": "专业性说明.md:L51",
+                "excerpt": "每条路径必须落到以下状态之一：PTP登记、转人工跟进、安排重拨、停止外呼（达上限）、加入禁呼名单、案件升级。",
+                "parameters": [
+                  {
+                    "name": "terminal_label",
+                    "value": "加入禁呼名单",
+                    "unit": null
+                  }
+                ],
+                "expected_relation": "每条业务路径必须进入一个来源终态",
+                "expected_action": "提供可达终态：加入禁呼名单",
+                "coverage_state": "covered",
+                "mapped_node_ids": [
+                  "out-node-terminal-dnc"
+                ],
+                "mapped_edge_ids": [],
+                "mapped_guard_ids": [],
+                "mapped_terminal_ids": [
+                  "out-terminal-dnc"
+                ]
+              },
+              {
+                "rule_id": "OUT-TERMINAL-06",
+                "group": "TERMINAL",
+                "source_file_ref": "forte-ba23e986a9c7e8d8",
+                "locator": "专业性说明.md:L51",
+                "excerpt": "每条路径必须落到以下状态之一：PTP登记、转人工跟进、安排重拨、停止外呼（达上限）、加入禁呼名单、案件升级。",
+                "parameters": [
+                  {
+                    "name": "terminal_label",
+                    "value": "案件升级",
+                    "unit": null
+                  }
+                ],
+                "expected_relation": "每条业务路径必须进入一个来源终态",
+                "expected_action": "提供可达终态：案件升级",
+                "coverage_state": "covered",
+                "mapped_node_ids": [
+                  "out-node-terminal-escalation"
+                ],
+                "mapped_edge_ids": [],
+                "mapped_guard_ids": [],
+                "mapped_terminal_ids": [
+                  "out-terminal-escalation"
+                ]
+              },
+              {
+                "rule_id": "OUT-PAYMENT-01",
+                "group": "PAYMENT",
+                "source_file_ref": "forte-ba23e986a9c7e8d8",
+                "locator": "专业性说明.md:L61",
+                "excerpt": "**还款引导**：告知逾期天数和最低还款额，提供还款方式（APP/网银/柜台），询问是否可近期还款或需要分期方案。",
+                "parameters": [],
+                "expected_relation": "本人确认后才可告知逾期天数和最低还款额",
+                "expected_action": "进入欠款信息与最低还款额节点",
+                "coverage_state": "covered",
+                "mapped_node_ids": [
+                  "out-node-payment-guidance"
+                ],
+                "mapped_edge_ids": [
+                  "out-edge-introduction-payment"
+                ],
+                "mapped_guard_ids": [],
+                "mapped_terminal_ids": []
+              },
+              {
+                "rule_id": "OUT-PAYMENT-02",
+                "group": "PAYMENT",
+                "source_file_ref": "forte-ba23e986a9c7e8d8",
+                "locator": "专业性说明.md:L61",
+                "excerpt": "**还款引导**：告知逾期天数和最低还款额，提供还款方式（APP/网银/柜台），询问是否可近期还款或需要分期方案。",
+                "parameters": [],
+                "expected_relation": "提供来源列出的还款渠道并询问近期还款或分期",
+                "expected_action": "进入还款渠道与分期询问节点",
+                "coverage_state": "covered",
+                "mapped_node_ids": [
+                  "out-node-payment-guidance"
+                ],
+                "mapped_edge_ids": [
+                  "out-edge-payment-response"
+                ],
+                "mapped_guard_ids": [],
+                "mapped_terminal_ids": []
+              },
+              {
+                "rule_id": "OUT-REDIAL-01",
+                "group": "REDIAL",
+                "source_file_ref": "forte-ba23e986a9c7e8d8",
+                "locator": "专业性说明.md:L65",
+                "excerpt": "**重拨调度**：未接通后查询今日已拨次数，未超限则间隔至少 1 小时后重拨；已达上限则标记为今日完成，次日重新评估。",
+                "parameters": [
+                  {
+                    "name": "redial_min_interval",
+                    "value": "1",
+                    "unit": "小时"
+                  }
+                ],
+                "expected_relation": "未接通重拨至少间隔来源小时数",
+                "expected_action": "未达限时进入未来重拨终态",
+                "coverage_state": "covered",
+                "mapped_node_ids": [
+                  "out-node-future-redial"
+                ],
+                "mapped_edge_ids": [
+                  "out-edge-time-hold-redial",
+                  "out-edge-post-frequency-allowed",
+                  "out-edge-redial-terminal"
+                ],
+                "mapped_guard_ids": [
+                  "out-guard-redial-interval"
+                ],
+                "mapped_terminal_ids": []
+              },
+              {
+                "rule_id": "OUT-REDIAL-02",
+                "group": "REDIAL",
+                "source_file_ref": "forte-ba23e986a9c7e8d8",
+                "locator": "专业性说明.md:L65",
+                "excerpt": "**重拨调度**：未接通后查询今日已拨次数，未超限则间隔至少 1 小时后重拨；已达上限则标记为今日完成，次日重新评估。",
+                "parameters": [],
+                "expected_relation": "达限标记今日完成并在次日重新评估",
+                "expected_action": "频次达限终态保留次日复核动作",
+                "coverage_state": "covered",
+                "mapped_node_ids": [
+                  "out-node-mark-daily-limit"
+                ],
+                "mapped_edge_ids": [
+                  "out-edge-limit-stop"
+                ],
+                "mapped_guard_ids": [],
+                "mapped_terminal_ids": []
+              }
+            ],
+            "nodes": [
+              {
+                "node_id": "out-node-start",
+                "label": "START",
+                "kind": "start",
+                "source_rule_ids": [],
+                "future_action": false
+              },
+              {
+                "node_id": "out-node-gate-time-window",
+                "label": "拨号前禁呼时段判断",
+                "kind": "gate",
+                "source_rule_ids": [
+                  "OUT-TIME-01",
+                  "OUT-TIME-02"
+                ],
+                "future_action": false
+              },
+              {
+                "node_id": "out-node-hold-until-window",
+                "label": "等待进入允许外呼时段",
+                "kind": "action",
+                "source_rule_ids": [
+                  "OUT-TIME-01"
+                ],
+                "future_action": true
+              },
+              {
+                "node_id": "out-node-gate-pre-dial-frequency",
+                "label": "拨号前每日/窗口频次判断",
+                "kind": "gate",
+                "source_rule_ids": [
+                  "OUT-FREQ-01",
+                  "OUT-FREQ-02",
+                  "OUT-FREQ-03"
+                ],
+                "future_action": false
+              },
+              {
+                "node_id": "out-node-mark-daily-limit",
+                "label": "标记当日频次已达上限并等待次日重评",
+                "kind": "action",
+                "source_rule_ids": [
+                  "OUT-FREQ-03",
+                  "OUT-REDIAL-02"
+                ],
+                "future_action": false
+              },
+              {
+                "node_id": "out-node-future-dial",
+                "label": "未来拨号尝试（本次未执行）",
+                "kind": "action",
+                "source_rule_ids": [
+                  "OUT-TIME-02"
+                ],
+                "future_action": true
+              },
+              {
+                "node_id": "out-node-decision-connection",
+                "label": "判断是否接通",
+                "kind": "decision",
+                "source_rule_ids": [
+                  "OUT-CONNECT-01"
+                ],
+                "future_action": false
+              },
+              {
+                "node_id": "out-node-classify-unanswered",
+                "label": "记录无人接听/关机空号/主动拒接",
+                "kind": "action",
+                "source_rule_ids": [
+                  "OUT-CONNECT-02"
+                ],
+                "future_action": false
+              },
+              {
+                "node_id": "out-node-gate-post-call-frequency",
+                "label": "无效或未接通后的频次判断",
+                "kind": "gate",
+                "source_rule_ids": [
+                  "OUT-CONNECT-02",
+                  "OUT-INVALID-01",
+                  "OUT-FREQ-01",
+                  "OUT-FREQ-02"
+                ],
+                "future_action": false
+              },
+              {
+                "node_id": "out-node-future-redial",
+                "label": "安排至少来源间隔后的未来重拨",
+                "kind": "action",
+                "source_rule_ids": [
+                  "OUT-REDIAL-01"
+                ],
+                "future_action": true
+              },
+              {
+                "node_id": "out-node-decision-identity",
+                "label": "确认是否本人接听",
+                "kind": "decision",
+                "source_rule_ids": [
+                  "OUT-IDENTITY-01",
+                  "OUT-IDENTITY-02",
+                  "OUT-IDENTITY-03"
+                ],
+                "future_action": false
+              },
+              {
+                "node_id": "out-node-recording-notice",
+                "label": "告知录音并标明全程录音与保留年限",
+                "kind": "action",
+                "source_rule_ids": [
+                  "OUT-RECORD-01",
+                  "OUT-RECORD-02"
+                ],
+                "future_action": false
+              },
+              {
+                "node_id": "out-node-relay-only",
+                "label": "非本人仅请转告且不披露欠款",
+                "kind": "action",
+                "source_rule_ids": [
+                  "OUT-THIRD_PARTY-01",
+                  "OUT-THIRD_PARTY-02"
+                ],
+                "future_action": false
+              },
+              {
+                "node_id": "out-node-decision-third-party-stop",
+                "label": "第三方是否要求停止联系",
+                "kind": "decision",
+                "source_rule_ids": [
+                  "OUT-THIRD_PARTY-03"
+                ],
+                "future_action": false
+              },
+              {
+                "node_id": "out-node-end-unconfirmed-identity",
+                "label": "结束身份无法确认或非本人通话",
+                "kind": "action",
+                "source_rule_ids": [
+                  "OUT-IDENTITY-03",
+                  "OUT-THIRD_PARTY-01"
+                ],
+                "future_action": false
+              },
+              {
+                "node_id": "out-node-introduce-purpose",
+                "label": "自我介绍、说明来意并应用禁止话术守卫",
+                "kind": "action",
+                "source_rule_ids": [
+                  "OUT-IDENTITY-02",
+                  "OUT-PROHIBIT-01",
+                  "OUT-PROHIBIT-02"
+                ],
+                "future_action": false
+              },
+              {
+                "node_id": "out-node-payment-guidance",
+                "label": "告知逾期/最低还款额、渠道并询问还款或分期",
+                "kind": "action",
+                "source_rule_ids": [
+                  "OUT-PAYMENT-01",
+                  "OUT-PAYMENT-02"
+                ],
+                "future_action": false
+              },
+              {
+                "node_id": "out-node-decision-response",
+                "label": "判断本人态度、投诉异议与情绪状态",
+                "kind": "decision",
+                "source_rule_ids": [
+                  "OUT-PTP-01",
+                  "OUT-SOFT-01",
+                  "OUT-HARD-01",
+                  "OUT-DISPUTE-01",
+                  "OUT-DISPUTE-02"
+                ],
+                "future_action": false
+              },
+              {
+                "node_id": "out-node-record-ptp",
+                "label": "记录承诺金额和日期",
+                "kind": "action",
+                "source_rule_ids": [
+                  "OUT-PTP-01"
+                ],
+                "future_action": false
+              },
+              {
+                "node_id": "out-node-future-sms",
+                "label": "安排到期前短信提醒（本次未发送）",
+                "kind": "action",
+                "source_rule_ids": [
+                  "OUT-PTP-02"
+                ],
+                "future_action": true
+              },
+              {
+                "node_id": "out-node-installment-follow-up",
+                "label": "引导分期并安排后续跟进",
+                "kind": "action",
+                "source_rule_ids": [
+                  "OUT-SOFT-01"
+                ],
+                "future_action": true
+              },
+              {
+                "node_id": "out-node-case-escalation",
+                "label": "案件升级并等待人工或法务处理",
+                "kind": "action",
+                "source_rule_ids": [
+                  "OUT-HARD-01"
+                ],
+                "future_action": true
+              },
+              {
+                "node_id": "out-node-human-transfer",
+                "label": "转人工处理投诉、异议或高风险状态",
+                "kind": "action",
+                "source_rule_ids": [
+                  "OUT-DISPUTE-01",
+                  "OUT-DISPUTE-02"
+                ],
+                "future_action": true
+              },
+              {
+                "node_id": "out-node-record-invalid-call",
+                "label": "记录立即挂断或无法沟通",
+                "kind": "action",
+                "source_rule_ids": [
+                  "OUT-INVALID-01"
+                ],
+                "future_action": false
+              },
+              {
+                "node_id": "out-node-terminal-ptp",
+                "label": "PTP登记",
+                "kind": "terminal",
+                "source_rule_ids": [
+                  "OUT-TERMINAL-01"
+                ],
+                "future_action": false
+              },
+              {
+                "node_id": "out-node-terminal-human",
+                "label": "转人工跟进",
+                "kind": "terminal",
+                "source_rule_ids": [
+                  "OUT-TERMINAL-02"
+                ],
+                "future_action": false
+              },
+              {
+                "node_id": "out-node-terminal-redial",
+                "label": "安排重拨",
+                "kind": "terminal",
+                "source_rule_ids": [
+                  "OUT-TERMINAL-03"
+                ],
+                "future_action": false
+              },
+              {
+                "node_id": "out-node-terminal-limit",
+                "label": "停止外呼（达上限）",
+                "kind": "terminal",
+                "source_rule_ids": [
+                  "OUT-TERMINAL-04"
+                ],
+                "future_action": false
+              },
+              {
+                "node_id": "out-node-terminal-dnc",
+                "label": "加入禁呼名单",
+                "kind": "terminal",
+                "source_rule_ids": [
+                  "OUT-TERMINAL-05"
+                ],
+                "future_action": false
+              },
+              {
+                "node_id": "out-node-terminal-escalation",
+                "label": "案件升级",
+                "kind": "terminal",
+                "source_rule_ids": [
+                  "OUT-TERMINAL-06"
+                ],
+                "future_action": false
+              },
+              {
+                "node_id": "out-node-terminal-identity-unconfirmed",
+                "label": "结束通话（身份无法确认）",
+                "kind": "terminal",
+                "source_rule_ids": [
+                  "OUT-IDENTITY-03"
+                ],
+                "future_action": false
+              }
+            ],
+            "edges": [
+              {
+                "edge_id": "out-edge-start-time",
+                "from_node_id": "out-node-start",
+                "to_node_id": "out-node-gate-time-window",
+                "label": "开始后先检查时段",
+                "guard_ids": [],
+                "source_rule_ids": [
+                  "OUT-TIME-02"
+                ],
+                "future_action": false
+              },
+              {
+                "edge_id": "out-edge-time-denied",
+                "from_node_id": "out-node-gate-time-window",
+                "to_node_id": "out-node-hold-until-window",
+                "label": "处于禁呼窗口",
+                "guard_ids": [
+                  "out-guard-time-window"
+                ],
+                "source_rule_ids": [
+                  "OUT-TIME-01"
+                ],
+                "future_action": false
+              },
+              {
+                "edge_id": "out-edge-time-hold-redial",
+                "from_node_id": "out-node-hold-until-window",
+                "to_node_id": "out-node-terminal-redial",
+                "label": "等待允许时段后重新安排",
+                "guard_ids": [],
+                "source_rule_ids": [
+                  "OUT-TIME-01",
+                  "OUT-REDIAL-01"
+                ],
+                "future_action": true
+              },
+              {
+                "edge_id": "out-edge-time-allowed",
+                "from_node_id": "out-node-gate-time-window",
+                "to_node_id": "out-node-gate-pre-dial-frequency",
+                "label": "当前时段允许",
+                "guard_ids": [
+                  "out-guard-time-window"
+                ],
+                "source_rule_ids": [
+                  "OUT-TIME-01"
+                ],
+                "future_action": false
+              },
+              {
+                "edge_id": "out-edge-pre-frequency-denied",
+                "from_node_id": "out-node-gate-pre-dial-frequency",
+                "to_node_id": "out-node-mark-daily-limit",
+                "label": "达到每日或窗口上限",
+                "guard_ids": [
+                  "out-guard-frequency"
+                ],
+                "source_rule_ids": [
+                  "OUT-FREQ-01",
+                  "OUT-FREQ-02",
+                  "OUT-FREQ-03"
+                ],
+                "future_action": false
+              },
+              {
+                "edge_id": "out-edge-limit-stop",
+                "from_node_id": "out-node-mark-daily-limit",
+                "to_node_id": "out-node-terminal-limit",
+                "label": "停止当日外呼并次日重评",
+                "guard_ids": [],
+                "source_rule_ids": [
+                  "OUT-FREQ-03",
+                  "OUT-REDIAL-02"
+                ],
+                "future_action": false
+              },
+              {
+                "edge_id": "out-edge-pre-frequency-allowed",
+                "from_node_id": "out-node-gate-pre-dial-frequency",
+                "to_node_id": "out-node-future-dial",
+                "label": "未达到频次上限",
+                "guard_ids": [
+                  "out-guard-frequency"
+                ],
+                "source_rule_ids": [
+                  "OUT-FREQ-01",
+                  "OUT-FREQ-02"
+                ],
+                "future_action": true
+              },
+              {
+                "edge_id": "out-edge-future-dial-connection",
+                "from_node_id": "out-node-future-dial",
+                "to_node_id": "out-node-decision-connection",
+                "label": "未来拨号返回连接状态",
+                "guard_ids": [],
+                "source_rule_ids": [
+                  "OUT-CONNECT-01"
+                ],
+                "future_action": true
+              },
+              {
+                "edge_id": "out-edge-not-connected",
+                "from_node_id": "out-node-decision-connection",
+                "to_node_id": "out-node-classify-unanswered",
+                "label": "未接通",
+                "guard_ids": [],
+                "source_rule_ids": [
+                  "OUT-CONNECT-01",
+                  "OUT-CONNECT-02"
+                ],
+                "future_action": false
+              },
+              {
+                "edge_id": "out-edge-unanswered-frequency",
+                "from_node_id": "out-node-classify-unanswered",
+                "to_node_id": "out-node-gate-post-call-frequency",
+                "label": "记录后检查频次",
+                "guard_ids": [],
+                "source_rule_ids": [
+                  "OUT-CONNECT-02"
+                ],
+                "future_action": false
+              },
+              {
+                "edge_id": "out-edge-post-frequency-denied",
+                "from_node_id": "out-node-gate-post-call-frequency",
+                "to_node_id": "out-node-mark-daily-limit",
+                "label": "达到每日或窗口上限",
+                "guard_ids": [
+                  "out-guard-frequency"
+                ],
+                "source_rule_ids": [
+                  "OUT-FREQ-01",
+                  "OUT-FREQ-02",
+                  "OUT-FREQ-03"
+                ],
+                "future_action": false
+              },
+              {
+                "edge_id": "out-edge-post-frequency-allowed",
+                "from_node_id": "out-node-gate-post-call-frequency",
+                "to_node_id": "out-node-future-redial",
+                "label": "未达到频次上限",
+                "guard_ids": [
+                  "out-guard-frequency",
+                  "out-guard-redial-interval"
+                ],
+                "source_rule_ids": [
+                  "OUT-CONNECT-02",
+                  "OUT-INVALID-01",
+                  "OUT-REDIAL-01"
+                ],
+                "future_action": true
+              },
+              {
+                "edge_id": "out-edge-redial-terminal",
+                "from_node_id": "out-node-future-redial",
+                "to_node_id": "out-node-terminal-redial",
+                "label": "形成未来重拨安排",
+                "guard_ids": [],
+                "source_rule_ids": [
+                  "OUT-REDIAL-01"
+                ],
+                "future_action": true
+              },
+              {
+                "edge_id": "out-edge-connected-identity",
+                "from_node_id": "out-node-decision-connection",
+                "to_node_id": "out-node-decision-identity",
+                "label": "接通后第一业务步骤是身份确认",
+                "guard_ids": [],
+                "source_rule_ids": [
+                  "OUT-CONNECT-01",
+                  "OUT-IDENTITY-01"
+                ],
+                "future_action": false
+              },
+              {
+                "edge_id": "out-edge-identity-self",
+                "from_node_id": "out-node-decision-identity",
+                "to_node_id": "out-node-recording-notice",
+                "label": "确认本人",
+                "guard_ids": [
+                  "out-guard-identity"
+                ],
+                "source_rule_ids": [
+                  "OUT-IDENTITY-01",
+                  "OUT-IDENTITY-02"
+                ],
+                "future_action": false
+              },
+              {
+                "edge_id": "out-edge-recording-introduction",
+                "from_node_id": "out-node-recording-notice",
+                "to_node_id": "out-node-introduce-purpose",
+                "label": "告知录音后说明来意",
+                "guard_ids": [],
+                "source_rule_ids": [
+                  "OUT-RECORD-02",
+                  "OUT-IDENTITY-01"
+                ],
+                "future_action": false
+              },
+              {
+                "edge_id": "out-edge-identity-unconfirmed",
+                "from_node_id": "out-node-decision-identity",
+                "to_node_id": "out-node-end-unconfirmed-identity",
+                "label": "无法确认身份",
+                "guard_ids": [
+                  "out-guard-identity"
+                ],
+                "source_rule_ids": [
+                  "OUT-IDENTITY-03"
+                ],
+                "future_action": false
+              },
+              {
+                "edge_id": "out-edge-unconfirmed-terminal",
+                "from_node_id": "out-node-end-unconfirmed-identity",
+                "to_node_id": "out-node-terminal-identity-unconfirmed",
+                "label": "结束通话",
+                "guard_ids": [],
+                "source_rule_ids": [
+                  "OUT-IDENTITY-03",
+                  "OUT-THIRD_PARTY-01"
+                ],
+                "future_action": false
+              },
+              {
+                "edge_id": "out-edge-identity-third-party",
+                "from_node_id": "out-node-decision-identity",
+                "to_node_id": "out-node-relay-only",
+                "label": "非本人接听",
+                "guard_ids": [
+                  "out-guard-identity"
+                ],
+                "source_rule_ids": [
+                  "OUT-THIRD_PARTY-01",
+                  "OUT-THIRD_PARTY-02"
+                ],
+                "future_action": false
+              },
+              {
+                "edge_id": "out-edge-relay-stop-decision",
+                "from_node_id": "out-node-relay-only",
+                "to_node_id": "out-node-decision-third-party-stop",
+                "label": "只请转告，不披露欠款",
+                "guard_ids": [],
+                "source_rule_ids": [
+                  "OUT-THIRD_PARTY-01",
+                  "OUT-THIRD_PARTY-02"
+                ],
+                "future_action": false
+              },
+              {
+                "edge_id": "out-edge-third-party-dnc",
+                "from_node_id": "out-node-decision-third-party-stop",
+                "to_node_id": "out-node-terminal-dnc",
+                "label": "要求停止联系",
+                "guard_ids": [
+                  "out-guard-third-party-stop"
+                ],
+                "source_rule_ids": [
+                  "OUT-THIRD_PARTY-03"
+                ],
+                "future_action": true
+              },
+              {
+                "edge_id": "out-edge-third-party-end",
+                "from_node_id": "out-node-decision-third-party-stop",
+                "to_node_id": "out-node-end-unconfirmed-identity",
+                "label": "未要求停止联系，转告后结束",
+                "guard_ids": [
+                  "out-guard-third-party-stop"
+                ],
+                "source_rule_ids": [
+                  "OUT-THIRD_PARTY-01"
+                ],
+                "future_action": false
+              },
+              {
+                "edge_id": "out-edge-introduction-payment",
+                "from_node_id": "out-node-introduce-purpose",
+                "to_node_id": "out-node-payment-guidance",
+                "label": "身份确认后才披露欠款并提供还款信息",
+                "guard_ids": [
+                  "out-guard-prohibited-content"
+                ],
+                "source_rule_ids": [
+                  "OUT-IDENTITY-02",
+                  "OUT-PAYMENT-01",
+                  "OUT-PROHIBIT-01",
+                  "OUT-PROHIBIT-02"
+                ],
+                "future_action": false
+              },
+              {
+                "edge_id": "out-edge-payment-response",
+                "from_node_id": "out-node-payment-guidance",
+                "to_node_id": "out-node-decision-response",
+                "label": "询问还款或分期意向",
+                "guard_ids": [],
+                "source_rule_ids": [
+                  "OUT-PAYMENT-02"
+                ],
+                "future_action": false
+              },
+              {
+                "edge_id": "out-edge-response-ptp",
+                "from_node_id": "out-node-decision-response",
+                "to_node_id": "out-node-record-ptp",
+                "label": "承诺还款",
+                "guard_ids": [
+                  "out-guard-response"
+                ],
+                "source_rule_ids": [
+                  "OUT-PTP-01"
+                ],
+                "future_action": false
+              },
+              {
+                "edge_id": "out-edge-ptp-sms",
+                "from_node_id": "out-node-record-ptp",
+                "to_node_id": "out-node-future-sms",
+                "label": "安排未来短信提醒",
+                "guard_ids": [],
+                "source_rule_ids": [
+                  "OUT-PTP-01",
+                  "OUT-PTP-02"
+                ],
+                "future_action": true
+              },
+              {
+                "edge_id": "out-edge-sms-ptp-terminal",
+                "from_node_id": "out-node-future-sms",
+                "to_node_id": "out-node-terminal-ptp",
+                "label": "完成 PTP 登记",
+                "guard_ids": [],
+                "source_rule_ids": [
+                  "OUT-PTP-02"
+                ],
+                "future_action": true
+              },
+              {
+                "edge_id": "out-edge-response-soft",
+                "from_node_id": "out-node-decision-response",
+                "to_node_id": "out-node-installment-follow-up",
+                "label": "软拒绝或暂时困难",
+                "guard_ids": [
+                  "out-guard-response"
+                ],
+                "source_rule_ids": [
+                  "OUT-SOFT-01"
+                ],
+                "future_action": false
+              },
+              {
+                "edge_id": "out-edge-soft-redial-terminal",
+                "from_node_id": "out-node-installment-follow-up",
+                "to_node_id": "out-node-terminal-redial",
+                "label": "安排分期沟通和后续跟进",
+                "guard_ids": [],
+                "source_rule_ids": [
+                  "OUT-SOFT-01"
+                ],
+                "future_action": true
+              },
+              {
+                "edge_id": "out-edge-response-hard",
+                "from_node_id": "out-node-decision-response",
+                "to_node_id": "out-node-case-escalation",
+                "label": "硬拒绝或否认债务",
+                "guard_ids": [
+                  "out-guard-response"
+                ],
+                "source_rule_ids": [
+                  "OUT-HARD-01"
+                ],
+                "future_action": false
+              },
+              {
+                "edge_id": "out-edge-hard-escalation-terminal",
+                "from_node_id": "out-node-case-escalation",
+                "to_node_id": "out-node-terminal-escalation",
+                "label": "等待人工或法务处理",
+                "guard_ids": [],
+                "source_rule_ids": [
+                  "OUT-HARD-01"
+                ],
+                "future_action": true
+              },
+              {
+                "edge_id": "out-edge-response-dispute",
+                "from_node_id": "out-node-decision-response",
+                "to_node_id": "out-node-human-transfer",
+                "label": "投诉、异议或指定高风险短语",
+                "guard_ids": [
+                  "out-guard-response"
+                ],
+                "source_rule_ids": [
+                  "OUT-DISPUTE-01"
+                ],
+                "future_action": true
+              },
+              {
+                "edge_id": "out-edge-response-emotion",
+                "from_node_id": "out-node-decision-response",
+                "to_node_id": "out-node-human-transfer",
+                "label": "情绪持续超过来源阈值",
+                "guard_ids": [
+                  "out-guard-response"
+                ],
+                "source_rule_ids": [
+                  "OUT-DISPUTE-02"
+                ],
+                "future_action": true
+              },
+              {
+                "edge_id": "out-edge-human-terminal",
+                "from_node_id": "out-node-human-transfer",
+                "to_node_id": "out-node-terminal-human",
+                "label": "进入人工跟进",
+                "guard_ids": [],
+                "source_rule_ids": [
+                  "OUT-DISPUTE-01",
+                  "OUT-DISPUTE-02"
+                ],
+                "future_action": true
+              },
+              {
+                "edge_id": "out-edge-response-invalid",
+                "from_node_id": "out-node-decision-response",
+                "to_node_id": "out-node-record-invalid-call",
+                "label": "立即挂断或无法沟通",
+                "guard_ids": [
+                  "out-guard-response"
+                ],
+                "source_rule_ids": [
+                  "OUT-INVALID-01"
+                ],
+                "future_action": false
+              },
+              {
+                "edge_id": "out-edge-invalid-frequency",
+                "from_node_id": "out-node-record-invalid-call",
+                "to_node_id": "out-node-gate-post-call-frequency",
+                "label": "记录后返回频次 Gate",
+                "guard_ids": [],
+                "source_rule_ids": [
+                  "OUT-INVALID-01"
+                ],
+                "future_action": false
+              }
+            ],
+            "guards": [
+              {
+                "guard_id": "out-guard-time-window",
+                "label": "当前时间不在来源禁呼窗口",
+                "parameters": [
+                  {
+                    "name": "prohibited_start",
+                    "value": "22:00",
+                    "unit": null
+                  },
+                  {
+                    "name": "prohibited_end",
+                    "value": "08:00",
+                    "unit": null
+                  }
+                ],
+                "source_rule_ids": [
+                  "OUT-TIME-01"
+                ]
+              },
+              {
+                "guard_id": "out-guard-frequency",
+                "label": "每日与窗口频次均未达到来源上限",
+                "parameters": [
+                  {
+                    "name": "daily_call_max",
+                    "value": "3",
+                    "unit": "次/日"
+                  },
+                  {
+                    "name": "hourly_window",
+                    "value": "1",
+                    "unit": "小时"
+                  },
+                  {
+                    "name": "hourly_call_max",
+                    "value": "1",
+                    "unit": "次/窗口"
+                  }
+                ],
+                "source_rule_ids": [
+                  "OUT-FREQ-01",
+                  "OUT-FREQ-02"
+                ]
+              },
+              {
+                "guard_id": "out-guard-identity",
+                "label": "本人/第三方/无法确认三态互斥",
+                "parameters": [],
+                "source_rule_ids": [
+                  "OUT-IDENTITY-01",
+                  "OUT-IDENTITY-02",
+                  "OUT-IDENTITY-03"
+                ]
+              },
+              {
+                "guard_id": "out-guard-third-party-stop",
+                "label": "第三方停止联系请求",
+                "parameters": [],
+                "source_rule_ids": [
+                  "OUT-THIRD_PARTY-03"
+                ]
+              },
+              {
+                "guard_id": "out-guard-prohibited-content",
+                "label": "禁止威胁、辱骂和 M1 法律行动暗示",
+                "parameters": [],
+                "source_rule_ids": [
+                  "OUT-PROHIBIT-01",
+                  "OUT-PROHIBIT-02"
+                ]
+              },
+              {
+                "guard_id": "out-guard-response",
+                "label": "本人态度、投诉、异议、无效通话与高风险触发互斥投影",
+                "parameters": [
+                  {
+                    "name": "emotion_transfer_threshold",
+                    "value": "30",
+                    "unit": "秒"
+                  }
+                ],
+                "source_rule_ids": [
+                  "OUT-PTP-01",
+                  "OUT-SOFT-01",
+                  "OUT-HARD-01",
+                  "OUT-DISPUTE-01",
+                  "OUT-DISPUTE-02"
+                ]
+              },
+              {
+                "guard_id": "out-guard-redial-interval",
+                "label": "未来重拨不得早于来源最小间隔",
+                "parameters": [
+                  {
+                    "name": "redial_min_interval",
+                    "value": "1",
+                    "unit": "小时"
+                  }
+                ],
+                "source_rule_ids": [
+                  "OUT-REDIAL-01"
+                ]
+              }
+            ],
+            "terminals": [
+              {
+                "terminal_id": "out-terminal-ptp",
+                "node_id": "out-node-terminal-ptp",
+                "label": "PTP登记",
+                "source_rule_ids": [
+                  "OUT-TERMINAL-01"
+                ],
+                "source_listed": true
+              },
+              {
+                "terminal_id": "out-terminal-human",
+                "node_id": "out-node-terminal-human",
+                "label": "转人工跟进",
+                "source_rule_ids": [
+                  "OUT-TERMINAL-02"
+                ],
+                "source_listed": true
+              },
+              {
+                "terminal_id": "out-terminal-redial",
+                "node_id": "out-node-terminal-redial",
+                "label": "安排重拨",
+                "source_rule_ids": [
+                  "OUT-TERMINAL-03"
+                ],
+                "source_listed": true
+              },
+              {
+                "terminal_id": "out-terminal-limit",
+                "node_id": "out-node-terminal-limit",
+                "label": "停止外呼（达上限）",
+                "source_rule_ids": [
+                  "OUT-TERMINAL-04"
+                ],
+                "source_listed": true
+              },
+              {
+                "terminal_id": "out-terminal-dnc",
+                "node_id": "out-node-terminal-dnc",
+                "label": "加入禁呼名单",
+                "source_rule_ids": [
+                  "OUT-TERMINAL-05"
+                ],
+                "source_listed": true
+              },
+              {
+                "terminal_id": "out-terminal-escalation",
+                "node_id": "out-node-terminal-escalation",
+                "label": "案件升级",
+                "source_rule_ids": [
+                  "OUT-TERMINAL-06"
+                ],
+                "source_listed": true
+              },
+              {
+                "terminal_id": "out-terminal-identity-unconfirmed",
+                "node_id": "out-node-terminal-identity-unconfirmed",
+                "label": "结束通话（身份无法确认）",
+                "source_rule_ids": [
+                  "OUT-IDENTITY-03"
+                ],
+                "source_listed": false
+              }
+            ],
+            "graph_integrity": {
+              "unique_start": true,
+              "unique_ids": true,
+              "no_dangling_edges": true,
+              "all_nodes_reachable": true,
+              "all_terminals_reachable": true,
+              "every_nonterminal_has_outgoing": true,
+              "every_node_can_reach_terminal": true,
+              "critical_order_valid": true,
+              "third_party_boundary_valid": true,
+              "all_rules_mapped": true
+            },
+            "human_approval_required": true,
+            "legal_opinion": false,
+            "original_inputs_modified": false,
+            "external_action": "none"
+          },
+          "self_test": null,
+          "external_action": "none",
+          "original_inputs_modified": false
+        }
+      ],
+      "artifact_downloads": [
+        {
+          "artifact_id": "workspace-artifact-636ec9d4725a",
+          "file_name": "外呼流程-M1逾期用户AI外呼催收流程图.docx",
+          "status_code": 200,
+          "content_type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+          "declared_size": 10095,
+          "downloaded_size": 10095,
+          "sha256": "40e3c191611a9eb89836f5a90aee1e0f80acfa9594e4b48fd1a29ab208341af0",
+          "size_matches": true,
+          "content_gate": {
+            "passed": true,
+            "valid_docx": true,
+            "paragraph_count": 864,
+            "table_count": 6,
+            "counts": {
+              "rules": 34,
+              "nodes": 31,
+              "edges": 36,
+              "guards": 7,
+              "terminals": 7,
+              "reachable_terminals": 7
+            },
+            "headers_match": true,
+            "row_counts_match": true,
+            "ids_unique": true,
+            "rules_located_and_covered": true,
+            "source_order_present": true,
+            "integrity_passed": true,
+            "required_token_count": 9,
+            "missing_tokens": []
+          }
+        }
+      ],
+      "expected_artifacts": [
+        "外呼流程-M1逾期用户AI外呼催收流程图.docx"
+      ],
+      "events": [
+        {
+          "sequence": 3,
+          "event_name": "planning_started",
+          "status": "planning"
+        },
+        {
+          "sequence": 4,
+          "event_name": "planning_completed",
+          "status": "planning"
+        },
+        {
+          "sequence": 6,
+          "event_name": "deterministic_office_tool_started",
+          "status": "validating"
+        },
+        {
+          "sequence": 7,
+          "event_name": "run_workspace_artifact_written",
+          "status": "validating"
+        },
+        {
+          "sequence": 8,
+          "event_name": "deterministic_verification_completed",
+          "status": "validating"
+        },
+        {
+          "sequence": 9,
+          "event_name": "analysis_started",
+          "status": "analyzing"
+        },
+        {
+          "sequence": 10,
+          "event_name": "analysis_completed",
+          "status": "analyzing"
+        }
+      ],
+      "waiting_branches": [],
+      "validation_errors": [],
+      "timed_out": false,
+      "effect_gate_passed": true,
+      "failure_reason": null
+    }
+  ],
+  "claim_boundary": "该证据仅证明固定服务配置下真实模型调用、运行工作区文件和确定性检查；不证明真实用户理解、生产安全沙箱或外部动作能力。"
+}

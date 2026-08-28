@@ -1,0 +1,27 @@
+{
+  "schema_version": "tc10-ui-screenshots.v1",
+  "captured_at": "2026-08-29T04:27:58+08:00",
+  "capture_command": "$env:CAPTURE_TC10_EFFECT_EVIDENCE='1'; pnpm --dir apps/web exec playwright test e2e/harness-workbench.spec.ts --grep TC-10",
+  "fixture_authority": "docs/evidence/manifests/tc10-public-outbound-flow-outcome-20260829.json",
+  "screenshots": [
+    {
+      "path": "docs/evidence/screenshots/tc10-source-derived-outbound-desktop-1440x1100.png",
+      "width": 1440,
+      "height": 1100,
+      "bytes": 169931,
+      "sha256": "15dbc4fb2160c3187c4b3d45502bee48cc160bb0cf05e1404f287228fca2ceaa",
+      "capture_kind": "full viewport without CSS injection",
+      "visible_context": "运营管理目录、专业性说明.md、四层流程结论与实时 Control Loop"
+    },
+    {
+      "path": "docs/evidence/screenshots/tc10-source-derived-outbound-mobile-390x844.png",
+      "width": 390,
+      "height": 844,
+      "bytes": 55537,
+      "sha256": "920dfd83430b56ec683cb2f915445fd1eaac2bce81ecc26bbe67329ccd2afb23",
+      "capture_kind": "full viewport without CSS injection",
+      "visible_context": "四层流程结论的 390 px 单栏投影"
+    }
+  ],
+  "claim_boundary": "截图和自动化只证明受控公共事实的浏览器投影、字号与无页面级横向溢出，不证明目标用户理解、合规质量或业务价值。"
+}

@@ -344,6 +344,14 @@ multi-instance coordination and governed external action remain target work.
   can all pass deterministic verification; the UI separately shows file checks,
   the current candidate count and the still-pending finance decision. This is a
   fixed heuristic review, not a general ledger or an accounting action.
+- `DR-0047` replaces TC-10's historical fixed flow and self-checking 13-item
+  list with a source-derived Operations-008 rule ledger and traversable graph.
+  The service parses the approved Markdown line by line, maps every supported
+  atomic requirement to stable nodes, edges, guards or terminals, and verifies
+  the generated DOCX by parsing it again. The UI separates deterministic file
+  and graph checks, rule coverage, pending approval and the fact that dialing,
+  CRM, SMS, deny-list writes and human transfer did not occur. This is a fixed
+  process-design adapter, not a general outbound system or legal opinion.
 - No target-user study has been run. Clarity, trust, efficiency and user value
   remain hypotheses.
 
@@ -380,6 +388,8 @@ The current TC-06 source-derived candidate review increment is tracked in
 [`DR-0045-TC06-SOURCE-DERIVED-CANDIDATE-REVIEW-EVIDENCE-20260829`](docs/evidence/DR-0045-TC06-SOURCE-DERIVED-CANDIDATE-REVIEW-EVIDENCE-20260829.md).
 The current TC-05 source-derived finance candidate review increment is tracked in
 [`DR-0046-TC05-SOURCE-DERIVED-FINANCE-REVIEW-EVIDENCE-20260829`](docs/evidence/DR-0046-TC05-SOURCE-DERIVED-FINANCE-REVIEW-EVIDENCE-20260829.md).
+The current TC-10 source-derived outbound-flow increment is tracked in
+[`DR-0047-TC10-SOURCE-DERIVED-OUTBOUND-FLOW-EVIDENCE-20260829`](docs/evidence/DR-0047-TC10-SOURCE-DERIVED-OUTBOUND-FLOW-EVIDENCE-20260829.md).
 
 ## Local run
 
@@ -473,8 +483,10 @@ pnpm --dir apps/web exec playwright test e2e/harness-workbench.spec.ts
 - [SCENARIO-031：用两份 JD 与五份简历形成可追溯的人工复核建议](docs/scenarios/SCENARIO-031-review-two-jobs-and-five-resumes-with-source-derived-conditions.md)
 - [TC-06 来源推导双岗位辅助筛选 Evidence](docs/evidence/DR-0045-TC06-SOURCE-DERIVED-CANDIDATE-REVIEW-EVIDENCE-20260829.md)
 - [DR-0046：TC-05 来源推导跨期风险候选与财务处置边界](docs/decisions/DR-0046-tc05-source-derived-finance-candidate-review.md)
+- [DR-0047：TC-10 来源推导外呼流程图与四层审批边界](docs/decisions/DR-0047-tc10-source-derived-outbound-flow.md)
 - [SCENARIO-032：从三期往来明细推导可复核风险候选](docs/scenarios/SCENARIO-032-review-three-period-finance-candidates-from-source.md)
 - [TC-05 来源推导财务候选 Evidence](docs/evidence/DR-0046-TC05-SOURCE-DERIVED-FINANCE-REVIEW-EVIDENCE-20260829.md)
+- [TC-10 来源推导外呼流程 Evidence](docs/evidence/DR-0047-TC10-SOURCE-DERIVED-OUTBOUND-FLOW-EVIDENCE-20260829.md)
 - [可恢复 Control Loop Evidence](docs/evidence/DURABLE-EVIDENCE-GATE-ARTIFACT-EVOLUTION-EVIDENCE-20260826.md)
 - [整库自主研究 Evidence](docs/evidence/AUTONOMOUS-WHOLE-WORKSPACE-RESEARCH-EVIDENCE-20260825.md)
 - [Agent Control Loop 三轮只读纵切证据](docs/evidence/AGENT-CONTROL-LOOP-BOUNDED-READONLY-EVIDENCE-20260825.md)

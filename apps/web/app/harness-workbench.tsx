@@ -609,6 +609,102 @@ type FinanceReviewOutcome = {
   external_action: "none";
 };
 
+type OutboundRuleParameter = {
+  name: string;
+  value: string;
+  unit: string | null;
+};
+
+type OutboundRule = {
+  rule_id: string;
+  group: "TIME" | "FREQ" | "RECORD" | "IDENTITY" | "THIRD_PARTY" | "PROHIBIT" | "CONNECT" | "PTP" | "SOFT" | "HARD" | "DISPUTE" | "INVALID" | "TERMINAL" | "PAYMENT" | "REDIAL";
+  source_file_ref: string;
+  locator: string;
+  excerpt: string;
+  parameters: OutboundRuleParameter[];
+  expected_relation: string;
+  expected_action: string;
+  coverage_state: "covered" | "unsupported" | "conflict";
+  mapped_node_ids: string[];
+  mapped_edge_ids: string[];
+  mapped_guard_ids: string[];
+  mapped_terminal_ids: string[];
+};
+
+type OutboundNode = {
+  node_id: string;
+  label: string;
+  kind: "start" | "gate" | "decision" | "action" | "terminal";
+  source_rule_ids: string[];
+  future_action: boolean;
+};
+
+type OutboundEdge = {
+  edge_id: string;
+  from_node_id: string;
+  to_node_id: string;
+  label: string;
+  guard_ids: string[];
+  source_rule_ids: string[];
+  future_action: boolean;
+};
+
+type OutboundGuard = {
+  guard_id: string;
+  label: string;
+  parameters: OutboundRuleParameter[];
+  source_rule_ids: string[];
+};
+
+type OutboundTerminal = {
+  terminal_id: string;
+  node_id: string;
+  label: string;
+  source_rule_ids: string[];
+  source_listed: boolean;
+};
+
+type OutboundGraphIntegrity = {
+  unique_start: boolean;
+  unique_ids: boolean;
+  no_dangling_edges: boolean;
+  all_nodes_reachable: boolean;
+  all_terminals_reachable: boolean;
+  every_nonterminal_has_outgoing: boolean;
+  every_node_can_reach_terminal: boolean;
+  critical_order_valid: boolean;
+  third_party_boundary_valid: boolean;
+  all_rules_mapped: boolean;
+};
+
+type OutboundFlowOutcome = {
+  outcome_id: string;
+  status: "approval_required" | "invalid";
+  decision: string;
+  summary: string;
+  source_rule_group_count: number;
+  atomic_requirement_count: number;
+  covered_count: number;
+  unsupported_count: number;
+  conflict_count: number;
+  node_count: number;
+  edge_count: number;
+  guard_count: number;
+  terminal_count: number;
+  reachable_terminal_count: number;
+  parameters: OutboundRuleParameter[];
+  rules: OutboundRule[];
+  nodes: OutboundNode[];
+  edges: OutboundEdge[];
+  guards: OutboundGuard[];
+  terminals: OutboundTerminal[];
+  graph_integrity: OutboundGraphIntegrity;
+  human_approval_required: true;
+  legal_opinion: false;
+  original_inputs_modified: false;
+  external_action: "none";
+};
+
 type WorkspaceArtifact = {
   artifact_id: string;
   capability_id: string;
@@ -638,6 +734,7 @@ type WorkspaceArtifact = {
   legal_review_outcome: LegalReviewOutcome | null;
   candidate_review_outcome: CandidateReviewOutcome | null;
   finance_review_outcome: FinanceReviewOutcome | null;
+  outbound_flow_outcome: OutboundFlowOutcome | null;
   download_path: string;
   created_at: string;
   original_inputs_modified: false;
@@ -662,6 +759,7 @@ type EffectReceipt = {
   legal_review_outcome: LegalReviewOutcome | null;
   candidate_review_outcome: CandidateReviewOutcome | null;
   finance_review_outcome: FinanceReviewOutcome | null;
+  outbound_flow_outcome: OutboundFlowOutcome | null;
   created_at: string;
   external_action: "none";
 };
@@ -2065,6 +2163,102 @@ function normalizeFinanceReviewOutcome(value: unknown): FinanceReviewOutcome | n
   };
 }
 
+function normalizeOutboundParameter(value: unknown): OutboundRuleParameter | null {
+  if (!value || typeof value !== "object") return null;
+  const raw = value as Record<string, unknown>;
+  const name = asText(raw.name);
+  const parameterValue = asText(raw.value);
+  if (!name || !parameterValue) return null;
+  return { name, value: parameterValue, unit: asText(raw.unit) || null };
+}
+
+function normalizeOutboundRule(value: unknown): OutboundRule | null {
+  if (!value || typeof value !== "object") return null;
+  const raw = value as Record<string, unknown>;
+  const ruleId = asText(raw.rule_id);
+  const group = asText(raw.group);
+  const coverageState = asText(raw.coverage_state);
+  const groups = ["TIME", "FREQ", "RECORD", "IDENTITY", "THIRD_PARTY", "PROHIBIT", "CONNECT", "PTP", "SOFT", "HARD", "DISPUTE", "INVALID", "TERMINAL", "PAYMENT", "REDIAL"];
+  if (!ruleId || !groups.includes(group) || !["covered", "unsupported", "conflict"].includes(coverageState)) return null;
+  return {
+    rule_id: ruleId,
+    group: group as OutboundRule["group"],
+    source_file_ref: asText(raw.source_file_ref),
+    locator: asText(raw.locator),
+    excerpt: asText(raw.excerpt),
+    parameters: Array.isArray(raw.parameters) ? raw.parameters.map(normalizeOutboundParameter).filter((item): item is OutboundRuleParameter => item !== null) : [],
+    expected_relation: asText(raw.expected_relation),
+    expected_action: asText(raw.expected_action),
+    coverage_state: coverageState as OutboundRule["coverage_state"],
+    mapped_node_ids: asStrings(raw.mapped_node_ids),
+    mapped_edge_ids: asStrings(raw.mapped_edge_ids),
+    mapped_guard_ids: asStrings(raw.mapped_guard_ids),
+    mapped_terminal_ids: asStrings(raw.mapped_terminal_ids),
+  };
+}
+
+function normalizeOutboundNode(value: unknown): OutboundNode | null {
+  if (!value || typeof value !== "object") return null;
+  const raw = value as Record<string, unknown>;
+  const kind = asText(raw.kind);
+  if (!asText(raw.node_id) || !["start", "gate", "decision", "action", "terminal"].includes(kind)) return null;
+  return { node_id: asText(raw.node_id), label: asText(raw.label), kind: kind as OutboundNode["kind"], source_rule_ids: asStrings(raw.source_rule_ids), future_action: raw.future_action === true };
+}
+
+function normalizeOutboundEdge(value: unknown): OutboundEdge | null {
+  if (!value || typeof value !== "object") return null;
+  const raw = value as Record<string, unknown>;
+  if (!asText(raw.edge_id) || !asText(raw.from_node_id) || !asText(raw.to_node_id)) return null;
+  return { edge_id: asText(raw.edge_id), from_node_id: asText(raw.from_node_id), to_node_id: asText(raw.to_node_id), label: asText(raw.label), guard_ids: asStrings(raw.guard_ids), source_rule_ids: asStrings(raw.source_rule_ids), future_action: raw.future_action === true };
+}
+
+function normalizeOutboundGuard(value: unknown): OutboundGuard | null {
+  if (!value || typeof value !== "object") return null;
+  const raw = value as Record<string, unknown>;
+  if (!asText(raw.guard_id)) return null;
+  return { guard_id: asText(raw.guard_id), label: asText(raw.label), parameters: Array.isArray(raw.parameters) ? raw.parameters.map(normalizeOutboundParameter).filter((item): item is OutboundRuleParameter => item !== null) : [], source_rule_ids: asStrings(raw.source_rule_ids) };
+}
+
+function normalizeOutboundTerminal(value: unknown): OutboundTerminal | null {
+  if (!value || typeof value !== "object") return null;
+  const raw = value as Record<string, unknown>;
+  if (!asText(raw.terminal_id) || !asText(raw.node_id)) return null;
+  return { terminal_id: asText(raw.terminal_id), node_id: asText(raw.node_id), label: asText(raw.label), source_rule_ids: asStrings(raw.source_rule_ids), source_listed: raw.source_listed === true };
+}
+
+function normalizeOutboundFlowOutcome(value: unknown): OutboundFlowOutcome | null {
+  if (!value || typeof value !== "object") return null;
+  const raw = value as Record<string, unknown>;
+  const status = asText(raw.status);
+  const rules = Array.isArray(raw.rules) ? raw.rules.map(normalizeOutboundRule).filter((item): item is OutboundRule => item !== null) : [];
+  const nodes = Array.isArray(raw.nodes) ? raw.nodes.map(normalizeOutboundNode).filter((item): item is OutboundNode => item !== null) : [];
+  const edges = Array.isArray(raw.edges) ? raw.edges.map(normalizeOutboundEdge).filter((item): item is OutboundEdge => item !== null) : [];
+  const guards = Array.isArray(raw.guards) ? raw.guards.map(normalizeOutboundGuard).filter((item): item is OutboundGuard => item !== null) : [];
+  const terminals = Array.isArray(raw.terminals) ? raw.terminals.map(normalizeOutboundTerminal).filter((item): item is OutboundTerminal => item !== null) : [];
+  const integrityRaw = raw.graph_integrity && typeof raw.graph_integrity === "object" ? raw.graph_integrity as Record<string, unknown> : null;
+  const atomicRequirementCount = asNumber(raw.atomic_requirement_count);
+  if (!asText(raw.outcome_id) || !["approval_required", "invalid"].includes(status) || rules.length !== atomicRequirementCount || nodes.length !== asNumber(raw.node_count) || edges.length !== asNumber(raw.edge_count) || guards.length !== asNumber(raw.guard_count) || terminals.length !== asNumber(raw.terminal_count) || !integrityRaw || raw.human_approval_required !== true || raw.legal_opinion !== false || raw.original_inputs_modified !== false) return null;
+  const graph_integrity: OutboundGraphIntegrity = {
+    unique_start: integrityRaw.unique_start === true,
+    unique_ids: integrityRaw.unique_ids === true,
+    no_dangling_edges: integrityRaw.no_dangling_edges === true,
+    all_nodes_reachable: integrityRaw.all_nodes_reachable === true,
+    all_terminals_reachable: integrityRaw.all_terminals_reachable === true,
+    every_nonterminal_has_outgoing: integrityRaw.every_nonterminal_has_outgoing === true,
+    every_node_can_reach_terminal: integrityRaw.every_node_can_reach_terminal === true,
+    critical_order_valid: integrityRaw.critical_order_valid === true,
+    third_party_boundary_valid: integrityRaw.third_party_boundary_valid === true,
+    all_rules_mapped: integrityRaw.all_rules_mapped === true,
+  };
+  return {
+    outcome_id: asText(raw.outcome_id), status: status as OutboundFlowOutcome["status"], decision: asText(raw.decision), summary: asText(raw.summary),
+    source_rule_group_count: asNumber(raw.source_rule_group_count), atomic_requirement_count: atomicRequirementCount, covered_count: asNumber(raw.covered_count), unsupported_count: asNumber(raw.unsupported_count), conflict_count: asNumber(raw.conflict_count),
+    node_count: nodes.length, edge_count: edges.length, guard_count: guards.length, terminal_count: terminals.length, reachable_terminal_count: asNumber(raw.reachable_terminal_count),
+    parameters: Array.isArray(raw.parameters) ? raw.parameters.map(normalizeOutboundParameter).filter((item): item is OutboundRuleParameter => item !== null) : [], rules, nodes, edges, guards, terminals, graph_integrity,
+    human_approval_required: true, legal_opinion: false, original_inputs_modified: false, external_action: "none",
+  };
+}
+
 function normalizeBusinessGateOutcome(value: unknown): BusinessGateOutcome | null {
   if (!value || typeof value !== "object") return null;
   const raw = value as Record<string, unknown>;
@@ -2142,6 +2336,7 @@ function normalizeWorkspaceArtifact(value: unknown): WorkspaceArtifact | null {
     legal_review_outcome: normalizeLegalReviewOutcome(raw.legal_review_outcome),
     candidate_review_outcome: normalizeCandidateReviewOutcome(raw.candidate_review_outcome),
     finance_review_outcome: normalizeFinanceReviewOutcome(raw.finance_review_outcome),
+    outbound_flow_outcome: normalizeOutboundFlowOutcome(raw.outbound_flow_outcome),
     download_path: asText(raw.download_path),
     created_at: asText(raw.created_at),
     original_inputs_modified: false,
@@ -2173,6 +2368,7 @@ function normalizeEffectReceipt(value: unknown): EffectReceipt | null {
     legal_review_outcome: normalizeLegalReviewOutcome(raw.legal_review_outcome),
     candidate_review_outcome: normalizeCandidateReviewOutcome(raw.candidate_review_outcome),
     finance_review_outcome: normalizeFinanceReviewOutcome(raw.finance_review_outcome),
+    outbound_flow_outcome: normalizeOutboundFlowOutcome(raw.outbound_flow_outcome),
     created_at: asText(raw.created_at),
     external_action: "none",
   };
@@ -3489,6 +3685,9 @@ function LoopView({
   const financeReviewOutcome = run.workspace_artifacts.find((artifact) => artifact.finance_review_outcome)?.finance_review_outcome
     ?? run.effect_receipts.find((receipt) => receipt.finance_review_outcome)?.finance_review_outcome
     ?? null;
+  const outboundFlowOutcome = run.workspace_artifacts.find((artifact) => artifact.outbound_flow_outcome)?.outbound_flow_outcome
+    ?? run.effect_receipts.find((receipt) => receipt.outbound_flow_outcome)?.outbound_flow_outcome
+    ?? null;
   const artifactCheckSummary = summarizeArtifactChecks(run.workspace_artifacts);
   const passedArtifactChecks = artifactCheckSummary.passed;
   const totalArtifactChecks = artifactCheckSummary.total;
@@ -3719,7 +3918,7 @@ function LoopView({
       {run.last_commit && <footer><IconCircleCheck aria-hidden="true" /><span>{run.last_commit.summary}</span><b>{run.commits.length} 次提交记录</b></footer>}
     </section>}
     {run.brief && <section className={`loop-brief is-${run.brief.outcome}`}><IconCircleCheck aria-hidden="true" /><div><span>任务简报</span><h3>{run.brief.summary}</h3><p>外部动作：未发生 · 结果仍需人工复核</p></div></section>}
-    {verifiedEffectReady && effectConclusionArtifact && <section className={`loop-effect-conclusion${businessGateOutcome && businessGateOutcome.status !== "passed" ? " is-business-blocked" : candidateReviewOutcome || financeReviewOutcome ? " is-human-review" : ""}`} aria-label="本次任务结语">{businessGateOutcome && businessGateOutcome.status !== "passed" || candidateReviewOutcome || financeReviewOutcome ? <IconAlertTriangle aria-hidden="true" /> : <IconShieldCheck aria-hidden="true" />}<div><span>{businessGateOutcome && businessGateOutcome.status !== "passed" ? "业务结论" : candidateReviewOutcome ? "招聘辅助结论" : financeReviewOutcome ? "财务复核结论" : "本次任务结语"}</span><h3>{businessGateOutcome && businessGateOutcome.status !== "passed" ? businessGateOutcome.decision : candidateReviewOutcome ? candidateReviewOutcome.decision : financeReviewOutcome ? financeReviewOutcome.decision : effectConclusionArtifact.execution_summary}</h3><p>{businessGateOutcome && businessGateOutcome.status !== "passed" ? businessGateOutcome.summary : candidateReviewOutcome ? candidateReviewOutcome.summary : financeReviewOutcome ? financeReviewOutcome.summary : effectConclusionArtifact.review_guidance}</p></div><b>{businessGateOutcome && businessGateOutcome.status !== "passed" ? `业务 Gate ${businessGateOutcome.failed_gate_count}/${businessGateOutcome.total_gate_count} 未通过` : candidateReviewOutcome ? "最终 HR 决定尚未发生" : financeReviewOutcome ? "最终财务处置尚未发生" : artifactCheckSummary.sameChecklist ? `${run.workspace_artifacts.length} 份成果共享 ${totalArtifactChecks} 项规则检查，${passedArtifactChecks}/${totalArtifactChecks} 通过` : artifactCheckSummary.shared ? `${run.workspace_artifacts.length} 份成果共 ${totalArtifactChecks} 项唯一规则检查，${passedArtifactChecks}/${totalArtifactChecks} 通过` : `${passedArtifactChecks}/${totalArtifactChecks} 项规则检查通过`}</b></section>}
+    {verifiedEffectReady && effectConclusionArtifact && <section className={`loop-effect-conclusion${businessGateOutcome && businessGateOutcome.status !== "passed" ? " is-business-blocked" : candidateReviewOutcome || financeReviewOutcome || outboundFlowOutcome ? " is-human-review" : ""}`} aria-label="本次任务结语">{businessGateOutcome && businessGateOutcome.status !== "passed" || candidateReviewOutcome || financeReviewOutcome || outboundFlowOutcome ? <IconAlertTriangle aria-hidden="true" /> : <IconShieldCheck aria-hidden="true" />}<div><span>{businessGateOutcome && businessGateOutcome.status !== "passed" ? "业务结论" : candidateReviewOutcome ? "招聘辅助结论" : financeReviewOutcome ? "财务复核结论" : outboundFlowOutcome ? "流程设计结论" : "本次任务结语"}</span><h3>{businessGateOutcome && businessGateOutcome.status !== "passed" ? businessGateOutcome.decision : candidateReviewOutcome ? candidateReviewOutcome.decision : financeReviewOutcome ? financeReviewOutcome.decision : outboundFlowOutcome ? outboundFlowOutcome.decision : effectConclusionArtifact.execution_summary}</h3><p>{businessGateOutcome && businessGateOutcome.status !== "passed" ? businessGateOutcome.summary : candidateReviewOutcome ? candidateReviewOutcome.summary : financeReviewOutcome ? financeReviewOutcome.summary : outboundFlowOutcome ? "这是一份流程设计，不是拨号、CRM/短信执行，也不是法律意见。" : effectConclusionArtifact.review_guidance}</p></div><b>{businessGateOutcome && businessGateOutcome.status !== "passed" ? `业务 Gate ${businessGateOutcome.failed_gate_count}/${businessGateOutcome.total_gate_count} 未通过` : candidateReviewOutcome ? "最终 HR 决定尚未发生" : financeReviewOutcome ? "最终财务处置尚未发生" : outboundFlowOutcome ? "最终合规审批与真实动作均未发生" : artifactCheckSummary.sameChecklist ? `${run.workspace_artifacts.length} 份成果共享 ${totalArtifactChecks} 项规则检查，${passedArtifactChecks}/${totalArtifactChecks} 通过` : artifactCheckSummary.shared ? `${run.workspace_artifacts.length} 份成果共 ${totalArtifactChecks} 项唯一规则检查，${passedArtifactChecks}/${totalArtifactChecks} 通过` : `${passedArtifactChecks}/${totalArtifactChecks} 项规则检查通过`}</b></section>}
   </section>;
 }
 
@@ -3919,6 +4118,59 @@ function FinanceReviewOutcomePanel({ outcome, deterministicPassed }: { outcome: 
   </section>;
 }
 
+const OUTBOUND_GROUP_LABELS: Record<OutboundRule["group"], string> = {
+  TIME: "允许外呼时段", FREQ: "拨打频次", RECORD: "录音与保存", IDENTITY: "身份确认顺序",
+  THIRD_PARTY: "第三方边界", PROHIBIT: "禁用话术", CONNECT: "接通与未接通", PTP: "承诺还款",
+  SOFT: "软拒绝", HARD: "硬拒绝", DISPUTE: "投诉与异议", INVALID: "无效通话",
+  TERMINAL: "流程终态", PAYMENT: "还款引导", REDIAL: "重拨间隔",
+};
+
+const OUTBOUND_PARAMETER_LABELS: Record<string, string> = {
+  prohibited_start: "禁呼开始", prohibited_end: "允许开始", daily_call_max: "每日上限", hourly_window: "频次窗口",
+  hourly_call_max: "窗口上限", recording_retention: "录音保存", emotion_transfer_threshold: "情绪阈值",
+  redial_min_interval: "重拨间隔", source_terminal_count: "来源终态", identity_recording_order: "身份与录音顺序",
+};
+
+function OutboundFlowOutcomePanel({ outcome, deterministicPassed }: { outcome: OutboundFlowOutcome; deterministicPassed: boolean }) {
+  const integrityPassed = Object.values(outcome.graph_integrity).every(Boolean);
+  const completeCoverage = outcome.unsupported_count === 0 && outcome.conflict_count === 0;
+  const groups = Object.entries(outcome.rules.reduce<Record<string, OutboundRule[]>>((result, rule) => {
+    (result[rule.group] ??= []).push(rule);
+    return result;
+  }, {}));
+  return <section className={`outbound-flow-outcome is-${outcome.status}`} aria-label="合规外呼流程设计复核结论">
+    <header>
+      <IconRoute aria-hidden="true" />
+      <div><span>流程设计结论</span><h3>这是流程设计，不是拨号、CRM/短信执行，也不是法律意见</h3><p>{outcome.decision}</p></div>
+      <b>{outcome.status === "approval_required" ? "等待业务与合规审批" : "规则或图结构未通过"}</b>
+    </header>
+    <ol className="outbound-flow-statuses" aria-label="来源验证、规则覆盖、审批与执行状态">
+      <li className={deterministicPassed ? "is-passed" : "is-failed"}><span>1</span><div><b>来源与 DOCX</b><strong>{deterministicPassed ? "确定性检查通过" : "确定性检查未通过"}</strong><p>服务端从批准 Markdown 重新推导规则，并解析生成后的 DOCX 逐表核对。</p></div></li>
+      <li className={completeCoverage && integrityPassed ? "is-passed" : "is-failed"}><span>2</span><div><b>规则覆盖与状态图</b><strong>{outcome.covered_count}/{outcome.atomic_requirement_count} 条覆盖 · {outcome.reachable_terminal_count}/{outcome.terminal_count} 个终态可达</strong><p>{completeCoverage && integrityPassed ? "当前未发现静默忽略、冲突或不可达路径。" : `不支持 ${outcome.unsupported_count} 条，冲突 ${outcome.conflict_count} 条，需要修复设计。`}</p></div></li>
+      <li className="is-review"><span>3</span><div><b>最终合规审批</b><strong>尚未发生</strong><p>来源未提供制度版本或批准主体，业务与合规负责人仍需核对当前有效口径。</p></div></li>
+      <li className="is-pending"><span>4</span><div><b>真实系统动作</b><strong>全部未发生</strong><p>未拨号、未写 CRM、未发短信、未写禁呼名单，也未实际转人工。</p></div></li>
+    </ol>
+    <section className="outbound-flow-summary" aria-label="规则和状态图摘要">
+      <div><span>来源规则</span><strong>{outcome.source_rule_group_count} 组 · {outcome.atomic_requirement_count} 条</strong><p>逐条保留原文行号与映射位置</p></div>
+      <div><span>状态图</span><strong>{outcome.node_count} 节点 · {outcome.edge_count} 边</strong><p>{outcome.guard_count} 个守卫条件</p></div>
+      <div><span>终态可达</span><strong>{outcome.reachable_terminal_count}/{outcome.terminal_count}</strong><p>均从唯一 START 可遍历到达</p></div>
+    </section>
+    <section className="outbound-flow-parameters" aria-label="来源动态参数">
+      {outcome.parameters.map((parameter) => <div key={parameter.name}><span>{OUTBOUND_PARAMETER_LABELS[parameter.name] ?? parameter.name}</span><strong>{parameter.value}{parameter.unit ? ` ${parameter.unit}` : ""}</strong></div>)}
+    </section>
+    <details className="outbound-flow-rules"><summary><IconEye aria-hidden="true" /><span><b>逐条查看来源规则与流程映射</b><small>{groups.length} 组规则，默认折叠</small></span><IconChevronDown aria-hidden="true" /></summary><div className="outbound-flow-rule-groups">{groups.map(([group, rules]) => <details key={group}>
+      <summary><span><b>{OUTBOUND_GROUP_LABELS[group as OutboundRule["group"]] ?? group}</b><small>{rules.length} 条</small></span><IconChevronDown aria-hidden="true" /></summary>
+      <ol>{rules.map((rule) => <li key={rule.rule_id} className={`is-${rule.coverage_state}`}>
+        <header><code>{rule.rule_id}</code><b>{rule.coverage_state === "covered" ? "已覆盖" : rule.coverage_state === "unsupported" ? "暂不支持" : "存在冲突"}</b></header>
+        <blockquote>{rule.excerpt}</blockquote>
+        <dl><div><dt>原文位置</dt><dd>{rule.locator}</dd></div><div><dt>流程要求</dt><dd>{rule.expected_action}</dd></div><div><dt>映射位置</dt><dd>{[...rule.mapped_node_ids, ...rule.mapped_edge_ids, ...rule.mapped_guard_ids, ...rule.mapped_terminal_ids].join("、") || "尚未映射"}</dd></div></dl>
+      </li>)}</ol>
+    </details>)}</div></details>
+    <details className="outbound-flow-terminals"><summary><IconRoute aria-hidden="true" />查看可达终态与图完整性</summary><div><ul>{outcome.terminals.map((terminal) => <li key={terminal.terminal_id}><b>{terminal.label}</b><small>{terminal.source_listed ? "来源列出" : "安全补充终态"}</small></li>)}</ul><p>{outcome.summary}</p></div></details>
+    <footer><IconShieldCheck aria-hidden="true" /><span>固定 Operations-008 流程设计适配器，不是外呼系统、最新监管验证或生产审批工具。</span></footer>
+  </section>;
+}
+
 function WorkspaceArtifactSection({ artifacts, receipts }: { artifacts: WorkspaceArtifact[]; receipts: EffectReceipt[] }) {
   const [downloading, setDownloading] = useState<string | null>(null);
   const [downloadError, setDownloadError] = useState("");
@@ -3942,6 +4194,9 @@ function WorkspaceArtifactSection({ artifacts, receipts }: { artifacts: Workspac
     ?? null;
   const financeReviewOutcome = artifacts.find((artifact) => artifact.finance_review_outcome)?.finance_review_outcome
     ?? latestReceipt?.finance_review_outcome
+    ?? null;
+  const outboundFlowOutcome = artifacts.find((artifact) => artifact.outbound_flow_outcome)?.outbound_flow_outcome
+    ?? latestReceipt?.outbound_flow_outcome
     ?? null;
   const businessBlocked = Boolean(businessGateOutcome && businessGateOutcome.status !== "passed");
   const deterministicPassed = artifacts.length > 0 && artifacts.every((artifact) => artifact.verifier_status === "passed");
@@ -3969,12 +4224,13 @@ function WorkspaceArtifactSection({ artifacts, receipts }: { artifacts: Workspac
       setDownloading(null);
     }
   };
-  return <section className={`workspace-artifacts${boundary ? " is-bounded" : ""}${businessBlocked ? " has-business-block" : ""}`} aria-labelledby="workspace-artifacts-title">
+  return <section className={`workspace-artifacts${boundary ? " is-bounded" : ""}${businessBlocked || outboundFlowOutcome?.status === "invalid" ? " has-business-block" : ""}`} aria-labelledby="workspace-artifacts-title">
     <header>
       <IconFileDescription aria-hidden="true" />
       <div><span>运行工作区</span><h3 id="workspace-artifacts-title">{artifacts.length > 0 ? `Agent 已生成 ${artifacts.length} 份真实成果文件` : "这项任务尚不能生成可信成果"}</h3><p>{artifacts.length > 0 ? "文件已写入本次 Run 的隔离目录，原始 FORTE 文件没有被修改。" : boundary?.result}</p></div>
-      <b>{businessGateOutcome?.status === "failed" ? `业务 Gate ${businessGateOutcome.failed_gate_count}/${businessGateOutcome.total_gate_count} 未通过` : businessGateOutcome?.status === "invalid" ? "来源校验失败" : candidateReviewOutcome ? "最终 HR 决定待人工处理" : financeReviewOutcome ? "最终财务处置待人工处理" : artifacts.length > 0 ? checkSummary.sameChecklist ? `${artifacts.length} 份成果共享 ${checkSummary.total} 项确定性检查，${checkSummary.passed}/${checkSummary.total} 通过` : checkSummary.shared ? `${artifacts.length} 份成果共 ${checkSummary.total} 项唯一确定性检查，${checkSummary.passed}/${checkSummary.total} 通过` : `${checkSummary.passed}/${checkSummary.total} 项检查通过` : "未伪造结果"}</b>
+      <b>{businessGateOutcome?.status === "failed" ? `业务 Gate ${businessGateOutcome.failed_gate_count}/${businessGateOutcome.total_gate_count} 未通过` : businessGateOutcome?.status === "invalid" ? "来源校验失败" : candidateReviewOutcome ? "最终 HR 决定待人工处理" : financeReviewOutcome ? "最终财务处置待人工处理" : outboundFlowOutcome?.status === "invalid" ? "规则或图结构未通过" : outboundFlowOutcome ? "最终合规审批待人工处理" : artifacts.length > 0 ? checkSummary.sameChecklist ? `${artifacts.length} 份成果共享 ${checkSummary.total} 项确定性检查，${checkSummary.passed}/${checkSummary.total} 通过` : checkSummary.shared ? `${artifacts.length} 份成果共 ${checkSummary.total} 项唯一确定性检查，${checkSummary.passed}/${checkSummary.total} 通过` : `${checkSummary.passed}/${checkSummary.total} 项检查通过` : "未伪造结果"}</b>
     </header>
+    {outboundFlowOutcome && <OutboundFlowOutcomePanel outcome={outboundFlowOutcome} deterministicPassed={deterministicPassed} />}
     {financeReviewOutcome && <FinanceReviewOutcomePanel outcome={financeReviewOutcome} deterministicPassed={deterministicPassed} />}
     {candidateReviewOutcome && <CandidateReviewOutcomePanel outcome={candidateReviewOutcome} deterministicPassed={deterministicPassed} />}
     {legalReviewOutcome && <LegalReviewOutcomePanel outcome={legalReviewOutcome} deterministicPassed={deterministicPassed} />}
@@ -3982,7 +4238,7 @@ function WorkspaceArtifactSection({ artifacts, receipts }: { artifacts: Workspac
     {executionArtifact && <article className={`workspace-action-result${executionArtifact.verifier_status === "failed" ? " is-failed" : ""}`} aria-label="实际执行边界"><IconShieldCheck aria-hidden="true" /><div><span>这次实际发生了什么</span><h4>{executionArtifact.execution_summary}</h4><p>{executionArtifact.purpose}</p>{latestReceipt && <ul>{latestReceipt.prohibited_side_effects.map((item) => <li key={item}>{item}</li>)}</ul>}</div></article>}
     {artifacts.length > 0 && <ol>{artifacts.map((artifact) => <li key={artifact.artifact_id} className={artifact.verifier_status === "passed" ? "is-passed" : "is-failed"}>
       <div className="workspace-artifact-file"><span><IconFile aria-hidden="true" /></span><div><h4>{artifact.title}</h4><p>{artifact.summary}</p><small>文件：{artifact.file_name} · 第 {artifact.round_number} 轮 · {formatSize(artifact.size)} · {artifact.source_file_refs.length} 份内容来源</small></div></div>
-      <div className="workspace-artifact-status"><b>{artifact.verifier_status === "passed" ? <><IconCheck aria-hidden="true" />确定性检查通过</> : <><IconAlertTriangle aria-hidden="true" />检查未通过</>}</b><span>{artifact.record_count !== null ? `${artifact.record_count} 条记录 · ` : ""}{artifact.checks.filter((check) => check.passed).length}/{artifact.checks.length} 项检查{(checklistUsage.get(artifactChecklistKey(artifact)) ?? 0) > 1 ? " · 使用同一验证清单" : ""}</span>{artifact.business_gate_outcome && <small>只代表公式、来源和文件结构已复核，不代表业务 Gate 通过。</small>}{artifact.candidate_review_outcome && <small>只代表来源、条件计算和成果结构已复核，不代表录用或淘汰。</small>}{artifact.finance_review_outcome && <small>只代表来源、金额、候选枚举和成果结构已复核，不代表已经付款、核销、记账或确认坏账。</small>}</div>
+      <div className="workspace-artifact-status"><b>{artifact.verifier_status === "passed" ? <><IconCheck aria-hidden="true" />确定性检查通过</> : <><IconAlertTriangle aria-hidden="true" />检查未通过</>}</b><span>{artifact.record_count !== null ? `${artifact.record_count} 条记录 · ` : ""}{artifact.checks.filter((check) => check.passed).length}/{artifact.checks.length} 项检查{(checklistUsage.get(artifactChecklistKey(artifact)) ?? 0) > 1 ? " · 使用同一验证清单" : ""}</span>{artifact.business_gate_outcome && <small>只代表公式、来源和文件结构已复核，不代表业务 Gate 通过。</small>}{artifact.candidate_review_outcome && <small>只代表来源、条件计算和成果结构已复核，不代表录用或淘汰。</small>}{artifact.finance_review_outcome && <small>只代表来源、金额、候选枚举和成果结构已复核，不代表已经付款、核销、记账或确认坏账。</small>}{artifact.outbound_flow_outcome && <small>只代表来源规则、DOCX 和图结构已复核，不代表合规审批或外呼动作发生。</small>}</div>
       <button type="button" onClick={() => void downloadArtifact(artifact)} disabled={downloading !== null}><IconDownload aria-hidden="true" />{downloading === artifact.artifact_id ? "正在下载" : "下载成果"}</button>
       {(artifact.deliverable_type || artifact.covered_period || artifact.statistic_basis || artifact.purpose) && <dl className={`workspace-artifact-semantics${artifact.deliverable_type ? " has-deliverable-type" : ""}`}>
         {artifact.deliverable_type && <div><dt>成果类型</dt><dd>{artifact.deliverable_type}</dd></div>}

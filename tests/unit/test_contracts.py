@@ -575,3 +575,134 @@ def test_finance_review_outcome_round_trips_without_becoming_an_accounting_actio
     assert restored_receipt.finance_review_outcome == restored_artifact.finance_review_outcome
     assert restored_receipt.finance_review_outcome.original_inputs_modified is False
     assert restored_receipt.finance_review_outcome.external_action == "none"
+
+
+def test_outbound_flow_outcome_round_trips_without_becoming_an_execution_receipt() -> None:
+    now = datetime.now(timezone.utc)
+    outcome = {
+        "outcome_id": "outbound-flow-outcome-operations-008",
+        "status": "approval_required",
+        "decision": "规则与图结构已复核，仍需业务与合规负责人审批。",
+        "summary": "1 条来源要求映射到一个最小测试图。",
+        "source_rule_group_count": 1,
+        "atomic_requirement_count": 1,
+        "covered_count": 1,
+        "unsupported_count": 0,
+        "conflict_count": 0,
+        "node_count": 1,
+        "edge_count": 0,
+        "guard_count": 0,
+        "terminal_count": 1,
+        "reachable_terminal_count": 1,
+        "parameters": [],
+        "rules": [
+            {
+                "rule_id": "OUT-TIME-01",
+                "group": "TIME",
+                "source_file_ref": "forte-ba23e986a9c7e8d8",
+                "locator": "专业性说明.md:L22",
+                "excerpt": "流程中必须在拨号前判断当前时段。",
+                "parameters": [],
+                "expected_relation": "拨号前检查时段",
+                "expected_action": "先进入时段 Gate",
+                "coverage_state": "covered",
+                "mapped_node_ids": ["out-node-start"],
+                "mapped_edge_ids": [],
+                "mapped_guard_ids": [],
+                "mapped_terminal_ids": ["out-terminal-done"],
+            }
+        ],
+        "nodes": [
+            {
+                "node_id": "out-node-start",
+                "label": "START",
+                "kind": "start",
+                "source_rule_ids": ["OUT-TIME-01"],
+                "future_action": False,
+            }
+        ],
+        "edges": [],
+        "guards": [],
+        "terminals": [
+            {
+                "terminal_id": "out-terminal-done",
+                "node_id": "out-node-start",
+                "label": "测试终态",
+                "source_rule_ids": ["OUT-TIME-01"],
+                "source_listed": True,
+            }
+        ],
+        "graph_integrity": {
+            "unique_start": True,
+            "unique_ids": True,
+            "no_dangling_edges": True,
+            "all_nodes_reachable": True,
+            "all_terminals_reachable": True,
+            "every_nonterminal_has_outgoing": True,
+            "every_node_can_reach_terminal": True,
+            "critical_order_valid": True,
+            "third_party_boundary_valid": True,
+            "all_rules_mapped": True,
+        },
+        "human_approval_required": True,
+        "legal_opinion": False,
+        "original_inputs_modified": False,
+        "external_action": "none",
+    }
+    artifact = AgentControlLoopWorkspaceArtifact.model_validate(
+        {
+            "artifact_id": "workspace-artifact-abcdef123456",
+            "capability_id": "office-compliant-outbound-flow",
+            "scenario_id": "TC-10",
+            "title": "外呼流程设计",
+            "file_name": "外呼流程-M1逾期用户AI外呼催收流程图.docx",
+            "media_type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            "size": 1024,
+            "round_number": 1,
+            "source_file_refs": ["forte-ba23e986a9c7e8d8"],
+            "validator_id": "validator-compliant-outbound-flow-v2",
+            "verifier_status": "passed",
+            "checks": [
+                {
+                    "check_id": "check-outbound-rule-ledger-v2",
+                    "label": "来源规则账本",
+                    "passed": True,
+                    "detail": "来源规则与 DOCX 表格一致。",
+                }
+            ],
+            "summary": "只生成流程设计，没有执行拨号。",
+            "outbound_flow_outcome": outcome,
+            "download_path": "/v1/harness/runs/run-1/artifacts/outbound-1",
+            "created_at": now,
+        }
+    )
+    receipt = AgentControlLoopEffectReceipt.model_validate(
+        {
+            "receipt_id": "effect-receipt-abcdef123456",
+            "capability_id": "office-compliant-outbound-flow",
+            "scenario_id": "TC-10",
+            "status": "passed",
+            "state": "批准来源已冻结。",
+            "action": "生成隔离流程设计。",
+            "observation": "来源规则和状态图已复核。",
+            "cost": "0 次额外模型调用。",
+            "result": "最终审批与外部动作均未发生。",
+            "source_file_refs": ["forte-ba23e986a9c7e8d8"],
+            "artifact_ids": [artifact.artifact_id],
+            "prohibited_side_effects": ["不拨号", "不写 CRM", "不发送短信"],
+            "outbound_flow_outcome": outcome,
+            "created_at": now,
+        }
+    )
+
+    restored_artifact = AgentControlLoopWorkspaceArtifact.model_validate_json(
+        artifact.model_dump_json()
+    )
+    restored_receipt = AgentControlLoopEffectReceipt.model_validate_json(
+        receipt.model_dump_json()
+    )
+    assert restored_artifact.outbound_flow_outcome is not None
+    assert restored_receipt.outbound_flow_outcome == restored_artifact.outbound_flow_outcome
+    assert restored_receipt.outbound_flow_outcome.human_approval_required is True
+    assert restored_receipt.outbound_flow_outcome.legal_opinion is False
+    assert restored_receipt.outbound_flow_outcome.external_action == "none"
