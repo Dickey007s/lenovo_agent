@@ -196,6 +196,20 @@ not as pass or fail. A lawyer-license field without a Registry/Connector receipt
 therefore stays visibly unresolved. Opening these details does not call a model,
 validate a signature, sign a document or make an authorization effective.
 
+DR-0045 applies the same truth separation to TC-06. The result area first says
+that this is a human-review aid, not a hiring or rejection decision, then shows
+three parallel states: deterministic source/file verification, role-matching
+advice and final HR decision. Dynamic totals come from the service-owned
+`candidate_review_outcome`; the browser does not recompute them. Role sections
+contain five candidate cards, collapsed by default. Opening one exposes every
+condition's four-state result, JD and resume locations/excerpts, source fact,
+judgment, human follow-up and exit condition. `unverifiable` is displayed as
+missing evidence rather than a negative result, while an explicit JD exception
+stays an HR decision. The candidate list uses content-width-driven `auto-fit`
+cards and falls back to one column in the narrow center pane and at 390 px.
+Opening these details does not call a model, change ATS state, notify a candidate
+or execute a hiring action.
+
 Open human decisions are authoritative in the Snapshot-level
 `decision_requests[]`; round-level copies are compatibility projections only.
 Closing or pressing Escape exits the review surface before the browser attempts a

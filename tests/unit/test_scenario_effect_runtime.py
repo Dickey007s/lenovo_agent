@@ -56,6 +56,7 @@ TC04_INSTRUCTION = (
 TC12_INSTRUCTION = "为三个看板工具模块编写 Vitest，修复源码并真实运行测试。"
 TC11_INSTRUCTION = "综合 PRD、上线配置、功能测试和兼容测试，给出上线结论与改进计划。"
 TC07_INSTRUCTION = "依据统一规则核查六份授权委托书，逐项说明风险、资料不足和复核动作。"
+TC06_INSTRUCTION = "依据两个岗位说明分别审阅五份简历，保留逐条证据并输出辅助筛选结果。"
 
 
 class OnboardingPlanner:
@@ -261,6 +262,56 @@ class LegalDelegationAnalyst:
                             role="observed",
                             label="空签署栏",
                             quote="委托人签名：",
+                        )
+                    ],
+                )
+            ],
+            follow_ups=[],
+            review_required=True,
+        )
+
+
+class CandidateReviewPlanner:
+    model = "deepseek-v4-pro"
+
+    async def plan(self, *, scenario, files):
+        source = next(
+            item for item in files if item["display_label"] == "外卖商户BD岗位JD.docx"
+        )
+        return HarnessPlanCandidate(
+            summary="读取一份岗位说明并形成可定位的招聘辅助上下文",
+            selection_reason="固定 TC-06 效果门会另行冻结两份 JD 与五份简历，并逐条件重算。",
+            units=[
+                HarnessPlanCandidateUnit(
+                    unit_id="read-candidate-role",
+                    title="读取外卖商户BD岗位说明",
+                    objective="核对岗位默认学历门槛与显式例外",
+                    input_file_refs=[source["file_ref"]],
+                    tool="file.read",
+                )
+            ],
+        )
+
+
+class CandidateReviewAnalyst:
+    model = "deepseek-v4-pro"
+
+    async def analyze(self, *, instruction, plan, files, validation_feedback=None):
+        source = files[0]
+        return HarnessTaskResult(
+            summary="已读取一份岗位说明；完整双岗位逐条件核对由服务端固定 TC-06 效果门执行。",
+            findings=[
+                HarnessFinding(
+                    plan_unit_id=plan.units[0].unit_id,
+                    title="学历门槛包含人工例外",
+                    detail="招聘负责人必须结合候选人的岗位证据决定是否适用优秀者放宽，服务端不会自动淘汰。",
+                    file_refs=[source["file_ref"]],
+                    evidence_quotes=[
+                        HarnessEvidenceQuote(
+                            file_ref=source["file_ref"],
+                            role="expected",
+                            label="默认学历门槛与例外",
+                            quote="学历背景： 大专及以上学历（优秀者可放宽）。",
                         )
                     ],
                 )
@@ -743,6 +794,100 @@ async def test_tc11_runtime_persists_verified_files_and_failed_business_gates(
         public_outcome = public["effect_receipts"][0]["business_gate_outcome"]
         assert public_outcome["decision"] == "不得上线"
         assert len(public_outcome["records"]) == 18
+    finally:
+        await runtime.close()
+
+
+@pytest.mark.asyncio
+async def test_tc06_runtime_keeps_source_verification_advice_and_hr_decision_separate(
+    tmp_path: Path,
+) -> None:
+    before = _forte_digests()
+    runtime = HarnessRuntime(
+        BenchmarkWorkspaceCatalog(FORTE_ROOT),
+        CandidateReviewPlanner(),
+        CandidateReviewAnalyst(),
+        effect_engine=ScenarioEffectEngine(),
+        artifact_store=RunWorkspaceArtifactStore(tmp_path / "run-workspaces"),
+    )
+    try:
+        started = await runtime.start(
+            "candidate-owner",
+            HarnessRunStart(
+                idempotency_key="tc06-derived-candidate-runtime-0001",
+                instruction=TC06_INSTRUCTION,
+            ),
+        )
+        snapshot = None
+        for _ in range(1_000):
+            candidate = await runtime.get("candidate-owner", started.run.run_id)
+            if candidate.status in {"waiting_input", "completed", "stopped", "failed"}:
+                snapshot = candidate
+                break
+            await asyncio.sleep(0.01)
+        assert snapshot is not None
+        assert snapshot.status == "completed"
+        assert len(snapshot.workspace_artifacts) == 3
+        assert len(snapshot.effect_receipts) == 1
+
+        receipt = snapshot.effect_receipts[0]
+        assert receipt.status == "passed"
+        assert receipt.scenario_id == "TC-06"
+        assert receipt.candidate_review_outcome is not None
+        outcome = receipt.candidate_review_outcome
+        assert outcome.status == "review_required"
+        assert outcome.decision == "这是人工复核建议，不是录用或淘汰决定。"
+        assert outcome.role_count == 2
+        assert outcome.candidate_count == 5
+        assert outcome.review_count == 10
+        assert outcome.assessment_count == 110
+        assert (
+            outcome.met_count,
+            outcome.not_met_count,
+            outcome.unverifiable_count,
+            outcome.human_exception_count,
+        ) == (32, 6, 71, 1)
+        assert outcome.human_review_required is True
+        assert outcome.fairness_evaluated is False
+
+        for artifact in snapshot.workspace_artifacts:
+            assert artifact.verifier_status == "passed"
+            assert artifact.candidate_review_outcome == outcome
+            assert all(check.passed for check in artifact.checks)
+            assert artifact.review_required is True
+            assert artifact.external_action == "none"
+
+        by_name = {item.file_name: item for item in snapshot.workspace_artifacts}
+        assert len(by_name["外卖商户BD岗位辅助筛选报告.docx"].source_file_refs) == 6
+        assert len(by_name["文本评测岗位辅助筛选报告.docx"].source_file_refs) == 6
+        assert len(by_name["候选人岗位条件逐项台账.csv"].source_file_refs) == 7
+        _, report = await runtime.get_workspace_artifact(
+            "candidate-owner",
+            snapshot.run_id,
+            by_name["外卖商户BD岗位辅助筛选报告.docx"].artifact_id,
+        )
+        with zipfile.ZipFile(io.BytesIO(report)) as package:
+            report_xml = package.read("word/document.xml").decode("utf-8")
+        assert report_xml.count("<w:tbl>") >= 8
+        assert "不是录用或淘汰决定" in report_xml
+
+        _, ledger = await runtime.get_workspace_artifact(
+            "candidate-owner",
+            snapshot.run_id,
+            by_name["候选人岗位条件逐项台账.csv"].artifact_id,
+        )
+        rows = list(csv.DictReader(io.StringIO(ledger.decode("utf-8-sig"))))
+        assert len(rows) == 110
+        assert len({(row["岗位ID"], row["候选人ID"], row["条件ID"]) for row in rows}) == 110
+        assert sum(row["状态"] == "需人工例外判断" for row in rows) == 1
+        assert "手机号" not in ledger.decode("utf-8-sig")
+        assert _forte_digests() == before
+
+        public = runtime.public_snapshot(snapshot).model_dump(mode="json")
+        public_outcome = public["effect_receipts"][0]["candidate_review_outcome"]
+        assert public_outcome["assessment_count"] == 110
+        assert public_outcome["fairness_evaluated"] is False
+        assert "content_sha256" not in json.dumps(public, ensure_ascii=False)
     finally:
         await runtime.close()
 

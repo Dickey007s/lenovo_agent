@@ -61,6 +61,7 @@ Agent Control Loop 的逐模块历史基线、当前有界效果纵切和后续�
 | 17 | 一个引用跳转缺口不应被包装成系统失败：先说成果是否已生成，再给一个动作 | TC-05 “成果已生成，还有 1 条说明缺少原表格位置”；查看成果、查找位置、技术详情三层 | `DR-0038`；只恢复目标 Branch，不覆盖 Artifact；未通过和旧 Run 使用不同话术 |
 | 18 | 代码测试的关键不是绿灯数字，而是同一套测试能否先抓住原缺陷、再验证修复 | TC-12 Stage A/B/C 红灯 -> Stage D 71/71；三套真实测试、四文件 diff、逐文件 coverage 与下载复跑 | `DR-0042`；固定 qa-003 适配器，不是任意 JS 沙箱、自动 PR 或 OS 级断网 |
 | 19 | 一个任务可以“成果文件检查通过，但业务结论仍是不通过”；前台必须同时讲清两种真相 | TC-11 两份 Artifact 共享 9 项确定性检查，同时四条来源推导上线 Gate 全失败；首屏“不得上线”+公式，辅助指标和 18 项台账渐进展开 | `DR-0043`；固定 pm-014 适配器，不执行上线、不改配置；自动化不证明用户理解 |
+| 20 | 简历辅助筛选不能把“没写到”变成“不满足”，也不能让绿色文件检查替 HR 作决定 | TC-06 首屏三状态、110 条双来源条件、王琳达人工例外、孙博文 8 个月与 1 年门槛、动态来源变异 | `DR-0045`；固定 hr-001 适配器，不是通用 ATS、正式招聘决定、公平性证明或候选人通知 |
 
 ## 4. 现场演示卡片
 
@@ -150,6 +151,7 @@ Agent Control Loop 的逐模块历史基线、当前有界效果纵切和后续�
 | 模型之后还有策略编译器 | 模型不能静默决定副作用 | “模型已调用”与“计划已校验”分开 | Model Receipt 与服务端 Plan |
 | 固定本地 Scenario Effect Gate | 用户看到的“已完成”必须落到真实文件和可复算检查，而不是一段模型回答 | 可下载 CSV/MD/DOCX/ZIP、检查清单、原件未修改、外部动作未发生 | `workspace_artifacts[]`、`effect_receipts[]`、Artifact GET 与 named SSE |
 | 来源推导法务核查与三状态反馈 | 用户不再把固定风险答案或绿色文件检查误读为“可以签署”，还能逐份查看哪条规则已触发、哪条只因资料不足无法判断 | “不得据此签署，必须法务复核”、文件检查/法务 Gate/签署复核三状态、六份文件的 21 条规则台账 | `legal_review_outcome.documents[].assessments[]` + `business_gate_outcome` + Artifact `verifier_status`；固定 Legal-020，不是正式法律意见或签署验证 |
+| 来源推导招聘辅助与 HR 决策边界 | 用户不再把缺失简历字段误读成不满足，也不会把文件验证通过误读成录用或淘汰 | “人工复核建议，不是录用或淘汰决定”、来源检查/岗位建议/HR 待决三状态、按岗位与候选人展开双来源条件 | `candidate_review_outcome.reviews[].assessments[]` + Artifact `verifier_status` + EffectReceipt `external_action=none`；固定 hr-001，不证明公平或正式招聘决定 |
 | 设计成果与执行回执分层 | 用户不会把流程文档中的动作词误读为 Agent 已经拨号或写系统 | “只生成流程设计 DOCX”、六类终态、人工复核原因、未拨号/未写 CRM/未发短信 | Artifact `deliverable_type/key_outputs/review_guidance/execution_summary` + EffectReceipt `external_action=none` |
 | 真实代码副本与自测分层 | 用户能区分“改造真实项目”与“另造一个演示包”，并知道如何复测和人工合并 | 完整 algorithm-013 副本、文件变更、两条命令、测试 ID 清单、失败信号 | Artifact `self_test/key_outputs_label` + ZIP/diff/JSON receipt + download content gate |
 | 双阶段真实项目测试 | 用户不再被“105 项通过”蒙蔽，能看到真实模块、修复前红灯和修复后覆盖门 | dev-015 完整 44 文件副本、五类 117 项可展开测试、三处 diff、逐文件覆盖率 | Artifact `test_suites[]` + unpatched/final results + public/ZIP manifest 集合一致门 |

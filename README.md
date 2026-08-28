@@ -327,6 +327,15 @@ multi-instance coordination and governed external action remain target work.
   receipt remains `unverifiable`. The UI shows file verification, legal business
   Gates and signing/human review as three different states. This is an auxiliary
   fixed-input review, not legal advice, signature validation or authorization.
+- `DR-0045` replaces TC-06's historical fixed candidate answers with a
+  source-derived hr-001 review. The service validates two role-specific JD DOCX
+  files and five unique resume PDFs, derives 14 BD and 8 text-evaluation
+  conditions, and verifies two structured role reports plus a 110-row joint
+  ledger from the approved bytes. Missing resume facts remain `unverifiable`,
+  explicit source gaps can be `not_met`, and the BD education exception remains
+  a human decision. The UI separates deterministic file checks, matching advice
+  and the final HR decision. This is a fixed auxiliary review, not a general ATS,
+  hiring decision, fairness proof, background check or candidate notification.
 - No target-user study has been run. Clarity, trust, efficiency and user value
   remain hypotheses.
 
@@ -359,6 +368,8 @@ The source-location user-language and local-recovery increment is tracked in
 [`DR-0038-USER-LANGUAGE-SOURCE-LOCATION-RECOVERY-EVIDENCE-20260828`](docs/evidence/DR-0038-USER-LANGUAGE-SOURCE-LOCATION-RECOVERY-EVIDENCE-20260828.md).
 The current TC-11 source-derived release Gate increment is tracked in
 [`DR-0043-TC11-DERIVED-RELEASE-GATES-EVIDENCE-20260828`](docs/evidence/DR-0043-TC11-DERIVED-RELEASE-GATES-EVIDENCE-20260828.md).
+The current TC-06 source-derived candidate review increment is tracked in
+[`DR-0045-TC06-SOURCE-DERIVED-CANDIDATE-REVIEW-EVIDENCE-20260829`](docs/evidence/DR-0045-TC06-SOURCE-DERIVED-CANDIDATE-REVIEW-EVIDENCE-20260829.md).
 
 ## Local run
 
@@ -448,6 +459,9 @@ pnpm --dir apps/web exec playwright test e2e/harness-workbench.spec.ts
 - [DR-0044：TC-07 来源推导授权核查与三状态前台](docs/decisions/DR-0044-tc07-source-derived-legal-delegation-review.md)
 - [SCENARIO-030：从一份规则和六份委托书逐项推导复核清单](docs/scenarios/SCENARIO-030-review-six-delegations-with-source-derived-rules.md)
 - [TC-07 来源推导授权核查 Evidence](docs/evidence/DR-0044-TC07-SOURCE-DERIVED-LEGAL-REVIEW-EVIDENCE-20260828.md)
+- [DR-0045：TC-06 来源推导双岗位辅助筛选与 HR 决策边界](docs/decisions/DR-0045-tc06-source-derived-candidate-review.md)
+- [SCENARIO-031：用两份 JD 与五份简历形成可追溯的人工复核建议](docs/scenarios/SCENARIO-031-review-two-jobs-and-five-resumes-with-source-derived-conditions.md)
+- [TC-06 来源推导双岗位辅助筛选 Evidence](docs/evidence/DR-0045-TC06-SOURCE-DERIVED-CANDIDATE-REVIEW-EVIDENCE-20260829.md)
 - [可恢复 Control Loop Evidence](docs/evidence/DURABLE-EVIDENCE-GATE-ARTIFACT-EVOLUTION-EVIDENCE-20260826.md)
 - [整库自主研究 Evidence](docs/evidence/AUTONOMOUS-WHOLE-WORKSPACE-RESEARCH-EVIDENCE-20260825.md)
 - [Agent Control Loop 三轮只读纵切证据](docs/evidence/AGENT-CONTROL-LOOP-BOUNDED-READONLY-EVIDENCE-20260825.md)

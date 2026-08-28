@@ -257,9 +257,7 @@ class AgentControlLoopBudget(StrictModel):
 
 class AgentControlLoopEvidenceGap(StrictModel):
     gap_id: str = Field(pattern=r"^gap-[0-9a-f]{12}$")
-    branch_id: str | None = Field(
-        default=None, pattern=r"^branch-[0-9a-f]{12}$"
-    )
+    branch_id: str | None = Field(default=None, pattern=r"^branch-[0-9a-f]{12}$")
     label: str = Field(min_length=1, max_length=240)
     detail: str = Field(min_length=1, max_length=1_000)
     candidate_file_refs: list[str] = Field(default_factory=list, max_length=20)
@@ -295,9 +293,7 @@ class AgentControlLoopEvidenceResolution(StrictModel):
     finding_title: str = Field(min_length=1, max_length=240)
     fact_summary: str | None = Field(default=None, max_length=500)
     impact: str | None = Field(default=None, max_length=500)
-    branch_id: str | None = Field(
-        default=None, pattern=r"^branch-[0-9a-f]{12}$"
-    )
+    branch_id: str | None = Field(default=None, pattern=r"^branch-[0-9a-f]{12}$")
     affected_branch_ids: list[str] = Field(default_factory=list, max_length=12)
     file_ref: str = Field(pattern=r"^forte-[0-9a-f]{16}$")
     role: AgentControlLoopEvidenceRole
@@ -305,16 +301,10 @@ class AgentControlLoopEvidenceResolution(StrictModel):
     query_excerpt: str = Field(min_length=4, max_length=600)
     status: AgentControlLoopEvidenceResolutionStatus
     reason: str = Field(min_length=1, max_length=500)
-    candidates: list[AgentControlLoopEvidenceCandidate] = Field(
-        default_factory=list, max_length=6
-    )
-    selected_candidate_id: str | None = Field(
-        default=None, pattern=r"^candidate-[0-9a-f]{12}$"
-    )
+    candidates: list[AgentControlLoopEvidenceCandidate] = Field(default_factory=list, max_length=6)
+    selected_candidate_id: str | None = Field(default=None, pattern=r"^candidate-[0-9a-f]{12}$")
     source_revision: str = Field(default="", max_length=128)
-    decision_status: Literal[
-        "pending", "accepted", "declined", "deferred", "cancelled"
-    ] = "pending"
+    decision_status: Literal["pending", "accepted", "declined", "deferred", "cancelled"] = "pending"
 
 
 class AgentControlLoopNextStep(StrictModel):
@@ -335,9 +325,7 @@ class AgentControlLoopBranch(StrictModel):
     branch_id: str = Field(pattern=r"^branch-[0-9a-f]{12}$")
     unit_id: str = Field(min_length=1, max_length=120)
     round_number: int = Field(ge=1, le=24)
-    parent_branch_id: str | None = Field(
-        default=None, pattern=r"^branch-[0-9a-f]{12}$"
-    )
+    parent_branch_id: str | None = Field(default=None, pattern=r"^branch-[0-9a-f]{12}$")
     title: str = Field(min_length=1, max_length=240)
     objective: str = Field(min_length=1, max_length=1_000)
     depends_on: list[str] = Field(default_factory=list, max_length=12)
@@ -363,9 +351,7 @@ class AgentControlLoopRound(StrictModel):
     result: dict[str, Any] | None = None
     analysis_receipt: dict[str, Any] | None = None
     verified_file_refs: list[str] = Field(default_factory=list, max_length=20)
-    evidence_gaps: list[AgentControlLoopEvidenceGap] = Field(
-        default_factory=list, max_length=20
-    )
+    evidence_gaps: list[AgentControlLoopEvidenceGap] = Field(default_factory=list, max_length=20)
     next_step: AgentControlLoopNextStep | None = None
     started_at: datetime
     completed_at: datetime | None = None
@@ -374,9 +360,7 @@ class AgentControlLoopRound(StrictModel):
 class AgentControlLoopControlEvent(StrictModel):
     control_id: str = Field(pattern=r"^control-[0-9a-f]{12}$")
     command: AgentControlLoopCommand
-    branch_id: str | None = Field(
-        default=None, pattern=r"^branch-[0-9a-f]{12}$"
-    )
+    branch_id: str | None = Field(default=None, pattern=r"^branch-[0-9a-f]{12}$")
     artifact_version: int | None = Field(default=None, ge=1, le=24)
     instruction: str | None = Field(default=None, max_length=2_000)
     accepted_at: datetime
@@ -394,16 +378,10 @@ class AgentControlLoopDecisionRecord(StrictModel):
     )
     action: AgentControlLoopDecisionAction
     finding_id: str = Field(pattern=r"^finding-[0-9a-f]{12}$")
-    resolution_id: str | None = Field(
-        default=None, pattern=r"^resolution-[0-9a-f]{12}$"
-    )
-    branch_id: str | None = Field(
-        default=None, pattern=r"^branch-[0-9a-f]{12}$"
-    )
+    resolution_id: str | None = Field(default=None, pattern=r"^resolution-[0-9a-f]{12}$")
+    branch_id: str | None = Field(default=None, pattern=r"^branch-[0-9a-f]{12}$")
     selected_option_id: AgentControlLoopDecisionOptionId | None = None
-    selected_candidate_id: str | None = Field(
-        default=None, pattern=r"^candidate-[0-9a-f]{12}$"
-    )
+    selected_candidate_id: str | None = Field(default=None, pattern=r"^candidate-[0-9a-f]{12}$")
     feedback: str | None = Field(default=None, max_length=2_000)
     recorded_at: datetime
     source_revision: str = Field(default="", max_length=128)
@@ -417,9 +395,7 @@ class AgentControlLoopDecisionRecord(StrictModel):
     applied_task_version: int | None = Field(default=None, ge=1)
     affected_branch_ids: list[str] = Field(default_factory=list, max_length=12)
     required_file_refs: list[str] = Field(default_factory=list, max_length=20)
-    effect: Literal[
-        "branch_resumed", "preserved", "deferred", "cancelled", "none"
-    ] = "none"
+    effect: Literal["branch_resumed", "preserved", "deferred", "cancelled", "none"] = "none"
     external_action: Literal["none"] = "none"
 
 
@@ -429,28 +405,20 @@ class AgentControlLoopDecisionRequest(StrictModel):
     decision_request_id: str = Field(pattern=r"^decision-request-[0-9a-f]{12}$")
     run_id: str = Field(min_length=1, max_length=120)
     finding_id: str = Field(pattern=r"^finding-[0-9a-f]{12}$")
-    resolution_id: str | None = Field(
-        default=None, pattern=r"^resolution-[0-9a-f]{12}$"
-    )
+    resolution_id: str | None = Field(default=None, pattern=r"^resolution-[0-9a-f]{12}$")
     plan_unit_id: str | None = Field(default=None, min_length=1, max_length=120)
-    branch_id: str | None = Field(
-        default=None, pattern=r"^branch-[0-9a-f]{12}$"
+    branch_id: str | None = Field(default=None, pattern=r"^branch-[0-9a-f]{12}$")
+    state: Literal["open", "accepted", "declined", "deferred", "cancelled", "stale", "rejected"] = (
+        "open"
     )
-    state: Literal[
-        "open", "accepted", "declined", "deferred", "cancelled", "stale", "rejected"
-    ] = "open"
     reason: str = Field(min_length=1, max_length=1_000)
     allowed_actions: list[AgentControlLoopDecisionAction] = Field(
         default_factory=lambda: ["accept", "decline", "defer", "cancel"], max_length=4
     )
     options: list[dict[str, Any]] = Field(default_factory=list, max_length=3)
     selected_option_id: AgentControlLoopDecisionOptionId | None = None
-    selected_candidate_id: str | None = Field(
-        default=None, pattern=r"^candidate-[0-9a-f]{12}$"
-    )
-    candidates: list[AgentControlLoopEvidenceCandidate] = Field(
-        default_factory=list, max_length=6
-    )
+    selected_candidate_id: str | None = Field(default=None, pattern=r"^candidate-[0-9a-f]{12}$")
+    candidates: list[AgentControlLoopEvidenceCandidate] = Field(default_factory=list, max_length=6)
     source_revision: str = Field(default="", max_length=128)
     expected_version: int = Field(ge=1)
     affected_branch_ids: list[str] = Field(default_factory=list, max_length=12)
@@ -465,9 +433,7 @@ class AgentControlLoopBrief(StrictModel):
     outcome: Literal["completed", "bounded", "user_stopped"]
     summary: str = Field(min_length=1, max_length=3_000)
     verified_file_refs: list[str] = Field(default_factory=list, max_length=20)
-    unresolved_gaps: list[AgentControlLoopEvidenceGap] = Field(
-        default_factory=list, max_length=20
-    )
+    unresolved_gaps: list[AgentControlLoopEvidenceGap] = Field(default_factory=list, max_length=20)
     rounds_completed: int = Field(ge=0, le=24)
     external_action: Literal["none"] = "none"
 
@@ -510,18 +476,14 @@ class AgentControlLoopFindingReview(StrictModel):
     requires_human_decision: bool
     question: str = Field(min_length=1, max_length=500)
     why_human: str = Field(min_length=1, max_length=500)
-    options: list[AgentControlLoopFindingDecisionOption] = Field(
-        default_factory=list, max_length=3
-    )
+    options: list[AgentControlLoopFindingDecisionOption] = Field(default_factory=list, max_length=3)
     recommended_option_id: AgentControlLoopDecisionOptionId | None = None
     recommendation_reason: str = Field(min_length=1, max_length=500)
     after_confirmation: str = Field(min_length=1, max_length=500)
 
 
 class AgentControlLoopArtifactFinding(StrictModel):
-    finding_id: str | None = Field(
-        default=None, pattern=r"^finding-[0-9a-f]{12}$"
-    )
+    finding_id: str | None = Field(default=None, pattern=r"^finding-[0-9a-f]{12}$")
     plan_unit_id: str | None = Field(default=None, min_length=1, max_length=120)
     affected_branch_ids: list[str] = Field(default_factory=list, max_length=12)
     title: str = Field(min_length=1, max_length=240)
@@ -548,13 +510,9 @@ class AgentControlLoopArtifactVersion(StrictModel):
     status: Literal["draft", "verified", "committed"]
     round_number: int = Field(default=1, ge=1, le=24)
     summary: str = Field(min_length=1, max_length=3_000)
-    findings: list[AgentControlLoopArtifactFinding] = Field(
-        default_factory=list, max_length=10
-    )
+    findings: list[AgentControlLoopArtifactFinding] = Field(default_factory=list, max_length=10)
     follow_ups: list[str] = Field(default_factory=list, max_length=4)
-    evidence_gaps: list[AgentControlLoopEvidenceGap] = Field(
-        default_factory=list, max_length=20
-    )
+    evidence_gaps: list[AgentControlLoopEvidenceGap] = Field(default_factory=list, max_length=20)
     source_file_refs: list[str] = Field(default_factory=list, max_length=20)
     finding_count: int = Field(ge=0, le=10)
     parent_version: int | None = Field(default=None, ge=1, le=23)
@@ -641,9 +599,7 @@ class AgentControlLoopBusinessRecord(StrictModel):
     total_cases: int = Field(ge=0, le=1_000_000)
     passed_cases: int = Field(ge=0, le=1_000_000)
     compatibility_issue_count: int = Field(ge=0, le=100)
-    compatibility_issue_environments: list[str] = Field(
-        default_factory=list, max_length=24
-    )
+    compatibility_issue_environments: list[str] = Field(default_factory=list, max_length=24)
     rules_hit: list[str] = Field(default_factory=list, max_length=12)
     base_risk_level: Literal["none", "minor", "major", "severe"]
     compatibility_risk_level: Literal["none", "minor", "severe"]
@@ -657,9 +613,7 @@ class AgentControlLoopBusinessRecord(StrictModel):
 class AgentControlLoopLegalRuleAssessment(StrictModel):
     """One source-derived rule result for one fixed Legal-020 document."""
 
-    assessment_id: str = Field(
-        pattern=r"^legal-assessment-doc-[0-9]{2}-[rml][0-9]{2}$"
-    )
+    assessment_id: str = Field(pattern=r"^legal-assessment-doc-[0-9]{2}-[rml][0-9]{2}$")
     rule_id: str = Field(pattern=r"^[RML][0-9]{2}$")
     rule_name: str = Field(min_length=1, max_length=180)
     rule_level: Literal["high", "medium", "low"]
@@ -685,9 +639,7 @@ class AgentControlLoopLegalDocumentReview(StrictModel):
     unverifiable_count: int = Field(ge=0, le=21)
     signing_evidence_status: Literal["present", "absent", "unverifiable"]
     summary: str = Field(min_length=1, max_length=800)
-    assessments: list[AgentControlLoopLegalRuleAssessment] = Field(
-        min_length=21, max_length=21
-    )
+    assessments: list[AgentControlLoopLegalRuleAssessment] = Field(min_length=21, max_length=21)
 
 
 class AgentControlLoopLegalReviewOutcome(StrictModel):
@@ -707,12 +659,92 @@ class AgentControlLoopLegalReviewOutcome(StrictModel):
     critical_unverifiable_count: int = Field(ge=0, le=126)
     signing_evidence_count: int = Field(ge=0, le=6)
     human_review_required: bool
-    signing_status: Literal[
-        "evidence_present", "evidence_incomplete", "invalid"
+    signing_status: Literal["evidence_present", "evidence_incomplete", "invalid"]
+    documents: list[AgentControlLoopLegalDocumentReview] = Field(default_factory=list, max_length=6)
+    external_action: Literal["none"] = "none"
+
+
+class AgentControlLoopCandidateConditionAssessment(StrictModel):
+    """One source-derived JD condition result for one candidate and role."""
+
+    assessment_id: str = Field(pattern=r"^candidate-assessment-[a-z0-9-]{6,100}$")
+    role_id: Literal["merchant_bd", "text_evaluation"]
+    candidate_id: str = Field(pattern=r"^CAND-[0-9]{2}$")
+    candidate_name: str = Field(min_length=1, max_length=80)
+    condition_id: str = Field(pattern=r"^[A-Z][A-Z0-9-]{2,79}$")
+    condition_type: Literal[
+        "responsibility",
+        "default_threshold",
+        "required",
+        "preferred",
+        "bonus",
     ]
-    documents: list[AgentControlLoopLegalDocumentReview] = Field(
-        default_factory=list, max_length=6
+    condition_label: str = Field(min_length=1, max_length=180)
+    jd_source_file_ref: str = Field(min_length=1, max_length=120)
+    jd_locator: str = Field(min_length=1, max_length=180)
+    jd_excerpt: str = Field(min_length=1, max_length=1_000)
+    resume_source_file_ref: str = Field(min_length=1, max_length=120)
+    resume_locator: str = Field(min_length=1, max_length=180)
+    resume_excerpt: str = Field(min_length=1, max_length=1_000)
+    resume_evidence_present: bool
+    status: Literal["met", "not_met", "unverifiable", "human_exception_required"]
+    fact: str = Field(min_length=1, max_length=800)
+    judgment: str = Field(min_length=1, max_length=800)
+    reason: str = Field(min_length=1, max_length=800)
+    owner: str = Field(min_length=1, max_length=160)
+    review_action: str = Field(min_length=1, max_length=800)
+    exit_condition: str = Field(min_length=1, max_length=800)
+
+
+class AgentControlLoopCandidateRoleReview(StrictModel):
+    """All parsed JD conditions for one candidate in one role."""
+
+    review_id: str = Field(pattern=r"^candidate-review-[a-z0-9-]{6,80}$")
+    role_id: Literal["merchant_bd", "text_evaluation"]
+    role_name: str = Field(min_length=1, max_length=120)
+    jd_source_file_ref: str = Field(min_length=1, max_length=120)
+    candidate_id: str = Field(pattern=r"^CAND-[0-9]{2}$")
+    candidate_name: str = Field(min_length=1, max_length=80)
+    resume_source_file_ref: str = Field(min_length=1, max_length=120)
+    recommendation: Literal[
+        "recommended_for_human_review",
+        "explicit_hard_gap",
+        "insufficient_evidence",
+        "exception_review_required",
+    ]
+    condition_count: int = Field(ge=1, le=40)
+    met_count: int = Field(ge=0, le=40)
+    not_met_count: int = Field(ge=0, le=40)
+    unverifiable_count: int = Field(ge=0, le=40)
+    human_exception_count: int = Field(ge=0, le=40)
+    summary: str = Field(min_length=1, max_length=800)
+    assessments: list[AgentControlLoopCandidateConditionAssessment] = Field(
+        min_length=1, max_length=40
     )
+
+
+class AgentControlLoopCandidateReviewOutcome(StrictModel):
+    """Candidate-review projection kept separate from file-verifier status."""
+
+    outcome_id: str = Field(pattern=r"^candidate-review-outcome-[a-z0-9-]{3,80}$")
+    status: Literal["review_required", "invalid"]
+    decision: str = Field(min_length=1, max_length=300)
+    summary: str = Field(min_length=1, max_length=1_000)
+    role_count: int = Field(ge=0, le=2)
+    candidate_count: int = Field(ge=0, le=5)
+    review_count: int = Field(ge=0, le=10)
+    assessment_count: int = Field(ge=0, le=200)
+    met_count: int = Field(ge=0, le=200)
+    not_met_count: int = Field(ge=0, le=200)
+    unverifiable_count: int = Field(ge=0, le=200)
+    human_exception_count: int = Field(ge=0, le=200)
+    recommended_for_human_review_count: int = Field(ge=0, le=10)
+    explicit_hard_gap_count: int = Field(ge=0, le=10)
+    insufficient_evidence_count: int = Field(ge=0, le=10)
+    exception_review_required_count: int = Field(ge=0, le=10)
+    human_review_required: Literal[True] = True
+    fairness_evaluated: Literal[False] = False
+    reviews: list[AgentControlLoopCandidateRoleReview] = Field(default_factory=list, max_length=10)
     external_action: Literal["none"] = "none"
 
 
@@ -720,9 +752,7 @@ class AgentControlLoopBusinessGateOutcome(StrictModel):
     """A business decision projected independently from deterministic checks."""
 
     outcome_id: str = Field(pattern=r"^business-outcome-[a-z0-9-]{3,80}$")
-    outcome_kind: Literal["release_readiness", "legal_delegation_review"] = (
-        "release_readiness"
-    )
+    outcome_kind: Literal["release_readiness", "legal_delegation_review"] = "release_readiness"
     status: Literal["passed", "failed", "invalid"]
     decision: str = Field(min_length=1, max_length=300)
     summary: str = Field(min_length=1, max_length=800)
@@ -732,9 +762,7 @@ class AgentControlLoopBusinessGateOutcome(StrictModel):
     auxiliary_metrics: list[AgentControlLoopBusinessMetric] = Field(
         default_factory=list, max_length=30
     )
-    records: list[AgentControlLoopBusinessRecord] = Field(
-        default_factory=list, max_length=100
-    )
+    records: list[AgentControlLoopBusinessRecord] = Field(default_factory=list, max_length=100)
     external_action: Literal["none"] = "none"
 
 
@@ -772,6 +800,7 @@ class AgentControlLoopWorkspaceArtifact(StrictModel):
     self_test: AgentControlLoopArtifactSelfTest | None = None
     business_gate_outcome: AgentControlLoopBusinessGateOutcome | None = None
     legal_review_outcome: AgentControlLoopLegalReviewOutcome | None = None
+    candidate_review_outcome: AgentControlLoopCandidateReviewOutcome | None = None
     download_path: str = Field(min_length=1, max_length=300)
     created_at: datetime
     original_inputs_modified: Literal[False] = False
@@ -801,6 +830,7 @@ class AgentControlLoopEffectReceipt(StrictModel):
     prohibited_side_effects: list[str] = Field(default_factory=list, max_length=12)
     business_gate_outcome: AgentControlLoopBusinessGateOutcome | None = None
     legal_review_outcome: AgentControlLoopLegalReviewOutcome | None = None
+    candidate_review_outcome: AgentControlLoopCandidateReviewOutcome | None = None
     created_at: datetime
     external_action: Literal["none"] = "none"
 
@@ -812,9 +842,7 @@ class AgentControlLoopCommit(StrictModel):
     artifact_id: str = Field(pattern=r"^artifact-[0-9a-f]{12}$")
     artifact_version: int = Field(ge=1, le=24)
     operation: Literal["commit", "rollback"] = "commit"
-    parent_commit_id: str | None = Field(
-        default=None, pattern=r"^commit-[0-9a-f]{12}$"
-    )
+    parent_commit_id: str | None = Field(default=None, pattern=r"^commit-[0-9a-f]{12}$")
     summary: str = Field(min_length=1, max_length=1_000)
     committed_at: datetime
     external_action: Literal["none"] = "none"
@@ -825,24 +853,16 @@ class AgentControlLoopControlRequest(StrictModel):
     idempotency_key: str = Field(min_length=8, max_length=160)
     expected_version: int = Field(ge=1)
     instruction: str | None = Field(default=None, max_length=2_000)
-    branch_id: str | None = Field(
-        default=None, pattern=r"^branch-[0-9a-f]{12}$"
-    )
+    branch_id: str | None = Field(default=None, pattern=r"^branch-[0-9a-f]{12}$")
     artifact_version: int | None = Field(default=None, ge=1, le=24)
     decision_action: AgentControlLoopDecisionAction | None = None
     decision_request_id: str | None = Field(
         default=None, pattern=r"^decision-request-[0-9a-f]{12}$"
     )
-    finding_id: str | None = Field(
-        default=None, pattern=r"^finding-[0-9a-f]{12}$"
-    )
-    resolution_id: str | None = Field(
-        default=None, pattern=r"^resolution-[0-9a-f]{12}$"
-    )
+    finding_id: str | None = Field(default=None, pattern=r"^finding-[0-9a-f]{12}$")
+    resolution_id: str | None = Field(default=None, pattern=r"^resolution-[0-9a-f]{12}$")
     selected_option_id: AgentControlLoopDecisionOptionId | None = None
-    selected_candidate_id: str | None = Field(
-        default=None, pattern=r"^candidate-[0-9a-f]{12}$"
-    )
+    selected_candidate_id: str | None = Field(default=None, pattern=r"^candidate-[0-9a-f]{12}$")
     candidate_digest: str | None = Field(default=None, max_length=128)
     source_revision: str | None = Field(default=None, max_length=128)
     feedback: str | None = Field(default=None, max_length=2_000)
@@ -872,10 +892,7 @@ class AgentControlLoopControlRequest(StrictModel):
         normalized = value.strip()
         if not normalized:
             return None
-        if any(
-            ord(character) < 32 and character not in "\n\t"
-            for character in normalized
-        ):
+        if any(ord(character) < 32 and character not in "\n\t" for character in normalized):
             raise ValueError("decision feedback contains invalid content")
         return normalized
 

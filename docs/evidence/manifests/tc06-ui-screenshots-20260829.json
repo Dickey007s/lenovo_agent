@@ -1,0 +1,38 @@
+{
+  "schema_version": "tc06-ui-screenshots.v1",
+  "captured_at": "2026-08-29T01:32:56+08:00",
+  "capture_method": "Playwright system-browser on the ordinary three-column page; no CSS injection or content rewrite. The browser-only directory state expands the 人力招聘 folder so both JD files and all five resumes are visible. The main workspace is scrolled to the server-shaped candidate review outcome. This display state does not submit selected_file_refs or change the whole_workspace Run scope.",
+  "source_fixture": "docs/evidence/manifests/tc06-public-candidate-review-outcome-20260829.json",
+  "screenshots": [
+    {
+      "path": "docs/evidence/screenshots/tc06-source-derived-candidate-review-desktop.png",
+      "viewport": "1440x1100",
+      "width": 1440,
+      "height": 1100,
+      "bytes": 154942,
+      "sha256": "53dda7d92e72f6ae5a7dce70bbd9883517d777db0a7b0db79e04d5bcf254763d"
+    },
+    {
+      "path": "docs/evidence/screenshots/tc06-source-derived-candidate-review-mobile.png",
+      "viewport": "390px full-page capture",
+      "width": 390,
+      "height": 10084,
+      "bytes": 582320,
+      "sha256": "1bda7f4619114c5445ebc5eae6a21ec99643512c75b6f83f410c3a9278601e4e"
+    }
+  ],
+  "proves": [
+    "The first visible statement says this is a human-review aid rather than a hiring or rejection decision.",
+    "Source and artifact verification, matching advice and the pending HR decision are separate visible states.",
+    "The dynamic 32 met, 6 not_met, 71 unverifiable and 1 human_exception_required facts are projected from the public outcome fixture.",
+    "The browser-only folder state shows two JD files and five resumes without changing the server-owned whole_workspace scope.",
+    "Candidate cards disclose condition-level source facts and human follow-up without presenting a green Artifact as a hiring decision.",
+    "The tested 1440px desktop and 390px mobile layouts have no page-level horizontal overflow."
+  ],
+  "does_not_prove": [
+    "User comprehension, recruiter decision quality or reduced decision time",
+    "Fairness, absence of bias, background checks or identity verification",
+    "A formal hiring decision, ATS write, candidate notification or any external action",
+    "Production browser coverage, a general ATS adapter, multi-Worker execution or Connector access"
+  ]
+}

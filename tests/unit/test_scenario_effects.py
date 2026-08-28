@@ -9,10 +9,12 @@ import shutil
 import subprocess
 import sys
 import zipfile
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
 
+from services.api.app.application import scenario_effects as scenario_effects_module
 from services.api.app.application.benchmark_workspace_catalog import (
     BenchmarkWorkspaceCatalog,
 )
@@ -667,13 +669,46 @@ def test_candidate_legal_and_release_outputs_keep_human_gates_and_source_facts(
     catalog: BenchmarkWorkspaceCatalog,
 ) -> None:
     _, candidates = _execute("TC-06", catalog)
-    assert len(candidates.artifacts) == 2
-    for artifact in candidates.artifacts:
+    assert [artifact.file_name for artifact in candidates.artifacts] == [
+        "外卖商户BD岗位辅助筛选报告.docx",
+        "文本评测岗位辅助筛选报告.docx",
+        "候选人岗位条件逐项台账.csv",
+    ]
+    for artifact in candidates.artifacts[:2]:
         with zipfile.ZipFile(io.BytesIO(artifact.content)) as package:
             document = package.read("word/document.xml").decode("utf-8")
-        assert "不作自动录用决定" in document
+        assert "不是录用或淘汰决定" in document
         assert all(name in document for name in ("周伦", "孙博文", "李雨桐", "王琳达", "赵晨曦"))
         assert "@" not in document
+        assert len(artifact.source_file_refs) == 6
+    ledger = candidates.artifacts[2]
+    assert len(ledger.source_file_refs) == 7
+    assert len(ledger.content.decode("utf-8-sig").splitlines()) == 111
+    outcome = candidates.artifacts[0].candidate_review_outcome
+    assert outcome is not None
+    assert outcome.assessment_count == 110
+    assert outcome.human_exception_count == 1
+    assert outcome.human_review_required is True
+    assert outcome.fairness_evaluated is False
+    assert all(
+        artifact.candidate_review_outcome == outcome
+        for artifact in candidates.artifacts
+    )
+    candidate_fixture = json.loads(
+        (
+            Path(__file__).resolve().parents[2]
+            / "docs"
+            / "evidence"
+            / "manifests"
+            / "tc06-public-candidate-review-outcome-20260829.json"
+        ).read_text(encoding="utf-8")
+    )
+    assert candidate_fixture["candidate_review_outcome"] == outcome.model_dump(
+        mode="json"
+    )
+    assert candidate_fixture["checks"] == [
+        check.model_dump(mode="json") for check in candidates.artifacts[0].checks
+    ]
 
     _, legal = _execute("TC-07", catalog)
     assert [artifact.file_name for artifact in legal.artifacts] == [
@@ -728,6 +763,44 @@ def test_candidate_legal_and_release_outputs_keep_human_gates_and_source_facts(
     assert release_document.count("<w:tbl>") >= 6
     assert release.artifacts[0].business_gate_outcome is not None
     assert release.artifacts[0].business_gate_outcome.failed_gate_count == 4
+
+
+def test_tc06_verifier_failure_keeps_all_artifacts_red_and_blocks_hr_use(
+    catalog: BenchmarkWorkspaceCatalog, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    build_candidate_review = scenario_effects_module.build_candidate_review
+
+    def fail_ledger_check(sources):
+        build = build_candidate_review(sources)
+        checks = tuple(
+            replace(
+                check,
+                passed=False,
+                label="逐项台账未通过",
+                detail="测试注入：台账状态与批准来源重算不一致。",
+            )
+            if check.check_id == "check-candidate-ledger-content"
+            else check
+            for check in build.checks
+        )
+        return replace(build, checks=checks)
+
+    monkeypatch.setattr(
+        scenario_effects_module, "build_candidate_review", fail_ledger_check
+    )
+    spec = next(item for item in SCENARIO_EFFECT_SPECS if item.scenario_id == "TC-06")
+    execution = ScenarioEffectEngine().execute(spec.instruction, catalog)
+
+    assert execution is not None and execution.status == "failed"
+    assert len(execution.artifacts) == 3
+    assert all(item.verifier_status == "failed" for item in execution.artifacts)
+    assert "所有确定性效果门通过" not in execution.result
+    for artifact in execution.artifacts:
+        assert "当前匹配建议不得采用" in "\n".join(artifact.key_outputs)
+        assert "不能用于招聘复核" in (artifact.review_guidance or "")
+        assert "没有通知、ATS 写入、录用或淘汰动作" in (
+            artifact.execution_summary or ""
+        )
 
 
 def test_onboarding_csv_applies_date_privacy_and_column_rules(

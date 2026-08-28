@@ -349,3 +349,124 @@ def test_legal_review_outcome_round_trips_with_all_six_documents() -> None:
     assert restored_artifact.business_gate_outcome.outcome_kind == "legal_delegation_review"
     assert restored_receipt.legal_review_outcome is not None
     assert restored_receipt.legal_review_outcome.assessment_count == 126
+
+
+def test_candidate_review_outcome_round_trips_without_becoming_a_hiring_decision() -> None:
+    now = datetime.now(timezone.utc)
+    assessment = {
+        "assessment_id": "candidate-assessment-text-evaluation-cand-02-ai-experience",
+        "role_id": "text_evaluation",
+        "candidate_id": "CAND-02",
+        "candidate_name": "孙博文",
+        "condition_id": "TEXT-REQ-AI-EXPERIENCE",
+        "condition_type": "required",
+        "condition_label": "AI 评测或开发经历",
+        "jd_source_file_ref": "jd-text-ref",
+        "jd_locator": "非空行 8",
+        "jd_excerpt": "必要项：1 年以上 AI 相关评测或开发工作经验",
+        "resume_source_file_ref": "resume-sun-ref",
+        "resume_locator": "第 1 页 · 非空行 9",
+        "resume_excerpt": "算法工程师（8 个月）",
+        "resume_evidence_present": True,
+        "status": "not_met",
+        "fact": "可复算 AI 相关经历为 8 个月。",
+        "judgment": "来源显示存在明确条件缺口；这仍不是自动淘汰决定。",
+        "reason": "低于 JD 的 12 个月必要门槛。",
+        "owner": "招聘负责人",
+        "review_action": "核对是否有未写入简历的补充经历。",
+        "exit_condition": "招聘负责人记录人工处置。",
+    }
+    outcome = {
+        "outcome_id": "candidate-review-outcome-hr-001",
+        "status": "review_required",
+        "decision": "这是人工复核建议，不是录用或淘汰决定。",
+        "summary": "1 个岗位、1 名候选人、1 条来源推导条件。",
+        "role_count": 1,
+        "candidate_count": 1,
+        "review_count": 1,
+        "assessment_count": 1,
+        "met_count": 0,
+        "not_met_count": 1,
+        "unverifiable_count": 0,
+        "human_exception_count": 0,
+        "recommended_for_human_review_count": 0,
+        "explicit_hard_gap_count": 1,
+        "insufficient_evidence_count": 0,
+        "exception_review_required_count": 0,
+        "human_review_required": True,
+        "fairness_evaluated": False,
+        "reviews": [
+            {
+                "review_id": "candidate-review-text-evaluation-cand-02",
+                "role_id": "text_evaluation",
+                "role_name": "文本评测",
+                "jd_source_file_ref": "jd-text-ref",
+                "candidate_id": "CAND-02",
+                "candidate_name": "孙博文",
+                "resume_source_file_ref": "resume-sun-ref",
+                "recommendation": "explicit_hard_gap",
+                "condition_count": 1,
+                "met_count": 0,
+                "not_met_count": 1,
+                "unverifiable_count": 0,
+                "human_exception_count": 0,
+                "summary": "存在明确硬条件缺口，但不作自动淘汰。",
+                "assessments": [assessment],
+            }
+        ],
+    }
+    common = {
+        "capability_id": "office-candidate-review",
+        "scenario_id": "TC-06",
+        "source_file_refs": ["jd-text-ref", "resume-sun-ref"],
+        "candidate_review_outcome": outcome,
+        "created_at": now,
+    }
+    artifact = AgentControlLoopWorkspaceArtifact.model_validate(
+        {
+            **common,
+            "artifact_id": "workspace-artifact-a1b2c3d4e5f6",
+            "title": "候选人岗位条件逐项台账",
+            "file_name": "候选人岗位条件逐项台账.csv",
+            "media_type": "text/csv",
+            "size": 2048,
+            "round_number": 1,
+            "validator_id": "validator-candidate-review-v2",
+            "verifier_status": "passed",
+            "checks": [
+                {
+                    "check_id": "check-candidate-dynamic-outcome",
+                    "label": "四态与建议动态汇总",
+                    "passed": True,
+                    "detail": "逐条件来源重算与成果一致。",
+                }
+            ],
+            "summary": "一条条件记录可独立复算。",
+            "download_path": "/v1/harness/runs/run-1/artifacts/artifact-1",
+        }
+    )
+    receipt = AgentControlLoopEffectReceipt.model_validate(
+        {
+            **common,
+            "receipt_id": "effect-receipt-a1b2c3d4e5f6",
+            "status": "passed",
+            "state": "冻结批准来源。",
+            "action": "生成辅助筛选报告与台账。",
+            "observation": "确定性检查通过，最终 HR 决定仍待人工处理。",
+            "cost": "0 次额外模型调用。",
+            "result": "不作自动录用或淘汰。",
+            "artifact_ids": [artifact.artifact_id],
+        }
+    )
+
+    restored_artifact = AgentControlLoopWorkspaceArtifact.model_validate_json(
+        artifact.model_dump_json()
+    )
+    restored_receipt = AgentControlLoopEffectReceipt.model_validate_json(
+        receipt.model_dump_json()
+    )
+    assert restored_artifact.candidate_review_outcome is not None
+    assert restored_artifact.candidate_review_outcome.reviews[0].assessments[0].status == "not_met"
+    assert restored_receipt.candidate_review_outcome is not None
+    assert restored_receipt.candidate_review_outcome.human_review_required is True
+    assert restored_receipt.candidate_review_outcome.fairness_evaluated is False
