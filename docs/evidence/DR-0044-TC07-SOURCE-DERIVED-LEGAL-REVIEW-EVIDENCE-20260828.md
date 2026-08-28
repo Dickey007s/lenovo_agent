@@ -41,6 +41,7 @@
 - E2E 在 1440×1100 的普通三栏状态读取真实 grid geometry：列表为一列，或每张卡至少 320 px；展开事实为一列，或每格至少 300 px；所有文件名不超过两行。390×844 必须单列，页面、法务结果区和文档列表的横向溢出均为 0。
 - 本地收尾门为 TC-07 Playwright `3 passed`，另有带截图的 canonical `1 passed`；`pnpm --dir apps/web lint`、`pnpm --dir apps/web build`、`uv run ruff check .` 和 `git diff --check` 均通过。
 - 新桌面图 SHA-256 为 `a87a6886ed3dc0d725c2417a9e77f3ffe912f849f3b67be01f0d0886e4124faa`，左栏展开法务规则与六份委托书，中央只展开 DOC-02，文件名为一行，规则事实为单列；移动图继续为 390 px 单列。截图与自动化不证明用户理解改善。
+- 后续 [PR #60](https://github.com/Dickey007s/lenovo_agent/pull/60) 的远端 `durable-agent-control-loop` [run `33191280014` / job `98917081022`](https://github.com/Dickey007s/lenovo_agent/actions/runs/33191280014/job/98917081022) 使用 PostgreSQL 17.11，结果为 `6 passed in 14.16s`。它证明既有顺序持久化门没有因纯前台修正回归，不证明新的后端能力。
 
 ## 不能支持的结论
 
