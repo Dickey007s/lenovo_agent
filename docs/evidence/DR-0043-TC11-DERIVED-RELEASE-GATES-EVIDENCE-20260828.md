@@ -2,7 +2,7 @@
 
 ## 当前结论
 
-`Limited Verified`。严格来源合同、逐功能风险推导、来源行变异、正式 Gate 与辅助指标分离、DOCX/CSV 下载解析、失败不伪绿前台、真实 `deepseek-v4-pro` Run 和 PostgreSQL 顺序恢复均已验证。实现由 [PR #57](https://github.com/Dickey007s/lenovo_agent/pull/57) 交付；远端门以该 PR 的实际检查为准。
+`Limited Verified`。严格来源合同、逐功能风险推导、来源行变异、正式 Gate 与辅助指标分离、DOCX/CSV 下载解析、失败不伪绿前台、真实 `deepseek-v4-pro` Run 和 PostgreSQL 顺序恢复均已验证。第一版由 [PR #57](https://github.com/Dickey007s/lenovo_agent/pull/57) 交付；独立验收发现的动态风险总数与 PRD 等级修正也已通过完整 Effect、来源变异、全量 Python 与浏览器回归。
 
 ## 历史基线为何不足
 
@@ -26,7 +26,8 @@
 
 ## 真实 Provider 与 PostgreSQL
 
-- Run：`harness:d1a3d9fca21d4e2299ac308bbaf73e1e`；健康状态为 `model=deepseek-v4-pro`、`checkpoint=postgres`、`task_store=postgres`。
+- Run：`harness:d1a3d9fca21d4e2299ac308bbaf73e1e`；Owner header 为 `X-User-Id: tc11-live-20260828`。创建与复读均使用这个精确 header；用 `demo_user` 查询“不存在”是 Owner 隔离的预期结果。
+- 健康状态为 `model=deepseek-v4-pro`、`checkpoint=postgres`、`task_store=postgres`。
 - Planner `called=true/output_used=true/13321 ms`；Analyst `called=true/output_used=true/27304 ms`。
 - Runtime 使用 1 轮、4 份已核对文件、2 次模型调用、43255 ms active elapsed。
 - 确定性效果生成两份 passed Artifact，共享 9 个唯一检查；业务 Gate 独立为 failed。整个 Run 因额外模型分支保持 `waiting_input`，不能把 Artifact 通过冒充 Run `completed`。
@@ -50,6 +51,15 @@
 - `pnpm --dir apps/web exec playwright test e2e/harness-workbench.spec.ts`：`39 passed`，其中 TC-11 正向双状态和强制 Verifier 失败负向均通过。
 - `git diff --check`：通过；仅有工作树行尾转换提示，无空白错误。
 - PR #57 首次远端 PostgreSQL Run `33180279124` 暴露集成测试只执行 `200` 次 `sleep(0)`、没有按真实耗时等待后台 Effect 的测试缺陷；失败记录保留。修复为有界 wall-clock 轮询且每次 `runtime.get` 独立限时后，远端 Run `33180513835` 为 `5 passed in 10.91s`，`durable-agent-control-loop` 实际通过。这修复的是等待契约，不通过扩大 API read timeout 掩盖事件循环阻塞。
+
+## 独立验收二次修正
+
+- 独立源码验收发现 `check-release-risk-ledger` 仍要求风险总数固定为 8，合法来源修复会被生产 Effect 错判为失败；DOCX、Artifact 摘要与复核引导也残留固定“8 项风险”“5 项未提测”。
+- 修正后 Verifier 从 `records[]` 动态复算记录唯一性、三档风险计数、非零风险总数和基础/兼容风险的唯一最高等级，不再检查固定样本总数。
+- F02 功能与兼容问题均合法修复后，完整 `ScenarioEffectEngine` 仍为 passed，两份 Artifact 均通过；业务台账从 8 项风险动态变为 7 项，严重从 4 降为 3，CSV 仍保持 18 行，DOCX 与前台摘要不再残留“8 项风险”。四条正式 Gate 仍全部失败，因为 F02 原先的“有条件通过”已经计入 P0 可接受结论。
+- PRD 原因类型的基础等级现在来自等级单元格。“功能缺陷”改为“次要”后 F05 随来源降为次要；未知等级或同时包含主要/次要会以 `prd-reason-level-invalid` fail closed。
+- 二次修正本地门：TC-11/Scenario/合同定向 `59 passed`；真实 PostgreSQL 全量 Python `157 passed in 260.58s`；TC-11 Playwright `3 passed`；完整 Playwright `40 passed`；Ruff、Web lint 与 Next.js production build 均通过。
+- 这次修正不回写旧 Run；上面的 live Run 继续描述固定原始 `pm-014` 的 8 项风险事实。
 
 ## 不能支持的结论
 

@@ -751,7 +751,8 @@ Branch validation、Result citation membership，以及 memory 或 PostgreSQL Sn
 
 **Agent 路径：** Planner 与 Analyst 仍负责从整库选择证据并形成可审查分析；固定 TC-11
 效果门另外冻结 `pm-014` 的四份批准输入。服务端先校验 PRD 18 项功能和三张 13 项执行表，
-再按 PRD 优先级、问题原因与兼容异常环境推导逐功能风险，最后聚合正式上线 Gate。这个路径
+再从 PRD 原因规则自己的等级单元格、功能优先级、测试事实与兼容异常环境推导逐功能风险，
+最后聚合正式上线 Gate。风险和未提测数量由 18 行台账动态汇总；未知/歧义等级直接失败。这个路径
 没有依赖功能名称名单，也没有启动并行 Worker。
 
 **确定性结果：** 四条正式 Gate 分别为 P0 提测 `5/7=71.4%<100%`、P0 已提测可接受结论
@@ -771,7 +772,8 @@ Artifact 与业务 Gate 事实保留，整个 Run 可以继续处于 `waiting_in
 **后端事实：** Artifact 与 EffectReceipt 共享服务端 `business_gate_outcome`；每条 Gate 保存
 分子、分母、运算符、阈值、实际值、结果和来源规则。Artifact `verifier_status`、业务 Gate
 状态与整个 Run 终态是三组不同事实。来源变异测试证明 F17、F05、F02 的等级会随来源行
-变化，而不是样本名单碰巧正确。
+变化；F02 合法修复后完整 Effect 仍通过且风险总数从 8 变为 7，DOCX、CSV 与前台摘要同步，
+不再让固定样本答案进入生产 Verifier。
 
 **证据来源：** `TC-11`、`DR-0043`、`SCENARIO-029`、
 `USER-FEEDBACK-20260828-TC11-DERIVED-RELEASE-GATES`、`FORTE-PINNED-20260825`，以及

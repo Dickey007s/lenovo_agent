@@ -52,6 +52,12 @@ class ReleaseReadinessBuild:
     missing_feature_codes: tuple[str, ...]
     docx_table_count: int
 
+    @property
+    def risk_total(self) -> int:
+        """Return the source-derived count of records with a non-none risk."""
+
+        return sum(self.risk_counts.values())
+
 
 CONFIG_HEADERS = (
     "功能编号",
@@ -289,18 +295,6 @@ def _parse_prd_rules(text: str) -> dict[str, Any]:
         raise ReleaseReadinessValidationError(
             "prd-threshold-invalid", "PRD 的上线或兼容升级阈值无法解析。"
         )
-    reason_levels: dict[str, str] = {}
-    for raw_line in text.splitlines():
-        if not raw_line.startswith("|"):
-            continue
-        cells = [cell.strip() for cell in raw_line.strip().strip("|").split("|")]
-        if len(cells) != 3:
-            continue
-        reason, level_text, _description = cells
-        if reason in {"功能缺陷", "性能问题", "数据一致性问题", "依赖异常"}:
-            reason_levels[reason] = "major"
-        elif reason in {"界面缺陷", "体验缺陷", "兼容性问题", "其它问题"}:
-            reason_levels[reason] = "minor"
     expected_reasons = {
         "功能缺陷",
         "性能问题",
@@ -311,6 +305,29 @@ def _parse_prd_rules(text: str) -> dict[str, Any]:
         "兼容性问题",
         "其它问题",
     }
+    reason_levels: dict[str, str] = {}
+    for raw_line in text.splitlines():
+        if not raw_line.startswith("|"):
+            continue
+        cells = [cell.strip() for cell in raw_line.strip().strip("|").split("|")]
+        if len(cells) != 3:
+            continue
+        reason, level_text, _description = cells
+        if reason not in expected_reasons:
+            continue
+        if reason in reason_levels:
+            raise ReleaseReadinessValidationError(
+                "prd-reason-rule-duplicate",
+                f"PRD 的原因类型规则重复：{reason}。",
+            )
+        has_major = "主要" in level_text
+        has_minor = "次要" in level_text
+        if has_major == has_minor:
+            raise ReleaseReadinessValidationError(
+                "prd-reason-level-invalid",
+                f"PRD 原因类型“{reason}”的基础等级“{level_text}”未知或有歧义。",
+            )
+        reason_levels[reason] = "major" if has_major else "minor"
     if set(reason_levels) != expected_reasons:
         raise ReleaseReadinessValidationError(
             "prd-reason-rules-invalid", "PRD 的原因类型与基础等级表不完整。"
@@ -879,6 +896,8 @@ def _report_docx(
     missing_records = [
         record for record in outcome.records if record.record_id in missing_codes
     ]
+    risk_total = sum(risk_counts.values())
+    missing_total = len(missing_codes)
     tables = [
         (
             ["正式上线 Gate", "分子/分母", "实际值", "标准", "结果", "来源规则"],
@@ -992,13 +1011,13 @@ def _report_docx(
         ("table", tables[1]),
         ("heading", "三、18 项逐功能矩阵"),
         ("table", tables[2]),
-        ("heading", "四、8 项风险"),
+        ("heading", f"四、{risk_total} 项风险"),
         (
             "body",
             f"严重 {risk_counts['severe']} 项、主要 {risk_counts['major']} 项、次要 {risk_counts['minor']} 项；同一功能仅保留最高等级。",
         ),
         ("table", tables[3]),
-        ("heading", "五、5 项未提测功能"),
+        ("heading", f"五、{missing_total} 项未提测功能"),
         ("table", tables[4]),
         ("heading", "六、整改计划"),
         ("body", "先处理严重问题，再处理主要、次要问题，随后补齐未提测功能；不虚构日期、签字或完成状态。"),

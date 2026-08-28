@@ -4,6 +4,10 @@
   "captured_at": "2026-08-28",
   "instruction": "综合 PRD、上线配置、功能测试和兼容测试，给出上线结论与改进计划。",
   "run_id": "harness:d1a3d9fca21d4e2299ac308bbaf73e1e",
+  "owner_header": {
+    "name": "X-User-Id",
+    "value": "tc11-live-20260828"
+  },
   "provider": {
     "model": "deepseek-v4-pro",
     "planner": {
