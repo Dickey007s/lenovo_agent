@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 import asyncio
+import csv
+import io
 import os
 import sys
+import zipfile
 from pathlib import Path
 from uuid import uuid4
 
@@ -27,9 +30,12 @@ from tests.unit.test_scenario_effect_runtime import (
     DashboardPlanner,
     FORTE_ROOT,
     ONBOARDING_INSTRUCTION,
+    TC11_INSTRUCTION,
     TC12_INSTRUCTION,
     OnboardingAnalyst,
     OnboardingPlanner,
+    ReleaseReadinessAnalyst,
+    ReleaseReadinessPlanner,
 )
 from tests.unit.test_harness_runtime import (
     AmbiguousCatalog,
@@ -205,6 +211,112 @@ async def test_postgres_restart_preserves_tc12_real_vitest_artifacts(
             owner, run_id, package.artifact_id
         )
         assert restored_content == original_content
+        assert "content_sha256" not in second.public_snapshot(
+            restored
+        ).model_dump_json()
+    finally:
+        for runtime in reversed(runtimes):
+            await runtime.close()
+        if DATABASE_DSN and run_id:
+            async with await psycopg.AsyncConnection.connect(DATABASE_DSN) as connection:
+                async with connection.cursor() as cursor:
+                    for table in (
+                        "harness_idempotency",
+                        "harness_task_commit",
+                        "harness_artifact_version",
+                        "harness_run_state",
+                    ):
+                        await cursor.execute(
+                            f"DELETE FROM {table} WHERE owner_id = %s",  # nosec B608
+                            (owner,),
+                        )
+
+
+@pytest.mark.asyncio
+async def test_postgres_restart_preserves_tc11_artifacts_and_business_gates(
+    tmp_path: Path,
+) -> None:
+    owner = f"postgres-tc11-release-{uuid4().hex}"
+    run_id = ""
+    runtimes: list[HarnessRuntime] = []
+    workspace_root = tmp_path / "tc11-run-workspaces"
+    try:
+        first = HarnessRuntime(
+            BenchmarkWorkspaceCatalog(FORTE_ROOT),
+            ReleaseReadinessPlanner(),
+            ReleaseReadinessAnalyst(),
+            PostgresHarnessStateStore(DATABASE_DSN),
+            effect_engine=ScenarioEffectEngine(),
+            artifact_store=RunWorkspaceArtifactStore(workspace_root),
+        )
+        runtimes.append(first)
+        await first.setup()
+        started = await first.start(
+            owner,
+            start_request(
+                idempotency_key=f"postgres-tc11-start-{uuid4().hex}",
+                instruction=TC11_INSTRUCTION,
+            ),
+        )
+        run_id = started.run.run_id
+        terminal = await wait_terminal(first, owner, run_id)
+        assert terminal.status == "completed"
+        assert terminal.effect_receipts[0].status == "passed"
+        outcome = terminal.effect_receipts[0].business_gate_outcome
+        assert outcome is not None
+        assert outcome.status == "failed"
+        assert outcome.decision == "不得上线"
+        assert outcome.failed_gate_count == 4
+        assert len(outcome.records) == 18
+        assert len(terminal.workspace_artifacts) == 2
+        originals: dict[str, bytes] = {}
+        for artifact in terminal.workspace_artifacts:
+            assert artifact.verifier_status == "passed"
+            assert artifact.business_gate_outcome == outcome
+            _, originals[artifact.file_name] = await first.get_workspace_artifact(
+                owner, run_id, artifact.artifact_id
+            )
+        await first.close()
+
+        second = HarnessRuntime(
+            BenchmarkWorkspaceCatalog(FORTE_ROOT),
+            ReleaseReadinessPlanner(),
+            ReleaseReadinessAnalyst(),
+            PostgresHarnessStateStore(DATABASE_DSN),
+            effect_engine=ScenarioEffectEngine(),
+            artifact_store=RunWorkspaceArtifactStore(workspace_root),
+        )
+        runtimes.append(second)
+        await second.setup()
+        restored = await second.get(owner, run_id)
+        restored_outcome = restored.effect_receipts[0].business_gate_outcome
+        assert restored_outcome == outcome
+        assert len(restored.workspace_artifacts) == 2
+        restored_by_name = {
+            item.file_name: item for item in restored.workspace_artifacts
+        }
+        for file_name, content in originals.items():
+            artifact = restored_by_name[file_name]
+            assert artifact.business_gate_outcome == outcome
+            _, restored_content = await second.get_workspace_artifact(
+                owner, run_id, artifact.artifact_id
+            )
+            assert restored_content == content
+
+        with zipfile.ZipFile(
+            io.BytesIO(originals["上线合规与风险报告.docx"])
+        ) as package:
+            document = package.read("word/document.xml").decode("utf-8")
+        assert document.count("<w:tbl>") >= 6
+        assert "上线结论：不得上线" in document
+        rows = list(
+            csv.DictReader(
+                io.StringIO(
+                    originals["上线功能风险逐项台账.csv"].decode("utf-8-sig")
+                )
+            )
+        )
+        assert len(rows) == 18
         assert "content_sha256" not in second.public_snapshot(
             restored
         ).model_dump_json()

@@ -683,11 +683,18 @@ def test_candidate_legal_and_release_outputs_keep_human_gates_and_fixed_facts(
     assert "R05" not in legal_document
 
     _, release = _execute("TC-11", catalog)
+    assert [artifact.file_name for artifact in release.artifacts] == [
+        "上线合规与风险报告.docx",
+        "上线功能风险逐项台账.csv",
+    ]
     with zipfile.ZipFile(io.BytesIO(release.artifacts[0].content)) as package:
         release_document = package.read("word/document.xml").decode("utf-8")
-    assert "上线结论：不满足上线条件，不得上线" in release_document
+    assert "上线结论：不得上线" in release_document
     for value in ("71.4%", "93.4%", "86.4%", "85.7%", "89.7%"):
         assert value in release_document
+    assert release_document.count("<w:tbl>") >= 6
+    assert release.artifacts[0].business_gate_outcome is not None
+    assert release.artifacts[0].business_gate_outcome.failed_gate_count == 4
 
 
 def test_onboarding_csv_applies_date_privacy_and_column_rules(

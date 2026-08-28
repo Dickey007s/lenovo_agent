@@ -3479,6 +3479,7 @@ class HarnessRuntime:
                     review_guidance=generated.review_guidance,
                     execution_summary=generated.execution_summary,
                     self_test=generated.self_test,
+                    business_gate_outcome=generated.business_gate_outcome,
                     download_path=(
                         f"/v1/harness/runs/{run_id}/artifacts/{artifact_id}"
                     ),
@@ -3492,6 +3493,16 @@ class HarnessRuntime:
                 "utf-8"
             )
         ).hexdigest()[:12]
+        business_outcomes = [
+            item.business_gate_outcome
+            for item in records
+            if item.business_gate_outcome is not None
+        ]
+        business_outcome = business_outcomes[0] if business_outcomes else None
+        if business_outcomes and any(
+            item != business_outcome for item in business_outcomes[1:]
+        ):
+            raise HarnessError("同一效果的业务 Gate 事实不一致")
         receipt = AgentControlLoopEffectReceipt(
             receipt_id=receipt_id,
             capability_id=execution.capability_id,
@@ -3505,6 +3516,7 @@ class HarnessRuntime:
             source_file_refs=list(execution.source_file_refs),
             artifact_ids=[item.artifact_id for item in records],
             prohibited_side_effects=list(execution.prohibited_side_effects),
+            business_gate_outcome=business_outcome,
             created_at=now,
         )
 

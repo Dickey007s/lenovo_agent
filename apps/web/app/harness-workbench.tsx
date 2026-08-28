@@ -392,6 +392,68 @@ type ArtifactTestSuite = {
   test_ids: string[];
 };
 
+type BusinessGate = {
+  gate_id: string;
+  label: string;
+  passed: boolean;
+  numerator: number;
+  denominator: number;
+  operator: ">=" | "==" | "<=";
+  threshold: number;
+  actual: number;
+  unit: "percent" | "count";
+  formula: string;
+  source_rule: string;
+  result: string;
+};
+
+type BusinessMetric = {
+  metric_id: string;
+  label: string;
+  numerator: number;
+  denominator: number;
+  value: number;
+  unit: "percent" | "count";
+  formula: string;
+  source_note: string;
+};
+
+type BusinessRecord = {
+  record_id: string;
+  title: string;
+  module: string;
+  priority: string;
+  owner: string;
+  configuration_status: string;
+  test_status: string;
+  test_reason: string;
+  total_cases: number;
+  passed_cases: number;
+  compatibility_issue_count: number;
+  compatibility_issue_environments: string[];
+  rules_hit: string[];
+  base_risk_level: "none" | "minor" | "major" | "severe";
+  compatibility_risk_level: "none" | "minor" | "severe";
+  final_risk_level: "none" | "minor" | "major" | "severe";
+  affected_gate_ids: string[];
+  source_locations: string[];
+  remediation_action: string;
+  exit_condition: string;
+};
+
+type BusinessGateOutcome = {
+  outcome_id: string;
+  status: "passed" | "failed" | "invalid";
+  decision: string;
+  summary: string;
+  total_gate_count: number;
+  failed_gate_count: number;
+  gates: BusinessGate[];
+  auxiliary_metrics: BusinessMetric[];
+  records: BusinessRecord[];
+  external_action: "none";
+};
+
 type WorkspaceArtifact = {
   artifact_id: string;
   capability_id: string;
@@ -417,6 +479,7 @@ type WorkspaceArtifact = {
   review_guidance: string | null;
   execution_summary: string | null;
   self_test: ArtifactSelfTest | null;
+  business_gate_outcome: BusinessGateOutcome | null;
   download_path: string;
   created_at: string;
   original_inputs_modified: false;
@@ -437,6 +500,7 @@ type EffectReceipt = {
   source_file_refs: string[];
   artifact_ids: string[];
   prohibited_side_effects: string[];
+  business_gate_outcome: BusinessGateOutcome | null;
   created_at: string;
   external_action: "none";
 };
@@ -1475,6 +1539,104 @@ function normalizeArtifactTestSuite(value: unknown): ArtifactTestSuite | null {
   return { suite_id: suiteId, label, test_files: testFiles, test_count: testCount, test_ids: testIds };
 }
 
+function normalizeBusinessGate(value: unknown): BusinessGate | null {
+  if (!value || typeof value !== "object") return null;
+  const raw = value as Record<string, unknown>;
+  const gateId = asText(raw.gate_id);
+  const operator = asText(raw.operator);
+  const unit = asText(raw.unit);
+  const denominator = asNumber(raw.denominator);
+  if (!gateId || typeof raw.passed !== "boolean" || ![">=", "==", "<="].includes(operator) || !["percent", "count"].includes(unit) || denominator <= 0) return null;
+  return {
+    gate_id: gateId,
+    label: asText(raw.label),
+    passed: raw.passed,
+    numerator: asNumber(raw.numerator),
+    denominator,
+    operator: operator as BusinessGate["operator"],
+    threshold: asNumber(raw.threshold),
+    actual: asNumber(raw.actual),
+    unit: unit as BusinessGate["unit"],
+    formula: asText(raw.formula),
+    source_rule: asText(raw.source_rule),
+    result: asText(raw.result),
+  };
+}
+
+function normalizeBusinessMetric(value: unknown): BusinessMetric | null {
+  if (!value || typeof value !== "object") return null;
+  const raw = value as Record<string, unknown>;
+  const metricId = asText(raw.metric_id);
+  const unit = asText(raw.unit);
+  const denominator = asNumber(raw.denominator);
+  if (!metricId || !["percent", "count"].includes(unit) || denominator <= 0) return null;
+  return {
+    metric_id: metricId,
+    label: asText(raw.label),
+    numerator: asNumber(raw.numerator),
+    denominator,
+    value: asNumber(raw.value),
+    unit: unit as BusinessMetric["unit"],
+    formula: asText(raw.formula),
+    source_note: asText(raw.source_note),
+  };
+}
+
+function normalizeBusinessRecord(value: unknown): BusinessRecord | null {
+  if (!value || typeof value !== "object") return null;
+  const raw = value as Record<string, unknown>;
+  const recordId = asText(raw.record_id);
+  const risk = asText(raw.final_risk_level);
+  const baseRisk = asText(raw.base_risk_level);
+  const compatibilityRisk = asText(raw.compatibility_risk_level);
+  if (!recordId || !["none", "minor", "major", "severe"].includes(risk) || !["none", "minor", "major", "severe"].includes(baseRisk) || !["none", "minor", "severe"].includes(compatibilityRisk)) return null;
+  return {
+    record_id: recordId,
+    title: asText(raw.title),
+    module: asText(raw.module),
+    priority: asText(raw.priority),
+    owner: asText(raw.owner),
+    configuration_status: asText(raw.configuration_status),
+    test_status: asText(raw.test_status),
+    test_reason: asText(raw.test_reason),
+    total_cases: asNumber(raw.total_cases),
+    passed_cases: asNumber(raw.passed_cases),
+    compatibility_issue_count: asNumber(raw.compatibility_issue_count),
+    compatibility_issue_environments: asStrings(raw.compatibility_issue_environments),
+    rules_hit: asStrings(raw.rules_hit),
+    base_risk_level: baseRisk as BusinessRecord["base_risk_level"],
+    compatibility_risk_level: compatibilityRisk as BusinessRecord["compatibility_risk_level"],
+    final_risk_level: risk as BusinessRecord["final_risk_level"],
+    affected_gate_ids: asStrings(raw.affected_gate_ids),
+    source_locations: asStrings(raw.source_locations),
+    remediation_action: asText(raw.remediation_action),
+    exit_condition: asText(raw.exit_condition),
+  };
+}
+
+function normalizeBusinessGateOutcome(value: unknown): BusinessGateOutcome | null {
+  if (!value || typeof value !== "object") return null;
+  const raw = value as Record<string, unknown>;
+  const outcomeId = asText(raw.outcome_id);
+  const status = asText(raw.status);
+  if (!outcomeId || !["passed", "failed", "invalid"].includes(status)) return null;
+  const gates = Array.isArray(raw.gates) ? raw.gates.map(normalizeBusinessGate).filter((item): item is BusinessGate => item !== null) : [];
+  const metrics = Array.isArray(raw.auxiliary_metrics) ? raw.auxiliary_metrics.map(normalizeBusinessMetric).filter((item): item is BusinessMetric => item !== null) : [];
+  const records = Array.isArray(raw.records) ? raw.records.map(normalizeBusinessRecord).filter((item): item is BusinessRecord => item !== null) : [];
+  return {
+    outcome_id: outcomeId,
+    status: status as BusinessGateOutcome["status"],
+    decision: asText(raw.decision),
+    summary: asText(raw.summary),
+    total_gate_count: asNumber(raw.total_gate_count),
+    failed_gate_count: asNumber(raw.failed_gate_count),
+    gates,
+    auxiliary_metrics: metrics,
+    records,
+    external_action: "none",
+  };
+}
+
 function normalizeWorkspaceArtifact(value: unknown): WorkspaceArtifact | null {
   if (!value || typeof value !== "object") return null;
   const raw = value as Record<string, unknown>;
@@ -1523,6 +1685,7 @@ function normalizeWorkspaceArtifact(value: unknown): WorkspaceArtifact | null {
     review_guidance: asText(raw.review_guidance) || null,
     execution_summary: asText(raw.execution_summary) || null,
     self_test: selfTest && selfTest.instruction && selfTest.commands.length > 0 ? selfTest : null,
+    business_gate_outcome: normalizeBusinessGateOutcome(raw.business_gate_outcome),
     download_path: asText(raw.download_path),
     created_at: asText(raw.created_at),
     original_inputs_modified: false,
@@ -1550,6 +1713,7 @@ function normalizeEffectReceipt(value: unknown): EffectReceipt | null {
     source_file_refs: asStrings(raw.source_file_refs),
     artifact_ids: asStrings(raw.artifact_ids),
     prohibited_side_effects: asStrings(raw.prohibited_side_effects),
+    business_gate_outcome: normalizeBusinessGateOutcome(raw.business_gate_outcome),
     created_at: asText(raw.created_at),
     external_action: "none",
   };
@@ -2857,6 +3021,9 @@ function LoopView({
     && run.workspace_artifacts.length > 0
     && run.workspace_artifacts.every((artifact) => artifact.verifier_status === "passed");
   const effectConclusionArtifact = run.workspace_artifacts.find((artifact) => artifact.execution_summary) ?? null;
+  const businessGateOutcome = run.workspace_artifacts.find((artifact) => artifact.business_gate_outcome)?.business_gate_outcome
+    ?? run.effect_receipts.find((receipt) => receipt.business_gate_outcome)?.business_gate_outcome
+    ?? null;
   const artifactCheckSummary = summarizeArtifactChecks(run.workspace_artifacts);
   const passedArtifactChecks = artifactCheckSummary.passed;
   const totalArtifactChecks = artifactCheckSummary.total;
@@ -3087,7 +3254,35 @@ function LoopView({
       {run.last_commit && <footer><IconCircleCheck aria-hidden="true" /><span>{run.last_commit.summary}</span><b>{run.commits.length} 次提交记录</b></footer>}
     </section>}
     {run.brief && <section className={`loop-brief is-${run.brief.outcome}`}><IconCircleCheck aria-hidden="true" /><div><span>任务简报</span><h3>{run.brief.summary}</h3><p>外部动作：未发生 · 结果仍需人工复核</p></div></section>}
-    {verifiedEffectReady && effectConclusionArtifact && <section className="loop-effect-conclusion" aria-label="本次任务结语"><IconShieldCheck aria-hidden="true" /><div><span>本次任务结语</span><h3>{effectConclusionArtifact.execution_summary}</h3><p>{effectConclusionArtifact.review_guidance}</p></div><b>{artifactCheckSummary.sameChecklist ? `${run.workspace_artifacts.length} 份成果共享 ${totalArtifactChecks} 项规则检查，${passedArtifactChecks}/${totalArtifactChecks} 通过` : artifactCheckSummary.shared ? `${run.workspace_artifacts.length} 份成果共 ${totalArtifactChecks} 项唯一规则检查，${passedArtifactChecks}/${totalArtifactChecks} 通过` : `${passedArtifactChecks}/${totalArtifactChecks} 项规则检查通过`}</b></section>}
+    {verifiedEffectReady && effectConclusionArtifact && <section className={`loop-effect-conclusion${businessGateOutcome && businessGateOutcome.status !== "passed" ? " is-business-blocked" : ""}`} aria-label="本次任务结语">{businessGateOutcome && businessGateOutcome.status !== "passed" ? <IconAlertTriangle aria-hidden="true" /> : <IconShieldCheck aria-hidden="true" />}<div><span>{businessGateOutcome && businessGateOutcome.status !== "passed" ? "业务结论" : "本次任务结语"}</span><h3>{businessGateOutcome && businessGateOutcome.status !== "passed" ? businessGateOutcome.decision : effectConclusionArtifact.execution_summary}</h3><p>{businessGateOutcome && businessGateOutcome.status !== "passed" ? businessGateOutcome.summary : effectConclusionArtifact.review_guidance}</p></div><b>{businessGateOutcome && businessGateOutcome.status !== "passed" ? `业务 Gate ${businessGateOutcome.failed_gate_count}/${businessGateOutcome.total_gate_count} 未通过` : artifactCheckSummary.sameChecklist ? `${run.workspace_artifacts.length} 份成果共享 ${totalArtifactChecks} 项规则检查，${passedArtifactChecks}/${totalArtifactChecks} 通过` : artifactCheckSummary.shared ? `${run.workspace_artifacts.length} 份成果共 ${totalArtifactChecks} 项唯一规则检查，${passedArtifactChecks}/${totalArtifactChecks} 通过` : `${passedArtifactChecks}/${totalArtifactChecks} 项规则检查通过`}</b></section>}
+  </section>;
+}
+
+function formatBusinessValue(value: number, unit: BusinessGate["unit"] | BusinessMetric["unit"]): string {
+  return unit === "percent" ? `${value.toFixed(1)}%` : `${value} 项`;
+}
+
+function BusinessGateOutcomePanel({ outcome }: { outcome: BusinessGateOutcome }) {
+  const riskLabels: Record<BusinessRecord["final_risk_level"], string> = { none: "无风险项", minor: "次要", major: "主要", severe: "严重" };
+  const riskCounts = outcome.records.reduce((counts, record) => ({ ...counts, [record.final_risk_level]: counts[record.final_risk_level] + 1 }), { none: 0, minor: 0, major: 0, severe: 0 });
+  const invalid = outcome.status === "invalid";
+  const blocked = outcome.status === "failed";
+  return <section className={`business-gate-outcome is-${outcome.status}`} aria-label="业务 Gate 结论" role="status">
+    <header>
+      {outcome.status === "passed" ? <IconCircleCheck aria-hidden="true" /> : <IconAlertTriangle aria-hidden="true" />}
+      <div><span>{invalid ? "来源数据未通过校验" : "业务 Gate 结论"}</span><h3>{outcome.decision}</h3><p>{outcome.summary}</p></div>
+      <b>{invalid ? "不能形成结论" : blocked ? `${outcome.failed_gate_count}/${outcome.total_gate_count} 条未通过` : `${outcome.total_gate_count}/${outcome.total_gate_count} 条通过`}</b>
+    </header>
+    {outcome.gates.length > 0 && <ol className="business-gate-list">{outcome.gates.map((gate, index) => <li key={gate.gate_id} className={gate.passed ? "is-passed" : "is-failed"}>
+      <div className="business-gate-number"><span>{index + 1}</span>{gate.passed ? <IconCheck aria-hidden="true" /> : <IconAlertTriangle aria-hidden="true" />}</div>
+      <div><span>正式上线条件</span><h4>{gate.label}</h4><strong>{formatBusinessValue(gate.actual, gate.unit)} <small>{gate.operator === ">=" ? "至少" : gate.operator === "==" ? "必须等于" : "至多"} {formatBusinessValue(gate.threshold, gate.unit)}</small></strong><p>{gate.result}</p><small>{gate.formula}</small></div>
+    </li>)}</ol>}
+    {outcome.auxiliary_metrics.length > 0 && <details className="business-metrics"><summary><IconEye aria-hidden="true" />查看辅助质量指标<span>不作为正式上线 Gate</span></summary><ul>{outcome.auxiliary_metrics.map((metric) => <li key={metric.metric_id}><div><b>{metric.label}</b><small>{metric.formula}</small></div><strong>{formatBusinessValue(metric.value, metric.unit)}</strong><p>{metric.numerator}/{metric.denominator}</p></li>)}</ul></details>}
+    {outcome.records.length > 0 && <details className="business-ledger"><summary><IconEye aria-hidden="true" />查看 18 项逐功能台账<span>严重 {riskCounts.severe} · 主要 {riskCounts.major} · 次要 {riskCounts.minor} · 无风险项 {riskCounts.none}</span></summary><ol>{outcome.records.map((record) => <li key={record.record_id} className={`is-${record.final_risk_level}`}>
+      <header><b>{record.record_id}</b><div><h4>{record.title}</h4><p>{record.module} · {record.priority} · 负责人 {record.owner}</p></div><strong>{riskLabels[record.final_risk_level]}</strong></header>
+      <dl><div><dt>测试与兼容</dt><dd>{record.test_status} · {record.passed_cases}/{record.total_cases} 用例通过 · {record.compatibility_issue_count} 个异常环境</dd></div><div><dt>为什么这样判</dt><dd>{record.rules_hit.length > 0 ? record.rules_hit.join("；") : "当前来源未命中风险规则。"}</dd></div><div><dt>整改与退出</dt><dd>{record.remediation_action} {record.exit_condition}</dd></div><div><dt>来源位置</dt><dd>{record.source_locations.join("；")}</dd></div></dl>
+    </li>)}</ol></details>}
+    <footer><IconShieldCheck aria-hidden="true" /><span>确定性检查只复核公式、来源归属和成果结构；本次没有执行上线、没有修改配置。</span></footer>
   </section>;
 }
 
@@ -3103,6 +3298,10 @@ function WorkspaceArtifactSection({ artifacts, receipts }: { artifacts: Workspac
   const latestReceipt = receipts.at(-1) ?? null;
   const boundary = latestReceipt && latestReceipt.status !== "passed" ? latestReceipt : null;
   const executionArtifact = artifacts.find((artifact) => artifact.execution_summary) ?? null;
+  const businessGateOutcome = artifacts.find((artifact) => artifact.business_gate_outcome)?.business_gate_outcome
+    ?? latestReceipt?.business_gate_outcome
+    ?? null;
+  const businessBlocked = Boolean(businessGateOutcome && businessGateOutcome.status !== "passed");
   const downloadArtifact = async (artifact: WorkspaceArtifact) => {
     if (!artifact.download_path.startsWith("/v1/harness/runs/")) {
       setDownloadError("成果下载地址未通过客户端边界检查。");
@@ -3127,16 +3326,17 @@ function WorkspaceArtifactSection({ artifacts, receipts }: { artifacts: Workspac
       setDownloading(null);
     }
   };
-  return <section className={`workspace-artifacts${boundary ? " is-bounded" : ""}`} aria-labelledby="workspace-artifacts-title">
+  return <section className={`workspace-artifacts${boundary ? " is-bounded" : ""}${businessBlocked ? " has-business-block" : ""}`} aria-labelledby="workspace-artifacts-title">
     <header>
       <IconFileDescription aria-hidden="true" />
       <div><span>运行工作区</span><h3 id="workspace-artifacts-title">{artifacts.length > 0 ? `Agent 已生成 ${artifacts.length} 份真实成果文件` : "这项任务尚不能生成可信成果"}</h3><p>{artifacts.length > 0 ? "文件已写入本次 Run 的隔离目录，原始 FORTE 文件没有被修改。" : boundary?.result}</p></div>
-      <b>{artifacts.length > 0 ? checkSummary.sameChecklist ? `${artifacts.length} 份成果共享 ${checkSummary.total} 项确定性检查，${checkSummary.passed}/${checkSummary.total} 通过` : checkSummary.shared ? `${artifacts.length} 份成果共 ${checkSummary.total} 项唯一确定性检查，${checkSummary.passed}/${checkSummary.total} 通过` : `${checkSummary.passed}/${checkSummary.total} 项检查通过` : "未伪造结果"}</b>
+      <b>{businessGateOutcome?.status === "failed" ? `业务 Gate ${businessGateOutcome.failed_gate_count}/${businessGateOutcome.total_gate_count} 未通过` : businessGateOutcome?.status === "invalid" ? "来源校验失败" : artifacts.length > 0 ? checkSummary.sameChecklist ? `${artifacts.length} 份成果共享 ${checkSummary.total} 项确定性检查，${checkSummary.passed}/${checkSummary.total} 通过` : checkSummary.shared ? `${artifacts.length} 份成果共 ${checkSummary.total} 项唯一确定性检查，${checkSummary.passed}/${checkSummary.total} 通过` : `${checkSummary.passed}/${checkSummary.total} 项检查通过` : "未伪造结果"}</b>
     </header>
+    {businessGateOutcome && <BusinessGateOutcomePanel outcome={businessGateOutcome} />}
     {executionArtifact && <article className={`workspace-action-result${executionArtifact.verifier_status === "failed" ? " is-failed" : ""}`} aria-label="实际执行边界"><IconShieldCheck aria-hidden="true" /><div><span>这次实际发生了什么</span><h4>{executionArtifact.execution_summary}</h4><p>{executionArtifact.purpose}</p>{latestReceipt && <ul>{latestReceipt.prohibited_side_effects.map((item) => <li key={item}>{item}</li>)}</ul>}</div></article>}
     {artifacts.length > 0 && <ol>{artifacts.map((artifact) => <li key={artifact.artifact_id} className={artifact.verifier_status === "passed" ? "is-passed" : "is-failed"}>
       <div className="workspace-artifact-file"><span><IconFile aria-hidden="true" /></span><div><h4>{artifact.title}</h4><p>{artifact.summary}</p><small>文件：{artifact.file_name} · 第 {artifact.round_number} 轮 · {formatSize(artifact.size)} · {artifact.source_file_refs.length} 份内容来源</small></div></div>
-      <div className="workspace-artifact-status"><b>{artifact.verifier_status === "passed" ? <><IconCheck aria-hidden="true" />确定性检查通过</> : <><IconAlertTriangle aria-hidden="true" />检查未通过</>}</b><span>{artifact.record_count !== null ? `${artifact.record_count} 条记录 · ` : ""}{artifact.checks.filter((check) => check.passed).length}/{artifact.checks.length} 项检查{(checklistUsage.get(artifactChecklistKey(artifact)) ?? 0) > 1 ? " · 使用同一验证清单" : ""}</span></div>
+      <div className="workspace-artifact-status"><b>{artifact.verifier_status === "passed" ? <><IconCheck aria-hidden="true" />确定性检查通过</> : <><IconAlertTriangle aria-hidden="true" />检查未通过</>}</b><span>{artifact.record_count !== null ? `${artifact.record_count} 条记录 · ` : ""}{artifact.checks.filter((check) => check.passed).length}/{artifact.checks.length} 项检查{(checklistUsage.get(artifactChecklistKey(artifact)) ?? 0) > 1 ? " · 使用同一验证清单" : ""}</span>{artifact.business_gate_outcome && <small>只代表公式、来源和文件结构已复核，不代表业务 Gate 通过。</small>}</div>
       <button type="button" onClick={() => void downloadArtifact(artifact)} disabled={downloading !== null}><IconDownload aria-hidden="true" />{downloading === artifact.artifact_id ? "正在下载" : "下载成果"}</button>
       {(artifact.deliverable_type || artifact.covered_period || artifact.statistic_basis || artifact.purpose) && <dl className={`workspace-artifact-semantics${artifact.deliverable_type ? " has-deliverable-type" : ""}`}>
         {artifact.deliverable_type && <div><dt>成果类型</dt><dd>{artifact.deliverable_type}</dd></div>}

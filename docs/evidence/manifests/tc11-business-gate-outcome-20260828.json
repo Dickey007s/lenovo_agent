@@ -1,0 +1,649 @@
+{
+  "outcome_id": "business-outcome-release-readiness",
+  "status": "failed",
+  "decision": "不得上线",
+  "summary": "4/4 条正式上线条件未通过；确定性检查通过不等于可以上线。",
+  "total_gate_count": 4,
+  "failed_gate_count": 4,
+  "gates": [
+    {
+      "gate_id": "business-gate-p0-tested",
+      "label": "P0 功能提测率",
+      "passed": false,
+      "numerator": 5.0,
+      "denominator": 7.0,
+      "operator": ">=",
+      "threshold": 100.0,
+      "actual": 71.4,
+      "unit": "percent",
+      "formula": "已提测 P0 功能数 / PRD P0 功能总数 × 100%",
+      "source_rule": "PRD_v2.5.md 上线条件：P0 功能提测率必须达到 100%。",
+      "result": "5/7 = 71.4%。"
+    },
+    {
+      "gate_id": "business-gate-p0-accepted",
+      "label": "P0 已提测功能测试结论",
+      "passed": false,
+      "numerator": 4.0,
+      "denominator": 5.0,
+      "operator": ">=",
+      "threshold": 100.0,
+      "actual": 80.0,
+      "unit": "percent",
+      "formula": "结论为通过或有条件通过的 P0 功能数 / P0 已提测功能数 × 100%",
+      "source_rule": "PRD_v2.5.md 上线条件：P0 已提测功能结论通过率必须达到 100%。",
+      "result": "4/5 = 80.0%。"
+    },
+    {
+      "gate_id": "business-gate-p1-passed",
+      "label": "P1 已提测功能完成率",
+      "passed": false,
+      "numerator": 2.0,
+      "denominator": 5.0,
+      "operator": ">=",
+      "threshold": 80.0,
+      "actual": 40.0,
+      "unit": "percent",
+      "formula": "结论为通过的 P1 功能数 / P1 已提测功能数 × 100%",
+      "source_rule": "PRD_v2.5.md 上线条件：P1 已提测功能完成率必须达到 80%。",
+      "result": "2/5 = 40.0%。"
+    },
+    {
+      "gate_id": "business-gate-severe-zero",
+      "label": "严重问题清零",
+      "passed": false,
+      "numerator": 4.0,
+      "denominator": 1.0,
+      "operator": "==",
+      "threshold": 0.0,
+      "actual": 4.0,
+      "unit": "count",
+      "formula": "逐功能最终风险等级为严重的功能数",
+      "source_rule": "PRD_v2.5.md 上线条件：严重等级问题必须清零。",
+      "result": "4 项严重问题未清零，不满足上线条件。"
+    }
+  ],
+  "auxiliary_metrics": [
+    {
+      "metric_id": "business-metric-p0-case-pass",
+      "label": "P0 用例通过率",
+      "numerator": 57.0,
+      "denominator": 61.0,
+      "value": 93.4,
+      "unit": "percent",
+      "formula": "通过用例数 / 用例总数 × 100%",
+      "source_note": "辅助质量指标，不是 PRD 正式上线 Gate。"
+    },
+    {
+      "metric_id": "business-metric-p1-case-pass",
+      "label": "P1 用例通过率",
+      "numerator": 38.0,
+      "denominator": 44.0,
+      "value": 86.4,
+      "unit": "percent",
+      "formula": "通过用例数 / 用例总数 × 100%",
+      "source_note": "辅助质量指标，不是 PRD 正式上线 Gate。"
+    },
+    {
+      "metric_id": "business-metric-p2-case-pass",
+      "label": "P2 用例通过率",
+      "numerator": 18.0,
+      "denominator": 21.0,
+      "value": 85.7,
+      "unit": "percent",
+      "formula": "通过用例数 / 用例总数 × 100%",
+      "source_note": "辅助质量指标，不是 PRD 正式上线 Gate。"
+    },
+    {
+      "metric_id": "business-metric-overall-case-pass",
+      "label": "综合用例通过率",
+      "numerator": 113.0,
+      "denominator": 126.0,
+      "value": 89.7,
+      "unit": "percent",
+      "formula": "全部已提测功能通过用例数 / 全部已提测功能用例总数 × 100%",
+      "source_note": "辅助质量指标，不替代 P0/P1 功能结论 Gate。"
+    }
+  ],
+  "records": [
+    {
+      "record_id": "F01",
+      "title": "安全审核开关",
+      "module": "内容安全审核模块",
+      "priority": "P0",
+      "owner": "王磊",
+      "configuration_status": "已提测",
+      "test_status": "通过",
+      "test_reason": "无",
+      "total_cases": 12,
+      "passed_cases": 12,
+      "compatibility_issue_count": 0,
+      "compatibility_issue_environments": [],
+      "rules_hit": [],
+      "base_risk_level": "none",
+      "compatibility_risk_level": "none",
+      "final_risk_level": "none",
+      "affected_gate_ids": [],
+      "source_locations": [
+        "PRD_v2.5.md 第 38 行",
+        "上线配置清单.xlsx 第 3 行",
+        "功能测试报告.xlsx 第 3 行",
+        "线上兼容环境测试报告.xlsx 第 4 行"
+      ],
+      "remediation_action": "由王磊保留当前证据并在发布前复核配置、测试和兼容记录。",
+      "exit_condition": "三份记录仍可追溯且四项正式上线 Gate 均满足。"
+    },
+    {
+      "record_id": "F02",
+      "title": "审核日志查看",
+      "module": "内容安全审核模块",
+      "priority": "P0",
+      "owner": "王磊",
+      "configuration_status": "已提测",
+      "test_status": "有条件通过",
+      "test_reason": "功能缺陷",
+      "total_cases": 15,
+      "passed_cases": 14,
+      "compatibility_issue_count": 1,
+      "compatibility_issue_environments": [
+        "Firefox 124 / macOS 14"
+      ],
+      "rules_hit": [
+        "规则一：P0 功能存在问题，直接判为严重",
+        "规则三：1 个异常环境未达到严重升级阈值"
+      ],
+      "base_risk_level": "severe",
+      "compatibility_risk_level": "minor",
+      "final_risk_level": "severe",
+      "affected_gate_ids": [
+        "business-gate-severe-zero"
+      ],
+      "source_locations": [
+        "PRD_v2.5.md 第 39 行",
+        "上线配置清单.xlsx 第 4 行",
+        "功能测试报告.xlsx 第 4 行",
+        "线上兼容环境测试报告.xlsx 第 5 行"
+      ],
+      "remediation_action": "由王磊修复“功能缺陷”对应问题并重新提测；由王磊修复 1 个异常环境并完成八环境回归。",
+      "exit_condition": "功能测试结论为通过或有条件通过，且 P0 问题清零；八个浏览器与系统组合全部为通过。"
+    },
+    {
+      "record_id": "F03",
+      "title": "违规类型统计",
+      "module": "内容安全审核模块",
+      "priority": "P1",
+      "owner": "赵敏",
+      "configuration_status": "已提测",
+      "test_status": "通过",
+      "test_reason": "无",
+      "total_cases": 8,
+      "passed_cases": 8,
+      "compatibility_issue_count": 0,
+      "compatibility_issue_environments": [],
+      "rules_hit": [],
+      "base_risk_level": "none",
+      "compatibility_risk_level": "none",
+      "final_risk_level": "none",
+      "affected_gate_ids": [],
+      "source_locations": [
+        "PRD_v2.5.md 第 40 行",
+        "上线配置清单.xlsx 第 5 行",
+        "功能测试报告.xlsx 第 5 行",
+        "线上兼容环境测试报告.xlsx 第 6 行"
+      ],
+      "remediation_action": "由赵敏保留当前证据并在发布前复核配置、测试和兼容记录。",
+      "exit_condition": "三份记录仍可追溯且四项正式上线 Gate 均满足。"
+    },
+    {
+      "record_id": "F04",
+      "title": "人工复核队列",
+      "module": "内容安全审核模块",
+      "priority": "P1",
+      "owner": "赵敏",
+      "configuration_status": "已提测",
+      "test_status": "有条件通过",
+      "test_reason": "体验缺陷",
+      "total_cases": 10,
+      "passed_cases": 9,
+      "compatibility_issue_count": 2,
+      "compatibility_issue_environments": [
+        "Firefox 124 / Windows 10",
+        "Firefox 124 / macOS 14"
+      ],
+      "rules_hit": [
+        "规则二：非 P0 的体验缺陷，基础等级为次要",
+        "规则三：2 个异常环境未达到严重升级阈值"
+      ],
+      "base_risk_level": "minor",
+      "compatibility_risk_level": "minor",
+      "final_risk_level": "minor",
+      "affected_gate_ids": [
+        "business-gate-p1-passed"
+      ],
+      "source_locations": [
+        "PRD_v2.5.md 第 41 行",
+        "上线配置清单.xlsx 第 6 行",
+        "功能测试报告.xlsx 第 6 行",
+        "线上兼容环境测试报告.xlsx 第 7 行"
+      ],
+      "remediation_action": "由赵敏修复“体验缺陷”对应问题并重新提测；由赵敏修复 2 个异常环境并完成八环境回归。",
+      "exit_condition": "功能测试结论为通过；八个浏览器与系统组合全部为通过。"
+    },
+    {
+      "record_id": "F05",
+      "title": "敏感词过滤规则配置",
+      "module": "内容安全审核模块",
+      "priority": "P1",
+      "owner": "王磊",
+      "configuration_status": "已提测",
+      "test_status": "不通过",
+      "test_reason": "功能缺陷",
+      "total_cases": 12,
+      "passed_cases": 9,
+      "compatibility_issue_count": 1,
+      "compatibility_issue_environments": [
+        "Firefox 124 / Windows 10"
+      ],
+      "rules_hit": [
+        "规则二：非 P0 的功能缺陷，基础等级为主要",
+        "规则三：1 个异常环境未达到严重升级阈值"
+      ],
+      "base_risk_level": "major",
+      "compatibility_risk_level": "minor",
+      "final_risk_level": "major",
+      "affected_gate_ids": [
+        "business-gate-p1-passed"
+      ],
+      "source_locations": [
+        "PRD_v2.5.md 第 42 行",
+        "上线配置清单.xlsx 第 7 行",
+        "功能测试报告.xlsx 第 7 行",
+        "线上兼容环境测试报告.xlsx 第 8 行"
+      ],
+      "remediation_action": "由王磊修复“功能缺陷”对应问题并重新提测；由王磊修复 1 个异常环境并完成八环境回归。",
+      "exit_condition": "功能测试结论为通过；八个浏览器与系统组合全部为通过。"
+    },
+    {
+      "record_id": "F12",
+      "title": "审核规则模板管理",
+      "module": "内容安全审核模块",
+      "priority": "P2",
+      "owner": "赵敏",
+      "configuration_status": "已提测",
+      "test_status": "有条件通过",
+      "test_reason": "界面缺陷",
+      "total_cases": 8,
+      "passed_cases": 7,
+      "compatibility_issue_count": 2,
+      "compatibility_issue_environments": [
+        "Chrome 122 / macOS 14",
+        "Safari 17 / macOS 14"
+      ],
+      "rules_hit": [
+        "规则二：非 P0 的界面缺陷，基础等级为次要",
+        "规则三：2 个异常环境未达到严重升级阈值"
+      ],
+      "base_risk_level": "minor",
+      "compatibility_risk_level": "minor",
+      "final_risk_level": "minor",
+      "affected_gate_ids": [],
+      "source_locations": [
+        "PRD_v2.5.md 第 43 行",
+        "上线配置清单.xlsx 第 8 行",
+        "功能测试报告.xlsx 第 8 行",
+        "线上兼容环境测试报告.xlsx 第 9 行"
+      ],
+      "remediation_action": "由赵敏修复“界面缺陷”对应问题并重新提测；由赵敏修复 2 个异常环境并完成八环境回归。",
+      "exit_condition": "功能测试结论为通过；八个浏览器与系统组合全部为通过。"
+    },
+    {
+      "record_id": "F13",
+      "title": "拦截通知推送",
+      "module": "内容安全审核模块",
+      "priority": "P3",
+      "owner": "王磊",
+      "configuration_status": "未列入配置清单",
+      "test_status": "未提测",
+      "test_reason": "无",
+      "total_cases": 0,
+      "passed_cases": 0,
+      "compatibility_issue_count": 0,
+      "compatibility_issue_environments": [],
+      "rules_hit": [],
+      "base_risk_level": "none",
+      "compatibility_risk_level": "none",
+      "final_risk_level": "none",
+      "affected_gate_ids": [],
+      "source_locations": [
+        "PRD_v2.5.md 第 44 行"
+      ],
+      "remediation_action": "由王磊补齐可追溯的上线配置和提测记录，并安排功能与兼容测试。",
+      "exit_condition": "F13 在三份执行清单中均存在且提测状态为已提测，测试结论满足对应优先级 Gate。"
+    },
+    {
+      "record_id": "F06",
+      "title": "实验创建与配置",
+      "module": "A/B 测试管理模块",
+      "priority": "P0",
+      "owner": "陈浩",
+      "configuration_status": "已提测",
+      "test_status": "通过",
+      "test_reason": "无",
+      "total_cases": 14,
+      "passed_cases": 14,
+      "compatibility_issue_count": 0,
+      "compatibility_issue_environments": [],
+      "rules_hit": [],
+      "base_risk_level": "none",
+      "compatibility_risk_level": "none",
+      "final_risk_level": "none",
+      "affected_gate_ids": [],
+      "source_locations": [
+        "PRD_v2.5.md 第 58 行",
+        "上线配置清单.xlsx 第 9 行",
+        "功能测试报告.xlsx 第 9 行",
+        "线上兼容环境测试报告.xlsx 第 10 行"
+      ],
+      "remediation_action": "由陈浩保留当前证据并在发布前复核配置、测试和兼容记录。",
+      "exit_condition": "三份记录仍可追溯且四项正式上线 Gate 均满足。"
+    },
+    {
+      "record_id": "F07",
+      "title": "实验数据看板",
+      "module": "A/B 测试管理模块",
+      "priority": "P0",
+      "owner": "陈浩",
+      "configuration_status": "已提测",
+      "test_status": "不通过",
+      "test_reason": "依赖异常",
+      "total_cases": 11,
+      "passed_cases": 8,
+      "compatibility_issue_count": 3,
+      "compatibility_issue_environments": [
+        "Chrome 122 / macOS 14",
+        "Safari 17 / macOS 14",
+        "Safari 17 / iOS 17"
+      ],
+      "rules_hit": [
+        "规则一：P0 功能存在问题，直接判为严重",
+        "规则三：3 个异常环境达到升级阈值 3"
+      ],
+      "base_risk_level": "severe",
+      "compatibility_risk_level": "severe",
+      "final_risk_level": "severe",
+      "affected_gate_ids": [
+        "business-gate-p0-accepted",
+        "business-gate-severe-zero"
+      ],
+      "source_locations": [
+        "PRD_v2.5.md 第 59 行",
+        "上线配置清单.xlsx 第 10 行",
+        "功能测试报告.xlsx 第 10 行",
+        "线上兼容环境测试报告.xlsx 第 11 行"
+      ],
+      "remediation_action": "由陈浩修复“依赖异常”对应问题并重新提测；由陈浩修复 3 个异常环境并完成八环境回归。",
+      "exit_condition": "功能测试结论为通过或有条件通过，且 P0 问题清零；八个浏览器与系统组合全部为通过。"
+    },
+    {
+      "record_id": "F09",
+      "title": "实验流量分配",
+      "module": "A/B 测试管理模块",
+      "priority": "P0",
+      "owner": "陈浩",
+      "configuration_status": "未列入配置清单",
+      "test_status": "未提测",
+      "test_reason": "无",
+      "total_cases": 0,
+      "passed_cases": 0,
+      "compatibility_issue_count": 0,
+      "compatibility_issue_environments": [],
+      "rules_hit": [],
+      "base_risk_level": "none",
+      "compatibility_risk_level": "none",
+      "final_risk_level": "none",
+      "affected_gate_ids": [
+        "business-gate-p0-tested"
+      ],
+      "source_locations": [
+        "PRD_v2.5.md 第 60 行"
+      ],
+      "remediation_action": "由陈浩补齐可追溯的上线配置和提测记录，并安排功能与兼容测试。",
+      "exit_condition": "F09 在三份执行清单中均存在且提测状态为已提测，测试结论满足对应优先级 Gate。"
+    },
+    {
+      "record_id": "F08",
+      "title": "实验结论归档",
+      "module": "A/B 测试管理模块",
+      "priority": "P1",
+      "owner": "林凯",
+      "configuration_status": "已提测",
+      "test_status": "通过",
+      "test_reason": "无",
+      "total_cases": 6,
+      "passed_cases": 6,
+      "compatibility_issue_count": 0,
+      "compatibility_issue_environments": [],
+      "rules_hit": [],
+      "base_risk_level": "none",
+      "compatibility_risk_level": "none",
+      "final_risk_level": "none",
+      "affected_gate_ids": [],
+      "source_locations": [
+        "PRD_v2.5.md 第 61 行",
+        "上线配置清单.xlsx 第 11 行",
+        "功能测试报告.xlsx 第 11 行",
+        "线上兼容环境测试报告.xlsx 第 12 行"
+      ],
+      "remediation_action": "由林凯保留当前证据并在发布前复核配置、测试和兼容记录。",
+      "exit_condition": "三份记录仍可追溯且四项正式上线 Gate 均满足。"
+    },
+    {
+      "record_id": "F14",
+      "title": "实验暂停与恢复",
+      "module": "A/B 测试管理模块",
+      "priority": "P2",
+      "owner": "陈浩",
+      "configuration_status": "已提测",
+      "test_status": "不通过",
+      "test_reason": "数据一致性问题",
+      "total_cases": 7,
+      "passed_cases": 5,
+      "compatibility_issue_count": 2,
+      "compatibility_issue_environments": [
+        "Firefox 124 / Windows 10",
+        "Safari 17 / macOS 14"
+      ],
+      "rules_hit": [
+        "规则二：非 P0 的数据一致性问题，基础等级为主要",
+        "规则三：2 个异常环境未达到严重升级阈值"
+      ],
+      "base_risk_level": "major",
+      "compatibility_risk_level": "minor",
+      "final_risk_level": "major",
+      "affected_gate_ids": [],
+      "source_locations": [
+        "PRD_v2.5.md 第 62 行",
+        "上线配置清单.xlsx 第 12 行",
+        "功能测试报告.xlsx 第 12 行",
+        "线上兼容环境测试报告.xlsx 第 15 行"
+      ],
+      "remediation_action": "由陈浩修复“数据一致性问题”对应问题并重新提测；由陈浩修复 2 个异常环境并完成八环境回归。",
+      "exit_condition": "功能测试结论为通过；八个浏览器与系统组合全部为通过。"
+    },
+    {
+      "record_id": "F15",
+      "title": "实验报告导出",
+      "module": "A/B 测试管理模块",
+      "priority": "P3",
+      "owner": "林凯",
+      "configuration_status": "未列入配置清单",
+      "test_status": "未提测",
+      "test_reason": "无",
+      "total_cases": 0,
+      "passed_cases": 0,
+      "compatibility_issue_count": 0,
+      "compatibility_issue_environments": [],
+      "rules_hit": [],
+      "base_risk_level": "none",
+      "compatibility_risk_level": "none",
+      "final_risk_level": "none",
+      "affected_gate_ids": [],
+      "source_locations": [
+        "PRD_v2.5.md 第 63 行"
+      ],
+      "remediation_action": "由林凯补齐可追溯的上线配置和提测记录，并安排功能与兼容测试。",
+      "exit_condition": "F15 在三份执行清单中均存在且提测状态为已提测，测试结论满足对应优先级 Gate。"
+    },
+    {
+      "record_id": "F10",
+      "title": "语言包管理",
+      "module": "多语言配置模块",
+      "priority": "P0",
+      "owner": "周洁",
+      "configuration_status": "已提测",
+      "test_status": "通过",
+      "test_reason": "无",
+      "total_cases": 9,
+      "passed_cases": 9,
+      "compatibility_issue_count": 0,
+      "compatibility_issue_environments": [],
+      "rules_hit": [],
+      "base_risk_level": "none",
+      "compatibility_risk_level": "none",
+      "final_risk_level": "none",
+      "affected_gate_ids": [],
+      "source_locations": [
+        "PRD_v2.5.md 第 77 行",
+        "上线配置清单.xlsx 第 13 行",
+        "功能测试报告.xlsx 第 13 行",
+        "线上兼容环境测试报告.xlsx 第 13 行"
+      ],
+      "remediation_action": "由周洁保留当前证据并在发布前复核配置、测试和兼容记录。",
+      "exit_condition": "三份记录仍可追溯且四项正式上线 Gate 均满足。"
+    },
+    {
+      "record_id": "F11",
+      "title": "多语言包上传",
+      "module": "多语言配置模块",
+      "priority": "P0",
+      "owner": "周洁",
+      "configuration_status": "未列入配置清单",
+      "test_status": "未提测",
+      "test_reason": "无",
+      "total_cases": 0,
+      "passed_cases": 0,
+      "compatibility_issue_count": 0,
+      "compatibility_issue_environments": [],
+      "rules_hit": [],
+      "base_risk_level": "none",
+      "compatibility_risk_level": "none",
+      "final_risk_level": "none",
+      "affected_gate_ids": [
+        "business-gate-p0-tested"
+      ],
+      "source_locations": [
+        "PRD_v2.5.md 第 78 行"
+      ],
+      "remediation_action": "由周洁补齐可追溯的上线配置和提测记录，并安排功能与兼容测试。",
+      "exit_condition": "F11 在三份执行清单中均存在且提测状态为已提测，测试结论满足对应优先级 Gate。"
+    },
+    {
+      "record_id": "F16",
+      "title": "语言包版本管理",
+      "module": "多语言配置模块",
+      "priority": "P1",
+      "owner": "周洁",
+      "configuration_status": "已提测",
+      "test_status": "不通过",
+      "test_reason": "功能缺陷",
+      "total_cases": 8,
+      "passed_cases": 6,
+      "compatibility_issue_count": 3,
+      "compatibility_issue_environments": [
+        "Firefox 124 / Windows 10",
+        "Safari 17 / macOS 14",
+        "Safari 17 / iOS 17"
+      ],
+      "rules_hit": [
+        "规则二：非 P0 的功能缺陷，基础等级为主要",
+        "规则三：3 个异常环境达到升级阈值 3"
+      ],
+      "base_risk_level": "major",
+      "compatibility_risk_level": "severe",
+      "final_risk_level": "severe",
+      "affected_gate_ids": [
+        "business-gate-p1-passed",
+        "business-gate-severe-zero"
+      ],
+      "source_locations": [
+        "PRD_v2.5.md 第 79 行",
+        "上线配置清单.xlsx 第 14 行",
+        "功能测试报告.xlsx 第 14 行",
+        "线上兼容环境测试报告.xlsx 第 16 行"
+      ],
+      "remediation_action": "由周洁修复“功能缺陷”对应问题并重新提测；由周洁修复 3 个异常环境并完成八环境回归。",
+      "exit_condition": "功能测试结论为通过；八个浏览器与系统组合全部为通过。"
+    },
+    {
+      "record_id": "F17",
+      "title": "界面语言预览",
+      "module": "多语言配置模块",
+      "priority": "P2",
+      "owner": "周洁",
+      "configuration_status": "已提测",
+      "test_status": "通过",
+      "test_reason": "无",
+      "total_cases": 6,
+      "passed_cases": 6,
+      "compatibility_issue_count": 4,
+      "compatibility_issue_environments": [
+        "Chrome 122 / macOS 14",
+        "Firefox 124 / macOS 14",
+        "Safari 17 / macOS 14",
+        "Safari 17 / iOS 17"
+      ],
+      "rules_hit": [
+        "规则三：4 个异常环境达到升级阈值 3"
+      ],
+      "base_risk_level": "none",
+      "compatibility_risk_level": "severe",
+      "final_risk_level": "severe",
+      "affected_gate_ids": [
+        "business-gate-severe-zero"
+      ],
+      "source_locations": [
+        "PRD_v2.5.md 第 80 行",
+        "上线配置清单.xlsx 第 15 行",
+        "功能测试报告.xlsx 第 15 行",
+        "线上兼容环境测试报告.xlsx 第 14 行"
+      ],
+      "remediation_action": "由周洁修复 4 个异常环境并完成八环境回归。",
+      "exit_condition": "八个浏览器与系统组合全部为通过。"
+    },
+    {
+      "record_id": "F18",
+      "title": "翻译缺失兜底配置",
+      "module": "多语言配置模块",
+      "priority": "P3",
+      "owner": "周洁",
+      "configuration_status": "未列入配置清单",
+      "test_status": "未提测",
+      "test_reason": "无",
+      "total_cases": 0,
+      "passed_cases": 0,
+      "compatibility_issue_count": 0,
+      "compatibility_issue_environments": [],
+      "rules_hit": [],
+      "base_risk_level": "none",
+      "compatibility_risk_level": "none",
+      "final_risk_level": "none",
+      "affected_gate_ids": [],
+      "source_locations": [
+        "PRD_v2.5.md 第 81 行"
+      ],
+      "remediation_action": "由周洁补齐可追溯的上线配置和提测记录，并安排功能与兼容测试。",
+      "exit_condition": "F18 在三份执行清单中均存在且提测状态为已提测，测试结论满足对应优先级 Gate。"
+    }
+  ],
+  "external_action": "none"
+}

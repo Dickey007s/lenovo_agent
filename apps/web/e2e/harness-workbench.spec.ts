@@ -1,5 +1,6 @@
 import { expect, test, type Page, type Route } from "@playwright/test";
 import tc04TestManifest from "../../../docs/evidence/manifests/tc04-public-test-manifest-20260828.json";
+import tc11BusinessOutcome from "../../../docs/evidence/manifests/tc11-business-gate-outcome-20260828.json";
 import tc12TestManifest from "../../../docs/evidence/manifests/tc12-public-test-manifest-20260828.json";
 
 type FileItem = {
@@ -921,6 +922,113 @@ function failedDashboardToolkitEffectSnapshot(body: { workspace_id: string; inst
   };
 }
 
+function releaseReadinessEffectSnapshot(body: { workspace_id: string; instruction: string }) {
+  const base = snapshot(body, "completed", 20);
+  const artifactIds = ["workspace-artifact-111122223333", "workspace-artifact-444455556666"];
+  const sourceRefs = [csvFile.file_ref, pdfFile.file_ref, docxFile.file_ref, txtFile.file_ref];
+  const checks = [
+    ["check-release-source-contract", "四份来源结构与交叉引用", "PRD 18 项、三张执行表各 13 项；表头、编号、名称、优先级、状态、数字和八环境均由服务端逐项校验。"],
+    ["check-release-gate-formulas", "四项正式上线 Gate 逐式复算", "每项保留分子、分母、运算符、阈值、实际值和 PRD 来源规则；零分母会直接失败。"],
+    ["check-release-risk-ledger", "逐功能风险按规则取唯一最高等级", "风险由 P0、原因类型和异常环境数推导；同一功能只保留最高等级。"],
+    ["check-release-gate-aggregation", "上线结论由 Gate 聚合", "结论取决于四项 Gate 的布尔聚合，不检查固定功能名称或固定结论文案。"],
+    ["check-release-auxiliary-separation", "辅助指标不冒充上线 Gate", "分级与综合用例通过率单独标为辅助指标。"],
+    ["check-release-ledger-csv", "CSV 18 行可独立复算", "台账一行一个 PRD 功能，包含用例数、异常环境、规则、风险、来源和退出条件。"],
+    ["check-release-report-tables", "DOCX 包含结构化核验表", "报告包含四项 Gate、辅助指标、18 项矩阵、风险、未提测和整改计划表。"],
+    ["check-release-remediation", "整改项有负责人和退出条件", "每项整改绑定功能编号、研发负责人、来源问题、动作和可验证退出条件。"],
+    ["check-release-no-action", "四份原件未改且没有外部动作", "生成前后重新读取四份 allowlisted 原件并逐字节比较；只在隔离运行工作区写入 DOCX/CSV，没有上线、配置写入或通知动作。"],
+  ].map(([check_id, label, detail]) => ({ check_id, label, passed: true, detail }));
+  const common = {
+    capability_id: "office-release-readiness",
+    scenario_id: "TC-11",
+    version: 1,
+    round_number: 1,
+    source_file_refs: sourceRefs,
+    validator_id: "validator-release-readiness-v2",
+    verifier_status: "passed",
+    checks,
+    covered_period: "AIPilot Console v2.5 本次上线审核批次",
+    statistic_basis: "PRD 18 项功能为全集；上线配置、功能测试和兼容测试各 13 项，按功能编号交叉核对并由 PRD 规则计算。",
+    purpose: "支持发布负责人复核是否满足上线条件；不代替人工审批，不执行上线或修改配置。",
+    record_count: 18,
+    key_outputs: ["正式上线 Gate：4/4 未通过，结论为不得上线", "风险：严重 4、主要 2、次要 2", "未提测功能：5 项", "用例通过率是辅助质量指标，不作为正式上线 Gate"],
+    key_outputs_label: "上线复核要点",
+    review_guidance: "请由发布、研发和测试负责人逐项确认四条未通过 Gate、8 项风险与 5 项未提测功能；本次没有执行上线或修改配置。",
+    execution_summary: "已在隔离运行工作区生成并校验上线报告和逐功能台账；没有执行上线、没有修改配置。",
+    business_gate_outcome: tc11BusinessOutcome,
+    created_at: new Date().toISOString(),
+    original_inputs_modified: false,
+    review_required: true,
+    external_action: "none",
+  };
+  return {
+    ...base,
+    workspace_artifacts: [{
+      ...common,
+      artifact_id: artifactIds[0],
+      title: "上线合规与风险报告",
+      file_name: "上线合规与风险报告.docx",
+      media_type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      size: 28140,
+      summary: "结构化报告包含正式 Gate、18 项矩阵、8 项风险、5 项未提测功能和整改计划。",
+      deliverable_type: "上线合规与风险报告 DOCX",
+      download_path: `/v1/harness/runs/${base.run_id}/artifacts/${artifactIds[0]}`,
+    }, {
+      ...common,
+      artifact_id: artifactIds[1],
+      title: "上线功能风险逐项台账",
+      file_name: "上线功能风险逐项台账.csv",
+      media_type: "text/csv",
+      size: 11840,
+      summary: "18 行逐功能台账保留来源行、风险规则、Gate 影响、负责人和退出条件，可下载复算。",
+      deliverable_type: "逐功能风险台账 CSV",
+      download_path: `/v1/harness/runs/${base.run_id}/artifacts/${artifactIds[1]}`,
+    }],
+    effect_receipts: [{
+      receipt_id: "effect-receipt-111122223333",
+      capability_id: "office-release-readiness",
+      scenario_id: "TC-11",
+      status: "passed",
+      state: "已冻结 4 份 FORTE 输入，原始文件保持只读。",
+      action: "生成上线报告与逐功能风险台账，并执行 9 项确定性检查。",
+      observation: "生成 2 份真实成果文件，共享 9 项确定性检查，9/9 通过。业务 Gate 4/4 未通过。",
+      cost: "0 次额外模型调用；仅消耗本机确定性解析、计算与文件写入。",
+      result: "确定性检查通过；业务 Gate 未通过，结论为“不得上线”。",
+      source_file_refs: sourceRefs,
+      artifact_ids: artifactIds,
+      prohibited_side_effects: ["不执行上线", "不改配置"],
+      business_gate_outcome: tc11BusinessOutcome,
+      created_at: new Date().toISOString(),
+      external_action: "none",
+    }],
+    last_event_sequence: 20,
+  };
+}
+
+function failedReleaseReadinessEffectSnapshot(body: { workspace_id: string; instruction: string }) {
+  const base = releaseReadinessEffectSnapshot(body);
+  const checks = base.workspace_artifacts[0].checks.map((check: { check_id: string; label: string; passed: boolean; detail: string }) => check.check_id === "check-release-report-tables"
+    ? { ...check, passed: false, label: "DOCX 结构检查未通过", detail: "下载物未达到结构化报告门；当前成果不得作为可靠上线报告。" }
+    : check);
+  return {
+    ...base,
+    status: "failed",
+    workspace_artifacts: base.workspace_artifacts.map((artifact: Record<string, unknown>) => ({
+      ...artifact,
+      verifier_status: "failed",
+      checks,
+      summary: "计算过程和失败证据已保留，但成果文件结构未通过确定性检查。",
+      review_guidance: "当前成果不得作为可靠上线报告；请查看失败检查并重新启动新的 TC-11 Run。",
+      execution_summary: "确定性文件检查失败；没有执行上线，也没有修改配置。",
+    })),
+    effect_receipts: base.effect_receipts.map((receipt: Record<string, unknown>) => ({
+      ...receipt,
+      status: "failed",
+      observation: "两份成果中至少一项确定性文件检查未通过；失败证据已保留。",
+      result: "当前成果不得作为可靠上线报告；没有执行上线或修改配置。",
+    })),
+  };
+}
+
 function boundedEffectSnapshot(body: { workspace_id: string; instruction: string }) {
   const base = snapshot(body, "completed", 18);
   return {
@@ -1299,7 +1407,7 @@ function locationFailureSnapshot(body: { workspace_id: string; instruction: stri
 }
 async function fulfillJson(route: Route, body: unknown, status = 200) { await route.fulfill({ status, contentType: "application/json", body: JSON.stringify(body) }); }
 
-async function mockHarness(page: Page, options: { failFirstStart?: boolean; failDecisionDefer?: boolean; disconnect?: boolean; failed?: boolean; locationFailure?: boolean; sourceRecovery?: boolean; sourceRecoveryThreeCandidates?: boolean; verifiedArtifactAuditPending?: boolean; verifiedArtifactAuditPendingDistinct?: boolean; verifiedFinanceArtifactAuditPending?: boolean; unverifiedArtifactLocationPending?: boolean; terminalArtifactLocationPending?: boolean; boundedRecovery?: boolean; effectArtifact?: boolean; outboundEffect?: boolean; reactEffect?: boolean; evaluationEffect?: boolean; dashboardEffect?: boolean; dashboardEffectFailed?: boolean; effectBoundary?: boolean; reviewTable?: boolean; workspaceFailures?: number; interactiveLoop?: boolean; evidenceGate?: boolean } = {}) {
+async function mockHarness(page: Page, options: { failFirstStart?: boolean; failDecisionDefer?: boolean; disconnect?: boolean; failed?: boolean; locationFailure?: boolean; sourceRecovery?: boolean; sourceRecoveryThreeCandidates?: boolean; verifiedArtifactAuditPending?: boolean; verifiedArtifactAuditPendingDistinct?: boolean; verifiedFinanceArtifactAuditPending?: boolean; unverifiedArtifactLocationPending?: boolean; terminalArtifactLocationPending?: boolean; boundedRecovery?: boolean; effectArtifact?: boolean; outboundEffect?: boolean; reactEffect?: boolean; evaluationEffect?: boolean; dashboardEffect?: boolean; dashboardEffectFailed?: boolean; releaseEffect?: boolean; releaseEffectFailed?: boolean; effectBoundary?: boolean; reviewTable?: boolean; workspaceFailures?: number; interactiveLoop?: boolean; evidenceGate?: boolean } = {}) {
   let workspaceCalls = 0; let startCalls = 0; let streamCalls = 0;
   let currentBody = { workspace_id: "forte-public-office", instruction: "" };
   // Mock snapshots intentionally cover several server state shapes in one route.
@@ -1354,6 +1462,10 @@ async function mockHarness(page: Page, options: { failFirstStart?: boolean; fail
         ? failedDashboardToolkitEffectSnapshot(body)
         : options.dashboardEffect
         ? dashboardToolkitEffectSnapshot(body)
+        : options.releaseEffectFailed
+        ? failedReleaseReadinessEffectSnapshot(body)
+        : options.releaseEffect
+        ? releaseReadinessEffectSnapshot(body)
         : options.effectBoundary
           ? boundedEffectSnapshot(body)
         : options.locationFailure
@@ -1460,7 +1572,7 @@ async function mockHarness(page: Page, options: { failFirstStart?: boolean; fail
     }
     if (path.startsWith("/v1/harness/runs/")) {
       if (options.disconnect && streamCalls === 1) return fulfillJson(route, { ...snapshot(currentBody, "queued"), status: "indexing", last_event_sequence: 1, version: 2 });
-      if (options.interactiveLoop || options.evidenceGate || options.sourceRecovery || options.verifiedArtifactAuditPending || options.verifiedArtifactAuditPendingDistinct || options.verifiedFinanceArtifactAuditPending || options.unverifiedArtifactLocationPending || options.terminalArtifactLocationPending || options.boundedRecovery || options.locationFailure || options.effectArtifact || options.outboundEffect || options.reactEffect || options.evaluationEffect || options.dashboardEffect || options.dashboardEffectFailed || options.effectBoundary) return fulfillJson(route, currentSnapshot);
+      if (options.interactiveLoop || options.evidenceGate || options.sourceRecovery || options.verifiedArtifactAuditPending || options.verifiedArtifactAuditPendingDistinct || options.verifiedFinanceArtifactAuditPending || options.unverifiedArtifactLocationPending || options.terminalArtifactLocationPending || options.boundedRecovery || options.locationFailure || options.effectArtifact || options.outboundEffect || options.reactEffect || options.evaluationEffect || options.dashboardEffect || options.dashboardEffectFailed || options.releaseEffect || options.releaseEffectFailed || options.effectBoundary) return fulfillJson(route, currentSnapshot);
       currentSnapshot = snapshot(currentBody, options.failed ? "failed" : "completed");
       return fulfillJson(route, currentSnapshot);
     }
@@ -1918,6 +2030,83 @@ test("shows TC-12 real Vitest red-to-green evidence and the exact public manifes
     await artifacts.scrollIntoViewIfNeeded();
     await page.screenshot({ path: "../../docs/evidence/screenshots/tc12-real-vitest-mobile.png", fullPage: true });
   }
+});
+
+test("keeps deterministic verification separate from the TC-11 business release decision", async ({ page }) => {
+  await mockHarness(page, { releaseEffect: true });
+  await page.goto("/");
+  await page.getByRole("textbox", { name: "任务指令" }).fill("综合 PRD、上线配置、功能测试和兼容测试，给出上线结论与改进计划。");
+  await page.getByRole("button", { name: "启动 Control Loop" }).click();
+
+  const artifacts = page.locator(".workspace-artifacts");
+  const outcome = page.getByRole("status", { name: "业务 Gate 结论" });
+  await expect(artifacts).toContainText("Agent 已生成 2 份真实成果文件");
+  await expect(artifacts.locator(":scope > header > b")).toHaveText("业务 Gate 4/4 未通过");
+  await expect(outcome.getByRole("heading", { name: "不得上线" })).toBeVisible();
+  await expect(outcome).toContainText("确定性检查通过不等于可以上线");
+  for (const statement of [
+    "5/7 = 71.4%",
+    "4/5 = 80.0%",
+    "2/5 = 40.0%",
+    "4 项严重问题未清零",
+  ]) await expect(outcome).toContainText(statement);
+  await expect(outcome.locator(".business-gate-list > li")).toHaveCount(4);
+  await expect(artifacts).toContainText("上线合规与风险报告 DOCX");
+  await expect(artifacts).toContainText("逐功能风险台账 CSV");
+  await expect(artifacts).toContainText("只代表公式、来源和文件结构已复核，不代表业务 Gate 通过");
+  await expect(page.locator(".loop-effect-conclusion")).toContainText("业务 Gate 4/4 未通过");
+  await expect(page.locator(".loop-effect-conclusion")).toContainText("不得上线");
+
+  await outcome.getByText("查看辅助质量指标").click();
+  for (const statement of ["93.4%", "86.4%", "85.7%", "89.7%", "不作为正式上线 Gate"]) await expect(outcome).toContainText(statement);
+  await outcome.getByText("查看 18 项逐功能台账").click();
+  await expect(outcome.locator(".business-ledger > ol > li")).toHaveCount(18);
+  await expect(outcome).toContainText("F17");
+  await expect(outcome).toContainText("界面语言预览");
+  await expect(outcome).toContainText("严重 4 · 主要 2 · 次要 2");
+  await expect(outcome).toContainText("没有执行上线、没有修改配置");
+
+  const typeSizes = await outcome.evaluate((element) => ({
+    conclusion: Number.parseFloat(getComputedStyle(element.querySelector(":scope > header h3")!).fontSize),
+    gateTitle: Number.parseFloat(getComputedStyle(element.querySelector(".business-gate-list h4")!).fontSize),
+    gateDetail: Number.parseFloat(getComputedStyle(element.querySelector(".business-gate-list p")!).fontSize),
+    ledgerDetail: Number.parseFloat(getComputedStyle(element.querySelector(".business-ledger dd")!).fontSize),
+  }));
+  expect(typeSizes.conclusion).toBeGreaterThanOrEqual(20);
+  expect(typeSizes.gateTitle).toBeGreaterThanOrEqual(13);
+  expect(typeSizes.gateDetail).toBeGreaterThanOrEqual(11);
+  expect(typeSizes.ledgerDetail).toBeGreaterThanOrEqual(11);
+  let overflow = await page.evaluate(() => ({ width: document.documentElement.clientWidth, scroll: document.documentElement.scrollWidth }));
+  expect(overflow.scroll).toBeLessThanOrEqual(overflow.width);
+  if (process.env.CAPTURE_TC11_EFFECT_EVIDENCE === "1") {
+    await page.setViewportSize({ width: 1440, height: 1100 });
+    await page.screenshot({ path: "../../docs/evidence/screenshots/tc11-release-gate-desktop.png", fullPage: true });
+  }
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(outcome.getByRole("heading", { name: "不得上线" })).toBeVisible();
+  overflow = await page.evaluate(() => ({ width: document.documentElement.clientWidth, scroll: document.documentElement.scrollWidth }));
+  expect(overflow.scroll).toBeLessThanOrEqual(overflow.width);
+  const outcomeOverflow = await outcome.evaluate((element) => ({ width: element.clientWidth, scroll: element.scrollWidth }));
+  expect(outcomeOverflow.scroll).toBeLessThanOrEqual(outcomeOverflow.width);
+  if (process.env.CAPTURE_TC11_EFFECT_EVIDENCE === "1") {
+    await page.screenshot({ path: "../../docs/evidence/screenshots/tc11-release-gate-mobile.png", fullPage: true });
+  }
+});
+
+test("keeps a failed TC-11 verifier red instead of presenting a reliable report", async ({ page }) => {
+  await mockHarness(page, { releaseEffectFailed: true });
+  await page.goto("/");
+  await page.getByRole("textbox", { name: "任务指令" }).fill("综合 PRD、上线配置、功能测试和兼容测试，给出上线结论与改进计划。");
+  await page.getByRole("button", { name: "启动 Control Loop" }).click();
+
+  const artifacts = page.locator(".workspace-artifacts");
+  await expect(artifacts).toContainText("DOCX 结构检查未通过");
+  await expect(artifacts).toContainText("当前成果不得作为可靠上线报告");
+  await expect(artifacts).not.toContainText("9/9 通过");
+  await expect(artifacts).not.toContainText("所有确定性效果门通过");
+  await expect(artifacts.locator(":scope > ol > li.is-failed")).toHaveCount(2);
+  await expect(artifacts.locator(":scope > ol > li.is-passed")).toHaveCount(0);
 });
 
 test("keeps a failed TC-12 fixed command red and tells the user not to merge", async ({ page }) => {

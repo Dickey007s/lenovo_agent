@@ -353,6 +353,16 @@ coverage are server-owned facts; the UI projects three suites of 23/20/28 withou
 inventing IDs. This proves one bounded JavaScript repair effect, not a general
 repository executor, automatic PR path or OS-level network sandbox.
 
+DR-0043 adds a generic business-outcome layer without weakening deterministic
+Artifact verification. The fixed pm-014 adapter validates four source-table
+contracts, derives one 18-row feature ledger and four formal release Gates, then
+stores the same `business_gate_outcome` on both Artifacts and the EffectReceipt.
+`verifier_status=passed` means the source/formula/file checks passed;
+`business_gate_outcome.status=failed` independently means the source-derived
+release conditions failed. The browser projects both rather than converting a
+business failure into an Artifact failure or hiding it behind a green check.
+This is not a general rules engine, release executor or configuration writer.
+
 ## 7. Eight module maturity
 
 | Module | Current implementation | Missing target work |

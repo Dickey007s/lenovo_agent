@@ -175,6 +175,16 @@ then shows the real metrics/data/filter files and 23/20/28 counts; test IDs are
 collapsed and scroll inside the card. Opening the list or downloading the ZIP
 does not rerun a model, edit FORTE input or create a PR.
 
+DR-0043 applies progressive disclosure to business Gate outcomes. The TC-11
+surface first renders `business_gate_outcome.decision`, the count of failed
+formal Gates and each Gate's source-owned formula. Auxiliary quality metrics and
+the 18-row ledger stay expandable. Artifact cards then show deterministic
+verification and downloads with an explicit warning that formula/source/file
+checks do not mean the business Gates passed. A failed Verifier keeps the cards
+red and suppresses a reliable-report claim even when a source-derived business
+decision is otherwise available. Opening the outcome does not call a model,
+write configuration or execute a release.
+
 Open human decisions are authoritative in the Snapshot-level
 `decision_requests[]`; round-level copies are compatibility projections only.
 Closing or pressing Escape exits the review surface before the browser attempts a

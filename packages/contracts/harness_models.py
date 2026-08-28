@@ -597,6 +597,82 @@ class AgentControlLoopArtifactSelfTest(StrictModel):
     )
 
 
+class AgentControlLoopBusinessGate(StrictModel):
+    """One server-derived business condition, separate from file verification."""
+
+    gate_id: str = Field(pattern=r"^business-gate-[a-z0-9-]{3,80}$")
+    label: str = Field(min_length=1, max_length=160)
+    passed: bool
+    numerator: float
+    denominator: float = Field(gt=0)
+    operator: Literal[">=", "==", "<="]
+    threshold: float
+    actual: float
+    unit: Literal["percent", "count"]
+    formula: str = Field(min_length=1, max_length=300)
+    source_rule: str = Field(min_length=1, max_length=500)
+    result: str = Field(min_length=1, max_length=500)
+
+
+class AgentControlLoopBusinessMetric(StrictModel):
+    """An informative metric that must not be projected as a business Gate."""
+
+    metric_id: str = Field(pattern=r"^business-metric-[a-z0-9-]{3,80}$")
+    label: str = Field(min_length=1, max_length=160)
+    numerator: float
+    denominator: float = Field(gt=0)
+    value: float
+    unit: Literal["percent", "count"]
+    formula: str = Field(min_length=1, max_length=300)
+    source_note: str = Field(min_length=1, max_length=500)
+
+
+class AgentControlLoopBusinessRecord(StrictModel):
+    """One auditable row in a server-derived business decision ledger."""
+
+    record_id: str = Field(pattern=r"^[A-Z][A-Z0-9-]{1,39}$")
+    title: str = Field(min_length=1, max_length=180)
+    module: str = Field(min_length=1, max_length=180)
+    priority: str = Field(min_length=1, max_length=40)
+    owner: str = Field(min_length=1, max_length=120)
+    configuration_status: str = Field(min_length=1, max_length=120)
+    test_status: str = Field(min_length=1, max_length=120)
+    test_reason: str = Field(min_length=1, max_length=160)
+    total_cases: int = Field(ge=0, le=1_000_000)
+    passed_cases: int = Field(ge=0, le=1_000_000)
+    compatibility_issue_count: int = Field(ge=0, le=100)
+    compatibility_issue_environments: list[str] = Field(
+        default_factory=list, max_length=24
+    )
+    rules_hit: list[str] = Field(default_factory=list, max_length=12)
+    base_risk_level: Literal["none", "minor", "major", "severe"]
+    compatibility_risk_level: Literal["none", "minor", "severe"]
+    final_risk_level: Literal["none", "minor", "major", "severe"]
+    affected_gate_ids: list[str] = Field(default_factory=list, max_length=12)
+    source_locations: list[str] = Field(min_length=1, max_length=8)
+    remediation_action: str = Field(min_length=1, max_length=500)
+    exit_condition: str = Field(min_length=1, max_length=500)
+
+
+class AgentControlLoopBusinessGateOutcome(StrictModel):
+    """A business decision projected independently from deterministic checks."""
+
+    outcome_id: str = Field(pattern=r"^business-outcome-[a-z0-9-]{3,80}$")
+    status: Literal["passed", "failed", "invalid"]
+    decision: str = Field(min_length=1, max_length=300)
+    summary: str = Field(min_length=1, max_length=800)
+    total_gate_count: int = Field(ge=0, le=30)
+    failed_gate_count: int = Field(ge=0, le=30)
+    gates: list[AgentControlLoopBusinessGate] = Field(default_factory=list, max_length=30)
+    auxiliary_metrics: list[AgentControlLoopBusinessMetric] = Field(
+        default_factory=list, max_length=30
+    )
+    records: list[AgentControlLoopBusinessRecord] = Field(
+        default_factory=list, max_length=100
+    )
+    external_action: Literal["none"] = "none"
+
+
 class AgentControlLoopWorkspaceArtifact(StrictModel):
     """A real file written only inside an isolated run workspace."""
 
@@ -629,6 +705,7 @@ class AgentControlLoopWorkspaceArtifact(StrictModel):
     review_guidance: str | None = Field(default=None, min_length=1, max_length=500)
     execution_summary: str | None = Field(default=None, min_length=1, max_length=500)
     self_test: AgentControlLoopArtifactSelfTest | None = None
+    business_gate_outcome: AgentControlLoopBusinessGateOutcome | None = None
     download_path: str = Field(min_length=1, max_length=300)
     created_at: datetime
     original_inputs_modified: Literal[False] = False
@@ -656,6 +733,7 @@ class AgentControlLoopEffectReceipt(StrictModel):
     source_file_refs: list[str] = Field(default_factory=list, max_length=96)
     artifact_ids: list[str] = Field(default_factory=list, max_length=8)
     prohibited_side_effects: list[str] = Field(default_factory=list, max_length=12)
+    business_gate_outcome: AgentControlLoopBusinessGateOutcome | None = None
     created_at: datetime
     external_action: Literal["none"] = "none"
 
