@@ -231,6 +231,13 @@ the public outcome; the browser does not parse Markdown, invent a percentage or
 call a model when details open. Unsupported or conflicting rules remain visible
 as a failed effect rather than being hidden behind an old `13/13` label.
 
+DR-0048 further requires sentence-fragment completeness within each approved
+line. A second normative sentence appended to a recognized TIME/FREQ/IDENTITY
+line becomes its own public rule and mapping when supported, or stops the fixed
+adapter when unknown/conflicting. The UI only renders the resulting service-
+owned `rules[]`; sharing a source locator never allows it to merge two rules or
+guess that a keyword was covered.
+
 Open human decisions are authoritative in the Snapshot-level
 `decision_requests[]`; round-level copies are compatibility projections only.
 Closing or pressing Escape exits the review surface before the browser attempts a

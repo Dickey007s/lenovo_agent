@@ -149,8 +149,18 @@ def test_committed_browser_fixture_matches_the_public_builder_manifest() -> None
         "每日拨打不得超过 5 次，2小时内不得超过 2 次",
         dynamic_content,
     )
+    dynamic_content = _replace_text(
+        "流程中必须在拨号前判断当前时段。",
+        "流程中必须在拨号前判断当前时段。 高龄客户必须立即转人工。",
+        dynamic_content,
+    )
     dynamic = build_outbound_flow(_source(dynamic_content))
     assert dynamic_manifest["outbound_flow_outcome"] == dynamic.outcome.model_dump(mode="json")
+    assert dynamic.outcome.atomic_requirement_count == 35
+    assert any(
+        rule.group == "DISPUTE" and rule.excerpt == "高龄客户必须立即转人工。"
+        for rule in dynamic.outcome.rules
+    )
 
 
 @pytest.mark.parametrize(
@@ -235,6 +245,59 @@ def test_recognized_human_transfer_rule_extends_ledger_guard_and_graph() -> None
     assert extra_rule.coverage_state == "covered"
     assert extra_rule.mapped_guard_ids
     assert extra_rule.mapped_edge_ids
+
+
+def test_inline_human_transfer_fragment_extends_ledger_guard_graph_and_docx() -> None:
+    content = _replace_text(
+        "流程中必须在拨号前判断当前时段。",
+        "流程中必须在拨号前判断当前时段。 高龄客户必须立即转人工。",
+    )
+    baseline = analyze_outbound_source(_source())
+    build = build_outbound_flow(_source(content))
+    changed = build.outcome
+
+    assert changed.atomic_requirement_count == baseline.atomic_requirement_count + 1
+    assert changed.guard_count == baseline.guard_count + 1
+    assert changed.edge_count == baseline.edge_count + 1
+    extra_rule = next(
+        rule for rule in changed.rules if rule.group == "DISPUTE" and "高龄客户" in rule.excerpt
+    )
+    assert extra_rule.locator == "专业性说明.md:L22"
+    assert extra_rule.excerpt == "高龄客户必须立即转人工。"
+    assert extra_rule.coverage_state == "covered"
+    assert extra_rule.mapped_guard_ids
+    assert extra_rule.mapped_edge_ids
+    assert all(check.passed for check in build.checks)
+
+
+def test_inline_unknown_normative_fragment_cannot_hide_on_recognized_line() -> None:
+    content = _replace_text(
+        "流程中必须在拨号前判断当前时段。",
+        "流程中必须在拨号前判断当前时段。 高龄客户必须立即冻结账户。",
+    )
+    with pytest.raises(OutboundFlowValidationError, match="不能静默忽略") as error:
+        analyze_outbound_source(_source(content))
+    assert error.value.code == "outbound_unsupported_rule"
+
+
+def test_inline_conflicting_identity_order_fails_closed() -> None:
+    content = _replace_text(
+        "流程中必须在拨号前判断当前时段。",
+        "流程中必须在拨号前判断当前时段。 接通后第一步必须先告知录音。",
+    )
+    with pytest.raises(OutboundFlowValidationError, match="身份.*录音") as error:
+        analyze_outbound_source(_source(content))
+    assert error.value.code == "outbound_identity_order_conflict"
+
+
+def test_inline_conflicting_frequency_fails_closed() -> None:
+    content = _replace_text(
+        "流程中必须在拨号前判断当前时段。",
+        "流程中必须在拨号前判断当前时段。 同一客户每日拨打不得超过 9 次。",
+    )
+    with pytest.raises(OutboundFlowValidationError, match="频次") as error:
+        analyze_outbound_source(_source(content))
+    assert error.value.code == "outbound_frequency_conflict"
 
 
 def test_unknown_normative_requirement_cannot_be_silently_ignored() -> None:

@@ -1,6 +1,6 @@
 {
   "schema_version": "tc10-public-outbound-flow.v1",
-  "variant": "time-frequency-mutation",
+  "variant": "time-frequency-inline-human-trigger-mutation",
   "source": {
     "logical_id": "operations-008-professional-guidance",
     "file_name": "专业性说明.md",
@@ -54,7 +54,7 @@
       "check_id": "check-outbound-graph-integrity-v2",
       "label": "流程图可遍历且终态可达",
       "passed": true,
-      "detail": "节点 31、边 36、终态 7/7 可达；无 dangling edge，所有节点均可到达终态。"
+      "detail": "节点 31、边 37、终态 7/7 可达；无 dangling edge，所有节点均可到达终态。"
     },
     {
       "check_id": "check-outbound-critical-order-v2",
@@ -66,7 +66,7 @@
       "check_id": "check-outbound-rule-coverage-v2",
       "label": "全部规范性要求均有图映射",
       "passed": true,
-      "detail": "34/34 条原子要求已绑定节点、边、守卫或终态；未知或冲突规则不得静默忽略。"
+      "detail": "35/35 条原子要求已绑定节点、边、守卫或终态；未知或冲突规则不得静默忽略。"
     },
     {
       "check_id": "check-outbound-boundary-v2",
@@ -85,15 +85,15 @@
     "outcome_id": "outbound-flow-outcome-operations-008",
     "status": "approval_required",
     "decision": "来源规则和流程图结构已由服务端重算，仍需业务与合规负责人批准；真实外呼及系统写入均未发生。",
-    "summary": "从批准 Markdown 推导 15 组、34 条原子要求；构建 31 个节点、36 条边和 7 个终态，可达终态 7/7。",
+    "summary": "从批准 Markdown 推导 15 组、35 条原子要求；构建 31 个节点、37 条边和 7 个终态，可达终态 7/7。",
     "source_rule_group_count": 15,
-    "atomic_requirement_count": 34,
-    "covered_count": 34,
+    "atomic_requirement_count": 35,
+    "covered_count": 35,
     "unsupported_count": 0,
     "conflict_count": 0,
     "node_count": 31,
-    "edge_count": 36,
-    "guard_count": 7,
+    "edge_count": 37,
+    "guard_count": 8,
     "terminal_count": 7,
     "reachable_terminal_count": 7,
     "parameters": [
@@ -154,7 +154,7 @@
         "group": "TIME",
         "source_file_ref": "forte-ba23e986a9c7e8d8",
         "locator": "专业性说明.md:L22",
-        "excerpt": "**外呼时间**：每日 21:00 至次日 09:00 严禁拨打，流程中必须在拨号前判断当前时段。",
+        "excerpt": "**外呼时间**：每日 21:00 至次日 09:00 严禁拨打，流程中必须在拨号前判断当前时段。 高龄客户必须立即转人工。",
         "parameters": [
           {
             "name": "prohibited_start",
@@ -189,7 +189,7 @@
         "group": "TIME",
         "source_file_ref": "forte-ba23e986a9c7e8d8",
         "locator": "专业性说明.md:L22",
-        "excerpt": "**外呼时间**：每日 21:00 至次日 09:00 严禁拨打，流程中必须在拨号前判断当前时段。",
+        "excerpt": "**外呼时间**：每日 21:00 至次日 09:00 严禁拨打，流程中必须在拨号前判断当前时段。 高龄客户必须立即转人工。",
         "parameters": [],
         "expected_relation": "TIME Gate 必须早于 future dial",
         "expected_action": "先校验时段，再允许未来拨号节点",
@@ -958,6 +958,25 @@
         ],
         "mapped_guard_ids": [],
         "mapped_terminal_ids": []
+      },
+      {
+        "rule_id": "OUT-DISPUTE-03",
+        "group": "DISPUTE",
+        "source_file_ref": "forte-ba23e986a9c7e8d8",
+        "locator": "专业性说明.md:L22",
+        "excerpt": "高龄客户必须立即转人工。",
+        "parameters": [],
+        "expected_relation": "新增来源触发条件命中时必须转人工",
+        "expected_action": "从客户态度决策进入转人工终态",
+        "coverage_state": "covered",
+        "mapped_node_ids": [],
+        "mapped_edge_ids": [
+          "out-edge-response-extra-human-1"
+        ],
+        "mapped_guard_ids": [
+          "out-guard-extra-human-1"
+        ],
+        "mapped_terminal_ids": []
       }
     ],
     "nodes": [
@@ -1713,6 +1732,19 @@
           "OUT-INVALID-01"
         ],
         "future_action": false
+      },
+      {
+        "edge_id": "out-edge-response-extra-human-1",
+        "from_node_id": "out-node-decision-response",
+        "to_node_id": "out-node-human-transfer",
+        "label": "高龄客户必须立即转人工。",
+        "guard_ids": [
+          "out-guard-extra-human-1"
+        ],
+        "source_rule_ids": [
+          "OUT-DISPUTE-03"
+        ],
+        "future_action": true
       }
     ],
     "guards": [
@@ -1817,6 +1849,14 @@
         ],
         "source_rule_ids": [
           "OUT-REDIAL-01"
+        ]
+      },
+      {
+        "guard_id": "out-guard-extra-human-1",
+        "label": "高龄客户必须立即转人工。",
+        "parameters": [],
+        "source_rule_ids": [
+          "OUT-DISPUTE-03"
         ]
       }
     ],

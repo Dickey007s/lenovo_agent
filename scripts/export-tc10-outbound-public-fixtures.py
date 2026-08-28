@@ -75,13 +75,17 @@ def manifests() -> dict[Path, dict]:
         "每日拨打不得超过 3 次，1小时内不得超过 1 次",
         "每日拨打不得超过 5 次，2小时内不得超过 2 次",
         1,
+    ).replace(
+        "流程中必须在拨号前判断当前时段。",
+        "流程中必须在拨号前判断当前时段。 高龄客户必须立即转人工。",
+        1,
     )
     return {
         MANIFEST_DIR / "tc10-public-outbound-flow-outcome-20260829.json": public_payload(
             baseline, "canonical"
         ),
         MANIFEST_DIR / "tc10-public-outbound-flow-outcome-dynamic-20260829.json": public_payload(
-            dynamic_text.encode("utf-8"), "time-frequency-mutation"
+            dynamic_text.encode("utf-8"), "time-frequency-inline-human-trigger-mutation"
         ),
     }
 

@@ -70,6 +70,15 @@ workflow nodes and did not occur. Dynamic rule coverage, graph integrity, final
 approval and external-action facts come from `outbound_flow_outcome`; this is not
 a general outbound engine, current-regulation check or legal opinion.
 
+DR-0048 closes the inline normative-fragment false green in that same adapter.
+Read `docs/decisions/DR-0048-tc10-fragment-consumption-and-stable-effect-wait.md`
+and its Evidence before changing TC-10 fragment parsing or Scenario Effect wait
+helpers. Recognizing one rule on a source line cannot consume other normative
+sentences on that line: supported high-age/serious-illness transfer fragments
+must become independent rules/guards/edges, while unknown or conflicting
+fragments fail closed. Fixed-yield test polling is not an acceptable substitute
+for a monotonic deadline with diagnostic Snapshot facts.
+
 DR-0040 governs TC-02 real-project refactoring. Read
 `docs/decisions/DR-0040-tc02-real-project-react-refactor.md`,
 `docs/scenarios/SCENARIO-026-refactor-real-search-agent-copy-with-bounded-react.md`

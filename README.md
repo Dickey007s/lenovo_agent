@@ -352,6 +352,13 @@ multi-instance coordination and governed external action remain target work.
   and graph checks, rule coverage, pending approval and the fact that dialing,
   CRM, SMS, deny-list writes and human transfer did not occur. This is a fixed
   process-design adapter, not a general outbound system or legal opinion.
+- `DR-0048` closes a source-completeness false green in that adapter. A selected
+  Markdown line is consumed as auditable sentence fragments rather than marked
+  wholesale by line number: supported inline high-age/serious-illness transfer
+  requirements become independent rules and graph guards, while unknown or
+  conflicting inline requirements fail closed. It also replaces fixed-yield
+  async test waits with monotonic deadlines; neither change broadens TC-10 into
+  a general policy compiler or production execution system.
 - No target-user study has been run. Clarity, trust, efficiency and user value
   remain hypotheses.
 
@@ -390,6 +397,8 @@ The current TC-05 source-derived finance candidate review increment is tracked i
 [`DR-0046-TC05-SOURCE-DERIVED-FINANCE-REVIEW-EVIDENCE-20260829`](docs/evidence/DR-0046-TC05-SOURCE-DERIVED-FINANCE-REVIEW-EVIDENCE-20260829.md).
 The current TC-10 source-derived outbound-flow increment is tracked in
 [`DR-0047-TC10-SOURCE-DERIVED-OUTBOUND-FLOW-EVIDENCE-20260829`](docs/evidence/DR-0047-TC10-SOURCE-DERIVED-OUTBOUND-FLOW-EVIDENCE-20260829.md).
+Its inline normative-fragment and stable Effect-wait correction is tracked in
+[`DR-0048-TC10-FRAGMENT-CONSUMPTION-AND-STABLE-WAIT-EVIDENCE-20260829`](docs/evidence/DR-0048-TC10-FRAGMENT-CONSUMPTION-AND-STABLE-WAIT-EVIDENCE-20260829.md).
 
 ## Local run
 
@@ -484,9 +493,11 @@ pnpm --dir apps/web exec playwright test e2e/harness-workbench.spec.ts
 - [TC-06 来源推导双岗位辅助筛选 Evidence](docs/evidence/DR-0045-TC06-SOURCE-DERIVED-CANDIDATE-REVIEW-EVIDENCE-20260829.md)
 - [DR-0046：TC-05 来源推导跨期风险候选与财务处置边界](docs/decisions/DR-0046-tc05-source-derived-finance-candidate-review.md)
 - [DR-0047：TC-10 来源推导外呼流程图与四层审批边界](docs/decisions/DR-0047-tc10-source-derived-outbound-flow.md)
+- [DR-0048：TC-10 规范片段消费与稳定 Effect 等待](docs/decisions/DR-0048-tc10-fragment-consumption-and-stable-effect-wait.md)
 - [SCENARIO-032：从三期往来明细推导可复核风险候选](docs/scenarios/SCENARIO-032-review-three-period-finance-candidates-from-source.md)
 - [TC-05 来源推导财务候选 Evidence](docs/evidence/DR-0046-TC05-SOURCE-DERIVED-FINANCE-REVIEW-EVIDENCE-20260829.md)
 - [TC-10 来源推导外呼流程 Evidence](docs/evidence/DR-0047-TC10-SOURCE-DERIVED-OUTBOUND-FLOW-EVIDENCE-20260829.md)
+- [TC-10 规范片段消费与稳定等待 Evidence](docs/evidence/DR-0048-TC10-FRAGMENT-CONSUMPTION-AND-STABLE-WAIT-EVIDENCE-20260829.md)
 - [可恢复 Control Loop Evidence](docs/evidence/DURABLE-EVIDENCE-GATE-ARTIFACT-EVOLUTION-EVIDENCE-20260826.md)
 - [整库自主研究 Evidence](docs/evidence/AUTONOMOUS-WHOLE-WORKSPACE-RESEARCH-EVIDENCE-20260825.md)
 - [Agent Control Loop 三轮只读纵切证据](docs/evidence/AGENT-CONTROL-LOOP-BOUNDED-READONLY-EVIDENCE-20260825.md)
