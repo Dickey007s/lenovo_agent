@@ -149,6 +149,7 @@ Agent Control Loop 的逐模块历史基线、当前有界效果纵切和后续�
 | 有界格式适配器 | 不执行文件也能检查证据 | 表格/文档预览和安全说明 | 文件预览路由与完整性校验 |
 | 模型之后还有策略编译器 | 模型不能静默决定副作用 | “模型已调用”与“计划已校验”分开 | Model Receipt 与服务端 Plan |
 | 固定本地 Scenario Effect Gate | 用户看到的“已完成”必须落到真实文件和可复算检查，而不是一段模型回答 | 可下载 CSV/MD/DOCX/ZIP、检查清单、原件未修改、外部动作未发生 | `workspace_artifacts[]`、`effect_receipts[]`、Artifact GET 与 named SSE |
+| 来源推导法务核查与三状态反馈 | 用户不再把固定风险答案或绿色文件检查误读为“可以签署”，还能逐份查看哪条规则已触发、哪条只因资料不足无法判断 | “不得据此签署，必须法务复核”、文件检查/法务 Gate/签署复核三状态、六份文件的 21 条规则台账 | `legal_review_outcome.documents[].assessments[]` + `business_gate_outcome` + Artifact `verifier_status`；固定 Legal-020，不是正式法律意见或签署验证 |
 | 设计成果与执行回执分层 | 用户不会把流程文档中的动作词误读为 Agent 已经拨号或写系统 | “只生成流程设计 DOCX”、六类终态、人工复核原因、未拨号/未写 CRM/未发短信 | Artifact `deliverable_type/key_outputs/review_guidance/execution_summary` + EffectReceipt `external_action=none` |
 | 真实代码副本与自测分层 | 用户能区分“改造真实项目”与“另造一个演示包”，并知道如何复测和人工合并 | 完整 algorithm-013 副本、文件变更、两条命令、测试 ID 清单、失败信号 | Artifact `self_test/key_outputs_label` + ZIP/diff/JSON receipt + download content gate |
 | 双阶段真实项目测试 | 用户不再被“105 项通过”蒙蔽，能看到真实模块、修复前红灯和修复后覆盖门 | dev-015 完整 44 文件副本、五类 117 项可展开测试、三处 diff、逐文件覆盖率 | Artifact `test_suites[]` + unpatched/final results + public/ZIP manifest 集合一致门 |

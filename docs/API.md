@@ -549,6 +549,16 @@ source-derived release conditions fail. The browser must not recompute the
 decision, promote auxiliary metrics into formal Gates or let a green Artifact
 hide a non-green business outcome.
 
+Optional `legal_review_outcome` is the source-derived projection for the fixed
+Legal-020 adapter. It contains document/rule coverage, dynamic risk and missing-
+material counts, signing-evidence count and six `documents[]`; each document has
+21 assessments with `triggered/not_triggered/unverifiable`, rule level, approved
+`source_file_ref`, source locator/excerpt, fact, judgment, reason, owner,
+remediation and exit condition. Clients must not turn `not_triggered` into legal
+approval or `unverifiable` into pass/fail. In particular, a lawyer license number
+without a Registry/Connector receipt remains `unverifiable`, and a package
+signature object would still not prove authenticity or authorization effect.
+
 For code artifacts, optional `self_test.test_suites[]` is a public projection of
 the server-owned test manifest. Each suite has `suite_id`, Chinese `label`,
 `test_files`, `test_count` and public `test_ids`. Optional
@@ -754,6 +764,16 @@ passed EffectReceipt proves nine unique deterministic checks completed; it does
 not turn `business_gate_outcome.status=failed` into a release approval. A source
 contract or Verifier failure keeps the Artifact and receipt failed and must not
 be overridden by business decision text.
+
+TC-07 also uses the ordinary Artifact and EffectReceipt protocol. Its two
+downloads share one `legal_review_outcome` and one legal
+`business_gate_outcome`. The fixed source contract is one rule Markdown plus six
+unique DOCX files; the server projects 126 source-derived assessment records and
+three legal review Gates. A passed EffectReceipt proves the source/rule/file
+checks completed. It does not mean a document was signed, a signature was
+authenticated, a lawyer qualification was confirmed or an authorization became
+effective. Any source-contract or Verifier failure keeps both Artifacts and the
+receipt failed even when a legal-risk summary can still be displayed for audit.
 
 `checkpoint_recovered` may appear after an API restart backed by PostgreSQL.
 It proves a persisted Snapshot was restored and the Run paused; it does not

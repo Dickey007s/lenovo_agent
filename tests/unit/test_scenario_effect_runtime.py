@@ -55,6 +55,7 @@ TC04_INSTRUCTION = (
 )
 TC12_INSTRUCTION = "为三个看板工具模块编写 Vitest，修复源码并真实运行测试。"
 TC11_INSTRUCTION = "综合 PRD、上线配置、功能测试和兼容测试，给出上线结论与改进计划。"
+TC07_INSTRUCTION = "依据统一规则核查六份授权委托书，逐项说明风险、资料不足和复核动作。"
 
 
 class OnboardingPlanner:
@@ -212,6 +213,54 @@ class ReleaseReadinessAnalyst:
                             role="observed",
                             label="PRD 文档状态",
                             quote="| 文档状态 | 待上线审核 |",
+                        )
+                    ],
+                )
+            ],
+            follow_ups=[],
+            review_required=True,
+        )
+
+
+class LegalDelegationPlanner:
+    model = "deepseek-v4-pro"
+
+    async def plan(self, *, scenario, files):
+        source = next(item for item in files if item["display_label"] == "委托书4.docx")
+        return HarnessPlanCandidate(
+            summary="读取一份委托书并形成可定位的法务核查上下文",
+            selection_reason="固定 TC-07 效果门会另行冻结一份来源规则与六份委托书，并逐项重算。",
+            units=[
+                HarnessPlanCandidateUnit(
+                    unit_id="read-delegation-document",
+                    title="读取授权委托书",
+                    objective="核对签署栏和身份字段",
+                    input_file_refs=[source["file_ref"]],
+                    tool="file.read",
+                )
+            ],
+        )
+
+
+class LegalDelegationAnalyst:
+    model = "deepseek-v4-pro"
+
+    async def analyze(self, *, instruction, plan, files, validation_feedback=None):
+        source = files[0]
+        return HarnessTaskResult(
+            summary="已读取一份委托书；完整 21 条规则核查由服务端固定 TC-07 效果门执行。",
+            findings=[
+                HarnessFinding(
+                    plan_unit_id=plan.units[0].unit_id,
+                    title="签署栏没有可见签署对象",
+                    detail="委托书4的签署栏为空，确定性效果门将结合 DOCX 包结构复核 R05。",
+                    file_refs=[source["file_ref"]],
+                    evidence_quotes=[
+                        HarnessEvidenceQuote(
+                            file_ref=source["file_ref"],
+                            role="observed",
+                            label="空签署栏",
+                            quote="委托人签名：",
                         )
                     ],
                 )
@@ -694,6 +743,89 @@ async def test_tc11_runtime_persists_verified_files_and_failed_business_gates(
         public_outcome = public["effect_receipts"][0]["business_gate_outcome"]
         assert public_outcome["decision"] == "不得上线"
         assert len(public_outcome["records"]) == 18
+    finally:
+        await runtime.close()
+
+
+@pytest.mark.asyncio
+async def test_tc07_runtime_keeps_file_verification_legal_gate_and_human_review_separate(
+    tmp_path: Path,
+) -> None:
+    before = _forte_digests()
+    runtime = HarnessRuntime(
+        BenchmarkWorkspaceCatalog(FORTE_ROOT),
+        LegalDelegationPlanner(),
+        LegalDelegationAnalyst(),
+        effect_engine=ScenarioEffectEngine(),
+        artifact_store=RunWorkspaceArtifactStore(tmp_path / "run-workspaces"),
+    )
+    try:
+        started = await runtime.start(
+            "legal-owner",
+            HarnessRunStart(
+                idempotency_key="tc07-derived-legal-runtime-0001",
+                instruction=TC07_INSTRUCTION,
+            ),
+        )
+        snapshot = None
+        for _ in range(1_000):
+            candidate = await runtime.get("legal-owner", started.run.run_id)
+            if candidate.status in {"waiting_input", "completed", "stopped", "failed"}:
+                snapshot = candidate
+                break
+            await asyncio.sleep(0.01)
+        assert snapshot is not None
+        assert snapshot.status == "completed"
+        assert len(snapshot.workspace_artifacts) == 2
+        assert len(snapshot.effect_receipts) == 1
+
+        receipt = snapshot.effect_receipts[0]
+        assert receipt.status == "passed"
+        assert receipt.business_gate_outcome is not None
+        assert receipt.business_gate_outcome.outcome_kind == "legal_delegation_review"
+        assert receipt.business_gate_outcome.failed_gate_count == 3
+        assert receipt.legal_review_outcome is not None
+        assert receipt.legal_review_outcome.status == "review_required"
+        assert receipt.legal_review_outcome.document_count == 6
+        assert receipt.legal_review_outcome.assessment_count == 126
+        assert receipt.legal_review_outcome.high_risk_document_count == 6
+        assert receipt.legal_review_outcome.signing_evidence_count == 0
+        assert receipt.legal_review_outcome.human_review_required is True
+
+        for artifact in snapshot.workspace_artifacts:
+            assert artifact.verifier_status == "passed"
+            assert artifact.business_gate_outcome == receipt.business_gate_outcome
+            assert artifact.legal_review_outcome == receipt.legal_review_outcome
+            assert all(check.passed for check in artifact.checks)
+
+        by_name = {item.file_name: item for item in snapshot.workspace_artifacts}
+        _, report = await runtime.get_workspace_artifact(
+            "legal-owner",
+            snapshot.run_id,
+            by_name["授权委托书风控报告.docx"].artifact_id,
+        )
+        with zipfile.ZipFile(io.BytesIO(report)) as package:
+            report_xml = package.read("word/document.xml").decode("utf-8")
+        assert report_xml.count("<w:tbl>") >= 8
+        assert "不是正式法律意见" in report_xml
+        assert "R05" in report_xml
+
+        _, ledger = await runtime.get_workspace_artifact(
+            "legal-owner",
+            snapshot.run_id,
+            by_name["授权委托书逐项核查台账.csv"].artifact_id,
+        )
+        rows = list(csv.DictReader(io.StringIO(ledger.decode("utf-8-sig"))))
+        assert len(rows) == 126
+        assert len({(row["文档ID"], row["规则ID"]) for row in rows}) == 126
+        assert sum(row["规则ID"] == "R05" and row["状态"] == "triggered" for row in rows) == 6
+        assert _forte_digests() == before
+
+        public = runtime.public_snapshot(snapshot).model_dump(mode="json")
+        public_legal = public["effect_receipts"][0]["legal_review_outcome"]
+        assert public_legal["decision"] == "不得据此签署，必须法务复核"
+        assert len(public_legal["documents"]) == 6
+        assert len(public_legal["documents"][0]["assessments"]) == 21
     finally:
         await runtime.close()
 

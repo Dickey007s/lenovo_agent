@@ -654,10 +654,75 @@ class AgentControlLoopBusinessRecord(StrictModel):
     exit_condition: str = Field(min_length=1, max_length=500)
 
 
+class AgentControlLoopLegalRuleAssessment(StrictModel):
+    """One source-derived rule result for one fixed Legal-020 document."""
+
+    assessment_id: str = Field(
+        pattern=r"^legal-assessment-doc-[0-9]{2}-[rml][0-9]{2}$"
+    )
+    rule_id: str = Field(pattern=r"^[RML][0-9]{2}$")
+    rule_name: str = Field(min_length=1, max_length=180)
+    rule_level: Literal["high", "medium", "low"]
+    status: Literal["triggered", "not_triggered", "unverifiable"]
+    source_locator: str = Field(min_length=1, max_length=180)
+    excerpt: str = Field(min_length=1, max_length=1_000)
+    fact: str = Field(min_length=1, max_length=800)
+    judgment: str = Field(min_length=1, max_length=800)
+    reason: str = Field(min_length=1, max_length=800)
+    owner: str = Field(min_length=1, max_length=160)
+    remediation_action: str = Field(min_length=1, max_length=800)
+    exit_condition: str = Field(min_length=1, max_length=800)
+
+
+class AgentControlLoopLegalDocumentReview(StrictModel):
+    """All 21 rule assessments for one source document."""
+
+    document_id: str = Field(pattern=r"^DOC-[0-9]{2}$")
+    document_name: str = Field(min_length=1, max_length=180)
+    source_file_ref: str = Field(min_length=1, max_length=120)
+    highest_triggered_level: Literal["none", "low", "medium", "high"]
+    triggered_count: int = Field(ge=0, le=21)
+    unverifiable_count: int = Field(ge=0, le=21)
+    signing_evidence_status: Literal["present", "absent", "unverifiable"]
+    summary: str = Field(min_length=1, max_length=800)
+    assessments: list[AgentControlLoopLegalRuleAssessment] = Field(
+        min_length=21, max_length=21
+    )
+
+
+class AgentControlLoopLegalReviewOutcome(StrictModel):
+    """Legal review projection kept separate from file-verifier status."""
+
+    outcome_id: str = Field(pattern=r"^legal-review-outcome-[a-z0-9-]{3,80}$")
+    status: Literal["cleared", "review_required", "invalid"]
+    decision: str = Field(min_length=1, max_length=300)
+    summary: str = Field(min_length=1, max_length=1_000)
+    document_count: int = Field(ge=0, le=6)
+    rule_count: int = Field(ge=0, le=21)
+    assessment_count: int = Field(ge=0, le=126)
+    high_risk_document_count: int = Field(ge=0, le=6)
+    medium_risk_document_count: int = Field(ge=0, le=6)
+    low_risk_document_count: int = Field(ge=0, le=6)
+    no_trigger_document_count: int = Field(ge=0, le=6)
+    critical_unverifiable_count: int = Field(ge=0, le=126)
+    signing_evidence_count: int = Field(ge=0, le=6)
+    human_review_required: bool
+    signing_status: Literal[
+        "evidence_present", "evidence_incomplete", "invalid"
+    ]
+    documents: list[AgentControlLoopLegalDocumentReview] = Field(
+        default_factory=list, max_length=6
+    )
+    external_action: Literal["none"] = "none"
+
+
 class AgentControlLoopBusinessGateOutcome(StrictModel):
     """A business decision projected independently from deterministic checks."""
 
     outcome_id: str = Field(pattern=r"^business-outcome-[a-z0-9-]{3,80}$")
+    outcome_kind: Literal["release_readiness", "legal_delegation_review"] = (
+        "release_readiness"
+    )
     status: Literal["passed", "failed", "invalid"]
     decision: str = Field(min_length=1, max_length=300)
     summary: str = Field(min_length=1, max_length=800)
@@ -706,6 +771,7 @@ class AgentControlLoopWorkspaceArtifact(StrictModel):
     execution_summary: str | None = Field(default=None, min_length=1, max_length=500)
     self_test: AgentControlLoopArtifactSelfTest | None = None
     business_gate_outcome: AgentControlLoopBusinessGateOutcome | None = None
+    legal_review_outcome: AgentControlLoopLegalReviewOutcome | None = None
     download_path: str = Field(min_length=1, max_length=300)
     created_at: datetime
     original_inputs_modified: Literal[False] = False
@@ -734,6 +800,7 @@ class AgentControlLoopEffectReceipt(StrictModel):
     artifact_ids: list[str] = Field(default_factory=list, max_length=8)
     prohibited_side_effects: list[str] = Field(default_factory=list, max_length=12)
     business_gate_outcome: AgentControlLoopBusinessGateOutcome | None = None
+    legal_review_outcome: AgentControlLoopLegalReviewOutcome | None = None
     created_at: datetime
     external_action: Literal["none"] = "none"
 

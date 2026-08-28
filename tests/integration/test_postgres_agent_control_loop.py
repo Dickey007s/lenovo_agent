@@ -29,9 +29,12 @@ from tests.unit.test_scenario_effect_runtime import (
     DashboardAnalyst,
     DashboardPlanner,
     FORTE_ROOT,
+    TC07_INSTRUCTION,
     ONBOARDING_INSTRUCTION,
     TC11_INSTRUCTION,
     TC12_INSTRUCTION,
+    LegalDelegationAnalyst,
+    LegalDelegationPlanner,
     OnboardingAnalyst,
     OnboardingPlanner,
     ReleaseReadinessAnalyst,
@@ -336,6 +339,126 @@ async def test_postgres_restart_preserves_tc11_artifacts_and_business_gates(
             )
         )
         assert len(rows) == 18
+        assert "content_sha256" not in second.public_snapshot(
+            restored
+        ).model_dump_json()
+    finally:
+        for runtime in reversed(runtimes):
+            await runtime.close()
+        if DATABASE_DSN and run_id:
+            async with await psycopg.AsyncConnection.connect(DATABASE_DSN) as connection:
+                async with connection.cursor() as cursor:
+                    for table in (
+                        "harness_idempotency",
+                        "harness_task_commit",
+                        "harness_artifact_version",
+                        "harness_run_state",
+                    ):
+                        await cursor.execute(
+                            f"DELETE FROM {table} WHERE owner_id = %s",  # nosec B608
+                            (owner,),
+                        )
+
+
+@pytest.mark.asyncio
+async def test_postgres_restart_preserves_tc07_legal_review_and_artifacts(
+    tmp_path: Path,
+) -> None:
+    owner = f"postgres-tc07-legal-{uuid4().hex}"
+    run_id = ""
+    runtimes: list[HarnessRuntime] = []
+    workspace_root = tmp_path / "tc07-run-workspaces"
+    try:
+        first = HarnessRuntime(
+            BenchmarkWorkspaceCatalog(FORTE_ROOT),
+            LegalDelegationPlanner(),
+            LegalDelegationAnalyst(),
+            PostgresHarnessStateStore(DATABASE_DSN),
+            effect_engine=ScenarioEffectEngine(),
+            artifact_store=RunWorkspaceArtifactStore(workspace_root),
+        )
+        runtimes.append(first)
+        await first.setup()
+        started = await first.start(
+            owner,
+            start_request(
+                idempotency_key=f"postgres-tc07-start-{uuid4().hex}",
+                instruction=TC07_INSTRUCTION,
+            ),
+        )
+        run_id = started.run.run_id
+        terminal = await wait_for_effect_run(first, owner, run_id)
+        assert terminal.status == "completed"
+        assert len(terminal.workspace_artifacts) == 2
+        receipt = terminal.effect_receipts[0]
+        assert receipt.status == "passed"
+        assert receipt.scenario_id == "TC-07"
+        assert receipt.business_gate_outcome is not None
+        assert receipt.business_gate_outcome.outcome_kind == "legal_delegation_review"
+        assert receipt.business_gate_outcome.failed_gate_count == 3
+        assert receipt.legal_review_outcome is not None
+        assert receipt.legal_review_outcome.status == "review_required"
+        assert receipt.legal_review_outcome.assessment_count == 126
+        assert receipt.legal_review_outcome.high_risk_document_count == 6
+        assert receipt.legal_review_outcome.critical_unverifiable_count == 11
+
+        originals: dict[str, bytes] = {}
+        for artifact in terminal.workspace_artifacts:
+            assert artifact.verifier_status == "passed"
+            assert artifact.legal_review_outcome == receipt.legal_review_outcome
+            _, originals[artifact.file_name] = await first.get_workspace_artifact(
+                owner, run_id, artifact.artifact_id
+            )
+        await first.close()
+
+        second = HarnessRuntime(
+            BenchmarkWorkspaceCatalog(FORTE_ROOT),
+            LegalDelegationPlanner(),
+            LegalDelegationAnalyst(),
+            PostgresHarnessStateStore(DATABASE_DSN),
+            effect_engine=ScenarioEffectEngine(),
+            artifact_store=RunWorkspaceArtifactStore(workspace_root),
+        )
+        runtimes.append(second)
+        await second.setup()
+        restored = await second.get(owner, run_id)
+        restored_receipt = restored.effect_receipts[0]
+        assert restored_receipt.business_gate_outcome == receipt.business_gate_outcome
+        assert restored_receipt.legal_review_outcome == receipt.legal_review_outcome
+        restored_by_name = {
+            item.file_name: item for item in restored.workspace_artifacts
+        }
+        for file_name, content in originals.items():
+            artifact = restored_by_name[file_name]
+            assert artifact.legal_review_outcome == receipt.legal_review_outcome
+            _, restored_content = await second.get_workspace_artifact(
+                owner, run_id, artifact.artifact_id
+            )
+            assert restored_content == content
+
+        with zipfile.ZipFile(
+            io.BytesIO(originals["授权委托书风控报告.docx"])
+        ) as package:
+            document = package.read("word/document.xml").decode("utf-8")
+        assert document.count("<w:tbl>") >= 8
+        assert "不得据此签署，必须法务复核" in document
+        assert "R05" in document
+        rows = list(
+            csv.DictReader(
+                io.StringIO(
+                    originals["授权委托书逐项核查台账.csv"].decode("utf-8-sig")
+                )
+            )
+        )
+        assert len(rows) == 126
+        assert sum(
+            row["规则ID"] == "R05" and row["状态"] == "triggered"
+            for row in rows
+        ) == 6
+        assert sum(
+            row["规则ID"] == "M03" and row["状态"] == "unverifiable"
+            for row in rows
+        ) == 5
         assert "content_sha256" not in second.public_snapshot(
             restored
         ).model_dump_json()

@@ -35,6 +35,7 @@ from packages.contracts.harness_models import (
     AgentControlLoopArtifactSelfTest,
     AgentControlLoopArtifactTestSuite,
     AgentControlLoopBusinessGateOutcome,
+    AgentControlLoopLegalReviewOutcome,
 )
 from services.api.app.application.react_refactor_effect import (
     build_real_react_refactor,
@@ -49,6 +50,13 @@ from services.api.app.application.release_readiness_effect import (
     ReleaseReadinessValidationError,
     build_release_readiness,
     invalid_release_outcome,
+)
+from services.api.app.application.legal_delegation_effect import (
+    DOCUMENT_LOGICAL_IDS,
+    RULE_LOGICAL_ID,
+    LegalDelegationValidationError,
+    LegalSourceInput,
+    build_legal_delegation_review,
 )
 
 
@@ -85,6 +93,7 @@ class GeneratedOfficeArtifact:
     execution_summary: str | None = None
     self_test: AgentControlLoopArtifactSelfTest | None = None
     business_gate_outcome: AgentControlLoopBusinessGateOutcome | None = None
+    legal_review_outcome: AgentControlLoopLegalReviewOutcome | None = None
 
     @property
     def verifier_status(self) -> str:
@@ -325,11 +334,15 @@ SCENARIO_EFFECT_SPECS: tuple[ScenarioEffectSpec, ...] = (
             ("法务", "委托书5.docx"),
             ("法务", "委托书6.docx"),
         ),
-        ("授权委托书风控报告.docx",),
-        "validator-legal-delegation-v1",
-        "按文档分支显示规则、证据和待复核风险。",
-        ("effect_receipts[]",),
-        ("不替代正式法律意见", "不签署文档"),
+        ("授权委托书风控报告.docx", "授权委托书逐项核查台账.csv"),
+        "validator-legal-delegation-v2",
+        "先显示法务 Gate 与签署边界，再按文档展开 21 条规则、来源位置和处置动作。",
+        (
+            "workspace_artifacts[].business_gate_outcome",
+            "workspace_artifacts[].legal_review_outcome",
+            "effect_receipts[].business_gate_outcome",
+        ),
+        ("不替代正式法律意见", "不签署文档", "不判断授权已经生效"),
         "implemented",
         _contains_any(("委托书", "风控"), ("授权", "核查")),
     ),
@@ -489,21 +502,47 @@ class ScenarioEffectEngine:
             return None
         workspace = copy.deepcopy(catalog.public_workspace())
         folders = list(workspace.get("folders") or [])
-        index = {
-            (str(folder.get("display_label")), str(item.get("display_label"))): str(
-                item.get("file_ref")
-            )
-            for folder in folders
-            for item in list(folder.get("files") or [])
+        requested_keys = set(spec.source_labels)
+        matches: dict[tuple[str, str], list[str]] = {
+            key: [] for key in requested_keys
         }
+        for folder in folders:
+            group = str(folder.get("display_label"))
+            for item in list(folder.get("files") or []):
+                key = (group, str(item.get("display_label")))
+                if key in requested_keys:
+                    matches[key].append(str(item.get("file_ref")))
+        if spec.scenario_id == "TC-07":
+            legal_folder = next(
+                (folder for folder in folders if folder.get("display_label") == "法务"),
+                None,
+            )
+            expected_labels = {label for group, label in spec.source_labels if group == "法务"}
+            actual_labels = [
+                str(item.get("display_label"))
+                for item in list((legal_folder or {}).get("files") or [])
+            ]
+            if (
+                legal_folder is None
+                or len(actual_labels) != 7
+                or set(actual_labels) != expected_labels
+            ):
+                raise ScenarioEffectError(
+                    "Legal-020 法务目录必须恰好包含一份规则和六份委托书"
+                )
         preview_refs: list[str] = []
         source_refs: list[str] = []
         for group, label in spec.source_labels:
-            file_ref = index.get((group, label))
-            if not file_ref:
+            candidates = matches[(group, label)]
+            if not candidates:
                 raise ScenarioEffectError(
                     f"确定性办公工具缺少来源：{group}/{label}"
                 )
+            if len(candidates) != 1:
+                raise ScenarioEffectError(
+                    f"确定性办公工具来源逻辑名称重复：{group}/{label}"
+                )
+            file_ref = candidates[0]
             preview_refs.append(file_ref)
             source_refs.append(file_ref)
 
@@ -2026,57 +2065,80 @@ class ScenarioEffectEngine:
     def _legal_delegation_review(
         self, catalog: ScenarioEffectCatalog, spec: ScenarioEffectSpec
     ) -> tuple[GeneratedOfficeArtifact, ...]:
-        previews = self._previews(catalog, spec)
-        source_refs = self._source_refs(previews)
-        rules = previews["授权委托书风控校验规则.md"].get("text") or ""
-        expected = {
-            1: ("中风险", ("M03 受托人无相应资质", "M07 转委托约定缺失", "M08 法律责任承担约定缺失")),
-            2: ("中风险", ("M01 特别授权范围过宽", "M07 转委托约定缺失", "M08 法律责任承担约定缺失")),
-            3: ("中风险", ("M03 受托人无相应资质", "M07 转委托约定缺失", "M08 法律责任承担约定缺失")),
-            4: ("高风险", ("R01 委托人身份证明缺失", "R02 受托人身份证明缺失", "M07 转委托约定缺失", "M08 法律责任承担约定缺失")),
-            5: ("高风险", ("R03 授权范围完全未明确", "M03 受托人无相应资质", "M07 转委托约定缺失", "M08 法律责任承担约定缺失")),
-            6: ("中风险", ("M01 特别授权范围过宽", "M07 转委托约定缺失", "M08 法律责任承担约定缺失")),
+        sources = self._legal_source_inputs(catalog, spec)
+        source_refs = tuple(source.file_ref for source in sources)
+        source_bytes_before = {
+            source.file_ref: source.content for source in sources
         }
-        paragraphs = [
-            "六份授权委托书风控核查报告",
-            "边界：本报告是基于公开样本和给定规则的辅助核查，不替代正式法律意见。",
-        ]
-        for index in range(1, 7):
-            level, risks = expected[index]
-            source = previews[f"委托书{index}.docx"].get("text") or ""
-            paragraphs.extend(
-                [
-                    f"委托书{index}",
-                    f"综合风险等级：{level}",
-                    "风险项：" + "；".join(risks),
-                    "证据说明：" + (
-                        "正文中的主体身份、授权范围、期限和责任条款已逐项与规则核对。"
-                        if source
-                        else "来源无法读取。"
-                    ),
-                    "调整建议：补齐对应身份或资质证明，明确转委托和责任承担；特别授权需收窄并逐项确认。",
-                ]
-            )
-        rendered = "\n".join(paragraphs)
-        content = self._docx_bytes(paragraphs)
-        checks = (
-            self._check("check-legal-six", "六份文件完整", all(rendered.count(f"委托书{index}\n") == 1 for index in range(1, 7)), "六份委托书各形成一个独立核查分支。"),
-            self._check("check-legal-levels", "最高风险等级", all(f"委托书{index}\n综合风险等级：{level}" in rendered for index, (level, _) in expected.items()), "风险等级严格取规则命中项的最高等级。"),
-            self._check("check-legal-items", "风险项逐项齐全", all(all(risk in rendered.split(f"委托书{index}", 1)[1].split("委托书", 1)[0] for risk in risks) for index, (_, risks) in expected.items()), "六个分支的预期风险项均已出现。"),
-            self._check("check-legal-rule-source", "规则来源复核", all(code in rules for code in ("R01", "R02", "R03", "M01", "M03", "M07", "M08")), "全部命中项在规则原文中有定义。"),
-            self._check("check-legal-no-r05", "不误报签字完全缺失", "R05" not in rendered and "签字/盖章完全缺失" not in rendered, "样本保留签署栏，未把空白预览误判为形式要件完全缺失。"),
-            self._check("check-legal-human", "法律意见边界", "不替代正式法律意见" in rendered, "报告保留人工法务复核边界且不签署文件。"),
+        try:
+            build = build_legal_delegation_review(sources)
+        except LegalDelegationValidationError as exc:
+            raise ScenarioEffectError(
+                f"TC-07 来源或规则合同失败：{exc.code}：{exc.detail}"
+            ) from exc
+        source_unchanged = all(
+            catalog.checked_input_bytes(file_ref) == content
+            for file_ref, content in source_bytes_before.items()
+        )
+        checks = tuple(
+            self._check(item.check_id, item.label, item.passed, item.detail)
+            for item in build.checks
+        ) + (
+            self._check(
+                "check-legal-originals-read-only",
+                "FORTE 原件未修改",
+                source_unchanged,
+                "生成前后重新读取七份 allowlist 输入，字节保持一致。",
+            ),
+        )
+        legal = build.analysis.legal_outcome
+        key_outputs = (
+            f"6 份文件 × 21 条规则，共 {legal.assessment_count} 条逐项记录",
+            f"高风险 {legal.high_risk_document_count} 份，关键资料不足 {legal.critical_unverifiable_count} 项",
+            f"可审查签署证据 {legal.signing_evidence_count}/6 份",
+            "所有 R05、身份、期限与资质判断均由批准来源字节重算",
+        )
+        common = dict(
+            source_file_refs=source_refs,
+            validator_id="validator-legal-delegation-v2",
+            checks=checks,
+            covered_period="固定 Legal-020 的 6 份公开授权委托书",
+            statistic_basis="1 份来源规则中的 21 条规则 × 6 份 DOCX，逐项形成 126 条核查记录。",
+            purpose="辅助法务人员定位风险、资料不足与补充条件；不能据此签署或认定授权有效。",
+            deliverable_type="来源推导的辅助法务核查成果",
+            key_outputs=key_outputs,
+            key_outputs_label="本次来源推导结果",
+            review_guidance=(
+                "先处理高风险与关键资料不足项，再由法务人员核对原件、关联业务材料和签署真实性；"
+                "本次没有签署、审批或使授权生效。"
+            ),
+            execution_summary=(
+                "已从七份冻结来源生成并校验报告与 126 行台账；没有签署文件，也不代表授权有效。"
+            ),
+            business_gate_outcome=build.analysis.business_outcome,
+            legal_review_outcome=legal,
         )
         return (
             GeneratedOfficeArtifact(
-                "授权委托书风控报告",
-                "授权委托书风控报告.docx",
-                "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                content,
-                source_refs,
-                "validator-legal-delegation-v1",
-                checks,
-                "六份委托书已按统一规则逐份核查；2 份高风险、4 份中风险，等待法务复核。",
+                title="授权委托书风控报告",
+                file_name="授权委托书风控报告.docx",
+                media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                content=build.report_docx,
+                summary=(
+                    f"六份文件均完成 21 条来源规则核查；高风险 {legal.high_risk_document_count} 份，"
+                    "必须法务复核。"
+                ),
+                record_count=6,
+                **common,
+            ),
+            GeneratedOfficeArtifact(
+                title="授权委托书逐项核查台账",
+                file_name="授权委托书逐项核查台账.csv",
+                media_type="text/csv",
+                content=build.ledger_csv,
+                summary="126 条文档、规则组合包含状态、原文位置、事实、判断、责任人和退出条件。",
+                record_count=126,
+                **common,
             ),
         )
 
@@ -2617,6 +2679,55 @@ class ScenarioEffectEngine:
         return AgentControlLoopArtifactCheck(
             check_id=check_id, label=label, passed=bool(passed), detail=detail
         )
+
+    @staticmethod
+    def _legal_source_inputs(
+        catalog: ScenarioEffectCatalog, spec: ScenarioEffectSpec
+    ) -> tuple[LegalSourceInput, ...]:
+        workspace = catalog.public_workspace()
+        legal_folders = [
+            folder
+            for folder in workspace.get("folders") or []
+            if folder.get("display_label") == "法务"
+        ]
+        if len(legal_folders) != 1:
+            raise ScenarioEffectError("Legal-020 法务目录必须唯一")
+        items = list(legal_folders[0].get("files") or [])
+        expected_labels = [label for group, label in spec.source_labels if group == "法务"]
+        if len(items) != 7 or sorted(str(item.get("display_label")) for item in items) != sorted(expected_labels):
+            raise ScenarioEffectError(
+                "Legal-020 法务目录必须恰好包含一份规则和六份委托书"
+            )
+        by_label: dict[str, dict[str, Any]] = {}
+        for item in items:
+            label = str(item.get("display_label"))
+            if label in by_label:
+                raise ScenarioEffectError(f"Legal-020 来源逻辑名称重复：{label}")
+            by_label[label] = item
+        logical_ids = {
+            "授权委托书风控校验规则.md": RULE_LOGICAL_ID,
+            **{
+                f"委托书{index}.docx": logical_id
+                for index, logical_id in enumerate(DOCUMENT_LOGICAL_IDS, start=1)
+            },
+        }
+        result: list[LegalSourceInput] = []
+        for label in expected_labels:
+            item = by_label[label]
+            file_ref = str(item.get("file_ref"))
+            content = catalog.checked_input_bytes(file_ref)
+            result.append(
+                LegalSourceInput(
+                    logical_id=logical_ids[label],
+                    file_name=label,
+                    display_path=str(item.get("display_path")),
+                    file_ref=file_ref,
+                    content=content,
+                    declared_size=int(item.get("size") or 0),
+                    allowlist_verified=True,
+                )
+            )
+        return tuple(result)
 
     @staticmethod
     def _previews(

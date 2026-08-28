@@ -1,5 +1,6 @@
 import { expect, test, type Page, type Route } from "@playwright/test";
 import tc04TestManifest from "../../../docs/evidence/manifests/tc04-public-test-manifest-20260828.json";
+import tc07LegalReviewManifest from "../../../docs/evidence/manifests/tc07-public-legal-review-outcome-20260828.json";
 import tc11BusinessOutcome from "../../../docs/evidence/manifests/tc11-business-gate-outcome-20260828.json";
 import tc12TestManifest from "../../../docs/evidence/manifests/tc12-public-test-manifest-20260828.json";
 
@@ -23,6 +24,15 @@ const docxFile = fileItem("forte-3333333333333333", "forte-folder-333333333333",
 const txtFile = fileItem("forte-4444444444444444", "forte-folder-444444444444", "运行日志.txt", "可靠性工程", "TXT", "text");
 const workflowFile = fileItem("forte-5555555555555555", "forte-folder-555555555555", "workflow.py", "算法研发", "PY", "text", "search_agent_workflow/workflow.py");
 const searchLogFile = fileItem("forte-6666666666666666", "forte-folder-555555555555", "search_agent.log", "算法研发", "LOG", "text", "search_agent_workflow/search_agent.log");
+const legalRuleFile = fileItem("forte-legal-rules-01", pdfFile.folder_id, "授权委托书风控校验规则.md", "法务", "MD", "text");
+const legalDelegationFiles = Array.from({ length: 6 }, (_, index) => fileItem(
+  `forte-legal-doc-0${index + 1}`,
+  pdfFile.folder_id,
+  `委托书${index + 1}.docx`,
+  "法务",
+  "DOCX",
+  "document",
+));
 
 function fileItem(fileRef: string, folderId: string, label: string, group: string, extension: FileItem["extension"], kind: FileItem["preview_kind"], nestedPath?: string): FileItem {
   return {
@@ -42,7 +52,7 @@ function fileItem(fileRef: string, folderId: string, label: string, group: strin
 
 const seedFolders = [
   { folder_id: csvFile.folder_id, display_label: "财务管理", display_summary: "跨期间往来资料", files: [csvFile] },
-  { folder_id: pdfFile.folder_id, display_label: "法务", display_summary: "合同与授权材料", files: [pdfFile] },
+  { folder_id: pdfFile.folder_id, display_label: "法务", display_summary: "合同与授权材料", files: [legalRuleFile, ...legalDelegationFiles, pdfFile] },
   { folder_id: docxFile.folder_id, display_label: "人力招聘", display_summary: "岗位与候选人材料", files: [docxFile] },
   { folder_id: txtFile.folder_id, display_label: "可靠性工程", display_summary: "运行日志与服务资料", files: [txtFile] },
   { folder_id: workflowFile.folder_id, display_label: "算法研发", display_summary: "搜索 Agent 代码与运行记录", files: [workflowFile, searchLogFile] },
@@ -51,7 +61,7 @@ const seedFolders = [
 const folders = Array.from({ length: 15 }, (_, folderIndex) => {
   const seed = seedFolders[folderIndex];
   const folderId = seed?.folder_id ?? `forte-folder-${String(folderIndex + 1).padStart(12, "0")}`;
-  const targetCount = folderIndex < 6 ? 7 : 6;
+  const targetCount = folderIndex === 1 ? 8 : folderIndex === 5 ? 6 : folderIndex < 6 ? 7 : 6;
   const files = seed ? [...seed.files] : [];
   while (files.length < targetCount) {
     const fileIndex = foldersFileIndex(folderIndex, files.length);
@@ -1058,6 +1068,150 @@ function failedReleaseReadinessEffectSnapshot(body: { workspace_id: string; inst
   };
 }
 
+function legalDelegationEffectSnapshot(body: { workspace_id: string; instruction: string }, options: { repairedDocumentFour?: boolean } = {}) {
+  const base = snapshot(body, "completed", 18);
+  const sourceRefs = [
+    "forte-legal-rules-01",
+    "forte-legal-doc-01",
+    "forte-legal-doc-02",
+    "forte-legal-doc-03",
+    "forte-legal-doc-04",
+    "forte-legal-doc-05",
+    "forte-legal-doc-06",
+  ];
+  const artifactIds = ["workspace-artifact-707070707001", "workspace-artifact-707070707002"];
+  const manifest = structuredClone(tc07LegalReviewManifest);
+  if (options.repairedDocumentFour) {
+    const outcome = manifest.legal_review_outcome;
+    const documentFour = outcome.documents.find((document) => document.document_id === "DOC-04");
+    if (!documentFour) throw new Error("TC-07 public manifest is missing DOC-04");
+    for (const assessment of documentFour.assessments) {
+      if (assessment.status !== "triggered") continue;
+      assessment.status = "not_triggered";
+      assessment.fact = assessment.rule_id === "R05"
+        ? "测试来源副本已加入可审查签署对象。"
+        : "测试来源副本已补齐该项所需字段或条款。";
+      assessment.judgment = "修订后的批准来源未再满足该规则触发条件，当前未触发。";
+      assessment.reason = "来源变体已通过服务端重新解析。";
+    }
+    documentFour.highest_triggered_level = "none";
+    documentFour.triggered_count = 0;
+    documentFour.signing_evidence_status = "present";
+    documentFour.summary = "已触发 0 项，资料不足 1 项；当前无已触发风险，仍需复核资料不足项。";
+    outcome.high_risk_document_count = 5;
+    outcome.no_trigger_document_count = 1;
+    outcome.signing_evidence_count = 1;
+    outcome.summary = "共 6 份文件：高风险 5 份、中风险 0 份、低风险 0 份、无已触发项 1 份；关键资料不足 11 项；可审查签署证据 1/6 份。";
+    const highRiskGate = manifest.business_gate_outcome.gates.find((gate) => gate.gate_id === "business-gate-legal-high-risk-zero");
+    const signingGate = manifest.business_gate_outcome.gates.find((gate) => gate.gate_id === "business-gate-legal-signing-evidence-complete");
+    if (!highRiskGate || !signingGate) throw new Error("TC-07 public manifest is missing dynamic Gate facts");
+    highRiskGate.numerator = 5;
+    highRiskGate.actual = 5;
+    highRiskGate.result = "仍有 5 份高风险文件。";
+    signingGate.numerator = 1;
+    signingGate.actual = 1;
+    signingGate.result = "仅 1/6 份存在可审查签署对象。";
+  }
+  const outcome = manifest.legal_review_outcome;
+  const common = {
+    capability_id: "office-legal-delegation-review",
+    scenario_id: "TC-07",
+    version: 1,
+    round_number: 1,
+    source_file_refs: sourceRefs,
+    validator_id: "validator-legal-delegation-v2",
+    verifier_status: "passed",
+    checks: manifest.checks,
+    covered_period: "固定 Legal-020 的 6 份公开授权委托书",
+    statistic_basis: "1 份来源规则中的 21 条规则 × 6 份 DOCX，逐项形成 126 条核查记录。",
+    purpose: "辅助法务人员定位风险、资料不足与补充条件；不能据此签署或认定授权有效。",
+    deliverable_type: "来源推导的辅助法务核查成果",
+    key_outputs: [
+      `${outcome.document_count} 份文件 × ${outcome.rule_count} 条规则，共 ${outcome.assessment_count} 条逐项记录`,
+      `高风险 ${outcome.high_risk_document_count} 份，关键资料不足 ${outcome.critical_unverifiable_count} 项`,
+      `可审查签署证据 ${outcome.signing_evidence_count}/${outcome.document_count} 份`,
+      "所有 R05、身份、期限与资质判断均由批准来源字节重算",
+    ],
+    key_outputs_label: "本次来源推导结果",
+    review_guidance: "先处理高风险与关键资料不足项，再由法务人员核对原件、关联业务材料和签署真实性；本次没有签署、审批或使授权生效。",
+    execution_summary: "已从七份冻结来源生成并校验报告与 126 行台账；没有签署文件，也不代表授权有效。",
+    business_gate_outcome: manifest.business_gate_outcome,
+    legal_review_outcome: manifest.legal_review_outcome,
+    created_at: new Date().toISOString(),
+    original_inputs_modified: false,
+    review_required: true,
+    external_action: "none",
+  };
+  return {
+    ...base,
+    workspace_artifacts: [{
+      ...common,
+      artifact_id: artifactIds[0],
+      title: "授权委托书风控报告",
+      file_name: "授权委托书风控报告.docx",
+      media_type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      size: 34120,
+      summary: `${outcome.document_count} 份文件均完成 ${outcome.rule_count} 条来源规则核查；高风险 ${outcome.high_risk_document_count} 份，必须法务复核。`,
+      record_count: 6,
+      download_path: `/v1/harness/runs/${base.run_id}/artifacts/${artifactIds[0]}`,
+    }, {
+      ...common,
+      artifact_id: artifactIds[1],
+      title: "授权委托书逐项核查台账",
+      file_name: "授权委托书逐项核查台账.csv",
+      media_type: "text/csv",
+      size: 62480,
+      summary: "126 条文档、规则组合包含状态、原文位置、事实、判断、责任人和退出条件。",
+      record_count: 126,
+      download_path: `/v1/harness/runs/${base.run_id}/artifacts/${artifactIds[1]}`,
+    }],
+    effect_receipts: [{
+      receipt_id: "effect-receipt-707070707070",
+      capability_id: "office-legal-delegation-review",
+      scenario_id: "TC-07",
+      status: "passed",
+      state: "已冻结 Legal-020 的 1 份规则和 6 份委托书，原件保持只读。",
+      action: "解析规则与 DOCX 包，生成报告和 126 行逐项台账。",
+      observation: "2 份成果共享 11 项确定性检查，11/11 通过；法务 Gate 3/3 未通过。",
+      cost: "0 次额外模型调用；仅消耗本机确定性解析、计算与文件写入。",
+      result: "文件与计算检查通过；不得据此签署，必须法务复核。",
+      source_file_refs: sourceRefs,
+      artifact_ids: artifactIds,
+      prohibited_side_effects: ["不签署文件", "不判断授权生效", "不提供正式法律意见"],
+      business_gate_outcome: manifest.business_gate_outcome,
+      legal_review_outcome: manifest.legal_review_outcome,
+      created_at: new Date().toISOString(),
+      external_action: "none",
+    }],
+    last_event_sequence: 20,
+  };
+}
+
+function failedLegalDelegationEffectSnapshot(body: { workspace_id: string; instruction: string }) {
+  const base = legalDelegationEffectSnapshot(body);
+  const checks = base.workspace_artifacts[0].checks.map((check) => check.check_id === "check-legal-report-structure"
+    ? { ...check, passed: false, label: "DOCX 逐项表未通过", detail: "报告缺少一条来源推导核查记录，当前成果不得采用。" }
+    : check);
+  return {
+    ...base,
+    status: "failed",
+    workspace_artifacts: base.workspace_artifacts.map((artifact) => ({
+      ...artifact,
+      verifier_status: "failed",
+      checks,
+      summary: "失败证据已保留，但成果文件未通过服务端重算。",
+      review_guidance: "当前成果不得用于法务复核或签署判断；请查看失败检查并重新启动新的 TC-07 Run。",
+      execution_summary: "确定性文件检查失败；没有签署文件，也没有判断授权生效。",
+    })),
+    effect_receipts: base.effect_receipts.map((receipt) => ({
+      ...receipt,
+      status: "failed",
+      observation: "两份成果中至少一项确定性文件检查未通过；失败证据已保留。",
+      result: "当前成果不得采用；没有签署或外部动作。",
+    })),
+  };
+}
+
 function boundedEffectSnapshot(body: { workspace_id: string; instruction: string }) {
   const base = snapshot(body, "completed", 18);
   return {
@@ -1436,7 +1590,7 @@ function locationFailureSnapshot(body: { workspace_id: string; instruction: stri
 }
 async function fulfillJson(route: Route, body: unknown, status = 200) { await route.fulfill({ status, contentType: "application/json", body: JSON.stringify(body) }); }
 
-async function mockHarness(page: Page, options: { failFirstStart?: boolean; failDecisionDefer?: boolean; disconnect?: boolean; failed?: boolean; locationFailure?: boolean; sourceRecovery?: boolean; sourceRecoveryThreeCandidates?: boolean; verifiedArtifactAuditPending?: boolean; verifiedArtifactAuditPendingDistinct?: boolean; verifiedFinanceArtifactAuditPending?: boolean; unverifiedArtifactLocationPending?: boolean; terminalArtifactLocationPending?: boolean; boundedRecovery?: boolean; effectArtifact?: boolean; outboundEffect?: boolean; reactEffect?: boolean; evaluationEffect?: boolean; dashboardEffect?: boolean; dashboardEffectFailed?: boolean; releaseEffect?: boolean; releaseEffectRepaired?: boolean; releaseEffectFailed?: boolean; effectBoundary?: boolean; reviewTable?: boolean; workspaceFailures?: number; interactiveLoop?: boolean; evidenceGate?: boolean } = {}) {
+async function mockHarness(page: Page, options: { failFirstStart?: boolean; failDecisionDefer?: boolean; disconnect?: boolean; failed?: boolean; locationFailure?: boolean; sourceRecovery?: boolean; sourceRecoveryThreeCandidates?: boolean; verifiedArtifactAuditPending?: boolean; verifiedArtifactAuditPendingDistinct?: boolean; verifiedFinanceArtifactAuditPending?: boolean; unverifiedArtifactLocationPending?: boolean; terminalArtifactLocationPending?: boolean; boundedRecovery?: boolean; effectArtifact?: boolean; outboundEffect?: boolean; reactEffect?: boolean; evaluationEffect?: boolean; dashboardEffect?: boolean; dashboardEffectFailed?: boolean; releaseEffect?: boolean; releaseEffectRepaired?: boolean; releaseEffectFailed?: boolean; legalEffect?: boolean; legalEffectRepaired?: boolean; legalEffectFailed?: boolean; effectBoundary?: boolean; reviewTable?: boolean; workspaceFailures?: number; interactiveLoop?: boolean; evidenceGate?: boolean } = {}) {
   let workspaceCalls = 0; let startCalls = 0; let streamCalls = 0;
   let currentBody = { workspace_id: "forte-public-office", instruction: "" };
   // Mock snapshots intentionally cover several server state shapes in one route.
@@ -1497,6 +1651,12 @@ async function mockHarness(page: Page, options: { failFirstStart?: boolean; fail
           ? releaseReadinessEffectSnapshot(body, { repairedF02: true })
         : options.releaseEffect
         ? releaseReadinessEffectSnapshot(body)
+        : options.legalEffectFailed
+          ? failedLegalDelegationEffectSnapshot(body)
+        : options.legalEffectRepaired
+          ? legalDelegationEffectSnapshot(body, { repairedDocumentFour: true })
+        : options.legalEffect
+          ? legalDelegationEffectSnapshot(body)
         : options.effectBoundary
           ? boundedEffectSnapshot(body)
         : options.locationFailure
@@ -1603,7 +1763,7 @@ async function mockHarness(page: Page, options: { failFirstStart?: boolean; fail
     }
     if (path.startsWith("/v1/harness/runs/")) {
       if (options.disconnect && streamCalls === 1) return fulfillJson(route, { ...snapshot(currentBody, "queued"), status: "indexing", last_event_sequence: 1, version: 2 });
-      if (options.interactiveLoop || options.evidenceGate || options.sourceRecovery || options.verifiedArtifactAuditPending || options.verifiedArtifactAuditPendingDistinct || options.verifiedFinanceArtifactAuditPending || options.unverifiedArtifactLocationPending || options.terminalArtifactLocationPending || options.boundedRecovery || options.locationFailure || options.effectArtifact || options.outboundEffect || options.reactEffect || options.evaluationEffect || options.dashboardEffect || options.dashboardEffectFailed || options.releaseEffect || options.releaseEffectRepaired || options.releaseEffectFailed || options.effectBoundary) return fulfillJson(route, currentSnapshot);
+      if (options.interactiveLoop || options.evidenceGate || options.sourceRecovery || options.verifiedArtifactAuditPending || options.verifiedArtifactAuditPendingDistinct || options.verifiedFinanceArtifactAuditPending || options.unverifiedArtifactLocationPending || options.terminalArtifactLocationPending || options.boundedRecovery || options.locationFailure || options.effectArtifact || options.outboundEffect || options.reactEffect || options.evaluationEffect || options.dashboardEffect || options.dashboardEffectFailed || options.releaseEffect || options.releaseEffectRepaired || options.releaseEffectFailed || options.legalEffect || options.legalEffectRepaired || options.legalEffectFailed || options.effectBoundary) return fulfillJson(route, currentSnapshot);
       currentSnapshot = snapshot(currentBody, options.failed ? "failed" : "completed");
       return fulfillJson(route, currentSnapshot);
     }
@@ -2123,6 +2283,127 @@ test("keeps deterministic verification separate from the TC-11 business release 
   if (process.env.CAPTURE_TC11_EFFECT_EVIDENCE === "1") {
     await page.screenshot({ path: "../../docs/evidence/screenshots/tc11-release-gate-mobile.png", fullPage: true });
   }
+});
+
+test("shows TC-07 file verification, legal gate and human review as three separate states", async ({ page }) => {
+  await mockHarness(page, { legalEffect: true });
+  await page.goto("/");
+  await page.getByRole("textbox", { name: "任务指令" }).fill("依据统一规则核查六份授权委托书，逐项说明风险、资料不足和复核动作。");
+  await page.getByRole("button", { name: "启动 Control Loop" }).click();
+
+  const artifacts = page.locator(".workspace-artifacts");
+  const legal = page.getByRole("region", { name: "授权委托书核查结论" });
+  const business = page.getByRole("status", { name: "业务 Gate 结论" });
+  await expect(artifacts).toContainText("Agent 已生成 2 份真实成果文件");
+  await expect(artifacts.locator(":scope > header > b")).toHaveText("业务 Gate 3/3 未通过");
+  await expect(legal.getByRole("heading", { name: "不得据此签署，必须法务复核" })).toBeVisible();
+  await expect(legal.locator(".legal-review-statuses > li")).toHaveCount(3);
+  await expect(legal).toContainText("确定性检查通过");
+  await expect(legal).toContainText("法务 Gate 未通过");
+  await expect(legal).toContainText("没有可核对签署证据");
+  await expect(legal).toContainText("6 份高风险 · 11 项关键资料不足");
+  await expect(legal).toContainText("0/6");
+  await expect(legal).toContainText("不构成正式法律意见");
+  await expect(business).toContainText("法务判断条件");
+  await expect(business).toContainText("3/3 条未通过");
+  await expect(business).not.toContainText("正式上线条件");
+  await expect(legal.locator(".legal-review-documents > details")).toHaveCount(6);
+
+  const documentFour = legal.locator(".legal-review-documents > details").filter({ hasText: "委托书4.docx" });
+  await documentFour.locator("summary").click();
+  await expect(documentFour.locator(":scope > ol > li")).toHaveCount(21);
+  for (const rule of ["R01", "R02", "M03", "R05"]) await expect(documentFour).toContainText(rule);
+  await expect(documentFour).toContainText("委托人行未提取到身份证号或统一社会信用代码");
+  await expect(documentFour).toContainText("签署栏为空，DOCX 包内没有 media、drawing、pict、嵌入或数字签名");
+  await expect(documentFour).toContainText("资料不足");
+
+  const documentTwo = legal.locator(".legal-review-documents > details").filter({ hasText: "委托书2.docx" });
+  await expect(documentTwo.locator("summary")).toContainText("高风险文件");
+  await documentTwo.locator("summary").click();
+  const principalIdentity = documentTwo.locator(":scope > ol > li").filter({ hasText: "R01" });
+  await expect(principalIdentity).toContainText("规则等级：高");
+  await expect(principalIdentity).toContainText("当前未触发");
+  await expect(principalIdentity).not.toContainText("高风险");
+  const lawyerCredential = documentTwo.locator(":scope > ol > li").filter({ hasText: "M03" });
+  await expect(lawyerCredential).toContainText("资料不足");
+  await expect(lawyerCredential).toContainText("字段存在不等于资质已核验");
+
+  const typeSizes = await legal.evaluate((element) => ({
+    conclusion: Number.parseFloat(getComputedStyle(element.querySelector(":scope > header h3")!).fontSize),
+    statusTitle: Number.parseFloat(getComputedStyle(element.querySelector(".legal-review-statuses strong")!).fontSize),
+    documentTitle: Number.parseFloat(getComputedStyle(element.querySelector(".legal-review-documents summary strong")!).fontSize),
+    assessmentText: Number.parseFloat(getComputedStyle(element.querySelector(".legal-review-documents dd")!).fontSize),
+  }));
+  expect(typeSizes.conclusion).toBeGreaterThanOrEqual(20);
+  expect(typeSizes.statusTitle).toBeGreaterThanOrEqual(14);
+  expect(typeSizes.documentTitle).toBeGreaterThanOrEqual(13);
+  expect(typeSizes.assessmentText).toBeGreaterThanOrEqual(12);
+  let overflow = await page.evaluate(() => ({ width: document.documentElement.clientWidth, scroll: document.documentElement.scrollWidth }));
+  expect(overflow.scroll).toBeLessThanOrEqual(overflow.width);
+
+  if (process.env.CAPTURE_TC07_EFFECT_EVIDENCE === "1") {
+    await page.setViewportSize({ width: 1440, height: 1100 });
+    const expandedFinance = page.getByRole("treeitem", { name: "收起文件夹 财务管理" });
+    if (await expandedFinance.isVisible()) await expandedFinance.click();
+    const collapsedLegal = page.getByRole("treeitem", { name: "展开文件夹 法务" });
+    if (await collapsedLegal.isVisible()) await collapsedLegal.click();
+    await expect(page.getByRole("treeitem", { name: "打开 法务/授权委托书风控校验规则.md" })).toBeVisible();
+    for (let index = 1; index <= 6; index += 1) {
+      await expect(page.getByRole("treeitem", { name: `打开 法务/委托书${index}.docx` })).toBeVisible();
+    }
+    await legal.evaluate((element) => element.scrollIntoView({ block: "start" }));
+    await page.screenshot({ path: "../../docs/evidence/screenshots/tc07-source-derived-legal-review-desktop.png" });
+  }
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(legal.getByRole("heading", { name: "不得据此签署，必须法务复核" })).toBeVisible();
+  overflow = await page.evaluate(() => ({ width: document.documentElement.clientWidth, scroll: document.documentElement.scrollWidth }));
+  expect(overflow.scroll).toBeLessThanOrEqual(overflow.width);
+  const legalOverflow = await legal.evaluate((element) => ({ width: element.clientWidth, scroll: element.scrollWidth }));
+  expect(legalOverflow.scroll).toBeLessThanOrEqual(legalOverflow.width);
+  if (process.env.CAPTURE_TC07_EFFECT_EVIDENCE === "1") {
+    await legal.evaluate((element) => element.scrollIntoView({ block: "start" }));
+    await page.screenshot({ path: "../../docs/evidence/screenshots/tc07-source-derived-legal-review-mobile.png" });
+  }
+});
+
+test("keeps a failed TC-07 artifact verifier red even when legal risks are still visible", async ({ page }) => {
+  await mockHarness(page, { legalEffectFailed: true });
+  await page.goto("/");
+  await page.getByRole("textbox", { name: "任务指令" }).fill("依据统一规则核查六份授权委托书，逐项说明风险、资料不足和复核动作。");
+  await page.getByRole("button", { name: "启动 Control Loop" }).click();
+
+  const artifacts = page.locator(".workspace-artifacts");
+  const legal = page.getByRole("region", { name: "授权委托书核查结论" });
+  await expect(legal).toContainText("确定性检查未通过");
+  await expect(legal).toContainText("法务 Gate 未通过");
+  await expect(artifacts).toContainText("DOCX 逐项表未通过");
+  await expect(artifacts).toContainText("当前成果不得用于法务复核或签署判断");
+  await expect(artifacts).not.toContainText("11/11 通过");
+  await expect(artifacts.locator(":scope > ol > li.is-failed")).toHaveCount(2);
+  await expect(artifacts.locator(":scope > ol > li.is-passed")).toHaveCount(0);
+});
+
+test("projects a repaired TC-07 source variant without stale canonical counts", async ({ page }) => {
+  await mockHarness(page, { legalEffectRepaired: true });
+  await page.goto("/");
+  await page.getByRole("textbox", { name: "任务指令" }).fill("依据统一规则核查六份授权委托书，逐项说明风险、资料不足和复核动作。");
+  await page.getByRole("button", { name: "启动 Control Loop" }).click();
+
+  const artifacts = page.locator(".workspace-artifacts");
+  const legal = page.getByRole("region", { name: "授权委托书核查结论" });
+  await expect(legal).toContainText("5 份高风险 · 11 项关键资料不足");
+  await expect(legal).toContainText("部分文件发现可核对签署证据");
+  await expect(legal).toContainText("1/6");
+  await expect(legal).not.toContainText("6 份高风险");
+  await expect(legal).not.toContainText("0/6");
+
+  const documentFour = legal.locator(".legal-review-documents > details").filter({ hasText: "委托书4.docx" });
+  await expect(documentFour.locator("summary")).toContainText("无已触发风险");
+  await expect(documentFour.locator("summary")).toContainText("0 条已触发");
+  await expect(artifacts).toContainText("高风险 5 份");
+  await expect(artifacts).toContainText("可审查签署证据 1/6 份");
+  await expect(artifacts).not.toContainText("高风险 6 份");
+  await expect(artifacts).not.toContainText("可审查签署证据 0/6 份");
 });
 
 test("renders a source-derived seven-risk TC-11 summary without a stale fixed total", async ({ page }) => {

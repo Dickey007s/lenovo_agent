@@ -117,6 +117,17 @@ verification, business Gate status and Run terminal status remain separate.
 This adapter does not execute a release, write configuration or prove a general
 release audit engine.
 
+DR-0044 governs TC-07 source-derived delegation review and the three-state legal
+surface. Read
+`docs/decisions/DR-0044-tc07-source-derived-legal-delegation-review.md`,
+`docs/scenarios/SCENARIO-030-review-six-delegations-with-source-derived-rules.md`
+and its Evidence before changing the fixed Legal-020 adapter or
+`legal_review_outcome`. The service must derive 21 assessments per approved DOCX
+from the source rule table, keep principal/agent fields isolated and treat a
+lawyer-license string without a Registry/Connector receipt as `unverifiable`.
+Artifact verification, legal business Gate and signing/human review are separate
+facts. This adapter is not legal advice, signature validation or authorization.
+
 DR-0037 governs TC-05 Artifact meaning and review typography. Read
 `docs/decisions/DR-0037-tc05-artifact-semantics-and-review-readability.md` and
 `docs/scenarios/SCENARIO-023-understand-finance-artifacts-and-review-evidence.md`
@@ -155,6 +166,7 @@ Source、Evidence 和 UI-server fact mapping，不能只更新 README。
 - TC-10 的流程设计 DOCX 必须把“文档里描述的动作”和“本次 Run 实际动作”分开：Artifact `deliverable_type/key_outputs/review_guidance/execution_summary` 负责成果语义，EffectReceipt `prohibited_side_effects/external_action=none` 负责未执行回执。前台和 DOCX 均明确未拨号、未写 CRM、未发短信；13 项固定检查仍需人工合规复核。
 - TC-05 成果卡必须从服务端 Artifact 字段显示涵盖期间、统计口径、用途和可选记录数；两个 CSV 只绑定 2026 内容来源，三期说明才绑定三期来源与僵尸比较。EffectReceipt 的任务上下文不得冒充单个文件的内容覆盖。
 - TC-11 的两份成果共享服务端 `business_gate_outcome`：18 项逐功能台账、四条正式上线 Gate 和单列辅助指标。风险总数、DOCX 标题、Artifact 摘要和复核引导必须由 `records[]` 动态计算，不得写死当前样本的 8/5；PRD 原因基础等级来自来源等级单元格。`verifier_status=passed` 只证明来源、公式和文件结构，不能盖过 `business_gate_outcome.status=failed` 的“不得上线”；任一来源合同或 Verifier 失败都必须保持 Artifact/EffectReceipt 红灯。
+- TC-07 的两份成果共享服务端 `legal_review_outcome` 与法务 `business_gate_outcome`：六份批准 DOCX 各有 21 条来源推导判断，前台分开显示确定性检查、法务 Gate 和签署/人工复核。主体字段不得串线；六份空签署栏在无获批草稿豁免时触发 R05；律师证号没有 Registry/Connector 回执时为 `unverifiable`。通过 Artifact 不能表述为可签署、签名真实或授权有效。
 - `pause/resume/steer/stop/rollback/decision` 必须携带 expected version 与幂等键。Branch resume 还携带 `branch_id`；rollback 还携带 `artifact_version`，只新增 TaskCommit 并恢复逻辑 Brief，不删除历史或回滚源文件。decision 把 `accept/decline/defer/cancel` 绑定到当前 DecisionRequest/Finding/Resolution/Branch；accept 证据候选还必须携带 source revision，服务端重新读取 Catalog 并重算 candidate。关闭待决页记录 defer，defer 后仍可继续最终决定；cancel 不冒充 rejected。它们不改变原文件或外部状态。pause/stop 只在模型调用之间的安全点生效；steer 只影响下一轮；deadline 阻止新调用但不硬取消在途 HTTP 请求。预算终态必须显示 `budget.stop_reason` 的具体中文原因，不得只显示 raw `budget_exhausted`；terminal Run 不得 resume，只能按 Branch 创建新 Run。
 - 开放待决单以 Snapshot 顶层 `decision_requests[]` 为权威，旧轮次投影只作兼容读取。关闭或 Escape 必须先退出审查页，再尝试写入 defer；409/断网只显示非阻塞错误并刷新 Snapshot，不能把用户困在弹窗，也不能伪造回执成功。Evidence Gap 区固定使用“分支 -> 当前材料 -> Evidence Gate -> 下一步”的 Branch lane；各单元只能来自 Branch/Gap/Resolution/Decision 服务端事实，不得把可视分支解释成并行 Worker。普通可恢复 Branch 必须明确“无需核对文件，建议重试”，首屏只给一个推荐 resume 且折叠可选输入/审计；ambiguous Branch 必须明确“从 N 个原文位置中选 1 个”，不默认选择并在未选前禁用 accept。
 - Snapshot 是状态权威，SSE 是有序变更投影。浏览器只单调应用 version/sequence，nonterminal 断线用 GET + `after=N`，terminal event 后 final GET。

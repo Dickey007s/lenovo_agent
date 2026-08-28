@@ -366,6 +366,19 @@ release conditions failed. The browser projects both rather than converting a
 business failure into an Artifact failure or hiding it behind a green check.
 This is not a general rules engine, release executor or configuration writer.
 
+DR-0044 reuses that separation for the fixed Legal-020 auxiliary review. A
+source-derived builder validates one rule Markdown and six unique DOCX packages,
+parses all 21 rules and produces one assessment for every document/rule pair.
+The parser binds principal and agent identity fields to their own subject rows;
+package-level media/drawing/pict/embedding/signature evidence is distinct from a
+blank signature placeholder. The same `legal_review_outcome` is stored on both
+Artifacts and the EffectReceipt, while `business_gate_outcome` holds three legal
+review Gates. `verifier_status=passed`, a failed legal Gate and
+`human_review_required=true` can therefore all be true at once. An attorney
+license string without a Registry/Connector receipt remains `unverifiable`. This
+is not legal advice, signature validation, authorization effectiveness or a
+general contract-review engine.
+
 ## 7. Eight module maturity
 
 | Module | Current implementation | Missing target work |

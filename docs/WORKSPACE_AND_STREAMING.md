@@ -185,6 +185,17 @@ red and suppresses a reliable-report claim even when a source-derived business
 decision is otherwise available. Opening the outcome does not call a model,
 write configuration or execute a release.
 
+DR-0044 applies the same truth separation to TC-07. The result area first shows
+`legal_review_outcome.decision`, then three parallel states: deterministic
+source/file verification, legal business Gate and signing/human review. Summary
+counts come from the service-owned 126-row assessment ledger. Six document
+sections are collapsed by default; opening one exposes its 21 rule records with
+status, level, source location, excerpt, fact, judgment, reason, owner,
+remediation and exit condition. `unverifiable` is displayed as missing material,
+not as pass or fail. A lawyer-license field without a Registry/Connector receipt
+therefore stays visibly unresolved. Opening these details does not call a model,
+validate a signature, sign a document or make an authorization effective.
+
 Open human decisions are authoritative in the Snapshot-level
 `decision_requests[]`; round-level copies are compatibility projections only.
 Closing or pressing Escape exits the review surface before the browser attempts a
