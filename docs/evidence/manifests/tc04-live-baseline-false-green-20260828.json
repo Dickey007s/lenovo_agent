@@ -1,0 +1,393 @@
+{
+  "schema_version": "scenario-effect-gate-live.v1",
+  "generated_at": "2026-08-28T10:02:10.882057+00:00",
+  "api_base": "http://127.0.0.1:8010",
+  "service": {
+    "model": "deepseek-v4-pro",
+    "checkpoint": "postgres",
+    "task_store": "postgres"
+  },
+  "dataset": {
+    "name": "FORTE public demo inputs",
+    "source_commit": "345c1ec1487139db9dd319787fa9405ba85d1869",
+    "input_tree_sha256": "2c19e31a8e437f8ccb0ab811ba20a940f022a5bea69bcc750574d753f10a250d",
+    "original_inputs_modified": false
+  },
+  "summary": {
+    "requested": 1,
+    "passed": 1,
+    "failed": 0,
+    "model_output_adopted": 0,
+    "run_completed": 0
+  },
+  "scenarios": [
+    {
+      "scenario_id": "TC-04",
+      "capability_id": "office-code-test-and-fix",
+      "title": "评测平台测试与修复",
+      "instruction": "为评测平台补充测试、修复缺陷并给出真实测试与覆盖率回执。",
+      "run_id": "harness:e80512fed92245d79fe24031954927a5",
+      "started_at": "2026-08-28T10:00:24.972868+00:00",
+      "observed_at": "2026-08-28T10:02:10.846142+00:00",
+      "run_status": "waiting_input",
+      "snapshot_version": 15,
+      "current_round": 1,
+      "budget": {
+        "max_rounds": 12,
+        "max_files_per_round": 16,
+        "max_model_calls": 30,
+        "deadline_seconds": 7200,
+        "rounds_used": 1,
+        "files_verified": 0,
+        "model_calls_used": 3,
+        "elapsed_ms": 104214,
+        "stop_reason": null
+      },
+      "model_calls": [
+        {
+          "round": 1,
+          "role": "planner",
+          "called": true,
+          "model": "deepseek-v4-pro",
+          "elapsed_ms": 19991,
+          "output_used": true
+        },
+        {
+          "round": 1,
+          "role": "analyst",
+          "called": true,
+          "model": "deepseek-v4-pro",
+          "elapsed_ms": 50556,
+          "output_used": false
+        }
+      ],
+      "model_execution_gate_passed": true,
+      "model_output_adopted": false,
+      "effect_receipts": [
+        {
+          "receipt_id": "effect-receipt-2d86dfab6416",
+          "capability_id": "office-code-test-and-fix",
+          "scenario_id": "TC-04",
+          "status": "passed",
+          "state": "已冻结 7 份 FORTE 输入，原始文件保持只读。",
+          "action": "调用 office-code-test-and-fix 确定性办公工具并写入隔离运行工作区。",
+          "observation": "生成 2 份真实成果文件，共享 7 项确定性检查，7/7 通过。",
+          "cost": "0 次额外模型调用；仅消耗本机确定性解析、计算与文件写入。",
+          "result": "所有确定性效果门通过，成果仍需用户复核。",
+          "source_file_refs": [
+            "forte-dc8d59ffb4dbbbf6",
+            "forte-f2063aec8e8cd1fe",
+            "forte-7b6ffd298ab30ce2",
+            "forte-0377b8e9a8800fcf",
+            "forte-3c7cdd64b6b3c08a",
+            "forte-c0bcc81791e415b3",
+            "forte-02fd4ca9238bd88f"
+          ],
+          "artifact_ids": [
+            "workspace-artifact-2f91621378c5",
+            "workspace-artifact-243be30bf967"
+          ],
+          "prohibited_side_effects": [
+            "不修改 FORTE 原始源码",
+            "不伪造测试通过"
+          ],
+          "created_at": "2026-08-28T10:00:46.797211Z",
+          "external_action": "none"
+        }
+      ],
+      "artifacts": [
+        {
+          "artifact_id": "workspace-artifact-2f91621378c5",
+          "file_name": "评测平台修复包.zip",
+          "media_type": "application/zip",
+          "size": 3363,
+          "validator_id": "validator-code-sandbox-v1",
+          "verifier_status": "passed",
+          "checks": [
+            {
+              "check_id": "check-eval-model-status",
+              "label": "模型删除状态修复",
+              "passed": true,
+              "detail": "删除检查从已完成实验改为运行中实验。"
+            },
+            {
+              "check_id": "check-eval-sequence",
+              "label": "追加序号修复",
+              "passed": true,
+              "detail": "追加模式从当前最大序号的下一位开始。"
+            },
+            {
+              "check_id": "check-eval-p99",
+              "label": "P99 边界修复",
+              "passed": true,
+              "detail": "使用最近秩并限制索引在 n-1 内。"
+            },
+            {
+              "check_id": "check-eval-compile",
+              "label": "补丁副本编译",
+              "passed": true,
+              "detail": "三个补丁文件与测试均可编译。"
+            },
+            {
+              "check_id": "check-eval-tests",
+              "label": "真实回归数量",
+              "passed": true,
+              "detail": "固定 Python 命令实际执行 105 项回归，零失败。"
+            },
+            {
+              "check_id": "check-eval-coverage",
+              "label": "确定性覆盖率",
+              "passed": true,
+              "detail": "合同模块语句节点覆盖率 100.0%。"
+            },
+            {
+              "check_id": "check-eval-boundary",
+              "label": "不夸大集成范围",
+              "passed": true,
+              "detail": "回执明确区分本地回归与尚未执行的完整集成。"
+            }
+          ],
+          "review_required": true,
+          "deliverable_type": null,
+          "key_outputs": [],
+          "key_outputs_label": null,
+          "review_guidance": null,
+          "execution_summary": null,
+          "self_test": null,
+          "external_action": "none",
+          "original_inputs_modified": false
+        },
+        {
+          "artifact_id": "workspace-artifact-243be30bf967",
+          "file_name": "评测平台测试回执.md",
+          "media_type": "text/markdown",
+          "size": 613,
+          "validator_id": "validator-code-sandbox-v1",
+          "verifier_status": "passed",
+          "checks": [
+            {
+              "check_id": "check-eval-model-status",
+              "label": "模型删除状态修复",
+              "passed": true,
+              "detail": "删除检查从已完成实验改为运行中实验。"
+            },
+            {
+              "check_id": "check-eval-sequence",
+              "label": "追加序号修复",
+              "passed": true,
+              "detail": "追加模式从当前最大序号的下一位开始。"
+            },
+            {
+              "check_id": "check-eval-p99",
+              "label": "P99 边界修复",
+              "passed": true,
+              "detail": "使用最近秩并限制索引在 n-1 内。"
+            },
+            {
+              "check_id": "check-eval-compile",
+              "label": "补丁副本编译",
+              "passed": true,
+              "detail": "三个补丁文件与测试均可编译。"
+            },
+            {
+              "check_id": "check-eval-tests",
+              "label": "真实回归数量",
+              "passed": true,
+              "detail": "固定 Python 命令实际执行 105 项回归，零失败。"
+            },
+            {
+              "check_id": "check-eval-coverage",
+              "label": "确定性覆盖率",
+              "passed": true,
+              "detail": "合同模块语句节点覆盖率 100.0%。"
+            },
+            {
+              "check_id": "check-eval-boundary",
+              "label": "不夸大集成范围",
+              "passed": true,
+              "detail": "回执明确区分本地回归与尚未执行的完整集成。"
+            }
+          ],
+          "review_required": true,
+          "deliverable_type": null,
+          "key_outputs": [],
+          "key_outputs_label": null,
+          "review_guidance": null,
+          "execution_summary": null,
+          "self_test": null,
+          "external_action": "none",
+          "original_inputs_modified": false
+        }
+      ],
+      "artifact_downloads": [
+        {
+          "artifact_id": "workspace-artifact-2f91621378c5",
+          "file_name": "评测平台修复包.zip",
+          "status_code": 200,
+          "content_type": "application/zip",
+          "declared_size": 3363,
+          "downloaded_size": 3363,
+          "sha256": "035db842921deda79885c5e074b63ebe1b7d21bcf85e8f4d05ee760d6b7be776",
+          "size_matches": true,
+          "content_gate": null
+        },
+        {
+          "artifact_id": "workspace-artifact-243be30bf967",
+          "file_name": "评测平台测试回执.md",
+          "status_code": 200,
+          "content_type": "text/markdown",
+          "declared_size": 613,
+          "downloaded_size": 613,
+          "sha256": "055dc7aace4f97541efdd34d8feaa26b29be3b1850ac9f82d76de25f163d3d86",
+          "size_matches": true,
+          "content_gate": null
+        }
+      ],
+      "expected_artifacts": [
+        "评测平台修复包.zip",
+        "评测平台测试回执.md"
+      ],
+      "events": [
+        {
+          "sequence": 3,
+          "event_name": "planning_started",
+          "status": "planning"
+        },
+        {
+          "sequence": 4,
+          "event_name": "planning_completed",
+          "status": "planning"
+        },
+        {
+          "sequence": 6,
+          "event_name": "deterministic_office_tool_started",
+          "status": "validating"
+        },
+        {
+          "sequence": 7,
+          "event_name": "run_workspace_artifact_written",
+          "status": "validating"
+        },
+        {
+          "sequence": 8,
+          "event_name": "run_workspace_artifact_written",
+          "status": "validating"
+        },
+        {
+          "sequence": 9,
+          "event_name": "deterministic_verification_completed",
+          "status": "validating"
+        },
+        {
+          "sequence": 10,
+          "event_name": "analysis_started",
+          "status": "analyzing"
+        },
+        {
+          "sequence": 11,
+          "event_name": "analysis_completed",
+          "status": "analyzing"
+        },
+        {
+          "sequence": 12,
+          "event_name": "analysis_validation_rejected",
+          "status": "analyzing"
+        },
+        {
+          "sequence": 13,
+          "event_name": "analysis_started",
+          "status": "analyzing"
+        },
+        {
+          "sequence": 14,
+          "event_name": "analysis_completed",
+          "status": "analyzing"
+        },
+        {
+          "sequence": 15,
+          "event_name": "analysis_structure_rejected",
+          "status": "analyzing"
+        }
+      ],
+      "waiting_branches": [
+        {
+          "branch_id": "branch-443281758296",
+          "title": "读取产品需求文档",
+          "status": "waiting_input",
+          "missing_file_count": 1
+        },
+        {
+          "branch_id": "branch-64f102e21c4c",
+          "title": "读取技术设计文档",
+          "status": "waiting_input",
+          "missing_file_count": 1
+        },
+        {
+          "branch_id": "branch-11bd8841e2c7",
+          "title": "读取评测引擎源码",
+          "status": "waiting_input",
+          "missing_file_count": 1
+        },
+        {
+          "branch_id": "branch-74f65025d188",
+          "title": "读取实验服务源码",
+          "status": "waiting_input",
+          "missing_file_count": 1
+        },
+        {
+          "branch_id": "branch-94573b6c1973",
+          "title": "读取数据集服务源码",
+          "status": "waiting_input",
+          "missing_file_count": 1
+        },
+        {
+          "branch_id": "branch-887ef423f27e",
+          "title": "读取模型服务源码",
+          "status": "waiting_input",
+          "missing_file_count": 1
+        },
+        {
+          "branch_id": "branch-430b08f08138",
+          "title": "读取功能测试报告",
+          "status": "waiting_input",
+          "missing_file_count": 1
+        },
+        {
+          "branch_id": "branch-bce22ea17d16",
+          "title": "读取线上兼容环境测试报告",
+          "status": "waiting_input",
+          "missing_file_count": 1
+        },
+        {
+          "branch_id": "branch-8ebc544f5955",
+          "title": "读取后端依赖清单",
+          "status": "waiting_input",
+          "missing_file_count": 1
+        },
+        {
+          "branch_id": "branch-5e84089e1f4b",
+          "title": "读取启动脚本",
+          "status": "waiting_input",
+          "missing_file_count": 1
+        },
+        {
+          "branch_id": "branch-1354f77faa0e",
+          "title": "读取应用入口源码",
+          "status": "waiting_input",
+          "missing_file_count": 1
+        },
+        {
+          "branch_id": "branch-49b3fee78a23",
+          "title": "读取数据库模块源码",
+          "status": "waiting_input",
+          "missing_file_count": 1
+        }
+      ],
+      "validation_errors": [],
+      "timed_out": false,
+      "effect_gate_passed": true,
+      "failure_reason": null
+    }
+  ],
+  "claim_boundary": "该证据仅证明固定服务配置下真实模型调用、运行工作区文件和确定性检查；不证明真实用户理解、生产安全沙箱或外部动作能力。"
+}

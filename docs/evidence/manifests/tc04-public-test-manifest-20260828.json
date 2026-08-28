@@ -1,0 +1,180 @@
+{
+  "schema_version": "tc04-public-test-manifest.v1",
+  "source_project": "dev-015/input/source-code",
+  "source_file_count": 44,
+  "test_count": 117,
+  "categories": [
+    {
+      "suite_id": "model-service",
+      "label": "模型 Service",
+      "test_files": [
+        "tests/test_model_service.py",
+        "tests/test_model_service_matrix.py"
+      ],
+      "test_count": 15,
+      "test_ids": [
+        "test_model_service.ModelServiceTests.test_create_model_encrypts_and_masks_api_key",
+        "test_model_service.ModelServiceTests.test_delete_allows_completed_experiment",
+        "test_model_service.ModelServiceTests.test_delete_rejects_running_experiment",
+        "test_model_service.ModelServiceTests.test_get_model_missing_raises_not_found",
+        "test_model_service.ModelServiceTests.test_list_models_filters_and_paginates_real_rows",
+        "test_model_service_matrix.ModelServiceBusinessMatrixTests.test_create_without_api_key_keeps_storage_empty",
+        "test_model_service_matrix.ModelServiceBusinessMatrixTests.test_delete_without_running_experiment_writes_audit_log",
+        "test_model_service_matrix.ModelServiceBusinessMatrixTests.test_detail_limits_recent_history_to_ten_experiments",
+        "test_model_service_matrix.ModelServiceBusinessMatrixTests.test_duplicate_active_name_is_rejected",
+        "test_model_service_matrix.ModelServiceBusinessMatrixTests.test_get_existing_model_returns_real_row",
+        "test_model_service_matrix.ModelServiceBusinessMatrixTests.test_list_applies_type_and_status_filters_together",
+        "test_model_service_matrix.ModelServiceBusinessMatrixTests.test_list_excludes_soft_deleted_rows",
+        "test_model_service_matrix.ModelServiceBusinessMatrixTests.test_partial_update_preserves_untouched_business_fields",
+        "test_model_service_matrix.ModelServiceBusinessMatrixTests.test_second_page_respects_page_size",
+        "test_model_service_matrix.ModelServiceBusinessMatrixTests.test_update_all_mutable_fields_and_encrypt_key"
+      ]
+    },
+    {
+      "suite_id": "dataset-service",
+      "label": "数据集 Service",
+      "test_files": [
+        "tests/test_dataset_service.py",
+        "tests/test_dataset_service_matrix.py"
+      ],
+      "test_count": 16,
+      "test_ids": [
+        "test_dataset_service.DatasetServiceTests.test_append_uses_next_sequence_after_current_maximum",
+        "test_dataset_service.DatasetServiceTests.test_delete_dataset_rejects_running_experiment",
+        "test_dataset_service.DatasetServiceTests.test_file_size_limit_is_checked_before_database_read",
+        "test_dataset_service.DatasetServiceTests.test_get_dataset_items_uses_real_order_and_page",
+        "test_dataset_service.DatasetServiceTests.test_invalid_json_is_reported_as_file_format_error",
+        "test_dataset_service.DatasetServiceTests.test_overwrite_restarts_sequence_at_one",
+        "test_dataset_service_matrix.DatasetServiceBusinessMatrixTests.test_completed_experiment_does_not_block_dataset_delete",
+        "test_dataset_service_matrix.DatasetServiceBusinessMatrixTests.test_create_initializes_zero_count_and_audit",
+        "test_dataset_service_matrix.DatasetServiceBusinessMatrixTests.test_delete_without_running_experiment_soft_deletes",
+        "test_dataset_service_matrix.DatasetServiceBusinessMatrixTests.test_detail_limits_recent_history_to_ten_experiments",
+        "test_dataset_service_matrix.DatasetServiceBusinessMatrixTests.test_duplicate_active_name_is_rejected",
+        "test_dataset_service_matrix.DatasetServiceBusinessMatrixTests.test_get_existing_dataset_returns_real_row",
+        "test_dataset_service_matrix.DatasetServiceBusinessMatrixTests.test_get_missing_dataset_raises_not_found",
+        "test_dataset_service_matrix.DatasetServiceBusinessMatrixTests.test_list_filters_name_and_hides_deleted_rows",
+        "test_dataset_service_matrix.DatasetServiceBusinessMatrixTests.test_rename_to_existing_name_is_rejected",
+        "test_dataset_service_matrix.DatasetServiceBusinessMatrixTests.test_update_changes_name_version_and_description"
+      ]
+    },
+    {
+      "suite_id": "experiment-service",
+      "label": "实验 Service",
+      "test_files": [
+        "tests/test_experiment_service.py",
+        "tests/test_experiment_service_matrix.py"
+      ],
+      "test_count": 15,
+      "test_ids": [
+        "test_experiment_service.ExperimentServiceTests.test_cancel_rejects_non_running_experiment",
+        "test_experiment_service.ExperimentServiceTests.test_create_experiment_commits_and_starts_real_engine_contract",
+        "test_experiment_service.ExperimentServiceTests.test_create_experiment_rejects_disabled_model",
+        "test_experiment_service.ExperimentServiceTests.test_create_experiment_rejects_missing_dataset",
+        "test_experiment_service.ExperimentServiceTests.test_detail_reads_statistics_and_result_page",
+        "test_experiment_service_matrix.ExperimentServiceBusinessMatrixTests.test_cancel_registered_running_task_returns_cancelled_receipt",
+        "test_experiment_service_matrix.ExperimentServiceBusinessMatrixTests.test_cancel_unregistered_running_task_forces_database_status",
+        "test_experiment_service_matrix.ExperimentServiceBusinessMatrixTests.test_detail_filters_failed_results_and_pages",
+        "test_experiment_service_matrix.ExperimentServiceBusinessMatrixTests.test_export_orders_results_by_sequence",
+        "test_experiment_service_matrix.ExperimentServiceBusinessMatrixTests.test_get_existing_experiment_returns_real_row",
+        "test_experiment_service_matrix.ExperimentServiceBusinessMatrixTests.test_get_missing_experiment_raises_not_found",
+        "test_experiment_service_matrix.ExperimentServiceBusinessMatrixTests.test_list_filters_by_name",
+        "test_experiment_service_matrix.ExperimentServiceBusinessMatrixTests.test_list_filters_by_status",
+        "test_experiment_service_matrix.ExperimentServiceBusinessMatrixTests.test_list_marks_soft_deleted_model_and_dataset",
+        "test_experiment_service_matrix.ExperimentServiceBusinessMatrixTests.test_results_filter_success_preserves_snapshot_fields"
+      ]
+    },
+    {
+      "suite_id": "evaluation-engine",
+      "label": "执行引擎",
+      "test_files": [
+        "tests/test_evaluation_engine.py",
+        "tests/test_evaluation_engine_matrix.py"
+      ],
+      "test_count": 23,
+      "test_ids": [
+        "test_evaluation_engine.EvaluationEngineTests.test_execute_never_exceeds_experiment_concurrency",
+        "test_evaluation_engine.EvaluationEngineTests.test_finalize_one_sample_keeps_its_latency",
+        "test_evaluation_engine.EvaluationEngineTests.test_finalize_two_samples_uses_nearest_rank_p99",
+        "test_evaluation_engine.EvaluationEngineTests.test_missing_endpoint_returns_failed_result_without_http",
+        "test_evaluation_engine.EvaluationEngineTests.test_mock_http_status_error_is_bounded",
+        "test_evaluation_engine.EvaluationEngineTests.test_mock_http_success_uses_real_engine_method",
+        "test_evaluation_engine.EvaluationEngineTests.test_mock_http_timeout_is_bounded",
+        "test_evaluation_engine_matrix.EvaluationEngineBusinessMatrixTests.test_api_key_becomes_bearer_header_in_mock_request",
+        "test_evaluation_engine_matrix.EvaluationEngineBusinessMatrixTests.test_cancel_completed_task_returns_false",
+        "test_evaluation_engine_matrix.EvaluationEngineBusinessMatrixTests.test_cancel_live_task_requests_cancellation",
+        "test_evaluation_engine_matrix.EvaluationEngineBusinessMatrixTests.test_cancel_unknown_task_returns_false",
+        "test_evaluation_engine_matrix.EvaluationEngineBusinessMatrixTests.test_execute_empty_dataset_completes_without_http",
+        "test_evaluation_engine_matrix.EvaluationEngineBusinessMatrixTests.test_execute_missing_experiment_returns_without_writes",
+        "test_evaluation_engine_matrix.EvaluationEngineBusinessMatrixTests.test_execute_missing_model_marks_experiment_failed",
+        "test_evaluation_engine_matrix.EvaluationEngineBusinessMatrixTests.test_finalize_empty_results_completes_with_null_latencies",
+        "test_evaluation_engine_matrix.EvaluationEngineBusinessMatrixTests.test_finalize_mixed_results_counts_failures_and_percentiles",
+        "test_evaluation_engine_matrix.EvaluationEngineBusinessMatrixTests.test_json_without_output_falls_back_to_response_text",
+        "test_evaluation_engine_matrix.EvaluationEngineBusinessMatrixTests.test_load_dataset_items_returns_sequence_order",
+        "test_evaluation_engine_matrix.EvaluationEngineBusinessMatrixTests.test_null_output_is_preserved_as_none",
+        "test_evaluation_engine_matrix.EvaluationEngineBusinessMatrixTests.test_start_registers_named_task_then_callback_removes_it",
+        "test_evaluation_engine_matrix.EvaluationEngineBusinessMatrixTests.test_unexpected_mock_transport_error_becomes_failed_result",
+        "test_evaluation_engine_matrix.EvaluationEngineBusinessMatrixTests.test_update_status_cancelled_sets_completion_time",
+        "test_evaluation_engine_matrix.EvaluationEngineBusinessMatrixTests.test_update_status_running_does_not_set_completion_time"
+      ]
+    },
+    {
+      "suite_id": "utilities",
+      "label": "工具类与事务",
+      "test_files": [
+        "tests/test_utils.py",
+        "tests/test_utils_boundaries.py"
+      ],
+      "test_count": 48,
+      "test_ids": [
+        "test_utils.UtilityTests.test_api_response_success_and_error_keep_contract",
+        "test_utils.UtilityTests.test_audit_log_is_written_to_real_session",
+        "test_utils.UtilityTests.test_crypto_rejects_invalid_key_length",
+        "test_utils.UtilityTests.test_crypto_round_trip_and_mask",
+        "test_utils.UtilityTests.test_page_params_compute_offset_and_limit",
+        "test_utils.UtilityTests.test_page_params_reject_more_than_one_hundred_rows",
+        "test_utils.UtilityTests.test_page_params_reject_zero_page",
+        "test_utils.UtilityTests.test_page_result_preserves_real_items",
+        "test_utils.UtilityTests.test_rollback_is_isolated_from_a_new_session",
+        "test_utils_boundaries.SchemaAndUtilityBoundaryTests.test_crypto_mask_empty_is_empty",
+        "test_utils_boundaries.SchemaAndUtilityBoundaryTests.test_crypto_mask_four_characters_is_fixed",
+        "test_utils_boundaries.SchemaAndUtilityBoundaryTests.test_crypto_mask_long_value_keeps_last_four",
+        "test_utils_boundaries.SchemaAndUtilityBoundaryTests.test_crypto_mask_short_value_is_fixed",
+        "test_utils_boundaries.SchemaAndUtilityBoundaryTests.test_dataset_version_missing_patch_is_rejected",
+        "test_utils_boundaries.SchemaAndUtilityBoundaryTests.test_dataset_version_none_is_accepted",
+        "test_utils_boundaries.SchemaAndUtilityBoundaryTests.test_dataset_version_semver_is_accepted",
+        "test_utils_boundaries.SchemaAndUtilityBoundaryTests.test_dataset_version_suffix_is_rejected",
+        "test_utils_boundaries.SchemaAndUtilityBoundaryTests.test_experiment_concurrency_one_is_accepted",
+        "test_utils_boundaries.SchemaAndUtilityBoundaryTests.test_experiment_concurrency_twenty_is_accepted",
+        "test_utils_boundaries.SchemaAndUtilityBoundaryTests.test_experiment_concurrency_twenty_one_is_rejected",
+        "test_utils_boundaries.SchemaAndUtilityBoundaryTests.test_experiment_concurrency_zero_is_rejected",
+        "test_utils_boundaries.SchemaAndUtilityBoundaryTests.test_experiment_timeout_five_is_accepted",
+        "test_utils_boundaries.SchemaAndUtilityBoundaryTests.test_experiment_timeout_three_hundred_is_accepted",
+        "test_utils_boundaries.SchemaAndUtilityBoundaryTests.test_model_type_chat_is_rejected",
+        "test_utils_boundaries.SchemaAndUtilityBoundaryTests.test_model_type_classification_is_accepted",
+        "test_utils_boundaries.SchemaAndUtilityBoundaryTests.test_model_type_empty_is_rejected",
+        "test_utils_boundaries.SchemaAndUtilityBoundaryTests.test_model_type_llm_is_accepted",
+        "test_utils_boundaries.SchemaAndUtilityBoundaryTests.test_model_type_lowercase_llm_is_rejected",
+        "test_utils_boundaries.SchemaAndUtilityBoundaryTests.test_model_type_numeric_text_is_rejected",
+        "test_utils_boundaries.SchemaAndUtilityBoundaryTests.test_model_type_other_is_accepted",
+        "test_utils_boundaries.SchemaAndUtilityBoundaryTests.test_model_type_regression_is_accepted",
+        "test_utils_boundaries.SchemaAndUtilityBoundaryTests.test_model_update_active_status_is_accepted",
+        "test_utils_boundaries.SchemaAndUtilityBoundaryTests.test_model_update_disabled_status_is_accepted",
+        "test_utils_boundaries.SchemaAndUtilityBoundaryTests.test_model_update_lowercase_status_is_rejected",
+        "test_utils_boundaries.SchemaAndUtilityBoundaryTests.test_model_update_pending_status_is_rejected",
+        "test_utils_boundaries.SchemaAndUtilityBoundaryTests.test_model_version_missing_prefix_is_rejected",
+        "test_utils_boundaries.SchemaAndUtilityBoundaryTests.test_model_version_none_is_accepted",
+        "test_utils_boundaries.SchemaAndUtilityBoundaryTests.test_model_version_prerelease_is_rejected",
+        "test_utils_boundaries.SchemaAndUtilityBoundaryTests.test_model_version_semver_is_accepted",
+        "test_utils_boundaries.SchemaAndUtilityBoundaryTests.test_page_result_keeps_business_total",
+        "test_utils_boundaries.SchemaAndUtilityBoundaryTests.test_pagination_first_page_has_zero_offset",
+        "test_utils_boundaries.SchemaAndUtilityBoundaryTests.test_pagination_hundred_rows_is_allowed",
+        "test_utils_boundaries.SchemaAndUtilityBoundaryTests.test_pagination_zero_page_size_is_rejected",
+        "test_utils_boundaries.SchemaAndUtilityBoundaryTests.test_parse_empty_array_is_valid",
+        "test_utils_boundaries.SchemaAndUtilityBoundaryTests.test_parse_missing_input_is_rejected",
+        "test_utils_boundaries.SchemaAndUtilityBoundaryTests.test_parse_non_array_is_rejected",
+        "test_utils_boundaries.SchemaAndUtilityBoundaryTests.test_parse_numeric_input_is_rejected",
+        "test_utils_boundaries.SchemaAndUtilityBoundaryTests.test_parse_unicode_input_is_preserved"
+      ]
+    }
+  ]
+}

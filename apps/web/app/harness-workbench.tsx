@@ -379,6 +379,17 @@ type ArtifactSelfTest = {
   commands: string[];
   expected_checks: string[];
   failure_signals: string[];
+  test_manifest_file: string | null;
+  test_manifest_matches_collected: boolean | null;
+  test_suites: ArtifactTestSuite[];
+};
+
+type ArtifactTestSuite = {
+  suite_id: string;
+  label: string;
+  test_files: string[];
+  test_count: number;
+  test_ids: string[];
 };
 
 type WorkspaceArtifact = {
@@ -591,6 +602,7 @@ const NAMED_EVENTS = [
   "deterministic_office_tool_started",
   "run_workspace_artifact_written",
   "deterministic_verification_completed",
+  "scenario_effect_failed",
   "scenario_effect_bounded",
   "result_validation",
   "evidence_gate",
@@ -1359,6 +1371,7 @@ function activityItem(event: HarnessServerEvent): HarnessActivityItem {
     deterministic_office_tool_started: "确定性办公工具开始处理",
     run_workspace_artifact_written: "真实成果文件已生成",
     deterministic_verification_completed: "成果已通过确定性检查",
+    scenario_effect_failed: "隔离成果构建或验证未完成",
     scenario_effect_bounded: "场景效果在能力边界停止",
     result_validation: "服务端核对引用与原文位置",
     round_started: "新一轮开始",
@@ -1375,7 +1388,7 @@ function activityItem(event: HarnessServerEvent): HarnessActivityItem {
     loop_stopped: "已按你的要求停止",
     harness_failed: "本轮已安全停止",
   };
-  const tone = event.event_name === "harness_failed" || event.event_name === "plan_validation_rejected" || event.event_name === "analysis_structure_rejected" || event.event_name === "analysis_validation_rejected" || event.event_name === "analysis_recovery_required" || event.event_name === "evidence_disambiguation_required" || event.event_name === "scenario_effect_bounded" || event.event_name.includes("stopped") ? "warning"
+  const tone = event.event_name === "harness_failed" || event.event_name === "plan_validation_rejected" || event.event_name === "analysis_structure_rejected" || event.event_name === "analysis_validation_rejected" || event.event_name === "analysis_recovery_required" || event.event_name === "evidence_disambiguation_required" || event.event_name === "scenario_effect_failed" || event.event_name === "scenario_effect_bounded" || event.event_name.includes("stopped") ? "warning"
     : ["analysis_scope_filtered", "decision_gate_suppressed"].includes(event.event_name) ? "success"
       : event.event_name.includes("planning") || event.event_name.includes("analysis") ? "model"
       : event.event_name.includes("validation") || TERMINAL_EVENTS.has(event.event_name) ? "success" : "neutral";
@@ -1450,6 +1463,18 @@ function normalizeArtifactCheck(value: unknown): ArtifactCheck | null {
   return { check_id: checkId, label, passed: raw.passed, detail };
 }
 
+function normalizeArtifactTestSuite(value: unknown): ArtifactTestSuite | null {
+  if (!value || typeof value !== "object") return null;
+  const raw = value as Record<string, unknown>;
+  const suiteId = asText(raw.suite_id);
+  const label = asText(raw.label);
+  const testFiles = asStrings(raw.test_files);
+  const testIds = asStrings(raw.test_ids);
+  const testCount = asNumber(raw.test_count);
+  if (!suiteId || !label || testFiles.length === 0 || testIds.length === 0 || testCount !== testIds.length) return null;
+  return { suite_id: suiteId, label, test_files: testFiles, test_count: testCount, test_ids: testIds };
+}
+
 function normalizeWorkspaceArtifact(value: unknown): WorkspaceArtifact | null {
   if (!value || typeof value !== "object") return null;
   const raw = value as Record<string, unknown>;
@@ -1467,6 +1492,11 @@ function normalizeWorkspaceArtifact(value: unknown): WorkspaceArtifact | null {
     commands: asStrings(rawSelfTest.commands),
     expected_checks: asStrings(rawSelfTest.expected_checks),
     failure_signals: asStrings(rawSelfTest.failure_signals),
+    test_manifest_file: asText(rawSelfTest.test_manifest_file) || null,
+    test_manifest_matches_collected: typeof rawSelfTest.test_manifest_matches_collected === "boolean" ? rawSelfTest.test_manifest_matches_collected : null,
+    test_suites: Array.isArray(rawSelfTest.test_suites)
+      ? rawSelfTest.test_suites.map(normalizeArtifactTestSuite).filter((item): item is ArtifactTestSuite => item !== null)
+      : [],
   } : null;
   return {
     artifact_id: artifactId,
@@ -3115,13 +3145,20 @@ function WorkspaceArtifactSection({ artifacts, receipts }: { artifacts: Workspac
         {artifact.purpose && <div><dt>{artifact.deliverable_type ? "使用边界" : "用途"}</dt><dd>{artifact.purpose}</dd></div>}
       </dl>}
       {artifact.key_outputs.length > 0 && <section className="workspace-artifact-key-outputs" aria-label={artifact.key_outputs_label ?? "关键输出"}><span>{artifact.key_outputs_label ?? `${artifact.key_outputs.length} 项关键输出`}</span><ul>{artifact.key_outputs.map((item) => <li key={item}>{item}</li>)}</ul></section>}
-      {artifact.self_test && <section className="workspace-artifact-self-test" aria-label="TC-02 自测卡">
-        <header><IconRoute aria-hidden="true" /><div><span>下载后可以自己验证</span><h5>TC-02 自测卡</h5></div></header>
+      {artifact.self_test && <section className="workspace-artifact-self-test" aria-label={`${artifact.scenario_id} 自测卡`}>
+        <header><IconRoute aria-hidden="true" /><div><span>下载后可以自己验证</span><h5>{artifact.scenario_id} 自测卡</h5></div></header>
         <dl>
           <div><dt>输入</dt><dd>{artifact.self_test.instruction}</dd></div>
           <div><dt>预期文件</dt><dd>{artifact.self_test.expected_files.join("、")}</dd></div>
         </dl>
         <div className="workspace-artifact-self-test-commands"><b>依次运行</b>{artifact.self_test.commands.map((command) => <code key={command}>{command}</code>)}</div>
+        {artifact.self_test.test_suites.length > 0 && <section className="workspace-artifact-test-suites" aria-label="真实测试清单">
+          <header><div><span>真实测试清单</span><h6>{artifact.self_test.test_suites.reduce((total, suite) => total + suite.test_count, 0)} 项</h6></div><p>{artifact.self_test.test_manifest_matches_collected ? `页面测试 ID、${artifact.self_test.test_manifest_file ?? "test-manifest.json"} 与实际 collected IDs 是同一集合。` : "测试清单仍需核对。"}</p></header>
+          <div>{artifact.self_test.test_suites.map((suite) => <details key={suite.suite_id}>
+            <summary><span><b>{suite.label}</b><small>{suite.test_files.join(" · ")}</small></span><strong>{suite.test_count} 项</strong></summary>
+            <ol aria-label={`${suite.label} 测试 ID`}>{suite.test_ids.map((testId) => <li key={testId}><code>{testId}</code></li>)}</ol>
+          </details>)}</div>
+        </section>}
         <details><summary><IconEye aria-hidden="true" />查看应通过的测试与失败信号</summary><div className="workspace-artifact-self-test-detail"><section><b>应通过</b><ul>{artifact.self_test.expected_checks.map((item) => <li key={item}>{item}</li>)}</ul></section><section><b>不要合并</b><ul>{artifact.self_test.failure_signals.map((item) => <li key={item}>{item}</li>)}</ul></section></div></details>
       </section>}
       {artifact.review_guidance && <aside className={`workspace-artifact-review${artifact.verifier_status === "failed" ? " is-failed" : ""}`}><IconAlertTriangle aria-hidden="true" /><div><b>{artifact.verifier_status === "failed" ? "下一步怎么处理" : "为什么仍需人工复核"}</b><p>{artifact.review_guidance}</p></div></aside>}

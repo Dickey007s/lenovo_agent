@@ -47,7 +47,7 @@ CSS、HTML、shell、log 等。它们覆盖结构化表格、长文档、扫描/
 | `TC-01` | `administration-001` | 入职员工物资与权限匹配 | CSV + PDF | Demo 1 单任务 | 隐私字段、工作区写入 | `Limited Verified`：真实 CSV + 5 项确定性检查 |
 | `TC-02` | `algorithm-013` | 搜索 Agent 从 Workflow 重构为有界 ReAct 控制结构 | Python + log + text | Demo 1 单任务 | 真实副本、代码修改、测试执行 | `Limited Verified`：完整项目 ZIP/说明，当前 20 项声明测试与实际执行一致；默认策略非模型自主决策，且非通用代码沙箱 |
 | `TC-03` | `ba-079` | 网约车经营数据 SQL 分析 | 远程 Datasette | Demo 2 多查询 | Connector、查询预算 | `blocked_external_boundary`：未授权 Datasette/SQL Connector |
-| `TC-04` | `dev-015` | 为评测平台补单测并修复缺陷 | 46 个混合代码文件 | Demo 2 多任务 | 沙箱执行、代码写入 | `Limited Verified`：隔离 ZIP/报告，105 项 unittest 与标准库 trace 覆盖检查；不等于完整 DB/HTTP 集成 |
+| `TC-04` | `dev-015` | 为评测平台补单测并修复缺陷 | 44 个 source-code 文件；PRD/设计稿另作任务上下文 | Demo 2 多任务 | 固定副本测试、代码写入 | `Draft`：完整隔离 ZIP/报告，未修复副本 5 个目标红灯，修复后 117 项真实模块测试与逐文件 coverage.py 门；待真实 Run/PR 收尾 |
 | `TC-05` | `Finance-018` | 跨三期往来款与僵尸账款核对 | 3 个 XLSX | Demo 1 单任务 | 数值验证、CSV 写入 | `Limited Verified`：两个 2026 CSV + 三期说明，8 项归属明确的确定性检查 |
 | `TC-06` | `hr-001` | 两个岗位与五份简历匹配 | DOCX + PDF | Demo 2 多任务 | 敏感信息、人工复核 | `Limited Verified`：两个 DOCX、每岗 5 名候选、敏感字段隐藏并保留人工 Gate |
 | `TC-07` | `Legal-020` | 六份授权委托书风控核查 | DOCX + MD | Demo 2 多任务 | 法务风险、报告写入 | `Limited Verified`：规则化 DOCX 与确定性完整性检查；非正式法律意见 |
@@ -129,10 +129,19 @@ CSS、HTML、shell、log 等。它们覆盖结构化表格、长文档、扫描/
 ### TC-04 研发单测与缺陷修复
 
 - 用户目标：覆盖 Service、执行引擎和工具类，真实运行测试并修复失败。
+- 原始指令：`为评测平台补充单元测试，覆盖 Service、执行引擎和工具类；真实运行测试，修复失败，并给出覆盖率与修改文件。`
+- 输入事实：dev-015 `input/source-code` 共 44 个真实前后端文件；PRD 与 technical-design 只作任务上下文，不算源码副本。
+- 预期成果：`评测平台真实修复包.zip`、`TC-04真实测试报告.md`、完整项目、三处 diff、修复前后结果、manifest 与自测卡。
+- 确定性门：同一 117 项测试先在未修复副本出现 5 个目标红灯，再在修复后 117/117；五类分别 15/16/15/23/48；三个变更文件逐一不低于 80%，aggregate 单列。
+- 前台效果：用户先看到真实副本、三处业务影响和五类数量，可展开真实测试文件与 collected IDs；页面清单、公共 manifest、ZIP manifest 与实际 collected 集合一致。
+- 等待体验：开始前冻结 46 份 allowlisted 输入并写入 started 事件；约一分钟真实测试期间，health、Run GET、资料库与 SSE 保持可读，不展示虚构百分比。
+- 禁止副作用：不改 FORTE 原树、不装依赖、不运行前端脚本、不访问真实模型 endpoint、不自动创建 PR；进程内 socket 规则不冒充 OS 级断网。
+- 失败信号：修复前无目标红灯、任一 ID 集合不一致、逐文件覆盖率不足、下载包不完整、自测命令非 0，或 builder 运行时 API/SSE 被阻塞，均保持红灯并禁止合并。
 - 自组织单元：后端 Service 测试、执行引擎测试、工具测试、前端/配置检查、覆盖率汇聚。
 - 动态重排：某一单元发现共享缺陷时新增根因修复单元，并使相关测试等待修复版本。
 - 验证：真实命令、通过/失败数、覆盖率和修改文件来自 Tool receipt，不由模型编写。
-- 禁止：在非沙箱环境运行未知脚本或把计划中的测试写成已执行。
+- 验证：受控阻塞探针中，health、Run GET、SSE 均在 1 秒门内返回；重复调度不增加 execute count，最终 Artifact 只生成一次。
+- 禁止：在非沙箱环境运行未知脚本、把计划中的测试写成已执行，或把工作线程描述成多 Worker/可跨进程续跑的 Tool Gateway。
 
 ### TC-06 双岗位简历筛选
 
@@ -223,7 +232,7 @@ FORTE 输入、写入隔离 Run Workspace、运行命名 validator，并把真�
 真实办公文件或源文件 Commit。
 
 代码型 TC-02/04/12 只证明固定适配器的隔离副本和已记录测试，不是任意命令沙箱；
-TC-04 的标准库 trace 覆盖也不等于完整 DB/HTTP 集成。下一层才是通用 Tool Gateway、
+TC-04 当前使用 coverage.py 核对真实模块与三个变更文件，但仍不等于完整真实外部 HTTP 集成。下一层才是通用 Tool Gateway、
 命令策略、依赖治理、Diff 审查与可复用 verifier。
 
 外部 TC-03/08/09 继续保持阻断。只有 Web、SQL、Scheduler Connector、身份授权、

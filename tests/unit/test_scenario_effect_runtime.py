@@ -3,12 +3,14 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import json
+import threading
 from pathlib import Path
 
 import httpx
 import pytest
 
 from packages.contracts.harness_models import (
+    AgentControlLoopArtifactCheck,
     AgentControlLoopFindingDecisionOption,
     AgentControlLoopFindingReview,
 )
@@ -29,7 +31,13 @@ from services.api.app.application.harness_runtime import (
 from services.api.app.application.run_workspace_artifact_store import (
     RunWorkspaceArtifactStore,
 )
-from services.api.app.application.scenario_effects import ScenarioEffectEngine
+from services.api.app.api.harness_routes import stream_harness_events
+from services.api.app.application.scenario_effects import (
+    GeneratedOfficeArtifact,
+    ScenarioEffectExecution,
+    ScenarioEffectEngine,
+    ScenarioEffectError,
+)
 from services.api.app.main import create_app
 
 
@@ -37,6 +45,10 @@ FORTE_ROOT = Path(__file__).resolve().parents[2] / "demo-enterprise-data" / "for
 ONBOARDING_LABEL = "3月20日-4月20日入职时间表.csv"
 ONBOARDING_INSTRUCTION = (
     "根据入职时间表和分配规则，生成 3 月 20 日至 4 月 20 日的入职资产匹配表。"
+)
+TC04_INSTRUCTION = (
+    "为评测平台补充单元测试，覆盖 Service、执行引擎和工具类；"
+    "真实运行测试，修复失败，并给出覆盖率与修改文件。"
 )
 
 
@@ -289,6 +301,91 @@ class RejectedOnboardingAnalyst:
         raise HarnessModelError("invalid structured response", called=True, elapsed_ms=9)
 
 
+class MainThreadCatalog:
+    """Fails if a live catalog method leaks into the effect worker thread."""
+
+    def __init__(self, catalog: BenchmarkWorkspaceCatalog) -> None:
+        self.catalog = catalog
+        self.owner_thread_id = threading.get_ident()
+
+    def _assert_main_thread(self) -> None:
+        assert threading.get_ident() == self.owner_thread_id
+
+    def internal_workspace(self):
+        self._assert_main_thread()
+        return self.catalog.internal_workspace()
+
+    def public_workspace(self):
+        self._assert_main_thread()
+        return self.catalog.public_workspace()
+
+    def public_file(self, file_ref: str):
+        self._assert_main_thread()
+        return self.catalog.public_file(file_ref)
+
+    def checked_input_bytes(self, file_ref: str):
+        self._assert_main_thread()
+        return self.catalog.checked_input_bytes(file_ref)
+
+    def checked_input_bytes_many(self, file_refs):
+        self._assert_main_thread()
+        return self.catalog.checked_input_bytes_many(file_refs)
+
+
+class BlockingScenarioEffectEngine(ScenarioEffectEngine):
+    def __init__(self, owner_thread_id: int) -> None:
+        self.owner_thread_id = owner_thread_id
+        self.started = threading.Event()
+        self.release = threading.Event()
+        self.execute_calls = 0
+        self.worker_thread_id: int | None = None
+
+    def execute(self, instruction, catalog):
+        self.execute_calls += 1
+        self.worker_thread_id = threading.get_ident()
+        assert self.worker_thread_id != self.owner_thread_id
+        self.started.set()
+        if not self.release.wait(timeout=5):
+            raise ScenarioEffectError("controlled blocking probe timed out")
+        spec = self.match(instruction)
+        assert spec is not None and spec.scenario_id == "TC-04"
+        source_refs = tuple(catalog.input_bytes)
+        check = AgentControlLoopArtifactCheck(
+            check_id="check-tc04-responsive-probe",
+            label="受控 TC-04 工作线程只生成一次成果",
+            passed=True,
+            detail="该探针只验证调度、响应性与去重，不替代真实 117 项效果门。",
+        )
+        artifact = GeneratedOfficeArtifact(
+            title="TC-04 受控响应探针",
+            file_name="tc04-responsive-probe.md",
+            media_type="text/markdown",
+            content=b"tc04 responsive probe\n",
+            source_file_refs=source_refs,
+            validator_id="validator-tc04-responsive-probe-v1",
+            checks=(check,),
+            summary="受控阻塞释放后只写入一次测试成果。",
+        )
+        return ScenarioEffectExecution(
+            scenario_id=spec.scenario_id,
+            capability_id=spec.capability_id,
+            status="passed",
+            state="frozen_tc04_probe",
+            action="run_in_worker_thread",
+            observation="health、Run GET 与 SSE 在阻塞期间仍可响应",
+            cost="一次受控工作线程",
+            result="只生成一次探针成果",
+            source_file_refs=source_refs,
+            artifacts=(artifact,),
+            prohibited_side_effects=spec.prohibited_side_effects,
+        )
+
+
+class FailingScenarioEffectEngine(ScenarioEffectEngine):
+    def execute(self, instruction, catalog):
+        raise ScenarioEffectError("controlled effect failure")
+
+
 def _forte_digests() -> dict[str, str]:
     return {
         item.relative_to(FORTE_ROOT).as_posix(): hashlib.sha256(item.read_bytes()).hexdigest()
@@ -385,6 +482,133 @@ async def test_runtime_writes_downloadable_verified_artifact_without_touching_fo
     assert response.headers["x-content-type-options"] == "nosniff"
     assert denied.status_code == 404
     json.dumps(public.model_dump(mode="json"), ensure_ascii=False)
+
+
+@pytest.mark.asyncio
+async def test_blocking_effect_keeps_health_run_get_and_sse_responsive(
+    tmp_path: Path,
+) -> None:
+    catalog = MainThreadCatalog(BenchmarkWorkspaceCatalog(FORTE_ROOT))
+    engine = BlockingScenarioEffectEngine(catalog.owner_thread_id)
+    runtime = HarnessRuntime(
+        catalog,
+        OnboardingPlanner(),
+        OnboardingAnalyst(),
+        effect_engine=engine,
+        artifact_store=RunWorkspaceArtifactStore(tmp_path / "run-workspaces"),
+    )
+    app = create_app()
+    app.state.harness_runtime = runtime
+    transport = httpx.ASGITransport(app=app)
+    try:
+        async with httpx.AsyncClient(
+            transport=transport, base_url="http://test"
+        ) as client:
+            response = await client.post(
+                "/v1/harness/runs",
+                headers={"X-User-Id": "alice"},
+                json={
+                    "idempotency_key": "scenario-effect-responsive-0001",
+                    "instruction": TC04_INSTRUCTION,
+                },
+            )
+            assert response.status_code == 202
+            run_id = response.json()["run"]["run_id"]
+
+            for _ in range(200):
+                if engine.started.is_set():
+                    break
+                await asyncio.sleep(0.01)
+            assert engine.started.is_set()
+
+            health = await asyncio.wait_for(client.get("/v1/health"), timeout=1)
+            current = await asyncio.wait_for(
+                client.get(
+                    f"/v1/harness/runs/{run_id}",
+                    headers={"X-User-Id": "alice"},
+                ),
+                timeout=1,
+            )
+            assert health.status_code == 200
+            assert current.status_code == 200
+            snapshot = await runtime.get("alice", run_id)
+            start_events = [
+                event
+                for event in snapshot.events
+                if event.event_name == "deterministic_office_tool_started"
+            ]
+            assert len(start_events) == 1
+            assert start_events[0].details["scenario_id"] == "TC-04"
+            assert start_events[0].details["frozen_source_file_count"] == 46
+            assert start_events[0].details["progress_percent"] is None
+            assert not snapshot.workspace_artifacts
+
+            stream = await stream_harness_events(
+                run_id=run_id,
+                owner_id="alice",
+                runtime=runtime,
+                after=start_events[0].sequence - 1,
+            )
+            chunk = await asyncio.wait_for(anext(stream.body_iterator), timeout=1)
+            if isinstance(chunk, bytes):
+                chunk = chunk.decode("utf-8")
+            assert "event: deterministic_office_tool_started" in chunk
+            await stream.body_iterator.aclose()
+
+            await asyncio.wait_for(
+                runtime._apply_scenario_effect("alice", run_id, round_number=1),
+                timeout=1,
+            )
+            assert engine.execute_calls == 1
+
+            engine.release.set()
+            settled = await _wait_for_settled(runtime, "alice", run_id)
+            assert settled.effect_receipts[0].status == "passed"
+            assert settled.effect_receipts[0].scenario_id == "TC-04"
+            assert len(settled.workspace_artifacts) == 1
+            assert len(
+                [
+                    event
+                    for event in settled.events
+                    if event.event_name == "deterministic_office_tool_started"
+                ]
+            ) == 1
+            assert engine.execute_calls == 1
+    finally:
+        engine.release.set()
+        await runtime.close()
+
+
+@pytest.mark.asyncio
+async def test_effect_failure_emits_ordered_failure_fact_without_artifact(
+    tmp_path: Path,
+) -> None:
+    runtime = HarnessRuntime(
+        BenchmarkWorkspaceCatalog(FORTE_ROOT),
+        OnboardingPlanner(),
+        OnboardingAnalyst(),
+        effect_engine=FailingScenarioEffectEngine(),
+        artifact_store=RunWorkspaceArtifactStore(tmp_path / "run-workspaces"),
+    )
+    try:
+        started = await runtime.start(
+            "alice",
+            HarnessRunStart(
+                idempotency_key="scenario-effect-failure-event-0001",
+                instruction=ONBOARDING_INSTRUCTION,
+            ),
+        )
+        settled = await _wait_for_settled(runtime, "alice", started.run.run_id)
+
+        assert settled.status == "failed"
+        assert not settled.workspace_artifacts
+        assert not settled.effect_receipts
+        names = [event.event_name for event in settled.events]
+        assert names.index("deterministic_office_tool_started") < names.index(
+            "scenario_effect_failed"
+        )
+    finally:
+        await runtime.close()
 
 
 @pytest.mark.asyncio

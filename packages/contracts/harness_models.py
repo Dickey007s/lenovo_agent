@@ -572,6 +572,16 @@ class AgentControlLoopArtifactCheck(StrictModel):
     detail: str = Field(min_length=1, max_length=1_000)
 
 
+class AgentControlLoopArtifactTestSuite(StrictModel):
+    """One public suite from the manifest and actual collected test set."""
+
+    suite_id: str = Field(pattern=r"^[a-z0-9][a-z0-9-]{2,79}$")
+    label: str = Field(min_length=1, max_length=120)
+    test_files: list[str] = Field(min_length=1, max_length=8)
+    test_count: int = Field(ge=1, le=500)
+    test_ids: list[str] = Field(min_length=1, max_length=500)
+
+
 class AgentControlLoopArtifactSelfTest(StrictModel):
     """User-visible instructions for independently checking one artifact."""
 
@@ -580,6 +590,11 @@ class AgentControlLoopArtifactSelfTest(StrictModel):
     commands: list[str] = Field(min_length=1, max_length=10)
     expected_checks: list[str] = Field(min_length=1, max_length=30)
     failure_signals: list[str] = Field(min_length=1, max_length=12)
+    test_manifest_file: str | None = Field(default=None, min_length=1, max_length=180)
+    test_manifest_matches_collected: bool | None = None
+    test_suites: list[AgentControlLoopArtifactTestSuite] = Field(
+        default_factory=list, max_length=10
+    )
 
 
 class AgentControlLoopWorkspaceArtifact(StrictModel):
@@ -599,7 +614,7 @@ class AgentControlLoopWorkspaceArtifact(StrictModel):
     size: int = Field(gt=0, le=10 * 1024 * 1024)
     version: int = Field(default=1, ge=1, le=24)
     round_number: int = Field(ge=1, le=24)
-    source_file_refs: list[str] = Field(min_length=1, max_length=24)
+    source_file_refs: list[str] = Field(min_length=1, max_length=96)
     validator_id: str = Field(pattern=r"^validator-[a-z0-9-]{3,100}$")
     verifier_status: Literal["passed", "failed"]
     checks: list[AgentControlLoopArtifactCheck] = Field(min_length=1, max_length=30)
@@ -638,7 +653,7 @@ class AgentControlLoopEffectReceipt(StrictModel):
     observation: str = Field(min_length=1, max_length=1_000)
     cost: str = Field(min_length=1, max_length=500)
     result: str = Field(min_length=1, max_length=1_000)
-    source_file_refs: list[str] = Field(default_factory=list, max_length=24)
+    source_file_refs: list[str] = Field(default_factory=list, max_length=96)
     artifact_ids: list[str] = Field(default_factory=list, max_length=8)
     prohibited_side_effects: list[str] = Field(default_factory=list, max_length=12)
     created_at: datetime

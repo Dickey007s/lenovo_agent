@@ -160,6 +160,14 @@ deterministically steps through planned tools and is replaceable; it does not
 claim that a model inside the ZIP selects actions from Observations. Outer
 Planner/Analyst receipts remain in the Run trace, not in the Artifact policy.
 
+DR-0041 makes the TC-04 test evidence inspectable before download. The browser
+renders `self_test.test_suites[]` as five readable suite summaries with real test
+files and 15/16/15/23/48 counts; IDs are collapsed and scroll inside the suite.
+The server asserts that these public IDs, the ZIP `test-manifest.json` and actual
+collected IDs are one set. The UI never invents placeholder names, never reads
+benchmark task/rubric/solution files, and opening the list does not execute tests
+or spend model budget. Desktop uses at most three columns and 390 px uses one.
+
 Open human decisions are authoritative in the Snapshot-level
 `decision_requests[]`; round-level copies are compatibility projections only.
 Closing or pressing Escape exits the review surface before the browser attempts a
@@ -244,8 +252,21 @@ The right pane distinguishes:
 
 The trace also projects `deterministic_office_tool_started`,
 `run_workspace_artifact_written`, `deterministic_verification_completed` and
-`scenario_effect_bounded`. These events are ordered change notifications; the
+`scenario_effect_failed` or `scenario_effect_bounded`. These events are ordered change notifications; the
 Snapshot remains authoritative.
+
+For TC-04, the started event is committed before the roughly one-minute fixed
+builder begins. Its message says that the isolated copy and real tests are in
+progress and intentionally omits a percentage. The Runtime freezes all 46
+allowlisted inputs on the event-loop thread, then passes only that immutable
+view to `asyncio.to_thread`; the worker cannot re-read the live Catalog. During
+this wait, workspace browsing, health, Run GET and SSE remain responsive.
+
+This is an interaction guarantee for one API process, not a Worker platform.
+The in-process thread and its subprocesses do not survive an API restart;
+PostgreSQL restores the last committed Snapshot and pauses under the existing
+checkpoint rule. A failed builder emits `scenario_effect_failed` and no green
+Artifact/EffectReceipt.
 
 Elapsed milliseconds are an observed call duration, not production SLA or cost.
 The trajectory uses named server events and business summaries. It also exposes

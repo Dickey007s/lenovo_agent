@@ -736,6 +736,7 @@ class HarnessRuntime:
             tuple[str, str], _IdempotentControl
         ] = {}
         self._tasks: dict[str, asyncio.Task[None]] = {}
+        self._effect_inflight: set[tuple[str, str, str]] = set()
         self._lock = asyncio.Lock()
 
     @property
@@ -3341,26 +3342,88 @@ class HarnessRuntime:
     async def _apply_scenario_effect(
         self, owner_id: str, run_id: str, *, round_number: int
     ) -> None:
-        """Run one deterministic office adapter without spending model budget."""
+        """Run one deterministic office adapter without blocking the API loop."""
 
         if self.effect_engine is None or self.artifact_store is None:
             return
         snapshot = await self.get(owner_id, run_id)
         spec = self.effect_engine.match(snapshot.instruction)
-        if spec is None or any(
-            receipt.capability_id == spec.capability_id
-            for receipt in snapshot.effect_receipts
-        ):
+        if spec is None:
             return
-        execution = self.effect_engine.execute(snapshot.instruction, self.catalog)
-        if execution is None:
-            return
-        await self._record_scenario_effect(
-            owner_id,
-            run_id,
-            round_number=round_number,
-            execution=execution,
-        )
+        inflight_key = (owner_id, run_id, spec.capability_id)
+        async with self._lock:
+            current = self._require_run(owner_id, run_id).snapshot
+            if any(
+                receipt.capability_id == spec.capability_id
+                for receipt in current.effect_receipts
+            ) or inflight_key in self._effect_inflight:
+                return
+            self._effect_inflight.add(inflight_key)
+
+        try:
+            frozen = self.effect_engine.freeze(snapshot.instruction, self.catalog)
+            if frozen is None:
+                return
+            latest = await self.get(owner_id, run_id)
+            await self._transition(
+                owner_id,
+                run_id,
+                latest.status,
+                "deterministic_office_tool_started",
+                (
+                    "正在复制隔离副本并运行修复前、修复后真实测试；"
+                    "期间仍可查看资料与任务状态。"
+                    if spec.scenario_id == "TC-04"
+                    else "正在读取冻结资料并生成隔离工作区成果；本次不额外调用模型。"
+                ),
+                {
+                    "capability_id": spec.capability_id,
+                    "scenario_id": spec.scenario_id,
+                    "frozen_source_file_count": len(frozen.source_file_refs),
+                    "execution_mode": "in_process_worker_thread",
+                    "progress_percent": None,
+                    "external_action": False,
+                },
+            )
+            execution = await asyncio.to_thread(
+                self.effect_engine.execute,
+                snapshot.instruction,
+                frozen.catalog,
+            )
+            if execution is None:
+                raise HarnessError("确定性办公工具未返回执行结果")
+            await self._record_scenario_effect(
+                owner_id,
+                run_id,
+                round_number=round_number,
+                execution=execution,
+            )
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:
+            latest = await self.get(owner_id, run_id)
+            await self._transition(
+                owner_id,
+                run_id,
+                latest.status,
+                "scenario_effect_failed",
+                (
+                    "隔离副本复制或真实测试未完成；未生成可验证成果，"
+                    "此前状态已保留。"
+                    if spec.scenario_id == "TC-04"
+                    else "确定性办公工具未完成；未生成可验证成果，此前状态已保留。"
+                ),
+                {
+                    "capability_id": spec.capability_id,
+                    "scenario_id": spec.scenario_id,
+                    "error_type": type(exc).__name__,
+                    "external_action": False,
+                },
+            )
+            raise
+        finally:
+            async with self._lock:
+                self._effect_inflight.discard(inflight_key)
 
     async def _record_scenario_effect(
         self,
@@ -3455,24 +3518,8 @@ class HarnessRuntime:
                 return
             sequence = snapshot.last_event_sequence
             events = list(snapshot.events)
-            sequence += 1
             _, unique_check_count, passed_check_count, _ = (
                 summarize_artifact_check_groups(record.checks for record in records)
-            )
-            events.append(
-                HarnessEvent(
-                    sequence=sequence,
-                    event_name="deterministic_office_tool_started",
-                    occurred_at=now,
-                    status=snapshot.status,
-                    message="已调用确定性办公工具；本次不额外调用模型。",
-                    details={
-                        "capability_id": execution.capability_id,
-                        "scenario_id": execution.scenario_id,
-                        "source_file_count": len(execution.source_file_refs),
-                        "external_action": False,
-                    },
-                )
             )
             for record in records:
                 sequence += 1

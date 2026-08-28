@@ -148,6 +148,8 @@ Agent Control Loop 的逐模块历史基线、当前有界效果纵切和后续�
 | 固定本地 Scenario Effect Gate | 用户看到的“已完成”必须落到真实文件和可复算检查，而不是一段模型回答 | 可下载 CSV/MD/DOCX/ZIP、检查清单、原件未修改、外部动作未发生 | `workspace_artifacts[]`、`effect_receipts[]`、Artifact GET 与 named SSE |
 | 设计成果与执行回执分层 | 用户不会把流程文档中的动作词误读为 Agent 已经拨号或写系统 | “只生成流程设计 DOCX”、六类终态、人工复核原因、未拨号/未写 CRM/未发短信 | Artifact `deliverable_type/key_outputs/review_guidance/execution_summary` + EffectReceipt `external_action=none` |
 | 真实代码副本与自测分层 | 用户能区分“改造真实项目”与“另造一个演示包”，并知道如何复测和人工合并 | 完整 algorithm-013 副本、文件变更、两条命令、测试 ID 清单、失败信号 | Artifact `self_test/key_outputs_label` + ZIP/diff/JSON receipt + download content gate |
+| 双阶段真实项目测试 | 用户不再被“105 项通过”蒙蔽，能看到真实模块、修复前红灯和修复后覆盖门 | dev-015 完整 44 文件副本、五类 117 项可展开测试、三处 diff、逐文件覆盖率 | Artifact `test_suites[]` + unpatched/final results + public/ZIP manifest 集合一致门 |
+| 长测试移出 API 事件循环 | 用户等待约一分钟时仍能看资料、Run 状态和真实轨迹，不会因为一个 builder 让整个服务像离线 | “正在复制并运行真实测试”、完成/失败事实，无虚构百分比 | 46 份输入冻结 + `asyncio.to_thread` + `deterministic_office_tool_started/scenario_effect_failed`；不是多 Worker 或可恢复 Tool Gateway |
 | 外部依赖显式阻断 | 用户不会把缺 Connector/权限的安全停止误读为任务成功 | `blocked_external_boundary`、缺失依赖与禁止副作用 | EffectReceipt + `scenario_effect_bounded`；不生成伪 Artifact |
 | 有序事件加权威 Snapshot | 进度和恢复依据事实 | 轨迹、重连中、最终对账 | named SSE 与 Run Snapshot |
 | 引用范围校验 + 问题审查页 | 用户不用在缺口卡和 96 份文件之间来回猜，可以从问题直接对照原文 | 轮次/分支定位、审查记录、关联文件、安全预览 | Gap/Branch/Finding refs + Preview GET；不等于语义正确 |

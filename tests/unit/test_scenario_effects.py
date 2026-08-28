@@ -232,6 +232,195 @@ def test_tc02_command_failure_marks_the_package_failed_and_gives_recovery(
     assert execution.artifacts[0].self_test is not None
 
 
+def test_tc04_repairs_and_tests_the_complete_real_platform_copy(
+    catalog: BenchmarkWorkspaceCatalog, tmp_path: Path
+) -> None:
+    source_root = FORTE_ROOT / "dev-015" / "input" / "source-code"
+    source_files = {
+        path.relative_to(source_root).as_posix(): path.read_bytes()
+        for path in source_root.rglob("*")
+        if path.is_file()
+    }
+    source_digest_before = {
+        name: hashlib.sha256(content).hexdigest()
+        for name, content in source_files.items()
+    }
+    spec = next(item for item in SCENARIO_EFFECT_SPECS if item.scenario_id == "TC-04")
+
+    execution = ScenarioEffectEngine().execute(spec.instruction, catalog)
+
+    assert execution is not None and execution.status == "passed"
+    assert len(source_files) == 44
+    assert len(execution.source_file_refs) == 44
+    assert all(len(artifact.source_file_refs) == 44 for artifact in execution.artifacts)
+    assert execution.observation == (
+        "生成 2 份真实成果文件，共享 12 项确定性检查，12/12 通过。"
+    )
+    archive = next(item for item in execution.artifacts if item.media_type == "application/zip")
+    report = next(item for item in execution.artifacts if item.media_type == "text/markdown")
+    assert archive.self_test is not None
+    assert archive.self_test.test_manifest_file == "evaluation-platform/test-manifest.json"
+    assert archive.self_test.test_manifest_matches_collected is True
+    assert [suite.test_count for suite in archive.self_test.test_suites] == [15, 16, 15, 23, 48]
+    assert [suite.test_files for suite in archive.self_test.test_suites] == [
+        ["tests/test_model_service.py", "tests/test_model_service_matrix.py"],
+        ["tests/test_dataset_service.py", "tests/test_dataset_service_matrix.py"],
+        ["tests/test_experiment_service.py", "tests/test_experiment_service_matrix.py"],
+        ["tests/test_evaluation_engine.py", "tests/test_evaluation_engine_matrix.py"],
+        ["tests/test_utils.py", "tests/test_utils_boundaries.py"],
+    ]
+    public_manifest = json.loads(
+        (
+            Path(__file__).resolve().parents[2]
+            / "docs/evidence/manifests/tc04-public-test-manifest-20260828.json"
+        ).read_text(encoding="utf-8")
+    )
+    assert public_manifest["test_count"] == 117
+    assert public_manifest["categories"] == [
+        suite.model_dump() for suite in archive.self_test.test_suites
+    ]
+    check_by_id = {check.check_id: check for check in archive.checks}
+    assert check_by_id["check-eval-baseline-red"].passed
+    assert check_by_id["check-eval-test-manifest"].passed
+    assert check_by_id["check-eval-changed-source-coverage"].passed
+    assert "117 项测试全部通过" in report.content.decode("utf-8")
+
+    with zipfile.ZipFile(io.BytesIO(archive.content)) as package:
+        names = set(package.namelist())
+        expected_project_files = {
+            f"evaluation-platform/{name}" for name in source_files
+        }
+        assert expected_project_files <= names
+        assert "evaluation-platform/contracts.py" not in names
+        for required in (
+            "evaluation-platform/changes.patch",
+            "evaluation-platform/changes.json",
+            "evaluation-platform/test-manifest.json",
+            "evaluation-platform/test-results.json",
+            "evaluation-platform/baseline-test-results.json",
+            "evaluation-platform/requirements-test.txt",
+            "evaluation-platform/TC-04自测卡.md",
+            "evaluation-platform/test-report.md",
+        ):
+            assert required in names
+        manifest = json.loads(package.read("evaluation-platform/test-manifest.json"))
+        result = json.loads(package.read("evaluation-platform/test-results.json"))
+        baseline = json.loads(package.read("evaluation-platform/baseline-test-results.json"))
+        changes = json.loads(package.read("evaluation-platform/changes.json"))
+        patch_text = package.read("evaluation-platform/changes.patch").decode("utf-8")
+        package.extractall(tmp_path)
+
+    assert manifest["declared_test_ids"] == result["collected_test_ids"]
+    assert sorted(
+        test_id
+        for suite in archive.self_test.test_suites
+        for test_id in suite.test_ids
+    ) == manifest["declared_test_ids"]
+    assert len(manifest["declared_test_ids"]) == 117
+    assert [item["test_count"] for item in manifest["categories"]] == [15, 16, 15, 23, 48]
+    assert result["status"] == "passed"
+    assert (result["passed"], result["failed"], result["errors"]) == (117, 0, 0)
+    assert baseline["status"] == "failed"
+    assert baseline["failed"] + baseline["errors"] == 5
+    assert set(changes["modified_files"]) == {
+        "app/services/model_service.py",
+        "app/services/dataset_service.py",
+        "app/engine/evaluation_engine.py",
+    }
+    assert all(
+        percent >= 80.0
+        for percent in changes["changed_source_coverage_percent"].values()
+    )
+    for changed_file in changes["modified_files"]:
+        assert f"a/{changed_file}" in patch_text
+        assert f"b/{changed_file}" in patch_text
+
+    isolated_env = {
+        "PATH": os.environ.get("PATH", ""),
+        "SYSTEMROOT": os.environ.get("SYSTEMROOT", ""),
+        "TEMP": os.environ.get("TEMP", str(tmp_path)),
+        "TMP": os.environ.get("TMP", str(tmp_path)),
+        "PYTHONNOUSERSITE": "1",
+        "HTTP_PROXY": "",
+        "HTTPS_PROXY": "",
+        "NO_PROXY": "*",
+    }
+    extracted = tmp_path / "evaluation-platform"
+    compiled = subprocess.run(
+        [sys.executable, "-m", "compileall", "-q", "app", "tests", "run_self_test.py"],
+        cwd=extracted,
+        env=isolated_env,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        check=False,
+    )
+    tested = subprocess.run(
+        [sys.executable, "run_self_test.py"],
+        cwd=extracted,
+        env=isolated_env,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        check=False,
+    )
+    rerun = json.loads((extracted / "test-results.json").read_text(encoding="utf-8"))
+    assert compiled.returncode == 0, compiled.stderr
+    assert tested.returncode == 0, tested.stdout + tested.stderr
+    assert (rerun["collected"], rerun["passed"], rerun["errors"]) == (117, 117, 0)
+    assert source_digest_before == {
+        name: hashlib.sha256((source_root / name).read_bytes()).hexdigest()
+        for name in source_files
+    }
+
+
+def test_tc04_freezes_all_project_and_context_bytes_before_worker_execution(
+    catalog: BenchmarkWorkspaceCatalog,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    spec = next(item for item in SCENARIO_EFFECT_SPECS if item.scenario_id == "TC-04")
+    monkeypatch.setattr(
+        catalog,
+        "checked_input_bytes",
+        lambda _file_ref: (_ for _ in ()).throw(
+            AssertionError("TC-04 must use one checked batch read")
+        ),
+    )
+    frozen = ScenarioEffectEngine().freeze(spec.instruction, catalog)
+
+    assert frozen is not None
+    assert frozen.spec.scenario_id == "TC-04"
+    assert len(frozen.source_file_refs) == 46
+    assert len(frozen.catalog.input_bytes) == 46
+    assert not frozen.catalog.previews
+    first_workspace = frozen.catalog.public_workspace()
+    first_workspace["title"] = "mutated test copy"
+    assert frozen.catalog.public_workspace()["title"] == "FORTE 公开办公资料库"
+    assert all(frozen.catalog.checked_input_bytes(file_ref) for file_ref in frozen.source_file_refs)
+
+
+def test_tc04_command_failure_keeps_both_artifacts_red_and_blocks_merge(
+    catalog: BenchmarkWorkspaceCatalog, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def fail_commands(command: list[str], *, cwd: Path, timeout_seconds: int = 30):
+        if "compileall" in command:
+            return 0, "", 4
+        return 1, "real project tests failed before producing a trusted result", 8
+
+    monkeypatch.setattr(
+        ScenarioEffectEngine, "_run_fixed_command", staticmethod(fail_commands)
+    )
+    spec = next(item for item in SCENARIO_EFFECT_SPECS if item.scenario_id == "TC-04")
+    execution = ScenarioEffectEngine().execute(spec.instruction, catalog)
+
+    assert execution is not None and execution.status == "failed"
+    assert all(artifact.verifier_status == "failed" for artifact in execution.artifacts)
+    assert all("当前包不得合并" in artifact.review_guidance for artifact in execution.artifacts)
+    assert "所有确定性效果门通过" not in execution.result
+
+
 def test_candidate_legal_and_release_outputs_keep_human_gates_and_fixed_facts(
     catalog: BenchmarkWorkspaceCatalog,
 ) -> None:

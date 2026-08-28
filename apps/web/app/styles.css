@@ -493,6 +493,23 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, summary:focus
 .workspace-artifact-self-test-detail b { font-size: 11px; }
 .workspace-artifact-self-test-detail ul { display: grid; gap: 4px; margin: 5px 0 0; padding-left: 17px; }
 .workspace-artifact-self-test-detail li { overflow-wrap: anywhere; color: var(--muted); font-size: 10px; line-height: 1.5; }
+.workspace-artifact-test-suites { border-top: 1px solid #d7e4f4; background: #fff; }
+.workspace-artifact-test-suites > header { display: grid; grid-template-columns: minmax(160px, .45fr) minmax(0, 1fr); gap: 12px; align-items: center; padding: 10px; }
+.workspace-artifact-test-suites > header div { display: flex; align-items: baseline; gap: 8px; }
+.workspace-artifact-test-suites > header span { color: #174f8d; font-size: 12px; font-weight: 750; }
+.workspace-artifact-test-suites > header h6 { margin: 0; color: var(--ink); font-size: 17px; letter-spacing: 0; }
+.workspace-artifact-test-suites > header p { margin: 0; color: var(--muted); font-size: 11px; line-height: 1.6; }
+.workspace-artifact-test-suites > div { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); border-top: 1px solid #d7e4f4; }
+.workspace-artifact-test-suites details { min-width: 0; border-right: 1px solid #d7e4f4; }
+.workspace-artifact-test-suites details:last-child { border-right: 0; }
+.workspace-artifact-test-suites summary { min-height: 68px; display: flex; justify-content: space-between; gap: 8px; align-items: flex-start; padding: 9px; cursor: pointer; }
+.workspace-artifact-test-suites summary span { min-width: 0; display: grid; gap: 4px; }
+.workspace-artifact-test-suites summary b { font-size: 12px; }
+.workspace-artifact-test-suites summary small { overflow-wrap: anywhere; color: var(--muted); font-size: 11px; line-height: 1.45; }
+.workspace-artifact-test-suites summary strong { flex: none; color: var(--blue); font-size: 12px; }
+.workspace-artifact-test-suites ol { max-height: 230px; margin: 0; padding: 8px 8px 8px 28px; overflow: auto; border-top: 1px solid #d7e4f4; background: #f8fbff; }
+.workspace-artifact-test-suites li { padding: 3px 0; }
+.workspace-artifact-test-suites code { white-space: normal; overflow-wrap: anywhere; color: #284966; font-size: 11px; line-height: 1.5; }
 .workspace-artifacts > ol > li > details { grid-column: 1 / -1; border-top: 1px solid var(--line); }
 .workspace-artifacts > ol > li > details > summary, .workspace-effect-receipt > summary { min-height: 34px; display: flex; align-items: center; gap: 6px; color: var(--blue); cursor: pointer; font-size: 11px; font-weight: 750; }
 .workspace-artifacts summary svg { width: 15px; }
@@ -880,6 +897,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, summary:focus
 @media (max-width: 1050px) {
   .data-workbench-grid { grid-template-columns: 280px minmax(0, 1fr); }
   .task-composer footer { align-items: flex-start; }
+  .workspace-artifact-test-suites > div { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 @media (max-width: 760px) {
@@ -890,6 +908,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, summary:focus
   .harness-app-divider { height: 9px; cursor: row-resize; }
   .harness-app-divider::before { inset: -16px 0; }
   .harness-app-divider span { writing-mode: horizontal-tb; }
+  .workspace-artifact-test-suites > div { grid-template-columns: 1fr; }
   .data-workbench-header { display: grid; }
   .data-workbench-header h1 { font-size: 23px; }
   .data-workbench-status { justify-content: space-between; }
@@ -978,6 +997,10 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, summary:focus
   .workspace-artifact-semantics, .workspace-artifact-semantics.has-deliverable-type { grid-template-columns: 1fr; }
   .workspace-artifact-key-outputs { grid-template-columns: 1fr; }
   .workspace-artifact-self-test > dl, .workspace-artifact-self-test-detail { grid-template-columns: 1fr; }
+  .workspace-artifact-test-suites > header { grid-template-columns: 1fr; gap: 5px; }
+  .workspace-artifact-test-suites > div { grid-template-columns: 1fr; }
+  .workspace-artifact-test-suites details { border-right: 0; border-top: 1px solid #d7e4f4; }
+  .workspace-artifact-test-suites summary { min-height: 54px; }
   .workspace-artifact-status { flex-direction: row; align-items: center; justify-content: space-between; }
   .workspace-artifacts > ol > li > button { width: 100%; }
   .file-preview > header { display: grid; }

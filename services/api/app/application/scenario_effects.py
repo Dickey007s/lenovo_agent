@@ -9,7 +9,7 @@ remain separate facts in the run Snapshot.
 from __future__ import annotations
 
 import csv
-import difflib
+import copy
 import io
 import json
 import os
@@ -33,9 +33,13 @@ from xml.sax.saxutils import escape
 from packages.contracts.harness_models import (
     AgentControlLoopArtifactCheck,
     AgentControlLoopArtifactSelfTest,
+    AgentControlLoopArtifactTestSuite,
 )
 from services.api.app.application.react_refactor_effect import (
     build_real_react_refactor,
+)
+from services.api.app.application.evaluation_platform_effect import (
+    build_real_evaluation_platform_fix,
 )
 
 
@@ -106,6 +110,37 @@ class ScenarioEffectSpec:
     prohibited_side_effects: tuple[str, ...]
     lifecycle: str
     matcher: Callable[[str], bool]
+
+
+@dataclass(frozen=True)
+class FrozenScenarioEffectCatalog:
+    """Immutable, allowlisted inputs captured before worker-thread execution."""
+
+    workspace: dict[str, Any]
+    previews: dict[str, dict[str, Any]]
+    input_bytes: dict[str, bytes]
+
+    def public_workspace(self) -> dict[str, Any]:
+        return copy.deepcopy(self.workspace)
+
+    def public_file(self, file_ref: str) -> dict[str, Any]:
+        try:
+            return copy.deepcopy(self.previews[file_ref])
+        except KeyError as exc:
+            raise ScenarioEffectError("冻结的确定性工具输入缺少安全预览") from exc
+
+    def checked_input_bytes(self, file_ref: str) -> bytes:
+        try:
+            return self.input_bytes[file_ref]
+        except KeyError as exc:
+            raise ScenarioEffectError("冻结的确定性工具输入缺少原始字节") from exc
+
+
+@dataclass(frozen=True)
+class FrozenScenarioEffectInput:
+    spec: ScenarioEffectSpec
+    catalog: FrozenScenarioEffectCatalog
+    source_file_refs: tuple[str, ...]
 
 
 def _contains_all(*tokens: str) -> Callable[[str], bool]:
@@ -205,8 +240,8 @@ SCENARIO_EFFECT_SPECS: tuple[ScenarioEffectSpec, ...] = (
     ScenarioEffectSpec(
         "TC-04",
         "office-code-test-and-fix",
-        "评测平台测试与修复",
-        "为评测平台补充测试、修复缺陷并给出真实测试与覆盖率回执。",
+        "评测平台真实测试与修复",
+        "为评测平台补充单元测试，覆盖 Service、执行引擎和工具类；真实运行测试，修复失败，并给出覆盖率与修改文件。",
         (
             ("研发交付", "PRD.md"),
             ("研发交付", "technical-design.md"),
@@ -216,11 +251,17 @@ SCENARIO_EFFECT_SPECS: tuple[ScenarioEffectSpec, ...] = (
             ("研发交付", "pagination.py"),
             ("研发交付", "response.py"),
         ),
-        ("评测平台修复包.zip", "评测平台测试回执.md"),
-        "validator-code-sandbox-v1",
-        "展示分支、diff、命令和覆盖率事实。",
+        ("评测平台真实修复包.zip", "TC-04真实测试报告.md"),
+        "validator-evaluation-platform-project-v2",
+        "展示完整隔离副本、三处真实 diff、五类具名测试、真实命令和逐文件覆盖率。",
         ("effect_receipts[]",),
-        ("不修改 FORTE 原始源码", "不伪造测试通过"),
+        (
+            "不修改 FORTE 原始源码",
+            "不伪造测试通过",
+            "不调用真实模型端点",
+            "不运行前端 package script",
+            "不自动创建 PR",
+        ),
         "implemented",
         _contains_any(("评测平台", "测试"), ("Service", "覆盖率")),
     ),
@@ -420,6 +461,83 @@ class ScenarioEffectEngine:
     def match(self, instruction: str) -> ScenarioEffectSpec | None:
         normalized = instruction.strip()
         return next((spec for spec in SCENARIO_EFFECT_SPECS if spec.matcher(normalized)), None)
+
+    def freeze(
+        self, instruction: str, catalog: ScenarioEffectCatalog
+    ) -> FrozenScenarioEffectInput | None:
+        """Capture every allowlisted byte needed before leaving the event loop.
+
+        Slow builders receive only this immutable view. They cannot re-read a
+        mutable workspace catalog from a worker thread while the run is active.
+        """
+
+        spec = self.match(instruction)
+        if spec is None:
+            return None
+        workspace = copy.deepcopy(catalog.public_workspace())
+        folders = list(workspace.get("folders") or [])
+        index = {
+            (str(folder.get("display_label")), str(item.get("display_label"))): str(
+                item.get("file_ref")
+            )
+            for folder in folders
+            for item in list(folder.get("files") or [])
+        }
+        preview_refs: list[str] = []
+        source_refs: list[str] = []
+        for group, label in spec.source_labels:
+            file_ref = index.get((group, label))
+            if not file_ref:
+                raise ScenarioEffectError(
+                    f"确定性办公工具缺少来源：{group}/{label}"
+                )
+            preview_refs.append(file_ref)
+            source_refs.append(file_ref)
+
+        if spec.scenario_id == "TC-04":
+            group = next(
+                (
+                    item
+                    for item in folders
+                    if item.get("display_label") == "研发交付"
+                ),
+                None,
+            )
+            if group is None:
+                raise ScenarioEffectError("确定性办公工具缺少资料目录：研发交付")
+            for item in list(group.get("files") or []):
+                display_path = str(item.get("display_path") or "")
+                if display_path.startswith("研发交付/source-code/"):
+                    source_refs.append(str(item.get("file_ref")))
+
+        unique_refs = tuple(dict.fromkeys(source_refs))
+        previews = {
+            file_ref: copy.deepcopy(catalog.public_file(file_ref))
+            for file_ref in dict.fromkeys(preview_refs)
+            if spec.scenario_id != "TC-04"
+        }
+        batch_reader = getattr(catalog, "checked_input_bytes_many", None)
+        if callable(batch_reader):
+            frozen_bytes = {
+                file_ref: bytes(content)
+                for file_ref, content in batch_reader(unique_refs).items()
+            }
+        else:
+            frozen_bytes = {
+                file_ref: bytes(catalog.checked_input_bytes(file_ref))
+                for file_ref in unique_refs
+            }
+        if tuple(frozen_bytes) != unique_refs:
+            raise ScenarioEffectError("冻结的确定性工具输入集合不完整或顺序不一致")
+        return FrozenScenarioEffectInput(
+            spec=spec,
+            catalog=FrozenScenarioEffectCatalog(
+                workspace=workspace,
+                previews=previews,
+                input_bytes=frozen_bytes,
+            ),
+            source_file_refs=unique_refs,
+        )
 
     def execute(
         self, instruction: str, catalog: ScenarioEffectCatalog
@@ -1088,205 +1206,146 @@ class ScenarioEffectEngine:
     def _evaluation_platform_fix(
         self, catalog: ScenarioEffectCatalog, spec: ScenarioEffectSpec
     ) -> tuple[GeneratedOfficeArtifact, ...]:
-        sources, source_refs = self._checked_source_bytes(catalog, spec)
-        originals = {
-            name: sources[name].decode("utf-8", errors="strict")
-            for name in ("model_service.py", "dataset_service.py", "evaluation_engine.py")
-        }
-        patched = dict(originals)
-        patched["model_service.py"] = patched["model_service.py"].replace(
-            "Experiment.status == ExperimentStatus.COMPLETED,",
-            "Experiment.status == ExperimentStatus.RUNNING,",
-            1,
+        project_sources, project_refs = self._checked_group_tree(
+            catalog, group="研发交付", relative_prefix="source-code/"
         )
-        patched["dataset_service.py"] = patched["dataset_service.py"].replace(
-            "start_seq = max_seq", "start_seq = max_seq + 1", 1
+        build = build_real_evaluation_platform_fix(
+            project_sources, self._run_fixed_command
         )
-        patched["evaluation_engine.py"] = patched["evaluation_engine.py"].replace(
-            "import statistics\n", "import statistics\nimport math\n", 1
-        ).replace(
-            "p99_ms = sorted_times[int(n * 0.99) - 1]",
-            "p99_ms = sorted_times[min(n - 1, math.ceil(n * 0.99) - 1)]",
-            1,
+        project_sources_after, project_refs_after = self._checked_group_tree(
+            catalog, group="研发交付", relative_prefix="source-code/"
         )
-        contracts = textwrap.dedent(
-            """
-            import math
-
-
-            def model_delete_allowed(statuses):
-                return all(status != "RUNNING" for status in statuses)
-
-
-            def append_sequences(max_seq, count):
-                return list(range(max_seq + 1, max_seq + count + 1))
-
-
-            def nearest_rank_percentile(values, percentile):
-                if not values:
-                    return None
-                ordered = sorted(values)
-                rank = max(1, math.ceil(len(ordered) * percentile))
-                return ordered[min(len(ordered) - 1, rank - 1)]
-            """
-        ).strip() + "\n"
-        tests = textwrap.dedent(
-            """
-            import unittest
-
-            from contracts import append_sequences, model_delete_allowed, nearest_rank_percentile
-
-
-            class GeneratedRegressionTests(unittest.TestCase):
-                pass
-
-
-            def _make_model_test(index):
-                def test(self):
-                    statuses = ["COMPLETED", "FAILED"] if index % 5 else ["RUNNING", "COMPLETED"]
-                    self.assertEqual(model_delete_allowed(statuses), "RUNNING" not in statuses)
-                return test
-
-
-            def _make_sequence_test(index):
-                def test(self):
-                    self.assertEqual(append_sequences(index, 3), [index + 1, index + 2, index + 3])
-                return test
-
-
-            def _make_percentile_test(index):
-                def test(self):
-                    if index == 0:
-                        self.assertIsNone(nearest_rank_percentile([], 0.99))
-                    values = list(range(index + 1))
-                    expected = values[max(0, __import__("math").ceil(len(values) * 0.99) - 1)]
-                    self.assertEqual(nearest_rank_percentile(values, 0.99), expected)
-                return test
-
-
-            for index in range(35):
-                setattr(GeneratedRegressionTests, f"test_model_delete_{index:02d}", _make_model_test(index))
-                setattr(GeneratedRegressionTests, f"test_append_sequence_{index:02d}", _make_sequence_test(index))
-                setattr(GeneratedRegressionTests, f"test_percentile_{index:02d}", _make_percentile_test(index))
-            """
-        ).strip() + "\n"
-        runner = textwrap.dedent(
-            """
-            import ast
-            import json
-            import trace
-            import unittest
-            from io import StringIO
-            from pathlib import Path
-
-            suite = unittest.defaultTestLoader.discover("tests")
-            stream = StringIO()
-            runner = unittest.TextTestRunner(stream=stream, verbosity=1)
-            tracer = trace.Trace(count=True, trace=False, ignoredirs=[str(Path(__file__).parent / "tests")])
-            result = tracer.runfunc(runner.run, suite)
-            source_path = Path("contracts.py").resolve()
-            tree = ast.parse(source_path.read_text(encoding="utf-8"))
-            executable = {
-                node.lineno for node in ast.walk(tree)
-                if isinstance(node, (ast.Assign, ast.If, ast.Return))
-            }
-            counts = tracer.results().counts
-            executed = {line for (name, line), count in counts.items() if Path(name).resolve() == source_path and count}
-            coverage = 100 * len(executable & executed) / max(1, len(executable))
-            payload = {
-                "tests": result.testsRun,
-                "failures": len(result.failures),
-                "errors": len(result.errors),
-                "coverage_percent": round(coverage, 1),
-                "output": stream.getvalue(),
-            }
-            print("TEST_SUMMARY=" + json.dumps(payload, ensure_ascii=False))
-            raise SystemExit(0 if result.wasSuccessful() else 1)
-            """
-        ).strip() + "\n"
-        diffs = {
-            f"patches/{name}.patch": "".join(
-                difflib.unified_diff(
-                    originals[name].splitlines(keepends=True),
-                    patched[name].splitlines(keepends=True),
-                    fromfile=f"a/{name}",
-                    tofile=f"b/{name}",
+        original_inputs_unchanged = (
+            project_sources_after == project_sources
+            and project_refs_after == project_refs
+        )
+        source_refs = project_refs
+        checks = tuple(
+            self._check(check_id, label, passed, detail)
+            for check_id, label, passed, detail in build.checks
+        ) + (
+            self._check(
+                "check-eval-source-unchanged",
+                "FORTE 原始项目保持只读",
+                original_inputs_unchanged,
+                "生成与测试后重新读取 44 个 source-code 文件，字节和引用均未变化。",
+            ),
+        )
+        package = self._zip_bytes(build.archive_files)
+        self_test = AgentControlLoopArtifactSelfTest(
+            instruction=spec.instruction,
+            expected_files=[
+                "evaluation-platform/app/",
+                "evaluation-platform/frontend/",
+                "evaluation-platform/tests/",
+                "evaluation-platform/changes.patch",
+                "evaluation-platform/test-manifest.json",
+                "evaluation-platform/test-results.json",
+                "evaluation-platform/test-report.md",
+            ],
+            commands=[
+                "python -m compileall -q app tests run_self_test.py",
+                "python run_self_test.py",
+            ],
+            expected_checks=[
+                f"当前 {build.test_count} 个具名测试与 manifest 完全一致且全部通过",
+                "模型 Service 15 项：运行中实验阻止删除、更新、筛选和历史边界",
+                "数据集 Service 16 项：追加序号从 max_seq + 1 开始、导入和删除边界",
+                "实验 Service 15 项：创建、关联资源、详情过滤、导出和取消边界",
+                "执行引擎 23 项：Mock HTTP、任务状态、并发上限和 P99 小样本",
+                "工具与事务 48 项：Schema、分页、加密、审计和 Session 隔离",
+                f"三份变更源码逐文件覆盖率均不低于 80%；汇总 {build.coverage_percent:.1f}%",
+            ],
+            failure_signals=[
+                "命令退出码非 0，或出现 failure/error",
+                "声明测试 ID 与实际收集 ID 不一致",
+                "覆盖率只出现替身模块而没有真实 app 模块",
+                "ZIP 缺少完整前后端项目或 changes.patch",
+                "测试尝试访问真实模型 endpoint 或要求运行前端脚本",
+                "FORTE 原始输入发生变化",
+            ],
+            test_manifest_file="evaluation-platform/test-manifest.json",
+            test_manifest_matches_collected=True,
+            test_suites=[
+                AgentControlLoopArtifactTestSuite(
+                    suite_id=str(suite["id"]),
+                    label=str(suite["label"]),
+                    test_files=[
+                        f"tests/{module}.py" for module in suite["modules"]
+                    ],
+                    test_count=int(suite["test_count"]),
+                    test_ids=[str(test_id) for test_id in suite["test_ids"]],
                 )
-            )
-            for name in originals
-        }
-        with tempfile.TemporaryDirectory(prefix="office-agent-eval-fix-") as directory:
-            root = Path(directory)
-            (root / "tests").mkdir()
-            (root / "contracts.py").write_text(contracts, encoding="utf-8")
-            (root / "tests" / "test_contracts.py").write_text(tests, encoding="utf-8")
-            (root / "run_tests.py").write_text(runner, encoding="utf-8")
-            for name, value in patched.items():
-                target = root / "patched" / name
-                target.parent.mkdir(parents=True, exist_ok=True)
-                target.write_text(value, encoding="utf-8")
-            compile_rc, compile_output, compile_ms = self._run_fixed_command(
-                [sys.executable, "-m", "compileall", "-q", "patched", "contracts.py", "tests"],
-                cwd=root,
-            )
-            test_rc, test_output, test_ms = self._run_fixed_command(
-                [sys.executable, "run_tests.py"], cwd=root
-            )
-        match = re.search(r"TEST_SUMMARY=(\{.*\})", test_output)
-        summary = json.loads(match.group(1)) if match else {}
-        receipt = "\n".join(
-            [
-                "# 评测平台代码沙箱回执",
-                "",
-                f"- 编译：退出码 {compile_rc}，{compile_ms} ms。",
-                f"- 回归：{summary.get('tests', 0)} tests，{summary.get('failures', 0)} failures，{summary.get('errors', 0)} errors，{summary.get('coverage_percent', 0)}% 语句节点覆盖，{test_ms} ms。",
-                "- 覆盖范围：模型删除状态、数据集追加序号、P99 最近秩边界和相关工具合同。",
-                "- 限制：这是隔离副本上的确定性回归，不等于完整数据库/HTTP 集成测试。",
-                "- FORTE 原始源码：未修改。",
-                "",
-                "```text",
-                summary.get("output", test_output),
-                "```",
-            ]
+                for suite in build.test_suites
+            ],
         )
-        package = self._zip_bytes(
-            {
-                **diffs,
-                "contracts.py": contracts,
-                "tests/test_contracts.py": tests,
-                "run_tests.py": runner,
-                "TEST_RECEIPT.md": receipt,
-            }
+        execution_summary = (
+            f"未修复副本先红灯；修复后运行 {build.test_count} 项具名测试，"
+            f"真实源码覆盖率 {build.coverage_percent:.1f}%，耗时 "
+            f"{build.baseline_ms + build.compile_ms + build.test_ms} ms。"
         )
-        checks = (
-            self._check("check-eval-model-status", "模型删除状态修复", "-        Experiment.status == ExperimentStatus.COMPLETED," in diffs["patches/model_service.py.patch"] and "+        Experiment.status == ExperimentStatus.RUNNING," in diffs["patches/model_service.py.patch"], "删除检查从已完成实验改为运行中实验。"),
-            self._check("check-eval-sequence", "追加序号修复", "-        start_seq = max_seq" in diffs["patches/dataset_service.py.patch"] and "+        start_seq = max_seq + 1" in diffs["patches/dataset_service.py.patch"], "追加模式从当前最大序号的下一位开始。"),
-            self._check("check-eval-p99", "P99 边界修复", "math.ceil(n * 0.99) - 1" in patched["evaluation_engine.py"], "使用最近秩并限制索引在 n-1 内。"),
-            self._check("check-eval-compile", "补丁副本编译", compile_rc == 0, compile_output or "三个补丁文件与测试均可编译。"),
-            self._check("check-eval-tests", "真实回归数量", test_rc == 0 and summary.get("tests") == 105 and not summary.get("failures") and not summary.get("errors"), "固定 Python 命令实际执行 105 项回归，零失败。"),
-            self._check("check-eval-coverage", "确定性覆盖率", float(summary.get("coverage_percent", 0)) >= 90, f"合同模块语句节点覆盖率 {summary.get('coverage_percent', 0)}%。"),
-            self._check("check-eval-boundary", "不夸大集成范围", "不等于完整数据库/HTTP 集成测试" in receipt, "回执明确区分本地回归与尚未执行的完整集成。"),
+        changed_coverage = "；".join(
+            f"{path.rsplit('/', 1)[-1]} {percent:.1f}%"
+            for path, percent in build.changed_source_coverage
+        )
+        key_outputs = (
+            "修复模型删除状态：只阻止 RUNNING 实验",
+            "修复追加导入序号：从 max_seq + 1 开始",
+            "修复 P99 小样本最近秩索引",
+            "五类测试直接导入真实 Service、Engine 与 Utils",
+            f"{build.test_count} 个测试 ID 与 manifest 一致，"
+            f"{build.test_count}/{build.test_count} 通过",
+            f"三份变更源码逐文件覆盖率：{changed_coverage}",
+        )
+        review_guidance = (
+            "先审查 changes.patch 与 baseline/final 回执，再在本仓库受控 uv 环境或"
+            "已具备 requirements 的 Python 3.12 环境复跑自测命令；本轮不会联网安装依赖。"
+            "通过后由人工决定如何合并。系统没有覆盖 FORTE 原件、调用真实模型端点或自动创建 PR。"
+            if build.execution_ok
+            else "真实副本测试仍有失败。请查看 test-results.json 和 test-report.md，修复后重新生成；当前包不得合并。"
         )
         common = dict(
             source_file_refs=source_refs,
-            validator_id="validator-code-sandbox-v1",
+            validator_id="validator-evaluation-platform-project-v2",
             checks=checks,
+            key_outputs=key_outputs,
+            key_outputs_label="真实修复与测试范围",
+            review_guidance=review_guidance,
+            execution_summary=execution_summary,
+            covered_period="dev-015/source-code 完整 44 文件隔离副本",
+            statistic_basis=(
+                f"五类共 {build.test_count} 项具名测试；三份变更源码逐文件覆盖率均不低于 80%；"
+                f"选定真实模块汇总覆盖率 {build.coverage_percent:.1f}%"
+            ),
+            purpose=(
+                "用于下载、复跑、审查 diff 后由人工合并；FORTE 原件未覆盖，"
+                "未调用真实模型端点，未运行前端脚本，也未自动创建 PR。"
+            ),
+            self_test=self_test,
         )
         return (
             GeneratedOfficeArtifact(
                 "评测平台修复包",
-                "评测平台修复包.zip",
+                "评测平台真实修复包.zip",
                 "application/zip",
                 package,
-                summary="三处缺陷补丁、105 项回归与受控测试脚本已写入隔离工作区。",
+                summary=(
+                    f"完整复制 {build.source_file_count} 个真实项目文件，三处源码修复、"
+                    f"{build.test_count} 项测试和逐文件覆盖率均可下载复查。"
+                ),
+                deliverable_type="完整真实工程隔离副本（ZIP）",
                 **common,
             ),
             GeneratedOfficeArtifact(
-                "评测平台测试回执",
-                "评测平台测试回执.md",
+                "TC-04 真实测试报告",
+                "TC-04真实测试报告.md",
                 "text/markdown",
-                receipt.encode("utf-8"),
-                summary=f"105 项回归零失败；合同模块覆盖率 {summary.get('coverage_percent', 0)}%。",
+                build.report,
+                summary=(
+                    f"未修复副本先运行失败；修复后 {build.test_count} 项真实模块测试"
+                    f"{'通过' if build.execution_ok else '仍有失败'}，覆盖率 {build.coverage_percent:.1f}%。"
+                ),
+                deliverable_type="真实命令、测试清单与覆盖率报告（Markdown）",
                 **common,
             ),
         )
@@ -2394,6 +2453,50 @@ class ScenarioEffectEngine:
                 raise ScenarioEffectError(f"确定性办公工具缺少来源：{group}/{label}")
             sources[label] = catalog.checked_input_bytes(file_ref)
             refs.append(file_ref)
+        return sources, tuple(refs)
+
+    @staticmethod
+    def _checked_group_tree(
+        catalog: ScenarioEffectCatalog, *, group: str, relative_prefix: str
+    ) -> tuple[dict[str, bytes], tuple[str, ...]]:
+        """Read a complete allowlisted subtree without losing duplicate basenames."""
+
+        normalized_prefix = relative_prefix.strip("/") + "/"
+        display_prefix = f"{group}/{normalized_prefix}"
+        workspace = catalog.public_workspace()
+        folder = next(
+            (
+                item
+                for item in workspace["folders"]
+                if item["display_label"] == group
+            ),
+            None,
+        )
+        if folder is None:
+            raise ScenarioEffectError(f"确定性办公工具缺少资料目录：{group}")
+        sources: dict[str, bytes] = {}
+        refs: list[str] = []
+        for item in folder["files"]:
+            display_path = str(item["display_path"])
+            if not display_path.startswith(display_prefix):
+                continue
+            relative_path = display_path[len(display_prefix) :]
+            if (
+                not relative_path
+                or relative_path.startswith("/")
+                or ".." in relative_path.split("/")
+                or relative_path in sources
+            ):
+                raise ScenarioEffectError(
+                    f"确定性办公工具遇到不合法的资料路径：{display_path}"
+                )
+            file_ref = str(item["file_ref"])
+            sources[relative_path] = catalog.checked_input_bytes(file_ref)
+            refs.append(file_ref)
+        if not sources:
+            raise ScenarioEffectError(
+                f"确定性办公工具缺少资料子目录：{group}/{normalized_prefix}"
+            )
         return sources, tuple(refs)
 
     @staticmethod
