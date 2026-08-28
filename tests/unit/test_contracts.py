@@ -111,3 +111,111 @@ def test_workspace_artifact_and_effect_receipt_round_trip_all_workspace_sources(
         ["source_file_refs"]["maxItems"]
         == 96
     )
+
+
+def test_business_gate_outcome_round_trips_on_artifact_and_effect_receipt() -> None:
+    now = datetime.now(timezone.utc)
+    outcome = {
+        "outcome_id": "business-outcome-release-readiness",
+        "status": "failed",
+        "decision": "不得上线",
+        "summary": "4/4 条正式上线条件未通过。",
+        "total_gate_count": 1,
+        "failed_gate_count": 1,
+        "gates": [
+            {
+                "gate_id": "business-gate-p0-tested",
+                "label": "P0 功能提测率",
+                "passed": False,
+                "numerator": 5,
+                "denominator": 7,
+                "operator": ">=",
+                "threshold": 100,
+                "actual": 71.4,
+                "unit": "percent",
+                "formula": "已提测 P0 / 全部 P0",
+                "source_rule": "PRD 上线条件。",
+                "result": "5/7 = 71.4%。",
+            }
+        ],
+        "auxiliary_metrics": [],
+        "records": [
+            {
+                "record_id": "F01",
+                "title": "安全审核开关",
+                "module": "内容安全审核模块",
+                "priority": "P0",
+                "owner": "王磊",
+                "configuration_status": "已提测",
+                "test_status": "通过",
+                "test_reason": "无",
+                "total_cases": 12,
+                "passed_cases": 12,
+                "compatibility_issue_count": 0,
+                "compatibility_issue_environments": [],
+                "rules_hit": [],
+                "base_risk_level": "none",
+                "compatibility_risk_level": "none",
+                "final_risk_level": "none",
+                "affected_gate_ids": [],
+                "source_locations": ["PRD_v2.5.md 第 1 行"],
+                "remediation_action": "保留证据并复核。",
+                "exit_condition": "正式上线 Gate 均满足。",
+            }
+        ],
+    }
+    artifact = AgentControlLoopWorkspaceArtifact.model_validate(
+        {
+            "artifact_id": "workspace-artifact-abcdef123456",
+            "capability_id": "office-release-readiness",
+            "scenario_id": "TC-11",
+            "title": "上线合规与风险报告",
+            "file_name": "上线合规与风险报告.docx",
+            "media_type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            "size": 1024,
+            "round_number": 1,
+            "source_file_refs": ["file-ref-01"],
+            "validator_id": "validator-release-readiness-v2",
+            "verifier_status": "passed",
+            "checks": [
+                {
+                    "check_id": "check-release-source-contract",
+                    "label": "来源合同",
+                    "passed": True,
+                    "detail": "四份来源通过结构校验。",
+                }
+            ],
+            "summary": "文件结构与公式通过检查，业务 Gate 未通过。",
+            "business_gate_outcome": outcome,
+            "download_path": "/v1/harness/runs/run-1/artifacts/artifact-1",
+            "created_at": now,
+        }
+    )
+    receipt = AgentControlLoopEffectReceipt.model_validate(
+        {
+            "receipt_id": "effect-receipt-abcdef123456",
+            "capability_id": "office-release-readiness",
+            "scenario_id": "TC-11",
+            "status": "passed",
+            "state": "冻结四份来源。",
+            "action": "生成报告与台账。",
+            "observation": "确定性检查通过，业务 Gate 未通过。",
+            "cost": "0 次额外模型调用。",
+            "result": "不得上线。",
+            "source_file_refs": ["file-ref-01"],
+            "artifact_ids": [artifact.artifact_id],
+            "business_gate_outcome": outcome,
+            "created_at": now,
+        }
+    )
+
+    restored_artifact = AgentControlLoopWorkspaceArtifact.model_validate_json(
+        artifact.model_dump_json()
+    )
+    restored_receipt = AgentControlLoopEffectReceipt.model_validate_json(
+        receipt.model_dump_json()
+    )
+    assert restored_artifact.business_gate_outcome is not None
+    assert restored_artifact.business_gate_outcome.failed_gate_count == 1
+    assert restored_receipt.business_gate_outcome is not None
+    assert restored_receipt.business_gate_outcome.decision == "不得上线"

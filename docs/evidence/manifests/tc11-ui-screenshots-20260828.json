@@ -1,0 +1,24 @@
+{
+  "evidence_id": "DR-0043-TC11-UI-SCREENSHOTS-20260828",
+  "capture": "Playwright 受控服务端事实夹具；无 CSS 注入；完整页面；工程代理，不是用户研究",
+  "screenshots": [
+    {
+      "file": "../screenshots/tc11-release-gate-desktop.png",
+      "viewport_width": 1440,
+      "viewport_height": 1100,
+      "image_width": 1440,
+      "image_height": 1100,
+      "bytes": 203938,
+      "sha256": "9c67342f7ffac8a76aa12f4085f8ce65afd2e8602bb11db3d2ac238843d4a9d8"
+    },
+    {
+      "file": "../screenshots/tc11-release-gate-mobile.png",
+      "viewport_width": 390,
+      "viewport_height": 844,
+      "image_width": 390,
+      "image_height": 7798,
+      "bytes": 443250,
+      "sha256": "03451331f225dd159d228f68b964234a27a3bf1f92e65e50efb4dfd63bf461ef"
+    }
+  ]
+}

@@ -1,9 +1,12 @@
 from __future__ import annotations
 
 import asyncio
+import csv
 import hashlib
+import io
 import json
 import threading
+import zipfile
 from pathlib import Path
 
 import httpx
@@ -51,6 +54,7 @@ TC04_INSTRUCTION = (
     "真实运行测试，修复失败，并给出覆盖率与修改文件。"
 )
 TC12_INSTRUCTION = "为三个看板工具模块编写 Vitest，修复源码并真实运行测试。"
+TC11_INSTRUCTION = "综合 PRD、上线配置、功能测试和兼容测试，给出上线结论与改进计划。"
 
 
 class OnboardingPlanner:
@@ -160,6 +164,54 @@ class DashboardAnalyst:
                             role="observed",
                             label="增长率原实现",
                             quote="return ((newValue - oldValue) / newValue) * 100",
+                        )
+                    ],
+                )
+            ],
+            follow_ups=[],
+            review_required=True,
+        )
+
+
+class ReleaseReadinessPlanner:
+    model = "deepseek-v4-pro"
+
+    async def plan(self, *, scenario, files):
+        source = next(item for item in files if item["display_label"] == "PRD_v2.5.md")
+        return HarnessPlanCandidate(
+            summary="读取发布规则并形成可复核的上线判断",
+            selection_reason="PRD 定义正式上线条件；固定 TC-11 效果门会另行冻结四份批准资料并逐项复算。",
+            units=[
+                HarnessPlanCandidateUnit(
+                    unit_id="read-release-rules",
+                    title="读取 PRD 上线规则",
+                    objective="核对功能全集、优先级和正式上线条件",
+                    input_file_refs=[source["file_ref"]],
+                    tool="file.read",
+                )
+            ],
+        )
+
+
+class ReleaseReadinessAnalyst:
+    model = "deepseek-v4-pro"
+
+    async def analyze(self, *, instruction, plan, files, validation_feedback=None):
+        source = files[0]
+        return HarnessTaskResult(
+            summary="已读取 PRD 上线规则；四份资料的交叉表校验、风险推导和 Gate 复算由服务端固定 TC-11 效果门完成。",
+            findings=[
+                HarnessFinding(
+                    plan_unit_id=plan.units[0].unit_id,
+                    title="本批次处于待上线审核状态",
+                    detail="PRD 将当前文档状态标记为待上线审核，需要结合配置、功能测试和兼容测试复核。",
+                    file_refs=[source["file_ref"]],
+                    evidence_quotes=[
+                        HarnessEvidenceQuote(
+                            file_ref=source["file_ref"],
+                            role="observed",
+                            label="PRD 文档状态",
+                            quote="| 文档状态 | 待上线审核 |",
                         )
                     ],
                 )
@@ -555,6 +607,93 @@ async def test_runtime_writes_downloadable_verified_artifact_without_touching_fo
         assert response.headers["x-content-type-options"] == "nosniff"
         assert denied.status_code == 404
         json.dumps(public.model_dump(mode="json"), ensure_ascii=False)
+    finally:
+        await runtime.close()
+
+
+@pytest.mark.asyncio
+async def test_tc11_runtime_persists_verified_files_and_failed_business_gates(
+    tmp_path: Path,
+) -> None:
+    before = _forte_digests()
+    runtime = HarnessRuntime(
+        BenchmarkWorkspaceCatalog(FORTE_ROOT),
+        ReleaseReadinessPlanner(),
+        ReleaseReadinessAnalyst(),
+        effect_engine=ScenarioEffectEngine(),
+        artifact_store=RunWorkspaceArtifactStore(tmp_path / "run-workspaces"),
+    )
+    try:
+        started = await runtime.start(
+            "release-owner",
+            HarnessRunStart(
+                idempotency_key="tc11-derived-release-runtime-0001",
+                instruction=TC11_INSTRUCTION,
+            ),
+        )
+        snapshot = None
+        for _ in range(1_000):
+            candidate = await runtime.get(
+                "release-owner", started.run.run_id
+            )
+            if candidate.status in {"waiting_input", "completed", "stopped", "failed"}:
+                snapshot = candidate
+                break
+            await asyncio.sleep(0.01)
+        assert snapshot is not None
+
+        assert snapshot.status == "completed"
+        assert len(snapshot.workspace_artifacts) == 2
+        assert snapshot.effect_receipts[0].status == "passed"
+        outcome = snapshot.effect_receipts[0].business_gate_outcome
+        assert outcome is not None
+        assert outcome.status == "failed"
+        assert outcome.decision == "不得上线"
+        assert outcome.failed_gate_count == outcome.total_gate_count == 4
+        assert [gate.actual for gate in outcome.gates] == [71.4, 80.0, 40.0, 4.0]
+        assert len(outcome.records) == 18
+        assert sum(item.final_risk_level == "severe" for item in outcome.records) == 4
+        assert sum(item.final_risk_level == "major" for item in outcome.records) == 2
+        assert sum(item.final_risk_level == "minor" for item in outcome.records) == 2
+        assert all(
+            item.business_gate_outcome == outcome
+            for item in snapshot.workspace_artifacts
+        )
+        assert all(
+            item.verifier_status == "passed"
+            for item in snapshot.workspace_artifacts
+        )
+        assert all(
+            check.passed
+            for item in snapshot.workspace_artifacts
+            for check in item.checks
+        )
+
+        by_name = {item.file_name: item for item in snapshot.workspace_artifacts}
+        _, report = await runtime.get_workspace_artifact(
+            "release-owner",
+            snapshot.run_id,
+            by_name["上线合规与风险报告.docx"].artifact_id,
+        )
+        with zipfile.ZipFile(io.BytesIO(report)) as package:
+            document = package.read("word/document.xml").decode("utf-8")
+        assert document.count("<w:tbl>") >= 6
+        assert "上线结论：不得上线" in document
+
+        _, ledger = await runtime.get_workspace_artifact(
+            "release-owner",
+            snapshot.run_id,
+            by_name["上线功能风险逐项台账.csv"].artifact_id,
+        )
+        ledger_rows = list(csv.DictReader(io.StringIO(ledger.decode("utf-8-sig"))))
+        assert len(ledger_rows) == 18
+        assert sum(item["最终等级"] == "严重" for item in ledger_rows) == 4
+        assert _forte_digests() == before
+
+        public = runtime.public_snapshot(snapshot).model_dump(mode="json")
+        public_outcome = public["effect_receipts"][0]["business_gate_outcome"]
+        assert public_outcome["decision"] == "不得上线"
+        assert len(public_outcome["records"]) == 18
     finally:
         await runtime.close()
 

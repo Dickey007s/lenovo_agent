@@ -1,0 +1,78 @@
+{
+  "evidence_id": "DR-0043-TC11-LIVE-DERIVED-RELEASE-GATES-20260828",
+  "status": "limited_verified",
+  "captured_at": "2026-08-28",
+  "instruction": "综合 PRD、上线配置、功能测试和兼容测试，给出上线结论与改进计划。",
+  "run_id": "harness:d1a3d9fca21d4e2299ac308bbaf73e1e",
+  "provider": {
+    "model": "deepseek-v4-pro",
+    "planner": {
+      "called": true,
+      "output_used": true,
+      "elapsed_ms": 13321
+    },
+    "analyst": {
+      "called": true,
+      "output_used": true,
+      "elapsed_ms": 27304
+    }
+  },
+  "runtime": {
+    "status": "waiting_input",
+    "checkpoint": "postgres",
+    "task_store": "postgres",
+    "rounds_used": 1,
+    "files_verified": 4,
+    "model_calls_used": 2,
+    "active_elapsed_ms": 43255
+  },
+  "deterministic_effect": {
+    "status": "passed",
+    "unique_check_count": 9,
+    "result": "确定性检查通过；业务 Gate 未通过，结论为‘不得上线’。",
+    "external_action": "none",
+    "original_inputs_modified": false
+  },
+  "business_gate_outcome": {
+    "status": "failed",
+    "decision": "不得上线",
+    "failed_gate_count": 4,
+    "total_gate_count": 4,
+    "gates": [
+      {"gate_id": "p0-tested", "numerator": 5, "denominator": 7, "actual": 71.4, "operator": ">=", "threshold": 100, "passed": false},
+      {"gate_id": "p0-accepted", "numerator": 4, "denominator": 5, "actual": 80.0, "operator": ">=", "threshold": 100, "passed": false},
+      {"gate_id": "p1-passed", "numerator": 2, "denominator": 5, "actual": 40.0, "operator": ">=", "threshold": 80, "passed": false},
+      {"gate_id": "severe-cleared", "numerator": 4, "denominator": 1, "actual": 4.0, "operator": "==", "threshold": 0, "passed": false}
+    ]
+  },
+  "artifacts": [
+    {
+      "file_name": "上线合规与风险报告.docx",
+      "bytes": 4393,
+      "sha256": "bdb74165c744876e46ac3b40fc5d33cfe96f9e886115133b32f636421b5ed8bd",
+      "parsed_tables": 6,
+      "verifier_status": "passed"
+    },
+    {
+      "file_name": "上线功能风险逐项台账.csv",
+      "bytes": 9196,
+      "sha256": "883398dda2df35294487727aa1476734360b849549affdddb9894e92b7f725bb",
+      "parsed_rows": 18,
+      "risk_counts": {"severe": 4, "major": 2, "minor": 2, "none": 10},
+      "verifier_status": "passed"
+    }
+  ],
+  "restart_verification": {
+    "api_process_restarted": true,
+    "run_restored": true,
+    "artifact_count": 2,
+    "business_records": 18,
+    "download_hashes_unchanged": true
+  },
+  "boundaries": [
+    "Artifact 的确定性检查通过不等于业务 Gate 通过，也不等于整个 Run completed。",
+    "当前只覆盖固定 pm-014 四份公开输入，不是通用发布审计器。",
+    "没有执行上线、没有修改配置、没有外部动作。",
+    "PostgreSQL 只证明顺序 Runtime 已提交 Snapshot/Artifact 恢复，不证明多实例并发安全。"
+  ]
+}

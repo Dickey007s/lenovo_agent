@@ -749,24 +749,36 @@ Branch validation、Result citation membership，以及 memory 或 PostgreSQL Sn
 **用户动作：** 写明需要核对的覆盖率、通过率与冲突点；可以预览 Markdown/XLSX，但不先
 指定 Agent 必须读取哪些文件。
 
-**Agent 路径：** 当前 Planner 可以提出需求、配置、测试和风险核对单元，Analyst 可以形成
-引用各报告的初步结论。服务端只校验 Plan 结构、来源与结果引用，没有启动并行 Worker，也
-不会因为报告冲突自动新增 reconciliation 单元。
+**Agent 路径：** Planner 与 Analyst 仍负责从整库选择证据并形成可审查分析；固定 TC-11
+效果门另外冻结 `pm-014` 的四份批准输入。服务端先校验 PRD 18 项功能和三张 13 项执行表，
+再按 PRD 优先级、问题原因与兼容异常环境推导逐功能风险，最后聚合正式上线 Gate。这个路径
+没有依赖功能名称名单，也没有启动并行 Worker。
 
-**停顿或失败：** SSE 中断时浏览器以 Snapshot 和 `after=N` 恢复；模型输出未通过 Schema、
-Plan 或引用校验时安全失败。引用缺口可以形成待确认 Branch；业务报告相互矛盾时仍没有
-确定性冲突判定或自动新增 reconciliation Worker。
+**确定性结果：** 四条正式 Gate 分别为 P0 提测 `5/7=71.4%<100%`、P0 已提测可接受结论
+`4/5=80%<100%`、P1 已提测通过 `2/5=40%<80%`、严重问题 `4>0`。四条均失败，因此
+业务结论为“不得上线”。分级和综合用例通过率仍展示，但明确只作辅助质量指标。
 
-**前台输出：** Agent 跨目录选证据的理由、有序轨迹、验证后的 Plan、每条结论的报告引用、重连状态和
-待复核终态。
+**停顿或失败：** 重复或未知功能编号、跨表名称/优先级冲突、未知状态、非法数字、兼容环境
+重复语义、零分母都会使数据合同失败。DOCX、CSV、风险集合或公式任一 Verifier 检查失败，
+两份成果必须转红，不能因为业务结论文案存在就冒充可靠报告。模型分析还有引用缺口时，
+Artifact 与业务 Gate 事实保留，整个 Run 可以继续处于 `waiting_input`。
 
-**后端事实：** Owner-scoped Run、幂等启动、Snapshot version/sequence 单调规则、named
-SSE、Plan validation 与 `review_required=true`。
+**前台输出：** 首屏先显示非绿色“业务 Gate 4/4 未通过，不得上线”和四条公式原因；
+辅助指标与 18 项逐功能台账渐进展开。两份可下载成果同时显示“确定性检查通过”，并解释这
+只证明来源、公式和文件结构，不代表业务 Gate 通过。用户无需先理解内部 Branch 才能看到
+结论、风险、负责人、退出条件和“没有执行上线、没有修改配置”。
 
-**证据来源：** `TC-11`、`SCENARIO-008`、`FORTE-PINNED-20260825`。
+**后端事实：** Artifact 与 EffectReceipt 共享服务端 `business_gate_outcome`；每条 Gate 保存
+分子、分母、运算符、阈值、实际值、结果和来源规则。Artifact `verifier_status`、业务 Gate
+状态与整个 Run 终态是三组不同事实。来源变异测试证明 F17、F05、F02 的等级会随来源行
+变化，而不是样本名单碰巧正确。
 
-**当前边界：** 没有 P0 覆盖率、各等级通过率和综合通过率的确定性复算，没有动态 Worker、
-共享 Artifact 或上线审批；不能把“Plan 已形成”说成“上线核验已完成”。
+**证据来源：** `TC-11`、`DR-0043`、`SCENARIO-029`、
+`USER-FEEDBACK-20260828-TC11-DERIVED-RELEASE-GATES`、`FORTE-PINNED-20260825`，以及
+Run `harness:d1a3d9fca21d4e2299ac308bbaf73e1e`。
+
+**当前边界：** 这是固定 `pm-014` 适配器，不是通用发布审计器、动态 Worker、真实上线审批、
+配置写入或生产 Connector。自动化和单次 Provider Run 不能证明用户理解、模型稳定质量或业务价值。
 
 ### 5.6 SRE 日志诊断与高风险止损建议
 

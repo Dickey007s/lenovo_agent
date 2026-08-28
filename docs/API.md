@@ -539,6 +539,16 @@ projections. If two files share the same twelve IDs, the EffectReceipt and UI
 must say that two deliverables share twelve checks, not report twenty-four
 independent checks.
 
+Optional `business_gate_outcome` is a service-owned business decision projection
+shared by the Artifacts and EffectReceipt. It contains `status`, `decision`,
+formal `gates[]`, `auxiliary_metrics[]` and a bounded `records[]` ledger. Every
+formal Gate retains numerator, denominator, operator, threshold, actual value,
+pass/fail state and source rule. Clients must render this independently from
+`verifier_status`: a valid DOCX/CSV may pass deterministic checks while the
+source-derived release conditions fail. The browser must not recompute the
+decision, promote auxiliary metrics into formal Gates or let a green Artifact
+hide a non-green business outcome.
+
 For code artifacts, optional `self_test.test_suites[]` is a public projection of
 the server-owned test manifest. Each suite has `suite_id`, Chinese `label`,
 `test_files`, `test_count` and public `test_ids`. Optional
@@ -732,6 +742,14 @@ Artifacts whose `source_file_refs` bind all 11 qa-003 dashboard-toolkit inputs.
 diff, per-file coverage and independent rerun. These fields are evidence for the
 fixed adapter only. They do not mean the API accepts arbitrary JavaScript or has
 created a PR.
+
+TC-11 likewise uses the ordinary Artifact and EffectReceipt protocol. Its two
+downloads carry one shared `business_gate_outcome`: 18 source-derived feature
+records, four formal release Gates and separate auxiliary quality metrics. A
+passed EffectReceipt proves nine unique deterministic checks completed; it does
+not turn `business_gate_outcome.status=failed` into a release approval. A source
+contract or Verifier failure keeps the Artifact and receipt failed and must not
+be overridden by business decision text.
 
 `checkpoint_recovered` may appear after an API restart backed by PostgreSQL.
 It proves a persisted Snapshot was restored and the Run paused; it does not

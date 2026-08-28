@@ -307,6 +307,15 @@ multi-instance coordination and governed external action remain target work.
   rerun self-test. This remains a fixed qa-003 adapter, not an arbitrary
   JavaScript sandbox, OS-level network isolation, automatic PR or production
   multi-tenant execution.
+- `DR-0043` replaces TC-11's historical name-list risk check with a strict
+  four-source contract and an 18-row service-owned ledger. Risk levels now
+  derive from PRD priority, test reason and compatibility exceptions; four
+  formal business Gates retain numerator, denominator, operator and threshold.
+  The UI can therefore show two simultaneous truths: both files passed nine
+  deterministic source/formula/structure checks, while the business decision is
+  still `4/4 Gates failed -> 不得上线`. This remains one fixed pm-014 adapter; it
+  does not execute a release, write configuration or prove a general release
+  audit engine.
 - No target-user study has been run. Clarity, trust, efficiency and user value
   remain hypotheses.
 
@@ -337,6 +346,8 @@ The current TC-05 artifact-semantics and review-readability increment is tracked
 [`DR-0037-TC05-ARTIFACT-SEMANTICS-AND-REVIEW-READABILITY-EVIDENCE-20260828`](docs/evidence/DR-0037-TC05-ARTIFACT-SEMANTICS-AND-REVIEW-READABILITY-EVIDENCE-20260828.md).
 The source-location user-language and local-recovery increment is tracked in
 [`DR-0038-USER-LANGUAGE-SOURCE-LOCATION-RECOVERY-EVIDENCE-20260828`](docs/evidence/DR-0038-USER-LANGUAGE-SOURCE-LOCATION-RECOVERY-EVIDENCE-20260828.md).
+The current TC-11 source-derived release Gate increment is tracked in
+[`DR-0043-TC11-DERIVED-RELEASE-GATES-EVIDENCE-20260828`](docs/evidence/DR-0043-TC11-DERIVED-RELEASE-GATES-EVIDENCE-20260828.md).
 
 ## Local run
 
@@ -420,6 +431,9 @@ pnpm --dir apps/web exec playwright test e2e/harness-workbench.spec.ts
 - [DR-0038：用用户任务语言呈现原表格位置恢复](docs/decisions/DR-0038-user-language-source-location-recovery.md)
 - [SCENARIO-024：理解并恢复缺少的原表格位置](docs/scenarios/SCENARIO-024-understand-and-recover-missing-table-location.md)
 - [原表格位置用户语言与局部恢复 Evidence](docs/evidence/DR-0038-USER-LANGUAGE-SOURCE-LOCATION-RECOVERY-EVIDENCE-20260828.md)
+- [DR-0043：TC-11 来源推导风险、正式业务 Gate 与双状态前台](docs/decisions/DR-0043-tc11-derived-release-gates.md)
+- [SCENARIO-029：从四份发布资料推导上线 Gate 并审查整改计划](docs/scenarios/SCENARIO-029-review-derived-release-gates.md)
+- [TC-11 来源推导上线 Gate Evidence](docs/evidence/DR-0043-TC11-DERIVED-RELEASE-GATES-EVIDENCE-20260828.md)
 - [可恢复 Control Loop Evidence](docs/evidence/DURABLE-EVIDENCE-GATE-ARTIFACT-EVOLUTION-EVIDENCE-20260826.md)
 - [整库自主研究 Evidence](docs/evidence/AUTONOMOUS-WHOLE-WORKSPACE-RESEARCH-EVIDENCE-20260825.md)
 - [Agent Control Loop 三轮只读纵切证据](docs/evidence/AGENT-CONTROL-LOOP-BOUNDED-READONLY-EVIDENCE-20260825.md)

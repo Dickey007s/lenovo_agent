@@ -34,6 +34,7 @@ from packages.contracts.harness_models import (
     AgentControlLoopArtifactCheck,
     AgentControlLoopArtifactSelfTest,
     AgentControlLoopArtifactTestSuite,
+    AgentControlLoopBusinessGateOutcome,
 )
 from services.api.app.application.react_refactor_effect import (
     build_real_react_refactor,
@@ -43,6 +44,11 @@ from services.api.app.application.evaluation_platform_effect import (
 )
 from services.api.app.application.dashboard_toolkit_effect import (
     build_real_dashboard_toolkit_fix,
+)
+from services.api.app.application.release_readiness_effect import (
+    ReleaseReadinessValidationError,
+    build_release_readiness,
+    invalid_release_outcome,
 )
 
 
@@ -78,6 +84,7 @@ class GeneratedOfficeArtifact:
     review_guidance: str | None = None
     execution_summary: str | None = None
     self_test: AgentControlLoopArtifactSelfTest | None = None
+    business_gate_outcome: AgentControlLoopBusinessGateOutcome | None = None
 
     @property
     def verifier_status(self) -> str:
@@ -379,10 +386,13 @@ SCENARIO_EFFECT_SPECS: tuple[ScenarioEffectSpec, ...] = (
             ("产品管理", "功能测试报告.xlsx"),
             ("产品管理", "线上兼容环境测试报告.xlsx"),
         ),
-        ("上线合规与风险报告.docx",),
-        "validator-release-readiness-v1",
-        "显示跨文档冲突、确定性指标和各分支状态。",
-        ("effect_receipts[]",),
+        ("上线合规与风险报告.docx", "上线功能风险逐项台账.csv"),
+        "validator-release-readiness-v2",
+        "先显示业务 Gate 结论和四条原因，再显示辅助指标、逐功能台账与两份下载成果。",
+        (
+            "workspace_artifacts[].business_gate_outcome",
+            "effect_receipts[].business_gate_outcome",
+        ),
         ("不执行上线", "不改配置"),
         "implemented",
         _contains_any(("上线", "合规"), ("PRD", "兼容", "测试")),
@@ -587,6 +597,16 @@ class ScenarioEffectEngine:
         )
         repeated_projection = projected_check_count > unique_check_count
         passed = all(artifact.verifier_status == "passed" for artifact in artifacts)
+        business_outcomes = [
+            artifact.business_gate_outcome
+            for artifact in artifacts
+            if artifact.business_gate_outcome is not None
+        ]
+        business_outcome = business_outcomes[0] if business_outcomes else None
+        if business_outcomes and any(
+            item != business_outcome for item in business_outcomes[1:]
+        ):
+            raise ScenarioEffectError("同一效果的业务 Gate 事实不一致")
         return ScenarioEffectExecution(
             scenario_id=spec.scenario_id,
             capability_id=spec.capability_id,
@@ -606,10 +626,19 @@ class ScenarioEffectEngine:
                     )
                 )
                 + f"{passed_check_count}/{unique_check_count} 通过。"
+                + (
+                    f" 业务 Gate {business_outcome.failed_gate_count}/{business_outcome.total_gate_count} 未通过。"
+                    if business_outcome and business_outcome.status == "failed"
+                    else ""
+                )
             ),
             cost="0 次额外模型调用；仅消耗本机确定性解析、计算与文件写入。",
             result=(
-                "所有确定性效果门通过，成果仍需用户复核。"
+                (
+                    f"确定性检查通过；业务 Gate 未通过，结论为“{business_outcome.decision}”。"
+                    if business_outcome and business_outcome.status == "failed"
+                    else "所有确定性效果门通过，成果仍需用户复核。"
+                )
                 if passed
                 else "至少一项确定性效果门失败，成果不得标为验证通过。"
             ),
@@ -2054,95 +2083,104 @@ class ScenarioEffectEngine:
     def _release_readiness(
         self, catalog: ScenarioEffectCatalog, spec: ScenarioEffectSpec
     ) -> tuple[GeneratedOfficeArtifact, ...]:
+        source_bytes_before, _ = self._checked_source_bytes(catalog, spec)
         previews = self._previews(catalog, spec)
         source_refs = self._source_refs(previews)
-        prd = previews["PRD_v2.5.md"].get("text") or ""
-        prd_matches = re.findall(
-            r"\|\s*(F\d+)\s*\|\s*([^|]+?)\s*\|\s*[^|]+\|\s*(P[0-3])\s*\|",
-            prd,
-        )
-        prd_features = {code: (name.strip(), priority) for code, name, priority in prd_matches}
+        try:
+            build = build_release_readiness(previews)
+        except ReleaseReadinessValidationError as exc:
+            outcome = invalid_release_outcome(exc.detail)
+            checks = (
+                self._check(
+                    "check-release-source-contract",
+                    "四份来源数据合同",
+                    False,
+                    f"{exc.code}：{exc.detail}",
+                ),
+            )
+            failure_text = (
+                "# TC-11 输入校验失败\n\n"
+                f"错误：{exc.detail}\n\n"
+                "没有形成可靠的上线结论，也没有执行上线或修改配置。"
+            )
+            return (
+                GeneratedOfficeArtifact(
+                    "上线资料校验失败说明",
+                    "TC-11输入校验失败.md",
+                    "text/markdown",
+                    failure_text.encode("utf-8"),
+                    source_refs,
+                    "validator-release-readiness-v2",
+                    checks,
+                    "四份来源未通过数据合同，已停止生成上线报告和风险台账。",
+                    deliverable_type="输入校验失败说明",
+                    statistic_basis="只报告服务端校验到的来源结构或取值冲突。",
+                    purpose="用于修复来源数据后重新启动新的 TC-11 Run；当前不得据此上线。",
+                    record_count=0,
+                    key_outputs=(f"校验错误：{exc.detail}",),
+                    key_outputs_label="失败原因",
+                    review_guidance="当前包不得用于上线判断；请修复来源后重新启动新的 TC-11 Run。",
+                    execution_summary="来源数据合同失败；没有生成可靠报告或台账，没有执行上线，也没有修改配置。",
+                    business_gate_outcome=outcome,
+                ),
+            )
 
-        def matrix(name: str) -> list[list[str]]:
-            return [
-                [str(value or "") for value in row.get("values") or []]
-                for row in previews[name].get("rows") or []
-            ]
-
-        config_rows = matrix("上线配置清单.xlsx")[1:]
-        test_rows = matrix("功能测试报告.xlsx")[1:]
-        compatibility_rows = matrix("线上兼容环境测试报告.xlsx")[2:]
-        configured = {row[0]: row for row in config_rows if row and re.fullmatch(r"F\d+", row[0])}
-        tested = {row[0]: row for row in test_rows if row and re.fullmatch(r"F\d+", row[0])}
-        compatibility = {
-            row[0]: row for row in compatibility_rows if row and re.fullmatch(r"F\d+", row[0])
-        }
-        missing = sorted(set(prd_features) - set(configured), key=lambda value: int(value[1:]))
-        metrics: dict[str, dict[str, float]] = {}
-        for priority in ("P0", "P1", "P2"):
-            rows = [row for row in tested.values() if row[3] == priority]
-            total_cases = sum(int(row[7]) for row in rows)
-            passed_cases = sum(int(row[8]) for row in rows)
-            metrics[priority] = {
-                "coverage": 100
-                * sum(1 for code, (_, item_priority) in prd_features.items() if item_priority == priority and code in tested)
-                / max(1, sum(item_priority == priority for _, item_priority in prd_features.values())),
-                "case_pass": 100 * passed_cases / max(1, total_cases),
-                "completion": 100 * sum(row[9] == "通过" for row in rows) / max(1, len(rows)),
-            }
-        total_cases = sum(int(row[7]) for row in tested.values())
-        total_passed = sum(int(row[8]) for row in tested.values())
-        overall_pass = 100 * total_passed / total_cases
-        severe = {"审核日志查看", "实验数据看板", "界面语言预览", "语言包版本管理"}
-        major = {"敏感词过滤规则配置", "实验暂停与恢复"}
-        minor = {"人工复核队列", "审核规则模板管理"}
-        compatibility_issues = {
-            row[1]
-            for row in compatibility.values()
-            if any(value in {"部分通过", "兼容问题"} for value in row[4:])
-        }
-        paragraphs = [
-            "AIPilot Console v2.5 上线合规与风险报告",
-            "上线结论：不满足上线条件，不得上线。",
-            "确定性指标",
-            f"P0 功能提测覆盖率：{metrics['P0']['coverage']:.1f}%",
-            f"P0 用例通过率：{metrics['P0']['case_pass']:.1f}%",
-            f"P1 用例通过率：{metrics['P1']['case_pass']:.1f}%",
-            f"P2 用例通过率：{metrics['P2']['case_pass']:.1f}%",
-            f"P0 功能完成率：{metrics['P0']['completion']:.1f}%",
-            f"P1 功能完成率：{metrics['P1']['completion']:.1f}%",
-            f"P2 功能完成率：{metrics['P2']['completion']:.1f}%",
-            f"综合用例通过率：{overall_pass:.1f}%",
-            "未提交功能：" + "、".join(prd_features[code][0] for code in missing),
-            "功能测试不通过：" + "、".join(row[1] for row in tested.values() if row[9] == "不通过"),
-            "兼容性异常：" + "、".join(sorted(compatibility_issues)),
-            "严重：" + "、".join(sorted(severe)),
-            "主要：" + "、".join(sorted(major)),
-            "次要：" + "、".join(sorted(minor)),
-            "改进计划：先补齐 P0 未提测功能并清零严重问题，再修复主要问题，完成全环境回归后重新计算全部门槛。",
-            "边界：只生成运行工作区报告，不执行上线、不改配置。",
-        ]
-        content = self._docx_bytes(paragraphs)
+        gates = build.outcome.gates
+        records = build.outcome.records
+        csv_rows = list(csv.reader(io.StringIO(build.ledger_csv.decode("utf-8-sig"))))
+        with zipfile.ZipFile(io.BytesIO(build.report_docx)) as archive:
+            document_xml = archive.read("word/document.xml").decode("utf-8")
+        source_bytes_after, _ = self._checked_source_bytes(catalog, spec)
+        source_bytes_unchanged = source_bytes_before == source_bytes_after
         checks = (
-            self._check("check-release-p0-coverage", "P0 提测覆盖率", round(metrics["P0"]["coverage"], 1) == 71.4, "按 PRD 的 P0 功能与测试报告交集复算为 71.4%。"),
-            self._check("check-release-case-rates", "分级用例通过率", [round(metrics[key]["case_pass"], 1) for key in ("P0", "P1", "P2")] == [93.4, 86.4, 85.7], "P0/P1/P2 用例通过率分别为 93.4%、86.4%、85.7%。"),
-            self._check("check-release-completion", "分级功能完成率", [round(metrics[key]["completion"], 1) for key in ("P0", "P1", "P2")] == [60.0, 40.0, 33.3], "完成率只计测试结论为通过的已提测功能。"),
-            self._check("check-release-overall", "综合通过率", round(overall_pass, 1) == 89.7, f"{total_passed}/{total_cases} 个用例通过，复算为 89.7%。"),
-            self._check("check-release-missing", "未提交功能完整", {prd_features[code][0] for code in missing} == {"拦截通知推送", "实验流量分配", "实验报告导出", "多语言包上传", "翻译缺失兜底配置"}, "PRD 与上线配置按功能编号做差，得到五项未提交功能。"),
-            self._check("check-release-risk", "风险分级", severe | major | minor == {"审核日志查看", "实验数据看板", "界面语言预览", "语言包版本管理", "敏感词过滤规则配置", "实验暂停与恢复", "人工复核队列", "审核规则模板管理"}, "按 P0、原因类型和兼容环境数量确定最高严重度。"),
-            self._check("check-release-conclusion", "上线 Gate", "不得上线" in "\n".join(paragraphs), "所有上线条件必须同时满足；当前结论明确为不得上线。"),
-            self._check("check-release-no-action", "无外部动作", "不执行上线、不改配置" in paragraphs[-1], "只写隔离运行工作区 DOCX。"),
+            self._check("check-release-source-contract", "四份来源结构与交叉引用", len(records) == 18 and len(source_refs) == 4, "PRD 18 项、三张执行表各 13 项；表头、编号、名称、优先级、状态、数字和八环境均由服务端逐项校验。"),
+            self._check("check-release-gate-formulas", "四项正式上线 Gate 逐式复算", len(gates) == 4 and all(gate.denominator > 0 for gate in gates), "每项保留分子、分母、运算符、阈值、实际值和 PRD 来源规则；零分母会直接失败。"),
+            self._check("check-release-risk-ledger", "逐功能风险按规则取唯一最高等级", sum(build.risk_counts.values()) == 8 and all(record.final_risk_level == max((record.base_risk_level, record.compatibility_risk_level), key=lambda level: {"none": 0, "minor": 1, "major": 2, "severe": 3}[level]) for record in records), "风险由 P0、原因类型和异常环境数推导；同一功能只保留最高等级。"),
+            self._check("check-release-gate-aggregation", "上线结论由 Gate 聚合", build.outcome.failed_gate_count == sum(not gate.passed for gate in gates) and build.outcome.status == ("passed" if all(gate.passed for gate in gates) else "failed"), "结论取决于四项 Gate 的布尔聚合，不检查固定功能名称或固定结论文案。"),
+            self._check("check-release-auxiliary-separation", "辅助指标不冒充上线 Gate", all("辅助质量指标" in metric.source_note for metric in build.outcome.auxiliary_metrics), "分级与综合用例通过率单独标为辅助指标。"),
+            self._check("check-release-ledger-csv", "CSV 18 行可独立复算", len(csv_rows) == 19 and len(csv_rows[0]) == 20, "台账一行一个 PRD 功能，包含用例数、异常环境、规则、风险、来源和退出条件。"),
+            self._check("check-release-report-tables", "DOCX 包含结构化核验表", build.docx_table_count >= 6 and document_xml.count("<w:tbl>") >= 6, "报告包含四项 Gate、辅助指标、18 项矩阵、风险、未提测和整改计划表。"),
+            self._check("check-release-remediation", "整改项有负责人和退出条件", all(record.owner and record.remediation_action and record.exit_condition for record in records), "每项整改绑定功能编号、研发负责人、来源问题、动作和可验证退出条件。"),
+            self._check("check-release-no-action", "四份原件未改且没有外部动作", source_bytes_unchanged, "生成前后重新读取四份 allowlisted 原件并逐字节比较；只在隔离运行工作区写入 DOCX/CSV，没有上线、配置写入或通知动作。"),
         )
+        common = {
+            "source_file_refs": source_refs,
+            "validator_id": "validator-release-readiness-v2",
+            "checks": checks,
+            "covered_period": "AIPilot Console v2.5 本次上线审核批次",
+            "statistic_basis": "PRD 18 项功能为全集；上线配置、功能测试和兼容测试各 13 项，按功能编号交叉核对并由 PRD 规则计算。",
+            "purpose": "支持发布负责人复核是否满足上线条件；不代替人工审批，不执行上线或修改配置。",
+            "key_outputs": (
+                f"正式上线 Gate：{build.outcome.failed_gate_count}/{build.outcome.total_gate_count} 未通过，结论为{build.outcome.decision}",
+                f"风险：严重 {build.risk_counts['severe']}、主要 {build.risk_counts['major']}、次要 {build.risk_counts['minor']}",
+                f"未提测功能：{len(build.missing_feature_codes)} 项",
+                "辅助指标：P0/P1/P2 用例通过率与综合用例通过率不作为正式上线 Gate",
+            ),
+            "key_outputs_label": "上线复核要点",
+            "review_guidance": "请由发布、研发和测试负责人逐项确认四条未通过 Gate、8 项风险与 5 项未提测功能；本次没有执行上线或修改配置。",
+            "execution_summary": "已在隔离运行工作区生成并校验上线报告和逐功能台账；没有执行上线、没有修改配置。",
+            "business_gate_outcome": build.outcome,
+        }
         return (
             GeneratedOfficeArtifact(
                 "上线合规与风险报告",
                 "上线合规与风险报告.docx",
                 "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                content,
-                source_refs,
-                "validator-release-readiness-v1",
-                checks,
-                "4 份材料已交叉复算；上线门未通过，报告列出五项未提交功能和分级风险。",
+                build.report_docx,
+                summary="结构化报告包含正式 Gate、18 项矩阵、8 项风险、5 项未提测功能和整改计划。",
+                record_count=18,
+                deliverable_type="上线合规与风险报告 DOCX",
+                **common,
+            ),
+            GeneratedOfficeArtifact(
+                "上线功能风险逐项台账",
+                "上线功能风险逐项台账.csv",
+                "text/csv",
+                build.ledger_csv,
+                summary="18 行逐功能台账保留来源行、风险规则、Gate 影响、负责人和退出条件，可下载复算。",
+                record_count=18,
+                deliverable_type="逐功能风险台账 CSV",
+                **common,
             ),
         )
 

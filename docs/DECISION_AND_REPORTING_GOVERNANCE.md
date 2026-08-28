@@ -108,6 +108,16 @@ Planner intent and Loop `completed` cannot substitute for that evidence. A safe
 block at an unauthorized SQL/Web/cron/Connector boundary is a correct control
 outcome, not a successful task effect.
 
+A deterministic Artifact outcome and a business Gate outcome are separate
+facts. When a valid report or ledger describes a failed business condition, the
+Artifact may remain `verifier_status=passed` while a server-owned
+`business_gate_outcome.status=failed` is shown first in a non-green state. Every
+formal business Gate must retain its source rule, numerator, denominator,
+operator, threshold and result; auxiliary metrics cannot silently become formal
+Gates. Conversely, a failed source contract or Artifact Verifier cannot be
+overridden by a plausible business conclusion. The UI must not compute either
+state from prose, filenames or Scenario IDs.
+
 A user-facing Finding must not end at “Agent says there is a problem”. The living
 fact matrix must record its source location, whether human judgment is required,
 what each visible choice causes, how feedback enters a new command and what does
