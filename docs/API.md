@@ -249,8 +249,10 @@ Important fields:
       "record_count": 31,
       "deliverable_type": null,
       "key_outputs": [],
+      "key_outputs_label": null,
       "review_guidance": null,
       "execution_summary": null,
+      "self_test": null,
       "download_path": "/v1/harness/runs/harness:.../artifacts/workspace-artifact-0123456789ab",
       "original_inputs_modified": false,
       "review_required": true,
@@ -387,12 +389,21 @@ Important fields:
 }
 ```
 
-`deliverable_type`, `key_outputs`, `review_guidance` and `execution_summary` are
+`deliverable_type`, `key_outputs`, `key_outputs_label`, `review_guidance`,
+`execution_summary` and `self_test` are
 optional fixed-adapter facts. TC-10 uses them to identify a flow-design DOCX,
 list its six terminal states, explain why business/compliance review remains,
 and state that dialing, CRM writes and SMS did not occur. The browser must not
 infer those facts from a file name or model prose; EffectReceipt
 `prohibited_side_effects[]` and `external_action=none` remain the action receipt.
+TC-02 uses `key_outputs_label="文件变更"` and `self_test` to publish its original
+instruction, expected archive members, two local commands, expected checks and
+failure signals. `self_test` is a review contract, not proof that the browser or
+user ran those commands; the Artifact checks and downloaded ZIP content gate own
+the actual execution fact. TC-02 `key_outputs[]/execution_summary` also project
+the policy boundary: the default policy deterministically executes planned tools
+behind a replaceable `action_policy`, while outer Planner/Analyst receipts do not
+prove model-driven action selection inside the downloaded project.
 
 `source_documents` and `contract.allowed_file_refs` are the full safe workspace
 index. They are not the files read by the Analyst. The authoritative per-round

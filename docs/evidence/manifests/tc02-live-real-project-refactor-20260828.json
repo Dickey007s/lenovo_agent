@@ -1,0 +1,497 @@
+{
+  "schema_version": "scenario-effect-gate-live.v1",
+  "generated_at": "2026-08-28T09:19:59.668712+00:00",
+  "api_base": "http://127.0.0.1:8010",
+  "service": {
+    "model": "deepseek-v4-pro",
+    "checkpoint": "memory",
+    "task_store": "memory"
+  },
+  "dataset": {
+    "name": "FORTE public demo inputs",
+    "source_commit": "345c1ec1487139db9dd319787fa9405ba85d1869",
+    "input_tree_sha256": "2c19e31a8e437f8ccb0ab811ba20a940f022a5bea69bcc750574d753f10a250d",
+    "original_inputs_modified": false
+  },
+  "summary": {
+    "requested": 1,
+    "passed": 1,
+    "failed": 0,
+    "model_output_adopted": 1,
+    "run_completed": 0
+  },
+  "scenarios": [
+    {
+      "scenario_id": "TC-02",
+      "capability_id": "office-code-react-refactor",
+      "title": "搜索 Agent 有界 ReAct 控制结构重构",
+      "instruction": "把搜索 Agent 从固定 Workflow 重构为带迭代上限和轨迹的 ReAct 结构。",
+      "run_id": "harness:2a00cdea6c7848c8aede34b594470638",
+      "started_at": "2026-08-28T09:19:04.510288+00:00",
+      "observed_at": "2026-08-28T09:19:59.631676+00:00",
+      "run_status": "waiting_input",
+      "snapshot_version": 12,
+      "current_round": 1,
+      "budget": {
+        "max_rounds": 12,
+        "max_files_per_round": 16,
+        "max_model_calls": 30,
+        "deadline_seconds": 7200,
+        "rounds_used": 1,
+        "files_verified": 4,
+        "model_calls_used": 2,
+        "elapsed_ms": 53404,
+        "stop_reason": null
+      },
+      "model_calls": [
+        {
+          "round": 1,
+          "role": "planner",
+          "called": true,
+          "model": "deepseek-v4-pro",
+          "elapsed_ms": 20114,
+          "output_used": true
+        },
+        {
+          "round": 1,
+          "role": "analyst",
+          "called": true,
+          "model": "deepseek-v4-pro",
+          "elapsed_ms": 31515,
+          "output_used": true
+        }
+      ],
+      "model_execution_gate_passed": true,
+      "model_output_adopted": true,
+      "effect_receipts": [
+        {
+          "receipt_id": "effect-receipt-1492f016269e",
+          "capability_id": "office-code-react-refactor",
+          "scenario_id": "TC-02",
+          "status": "passed",
+          "state": "已冻结 7 份 FORTE 输入，原始文件保持只读。",
+          "action": "调用 office-code-react-refactor 确定性办公工具并写入隔离运行工作区。",
+          "observation": "生成 2 份真实成果文件，执行 24 项确定性检查。",
+          "cost": "0 次额外模型调用；仅消耗本机确定性解析、计算与文件写入。",
+          "result": "所有确定性效果门通过，成果仍需用户复核。",
+          "source_file_refs": [
+            "forte-7b13238f78667944",
+            "forte-5004c43960105473",
+            "forte-84c9c417c6fffc23",
+            "forte-9d0252e42b14a1d0",
+            "forte-daa8f1fbdd343272",
+            "forte-04c603e979388bbe",
+            "forte-2f73463ddf941c94"
+          ],
+          "artifact_ids": [
+            "workspace-artifact-3aca47a0d3cf",
+            "workspace-artifact-44b2c67569f8"
+          ],
+          "prohibited_side_effects": [
+            "不修改 FORTE 原始源码",
+            "不运行未批准命令",
+            "固定测试不调用网络或生产搜索"
+          ],
+          "created_at": "2026-08-28T09:19:25.738945Z",
+          "external_action": "none"
+        }
+      ],
+      "artifacts": [
+        {
+          "artifact_id": "workspace-artifact-3aca47a0d3cf",
+          "file_name": "search-agent-react-refactor.zip",
+          "media_type": "application/zip",
+          "size": 31411,
+          "validator_id": "validator-code-project-copy-v2",
+          "verifier_status": "passed",
+          "checks": [
+            {
+              "check_id": "check-react-full-copy",
+              "label": "完整复制真实项目",
+              "passed": true,
+              "detail": "七个 FORTE 输入文件全部进入隔离副本。"
+            },
+            {
+              "check_id": "check-react-contract-copy",
+              "label": "原契约文件逐字保留",
+              "passed": true,
+              "detail": "workflow、llm、tools、requirements 和日志与冻结输入逐字一致。"
+            },
+            {
+              "check_id": "check-react-main-entry",
+              "label": "主入口改走有界 ReAct",
+              "passed": true,
+              "detail": "固定五节点文件保留，但不再是唯一主入口。"
+            },
+            {
+              "check_id": "check-react-diff",
+              "label": "可机器审查改动",
+              "passed": true,
+              "detail": "ZIP 同时包含 unified diff 与 JSON 变更清单。"
+            },
+            {
+              "check_id": "check-react-compile",
+              "label": "完整副本编译",
+              "passed": true,
+              "detail": "compileall 无错误输出。"
+            },
+            {
+              "check_id": "check-react-tests",
+              "label": "测试清单与执行一致",
+              "passed": true,
+              "detail": "声明并实际运行 20 项 unittest；测试 ID 集合一致。"
+            },
+            {
+              "check_id": "check-react-contract-tests",
+              "label": "风险契约测试齐全",
+              "passed": true,
+              "detail": "迭代、动作、工具、轨迹和四类原业务行为均有测试。"
+            },
+            {
+              "check_id": "check-react-cap",
+              "label": "迭代上限 1 到 20",
+              "passed": true,
+              "detail": "配置与循环共同限制迭代次数。"
+            },
+            {
+              "check_id": "check-react-actions",
+              "label": "非法动作与工具拒绝",
+              "passed": true,
+              "detail": "动作白名单和原 ToolRegistry 双重校验。"
+            },
+            {
+              "check_id": "check-react-trace",
+              "label": "只记录动作与观察",
+              "passed": true,
+              "detail": "公开轨迹不含私有 CoT。"
+            },
+            {
+              "check_id": "check-react-policy-boundary",
+              "label": "默认策略边界明确",
+              "passed": true,
+              "detail": "默认策略确定性执行已规划工具；接口可替换，不冒充内部模型自主 ReAct。"
+            },
+            {
+              "check_id": "check-react-no-network",
+              "label": "固定测试无网络调用",
+              "passed": true,
+              "detail": "本次代码路径仅编译和 unittest，未调用网络或生产搜索，未注入凭据和代理；不代表 OS 级隔离。"
+            }
+          ],
+          "review_required": true,
+          "deliverable_type": "完整可运行项目副本",
+          "key_outputs": [
+            "修改 config.py：增加 1 到 20 次迭代边界",
+            "修改 main.py：主入口改走 bounded ReAct",
+            "新增 react_agent.py：复用原 LLM、ToolRegistry、WorkflowState 与业务节点",
+            "默认策略依次执行已规划工具；action_policy 可替换，但未证明包内模型自主 ReAct",
+            "原 workflow.py、llm.py、tools.py、requirements.txt、search_agent.log 逐字保留"
+          ],
+          "key_outputs_label": "文件变更",
+          "review_guidance": "先核对 CHANGESET.patch，再按自测卡运行两条命令。全部通过后人工挑选合并；当前系统不会写回仓库或发起 PR。",
+          "execution_summary": "编译退出码 0；实际运行 20 项 unittest；本次固定测试未调用网络、未安装依赖、未调用生产搜索；runner 不具备 OS 级 socket 隔离；外层 Planner/Analyst 不是包内 action policy。",
+          "self_test": {
+            "instruction": "把搜索 Agent 从固定 Workflow 重构为带迭代上限和轨迹的 ReAct 结构。",
+            "expected_files": [
+              "search_agent_workflow/",
+              "search_agent_workflow/CHANGESET.patch",
+              "search_agent_workflow/changes.json",
+              "search_agent_workflow/改动说明.md",
+              "search_agent_workflow/TC-02自测卡.md",
+              "search_agent_workflow/TEST_RECEIPT.txt"
+            ],
+            "commands": [
+              "python -m compileall -q search_agent_workflow",
+              "python -m unittest discover -s search_agent_workflow/tests -v"
+            ],
+            "expected_checks": [
+              "当前 20 项 unittest 与包内清单一致且全部通过",
+              "max_iterations 接受 1 和 20，拒绝 0 和 21",
+              "正常完成与达到迭代上限均有独立测试",
+              "非法 Action、未知 Tool 和私有 reasoning 字段均被拒绝",
+              "真实 ToolRegistry 调用与 action/observation 轨迹可核对",
+              "默认策略确定性执行已规划工具，action_policy 接口可替换",
+              "外层 Planner/Analyst 调用不冒充代码包内部 action policy",
+              "原查询漂移、质量降级、来源配额、句界截断行为保持"
+            ],
+            "failure_signals": [
+              "任一命令退出码非 0",
+              "包内声明的测试 ID 与实际执行集合不一致，或出现 failure/error",
+              "ZIP 缺少原 workflow.py、tools.py、llm.py、config.py 或 main.py",
+              "main.py 仍只调用 SearchWorkflow",
+              "运行时要求网络、安装依赖或生产凭据"
+            ]
+          },
+          "external_action": "none",
+          "original_inputs_modified": false
+        },
+        {
+          "artifact_id": "workspace-artifact-44b2c67569f8",
+          "file_name": "TC-02测试与改动说明.md",
+          "media_type": "text/markdown",
+          "size": 1658,
+          "validator_id": "validator-code-project-copy-v2",
+          "verifier_status": "passed",
+          "checks": [
+            {
+              "check_id": "check-react-full-copy",
+              "label": "完整复制真实项目",
+              "passed": true,
+              "detail": "七个 FORTE 输入文件全部进入隔离副本。"
+            },
+            {
+              "check_id": "check-react-contract-copy",
+              "label": "原契约文件逐字保留",
+              "passed": true,
+              "detail": "workflow、llm、tools、requirements 和日志与冻结输入逐字一致。"
+            },
+            {
+              "check_id": "check-react-main-entry",
+              "label": "主入口改走有界 ReAct",
+              "passed": true,
+              "detail": "固定五节点文件保留，但不再是唯一主入口。"
+            },
+            {
+              "check_id": "check-react-diff",
+              "label": "可机器审查改动",
+              "passed": true,
+              "detail": "ZIP 同时包含 unified diff 与 JSON 变更清单。"
+            },
+            {
+              "check_id": "check-react-compile",
+              "label": "完整副本编译",
+              "passed": true,
+              "detail": "compileall 无错误输出。"
+            },
+            {
+              "check_id": "check-react-tests",
+              "label": "测试清单与执行一致",
+              "passed": true,
+              "detail": "声明并实际运行 20 项 unittest；测试 ID 集合一致。"
+            },
+            {
+              "check_id": "check-react-contract-tests",
+              "label": "风险契约测试齐全",
+              "passed": true,
+              "detail": "迭代、动作、工具、轨迹和四类原业务行为均有测试。"
+            },
+            {
+              "check_id": "check-react-cap",
+              "label": "迭代上限 1 到 20",
+              "passed": true,
+              "detail": "配置与循环共同限制迭代次数。"
+            },
+            {
+              "check_id": "check-react-actions",
+              "label": "非法动作与工具拒绝",
+              "passed": true,
+              "detail": "动作白名单和原 ToolRegistry 双重校验。"
+            },
+            {
+              "check_id": "check-react-trace",
+              "label": "只记录动作与观察",
+              "passed": true,
+              "detail": "公开轨迹不含私有 CoT。"
+            },
+            {
+              "check_id": "check-react-policy-boundary",
+              "label": "默认策略边界明确",
+              "passed": true,
+              "detail": "默认策略确定性执行已规划工具；接口可替换，不冒充内部模型自主 ReAct。"
+            },
+            {
+              "check_id": "check-react-no-network",
+              "label": "固定测试无网络调用",
+              "passed": true,
+              "detail": "本次代码路径仅编译和 unittest，未调用网络或生产搜索，未注入凭据和代理；不代表 OS 级隔离。"
+            }
+          ],
+          "review_required": true,
+          "deliverable_type": "测试回执与改动说明",
+          "key_outputs": [
+            "完整副本编译及 20 项测试通过",
+            "公开轨迹只有 action/observation，不含私有思维过程",
+            "默认策略确定性执行已规划工具；未证明包内模型自主 ReAct",
+            "原 FORTE 输入未覆盖，external_action=none"
+          ],
+          "key_outputs_label": "验证结论",
+          "review_guidance": "先核对 CHANGESET.patch，再按自测卡运行两条命令。全部通过后人工挑选合并；当前系统不会写回仓库或发起 PR。",
+          "execution_summary": "编译 171 ms，测试 141 ms；失败时成果卡必须标红并停止人工合并。",
+          "self_test": null,
+          "external_action": "none",
+          "original_inputs_modified": false
+        }
+      ],
+      "artifact_downloads": [
+        {
+          "artifact_id": "workspace-artifact-3aca47a0d3cf",
+          "file_name": "search-agent-react-refactor.zip",
+          "status_code": 200,
+          "content_type": "application/zip",
+          "declared_size": 31411,
+          "downloaded_size": 31411,
+          "sha256": "d66912916a17df56d3ea31f5be2d234267b9ea6eaaaaa9b0e73fa434a87caa55",
+          "size_matches": true,
+          "content_gate": {
+            "passed": true,
+            "valid_zip": true,
+            "file_count": 15,
+            "missing_members": [],
+            "unsafe_members": [],
+            "unchanged_source_contracts": {
+              "workflow.py": true,
+              "llm.py": true,
+              "tools.py": true,
+              "requirements.txt": true,
+              "search_agent.log": true
+            },
+            "compile": {
+              "exit_code": 0,
+              "elapsed_ms": 125
+            },
+            "tests": {
+              "exit_code": 0,
+              "elapsed_ms": 141,
+              "count": 20,
+              "declared_ids": [
+                "test_config_accepts_minimum_iteration_bound",
+                "test_config_accepts_maximum_iteration_bound",
+                "test_config_rejects_zero_iterations",
+                "test_config_rejects_more_than_twenty_iterations",
+                "test_normal_finish_stops_before_iteration_cap",
+                "test_iteration_cap_stops_repeated_search",
+                "test_non_object_action_is_rejected",
+                "test_private_reasoning_field_is_rejected",
+                "test_unknown_action_is_rejected",
+                "test_unknown_tool_is_rejected",
+                "test_original_tool_registry_is_actually_called",
+                "test_public_trace_contains_only_action_and_observation",
+                "test_original_query_drift_falls_back",
+                "test_original_quality_filter_relaxes_threshold",
+                "test_original_source_quota_is_preserved",
+                "test_original_summary_truncates_at_sentence_boundary",
+                "test_default_policy_is_deterministic_and_replaceable",
+                "test_legacy_workflow_remains_importable_for_review",
+                "test_main_entry_uses_react_not_legacy_workflow",
+                "test_fixed_environment_contains_no_credentials_or_proxies"
+              ],
+              "executed_ids": [
+                "test_config_accepts_maximum_iteration_bound",
+                "test_config_accepts_minimum_iteration_bound",
+                "test_config_rejects_more_than_twenty_iterations",
+                "test_config_rejects_zero_iterations",
+                "test_default_policy_is_deterministic_and_replaceable",
+                "test_fixed_environment_contains_no_credentials_or_proxies",
+                "test_iteration_cap_stops_repeated_search",
+                "test_legacy_workflow_remains_importable_for_review",
+                "test_main_entry_uses_react_not_legacy_workflow",
+                "test_non_object_action_is_rejected",
+                "test_normal_finish_stops_before_iteration_cap",
+                "test_original_quality_filter_relaxes_threshold",
+                "test_original_query_drift_falls_back",
+                "test_original_source_quota_is_preserved",
+                "test_original_summary_truncates_at_sentence_boundary",
+                "test_original_tool_registry_is_actually_called",
+                "test_private_reasoning_field_is_rejected",
+                "test_public_trace_contains_only_action_and_observation",
+                "test_unknown_action_is_rejected",
+                "test_unknown_tool_is_rejected"
+              ],
+              "manifest_consistent": true
+            },
+            "main_uses_react": true,
+            "network_boundary": "本次固定测试未调用网络或生产搜索；没有 OS 级 socket 隔离。"
+          }
+        },
+        {
+          "artifact_id": "workspace-artifact-44b2c67569f8",
+          "file_name": "TC-02测试与改动说明.md",
+          "status_code": 200,
+          "content_type": "text/markdown",
+          "declared_size": 1658,
+          "downloaded_size": 1658,
+          "sha256": "be28ff57412659c006d54d087003e8909dbdfb5f039e54f50c93cf7aab70691b",
+          "size_matches": true,
+          "content_gate": null
+        }
+      ],
+      "expected_artifacts": [
+        "search-agent-react-refactor.zip",
+        "TC-02测试与改动说明.md"
+      ],
+      "events": [
+        {
+          "sequence": 3,
+          "event_name": "planning_started",
+          "status": "planning"
+        },
+        {
+          "sequence": 4,
+          "event_name": "planning_completed",
+          "status": "planning"
+        },
+        {
+          "sequence": 6,
+          "event_name": "deterministic_office_tool_started",
+          "status": "validating"
+        },
+        {
+          "sequence": 7,
+          "event_name": "run_workspace_artifact_written",
+          "status": "validating"
+        },
+        {
+          "sequence": 8,
+          "event_name": "run_workspace_artifact_written",
+          "status": "validating"
+        },
+        {
+          "sequence": 9,
+          "event_name": "deterministic_verification_completed",
+          "status": "validating"
+        },
+        {
+          "sequence": 10,
+          "event_name": "analysis_started",
+          "status": "analyzing"
+        },
+        {
+          "sequence": 11,
+          "event_name": "analysis_completed",
+          "status": "analyzing"
+        }
+      ],
+      "waiting_branches": [
+        {
+          "branch_id": "branch-5a5a89007f19",
+          "title": "读取 Agent 入口与工具实现",
+          "status": "waiting_input",
+          "missing_file_count": 2
+        },
+        {
+          "branch_id": "branch-d34e3dc52d77",
+          "title": "读取依赖清单与运行日志",
+          "status": "waiting_input",
+          "missing_file_count": 1
+        },
+        {
+          "branch_id": "branch-28914ae1b391",
+          "title": "读取产品需求与技术设计约束",
+          "status": "waiting_input",
+          "missing_file_count": 2
+        },
+        {
+          "branch_id": "branch-749ba459d49b",
+          "title": "生成带文件引用的初步分析结果",
+          "status": "waiting_input",
+          "missing_file_count": 5
+        }
+      ],
+      "validation_errors": [],
+      "timed_out": false,
+      "effect_gate_passed": true,
+      "failure_reason": null
+    }
+  ],
+  "claim_boundary": "该证据仅证明固定服务配置下真实模型调用、运行工作区文件和确定性检查；不证明真实用户理解、生产安全沙箱或外部动作能力。"
+}

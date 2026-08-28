@@ -57,6 +57,16 @@ TC-02/04/06/07/11/12 的固定本地适配器也通过确定性门，形成 12 �
 [`SCENARIO-EFFECT-GATE-LEDGER-20260827`](SCENARIO-EFFECT-GATE-LEDGER-20260827.md)
 和[`SCENARIO-EFFECT-GATE-20260827`](../evidence/SCENARIO-EFFECT-GATE-20260827.md)。
 
+TC-02 后续暴露了“固定场景通过”仍可能验错对象的典型问题：旧实现另造 9 文件迷你包，
+虽然 8 项测试通过，却缺真实 `workflow.py` 和日志，无法证明原项目被改造。`DR-0040` 把效果门
+提升为完整 algorithm-013 副本、统一 diff、机器可读变更、下载后独立编译与测试 ID 集合核对。
+前台同时显示文件变更、自测卡和人工合并边界。修复后一次真实 Run 的 Planner/Analyst 均调用并
+采用，ZIP 15 文件、当前 20 项声明/执行测试一致；但这仍只是固定适配器，不是任意代码沙箱、
+自动 PR 或 OS 级网络隔离。更重要的是，下载项目的 `DefaultReActPolicy` 仍按已规划工具确定性
+执行，只证明有界、可插拔的 ReAct 控制结构；它没有证明模型依据 Observation 在副本内自主
+决定动作。外层 `deepseek-v4-pro` Planner/Analyst 回执是 Run 事实，不是包内 action policy。
+修复前的假绿 baseline 被保留，避免汇报只讲成功结果。
+
 ## 2026-08-27 增补：把“卡住”改造成可判断、可重启、可局部恢复
 
 `DR-0032` 继续修复一个更具体的失败体验：同一段原文出现多次，或当前来源已经变化时，旧系统

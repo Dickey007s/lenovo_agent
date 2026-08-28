@@ -1,0 +1,22 @@
+{
+  "schema_version": "tc02-ui-screenshots.v1",
+  "generated_at": "2026-08-28T17:18:18+08:00",
+  "source": "Playwright TC-02 deterministic browser fixture",
+  "screenshots": [
+    {
+      "path": "docs/evidence/screenshots/tc02-real-project-refactor-desktop.png",
+      "width": 441,
+      "height": 2302,
+      "bytes": 58878,
+      "sha256": "3199af99d0cd2753c53b815c720577d09993f64e36aa07dc7f15ddcfcb7aca79"
+    },
+    {
+      "path": "docs/evidence/screenshots/tc02-real-project-refactor-mobile.png",
+      "width": 334,
+      "height": 2929,
+      "bytes": 160656,
+      "sha256": "d997beca8623de53237a9deab4c65d5a35f2709899cc826f1c9a35f200067cfe"
+    }
+  ],
+  "claim_boundary": "截图证明被测 DOM、响应式布局与策略边界文案，不证明真实用户理解；真实 Provider 与 Artifact 下载证据在独立 live manifest。"
+}

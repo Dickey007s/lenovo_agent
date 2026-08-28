@@ -270,6 +270,17 @@ multi-instance coordination and governed external action remain target work.
   task close both say that dialing, CRM writes and SMS did not occur. The
   downloaded DOCX repeats that boundary before its complete flow. This remains
   one fixed Operations-008 adapter, not a general outbound engine.
+- `DR-0040` replaces TC-02's historical 9-file mini package with a refactor of
+  the complete algorithm-013 project copy. The ZIP now retains every real input,
+  includes a unified diff, machine-readable changes, Chinese review notes, a
+  self-test card and manifest-matched test receipts. The main entry uses a
+  bounded ReAct action/observation controller while the original Workflow, LLM
+  and ToolRegistry contracts remain reviewable. Its default policy
+  deterministically steps through planned tools behind a replaceable
+  `action_policy`; it does not prove model-driven action selection inside the
+  downloaded project. The outer Planner/Analyst provider calls are separate
+  facts. This is one fixed adapter, not an arbitrary code sandbox, automatic PR
+  path or OS-level network isolation.
 - No target-user study has been run. Clarity, trust, efficiency and user value
   remain hypotheses.
 
