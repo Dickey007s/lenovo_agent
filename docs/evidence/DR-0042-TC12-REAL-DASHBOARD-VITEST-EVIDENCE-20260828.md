@@ -2,7 +2,7 @@
 
 ## 当前结论
 
-`Limited Verified`。本地确定性 builder、同测集分阶段红灯、最终 71/71、逐文件 V8 coverage、独立解压复跑、合同 round-trip、前台回归、真实 PostgreSQL 顺序恢复和普通 `deepseek-v4-pro` Run 已通过。该 Run 的 Artifact effect 通过，Planner/Analyst 均调用且采用，但整个 Run 因八条未覆盖 Branch 保持 `waiting_input`；三层事实必须分开报告。远端 PR check 与 merge SHA 在本分支提交后补记。
+`Limited Verified`。本地确定性 builder、同测集分阶段红灯、最终 71/71、逐文件 V8 coverage、独立解压复跑、合同 round-trip、前台回归、真实 PostgreSQL 顺序恢复和普通 `deepseek-v4-pro` Run 已通过。该 Run 的 Artifact effect 通过，Planner/Analyst 均调用且采用，但整个 Run 因八条未覆盖 Branch 保持 `waiting_input`；三层事实必须分开报告。[PR #54](https://github.com/Dickey007s/lenovo_agent/pull/54) 已创建，远端 PostgreSQL check 正在运行；merge SHA 只能在实际合并后报告。
 
 ## 历史基线为何不足
 
@@ -58,7 +58,7 @@ ZIP 包含完整 11 文件修复后副本、三套真实测试、`changes.patch`
 
 ## 尚待收尾
 
-- 远端 check、PR、merge SHA 与最新 master PostgreSQL 重启。
+- PR #54 的远端 check、实际 merge SHA 与最新 master PostgreSQL 重启。
 
 ## 不能支持的结论
 
