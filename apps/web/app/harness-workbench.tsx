@@ -443,6 +443,7 @@ type BusinessRecord = {
 
 type BusinessGateOutcome = {
   outcome_id: string;
+  outcome_kind: "release_readiness" | "legal_delegation_review";
   status: "passed" | "failed" | "invalid";
   decision: string;
   summary: string;
@@ -451,6 +452,54 @@ type BusinessGateOutcome = {
   gates: BusinessGate[];
   auxiliary_metrics: BusinessMetric[];
   records: BusinessRecord[];
+  external_action: "none";
+};
+
+type LegalRuleAssessment = {
+  assessment_id: string;
+  rule_id: string;
+  rule_name: string;
+  rule_level: "high" | "medium" | "low";
+  status: "triggered" | "not_triggered" | "unverifiable";
+  source_locator: string;
+  excerpt: string;
+  fact: string;
+  judgment: string;
+  reason: string;
+  owner: string;
+  remediation_action: string;
+  exit_condition: string;
+};
+
+type LegalDocumentReview = {
+  document_id: string;
+  document_name: string;
+  source_file_ref: string;
+  highest_triggered_level: "none" | "low" | "medium" | "high";
+  triggered_count: number;
+  unverifiable_count: number;
+  signing_evidence_status: "present" | "absent" | "unverifiable";
+  summary: string;
+  assessments: LegalRuleAssessment[];
+};
+
+type LegalReviewOutcome = {
+  outcome_id: string;
+  status: "cleared" | "review_required" | "invalid";
+  decision: string;
+  summary: string;
+  document_count: number;
+  rule_count: number;
+  assessment_count: number;
+  high_risk_document_count: number;
+  medium_risk_document_count: number;
+  low_risk_document_count: number;
+  no_trigger_document_count: number;
+  critical_unverifiable_count: number;
+  signing_evidence_count: number;
+  human_review_required: boolean;
+  signing_status: "evidence_present" | "evidence_incomplete" | "invalid";
+  documents: LegalDocumentReview[];
   external_action: "none";
 };
 
@@ -480,6 +529,7 @@ type WorkspaceArtifact = {
   execution_summary: string | null;
   self_test: ArtifactSelfTest | null;
   business_gate_outcome: BusinessGateOutcome | null;
+  legal_review_outcome: LegalReviewOutcome | null;
   download_path: string;
   created_at: string;
   original_inputs_modified: false;
@@ -501,6 +551,7 @@ type EffectReceipt = {
   artifact_ids: string[];
   prohibited_side_effects: string[];
   business_gate_outcome: BusinessGateOutcome | null;
+  legal_review_outcome: LegalReviewOutcome | null;
   created_at: string;
   external_action: "none";
 };
@@ -1614,17 +1665,113 @@ function normalizeBusinessRecord(value: unknown): BusinessRecord | null {
   };
 }
 
+function normalizeLegalRuleAssessment(value: unknown): LegalRuleAssessment | null {
+  if (!value || typeof value !== "object") return null;
+  const raw = value as Record<string, unknown>;
+  const assessmentId = asText(raw.assessment_id);
+  const ruleId = asText(raw.rule_id);
+  const ruleLevel = asText(raw.rule_level);
+  const status = asText(raw.status);
+  if (
+    !assessmentId
+    || !/^[RML][0-9]{2}$/.test(ruleId)
+    || !["high", "medium", "low"].includes(ruleLevel)
+    || !["triggered", "not_triggered", "unverifiable"].includes(status)
+  ) return null;
+  return {
+    assessment_id: assessmentId,
+    rule_id: ruleId,
+    rule_name: asText(raw.rule_name),
+    rule_level: ruleLevel as LegalRuleAssessment["rule_level"],
+    status: status as LegalRuleAssessment["status"],
+    source_locator: asText(raw.source_locator),
+    excerpt: asText(raw.excerpt),
+    fact: asText(raw.fact),
+    judgment: asText(raw.judgment),
+    reason: asText(raw.reason),
+    owner: asText(raw.owner),
+    remediation_action: asText(raw.remediation_action),
+    exit_condition: asText(raw.exit_condition),
+  };
+}
+
+function normalizeLegalDocumentReview(value: unknown): LegalDocumentReview | null {
+  if (!value || typeof value !== "object") return null;
+  const raw = value as Record<string, unknown>;
+  const documentId = asText(raw.document_id);
+  const highestLevel = asText(raw.highest_triggered_level);
+  const signingStatus = asText(raw.signing_evidence_status);
+  const assessments = Array.isArray(raw.assessments)
+    ? raw.assessments.map(normalizeLegalRuleAssessment).filter((item): item is LegalRuleAssessment => item !== null)
+    : [];
+  if (
+    !/^DOC-[0-9]{2}$/.test(documentId)
+    || !["none", "low", "medium", "high"].includes(highestLevel)
+    || !["present", "absent", "unverifiable"].includes(signingStatus)
+    || assessments.length !== 21
+  ) return null;
+  return {
+    document_id: documentId,
+    document_name: asText(raw.document_name),
+    source_file_ref: asText(raw.source_file_ref),
+    highest_triggered_level: highestLevel as LegalDocumentReview["highest_triggered_level"],
+    triggered_count: asNumber(raw.triggered_count),
+    unverifiable_count: asNumber(raw.unverifiable_count),
+    signing_evidence_status: signingStatus as LegalDocumentReview["signing_evidence_status"],
+    summary: asText(raw.summary),
+    assessments,
+  };
+}
+
+function normalizeLegalReviewOutcome(value: unknown): LegalReviewOutcome | null {
+  if (!value || typeof value !== "object") return null;
+  const raw = value as Record<string, unknown>;
+  const outcomeId = asText(raw.outcome_id);
+  const status = asText(raw.status);
+  const signingStatus = asText(raw.signing_status);
+  const documents = Array.isArray(raw.documents)
+    ? raw.documents.map(normalizeLegalDocumentReview).filter((item): item is LegalDocumentReview => item !== null)
+    : [];
+  if (
+    !outcomeId
+    || !["cleared", "review_required", "invalid"].includes(status)
+    || !["evidence_present", "evidence_incomplete", "invalid"].includes(signingStatus)
+    || documents.length !== 6
+  ) return null;
+  return {
+    outcome_id: outcomeId,
+    status: status as LegalReviewOutcome["status"],
+    decision: asText(raw.decision),
+    summary: asText(raw.summary),
+    document_count: asNumber(raw.document_count),
+    rule_count: asNumber(raw.rule_count),
+    assessment_count: asNumber(raw.assessment_count),
+    high_risk_document_count: asNumber(raw.high_risk_document_count),
+    medium_risk_document_count: asNumber(raw.medium_risk_document_count),
+    low_risk_document_count: asNumber(raw.low_risk_document_count),
+    no_trigger_document_count: asNumber(raw.no_trigger_document_count),
+    critical_unverifiable_count: asNumber(raw.critical_unverifiable_count),
+    signing_evidence_count: asNumber(raw.signing_evidence_count),
+    human_review_required: raw.human_review_required === true,
+    signing_status: signingStatus as LegalReviewOutcome["signing_status"],
+    documents,
+    external_action: "none",
+  };
+}
+
 function normalizeBusinessGateOutcome(value: unknown): BusinessGateOutcome | null {
   if (!value || typeof value !== "object") return null;
   const raw = value as Record<string, unknown>;
   const outcomeId = asText(raw.outcome_id);
   const status = asText(raw.status);
-  if (!outcomeId || !["passed", "failed", "invalid"].includes(status)) return null;
+  const outcomeKind = asText(raw.outcome_kind, "release_readiness");
+  if (!outcomeId || !["passed", "failed", "invalid"].includes(status) || !["release_readiness", "legal_delegation_review"].includes(outcomeKind)) return null;
   const gates = Array.isArray(raw.gates) ? raw.gates.map(normalizeBusinessGate).filter((item): item is BusinessGate => item !== null) : [];
   const metrics = Array.isArray(raw.auxiliary_metrics) ? raw.auxiliary_metrics.map(normalizeBusinessMetric).filter((item): item is BusinessMetric => item !== null) : [];
   const records = Array.isArray(raw.records) ? raw.records.map(normalizeBusinessRecord).filter((item): item is BusinessRecord => item !== null) : [];
   return {
     outcome_id: outcomeId,
+    outcome_kind: outcomeKind as BusinessGateOutcome["outcome_kind"],
     status: status as BusinessGateOutcome["status"],
     decision: asText(raw.decision),
     summary: asText(raw.summary),
@@ -1686,6 +1833,7 @@ function normalizeWorkspaceArtifact(value: unknown): WorkspaceArtifact | null {
     execution_summary: asText(raw.execution_summary) || null,
     self_test: selfTest && selfTest.instruction && selfTest.commands.length > 0 ? selfTest : null,
     business_gate_outcome: normalizeBusinessGateOutcome(raw.business_gate_outcome),
+    legal_review_outcome: normalizeLegalReviewOutcome(raw.legal_review_outcome),
     download_path: asText(raw.download_path),
     created_at: asText(raw.created_at),
     original_inputs_modified: false,
@@ -1714,6 +1862,7 @@ function normalizeEffectReceipt(value: unknown): EffectReceipt | null {
     artifact_ids: asStrings(raw.artifact_ids),
     prohibited_side_effects: asStrings(raw.prohibited_side_effects),
     business_gate_outcome: normalizeBusinessGateOutcome(raw.business_gate_outcome),
+    legal_review_outcome: normalizeLegalReviewOutcome(raw.legal_review_outcome),
     created_at: asText(raw.created_at),
     external_action: "none",
   };
@@ -3267,6 +3416,7 @@ function BusinessGateOutcomePanel({ outcome }: { outcome: BusinessGateOutcome })
   const riskCounts = outcome.records.reduce((counts, record) => ({ ...counts, [record.final_risk_level]: counts[record.final_risk_level] + 1 }), { none: 0, minor: 0, major: 0, severe: 0 });
   const invalid = outcome.status === "invalid";
   const blocked = outcome.status === "failed";
+  const legalReview = outcome.outcome_kind === "legal_delegation_review";
   return <section className={`business-gate-outcome is-${outcome.status}`} aria-label="业务 Gate 结论" role="status">
     <header>
       {outcome.status === "passed" ? <IconCircleCheck aria-hidden="true" /> : <IconAlertTriangle aria-hidden="true" />}
@@ -3275,14 +3425,69 @@ function BusinessGateOutcomePanel({ outcome }: { outcome: BusinessGateOutcome })
     </header>
     {outcome.gates.length > 0 && <ol className="business-gate-list">{outcome.gates.map((gate, index) => <li key={gate.gate_id} className={gate.passed ? "is-passed" : "is-failed"}>
       <div className="business-gate-number"><span>{index + 1}</span>{gate.passed ? <IconCheck aria-hidden="true" /> : <IconAlertTriangle aria-hidden="true" />}</div>
-      <div><span>正式上线条件</span><h4>{gate.label}</h4><strong>{formatBusinessValue(gate.actual, gate.unit)} <small>{gate.operator === ">=" ? "至少" : gate.operator === "==" ? "必须等于" : "至多"} {formatBusinessValue(gate.threshold, gate.unit)}</small></strong><p>{gate.result}</p><small>{gate.formula}</small></div>
+      <div><span>{legalReview ? "法务判断条件" : "正式上线条件"}</span><h4>{gate.label}</h4><strong>{formatBusinessValue(gate.actual, gate.unit)} <small>{gate.operator === ">=" ? "至少" : gate.operator === "==" ? "必须等于" : "至多"} {formatBusinessValue(gate.threshold, gate.unit)}</small></strong><p>{gate.result}</p><small>{gate.formula}</small></div>
     </li>)}</ol>}
-    {outcome.auxiliary_metrics.length > 0 && <details className="business-metrics"><summary><IconEye aria-hidden="true" />查看辅助质量指标<span>不作为正式上线 Gate</span></summary><ul>{outcome.auxiliary_metrics.map((metric) => <li key={metric.metric_id}><div><b>{metric.label}</b><small>{metric.formula}</small></div><strong>{formatBusinessValue(metric.value, metric.unit)}</strong><p>{metric.numerator}/{metric.denominator}</p></li>)}</ul></details>}
+    {outcome.auxiliary_metrics.length > 0 && <details className="business-metrics"><summary><IconEye aria-hidden="true" />查看辅助质量指标<span>不作为{legalReview ? "法务判断" : "正式上线"} Gate</span></summary><ul>{outcome.auxiliary_metrics.map((metric) => <li key={metric.metric_id}><div><b>{metric.label}</b><small>{metric.formula}</small></div><strong>{formatBusinessValue(metric.value, metric.unit)}</strong><p>{metric.numerator}/{metric.denominator}</p></li>)}</ul></details>}
     {outcome.records.length > 0 && <details className="business-ledger"><summary><IconEye aria-hidden="true" />查看 18 项逐功能台账<span>严重 {riskCounts.severe} · 主要 {riskCounts.major} · 次要 {riskCounts.minor} · 无风险项 {riskCounts.none}</span></summary><ol>{outcome.records.map((record) => <li key={record.record_id} className={`is-${record.final_risk_level}`}>
       <header><b>{record.record_id}</b><div><h4>{record.title}</h4><p>{record.module} · {record.priority} · 负责人 {record.owner}</p></div><strong>{riskLabels[record.final_risk_level]}</strong></header>
       <dl><div><dt>测试与兼容</dt><dd>{record.test_status} · {record.passed_cases}/{record.total_cases} 用例通过 · {record.compatibility_issue_count} 个异常环境</dd></div><div><dt>为什么这样判</dt><dd>{record.rules_hit.length > 0 ? record.rules_hit.join("；") : "当前来源未命中风险规则。"}</dd></div><div><dt>整改与退出</dt><dd>{record.remediation_action} {record.exit_condition}</dd></div><div><dt>来源位置</dt><dd>{record.source_locations.join("；")}</dd></div></dl>
     </li>)}</ol></details>}
-    <footer><IconShieldCheck aria-hidden="true" /><span>确定性检查只复核公式、来源归属和成果结构；本次没有执行上线、没有修改配置。</span></footer>
+    <footer><IconShieldCheck aria-hidden="true" /><span>{legalReview ? "确定性检查只复核来源、规则计算和成果结构；不是正式法律意见，也没有签署或使授权生效。" : "确定性检查只复核公式、来源归属和成果结构；本次没有执行上线、没有修改配置。"}</span></footer>
+  </section>;
+}
+
+function legalDocumentRiskLabel(level: LegalDocumentReview["highest_triggered_level"]): string {
+  return { none: "无已触发风险", low: "低风险文件", medium: "中风险文件", high: "高风险文件" }[level];
+}
+
+function legalRuleLevelLabel(level: LegalRuleAssessment["rule_level"]): string {
+  return { low: "低", medium: "中", high: "高" }[level];
+}
+
+function legalAssessmentStatusLabel(status: LegalRuleAssessment["status"]): string {
+  return { triggered: "已触发", not_triggered: "当前未触发", unverifiable: "资料不足" }[status];
+}
+
+function legalSigningEvidenceLabel(outcome: LegalReviewOutcome): string {
+  if (outcome.signing_evidence_count === 0) return "没有可核对签署证据";
+  if (outcome.signing_evidence_count === outcome.document_count) return "全部文件发现可核对签署证据";
+  return "部分文件发现可核对签署证据";
+}
+
+function LegalReviewOutcomePanel({ outcome, deterministicPassed }: { outcome: LegalReviewOutcome; deterministicPassed: boolean }) {
+  return <section className={`legal-review-outcome is-${outcome.status}`} aria-label="授权委托书核查结论">
+    <header>
+      <IconAlertTriangle aria-hidden="true" />
+      <div><span>法务核查结论</span><h3>{outcome.decision}</h3><p>{outcome.summary}</p></div>
+      <b>{outcome.high_risk_document_count} 份高风险 · {outcome.critical_unverifiable_count} 项关键资料不足</b>
+    </header>
+    <ol className="legal-review-statuses" aria-label="文件核验、法务判断与签署状态">
+      <li className={deterministicPassed ? "is-passed" : "is-failed"}><span>1</span><div><b>文件与计算</b><strong>{deterministicPassed ? "确定性检查通过" : "确定性检查未通过"}</strong><p>{deterministicPassed ? `${outcome.document_count} 份文件、${outcome.rule_count} 条规则、${outcome.assessment_count} 项核查已完成结构复核。` : "成果文件或核查台账未通过服务端验证，不能采用。"}</p></div></li>
+      <li className={outcome.status === "cleared" ? "is-passed" : "is-failed"}><span>2</span><div><b>法务风险</b><strong>{outcome.status === "cleared" ? "法务 Gate 已通过" : "法务 Gate 未通过"}</strong><p>{outcome.high_risk_document_count} 份高风险，{outcome.medium_risk_document_count} 份中风险，{outcome.low_risk_document_count} 份低风险。</p></div></li>
+      <li className={outcome.signing_status === "evidence_present" && !outcome.human_review_required ? "is-passed" : "is-pending"}><span>3</span><div><b>签署与人工复核</b><strong>{legalSigningEvidenceLabel(outcome)}</strong><p>{outcome.signing_evidence_count}/{outcome.document_count} 份发现签署对象；仍需法务人员逐项复核，当前没有签署、授权生效或外部动作。</p></div></li>
+    </ol>
+    <section className="legal-review-summary" aria-label="六份文件核查摘要">
+      <div><span>逐项覆盖</span><strong>{outcome.assessment_count}/{outcome.document_count * outcome.rule_count}</strong><p>每份文件都按 21 条来源规则核查</p></div>
+      <div><span>签署证据</span><strong>{outcome.signing_evidence_count}/{outcome.document_count}</strong><p>空签署栏不算签字或盖章</p></div>
+      <div><span>人工复核</span><strong>{outcome.human_review_required ? "必须" : "无需"}</strong><p>资料不足不会被 Agent 猜测为通过</p></div>
+    </section>
+    <div className="legal-review-documents">{outcome.documents.map((document) => {
+      const attentionItems = document.assessments.filter((assessment) => assessment.status !== "not_triggered");
+      return <details key={document.document_id} className={`is-${document.highest_triggered_level}`}>
+        <summary>
+          <span><b>{document.document_id}</b><strong>{document.document_name}</strong></span>
+          <span><em>{legalDocumentRiskLabel(document.highest_triggered_level)}</em><small>{document.triggered_count} 条已触发 · {document.unverifiable_count} 条资料不足</small></span>
+          <IconChevronDown aria-hidden="true" />
+        </summary>
+        <p>{document.summary}</p>
+        <ol aria-label={`${document.document_name} 的 21 条规则核查`}>{document.assessments.map((assessment) => <li key={assessment.assessment_id} className={`is-${assessment.status}`}>
+          <header><span><b>{assessment.rule_id}</b><strong>{assessment.rule_name}</strong></span><span><em>规则等级：{legalRuleLevelLabel(assessment.rule_level)}</em><mark>{legalAssessmentStatusLabel(assessment.status)}</mark></span></header>
+          <dl><div><dt>原文位置</dt><dd>{assessment.source_locator}</dd></div><div><dt>原文摘录</dt><dd>{assessment.excerpt}</dd></div><div><dt>来源事实</dt><dd>{assessment.fact}</dd></div><div><dt>规则判断</dt><dd>{assessment.judgment}</dd></div><div><dt>为什么</dt><dd>{assessment.reason}</dd></div><div><dt>处理与退出</dt><dd>{assessment.owner}：{assessment.remediation_action}；{assessment.exit_condition}</dd></div></dl>
+        </li>)}</ol>
+        <footer><span>共 21 项：{attentionItems.length} 项需要关注，{21 - attentionItems.length} 项在当前来源下未触发。</span></footer>
+      </details>;
+    })}</div>
+    <footer><IconShieldCheck aria-hidden="true" /><span>这是固定 Legal-020 资料的辅助核查。它不构成正式法律意见，不证明签署有效，不代表授权已生效。</span></footer>
   </section>;
 }
 
@@ -3301,7 +3506,11 @@ function WorkspaceArtifactSection({ artifacts, receipts }: { artifacts: Workspac
   const businessGateOutcome = artifacts.find((artifact) => artifact.business_gate_outcome)?.business_gate_outcome
     ?? latestReceipt?.business_gate_outcome
     ?? null;
+  const legalReviewOutcome = artifacts.find((artifact) => artifact.legal_review_outcome)?.legal_review_outcome
+    ?? latestReceipt?.legal_review_outcome
+    ?? null;
   const businessBlocked = Boolean(businessGateOutcome && businessGateOutcome.status !== "passed");
+  const deterministicPassed = artifacts.length > 0 && artifacts.every((artifact) => artifact.verifier_status === "passed");
   const downloadArtifact = async (artifact: WorkspaceArtifact) => {
     if (!artifact.download_path.startsWith("/v1/harness/runs/")) {
       setDownloadError("成果下载地址未通过客户端边界检查。");
@@ -3332,6 +3541,7 @@ function WorkspaceArtifactSection({ artifacts, receipts }: { artifacts: Workspac
       <div><span>运行工作区</span><h3 id="workspace-artifacts-title">{artifacts.length > 0 ? `Agent 已生成 ${artifacts.length} 份真实成果文件` : "这项任务尚不能生成可信成果"}</h3><p>{artifacts.length > 0 ? "文件已写入本次 Run 的隔离目录，原始 FORTE 文件没有被修改。" : boundary?.result}</p></div>
       <b>{businessGateOutcome?.status === "failed" ? `业务 Gate ${businessGateOutcome.failed_gate_count}/${businessGateOutcome.total_gate_count} 未通过` : businessGateOutcome?.status === "invalid" ? "来源校验失败" : artifacts.length > 0 ? checkSummary.sameChecklist ? `${artifacts.length} 份成果共享 ${checkSummary.total} 项确定性检查，${checkSummary.passed}/${checkSummary.total} 通过` : checkSummary.shared ? `${artifacts.length} 份成果共 ${checkSummary.total} 项唯一确定性检查，${checkSummary.passed}/${checkSummary.total} 通过` : `${checkSummary.passed}/${checkSummary.total} 项检查通过` : "未伪造结果"}</b>
     </header>
+    {legalReviewOutcome && <LegalReviewOutcomePanel outcome={legalReviewOutcome} deterministicPassed={deterministicPassed} />}
     {businessGateOutcome && <BusinessGateOutcomePanel outcome={businessGateOutcome} />}
     {executionArtifact && <article className={`workspace-action-result${executionArtifact.verifier_status === "failed" ? " is-failed" : ""}`} aria-label="实际执行边界"><IconShieldCheck aria-hidden="true" /><div><span>这次实际发生了什么</span><h4>{executionArtifact.execution_summary}</h4><p>{executionArtifact.purpose}</p>{latestReceipt && <ul>{latestReceipt.prohibited_side_effects.map((item) => <li key={item}>{item}</li>)}</ul>}</div></article>}
     {artifacts.length > 0 && <ol>{artifacts.map((artifact) => <li key={artifact.artifact_id} className={artifact.verifier_status === "passed" ? "is-passed" : "is-failed"}>

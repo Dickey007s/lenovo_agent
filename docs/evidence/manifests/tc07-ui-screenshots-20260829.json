@@ -1,0 +1,37 @@
+{
+  "schema_version": "tc07-ui-screenshots.v1",
+  "captured_at": "2026-08-29T00:09:37+08:00",
+  "capture_method": "Playwright system-browser on the ordinary three-column page; no CSS injection or content rewrite. The main workspace was scrolled to the server-derived legal outcome. For the desktop capture, the browser-only folder view was switched from 财务管理 to 法务 so the rule file and six delegation documents are visible; this display state does not submit selected_file_refs or change the whole_workspace Run scope.",
+  "source_fixture": "docs/evidence/manifests/tc07-public-legal-review-outcome-20260828.json",
+  "screenshots": [
+    {
+      "path": "docs/evidence/screenshots/tc07-source-derived-legal-review-desktop.png",
+      "viewport": "1440x1100",
+      "width": 1440,
+      "height": 1100,
+      "bytes": 172064,
+      "sha256": "26585bdb0e7b645db272400c7b5326b1c36e9968101d5a4246e6d80d9d7ab1a2"
+    },
+    {
+      "path": "docs/evidence/screenshots/tc07-source-derived-legal-review-mobile.png",
+      "viewport": "390x844",
+      "width": 390,
+      "height": 844,
+      "bytes": 50357,
+      "sha256": "0e540ae3bb022e43670367a12e3931bea523eb008921f8dcfdfd57a2edc127a2"
+    }
+  ],
+  "proves": [
+    "The legal decision is visible before per-document detail.",
+    "Deterministic verification, legal Gate and signing/human review are separate visible states.",
+    "The desktop capture visibly expands the 法务 folder and shows the rule file plus six delegation documents without changing the server-owned whole_workspace scope.",
+    "Six document sections and dynamic 126/126, 0/6 and mandatory-review facts fit the tested layouts.",
+    "The 390 px viewport has no page-level horizontal overflow in the tested state."
+  ],
+  "does_not_prove": [
+    "User comprehension or decision quality",
+    "Formal legal advice, signature authenticity or authorization effectiveness",
+    "Real Registry or Connector access",
+    "Model quality or production browser coverage"
+  ]
+}

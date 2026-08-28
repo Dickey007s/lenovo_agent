@@ -319,6 +319,14 @@ multi-instance coordination and governed external action remain target work.
   still `4/4 Gates failed -> 不得上线`. This remains one fixed pm-014 adapter; it
   does not execute a release, write configuration or prove a general release
   audit engine.
+- `DR-0044` replaces TC-07's historical fixed risk answers with a source-derived
+  Legal-020 review. The service validates one rule table and six unique DOCX
+  sources, evaluates all 21 rules for every document and verifies a 126-row CSV
+  plus structured DOCX from the approved bytes. Principal and agent identity
+  fields are isolated; an attorney license number without a Registry/Connector
+  receipt remains `unverifiable`. The UI shows file verification, legal business
+  Gates and signing/human review as three different states. This is an auxiliary
+  fixed-input review, not legal advice, signature validation or authorization.
 - No target-user study has been run. Clarity, trust, efficiency and user value
   remain hypotheses.
 
@@ -437,6 +445,9 @@ pnpm --dir apps/web exec playwright test e2e/harness-workbench.spec.ts
 - [DR-0043：TC-11 来源推导风险、正式业务 Gate 与双状态前台](docs/decisions/DR-0043-tc11-derived-release-gates.md)
 - [SCENARIO-029：从四份发布资料推导上线 Gate 并审查整改计划](docs/scenarios/SCENARIO-029-review-derived-release-gates.md)
 - [TC-11 来源推导上线 Gate Evidence](docs/evidence/DR-0043-TC11-DERIVED-RELEASE-GATES-EVIDENCE-20260828.md)
+- [DR-0044：TC-07 来源推导授权核查与三状态前台](docs/decisions/DR-0044-tc07-source-derived-legal-delegation-review.md)
+- [SCENARIO-030：从一份规则和六份委托书逐项推导复核清单](docs/scenarios/SCENARIO-030-review-six-delegations-with-source-derived-rules.md)
+- [TC-07 来源推导授权核查 Evidence](docs/evidence/DR-0044-TC07-SOURCE-DERIVED-LEGAL-REVIEW-EVIDENCE-20260828.md)
 - [可恢复 Control Loop Evidence](docs/evidence/DURABLE-EVIDENCE-GATE-ARTIFACT-EVOLUTION-EVIDENCE-20260826.md)
 - [整库自主研究 Evidence](docs/evidence/AUTONOMOUS-WHOLE-WORKSPACE-RESEARCH-EVIDENCE-20260825.md)
 - [Agent Control Loop 三轮只读纵切证据](docs/evidence/AGENT-CONTROL-LOOP-BOUNDED-READONLY-EVIDENCE-20260825.md)

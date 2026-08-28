@@ -663,7 +663,7 @@ def test_tc12_e2e_fixture_uses_the_same_public_test_manifest() -> None:
     assert fixture == dashboard_toolkit_public_test_manifest()
 
 
-def test_candidate_legal_and_release_outputs_keep_human_gates_and_fixed_facts(
+def test_candidate_legal_and_release_outputs_keep_human_gates_and_source_facts(
     catalog: BenchmarkWorkspaceCatalog,
 ) -> None:
     _, candidates = _execute("TC-06", catalog)
@@ -676,11 +676,44 @@ def test_candidate_legal_and_release_outputs_keep_human_gates_and_fixed_facts(
         assert "@" not in document
 
     _, legal = _execute("TC-07", catalog)
+    assert [artifact.file_name for artifact in legal.artifacts] == [
+        "授权委托书风控报告.docx",
+        "授权委托书逐项核查台账.csv",
+    ]
     with zipfile.ZipFile(io.BytesIO(legal.artifacts[0].content)) as package:
         legal_document = package.read("word/document.xml").decode("utf-8")
-    assert legal_document.count("综合风险等级：高风险") == 2
-    assert legal_document.count("综合风险等级：中风险") == 4
-    assert "R05" not in legal_document
+    assert legal_document.count("高风险") >= 6
+    assert "R05" in legal_document
+    assert "不是正式法律意见" in legal_document
+    legal_outcome = legal.artifacts[0].legal_review_outcome
+    assert legal_outcome is not None
+    assert legal_outcome.assessment_count == 126
+    assert legal_outcome.high_risk_document_count == 6
+    assert legal_outcome.signing_evidence_count == 0
+    assert legal.artifacts[0].business_gate_outcome is not None
+    assert legal.artifacts[0].business_gate_outcome.failed_gate_count == 3
+    assert legal_outcome.critical_unverifiable_count == 11
+    doc2 = next(item for item in legal_outcome.documents if item.document_id == "DOC-02")
+    doc2_m03 = next(item for item in doc2.assessments if item.rule_id == "M03")
+    assert doc2_m03.status == "unverifiable"
+    assert "字段存在不等于资质已核验" in doc2_m03.reason
+
+    fixture = json.loads(
+        (
+            Path(__file__).resolve().parents[2]
+            / "docs"
+            / "evidence"
+            / "manifests"
+            / "tc07-public-legal-review-outcome-20260828.json"
+        ).read_text(encoding="utf-8")
+    )
+    assert fixture["business_gate_outcome"] == legal.artifacts[
+        0
+    ].business_gate_outcome.model_dump(mode="json")
+    assert fixture["legal_review_outcome"] == legal_outcome.model_dump(mode="json")
+    assert fixture["checks"] == [
+        check.model_dump(mode="json") for check in legal.artifacts[0].checks
+    ]
 
     _, release = _execute("TC-11", catalog)
     assert [artifact.file_name for artifact in release.artifacts] == [

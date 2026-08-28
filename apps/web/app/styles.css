@@ -485,6 +485,65 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, summary:focus
 .business-ledger dd { margin: 3px 0 0; overflow-wrap: anywhere; color: var(--ink-soft); font-size: 11px; line-height: 1.5; }
 .business-gate-outcome > footer { display: flex; align-items: center; gap: 7px; padding: 10px 13px; border-top: 1px solid #e4d8d6; color: #6f4945; font-size: 11px; line-height: 1.5; }
 .business-gate-outcome > footer svg { width: 16px; flex: 0 0 auto; color: #3f6e9d; }
+.legal-review-outcome { margin: 12px 14px 0; border: 1px solid #dea59e; background: #fffafa; }
+.legal-review-outcome > header { display: grid; grid-template-columns: 30px minmax(0, 1fr) auto; gap: 10px; align-items: start; padding: 14px; border-bottom: 1px solid #ecd0cc; }
+.legal-review-outcome > header > svg { width: 24px; color: var(--red); }
+.legal-review-outcome > header span { color: #a1372c; font-size: 11px; font-weight: 800; }
+.legal-review-outcome > header h3 { margin: 3px 0 0; color: #7d251d; font-size: 20px; line-height: 1.35; letter-spacing: 0; }
+.legal-review-outcome > header p { margin: 5px 0 0; color: #644542; font-size: 12px; line-height: 1.6; }
+.legal-review-outcome > header > b { padding: 6px 8px; color: #8d281f; background: #ffecea; font-size: 12px; white-space: nowrap; }
+.legal-review-statuses { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1px; margin: 0; padding: 0; background: #ded7d4; list-style: none; }
+.legal-review-statuses > li { min-width: 0; display: grid; grid-template-columns: 30px minmax(0, 1fr); gap: 9px; padding: 12px; background: #fff; }
+.legal-review-statuses > li > span { width: 28px; height: 28px; display: grid; place-items: center; color: #fff; background: #667788; font-size: 12px; font-weight: 800; }
+.legal-review-statuses > li.is-passed > span { background: var(--green); }
+.legal-review-statuses > li.is-failed > span { background: var(--red); }
+.legal-review-statuses > li.is-pending > span { background: #b46c16; }
+.legal-review-statuses b { display: block; color: var(--muted); font-size: 11px; }
+.legal-review-statuses strong { display: block; margin-top: 3px; font-size: 14px; line-height: 1.4; }
+.legal-review-statuses .is-passed strong { color: #176a46; }
+.legal-review-statuses .is-failed strong { color: #8d281f; }
+.legal-review-statuses .is-pending strong { color: #8a510d; }
+.legal-review-statuses p { margin: 4px 0 0; color: var(--ink-soft); font-size: 11px; line-height: 1.55; }
+.legal-review-summary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1px; border-top: 1px solid #e5d8d6; border-bottom: 1px solid #e5d8d6; background: #e3e7ea; }
+.legal-review-summary > div { min-width: 0; padding: 10px 12px; background: #f8fafb; }
+.legal-review-summary span { display: block; color: #566b7e; font-size: 11px; font-weight: 750; }
+.legal-review-summary strong { display: block; margin-top: 2px; color: #263b4d; font-size: 17px; }
+.legal-review-summary p { margin: 3px 0 0; color: var(--muted); font-size: 11px; line-height: 1.45; }
+.legal-review-documents { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; padding: 10px; background: #f4f6f8; }
+.legal-review-documents > details { min-width: 0; align-self: start; border: 1px solid #ccd5dc; border-left: 4px solid #8797a5; background: #fff; }
+.legal-review-documents > details.is-high { border-left-color: var(--red); }
+.legal-review-documents > details.is-medium { border-left-color: #d5781c; }
+.legal-review-documents > details.is-low { border-left-color: #c3a031; }
+.legal-review-documents > details > summary { min-height: 58px; display: grid; grid-template-columns: minmax(0, 1fr) auto 18px; align-items: center; gap: 8px; padding: 9px 10px; cursor: pointer; }
+.legal-review-documents > details > summary > span:first-child { min-width: 0; display: grid; grid-template-columns: 46px minmax(0, 1fr); gap: 7px; align-items: start; }
+.legal-review-documents > details > summary > span:first-child > b { color: #2f628f; font-size: 12px; }
+.legal-review-documents > details > summary > span:first-child > strong { overflow-wrap: anywhere; font-size: 13px; line-height: 1.45; }
+.legal-review-documents > details > summary > span:nth-child(2) { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; }
+.legal-review-documents summary em { padding: 3px 6px; color: #8d281f; background: #ffebe8; font-size: 11px; font-style: normal; font-weight: 750; white-space: nowrap; }
+.legal-review-documents summary small { color: var(--muted); font-size: 11px; white-space: nowrap; }
+.legal-review-documents summary svg { width: 16px; transition: transform 140ms ease; }
+.legal-review-documents details[open] > summary svg { transform: rotate(180deg); }
+.legal-review-documents > details > p { margin: 0; padding: 0 10px 10px; color: var(--ink-soft); font-size: 12px; line-height: 1.55; }
+.legal-review-documents > details > ol { display: grid; gap: 7px; max-height: 620px; margin: 0; padding: 10px; overflow: auto; border-top: 1px solid #dfe5e9; background: #f6f8fa; list-style: none; }
+.legal-review-documents > details > ol > li { min-width: 0; border: 1px solid #d9e0e5; background: #fff; }
+.legal-review-documents > details > ol > li.is-triggered { border-color: #e5aca5; }
+.legal-review-documents > details > ol > li.is-unverifiable { border-color: #e7c48e; }
+.legal-review-documents > details > ol > li > header { display: flex; align-items: flex-start; justify-content: space-between; gap: 9px; padding: 8px 9px; border-bottom: 1px solid #e5e9ec; }
+.legal-review-documents > details > ol > li > header > span { min-width: 0; display: flex; align-items: center; flex-wrap: wrap; gap: 6px; }
+.legal-review-documents > details > ol > li > header b { color: #2f628f; font-size: 12px; }
+.legal-review-documents > details > ol > li > header strong { overflow-wrap: anywhere; font-size: 12px; line-height: 1.45; }
+.legal-review-documents > details > ol > li > header em, .legal-review-documents > details > ol > li > header mark { padding: 3px 5px; font-size: 11px; font-style: normal; font-weight: 750; white-space: nowrap; }
+.legal-review-documents > details > ol > li > header em { color: #665326; background: #fff5d6; }
+.legal-review-documents > details > ol > li > header mark { color: #35536d; background: #edf2f6; }
+.legal-review-documents > details > ol > li.is-triggered > header mark { color: #8d281f; background: #ffebe8; }
+.legal-review-documents > details > ol > li.is-unverifiable > header mark { color: #85510f; background: #fff0d8; }
+.legal-review-documents dl { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1px; margin: 0; background: #e1e6ea; }
+.legal-review-documents dl > div { min-width: 0; padding: 8px 9px; background: #fff; }
+.legal-review-documents dt { color: #52677a; font-size: 11px; font-weight: 750; }
+.legal-review-documents dd { margin: 3px 0 0; overflow-wrap: anywhere; color: var(--ink-soft); font-size: 12px; line-height: 1.55; }
+.legal-review-documents > details > footer { padding: 8px 10px; border-top: 1px solid #e0e5e9; color: #52677a; font-size: 11px; line-height: 1.5; }
+.legal-review-outcome > footer { display: flex; align-items: center; gap: 7px; padding: 10px 13px; border-top: 1px solid #e4d8d6; color: #6f4945; font-size: 11px; line-height: 1.5; }
+.legal-review-outcome > footer svg { width: 16px; flex: 0 0 auto; color: #3f6e9d; }
 .workspace-action-result { display: grid; grid-template-columns: 28px minmax(0, 1fr); gap: 10px; margin: 12px 14px 0; padding: 12px 13px; border-left: 4px solid var(--blue); background: #f2f7fd; }
 .workspace-action-result > svg { width: 21px; margin-top: 2px; color: var(--blue); }
 .workspace-action-result span { color: var(--blue); font-size: 10px; font-weight: 750; }
@@ -1018,8 +1077,13 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, summary:focus
   .workspace-artifacts > header > b { grid-column: 2; justify-self: start; }
   .business-gate-outcome > header { grid-template-columns: 25px minmax(0, 1fr); }
   .business-gate-outcome > header > b { grid-column: 2; justify-self: start; }
+  .legal-review-outcome > header { grid-template-columns: 25px minmax(0, 1fr); }
+  .legal-review-outcome > header > b { grid-column: 2; justify-self: start; }
   .business-gate-list, .business-metrics > ul { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .business-ledger > ol { grid-template-columns: 1fr; }
+  .legal-review-statuses { grid-template-columns: 1fr; }
+  .legal-review-summary { grid-template-columns: 1fr 1fr 1fr; }
+  .legal-review-documents { grid-template-columns: 1fr; }
   .workspace-artifacts > ol > li { grid-template-columns: minmax(0, 1fr) auto; }
   .workspace-artifact-semantics.has-deliverable-type { grid-template-columns: 1fr 1fr; }
   .workspace-artifact-status { align-items: flex-start; }
@@ -1058,10 +1122,18 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, summary:focus
   .workspace-artifacts { margin-right: 8px; margin-left: 8px; }
   .workspace-artifacts > ol > li { grid-template-columns: minmax(0, 1fr); }
   .business-gate-outcome { margin-right: 8px; margin-left: 8px; }
+  .legal-review-outcome { margin-right: 8px; margin-left: 8px; }
   .business-gate-list, .business-metrics > ul { grid-template-columns: 1fr; }
   .business-metrics > summary, .business-ledger > summary { align-items: flex-start; flex-wrap: wrap; padding-top: 9px; padding-bottom: 9px; }
   .business-metrics > summary span, .business-ledger > summary span { width: 100%; margin-left: 23px; }
   .business-ledger dl { grid-template-columns: 1fr; }
+  .legal-review-summary { grid-template-columns: 1fr; }
+  .legal-review-documents { padding: 8px; }
+  .legal-review-documents > details > summary { grid-template-columns: minmax(0, 1fr) 18px; }
+  .legal-review-documents > details > summary > span:nth-child(2) { grid-column: 1 / -1; align-items: flex-start; }
+  .legal-review-documents > details > summary > svg { grid-column: 2; grid-row: 1; }
+  .legal-review-documents dl { grid-template-columns: 1fr; }
+  .legal-review-documents > details > ol > li > header { align-items: flex-start; flex-direction: column; }
   .workspace-action-result { margin-right: 8px; margin-left: 8px; }
   .workspace-artifact-semantics, .workspace-artifact-semantics.has-deliverable-type { grid-template-columns: 1fr; }
   .workspace-artifact-key-outputs { grid-template-columns: 1fr; }

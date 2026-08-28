@@ -1,0 +1,67 @@
+{
+  "schema_version": "tc07-live-artifact-download-review.v1",
+  "verified_at": "2026-08-29T00:11:23+08:00",
+  "api_base": "http://127.0.0.1:8010",
+  "run_id": "harness:fa527bfb5b054401a6a16f77bf40f4b9",
+  "owner_header": {
+    "name": "X-User-Id",
+    "value": "tc07-live-20260829"
+  },
+  "service_after_restart": {
+    "health": "ok",
+    "model": "deepseek-v4-pro",
+    "checkpoint": "postgres",
+    "task_store": "postgres"
+  },
+  "snapshot_after_restart": {
+    "status": "waiting_input",
+    "version": 13,
+    "artifact_count": 2,
+    "effect_receipt_count": 1,
+    "legal_decision": "不得据此签署，必须法务复核"
+  },
+  "model_calls": [
+    {
+      "role": "planner",
+      "called": true,
+      "model": "deepseek-v4-pro",
+      "elapsed_ms": 13085,
+      "output_used": true
+    },
+    {
+      "role": "analyst",
+      "called": true,
+      "model": "deepseek-v4-pro",
+      "elapsed_ms": 15866,
+      "output_used": true
+    }
+  ],
+  "downloads": [
+    {
+      "file_name": "授权委托书风控报告.docx",
+      "bytes": 8296,
+      "sha256": "aed349d13188a72238ab7264412f22fc22aff5a55a651b96c624fd1957f9f51a",
+      "parsed_table_count": 9,
+      "contains_legal_decision": true,
+      "contains_r05": true,
+      "contains_not_formal_legal_advice_boundary": true,
+      "contains_no_signature_action_boundary": true,
+      "contains_no_external_action_boundary": true
+    },
+    {
+      "file_name": "授权委托书逐项核查台账.csv",
+      "bytes": 71448,
+      "sha256": "d8e7f7d03f012cda7ca97d096fd240b9953215a76a8b053b45224dd03a5e3b6d",
+      "row_count": 126,
+      "unique_document_rule_pairs": 126,
+      "column_count": 16,
+      "r05_triggered_count": 6,
+      "doc04_m03_triggered_count": 1,
+      "m03_unverifiable_count": 5,
+      "all_source_locators_present": true
+    }
+  ],
+  "original_inputs_modified": false,
+  "external_action": "none",
+  "claim_boundary": "The download review independently reparsed returned bytes after a PostgreSQL-backed service restart. It proves this fixed Legal-020 adapter's files and persisted facts, not formal legal advice, signature authenticity, authorization effectiveness, multi-worker execution or a general contract-review engine."
+}

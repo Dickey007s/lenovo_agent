@@ -219,3 +219,133 @@ def test_business_gate_outcome_round_trips_on_artifact_and_effect_receipt() -> N
     assert restored_artifact.business_gate_outcome.failed_gate_count == 1
     assert restored_receipt.business_gate_outcome is not None
     assert restored_receipt.business_gate_outcome.decision == "不得上线"
+
+
+def test_legal_review_outcome_round_trips_with_all_six_documents() -> None:
+    now = datetime.now(timezone.utc)
+    rule_ids = [
+        *(f"R{index:02d}" for index in range(1, 7)),
+        *(f"M{index:02d}" for index in range(1, 10)),
+        *(f"L{index:02d}" for index in range(1, 7)),
+    ]
+    documents = []
+    for document_index in range(1, 7):
+        document_id = f"DOC-{document_index:02d}"
+        documents.append(
+            {
+                "document_id": document_id,
+                "document_name": f"委托书{document_index}.docx",
+                "source_file_ref": f"file-ref-{document_index:02d}",
+                "highest_triggered_level": "high",
+                "triggered_count": 1,
+                "unverifiable_count": 1,
+                "signing_evidence_status": "absent",
+                "summary": "签署栏为空，仍需法务复核。",
+                "assessments": [
+                    {
+                        "assessment_id": f"legal-assessment-doc-{document_index:02d}-{rule_id.lower()}",
+                        "rule_id": rule_id,
+                        "rule_name": f"规则 {rule_id}",
+                        "rule_level": "high" if rule_id.startswith("R") else "medium" if rule_id.startswith("M") else "low",
+                        "status": "triggered" if rule_id == "R05" else "unverifiable" if rule_id == "M02" else "not_triggered",
+                        "source_locator": "P8",
+                        "excerpt": "委托人签名：",
+                        "fact": "签署栏为空。",
+                        "judgment": "按来源规则核查。",
+                        "reason": "来源足以判断或明确资料不足。",
+                        "owner": "法务负责人",
+                        "remediation_action": "补充并核验材料。",
+                        "exit_condition": "材料可由法务独立核验。",
+                    }
+                    for rule_id in rule_ids
+                ],
+            }
+        )
+    legal_outcome = {
+        "outcome_id": "legal-review-outcome-legal-020",
+        "status": "review_required",
+        "decision": "不得据此签署，必须法务复核",
+        "summary": "六份文件均有高风险或关键资料不足。",
+        "document_count": 6,
+        "rule_count": 21,
+        "assessment_count": 126,
+        "high_risk_document_count": 6,
+        "medium_risk_document_count": 0,
+        "low_risk_document_count": 0,
+        "no_trigger_document_count": 0,
+        "critical_unverifiable_count": 6,
+        "signing_evidence_count": 0,
+        "human_review_required": True,
+        "signing_status": "evidence_incomplete",
+        "documents": documents,
+    }
+    business_outcome = {
+        "outcome_id": "business-outcome-legal-delegation-review",
+        "outcome_kind": "legal_delegation_review",
+        "status": "failed",
+        "decision": "不得据此签署，必须法务复核",
+        "summary": "3/3 条法务判断条件未通过。",
+        "total_gate_count": 3,
+        "failed_gate_count": 3,
+        "gates": [],
+        "auxiliary_metrics": [],
+        "records": [],
+    }
+    common = {
+        "capability_id": "office-legal-delegation-review",
+        "scenario_id": "TC-07",
+        "source_file_refs": [f"file-ref-{index:02d}" for index in range(1, 8)],
+        "business_gate_outcome": business_outcome,
+        "legal_review_outcome": legal_outcome,
+        "created_at": now,
+    }
+    artifact = AgentControlLoopWorkspaceArtifact.model_validate(
+        {
+            **common,
+            "artifact_id": "workspace-artifact-fedcba654321",
+            "title": "授权委托书逐项核查台账",
+            "file_name": "授权委托书逐项核查台账.csv",
+            "media_type": "text/csv",
+            "size": 4096,
+            "round_number": 1,
+            "validator_id": "validator-legal-delegation-v2",
+            "verifier_status": "passed",
+            "checks": [
+                {
+                    "check_id": "check-legal-assessment-coverage",
+                    "label": "126 条逐项核查",
+                    "passed": True,
+                    "detail": "六份文件逐项覆盖全部 21 条来源规则。",
+                }
+            ],
+            "summary": "结构通过核验，法务 Gate 未通过。",
+            "download_path": "/v1/harness/runs/run-1/artifacts/artifact-1",
+        }
+    )
+    receipt = AgentControlLoopEffectReceipt.model_validate(
+        {
+            **common,
+            "receipt_id": "effect-receipt-fedcba654321",
+            "status": "passed",
+            "state": "冻结七份来源。",
+            "action": "生成报告与台账。",
+            "observation": "文件结构通过，法务 Gate 未通过。",
+            "cost": "0 次额外模型调用。",
+            "result": "不得据此签署。",
+            "artifact_ids": [artifact.artifact_id],
+        }
+    )
+
+    restored_artifact = AgentControlLoopWorkspaceArtifact.model_validate_json(
+        artifact.model_dump_json()
+    )
+    restored_receipt = AgentControlLoopEffectReceipt.model_validate_json(
+        receipt.model_dump_json()
+    )
+    assert restored_artifact.legal_review_outcome is not None
+    assert len(restored_artifact.legal_review_outcome.documents) == 6
+    assert len(restored_artifact.legal_review_outcome.documents[0].assessments) == 21
+    assert restored_artifact.business_gate_outcome is not None
+    assert restored_artifact.business_gate_outcome.outcome_kind == "legal_delegation_review"
+    assert restored_receipt.legal_review_outcome is not None
+    assert restored_receipt.legal_review_outcome.assessment_count == 126

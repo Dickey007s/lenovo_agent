@@ -3480,6 +3480,7 @@ class HarnessRuntime:
                     execution_summary=generated.execution_summary,
                     self_test=generated.self_test,
                     business_gate_outcome=generated.business_gate_outcome,
+                    legal_review_outcome=generated.legal_review_outcome,
                     download_path=(
                         f"/v1/harness/runs/{run_id}/artifacts/{artifact_id}"
                     ),
@@ -3503,6 +3504,16 @@ class HarnessRuntime:
             item != business_outcome for item in business_outcomes[1:]
         ):
             raise HarnessError("同一效果的业务 Gate 事实不一致")
+        legal_outcomes = [
+            item.legal_review_outcome
+            for item in records
+            if item.legal_review_outcome is not None
+        ]
+        legal_outcome = legal_outcomes[0] if legal_outcomes else None
+        if legal_outcomes and any(
+            item != legal_outcome for item in legal_outcomes[1:]
+        ):
+            raise HarnessError("同一效果的法务核查事实不一致")
         receipt = AgentControlLoopEffectReceipt(
             receipt_id=receipt_id,
             capability_id=execution.capability_id,
@@ -3517,6 +3528,7 @@ class HarnessRuntime:
             artifact_ids=[item.artifact_id for item in records],
             prohibited_side_effects=list(execution.prohibited_side_effects),
             business_gate_outcome=business_outcome,
+            legal_review_outcome=legal_outcome,
             created_at=now,
         )
 

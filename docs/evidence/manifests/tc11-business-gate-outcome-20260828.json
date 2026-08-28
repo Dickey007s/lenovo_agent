@@ -1,5 +1,6 @@
 {
   "outcome_id": "business-outcome-release-readiness",
+  "outcome_kind": "release_readiness",
   "status": "failed",
   "decision": "不得上线",
   "summary": "4/4 条正式上线条件未通过；确定性检查通过不等于可以上线。",
