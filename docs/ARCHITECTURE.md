@@ -425,6 +425,19 @@ the audit anchor. This avoids both whole-line false green and browser-side
 keyword inference; it is still a fixed Operations-008 parser rather than a
 general policy language.
 
+DR-0049 applies source-derived verification to the fixed Sales-020 adapter. The
+server freezes exactly one survey CSV and one rule Markdown, validates the CSV
+encoding/schema/value domain and derives cleaning, thresholds, priority,
+exclusion and report structure from approved rule locators. Every source row
+becomes a decision record with raw and cleaned values, transformations, all
+matched profiles, priority application, final label or exclusion and duplicate
+link. `customer_segmentation_outcome` is stored on both Artifacts and the
+EffectReceipt, so deterministic file verification, a review-required duplicate
+assumption, a draft strategy and zero external actions remain distinct facts.
+The generated Markdown and CSV are parsed again against a fresh source
+derivation. This is not a CRM, customer study, sales-effectiveness verifier or
+general clustering engine.
+
 ## 7. Eight module maturity
 
 | Module | Current implementation | Missing target work |

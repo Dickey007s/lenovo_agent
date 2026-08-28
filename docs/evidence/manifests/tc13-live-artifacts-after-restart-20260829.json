@@ -1,0 +1,750 @@
+{
+  "schema_version": "tc13-live-artifact-evidence.v1",
+  "request": {
+    "api_header": {
+      "X-User-Id": "tc13-live-owner-20260829"
+    },
+    "run_id": "harness:80a5e5c91a294ee687f28eed731570d3",
+    "idempotency_key": "scenario-effect-live-tc-13-d0686b4400324b9ab18e86d3b5c4812f",
+    "instruction": "清洗问卷、完成客户画像分类，并生成差异化销售策略 Markdown 报告。"
+  },
+  "runtime": {
+    "health": {
+      "status": "ok",
+      "model": "deepseek-v4-pro",
+      "checkpoint": "postgres",
+      "task_store": "postgres"
+    },
+    "status": "completed",
+    "version": 13,
+    "round_count": 1,
+    "planner_receipt": {
+      "model": "deepseek-v4-pro",
+      "called": true,
+      "elapsed_ms": 9259,
+      "output_used": true
+    },
+    "analyst_receipt": {
+      "model": "deepseek-v4-pro",
+      "called": true,
+      "elapsed_ms": 16233,
+      "output_used": true
+    },
+    "deterministic_effect_status": "passed",
+    "external_action": "none",
+    "unique_check_count": 8,
+    "passed_unique_check_count": 8,
+    "customer_segmentation_outcome": {
+      "outcome_id": "customer-segmentation-outcome-sales-020",
+      "status": "sales_review_required",
+      "decision": "来源规则、清洗与画像台账已由服务端重算；重复口径和策略草案仍需销售负责人批准，客户联系、CRM、商机和营销动作均未发生。",
+      "summary": "公开问卷 11 行，唯一业务载荷 10 条；分类 8 条、无法归类 2 条、精确重复 1 条。多标签优先级 witness 0 个。",
+      "source_row_count": 11,
+      "unique_payload_count": 10,
+      "duplicate_count": 1,
+      "classified_count": 8,
+      "unclassified_count": 2,
+      "excluded_count": 3,
+      "profile_counts": {
+        "安全型": 3,
+        "技术型": 3,
+        "敏捷型": 2
+      },
+      "parameters": {
+        "parsing_encoding": "gb18030",
+        "missing_score_default": 0,
+        "chinese_number_domain": "零至十，对应整数 0..10",
+        "profile_thresholds": {
+          "安全型": 8,
+          "技术型": 8,
+          "敏捷型": 8
+        },
+        "profile_priority": [
+          "安全型",
+          "技术型",
+          "敏捷型"
+        ],
+        "duplicate_policy": "exact_non_id_payload"
+      },
+      "rules": [
+        {
+          "rule_id": "SEG-CLEAN-DUPLICATE",
+          "category": "cleaning",
+          "source_file_ref": "forte-8d86fcca3891dabb",
+          "locator": "客户分类画像与差异化销售策略生成规则.md:L8",
+          "excerpt": "1. 剔除重复样本，仅保留重复样本中的第一条",
+          "parameters": [
+            "policy_assumption=exact_non_id_payload"
+          ]
+        },
+        {
+          "rule_id": "SEG-CLEAN-CHINESE",
+          "category": "cleaning",
+          "source_file_ref": "forte-8d86fcca3891dabb",
+          "locator": "客户分类画像与差异化销售策略生成规则.md:L9",
+          "excerpt": "2. 将非数字格式的评分字段转换为对应数字（例如将「一」转换为「1」）",
+          "parameters": [
+            "mapping=零..十",
+            "range=0..10"
+          ]
+        },
+        {
+          "rule_id": "SEG-CLEAN-MISSING",
+          "category": "cleaning",
+          "source_file_ref": "forte-8d86fcca3891dabb",
+          "locator": "客户分类画像与差异化销售策略生成规则.md:L10",
+          "excerpt": "3. 缺失的评分字段统一按数值0处理",
+          "parameters": [
+            "default=0"
+          ]
+        },
+        {
+          "rule_id": "SEG-PROFILE-TECH",
+          "category": "classification",
+          "source_file_ref": "forte-8d86fcca3891dabb",
+          "locator": "客户分类画像与差异化销售策略生成规则.md:L15",
+          "excerpt": "1. 技术型：专业(Stech)字段数值≥8的客户",
+          "parameters": [
+            "threshold=8"
+          ]
+        },
+        {
+          "rule_id": "SEG-PROFILE-SAFE",
+          "category": "classification",
+          "source_file_ref": "forte-8d86fcca3891dabb",
+          "locator": "客户分类画像与差异化销售策略生成规则.md:L16",
+          "excerpt": "2. 安全型：安全(Ssafe)字段 **和** 预算(Sbudget)字段数值同时≥8的客户",
+          "parameters": [
+            "threshold=8",
+            "fields=safe+budget"
+          ]
+        },
+        {
+          "rule_id": "SEG-PROFILE-AGILE",
+          "category": "classification",
+          "source_file_ref": "forte-8d86fcca3891dabb",
+          "locator": "客户分类画像与差异化销售策略生成规则.md:L17",
+          "excerpt": "3. 敏捷型：易用(Seasy)字段数值≥8的客户",
+          "parameters": [
+            "threshold=8"
+          ]
+        },
+        {
+          "rule_id": "SEG-PRIORITY",
+          "category": "priority",
+          "source_file_ref": "forte-8d86fcca3891dabb",
+          "locator": "客户分类画像与差异化销售策略生成规则.md:L20",
+          "excerpt": "若某客户同时满足多个画像条件，按以下优先级取唯一标签：`安全型 > 技术型 > 敏捷型`，最终输出剔除所有无法归类的样本数据",
+          "parameters": [
+            "order=安全型 > 技术型 > 敏捷型"
+          ]
+        },
+        {
+          "rule_id": "SEG-EXCLUDE",
+          "category": "exclusion",
+          "source_file_ref": "forte-8d86fcca3891dabb",
+          "locator": "客户分类画像与差异化销售策略生成规则.md:L20",
+          "excerpt": "若某客户同时满足多个画像条件，按以下优先级取唯一标签：`安全型 > 技术型 > 敏捷型`，最终输出剔除所有无法归类的样本数据",
+          "parameters": [
+            "unclassified=exclude"
+          ]
+        },
+        {
+          "rule_id": "SEG-REPORT-PARTS",
+          "category": "report",
+          "source_file_ref": "forte-8d86fcca3891dabb",
+          "locator": "客户分类画像与差异化销售策略生成规则.md:L23",
+          "excerpt": "最终Markdown报告必须包含以下3个部分，格式严格符合要求：",
+          "parameters": [
+            "count=3"
+          ]
+        },
+        {
+          "rule_id": "SEG-REPORT-PORTRAIT",
+          "category": "report",
+          "source_file_ref": "forte-8d86fcca3891dabb",
+          "locator": "客户分类画像与差异化销售策略生成规则.md:L24",
+          "excerpt": "1. **客户画像表格**",
+          "parameters": [
+            "title=客户画像"
+          ]
+        },
+        {
+          "rule_id": "SEG-REPORT-COLUMNS",
+          "category": "report",
+          "source_file_ref": "forte-8d86fcca3891dabb",
+          "locator": "客户分类画像与差异化销售策略生成规则.md:L26",
+          "excerpt": "- 列名严格设定为：`样本ID`、`企业所在行业`、`企业规模`、`客户画像`",
+          "parameters": [
+            "样本ID",
+            "企业所在行业",
+            "企业规模",
+            "客户画像"
+          ]
+        },
+        {
+          "rule_id": "SEG-REPORT-STRATEGY",
+          "category": "report",
+          "source_file_ref": "forte-8d86fcca3891dabb",
+          "locator": "客户分类画像与差异化销售策略生成规则.md:L27",
+          "excerpt": "2. **销售策略模块**",
+          "parameters": [
+            "title=销售策略"
+          ]
+        },
+        {
+          "rule_id": "SEG-REPORT-STRATEGY-ITEMS",
+          "category": "report",
+          "source_file_ref": "forte-8d86fcca3891dabb",
+          "locator": "客户分类画像与差异化销售策略生成规则.md:L29",
+          "excerpt": "- 分别为3类客户定制差异化建议，每类客户的策略必须包含两个子项，子项标题严格使用：`推荐话术`、`主推功能`",
+          "parameters": [
+            "推荐话术",
+            "主推功能"
+          ]
+        },
+        {
+          "rule_id": "SEG-REPORT-ANALYSIS",
+          "category": "report",
+          "source_file_ref": "forte-8d86fcca3891dabb",
+          "locator": "客户分类画像与差异化销售策略生成规则.md:L30",
+          "excerpt": "3. **客户分析模块**",
+          "parameters": [
+            "title=客户分析"
+          ]
+        },
+        {
+          "rule_id": "SEG-REPORT-ANALYSIS-ITEMS",
+          "category": "report",
+          "source_file_ref": "forte-8d86fcca3891dabb",
+          "locator": "客户分类画像与差异化销售策略生成规则.md:L32",
+          "excerpt": "- 必须包含三个子项，子项标题严格使用：`画像分布`、`行业与规模特征`、`销售优先级建议`",
+          "parameters": [
+            "画像分布",
+            "行业与规模特征",
+            "销售优先级建议"
+          ]
+        }
+      ],
+      "samples": [
+        {
+          "sample_id": "101",
+          "source_file_ref": "forte-30f5e044f5d7a199",
+          "source_row": 2,
+          "source_locator": "客户画像调研问卷.csv:row=2",
+          "industry": "金融科技",
+          "company_size": "500-1000人",
+          "respondent_role": "技术架构师",
+          "raw_scores": {
+            "easy": "2",
+            "safe": "7",
+            "tech": "9",
+            "budget": "6"
+          },
+          "cleaned_scores": {
+            "easy": 2,
+            "safe": 7,
+            "tech": 9,
+            "budget": 6
+          },
+          "transformations": [],
+          "matched_profiles": [
+            "技术型"
+          ],
+          "priority_applied": false,
+          "final_label": "技术型",
+          "exclusion_reason": null,
+          "duplicate_of": null,
+          "rule_refs": [
+            "SEG-CLEAN-DUPLICATE",
+            "SEG-CLEAN-CHINESE",
+            "SEG-CLEAN-MISSING",
+            "SEG-PROFILE-TECH"
+          ]
+        },
+        {
+          "sample_id": "102",
+          "source_file_ref": "forte-30f5e044f5d7a199",
+          "source_row": 3,
+          "source_locator": "客户画像调研问卷.csv:row=3",
+          "industry": "国有银行",
+          "company_size": "5000人+",
+          "respondent_role": "信息部主管",
+          "raw_scores": {
+            "easy": "4",
+            "safe": "10",
+            "tech": "5",
+            "budget": "9"
+          },
+          "cleaned_scores": {
+            "easy": 4,
+            "safe": 10,
+            "tech": 5,
+            "budget": 9
+          },
+          "transformations": [],
+          "matched_profiles": [
+            "安全型"
+          ],
+          "priority_applied": false,
+          "final_label": "安全型",
+          "exclusion_reason": null,
+          "duplicate_of": null,
+          "rule_refs": [
+            "SEG-CLEAN-DUPLICATE",
+            "SEG-CLEAN-CHINESE",
+            "SEG-CLEAN-MISSING",
+            "SEG-PROFILE-SAFE"
+          ]
+        },
+        {
+          "sample_id": "103",
+          "source_file_ref": "forte-30f5e044f5d7a199",
+          "source_row": 4,
+          "source_locator": "客户画像调研问卷.csv:row=4",
+          "industry": "电商初创",
+          "company_size": "20-50人",
+          "respondent_role": "运营负责人",
+          "raw_scores": {
+            "easy": "八",
+            "safe": "三",
+            "tech": "二",
+            "budget": "二"
+          },
+          "cleaned_scores": {
+            "easy": 8,
+            "safe": 3,
+            "tech": 2,
+            "budget": 2
+          },
+          "transformations": [
+            "tech:二→2",
+            "safe:三→3",
+            "budget:二→2",
+            "easy:八→8"
+          ],
+          "matched_profiles": [
+            "敏捷型"
+          ],
+          "priority_applied": false,
+          "final_label": "敏捷型",
+          "exclusion_reason": null,
+          "duplicate_of": null,
+          "rule_refs": [
+            "SEG-CLEAN-DUPLICATE",
+            "SEG-CLEAN-CHINESE",
+            "SEG-CLEAN-MISSING",
+            "SEG-PROFILE-AGILE"
+          ]
+        },
+        {
+          "sample_id": "104",
+          "source_file_ref": "forte-30f5e044f5d7a199",
+          "source_row": 5,
+          "source_locator": "客户画像调研问卷.csv:row=5",
+          "industry": "互联网大厂",
+          "company_size": "10000人+",
+          "respondent_role": "高级后端开发",
+          "raw_scores": {
+            "easy": "3",
+            "safe": "6",
+            "tech": "8",
+            "budget": "8"
+          },
+          "cleaned_scores": {
+            "easy": 3,
+            "safe": 6,
+            "tech": 8,
+            "budget": 8
+          },
+          "transformations": [],
+          "matched_profiles": [
+            "技术型"
+          ],
+          "priority_applied": false,
+          "final_label": "技术型",
+          "exclusion_reason": null,
+          "duplicate_of": null,
+          "rule_refs": [
+            "SEG-CLEAN-DUPLICATE",
+            "SEG-CLEAN-CHINESE",
+            "SEG-CLEAN-MISSING",
+            "SEG-PROFILE-TECH"
+          ]
+        },
+        {
+          "sample_id": "105",
+          "source_file_ref": "forte-30f5e044f5d7a199",
+          "source_row": 6,
+          "source_locator": "客户画像调研问卷.csv:row=6",
+          "industry": "政府机构",
+          "company_size": "2000-5000人",
+          "respondent_role": "数字化办公室主任",
+          "raw_scores": {
+            "easy": "5",
+            "safe": "9",
+            "tech": "4",
+            "budget": "10"
+          },
+          "cleaned_scores": {
+            "easy": 5,
+            "safe": 9,
+            "tech": 4,
+            "budget": 10
+          },
+          "transformations": [],
+          "matched_profiles": [
+            "安全型"
+          ],
+          "priority_applied": false,
+          "final_label": "安全型",
+          "exclusion_reason": null,
+          "duplicate_of": null,
+          "rule_refs": [
+            "SEG-CLEAN-DUPLICATE",
+            "SEG-CLEAN-CHINESE",
+            "SEG-CLEAN-MISSING",
+            "SEG-PROFILE-SAFE"
+          ]
+        },
+        {
+          "sample_id": "106",
+          "source_file_ref": "forte-30f5e044f5d7a199",
+          "source_row": 7,
+          "source_locator": "客户画像调研问卷.csv:row=7",
+          "industry": "连锁餐饮",
+          "company_size": "500-1000人",
+          "respondent_role": "数据安全专家",
+          "raw_scores": {
+            "easy": "7",
+            "safe": "",
+            "tech": "3",
+            "budget": "5"
+          },
+          "cleaned_scores": {
+            "easy": 7,
+            "safe": 0,
+            "tech": 3,
+            "budget": 5
+          },
+          "transformations": [
+            "safe:空→0"
+          ],
+          "matched_profiles": [],
+          "priority_applied": false,
+          "final_label": null,
+          "exclusion_reason": "unclassified",
+          "duplicate_of": null,
+          "rule_refs": [
+            "SEG-CLEAN-DUPLICATE",
+            "SEG-CLEAN-CHINESE",
+            "SEG-CLEAN-MISSING",
+            "SEG-EXCLUDE"
+          ]
+        },
+        {
+          "sample_id": "107",
+          "source_file_ref": "forte-30f5e044f5d7a199",
+          "source_row": 8,
+          "source_locator": "客户画像调研问卷.csv:row=8",
+          "industry": "高端制造",
+          "company_size": "1000-3000人",
+          "respondent_role": "CIO(首席信息官)",
+          "raw_scores": {
+            "easy": "4",
+            "safe": "8",
+            "tech": "6",
+            "budget": "8"
+          },
+          "cleaned_scores": {
+            "easy": 4,
+            "safe": 8,
+            "tech": 6,
+            "budget": 8
+          },
+          "transformations": [],
+          "matched_profiles": [
+            "安全型"
+          ],
+          "priority_applied": false,
+          "final_label": "安全型",
+          "exclusion_reason": null,
+          "duplicate_of": null,
+          "rule_refs": [
+            "SEG-CLEAN-DUPLICATE",
+            "SEG-CLEAN-CHINESE",
+            "SEG-CLEAN-MISSING",
+            "SEG-PROFILE-SAFE"
+          ]
+        },
+        {
+          "sample_id": "108",
+          "source_file_ref": "forte-30f5e044f5d7a199",
+          "source_row": 9,
+          "source_locator": "客户画像调研问卷.csv:row=9",
+          "industry": "咨询公司",
+          "company_size": "50-100人",
+          "respondent_role": "业务分析师",
+          "raw_scores": {
+            "easy": "10",
+            "safe": "2",
+            "tech": "3",
+            "budget": "4"
+          },
+          "cleaned_scores": {
+            "easy": 10,
+            "safe": 2,
+            "tech": 3,
+            "budget": 4
+          },
+          "transformations": [],
+          "matched_profiles": [
+            "敏捷型"
+          ],
+          "priority_applied": false,
+          "final_label": "敏捷型",
+          "exclusion_reason": null,
+          "duplicate_of": null,
+          "rule_refs": [
+            "SEG-CLEAN-DUPLICATE",
+            "SEG-CLEAN-CHINESE",
+            "SEG-CLEAN-MISSING",
+            "SEG-PROFILE-AGILE"
+          ]
+        },
+        {
+          "sample_id": "109",
+          "source_file_ref": "forte-30f5e044f5d7a199",
+          "source_row": 10,
+          "source_locator": "客户画像调研问卷.csv:row=10",
+          "industry": "软件外包",
+          "company_size": "100-500人",
+          "respondent_role": "CTO",
+          "raw_scores": {
+            "easy": "2",
+            "safe": "5",
+            "tech": "10",
+            "budget": "5"
+          },
+          "cleaned_scores": {
+            "easy": 2,
+            "safe": 5,
+            "tech": 10,
+            "budget": 5
+          },
+          "transformations": [],
+          "matched_profiles": [
+            "技术型"
+          ],
+          "priority_applied": false,
+          "final_label": "技术型",
+          "exclusion_reason": null,
+          "duplicate_of": null,
+          "rule_refs": [
+            "SEG-CLEAN-DUPLICATE",
+            "SEG-CLEAN-CHINESE",
+            "SEG-CLEAN-MISSING",
+            "SEG-PROFILE-TECH"
+          ]
+        },
+        {
+          "sample_id": "110",
+          "source_file_ref": "forte-30f5e044f5d7a199",
+          "source_row": 11,
+          "source_locator": "客户画像调研问卷.csv:row=11",
+          "industry": "零售外贸",
+          "company_size": "100-500人",
+          "respondent_role": "销售主管",
+          "raw_scores": {
+            "easy": "7",
+            "safe": "8",
+            "tech": "4",
+            "budget": "4"
+          },
+          "cleaned_scores": {
+            "easy": 7,
+            "safe": 8,
+            "tech": 4,
+            "budget": 4
+          },
+          "transformations": [],
+          "matched_profiles": [],
+          "priority_applied": false,
+          "final_label": null,
+          "exclusion_reason": "unclassified",
+          "duplicate_of": null,
+          "rule_refs": [
+            "SEG-CLEAN-DUPLICATE",
+            "SEG-CLEAN-CHINESE",
+            "SEG-CLEAN-MISSING",
+            "SEG-EXCLUDE"
+          ]
+        },
+        {
+          "sample_id": "111",
+          "source_file_ref": "forte-30f5e044f5d7a199",
+          "source_row": 12,
+          "source_locator": "客户画像调研问卷.csv:row=12",
+          "industry": "金融科技",
+          "company_size": "500-1000人",
+          "respondent_role": "技术架构师",
+          "raw_scores": {
+            "easy": "2",
+            "safe": "7",
+            "tech": "9",
+            "budget": "6"
+          },
+          "cleaned_scores": {
+            "easy": 2,
+            "safe": 7,
+            "tech": 9,
+            "budget": 6
+          },
+          "transformations": [],
+          "matched_profiles": [
+            "技术型"
+          ],
+          "priority_applied": false,
+          "final_label": null,
+          "exclusion_reason": "exact_duplicate",
+          "duplicate_of": "101",
+          "rule_refs": [
+            "SEG-CLEAN-DUPLICATE",
+            "SEG-CLEAN-CHINESE",
+            "SEG-CLEAN-MISSING",
+            "SEG-PROFILE-TECH"
+          ]
+        }
+      ],
+      "duplicate_policy_assumption": "exact_non_id_payload",
+      "policy_assumption_review_required": true,
+      "priority_witness_count": 0,
+      "strategy_evidence_status": "no_approved_strategy_source",
+      "human_review_required": true,
+      "original_inputs_modified": false,
+      "external_action": "none"
+    },
+    "event_names": [
+      "workspace_index",
+      "round_started",
+      "planning_started",
+      "planning_completed",
+      "plan_validation",
+      "deterministic_office_tool_started",
+      "run_workspace_artifact_written",
+      "run_workspace_artifact_written",
+      "deterministic_verification_completed",
+      "analysis_started",
+      "analysis_completed",
+      "result_validation",
+      "evidence_gate",
+      "loop_committed"
+    ]
+  },
+  "source_integrity": [
+    {
+      "path": "sales-020/input/客户画像调研问卷.csv",
+      "size": 584,
+      "declared_size": 584,
+      "sha256": "a56e118eabd1ef5fd718b946887058f998b73117f3b6d56b5349b73bb4a3fff0",
+      "declared_sha256": "a56e118eabd1ef5fd718b946887058f998b73117f3b6d56b5349b73bb4a3fff0",
+      "matches_pinned_manifest": true
+    },
+    {
+      "path": "sales-020/input/客户分类画像与差异化销售策略生成规则.md",
+      "size": 1720,
+      "declared_size": 1720,
+      "sha256": "b10bf0cfb272352788267e6195f1f9b5e31ae9dc4f17cbc63ea7b579aea33565",
+      "declared_sha256": "b10bf0cfb272352788267e6195f1f9b5e31ae9dc4f17cbc63ea7b579aea33565",
+      "matches_pinned_manifest": true
+    }
+  ],
+  "artifacts": [
+    {
+      "artifact_id": "workspace-artifact-c3938219a030",
+      "file_name": "客户画像及销售策略.md",
+      "size": 6281,
+      "declared_size": 6281,
+      "sha256": "d4a23db63598c9ae3bc91b4fe7ee575dbb2766a3c574aad94cfeed7834dc26f4",
+      "size_matches_snapshot": true,
+      "verifier_status": "passed",
+      "source_file_refs": [
+        "forte-30f5e044f5d7a199",
+        "forte-8d86fcca3891dabb"
+      ],
+      "parsed": {
+        "counts": {
+          "source_row_count": 11,
+          "unique_payload_count": 10,
+          "duplicate_count": 1,
+          "classified_count": 8,
+          "unclassified_count": 2,
+          "excluded_count": 3,
+          "priority_witness_count": 0
+        },
+        "required_sections_present_once": true,
+        "contains_duplicate_policy_assumption": true,
+        "contains_strategy_evidence_boundary": true,
+        "contains_public_sample_boundary": true,
+        "contains_no_customer_action_boundary": true,
+        "contains_no_approved_sales_priority": true
+      }
+    },
+    {
+      "artifact_id": "workspace-artifact-94406b1fd00d",
+      "file_name": "客户画像逐样本台账.csv",
+      "size": 2567,
+      "declared_size": 2567,
+      "sha256": "b8f38b4c8cd700be5b12fec569a433a303ba140a71b83e5665b49b192d50c004",
+      "size_matches_snapshot": true,
+      "verifier_status": "passed",
+      "source_file_refs": [
+        "forte-30f5e044f5d7a199",
+        "forte-8d86fcca3891dabb"
+      ],
+      "parsed": {
+        "row_count": 11,
+        "unique_sample_id_count": 11,
+        "duplicate_count": 1,
+        "duplicate_pairs": [
+          [
+            "111",
+            "101"
+          ]
+        ],
+        "classified_count": 8,
+        "unclassified_count": 2,
+        "excluded_count": 3,
+        "profile_counts": {
+          "安全型": 3,
+          "技术型": 3,
+          "敏捷型": 2
+        },
+        "priority_witness_count": 0,
+        "source_locators": [
+          "客户画像调研问卷.csv:row=10",
+          "客户画像调研问卷.csv:row=11",
+          "客户画像调研问卷.csv:row=12",
+          "客户画像调研问卷.csv:row=2",
+          "客户画像调研问卷.csv:row=3",
+          "客户画像调研问卷.csv:row=4",
+          "客户画像调研问卷.csv:row=5",
+          "客户画像调研问卷.csv:row=6",
+          "客户画像调研问卷.csv:row=7",
+          "客户画像调研问卷.csv:row=8",
+          "客户画像调研问卷.csv:row=9"
+        ],
+        "all_locators_are_source_rows": true,
+        "all_clean_scores_are_0_to_10_integers": true,
+        "all_rows_have_rule_refs": true
+      }
+    }
+  ],
+  "artifact_facts_match_outcome": true,
+  "restart_verification": {
+    "before_manifest": "docs\\evidence\\manifests\\tc13-live-artifacts-20260829.json",
+    "hashes_match": true
+  },
+  "verified": true,
+  "claim_boundary": "This independently reparses the two downloaded artifacts and fixed Sales-020 inputs. It proves the current public-sample cleaning and deterministic label projection, not CRM execution, sales effectiveness, customer research, an approved strategy, a general segmentation engine or multi-instance execution."
+}

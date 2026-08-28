@@ -748,6 +748,97 @@ class AgentControlLoopCandidateReviewOutcome(StrictModel):
     external_action: Literal["none"] = "none"
 
 
+class AgentControlLoopCustomerSegmentationRule(StrictModel):
+    """One source-derived Sales-020 cleaning, classification, or report rule."""
+
+    rule_id: str = Field(pattern=r"^SEG-[A-Z0-9-]{3,80}$")
+    category: Literal["cleaning", "classification", "priority", "exclusion", "report"]
+    source_file_ref: str = Field(min_length=1, max_length=120)
+    locator: str = Field(min_length=1, max_length=180)
+    excerpt: str = Field(min_length=1, max_length=1_000)
+    parameters: list[str] = Field(default_factory=list, max_length=16)
+
+
+class AgentControlLoopCustomerSampleDecision(StrictModel):
+    """One raw survey row, its cleaning trace, and its source-derived label decision."""
+
+    sample_id: str = Field(min_length=1, max_length=80)
+    source_file_ref: str = Field(min_length=1, max_length=120)
+    source_row: int = Field(ge=2, le=1_000_000)
+    source_locator: str = Field(min_length=1, max_length=180)
+    industry: str = Field(min_length=1, max_length=180)
+    company_size: str = Field(min_length=1, max_length=120)
+    respondent_role: str = Field(min_length=1, max_length=180)
+    raw_scores: dict[str, str] = Field(min_length=4, max_length=4)
+    cleaned_scores: dict[str, int] = Field(min_length=4, max_length=4)
+    transformations: list[str] = Field(default_factory=list, max_length=12)
+    matched_profiles: list[str] = Field(default_factory=list, max_length=8)
+    priority_applied: bool
+    final_label: str | None = Field(default=None, min_length=1, max_length=80)
+    exclusion_reason: Literal["exact_duplicate", "unclassified"] | None = None
+    duplicate_of: str | None = Field(default=None, min_length=1, max_length=80)
+    rule_refs: list[str] = Field(min_length=1, max_length=24)
+
+
+class AgentControlLoopCustomerSegmentationParameters(StrictModel):
+    """Public parameters parsed from the approved Sales-020 Markdown."""
+
+    parsing_encoding: Literal["utf-8-sig", "utf-8", "gb18030"]
+    missing_score_default: int = Field(ge=0, le=10)
+    chinese_number_domain: str = Field(min_length=1, max_length=120)
+    profile_thresholds: dict[str, int] = Field(min_length=3, max_length=3)
+    profile_priority: list[str] = Field(min_length=3, max_length=3)
+    duplicate_policy: Literal["exact_non_id_payload"] = "exact_non_id_payload"
+
+
+class AgentControlLoopCustomerSegmentationOutcome(StrictModel):
+    """Customer-segmentation facts kept separate from sales approval and CRM actions."""
+
+    outcome_id: str = Field(pattern=r"^customer-segmentation-outcome-[a-z0-9-]{3,80}$")
+    status: Literal["sales_review_required", "invalid"]
+    decision: str = Field(min_length=1, max_length=500)
+    summary: str = Field(min_length=1, max_length=1_000)
+    source_row_count: int = Field(ge=0, le=20_000)
+    unique_payload_count: int = Field(ge=0, le=20_000)
+    duplicate_count: int = Field(ge=0, le=20_000)
+    classified_count: int = Field(ge=0, le=20_000)
+    unclassified_count: int = Field(ge=0, le=20_000)
+    excluded_count: int = Field(ge=0, le=20_000)
+    profile_counts: dict[str, int] = Field(default_factory=dict, max_length=8)
+    parameters: AgentControlLoopCustomerSegmentationParameters
+    rules: list[AgentControlLoopCustomerSegmentationRule] = Field(min_length=1, max_length=40)
+    samples: list[AgentControlLoopCustomerSampleDecision] = Field(
+        min_length=1, max_length=20_000
+    )
+    duplicate_policy_assumption: Literal["exact_non_id_payload"] = "exact_non_id_payload"
+    policy_assumption_review_required: Literal[True] = True
+    priority_witness_count: int = Field(ge=0, le=20_000)
+    strategy_evidence_status: Literal["no_approved_strategy_source"] = (
+        "no_approved_strategy_source"
+    )
+    human_review_required: Literal[True] = True
+    original_inputs_modified: Literal[False] = False
+    external_action: Literal["none"] = "none"
+
+    @model_validator(mode="after")
+    def validate_customer_counts(self) -> "AgentControlLoopCustomerSegmentationOutcome":
+        if self.unique_payload_count + self.duplicate_count != self.source_row_count:
+            raise ValueError("unique payloads plus duplicates must equal source rows")
+        if self.classified_count + self.unclassified_count != self.unique_payload_count:
+            raise ValueError("classified plus unclassified must equal unique payloads")
+        if self.unclassified_count + self.duplicate_count != self.excluded_count:
+            raise ValueError("unclassified plus duplicates must equal excluded rows")
+        if sum(self.profile_counts.values()) != self.classified_count:
+            raise ValueError("profile counts must equal classified_count")
+        if len(self.samples) != self.source_row_count:
+            raise ValueError("sample decisions must cover every source row")
+        if sum(bool(item.duplicate_of) for item in self.samples) != self.duplicate_count:
+            raise ValueError("duplicate sample projection must equal duplicate_count")
+        if sum(item.priority_applied for item in self.samples) != self.priority_witness_count:
+            raise ValueError("priority witness projection must equal priority_witness_count")
+        return self
+
+
 class AgentControlLoopFinanceCandidateSource(StrictModel):
     """One period-specific source row for a cross-period finance candidate."""
 
@@ -1019,6 +1110,7 @@ class AgentControlLoopWorkspaceArtifact(StrictModel):
     candidate_review_outcome: AgentControlLoopCandidateReviewOutcome | None = None
     finance_review_outcome: AgentControlLoopFinanceReviewOutcome | None = None
     outbound_flow_outcome: AgentControlLoopOutboundFlowOutcome | None = None
+    customer_segmentation_outcome: AgentControlLoopCustomerSegmentationOutcome | None = None
     download_path: str = Field(min_length=1, max_length=300)
     created_at: datetime
     original_inputs_modified: Literal[False] = False
@@ -1051,6 +1143,7 @@ class AgentControlLoopEffectReceipt(StrictModel):
     candidate_review_outcome: AgentControlLoopCandidateReviewOutcome | None = None
     finance_review_outcome: AgentControlLoopFinanceReviewOutcome | None = None
     outbound_flow_outcome: AgentControlLoopOutboundFlowOutcome | None = None
+    customer_segmentation_outcome: AgentControlLoopCustomerSegmentationOutcome | None = None
     created_at: datetime
     external_action: Literal["none"] = "none"
 

@@ -359,6 +359,15 @@ multi-instance coordination and governed external action remain target work.
   conflicting inline requirements fail closed. It also replaces fixed-yield
   async test waits with monotonic deadlines; neither change broadens TC-10 into
   a general policy compiler or production execution system.
+- `DR-0049` replaces TC-13's fixed sample IDs, thresholds, distributions and
+  sales wording with a source-derived Sales-020 cleaning ledger. The service
+  validates exactly one approved survey CSV and one approved rule Markdown,
+  derives every row conversion/profile/exclusion from those bytes, and then
+  independently parses the generated Markdown and CSV. The UI separates
+  deterministic files, cleaning facts and duplicate-policy assumption, a draft
+  strategy awaiting sales approval, and the fact that no customer or CRM action
+  occurred. This is a fixed public-sample adapter, not customer research, a CRM
+  or a general segmentation engine.
 - No target-user study has been run. Clarity, trust, efficiency and user value
   remain hypotheses.
 
@@ -399,6 +408,8 @@ The current TC-10 source-derived outbound-flow increment is tracked in
 [`DR-0047-TC10-SOURCE-DERIVED-OUTBOUND-FLOW-EVIDENCE-20260829`](docs/evidence/DR-0047-TC10-SOURCE-DERIVED-OUTBOUND-FLOW-EVIDENCE-20260829.md).
 Its inline normative-fragment and stable Effect-wait correction is tracked in
 [`DR-0048-TC10-FRAGMENT-CONSUMPTION-AND-STABLE-WAIT-EVIDENCE-20260829`](docs/evidence/DR-0048-TC10-FRAGMENT-CONSUMPTION-AND-STABLE-WAIT-EVIDENCE-20260829.md).
+The current TC-13 source-derived customer-segmentation increment is tracked in
+[`DR-0049-TC13-SOURCE-DERIVED-CUSTOMER-SEGMENTATION-EVIDENCE-20260829`](docs/evidence/DR-0049-TC13-SOURCE-DERIVED-CUSTOMER-SEGMENTATION-EVIDENCE-20260829.md).
 
 ## Local run
 
@@ -494,10 +505,13 @@ pnpm --dir apps/web exec playwright test e2e/harness-workbench.spec.ts
 - [DR-0046：TC-05 来源推导跨期风险候选与财务处置边界](docs/decisions/DR-0046-tc05-source-derived-finance-candidate-review.md)
 - [DR-0047：TC-10 来源推导外呼流程图与四层审批边界](docs/decisions/DR-0047-tc10-source-derived-outbound-flow.md)
 - [DR-0048：TC-10 规范片段消费与稳定 Effect 等待](docs/decisions/DR-0048-tc10-fragment-consumption-and-stable-effect-wait.md)
+- [DR-0049：TC-13 来源推导画像清洗、策略草案与四层事实](docs/decisions/DR-0049-tc13-source-derived-customer-segmentation.md)
 - [SCENARIO-032：从三期往来明细推导可复核风险候选](docs/scenarios/SCENARIO-032-review-three-period-finance-candidates-from-source.md)
 - [TC-05 来源推导财务候选 Evidence](docs/evidence/DR-0046-TC05-SOURCE-DERIVED-FINANCE-REVIEW-EVIDENCE-20260829.md)
 - [TC-10 来源推导外呼流程 Evidence](docs/evidence/DR-0047-TC10-SOURCE-DERIVED-OUTBOUND-FLOW-EVIDENCE-20260829.md)
 - [TC-10 规范片段消费与稳定等待 Evidence](docs/evidence/DR-0048-TC10-FRAGMENT-CONSUMPTION-AND-STABLE-WAIT-EVIDENCE-20260829.md)
+- [SCENARIO-034：从公开问卷与规则推导可复核画像清洗和策略草案](docs/scenarios/SCENARIO-034-review-source-derived-customer-segmentation.md)
+- [TC-13 来源推导客户画像 Evidence](docs/evidence/DR-0049-TC13-SOURCE-DERIVED-CUSTOMER-SEGMENTATION-EVIDENCE-20260829.md)
 - [可恢复 Control Loop Evidence](docs/evidence/DURABLE-EVIDENCE-GATE-ARTIFACT-EVOLUTION-EVIDENCE-20260826.md)
 - [整库自主研究 Evidence](docs/evidence/AUTONOMOUS-WHOLE-WORKSPACE-RESEARCH-EVIDENCE-20260825.md)
 - [Agent Control Loop 三轮只读纵切证据](docs/evidence/AGENT-CONTROL-LOOP-BOUNDED-READONLY-EVIDENCE-20260825.md)
