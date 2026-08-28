@@ -2,7 +2,7 @@
 
 ## 当前结论
 
-`Limited Verified`。固定 Sales-020 纵切已完成严格来源合同、动态清洗与画像裁决、两份成果独立复核、四层前台、真实 `deepseek-v4-pro` 运行和 PostgreSQL 顺序重启复读。该结论只覆盖公开样本与固定适配器，不代表真实客户研究、销售效果、策略批准或 CRM 执行。
+`Limited Verified`。固定 Sales-020 纵切已完成严格来源合同、动态清洗与画像裁决、两份成果独立复核、四层前台、真实 `deepseek-v4-pro` 运行和 PostgreSQL 顺序重启复读。实现提交 [`d8d7f5f`](https://github.com/Dickey007s/lenovo_agent/commit/d8d7f5f) 已进入 [PR #65](https://github.com/Dickey007s/lenovo_agent/pull/65)。该结论只覆盖公开样本与固定适配器，不代表真实客户研究、销售效果、策略批准或 CRM 执行。
 
 ## 历史基线为何不足
 
@@ -52,6 +52,11 @@
 - 配置真实 PostgreSQL 的 `uv run pytest -q`：`306 passed in 324.88s`。
 - `pnpm --dir apps/web exec playwright test e2e/harness-workbench.spec.ts`：`54 passed`；其中 TC-13 canonical/threshold/witness/failure 四条全部通过。
 - `uv run ruff check .`、`pnpm --dir apps/web lint`、`pnpm --dir apps/web build` 与 TC-13 公共 manifest `--check` 均通过。
+
+## 远端门
+
+- [PR #65](https://github.com/Dickey007s/lenovo_agent/pull/65) 的首轮 `durable-agent-control-loop` 通过，job [`99003808963`](https://github.com/Dickey007s/lenovo_agent/actions/runs/33217342695/job/99003808963)，耗时约 1 分钟。
+- 文档回填提交仍须等待同一远端门再次通过后才合并；合并后从最新 `master` 以 PostgreSQL 重启服务，并用相同 Owner 复读本 Evidence 的 Run。
 
 ## 不能支持的结论
 
