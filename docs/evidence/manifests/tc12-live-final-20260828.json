@@ -1,0 +1,720 @@
+{
+  "schema_version": "scenario-effect-gate-live.v1",
+  "generated_at": "2026-08-28T13:18:47.731846+00:00",
+  "api_base": "http://127.0.0.1:8010",
+  "service": {
+    "model": "deepseek-v4-pro",
+    "checkpoint": "postgres",
+    "task_store": "postgres"
+  },
+  "dataset": {
+    "name": "FORTE public demo inputs",
+    "source_commit": "345c1ec1487139db9dd319787fa9405ba85d1869",
+    "input_tree_sha256": "2c19e31a8e437f8ccb0ab811ba20a940f022a5bea69bcc750574d753f10a250d",
+    "original_inputs_modified": false
+  },
+  "summary": {
+    "requested": 1,
+    "passed": 1,
+    "failed": 0,
+    "model_output_adopted": 1,
+    "run_completed": 0
+  },
+  "scenarios": [
+    {
+      "scenario_id": "TC-12",
+      "capability_id": "office-js-test-and-fix",
+      "title": "看板工具库测试与修复",
+      "instruction": "为三个看板工具模块编写 Vitest，修复源码并真实运行测试。",
+      "run_id": "harness:d9355005af924d57bb1e9c526adca072",
+      "started_at": "2026-08-28T13:17:58.474419+00:00",
+      "observed_at": "2026-08-28T13:18:47.691549+00:00",
+      "run_status": "waiting_input",
+      "snapshot_version": 12,
+      "current_round": 1,
+      "budget": {
+        "max_rounds": 12,
+        "max_files_per_round": 16,
+        "max_model_calls": 30,
+        "deadline_seconds": 7200,
+        "rounds_used": 1,
+        "files_verified": 3,
+        "model_calls_used": 2,
+        "elapsed_ms": 47270,
+        "stop_reason": null
+      },
+      "model_calls": [
+        {
+          "round": 1,
+          "role": "planner",
+          "called": true,
+          "model": "deepseek-v4-pro",
+          "elapsed_ms": 16828,
+          "output_used": true
+        },
+        {
+          "round": 1,
+          "role": "analyst",
+          "called": true,
+          "model": "deepseek-v4-pro",
+          "elapsed_ms": 19454,
+          "output_used": true
+        }
+      ],
+      "model_execution_gate_passed": true,
+      "model_output_adopted": true,
+      "api_responsiveness": {
+        "client_total_timeout_seconds": 180,
+        "request_latency_gate_ms": 5000,
+        "run_get_sample_count": 24,
+        "run_get_max_ms": 547,
+        "effect_active_run_get_sample_count": 4,
+        "effect_active_run_get_max_ms": 468,
+        "effect_active_health_sample_count": 4,
+        "effect_active_health_max_ms": 15,
+        "sse_probe": {
+          "event_name": "deterministic_office_tool_started",
+          "elapsed_ms": 16,
+          "after_sequence": 5
+        },
+        "scenario_elapsed_ms": 49078,
+        "passed": true,
+        "boundary": "总任务可持续约一分钟；这里验证的是单次 Run GET、health 与 SSE 请求未被同步构建阻塞，不证明线程内子进程可跨进程续跑。"
+      },
+      "effect_receipts": [
+        {
+          "receipt_id": "effect-receipt-9b63c7008e8a",
+          "capability_id": "office-js-test-and-fix",
+          "scenario_id": "TC-12",
+          "status": "passed",
+          "state": "已冻结 11 份 FORTE 输入，原始文件保持只读。",
+          "action": "调用 office-js-test-and-fix 确定性办公工具并写入隔离运行工作区。",
+          "observation": "生成 2 份真实成果文件，共享 12 项确定性检查，12/12 通过。",
+          "cost": "0 次额外模型调用；仅消耗本机确定性解析、计算与文件写入。",
+          "result": "所有确定性效果门通过，成果仍需用户复核。",
+          "source_file_refs": [
+            "forte-758065696b7d272d",
+            "forte-f786ca78b779540a",
+            "forte-f1959697ef3537bc",
+            "forte-34a8fd479f0cb802",
+            "forte-7f21b8e8b8a07379",
+            "forte-8c5df38f9db2cc16",
+            "forte-23f5268ddfef6463",
+            "forte-075f316aef9d927d",
+            "forte-8a386050c1e54ff0",
+            "forte-895cb66dea421e43",
+            "forte-e4b62b751e4593d2"
+          ],
+          "artifact_ids": [
+            "workspace-artifact-bbce54f0668e",
+            "workspace-artifact-5188194048ec"
+          ],
+          "prohibited_side_effects": [
+            "不修改 FORTE 原始源码",
+            "不伪造测试通过"
+          ],
+          "created_at": "2026-08-28T13:18:24.733964Z",
+          "external_action": "none"
+        }
+      ],
+      "artifacts": [
+        {
+          "artifact_id": "workspace-artifact-bbce54f0668e",
+          "file_name": "看板工具库修复包.zip",
+          "media_type": "application/zip",
+          "size": 44835,
+          "validator_id": "validator-dashboard-toolkit-project-v2",
+          "verifier_status": "passed",
+          "checks": [
+            {
+              "check_id": "check-tc12-complete-copy",
+              "label": "完整 11 文件隔离副本",
+              "passed": true,
+              "detail": "冻结并复制 dashboard-toolkit 全部 11/11 个允许输入文件。"
+            },
+            {
+              "check_id": "check-tc12-source-unchanged",
+              "label": "FORTE 原始项目保持只读",
+              "passed": true,
+              "detail": "生成、四阶段测试和独立复跑前后，冻结输入树摘要保持一致。"
+            },
+            {
+              "check_id": "check-tc12-stage-a-alias-red",
+              "label": "原配置解析红灯",
+              "passed": true,
+              "detail": "Stage A 使用原配置，真实 Vitest 因 @ 指向 ./source 而无法解析业务模块。"
+            },
+            {
+              "check_id": "check-tc12-stage-b-business-red",
+              "label": "配置修复后的业务红灯",
+              "passed": true,
+              "detail": "Stage B 复现增长率、排序副作用、相等值和日期函数未导出问题。"
+            },
+            {
+              "check_id": "check-tc12-stage-c-boundary-red",
+              "label": "日期闭区间红灯",
+              "passed": true,
+              "detail": "Stage C 只增加导出后，开始日和结束日排除问题均由真实测试捕获。"
+            },
+            {
+              "check_id": "check-tc12-final-green",
+              "label": "同一测试集最终全绿",
+              "passed": true,
+              "detail": "最终 71/71 通过，零失败。"
+            },
+            {
+              "check_id": "check-tc12-manifest",
+              "label": "测试清单与实际收集一致",
+              "passed": true,
+              "detail": "三个套件的 71 个公开 ID 与最终 collected IDs 完全一致。"
+            },
+            {
+              "check_id": "check-tc12-coverage",
+              "label": "逐文件覆盖率达到门槛",
+              "passed": true,
+              "detail": "metricsCalculator.js: statements 100%, branches 100%, functions 100%, lines 100%；dataTransformer.js: statements 100%, branches 91.3%, functions 100%, lines 100%；filterEngine.js: statements 100%, branches 97.5%, functions 100%, lines 100%"
+            },
+            {
+              "check_id": "check-tc12-diff-scope",
+              "label": "真实修改范围可审查",
+              "passed": true,
+              "detail": "统一 diff 只修改配置和三个真实业务源码文件；额外相等值缺陷同样先红后绿。"
+            },
+            {
+              "check_id": "check-tc12-independent-rerun",
+              "label": "下载包独立解压复跑",
+              "passed": true,
+              "detail": "独立临时目录运行固定入口，测试 ID、覆盖率、退出码和 manifest 再次一致。"
+            },
+            {
+              "check_id": "check-tc12-fixed-runner-boundary",
+              "label": "固定本地执行边界",
+              "passed": true,
+              "detail": "未运行来源 package scripts、未联网安装；未注入凭据/代理，也不声称进程或 OS 级断网。"
+            },
+            {
+              "check_id": "check-tc12-catalog-reread",
+              "label": "原始输入再次读取一致",
+              "passed": true,
+              "detail": "四阶段测试和独立解压复跑后重新读取 11/11 个 FORTE 输入，字节与引用未变化。"
+            }
+          ],
+          "review_required": true,
+          "deliverable_type": "完整看板工具库隔离修复副本（ZIP）",
+          "key_outputs": [
+            "Stage A：原配置真实复现 @ 指向 ./source 的模块解析红灯。",
+            "Stage B：只修配置后，增长率分母、排序副作用、相等值和日期函数未导出仍真实失败。",
+            "Stage C：只补日期函数导出后，开始日和结束日排除测试仍失败。",
+            "Stage D：应用完整修复后 71/71 项真实 Vitest 全部通过。",
+            "配置修复：@ 别名改为真实 src，测试才能加载三个业务模块。",
+            "指标修复：增长率以旧值为分母，避免经营指标失真。",
+            "转换修复：排序不再修改调用方数组，相等值保持稳定顺序。",
+            "筛选修复：日期函数可导入，并把起止日期纳入闭区间。",
+            "metricsCalculator.js：statements 100%，branches 100%，lines 100%",
+            "dataTransformer.js：statements 100%，branches 91.3%，lines 100%",
+            "filterEngine.js：statements 100%，branches 97.5%，lines 100%",
+            "清单一致：页面、test-manifest.json 与实际 collected IDs 同为 71 项。"
+          ],
+          "key_outputs_label": "红灯到绿灯与修复影响",
+          "review_guidance": "请先确认三阶段红灯确实对应原缺陷，再复跑最终测试并审查 changes.patch。当前只是固定 qa-003 适配器，不是任意 JavaScript 沙箱，也没有生产多租户隔离。",
+          "execution_summary": "Agent 在隔离副本中先用同一套 71 项 Vitest 复现三阶段红灯，再修复四个真实文件并实现 71/71 通过；FORTE 原文件没有被覆盖。",
+          "self_test": {
+            "instruction": "为三个看板工具模块编写 Vitest，修复源码并真实运行测试。",
+            "expected_files": [
+              "dashboard-toolkit/src/",
+              "dashboard-toolkit/tests/metricsCalculator.test.js",
+              "dashboard-toolkit/tests/dataTransformer.test.js",
+              "dashboard-toolkit/tests/filterEngine.test.js",
+              "dashboard-toolkit/changes.patch",
+              "dashboard-toolkit/test-manifest.json",
+              "dashboard-toolkit/evidence/stage-a-original-result.json",
+              "dashboard-toolkit/evidence/stage-b-config-only-result.json",
+              "dashboard-toolkit/evidence/stage-c-export-only-result.json",
+              "dashboard-toolkit/evidence/stage-d-final-result.json",
+              "dashboard-toolkit/evidence/coverage-summary.json",
+              "dashboard-toolkit/TC-12测试报告.md",
+              "dashboard-toolkit/TC-12自测卡.md",
+              "dashboard-toolkit/run-self-test.mjs"
+            ],
+            "commands": [
+              "node dashboard-toolkit/run-self-test.mjs apps/web/node_modules/vitest/vitest.mjs"
+            ],
+            "expected_checks": [
+              "Stage A 必须因原 @ 别名指向 ./source 而红灯",
+              "Stage B 必须由真实源码复现增长率、排序副作用和未导出日期函数",
+              "Stage C 必须由真实测试复现日期闭区间缺陷",
+              "Stage D 必须 71/71 通过且零失败",
+              "三个测试套件必须直接导入真实 metricsCalculator、dataTransformer、filterEngine",
+              "test-manifest.json 声明集合必须等于实际 collected IDs",
+              "三份变更业务源码 statements/lines >= 85%，branches >= 75%",
+              "完整 11 文件副本、changes.patch 和四阶段 JSON 都必须存在",
+              "独立解压目录复跑结果必须与服务端回执一致"
+            ],
+            "failure_signals": [
+              "命令退出码非 0，或最终出现 failed/error",
+              "任一阶段没有出现预期红灯，说明测试未证明原缺陷",
+              "声明 ID 与实际 collected IDs 不一致",
+              "任一变更业务源码覆盖率未达到逐文件门槛",
+              "ZIP 缺少 11 文件副本、统一 diff、阶段 JSON 或覆盖率摘要",
+              "运行来源 package scripts、访问真实 endpoint 或要求联网安装依赖",
+              "FORTE 原始输入字节发生变化"
+            ],
+            "test_manifest_file": "dashboard-toolkit/test-manifest.json",
+            "test_manifest_matches_collected": true,
+            "test_suites": [
+              {
+                "suite_id": "metrics-calculator",
+                "label": "指标计算",
+                "test_files": [
+                  "tests/metricsCalculator.test.js"
+                ],
+                "test_count": 23,
+                "test_ids": [
+                  "tests/metricsCalculator.test.js::metricsCalculator > calculates positive growth from the old value",
+                  "tests/metricsCalculator.test.js::metricsCalculator > calculates a decline from the old value",
+                  "tests/metricsCalculator.test.js::metricsCalculator > returns Infinity for growth from zero to a positive value",
+                  "tests/metricsCalculator.test.js::metricsCalculator > returns zero when both growth values are zero",
+                  "tests/metricsCalculator.test.js::metricsCalculator > calculates compound annual growth",
+                  "tests/metricsCalculator.test.js::metricsCalculator > rejects a non-positive CAGR base",
+                  "tests/metricsCalculator.test.js::metricsCalculator > rejects a non-positive CAGR period",
+                  "tests/metricsCalculator.test.js::metricsCalculator > calculates a conversion rate",
+                  "tests/metricsCalculator.test.js::metricsCalculator > returns zero conversion for an empty denominator",
+                  "tests/metricsCalculator.test.js::metricsCalculator > calculates and rounds a retention rate",
+                  "tests/metricsCalculator.test.js::metricsCalculator > returns zero retention for an empty cohort",
+                  "tests/metricsCalculator.test.js::metricsCalculator > calculates an arithmetic average",
+                  "tests/metricsCalculator.test.js::metricsCalculator > returns zero for an empty average input",
+                  "tests/metricsCalculator.test.js::metricsCalculator > returns zero for a missing average input",
+                  "tests/metricsCalculator.test.js::metricsCalculator > calculates a weighted average",
+                  "tests/metricsCalculator.test.js::metricsCalculator > rejects mismatched weighted-average inputs",
+                  "tests/metricsCalculator.test.js::metricsCalculator > returns zero when all weights are zero",
+                  "tests/metricsCalculator.test.js::metricsCalculator > calculates an exact percentile",
+                  "tests/metricsCalculator.test.js::metricsCalculator > interpolates a percentile",
+                  "tests/metricsCalculator.test.js::metricsCalculator > rejects an out-of-range percentile",
+                  "tests/metricsCalculator.test.js::metricsCalculator > returns zero for an empty percentile input",
+                  "tests/metricsCalculator.test.js::metricsCalculator > calculates ARPU",
+                  "tests/metricsCalculator.test.js::metricsCalculator > returns zero ARPU for no active users"
+                ]
+              },
+              {
+                "suite_id": "data-transformer",
+                "label": "数据转换",
+                "test_files": [
+                  "tests/dataTransformer.test.js"
+                ],
+                "test_count": 20,
+                "test_ids": [
+                  "tests/dataTransformer.test.js::dataTransformer > groups records by a business field",
+                  "tests/dataTransformer.test.js::dataTransformer > keeps records with a missing group key",
+                  "tests/dataTransformer.test.js::dataTransformer > sorts ascending values",
+                  "tests/dataTransformer.test.js::dataTransformer > sorts descending values",
+                  "tests/dataTransformer.test.js::dataTransformer > does not mutate the caller array",
+                  "tests/dataTransformer.test.js::dataTransformer > keeps equal values in their original order",
+                  "tests/dataTransformer.test.js::dataTransformer > formats a time series without changing values",
+                  "tests/dataTransformer.test.js::dataTransformer > aggregates monthly values by sum",
+                  "tests/dataTransformer.test.js::dataTransformer > aggregates values by average",
+                  "tests/dataTransformer.test.js::dataTransformer > aggregates values by count",
+                  "tests/dataTransformer.test.js::dataTransformer > aggregates values by maximum",
+                  "tests/dataTransformer.test.js::dataTransformer > aggregates values by minimum",
+                  "tests/dataTransformer.test.js::dataTransformer > falls back to sum for an unknown aggregation",
+                  "tests/dataTransformer.test.js::dataTransformer > orders period buckets chronologically",
+                  "tests/dataTransformer.test.js::dataTransformer > builds a sum pivot table",
+                  "tests/dataTransformer.test.js::dataTransformer > builds a count pivot table",
+                  "tests/dataTransformer.test.js::dataTransformer > builds an average pivot table",
+                  "tests/dataTransformer.test.js::dataTransformer > keeps missing pivot cells as null",
+                  "tests/dataTransformer.test.js::dataTransformer > flattens grouped records with the default label",
+                  "tests/dataTransformer.test.js::dataTransformer > flattens grouped records with a custom label"
+                ]
+              },
+              {
+                "suite_id": "filter-engine",
+                "label": "筛选与分页",
+                "test_files": [
+                  "tests/filterEngine.test.js"
+                ],
+                "test_count": 28,
+                "test_ids": [
+                  "tests/filterEngine.test.js::filterEngine > returns a copy for a blank keyword",
+                  "tests/filterEngine.test.js::filterEngine > matches keywords without case sensitivity",
+                  "tests/filterEngine.test.js::filterEngine > ignores missing keyword fields safely",
+                  "tests/filterEngine.test.js::filterEngine > includes the start date boundary",
+                  "tests/filterEngine.test.js::filterEngine > includes the end date boundary",
+                  "tests/filterEngine.test.js::filterEngine > returns an empty date result outside the range",
+                  "tests/filterEngine.test.js::filterEngine > returns a copy when no conditions are supplied",
+                  "tests/filterEngine.test.js::filterEngine > supports the eq operator",
+                  "tests/filterEngine.test.js::filterEngine > supports the neq operator",
+                  "tests/filterEngine.test.js::filterEngine > supports the gt operator",
+                  "tests/filterEngine.test.js::filterEngine > supports the gte operator",
+                  "tests/filterEngine.test.js::filterEngine > supports the lt operator",
+                  "tests/filterEngine.test.js::filterEngine > supports the lte operator",
+                  "tests/filterEngine.test.js::filterEngine > supports the contains operator without case sensitivity",
+                  "tests/filterEngine.test.js::filterEngine > supports the in operator",
+                  "tests/filterEngine.test.js::filterEngine > rejects a non-array in operand",
+                  "tests/filterEngine.test.js::filterEngine > keeps a record for an unknown operator",
+                  "tests/filterEngine.test.js::filterEngine > requires every condition to pass",
+                  "tests/filterEngine.test.js::filterEngine > paginates the first page",
+                  "tests/filterEngine.test.js::filterEngine > clamps a page below one",
+                  "tests/filterEngine.test.js::filterEngine > clamps a page beyond the last page",
+                  "tests/filterEngine.test.js::filterEngine > handles an empty pagination input",
+                  "tests/filterEngine.test.js::filterEngine > sorts ascending with a comparator",
+                  "tests/filterEngine.test.js::filterEngine > sorts descending with a comparator",
+                  "tests/filterEngine.test.js::filterEngine > uses a later comparator rule when values are equal",
+                  "tests/filterEngine.test.js::filterEngine > keeps equal comparator records stable",
+                  "tests/filterEngine.test.js::filterEngine > places a null left value after a real value",
+                  "tests/filterEngine.test.js::filterEngine > places a null right value after a real value"
+                ]
+              }
+            ]
+          },
+          "external_action": "none",
+          "original_inputs_modified": false
+        },
+        {
+          "artifact_id": "workspace-artifact-5188194048ec",
+          "file_name": "TC-12真实测试报告.md",
+          "media_type": "text/markdown",
+          "size": 2282,
+          "validator_id": "validator-dashboard-toolkit-project-v2",
+          "verifier_status": "passed",
+          "checks": [
+            {
+              "check_id": "check-tc12-complete-copy",
+              "label": "完整 11 文件隔离副本",
+              "passed": true,
+              "detail": "冻结并复制 dashboard-toolkit 全部 11/11 个允许输入文件。"
+            },
+            {
+              "check_id": "check-tc12-source-unchanged",
+              "label": "FORTE 原始项目保持只读",
+              "passed": true,
+              "detail": "生成、四阶段测试和独立复跑前后，冻结输入树摘要保持一致。"
+            },
+            {
+              "check_id": "check-tc12-stage-a-alias-red",
+              "label": "原配置解析红灯",
+              "passed": true,
+              "detail": "Stage A 使用原配置，真实 Vitest 因 @ 指向 ./source 而无法解析业务模块。"
+            },
+            {
+              "check_id": "check-tc12-stage-b-business-red",
+              "label": "配置修复后的业务红灯",
+              "passed": true,
+              "detail": "Stage B 复现增长率、排序副作用、相等值和日期函数未导出问题。"
+            },
+            {
+              "check_id": "check-tc12-stage-c-boundary-red",
+              "label": "日期闭区间红灯",
+              "passed": true,
+              "detail": "Stage C 只增加导出后，开始日和结束日排除问题均由真实测试捕获。"
+            },
+            {
+              "check_id": "check-tc12-final-green",
+              "label": "同一测试集最终全绿",
+              "passed": true,
+              "detail": "最终 71/71 通过，零失败。"
+            },
+            {
+              "check_id": "check-tc12-manifest",
+              "label": "测试清单与实际收集一致",
+              "passed": true,
+              "detail": "三个套件的 71 个公开 ID 与最终 collected IDs 完全一致。"
+            },
+            {
+              "check_id": "check-tc12-coverage",
+              "label": "逐文件覆盖率达到门槛",
+              "passed": true,
+              "detail": "metricsCalculator.js: statements 100%, branches 100%, functions 100%, lines 100%；dataTransformer.js: statements 100%, branches 91.3%, functions 100%, lines 100%；filterEngine.js: statements 100%, branches 97.5%, functions 100%, lines 100%"
+            },
+            {
+              "check_id": "check-tc12-diff-scope",
+              "label": "真实修改范围可审查",
+              "passed": true,
+              "detail": "统一 diff 只修改配置和三个真实业务源码文件；额外相等值缺陷同样先红后绿。"
+            },
+            {
+              "check_id": "check-tc12-independent-rerun",
+              "label": "下载包独立解压复跑",
+              "passed": true,
+              "detail": "独立临时目录运行固定入口，测试 ID、覆盖率、退出码和 manifest 再次一致。"
+            },
+            {
+              "check_id": "check-tc12-fixed-runner-boundary",
+              "label": "固定本地执行边界",
+              "passed": true,
+              "detail": "未运行来源 package scripts、未联网安装；未注入凭据/代理，也不声称进程或 OS 级断网。"
+            },
+            {
+              "check_id": "check-tc12-catalog-reread",
+              "label": "原始输入再次读取一致",
+              "passed": true,
+              "detail": "四阶段测试和独立解压复跑后重新读取 11/11 个 FORTE 输入，字节与引用未变化。"
+            }
+          ],
+          "review_required": true,
+          "deliverable_type": "分阶段 Vitest、覆盖率与独立复跑报告（Markdown）",
+          "key_outputs": [
+            "Stage A：原配置真实复现 @ 指向 ./source 的模块解析红灯。",
+            "Stage B：只修配置后，增长率分母、排序副作用、相等值和日期函数未导出仍真实失败。",
+            "Stage C：只补日期函数导出后，开始日和结束日排除测试仍失败。",
+            "Stage D：应用完整修复后 71/71 项真实 Vitest 全部通过。",
+            "配置修复：@ 别名改为真实 src，测试才能加载三个业务模块。",
+            "指标修复：增长率以旧值为分母，避免经营指标失真。",
+            "转换修复：排序不再修改调用方数组，相等值保持稳定顺序。",
+            "筛选修复：日期函数可导入，并把起止日期纳入闭区间。",
+            "metricsCalculator.js：statements 100%，branches 100%，lines 100%",
+            "dataTransformer.js：statements 100%，branches 91.3%，lines 100%",
+            "filterEngine.js：statements 100%，branches 97.5%，lines 100%",
+            "清单一致：页面、test-manifest.json 与实际 collected IDs 同为 71 项。"
+          ],
+          "key_outputs_label": "红灯到绿灯与修复影响",
+          "review_guidance": "请先确认三阶段红灯确实对应原缺陷，再复跑最终测试并审查 changes.patch。当前只是固定 qa-003 适配器，不是任意 JavaScript 沙箱，也没有生产多租户隔离。",
+          "execution_summary": "Agent 在隔离副本中先用同一套 71 项 Vitest 复现三阶段红灯，再修复四个真实文件并实现 71/71 通过；FORTE 原文件没有被覆盖。",
+          "self_test": null,
+          "external_action": "none",
+          "original_inputs_modified": false
+        }
+      ],
+      "artifact_downloads": [
+        {
+          "artifact_id": "workspace-artifact-bbce54f0668e",
+          "file_name": "看板工具库修复包.zip",
+          "status_code": 200,
+          "content_type": "application/zip",
+          "declared_size": 44835,
+          "downloaded_size": 44835,
+          "sha256": "8fd4ab865217bf64bc487bab7ed16ee9e52db37baeba0080d2b62594c16bf70f",
+          "size_matches": true,
+          "content_gate": {
+            "passed": true,
+            "valid_zip": true,
+            "file_count": 35,
+            "source_file_count": 11,
+            "missing_members": [],
+            "unsafe_members": [],
+            "source_copy": {
+              "unchanged_file_count": 7,
+              "expected_unchanged_file_count": 7,
+              "changed_files": [
+                "src/utils/dataTransformer.js",
+                "src/utils/filterEngine.js",
+                "src/utils/metricsCalculator.js",
+                "vitest.config.js"
+              ],
+              "passed": true
+            },
+            "stages": {
+              "stage_a_exit_code": 1,
+              "stage_b_failed": 7,
+              "stage_c_failed": 6,
+              "stage_d_passed": 71
+            },
+            "tests": {
+              "exit_code": 0,
+              "elapsed_ms": 1703,
+              "collected": 71,
+              "passed": 71,
+              "failed": 0,
+              "manifest_consistent": true
+            },
+            "coverage_files": [
+              {
+                "file": "src/utils/metricsCalculator.js",
+                "lines": {
+                  "total": 112,
+                  "covered": 112,
+                  "skipped": 0,
+                  "pct": 100
+                },
+                "functions": {
+                  "total": 9,
+                  "covered": 9,
+                  "skipped": 0,
+                  "pct": 100
+                },
+                "statements": {
+                  "total": 112,
+                  "covered": 112,
+                  "skipped": 0,
+                  "pct": 100
+                },
+                "branches": {
+                  "total": 34,
+                  "covered": 34,
+                  "skipped": 0,
+                  "pct": 100
+                }
+              },
+              {
+                "file": "src/utils/dataTransformer.js",
+                "lines": {
+                  "total": 156,
+                  "covered": 156,
+                  "skipped": 0,
+                  "pct": 100
+                },
+                "functions": {
+                  "total": 6,
+                  "covered": 6,
+                  "skipped": 0,
+                  "pct": 100
+                },
+                "statements": {
+                  "total": 156,
+                  "covered": 156,
+                  "skipped": 0,
+                  "pct": 100
+                },
+                "branches": {
+                  "total": 46,
+                  "covered": 42,
+                  "skipped": 0,
+                  "pct": 91.3
+                }
+              },
+              {
+                "file": "src/utils/filterEngine.js",
+                "lines": {
+                  "total": 113,
+                  "covered": 113,
+                  "skipped": 0,
+                  "pct": 100
+                },
+                "functions": {
+                  "total": 5,
+                  "covered": 5,
+                  "skipped": 0,
+                  "pct": 100
+                },
+                "statements": {
+                  "total": 113,
+                  "covered": 113,
+                  "skipped": 0,
+                  "pct": 100
+                },
+                "branches": {
+                  "total": 40,
+                  "covered": 39,
+                  "skipped": 0,
+                  "pct": 97.5
+                }
+              }
+            ],
+            "coverage_gate_passed": true,
+            "network_boundary": "本次固定测试未观察到网络调用且未注入凭据或代理；没有进程或 OS 级 socket 隔离。"
+          }
+        },
+        {
+          "artifact_id": "workspace-artifact-5188194048ec",
+          "file_name": "TC-12真实测试报告.md",
+          "status_code": 200,
+          "content_type": "text/markdown",
+          "declared_size": 2282,
+          "downloaded_size": 2282,
+          "sha256": "fdbb9361ca871c07049a6a89609bcc5908a2a7703311f38d83c69296fb58c2ed",
+          "size_matches": true,
+          "content_gate": null
+        }
+      ],
+      "expected_artifacts": [
+        "看板工具库修复包.zip",
+        "TC-12真实测试报告.md"
+      ],
+      "events": [
+        {
+          "sequence": 3,
+          "event_name": "planning_started",
+          "status": "planning"
+        },
+        {
+          "sequence": 4,
+          "event_name": "planning_completed",
+          "status": "planning"
+        },
+        {
+          "sequence": 6,
+          "event_name": "deterministic_office_tool_started",
+          "status": "validating"
+        },
+        {
+          "sequence": 7,
+          "event_name": "run_workspace_artifact_written",
+          "status": "validating"
+        },
+        {
+          "sequence": 8,
+          "event_name": "run_workspace_artifact_written",
+          "status": "validating"
+        },
+        {
+          "sequence": 9,
+          "event_name": "deterministic_verification_completed",
+          "status": "validating"
+        },
+        {
+          "sequence": 10,
+          "event_name": "analysis_started",
+          "status": "analyzing"
+        },
+        {
+          "sequence": 11,
+          "event_name": "analysis_completed",
+          "status": "analyzing"
+        }
+      ],
+      "waiting_branches": [
+        {
+          "branch_id": "branch-635a5e008e83",
+          "title": "检查 dashboard-toolkit 依赖与脚本配置",
+          "status": "waiting_input",
+          "missing_file_count": 1
+        },
+        {
+          "branch_id": "branch-c765aad568bd",
+          "title": "检查 Vitest 配置",
+          "status": "waiting_input",
+          "missing_file_count": 1
+        },
+        {
+          "branch_id": "branch-3a64d5d98108",
+          "title": "检查 chartHelper 模块源码",
+          "status": "waiting_input",
+          "missing_file_count": 1
+        },
+        {
+          "branch_id": "branch-7d48f4eb8eb7",
+          "title": "检查 dateUtils 模块源码",
+          "status": "waiting_input",
+          "missing_file_count": 1
+        },
+        {
+          "branch_id": "branch-891360bf9005",
+          "title": "检查 exportHelper 模块源码",
+          "status": "waiting_input",
+          "missing_file_count": 1
+        },
+        {
+          "branch_id": "branch-438fedbb24e7",
+          "title": "检查 statisticsEngine 模块源码",
+          "status": "waiting_input",
+          "missing_file_count": 1
+        },
+        {
+          "branch_id": "branch-2da406c50a1b",
+          "title": "检查 validatorUtils 模块源码",
+          "status": "waiting_input",
+          "missing_file_count": 1
+        },
+        {
+          "branch_id": "branch-8382d2187dfc",
+          "title": "检查常量定义模块",
+          "status": "waiting_input",
+          "missing_file_count": 1
+        }
+      ],
+      "validation_errors": [],
+      "timed_out": false,
+      "effect_gate_passed": true,
+      "failure_reason": null
+    }
+  ],
+  "claim_boundary": "该证据仅证明固定服务配置下真实模型调用、运行工作区文件和确定性检查；不证明真实用户理解、生产安全沙箱或外部动作能力。"
+}

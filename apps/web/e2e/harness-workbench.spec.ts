@@ -1,5 +1,6 @@
 import { expect, test, type Page, type Route } from "@playwright/test";
 import tc04TestManifest from "../../../docs/evidence/manifests/tc04-public-test-manifest-20260828.json";
+import tc12TestManifest from "../../../docs/evidence/manifests/tc12-public-test-manifest-20260828.json";
 
 type FileItem = {
   file_ref: string;
@@ -764,6 +765,162 @@ function evaluationPlatformEffectSnapshot(body: { workspace_id: string; instruct
   };
 }
 
+function dashboardToolkitEffectSnapshot(body: { workspace_id: string; instruction: string }) {
+  const base = snapshot(body, "completed", 20);
+  const sourceRefs = folders.flatMap((folder) => folder.files).slice(0, 11).map((file) => file.file_ref);
+  const artifactIds = ["workspace-artifact-121212121212", "workspace-artifact-131313131313"];
+  const checks = [
+    ["check-tc12-complete-copy", "完整 11 文件隔离副本", "冻结并复制 dashboard-toolkit 全部 11/11 个允许输入文件。"],
+    ["check-tc12-source-unchanged", "FORTE 原始项目保持只读", "四阶段测试和独立复跑前后输入树不变。"],
+    ["check-tc12-stage-a-alias-red", "原配置解析红灯", "Stage A 真实复现 @ 指向 ./source 的解析失败。"],
+    ["check-tc12-stage-b-business-red", "配置修复后的业务红灯", "Stage B 复现增长率、排序副作用、相等值和日期函数未导出。"],
+    ["check-tc12-stage-c-boundary-red", "日期闭区间红灯", "Stage C 复现开始日和结束日被排除。"],
+    ["check-tc12-final-green", "同一测试集最终全绿", "Stage D 71/71 通过，零失败。"],
+    ["check-tc12-manifest", "测试清单与实际收集一致", "页面、manifest 和 collected IDs 同为 71 项。"],
+    ["check-tc12-coverage", "逐文件覆盖率达到门槛", "metrics 100/100/100；transformer 100/91.3/100；filter 100/97.5/100。"],
+    ["check-tc12-diff-scope", "真实修改范围可审查", "统一 diff 只修改配置和三个真实业务源码。"],
+    ["check-tc12-independent-rerun", "下载包独立解压复跑", "独立临时目录运行固定入口，测试 ID、覆盖率、退出码和 manifest 再次一致。"],
+    ["check-tc12-fixed-runner-boundary", "固定本地执行边界", "未运行来源 scripts、未联网安装，不声称 OS 级断网。"],
+    ["check-tc12-catalog-reread", "原始输入再次读取一致", "测试后重新读取 11/11 输入，字节与引用不变。"],
+  ].map(([check_id, label, detail]) => ({ check_id, label, passed: true, detail }));
+  const selfTest = {
+    instruction: "为三个看板工具模块编写 Vitest，修复源码并真实运行测试。",
+    expected_files: ["dashboard-toolkit/src/", "dashboard-toolkit/tests/", "dashboard-toolkit/changes.patch", "dashboard-toolkit/test-manifest.json", "dashboard-toolkit/evidence/", "dashboard-toolkit/run-self-test.mjs"],
+    commands: ["node dashboard-toolkit/run-self-test.mjs apps/web/node_modules/vitest/vitest.mjs"],
+    expected_checks: ["Stage A 必须因原 @ 别名指向 ./source 而红灯", "Stage B 必须由真实源码复现增长率、排序副作用和未导出日期函数", "Stage C 必须由真实测试复现日期闭区间缺陷", "Stage D 必须 71/71 通过且零失败", "三个测试套件必须直接导入真实业务模块", "test-manifest.json 声明集合必须等于实际 collected IDs", "三份变更业务源码 statements/lines >= 85%，branches >= 75%"],
+    failure_signals: ["命令退出码非 0，或最终出现 failed/error", "任一阶段没有出现预期红灯，说明测试未证明原缺陷", "声明 ID 与实际 collected IDs 不一致", "任一变更业务源码覆盖率未达到逐文件门槛"],
+    test_manifest_file: "dashboard-toolkit/test-manifest.json",
+    test_manifest_matches_collected: true,
+    test_suites: tc12TestManifest.test_suites.map((suite) => ({
+      suite_id: suite.id,
+      label: suite.label,
+      test_files: suite.test_files,
+      test_count: suite.test_count,
+      test_ids: suite.test_ids,
+    })),
+  };
+  const common = {
+    capability_id: "office-js-test-and-fix",
+    scenario_id: "TC-12",
+    version: 1,
+    round_number: 1,
+    source_file_refs: sourceRefs,
+    validator_id: "validator-dashboard-toolkit-project-v2",
+    verifier_status: "passed",
+    checks,
+    covered_period: "固定 FORTE qa-003 / dashboard-toolkit 公开输入",
+    statistic_basis: "完整 11/11 输入；同一套 71 项 Vitest 的 Stage A/B/C 红灯与 Stage D 绿灯；Vitest 与 coverage-v8 均为 1.6.1。",
+    purpose: "用于下载、复跑和审查统一 diff；不会覆盖 FORTE 原件，也不会自动创建或合并 PR。",
+    record_count: null,
+    key_outputs_label: "红灯到绿灯与修复影响",
+    key_outputs: [
+      "Stage A：原配置真实复现 @ 指向 ./source 的模块解析红灯。",
+      "Stage B：只修配置后，增长率分母、排序副作用、相等值和日期函数未导出仍真实失败。",
+      "Stage C：只补日期函数导出后，开始日和结束日排除测试仍失败。",
+      "Stage D：应用完整修复后 71/71 项真实 Vitest 全部通过。",
+      "配置修复：@ 别名改为真实 src，测试才能加载三个业务模块。",
+      "指标修复：增长率以旧值为分母，避免经营指标失真。",
+      "转换修复：排序不再修改调用方数组，相等值保持稳定顺序。",
+      "筛选修复：日期函数可导入，并把起止日期纳入闭区间。",
+      "metricsCalculator.js：statements 100%，branches 100%，lines 100%",
+      "dataTransformer.js：statements 100%，branches 91.3%，lines 100%",
+      "filterEngine.js：statements 100%，branches 97.5%，lines 100%",
+      "清单一致：页面、test-manifest.json 与实际 collected IDs 同为 71 项。",
+    ],
+    review_guidance: "先确认三阶段红灯确实对应原缺陷，再复跑最终测试并审查 changes.patch；当前只是固定 qa-003 适配器，不是任意 JavaScript 沙箱。",
+    execution_summary: "Agent 在隔离副本中先用同一套 71 项 Vitest 复现三阶段红灯，再修复四个真实文件并实现 71/71 通过；FORTE 原文件没有被覆盖。",
+    self_test: selfTest,
+    created_at: new Date().toISOString(),
+    original_inputs_modified: false,
+    review_required: true,
+    external_action: "none",
+  };
+  return {
+    ...base,
+    workspace_artifacts: [{
+      ...common,
+      artifact_id: artifactIds[0],
+      title: "看板工具库修复包",
+      file_name: "看板工具库修复包.zip",
+      media_type: "application/zip",
+      size: 118000,
+      summary: "完整 11 文件隔离副本、四文件真实 diff、三阶段红灯、71 项测试与逐文件覆盖率均可下载复查。",
+      deliverable_type: "完整看板工具库隔离修复副本（ZIP）",
+      download_path: `/v1/harness/runs/${base.run_id}/artifacts/${artifactIds[0]}`,
+    }, {
+      ...common,
+      artifact_id: artifactIds[1],
+      title: "TC-12 真实测试报告",
+      file_name: "TC-12真实测试报告.md",
+      media_type: "text/markdown",
+      size: 6100,
+      summary: "同一测试集先证明原缺陷，再验证修复后 71/71 通过和逐文件覆盖率门。",
+      deliverable_type: "分阶段 Vitest、覆盖率与独立复跑报告（Markdown）",
+      self_test: null,
+      download_path: `/v1/harness/runs/${base.run_id}/artifacts/${artifactIds[1]}`,
+    }],
+    effect_receipts: [{
+      receipt_id: "effect-receipt-121212121212",
+      capability_id: "office-js-test-and-fix",
+      scenario_id: "TC-12",
+      status: "passed",
+      state: "已冻结 qa-003 的完整 11 文件看板工具库，原始输入保持只读。",
+      action: "复制到隔离 Run Workspace，用同一套 Vitest 分阶段复现红灯、修复并复跑。",
+      observation: "生成 2 份真实成果文件，共享 12 项确定性检查，12/12 通过。",
+      cost: "0 次额外模型调用；固定本地测试未联网安装依赖。",
+      result: "修复包与真实测试报告可下载，等待人工代码评审与合并。",
+      source_file_refs: sourceRefs,
+      artifact_ids: artifactIds,
+      prohibited_side_effects: ["不修改 FORTE 原始源码", "不运行来源 package scripts", "不访问真实 endpoint", "不自动创建 PR"],
+      created_at: new Date().toISOString(),
+      external_action: "none",
+    }],
+    last_event_sequence: 20,
+  };
+}
+
+function failedDashboardToolkitEffectSnapshot(body: { workspace_id: string; instruction: string }) {
+  const base = dashboardToolkitEffectSnapshot(body);
+  const reviewGuidance = "当前包不得合并。请查看 dashboard-toolkit/evidence/stage-d-final-result.json、coverage-summary.json 和 independent-unpack-rerun.json；修复后重新启动一项新的 TC-12 Run。";
+  const checks = base.workspace_artifacts[0].checks.map((check: { check_id: string; label: string; passed: boolean; detail: string }) => check.check_id === "check-tc12-final-green"
+    ? { ...check, label: "最终测试命令未通过", passed: false, detail: "最终固定命令未通过；查看 stage-d-final-result.json 后重新启动新的 TC-12 Run。" }
+    : check);
+  return {
+    ...base,
+    status: "failed",
+    workspace_artifacts: base.workspace_artifacts.map((artifact: Record<string, unknown>) => ({
+      ...artifact,
+      verifier_status: "failed",
+      checks,
+      summary: "隔离副本、统一 diff 和失败证据已保留；固定测试未通过，当前包不得合并。",
+      statistic_basis: "完整 11/11 输入文件与分阶段失败证据；最终固定命令未通过，不形成测试全绿结论。",
+      key_outputs: [
+        "当前固定测试命令未完成全部验证，这不是测试全绿回执。",
+        "当前包不得合并；隔离副本、统一 diff 和失败证据已经保留。",
+        "请查看 Stage D 结果 JSON、coverage-summary.json 与独立复跑回执。",
+        "修复执行环境或源码后，重新启动一项新的 TC-12 Run。",
+      ],
+      review_guidance: reviewGuidance,
+      execution_summary: "固定测试命令未完成全部验证；当前包不得合并。FORTE 原文件没有被覆盖。",
+      self_test: artifact.self_test ? {
+        ...(artifact.self_test as Record<string, unknown>),
+        expected_checks: [
+          "当前 Stage D 或独立复跑未通过，不得把本轮标为测试全绿",
+          "查看 evidence/stage-d-final-result.json 与对应 Vitest JSON",
+          "查看 evidence/coverage-summary.json 与 independent-unpack-rerun.json",
+          "修复后必须重新启动一项新的 TC-12 Run",
+        ],
+      } : null,
+    })),
+    effect_receipts: base.effect_receipts.map((receipt: Record<string, unknown>) => ({
+      ...receipt,
+      status: "failed",
+      observation: "生成 2 份失败证据成果，共享 12 项确定性检查，其中最终固定命令未通过。",
+      result: "固定命令失败，当前包不得合并；请查看阶段 JSON、coverage 和独立复跑回执。",
+    })),
+  };
+}
+
 function boundedEffectSnapshot(body: { workspace_id: string; instruction: string }) {
   const base = snapshot(body, "completed", 18);
   return {
@@ -1142,7 +1299,7 @@ function locationFailureSnapshot(body: { workspace_id: string; instruction: stri
 }
 async function fulfillJson(route: Route, body: unknown, status = 200) { await route.fulfill({ status, contentType: "application/json", body: JSON.stringify(body) }); }
 
-async function mockHarness(page: Page, options: { failFirstStart?: boolean; failDecisionDefer?: boolean; disconnect?: boolean; failed?: boolean; locationFailure?: boolean; sourceRecovery?: boolean; sourceRecoveryThreeCandidates?: boolean; verifiedArtifactAuditPending?: boolean; verifiedArtifactAuditPendingDistinct?: boolean; verifiedFinanceArtifactAuditPending?: boolean; unverifiedArtifactLocationPending?: boolean; terminalArtifactLocationPending?: boolean; boundedRecovery?: boolean; effectArtifact?: boolean; outboundEffect?: boolean; reactEffect?: boolean; evaluationEffect?: boolean; effectBoundary?: boolean; reviewTable?: boolean; workspaceFailures?: number; interactiveLoop?: boolean; evidenceGate?: boolean } = {}) {
+async function mockHarness(page: Page, options: { failFirstStart?: boolean; failDecisionDefer?: boolean; disconnect?: boolean; failed?: boolean; locationFailure?: boolean; sourceRecovery?: boolean; sourceRecoveryThreeCandidates?: boolean; verifiedArtifactAuditPending?: boolean; verifiedArtifactAuditPendingDistinct?: boolean; verifiedFinanceArtifactAuditPending?: boolean; unverifiedArtifactLocationPending?: boolean; terminalArtifactLocationPending?: boolean; boundedRecovery?: boolean; effectArtifact?: boolean; outboundEffect?: boolean; reactEffect?: boolean; evaluationEffect?: boolean; dashboardEffect?: boolean; dashboardEffectFailed?: boolean; effectBoundary?: boolean; reviewTable?: boolean; workspaceFailures?: number; interactiveLoop?: boolean; evidenceGate?: boolean } = {}) {
   let workspaceCalls = 0; let startCalls = 0; let streamCalls = 0;
   let currentBody = { workspace_id: "forte-public-office", instruction: "" };
   // Mock snapshots intentionally cover several server state shapes in one route.
@@ -1164,6 +1321,7 @@ async function mockHarness(page: Page, options: { failFirstStart?: boolean; fail
       if (options.outboundEffect) return route.fulfill({ status: 200, contentType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document", body: "mock-docx-bytes", headers: { "Content-Disposition": "attachment; filename*=UTF-8''%E5%A4%96%E5%91%BC%E6%B5%81%E7%A8%8B-M1%E9%80%BE%E6%9C%9F%E7%94%A8%E6%88%B7AI%E5%A4%96%E5%91%BC%E5%82%AC%E6%94%B6%E6%B5%81%E7%A8%8B%E5%9B%BE.docx" } });
       if (options.reactEffect) return route.fulfill({ status: 200, contentType: "application/zip", body: "mock-zip-bytes" });
       if (options.evaluationEffect) return route.fulfill({ status: 200, contentType: "application/zip", body: "mock-evaluation-zip-bytes", headers: { "Content-Disposition": "attachment; filename*=UTF-8''%E8%AF%84%E6%B5%8B%E5%B9%B3%E5%8F%B0%E7%9C%9F%E5%AE%9E%E4%BF%AE%E5%A4%8D%E5%8C%85.zip" } });
+      if (options.dashboardEffect) return route.fulfill({ status: 200, contentType: "application/zip", body: "mock-dashboard-zip-bytes", headers: { "Content-Disposition": "attachment; filename*=UTF-8''%E7%9C%8B%E6%9D%BF%E5%B7%A5%E5%85%B7%E5%BA%93%E4%BF%AE%E5%A4%8D%E5%8C%85.zip" } });
       return route.fulfill({ status: 200, contentType: "text/csv; charset=utf-8", body: "科目名称,客商名称,未付款项\n应付账款,星海科技,100.00\n", headers: { "Content-Disposition": "attachment; filename*=UTF-8''%E6%9C%AA%E4%BB%98%E7%BB%9F%E8%AE%A1.csv" } });
     }
     if (path === "/v1/harness/runs" && route.request().method() === "GET") {
@@ -1192,6 +1350,10 @@ async function mockHarness(page: Page, options: { failFirstStart?: boolean; fail
         ? reactRefactorEffectSnapshot(body)
         : options.evaluationEffect
         ? evaluationPlatformEffectSnapshot(body)
+        : options.dashboardEffectFailed
+        ? failedDashboardToolkitEffectSnapshot(body)
+        : options.dashboardEffect
+        ? dashboardToolkitEffectSnapshot(body)
         : options.effectBoundary
           ? boundedEffectSnapshot(body)
         : options.locationFailure
@@ -1298,7 +1460,7 @@ async function mockHarness(page: Page, options: { failFirstStart?: boolean; fail
     }
     if (path.startsWith("/v1/harness/runs/")) {
       if (options.disconnect && streamCalls === 1) return fulfillJson(route, { ...snapshot(currentBody, "queued"), status: "indexing", last_event_sequence: 1, version: 2 });
-      if (options.interactiveLoop || options.evidenceGate || options.sourceRecovery || options.verifiedArtifactAuditPending || options.verifiedArtifactAuditPendingDistinct || options.verifiedFinanceArtifactAuditPending || options.unverifiedArtifactLocationPending || options.terminalArtifactLocationPending || options.boundedRecovery || options.locationFailure || options.effectArtifact || options.outboundEffect || options.reactEffect || options.effectBoundary) return fulfillJson(route, currentSnapshot);
+      if (options.interactiveLoop || options.evidenceGate || options.sourceRecovery || options.verifiedArtifactAuditPending || options.verifiedArtifactAuditPendingDistinct || options.verifiedFinanceArtifactAuditPending || options.unverifiedArtifactLocationPending || options.terminalArtifactLocationPending || options.boundedRecovery || options.locationFailure || options.effectArtifact || options.outboundEffect || options.reactEffect || options.evaluationEffect || options.dashboardEffect || options.dashboardEffectFailed || options.effectBoundary) return fulfillJson(route, currentSnapshot);
       currentSnapshot = snapshot(currentBody, options.failed ? "failed" : "completed");
       return fulfillJson(route, currentSnapshot);
     }
@@ -1666,6 +1828,112 @@ test("shows the real TC-04 project tests, per-file coverage and manual merge bou
   if (process.env.CAPTURE_TC04_EFFECT_EVIDENCE === "1") {
     await artifacts.screenshot({ path: "../../docs/evidence/screenshots/tc04-real-platform-tests-mobile.png" });
   }
+});
+
+test("shows TC-12 real Vitest red-to-green evidence and the exact public manifest", async ({ page }) => {
+  await mockHarness(page, { dashboardEffect: true });
+  await page.goto("/");
+  await page.getByRole("textbox", { name: "任务指令" }).fill("为三个看板工具模块编写 Vitest，修复源码并真实运行测试。");
+  await page.getByRole("button", { name: "启动 Control Loop" }).click();
+
+  const artifacts = page.locator(".workspace-artifacts");
+  const selfTest = page.getByRole("region", { name: "TC-12 自测卡" });
+  const testSuites = page.getByRole("region", { name: "真实测试清单" });
+  await expect(artifacts).toContainText("Agent 已生成 2 份真实成果文件");
+  await expect(artifacts).toContainText("2 份成果共享 12 项确定性检查，12/12 通过");
+  await expect(artifacts).not.toContainText("24/24");
+  await expect(artifacts).toContainText("看板工具库修复包");
+  await expect(artifacts).toContainText("TC-12 真实测试报告");
+  await expect(artifacts).toContainText("完整 11 文件隔离副本");
+  await expect(artifacts).toContainText("11 份内容来源");
+  await expect(page.locator(".workspace-action-result")).toContainText("同一套 71 项 Vitest 复现三阶段红灯");
+  for (const statement of [
+    "Stage A：原配置真实复现 @ 指向 ./source 的模块解析红灯",
+    "Stage B：只修配置后",
+    "Stage C：只补日期函数导出后",
+    "Stage D：应用完整修复后 71/71 项真实 Vitest 全部通过",
+    "增长率以旧值为分母",
+    "排序不再修改调用方数组",
+    "起止日期纳入闭区间",
+    "metricsCalculator.js：statements 100%",
+    "dataTransformer.js：statements 100%，branches 91.3%",
+    "filterEngine.js：statements 100%，branches 97.5%",
+  ]) await expect(artifacts).toContainText(statement);
+  await expect(artifacts).toContainText("不会自动创建或合并 PR");
+  await expect(artifacts).toContainText("固定 qa-003 适配器，不是任意 JavaScript 沙箱");
+
+  await expect(selfTest).toContainText("node dashboard-toolkit/run-self-test.mjs apps/web/node_modules/vitest/vitest.mjs");
+  await expect(testSuites).toContainText("71 项");
+  await expect(testSuites).toContainText("页面测试 ID、dashboard-toolkit/test-manifest.json 与实际 collected IDs 是同一集合");
+  for (const [label, count, fileName, representative] of [
+    ["指标计算", "23 项", "tests/metricsCalculator.test.js", "tests/metricsCalculator.test.js::metricsCalculator > calculates positive growth from the old value"],
+    ["数据转换", "20 项", "tests/dataTransformer.test.js", "tests/dataTransformer.test.js::dataTransformer > does not mutate the caller array"],
+    ["筛选与分页", "28 项", "tests/filterEngine.test.js", "tests/filterEngine.test.js::filterEngine > includes the start date boundary"],
+  ] as const) {
+    const suite = testSuites.locator("details").filter({ hasText: label });
+    await expect(suite).toContainText(count);
+    await expect(suite).toContainText(fileName);
+    await suite.locator("summary").click();
+    await expect(suite).toContainText(representative);
+    await suite.locator("summary").click();
+  }
+  await expect(testSuites).not.toContainText("business_boundary_1");
+  const suiteType = await testSuites.evaluate((element) => ({
+    explanation: Number.parseFloat(getComputedStyle(element.querySelector(":scope > header p")!).fontSize),
+    suiteTitle: Number.parseFloat(getComputedStyle(element.querySelector("summary b")!).fontSize),
+    fileName: Number.parseFloat(getComputedStyle(element.querySelector("summary small")!).fontSize),
+    testId: Number.parseFloat(getComputedStyle(element.querySelector("ol code")!).fontSize),
+  }));
+  expect(suiteType.explanation).toBeGreaterThanOrEqual(11);
+  expect(suiteType.suiteTitle).toBeGreaterThanOrEqual(12);
+  expect(suiteType.fileName).toBeGreaterThanOrEqual(11);
+  expect(suiteType.testId).toBeGreaterThanOrEqual(11);
+  await selfTest.getByText("查看应通过的测试与失败信号").click();
+  await expect(selfTest).toContainText("Stage A 必须因原 @ 别名指向 ./source 而红灯");
+  await expect(selfTest).toContainText("Stage D 必须 71/71 通过且零失败");
+  await expect(selfTest).toContainText("任一阶段没有出现预期红灯");
+
+  const downloadPromise = page.waitForEvent("download");
+  await artifacts.getByRole("button", { name: "下载成果" }).first().click();
+  const download = await downloadPromise;
+  expect(download.suggestedFilename()).toBe("看板工具库修复包.zip");
+
+  if (process.env.CAPTURE_TC12_EFFECT_EVIDENCE === "1") {
+    await page.setViewportSize({ width: 1440, height: 1100 });
+    await artifacts.scrollIntoViewIfNeeded();
+    await page.screenshot({ path: "../../docs/evidence/screenshots/tc12-real-vitest-desktop.png", fullPage: true });
+  }
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  const pageMetrics = await page.evaluate(() => ({ viewport: document.documentElement.clientWidth, scroll: document.documentElement.scrollWidth }));
+  const artifactMetrics = await artifacts.evaluate((element) => ({ width: element.clientWidth, scroll: element.scrollWidth }));
+  expect(pageMetrics.scroll).toBeLessThanOrEqual(pageMetrics.viewport);
+  expect(artifactMetrics.scroll).toBeLessThanOrEqual(artifactMetrics.width);
+  const filterSuite = testSuites.locator("details").filter({ hasText: "筛选与分页" });
+  await filterSuite.locator("summary").click();
+  await expect(filterSuite).toContainText("tests/filterEngine.test.js::filterEngine > uses a later comparator rule when values are equal");
+  const suiteMetrics = await testSuites.evaluate((element) => ({ width: element.clientWidth, scroll: element.scrollWidth }));
+  expect(suiteMetrics.scroll).toBeLessThanOrEqual(suiteMetrics.width);
+  if (process.env.CAPTURE_TC12_EFFECT_EVIDENCE === "1") {
+    await artifacts.scrollIntoViewIfNeeded();
+    await page.screenshot({ path: "../../docs/evidence/screenshots/tc12-real-vitest-mobile.png", fullPage: true });
+  }
+});
+
+test("keeps a failed TC-12 fixed command red and tells the user not to merge", async ({ page }) => {
+  await mockHarness(page, { dashboardEffectFailed: true });
+  await page.goto("/");
+  await page.getByRole("textbox", { name: "任务指令" }).fill("为三个看板工具模块编写 Vitest，修复源码并真实运行测试。");
+  await page.getByRole("button", { name: "启动 Control Loop" }).click();
+
+  const artifacts = page.locator(".workspace-artifacts");
+  await expect(artifacts).toContainText("当前固定测试命令未完成全部验证");
+  await expect(artifacts).toContainText("当前包不得合并");
+  await expect(artifacts).toContainText("stage-d-final-result.json");
+  await expect(artifacts).toContainText("coverage-summary.json");
+  await expect(artifacts).toContainText("重新启动一项新的 TC-12 Run");
+  await expect(artifacts).not.toContainText("71/71");
+  await expect(artifacts).not.toContainText("所有确定性效果门通过");
 });
 
 test("explains a verified finance result in user language and resumes only the location branch", async ({ page }) => {

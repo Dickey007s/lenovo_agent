@@ -6,6 +6,7 @@ import io
 import json
 import os
 import re
+import shutil
 import stat
 import subprocess
 import sys
@@ -385,6 +386,242 @@ def _tc04_zip_content_gate(content: bytes) -> dict[str, Any]:
         }
 
 
+def _tc12_zip_content_gate(content: bytes) -> dict[str, Any]:
+    project_prefix = "dashboard-toolkit/"
+    source_root = FORTE_ROOT / "qa-003" / "input" / "dashboard-toolkit"
+    source_files = {
+        path.relative_to(source_root).as_posix(): path
+        for path in source_root.rglob("*")
+        if path.is_file()
+    }
+    changed_files = {
+        "vitest.config.js",
+        "src/utils/metricsCalculator.js",
+        "src/utils/dataTransformer.js",
+        "src/utils/filterEngine.js",
+    }
+    required_support_files = {
+        "tests/metricsCalculator.test.js",
+        "tests/dataTransformer.test.js",
+        "tests/filterEngine.test.js",
+        "changes.patch",
+        "changes.json",
+        "test-manifest.json",
+        "run-self-test.mjs",
+        "TC-12测试报告.md",
+        "TC-12改动说明.md",
+        "TC-12自测卡.md",
+        "evidence/stage-a-original-result.json",
+        "evidence/stage-b-config-only-result.json",
+        "evidence/stage-c-export-only-result.json",
+        "evidence/stage-d-final-result.json",
+        "evidence/coverage-summary.json",
+        "evidence/independent-unpack-rerun.json",
+    }
+    expected_members = {
+        f"{project_prefix}{name}"
+        for name in set(source_files) | required_support_files
+    }
+    try:
+        with zipfile.ZipFile(io.BytesIO(content)) as archive:
+            members = archive.infolist()
+            unsafe = [
+                item.filename
+                for item in members
+                if Path(item.filename).is_absolute()
+                or ".." in Path(item.filename).parts
+                or stat.S_ISLNK(item.external_attr >> 16)
+            ]
+            names = {item.filename for item in members if not item.is_dir()}
+            missing = sorted(expected_members - names)
+            if unsafe or missing:
+                return {
+                    "passed": False,
+                    "valid_zip": True,
+                    "unsafe_members": unsafe,
+                    "missing_members": missing,
+                }
+            manifest = json.loads(
+                archive.read(f"{project_prefix}test-manifest.json")
+            )
+            stages = {
+                stage: json.loads(
+                    archive.read(
+                        f"{project_prefix}evidence/{stage}-result.json"
+                    )
+                )
+                for stage in (
+                    "stage-a-original",
+                    "stage-b-config-only",
+                    "stage-c-export-only",
+                    "stage-d-final",
+                )
+            }
+            changes = json.loads(archive.read(f"{project_prefix}changes.json"))
+            independent = json.loads(
+                archive.read(
+                    f"{project_prefix}evidence/independent-unpack-rerun.json"
+                )
+            )
+            unchanged_source_files = {
+                name: hashlib.sha256(
+                    archive.read(f"{project_prefix}{name}")
+                ).hexdigest()
+                == hashlib.sha256(path.read_bytes()).hexdigest()
+                for name, path in source_files.items()
+                if name not in changed_files
+            }
+            changed_source_files = {
+                name: hashlib.sha256(
+                    archive.read(f"{project_prefix}{name}")
+                ).hexdigest()
+                != hashlib.sha256(source_files[name].read_bytes()).hexdigest()
+                for name in changed_files
+            }
+            with tempfile.TemporaryDirectory(prefix="tc12-live-download-") as directory:
+                root = Path(directory)
+                archive.extractall(root)
+                project_root = root / "dashboard-toolkit"
+                node = shutil.which("node")
+                if node is None:
+                    raise RuntimeError("Node is unavailable")
+                vitest_entry = (
+                    REPO_ROOT
+                    / "apps"
+                    / "web"
+                    / "node_modules"
+                    / "vitest"
+                    / "vitest.mjs"
+                )
+                started = time.monotonic()
+                tested = subprocess.run(
+                    [node, str(project_root / "run-self-test.mjs"), str(vitest_entry)],
+                    cwd=root,
+                    env={
+                        "PATH": os.environ.get("PATH", ""),
+                        "SYSTEMROOT": os.environ.get("SYSTEMROOT", ""),
+                        "WINDIR": os.environ.get("WINDIR", ""),
+                        "TEMP": os.environ.get("TEMP", directory),
+                        "TMP": os.environ.get("TMP", directory),
+                        "HTTP_PROXY": "",
+                        "HTTPS_PROXY": "",
+                        "ALL_PROXY": "",
+                        "NO_PROXY": "*",
+                    },
+                    capture_output=True,
+                    text=True,
+                    encoding="utf-8",
+                    errors="replace",
+                    timeout=120,
+                    check=False,
+                )
+                elapsed_ms = int((time.monotonic() - started) * 1_000)
+                rerun = json.loads(
+                    (project_root / "self-test-results.json").read_text(
+                        encoding="utf-8"
+                    )
+                )
+
+        declared_ids = sorted(manifest.get("declared_test_ids", []))
+        final_ids = sorted(stages["stage-d-final"].get("collected_test_ids", []))
+        rerun_ids = sorted(rerun.get("collected_test_ids", []))
+        coverage_files = rerun.get("coverage_files", [])
+        coverage_ok = len(coverage_files) == 3 and all(
+            float(item.get("statements", {}).get("pct", 0)) >= 85
+            and float(item.get("lines", {}).get("pct", 0)) >= 85
+            and float(item.get("branches", {}).get("pct", 0)) >= 75
+            for item in coverage_files
+        )
+        stage_gate = (
+            stages["stage-a-original"].get("exit_code") != 0
+            and stages["stage-a-original"].get("num_total_tests") == 0
+            and stages["stage-b-config-only"].get("num_failed_tests") == 7
+            and stages["stage-c-export-only"].get("num_failed_tests") == 6
+            and stages["stage-d-final"].get("exit_code") == 0
+            and stages["stage-d-final"].get("num_passed_tests") == 71
+            and stages["stage-d-final"].get("num_failed_tests") == 0
+        )
+        manifest_consistent = (
+            len(declared_ids) == 71
+            and declared_ids == final_ids == rerun_ids
+            and rerun.get("manifest_consistent") is True
+        )
+        source_copy_ok = (
+            len(source_files) == 11
+            and all(unchanged_source_files.values())
+            and all(changed_source_files.values())
+            and set(changes.get("changed_files", [])) == changed_files
+        )
+        passed = (
+            tested.returncode == 0
+            and rerun.get("status") == "passed"
+            and rerun.get("coverage_ok") is True
+            and independent.get("status") == "passed"
+            and stage_gate
+            and manifest_consistent
+            and coverage_ok
+            and source_copy_ok
+        )
+        return {
+            "passed": passed,
+            "valid_zip": True,
+            "file_count": len(names),
+            "source_file_count": len(source_files),
+            "missing_members": [],
+            "unsafe_members": [],
+            "source_copy": {
+                "unchanged_file_count": sum(unchanged_source_files.values()),
+                "expected_unchanged_file_count": len(source_files) - len(changed_files),
+                "changed_files": sorted(
+                    name for name, changed in changed_source_files.items() if changed
+                ),
+                "passed": source_copy_ok,
+            },
+            "stages": {
+                "stage_a_exit_code": stages["stage-a-original"].get("exit_code"),
+                "stage_b_failed": stages["stage-b-config-only"].get(
+                    "num_failed_tests"
+                ),
+                "stage_c_failed": stages["stage-c-export-only"].get(
+                    "num_failed_tests"
+                ),
+                "stage_d_passed": stages["stage-d-final"].get(
+                    "num_passed_tests"
+                ),
+            },
+            "tests": {
+                "exit_code": tested.returncode,
+                "elapsed_ms": elapsed_ms,
+                "collected": len(rerun_ids),
+                "passed": rerun.get("passed"),
+                "failed": rerun.get("failed"),
+                "manifest_consistent": manifest_consistent,
+            },
+            "coverage_files": coverage_files,
+            "coverage_gate_passed": coverage_ok,
+            "network_boundary": (
+                "本次固定测试未观察到网络调用且未注入凭据或代理；"
+                "没有进程或 OS 级 socket 隔离。"
+            ),
+        }
+    except (
+        KeyError,
+        OSError,
+        RuntimeError,
+        TypeError,
+        ValueError,
+        json.JSONDecodeError,
+        zipfile.BadZipFile,
+        subprocess.SubprocessError,
+    ) as exc:
+        return {
+            "passed": False,
+            "valid_zip": False,
+            "error": type(exc).__name__,
+            "detail": str(exc),
+        }
+
+
 def _tc10_docx_content_gate(content: bytes) -> dict[str, Any]:
     required_tokens = (
         "START -> 外呼时段合规判断",
@@ -521,6 +758,12 @@ def _download_artifacts(
             and artifact.get("media_type") == "application/zip"
         ):
             content_gate = _tc04_zip_content_gate(response.content)
+        elif (
+            response.status_code == 200
+            and artifact.get("scenario_id") == "TC-12"
+            and artifact.get("media_type") == "application/zip"
+        ):
+            content_gate = _tc12_zip_content_gate(response.content)
         downloads.append(
             {
                 "artifact_id": artifact["artifact_id"],

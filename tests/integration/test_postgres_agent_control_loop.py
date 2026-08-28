@@ -23,8 +23,11 @@ from services.api.app.application.run_workspace_artifact_store import (
 )
 from services.api.app.application.scenario_effects import ScenarioEffectEngine
 from tests.unit.test_scenario_effect_runtime import (
+    DashboardAnalyst,
+    DashboardPlanner,
     FORTE_ROOT,
     ONBOARDING_INSTRUCTION,
+    TC12_INSTRUCTION,
     OnboardingAnalyst,
     OnboardingPlanner,
 )
@@ -107,6 +110,104 @@ async def test_postgres_restart_preserves_verified_run_workspace_artifact(
         assert metadata.original_inputs_modified is False
         assert metadata.external_action == "none"
         assert "content_sha256" not in second.public_snapshot(restored).model_dump_json()
+    finally:
+        for runtime in reversed(runtimes):
+            await runtime.close()
+        if DATABASE_DSN and run_id:
+            async with await psycopg.AsyncConnection.connect(DATABASE_DSN) as connection:
+                async with connection.cursor() as cursor:
+                    for table in (
+                        "harness_idempotency",
+                        "harness_task_commit",
+                        "harness_artifact_version",
+                        "harness_run_state",
+                    ):
+                        await cursor.execute(
+                            f"DELETE FROM {table} WHERE owner_id = %s",  # nosec B608
+                            (owner,),
+                        )
+
+
+@pytest.mark.asyncio
+async def test_postgres_restart_preserves_tc12_real_vitest_artifacts(
+    tmp_path: Path,
+) -> None:
+    owner = f"postgres-tc12-vitest-{uuid4().hex}"
+    run_id = ""
+    runtimes: list[HarnessRuntime] = []
+    workspace_root = tmp_path / "tc12-run-workspaces"
+    try:
+        first = HarnessRuntime(
+            BenchmarkWorkspaceCatalog(FORTE_ROOT),
+            DashboardPlanner(),
+            DashboardAnalyst(),
+            PostgresHarnessStateStore(DATABASE_DSN),
+            effect_engine=ScenarioEffectEngine(),
+            artifact_store=RunWorkspaceArtifactStore(workspace_root),
+        )
+        runtimes.append(first)
+        await first.setup()
+        started = await first.start(
+            owner,
+            start_request(
+                idempotency_key=f"postgres-tc12-start-{uuid4().hex}",
+                instruction=TC12_INSTRUCTION,
+            ),
+        )
+        run_id = started.run.run_id
+        terminal = None
+        for _ in range(600):
+            candidate = await first.get(owner, run_id)
+            if candidate.status in {"completed", "stopped", "failed"}:
+                terminal = candidate
+                break
+            await asyncio.sleep(0.05)
+        assert terminal is not None and terminal.status == "completed"
+        assert terminal.effect_receipts[0].status == "passed"
+        assert terminal.effect_receipts[0].scenario_id == "TC-12"
+        assert len(terminal.workspace_artifacts) == 2
+        package = next(
+            item
+            for item in terminal.workspace_artifacts
+            if item.file_name == "看板工具库修复包.zip"
+        )
+        assert package.verifier_status == "passed"
+        assert package.self_test is not None
+        assert sum(
+            suite.test_count for suite in package.self_test.test_suites
+        ) == 71
+        _, original_content = await first.get_workspace_artifact(
+            owner, run_id, package.artifact_id
+        )
+        await first.close()
+
+        second = HarnessRuntime(
+            BenchmarkWorkspaceCatalog(FORTE_ROOT),
+            DashboardPlanner(),
+            DashboardAnalyst(),
+            PostgresHarnessStateStore(DATABASE_DSN),
+            effect_engine=ScenarioEffectEngine(),
+            artifact_store=RunWorkspaceArtifactStore(workspace_root),
+        )
+        runtimes.append(second)
+        await second.setup()
+        restored = await second.get(owner, run_id)
+        assert restored.status == "completed"
+        assert restored.effect_receipts[0].scenario_id == "TC-12"
+        restored_package = next(
+            item
+            for item in restored.workspace_artifacts
+            if item.artifact_id == package.artifact_id
+        )
+        assert restored_package.self_test is not None
+        assert restored_package.self_test.test_manifest_matches_collected is True
+        _, restored_content = await second.get_workspace_artifact(
+            owner, run_id, package.artifact_id
+        )
+        assert restored_content == original_content
+        assert "content_sha256" not in second.public_snapshot(
+            restored
+        ).model_dump_json()
     finally:
         for runtime in reversed(runtimes):
             await runtime.close()

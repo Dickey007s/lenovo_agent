@@ -55,7 +55,7 @@ CSS、HTML、shell、log 等。它们覆盖结构化表格、长文档、扫描/
 | `TC-09` | `Misc-AT-003` | 周期搜索新闻并追加文件 | Web + cron | 单任务持续运行 | 全局定时、副作用 | `blocked_external_boundary`：未创建 cron/未发起 Web 任务 |
 | `TC-10` | `Operations-008` | 设计合规催收外呼流程 | MD | Demo 1 + Demo 3 | 合规规则、禁止真实外呼 | `Limited Verified`：真实 DOCX + 13 项规则/终态检查；未拨号、未写 CRM |
 | `TC-11` | `pm-014` | 上线合规与风险评估 | MD + 3 个 XLSX | Demo 2 多任务 | 冲突汇聚、报告写入 | `Limited Verified`：DOCX 与确定性指标复算；没有多 Worker 或真实发布 |
-| `TC-12` | `qa-003` | 为看板工具库补测试并修复源码 | JS + JSON | Demo 2 多任务 | 沙箱执行、代码写入 | `Limited Verified`：隔离 ZIP/报告，Vitest 9/9；无网络或任意 package script |
+| `TC-12` | `qa-003` | 为看板工具库补测试并修复源码 | JS + JSON | Demo 2 多任务 | 固定测试执行、隔离代码写入 | `Limited Verified` 收尾中：完整 11 文件副本，同一 71 项 Vitest 先红后绿、逐文件 coverage、独立复跑；没有自动 PR 或 OS 级断网 |
 | `TC-13` | `sales-020` | 客户画像清洗与销售策略 | CSV + MD | Demo 1/2 | 分群依据、人工复核 | `Limited Verified`：Markdown 报告 + 6 项分群/守恒检查 |
 | `TC-14` | `sre-010` | 大促 ES 故障诊断与止损建议 | TXT log | Demo 1 + Demo 3 | 高风险命令、禁止自动执行 | `Limited Verified`：Markdown 诊断 + 9 项日志/地址/禁执行检查 |
 | `TC-15` | `uiux-021` | 交互痛点归因与优先级排序 | XLSX + MD + DOCX | Demo 2 多任务 | 排序验证、CSV 写入 | `Limited Verified`：真实 CSV + 6 项 P0-P4/稳定排序检查 |
@@ -178,10 +178,17 @@ CSS、HTML、shell、log 等。它们覆盖结构化表格、长文档、扫描/
 ### TC-12 看板工具库测试与修复
 
 - 用户目标：为三个工具模块编写 Vitest，修复问题并确保全部通过。
-- 自组织单元：三个模块测试、配置诊断、共享缺陷修复、最终回归。
-- 动态重排：共享工具或配置缺陷触发跨分支依赖与统一回归。
-- 验证：至少八个场景、真实 Vitest receipt、最终零失败和修改摘要。
-- 禁止：未运行测试时声称通过，或让 Worker 直接改原始只读来源。
+- 输入事实：qa-003 `dashboard-toolkit` 的 11/11 个公开 input；普通 UI 和模型不得读取 `task.md`、rubric 或 solution。
+- 预期成果：`看板工具库修复包.zip` 与 `TC-12真实测试报告.md`；ZIP 含完整修复后副本、统一 diff、四阶段 JSON、coverage、manifest、自测卡和固定入口。
+- Stage A：保持原配置，真实复现 `@` 指向 `./source` 的解析红灯。
+- Stage B：只修配置，用同一套测试复现增长率分母、排序副作用、相等值稳定性和日期函数未导出。
+- Stage C：只补日期函数导出，复现开始日和结束日被排除。
+- Stage D：应用完整四文件修复；指标计算 23、数据转换 20、筛选与分页 28，共 71/71。
+- 确定性门：公共 manifest、实际 collected、前台与 ZIP 同集；三份业务源码 statements/lines >=85%、branches >=75%；独立解压复跑通过；11 个原输入前后字节不变。
+- 前台效果：用户能展开真实测试 ID，看到四处问题及业务影响、逐文件 coverage、自测命令、失败信号和人工合并边界。
+- 负向门：向 Stage D coverage 固定命令注入非零退出；Scenario、两份 Artifact 与 EffectReceipt 必须失败，首屏和报告不得显示 `71/71` 绿灯，必须写“当前包不得合并”、三类证据路径和“重新启动新的 TC-12 Run”。
+- 禁止副作用：不修改 FORTE 原件、不联网安装、不运行来源 package scripts、不注入凭据/代理、不创建或合并 PR。
+- 边界：固定测试未观察到网络调用，但没有进程或 OS 级断网；这是 qa-003 适配器，不是任意 JavaScript 沙箱。
 
 ### TC-15 交互痛点优化方案
 
@@ -232,7 +239,7 @@ FORTE 输入、写入隔离 Run Workspace、运行命名 validator，并把真�
 真实办公文件或源文件 Commit。
 
 代码型 TC-02/04/12 只证明固定适配器的隔离副本和已记录测试，不是任意命令沙箱；
-TC-04 当前使用 coverage.py 核对真实模块与三个变更文件，但仍不等于完整真实外部 HTTP 集成。下一层才是通用 Tool Gateway、
+TC-04 使用 coverage.py 核对真实模块与三个变更文件，TC-12 使用 V8 coverage 核对三个变更业务模块；二者都不等于完整真实外部 HTTP 集成。下一层才是通用 Tool Gateway、
 命令策略、依赖治理、Diff 审查与可复用 verifier。
 
 外部 TC-03/08/09 继续保持阻断。只有 Web、SQL、Scheduler Connector、身份授权、

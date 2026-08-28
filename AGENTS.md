@@ -95,6 +95,16 @@ GET and SSE must remain responsive, and `scenario_effect_failed` creates no gree
 Artifact. This is not multi Worker scheduling or durable subprocess execution;
 restart follows the existing checkpoint pause rule.
 
+DR-0042 governs TC-12 real dashboard-toolkit Vitest evidence. Read
+`docs/decisions/DR-0042-tc12-real-dashboard-toolkit-vitest.md`,
+`docs/scenarios/SCENARIO-028-test-and-fix-real-dashboard-toolkit-copy.md`
+and its Evidence before changing the fixed qa-003 adapter or shared test-list UI.
+TC-12 must copy all 11 public inputs, preserve the historical repair-only 9/9
+baseline, run the same manifest-owned tests through three red stages and the final
+green stage, gate each changed business file by V8 coverage, and independently
+rerun the downloaded ZIP. It is not an arbitrary JavaScript sandbox, OS-level
+network isolation, automatic PR/merge or production multi-tenant execution.
+
 DR-0037 governs TC-05 Artifact meaning and review typography. Read
 `docs/decisions/DR-0037-tc05-artifact-semantics-and-review-readability.md` and
 `docs/scenarios/SCENARIO-023-understand-finance-artifacts-and-review-evidence.md`

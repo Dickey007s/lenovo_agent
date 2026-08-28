@@ -297,6 +297,16 @@ multi-instance coordination and governed external action remain target work.
   without a green Artifact. This remains one fixed adapter, not an arbitrary
   test sandbox, OS-level network isolation, real endpoint integration, automatic
   PR path, multi Worker scheduler or resumable Tool Gateway.
+- `DR-0042` replaces TC-12's historical repair-only 9/9 Vitest receipt with the
+  complete 11-file qa-003 dashboard-toolkit copy and one manifest-owned 71-case
+  test set. The same tests first expose the original alias failure, then the
+  growth, sorting and date-boundary defects across three red stages, before the
+  four-file fix passes 71/71. Three changed business modules each have their own
+  V8 statements/lines >=85% and branches >=75% gate. The ZIP includes the full
+  copy, unified diff, stage JSON, coverage, real test IDs and an independently
+  rerun self-test. This remains a fixed qa-003 adapter, not an arbitrary
+  JavaScript sandbox, OS-level network isolation, automatic PR or production
+  multi-tenant execution.
 - No target-user study has been run. Clarity, trust, efficiency and user value
   remain hypotheses.
 

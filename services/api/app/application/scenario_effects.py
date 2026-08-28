@@ -41,6 +41,9 @@ from services.api.app.application.react_refactor_effect import (
 from services.api.app.application.evaluation_platform_effect import (
     build_real_evaluation_platform_fix,
 )
+from services.api.app.application.dashboard_toolkit_effect import (
+    build_real_dashboard_toolkit_fix,
+)
 
 
 class ScenarioEffectError(RuntimeError):
@@ -402,9 +405,9 @@ SCENARIO_EFFECT_SPECS: tuple[ScenarioEffectSpec, ...] = (
             ("质量保障", "statisticsEngine.js"),
             ("质量保障", "validatorUtils.js"),
         ),
-        ("看板工具库修复包.zip", "Vitest回执.md"),
-        "validator-code-sandbox-v1",
-        "显示真实 diff、Vitest 输出和零失败事实。",
+        ("看板工具库修复包.zip", "TC-12真实测试报告.md"),
+        "validator-dashboard-toolkit-project-v2",
+        "显示完整隔离副本、分阶段红灯、真实 diff、71 项测试和逐文件覆盖率。",
         ("effect_receipts[]",),
         ("不修改 FORTE 原始源码", "不伪造测试通过"),
         "implemented",
@@ -1350,7 +1353,7 @@ class ScenarioEffectEngine:
             ),
         )
 
-    def _dashboard_toolkit_fix(
+    def _dashboard_toolkit_fix_legacy(
         self, catalog: ScenarioEffectCatalog, spec: ScenarioEffectSpec
     ) -> tuple[GeneratedOfficeArtifact, ...]:
         sources, source_refs = self._checked_source_bytes(catalog, spec)
@@ -1543,6 +1546,248 @@ class ScenarioEffectEngine:
                 "text/markdown",
                 receipt.encode("utf-8"),
                 summary=f"真实 Vitest 固定命令执行 {total_tests} 项测试，零失败。",
+                **common,
+            ),
+        )
+
+    def _dashboard_toolkit_fix(
+        self, catalog: ScenarioEffectCatalog, spec: ScenarioEffectSpec
+    ) -> tuple[GeneratedOfficeArtifact, ...]:
+        project_sources, project_refs = self._checked_group_tree(
+            catalog, group="质量保障", relative_prefix="dashboard-toolkit/"
+        )
+        repo_root = Path(__file__).resolve().parents[4]
+        node_modules_root = repo_root / "apps" / "web" / "node_modules"
+        vitest_entry = node_modules_root / "vitest" / "vitest.mjs"
+        vitest_package = node_modules_root / "vitest" / "package.json"
+        coverage_package = (
+            node_modules_root / "@vitest" / "coverage-v8" / "package.json"
+        )
+        node = shutil.which("node")
+        if node is None or not all(
+            path.is_file()
+            for path in (vitest_entry, vitest_package, coverage_package)
+        ):
+            raise ScenarioEffectError(
+                "本地 Vitest 1.6.1 与 coverage-v8 1.6.1 固定执行器不可用"
+            )
+        versions = {
+            "vitest": json.loads(vitest_package.read_text(encoding="utf-8"))[
+                "version"
+            ],
+            "coverage": json.loads(
+                coverage_package.read_text(encoding="utf-8")
+            )["version"],
+        }
+        if versions != {"vitest": "1.6.1", "coverage": "1.6.1"}:
+            raise ScenarioEffectError(
+                "TC-12 只允许匹配的 Vitest 1.6.1 与 coverage-v8 1.6.1"
+            )
+        build = build_real_dashboard_toolkit_fix(
+            project_sources,
+            self._run_fixed_command,
+            node=node,
+            vitest_entry=vitest_entry,
+            dependency_root=node_modules_root,
+        )
+        sources_after, refs_after = self._checked_group_tree(
+            catalog, group="质量保障", relative_prefix="dashboard-toolkit/"
+        )
+        source_tree_unchanged = (
+            sources_after == project_sources and refs_after == project_refs
+        )
+        checks = tuple(
+            self._check(check_id, label, passed, detail)
+            for check_id, label, passed, detail in build.checks
+        ) + (
+            self._check(
+                "check-tc12-catalog-reread",
+                "原始输入再次读取一致",
+                source_tree_unchanged,
+                "四阶段测试和独立解压复跑后重新读取 11/11 个 FORTE 输入，字节与引用未变化。",
+            ),
+        )
+        coverage_lines = [
+            (
+                f"{Path(str(item['file'])).name}：statements "
+                f"{item.get('statements', {}).get('pct', 0)}%，branches "
+                f"{item.get('branches', {}).get('pct', 0)}%，lines "
+                f"{item.get('lines', {}).get('pct', 0)}%"
+            )
+            for item in build.coverage_by_file
+        ]
+        artifact_ready = build.execution_ok and source_tree_unchanged
+        key_outputs = (
+            (
+                "Stage A：原配置真实复现 @ 指向 ./source 的模块解析红灯。",
+                "Stage B：只修配置后，增长率分母、排序副作用、相等值和日期函数未导出仍真实失败。",
+                "Stage C：只补日期函数导出后，开始日和结束日排除测试仍失败。",
+                f"Stage D：应用完整修复后 {build.test_count}/{build.test_count} 项真实 Vitest 全部通过。",
+                "配置修复：@ 别名改为真实 src，测试才能加载三个业务模块。",
+                "指标修复：增长率以旧值为分母，避免经营指标失真。",
+                "转换修复：排序不再修改调用方数组，相等值保持稳定顺序。",
+                "筛选修复：日期函数可导入，并把起止日期纳入闭区间。",
+                *coverage_lines,
+                f"清单一致：页面、test-manifest.json 与实际 collected IDs 同为 {build.test_count} 项。",
+            )
+            if artifact_ready
+            else (
+                "当前固定测试命令未完成全部验证，这不是测试全绿回执。",
+                "当前包不得合并；隔离副本、统一 diff 和失败证据已经保留。",
+                "请查看 Stage D 结果 JSON、coverage-summary.json 与独立复跑回执。",
+                "修复执行环境或源码后，重新启动一项新的 TC-12 Run。",
+            )
+        )
+        expected_checks = (
+            [
+                "Stage A 必须因原 @ 别名指向 ./source 而红灯",
+                "Stage B 必须由真实源码复现增长率、排序副作用和未导出日期函数",
+                "Stage C 必须由真实测试复现日期闭区间缺陷",
+                f"Stage D 必须 {build.test_count}/{build.test_count} 通过且零失败",
+                "三个测试套件必须直接导入真实 metricsCalculator、dataTransformer、filterEngine",
+                "test-manifest.json 声明集合必须等于实际 collected IDs",
+                "三份变更业务源码 statements/lines >= 85%，branches >= 75%",
+                "完整 11 文件副本、changes.patch 和四阶段 JSON 都必须存在",
+                "独立解压目录复跑结果必须与服务端回执一致",
+            ]
+            if artifact_ready
+            else [
+                "当前 Stage D 或独立复跑未通过，不得把本轮标为测试全绿",
+                "查看 evidence/stage-d-final-result.json 与对应 Vitest JSON",
+                "查看 evidence/coverage-summary.json 与 independent-unpack-rerun.json",
+                "修复后必须重新启动一项新的 TC-12 Run",
+            ]
+        )
+        self_test = AgentControlLoopArtifactSelfTest(
+            instruction=spec.instruction,
+            expected_files=[
+                "dashboard-toolkit/src/",
+                "dashboard-toolkit/tests/metricsCalculator.test.js",
+                "dashboard-toolkit/tests/dataTransformer.test.js",
+                "dashboard-toolkit/tests/filterEngine.test.js",
+                "dashboard-toolkit/changes.patch",
+                "dashboard-toolkit/test-manifest.json",
+                "dashboard-toolkit/evidence/stage-a-original-result.json",
+                "dashboard-toolkit/evidence/stage-b-config-only-result.json",
+                "dashboard-toolkit/evidence/stage-c-export-only-result.json",
+                "dashboard-toolkit/evidence/stage-d-final-result.json",
+                "dashboard-toolkit/evidence/coverage-summary.json",
+                "dashboard-toolkit/TC-12测试报告.md",
+                "dashboard-toolkit/TC-12自测卡.md",
+                "dashboard-toolkit/run-self-test.mjs",
+            ],
+            commands=[
+                "node dashboard-toolkit/run-self-test.mjs apps/web/node_modules/vitest/vitest.mjs"
+            ],
+            expected_checks=expected_checks,
+            failure_signals=[
+                "命令退出码非 0，或最终出现 failed/error",
+                "任一阶段没有出现预期红灯，说明测试未证明原缺陷",
+                "声明 ID 与实际 collected IDs 不一致",
+                "任一变更业务源码覆盖率未达到逐文件门槛",
+                "ZIP 缺少 11 文件副本、统一 diff、阶段 JSON 或覆盖率摘要",
+                "运行来源 package scripts、访问真实 endpoint 或要求联网安装依赖",
+                "FORTE 原始输入字节发生变化",
+            ],
+            test_manifest_file="dashboard-toolkit/test-manifest.json",
+            test_manifest_matches_collected=True,
+            test_suites=[
+                AgentControlLoopArtifactTestSuite(
+                    suite_id=str(suite["id"]),
+                    label=str(suite["label"]),
+                    test_files=[str(item) for item in suite["test_files"]],
+                    test_count=int(suite["test_count"]),
+                    test_ids=[str(item) for item in suite["test_ids"]],
+                )
+                for suite in build.test_suites
+            ],
+        )
+        package = self._zip_bytes(build.archive_files)
+        execution_summary = (
+            (
+                f"Agent 在隔离副本中先用同一套 {build.test_count} 项 Vitest 复现三阶段红灯，"
+                f"再修复四个真实文件并实现 {build.test_count}/{build.test_count} 通过；"
+                "FORTE 原文件没有被覆盖。"
+            )
+            if artifact_ready
+            else (
+                "固定测试命令未完成全部验证；当前包不得合并。失败只影响本轮隔离副本，"
+                "FORTE 原文件没有被覆盖。"
+            )
+        )
+        common = dict(
+            source_file_refs=project_refs,
+            validator_id="validator-dashboard-toolkit-project-v2",
+            checks=checks,
+            covered_period="固定 FORTE qa-003 / dashboard-toolkit 公开输入",
+            statistic_basis=(
+                (
+                    "完整 11/11 输入文件；同一套具名 Vitest 的 Stage A/B/C 红灯、Stage D 绿灯；"
+                    "Vitest 1.6.1 与 coverage-v8 1.6.1。"
+                )
+                if artifact_ready
+                else (
+                    "完整 11/11 输入文件与分阶段失败证据；最终固定命令或独立复跑未通过，"
+                    "不形成测试全绿结论。"
+                )
+            ),
+            purpose=(
+                "用于下载、复跑、审查统一 diff 后由人工决定是否合并；"
+                "不会修改 FORTE 原件，也不会自动创建或合并 PR。"
+            ),
+            key_outputs=key_outputs,
+            key_outputs_label="红灯到绿灯与修复影响",
+            review_guidance=(
+                (
+                    "请先确认三阶段红灯确实对应原缺陷，再复跑最终测试并审查 changes.patch。"
+                    "当前只是固定 qa-003 适配器，不是任意 JavaScript 沙箱，也没有生产多租户隔离。"
+                )
+                if artifact_ready
+                else (
+                    "当前包不得合并。请查看 dashboard-toolkit/evidence/stage-d-final-result.json、"
+                    "coverage-summary.json 和 independent-unpack-rerun.json；修复后重新启动一项"
+                    "新的 TC-12 Run。"
+                )
+            ),
+            execution_summary=execution_summary,
+        )
+        return (
+            GeneratedOfficeArtifact(
+                "看板工具库修复包",
+                "看板工具库修复包.zip",
+                "application/zip",
+                package,
+                summary=(
+                    (
+                        f"完整 11 文件隔离副本、四文件真实 diff、三阶段红灯、"
+                        f"{build.test_count} 项测试与逐文件覆盖率均可下载复查。"
+                    )
+                    if artifact_ready
+                    else (
+                        "完整隔离副本、统一 diff 和失败证据已保留；固定测试未通过，当前包不得合并。"
+                    )
+                ),
+                deliverable_type="完整看板工具库隔离修复副本（ZIP）",
+                self_test=self_test,
+                **common,
+            ),
+            GeneratedOfficeArtifact(
+                "TC-12 真实测试报告",
+                "TC-12真实测试报告.md",
+                "text/markdown",
+                build.report,
+                summary=(
+                    (
+                        f"同一测试集先证明原缺陷，再验证修复后 {build.test_count}/"
+                        f"{build.test_count} 通过和逐文件覆盖率门。"
+                    )
+                    if artifact_ready
+                    else (
+                        "报告保留分阶段失败、coverage 和复跑证据；当前未形成测试全绿结论。"
+                    )
+                ),
+                deliverable_type="分阶段 Vitest、覆盖率与独立复跑报告（Markdown）",
+                self_test=None,
                 **common,
             ),
         )
