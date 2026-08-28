@@ -313,7 +313,10 @@ Planner/Analyst are not this internal policy. The verifier compares declared and
 executed test IDs and independently rechecks the downloaded ZIP. This does not
 prove model-driven action selection inside the project and does not add a general
 shell, arbitrary repository support, dependency installation, automatic merge or
-OS-level network isolation.
+OS-level network isolation. Artifact cards keep their own `checks[]` projection,
+but Run-level counts and EffectReceipt wording deduplicate repeated `check_id`
+values. Two files using one checklist are therefore twelve unique checks, not
+twenty-four independent checks.
 
 ## 7. Eight module maturity
 

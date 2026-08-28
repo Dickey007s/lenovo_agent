@@ -54,6 +54,7 @@ from services.api.app.application.run_workspace_artifact_store import (
 from services.api.app.application.scenario_effects import (
     ScenarioEffectEngine,
     ScenarioEffectExecution,
+    summarize_artifact_check_groups,
 )
 from services.api.app.application.harness_storage import (
     HarnessStateStore,
@@ -3455,6 +3456,9 @@ class HarnessRuntime:
             sequence = snapshot.last_event_sequence
             events = list(snapshot.events)
             sequence += 1
+            _, unique_check_count, passed_check_count, _ = (
+                summarize_artifact_check_groups(record.checks for record in records)
+            )
             events.append(
                 HarnessEvent(
                     sequence=sequence,
@@ -3509,7 +3513,8 @@ class HarnessRuntime:
                         "scenario_id": execution.scenario_id,
                         "effect_status": execution.status,
                         "artifact_count": len(records),
-                        "check_count": sum(len(item.checks) for item in records),
+                        "check_count": unique_check_count,
+                        "passed_check_count": passed_check_count,
                         "external_action": False,
                     },
                 )

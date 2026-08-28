@@ -1,11 +1,11 @@
 {
   "schema_version": "scenario-effect-gate-live.v1",
-  "generated_at": "2026-08-28T09:19:59.668712+00:00",
+  "generated_at": "2026-08-28T09:39:42.378514+00:00",
   "api_base": "http://127.0.0.1:8010",
   "service": {
     "model": "deepseek-v4-pro",
-    "checkpoint": "memory",
-    "task_store": "memory"
+    "checkpoint": "postgres",
+    "task_store": "postgres"
   },
   "dataset": {
     "name": "FORTE public demo inputs",
@@ -26,11 +26,11 @@
       "capability_id": "office-code-react-refactor",
       "title": "搜索 Agent 有界 ReAct 控制结构重构",
       "instruction": "把搜索 Agent 从固定 Workflow 重构为带迭代上限和轨迹的 ReAct 结构。",
-      "run_id": "harness:2a00cdea6c7848c8aede34b594470638",
-      "started_at": "2026-08-28T09:19:04.510288+00:00",
-      "observed_at": "2026-08-28T09:19:59.631676+00:00",
+      "run_id": "harness:76d4b2f5828a45b28832ab7e63f317d5",
+      "started_at": "2026-08-28T09:38:18.076396+00:00",
+      "observed_at": "2026-08-28T09:39:42.339744+00:00",
       "run_status": "waiting_input",
-      "snapshot_version": 12,
+      "snapshot_version": 14,
       "current_round": 1,
       "budget": {
         "max_rounds": 12,
@@ -38,9 +38,9 @@
         "max_model_calls": 30,
         "deadline_seconds": 7200,
         "rounds_used": 1,
-        "files_verified": 4,
-        "model_calls_used": 2,
-        "elapsed_ms": 53404,
+        "files_verified": 3,
+        "model_calls_used": 3,
+        "elapsed_ms": 82314,
         "stop_reason": null
       },
       "model_calls": [
@@ -49,7 +49,7 @@
           "role": "planner",
           "called": true,
           "model": "deepseek-v4-pro",
-          "elapsed_ms": 20114,
+          "elapsed_ms": 20508,
           "output_used": true
         },
         {
@@ -57,7 +57,7 @@
           "role": "analyst",
           "called": true,
           "model": "deepseek-v4-pro",
-          "elapsed_ms": 31515,
+          "elapsed_ms": 26820,
           "output_used": true
         }
       ],
@@ -65,13 +65,13 @@
       "model_output_adopted": true,
       "effect_receipts": [
         {
-          "receipt_id": "effect-receipt-1492f016269e",
+          "receipt_id": "effect-receipt-b5a6f86ee6a8",
           "capability_id": "office-code-react-refactor",
           "scenario_id": "TC-02",
           "status": "passed",
           "state": "已冻结 7 份 FORTE 输入，原始文件保持只读。",
           "action": "调用 office-code-react-refactor 确定性办公工具并写入隔离运行工作区。",
-          "observation": "生成 2 份真实成果文件，执行 24 项确定性检查。",
+          "observation": "生成 2 份真实成果文件，共享 12 项确定性检查，12/12 通过。",
           "cost": "0 次额外模型调用；仅消耗本机确定性解析、计算与文件写入。",
           "result": "所有确定性效果门通过，成果仍需用户复核。",
           "source_file_refs": [
@@ -84,24 +84,24 @@
             "forte-2f73463ddf941c94"
           ],
           "artifact_ids": [
-            "workspace-artifact-3aca47a0d3cf",
-            "workspace-artifact-44b2c67569f8"
+            "workspace-artifact-74d901fa7b55",
+            "workspace-artifact-32bc0b5dfd2c"
           ],
           "prohibited_side_effects": [
             "不修改 FORTE 原始源码",
             "不运行未批准命令",
             "固定测试不调用网络或生产搜索"
           ],
-          "created_at": "2026-08-28T09:19:25.738945Z",
+          "created_at": "2026-08-28T09:38:40.293601Z",
           "external_action": "none"
         }
       ],
       "artifacts": [
         {
-          "artifact_id": "workspace-artifact-3aca47a0d3cf",
+          "artifact_id": "workspace-artifact-74d901fa7b55",
           "file_name": "search-agent-react-refactor.zip",
           "media_type": "application/zip",
-          "size": 31411,
+          "size": 31412,
           "validator_id": "validator-code-project-copy-v2",
           "verifier_status": "passed",
           "checks": [
@@ -226,7 +226,7 @@
           "original_inputs_modified": false
         },
         {
-          "artifact_id": "workspace-artifact-44b2c67569f8",
+          "artifact_id": "workspace-artifact-32bc0b5dfd2c",
           "file_name": "TC-02测试与改动说明.md",
           "media_type": "text/markdown",
           "size": 1658,
@@ -316,7 +316,7 @@
           ],
           "key_outputs_label": "验证结论",
           "review_guidance": "先核对 CHANGESET.patch，再按自测卡运行两条命令。全部通过后人工挑选合并；当前系统不会写回仓库或发起 PR。",
-          "execution_summary": "编译 171 ms，测试 141 ms；失败时成果卡必须标红并停止人工合并。",
+          "execution_summary": "编译 139 ms，测试 141 ms；失败时成果卡必须标红并停止人工合并。",
           "self_test": null,
           "external_action": "none",
           "original_inputs_modified": false
@@ -324,13 +324,13 @@
       ],
       "artifact_downloads": [
         {
-          "artifact_id": "workspace-artifact-3aca47a0d3cf",
+          "artifact_id": "workspace-artifact-74d901fa7b55",
           "file_name": "search-agent-react-refactor.zip",
           "status_code": 200,
           "content_type": "application/zip",
-          "declared_size": 31411,
-          "downloaded_size": 31411,
-          "sha256": "d66912916a17df56d3ea31f5be2d234267b9ea6eaaaaa9b0e73fa434a87caa55",
+          "declared_size": 31412,
+          "downloaded_size": 31412,
+          "sha256": "6150a5fbc8d287a3bb465c084bf4b5f7f50aa5a90e8afea1cd7d8117715a0e0a",
           "size_matches": true,
           "content_gate": {
             "passed": true,
@@ -347,11 +347,11 @@
             },
             "compile": {
               "exit_code": 0,
-              "elapsed_ms": 125
+              "elapsed_ms": 141
             },
             "tests": {
               "exit_code": 0,
-              "elapsed_ms": 141,
+              "elapsed_ms": 139,
               "count": 20,
               "declared_ids": [
                 "test_config_accepts_minimum_iteration_bound",
@@ -404,13 +404,13 @@
           }
         },
         {
-          "artifact_id": "workspace-artifact-44b2c67569f8",
+          "artifact_id": "workspace-artifact-32bc0b5dfd2c",
           "file_name": "TC-02测试与改动说明.md",
           "status_code": 200,
           "content_type": "text/markdown",
           "declared_size": 1658,
           "downloaded_size": 1658,
-          "sha256": "be28ff57412659c006d54d087003e8909dbdfb5f039e54f50c93cf7aab70691b",
+          "sha256": "7f14ae42bd6ef2053027e1e6619cb2418e3d39dc071c18be2a2e35a6f4b0a14e",
           "size_matches": true,
           "content_gate": null
         }
@@ -459,29 +459,56 @@
           "sequence": 11,
           "event_name": "analysis_completed",
           "status": "analyzing"
+        },
+        {
+          "sequence": 12,
+          "event_name": "analysis_validation_rejected",
+          "status": "analyzing"
+        },
+        {
+          "sequence": 13,
+          "event_name": "analysis_started",
+          "status": "analyzing"
+        },
+        {
+          "sequence": 14,
+          "event_name": "analysis_completed",
+          "status": "analyzing"
         }
       ],
       "waiting_branches": [
         {
-          "branch_id": "branch-5a5a89007f19",
-          "title": "读取 Agent 入口与工具实现",
-          "status": "waiting_input",
-          "missing_file_count": 2
-        },
-        {
-          "branch_id": "branch-d34e3dc52d77",
-          "title": "读取依赖清单与运行日志",
+          "branch_id": "branch-4246e10f43db",
+          "title": "读取搜索 Agent 工具定义",
           "status": "waiting_input",
           "missing_file_count": 1
         },
         {
-          "branch_id": "branch-28914ae1b391",
-          "title": "读取产品需求与技术设计约束",
+          "branch_id": "branch-16fd35dd4481",
+          "title": "读取 LLM 调用封装",
           "status": "waiting_input",
-          "missing_file_count": 2
+          "missing_file_count": 1
         },
         {
-          "branch_id": "branch-749ba459d49b",
+          "branch_id": "branch-f1c0d1020c7d",
+          "title": "读取搜索 Agent 入口",
+          "status": "waiting_input",
+          "missing_file_count": 1
+        },
+        {
+          "branch_id": "branch-5b37bf2dcd46",
+          "title": "读取产品需求文档",
+          "status": "waiting_input",
+          "missing_file_count": 1
+        },
+        {
+          "branch_id": "branch-003feab86767",
+          "title": "读取技术设计文档",
+          "status": "waiting_input",
+          "missing_file_count": 1
+        },
+        {
+          "branch_id": "branch-1ea879086865",
           "title": "生成带文件引用的初步分析结果",
           "status": "waiting_input",
           "missing_file_count": 5

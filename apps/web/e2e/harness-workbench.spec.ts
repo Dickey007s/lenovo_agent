@@ -473,7 +473,7 @@ function verifiedEffectSnapshot(body: { workspace_id: string; instruction: strin
       status: "passed",
       state: "已冻结 3 份 FORTE 输入，原始文件保持只读。",
       action: "调用确定性财务核对工具并写入隔离运行工作区。",
-      observation: "生成 3 份真实成果文件，执行 8 项确定性检查。",
+      observation: "生成 3 份真实成果文件，共 7 项唯一确定性检查（重复 ID 已合并），7/7 通过。",
       cost: "0 次额外模型调用；仅消耗本机确定性计算。",
       result: "所有确定性效果门通过，成果仍需用户复核。",
       source_file_refs: [csvFile.file_ref, pdfFile.file_ref],
@@ -648,7 +648,7 @@ function reactRefactorEffectSnapshot(body: { workspace_id: string; instruction: 
       status: "passed",
       state: "已冻结 algorithm-013 的 7 个输入文件，原始树保持只读。",
       action: "复制真实项目到隔离 Run Workspace，修改副本并执行固定编译和测试。",
-      observation: "完整副本、diff、说明和测试回执均可下载；声明测试与实际执行一致。",
+      observation: "生成 2 份真实成果文件，共享 12 项确定性检查，12/12 通过。",
       cost: "0 次额外模型调用；仅消耗本机固定代码变换与测试。",
       result: "固定 TC-02 效果门通过，等待人工代码评审与合并。",
       source_file_refs: common.source_file_refs,
@@ -1278,7 +1278,7 @@ test("shows a real run-workspace file, deterministic checks and a download", asy
   await expect(artifacts).toContainText("2026 期末未付明细");
   await expect(artifacts).toContainText("2026 期末未收明细");
   await expect(artifacts).toContainText("三期僵尸账款核对说明");
-  await expect(artifacts).toContainText("8/8 项检查通过");
+  await expect(artifacts).toContainText("3 份成果共 7 项唯一确定性检查，7/7 通过");
   await expect(artifacts).toContainText("涵盖期间");
   await expect(artifacts).toContainText("统计口径");
   await expect(artifacts).toContainText("用途");
@@ -1392,6 +1392,13 @@ test("explains the real TC-02 project copy, diff, self-test and merge boundary",
   const artifacts = page.locator(".workspace-artifacts");
   const selfTest = page.locator(".workspace-artifact-self-test");
   await expect(artifacts).toContainText("Agent 已生成 2 份真实成果文件");
+  await expect(artifacts).toContainText("2 份成果共享 12 项确定性检查，12/12 通过");
+  await expect(artifacts).not.toContainText("24/24");
+  await expect(artifacts).not.toContainText("执行 24 项");
+  await expect(artifacts.locator(".workspace-artifact-status")).toHaveCount(2);
+  await expect(artifacts.locator(".workspace-artifact-status").first()).toContainText("使用同一验证清单");
+  await expect(page.locator(".loop-effect-conclusion")).toContainText("2 份成果共享 12 项规则检查，12/12 通过");
+  await expect(page.locator(".workspace-effect-receipt")).toContainText("生成 2 份真实成果文件，共享 12 项确定性检查，12/12 通过");
   await expect(artifacts).toContainText("algorithm-013 有界 ReAct 控制结构代码包");
   await expect(artifacts).toContainText("完整可运行项目副本");
   await expect(artifacts).toContainText("测试回执与改动说明");
@@ -1422,7 +1429,17 @@ test("explains the real TC-02 project copy, diff, self-test and merge boundary",
   const commandSize = await selfTest.locator("code").first().evaluate((element) => Number.parseFloat(getComputedStyle(element).fontSize));
   expect(commandSize).toBeGreaterThanOrEqual(10);
   if (process.env.CAPTURE_TC02_EFFECT_EVIDENCE === "1") {
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    const evidenceStyle = await page.addStyleTag({ content: `
+      html, body, .harness-app-shell { height: auto !important; overflow: visible !important; }
+      .harness-app-shell { display: block !important; }
+      .harness-workspace-shell { overflow: visible !important; }
+      .harness-agent-shell, .harness-app-divider, .dataset-browser { display: none !important; }
+      .data-workbench { width: 1400px !important; }
+      .data-workbench-grid { grid-template-columns: minmax(0, 1fr) !important; }
+    ` });
     await artifacts.screenshot({ path: "../../docs/evidence/screenshots/tc02-real-project-refactor-desktop.png" });
+    await evidenceStyle.evaluate((element) => element.parentNode?.removeChild(element));
   }
 
   await page.setViewportSize({ width: 390, height: 844 });

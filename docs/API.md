@@ -532,6 +532,12 @@ For one Artifact, `source_file_refs` identifies content sources. Optional
 `covered_period/statistic_basis/purpose/record_count` are service-owned display
 facts. The EffectReceipt may cite a wider fixed-adapter task context; clients
 must not infer an Artifact's period or row semantics from source count.
+Artifact `checks[]` remain attached to each downloadable file. Run-level check
+totals and `deterministic_verification_completed.details.check_count` count
+unique `check_id` values; `passed_check_count` is conservative across repeated
+projections. If two files share the same twelve IDs, the EffectReceipt and UI
+must say that two deliverables share twelve checks, not report twenty-four
+independent checks.
 
 `artifact_versions` and `commits` are safe Snapshot projections of independent
 append-only Store records. ArtifactVersion contains the complete logical

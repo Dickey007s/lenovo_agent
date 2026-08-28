@@ -221,6 +221,12 @@ Artifact route. The public UI never receives the server storage path or private
 digest. The original FORTE source remains read-only and every receipt states
 `external_action=none`.
 
+Each Artifact retains its own `checks[]` so the user can review that file in
+isolation. The section header, task conclusion, EffectReceipt observation and
+verification event count unique checks by server-owned `check_id`; repeated
+projection of the same checklist across multiple deliverables is shown as a
+shared checklist and is never multiplied by the number of files.
+
 The section deliberately keeps three statuses separate: Planner/Analyst
 `called/output_used`, deterministic effect `passed/failed/blocked`, and overall
 Loop `waiting/completed/failed`. A verified Artifact remains visible if the later

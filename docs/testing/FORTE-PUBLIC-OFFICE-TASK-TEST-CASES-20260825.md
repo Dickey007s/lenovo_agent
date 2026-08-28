@@ -83,7 +83,7 @@ CSS、HTML、shell、log 等。它们覆盖结构化表格、长文档、扫描/
 - 原业务回归：查询漂移回退、质量阈值降级、按来源配额和句界截断必须继续由原节点逻辑及测试覆盖。
 - 下载后命令：`python -m compileall -q search_agent_workflow`；`python -m unittest discover -s search_agent_workflow/tests -v`。当前测试数由包内声明 ID 推导；声明与实际执行集合必须一致，数量不是永久上限。
 - 失败信号：任一退出码非 0、清单不一致、缺真实源文件、保留文件 digest 变化、主入口仍只走 `SearchWorkflow`。失败成果红灯并说明不要合并、查看回执、修复后新建 TC-02 任务。
-- 真实 Run：baseline `harness:b294f7feadd64c5196ce04982761b6b2` 是 9 文件迷你包红灯；修复后 `harness:2a00cdea6c7848c8aede34b594470638` 同时记录外层 Planner/Analyst 回执、下载 ZIP 15 文件、每份 Artifact 12 项效果检查、独立编译与当前 20 项测试，并单列内部默认策略边界。
+- 真实 Run：baseline `harness:b294f7feadd64c5196ce04982761b6b2` 是 9 文件迷你包红灯；修复后 `harness:76d4b2f5828a45b28832ab7e63f317d5` 同时记录外层 Planner/Analyst 回执、下载 ZIP 15 文件、两份 Artifact 共享 12 个唯一效果检查、独立编译与当前 20 项测试，并单列内部默认策略边界。
 - 网络边界：本次固定测试未调用网络或生产搜索、未安装依赖、未注入凭据与代理；runner 没有 OS 级 socket 隔离。禁止把它写成任意代码沙箱、自动 PR 或原仓库已修改。
 
 ### TC-05 跨期往来款核对

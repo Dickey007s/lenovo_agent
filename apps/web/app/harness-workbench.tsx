@@ -430,6 +430,38 @@ type EffectReceipt = {
   external_action: "none";
 };
 
+type ArtifactCheckSummary = {
+  passed: number;
+  total: number;
+  projected: number;
+  shared: boolean;
+  sameChecklist: boolean;
+};
+
+function summarizeArtifactChecks(artifacts: WorkspaceArtifact[]): ArtifactCheckSummary {
+  const checksById = new Map<string, boolean>();
+  const checklistKeys = new Set<string>();
+  let projected = 0;
+  for (const artifact of artifacts) {
+    checklistKeys.add(artifactChecklistKey(artifact));
+    for (const check of artifact.checks) {
+      projected += 1;
+      checksById.set(check.check_id, (checksById.get(check.check_id) ?? true) && check.passed);
+    }
+  }
+  return {
+    passed: [...checksById.values()].filter(Boolean).length,
+    total: checksById.size,
+    projected,
+    shared: projected > checksById.size,
+    sameChecklist: artifacts.length > 1 && checklistKeys.size === 1 && !checklistKeys.has(""),
+  };
+}
+
+function artifactChecklistKey(artifact: WorkspaceArtifact): string {
+  return [...new Set(artifact.checks.map((check) => check.check_id))].sort().join("\u0000");
+}
+
 type LoopCommit = {
   commit_id: string;
   artifact_id: string;
@@ -2471,6 +2503,7 @@ export function HarnessWorkbench({ onActivityChange }: { onActivityChange?: (sta
   }, [activeFileRef]);
 
   useEffect(() => {
+    const artifactCheckSummary = summarizeArtifactChecks(run?.workspace_artifacts ?? []);
     onActivityChange?.({
       workspaceTitle: workspace?.title ?? "FORTE 公开办公资料库",
       instruction: run?.instruction ?? null,
@@ -2485,8 +2518,8 @@ export function HarnessWorkbench({ onActivityChange }: { onActivityChange?: (sta
         && run.workspace_artifacts.length > 0
         && run.workspace_artifacts.every((artifact) => artifact.verifier_status === "passed")
       ),
-      passedArtifactChecks: run?.workspace_artifacts.reduce((total, artifact) => total + artifact.checks.filter((check) => check.passed).length, 0) ?? 0,
-      totalArtifactChecks: run?.workspace_artifacts.reduce((total, artifact) => total + artifact.checks.length, 0) ?? 0,
+      passedArtifactChecks: artifactCheckSummary.passed,
+      totalArtifactChecks: artifactCheckSummary.total,
       contract: run?.contract ?? null,
       budget: run?.budget ?? null,
       rounds: run?.rounds ?? [],
@@ -2794,8 +2827,9 @@ function LoopView({
     && run.workspace_artifacts.length > 0
     && run.workspace_artifacts.every((artifact) => artifact.verifier_status === "passed");
   const effectConclusionArtifact = run.workspace_artifacts.find((artifact) => artifact.execution_summary) ?? null;
-  const passedArtifactChecks = run.workspace_artifacts.reduce((total, artifact) => total + artifact.checks.filter((check) => check.passed).length, 0);
-  const totalArtifactChecks = run.workspace_artifacts.reduce((total, artifact) => total + artifact.checks.length, 0);
+  const artifactCheckSummary = summarizeArtifactChecks(run.workspace_artifacts);
+  const passedArtifactChecks = artifactCheckSummary.passed;
+  const totalArtifactChecks = artifactCheckSummary.total;
   const verifiedOutcomeWithAuditPending = verifiedEffectReady
     && recoveryKind === "source_location"
     && selectedRound?.next_step?.decision === "waiting_input"
@@ -3023,15 +3057,19 @@ function LoopView({
       {run.last_commit && <footer><IconCircleCheck aria-hidden="true" /><span>{run.last_commit.summary}</span><b>{run.commits.length} 次提交记录</b></footer>}
     </section>}
     {run.brief && <section className={`loop-brief is-${run.brief.outcome}`}><IconCircleCheck aria-hidden="true" /><div><span>任务简报</span><h3>{run.brief.summary}</h3><p>外部动作：未发生 · 结果仍需人工复核</p></div></section>}
-    {verifiedEffectReady && effectConclusionArtifact && <section className="loop-effect-conclusion" aria-label="本次任务结语"><IconShieldCheck aria-hidden="true" /><div><span>本次任务结语</span><h3>{effectConclusionArtifact.execution_summary}</h3><p>{effectConclusionArtifact.review_guidance}</p></div><b>{passedArtifactChecks}/{totalArtifactChecks} 项规则检查通过</b></section>}
+    {verifiedEffectReady && effectConclusionArtifact && <section className="loop-effect-conclusion" aria-label="本次任务结语"><IconShieldCheck aria-hidden="true" /><div><span>本次任务结语</span><h3>{effectConclusionArtifact.execution_summary}</h3><p>{effectConclusionArtifact.review_guidance}</p></div><b>{artifactCheckSummary.sameChecklist ? `${run.workspace_artifacts.length} 份成果共享 ${totalArtifactChecks} 项规则检查，${passedArtifactChecks}/${totalArtifactChecks} 通过` : artifactCheckSummary.shared ? `${run.workspace_artifacts.length} 份成果共 ${totalArtifactChecks} 项唯一规则检查，${passedArtifactChecks}/${totalArtifactChecks} 通过` : `${passedArtifactChecks}/${totalArtifactChecks} 项规则检查通过`}</b></section>}
   </section>;
 }
 
 function WorkspaceArtifactSection({ artifacts, receipts }: { artifacts: WorkspaceArtifact[]; receipts: EffectReceipt[] }) {
   const [downloading, setDownloading] = useState<string | null>(null);
   const [downloadError, setDownloadError] = useState("");
-  const passedChecks = artifacts.reduce((total, artifact) => total + artifact.checks.filter((check) => check.passed).length, 0);
-  const totalChecks = artifacts.reduce((total, artifact) => total + artifact.checks.length, 0);
+  const checkSummary = summarizeArtifactChecks(artifacts);
+  const checklistUsage = new Map<string, number>();
+  for (const artifact of artifacts) {
+    const key = artifactChecklistKey(artifact);
+    checklistUsage.set(key, (checklistUsage.get(key) ?? 0) + 1);
+  }
   const latestReceipt = receipts.at(-1) ?? null;
   const boundary = latestReceipt && latestReceipt.status !== "passed" ? latestReceipt : null;
   const executionArtifact = artifacts.find((artifact) => artifact.execution_summary) ?? null;
@@ -3063,12 +3101,12 @@ function WorkspaceArtifactSection({ artifacts, receipts }: { artifacts: Workspac
     <header>
       <IconFileDescription aria-hidden="true" />
       <div><span>运行工作区</span><h3 id="workspace-artifacts-title">{artifacts.length > 0 ? `Agent 已生成 ${artifacts.length} 份真实成果文件` : "这项任务尚不能生成可信成果"}</h3><p>{artifacts.length > 0 ? "文件已写入本次 Run 的隔离目录，原始 FORTE 文件没有被修改。" : boundary?.result}</p></div>
-      <b>{artifacts.length > 0 ? `${passedChecks}/${totalChecks} 项检查通过` : "未伪造结果"}</b>
+      <b>{artifacts.length > 0 ? checkSummary.sameChecklist ? `${artifacts.length} 份成果共享 ${checkSummary.total} 项确定性检查，${checkSummary.passed}/${checkSummary.total} 通过` : checkSummary.shared ? `${artifacts.length} 份成果共 ${checkSummary.total} 项唯一确定性检查，${checkSummary.passed}/${checkSummary.total} 通过` : `${checkSummary.passed}/${checkSummary.total} 项检查通过` : "未伪造结果"}</b>
     </header>
     {executionArtifact && <article className={`workspace-action-result${executionArtifact.verifier_status === "failed" ? " is-failed" : ""}`} aria-label="实际执行边界"><IconShieldCheck aria-hidden="true" /><div><span>这次实际发生了什么</span><h4>{executionArtifact.execution_summary}</h4><p>{executionArtifact.purpose}</p>{latestReceipt && <ul>{latestReceipt.prohibited_side_effects.map((item) => <li key={item}>{item}</li>)}</ul>}</div></article>}
     {artifacts.length > 0 && <ol>{artifacts.map((artifact) => <li key={artifact.artifact_id} className={artifact.verifier_status === "passed" ? "is-passed" : "is-failed"}>
       <div className="workspace-artifact-file"><span><IconFile aria-hidden="true" /></span><div><h4>{artifact.title}</h4><p>{artifact.summary}</p><small>文件：{artifact.file_name} · 第 {artifact.round_number} 轮 · {formatSize(artifact.size)} · {artifact.source_file_refs.length} 份内容来源</small></div></div>
-      <div className="workspace-artifact-status"><b>{artifact.verifier_status === "passed" ? <><IconCheck aria-hidden="true" />确定性检查通过</> : <><IconAlertTriangle aria-hidden="true" />检查未通过</>}</b><span>{artifact.record_count !== null ? `${artifact.record_count} 条记录 · ` : ""}{artifact.checks.filter((check) => check.passed).length}/{artifact.checks.length} 项检查</span></div>
+      <div className="workspace-artifact-status"><b>{artifact.verifier_status === "passed" ? <><IconCheck aria-hidden="true" />确定性检查通过</> : <><IconAlertTriangle aria-hidden="true" />检查未通过</>}</b><span>{artifact.record_count !== null ? `${artifact.record_count} 条记录 · ` : ""}{artifact.checks.filter((check) => check.passed).length}/{artifact.checks.length} 项检查{(checklistUsage.get(artifactChecklistKey(artifact)) ?? 0) > 1 ? " · 使用同一验证清单" : ""}</span></div>
       <button type="button" onClick={() => void downloadArtifact(artifact)} disabled={downloading !== null}><IconDownload aria-hidden="true" />{downloading === artifact.artifact_id ? "正在下载" : "下载成果"}</button>
       {(artifact.deliverable_type || artifact.covered_period || artifact.statistic_basis || artifact.purpose) && <dl className={`workspace-artifact-semantics${artifact.deliverable_type ? " has-deliverable-type" : ""}`}>
         {artifact.deliverable_type && <div><dt>成果类型</dt><dd>{artifact.deliverable_type}</dd></div>}

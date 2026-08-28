@@ -22,6 +22,7 @@ import textwrap
 import time
 import zipfile
 from collections import Counter, defaultdict
+from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from decimal import Decimal, InvalidOperation
@@ -114,6 +115,35 @@ def _contains_all(*tokens: str) -> Callable[[str], bool]:
 def _contains_any(*groups: tuple[str, ...]) -> Callable[[str], bool]:
     return lambda value: any(
         all(token.lower() in value.lower() for token in group) for group in groups
+    )
+
+
+def summarize_artifact_check_groups(
+    check_groups: Iterable[Iterable[AgentControlLoopArtifactCheck]],
+) -> tuple[int, int, int, bool]:
+    """Return projected, unique, passed counts and full-checklist sharing."""
+
+    materialized_groups = [tuple(checks) for checks in check_groups]
+    projected_count = 0
+    checks_by_id: dict[str, bool] = {}
+    checklist_signatures: set[tuple[str, ...]] = set()
+    for checks in materialized_groups:
+        checklist_signatures.add(tuple(sorted({check.check_id for check in checks})))
+        for check in checks:
+            projected_count += 1
+            checks_by_id[check.check_id] = (
+                checks_by_id.get(check.check_id, True) and check.passed
+            )
+    same_checklist = (
+        len(materialized_groups) > 1
+        and len(checklist_signatures) == 1
+        and bool(next(iter(checklist_signatures), ()))
+    )
+    return (
+        projected_count,
+        len(checks_by_id),
+        sum(checks_by_id.values()),
+        same_checklist,
     )
 
 
@@ -424,6 +454,17 @@ class ScenarioEffectEngine:
                 for file_ref in artifact.source_file_refs
             )
         )
+        (
+            projected_check_count,
+            unique_check_count,
+            passed_check_count,
+            shared_checklist,
+        ) = (
+            summarize_artifact_check_groups(
+                artifact.checks for artifact in artifacts
+            )
+        )
+        repeated_projection = projected_check_count > unique_check_count
         passed = all(artifact.verifier_status == "passed" for artifact in artifacts)
         return ScenarioEffectExecution(
             scenario_id=spec.scenario_id,
@@ -432,8 +473,18 @@ class ScenarioEffectEngine:
             state=f"已冻结 {len(source_refs)} 份 FORTE 输入，原始文件保持只读。",
             action=f"调用 {spec.capability_id} 确定性办公工具并写入隔离运行工作区。",
             observation=(
-                f"生成 {len(artifacts)} 份真实成果文件，执行 "
-                f"{sum(len(item.checks) for item in artifacts)} 项确定性检查。"
+                f"生成 {len(artifacts)} 份真实成果文件，"
+                + (
+                    f"共享 {unique_check_count} 项确定性检查，"
+                    if shared_checklist
+                    else (
+                        f"共 {unique_check_count} 项唯一确定性检查"
+                        "（重复 ID 已合并），"
+                        if repeated_projection
+                        else f"执行 {unique_check_count} 项确定性检查，"
+                    )
+                )
+                + f"{passed_check_count}/{unique_check_count} 通过。"
             ),
             cost="0 次额外模型调用；仅消耗本机确定性解析、计算与文件写入。",
             result=(

@@ -13,21 +13,21 @@
 
 ## 修复后真实运行
 
-- Run：`harness:2a00cdea6c7848c8aede34b594470638`。
+- Run：`harness:76d4b2f5828a45b28832ab7e63f317d5`。
 - 用户输入：`把搜索 Agent 从固定 Workflow 重构为带迭代上限和轨迹的 ReAct 结构。`
-- Planner：`deepseek-v4-pro`，`called=true`、`output_used=true`、`20114 ms`。
-- Analyst：`deepseek-v4-pro`，`called=true`、`output_used=true`、`31515 ms`。
-- Run 状态：`waiting_input`、Snapshot v12；Artifact 效果门：通过。二者分开记录，等待 Evidence Gate 不抹去已验证成果。
-- 两份 Artifact、每份 12 项检查，共 24 项；其中 `check-react-policy-boundary` 明确验证默认策略与可替换接口，不把外层模型回执算作包内策略。
+- Planner：`deepseek-v4-pro`，`called=true`、`output_used=true`、`20508 ms`。
+- Analyst：`deepseek-v4-pro`，`called=true`、`output_used=true`、`26820 ms`。
+- Run 状态：`waiting_input`、Snapshot v14；Artifact 效果门：通过。二者分开记录，等待 Evidence Gate 不抹去已验证成果。
+- 两份 Artifact 各自投影同一组 12 项检查，按 `check_id` 去重后是 12 个唯一检查，EffectReceipt 明确写成“2 份成果共享 12 项确定性检查，12/12 通过”；其中 `check-react-policy-boundary` 明确验证默认策略与可替换接口，不把外层模型回执算作包内策略。
 - 原输入树前后 SHA-256 均为 `2c19e31a8e437f8ccb0ab811ba20a940f022a5bea69bcc750574d753f10a250d`。
-- 服务本轮为 `checkpoint=memory/task_store=memory`，因此该 Run 不用于声称 PostgreSQL 重启恢复。
+- 服务本轮为 `checkpoint=postgres/task_store=postgres`；它证明本次 Snapshot 写入 PostgreSQL，不单独证明多实例并发或在途模型调用恢复。
 - 证据：[`tc02-live-real-project-refactor-20260828.json`](manifests/tc02-live-real-project-refactor-20260828.json)。
 
 ## 下载后独立内容门
 
 - ZIP 有效，15 个文件，无缺失成员、路径穿越或 symlink。
 - `workflow.py`、`llm.py`、`tools.py`、`requirements.txt`、`search_agent.log` 与冻结输入逐字一致。
-- 独立临时目录编译退出码 0，125 ms；unittest 退出码 0，141 ms。
+- 独立临时目录编译退出码 0，141 ms；unittest 退出码 0，139 ms。
 - 当前 20 个声明测试 ID 与实际执行集合一致，覆盖 1/20 边界、0/21 拒绝、正常 finish、达到上限、非法 action、未知 tool、真实 ToolRegistry、公开 action/observation 轨迹、漂移回退、质量降级、来源配额与句界截断。
 - 新 `main.py` 使用 `ReActSearchAgent`，不再只调用 `SearchWorkflow`。
 
@@ -42,15 +42,18 @@
 
 - 服务端 Artifact 提供 `deliverable_type/key_outputs_label/self_test/review_guidance/execution_summary`；浏览器不从场景名猜事实。
 - E2E 覆盖两类成果、隔离副本、文件变更、自测命令、失败信号、人工合并边界、下载文件名和 390 px 无横向溢出。
-- 截图：`tc02-real-project-refactor-desktop.png`、`tc02-real-project-refactor-mobile.png`；尺寸、字节数和 SHA-256 见 [`tc02-ui-screenshots-20260828.json`](manifests/tc02-ui-screenshots-20260828.json)。截图证明被测渲染，不证明真实用户理解。
+- E2E 还断言顶层为“2 份成果共享 12 项确定性检查，12/12 通过”、每张卡提示“使用同一验证清单”，并禁止 `24/24` 或“执行 24 项”回归。
+- 最终桌面截图 `tc02-real-project-refactor-desktop.png` 是 1440 px viewport 中成果区域的 1338 x 1430 紧凑 crop，同时包含“这次实际发生了什么”、两类成果、自测卡和人工合并边界；移动图 `tc02-real-project-refactor-mobile.png` 覆盖 390 px 路径。尺寸、字节数和 SHA-256 见 [`tc02-ui-screenshots-20260828.json`](manifests/tc02-ui-screenshots-20260828.json)。
+- 旧 `tc02-real-project-refactor-desktop-narrow-negative.png` 只有 441 px 宽且有大片空白，保留为视觉证据失败记录，不再支持桌面结论。截图只能证明被测渲染，不能证明真实用户理解。
 
 ## 工程回归
 
-- 全量 Python：`118 passed, 3 skipped in 37.14s`；三个 skip 是未向该通用命令注入 `TEST_DATABASE_DSN` 的 PostgreSQL 集成门。
-- 真实 PostgreSQL 17.11 顺序 Runtime：单独注入本机临时 DSN 后 `3 passed in 22.91s`。该门回归 Snapshot、Artifact 与 Decision/Branch 恢复，不证明多实例并发或本次 live Run 使用了 PostgreSQL。
+- 全量 Python：`118 passed, 3 skipped in 33.43s`；三个 skip 是未向该通用命令注入 `TEST_DATABASE_DSN` 的 PostgreSQL 集成门。
+- 真实 PostgreSQL 17.11 顺序 Runtime：单独注入本机临时 DSN 后 `3 passed in 16.34s`。该门回归 Snapshot、Artifact 与 Decision/Branch 恢复，不证明多实例并发；本次 live Run 的 Snapshot 使用 PostgreSQL，但仍不证明在途模型调用续跑。
 - Ruff：通过；Web TypeScript lint：通过；Next.js production build：通过。
 - Playwright：`34 passed`，包括 TC-02 桌面/390 px、下载名、策略边界、自测卡和无页面级横向溢出。
-- `git diff --check`：通过。远端 check、PR 与合并状态仍在收尾前保持待定。
+- `git diff --check`：通过。
+- 远端载体：[PR #51](https://github.com/Dickey007s/lenovo_agent/pull/51)；实际 `durable-agent-control-loop` check [run 33159382404 / job 98809867262](https://github.com/Dickey007s/lenovo_agent/actions/runs/33159382404/job/98809867262) 在当前 head 通过，用时 26 秒。本文件提交时尚未把合并状态写成既成事实。
 
 ## 网络与安全边界
 
@@ -58,4 +61,4 @@
 
 ## 待收尾
 
-本 Evidence 在 PR 合并前保持 `Limited Verified / local`。PR、远端 checks、合并 SHA、服务重启和最终存储后端将于收尾时追加；没有实际远端 check 时必须如实记录。
+本 Evidence 保持 `Limited Verified`。PR #51 与远端 check 已有实际通过记录；合并 SHA、服务重启和最终存储后端以收尾后的仓库与 `/v1/health` 事实为准。

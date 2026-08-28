@@ -127,6 +127,15 @@ def test_tc02_refactors_the_complete_real_project_and_survives_independent_unpac
 
     execution = ScenarioEffectEngine().execute(spec.instruction, catalog)
     assert execution is not None and execution.status == "passed"
+    projected_checks = [
+        check for artifact in execution.artifacts for check in artifact.checks
+    ]
+    assert len(projected_checks) == 24
+    assert len({check.check_id for check in projected_checks}) == 12
+    assert execution.observation == (
+        "生成 2 份真实成果文件，共享 12 项确定性检查，12/12 通过。"
+    )
+    assert "24 项" not in execution.observation
     archive = next(item for item in execution.artifacts if item.media_type == "application/zip")
     assert archive.validator_id == "validator-code-project-copy-v2"
     assert archive.self_test is not None

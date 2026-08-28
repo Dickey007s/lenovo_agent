@@ -279,8 +279,10 @@ multi-instance coordination and governed external action remain target work.
   deterministically steps through planned tools behind a replaceable
   `action_policy`; it does not prove model-driven action selection inside the
   downloaded project. The outer Planner/Analyst provider calls are separate
-  facts. This is one fixed adapter, not an arbitrary code sandbox, automatic PR
-  path or OS-level network isolation.
+  facts. Both deliverables project the same twelve verifier `check_id` values;
+  Run-level UI and receipts therefore report one shared 12-item checklist rather
+  than inflating it to 24 checks. This is one fixed adapter, not an arbitrary code
+  sandbox, automatic PR path or OS-level network isolation.
 - No target-user study has been run. Clarity, trust, efficiency and user value
   remain hypotheses.
 
