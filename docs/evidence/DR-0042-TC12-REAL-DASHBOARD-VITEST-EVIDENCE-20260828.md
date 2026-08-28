@@ -2,7 +2,7 @@
 
 ## 当前结论
 
-`Limited Verified`。本地确定性 builder、同测集分阶段红灯、最终 71/71、逐文件 V8 coverage、独立解压复跑、合同 round-trip、前台回归、真实 PostgreSQL 顺序恢复和普通 `deepseek-v4-pro` Run 已通过。该 Run 的 Artifact effect 通过，Planner/Analyst 均调用且采用，但整个 Run 因八条未覆盖 Branch 保持 `waiting_input`；三层事实必须分开报告。[PR #54](https://github.com/Dickey007s/lenovo_agent/pull/54) 已创建；首次远端门因 CI 未安装锁定的 Vitest 依赖而按边界失败，workflow 修复后的 [替代 check](https://github.com/Dickey007s/lenovo_agent/actions/runs/33175119797/job/98861616061) 已通过。merge SHA 只能在实际合并后报告。
+`Limited Verified`。本地确定性 builder、同测集分阶段红灯、最终 71/71、逐文件 V8 coverage、独立解压复跑、合同 round-trip、前台回归、真实 PostgreSQL 顺序恢复和普通 `deepseek-v4-pro` Run 已通过。该 Run 的 Artifact effect 通过，Planner/Analyst 均调用且采用，但整个 Run 因八条未覆盖 Branch 保持 `waiting_input`；三层事实必须分开报告。[PR #54](https://github.com/Dickey007s/lenovo_agent/pull/54) 已通过远端 PostgreSQL check 并合并为 `fb8017099289bfc2c62803f17717cfb507e3f72a`。
 
 ## 历史基线为何不足
 
@@ -56,11 +56,13 @@ ZIP 包含完整 11 文件修复后副本、三套真实测试、`changes.patch`
 - 真实 PostgreSQL 顺序门：`1 passed, 3 deselected in 11.72s`。它覆盖 Artifact、EffectReceipt、71 项 `self_test` 与下载 bytes 在 Runtime 重启后的恢复；不证明多实例并发或在途 Vitest 子进程续跑。
 - Ruff、前端 lint 与 Next.js production build 通过；Harness Playwright 全量 `37 passed`，其中包含成功路径和固定命令失败路径。
 
-## 尚待收尾
+## 合并后恢复
 
-- PR #54 的实际 merge SHA 与最新 master PostgreSQL 重启。
+- 最新 `master@fb80170` 已重新启动；`http://localhost:3000` 返回 200。
+- `/v1/health` 返回 `model=deepseek-v4-pro`、`checkpoint=postgres`、`task_store=postgres`。
+- PostgreSQL 重启后重新读取 Run `harness:d9355005af924d57bb1e9c526adca072`：状态仍为 `waiting_input`，两份 Artifact 与 passed EffectReceipt 均存在。
 
-首次 PR check `33174992307` 真实失败：原 PostgreSQL workflow 只安装 Python 依赖，Linux runner 缺少仓库批准的 Vitest 1.6.1 与 coverage-v8 1.6.1，因此 TC-12 按安全边界失败，而不是伪造测试回执。PR 随后为 workflow 增加 Node 22、pnpm 10 和 `--frozen-lockfile --ignore-scripts` 的仓库依赖准备；这是 CI 环境预装，不改变 Runtime “不联网安装、不执行来源 package scripts”的边界。替代 check `33175119797` 用 PostgreSQL 17 实际执行四条 integration 测试并通过。
+首次 PR check `33174992307` 真实失败：原 PostgreSQL workflow 只安装 Python 依赖，Linux runner 缺少仓库批准的 Vitest 1.6.1 与 coverage-v8 1.6.1，因此 TC-12 按安全边界失败，而不是伪造测试回执。PR 随后为 workflow 增加 Node 22、pnpm 10 和 `--frozen-lockfile --ignore-scripts` 的仓库依赖准备；这是 CI 环境预装，不改变 Runtime “不联网安装、不执行来源 package scripts”的边界。最终 [check `33175218945`](https://github.com/Dickey007s/lenovo_agent/actions/runs/33175218945/job/98861955499) 用 PostgreSQL 17 实际执行四条 integration 测试并通过。
 
 ## 不能支持的结论
 
