@@ -55,7 +55,7 @@
 
 ## 远端门
 
-- [PR #65](https://github.com/Dickey007s/lenovo_agent/pull/65) 的实现提交和文档回填均通过 `durable-agent-control-loop`。最终分支 job [`99004195034`](https://github.com/Dickey007s/lenovo_agent/actions/runs/33217467604/job/99004195034) 通过，耗时约 1 分钟；首轮实现 job `99003808963` 同样通过。
+- [PR #65](https://github.com/Dickey007s/lenovo_agent/pull/65) 的实现提交和文档回填均通过 `durable-agent-control-loop`。文档回填 job [`99004195034`](https://github.com/Dickey007s/lenovo_agent/actions/runs/33217467604/job/99004195034) 通过，耗时约 1 分钟；首轮实现 job `99003808963` 同样通过。
 - 合并后从最新 `master` 以 PostgreSQL 重启服务，并用相同 Owner 复读本 Evidence 的 Run；该动作不反向改写上述历史 manifest。
 
 ## 不能支持的结论
