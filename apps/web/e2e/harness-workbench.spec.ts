@@ -540,6 +540,7 @@ function outboundEffectSnapshot(body: { workspace_id: string; instruction: strin
       record_count: null,
       deliverable_type: "流程设计 DOCX",
       key_outputs: terminalStates,
+      key_outputs_label: "6 类关键终态",
       review_guidance: "13 项确定性规则检查通过后，仍需业务与合规负责人复核当前制度口径、话术和实际系统接入方案。",
       execution_summary: executionSummary,
       download_path: `/v1/harness/runs/${base.run_id}/artifacts/${artifactId}`,
@@ -570,6 +571,92 @@ function outboundEffectSnapshot(body: { workspace_id: string; instruction: strin
       { sequence: 18, event_name: "run_workspace_artifact_written", occurred_at: new Date().toISOString(), status: "verifying", message: "流程设计 DOCX 已写入隔离运行工作区。", details: {} },
       { sequence: 19, event_name: "deterministic_verification_completed", occurred_at: new Date().toISOString(), status: "verifying", message: "13 项规则检查通过；没有外部动作。", details: {} },
     ],
+    last_event_sequence: 20,
+  };
+}
+
+function reactRefactorEffectSnapshot(body: { workspace_id: string; instruction: string }) {
+  const base = snapshot(body, "completed", 20);
+  const artifactIds = ["workspace-artifact-202020202020", "workspace-artifact-212121212121"];
+  const common = {
+    capability_id: "office-code-react-refactor",
+    scenario_id: "TC-02",
+    version: 1,
+    round_number: 1,
+    source_file_refs: [csvFile.file_ref, pdfFile.file_ref, docxFile.file_ref],
+    validator_id: "validator-code-project-copy-v2",
+    verifier_status: "passed",
+    covered_period: "FORTE 固定 commit 345c1ec 的 algorithm-013 输入版本",
+    statistic_basis: "完整复制 7 个输入文件后，仅在隔离副本修改 2 个并新增 ReAct 控制器、测试与审计文件",
+    purpose: "供代码评审者下载、独立复测并人工合并；不会覆盖 FORTE 原文件",
+    record_count: null,
+    review_guidance: "先核对 CHANGESET.patch，再按自测卡运行两条命令。全部通过后人工挑选合并；当前系统不会写回仓库或发起 PR。",
+    created_at: new Date().toISOString(),
+    original_inputs_modified: false,
+    review_required: true,
+    external_action: "none",
+  };
+  const checks = [
+    "完整复制真实项目", "原契约文件逐字保留", "主入口改走有界 ReAct", "可机器审查改动",
+    "完整副本编译", "测试清单与执行一致", "风险契约测试齐全", "迭代上限 1 到 20",
+    "非法动作与工具拒绝", "只记录动作与观察", "默认策略边界明确", "固定测试无网络调用",
+  ].map((label, index) => ({ check_id: `check-react-${index}`, label, passed: true, detail: `${label}已由固定 TC-02 Verifier 复核。` }));
+  const selfTest = {
+    instruction: "把搜索 Agent 从固定 Workflow 重构为带迭代上限和轨迹的 ReAct 结构。",
+    expected_files: ["search_agent_workflow/", "search_agent_workflow/CHANGESET.patch", "search_agent_workflow/test_receipt.json"],
+    commands: ["python -m compileall -q search_agent_workflow", "python -m unittest discover -s search_agent_workflow/tests -v"],
+    expected_checks: ["当前 20 项 unittest 与包内清单一致且全部通过", "真实 ToolRegistry 调用与 action/observation 轨迹可核对", "默认策略确定性执行已规划工具，action_policy 接口可替换", "外层 Planner/Analyst 调用不冒充代码包内部 action policy", "原查询漂移、质量降级、来源配额、句界截断行为保持"],
+    failure_signals: ["任一命令退出码非 0", "声明测试 ID 与执行集合不一致", "main.py 仍只调用 SearchWorkflow"],
+  };
+  return {
+    ...base,
+    workspace_artifacts: [{
+      ...common,
+      artifact_id: artifactIds[0],
+      title: "algorithm-013 有界 ReAct 控制结构代码包",
+      file_name: "search-agent-react-refactor.zip",
+      media_type: "application/zip",
+      size: 48210,
+      checks,
+      summary: "已从真实项目副本生成可审查 ZIP；编译与 20 项测试通过。",
+      deliverable_type: "完整可运行项目副本",
+      key_outputs: ["修改 config.py：增加 1 到 20 次迭代边界", "修改 main.py：主入口改走 bounded ReAct", "新增 react_agent.py：复用原 LLM、ToolRegistry、WorkflowState 与业务节点", "默认策略按已规划工具依次执行；action_policy 可替换；未证明包内模型自主 ReAct", "原 workflow.py、llm.py、tools.py、requirements.txt、search_agent.log 逐字保留"],
+      key_outputs_label: "文件变更",
+      execution_summary: "编译退出码 0；实际运行 20 项 unittest；本次固定测试未调用网络、未安装依赖、未调用生产搜索；runner 不具备 OS 级 socket 隔离；外层 Planner/Analyst 不是包内 action policy。",
+      self_test: selfTest,
+      download_path: `/v1/harness/runs/${base.run_id}/artifacts/${artifactIds[0]}`,
+    }, {
+      ...common,
+      artifact_id: artifactIds[1],
+      title: "TC-02 测试与改动说明",
+      file_name: "TC-02测试与改动说明.md",
+      media_type: "text/markdown",
+      size: 1820,
+      checks,
+      summary: "说明固定五节点如何变为有界 ReAct 控制结构，并记录默认策略边界、20 项真实测试与人工合并步骤。",
+      deliverable_type: "测试回执与改动说明",
+      key_outputs: ["完整副本编译及 20 项测试通过", "公开轨迹只有 action/observation，不含私有思维过程", "默认策略确定性执行已规划工具；未证明包内模型自主 ReAct", "原 FORTE 输入未覆盖，external_action=none"],
+      key_outputs_label: "验证结论",
+      execution_summary: "编译 120 ms，测试 150 ms；失败时成果卡必须标红并停止人工合并。",
+      self_test: null,
+      download_path: `/v1/harness/runs/${base.run_id}/artifacts/${artifactIds[1]}`,
+    }],
+    effect_receipts: [{
+      receipt_id: "effect-receipt-202020202020",
+      capability_id: "office-code-react-refactor",
+      scenario_id: "TC-02",
+      status: "passed",
+      state: "已冻结 algorithm-013 的 7 个输入文件，原始树保持只读。",
+      action: "复制真实项目到隔离 Run Workspace，修改副本并执行固定编译和测试。",
+      observation: "完整副本、diff、说明和测试回执均可下载；声明测试与实际执行一致。",
+      cost: "0 次额外模型调用；仅消耗本机固定代码变换与测试。",
+      result: "固定 TC-02 效果门通过，等待人工代码评审与合并。",
+      source_file_refs: common.source_file_refs,
+      artifact_ids: artifactIds,
+      prohibited_side_effects: ["不修改 FORTE 原始源码", "不安装依赖", "本次固定测试不调用生产搜索"],
+      created_at: new Date().toISOString(),
+      external_action: "none",
+    }],
     last_event_sequence: 20,
   };
 }
@@ -952,7 +1039,7 @@ function locationFailureSnapshot(body: { workspace_id: string; instruction: stri
 }
 async function fulfillJson(route: Route, body: unknown, status = 200) { await route.fulfill({ status, contentType: "application/json", body: JSON.stringify(body) }); }
 
-async function mockHarness(page: Page, options: { failFirstStart?: boolean; failDecisionDefer?: boolean; disconnect?: boolean; failed?: boolean; locationFailure?: boolean; sourceRecovery?: boolean; sourceRecoveryThreeCandidates?: boolean; verifiedArtifactAuditPending?: boolean; verifiedArtifactAuditPendingDistinct?: boolean; verifiedFinanceArtifactAuditPending?: boolean; unverifiedArtifactLocationPending?: boolean; terminalArtifactLocationPending?: boolean; boundedRecovery?: boolean; effectArtifact?: boolean; outboundEffect?: boolean; effectBoundary?: boolean; reviewTable?: boolean; workspaceFailures?: number; interactiveLoop?: boolean; evidenceGate?: boolean } = {}) {
+async function mockHarness(page: Page, options: { failFirstStart?: boolean; failDecisionDefer?: boolean; disconnect?: boolean; failed?: boolean; locationFailure?: boolean; sourceRecovery?: boolean; sourceRecoveryThreeCandidates?: boolean; verifiedArtifactAuditPending?: boolean; verifiedArtifactAuditPendingDistinct?: boolean; verifiedFinanceArtifactAuditPending?: boolean; unverifiedArtifactLocationPending?: boolean; terminalArtifactLocationPending?: boolean; boundedRecovery?: boolean; effectArtifact?: boolean; outboundEffect?: boolean; reactEffect?: boolean; effectBoundary?: boolean; reviewTable?: boolean; workspaceFailures?: number; interactiveLoop?: boolean; evidenceGate?: boolean } = {}) {
   let workspaceCalls = 0; let startCalls = 0; let streamCalls = 0;
   let currentBody = { workspace_id: "forte-public-office", instruction: "" };
   // Mock snapshots intentionally cover several server state shapes in one route.
@@ -972,6 +1059,7 @@ async function mockHarness(page: Page, options: { failFirstStart?: boolean; fail
     if (path.startsWith("/v1/harness/workspace/files/")) return fulfillJson(route, previewFor(path.split("/").at(-1)!));
     if (path.includes("/artifacts/") && route.request().method() === "GET") {
       if (options.outboundEffect) return route.fulfill({ status: 200, contentType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document", body: "mock-docx-bytes", headers: { "Content-Disposition": "attachment; filename*=UTF-8''%E5%A4%96%E5%91%BC%E6%B5%81%E7%A8%8B-M1%E9%80%BE%E6%9C%9F%E7%94%A8%E6%88%B7AI%E5%A4%96%E5%91%BC%E5%82%AC%E6%94%B6%E6%B5%81%E7%A8%8B%E5%9B%BE.docx" } });
+      if (options.reactEffect) return route.fulfill({ status: 200, contentType: "application/zip", body: "mock-zip-bytes" });
       return route.fulfill({ status: 200, contentType: "text/csv; charset=utf-8", body: "科目名称,客商名称,未付款项\n应付账款,星海科技,100.00\n", headers: { "Content-Disposition": "attachment; filename*=UTF-8''%E6%9C%AA%E4%BB%98%E7%BB%9F%E8%AE%A1.csv" } });
     }
     if (path === "/v1/harness/runs" && route.request().method() === "GET") {
@@ -996,6 +1084,8 @@ async function mockHarness(page: Page, options: { failFirstStart?: boolean; fail
         ? verifiedEffectSnapshot(body)
         : options.outboundEffect
         ? outboundEffectSnapshot(body)
+        : options.reactEffect
+        ? reactRefactorEffectSnapshot(body)
         : options.effectBoundary
           ? boundedEffectSnapshot(body)
         : options.locationFailure
@@ -1102,7 +1192,7 @@ async function mockHarness(page: Page, options: { failFirstStart?: boolean; fail
     }
     if (path.startsWith("/v1/harness/runs/")) {
       if (options.disconnect && streamCalls === 1) return fulfillJson(route, { ...snapshot(currentBody, "queued"), status: "indexing", last_event_sequence: 1, version: 2 });
-      if (options.interactiveLoop || options.evidenceGate || options.sourceRecovery || options.verifiedArtifactAuditPending || options.verifiedArtifactAuditPendingDistinct || options.verifiedFinanceArtifactAuditPending || options.unverifiedArtifactLocationPending || options.terminalArtifactLocationPending || options.boundedRecovery || options.locationFailure || options.effectArtifact || options.outboundEffect || options.effectBoundary) return fulfillJson(route, currentSnapshot);
+      if (options.interactiveLoop || options.evidenceGate || options.sourceRecovery || options.verifiedArtifactAuditPending || options.verifiedArtifactAuditPendingDistinct || options.verifiedFinanceArtifactAuditPending || options.unverifiedArtifactLocationPending || options.terminalArtifactLocationPending || options.boundedRecovery || options.locationFailure || options.effectArtifact || options.outboundEffect || options.reactEffect || options.effectBoundary) return fulfillJson(route, currentSnapshot);
       currentSnapshot = snapshot(currentBody, options.failed ? "failed" : "completed");
       return fulfillJson(route, currentSnapshot);
     }
@@ -1290,6 +1380,59 @@ test("distinguishes a TC-10 flow document from real outbound execution", async (
   await expect(actionBoundary).toContainText("实际没有拨号、没有写 CRM、没有发送短信");
   if (process.env.CAPTURE_TC10_EFFECT_EVIDENCE === "1") {
     await artifacts.screenshot({ path: "../../docs/evidence/screenshots/tc10-outbound-effect-mobile.png" });
+  }
+});
+
+test("explains the real TC-02 project copy, diff, self-test and merge boundary", async ({ page }) => {
+  await mockHarness(page, { reactEffect: true });
+  await page.goto("/");
+  await page.getByRole("textbox", { name: "任务指令" }).fill("把搜索 Agent 从固定 Workflow 重构为带迭代上限和轨迹的 ReAct 结构。");
+  await page.getByRole("button", { name: "启动 Control Loop" }).click();
+
+  const artifacts = page.locator(".workspace-artifacts");
+  const selfTest = page.locator(".workspace-artifact-self-test");
+  await expect(artifacts).toContainText("Agent 已生成 2 份真实成果文件");
+  await expect(artifacts).toContainText("algorithm-013 有界 ReAct 控制结构代码包");
+  await expect(artifacts).toContainText("完整可运行项目副本");
+  await expect(artifacts).toContainText("测试回执与改动说明");
+  await expect(artifacts).toContainText("不会覆盖 FORTE 原文件");
+  await expect(artifacts).toContainText("固定五节点");
+  await expect(artifacts).toContainText("action/observation");
+  await expect(artifacts).toContainText("action_policy 可替换");
+  await expect(artifacts).toContainText("未证明包内模型自主 ReAct");
+  await expect(artifacts).toContainText("外层 Planner/Analyst 不是包内 action policy");
+  await expect(artifacts).toContainText("文件变更");
+  await expect(artifacts).not.toContainText("4 类关键终态");
+  await expect(artifacts).toContainText("runner 不具备 OS 级 socket 隔离");
+
+  await expect(selfTest).toContainText("下载后可以自己验证");
+  await expect(selfTest).toContainText("TC-02 自测卡");
+  await expect(selfTest).toContainText("python -m compileall -q search_agent_workflow");
+  await expect(selfTest).toContainText("python -m unittest discover -s search_agent_workflow/tests -v");
+  await expect(selfTest.getByText("查看应通过的测试与失败信号")).toBeVisible();
+  await selfTest.getByText("查看应通过的测试与失败信号").click();
+  await expect(selfTest).toContainText("真实 ToolRegistry 调用");
+  await expect(selfTest).toContainText("main.py 仍只调用 SearchWorkflow");
+
+  const downloadPromise = page.waitForEvent("download");
+  await artifacts.getByRole("button", { name: "下载成果" }).first().click();
+  const download = await downloadPromise;
+  expect(download.suggestedFilename()).toBe("search-agent-react-refactor.zip");
+
+  const commandSize = await selfTest.locator("code").first().evaluate((element) => Number.parseFloat(getComputedStyle(element).fontSize));
+  expect(commandSize).toBeGreaterThanOrEqual(10);
+  if (process.env.CAPTURE_TC02_EFFECT_EVIDENCE === "1") {
+    await artifacts.screenshot({ path: "../../docs/evidence/screenshots/tc02-real-project-refactor-desktop.png" });
+  }
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  const pageMetrics = await page.evaluate(() => ({ viewport: document.documentElement.clientWidth, scroll: document.documentElement.scrollWidth }));
+  const artifactMetrics = await artifacts.evaluate((element) => ({ width: element.clientWidth, scroll: element.scrollWidth }));
+  expect(pageMetrics.scroll).toBeLessThanOrEqual(pageMetrics.viewport);
+  expect(artifactMetrics.scroll).toBeLessThanOrEqual(artifactMetrics.width);
+  await expect(selfTest).toContainText("TC-02 自测卡");
+  if (process.env.CAPTURE_TC02_EFFECT_EVIDENCE === "1") {
+    await artifacts.screenshot({ path: "../../docs/evidence/screenshots/tc02-real-project-refactor-mobile.png" });
   }
 });
 

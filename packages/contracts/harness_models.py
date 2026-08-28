@@ -572,6 +572,16 @@ class AgentControlLoopArtifactCheck(StrictModel):
     detail: str = Field(min_length=1, max_length=1_000)
 
 
+class AgentControlLoopArtifactSelfTest(StrictModel):
+    """User-visible instructions for independently checking one artifact."""
+
+    instruction: str = Field(min_length=3, max_length=2_000)
+    expected_files: list[str] = Field(min_length=1, max_length=20)
+    commands: list[str] = Field(min_length=1, max_length=10)
+    expected_checks: list[str] = Field(min_length=1, max_length=30)
+    failure_signals: list[str] = Field(min_length=1, max_length=12)
+
+
 class AgentControlLoopWorkspaceArtifact(StrictModel):
     """A real file written only inside an isolated run workspace."""
 
@@ -600,8 +610,10 @@ class AgentControlLoopWorkspaceArtifact(StrictModel):
     record_count: int | None = Field(default=None, ge=0, le=1_000_000)
     deliverable_type: str | None = Field(default=None, min_length=1, max_length=120)
     key_outputs: list[str] = Field(default_factory=list, max_length=12)
+    key_outputs_label: str | None = Field(default=None, min_length=1, max_length=80)
     review_guidance: str | None = Field(default=None, min_length=1, max_length=500)
     execution_summary: str | None = Field(default=None, min_length=1, max_length=500)
+    self_test: AgentControlLoopArtifactSelfTest | None = None
     download_path: str = Field(min_length=1, max_length=300)
     created_at: datetime
     original_inputs_modified: Literal[False] = False

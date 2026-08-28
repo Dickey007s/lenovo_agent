@@ -373,6 +373,14 @@ type ArtifactCheck = {
   detail: string;
 };
 
+type ArtifactSelfTest = {
+  instruction: string;
+  expected_files: string[];
+  commands: string[];
+  expected_checks: string[];
+  failure_signals: string[];
+};
+
 type WorkspaceArtifact = {
   artifact_id: string;
   capability_id: string;
@@ -394,8 +402,10 @@ type WorkspaceArtifact = {
   record_count: number | null;
   deliverable_type: string | null;
   key_outputs: string[];
+  key_outputs_label: string | null;
   review_guidance: string | null;
   execution_summary: string | null;
+  self_test: ArtifactSelfTest | null;
   download_path: string;
   created_at: string;
   original_inputs_modified: false;
@@ -1418,6 +1428,14 @@ function normalizeWorkspaceArtifact(value: unknown): WorkspaceArtifact | null {
   const checks = Array.isArray(raw.checks)
     ? raw.checks.map(normalizeArtifactCheck).filter((item): item is ArtifactCheck => item !== null)
     : [];
+  const rawSelfTest = raw.self_test && typeof raw.self_test === "object" ? raw.self_test as Record<string, unknown> : null;
+  const selfTest = rawSelfTest ? {
+    instruction: asText(rawSelfTest.instruction),
+    expected_files: asStrings(rawSelfTest.expected_files),
+    commands: asStrings(rawSelfTest.commands),
+    expected_checks: asStrings(rawSelfTest.expected_checks),
+    failure_signals: asStrings(rawSelfTest.failure_signals),
+  } : null;
   return {
     artifact_id: artifactId,
     capability_id: asText(raw.capability_id),
@@ -1439,8 +1457,10 @@ function normalizeWorkspaceArtifact(value: unknown): WorkspaceArtifact | null {
     record_count: typeof raw.record_count === "number" && Number.isInteger(raw.record_count) && raw.record_count >= 0 ? raw.record_count : null,
     deliverable_type: asText(raw.deliverable_type) || null,
     key_outputs: asStrings(raw.key_outputs),
+    key_outputs_label: asText(raw.key_outputs_label) || null,
     review_guidance: asText(raw.review_guidance) || null,
     execution_summary: asText(raw.execution_summary) || null,
+    self_test: selfTest && selfTest.instruction && selfTest.commands.length > 0 ? selfTest : null,
     download_path: asText(raw.download_path),
     created_at: asText(raw.created_at),
     original_inputs_modified: false,
@@ -3045,7 +3065,7 @@ function WorkspaceArtifactSection({ artifacts, receipts }: { artifacts: Workspac
       <div><span>运行工作区</span><h3 id="workspace-artifacts-title">{artifacts.length > 0 ? `Agent 已生成 ${artifacts.length} 份真实成果文件` : "这项任务尚不能生成可信成果"}</h3><p>{artifacts.length > 0 ? "文件已写入本次 Run 的隔离目录，原始 FORTE 文件没有被修改。" : boundary?.result}</p></div>
       <b>{artifacts.length > 0 ? `${passedChecks}/${totalChecks} 项检查通过` : "未伪造结果"}</b>
     </header>
-    {executionArtifact && <article className="workspace-action-result" aria-label="实际执行边界"><IconShieldCheck aria-hidden="true" /><div><span>这次实际发生了什么</span><h4>{executionArtifact.execution_summary}</h4><p>{executionArtifact.purpose}</p>{latestReceipt && <ul>{latestReceipt.prohibited_side_effects.map((item) => <li key={item}>{item}</li>)}</ul>}</div></article>}
+    {executionArtifact && <article className={`workspace-action-result${executionArtifact.verifier_status === "failed" ? " is-failed" : ""}`} aria-label="实际执行边界"><IconShieldCheck aria-hidden="true" /><div><span>这次实际发生了什么</span><h4>{executionArtifact.execution_summary}</h4><p>{executionArtifact.purpose}</p>{latestReceipt && <ul>{latestReceipt.prohibited_side_effects.map((item) => <li key={item}>{item}</li>)}</ul>}</div></article>}
     {artifacts.length > 0 && <ol>{artifacts.map((artifact) => <li key={artifact.artifact_id} className={artifact.verifier_status === "passed" ? "is-passed" : "is-failed"}>
       <div className="workspace-artifact-file"><span><IconFile aria-hidden="true" /></span><div><h4>{artifact.title}</h4><p>{artifact.summary}</p><small>文件：{artifact.file_name} · 第 {artifact.round_number} 轮 · {formatSize(artifact.size)} · {artifact.source_file_refs.length} 份内容来源</small></div></div>
       <div className="workspace-artifact-status"><b>{artifact.verifier_status === "passed" ? <><IconCheck aria-hidden="true" />确定性检查通过</> : <><IconAlertTriangle aria-hidden="true" />检查未通过</>}</b><span>{artifact.record_count !== null ? `${artifact.record_count} 条记录 · ` : ""}{artifact.checks.filter((check) => check.passed).length}/{artifact.checks.length} 项检查</span></div>
@@ -3056,8 +3076,17 @@ function WorkspaceArtifactSection({ artifacts, receipts }: { artifacts: Workspac
         {artifact.statistic_basis && <div><dt>{artifact.deliverable_type ? "采用依据" : "统计口径"}</dt><dd>{artifact.statistic_basis}</dd></div>}
         {artifact.purpose && <div><dt>{artifact.deliverable_type ? "使用边界" : "用途"}</dt><dd>{artifact.purpose}</dd></div>}
       </dl>}
-      {artifact.key_outputs.length > 0 && <section className="workspace-artifact-key-outputs" aria-label="六类终态"><span>{artifact.key_outputs.length} 类关键终态</span><ul>{artifact.key_outputs.map((item) => <li key={item}>{item}</li>)}</ul></section>}
-      {artifact.review_guidance && <aside className="workspace-artifact-review"><IconAlertTriangle aria-hidden="true" /><div><b>为什么仍需人工复核</b><p>{artifact.review_guidance}</p></div></aside>}
+      {artifact.key_outputs.length > 0 && <section className="workspace-artifact-key-outputs" aria-label={artifact.key_outputs_label ?? "关键输出"}><span>{artifact.key_outputs_label ?? `${artifact.key_outputs.length} 项关键输出`}</span><ul>{artifact.key_outputs.map((item) => <li key={item}>{item}</li>)}</ul></section>}
+      {artifact.self_test && <section className="workspace-artifact-self-test" aria-label="TC-02 自测卡">
+        <header><IconRoute aria-hidden="true" /><div><span>下载后可以自己验证</span><h5>TC-02 自测卡</h5></div></header>
+        <dl>
+          <div><dt>输入</dt><dd>{artifact.self_test.instruction}</dd></div>
+          <div><dt>预期文件</dt><dd>{artifact.self_test.expected_files.join("、")}</dd></div>
+        </dl>
+        <div className="workspace-artifact-self-test-commands"><b>依次运行</b>{artifact.self_test.commands.map((command) => <code key={command}>{command}</code>)}</div>
+        <details><summary><IconEye aria-hidden="true" />查看应通过的测试与失败信号</summary><div className="workspace-artifact-self-test-detail"><section><b>应通过</b><ul>{artifact.self_test.expected_checks.map((item) => <li key={item}>{item}</li>)}</ul></section><section><b>不要合并</b><ul>{artifact.self_test.failure_signals.map((item) => <li key={item}>{item}</li>)}</ul></section></div></details>
+      </section>}
+      {artifact.review_guidance && <aside className={`workspace-artifact-review${artifact.verifier_status === "failed" ? " is-failed" : ""}`}><IconAlertTriangle aria-hidden="true" /><div><b>{artifact.verifier_status === "failed" ? "下一步怎么处理" : "为什么仍需人工复核"}</b><p>{artifact.review_guidance}</p></div></aside>}
       <details><summary><IconEye aria-hidden="true" />查看逐项检查</summary><ul>{artifact.checks.map((check) => <li key={check.check_id} className={check.passed ? "is-passed" : "is-failed"}><span>{check.passed ? <IconCheck aria-hidden="true" /> : <IconAlertTriangle aria-hidden="true" />}</span><div><b>{check.label}</b><p>{check.detail}</p></div></li>)}</ul></details>
     </li>)}</ol>}
     {boundary && <article className="workspace-effect-boundary"><IconAlertTriangle aria-hidden="true" /><div><b>{boundary.status === "blocked_external_boundary" ? "缺少已授权的外部连接" : boundary.status === "unsupported_local_capability" ? "本地能力仍未实现" : "确定性效果门未通过"}</b><p>{boundary.observation}</p><strong>{boundary.result}</strong></div></article>}

@@ -4,6 +4,12 @@ import argparse
 import hashlib
 import io
 import json
+import os
+import re
+import stat
+import subprocess
+import sys
+import tempfile
 import time
 import uuid
 import zipfile
@@ -21,6 +27,133 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 FORTE_ROOT = REPO_ROOT / "demo-enterprise-data" / "forte"
 DEFAULT_SCENARIOS = ("TC-01", "TC-05", "TC-10", "TC-13", "TC-14", "TC-15")
 SETTLED_STATUSES = {"waiting_input", "ready_to_execute", "completed", "stopped", "failed"}
+
+
+def _tc02_zip_content_gate(content: bytes) -> dict[str, Any]:
+    project_prefix = "search_agent_workflow/"
+    required = {
+        f"{project_prefix}{name}"
+        for name in (
+            "config.py",
+            "llm.py",
+            "main.py",
+            "requirements.txt",
+            "search_agent.log",
+            "tools.py",
+            "workflow.py",
+            "react_agent.py",
+            "tests/test_react_agent.py",
+            "CHANGESET.patch",
+            "changes.json",
+            "改动说明.md",
+            "TC-02自测卡.md",
+            "TEST_RECEIPT.txt",
+            "test_receipt.json",
+        )
+    }
+    source_root = FORTE_ROOT / "algorithm-013" / "input" / "search_agent_workflow"
+    try:
+        with zipfile.ZipFile(io.BytesIO(content)) as archive:
+            members = archive.infolist()
+            unsafe = [
+                item.filename
+                for item in members
+                if Path(item.filename).is_absolute()
+                or ".." in Path(item.filename).parts
+                or stat.S_ISLNK(item.external_attr >> 16)
+            ]
+            names = {item.filename for item in members if not item.is_dir()}
+            missing = sorted(required - names)
+            if unsafe or missing:
+                return {
+                    "passed": False,
+                    "valid_zip": True,
+                    "unsafe_members": unsafe,
+                    "missing_members": missing,
+                }
+            unchanged = {
+                name: hashlib.sha256(archive.read(f"{project_prefix}{name}")).hexdigest()
+                == hashlib.sha256((source_root / name).read_bytes()).hexdigest()
+                for name in ("workflow.py", "llm.py", "tools.py", "requirements.txt", "search_agent.log")
+            }
+            main_text = archive.read(f"{project_prefix}main.py").decode("utf-8")
+            react_text = archive.read(f"{project_prefix}react_agent.py").decode("utf-8")
+            receipt = json.loads(archive.read(f"{project_prefix}test_receipt.json"))
+            with tempfile.TemporaryDirectory(prefix="tc02-live-download-") as directory:
+                root = Path(directory)
+                archive.extractall(root)
+                env = {
+                    "PATH": os.environ.get("PATH", ""),
+                    "SYSTEMROOT": os.environ.get("SYSTEMROOT", ""),
+                    "TEMP": os.environ.get("TEMP", directory),
+                    "TMP": os.environ.get("TMP", directory),
+                    "PYTHONNOUSERSITE": "1",
+                    "HTTP_PROXY": "",
+                    "HTTPS_PROXY": "",
+                    "NO_PROXY": "*",
+                }
+                compile_started = time.monotonic()
+                compiled = subprocess.run(
+                    [sys.executable, "-m", "compileall", "-q", "search_agent_workflow"],
+                    cwd=root,
+                    env=env,
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                    timeout=30,
+                )
+                compile_ms = int((time.monotonic() - compile_started) * 1000)
+                test_started = time.monotonic()
+                tested = subprocess.run(
+                    [sys.executable, "-m", "unittest", "discover", "-s", "search_agent_workflow/tests", "-v"],
+                    cwd=root,
+                    env=env,
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                    timeout=30,
+                )
+                test_ms = int((time.monotonic() - test_started) * 1000)
+        test_output = tested.stdout + "\n" + tested.stderr
+        executed_ids = re.findall(r"^(test_[a-z0-9_]+) \(", test_output, flags=re.MULTILINE)
+        declared_ids = receipt.get("tests", {}).get("declared_ids", [])
+        manifest_consistent = set(executed_ids) == set(declared_ids) and len(executed_ids) == len(declared_ids)
+        passed = (
+            compiled.returncode == 0
+            and tested.returncode == 0
+            and manifest_consistent
+            and all(unchanged.values())
+            and "ReActSearchAgent" in main_text
+            and "SearchWorkflow" not in main_text
+            and "range(1, self.config.max_iterations + 1)" in react_text
+            and receipt.get("status") == "passed"
+        )
+        return {
+            "passed": passed,
+            "valid_zip": True,
+            "file_count": len(names),
+            "missing_members": [],
+            "unsafe_members": [],
+            "unchanged_source_contracts": unchanged,
+            "compile": {"exit_code": compiled.returncode, "elapsed_ms": compile_ms},
+            "tests": {
+                "exit_code": tested.returncode,
+                "elapsed_ms": test_ms,
+                "count": len(executed_ids),
+                "declared_ids": declared_ids,
+                "executed_ids": executed_ids,
+                "manifest_consistent": manifest_consistent,
+            },
+            "main_uses_react": "ReActSearchAgent" in main_text and "SearchWorkflow" not in main_text,
+            "network_boundary": "本次固定测试未调用网络或生产搜索；没有 OS 级 socket 隔离。",
+        }
+    except (KeyError, OSError, ValueError, json.JSONDecodeError, zipfile.BadZipFile, subprocess.SubprocessError) as exc:
+        return {
+            "passed": False,
+            "valid_zip": False,
+            "error": type(exc).__name__,
+            "detail": str(exc),
+        }
 
 
 def _tc10_docx_content_gate(content: bytes) -> dict[str, Any]:
@@ -143,11 +276,15 @@ def _download_artifacts(
         response = client.get(
             f"{api_base}/v1/harness/runs/{run_id}/artifacts/{artifact['artifact_id']}"
         )
-        content_gate = (
-            _tc10_docx_content_gate(response.content)
-            if response.status_code == 200 and artifact.get("scenario_id") == "TC-10"
-            else None
-        )
+        content_gate = None
+        if response.status_code == 200 and artifact.get("scenario_id") == "TC-10":
+            content_gate = _tc10_docx_content_gate(response.content)
+        elif (
+            response.status_code == 200
+            and artifact.get("scenario_id") == "TC-02"
+            and artifact.get("media_type") == "application/zip"
+        ):
+            content_gate = _tc02_zip_content_gate(response.content)
         downloads.append(
             {
                 "artifact_id": artifact["artifact_id"],
@@ -304,8 +441,10 @@ def _run_one(
                 "review_required": item.get("review_required"),
                 "deliverable_type": item.get("deliverable_type"),
                 "key_outputs": item.get("key_outputs", []),
+                "key_outputs_label": item.get("key_outputs_label"),
                 "review_guidance": item.get("review_guidance"),
                 "execution_summary": item.get("execution_summary"),
+                "self_test": item.get("self_test"),
                 "external_action": item.get("external_action"),
                 "original_inputs_modified": item.get("original_inputs_modified"),
             }

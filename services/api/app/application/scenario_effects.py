@@ -29,7 +29,13 @@ from pathlib import Path
 from typing import Any, Callable, Protocol
 from xml.sax.saxutils import escape
 
-from packages.contracts.harness_models import AgentControlLoopArtifactCheck
+from packages.contracts.harness_models import (
+    AgentControlLoopArtifactCheck,
+    AgentControlLoopArtifactSelfTest,
+)
+from services.api.app.application.react_refactor_effect import (
+    build_real_react_refactor,
+)
 
 
 class ScenarioEffectError(RuntimeError):
@@ -60,8 +66,10 @@ class GeneratedOfficeArtifact:
     record_count: int | None = None
     deliverable_type: str | None = None
     key_outputs: tuple[str, ...] = ()
+    key_outputs_label: str | None = None
     review_guidance: str | None = None
     execution_summary: str | None = None
+    self_test: AgentControlLoopArtifactSelfTest | None = None
 
     @property
     def verifier_status(self) -> str:
@@ -127,8 +135,8 @@ SCENARIO_EFFECT_SPECS: tuple[ScenarioEffectSpec, ...] = (
     ScenarioEffectSpec(
         "TC-02",
         "office-code-react-refactor",
-        "搜索 Agent ReAct 重构",
-        "把固定 Workflow 搜索代码改造成有迭代上限和轨迹的 ReAct 结构，并运行测试。",
+        "搜索 Agent 有界 ReAct 控制结构重构",
+        "把搜索 Agent 从固定 Workflow 重构为带迭代上限和轨迹的 ReAct 结构。",
         (
             ("算法研发", "config.py"),
             ("算法研发", "llm.py"),
@@ -138,11 +146,15 @@ SCENARIO_EFFECT_SPECS: tuple[ScenarioEffectSpec, ...] = (
             ("算法研发", "tools.py"),
             ("算法研发", "workflow.py"),
         ),
-        ("search-agent-react-refactor.zip", "ReAct测试回执.md"),
-        "validator-code-sandbox-v1",
+        ("search-agent-react-refactor.zip", "TC-02测试与改动说明.md"),
+        "validator-code-project-copy-v2",
         "展示真实 diff、命令回执和失败位置。",
         ("effect_receipts[]",),
-        ("不修改 FORTE 原始源码", "不运行未批准命令", "不访问网络"),
+        (
+            "不修改 FORTE 原始源码",
+            "不运行未批准命令",
+            "固定测试不调用网络或生产搜索",
+        ),
         "implemented",
         _contains_any(("ReAct", "Workflow"), ("搜索 Agent", "重构")),
     ),
@@ -581,6 +593,113 @@ class ScenarioEffectEngine:
         )
 
     def _react_refactor(
+        self, catalog: ScenarioEffectCatalog, spec: ScenarioEffectSpec
+    ) -> tuple[GeneratedOfficeArtifact, ...]:
+        sources, source_refs = self._checked_source_bytes(catalog, spec)
+        build = build_real_react_refactor(sources, self._run_fixed_command)
+        checks = tuple(self._check(*item) for item in build.checks)
+        archive = self._zip_bytes(build.archive_files)
+        status = "通过" if build.execution_ok else "失败"
+        self_test = AgentControlLoopArtifactSelfTest(
+            instruction=spec.instruction,
+            expected_files=[
+                "search_agent_workflow/",
+                "search_agent_workflow/CHANGESET.patch",
+                "search_agent_workflow/changes.json",
+                "search_agent_workflow/改动说明.md",
+                "search_agent_workflow/TC-02自测卡.md",
+                "search_agent_workflow/TEST_RECEIPT.txt",
+            ],
+            commands=[
+                "python -m compileall -q search_agent_workflow",
+                "python -m unittest discover -s search_agent_workflow/tests -v",
+            ],
+            expected_checks=[
+                f"当前 {build.test_count} 项 unittest 与包内清单一致且全部通过",
+                "max_iterations 接受 1 和 20，拒绝 0 和 21",
+                "正常完成与达到迭代上限均有独立测试",
+                "非法 Action、未知 Tool 和私有 reasoning 字段均被拒绝",
+                "真实 ToolRegistry 调用与 action/observation 轨迹可核对",
+                "默认策略确定性执行已规划工具，action_policy 接口可替换",
+                "外层 Planner/Analyst 调用不冒充代码包内部 action policy",
+                "原查询漂移、质量降级、来源配额、句界截断行为保持",
+            ],
+            failure_signals=[
+                "任一命令退出码非 0",
+                "包内声明的测试 ID 与实际执行集合不一致，或出现 failure/error",
+                "ZIP 缺少原 workflow.py、tools.py、llm.py、config.py 或 main.py",
+                "main.py 仍只调用 SearchWorkflow",
+                "运行时要求网络、安装依赖或生产凭据",
+            ],
+        )
+        common = dict(
+            source_file_refs=source_refs,
+            validator_id="validator-code-project-copy-v2",
+            checks=checks,
+            covered_period="FORTE 固定 commit 345c1ec 的 algorithm-013 输入版本",
+            statistic_basis="完整复制 7 个输入文件后，仅在隔离副本修改 2 个并新增 ReAct 控制器、测试与审计文件",
+            purpose="供代码评审者下载、独立复测并人工合并；不会覆盖 FORTE 原文件",
+            review_guidance=(
+                "先核对 CHANGESET.patch，再按自测卡运行两条命令。全部通过后人工挑选合并；"
+                "当前系统不会写回仓库或发起 PR。"
+                if build.execution_ok
+                else "不要合并这个代码包。先展开失败检查和 TEST_RECEIPT.txt，修复后重新启动一项 TC-02 任务；"
+                "当前失败包仍可下载排查，但不会写回原仓库。"
+            ),
+        )
+        return (
+            GeneratedOfficeArtifact(
+                title="algorithm-013 有界 ReAct 控制结构代码包",
+                file_name="search-agent-react-refactor.zip",
+                media_type="application/zip",
+                content=archive,
+                summary=(
+                    f"已从真实项目副本生成可审查 ZIP；编译与 {build.test_count} 项测试{status}。"
+                ),
+                deliverable_type="完整可运行项目副本",
+                key_outputs=(
+                    "修改 config.py：增加 1 到 20 次迭代边界",
+                    "修改 main.py：主入口改走 bounded ReAct",
+                    "新增 react_agent.py：复用原 LLM、ToolRegistry、WorkflowState 与业务节点",
+                    "默认策略依次执行已规划工具；action_policy 可替换，但未证明包内模型自主 ReAct",
+                    "原 workflow.py、llm.py、tools.py、requirements.txt、search_agent.log 逐字保留",
+                ),
+                key_outputs_label="文件变更",
+                execution_summary=(
+                    f"编译退出码 {'0' if build.execution_ok else '非 0'}；"
+                    f"实际运行 {build.test_count} 项 unittest；"
+                    "本次固定测试未调用网络、未安装依赖、未调用生产搜索；"
+                    "runner 不具备 OS 级 socket 隔离；外层 Planner/Analyst 不是包内 action policy。"
+                ),
+                self_test=self_test,
+                **common,
+            ),
+            GeneratedOfficeArtifact(
+                title="TC-02 测试与改动说明",
+                file_name="TC-02测试与改动说明.md",
+                media_type="text/markdown",
+                content=build.report,
+                summary=(
+                    "说明固定五节点如何变为有界 ReAct 控制结构，并明确默认策略、"
+                    f"{build.test_count} 项真实测试与人工合并步骤。"
+                ),
+                deliverable_type="测试回执与改动说明",
+                key_outputs=(
+                    f"完整副本编译及 {build.test_count} 项测试{status}",
+                    "公开轨迹只有 action/observation，不含私有思维过程",
+                    "默认策略确定性执行已规划工具；未证明包内模型自主 ReAct",
+                    "原 FORTE 输入未覆盖，external_action=none",
+                ),
+                key_outputs_label="验证结论",
+                execution_summary=(
+                    f"编译 {build.compile_ms} ms，测试 {build.test_ms} ms；"
+                    "失败时成果卡必须标红并停止人工合并。"
+                ),
+                **common,
+            ),
+        )
+
+    def _legacy_react_refactor(
         self, catalog: ScenarioEffectCatalog, spec: ScenarioEffectSpec
     ) -> tuple[GeneratedOfficeArtifact, ...]:
         sources, source_refs = self._checked_source_bytes(catalog, spec)
@@ -1773,6 +1892,7 @@ class ScenarioEffectEngine:
                 purpose="供业务与合规负责人审阅流程是否可采用；不是拨号、CRM 或短信执行工具。",
                 deliverable_type="流程设计 DOCX",
                 key_outputs=terminal_states,
+                key_outputs_label="6 类关键终态",
                 review_guidance="13 项确定性规则检查通过后，仍需业务与合规负责人复核当前制度口径、话术和实际系统接入方案。",
                 execution_summary=execution_summary,
             ),
