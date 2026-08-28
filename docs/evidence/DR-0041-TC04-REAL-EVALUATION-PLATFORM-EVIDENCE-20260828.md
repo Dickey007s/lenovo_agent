@@ -63,4 +63,4 @@
 - Python：配置真实 PostgreSQL 17.11 测试库后最终 `127 passed in 184.12s`，包含 TC-04 响应性、去重与 PostgreSQL 顺序恢复路径。
 - Ruff、前端 lint、Next.js production build 均通过；Harness Playwright `35 passed in 1.4m`。
 - 桌面、成果聚焦与 390px 截图、SHA-256 manifest 已保存；聚焦图不冒充实际桌面布局。
-- 远端 PR/check/merge SHA 与合并后最新 master 健康状态待提交阶段补记。
+- 代码提交 [`9e33fdd`](https://github.com/Dickey007s/lenovo_agent/commit/9e33fdd592cdae8583f1e262d7213d92b0e38f30) 已进入 [PR #52](https://github.com/Dickey007s/lenovo_agent/pull/52)；该代码 head 的 [PostgreSQL 17.11 job](https://github.com/Dickey007s/lenovo_agent/actions/runs/33168608454/job/98839939131) 实际 `3 passed in 4.39s`。本 Evidence 留痕提交自己的远端门与最终 merge SHA 仍以 PR 页面为权威。
