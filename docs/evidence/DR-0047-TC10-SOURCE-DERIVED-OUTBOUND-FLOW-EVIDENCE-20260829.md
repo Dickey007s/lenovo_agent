@@ -2,7 +2,7 @@
 
 ## 当前结论
 
-`Limited Verified`。固定 Operations-008 纵切已完成来源推导、动态规则与状态图、DOCX 独立复核、真实 `deepseek-v4-pro`、PostgreSQL 顺序重启复读、canonical/dynamic/failure 前台和本地完整工程门。PR 与远端 PostgreSQL 门在合并后补记；在此之前不把本地结论扩写为远端或生产事实。
+`Limited Verified`。固定 Operations-008 纵切已完成来源推导、动态规则与状态图、DOCX 独立复核、真实 `deepseek-v4-pro`、PostgreSQL 顺序重启复读、canonical/dynamic/failure 前台和完整工程门。实现提交 [`ccc6177`](https://github.com/Dickey007s/lenovo_agent/commit/ccc61775e2cb9d8640f7da23b2fb93b529c27a3e) 已进入 [PR #63](https://github.com/Dickey007s/lenovo_agent/pull/63)，首轮远端 PostgreSQL 门通过；最终合并 SHA 由交付回执记录。
 
 ## 历史基线为何不足
 
@@ -51,9 +51,10 @@
 - `uv run ruff check .`、`pnpm --dir apps/web lint`、`pnpm --dir apps/web build` 与公共 fixture `--check` 均通过。
 - 真实模型阶段未触发 deadline 或费用停止：仅 1 轮、Planner/Analyst 各一次。长时间验证来自本地全量工程门，不是持续 Provider 调用。
 
-## 尚待远端收口
+## 远端门
 
-- PR、远端 durable workflow、合并 SHA 与最新 master PostgreSQL 服务将在远端门完成后补记。
+- [PR #63](https://github.com/Dickey007s/lenovo_agent/pull/63) 的 `durable-agent-control-loop` 在实现提交上通过，job [`98977859750`](https://github.com/Dickey007s/lenovo_agent/actions/runs/33209173403/job/98977859750)，耗时 55 秒。
+- 合并后仍须从最新 `master` 以 PostgreSQL 重启服务，并用同一 Owner 复读本 Evidence 的 Run；该最终服务状态写入交付回执，不反向改写历史 manifest。
 
 ## 不能支持的结论
 
