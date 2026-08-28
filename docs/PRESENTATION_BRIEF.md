@@ -56,6 +56,7 @@ Agent Control Loop 的逐模块历史基线、当前有界效果纵切和后续�
 | 12 | Demo 3 对单任务和多任务统一施加风险与动作控制 | 影响预演 -> 证据 -> 审批 -> Permit -> 回执 | 目标设计；当前没有真实外部动作 |
 | 13 | 当前 12 个本地 FORTE 场景已有真实隔离工件与确定性验证；3 个外部依赖场景明确阻断 | 12 通过、3 `blocked_external_boundary` 的效果账本；六个真实 `deepseek-v4-pro` 运行 | `DR-0035` 限定能力，不等于任意办公任务或用户价值；模型质量、效果验证、Loop 终态分开报告 |
 | 14 | 历史约 30% 审计基线已升级为可见分支、可恢复逻辑成果和固定本地可写工件；下一步仍是通用 Tool Gateway、多 Worker 与外部动作治理 | Branch、Run Workspace Artifact 与 Demo 2/3 目标架构叠加图 | `30%` 只代表历史基线；当前真实工件仅来自十二个服务端固定适配器，不是通用 Agent 执行环境 |
+| 15 | 同一个任务可以“成果已通过、Agent 审计说明仍待修复”；用户必须先知道成果能否用，再决定是否处理引用位置 | TC-01 5/5 成果在前、两个同源 Gap 合并为一个审计项；PDF “技术/研发”断行修复前后 | `DR-0036`；Artifact 通过不等于 Run completed，Anchor 仍不证明语义正确 |
 
 ## 4. 现场演示卡片
 
@@ -71,6 +72,7 @@ Agent Control Loop 的逐模块历史基线、当前有界效果纵切和后续�
 10. 再展示一次 ambiguous 恢复态：首屏只回答为什么需要人、从几个真实位置中选哪一个、选择后只恢复哪条 Branch；不预选候选，未选择前主按钮禁用。若预算已到 `stopped/bounded`，明确说明旧 Run 不可继续，并用一条 Branch 创建新的独立任务。
 11. 运行 TC-05 或 TC-14：展示模型是否调用/采用、隔离工件、逐项确定性检查和下载按钮；指出即使 Analyst 未采用，已通过的工件仍保留。再展示 TC-03/08/09 的外部边界回执，证明系统没有伪造 SQL/Web/cron。
 12. 对建议点“查看形成依据”，说明建议尚未逐项绑定引用；只有点击“确认并启动”才创建新 Loop。
+13. 展示 TC-01 的负例与修复：原页面已有可下载 CSV，却把同一 PDF 定位缺口重复成两个“重试分支”；新页面先显示 5/5 成果，再把它合并成一个“不影响成果”的审计项。随后说明新 Run 会直接容忍 PDF 版面断行、过滤 4 月 20 日之后的候选，并取消没有矛盾 Anchor 的人工阻塞。
 
 演示不要从八模块架构图开始。先让观众看到数据、任务、轨迹和证据闭环，
 再解释支撑它的架构。
@@ -148,6 +150,7 @@ Agent Control Loop 的逐模块历史基线、当前有界效果纵切和后续�
 | 人工处理选项与反馈 | 用户能明确告诉 Agent 接受、否决还是暂缓，采用哪种口径，还要核对什么 | A/B/C、影响预演、反馈框、决定回执 | `decision_records[]` + 新 Run POST；当前没有文件写入或外部动作 |
 | 终态仍要求复核 | 完成不等于正确 | “模型初步结论 · 待复核” | `review_required=true` |
 | 服务端 Evidence Gate | 验证结果可决定继续还是停止 | 本轮缺口、下一轮目的、剩余预算 | `rounds[].evidence_gaps` 与 `next_step` |
+| 成果与审计分层 | 用户先判断真实文件是否可用，再看 Agent 说明是否能回开原文 | “成果可用，审计待补充”、5/5、同源 Gap 合并、补齐来源定位 | passed Artifact/EffectReceipt + waiting Gap；客户端合并不改 Branch，不等于 Run completed |
 | 轮次间人工证据门 | 证据不足时由人决定是否继续花预算 | “确认并继续核对”、调整方向或停止 | `status=waiting_input`、`control_state=paused`、resume 回执 |
 | active deadline | 用户阅读、开会或暂停时不会把 Agent 预算烧光 | “Agent 执行时间”、已用 active 秒数、精确停止原因 | 默认 7200 秒、上限 14400 秒；`budget.elapsed_ms/stop_reason`，waiting/pause 冻结 |
 | Agent 自有缺口处置 | 用户不再被要求替 Agent 猜行号或修改候选文件 | 原目标、尝试文件、模型调用/采用、保留项、无外部动作、只重试本分支 | `recovery_kind` + Branch/Gap + model receipt；无 Anchor 不高亮 |
@@ -185,6 +188,7 @@ Agent Control Loop 的逐模块历史基线、当前有界效果纵切和后续�
 - `exact/ambiguous/unavailable/stale/rejected` 是服务端拥有的原文位置状态，不是 Finding 真值；来源变化会进入 `stale`，候选重算不一致会进入 `rejected`；
 - DR-0032 的 `DecisionRequest`、来源修订校验、五态 EvidenceResolution、局部 Branch 恢复与 PostgreSQL 顺序重启门已在限定范围内实现；当前仍不能宣称独立决定账本、并发 CAS、多实例协调或在途调用恢复。
 - DR-0034 的全量门为 Python `83 passed, 2 skipped`、PostgreSQL `2 passed`、Harness browser `25 passed`，Ruff/lint/build 通过；它证明两类待处理动作的前台映射和 390 px 回归，不证明“3 秒内理解”或用户价值。
+- DR-0036 的门为 Python 定向 `78 passed`、全量 `116 passed, 3 skipped`、Harness browser `29 passed`、Ruff/lint/build 通过；一次真实 `deepseek-v4-pro` TC-01 在第 1 轮完成，真实 CSV 5/5、三 Branch 完成、0 Gap/开放 DecisionRequest。三个 skip 是本机没有 PostgreSQL；一次成功仍不证明 Provider 重复稳定性或目标用户理解提升。
 - 两张确定性浏览器图分别展示“继续此分支”与“恢复 v1”；它们证明 UI/服务端字段映射，不是真实模型运行；
 - 最终截图绑定的真实浏览器运行：整库冻结 96 份索引，Agent 自主选择并核对 3 份文件，2 次 `deepseek-v4-pro` 调用，形成 5 条发现和 4 条待确认建议；
 - 3 张最终文件管理器/建议截图及 SHA-256 写入 Evidence；1440px 与 390px 无页面横向溢出；

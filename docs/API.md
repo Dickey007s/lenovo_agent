@@ -411,6 +411,11 @@ safe extracted preview lines; for PDF/DOCX it is not an original page or native
 paragraph coordinate. `table_rows` is row-level, not cell-level semantic proof.
 Each newly adopted Finding needs at least one resolved Anchor. Anchor membership
 and location do not prove entailment, arithmetic, completeness or correctness.
+Text resolution first uses strict whitespace-normalized matching. If that yields
+no candidate and the normalized quote has at least 12 characters, the server may
+ignore safe-Preview layout whitespace and punctuation while retaining its line
+map. Exactly one position becomes `exact`; repeated positions remain `ambiguous`.
+This is not fuzzy or semantic matching.
 If the first Analyst candidate cannot be uniquely located, the Runtime may spend
 one additional Analyst call inside the same Run budget. It emits
 `analysis_validation_rejected` before retrying and never publishes rejected
@@ -423,6 +428,12 @@ unresolved Finding and candidates remain in `next_step.evidence_resolutions`; on
 their affected Branches wait. If no Finding can be adopted, the round is still
 preserved with `recovery_kind=source_location`. Repeated schema failures use
 `analysis_output`. Scope or integrity violations still fail closed.
+
+After resolution, the Runtime may omit a Finding when every verified `observed`
+month/day lies outside an explicit Chinese date window in the original instruction;
+it emits `analysis_scope_filtered`. A model-proposed human review without an exact
+`contradiction` Anchor is removed with `decision_gate_suppressed`. These rules do
+not authorize an out-of-scope ref and do not implement a general predicate compiler.
 
 `review.options[]` is model-proposed handling context, not a server decision or
 approval. Every option projects `affected_branch_ids`, `required_file_refs`,
@@ -625,6 +636,8 @@ analysis_started
 analysis_completed
 analysis_structure_rejected (optional, followed by one bounded retry)
 analysis_validation_rejected (optional, followed by one bounded retry)
+analysis_scope_filtered (optional when all verified observed dates are outside the instruction window)
+decision_gate_suppressed (optional when a proposed human Gate has no contradiction Anchor)
 analysis_partial_adopted (optional when only verified Findings remain)
 analysis_recovery_required (optional before a guided waiting state)
 evidence_disambiguation_required (optional for multiple real source positions)
@@ -674,6 +687,7 @@ reconciliation; a nonterminal interruption uses GET plus `after=N` recovery.
 | Artifact download 404 | Artifact is not owned by this Run/Owner | keep Snapshot state; do not guess another file |
 | Artifact download 503 | stored bytes are missing or fail size/digest verification | show a fail-closed download error; never return partial/drifted bytes |
 | `status=waiting_input` | one or more Branches could close a visible evidence gap | inspect sources, optionally steer, then explicitly resume one Branch or stop |
+| passed `workspace_artifacts[]` plus `status=waiting_input` | deterministic outcome is downloadable, while Analyst audit location remains unresolved | show outcome first and group only same-source/same-failure gaps in the browser; do not change Snapshot Branches or claim `completed` |
 | `next_step.recovery_kind=source_location` | legal-scope candidate could not be uniquely mapped to safe Preview | for unavailable: show one recommended Branch retry with optional details collapsed; for ambiguous: require one explicit candidate choice before accept |
 | `next_step.recovery_kind=analysis_output` | provider responded twice without a usable public result structure | keep raw output hidden; show one recommended minimal-Branch retry, optional feedback or stop |
 | `checkpoint_recovered` | server restored a PostgreSQL Snapshot and paused | reconcile the trace; explicitly resume from the safe checkpoint |
@@ -681,6 +695,7 @@ reconciliation; a nonterminal interruption uses GET plus `after=N` recovery.
 | `status=failed` | model/schema/plan/source/citation validation failed | show safe business error and no result |
 
 See [UI-server fact matrix](contracts/UI_SERVER_FACT_MATRIX.md),
+[`DR-0036`](decisions/DR-0036-outcome-first-and-layout-tolerant-evidence.md),
 [`DR-0034`](decisions/DR-0034-one-action-recovery-and-explicit-source-choice.md),
 [`DR-0031`](decisions/DR-0031-active-budget-and-agent-owned-gap-recovery.md)
-and [current Evidence](evidence/DR-0034-ONE-ACTION-RECOVERY-EVIDENCE-20260827.md).
+and [current Evidence](evidence/DR-0036-TC01-OUTCOME-EVIDENCE-LOCALIZATION-EVIDENCE-20260828.md).

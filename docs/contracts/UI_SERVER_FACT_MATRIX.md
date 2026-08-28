@@ -1,7 +1,8 @@
 # UI-server fact matrix
 
-This is the current `DR-0035` Scenario Effect Gate and Run Workspace Artifact
-surface, on top of the `DR-0034` one-action recovery, `DR-0033` closable
+This is the current `DR-0036` outcome-first evidence-localization surface on top
+of the `DR-0035` Scenario Effect Gate and Run Workspace Artifact surface,
+`DR-0034` one-action recovery, `DR-0033` closable
 Branch-lane review, `DR-0032`
 persistent decision/recovery contract, `DR-0029`
 server-verified Evidence Anchors and `DR-0026`
@@ -59,6 +60,10 @@ Prompt、思维链、原始模型响应、绝对路径、哈希和内部策略�
 | Analyst started/returned | provider analysis stage, not completion | `analysis_started/completed` | per round | Prompt, CoT, raw response |
 | Analyst receipt | not called/adopted/not adopted and elapsed time | round `analysis_receipt.*` | independent of result validation | token/provider trace |
 | Citation and location validation | every Finding stays inside this round's approved refs and has at least one quote uniquely resolved in the exact bounded source | `result_validation`, `result.findings[].evidence_anchors` | before Evidence Gate; model quote candidates are removed before public projection | false semantic/numeric proof claim, raw quote candidate or model-supplied line number |
+| Layout-tolerant unique location | a PDF/DOCX Preview line wrap or punctuation split no longer creates a false missing citation when there is exactly one normalized location | strict match first; server line-mapped layout normalization; resulting exact Anchor | only after zero strict candidates and at least 12 normalized characters; multiple positions stay ambiguous | fuzzy/semantic match, native PDF coordinates, entailment or server guessing |
+| Instruction date-scope filter | a Finding whose verified observed dates all fall outside the user's explicit month/day window does not block the current task | `analysis_scope_filtered`, filtered count, original instruction and resolved observed Anchors | after source resolution and before result adoption | generic object/department/version filter support or an inferred date window |
+| Human Gate admission | a model-proposed decision blocks the user only when the Finding has an exact contradiction Anchor | `decision_gate_suppressed` or a retained `review` plus contradiction Anchor | unsupported review becomes ordinary Finding review; true conflicts keep DecisionRequest flow | claim that all ordinary Findings are correct or need no human review |
+| Verified outcome with audit pending | a deterministic file is usable even though Agent source-location audit still waits | passed EffectReceipt, all visible Artifact checks passed, latest `waiting_input` Gap; UI label “成果可用，审计待补充” | Artifact/download/checks render before Branch/Gaps; only Gaps with the same candidate refs and failure detail may be grouped in the browser | Run `completed`, deleted/merged Branches, same-file distinct failures being one audit item or audit location proving task correctness |
 | Evidence gap Branch lane | the Agent has not produced an adoptable result for one or more bounded Branches; the header says how many are waiting and each row distinguishes “无需核对文件，建议重试” from “需要从 N 个原文位置中选 1 个” | `branches[]` joined by `evidence_gaps[].branch_id`; Branch input/verified/missing refs; top-level `decision_requests[]`; `EvidenceResolution.status/candidates[]` | prior rounds/branches/versions remain visible; opening is read-only; only a versioned Branch decision/resume creates work | claim that visual lanes prove parallel Workers, a candidate file is wrong or the evidence guarantees truth |
 | Agent gap recovery sheet | retry-only user sees one recommended Branch action before optional explanation; ambiguous user first sees why a human is needed, what to select and what happens next | latest Round `next_step.recovery_kind`, bound Branch objective/status/input/verified refs, Gap candidates, EvidenceResolution and Planner/Analyst `called/output_used` | opening has no mutation; optional clue and audit/Preview are collapsed; waiting Run may steer then resume only that Branch; terminal Run creates a new task | raw validator text, invented row/highlight, mandatory source edit, mandatory feedback or replay of a terminal provider call |
 | Retry-only Branch action | user can continue one recoverable Branch without editing files or filling an answer | waiting Branch + non-ambiguous Gap/Resolution + recovery mode; control POST `resume(branch_id)` and optional prior `steer` | primary action is unique; opening does not call a model or charge the next round; unselected Branches remain waiting | automatic retry, hidden budget spend, all-Branch resume |
@@ -148,7 +153,9 @@ Prompt、思维链、原始模型响应、绝对路径、哈希和内部策略�
 
 ## 7. Evidence and applicability
 
-Current contract: [`DR-0035`](../decisions/DR-0035-scenario-effect-gate-and-run-workspace-artifacts.md),
+Current contract: [`DR-0036`](../decisions/DR-0036-outcome-first-and-layout-tolerant-evidence.md),
+[`SCENARIO-022`](../scenarios/SCENARIO-022-verified-outcome-and-audit-location.md),
+[`DR-0035`](../decisions/DR-0035-scenario-effect-gate-and-run-workspace-artifacts.md),
 [`SCENARIO-021`](../scenarios/SCENARIO-021-verifiable-office-artifact-effect.md),
 [`DR-0030`](../decisions/DR-0030-actionable-review-and-recoverable-analysis.md),
 [`SCENARIO-016`](../scenarios/SCENARIO-016-actionable-finding-and-recoverable-analysis.md),
@@ -160,7 +167,7 @@ Current contract: [`DR-0035`](../decisions/DR-0035-scenario-effect-gate-and-run-
 [`SCENARIO-010`](../scenarios/SCENARIO-010-autonomous-whole-workspace-research.md),
 [`SCENARIO-009`](../scenarios/SCENARIO-009-agent-control-loop.md),
 [workspace interaction/source record](../research/WORKSPACE-CENTRIC-OFFICE-AGENT-INTERACTION-AND-SOURCES-20260825.md)
-and [current Scenario Effect Evidence](../evidence/SCENARIO-EFFECT-GATE-20260827.md).
+and [current TC-01 outcome/evidence localization Evidence](../evidence/DR-0036-TC01-OUTCOME-EVIDENCE-LOCALIZATION-EVIDENCE-20260828.md).
 
 Automated checks are engineering proxies, not user research. User
 comprehension, calibrated trust and task value remain `Draft`.

@@ -8,6 +8,10 @@ from pathlib import Path
 import httpx
 import pytest
 
+from packages.contracts.harness_models import (
+    AgentControlLoopFindingDecisionOption,
+    AgentControlLoopFindingReview,
+)
 from services.api.app.application.benchmark_workspace_catalog import (
     BenchmarkWorkspaceCatalog,
 )
@@ -79,6 +83,199 @@ class OnboardingAnalyst:
                         )
                     ],
                 )
+            ],
+            follow_ups=[],
+            review_required=True,
+        )
+
+
+class NoisyOnboardingPlanner:
+    model = "deepseek-v4-pro"
+
+    async def plan(self, *, scenario, files):
+        schedule = next(
+            item for item in files if item["display_label"] == ONBOARDING_LABEL
+        )
+        rules = next(
+            item
+            for item in files
+            if item["display_label"] == "入职物资权限软件分配.pdf"
+        )
+        return HarnessPlanCandidate(
+            summary="读取名单、规则并生成入职资产匹配表",
+            selection_reason="名单与分配规则共同决定日期范围内的匹配结果。",
+            units=[
+                HarnessPlanCandidateUnit(
+                    unit_id="read-schedule",
+                    title="读取入职时间表",
+                    objective="筛选日期范围内的员工",
+                    input_file_refs=[schedule["file_ref"]],
+                    tool="table.inspect",
+                ),
+                HarnessPlanCandidateUnit(
+                    unit_id="read-rules",
+                    title="读取入职物资权限软件分配规则",
+                    objective="核对岗位分类、优先级与备注覆盖规则",
+                    input_file_refs=[rules["file_ref"]],
+                    tool="file.read",
+                ),
+                HarnessPlanCandidateUnit(
+                    unit_id="generate-assets",
+                    title="生成入职资产匹配表",
+                    objective="按时间表与规则形成可下载成果",
+                    input_file_refs=[schedule["file_ref"], rules["file_ref"]],
+                    depends_on=["read-schedule", "read-rules"],
+                    tool="evidence.verify",
+                ),
+            ],
+        )
+
+
+class NoisyOnboardingAnalyst:
+    model = "deepseek-v4-pro"
+
+    def __init__(self) -> None:
+        self.calls = 0
+
+    async def analyze(self, *, instruction, plan, files, validation_feedback=None):
+        self.calls += 1
+        schedule = next(item for item in files if item["display_label"] == ONBOARDING_LABEL)
+        rules = next(
+            item
+            for item in files
+            if item["display_label"] == "入职物资权限软件分配.pdf"
+        )
+        unit_ids = {unit.title: unit.unit_id for unit in plan.units}
+        review = AgentControlLoopFindingReview(
+            requires_human_decision=True,
+            question="是否需要人工指定技术研发岗位的分类？",
+            why_human="模型把已经明确的关键词优先级误判为需要用户选择。",
+            options=[
+                AgentControlLoopFindingDecisionOption(
+                    option_id="A",
+                    label="按规则归类",
+                    meaning="使用文档中已经给出的关键词优先级。",
+                    agent_next_step="保留当前匹配结果。",
+                    next_instruction="按明确规则复核当前匹配结果。",
+                ),
+                AgentControlLoopFindingDecisionOption(
+                    option_id="B",
+                    label="另行指定",
+                    meaning="由用户手工指定其他岗位分类。",
+                    agent_next_step="形成另一份只读匹配建议。",
+                    next_instruction="按用户指定分类形成另一份只读匹配建议。",
+                ),
+            ],
+            recommended_option_id="A",
+            recommendation_reason="规则已经明确给出分类优先级。",
+            after_confirmation="只更新分析说明，不修改原文件。",
+        )
+        priority_quote = (
+            '优先级说明：若岗位同时包含多个分类关键词（如"产品运营"、"市场研发"），'
+            "以排列靠前的分类为准——技术研发 > 产品/视觉设计 > 运营/市场/职能。"
+        )
+        return HarnessTaskResult(
+            summary="日期范围内的入职资产已匹配，另有范围外候选和多余人工门需要服务端处理。",
+            findings=[
+                HarnessFinding(
+                    plan_unit_id=unit_ids["读取入职时间表"],
+                    title="日期范围内共有九名待入职员工",
+                    detail="3 月 20 日至 4 月 20 日的边界员工已保留。",
+                    file_refs=[schedule["file_ref"]],
+                    evidence_quotes=[
+                        HarnessEvidenceQuote(
+                            file_ref=schedule["file_ref"],
+                            role="observed",
+                            label="日期上界记录",
+                            quote=(
+                                "林舒志 | 4月20日 (周一) | 技术研发 | "
+                                "林某某 138xxxx0015 | 共享工位"
+                            ),
+                        )
+                    ],
+                ),
+                HarnessFinding(
+                    plan_unit_id=unit_ids["读取入职物资权限软件分配规则"],
+                    title="技术研发按明确优先级归类",
+                    detail="规则已经给出关键词和优先级，不需要用户再次决定。",
+                    file_refs=[schedule["file_ref"], rules["file_ref"]],
+                    evidence_quotes=[
+                        HarnessEvidenceQuote(
+                            file_ref=schedule["file_ref"],
+                            role="observed",
+                            label="技术研发员工",
+                            quote=(
+                                "林舒志 | 4月20日 (周一) | 技术研发 | "
+                                "林某某 138xxxx0015 | 共享工位"
+                            ),
+                        ),
+                        HarnessEvidenceQuote(
+                            file_ref=rules["file_ref"],
+                            role="expected",
+                            label="岗位分类优先级",
+                            quote=priority_quote,
+                        ),
+                    ],
+                    review=review,
+                ),
+                HarnessFinding(
+                    plan_unit_id=unit_ids["生成入职资产匹配表"],
+                    title="两条特殊备注均已生效",
+                    detail="设计软件权限和共享工位分别覆盖默认值。",
+                    file_refs=[schedule["file_ref"], rules["file_ref"]],
+                    evidence_quotes=[
+                        HarnessEvidenceQuote(
+                            file_ref=schedule["file_ref"],
+                            role="observed",
+                            label="多条备注员工",
+                            quote=(
+                                "冯子健 | 4月13日 (周一) | 设计 | "
+                                "冯某某 138xxxx0018 | 不开通设计软件权限、共享工位"
+                            ),
+                        ),
+                        HarnessEvidenceQuote(
+                            file_ref=rules["file_ref"],
+                            role="expected",
+                            label="多条备注规则",
+                            quote=(
+                                '多条备注处理：若同一员工有多条备注（以顿号"、"分隔），'
+                                "每条备注均须生效。"
+                            ),
+                        ),
+                    ],
+                ),
+                HarnessFinding(
+                    plan_unit_id=unit_ids["读取入职时间表"],
+                    title="范围外岗位包含组合关键词",
+                    detail="4 月 21 日和 4 月 23 日不属于当前任务范围。",
+                    file_refs=[schedule["file_ref"], rules["file_ref"]],
+                    evidence_quotes=[
+                        HarnessEvidenceQuote(
+                            file_ref=schedule["file_ref"],
+                            role="observed",
+                            label="范围外产品运营员工",
+                            quote=(
+                                "姜映雪 | 4月21日 (周二) | 产品运营 | "
+                                "姜某某 138xxxx0012"
+                            ),
+                        ),
+                        HarnessEvidenceQuote(
+                            file_ref=schedule["file_ref"],
+                            role="observed",
+                            label="范围外市场运营员工",
+                            quote=(
+                                "孟雨桐 | 4月23日 (周四) | 市场运营 | "
+                                "孟某某 138xxxx0029"
+                            ),
+                        ),
+                        HarnessEvidenceQuote(
+                            file_ref=rules["file_ref"],
+                            role="expected",
+                            label="岗位分类优先级",
+                            quote=priority_quote,
+                        ),
+                    ],
+                ),
             ],
             follow_ups=[],
             review_required=True,
@@ -188,6 +385,46 @@ async def test_runtime_writes_downloadable_verified_artifact_without_touching_fo
     assert response.headers["x-content-type-options"] == "nosniff"
     assert denied.status_code == 404
     json.dumps(public.model_dump(mode="json"), ensure_ascii=False)
+
+
+@pytest.mark.asyncio
+async def test_tc01_verified_artifact_is_not_blocked_by_pdf_layout_or_scope_noise(
+    tmp_path: Path,
+) -> None:
+    analyst = NoisyOnboardingAnalyst()
+    runtime = HarnessRuntime(
+        BenchmarkWorkspaceCatalog(FORTE_ROOT),
+        NoisyOnboardingPlanner(),
+        analyst,
+        effect_engine=ScenarioEffectEngine(),
+        artifact_store=RunWorkspaceArtifactStore(tmp_path / "run-workspaces"),
+    )
+    started = await runtime.start(
+        "alice",
+        HarnessRunStart(
+            idempotency_key="tc01-layout-scope-regression-0001",
+            instruction=ONBOARDING_INSTRUCTION,
+        ),
+    )
+    snapshot = await _wait_for_settled(runtime, "alice", started.run.run_id)
+
+    assert snapshot.status == "completed"
+    assert analyst.calls == 1
+    assert len(snapshot.workspace_artifacts) == 1
+    assert snapshot.workspace_artifacts[0].verifier_status == "passed"
+    assert len(snapshot.workspace_artifacts[0].checks) == 5
+    assert all(check.passed for check in snapshot.workspace_artifacts[0].checks)
+    assert snapshot.effect_receipts[0].status == "passed"
+    assert all(branch.status == "completed" for branch in snapshot.branches)
+    assert all(not round_item.evidence_gaps for round_item in snapshot.rounds)
+    assert not snapshot.decision_requests
+    assert snapshot.result is not None
+    assert len(snapshot.result.findings) == 3
+    assert all("范围外" not in finding.title for finding in snapshot.result.findings)
+    assert all(finding.review is None for finding in snapshot.result.findings)
+    event_names = [event.event_name for event in snapshot.events]
+    assert "analysis_scope_filtered" in event_names
+    assert "decision_gate_suppressed" in event_names
 
 
 @pytest.mark.asyncio

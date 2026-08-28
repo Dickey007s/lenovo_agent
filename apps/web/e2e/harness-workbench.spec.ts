@@ -544,6 +544,80 @@ function sourceLocationRecoverySnapshot(body: { workspace_id: string; instructio
   };
 }
 
+function verifiedArtifactAuditPendingSnapshot(body: { workspace_id: string; instruction: string }, distinctDetails = false) {
+  const base = sourceLocationRecoverySnapshot(body);
+  const effect = verifiedEffectSnapshot(body);
+  const branches = base.branches.map((branch, index) => ({
+    ...branch,
+    title: index === 0 ? "读取入职物资权限软件分配规则" : "生成入职资产匹配表",
+    objective: index === 0 ? "核对岗位分类和备注覆盖规则" : "按时间表和规则形成成果",
+    input_file_refs: index === 0 ? [pdfFile.file_ref] : [csvFile.file_ref, pdfFile.file_ref],
+    verified_file_refs: index === 0 ? [] : [csvFile.file_ref],
+    missing_file_refs: [pdfFile.file_ref],
+  }));
+  const gaps = branches.map((branch, index) => ({
+    gap_id: `gap-onboarding-${String(index + 1).padStart(4, "0")}`,
+    branch_id: branch.branch_id,
+    label: `“${branch.title}”的规则原文尚未定位`,
+    detail: distinctDetails && index === 1
+      ? "PDF 中另一条规则缺少独立的可回开位置。"
+      : "PDF 安全预览中的版面换行导致 Agent 引用未能逐字匹配。",
+    candidate_file_refs: [pdfFile.file_ref],
+  }));
+  const round = {
+    ...base.rounds[0],
+    question: body.instruction,
+    input_file_refs: [csvFile.file_ref, pdfFile.file_ref],
+    branch_ids: branches.map((branch) => branch.branch_id),
+    evidence_gaps: gaps,
+    next_step: {
+      ...base.rounds[0].next_step,
+      reason: "成果检查已经通过；Agent 的规则说明仍缺少一个可回开的原文位置。",
+      candidate_file_refs: [pdfFile.file_ref],
+      candidate_branch_ids: branches.map((branch) => branch.branch_id),
+      evidence_resolutions: [],
+      decision_requests: [],
+    },
+  };
+  const artifact = {
+    ...effect.workspace_artifacts[0],
+    capability_id: "office-onboarding-assets",
+    scenario_id: "TC-01",
+    title: "入职资产匹配表",
+    file_name: "入职资产匹配表.csv",
+    source_file_refs: [csvFile.file_ref, pdfFile.file_ref],
+    checks: [
+      { check_id: "check-onboarding-date", label: "日期范围", passed: true, detail: "仅保留 3 月 20 日至 4 月 20 日的九名员工。" },
+      { check_id: "check-onboarding-columns", label: "列结构", passed: true, detail: "成果包含员工、资产、权限和工位列。" },
+      { check_id: "check-onboarding-mapping", label: "分配规则", passed: true, detail: "岗位分类与 PDF 优先级规则均已核对。" },
+      { check_id: "check-onboarding-notes", label: "备注覆盖", passed: true, detail: "多条特殊备注均已生效。" },
+      { check_id: "check-onboarding-readonly", label: "原文件只读", passed: true, detail: "原始 FORTE 输入没有被修改。" },
+    ],
+  };
+  return {
+    ...base,
+    rounds: [round],
+    branches,
+    decision_requests: [],
+    workspace_artifacts: [artifact],
+    effect_receipts: [{
+      ...effect.effect_receipts[0],
+      capability_id: "office-onboarding-assets",
+      scenario_id: "TC-01",
+      source_file_refs: [csvFile.file_ref, pdfFile.file_ref],
+      artifact_ids: [artifact.artifact_id],
+      observation: "生成 1 份真实成果文件，执行 5 项确定性检查。",
+      result: "5 项确定性效果门通过；Agent 来源说明仍需补齐定位。",
+    }],
+    artifact_versions: [{
+      ...base.artifact_versions[0],
+      summary: round.next_step.reason,
+      evidence_gaps: gaps,
+      source_file_refs: [csvFile.file_ref],
+    }],
+  };
+}
+
 function boundedAnalysisRecoverySnapshot(body: { workspace_id: string; instruction: string }) {
   const base = sourceLocationRecoverySnapshot(body);
   const branches = base.branches.map((branch) => ({ ...branch, status: "stopped" }));
@@ -612,7 +686,7 @@ function locationFailureSnapshot(body: { workspace_id: string; instruction: stri
 }
 async function fulfillJson(route: Route, body: unknown, status = 200) { await route.fulfill({ status, contentType: "application/json", body: JSON.stringify(body) }); }
 
-async function mockHarness(page: Page, options: { failFirstStart?: boolean; failDecisionDefer?: boolean; disconnect?: boolean; failed?: boolean; locationFailure?: boolean; sourceRecovery?: boolean; sourceRecoveryThreeCandidates?: boolean; boundedRecovery?: boolean; effectArtifact?: boolean; effectBoundary?: boolean; workspaceFailures?: number; interactiveLoop?: boolean; evidenceGate?: boolean } = {}) {
+async function mockHarness(page: Page, options: { failFirstStart?: boolean; failDecisionDefer?: boolean; disconnect?: boolean; failed?: boolean; locationFailure?: boolean; sourceRecovery?: boolean; sourceRecoveryThreeCandidates?: boolean; verifiedArtifactAuditPending?: boolean; verifiedArtifactAuditPendingDistinct?: boolean; boundedRecovery?: boolean; effectArtifact?: boolean; effectBoundary?: boolean; workspaceFailures?: number; interactiveLoop?: boolean; evidenceGate?: boolean } = {}) {
   let workspaceCalls = 0; let startCalls = 0; let streamCalls = 0;
   let currentBody = { workspace_id: "forte-public-office", instruction: "" };
   // Mock snapshots intentionally cover several server state shapes in one route.
@@ -641,7 +715,9 @@ async function mockHarness(page: Page, options: { failFirstStart?: boolean; fail
       const body = route.request().postDataJSON() as typeof currentBody & { idempotency_key: string };
       currentBody = body; starts.push(body);
       if (options.failFirstStart && startCalls === 1) return fulfillJson(route, { detail: "任务启动结果未知" }, 503);
-      currentSnapshot = options.effectArtifact
+      currentSnapshot = options.verifiedArtifactAuditPending || options.verifiedArtifactAuditPendingDistinct
+        ? verifiedArtifactAuditPendingSnapshot(body, options.verifiedArtifactAuditPendingDistinct)
+        : options.effectArtifact
         ? verifiedEffectSnapshot(body)
         : options.effectBoundary
           ? boundedEffectSnapshot(body)
@@ -734,7 +810,7 @@ async function mockHarness(page: Page, options: { failFirstStart?: boolean; fail
       streamCalls += 1; streams.push(url.toString());
       const after = Number(url.searchParams.get("after") ?? "0");
       const all = ["workspace_index", "round_started", "planning_started", "planning_completed", "plan_validation", "analysis_started", "analysis_completed", "result_validation", "evidence_gate", "round_started", "planning_started", "planning_completed", "analysis_started", "analysis_completed", "evidence_gate", options.failed ? "harness_failed" : "loop_committed"];
-      if (options.interactiveLoop || options.evidenceGate || options.sourceRecovery || options.boundedRecovery) {
+      if (options.interactiveLoop || options.evidenceGate || options.sourceRecovery || options.verifiedArtifactAuditPending || options.verifiedArtifactAuditPendingDistinct || options.boundedRecovery) {
         const sequence = Math.max(after + 1, currentSnapshot.last_event_sequence);
         const terminalEvent = currentSnapshot.status === "completed" ? "loop_committed" : currentSnapshot.status === "stopped" ? "loop_stopped" : currentSnapshot.status === "waiting_input" ? "evidence_gate" : "round_started";
         const body = `id: ${sequence}\nevent: ${terminalEvent}\ndata: ${JSON.stringify({ sequence, event_name: terminalEvent, occurred_at: new Date().toISOString(), message: "服务端状态已更新。" })}\n\n`;
@@ -749,7 +825,7 @@ async function mockHarness(page: Page, options: { failFirstStart?: boolean; fail
     }
     if (path.startsWith("/v1/harness/runs/")) {
       if (options.disconnect && streamCalls === 1) return fulfillJson(route, { ...snapshot(currentBody, "queued"), status: "indexing", last_event_sequence: 1, version: 2 });
-      if (options.interactiveLoop || options.evidenceGate || options.sourceRecovery || options.boundedRecovery || options.locationFailure || options.effectArtifact || options.effectBoundary) return fulfillJson(route, currentSnapshot);
+      if (options.interactiveLoop || options.evidenceGate || options.sourceRecovery || options.verifiedArtifactAuditPending || options.verifiedArtifactAuditPendingDistinct || options.boundedRecovery || options.locationFailure || options.effectArtifact || options.effectBoundary) return fulfillJson(route, currentSnapshot);
       currentSnapshot = snapshot(currentBody, options.failed ? "failed" : "completed");
       return fulfillJson(route, currentSnapshot);
     }
@@ -858,6 +934,59 @@ test("shows a real run-workspace file, deterministic checks and a download", asy
     await artifacts.screenshot({ path: "../../docs/evidence/screenshots/scenario-effect-gate-artifact-mobile.png" });
     await page.screenshot({ path: "../../docs/evidence/screenshots/scenario-effect-gate-mobile.png", fullPage: true });
   }
+});
+
+test("puts a verified TC-01 outcome before one grouped audit-location gap", async ({ page }) => {
+  await mockHarness(page, { verifiedArtifactAuditPending: true });
+  await page.goto("/");
+  await page.getByRole("textbox", { name: "任务指令" }).fill("根据入职时间表和分配规则，生成 3 月 20 日至 4 月 20 日的入职资产匹配表。");
+  await page.getByRole("button", { name: "启动 Control Loop" }).click();
+
+  const artifacts = page.locator(".workspace-artifacts");
+  const recovery = page.locator(".loop-source-recovery");
+  const auditItems = page.locator(".loop-gap-branches > li");
+  await expect(artifacts).toContainText("Agent 已生成 1 份真实成果文件");
+  await expect(artifacts).toContainText("入职资产匹配表.csv");
+  await expect(artifacts).toContainText("5/5 项检查通过");
+  await expect(recovery).toContainText("成果已生成，1 处来源定位待补充");
+  await expect(recovery).toContainText("不是源文件，也不是日期结果");
+  await expect(page.locator(".trace-current-round")).toContainText("成果可用，审计待补充");
+  await expect(auditItems).toHaveCount(1);
+  await expect(auditItems.first()).toContainText("同一来源影响 2 个内部步骤");
+  await expect(auditItems.first()).toContainText("不影响成果");
+  await expect(auditItems.first().getByRole("button", { name: "补齐来源定位" })).toBeVisible();
+  await expect(page.locator(".loop-view")).not.toContainText("缺 1 份引用");
+  await expect(page.locator(".loop-view")).not.toContainText("建议重试此分支");
+  await expect(page.locator(".loop-view")).not.toContainText("共有 2 个待处理");
+  const outcomeFirst = await page.evaluate(() => {
+    const outcome = document.querySelector(".workspace-artifacts");
+    const audit = document.querySelector(".loop-source-recovery");
+    return Boolean(outcome && audit && (outcome.compareDocumentPosition(audit) & Node.DOCUMENT_POSITION_FOLLOWING));
+  });
+  expect(outcomeFirst).toBe(true);
+
+  if (process.env.CAPTURE_DR0036_EVIDENCE === "1") {
+    await page.setViewportSize({ width: 1600, height: 1000 });
+    await page.locator(".loop-view").screenshot({ path: "../../docs/evidence/screenshots/dr-0036-tc01-outcome-first-desktop.png" });
+    await page.locator(".loop-gap").screenshot({ path: "../../docs/evidence/screenshots/dr-0036-tc01-grouped-audit-desktop.png" });
+  }
+  await page.setViewportSize({ width: 390, height: 844 });
+  const metrics = await page.evaluate(() => ({ viewport: document.documentElement.clientWidth, scroll: document.documentElement.scrollWidth }));
+  expect(metrics.scroll).toBeLessThanOrEqual(metrics.viewport);
+  if (process.env.CAPTURE_DR0036_EVIDENCE === "1") {
+    await page.locator(".loop-view").screenshot({ path: "../../docs/evidence/screenshots/dr-0036-tc01-outcome-first-mobile.png" });
+  }
+});
+
+test("keeps distinct audit failures separate even when they reference the same file", async ({ page }) => {
+  await mockHarness(page, { verifiedArtifactAuditPendingDistinct: true });
+  await page.goto("/");
+  await page.getByRole("textbox", { name: "任务指令" }).fill("根据入职时间表和分配规则，生成入职资产匹配表。");
+  await page.getByRole("button", { name: "启动 Control Loop" }).click();
+
+  await expect(page.locator(".loop-gap-branches > li")).toHaveCount(2);
+  await expect(page.locator(".loop-gap")).toContainText("还有 2 处来源定位待补充");
+  await expect(page.locator(".loop-gap")).not.toContainText("同一来源影响 2 个内部步骤");
 });
 
 test("shows an external boundary instead of a fabricated result", async ({ page }) => {

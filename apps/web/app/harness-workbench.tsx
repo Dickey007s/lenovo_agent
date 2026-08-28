@@ -501,6 +501,9 @@ export type HarnessActivityState = {
   analysisReceipt: ModelReceipt | null;
   events: HarnessActivityItem[];
   resultReady: boolean;
+  verifiedEffectReady: boolean;
+  passedArtifactChecks: number;
+  totalArtifactChecks: number;
   contract: LoopContract | null;
   budget: LoopBudget | null;
   rounds: LoopRound[];
@@ -526,6 +529,8 @@ const NAMED_EVENTS = [
   "analysis_completed",
   "analysis_structure_rejected",
   "analysis_validation_rejected",
+  "analysis_scope_filtered",
+  "decision_gate_suppressed",
   "analysis_partial_adopted",
   "analysis_recovery_required",
   "evidence_disambiguation_required",
@@ -676,6 +681,27 @@ function filterWorkspaceTree(node: WorkspaceTreeFolder, query: string, extension
 
 function uniqueFileRefs(refs: string[]) {
   return Array.from(new Set(refs));
+}
+
+type EvidenceGapGroup = {
+  groupKey: string;
+  gaps: EvidenceGap[];
+  candidateFileRefs: string[];
+};
+
+function groupEvidenceGaps(gaps: EvidenceGap[]): EvidenceGapGroup[] {
+  const groups = new Map<string, EvidenceGapGroup>();
+  for (const gap of gaps) {
+    const candidateFileRefs = uniqueFileRefs(gap.candidate_file_refs).sort();
+    const normalizedDetail = gap.detail.trim().replace(/\s+/g, " ");
+    const groupKey = candidateFileRefs.length > 0
+      ? `sources:${candidateFileRefs.join(",")}|detail:${normalizedDetail}`
+      : `gap:${gap.gap_id}`;
+    const existing = groups.get(groupKey);
+    if (existing) existing.gaps.push(gap);
+    else groups.set(groupKey, { groupKey, gaps: [gap], candidateFileRefs });
+  }
+  return [...groups.values()];
 }
 
 function uniqueDecisionRequests(requests: DecisionRequest[]) {
@@ -1271,6 +1297,8 @@ function activityItem(event: HarnessServerEvent): HarnessActivityItem {
     analysis_completed: "分析模型返回初步结果",
     analysis_structure_rejected: "分析格式未通过，正在受控重试",
     analysis_validation_rejected: "原文位置未通过，正在受控重试",
+    analysis_scope_filtered: "已过滤任务范围外的候选发现",
+    decision_gate_suppressed: "已取消没有矛盾证据的人工阻塞",
     analysis_partial_adopted: "仅采用可定位的发现",
     analysis_recovery_required: "需要缩小范围后继续",
     evidence_disambiguation_required: "需要你选择原文位置",
@@ -1298,7 +1326,8 @@ function activityItem(event: HarnessServerEvent): HarnessActivityItem {
     harness_failed: "本轮已安全停止",
   };
   const tone = event.event_name === "harness_failed" || event.event_name === "plan_validation_rejected" || event.event_name === "analysis_structure_rejected" || event.event_name === "analysis_validation_rejected" || event.event_name === "analysis_recovery_required" || event.event_name === "evidence_disambiguation_required" || event.event_name === "scenario_effect_bounded" || event.event_name.includes("stopped") ? "warning"
-    : event.event_name.includes("planning") || event.event_name.includes("analysis") ? "model"
+    : ["analysis_scope_filtered", "decision_gate_suppressed"].includes(event.event_name) ? "success"
+      : event.event_name.includes("planning") || event.event_name.includes("analysis") ? "model"
       : event.event_name.includes("validation") || TERMINAL_EVENTS.has(event.event_name) ? "success" : "neutral";
   return {
     sequence: event.sequence,
@@ -1670,6 +1699,10 @@ export function HarnessActivityPane({ state }: { state: HarnessActivityState | n
   </section>;
   const latestRound = state.rounds.at(-1) ?? null;
   const terminalRecovery = state.runStatus === "stopped" && Boolean(latestRound?.next_step?.recovery_kind);
+  const verifiedOutcomeWithAuditPending = Boolean(
+    state.verifiedEffectReady
+    && latestRound?.next_step?.decision === "waiting_input"
+  );
   const phaseIndex = latestRound ? LOOP_PHASES.findIndex((item) => item.key === latestRound.phase) : -1;
   const visibleEvents = state.events.slice(-5);
   const connectionLabel = state.connection === "live" ? "实时"
@@ -1690,11 +1723,13 @@ export function HarnessActivityPane({ state }: { state: HarnessActivityState | n
       <span><b>{Math.ceil(Math.max(0, state.budget.deadline_seconds * 1000 - state.budget.elapsed_ms) / 1000)}</b>秒剩余</span>
     </div>}
     {latestRound && <section className="trace-current-round" aria-label={`第 ${latestRound.round_number} 轮`}>
-      <header><span>第 {latestRound.round_number} 轮</span><b>{gateLabel(latestRound.next_step?.decision)}</b></header>
+      <header><span>第 {latestRound.round_number} 轮</span><b>{verifiedOutcomeWithAuditPending ? "成果可用，审计待补充" : gateLabel(latestRound.next_step?.decision)}</b></header>
       <ol>{LOOP_PHASES.slice(0, 5).map((phase, index) => <li key={phase.key} className={index < phaseIndex || latestRound.status === "completed" ? "is-complete" : index === phaseIndex ? "is-active" : ""}><span>{index < phaseIndex || latestRound.status === "completed" ? <IconCheck aria-hidden="true" /> : index + 1}</span><b>{phase.label}</b></li>)}</ol>
-      {latestRound.evidence_gaps[0] && <p><IconAlertTriangle aria-hidden="true" />{latestRound.evidence_gaps[0].label}</p>}
+      {verifiedOutcomeWithAuditPending
+        ? <p><IconAlertTriangle aria-hidden="true" />成果的 {state.passedArtifactChecks}/{state.totalArtifactChecks} 项检查已通过；仍有来源定位需要 Agent 补齐，不代表文件缺失。</p>
+        : latestRound.evidence_gaps[0] && <p><IconAlertTriangle aria-hidden="true" />{latestRound.evidence_gaps[0].label}</p>}
     </section>}
-    {latestRound?.next_step?.recovery_kind && <div className="trace-recovery-hint"><IconArrowRight aria-hidden="true" /><span><b>{terminalRecovery ? "本次 Run 已结束" : "下一步已准备好"}</b>{terminalRecovery ? "回到主区选择一个未完成分支，以它为目标创建新的独立 Run。" : "回到主区选择一个最小分支，可补充方向后继续。"}</span></div>}
+    {latestRound?.next_step?.recovery_kind && <div className="trace-recovery-hint"><IconArrowRight aria-hidden="true" /><span><b>{verifiedOutcomeWithAuditPending ? "成果不受影响" : terminalRecovery ? "本次 Run 已结束" : "下一步已准备好"}</b>{verifiedOutcomeWithAuditPending ? "回到主区可下载成果；来源定位属于 Agent 的审计修复，不要求你修改文件。" : terminalRecovery ? "回到主区选择一个未完成分支，以它为目标创建新的独立 Run。" : "回到主区选择一个最小分支，可补充方向后继续。"}</span></div>}
     <div className="trace-receipts">
       <Receipt receipt={state.planningReceipt} label="规划模型" />
       <Receipt receipt={state.analysisReceipt} label="分析模型" />
@@ -2408,6 +2443,13 @@ export function HarnessWorkbench({ onActivityChange }: { onActivityChange?: (sta
       analysisReceipt: run?.analysis_receipt ?? null,
       events: run?.events ?? [],
       resultReady: Boolean(run?.result),
+      verifiedEffectReady: Boolean(
+        run?.effect_receipts.some((receipt) => receipt.status === "passed")
+        && run.workspace_artifacts.length > 0
+        && run.workspace_artifacts.every((artifact) => artifact.verifier_status === "passed")
+      ),
+      passedArtifactChecks: run?.workspace_artifacts.reduce((total, artifact) => total + artifact.checks.filter((check) => check.passed).length, 0) ?? 0,
+      totalArtifactChecks: run?.workspace_artifacts.reduce((total, artifact) => total + artifact.checks.length, 0) ?? 0,
       contract: run?.contract ?? null,
       budget: run?.budget ?? null,
       rounds: run?.rounds ?? [],
@@ -2709,6 +2751,24 @@ function LoopView({
     return !["accepted", "declined", "cancelled", "rejected"].includes(decisionState ?? "");
   });
   const recoveryBranches = roundBranches.filter((branch) => branch.status === "waiting_input").sort((left, right) => left.missing_file_refs.length - right.missing_file_refs.length);
+  const verifiedEffectReady = run.effect_receipts.some((receipt) => receipt.status === "passed")
+    && run.workspace_artifacts.length > 0
+    && run.workspace_artifacts.every((artifact) => artifact.verifier_status === "passed");
+  const passedArtifactChecks = run.workspace_artifacts.reduce((total, artifact) => total + artifact.checks.filter((check) => check.passed).length, 0);
+  const totalArtifactChecks = run.workspace_artifacts.reduce((total, artifact) => total + artifact.checks.length, 0);
+  const verifiedOutcomeWithAuditPending = verifiedEffectReady
+    && selectedRound?.next_step?.decision === "waiting_input"
+    && Boolean(selectedRound.evidence_gaps.length);
+  const evidenceGapGroups = verifiedOutcomeWithAuditPending
+    ? groupEvidenceGaps(selectedRound?.evidence_gaps ?? [])
+    : (selectedRound?.evidence_gaps ?? []).map((gap) => ({
+        groupKey: gap.gap_id,
+        candidateFileRefs: uniqueFileRefs(gap.candidate_file_refs),
+        gaps: [gap],
+      }));
+  const selectedRoundGateLabel = verifiedOutcomeWithAuditPending
+    ? "成果可用，审计待补充"
+    : gateLabel(selectedRound?.next_step?.decision);
   const terminalCandidateBranches = new Set(selectedRound?.next_step?.candidate_branch_ids ?? []);
   const terminalRecoveryBranches = roundBranches
     .filter((branch) => terminalCandidateBranches.size > 0
@@ -2783,11 +2843,12 @@ function LoopView({
       {run.rounds.length ? run.rounds.map((round) => <button type="button" key={round.round_number} className={round.round_number === selectedRound?.round_number ? "is-active" : ""} onClick={() => setSelectedRoundNumber(round.round_number)}>
         <span>{round.status === "completed" ? <IconCheck aria-hidden="true" /> : round.round_number}</span>
         <b>第 {round.round_number} 轮</b>
-        <small>{round.next_step ? gateLabel(round.next_step.decision) : LOOP_PHASES.find((phase) => phase.key === round.phase)?.label}</small>
+        <small>{round.round_number === selectedRound?.round_number && verifiedOutcomeWithAuditPending ? "成果可用，审计待补充" : round.next_step ? gateLabel(round.next_step.decision) : LOOP_PHASES.find((phase) => phase.key === round.phase)?.label}</small>
       </button>) : <span>服务端正在建立第一轮。</span>}
     </nav>
+    {(run.workspace_artifacts.length > 0 || run.effect_receipts.length > 0) && <WorkspaceArtifactSection artifacts={run.workspace_artifacts} receipts={run.effect_receipts} />}
     {selectedRound && <article className="loop-round-detail">
-      <header><div><span>本轮问题</span><h3>{selectedRound.question}</h3></div><b>{gateLabel(selectedRound.next_step?.decision)}</b></header>
+      <header><div><span>本轮问题</span><h3>{selectedRound.question}</h3></div><b>{selectedRoundGateLabel}</b></header>
       <ol className="loop-phase-rail">
         {LOOP_PHASES.slice(0, 5).map((phase, index) => {
           const activeIndex = LOOP_PHASES.findIndex((item) => item.key === selectedRound.phase);
@@ -2797,34 +2858,42 @@ function LoopView({
       </ol>
       {selectedRound.input_file_refs.length > 0 && <section className="loop-round-files"><span>Agent 本轮自主选择</span>{selectedRound.selection_reason && <p>{selectedRound.selection_reason}</p>}<div>{selectedRound.input_file_refs.map((ref) => <b key={ref}>{fileLabel(ref)}</b>)}</div></section>}
       {guidedRecovery && <section className="loop-source-recovery" aria-labelledby="source-recovery-title">
-        <header><IconAlertTriangle aria-hidden="true" /><div><span>这轮需要分支级处理</span><h3 id="source-recovery-title">共有 {recoveryBranches.length} 个待处理，每次处理 1 个</h3><p>{pendingResolutions.some((item) => item.status === "ambiguous") ? "需要选择原文的分支与可以直接重试的分支已经分开标注。" : "这些分支都不需要你修改文件；选择一条后才会继续。"}</p></div></header>
-        <div className="source-recovery-facts"><span><b>已保留</b>本轮计划、文件范围、调用记录</span><span><b>未采用</b>无法定位的候选结论</span><span><b>未发生</b>文件修改或外部动作</span></div>
+        <header><IconAlertTriangle aria-hidden="true" /><div><span>{verifiedOutcomeWithAuditPending ? "成果与审计分开处理" : "这轮需要分支级处理"}</span><h3 id="source-recovery-title">{verifiedOutcomeWithAuditPending ? `成果已生成，${evidenceGapGroups.length} 处来源定位待补充` : `共有 ${evidenceGapGroups.length} 个待处理，每次处理 1 个`}</h3><p>{verifiedOutcomeWithAuditPending ? "成果文件可以下载；这里缺的是 Agent 说明中的原文位置，不是源文件，也不是日期结果。" : pendingResolutions.some((item) => item.status === "ambiguous") ? "需要选择原文的分支与可以直接重试的分支已经分开标注。" : "这些分支都不需要你修改文件；选择一条后才会继续。"}</p></div></header>
+        <div className="source-recovery-facts"><span><b>{verifiedOutcomeWithAuditPending ? `${passedArtifactChecks}/${totalArtifactChecks} 通过` : "已保留"}</b>{verifiedOutcomeWithAuditPending ? "成果确定性检查" : "本轮计划、文件范围、调用记录"}</span><span><b>{verifiedOutcomeWithAuditPending ? "待补充" : "未采用"}</b>{verifiedOutcomeWithAuditPending ? "Agent 来源定位" : "无法定位的候选结论"}</span><span><b>未发生</b>原文件修改或外部动作</span></div>
       </section>}
       {roundBranches.length > 0 && <section className="loop-branches" aria-label={`第 ${selectedRound.round_number} 轮任务分支`}>
         <header><div><span>任务分支现场</span><h3>{roundBranches.length} 条分支，分别保留证据状态</h3></div><b>{roundBranches.filter((branch) => branch.status === "completed").length}/{roundBranches.length} 已核对</b></header>
         <ol>{roundBranches.map((branch, index) => <li key={branch.branch_id} className={`is-${branch.status}${run.active_branch_id === branch.branch_id ? " is-selected" : ""}`}>
           <span>{branch.status === "completed" ? <IconCheck aria-hidden="true" /> : index + 1}</span>
-          <div><header><b>{branch.title}</b><small>{branchStatusLabel(branch.status)}</small></header><p>{branch.objective}</p><footer><span>{branch.input_file_refs.length} 份资料</span>{branch.depends_on.length > 0 && <span>{branch.depends_on.length} 条前序依赖</span>}{branch.parent_branch_id && <span>续自上一轮</span>}{branch.missing_file_refs.length > 0 && <strong>缺 {branch.missing_file_refs.length} 份引用</strong>}</footer></div>
+          <div><header><b>{branch.title}</b><small>{verifiedOutcomeWithAuditPending && branch.status === "waiting_input" ? "审计待补充" : branchStatusLabel(branch.status)}</small></header><p>{branch.objective}</p><footer><span>{branch.input_file_refs.length} 份资料</span>{branch.depends_on.length > 0 && <span>{branch.depends_on.length} 条前序依赖</span>}{branch.parent_branch_id && <span>续自上一轮</span>}{branch.missing_file_refs.length > 0 && <strong>{verifiedOutcomeWithAuditPending ? `${branch.missing_file_refs.length} 处来源待定位` : `缺 ${branch.missing_file_refs.length} 份引用`}</strong>}</footer></div>
           {branch.status === "waiting_input" && waitingForBranch && !guidedRecovery && <div className="loop-branch-actions"><button type="button" className="is-review" onClick={() => onReview(branchReviewRequest(branch, selectedRound.evidence_gaps, selectedRound, run))}><IconEye aria-hidden="true" />查看问题</button><button type="button" onClick={() => void onControl("resume", { branchId: branch.branch_id })} disabled={!canResume || controlBusy !== null}><IconPlayerPlay aria-hidden="true" />{controlBusy === "resume" ? "正在启动" : "继续此分支"}</button></div>}
         </li>)}</ol>
       </section>}
       {selectedRound.result && <section className="loop-round-result"><span>本轮核对结果</span><h3>{selectedRound.result.summary}</h3><p>{selectedRound.result.findings.length} 条发现，引用 {selectedRound.verified_file_refs.length} 份文件。</p>{selectedRound.result.findings.length > 0 && <div className="loop-review-links">{selectedRound.result.findings.map((finding, index) => <button type="button" key={`${finding.title}:${index}`} onClick={() => onReview(findingReviewRequest(finding, index, selectedRound.round_number, run.decision_records, decisionRequests))}><IconEye aria-hidden="true" />核对：{finding.title}</button>)}</div>}</section>}
-      {selectedRound.evidence_gaps.length > 0 && <section className="loop-gap" aria-labelledby={`loop-gap-title-${selectedRound.round_number}`}>
-        <header><IconRoute aria-hidden="true" /><div><span>待处理分支</span><h3 id={`loop-gap-title-${selectedRound.round_number}`}>共有 {selectedRound.evidence_gaps.length} 个待处理，每次处理 1 个</h3><p>{boundedTerminalRecovery ? "旧 Run 已结束；先选一条路径创建新任务，其他结果保持不变。" : "先选一条路径继续；没有被选择的分支不会启动，也不会消耗下一轮预算。"}</p></div><b>每次 1 个</b></header>
-        <ol className="loop-gap-branches">{selectedRound.evidence_gaps.map((gap, index) => {
-          const branch = run.branches.find((item) => item.branch_id === gap.branch_id) ?? null;
-          const branchRequests = decisionRequests.filter((item) => item.branch_id === gap.branch_id && ["pending", "deferred"].includes(item.state ?? "pending"));
+      {evidenceGapGroups.length > 0 && <section className="loop-gap" aria-labelledby={`loop-gap-title-${selectedRound.round_number}`}>
+        <header><IconRoute aria-hidden="true" /><div><span>{verifiedOutcomeWithAuditPending ? "审计说明" : "待处理分支"}</span><h3 id={`loop-gap-title-${selectedRound.round_number}`}>{verifiedOutcomeWithAuditPending ? `还有 ${evidenceGapGroups.length} 处来源定位待补充` : `共有 ${evidenceGapGroups.length} 个待处理，每次处理 1 个`}</h3><p>{verifiedOutcomeWithAuditPending ? "相同来源影响的多个内部分支已合并显示；补齐定位不会重新生成或覆盖当前成果。" : boundedTerminalRecovery ? "旧 Run 已结束；先选一条路径创建新任务，其他结果保持不变。" : "先选一条路径继续；没有被选择的分支不会启动，也不会消耗下一轮预算。"}</p></div><b>{verifiedOutcomeWithAuditPending ? "不影响成果" : "每次 1 个"}</b></header>
+        <ol className="loop-gap-branches">{evidenceGapGroups.map((group, index) => {
+          const gap = group.gaps[0];
+          const affectedBranches = group.gaps.flatMap((item) => {
+            const branch = run.branches.find((candidate) => candidate.branch_id === item.branch_id);
+            return branch ? [branch] : [];
+          });
+          const branch = affectedBranches.sort((left, right) => left.input_file_refs.length - right.input_file_refs.length)[0] ?? null;
+          const affectedBranchIds = new Set(affectedBranches.map((item) => item.branch_id));
+          const branchRequests = decisionRequests.filter((item) => affectedBranchIds.has(item.branch_id ?? "") && ["pending", "deferred"].includes(item.state ?? "pending"));
           const openRequest = branchRequests.find((item) => Boolean(item.resolution_id)) ?? branchRequests[0] ?? null;
           const unresolvedResolutions = run.rounds.flatMap((round) => round.next_step?.evidence_resolutions ?? []);
           const resolution = unresolvedResolutions.find((item) => item.resolution_id === openRequest?.resolution_id)
-            ?? unresolvedResolutions.find((item) => item.branch_id === gap.branch_id && ["ambiguous", "unavailable", "stale"].includes(item.status))
+            ?? unresolvedResolutions.find((item) => affectedBranchIds.has(item.branch_id ?? "") && ["ambiguous", "unavailable", "stale"].includes(item.status))
             ?? null;
-          const sourceRefs = uniqueFileRefs([...(branch?.input_file_refs ?? []), ...gap.candidate_file_refs]);
+          const sourceRefs = group.candidateFileRefs.length > 0 ? group.candidateFileRefs : uniqueFileRefs([...(branch?.input_file_refs ?? []), ...gap.candidate_file_refs]);
           const primarySource = sourceRefs[0] ? fileLabel(sourceRefs[0]) : null;
           const requiresSourceChoice = resolution?.status === "ambiguous";
-          const gateLabel = requiresSourceChoice
+          const evidenceGateLabel = requiresSourceChoice
             ? `需要从 ${resolution.candidates.length} 个原文位置中选 1 个`
-            : "无需核对文件，建议重试";
+            : verifiedOutcomeWithAuditPending
+              ? "Agent 未完成原文定位"
+              : "无需核对文件，建议重试";
           const reviewRequest = resolution
             ? resolutionReviewRequest(resolution, selectedRound.round_number, branch?.title ?? null, run.decision_records, decisionRequests)
             : gapReviewRequest(gap, index, selectedRound, branch, run);
@@ -2832,22 +2901,26 @@ function LoopView({
             ? "需要你选 1 个位置"
             : boundedTerminalRecovery
               ? "查看后创建新任务"
-              : "建议只重试此分支";
-          return <li key={gap.gap_id} className={`is-${branch?.status ?? "waiting_input"}`} aria-label={`分支：${branch?.title ?? gap.label}`}>
-            <section className="loop-gap-branch-identity"><span>分支 {index + 1}</span><h4>{branch?.title ?? gap.label}</h4><b>{branch ? branchStatusLabel(branch.status) : "等待处理"}</b></section>
+              : verifiedOutcomeWithAuditPending
+                ? "让 Agent 补齐来源定位"
+                : "建议只重试此分支";
+          const groupTitle = verifiedOutcomeWithAuditPending && affectedBranches.length > 1
+            ? `同一来源影响 ${affectedBranches.length} 个内部步骤`
+            : branch?.title ?? gap.label;
+          return <li key={group.groupKey} className={`is-${branch?.status ?? "waiting_input"}`} aria-label={`${verifiedOutcomeWithAuditPending ? "审计项" : "分支"}：${groupTitle}`}>
+            <section className="loop-gap-branch-identity"><span>{verifiedOutcomeWithAuditPending ? "审计项" : "分支"} {index + 1}</span><h4>{groupTitle}</h4><b>{verifiedOutcomeWithAuditPending ? "不影响成果" : branch ? branchStatusLabel(branch.status) : "等待处理"}</b></section>
             <IconArrowRight className="loop-gap-branch-arrow" aria-hidden="true" />
-            <section className="loop-gap-branch-stage"><span>当前材料</span><strong>{primarySource ?? "等待 Agent 重新检索"}</strong><small>{sourceRefs.length > 1 ? `另有 ${sourceRefs.length - 1} 份 · ` : ""}{branch?.verified_file_refs.length ?? 0}/{sourceRefs.length} 份已形成引用</small></section>
+            <section className="loop-gap-branch-stage"><span>{verifiedOutcomeWithAuditPending ? "待定位来源" : "当前材料"}</span><strong>{primarySource ?? "等待 Agent 重新检索"}</strong><small>{verifiedOutcomeWithAuditPending ? `${sourceRefs.length > 1 ? `另有 ${sourceRefs.length - 1} 份 · ` : ""}文件存在，缺少的是说明中的精确位置` : `${sourceRefs.length > 1 ? `另有 ${sourceRefs.length - 1} 份 · ` : ""}${branch?.verified_file_refs.length ?? 0}/${sourceRefs.length} 份已形成引用`}</small></section>
             <IconArrowRight className="loop-gap-branch-arrow" aria-hidden="true" />
-            <section className="loop-gap-branch-stage is-gate"><span>证据门</span><strong>{gateLabel}</strong><small>{gap.detail}</small></section>
+            <section className="loop-gap-branch-stage is-gate"><span>{verifiedOutcomeWithAuditPending ? "审计状态" : "证据门"}</span><strong>{evidenceGateLabel}</strong><small>{verifiedOutcomeWithAuditPending ? "成果检查已通过；系统不会把定位缺口解释为文件或日期错误。" : gap.detail}</small></section>
             <IconArrowRight className="loop-gap-branch-arrow" aria-hidden="true" />
-            <section className="loop-gap-branch-next"><span>下一步</span><strong>{nextLabel}</strong><button type="button" onClick={() => onReview(reviewRequest)}>{requiresSourceChoice ? <IconEye aria-hidden="true" /> : <IconPlayerPlay aria-hidden="true" />}{requiresSourceChoice ? "选择原文位置" : boundedTerminalRecovery ? "查看如何续办" : "继续此分支"}</button></section>
+            <section className="loop-gap-branch-next"><span>下一步</span><strong>{nextLabel}</strong><button type="button" onClick={() => onReview(reviewRequest)}>{requiresSourceChoice ? <IconEye aria-hidden="true" /> : verifiedOutcomeWithAuditPending ? <IconRefresh aria-hidden="true" /> : <IconPlayerPlay aria-hidden="true" />}{requiresSourceChoice ? "选择原文位置" : boundedTerminalRecovery ? "查看如何续办" : verifiedOutcomeWithAuditPending ? "补齐来源定位" : "继续此分支"}</button></section>
           </li>;
         })}</ol>
-        <footer><IconShieldCheck aria-hidden="true" /><span>已有成果版本和已完成分支不会被覆盖；当前仍是只读核对，不修改文件，也不执行外部动作。</span></footer>
+        <footer><IconShieldCheck aria-hidden="true" /><span>{verifiedOutcomeWithAuditPending ? "成果可以继续下载和复核；补齐来源定位只更新审计说明，不修改原始文件。" : "已有成果版本和已完成分支不会被覆盖；当前仍是只读核对，不修改文件，也不执行外部动作。"}</span></footer>
       </section>}
-      {selectedRound.next_step && <footer className={selectedRound.next_step.decision === "completed" ? "is-complete" : "is-next"}><div><span>服务端决定</span><strong>{gateLabel(selectedRound.next_step.decision)}</strong><p>{selectedRound.next_step.reason}</p></div>{selectedRound.next_step.decision === "waiting_input" ? <b>{guidedRecovery ? "选择恢复分支继续" : "选择上方分支继续"}</b> : boundedTerminalRecovery ? <b>选择上方分支创建新任务</b> : selectedRound.next_step.decision === "next_round" ? <IconArrowRight aria-hidden="true" /> : null}</footer>}
+      {selectedRound.next_step && <footer className={selectedRound.next_step.decision === "completed" ? "is-complete" : "is-next"}><div><span>服务端决定</span><strong>{selectedRoundGateLabel}</strong><p>{verifiedOutcomeWithAuditPending ? "成果文件已通过确定性检查；当前只保留 Agent 来源定位的审计缺口。" : selectedRound.next_step.reason}</p></div>{selectedRound.next_step.decision === "waiting_input" ? <b>{verifiedOutcomeWithAuditPending ? "成果不受影响" : guidedRecovery ? "选择恢复分支继续" : "选择上方分支继续"}</b> : boundedTerminalRecovery ? <b>选择上方分支创建新任务</b> : selectedRound.next_step.decision === "next_round" ? <IconArrowRight aria-hidden="true" /> : null}</footer>}
     </article>}
-    {(run.workspace_artifacts.length > 0 || run.effect_receipts.length > 0) && <WorkspaceArtifactSection artifacts={run.workspace_artifacts} receipts={run.effect_receipts} />}
     {run.artifact_versions.length > 0 && <section className="artifact-evolution" aria-label="成果版本">
       <header><div><span>不可变成果历史</span><h3>每轮形成一个可追溯版本</h3></div><b>{currentArtifactVersion ? `当前 v${currentArtifactVersion}` : "尚未提交"}</b></header>
       <ol>{run.artifact_versions.map((artifact) => <li key={`${artifact.artifact_id}:${artifact.version}`} className={currentArtifactVersion === artifact.version ? "is-current" : ""}><span>v{artifact.version}</span><div><b>{currentArtifactVersion === artifact.version ? "当前版本" : artifact.status === "verified" ? "已核对" : "阶段草稿"}</b><p>第 {artifact.round_number} 轮 · {artifact.finding_count} 条发现 · {artifact.source_file_refs.length} 份引用</p></div>{terminal && currentArtifactVersion !== artifact.version && <button type="button" title={`恢复为成果版本 v${artifact.version}`} onClick={() => void onControl("rollback", { artifactVersion: artifact.version })} disabled={controlBusy !== null}><IconRefresh aria-hidden="true" />{controlBusy === "rollback" ? "恢复中" : "恢复"}</button>}</li>)}</ol>

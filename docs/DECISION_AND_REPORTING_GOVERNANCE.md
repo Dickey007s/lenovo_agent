@@ -118,6 +118,16 @@ An accept/decline/defer interaction counts as implemented only when the server
 returns a versioned, idempotent DecisionRecord bound to the current Finding or
 EvidenceResolution. A client-only selected radio button or toast is a Draft.
 
+When a deterministic Artifact is passed but the Loop still waits on an Analyst
+source-location gap, reports and UI must state both facts separately. The Artifact
+and its checks may be called usable within their fixed validator scope; the Run
+must not be called completed, and the Gap must not be described as a missing file,
+wrong date or failed Artifact without matching server evidence. Browser grouping
+requires the same candidate sources and failure detail, is presentation only and
+must retain a traceable real Branch for every control. Layout-tolerant Anchor resolution must remain deterministic,
+unique and negative-tested against repeated matches; fuzzy or semantic guessing is
+not an acceptable citation repair.
+
 For DR-0032, the record must also retain the expected version, idempotency key,
 source revision and selected candidate/effect snapshot. Persistence claims must
 name whether these facts are nested in Snapshot JSONB or independently journaled;

@@ -965,10 +965,15 @@ Gateway receipt，就不能出现“已执行”；没有 ArtifactVersion 和 Co
 7. 当前问题处置与恢复截图优先使用 `dr-0031-*`、`dr-0030-*` 和 `dr-0029-*`，并在页脚绑定
    `ACTIVE-BUDGET-AND-AGENT-GAP-RECOVERY-20260826` 与
    `ACTIONABLE-REVIEW-AND-RECOVERY-20260826`；历史 `dr-0022/23-*` 只能用于说明演进。
+8. TC-01 成果与审计分层页使用 `dr-0036-tc01-outcome-first-*` 和
+   `dr-0036-tc01-grouped-audit-desktop.png`；同时展示 Stakeholder 原负例，明确新图是确定性
+   Snapshot 回归。真实运行另使用 `dr-0036-tc01-live-run-completed.png` 与
+   `dr-0036-tc01-live-run-artifact.png`，两类证据都不是用户研究。
 
 ## 十、验证证据与禁止推断
 
-当前以 [`SCENARIO-EFFECT-GATE-20260827`](../evidence/SCENARIO-EFFECT-GATE-20260827.md)
+当前以 [`DR-0036-TC01-OUTCOME-EVIDENCE-LOCALIZATION-EVIDENCE-20260828`](../evidence/DR-0036-TC01-OUTCOME-EVIDENCE-LOCALIZATION-EVIDENCE-20260828.md)
+和 [`SCENARIO-EFFECT-GATE-20260827`](../evidence/SCENARIO-EFFECT-GATE-20260827.md)
 为最新实现证据入口，并结合
 [`ACTIVE-BUDGET-AND-AGENT-GAP-RECOVERY-20260826`](../evidence/ACTIVE-BUDGET-AND-AGENT-GAP-RECOVERY-EVIDENCE-20260826.md)、
 [`ACTIONABLE-REVIEW-AND-RECOVERY-20260826`](../evidence/ACTIONABLE-REVIEW-AND-RECOVERY-EVIDENCE-20260826.md)
@@ -978,6 +983,12 @@ DR-0035 的当前工程门先证明 12 条本地确定性效果通过、3 条外
 Planner/Analyst 调用、真实隔离 Artifact 和通过的 deterministic verifier；模型采用、Loop
 终态与效果通过分开报告。准确的最终 Python、PostgreSQL、Ruff、前端 lint/build、Harness
 浏览器数字以本 Evidence 的收尾记录为准。该证据不证明 Finding 语义、模型稳定性或用户价值。
+DR-0036 又针对 TC-01 的真实负例补了一层：PDF Preview 版面断行可以在唯一位置下容错定位，
+4 月 20 日之后的已定位候选不会阻塞当前任务，没有矛盾 Anchor 的 review 不再要求用户决定；
+若历史 Snapshot 仍有审计缺口，前台先展示 5/5 成果，再把两个同源内部 Gap 合并成一个审计项。
+同一用户原始指令还完成了一次真实 `deepseek-v4-pro` 纵切：第 1 轮 `completed`，真实 CSV 5/5、
+三 Branch 全部完成、0 Gap、0 开放 DecisionRequest；该运行使用 memory store，只证明一次成功，
+不证明重复稳定性或重启恢复。
 竞争差异研究仍是 `Draft`；本轮不是固定配置竞品同场实测，不能据此声称主流竞品做不到。
 
 这些证据能够支持：固定公开文件清单、安全有界预览、整库合同与逐轮来源范围、
@@ -998,6 +1009,18 @@ SSE、Snapshot 对账、引用成员和服务端原文位置，以及当前被�
 - 一次模型耗时可以代表 SLA 与成本；
 - 主流竞品在未完成固定版本、账户和入口的同场挑战时“不能完成”这些任务。
 
+### TC-01 给前台设计带来的新结论
+
+这次负例表明，办公 Agent 不能只用一个“任务状态”概括所有事实。用户首先问的是“文件能不能
+用”，其次才是“Agent 的说明能不能逐句回开”。因此前台采用两层承诺：确定性 Artifact 回答
+日期、字段、规则和下载；Evidence Anchor 回答 Agent 说明来自哪里。前者通过、后者待修时，正确
+输出不是一片绿色，也不是“任务失败”，而是“成果可用，审计待补充”。
+
+这个交互反过来约束后端：定位器必须区分版面差异和真正多义，范围过滤必须基于服务端已定位的
+observed 日期，人工 Gate 必须绑定 contradiction Anchor，TC-01 Verifier 必须读取 PDF 规则合同。
+前台合并同源 Gap 只减少认知重复，不能删除 Branch、伪造 `completed` 或跳过 expected version/
+幂等控制。该结论来自 Stakeholder 负例、当前 Run 审计和确定性回归，不是普遍用户研究。
+
 ## 十一、来源索引
 
 - 主流方案与交互研究：[`WORKSPACE-CENTRIC-OFFICE-AGENT-INTERACTION-AND-SOURCES-20260825`](../research/WORKSPACE-CENTRIC-OFFICE-AGENT-INTERACTION-AND-SOURCES-20260825.md)。
@@ -1013,6 +1036,7 @@ SSE、Snapshot 对账、引用成员和服务端原文位置，以及当前被�
 - 当前 Evidence：[`AGENT-CONTROL-LOOP-BOUNDED-READONLY-20260825`](../evidence/AGENT-CONTROL-LOOP-BOUNDED-READONLY-EVIDENCE-20260825.md)。
 - 当前截图机器清单：[`dr-0023-agent-control-loop-live-run.json`](../evidence/manifests/dr-0023-agent-control-loop-live-run.json)。
 - 当前局部恢复 Evidence：[`DR-0032-POSTGRES-DECISION-RECOVERY-EVIDENCE-20260827`](../evidence/DR-0032-POSTGRES-DECISION-RECOVERY-EVIDENCE-20260827.md)。
+- 当前 TC-01 成果/审计分层 Evidence：[`DR-0036-TC01-OUTCOME-EVIDENCE-LOCALIZATION-EVIDENCE-20260828`](../evidence/DR-0036-TC01-OUTCOME-EVIDENCE-LOCALIZATION-EVIDENCE-20260828.md)。
 
 ## 十二、收束讲稿
 
@@ -1024,8 +1048,9 @@ Office Agent 当前最值得汇报的，不是它已经“自动完成了多少�
 服务端策略编译、named SSE、权威 Snapshot、Branch Evidence Gate、Evidence Anchor、
 append-only 逻辑 ArtifactVersion/TaskCommit 和 `review_required=true` 做出了受限只读纵切。
 `DR-0032` 又补齐了五态 EvidenceResolution、持久化 DecisionRequest/DecisionRecord 与
-Finding/Branch 局部恢复。仍未完成的是确定性业务 Verify、携证成果导出、可写 Office Artifact、
-Worker、Tool Gateway、Risk/Approval/Permit、真实 Connector、独立决策账本和多实例调度。
+Finding/Branch 局部恢复；`DR-0035/36` 已在十二个固定场景加入真实隔离成果、确定性检查和
+TC-01 的成果/审计分层。仍未完成的是通用语义/数值 Verify、任意可写 Office Artifact、
+Worker、通用 Tool Gateway、Risk/Approval/Permit、真实 Connector、独立决策账本和多实例调度。
 
 因此这版汇报的竞争结论也不是“主流竞品做不到”。更准确的说法是：**我们已经做实一组
 值得同场验证的原生保证，并设计了八个固定挑战。只有竞品在注明版本、账户、入口和配置下

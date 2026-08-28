@@ -648,7 +648,15 @@ class HumanDecisionAnalyst(FakeAnalyst):
             recommendation_reason="当前文件可唯一定位。",
             after_confirmation="决定将先写入当前任务回执。",
         )
-        finding = result.findings[0].model_copy(update={"review": review})
+        finding = result.findings[0].model_copy(
+            update={
+                "evidence_quotes": [
+                    quote.model_copy(update={"role": "contradiction"})
+                    for quote in result.findings[0].evidence_quotes
+                ],
+                "review": review,
+            }
+        )
         return result.model_copy(update={"findings": [finding]})
 
 
@@ -2115,6 +2123,146 @@ def test_server_resolves_model_quotes_to_exact_preview_locations() -> None:
     ]
     assert resolved.findings[0].evidence_quotes == []
     assert "web_search_news_called=false" in anchors[1].excerpt
+
+
+def test_text_anchor_tolerates_pdf_layout_line_wrap_without_guessing() -> None:
+    quote = (
+        '优先级说明：若岗位同时包含多个分类关键词（如"产品运营"、"市场研发"），'
+        "以排列靠前的分类为准——技术研发 > 产品/视觉设计 > 运营/市场/职能。"
+    )
+    text = (
+        '优先级说明：若岗位同时包含多个分类关键词（如"产品运营"、"市场研发"），'
+        "以排列靠前的分类为准——技术\n"
+        "研发 > 产品/视觉设计 > 运营/市场/职能。"
+    )
+
+    candidates = HarnessRuntime._resolve_text_anchor_candidates(
+        file_ref=REF_TWO,
+        role="expected",
+        label="岗位分类优先级",
+        quote=quote,
+        text=text,
+    )
+
+    assert len(candidates) == 1
+    assert candidates[0].start == 1
+    assert candidates[0].end == 2
+    assert "技术\n研发" in candidates[0].excerpt
+
+
+def test_pdf_layout_fallback_keeps_repeated_matches_ambiguous() -> None:
+    text = (
+        "岗位优先级：技术\n研发 > 产品视觉设计 > 运营市场职能。\n"
+        "附录岗位优先级：技术\n研发 > 产品视觉设计 > 运营市场职能。"
+    )
+
+    candidates = HarnessRuntime._resolve_text_anchor_candidates(
+        file_ref=REF_TWO,
+        role="expected",
+        label="重复岗位优先级",
+        quote="岗位优先级：技术研发 > 产品视觉设计 > 运营市场职能。",
+        text=text,
+    )
+
+    assert len(candidates) == 2
+    assert [(candidate.start, candidate.end) for candidate in candidates] == [(1, 2), (3, 4)]
+
+
+def test_date_scope_filters_irrelevant_finding_and_suppresses_unproven_gate() -> None:
+    review = AgentControlLoopFindingReview(
+        requires_human_decision=True,
+        question="是否需要人工指定岗位分类？",
+        why_human="模型认为关键词分类需要人工选择。",
+        options=[
+            AgentControlLoopFindingDecisionOption(
+                option_id="A",
+                label="按关键词归类",
+                meaning="使用规则中的关键词和优先级。",
+                agent_next_step="保留当前映射。",
+                next_instruction="按明确规则复核当前映射。",
+            ),
+            AgentControlLoopFindingDecisionOption(
+                option_id="B",
+                label="另行指定",
+                meaning="由用户指定其他分类。",
+                agent_next_step="形成另一份映射建议。",
+                next_instruction="按用户指定分类形成映射建议。",
+            ),
+        ],
+        recommended_option_id="A",
+        recommendation_reason="规则已经给出优先级。",
+        after_confirmation="只更新分析说明。",
+    )
+    result = HarnessTaskResult(
+        summary="核对岗位分类",
+        findings=[
+            HarnessFinding(
+                title="范围外的产品运营记录",
+                detail="该员工不在本次日期范围内。",
+                file_refs=[REF_ONE],
+                evidence_quotes=[
+                    HarnessEvidenceQuote(
+                        file_ref=REF_ONE,
+                        role="observed",
+                        label="范围外记录",
+                        quote="姜映雪 | 4月21日 (周二) | 产品运营",
+                    )
+                ],
+            ),
+            HarnessFinding(
+                title="技术研发按关键词归类",
+                detail="规则已明确关键词与优先级。",
+                file_refs=[REF_ONE, REF_TWO],
+                evidence_quotes=[
+                    HarnessEvidenceQuote(
+                        file_ref=REF_ONE,
+                        role="observed",
+                        label="范围内记录",
+                        quote="林舒志 | 4月20日 (周一) | 技术研发",
+                    ),
+                    HarnessEvidenceQuote(
+                        file_ref=REF_TWO,
+                        role="expected",
+                        label="分类规则",
+                        quote="技术研发 > 产品/视觉设计 > 运营/市场/职能",
+                    ),
+                ],
+                review=review,
+            ),
+        ],
+        review_required=True,
+    )
+    files = [
+        {
+            "file_ref": REF_ONE,
+            "kind": "table",
+            "columns": ["姓名", "入职日期", "岗位系列"],
+            "rows": [
+                {"row_number": 13, "values": ["姜映雪", "4月21日 (周二)", "产品运营"]},
+                {"row_number": 16, "values": ["林舒志", "4月20日 (周一)", "技术研发"]},
+            ],
+        },
+        {
+            "file_ref": REF_TWO,
+            "kind": "text",
+            "text": "优先级：技术\n研发 > 产品/视觉设计 > 运营/市场/职能",
+        },
+    ]
+
+    resolution = HarnessRuntime._resolve_evidence_anchors(
+        result,
+        files,
+        instruction="生成 3 月 20 日至 4 月 20 日的入职资产匹配表。",
+    )
+
+    assert resolution.result is not None
+    assert [item.title for item in resolution.result.findings] == [
+        "技术研发按关键词归类"
+    ]
+    assert resolution.out_of_scope_finding_count == 1
+    assert resolution.downgraded_review_count == 1
+    assert resolution.result.findings[0].review is None
+    assert resolution.evidence_resolutions == ()
 
 
 def test_server_omits_a_finding_without_a_unique_preview_location() -> None:
