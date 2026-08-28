@@ -238,6 +238,18 @@ adapter when unknown/conflicting. The UI only renders the resulting service-
 owned `rules[]`; sharing a source locator never allows it to merge two rules or
 guess that a keyword was covered.
 
+DR-0049 gives TC-13 a four-layer projection. The first screen says that the
+output is public-sample cleaning and a strategy draft, not customer research,
+sales-effectiveness proof or CRM execution. It then shows deterministic
+source/Markdown/CSV verification, dynamic cleaning and profile facts plus the
+review-required duplicate-policy assumption, a strategy template awaiting a
+sales owner, and the explicit no-action receipt. Opening a sample reveals its
+approved CSV row, raw-to-cleaned transformations, all matched profiles,
+priority decision and final label/exclusion; opening a rule reveals its approved
+locator. Canonical input displays zero priority witnesses rather than pretending
+the priority order ran. These panels render `customer_segmentation_outcome` and
+do not parse source files, call a model or mutate CRM state.
+
 Open human decisions are authoritative in the Snapshot-level
 `decision_requests[]`; round-level copies are compatibility projections only.
 Closing or pressing Escape exits the review surface before the browser attempts a

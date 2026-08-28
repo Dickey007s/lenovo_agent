@@ -59,6 +59,7 @@ TC05_INSTRUCTION = "核对三期往来明细，生成未付统计、未收统计
 TC07_INSTRUCTION = "依据统一规则核查六份授权委托书，逐项说明风险、资料不足和复核动作。"
 TC06_INSTRUCTION = "依据两个岗位说明分别审阅五份简历，保留逐条证据并输出辅助筛选结果。"
 TC10_INSTRUCTION = "根据专业性说明生成信用卡 M1 逾期用户 AI 外呼催收流程图文档。"
+TC13_INSTRUCTION = "清洗问卷、完成客户画像分类，并生成差异化销售策略 Markdown 报告。"
 
 
 class OnboardingPlanner:
@@ -314,6 +315,54 @@ class CandidateReviewAnalyst:
                             role="expected",
                             label="默认学历门槛与例外",
                             quote="学历背景： 大专及以上学历（优秀者可放宽）。",
+                        )
+                    ],
+                )
+            ],
+            follow_ups=[],
+            review_required=True,
+        )
+
+
+class CustomerSegmentationPlanner:
+    model = "deepseek-v4-pro"
+
+    async def plan(self, *, scenario, files):
+        source = next(item for item in files if item["display_label"] == "客户画像调研问卷.csv")
+        return HarnessPlanCandidate(
+            summary="读取公开问卷并形成可定位的画像清洗上下文",
+            selection_reason="固定 TC-13 效果门会另行冻结问卷与规则，并逐原始行重算清洗和画像。",
+            units=[
+                HarnessPlanCandidateUnit(
+                    unit_id="read-customer-survey",
+                    title="读取客户画像调研问卷",
+                    objective="核对一条可回开的公开样本记录",
+                    input_file_refs=[source["file_ref"]],
+                    tool="table.inspect",
+                )
+            ],
+        )
+
+
+class CustomerSegmentationAnalyst:
+    model = "deepseek-v4-pro"
+
+    async def analyze(self, *, instruction, plan, files, validation_feedback=None):
+        source = files[0]
+        return HarnessTaskResult(
+            summary="已读取一条公开问卷记录；两份成果由服务端固定 TC-13 效果门从批准来源独立重算。",
+            findings=[
+                HarnessFinding(
+                    plan_unit_id=plan.units[0].unit_id,
+                    title="公开样本包含可复算的画像评分",
+                    detail="这条记录只作为可回开的模型分析证据；清洗、重复和画像裁决由确定性效果门重算。",
+                    file_refs=[source["file_ref"]],
+                    evidence_quotes=[
+                        HarnessEvidenceQuote(
+                            file_ref=source["file_ref"],
+                            role="observed",
+                            label="一条公开问卷记录",
+                            quote="101 | 金融科技 | 500-1000人 | 技术架构师 | 9 | 7 | 6 | 2",
                         )
                     ],
                 )
@@ -1022,6 +1071,106 @@ async def test_tc06_runtime_keeps_source_verification_advice_and_hr_decision_sep
         public_outcome = public["effect_receipts"][0]["candidate_review_outcome"]
         assert public_outcome["assessment_count"] == 110
         assert public_outcome["fairness_evaluated"] is False
+        assert "content_sha256" not in json.dumps(public, ensure_ascii=False)
+    finally:
+        await runtime.close()
+
+
+@pytest.mark.asyncio
+async def test_tc13_runtime_keeps_cleaning_strategy_review_and_customer_actions_separate(
+    tmp_path: Path,
+) -> None:
+    before = _forte_digests()
+    runtime = HarnessRuntime(
+        BenchmarkWorkspaceCatalog(FORTE_ROOT),
+        CustomerSegmentationPlanner(),
+        CustomerSegmentationAnalyst(),
+        effect_engine=ScenarioEffectEngine(),
+        artifact_store=RunWorkspaceArtifactStore(tmp_path / "run-workspaces"),
+    )
+    try:
+        started = await runtime.start(
+            "customer-segmentation-owner",
+            HarnessRunStart(
+                idempotency_key="tc13-source-derived-customer-runtime-0001",
+                instruction=TC13_INSTRUCTION,
+            ),
+        )
+        snapshot = None
+        for _ in range(1_000):
+            candidate = await runtime.get(
+                "customer-segmentation-owner", started.run.run_id
+            )
+            if candidate.status in {"waiting_input", "completed", "stopped", "failed"}:
+                snapshot = candidate
+                break
+            await asyncio.sleep(0.01)
+        assert snapshot is not None
+        assert snapshot.status == "completed"
+        assert len(snapshot.workspace_artifacts) == 2
+        assert len(snapshot.effect_receipts) == 1
+
+        receipt = snapshot.effect_receipts[0]
+        assert receipt.status == "passed"
+        assert receipt.scenario_id == "TC-13"
+        assert receipt.customer_segmentation_outcome is not None
+        outcome = receipt.customer_segmentation_outcome
+        assert outcome.status == "sales_review_required"
+        assert (
+            outcome.source_row_count,
+            outcome.unique_payload_count,
+            outcome.duplicate_count,
+            outcome.classified_count,
+            outcome.unclassified_count,
+            outcome.excluded_count,
+        ) == (11, 10, 1, 8, 2, 3)
+        assert outcome.profile_counts == {"技术型": 3, "安全型": 3, "敏捷型": 2}
+        assert outcome.priority_witness_count == 0
+        assert outcome.strategy_evidence_status == "no_approved_strategy_source"
+        assert outcome.policy_assumption_review_required is True
+        assert outcome.human_review_required is True
+        assert outcome.original_inputs_modified is False
+        assert outcome.external_action == "none"
+
+        for artifact in snapshot.workspace_artifacts:
+            assert artifact.verifier_status == "passed"
+            assert artifact.customer_segmentation_outcome == outcome
+            assert len({check.check_id for check in artifact.checks}) == 8
+            assert all(check.passed for check in artifact.checks)
+            assert artifact.review_required is True
+            assert artifact.external_action == "none"
+            assert len(artifact.source_file_refs) == 2
+
+        by_name = {item.file_name: item for item in snapshot.workspace_artifacts}
+        _, report = await runtime.get_workspace_artifact(
+            "customer-segmentation-owner",
+            snapshot.run_id,
+            by_name["客户画像及销售策略.md"].artifact_id,
+        )
+        report_text = report.decode("utf-8")
+        assert "多标签优先级 witness：0" in report_text
+        assert "no_approved_strategy_source" in report_text
+        assert "待批准模板" in report_text
+        assert "没有联系客户、写 CRM、创建商机或触发营销动作" in report_text
+
+        _, ledger = await runtime.get_workspace_artifact(
+            "customer-segmentation-owner",
+            snapshot.run_id,
+            by_name["客户画像逐样本台账.csv"].artifact_id,
+        )
+        rows = list(csv.DictReader(io.StringIO(ledger.decode("utf-8-sig"))))
+        assert len(rows) == 11
+        assert len({row["样本ID"] for row in rows}) == 11
+        duplicate = next(row for row in rows if row["样本ID"] == "111")
+        assert duplicate["duplicate_of"] == "101"
+        assert duplicate["排除原因"] == "exact_duplicate"
+        assert _forte_digests() == before
+
+        public = runtime.public_snapshot(snapshot).model_dump(mode="json")
+        public_outcome = public["effect_receipts"][0]["customer_segmentation_outcome"]
+        assert public_outcome["source_row_count"] == 11
+        assert public_outcome["priority_witness_count"] == 0
+        assert public_outcome["external_action"] == "none"
         assert "content_sha256" not in json.dumps(public, ensure_ascii=False)
     finally:
         await runtime.close()

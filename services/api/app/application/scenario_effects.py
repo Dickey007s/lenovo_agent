@@ -36,6 +36,7 @@ from packages.contracts.harness_models import (
     AgentControlLoopArtifactTestSuite,
     AgentControlLoopBusinessGateOutcome,
     AgentControlLoopCandidateReviewOutcome,
+    AgentControlLoopCustomerSegmentationOutcome,
     AgentControlLoopFinanceReviewOutcome,
     AgentControlLoopLegalReviewOutcome,
     AgentControlLoopOutboundFlowOutcome,
@@ -81,6 +82,13 @@ from services.api.app.application.outbound_flow_effect import (
     OutboundSourceInput,
     build_outbound_flow,
 )
+from services.api.app.application.customer_segmentation_effect import (
+    RULES_LOGICAL_ID as CUSTOMER_RULES_LOGICAL_ID,
+    SURVEY_LOGICAL_ID as CUSTOMER_SURVEY_LOGICAL_ID,
+    CustomerSegmentationValidationError,
+    CustomerSourceInput,
+    build_customer_segmentation,
+)
 
 
 class ScenarioEffectError(RuntimeError):
@@ -120,6 +128,7 @@ class GeneratedOfficeArtifact:
     candidate_review_outcome: AgentControlLoopCandidateReviewOutcome | None = None
     finance_review_outcome: AgentControlLoopFinanceReviewOutcome | None = None
     outbound_flow_outcome: AgentControlLoopOutboundFlowOutcome | None = None
+    customer_segmentation_outcome: AgentControlLoopCustomerSegmentationOutcome | None = None
 
     @property
     def verifier_status(self) -> str:
@@ -488,11 +497,15 @@ SCENARIO_EFFECT_SPECS: tuple[ScenarioEffectSpec, ...] = (
             ("销售运营", "客户画像调研问卷.csv"),
             ("销售运营", "客户分类画像与差异化销售策略生成规则.md"),
         ),
-        ("客户画像及销售策略.md",),
-        "validator-customer-segmentation-v1",
-        "成果区显示真实 Markdown、分群守恒检查和未联系客户回执。",
-        ("workspace_artifacts[]", "effect_receipts[]", "deterministic_verification_completed"),
-        ("不联系客户", "不写 CRM", "不把公开样本当真实线索"),
+        ("客户画像及销售策略.md", "客户画像逐样本台账.csv"),
+        "validator-customer-segmentation-v2",
+        "分开显示来源与成果验证、清洗事实、策略草案复核和未发生的客户动作。",
+        (
+            "workspace_artifacts[].customer_segmentation_outcome",
+            "effect_receipts[].customer_segmentation_outcome",
+            "deterministic_verification_completed",
+        ),
+        ("不联系客户", "不写 CRM", "不创建商机", "不把公开样本当真实线索"),
         "implemented",
         _contains_any(("客户画像", "销售策略"), ("问卷", "分群")),
     ),
@@ -560,16 +573,21 @@ class ScenarioEffectEngine:
                 key = (group, str(item.get("display_label")))
                 if key in requested_keys:
                     matches[key].append(str(item.get("file_ref")))
-        if spec.scenario_id in {"TC-05", "TC-06", "TC-07", "TC-10"}:
+        if spec.scenario_id in {"TC-05", "TC-06", "TC-07", "TC-10", "TC-13"}:
             folder_label = {
                 "TC-05": "财务管理",
                 "TC-06": "人力招聘",
                 "TC-07": "法务",
                 "TC-10": "运营管理",
+                "TC-13": "销售运营",
             }[spec.scenario_id]
-            expected_count = {"TC-05": 3, "TC-06": 7, "TC-07": 7, "TC-10": 1}[
-                spec.scenario_id
-            ]
+            expected_count = {
+                "TC-05": 3,
+                "TC-06": 7,
+                "TC-07": 7,
+                "TC-10": 1,
+                "TC-13": 2,
+            }[spec.scenario_id]
             source_folder = next(
                 (folder for folder in folders if folder.get("display_label") == folder_label),
                 None,
@@ -592,6 +610,7 @@ class ScenarioEffectEngine:
                         "TC-06": "hr-001 人力招聘目录必须恰好包含两份 JD 和五份简历",
                         "TC-07": "Legal-020 法务目录必须恰好包含一份规则和六份委托书",
                         "TC-10": "Operations-008 运营管理目录必须恰好包含一份专业性说明",
+                        "TC-13": "Sales-020 销售运营目录必须恰好包含一份问卷和一份规则",
                     }[spec.scenario_id]
                 )
         preview_refs: list[str] = []
@@ -716,6 +735,14 @@ class ScenarioEffectEngine:
         outbound_outcome = outbound_outcomes[0] if outbound_outcomes else None
         if outbound_outcomes and any(item != outbound_outcome for item in outbound_outcomes[1:]):
             raise ScenarioEffectError("同一效果的外呼流程覆盖事实不一致")
+        customer_outcomes = [
+            artifact.customer_segmentation_outcome
+            for artifact in artifacts
+            if artifact.customer_segmentation_outcome is not None
+        ]
+        customer_outcome = customer_outcomes[0] if customer_outcomes else None
+        if customer_outcomes and any(item != customer_outcome for item in customer_outcomes[1:]):
+            raise ScenarioEffectError("同一效果的客户画像清洗事实不一致")
         return ScenarioEffectExecution(
             scenario_id=spec.scenario_id,
             capability_id=spec.capability_id,
@@ -759,6 +786,14 @@ class ScenarioEffectEngine:
                     if outbound_outcome
                     else ""
                 )
+                + (
+                    f" 清洗 {customer_outcome.source_row_count} 个公开样本行，"
+                    f"分类 {customer_outcome.classified_count} 条、"
+                    f"排除 {customer_outcome.excluded_count} 条；"
+                    f"多标签优先级 witness {customer_outcome.priority_witness_count} 个。"
+                    if customer_outcome
+                    else ""
+                )
             ),
             cost="0 次额外模型调用；仅消耗本机确定性解析、计算与文件写入。",
             result=(
@@ -774,7 +809,11 @@ class ScenarioEffectEngine:
                             else (
                                 "来源规则、DOCX 与状态图结构通过；这仍只是流程设计，最终合规审批及拨号、CRM、短信等动作均未发生。"
                                 if outbound_outcome
-                                else "所有确定性效果门通过，成果仍需用户复核。"
+                                else (
+                                    "来源、清洗与两份成果结构通过；画像分类和销售策略草案仍待销售负责人复核，客户联系、CRM、商机和营销动作均未发生。"
+                                    if customer_outcome
+                                    else "所有确定性效果门通过，成果仍需用户复核。"
+                                )
                             )
                         )
                     )
@@ -2716,173 +2755,100 @@ class ScenarioEffectEngine:
     def _customer_segmentation(
         self, catalog: ScenarioEffectCatalog, spec: ScenarioEffectSpec
     ) -> tuple[GeneratedOfficeArtifact, ...]:
-        previews = self._previews(catalog, spec)
-        source_refs = self._source_refs(previews)
-        survey = previews["客户画像调研问卷.csv"]
-        records = self._table_records(survey)
-        chinese_digits = {
-            "零": 0,
-            "一": 1,
-            "二": 2,
-            "三": 3,
-            "四": 4,
-            "五": 5,
-            "六": 6,
-            "七": 7,
-            "八": 8,
-            "九": 9,
-            "十": 10,
+        sources = self._customer_source_inputs(catalog, spec)
+        source_refs = tuple(source.file_ref for source in sources)
+        original_bytes = {source.file_ref: source.content for source in sources}
+        try:
+            build = build_customer_segmentation(sources)
+        except CustomerSegmentationValidationError as exc:
+            raise ScenarioEffectError(
+                f"TC-13 来源或规则合同失败：{exc.code}：{exc.detail}"
+            ) from exc
+        source_unchanged = all(
+            catalog.checked_input_bytes(file_ref) == content
+            for file_ref, content in original_bytes.items()
+        )
+        checks = tuple(
+            self._check(item.check_id, item.label, item.passed, item.detail)
+            for item in build.checks
+        ) + (
+            self._check(
+                "check-customer-original-sources-read-only-v2",
+                "Sales-020 原始资料保持只读",
+                source_unchanged,
+                "生成后重新读取冻结 Catalog 字节；只写隔离 Run Workspace，不修改问卷或规则原件。",
+            ),
+        )
+        outcome = build.analysis.outcome
+        artifact_ready = all(check.passed for check in checks)
+        review_guidance = (
+            (
+                "请先确认 exact_non_id_payload 重复口径，再核对逐样本清洗和画像；销售策略只有待补充模板，"
+                "需要销售负责人依据已批准产品资料补充并批准。当前未联系客户、写 CRM、创建商机或营销。"
+            )
+            if artifact_ready
+            else (
+                "当前来源重算或成果结构校验失败，画像和策略草案不得使用。请查看失败检查，"
+                "修复来源或生成问题后创建新的 TC-13 Run。"
+            )
+        )
+        execution_summary = (
+            "服务端只读解析 Sales-020 公开问卷与规则，逐原始行记录清洗、重复、画像命中和优先级裁决，"
+            "并在隔离 Run Workspace 生成 Markdown 与 CSV 台账；原件和外部系统均未修改。"
+        )
+        common_kwargs = {
+            "source_file_refs": source_refs,
+            "validator_id": "validator-customer-segmentation-v2",
+            "checks": checks,
+            "covered_period": "Sales-020 公开样本；不是现实客户总体或时间序列",
+            "statistic_basis": (
+                f"规则来源动态给出缺失值默认 {outcome.parameters.missing_score_default}、"
+                f"阈值 {outcome.parameters.profile_thresholds}、优先级 "
+                f"{' > '.join(outcome.parameters.profile_priority)}；重复口径为待复核的 exact_non_id_payload。"
+            ),
+            "purpose": "供销售负责人复核公开样本清洗、画像决策和策略草案，不作客户研究或销售动作。",
+            "record_count": outcome.source_row_count,
+            "review_guidance": review_guidance,
+            "execution_summary": execution_summary,
+            "customer_segmentation_outcome": outcome,
         }
-        seen_payloads: set[tuple[str, ...]] = set()
-        classified: list[tuple[str, str, str, str]] = []
-        excluded: list[str] = []
-        for row in records:
-            payload = tuple(value for key, value in row.items() if key != "样本ID")
-            if payload in seen_payloads:
-                excluded.append(row["样本ID"])
-                continue
-            seen_payloads.add(payload)
-
-            def score(column: str) -> int:
-                raw = row[column].strip()
-                if not raw:
-                    return 0
-                if raw in chinese_digits:
-                    return chinese_digits[raw]
-                return int(raw)
-
-            tech = score("专业 (Stech)")
-            safe = score("安全 (Ssafe)")
-            budget = score("预算 (Sbudget)")
-            easy = score("易用 (Seasy)")
-            label = ""
-            if safe >= 8 and budget >= 8:
-                label = "安全型"
-            elif tech >= 8:
-                label = "技术型"
-            elif easy >= 8:
-                label = "敏捷型"
-            if label:
-                classified.append((row["样本ID"], row["企业所在行业"], row["企业规模"], label))
-            else:
-                excluded.append(row["样本ID"])
-        counts = Counter(item[3] for item in classified)
-        lines = [
-            "# 客户画像及销售策略",
-            "",
-            "## 客户画像",
-            "",
-            "| 样本ID | 企业所在行业 | 企业规模 | 客户画像 |",
-            "| --- | --- | --- | --- |",
-            *[
-                f"| {sample_id} | {industry} | {scale} | {label} |"
-                for sample_id, industry, scale, label in classified
-            ],
-            "",
-            "## 销售策略",
-            "",
-            "### 安全型",
-            "#### 推荐话术",
-            "先确认合规、权限和审计边界，再以可追溯的落地路径降低决策风险。",
-            "#### 主推功能",
-            "细粒度权限、审计日志、私有化部署与发布审批。",
-            "",
-            "### 技术型",
-            "#### 推荐话术",
-            "从开放架构、扩展能力和工程效率切入，用可运行样例说明集成方式。",
-            "#### 主推功能",
-            "自定义组件、API 集成、版本管理与自动化测试。",
-            "",
-            "### 敏捷型",
-            "#### 推荐话术",
-            "以快速试用和短周期交付说明业务人员如何降低搭建门槛。",
-            "#### 主推功能",
-            "可视化编排、模板市场、多人协作与一键发布。",
-            "",
-            "## 客户分析",
-            "",
-            "### 画像分布",
-            "；".join(f"{label} {counts[label]} 家" for label in ("安全型", "技术型", "敏捷型"))
-            + "。",
-            "",
-            "### 行业与规模特征",
-            "安全型集中在强监管和大型组织；技术型偏工程团队；敏捷型偏小型、快速迭代组织。",
-            "",
-            "### 销售优先级建议",
-            "先处理安全型的合规验证，再推进技术型 PoC，敏捷型采用标准化快速试用。",
-            "",
-            f"> 已排除无法归类或重复样本：{','.join(excluded)}。未联系任何客户。",
-        ]
-        content = "\n".join(lines).encode("utf-8")
-        actual_sets = {
-            label: {sample_id for sample_id, _, _, item_label in classified if item_label == label}
-            for label in ("安全型", "技术型", "敏捷型")
-        }
-        expected_sets = {
-            "安全型": {"102", "105", "107"},
-            "技术型": {"101", "104", "109"},
-            "敏捷型": {"103", "108"},
-        }
-        checks = (
-            self._check(
-                "check-segmentation-clean",
-                "清洗、中文数字和缺失值",
-                set(excluded) == {"106", "110", "111"},
-                "重复样本 111、无法归类样本 106/110 已排除。",
-            ),
-            self._check(
-                "check-segmentation-priority",
-                "安全型优先级",
-                actual_sets["安全型"] == expected_sets["安全型"],
-                "安全型为 102、105、107。",
-            ),
-            self._check(
-                "check-segmentation-technical",
-                "技术型分类",
-                actual_sets["技术型"] == expected_sets["技术型"],
-                "技术型为 101、104、109。",
-            ),
-            self._check(
-                "check-segmentation-agile",
-                "敏捷型分类",
-                actual_sets["敏捷型"] == expected_sets["敏捷型"],
-                "敏捷型为 103、108。",
-            ),
-            self._check(
-                "check-segmentation-conservation",
-                "记录数守恒",
-                len(classified) + len(excluded) == len(records),
-                f"{len(records)} 条输入 = {len(classified)} 条分类 + {len(excluded)} 条排除。",
-            ),
-            self._check(
-                "check-segmentation-sections",
-                "报告结构",
-                all(
-                    heading in lines
-                    for heading in (
-                        "## 客户画像",
-                        "## 销售策略",
-                        "## 客户分析",
-                        "#### 推荐话术",
-                        "#### 主推功能",
-                        "### 画像分布",
-                        "### 行业与规模特征",
-                        "### 销售优先级建议",
-                    )
-                ),
-                "报告标题和必需小节完整。",
-            ),
+        summary = (
+            f"{outcome.source_row_count} 个原始样本行，{outcome.unique_payload_count} 条唯一载荷；"
+            f"分类 {outcome.classified_count} 条、排除 {outcome.excluded_count} 条，"
+            f"多标签优先级 witness {outcome.priority_witness_count} 个。"
+        )
+        key_outputs = tuple(
+            f"{profile} {count} 条" for profile, count in outcome.profile_counts.items()
+        ) + (
+            f"精确重复 {outcome.duplicate_count} 条",
+            f"无法归类 {outcome.unclassified_count} 条",
         )
         return (
             GeneratedOfficeArtifact(
-                "客户画像及销售策略",
-                "客户画像及销售策略.md",
-                "text/markdown",
-                content,
-                source_refs,
-                "validator-customer-segmentation-v1",
-                checks,
-                f"8 条客户记录完成唯一画像分类，{len(excluded)} 条记录按规则排除。",
+                title="公开样本画像清洗与策略草案",
+                file_name="客户画像及销售策略.md",
+                media_type="text/markdown",
+                content=build.report_markdown,
+                summary=summary,
+                deliverable_type="来源推导的画像与策略草案 Markdown",
+                key_outputs=key_outputs,
+                key_outputs_label="动态清洗与画像事实",
+                **common_kwargs,
+            ),
+            GeneratedOfficeArtifact(
+                title="客户画像逐样本清洗台账",
+                file_name="客户画像逐样本台账.csv",
+                media_type="text/csv",
+                content=build.ledger_csv,
+                summary="每个原始行均保留来源位置、原始值、清洗值、命中画像、裁决和排除原因。",
+                deliverable_type="逐原始行可复算 CSV 台账",
+                key_outputs=(
+                    f"{outcome.source_row_count} 行完整覆盖",
+                    f"{outcome.duplicate_count} 行 duplicate_of 关系",
+                    f"{outcome.priority_witness_count} 个多标签裁决 witness",
+                ),
+                key_outputs_label="逐样本可审计字段",
+                **common_kwargs,
             ),
         )
 
@@ -3219,6 +3185,51 @@ class ScenarioEffectEngine:
         return AgentControlLoopArtifactCheck(
             check_id=check_id, label=label, passed=bool(passed), detail=detail
         )
+
+    @staticmethod
+    def _customer_source_inputs(
+        catalog: ScenarioEffectCatalog, spec: ScenarioEffectSpec
+    ) -> tuple[CustomerSourceInput, ...]:
+        workspace = catalog.public_workspace()
+        folders = [
+            folder
+            for folder in workspace.get("folders") or []
+            if folder.get("display_label") == "销售运营"
+        ]
+        if len(folders) != 1:
+            raise ScenarioEffectError("Sales-020 销售运营目录必须唯一")
+        items = list(folders[0].get("files") or [])
+        expected_labels = [label for group, label in spec.source_labels if group == "销售运营"]
+        if len(items) != 2 or sorted(str(item.get("display_label")) for item in items) != sorted(
+            expected_labels
+        ):
+            raise ScenarioEffectError("Sales-020 销售运营目录必须恰好包含一份问卷和一份规则")
+        by_label: dict[str, dict[str, Any]] = {}
+        for item in items:
+            label = str(item.get("display_label"))
+            if label in by_label:
+                raise ScenarioEffectError(f"Sales-020 来源逻辑名称重复：{label}")
+            by_label[label] = item
+        logical_ids = {
+            "客户画像调研问卷.csv": CUSTOMER_SURVEY_LOGICAL_ID,
+            "客户分类画像与差异化销售策略生成规则.md": CUSTOMER_RULES_LOGICAL_ID,
+        }
+        result: list[CustomerSourceInput] = []
+        for label in expected_labels:
+            item = by_label[label]
+            file_ref = str(item.get("file_ref"))
+            result.append(
+                CustomerSourceInput(
+                    logical_id=logical_ids[label],
+                    file_name=label,
+                    display_path=str(item.get("display_path")),
+                    file_ref=file_ref,
+                    content=catalog.checked_input_bytes(file_ref),
+                    declared_size=int(item.get("size") or 0),
+                    allowlist_verified=True,
+                )
+            )
+        return tuple(result)
 
     @staticmethod
     def _outbound_source_input(

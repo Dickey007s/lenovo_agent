@@ -3321,6 +3321,7 @@ class HarnessRuntime:
                     candidate_review_outcome=generated.candidate_review_outcome,
                     finance_review_outcome=generated.finance_review_outcome,
                     outbound_flow_outcome=generated.outbound_flow_outcome,
+                    customer_segmentation_outcome=generated.customer_segmentation_outcome,
                     download_path=(f"/v1/harness/runs/{run_id}/artifacts/{artifact_id}"),
                     created_at=now,
                     content_sha256=stored.sha256,
@@ -3369,6 +3370,14 @@ class HarnessRuntime:
         outbound_outcome = outbound_outcomes[0] if outbound_outcomes else None
         if outbound_outcomes and any(item != outbound_outcome for item in outbound_outcomes[1:]):
             raise HarnessError("同一效果的外呼流程覆盖事实不一致")
+        customer_outcomes = [
+            item.customer_segmentation_outcome
+            for item in records
+            if item.customer_segmentation_outcome is not None
+        ]
+        customer_outcome = customer_outcomes[0] if customer_outcomes else None
+        if customer_outcomes and any(item != customer_outcome for item in customer_outcomes[1:]):
+            raise HarnessError("同一效果的客户画像清洗事实不一致")
         receipt = AgentControlLoopEffectReceipt(
             receipt_id=receipt_id,
             capability_id=execution.capability_id,
@@ -3387,6 +3396,7 @@ class HarnessRuntime:
             candidate_review_outcome=candidate_outcome,
             finance_review_outcome=finance_outcome,
             outbound_flow_outcome=outbound_outcome,
+            customer_segmentation_outcome=customer_outcome,
             created_at=now,
         )
 

@@ -705,6 +705,65 @@ type OutboundFlowOutcome = {
   external_action: "none";
 };
 
+type CustomerSegmentationRule = {
+  rule_id: string;
+  category: "cleaning" | "classification" | "priority" | "exclusion" | "report";
+  source_file_ref: string;
+  locator: string;
+  excerpt: string;
+  parameters: string[];
+};
+
+type CustomerSampleDecision = {
+  sample_id: string;
+  source_file_ref: string;
+  source_row: number;
+  source_locator: string;
+  industry: string;
+  company_size: string;
+  respondent_role: string;
+  raw_scores: Record<string, string>;
+  cleaned_scores: Record<string, number>;
+  transformations: string[];
+  matched_profiles: string[];
+  priority_applied: boolean;
+  final_label: string | null;
+  exclusion_reason: "exact_duplicate" | "unclassified" | null;
+  duplicate_of: string | null;
+  rule_refs: string[];
+};
+
+type CustomerSegmentationOutcome = {
+  outcome_id: string;
+  status: "sales_review_required" | "invalid";
+  decision: string;
+  summary: string;
+  source_row_count: number;
+  unique_payload_count: number;
+  duplicate_count: number;
+  classified_count: number;
+  unclassified_count: number;
+  excluded_count: number;
+  profile_counts: Record<string, number>;
+  parameters: {
+    parsing_encoding: "utf-8-sig" | "utf-8" | "gb18030";
+    missing_score_default: number;
+    chinese_number_domain: string;
+    profile_thresholds: Record<string, number>;
+    profile_priority: string[];
+    duplicate_policy: "exact_non_id_payload";
+  };
+  rules: CustomerSegmentationRule[];
+  samples: CustomerSampleDecision[];
+  duplicate_policy_assumption: "exact_non_id_payload";
+  policy_assumption_review_required: true;
+  priority_witness_count: number;
+  strategy_evidence_status: "no_approved_strategy_source";
+  human_review_required: true;
+  original_inputs_modified: false;
+  external_action: "none";
+};
+
 type WorkspaceArtifact = {
   artifact_id: string;
   capability_id: string;
@@ -735,6 +794,7 @@ type WorkspaceArtifact = {
   candidate_review_outcome: CandidateReviewOutcome | null;
   finance_review_outcome: FinanceReviewOutcome | null;
   outbound_flow_outcome: OutboundFlowOutcome | null;
+  customer_segmentation_outcome: CustomerSegmentationOutcome | null;
   download_path: string;
   created_at: string;
   original_inputs_modified: false;
@@ -760,6 +820,7 @@ type EffectReceipt = {
   candidate_review_outcome: CandidateReviewOutcome | null;
   finance_review_outcome: FinanceReviewOutcome | null;
   outbound_flow_outcome: OutboundFlowOutcome | null;
+  customer_segmentation_outcome: CustomerSegmentationOutcome | null;
   created_at: string;
   external_action: "none";
 };
@@ -951,6 +1012,14 @@ const TASK_EXAMPLES = [
 function asText(value: unknown, fallback = "") { return typeof value === "string" ? value : fallback; }
 function asStrings(value: unknown) { return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : []; }
 function asNumber(value: unknown, fallback = 0) { return typeof value === "number" && Number.isFinite(value) ? value : fallback; }
+function asStringRecord(value: unknown): Record<string, string> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+  return Object.fromEntries(Object.entries(value).filter((entry): entry is [string, string] => typeof entry[1] === "string"));
+}
+function asNumberRecord(value: unknown): Record<string, number> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+  return Object.fromEntries(Object.entries(value).filter((entry): entry is [string, number] => typeof entry[1] === "number" && Number.isFinite(entry[1])));
+}
 
 function normalizeDecisionRequest(value: unknown): DecisionRequest | null {
   if (!value || typeof value !== "object") return null;
@@ -2259,6 +2328,134 @@ function normalizeOutboundFlowOutcome(value: unknown): OutboundFlowOutcome | nul
   };
 }
 
+function normalizeCustomerSegmentationRule(value: unknown): CustomerSegmentationRule | null {
+  if (!value || typeof value !== "object") return null;
+  const raw = value as Record<string, unknown>;
+  const category = asText(raw.category);
+  if (!asText(raw.rule_id) || !["cleaning", "classification", "priority", "exclusion", "report"].includes(category) || !asText(raw.locator)) return null;
+  return {
+    rule_id: asText(raw.rule_id),
+    category: category as CustomerSegmentationRule["category"],
+    source_file_ref: asText(raw.source_file_ref),
+    locator: asText(raw.locator),
+    excerpt: asText(raw.excerpt),
+    parameters: asStrings(raw.parameters),
+  };
+}
+
+function normalizeCustomerSampleDecision(value: unknown): CustomerSampleDecision | null {
+  if (!value || typeof value !== "object") return null;
+  const raw = value as Record<string, unknown>;
+  const exclusion = asText(raw.exclusion_reason);
+  const rawScores = asStringRecord(raw.raw_scores);
+  const cleanedScores = asNumberRecord(raw.cleaned_scores);
+  if (
+    !asText(raw.sample_id)
+    || !asText(raw.source_file_ref)
+    || !asText(raw.source_locator)
+    || Object.keys(rawScores).length !== 4
+    || Object.keys(cleanedScores).length !== 4
+    || (exclusion && !["exact_duplicate", "unclassified"].includes(exclusion))
+  ) return null;
+  return {
+    sample_id: asText(raw.sample_id),
+    source_file_ref: asText(raw.source_file_ref),
+    source_row: asNumber(raw.source_row),
+    source_locator: asText(raw.source_locator),
+    industry: asText(raw.industry),
+    company_size: asText(raw.company_size),
+    respondent_role: asText(raw.respondent_role),
+    raw_scores: rawScores,
+    cleaned_scores: cleanedScores,
+    transformations: asStrings(raw.transformations),
+    matched_profiles: asStrings(raw.matched_profiles),
+    priority_applied: raw.priority_applied === true,
+    final_label: asText(raw.final_label) || null,
+    exclusion_reason: (exclusion || null) as CustomerSampleDecision["exclusion_reason"],
+    duplicate_of: asText(raw.duplicate_of) || null,
+    rule_refs: asStrings(raw.rule_refs),
+  };
+}
+
+function normalizeCustomerSegmentationOutcome(value: unknown): CustomerSegmentationOutcome | null {
+  if (!value || typeof value !== "object") return null;
+  const raw = value as Record<string, unknown>;
+  const status = asText(raw.status);
+  const parametersRaw = raw.parameters && typeof raw.parameters === "object" && !Array.isArray(raw.parameters)
+    ? raw.parameters as Record<string, unknown>
+    : null;
+  const rules = Array.isArray(raw.rules)
+    ? raw.rules.map(normalizeCustomerSegmentationRule).filter((item): item is CustomerSegmentationRule => item !== null)
+    : [];
+  const samples = Array.isArray(raw.samples)
+    ? raw.samples.map(normalizeCustomerSampleDecision).filter((item): item is CustomerSampleDecision => item !== null)
+    : [];
+  const profileCounts = asNumberRecord(raw.profile_counts);
+  const thresholds = asNumberRecord(parametersRaw?.profile_thresholds);
+  const priority = asStrings(parametersRaw?.profile_priority);
+  const sourceCount = asNumber(raw.source_row_count);
+  const uniqueCount = asNumber(raw.unique_payload_count);
+  const duplicateCount = asNumber(raw.duplicate_count);
+  const classifiedCount = asNumber(raw.classified_count);
+  const unclassifiedCount = asNumber(raw.unclassified_count);
+  const excludedCount = asNumber(raw.excluded_count);
+  const witnessCount = asNumber(raw.priority_witness_count);
+  const encoding = asText(parametersRaw?.parsing_encoding);
+  if (
+    !asText(raw.outcome_id)
+    || !["sales_review_required", "invalid"].includes(status)
+    || !parametersRaw
+    || !["utf-8-sig", "utf-8", "gb18030"].includes(encoding)
+    || Object.keys(thresholds).length !== 3
+    || priority.length !== 3
+    || rules.length === 0
+    || samples.length !== sourceCount
+    || uniqueCount + duplicateCount !== sourceCount
+    || classifiedCount + unclassifiedCount !== uniqueCount
+    || unclassifiedCount + duplicateCount !== excludedCount
+    || Object.values(profileCounts).reduce((sum, count) => sum + count, 0) !== classifiedCount
+    || samples.filter((sample) => sample.duplicate_of !== null).length !== duplicateCount
+    || samples.filter((sample) => sample.priority_applied).length !== witnessCount
+    || parametersRaw.duplicate_policy !== "exact_non_id_payload"
+    || raw.duplicate_policy_assumption !== "exact_non_id_payload"
+    || raw.policy_assumption_review_required !== true
+    || raw.strategy_evidence_status !== "no_approved_strategy_source"
+    || raw.human_review_required !== true
+    || raw.original_inputs_modified !== false
+    || raw.external_action !== "none"
+  ) return null;
+  return {
+    outcome_id: asText(raw.outcome_id),
+    status: status as CustomerSegmentationOutcome["status"],
+    decision: asText(raw.decision),
+    summary: asText(raw.summary),
+    source_row_count: sourceCount,
+    unique_payload_count: uniqueCount,
+    duplicate_count: duplicateCount,
+    classified_count: classifiedCount,
+    unclassified_count: unclassifiedCount,
+    excluded_count: excludedCount,
+    profile_counts: profileCounts,
+    parameters: {
+      parsing_encoding: encoding as CustomerSegmentationOutcome["parameters"]["parsing_encoding"],
+      missing_score_default: asNumber(parametersRaw.missing_score_default),
+      chinese_number_domain: asText(parametersRaw.chinese_number_domain),
+      profile_thresholds: thresholds,
+      profile_priority: priority,
+      duplicate_policy: "exact_non_id_payload",
+    },
+    rules,
+    samples,
+    duplicate_policy_assumption: "exact_non_id_payload",
+    policy_assumption_review_required: true,
+    priority_witness_count: witnessCount,
+    strategy_evidence_status: "no_approved_strategy_source",
+    human_review_required: true,
+    original_inputs_modified: false,
+    external_action: "none",
+  };
+}
+
 function normalizeBusinessGateOutcome(value: unknown): BusinessGateOutcome | null {
   if (!value || typeof value !== "object") return null;
   const raw = value as Record<string, unknown>;
@@ -2337,6 +2534,7 @@ function normalizeWorkspaceArtifact(value: unknown): WorkspaceArtifact | null {
     candidate_review_outcome: normalizeCandidateReviewOutcome(raw.candidate_review_outcome),
     finance_review_outcome: normalizeFinanceReviewOutcome(raw.finance_review_outcome),
     outbound_flow_outcome: normalizeOutboundFlowOutcome(raw.outbound_flow_outcome),
+    customer_segmentation_outcome: normalizeCustomerSegmentationOutcome(raw.customer_segmentation_outcome),
     download_path: asText(raw.download_path),
     created_at: asText(raw.created_at),
     original_inputs_modified: false,
@@ -2369,6 +2567,7 @@ function normalizeEffectReceipt(value: unknown): EffectReceipt | null {
     candidate_review_outcome: normalizeCandidateReviewOutcome(raw.candidate_review_outcome),
     finance_review_outcome: normalizeFinanceReviewOutcome(raw.finance_review_outcome),
     outbound_flow_outcome: normalizeOutboundFlowOutcome(raw.outbound_flow_outcome),
+    customer_segmentation_outcome: normalizeCustomerSegmentationOutcome(raw.customer_segmentation_outcome),
     created_at: asText(raw.created_at),
     external_action: "none",
   };
@@ -3688,6 +3887,9 @@ function LoopView({
   const outboundFlowOutcome = run.workspace_artifacts.find((artifact) => artifact.outbound_flow_outcome)?.outbound_flow_outcome
     ?? run.effect_receipts.find((receipt) => receipt.outbound_flow_outcome)?.outbound_flow_outcome
     ?? null;
+  const customerSegmentationOutcome = run.workspace_artifacts.find((artifact) => artifact.customer_segmentation_outcome)?.customer_segmentation_outcome
+    ?? run.effect_receipts.find((receipt) => receipt.customer_segmentation_outcome)?.customer_segmentation_outcome
+    ?? null;
   const artifactCheckSummary = summarizeArtifactChecks(run.workspace_artifacts);
   const passedArtifactChecks = artifactCheckSummary.passed;
   const totalArtifactChecks = artifactCheckSummary.total;
@@ -3918,7 +4120,7 @@ function LoopView({
       {run.last_commit && <footer><IconCircleCheck aria-hidden="true" /><span>{run.last_commit.summary}</span><b>{run.commits.length} 次提交记录</b></footer>}
     </section>}
     {run.brief && <section className={`loop-brief is-${run.brief.outcome}`}><IconCircleCheck aria-hidden="true" /><div><span>任务简报</span><h3>{run.brief.summary}</h3><p>外部动作：未发生 · 结果仍需人工复核</p></div></section>}
-    {verifiedEffectReady && effectConclusionArtifact && <section className={`loop-effect-conclusion${businessGateOutcome && businessGateOutcome.status !== "passed" ? " is-business-blocked" : candidateReviewOutcome || financeReviewOutcome || outboundFlowOutcome ? " is-human-review" : ""}`} aria-label="本次任务结语">{businessGateOutcome && businessGateOutcome.status !== "passed" || candidateReviewOutcome || financeReviewOutcome || outboundFlowOutcome ? <IconAlertTriangle aria-hidden="true" /> : <IconShieldCheck aria-hidden="true" />}<div><span>{businessGateOutcome && businessGateOutcome.status !== "passed" ? "业务结论" : candidateReviewOutcome ? "招聘辅助结论" : financeReviewOutcome ? "财务复核结论" : outboundFlowOutcome ? "流程设计结论" : "本次任务结语"}</span><h3>{businessGateOutcome && businessGateOutcome.status !== "passed" ? businessGateOutcome.decision : candidateReviewOutcome ? candidateReviewOutcome.decision : financeReviewOutcome ? financeReviewOutcome.decision : outboundFlowOutcome ? outboundFlowOutcome.decision : effectConclusionArtifact.execution_summary}</h3><p>{businessGateOutcome && businessGateOutcome.status !== "passed" ? businessGateOutcome.summary : candidateReviewOutcome ? candidateReviewOutcome.summary : financeReviewOutcome ? financeReviewOutcome.summary : outboundFlowOutcome ? "这是一份流程设计，不是拨号、CRM/短信执行，也不是法律意见。" : effectConclusionArtifact.review_guidance}</p></div><b>{businessGateOutcome && businessGateOutcome.status !== "passed" ? `业务 Gate ${businessGateOutcome.failed_gate_count}/${businessGateOutcome.total_gate_count} 未通过` : candidateReviewOutcome ? "最终 HR 决定尚未发生" : financeReviewOutcome ? "最终财务处置尚未发生" : outboundFlowOutcome ? "最终合规审批与真实动作均未发生" : artifactCheckSummary.sameChecklist ? `${run.workspace_artifacts.length} 份成果共享 ${totalArtifactChecks} 项规则检查，${passedArtifactChecks}/${totalArtifactChecks} 通过` : artifactCheckSummary.shared ? `${run.workspace_artifacts.length} 份成果共 ${totalArtifactChecks} 项唯一规则检查，${passedArtifactChecks}/${totalArtifactChecks} 通过` : `${passedArtifactChecks}/${totalArtifactChecks} 项规则检查通过`}</b></section>}
+    {verifiedEffectReady && effectConclusionArtifact && <section className={`loop-effect-conclusion${businessGateOutcome && businessGateOutcome.status !== "passed" ? " is-business-blocked" : candidateReviewOutcome || financeReviewOutcome || outboundFlowOutcome || customerSegmentationOutcome ? " is-human-review" : ""}`} aria-label="本次任务结语">{businessGateOutcome && businessGateOutcome.status !== "passed" || candidateReviewOutcome || financeReviewOutcome || outboundFlowOutcome || customerSegmentationOutcome ? <IconAlertTriangle aria-hidden="true" /> : <IconShieldCheck aria-hidden="true" />}<div><span>{businessGateOutcome && businessGateOutcome.status !== "passed" ? "业务结论" : candidateReviewOutcome ? "招聘辅助结论" : financeReviewOutcome ? "财务复核结论" : outboundFlowOutcome ? "流程设计结论" : customerSegmentationOutcome ? "画像清洗与策略草案" : "本次任务结语"}</span><h3>{businessGateOutcome && businessGateOutcome.status !== "passed" ? businessGateOutcome.decision : candidateReviewOutcome ? candidateReviewOutcome.decision : financeReviewOutcome ? financeReviewOutcome.decision : outboundFlowOutcome ? outboundFlowOutcome.decision : customerSegmentationOutcome ? customerSegmentationOutcome.decision : effectConclusionArtifact.execution_summary}</h3><p>{businessGateOutcome && businessGateOutcome.status !== "passed" ? businessGateOutcome.summary : candidateReviewOutcome ? candidateReviewOutcome.summary : financeReviewOutcome ? financeReviewOutcome.summary : outboundFlowOutcome ? "这是一份流程设计，不是拨号、CRM/短信执行，也不是法律意见。" : customerSegmentationOutcome ? "这是公开样本的清洗和画像事实；重复口径、策略内容与真实客户适用性仍待销售负责人复核。" : effectConclusionArtifact.review_guidance}</p></div><b>{businessGateOutcome && businessGateOutcome.status !== "passed" ? `业务 Gate ${businessGateOutcome.failed_gate_count}/${businessGateOutcome.total_gate_count} 未通过` : candidateReviewOutcome ? "最终 HR 决定尚未发生" : financeReviewOutcome ? "最终财务处置尚未发生" : outboundFlowOutcome ? "最终合规审批与真实动作均未发生" : customerSegmentationOutcome ? "策略审批与客户动作均未发生" : artifactCheckSummary.sameChecklist ? `${run.workspace_artifacts.length} 份成果共享 ${totalArtifactChecks} 项规则检查，${passedArtifactChecks}/${totalArtifactChecks} 通过` : artifactCheckSummary.shared ? `${run.workspace_artifacts.length} 份成果共 ${totalArtifactChecks} 项唯一规则检查，${passedArtifactChecks}/${totalArtifactChecks} 通过` : `${passedArtifactChecks}/${totalArtifactChecks} 项规则检查通过`}</b></section>}
   </section>;
 }
 
@@ -4171,6 +4373,49 @@ function OutboundFlowOutcomePanel({ outcome, deterministicPassed }: { outcome: O
   </section>;
 }
 
+function customerSampleStatus(sample: CustomerSampleDecision): string {
+  if (sample.duplicate_of) return `精确重复，保留样本 ${sample.duplicate_of}`;
+  if (sample.exclusion_reason === "unclassified") return "未命中画像，已排除";
+  return sample.final_label ?? "待复核";
+}
+
+function CustomerSegmentationOutcomePanel({ outcome, deterministicPassed }: { outcome: CustomerSegmentationOutcome; deterministicPassed: boolean }) {
+  const profileEntries = Object.entries(outcome.profile_counts);
+  return <section className={`customer-segmentation-outcome is-${outcome.status}`} aria-label="客户画像清洗与销售策略草案复核">
+    <header>
+      <IconAdjustments aria-hidden="true" />
+      <div><span>公开样本清洗与画像</span><h3>这是画像清洗与策略草案，不是真实客户研究、销售效果证明或 CRM 执行</h3><p>{outcome.decision}</p></div>
+      <b>{outcome.source_row_count} 个原始行 · {outcome.classified_count} 条分类</b>
+    </header>
+    <ol className="customer-segmentation-statuses" aria-label="来源验证、清洗事实、策略复核与外部动作">
+      <li className={deterministicPassed ? "is-passed" : "is-failed"}><span>1</span><div><b>来源与两份成果</b><strong>{deterministicPassed ? "确定性检查通过" : "确定性检查未通过"}</strong><p>{deterministicPassed ? "服务端重新读取问卷和规则，再解析最终 Markdown 与 CSV 逐字段核对。" : "来源、清洗或成果结构未通过验证，当前分类不得采用。"}</p></div></li>
+      <li className="is-review"><span>2</span><div><b>画像清洗事实</b><strong>{outcome.classified_count} 条分类 · {outcome.excluded_count} 条排除</strong><p>重复口径是公开假设，canonical 中多标签优先级 witness 为 {outcome.priority_witness_count} 个。</p></div></li>
+      <li className="is-pending"><span>3</span><div><b>销售策略草案</b><strong>待销售负责人补充和批准</strong><p>规则只批准报告栏目，没有批准话术、主推功能、行业结论或销售优先级。</p></div></li>
+      <li className="is-pending"><span>4</span><div><b>客户与 CRM 动作</b><strong>全部未发生</strong><p>未联系客户、未写 CRM、未创建商机，也未触发任何营销动作。</p></div></li>
+    </ol>
+    <section className="customer-segmentation-summary" aria-label="画像清洗动态摘要">
+      <div><span>原始行</span><strong>{outcome.source_row_count}</strong><p>{outcome.unique_payload_count} 条唯一业务载荷</p></div>
+      <div><span>精确重复</span><strong>{outcome.duplicate_count}</strong><p>按 exact_non_id_payload 保留第一条</p></div>
+      <div><span>完成分类</span><strong>{outcome.classified_count}</strong><p>{profileEntries.map(([label, count]) => `${label} ${count}`).join(" · ")}</p></div>
+      <div><span>无法归类</span><strong>{outcome.unclassified_count}</strong><p>连同重复共排除 {outcome.excluded_count} 条</p></div>
+    </section>
+    <article className="customer-segmentation-assumption"><IconAlertTriangle aria-hidden="true" /><div><b>重复口径仍需业务确认</b><p>来源只说“重复保留第一条”，没有定义重复键。当前固定适配器仅把除样本 ID 外所有原始字段完全相同视为重复。</p></div></article>
+    <div className="customer-segmentation-samples" aria-label="逐样本清洗与画像裁决">{outcome.samples.map((sample) => <details key={`${sample.sample_id}:${sample.source_row}`} className={sample.duplicate_of ? "is-duplicate" : sample.exclusion_reason ? "is-excluded" : "is-classified"}>
+      <summary><span><b>样本 {sample.sample_id}</b><strong>{customerSampleStatus(sample)}</strong></span><span><small>{sample.industry} · {sample.company_size}</small><em>{sample.source_locator}</em></span><IconChevronDown aria-hidden="true" /></summary>
+      <dl>
+        <div><dt>原始评分</dt><dd>{Object.entries(sample.raw_scores).map(([field, value]) => `${field}=${value || "空"}`).join(" · ")}</dd></div>
+        <div><dt>清洗评分</dt><dd>{Object.entries(sample.cleaned_scores).map(([field, value]) => `${field}=${value}`).join(" · ")}</dd></div>
+        <div><dt>清洗转换</dt><dd>{sample.transformations.length > 0 ? sample.transformations.join("；") : "无需转换"}</dd></div>
+        <div><dt>画像命中</dt><dd>{sample.matched_profiles.length > 0 ? sample.matched_profiles.join("、") : "未命中"}{sample.priority_applied ? `；按 ${outcome.parameters.profile_priority.join(" > ")} 选出唯一标签` : "；未触发多标签优先级"}</dd></div>
+        <div><dt>最终处理</dt><dd>{customerSampleStatus(sample)}</dd></div>
+        <div><dt>来源规则</dt><dd>{sample.rule_refs.join("、")}</dd></div>
+      </dl>
+    </details>)}</div>
+    <details className="customer-segmentation-rules"><summary><IconEye aria-hidden="true" /><span><b>查看来源规则与动态参数</b><small>{outcome.rules.length} 条规则 · 缺失值={outcome.parameters.missing_score_default} · 优先级 {outcome.parameters.profile_priority.join(" > ")}</small></span><IconChevronDown aria-hidden="true" /></summary><ol>{outcome.rules.map((rule) => <li key={rule.rule_id}><header><code>{rule.rule_id}</code><b>{rule.locator}</b></header><blockquote>{rule.excerpt}</blockquote><p>{rule.parameters.join(" · ") || "无额外参数"}</p></li>)}</ol></details>
+    <footer><IconShieldCheck aria-hidden="true" /><span>固定 Sales-020 公开样本适配器。重复口径和策略内容仍需业务负责人批准，不是 CRM、自动营销、真实客户研究或通用分群引擎。</span></footer>
+  </section>;
+}
+
 function WorkspaceArtifactSection({ artifacts, receipts }: { artifacts: WorkspaceArtifact[]; receipts: EffectReceipt[] }) {
   const [downloading, setDownloading] = useState<string | null>(null);
   const [downloadError, setDownloadError] = useState("");
@@ -4197,6 +4442,9 @@ function WorkspaceArtifactSection({ artifacts, receipts }: { artifacts: Workspac
     ?? null;
   const outboundFlowOutcome = artifacts.find((artifact) => artifact.outbound_flow_outcome)?.outbound_flow_outcome
     ?? latestReceipt?.outbound_flow_outcome
+    ?? null;
+  const customerSegmentationOutcome = artifacts.find((artifact) => artifact.customer_segmentation_outcome)?.customer_segmentation_outcome
+    ?? latestReceipt?.customer_segmentation_outcome
     ?? null;
   const businessBlocked = Boolean(businessGateOutcome && businessGateOutcome.status !== "passed");
   const deterministicPassed = artifacts.length > 0 && artifacts.every((artifact) => artifact.verifier_status === "passed");
@@ -4228,8 +4476,9 @@ function WorkspaceArtifactSection({ artifacts, receipts }: { artifacts: Workspac
     <header>
       <IconFileDescription aria-hidden="true" />
       <div><span>运行工作区</span><h3 id="workspace-artifacts-title">{artifacts.length > 0 ? `Agent 已生成 ${artifacts.length} 份真实成果文件` : "这项任务尚不能生成可信成果"}</h3><p>{artifacts.length > 0 ? "文件已写入本次 Run 的隔离目录，原始 FORTE 文件没有被修改。" : boundary?.result}</p></div>
-      <b>{businessGateOutcome?.status === "failed" ? `业务 Gate ${businessGateOutcome.failed_gate_count}/${businessGateOutcome.total_gate_count} 未通过` : businessGateOutcome?.status === "invalid" ? "来源校验失败" : candidateReviewOutcome ? "最终 HR 决定待人工处理" : financeReviewOutcome ? "最终财务处置待人工处理" : outboundFlowOutcome?.status === "invalid" ? "规则或图结构未通过" : outboundFlowOutcome ? "最终合规审批待人工处理" : artifacts.length > 0 ? checkSummary.sameChecklist ? `${artifacts.length} 份成果共享 ${checkSummary.total} 项确定性检查，${checkSummary.passed}/${checkSummary.total} 通过` : checkSummary.shared ? `${artifacts.length} 份成果共 ${checkSummary.total} 项唯一确定性检查，${checkSummary.passed}/${checkSummary.total} 通过` : `${checkSummary.passed}/${checkSummary.total} 项检查通过` : "未伪造结果"}</b>
+      <b>{businessGateOutcome?.status === "failed" ? `业务 Gate ${businessGateOutcome.failed_gate_count}/${businessGateOutcome.total_gate_count} 未通过` : businessGateOutcome?.status === "invalid" ? "来源校验失败" : candidateReviewOutcome ? "最终 HR 决定待人工处理" : financeReviewOutcome ? "最终财务处置待人工处理" : outboundFlowOutcome?.status === "invalid" ? "规则或图结构未通过" : outboundFlowOutcome ? "最终合规审批待人工处理" : customerSegmentationOutcome ? "策略草案待销售负责人复核" : artifacts.length > 0 ? checkSummary.sameChecklist ? `${artifacts.length} 份成果共享 ${checkSummary.total} 项确定性检查，${checkSummary.passed}/${checkSummary.total} 通过` : checkSummary.shared ? `${artifacts.length} 份成果共 ${checkSummary.total} 项唯一确定性检查，${checkSummary.passed}/${checkSummary.total} 通过` : `${checkSummary.passed}/${checkSummary.total} 项检查通过` : "未伪造结果"}</b>
     </header>
+    {customerSegmentationOutcome && <CustomerSegmentationOutcomePanel outcome={customerSegmentationOutcome} deterministicPassed={deterministicPassed} />}
     {outboundFlowOutcome && <OutboundFlowOutcomePanel outcome={outboundFlowOutcome} deterministicPassed={deterministicPassed} />}
     {financeReviewOutcome && <FinanceReviewOutcomePanel outcome={financeReviewOutcome} deterministicPassed={deterministicPassed} />}
     {candidateReviewOutcome && <CandidateReviewOutcomePanel outcome={candidateReviewOutcome} deterministicPassed={deterministicPassed} />}
@@ -4238,7 +4487,7 @@ function WorkspaceArtifactSection({ artifacts, receipts }: { artifacts: Workspac
     {executionArtifact && <article className={`workspace-action-result${executionArtifact.verifier_status === "failed" ? " is-failed" : ""}`} aria-label="实际执行边界"><IconShieldCheck aria-hidden="true" /><div><span>这次实际发生了什么</span><h4>{executionArtifact.execution_summary}</h4><p>{executionArtifact.purpose}</p>{latestReceipt && <ul>{latestReceipt.prohibited_side_effects.map((item) => <li key={item}>{item}</li>)}</ul>}</div></article>}
     {artifacts.length > 0 && <ol>{artifacts.map((artifact) => <li key={artifact.artifact_id} className={artifact.verifier_status === "passed" ? "is-passed" : "is-failed"}>
       <div className="workspace-artifact-file"><span><IconFile aria-hidden="true" /></span><div><h4>{artifact.title}</h4><p>{artifact.summary}</p><small>文件：{artifact.file_name} · 第 {artifact.round_number} 轮 · {formatSize(artifact.size)} · {artifact.source_file_refs.length} 份内容来源</small></div></div>
-      <div className="workspace-artifact-status"><b>{artifact.verifier_status === "passed" ? <><IconCheck aria-hidden="true" />确定性检查通过</> : <><IconAlertTriangle aria-hidden="true" />检查未通过</>}</b><span>{artifact.record_count !== null ? `${artifact.record_count} 条记录 · ` : ""}{artifact.checks.filter((check) => check.passed).length}/{artifact.checks.length} 项检查{(checklistUsage.get(artifactChecklistKey(artifact)) ?? 0) > 1 ? " · 使用同一验证清单" : ""}</span>{artifact.business_gate_outcome && <small>只代表公式、来源和文件结构已复核，不代表业务 Gate 通过。</small>}{artifact.candidate_review_outcome && <small>只代表来源、条件计算和成果结构已复核，不代表录用或淘汰。</small>}{artifact.finance_review_outcome && <small>只代表来源、金额、候选枚举和成果结构已复核，不代表已经付款、核销、记账或确认坏账。</small>}{artifact.outbound_flow_outcome && <small>只代表来源规则、DOCX 和图结构已复核，不代表合规审批或外呼动作发生。</small>}</div>
+      <div className="workspace-artifact-status"><b>{artifact.verifier_status === "passed" ? <><IconCheck aria-hidden="true" />确定性检查通过</> : <><IconAlertTriangle aria-hidden="true" />检查未通过</>}</b><span>{artifact.record_count !== null ? `${artifact.record_count} 条记录 · ` : ""}{artifact.checks.filter((check) => check.passed).length}/{artifact.checks.length} 项检查{(checklistUsage.get(artifactChecklistKey(artifact)) ?? 0) > 1 ? " · 使用同一验证清单" : ""}</span>{artifact.business_gate_outcome && <small>只代表公式、来源和文件结构已复核，不代表业务 Gate 通过。</small>}{artifact.candidate_review_outcome && <small>只代表来源、条件计算和成果结构已复核，不代表录用或淘汰。</small>}{artifact.finance_review_outcome && <small>只代表来源、金额、候选枚举和成果结构已复核，不代表已经付款、核销、记账或确认坏账。</small>}{artifact.outbound_flow_outcome && <small>只代表来源规则、DOCX 和图结构已复核，不代表合规审批或外呼动作发生。</small>}{artifact.customer_segmentation_outcome && <small>只代表来源、清洗、画像裁决与成果结构已复核，不代表策略获批、销售有效或客户动作发生。</small>}</div>
       <button type="button" onClick={() => void downloadArtifact(artifact)} disabled={downloading !== null}><IconDownload aria-hidden="true" />{downloading === artifact.artifact_id ? "正在下载" : "下载成果"}</button>
       {(artifact.deliverable_type || artifact.covered_period || artifact.statistic_basis || artifact.purpose) && <dl className={`workspace-artifact-semantics${artifact.deliverable_type ? " has-deliverable-type" : ""}`}>
         {artifact.deliverable_type && <div><dt>成果类型</dt><dd>{artifact.deliverable_type}</dd></div>}

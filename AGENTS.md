@@ -79,6 +79,17 @@ must become independent rules/guards/edges, while unknown or conflicting
 fragments fail closed. Fixed-yield test polling is not an acceptable substitute
 for a monotonic deadline with diagnostic Snapshot facts.
 
+DR-0049 governs the current TC-13 source-derived customer-segmentation slice.
+Read `docs/decisions/DR-0049-tc13-source-derived-customer-segmentation.md`,
+`docs/scenarios/SCENARIO-034-review-source-derived-customer-segmentation.md`
+and its Evidence before changing Sales-020 parsing, duplicate handling,
+strategy wording or the four-layer UI. `exact_non_id_payload` is a published
+review-required assumption, not a source-defined customer key. Canonical input
+has zero priority witnesses, and the source has no approved sales wording or
+feature recommendation. A passed Artifact proves only source, cleaning and file
+consistency; it does not prove customer research, strategy approval, CRM writes
+or sales effectiveness.
+
 DR-0040 governs TC-02 real-project refactoring. Read
 `docs/decisions/DR-0040-tc02-real-project-react-refactor.md`,
 `docs/scenarios/SCENARIO-026-refactor-real-search-agent-copy-with-bounded-react.md`

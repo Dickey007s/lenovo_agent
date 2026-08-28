@@ -976,8 +976,26 @@ def test_customer_sre_and_ux_outputs_retain_deterministic_business_facts(
 ) -> None:
     _, customers = _execute("TC-13", catalog)
     customer_report = customers.artifacts[0].content.decode("utf-8")
-    assert "8 条客户记录" in customers.artifacts[0].summary
+    assert len(customers.artifacts) == 2
+    assert "11 个原始样本行" in customers.artifacts[0].summary
+    assert "分类 8 条" in customers.artifacts[0].summary
+    assert "多标签优先级 witness 0 个" in customers.artifacts[0].summary
+    assert customers.artifacts[0].customer_segmentation_outcome is not None
+    assert customers.artifacts[1].customer_segmentation_outcome is not None
+    assert (
+        customers.artifacts[0].customer_segmentation_outcome
+        == customers.artifacts[1].customer_segmentation_outcome
+    )
+    assert customers.artifacts[0].customer_segmentation_outcome.profile_counts == {
+        "技术型": 3,
+        "安全型": 3,
+        "敏捷型": 2,
+    }
+    assert len(customers.artifacts[0].checks) == 8
+    assert all(check.passed for check in customers.artifacts[0].checks)
     assert all(label in customer_report for label in ("安全型", "技术型", "敏捷型"))
+    assert "no_approved_strategy_source" in customer_report
+    assert "没有联系客户、写 CRM、创建商机或触发营销动作" in customer_report
 
     _, sre = _execute("TC-14", catalog)
     sre_report = sre.artifacts[0].content.decode("utf-8")

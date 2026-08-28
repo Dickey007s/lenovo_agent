@@ -30,6 +30,8 @@ from services.api.app.application.scenario_effects import ScenarioEffectEngine
 from tests.unit.test_scenario_effect_runtime import (
     CandidateReviewAnalyst,
     CandidateReviewPlanner,
+    CustomerSegmentationAnalyst,
+    CustomerSegmentationPlanner,
     DashboardAnalyst,
     DashboardPlanner,
     FinanceReconciliationAnalyst,
@@ -42,6 +44,7 @@ from tests.unit.test_scenario_effect_runtime import (
     ONBOARDING_INSTRUCTION,
     TC11_INSTRUCTION,
     TC12_INSTRUCTION,
+    TC13_INSTRUCTION,
     LegalDelegationAnalyst,
     LegalDelegationPlanner,
     OnboardingAnalyst,
@@ -714,6 +717,122 @@ async def test_postgres_restart_preserves_tc10_outbound_flow_outcome_and_docx(
         public_json = public_snapshot.model_dump_json()
         assert "content_sha256" not in public_json
         assert public_snapshot.effect_receipts[0].outbound_flow_outcome == outcome
+        assert public_snapshot.effect_receipts[0].external_action == "none"
+    finally:
+        for runtime in reversed(runtimes):
+            await runtime.close()
+        if DATABASE_DSN and run_id:
+            async with await psycopg.AsyncConnection.connect(DATABASE_DSN) as connection:
+                async with connection.cursor() as cursor:
+                    for table in (
+                        "harness_idempotency",
+                        "harness_task_commit",
+                        "harness_artifact_version",
+                        "harness_run_state",
+                    ):
+                        await cursor.execute(
+                            f"DELETE FROM {table} WHERE owner_id = %s",  # nosec B608
+                            (owner,),
+                        )
+
+
+@pytest.mark.asyncio
+async def test_postgres_restart_preserves_tc13_customer_outcome_and_two_artifacts(
+    tmp_path: Path,
+) -> None:
+    owner = f"postgres-tc13-customer-{uuid4().hex}"
+    run_id = ""
+    runtimes: list[HarnessRuntime] = []
+    workspace_root = tmp_path / "tc13-run-workspaces"
+    try:
+        first = HarnessRuntime(
+            BenchmarkWorkspaceCatalog(FORTE_ROOT),
+            CustomerSegmentationPlanner(),
+            CustomerSegmentationAnalyst(),
+            PostgresHarnessStateStore(DATABASE_DSN),
+            effect_engine=ScenarioEffectEngine(),
+            artifact_store=RunWorkspaceArtifactStore(workspace_root),
+        )
+        runtimes.append(first)
+        await first.setup()
+        started = await first.start(
+            owner,
+            start_request(
+                idempotency_key=f"postgres-tc13-start-{uuid4().hex}",
+                instruction=TC13_INSTRUCTION,
+            ),
+        )
+        run_id = started.run.run_id
+        terminal = await wait_for_effect_run(first, owner, run_id)
+        assert terminal.status == "completed"
+        assert len(terminal.workspace_artifacts) == 2
+        receipt = terminal.effect_receipts[0]
+        assert receipt.status == "passed"
+        assert receipt.scenario_id == "TC-13"
+        assert receipt.customer_segmentation_outcome is not None
+        outcome = receipt.customer_segmentation_outcome
+        assert outcome.status == "sales_review_required"
+        assert (
+            outcome.source_row_count,
+            outcome.unique_payload_count,
+            outcome.duplicate_count,
+            outcome.classified_count,
+            outcome.unclassified_count,
+            outcome.excluded_count,
+        ) == (11, 10, 1, 8, 2, 3)
+        assert outcome.profile_counts == {"技术型": 3, "安全型": 3, "敏捷型": 2}
+        assert outcome.priority_witness_count == 0
+        assert outcome.strategy_evidence_status == "no_approved_strategy_source"
+        assert outcome.original_inputs_modified is False
+        assert outcome.external_action == "none"
+
+        originals: dict[str, bytes] = {}
+        for artifact in terminal.workspace_artifacts:
+            assert artifact.verifier_status == "passed"
+            assert artifact.customer_segmentation_outcome == outcome
+            _, originals[artifact.file_name] = await first.get_workspace_artifact(
+                owner, run_id, artifact.artifact_id
+            )
+        ledger_rows = list(
+            csv.DictReader(
+                io.StringIO(originals["客户画像逐样本台账.csv"].decode("utf-8-sig"))
+            )
+        )
+        assert len(ledger_rows) == 11
+        assert len({row["样本ID"] for row in ledger_rows}) == 11
+        assert next(row for row in ledger_rows if row["样本ID"] == "111")["duplicate_of"] == "101"
+        report = originals["客户画像及销售策略.md"].decode("utf-8")
+        assert "多标签优先级 witness：0" in report
+        assert "no_approved_strategy_source" in report
+        assert "没有联系客户、写 CRM、创建商机或触发营销动作" in report
+        await first.close()
+
+        second = HarnessRuntime(
+            BenchmarkWorkspaceCatalog(FORTE_ROOT),
+            CustomerSegmentationPlanner(),
+            CustomerSegmentationAnalyst(),
+            PostgresHarnessStateStore(DATABASE_DSN),
+            effect_engine=ScenarioEffectEngine(),
+            artifact_store=RunWorkspaceArtifactStore(workspace_root),
+        )
+        runtimes.append(second)
+        await second.setup()
+        restored = await second.get(owner, run_id)
+        assert restored.effect_receipts[0].customer_segmentation_outcome == outcome
+        restored_by_name = {item.file_name: item for item in restored.workspace_artifacts}
+        assert set(restored_by_name) == set(originals)
+        for file_name, content in originals.items():
+            artifact = restored_by_name[file_name]
+            assert artifact.customer_segmentation_outcome == outcome
+            _, restored_content = await second.get_workspace_artifact(
+                owner, run_id, artifact.artifact_id
+            )
+            assert restored_content == content
+
+        public_snapshot = second.public_snapshot(restored)
+        public_json = public_snapshot.model_dump_json()
+        assert "content_sha256" not in public_json
+        assert public_snapshot.effect_receipts[0].customer_segmentation_outcome == outcome
         assert public_snapshot.effect_receipts[0].external_action == "none"
     finally:
         for runtime in reversed(runtimes):

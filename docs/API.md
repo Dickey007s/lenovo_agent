@@ -452,6 +452,18 @@ Artifact means the fixed source, generated DOCX and graph structure were
 recomputed successfully, not that a compliance approval or external action
 occurred.
 
+TC-13 additionally publishes optional `customer_segmentation_outcome` on both
+Artifacts and the EffectReceipt. It contains `status=sales_review_required`,
+dynamic source/unique/duplicate/classified/unclassified/excluded and per-profile
+counts, source-derived cleaning parameters and rules, one decision per original
+CSV row, `duplicate_policy_assumption=exact_non_id_payload`,
+`policy_assumption_review_required=true`, `priority_witness_count`,
+`strategy_evidence_status=no_approved_strategy_source`, the pending sales
+decision and `external_action=none`. Clients must not infer counts from current
+sample IDs, treat a zero witness as proof that priority was exercised, promote a
+draft template into an approved strategy, or interpret a passed Artifact as a
+CRM/customer action.
+
 `source_documents` and `contract.allowed_file_refs` are the full safe workspace
 index. They are not the files read by the Analyst. The authoritative per-round
 evidence scope is `rounds[].input_file_refs`, and the public reason is

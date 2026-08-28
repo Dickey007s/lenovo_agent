@@ -1,0 +1,27 @@
+{
+  "schema_version": "tc13-screenshot-evidence.v1",
+  "captured_at": "2026-08-29T06:14:29+08:00",
+  "capture_command": "$env:CAPTURE_TC13_EFFECT_EVIDENCE='1'; pnpm --dir apps/web exec playwright test e2e/harness-workbench.spec.ts -g \"four layers\"",
+  "capture_method": "Playwright system-browser complete viewport; no CSS injection and no content rewriting",
+  "fixture_source": "docs/evidence/manifests/tc13-public-customer-segmentation-outcome-20260829.json",
+  "browser_fixture_boundary": "The browser fixture is exported from the same public service contract as the Python builder. It validates projection and geometry, not a live provider call or user understanding.",
+  "screenshots": [
+    {
+      "path": "docs/evidence/screenshots/tc13-customer-segmentation-desktop.png",
+      "width": 1440,
+      "height": 1100,
+      "size": 155400,
+      "sha256": "aaf9901be6d06ba662cbaab76999d2585c5f19c367f0f391423b78856573a34a",
+      "visible_state": "Sales-020 directory expanded; four-layer customer outcome and three-pane workspace visible"
+    },
+    {
+      "path": "docs/evidence/screenshots/tc13-customer-segmentation-mobile.png",
+      "width": 390,
+      "height": 844,
+      "size": 57295,
+      "sha256": "99ae9e955e0e4778a8ae399507fe248099d40d75102a9da14b1dff3fc3792c83",
+      "visible_state": "Single-column four-layer customer outcome at its first viewport"
+    }
+  ],
+  "verified": true
+}

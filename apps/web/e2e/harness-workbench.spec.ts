@@ -7,6 +7,9 @@ import tc10OutboundFlowManifest from "../../../docs/evidence/manifests/tc10-publ
 import tc10OutboundFlowDynamicManifest from "../../../docs/evidence/manifests/tc10-public-outbound-flow-outcome-dynamic-20260829.json";
 import tc11BusinessOutcome from "../../../docs/evidence/manifests/tc11-business-gate-outcome-20260828.json";
 import tc12TestManifest from "../../../docs/evidence/manifests/tc12-public-test-manifest-20260828.json";
+import tc13CustomerSegmentationManifest from "../../../docs/evidence/manifests/tc13-public-customer-segmentation-outcome-20260829.json";
+import tc13CustomerSegmentationThresholdManifest from "../../../docs/evidence/manifests/tc13-public-customer-segmentation-outcome-threshold-20260829.json";
+import tc13CustomerSegmentationWitnessManifest from "../../../docs/evidence/manifests/tc13-public-customer-segmentation-outcome-witness-20260829.json";
 
 type FileItem = {
   file_ref: string;
@@ -49,6 +52,22 @@ const outboundRuleFile = fileItem(
   "MD",
   "text",
 );
+const customerSurveyFile = fileItem(
+  "forte-30f5e044f5d7a199",
+  "forte-folder-sales-020",
+  "客户画像调研问卷.csv",
+  "销售运营",
+  "CSV",
+  "table",
+);
+const customerRuleFile = fileItem(
+  "forte-8d86fcca3891dabb",
+  "forte-folder-sales-020",
+  "客户分类画像与差异化销售策略生成规则.md",
+  "销售运营",
+  "MD",
+  "text",
+);
 const workflowFile = fileItem("forte-5555555555555555", "forte-folder-555555555555", "workflow.py", "算法研发", "PY", "text", "search_agent_workflow/workflow.py");
 const searchLogFile = fileItem("forte-6666666666666666", "forte-folder-555555555555", "search_agent.log", "算法研发", "LOG", "text", "search_agent_workflow/search_agent.log");
 const legalRuleFile = fileItem("forte-legal-rules-01", pdfFile.folder_id, "授权委托书风控校验规则.md", "法务", "MD", "text");
@@ -84,6 +103,7 @@ const seedFolders = [
   { folder_id: txtFile.folder_id, display_label: "可靠性工程", display_summary: "运行日志与服务资料", files: [txtFile] },
   { folder_id: workflowFile.folder_id, display_label: "算法研发", display_summary: "搜索 Agent 代码与运行记录", files: [workflowFile, searchLogFile] },
   { folder_id: outboundRuleFile.folder_id, display_label: "运营管理", display_summary: "外呼规则与运营资料", files: [outboundRuleFile] },
+  { folder_id: customerSurveyFile.folder_id, display_label: "销售运营", display_summary: "公开问卷与画像规则", files: [customerSurveyFile, customerRuleFile] },
 ];
 
 const folders = Array.from({ length: 15 }, (_, folderIndex) => {
@@ -164,6 +184,18 @@ function previewFor(fileRef: string) {
   if (fileRef === docxFile.file_ref) return { ...base, kind: "document", text: "岗位职责：负责商户拓展与经营分析。" };
   if (fileRef === workflowFile.file_ref) return { ...base, kind: "text", text: "AI 搜索 Agent - Workflow 核心模块\n\nclass QueryAnalysisNode:\n    intent = llm.classify(query)\n    rewritten = llm.rewrite(query)\n    drift_score = semantic_drift(query, rewritten)\n\nclass SearchPlanNode:\n    route = choose(intent, rewritten)\n    if intent == 'news':\n        route.append('web_search_news')\n\nclass FallbackPlanNode:\n    route = choose(intent, rewritten)" };
   if (fileRef === searchLogFile.file_ref) return { ...base, kind: "text", text: "2026-08-24 request=Breaking news about AI regulation today\nintent=factual\nrewrite=detailed explanation of AI regulation\nroute=web_search+knowledge_base\nweb_search_news_called=false" };
+  if (fileRef === customerSurveyFile.file_ref) return {
+    ...base,
+    kind: "table",
+    columns: ["样本ID", "企业所在行业", "企业规模", "填写人职位", "专业", "安全", "预算", "易用"],
+    rows: [{ row_number: 2, values: ["101", "金融科技", "500-1000人", "技术架构师", "9", "7", "6", "2"] }],
+    total_rows: 11,
+  };
+  if (fileRef === customerRuleFile.file_ref) return {
+    ...base,
+    kind: "text",
+    text: "缺失的评分字段统一按数值0处理\n技术型：专业字段数值≥8\n安全型：安全和预算同时≥8\n敏捷型：易用字段数值≥8\n安全型 > 技术型 > 敏捷型",
+  };
   return { ...base, kind: "text", text: "2026-08-24 09:30 service healthy" };
 }
 
@@ -1192,6 +1224,123 @@ function failedCandidateReviewEffectSnapshot(body: { workspace_id: string; instr
   };
 }
 
+function customerSegmentationEffectSnapshot(
+  body: { workspace_id: string; instruction: string },
+  variant: "canonical" | "threshold" | "witness" = "canonical",
+) {
+  const base = snapshot(body, "completed", 19);
+  const manifest = structuredClone(
+    variant === "threshold"
+      ? tc13CustomerSegmentationThresholdManifest
+      : variant === "witness"
+        ? tc13CustomerSegmentationWitnessManifest
+        : tc13CustomerSegmentationManifest,
+  );
+  const outcome = manifest.customer_segmentation_outcome;
+  const sourceRefs = manifest.sources.map((source) => source.file_ref);
+  const artifactIds = ["workspace-artifact-131313131301", "workspace-artifact-131313131302"];
+  const common = {
+    capability_id: "office-customer-segmentation",
+    scenario_id: "TC-13",
+    version: 1,
+    round_number: 1,
+    source_file_refs: sourceRefs,
+    validator_id: "validator-customer-segmentation-v2",
+    verifier_status: "passed",
+    checks: manifest.checks,
+    covered_period: "Sales-020 公开样本；不是现实客户总体或时间序列",
+    statistic_basis: `规则来源动态给出缺失值默认 ${outcome.parameters.missing_score_default}、阈值 ${JSON.stringify(outcome.parameters.profile_thresholds)}、优先级 ${outcome.parameters.profile_priority.join(" > ")}；重复口径为待复核的 exact_non_id_payload。`,
+    purpose: "供销售负责人复核公开样本清洗、画像决策和策略草案，不作客户研究或销售动作。",
+    review_guidance: "请先确认 exact_non_id_payload 重复口径，再核对逐样本清洗和画像；销售策略只有待补充模板，仍需负责人批准。",
+    execution_summary: "已只读解析 Sales-020 公开问卷与规则，并在隔离 Run Workspace 生成 Markdown 与 CSV；原件和外部系统均未修改。",
+    self_test: null,
+    business_gate_outcome: null,
+    legal_review_outcome: null,
+    candidate_review_outcome: null,
+    finance_review_outcome: null,
+    outbound_flow_outcome: null,
+    customer_segmentation_outcome: outcome,
+    created_at: new Date().toISOString(),
+    original_inputs_modified: false,
+    review_required: true,
+    external_action: "none",
+  };
+  const profileOutputs = Object.entries(outcome.profile_counts).map(([label, count]) => `${label} ${count} 条`);
+  const artifacts = [{
+    ...common,
+    artifact_id: artifactIds[0],
+    title: "公开样本画像清洗与策略草案",
+    file_name: "客户画像及销售策略.md",
+    media_type: "text/markdown",
+    size: 6281,
+    summary: `${outcome.source_row_count} 个原始样本行，${outcome.unique_payload_count} 条唯一载荷；分类 ${outcome.classified_count} 条、排除 ${outcome.excluded_count} 条，多标签优先级 witness ${outcome.priority_witness_count} 个。`,
+    deliverable_type: "来源推导的画像与策略草案 Markdown",
+    key_outputs: [...profileOutputs, `精确重复 ${outcome.duplicate_count} 条`, `无法归类 ${outcome.unclassified_count} 条`],
+    key_outputs_label: "动态清洗与画像事实",
+    record_count: outcome.source_row_count,
+    download_path: `/v1/harness/runs/${base.run_id}/artifacts/${artifactIds[0]}`,
+  }, {
+    ...common,
+    artifact_id: artifactIds[1],
+    title: "客户画像逐样本清洗台账",
+    file_name: "客户画像逐样本台账.csv",
+    media_type: "text/csv",
+    size: 2567,
+    summary: "每个原始行均保留来源位置、原始值、清洗值、命中画像、裁决和排除原因。",
+    deliverable_type: "逐原始行可复算 CSV 台账",
+    key_outputs: [`${outcome.source_row_count} 行完整来源轨迹`, `多标签优先级 witness ${outcome.priority_witness_count} 个`, "重复行显示保留对象"],
+    key_outputs_label: "逐样本可审计事实",
+    record_count: outcome.source_row_count,
+    download_path: `/v1/harness/runs/${base.run_id}/artifacts/${artifactIds[1]}`,
+  }];
+  return {
+    ...base,
+    workspace_artifacts: artifacts,
+    effect_receipts: [{
+      receipt_id: "effect-receipt-131313131313",
+      capability_id: "office-customer-segmentation",
+      scenario_id: "TC-13",
+      status: "passed",
+      state: "已冻结 Sales-020 的公开问卷与规则，原件保持只读。",
+      action: "逐行重算清洗、重复、画像和优先级，并生成 Markdown 与 CSV 台账。",
+      observation: `2 份成果共享 ${manifest.checks.length} 项确定性检查；分类 ${outcome.classified_count} 条，多标签 witness ${outcome.priority_witness_count} 个。`,
+      cost: "0 次额外模型调用；仅消耗本机确定性解析、计算与文件写入。",
+      result: "来源和成果结构已复核；重复口径与策略草案仍待负责人批准，客户与 CRM 动作均未发生。",
+      source_file_refs: sourceRefs,
+      artifact_ids: artifactIds,
+      prohibited_side_effects: ["不联系客户", "不写 CRM", "不创建商机", "不触发营销动作"],
+      customer_segmentation_outcome: outcome,
+      created_at: new Date().toISOString(),
+      external_action: "none",
+    }],
+    last_event_sequence: 19,
+  };
+}
+
+function failedCustomerSegmentationEffectSnapshot(body: { workspace_id: string; instruction: string }) {
+  const base = customerSegmentationEffectSnapshot(body);
+  const checks = base.workspace_artifacts[0].checks.map((check) => check.check_id === "check-customer-ledger-csv-v2"
+    ? { ...check, passed: false, label: "逐样本台账未通过", detail: "台账中的一条清洗值或来源位置与批准问卷重算不一致。" }
+    : check);
+  return {
+    ...base,
+    status: "failed",
+    workspace_artifacts: base.workspace_artifacts.map((artifact) => ({
+      ...artifact,
+      verifier_status: "failed",
+      checks,
+      summary: "失败证据已保留，但画像与策略草案未通过服务端来源重算。",
+      review_guidance: "当前成果不得用于销售复核；请查看失败项并重新启动新的 TC-13 Run。",
+    })),
+    effect_receipts: base.effect_receipts.map((receipt) => ({
+      ...receipt,
+      status: "failed",
+      observation: "至少一项来源或成果检查未通过，失败证据已保留。",
+      result: "当前画像和策略草案不得采用；没有联系客户或写入 CRM。",
+    })),
+  };
+}
+
 function legalDelegationEffectSnapshot(body: { workspace_id: string; instruction: string }, options: { repairedDocumentFour?: boolean } = {}) {
   const base = snapshot(body, "completed", 18);
   const sourceRefs = [
@@ -1714,7 +1863,7 @@ function locationFailureSnapshot(body: { workspace_id: string; instruction: stri
 }
 async function fulfillJson(route: Route, body: unknown, status = 200) { await route.fulfill({ status, contentType: "application/json", body: JSON.stringify(body) }); }
 
-async function mockHarness(page: Page, options: { failFirstStart?: boolean; failDecisionDefer?: boolean; disconnect?: boolean; failed?: boolean; locationFailure?: boolean; sourceRecovery?: boolean; sourceRecoveryThreeCandidates?: boolean; verifiedArtifactAuditPending?: boolean; verifiedArtifactAuditPendingDistinct?: boolean; verifiedFinanceArtifactAuditPending?: boolean; unverifiedArtifactLocationPending?: boolean; terminalArtifactLocationPending?: boolean; boundedRecovery?: boolean; effectArtifact?: boolean; financePositiveCandidate?: boolean; financeVerifierFailed?: boolean; outboundEffect?: boolean; outboundEffectDynamic?: boolean; outboundEffectFailed?: boolean; reactEffect?: boolean; evaluationEffect?: boolean; dashboardEffect?: boolean; dashboardEffectFailed?: boolean; releaseEffect?: boolean; releaseEffectRepaired?: boolean; releaseEffectFailed?: boolean; candidateEffect?: boolean; candidateEffectImproved?: boolean; candidateEffectFailed?: boolean; legalEffect?: boolean; legalEffectRepaired?: boolean; legalEffectFailed?: boolean; effectBoundary?: boolean; reviewTable?: boolean; workspaceFailures?: number; interactiveLoop?: boolean; evidenceGate?: boolean } = {}) {
+async function mockHarness(page: Page, options: { failFirstStart?: boolean; failDecisionDefer?: boolean; disconnect?: boolean; failed?: boolean; locationFailure?: boolean; sourceRecovery?: boolean; sourceRecoveryThreeCandidates?: boolean; verifiedArtifactAuditPending?: boolean; verifiedArtifactAuditPendingDistinct?: boolean; verifiedFinanceArtifactAuditPending?: boolean; unverifiedArtifactLocationPending?: boolean; terminalArtifactLocationPending?: boolean; boundedRecovery?: boolean; effectArtifact?: boolean; financePositiveCandidate?: boolean; financeVerifierFailed?: boolean; outboundEffect?: boolean; outboundEffectDynamic?: boolean; outboundEffectFailed?: boolean; reactEffect?: boolean; evaluationEffect?: boolean; dashboardEffect?: boolean; dashboardEffectFailed?: boolean; releaseEffect?: boolean; releaseEffectRepaired?: boolean; releaseEffectFailed?: boolean; candidateEffect?: boolean; candidateEffectImproved?: boolean; candidateEffectFailed?: boolean; customerEffect?: boolean; customerEffectThreshold?: boolean; customerEffectWitness?: boolean; customerEffectFailed?: boolean; legalEffect?: boolean; legalEffectRepaired?: boolean; legalEffectFailed?: boolean; effectBoundary?: boolean; reviewTable?: boolean; workspaceFailures?: number; interactiveLoop?: boolean; evidenceGate?: boolean } = {}) {
   let workspaceCalls = 0; let startCalls = 0; let streamCalls = 0;
   let currentBody = { workspace_id: "forte-public-office", instruction: "" };
   // Mock snapshots intentionally cover several server state shapes in one route.
@@ -1789,6 +1938,14 @@ async function mockHarness(page: Page, options: { failFirstStart?: boolean; fail
           ? candidateReviewEffectSnapshot(body, { improvedSunExperience: true })
         : options.candidateEffect
           ? candidateReviewEffectSnapshot(body)
+        : options.customerEffectFailed
+          ? failedCustomerSegmentationEffectSnapshot(body)
+        : options.customerEffectThreshold
+          ? customerSegmentationEffectSnapshot(body, "threshold")
+        : options.customerEffectWitness
+          ? customerSegmentationEffectSnapshot(body, "witness")
+        : options.customerEffect
+          ? customerSegmentationEffectSnapshot(body)
         : options.legalEffectFailed
           ? failedLegalDelegationEffectSnapshot(body)
         : options.legalEffectRepaired
@@ -2475,6 +2632,145 @@ test("shows TC-12 real Vitest red-to-green evidence and the exact public manifes
     await artifacts.scrollIntoViewIfNeeded();
     await page.screenshot({ path: "../../docs/evidence/screenshots/tc12-real-vitest-mobile.png", fullPage: true });
   }
+});
+
+test("shows TC-13 source verification, cleaning facts, strategy review and no customer action as four layers", async ({ page }) => {
+  await mockHarness(page, { customerEffect: true });
+  await page.goto("/");
+  await page.getByRole("textbox", { name: "任务指令" }).fill("清洗问卷、完成客户画像分类，并生成差异化销售策略 Markdown 报告。");
+  await page.getByRole("button", { name: "启动 Control Loop" }).click();
+
+  const artifacts = page.locator(".workspace-artifacts");
+  const outcome = page.getByRole("region", { name: "客户画像清洗与销售策略草案复核" });
+  await expect(artifacts).toContainText("Agent 已生成 2 份真实成果文件");
+  await expect(artifacts.locator(":scope > header > b")).toHaveText("策略草案待销售负责人复核");
+  await expect(outcome.getByRole("heading", { name: "这是画像清洗与策略草案，不是真实客户研究、销售效果证明或 CRM 执行" })).toBeVisible();
+  await expect(outcome.locator(".customer-segmentation-statuses > li")).toHaveCount(4);
+  for (const statement of [
+    "确定性检查通过",
+    "8 条分类 · 3 条排除",
+    "待销售负责人补充和批准",
+    "客户与 CRM 动作",
+    "全部未发生",
+    "11 个原始行 · 8 条分类",
+    "10 条唯一业务载荷",
+    "精确重复",
+    "安全型 3",
+    "技术型 3",
+    "敏捷型 2",
+    "canonical 中多标签优先级 witness 为 0 个",
+    "exact_non_id_payload",
+  ]) await expect(outcome).toContainText(statement);
+  await expect(outcome).not.toContainText("私有化部署");
+  await expect(outcome).not.toContainText("模板市场");
+  await expect(artifacts).toContainText("只代表来源、清洗、画像裁决与成果结构已复核，不代表策略获批、销售有效或客户动作发生");
+  await expect(page.locator(".loop-effect-conclusion")).toContainText("策略内容与真实客户适用性仍待销售负责人复核");
+  await expect(page.locator(".loop-effect-conclusion")).toContainText("客户联系、CRM、商机和营销动作均未发生");
+
+  const duplicate = outcome.locator("details").filter({ hasText: "样本 111" });
+  await duplicate.locator("summary").click();
+  await expect(duplicate).toContainText("精确重复，保留样本 101");
+  await expect(duplicate).toContainText("客户画像调研问卷.csv:row=12");
+  const unclassified = outcome.locator("details").filter({ hasText: "样本 106" });
+  await unclassified.locator("summary").click();
+  await expect(unclassified).toContainText("safe:空→0");
+  await expect(unclassified).toContainText("未命中画像，已排除");
+  const rules = outcome.locator(".customer-segmentation-rules");
+  await rules.locator("summary").click();
+  await expect(rules).toContainText("15 条规则 · 缺失值=0 · 优先级 安全型 > 技术型 > 敏捷型");
+  await expect(rules).toContainText("SEG-CLEAN-DUPLICATE");
+  await expect(rules).toContainText("客户分类画像与差异化销售策略生成规则.md:L8");
+
+  const typeSizes = await outcome.evaluate((element) => ({
+    title: Number.parseFloat(getComputedStyle(element.querySelector(":scope > header h3")!).fontSize),
+    layerTitle: Number.parseFloat(getComputedStyle(element.querySelector(".customer-segmentation-statuses b")!).fontSize),
+    layerDetail: Number.parseFloat(getComputedStyle(element.querySelector(".customer-segmentation-statuses p")!).fontSize),
+    sampleTitle: Number.parseFloat(getComputedStyle(element.querySelector(".customer-segmentation-samples summary b")!).fontSize),
+    ruleExcerpt: Number.parseFloat(getComputedStyle(element.querySelector(".customer-segmentation-rules blockquote")!).fontSize),
+  }));
+  expect(typeSizes.title).toBeGreaterThanOrEqual(20);
+  expect(typeSizes.layerTitle).toBeGreaterThanOrEqual(12);
+  expect(typeSizes.layerDetail).toBeGreaterThanOrEqual(11);
+  expect(typeSizes.sampleTitle).toBeGreaterThanOrEqual(12);
+  expect(typeSizes.ruleExcerpt).toBeGreaterThanOrEqual(11);
+
+  await page.setViewportSize({ width: 1440, height: 1100 });
+  let overflow = await page.evaluate(() => ({ width: document.documentElement.clientWidth, scroll: document.documentElement.scrollWidth }));
+  expect(overflow.scroll).toBeLessThanOrEqual(overflow.width);
+  if (process.env.CAPTURE_TC13_EFFECT_EVIDENCE === "1") {
+    await duplicate.locator("summary").click();
+    await unclassified.locator("summary").click();
+    await rules.locator("summary").click();
+    const financeFolder = page.getByRole("treeitem", { name: "收起文件夹 财务管理" });
+    if (await financeFolder.isVisible()) await financeFolder.click();
+    const salesFolder = page.getByRole("treeitem", { name: "展开文件夹 销售运营" });
+    if (await salesFolder.isVisible()) await salesFolder.click();
+    await outcome.evaluate((element) => element.scrollIntoView({ block: "start" }));
+    await page.screenshot({ path: "../../docs/evidence/screenshots/tc13-customer-segmentation-desktop.png" });
+  }
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  overflow = await page.evaluate(() => ({ width: document.documentElement.clientWidth, scroll: document.documentElement.scrollWidth }));
+  expect(overflow.scroll).toBeLessThanOrEqual(overflow.width);
+  const panelOverflow = await outcome.evaluate((element) => ({ width: element.clientWidth, scroll: element.scrollWidth }));
+  expect(panelOverflow.scroll).toBeLessThanOrEqual(panelOverflow.width);
+  await expect(outcome.getByRole("heading", { name: "这是画像清洗与策略草案，不是真实客户研究、销售效果证明或 CRM 执行" })).toBeVisible();
+  if (process.env.CAPTURE_TC13_EFFECT_EVIDENCE === "1") {
+    await outcome.evaluate((element) => element.scrollIntoView({ block: "start" }));
+    await page.screenshot({ path: "../../docs/evidence/screenshots/tc13-customer-segmentation-mobile.png" });
+  }
+});
+
+test("projects TC-13 threshold changes without stale sample IDs or baseline counts", async ({ page }) => {
+  await mockHarness(page, { customerEffectThreshold: true });
+  await page.goto("/");
+  await page.getByRole("textbox", { name: "任务指令" }).fill("清洗问卷、完成客户画像分类，并生成差异化销售策略 Markdown 报告。");
+  await page.getByRole("button", { name: "启动 Control Loop" }).click();
+
+  const outcome = page.getByRole("region", { name: "客户画像清洗与销售策略草案复核" });
+  await expect(outcome).toContainText("7 条分类 · 4 条排除");
+  await expect(outcome).toContainText("技术型 2");
+  await expect(outcome).toContainText("安全型 3");
+  await expect(outcome).toContainText("敏捷型 2");
+  const sample = outcome.locator("details").filter({ hasText: "样本 104" });
+  await sample.locator("summary").click();
+  await expect(sample).toContainText("未命中画像，已排除");
+  await expect(sample).toContainText("tech=8");
+  await expect(outcome).not.toContainText("8 条分类 · 3 条排除");
+});
+
+test("shows a real TC-13 multilabel witness and source-derived priority decision", async ({ page }) => {
+  await mockHarness(page, { customerEffectWitness: true });
+  await page.goto("/");
+  await page.getByRole("textbox", { name: "任务指令" }).fill("清洗问卷、完成客户画像分类，并生成差异化销售策略 Markdown 报告。");
+  await page.getByRole("button", { name: "启动 Control Loop" }).click();
+
+  const outcome = page.getByRole("region", { name: "客户画像清洗与销售策略草案复核" });
+  await expect(outcome).toContainText("12 个原始行 · 9 条分类");
+  await expect(outcome).toContainText("canonical 中多标签优先级 witness 为 1 个");
+  const sample = outcome.locator("details").filter({ hasText: "样本 112" });
+  await sample.locator("summary").click();
+  await expect(sample).toContainText("技术型、安全型、敏捷型");
+  await expect(sample).toContainText("按 技术型 > 安全型 > 敏捷型 选出唯一标签");
+  await expect(sample).toContainText("最终处理");
+  await expect(sample).toContainText("技术型");
+  await expect(outcome).not.toContainText("witness 为 0 个");
+});
+
+test("keeps TC-13 visibly red when the independent ledger verifier fails", async ({ page }) => {
+  await mockHarness(page, { customerEffectFailed: true });
+  await page.goto("/");
+  await page.getByRole("textbox", { name: "任务指令" }).fill("清洗问卷、完成客户画像分类，并生成差异化销售策略 Markdown 报告。");
+  await page.getByRole("button", { name: "启动 Control Loop" }).click();
+
+  const artifacts = page.locator(".workspace-artifacts");
+  const outcome = page.getByRole("region", { name: "客户画像清洗与销售策略草案复核" });
+  await expect(outcome).toContainText("确定性检查未通过");
+  await expect(outcome).toContainText("当前分类不得采用");
+  await expect(artifacts).toContainText("逐样本台账未通过");
+  await expect(artifacts).toContainText("当前成果不得用于销售复核");
+  await expect(artifacts).not.toContainText("8/8 项检查通过");
+  await expect(artifacts).toContainText("没有联系客户或写入 CRM");
 });
 
 test("keeps deterministic verification separate from the TC-11 business release decision", async ({ page }) => {

@@ -577,6 +577,143 @@ def test_finance_review_outcome_round_trips_without_becoming_an_accounting_actio
     assert restored_receipt.finance_review_outcome.external_action == "none"
 
 
+def test_customer_segmentation_outcome_round_trips_without_becoming_a_sales_action() -> None:
+    now = datetime.now(timezone.utc)
+    outcome = {
+        "outcome_id": "customer-segmentation-outcome-sales-020",
+        "status": "sales_review_required",
+        "decision": "清洗与画像已重算，重复口径和策略草案仍需销售负责人批准。",
+        "summary": "2 行公开样本，1 条分类、1 条精确重复。",
+        "source_row_count": 2,
+        "unique_payload_count": 1,
+        "duplicate_count": 1,
+        "classified_count": 1,
+        "unclassified_count": 0,
+        "excluded_count": 1,
+        "profile_counts": {"技术型": 1, "安全型": 0, "敏捷型": 0},
+        "parameters": {
+            "parsing_encoding": "gb18030",
+            "missing_score_default": 0,
+            "chinese_number_domain": "零至十，对应整数 0..10",
+            "profile_thresholds": {"技术型": 8, "安全型": 8, "敏捷型": 8},
+            "profile_priority": ["安全型", "技术型", "敏捷型"],
+            "duplicate_policy": "exact_non_id_payload",
+        },
+        "rules": [
+            {
+                "rule_id": "SEG-PROFILE-TECH",
+                "category": "classification",
+                "source_file_ref": "sales-rules-ref",
+                "locator": "客户分类画像与差异化销售策略生成规则.md:L12",
+                "excerpt": "技术型：专业评分达到来源阈值。",
+                "parameters": ["threshold=8"],
+            }
+        ],
+        "samples": [
+            {
+                "sample_id": "101",
+                "source_file_ref": "sales-survey-ref",
+                "source_row": 2,
+                "source_locator": "客户画像调研问卷.csv:row=2",
+                "industry": "金融科技",
+                "company_size": "500-1000人",
+                "respondent_role": "技术架构师",
+                "raw_scores": {"tech": "9", "safe": "7", "budget": "6", "easy": "2"},
+                "cleaned_scores": {"tech": 9, "safe": 7, "budget": 6, "easy": 2},
+                "transformations": [],
+                "matched_profiles": ["技术型"],
+                "priority_applied": False,
+                "final_label": "技术型",
+                "exclusion_reason": None,
+                "duplicate_of": None,
+                "rule_refs": ["SEG-PROFILE-TECH"],
+            },
+            {
+                "sample_id": "111",
+                "source_file_ref": "sales-survey-ref",
+                "source_row": 3,
+                "source_locator": "客户画像调研问卷.csv:row=3",
+                "industry": "金融科技",
+                "company_size": "500-1000人",
+                "respondent_role": "技术架构师",
+                "raw_scores": {"tech": "9", "safe": "7", "budget": "6", "easy": "2"},
+                "cleaned_scores": {"tech": 9, "safe": 7, "budget": 6, "easy": 2},
+                "transformations": [],
+                "matched_profiles": ["技术型"],
+                "priority_applied": False,
+                "final_label": None,
+                "exclusion_reason": "exact_duplicate",
+                "duplicate_of": "101",
+                "rule_refs": ["SEG-PROFILE-TECH"],
+            },
+        ],
+        "duplicate_policy_assumption": "exact_non_id_payload",
+        "policy_assumption_review_required": True,
+        "priority_witness_count": 0,
+        "strategy_evidence_status": "no_approved_strategy_source",
+        "human_review_required": True,
+        "original_inputs_modified": False,
+        "external_action": "none",
+    }
+    common = {
+        "capability_id": "office-customer-segmentation",
+        "scenario_id": "TC-13",
+        "source_file_refs": ["sales-survey-ref", "sales-rules-ref"],
+        "customer_segmentation_outcome": outcome,
+        "created_at": now,
+    }
+    artifact = AgentControlLoopWorkspaceArtifact.model_validate(
+        {
+            **common,
+            "artifact_id": "workspace-artifact-abcdef123456",
+            "title": "公开样本画像清洗与策略草案",
+            "file_name": "客户画像及销售策略.md",
+            "media_type": "text/markdown",
+            "size": 2048,
+            "round_number": 1,
+            "validator_id": "validator-customer-segmentation-v2",
+            "verifier_status": "passed",
+            "checks": [
+                {
+                    "check_id": "check-customer-ledger-v2",
+                    "label": "逐样本台账来源重算一致",
+                    "passed": True,
+                    "detail": "两行样本和重复关系一致。",
+                }
+            ],
+            "summary": "清洗与画像通过，销售策略仍待批准。",
+            "download_path": "/v1/harness/runs/run-1/artifacts/customer-1",
+        }
+    )
+    receipt = AgentControlLoopEffectReceipt.model_validate(
+        {
+            **common,
+            "receipt_id": "effect-receipt-abcdef123456",
+            "status": "passed",
+            "state": "冻结问卷与规则。",
+            "action": "重算清洗、画像并生成 Markdown 与 CSV。",
+            "observation": "来源、台账和报告结构通过确定性复核。",
+            "cost": "0 次额外模型调用。",
+            "result": "策略仍待批准，没有发生客户动作。",
+            "artifact_ids": [artifact.artifact_id],
+        }
+    )
+
+    restored_artifact = AgentControlLoopWorkspaceArtifact.model_validate_json(
+        artifact.model_dump_json()
+    )
+    restored_receipt = AgentControlLoopEffectReceipt.model_validate_json(
+        receipt.model_dump_json()
+    )
+    assert restored_artifact.customer_segmentation_outcome is not None
+    assert restored_artifact.customer_segmentation_outcome.duplicate_count == 1
+    assert restored_artifact.customer_segmentation_outcome.priority_witness_count == 0
+    assert restored_receipt.customer_segmentation_outcome == (
+        restored_artifact.customer_segmentation_outcome
+    )
+    assert restored_receipt.customer_segmentation_outcome.external_action == "none"
+
+
 def test_outbound_flow_outcome_round_trips_without_becoming_an_execution_receipt() -> None:
     now = datetime.now(timezone.utc)
     outcome = {
