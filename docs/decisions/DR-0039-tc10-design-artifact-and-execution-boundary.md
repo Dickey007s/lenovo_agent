@@ -1,6 +1,6 @@
 # DR-0039：TC-10 流程设计成果与真实执行边界
 
-- 状态：Implemented，真实 Provider 与本地完整门已通过，等待 PR 门收尾
+- 状态：Implemented，真实 Provider、本地完整门与 PR #50 PostgreSQL 门已通过
 - 日期：2026-08-28
 - Source：`USER-FEEDBACK-20260828-TC10-DESIGN-VERSUS-EXECUTION`
 - Scenario：`SCENARIO-025`

@@ -55,6 +55,13 @@
 - Playwright：`33 passed`，含 TC-10 下载、服务端字段、13/13、桌面/390 px 和无横向溢出。
 - `scripts/run-live-scenario-effect-gate.py` 的 TC-10 门已升级为下载内容校验，不再只比较 Artifact 元数据和字节大小。
 
+## PR 与 PostgreSQL 门
+
+- 实现提交：[`3f2e3cc`](https://github.com/Dickey007s/lenovo_agent/commit/3f2e3cc)。
+- PR：[#50](https://github.com/Dickey007s/lenovo_agent/pull/50)。
+- 远端 `durable-agent-control-loop`：[`passed`](https://github.com/Dickey007s/lenovo_agent/actions/runs/33154676600/job/98794501757)，PostgreSQL 17.11 下 `3 passed in 4.72s`。
+- 该远端门证明既有 PostgreSQL 顺序重启路径未因本次 Artifact 协议扩展回归；仍不证明多实例 CAS、高可用或在途模型调用续跑。
+
 ## 不能证明
 
 - 固定适配器不能推广为通用状态机生成器、外呼执行引擎或生产 Tool Gateway。
