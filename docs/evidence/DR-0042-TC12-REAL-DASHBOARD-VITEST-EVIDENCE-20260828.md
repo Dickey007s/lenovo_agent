@@ -2,7 +2,7 @@
 
 ## 当前结论
 
-`Limited Verified`。本地确定性 builder、同测集分阶段红灯、最终 71/71、逐文件 V8 coverage、独立解压复跑、合同 round-trip、前台回归、真实 PostgreSQL 顺序恢复和普通 `deepseek-v4-pro` Run 已通过。该 Run 的 Artifact effect 通过，Planner/Analyst 均调用且采用，但整个 Run 因八条未覆盖 Branch 保持 `waiting_input`；三层事实必须分开报告。[PR #54](https://github.com/Dickey007s/lenovo_agent/pull/54) 已创建，远端 PostgreSQL check 正在运行；merge SHA 只能在实际合并后报告。
+`Limited Verified`。本地确定性 builder、同测集分阶段红灯、最终 71/71、逐文件 V8 coverage、独立解压复跑、合同 round-trip、前台回归、真实 PostgreSQL 顺序恢复和普通 `deepseek-v4-pro` Run 已通过。该 Run 的 Artifact effect 通过，Planner/Analyst 均调用且采用，但整个 Run 因八条未覆盖 Branch 保持 `waiting_input`；三层事实必须分开报告。[PR #54](https://github.com/Dickey007s/lenovo_agent/pull/54) 已创建；首次远端门因 CI 未安装锁定的 Vitest 依赖而按边界失败，workflow 修复后的替代 check 待运行。merge SHA 只能在实际合并后报告。
 
 ## 历史基线为何不足
 
@@ -59,6 +59,8 @@ ZIP 包含完整 11 文件修复后副本、三套真实测试、`changes.patch`
 ## 尚待收尾
 
 - PR #54 的远端 check、实际 merge SHA 与最新 master PostgreSQL 重启。
+
+首次 PR check `33174992307` 真实失败：原 PostgreSQL workflow 只安装 Python 依赖，Linux runner 缺少仓库批准的 Vitest 1.6.1 与 coverage-v8 1.6.1，因此 TC-12 按安全边界失败，而不是伪造测试回执。PR 随后为 workflow 增加 Node 22、pnpm 10 和 `--frozen-lockfile --ignore-scripts` 的仓库依赖准备；这是 CI 环境预装，不改变 Runtime “不联网安装、不执行来源 package scripts”的边界。后续 check 结果以新提交为准。
 
 ## 不能支持的结论
 
