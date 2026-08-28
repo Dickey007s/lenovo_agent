@@ -1,6 +1,6 @@
 # DR-0038：用用户任务语言呈现原表格位置恢复
 
-- 状态：Accepted；本地工程门 `Limited Verified`，远端 PostgreSQL 门待 PR 收尾
+- 状态：Accepted；本地工程门与 PR #48 PostgreSQL 顺序恢复门 `Limited Verified`
 - 日期：2026-08-28
 - Owner：Office Agent 项目组
 - Source：`USER-FEEDBACK-20260828-SOURCE-LOCATION-USER-LANGUAGE`

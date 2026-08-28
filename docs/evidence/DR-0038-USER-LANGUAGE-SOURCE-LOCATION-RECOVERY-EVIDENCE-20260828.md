@@ -1,8 +1,9 @@
 # DR-0038 原表格位置用户语言与局部恢复 Evidence
 
 - 日期：2026-08-28
-- 状态：`Limited Verified`（本地完整工程门；远端 PostgreSQL 门待 PR 收尾）
+- 状态：`Limited Verified`（本地完整工程门与远端 PostgreSQL 顺序恢复门）
 - 实现：[`15d606e895118928e8e99ea70e61b7e9bc7819b1`](https://github.com/Dickey007s/lenovo_agent/commit/15d606e895118928e8e99ea70e61b7e9bc7819b1)
+- PR：[`#48`](https://github.com/Dickey007s/lenovo_agent/pull/48)
 - Decision：[`DR-0038`](../decisions/DR-0038-user-language-source-location-recovery.md)
 - Scenario：[`SCENARIO-024`](../scenarios/SCENARIO-024-understand-and-recover-missing-table-location.md)
 - Source：[`USER-FEEDBACK-20260828-SOURCE-LOCATION-USER-LANGUAGE`](../sources/USER-FEEDBACK-20260828-tc05-artifact-meaning-and-review-readability.md)
@@ -48,9 +49,13 @@
 两张图证明被测内容区中主标题、已知来源、影响、主动作、成果入口与折叠技术详情可见，
 不证明真实用户已理解，也不代表整个页面只包含该截图范围。
 
-## 待补远端证据
+## 远端验证
 
-- PR、远端 PostgreSQL 顺序恢复门、merge SHA 与最新 `master` 重启健康状态。
+- PR #48 check `durable-agent-control-loop`：通过，26 秒。
+- [`PostgreSQL restart job`](https://github.com/Dickey007s/lenovo_agent/actions/runs/33152553748/job/98787706273)：
+  PostgreSQL 17.11，`3 passed in 4.31s`。它回归的是顺序 Runtime 重启恢复，不证明多实例 CAS、
+  高可用或在途模型调用续跑。
+- merge SHA 与最新 `master` 重启健康状态在合并后补记。
 
 ## 证明边界
 
