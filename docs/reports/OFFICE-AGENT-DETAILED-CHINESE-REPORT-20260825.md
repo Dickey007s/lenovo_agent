@@ -989,6 +989,9 @@ DR-0036 又针对 TC-01 的真实负例补了一层：PDF Preview 版面断行�
 同一用户原始指令还完成了一次真实 `deepseek-v4-pro` 纵切：第 1 轮 `completed`，真实 CSV 5/5、
 三 Branch 全部完成、0 Gap、0 开放 DecisionRequest；该运行使用 memory store，只证明一次成功，
 不证明重复稳定性或重启恢复。
+工程全量门为本机 Python `116 passed, 3 skipped`、Harness browser `29 passed`、Ruff/lint/build 通过；
+本机跳过的三个 PostgreSQL 用例已由 PR #45 的 PostgreSQL 17 workflow 补证为 `3 passed in 4.33s`。
+它仍是顺序 Runtime 证据，不是多实例高可用。
 竞争差异研究仍是 `Draft`；本轮不是固定配置竞品同场实测，不能据此声称主流竞品做不到。
 
 这些证据能够支持：固定公开文件清单、安全有界预览、整库合同与逐轮来源范围、
