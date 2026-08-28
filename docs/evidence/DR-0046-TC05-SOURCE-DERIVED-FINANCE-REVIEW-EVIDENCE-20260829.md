@@ -2,7 +2,7 @@
 
 ## 当前结论
 
-`Limited Verified`。严格三份来源合同、XLSX 原始字节解析、2026 明细、跨期候选启发式、独立输出 Verifier、来源变异、负向合同、三状态前台、真实 `deepseek-v4-pro` Run、三份下载独立解析与 PostgreSQL 进程重启复读均已通过。PR/远端门在合并后补入，不在这里提前写绿。
+`Limited Verified`。严格三份来源合同、XLSX 原始字节解析、2026 明细、跨期候选启发式、独立输出 Verifier、来源变异、负向合同、三状态前台、真实 `deepseek-v4-pro` Run、三份下载独立解析与 PostgreSQL 进程重启复读均已通过。实现提交 [`6b5e778`](https://github.com/Dickey007s/lenovo_agent/commit/6b5e778d61677cffe32d8a1577870d1eff34bc92) 已进入 [PR #62](https://github.com/Dickey007s/lenovo_agent/pull/62)，远端 PostgreSQL 门已通过。
 
 ## 历史基线为何不足
 
@@ -39,6 +39,7 @@
 - 全量 Python（含真实 PostgreSQL）：`231 passed in 307.23s`。
 - 全量 Playwright：首次发现两个历史文件预览断言仍引用退休的合成客商名；改为当前 FORTE 预览事实后 `48 passed`。
 - Ruff、TypeScript lint 与 Next.js production build 通过。
+- 远端 [`durable-agent-control-loop`](https://github.com/Dickey007s/lenovo_agent/actions/runs/33203777256/job/98959521498) 通过。
 
 ## 真实 Provider、下载与重启
 
