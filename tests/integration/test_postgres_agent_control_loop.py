@@ -58,6 +58,25 @@ pytestmark = pytest.mark.skipif(
 )
 
 
+async def wait_for_effect_run(
+    runtime: HarnessRuntime,
+    owner: str,
+    run_id: str,
+    *,
+    timeout_seconds: float = 60,
+):
+    """Wait in wall-clock time for a threaded deterministic effect to settle."""
+
+    loop = asyncio.get_running_loop()
+    deadline = loop.time() + timeout_seconds
+    while loop.time() < deadline:
+        snapshot = await asyncio.wait_for(runtime.get(owner, run_id), timeout=2)
+        if snapshot.status in {"ready_to_execute", "completed", "stopped", "failed"}:
+            return snapshot
+        await asyncio.sleep(0.05)
+    raise AssertionError("harness effect run did not settle before the deadline")
+
+
 @pytest.mark.asyncio
 async def test_postgres_restart_preserves_verified_run_workspace_artifact(
     tmp_path: Path,
@@ -259,7 +278,7 @@ async def test_postgres_restart_preserves_tc11_artifacts_and_business_gates(
             ),
         )
         run_id = started.run.run_id
-        terminal = await wait_terminal(first, owner, run_id)
+        terminal = await wait_for_effect_run(first, owner, run_id)
         assert terminal.status == "completed"
         assert terminal.effect_receipts[0].status == "passed"
         outcome = terminal.effect_receipts[0].business_gate_outcome
