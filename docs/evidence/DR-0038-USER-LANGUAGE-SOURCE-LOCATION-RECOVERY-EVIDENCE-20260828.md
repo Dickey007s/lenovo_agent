@@ -4,6 +4,7 @@
 - 状态：`Limited Verified`（本地完整工程门与远端 PostgreSQL 顺序恢复门）
 - 实现：[`15d606e895118928e8e99ea70e61b7e9bc7819b1`](https://github.com/Dickey007s/lenovo_agent/commit/15d606e895118928e8e99ea70e61b7e9bc7819b1)
 - PR：[`#48`](https://github.com/Dickey007s/lenovo_agent/pull/48)
+- 合并：[`82e45fae02183ad5893980d258c3399fde267654`](https://github.com/Dickey007s/lenovo_agent/commit/82e45fae02183ad5893980d258c3399fde267654)
 - Decision：[`DR-0038`](../decisions/DR-0038-user-language-source-location-recovery.md)
 - Scenario：[`SCENARIO-024`](../scenarios/SCENARIO-024-understand-and-recover-missing-table-location.md)
 - Source：[`USER-FEEDBACK-20260828-SOURCE-LOCATION-USER-LANGUAGE`](../sources/USER-FEEDBACK-20260828-tc05-artifact-meaning-and-review-readability.md)
@@ -55,7 +56,10 @@
 - [`PostgreSQL restart job`](https://github.com/Dickey007s/lenovo_agent/actions/runs/33152553748/job/98787706273)：
   PostgreSQL 17.11，`3 passed in 4.31s`。它回归的是顺序 Runtime 重启恢复，不证明多实例 CAS、
   高可用或在途模型调用续跑。
-- merge SHA 与最新 `master` 重启健康状态在合并后补记。
+- `master@82e45fa` 本地启动后，`GET /v1/health` 返回 `status=ok`、
+  `model=deepseek-v4-pro`、`checkpoint=memory`、`task_store=memory`，根页面 HTTP 200。
+  本机当时没有 Docker 或进程级 `DATABASE_DSN`，所以该现场重启不证明本地持久恢复；
+  PostgreSQL 恢复结论只来自上方远端 job。
 
 ## 证明边界
 
