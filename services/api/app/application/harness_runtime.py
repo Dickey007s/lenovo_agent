@@ -3312,6 +3312,7 @@ class HarnessRuntime:
                     business_gate_outcome=generated.business_gate_outcome,
                     legal_review_outcome=generated.legal_review_outcome,
                     candidate_review_outcome=generated.candidate_review_outcome,
+                    finance_review_outcome=generated.finance_review_outcome,
                     download_path=(f"/v1/harness/runs/{run_id}/artifacts/{artifact_id}"),
                     created_at=now,
                     content_sha256=stored.sha256,
@@ -3344,6 +3345,14 @@ class HarnessRuntime:
         candidate_outcome = candidate_outcomes[0] if candidate_outcomes else None
         if candidate_outcomes and any(item != candidate_outcome for item in candidate_outcomes[1:]):
             raise HarnessError("同一效果的候选人辅助筛选事实不一致")
+        finance_outcomes = [
+            item.finance_review_outcome
+            for item in records
+            if item.finance_review_outcome is not None
+        ]
+        finance_outcome = finance_outcomes[0] if finance_outcomes else None
+        if finance_outcomes and any(item != finance_outcome for item in finance_outcomes[1:]):
+            raise HarnessError("同一效果的财务复核事实不一致")
         receipt = AgentControlLoopEffectReceipt(
             receipt_id=receipt_id,
             capability_id=execution.capability_id,
@@ -3360,6 +3369,7 @@ class HarnessRuntime:
             business_gate_outcome=business_outcome,
             legal_review_outcome=legal_outcome,
             candidate_review_outcome=candidate_outcome,
+            finance_review_outcome=finance_outcome,
             created_at=now,
         )
 

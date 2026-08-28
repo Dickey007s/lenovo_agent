@@ -568,6 +568,47 @@ type CandidateReviewOutcome = {
   external_action: "none";
 };
 
+type FinanceCandidateSource = {
+  period_id: "2025_h1" | "2025_h2" | "2026";
+  period_label: string;
+  source_file_ref: string;
+  file_name: string;
+  sheet_name: string;
+  row_number: number;
+  locator: string;
+  direction: "借";
+  ending_balance: string;
+};
+
+type FinanceCandidate = {
+  candidate_id: string;
+  key: string;
+  subject: string;
+  customer: string;
+  sources: FinanceCandidateSource[];
+  review_action: string;
+  exit_condition: string;
+};
+
+type FinanceReviewOutcome = {
+  outcome_id: string;
+  status: "review_required" | "invalid";
+  decision: string;
+  summary: string;
+  period_ids: ("2025_h1" | "2025_h2" | "2026")[];
+  unpaid_count: number;
+  unpaid_total: string;
+  unreceived_count: number;
+  unreceived_total: string;
+  candidate_count: number;
+  candidates: FinanceCandidate[];
+  method: string;
+  limitations: string[];
+  human_review_required: true;
+  original_inputs_modified: false;
+  external_action: "none";
+};
+
 type WorkspaceArtifact = {
   artifact_id: string;
   capability_id: string;
@@ -596,6 +637,7 @@ type WorkspaceArtifact = {
   business_gate_outcome: BusinessGateOutcome | null;
   legal_review_outcome: LegalReviewOutcome | null;
   candidate_review_outcome: CandidateReviewOutcome | null;
+  finance_review_outcome: FinanceReviewOutcome | null;
   download_path: string;
   created_at: string;
   original_inputs_modified: false;
@@ -619,6 +661,7 @@ type EffectReceipt = {
   business_gate_outcome: BusinessGateOutcome | null;
   legal_review_outcome: LegalReviewOutcome | null;
   candidate_review_outcome: CandidateReviewOutcome | null;
+  finance_review_outcome: FinanceReviewOutcome | null;
   created_at: string;
   external_action: "none";
 };
@@ -1945,6 +1988,83 @@ function normalizeCandidateReviewOutcome(value: unknown): CandidateReviewOutcome
   };
 }
 
+function normalizeFinanceCandidateSource(value: unknown): FinanceCandidateSource | null {
+  if (!value || typeof value !== "object") return null;
+  const raw = value as Record<string, unknown>;
+  const periodId = asText(raw.period_id);
+  const sourceFileRef = asText(raw.source_file_ref);
+  const locator = asText(raw.locator);
+  if (!(["2025_h1", "2025_h2", "2026"] as string[]).includes(periodId) || !sourceFileRef || !locator) return null;
+  return {
+    period_id: periodId as FinanceCandidateSource["period_id"],
+    period_label: asText(raw.period_label),
+    source_file_ref: sourceFileRef,
+    file_name: asText(raw.file_name),
+    sheet_name: asText(raw.sheet_name),
+    row_number: asNumber(raw.row_number),
+    locator,
+    direction: "借",
+    ending_balance: asText(raw.ending_balance),
+  };
+}
+
+function normalizeFinanceCandidate(value: unknown): FinanceCandidate | null {
+  if (!value || typeof value !== "object") return null;
+  const raw = value as Record<string, unknown>;
+  const candidateId = asText(raw.candidate_id);
+  const sources = Array.isArray(raw.sources)
+    ? raw.sources.map(normalizeFinanceCandidateSource).filter((item): item is FinanceCandidateSource => item !== null)
+    : [];
+  if (!candidateId || sources.length !== 3) return null;
+  return {
+    candidate_id: candidateId,
+    key: asText(raw.key),
+    subject: asText(raw.subject),
+    customer: asText(raw.customer),
+    sources,
+    review_action: asText(raw.review_action),
+    exit_condition: asText(raw.exit_condition),
+  };
+}
+
+function normalizeFinanceReviewOutcome(value: unknown): FinanceReviewOutcome | null {
+  if (!value || typeof value !== "object") return null;
+  const raw = value as Record<string, unknown>;
+  const status = asText(raw.status);
+  const periodIds = asStrings(raw.period_ids).filter((item) => (["2025_h1", "2025_h2", "2026"] as string[]).includes(item));
+  const candidates = Array.isArray(raw.candidates)
+    ? raw.candidates.map(normalizeFinanceCandidate).filter((item): item is FinanceCandidate => item !== null)
+    : [];
+  const candidateCount = asNumber(raw.candidate_count);
+  if (
+    !asText(raw.outcome_id)
+    || !["review_required", "invalid"].includes(status)
+    || periodIds.length !== 3
+    || new Set(periodIds).size !== 3
+    || candidates.length !== candidateCount
+    || raw.human_review_required !== true
+    || raw.original_inputs_modified !== false
+  ) return null;
+  return {
+    outcome_id: asText(raw.outcome_id),
+    status: status as FinanceReviewOutcome["status"],
+    decision: asText(raw.decision),
+    summary: asText(raw.summary),
+    period_ids: periodIds as FinanceReviewOutcome["period_ids"],
+    unpaid_count: asNumber(raw.unpaid_count),
+    unpaid_total: asText(raw.unpaid_total),
+    unreceived_count: asNumber(raw.unreceived_count),
+    unreceived_total: asText(raw.unreceived_total),
+    candidate_count: candidateCount,
+    candidates,
+    method: asText(raw.method),
+    limitations: asStrings(raw.limitations),
+    human_review_required: true,
+    original_inputs_modified: false,
+    external_action: "none",
+  };
+}
+
 function normalizeBusinessGateOutcome(value: unknown): BusinessGateOutcome | null {
   if (!value || typeof value !== "object") return null;
   const raw = value as Record<string, unknown>;
@@ -2021,6 +2141,7 @@ function normalizeWorkspaceArtifact(value: unknown): WorkspaceArtifact | null {
     business_gate_outcome: normalizeBusinessGateOutcome(raw.business_gate_outcome),
     legal_review_outcome: normalizeLegalReviewOutcome(raw.legal_review_outcome),
     candidate_review_outcome: normalizeCandidateReviewOutcome(raw.candidate_review_outcome),
+    finance_review_outcome: normalizeFinanceReviewOutcome(raw.finance_review_outcome),
     download_path: asText(raw.download_path),
     created_at: asText(raw.created_at),
     original_inputs_modified: false,
@@ -2051,6 +2172,7 @@ function normalizeEffectReceipt(value: unknown): EffectReceipt | null {
     business_gate_outcome: normalizeBusinessGateOutcome(raw.business_gate_outcome),
     legal_review_outcome: normalizeLegalReviewOutcome(raw.legal_review_outcome),
     candidate_review_outcome: normalizeCandidateReviewOutcome(raw.candidate_review_outcome),
+    finance_review_outcome: normalizeFinanceReviewOutcome(raw.finance_review_outcome),
     created_at: asText(raw.created_at),
     external_action: "none",
   };
@@ -3364,6 +3486,9 @@ function LoopView({
   const candidateReviewOutcome = run.workspace_artifacts.find((artifact) => artifact.candidate_review_outcome)?.candidate_review_outcome
     ?? run.effect_receipts.find((receipt) => receipt.candidate_review_outcome)?.candidate_review_outcome
     ?? null;
+  const financeReviewOutcome = run.workspace_artifacts.find((artifact) => artifact.finance_review_outcome)?.finance_review_outcome
+    ?? run.effect_receipts.find((receipt) => receipt.finance_review_outcome)?.finance_review_outcome
+    ?? null;
   const artifactCheckSummary = summarizeArtifactChecks(run.workspace_artifacts);
   const passedArtifactChecks = artifactCheckSummary.passed;
   const totalArtifactChecks = artifactCheckSummary.total;
@@ -3594,7 +3719,7 @@ function LoopView({
       {run.last_commit && <footer><IconCircleCheck aria-hidden="true" /><span>{run.last_commit.summary}</span><b>{run.commits.length} 次提交记录</b></footer>}
     </section>}
     {run.brief && <section className={`loop-brief is-${run.brief.outcome}`}><IconCircleCheck aria-hidden="true" /><div><span>任务简报</span><h3>{run.brief.summary}</h3><p>外部动作：未发生 · 结果仍需人工复核</p></div></section>}
-    {verifiedEffectReady && effectConclusionArtifact && <section className={`loop-effect-conclusion${businessGateOutcome && businessGateOutcome.status !== "passed" ? " is-business-blocked" : candidateReviewOutcome ? " is-human-review" : ""}`} aria-label="本次任务结语">{businessGateOutcome && businessGateOutcome.status !== "passed" || candidateReviewOutcome ? <IconAlertTriangle aria-hidden="true" /> : <IconShieldCheck aria-hidden="true" />}<div><span>{businessGateOutcome && businessGateOutcome.status !== "passed" ? "业务结论" : candidateReviewOutcome ? "招聘辅助结论" : "本次任务结语"}</span><h3>{businessGateOutcome && businessGateOutcome.status !== "passed" ? businessGateOutcome.decision : candidateReviewOutcome ? candidateReviewOutcome.decision : effectConclusionArtifact.execution_summary}</h3><p>{businessGateOutcome && businessGateOutcome.status !== "passed" ? businessGateOutcome.summary : candidateReviewOutcome ? candidateReviewOutcome.summary : effectConclusionArtifact.review_guidance}</p></div><b>{businessGateOutcome && businessGateOutcome.status !== "passed" ? `业务 Gate ${businessGateOutcome.failed_gate_count}/${businessGateOutcome.total_gate_count} 未通过` : candidateReviewOutcome ? "最终 HR 决定尚未发生" : artifactCheckSummary.sameChecklist ? `${run.workspace_artifacts.length} 份成果共享 ${totalArtifactChecks} 项规则检查，${passedArtifactChecks}/${totalArtifactChecks} 通过` : artifactCheckSummary.shared ? `${run.workspace_artifacts.length} 份成果共 ${totalArtifactChecks} 项唯一规则检查，${passedArtifactChecks}/${totalArtifactChecks} 通过` : `${passedArtifactChecks}/${totalArtifactChecks} 项规则检查通过`}</b></section>}
+    {verifiedEffectReady && effectConclusionArtifact && <section className={`loop-effect-conclusion${businessGateOutcome && businessGateOutcome.status !== "passed" ? " is-business-blocked" : candidateReviewOutcome || financeReviewOutcome ? " is-human-review" : ""}`} aria-label="本次任务结语">{businessGateOutcome && businessGateOutcome.status !== "passed" || candidateReviewOutcome || financeReviewOutcome ? <IconAlertTriangle aria-hidden="true" /> : <IconShieldCheck aria-hidden="true" />}<div><span>{businessGateOutcome && businessGateOutcome.status !== "passed" ? "业务结论" : candidateReviewOutcome ? "招聘辅助结论" : financeReviewOutcome ? "财务复核结论" : "本次任务结语"}</span><h3>{businessGateOutcome && businessGateOutcome.status !== "passed" ? businessGateOutcome.decision : candidateReviewOutcome ? candidateReviewOutcome.decision : financeReviewOutcome ? financeReviewOutcome.decision : effectConclusionArtifact.execution_summary}</h3><p>{businessGateOutcome && businessGateOutcome.status !== "passed" ? businessGateOutcome.summary : candidateReviewOutcome ? candidateReviewOutcome.summary : financeReviewOutcome ? financeReviewOutcome.summary : effectConclusionArtifact.review_guidance}</p></div><b>{businessGateOutcome && businessGateOutcome.status !== "passed" ? `业务 Gate ${businessGateOutcome.failed_gate_count}/${businessGateOutcome.total_gate_count} 未通过` : candidateReviewOutcome ? "最终 HR 决定尚未发生" : financeReviewOutcome ? "最终财务处置尚未发生" : artifactCheckSummary.sameChecklist ? `${run.workspace_artifacts.length} 份成果共享 ${totalArtifactChecks} 项规则检查，${passedArtifactChecks}/${totalArtifactChecks} 通过` : artifactCheckSummary.shared ? `${run.workspace_artifacts.length} 份成果共 ${totalArtifactChecks} 项唯一规则检查，${passedArtifactChecks}/${totalArtifactChecks} 通过` : `${passedArtifactChecks}/${totalArtifactChecks} 项规则检查通过`}</b></section>}
   </section>;
 }
 
@@ -3759,6 +3884,41 @@ function CandidateReviewOutcomePanel({ outcome, deterministicPassed }: { outcome
   </section>;
 }
 
+function formatFinanceAmount(value: string): string {
+  const parsed = Number(value);
+  return Number.isFinite(parsed)
+    ? new Intl.NumberFormat("zh-CN", { maximumFractionDigits: 2 }).format(parsed)
+    : value;
+}
+
+function FinanceReviewOutcomePanel({ outcome, deterministicPassed }: { outcome: FinanceReviewOutcome; deterministicPassed: boolean }) {
+  const hasCandidates = outcome.candidate_count > 0;
+  return <section className={`finance-review-outcome is-${hasCandidates ? "candidates" : "clear"}`} aria-label="跨期往来风险候选复核结论">
+    <header>
+      <IconAlertTriangle aria-hidden="true" />
+      <div><span>财务复核结论</span><h3>这是跨期风险候选，不是付款、核销、记账或坏账确认</h3><p>{outcome.decision}</p></div>
+      <b>{hasCandidates ? `发现 ${outcome.candidate_count} 条候选` : "当前 0 条候选"}</b>
+    </header>
+    <ol className="finance-review-statuses" aria-label="确定性验证、风险候选与最终财务处置">
+      <li className={deterministicPassed ? "is-passed" : "is-failed"}><span>1</span><div><b>来源、计算与成果</b><strong>{deterministicPassed ? "确定性检查通过" : "确定性检查未通过"}</strong><p>{deterministicPassed ? "三个固定期间、两张 2026 明细和跨期说明均由服务端重新解析复算。" : "来源或成果没有通过服务端复算，当前文件不得采用。"}</p></div></li>
+      <li className={hasCandidates ? "is-review" : "is-clear"}><span>2</span><div><b>跨期风险候选</b><strong>{hasCandidates ? `发现 ${outcome.candidate_count} 条，需财务复核` : "当前启发式未发现候选"}</strong><p>{hasCandidates ? "候选不是业务定论；展开可查看三期金额和原表位置。" : "没有发现候选也不等于账务无风险，仍需财务人员复核。"}</p></div></li>
+      <li className="is-pending"><span>3</span><div><b>最终财务处置</b><strong>尚未发生</strong><p>本轮没有付款、核销、记账或坏账确认，也没有修改 FORTE 原始工作簿。</p></div></li>
+    </ol>
+    <section className="finance-review-summary" aria-label="2026 期末与跨期候选摘要">
+      <div><span>2026 期末未付</span><strong>{outcome.unpaid_count} 条</strong><p>正数贷方期末余额 · 合计 {formatFinanceAmount(outcome.unpaid_total)}</p></div>
+      <div><span>2026 期末未收</span><strong>{outcome.unreceived_count} 条</strong><p>正数借方期末余额 · 合计 {formatFinanceAmount(outcome.unreceived_total)}</p></div>
+      <div className={hasCandidates ? "is-candidate" : ""}><span>三期风险候选</span><strong>{outcome.candidate_count} 条</strong><p>{hasCandidates ? "需逐项财务复核" : "当前启发式未发现"}</p></div>
+    </section>
+    {hasCandidates ? <div className="finance-review-candidates" aria-label="僵尸账款候选明细">{outcome.candidates.map((candidate) => <details key={candidate.candidate_id}>
+      <summary><span><b>{candidate.subject}</b><strong>{candidate.customer}</strong></span><span><em>需财务复核</em><small>三期金额完全相同</small></span><IconChevronDown aria-hidden="true" /></summary>
+      <ol>{candidate.sources.map((source) => <li key={`${candidate.candidate_id}:${source.period_id}`}><span>{source.period_label}</span><strong>{formatFinanceAmount(source.ending_balance)}</strong><p>{source.file_name}</p><code>{source.locator}</code></li>)}</ol>
+      <dl><div><dt>复核动作</dt><dd>{candidate.review_action}</dd></div><div><dt>退出条件</dt><dd>{candidate.exit_condition}</dd></div></dl>
+    </details>)}</div> : <section className="finance-review-empty"><IconShieldCheck aria-hidden="true" /><div><strong>当前启发式未发现候选，仍需财务复核</strong><p>0 条候选只表示三期“正数借方期末余额完全相同”的固定条件没有命中。</p></div></section>}
+    <details className="finance-review-method"><summary><IconEye aria-hidden="true" />查看方法、局限与处置边界</summary><div><p><b>方法</b>{outcome.method}</p><ul>{outcome.limitations.map((item) => <li key={item}>{item}</li>)}</ul></div></details>
+    <footer><IconShieldCheck aria-hidden="true" /><span>固定 Finance-018 启发式适配器只生成可复核候选。最终判断和会计处理必须由财务人员完成。</span></footer>
+  </section>;
+}
+
 function WorkspaceArtifactSection({ artifacts, receipts }: { artifacts: WorkspaceArtifact[]; receipts: EffectReceipt[] }) {
   const [downloading, setDownloading] = useState<string | null>(null);
   const [downloadError, setDownloadError] = useState("");
@@ -3779,6 +3939,9 @@ function WorkspaceArtifactSection({ artifacts, receipts }: { artifacts: Workspac
     ?? null;
   const candidateReviewOutcome = artifacts.find((artifact) => artifact.candidate_review_outcome)?.candidate_review_outcome
     ?? latestReceipt?.candidate_review_outcome
+    ?? null;
+  const financeReviewOutcome = artifacts.find((artifact) => artifact.finance_review_outcome)?.finance_review_outcome
+    ?? latestReceipt?.finance_review_outcome
     ?? null;
   const businessBlocked = Boolean(businessGateOutcome && businessGateOutcome.status !== "passed");
   const deterministicPassed = artifacts.length > 0 && artifacts.every((artifact) => artifact.verifier_status === "passed");
@@ -3810,21 +3973,22 @@ function WorkspaceArtifactSection({ artifacts, receipts }: { artifacts: Workspac
     <header>
       <IconFileDescription aria-hidden="true" />
       <div><span>运行工作区</span><h3 id="workspace-artifacts-title">{artifacts.length > 0 ? `Agent 已生成 ${artifacts.length} 份真实成果文件` : "这项任务尚不能生成可信成果"}</h3><p>{artifacts.length > 0 ? "文件已写入本次 Run 的隔离目录，原始 FORTE 文件没有被修改。" : boundary?.result}</p></div>
-      <b>{businessGateOutcome?.status === "failed" ? `业务 Gate ${businessGateOutcome.failed_gate_count}/${businessGateOutcome.total_gate_count} 未通过` : businessGateOutcome?.status === "invalid" ? "来源校验失败" : candidateReviewOutcome ? "最终 HR 决定待人工处理" : artifacts.length > 0 ? checkSummary.sameChecklist ? `${artifacts.length} 份成果共享 ${checkSummary.total} 项确定性检查，${checkSummary.passed}/${checkSummary.total} 通过` : checkSummary.shared ? `${artifacts.length} 份成果共 ${checkSummary.total} 项唯一确定性检查，${checkSummary.passed}/${checkSummary.total} 通过` : `${checkSummary.passed}/${checkSummary.total} 项检查通过` : "未伪造结果"}</b>
+      <b>{businessGateOutcome?.status === "failed" ? `业务 Gate ${businessGateOutcome.failed_gate_count}/${businessGateOutcome.total_gate_count} 未通过` : businessGateOutcome?.status === "invalid" ? "来源校验失败" : candidateReviewOutcome ? "最终 HR 决定待人工处理" : financeReviewOutcome ? "最终财务处置待人工处理" : artifacts.length > 0 ? checkSummary.sameChecklist ? `${artifacts.length} 份成果共享 ${checkSummary.total} 项确定性检查，${checkSummary.passed}/${checkSummary.total} 通过` : checkSummary.shared ? `${artifacts.length} 份成果共 ${checkSummary.total} 项唯一确定性检查，${checkSummary.passed}/${checkSummary.total} 通过` : `${checkSummary.passed}/${checkSummary.total} 项检查通过` : "未伪造结果"}</b>
     </header>
+    {financeReviewOutcome && <FinanceReviewOutcomePanel outcome={financeReviewOutcome} deterministicPassed={deterministicPassed} />}
     {candidateReviewOutcome && <CandidateReviewOutcomePanel outcome={candidateReviewOutcome} deterministicPassed={deterministicPassed} />}
     {legalReviewOutcome && <LegalReviewOutcomePanel outcome={legalReviewOutcome} deterministicPassed={deterministicPassed} />}
     {businessGateOutcome && <BusinessGateOutcomePanel outcome={businessGateOutcome} />}
     {executionArtifact && <article className={`workspace-action-result${executionArtifact.verifier_status === "failed" ? " is-failed" : ""}`} aria-label="实际执行边界"><IconShieldCheck aria-hidden="true" /><div><span>这次实际发生了什么</span><h4>{executionArtifact.execution_summary}</h4><p>{executionArtifact.purpose}</p>{latestReceipt && <ul>{latestReceipt.prohibited_side_effects.map((item) => <li key={item}>{item}</li>)}</ul>}</div></article>}
     {artifacts.length > 0 && <ol>{artifacts.map((artifact) => <li key={artifact.artifact_id} className={artifact.verifier_status === "passed" ? "is-passed" : "is-failed"}>
       <div className="workspace-artifact-file"><span><IconFile aria-hidden="true" /></span><div><h4>{artifact.title}</h4><p>{artifact.summary}</p><small>文件：{artifact.file_name} · 第 {artifact.round_number} 轮 · {formatSize(artifact.size)} · {artifact.source_file_refs.length} 份内容来源</small></div></div>
-      <div className="workspace-artifact-status"><b>{artifact.verifier_status === "passed" ? <><IconCheck aria-hidden="true" />确定性检查通过</> : <><IconAlertTriangle aria-hidden="true" />检查未通过</>}</b><span>{artifact.record_count !== null ? `${artifact.record_count} 条记录 · ` : ""}{artifact.checks.filter((check) => check.passed).length}/{artifact.checks.length} 项检查{(checklistUsage.get(artifactChecklistKey(artifact)) ?? 0) > 1 ? " · 使用同一验证清单" : ""}</span>{artifact.business_gate_outcome && <small>只代表公式、来源和文件结构已复核，不代表业务 Gate 通过。</small>}{artifact.candidate_review_outcome && <small>只代表来源、条件计算和成果结构已复核，不代表录用或淘汰。</small>}</div>
+      <div className="workspace-artifact-status"><b>{artifact.verifier_status === "passed" ? <><IconCheck aria-hidden="true" />确定性检查通过</> : <><IconAlertTriangle aria-hidden="true" />检查未通过</>}</b><span>{artifact.record_count !== null ? `${artifact.record_count} 条记录 · ` : ""}{artifact.checks.filter((check) => check.passed).length}/{artifact.checks.length} 项检查{(checklistUsage.get(artifactChecklistKey(artifact)) ?? 0) > 1 ? " · 使用同一验证清单" : ""}</span>{artifact.business_gate_outcome && <small>只代表公式、来源和文件结构已复核，不代表业务 Gate 通过。</small>}{artifact.candidate_review_outcome && <small>只代表来源、条件计算和成果结构已复核，不代表录用或淘汰。</small>}{artifact.finance_review_outcome && <small>只代表来源、金额、候选枚举和成果结构已复核，不代表已经付款、核销、记账或确认坏账。</small>}</div>
       <button type="button" onClick={() => void downloadArtifact(artifact)} disabled={downloading !== null}><IconDownload aria-hidden="true" />{downloading === artifact.artifact_id ? "正在下载" : "下载成果"}</button>
       {(artifact.deliverable_type || artifact.covered_period || artifact.statistic_basis || artifact.purpose) && <dl className={`workspace-artifact-semantics${artifact.deliverable_type ? " has-deliverable-type" : ""}`}>
         {artifact.deliverable_type && <div><dt>成果类型</dt><dd>{artifact.deliverable_type}</dd></div>}
-        {artifact.covered_period && <div><dt>{artifact.deliverable_type ? "适用范围" : "涵盖期间"}</dt><dd>{artifact.covered_period}</dd></div>}
-        {artifact.statistic_basis && <div><dt>{artifact.deliverable_type ? "采用依据" : "统计口径"}</dt><dd>{artifact.statistic_basis}</dd></div>}
-        {artifact.purpose && <div><dt>{artifact.deliverable_type ? "使用边界" : "用途"}</dt><dd>{artifact.purpose}</dd></div>}
+        {artifact.covered_period && <div><dt>{artifact.finance_review_outcome ? "涵盖期间" : artifact.deliverable_type ? "适用范围" : "涵盖期间"}</dt><dd>{artifact.covered_period}</dd></div>}
+        {artifact.statistic_basis && <div><dt>{artifact.finance_review_outcome ? "统计口径" : artifact.deliverable_type ? "采用依据" : "统计口径"}</dt><dd>{artifact.statistic_basis}</dd></div>}
+        {artifact.purpose && <div><dt>{artifact.finance_review_outcome ? "用途" : artifact.deliverable_type ? "使用边界" : "用途"}</dt><dd>{artifact.purpose}</dd></div>}
       </dl>}
       {artifact.key_outputs.length > 0 && <section className="workspace-artifact-key-outputs" aria-label={artifact.key_outputs_label ?? "关键输出"}><span>{artifact.key_outputs_label ?? `${artifact.key_outputs.length} 项关键输出`}</span><ul>{artifact.key_outputs.map((item) => <li key={item}>{item}</li>)}</ul></section>}
       {artifact.self_test && <section className="workspace-artifact-self-test" aria-label={`${artifact.scenario_id} 自测卡`}>

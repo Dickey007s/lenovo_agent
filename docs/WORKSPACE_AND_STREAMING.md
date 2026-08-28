@@ -210,6 +210,16 @@ cards and falls back to one column in the narrow center pane and at 390 px.
 Opening these details does not call a model, change ATS state, notify a candidate
 or execute a hiring action.
 
+DR-0046 applies the three-state projection to TC-05. The result area first says
+that the output is a cross-period risk candidate review, not a payment,
+write-off, posting or bad-debt decision. It then shows deterministic source/file
+verification, the current 2026 payable/receivable totals plus zero or more
+candidates, and the still-pending finance disposition as separate service-owned
+facts. A positive candidate uses an amber review state rather than a system-
+failure state. Expanding a candidate shows its subject, counterparty, the three
+period amounts and source locators; doing so is browser-only and does not call a
+model, alter a workbook or perform an accounting action.
+
 Open human decisions are authoritative in the Snapshot-level
 `decision_requests[]`; round-level copies are compatibility projections only.
 Closing or pressing Escape exits the review surface before the browser attempts a
@@ -404,6 +414,10 @@ same-source/same-failure audit grouping for verified outcomes. It does not add s
 a generic task-filter compiler or an Artifact-driven override of Loop terminal state.
 DR-0037 adds Artifact meaning fields and corrects TC-05 attribution. It does not
 turn Finance-018 into a reusable accounting ontology or prove user comprehension.
+DR-0046 replaces the old zero-candidate success assumption with independent
+source and output recomputation. It remains a fixed exact-balance heuristic and
+does not add currencies, legal entities, ageing, in-period activity, write-off
+policy, a Connector or a general ledger.
 DR-0038 adds a three-state user-language projection and target-Branch action. It
 does not prove the Agent explanation, user comprehension or a new recovery protocol.
 

@@ -32,7 +32,10 @@ from tests.unit.test_scenario_effect_runtime import (
     CandidateReviewPlanner,
     DashboardAnalyst,
     DashboardPlanner,
+    FinanceReconciliationAnalyst,
+    FinanceReconciliationPlanner,
     FORTE_ROOT,
+    TC05_INSTRUCTION,
     TC06_INSTRUCTION,
     TC07_INSTRUCTION,
     ONBOARDING_INSTRUCTION,
@@ -499,6 +502,118 @@ async def test_postgres_restart_preserves_tc06_candidate_outcome_and_three_artif
             r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}",
             candidate_projection,
         )
+    finally:
+        for runtime in reversed(runtimes):
+            await runtime.close()
+        if DATABASE_DSN and run_id:
+            async with await psycopg.AsyncConnection.connect(DATABASE_DSN) as connection:
+                async with connection.cursor() as cursor:
+                    for table in (
+                        "harness_idempotency",
+                        "harness_task_commit",
+                        "harness_artifact_version",
+                        "harness_run_state",
+                    ):
+                        await cursor.execute(
+                            f"DELETE FROM {table} WHERE owner_id = %s",  # nosec B608
+                            (owner,),
+                        )
+
+
+@pytest.mark.asyncio
+async def test_postgres_restart_preserves_tc05_finance_outcome_and_three_artifacts(
+    tmp_path: Path,
+) -> None:
+    owner = f"postgres-tc05-finance-{uuid4().hex}"
+    run_id = ""
+    runtimes: list[HarnessRuntime] = []
+    workspace_root = tmp_path / "tc05-run-workspaces"
+    try:
+        first = HarnessRuntime(
+            BenchmarkWorkspaceCatalog(FORTE_ROOT),
+            FinanceReconciliationPlanner(),
+            FinanceReconciliationAnalyst(),
+            PostgresHarnessStateStore(DATABASE_DSN),
+            effect_engine=ScenarioEffectEngine(),
+            artifact_store=RunWorkspaceArtifactStore(workspace_root),
+        )
+        runtimes.append(first)
+        await first.setup()
+        started = await first.start(
+            owner,
+            start_request(
+                idempotency_key=f"postgres-tc05-start-{uuid4().hex}",
+                instruction=TC05_INSTRUCTION,
+            ),
+        )
+        run_id = started.run.run_id
+        terminal = await wait_for_effect_run(first, owner, run_id)
+        assert terminal.status == "completed"
+        assert len(terminal.workspace_artifacts) == 3
+        receipt = terminal.effect_receipts[0]
+        assert receipt.status == "passed"
+        assert receipt.scenario_id == "TC-05"
+        assert receipt.finance_review_outcome is not None
+        outcome = receipt.finance_review_outcome
+        assert outcome.status == "review_required"
+        assert (outcome.unpaid_count, outcome.unreceived_count, outcome.candidate_count) == (
+            31,
+            2,
+            0,
+        )
+        assert outcome.unpaid_total == "3984606.46"
+        assert outcome.unreceived_total == "4992891.47"
+        assert outcome.original_inputs_modified is False
+
+        originals: dict[str, bytes] = {}
+        for artifact in terminal.workspace_artifacts:
+            assert artifact.verifier_status == "passed"
+            assert artifact.finance_review_outcome == outcome
+            _, originals[artifact.file_name] = await first.get_workspace_artifact(
+                owner, run_id, artifact.artifact_id
+            )
+        await first.close()
+
+        second = HarnessRuntime(
+            BenchmarkWorkspaceCatalog(FORTE_ROOT),
+            FinanceReconciliationPlanner(),
+            FinanceReconciliationAnalyst(),
+            PostgresHarnessStateStore(DATABASE_DSN),
+            effect_engine=ScenarioEffectEngine(),
+            artifact_store=RunWorkspaceArtifactStore(workspace_root),
+        )
+        runtimes.append(second)
+        await second.setup()
+        restored = await second.get(owner, run_id)
+        restored_receipt = restored.effect_receipts[0]
+        assert restored_receipt.finance_review_outcome == outcome
+        assert len(restored.workspace_artifacts) == 3
+        restored_by_name = {
+            item.file_name: item for item in restored.workspace_artifacts
+        }
+        for file_name, content in originals.items():
+            artifact = restored_by_name[file_name]
+            assert artifact.finance_review_outcome == outcome
+            _, restored_content = await second.get_workspace_artifact(
+                owner, run_id, artifact.artifact_id
+            )
+            assert restored_content == content
+
+        unpaid_rows = list(
+            csv.DictReader(io.StringIO(originals["未付统计.csv"].decode("utf-8-sig")))
+        )
+        unreceived_rows = list(
+            csv.DictReader(io.StringIO(originals["未收统计.csv"].decode("utf-8-sig")))
+        )
+        assert len(unpaid_rows) == 31
+        assert len(unreceived_rows) == 2
+        assert "跨期僵尸账款候选：0 条" in originals["跨期核对说明.md"].decode(
+            "utf-8"
+        )
+        public_snapshot = second.public_snapshot(restored)
+        public_json = public_snapshot.model_dump_json()
+        assert "content_sha256" not in public_json
+        assert public_snapshot.effect_receipts[0].finance_review_outcome == outcome
     finally:
         for runtime in reversed(runtimes):
             await runtime.close()

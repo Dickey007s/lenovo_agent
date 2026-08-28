@@ -237,10 +237,10 @@ Important fields:
       "version": 1,
       "round_number": 1,
       "source_file_refs": ["forte-..."],
-      "validator_id": "validator-finance-reconciliation-v1",
+      "validator_id": "validator-finance-reconciliation-v2",
       "verifier_status": "passed",
       "checks": [
-        {"check_id": "check-finance-unpaid-rows", "label": "未付逐行复算", "passed": true, "detail": "31 条贷方期末余额逐行相等"}
+        {"check_id": "check-finance-unpaid-rows", "label": "来源行、方向与定位逐字段复算", "passed": true, "detail": "31 条来源行与批准工作簿一致"}
       ],
       "summary": "31 条记录已逐行复算。",
       "covered_period": "2026 年期末",
@@ -253,6 +253,24 @@ Important fields:
       "review_guidance": null,
       "execution_summary": null,
       "self_test": null,
+      "finance_review_outcome": {
+        "outcome_id": "finance-review-outcome-finance-018",
+        "status": "review_required",
+        "decision": "当前启发式未发现跨期风险候选，仍需财务复核；未执行付款、核销、记账或坏账确认。",
+        "summary": "2026 期末未付 31 条、未收 2 条；三期启发式候选 0 条。",
+        "period_ids": ["2025_h1", "2025_h2", "2026"],
+        "unpaid_count": 31,
+        "unpaid_total": "3984606.46",
+        "unreceived_count": 2,
+        "unreceived_total": "4992891.47",
+        "candidate_count": 0,
+        "candidates": [],
+        "method": "同一科目+客商在三个期间均为正数借方期末余额且金额完全相同，才列为候选。",
+        "limitations": ["未检查期间内发生额、账龄、币种、主体、核销记录或贷方余额。"],
+        "human_review_required": true,
+        "original_inputs_modified": false,
+        "external_action": "none"
+      },
       "download_path": "/v1/harness/runs/harness:.../artifacts/workspace-artifact-0123456789ab",
       "original_inputs_modified": false,
       "review_required": true,
@@ -271,6 +289,24 @@ Important fields:
       "cost": "本地确定性处理；没有外部调用",
       "result": "工件可下载，原始输入未修改",
       "artifact_ids": ["workspace-artifact-0123456789ab"],
+      "finance_review_outcome": {
+        "outcome_id": "finance-review-outcome-finance-018",
+        "status": "review_required",
+        "decision": "当前启发式未发现跨期风险候选，仍需财务复核；未执行付款、核销、记账或坏账确认。",
+        "summary": "2026 期末未付 31 条、未收 2 条；三期启发式候选 0 条。",
+        "period_ids": ["2025_h1", "2025_h2", "2026"],
+        "unpaid_count": 31,
+        "unpaid_total": "3984606.46",
+        "unreceived_count": 2,
+        "unreceived_total": "4992891.47",
+        "candidate_count": 0,
+        "candidates": [],
+        "method": "同一科目+客商在三个期间均为正数借方期末余额且金额完全相同，才列为候选。",
+        "limitations": ["未检查期间内发生额、账龄、币种、主体、核销记录或贷方余额。"],
+        "human_review_required": true,
+        "original_inputs_modified": false,
+        "external_action": "none"
+      },
       "external_action": "none"
     }
   ],

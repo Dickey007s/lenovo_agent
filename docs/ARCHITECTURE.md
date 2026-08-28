@@ -394,6 +394,17 @@ plus five resumes; the joint ledger binds all seven sources. This is not a
 general hiring engine, fairness proof, background check, identity verifier or
 candidate-notification system.
 
+DR-0046 applies source-derived verification to the fixed Finance-018 adapter.
+It validates three unique period workbooks and parses each row into a period,
+source file, sheet, Excel row/cell locator, subject, counterparty, direction and
+finite ending balance. The two 2026 CSV files and the three-period Markdown are
+then parsed again and compared with a fresh recomputation from the approved XLSX
+bytes. `finance_review_outcome` is stored on all three Artifacts and the
+EffectReceipt. A deterministic pass, one or more cross-period candidates and a
+pending finance decision may therefore coexist. Candidate enumeration is an
+exact-balance heuristic, not a bad-debt conclusion, accounting policy, payment,
+write-off, posting or source-workbook edit.
+
 ## 7. Eight module maturity
 
 | Module | Current implementation | Missing target work |
@@ -442,5 +453,5 @@ See [`DR-0036`](decisions/DR-0036-outcome-first-and-layout-tolerant-evidence.md)
 [`SCENARIO-012`](scenarios/SCENARIO-012-selective-branch-and-artifact-restore.md),
 [UI-server fact matrix](contracts/UI_SERVER_FACT_MATRIX.md) and
 [current TC-01 Evidence](evidence/DR-0036-TC01-OUTCOME-EVIDENCE-LOCALIZATION-EVIDENCE-20260828.md) and
-[current TC-05 Evidence](evidence/DR-0037-TC05-ARTIFACT-SEMANTICS-AND-REVIEW-READABILITY-EVIDENCE-20260828.md),
+[current TC-05 Evidence](evidence/DR-0046-TC05-SOURCE-DERIVED-FINANCE-REVIEW-EVIDENCE-20260829.md),
 plus [current source-location language Evidence](evidence/DR-0038-USER-LANGUAGE-SOURCE-LOCATION-RECOVERY-EVIDENCE-20260828.md).
