@@ -1,6 +1,6 @@
 # DR-0048：TC-10 规范片段消费与稳定 Effect 等待
 
-- 状态：Implemented / Locally Verified；等待远端门与合并后转为 Accepted
+- 状态：Accepted；本地全量、真实 PostgreSQL 与 PR #64 远端门已通过
 - 日期：2026-08-29
 - Source：`USER-FEEDBACK-20260829-TC10-INLINE-NORMATIVE-FRAGMENT-AND-EFFECT-WAIT`
 - 继承：`DR-0047`

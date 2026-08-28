@@ -2,7 +2,7 @@
 
 ## 当前结论
 
-`Locally Verified`。片段级来源消费、动态转人工规则、同行冲突门、单调时钟 Effect 等待、公共前台 fixture、全量工程门与真实 PostgreSQL TC-10 顺序门已通过；待远端 durable 门与合并完成后更新为 `Limited Verified`。
+`Limited Verified`。片段级来源消费、动态转人工规则、同行冲突门、单调时钟 Effect 等待、公共前台 fixture、本地全量工程门、真实 PostgreSQL TC-10 顺序门与 [PR #64](https://github.com/Dickey007s/lenovo_agent/pull/64) 远端 durable 门已通过。实现提交 [`a77fd1b`](https://github.com/Dickey007s/lenovo_agent/commit/a77fd1b)；最终合并 SHA 与最新 master 重启由交付回执记录。
 
 ## 可复现负例
 
@@ -39,9 +39,10 @@
 - `pnpm --dir apps/web exec playwright test e2e/harness-workbench.spec.ts`：50 passed；TC-10 canonical/dynamic/failure 为 3/3。
 - canonical UI 数字和布局没有变化，因此不改写 DR-0047 的历史 1440/390 截图；本轮完整 Playwright 继续执行同一桌面/移动几何与无溢出断言。
 
-## 待完成
+## 远端门
 
-- PR 远端 `durable-agent-control-loop`、合并 SHA 与最新 master PostgreSQL 重启。
+- PR #64 的 `durable-agent-control-loop` 在实现提交上通过，job [`98986856245`](https://github.com/Dickey007s/lenovo_agent/actions/runs/33211909915/job/98986856245)，耗时 49 秒。
+- 文档收口提交会再次触发同一远端门；合并后从最新 master 以 PostgreSQL 重启，并保留 DR-0047 canonical live Run 作为历史复读，不额外消费 Provider。
 
 ## 不证明什么
 
