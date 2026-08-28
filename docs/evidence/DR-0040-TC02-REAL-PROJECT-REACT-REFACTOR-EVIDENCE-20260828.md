@@ -53,7 +53,7 @@
 - Ruff：通过；Web TypeScript lint：通过；Next.js production build：通过。
 - Playwright：`34 passed`，包括 TC-02 桌面/390 px、下载名、策略边界、自测卡和无页面级横向溢出。
 - `git diff --check`：通过。
-- 远端载体：[PR #51](https://github.com/Dickey007s/lenovo_agent/pull/51)；实际 `durable-agent-control-loop` check [run 33159382404 / job 98809867262](https://github.com/Dickey007s/lenovo_agent/actions/runs/33159382404/job/98809867262) 在当前 head 通过，用时 26 秒。本文件提交时尚未把合并状态写成既成事实。
+- 远端载体：[PR #51](https://github.com/Dickey007s/lenovo_agent/pull/51)；包含计数修复的代码 head `9ce49b5` 已通过实际 `durable-agent-control-loop` check [run 33161111737 / job 98815528675](https://github.com/Dickey007s/lenovo_agent/actions/runs/33161111737/job/98815528675)，用时 33 秒。本文件提交后的文档收尾 head 仍须通过同一门才允许合并；这里不预写合并成功。
 
 ## 网络与安全边界
 
