@@ -2,6 +2,8 @@
 
 ## 来源
 
+- Source ID：`USER-FEEDBACK-20260828-TC05-ARTIFACT-MEANING-AND-REVIEW-READABILITY`、
+  `USER-FEEDBACK-20260828-SOURCE-LOCATION-USER-LANGUAGE`。
 - 日期：2026-08-28，Asia/Shanghai。
 - 类型：单一 Stakeholder 的形成性产品反馈与两张真实界面截图。
 - 图 1：[`user-feedback-20260828-tc05-artifact-meaning.png`](../evidence/screenshots/user-feedback-20260828-tc05-artifact-meaning.png)，`2018 x 1265`，305279 bytes，SHA-256 `0FDE3DE3561518392A9B360FE7746D7754080D1EC79E4E121D1BAD0A8E6163B7`。

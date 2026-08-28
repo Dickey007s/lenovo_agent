@@ -390,6 +390,22 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, summary:focus
 .loop-gap-branch-next button { min-height: 36px; display: inline-flex; align-items: center; gap: 5px; margin-top: 8px; padding: 0 9px; border: 1px solid #2867a9; border-radius: 4px; color: #245989; background: #fff; font-size: 11px; font-weight: 750; }
 .loop-gap-branch-next button:hover { border-color: #185caf; background: var(--blue-soft); }
 .loop-gap-branch-next button svg { width: 14px; flex: 0 0 auto; }
+.loop-gap-user-actions { width: 100%; display: grid; gap: 6px; margin-top: 8px; }
+.loop-gap-user-actions button { width: 100%; min-height: 38px; justify-content: center; margin-top: 0; }
+.loop-gap-user-actions button.is-primary { color: #fff; border-color: #2867a9; background: #2867a9; }
+.loop-gap-user-actions button.is-primary:hover { color: #fff; border-color: #185caf; background: #185caf; }
+.loop-gap-branches > li.is-source-location h4,
+.loop-gap-branches > li.is-source-location .loop-gap-branch-stage strong,
+.loop-gap-branches > li.is-source-location .loop-gap-branch-next strong { overflow: visible; text-overflow: clip; white-space: normal; }
+.loop-gap-branches > li.is-source-location .loop-gap-branch-stage small { -webkit-line-clamp: 4; }
+.loop-gap-technical-details { grid-column: 1 / -1; border-top: 1px solid #d7dee6; background: #f7f9fb; }
+.loop-gap-technical-details > summary { min-height: 40px; display: flex; align-items: center; padding: 0 12px; color: #486580; cursor: pointer; font-size: 11px; font-weight: 750; }
+.loop-gap-technical-details[open] > summary { border-bottom: 1px solid #d7dee6; }
+.loop-gap-technical-details dl { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); margin: 0; }
+.loop-gap-technical-details dl > div { min-width: 0; padding: 9px 12px; }
+.loop-gap-technical-details dl > div + div { border-left: 1px solid #d7dee6; }
+.loop-gap-technical-details dt { color: var(--muted); font-size: 10px; font-weight: 750; }
+.loop-gap-technical-details dd { margin: 4px 0 0; overflow-wrap: anywhere; color: var(--ink-soft); font-size: 11px; line-height: 1.5; }
 .loop-gap > footer { display: flex; align-items: center; gap: 7px; padding: 9px 12px; border-top: 1px solid #e6d6bd; color: #5d6874; background: #fff; font-size: 10px; line-height: 1.45; }
 .loop-gap > footer svg { width: 16px; flex: 0 0 auto; color: var(--green); }
 .loop-review-links { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 9px; }
@@ -868,6 +884,9 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, summary:focus
   .loop-gap-branch-arrow { margin: -3px 0; transform: rotate(90deg); }
   .loop-gap-branches section + .loop-gap-branch-arrow + section { border-top: 1px solid #e5e9ed; border-left: 0; }
   .loop-gap-branch-next button { width: 100%; min-height: 44px; justify-content: center; }
+  .loop-gap-technical-details { grid-column: 1; }
+  .loop-gap-technical-details dl { grid-template-columns: 1fr; }
+  .loop-gap-technical-details dl > div + div { border-top: 1px solid #d7dee6; border-left: 0; }
   .workspace-artifacts > header { grid-template-columns: 25px minmax(0, 1fr); }
   .workspace-artifacts > header > b { grid-column: 2; justify-self: start; }
   .workspace-artifacts > ol > li { grid-template-columns: minmax(0, 1fr) auto; }

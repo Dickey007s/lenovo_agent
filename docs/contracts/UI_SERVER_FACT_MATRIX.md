@@ -91,6 +91,9 @@ Prompt、思维链、原始模型响应、绝对路径、哈希和内部策略�
 | Partial analysis adopted | only Findings with server-resolved Anchors become public; unresolved records stay actionable | `analysis_partial_adopted`, `partial_artifact_saved`, Artifact findings, EvidenceResolution and Branch status | review retained Findings; open unresolved candidates separately | content or correctness of omitted Findings |
 | Analysis recovery required | two bounded attempts yielded no adoptable Finding/structure but legal scope and prior work remain | `analysis_recovery_required`, Round `next_step.recovery_kind`, candidate Branches, `status=waiting_input` | add steer text and resume one waiting Branch | result acceptance, model not called or file modified |
 | Candidate disambiguation | one quote matches multiple real positions and requires one human source-location choice | `evidence_disambiguation_required`, `EvidenceResolution(status=ambiguous).candidates[]`, open DecisionRequest | compare source positions; no default candidate; accept stays disabled until one candidate is selected, then versioned/idempotent decision resumes only the bound Branch | server or Agent chose for the user, random location, other Branches reran |
+| Verified result, table position pending | generated files passed deterministic checks while one Agent explanation lacks a unique row/cell | passed `workspace_artifacts[].checks`, corresponding `effect_receipts[]`, `recovery_kind=source_location`, grouped Branch/Gap projection | show files first; “查看已生成成果” is read-only; “查找原表格位置” resumes one bound Branch; technical facts are collapsed | file missing, date/amount failure, Agent explanation proved correct, Run completed, Artifact overwritten |
+| Unverified result, table position pending | a `source_location` Gap exists but no current all-passed Artifact set establishes a usable result | Run/Artifact/EffectReceipt plus Branch/Gap facts | say the result is not yet verified; handle only the bound Branch | borrow the verified-result claim or hide an Artifact failure |
+| Terminal source-location gap | an old Run ended with the Gap preserved | terminal `status`, preserved Branch/Gap, Snapshot/version | create a new task from the smallest scope; preserve the old Run | resume a terminal Run or claim in-place continuation |
 | Resume recovery Branch | selected evidence decision is consumed at a safe checkpoint | `DecisionRequest`, `decision_recorded`, `branch_resumed_from_checkpoint`; optional `control_steer_recorded` for user feedback | continue only the bound waiting Branch; reconnect from Snapshot/SSE; v1 remains while resumed work appends v2 | lost ArtifactVersion, replay of completed Branches or external action |
 | Legacy terminal analysis failure | an older Run stopped before the recoverable protocol existed | `status=failed`, safe validation error, preserved instruction/Plan/Branch/call facts | create a new smallest-scope Run | interrupted call resumed or failed output adopted |
 | Proposal context review | user sees the result context before deciding whether to start the suggestion | one `result.follow_ups[]` string + union of current Finding refs | explicitly labeled not independently source-verified; no mutation | direct per-proposal citation or accepted-proposal state |
@@ -175,6 +178,10 @@ TC-05 Artifact meaning and review typography additionally follow
 [`DR-0037`](../decisions/DR-0037-tc05-artifact-semantics-and-review-readability.md),
 [`SCENARIO-023`](../scenarios/SCENARIO-023-understand-finance-artifacts-and-review-evidence.md)
 and [current TC-05 Evidence](../evidence/DR-0037-TC05-ARTIFACT-SEMANTICS-AND-REVIEW-READABILITY-EVIDENCE-20260828.md).
+Source-location wording and recovery additionally follow
+[`DR-0038`](../decisions/DR-0038-user-language-source-location-recovery.md),
+[`SCENARIO-024`](../scenarios/SCENARIO-024-understand-and-recover-missing-table-location.md)
+and [current DR-0038 Evidence](../evidence/DR-0038-USER-LANGUAGE-SOURCE-LOCATION-RECOVERY-EVIDENCE-20260828.md).
 
 Automated checks are engineering proxies, not user research. User
 comprehension, calibrated trust and task value remain `Draft`.

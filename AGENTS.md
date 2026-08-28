@@ -67,6 +67,15 @@ before changing fixed finance artifacts or review type scale. Artifact
 task context. The two TC-05 CSVs are 2026-only and 31/2 are record counts; only
 the note owns the three-period comparison. Finance-018 is not a general verifier.
 
+DR-0038 governs user-language projection of source-location recovery. Read
+`docs/decisions/DR-0038-user-language-source-location-recovery.md` and
+`docs/scenarios/SCENARIO-024-understand-and-recover-missing-table-location.md`
+before changing a verified Artifact plus `source_location` Gap. The first screen
+must say whether files are already generated, what exact table position is missing,
+what is and is not affected, and the one next action. Branch/Gap/Resolution facts
+remain available under collapsed technical details. Verified, unverified and
+terminal Runs require distinct wording and recovery paths.
+
 源码永远高于文档。行为或叙事变化后必须同步 living docs、Decision、Scenario、
 Source、Evidence 和 UI-server fact mapping，不能只更新 README。
 

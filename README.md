@@ -259,6 +259,11 @@ multi-instance coordination and governed external action remain target work.
   record count; review body text, evidence excerpts and safe previews are larger
   on desktop and 390 px. This remains one fixed Finance-018 adapter, not a
   general finance verifier or proof of improved user understanding.
+- `DR-0038` turns a remaining `source_location` gap into one user task instead
+  of a wall of Runtime terms. A verified result says that files are already
+  generated and one Agent explanation still lacks a row/cell location; its
+  primary action resumes only the affected Branch. Unverified and terminal Runs
+  use different wording and never borrow the verified-result claim.
 - No target-user study has been run. Clarity, trust, efficiency and user value
   remain hypotheses.
 
@@ -287,6 +292,8 @@ The current TC-01 outcome-first and evidence-localization increment is tracked i
 [`DR-0036-TC01-OUTCOME-EVIDENCE-LOCALIZATION-EVIDENCE-20260828`](docs/evidence/DR-0036-TC01-OUTCOME-EVIDENCE-LOCALIZATION-EVIDENCE-20260828.md).
 The current TC-05 artifact-semantics and review-readability increment is tracked in
 [`DR-0037-TC05-ARTIFACT-SEMANTICS-AND-REVIEW-READABILITY-EVIDENCE-20260828`](docs/evidence/DR-0037-TC05-ARTIFACT-SEMANTICS-AND-REVIEW-READABILITY-EVIDENCE-20260828.md).
+The source-location user-language and local-recovery increment is tracked in
+[`DR-0038-USER-LANGUAGE-SOURCE-LOCATION-RECOVERY-EVIDENCE-20260828`](docs/evidence/DR-0038-USER-LANGUAGE-SOURCE-LOCATION-RECOVERY-EVIDENCE-20260828.md).
 
 ## Local run
 
@@ -367,6 +374,9 @@ pnpm --dir apps/web exec playwright test e2e/harness-workbench.spec.ts
 - [DR-0037：TC-05 成果语义与问题审查可读性](docs/decisions/DR-0037-tc05-artifact-semantics-and-review-readability.md)
 - [SCENARIO-023：在下载前理解财务成果并清楚审查证据](docs/scenarios/SCENARIO-023-understand-finance-artifacts-and-review-evidence.md)
 - [TC-05 成果语义与审查可读性 Evidence](docs/evidence/DR-0037-TC05-ARTIFACT-SEMANTICS-AND-REVIEW-READABILITY-EVIDENCE-20260828.md)
+- [DR-0038：用用户任务语言呈现原表格位置恢复](docs/decisions/DR-0038-user-language-source-location-recovery.md)
+- [SCENARIO-024：理解并恢复缺少的原表格位置](docs/scenarios/SCENARIO-024-understand-and-recover-missing-table-location.md)
+- [原表格位置用户语言与局部恢复 Evidence](docs/evidence/DR-0038-USER-LANGUAGE-SOURCE-LOCATION-RECOVERY-EVIDENCE-20260828.md)
 - [可恢复 Control Loop Evidence](docs/evidence/DURABLE-EVIDENCE-GATE-ARTIFACT-EVOLUTION-EVIDENCE-20260826.md)
 - [整库自主研究 Evidence](docs/evidence/AUTONOMOUS-WHOLE-WORKSPACE-RESEARCH-EVIDENCE-20260825.md)
 - [Agent Control Loop 三轮只读纵切证据](docs/evidence/AGENT-CONTROL-LOOP-BOUNDED-READONLY-EVIDENCE-20260825.md)
