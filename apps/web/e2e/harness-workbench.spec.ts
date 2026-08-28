@@ -2316,6 +2316,7 @@ test("shows TC-07 file verification, legal gate and human review as three separa
   await expect(documentFour).toContainText("委托人行未提取到身份证号或统一社会信用代码");
   await expect(documentFour).toContainText("签署栏为空，DOCX 包内没有 media、drawing、pict、嵌入或数字签名");
   await expect(documentFour).toContainText("资料不足");
+  await documentFour.locator("summary").click();
 
   const documentTwo = legal.locator(".legal-review-documents > details").filter({ hasText: "委托书2.docx" });
   await expect(documentTwo.locator("summary")).toContainText("高风险文件");
@@ -2328,6 +2329,7 @@ test("shows TC-07 file verification, legal gate and human review as three separa
   await expect(lawyerCredential).toContainText("资料不足");
   await expect(lawyerCredential).toContainText("字段存在不等于资质已核验");
 
+  await page.setViewportSize({ width: 1440, height: 1100 });
   const typeSizes = await legal.evaluate((element) => ({
     conclusion: Number.parseFloat(getComputedStyle(element.querySelector(":scope > header h3")!).fontSize),
     statusTitle: Number.parseFloat(getComputedStyle(element.querySelector(".legal-review-statuses strong")!).fontSize),
@@ -2338,11 +2340,38 @@ test("shows TC-07 file verification, legal gate and human review as three separa
   expect(typeSizes.statusTitle).toBeGreaterThanOrEqual(14);
   expect(typeSizes.documentTitle).toBeGreaterThanOrEqual(13);
   expect(typeSizes.assessmentText).toBeGreaterThanOrEqual(12);
+  const desktopGeometry = await legal.evaluate((element) => {
+    const documents = element.querySelector<HTMLElement>(".legal-review-documents")!;
+    const cards = Array.from(documents.querySelectorAll<HTMLElement>(":scope > details"));
+    const titles = Array.from(documents.querySelectorAll<HTMLElement>(":scope > details > summary strong"));
+    const openDocumentFacts = Array.from(documents.querySelectorAll<HTMLElement>(":scope > details[open] dl > div"));
+    const documentColumns = getComputedStyle(documents).gridTemplateColumns.split(/\s+/).filter(Boolean).length;
+    const openDocumentGrid = documents.querySelector<HTMLElement>(":scope > details[open] dl");
+    const factColumns = openDocumentGrid
+      ? getComputedStyle(openDocumentGrid).gridTemplateColumns.split(/\s+/).filter(Boolean).length
+      : 0;
+    const titleLineCounts = titles.map((title) => {
+      const lineHeight = Number.parseFloat(getComputedStyle(title).lineHeight);
+      return title.getBoundingClientRect().height / lineHeight;
+    });
+    return {
+      documentColumns,
+      factColumns,
+      minCardWidth: Math.min(...cards.map((card) => card.getBoundingClientRect().width)),
+      minFactWidth: Math.min(...openDocumentFacts.map((fact) => fact.getBoundingClientRect().width)),
+      maxTitleLines: Math.max(...titleLineCounts),
+      overflow: documents.scrollWidth - documents.clientWidth,
+    };
+  });
+  expect(desktopGeometry.documentColumns === 1 || desktopGeometry.minCardWidth >= 320).toBeTruthy();
+  expect(desktopGeometry.minCardWidth).toBeGreaterThanOrEqual(320);
+  expect(desktopGeometry.factColumns === 1 || desktopGeometry.minFactWidth >= 300).toBeTruthy();
+  expect(desktopGeometry.maxTitleLines).toBeLessThanOrEqual(2.05);
+  expect(desktopGeometry.overflow).toBeLessThanOrEqual(0);
   let overflow = await page.evaluate(() => ({ width: document.documentElement.clientWidth, scroll: document.documentElement.scrollWidth }));
   expect(overflow.scroll).toBeLessThanOrEqual(overflow.width);
 
   if (process.env.CAPTURE_TC07_EFFECT_EVIDENCE === "1") {
-    await page.setViewportSize({ width: 1440, height: 1100 });
     const expandedFinance = page.getByRole("treeitem", { name: "收起文件夹 财务管理" });
     if (await expandedFinance.isVisible()) await expandedFinance.click();
     const collapsedLegal = page.getByRole("treeitem", { name: "展开文件夹 法务" });
@@ -2358,8 +2387,24 @@ test("shows TC-07 file verification, legal gate and human review as three separa
   await expect(legal.getByRole("heading", { name: "不得据此签署，必须法务复核" })).toBeVisible();
   overflow = await page.evaluate(() => ({ width: document.documentElement.clientWidth, scroll: document.documentElement.scrollWidth }));
   expect(overflow.scroll).toBeLessThanOrEqual(overflow.width);
-  const legalOverflow = await legal.evaluate((element) => ({ width: element.clientWidth, scroll: element.scrollWidth }));
+  const legalOverflow = await legal.evaluate((element) => {
+    const documents = element.querySelector<HTMLElement>(".legal-review-documents")!;
+    const titleLineCounts = Array.from(documents.querySelectorAll<HTMLElement>(":scope > details > summary strong")).map((title) => {
+      const lineHeight = Number.parseFloat(getComputedStyle(title).lineHeight);
+      return title.getBoundingClientRect().height / lineHeight;
+    });
+    return {
+      width: element.clientWidth,
+      scroll: element.scrollWidth,
+      documentColumns: getComputedStyle(documents).gridTemplateColumns.split(/\s+/).filter(Boolean).length,
+      maxTitleLines: Math.max(...titleLineCounts),
+      documentOverflow: documents.scrollWidth - documents.clientWidth,
+    };
+  });
   expect(legalOverflow.scroll).toBeLessThanOrEqual(legalOverflow.width);
+  expect(legalOverflow.documentColumns).toBe(1);
+  expect(legalOverflow.maxTitleLines).toBeLessThanOrEqual(2.05);
+  expect(legalOverflow.documentOverflow).toBeLessThanOrEqual(0);
   if (process.env.CAPTURE_TC07_EFFECT_EVIDENCE === "1") {
     await legal.evaluate((element) => element.scrollIntoView({ block: "start" }));
     await page.screenshot({ path: "../../docs/evidence/screenshots/tc07-source-derived-legal-review-mobile.png" });
