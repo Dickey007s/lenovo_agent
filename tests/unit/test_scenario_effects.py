@@ -864,7 +864,8 @@ def test_finance_outputs_match_known_fixed_input_totals(
     assert len(unreceived) - 1 == 2
     assert "3,984,606.46" in conclusion
     assert "4,992,891.47" in conclusion
-    assert "无僵尸账款" in conclusion
+    assert "当前启发式未发现候选，仍需财务复核" in conclusion
+    assert "不是付款、核销、记账或坏账确认" in conclusion
 
     unpaid_artifact = artifacts["未付统计.csv"]
     assert unpaid_artifact.title == "2026 期末未付明细"
@@ -872,9 +873,11 @@ def test_finance_outputs_match_known_fixed_input_totals(
     assert unpaid_artifact.record_count == 31
     assert unpaid_artifact.source_file_refs == (current_ref,)
     assert {check.check_id for check in unpaid_artifact.checks} == {
-        "check-finance-current-source",
+        "check-finance-unpaid-schema",
         "check-finance-unpaid-rows",
-        "check-finance-unpaid-sort",
+        "check-finance-unpaid-unique-sort",
+        "check-finance-unpaid-total",
+        "check-finance-originals-read-only-unpaid",
     }
     assert "不是三期合并表" in (unpaid_artifact.purpose or "")
 
@@ -884,24 +887,36 @@ def test_finance_outputs_match_known_fixed_input_totals(
     assert unreceived_artifact.record_count == 2
     assert unreceived_artifact.source_file_refs == (current_ref,)
     assert {check.check_id for check in unreceived_artifact.checks} == {
-        "check-finance-current-source",
+        "check-finance-unreceived-schema",
         "check-finance-unreceived-rows",
-        "check-finance-unreceived-sort",
+        "check-finance-unreceived-unique-sort",
+        "check-finance-unreceived-total",
+        "check-finance-originals-read-only-unreceived",
     }
-    assert "记录数" in (unreceived_artifact.purpose or "")
+    assert "不是三期合并表" in (unreceived_artifact.purpose or "")
 
     cross_period_artifact = artifacts["跨期核对说明.md"]
     assert cross_period_artifact.title == "三期僵尸账款核对说明"
     assert cross_period_artifact.covered_period == (
         "2025 年上半年、2025 年下半年、2026 年"
     )
-    assert cross_period_artifact.record_count is None
+    assert cross_period_artifact.record_count == 0
     assert cross_period_artifact.source_file_refs == period_refs
     assert {check.check_id for check in cross_period_artifact.checks} == {
-        "check-finance-source",
+        "check-finance-source-contract",
         "check-finance-zombie",
+        "check-finance-summary",
+        "check-finance-boundary",
+        "check-finance-originals-read-only-cross-period",
     }
-    assert "三期正数借方期末余额" in (cross_period_artifact.statistic_basis or "")
+    assert "正数借方期末余额" in (cross_period_artifact.statistic_basis or "")
+    outcome = cross_period_artifact.finance_review_outcome
+    assert outcome is not None
+    assert outcome.status == "review_required"
+    assert outcome.unpaid_count == 31
+    assert outcome.unreceived_count == 2
+    assert outcome.candidate_count == 0
+    assert outcome.external_action == "none"
 
 
 def test_outbound_flow_is_a_valid_docx_and_never_claims_execution(

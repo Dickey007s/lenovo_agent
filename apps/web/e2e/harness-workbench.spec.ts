@@ -1,5 +1,6 @@
 import { expect, test, type Page, type Route } from "@playwright/test";
 import tc04TestManifest from "../../../docs/evidence/manifests/tc04-public-test-manifest-20260828.json";
+import tc05FinanceReviewManifest from "../../../docs/evidence/manifests/tc05-public-finance-review-outcome-20260829.json";
 import tc06CandidateReviewManifest from "../../../docs/evidence/manifests/tc06-public-candidate-review-outcome-20260829.json";
 import tc07LegalReviewManifest from "../../../docs/evidence/manifests/tc07-public-legal-review-outcome-20260828.json";
 import tc11BusinessOutcome from "../../../docs/evidence/manifests/tc11-business-gate-outcome-20260828.json";
@@ -19,7 +20,10 @@ type FileItem = {
   preview_available: true;
 };
 
-const csvFile = fileItem("forte-1111111111111111", "forte-folder-111111111111", "2026往来明细.xlsx", "财务管理", "XLSX", "table");
+const financeFolderId = "forte-folder-7af3b6e416d7";
+const financeH1File = fileItem("forte-81f51a0aa85b5c3c", financeFolderId, "2025往来明细-上半年.xlsx", "财务管理", "XLSX", "table");
+const financeH2File = fileItem("forte-8261a3b36e7370da", financeFolderId, "2025往来明细-下半年.xlsx", "财务管理", "XLSX", "table");
+const csvFile = fileItem("forte-8691e8a3837debd3", financeFolderId, "2026往来明细.xlsx", "财务管理", "XLSX", "table");
 const pdfFile = fileItem("forte-2222222222222222", "forte-folder-222222222222", "授权委托书.pdf", "法务", "PDF", "pdf", "合同与授权/授权委托书.pdf");
 const docxFile = fileItem("forte-3333333333333333", "forte-folder-333333333333", "外卖商户BD岗位JD.docx", "人力招聘", "DOCX", "document");
 const candidateFiles = [
@@ -64,7 +68,7 @@ function fileItem(fileRef: string, folderId: string, label: string, group: strin
 }
 
 const seedFolders = [
-  { folder_id: csvFile.folder_id, display_label: "财务管理", display_summary: "跨期间往来资料", files: [csvFile] },
+  { folder_id: csvFile.folder_id, display_label: "财务管理", display_summary: "跨期间往来资料", files: [financeH1File, financeH2File, csvFile] },
   { folder_id: pdfFile.folder_id, display_label: "法务", display_summary: "合同与授权材料", files: [legalRuleFile, ...legalDelegationFiles, pdfFile] },
   { folder_id: docxFile.folder_id, display_label: "人力招聘", display_summary: "岗位与候选人材料", files: candidateFiles },
   { folder_id: txtFile.folder_id, display_label: "可靠性工程", display_summary: "运行日志与服务资料", files: [txtFile] },
@@ -135,7 +139,16 @@ function previewFor(fileRef: string) {
       notes: ["清单、大小与 SHA-256 已在服务端核对", "没有执行宏、脚本或外部资源"],
     },
   };
-  if (fileRef === csvFile.file_ref) return { ...base, kind: "table", columns: ["客商", "方向", "期末余额"], rows: [{ row_number: 2, values: ["星海科技股份有限公司华东区域企业服务中心", "借", "1,500,000.00"] }], total_rows: 30 };
+  if ([financeH1File.file_ref, financeH2File.file_ref, csvFile.file_ref].includes(fileRef)) return {
+    ...base,
+    kind: "table",
+    columns: ["科目名称", "客商名称", "方向", "期末余额"],
+    rows: [{
+      row_number: fileRef === financeH1File.file_ref ? 5 : 3,
+      values: ["其他应收款\\其他应收往来", "绵阳长城发展融资担保有限公司", "借", fileRef === csvFile.file_ref ? "1700000" : "1500000"],
+    }],
+    total_rows: fileRef === csvFile.file_ref ? 75 : 70,
+  };
   if (fileRef === pdfFile.file_ref) return { ...base, kind: "pdf", text: "授权范围：仅限本项目合同审阅。", page_count: 2 };
   if (fileRef === docxFile.file_ref) return { ...base, kind: "document", text: "岗位职责：负责商户拓展与经营分析。" };
   if (fileRef === workflowFile.file_ref) return { ...base, kind: "text", text: "AI 搜索 Agent - Workflow 核心模块\n\nclass QueryAnalysisNode:\n    intent = llm.classify(query)\n    rewritten = llm.rewrite(query)\n    drift_score = semantic_drift(query, rewritten)\n\nclass SearchPlanNode:\n    route = choose(intent, rewritten)\n    if intent == 'news':\n        route.append('web_search_news')\n\nclass FallbackPlanNode:\n    route = choose(intent, rewritten)" };
@@ -398,97 +411,43 @@ function snapshot(
   };
 }
 
-function verifiedEffectSnapshot(body: { workspace_id: string; instruction: string }) {
+function verifiedEffectSnapshot(
+  body: { workspace_id: string; instruction: string },
+  options: { positiveCandidate?: boolean; verifierFailed?: boolean } = {},
+) {
   const base = snapshot(body, "completed", 20);
+  const canonical = tc05FinanceReviewManifest.canonical;
+  const outcome = options.positiveCandidate
+    ? tc05FinanceReviewManifest.positive_candidate.finance_review_outcome
+    : canonical.finance_review_outcome;
   const artifactIds = [
     "workspace-artifact-111111111111",
     "workspace-artifact-222222222222",
     "workspace-artifact-333333333333",
   ];
-  const artifacts = [{
-    artifact_id: artifactIds[0],
-    capability_id: "office-finance-reconciliation",
-    scenario_id: "TC-05",
-    title: "2026 期末未付明细",
-    file_name: "未付统计.csv",
-    media_type: "text/csv",
-    size: 2399,
-    version: 1,
-    round_number: 1,
-    source_file_refs: [csvFile.file_ref],
-    validator_id: "validator-finance-reconciliation-v1",
-    verifier_status: "passed",
-    checks: [
-      { check_id: "check-finance-current-source", label: "2026 内容来源", passed: true, detail: "明细行只取自 2026 往来工作簿，不是三期合并表。" },
-      { check_id: "check-finance-unpaid-rows", label: "未付逐行复算", passed: true, detail: "31 条贷方期末余额逐行相等。" },
-      { check_id: "check-finance-unpaid-sort", label: "未付排序", passed: true, detail: "按客商升序、同客商金额降序。" },
-    ],
-    summary: "31 条记录已逐行复算。",
-    covered_period: "2026 年期末",
-    statistic_basis: "筛选期末余额大于 0 且方向为“贷”的行；每行代表一个科目与客商组合。",
-    purpose: "查看 2026 年期末待付款项；不是三期合并表。",
-    record_count: 31,
-    download_path: `/v1/harness/runs/${base.run_id}/artifacts/${artifactIds[0]}`,
-    created_at: new Date().toISOString(),
-    original_inputs_modified: false,
-    review_required: true,
-    external_action: "none",
-  }, {
-    artifact_id: artifactIds[1],
-    capability_id: "office-finance-reconciliation",
-    scenario_id: "TC-05",
-    title: "2026 期末未收明细",
-    file_name: "未收统计.csv",
-    media_type: "text/csv",
-    size: 340,
-    version: 1,
-    round_number: 1,
-    source_file_refs: [csvFile.file_ref],
-    validator_id: "validator-finance-reconciliation-v1",
-    verifier_status: "passed",
-    checks: [
-      { check_id: "check-finance-current-source", label: "2026 内容来源", passed: true, detail: "明细行只取自 2026 往来工作簿，不是三期合并表。" },
-      { check_id: "check-finance-unreceived-rows", label: "未收逐行复算", passed: true, detail: "2 条借方期末余额逐行相等。" },
-      { check_id: "check-finance-unreceived-sort", label: "未收排序", passed: true, detail: "按客商升序、同客商金额降序。" },
-    ],
-    summary: "2 条记录已逐行复算。",
-    covered_period: "2026 年期末",
-    statistic_basis: "筛选期末余额大于 0 且方向为“借”的行；每行代表一个科目与客商组合。",
-    purpose: "查看 2026 年期末待收款项；2 表示记录数，不是期间数。",
-    record_count: 2,
-    download_path: `/v1/harness/runs/${base.run_id}/artifacts/${artifactIds[1]}`,
-    created_at: new Date().toISOString(),
-    original_inputs_modified: false,
-    review_required: true,
-    external_action: "none",
-  }, {
-    artifact_id: artifactIds[2],
-    capability_id: "office-finance-reconciliation",
-    scenario_id: "TC-05",
-    title: "三期僵尸账款核对说明",
-    file_name: "跨期核对说明.md",
-    media_type: "text/markdown",
-    size: 620,
-    version: 1,
-    round_number: 1,
-    source_file_refs: [csvFile.file_ref, pdfFile.file_ref, docxFile.file_ref],
-    validator_id: "validator-finance-reconciliation-v1",
-    verifier_status: "passed",
-    checks: [
-      { check_id: "check-finance-source", label: "三期来源完整", passed: true, detail: "三个固定期间工作簿均通过 Catalog 完整性检查。" },
-      { check_id: "check-finance-zombie", label: "跨期僵尸账款复算", passed: true, detail: "按同一客商、同一科目、三期借方期末余额逐项比较。" },
-    ],
-    summary: "三期借方未收余额已比较，结论为无僵尸账款。",
-    covered_period: "2025 年上半年、2025 年下半年、2026 年",
-    statistic_basis: "按同一科目名称与客商名称，对三期正数借方期末余额逐项比较。",
-    purpose: "识别三期借方未收余额连续不变的僵尸账款候选。",
-    record_count: null,
-    download_path: `/v1/harness/runs/${base.run_id}/artifacts/${artifactIds[2]}`,
-    created_at: new Date().toISOString(),
-    original_inputs_modified: false,
-    review_required: true,
-    external_action: "none",
-  }];
+  const artifacts = canonical.artifacts.map((artifact, index) => {
+    const failed = Boolean(options.verifierFailed && index === 0);
+    const candidateArtifact = artifact.file_name === "跨期核对说明.md";
+    return {
+      ...artifact,
+      artifact_id: artifactIds[index],
+      capability_id: "office-finance-reconciliation",
+      scenario_id: "TC-05",
+      version: 1,
+      round_number: 1,
+      verifier_status: failed ? "failed" : artifact.verifier_status,
+      checks: artifact.checks.map((check, checkIndex) => failed && checkIndex === 0 ? { ...check, passed: false, detail: "受控测试：成果结构未通过服务端复算。" } : check),
+      summary: options.positiveCandidate && candidateArtifact ? "三期借方期末余额已按固定启发式比较。发现 1 条僵尸账款候选，需财务复核。" : artifact.summary,
+      record_count: options.positiveCandidate && candidateArtifact ? outcome.candidate_count : artifact.record_count,
+      key_outputs: options.positiveCandidate && candidateArtifact ? ["发现 1 条僵尸账款候选，需财务复核。", "三期金额与 locator", "方法、局限与退出条件"] : artifact.key_outputs,
+      finance_review_outcome: outcome,
+      download_path: `/v1/harness/runs/${base.run_id}/artifacts/${artifactIds[index]}`,
+      created_at: new Date().toISOString(),
+      original_inputs_modified: false,
+      review_required: true,
+      external_action: "none",
+    };
+  });
   return {
     ...base,
     workspace_artifacts: artifacts,
@@ -496,15 +455,16 @@ function verifiedEffectSnapshot(body: { workspace_id: string; instruction: strin
       receipt_id: "effect-receipt-111111111111",
       capability_id: "office-finance-reconciliation",
       scenario_id: "TC-05",
-      status: "passed",
-      state: "已冻结 3 份 FORTE 输入，原始文件保持只读。",
-      action: "调用确定性财务核对工具并写入隔离运行工作区。",
-      observation: "生成 3 份真实成果文件，共 7 项唯一确定性检查（重复 ID 已合并），7/7 通过。",
-      cost: "0 次额外模型调用；仅消耗本机确定性计算。",
-      result: "所有确定性效果门通过，成果仍需用户复核。",
-      source_file_refs: [csvFile.file_ref, pdfFile.file_ref],
+      status: options.verifierFailed ? "failed" : canonical.status,
+      state: canonical.state,
+      action: canonical.action,
+      observation: options.verifierFailed ? "至少一项确定性效果门失败，成果不得标为验证通过。" : canonical.observation,
+      cost: canonical.cost,
+      result: options.verifierFailed ? "至少一项确定性效果门失败，成果不得标为验证通过。" : canonical.result,
+      source_file_refs: canonical.source_file_refs,
       artifact_ids: artifactIds,
-      prohibited_side_effects: ["不覆盖原始账表", "不记账", "不发起付款"],
+      prohibited_side_effects: canonical.prohibited_side_effects,
+      finance_review_outcome: outcome,
       created_at: new Date().toISOString(),
       external_action: "none",
     }],
@@ -512,7 +472,7 @@ function verifiedEffectSnapshot(body: { workspace_id: string; instruction: strin
       ...base.events,
       { sequence: 17, event_name: "deterministic_office_tool_started", occurred_at: new Date().toISOString(), status: "verifying", message: "已调用确定性办公工具；本次不额外调用模型。", details: {} },
       { sequence: 18, event_name: "run_workspace_artifact_written", occurred_at: new Date().toISOString(), status: "verifying", message: "已在隔离运行工作区生成“未付统计.csv”。", details: {} },
-      { sequence: 19, event_name: "deterministic_verification_completed", occurred_at: new Date().toISOString(), status: "verifying", message: "真实成果文件已通过确定性效果门，仍需用户复核。", details: {} },
+      { sequence: 19, event_name: options.verifierFailed ? "scenario_effect_bounded" : "deterministic_verification_completed", occurred_at: new Date().toISOString(), status: "verifying", message: options.verifierFailed ? "成果未通过确定性效果门。" : "真实成果文件已通过确定性效果门，仍需用户复核。", details: {} },
     ],
     last_event_sequence: 20,
   };
@@ -1753,7 +1713,7 @@ function locationFailureSnapshot(body: { workspace_id: string; instruction: stri
 }
 async function fulfillJson(route: Route, body: unknown, status = 200) { await route.fulfill({ status, contentType: "application/json", body: JSON.stringify(body) }); }
 
-async function mockHarness(page: Page, options: { failFirstStart?: boolean; failDecisionDefer?: boolean; disconnect?: boolean; failed?: boolean; locationFailure?: boolean; sourceRecovery?: boolean; sourceRecoveryThreeCandidates?: boolean; verifiedArtifactAuditPending?: boolean; verifiedArtifactAuditPendingDistinct?: boolean; verifiedFinanceArtifactAuditPending?: boolean; unverifiedArtifactLocationPending?: boolean; terminalArtifactLocationPending?: boolean; boundedRecovery?: boolean; effectArtifact?: boolean; outboundEffect?: boolean; reactEffect?: boolean; evaluationEffect?: boolean; dashboardEffect?: boolean; dashboardEffectFailed?: boolean; releaseEffect?: boolean; releaseEffectRepaired?: boolean; releaseEffectFailed?: boolean; candidateEffect?: boolean; candidateEffectImproved?: boolean; candidateEffectFailed?: boolean; legalEffect?: boolean; legalEffectRepaired?: boolean; legalEffectFailed?: boolean; effectBoundary?: boolean; reviewTable?: boolean; workspaceFailures?: number; interactiveLoop?: boolean; evidenceGate?: boolean } = {}) {
+async function mockHarness(page: Page, options: { failFirstStart?: boolean; failDecisionDefer?: boolean; disconnect?: boolean; failed?: boolean; locationFailure?: boolean; sourceRecovery?: boolean; sourceRecoveryThreeCandidates?: boolean; verifiedArtifactAuditPending?: boolean; verifiedArtifactAuditPendingDistinct?: boolean; verifiedFinanceArtifactAuditPending?: boolean; unverifiedArtifactLocationPending?: boolean; terminalArtifactLocationPending?: boolean; boundedRecovery?: boolean; effectArtifact?: boolean; financePositiveCandidate?: boolean; financeVerifierFailed?: boolean; outboundEffect?: boolean; reactEffect?: boolean; evaluationEffect?: boolean; dashboardEffect?: boolean; dashboardEffectFailed?: boolean; releaseEffect?: boolean; releaseEffectRepaired?: boolean; releaseEffectFailed?: boolean; candidateEffect?: boolean; candidateEffectImproved?: boolean; candidateEffectFailed?: boolean; legalEffect?: boolean; legalEffectRepaired?: boolean; legalEffectFailed?: boolean; effectBoundary?: boolean; reviewTable?: boolean; workspaceFailures?: number; interactiveLoop?: boolean; evidenceGate?: boolean } = {}) {
   let workspaceCalls = 0; let startCalls = 0; let streamCalls = 0;
   let currentBody = { workspace_id: "forte-public-office", instruction: "" };
   // Mock snapshots intentionally cover several server state shapes in one route.
@@ -1796,6 +1756,10 @@ async function mockHarness(page: Page, options: { failFirstStart?: boolean; fail
         ? verifiedArtifactAuditPendingSnapshot(body, options.verifiedArtifactAuditPendingDistinct)
         : options.reviewTable
         ? tableEvidenceReviewSnapshot(body)
+        : options.financeVerifierFailed
+        ? verifiedEffectSnapshot(body, { verifierFailed: true })
+        : options.financePositiveCandidate
+        ? verifiedEffectSnapshot(body, { positiveCandidate: true })
         : options.effectArtifact
         ? verifiedEffectSnapshot(body)
         : options.outboundEffect
@@ -1932,7 +1896,7 @@ async function mockHarness(page: Page, options: { failFirstStart?: boolean; fail
     }
     if (path.startsWith("/v1/harness/runs/")) {
       if (options.disconnect && streamCalls === 1) return fulfillJson(route, { ...snapshot(currentBody, "queued"), status: "indexing", last_event_sequence: 1, version: 2 });
-      if (options.interactiveLoop || options.evidenceGate || options.sourceRecovery || options.verifiedArtifactAuditPending || options.verifiedArtifactAuditPendingDistinct || options.verifiedFinanceArtifactAuditPending || options.unverifiedArtifactLocationPending || options.terminalArtifactLocationPending || options.boundedRecovery || options.locationFailure || options.effectArtifact || options.outboundEffect || options.reactEffect || options.evaluationEffect || options.dashboardEffect || options.dashboardEffectFailed || options.releaseEffect || options.releaseEffectRepaired || options.releaseEffectFailed || options.candidateEffect || options.candidateEffectImproved || options.candidateEffectFailed || options.legalEffect || options.legalEffectRepaired || options.legalEffectFailed || options.effectBoundary) return fulfillJson(route, currentSnapshot);
+      if (options.interactiveLoop || options.evidenceGate || options.sourceRecovery || options.verifiedArtifactAuditPending || options.verifiedArtifactAuditPendingDistinct || options.verifiedFinanceArtifactAuditPending || options.unverifiedArtifactLocationPending || options.terminalArtifactLocationPending || options.boundedRecovery || options.locationFailure || options.effectArtifact || options.financePositiveCandidate || options.financeVerifierFailed || options.outboundEffect || options.reactEffect || options.evaluationEffect || options.dashboardEffect || options.dashboardEffectFailed || options.releaseEffect || options.releaseEffectRepaired || options.releaseEffectFailed || options.candidateEffect || options.candidateEffectImproved || options.candidateEffectFailed || options.legalEffect || options.legalEffectRepaired || options.legalEffectFailed || options.effectBoundary) return fulfillJson(route, currentSnapshot);
       currentSnapshot = snapshot(currentBody, options.failed ? "failed" : "completed");
       return fulfillJson(route, currentSnapshot);
     }
@@ -1957,7 +1921,7 @@ test("shows one complete folder workspace instead of registered scenarios", asyn
   await expect(page.getByRole("treeitem", { name: "展开文件夹 法务/合同与授权" })).toBeVisible();
   await page.getByRole("treeitem", { name: "展开文件夹 法务/合同与授权" }).click();
   await expect(page.getByRole("treeitem", { name: `打开 ${pdfFile.display_path}` })).toBeVisible();
-  await expect(page.getByText("星海科技")).toBeVisible();
+  await expect(page.getByText("绵阳长城发展融资担保有限公司")).toBeVisible();
   if (process.env.CAPTURE_DR0028_EVIDENCE === "1") {
     await page.locator(".data-workbench-grid").screenshot({ path: "../../docs/evidence/screenshots/dr-0028-hierarchical-workspace.png" });
   }
@@ -1967,7 +1931,7 @@ test("shows one complete folder workspace instead of registered scenarios", asyn
 
 test("previews CSV, PDF, DOCX and TXT with security facts", async ({ page }) => {
   await mockHarness(page); await page.goto("/");
-  await expect(page.getByText("星海科技")).toBeVisible();
+  await expect(page.getByText("绵阳长城发展融资担保有限公司")).toBeVisible();
   await openFile(page, pdfFile.display_label);
   await expect(page.getByText("授权范围：仅限本项目合同审阅。")).toBeVisible();
   await openFile(page, docxFile.display_label);
@@ -2008,6 +1972,7 @@ test("runs an arbitrary task while the agent selects evidence from the whole wor
 });
 
 test("shows a real run-workspace file, deterministic checks and a download", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 1100 });
   await mockHarness(page, { effectArtifact: true });
   await page.goto("/");
   await page.getByRole("textbox", { name: "任务指令" }).fill("核对三期往来明细，生成未付统计、未收统计，并判断是否存在僵尸账款。");
@@ -2018,7 +1983,12 @@ test("shows a real run-workspace file, deterministic checks and a download", asy
   await expect(artifacts).toContainText("2026 期末未付明细");
   await expect(artifacts).toContainText("2026 期末未收明细");
   await expect(artifacts).toContainText("三期僵尸账款核对说明");
-  await expect(artifacts).toContainText("3 份成果共 7 项唯一确定性检查，7/7 通过");
+  await expect(artifacts).toContainText("最终财务处置待人工处理");
+  await expect(artifacts).toContainText("这是跨期风险候选，不是付款、核销、记账或坏账确认");
+  await expect(artifacts).toContainText("确定性检查通过");
+  await expect(artifacts).toContainText("当前启发式未发现候选，仍需财务复核");
+  await expect(artifacts).toContainText("最终财务处置");
+  await expect(artifacts).toContainText("尚未发生");
   await expect(artifacts).toContainText("涵盖期间");
   await expect(artifacts).toContainText("统计口径");
   await expect(artifacts).toContainText("用途");
@@ -2030,9 +2000,12 @@ test("shows a real run-workspace file, deterministic checks and a download", asy
   await expect(artifacts).toContainText("3 份内容来源");
   await expect(artifacts).toContainText("原始 FORTE 文件没有被修改");
   await artifacts.getByText("查看逐项检查").first().click();
-  await expect(artifacts).toContainText("31 条贷方期末余额逐行相等");
+  await expect(artifacts).toContainText("31 条来源行的科目、客商、方向、金额、file_ref 与 Excel 位置完全一致");
   await artifacts.getByText("查看效果回执").click();
   await expect(artifacts).toContainText("0 次额外模型调用");
+  await expect(artifacts.locator(".finance-review-outcome > header h3")).toHaveCSS("font-size", "20px");
+  const financeBodySize = await artifacts.locator(".finance-review-statuses p").first().evaluate((element) => Number.parseFloat(getComputedStyle(element).fontSize));
+  expect(financeBodySize).toBeGreaterThanOrEqual(11);
 
   const downloadPromise = page.waitForEvent("download");
   await artifacts.getByRole("button", { name: "下载成果" }).first().click();
@@ -2046,6 +2019,9 @@ test("shows a real run-workspace file, deterministic checks and a download", asy
   if (process.env.CAPTURE_DR0037_EVIDENCE === "1") {
     await artifacts.screenshot({ path: "../../docs/evidence/screenshots/dr-0037-tc05-artifact-semantics-desktop.png" });
   }
+  if (process.env.CAPTURE_TC05_EVIDENCE === "1") {
+    await page.screenshot({ path: "../../docs/evidence/screenshots/tc05-finance-review-canonical-desktop-20260829.png", fullPage: true });
+  }
   await page.setViewportSize({ width: 390, height: 844 });
   const metrics = await page.evaluate(() => ({ viewport: document.documentElement.clientWidth, scroll: document.documentElement.scrollWidth }));
   expect(metrics.scroll).toBeLessThanOrEqual(metrics.viewport);
@@ -2054,10 +2030,58 @@ test("shows a real run-workspace file, deterministic checks and a download", asy
   if (process.env.CAPTURE_DR0037_EVIDENCE === "1") {
     await artifacts.screenshot({ path: "../../docs/evidence/screenshots/dr-0037-tc05-artifact-semantics-mobile.png" });
   }
+  if (process.env.CAPTURE_TC05_EVIDENCE === "1") {
+    await page.screenshot({ path: "../../docs/evidence/screenshots/tc05-finance-review-canonical-mobile-20260829.png", fullPage: true });
+  }
   if (process.env.CAPTURE_SCENARIO_EFFECT_GATE === "1") {
     await artifacts.screenshot({ path: "../../docs/evidence/screenshots/scenario-effect-gate-artifact-mobile.png" });
     await page.screenshot({ path: "../../docs/evidence/screenshots/scenario-effect-gate-mobile.png", fullPage: true });
   }
+});
+
+test("shows a positive TC-05 candidate as an amber review finding, not a system failure", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 1100 });
+  await mockHarness(page, { financePositiveCandidate: true });
+  await page.goto("/");
+  await page.getByRole("textbox", { name: "任务指令" }).fill("核对三期往来明细，生成未付统计、未收统计，并判断是否存在僵尸账款。");
+  await page.getByRole("button", { name: "启动 Control Loop" }).click();
+
+  const panel = page.locator(".finance-review-outcome");
+  await expect(panel).toContainText("发现 1 条候选");
+  await expect(panel).toContainText("需财务复核");
+  await expect(panel).toContainText("绵阳长城发展融资担保有限公司");
+  await expect(panel).not.toContainText("当前 0 条候选");
+  await expect(page.locator(".workspace-effect-boundary")).toHaveCount(0);
+  await panel.locator(".finance-review-candidates summary").first().click();
+  await expect(panel.locator(".finance-review-candidates li")).toHaveCount(3);
+  await expect(panel).toContainText("Sheet1!A3:J3");
+  await expect(panel).toContainText("1,500,000");
+  await expect(panel).toContainText("最终财务处置");
+
+  if (process.env.CAPTURE_TC05_EVIDENCE === "1") {
+    await page.screenshot({ path: "../../docs/evidence/screenshots/tc05-positive-candidate-desktop-20260829.png", fullPage: true });
+  }
+  await page.setViewportSize({ width: 390, height: 844 });
+  const metrics = await page.evaluate(() => ({ viewport: document.documentElement.clientWidth, scroll: document.documentElement.scrollWidth }));
+  expect(metrics.scroll).toBeLessThanOrEqual(metrics.viewport);
+  const panelMetrics = await panel.evaluate((element) => ({ width: element.clientWidth, scroll: element.scrollWidth }));
+  expect(panelMetrics.scroll).toBeLessThanOrEqual(panelMetrics.width);
+  if (process.env.CAPTURE_TC05_EVIDENCE === "1") {
+    await page.screenshot({ path: "../../docs/evidence/screenshots/tc05-positive-candidate-mobile-20260829.png", fullPage: true });
+  }
+});
+
+test("keeps TC-05 outcome red when the independent artifact verifier fails", async ({ page }) => {
+  await mockHarness(page, { financeVerifierFailed: true });
+  await page.goto("/");
+  await page.getByRole("textbox", { name: "任务指令" }).fill("核对三期往来明细，生成未付统计、未收统计，并判断是否存在僵尸账款。");
+  await page.getByRole("button", { name: "启动 Control Loop" }).click();
+
+  const artifacts = page.locator(".workspace-artifacts");
+  await expect(artifacts.locator(".finance-review-statuses")).toContainText("确定性检查未通过");
+  await expect(artifacts).toContainText("当前文件不得采用");
+  await expect(artifacts.locator(".workspace-effect-boundary")).toContainText("确定性效果门未通过");
+  await expect(artifacts.locator(".workspace-artifact-status").first()).toContainText("检查未通过");
 });
 
 test("distinguishes a TC-10 flow document from real outbound execution", async ({ page }) => {

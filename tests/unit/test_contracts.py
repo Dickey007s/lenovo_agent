@@ -470,3 +470,108 @@ def test_candidate_review_outcome_round_trips_without_becoming_a_hiring_decision
     assert restored_receipt.candidate_review_outcome is not None
     assert restored_receipt.candidate_review_outcome.human_review_required is True
     assert restored_receipt.candidate_review_outcome.fairness_evaluated is False
+
+
+def test_finance_review_outcome_round_trips_without_becoming_an_accounting_action() -> None:
+    now = datetime.now(timezone.utc)
+    outcome = {
+        "outcome_id": "finance-review-outcome-finance-018",
+        "status": "review_required",
+        "decision": "发现 1 条跨期风险候选，最终由财务复核。",
+        "summary": "2026 期末未付 31 条、未收 2 条，跨三期候选 1 条。",
+        "period_ids": ["2025_h1", "2025_h2", "2026"],
+        "unpaid_count": 31,
+        "unpaid_total": "3984606.46",
+        "unreceived_count": 2,
+        "unreceived_total": "4992891.47",
+        "candidate_count": 1,
+        "candidates": [
+            {
+                "candidate_id": "finance-candidate-123456789abc",
+                "key": "其他应收款\\其他应收往来 / 绵阳长城发展融资担保有限公司",
+                "subject": "其他应收款\\其他应收往来",
+                "customer": "绵阳长城发展融资担保有限公司",
+                "sources": [
+                    {
+                        "period_id": period_id,
+                        "period_label": period_label,
+                        "source_file_ref": f"finance-{period_id}",
+                        "file_name": file_name,
+                        "sheet_name": "Sheet1",
+                        "row_number": 3,
+                        "locator": "Sheet1!A3:J3",
+                        "direction": "借",
+                        "ending_balance": "1500000",
+                    }
+                    for period_id, period_label, file_name in (
+                        ("2025_h1", "2025 年上半年", "2025往来明细-上半年.xlsx"),
+                        ("2025_h2", "2025 年下半年", "2025往来明细-下半年.xlsx"),
+                        ("2026", "2026 年", "2026往来明细.xlsx"),
+                    )
+                ],
+                "review_action": "核对期间内发生额、账龄、币种、主体和核销记录。",
+                "exit_condition": "财务负责人记录候选是否继续处置及依据。",
+            }
+        ],
+        "method": "同一科目和客商在三个期间均为正数借方期末余额且金额完全相同。",
+        "limitations": ["不检查期间内发生额。", "不支持多主体或多币种。"],
+        "human_review_required": True,
+        "original_inputs_modified": False,
+        "external_action": "none",
+    }
+    common = {
+        "capability_id": "office-finance-reconciliation",
+        "scenario_id": "TC-05",
+        "source_file_refs": ["finance-2025-h1", "finance-2025-h2", "finance-2026"],
+        "finance_review_outcome": outcome,
+        "created_at": now,
+    }
+    artifact = AgentControlLoopWorkspaceArtifact.model_validate(
+        {
+            **common,
+            "artifact_id": "workspace-artifact-123456789abc",
+            "title": "三期僵尸账款候选核对说明",
+            "file_name": "跨期核对说明.md",
+            "media_type": "text/markdown",
+            "size": 2048,
+            "round_number": 1,
+            "validator_id": "validator-finance-reconciliation-v2",
+            "verifier_status": "passed",
+            "checks": [
+                {
+                    "check_id": "check-finance-zombie",
+                    "label": "候选枚举与来源重算一致",
+                    "passed": True,
+                    "detail": "1 条候选与三个期间批准来源逐项一致。",
+                }
+            ],
+            "summary": "发现 1 条候选，需财务复核。",
+            "download_path": "/v1/harness/runs/run-1/artifacts/artifact-1",
+        }
+    )
+    receipt = AgentControlLoopEffectReceipt.model_validate(
+        {
+            **common,
+            "receipt_id": "effect-receipt-123456789abc",
+            "status": "passed",
+            "state": "冻结并重读三个期间的批准来源。",
+            "action": "生成两份 2026 期末明细和一份三期候选说明。",
+            "observation": "来源、金额、候选枚举和成果结构通过确定性复核。",
+            "cost": "0 次额外模型调用。",
+            "result": "候选仍需财务复核，没有发生会计动作。",
+            "artifact_ids": [artifact.artifact_id],
+        }
+    )
+
+    restored_artifact = AgentControlLoopWorkspaceArtifact.model_validate_json(
+        artifact.model_dump_json()
+    )
+    restored_receipt = AgentControlLoopEffectReceipt.model_validate_json(
+        receipt.model_dump_json()
+    )
+    assert restored_artifact.finance_review_outcome is not None
+    assert restored_artifact.finance_review_outcome.candidate_count == 1
+    assert restored_artifact.finance_review_outcome.candidates[0].sources[2].period_id == "2026"
+    assert restored_receipt.finance_review_outcome == restored_artifact.finance_review_outcome
+    assert restored_receipt.finance_review_outcome.original_inputs_modified is False
+    assert restored_receipt.finance_review_outcome.external_action == "none"

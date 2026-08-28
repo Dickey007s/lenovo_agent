@@ -1,0 +1,58 @@
+{
+  "schema_version": "tc05-ui-screenshots.v1",
+  "captured_at": "2026-08-29T02:57:35+08:00",
+  "capture_command": "$env:CAPTURE_TC05_EVIDENCE='1'; pnpm --dir apps/web exec playwright test e2e/harness-workbench.spec.ts --grep \"real run-workspace|positive TC-05 candidate|TC-05 outcome red\"",
+  "source_fixture": {
+    "path": "docs/evidence/manifests/tc05-public-finance-review-outcome-20260829.json",
+    "bytes": 22585,
+    "sha256": "86b1074b590ac47b885f3b996aa4bd56af4fd8c92e243d424d1f3aa4c1ba95ec",
+    "fact_owner": "ScenarioEffectEngine public Artifact and EffectReceipt projection"
+  },
+  "screenshots": [
+    {
+      "path": "docs/evidence/screenshots/tc05-finance-review-canonical-desktop-20260829.png",
+      "width": 1440,
+      "height": 1100,
+      "bytes": 181935,
+      "sha256": "1ba123977e5976d3d50f864fdfa05a90b0f59c0bdae2eb2327e4073fec1bf94d",
+      "state": "canonical_zero_candidate",
+      "capture_kind": "normal_three_column_page"
+    },
+    {
+      "path": "docs/evidence/screenshots/tc05-finance-review-canonical-mobile-20260829.png",
+      "width": 390,
+      "height": 8431,
+      "bytes": 489646,
+      "sha256": "3447d8323790aaee2cf7ab97b4f654982e09e0c6796bc23170e1f94a8b7690f2",
+      "state": "canonical_zero_candidate",
+      "capture_kind": "normal_single_column_full_page"
+    },
+    {
+      "path": "docs/evidence/screenshots/tc05-positive-candidate-desktop-20260829.png",
+      "width": 1440,
+      "height": 1100,
+      "bytes": 156009,
+      "sha256": "2aaf83d15d9187819fc3b771c158a05efd64a47ee9e3d96a50728b297b03bbed",
+      "state": "one_candidate_review_required",
+      "capture_kind": "normal_three_column_page"
+    },
+    {
+      "path": "docs/evidence/screenshots/tc05-positive-candidate-mobile-20260829.png",
+      "width": 390,
+      "height": 8234,
+      "bytes": 467827,
+      "sha256": "0d936ec9b2fb2571eff7f5a65e9d3b72aa6fcaf8bd28d630360841803b49674b",
+      "state": "one_candidate_review_required",
+      "capture_kind": "normal_single_column_full_page"
+    }
+  ],
+  "assertions": {
+    "desktop_viewport": "1440x1100",
+    "mobile_viewport_width": 390,
+    "page_horizontal_overflow": 0,
+    "finance_panel_horizontal_overflow": 0,
+    "body_font_min_px": 11,
+    "browser_recomputes_finance_facts": false
+  },
+  "boundary": "Screenshots and browser automation prove the tested projection, typography and geometry. They do not prove finance-user comprehension, accounting correctness outside the fixed adapter or any external accounting action."
+}

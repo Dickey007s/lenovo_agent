@@ -10,7 +10,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any, Literal
 
-from pydantic import Field, field_validator
+from pydantic import Field, ValidationInfo, field_validator
 
 from .models import StrictModel
 
@@ -748,6 +748,82 @@ class AgentControlLoopCandidateReviewOutcome(StrictModel):
     external_action: Literal["none"] = "none"
 
 
+class AgentControlLoopFinanceCandidateSource(StrictModel):
+    """One period-specific source row for a cross-period finance candidate."""
+
+    period_id: Literal["2025_h1", "2025_h2", "2026"]
+    period_label: str = Field(min_length=1, max_length=80)
+    source_file_ref: str = Field(min_length=1, max_length=120)
+    file_name: str = Field(min_length=1, max_length=180)
+    sheet_name: str = Field(min_length=1, max_length=120)
+    row_number: int = Field(ge=2, le=1_000_000)
+    locator: str = Field(min_length=1, max_length=180)
+    direction: Literal["借"] = "借"
+    ending_balance: str = Field(pattern=r"^(0|[1-9][0-9]*)(\.[0-9]+)?$")
+
+
+class AgentControlLoopFinanceCandidate(StrictModel):
+    """A source-derived cross-period risk candidate, not an accounting decision."""
+
+    candidate_id: str = Field(pattern=r"^finance-candidate-[0-9a-f]{12}$")
+    key: str = Field(min_length=1, max_length=360)
+    subject: str = Field(min_length=1, max_length=180)
+    customer: str = Field(min_length=1, max_length=180)
+    sources: list[AgentControlLoopFinanceCandidateSource] = Field(min_length=3, max_length=3)
+    review_action: str = Field(min_length=1, max_length=800)
+    exit_condition: str = Field(min_length=1, max_length=800)
+
+
+class AgentControlLoopFinanceReviewOutcome(StrictModel):
+    """Finance review projection kept separate from deterministic file verification."""
+
+    outcome_id: str = Field(pattern=r"^finance-review-outcome-[a-z0-9-]{3,80}$")
+    status: Literal["review_required", "invalid"]
+    decision: str = Field(min_length=1, max_length=500)
+    summary: str = Field(min_length=1, max_length=1_000)
+    period_ids: list[Literal["2025_h1", "2025_h2", "2026"]] = Field(
+        min_length=3, max_length=3
+    )
+    unpaid_count: int = Field(ge=0, le=1_000_000)
+    unpaid_total: str = Field(pattern=r"^(0|[1-9][0-9]*)(\.[0-9]+)?$")
+    unreceived_count: int = Field(ge=0, le=1_000_000)
+    unreceived_total: str = Field(pattern=r"^(0|[1-9][0-9]*)(\.[0-9]+)?$")
+    candidate_count: int = Field(ge=0, le=1_000)
+    candidates: list[AgentControlLoopFinanceCandidate] = Field(
+        default_factory=list, max_length=1_000
+    )
+    method: str = Field(min_length=1, max_length=1_000)
+    limitations: list[str] = Field(min_length=1, max_length=12)
+    human_review_required: Literal[True] = True
+    original_inputs_modified: Literal[False] = False
+    external_action: Literal["none"] = "none"
+
+    @field_validator("period_ids")
+    @classmethod
+    def validate_period_order(cls, value: list[str]) -> list[str]:
+        if value != ["2025_h1", "2025_h2", "2026"]:
+            raise ValueError("finance review periods must contain the three fixed periods in order")
+        return value
+
+    @field_validator("candidates")
+    @classmethod
+    def validate_candidate_projection(
+        cls,
+        value: list[AgentControlLoopFinanceCandidate],
+        info: ValidationInfo,
+    ) -> list[AgentControlLoopFinanceCandidate]:
+        if len(value) != info.data.get("candidate_count"):
+            raise ValueError("finance candidate_count must equal the candidate list length")
+        candidate_ids = [item.candidate_id for item in value]
+        if len(candidate_ids) != len(set(candidate_ids)):
+            raise ValueError("finance candidate ids must be unique")
+        expected_periods = ["2025_h1", "2025_h2", "2026"]
+        for candidate in value:
+            if [source.period_id for source in candidate.sources] != expected_periods:
+                raise ValueError("each finance candidate must bind the three fixed periods in order")
+        return value
+
+
 class AgentControlLoopBusinessGateOutcome(StrictModel):
     """A business decision projected independently from deterministic checks."""
 
@@ -801,6 +877,7 @@ class AgentControlLoopWorkspaceArtifact(StrictModel):
     business_gate_outcome: AgentControlLoopBusinessGateOutcome | None = None
     legal_review_outcome: AgentControlLoopLegalReviewOutcome | None = None
     candidate_review_outcome: AgentControlLoopCandidateReviewOutcome | None = None
+    finance_review_outcome: AgentControlLoopFinanceReviewOutcome | None = None
     download_path: str = Field(min_length=1, max_length=300)
     created_at: datetime
     original_inputs_modified: Literal[False] = False
@@ -831,6 +908,7 @@ class AgentControlLoopEffectReceipt(StrictModel):
     business_gate_outcome: AgentControlLoopBusinessGateOutcome | None = None
     legal_review_outcome: AgentControlLoopLegalReviewOutcome | None = None
     candidate_review_outcome: AgentControlLoopCandidateReviewOutcome | None = None
+    finance_review_outcome: AgentControlLoopFinanceReviewOutcome | None = None
     created_at: datetime
     external_action: Literal["none"] = "none"
 

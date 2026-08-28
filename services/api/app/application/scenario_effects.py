@@ -36,6 +36,7 @@ from packages.contracts.harness_models import (
     AgentControlLoopArtifactTestSuite,
     AgentControlLoopBusinessGateOutcome,
     AgentControlLoopCandidateReviewOutcome,
+    AgentControlLoopFinanceReviewOutcome,
     AgentControlLoopLegalReviewOutcome,
 )
 from services.api.app.application.candidate_review_effect import (
@@ -66,6 +67,12 @@ from services.api.app.application.legal_delegation_effect import (
     LegalDelegationValidationError,
     LegalSourceInput,
     build_legal_delegation_review,
+)
+from services.api.app.application.finance_reconciliation_effect import (
+    SOURCE_SPECS as FINANCE_SOURCE_SPECS,
+    FinanceReconciliationValidationError,
+    FinanceSourceInput,
+    build_finance_reconciliation,
 )
 
 
@@ -104,6 +111,7 @@ class GeneratedOfficeArtifact:
     business_gate_outcome: AgentControlLoopBusinessGateOutcome | None = None
     legal_review_outcome: AgentControlLoopLegalReviewOutcome | None = None
     candidate_review_outcome: AgentControlLoopCandidateReviewOutcome | None = None
+    finance_review_outcome: AgentControlLoopFinanceReviewOutcome | None = None
 
     @property
     def verifier_status(self) -> str:
@@ -540,9 +548,13 @@ class ScenarioEffectEngine:
                 key = (group, str(item.get("display_label")))
                 if key in requested_keys:
                     matches[key].append(str(item.get("file_ref")))
-        if spec.scenario_id in {"TC-06", "TC-07"}:
-            folder_label = "人力招聘" if spec.scenario_id == "TC-06" else "法务"
-            expected_count = 7
+        if spec.scenario_id in {"TC-05", "TC-06", "TC-07"}:
+            folder_label = {
+                "TC-05": "财务管理",
+                "TC-06": "人力招聘",
+                "TC-07": "法务",
+            }[spec.scenario_id]
+            expected_count = 3 if spec.scenario_id == "TC-05" else 7
             legal_folder = next(
                 (folder for folder in folders if folder.get("display_label") == folder_label),
                 None,
@@ -560,11 +572,11 @@ class ScenarioEffectEngine:
                 or set(actual_labels) != expected_labels
             ):
                 raise ScenarioEffectError(
-                    (
-                        "hr-001 人力招聘目录必须恰好包含两份 JD 和五份简历"
-                        if spec.scenario_id == "TC-06"
-                        else "Legal-020 法务目录必须恰好包含一份规则和六份委托书"
-                    )
+                    {
+                        "TC-05": "Finance-018 财务管理目录必须恰好包含三个固定期间工作簿",
+                        "TC-06": "hr-001 人力招聘目录必须恰好包含两份 JD 和五份简历",
+                        "TC-07": "Legal-020 法务目录必须恰好包含一份规则和六份委托书",
+                    }[spec.scenario_id]
                 )
         preview_refs: list[str] = []
         source_refs: list[str] = []
@@ -672,6 +684,14 @@ class ScenarioEffectEngine:
         candidate_outcome = candidate_outcomes[0] if candidate_outcomes else None
         if candidate_outcomes and any(item != candidate_outcome for item in candidate_outcomes[1:]):
             raise ScenarioEffectError("同一效果的候选人辅助筛选事实不一致")
+        finance_outcomes = [
+            artifact.finance_review_outcome
+            for artifact in artifacts
+            if artifact.finance_review_outcome is not None
+        ]
+        finance_outcome = finance_outcomes[0] if finance_outcomes else None
+        if finance_outcomes and any(item != finance_outcome for item in finance_outcomes[1:]):
+            raise ScenarioEffectError("同一效果的财务复核事实不一致")
         return ScenarioEffectExecution(
             scenario_id=spec.scenario_id,
             capability_id=spec.capability_id,
@@ -700,6 +720,11 @@ class ScenarioEffectEngine:
                     if candidate_outcome
                     else ""
                 )
+                + (
+                    f" 识别 {finance_outcome.candidate_count} 条跨期风险候选，最终财务处置尚未发生。"
+                    if finance_outcome
+                    else ""
+                )
             ),
             cost="0 次额外模型调用；仅消耗本机确定性解析、计算与文件写入。",
             result=(
@@ -709,7 +734,11 @@ class ScenarioEffectEngine:
                     else (
                         "确定性检查通过；只形成辅助筛选建议，最终录用或淘汰仍待 HR 人工决定。"
                         if candidate_outcome
-                        else "所有确定性效果门通过，成果仍需用户复核。"
+                        else (
+                            "确定性计算与三份成果结构通过；只形成跨期风险候选，最终财务处置仍待人工复核。"
+                            if finance_outcome
+                            else "所有确定性效果门通过，成果仍需用户复核。"
+                        )
                     )
                 )
                 if passed
@@ -2027,189 +2056,101 @@ class ScenarioEffectEngine:
     def _finance_reconciliation(
         self, catalog: ScenarioEffectCatalog, spec: ScenarioEffectSpec
     ) -> tuple[GeneratedOfficeArtifact, ...]:
-        previews = self._previews(catalog, spec)
-        source_refs = self._source_refs(previews)
-        current = previews["2026往来明细.xlsx"]
-        current_source_refs = (str(current["file_ref"]),)
-        current_records = self._table_records(current)
-        unpaid: list[list[str]] = []
-        unreceived: list[list[str]] = []
-        for row in current_records:
-            direction = row.get("方向#2", row.get("方向", ""))
-            amount = self._decimal(row.get("期末余额", ""))
-            if amount <= 0:
-                continue
-            output = [row["科目名称"], row["客商名称"], self._format_amount(amount)]
-            if direction == "贷":
-                unpaid.append(output)
-            elif direction == "借":
-                unreceived.append(output)
-
-        def sort_key(item: list[str]) -> tuple[str, Decimal]:
-            return item[1], -self._decimal(item[2])
-
-        unpaid.sort(key=sort_key)
-        unreceived.sort(key=sort_key)
-
-        period_records = {
-            label: self._table_records(preview) for label, preview in previews.items()
-        }
-        balances: dict[tuple[str, str], list[Decimal | None]] = defaultdict(list)
-        for label in (
-            "2025往来明细-上半年.xlsx",
-            "2025往来明细-下半年.xlsx",
-            "2026往来明细.xlsx",
-        ):
-            period = {
-                (row["科目名称"], row["客商名称"]): (
-                    self._decimal(row["期末余额"])
-                    if row.get("方向#2", row.get("方向", "")) == "借"
-                    and self._decimal(row["期末余额"]) > 0
-                    else None
-                )
-                for row in period_records[label]
-            }
-            for key in set(balances) | set(period):
-                balances[key].append(period.get(key))
-        zombie = [
-            (subject, customer, values[0])
-            for (subject, customer), values in balances.items()
-            if len(values) == 3
-            and all(value is not None for value in values)
-            and values[0] == values[1] == values[2]
-        ]
-
-        unpaid_content = self._csv_bytes(["科目名称", "客商名称", "未付款项"], unpaid)
-        unreceived_content = self._csv_bytes(["科目名称", "客商名称", "未收款项"], unreceived)
-        conclusion_lines = [
-            "# 跨期往来核对说明",
-            "",
-            f"- 当前未付记录：{len(unpaid)} 条，合计 {self._format_amount(sum((self._decimal(row[2]) for row in unpaid), Decimal(0)))}。",
-            f"- 当前未收记录：{len(unreceived)} 条，合计 {self._format_amount(sum((self._decimal(row[2]) for row in unreceived), Decimal(0)))}。",
-            "- 僵尸账款判断："
-            + (
-                "无僵尸账款。"
-                if not zombie
-                else "；".join(
-                    f"{customer} / {subject} / {self._format_amount(amount or Decimal(0))}"
-                    for subject, customer, amount in zombie
-                )
-            ),
-            "",
-            "> 仅核对 FORTE 公开样本；未发起付款、记账或外部动作。",
-        ]
-        conclusion_content = "\n".join(conclusion_lines).encode("utf-8")
-
-        current_map = {
-            (
-                row["科目名称"],
-                row["客商名称"],
-                row.get("方向#2", row.get("方向", "")),
-            ): self._decimal(row["期末余额"])
-            for row in current_records
-            if self._decimal(row["期末余额"]) > 0
-        }
-        cross_period_checks = (
-            self._check(
-                "check-finance-source",
-                "三期来源完整",
-                len(previews) == 3,
-                "三个固定期间工作簿均通过 Catalog 完整性检查。",
-            ),
-            self._check(
-                "check-finance-zombie",
-                "跨期僵尸账款复算",
-                not zombie,
-                "按同一客商、同一科目、三期借方期末余额逐项比较，结果为无僵尸账款。",
-            ),
+        sources = self._finance_source_inputs(catalog, spec)
+        source_bytes_before = {source.file_ref: source.content for source in sources}
+        try:
+            build = build_finance_reconciliation(sources)
+        except FinanceReconciliationValidationError as exc:
+            raise ScenarioEffectError(
+                f"TC-05 来源或解析合同失败：{exc.code}：{exc.detail}"
+            ) from exc
+        source_unchanged = all(
+            catalog.checked_input_bytes(file_ref) == content
+            for file_ref, content in source_bytes_before.items()
         )
-        unpaid_checks = (
-            self._check(
-                "check-finance-current-source",
-                "2026 内容来源",
-                len(current_source_refs) == 1,
-                "明细行只取自 2026 往来工作簿，不是三期合并表。",
-            ),
-            self._check(
-                "check-finance-unpaid-rows",
-                "未付逐行复算",
-                all(
-                    current_map.get((row[0], row[1], "贷")) == self._decimal(row[2])
-                    for row in unpaid
+        checks_by_artifact: dict[str, tuple[AgentControlLoopArtifactCheck, ...]] = {}
+        artifact_slugs = {
+            "未付统计.csv": "unpaid",
+            "未收统计.csv": "unreceived",
+            "跨期核对说明.md": "cross-period",
+        }
+        for artifact_name, artifact_slug in artifact_slugs.items():
+            checks_by_artifact[artifact_name] = tuple(
+                self._check(check.check_id, check.label, check.passed, check.detail)
+                for check in build.checks
+                if check.artifact_name == artifact_name
+            ) + (
+                self._check(
+                    f"check-finance-originals-read-only-{artifact_slug}",
+                    "FORTE 原件未修改",
+                    source_unchanged,
+                    "生成和独立复核后重新读取三个工作簿，冻结原始字节保持一致。",
                 ),
-                f"{len(unpaid)} 条贷方期末余额逐行相等。",
-            ),
-            self._check(
-                "check-finance-unpaid-sort",
-                "未付排序",
-                unpaid == sorted(unpaid, key=sort_key),
-                "按客商升序、同客商金额降序。",
-            ),
+            )
+        analysis = build.analysis
+        outcome = analysis.outcome
+        source_by_period = {source.period_id: source for source in sources}
+        current_source_refs = (source_by_period["2026"].file_ref,)
+        all_source_refs = tuple(source_by_period[period_id].file_ref for period_id in ("2025_h1", "2025_h2", "2026"))
+        candidate_summary = (
+            f"发现 {outcome.candidate_count} 条僵尸账款候选，需财务复核。"
+            if outcome.candidate_count
+            else "当前启发式未发现候选，仍需财务复核。"
         )
-        unreceived_checks = (
-            self._check(
-                "check-finance-current-source",
-                "2026 内容来源",
-                len(current_source_refs) == 1,
-                "明细行只取自 2026 往来工作簿，不是三期合并表。",
-            ),
-            self._check(
-                "check-finance-unreceived-rows",
-                "未收逐行复算",
-                all(
-                    current_map.get((row[0], row[1], "借")) == self._decimal(row[2])
-                    for row in unreceived
-                ),
-                f"{len(unreceived)} 条借方期末余额逐行相等。",
-            ),
-            self._check(
-                "check-finance-unreceived-sort",
-                "未收排序",
-                unreceived == sorted(unreceived, key=sort_key),
-                "按客商升序、同客商金额降序。",
-            ),
+        common = dict(
+            validator_id="validator-finance-reconciliation-v2",
+            finance_review_outcome=outcome,
+            review_guidance="先核对三份成果与来源位置；候选只用于人工复核，不会触发付款、核销、记账或坏账确认。",
+            execution_summary="已在隔离运行工作区生成并独立解析成果；FORTE 原始工作簿保持只读，外部动作 0 个。",
         )
         return (
             GeneratedOfficeArtifact(
                 "2026 期末未付明细",
                 "未付统计.csv",
                 "text/csv",
-                unpaid_content,
+                build.unpaid_csv,
                 current_source_refs,
-                "validator-finance-reconciliation-v1",
-                unpaid_checks,
-                f"{len(unpaid)} 条记录已逐行复算。",
+                checks=checks_by_artifact["未付统计.csv"],
+                summary=f"{outcome.unpaid_count} 条 2026 正数贷方期末余额已逐行复算，合计 {outcome.unpaid_total}。",
                 covered_period="2026 年期末",
-                statistic_basis="筛选期末余额大于 0 且方向为“贷”的行；每行代表一个科目与客商组合。",
-                purpose="查看 2026 年期末待付款项；不是三期合并表。",
-                record_count=len(unpaid),
+                statistic_basis="只筛选 2026 工作簿中期末余额大于 0 且期末方向为“贷”的唯一科目+客商行，并保留 Excel 来源位置。",
+                purpose="查看 2026 期末未付明细；不是三期合并表，不代表已付款。",
+                record_count=outcome.unpaid_count,
+                deliverable_type="2026 期末未付明细 CSV",
+                key_outputs=(f"{outcome.unpaid_count} 条记录", f"合计 {outcome.unpaid_total}", "逐行来源 locator"),
+                **common,
             ),
             GeneratedOfficeArtifact(
                 "2026 期末未收明细",
                 "未收统计.csv",
                 "text/csv",
-                unreceived_content,
+                build.unreceived_csv,
                 current_source_refs,
-                "validator-finance-reconciliation-v1",
-                unreceived_checks,
-                f"{len(unreceived)} 条记录已逐行复算。",
+                checks=checks_by_artifact["未收统计.csv"],
+                summary=f"{outcome.unreceived_count} 条 2026 正数借方期末余额已逐行复算，合计 {outcome.unreceived_total}。",
                 covered_period="2026 年期末",
-                statistic_basis="筛选期末余额大于 0 且方向为“借”的行；每行代表一个科目与客商组合。",
-                purpose="查看 2026 年期末待收款项；2 表示记录数，不是期间数。",
-                record_count=len(unreceived),
+                statistic_basis="只筛选 2026 工作簿中期末余额大于 0 且期末方向为“借”的唯一科目+客商行，并保留 Excel 来源位置。",
+                purpose="查看 2026 期末未收明细；不是三期合并表，不代表已收款或已核销。",
+                record_count=outcome.unreceived_count,
+                deliverable_type="2026 期末未收明细 CSV",
+                key_outputs=(f"{outcome.unreceived_count} 条记录", f"合计 {outcome.unreceived_total}", "逐行来源 locator"),
+                **common,
             ),
             GeneratedOfficeArtifact(
                 "三期僵尸账款核对说明",
                 "跨期核对说明.md",
                 "text/markdown",
-                conclusion_content,
-                source_refs,
-                "validator-finance-reconciliation-v1",
-                cross_period_checks,
-                "三期借方未收余额已比较，结论为无僵尸账款。",
+                build.cross_period_markdown,
+                all_source_refs,
+                checks=checks_by_artifact["跨期核对说明.md"],
+                summary=f"三期借方期末余额已按固定启发式比较。{candidate_summary}",
                 covered_period="2025 年上半年、2025 年下半年、2026 年",
-                statistic_basis="按同一科目名称与客商名称，对三期正数借方期末余额逐项比较。",
-                purpose="识别三期借方未收余额连续不变的僵尸账款候选。",
+                statistic_basis="同一科目+客商在三个固定期间均为正数借方期末余额且金额完全相同，才列为候选。",
+                purpose="列出跨期僵尸账款风险候选及三期来源位置，供财务人工复核；不是业务定论。",
+                record_count=outcome.candidate_count,
+                deliverable_type="三期风险候选核对说明 Markdown",
+                key_outputs=(candidate_summary, "三期金额与 locator", "方法、局限与退出条件"),
+                **common,
             ),
         )
 
@@ -3355,6 +3296,52 @@ class ScenarioEffectEngine:
         return AgentControlLoopArtifactCheck(
             check_id=check_id, label=label, passed=bool(passed), detail=detail
         )
+
+    @staticmethod
+    def _finance_source_inputs(
+        catalog: ScenarioEffectCatalog, spec: ScenarioEffectSpec
+    ) -> tuple[FinanceSourceInput, ...]:
+        workspace = catalog.public_workspace()
+        folders = [
+            folder
+            for folder in workspace.get("folders") or []
+            if folder.get("display_label") == "财务管理"
+        ]
+        if len(folders) != 1:
+            raise ScenarioEffectError("Finance-018 财务管理目录必须唯一")
+        items = list(folders[0].get("files") or [])
+        expected_labels = [label for group, label in spec.source_labels if group == "财务管理"]
+        if len(items) != 3 or sorted(str(item.get("display_label")) for item in items) != sorted(
+            expected_labels
+        ):
+            raise ScenarioEffectError("Finance-018 财务管理目录必须恰好包含三个固定期间工作簿")
+        by_label: dict[str, dict[str, Any]] = {}
+        for item in items:
+            label = str(item.get("display_label"))
+            if label in by_label:
+                raise ScenarioEffectError(f"Finance-018 来源逻辑名称重复：{label}")
+            by_label[label] = item
+        result: list[FinanceSourceInput] = []
+        for period_id in ("2025_h1", "2025_h2", "2026"):
+            logical_id, period_label, file_name, _display_path = FINANCE_SOURCE_SPECS[period_id]
+            item = by_label.get(file_name)
+            if item is None:
+                raise ScenarioEffectError(f"Finance-018 缺少来源：{file_name}")
+            file_ref = str(item.get("file_ref"))
+            result.append(
+                FinanceSourceInput(
+                    logical_id=logical_id,
+                    period_id=period_id,
+                    period_label=period_label,
+                    file_name=file_name,
+                    display_path=str(item.get("display_path")),
+                    file_ref=file_ref,
+                    content=catalog.checked_input_bytes(file_ref),
+                    declared_size=int(item.get("size") or 0),
+                    allowlist_verified=True,
+                )
+            )
+        return tuple(result)
 
     @staticmethod
     def _candidate_source_inputs(

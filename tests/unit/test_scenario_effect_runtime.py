@@ -55,6 +55,7 @@ TC04_INSTRUCTION = (
 )
 TC12_INSTRUCTION = "为三个看板工具模块编写 Vitest，修复源码并真实运行测试。"
 TC11_INSTRUCTION = "综合 PRD、上线配置、功能测试和兼容测试，给出上线结论与改进计划。"
+TC05_INSTRUCTION = "核对三期往来明细，生成未付统计、未收统计，并判断是否存在僵尸账款。"
 TC07_INSTRUCTION = "依据统一规则核查六份授权委托书，逐项说明风险、资料不足和复核动作。"
 TC06_INSTRUCTION = "依据两个岗位说明分别审阅五份简历，保留逐条证据并输出辅助筛选结果。"
 
@@ -312,6 +313,57 @@ class CandidateReviewAnalyst:
                             role="expected",
                             label="默认学历门槛与例外",
                             quote="学历背景： 大专及以上学历（优秀者可放宽）。",
+                        )
+                    ],
+                )
+            ],
+            follow_ups=[],
+            review_required=True,
+        )
+
+
+class FinanceReconciliationPlanner:
+    model = "deepseek-v4-pro"
+
+    async def plan(self, *, scenario, files):
+        source = next(item for item in files if item["display_label"] == "2026往来明细.xlsx")
+        return HarnessPlanCandidate(
+            summary="读取 2026 往来明细并形成可定位的财务核对上下文",
+            selection_reason="固定 TC-05 效果门会另行冻结三个期间工作簿，并从来源字节重新计算明细和跨期候选。",
+            units=[
+                HarnessPlanCandidateUnit(
+                    unit_id="read-finance-ledger",
+                    title="读取 2026 往来明细",
+                    objective="核对一条可回开的期末余额记录",
+                    input_file_refs=[source["file_ref"]],
+                    tool="table.inspect",
+                )
+            ],
+        )
+
+
+class FinanceReconciliationAnalyst:
+    model = "deepseek-v4-pro"
+
+    async def analyze(self, *, instruction, plan, files, validation_feedback=None):
+        source = files[0]
+        return HarnessTaskResult(
+            summary="已读取一条 2026 往来记录；三份成果由服务端固定 TC-05 效果门独立重算。",
+            findings=[
+                HarnessFinding(
+                    plan_unit_id=plan.units[0].unit_id,
+                    title="2026 年存在正数借方期末余额",
+                    detail="这条记录只作为可回开的模型分析证据；财务明细和候选由确定性效果门重算。",
+                    file_refs=[source["file_ref"]],
+                    evidence_quotes=[
+                        HarnessEvidenceQuote(
+                            file_ref=source["file_ref"],
+                            role="observed",
+                            label="一条正数借方期末余额",
+                            quote=(
+                                "其他应收款\\其他应收往来 | 【绵阳长城发展融资担保有限公司】 | "
+                                "借 | 1500000 | 200000 |  | 200000 |  | 借 | 1700000"
+                            ),
                         )
                     ],
                 )
@@ -887,6 +939,109 @@ async def test_tc06_runtime_keeps_source_verification_advice_and_hr_decision_sep
         public_outcome = public["effect_receipts"][0]["candidate_review_outcome"]
         assert public_outcome["assessment_count"] == 110
         assert public_outcome["fairness_evaluated"] is False
+        assert "content_sha256" not in json.dumps(public, ensure_ascii=False)
+    finally:
+        await runtime.close()
+
+
+@pytest.mark.asyncio
+async def test_tc05_runtime_keeps_calculation_candidates_and_finance_decision_separate(
+    tmp_path: Path,
+) -> None:
+    before = _forte_digests()
+    runtime = HarnessRuntime(
+        BenchmarkWorkspaceCatalog(FORTE_ROOT),
+        FinanceReconciliationPlanner(),
+        FinanceReconciliationAnalyst(),
+        effect_engine=ScenarioEffectEngine(),
+        artifact_store=RunWorkspaceArtifactStore(tmp_path / "run-workspaces"),
+    )
+    try:
+        started = await runtime.start(
+            "finance-owner",
+            HarnessRunStart(
+                idempotency_key="tc05-derived-finance-runtime-0001",
+                instruction=TC05_INSTRUCTION,
+            ),
+        )
+        snapshot = None
+        for _ in range(1_000):
+            candidate = await runtime.get("finance-owner", started.run.run_id)
+            if candidate.status in {"waiting_input", "completed", "stopped", "failed"}:
+                snapshot = candidate
+                break
+            await asyncio.sleep(0.01)
+        assert snapshot is not None
+        assert snapshot.status == "completed"
+        assert len(snapshot.workspace_artifacts) == 3
+        assert len(snapshot.effect_receipts) == 1
+
+        receipt = snapshot.effect_receipts[0]
+        assert receipt.status == "passed"
+        assert receipt.scenario_id == "TC-05"
+        assert receipt.finance_review_outcome is not None
+        outcome = receipt.finance_review_outcome
+        assert outcome.status == "review_required"
+        assert outcome.period_ids == ["2025_h1", "2025_h2", "2026"]
+        assert (outcome.unpaid_count, outcome.unreceived_count, outcome.candidate_count) == (
+            31,
+            2,
+            0,
+        )
+        assert outcome.unpaid_total == "3984606.46"
+        assert outcome.unreceived_total == "4992891.47"
+        assert outcome.human_review_required is True
+        assert outcome.original_inputs_modified is False
+        assert outcome.external_action == "none"
+
+        for artifact in snapshot.workspace_artifacts:
+            assert artifact.verifier_status == "passed"
+            assert artifact.finance_review_outcome == outcome
+            assert len(artifact.checks) == 5
+            assert all(check.passed for check in artifact.checks)
+            assert artifact.review_required is True
+            assert artifact.external_action == "none"
+
+        by_name = {item.file_name: item for item in snapshot.workspace_artifacts}
+        assert len(by_name["未付统计.csv"].source_file_refs) == 1
+        assert len(by_name["未收统计.csv"].source_file_refs) == 1
+        assert len(by_name["跨期核对说明.md"].source_file_refs) == 3
+        assert by_name["未付统计.csv"].source_file_refs == by_name["未收统计.csv"].source_file_refs
+
+        _, unpaid = await runtime.get_workspace_artifact(
+            "finance-owner", snapshot.run_id, by_name["未付统计.csv"].artifact_id
+        )
+        unpaid_rows = list(csv.DictReader(io.StringIO(unpaid.decode("utf-8-sig"))))
+        assert len(unpaid_rows) == 31
+        assert sum(float(row["期末余额"]) for row in unpaid_rows) == pytest.approx(3984606.46)
+        assert all(row["来源文件"] == "2026往来明细.xlsx" for row in unpaid_rows)
+        assert all(row["来源位置"].startswith("Sheet1!A") for row in unpaid_rows)
+
+        _, unreceived = await runtime.get_workspace_artifact(
+            "finance-owner", snapshot.run_id, by_name["未收统计.csv"].artifact_id
+        )
+        unreceived_rows = list(
+            csv.DictReader(io.StringIO(unreceived.decode("utf-8-sig")))
+        )
+        assert len(unreceived_rows) == 2
+        assert sum(float(row["期末余额"]) for row in unreceived_rows) == pytest.approx(
+            4992891.47
+        )
+
+        _, explanation = await runtime.get_workspace_artifact(
+            "finance-owner", snapshot.run_id, by_name["跨期核对说明.md"].artifact_id
+        )
+        explanation_text = explanation.decode("utf-8")
+        assert "跨期僵尸账款候选：0 条" in explanation_text
+        assert "当前启发式未发现候选，仍需财务复核" in explanation_text
+        assert "不是付款、核销、记账或坏账确认" in explanation_text
+        assert _forte_digests() == before
+
+        public = runtime.public_snapshot(snapshot).model_dump(mode="json")
+        public_outcome = public["effect_receipts"][0]["finance_review_outcome"]
+        assert public_outcome["unpaid_count"] == 31
+        assert public_outcome["candidate_count"] == 0
+        assert public_outcome["original_inputs_modified"] is False
         assert "content_sha256" not in json.dumps(public, ensure_ascii=False)
     finally:
         await runtime.close()

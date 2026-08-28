@@ -1,0 +1,236 @@
+{
+  "schema_version": "tc05-live-artifact-evidence.v1",
+  "request": {
+    "api_header": {
+      "X-User-Id": "tc05-live-20260829"
+    },
+    "run_id": "harness:55a7fdb7174d45e9a1dc11c6d390c1e7",
+    "idempotency_key": "tc05-source-derived-live-20260829-v1",
+    "instruction": "核对三期往来明细，生成未付统计、未收统计，并判断是否存在僵尸账款。"
+  },
+  "runtime": {
+    "health": {
+      "status": "ok",
+      "model": "deepseek-v4-pro",
+      "checkpoint": "postgres",
+      "task_store": "postgres"
+    },
+    "status": "completed",
+    "version": 13,
+    "round_count": 1,
+    "planner_receipt": {
+      "model": "deepseek-v4-pro",
+      "called": true,
+      "elapsed_ms": 11538,
+      "output_used": true
+    },
+    "analyst_receipt": {
+      "model": "deepseek-v4-pro",
+      "called": true,
+      "elapsed_ms": 23711,
+      "output_used": true
+    },
+    "deterministic_effect_status": "passed",
+    "external_action": "none",
+    "unique_check_count": 15,
+    "passed_unique_check_count": 15,
+    "finance_review_outcome": {
+      "outcome_id": "finance-review-outcome-finance-018",
+      "status": "review_required",
+      "decision": "当前启发式未发现跨期风险候选，仍需财务复核；未执行付款、核销、记账或坏账确认。",
+      "summary": "2026 期末未付 31 条、未收 2 条；三期启发式候选 0 条。来源计算通过不等于会计处置已完成。",
+      "period_ids": [
+        "2025_h1",
+        "2025_h2",
+        "2026"
+      ],
+      "unpaid_count": 31,
+      "unpaid_total": "3984606.46",
+      "unreceived_count": 2,
+      "unreceived_total": "4992891.47",
+      "candidate_count": 0,
+      "candidates": [],
+      "method": "同一“科目名称+客商名称”在 2025 年上半年、2025 年下半年和 2026 年均为正数借方期末余额，且三期金额完全相同，才列为僵尸账款候选。",
+      "limitations": [
+        "当前固定适配器没有主体、科目编码、币种或子项字段，名称相同不代表会计主体相同。",
+        "没有检查期间内发生额、账龄、核销记录或贷方余额，候选不是僵尸账款业务定论。",
+        "只处理固定 Finance-018 三个期间，不能替代总账、应收应付或坏账确认流程。"
+      ],
+      "human_review_required": true,
+      "original_inputs_modified": false,
+      "external_action": "none"
+    },
+    "event_names": [
+      "workspace_index",
+      "round_started",
+      "planning_started",
+      "planning_completed",
+      "plan_validation",
+      "deterministic_office_tool_started",
+      "run_workspace_artifact_written",
+      "run_workspace_artifact_written",
+      "run_workspace_artifact_written",
+      "deterministic_verification_completed",
+      "analysis_started",
+      "analysis_completed",
+      "result_validation",
+      "evidence_gate",
+      "loop_committed"
+    ]
+  },
+  "source_integrity": [
+    {
+      "path": "Finance-018/input/2025往来明细-上半年.xlsx",
+      "size": 13873,
+      "declared_size": 13873,
+      "sha256": "4ffb7c2d6d3efe6fcae45c2aff755bedd727d9c3467d00e1765a147e5ecab5f3",
+      "declared_sha256": "4ffb7c2d6d3efe6fcae45c2aff755bedd727d9c3467d00e1765a147e5ecab5f3",
+      "matches_pinned_manifest": true
+    },
+    {
+      "path": "Finance-018/input/2025往来明细-下半年.xlsx",
+      "size": 12850,
+      "declared_size": 12850,
+      "sha256": "4ad841ee36acc3b52aea0c6931a260b69ead7493f0c33056c429c36d70575c31",
+      "declared_sha256": "4ad841ee36acc3b52aea0c6931a260b69ead7493f0c33056c429c36d70575c31",
+      "matches_pinned_manifest": true
+    },
+    {
+      "path": "Finance-018/input/2026往来明细.xlsx",
+      "size": 12746,
+      "declared_size": 12746,
+      "sha256": "4ee1f69d3346eea3b99660ab8a2efc946c93f00123ba83e121277bc7be66f4f3",
+      "declared_sha256": "4ee1f69d3346eea3b99660ab8a2efc946c93f00123ba83e121277bc7be66f4f3",
+      "matches_pinned_manifest": true
+    }
+  ],
+  "artifacts": [
+    {
+      "artifact_id": "workspace-artifact-dd145f3645ef",
+      "file_name": "未付统计.csv",
+      "size": 4095,
+      "declared_size": 4095,
+      "sha256": "d81836444a5369edc8e389d265c391a36abc51f3ccfa5cee531b81b479a17f1d",
+      "size_matches_snapshot": true,
+      "verifier_status": "passed",
+      "source_file_refs": [
+        "forte-8691e8a3837debd3"
+      ],
+      "parsed": {
+        "row_count": 31,
+        "unique_key_count": 31,
+        "total": "3984606.46",
+        "directions": [
+          "贷"
+        ],
+        "source_files": [
+          "2026往来明细.xlsx"
+        ],
+        "source_file_refs": [
+          "forte-8691e8a3837debd3"
+        ],
+        "all_locators_are_excel_ranges": true
+      }
+    },
+    {
+      "artifact_id": "workspace-artifact-882c43649608",
+      "file_name": "未收统计.csv",
+      "size": 356,
+      "declared_size": 356,
+      "sha256": "02abc7e028cc7af7dbbdc97d0bf37fc99d32fcc1fb99484ba5ef823c234a2208",
+      "size_matches_snapshot": true,
+      "verifier_status": "passed",
+      "source_file_refs": [
+        "forte-8691e8a3837debd3"
+      ],
+      "parsed": {
+        "row_count": 2,
+        "unique_key_count": 2,
+        "total": "4992891.47",
+        "directions": [
+          "借"
+        ],
+        "source_files": [
+          "2026往来明细.xlsx"
+        ],
+        "source_file_refs": [
+          "forte-8691e8a3837debd3"
+        ],
+        "all_locators_are_excel_ranges": true
+      }
+    },
+    {
+      "artifact_id": "workspace-artifact-b9d4de14e4d4",
+      "file_name": "跨期核对说明.md",
+      "size": 3225,
+      "declared_size": 3225,
+      "sha256": "827c9c55816cc644abd7bbec3dd27e044bbedb1a7b36a360c57572f8601327f1",
+      "size_matches_snapshot": true,
+      "verifier_status": "passed",
+      "source_file_refs": [
+        "forte-81f51a0aa85b5c3c",
+        "forte-8261a3b36e7370da",
+        "forte-8691e8a3837debd3"
+      ],
+      "parsed": {
+        "machine_summary": {
+          "candidate_count": 0,
+          "candidates": [],
+          "exit_condition": "财务人员记录逐项复核结论和依据后，才能决定是否进入后续会计处理。",
+          "external_action": "none",
+          "limitations": [
+            "当前固定适配器没有主体、科目编码、币种或子项字段，名称相同不代表会计主体相同。",
+            "没有检查期间内发生额、账龄、核销记录或贷方余额，候选不是僵尸账款业务定论。",
+            "只处理固定 Finance-018 三个期间，不能替代总账、应收应付或坏账确认流程。"
+          ],
+          "method": "同一“科目名称+客商名称”在 2025 年上半年、2025 年下半年和 2026 年均为正数借方期末余额，且三期金额完全相同，才列为僵尸账款候选。",
+          "original_inputs_modified": false,
+          "period_ids": [
+            "2025_h1",
+            "2025_h2",
+            "2026"
+          ],
+          "period_summaries": {
+            "2025_h1": {
+              "file_name": "2025往来明细-上半年.xlsx",
+              "period_label": "2025 年上半年",
+              "positive_debit_total": "3353858.43",
+              "row_count": 74,
+              "source_file_ref": "forte-81f51a0aa85b5c3c"
+            },
+            "2025_h2": {
+              "file_name": "2025往来明细-下半年.xlsx",
+              "period_label": "2025 年下半年",
+              "positive_debit_total": "6172887.5",
+              "row_count": 59,
+              "source_file_ref": "forte-8261a3b36e7370da"
+            },
+            "2026": {
+              "file_name": "2026往来明细.xlsx",
+              "period_label": "2026 年",
+              "positive_debit_total": "4992891.47",
+              "row_count": 58,
+              "source_file_ref": "forte-8691e8a3837debd3"
+            }
+          },
+          "review_action": "财务人员回开三期原表，核对期间内发生额、账龄、币种、主体和核销记录。",
+          "unpaid_count": 31,
+          "unpaid_total": "3984606.46",
+          "unreceived_count": 2,
+          "unreceived_total": "4992891.47"
+        },
+        "contains_no_accounting_action_boundary": true,
+        "contains_human_review_action": true,
+        "contains_exit_condition": true,
+        "contains_fixed_zero_success_claim": false
+      }
+    }
+  ],
+  "artifact_facts_match_outcome": true,
+  "restart_verification": {
+    "before_manifest": "outputs\\tc05-live-source-derived-20260829\\pre-restart-manifest.json",
+    "hashes_match": true
+  },
+  "verified": true,
+  "claim_boundary": "This independently reparses the three downloaded artifacts and fixed Finance-018 inputs. It proves the current heuristic and sequential PostgreSQL-backed facts, not an accounting policy, zombie-account conclusion, multi-instance execution or any payment, write-off, posting or bad-debt action."
+}
