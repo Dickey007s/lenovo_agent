@@ -22,12 +22,12 @@ PDF 规则检查和前台成果/审计分层，并包含一次真实 `deepseek-v
 | TC-01 噪声纵切 | `test_tc01_verified_artifact_is_not_blocked_by_pdf_layout_or_scope_noise` 通过 | 同一次 Run 中 5/5 Artifact、范围外候选、错误 review 和 PDF 断行共同出现时最终 `completed`、无 Gap/DecisionRequest | 任意模型响应或任意任务 |
 | Web TypeScript | `pnpm --dir apps/web lint` 通过 | 新状态投影和 E2E fixture 类型成立 | 浏览器布局和交互 |
 | Playwright 定向 | `2 passed` | 成果区先于审计区、5/5、同源同问题 Gap 合并、同文件不同问题保持分开、旧误导文案消失、390 px 无页面溢出 | 目标用户一定理解或真实 API 状态 |
-| 全量 Python | `116 passed, 3 skipped in 40.94s` | 当前整库 Python 回归通过 | 3 个 PostgreSQL 门因本机无 Docker/`TEST_DATABASE_DSN` 跳过 |
+| 全量 Python | `116 passed, 3 skipped in 40.94s` | 当前整库 Python 回归通过 | 本地 3 个 PostgreSQL 门因无 Docker/`TEST_DATABASE_DSN` 跳过；远端门见下行 |
 | 全量 Ruff | `uv run ruff check .` 通过 | 当前 Python 静态检查通过 | 运行时行为 |
 | Web build | lint 通过；Next.js production build 通过 | TypeScript 与生产构建成立 | 浏览器中的业务理解 |
 | 全量 Harness Playwright | `29 passed in 53.8s` | 当前桌面/窄屏与 Harness 交互回归通过；同文件但失败说明不同的 Gap 不会被错误合并 | 目标用户研究 |
 | Markdown 相对链接 | 检查 18 个变更 Markdown，全部相对链接可解析 | 本次新增/更新文档没有失效相对链接 | 外部网页长期可用性 |
-| PostgreSQL | 未执行真实门；本机没有 Docker、5432 服务或 `TEST_DATABASE_DSN` | 明确记录未覆盖项 | 不得据此声称本次验证了重启恢复或多实例 |
+| PostgreSQL 17 | PR #45 `durable-agent-control-loop`：`3 passed in 4.33s` | 真实 PostgreSQL 顺序门覆盖当前 integration 文件中的 Artifact/Commit/rollback、重启恢复和待决决定局部恢复 | 不证明多实例 lease、高可用或在途 HTTP 续跑；本机仍未执行 |
 
 ## 真实 Provider 纵切
 
@@ -53,6 +53,13 @@ PDF 规则检查和前台成果/审计分层，并包含一次真实 `deepseek-v
 
 该纵切直接证明用户给出的 TC-01 在一次真实模型运行中不再出现“缺一份引用/建议重试/等待人工输入”，
 但一次成功不能证明 Provider 重复运行稳定性，也不能把 5/5 扩展为任意办公任务正确率。
+
+## 提交与远端门
+
+- 实现提交：[`581fbfb`](https://github.com/Dickey007s/lenovo_agent/commit/581fbfb)。
+- PR：[#45](https://github.com/Dickey007s/lenovo_agent/pull/45)，已合并。
+- master 合并提交：[`7a7c3de`](https://github.com/Dickey007s/lenovo_agent/commit/7a7c3de98511b8adfde737f27fa5727cee3d704f)。
+- PostgreSQL 17 workflow：[`33141022127 / durable-agent-control-loop`](https://github.com/Dickey007s/lenovo_agent/actions/runs/33141022127/job/98751701696)，`3 passed in 4.33s`。
 
 ## 截图清单
 
