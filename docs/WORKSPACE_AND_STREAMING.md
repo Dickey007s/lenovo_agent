@@ -113,6 +113,15 @@ disabled until the user chooses. Neither surface starts another call or charges
 the next-round budget before an explicit control receipt. A terminal Run uses a
 separate new-task label rather than pretending to resume.
 
+DR-0036 adds an outcome-first exception without changing those recovery controls.
+If every visible Run Workspace Artifact passed but the latest round still waits on
+source location, the Artifact/download/check section is shown first and the Gate
+label becomes “成果可用，审计待补充”. Gaps sharing the same candidate source refs
+and failure detail are grouped into one audit item and say that the missing fact is
+the Agent's exact source location, not a missing file or incorrect date. Different
+failures in the same file stay separate. This grouping is client-only; one real
+Branch ID is still used for any resume, and the Run is not presented as `completed`.
+
 Open human decisions are authoritative in the Snapshot-level
 `decision_requests[]`; round-level copies are compatibility projections only.
 Closing or pressing Escape exits the review surface before the browser attempts a
@@ -245,6 +254,10 @@ browser fact, not a server task phase.
 | model/schema/policy failure | safe stop plus receipt | whole-workspace contract, instruction and completed rounds | revise or create a fresh Run |
 | rejected plan candidate | not adopted plus bounded retry | frozen contract and used-call count | server retries once if budget allows; otherwise fails closed |
 | one or more source locations cannot be resolved | rejected/partial-adoption trace | valid Findings, approved Plan, files, Branches and receipts | retry once; adopt the valid subset or pause one candidate Branch with `recovery_kind=source_location` |
+| PDF/DOCX layout splits one otherwise exact quote | no user interruption when the normalized location is unique | strict candidate, safe Preview line map and all scope checks | ignore layout whitespace/punctuation only after strict matching fails; require one location, otherwise keep ambiguous |
+| all verified observed dates in a Finding are outside the explicit instruction window | `analysis_scope_filtered` trace; no Gap or DecisionRequest for that Finding | in-scope Findings, Artifact and model receipt | omit only the out-of-window Finding; unsupported range expressions are not guessed |
+| model asks for a human decision without contradiction evidence | `decision_gate_suppressed` trace; ordinary Finding review | exact support/expected Anchors and Artifact | do not create an artificial DecisionRequest; real contradiction Anchors still use the decision protocol |
+| Artifact passed while audit location still waits | outcome/download first, “成果可用，审计待补充”, same-source/same-failure gaps grouped | Artifact/EffectReceipt, every underlying Branch/Gap and current version | download or inspect; optionally repair one real Branch; do not call the Run completed, collapse distinct failures or merge server Branches |
 | one source quote has multiple real matches | `evidence_disambiguation_required` + `EvidenceResolution(status=ambiguous)` | completed Branches, ArtifactVersion and all candidates | compare candidates; record the selected candidate; steer and resume only its Branch |
 | pending human decision is closed | `decision_recorded(action=defer|cancel)` | Finding, evidence, user feedback draft and all execution facts | defer stays actionable; cancel closes the packet without marking the source rejected; use a fresh version for any later control |
 | repeated malformed analysis output | structure-rejected trace | approved Plan, files, Branches and both call receipts | pause one candidate Branch with `recovery_kind=analysis_output`; do not expose raw response |
@@ -279,6 +292,9 @@ DR-0034 adds only a browser projection gate: deterministic E2E checks retry-firs
 and ambiguous-choice-first screens, disabled accept before selection, collapsed
 optional details and 390 px overflow. It does not change the DR-0032 persistence
 or recovery state machine.
+DR-0036 adds deterministic Anchor/scope/Gate admission rules plus a browser-only
+same-source/same-failure audit grouping for verified outcomes. It does not add semantic proof,
+a generic task-filter compiler or an Artifact-driven override of Loop terminal state.
 
 ## 9. Responsive behavior
 

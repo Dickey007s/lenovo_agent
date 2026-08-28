@@ -243,6 +243,15 @@ multi-instance coordination and governed external action remain target work.
   is retained; after moving deterministic work before Analyst narration and
   simplifying the model contract, all six priority effects passed. Model
   adoption, deterministic effect and Run terminal status remain separate facts.
+- `DR-0036` fixes the TC-01 state where a 5/5 verified CSV looked unfinished
+  because PDF layout wrapped “技术研发” across two Preview lines. The server now
+  permits a punctuation/whitespace-insensitive fallback only after strict matching
+  fails and still requires a unique location; repeated matches remain ambiguous.
+  Findings whose verified observed dates all fall outside the explicit instruction
+  window are omitted, and a human Gate without an exact contradiction Anchor is
+  suppressed. When a historical Snapshot still has an audit-location gap, the UI
+  shows the verified outcome first and groups duplicate same-source/same-failure
+  gaps without changing server Branch state.
 - No target-user study has been run. Clarity, trust, efficiency and user value
   remain hypotheses.
 
@@ -267,6 +276,8 @@ The current closable-review and Branch-lane interaction increment is tracked in
 [`DR-0033-CLOSABLE-REVIEW-BRANCH-LANES-EVIDENCE-20260827`](docs/evidence/DR-0033-CLOSABLE-REVIEW-BRANCH-LANES-EVIDENCE-20260827.md).
 The current one-action recovery and explicit source-choice increment is tracked in
 [`DR-0034-ONE-ACTION-RECOVERY-EVIDENCE-20260827`](docs/evidence/DR-0034-ONE-ACTION-RECOVERY-EVIDENCE-20260827.md).
+The current TC-01 outcome-first and evidence-localization increment is tracked in
+[`DR-0036-TC01-OUTCOME-EVIDENCE-LOCALIZATION-EVIDENCE-20260828`](docs/evidence/DR-0036-TC01-OUTCOME-EVIDENCE-LOCALIZATION-EVIDENCE-20260828.md).
 
 ## Local run
 
@@ -341,6 +352,9 @@ pnpm --dir apps/web exec playwright test e2e/harness-workbench.spec.ts
 - [DR-0030：可处置问题审查与可恢复分析门](docs/decisions/DR-0030-actionable-review-and-recoverable-analysis.md)
 - [SCENARIO-016：从可定位问题到人工决断，并从分析失败继续](docs/scenarios/SCENARIO-016-actionable-finding-and-recoverable-analysis.md)
 - [可处置问题与失败恢复 Evidence](docs/evidence/ACTIONABLE-REVIEW-AND-RECOVERY-EVIDENCE-20260826.md)
+- [DR-0036：成果优先、版面容错定位与任务范围收敛](docs/decisions/DR-0036-outcome-first-and-layout-tolerant-evidence.md)
+- [SCENARIO-022：成果已验证时，把来源定位作为独立审计项](docs/scenarios/SCENARIO-022-verified-outcome-and-audit-location.md)
+- [TC-01 成果与引用定位 Evidence](docs/evidence/DR-0036-TC01-OUTCOME-EVIDENCE-LOCALIZATION-EVIDENCE-20260828.md)
 - [可恢复 Control Loop Evidence](docs/evidence/DURABLE-EVIDENCE-GATE-ARTIFACT-EVOLUTION-EVIDENCE-20260826.md)
 - [整库自主研究 Evidence](docs/evidence/AUTONOMOUS-WHOLE-WORKSPACE-RESEARCH-EVIDENCE-20260825.md)
 - [Agent Control Loop 三轮只读纵切证据](docs/evidence/AGENT-CONTROL-LOOP-BOUNDED-READONLY-EVIDENCE-20260825.md)

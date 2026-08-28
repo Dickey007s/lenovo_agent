@@ -50,3 +50,11 @@
 | E2E/截图 | 被测 DOM、下载和响应式布局成立 | 用户理解、效率、信任或业务成效 |
 
 代码场景只运行固定、无网络、最小环境变量的本地测试命令。TC-02 的 8 条 unittest、TC-04 的 105 条 unittest/标准库 trace coverage、TC-12 的 9 条 Vitest 是当前固定包的回执，不是生产多租户沙箱或完整集成测试证明。
+
+## 7. 2026-08-28 TC-01 后续加固
+
+本文件保留 2026-08-27 的原始运行数值，不回写历史 Run。后续 Stakeholder 试用发现 TC-01 的
+Artifact 已通过，但 PDF 版面断行造成 Analyst 引用 unavailable，并在前台重复成两个重试分支。
+`DR-0036` 将 TC-01 的 `check-onboarding-mapping` 加固为同时核对 PDF 岗位关键词、优先级和多备注
+规则，并新增唯一版面定位、日期范围收敛、人工 Gate 准入和成果优先浏览器回归。新增证据见
+[`DR-0036-TC01-OUTCOME-EVIDENCE-LOCALIZATION-EVIDENCE-20260828`](DR-0036-TC01-OUTCOME-EVIDENCE-LOCALIZATION-EVIDENCE-20260828.md)。

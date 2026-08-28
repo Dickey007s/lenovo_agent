@@ -460,7 +460,23 @@ class ScenarioEffectEngine:
     ) -> tuple[GeneratedOfficeArtifact, ...]:
         previews = self._previews(catalog, spec)
         schedule = previews["3月20日-4月20日入职时间表.csv"]
+        rules = previews["入职物资权限软件分配.pdf"]
         source_refs = self._source_refs(previews)
+        compact_rules = re.sub(
+            r"[^\w]+", "", str(rules.get("text") or ""), flags=re.UNICODE
+        ).replace("_", "").casefold()
+        required_rule_fragments = (
+            "研发开发工程师程序员技术devengineer技术研发",
+            "产品设计视觉uiuxdesignproduct产品视觉设计",
+            "运营市场销售行政人事财务职能marketingsaleshr运营市场职能",
+            "优先级说明若岗位同时包含多个分类关键词",
+            "技术研发产品视觉设计运营市场职能",
+            "多条备注处理若同一员工有多条备注",
+            "每条备注均须生效",
+        )
+        rule_contract_verified = all(
+            fragment in compact_rules for fragment in required_rule_fragments
+        )
         headers = [
             "姓名",
             "入职日期",
@@ -540,7 +556,7 @@ class ScenarioEffectEngine:
             self._check("check-onboarding-date", "日期范围与排序", all((3, 20) <= self._month_day(row[1]) <= (4, 20) for row in parsed_rows) and parsed_rows == sorted(parsed_rows, key=lambda item: (*self._month_day(item[1]), item[0])), f"{len(parsed_rows)} 名员工均在闭区间内并按入职日期排序。"),
             self._check("check-onboarding-privacy", "删除紧急联系人", "紧急联系人" not in parsed_headers, "成果表不包含紧急联系人列。"),
             self._check("check-onboarding-columns", "新增五类资产与权限列", parsed_headers == headers, "表头由服务端按固定顺序复核。"),
-            self._check("check-onboarding-mapping", "岗位规则和备注覆盖", all(len(row) == len(headers) and row[-1] in {"是", "否"} for row in parsed_rows), "逐行映射字段完整，特殊备注优先覆盖默认规则。"),
+            self._check("check-onboarding-mapping", "岗位规则和备注覆盖", rule_contract_verified and all(len(row) == len(headers) and row[-1] in {"是", "否"} for row in parsed_rows), "已从 PDF 核对分类关键词、优先级和多备注同时生效规则；逐行映射字段完整。"),
             self._check("check-onboarding-delimiter", "列举项使用半角逗号", all("，" not in cell for row in parsed_rows for cell in row), "所有列举值均使用半角逗号。"),
         )
         return (

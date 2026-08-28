@@ -105,13 +105,24 @@ once within the same budget; rejection and retry are ordered facts. The server
 also caps the union of model-selected refs at `max_files_per_round`, preserving
 the model's highest-priority order and repairing dependencies. The Analyst
 receives the user instruction, validated public plan and safe content only for
-that approved round. It returns 1-10 findings with approved refs, a short fact,
+that approved round. It returns 1-3 findings with approved refs, a short fact,
 separate impact, optional structured human-decision options, verbatim quote
 candidates and `review_required=true`. The Runtime ignores model-supplied
 locations, uniquely resolves each candidate against that same bounded safe
 content, and publishes server-owned `evidence_anchors`. Every newly adopted
 Finding needs at least one Anchor. Citation membership and source location are
 checked; semantic truth, completeness and arithmetic are not. If the first
+strict text match has no candidate, the resolver may ignore safe-Preview layout
+whitespace and punctuation while retaining a character-to-line map. This fallback
+requires at least 12 normalized characters and exactly one position; repeated
+matches remain `ambiguous`, so it is not fuzzy or semantic matching. After Anchor
+resolution, a Finding whose verified `observed` dates all fall outside an explicit
+Chinese month/day window in the instruction is omitted with
+`analysis_scope_filtered`. A model-proposed human review without any exact
+`contradiction` Anchor is removed with `decision_gate_suppressed`; neither rule
+weakens file-scope or Catalog-integrity fail-closed checks.
+
+If the first
 Analyst output cannot be uniquely located, the Runtime records
 `analysis_validation_rejected` and permits at most one new Analyst call within
 the same budget; the browser never receives rejected prose as an adopted result.
@@ -226,6 +237,12 @@ The Artifact area independently shows whether the model call happened, whether
 its output was adopted, whether a deterministic local effect passed, what file
 was written and which side effects did not occur. It never collapses these into
 one green “completed” state.
+When every Run Workspace Artifact is verified but the Loop still waits on an
+audit-location Gap, the work area renders the outcome before Branch/Gaps and says
+“成果可用，审计待补充”. Gaps with the same candidate source refs and failure detail
+may be grouped into one user-visible audit item only in this state; different failures
+in the same file remain separate. The grouping is client projection; server Branch
+IDs, versions and recovery controls are unchanged.
 The issue-review surface reuses the same preview route and organizes authoritative
 Snapshot facts as Agent proposal -> server record -> human review. For Findings,
 it first separates fact, impact and the required human action, then renders the
@@ -284,7 +301,9 @@ intent declarations; only Artifact/Effect receipts prove a fixed adapter ran.
 `completed` means a reviewable logical response exists, not that a deterministic
 Artifact or external process completed.
 
-See [`DR-0035`](decisions/DR-0035-scenario-effect-gate-and-run-workspace-artifacts.md),
+See [`DR-0036`](decisions/DR-0036-outcome-first-and-layout-tolerant-evidence.md),
+[`SCENARIO-022`](scenarios/SCENARIO-022-verified-outcome-and-audit-location.md),
+[`DR-0035`](decisions/DR-0035-scenario-effect-gate-and-run-workspace-artifacts.md),
 [`SCENARIO-021`](scenarios/SCENARIO-021-verifiable-office-artifact-effect.md),
 [`DR-0034`](decisions/DR-0034-one-action-recovery-and-explicit-source-choice.md),
 [`SCENARIO-020`](scenarios/SCENARIO-020-retry-or-select-one-source.md),
@@ -297,4 +316,4 @@ See [`DR-0035`](decisions/DR-0035-scenario-effect-gate-and-run-workspace-artifac
 [`DR-0026`](decisions/DR-0026-selective-branch-and-immutable-artifact-history.md),
 [`SCENARIO-012`](scenarios/SCENARIO-012-selective-branch-and-artifact-restore.md),
 [UI-server fact matrix](contracts/UI_SERVER_FACT_MATRIX.md) and
-[current Evidence](evidence/SCENARIO-EFFECT-GATE-20260827.md).
+[current Evidence](evidence/DR-0036-TC01-OUTCOME-EVIDENCE-LOCALIZATION-EVIDENCE-20260828.md).

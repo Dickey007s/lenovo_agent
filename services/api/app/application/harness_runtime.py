@@ -580,8 +580,10 @@ class OpenAICompatibleHarnessAnalyst:
             "每个 finding.evidence_quotes 必须给出 1 到 6 个可在对应文件中逐字找到的短片段，至少精确定位一处依据；"
             "role 用 expected 表示设计或规则预期，用 observed 表示实际记录，用 support 表示支持结论，用 contradiction 表示冲突，用 context 表示上下文。"
             "表格 quote 应组合足以唯一定位一行的连续单元格文本；文本 quote 应选可唯一定位的连续原文，不得改写。"
+            "必须服从用户目标中的日期、对象、部门、版本和其他筛选条件；筛选范围外的记录不得作为 finding 或人工决策。"
             "finding.evidence_anchors 必须返回空数组；位置、行号和展示摘录由服务端验证原文后生成。"
             "只有存在真实业务冲突且必须由人选择口径时才输出 finding.review；其余情况必须省略 review。"
+            "若规则已明确给出关键词、优先级或覆盖关系，不得把按规则即可确定的结果升级为人工决策。"
             "存在 contradiction 时 requires_human_decision 必须为 true，提供 2 个 A/B 互斥选项、推荐项、推荐理由，"
             "以及用户确认后 Agent 将执行的下一步。"
             "每个 option.next_instruction 必须是一条可作为新只读 Control Loop 目标的完整指令；只能核对资料、形成修改建议或待办，不能声称直接改文件。"
@@ -689,6 +691,8 @@ class _EvidenceResolution:
     rejected_finding_count: int
     rejected_file_refs: tuple[str, ...]
     evidence_resolutions: tuple[AgentControlLoopEvidenceResolution, ...]
+    out_of_scope_finding_count: int = 0
+    downgraded_review_count: int = 0
 
 
 class HarnessRuntime:
@@ -2657,6 +2661,9 @@ class HarnessRuntime:
                 best_result: HarnessTaskResult | None = None
                 best_receipt: HarnessModelReceipt | None = None
                 best_rejected_count = 0
+                best_score: tuple[int, int, int, int] | None = None
+                best_out_of_scope_count = 0
+                best_downgraded_review_count = 0
                 best_evidence_resolutions: list[
                     AgentControlLoopEvidenceResolution
                 ] = []
@@ -2664,6 +2671,8 @@ class HarnessRuntime:
                     AgentControlLoopEvidenceResolution
                 ] = []
                 omitted_finding_count = 0
+                scope_filtered_finding_count = 0
+                downgraded_review_count = 0
                 recovery_kind: Literal["source_location", "analysis_output"] = (
                     "source_location"
                 )
@@ -2744,6 +2753,7 @@ class HarnessRuntime:
                                 str(item["file_ref"]): self._source_revision(item)
                                 for item in round_files
                             },
+                            instruction,
                         )
                         if resolution.result is not None:
                             self._validate_result(resolution.result, round_files)
@@ -2775,26 +2785,46 @@ class HarnessRuntime:
                             "不要复用会在日志中重复出现的短句。"
                         )
                         continue
-                    if resolution.result is not None and (
-                        best_result is None
-                        or len(resolution.result.findings) > len(best_result.findings)
-                    ):
-                        best_result = resolution.result
-                        best_receipt = candidate_receipt
-                        best_rejected_count = resolution.rejected_finding_count
-                        best_evidence_resolutions = list(
-                            resolution.evidence_resolutions
+                    if resolution.result is not None:
+                        resolution_score = (
+                            int(
+                                not resolution.rejected_finding_count
+                                and not resolution.evidence_resolutions
+                            ),
+                            len(resolution.result.findings),
+                            -resolution.rejected_finding_count,
+                            -len(resolution.evidence_resolutions),
                         )
+                        if best_score is None or resolution_score > best_score:
+                            best_score = resolution_score
+                            best_result = resolution.result
+                            best_receipt = candidate_receipt
+                            best_rejected_count = resolution.rejected_finding_count
+                            best_out_of_scope_count = (
+                                resolution.out_of_scope_finding_count
+                            )
+                            best_downgraded_review_count = (
+                                resolution.downgraded_review_count
+                            )
+                            best_evidence_resolutions = list(
+                                resolution.evidence_resolutions
+                            )
                     elif resolution.result is None:
                         pending_evidence_resolutions = list(
                             resolution.evidence_resolutions
                         )
-                    if resolution.result is not None and not resolution.rejected_finding_count:
+                    if (
+                        resolution.result is not None
+                        and not resolution.rejected_finding_count
+                        and not resolution.evidence_resolutions
+                    ):
                         result = resolution.result
                         analysis_receipt = candidate_receipt
-                        pending_evidence_resolutions = list(
-                            resolution.evidence_resolutions
+                        pending_evidence_resolutions = []
+                        scope_filtered_finding_count = (
+                            resolution.out_of_scope_finding_count
                         )
+                        downgraded_review_count = resolution.downgraded_review_count
                         break
                     await self._transition(
                         owner_id,
@@ -2816,18 +2846,23 @@ class HarnessRuntime:
                             if resolution.result
                             else 0,
                             "rejected_finding_count": resolution.rejected_finding_count,
+                            "pending_resolution_count": len(
+                                resolution.evidence_resolutions
+                            ),
                         },
                     )
                     if analysis_attempt == 1:
                         validation_feedback = (
-                            "上一候选有 Finding 没有任何 quote 能在对应文件中唯一匹配。"
-                            "请保留任务目标并重新生成全部 findings；每条至少选择一段更长、连续、只出现一次的原文，"
+                            "上一候选至少有一条逐字引用无法在对应文件中唯一匹配。"
+                            "请保留任务目标与筛选范围并重新生成全部 findings；每条至少选择一段更长、连续、只出现一次的原文，"
                             "表格请组合能唯一定位整行的关键单元格，不要复用日志中的重复短句。"
                         )
                         continue
                     result = best_result
                     analysis_receipt = best_receipt
                     omitted_finding_count = best_rejected_count
+                    scope_filtered_finding_count = best_out_of_scope_count
+                    downgraded_review_count = best_downgraded_review_count
                     pending_evidence_resolutions = best_evidence_resolutions
 
                 if result is None or analysis_receipt is None:
@@ -2976,6 +3011,40 @@ class HarnessRuntime:
                     terminal_decision = decision
                     break
 
+                if scope_filtered_finding_count:
+                    await self._transition(
+                        owner_id,
+                        run_id,
+                        "analyzing",
+                        "analysis_scope_filtered",
+                        (
+                            f"服务端省略 {scope_filtered_finding_count} 条超出用户筛选范围的候选发现；"
+                            "这些内容不会阻塞当前任务。"
+                        ),
+                        {
+                            "round_number": round_number,
+                            "filtered_finding_count": scope_filtered_finding_count,
+                            "output_used": True,
+                            "external_action": False,
+                        },
+                    )
+                if downgraded_review_count:
+                    await self._transition(
+                        owner_id,
+                        run_id,
+                        "analyzing",
+                        "decision_gate_suppressed",
+                        (
+                            f"服务端将 {downgraded_review_count} 条缺少矛盾证据的人工决策候选降为普通复核；"
+                            "明确规则不会被升级为用户阻塞。"
+                        ),
+                        {
+                            "round_number": round_number,
+                            "suppressed_review_count": downgraded_review_count,
+                            "output_used": True,
+                            "external_action": False,
+                        },
+                    )
                 if omitted_finding_count:
                     await self._transition(
                         owner_id,
@@ -4955,6 +5024,22 @@ class HarnessRuntime:
     def _compact_evidence_text(value: str) -> str:
         return re.sub(r"[^\w]+", "", value, flags=re.UNICODE).replace("_", "").casefold()
 
+    @staticmethod
+    def _compact_text_with_line_map(text: str) -> tuple[str, list[int], list[str]]:
+        """Remove layout punctuation while preserving safe-preview line locations."""
+
+        compact_chars: list[str] = []
+        line_map: list[int] = []
+        lines = text.splitlines() or [text]
+        for line_number, line in enumerate(lines, start=1):
+            for character in line:
+                if character == "_" or not re.match(r"\w", character, re.UNICODE):
+                    continue
+                folded = character.casefold()
+                compact_chars.extend(folded)
+                line_map.extend([line_number] * len(folded))
+        return "".join(compact_chars), line_map, lines
+
     @classmethod
     def _resolve_text_anchor_candidates(
         cls,
@@ -5001,11 +5086,28 @@ class HarnessRuntime:
                 break
             positions.append(position)
             cursor = position + 1
+        position_map = line_map
+        matched_length = len(normalized_quote)
+        if not positions:
+            compact_quote = cls._compact_evidence_text(quote)
+            if len(compact_quote) >= 12:
+                compact_text, compact_line_map, lines = cls._compact_text_with_line_map(
+                    text
+                )
+                cursor = 0
+                while True:
+                    position = compact_text.find(compact_quote, cursor)
+                    if position < 0:
+                        break
+                    positions.append(position)
+                    cursor = position + 1
+                position_map = compact_line_map
+                matched_length = len(compact_quote)
         anchors: list[AgentControlLoopEvidenceAnchor] = []
         seen_ranges: set[tuple[int, int]] = set()
         for position in positions[:6]:
-            start = line_map[position]
-            end = line_map[position + len(normalized_quote) - 1]
+            start = position_map[position]
+            end = position_map[position + matched_length - 1]
             if (start, end) in seen_ranges:
                 continue
             seen_ranges.add((start, end))
@@ -5105,12 +5207,55 @@ class HarnessRuntime:
         candidates = cls._resolve_table_anchor_candidates(**kwargs)
         return candidates[0] if len(candidates) == 1 else None
 
+    @staticmethod
+    def _instruction_date_window(
+        instruction: str | None,
+    ) -> tuple[tuple[int, int], tuple[int, int]] | None:
+        if not instruction:
+            return None
+        match = re.search(
+            r"(\d{1,2})\s*月\s*(\d{1,2})\s*日\s*"
+            r"(?:至|到|[-~～—])\s*"
+            r"(\d{1,2})\s*月\s*(\d{1,2})\s*日",
+            instruction,
+        )
+        if not match:
+            return None
+        start = (int(match.group(1)), int(match.group(2)))
+        end = (int(match.group(3)), int(match.group(4)))
+        return (start, end) if start <= end else None
+
+    @classmethod
+    def _finding_outside_instruction_date_window(
+        cls,
+        finding: HarnessFinding,
+        instruction: str | None,
+    ) -> bool:
+        window = cls._instruction_date_window(instruction)
+        if window is None:
+            return False
+        observed_dates: list[tuple[int, int]] = []
+        for anchor in finding.evidence_anchors:
+            if anchor.role != "observed":
+                continue
+            observed_dates.extend(
+                (int(month), int(day))
+                for month, day in re.findall(
+                    r"(\d{1,2})\s*月\s*(\d{1,2})\s*日", anchor.excerpt
+                )
+            )
+        if not observed_dates:
+            return False
+        start, end = window
+        return all(date < start or date > end for date in observed_dates)
+
     @classmethod
     def _resolve_evidence_anchors(
         cls,
         result: HarnessTaskResult,
         files: list[dict[str, Any]],
         source_revisions: dict[str, str] | None = None,
+        instruction: str | None = None,
     ) -> _EvidenceResolution:
         files_by_ref = {str(item.get("file_ref")): item for item in files}
         revisions = source_revisions or {
@@ -5120,6 +5265,8 @@ class HarnessRuntime:
         evidence_resolutions: list[AgentControlLoopEvidenceResolution] = []
         rejected_finding_count = 0
         rejected_file_refs: list[str] = []
+        out_of_scope_finding_count = 0
+        downgraded_review_count = 0
         for finding in result.findings:
             finding_id = finding.finding_id or cls._finding_id(finding)
             anchors: list[AgentControlLoopEvidenceAnchor] = []
@@ -5241,26 +5388,42 @@ class HarnessRuntime:
                         source_revision=revisions.get(missing_ref, ""),
                     )
                 )
-            unresolved = [
-                item for item in finding_resolutions if item.status != "exact"
-            ]
-            evidence_resolutions.extend(unresolved)
             if not anchors:
+                evidence_resolutions.extend(
+                    item
+                    for item in finding_resolutions
+                    if item.status != "exact"
+                )
                 rejected_finding_count += 1
                 for file_ref in finding.file_refs:
                     if file_ref in files_by_ref and file_ref not in rejected_file_refs:
                         rejected_file_refs.append(file_ref)
                 continue
-            resolved_findings.append(
-                finding.model_copy(
-                    update={
-                        "finding_id": finding_id,
-                        "evidence_quotes": [],
-                        "evidence_anchors": anchors,
-                        "evidence_resolutions": finding_resolutions,
-                    }
-                )
+            resolved_finding = finding.model_copy(
+                update={
+                    "finding_id": finding_id,
+                    "evidence_quotes": [],
+                    "evidence_anchors": anchors,
+                    "evidence_resolutions": finding_resolutions,
+                }
             )
+            if cls._finding_outside_instruction_date_window(
+                resolved_finding, instruction
+            ):
+                out_of_scope_finding_count += 1
+                continue
+            review = resolved_finding.review
+            if (
+                review is not None
+                and review.requires_human_decision
+                and not any(anchor.role == "contradiction" for anchor in anchors)
+            ):
+                resolved_finding = resolved_finding.model_copy(update={"review": None})
+                downgraded_review_count += 1
+            evidence_resolutions.extend(
+                item for item in finding_resolutions if item.status != "exact"
+            )
+            resolved_findings.append(resolved_finding)
         resolved_result = (
             result.model_copy(update={"findings": resolved_findings})
             if resolved_findings
@@ -5271,6 +5434,8 @@ class HarnessRuntime:
             rejected_finding_count=rejected_finding_count,
             rejected_file_refs=tuple(rejected_file_refs),
             evidence_resolutions=tuple(evidence_resolutions),
+            out_of_scope_finding_count=out_of_scope_finding_count,
+            downgraded_review_count=downgraded_review_count,
         )
 
     @staticmethod
