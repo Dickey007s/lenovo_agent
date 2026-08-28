@@ -50,7 +50,7 @@ CSS、HTML、shell、log 等。它们覆盖结构化表格、长文档、扫描/
 | `TC-04` | `dev-015` | 为评测平台补单测并修复缺陷 | 44 个 source-code 文件；PRD/设计稿另作任务上下文 | Demo 2 多任务 | 固定副本测试、代码写入 | `Limited Verified`（DR-0041、PR #52、Run `harness:c4bd926b13a44665aa49429d177305a9`）：完整隔离 ZIP/报告，未修复副本 5 个目标红灯，修复后 117 项真实模块测试与逐文件 coverage.py 门；固定 dev-015 适配器，不是通用代码沙箱或自动 PR |
 | `TC-05` | `Finance-018` | 跨三期往来款与僵尸账款核对 | 3 个 XLSX | Demo 1 单任务 | 数值验证、CSV 写入 | `Limited Verified`：两个 2026 CSV + 三期说明，8 项归属明确的确定性检查 |
 | `TC-06` | `hr-001` | 两个岗位与五份简历匹配 | DOCX + PDF | Demo 2 多任务 | 敏感信息、人工复核 | `Limited Verified`：两个 DOCX、每岗 5 名候选、敏感字段隐藏并保留人工 Gate |
-| `TC-07` | `Legal-020` | 六份授权委托书风控核查 | DOCX + MD | Demo 2 多任务 | 来源推导 21 条规则、126 行台账、三状态前台 | `Draft，待远端 PR 门`（DR-0044、Run `harness:fa527bfb5b054401a6a16f77bf40f4b9`）：来源合同、R05/M03 纠偏、动态资料不足、DOCX/CSV 下载解析、负向门、真实 Provider、本地完整门和 PostgreSQL 顺序恢复已通过；非正式法律意见，未签署或认定授权有效 |
+| `TC-07` | `Legal-020` | 六份授权委托书风控核查 | DOCX + MD | Demo 2 多任务 | 来源推导 21 条规则、126 行台账、三状态前台 | `Limited Verified`（DR-0044、PR #59、Run `harness:fa527bfb5b054401a6a16f77bf40f4b9`）：来源合同、R05/M03 纠偏、动态资料不足、DOCX/CSV 下载解析、负向门、真实 Provider、本地完整门和 PostgreSQL 顺序恢复通过；非正式法律意见，未签署或认定授权有效 |
 | `TC-08` | `Marketing-012` | 按规则采集竞品广告 | DOCX + Web | Demo 2 多任务 | Web 来源、时间范围 | `blocked_external_boundary`：本地规则可读，未伪造 Web 采集 |
 | `TC-09` | `Misc-AT-003` | 周期搜索新闻并追加文件 | Web + cron | 单任务持续运行 | 全局定时、副作用 | `blocked_external_boundary`：未创建 cron/未发起 Web 任务 |
 | `TC-10` | `Operations-008` | 设计合规催收外呼流程 | MD | Demo 1 + Demo 3 | 合规规则、禁止真实外呼 | `Limited Verified`：真实 DOCX + 13 项规则/终态检查；未拨号、未写 CRM |
