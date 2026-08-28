@@ -2,7 +2,7 @@
 
 ## 当前结论
 
-`Limited Verified`。严格七份来源合同、两份 JD 条件解析、五份简历事实隔离、110 条四状态台账、来源变异、负向合同、隐私检查、三状态前台、真实 `deepseek-v4-pro` Run、三份下载物独立解析和 PostgreSQL 顺序恢复均已通过。最终本地门、PR 与远端 PostgreSQL 门在合并后补记于本 Evidence，不把当前结论扩写为通用 ATS、正式招聘决定或公平性证明。
+`Limited Verified`。严格七份来源合同、两份 JD 条件解析、五份简历事实隔离、110 条四状态台账、来源变异、负向合同、隐私检查、三状态前台、真实 `deepseek-v4-pro` Run、三份下载物独立解析和 PostgreSQL 顺序恢复均已通过。实现由 [PR #61](https://github.com/Dickey007s/lenovo_agent/pull/61) 交付；远端门及合并状态以该 PR 的不可变记录为准，不在本文复制易漂移的瞬时状态。不把当前结论扩写为通用 ATS、正式招聘决定或公平性证明。
 
 ## 历史基线为何不足
 
@@ -40,6 +40,13 @@
 - 用户可按岗位和候选人展开，查看每条条件的 JD 位置、简历位置、来源事实、规则判断、面试或补证动作与退出条件；浏览器不重算匹配。
 - [`tc06-ui-screenshots-20260829.json`](manifests/tc06-ui-screenshots-20260829.json) 记录普通 1440×1100 三栏和 390 px full-page 截图。左栏展开人力招聘的两份 JD 与五份简历；目录展开只是浏览器查看状态，不提交 `selected_file_refs`。
 - 截图与自动化只证明被测 DOM、字号、几何和无横向溢出，不证明招聘人员理解、效率、信任或决策质量改善。
+
+## 工程验证
+
+- `uv run pytest -q`：`207 passed`；其中真实 PostgreSQL TC-06 顺序恢复定向门为 `1 passed, 6 deselected`。
+- `uv run ruff check .`、`pnpm --dir apps/web lint`、`pnpm --dir apps/web build` 均通过。
+- `pnpm --dir apps/web exec playwright test e2e/harness-workbench.spec.ts`：`46 passed`，包含 TC-06 canonical、孙博文来源变异和 Verifier failure 三条前台门。
+- 隐私集成断言只扫描候选人成果、EffectReceipt 与 `candidate_review_outcome` 的公开投影；Run/Owner 随机标识不属于候选人内容，不能因偶然形成手机号样式而制造假红灯。完整公开 Snapshot 仍单独断言不含内部 `content_sha256`。
 
 ## 不能支持的结论
 
