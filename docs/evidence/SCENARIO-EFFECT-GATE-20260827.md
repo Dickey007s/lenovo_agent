@@ -49,7 +49,7 @@
 | PostgreSQL restart | 顺序 Runtime 可恢复 Snapshot 元数据和稳定 Artifact 文件 | 独立 Artifact ledger、CAS、多实例、高可用 |
 | E2E/截图 | 被测 DOM、下载和响应式布局成立 | 用户理解、效率、信任或业务成效 |
 
-代码场景只运行固定、无网络、最小环境变量的本地测试命令。TC-02 的 8 条 unittest、TC-04 的 105 条 unittest/标准库 trace coverage、TC-12 的 9 条 Vitest 是当前固定包的回执，不是生产多租户沙箱或完整集成测试证明。
+代码场景只运行固定、最小环境变量的本地测试命令。该阶段 TC-02 的 8 条 unittest 对应后来确认不足的 9 文件迷你包，历史记录保留但已由 DR-0040 取代；当前 TC-02 复制完整 algorithm-013 项目，声明/执行测试 ID 一致并在下载后独立复测。下载项目的默认策略按已规划工具确定性执行，虽然 `action_policy` 可替换，但尚未证明模型依据 Observation 在包内自主选动作；外层 Planner/Analyst 回执不得冒充包内策略。TC-04 的 105 条 unittest/标准库 trace coverage、TC-12 的 9 条 Vitest 仍是各自固定包回执。测试环境不注入凭据或代理，本次固定路径未调用网络；没有 OS 级 socket 隔离，也不是生产多租户沙箱或完整集成测试证明。
 
 ## 7. 2026-08-28 TC-01 后续加固
 

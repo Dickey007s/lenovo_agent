@@ -116,6 +116,7 @@ Agent Control Loop 的逐模块历史基线、当前有界效果纵切和后续�
 - ReAct 启发：以 Reasoning、Action、Observation 交替组织执行轨迹。
 - 当前落地：普通前台只展示模型调用、业务操作、服务端校验、回执和引用，不暴露私有思维链。
 - 用户流程：浏览 -> 下达目标 -> Agent 自主选证据 -> 查看轨迹 -> 打开引用 -> 确认下一步。
+- TC-02 当前只证明真实 algorithm-013 副本具备有界、可插拔的 ReAct 控制结构。默认策略确定性执行已规划工具；没有证明模型依据 Observation 在副本内自主选动作。外层 `deepseek-v4-pro` Planner/Analyst 回执必须单列，不能当作下载代码包内部策略。
 
 不能表述为“竞品没有这些能力”或“本方案优于竞品”。官方文档不是受控竞品测试，
 引用页面没有提及某项能力，也不能证明产品绝对不具备它。只有固定产品版本、账户、入口、
@@ -146,6 +147,7 @@ Agent Control Loop 的逐模块历史基线、当前有界效果纵切和后续�
 | 模型之后还有策略编译器 | 模型不能静默决定副作用 | “模型已调用”与“计划已校验”分开 | Model Receipt 与服务端 Plan |
 | 固定本地 Scenario Effect Gate | 用户看到的“已完成”必须落到真实文件和可复算检查，而不是一段模型回答 | 可下载 CSV/MD/DOCX/ZIP、检查清单、原件未修改、外部动作未发生 | `workspace_artifacts[]`、`effect_receipts[]`、Artifact GET 与 named SSE |
 | 设计成果与执行回执分层 | 用户不会把流程文档中的动作词误读为 Agent 已经拨号或写系统 | “只生成流程设计 DOCX”、六类终态、人工复核原因、未拨号/未写 CRM/未发短信 | Artifact `deliverable_type/key_outputs/review_guidance/execution_summary` + EffectReceipt `external_action=none` |
+| 真实代码副本与自测分层 | 用户能区分“改造真实项目”与“另造一个演示包”，并知道如何复测和人工合并 | 完整 algorithm-013 副本、文件变更、两条命令、测试 ID 清单、失败信号 | Artifact `self_test/key_outputs_label` + ZIP/diff/JSON receipt + download content gate |
 | 外部依赖显式阻断 | 用户不会把缺 Connector/权限的安全停止误读为任务成功 | `blocked_external_boundary`、缺失依赖与禁止副作用 | EffectReceipt + `scenario_effect_bounded`；不生成伪 Artifact |
 | 有序事件加权威 Snapshot | 进度和恢复依据事实 | 轨迹、重连中、最终对账 | named SSE 与 Run Snapshot |
 | 引用范围校验 + 问题审查页 | 用户不用在缺口卡和 96 份文件之间来回猜，可以从问题直接对照原文 | 轮次/分支定位、审查记录、关联文件、安全预览 | Gap/Branch/Finding refs + Preview GET；不等于语义正确 |

@@ -45,7 +45,7 @@ CSS、HTML、shell、log 等。它们覆盖结构化表格、长文档、扫描/
 | ID | FORTE Task | 办公任务 | 文件/依赖 | 主要拓扑 | 主要 Gate | 当前状态 |
 | --- | --- | --- | --- | --- | --- | --- |
 | `TC-01` | `administration-001` | 入职员工物资与权限匹配 | CSV + PDF | Demo 1 单任务 | 隐私字段、工作区写入 | `Limited Verified`：真实 CSV + 5 项确定性检查 |
-| `TC-02` | `algorithm-013` | 搜索 Agent 从 Workflow 重构为 ReAct | Python + log + text | Demo 1 单任务 | 代码修改、测试执行 | `Limited Verified`：隔离 ZIP/报告，8 项 unittest 通过；非通用代码沙箱 |
+| `TC-02` | `algorithm-013` | 搜索 Agent 从 Workflow 重构为有界 ReAct 控制结构 | Python + log + text | Demo 1 单任务 | 真实副本、代码修改、测试执行 | `Limited Verified`：完整项目 ZIP/说明，当前 20 项声明测试与实际执行一致；默认策略非模型自主决策，且非通用代码沙箱 |
 | `TC-03` | `ba-079` | 网约车经营数据 SQL 分析 | 远程 Datasette | Demo 2 多查询 | Connector、查询预算 | `blocked_external_boundary`：未授权 Datasette/SQL Connector |
 | `TC-04` | `dev-015` | 为评测平台补单测并修复缺陷 | 46 个混合代码文件 | Demo 2 多任务 | 沙箱执行、代码写入 | `Limited Verified`：隔离 ZIP/报告，105 项 unittest 与标准库 trace 覆盖检查；不等于完整 DB/HTTP 集成 |
 | `TC-05` | `Finance-018` | 跨三期往来款与僵尸账款核对 | 3 个 XLSX | Demo 1 单任务 | 数值验证、CSV 写入 | `Limited Verified`：两个 2026 CSV + 三期说明，8 项归属明确的确定性检查 |
@@ -74,11 +74,17 @@ CSS、HTML、shell、log 等。它们覆盖结构化表格、长文档、扫描/
 
 ### TC-02 搜索 Agent 架构重构
 
-- 用户目标：把固定 Workflow 搜索代码改成有迭代上限和轨迹的 ReAct 结构。
-- 期望路径：索引代码 -> 形成改造计划 -> 修改运行工作区副本 -> 执行测试 -> 分析失败 -> 有界修复 -> 输出变更与测试报告。
-- 人工暂停：依赖安装、网络访问或超出允许命令集合时确认；测试持续失败达到预算时停止。
-- 验证：原固定五节点路径不再是唯一流程，最大迭代可配置，Action 解析和轨迹测试通过。
-- 禁止：在普通 UI 暴露模型 CoT；未经许可修改原始 benchmark 文件。
+- 原始输入：`把搜索 Agent 从固定 Workflow 重构为带迭代上限和轨迹的 ReAct 结构。`
+- 预期文件：`search-agent-react-refactor.zip` 与 `TC-02测试与改动说明.md`；ZIP 内必须有完整 `search_agent_workflow/`、unified diff、JSON 变更清单、中文说明、自测卡、测试与两种回执。
+- 期望路径：冻结 algorithm-013 七个输入 -> 复制完整项目到隔离 Run Workspace -> 修改副本 `config.py/main.py` -> 新增有界、可插拔 ReAct 控制结构与测试 -> 固定编译/测试 -> 下载后第二次独立解压复测 -> 人工审查与合并。
+- 原样保留：`workflow.py/llm.py/tools.py/requirements.txt/search_agent.log` 必须与冻结输入逐字一致；保留旧 Workflow 供审查，但 `main.py` 不得仍只调用它。
+- 迭代与安全：`max_iterations` 接受 1 和 20、拒绝 0 和 21；正常 finish、到上限停止、非法/未知 Action、未知 Tool、真实 ToolRegistry 调用和 action/observation 轨迹均有测试；轨迹不得出现私有 CoT。
+- 策略边界：当前 `DefaultReActPolicy` 按 Planner 已规划工具依次执行，`action_policy` 接口可替换；测试必须验证这一事实，不能把外层 Planner/Analyst 调用当作副本内部模型自主 ReAct。
+- 原业务回归：查询漂移回退、质量阈值降级、按来源配额和句界截断必须继续由原节点逻辑及测试覆盖。
+- 下载后命令：`python -m compileall -q search_agent_workflow`；`python -m unittest discover -s search_agent_workflow/tests -v`。当前测试数由包内声明 ID 推导；声明与实际执行集合必须一致，数量不是永久上限。
+- 失败信号：任一退出码非 0、清单不一致、缺真实源文件、保留文件 digest 变化、主入口仍只走 `SearchWorkflow`。失败成果红灯并说明不要合并、查看回执、修复后新建 TC-02 任务。
+- 真实 Run：baseline `harness:b294f7feadd64c5196ce04982761b6b2` 是 9 文件迷你包红灯；修复后 `harness:76d4b2f5828a45b28832ab7e63f317d5` 同时记录外层 Planner/Analyst 回执、下载 ZIP 15 文件、两份 Artifact 共享 12 个唯一效果检查、独立编译与当前 20 项测试，并单列内部默认策略边界。
+- 网络边界：本次固定测试未调用网络或生产搜索、未安装依赖、未注入凭据与代理；runner 没有 OS 级 socket 隔离。禁止把它写成任意代码沙箱、自动 PR 或原仓库已修改。
 
 ### TC-05 跨期往来款核对
 

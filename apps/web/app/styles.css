@@ -437,6 +437,9 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, summary:focus
 .workspace-action-result p { margin: 5px 0 0; color: var(--muted); font-size: 11px; line-height: 1.55; }
 .workspace-action-result ul { display: flex; flex-wrap: wrap; gap: 5px; margin: 8px 0 0; padding: 0; list-style: none; }
 .workspace-action-result li { padding: 4px 7px; border: 1px solid #a7c3df; color: #174f8d; background: #fff; font-size: 10px; font-weight: 750; }
+.workspace-action-result.is-failed { border-left-color: var(--red); background: #fff4f2; }
+.workspace-action-result.is-failed > svg, .workspace-action-result.is-failed span { color: var(--red); }
+.workspace-action-result.is-failed li { border-color: #e6b4ad; color: #8c2d22; }
 .workspace-artifacts > ol { display: grid; gap: 8px; margin: 0; padding: 12px 14px; list-style: none; }
 .workspace-artifacts > ol > li { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 12px; padding: 11px; border: 1px solid #cadbd1; border-left: 3px solid var(--green); background: #fff; }
 .workspace-artifacts > ol > li.is-failed { border-color: #ecc2bd; border-left-color: var(--red); }
@@ -450,6 +453,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, summary:focus
 .workspace-artifact-status b { display: inline-flex; align-items: center; gap: 4px; color: var(--green); font-size: 11px; white-space: nowrap; }
 .workspace-artifact-status b svg { width: 14px; }
 .workspace-artifact-status span { color: var(--muted); font-size: 10px; }
+.workspace-artifacts > ol > li.is-failed .workspace-artifact-status b { color: var(--red); }
 .workspace-artifacts > ol > li > button { min-height: 34px; display: inline-flex; align-items: center; justify-content: center; gap: 5px; padding: 0 10px; border: 1px solid #87a8cb; border-radius: 4px; color: var(--blue); background: #fff; font-size: 11px; font-weight: 750; white-space: nowrap; }
 .workspace-artifacts > ol > li > button:hover:not(:disabled) { background: var(--blue-soft); }
 .workspace-artifacts > ol > li > button svg { width: 15px; }
@@ -466,6 +470,29 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, summary:focus
 .workspace-artifact-review > svg { width: 17px; color: var(--amber); }
 .workspace-artifact-review b { font-size: 11px; }
 .workspace-artifact-review p { margin: 3px 0 0; color: #73501a; font-size: 10px; line-height: 1.55; }
+.workspace-artifact-review.is-failed { border-left-color: var(--red); background: #fff4f2; }
+.workspace-artifact-review.is-failed > svg { color: var(--red); }
+.workspace-artifact-review.is-failed p { color: #7e3026; }
+.workspace-artifact-self-test { grid-column: 1 / -1; min-width: 0; border: 1px solid #b9cfeb; background: #f8fbff; }
+.workspace-artifact-self-test > header { display: grid; grid-template-columns: 24px minmax(0, 1fr); gap: 8px; align-items: start; padding: 10px; border-bottom: 1px solid #d7e4f4; }
+.workspace-artifact-self-test > header > svg { width: 18px; color: var(--blue); }
+.workspace-artifact-self-test > header span { color: var(--blue); font-size: 10px; font-weight: 750; }
+.workspace-artifact-self-test > header h5 { margin: 2px 0 0; font-size: 13px; letter-spacing: 0; }
+.workspace-artifact-self-test > dl { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; margin: 0; background: #d7e4f4; }
+.workspace-artifact-self-test > dl > div { min-width: 0; padding: 9px 10px; background: #fff; }
+.workspace-artifact-self-test dt { color: #53708e; font-size: 10px; font-weight: 750; }
+.workspace-artifact-self-test dd { margin: 3px 0 0; overflow-wrap: anywhere; font-size: 11px; line-height: 1.55; }
+.workspace-artifact-self-test-commands { display: grid; gap: 6px; padding: 10px; border-top: 1px solid #d7e4f4; }
+.workspace-artifact-self-test-commands > b { color: #174f8d; font-size: 11px; }
+.workspace-artifact-self-test-commands code { display: block; max-width: 100%; padding: 7px 8px; overflow-wrap: anywhere; white-space: normal; color: #18354f; background: #eef5fc; font-size: 10px; line-height: 1.5; }
+.workspace-artifact-self-test > details { border-top: 1px solid #d7e4f4; }
+.workspace-artifact-self-test > details > summary { min-height: 36px; display: flex; align-items: center; gap: 6px; padding: 0 10px; color: var(--blue); cursor: pointer; font-size: 11px; font-weight: 750; }
+.workspace-artifact-self-test > details > summary svg { width: 15px; }
+.workspace-artifact-self-test-detail { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding: 0 10px 10px; }
+.workspace-artifact-self-test-detail section { min-width: 0; }
+.workspace-artifact-self-test-detail b { font-size: 11px; }
+.workspace-artifact-self-test-detail ul { display: grid; gap: 4px; margin: 5px 0 0; padding-left: 17px; }
+.workspace-artifact-self-test-detail li { overflow-wrap: anywhere; color: var(--muted); font-size: 10px; line-height: 1.5; }
 .workspace-artifacts > ol > li > details { grid-column: 1 / -1; border-top: 1px solid var(--line); }
 .workspace-artifacts > ol > li > details > summary, .workspace-effect-receipt > summary { min-height: 34px; display: flex; align-items: center; gap: 6px; color: var(--blue); cursor: pointer; font-size: 11px; font-weight: 750; }
 .workspace-artifacts summary svg { width: 15px; }
@@ -950,6 +977,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, summary:focus
   .workspace-action-result { margin-right: 8px; margin-left: 8px; }
   .workspace-artifact-semantics, .workspace-artifact-semantics.has-deliverable-type { grid-template-columns: 1fr; }
   .workspace-artifact-key-outputs { grid-template-columns: 1fr; }
+  .workspace-artifact-self-test > dl, .workspace-artifact-self-test-detail { grid-template-columns: 1fr; }
   .workspace-artifact-status { flex-direction: row; align-items: center; justify-content: space-between; }
   .workspace-artifacts > ol > li > button { width: 100%; }
   .file-preview > header { display: grid; }

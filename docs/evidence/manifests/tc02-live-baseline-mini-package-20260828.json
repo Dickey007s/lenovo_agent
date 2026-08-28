@@ -1,0 +1,354 @@
+{
+  "schema_version": "scenario-effect-gate-live.v1",
+  "generated_at": "2026-08-28T08:47:36.236714+00:00",
+  "api_base": "http://127.0.0.1:8010",
+  "service": {
+    "model": "deepseek-v4-pro",
+    "checkpoint": "memory",
+    "task_store": "memory"
+  },
+  "dataset": {
+    "name": "FORTE public demo inputs",
+    "source_commit": "345c1ec1487139db9dd319787fa9405ba85d1869",
+    "input_tree_sha256": "2c19e31a8e437f8ccb0ab811ba20a940f022a5bea69bcc750574d753f10a250d",
+    "original_inputs_modified": false
+  },
+  "summary": {
+    "requested": 1,
+    "passed": 1,
+    "failed": 0,
+    "model_output_adopted": 0,
+    "run_completed": 0
+  },
+  "scenarios": [
+    {
+      "scenario_id": "TC-02",
+      "capability_id": "office-code-react-refactor",
+      "title": "搜索 Agent ReAct 重构",
+      "instruction": "把固定 Workflow 搜索代码改造成有迭代上限和轨迹的 ReAct 结构，并运行测试。",
+      "run_id": "harness:b294f7feadd64c5196ce04982761b6b2",
+      "started_at": "2026-08-28T08:46:20.717793+00:00",
+      "observed_at": "2026-08-28T08:47:36.197261+00:00",
+      "run_status": "waiting_input",
+      "snapshot_version": 15,
+      "current_round": 1,
+      "budget": {
+        "max_rounds": 12,
+        "max_files_per_round": 16,
+        "max_model_calls": 30,
+        "deadline_seconds": 7200,
+        "rounds_used": 1,
+        "files_verified": 0,
+        "model_calls_used": 3,
+        "elapsed_ms": 74258,
+        "stop_reason": null
+      },
+      "model_calls": [
+        {
+          "round": 1,
+          "role": "planner",
+          "called": true,
+          "model": "deepseek-v4-pro",
+          "elapsed_ms": 14530,
+          "output_used": true
+        },
+        {
+          "round": 1,
+          "role": "analyst",
+          "called": true,
+          "model": "deepseek-v4-pro",
+          "elapsed_ms": 30229,
+          "output_used": false
+        }
+      ],
+      "model_execution_gate_passed": true,
+      "model_output_adopted": false,
+      "effect_receipts": [
+        {
+          "receipt_id": "effect-receipt-e48212ea6673",
+          "capability_id": "office-code-react-refactor",
+          "scenario_id": "TC-02",
+          "status": "passed",
+          "state": "已冻结 7 份 FORTE 输入，原始文件保持只读。",
+          "action": "调用 office-code-react-refactor 确定性办公工具并写入隔离运行工作区。",
+          "observation": "生成 2 份真实成果文件，执行 14 项确定性检查。",
+          "cost": "0 次额外模型调用；仅消耗本机确定性解析、计算与文件写入。",
+          "result": "所有确定性效果门通过，成果仍需用户复核。",
+          "source_file_refs": [
+            "forte-7b13238f78667944",
+            "forte-5004c43960105473",
+            "forte-84c9c417c6fffc23",
+            "forte-9d0252e42b14a1d0",
+            "forte-daa8f1fbdd343272",
+            "forte-04c603e979388bbe",
+            "forte-2f73463ddf941c94"
+          ],
+          "artifact_ids": [
+            "workspace-artifact-2d8e116bc156",
+            "workspace-artifact-87ca2992f3f9"
+          ],
+          "prohibited_side_effects": [
+            "不修改 FORTE 原始源码",
+            "不运行未批准命令",
+            "不访问网络"
+          ],
+          "created_at": "2026-08-28T08:46:36.470260Z",
+          "external_action": "none"
+        }
+      ],
+      "artifacts": [
+        {
+          "artifact_id": "workspace-artifact-2d8e116bc156",
+          "file_name": "search-agent-react-refactor.zip",
+          "media_type": "application/zip",
+          "size": 5041,
+          "validator_id": "validator-code-sandbox-v1",
+          "verifier_status": "passed",
+          "checks": [
+            {
+              "check_id": "check-react-source",
+              "label": "原固定 Workflow 已核对",
+              "passed": true,
+              "detail": "改造基于实际 workflow.py，而非空模板。"
+            },
+            {
+              "check_id": "check-react-compile",
+              "label": "代码编译",
+              "passed": true,
+              "detail": "compileall 无错误输出。"
+            },
+            {
+              "check_id": "check-react-tests",
+              "label": "八项回归测试",
+              "passed": true,
+              "detail": "真实 unittest 回执必须显示 8 tests、0 failure。"
+            },
+            {
+              "check_id": "check-react-cap",
+              "label": "迭代上限",
+              "passed": true,
+              "detail": "最大迭代次数由 ReActConfig 控制。"
+            },
+            {
+              "check_id": "check-react-trace",
+              "label": "可审计轨迹",
+              "passed": true,
+              "detail": "只记录动作与观察摘要，不输出私有 CoT。"
+            },
+            {
+              "check_id": "check-react-regressions",
+              "label": "原业务逻辑保留",
+              "passed": true,
+              "detail": "漂移检测、质量降级、来源配额和句界截断均有测试。"
+            },
+            {
+              "check_id": "check-react-no-network",
+              "label": "无网络副作用",
+              "passed": true,
+              "detail": "固定命令只编译并运行本地单元测试，不调用搜索网络。"
+            }
+          ],
+          "review_required": true,
+          "deliverable_type": null,
+          "key_outputs": [],
+          "review_guidance": null,
+          "execution_summary": null,
+          "external_action": "none",
+          "original_inputs_modified": false
+        },
+        {
+          "artifact_id": "workspace-artifact-87ca2992f3f9",
+          "file_name": "ReAct测试回执.md",
+          "media_type": "text/markdown",
+          "size": 1239,
+          "validator_id": "validator-code-sandbox-v1",
+          "verifier_status": "passed",
+          "checks": [
+            {
+              "check_id": "check-react-source",
+              "label": "原固定 Workflow 已核对",
+              "passed": true,
+              "detail": "改造基于实际 workflow.py，而非空模板。"
+            },
+            {
+              "check_id": "check-react-compile",
+              "label": "代码编译",
+              "passed": true,
+              "detail": "compileall 无错误输出。"
+            },
+            {
+              "check_id": "check-react-tests",
+              "label": "八项回归测试",
+              "passed": true,
+              "detail": "真实 unittest 回执必须显示 8 tests、0 failure。"
+            },
+            {
+              "check_id": "check-react-cap",
+              "label": "迭代上限",
+              "passed": true,
+              "detail": "最大迭代次数由 ReActConfig 控制。"
+            },
+            {
+              "check_id": "check-react-trace",
+              "label": "可审计轨迹",
+              "passed": true,
+              "detail": "只记录动作与观察摘要，不输出私有 CoT。"
+            },
+            {
+              "check_id": "check-react-regressions",
+              "label": "原业务逻辑保留",
+              "passed": true,
+              "detail": "漂移检测、质量降级、来源配额和句界截断均有测试。"
+            },
+            {
+              "check_id": "check-react-no-network",
+              "label": "无网络副作用",
+              "passed": true,
+              "detail": "固定命令只编译并运行本地单元测试，不调用搜索网络。"
+            }
+          ],
+          "review_required": true,
+          "deliverable_type": null,
+          "key_outputs": [],
+          "review_guidance": null,
+          "execution_summary": null,
+          "external_action": "none",
+          "original_inputs_modified": false
+        }
+      ],
+      "artifact_downloads": [
+        {
+          "artifact_id": "workspace-artifact-2d8e116bc156",
+          "file_name": "search-agent-react-refactor.zip",
+          "status_code": 200,
+          "content_type": "application/zip",
+          "declared_size": 5041,
+          "downloaded_size": 5041,
+          "sha256": "c20f7c51bee396f8ac938ee0c257657ce87b75fe5e9d36d48f8fc3280831e923",
+          "size_matches": true,
+          "content_gate": null
+        },
+        {
+          "artifact_id": "workspace-artifact-87ca2992f3f9",
+          "file_name": "ReAct测试回执.md",
+          "status_code": 200,
+          "content_type": "text/markdown",
+          "declared_size": 1239,
+          "downloaded_size": 1239,
+          "sha256": "54f9748600b5c59aa3821b2a80095b01d7dc547cbb58af780443175360dd4c03",
+          "size_matches": true,
+          "content_gate": null
+        }
+      ],
+      "expected_artifacts": [
+        "search-agent-react-refactor.zip",
+        "ReAct测试回执.md"
+      ],
+      "events": [
+        {
+          "sequence": 3,
+          "event_name": "planning_started",
+          "status": "planning"
+        },
+        {
+          "sequence": 4,
+          "event_name": "planning_completed",
+          "status": "planning"
+        },
+        {
+          "sequence": 6,
+          "event_name": "deterministic_office_tool_started",
+          "status": "validating"
+        },
+        {
+          "sequence": 7,
+          "event_name": "run_workspace_artifact_written",
+          "status": "validating"
+        },
+        {
+          "sequence": 8,
+          "event_name": "run_workspace_artifact_written",
+          "status": "validating"
+        },
+        {
+          "sequence": 9,
+          "event_name": "deterministic_verification_completed",
+          "status": "validating"
+        },
+        {
+          "sequence": 10,
+          "event_name": "analysis_started",
+          "status": "analyzing"
+        },
+        {
+          "sequence": 11,
+          "event_name": "analysis_completed",
+          "status": "analyzing"
+        },
+        {
+          "sequence": 12,
+          "event_name": "analysis_validation_rejected",
+          "status": "analyzing"
+        },
+        {
+          "sequence": 13,
+          "event_name": "analysis_started",
+          "status": "analyzing"
+        },
+        {
+          "sequence": 14,
+          "event_name": "analysis_completed",
+          "status": "analyzing"
+        },
+        {
+          "sequence": 15,
+          "event_name": "analysis_structure_rejected",
+          "status": "analyzing"
+        }
+      ],
+      "waiting_branches": [
+        {
+          "branch_id": "branch-5ebdc0801804",
+          "title": "读取固定 Workflow 搜索实现",
+          "status": "waiting_input",
+          "missing_file_count": 1
+        },
+        {
+          "branch_id": "branch-c6c1c2dc5b4b",
+          "title": "读取入口与运行逻辑",
+          "status": "waiting_input",
+          "missing_file_count": 1
+        },
+        {
+          "branch_id": "branch-4efdfcbbbd05",
+          "title": "读取工具定义",
+          "status": "waiting_input",
+          "missing_file_count": 1
+        },
+        {
+          "branch_id": "branch-5546a120cbe3",
+          "title": "读取 LLM 交互实现",
+          "status": "waiting_input",
+          "missing_file_count": 1
+        },
+        {
+          "branch_id": "branch-58d346fe09af",
+          "title": "读取配置与依赖",
+          "status": "waiting_input",
+          "missing_file_count": 2
+        },
+        {
+          "branch_id": "branch-f800fd021599",
+          "title": "读取运行日志",
+          "status": "waiting_input",
+          "missing_file_count": 1
+        }
+      ],
+      "validation_errors": [],
+      "timed_out": false,
+      "effect_gate_passed": true,
+      "failure_reason": null
+    }
+  ],
+  "claim_boundary": "该证据仅证明固定服务配置下真实模型调用、运行工作区文件和确定性检查；不证明真实用户理解、生产安全沙箱或外部动作能力。"
+}

@@ -1,8 +1,12 @@
 from __future__ import annotations
 
 import csv
+import hashlib
 import io
+import json
 import os
+import subprocess
+import sys
 import zipfile
 from pathlib import Path
 
@@ -100,6 +104,132 @@ def test_code_scenarios_return_real_archives_and_command_receipts(
     rendered = receipt.content.decode("utf-8")
     assert "退出码 0" in rendered or "零失败" in rendered
     assert "FORTE 原始源码：未修改" in rendered
+
+
+def test_tc02_refactors_the_complete_real_project_and_survives_independent_unpack(
+    catalog: BenchmarkWorkspaceCatalog, tmp_path: Path
+) -> None:
+    spec = next(item for item in SCENARIO_EFFECT_SPECS if item.scenario_id == "TC-02")
+    workspace = catalog.public_workspace()
+    index = {
+        (folder["display_label"], item["display_label"]): item["file_ref"]
+        for folder in workspace["folders"]
+        for item in folder["files"]
+    }
+    source_bytes = {
+        label: catalog.checked_input_bytes(index[(group, label)])
+        for group, label in spec.source_labels
+    }
+    source_digest_before = {
+        name: hashlib.sha256(content).hexdigest()
+        for name, content in source_bytes.items()
+    }
+
+    execution = ScenarioEffectEngine().execute(spec.instruction, catalog)
+    assert execution is not None and execution.status == "passed"
+    projected_checks = [
+        check for artifact in execution.artifacts for check in artifact.checks
+    ]
+    assert len(projected_checks) == 24
+    assert len({check.check_id for check in projected_checks}) == 12
+    assert execution.observation == (
+        "生成 2 份真实成果文件，共享 12 项确定性检查，12/12 通过。"
+    )
+    assert "24 项" not in execution.observation
+    archive = next(item for item in execution.artifacts if item.media_type == "application/zip")
+    assert archive.validator_id == "validator-code-project-copy-v2"
+    assert archive.self_test is not None
+
+    with zipfile.ZipFile(io.BytesIO(archive.content)) as package:
+        names = set(package.namelist())
+        required = {
+            f"search_agent_workflow/{name}" for name in source_bytes
+        }
+        required |= {
+            "search_agent_workflow/react_agent.py",
+            "search_agent_workflow/tests/test_react_agent.py",
+            "search_agent_workflow/CHANGESET.patch",
+            "search_agent_workflow/changes.json",
+            "search_agent_workflow/改动说明.md",
+            "search_agent_workflow/TC-02自测卡.md",
+            "search_agent_workflow/TEST_RECEIPT.txt",
+            "search_agent_workflow/test_receipt.json",
+        }
+        assert required <= names
+        for name in ("workflow.py", "llm.py", "tools.py", "requirements.txt", "search_agent.log"):
+            assert package.read(f"search_agent_workflow/{name}") == source_bytes[name]
+        main_text = package.read("search_agent_workflow/main.py").decode("utf-8")
+        react_text = package.read("search_agent_workflow/react_agent.py").decode("utf-8")
+        changes = json.loads(package.read("search_agent_workflow/changes.json"))
+        receipt = json.loads(package.read("search_agent_workflow/test_receipt.json"))
+        package.extractall(tmp_path)
+
+    assert "ReActSearchAgent" in main_text and "SearchWorkflow" not in main_text
+    assert "range(1, self.config.max_iterations + 1)" in react_text
+    assert changes["source_project"] == "algorithm-013/input/search_agent_workflow"
+    assert changes["source_tree_modified"] is False
+    assert receipt["status"] == "passed"
+    assert receipt["tests"]["manifest_consistent"] is True
+    assert set(receipt["tests"]["declared_ids"]) == set(receipt["tests"]["executed_ids"])
+
+    isolated_env = {
+        "PATH": os.environ.get("PATH", ""),
+        "SYSTEMROOT": os.environ.get("SYSTEMROOT", ""),
+        "TEMP": os.environ.get("TEMP", str(tmp_path)),
+        "TMP": os.environ.get("TMP", str(tmp_path)),
+        "PYTHONNOUSERSITE": "1",
+        "HTTP_PROXY": "",
+        "HTTPS_PROXY": "",
+        "NO_PROXY": "*",
+    }
+    compiled = subprocess.run(
+        [sys.executable, "-m", "compileall", "-q", "search_agent_workflow"],
+        cwd=tmp_path,
+        env=isolated_env,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    tested = subprocess.run(
+        [sys.executable, "-m", "unittest", "discover", "-s", "search_agent_workflow/tests", "-v"],
+        cwd=tmp_path,
+        env=isolated_env,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert compiled.returncode == 0, compiled.stderr
+    assert tested.returncode == 0, tested.stdout + tested.stderr
+    assert f"Ran {len(receipt['tests']['declared_ids'])} tests" in tested.stderr
+    assert source_digest_before == {
+        name: hashlib.sha256(catalog.checked_input_bytes(index[(group, name)])).hexdigest()
+        for group, name in spec.source_labels
+    }
+
+
+def test_tc02_command_failure_marks_the_package_failed_and_gives_recovery(
+    catalog: BenchmarkWorkspaceCatalog, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    calls = 0
+
+    def fail_tests(command: list[str], *, cwd: Path, timeout_seconds: int = 30):
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            return 0, "", 5
+        return 1, "Ran 20 tests\nFAILED (failures=1)", 7
+
+    monkeypatch.setattr(
+        ScenarioEffectEngine, "_run_fixed_command", staticmethod(fail_tests)
+    )
+    spec = next(item for item in SCENARIO_EFFECT_SPECS if item.scenario_id == "TC-02")
+    execution = ScenarioEffectEngine().execute(spec.instruction, catalog)
+
+    assert execution is not None and execution.status == "failed"
+    assert all(item.verifier_status == "failed" for item in execution.artifacts)
+    assert "不要合并这个代码包" in execution.artifacts[0].review_guidance
+    assert "重新启动一项 TC-02 任务" in execution.artifacts[0].review_guidance
+    assert execution.artifacts[0].self_test is not None
 
 
 def test_candidate_legal_and_release_outputs_keep_human_gates_and_fixed_facts(

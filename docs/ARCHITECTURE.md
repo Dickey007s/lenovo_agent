@@ -301,6 +301,23 @@ verifier still owns the 13 checks, while the EffectReceipt owns prohibited side
 effects and `external_action=none`. These fields do not create a Connector,
 Permit, general outbound engine or production compliance approval.
 
+DR-0040 adds optional `key_outputs_label` and `self_test` to the same
+service-owned Artifact contract. TC-02 uses them to expose exact file changes,
+download commands, declared checks and failure signals without letting the
+browser infer code facts from a Scenario name. Its fixed adapter copies all
+seven algorithm-013 inputs to a temporary Run Workspace, preserves five contract
+files byte-for-byte, modifies the copied config/main entry and adds a bounded
+ReAct controller plus tests. Its default policy deterministically walks the
+Planner-selected tools through a replaceable `action_policy`; the outer provider
+Planner/Analyst are not this internal policy. The verifier compares declared and
+executed test IDs and independently rechecks the downloaded ZIP. This does not
+prove model-driven action selection inside the project and does not add a general
+shell, arbitrary repository support, dependency installation, automatic merge or
+OS-level network isolation. Artifact cards keep their own `checks[]` projection,
+but Run-level counts and EffectReceipt wording deduplicate repeated `check_id`
+values. Two files using one checklist are therefore twelve unique checks, not
+twenty-four independent checks.
+
 ## 7. Eight module maturity
 
 | Module | Current implementation | Missing target work |
@@ -325,6 +342,9 @@ receive a minimal OS environment allowlist; provider keys, tokens, database DSNs
 intent declarations; only Artifact/Effect receipts prove a fixed adapter ran.
 `completed` means a reviewable logical response exists, not that a deterministic
 Artifact or external process completed.
+The fixed TC-02 test path did not call network or production search, but the
+runner does not block direct sockets at the OS boundary. Reports must preserve
+that distinction.
 
 See [`DR-0036`](decisions/DR-0036-outcome-first-and-layout-tolerant-evidence.md),
 [`SCENARIO-022`](scenarios/SCENARIO-022-verified-outcome-and-audit-location.md),

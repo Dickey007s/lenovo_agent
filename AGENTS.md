@@ -68,6 +68,18 @@ and SMS are described workflow nodes but did not occur. The six terminal states,
 source basis and human review reason are server-owned fixed-adapter facts; this is
 not a general outbound engine or production compliance approval.
 
+DR-0040 governs TC-02 real-project refactoring. Read
+`docs/decisions/DR-0040-tc02-real-project-react-refactor.md`,
+`docs/scenarios/SCENARIO-026-refactor-real-search-agent-copy-with-bounded-react.md`
+and its Evidence before changing the fixed ReAct adapter or code-artifact UI.
+TC-02 must copy the complete algorithm-013 project, preserve declared source
+contracts, publish diff/test receipts and independently retest the downloaded ZIP.
+The current test count is manifest-derived, not a business cap. “No network call
+observed” is not OS-level socket isolation or a general code sandbox. The
+generated project's default action policy deterministically follows planned
+tools; its interface is replaceable, but this does not prove model-driven ReAct
+inside the project. Outer Planner/Analyst receipts must remain separate.
+
 DR-0037 governs TC-05 Artifact meaning and review typography. Read
 `docs/decisions/DR-0037-tc05-artifact-semantics-and-review-readability.md` and
 `docs/scenarios/SCENARIO-023-understand-finance-artifacts-and-review-evidence.md`

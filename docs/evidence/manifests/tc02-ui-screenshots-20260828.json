@@ -1,0 +1,31 @@
+{
+  "schema_version": "tc02-ui-screenshots.v1",
+  "generated_at": "2026-08-28T17:50:58+08:00",
+  "source": "Playwright TC-02 deterministic browser fixture; desktop final is a tight artifact-region crop rendered from a 1440 px viewport",
+  "screenshots": [
+    {
+      "path": "docs/evidence/screenshots/tc02-real-project-refactor-desktop.png",
+      "width": 1338,
+      "height": 1430,
+      "bytes": 162067,
+      "sha256": "bd413c4dc27dcc8a363ba0518483bb733c60107e448a59675008160ce4a265e0"
+    },
+    {
+      "path": "docs/evidence/screenshots/tc02-real-project-refactor-mobile.png",
+      "width": 334,
+      "height": 2929,
+      "bytes": 162955,
+      "sha256": "3cd7ea4ed7a56987a685f6de5582619e1c4048b6b8c0ed8b59998956ac1ea316"
+    },
+    {
+      "path": "docs/evidence/screenshots/tc02-real-project-refactor-desktop-narrow-negative.png",
+      "width": 441,
+      "height": 2302,
+      "bytes": 58878,
+      "sha256": "3199af99d0cd2753c53b815c720577d09993f64e36aa07dc7f15ddcfcb7aca79",
+      "status": "historical_negative",
+      "failure": "截图过窄且包含大片空白，不能证明桌面布局；不作为最终正向证据。"
+    }
+  ],
+  "claim_boundary": "最终桌面图是 1440 px viewport 中成果区的 1338 px 紧凑 crop，包含共享 12 项检查汇总、实际发生说明、两类成果、自测卡与人工合并边界；移动图证明 390 px 路径。截图不证明真实用户理解；真实 Provider 与 Artifact 下载证据在独立 live manifest。"
+}

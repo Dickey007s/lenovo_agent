@@ -147,6 +147,19 @@ task close say that only a flow-design DOCX was generated; “发起外呼拨号
 SMS action occurred. The DOCX itself repeats its question, source, boundary and
 review responsibility before the full flow.
 
+DR-0040 gives code-change Artifacts an explicit review and self-test surface.
+Optional `key_outputs_label` names the list as “文件变更” or “验证结论” instead
+of borrowing TC-10's terminal-state vocabulary. Optional `self_test` contains
+the original instruction, expected files, commands, expected checks and failure
+signals. The browser shows these before technical receipts; commands wrap at
+390 px and do not execute when the card opens. TC-02 still writes only a fixed
+algorithm-013 copy. Passing checks mean the downloaded copy compiled and its
+declared tests matched execution, not that the original repository was changed
+or automatically merged. The card also states that the current default policy
+deterministically steps through planned tools and is replaceable; it does not
+claim that a model inside the ZIP selects actions from Observations. Outer
+Planner/Analyst receipts remain in the Run trace, not in the Artifact policy.
+
 Open human decisions are authoritative in the Snapshot-level
 `decision_requests[]`; round-level copies are compatibility projections only.
 Closing or pressing Escape exits the review surface before the browser attempts a
@@ -207,6 +220,12 @@ not happen. CSV/Markdown/DOCX/ZIP files download through the Owner/Run-scoped
 Artifact route. The public UI never receives the server storage path or private
 digest. The original FORTE source remains read-only and every receipt states
 `external_action=none`.
+
+Each Artifact retains its own `checks[]` so the user can review that file in
+isolation. The section header, task conclusion, EffectReceipt observation and
+verification event count unique checks by server-owned `check_id`; repeated
+projection of the same checklist across multiple deliverables is shown as a
+shared checklist and is never multiplied by the number of files.
 
 The section deliberately keeps three statuses separate: Planner/Analyst
 `called/output_used`, deterministic effect `passed/failed/blocked`, and overall
