@@ -3409,6 +3409,10 @@ class HarnessRuntime:
                     statistic_basis=generated.statistic_basis,
                     purpose=generated.purpose,
                     record_count=generated.record_count,
+                    deliverable_type=generated.deliverable_type,
+                    key_outputs=list(generated.key_outputs),
+                    review_guidance=generated.review_guidance,
+                    execution_summary=generated.execution_summary,
                     download_path=(
                         f"/v1/harness/runs/{run_id}/artifacts/{artifact_id}"
                     ),

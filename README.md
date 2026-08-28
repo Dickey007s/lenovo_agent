@@ -264,6 +264,12 @@ multi-instance coordination and governed external action remain target work.
   generated and one Agent explanation still lacks a row/cell location; its
   primary action resumes only the affected Branch. Unverified and terminal Runs
   use different wording and never borrow the verified-result claim.
+- `DR-0039` makes TC-10 distinguish a flow-design DOCX from external execution.
+  The service-owned Artifact now states its type, M1 scope, source basis, six
+  terminal states, review reason and execution boundary. The result area and
+  task close both say that dialing, CRM writes and SMS did not occur. The
+  downloaded DOCX repeats that boundary before its complete flow. This remains
+  one fixed Operations-008 adapter, not a general outbound engine.
 - No target-user study has been run. Clarity, trust, efficiency and user value
   remain hypotheses.
 

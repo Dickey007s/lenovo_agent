@@ -233,7 +233,7 @@ def test_finance_outputs_match_known_fixed_input_totals(
 def test_outbound_flow_is_a_valid_docx_and_never_claims_execution(
     catalog: BenchmarkWorkspaceCatalog,
 ) -> None:
-    _, execution = _execute("TC-10", catalog)
+    spec, execution = _execute("TC-10", catalog)
     artifact = execution.artifacts[0]
 
     with zipfile.ZipFile(io.BytesIO(artifact.content)) as archive:
@@ -241,10 +241,47 @@ def test_outbound_flow_is_a_valid_docx_and_never_claims_execution(
             archive.namelist()
         )
         document = archive.read("word/document.xml").decode("utf-8")
-    assert "START" in document
-    assert "六类终态" in document
-    assert "不拨号、不写 CRM、不发送短信" in document
+    expected_terminals = (
+        "PTP登记",
+        "转人工跟进",
+        "安排重拨",
+        "停止外呼（达上限）",
+        "加入禁呼名单",
+        "案件升级",
+    )
+    assert document.count("START") == 1
+    assert all(token in document for token in expected_terminals)
+    assert "这份文档负责回答" in document
+    assert "采用依据：《专业性说明.md》" in document
+    assert "流程节点描述，不是执行回执" in document
+    assert "没有拨号、没有写 CRM、没有发送短信" in document
     assert len(artifact.checks) == 13
+    assert all(check.passed for check in artifact.checks)
+    assert {check.check_id for check in artifact.checks} == {
+        "check-outbound-source",
+        "check-outbound-start",
+        "check-outbound-time-gate",
+        "check-outbound-connect",
+        "check-outbound-retry",
+        "check-outbound-recording",
+        "check-outbound-identity",
+        "check-outbound-third-party",
+        "check-outbound-attitude",
+        "check-outbound-invalid",
+        "check-outbound-human",
+        "check-outbound-terminals",
+        "check-outbound-no-action",
+    }
+    assert artifact.source_file_refs == execution.source_file_refs
+    assert spec.source_labels == (("运营管理", "专业性说明.md"),)
+    assert artifact.covered_period == "信用卡 M1 逾期阶段"
+    assert artifact.deliverable_type == "流程设计 DOCX"
+    assert artifact.key_outputs == expected_terminals
+    assert "专业性说明.md" in (artifact.statistic_basis or "")
+    assert "不是拨号" in (artifact.purpose or "")
+    assert "业务与合规负责人" in (artifact.review_guidance or "")
+    assert "流程节点描述，不是执行回执" in (artifact.execution_summary or "")
+    assert execution.prohibited_side_effects == ("不拨号", "不写 CRM", "不发送短信")
 
 
 def test_customer_sre_and_ux_outputs_retain_deterministic_business_facts(

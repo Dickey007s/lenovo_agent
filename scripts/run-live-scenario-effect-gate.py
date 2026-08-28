@@ -2,12 +2,15 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import io
 import json
 import time
 import uuid
+import zipfile
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+from xml.etree import ElementTree
 
 import httpx
 
@@ -18,6 +21,53 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 FORTE_ROOT = REPO_ROOT / "demo-enterprise-data" / "forte"
 DEFAULT_SCENARIOS = ("TC-01", "TC-05", "TC-10", "TC-13", "TC-14", "TC-15")
 SETTLED_STATUSES = {"waiting_input", "ready_to_execute", "completed", "stopped", "failed"}
+
+
+def _tc10_docx_content_gate(content: bytes) -> dict[str, Any]:
+    required_tokens = (
+        "START -> 外呼时段合规判断",
+        "外呼时段合规 -> 发起外呼拨号",
+        "未接通 -> 今日已拨次数与一小时频次判断",
+        "达到每日3次或1小时1次上限 -> 停止外呼（达上限）",
+        "接通 -> 录音告知（本次通话将被录音）",
+        "录音告知 -> 身份确认",
+        "本人 -> 开场告知与还款引导",
+        "第三方要求不再联系 -> 加入禁呼名单",
+        "接通后立即挂断或无法沟通 -> 今日已拨次数与一小时频次判断",
+        "情绪激动超过30秒 -> 转人工跟进",
+        "PTP登记",
+        "转人工跟进",
+        "安排重拨",
+        "停止外呼（达上限）",
+        "加入禁呼名单",
+        "案件升级",
+        "采用依据：《专业性说明.md》",
+        "实际没有拨号、没有写 CRM、没有发送短信",
+    )
+    try:
+        with zipfile.ZipFile(io.BytesIO(content)) as archive:
+            document = archive.read("word/document.xml")
+        root = ElementTree.fromstring(document)
+        text = "".join(root.itertext())
+    except (KeyError, OSError, zipfile.BadZipFile, ElementTree.ParseError) as exc:
+        return {
+            "passed": False,
+            "valid_docx": False,
+            "paragraph_count": 0,
+            "missing_tokens": list(required_tokens),
+            "error": type(exc).__name__,
+        }
+    paragraph_count = len(root.findall(".//{http://schemas.openxmlformats.org/wordprocessingml/2006/main}p"))
+    missing = [token for token in required_tokens if token not in text]
+    unique_start = text.count("START -> 外呼时段合规判断") == 1
+    return {
+        "passed": unique_start and not missing,
+        "valid_docx": True,
+        "paragraph_count": paragraph_count,
+        "unique_start": unique_start,
+        "required_token_count": len(required_tokens),
+        "missing_tokens": missing,
+    }
 
 
 def _input_tree_digest() -> str:
@@ -93,6 +143,11 @@ def _download_artifacts(
         response = client.get(
             f"{api_base}/v1/harness/runs/{run_id}/artifacts/{artifact['artifact_id']}"
         )
+        content_gate = (
+            _tc10_docx_content_gate(response.content)
+            if response.status_code == 200 and artifact.get("scenario_id") == "TC-10"
+            else None
+        )
         downloads.append(
             {
                 "artifact_id": artifact["artifact_id"],
@@ -101,8 +156,10 @@ def _download_artifacts(
                 "content_type": response.headers.get("content-type", "").split(";", 1)[0],
                 "declared_size": artifact["size"],
                 "downloaded_size": len(response.content),
+                "sha256": hashlib.sha256(response.content).hexdigest(),
                 "size_matches": response.status_code == 200
                 and len(response.content) == artifact["size"],
+                "content_gate": content_gate,
             }
         )
     return downloads
@@ -211,6 +268,10 @@ def _run_one(
         and all(bool(item.get("passed")) for item in checks)
         and bool(downloads)
         and all(item["size_matches"] for item in downloads)
+        and all(
+            item["content_gate"] is None or item["content_gate"]["passed"]
+            for item in downloads
+        )
         and model_execution_gate
         and all(item.get("external_action") == "none" for item in receipts)
         and all(item.get("original_inputs_modified") is False for item in artifacts)
@@ -241,6 +302,10 @@ def _run_one(
                 "verifier_status": item.get("verifier_status"),
                 "checks": item.get("checks", []),
                 "review_required": item.get("review_required"),
+                "deliverable_type": item.get("deliverable_type"),
+                "key_outputs": item.get("key_outputs", []),
+                "review_guidance": item.get("review_guidance"),
+                "execution_summary": item.get("execution_summary"),
                 "external_action": item.get("external_action"),
                 "original_inputs_modified": item.get("original_inputs_modified"),
             }
