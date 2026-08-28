@@ -220,6 +220,17 @@ failure state. Expanding a candidate shows its subject, counterparty, the three
 period amounts and source locators; doing so is browser-only and does not call a
 model, alter a workbook or perform an accounting action.
 
+DR-0047 gives TC-10 a four-state projection. The first screen says that the
+output is a flow-design document, not dialing, CRM/SMS execution or legal
+advice. It then shows deterministic source/DOCX/graph checks, dynamic rule
+coverage and reachable terminals, pending business/compliance approval, and
+the explicit no-action receipt as separate server-owned facts. Expanding a
+rule reveals its approved line locator, excerpt and mapped node/edge/guard/
+terminal IDs. A legal source mutation changes these counts and parameters from
+the public outcome; the browser does not parse Markdown, invent a percentage or
+call a model when details open. Unsupported or conflicting rules remain visible
+as a failed effect rather than being hidden behind an old `13/13` label.
+
 Open human decisions are authoritative in the Snapshot-level
 `decision_requests[]`; round-level copies are compatibility projections only.
 Closing or pressing Escape exits the review surface before the browser attempts a

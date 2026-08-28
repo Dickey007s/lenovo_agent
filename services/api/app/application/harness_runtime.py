@@ -3222,6 +3222,13 @@ class HarnessRuntime:
             )
             if execution is None:
                 raise HarnessError("确定性办公工具未返回执行结果")
+            if spec.scenario_id == "TC-10":
+                for file_ref in frozen.source_file_refs:
+                    if (
+                        self.catalog.checked_input_bytes(file_ref)
+                        != frozen.catalog.checked_input_bytes(file_ref)
+                    ):
+                        raise HarnessError("Operations-008 原始来源在成果生成期间发生变化")
             await self._record_scenario_effect(
                 owner_id,
                 run_id,
@@ -3313,6 +3320,7 @@ class HarnessRuntime:
                     legal_review_outcome=generated.legal_review_outcome,
                     candidate_review_outcome=generated.candidate_review_outcome,
                     finance_review_outcome=generated.finance_review_outcome,
+                    outbound_flow_outcome=generated.outbound_flow_outcome,
                     download_path=(f"/v1/harness/runs/{run_id}/artifacts/{artifact_id}"),
                     created_at=now,
                     content_sha256=stored.sha256,
@@ -3353,6 +3361,14 @@ class HarnessRuntime:
         finance_outcome = finance_outcomes[0] if finance_outcomes else None
         if finance_outcomes and any(item != finance_outcome for item in finance_outcomes[1:]):
             raise HarnessError("同一效果的财务复核事实不一致")
+        outbound_outcomes = [
+            item.outbound_flow_outcome
+            for item in records
+            if item.outbound_flow_outcome is not None
+        ]
+        outbound_outcome = outbound_outcomes[0] if outbound_outcomes else None
+        if outbound_outcomes and any(item != outbound_outcome for item in outbound_outcomes[1:]):
+            raise HarnessError("同一效果的外呼流程覆盖事实不一致")
         receipt = AgentControlLoopEffectReceipt(
             receipt_id=receipt_id,
             capability_id=execution.capability_id,
@@ -3370,6 +3386,7 @@ class HarnessRuntime:
             legal_review_outcome=legal_outcome,
             candidate_review_outcome=candidate_outcome,
             finance_review_outcome=finance_outcome,
+            outbound_flow_outcome=outbound_outcome,
             created_at=now,
         )
 

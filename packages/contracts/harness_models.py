@@ -10,7 +10,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any, Literal
 
-from pydantic import Field, ValidationInfo, field_validator
+from pydantic import Field, ValidationInfo, field_validator, model_validator
 
 from .models import StrictModel
 
@@ -824,6 +824,146 @@ class AgentControlLoopFinanceReviewOutcome(StrictModel):
         return value
 
 
+class AgentControlLoopOutboundRuleParameter(StrictModel):
+    """One public, source-derived parameter used by the outbound-flow design."""
+
+    name: str = Field(pattern=r"^[a-z][a-z0-9_]{2,79}$")
+    value: str = Field(min_length=1, max_length=180)
+    unit: str | None = Field(default=None, min_length=1, max_length=40)
+
+
+class AgentControlLoopOutboundRule(StrictModel):
+    """One normative requirement extracted from the approved Operations-008 Markdown."""
+
+    rule_id: str = Field(pattern=r"^OUT-[A-Z][A-Z0-9_]*-[0-9]{2}$")
+    group: Literal[
+        "TIME",
+        "FREQ",
+        "RECORD",
+        "IDENTITY",
+        "THIRD_PARTY",
+        "PROHIBIT",
+        "CONNECT",
+        "PTP",
+        "SOFT",
+        "HARD",
+        "DISPUTE",
+        "INVALID",
+        "TERMINAL",
+        "PAYMENT",
+        "REDIAL",
+    ]
+    source_file_ref: str = Field(min_length=1, max_length=120)
+    locator: str = Field(min_length=1, max_length=180)
+    excerpt: str = Field(min_length=1, max_length=1_000)
+    parameters: list[AgentControlLoopOutboundRuleParameter] = Field(
+        default_factory=list, max_length=12
+    )
+    expected_relation: str = Field(min_length=1, max_length=300)
+    expected_action: str = Field(min_length=1, max_length=500)
+    coverage_state: Literal["covered", "unsupported", "conflict"]
+    mapped_node_ids: list[str] = Field(default_factory=list, max_length=20)
+    mapped_edge_ids: list[str] = Field(default_factory=list, max_length=20)
+    mapped_guard_ids: list[str] = Field(default_factory=list, max_length=20)
+    mapped_terminal_ids: list[str] = Field(default_factory=list, max_length=12)
+
+
+class AgentControlLoopOutboundNode(StrictModel):
+    node_id: str = Field(pattern=r"^out-node-[a-z0-9-]{2,100}$")
+    label: str = Field(min_length=1, max_length=240)
+    kind: Literal["start", "gate", "decision", "action", "terminal"]
+    source_rule_ids: list[str] = Field(default_factory=list, max_length=30)
+    future_action: bool = False
+
+
+class AgentControlLoopOutboundEdge(StrictModel):
+    edge_id: str = Field(pattern=r"^out-edge-[a-z0-9-]{2,100}$")
+    from_node_id: str = Field(pattern=r"^out-node-[a-z0-9-]{2,100}$")
+    to_node_id: str = Field(pattern=r"^out-node-[a-z0-9-]{2,100}$")
+    label: str = Field(min_length=1, max_length=240)
+    guard_ids: list[str] = Field(default_factory=list, max_length=12)
+    source_rule_ids: list[str] = Field(default_factory=list, max_length=30)
+    future_action: bool = False
+
+
+class AgentControlLoopOutboundGuard(StrictModel):
+    guard_id: str = Field(pattern=r"^out-guard-[a-z0-9-]{2,100}$")
+    label: str = Field(min_length=1, max_length=300)
+    parameters: list[AgentControlLoopOutboundRuleParameter] = Field(
+        default_factory=list, max_length=12
+    )
+    source_rule_ids: list[str] = Field(min_length=1, max_length=30)
+
+
+class AgentControlLoopOutboundTerminal(StrictModel):
+    terminal_id: str = Field(pattern=r"^out-terminal-[a-z0-9-]{2,100}$")
+    node_id: str = Field(pattern=r"^out-node-[a-z0-9-]{2,100}$")
+    label: str = Field(min_length=1, max_length=180)
+    source_rule_ids: list[str] = Field(min_length=1, max_length=20)
+    source_listed: bool
+
+
+class AgentControlLoopOutboundGraphIntegrity(StrictModel):
+    unique_start: bool
+    unique_ids: bool
+    no_dangling_edges: bool
+    all_nodes_reachable: bool
+    all_terminals_reachable: bool
+    every_nonterminal_has_outgoing: bool
+    every_node_can_reach_terminal: bool
+    critical_order_valid: bool
+    third_party_boundary_valid: bool
+    all_rules_mapped: bool
+
+
+class AgentControlLoopOutboundFlowOutcome(StrictModel):
+    """Source-derived flow coverage, kept separate from approval and execution."""
+
+    outcome_id: str = Field(pattern=r"^outbound-flow-outcome-[a-z0-9-]{3,80}$")
+    status: Literal["approval_required", "invalid"]
+    decision: str = Field(min_length=1, max_length=500)
+    summary: str = Field(min_length=1, max_length=1_000)
+    source_rule_group_count: int = Field(ge=0, le=30)
+    atomic_requirement_count: int = Field(ge=0, le=100)
+    covered_count: int = Field(ge=0, le=100)
+    unsupported_count: int = Field(ge=0, le=100)
+    conflict_count: int = Field(ge=0, le=100)
+    node_count: int = Field(ge=0, le=100)
+    edge_count: int = Field(ge=0, le=150)
+    guard_count: int = Field(ge=0, le=50)
+    terminal_count: int = Field(ge=0, le=20)
+    reachable_terminal_count: int = Field(ge=0, le=20)
+    parameters: list[AgentControlLoopOutboundRuleParameter] = Field(
+        default_factory=list, max_length=30
+    )
+    rules: list[AgentControlLoopOutboundRule] = Field(default_factory=list, max_length=100)
+    nodes: list[AgentControlLoopOutboundNode] = Field(default_factory=list, max_length=100)
+    edges: list[AgentControlLoopOutboundEdge] = Field(default_factory=list, max_length=150)
+    guards: list[AgentControlLoopOutboundGuard] = Field(default_factory=list, max_length=50)
+    terminals: list[AgentControlLoopOutboundTerminal] = Field(default_factory=list, max_length=20)
+    graph_integrity: AgentControlLoopOutboundGraphIntegrity
+    human_approval_required: Literal[True] = True
+    legal_opinion: Literal[False] = False
+    original_inputs_modified: Literal[False] = False
+    external_action: Literal["none"] = "none"
+
+    @model_validator(mode="after")
+    def validate_projection_counts(self) -> "AgentControlLoopOutboundFlowOutcome":
+        if self.atomic_requirement_count != len(self.rules):
+            raise ValueError("outbound atomic_requirement_count must equal rules length")
+        if self.source_rule_group_count != len({rule.group for rule in self.rules}):
+            raise ValueError("outbound source_rule_group_count must equal unique groups")
+        if self.covered_count + self.unsupported_count + self.conflict_count != len(self.rules):
+            raise ValueError("outbound coverage counts must equal rules length")
+        if self.node_count != len(self.nodes) or self.edge_count != len(self.edges):
+            raise ValueError("outbound graph counts must equal node and edge list lengths")
+        if self.guard_count != len(self.guards) or self.terminal_count != len(self.terminals):
+            raise ValueError("outbound graph counts must equal guard and terminal list lengths")
+        if self.reachable_terminal_count > self.terminal_count:
+            raise ValueError("outbound reachable terminals cannot exceed terminal count")
+        return self
+
+
 class AgentControlLoopBusinessGateOutcome(StrictModel):
     """A business decision projected independently from deterministic checks."""
 
@@ -878,6 +1018,7 @@ class AgentControlLoopWorkspaceArtifact(StrictModel):
     legal_review_outcome: AgentControlLoopLegalReviewOutcome | None = None
     candidate_review_outcome: AgentControlLoopCandidateReviewOutcome | None = None
     finance_review_outcome: AgentControlLoopFinanceReviewOutcome | None = None
+    outbound_flow_outcome: AgentControlLoopOutboundFlowOutcome | None = None
     download_path: str = Field(min_length=1, max_length=300)
     created_at: datetime
     original_inputs_modified: Literal[False] = False
@@ -909,6 +1050,7 @@ class AgentControlLoopEffectReceipt(StrictModel):
     legal_review_outcome: AgentControlLoopLegalReviewOutcome | None = None
     candidate_review_outcome: AgentControlLoopCandidateReviewOutcome | None = None
     finance_review_outcome: AgentControlLoopFinanceReviewOutcome | None = None
+    outbound_flow_outcome: AgentControlLoopOutboundFlowOutcome | None = None
     created_at: datetime
     external_action: Literal["none"] = "none"
 

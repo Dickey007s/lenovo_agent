@@ -38,6 +38,7 @@ from tests.unit.test_scenario_effect_runtime import (
     TC05_INSTRUCTION,
     TC06_INSTRUCTION,
     TC07_INSTRUCTION,
+    TC10_INSTRUCTION,
     ONBOARDING_INSTRUCTION,
     TC11_INSTRUCTION,
     TC12_INSTRUCTION,
@@ -45,6 +46,8 @@ from tests.unit.test_scenario_effect_runtime import (
     LegalDelegationPlanner,
     OnboardingAnalyst,
     OnboardingPlanner,
+    OutboundFlowAnalyst,
+    OutboundFlowPlanner,
     ReleaseReadinessAnalyst,
     ReleaseReadinessPlanner,
 )
@@ -614,6 +617,104 @@ async def test_postgres_restart_preserves_tc05_finance_outcome_and_three_artifac
         public_json = public_snapshot.model_dump_json()
         assert "content_sha256" not in public_json
         assert public_snapshot.effect_receipts[0].finance_review_outcome == outcome
+    finally:
+        for runtime in reversed(runtimes):
+            await runtime.close()
+        if DATABASE_DSN and run_id:
+            async with await psycopg.AsyncConnection.connect(DATABASE_DSN) as connection:
+                async with connection.cursor() as cursor:
+                    for table in (
+                        "harness_idempotency",
+                        "harness_task_commit",
+                        "harness_artifact_version",
+                        "harness_run_state",
+                    ):
+                        await cursor.execute(
+                            f"DELETE FROM {table} WHERE owner_id = %s",  # nosec B608
+                            (owner,),
+                        )
+
+
+@pytest.mark.asyncio
+async def test_postgres_restart_preserves_tc10_outbound_flow_outcome_and_docx(
+    tmp_path: Path,
+) -> None:
+    owner = f"postgres-tc10-outbound-{uuid4().hex}"
+    run_id = ""
+    runtimes: list[HarnessRuntime] = []
+    workspace_root = tmp_path / "tc10-run-workspaces"
+    try:
+        first = HarnessRuntime(
+            BenchmarkWorkspaceCatalog(FORTE_ROOT),
+            OutboundFlowPlanner(),
+            OutboundFlowAnalyst(),
+            PostgresHarnessStateStore(DATABASE_DSN),
+            effect_engine=ScenarioEffectEngine(),
+            artifact_store=RunWorkspaceArtifactStore(workspace_root),
+        )
+        runtimes.append(first)
+        await first.setup()
+        started = await first.start(
+            owner,
+            start_request(
+                idempotency_key=f"postgres-tc10-start-{uuid4().hex}",
+                instruction=TC10_INSTRUCTION,
+            ),
+        )
+        run_id = started.run.run_id
+        terminal = await wait_for_effect_run(first, owner, run_id)
+        assert terminal.status == "completed"
+        assert len(terminal.workspace_artifacts) == 1
+        receipt = terminal.effect_receipts[0]
+        assert receipt.status == "passed"
+        assert receipt.scenario_id == "TC-10"
+        assert receipt.outbound_flow_outcome is not None
+        outcome = receipt.outbound_flow_outcome
+        assert outcome.status == "approval_required"
+        assert outcome.atomic_requirement_count == len(outcome.rules)
+        assert outcome.covered_count == outcome.atomic_requirement_count
+        assert outcome.unsupported_count == outcome.conflict_count == 0
+        assert outcome.reachable_terminal_count == outcome.terminal_count
+        assert all(outcome.graph_integrity.model_dump().values())
+
+        artifact = terminal.workspace_artifacts[0]
+        assert artifact.verifier_status == "passed"
+        assert artifact.outbound_flow_outcome == outcome
+        _, original_docx = await first.get_workspace_artifact(
+            owner, run_id, artifact.artifact_id
+        )
+        with zipfile.ZipFile(io.BytesIO(original_docx)) as package:
+            document = package.read("word/document.xml").decode("utf-8")
+        assert document.count("<w:tbl>") >= 6
+        assert "来源规则账本" in document
+        assert "最终合规审批未发生" in document
+        await first.close()
+
+        second = HarnessRuntime(
+            BenchmarkWorkspaceCatalog(FORTE_ROOT),
+            OutboundFlowPlanner(),
+            OutboundFlowAnalyst(),
+            PostgresHarnessStateStore(DATABASE_DSN),
+            effect_engine=ScenarioEffectEngine(),
+            artifact_store=RunWorkspaceArtifactStore(workspace_root),
+        )
+        runtimes.append(second)
+        await second.setup()
+        restored = await second.get(owner, run_id)
+        assert restored.effect_receipts[0].outbound_flow_outcome == outcome
+        assert len(restored.workspace_artifacts) == 1
+        restored_artifact = restored.workspace_artifacts[0]
+        assert restored_artifact.outbound_flow_outcome == outcome
+        _, restored_docx = await second.get_workspace_artifact(
+            owner, run_id, restored_artifact.artifact_id
+        )
+        assert restored_docx == original_docx
+
+        public_snapshot = second.public_snapshot(restored)
+        public_json = public_snapshot.model_dump_json()
+        assert "content_sha256" not in public_json
+        assert public_snapshot.effect_receipts[0].outbound_flow_outcome == outcome
+        assert public_snapshot.effect_receipts[0].external_action == "none"
     finally:
         for runtime in reversed(runtimes):
             await runtime.close()

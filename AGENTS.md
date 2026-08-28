@@ -59,14 +59,16 @@ must appear before audit gaps, and grouping requires both the same candidate sou
 and the same failure detail; it is only a browser projection, not a merge of server
 Branches or proof that the Run completed.
 
-DR-0039 governs TC-10 flow-design meaning versus execution. Read
-`docs/decisions/DR-0039-tc10-design-artifact-and-execution-boundary.md` and
-`docs/scenarios/SCENARIO-025-review-tc10-flow-design-without-false-execution.md`
-before changing process-design Artifact semantics or the TC-10 verifier. The
-downloaded DOCX, Artifact card and task close must all say that dialing, CRM writes
-and SMS are described workflow nodes but did not occur. The six terminal states,
-source basis and human review reason are server-owned fixed-adapter facts; this is
-not a general outbound engine or production compliance approval.
+DR-0047 governs the current TC-10 source-derived flow; DR-0039 is its historical
+fixed-flow baseline. Read
+`docs/decisions/DR-0047-tc10-source-derived-outbound-flow.md`,
+`docs/scenarios/SCENARIO-033-review-source-derived-outbound-flow.md` and its
+Evidence before changing process-design Artifact semantics, rule parsing, graph
+verification or the TC-10 UI. The downloaded DOCX, Artifact card and task close
+must all say that dialing, CRM/SMS, deny-list writes and human transfer are future
+workflow nodes and did not occur. Dynamic rule coverage, graph integrity, final
+approval and external-action facts come from `outbound_flow_outcome`; this is not
+a general outbound engine, current-regulation check or legal opinion.
 
 DR-0040 governs TC-02 real-project refactoring. Read
 `docs/decisions/DR-0040-tc02-real-project-react-refactor.md`,
@@ -163,7 +165,7 @@ Source、Evidence 和 UI-server fact mapping，不能只更新 README。
 - 终态 `result.follow_ups` 最多显示 4 条 Agent 下一步建议。建议不是执行事实；当前协议没有逐项引用，审查页只能把 Finding refs 并集标为本轮上下文，不得冒充直接证据。只有用户点击“确认并启动”后才创建新的独立 Run，旧 Run/结果不得被覆盖。
 - 默认预算为 12 轮、每轮 16 文件、30 次模型调用和 7200 秒 active deadline；允许上限为 24/24/60/14400。`waiting_input`、显式 pause 和 terminal 状态冻结 elapsed，合法 resume 从已用 active elapsed 继续。validated plan unit 由服务端编译为稳定 Branch；Evidence Gate 按 Branch 维护已核对/缺失引用。证据不足且预算允许时进入 `waiting_input/paused`，用户只选择一条 waiting Branch 继续，下一轮范围严格等于该 Branch 的 `missing_file_refs`，其他 Branch 保持等待。合法范围内的 Analyst 原文定位或结构输出失败最多受控重试一次：可定位 Finding 可部分采用；全不可用时保留 Plan/Branch/调用事实，并以 `next_step.recovery_kind=source_location|analysis_output` 暂停最小分支；范围越权和完整性错误仍 fail closed。每个完成轮次生成独立 append-only 逻辑 evidence-brief ArtifactVersion，成功终态新增 TaskCommit 指针而不改写版本。当前固定确定性办公工具在计划校验后可生成真实隔离 Artifact 和检查回执；Analyst 未采用不会删除该成果。`completed` 仍只表示 Loop 合同通过，不自动证明模型质量、任意任务正确、原文件写入、Worker/Connector 或外部动作发生。
 - passed Artifact 与 waiting audit gap 必须分开显示：成果先展示，Gap 只说明 Agent 来源位置待补充；候选来源和失败说明都相同的多个 Gap 可在浏览器合并展示，但 Snapshot Branch 不变，也不能把 Artifact 通过写成 Run `completed`。
-- TC-10 的流程设计 DOCX 必须把“文档里描述的动作”和“本次 Run 实际动作”分开：Artifact `deliverable_type/key_outputs/review_guidance/execution_summary` 负责成果语义，EffectReceipt `prohibited_side_effects/external_action=none` 负责未执行回执。前台和 DOCX 均明确未拨号、未写 CRM、未发短信；13 项固定检查仍需人工合规复核。
+- TC-10 的流程设计 DOCX 必须把“来源规则、图结构、最终审批、真实动作”四层事实分开：Artifact/EffectReceipt 的 `outbound_flow_outcome` 保存动态规则账本、图完整性、审批与 `external_action=none`。前台和 DOCX 均明确未拨号、未写 CRM/短信、未写禁呼名单、未实际转人工；历史 13 项固定检查不能再充当当前来源覆盖证明。
 - TC-05 成果卡必须从服务端 Artifact 字段显示涵盖期间、统计口径、用途和可选记录数；两个 CSV 只绑定 2026 内容来源，三期说明才绑定三期来源与僵尸比较。EffectReceipt 的任务上下文不得冒充单个文件的内容覆盖。
 - TC-11 的两份成果共享服务端 `business_gate_outcome`：18 项逐功能台账、四条正式上线 Gate 和单列辅助指标。风险总数、DOCX 标题、Artifact 摘要和复核引导必须由 `records[]` 动态计算，不得写死当前样本的 8/5；PRD 原因基础等级来自来源等级单元格。`verifier_status=passed` 只证明来源、公式和文件结构，不能盖过 `business_gate_outcome.status=failed` 的“不得上线”；任一来源合同或 Verifier 失败都必须保持 Artifact/EffectReceipt 红灯。
 - TC-07 的两份成果共享服务端 `legal_review_outcome` 与法务 `business_gate_outcome`：六份批准 DOCX 各有 21 条来源推导判断，前台分开显示确定性检查、法务 Gate 和签署/人工复核。主体字段不得串线；六份空签署栏在无获批草稿豁免时触发 R05；律师证号没有 Registry/Connector 回执时为 `unverifiable`。通过 Artifact 不能表述为可签署、签名真实或授权有效。

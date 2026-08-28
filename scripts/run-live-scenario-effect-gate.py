@@ -624,46 +624,129 @@ def _tc12_zip_content_gate(content: bytes) -> dict[str, Any]:
 
 def _tc10_docx_content_gate(content: bytes) -> dict[str, Any]:
     required_tokens = (
-        "START -> 外呼时段合规判断",
-        "外呼时段合规 -> 发起外呼拨号",
-        "未接通 -> 今日已拨次数与一小时频次判断",
-        "达到每日3次或1小时1次上限 -> 停止外呼（达上限）",
-        "接通 -> 录音告知（本次通话将被录音）",
-        "录音告知 -> 身份确认",
-        "本人 -> 开场告知与还款引导",
-        "第三方要求不再联系 -> 加入禁呼名单",
-        "接通后立即挂断或无法沟通 -> 今日已拨次数与一小时频次判断",
-        "情绪激动超过30秒 -> 转人工跟进",
+        "这是流程设计，不是拨号、CRM/短信执行，也不是法律意见",
+        "批准来源仅笼统提及监管机构，没有制度版本、批准主体或当前有效性证明",
+        "最终合规审批未发生",
         "PTP登记",
         "转人工跟进",
         "安排重拨",
         "停止外呼（达上限）",
         "加入禁呼名单",
         "案件升级",
-        "采用依据：《专业性说明.md》",
-        "实际没有拨号、没有写 CRM、没有发送短信",
     )
     try:
         with zipfile.ZipFile(io.BytesIO(content)) as archive:
-            document = archive.read("word/document.xml")
-        root = ElementTree.fromstring(document)
-        text = "".join(root.itertext())
-    except (KeyError, OSError, zipfile.BadZipFile, ElementTree.ParseError) as exc:
+            document_xml = archive.read("word/document.xml")
+        root = ElementTree.fromstring(document_xml)
+        namespace = {"w": "http://schemas.openxmlformats.org/wordprocessingml/2006/main"}
+        tables = [
+            [
+                ["".join(cell.itertext()).strip() for cell in row.findall("./w:tc", namespace)]
+                for row in table.findall("./w:tr", namespace)
+            ]
+            for table in root.findall(".//w:tbl", namespace)
+        ]
+        text = "\n".join(root.itertext())
+        integrity = {
+            row[0]: row[1]
+            for row in tables[5][1:]
+            if len(row) >= 2 and row[0]
+        }
+        counts = {
+            "rules": int(integrity["atomic_requirement_count"]),
+            "nodes": int(integrity["node_count"]),
+            "edges": int(integrity["edge_count"]),
+            "guards": int(integrity["guard_count"]),
+            "terminals": int(integrity["terminal_count"]),
+            "reachable_terminals": int(integrity["reachable_terminal_count"]),
+        }
+    except (
+        IndexError,
+        KeyError,
+        OSError,
+        ValueError,
+        zipfile.BadZipFile,
+        ElementTree.ParseError,
+    ) as exc:
         return {
             "passed": False,
             "valid_docx": False,
             "paragraph_count": 0,
+            "table_count": 0,
             "missing_tokens": list(required_tokens),
             "error": type(exc).__name__,
         }
-    paragraph_count = len(root.findall(".//{http://schemas.openxmlformats.org/wordprocessingml/2006/main}p"))
+    expected_headers = (
+        ["rule_id", "group", "locator", "excerpt", "parameters", "expected_relation", "expected_action", "coverage_state", "mapped_elements"],
+        ["node_id", "label", "kind", "source_rule_ids", "future_action"],
+        ["edge_id", "from_node_id", "to_node_id", "label", "guard_ids", "source_rule_ids", "future_action"],
+        ["guard_id", "label", "parameters", "source_rule_ids"],
+        ["terminal_id", "node_id", "label", "source_rule_ids", "source_listed"],
+        ["fact", "value"],
+    )
+    headers_match = len(tables) == 6 and all(
+        table and table[0] == header for table, header in zip(tables, expected_headers, strict=True)
+    )
+    row_counts_match = len(tables) == 6 and [len(table) - 1 for table in tables[:5]] == [
+        counts["rules"],
+        counts["nodes"],
+        counts["edges"],
+        counts["guards"],
+        counts["terminals"],
+    ]
+    ids_unique = len(tables) == 6 and all(
+        len({row[0] for row in table[1:]}) == len(table) - 1 for table in tables[:5]
+    )
+    rule_rows = tables[0][1:]
+    edge_rows = tables[2][1:]
+    rules_located_and_covered = all(
+        row[2].startswith("专业性说明.md:L") and row[7] == "covered" and row[8]
+        for row in rule_rows
+    )
+    edge_pairs = {(row[1], row[2]) for row in edge_rows}
+    source_order_present = {
+        ("out-node-decision-identity", "out-node-recording-notice"),
+        ("out-node-recording-notice", "out-node-introduce-purpose"),
+        ("out-node-introduce-purpose", "out-node-payment-guidance"),
+    }.issubset(edge_pairs)
+    integrity_passed = all(
+        integrity.get(name) == "true"
+        for name in (
+            "unique_start",
+            "unique_ids",
+            "no_dangling_edges",
+            "all_nodes_reachable",
+            "every_nonterminal_has_outgoing",
+            "every_node_can_reach_terminal",
+            "all_terminals_reachable",
+            "critical_order_valid",
+            "third_party_boundary_valid",
+            "all_rules_mapped",
+        )
+    ) and integrity.get("status") == "approval_required" and integrity.get("external_action") == "none"
+    paragraph_count = len(root.findall(".//w:p", namespace))
     missing = [token for token in required_tokens if token not in text]
-    unique_start = text.count("START -> 外呼时段合规判断") == 1
     return {
-        "passed": unique_start and not missing,
+        "passed": (
+            not missing
+            and headers_match
+            and row_counts_match
+            and ids_unique
+            and rules_located_and_covered
+            and source_order_present
+            and integrity_passed
+            and counts["terminals"] == counts["reachable_terminals"]
+        ),
         "valid_docx": True,
         "paragraph_count": paragraph_count,
-        "unique_start": unique_start,
+        "table_count": len(tables),
+        "counts": counts,
+        "headers_match": headers_match,
+        "row_counts_match": row_counts_match,
+        "ids_unique": ids_unique,
+        "rules_located_and_covered": rules_located_and_covered,
+        "source_order_present": source_order_present,
+        "integrity_passed": integrity_passed,
         "required_token_count": len(required_tokens),
         "missing_tokens": missing,
     }
@@ -1021,6 +1104,7 @@ def _run_one(
                 "key_outputs_label": item.get("key_outputs_label"),
                 "review_guidance": item.get("review_guidance"),
                 "execution_summary": item.get("execution_summary"),
+                "outbound_flow_outcome": item.get("outbound_flow_outcome"),
                 "self_test": item.get("self_test"),
                 "external_action": item.get("external_action"),
                 "original_inputs_modified": item.get("original_inputs_modified"),

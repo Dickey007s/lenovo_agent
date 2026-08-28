@@ -441,6 +441,17 @@ the policy boundary: the default policy deterministically executes planned tools
 behind a replaceable `action_policy`, while outer Planner/Analyst receipts do not
 prove model-driven action selection inside the downloaded project.
 
+TC-10 additionally publishes optional `outbound_flow_outcome` on its Artifact
+and EffectReceipt. It contains `status=approval_required|invalid`, dynamic source
+rule/coverage counts, nodes, edges, guards, terminals, graph-integrity facts,
+parsed parameters, human-approval and no-action boundaries. `rules[]` exposes
+safe `locator/excerpt` values and mapped public IDs; it never exposes source
+bytes, absolute paths, internal hashes or validator implementation. The browser
+must not infer these facts from the DOCX filename or model prose. A passed
+Artifact means the fixed source, generated DOCX and graph structure were
+recomputed successfully, not that a compliance approval or external action
+occurred.
+
 `source_documents` and `contract.allowed_file_refs` are the full safe workspace
 index. They are not the files read by the Analyst. The authoritative per-round
 evidence scope is `rounds[].input_file_refs`, and the public reason is
