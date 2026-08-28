@@ -2,7 +2,7 @@
 
 ## 当前结论
 
-`Limited Verified`。严格来源合同、逐功能风险推导、来源行变异、正式 Gate 与辅助指标分离、DOCX/CSV 下载解析、失败不伪绿前台、真实 `deepseek-v4-pro` Run 和 PostgreSQL 顺序恢复均已验证。第一版由 [PR #57](https://github.com/Dickey007s/lenovo_agent/pull/57) 交付；独立验收发现的动态风险总数与 PRD 等级修正也已通过完整 Effect、来源变异、全量 Python 与浏览器回归。
+`Limited Verified`。严格来源合同、逐功能风险推导、来源行变异、正式 Gate 与辅助指标分离、DOCX/CSV 下载解析、失败不伪绿前台、真实 `deepseek-v4-pro` Run 和 PostgreSQL 顺序恢复均已验证。第一版由 [PR #57](https://github.com/Dickey007s/lenovo_agent/pull/57) 交付；独立验收发现的动态风险总数与 PRD 等级修正由 [PR #58](https://github.com/Dickey007s/lenovo_agent/pull/58) 补齐，并通过完整 Effect、来源变异、全量 Python、浏览器和远端 PostgreSQL 回归。
 
 ## 历史基线为何不足
 
@@ -59,6 +59,7 @@
 - F02 功能与兼容问题均合法修复后，完整 `ScenarioEffectEngine` 仍为 passed，两份 Artifact 均通过；业务台账从 8 项风险动态变为 7 项，严重从 4 降为 3，CSV 仍保持 18 行，DOCX 与前台摘要不再残留“8 项风险”。四条正式 Gate 仍全部失败，因为 F02 原先的“有条件通过”已经计入 P0 可接受结论。
 - PRD 原因类型的基础等级现在来自等级单元格。“功能缺陷”改为“次要”后 F05 随来源降为次要；未知等级或同时包含主要/次要会以 `prd-reason-level-invalid` fail closed。
 - 二次修正本地门：TC-11/Scenario/合同定向 `59 passed`；真实 PostgreSQL 全量 Python `157 passed in 260.58s`；TC-11 Playwright `3 passed`；完整 Playwright `40 passed`；Ruff、Web lint 与 Next.js production build 均通过。
+- PR #58 远端 `durable-agent-control-loop` Run [`33183307581`](https://github.com/Dickey007s/lenovo_agent/actions/runs/33183307581/job/98889778735) 实际通过，耗时 46 秒。
 - 这次修正不回写旧 Run；上面的 live Run 继续描述固定原始 `pm-014` 的 8 项风险事实。
 
 ## 不能支持的结论

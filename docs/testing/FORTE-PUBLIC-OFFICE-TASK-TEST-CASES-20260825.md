@@ -54,7 +54,7 @@ CSS、HTML、shell、log 等。它们覆盖结构化表格、长文档、扫描/
 | `TC-08` | `Marketing-012` | 按规则采集竞品广告 | DOCX + Web | Demo 2 多任务 | Web 来源、时间范围 | `blocked_external_boundary`：本地规则可读，未伪造 Web 采集 |
 | `TC-09` | `Misc-AT-003` | 周期搜索新闻并追加文件 | Web + cron | 单任务持续运行 | 全局定时、副作用 | `blocked_external_boundary`：未创建 cron/未发起 Web 任务 |
 | `TC-10` | `Operations-008` | 设计合规催收外呼流程 | MD | Demo 1 + Demo 3 | 合规规则、禁止真实外呼 | `Limited Verified`：真实 DOCX + 13 项规则/终态检查；未拨号、未写 CRM |
-| `TC-11` | `pm-014` | 上线合规与风险评估 | MD + 3 个 XLSX | Demo 2 多任务 | 来源推导风险、正式 Gate、结构化报告与台账 | `Limited Verified`（DR-0043、PR #57、Run `harness:d1a3d9fca21d4e2299ac308bbaf73e1e`）：18 行台账、四条正式 Gate、变异/负向门、DOCX/CSV 下载解析与 PostgreSQL 顺序恢复；固定适配器，没有多 Worker 或真实发布 |
+| `TC-11` | `pm-014` | 上线合规与风险评估 | MD + 3 个 XLSX | Demo 2 多任务 | 来源推导风险、正式 Gate、结构化报告与台账 | `Limited Verified`（DR-0043、PR #57/#58、Run `harness:d1a3d9fca21d4e2299ac308bbaf73e1e`）：18 行台账、四条正式 Gate、动态风险/未提测数量、PRD 等级来源变异、负向门、DOCX/CSV 下载解析与 PostgreSQL 顺序恢复；固定适配器，没有多 Worker 或真实发布 |
 | `TC-12` | `qa-003` | 为看板工具库补测试并修复源码 | JS + JSON | Demo 2 多任务 | 固定测试执行、隔离代码写入 | `Limited Verified`（DR-0042、PR #54/#55、Run `harness:d9355005af924d57bb1e9c526adca072`）：完整 11 文件副本，同一 71 项 Vitest 先红后绿、逐文件 coverage、独立复跑；固定 qa-003 适配器，没有自动 PR 或 OS 级断网 |
 | `TC-13` | `sales-020` | 客户画像清洗与销售策略 | CSV + MD | Demo 1/2 | 分群依据、人工复核 | `Limited Verified`：Markdown 报告 + 6 项分群/守恒检查 |
 | `TC-14` | `sre-010` | 大促 ES 故障诊断与止损建议 | TXT log | Demo 1 + Demo 3 | 高风险命令、禁止自动执行 | `Limited Verified`：Markdown 诊断 + 9 项日志/地址/禁执行检查 |
