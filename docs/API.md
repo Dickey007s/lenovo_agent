@@ -464,6 +464,16 @@ sample IDs, treat a zero witness as proof that priority was exercised, promote a
 draft template into an approved strategy, or interpret a passed Artifact as a
 CRM/customer action.
 
+TC-14 additionally publishes optional `sre_diagnosis_outcome` on both Artifacts
+and the EffectReceipt. It contains `status=incident_review_required|invalid`,
+dynamic source-line/cluster/index/node/metric facts, observations, source
+conflicts, evidence-bound hypotheses, typed action proposals, business
+mitigations, `resolved_target_count=0`, the pending SRE decision,
+`original_inputs_modified=false` and `external_action=none`. Public proposal
+commands contain only placeholders and are never execution receipts. Clients
+must not infer causality from co-occurrence, select a dedicated master as an
+endpoint, or interpret a passed Artifact as approval or execution.
+
 `source_documents` and `contract.allowed_file_refs` are the full safe workspace
 index. They are not the files read by the Analyst. The authoritative per-round
 evidence scope is `rounds[].input_file_refs`, and the public reason is

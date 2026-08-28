@@ -368,6 +368,15 @@ multi-instance coordination and governed external action remain target work.
   strategy awaiting sales approval, and the fact that no customer or CRM action
   occurred. This is a fixed public-sample adapter, not customer research, a CRM
   or a general segmentation engine.
+- `DR-0050` replaces TC-14's fixed SRE numbers, commands and self-checking
+  strings with a source-derived SRE-010 observation ledger. The service freezes
+  the single approved log, separates observations from hypotheses, preserves
+  three canonical source conflicts, and emits only unexecuted read-only,
+  conditional-write and business-mitigation proposals. The Markdown and CSV are
+  parsed again against a fresh source derivation. The UI separates deterministic
+  file verification, contradictory observations, SRE review and the fact that
+  no Elasticsearch or business action occurred. This is a fixed offline-review
+  adapter, not monitoring, root-cause proof, a Connector or change approval.
 - No target-user study has been run. Clarity, trust, efficiency and user value
   remain hypotheses.
 
@@ -410,6 +419,8 @@ Its inline normative-fragment and stable Effect-wait correction is tracked in
 [`DR-0048-TC10-FRAGMENT-CONSUMPTION-AND-STABLE-WAIT-EVIDENCE-20260829`](docs/evidence/DR-0048-TC10-FRAGMENT-CONSUMPTION-AND-STABLE-WAIT-EVIDENCE-20260829.md).
 The current TC-13 source-derived customer-segmentation increment is tracked in
 [`DR-0049-TC13-SOURCE-DERIVED-CUSTOMER-SEGMENTATION-EVIDENCE-20260829`](docs/evidence/DR-0049-TC13-SOURCE-DERIVED-CUSTOMER-SEGMENTATION-EVIDENCE-20260829.md).
+The current TC-14 source-derived SRE incident-review increment is tracked in
+[`DR-0050-TC14-SOURCE-DERIVED-SRE-DIAGNOSIS-EVIDENCE-20260829`](docs/evidence/DR-0050-TC14-SOURCE-DERIVED-SRE-DIAGNOSIS-EVIDENCE-20260829.md).
 
 ## Local run
 
@@ -512,6 +523,9 @@ pnpm --dir apps/web exec playwright test e2e/harness-workbench.spec.ts
 - [TC-10 规范片段消费与稳定等待 Evidence](docs/evidence/DR-0048-TC10-FRAGMENT-CONSUMPTION-AND-STABLE-WAIT-EVIDENCE-20260829.md)
 - [SCENARIO-034：从公开问卷与规则推导可复核画像清洗和策略草案](docs/scenarios/SCENARIO-034-review-source-derived-customer-segmentation.md)
 - [TC-13 来源推导客户画像 Evidence](docs/evidence/DR-0049-TC13-SOURCE-DERIVED-CUSTOMER-SEGMENTATION-EVIDENCE-20260829.md)
+- [DR-0050：TC-14 来源推导 SRE 事故复盘与未执行提案](docs/decisions/DR-0050-tc14-source-derived-sre-incident-review.md)
+- [SCENARIO-035：从公开日志形成可复核事故复盘](docs/scenarios/SCENARIO-035-review-source-derived-sre-incident.md)
+- [TC-14 来源推导 SRE 复盘 Evidence](docs/evidence/DR-0050-TC14-SOURCE-DERIVED-SRE-DIAGNOSIS-EVIDENCE-20260829.md)
 - [可恢复 Control Loop Evidence](docs/evidence/DURABLE-EVIDENCE-GATE-ARTIFACT-EVOLUTION-EVIDENCE-20260826.md)
 - [整库自主研究 Evidence](docs/evidence/AUTONOMOUS-WHOLE-WORKSPACE-RESEARCH-EVIDENCE-20260825.md)
 - [Agent Control Loop 三轮只读纵切证据](docs/evidence/AGENT-CONTROL-LOOP-BOUNDED-READONLY-EVIDENCE-20260825.md)

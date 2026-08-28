@@ -10,6 +10,8 @@ import tc12TestManifest from "../../../docs/evidence/manifests/tc12-public-test-
 import tc13CustomerSegmentationManifest from "../../../docs/evidence/manifests/tc13-public-customer-segmentation-outcome-20260829.json";
 import tc13CustomerSegmentationThresholdManifest from "../../../docs/evidence/manifests/tc13-public-customer-segmentation-outcome-threshold-20260829.json";
 import tc13CustomerSegmentationWitnessManifest from "../../../docs/evidence/manifests/tc13-public-customer-segmentation-outcome-witness-20260829.json";
+import tc14SREDiagnosisManifest from "../../../docs/evidence/manifests/tc14-public-sre-diagnosis-outcome-20260829.json";
+import tc14SREDiagnosisDynamicManifest from "../../../docs/evidence/manifests/tc14-public-sre-diagnosis-outcome-dynamic-20260829.json";
 
 type FileItem = {
   file_ref: string;
@@ -43,7 +45,7 @@ const candidateFiles = [
     "pdf",
   )),
 ];
-const txtFile = fileItem("forte-4444444444444444", "forte-folder-444444444444", "运行日志.txt", "可靠性工程", "TXT", "text");
+const txtFile = fileItem("forte-df5ae9b9a1273380", "forte-folder-444444444444", "log.txt", "可靠性工程", "TXT", "text");
 const outboundRuleFile = fileItem(
   "forte-ba23e986a9c7e8d8",
   "forte-folder-operations-008",
@@ -109,7 +111,10 @@ const seedFolders = [
 const folders = Array.from({ length: 15 }, (_, folderIndex) => {
   const seed = seedFolders[folderIndex];
   const folderId = seed?.folder_id ?? `forte-folder-${String(folderIndex + 1).padStart(12, "0")}`;
-  const targetCount = folderIndex === 1 ? 8 : folderIndex === 5 ? 6 : folderIndex < 6 ? 7 : 6;
+  // Keep every named benchmark folder faithful to its controlled fixture.
+  // The eight generic folders carry the remaining 72 inputs so the workspace
+  // still exercises the production 15-folder / 96-file summary.
+  const targetCount = seed ? seed.files.length : 9;
   const files = seed ? [...seed.files] : [];
   while (files.length < targetCount) {
     const fileIndex = foldersFileIndex(folderIndex, files.length);
@@ -1317,6 +1322,118 @@ function customerSegmentationEffectSnapshot(
   };
 }
 
+function sreDiagnosisEffectSnapshot(
+  body: { workspace_id: string; instruction: string },
+  variant: "canonical" | "dynamic" = "canonical",
+) {
+  const base = snapshot(body, "completed", 20);
+  const manifest = structuredClone(
+    variant === "dynamic" ? tc14SREDiagnosisDynamicManifest : tc14SREDiagnosisManifest,
+  );
+  const outcome = manifest.sre_diagnosis_outcome;
+  const sourceRefs = [manifest.source.file_ref];
+  const artifactIds = ["workspace-artifact-141414141401", "workspace-artifact-141414141402"];
+  const common = {
+    capability_id: "office-sre-log-diagnosis",
+    scenario_id: "TC-14",
+    version: 1,
+    round_number: 1,
+    source_file_refs: sourceRefs,
+    validator_id: "validator-sre-log-diagnosis-v2",
+    verifier_status: "passed",
+    checks: manifest.checks,
+    covered_period: String(outcome.cluster_facts.occurred_at ?? "离线日志时间窗"),
+    statistic_basis: `从批准日志 ${outcome.source_line_count} 行重算观察、冲突、假设和动作提案；不读取隐藏答案，不连接集群。`,
+    purpose: "供 SRE 复核日志事实、来源冲突、根因假设和条件式止损提案。",
+    record_count: outcome.observation_count,
+    review_guidance: `请先核实 ${outcome.conflict_count} 组来源冲突并提供批准的非 dedicated-master 协调入口；所有命令与业务止损仍未执行。`,
+    execution_summary: `生成两份隔离成果，共享 ${manifest.checks.length} 项来源重算检查；原日志未修改，external_action=none。`,
+    self_test: null,
+    business_gate_outcome: null,
+    legal_review_outcome: null,
+    candidate_review_outcome: null,
+    finance_review_outcome: null,
+    outbound_flow_outcome: null,
+    customer_segmentation_outcome: null,
+    sre_diagnosis_outcome: outcome,
+    created_at: new Date().toISOString(),
+    original_inputs_modified: false,
+    review_required: true,
+    external_action: "none",
+  };
+  const artifacts = [{
+    ...common,
+    artifact_id: artifactIds[0],
+    title: "ES 离线事故复盘与止损提案",
+    file_name: "ES故障诊断与止损建议.md",
+    media_type: "text/markdown",
+    size: 67523,
+    summary: `${outcome.observation_count} 条观察、${outcome.conflict_count} 组来源冲突、${outcome.hypothesis_count} 个有边界假设、${outcome.proposal_count + outcome.business_mitigation_count} 个未执行提案。`,
+    deliverable_type: "来源推导的离线事故复盘 Markdown",
+    key_outputs: [`来源日志 ${outcome.source_line_count} 行`, `来源冲突 ${outcome.conflict_count} 组`, `SRE 假设 ${outcome.hypothesis_count} 个`, `批准入口 resolved ${outcome.resolved_target_count} 个`],
+    key_outputs_label: "动态观察与复核边界",
+    download_path: `/v1/harness/runs/${base.run_id}/artifacts/${artifactIds[0]}`,
+  }, {
+    ...common,
+    artifact_id: artifactIds[1],
+    title: "SRE 事故观察与动作台账",
+    file_name: "SRE事故观察与动作台账.csv",
+    media_type: "text/csv",
+    size: 90148,
+    summary: "逐项记录观察、来源冲突、假设、支持/反证和未执行动作提案。",
+    deliverable_type: "可独立复算的观察与动作 CSV 台账",
+    key_outputs: [`观察 ${outcome.observation_count} 条`, `未分类观察 ${outcome.unclassified_count} 条`, `ES 提案 ${outcome.proposal_count} 个`, `业务止损提案 ${outcome.business_mitigation_count} 个`],
+    key_outputs_label: "逐项可审计事实",
+    download_path: `/v1/harness/runs/${base.run_id}/artifacts/${artifactIds[1]}`,
+  }];
+  return {
+    ...base,
+    workspace_artifacts: artifacts,
+    effect_receipts: [{
+      receipt_id: "effect-receipt-141414141414",
+      capability_id: "office-sre-log-diagnosis",
+      scenario_id: "TC-14",
+      status: "passed",
+      state: "已冻结 SRE-010 的批准日志，原件保持只读。",
+      action: "从日志重算观察、冲突、假设和条件式提案，并生成 Markdown 与 CSV。",
+      observation: `2 份成果共享 ${manifest.checks.length} 项确定性检查；识别 ${outcome.conflict_count} 组来源冲突。`,
+      cost: "0 次额外模型调用；仅消耗本机确定性解析、计算与文件写入。",
+      result: "日志和成果结构已复核；根因与提案待 SRE 审批，ES 和业务动作均未发生。",
+      source_file_refs: sourceRefs,
+      artifact_ids: artifactIds,
+      prohibited_side_effects: ["不执行 ES 命令", "不连接集群", "不自动限流"],
+      sre_diagnosis_outcome: outcome,
+      created_at: new Date().toISOString(),
+      external_action: "none",
+    }],
+    last_event_sequence: 20,
+  };
+}
+
+function failedSREDiagnosisEffectSnapshot(body: { workspace_id: string; instruction: string }) {
+  const base = sreDiagnosisEffectSnapshot(body);
+  const checks = base.workspace_artifacts[0].checks.map((check) => check.check_id === "check-sre-ledger-v2"
+    ? { ...check, passed: false, label: "SRE 台账未通过", detail: "台账中的一条观察或动作边界与批准日志重算不一致。" }
+    : check);
+  return {
+    ...base,
+    status: "failed",
+    workspace_artifacts: base.workspace_artifacts.map((artifact) => ({
+      ...artifact,
+      verifier_status: "failed",
+      checks,
+      summary: "失败证据已保留，但事故复盘与台账未通过服务端来源重算。",
+      review_guidance: "当前成果不得用于事故处置；请查看失败项并重新启动新的 TC-14 Run。",
+    })),
+    effect_receipts: base.effect_receipts.map((receipt) => ({
+      ...receipt,
+      status: "failed",
+      observation: "至少一项来源或成果检查未通过，失败证据已保留。",
+      result: "当前复盘和提案不得采用；没有连接集群或执行命令。",
+    })),
+  };
+}
+
 function failedCustomerSegmentationEffectSnapshot(body: { workspace_id: string; instruction: string }) {
   const base = customerSegmentationEffectSnapshot(body);
   const checks = base.workspace_artifacts[0].checks.map((check) => check.check_id === "check-customer-ledger-csv-v2"
@@ -1863,7 +1980,7 @@ function locationFailureSnapshot(body: { workspace_id: string; instruction: stri
 }
 async function fulfillJson(route: Route, body: unknown, status = 200) { await route.fulfill({ status, contentType: "application/json", body: JSON.stringify(body) }); }
 
-async function mockHarness(page: Page, options: { failFirstStart?: boolean; failDecisionDefer?: boolean; disconnect?: boolean; failed?: boolean; locationFailure?: boolean; sourceRecovery?: boolean; sourceRecoveryThreeCandidates?: boolean; verifiedArtifactAuditPending?: boolean; verifiedArtifactAuditPendingDistinct?: boolean; verifiedFinanceArtifactAuditPending?: boolean; unverifiedArtifactLocationPending?: boolean; terminalArtifactLocationPending?: boolean; boundedRecovery?: boolean; effectArtifact?: boolean; financePositiveCandidate?: boolean; financeVerifierFailed?: boolean; outboundEffect?: boolean; outboundEffectDynamic?: boolean; outboundEffectFailed?: boolean; reactEffect?: boolean; evaluationEffect?: boolean; dashboardEffect?: boolean; dashboardEffectFailed?: boolean; releaseEffect?: boolean; releaseEffectRepaired?: boolean; releaseEffectFailed?: boolean; candidateEffect?: boolean; candidateEffectImproved?: boolean; candidateEffectFailed?: boolean; customerEffect?: boolean; customerEffectThreshold?: boolean; customerEffectWitness?: boolean; customerEffectFailed?: boolean; legalEffect?: boolean; legalEffectRepaired?: boolean; legalEffectFailed?: boolean; effectBoundary?: boolean; reviewTable?: boolean; workspaceFailures?: number; interactiveLoop?: boolean; evidenceGate?: boolean } = {}) {
+async function mockHarness(page: Page, options: { failFirstStart?: boolean; failDecisionDefer?: boolean; disconnect?: boolean; failed?: boolean; locationFailure?: boolean; sourceRecovery?: boolean; sourceRecoveryThreeCandidates?: boolean; verifiedArtifactAuditPending?: boolean; verifiedArtifactAuditPendingDistinct?: boolean; verifiedFinanceArtifactAuditPending?: boolean; unverifiedArtifactLocationPending?: boolean; terminalArtifactLocationPending?: boolean; boundedRecovery?: boolean; effectArtifact?: boolean; financePositiveCandidate?: boolean; financeVerifierFailed?: boolean; outboundEffect?: boolean; outboundEffectDynamic?: boolean; outboundEffectFailed?: boolean; reactEffect?: boolean; evaluationEffect?: boolean; dashboardEffect?: boolean; dashboardEffectFailed?: boolean; releaseEffect?: boolean; releaseEffectRepaired?: boolean; releaseEffectFailed?: boolean; candidateEffect?: boolean; candidateEffectImproved?: boolean; candidateEffectFailed?: boolean; customerEffect?: boolean; customerEffectThreshold?: boolean; customerEffectWitness?: boolean; customerEffectFailed?: boolean; sreEffect?: boolean; sreEffectDynamic?: boolean; sreEffectFailed?: boolean; legalEffect?: boolean; legalEffectRepaired?: boolean; legalEffectFailed?: boolean; effectBoundary?: boolean; reviewTable?: boolean; workspaceFailures?: number; interactiveLoop?: boolean; evidenceGate?: boolean } = {}) {
   let workspaceCalls = 0; let startCalls = 0; let streamCalls = 0;
   let currentBody = { workspace_id: "forte-public-office", instruction: "" };
   // Mock snapshots intentionally cover several server state shapes in one route.
@@ -1946,6 +2063,12 @@ async function mockHarness(page: Page, options: { failFirstStart?: boolean; fail
           ? customerSegmentationEffectSnapshot(body, "witness")
         : options.customerEffect
           ? customerSegmentationEffectSnapshot(body)
+        : options.sreEffectFailed
+          ? failedSREDiagnosisEffectSnapshot(body)
+        : options.sreEffectDynamic
+          ? sreDiagnosisEffectSnapshot(body, "dynamic")
+        : options.sreEffect
+          ? sreDiagnosisEffectSnapshot(body)
         : options.legalEffectFailed
           ? failedLegalDelegationEffectSnapshot(body)
         : options.legalEffectRepaired
@@ -2771,6 +2894,119 @@ test("keeps TC-13 visibly red when the independent ledger verifier fails", async
   await expect(artifacts).toContainText("当前成果不得用于销售复核");
   await expect(artifacts).not.toContainText("8/8 项检查通过");
   await expect(artifacts).toContainText("没有联系客户或写入 CRM");
+});
+
+test("shows TC-14 verification, source conflicts, bounded hypotheses and no execution as four layers", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 1100 });
+  await mockHarness(page, { sreEffect: true });
+  await page.goto("/");
+  await page.getByRole("textbox", { name: "任务指令" }).fill("分析双十一 Elasticsearch 日志，给出根因与两个层面的紧急止损建议。");
+  await page.getByRole("button", { name: "启动 Control Loop" }).click();
+
+  const artifacts = page.locator(".workspace-artifacts");
+  const outcome = page.getByRole("region", { name: "SRE 离线事故复盘与止损提案" });
+  await expect(artifacts).toContainText("Agent 已生成 2 份真实成果文件");
+  await expect(artifacts.locator(":scope > header > b")).toHaveText("3 组来源冲突待 SRE 核实");
+  await expect(outcome.getByRole("heading", { name: "这是固定公开日志的离线复盘与止损提案，不是在线监控、根因定论或命令执行回执" })).toBeVisible();
+  await expect(outcome.locator(".sre-diagnosis-statuses > li")).toHaveCount(4);
+  for (const statement of [
+    "确定性检查通过",
+    "3 组冲突",
+    "2 个假设 · 11 个提案待 SRE 复核",
+    "真实集群与业务动作",
+    "全部未发生",
+    "600 → 4800/s",
+    "10 声明 / 11 列表",
+    "48 health / 24 明细",
+    "命令目标尚未确定",
+    "10.1.1.1 是 dedicated master",
+    "节点总数口径冲突",
+    "UNASSIGNED 分片计数冲突",
+    "磁盘使用率解释冲突",
+  ]) await expect(outcome).toContainText(statement);
+  await expect(artifacts).toContainText("不代表根因已确定、提案获批或任何命令已经执行");
+  await expect(page.locator(".loop-effect-conclusion")).toContainText("请先核实 3 组来源冲突");
+  await expect(page.locator(".loop-effect-conclusion")).toContainText("所有命令与业务止损仍未执行");
+
+  const hypotheses = outcome.locator(".sre-hypotheses");
+  await hypotheses.locator("summary").click();
+  await expect(hypotheses).toContainText("置信度 medium");
+  await expect(hypotheses).toContainText("反证/待核实");
+  await expect(hypotheses).toContainText("相关事件同时出现不等于单一因果关系已证");
+  const proposals = outcome.locator(".sre-proposals");
+  await proposals.locator("summary").click();
+  await expect(proposals).toContainText("高风险 · 未执行");
+  await expect(proposals).toContainText("未解析，等待批准入口");
+  await expect(proposals).toContainText("回滚/停止");
+  await expect(proposals).toContainText("官方 API 语义参考");
+
+  const typeSizes = await outcome.evaluate((element) => ({
+    title: Number.parseFloat(getComputedStyle(element.querySelector(":scope > header h3")!).fontSize),
+    layerTitle: Number.parseFloat(getComputedStyle(element.querySelector(".sre-diagnosis-statuses b")!).fontSize),
+    layerDetail: Number.parseFloat(getComputedStyle(element.querySelector(".sre-diagnosis-statuses p")!).fontSize),
+    detailTitle: Number.parseFloat(getComputedStyle(element.querySelector(".sre-diagnosis-details summary b")!).fontSize),
+    detailBody: Number.parseFloat(getComputedStyle(element.querySelector(".sre-diagnosis-details li p")!).fontSize),
+  }));
+  expect(typeSizes.title).toBeGreaterThanOrEqual(19);
+  expect(typeSizes.layerTitle).toBeGreaterThanOrEqual(12);
+  expect(typeSizes.layerDetail).toBeGreaterThanOrEqual(11);
+  expect(typeSizes.detailTitle).toBeGreaterThanOrEqual(12);
+  expect(typeSizes.detailBody).toBeGreaterThanOrEqual(11);
+
+  let overflow = await page.evaluate(() => ({ width: document.documentElement.clientWidth, scroll: document.documentElement.scrollWidth }));
+  expect(overflow.scroll).toBeLessThanOrEqual(overflow.width);
+  if (process.env.CAPTURE_TC14_EFFECT_EVIDENCE === "1") {
+    await hypotheses.locator("summary").click();
+    await proposals.locator("summary").click();
+    const financeFolder = page.getByRole("treeitem", { name: "收起文件夹 财务管理" });
+    if (await financeFolder.isVisible()) await financeFolder.click();
+    const sreFolder = page.getByRole("treeitem", { name: "展开文件夹 可靠性工程" });
+    if (await sreFolder.isVisible()) await sreFolder.click();
+    await outcome.evaluate((element) => element.scrollIntoView({ block: "start" }));
+    await page.screenshot({ path: "../../docs/evidence/screenshots/tc14-sre-diagnosis-desktop.png" });
+  }
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  overflow = await page.evaluate(() => ({ width: document.documentElement.clientWidth, scroll: document.documentElement.scrollWidth }));
+  expect(overflow.scroll).toBeLessThanOrEqual(overflow.width);
+  const panelOverflow = await outcome.evaluate((element) => ({ width: element.clientWidth, scroll: element.scrollWidth }));
+  expect(panelOverflow.scroll).toBeLessThanOrEqual(panelOverflow.width);
+  await expect(outcome.getByRole("heading", { name: "这是固定公开日志的离线复盘与止损提案，不是在线监控、根因定论或命令执行回执" })).toBeVisible();
+  if (process.env.CAPTURE_TC14_EFFECT_EVIDENCE === "1") {
+    await outcome.evaluate((element) => element.scrollIntoView({ block: "start" }));
+    await page.screenshot({ path: "../../docs/evidence/screenshots/tc14-sre-diagnosis-mobile.png" });
+  }
+});
+
+test("projects TC-14 corrected node count and dynamic QPS without stale conflict totals", async ({ page }) => {
+  await mockHarness(page, { sreEffectDynamic: true });
+  await page.goto("/");
+  await page.getByRole("textbox", { name: "任务指令" }).fill("分析双十一 Elasticsearch 日志，给出根因与两个层面的紧急止损建议。");
+  await page.getByRole("button", { name: "启动 Control Loop" }).click();
+
+  const artifacts = page.locator(".workspace-artifacts");
+  const outcome = page.getByRole("region", { name: "SRE 离线事故复盘与止损提案" });
+  await expect(artifacts.locator(":scope > header > b")).toHaveText("2 组来源冲突待 SRE 核实");
+  await expect(outcome).toContainText("700 → 5600/s");
+  await expect(outcome).toContainText("11 声明 / 11 列表");
+  await expect(outcome).toContainText("2 组冲突");
+  await expect(outcome).not.toContainText("节点总数口径冲突");
+  await expect(outcome).not.toContainText("600 → 4800/s");
+});
+
+test("keeps TC-14 visibly red when the independent ledger verifier fails", async ({ page }) => {
+  await mockHarness(page, { sreEffectFailed: true });
+  await page.goto("/");
+  await page.getByRole("textbox", { name: "任务指令" }).fill("分析双十一 Elasticsearch 日志，给出根因与两个层面的紧急止损建议。");
+  await page.getByRole("button", { name: "启动 Control Loop" }).click();
+
+  const artifacts = page.locator(".workspace-artifacts");
+  const outcome = page.getByRole("region", { name: "SRE 离线事故复盘与止损提案" });
+  await expect(outcome).toContainText("确定性检查未通过");
+  await expect(artifacts).toContainText("SRE 台账未通过");
+  await expect(artifacts).toContainText("当前成果不得用于事故处置");
+  await expect(artifacts).not.toContainText("12/12 项检查通过");
+  await expect(artifacts).toContainText("没有连接集群或执行命令");
 });
 
 test("keeps deterministic verification separate from the TC-11 business release decision", async ({ page }) => {

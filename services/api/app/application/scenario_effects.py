@@ -40,6 +40,7 @@ from packages.contracts.harness_models import (
     AgentControlLoopFinanceReviewOutcome,
     AgentControlLoopLegalReviewOutcome,
     AgentControlLoopOutboundFlowOutcome,
+    AgentControlLoopSREDiagnosisOutcome,
 )
 from services.api.app.application.candidate_review_effect import (
     CANDIDATE_LOGICAL_IDS,
@@ -89,6 +90,12 @@ from services.api.app.application.customer_segmentation_effect import (
     CustomerSourceInput,
     build_customer_segmentation,
 )
+from services.api.app.application.sre_diagnosis_effect import (
+    SOURCE_LOGICAL_ID as SRE_SOURCE_LOGICAL_ID,
+    SREDiagnosisValidationError,
+    SRESourceInput,
+    build_sre_diagnosis,
+)
 
 
 class ScenarioEffectError(RuntimeError):
@@ -129,6 +136,7 @@ class GeneratedOfficeArtifact:
     finance_review_outcome: AgentControlLoopFinanceReviewOutcome | None = None
     outbound_flow_outcome: AgentControlLoopOutboundFlowOutcome | None = None
     customer_segmentation_outcome: AgentControlLoopCustomerSegmentationOutcome | None = None
+    sre_diagnosis_outcome: AgentControlLoopSREDiagnosisOutcome | None = None
 
     @property
     def verifier_status(self) -> str:
@@ -515,10 +523,14 @@ SCENARIO_EFFECT_SPECS: tuple[ScenarioEffectSpec, ...] = (
         "SRE 日志诊断",
         "分析双十一 Elasticsearch 日志，给出根因与两个层面的紧急止损建议。",
         (("可靠性工程", "log.txt"),),
-        ("ES故障诊断与止损建议.md",),
-        "validator-sre-log-diagnosis-v1",
-        "成果区显示真实 Markdown、日志事实复核和命令未执行回执。",
-        ("workspace_artifacts[]", "effect_receipts[]", "deterministic_verification_completed"),
+        ("ES故障诊断与止损建议.md", "SRE事故观察与动作台账.csv"),
+        "validator-sre-log-diagnosis-v2",
+        "分开显示来源与成果验证、来源冲突、根因假设/提案复核和全部未执行动作。",
+        (
+            "workspace_artifacts[].sre_diagnosis_outcome",
+            "effect_receipts[].sre_diagnosis_outcome",
+            "deterministic_verification_completed",
+        ),
         ("不执行 ES 命令", "不连接集群", "不自动限流"),
         "implemented",
         _contains_any(("Elasticsearch", "日志"), ("ES", "日志", "止损"), ("双十一", "集群")),
@@ -573,13 +585,14 @@ class ScenarioEffectEngine:
                 key = (group, str(item.get("display_label")))
                 if key in requested_keys:
                     matches[key].append(str(item.get("file_ref")))
-        if spec.scenario_id in {"TC-05", "TC-06", "TC-07", "TC-10", "TC-13"}:
+        if spec.scenario_id in {"TC-05", "TC-06", "TC-07", "TC-10", "TC-13", "TC-14"}:
             folder_label = {
                 "TC-05": "财务管理",
                 "TC-06": "人力招聘",
                 "TC-07": "法务",
                 "TC-10": "运营管理",
                 "TC-13": "销售运营",
+                "TC-14": "可靠性工程",
             }[spec.scenario_id]
             expected_count = {
                 "TC-05": 3,
@@ -587,6 +600,7 @@ class ScenarioEffectEngine:
                 "TC-07": 7,
                 "TC-10": 1,
                 "TC-13": 2,
+                "TC-14": 1,
             }[spec.scenario_id]
             source_folder = next(
                 (folder for folder in folders if folder.get("display_label") == folder_label),
@@ -611,6 +625,7 @@ class ScenarioEffectEngine:
                         "TC-07": "Legal-020 法务目录必须恰好包含一份规则和六份委托书",
                         "TC-10": "Operations-008 运营管理目录必须恰好包含一份专业性说明",
                         "TC-13": "Sales-020 销售运营目录必须恰好包含一份问卷和一份规则",
+                        "TC-14": "SRE-010 可靠性工程目录必须恰好包含一份批准日志",
                     }[spec.scenario_id]
                 )
         preview_refs: list[str] = []
@@ -743,6 +758,14 @@ class ScenarioEffectEngine:
         customer_outcome = customer_outcomes[0] if customer_outcomes else None
         if customer_outcomes and any(item != customer_outcome for item in customer_outcomes[1:]):
             raise ScenarioEffectError("同一效果的客户画像清洗事实不一致")
+        sre_outcomes = [
+            artifact.sre_diagnosis_outcome
+            for artifact in artifacts
+            if artifact.sre_diagnosis_outcome is not None
+        ]
+        sre_outcome = sre_outcomes[0] if sre_outcomes else None
+        if sre_outcomes and any(item != sre_outcome for item in sre_outcomes[1:]):
+            raise ScenarioEffectError("同一效果的 SRE 离线诊断事实不一致")
         return ScenarioEffectExecution(
             scenario_id=spec.scenario_id,
             capability_id=spec.capability_id,
@@ -794,6 +817,13 @@ class ScenarioEffectEngine:
                     if customer_outcome
                     else ""
                 )
+                + (
+                    f" 从 {sre_outcome.source_line_count} 行日志得到 {sre_outcome.observation_count} 条观察、"
+                    f"{sre_outcome.conflict_count} 组来源冲突、{sre_outcome.hypothesis_count} 个假设和"
+                    f"{sre_outcome.proposal_count + sre_outcome.business_mitigation_count} 个未执行提案。"
+                    if sre_outcome
+                    else ""
+                )
             ),
             cost="0 次额外模型调用；仅消耗本机确定性解析、计算与文件写入。",
             result=(
@@ -812,7 +842,11 @@ class ScenarioEffectEngine:
                                 else (
                                     "来源、清洗与两份成果结构通过；画像分类和销售策略草案仍待销售负责人复核，客户联系、CRM、商机和营销动作均未发生。"
                                     if customer_outcome
-                                    else "所有确定性效果门通过，成果仍需用户复核。"
+                                    else (
+                                        "日志、观察台账与报告结构通过；来源冲突、根因假设、动作目标和参数仍待 SRE 审批，ES 命令及业务止损均未发生。"
+                                        if sre_outcome
+                                        else "所有确定性效果门通过，成果仍需用户复核。"
+                                    )
                                 )
                             )
                         )
@@ -2856,134 +2890,84 @@ class ScenarioEffectEngine:
         self, catalog: ScenarioEffectCatalog, spec: ScenarioEffectSpec
     ) -> tuple[GeneratedOfficeArtifact, ...]:
         previews = self._previews(catalog, spec)
-        source_refs = self._source_refs(previews)
-        log_text = previews["log.txt"].get("text") or ""
-        node_ips = sorted(
-            set(re.findall(r"10\.1\.1\.(?:[1-9]|1[01])", log_text)),
-            key=lambda item: tuple(int(part) for part in item.split(".")),
+        preview = previews["log.txt"]
+        file_ref = str(preview.get("file_ref") or "")
+        source = SRESourceInput(
+            logical_id=SRE_SOURCE_LOGICAL_ID,
+            file_name=str(preview.get("display_label") or ""),
+            display_path=str(preview.get("display_path") or ""),
+            file_ref=file_ref,
+            content=catalog.checked_input_bytes(file_ref),
+            declared_size=int(preview.get("size") or 0),
+            allowlist_verified=True,
         )
-        api_host = next((ip for ip in node_ips if ip == "10.1.1.1"), node_ips[0])
-        lines = [
-            "# 双十一 Elasticsearch 集群故障诊断与止损建议",
-            "",
-            "## 结论",
-            "查询 QPS 从 600/s 增至 4800/s、写入 QPS 从 400/s 增至 3200/s，均约 8 倍，是直接触发因素。8 个 SATA data 节点在流量冲击下出现磁盘 IO 97%~99%、CPU 93%~97%、堆内存 87%~91%，继而造成 Young/Old GC 恶化、9.8s~14.2s 慢查询、write/search 队列打满与大量 rejected，集群转为 YELLOW，48 个副本分片 UNASSIGNED。",
-            "",
-            "深度分页 from=5000 与 terms/range 多层聚合进一步放大 CPU、内存和 IO 压力。master 心跳重试、License 到期提醒、snapshot 失败、短暂 circuit breaker 与 shard lock 重试是伴随或次生现象，不是本次根因。",
-            "",
-            "## 并行止损路径 A：ES 侧建议命令（仅建议，未执行）",
-            "",
-            "```http",
-            f"PUT http://{api_host}:9200/_cluster/settings",
-            '{"transient":{"cluster.routing.allocation.enable":"all"}}',
-            f"POST http://{api_host}:9200/_cluster/reroute?retry_failed=true",
-            f"PUT http://{api_host}:9200/order-2024-11/_settings",
-            '{"index.refresh_interval":"30s"}',
-            f"POST http://{api_host}:9200/_cache/clear?fielddata=true",
-            "```",
-            "",
-            "## 并行止损路径 B：业务侧降级",
-            "",
-            "1. 立即把查询 QPS 限流至正常基线 600/s、写入 QPS 限流至 400/s，并按恢复情况缓慢放量。",
-            "2. 立即停止或熔断 from=5000 深度分页和 terms + range 多层聚合查询。",
-            "3. 保留监控和复核窗口；未经人工批准不执行上方命令。",
-            "",
-            "> 本成果只生成建议文件，没有连接集群或执行任何命令。",
-        ]
-        content = "\n".join(lines).encode("utf-8")
-        rendered = content.decode("utf-8")
-        checks = (
-            self._check(
-                "check-sre-qps",
-                "QPS 触发链",
-                all(
-                    token in log_text and token in rendered
-                    for token in ("4800/s", "600/s", "3200/s", "400/s", "8 倍")
-                ),
-                "查询和写入 QPS 基线、峰值与倍数均由日志复核。",
+        try:
+            build = build_sre_diagnosis(source)
+        except SREDiagnosisValidationError as exc:
+            raise ScenarioEffectError(f"SRE-010 来源或成果验证失败 [{exc.code}]：{exc.detail}") from exc
+        outcome = build.outcome
+        checks = tuple(
+            self._check(item.check_id, item.label, item.passed, item.detail)
+            for item in build.checks
+        )
+        common_kwargs: dict[str, Any] = {
+            "source_file_refs": (file_ref,),
+            "validator_id": "validator-sre-log-diagnosis-v2",
+            "checks": checks,
+            "covered_period": str(outcome.cluster_facts.get("occurred_at") or "离线日志时间窗"),
+            "statistic_basis": (
+                f"从批准日志 {outcome.source_line_count} 行重算观察、冲突、假设和动作提案；"
+                "不读取 task/rubric/solution，不连接集群。"
             ),
-            self._check(
-                "check-sre-resources",
-                "资源瓶颈",
-                all(token in rendered for token in ("SATA", "97%~99%", "93%~97%", "87%~91%")),
-                "磁盘、CPU 与堆内存范围均写入因果链。",
+            "purpose": "供 SRE 复核日志事实、来源冲突、根因假设和条件式止损提案。",
+            "record_count": outcome.observation_count,
+            "review_guidance": (
+                f"请先核实 {outcome.conflict_count} 组来源冲突并提供批准的非 dedicated-master 协调入口；"
+                "所有命令与业务止损仍未执行。"
             ),
-            self._check(
-                "check-sre-gc",
-                "GC 与慢查询",
-                all(
-                    token in rendered
-                    for token in ("Young/Old GC", "9.8s~14.2s", "from=5000", "terms/range")
-                ),
-                "GC、深度分页和重聚合被识别为放大因素。",
+            "execution_summary": (
+                f"生成两份隔离成果，共享 {len(checks)} 项来源重算检查；"
+                "原日志未修改，external_action=none。"
             ),
-            self._check(
-                "check-sre-shards",
-                "队列和副本",
-                all(
-                    token in rendered
-                    for token in ("write/search", "rejected", "48 个副本分片", "UNASSIGNED")
-                ),
-                "线程池与分片状态均来自日志。",
-            ),
-            self._check(
-                "check-sre-distractors",
-                "干扰项排除",
-                all(
-                    token in rendered
-                    for token in (
-                        "master 心跳重试",
-                        "License",
-                        "snapshot",
-                        "circuit breaker",
-                        "shard lock",
-                    )
-                ),
-                "干扰项明确标为伴随或次生现象。",
-            ),
-            self._check(
-                "check-sre-address",
-                "命令地址来自日志",
-                api_host in node_ips and f"{api_host}:9200" in rendered,
-                f"命令使用日志中的 {api_host}:9200。",
-            ),
-            self._check(
-                "check-sre-es-actions",
-                "ES 侧三类操作",
-                all(
-                    token in rendered
-                    for token in (
-                        "/_cluster/settings",
-                        "retry_failed=true",
-                        "refresh_interval",
-                        "fielddata=true",
-                    )
-                ),
-                "分片重试、refresh 调整和缓存清理均给出建议命令。",
-            ),
-            self._check(
-                "check-sre-business",
-                "业务侧降级",
-                all(token in rendered for token in ("600/s", "400/s", "停止或熔断", "from=5000")),
-                "限流和停止重查询两条业务措施齐全。",
-            ),
-            self._check(
-                "check-sre-no-exec",
-                "命令未执行",
-                "仅建议，未执行" in rendered and "没有连接集群" in rendered,
-                "Tool Gateway 未接入，external_action=none。",
-            ),
+            "sre_diagnosis_outcome": outcome,
+        }
+        summary = (
+            f"{outcome.observation_count} 条观察、{outcome.conflict_count} 组来源冲突、"
+            f"{outcome.hypothesis_count} 个有边界假设、"
+            f"{outcome.proposal_count + outcome.business_mitigation_count} 个未执行提案。"
         )
         return (
             GeneratedOfficeArtifact(
-                "ES 故障诊断与止损建议",
-                "ES故障诊断与止损建议.md",
-                "text/markdown",
-                content,
-                source_refs,
-                "validator-sre-log-diagnosis-v1",
-                checks,
-                "日志根因链和两条并行止损路径已通过确定性复核，命令未执行。",
+                title="ES 离线事故复盘与止损提案",
+                file_name="ES故障诊断与止损建议.md",
+                media_type="text/markdown",
+                content=build.report_markdown,
+                summary=summary,
+                deliverable_type="来源推导的离线事故复盘 Markdown",
+                key_outputs=(
+                    f"来源日志 {outcome.source_line_count} 行",
+                    f"来源冲突 {outcome.conflict_count} 组",
+                    f"SRE 假设 {outcome.hypothesis_count} 个",
+                    f"批准入口 resolved {outcome.resolved_target_count} 个",
+                ),
+                key_outputs_label="动态观察与复核边界",
+                **common_kwargs,
+            ),
+            GeneratedOfficeArtifact(
+                title="SRE 事故观察与动作台账",
+                file_name="SRE事故观察与动作台账.csv",
+                media_type="text/csv",
+                content=build.ledger_csv,
+                summary="逐项记录观察、来源冲突、假设、支持/反证和未执行动作提案。",
+                deliverable_type="可独立复算的观察与动作 CSV 台账",
+                key_outputs=(
+                    f"观察 {outcome.observation_count} 条",
+                    f"未分类观察 {outcome.unclassified_count} 条",
+                    f"ES 提案 {outcome.proposal_count} 个",
+                    f"业务止损提案 {outcome.business_mitigation_count} 个",
+                ),
+                key_outputs_label="逐项可审计记录",
+                **common_kwargs,
             ),
         )
 

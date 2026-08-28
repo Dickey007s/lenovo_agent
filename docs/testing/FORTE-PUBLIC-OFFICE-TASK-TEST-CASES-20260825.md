@@ -57,7 +57,7 @@ CSS、HTML、shell、log 等。它们覆盖结构化表格、长文档、扫描/
 | `TC-11` | `pm-014` | 上线合规与风险评估 | MD + 3 个 XLSX | Demo 2 多任务 | 来源推导风险、正式 Gate、结构化报告与台账 | `Limited Verified`（DR-0043、PR #57/#58、Run `harness:d1a3d9fca21d4e2299ac308bbaf73e1e`）：18 行台账、四条正式 Gate、动态风险/未提测数量、PRD 等级来源变异、负向门、DOCX/CSV 下载解析与 PostgreSQL 顺序恢复；固定适配器，没有多 Worker 或真实发布 |
 | `TC-12` | `qa-003` | 为看板工具库补测试并修复源码 | JS + JSON | Demo 2 多任务 | 固定测试执行、隔离代码写入 | `Limited Verified`（DR-0042、PR #54/#55、Run `harness:d9355005af924d57bb1e9c526adca072`）：完整 11 文件副本，同一 71 项 Vitest 先红后绿、逐文件 coverage、独立复跑；固定 qa-003 适配器，没有自动 PR 或 OS 级断网 |
 | `TC-13` | `sales-020` | 客户画像清洗与销售策略 | CSV + MD | Demo 1/2 | 来源推导清洗、重复假设、策略复核 | `Limited Verified`（DR-0049、Run `harness:80a5e5c91a294ee687f28eed731570d3`）：Markdown + 逐原始行 CSV，8 项独立来源/成果检查；当前动态 11/10/1/8/2/3、画像 3/3/2、priority witness 0；固定公开样本适配器，不是客户研究、CRM 或销售效果证明 |
-| `TC-14` | `sre-010` | 大促 ES 故障诊断与止损建议 | TXT log | Demo 1 + Demo 3 | 高风险命令、禁止自动执行 | `Limited Verified`：Markdown 诊断 + 9 项日志/地址/禁执行检查 |
+| `TC-14` | `sre-010` | 大促 ES 日志离线复盘与条件式止损提案 | TXT log | Demo 1 + Demo 3 | 来源冲突、根因假设、未解析目标与禁止执行 | `Draft`（DR-0050，待真实 Run/PR 收口）：来源推导 Markdown + CSV、12 项独立检查；当前动态 232 行、167 条观察、3 组来源冲突、2 个假设、8 个 ES + 3 个业务提案，全部未执行 |
 | `TC-15` | `uiux-021` | 交互痛点归因与优先级排序 | XLSX + MD + DOCX | Demo 2 多任务 | 排序验证、CSV 写入 | `Limited Verified`：真实 CSV + 6 项 P0-P4/稳定排序检查 |
 
 ## 5. 单任务有界循环用例
@@ -131,11 +131,17 @@ CSS、HTML、shell、log 等。它们覆盖结构化表格、长文档、扫描/
 
 ### TC-14 SRE 日志诊断
 
-- 用户目标：诊断大促期间 ES 集群问题并给出止损命令和业务降级措施。
-- 期望路径：读取日志 -> 提取时间线/节点 -> 建立根因假设 -> 引用日志验证 -> 生成两条并行止损路径。
-- 人工暂停：任何真实集群命令都必须进入高风险确认；当前仅允许生成建议。
-- 验证：命令中的节点地址必须来自日志，根因与每项建议有对应证据行。
-- 禁止：在本机或外部集群执行 ES 命令。
+- 用户目标：从固定公开日志形成可复核的观察、来源冲突、根因假设与条件式止损提案。
+- 期望路径：冻结唯一日志 -> 逐行解析观察 -> 显式保留冲突 -> 形成支持/反证假设 -> 生成未执行提案 -> 输出 Markdown/CSV -> 重读来源和两份成果复核。
+- 当前来源观测：232 行、3 个索引、11 个列出节点（3 master/8 data）、查询/写入 QPS 均为基线 8 倍、5 条 search slow、1 条 indexing slow、3 次 transport timeout 后恢复；这些是当前来源观测，不是生产常量。
+- 三组冲突：声明节点 10 vs 列表/角色/health 11；health UNASSIGNED 48 vs shard 明细 24；node disk 53.9%-56.1% vs allocation explain 大于 85%。计算通过表示冲突被完整保留，不表示数据一致。
+- 假设边界：容量、查询形态、GC/队列/慢查询的同时出现只支持待 SRE 复核的假设；NODE_LEFT、冲突与恢复事件作为反证/局限保留。
+- 提案边界：ES endpoint 固定为 unresolved，不使用 dedicated master；只读预检优先，写提案带风险、前置、rollback、verify 和审批，所有 `executed=false`。
+- 正向变异：QPS、节点/角色、索引、分片、慢查询与冲突修正动态改变受影响事实；删除 GC 会降低假设支持；未知异常进入 manual review。
+- 负向门：缺/多/错路径来源、空/二进制/截断、重复关键章节、非法数字，以及 Markdown/CSV observation/conflict/hypothesis/proposal/locator/边界篡改均失败。
+- 前台：分开确定性验证、观察与冲突、假设/建议待 SRE 复核、真实命令与业务降级均未发生；逐项可展开来源位置和安全字段。
+- 成果验收：下载 Markdown/CSV 独立解析；Artifact、EffectReceipt 与 `sre_diagnosis_outcome` 在 PostgreSQL 重启后保持一致，原日志不修改。
+- 禁止：连接 Elasticsearch，执行 ES/curl/Invoke-WebRequest/http 命令，或把官方 API 语义、日志相关性、绿灯文件和提案文字表述为现场批准、根因定论或执行回执。
 
 ## 6. 多任务自组织用例
 
@@ -286,5 +292,5 @@ TC-04 使用 coverage.py 核对真实模块与三个变更文件，TC-12 使用 
 | TC-05 | 核对三期往来明细，生成未付统计、未收统计，并判断是否存在僵尸账款。 | 2 个 2026 CSV、1 个三期说明；当前 31/2/0、15 项来源与成果检查，0/N 候选均需财务复核 |
 | TC-10 | 根据专业性说明生成信用卡 M1 逾期用户 AI 外呼催收流程图文档。 | 来源推导结构化 DOCX，规则/图动态检查，审批待人工，无真实外呼/系统写入 |
 | TC-13 | 清洗问卷、完成客户画像分类，并生成差异化销售策略 Markdown 报告。 | 来源推导 Markdown + 逐原始行 CSV；8 项检查，当前 11/10/1/8/2/3，策略待销售负责人批准且无 CRM/客户动作 |
-| TC-14 | 分析双十一 Elasticsearch 日志，给出根因与两个层面的紧急止损建议。 | Markdown，9 项检查，命令未执行 |
+| TC-14 | 分析双十一 Elasticsearch 日志，给出根因与两个层面的紧急止损建议。 | 来源推导 Markdown + CSV；12 项独立检查，三组冲突显式保留，ES target 未解析，命令与业务降级均未执行 |
 | TC-15 | 根据交互日志、痛点规则和页面规范，生成排序正确的交互规范优化方案 CSV。 | CSV，6 项排序检查 |

@@ -250,6 +250,17 @@ locator. Canonical input displays zero priority witnesses rather than pretending
 the priority order ran. These panels render `customer_segmentation_outcome` and
 do not parse source files, call a model or mutate CRM state.
 
+DR-0050 gives TC-14 a four-layer incident-review projection. The first screen
+states that the output is an offline review of a fixed public log, not online
+monitoring, a root-cause conclusion or command execution. It then separates
+deterministic source/Markdown/CSV verification, observations and contradictory
+source facts, hypotheses/proposals awaiting SRE review, and the explicit fact
+that no Elasticsearch or business action occurred. Expanding an observation,
+conflict, hypothesis or proposal reveals only service-owned safe locators,
+support/counter evidence, risk, unresolved target, preconditions, rollback,
+verification and official API semantics. Expansion is read-only, calls no
+model and never executes a command.
+
 Open human decisions are authoritative in the Snapshot-level
 `decision_requests[]`; round-level copies are compatibility projections only.
 Closing or pressing Escape exits the review surface before the browser attempts a

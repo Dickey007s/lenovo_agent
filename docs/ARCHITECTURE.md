@@ -438,6 +438,17 @@ The generated Markdown and CSV are parsed again against a fresh source
 derivation. This is not a CRM, customer study, sales-effectiveness verifier or
 general clustering engine.
 
+DR-0050 applies the same source-owned boundary to the fixed SRE-010 adapter.
+Exactly one allowlisted log is frozen and parsed into observations, source
+conflicts, hypotheses and typed action proposals. Observations retain safe line
+locators; hypotheses reference supporting and counter evidence; every proposal
+is approval-required and unexecuted. Elasticsearch targets remain unresolved
+until an SRE supplies an approved non-dedicated-master endpoint. The Markdown
+and CSV are independently reparsed against a fresh source derivation, and
+`sre_diagnosis_outcome` is persisted on both Artifacts and the EffectReceipt.
+This architecture proves an offline review file, not an online monitor,
+root-cause oracle, Elasticsearch Connector or durable production change.
+
 ## 7. Eight module maturity
 
 | Module | Current implementation | Missing target work |

@@ -714,6 +714,131 @@ def test_customer_segmentation_outcome_round_trips_without_becoming_a_sales_acti
     assert restored_receipt.customer_segmentation_outcome.external_action == "none"
 
 
+def test_sre_diagnosis_outcome_round_trips_without_becoming_an_execution_receipt() -> None:
+    now = datetime.now(timezone.utc)
+    outcome = {
+        "outcome_id": "sre-diagnosis-outcome-sre-010",
+        "status": "incident_review_required",
+        "decision": "日志事实与提案已形成，仍需 SRE 复核。",
+        "summary": "一条观察、一个假设和一个未执行的只读预检提案。",
+        "source_line_count": 1,
+        "cluster_facts": {"cluster": "demo-es", "version": "7.10.2"},
+        "node_facts": {"listed_count": 1},
+        "metric_facts": {"query_qps": 10},
+        "timeline": ["00:00 告警"],
+        "observation_count": 1,
+        "conflict_count": 0,
+        "hypothesis_count": 1,
+        "proposal_count": 1,
+        "business_mitigation_count": 0,
+        "unclassified_count": 0,
+        "observations": [
+            {
+                "observation_id": "sre-observation-query-qps",
+                "category": "metric",
+                "statement": "query QPS 为 10。",
+                "source_file_ref": "sre-log-ref",
+                "locator": "log.txt:L1",
+                "excerpt": "query_qps=10",
+                "fields": {"query_qps": "10"},
+                "status": "observed",
+            }
+        ],
+        "source_conflicts": [],
+        "hypotheses": [
+            {
+                "hypothesis_id": "sre-hypothesis-load",
+                "statement": "负载变化可能与告警同时出现。",
+                "confidence": "low",
+                "supporting_observation_ids": ["sre-observation-query-qps"],
+                "supporting_locators": ["log.txt:L1"],
+                "counter_evidence_ids": [],
+                "counter_evidence_locators": [],
+                "limitations": ["离线日志不能证明因果。"],
+            }
+        ],
+        "action_proposals": [
+            {
+                "proposal_id": "sre-proposal-read-health",
+                "kind": "read_only_preflight",
+                "title": "读取集群健康状态",
+                "risk_level": "low",
+                "command_template": "GET {approved_non_master_endpoint}/_cluster/health",
+                "action_text": None,
+                "target_status": "unresolved",
+                "target_rationale": "等待批准的非 dedicated-master 协调入口。",
+                "preconditions": ["SRE 批准入口和只读凭据。"],
+                "rollback": "只读请求无需回滚；异常时立即停止。",
+                "verify_after": ["保存状态码和响应摘要。"],
+                "official_reference": "https://www.elastic.co/guide/en/elasticsearch/reference/7.10/cluster-health.html",
+                "approval_required": True,
+                "executed": False,
+                "source_observation_ids": ["sre-observation-query-qps"],
+            }
+        ],
+        "business_mitigations": [],
+        "resolved_target_count": 0,
+        "human_review_required": True,
+        "original_inputs_modified": False,
+        "external_action": "none",
+    }
+    common = {
+        "capability_id": "office-sre-log-diagnosis",
+        "scenario_id": "TC-14",
+        "source_file_refs": ["sre-log-ref"],
+        "sre_diagnosis_outcome": outcome,
+        "created_at": now,
+    }
+    artifact = AgentControlLoopWorkspaceArtifact.model_validate(
+        {
+            **common,
+            "artifact_id": "workspace-artifact-fedcba987654",
+            "title": "ES 离线事故复盘与止损提案",
+            "file_name": "ES故障诊断与止损建议.md",
+            "media_type": "text/markdown",
+            "size": 2048,
+            "round_number": 1,
+            "validator_id": "validator-sre-log-diagnosis-v2",
+            "verifier_status": "passed",
+            "checks": [
+                {
+                    "check_id": "check-sre-observations",
+                    "label": "观察由来源重算",
+                    "passed": True,
+                    "detail": "一条观察一致。",
+                }
+            ],
+            "summary": "报告结构通过，SRE 复核与所有动作仍未发生。",
+            "download_path": "/v1/harness/runs/run-1/artifacts/sre-1",
+        }
+    )
+    receipt = AgentControlLoopEffectReceipt.model_validate(
+        {
+            **common,
+            "receipt_id": "effect-receipt-fedcba987654",
+            "status": "passed",
+            "state": "冻结一份批准日志。",
+            "action": "重算观察、冲突、假设与提案。",
+            "observation": "来源和两份成果通过确定性复核。",
+            "cost": "0 次额外模型调用。",
+            "result": "没有连接集群或执行命令。",
+            "artifact_ids": [artifact.artifact_id],
+        }
+    )
+
+    restored_artifact = AgentControlLoopWorkspaceArtifact.model_validate_json(
+        artifact.model_dump_json()
+    )
+    restored_receipt = AgentControlLoopEffectReceipt.model_validate_json(
+        receipt.model_dump_json()
+    )
+    assert restored_artifact.sre_diagnosis_outcome is not None
+    assert restored_artifact.sre_diagnosis_outcome.resolved_target_count == 0
+    assert restored_artifact.sre_diagnosis_outcome.action_proposals[0].executed is False
+    assert restored_receipt.sre_diagnosis_outcome == restored_artifact.sre_diagnosis_outcome
+    assert restored_receipt.sre_diagnosis_outcome.external_action == "none"
+
+
 def test_outbound_flow_outcome_round_trips_without_becoming_an_execution_receipt() -> None:
     now = datetime.now(timezone.utc)
     outcome = {

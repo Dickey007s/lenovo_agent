@@ -1,0 +1,3634 @@
+{
+  "schema_version": "scenario-effect-gate-live.v1",
+  "generated_at": "2026-08-28T23:38:27.398916+00:00",
+  "api_base": "http://127.0.0.1:8010",
+  "service": {
+    "model": "deepseek-v4-pro",
+    "checkpoint": "postgres",
+    "task_store": "postgres"
+  },
+  "dataset": {
+    "name": "FORTE public demo inputs",
+    "source_commit": "345c1ec1487139db9dd319787fa9405ba85d1869",
+    "input_tree_sha256": "2c19e31a8e437f8ccb0ab811ba20a940f022a5bea69bcc750574d753f10a250d",
+    "original_inputs_modified": false
+  },
+  "summary": {
+    "requested": 1,
+    "passed": 1,
+    "failed": 0,
+    "model_output_adopted": 1,
+    "run_completed": 0
+  },
+  "scenarios": [
+    {
+      "scenario_id": "TC-14",
+      "capability_id": "office-sre-log-diagnosis",
+      "title": "SRE 日志诊断",
+      "instruction": "分析双十一 Elasticsearch 日志，给出根因与两个层面的紧急止损建议。",
+      "run_id": "harness:fe527536c857404f88f46d9a68b09397",
+      "started_at": "2026-08-28T23:37:43.666453+00:00",
+      "observed_at": "2026-08-28T23:38:27.359975+00:00",
+      "run_status": "waiting_input",
+      "snapshot_version": 12,
+      "current_round": 1,
+      "budget": {
+        "max_rounds": 12,
+        "max_files_per_round": 16,
+        "max_model_calls": 30,
+        "deadline_seconds": 7200,
+        "rounds_used": 1,
+        "files_verified": 1,
+        "model_calls_used": 2,
+        "elapsed_ms": 41776,
+        "stop_reason": null
+      },
+      "model_calls": [
+        {
+          "round": 1,
+          "role": "planner",
+          "called": true,
+          "model": "deepseek-v4-pro",
+          "elapsed_ms": 13212,
+          "output_used": true
+        },
+        {
+          "round": 1,
+          "role": "analyst",
+          "called": true,
+          "model": "deepseek-v4-pro",
+          "elapsed_ms": 25960,
+          "output_used": true
+        }
+      ],
+      "model_execution_gate_passed": true,
+      "model_output_adopted": true,
+      "api_responsiveness": {
+        "client_total_timeout_seconds": 180,
+        "request_latency_gate_ms": 5000,
+        "run_get_sample_count": 22,
+        "run_get_max_ms": 93,
+        "effect_active_run_get_sample_count": 1,
+        "effect_active_run_get_max_ms": 62,
+        "effect_active_health_sample_count": 1,
+        "effect_active_health_max_ms": 93,
+        "sse_probe": {
+          "event_name": "deterministic_office_tool_started",
+          "elapsed_ms": 578,
+          "after_sequence": 5
+        },
+        "scenario_elapsed_ms": 43516,
+        "passed": true,
+        "boundary": "总任务可持续约一分钟；这里验证的是单次 Run GET、health 与 SSE 请求未被同步构建阻塞，不证明线程内子进程可跨进程续跑。"
+      },
+      "effect_receipts": [
+        {
+          "receipt_id": "effect-receipt-7e14b603dbf7",
+          "capability_id": "office-sre-log-diagnosis",
+          "scenario_id": "TC-14",
+          "status": "passed",
+          "state": "已冻结 1 份 FORTE 输入，原始文件保持只读。",
+          "action": "调用 office-sre-log-diagnosis 确定性办公工具并写入隔离运行工作区。",
+          "observation": "生成 2 份真实成果文件，共享 12 项确定性检查，12/12 通过。 从 232 行日志得到 167 条观察、3 组来源冲突、2 个假设和11 个未执行提案。",
+          "cost": "0 次额外模型调用；仅消耗本机确定性解析、计算与文件写入。",
+          "result": "日志、观察台账与报告结构通过；来源冲突、根因假设、动作目标和参数仍待 SRE 审批，ES 命令及业务止损均未发生。",
+          "source_file_refs": [
+            "forte-df5ae9b9a1273380"
+          ],
+          "artifact_ids": [
+            "workspace-artifact-6887356cbc33",
+            "workspace-artifact-455269f9834b"
+          ],
+          "prohibited_side_effects": [
+            "不执行 ES 命令",
+            "不连接集群",
+            "不自动限流"
+          ],
+          "business_gate_outcome": null,
+          "legal_review_outcome": null,
+          "candidate_review_outcome": null,
+          "finance_review_outcome": null,
+          "outbound_flow_outcome": null,
+          "customer_segmentation_outcome": null,
+          "sre_diagnosis_outcome": {
+            "outcome_id": "sre-diagnosis-outcome-sre-010",
+            "status": "incident_review_required",
+            "decision": "日志事实与成果结构已由服务端重算；三组来源冲突、根因假设、批准入口和所有动作仍需 SRE 复核。不得把本成果当作生产变更批准或执行回执。",
+            "summary": "从 232 行批准日志解析 167 条观察、3 组来源冲突、2 个有边界假设和 8 个 ES 条件式提案；目标入口仍为 unresolved，另有 3 个业务止损提案，均未执行。",
+            "source_line_count": 232,
+            "cluster_facts": {
+              "alert_id": "ES-PERF-010-QPS-SURGE-RESOURCE-BOTTLENECK",
+              "occurred_at": "2024-11-11T00:00:00Z（双十一大促零点开始）",
+              "duration": "约 40 分钟（00:00 起持续告警，00:38 集群读写性能严重劣化）",
+              "cluster": "prod-order-es-cluster",
+              "version": "7.10.2",
+              "indices": [
+                "order-2024-11",
+                "item-search-2024-11",
+                "user-activity-2024-11"
+              ],
+              "health_status": "yellow",
+              "health_shards": 96,
+              "health_primaries": 48,
+              "health_unassigned": 48,
+              "detail_rows": 48,
+              "detail_primaries": 24,
+              "detail_unassigned": 24
+            },
+            "node_facts": {
+              "declared_count": 10,
+              "listed_count": 11,
+              "listed_master_count": 3,
+              "listed_data_count": 8,
+              "declared_master_count": 3,
+              "declared_data_count": 8,
+              "health_count": 11,
+              "health_data_count": 8,
+              "dedicated_master_ips": [
+                "10.1.1.1",
+                "10.1.1.2",
+                "10.1.1.3"
+              ],
+              "data_ips": [
+                "10.1.1.4",
+                "10.1.1.5",
+                "10.1.1.6",
+                "10.1.1.7",
+                "10.1.1.8",
+                "10.1.1.9",
+                "10.1.1.10",
+                "10.1.1.11"
+              ],
+              "data_cpu_range": {
+                "min": 93.0,
+                "max": 97.0
+              },
+              "data_heap_range": {
+                "min": 87.0,
+                "max": 91.0
+              },
+              "data_disk_used_range": {
+                "min": 53.9,
+                "max": 56.1
+              },
+              "data_disk_io_range": {
+                "min": 97.1,
+                "max": 99.4
+              }
+            },
+            "metric_facts": {
+              "query_qps": 4800.0,
+              "query_qps_baseline": 600.0,
+              "query_qps_multiplier": 8.0,
+              "write_qps": 3200.0,
+              "write_qps_baseline": 400.0,
+              "write_qps_multiplier": 8.0,
+              "cpu": 97.0,
+              "disk_io": 99.0,
+              "heap": 91.0,
+              "young_gc": 48.0,
+              "old_gc": 5.0,
+              "old_gc_time": 28000.0,
+              "search_latency": 12400.0,
+              "index_latency": 8800.0,
+              "write_rejected": 2340.0,
+              "search_rejected": 1860.0,
+              "gc_event_count": 11,
+              "search_slow_count": 5,
+              "index_slow_count": 1,
+              "queue_warning_count": 6,
+              "transport_timeout_count": 3,
+              "transport_recovered_count": 3,
+              "circuit_reset_count": 1,
+              "shard_lock_retry_success_count": 1,
+              "snapshot_failure_count": 1,
+              "snapshot_cleanup_count": 1,
+              "query_evidence_count": 5
+            },
+            "timeline": [
+              "log.txt:L3 告警 ES-PERF-010-QPS-SURGE-RESOURCE-BOTTLENECK",
+              "log.txt:L4 告警发生于 2024-11-11T00:00:00Z（双十一大促零点开始）",
+              "log.txt:L5 约 40 分钟（00:00 起持续告警，00:38 集群读写性能严重劣化）",
+              "log.txt:L47 传输响应超时：[2024-11-10T23:58:44,231][WARN ][o.e.t.TransportService   ] [es-node-01] timeout waiting for [30s] on response from [es-node-04][10.1.1.4:9300]; retrying",
+              "log.txt:L49 传输响应超时：[2024-11-11T00:03:17,004][WARN ][o.e.t.TransportService   ] [es-node-01] timeout waiting for [30s] on response from [es-node-06][10.1.1.6:9300]; retrying",
+              "log.txt:L51 传输响应超时：[2024-11-11T00:08:55,771][WARN ][o.e.t.TransportService   ] [es-node-01] timeout waiting for [30s] on response from [es-node-08][10.1.1.8:9300]; retrying",
+              "log.txt:L48 传输重试后恢复：[2024-11-10T23:58:44,512][INFO ][o.e.t.TransportService   ] [es-node-01] received response from [es-node-04][10.1.1.4:9300] after retry; connection restored",
+              "log.txt:L50 传输重试后恢复：[2024-11-11T00:03:17,389][INFO ][o.e.t.TransportService   ] [es-node-01] received response from [es-node-06][10.1.1.6:9300] after retry; connection restored",
+              "log.txt:L52 传输重试后恢复：[2024-11-11T00:08:55,990][INFO ][o.e.t.TransportService   ] [es-node-01] received response from [es-node-08][10.1.1.8:9300] after retry; connection restored",
+              "log.txt:L76 快照创建失败：[2024-11-11T00:01:22,114][INFO ][o.e.s.s.SnapshotShardsService] [es-node-07] snapshot [order-backup/snap_20241110_2300] shard [order-2024-11][2] failed to create snapshot, reason: [failed to obtain shard lock for [order-2024-11][2]: lock held by [index shard recovery]]",
+              "log.txt:L81 快照失败后的清理完成：[2024-11-11T00:01:23,002][INFO ][o.e.s.SnapshotsService  ] [es-node-07] [order-backup/snap_20241110_2300] snapshot deleted successfully (cleanup after failure)",
+              "log.txt:L92 熔断器触发：[2024-11-11T00:09:13,441][WARN ][o.e.i.IndicesService    ] [es-node-09] [user-activity-2024-11][3] CircuitBreakingException: [parent] Data too large, data for [<agg [hourly_trend]>] would be [28.9gb/28gb], which is larger than the limit of [26.2gb/24.4gb]; this circuit breaker is now open",
+              "log.txt:L94 熔断器复位：[2024-11-11T00:09:15,003][INFO ][o.e.i.IndicesService    ] [es-node-09] [user-activity-2024-11][3] circuit breaker reset; resuming normal operation",
+              "log.txt:L76 分片锁获取失败：[2024-11-11T00:01:22,114][INFO ][o.e.s.s.SnapshotShardsService] [es-node-07] snapshot [order-backup/snap_20241110_2300] shard [order-2024-11][2] failed to create snapshot, reason: [failed to obtain shard lock for [order-2024-11][2]: lock held by [index shard recovery]]",
+              "log.txt:L98 分片锁获取失败：[2024-11-11T00:22:08,334][ERROR][o.e.i.s.InternalEngine  ] [es-node-10] [item-search-2024-11][5] failed to obtain shard lock, retrying in 5s",
+              "log.txt:L102 分片锁重试成功：[2024-11-11T00:22:13,891][INFO ][o.e.i.s.InternalEngine  ] [es-node-10] [item-search-2024-11][5] shard lock obtained successfully after retry",
+              "log.txt:L53 License 到期提醒：[2024-11-11T00:12:01,334][INFO ][o.e.l.LicenseService     ] [es-node-01] LICENSE [TRIAL] mode - license will expire in 14 days. Cluster functionality may be reduced after expiration. Please update your license."
+            ],
+            "observation_count": 167,
+            "conflict_count": 3,
+            "hypothesis_count": 2,
+            "proposal_count": 8,
+            "business_mitigation_count": 3,
+            "unclassified_count": 14,
+            "observations": [
+              {
+                "observation_id": "sre-observation-alert",
+                "category": "metadata",
+                "statement": "告警 ES-PERF-010-QPS-SURGE-RESOURCE-BOTTLENECK",
+                "source_file_ref": "forte-df5ae9b9a1273380",
+                "locator": "log.txt:L3",
+                "excerpt": "告警ID: ES-PERF-010-QPS-SURGE-RESOURCE-BOTTLENECK",
+                "fields": {
+                  "alert_id": "ES-PERF-010-QPS-SURGE-RESOURCE-BOTTLENECK"
+                },
+                "status": "observed"
+              },
+              {
+                "observation_id": "sre-observation-time",
+                "category": "metadata",
+                "statement": "告警发生于 2024-11-11T00:00:00Z（双十一大促零点开始）",
+                "source_file_ref": "forte-df5ae9b9a1273380",
+                "locator": "log.txt:L4",
+                "excerpt": "发生时间: 2024-11-11T00:00:00Z（双十一大促零点开始）",
+                "fields": {
+                  "occurred_at": "2024-11-11T00:00:00Z（双十一大促零点开始）"
+                },
+                "status": "observed"
+              },
+              {
+                "observation_id": "sre-observation-duration",
+                "category": "metadata",
+                "statement": "约 40 分钟（00:00 起持续告警，00:38 集群读写性能严重劣化）",
+                "source_file_ref": "forte-df5ae9b9a1273380",
+                "locator": "log.txt:L5",
+                "excerpt": "持续时间: 约 40 分钟（00:00 起持续告警，00:38 集群读写性能严重劣化）",
+                "fields": {
+                  "duration": "约 40 分钟（00:00 起持续告警，00:38 集群读写性能严重劣化）"
+                },
+                "status": "observed"
+              },
+              {
+                "observation_id": "sre-observation-affected-resources",
+                "category": "cluster",
+                "statement": "受影响集群 prod-order-es-cluster，索引 3 个。",
+                "source_file_ref": "forte-df5ae9b9a1273380",
+                "locator": "log.txt:L6",
+                "excerpt": "受影响资源: cluster: prod-order-es-cluster, indices: [order-2024-11, item-search-2024-11, user-activity-2024-11]",
+                "fields": {
+                  "cluster": "prod-order-es-cluster",
+                  "indices": "order-2024-11,item-search-2024-11,user-activity-2024-11"
+                },
+                "status": "observed"
+              },
+              {
+                "observation_id": "sre-observation-metric-query-qps",
+                "category": "metric",
+                "statement": "node.indices.search.query_qps: 峰值 4800/s（正常基线 600/s，激增 8 倍）",
+                "source_file_ref": "forte-df5ae9b9a1273380",
+                "locator": "log.txt:L8",
+                "excerpt": "  - node.indices.search.query_qps: 峰值 4800/s（正常基线 600/s，激增 8 倍）",
+                "fields": {
+                  "value_1": "4800",
+                  "value_2": "600",
+                  "value_3": "8"
+                },
+                "status": "observed"
+              },
+              {
+                "observation_id": "sre-observation-metric-write-qps",
+                "category": "metric",
+                "statement": "node.indices.indexing.index_qps: 峰值 3200/s（正常基线 400/s，激增 8 倍）",
+                "source_file_ref": "forte-df5ae9b9a1273380",
+                "locator": "log.txt:L9",
+                "excerpt": "  - node.indices.indexing.index_qps: 峰值 3200/s（正常基线 400/s，激增 8 倍）",
+                "fields": {
+                  "value_1": "3200",
+                  "value_2": "400",
+                  "value_3": "8"
+                },
+                "status": "observed"
+              },
+              {
+                "observation_id": "sre-observation-metric-cpu",
+                "category": "metric",
+                "statement": "cpu.busy: 峰值 97%（阈值 80%，全部 8 个 data 节点均超阈值）",
+                "source_file_ref": "forte-df5ae9b9a1273380",
+                "locator": "log.txt:L10",
+                "excerpt": "  - cpu.busy: 峰值 97%（阈值 80%，全部 8 个 data 节点均超阈值）",
+                "fields": {
+                  "value_1": "97",
+                  "value_2": "80",
+                  "value_3": "8"
+                },
+                "status": "observed"
+              },
+              {
+                "observation_id": "sre-observation-metric-disk-io",
+                "category": "metric",
+                "statement": "disk.io.util/device=max: 峰值 99%（阈值 80%，SATA 磁盘 IO 打满）",
+                "source_file_ref": "forte-df5ae9b9a1273380",
+                "locator": "log.txt:L11",
+                "excerpt": "  - disk.io.util/device=max: 峰值 99%（阈值 80%，SATA 磁盘 IO 打满）",
+                "fields": {
+                  "value_1": "99",
+                  "value_2": "80"
+                },
+                "status": "observed"
+              },
+              {
+                "observation_id": "sre-observation-metric-heap",
+                "category": "metric",
+                "statement": "node.jvm.mem.heap_used_percent: 峰值 91%（阈值 80%）",
+                "source_file_ref": "forte-df5ae9b9a1273380",
+                "locator": "log.txt:L12",
+                "excerpt": "  - node.jvm.mem.heap_used_percent: 峰值 91%（阈值 80%）",
+                "fields": {
+                  "value_1": "91",
+                  "value_2": "80"
+                },
+                "status": "observed"
+              },
+              {
+                "observation_id": "sre-observation-metric-young-gc",
+                "category": "metric",
+                "statement": "node.jvm.gc.collectors.young.collection_count.perMin: 峰值 48 次/min（阈值 20 次/min）",
+                "source_file_ref": "forte-df5ae9b9a1273380",
+                "locator": "log.txt:L13",
+                "excerpt": "  - node.jvm.gc.collectors.young.collection_count.perMin: 峰值 48 次/min（阈值 20 次/min）",
+                "fields": {
+                  "value_1": "48",
+                  "value_2": "20"
+                },
+                "status": "observed"
+              },
+              {
+                "observation_id": "sre-observation-metric-old-gc",
+                "category": "metric",
+                "statement": "node.jvm.gc.collectors.old.collection_count.perMin: 峰值 5 次/min（阈值 1 次/min）",
+                "source_file_ref": "forte-df5ae9b9a1273380",
+                "locator": "log.txt:L14",
+                "excerpt": "  - node.jvm.gc.collectors.old.collection_count.perMin: 峰值 5 次/min（阈值 1 次/min）",
+                "fields": {
+                  "value_1": "5",
+                  "value_2": "1"
+                },
+                "status": "observed"
+              },
+              {
+                "observation_id": "sre-observation-metric-old-gc-time",
+                "category": "metric",
+                "statement": "node.jvm.gc.collectors.old.collection_time_in_millis.perMin: 峰值 28000ms/min（阈值 20000ms/min）",
+                "source_file_ref": "forte-df5ae9b9a1273380",
+                "locator": "log.txt:L15",
+                "excerpt": "  - node.jvm.gc.collectors.old.collection_time_in_millis.perMin: 峰值 28000ms/min（阈值 20000ms/min）",
+                "fields": {
+                  "value_1": "28000",
+                  "value_2": "20000"
+                },
+                "status": "observed"
+              },
+              {
+                "observation_id": "sre-observation-metric-search-latency",
+                "category": "metric",
+                "statement": "node.indices.search.query_time_in_millis.avg: 峰值 12400ms（正常 < 200ms）",
+                "source_file_ref": "forte-df5ae9b9a1273380",
+                "locator": "log.txt:L16",
+                "excerpt": "  - node.indices.search.query_time_in_millis.avg: 峰值 12400ms（正常 < 200ms）",
+                "fields": {
+                  "value_1": "12400",
+                  "value_2": "200"
+                },
+                "status": "observed"
+              },
+              {
+                "observation_id": "sre-observation-metric-index-latency",
+                "category": "metric",
+                "statement": "node.indices.indexing.index_time_in_millis.avg: 峰值 8800ms（正常 < 50ms）",
+                "source_file_ref": "forte-df5ae9b9a1273380",
+                "locator": "log.txt:L17",
+                "excerpt": "  - node.indices.indexing.index_time_in_millis.avg: 峰值 8800ms（正常 < 50ms）",
+                "fields": {
+                  "value_1": "8800",
+                  "value_2": "50"
+                },
+                "status": "observed"
+              },
+              {
+                "observation_id": "sre-observation-metric-write-rejected",
+                "category": "metric",
+                "statement": "node.thread_pool.write.rejected.perMin: 峰值 2340/min",
+                "source_file_ref": "forte-df5ae9b9a1273380",
+                "locator": "log.txt:L18",
+                "excerpt": "  - node.thread_pool.write.rejected.perMin: 峰值 2340/min",
+                "fields": {
+                  "value_1": "2340"
+                },
+                "status": "observed"
+              },
+              {
+                "observation_id": "sre-observation-metric-search-rejected",
+                "category": "metric",
+                "statement": "node.thread_pool.search.rejected.perMin: 峰值 1860/min",
+                "source_file_ref": "forte-df5ae9b9a1273380",
+                "locator": "log.txt:L19",
+                "excerpt": "  - node.thread_pool.search.rejected.perMin: 峰值 1860/min",
+                "fields": {
+                  "value_1": "1860"
+                },
+                "status": "observed"
+              },
+              {
+                "observation_id": "sre-observation-cluster-name",
+                "category": "cluster",
+                "statement": "集群名称 prod-order-es-cluster",
+                "source_file_ref": "forte-df5ae9b9a1273380",
+                "locator": "log.txt:L23",
+                "excerpt": "集群名称: prod-order-es-cluster",
+                "fields": {
+                  "cluster": "prod-order-es-cluster"
+                },
+                "status": "observed"
+              },
+              {
+                "observation_id": "sre-observation-cluster-version",
+                "category": "cluster",
+                "statement": "Elasticsearch 7.10.2",
+                "source_file_ref": "forte-df5ae9b9a1273380",
+                "locator": "log.txt:L24",
+                "excerpt": "集群版本: Elasticsearch 7.10.2",
+                "fields": {
+                  "version": "7.10.2"
+                },
+                "status": "observed"
+              },
+              {
+                "observation_id": "sre-observation-declared-node-count",
+                "category": "cluster",
+                "statement": "部署区声明节点总数 10。",
+                "source_file_ref": "forte-df5ae9b9a1273380",
+                "locator": "log.txt:L25",
+                "excerpt": "节点总数: 10",
+                "fields": {
+                  "count": "10"
+                },
+                "status": "observed"
+              },
+              {
+                "observation_id": "sre-observation-node-es-node-01",
+                "category": "node",
+                "statement": "es-node-01 角色 master，IP 10.1.1.1。",
+                "source_file_ref": "forte-df5ae9b9a1273380",
+                "locator": "log.txt:L27",
+                "excerpt": "  - es-node-01 (10.1.1.1): roles=[master]  机型=vm-sata-8c-16g   机房=DC1",
+                "fields": {
+                  "name": "es-node-01",
+                  "ip": "10.1.1.1",
+                  "role": "master",
+                  "model": "vm-sata-8c-16g",
+                  "dc": "DC1"
+                },
+                "status": "observed"
+              },
+              {
+                "observation_id": "sre-observation-node-es-node-02",
+                "category": "node",
+                "statement": "es-node-02 角色 master，IP 10.1.1.2。",
+                "source_file_ref": "forte-df5ae9b9a1273380",
+                "locator": "log.txt:L28",
+                "excerpt": "  - es-node-02 (10.1.1.2): roles=[master]  机型=vm-sata-8c-16g   机房=DC2",
+                "fields": {
+                  "name": "es-node-02",
+                  "ip": "10.1.1.2",
+                  "role": "master",
+                  "model": "vm-sata-8c-16g",
+                  "dc": "DC2"
+                },
+                "status": "observed"
+              },
+              {
+                "observation_id": "sre-observation-node-es-node-03",
+                "category": "node",
+                "statement": "es-node-03 角色 master，IP 10.1.1.3。",
+                "source_file_ref": "forte-df5ae9b9a1273380",
+                "locator": "log.txt:L29",
+                "excerpt": "  - es-node-03 (10.1.1.3): roles=[master]  机型=vm-sata-8c-16g   机房=DC3",
+                "fields": {
+                  "name": "es-node-03",
+                  "ip": "10.1.1.3",
+                  "role": "master",
+                  "model": "vm-sata-8c-16g",
+                  "dc": "DC3"
+                },
+                "status": "observed"
+              },
+              {
+                "observation_id": "sre-observation-node-es-node-04",
+                "category": "node",
+                "statement": "es-node-04 角色 data，IP 10.1.1.4。",
+                "source_file_ref": "forte-df5ae9b9a1273380",
+                "locator": "log.txt:L30",
+                "excerpt": "  - es-node-04 (10.1.1.4): roles=[data]    机型=vm-sata-16c-32g  机房=DC1",
+                "fields": {
+                  "name": "es-node-04",
+                  "ip": "10.1.1.4",
+                  "role": "data",
+                  "model": "vm-sata-16c-32g",
+                  "dc": "DC1"
+                },
+                "status": "observed"
+              },
+              {
+                "observation_id": "sre-observation-node-es-node-05",
+                "category": "node",
+                "statement": "es-node-05 角色 data，IP 10.1.1.5。",
+                "source_file_ref": "forte-df5ae9b9a1273380",
+                "locator": "log.txt:L31",
+                "excerpt": "  - es-node-05 (10.1.1.5): roles=[data]    机型=vm-sata-16c-32g  机房=DC1",
+                "fields": {
+                  "name": "es-node-05",
+                  "ip": "10.1.1.5",
+                  "role": "data",
+                  "model": "vm-sata-16c-32g",
+                  "dc": "DC1"
+                },
+                "status": "observed"
+              },
+              {
+                "observation_id": "sre-observation-node-es-node-06",
+                "category": "node",
+                "statement": "es-node-06 角色 data，IP 10.1.1.6。",
+                "source_file_ref": "forte-df5ae9b9a1273380",
+                "locator": "log.txt:L32",
+                "excerpt": "  - es-node-06 (10.1.1.6): roles=[data]    机型=vm-sata-16c-32g  机房=DC2",
+                "fields": {
+                  "name": "es-node-06",
+                  "ip": "10.1.1.6",
+                  "role": "data",
+                  "model": "vm-sata-16c-32g",
+                  "dc": "DC2"
+                },
+                "status": "observed"
+              },
+              {
+                "observation_id": "sre-observation-node-es-node-07",
+                "category": "node",
+                "statement": "es-node-07 角色 data，IP 10.1.1.7。",
+                "source_file_ref": "forte-df5ae9b9a1273380",
+                "locator": "log.txt:L33",
+                "excerpt": "  - es-node-07 (10.1.1.7): roles=[data]    机型=vm-sata-16c-32g  机房=DC2",
+                "fields": {
+                  "name": "es-node-07",
+                  "ip": "10.1.1.7",
+                  "role": "data",
+                  "model": "vm-sata-16c-32g",
+                  "dc": "DC2"
+                },
+                "status": "observed"
+              },
+              {
+                "observation_id": "sre-observation-node-es-node-08",
+                "category": "node",
+                "statement": "es-node-08 角色 data，IP 10.1.1.8。",
+                "source_file_ref": "forte-df5ae9b9a1273380",
+                "locator": "log.txt:L34",
+                "excerpt": "  - es-node-08 (10.1.1.8): roles=[data]    机型=vm-sata-16c-32g  机房=DC3",
+                "fields": {
+                  "name": "es-node-08",
+                  "ip": "10.1.1.8",
+                  "role": "data",
+                  "model": "vm-sata-16c-32g",
+                  "dc": "DC3"
+                },
+                "status": "observed"
+              },
+              {
+                "observation_id": "sre-observation-node-es-node-09",
+                "category": "node",
+                "statement": "es-node-09 角色 data，IP 10.1.1.9。",
+                "source_file_ref": "forte-df5ae9b9a1273380",
+                "locator": "log.txt:L35",
+                "excerpt": "  - es-node-09 (10.1.1.9): roles=[data]    机型=vm-sata-16c-32g  机房=DC3",
+                "fields": {
+                  "name": "es-node-09",
+                  "ip": "10.1.1.9",
+                  "role": "data",
+                  "model": "vm-sata-16c-32g",
+                  "dc": "DC3"
+                },
+                "status": "observed"
+              },
+              {
+                "observation_id": "sre-observation-node-es-node-10",
+                "category": "node",
+                "statement": "es-node-10 角色 data，IP 10.1.1.10。",
+                "source_file_ref": "forte-df5ae9b9a1273380",
+                "locator": "log.txt:L36",
+                "excerpt": "  - es-node-10 (10.1.1.10): roles=[data]   机型=vm-sata-16c-32g  机房=DC1",
+                "fields": {
+                  "name": "es-node-10",
+                  "ip": "10.1.1.10",
+                  "role": "data",
+                  "model": "vm-sata-16c-32g",
+                  "dc": "DC1"
+                },
+                "status": "observed"
+              },
+              {
+                "observation_id": "sre-observation-node-es-node-11",
+                "category": "node",
+                "statement": "es-node-11 角色 data，IP 10.1.1.11。",
+                "source_file_ref": "forte-df5ae9b9a1273380",
+                "locator": "log.txt:L37",
+                "excerpt": "  - es-node-11 (10.1.1.11): roles=[data]   机型=vm-sata-16c-32g  机房=DC2",
+                "fields": {
+                  "name": "es-node-11",
+                  "ip": "10.1.1.11",
+                  "role": "data",
+                  "model": "vm-sata-16c-32g",
+                  "dc": "DC2"
+                },
+                "status": "observed"
+              },
+              {
+                "observation_id": "sre-observation-role-summary",
+                "category": "cluster",
+                "statement": "角色汇总声明 3 master + 8 data。",
+                "source_file_ref": "forte-df5ae9b9a1273380",
+                "locator": "log.txt:L38",
+                "excerpt": "注意: master 与 data 节点已分离部署，共 3 master + 8 data 节点",
+                "fields": {
+                  "master": "3",
+                  "data": "8"
+                },
+                "status": "observed"
+              },
+              {
+                "observation_id": "sre-observation-index-order-2024-11",
+                "category": "cluster",
+                "statement": "索引 order-2024-11：8 主分片，1 副本。",
+                "source_file_ref": "forte-df5ae9b9a1273380",
+                "locator": "log.txt:L41",
+                "excerpt": "  - order-2024-11:       主分片=8, 副本=1, 单分片大小约 38GB",
+                "fields": {
+                  "name": "order-2024-11",
+                  "primaries": "8",
+                  "replicas": "1",
+                  "shard_size_gb": "38"
+                },
+                "status": "observed"
+              },
+              {
+                "observation_id": "sre-observation-index-item-search-2024-11",
+                "category": "cluster",
+                "statement": "索引 item-search-2024-11：8 主分片，1 副本。",
+                "source_file_ref": "forte-df5ae9b9a1273380",
+                "locator": "log.txt:L42",
+                "excerpt": "  - item-search-2024-11: 主分片=8, 副本=1, 单分片大小约 42GB",
+                "fields": {
+                  "name": "item-search-2024-11",
+                  "primaries": "8",
+                  "replicas": "1",
+                  "shard_size_gb": "42"
+                },
+                "status": "observed"
+              },
+              {
+                "observation_id": "sre-observation-index-user-activity-2024-11",
+                "category": "cluster",
+                "statement": "索引 user-activity-2024-11：8 主分片，1 副本。",
+                "source_file_ref": "forte-df5ae9b9a1273380",
+                "locator": "log.txt:L43",
+                "excerpt": "  - user-activity-2024-11: 主分片=8, 副本=1, 单分片大小约 28GB",
+                "fields": {
+                  "name": "user-activity-2024-11",
+                  "primaries": "8",
+                  "replicas": "1",
+                  "shard_size_gb": "28"
+                },
+                "status": "observed"
+              },
+              {
+                "observation_id": "sre-observation-health",
+                "category": "health",
+                "statement": "00:38 集群 yellow，节点 11，UNASSIGNED 48。",
+                "source_file_ref": "forte-df5ae9b9a1273380",
+                "locator": "log.txt:L108",
+                "excerpt": "1731254280 00:38:00  prod-order-es-cluster  yellow 11         8         96   48    0     0    48       0             -                  50.0%",
+                "fields": {
+                  "status": "yellow",
+                  "node_total": "11",
+                  "node_data": "8",
+                  "shards": "96",
+                  "primaries": "48",
+                  "relocating": "0",
+                  "initializing": "0",
+                  "unassigned": "48",
+                  "pending": "0",
+                  "active_percent": "50.0"
+                },
+                "status": "observed"
+              },
+              {
+                "observation_id": "sre-observation-cat-node-es-node-01",
+                "category": "node",
+                "statement": "es-node-01 CPU 8% / heap 22% / disk 18.3% / IO 12.1%。",
+                "source_file_ref": "forte-df5ae9b9a1273380",
+                "locator": "log.txt:L112",
+                "excerpt": "es-node-01    10.1.1.1      8            22               18.3          12.1     0.88    *       m",
+                "fields": {
+                  "name": "es-node-01",
+                  "ip": "10.1.1.1",
+                  "cpu": "8",
+                  "heap": "22",
+                  "disk_used": "18.3",
+                  "disk_io": "12.1",
+                  "load": "0.88",
+                  "master_mark": "*",
+                  "role": "master"
+                },
+                "status": "observed"
+              },
+              {
+                "observation_id": "sre-observation-cat-node-es-node-02",
+                "category": "node",
+                "statement": "es-node-02 CPU 6% / heap 20% / disk 17.8% / IO 10.4%。",
+                "source_file_ref": "forte-df5ae9b9a1273380",
+                "locator": "log.txt:L113",
+                "excerpt": "es-node-02    10.1.1.2      6            20               17.8          10.4     0.72    -       m",
+                "fields": {
+                  "name": "es-node-02",
+                  "ip": "10.1.1.2",
+                  "cpu": "6",
+                  "heap": "20",
+                  "disk_used": "17.8",
+                  "disk_io": "10.4",
+                  "load": "0.72",
+                  "master_mark": "-",
+                  "role": "master"
+                },
+                "status": "observed"
+              },
+              {
+                "observation_id": "sre-observation-cat-node-es-node-03",
+                "category": "node",
+                "statement": "es-node-03 CPU 7% / heap 21% / disk 18.1% / IO 11.2%。",
+                "source_file_ref": "forte-df5ae9b9a1273380",
+                "locator": "log.txt:L114",
+                "excerpt": "es-node-03    10.1.1.3      7            21               18.1          11.2     0.81    -       m",
+                "fields": {
+                  "name": "es-node-03",
+                  "ip": "10.1.1.3",
+                  "cpu": "7",
+                  "heap": "21",
+                  "disk_used": "18.1",
+                  "disk_io": "11.2",
+                  "load": "0.81",
+                  "master_mark": "-",
+                  "role": "master"
+                },
+                "status": "observed"
+              },
+              {
+                "observation_id": "sre-observation-cat-node-es-node-04",
+                "category": "node",
+                "statement": "es-node-04 CPU 97% / heap 91% / disk 55.2% / IO 99.1%。",
+                "source_file_ref": "forte-df5ae9b9a1273380",
+                "locator": "log.txt:L115",
+                "excerpt": "es-node-04    10.1.1.4     97            91               55.2          99.1    14.22    -       d",
+                "fields": {
+                  "name": "es-node-04",
+                  "ip": "10.1.1.4",
+                  "cpu": "97",
+                  "heap": "91",
+                  "disk_used": "55.2",
+                  "disk_io": "99.1",
+                  "load": "14.22",
+                  "master_mark": "-",
+                  "role": "data"
+                },
+                "status": "observed"
+              },
+              {
+                "observation_id": "sre-observation-cat-node-es-node-05",
+                "category": "node",
+                "statement": "es-node-05 CPU 95% / heap 89% / disk 54.8% / IO 98.3%。",
+                "source_file_ref": "forte-df5ae9b9a1273380",
+                "locator": "log.txt:L116",
+                "excerpt": "es-node-05    10.1.1.5     95            89               54.8          98.3    13.88    -       d",
+                "fields": {
+                  "name": "es-node-05",
+                  "ip": "10.1.1.5",
+                  "cpu": "95",
+                  "heap": "89",
+                  "disk_used": "54.8",
+                  "disk_io": "98.3",
+                  "load": "13.88",
+                  "master_mark": "-",
+                  "role": "data"
+                },
+                "status": "observed"
+              },
+              {
+                "observation_id": "sre-observation-cat-node-es-node-06",
+                "category": "node",
+                "statement": "es-node-06 CPU 96% / heap 90% / disk 56.1% / IO 99.4%。",
+                "source_file_ref": "forte-df5ae9b9a1273380",
+                "locator": "log.txt:L117",
+                "excerpt": "es-node-06    10.1.1.6     96            90               56.1          99.4    14.55    -       d",
+                "fields": {
+                  "name": "es-node-06",
+                  "ip": "10.1.1.6",
+                  "cpu": "96",
+                  "heap": "90",
+                  "disk_used": "56.1",
+                  "disk_io": "99.4",
+                  "load": "14.55",
+                  "master_mark": "-",
+                  "role": "data"
+                },
+                "status": "observed"
+              },
+              {
+                "observation_id": "sre-observation-cat-node-es-node-07",
+                "category": "node",
+                "statement": "es-node-07 CPU 94% / heap 88% / disk 53.9% / IO 97.8%。",
+                "source_file_ref": "forte-df5ae9b9a1273380",
+                "locator": "log.txt:L118",
+                "excerpt": "es-node-07    10.1.1.7     94            88               53.9          97.8    13.44    -       d",
+                "fields": {
+                  "name": "es-node-07",
+                  "ip": "10.1.1.7",
+                  "cpu": "94",
+                  "heap": "88",
+                  "disk_used": "53.9",
+                  "disk_io": "97.8",
+                  "load": "13.44",
+                  "master_mark": "-",
+                  "role": "data"
+                },
+                "status": "observed"
+              },
+              {
+                "observation_id": "sre-observation-cat-node-es-node-08",
+                "category": "node",
+                "statement": "es-node-08 CPU 97% / heap 91% / disk 55.7% / IO 99.2%。",
+                "source_file_ref": "forte-df5ae9b9a1273380",
+                "locator": "log.txt:L119",
+                "excerpt": "es-node-08    10.1.1.8     97            91               55.7          99.2    14.33    -       d",
+                "fields": {
+                  "name": "es-node-08",
+                  "ip": "10.1.1.8",
+                  "cpu": "97",
+                  "heap": "91",
+                  "disk_used": "55.7",
+                  "disk_io": "99.2",
+                  "load": "14.33",
+                  "master_mark": "-",
+                  "role": "data"
+                },
+                "status": "observed"
+              },
+              {
+                "observation_id": "sre-observation-cat-node-es-node-09",
+                "category": "node",
+                "statement": "es-node-09 CPU 93% / heap 87% / disk 54.3% / IO 97.1%。",
+                "source_file_ref": "forte-df5ae9b9a1273380",
+                "locator": "log.txt:L120",
+                "excerpt": "es-node-09    10.1.1.9     93            87               54.3          97.1    13.21    -       d",
+                "fields": {
+                  "name": "es-node-09",
+                  "ip": "10.1.1.9",
+                  "cpu": "93",
+                  "heap": "87",
+                  "disk_used": "54.3",
+                  "disk_io": "97.1",
+                  "load": "13.21",
+                  "master_mark": "-",
+                  "role": "data"
+                },
+                "status": "observed"
+              },
+              {
+                "observation_id": "sre-observation-cat-node-es-node-10",
+                "category": "node",
+                "statement": "es-node-10 CPU 96% / heap 90% / disk 55.5% / IO 98.9%。",
+                "source_file_ref": "forte-df5ae9b9a1273380",
+                "locator": "log.txt:L121",
+                "excerpt": "es-node-10    10.1.1.10    96            90               55.5          98.9    14.11    -       d",
+                "fields": {
+                  "name": "es-node-10",
+                  "ip": "10.1.1.10",
+                  "cpu": "96",
+                  "heap": "90",
+                  "disk_used": "55.5",
+                  "disk_io": "98.9",
+                  "load": "14.11",
+                  "master_mark": "-",
+                  "role": "data"
+                },
+                "status": "observed"
+              },
+              {
+                "observation_id": "sre-observation-cat-node-es-node-11",
+                "category": "node",
+                "statement": "es-node-11 CPU 95% / heap 89% / disk 54.6% / IO 98.5%。",
+                "source_file_ref": "forte-df5ae9b9a1273380",
+                "locator": "log.txt:L122",
+                "excerpt": "es-node-11    10.1.1.11    95            89               54.6          98.5    13.77    -       d",
+                "fields": {
+                  "name": "es-node-11",
+                  "ip": "10.1.1.11",
+                  "cpu": "95",
+                  "heap": "89",
+                  "disk_used": "54.6",
+                  "disk_io": "98.5",
+                  "load": "13.77",
+                  "master_mark": "-",
+                  "role": "data"
+                },
+                "status": "observed"
+              },
+              {
+                "observation_id": "sre-observation-thread-es-node-04-write",
+                "category": "thread_pool",
+                "statement": "es-node-04 write active=32 queue=1000 rejected=72341。",
+                "source_file_ref": "forte-df5ae9b9a1273380",
+                "locator": "log.txt:L126",
+                "excerpt": "es-node-04   write       32   1000     72341",
+                "fields": {
+                  "node": "es-node-04",
+                  "pool": "write",
+                  "active": "32",
+                  "queue": "1000",
+                  "rejected": "72341"
+                },
+                "status": "observed"
+              },
+              {
+                "observation_id": "sre-observation-thread-es-node-04-search",
+                "category": "thread_pool",
+                "statement": "es-node-04 search active=16 queue=500 rejected=48921。",
+                "source_file_ref": "forte-df5ae9b9a1273380",
+                "locator": "log.txt:L127",
+                "excerpt": "es-node-04   search      16    500     48921",
+                "fields": {
+                  "node": "es-node-04",
+                  "pool": "search",
+                  "active": "16",
+                  "queue": "500",
+                  "rejected": "48921"
+                },
+                "status": "observed"
+              },
+              {
+                "observation_id": "sre-observation-thread-es-node-05-write",
+                "category": "thread_pool",
+                "statement": "es-node-05 write active=32 queue=998 rejected=68234。",
+                "source_file_ref": "forte-df5ae9b9a1273380",
+                "locator": "log.txt:L128",
+                "excerpt": "es-node-05   write       32    998     68234",
+                "fields": {
+                  "node": "es-node-05",
+                  "pool": "write",
+                  "active": "32",
+                  "queue": "998",
+                  "rejected": "68234"
+                },
+                "status": "observed"
+              },
+              {
+                "observation_id": "sre-observation-thread-es-node-05-search",
+                "category": "thread_pool",
+                "statement": "es-node-05 search active=16 queue=497 rejected=45678。",
+                "source_file_ref": "forte-df5ae9b9a1273380",
+                "locator": "log.txt:L129",
+                "excerpt": "es-node-05   search      16    497     45678",
+                "fields": {
+                  "node": "es-node-05",
+                  "pool": "search",
+                  "active": "16",
+                  "queue": "497",
+                  "rejected": "45678"
+                },
+                "status": "observed"
+              },
+              {
+                "observation_id": "sre-observation-thread-es-node-06-write",
+                "category": "thread_pool",
+                "statement": "es-node-06 write active=32 queue=1000 rejected=74512。",
+                "source_file_ref": "forte-df5ae9b9a1273380",
+                "locator": "log.txt:L130",
+                "excerpt": "es-node-06   write       32   1000     74512",
+                "fields": {
+                  "node": "es-node-06",
+                  "pool": "write",
+                  "active": "32",
+                  "queue": "1000",
+                  "rejected": "74512"
+                },
+                "status": "observed"
+              },
+              {
+                "observation_id": "sre-observation-thread-es-node-06-search",
+                "category": "thread_pool",
+                "statement": "es-node-06 search active=16 queue=500 rejected=50234。",
+                "source_file_ref": "forte-df5ae9b9a1273380",
+                "locator": "log.txt:L131",
+                "excerpt": "es-node-06   search      16    500     50234",
+                "fields": {
+                  "node": "es-node-06",
+                  "pool": "search",
+                  "active": "16",
+                  "queue": "500",
+                  "rejected": "50234"
+                },
+                "status": "observed"
+              },
+              {
+                "observation_id": "sre-observation-thread-es-node-07-write",
+                "category": "thread_pool",
+                "statement": "es-node-07 write active=32 queue=995 rejected=65891。",
+                "source_file_ref": "forte-df5ae9b9a1273380",
+                "locator": "log.txt:L132",
+                "excerpt": "es-node-07   write       32    995     65891",
+                "fields": {
+                  "node": "es-node-07",
+                  "pool": "write",
+                  "active": "32",
+                  "queue": "995",
+                  "rejected": "65891"
+                },
+                "status": "observed"
+              },
+              {
+                "observation_id": "sre-observation-thread-es-node-07-search",
+                "category": "thread_pool",
+                "statement": "es-node-07 search active=16 queue=493 rejected=43210。",
+                "source_file_ref": "forte-df5ae9b9a1273380",
+                "locator": "log.txt:L133",
+                "excerpt": "es-node-07   search      16    493     43210",
+                "fields": {
+                  "node": "es-node-07",
+                  "pool": "search",
+                  "active": "16",
+                  "queue": "493",
+                  "rejected": "43210"
+                },
+                "status": "observed"
+              },
+              {
+                "observation_id": "sre-observation-thread-es-node-08-write",
+                "category": "thread_pool",
+                "statement": "es-node-08 write active=32 queue=1000 rejected=76234。",
+                "source_file_ref": "forte-df5ae9b9a1273380",
+                "locator": "log.txt:L134",
+                "excerpt": "es-node-08   write       32   1000     76234",
+                "fields": {
+                  "node": "es-node-08",
+                  "pool": "write",
+                  "active": "32",
+                  "queue": "1000",
+                  "rejected": "76234"
+                },
+                "status": "observed"
+              },
+              {
+                "observation_id": "sre-observation-thread-es-node-08-search",
+                "category": "thread_pool",
+                "statement": "es-node-08 search active=16 queue=500 rejected=51234。",
+                "source_file_ref": "forte-df5ae9b9a1273380",
+                "locator": "log.txt:L135",
+                "excerpt": "es-node-08   search      16    500     51234",
+                "fields": {
+                  "node": "es-node-08",
+                  "pool": "search",
+                  "active": "16",
+                  "queue": "500",
+                  "rejected": "51234"
+                },
+                "status": "observed"
+              },
+              {
+                "observation_id": "sre-observation-thread-es-node-09-write",
+                "category": "thread_pool",
+                "statement": "es-node-09 write active=32 queue=992 rejected=63445。",
+                "source_file_ref": "forte-df5ae9b9a1273380",
+                "locator": "log.txt:L136",
+                "excerpt": "es-node-09   write       32    992     63445",
+                "fields": {
+                  "node": "es-node-09",
+                  "pool": "write",
+                  "active": "32",
+                  "queue": "992",
+                  "rejected": "63445"
+                },
+                "status": "observed"
+              },
+              {
+                "observation_id": "sre-observation-thread-es-node-09-search",
+                "category": "thread_pool",
+                "statement": "es-node-09 search active=16 queue=490 rejected=41234。",
+                "source_file_ref": "forte-df5ae9b9a1273380",
+                "locator": "log.txt:L137",
+                "excerpt": "es-node-09   search      16    490     41234",
+                "fields": {
+                  "node": "es-node-09",
+                  "pool": "search",
+                  "active": "16",
+                  "queue": "490",
+                  "rejected": "41234"
+                },
+                "status": "observed"
+              },
+              {
+                "observation_id": "sre-observation-thread-es-node-10-write",
+                "category": "thread_pool",
+                "statement": "es-node-10 write active=32 queue=999 rejected=71234。",
+                "source_file_ref": "forte-df5ae9b9a1273380",
+                "locator": "log.txt:L138",
+                "excerpt": "es-node-10   write       32    999     71234",
+                "fields": {
+                  "node": "es-node-10",
+                  "pool": "write",
+                  "active": "32",
+                  "queue": "999",
+                  "rejected": "71234"
+                },
+                "status": "observed"
+              },
+              {
+                "observation_id": "sre-observation-thread-es-node-10-search",
+                "category": "thread_pool",
+                "statement": "es-node-10 search active=16 queue=498 rejected=47891。",
+                "source_file_ref": "forte-df5ae9b9a1273380",
+                "locator": "log.txt:L139",
+                "excerpt": "es-node-10   search      16    498     47891",
+                "fields": {
+                  "node": "es-node-10",
+                  "pool": "search",
+                  "active": "16",
+                  "queue": "498",
+                  "rejected": "47891"
+                },
+                "status": "observed"
+              },
+              {
+                "observation_id": "sre-observation-thread-es-node-11-write",
+                "category": "thread_pool",
+                "statement": "es-node-11 write active=32 queue=997 rejected=69123。",
+                "source_file_ref": "forte-df5ae9b9a1273380",
+                "locator": "log.txt:L140",
+                "excerpt": "es-node-11   write       32    997     69123",
+                "fields": {
+                  "node": "es-node-11",
+                  "pool": "write",
+                  "active": "32",
+                  "queue": "997",
+                  "rejected": "69123"
+                },
+                "status": "observed"
+              },
+              {
+                "observation_id": "sre-observation-thread-es-node-11-search",
+                "category": "thread_pool",
+                "statement": "es-node-11 search active=16 queue=496 rejected=46234。",
+                "source_file_ref": "forte-df5ae9b9a1273380",
+                "locator": "log.txt:L141",
+                "excerpt": "es-node-11   search      16    496     46234",
+                "fields": {
+                  "node": "es-node-11",
+                  "pool": "search",
+                  "active": "16",
+                  "queue": "496",
+                  "rejected": "46234"
+                },
+                "status": "observed"
+              },
+              {
+                "observation_id": "sre-observation-shard-order-2024-11-0-p",
+                "category": "shard",
+                "statement": "order-2024-11 shard 0 p = STARTED。",
+                "source_file_ref": "forte-df5ae9b9a1273380",
+                "locator": "log.txt:L145",
+                "excerpt": "order-2024-11              0      p       STARTED       es-node-04",
+                "fields": {
+                  "index": "order-2024-11",
+                  "shard": "0",
+                  "prirep": "p",
+                  "state": "STARTED",
+                  "node": "es-node-04"
+                },
+                "status": "observed"
+              },
+              {
+                "observation_id": "sre-observation-shard-order-2024-11-0-r",
+                "category": "shard",
+                "statement": "order-2024-11 shard 0 r = UNASSIGNED。",
+                "source_file_ref": "forte-df5ae9b9a1273380",
+                "locator": "log.txt:L146",
+                "excerpt": "order-2024-11              0      r       UNASSIGNED    (unassigned)",
+                "fields": {
+                  "index": "order-2024-11",
+                  "shard": "0",
+                  "prirep": "r",
+                  "state": "UNASSIGNED",
+                  "node": "(unassigned)"
+                },
+                "status": "observed"
+              },
+              {
+                "observation_id": "sre-observation-shard-order-2024-11-1-p",
+                "category": "shard",
+                "statement": "order-2024-11 shard 1 p = STARTED。",
+                "source_file_ref": "forte-df5ae9b9a1273380",
+                "locator": "log.txt:L147",
+                "excerpt": "order-2024-11              1      p       STARTED       es-node-05",
+                "fields": {
+                  "index": "order-2024-11",
+                  "shard": "1",
+                  "prirep": "p",
+                  "state": "STARTED",
+                  "node": "es-node-05"
+                },
+                "status": "observed"
+              },
+              {
+                "observation_id": "sre-observation-shard-order-2024-11-1-r",
+                "category": "shard",
+                "statement": "order-2024-11 shard 1 r = UNASSIGNED。",
+                "source_file_ref": "forte-df5ae9b9a1273380",
+                "locator": "log.txt:L148",
+                "excerpt": "order-2024-11              1      r       UNASSIGNED    (unassigned)",
+                "fields": {
+                  "index": "order-2024-11",
+                  "shard": "1",
+                  "prirep": "r",
+                  "state": "UNASSIGNED",
+                  "node": "(unassigned)"
+                },
+                "status": "observed"
+              },
+              {
+                "observation_id": "sre-observation-shard-order-2024-11-2-p",
+                "category": "shard",
+                "statement": "order-2024-11 shard 2 p = STARTED。",
+                "source_file_ref": "forte-df5ae9b9a1273380",
+                "locator": "log.txt:L149",
+                "excerpt": "order-2024-11              2      p       STARTED       es-node-06",
+                "fields": {
+                  "index": "order-2024-11",
+                  "shard": "2",
+                  "prirep": "p",
+                  "state": "STARTED",
+                  "node": "es-node-06"
+                },
+                "status": "observed"
+              },
+              {
+                "observation_id": "sre-observation-shard-order-2024-11-2-r",
+                "category": "shard",
+                "statement": "order-2024-11 shard 2 r = UNASSIGNED。",
+                "source_file_ref": "forte-df5ae9b9a1273380",
+                "locator": "log.txt:L150",
+                "excerpt": "order-2024-11              2      r       UNASSIGNED    (unassigned)",
+                "fields": {
+                  "index": "order-2024-11",
+                  "shard": "2",
+                  "prirep": "r",
+                  "state": "UNASSIGNED",
+                  "node": "(unassigned)"
+                },
+                "status": "observed"
+              },
+              {
+                "observation_id": "sre-observation-shard-order-2024-11-3-p",
+                "category": "shard",
+                "statement": "order-2024-11 shard 3 p = STARTED。",
+                "source_file_ref": "forte-df5ae9b9a1273380",
+                "locator": "log.txt:L151",
+                "excerpt": "order-2024-11              3      p       STARTED       es-node-07",
+                "fields": {
+                  "index": "order-2024-11",
+                  "shard": "3",
+                  "prirep": "p",
+                  "state": "STARTED",
+                  "node": "es-node-07"
+                },
+                "status": "observed"
+              },
+              {
+                "observation_id": "sre-observation-shard-order-2024-11-3-r",
+                "category": "shard",
+                "statement": "order-2024-11 shard 3 r = UNASSIGNED。",
+                "source_file_ref": "forte-df5ae9b9a1273380",
+                "locator": "log.txt:L152",
+                "excerpt": "order-2024-11              3      r       UNASSIGNED    (unassigned)",
+                "fields": {
+                  "index": "order-2024-11",
+                  "shard": "3",
+                  "prirep": "r",
+                  "state": "UNASSIGNED",
+                  "node": "(unassigned)"
+                },
+                "status": "observed"
+              },
+              {
+                "observation_id": "sre-observation-shard-order-2024-11-4-p",
+                "category": "shard",
+                "statement": "order-2024-11 shard 4 p = STARTED。",
+                "source_file_ref": "forte-df5ae9b9a1273380",
+                "locator": "log.txt:L153",
+                "excerpt": "order-2024-11              4      p       STARTED       es-node-08",
+                "fields": {
+                  "index": "order-2024-11",
+                  "shard": "4",
+                  "prirep": "p",
+                  "state": "STARTED",
+                  "node": "es-node-08"
+                },
+                "status": "observed"
+              },
+              {
+                "observation_id": "sre-observation-shard-order-2024-11-4-r",
+                "category": "shard",
+                "statement": "order-2024-11 shard 4 r = UNASSIGNED。",
+                "source_file_ref": "forte-df5ae9b9a1273380",
+                "locator": "log.txt:L154",
+                "excerpt": "order-2024-11              4      r       UNASSIGNED    (unassigned)",
+                "fields": {
+                  "index": "order-2024-11",
+                  "shard": "4",
+                  "prirep": "r",
+                  "state": "UNASSIGNED",
+                  "node": "(unassigned)"
+                },
+                "status": "observed"
+              },
+              {
+                "observation_id": "sre-observation-shard-order-2024-11-5-p",
+                "category": "shard",
+                "statement": "order-2024-11 shard 5 p = STARTED。",
+                "source_file_ref": "forte-df5ae9b9a1273380",
+                "locator": "log.txt:L155",
+                "excerpt": "order-2024-11              5      p       STARTED       es-node-09",
+                "fields": {
+                  "index": "order-2024-11",
+                  "shard": "5",
+                  "prirep": "p",
+                  "state": "STARTED",
+                  "node": "es-node-09"
+                },
+                "status": "observed"
+              },
+              {
+                "observation_id": "sre-observation-shard-order-2024-11-5-r",
+                "category": "shard",
+                "statement": "order-2024-11 shard 5 r = UNASSIGNED。",
+                "source_file_ref": "forte-df5ae9b9a1273380",
+                "locator": "log.txt:L156",
+                "excerpt": "order-2024-11              5      r       UNASSIGNED    (unassigned)",
+                "fields": {
+                  "index": "order-2024-11",
+                  "shard": "5",
+                  "prirep": "r",
+                  "state": "UNASSIGNED",
+                  "node": "(unassigned)"
+                },
+                "status": "observed"
+              },
+              {
+                "observation_id": "sre-observation-shard-order-2024-11-6-p",
+                "category": "shard",
+                "statement": "order-2024-11 shard 6 p = STARTED。",
+                "source_file_ref": "forte-df5ae9b9a1273380",
+                "locator": "log.txt:L157",
+                "excerpt": "order-2024-11              6      p       STARTED       es-node-10",
+                "fields": {
+                  "index": "order-2024-11",
+                  "shard": "6",
+                  "prirep": "p",
+                  "state": "STARTED",
+                  "node": "es-node-10"
+                },
+                "status": "observed"
+              },
+              {
+                "observation_id": "sre-observation-shard-order-2024-11-6-r",
+                "category": "shard",
+                "statement": "order-2024-11 shard 6 r = UNASSIGNED。",
+                "source_file_ref": "forte-df5ae9b9a1273380",
+                "locator": "log.txt:L158",
+                "excerpt": "order-2024-11              6      r       UNASSIGNED    (unassigned)",
+                "fields": {
+                  "index": "order-2024-11",
+                  "shard": "6",
+                  "prirep": "r",
+                  "state": "UNASSIGNED",
+                  "node": "(unassigned)"
+                },
+                "status": "observed"
+              },
+              {
+                "observation_id": "sre-observation-shard-order-2024-11-7-p",
+                "category": "shard",
+                "statement": "order-2024-11 shard 7 p = STARTED。",
+                "source_file_ref": "forte-df5ae9b9a1273380",
+                "locator": "log.txt:L159",
+                "excerpt": "order-2024-11              7      p       STARTED       es-node-11",
+                "fields": {
+                  "index": "order-2024-11",
+                  "shard": "7",
+                  "prirep": "p",
+                  "state": "STARTED",
+                  "node": "es-node-11"
+                },
+                "status": "observed"
+              },
+              {
+                "observation_id": "sre-observation-shard-order-2024-11-7-r",
+                "category": "shard",
+                "statement": "order-2024-11 shard 7 r = UNASSIGNED。",
+                "source_file_ref": "forte-df5ae9b9a1273380",
+                "locator": "log.txt:L160",
+                "excerpt": "order-2024-11              7      r       UNASSIGNED    (unassigned)",
+                "fields": {
+                  "index": "order-2024-11",
+                  "shard": "7",
+                  "prirep": "r",
+                  "state": "UNASSIGNED",
+                  "node": "(unassigned)"
+                },
+                "status": "observed"
+              },
+              {
+                "observation_id": "sre-observation-shard-item-search-2024-11-0-p",
+                "category": "shard",
+                "statement": "item-search-2024-11 shard 0 p = STARTED。",
+                "source_file_ref": "forte-df5ae9b9a1273380",
+                "locator": "log.txt:L161",
+                "excerpt": "item-search-2024-11        0      p       STARTED       es-node-05",
+                "fields": {
+                  "index": "item-search-2024-11",
+                  "shard": "0",
+                  "prirep": "p",
+                  "state": "STARTED",
+                  "node": "es-node-05"
+                },
+                "status": "observed"
+              },
+              {
+                "observation_id": "sre-observation-shard-item-search-2024-11-0-r",
+                "category": "shard",
+                "statement": "item-search-2024-11 shard 0 r = UNASSIGNED。",
+                "source_file_ref": "forte-df5ae9b9a1273380",
+                "locator": "log.txt:L162",
+                "excerpt": "item-search-2024-11        0      r       UNASSIGNED    (unassigned)",
+                "fields": {
+                  "index": "item-search-2024-11",
+                  "shard": "0",
+                  "prirep": "r",
+                  "state": "UNASSIGNED",
+                  "node": "(unassigned)"
+                },
+                "status": "observed"
+              },
+              {
+                "observation_id": "sre-observation-shard-item-search-2024-11-1-p",
+                "category": "shard",
+                "statement": "item-search-2024-11 shard 1 p = STARTED。",
+                "source_file_ref": "forte-df5ae9b9a1273380",
+                "locator": "log.txt:L163",
+                "excerpt": "item-search-2024-11        1      p       STARTED       es-node-06",
+                "fields": {
+                  "index": "item-search-2024-11",
+                  "shard": "1",
+                  "prirep": "p",
+                  "state": "STARTED",
+                  "node": "es-node-06"
+                },
+                "status": "observed"
+              },
+              {
+                "observation_id": "sre-observation-shard-item-search-2024-11-1-r",
+                "category": "shard",
+                "statement": "item-search-2024-11 shard 1 r = UNASSIGNED。",
+                "source_file_ref": "forte-df5ae9b9a1273380",
+                "locator": "log.txt:L164",
+                "excerpt": "item-search-2024-11        1      r       UNASSIGNED    (unassigned)",
+                "fields": {
+                  "index": "item-search-2024-11",
+                  "shard": "1",
+                  "prirep": "r",
+                  "state": "UNASSIGNED",
+                  "node": "(unassigned)"
+                },
+                "status": "observed"
+              },
+              {
+                "observation_id": "sre-observation-shard-item-search-2024-11-2-p",
+                "category": "shard",
+                "statement": "item-search-2024-11 shard 2 p = STARTED。",
+                "source_file_ref": "forte-df5ae9b9a1273380",
+                "locator": "log.txt:L165",
+                "excerpt": "item-search-2024-11        2      p       STARTED       es-node-07",
+                "fields": {
+                  "index": "item-search-2024-11",
+                  "shard": "2",
+                  "prirep": "p",
+                  "state": "STARTED",
+                  "node": "es-node-07"
+                },
+                "status": "observed"
+              },
+              {
+                "observation_id": "sre-observation-shard-item-search-2024-11-2-r",
+                "category": "shard",
+                "statement": "item-search-2024-11 shard 2 r = UNASSIGNED。",
+                "source_file_ref": "forte-df5ae9b9a1273380",
+                "locator": "log.txt:L166",
+                "excerpt": "item-search-2024-11        2      r       UNASSIGNED    (unassigned)",
+                "fields": {
+                  "index": "item-search-2024-11",
+                  "shard": "2",
+                  "prirep": "r",
+                  "state": "UNASSIGNED",
+                  "node": "(unassigned)"
+                },
+                "status": "observed"
+              },
+              {
+                "observation_id": "sre-observation-shard-item-search-2024-11-3-p",
+                "category": "shard",
+                "statement": "item-search-2024-11 shard 3 p = STARTED。",
+                "source_file_ref": "forte-df5ae9b9a1273380",
+                "locator": "log.txt:L167",
+                "excerpt": "item-search-2024-11        3      p       STARTED       es-node-08",
+                "fields": {
+                  "index": "item-search-2024-11",
+                  "shard": "3",
+                  "prirep": "p",
+                  "state": "STARTED",
+                  "node": "es-node-08"
+                },
+                "status": "observed"
+              },
+              {
+                "observation_id": "sre-observation-shard-item-search-2024-11-3-r",
+                "category": "shard",
+                "statement": "item-search-2024-11 shard 3 r = UNASSIGNED。",
+                "source_file_ref": "forte-df5ae9b9a1273380",
+                "locator": "log.txt:L168",
+                "excerpt": "item-search-2024-11        3      r       UNASSIGNED    (unassigned)",
+                "fields": {
+                  "index": "item-search-2024-11",
+                  "shard": "3",
+                  "prirep": "r",
+                  "state": "UNASSIGNED",
+                  "node": "(unassigned)"
+                },
+                "status": "observed"
+              },
+              {
+                "observation_id": "sre-observation-shard-item-search-2024-11-4-p",
+                "category": "shard",
+                "statement": "item-search-2024-11 shard 4 p = STARTED。",
+                "source_file_ref": "forte-df5ae9b9a1273380",
+                "locator": "log.txt:L169",
+                "excerpt": "item-search-2024-11        4      p       STARTED       es-node-09",
+                "fields": {
+                  "index": "item-search-2024-11",
+                  "shard": "4",
+                  "prirep": "p",
+                  "state": "STARTED",
+                  "node": "es-node-09"
+                },
+                "status": "observed"
+              },
+              {
+                "observation_id": "sre-observation-shard-item-search-2024-11-4-r",
+                "category": "shard",
+                "statement": "item-search-2024-11 shard 4 r = UNASSIGNED。",
+                "source_file_ref": "forte-df5ae9b9a1273380",
+                "locator": "log.txt:L170",
+                "excerpt": "item-search-2024-11        4      r       UNASSIGNED    (unassigned)",
+                "fields": {
+                  "index": "item-search-2024-11",
+                  "shard": "4",
+                  "prirep": "r",
+                  "state": "UNASSIGNED",
+                  "node": "(unassigned)"
+                },
+                "status": "observed"
+              },
+              {
+                "observation_id": "sre-observation-shard-item-search-2024-11-5-p",
+                "category": "shard",
+                "statement": "item-search-2024-11 shard 5 p = STARTED。",
+                "source_file_ref": "forte-df5ae9b9a1273380",
+                "locator": "log.txt:L171",
+                "excerpt": "item-search-2024-11        5      p       STARTED       es-node-10",
+                "fields": {
+                  "index": "item-search-2024-11",
+                  "shard": "5",
+                  "prirep": "p",
+                  "state": "STARTED",
+                  "node": "es-node-10"
+                },
+                "status": "observed"
+              },
+              {
+                "observation_id": "sre-observation-shard-item-search-2024-11-5-r",
+                "category": "shard",
+                "statement": "item-search-2024-11 shard 5 r = UNASSIGNED。",
+                "source_file_ref": "forte-df5ae9b9a1273380",
+                "locator": "log.txt:L172",
+                "excerpt": "item-search-2024-11        5      r       UNASSIGNED    (unassigned)",
+                "fields": {
+                  "index": "item-search-2024-11",
+                  "shard": "5",
+                  "prirep": "r",
+                  "state": "UNASSIGNED",
+                  "node": "(unassigned)"
+                },
+                "status": "observed"
+              },
+              {
+                "observation_id": "sre-observation-shard-item-search-2024-11-6-p",
+                "category": "shard",
+                "statement": "item-search-2024-11 shard 6 p = STARTED。",
+                "source_file_ref": "forte-df5ae9b9a1273380",
+                "locator": "log.txt:L173",
+                "excerpt": "item-search-2024-11        6      p       STARTED       es-node-11",
+                "fields": {
+                  "index": "item-search-2024-11",
+                  "shard": "6",
+                  "prirep": "p",
+                  "state": "STARTED",
+                  "node": "es-node-11"
+                },
+                "status": "observed"
+              },
+              {
+                "observation_id": "sre-observation-shard-item-search-2024-11-6-r",
+                "category": "shard",
+                "statement": "item-search-2024-11 shard 6 r = UNASSIGNED。",
+                "source_file_ref": "forte-df5ae9b9a1273380",
+                "locator": "log.txt:L174",
+                "excerpt": "item-search-2024-11        6      r       UNASSIGNED    (unassigned)",
+                "fields": {
+                  "index": "item-search-2024-11",
+                  "shard": "6",
+                  "prirep": "r",
+                  "state": "UNASSIGNED",
+                  "node": "(unassigned)"
+                },
+                "status": "observed"
+              },
+              {
+                "observation_id": "sre-observation-shard-item-search-2024-11-7-p",
+                "category": "shard",
+                "statement": "item-search-2024-11 shard 7 p = STARTED。",
+                "source_file_ref": "forte-df5ae9b9a1273380",
+                "locator": "log.txt:L175",
+                "excerpt": "item-search-2024-11        7      p       STARTED       es-node-04",
+                "fields": {
+                  "index": "item-search-2024-11",
+                  "shard": "7",
+                  "prirep": "p",
+                  "state": "STARTED",
+                  "node": "es-node-04"
+                },
+                "status": "observed"
+              },
+              {
+                "observation_id": "sre-observation-shard-item-search-2024-11-7-r",
+                "category": "shard",
+                "statement": "item-search-2024-11 shard 7 r = UNASSIGNED。",
+                "source_file_ref": "forte-df5ae9b9a1273380",
+                "locator": "log.txt:L176",
+                "excerpt": "item-search-2024-11        7      r       UNASSIGNED    (unassigned)",
+                "fields": {
+                  "index": "item-search-2024-11",
+                  "shard": "7",
+                  "prirep": "r",
+                  "state": "UNASSIGNED",
+                  "node": "(unassigned)"
+                },
+                "status": "observed"
+              },
+              {
+                "observation_id": "sre-observation-shard-user-activity-2024-11-0-p",
+                "category": "shard",
+                "statement": "user-activity-2024-11 shard 0 p = STARTED。",
+                "source_file_ref": "forte-df5ae9b9a1273380",
+                "locator": "log.txt:L177",
+                "excerpt": "user-activity-2024-11      0      p       STARTED       es-node-06",
+                "fields": {
+                  "index": "user-activity-2024-11",
+                  "shard": "0",
+                  "prirep": "p",
+                  "state": "STARTED",
+                  "node": "es-node-06"
+                },
+                "status": "observed"
+              },
+              {
+                "observation_id": "sre-observation-shard-user-activity-2024-11-0-r",
+                "category": "shard",
+                "statement": "user-activity-2024-11 shard 0 r = UNASSIGNED。",
+                "source_file_ref": "forte-df5ae9b9a1273380",
+                "locator": "log.txt:L178",
+                "excerpt": "user-activity-2024-11      0      r       UNASSIGNED    (unassigned)",
+                "fields": {
+                  "index": "user-activity-2024-11",
+                  "shard": "0",
+                  "prirep": "r",
+                  "state": "UNASSIGNED",
+                  "node": "(unassigned)"
+                },
+                "status": "observed"
+              },
+              {
+                "observation_id": "sre-observation-shard-user-activity-2024-11-1-p",
+                "category": "shard",
+                "statement": "user-activity-2024-11 shard 1 p = STARTED。",
+                "source_file_ref": "forte-df5ae9b9a1273380",
+                "locator": "log.txt:L179",
+                "excerpt": "user-activity-2024-11      1      p       STARTED       es-node-07",
+                "fields": {
+                  "index": "user-activity-2024-11",
+                  "shard": "1",
+                  "prirep": "p",
+                  "state": "STARTED",
+                  "node": "es-node-07"
+                },
+                "status": "observed"
+              },
+              {
+                "observation_id": "sre-observation-shard-user-activity-2024-11-1-r",
+                "category": "shard",
+                "statement": "user-activity-2024-11 shard 1 r = UNASSIGNED。",
+                "source_file_ref": "forte-df5ae9b9a1273380",
+                "locator": "log.txt:L180",
+                "excerpt": "user-activity-2024-11      1      r       UNASSIGNED    (unassigned)",
+                "fields": {
+                  "index": "user-activity-2024-11",
+                  "shard": "1",
+                  "prirep": "r",
+                  "state": "UNASSIGNED",
+                  "node": "(unassigned)"
+                },
+                "status": "observed"
+              },
+              {
+                "observation_id": "sre-observation-shard-user-activity-2024-11-2-p",
+                "category": "shard",
+                "statement": "user-activity-2024-11 shard 2 p = STARTED。",
+                "source_file_ref": "forte-df5ae9b9a1273380",
+                "locator": "log.txt:L181",
+                "excerpt": "user-activity-2024-11      2      p       STARTED       es-node-08",
+                "fields": {
+                  "index": "user-activity-2024-11",
+                  "shard": "2",
+                  "prirep": "p",
+                  "state": "STARTED",
+                  "node": "es-node-08"
+                },
+                "status": "observed"
+              },
+              {
+                "observation_id": "sre-observation-shard-user-activity-2024-11-2-r",
+                "category": "shard",
+                "statement": "user-activity-2024-11 shard 2 r = UNASSIGNED。",
+                "source_file_ref": "forte-df5ae9b9a1273380",
+                "locator": "log.txt:L182",
+                "excerpt": "user-activity-2024-11      2      r       UNASSIGNED    (unassigned)",
+                "fields": {
+                  "index": "user-activity-2024-11",
+                  "shard": "2",
+                  "prirep": "r",
+                  "state": "UNASSIGNED",
+                  "node": "(unassigned)"
+                },
+                "status": "observed"
+              },
+              {
+                "observation_id": "sre-observation-shard-user-activity-2024-11-3-p",
+                "category": "shard",
+                "statement": "user-activity-2024-11 shard 3 p = STARTED。",
+                "source_file_ref": "forte-df5ae9b9a1273380",
+                "locator": "log.txt:L183",
+                "excerpt": "user-activity-2024-11      3      p       STARTED       es-node-09",
+                "fields": {
+                  "index": "user-activity-2024-11",
+                  "shard": "3",
+                  "prirep": "p",
+                  "state": "STARTED",
+                  "node": "es-node-09"
+                },
+                "status": "observed"
+              },
+              {
+                "observation_id": "sre-observation-shard-user-activity-2024-11-3-r",
+                "category": "shard",
+                "statement": "user-activity-2024-11 shard 3 r = UNASSIGNED。",
+                "source_file_ref": "forte-df5ae9b9a1273380",
+                "locator": "log.txt:L184",
+                "excerpt": "user-activity-2024-11      3      r       UNASSIGNED    (unassigned)",
+                "fields": {
+                  "index": "user-activity-2024-11",
+                  "shard": "3",
+                  "prirep": "r",
+                  "state": "UNASSIGNED",
+                  "node": "(unassigned)"
+                },
+                "status": "observed"
+              },
+              {
+                "observation_id": "sre-observation-shard-user-activity-2024-11-4-p",
+                "category": "shard",
+                "statement": "user-activity-2024-11 shard 4 p = STARTED。",
+                "source_file_ref": "forte-df5ae9b9a1273380",
+                "locator": "log.txt:L185",
+                "excerpt": "user-activity-2024-11      4      p       STARTED       es-node-10",
+                "fields": {
+                  "index": "user-activity-2024-11",
+                  "shard": "4",
+                  "prirep": "p",
+                  "state": "STARTED",
+                  "node": "es-node-10"
+                },
+                "status": "observed"
+              },
+              {
+                "observation_id": "sre-observation-shard-user-activity-2024-11-4-r",
+                "category": "shard",
+                "statement": "user-activity-2024-11 shard 4 r = UNASSIGNED。",
+                "source_file_ref": "forte-df5ae9b9a1273380",
+                "locator": "log.txt:L186",
+                "excerpt": "user-activity-2024-11      4      r       UNASSIGNED    (unassigned)",
+                "fields": {
+                  "index": "user-activity-2024-11",
+                  "shard": "4",
+                  "prirep": "r",
+                  "state": "UNASSIGNED",
+                  "node": "(unassigned)"
+                },
+                "status": "observed"
+              },
+              {
+                "observation_id": "sre-observation-shard-user-activity-2024-11-5-p",
+                "category": "shard",
+                "statement": "user-activity-2024-11 shard 5 p = STARTED。",
+                "source_file_ref": "forte-df5ae9b9a1273380",
+                "locator": "log.txt:L187",
+                "excerpt": "user-activity-2024-11      5      p       STARTED       es-node-11",
+                "fields": {
+                  "index": "user-activity-2024-11",
+                  "shard": "5",
+                  "prirep": "p",
+                  "state": "STARTED",
+                  "node": "es-node-11"
+                },
+                "status": "observed"
+              },
+              {
+                "observation_id": "sre-observation-shard-user-activity-2024-11-5-r",
+                "category": "shard",
+                "statement": "user-activity-2024-11 shard 5 r = UNASSIGNED。",
+                "source_file_ref": "forte-df5ae9b9a1273380",
+                "locator": "log.txt:L188",
+                "excerpt": "user-activity-2024-11      5      r       UNASSIGNED    (unassigned)",
+                "fields": {
+                  "index": "user-activity-2024-11",
+                  "shard": "5",
+                  "prirep": "r",
+                  "state": "UNASSIGNED",
+                  "node": "(unassigned)"
+                },
+                "status": "observed"
+              },
+              {
+                "observation_id": "sre-observation-shard-user-activity-2024-11-6-p",
+                "category": "shard",
+                "statement": "user-activity-2024-11 shard 6 p = STARTED。",
+                "source_file_ref": "forte-df5ae9b9a1273380",
+                "locator": "log.txt:L189",
+                "excerpt": "user-activity-2024-11      6      p       STARTED       es-node-04",
+                "fields": {
+                  "index": "user-activity-2024-11",
+                  "shard": "6",
+                  "prirep": "p",
+                  "state": "STARTED",
+                  "node": "es-node-04"
+                },
+                "status": "observed"
+              },
+              {
+                "observation_id": "sre-observation-shard-user-activity-2024-11-6-r",
+                "category": "shard",
+                "statement": "user-activity-2024-11 shard 6 r = UNASSIGNED。",
+                "source_file_ref": "forte-df5ae9b9a1273380",
+                "locator": "log.txt:L190",
+                "excerpt": "user-activity-2024-11      6      r       UNASSIGNED    (unassigned)",
+                "fields": {
+                  "index": "user-activity-2024-11",
+                  "shard": "6",
+                  "prirep": "r",
+                  "state": "UNASSIGNED",
+                  "node": "(unassigned)"
+                },
+                "status": "observed"
+              },
+              {
+                "observation_id": "sre-observation-shard-user-activity-2024-11-7-p",
+                "category": "shard",
+                "statement": "user-activity-2024-11 shard 7 p = STARTED。",
+                "source_file_ref": "forte-df5ae9b9a1273380",
+                "locator": "log.txt:L191",
+                "excerpt": "user-activity-2024-11      7      p       STARTED       es-node-05",
+                "fields": {
+                  "index": "user-activity-2024-11",
+                  "shard": "7",
+                  "prirep": "p",
+                  "state": "STARTED",
+                  "node": "es-node-05"
+                },
+                "status": "observed"
+              },
+              {
+                "observation_id": "sre-observation-shard-user-activity-2024-11-7-r",
+                "category": "shard",
+                "statement": "user-activity-2024-11 shard 7 r = UNASSIGNED。",
+                "source_file_ref": "forte-df5ae9b9a1273380",
+                "locator": "log.txt:L192",
+                "excerpt": "user-activity-2024-11      7      r       UNASSIGNED    (unassigned)",
+                "fields": {
+                  "index": "user-activity-2024-11",
+                  "shard": "7",
+                  "prirep": "r",
+                  "state": "UNASSIGNED",
+                  "node": "(unassigned)"
+                },
+                "status": "observed"
+              },
+              {
+                "observation_id": "sre-observation-allocation-explain",
+                "category": "allocation",
+                "statement": "allocation explain：NODE_LEFT / no_attempt / throttled，并称磁盘高于 85.0%。",
+                "source_file_ref": "forte-df5ae9b9a1273380",
+                "locator": "log.txt:L225-L231",
+                "excerpt": "    \"reason\": \"NODE_LEFT\",\n    \"at\": \"2024-11-11T00:05:00.000Z\",\n    \"details\": \"node_left[es-node-spare-01]\",\n    \"last_allocation_status\": \"no_attempt\"\n  },\n  \"can_allocate\": \"throttled\",\n  \"allocate_explanation\": \"cannot allocate because all found copies of the shard are on nodes with high disk usage (above 85% threshold), and the cluster is under high load; throttling allocation to protect cluster stability\"",
+                "fields": {
+                  "reason": "NODE_LEFT",
+                  "last_status": "no_attempt",
+                  "can_allocate": "throttled",
+                  "disk_threshold": "85"
+                },
+                "status": "observed"
+              },
+              {
+                "observation_id": "sre-observation-event-transport-timeout-1",
+                "category": "recovery",
+                "statement": "传输响应超时：[2024-11-10T23:58:44,231][WARN ][o.e.t.TransportService   ] [es-node-01] timeout waiting for [30s] on response from [es-node-04][10.1.1.4:9300]; retrying",
+                "source_file_ref": "forte-df5ae9b9a1273380",
+                "locator": "log.txt:L47",
+                "excerpt": "[2024-11-10T23:58:44,231][WARN ][o.e.t.TransportService   ] [es-node-01] timeout waiting for [30s] on response from [es-node-04][10.1.1.4:9300]; retrying",
+                "fields": {
+                  "event_type": "transport-timeout"
+                },
+                "status": "observed"
+              },
+              {
+                "observation_id": "sre-observation-event-transport-timeout-2",
+                "category": "recovery",
+                "statement": "传输响应超时：[2024-11-11T00:03:17,004][WARN ][o.e.t.TransportService   ] [es-node-01] timeout waiting for [30s] on response from [es-node-06][10.1.1.6:9300]; retrying",
+                "source_file_ref": "forte-df5ae9b9a1273380",
+                "locator": "log.txt:L49",
+                "excerpt": "[2024-11-11T00:03:17,004][WARN ][o.e.t.TransportService   ] [es-node-01] timeout waiting for [30s] on response from [es-node-06][10.1.1.6:9300]; retrying",
+                "fields": {
+                  "event_type": "transport-timeout"
+                },
+                "status": "observed"
+              },
+              {
+                "observation_id": "sre-observation-event-transport-timeout-3",
+                "category": "recovery",
+                "statement": "传输响应超时：[2024-11-11T00:08:55,771][WARN ][o.e.t.TransportService   ] [es-node-01] timeout waiting for [30s] on response from [es-node-08][10.1.1.8:9300]; retrying",
+                "source_file_ref": "forte-df5ae9b9a1273380",
+                "locator": "log.txt:L51",
+                "excerpt": "[2024-11-11T00:08:55,771][WARN ][o.e.t.TransportService   ] [es-node-01] timeout waiting for [30s] on response from [es-node-08][10.1.1.8:9300]; retrying",
+                "fields": {
+                  "event_type": "transport-timeout"
+                },
+                "status": "observed"
+              },
+              {
+                "observation_id": "sre-observation-event-transport-restored-1",
+                "category": "recovery",
+                "statement": "传输重试后恢复：[2024-11-10T23:58:44,512][INFO ][o.e.t.TransportService   ] [es-node-01] received response from [es-node-04][10.1.1.4:9300] after retry; connection restored",
+                "source_file_ref": "forte-df5ae9b9a1273380",
+                "locator": "log.txt:L48",
+                "excerpt": "[2024-11-10T23:58:44,512][INFO ][o.e.t.TransportService   ] [es-node-01] received response from [es-node-04][10.1.1.4:9300] after retry; connection restored",
+                "fields": {
+                  "event_type": "transport-restored"
+                },
+                "status": "observed"
+              },
+              {
+                "observation_id": "sre-observation-event-transport-restored-2",
+                "category": "recovery",
+                "statement": "传输重试后恢复：[2024-11-11T00:03:17,389][INFO ][o.e.t.TransportService   ] [es-node-01] received response from [es-node-06][10.1.1.6:9300] after retry; connection restored",
+                "source_file_ref": "forte-df5ae9b9a1273380",
+                "locator": "log.txt:L50",
+                "excerpt": "[2024-11-11T00:03:17,389][INFO ][o.e.t.TransportService   ] [es-node-01] received response from [es-node-06][10.1.1.6:9300] after retry; connection restored",
+                "fields": {
+                  "event_type": "transport-restored"
+                },
+                "status": "observed"
+              },
+              {
+                "observation_id": "sre-observation-event-transport-restored-3",
+                "category": "recovery",
+                "statement": "传输重试后恢复：[2024-11-11T00:08:55,990][INFO ][o.e.t.TransportService   ] [es-node-01] received response from [es-node-08][10.1.1.8:9300] after retry; connection restored",
+                "source_file_ref": "forte-df5ae9b9a1273380",
+                "locator": "log.txt:L52",
+                "excerpt": "[2024-11-11T00:08:55,990][INFO ][o.e.t.TransportService   ] [es-node-01] received response from [es-node-08][10.1.1.8:9300] after retry; connection restored",
+                "fields": {
+                  "event_type": "transport-restored"
+                },
+                "status": "observed"
+              },
+              {
+                "observation_id": "sre-observation-event-gc-1",
+                "category": "gc",
+                "statement": "GC 事件：[2024-11-10T23:55:12,441][INFO ][o.e.m.j.JvmGcMonitorService] [es-node-04] [gc][young][30021][3] duration [180ms], collections [2]/[5s], total [180ms]/[8s], memory [22gb]->[18gb]/[28gb], all_pools {[young] [2.8gb]->[0.3gb]/[3gb]}{[survivor] [300mb]->[280mb]/[400mb]}{[old] [19gb]->[17.4gb]/[24.5gb]}",
+                "source_file_ref": "forte-df5ae9b9a1273380",
+                "locator": "log.txt:L56",
+                "excerpt": "[2024-11-10T23:55:12,441][INFO ][o.e.m.j.JvmGcMonitorService] [es-node-04] [gc][young][30021][3] duration [180ms], collections [2]/[5s], total [180ms]/[8s], memory [22gb]->[18gb]/[28gb], all_pools {[young] [2.8gb]->[0.3gb]/[3gb]}{[survivor] [300mb]->[280mb]/[400mb]}{[old] [19gb]->[17.4gb]/[24.5gb]}",
+                "fields": {
+                  "event_type": "gc"
+                },
+                "status": "observed"
+              },
+              {
+                "observation_id": "sre-observation-event-gc-2",
+                "category": "gc",
+                "statement": "GC 事件：[2024-11-11T00:00:03,118][INFO ][o.e.m.j.JvmGcMonitorService] [es-node-04] [gc][young][30022][8] duration [420ms], collections [6]/[5s], total [420ms]/[12s], memory [26gb]->[21gb]/[28gb], all_pools {[young] [2.9gb]->[0.2gb]/[3gb]}{[survivor] [290mb]->[260mb]/[400mb]}{[old] [22.8gb]->[20.5gb]/[24.5gb",
+                "source_file_ref": "forte-df5ae9b9a1273380",
+                "locator": "log.txt:L57",
+                "excerpt": "[2024-11-11T00:00:03,118][INFO ][o.e.m.j.JvmGcMonitorService] [es-node-04] [gc][young][30022][8] duration [420ms], collections [6]/[5s], total [420ms]/[12s], memory [26gb]->[21gb]/[28gb], all_pools {[young] [2.9gb]->[0.2gb]/[3gb]}{[survivor] [290mb]->[260mb]/[400mb]}{[old] [22.8gb]->[20.5gb]/[24.5gb]}",
+                "fields": {
+                  "event_type": "gc"
+                },
+                "status": "observed"
+              },
+              {
+                "observation_id": "sre-observation-event-gc-3",
+                "category": "gc",
+                "statement": "GC 事件：[2024-11-11T00:02:44,881][WARN ][o.e.m.j.JvmGcMonitorService] [es-node-04] [gc][young][30023][12] duration [860ms], collections [10]/[5s], total [860ms]/[18s], memory [27.5gb]->[23gb]/[28gb], all_pools {[young] [2.7gb]->[0.2gb]/[3gb]}{[survivor] [270mb]->[250mb]/[400mb]}{[old] [24.5gb]->[22.5gb]/[24",
+                "source_file_ref": "forte-df5ae9b9a1273380",
+                "locator": "log.txt:L58",
+                "excerpt": "[2024-11-11T00:02:44,881][WARN ][o.e.m.j.JvmGcMonitorService] [es-node-04] [gc][young][30023][12] duration [860ms], collections [10]/[5s], total [860ms]/[18s], memory [27.5gb]->[23gb]/[28gb], all_pools {[young] [2.7gb]->[0.2gb]/[3gb]}{[survivor] [270mb]->[250mb]/[400mb]}{[old] [24.5gb]->[22.5gb]/[24.5gb]}",
+                "fields": {
+                  "event_type": "gc"
+                },
+                "status": "observed"
+              },
+              {
+                "observation_id": "sre-observation-event-gc-4",
+                "category": "gc",
+                "statement": "GC 事件：[2024-11-11T00:05:01,223][WARN ][o.e.m.j.JvmGcMonitorService] [es-node-04] [gc][old][30024][2] duration [3.4s], collections [1]/[60s], total [3.4s]/[10s], memory [27.8gb]->[25gb]/[28gb], all_pools {[young] [2.5gb]->[0.2gb]/[3gb]}{[survivor] [250mb]->[230mb]/[400mb]}{[old] [25.05gb]->[24.6gb]/[24.5gb",
+                "source_file_ref": "forte-df5ae9b9a1273380",
+                "locator": "log.txt:L59",
+                "excerpt": "[2024-11-11T00:05:01,223][WARN ][o.e.m.j.JvmGcMonitorService] [es-node-04] [gc][old][30024][2] duration [3.4s], collections [1]/[60s], total [3.4s]/[10s], memory [27.8gb]->[25gb]/[28gb], all_pools {[young] [2.5gb]->[0.2gb]/[3gb]}{[survivor] [250mb]->[230mb]/[400mb]}{[old] [25.05gb]->[24.6gb]/[24.5gb]}",
+                "fields": {
+                  "event_type": "gc"
+                },
+                "status": "observed"
+              },
+              {
+                "observation_id": "sre-observation-event-gc-5",
+                "category": "gc",
+                "statement": "GC 事件：[2024-11-11T00:08:22,001][WARN ][o.e.m.j.JvmGcMonitorService] [es-node-04] [gc][old][30025][3] duration [5.1s], collections [2]/[60s], total [5.1s]/[16s], memory [27.9gb]->[26.5gb]/[28gb], all_pools {[young] [2.2gb]->[0.2gb]/[3gb]}{[survivor] [220mb]->[200mb]/[400mb]}{[old] [25.5gb]->[26.1gb]/[24.5g",
+                "source_file_ref": "forte-df5ae9b9a1273380",
+                "locator": "log.txt:L62",
+                "excerpt": "[2024-11-11T00:08:22,001][WARN ][o.e.m.j.JvmGcMonitorService] [es-node-04] [gc][old][30025][3] duration [5.1s], collections [2]/[60s], total [5.1s]/[16s], memory [27.9gb]->[26.5gb]/[28gb], all_pools {[young] [2.2gb]->[0.2gb]/[3gb]}{[survivor] [220mb]->[200mb]/[400mb]}{[old] [25.5gb]->[26.1gb]/[24.5gb]}",
+                "fields": {
+                  "event_type": "gc"
+                },
+                "status": "observed"
+              },
+              {
+                "observation_id": "sre-observation-event-gc-6",
+                "category": "gc",
+                "statement": "GC 事件：[2024-11-11T00:15:44,559][WARN ][o.e.m.j.JvmGcMonitorService] [es-node-04] [gc][old][30026][5] duration [7.2s], collections [3]/[60s], total [7.2s]/[22s], memory [27.95gb]->[27.2gb]/[28gb], all_pools {[young] [1.8gb]->[0.2gb]/[3gb]}{[survivor] [180mb]->[160mb]/[400mb]}{[old] [26gb]->[26.8gb]/[24.5gb",
+                "source_file_ref": "forte-df5ae9b9a1273380",
+                "locator": "log.txt:L65",
+                "excerpt": "[2024-11-11T00:15:44,559][WARN ][o.e.m.j.JvmGcMonitorService] [es-node-04] [gc][old][30026][5] duration [7.2s], collections [3]/[60s], total [7.2s]/[22s], memory [27.95gb]->[27.2gb]/[28gb], all_pools {[young] [1.8gb]->[0.2gb]/[3gb]}{[survivor] [180mb]->[160mb]/[400mb]}{[old] [26gb]->[26.8gb]/[24.5gb]}",
+                "fields": {
+                  "event_type": "gc"
+                },
+                "status": "observed"
+              },
+              {
+                "observation_id": "sre-observation-event-gc-7",
+                "category": "gc",
+                "statement": "GC 事件：[2024-11-11T00:05:44,221][WARN ][o.e.m.j.JvmGcMonitorService] [es-node-06] [gc][young][30027][9] duration [780ms], collections [8]/[5s], total [780ms]/[16s], memory [27gb]->[22gb]/[28gb], all_pools {[young] [2.6gb]->[0.2gb]/[3gb]}{[survivor] [260mb]->[240mb]/[400mb]}{[old] [24.1gb]->[21.6gb]/[24.5gb",
+                "source_file_ref": "forte-df5ae9b9a1273380",
+                "locator": "log.txt:L68",
+                "excerpt": "[2024-11-11T00:05:44,221][WARN ][o.e.m.j.JvmGcMonitorService] [es-node-06] [gc][young][30027][9] duration [780ms], collections [8]/[5s], total [780ms]/[16s], memory [27gb]->[22gb]/[28gb], all_pools {[young] [2.6gb]->[0.2gb]/[3gb]}{[survivor] [260mb]->[240mb]/[400mb]}{[old] [24.1gb]->[21.6gb]/[24.5gb]}",
+                "fields": {
+                  "event_type": "gc"
+                },
+                "status": "observed"
+              },
+              {
+                "observation_id": "sre-observation-event-gc-8",
+                "category": "gc",
+                "statement": "GC 事件：[2024-11-11T00:09:01,882][WARN ][o.e.m.j.JvmGcMonitorService] [es-node-06] [gc][old][30028][4] duration [4.8s], collections [2]/[60s], total [4.8s]/[14s], memory [27.8gb]->[26gb]/[28gb], all_pools {[young] [2.3gb]->[0.2gb]/[3gb]}{[survivor] [230mb]->[210mb]/[400mb]}{[old] [25.3gb]->[25.6gb]/[24.5gb]",
+                "source_file_ref": "forte-df5ae9b9a1273380",
+                "locator": "log.txt:L71",
+                "excerpt": "[2024-11-11T00:09:01,882][WARN ][o.e.m.j.JvmGcMonitorService] [es-node-06] [gc][old][30028][4] duration [4.8s], collections [2]/[60s], total [4.8s]/[14s], memory [27.8gb]->[26gb]/[28gb], all_pools {[young] [2.3gb]->[0.2gb]/[3gb]}{[survivor] [230mb]->[210mb]/[400mb]}{[old] [25.3gb]->[25.6gb]/[24.5gb]}",
+                "fields": {
+                  "event_type": "gc"
+                },
+                "status": "observed"
+              },
+              {
+                "observation_id": "sre-observation-event-gc-9",
+                "category": "gc",
+                "statement": "GC 事件：[2024-11-11T00:14:22,445][WARN ][o.e.m.j.JvmGcMonitorService] [es-node-06] [gc][old][30029][6] duration [6.3s], collections [3]/[60s], total [6.3s]/[20s], memory [27.9gb]->[27gb]/[28gb], all_pools {[young] [2.0gb]->[0.2gb]/[3gb]}{[survivor] [200mb]->[180mb]/[400mb]}{[old] [25.7gb]->[26.6gb]/[24.5gb]",
+                "source_file_ref": "forte-df5ae9b9a1273380",
+                "locator": "log.txt:L73",
+                "excerpt": "[2024-11-11T00:14:22,445][WARN ][o.e.m.j.JvmGcMonitorService] [es-node-06] [gc][old][30029][6] duration [6.3s], collections [3]/[60s], total [6.3s]/[20s], memory [27.9gb]->[27gb]/[28gb], all_pools {[young] [2.0gb]->[0.2gb]/[3gb]}{[survivor] [200mb]->[180mb]/[400mb]}{[old] [25.7gb]->[26.6gb]/[24.5gb]}",
+                "fields": {
+                  "event_type": "gc"
+                },
+                "status": "observed"
+              },
+              {
+                "observation_id": "sre-observation-event-gc-10",
+                "category": "gc",
+                "statement": "GC 事件：[2024-11-11T00:10:55,221][WARN ][o.e.m.j.JvmGcMonitorService] [es-node-08] [gc][young][30030][11] duration [920ms], collections [9]/[5s], total [920ms]/[20s], memory [27.5gb]->[23gb]/[28gb], all_pools {[young] [2.4gb]->[0.2gb]/[3gb]}{[survivor] [240mb]->[220mb]/[400mb]}{[old] [24.9gb]->[22.6gb]/[24.",
+                "source_file_ref": "forte-df5ae9b9a1273380",
+                "locator": "log.txt:L84",
+                "excerpt": "[2024-11-11T00:10:55,221][WARN ][o.e.m.j.JvmGcMonitorService] [es-node-08] [gc][young][30030][11] duration [920ms], collections [9]/[5s], total [920ms]/[20s], memory [27.5gb]->[23gb]/[28gb], all_pools {[young] [2.4gb]->[0.2gb]/[3gb]}{[survivor] [240mb]->[220mb]/[400mb]}{[old] [24.9gb]->[22.6gb]/[24.5gb]}",
+                "fields": {
+                  "event_type": "gc"
+                },
+                "status": "observed"
+              },
+              {
+                "observation_id": "sre-observation-event-gc-11",
+                "category": "gc",
+                "statement": "GC 事件：[2024-11-11T00:16:01,882][WARN ][o.e.m.j.JvmGcMonitorService] [es-node-08] [gc][old][30031][7] duration [8.1s], collections [4]/[60s], total [8.1s]/[26s], memory [27.95gb]->[27.5gb]/[28gb], all_pools {[young] [1.9gb]->[0.2gb]/[3gb]}{[survivor] [190mb]->[170mb]/[400mb]}{[old] [25.9gb]->[27.1gb]/[24.5",
+                "source_file_ref": "forte-df5ae9b9a1273380",
+                "locator": "log.txt:L87",
+                "excerpt": "[2024-11-11T00:16:01,882][WARN ][o.e.m.j.JvmGcMonitorService] [es-node-08] [gc][old][30031][7] duration [8.1s], collections [4]/[60s], total [8.1s]/[26s], memory [27.95gb]->[27.5gb]/[28gb], all_pools {[young] [1.9gb]->[0.2gb]/[3gb]}{[survivor] [190mb]->[170mb]/[400mb]}{[old] [25.9gb]->[27.1gb]/[24.5gb]}",
+                "fields": {
+                  "event_type": "gc"
+                },
+                "status": "observed"
+              },
+              {
+                "observation_id": "sre-observation-event-queue-rejected-1",
+                "category": "queue",
+                "statement": "线程池队列拒绝：[2024-11-11T00:06:15,334][WARN ][o.e.t.ThreadPool] [es-node-04] thread pool [write] queue capacity reached, rejecting task",
+                "source_file_ref": "forte-df5ae9b9a1273380",
+                "locator": "log.txt:L60",
+                "excerpt": "[2024-11-11T00:06:15,334][WARN ][o.e.t.ThreadPool] [es-node-04] thread pool [write] queue capacity reached, rejecting task",
+                "fields": {
+                  "event_type": "queue-rejected"
+                },
+                "status": "observed"
+              },
+              {
+                "observation_id": "sre-observation-event-queue-rejected-2",
+                "category": "queue",
+                "statement": "线程池队列拒绝：[2024-11-11T00:06:15,335][WARN ][o.e.t.ThreadPool] [es-node-04] thread pool [search] queue capacity reached, rejecting task",
+                "source_file_ref": "forte-df5ae9b9a1273380",
+                "locator": "log.txt:L61",
+                "excerpt": "[2024-11-11T00:06:15,335][WARN ][o.e.t.ThreadPool] [es-node-04] thread pool [search] queue capacity reached, rejecting task",
+                "fields": {
+                  "event_type": "queue-rejected"
+                },
+                "status": "observed"
+              },
+              {
+                "observation_id": "sre-observation-event-queue-rejected-3",
+                "category": "queue",
+                "statement": "线程池队列拒绝：[2024-11-11T00:07:12,003][WARN ][o.e.t.ThreadPool] [es-node-06] thread pool [write] queue capacity reached, rejecting task",
+                "source_file_ref": "forte-df5ae9b9a1273380",
+                "locator": "log.txt:L69",
+                "excerpt": "[2024-11-11T00:07:12,003][WARN ][o.e.t.ThreadPool] [es-node-06] thread pool [write] queue capacity reached, rejecting task",
+                "fields": {
+                  "event_type": "queue-rejected"
+                },
+                "status": "observed"
+              },
+              {
+                "observation_id": "sre-observation-event-queue-rejected-4",
+                "category": "queue",
+                "statement": "线程池队列拒绝：[2024-11-11T00:07:12,004][WARN ][o.e.t.ThreadPool] [es-node-06] thread pool [search] queue capacity reached, rejecting task",
+                "source_file_ref": "forte-df5ae9b9a1273380",
+                "locator": "log.txt:L70",
+                "excerpt": "[2024-11-11T00:07:12,004][WARN ][o.e.t.ThreadPool] [es-node-06] thread pool [search] queue capacity reached, rejecting task",
+                "fields": {
+                  "event_type": "queue-rejected"
+                },
+                "status": "observed"
+              },
+              {
+                "observation_id": "sre-observation-event-queue-rejected-5",
+                "category": "queue",
+                "statement": "线程池队列拒绝：[2024-11-11T00:12:34,334][WARN ][o.e.t.ThreadPool] [es-node-08] thread pool [write] queue capacity reached, rejecting task",
+                "source_file_ref": "forte-df5ae9b9a1273380",
+                "locator": "log.txt:L85",
+                "excerpt": "[2024-11-11T00:12:34,334][WARN ][o.e.t.ThreadPool] [es-node-08] thread pool [write] queue capacity reached, rejecting task",
+                "fields": {
+                  "event_type": "queue-rejected"
+                },
+                "status": "observed"
+              },
+              {
+                "observation_id": "sre-observation-event-queue-rejected-6",
+                "category": "queue",
+                "statement": "线程池队列拒绝：[2024-11-11T00:12:34,335][WARN ][o.e.t.ThreadPool] [es-node-08] thread pool [search] queue capacity reached, rejecting task",
+                "source_file_ref": "forte-df5ae9b9a1273380",
+                "locator": "log.txt:L86",
+                "excerpt": "[2024-11-11T00:12:34,335][WARN ][o.e.t.ThreadPool] [es-node-08] thread pool [search] queue capacity reached, rejecting task",
+                "fields": {
+                  "event_type": "queue-rejected"
+                },
+                "status": "observed"
+              },
+              {
+                "observation_id": "sre-observation-event-search-slow-1",
+                "category": "slow_query",
+                "statement": "搜索慢日志：[2024-11-11T00:10:33,445][WARN ][o.e.i.s.SearchSlowLog] [es-node-04] [index][order-2024-11][3] took[12.4s], took_millis[12400], total_hits[1234567], types[], stats[], search_type[QUERY_THEN_FETCH], total_shards[16], source[{\"query\":{\"bool\":{\"must\":[{\"term\":{\"user_id\":\"10086\"}},{\"range\":{\"create_time",
+                "source_file_ref": "forte-df5ae9b9a1273380",
+                "locator": "log.txt:L63",
+                "excerpt": "[2024-11-11T00:10:33,445][WARN ][o.e.i.s.SearchSlowLog] [es-node-04] [index][order-2024-11][3] took[12.4s], took_millis[12400], total_hits[1234567], types[], stats[], search_type[QUERY_THEN_FETCH], total_shards[16], source[{\"query\":{\"bool\":{\"must\":[{\"term\":{\"user_id\":\"10086\"}},{\"range\":{\"create_time\":{\"gte\":\"2024-11-01\",\"lte\":\"2024-11-11\"}}}]}},\"aggs\":{\"status_count\":{\"terms\":{\"field\":\"order_status\"}}},\"size\":100,\"from\":0}]",
+                "fields": {
+                  "event_type": "search-slow"
+                },
+                "status": "observed"
+              },
+              {
+                "observation_id": "sre-observation-event-search-slow-2",
+                "category": "slow_query",
+                "statement": "搜索慢日志：[2024-11-11T00:11:33,334][WARN ][o.e.i.s.SearchSlowLog] [es-node-06] [index][item-search-2024-11][1] took[9.8s], took_millis[9800], total_hits[892341], types[], stats[], search_type[QUERY_THEN_FETCH], total_shards[16], source[{\"query\":{\"bool\":{\"must\":[{\"match\":{\"item_name\":\"手机\"}},{\"range\":{\"price\":{",
+                "source_file_ref": "forte-df5ae9b9a1273380",
+                "locator": "log.txt:L72",
+                "excerpt": "[2024-11-11T00:11:33,334][WARN ][o.e.i.s.SearchSlowLog] [es-node-06] [index][item-search-2024-11][1] took[9.8s], took_millis[9800], total_hits[892341], types[], stats[], search_type[QUERY_THEN_FETCH], total_shards[16], source[{\"query\":{\"bool\":{\"must\":[{\"match\":{\"item_name\":\"手机\"}},{\"range\":{\"price\":{\"gte\":1000,\"lte\":5000}}}]}},\"aggs\":{\"brand_count\":{\"terms\":{\"field\":\"brand\",\"size\":100}},\"price_range\":{\"range\":{\"field\":\"price\",\"ranges\":[{\"to\":2000},{\"from\":2000,\"to\":3000},{\"from\":3000}]}}},\"size\":20,\"from\":0}]",
+                "fields": {
+                  "event_type": "search-slow"
+                },
+                "status": "observed"
+              },
+              {
+                "observation_id": "sre-observation-event-search-slow-3",
+                "category": "slow_query",
+                "statement": "搜索慢日志：[2024-11-11T00:20:12,003][WARN ][o.e.i.s.SearchSlowLog] [es-node-08] [index][user-activity-2024-11][5] took[14.2s], took_millis[14200], total_hits[3456789], types[], stats[], search_type[QUERY_THEN_FETCH], total_shards[16], source[{\"query\":{\"bool\":{\"must\":[{\"term\":{\"user_id\":\"88888\"}},{\"range\":{\"act",
+                "source_file_ref": "forte-df5ae9b9a1273380",
+                "locator": "log.txt:L88",
+                "excerpt": "[2024-11-11T00:20:12,003][WARN ][o.e.i.s.SearchSlowLog] [es-node-08] [index][user-activity-2024-11][5] took[14.2s], took_millis[14200], total_hits[3456789], types[], stats[], search_type[QUERY_THEN_FETCH], total_shards[16], source[{\"query\":{\"bool\":{\"must\":[{\"term\":{\"user_id\":\"88888\"}},{\"range\":{\"activity_time\":{\"gte\":\"2024-11-01\",\"lte\":\"2024-11-11\"}}}]}},\"aggs\":{\"action_type\":{\"terms\":{\"field\":\"action_type\",\"size\":50}},\"hourly_trend\":{\"date_histogram\":{\"field\":\"activity_time\",\"calendar_interval\":\"hour\"}}},\"size\":200,\"from\":5000}]",
+                "fields": {
+                  "event_type": "search-slow"
+                },
+                "status": "observed"
+              },
+              {
+                "observation_id": "sre-observation-event-search-slow-4",
+                "category": "slow_query",
+                "statement": "搜索慢日志：[2024-11-11T00:06:44,882][WARN ][o.e.i.s.SearchSlowLog] [es-node-09] [index][user-activity-2024-11][3] took[11.1s], took_millis[11100], total_hits[2134221], types[], stats[], search_type[QUERY_THEN_FETCH], total_shards[16], source[{\"query\":{\"bool\":{\"must\":[{\"term\":{\"user_id\":\"66666\"}},{\"range\":{\"act",
+                "source_file_ref": "forte-df5ae9b9a1273380",
+                "locator": "log.txt:L91",
+                "excerpt": "[2024-11-11T00:06:44,882][WARN ][o.e.i.s.SearchSlowLog] [es-node-09] [index][user-activity-2024-11][3] took[11.1s], took_millis[11100], total_hits[2134221], types[], stats[], search_type[QUERY_THEN_FETCH], total_shards[16], source[{\"query\":{\"bool\":{\"must\":[{\"term\":{\"user_id\":\"66666\"}},{\"range\":{\"activity_time\":{\"gte\":\"2024-11-01\",\"lte\":\"2024-11-11\"}}}]}},\"aggs\":{\"hourly_trend\":{\"date_histogram\":{\"field\":\"activity_time\",\"calendar_interval\":\"hour\"}}},\"size\":100,\"from\":0}]",
+                "fields": {
+                  "event_type": "search-slow"
+                },
+                "status": "observed"
+              },
+              {
+                "observation_id": "sre-observation-event-search-slow-5",
+                "category": "slow_query",
+                "statement": "搜索慢日志：[2024-11-11T00:17:33,112][WARN ][o.e.i.s.SearchSlowLog] [es-node-10] [index][item-search-2024-11][5] took[10.3s], took_millis[10300], total_hits[1023441], types[], stats[], search_type[QUERY_THEN_FETCH], total_shards[16], source[{\"query\":{\"bool\":{\"must\":[{\"match\":{\"item_name\":\"电视\"}},{\"range\":{\"price",
+                "source_file_ref": "forte-df5ae9b9a1273380",
+                "locator": "log.txt:L97",
+                "excerpt": "[2024-11-11T00:17:33,112][WARN ][o.e.i.s.SearchSlowLog] [es-node-10] [index][item-search-2024-11][5] took[10.3s], took_millis[10300], total_hits[1023441], types[], stats[], search_type[QUERY_THEN_FETCH], total_shards[16], source[{\"query\":{\"bool\":{\"must\":[{\"match\":{\"item_name\":\"电视\"}},{\"range\":{\"price\":{\"gte\":2000,\"lte\":8000}}}]}},\"aggs\":{\"brand_count\":{\"terms\":{\"field\":\"brand\",\"size\":100}},\"price_range\":{\"range\":{\"field\":\"price\",\"ranges\":[{\"to\":3000},{\"from\":3000,\"to\":5000},{\"from\":5000}]}}},\"size\":20,\"from\":0}]",
+                "fields": {
+                  "event_type": "search-slow"
+                },
+                "status": "observed"
+              },
+              {
+                "observation_id": "sre-observation-event-index-slow-1",
+                "category": "slow_query",
+                "statement": "写入慢日志：[2024-11-11T00:12:01,882][WARN ][o.e.i.s.IndexingSlowLog] [es-node-04] [index][order-2024-11][3] took[8.8s], took_millis[8800], type[_doc], id[order_20241111_00120001], routing[], source[...]]",
+                "source_file_ref": "forte-df5ae9b9a1273380",
+                "locator": "log.txt:L64",
+                "excerpt": "[2024-11-11T00:12:01,882][WARN ][o.e.i.s.IndexingSlowLog] [es-node-04] [index][order-2024-11][3] took[8.8s], took_millis[8800], type[_doc], id[order_20241111_00120001], routing[], source[...]]",
+                "fields": {
+                  "event_type": "index-slow"
+                },
+                "status": "observed"
+              },
+              {
+                "observation_id": "sre-observation-event-snapshot-failed-1",
+                "category": "side_event",
+                "statement": "快照创建失败：[2024-11-11T00:01:22,114][INFO ][o.e.s.s.SnapshotShardsService] [es-node-07] snapshot [order-backup/snap_20241110_2300] shard [order-2024-11][2] failed to create snapshot, reason: [failed to obtain shard lock for [order-2024-11][2]: lock held by [index shard recovery]]",
+                "source_file_ref": "forte-df5ae9b9a1273380",
+                "locator": "log.txt:L76",
+                "excerpt": "[2024-11-11T00:01:22,114][INFO ][o.e.s.s.SnapshotShardsService] [es-node-07] snapshot [order-backup/snap_20241110_2300] shard [order-2024-11][2] failed to create snapshot, reason: [failed to obtain shard lock for [order-2024-11][2]: lock held by [index shard recovery]]",
+                "fields": {
+                  "event_type": "snapshot-failed"
+                },
+                "status": "observed"
+              },
+              {
+                "observation_id": "sre-observation-event-snapshot-cleanup-1",
+                "category": "recovery",
+                "statement": "快照失败后的清理完成：[2024-11-11T00:01:23,002][INFO ][o.e.s.SnapshotsService  ] [es-node-07] [order-backup/snap_20241110_2300] snapshot deleted successfully (cleanup after failure)",
+                "source_file_ref": "forte-df5ae9b9a1273380",
+                "locator": "log.txt:L81",
+                "excerpt": "[2024-11-11T00:01:23,002][INFO ][o.e.s.SnapshotsService  ] [es-node-07] [order-backup/snap_20241110_2300] snapshot deleted successfully (cleanup after failure)",
+                "fields": {
+                  "event_type": "snapshot-cleanup"
+                },
+                "status": "observed"
+              },
+              {
+                "observation_id": "sre-observation-event-circuit-open-1",
+                "category": "side_event",
+                "statement": "熔断器触发：[2024-11-11T00:09:13,441][WARN ][o.e.i.IndicesService    ] [es-node-09] [user-activity-2024-11][3] CircuitBreakingException: [parent] Data too large, data for [<agg [hourly_trend]>] would be [28.9gb/28gb], which is larger than the limit of [26.2gb/24.4gb]; this circuit breaker is now open",
+                "source_file_ref": "forte-df5ae9b9a1273380",
+                "locator": "log.txt:L92",
+                "excerpt": "[2024-11-11T00:09:13,441][WARN ][o.e.i.IndicesService    ] [es-node-09] [user-activity-2024-11][3] CircuitBreakingException: [parent] Data too large, data for [<agg [hourly_trend]>] would be [28.9gb/28gb], which is larger than the limit of [26.2gb/24.4gb]; this circuit breaker is now open",
+                "fields": {
+                  "event_type": "circuit-open"
+                },
+                "status": "observed"
+              },
+              {
+                "observation_id": "sre-observation-event-circuit-reset-1",
+                "category": "recovery",
+                "statement": "熔断器复位：[2024-11-11T00:09:15,003][INFO ][o.e.i.IndicesService    ] [es-node-09] [user-activity-2024-11][3] circuit breaker reset; resuming normal operation",
+                "source_file_ref": "forte-df5ae9b9a1273380",
+                "locator": "log.txt:L94",
+                "excerpt": "[2024-11-11T00:09:15,003][INFO ][o.e.i.IndicesService    ] [es-node-09] [user-activity-2024-11][3] circuit breaker reset; resuming normal operation",
+                "fields": {
+                  "event_type": "circuit-reset"
+                },
+                "status": "observed"
+              },
+              {
+                "observation_id": "sre-observation-event-shard-lock-failed-1",
+                "category": "side_event",
+                "statement": "分片锁获取失败：[2024-11-11T00:01:22,114][INFO ][o.e.s.s.SnapshotShardsService] [es-node-07] snapshot [order-backup/snap_20241110_2300] shard [order-2024-11][2] failed to create snapshot, reason: [failed to obtain shard lock for [order-2024-11][2]: lock held by [index shard recovery]]",
+                "source_file_ref": "forte-df5ae9b9a1273380",
+                "locator": "log.txt:L76",
+                "excerpt": "[2024-11-11T00:01:22,114][INFO ][o.e.s.s.SnapshotShardsService] [es-node-07] snapshot [order-backup/snap_20241110_2300] shard [order-2024-11][2] failed to create snapshot, reason: [failed to obtain shard lock for [order-2024-11][2]: lock held by [index shard recovery]]",
+                "fields": {
+                  "event_type": "shard-lock-failed"
+                },
+                "status": "observed"
+              },
+              {
+                "observation_id": "sre-observation-event-shard-lock-failed-2",
+                "category": "side_event",
+                "statement": "分片锁获取失败：[2024-11-11T00:22:08,334][ERROR][o.e.i.s.InternalEngine  ] [es-node-10] [item-search-2024-11][5] failed to obtain shard lock, retrying in 5s",
+                "source_file_ref": "forte-df5ae9b9a1273380",
+                "locator": "log.txt:L98",
+                "excerpt": "[2024-11-11T00:22:08,334][ERROR][o.e.i.s.InternalEngine  ] [es-node-10] [item-search-2024-11][5] failed to obtain shard lock, retrying in 5s",
+                "fields": {
+                  "event_type": "shard-lock-failed"
+                },
+                "status": "observed"
+              },
+              {
+                "observation_id": "sre-observation-event-shard-lock-success-1",
+                "category": "recovery",
+                "statement": "分片锁重试成功：[2024-11-11T00:22:13,891][INFO ][o.e.i.s.InternalEngine  ] [es-node-10] [item-search-2024-11][5] shard lock obtained successfully after retry",
+                "source_file_ref": "forte-df5ae9b9a1273380",
+                "locator": "log.txt:L102",
+                "excerpt": "[2024-11-11T00:22:13,891][INFO ][o.e.i.s.InternalEngine  ] [es-node-10] [item-search-2024-11][5] shard lock obtained successfully after retry",
+                "fields": {
+                  "event_type": "shard-lock-success"
+                },
+                "status": "observed"
+              },
+              {
+                "observation_id": "sre-observation-event-license-1",
+                "category": "side_event",
+                "statement": "License 到期提醒：[2024-11-11T00:12:01,334][INFO ][o.e.l.LicenseService     ] [es-node-01] LICENSE [TRIAL] mode - license will expire in 14 days. Cluster functionality may be reduced after expiration. Please update your license.",
+                "source_file_ref": "forte-df5ae9b9a1273380",
+                "locator": "log.txt:L53",
+                "excerpt": "[2024-11-11T00:12:01,334][INFO ][o.e.l.LicenseService     ] [es-node-01] LICENSE [TRIAL] mode - license will expire in 14 days. Cluster functionality may be reduced after expiration. Please update your license.",
+                "fields": {
+                  "event_type": "license"
+                },
+                "status": "observed"
+              },
+              {
+                "observation_id": "sre-observation-query-63",
+                "category": "query",
+                "statement": "查询形态包含：aggregation。",
+                "source_file_ref": "forte-df5ae9b9a1273380",
+                "locator": "log.txt:L63",
+                "excerpt": "[2024-11-11T00:10:33,445][WARN ][o.e.i.s.SearchSlowLog] [es-node-04] [index][order-2024-11][3] took[12.4s], took_millis[12400], total_hits[1234567], types[], stats[], search_type[QUERY_THEN_FETCH], total_shards[16], source[{\"query\":{\"bool\":{\"must\":[{\"term\":{\"user_id\":\"10086\"}},{\"range\":{\"create_time\":{\"gte\":\"2024-11-01\",\"lte\":\"2024-11-11\"}}}]}},\"aggs\":{\"status_count\":{\"terms\":{\"field\":\"order_status\"}}},\"size\":100,\"from\":0}]",
+                "fields": {
+                  "flags": "aggregation"
+                },
+                "status": "observed"
+              },
+              {
+                "observation_id": "sre-observation-query-72",
+                "category": "query",
+                "statement": "查询形态包含：deep_pagination,aggregation。",
+                "source_file_ref": "forte-df5ae9b9a1273380",
+                "locator": "log.txt:L72",
+                "excerpt": "[2024-11-11T00:11:33,334][WARN ][o.e.i.s.SearchSlowLog] [es-node-06] [index][item-search-2024-11][1] took[9.8s], took_millis[9800], total_hits[892341], types[], stats[], search_type[QUERY_THEN_FETCH], total_shards[16], source[{\"query\":{\"bool\":{\"must\":[{\"match\":{\"item_name\":\"手机\"}},{\"range\":{\"price\":{\"gte\":1000,\"lte\":5000}}}]}},\"aggs\":{\"brand_count\":{\"terms\":{\"field\":\"brand\",\"size\":100}},\"price_range\":{\"range\":{\"field\":\"price\",\"ranges\":[{\"to\":2000},{\"from\":2000,\"to\":3000},{\"from\":3000}]}}},\"size\":20,\"from\":0}]",
+                "fields": {
+                  "flags": "deep_pagination,aggregation"
+                },
+                "status": "observed"
+              },
+              {
+                "observation_id": "sre-observation-query-88",
+                "category": "query",
+                "statement": "查询形态包含：deep_pagination,aggregation。",
+                "source_file_ref": "forte-df5ae9b9a1273380",
+                "locator": "log.txt:L88",
+                "excerpt": "[2024-11-11T00:20:12,003][WARN ][o.e.i.s.SearchSlowLog] [es-node-08] [index][user-activity-2024-11][5] took[14.2s], took_millis[14200], total_hits[3456789], types[], stats[], search_type[QUERY_THEN_FETCH], total_shards[16], source[{\"query\":{\"bool\":{\"must\":[{\"term\":{\"user_id\":\"88888\"}},{\"range\":{\"activity_time\":{\"gte\":\"2024-11-01\",\"lte\":\"2024-11-11\"}}}]}},\"aggs\":{\"action_type\":{\"terms\":{\"field\":\"action_type\",\"size\":50}},\"hourly_trend\":{\"date_histogram\":{\"field\":\"activity_time\",\"calendar_interval\":\"hour\"}}},\"size\":200,\"from\":5000}]",
+                "fields": {
+                  "flags": "deep_pagination,aggregation"
+                },
+                "status": "observed"
+              },
+              {
+                "observation_id": "sre-observation-query-91",
+                "category": "query",
+                "statement": "查询形态包含：aggregation。",
+                "source_file_ref": "forte-df5ae9b9a1273380",
+                "locator": "log.txt:L91",
+                "excerpt": "[2024-11-11T00:06:44,882][WARN ][o.e.i.s.SearchSlowLog] [es-node-09] [index][user-activity-2024-11][3] took[11.1s], took_millis[11100], total_hits[2134221], types[], stats[], search_type[QUERY_THEN_FETCH], total_shards[16], source[{\"query\":{\"bool\":{\"must\":[{\"term\":{\"user_id\":\"66666\"}},{\"range\":{\"activity_time\":{\"gte\":\"2024-11-01\",\"lte\":\"2024-11-11\"}}}]}},\"aggs\":{\"hourly_trend\":{\"date_histogram\":{\"field\":\"activity_time\",\"calendar_interval\":\"hour\"}}},\"size\":100,\"from\":0}]",
+                "fields": {
+                  "flags": "aggregation"
+                },
+                "status": "observed"
+              },
+              {
+                "observation_id": "sre-observation-query-97",
+                "category": "query",
+                "statement": "查询形态包含：deep_pagination,aggregation。",
+                "source_file_ref": "forte-df5ae9b9a1273380",
+                "locator": "log.txt:L97",
+                "excerpt": "[2024-11-11T00:17:33,112][WARN ][o.e.i.s.SearchSlowLog] [es-node-10] [index][item-search-2024-11][5] took[10.3s], took_millis[10300], total_hits[1023441], types[], stats[], search_type[QUERY_THEN_FETCH], total_shards[16], source[{\"query\":{\"bool\":{\"must\":[{\"match\":{\"item_name\":\"电视\"}},{\"range\":{\"price\":{\"gte\":2000,\"lte\":8000}}}]}},\"aggs\":{\"brand_count\":{\"terms\":{\"field\":\"brand\",\"size\":100}},\"price_range\":{\"range\":{\"field\":\"price\",\"ranges\":[{\"to\":3000},{\"from\":3000,\"to\":5000},{\"from\":5000}]}}},\"size\":20,\"from\":0}]",
+                "fields": {
+                  "flags": "deep_pagination,aggregation"
+                },
+                "status": "observed"
+              },
+              {
+                "observation_id": "sre-observation-unclassified-46",
+                "category": "unclassified",
+                "statement": "固定适配器未分类的日志片段，需要 SRE 人工判断。",
+                "source_file_ref": "forte-df5ae9b9a1273380",
+                "locator": "log.txt:L46",
+                "excerpt": "[2024-11-10T23:50:03,812][INFO ][o.e.c.s.MasterService    ] [es-node-01] elected-as-master ([3] nodes joined)[{es-node-01}{...}{...}{10.1.1.1}{10.1.1.1:9300}], term: 12, version: 4821, reason: master node changed",
+                "fields": {},
+                "status": "unclassified"
+              },
+              {
+                "observation_id": "sre-observation-unclassified-77",
+                "category": "unclassified",
+                "statement": "固定适配器未分类的日志片段，需要 SRE 人工判断。",
+                "source_file_ref": "forte-df5ae9b9a1273380",
+                "locator": "log.txt:L77",
+                "excerpt": "[2024-11-11T00:01:22,115][WARN ][o.e.s.SnapshotsService  ] [es-node-07] [order-backup/snap_20241110_2300] failed to finalize snapshot; deleting snapshot to clean up",
+                "fields": {},
+                "status": "unclassified"
+              },
+              {
+                "observation_id": "sre-observation-unclassified-93",
+                "category": "unclassified",
+                "statement": "固定适配器未分类的日志片段，需要 SRE 人工判断。",
+                "source_file_ref": "forte-df5ae9b9a1273380",
+                "locator": "log.txt:L93",
+                "excerpt": "[2024-11-11T00:09:13,442][INFO ][o.e.i.IndicesService    ] [es-node-09] [user-activity-2024-11][3] circuit breaker tripped for request, request rejected; circuit breaker will reset automatically",
+                "fields": {},
+                "status": "unclassified"
+              },
+              {
+                "observation_id": "sre-observation-unclassified-196",
+                "category": "unclassified",
+                "statement": "固定适配器未分类的日志片段，需要 SRE 人工判断。",
+                "source_file_ref": "forte-df5ae9b9a1273380",
+                "locator": "log.txt:L196",
+                "excerpt": "  \"persistent\": {},",
+                "fields": {},
+                "status": "unclassified"
+              },
+              {
+                "observation_id": "sre-observation-unclassified-197",
+                "category": "unclassified",
+                "statement": "固定适配器未分类的日志片段，需要 SRE 人工判断。",
+                "source_file_ref": "forte-df5ae9b9a1273380",
+                "locator": "log.txt:L197",
+                "excerpt": "  \"transient\": {}",
+                "fields": {},
+                "status": "unclassified"
+              },
+              {
+                "observation_id": "sre-observation-unclassified-202",
+                "category": "unclassified",
+                "statement": "固定适配器未分类的日志片段，需要 SRE 人工判断。",
+                "source_file_ref": "forte-df5ae9b9a1273380",
+                "locator": "log.txt:L202",
+                "excerpt": "  \"nodes\": {",
+                "fields": {},
+                "status": "unclassified"
+              },
+              {
+                "observation_id": "sre-observation-unclassified-203",
+                "category": "unclassified",
+                "statement": "固定适配器未分类的日志片段，需要 SRE 人工判断。",
+                "source_file_ref": "forte-df5ae9b9a1273380",
+                "locator": "log.txt:L203",
+                "excerpt": "    \"node-04-id\": {",
+                "fields": {},
+                "status": "unclassified"
+              },
+              {
+                "observation_id": "sre-observation-unclassified-204",
+                "category": "unclassified",
+                "statement": "固定适配器未分类的日志片段，需要 SRE 人工判断。",
+                "source_file_ref": "forte-df5ae9b9a1273380",
+                "locator": "log.txt:L204",
+                "excerpt": "      \"name\": \"es-node-04\",",
+                "fields": {},
+                "status": "unclassified"
+              },
+              {
+                "observation_id": "sre-observation-unclassified-205",
+                "category": "unclassified",
+                "statement": "固定适配器未分类的日志片段，需要 SRE 人工判断。",
+                "source_file_ref": "forte-df5ae9b9a1273380",
+                "locator": "log.txt:L205",
+                "excerpt": "      \"thread_pool\": {",
+                "fields": {},
+                "status": "unclassified"
+              },
+              {
+                "observation_id": "sre-observation-unclassified-208",
+                "category": "unclassified",
+                "statement": "固定适配器未分类的日志片段，需要 SRE 人工判断。",
+                "source_file_ref": "forte-df5ae9b9a1273380",
+                "locator": "log.txt:L208",
+                "excerpt": "      }",
+                "fields": {},
+                "status": "unclassified"
+              },
+              {
+                "observation_id": "sre-observation-unclassified-209",
+                "category": "unclassified",
+                "statement": "固定适配器未分类的日志片段，需要 SRE 人工判断。",
+                "source_file_ref": "forte-df5ae9b9a1273380",
+                "locator": "log.txt:L209",
+                "excerpt": "    }",
+                "fields": {},
+                "status": "unclassified"
+              },
+              {
+                "observation_id": "sre-observation-unclassified-210",
+                "category": "unclassified",
+                "statement": "固定适配器未分类的日志片段，需要 SRE 人工判断。",
+                "source_file_ref": "forte-df5ae9b9a1273380",
+                "locator": "log.txt:L210",
+                "excerpt": "  }",
+                "fields": {},
+                "status": "unclassified"
+              },
+              {
+                "observation_id": "sre-observation-unclassified-224",
+                "category": "unclassified",
+                "statement": "固定适配器未分类的日志片段，需要 SRE 人工判断。",
+                "source_file_ref": "forte-df5ae9b9a1273380",
+                "locator": "log.txt:L224",
+                "excerpt": "  \"unassigned_info\": {",
+                "fields": {},
+                "status": "unclassified"
+              },
+              {
+                "observation_id": "sre-observation-unclassified-229",
+                "category": "unclassified",
+                "statement": "固定适配器未分类的日志片段，需要 SRE 人工判断。",
+                "source_file_ref": "forte-df5ae9b9a1273380",
+                "locator": "log.txt:L229",
+                "excerpt": "  },",
+                "fields": {},
+                "status": "unclassified"
+              }
+            ],
+            "source_conflicts": [
+              {
+                "conflict_id": "sre-conflict-node-count",
+                "title": "节点总数口径冲突",
+                "statement": "部署区声明 10 个，逐行列出 11 个，角色汇总为 3+8=11 个，health 为 11 个。",
+                "side_a_observation_ids": [
+                  "sre-observation-declared-node-count"
+                ],
+                "side_b_observation_ids": [
+                  "sre-observation-node-es-node-01",
+                  "sre-observation-node-es-node-02",
+                  "sre-observation-node-es-node-03",
+                  "sre-observation-node-es-node-04",
+                  "sre-observation-node-es-node-05",
+                  "sre-observation-node-es-node-06",
+                  "sre-observation-node-es-node-07",
+                  "sre-observation-node-es-node-08",
+                  "sre-observation-node-es-node-09",
+                  "sre-observation-node-es-node-10",
+                  "sre-observation-node-es-node-11",
+                  "sre-observation-role-summary",
+                  "sre-observation-health"
+                ],
+                "locators": [
+                  "log.txt:L25",
+                  "log.txt:L27-L37",
+                  "log.txt:L108"
+                ],
+                "impact": "节点容量口径不一致，不能据此确定容量缺口或变更范围。",
+                "status": "open"
+              },
+              {
+                "conflict_id": "sre-conflict-unassigned-count",
+                "title": "UNASSIGNED 分片计数冲突",
+                "statement": "health 报告 48，cat shards 明细仅列出 24。",
+                "side_a_observation_ids": [
+                  "sre-observation-health"
+                ],
+                "side_b_observation_ids": [
+                  "sre-observation-shard-order-2024-11-0-p",
+                  "sre-observation-shard-order-2024-11-0-r",
+                  "sre-observation-shard-order-2024-11-1-p",
+                  "sre-observation-shard-order-2024-11-1-r",
+                  "sre-observation-shard-order-2024-11-2-p",
+                  "sre-observation-shard-order-2024-11-2-r",
+                  "sre-observation-shard-order-2024-11-3-p",
+                  "sre-observation-shard-order-2024-11-3-r",
+                  "sre-observation-shard-order-2024-11-4-p",
+                  "sre-observation-shard-order-2024-11-4-r",
+                  "sre-observation-shard-order-2024-11-5-p",
+                  "sre-observation-shard-order-2024-11-5-r",
+                  "sre-observation-shard-order-2024-11-6-p",
+                  "sre-observation-shard-order-2024-11-6-r",
+                  "sre-observation-shard-order-2024-11-7-p",
+                  "sre-observation-shard-order-2024-11-7-r",
+                  "sre-observation-shard-item-search-2024-11-0-p",
+                  "sre-observation-shard-item-search-2024-11-0-r",
+                  "sre-observation-shard-item-search-2024-11-1-p",
+                  "sre-observation-shard-item-search-2024-11-1-r",
+                  "sre-observation-shard-item-search-2024-11-2-p",
+                  "sre-observation-shard-item-search-2024-11-2-r",
+                  "sre-observation-shard-item-search-2024-11-3-p",
+                  "sre-observation-shard-item-search-2024-11-3-r",
+                  "sre-observation-shard-item-search-2024-11-4-p",
+                  "sre-observation-shard-item-search-2024-11-4-r",
+                  "sre-observation-shard-item-search-2024-11-5-p",
+                  "sre-observation-shard-item-search-2024-11-5-r",
+                  "sre-observation-shard-item-search-2024-11-6-p",
+                  "sre-observation-shard-item-search-2024-11-6-r",
+                  "sre-observation-shard-item-search-2024-11-7-p",
+                  "sre-observation-shard-item-search-2024-11-7-r",
+                  "sre-observation-shard-user-activity-2024-11-0-p",
+                  "sre-observation-shard-user-activity-2024-11-0-r",
+                  "sre-observation-shard-user-activity-2024-11-1-p",
+                  "sre-observation-shard-user-activity-2024-11-1-r",
+                  "sre-observation-shard-user-activity-2024-11-2-p",
+                  "sre-observation-shard-user-activity-2024-11-2-r",
+                  "sre-observation-shard-user-activity-2024-11-3-p",
+                  "sre-observation-shard-user-activity-2024-11-3-r",
+                  "sre-observation-shard-user-activity-2024-11-4-p",
+                  "sre-observation-shard-user-activity-2024-11-4-r",
+                  "sre-observation-shard-user-activity-2024-11-5-p",
+                  "sre-observation-shard-user-activity-2024-11-5-r",
+                  "sre-observation-shard-user-activity-2024-11-6-p",
+                  "sre-observation-shard-user-activity-2024-11-6-r",
+                  "sre-observation-shard-user-activity-2024-11-7-p",
+                  "sre-observation-shard-user-activity-2024-11-7-r"
+                ],
+                "locators": [
+                  "log.txt:L108",
+                  "log.txt:L145-L192"
+                ],
+                "impact": "必须先确认诊断输出是否为完整快照，不能把 48 直接当作已逐项定位的副本数。",
+                "status": "open"
+              },
+              {
+                "conflict_id": "sre-conflict-disk-threshold",
+                "title": "磁盘使用率解释冲突",
+                "statement": "cat nodes 的 data 节点 disk.used 为 53.9%-56.1%，allocation explain 却称高于 85.0% 阈值。",
+                "side_a_observation_ids": [
+                  "sre-observation-cat-node-es-node-01",
+                  "sre-observation-cat-node-es-node-02",
+                  "sre-observation-cat-node-es-node-03",
+                  "sre-observation-cat-node-es-node-04",
+                  "sre-observation-cat-node-es-node-05",
+                  "sre-observation-cat-node-es-node-06",
+                  "sre-observation-cat-node-es-node-07",
+                  "sre-observation-cat-node-es-node-08",
+                  "sre-observation-cat-node-es-node-09",
+                  "sre-observation-cat-node-es-node-10",
+                  "sre-observation-cat-node-es-node-11"
+                ],
+                "side_b_observation_ids": [
+                  "sre-observation-allocation-explain"
+                ],
+                "locators": [
+                  "log.txt:L112-L122",
+                  "log.txt:L225-L231"
+                ],
+                "impact": "磁盘容量是否阻塞分配仍待实时只读预检，不能直接修改 allocation setting。",
+                "status": "open"
+              }
+            ],
+            "hypotheses": [
+              {
+                "hypothesis_id": "sre-hypothesis-capacity-query-amplification",
+                "statement": "QPS 激增、data 节点资源饱和、GC/队列拒绝/慢查询并发出现，支持容量与查询形态共同放大的假设；这不是已证明的单一因果结论。",
+                "confidence": "medium",
+                "supporting_observation_ids": [
+                  "sre-observation-metric-query-qps",
+                  "sre-observation-metric-write-qps",
+                  "sre-observation-metric-cpu",
+                  "sre-observation-metric-disk-io",
+                  "sre-observation-metric-heap",
+                  "sre-observation-metric-young-gc",
+                  "sre-observation-metric-old-gc",
+                  "sre-observation-metric-old-gc-time",
+                  "sre-observation-metric-search-latency",
+                  "sre-observation-metric-index-latency",
+                  "sre-observation-metric-write-rejected",
+                  "sre-observation-metric-search-rejected",
+                  "sre-observation-event-gc-1",
+                  "sre-observation-event-gc-2",
+                  "sre-observation-event-gc-3",
+                  "sre-observation-event-gc-4",
+                  "sre-observation-event-gc-5",
+                  "sre-observation-event-gc-6",
+                  "sre-observation-event-gc-7",
+                  "sre-observation-event-gc-8",
+                  "sre-observation-event-gc-9",
+                  "sre-observation-event-gc-10",
+                  "sre-observation-event-gc-11",
+                  "sre-observation-event-queue-rejected-1",
+                  "sre-observation-event-queue-rejected-2",
+                  "sre-observation-event-queue-rejected-3",
+                  "sre-observation-event-queue-rejected-4",
+                  "sre-observation-event-queue-rejected-5",
+                  "sre-observation-event-queue-rejected-6",
+                  "sre-observation-event-search-slow-1",
+                  "sre-observation-event-search-slow-2",
+                  "sre-observation-event-search-slow-3",
+                  "sre-observation-event-search-slow-4",
+                  "sre-observation-event-search-slow-5",
+                  "sre-observation-event-index-slow-1",
+                  "sre-observation-query-63",
+                  "sre-observation-query-72",
+                  "sre-observation-query-88",
+                  "sre-observation-query-91",
+                  "sre-observation-query-97"
+                ],
+                "supporting_locators": [
+                  "log.txt:L8",
+                  "log.txt:L9",
+                  "log.txt:L10",
+                  "log.txt:L11",
+                  "log.txt:L12",
+                  "log.txt:L13",
+                  "log.txt:L14",
+                  "log.txt:L15",
+                  "log.txt:L16",
+                  "log.txt:L17",
+                  "log.txt:L18",
+                  "log.txt:L19",
+                  "log.txt:L56",
+                  "log.txt:L57",
+                  "log.txt:L58",
+                  "log.txt:L59",
+                  "log.txt:L62",
+                  "log.txt:L65",
+                  "log.txt:L68",
+                  "log.txt:L71",
+                  "log.txt:L73",
+                  "log.txt:L84",
+                  "log.txt:L87",
+                  "log.txt:L60",
+                  "log.txt:L61",
+                  "log.txt:L69",
+                  "log.txt:L70",
+                  "log.txt:L85",
+                  "log.txt:L86",
+                  "log.txt:L63",
+                  "log.txt:L72",
+                  "log.txt:L88",
+                  "log.txt:L91",
+                  "log.txt:L97",
+                  "log.txt:L64",
+                  "log.txt:L63",
+                  "log.txt:L72",
+                  "log.txt:L88",
+                  "log.txt:L91",
+                  "log.txt:L97"
+                ],
+                "counter_evidence_ids": [
+                  "sre-observation-allocation-explain",
+                  "sre-observation-event-transport-restored-1",
+                  "sre-observation-event-transport-restored-2",
+                  "sre-observation-event-transport-restored-3"
+                ],
+                "counter_evidence_locators": [
+                  "log.txt:L225-L231",
+                  "log.txt:L48",
+                  "log.txt:L50",
+                  "log.txt:L52"
+                ],
+                "limitations": [
+                  "只有离线日志片段，没有实时 metrics、完整查询采样或配置变更史。",
+                  "NODE_LEFT 与三组来源冲突可能改变容量和分片解释。",
+                  "相关事件同时出现不等于单一因果关系已证。"
+                ]
+              },
+              {
+                "hypothesis_id": "sre-hypothesis-node-left-allocation",
+                "statement": "NODE_LEFT 与 allocation throttled 支持副本恢复受阻的次级假设，但磁盘口径冲突使具体阻塞原因待核实。",
+                "confidence": "low",
+                "supporting_observation_ids": [
+                  "sre-observation-allocation-explain",
+                  "sre-observation-health"
+                ],
+                "supporting_locators": [
+                  "log.txt:L225-L231",
+                  "log.txt:L108"
+                ],
+                "counter_evidence_ids": [
+                  "sre-observation-cat-node-es-node-01",
+                  "sre-observation-cat-node-es-node-02",
+                  "sre-observation-cat-node-es-node-03",
+                  "sre-observation-cat-node-es-node-04",
+                  "sre-observation-cat-node-es-node-05",
+                  "sre-observation-cat-node-es-node-06",
+                  "sre-observation-cat-node-es-node-07",
+                  "sre-observation-cat-node-es-node-08",
+                  "sre-observation-cat-node-es-node-09",
+                  "sre-observation-cat-node-es-node-10",
+                  "sre-observation-cat-node-es-node-11"
+                ],
+                "counter_evidence_locators": [
+                  "log.txt:L112",
+                  "log.txt:L113",
+                  "log.txt:L114",
+                  "log.txt:L115",
+                  "log.txt:L116",
+                  "log.txt:L117",
+                  "log.txt:L118",
+                  "log.txt:L119",
+                  "log.txt:L120",
+                  "log.txt:L121",
+                  "log.txt:L122"
+                ],
+                "limitations": [
+                  "日志没有批准入口、实时 allocation decision 或节点离线原因。"
+                ]
+              }
+            ],
+            "action_proposals": [
+              {
+                "proposal_id": "sre-proposal-read-cluster-settings",
+                "kind": "read_only_preflight",
+                "title": "读取集群设置与默认值",
+                "risk_level": "low",
+                "command_template": "GET {approved_non_master_endpoint}/_cluster/settings?include_defaults=true&flat_settings=true",
+                "action_text": null,
+                "target_status": "unresolved",
+                "target_rationale": "日志中的 10.1.1.1 是 dedicated master，不能据此选择为客户端协调入口；所有 Elasticsearch 提案都等待 SRE 提供非 dedicated-master 的批准协调入口。",
+                "preconditions": [
+                  "SRE 提供并批准非 dedicated-master 的协调入口",
+                  "只读权限已确认"
+                ],
+                "rollback": "只读请求无需回滚；若入口或权限不匹配立即停止。",
+                "verify_after": [
+                  "保存 settings 响应与时间戳",
+                  "核对 allocation.enable 当前值而非猜测"
+                ],
+                "official_reference": "https://www.elastic.co/guide/en/elasticsearch/reference/7.10/modules-cluster.html (Elasticsearch 7.10; accessed 2026-08-29)",
+                "approval_required": true,
+                "executed": false,
+                "source_observation_ids": [
+                  "sre-observation-metric-query-qps",
+                  "sre-observation-metric-write-qps",
+                  "sre-observation-metric-cpu",
+                  "sre-observation-metric-disk-io",
+                  "sre-observation-metric-heap",
+                  "sre-observation-metric-young-gc",
+                  "sre-observation-metric-old-gc",
+                  "sre-observation-metric-old-gc-time",
+                  "sre-observation-metric-search-latency",
+                  "sre-observation-metric-index-latency",
+                  "sre-observation-metric-write-rejected",
+                  "sre-observation-metric-search-rejected",
+                  "sre-observation-event-gc-1",
+                  "sre-observation-event-gc-2",
+                  "sre-observation-event-gc-3",
+                  "sre-observation-event-gc-4",
+                  "sre-observation-event-gc-5",
+                  "sre-observation-event-gc-6",
+                  "sre-observation-event-gc-7",
+                  "sre-observation-event-gc-8",
+                  "sre-observation-event-gc-9",
+                  "sre-observation-event-gc-10",
+                  "sre-observation-event-gc-11",
+                  "sre-observation-event-queue-rejected-1",
+                  "sre-observation-event-queue-rejected-2",
+                  "sre-observation-event-queue-rejected-3",
+                  "sre-observation-event-queue-rejected-4",
+                  "sre-observation-event-queue-rejected-5",
+                  "sre-observation-event-queue-rejected-6",
+                  "sre-observation-event-search-slow-1",
+                  "sre-observation-event-search-slow-2",
+                  "sre-observation-event-search-slow-3",
+                  "sre-observation-event-search-slow-4",
+                  "sre-observation-event-search-slow-5",
+                  "sre-observation-event-index-slow-1",
+                  "sre-observation-query-63",
+                  "sre-observation-query-72",
+                  "sre-observation-query-88",
+                  "sre-observation-query-91",
+                  "sre-observation-query-97"
+                ]
+              },
+              {
+                "proposal_id": "sre-proposal-read-allocation-explain",
+                "kind": "read_only_preflight",
+                "title": "重新读取 allocation explain",
+                "risk_level": "low",
+                "command_template": "POST {approved_non_master_endpoint}/_cluster/allocation/explain?include_yes_decisions=true&include_disk_info=true\n{\"index\":\"order-2024-11\",\"shard\":0,\"primary\":false}",
+                "action_text": null,
+                "target_status": "unresolved",
+                "target_rationale": "日志中的 10.1.1.1 是 dedicated master，不能据此选择为客户端协调入口；所有 Elasticsearch 提案都等待 SRE 提供非 dedicated-master 的批准协调入口。",
+                "preconditions": [
+                  "SRE 选定仍为 UNASSIGNED 的分片",
+                  "只读权限已确认"
+                ],
+                "rollback": "只读请求无需回滚；返回结构或分片状态变化时停止后续写提案。",
+                "verify_after": [
+                  "核对 reason、deciders、disk info 与当前节点状态",
+                  "与日志冲突逐项对照"
+                ],
+                "official_reference": "https://www.elastic.co/guide/en/elasticsearch/reference/7.10/cluster-allocation-explain.html (Elasticsearch 7.10; accessed 2026-08-29)",
+                "approval_required": true,
+                "executed": false,
+                "source_observation_ids": [
+                  "sre-observation-health",
+                  "sre-observation-allocation-explain"
+                ]
+              },
+              {
+                "proposal_id": "sre-proposal-read-health-nodes-pools",
+                "kind": "read_only_preflight",
+                "title": "读取 health、nodes 与 thread pools",
+                "risk_level": "low",
+                "command_template": "GET {approved_non_master_endpoint}/_cluster/health\nGET {approved_non_master_endpoint}/_cat/nodes?v\nGET {approved_non_master_endpoint}/_cat/thread_pool/write,search?v",
+                "action_text": null,
+                "target_status": "unresolved",
+                "target_rationale": "日志中的 10.1.1.1 是 dedicated master，不能据此选择为客户端协调入口；所有 Elasticsearch 提案都等待 SRE 提供非 dedicated-master 的批准协调入口。",
+                "preconditions": [
+                  "SRE 提供批准入口",
+                  "只读权限与采样窗口已确认"
+                ],
+                "rollback": "只读请求无需回滚；任何超时或权限异常即停止。",
+                "verify_after": [
+                  "复核节点数、角色、资源、queue 和 rejected",
+                  "记录与离线日志的差异"
+                ],
+                "official_reference": "https://www.elastic.co/guide/en/elasticsearch/reference/7.10/modules-node.html (Elasticsearch 7.10; accessed 2026-08-29)",
+                "approval_required": true,
+                "executed": false,
+                "source_observation_ids": [
+                  "sre-observation-metric-query-qps",
+                  "sre-observation-metric-write-qps",
+                  "sre-observation-metric-cpu",
+                  "sre-observation-metric-disk-io",
+                  "sre-observation-metric-heap",
+                  "sre-observation-metric-young-gc",
+                  "sre-observation-metric-old-gc",
+                  "sre-observation-metric-old-gc-time",
+                  "sre-observation-metric-search-latency",
+                  "sre-observation-metric-index-latency",
+                  "sre-observation-metric-write-rejected",
+                  "sre-observation-metric-search-rejected",
+                  "sre-observation-event-gc-1",
+                  "sre-observation-event-gc-2",
+                  "sre-observation-event-gc-3",
+                  "sre-observation-event-gc-4",
+                  "sre-observation-event-gc-5",
+                  "sre-observation-event-gc-6",
+                  "sre-observation-event-gc-7",
+                  "sre-observation-event-gc-8",
+                  "sre-observation-event-gc-9",
+                  "sre-observation-event-gc-10",
+                  "sre-observation-event-gc-11",
+                  "sre-observation-event-queue-rejected-1",
+                  "sre-observation-event-queue-rejected-2",
+                  "sre-observation-event-queue-rejected-3",
+                  "sre-observation-event-queue-rejected-4",
+                  "sre-observation-event-queue-rejected-5",
+                  "sre-observation-event-queue-rejected-6",
+                  "sre-observation-event-search-slow-1",
+                  "sre-observation-event-search-slow-2",
+                  "sre-observation-event-search-slow-3",
+                  "sre-observation-event-search-slow-4",
+                  "sre-observation-event-search-slow-5",
+                  "sre-observation-event-index-slow-1",
+                  "sre-observation-query-63",
+                  "sre-observation-query-72",
+                  "sre-observation-query-88",
+                  "sre-observation-query-91",
+                  "sre-observation-query-97"
+                ]
+              },
+              {
+                "proposal_id": "sre-proposal-read-node-stats",
+                "kind": "read_only_preflight",
+                "title": "读取 fielddata、熔断器与恢复状态",
+                "risk_level": "low",
+                "command_template": "GET {approved_non_master_endpoint}/_nodes/stats/indices/fielddata,breaker,thread_pool\nGET {approved_non_master_endpoint}/_cat/recovery?v",
+                "action_text": null,
+                "target_status": "unresolved",
+                "target_rationale": "日志中的 10.1.1.1 是 dedicated master，不能据此选择为客户端协调入口；所有 Elasticsearch 提案都等待 SRE 提供非 dedicated-master 的批准协调入口。",
+                "preconditions": [
+                  "SRE 提供批准入口",
+                  "只读权限已确认"
+                ],
+                "rollback": "只读请求无需回滚；响应过大或影响监控时停止。",
+                "verify_after": [
+                  "判断是否存在 fielddata 证据",
+                  "核对 circuit breaker 与 shard recovery"
+                ],
+                "official_reference": "https://www.elastic.co/guide/en/elasticsearch/reference/7.10/indices-clearcache.html (Elasticsearch 7.10; accessed 2026-08-29)",
+                "approval_required": true,
+                "executed": false,
+                "source_observation_ids": [
+                  "sre-observation-metric-query-qps",
+                  "sre-observation-metric-write-qps",
+                  "sre-observation-metric-cpu",
+                  "sre-observation-metric-disk-io",
+                  "sre-observation-metric-heap",
+                  "sre-observation-metric-young-gc",
+                  "sre-observation-metric-old-gc",
+                  "sre-observation-metric-old-gc-time",
+                  "sre-observation-metric-search-latency",
+                  "sre-observation-metric-index-latency",
+                  "sre-observation-metric-write-rejected",
+                  "sre-observation-metric-search-rejected",
+                  "sre-observation-event-gc-1",
+                  "sre-observation-event-gc-2",
+                  "sre-observation-event-gc-3",
+                  "sre-observation-event-gc-4",
+                  "sre-observation-event-gc-5",
+                  "sre-observation-event-gc-6",
+                  "sre-observation-event-gc-7",
+                  "sre-observation-event-gc-8",
+                  "sre-observation-event-gc-9",
+                  "sre-observation-event-gc-10",
+                  "sre-observation-event-gc-11",
+                  "sre-observation-event-queue-rejected-1",
+                  "sre-observation-event-queue-rejected-2",
+                  "sre-observation-event-queue-rejected-3",
+                  "sre-observation-event-queue-rejected-4",
+                  "sre-observation-event-queue-rejected-5",
+                  "sre-observation-event-queue-rejected-6",
+                  "sre-observation-event-search-slow-1",
+                  "sre-observation-event-search-slow-2",
+                  "sre-observation-event-search-slow-3",
+                  "sre-observation-event-search-slow-4",
+                  "sre-observation-event-search-slow-5",
+                  "sre-observation-event-index-slow-1",
+                  "sre-observation-query-63",
+                  "sre-observation-query-72",
+                  "sre-observation-query-88",
+                  "sre-observation-query-91",
+                  "sre-observation-query-97"
+                ]
+              },
+              {
+                "proposal_id": "sre-proposal-read-refresh-settings",
+                "kind": "read_only_preflight",
+                "title": "读取当前 refresh 设置",
+                "risk_level": "low",
+                "command_template": "GET {approved_non_master_endpoint}/order-2024-11,item-search-2024-11,user-activity-2024-11/_settings?flat_settings=true&include_defaults=true",
+                "action_text": null,
+                "target_status": "unresolved",
+                "target_rationale": "日志中的 10.1.1.1 是 dedicated master，不能据此选择为客户端协调入口；所有 Elasticsearch 提案都等待 SRE 提供非 dedicated-master 的批准协调入口。",
+                "preconditions": [
+                  "SRE 提供批准入口",
+                  "只读权限已确认"
+                ],
+                "rollback": "只读请求无需回滚；索引集合变化时重新冻结范围。",
+                "verify_after": [
+                  "逐索引保存 index.refresh_interval 原值",
+                  "向业务确认新鲜度 SLA"
+                ],
+                "official_reference": "https://www.elastic.co/guide/en/elasticsearch/reference/7.10/index-modules.html (Elasticsearch 7.10; accessed 2026-08-29)",
+                "approval_required": true,
+                "executed": false,
+                "source_observation_ids": [
+                  "sre-observation-affected-resources",
+                  "sre-observation-query-63",
+                  "sre-observation-query-72",
+                  "sre-observation-query-88",
+                  "sre-observation-query-91",
+                  "sre-observation-query-97"
+                ]
+              },
+              {
+                "proposal_id": "sre-proposal-retry-failed",
+                "kind": "write_change",
+                "title": "条件式重试失败分片",
+                "risk_level": "high",
+                "command_template": "POST {approved_non_master_endpoint}/_cluster/reroute?retry_failed=true&dry_run=true&explain=true",
+                "action_text": null,
+                "target_status": "unresolved",
+                "target_rationale": "日志中的 10.1.1.1 是 dedicated master，不能据此选择为客户端协调入口；所有 Elasticsearch 提案都等待 SRE 提供非 dedicated-master 的批准协调入口。",
+                "preconditions": [
+                  "根因已修复并确认失败重试计数",
+                  "allocation explain 与 dry_run/explain 已由 SRE 审核",
+                  "变更审批已通过"
+                ],
+                "rollback": "若 dry-run 显示非预期移动、集群负载恶化或失败数增加，停止且不执行真实 reroute。",
+                "verify_after": [
+                  "复核 UNASSIGNED 数与 allocation deciders",
+                  "观察 CPU/heap/IO/queue/rejected"
+                ],
+                "official_reference": "https://www.elastic.co/guide/en/elasticsearch/reference/7.10/cluster-reroute.html (Elasticsearch 7.10; accessed 2026-08-29)",
+                "approval_required": true,
+                "executed": false,
+                "source_observation_ids": [
+                  "sre-observation-health",
+                  "sre-observation-allocation-explain"
+                ]
+              },
+              {
+                "proposal_id": "sre-proposal-refresh-interval",
+                "kind": "write_change",
+                "title": "条件式调整指定索引 refresh interval",
+                "risk_level": "high",
+                "command_template": "PUT {approved_non_master_endpoint}/order-2024-11,item-search-2024-11,user-activity-2024-11/_settings\n{\"index\":{\"refresh_interval\":\"{approved_value}\"}}",
+                "action_text": null,
+                "target_status": "unresolved",
+                "target_rationale": "日志中的 10.1.1.1 是 dedicated master，不能据此选择为客户端协调入口；所有 Elasticsearch 提案都等待 SRE 提供非 dedicated-master 的批准协调入口。",
+                "preconditions": [
+                  "已读取每个索引当前值",
+                  "业务新鲜度 SLA 与批准值已确认",
+                  "精确回滚原值已记录",
+                  "变更审批已通过"
+                ],
+                "rollback": "逐索引恢复本次预检记录的原 refresh_interval；若 SLA 或写入延迟恶化立即回滚。",
+                "verify_after": [
+                  "复核 refresh、indexing latency、search latency 与业务新鲜度"
+                ],
+                "official_reference": "https://www.elastic.co/guide/en/elasticsearch/reference/7.10/index-modules.html (Elasticsearch 7.10; accessed 2026-08-29)",
+                "approval_required": true,
+                "executed": false,
+                "source_observation_ids": [
+                  "sre-observation-affected-resources",
+                  "sre-observation-metric-index-latency"
+                ]
+              },
+              {
+                "proposal_id": "sre-proposal-fielddata-cache",
+                "kind": "write_change",
+                "title": "有 fielddata 证据时仅清理指定索引字段缓存",
+                "risk_level": "high",
+                "command_template": "POST {approved_non_master_endpoint}/{approved_index}/_cache/clear?fielddata=true&fields={approved_fields}",
+                "action_text": null,
+                "target_status": "unresolved",
+                "target_rationale": "日志中的 10.1.1.1 是 dedicated master，不能据此选择为客户端协调入口；所有 Elasticsearch 提案都等待 SRE 提供非 dedicated-master 的批准协调入口。",
+                "preconditions": [
+                  "nodes stats 已证明具体索引/字段的 fielddata 压力",
+                  "manage 权限、影响和变更审批已确认",
+                  "禁止省略索引或 fields 范围"
+                ],
+                "rollback": "缓存清理不可恢复；如无充分 fielddata 证据、范围不明确或查询延迟恶化则不执行/立即停止。",
+                "verify_after": [
+                  "复核 fielddata bytes、breaker、GC 与查询延迟",
+                  "确认未清理全局缓存"
+                ],
+                "official_reference": "https://www.elastic.co/guide/en/elasticsearch/reference/7.10/indices-clearcache.html (Elasticsearch 7.10; accessed 2026-08-29)",
+                "approval_required": true,
+                "executed": false,
+                "source_observation_ids": [
+                  "sre-observation-event-circuit-open-1",
+                  "sre-observation-event-circuit-reset-1"
+                ]
+              }
+            ],
+            "business_mitigations": [
+              {
+                "proposal_id": "sre-proposal-limit-query-qps",
+                "kind": "business_mitigation",
+                "title": "按已观测正常基线申请查询侧限流",
+                "risk_level": "medium",
+                "command_template": null,
+                "action_text": "申请把查询流量逐步压到日志基线 600/s，观察后再放量。",
+                "target_status": "not_applicable",
+                "target_rationale": "这是业务侧止损提案，不使用 Elasticsearch endpoint。",
+                "preconditions": [
+                  "业务负责人确认影响范围与回退标准",
+                  "SRE 提供观察窗口与放量门槛"
+                ],
+                "rollback": "按审批记录恢复原流量或查询能力；若错误率或收入指标恶化立即停止。",
+                "verify_after": [
+                  "观察请求量、错误率、延迟和业务关键指标",
+                  "记录批准人与实际执行系统回执"
+                ],
+                "official_reference": null,
+                "approval_required": true,
+                "executed": false,
+                "source_observation_ids": [
+                  "sre-observation-metric-query-qps"
+                ]
+              },
+              {
+                "proposal_id": "sre-proposal-limit-write-qps",
+                "kind": "business_mitigation",
+                "title": "按已观测正常基线申请写入侧限流",
+                "risk_level": "medium",
+                "command_template": null,
+                "action_text": "申请把写入流量逐步压到日志基线 400/s，观察后再放量。",
+                "target_status": "not_applicable",
+                "target_rationale": "这是业务侧止损提案，不使用 Elasticsearch endpoint。",
+                "preconditions": [
+                  "业务负责人确认影响范围与回退标准",
+                  "SRE 提供观察窗口与放量门槛"
+                ],
+                "rollback": "按审批记录恢复原流量或查询能力；若错误率或收入指标恶化立即停止。",
+                "verify_after": [
+                  "观察请求量、错误率、延迟和业务关键指标",
+                  "记录批准人与实际执行系统回执"
+                ],
+                "official_reference": null,
+                "approval_required": true,
+                "executed": false,
+                "source_observation_ids": [
+                  "sre-observation-metric-write-qps"
+                ]
+              },
+              {
+                "proposal_id": "sre-proposal-degrade-expensive-query",
+                "kind": "business_mitigation",
+                "title": "暂停深分页与重聚合查询",
+                "risk_level": "medium",
+                "command_template": null,
+                "action_text": "申请暂停或降级日志已出现的深分页和重聚合查询，并由业务负责人确认影响范围。",
+                "target_status": "not_applicable",
+                "target_rationale": "这是业务侧止损提案，不使用 Elasticsearch endpoint。",
+                "preconditions": [
+                  "业务负责人确认影响范围与回退标准",
+                  "SRE 提供观察窗口与放量门槛"
+                ],
+                "rollback": "按审批记录恢复原流量或查询能力；若错误率或收入指标恶化立即停止。",
+                "verify_after": [
+                  "观察请求量、错误率、延迟和业务关键指标",
+                  "记录批准人与实际执行系统回执"
+                ],
+                "official_reference": null,
+                "approval_required": true,
+                "executed": false,
+                "source_observation_ids": [
+                  "sre-observation-query-63",
+                  "sre-observation-query-72",
+                  "sre-observation-query-88",
+                  "sre-observation-query-91",
+                  "sre-observation-query-97"
+                ]
+              }
+            ],
+            "resolved_target_count": 0,
+            "human_review_required": true,
+            "original_inputs_modified": false,
+            "external_action": "none"
+          },
+          "created_at": "2026-08-28T23:37:58.092243Z",
+          "external_action": "none"
+        }
+      ],
+      "artifacts": [
+        {
+          "artifact_id": "workspace-artifact-6887356cbc33",
+          "file_name": "ES故障诊断与止损建议.md",
+          "media_type": "text/markdown",
+          "size": 67698,
+          "validator_id": "validator-sre-log-diagnosis-v2",
+          "verifier_status": "passed",
+          "checks": [
+            {
+              "check_id": "check-sre-source-contract-v2",
+              "label": "唯一批准日志合同",
+              "passed": true,
+              "detail": "SRE-010 的 logical ID、文件名、展示路径、file_ref、声明大小、UTF-8 字节与章节完整性已校验。"
+            },
+            {
+              "check_id": "check-sre-observations-v2",
+              "label": "观察由原始日志动态重算",
+              "passed": true,
+              "detail": "报告必须逐项列出 167 条来源观察；Markdown 结构可解析。"
+            },
+            {
+              "check_id": "check-sre-conflicts-v2",
+              "label": "来源冲突被完整保留",
+              "passed": true,
+              "detail": "报告必须保留 3 组动态冲突，不能写成数据一致。"
+            },
+            {
+              "check_id": "check-sre-hypotheses-v2",
+              "label": "假设与观察事实分离",
+              "passed": true,
+              "detail": "每个假设必须保留支持、反证、置信度和局限，不能把相关性写成已证因果。"
+            },
+            {
+              "check_id": "check-sre-proposals-v2",
+              "label": "动作提案保持审批与未执行状态",
+              "passed": true,
+              "detail": "所有 ES 与业务提案必须逐项列出风险、未解析目标、前置、回滚、验证、审批和未执行回执。"
+            },
+            {
+              "check_id": "check-sre-ledger-v2",
+              "label": "观察与动作台账可独立解析",
+              "passed": true,
+              "detail": "CSV 必须逐字段覆盖观察、冲突、假设和提案且无缺行、重复行或状态漂移；解析 183 行唯一台账。"
+            },
+            {
+              "check_id": "check-sre-locators-v2",
+              "label": "日志原文位置可回开",
+              "passed": true,
+              "detail": "成果必须保留 161 个服务端日志 locator。"
+            },
+            {
+              "check_id": "check-sre-dynamic-metrics-v2",
+              "label": "指标与事件数量由来源复算",
+              "passed": true,
+              "detail": "QPS、节点、资源、GC、慢查询、拒绝、分片和恢复事件不得使用旧固定常量。"
+            },
+            {
+              "check_id": "check-sre-target-v2",
+              "label": "dedicated master 未被当作建议目标",
+              "passed": true,
+              "detail": "日志中的 dedicated master 只作为来源事实；所有 ES proposal 等待批准的非 master 协调入口。"
+            },
+            {
+              "check_id": "check-sre-official-references-v2",
+              "label": "官方 API 参考与现场批准分离",
+              "passed": true,
+              "detail": "官方文档只解释 Elasticsearch 7.10 API 语义，不作为当前现场执行批准。"
+            },
+            {
+              "check_id": "check-sre-no-execution-v2",
+              "label": "无命令或业务降级执行",
+              "passed": true,
+              "detail": "Adapter 只生成本地 Markdown/CSV；没有连接集群、发送 HTTP、执行 ES 命令或实施业务限流。"
+            },
+            {
+              "check_id": "check-sre-canonical-bytes-v2",
+              "label": "两份成果为来源重算后的规范字节",
+              "passed": true,
+              "detail": "Verifier 重新读取批准日志并解析最终 Markdown/CSV；任一数字、locator、冲突、证据或安全字段变化均转红。"
+            }
+          ],
+          "review_required": true,
+          "deliverable_type": "来源推导的离线事故复盘 Markdown",
+          "key_outputs": [
+            "来源日志 232 行",
+            "来源冲突 3 组",
+            "SRE 假设 2 个",
+            "批准入口 resolved 0 个"
+          ],
+          "key_outputs_label": "动态观察与复核边界",
+          "review_guidance": "请先核实 3 组来源冲突并提供批准的非 dedicated-master 协调入口；所有命令与业务止损仍未执行。",
+          "execution_summary": "生成两份隔离成果，共享 12 项来源重算检查；原日志未修改，external_action=none。",
+          "outbound_flow_outcome": null,
+          "self_test": null,
+          "external_action": "none",
+          "original_inputs_modified": false
+        },
+        {
+          "artifact_id": "workspace-artifact-455269f9834b",
+          "file_name": "SRE事故观察与动作台账.csv",
+          "media_type": "text/csv",
+          "size": 90359,
+          "validator_id": "validator-sre-log-diagnosis-v2",
+          "verifier_status": "passed",
+          "checks": [
+            {
+              "check_id": "check-sre-source-contract-v2",
+              "label": "唯一批准日志合同",
+              "passed": true,
+              "detail": "SRE-010 的 logical ID、文件名、展示路径、file_ref、声明大小、UTF-8 字节与章节完整性已校验。"
+            },
+            {
+              "check_id": "check-sre-observations-v2",
+              "label": "观察由原始日志动态重算",
+              "passed": true,
+              "detail": "报告必须逐项列出 167 条来源观察；Markdown 结构可解析。"
+            },
+            {
+              "check_id": "check-sre-conflicts-v2",
+              "label": "来源冲突被完整保留",
+              "passed": true,
+              "detail": "报告必须保留 3 组动态冲突，不能写成数据一致。"
+            },
+            {
+              "check_id": "check-sre-hypotheses-v2",
+              "label": "假设与观察事实分离",
+              "passed": true,
+              "detail": "每个假设必须保留支持、反证、置信度和局限，不能把相关性写成已证因果。"
+            },
+            {
+              "check_id": "check-sre-proposals-v2",
+              "label": "动作提案保持审批与未执行状态",
+              "passed": true,
+              "detail": "所有 ES 与业务提案必须逐项列出风险、未解析目标、前置、回滚、验证、审批和未执行回执。"
+            },
+            {
+              "check_id": "check-sre-ledger-v2",
+              "label": "观察与动作台账可独立解析",
+              "passed": true,
+              "detail": "CSV 必须逐字段覆盖观察、冲突、假设和提案且无缺行、重复行或状态漂移；解析 183 行唯一台账。"
+            },
+            {
+              "check_id": "check-sre-locators-v2",
+              "label": "日志原文位置可回开",
+              "passed": true,
+              "detail": "成果必须保留 161 个服务端日志 locator。"
+            },
+            {
+              "check_id": "check-sre-dynamic-metrics-v2",
+              "label": "指标与事件数量由来源复算",
+              "passed": true,
+              "detail": "QPS、节点、资源、GC、慢查询、拒绝、分片和恢复事件不得使用旧固定常量。"
+            },
+            {
+              "check_id": "check-sre-target-v2",
+              "label": "dedicated master 未被当作建议目标",
+              "passed": true,
+              "detail": "日志中的 dedicated master 只作为来源事实；所有 ES proposal 等待批准的非 master 协调入口。"
+            },
+            {
+              "check_id": "check-sre-official-references-v2",
+              "label": "官方 API 参考与现场批准分离",
+              "passed": true,
+              "detail": "官方文档只解释 Elasticsearch 7.10 API 语义，不作为当前现场执行批准。"
+            },
+            {
+              "check_id": "check-sre-no-execution-v2",
+              "label": "无命令或业务降级执行",
+              "passed": true,
+              "detail": "Adapter 只生成本地 Markdown/CSV；没有连接集群、发送 HTTP、执行 ES 命令或实施业务限流。"
+            },
+            {
+              "check_id": "check-sre-canonical-bytes-v2",
+              "label": "两份成果为来源重算后的规范字节",
+              "passed": true,
+              "detail": "Verifier 重新读取批准日志并解析最终 Markdown/CSV；任一数字、locator、冲突、证据或安全字段变化均转红。"
+            }
+          ],
+          "review_required": true,
+          "deliverable_type": "可独立复算的观察与动作 CSV 台账",
+          "key_outputs": [
+            "观察 167 条",
+            "未分类观察 14 条",
+            "ES 提案 8 个",
+            "业务止损提案 3 个"
+          ],
+          "key_outputs_label": "逐项可审计记录",
+          "review_guidance": "请先核实 3 组来源冲突并提供批准的非 dedicated-master 协调入口；所有命令与业务止损仍未执行。",
+          "execution_summary": "生成两份隔离成果，共享 12 项来源重算检查；原日志未修改，external_action=none。",
+          "outbound_flow_outcome": null,
+          "self_test": null,
+          "external_action": "none",
+          "original_inputs_modified": false
+        }
+      ],
+      "artifact_downloads": [
+        {
+          "artifact_id": "workspace-artifact-6887356cbc33",
+          "file_name": "ES故障诊断与止损建议.md",
+          "status_code": 200,
+          "content_type": "text/markdown",
+          "declared_size": 67698,
+          "downloaded_size": 67698,
+          "sha256": "819e59c1d84af64609622d28d88282417a22214a0dc84808f2f55fe2d756d4c0",
+          "size_matches": true,
+          "content_gate": null
+        },
+        {
+          "artifact_id": "workspace-artifact-455269f9834b",
+          "file_name": "SRE事故观察与动作台账.csv",
+          "status_code": 200,
+          "content_type": "text/csv",
+          "declared_size": 90359,
+          "downloaded_size": 90359,
+          "sha256": "253580d289e5d59b5a75f409b95983bb6983dc1cb10fa18ba111c756cc50d356",
+          "size_matches": true,
+          "content_gate": null
+        }
+      ],
+      "expected_artifacts": [
+        "ES故障诊断与止损建议.md",
+        "SRE事故观察与动作台账.csv"
+      ],
+      "events": [
+        {
+          "sequence": 3,
+          "event_name": "planning_started",
+          "status": "planning"
+        },
+        {
+          "sequence": 4,
+          "event_name": "planning_completed",
+          "status": "planning"
+        },
+        {
+          "sequence": 6,
+          "event_name": "deterministic_office_tool_started",
+          "status": "validating"
+        },
+        {
+          "sequence": 7,
+          "event_name": "run_workspace_artifact_written",
+          "status": "validating"
+        },
+        {
+          "sequence": 8,
+          "event_name": "run_workspace_artifact_written",
+          "status": "validating"
+        },
+        {
+          "sequence": 9,
+          "event_name": "deterministic_verification_completed",
+          "status": "validating"
+        },
+        {
+          "sequence": 10,
+          "event_name": "analysis_started",
+          "status": "analyzing"
+        },
+        {
+          "sequence": 11,
+          "event_name": "analysis_completed",
+          "status": "analyzing"
+        }
+      ],
+      "waiting_branches": [
+        {
+          "branch_id": "branch-80b8c4ab5651",
+          "title": "读取算法研发运行日志",
+          "status": "waiting_input",
+          "missing_file_count": 1
+        },
+        {
+          "branch_id": "branch-720421d55d33",
+          "title": "读取搜索代理配置",
+          "status": "waiting_input",
+          "missing_file_count": 1
+        },
+        {
+          "branch_id": "branch-7cc385d5cbab",
+          "title": "读取搜索代理工作流",
+          "status": "waiting_input",
+          "missing_file_count": 1
+        },
+        {
+          "branch_id": "branch-38f05b86a663",
+          "title": "读取技术设计文档",
+          "status": "waiting_input",
+          "missing_file_count": 1
+        },
+        {
+          "branch_id": "branch-8d9c91d2a1b1",
+          "title": "生成初步分析结果",
+          "status": "waiting_input",
+          "missing_file_count": 4
+        }
+      ],
+      "validation_errors": [],
+      "timed_out": false,
+      "effect_gate_passed": true,
+      "failure_reason": null
+    }
+  ],
+  "claim_boundary": "该证据仅证明固定服务配置下真实模型调用、运行工作区文件和确定性检查；不证明真实用户理解、生产安全沙箱或外部动作能力。"
+}

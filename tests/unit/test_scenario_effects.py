@@ -999,8 +999,13 @@ def test_customer_sre_and_ux_outputs_retain_deterministic_business_facts(
 
     _, sre = _execute("TC-14", catalog)
     sre_report = sre.artifacts[0].content.decode("utf-8")
-    assert "约 8 倍" in sre_report
-    assert "仅建议，未执行" in sre_report
+    assert len(sre.artifacts) == 2
+    assert sre.artifacts[0].sre_diagnosis_outcome is not None
+    assert sre.artifacts[1].sre_diagnosis_outcome == sre.artifacts[0].sre_diagnosis_outcome
+    assert sre.artifacts[0].sre_diagnosis_outcome.conflict_count == 3
+    assert "query_qps_multiplier" in sre_report
+    assert "没有连接 Elasticsearch" in sre_report
+    assert "external_action=none" in sre_report
 
     _, ux = _execute("TC-15", catalog)
     ux_rows = list(
