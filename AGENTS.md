@@ -59,6 +59,14 @@ must appear before audit gaps, and grouping requires both the same candidate sou
 and the same failure detail; it is only a browser projection, not a merge of server
 Branches or proof that the Run completed.
 
+DR-0037 governs TC-05 Artifact meaning and review typography. Read
+`docs/decisions/DR-0037-tc05-artifact-semantics-and-review-readability.md` and
+`docs/scenarios/SCENARIO-023-understand-finance-artifacts-and-review-evidence.md`
+before changing fixed finance artifacts or review type scale. Artifact
+`source_file_refs` are content sources; EffectReceipt refs may describe wider
+task context. The two TC-05 CSVs are 2026-only and 31/2 are record counts; only
+the note owns the three-period comparison. Finance-018 is not a general verifier.
+
 源码永远高于文档。行为或叙事变化后必须同步 living docs、Decision、Scenario、
 Source、Evidence 和 UI-server fact mapping，不能只更新 README。
 
@@ -77,6 +85,7 @@ Source、Evidence 和 UI-server fact mapping，不能只更新 README。
 - 终态 `result.follow_ups` 最多显示 4 条 Agent 下一步建议。建议不是执行事实；当前协议没有逐项引用，审查页只能把 Finding refs 并集标为本轮上下文，不得冒充直接证据。只有用户点击“确认并启动”后才创建新的独立 Run，旧 Run/结果不得被覆盖。
 - 默认预算为 12 轮、每轮 16 文件、30 次模型调用和 7200 秒 active deadline；允许上限为 24/24/60/14400。`waiting_input`、显式 pause 和 terminal 状态冻结 elapsed，合法 resume 从已用 active elapsed 继续。validated plan unit 由服务端编译为稳定 Branch；Evidence Gate 按 Branch 维护已核对/缺失引用。证据不足且预算允许时进入 `waiting_input/paused`，用户只选择一条 waiting Branch 继续，下一轮范围严格等于该 Branch 的 `missing_file_refs`，其他 Branch 保持等待。合法范围内的 Analyst 原文定位或结构输出失败最多受控重试一次：可定位 Finding 可部分采用；全不可用时保留 Plan/Branch/调用事实，并以 `next_step.recovery_kind=source_location|analysis_output` 暂停最小分支；范围越权和完整性错误仍 fail closed。每个完成轮次生成独立 append-only 逻辑 evidence-brief ArtifactVersion，成功终态新增 TaskCommit 指针而不改写版本。当前固定确定性办公工具在计划校验后可生成真实隔离 Artifact 和检查回执；Analyst 未采用不会删除该成果。`completed` 仍只表示 Loop 合同通过，不自动证明模型质量、任意任务正确、原文件写入、Worker/Connector 或外部动作发生。
 - passed Artifact 与 waiting audit gap 必须分开显示：成果先展示，Gap 只说明 Agent 来源位置待补充；候选来源和失败说明都相同的多个 Gap 可在浏览器合并展示，但 Snapshot Branch 不变，也不能把 Artifact 通过写成 Run `completed`。
+- TC-05 成果卡必须从服务端 Artifact 字段显示涵盖期间、统计口径、用途和可选记录数；两个 CSV 只绑定 2026 内容来源，三期说明才绑定三期来源与僵尸比较。EffectReceipt 的任务上下文不得冒充单个文件的内容覆盖。
 - `pause/resume/steer/stop/rollback/decision` 必须携带 expected version 与幂等键。Branch resume 还携带 `branch_id`；rollback 还携带 `artifact_version`，只新增 TaskCommit 并恢复逻辑 Brief，不删除历史或回滚源文件。decision 把 `accept/decline/defer/cancel` 绑定到当前 DecisionRequest/Finding/Resolution/Branch；accept 证据候选还必须携带 source revision，服务端重新读取 Catalog 并重算 candidate。关闭待决页记录 defer，defer 后仍可继续最终决定；cancel 不冒充 rejected。它们不改变原文件或外部状态。pause/stop 只在模型调用之间的安全点生效；steer 只影响下一轮；deadline 阻止新调用但不硬取消在途 HTTP 请求。预算终态必须显示 `budget.stop_reason` 的具体中文原因，不得只显示 raw `budget_exhausted`；terminal Run 不得 resume，只能按 Branch 创建新 Run。
 - 开放待决单以 Snapshot 顶层 `decision_requests[]` 为权威，旧轮次投影只作兼容读取。关闭或 Escape 必须先退出审查页，再尝试写入 defer；409/断网只显示非阻塞错误并刷新 Snapshot，不能把用户困在弹窗，也不能伪造回执成功。Evidence Gap 区固定使用“分支 -> 当前材料 -> Evidence Gate -> 下一步”的 Branch lane；各单元只能来自 Branch/Gap/Resolution/Decision 服务端事实，不得把可视分支解释成并行 Worker。普通可恢复 Branch 必须明确“无需核对文件，建议重试”，首屏只给一个推荐 resume 且折叠可选输入/审计；ambiguous Branch 必须明确“从 N 个原文位置中选 1 个”，不默认选择并在未选前禁用 accept。
 - Snapshot 是状态权威，SSE 是有序变更投影。浏览器只单调应用 version/sequence，nonterminal 断线用 GET + `after=N`，terminal event 后 final GET。

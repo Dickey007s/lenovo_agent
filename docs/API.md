@@ -230,8 +230,8 @@ Important fields:
       "artifact_id": "workspace-artifact-0123456789ab",
       "capability_id": "office-finance-reconciliation",
       "scenario_id": "TC-05",
-      "title": "跨期往来款核对结果",
-      "file_name": "跨期往来款核对结果.csv",
+      "title": "2026 期末未付明细",
+      "file_name": "未付统计.csv",
       "media_type": "text/csv",
       "size": 4821,
       "version": 1,
@@ -240,8 +240,13 @@ Important fields:
       "validator_id": "validator-finance-reconciliation-v1",
       "verifier_status": "passed",
       "checks": [
-        {"check_id": "check-row-formula", "label": "逐行公式复算", "passed": true, "detail": "全部通过"}
+        {"check_id": "check-finance-unpaid-rows", "label": "未付逐行复算", "passed": true, "detail": "31 条贷方期末余额逐行相等"}
       ],
+      "summary": "31 条记录已逐行复算。",
+      "covered_period": "2026 年期末",
+      "statistic_basis": "筛选期末余额大于 0 且方向为‘贷’的行；每行代表一个科目与客商组合。",
+      "purpose": "查看 2026 年期末待付款项；不是三期合并表。",
+      "record_count": 31,
       "download_path": "/v1/harness/runs/harness:.../artifacts/workspace-artifact-0123456789ab",
       "original_inputs_modified": false,
       "review_required": true,
@@ -501,6 +506,10 @@ server-owned validator and its checks. Only `verifier_status=passed`, verified
 bytes and a successful Owner-scoped download prove that the fixed local adapter
 created a real Run Workspace file. They do not prove arbitrary instructions are
 implemented, and they never authorize a source-file or external-system mutation.
+For one Artifact, `source_file_refs` identifies content sources. Optional
+`covered_period/statistic_basis/purpose/record_count` are service-owned display
+facts. The EffectReceipt may cite a wider fixed-adapter task context; clients
+must not infer an Artifact's period or row semantics from source count.
 
 `artifact_versions` and `commits` are safe Snapshot projections of independent
 append-only Store records. ArtifactVersion contains the complete logical

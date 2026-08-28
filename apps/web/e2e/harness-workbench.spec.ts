@@ -109,7 +109,7 @@ function previewFor(fileRef: string) {
       notes: ["清单、大小与 SHA-256 已在服务端核对", "没有执行宏、脚本或外部资源"],
     },
   };
-  if (fileRef === csvFile.file_ref) return { ...base, kind: "table", columns: ["客商", "方向", "期末余额"], rows: [{ row_number: 2, values: ["星海科技", "借", "1500000"] }], total_rows: 30 };
+  if (fileRef === csvFile.file_ref) return { ...base, kind: "table", columns: ["客商", "方向", "期末余额"], rows: [{ row_number: 2, values: ["星海科技股份有限公司华东区域企业服务中心", "借", "1,500,000.00"] }], total_rows: 30 };
   if (fileRef === pdfFile.file_ref) return { ...base, kind: "pdf", text: "授权范围：仅限本项目合同审阅。", page_count: 2 };
   if (fileRef === docxFile.file_ref) return { ...base, kind: "document", text: "岗位职责：负责商户拓展与经营分析。" };
   if (fileRef === workflowFile.file_ref) return { ...base, kind: "text", text: "AI 搜索 Agent - Workflow 核心模块\n\nclass QueryAnalysisNode:\n    intent = llm.classify(query)\n    rewritten = llm.rewrite(query)\n    drift_score = semantic_drift(query, rewritten)\n\nclass SearchPlanNode:\n    route = choose(intent, rewritten)\n    if intent == 'news':\n        route.append('web_search_news')\n\nclass FallbackPlanNode:\n    route = choose(intent, rewritten)" };
@@ -374,34 +374,98 @@ function snapshot(
 
 function verifiedEffectSnapshot(body: { workspace_id: string; instruction: string }) {
   const base = snapshot(body, "completed", 20);
-  const artifactId = "workspace-artifact-111111111111";
+  const artifactIds = [
+    "workspace-artifact-111111111111",
+    "workspace-artifact-222222222222",
+    "workspace-artifact-333333333333",
+  ];
+  const artifacts = [{
+    artifact_id: artifactIds[0],
+    capability_id: "office-finance-reconciliation",
+    scenario_id: "TC-05",
+    title: "2026 期末未付明细",
+    file_name: "未付统计.csv",
+    media_type: "text/csv",
+    size: 2399,
+    version: 1,
+    round_number: 1,
+    source_file_refs: [csvFile.file_ref],
+    validator_id: "validator-finance-reconciliation-v1",
+    verifier_status: "passed",
+    checks: [
+      { check_id: "check-finance-current-source", label: "2026 内容来源", passed: true, detail: "明细行只取自 2026 往来工作簿，不是三期合并表。" },
+      { check_id: "check-finance-unpaid-rows", label: "未付逐行复算", passed: true, detail: "31 条贷方期末余额逐行相等。" },
+      { check_id: "check-finance-unpaid-sort", label: "未付排序", passed: true, detail: "按客商升序、同客商金额降序。" },
+    ],
+    summary: "31 条记录已逐行复算。",
+    covered_period: "2026 年期末",
+    statistic_basis: "筛选期末余额大于 0 且方向为“贷”的行；每行代表一个科目与客商组合。",
+    purpose: "查看 2026 年期末待付款项；不是三期合并表。",
+    record_count: 31,
+    download_path: `/v1/harness/runs/${base.run_id}/artifacts/${artifactIds[0]}`,
+    created_at: new Date().toISOString(),
+    original_inputs_modified: false,
+    review_required: true,
+    external_action: "none",
+  }, {
+    artifact_id: artifactIds[1],
+    capability_id: "office-finance-reconciliation",
+    scenario_id: "TC-05",
+    title: "2026 期末未收明细",
+    file_name: "未收统计.csv",
+    media_type: "text/csv",
+    size: 340,
+    version: 1,
+    round_number: 1,
+    source_file_refs: [csvFile.file_ref],
+    validator_id: "validator-finance-reconciliation-v1",
+    verifier_status: "passed",
+    checks: [
+      { check_id: "check-finance-current-source", label: "2026 内容来源", passed: true, detail: "明细行只取自 2026 往来工作簿，不是三期合并表。" },
+      { check_id: "check-finance-unreceived-rows", label: "未收逐行复算", passed: true, detail: "2 条借方期末余额逐行相等。" },
+      { check_id: "check-finance-unreceived-sort", label: "未收排序", passed: true, detail: "按客商升序、同客商金额降序。" },
+    ],
+    summary: "2 条记录已逐行复算。",
+    covered_period: "2026 年期末",
+    statistic_basis: "筛选期末余额大于 0 且方向为“借”的行；每行代表一个科目与客商组合。",
+    purpose: "查看 2026 年期末待收款项；2 表示记录数，不是期间数。",
+    record_count: 2,
+    download_path: `/v1/harness/runs/${base.run_id}/artifacts/${artifactIds[1]}`,
+    created_at: new Date().toISOString(),
+    original_inputs_modified: false,
+    review_required: true,
+    external_action: "none",
+  }, {
+    artifact_id: artifactIds[2],
+    capability_id: "office-finance-reconciliation",
+    scenario_id: "TC-05",
+    title: "三期僵尸账款核对说明",
+    file_name: "跨期核对说明.md",
+    media_type: "text/markdown",
+    size: 620,
+    version: 1,
+    round_number: 1,
+    source_file_refs: [csvFile.file_ref, pdfFile.file_ref, docxFile.file_ref],
+    validator_id: "validator-finance-reconciliation-v1",
+    verifier_status: "passed",
+    checks: [
+      { check_id: "check-finance-source", label: "三期来源完整", passed: true, detail: "三个固定期间工作簿均通过 Catalog 完整性检查。" },
+      { check_id: "check-finance-zombie", label: "跨期僵尸账款复算", passed: true, detail: "按同一客商、同一科目、三期借方期末余额逐项比较。" },
+    ],
+    summary: "三期借方未收余额已比较，结论为无僵尸账款。",
+    covered_period: "2025 年上半年、2025 年下半年、2026 年",
+    statistic_basis: "按同一科目名称与客商名称，对三期正数借方期末余额逐项比较。",
+    purpose: "识别三期借方未收余额连续不变的僵尸账款候选。",
+    record_count: null,
+    download_path: `/v1/harness/runs/${base.run_id}/artifacts/${artifactIds[2]}`,
+    created_at: new Date().toISOString(),
+    original_inputs_modified: false,
+    review_required: true,
+    external_action: "none",
+  }];
   return {
     ...base,
-    workspace_artifacts: [{
-      artifact_id: artifactId,
-      capability_id: "office-finance-reconciliation",
-      scenario_id: "TC-05",
-      title: "未付统计",
-      file_name: "未付统计.csv",
-      media_type: "text/csv",
-      size: 2399,
-      version: 1,
-      round_number: 1,
-      source_file_refs: [csvFile.file_ref, pdfFile.file_ref],
-      validator_id: "validator-finance-reconciliation-v1",
-      verifier_status: "passed",
-      checks: [
-        { check_id: "check-finance-source", label: "三期来源完整", passed: true, detail: "三个固定期间工作簿均通过 Catalog 完整性检查。" },
-        { check_id: "check-finance-unpaid-rows", label: "未付逐行复算", passed: true, detail: "31 条贷方期末余额逐行相等。" },
-        { check_id: "check-finance-unpaid-sort", label: "未付排序", passed: true, detail: "按客商升序、同客商金额降序。" },
-      ],
-      summary: "31 条未付记录已逐行复算。",
-      download_path: `/v1/harness/runs/${base.run_id}/artifacts/${artifactId}`,
-      created_at: new Date().toISOString(),
-      original_inputs_modified: false,
-      review_required: true,
-      external_action: "none",
-    }],
+    workspace_artifacts: artifacts,
     effect_receipts: [{
       receipt_id: "effect-receipt-111111111111",
       capability_id: "office-finance-reconciliation",
@@ -409,11 +473,11 @@ function verifiedEffectSnapshot(body: { workspace_id: string; instruction: strin
       status: "passed",
       state: "已冻结 3 份 FORTE 输入，原始文件保持只读。",
       action: "调用确定性财务核对工具并写入隔离运行工作区。",
-      observation: "生成 1 份真实成果文件，执行 3 项确定性检查。",
+      observation: "生成 3 份真实成果文件，执行 8 项确定性检查。",
       cost: "0 次额外模型调用；仅消耗本机确定性计算。",
       result: "所有确定性效果门通过，成果仍需用户复核。",
       source_file_refs: [csvFile.file_ref, pdfFile.file_ref],
-      artifact_ids: [artifactId],
+      artifact_ids: artifactIds,
       prohibited_side_effects: ["不覆盖原始账表", "不记账", "不发起付款"],
       created_at: new Date().toISOString(),
       external_action: "none",
@@ -454,6 +518,33 @@ function boundedEffectSnapshot(body: { workspace_id: string; instruction: string
       { sequence: 17, event_name: "scenario_effect_bounded", occurred_at: new Date().toISOString(), status: "verifying", message: "按外部事实边界阻断；没有生成伪造结果。", details: {} },
     ],
     last_event_sequence: 18,
+  };
+}
+
+function tableEvidenceReviewSnapshot(body: { workspace_id: string; instruction: string }) {
+  const base: any = snapshot(body, "completed", 20);
+  const original = base.result.findings[0];
+  const tableFinding = {
+    ...original,
+    title: "超长客商期末余额需要复核",
+    detail: "星海科技股份有限公司华东区域企业服务中心的期末余额需要结合方向与金额核对。",
+    file_refs: [csvFile.file_ref],
+    evidence_anchors: [{
+      file_ref: csvFile.file_ref,
+      role: "observed",
+      label: "客商期末余额",
+      locator_kind: "table_rows",
+      start: 2,
+      end: 2,
+      excerpt: "星海科技股份有限公司华东区域企业服务中心 | 借 | 1,500,000.00",
+    }],
+  };
+  return {
+    ...base,
+    result: { ...base.result, findings: [tableFinding] },
+    rounds: base.rounds.map((round: any, index: number) => index === 0
+      ? { ...round, result: { ...round.result, findings: [tableFinding] } }
+      : round),
   };
 }
 
@@ -686,7 +777,7 @@ function locationFailureSnapshot(body: { workspace_id: string; instruction: stri
 }
 async function fulfillJson(route: Route, body: unknown, status = 200) { await route.fulfill({ status, contentType: "application/json", body: JSON.stringify(body) }); }
 
-async function mockHarness(page: Page, options: { failFirstStart?: boolean; failDecisionDefer?: boolean; disconnect?: boolean; failed?: boolean; locationFailure?: boolean; sourceRecovery?: boolean; sourceRecoveryThreeCandidates?: boolean; verifiedArtifactAuditPending?: boolean; verifiedArtifactAuditPendingDistinct?: boolean; boundedRecovery?: boolean; effectArtifact?: boolean; effectBoundary?: boolean; workspaceFailures?: number; interactiveLoop?: boolean; evidenceGate?: boolean } = {}) {
+async function mockHarness(page: Page, options: { failFirstStart?: boolean; failDecisionDefer?: boolean; disconnect?: boolean; failed?: boolean; locationFailure?: boolean; sourceRecovery?: boolean; sourceRecoveryThreeCandidates?: boolean; verifiedArtifactAuditPending?: boolean; verifiedArtifactAuditPendingDistinct?: boolean; boundedRecovery?: boolean; effectArtifact?: boolean; effectBoundary?: boolean; reviewTable?: boolean; workspaceFailures?: number; interactiveLoop?: boolean; evidenceGate?: boolean } = {}) {
   let workspaceCalls = 0; let startCalls = 0; let streamCalls = 0;
   let currentBody = { workspace_id: "forte-public-office", instruction: "" };
   // Mock snapshots intentionally cover several server state shapes in one route.
@@ -717,6 +808,8 @@ async function mockHarness(page: Page, options: { failFirstStart?: boolean; fail
       if (options.failFirstStart && startCalls === 1) return fulfillJson(route, { detail: "任务启动结果未知" }, 503);
       currentSnapshot = options.verifiedArtifactAuditPending || options.verifiedArtifactAuditPendingDistinct
         ? verifiedArtifactAuditPendingSnapshot(body, options.verifiedArtifactAuditPendingDistinct)
+        : options.reviewTable
+        ? tableEvidenceReviewSnapshot(body)
         : options.effectArtifact
         ? verifiedEffectSnapshot(body)
         : options.effectBoundary
@@ -907,17 +1000,28 @@ test("shows a real run-workspace file, deterministic checks and a download", asy
   await page.getByRole("button", { name: "启动 Control Loop" }).click();
 
   const artifacts = page.locator(".workspace-artifacts");
-  await expect(artifacts).toContainText("Agent 已生成 1 份真实成果文件");
-  await expect(artifacts).toContainText("未付统计.csv");
-  await expect(artifacts).toContainText("3/3 项检查通过");
+  await expect(artifacts).toContainText("Agent 已生成 3 份真实成果文件");
+  await expect(artifacts).toContainText("2026 期末未付明细");
+  await expect(artifacts).toContainText("2026 期末未收明细");
+  await expect(artifacts).toContainText("三期僵尸账款核对说明");
+  await expect(artifacts).toContainText("8/8 项检查通过");
+  await expect(artifacts).toContainText("涵盖期间");
+  await expect(artifacts).toContainText("统计口径");
+  await expect(artifacts).toContainText("用途");
+  await expect(artifacts).toContainText("31 条记录");
+  await expect(artifacts).toContainText("2 条记录");
+  await expect(artifacts).toContainText("不是三期合并表");
+  await expect(artifacts).toContainText("2025 年上半年、2025 年下半年、2026 年");
+  await expect(artifacts).toContainText("1 份内容来源");
+  await expect(artifacts).toContainText("3 份内容来源");
   await expect(artifacts).toContainText("原始 FORTE 文件没有被修改");
-  await artifacts.getByText("查看逐项检查").click();
+  await artifacts.getByText("查看逐项检查").first().click();
   await expect(artifacts).toContainText("31 条贷方期末余额逐行相等");
   await artifacts.getByText("查看效果回执").click();
   await expect(artifacts).toContainText("0 次额外模型调用");
 
   const downloadPromise = page.waitForEvent("download");
-  await artifacts.getByRole("button", { name: "下载成果" }).click();
+  await artifacts.getByRole("button", { name: "下载成果" }).first().click();
   const download = await downloadPromise;
   expect(download.suggestedFilename()).toBe("未付统计.csv");
 
@@ -925,11 +1029,17 @@ test("shows a real run-workspace file, deterministic checks and a download", asy
     await page.screenshot({ path: "../../docs/evidence/screenshots/scenario-effect-gate-desktop.png", fullPage: true });
     await artifacts.screenshot({ path: "../../docs/evidence/screenshots/scenario-effect-gate-artifact-desktop.png" });
   }
+  if (process.env.CAPTURE_DR0037_EVIDENCE === "1") {
+    await artifacts.screenshot({ path: "../../docs/evidence/screenshots/dr-0037-tc05-artifact-semantics-desktop.png" });
+  }
   await page.setViewportSize({ width: 390, height: 844 });
   const metrics = await page.evaluate(() => ({ viewport: document.documentElement.clientWidth, scroll: document.documentElement.scrollWidth }));
   expect(metrics.scroll).toBeLessThanOrEqual(metrics.viewport);
   const artifactMetrics = await artifacts.evaluate((element) => ({ width: element.clientWidth, scroll: element.scrollWidth }));
   expect(artifactMetrics.scroll).toBeLessThanOrEqual(artifactMetrics.width);
+  if (process.env.CAPTURE_DR0037_EVIDENCE === "1") {
+    await artifacts.screenshot({ path: "../../docs/evidence/screenshots/dr-0037-tc05-artifact-semantics-mobile.png" });
+  }
   if (process.env.CAPTURE_SCENARIO_EFFECT_GATE === "1") {
     await artifacts.screenshot({ path: "../../docs/evidence/screenshots/scenario-effect-gate-artifact-mobile.png" });
     await page.screenshot({ path: "../../docs/evidence/screenshots/scenario-effect-gate-mobile.png", fullPage: true });
@@ -1119,6 +1229,55 @@ test("opens a cited source file from an analysis finding", async ({ page }) => {
   await page.getByRole("button", { name: workflowFile.display_label }).last().click();
   await expect(page.getByText("class QueryAnalysisNode:")).toBeVisible();
   await expect(page.getByRole("button", { name: "预览" })).toHaveClass(/is-active/);
+});
+
+test("keeps the review body, evidence and safe table preview readable on desktop and mobile", async ({ page }) => {
+  await page.setViewportSize({ width: 1600, height: 1000 });
+  await mockHarness(page, { reviewTable: true });
+  await page.goto("/");
+  await page.getByRole("textbox", { name: "任务指令" }).fill("核对超长客商的期末余额并打开问题审查页。");
+  await page.getByRole("button", { name: "启动 Control Loop" }).click();
+  await page.getByRole("button", { name: /发现与建议/ }).click();
+  await page.getByRole("button", { name: "打开审查页" }).first().click();
+
+  const dialog = page.getByRole("dialog");
+  await expect(dialog).toContainText("星海科技股份有限公司华东区域企业服务中心");
+  await expect(dialog).toContainText("1,500,000.00");
+  const sizes = await dialog.evaluate((element) => {
+    const size = (selector: string) => {
+      const node = element.querySelector(selector);
+      return node ? Number.parseFloat(getComputedStyle(node).fontSize) : 0;
+    };
+    return {
+      fact: size(".review-summary-steps strong"),
+      impact: size(".evidence-review-claim details p"),
+      excerpt: size(".evidence-anchor-item q"),
+      metadata: size(".evidence-anchor-item em"),
+      callout: size(".active-evidence-callout q"),
+      table: size(".table-preview td"),
+    };
+  });
+  expect(sizes.fact).toBeGreaterThanOrEqual(14);
+  expect(sizes.impact).toBeGreaterThanOrEqual(14);
+  expect(sizes.excerpt).toBeGreaterThanOrEqual(13);
+  expect(sizes.metadata).toBeGreaterThanOrEqual(11);
+  expect(sizes.callout).toBeGreaterThanOrEqual(13);
+  expect(sizes.table).toBeGreaterThanOrEqual(15);
+  const desktopOverflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+  expect(desktopOverflow).toBeLessThanOrEqual(0);
+  if (process.env.CAPTURE_DR0037_EVIDENCE === "1") {
+    await dialog.screenshot({ path: "../../docs/evidence/screenshots/dr-0037-review-readability-desktop.png" });
+  }
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  const mobileOverflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+  expect(mobileOverflow).toBeLessThanOrEqual(0);
+  const reviewOverflow = await dialog.evaluate((element) => element.scrollWidth - element.clientWidth);
+  expect(reviewOverflow).toBeLessThanOrEqual(0);
+  await expect(dialog.getByRole("button", { name: "关闭问题审查页" })).toBeVisible();
+  if (process.env.CAPTURE_DR0037_EVIDENCE === "1") {
+    await dialog.screenshot({ path: "../../docs/evidence/screenshots/dr-0037-review-readability-mobile.png" });
+  }
 });
 
 test("turns a finding into an evidence-backed human decision and a new task", async ({ page }) => {

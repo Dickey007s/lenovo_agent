@@ -276,6 +276,15 @@ explicitly not a per-proposal citation. Preview security and result-review
 boundaries remain available without turning the primary page into an
 architecture document.
 
+DR-0037 adds artifact-level semantics without widening the Tool Gateway. A real
+Run Workspace Artifact may carry `covered_period`, `statistic_basis`, `purpose`
+and `record_count`; `source_file_refs` then names that file's content sources,
+while the EffectReceipt retains the whole fixed-adapter context. For TC-05 this
+means the two 2026 CSVs no longer inherit three-period source/check claims, and
+only the cross-period note owns the three-period comparison. These fields are
+service-owned deterministic facts, not model narration or a general finance
+ontology. The larger review typography changes only the browser projection.
+
 ## 7. Eight module maturity
 
 | Module | Current implementation | Missing target work |
@@ -303,6 +312,8 @@ Artifact or external process completed.
 
 See [`DR-0036`](decisions/DR-0036-outcome-first-and-layout-tolerant-evidence.md),
 [`SCENARIO-022`](scenarios/SCENARIO-022-verified-outcome-and-audit-location.md),
+[`DR-0037`](decisions/DR-0037-tc05-artifact-semantics-and-review-readability.md),
+[`SCENARIO-023`](scenarios/SCENARIO-023-understand-finance-artifacts-and-review-evidence.md),
 [`DR-0035`](decisions/DR-0035-scenario-effect-gate-and-run-workspace-artifacts.md),
 [`SCENARIO-021`](scenarios/SCENARIO-021-verifiable-office-artifact-effect.md),
 [`DR-0034`](decisions/DR-0034-one-action-recovery-and-explicit-source-choice.md),
@@ -316,4 +327,5 @@ See [`DR-0036`](decisions/DR-0036-outcome-first-and-layout-tolerant-evidence.md)
 [`DR-0026`](decisions/DR-0026-selective-branch-and-immutable-artifact-history.md),
 [`SCENARIO-012`](scenarios/SCENARIO-012-selective-branch-and-artifact-restore.md),
 [UI-server fact matrix](contracts/UI_SERVER_FACT_MATRIX.md) and
-[current Evidence](evidence/DR-0036-TC01-OUTCOME-EVIDENCE-LOCALIZATION-EVIDENCE-20260828.md).
+[current TC-01 Evidence](evidence/DR-0036-TC01-OUTCOME-EVIDENCE-LOCALIZATION-EVIDENCE-20260828.md) and
+[current TC-05 Evidence](evidence/DR-0037-TC05-ARTIFACT-SEMANTICS-AND-REVIEW-READABILITY-EVIDENCE-20260828.md).

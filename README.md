@@ -252,6 +252,13 @@ multi-instance coordination and governed external action remain target work.
   suppressed. When a historical Snapshot still has an audit-location gap, the UI
   shows the verified outcome first and groups duplicate same-source/same-failure
   gaps without changing server Branch state.
+- `DR-0037` separates TC-05 task context from each file's content semantics.
+  The two CSV cards now state that they contain 2026 ending-balance records,
+  while only the cross-period note carries all three periods and zombie-account
+  checks. Artifact cards expose server-owned period, basis, purpose and optional
+  record count; review body text, evidence excerpts and safe previews are larger
+  on desktop and 390 px. This remains one fixed Finance-018 adapter, not a
+  general finance verifier or proof of improved user understanding.
 - No target-user study has been run. Clarity, trust, efficiency and user value
   remain hypotheses.
 
@@ -278,6 +285,8 @@ The current one-action recovery and explicit source-choice increment is tracked 
 [`DR-0034-ONE-ACTION-RECOVERY-EVIDENCE-20260827`](docs/evidence/DR-0034-ONE-ACTION-RECOVERY-EVIDENCE-20260827.md).
 The current TC-01 outcome-first and evidence-localization increment is tracked in
 [`DR-0036-TC01-OUTCOME-EVIDENCE-LOCALIZATION-EVIDENCE-20260828`](docs/evidence/DR-0036-TC01-OUTCOME-EVIDENCE-LOCALIZATION-EVIDENCE-20260828.md).
+The current TC-05 artifact-semantics and review-readability increment is tracked in
+[`DR-0037-TC05-ARTIFACT-SEMANTICS-AND-REVIEW-READABILITY-EVIDENCE-20260828`](docs/evidence/DR-0037-TC05-ARTIFACT-SEMANTICS-AND-REVIEW-READABILITY-EVIDENCE-20260828.md).
 
 ## Local run
 
@@ -355,6 +364,9 @@ pnpm --dir apps/web exec playwright test e2e/harness-workbench.spec.ts
 - [DR-0036：成果优先、版面容错定位与任务范围收敛](docs/decisions/DR-0036-outcome-first-and-layout-tolerant-evidence.md)
 - [SCENARIO-022：成果已验证时，把来源定位作为独立审计项](docs/scenarios/SCENARIO-022-verified-outcome-and-audit-location.md)
 - [TC-01 成果与引用定位 Evidence](docs/evidence/DR-0036-TC01-OUTCOME-EVIDENCE-LOCALIZATION-EVIDENCE-20260828.md)
+- [DR-0037：TC-05 成果语义与问题审查可读性](docs/decisions/DR-0037-tc05-artifact-semantics-and-review-readability.md)
+- [SCENARIO-023：在下载前理解财务成果并清楚审查证据](docs/scenarios/SCENARIO-023-understand-finance-artifacts-and-review-evidence.md)
+- [TC-05 成果语义与审查可读性 Evidence](docs/evidence/DR-0037-TC05-ARTIFACT-SEMANTICS-AND-REVIEW-READABILITY-EVIDENCE-20260828.md)
 - [可恢复 Control Loop Evidence](docs/evidence/DURABLE-EVIDENCE-GATE-ARTIFACT-EVOLUTION-EVIDENCE-20260826.md)
 - [整库自主研究 Evidence](docs/evidence/AUTONOMOUS-WHOLE-WORKSPACE-RESEARCH-EVIDENCE-20260825.md)
 - [Agent Control Loop 三轮只读纵切证据](docs/evidence/AGENT-CONTROL-LOOP-BOUNDED-READONLY-EVIDENCE-20260825.md)

@@ -388,6 +388,10 @@ type WorkspaceArtifact = {
   verifier_status: "passed" | "failed";
   checks: ArtifactCheck[];
   summary: string;
+  covered_period: string | null;
+  statistic_basis: string | null;
+  purpose: string | null;
+  record_count: number | null;
   download_path: string;
   created_at: string;
   original_inputs_modified: false;
@@ -1425,6 +1429,10 @@ function normalizeWorkspaceArtifact(value: unknown): WorkspaceArtifact | null {
     verifier_status: verifierStatus as WorkspaceArtifact["verifier_status"],
     checks,
     summary: asText(raw.summary),
+    covered_period: asText(raw.covered_period) || null,
+    statistic_basis: asText(raw.statistic_basis) || null,
+    purpose: asText(raw.purpose) || null,
+    record_count: typeof raw.record_count === "number" && Number.isInteger(raw.record_count) && raw.record_count >= 0 ? raw.record_count : null,
     download_path: asText(raw.download_path),
     created_at: asText(raw.created_at),
     original_inputs_modified: false,
@@ -2968,9 +2976,14 @@ function WorkspaceArtifactSection({ artifacts, receipts }: { artifacts: Workspac
       <b>{artifacts.length > 0 ? `${passedChecks}/${totalChecks} 项检查通过` : "未伪造结果"}</b>
     </header>
     {artifacts.length > 0 && <ol>{artifacts.map((artifact) => <li key={artifact.artifact_id} className={artifact.verifier_status === "passed" ? "is-passed" : "is-failed"}>
-      <div className="workspace-artifact-file"><span><IconFile aria-hidden="true" /></span><div><h4>{artifact.file_name}</h4><p>{artifact.summary}</p><small>第 {artifact.round_number} 轮 · {formatSize(artifact.size)} · {artifact.source_file_refs.length} 份来源</small></div></div>
-      <div className="workspace-artifact-status"><b>{artifact.verifier_status === "passed" ? <><IconCheck aria-hidden="true" />确定性检查通过</> : <><IconAlertTriangle aria-hidden="true" />检查未通过</>}</b><span>{artifact.checks.filter((check) => check.passed).length}/{artifact.checks.length} 项</span></div>
+      <div className="workspace-artifact-file"><span><IconFile aria-hidden="true" /></span><div><h4>{artifact.title}</h4><p>{artifact.summary}</p><small>文件：{artifact.file_name} · 第 {artifact.round_number} 轮 · {formatSize(artifact.size)} · {artifact.source_file_refs.length} 份内容来源</small></div></div>
+      <div className="workspace-artifact-status"><b>{artifact.verifier_status === "passed" ? <><IconCheck aria-hidden="true" />确定性检查通过</> : <><IconAlertTriangle aria-hidden="true" />检查未通过</>}</b><span>{artifact.record_count !== null ? `${artifact.record_count} 条记录 · ` : ""}{artifact.checks.filter((check) => check.passed).length}/{artifact.checks.length} 项检查</span></div>
       <button type="button" onClick={() => void downloadArtifact(artifact)} disabled={downloading !== null}><IconDownload aria-hidden="true" />{downloading === artifact.artifact_id ? "正在下载" : "下载成果"}</button>
+      {(artifact.covered_period || artifact.statistic_basis || artifact.purpose) && <dl className="workspace-artifact-semantics">
+        {artifact.covered_period && <div><dt>涵盖期间</dt><dd>{artifact.covered_period}</dd></div>}
+        {artifact.statistic_basis && <div><dt>统计口径</dt><dd>{artifact.statistic_basis}</dd></div>}
+        {artifact.purpose && <div><dt>用途</dt><dd>{artifact.purpose}</dd></div>}
+      </dl>}
       <details><summary><IconEye aria-hidden="true" />查看逐项检查</summary><ul>{artifact.checks.map((check) => <li key={check.check_id} className={check.passed ? "is-passed" : "is-failed"}><span>{check.passed ? <IconCheck aria-hidden="true" /> : <IconAlertTriangle aria-hidden="true" />}</span><div><b>{check.label}</b><p>{check.detail}</p></div></li>)}</ul></details>
     </li>)}</ol>}
     {boundary && <article className="workspace-effect-boundary"><IconAlertTriangle aria-hidden="true" /><div><b>{boundary.status === "blocked_external_boundary" ? "缺少已授权的外部连接" : boundary.status === "unsupported_local_capability" ? "本地能力仍未实现" : "确定性效果门未通过"}</b><p>{boundary.observation}</p><strong>{boundary.result}</strong></div></article>}
