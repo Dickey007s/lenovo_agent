@@ -49,6 +49,7 @@
 - `pnpm --dir apps/web build`：通过，Next.js 生产构建完成。
 - `pnpm --dir apps/web exec playwright test e2e/harness-workbench.spec.ts`：`39 passed`，其中 TC-11 正向双状态和强制 Verifier 失败负向均通过。
 - `git diff --check`：通过；仅有工作树行尾转换提示，无空白错误。
+- PR #57 首次远端 PostgreSQL Run `33180279124` 暴露集成测试只执行 `200` 次 `sleep(0)`、没有按真实耗时等待后台 Effect 的测试缺陷；失败记录保留。修复为有界 wall-clock 轮询且每次 `runtime.get` 独立限时后，远端 Run `33180513835` 为 `5 passed in 10.91s`，`durable-agent-control-loop` 实际通过。这修复的是等待契约，不通过扩大 API read timeout 掩盖事件循环阻塞。
 
 ## 不能支持的结论
 
