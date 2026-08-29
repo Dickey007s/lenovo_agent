@@ -28,6 +28,7 @@ TC-15 历史 Run `harness:731c429f82a941438b838fa8982699fd` 的确定性成果�
 - 冲突：`unsupported_solution_claim`
 - 成果：2 个 CSV Artifact、1 个通过的 EffectReceipt；下载大小与独立内容校验均通过，212/212 行、87 个组合、P0/P1/P2/P3/P4 为 25/40/14/6/2
 - 重启：API 重启后同一 Run 保持 `completed`、2 个 Artifact、1 个 EffectReceipt、对账状态和 `analysis_output_used=false`；详见两个 live manifest
+- 服务恢复：PostgreSQL 模式 API 与前端已恢复，健康检查继续报告可恢复状态；本地地址为 `http://localhost:3000`。
 
 ## 尚待执行
 
