@@ -1,0 +1,19 @@
+{
+  "captured_at": "2026-08-29T09:02:20+08:00",
+  "capture_method": "Playwright system-browser full viewport; no CSS injection and no content rewriting",
+  "evidence_boundary": "Controlled browser projection, not target-user research or proof of design effectiveness",
+  "screenshots": [
+    {
+      "path": "docs/evidence/screenshots/tc15-ux-prioritization-desktop.png",
+      "viewport": {"width": 1440, "height": 1100},
+      "bytes": 164815,
+      "sha256": "5d290d1d11de228a4a234c27ecc670e7df38b99874bbaacb35bd81d26e58cb48"
+    },
+    {
+      "path": "docs/evidence/screenshots/tc15-ux-prioritization-mobile.png",
+      "viewport": {"width": 390, "height": 844},
+      "bytes": 62147,
+      "sha256": "1bbac70aaf9ba1df9ce37a81023dc7b6a6c36859a61e323f235986507e399a13"
+    }
+  ]
+}

@@ -474,6 +474,19 @@ commands contain only placeholders and are never execution receipts. Clients
 must not infer causality from co-occurrence, select a dedicated master as an
 endpoint, or interpret a passed Artifact as approval or execution.
 
+TC-15 additionally publishes optional `ux_prioritization_outcome` on both
+Artifacts and the EffectReceipt. It contains
+`status=prioritization_review_required|invalid`, complete row coverage,
+included/excluded/manual-review decisions, dynamic group and P0-P4 counts,
+duplicate-event facts, parsed rules/specs, controlled mapping assumptions,
+3% source conflicts, and per-group `rule_refs[]`. Rule IDs bind a semantic slot
+to approved excerpt/parameters; refs also carry readable source locators. A
+disputed boundary group keeps two frequency refs and no priority ref. Clients
+must not compute from bounded Preview rows, treat adapter mappings as source
+facts, promote `no_approved_solution_source` templates into approved fixes, or
+interpret a passed Artifact as user research, experience improvement or a
+production action.
+
 `source_documents` and `contract.allowed_file_refs` are the full safe workspace
 index. They are not the files read by the Analyst. The authoritative per-round
 evidence scope is `rounds[].input_file_refs`, and the public reason is

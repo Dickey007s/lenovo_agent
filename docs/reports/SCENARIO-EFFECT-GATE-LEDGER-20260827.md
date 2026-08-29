@@ -30,7 +30,7 @@
 | TC-12 | 看板工具库补 Vitest 并修复 | ZIP + `TC-12真实测试报告.md` | 12 个唯一检查，两份成果共享 | 同测集 Stage A/B/C 红灯，Stage D 71/71；逐文件 coverage 与独立复跑通过 | 不改原始源码、不联网安装、不自动 PR；无 OS 级断网 |
 | TC-13 | 从批准问卷与规则推导画像清洗和策略草案 | Markdown + 逐原始行 CSV | 8 个来源/成果检查，两份成果共享 | `Limited Verified`（DR-0049）：当前来源动态 11/10/1/8/2/3、画像 3/3/2、priority witness 0；阈值/优先级/新样本变异动态生效，策略来源仍为 `no_approved_strategy_source` | 公开样本非客户研究；重复口径待批准；不联系客户、不写 CRM/商机、不触发营销 |
 | TC-14 | 从固定日志推导离线复盘与条件式止损提案 | Markdown + 观察/动作 CSV | 12 个来源/成果/安全边界检查，两份成果共享 | `Limited Verified`（DR-0050、PR #66、Run `harness:fe527536c857404f88f46d9a68b09397`）：当前来源动态 232 行、167 条观察、3 组来源冲突、2 个假设、8 个 ES + 3 个业务提案；target 全部 unresolved/not_applicable、approval required、executed=false；合法指标/冲突变异、篡改转红、下载解析和 PostgreSQL 顺序恢复通过 | 不连接或执行 Elasticsearch/HTTP 命令，不把相关性写成根因定论，不选 dedicated master，不执行限流/降级或生产审批 |
-| TC-15 | 生成排序正确的交互优化方案 | CSV | 6 | 通过 | 不修改/发布生产界面 |
+| TC-15 | 从完整交互日志、规则与页面规范推导可回溯排序 | 聚合优先级 CSV + 逐行归因 CSV | 12 个来源/覆盖/规则引用/双成果/无动作检查，两份成果共享 | `Draft`（DR-0051）：本地来源变异、篡改门和前台 canonical/动态/失败已通过；真实 Provider/PostgreSQL/PR 收尾中。当前来源动态 212 行、87 组、P0-P4=25/40/14/6/2；逐组保留内容寻址 rule refs | 不把 bounded Preview 当完整来源，不把映射假设或方案模板冒充批准结论，不修改/发布生产界面或启动实验 |
 
 三个代码场景的命令由服务端固定，运行在一次性临时目录中，网络代理被清空，子进程只接收启动 Python/Node 所需的最小环境变量；API Key、Token、数据库 DSN、`PYTHONPATH` 和用户 shell hook 不会传入。这里证明的是固定测试包，不是可执行任意用户代码的生产沙箱，也不是 OS 级 socket 隔离。
 
@@ -63,6 +63,7 @@
 14. TC-10 旧门写死流程、终态和 13 项检查后自证，还把录音放在身份确认之前。DR-0047 改为从唯一批准 Markdown 生成规则账本和可遍历图，再独立解析 DOCX；合法时段、频次、保存年限、顺序和转人工规则变异动态生效，未知规范与图缺口不能静默绿色。
 15. TC-13 旧门写死样本 ID、8 条分类、排除名单、阈值、优先级和销售话术后自证。DR-0049 改为重读批准 CSV/Markdown 与两份成果 bytes；当前 11/10/1/8/2/3 和 3/3/2 只是来源观测，canonical 0 个优先级 witness 也如实显示。阈值、多标签、新样本和 ID 变异动态生效，未知规范、CSV 注入与成果篡改转红；没有批准来源的策略只保留待负责人补充模板。
 16. TC-14 旧门只提取 IP，其余 QPS、48 个 UNASSIGNED、根因、命令和 9 项检查由固定字符串自证。DR-0050 改为逐行重算 observation/conflict/hypothesis/proposal，并重读最终 Markdown/CSV。三组来源冲突不再被绿色文件覆盖；合法来源变异动态生效，所有 target 未解析、所有动作未执行，官方文档只解释 API 语义。
+17. TC-15 旧门只分析 120 行 Preview 并产出 66 组，漏掉完整 212 行中的 21 个尾部独有组，22 个重叠组频次也发生变化，但 6/6 仍绿。DR-0051 改为完整原始 XLSX、来源规则/规范推导、逐组 content-addressed rule refs 与双 CSV 重读验证；当前 87 组和分布只是来源观测，不是生产 success 常量。
 
 ## 汇报限制
 

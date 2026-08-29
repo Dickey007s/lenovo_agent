@@ -842,6 +842,128 @@ type SREDiagnosisOutcome = {
   external_action: "none";
 };
 
+type UXRule = {
+  rule_id: string;
+  kind: "severity" | "frequency" | "priority" | "disposition";
+  name: string;
+  locator: string;
+  excerpt: string;
+  parameters: Record<string, string>;
+};
+
+type UXSpecElement = {
+  spec_id: string;
+  page_name: string;
+  page_order: number;
+  element_name: string;
+  element_order: number;
+  requirement: string;
+  locator: string;
+};
+
+type UXMappingDecision = {
+  mapping_id: string;
+  page_name: string;
+  operation: string;
+  status: "controlled_adapter_assumption" | "unmapped";
+  spec_id: string | null;
+  element_name: string | null;
+  candidate_spec_ids: string[];
+  mapping_basis: string;
+  review_required: true;
+};
+
+type UXRowDecision = {
+  row_number: number;
+  locator: string;
+  page_name: string;
+  page_path: string;
+  operation: string;
+  operation_result: string;
+  pain_type: string;
+  failure_reason: string;
+  misclick_count: number;
+  exit_node: string;
+  retry_count: number;
+  status: "included" | "excluded" | "manual_review";
+  group_id: string | null;
+  mapping_id: string | null;
+  mapping_status: "controlled_adapter_assumption" | "unmapped" | "not_applicable";
+  duplicate_group_id: string | null;
+  duplicate_ordinal: number;
+  reason: string;
+  data_quality_flags: string[];
+};
+
+type UXGroupRuleRef = {
+  role: "severity" | "frequency" | "priority";
+  rule_id: string;
+  locator: string;
+  application: "applied" | "conflict_side";
+};
+
+type UXGroup = {
+  group_id: string;
+  page_name: string;
+  page_path: string;
+  operation: string;
+  spec_id: string;
+  element_name: string;
+  pain_type: string;
+  severity: "严重" | "中等" | "轻微";
+  scenario_count: number;
+  denominator: number;
+  ratio: string;
+  frequency: "高频" | "中频" | "低频" | "边界待确认";
+  priority: "P0" | "P1" | "P2" | "P3" | "P4" | null;
+  disposition: string;
+  spec_requirement: string;
+  contributing_row_locators: string[];
+  mapping_status: "controlled_adapter_assumption";
+  mapping_basis: string;
+  rule_refs: UXGroupRuleRef[];
+  data_quality_flags: string[];
+  suggestion_status: "no_approved_solution_source";
+  suggestion_template: string;
+};
+
+type UXRuleConflict = {
+  conflict_id: string;
+  title: string;
+  locators: string[];
+  statement: string;
+  impact: string;
+  status: "open" | "resolved";
+};
+
+type UXPrioritizationOutcome = {
+  outcome_id: string;
+  status: "prioritization_review_required" | "invalid";
+  decision: string;
+  summary: string;
+  source_row_count: number;
+  analyzed_row_count: number;
+  included_pain_row_count: number;
+  excluded_no_pain_count: number;
+  success_with_pain_count: number;
+  group_count: number;
+  priority_counts: Record<string, number>;
+  duplicate_group_count: number;
+  duplicate_extra_count: number;
+  unmapped_count: number;
+  uncovered_spec_count: number;
+  rules: UXRule[];
+  specs: UXSpecElement[];
+  mappings: UXMappingDecision[];
+  groups: UXGroup[];
+  row_decisions: UXRowDecision[];
+  rule_conflicts: UXRuleConflict[];
+  suggestion_status: "no_approved_solution_source";
+  human_review_required: true;
+  original_inputs_modified: false;
+  external_action: "none";
+};
+
 type WorkspaceArtifact = {
   artifact_id: string;
   capability_id: string;
@@ -874,6 +996,7 @@ type WorkspaceArtifact = {
   outbound_flow_outcome: OutboundFlowOutcome | null;
   customer_segmentation_outcome: CustomerSegmentationOutcome | null;
   sre_diagnosis_outcome: SREDiagnosisOutcome | null;
+  ux_prioritization_outcome: UXPrioritizationOutcome | null;
   download_path: string;
   created_at: string;
   original_inputs_modified: false;
@@ -901,6 +1024,7 @@ type EffectReceipt = {
   outbound_flow_outcome: OutboundFlowOutcome | null;
   customer_segmentation_outcome: CustomerSegmentationOutcome | null;
   sre_diagnosis_outcome: SREDiagnosisOutcome | null;
+  ux_prioritization_outcome: UXPrioritizationOutcome | null;
   created_at: string;
   external_action: "none";
 };
@@ -2631,6 +2755,105 @@ function normalizeSREDiagnosisOutcome(value: unknown): SREDiagnosisOutcome | nul
   };
 }
 
+function normalizeUXRule(value: unknown): UXRule | null {
+  if (!value || typeof value !== "object") return null;
+  const raw = value as Record<string, unknown>;
+  const kind = asText(raw.kind);
+  if (!asText(raw.rule_id) || !["severity", "frequency", "priority", "disposition"].includes(kind) || !asText(raw.locator)) return null;
+  return { rule_id: asText(raw.rule_id), kind: kind as UXRule["kind"], name: asText(raw.name), locator: asText(raw.locator), excerpt: asText(raw.excerpt), parameters: asStringRecord(raw.parameters) };
+}
+
+function normalizeUXSpec(value: unknown): UXSpecElement | null {
+  if (!value || typeof value !== "object") return null;
+  const raw = value as Record<string, unknown>;
+  if (!asText(raw.spec_id) || !asText(raw.page_name) || !asText(raw.element_name) || !asText(raw.locator)) return null;
+  return { spec_id: asText(raw.spec_id), page_name: asText(raw.page_name), page_order: asNumber(raw.page_order), element_name: asText(raw.element_name), element_order: asNumber(raw.element_order), requirement: asText(raw.requirement), locator: asText(raw.locator) };
+}
+
+function normalizeUXMapping(value: unknown): UXMappingDecision | null {
+  if (!value || typeof value !== "object") return null;
+  const raw = value as Record<string, unknown>;
+  const status = asText(raw.status);
+  if (!asText(raw.mapping_id) || !["controlled_adapter_assumption", "unmapped"].includes(status) || raw.review_required !== true) return null;
+  return { mapping_id: asText(raw.mapping_id), page_name: asText(raw.page_name), operation: asText(raw.operation), status: status as UXMappingDecision["status"], spec_id: asText(raw.spec_id) || null, element_name: asText(raw.element_name) || null, candidate_spec_ids: asStrings(raw.candidate_spec_ids), mapping_basis: asText(raw.mapping_basis), review_required: true };
+}
+
+function normalizeUXRow(value: unknown): UXRowDecision | null {
+  if (!value || typeof value !== "object") return null;
+  const raw = value as Record<string, unknown>;
+  const status = asText(raw.status); const mappingStatus = asText(raw.mapping_status);
+  if (!asNumber(raw.row_number) || !asText(raw.locator) || !["included", "excluded", "manual_review"].includes(status) || !["controlled_adapter_assumption", "unmapped", "not_applicable"].includes(mappingStatus)) return null;
+  return {
+    row_number: asNumber(raw.row_number), locator: asText(raw.locator), page_name: asText(raw.page_name), page_path: asText(raw.page_path), operation: asText(raw.operation), operation_result: asText(raw.operation_result), pain_type: asText(raw.pain_type), failure_reason: asText(raw.failure_reason), misclick_count: asNumber(raw.misclick_count), exit_node: asText(raw.exit_node), retry_count: asNumber(raw.retry_count), status: status as UXRowDecision["status"], group_id: asText(raw.group_id) || null, mapping_id: asText(raw.mapping_id) || null, mapping_status: mappingStatus as UXRowDecision["mapping_status"], duplicate_group_id: asText(raw.duplicate_group_id) || null, duplicate_ordinal: asNumber(raw.duplicate_ordinal, 1), reason: asText(raw.reason), data_quality_flags: asStrings(raw.data_quality_flags),
+  };
+}
+
+function normalizeUXGroupRuleRef(value: unknown): UXGroupRuleRef | null {
+  if (!value || typeof value !== "object") return null;
+  const raw = value as Record<string, unknown>;
+  const role = asText(raw.role); const application = asText(raw.application);
+  if (
+    !["severity", "frequency", "priority"].includes(role)
+    || !asText(raw.rule_id)
+    || !asText(raw.locator)
+    || !["applied", "conflict_side"].includes(application)
+  ) return null;
+  return { role: role as UXGroupRuleRef["role"], rule_id: asText(raw.rule_id), locator: asText(raw.locator), application: application as UXGroupRuleRef["application"] };
+}
+
+function normalizeUXGroup(value: unknown): UXGroup | null {
+  if (!value || typeof value !== "object") return null;
+  const raw = value as Record<string, unknown>;
+  const severity = asText(raw.severity); const frequency = asText(raw.frequency); const priority = asText(raw.priority) || null;
+  const ruleRefs = Array.isArray(raw.rule_refs) ? raw.rule_refs.map(normalizeUXGroupRuleRef).filter((item): item is UXGroupRuleRef => item !== null) : [];
+  const severityRefs = ruleRefs.filter((item) => item.role === "severity");
+  const frequencyRefs = ruleRefs.filter((item) => item.role === "frequency");
+  const priorityRefs = ruleRefs.filter((item) => item.role === "priority");
+  if (
+    !asText(raw.group_id)
+    || !["严重", "中等", "轻微"].includes(severity)
+    || !["高频", "中频", "低频", "边界待确认"].includes(frequency)
+    || (priority !== null && !["P0", "P1", "P2", "P3", "P4"].includes(priority))
+    || raw.suggestion_status !== "no_approved_solution_source"
+    || severityRefs.length !== 1
+    || (frequency === "边界待确认" ? frequencyRefs.length !== 2 || priorityRefs.length !== 0 : frequencyRefs.length !== 1 || priorityRefs.length !== 1)
+  ) return null;
+  return {
+    group_id: asText(raw.group_id), page_name: asText(raw.page_name), page_path: asText(raw.page_path), operation: asText(raw.operation), spec_id: asText(raw.spec_id), element_name: asText(raw.element_name), pain_type: asText(raw.pain_type), severity: severity as UXGroup["severity"], scenario_count: asNumber(raw.scenario_count), denominator: asNumber(raw.denominator), ratio: asText(raw.ratio), frequency: frequency as UXGroup["frequency"], priority: priority as UXGroup["priority"], disposition: asText(raw.disposition), spec_requirement: asText(raw.spec_requirement), contributing_row_locators: asStrings(raw.contributing_row_locators), mapping_status: "controlled_adapter_assumption", mapping_basis: asText(raw.mapping_basis), rule_refs: ruleRefs, data_quality_flags: asStrings(raw.data_quality_flags), suggestion_status: "no_approved_solution_source", suggestion_template: asText(raw.suggestion_template),
+  };
+}
+
+function normalizeUXConflict(value: unknown): UXRuleConflict | null {
+  if (!value || typeof value !== "object") return null;
+  const raw = value as Record<string, unknown>; const status = asText(raw.status);
+  if (!asText(raw.conflict_id) || !["open", "resolved"].includes(status)) return null;
+  return { conflict_id: asText(raw.conflict_id), title: asText(raw.title), locators: asStrings(raw.locators), statement: asText(raw.statement), impact: asText(raw.impact), status: status as UXRuleConflict["status"] };
+}
+
+function normalizeUXPrioritizationOutcome(value: unknown): UXPrioritizationOutcome | null {
+  if (!value || typeof value !== "object") return null;
+  const raw = value as Record<string, unknown>; const status = asText(raw.status);
+  const rules = Array.isArray(raw.rules) ? raw.rules.map(normalizeUXRule).filter((item): item is UXRule => item !== null) : [];
+  const specs = Array.isArray(raw.specs) ? raw.specs.map(normalizeUXSpec).filter((item): item is UXSpecElement => item !== null) : [];
+  const mappings = Array.isArray(raw.mappings) ? raw.mappings.map(normalizeUXMapping).filter((item): item is UXMappingDecision => item !== null) : [];
+  const groups = Array.isArray(raw.groups) ? raw.groups.map(normalizeUXGroup).filter((item): item is UXGroup => item !== null) : [];
+  const rows = Array.isArray(raw.row_decisions) ? raw.row_decisions.map(normalizeUXRow).filter((item): item is UXRowDecision => item !== null) : [];
+  const conflicts = Array.isArray(raw.rule_conflicts) ? raw.rule_conflicts.map(normalizeUXConflict).filter((item): item is UXRuleConflict => item !== null) : [];
+  const sourceCount = asNumber(raw.source_row_count); const analyzedCount = asNumber(raw.analyzed_row_count); const priorityCounts = asNumberRecord(raw.priority_counts);
+  if (
+    !asText(raw.outcome_id) || !["prioritization_review_required", "invalid"].includes(status)
+    || sourceCount <= 0 || analyzedCount !== sourceCount || rows.length !== sourceCount || groups.length !== asNumber(raw.group_count)
+    || rows.filter((row) => row.status === "included").length !== asNumber(raw.included_pain_row_count)
+    || rows.filter((row) => row.status === "excluded").length !== asNumber(raw.excluded_no_pain_count)
+    || ["P0", "P1", "P2", "P3", "P4"].some((label) => (priorityCounts[label] ?? 0) !== groups.filter((group) => group.priority === label).length)
+    || rules.length === 0 || specs.length === 0 || raw.suggestion_status !== "no_approved_solution_source"
+    || raw.human_review_required !== true || raw.original_inputs_modified !== false || raw.external_action !== "none"
+  ) return null;
+  return {
+    outcome_id: asText(raw.outcome_id), status: status as UXPrioritizationOutcome["status"], decision: asText(raw.decision), summary: asText(raw.summary), source_row_count: sourceCount, analyzed_row_count: analyzedCount, included_pain_row_count: asNumber(raw.included_pain_row_count), excluded_no_pain_count: asNumber(raw.excluded_no_pain_count), success_with_pain_count: asNumber(raw.success_with_pain_count), group_count: groups.length, priority_counts: priorityCounts, duplicate_group_count: asNumber(raw.duplicate_group_count), duplicate_extra_count: asNumber(raw.duplicate_extra_count), unmapped_count: asNumber(raw.unmapped_count), uncovered_spec_count: asNumber(raw.uncovered_spec_count), rules, specs, mappings, groups, row_decisions: rows, rule_conflicts: conflicts, suggestion_status: "no_approved_solution_source", human_review_required: true, original_inputs_modified: false, external_action: "none",
+  };
+}
+
 function normalizeBusinessGateOutcome(value: unknown): BusinessGateOutcome | null {
   if (!value || typeof value !== "object") return null;
   const raw = value as Record<string, unknown>;
@@ -2711,6 +2934,7 @@ function normalizeWorkspaceArtifact(value: unknown): WorkspaceArtifact | null {
     outbound_flow_outcome: normalizeOutboundFlowOutcome(raw.outbound_flow_outcome),
     customer_segmentation_outcome: normalizeCustomerSegmentationOutcome(raw.customer_segmentation_outcome),
     sre_diagnosis_outcome: normalizeSREDiagnosisOutcome(raw.sre_diagnosis_outcome),
+    ux_prioritization_outcome: normalizeUXPrioritizationOutcome(raw.ux_prioritization_outcome),
     download_path: asText(raw.download_path),
     created_at: asText(raw.created_at),
     original_inputs_modified: false,
@@ -2745,6 +2969,7 @@ function normalizeEffectReceipt(value: unknown): EffectReceipt | null {
     outbound_flow_outcome: normalizeOutboundFlowOutcome(raw.outbound_flow_outcome),
     customer_segmentation_outcome: normalizeCustomerSegmentationOutcome(raw.customer_segmentation_outcome),
     sre_diagnosis_outcome: normalizeSREDiagnosisOutcome(raw.sre_diagnosis_outcome),
+    ux_prioritization_outcome: normalizeUXPrioritizationOutcome(raw.ux_prioritization_outcome),
     created_at: asText(raw.created_at),
     external_action: "none",
   };
@@ -4641,6 +4866,65 @@ function SREDiagnosisOutcomePanel({ outcome, deterministicPassed }: { outcome: S
   </section>;
 }
 
+function uxRowStatusLabel(status: UXRowDecision["status"]): string {
+  return { included: "进入聚合", excluded: "无痛点，计入分母", manual_review: "待人工核对" }[status];
+}
+
+function UXPrioritizationOutcomePanel({ outcome, deterministicPassed }: { outcome: UXPrioritizationOutcome; deterministicPassed: boolean }) {
+  const [priorityFilter, setPriorityFilter] = useState("ALL");
+  const [pageFilter, setPageFilter] = useState("ALL");
+  const pages = Array.from(new Set(outcome.groups.map((group) => group.page_name)));
+  const visibleGroups = outcome.groups.filter((group) => (priorityFilter === "ALL" || group.priority === priorityFilter) && (pageFilter === "ALL" || group.page_name === pageFilter));
+  const visibleRows = outcome.row_decisions.filter((row) => pageFilter === "ALL" || row.page_name === pageFilter);
+  const prioritySummary = ["P0", "P1", "P2", "P3", "P4"].map((label) => `${label} ${outcome.priority_counts[label] ?? 0}`).join(" · ");
+  return <section className={`ux-prioritization-outcome is-${outcome.status}`} aria-label="交互痛点全量优先级复核">
+    <header>
+      <IconAdjustments aria-hidden="true" />
+      <div><span>UX 离线优先级排序</span><h3>这是固定公开日志的离线排序，不是用户研究、线上遥测、设计效果证明或自动修复</h3><p>{outcome.decision}</p></div>
+      <b>{outcome.analyzed_row_count}/{outcome.source_row_count} 行完整覆盖</b>
+    </header>
+    <ol className="ux-prioritization-statuses" aria-label="来源验证、全量日志、优先级复核与生产动作">
+      <li className={deterministicPassed ? "is-passed" : "is-failed"}><span>1</span><div><b>三份来源与两份成果</b><strong>{deterministicPassed ? "确定性检查通过" : "确定性检查未通过"}</strong><p>服务端读取完整 XLSX，并重新解析规则、页面规范和最终两份 CSV 逐字段核对。</p></div></li>
+      <li className="is-review"><span>2</span><div><b>完整日志覆盖与数据质量</b><strong>{outcome.included_pain_row_count} 行有痛点 · {outcome.excluded_no_pain_count} 行无痛点</strong><p>{outcome.success_with_pain_count} 行“成功但有痛点”；{outcome.duplicate_group_count} 个重复组未去重，额外重复事件 {outcome.duplicate_extra_count} 条。</p></div></li>
+      <li className="is-review"><span>3</span><div><b>优先级与来源边界</b><strong>{outcome.group_count} 组 · {prioritySummary}</strong><p>{outcome.mappings.length} 个映射是受控适配器假设；{outcome.rule_conflicts.length} 组 3% 来源冲突、{outcome.uncovered_spec_count} 个规范元素未覆盖。</p></div></li>
+      <li className="is-pending"><span>4</span><div><b>方案批准与生产动作</b><strong>全部尚未发生</strong><p>没有批准的具体优化方案，也没有修改生产界面、发布版本或创建 A/B 实验。</p></div></li>
+    </ol>
+    <section className="ux-prioritization-summary" aria-label="全量日志动态摘要">
+      <div><span>全量分母</span><strong>{outcome.source_row_count}</strong><p>无痛点和成功记录都保留在分母</p></div>
+      <div><span>痛点聚合</span><strong>{outcome.group_count}</strong><p>page × operation × pain</p></div>
+      <div><span>成功但有痛点</span><strong>{outcome.success_with_pain_count}</strong><p>不能统称为失败记录</p></div>
+      <div><span>待复核映射</span><strong>{outcome.mappings.length}</strong><p>{outcome.unmapped_count} 个操作当前未映射</p></div>
+    </section>
+    {outcome.rule_conflicts.map((conflict) => <article key={conflict.conflict_id} className="ux-prioritization-conflict"><IconAlertTriangle aria-hidden="true" /><div><b>{conflict.title}</b><p>{conflict.statement}</p><small>{conflict.impact} · {conflict.locators.join("、")}</small></div></article>)}
+    <nav className="ux-prioritization-filters" aria-label="优先级和页面筛选">
+      <div><span>优先级</span>{["ALL", "P0", "P1", "P2", "P3", "P4"].map((label) => <button key={label} type="button" className={priorityFilter === label ? "is-active" : ""} onClick={() => setPriorityFilter(label)}>{label === "ALL" ? "全部" : `${label} ${outcome.priority_counts[label] ?? 0}`}</button>)}</div>
+      <div><span>页面</span><select value={pageFilter} onChange={(event) => setPageFilter(event.target.value)} aria-label="按页面筛选"><option value="ALL">全部页面</option>{pages.map((page) => <option key={page} value={page}>{page}</option>)}</select></div>
+    </nav>
+    <section className="ux-prioritization-groups" aria-label="优先级组合列表">
+      <header><div><span>当前视图</span><h4>{visibleGroups.length} 个聚合组合</h4></div><small>P0 是来源矩阵优先级，不代表已经立项。</small></header>
+      <div>{visibleGroups.map((group) => <details key={group.group_id} className={`is-${group.priority?.toLowerCase() ?? "ambiguous"}`}>
+        <summary><span><b>{group.priority ?? "待确认"}</b><strong>{group.page_name} · {group.operation}</strong><small>{group.pain_type} · {group.scenario_count}/{group.denominator} · {group.frequency}</small></span><span><em>{group.element_name}</em><IconChevronDown aria-hidden="true" /></span></summary>
+        <dl>
+          <div><dt>规范要求</dt><dd>{group.spec_requirement}</dd></div>
+          <div><dt>来源处置</dt><dd>{group.disposition}</dd></div>
+          <div><dt>精确占比</dt><dd>{group.ratio}，分母为全部 {group.denominator} 条操作</dd></div>
+          <div className="ux-prioritization-rule-refs"><dt>为何这样分级</dt><dd><ol>{group.rule_refs.map((ref) => <li key={`${ref.role}:${ref.rule_id}`}><span>{ref.role === "severity" ? "严重度" : ref.role === "frequency" ? "频率" : "优先级"}{ref.application === "conflict_side" ? "冲突侧" : "已采用"}</span><code>{ref.rule_id}</code><small>{ref.locator}</small></li>)}</ol>{group.priority === null && <p>当前边界存在两种频率解释，因此未应用优先级矩阵规则。</p>}</dd></div>
+          <div><dt>映射依据</dt><dd>{group.mapping_basis}</dd></div>
+          <div><dt>具体方案</dt><dd>{group.suggestion_template}</dd></div>
+          <div><dt>数据质量</dt><dd>{group.data_quality_flags.length > 0 ? group.data_quality_flags.join("、") : "当前贡献行未标记额外问题"}</dd></div>
+        </dl>
+        <details className="ux-prioritization-locators"><summary>查看 {group.contributing_row_locators.length} 条贡献来源位置</summary><ol>{group.contributing_row_locators.map((locator) => <li key={locator}><code>{locator}</code></li>)}</ol></details>
+      </details>)}</div>
+    </section>
+    <details className="ux-prioritization-rows"><summary><IconFileDescription aria-hidden="true" /><span><b>逐行查看原始日志裁决</b><small>{visibleRows.length} 行 · included / excluded / manual_review 全部保留</small></span><IconChevronDown aria-hidden="true" /></summary><div>{visibleRows.map((row) => <details key={row.row_number} className={`is-${row.status}`}>
+      <summary><span><b>第 {row.row_number} 行</b><strong>{row.page_name} · {row.operation}</strong><small>{row.pain_type} · {uxRowStatusLabel(row.status)}</small></span><IconChevronDown aria-hidden="true" /></summary>
+      <dl><div><dt>来源位置</dt><dd><code>{row.locator}</code></dd></div><div><dt>结果与原因</dt><dd>{row.operation_result} · {row.failure_reason || "来源未填写失败原因"}</dd></div><div><dt>误触 / 退出 / 重试</dt><dd>{row.misclick_count} / {row.exit_node || "空"} / {row.retry_count}</dd></div><div><dt>服务端处理</dt><dd>{row.reason}</dd></div><div><dt>数据质量</dt><dd>{row.data_quality_flags.join("、") || "无额外标记"}</dd></div>{row.duplicate_group_id && <div><dt>重复事件</dt><dd>{row.duplicate_group_id} · 第 {row.duplicate_ordinal} 条，仍计入分母</dd></div>}</dl>
+    </details>)}</div></details>
+    <details className="ux-prioritization-rules"><summary><IconEye aria-hidden="true" /><span><b>查看来源规则、页面规范与映射假设</b><small>{outcome.rules.length} 条规则 · {outcome.specs.length} 个规范元素 · {outcome.mappings.length} 个映射</small></span><IconChevronDown aria-hidden="true" /></summary><div><section><h4>来源规则</h4>{outcome.rules.map((rule) => <article key={rule.rule_id}><code>{rule.rule_id}</code><b>{rule.name}</b><p>{rule.excerpt}</p><small>{rule.locator}</small></article>)}</section><section><h4>映射假设</h4>{outcome.mappings.map((mapping) => <article key={mapping.mapping_id}><code>{mapping.mapping_id}</code><b>{mapping.page_name} · {mapping.operation}</b><p>{mapping.element_name ?? "未映射"} · {mapping.mapping_basis}</p></article>)}</section></div></details>
+    <footer><IconShieldCheck aria-hidden="true" /><span>固定 uiux-021 离线优先级适配器。它不是用户研究、线上遥测、通用产品分析、设计效果验证、自动改 UI、A/B 实验或生产发布。</span></footer>
+  </section>;
+}
+
 function WorkspaceArtifactSection({ artifacts, receipts }: { artifacts: WorkspaceArtifact[]; receipts: EffectReceipt[] }) {
   const [downloading, setDownloading] = useState<string | null>(null);
   const [downloadError, setDownloadError] = useState("");
@@ -4674,6 +4958,9 @@ function WorkspaceArtifactSection({ artifacts, receipts }: { artifacts: Workspac
   const sreDiagnosisOutcome = artifacts.find((artifact) => artifact.sre_diagnosis_outcome)?.sre_diagnosis_outcome
     ?? latestReceipt?.sre_diagnosis_outcome
     ?? null;
+  const uxPrioritizationOutcome = artifacts.find((artifact) => artifact.ux_prioritization_outcome)?.ux_prioritization_outcome
+    ?? latestReceipt?.ux_prioritization_outcome
+    ?? null;
   const businessBlocked = Boolean(businessGateOutcome && businessGateOutcome.status !== "passed");
   const deterministicPassed = artifacts.length > 0 && artifacts.every((artifact) => artifact.verifier_status === "passed");
   const downloadArtifact = async (artifact: WorkspaceArtifact) => {
@@ -4704,8 +4991,9 @@ function WorkspaceArtifactSection({ artifacts, receipts }: { artifacts: Workspac
     <header>
       <IconFileDescription aria-hidden="true" />
       <div><span>运行工作区</span><h3 id="workspace-artifacts-title">{artifacts.length > 0 ? `Agent 已生成 ${artifacts.length} 份真实成果文件` : "这项任务尚不能生成可信成果"}</h3><p>{artifacts.length > 0 ? "文件已写入本次 Run 的隔离目录，原始 FORTE 文件没有被修改。" : boundary?.result}</p></div>
-      <b>{businessGateOutcome?.status === "failed" ? `业务 Gate ${businessGateOutcome.failed_gate_count}/${businessGateOutcome.total_gate_count} 未通过` : businessGateOutcome?.status === "invalid" ? "来源校验失败" : candidateReviewOutcome ? "最终 HR 决定待人工处理" : financeReviewOutcome ? "最终财务处置待人工处理" : outboundFlowOutcome?.status === "invalid" ? "规则或图结构未通过" : outboundFlowOutcome ? "最终合规审批待人工处理" : customerSegmentationOutcome ? "策略草案待销售负责人复核" : sreDiagnosisOutcome ? `${sreDiagnosisOutcome.conflict_count} 组来源冲突待 SRE 核实` : artifacts.length > 0 ? checkSummary.sameChecklist ? `${artifacts.length} 份成果共享 ${checkSummary.total} 项确定性检查，${checkSummary.passed}/${checkSummary.total} 通过` : checkSummary.shared ? `${artifacts.length} 份成果共 ${checkSummary.total} 项唯一确定性检查，${checkSummary.passed}/${checkSummary.total} 通过` : `${checkSummary.passed}/${checkSummary.total} 项检查通过` : "未伪造结果"}</b>
+      <b>{businessGateOutcome?.status === "failed" ? `业务 Gate ${businessGateOutcome.failed_gate_count}/${businessGateOutcome.total_gate_count} 未通过` : businessGateOutcome?.status === "invalid" ? "来源校验失败" : candidateReviewOutcome ? "最终 HR 决定待人工处理" : financeReviewOutcome ? "最终财务处置待人工处理" : outboundFlowOutcome?.status === "invalid" ? "规则或图结构未通过" : outboundFlowOutcome ? "最终合规审批待人工处理" : customerSegmentationOutcome ? "策略草案待销售负责人复核" : sreDiagnosisOutcome ? `${sreDiagnosisOutcome.conflict_count} 组来源冲突待 SRE 核实` : uxPrioritizationOutcome ? `${uxPrioritizationOutcome.group_count} 组排序待 UX 负责人复核` : artifacts.length > 0 ? checkSummary.sameChecklist ? `${artifacts.length} 份成果共享 ${checkSummary.total} 项确定性检查，${checkSummary.passed}/${checkSummary.total} 通过` : checkSummary.shared ? `${artifacts.length} 份成果共 ${checkSummary.total} 项唯一确定性检查，${checkSummary.passed}/${checkSummary.total} 通过` : `${checkSummary.passed}/${checkSummary.total} 项检查通过` : "未伪造结果"}</b>
     </header>
+    {uxPrioritizationOutcome && <UXPrioritizationOutcomePanel outcome={uxPrioritizationOutcome} deterministicPassed={deterministicPassed} />}
     {sreDiagnosisOutcome && <SREDiagnosisOutcomePanel outcome={sreDiagnosisOutcome} deterministicPassed={deterministicPassed} />}
     {customerSegmentationOutcome && <CustomerSegmentationOutcomePanel outcome={customerSegmentationOutcome} deterministicPassed={deterministicPassed} />}
     {outboundFlowOutcome && <OutboundFlowOutcomePanel outcome={outboundFlowOutcome} deterministicPassed={deterministicPassed} />}
@@ -4716,7 +5004,7 @@ function WorkspaceArtifactSection({ artifacts, receipts }: { artifacts: Workspac
     {executionArtifact && <article className={`workspace-action-result${executionArtifact.verifier_status === "failed" ? " is-failed" : ""}`} aria-label="实际执行边界"><IconShieldCheck aria-hidden="true" /><div><span>这次实际发生了什么</span><h4>{executionArtifact.execution_summary}</h4><p>{executionArtifact.purpose}</p>{latestReceipt && <ul>{latestReceipt.prohibited_side_effects.map((item) => <li key={item}>{item}</li>)}</ul>}</div></article>}
     {artifacts.length > 0 && <ol>{artifacts.map((artifact) => <li key={artifact.artifact_id} className={artifact.verifier_status === "passed" ? "is-passed" : "is-failed"}>
       <div className="workspace-artifact-file"><span><IconFile aria-hidden="true" /></span><div><h4>{artifact.title}</h4><p>{artifact.summary}</p><small>文件：{artifact.file_name} · 第 {artifact.round_number} 轮 · {formatSize(artifact.size)} · {artifact.source_file_refs.length} 份内容来源</small></div></div>
-      <div className="workspace-artifact-status"><b>{artifact.verifier_status === "passed" ? <><IconCheck aria-hidden="true" />确定性检查通过</> : <><IconAlertTriangle aria-hidden="true" />检查未通过</>}</b><span>{artifact.record_count !== null ? `${artifact.record_count} 条记录 · ` : ""}{artifact.checks.filter((check) => check.passed).length}/{artifact.checks.length} 项检查{(checklistUsage.get(artifactChecklistKey(artifact)) ?? 0) > 1 ? " · 使用同一验证清单" : ""}</span>{artifact.business_gate_outcome && <small>只代表公式、来源和文件结构已复核，不代表业务 Gate 通过。</small>}{artifact.candidate_review_outcome && <small>只代表来源、条件计算和成果结构已复核，不代表录用或淘汰。</small>}{artifact.finance_review_outcome && <small>只代表来源、金额、候选枚举和成果结构已复核，不代表已经付款、核销、记账或确认坏账。</small>}{artifact.outbound_flow_outcome && <small>只代表来源规则、DOCX 和图结构已复核，不代表合规审批或外呼动作发生。</small>}{artifact.customer_segmentation_outcome && <small>只代表来源、清洗、画像裁决与成果结构已复核，不代表策略获批、销售有效或客户动作发生。</small>}{artifact.sre_diagnosis_outcome && <small>只代表日志、观察台账和成果结构已复核，不代表根因已确定、提案获批或任何命令已经执行。</small>}</div>
+      <div className="workspace-artifact-status"><b>{artifact.verifier_status === "passed" ? <><IconCheck aria-hidden="true" />确定性检查通过</> : <><IconAlertTriangle aria-hidden="true" />检查未通过</>}</b><span>{artifact.record_count !== null ? `${artifact.record_count} 条记录 · ` : ""}{artifact.checks.filter((check) => check.passed).length}/{artifact.checks.length} 项检查{(checklistUsage.get(artifactChecklistKey(artifact)) ?? 0) > 1 ? " · 使用同一验证清单" : ""}</span>{artifact.business_gate_outcome && <small>只代表公式、来源和文件结构已复核，不代表业务 Gate 通过。</small>}{artifact.candidate_review_outcome && <small>只代表来源、条件计算和成果结构已复核，不代表录用或淘汰。</small>}{artifact.finance_review_outcome && <small>只代表来源、金额、候选枚举和成果结构已复核，不代表已经付款、核销、记账或确认坏账。</small>}{artifact.outbound_flow_outcome && <small>只代表来源规则、DOCX 和图结构已复核，不代表合规审批或外呼动作发生。</small>}{artifact.customer_segmentation_outcome && <small>只代表来源、清洗、画像裁决与成果结构已复核，不代表策略获批、销售有效或客户动作发生。</small>}{artifact.sre_diagnosis_outcome && <small>只代表日志、观察台账和成果结构已复核，不代表根因已确定、提案获批或任何命令已经执行。</small>}{artifact.ux_prioritization_outcome && <small>只代表完整日志、规则、排序和两份 CSV 结构已复核，不代表方案获批、体验改善或生产 UI 已修改。</small>}</div>
       <button type="button" onClick={() => void downloadArtifact(artifact)} disabled={downloading !== null}><IconDownload aria-hidden="true" />{downloading === artifact.artifact_id ? "正在下载" : "下载成果"}</button>
       {(artifact.deliverable_type || artifact.covered_period || artifact.statistic_basis || artifact.purpose) && <dl className={`workspace-artifact-semantics${artifact.deliverable_type ? " has-deliverable-type" : ""}`}>
         {artifact.deliverable_type && <div><dt>成果类型</dt><dd>{artifact.deliverable_type}</dd></div>}

@@ -1008,19 +1008,24 @@ def test_customer_sre_and_ux_outputs_retain_deterministic_business_facts(
     assert "external_action=none" in sre_report
 
     _, ux = _execute("TC-15", catalog)
-    ux_rows = list(
+    ux_groups = list(
         csv.reader(io.StringIO(ux.artifacts[0].content.decode("utf-8-sig")))
     )
-    assert len(ux_rows) - 1 == 66
-    assert ux_rows[0] == [
-        "页面名称",
-        "交互元素",
-        "痛点类型",
-        "优先级",
-        "痛点分析",
-        "优化建议",
-    ]
-    assert ux_rows[1][3] == "P0"
+    ux_rows = list(
+        csv.reader(io.StringIO(ux.artifacts[1].content.decode("utf-8-sig")))
+    )
+    outcome = ux.artifacts[0].ux_prioritization_outcome
+    assert outcome is not None
+    assert ux.artifacts[1].ux_prioritization_outcome == outcome
+    assert (outcome.source_row_count, outcome.group_count) == (212, 87)
+    assert outcome.priority_counts == {"P0": 25, "P1": 40, "P2": 14, "P3": 6, "P4": 2}
+    assert (outcome.duplicate_group_count, outcome.duplicate_extra_count) == (16, 20)
+    assert len(ux_groups) - 1 == 87
+    assert len(ux_rows) - 1 == 212
+    assert ux_groups[0][:4] == ["group_id", "页面名称", "页面路径", "操作动作"]
+    assert ux_rows[0][:4] == ["来源行号", "来源位置", "页面名称", "页面路径"]
+    assert all(check.passed for check in ux.artifacts[0].checks)
+    assert ux.artifacts[0].checks == ux.artifacts[1].checks
 
 
 @pytest.mark.parametrize("scenario_id", sorted(BLOCKED_EXTERNAL))

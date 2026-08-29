@@ -61,6 +61,7 @@ TC06_INSTRUCTION = "依据两个岗位说明分别审阅五份简历，保留逐
 TC10_INSTRUCTION = "根据专业性说明生成信用卡 M1 逾期用户 AI 外呼催收流程图文档。"
 TC13_INSTRUCTION = "清洗问卷、完成客户画像分类，并生成差异化销售策略 Markdown 报告。"
 TC14_INSTRUCTION = "分析双十一 Elasticsearch 日志，给出根因与两个层面的紧急止损建议。"
+TC15_INSTRUCTION = "根据交互日志、痛点规则和页面规范，生成排序正确的交互规范优化方案 CSV。"
 
 
 class OnboardingPlanner:
@@ -414,6 +415,64 @@ class SREDiagnosisAnalyst:
                             role="observed",
                             label="查询 QPS 峰值与基线",
                             quote="node.indices.search.query_qps: 峰值 4800/s（正常基线 600/s，激增 8 倍）",
+                        )
+                    ],
+                )
+            ],
+            follow_ups=[],
+            review_required=True,
+        )
+
+
+class UXPrioritizationPlanner:
+    model = "deepseek-v4-pro"
+
+    async def plan(self, *, scenario, files):
+        source = next(
+            item
+            for item in files
+            if item["display_path"] == "用户体验/用户交互行为日志.xlsx"
+        )
+        return HarnessPlanCandidate(
+            summary="读取公开交互日志并形成可定位的离线排序上下文",
+            selection_reason=(
+                "固定 TC-15 效果门会另行冻结完整工作簿、规则和页面规范，"
+                "并从原始字节重算逐行台账和优先级。"
+            ),
+            units=[
+                HarnessPlanCandidateUnit(
+                    unit_id="read-ux-log",
+                    title="读取公开交互行为日志",
+                    objective="核对一条可回开的交互事件",
+                    input_file_refs=[source["file_ref"]],
+                    tool="table.inspect",
+                )
+            ],
+        )
+
+
+class UXPrioritizationAnalyst:
+    model = "deepseek-v4-pro"
+
+    async def analyze(self, *, instruction, plan, files, validation_feedback=None):
+        source = files[0]
+        return HarnessTaskResult(
+            summary="已读取一条公开交互事件；完整排序由服务端固定 TC-15 效果门从三份批准来源独立重算。",
+            findings=[
+                HarnessFinding(
+                    plan_unit_id=plan.units[0].unit_id,
+                    title="公开日志包含可回开的操作与痛点事实",
+                    detail=(
+                        "该行只作为模型分析证据；完整 212 行覆盖、规则冲突、"
+                        "重复事件和映射假设由确定性效果门重算。"
+                    ),
+                    file_refs=[source["file_ref"]],
+                    evidence_quotes=[
+                        HarnessEvidenceQuote(
+                            file_ref=source["file_ref"],
+                            role="observed",
+                            label="一条公开交互事件",
+                            quote="首页 | /home | 点击Banner轮播图 | 失败 | 操作卡顿 | 首页加载耗时4071ms | 0 |  | 0",
                         )
                     ],
                 )
@@ -1323,6 +1382,123 @@ async def test_tc14_runtime_keeps_observations_hypotheses_and_actions_separate(
         public_outcome = public["effect_receipts"][0]["sre_diagnosis_outcome"]
         assert public_outcome["conflict_count"] == 3
         assert public_outcome["resolved_target_count"] == 0
+        assert public_outcome["external_action"] == "none"
+        assert "content_sha256" not in json.dumps(public, ensure_ascii=False)
+    finally:
+        await runtime.close()
+
+
+@pytest.mark.asyncio
+async def test_tc15_runtime_keeps_full_log_ranking_review_and_actions_separate(
+    tmp_path: Path,
+) -> None:
+    before = _forte_digests()
+    runtime = HarnessRuntime(
+        BenchmarkWorkspaceCatalog(FORTE_ROOT),
+        UXPrioritizationPlanner(),
+        UXPrioritizationAnalyst(),
+        effect_engine=ScenarioEffectEngine(),
+        artifact_store=RunWorkspaceArtifactStore(tmp_path / "run-workspaces"),
+    )
+    try:
+        started = await runtime.start(
+            "ux-prioritization-owner",
+            HarnessRunStart(
+                idempotency_key="tc15-source-derived-ux-runtime-0001",
+                instruction=TC15_INSTRUCTION,
+            ),
+        )
+        snapshot = None
+        for _ in range(1_000):
+            candidate = await runtime.get(
+                "ux-prioritization-owner", started.run.run_id
+            )
+            if candidate.status in {"waiting_input", "completed", "stopped", "failed"}:
+                snapshot = candidate
+                break
+            await asyncio.sleep(0.01)
+        assert snapshot is not None
+        assert snapshot.status == "completed"
+        assert len(snapshot.workspace_artifacts) == 2
+        assert len(snapshot.effect_receipts) == 1
+
+        receipt = snapshot.effect_receipts[0]
+        assert receipt.status == "passed"
+        assert receipt.scenario_id == "TC-15"
+        assert receipt.ux_prioritization_outcome is not None
+        outcome = receipt.ux_prioritization_outcome
+        assert outcome.status == "prioritization_review_required"
+        assert (
+            outcome.source_row_count,
+            outcome.analyzed_row_count,
+            outcome.included_pain_row_count,
+            outcome.excluded_no_pain_count,
+            outcome.success_with_pain_count,
+            outcome.group_count,
+        ) == (212, 212, 161, 51, 55, 87)
+        assert outcome.priority_counts == {
+            "P0": 25,
+            "P1": 40,
+            "P2": 14,
+            "P3": 6,
+            "P4": 2,
+        }
+        assert (outcome.duplicate_group_count, outcome.duplicate_extra_count) == (
+            16,
+            20,
+        )
+        assert len(outcome.rule_conflicts) == 1
+        assert outcome.human_review_required is True
+        assert outcome.original_inputs_modified is False
+        assert outcome.external_action == "none"
+
+        for artifact in snapshot.workspace_artifacts:
+            assert artifact.verifier_status == "passed"
+            assert artifact.ux_prioritization_outcome == outcome
+            assert len({check.check_id for check in artifact.checks}) == 13
+            assert all(check.passed for check in artifact.checks)
+            assert artifact.review_required is True
+            assert artifact.external_action == "none"
+            assert artifact.source_file_refs == [
+                "forte-3913d2ccb62b9b02",
+                "forte-0506a266b89dfef4",
+                "forte-3f48165dbc47276d",
+            ]
+
+        by_name = {item.file_name: item for item in snapshot.workspace_artifacts}
+        assert by_name["交互规范优化方案.csv"].record_count == 87
+        assert by_name["交互行为逐行归因台账.csv"].record_count == 212
+
+        _, group_content = await runtime.get_workspace_artifact(
+            "ux-prioritization-owner",
+            snapshot.run_id,
+            by_name["交互规范优化方案.csv"].artifact_id,
+        )
+        group_rows = list(
+            csv.DictReader(io.StringIO(group_content.decode("utf-8-sig")))
+        )
+        assert len(group_rows) == 87
+        assert sum(row["优先级"] == "P0" for row in group_rows) == 25
+        save_rows = [row for row in group_rows if row["操作动作"] == "点击保存按钮"]
+        assert save_rows
+        assert all(row["全量分母"] == "212" for row in save_rows)
+
+        _, row_content = await runtime.get_workspace_artifact(
+            "ux-prioritization-owner",
+            snapshot.run_id,
+            by_name["交互行为逐行归因台账.csv"].artifact_id,
+        )
+        row_ledger = list(csv.DictReader(io.StringIO(row_content.decode("utf-8-sig"))))
+        assert len(row_ledger) == 212
+        assert sum(row["处理状态"] == "included" for row in row_ledger) == 161
+        assert sum(row["处理状态"] == "excluded" for row in row_ledger) == 51
+        assert _forte_digests() == before
+
+        public = runtime.public_snapshot(snapshot).model_dump(mode="json")
+        public_outcome = public["effect_receipts"][0]["ux_prioritization_outcome"]
+        assert public_outcome["source_row_count"] == 212
+        assert public_outcome["group_count"] == 87
+        assert public_outcome["suggestion_status"] == "no_approved_solution_source"
         assert public_outcome["external_action"] == "none"
         assert "content_sha256" not in json.dumps(public, ensure_ascii=False)
     finally:

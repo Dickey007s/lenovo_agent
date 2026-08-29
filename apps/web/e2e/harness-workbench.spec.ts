@@ -12,6 +12,8 @@ import tc13CustomerSegmentationThresholdManifest from "../../../docs/evidence/ma
 import tc13CustomerSegmentationWitnessManifest from "../../../docs/evidence/manifests/tc13-public-customer-segmentation-outcome-witness-20260829.json";
 import tc14SREDiagnosisManifest from "../../../docs/evidence/manifests/tc14-public-sre-diagnosis-outcome-20260829.json";
 import tc14SREDiagnosisDynamicManifest from "../../../docs/evidence/manifests/tc14-public-sre-diagnosis-outcome-dynamic-20260829.json";
+import tc15UXPrioritizationManifest from "../../../docs/evidence/manifests/tc15-public-ux-prioritization-outcome-20260829.json";
+import tc15UXPrioritizationThresholdManifest from "../../../docs/evidence/manifests/tc15-public-ux-prioritization-outcome-threshold-20260829.json";
 
 type FileItem = {
   file_ref: string;
@@ -70,6 +72,30 @@ const customerRuleFile = fileItem(
   "MD",
   "text",
 );
+const uxBehaviorFile = fileItem(
+  "forte-3913d2ccb62b9b02",
+  "forte-folder-uiux-021",
+  "用户交互行为日志.xlsx",
+  "用户体验",
+  "XLSX",
+  "table",
+);
+const uxRuleFile = fileItem(
+  "forte-0506a266b89dfef4",
+  uxBehaviorFile.folder_id,
+  "交互行为痛点及优化规则.md",
+  "用户体验",
+  "MD",
+  "text",
+);
+const uxSpecFile = fileItem(
+  "forte-3f48165dbc47276d",
+  uxBehaviorFile.folder_id,
+  "页面级交互规范.docx",
+  "用户体验",
+  "DOCX",
+  "document",
+);
 const workflowFile = fileItem("forte-5555555555555555", "forte-folder-555555555555", "workflow.py", "算法研发", "PY", "text", "search_agent_workflow/workflow.py");
 const searchLogFile = fileItem("forte-6666666666666666", "forte-folder-555555555555", "search_agent.log", "算法研发", "LOG", "text", "search_agent_workflow/search_agent.log");
 const legalRuleFile = fileItem("forte-legal-rules-01", pdfFile.folder_id, "授权委托书风控校验规则.md", "法务", "MD", "text");
@@ -106,15 +132,16 @@ const seedFolders = [
   { folder_id: workflowFile.folder_id, display_label: "算法研发", display_summary: "搜索 Agent 代码与运行记录", files: [workflowFile, searchLogFile] },
   { folder_id: outboundRuleFile.folder_id, display_label: "运营管理", display_summary: "外呼规则与运营资料", files: [outboundRuleFile] },
   { folder_id: customerSurveyFile.folder_id, display_label: "销售运营", display_summary: "公开问卷与画像规则", files: [customerSurveyFile, customerRuleFile] },
+  { folder_id: uxBehaviorFile.folder_id, display_label: "用户体验", display_summary: "交互日志、排序规则与页面规范", files: [uxBehaviorFile, uxRuleFile, uxSpecFile] },
 ];
 
 const folders = Array.from({ length: 15 }, (_, folderIndex) => {
   const seed = seedFolders[folderIndex];
   const folderId = seed?.folder_id ?? `forte-folder-${String(folderIndex + 1).padStart(12, "0")}`;
   // Keep every named benchmark folder faithful to its controlled fixture.
-  // The eight generic folders carry the remaining 72 inputs so the workspace
+  // The seven generic folders carry the remaining 69 inputs so the workspace
   // still exercises the production 15-folder / 96-file summary.
-  const targetCount = seed ? seed.files.length : 9;
+  const targetCount = seed ? seed.files.length : folderIndex < 14 ? 10 : 9;
   const files = seed ? [...seed.files] : [];
   while (files.length < targetCount) {
     const fileIndex = foldersFileIndex(folderIndex, files.length);
@@ -200,6 +227,24 @@ function previewFor(fileRef: string) {
     ...base,
     kind: "text",
     text: "缺失的评分字段统一按数值0处理\n技术型：专业字段数值≥8\n安全型：安全和预算同时≥8\n敏捷型：易用字段数值≥8\n安全型 > 技术型 > 敏捷型",
+  };
+  if (fileRef === uxBehaviorFile.file_ref) return {
+    ...base,
+    kind: "table",
+    columns: ["页面名称", "页面路径", "操作动作", "最终操作结果", "痛点类型", "失败原因", "误触次数", "页面退出节点", "重试次数"],
+    rows: [{ row_number: 2, values: ["首页", "/home", "点击Banner轮播图", "失败", "操作卡顿", "首页加载耗时4071ms", "0", "", "0"] }],
+    total_rows: 212,
+    truncated: true,
+  };
+  if (fileRef === uxRuleFile.file_ref) return {
+    ...base,
+    kind: "text",
+    text: "场景频次使用全部操作为分母。高频 >= 5%，中频 3% <= x < 5%，低频 < 3%。来源中的 3% 边界说明存在冲突。",
+  };
+  if (fileRef === uxSpecFile.file_ref) return {
+    ...base,
+    kind: "document",
+    text: "页面级交互规范：5 个页面、28 个规范元素。来源没有批准操作到元素的映射表。",
   };
   return { ...base, kind: "text", text: "2026-08-24 09:30 service healthy" };
 }
@@ -1962,6 +2007,123 @@ function boundedAnalysisRecoverySnapshot(body: { workspace_id: string; instructi
   };
 }
 
+function uxPrioritizationEffectSnapshot(
+  body: { workspace_id: string; instruction: string },
+  variant: "canonical" | "threshold" = "canonical",
+) {
+  const base = snapshot(body, "completed", 21);
+  const manifest = structuredClone(
+    variant === "threshold" ? tc15UXPrioritizationThresholdManifest : tc15UXPrioritizationManifest,
+  );
+  const outcome = manifest.ux_prioritization_outcome;
+  const sourceRefs = manifest.sources.map((source) => source.file_ref);
+  const artifactIds = ["workspace-artifact-151515151501", "workspace-artifact-151515151502"];
+  const common = {
+    capability_id: "office-ux-pain-prioritization",
+    scenario_id: "TC-15",
+    version: 1,
+    round_number: 1,
+    source_file_refs: sourceRefs,
+    validator_id: "validator-ux-pain-prioritization-v2",
+    verifier_status: "passed",
+    checks: manifest.checks,
+    covered_period: "uiux-021 固定公开离线日志；不代表线上时间窗或真实用户总体",
+    statistic_basis: `完整读取 ${outcome.source_row_count} 行，以全部操作为分母；按来源严重度、频次与 P0-P4 矩阵计算，不使用 120 行安全 Preview。`,
+    purpose: "供 UX 负责人复核公开日志排序、映射假设和来源冲突，不作用户研究或生产修改。",
+    review_guidance: `请 UX 负责人复核 ${outcome.rule_conflicts.length} 组规则冲突、${outcome.duplicate_group_count} 个重复事件组、${outcome.mappings.length} 个映射假设，并补充批准的具体优化方案与效果指标。`,
+    execution_summary: `服务端只读解析三份 uiux-021 来源，覆盖 ${outcome.analyzed_row_count}/${outcome.source_row_count} 行并生成两份 CSV；原件和生产系统均未修改。`,
+    self_test: null,
+    business_gate_outcome: null,
+    legal_review_outcome: null,
+    candidate_review_outcome: null,
+    finance_review_outcome: null,
+    outbound_flow_outcome: null,
+    customer_segmentation_outcome: null,
+    sre_diagnosis_outcome: null,
+    ux_prioritization_outcome: outcome,
+    created_at: new Date().toISOString(),
+    original_inputs_modified: false,
+    review_required: true,
+    external_action: "none",
+  };
+  const priorityText = (["P0", "P1", "P2", "P3", "P4"] as const)
+    .map((label) => `${label}=${outcome.priority_counts[label] ?? 0}`)
+    .join("/");
+  const artifacts = [{
+    ...common,
+    artifact_id: artifactIds[0],
+    title: "交互痛点全量优先级台账",
+    file_name: "交互规范优化方案.csv",
+    media_type: "text/csv",
+    size: 128000,
+    record_count: outcome.group_count,
+    summary: `完整日志形成 ${outcome.group_count} 个可排序组合，${priorityText}；具体优化方案仍待 UX 负责人批准。`,
+    deliverable_type: "来源推导的聚合优先级 CSV",
+    key_outputs: [`完整分母 ${outcome.source_row_count} 行`, `痛点组合 ${outcome.group_count} 个`, priorityText, `未覆盖规范元素 ${outcome.uncovered_spec_count} 个`],
+    key_outputs_label: "全量排序与来源边界",
+    download_path: `/v1/harness/runs/${base.run_id}/artifacts/${artifactIds[0]}`,
+  }, {
+    ...common,
+    artifact_id: artifactIds[1],
+    title: "交互行为逐行归因台账",
+    file_name: "交互行为逐行归因台账.csv",
+    media_type: "text/csv",
+    size: 241000,
+    record_count: outcome.source_row_count,
+    summary: `${outcome.analyzed_row_count}/${outcome.source_row_count} 行均有 included、excluded 或 manual_review 裁决；重复事件保留且未自动去重。`,
+    deliverable_type: "逐原始行可复算 CSV 台账",
+    key_outputs: [`有痛点 ${outcome.included_pain_row_count} 行`, `无痛点 ${outcome.excluded_no_pain_count} 行`, `成功但有痛点 ${outcome.success_with_pain_count} 行`, `重复组 ${outcome.duplicate_group_count} 个 / 额外重复事件 ${outcome.duplicate_extra_count} 条`],
+    key_outputs_label: "逐行覆盖与数据质量",
+    download_path: `/v1/harness/runs/${base.run_id}/artifacts/${artifactIds[1]}`,
+  }];
+  return {
+    ...base,
+    workspace_artifacts: artifacts,
+    effect_receipts: [{
+      receipt_id: "effect-receipt-151515151515",
+      capability_id: "office-ux-pain-prioritization",
+      scenario_id: "TC-15",
+      status: "passed",
+      state: "已冻结 uiux-021 的完整工作簿、排序规则和页面规范，原件保持只读。",
+      action: "逐行重算全量分母、痛点组合、映射假设和优先级，并生成两份 CSV。",
+      observation: `2 份成果共享 ${manifest.checks.length} 项确定性检查；完整覆盖 ${outcome.source_row_count} 行、形成 ${outcome.group_count} 组。`,
+      cost: "0 次额外模型调用；仅消耗本机确定性解析、计算与文件写入。",
+      result: "来源、计算和成果结构已复核；映射、具体方案与效果仍待 UX 负责人批准，生产动作未发生。",
+      source_file_refs: sourceRefs,
+      artifact_ids: artifactIds,
+      prohibited_side_effects: ["不修改生产界面", "不发布版本", "不创建 A/B 实验", "不写回原始日志"],
+      ux_prioritization_outcome: outcome,
+      created_at: new Date().toISOString(),
+      external_action: "none",
+    }],
+    last_event_sequence: 21,
+  };
+}
+
+function failedUXPrioritizationEffectSnapshot(body: { workspace_id: string; instruction: string }) {
+  const base = uxPrioritizationEffectSnapshot(body);
+  const checks = base.workspace_artifacts[0].checks.map((check) => check.check_id === "check-ux-group-artifact-v2"
+    ? { ...check, passed: false, label: "聚合优先级台账未通过", detail: "最终 CSV 与批准来源的独立重算结果不一致。" }
+    : check);
+  return {
+    ...base,
+    status: "failed",
+    workspace_artifacts: base.workspace_artifacts.map((artifact) => ({
+      ...artifact,
+      verifier_status: "failed",
+      checks,
+      summary: "失败证据已保留，但排序或逐行台账未通过服务端来源重算。",
+      review_guidance: "当前排序不得用于排期；请查看失败项并重新启动新的 TC-15 Run。",
+    })),
+    effect_receipts: base.effect_receipts.map((receipt) => ({
+      ...receipt,
+      status: "failed",
+      observation: "至少一项来源或成果检查未通过，失败证据已保留。",
+      result: "当前排序不得采用；没有修改生产界面、发布或创建实验。",
+    })),
+  };
+}
+
 function locationFailureSnapshot(body: { workspace_id: string; instruction: string }) {
   const base = sourceLocationRecoverySnapshot(body);
   return {
@@ -1980,7 +2142,7 @@ function locationFailureSnapshot(body: { workspace_id: string; instruction: stri
 }
 async function fulfillJson(route: Route, body: unknown, status = 200) { await route.fulfill({ status, contentType: "application/json", body: JSON.stringify(body) }); }
 
-async function mockHarness(page: Page, options: { failFirstStart?: boolean; failDecisionDefer?: boolean; disconnect?: boolean; failed?: boolean; locationFailure?: boolean; sourceRecovery?: boolean; sourceRecoveryThreeCandidates?: boolean; verifiedArtifactAuditPending?: boolean; verifiedArtifactAuditPendingDistinct?: boolean; verifiedFinanceArtifactAuditPending?: boolean; unverifiedArtifactLocationPending?: boolean; terminalArtifactLocationPending?: boolean; boundedRecovery?: boolean; effectArtifact?: boolean; financePositiveCandidate?: boolean; financeVerifierFailed?: boolean; outboundEffect?: boolean; outboundEffectDynamic?: boolean; outboundEffectFailed?: boolean; reactEffect?: boolean; evaluationEffect?: boolean; dashboardEffect?: boolean; dashboardEffectFailed?: boolean; releaseEffect?: boolean; releaseEffectRepaired?: boolean; releaseEffectFailed?: boolean; candidateEffect?: boolean; candidateEffectImproved?: boolean; candidateEffectFailed?: boolean; customerEffect?: boolean; customerEffectThreshold?: boolean; customerEffectWitness?: boolean; customerEffectFailed?: boolean; sreEffect?: boolean; sreEffectDynamic?: boolean; sreEffectFailed?: boolean; legalEffect?: boolean; legalEffectRepaired?: boolean; legalEffectFailed?: boolean; effectBoundary?: boolean; reviewTable?: boolean; workspaceFailures?: number; interactiveLoop?: boolean; evidenceGate?: boolean } = {}) {
+async function mockHarness(page: Page, options: { failFirstStart?: boolean; failDecisionDefer?: boolean; disconnect?: boolean; failed?: boolean; locationFailure?: boolean; sourceRecovery?: boolean; sourceRecoveryThreeCandidates?: boolean; verifiedArtifactAuditPending?: boolean; verifiedArtifactAuditPendingDistinct?: boolean; verifiedFinanceArtifactAuditPending?: boolean; unverifiedArtifactLocationPending?: boolean; terminalArtifactLocationPending?: boolean; boundedRecovery?: boolean; effectArtifact?: boolean; financePositiveCandidate?: boolean; financeVerifierFailed?: boolean; outboundEffect?: boolean; outboundEffectDynamic?: boolean; outboundEffectFailed?: boolean; reactEffect?: boolean; evaluationEffect?: boolean; dashboardEffect?: boolean; dashboardEffectFailed?: boolean; releaseEffect?: boolean; releaseEffectRepaired?: boolean; releaseEffectFailed?: boolean; candidateEffect?: boolean; candidateEffectImproved?: boolean; candidateEffectFailed?: boolean; customerEffect?: boolean; customerEffectThreshold?: boolean; customerEffectWitness?: boolean; customerEffectFailed?: boolean; sreEffect?: boolean; sreEffectDynamic?: boolean; sreEffectFailed?: boolean; uxEffect?: boolean; uxEffectThreshold?: boolean; uxEffectFailed?: boolean; legalEffect?: boolean; legalEffectRepaired?: boolean; legalEffectFailed?: boolean; effectBoundary?: boolean; reviewTable?: boolean; workspaceFailures?: number; interactiveLoop?: boolean; evidenceGate?: boolean } = {}) {
   let workspaceCalls = 0; let startCalls = 0; let streamCalls = 0;
   let currentBody = { workspace_id: "forte-public-office", instruction: "" };
   // Mock snapshots intentionally cover several server state shapes in one route.
@@ -2069,6 +2231,12 @@ async function mockHarness(page: Page, options: { failFirstStart?: boolean; fail
           ? sreDiagnosisEffectSnapshot(body, "dynamic")
         : options.sreEffect
           ? sreDiagnosisEffectSnapshot(body)
+        : options.uxEffectFailed
+          ? failedUXPrioritizationEffectSnapshot(body)
+        : options.uxEffectThreshold
+          ? uxPrioritizationEffectSnapshot(body, "threshold")
+        : options.uxEffect
+          ? uxPrioritizationEffectSnapshot(body)
         : options.legalEffectFailed
           ? failedLegalDelegationEffectSnapshot(body)
         : options.legalEffectRepaired
@@ -3007,6 +3175,117 @@ test("keeps TC-14 visibly red when the independent ledger verifier fails", async
   await expect(artifacts).toContainText("当前成果不得用于事故处置");
   await expect(artifacts).not.toContainText("12/12 项检查通过");
   await expect(artifacts).toContainText("没有连接集群或执行命令");
+});
+
+test("projects TC-15 full-workbook prioritization, source boundaries, and no production action", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 1100 });
+  await mockHarness(page, { uxEffect: true });
+  await page.goto("/");
+  await page.getByRole("textbox", { name: "任务指令" }).fill("基于完整交互行为日志和页面规范，给出痛点优先级与优化建议。 ");
+  await page.getByRole("button", { name: "启动 Control Loop" }).click();
+
+  const artifacts = page.locator(".workspace-artifacts");
+  const outcome = page.getByRole("region", { name: "交互痛点全量优先级复核" });
+  await expect(artifacts).toContainText("Agent 已生成 2 份真实成果文件");
+  await expect(artifacts.locator(":scope > header > b")).toHaveText("87 组排序待 UX 负责人复核");
+  await expect(outcome.getByRole("heading", { name: "这是固定公开日志的离线排序，不是用户研究、线上遥测、设计效果证明或自动修复" })).toBeVisible();
+  await expect(outcome).toContainText("212/212 行完整覆盖");
+  await expect(outcome).toContainText("161 行有痛点 · 51 行无痛点");
+  await expect(outcome).toContainText("55 行“成功但有痛点”");
+  await expect(outcome).toContainText("87 组 · P0 25 · P1 40 · P2 14 · P3 6 · P4 2");
+  await expect(outcome).toContainText("16 个重复组未去重");
+  await expect(outcome).toContainText("24 个映射是受控适配器假设");
+  await expect(outcome).toContainText("3% 频次边界定义不一致");
+  await expect(outcome).toContainText("全部尚未发生");
+  await expect(outcome).toContainText("没有修改生产界面、发布版本或创建 A/B 实验");
+  await expect(artifacts).toContainText("不代表方案获批、体验改善或生产 UI 已修改");
+  await expect(page.locator(".loop-effect-conclusion")).toContainText("具体优化方案");
+
+  const saveGroup = outcome.locator(".ux-prioritization-groups details").filter({ hasText: "点击保存按钮" }).first();
+  await saveGroup.locator(":scope > summary").click();
+  await expect(saveGroup).toContainText("分母为全部 212 条操作");
+  await expect(saveGroup).toContainText("补充具体方案、验证指标与批准记录");
+  await expect(saveGroup).toContainText("为何这样分级");
+  await expect(saveGroup).toContainText("ux-rule-frequency-high");
+  await expect(saveGroup).toContainText("交互行为痛点及优化规则.md:L25");
+  await expect(saveGroup).toContainText("ux-rule-priority-high-severe");
+  await saveGroup.getByText(/查看 4 条贡献来源位置/).click();
+  await expect(saveGroup.locator(".ux-prioritization-locators li")).toHaveCount(4);
+
+  await outcome.getByRole("button", { name: "P0 25" }).click();
+  await expect(outcome.locator(".ux-prioritization-groups > header h4")).toHaveText("25 个聚合组合");
+  await outcome.locator(".ux-prioritization-rows > summary").click();
+  await expect(outcome.locator(".ux-prioritization-rows > summary")).toContainText("212 行");
+
+  const typeSizes = await outcome.evaluate((element) => ({
+    title: Number.parseFloat(getComputedStyle(element.querySelector(":scope > header h3")!).fontSize),
+    layerTitle: Number.parseFloat(getComputedStyle(element.querySelector(".ux-prioritization-statuses strong")!).fontSize),
+    layerBody: Number.parseFloat(getComputedStyle(element.querySelector(".ux-prioritization-statuses p")!).fontSize),
+    groupTitle: Number.parseFloat(getComputedStyle(element.querySelector(".ux-prioritization-groups summary strong")!).fontSize),
+    groupDetail: Number.parseFloat(getComputedStyle(element.querySelector(".ux-prioritization-groups dd")!).fontSize),
+  }));
+  expect(typeSizes.title).toBeGreaterThanOrEqual(19);
+  expect(typeSizes.layerTitle).toBeGreaterThanOrEqual(12);
+  expect(typeSizes.layerBody).toBeGreaterThanOrEqual(11);
+  expect(typeSizes.groupTitle).toBeGreaterThanOrEqual(13);
+  expect(typeSizes.groupDetail).toBeGreaterThanOrEqual(11);
+  let overflow = await page.evaluate(() => ({ width: document.documentElement.clientWidth, scroll: document.documentElement.scrollWidth }));
+  expect(overflow.scroll).toBeLessThanOrEqual(overflow.width);
+
+  if (process.env.CAPTURE_TC15_EFFECT_EVIDENCE === "1") {
+    const financeFolder = page.getByRole("treeitem", { name: "收起文件夹 财务管理" });
+    if (await financeFolder.isVisible()) await financeFolder.click();
+    const uxFolder = page.getByRole("treeitem", { name: "展开文件夹 用户体验" });
+    if (await uxFolder.isVisible()) await uxFolder.click();
+    await outcome.evaluate((element) => element.scrollIntoView({ block: "start" }));
+    await page.screenshot({ path: "../../docs/evidence/screenshots/tc15-ux-prioritization-desktop.png" });
+  }
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(outcome.getByRole("heading", { name: "这是固定公开日志的离线排序，不是用户研究、线上遥测、设计效果证明或自动修复" })).toBeVisible();
+  overflow = await page.evaluate(() => ({ width: document.documentElement.clientWidth, scroll: document.documentElement.scrollWidth }));
+  expect(overflow.scroll).toBeLessThanOrEqual(overflow.width);
+  const panelOverflow = await outcome.evaluate((element) => ({ width: element.clientWidth, scroll: element.scrollWidth }));
+  expect(panelOverflow.scroll).toBeLessThanOrEqual(panelOverflow.width);
+  const mobileFilterHeight = await outcome.getByRole("button", { name: "P0 25" }).evaluate((element) => element.getBoundingClientRect().height);
+  expect(mobileFilterHeight).toBeGreaterThanOrEqual(40);
+  if (process.env.CAPTURE_TC15_EFFECT_EVIDENCE === "1") {
+    await outcome.evaluate((element) => element.scrollIntoView({ block: "start" }));
+    await page.screenshot({ path: "../../docs/evidence/screenshots/tc15-ux-prioritization-mobile.png" });
+  }
+});
+
+test("projects TC-15 threshold changes without stale canonical totals", async ({ page }) => {
+  await mockHarness(page, { uxEffectThreshold: true });
+  await page.goto("/");
+  await page.getByRole("textbox", { name: "任务指令" }).fill("基于完整交互行为日志和页面规范，给出痛点优先级与优化建议。 ");
+  await page.getByRole("button", { name: "启动 Control Loop" }).click();
+
+  const outcome = page.getByRole("region", { name: "交互痛点全量优先级复核" });
+  await expect(outcome).toContainText("87 组 · P0 0 · P1 54 · P2 24 · P3 7 · P4 2");
+  await expect(outcome).not.toContainText("P0 25 · P1 40 · P2 14 · P3 6 · P4 2");
+  const saveGroup = outcome.locator(".ux-prioritization-groups details").filter({ hasText: "点击保存按钮" }).first();
+  await expect(saveGroup.locator(":scope > summary")).toContainText("P1");
+  await expect(saveGroup.locator(":scope > summary")).toContainText("中频");
+  await saveGroup.locator(":scope > summary").click();
+  await expect(saveGroup).toContainText("ux-rule-frequency-medium");
+  await expect(saveGroup).toContainText("ux-rule-priority-medium-severe");
+  await expect(saveGroup).not.toContainText("ux-rule-frequency-high");
+});
+
+test("keeps TC-15 visibly red when either generated CSV fails independent verification", async ({ page }) => {
+  await mockHarness(page, { uxEffectFailed: true });
+  await page.goto("/");
+  await page.getByRole("textbox", { name: "任务指令" }).fill("基于完整交互行为日志和页面规范，给出痛点优先级与优化建议。 ");
+  await page.getByRole("button", { name: "启动 Control Loop" }).click();
+
+  const artifacts = page.locator(".workspace-artifacts");
+  const outcome = page.getByRole("region", { name: "交互痛点全量优先级复核" });
+  await expect(outcome).toContainText("确定性检查未通过");
+  await expect(artifacts).toContainText("聚合优先级台账未通过");
+  await expect(artifacts).toContainText("当前排序不得用于排期");
+  await expect(artifacts).not.toContainText("12/12 项检查通过");
+  await expect(artifacts).toContainText("没有修改生产界面、发布或创建实验");
 });
 
 test("keeps deterministic verification separate from the TC-11 business release decision", async ({ page }) => {

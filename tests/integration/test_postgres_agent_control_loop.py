@@ -46,6 +46,7 @@ from tests.unit.test_scenario_effect_runtime import (
     TC12_INSTRUCTION,
     TC13_INSTRUCTION,
     TC14_INSTRUCTION,
+    TC15_INSTRUCTION,
     LegalDelegationAnalyst,
     LegalDelegationPlanner,
     OnboardingAnalyst,
@@ -56,6 +57,8 @@ from tests.unit.test_scenario_effect_runtime import (
     ReleaseReadinessPlanner,
     SREDiagnosisAnalyst,
     SREDiagnosisPlanner,
+    UXPrioritizationAnalyst,
+    UXPrioritizationPlanner,
 )
 from tests.unit.test_harness_runtime import (
     AmbiguousCatalog,
@@ -944,6 +947,125 @@ async def test_postgres_restart_preserves_tc14_sre_outcome_and_two_artifacts(
         public_json = public_snapshot.model_dump_json()
         assert "content_sha256" not in public_json
         assert public_snapshot.effect_receipts[0].sre_diagnosis_outcome == outcome
+        assert public_snapshot.effect_receipts[0].external_action == "none"
+    finally:
+        for runtime in reversed(runtimes):
+            await runtime.close()
+        if DATABASE_DSN and run_id:
+            async with await psycopg.AsyncConnection.connect(DATABASE_DSN) as connection:
+                async with connection.cursor() as cursor:
+                    for table in (
+                        "harness_idempotency",
+                        "harness_task_commit",
+                        "harness_artifact_version",
+                        "harness_run_state",
+                    ):
+                        await cursor.execute(
+                            f"DELETE FROM {table} WHERE owner_id = %s",  # nosec B608
+                            (owner,),
+                        )
+
+
+@pytest.mark.asyncio
+async def test_postgres_restart_preserves_tc15_ux_outcome_and_two_ledgers(
+    tmp_path: Path,
+) -> None:
+    owner = f"postgres-tc15-ux-{uuid4().hex}"
+    run_id = ""
+    runtimes: list[HarnessRuntime] = []
+    workspace_root = tmp_path / "tc15-run-workspaces"
+    try:
+        first = HarnessRuntime(
+            BenchmarkWorkspaceCatalog(FORTE_ROOT),
+            UXPrioritizationPlanner(),
+            UXPrioritizationAnalyst(),
+            PostgresHarnessStateStore(DATABASE_DSN),
+            effect_engine=ScenarioEffectEngine(),
+            artifact_store=RunWorkspaceArtifactStore(workspace_root),
+        )
+        runtimes.append(first)
+        await first.setup()
+        started = await first.start(
+            owner,
+            start_request(
+                idempotency_key=f"postgres-tc15-start-{uuid4().hex}",
+                instruction=TC15_INSTRUCTION,
+            ),
+        )
+        run_id = started.run.run_id
+        terminal = await wait_for_effect_run(first, owner, run_id)
+        assert terminal.status == "completed"
+        assert len(terminal.workspace_artifacts) == 2
+        receipt = terminal.effect_receipts[0]
+        assert receipt.status == "passed"
+        assert receipt.scenario_id == "TC-15"
+        assert receipt.ux_prioritization_outcome is not None
+        outcome = receipt.ux_prioritization_outcome
+        assert outcome.status == "prioritization_review_required"
+        assert (
+            outcome.source_row_count,
+            outcome.analyzed_row_count,
+            outcome.included_pain_row_count,
+            outcome.excluded_no_pain_count,
+            outcome.success_with_pain_count,
+            outcome.group_count,
+        ) == (212, 212, 161, 51, 55, 87)
+        assert outcome.priority_counts == {
+            "P0": 25,
+            "P1": 40,
+            "P2": 14,
+            "P3": 6,
+            "P4": 2,
+        }
+        assert outcome.external_action == "none"
+
+        originals: dict[str, bytes] = {}
+        for artifact in terminal.workspace_artifacts:
+            assert artifact.verifier_status == "passed"
+            assert artifact.ux_prioritization_outcome == outcome
+            _, originals[artifact.file_name] = await first.get_workspace_artifact(
+                owner, run_id, artifact.artifact_id
+            )
+        group_rows = list(
+            csv.DictReader(
+                io.StringIO(originals["交互规范优化方案.csv"].decode("utf-8-sig"))
+            )
+        )
+        row_rows = list(
+            csv.DictReader(
+                io.StringIO(originals["交互行为逐行归因台账.csv"].decode("utf-8-sig"))
+            )
+        )
+        assert len(group_rows) == 87
+        assert len(row_rows) == 212
+        await first.close()
+
+        second = HarnessRuntime(
+            BenchmarkWorkspaceCatalog(FORTE_ROOT),
+            UXPrioritizationPlanner(),
+            UXPrioritizationAnalyst(),
+            PostgresHarnessStateStore(DATABASE_DSN),
+            effect_engine=ScenarioEffectEngine(),
+            artifact_store=RunWorkspaceArtifactStore(workspace_root),
+        )
+        runtimes.append(second)
+        await second.setup()
+        restored = await second.get(owner, run_id)
+        assert restored.effect_receipts[0].ux_prioritization_outcome == outcome
+        restored_by_name = {item.file_name: item for item in restored.workspace_artifacts}
+        assert set(restored_by_name) == set(originals)
+        for file_name, content in originals.items():
+            artifact = restored_by_name[file_name]
+            assert artifact.ux_prioritization_outcome == outcome
+            _, restored_content = await second.get_workspace_artifact(
+                owner, run_id, artifact.artifact_id
+            )
+            assert restored_content == content
+
+        public_snapshot = second.public_snapshot(restored)
+        public_json = public_snapshot.model_dump_json()
+        assert "content_sha256" not in public_json
+        assert public_snapshot.effect_receipts[0].ux_prioritization_outcome == outcome
         assert public_snapshot.effect_receipts[0].external_action == "none"
     finally:
         for runtime in reversed(runtimes):
