@@ -831,6 +831,38 @@ def _model_calls(snapshot: dict[str, Any]) -> list[dict[str, Any]]:
     return calls
 
 
+def _narrative_reconciliation(snapshot: dict[str, Any]) -> dict[str, Any] | None:
+    raw = snapshot.get("narrative_reconciliation")
+    if not isinstance(raw, dict):
+        return None
+    return {
+        "reconciliation_id": raw.get("reconciliation_id"),
+        "status": raw.get("status"),
+        "authority": raw.get("authority"),
+        "model_disposition": raw.get("model_disposition"),
+        "outcome_revision": raw.get("outcome_revision"),
+        "effect_receipt_id": raw.get("effect_receipt_id"),
+        "model_returned": bool(raw.get("model_returned")),
+        "comparable_claim_count": raw.get("comparable_claim_count"),
+        "conflicts": [
+            {
+                "conflict_id": item.get("conflict_id"),
+                "kind": item.get("kind"),
+                "narrative_path": item.get("narrative_path"),
+                "narrative_excerpt": item.get("narrative_excerpt"),
+                "outcome_path": item.get("outcome_path"),
+                "expected": item.get("expected"),
+                "observed": item.get("observed"),
+                "severity": item.get("severity"),
+            }
+            for item in raw.get("conflicts", [])
+            if isinstance(item, dict)
+        ],
+        "message": raw.get("message"),
+        "external_action": raw.get("external_action"),
+    }
+
+
 def _event_projection(snapshot: dict[str, Any]) -> list[dict[str, Any]]:
     allowed = {
         "planning_started",
@@ -839,6 +871,8 @@ def _event_projection(snapshot: dict[str, Any]) -> list[dict[str, Any]]:
         "analysis_completed",
         "analysis_structure_rejected",
         "analysis_validation_rejected",
+        "narrative_reconciliation_completed",
+        "narrative_reconciliation_rejected",
         "deterministic_office_tool_started",
         "scenario_effect_failed",
         "run_workspace_artifact_written",
@@ -1074,6 +1108,37 @@ def _run_one(
         any(item["output_used"] for item in planner_calls)
         and any(item["output_used"] for item in analyst_calls)
     )
+    reconciliation = _narrative_reconciliation(snapshot)
+    analyst_output_used = any(item["output_used"] for item in analyst_calls)
+    has_verified_ux_outcome = any(
+        isinstance(item.get("ux_prioritization_outcome"), dict)
+        for item in receipts
+        if item.get("status") == "passed"
+    )
+    narrative_gate_passed = True
+    if has_verified_ux_outcome:
+        status = reconciliation.get("status") if reconciliation else None
+        disposition = reconciliation.get("model_disposition") if reconciliation else None
+        narrative_gate_passed = bool(
+            reconciliation
+            and reconciliation.get("authority") == "deterministic_outcome"
+            and reconciliation.get("model_returned") is True
+            and (
+                (status == "consistent" and disposition == "adopted" and analyst_output_used)
+                or (
+                    status == "partial"
+                    and disposition == "supplemental"
+                    and not analyst_output_used
+                    and snapshot.get("result") is None
+                )
+                or (
+                    status in {"contradictory", "stale"}
+                    and disposition == "rejected"
+                    and not analyst_output_used
+                    and snapshot.get("result") is None
+                )
+            )
+        )
     request_latency_limit_ms = 5_000
     responsiveness_gate_passed = scenario_id != "TC-04" or (
         bool(active_run_get_latencies_ms)
@@ -1100,6 +1165,7 @@ def _run_one(
             for item in downloads
         )
         and model_execution_gate
+        and narrative_gate_passed
         and responsiveness_gate_passed
         and all(item.get("external_action") == "none" for item in receipts)
         and all(item.get("original_inputs_modified") is False for item in artifacts)
@@ -1119,7 +1185,10 @@ def _run_one(
         "budget": snapshot.get("budget"),
         "model_calls": calls,
         "model_execution_gate_passed": model_execution_gate,
+        "model_returned": any(item["called"] for item in analyst_calls),
         "model_output_adopted": model_output_adopted,
+        "narrative_reconciliation": reconciliation,
+        "narrative_reconciliation_gate_passed": narrative_gate_passed,
         "api_responsiveness": {
             "client_total_timeout_seconds": 180,
             "request_latency_gate_ms": request_latency_limit_ms,

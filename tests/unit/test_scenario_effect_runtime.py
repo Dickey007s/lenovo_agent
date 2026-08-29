@@ -454,7 +454,19 @@ class UXPrioritizationPlanner:
 class UXPrioritizationAnalyst:
     model = "deepseek-v4-pro"
 
-    async def analyze(self, *, instruction, plan, files, validation_feedback=None):
+    def __init__(self) -> None:
+        self.verified_effect_contexts: list[dict | None] = []
+
+    async def analyze(
+        self,
+        *,
+        instruction,
+        plan,
+        files,
+        verified_effect_context=None,
+        validation_feedback=None,
+    ):
+        self.verified_effect_contexts.append(verified_effect_context)
         source = files[0]
         return HarnessTaskResult(
             summary="已读取一条公开交互事件；完整排序由服务端固定 TC-15 效果门从三份批准来源独立重算。",
@@ -478,6 +490,50 @@ class UXPrioritizationAnalyst:
                 )
             ],
             follow_ups=[],
+            review_required=True,
+        )
+
+
+class ContradictoryUXPrioritizationAnalyst(UXPrioritizationAnalyst):
+    async def analyze(
+        self,
+        *,
+        instruction,
+        plan,
+        files,
+        verified_effect_context=None,
+        validation_feedback=None,
+    ):
+        self.verified_effect_contexts.append(verified_effect_context)
+        source = files[0]
+        return HarnessTaskResult(
+            summary=(
+                "日志文件仅展示前60行，总行数为212行；本次分析仅基于已提供样本，"
+                "覆盖仍不完整。"
+            ),
+            findings=[
+                HarnessFinding(
+                    plan_unit_id=plan.units[0].unit_id,
+                    title="笔记编辑页取消操作应列为P1优化项",
+                    detail=(
+                        "该问题属于高频且严重，按矩阵应列为P0；"
+                        "但考虑后建议列为P1并新增二次确认弹窗。"
+                    ),
+                    file_refs=[source["file_ref"]],
+                    evidence_quotes=[
+                        HarnessEvidenceQuote(
+                            file_ref=source["file_ref"],
+                            role="observed",
+                            label="一条公开交互事件",
+                            quote=(
+                                "首页 | /home | 点击Banner轮播图 | 失败 | 操作卡顿 | "
+                                "首页加载耗时4071ms | 0 |  | 0"
+                            ),
+                        )
+                    ],
+                )
+            ],
+            follow_ups=["重新统计全部212行并据此完成排序。"],
             review_required=True,
         )
 
@@ -1393,10 +1449,11 @@ async def test_tc15_runtime_keeps_full_log_ranking_review_and_actions_separate(
     tmp_path: Path,
 ) -> None:
     before = _forte_digests()
+    analyst = UXPrioritizationAnalyst()
     runtime = HarnessRuntime(
         BenchmarkWorkspaceCatalog(FORTE_ROOT),
         UXPrioritizationPlanner(),
-        UXPrioritizationAnalyst(),
+        analyst,
         effect_engine=ScenarioEffectEngine(),
         artifact_store=RunWorkspaceArtifactStore(tmp_path / "run-workspaces"),
     )
@@ -1421,6 +1478,17 @@ async def test_tc15_runtime_keeps_full_log_ranking_review_and_actions_separate(
         assert snapshot.status == "completed"
         assert len(snapshot.workspace_artifacts) == 2
         assert len(snapshot.effect_receipts) == 1
+        assert snapshot.narrative_reconciliation is not None
+        assert snapshot.narrative_reconciliation.status == "consistent"
+        assert snapshot.narrative_reconciliation.model_disposition == "adopted"
+        assert snapshot.analysis_receipt is not None
+        assert snapshot.analysis_receipt.output_used is True
+        assert analyst.verified_effect_contexts
+        verified_context = analyst.verified_effect_contexts[0]
+        assert verified_context is not None
+        assert verified_context["facts"]["source_row_count"] == 212
+        assert verified_context["facts"]["group_count"] == 87
+        assert len(verified_context["facts"]["groups"]) == 87
 
         receipt = snapshot.effect_receipts[0]
         assert receipt.status == "passed"
@@ -1500,7 +1568,102 @@ async def test_tc15_runtime_keeps_full_log_ranking_review_and_actions_separate(
         assert public_outcome["group_count"] == 87
         assert public_outcome["suggestion_status"] == "no_approved_solution_source"
         assert public_outcome["external_action"] == "none"
+        assert public["narrative_reconciliation"]["status"] == "consistent"
+        assert "narrative_audit_drafts" not in public
         assert "content_sha256" not in json.dumps(public, ensure_ascii=False)
+    finally:
+        await runtime.close()
+
+
+@pytest.mark.asyncio
+async def test_tc15_runtime_rejects_contradictory_model_draft_without_polluting_artifacts(
+    tmp_path: Path,
+) -> None:
+    analyst = ContradictoryUXPrioritizationAnalyst()
+    runtime = HarnessRuntime(
+        BenchmarkWorkspaceCatalog(FORTE_ROOT),
+        UXPrioritizationPlanner(),
+        analyst,
+        effect_engine=ScenarioEffectEngine(),
+        artifact_store=RunWorkspaceArtifactStore(tmp_path / "run-workspaces"),
+    )
+    try:
+        started = await runtime.start(
+            "ux-narrative-rejection-owner",
+            HarnessRunStart(
+                idempotency_key="tc15-narrative-rejection-runtime-0001",
+                instruction=TC15_INSTRUCTION,
+            ),
+        )
+        snapshot = None
+        for _ in range(1_000):
+            candidate = await runtime.get(
+                "ux-narrative-rejection-owner", started.run.run_id
+            )
+            if candidate.status in {"waiting_input", "completed", "stopped", "failed"}:
+                snapshot = candidate
+                break
+            await asyncio.sleep(0.01)
+        assert snapshot is not None
+        assert snapshot.status == "completed"
+        assert len(snapshot.workspace_artifacts) == 2
+        assert all(
+            artifact.verifier_status == "passed"
+            for artifact in snapshot.workspace_artifacts
+        )
+        assert snapshot.effect_receipts[0].status == "passed"
+        assert snapshot.analysis_receipt is not None
+        assert snapshot.analysis_receipt.called is True
+        assert snapshot.analysis_receipt.output_used is False
+        assert snapshot.narrative_reconciliation is not None
+        assert snapshot.narrative_reconciliation.status == "contradictory"
+        assert snapshot.narrative_reconciliation.authority == "deterministic_outcome"
+        assert snapshot.narrative_reconciliation.model_disposition == "rejected"
+        conflict_kinds = {
+            item.kind for item in snapshot.narrative_reconciliation.conflicts
+        }
+        assert {
+            "incomplete_coverage",
+            "priority_mismatch",
+            "unsupported_solution_claim",
+            "redundant_completed_work",
+        } <= conflict_kinds
+        assert snapshot.result is None
+        assert snapshot.rounds[0].result is None
+        assert snapshot.artifact_versions[-1].findings == []
+        assert snapshot.artifact_versions[-1].follow_ups == []
+        assert snapshot.brief is not None
+        assert "模型说明未采用" in snapshot.brief.summary
+        assert len(snapshot.narrative_audit_drafts) == 1
+        audit_draft = snapshot.narrative_audit_drafts[0]
+        assert audit_draft.result.follow_ups == ["重新统计全部212行并据此完成排序。"]
+        assert analyst.verified_effect_contexts[0]["facts"]["analyzed_row_count"] == 212
+        event_names = [item.event_name for item in snapshot.events]
+        assert "narrative_reconciliation_rejected" in event_names
+        assert event_names.index("deterministic_verification_completed") < event_names.index(
+            "analysis_started"
+        ) < event_names.index("narrative_reconciliation_rejected")
+
+        public = runtime.public_snapshot(snapshot).model_dump(mode="json")
+        assert public["status"] == "completed"
+        assert public["result"] is None
+        assert public["narrative_reconciliation"]["model_disposition"] == "rejected"
+        assert "narrative_audit_drafts" not in public
+        assert public["rounds"][0]["result"] is None
+        current_conclusion_projection = json.dumps(
+            {
+                "brief": public["brief"],
+                "artifact_versions": public["artifact_versions"],
+                "workspace_artifacts": public["workspace_artifacts"],
+                "result": public["result"],
+            },
+            ensure_ascii=False,
+        )
+        assert "重新统计全部212行" not in current_conclusion_projection
+        assert any(
+            "重新统计全部212行" in item["narrative_excerpt"]
+            for item in public["narrative_reconciliation"]["conflicts"]
+        )
     finally:
         await runtime.close()
 

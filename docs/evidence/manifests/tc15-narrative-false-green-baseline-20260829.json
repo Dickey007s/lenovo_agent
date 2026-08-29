@@ -1,0 +1,48 @@
+{
+  "schema_version": "narrative-reconciliation-baseline.v1",
+  "source_run_id": "harness:731c429f82a941438b838fa8982699fd",
+  "owner_header": {
+    "X-User-Id": "tc15-live-owner-20260829"
+  },
+  "historical_manifest": "tc15-live-source-derived-ux-prioritization-20260829.json",
+  "historical_facts": {
+    "run_status": "completed",
+    "deterministic_outcome": "212/212 rows, 87 groups, P0/P1/P2/P3/P4=25/40/14/6/2",
+    "analysis_called": true,
+    "analysis_output_used": true
+  },
+  "model_result": {
+    "summary": "基于交互行为痛点及优化规则、用户交互行为日志和页面级交互规范三份证据完成交叉分析。日志显示高频页面与操作组合集中在首页、阅读页、书籍详情页和笔记编辑页，且存在大量严重痛点。按规则中的优先级矩阵，高频且严重的问题应列为P0。由于日志文件仅展示前60行且总行数为212行，本次分析基于已提供样本，结论存在样本覆盖不确定性。",
+    "findings": [
+      {
+        "title": "笔记编辑页取消操作缺少未保存内容确认，导致内容丢失，应列为P1优化项",
+        "detail": "该组合属于高频场景，且反馈迟钝为严重程度。按优化优先级矩阵，高频且严重应列为P0；但考虑到问题主要涉及确认对话框缺失，可列为P1本迭代内修复。",
+        "fact_summary": "笔记编辑页点击取消按钮后出现内容丢失。",
+        "impact": "可能造成数据损失。",
+        "file_refs": [
+          "forte-3913d2ccb62b9b02",
+          "forte-0506a266b89dfef4",
+          "forte-3f48165dbc47276d"
+        ],
+        "evidence_quotes": [],
+        "evidence_anchors": [],
+        "evidence_resolutions": []
+      }
+    ],
+    "follow_ups": [
+      "基于已展示的60行日志样本，统计全部212行日志中各页面与操作动作组合的出现次数和占比，以确认完整分布并重新排序。"
+    ],
+    "review_required": true
+  },
+  "expected_reconciliation": {
+    "status": "contradictory",
+    "authority": "deterministic_outcome",
+    "model_disposition": "rejected",
+    "required_conflict_kinds": [
+      "incomplete_coverage",
+      "priority_mismatch",
+      "redundant_completed_work"
+    ]
+  },
+  "boundary": "This append-only baseline preserves sanitized public narrative facts. It does not modify the historical Run or DR-0051 manifest and does not contain provider raw output, prompts, chain of thought, internal paths, or hashes."
+}

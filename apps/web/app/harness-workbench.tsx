@@ -258,6 +258,33 @@ type HarnessFinding = {
 type HarnessResult = { summary: string; findings: HarnessFinding[]; follow_ups: string[]; review_required: boolean };
 type HarnessServerEvent = { sequence: number; event_name: string; occurred_at?: string; message?: string };
 
+type NarrativeConflict = {
+  conflict_id: string;
+  kind: "incomplete_coverage" | "outcome_count_mismatch" | "priority_mismatch" | "unsupported_solution_claim" | "redundant_completed_work" | "outcome_revision_mismatch";
+  narrative_path: string;
+  narrative_excerpt: string;
+  outcome_path: string;
+  expected: string;
+  observed: string;
+  severity: "warning" | "error";
+};
+
+type NarrativeReconciliation = {
+  reconciliation_id: string;
+  round_number: number;
+  status: "consistent" | "partial" | "contradictory" | "stale" | "not_applicable";
+  authority: "deterministic_outcome" | "model_only";
+  model_disposition: "adopted" | "supplemental" | "rejected";
+  outcome_revision: string | null;
+  effect_receipt_id: string | null;
+  model_returned: boolean;
+  comparable_claim_count: number;
+  conflicts: NarrativeConflict[];
+  message: string;
+  checked_at: string;
+  external_action: "none";
+};
+
 type LoopContract = {
   contract_version: string;
   goal: string;
@@ -316,6 +343,7 @@ type LoopRound = {
   model_receipt: ModelReceipt | null;
   result: HarnessResult | null;
   analysis_receipt: ModelReceipt | null;
+  narrative_reconciliation: NarrativeReconciliation | null;
   verified_file_refs: string[];
   evidence_gaps: EvidenceGap[];
   next_step: LoopNextStep | null;
@@ -1128,6 +1156,7 @@ export type HarnessRun = {
   model_receipt: ModelReceipt | null;
   analysis_receipt: ModelReceipt | null;
   result: HarnessResult | null;
+  narrative_reconciliation: NarrativeReconciliation | null;
   validation_errors: string[];
   events: HarnessActivityItem[];
 };
@@ -1181,7 +1210,10 @@ const NAMED_EVENTS = [
   "analysis_scope_filtered",
   "decision_gate_suppressed",
   "analysis_partial_adopted",
+  "analysis_partial_candidate",
   "analysis_recovery_required",
+  "narrative_reconciliation_completed",
+  "narrative_reconciliation_rejected",
   "evidence_disambiguation_required",
   "partial_artifact_saved",
   "decision_requested",
@@ -1627,6 +1659,63 @@ function normalizeReceipt(value: unknown): ModelReceipt | null {
   };
 }
 
+function normalizeNarrativeConflict(value: unknown): NarrativeConflict | null {
+  if (!value || typeof value !== "object") return null;
+  const raw = value as Record<string, unknown>;
+  const conflictId = asText(raw.conflict_id);
+  const kind = asText(raw.kind);
+  const severity = asText(raw.severity);
+  const narrativeExcerpt = asText(raw.narrative_excerpt);
+  if (
+    !conflictId
+    || !["incomplete_coverage", "outcome_count_mismatch", "priority_mismatch", "unsupported_solution_claim", "redundant_completed_work", "outcome_revision_mismatch"].includes(kind)
+    || !["warning", "error"].includes(severity)
+    || !narrativeExcerpt
+  ) return null;
+  return {
+    conflict_id: conflictId,
+    kind: kind as NarrativeConflict["kind"],
+    narrative_path: asText(raw.narrative_path),
+    narrative_excerpt: narrativeExcerpt,
+    outcome_path: asText(raw.outcome_path),
+    expected: asText(raw.expected),
+    observed: asText(raw.observed),
+    severity: severity as NarrativeConflict["severity"],
+  };
+}
+
+function normalizeNarrativeReconciliation(value: unknown): NarrativeReconciliation | null {
+  if (!value || typeof value !== "object") return null;
+  const raw = value as Record<string, unknown>;
+  const reconciliationId = asText(raw.reconciliation_id);
+  const status = asText(raw.status);
+  const authority = asText(raw.authority);
+  const disposition = asText(raw.model_disposition);
+  if (
+    !reconciliationId
+    || !["consistent", "partial", "contradictory", "stale", "not_applicable"].includes(status)
+    || !["deterministic_outcome", "model_only"].includes(authority)
+    || !["adopted", "supplemental", "rejected"].includes(disposition)
+  ) return null;
+  return {
+    reconciliation_id: reconciliationId,
+    round_number: asNumber(raw.round_number, 1),
+    status: status as NarrativeReconciliation["status"],
+    authority: authority as NarrativeReconciliation["authority"],
+    model_disposition: disposition as NarrativeReconciliation["model_disposition"],
+    outcome_revision: asText(raw.outcome_revision) || null,
+    effect_receipt_id: asText(raw.effect_receipt_id) || null,
+    model_returned: raw.model_returned === true,
+    comparable_claim_count: asNumber(raw.comparable_claim_count),
+    conflicts: Array.isArray(raw.conflicts)
+      ? raw.conflicts.map(normalizeNarrativeConflict).filter((item): item is NarrativeConflict => item !== null)
+      : [],
+    message: asText(raw.message),
+    checked_at: asText(raw.checked_at),
+    external_action: "none",
+  };
+}
+
 function normalizeEvidenceAnchor(value: unknown): EvidenceAnchor | null {
   if (!value || typeof value !== "object") return null;
   const raw = value as Record<string, unknown>;
@@ -1934,6 +2023,7 @@ function normalizeLoopRound(value: unknown): LoopRound | null {
     model_receipt: normalizeReceipt(raw.model_receipt),
     result: normalizeResult(raw.result),
     analysis_receipt: normalizeReceipt(raw.analysis_receipt),
+    narrative_reconciliation: normalizeNarrativeReconciliation(raw.narrative_reconciliation),
     verified_file_refs: asStrings(raw.verified_file_refs),
     evidence_gaps: Array.isArray(raw.evidence_gaps)
       ? raw.evidence_gaps.map(normalizeGap).filter((item): item is EvidenceGap => item !== null)
@@ -1958,7 +2048,10 @@ function activityItem(event: HarnessServerEvent): HarnessActivityItem {
     analysis_scope_filtered: "已过滤任务范围外的候选发现",
     decision_gate_suppressed: "已取消没有矛盾证据的人工阻塞",
     analysis_partial_adopted: "仅采用可定位的发现",
+    analysis_partial_candidate: "模型候选说明仍待事实对账",
     analysis_recovery_required: "需要缩小范围后继续",
+    narrative_reconciliation_completed: "模型说明已与服务端事实对账",
+    narrative_reconciliation_rejected: "模型说明与服务端事实冲突，未采用",
     evidence_disambiguation_required: "需要你选择原文位置",
     partial_artifact_saved: "已保留可核对成果",
     decision_requested: "需要人工决定处理口径",
@@ -1984,7 +2077,7 @@ function activityItem(event: HarnessServerEvent): HarnessActivityItem {
     loop_stopped: "已按你的要求停止",
     harness_failed: "本轮已安全停止",
   };
-  const tone = event.event_name === "harness_failed" || event.event_name === "plan_validation_rejected" || event.event_name === "analysis_structure_rejected" || event.event_name === "analysis_validation_rejected" || event.event_name === "analysis_recovery_required" || event.event_name === "evidence_disambiguation_required" || event.event_name === "scenario_effect_failed" || event.event_name === "scenario_effect_bounded" || event.event_name.includes("stopped") ? "warning"
+  const tone = event.event_name === "harness_failed" || event.event_name === "plan_validation_rejected" || event.event_name === "analysis_structure_rejected" || event.event_name === "analysis_validation_rejected" || event.event_name === "analysis_recovery_required" || event.event_name === "evidence_disambiguation_required" || event.event_name === "scenario_effect_failed" || event.event_name === "scenario_effect_bounded" || event.event_name === "narrative_reconciliation_rejected" || event.event_name.includes("stopped") ? "warning"
     : ["analysis_scope_filtered", "decision_gate_suppressed"].includes(event.event_name) ? "success"
       : event.event_name.includes("planning") || event.event_name.includes("analysis") ? "model"
       : event.event_name.includes("validation") || TERMINAL_EVENTS.has(event.event_name) ? "success" : "neutral";
@@ -3149,6 +3242,7 @@ function normalizeRun(value: unknown): HarnessRun | null {
     model_receipt: normalizeReceipt(raw.model_receipt),
     analysis_receipt: normalizeReceipt(raw.analysis_receipt),
     result: normalizeResult(raw.result),
+    narrative_reconciliation: normalizeNarrativeReconciliation(raw.narrative_reconciliation),
     validation_errors: asStrings(raw.validation_errors),
     events: serverEvents.map(activityItem).sort((a, b) => a.sequence - b.sequence),
   };
@@ -4176,12 +4270,12 @@ export function HarnessWorkbench({ onActivityChange }: { onActivityChange?: (sta
         <nav className="workspace-tabs" aria-label="工作区视图">
           <button type="button" className={view === "data" ? "is-active" : ""} onClick={() => setView("data")}><IconFileDescription aria-hidden="true" />预览</button>
           <button type="button" className={view === "loop" ? "is-active" : ""} onClick={() => setView("loop")}><IconRoute aria-hidden="true" />Agent 路径{run?.rounds.length ? <b>{run.rounds.length}</b> : null}</button>
-          <button type="button" className={view === "result" ? "is-active" : ""} onClick={() => setView("result")}><IconCircleCheck aria-hidden="true" />发现与建议{run?.result ? <b>{run.result.findings.length}</b> : null}</button>
+          <button type="button" className={view === "result" ? "is-active" : ""} onClick={() => setView("result")}><IconCircleCheck aria-hidden="true" />成果与建议{run?.workspace_artifacts.length ? <b>{run.workspace_artifacts.length}</b> : run?.result ? <b>{run.result.findings.length}</b> : null}</button>
         </nav>
         <div className="workspace-content">
           {view === "data" && <FilePreview preview={preview} file={activeFile} loading={previewLoading} error={previewError} />}
           {view === "loop" && <LoopView run={run} files={allFiles} controlBusy={controlBusy} onControl={controlLoop} onReview={setReviewRequest} onStartTask={startTask} starting={starting} />}
-          {view === "result" && <ResultView result={run?.result ?? null} artifacts={run?.artifact_versions ?? []} commit={run?.last_commit ?? null} decisions={run?.decision_records ?? []} decisionRequests={run?.decision_requests ?? []} files={allFiles} onOpenFile={openFile} onReview={setReviewRequest} onStartTask={startTask} starting={starting} />}
+          {view === "result" && <ResultView result={run?.result ?? null} artifacts={run?.artifact_versions ?? []} workspaceArtifacts={run?.workspace_artifacts ?? []} receipts={run?.effect_receipts ?? []} reconciliation={run?.narrative_reconciliation ?? null} commit={run?.last_commit ?? null} decisions={run?.decision_records ?? []} decisionRequests={run?.decision_requests ?? []} files={allFiles} onOpenFile={openFile} onReview={setReviewRequest} onStartTask={startTask} starting={starting} />}
         </div>
         <details className="workspace-boundary"><summary><IconShieldCheck aria-hidden="true" />数据与执行边界</summary><p>{workspace.data_boundary} Agent 可以检索整个资料库，但每轮只读取服务端校验通过且受预算约束的文件；本轮不会修改原文件或执行外部动作。</p></details>
         {error && run?.status !== "failed" && <div className="workspace-error" role="alert"><IconAlertTriangle aria-hidden="true" /><span>{error}</span></div>}
@@ -4401,6 +4495,7 @@ function LoopView({
       </button>) : <span>服务端正在建立第一轮。</span>}
     </nav>
     {(run.workspace_artifacts.length > 0 || run.effect_receipts.length > 0) && <WorkspaceArtifactSection artifacts={run.workspace_artifacts} receipts={run.effect_receipts} />}
+    {run.narrative_reconciliation && <NarrativeReconciliationPanel reconciliation={run.narrative_reconciliation} />}
     {selectedRound && <article className="loop-round-detail">
       <header><div><span>本轮问题</span><h3>{selectedRound.question}</h3></div><b>{selectedRoundGateLabel}</b></header>
       <ol className="loop-phase-rail">
@@ -4925,6 +5020,53 @@ function UXPrioritizationOutcomePanel({ outcome, deterministicPassed }: { outcom
   </section>;
 }
 
+function narrativeConflictLabel(kind: NarrativeConflict["kind"]) {
+  const labels: Record<NarrativeConflict["kind"], string> = {
+    incomplete_coverage: "覆盖范围不完整",
+    outcome_count_mismatch: "数量与服务端复算不一致",
+    priority_mismatch: "优先级与规则台账不一致",
+    unsupported_solution_claim: "把未批准方案写成当前结论",
+    redundant_completed_work: "重复要求已经完成的计算",
+    outcome_revision_mismatch: "引用了过期成果版本",
+  };
+  return labels[kind];
+}
+
+function NarrativeReconciliationPanel({ reconciliation }: { reconciliation: NarrativeReconciliation }) {
+  const isRejected = reconciliation.model_disposition === "rejected";
+  const isSupplemental = reconciliation.model_disposition === "supplemental";
+  const modelOnly = reconciliation.authority === "model_only";
+  const title = isRejected
+    ? "成果已完成，模型说明未采用"
+    : isSupplemental
+      ? "当前结论来自服务端复算，模型说明仅作补充"
+      : modelOnly
+        ? "当前结论仅来自模型，仍需人工复核"
+        : "模型说明已与服务端事实对账";
+  const detail = isRejected
+    ? "模型已返回，但与当前结构化成果存在冲突。页面只展示服务端全量复算的当前结论，错误发现和后续建议不会进入成果。"
+    : isSupplemental
+      ? "模型没有提供足够的可比事实，因而不能覆盖确定性成果；它只作为执行轨迹中的补充说明。"
+      : modelOnly
+        ? "本任务没有可比的服务端确定性成果。模型说明不是已验证事实，仍需结合来源和人工判断。"
+        : "模型说明中的可比数字和优先级已与当前服务端复算结果对齐；服务端成果仍是事实权威。";
+  return <section className={`narrative-reconciliation is-${reconciliation.model_disposition}`} aria-label="模型说明与服务端事实对账">
+    <header>
+      {isRejected || isSupplemental || modelOnly ? <IconAlertTriangle aria-hidden="true" /> : <IconShieldCheck aria-hidden="true" />}
+      <div><span>说明采用回执</span><h3>{title}</h3><p>{detail}</p></div>
+      <b>{isRejected ? "未采用" : isSupplemental ? "仅补充" : "已采用"}</b>
+    </header>
+    {reconciliation.conflicts.length > 0 && <details>
+      <summary><IconRoute aria-hidden="true" />查看未采用原因（{reconciliation.conflicts.length} 项）<IconChevronDown aria-hidden="true" /></summary>
+      <ol>{reconciliation.conflicts.map((conflict) => <li key={conflict.conflict_id} className={`is-${conflict.severity}`}>
+        <div><b>{narrativeConflictLabel(conflict.kind)}</b><p>{conflict.narrative_excerpt}</p></div>
+        <dl><div><dt>服务端事实</dt><dd>{conflict.expected}</dd></div><div><dt>模型说法</dt><dd>{conflict.observed}</dd></div></dl>
+      </li>)}</ol>
+    </details>}
+    <footer><IconShieldCheck aria-hidden="true" /><span>这份回执只核对模型叙事与当前结构化事实是否一致，不证明方案有效或体验已经改善。</span></footer>
+  </section>;
+}
+
 function WorkspaceArtifactSection({ artifacts, receipts }: { artifacts: WorkspaceArtifact[]; receipts: EffectReceipt[] }) {
   const [downloading, setDownloading] = useState<string | null>(null);
   const [downloadError, setDownloadError] = useState("");
@@ -5042,6 +5184,9 @@ function WorkspaceArtifactSection({ artifacts, receipts }: { artifacts: Workspac
 function ResultView({
   result,
   artifacts,
+  workspaceArtifacts,
+  receipts,
+  reconciliation,
   commit,
   decisions,
   decisionRequests,
@@ -5053,6 +5198,9 @@ function ResultView({
 }: {
   result: HarnessResult | null;
   artifacts: ArtifactVersion[];
+  workspaceArtifacts: WorkspaceArtifact[];
+  receipts: EffectReceipt[];
+  reconciliation: NarrativeReconciliation | null;
   commit: LoopCommit | null;
   decisions: DecisionRecord[];
   decisionRequests: DecisionRequest[];
@@ -5063,10 +5211,18 @@ function ResultView({
   starting: boolean;
 }) {
   const [expanded, setExpanded] = useState(false);
-  if (!result) return <div className="workspace-placeholder"><IconClock aria-hidden="true" /><h2>任务简报尚未形成</h2><p>Agent Control Loop 完成只读分析并通过文件引用校验后，简报会出现在这里。</p></div>;
-  const visibleFindings = expanded ? result.findings : result.findings.slice(0, 3);
+  const hasWorkspaceEvidence = workspaceArtifacts.length > 0 || receipts.length > 0;
+  const hasPassedDeterministicEvidence = workspaceArtifacts.some((artifact) => artifact.verifier_status === "passed")
+    || receipts.some((receipt) => receipt.status === "passed");
+  const hasDeterministicAuthority = reconciliation?.authority === "deterministic_outcome"
+    && hasPassedDeterministicEvidence;
+  if (!result && !hasWorkspaceEvidence) return <div className="workspace-placeholder"><IconClock aria-hidden="true" /><h2>任务简报尚未形成</h2><p>Agent Control Loop 完成只读分析并通过文件引用校验后，简报会出现在这里。</p></div>;
+  const visibleFindings = result ? (expanded ? result.findings : result.findings.slice(0, 3)) : [];
   const latestRoundNumber = artifacts.at(-1)?.round_number ?? null;
-  return <article className="result-view">
+  return <div className="result-view-stack">
+    {hasWorkspaceEvidence && <WorkspaceArtifactSection artifacts={workspaceArtifacts} receipts={receipts} />}
+    {reconciliation && <NarrativeReconciliationPanel reconciliation={reconciliation} />}
+    {result ? <article className="result-view">
     <header><IconCircleCheck aria-hidden="true" /><div><span>{commit ? `任务证据简报 v${commit.artifact_version} · ${commit.operation === "rollback" ? "已恢复" : "已提交"}` : artifacts.length ? `任务证据简报 v${artifacts.at(-1)?.version} · 待证据门` : "资料库研究结果 · 待复核"}</span><h2>{result.summary}</h2></div></header>
     <div className="result-findings">{visibleFindings.map((finding, index) => {
       const findingArtifact = artifacts.find((artifact) => artifact.findings.some((candidate) => candidate.title === finding.title && candidate.detail === finding.detail));
@@ -5087,5 +5243,12 @@ function ResultView({
       {result.follow_ups.map((item, index) => <article key={`${item}:${index}`}><div><b>建议 {index + 1}</b><p>{item}</p></div><div className="result-proposal-actions"><button type="button" className="is-review" onClick={() => onReview(proposalReviewRequest(item, index, result, latestRoundNumber))}><IconEye aria-hidden="true" />查看形成依据</button><button type="button" disabled={starting} onClick={() => void onStartTask(item)}><IconPlayerPlay aria-hidden="true" />{starting ? "正在启动" : "确认并启动"}</button></div></article>)}
     </section>}
     <footer><IconShieldCheck aria-hidden="true" />这些建议由模型基于本轮已读取资料生成，尚未逐项验证；只有你点击确认后才会启动新任务，本轮没有修改原文件或执行外部动作。</footer>
-  </article>;
+  </article> : hasDeterministicAuthority ? <article className="result-authority-placeholder" aria-label="当前结论来源">
+    <IconShieldCheck aria-hidden="true" />
+    <div><span>当前结论</span><h2>以服务端确定性成果为准</h2><p>本轮模型说明没有进入发现、建议或成果版本；请直接查看上方经过来源重算和文件校验的结果。</p></div>
+  </article> : <article className="result-authority-placeholder is-failed" aria-label="当前没有可采用结论">
+    <IconAlertTriangle aria-hidden="true" />
+    <div><span>当前结论</span><h2>尚未形成可采用的确定性成果</h2><p>当前只保留了失败或受限回执。请先查看上方失败原因和恢复动作，不要把它当作服务端确认的业务结论。</p></div>
+  </article>}
+  </div>;
 }

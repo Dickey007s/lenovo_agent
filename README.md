@@ -385,6 +385,14 @@ multi-instance coordination and governed external action remain target work.
   source rules used. The UI separates deterministic coverage, data-quality facts,
   prioritization review and the fact that no design, experiment or production UI
   action occurred. This is not user research or a general UX analytics engine.
+- `DR-0052` adds a generic narrative-reconciliation gate after deterministic
+  effects and Analyst validation. A passed effect supplies compact authoritative
+  facts to the Analyst; returned prose is adopted only when comparable claims
+  agree. Contradictory or stale prose remains an auditable receipt but cannot
+  enter the current Result, findings, follow-ups, Brief or Commit, while verified
+  workspace files remain available. The UI claims deterministic authority only
+  when the reconciliation protocol and a passed Artifact/EffectReceipt agree.
+  This checks narrative consistency, not semantic completeness or business value.
 - No target-user study has been run. Clarity, trust, efficiency and user value
   remain hypotheses.
 
@@ -431,6 +439,8 @@ The current TC-14 source-derived SRE incident-review increment is tracked in
 [`DR-0050-TC14-SOURCE-DERIVED-SRE-DIAGNOSIS-EVIDENCE-20260829`](docs/evidence/DR-0050-TC14-SOURCE-DERIVED-SRE-DIAGNOSIS-EVIDENCE-20260829.md).
 The current TC-15 full-workbook UX-prioritization increment is tracked in
 [`DR-0051-TC15-SOURCE-DERIVED-UX-PRIORITIZATION-EVIDENCE-20260829`](docs/evidence/DR-0051-TC15-SOURCE-DERIVED-UX-PRIORITIZATION-EVIDENCE-20260829.md).
+The current deterministic-outcome and model-narrative reconciliation increment is tracked in
+[`DR-0052-NARRATIVE-RECONCILIATION-EVIDENCE-20260829`](docs/evidence/DR-0052-NARRATIVE-RECONCILIATION-EVIDENCE-20260829.md).
 
 ## Local run
 
@@ -539,6 +549,9 @@ pnpm --dir apps/web exec playwright test e2e/harness-workbench.spec.ts
 - [DR-0051：TC-15 完整日志来源推导与逐组规则引用](docs/decisions/DR-0051-tc15-source-derived-ux-prioritization.md)
 - [SCENARIO-036：从完整交互日志形成可回溯优先级](docs/scenarios/SCENARIO-036-review-source-derived-ux-prioritization.md)
 - [TC-15 来源推导交互优先级 Evidence](docs/evidence/DR-0051-TC15-SOURCE-DERIVED-UX-PRIORITIZATION-EVIDENCE-20260829.md)
+- [DR-0052：服务端确定性成果与模型说明对账](docs/decisions/DR-0052-authoritative-outcome-and-narrative-reconciliation.md)
+- [SCENARIO-037：只保留一个可复核的当前结论](docs/scenarios/SCENARIO-037-reconcile-model-narrative-with-authoritative-outcome.md)
+- [模型说明对账 Evidence](docs/evidence/DR-0052-NARRATIVE-RECONCILIATION-EVIDENCE-20260829.md)
 - [可恢复 Control Loop Evidence](docs/evidence/DURABLE-EVIDENCE-GATE-ARTIFACT-EVOLUTION-EVIDENCE-20260826.md)
 - [整库自主研究 Evidence](docs/evidence/AUTONOMOUS-WHOLE-WORKSPACE-RESEARCH-EVIDENCE-20260825.md)
 - [Agent Control Loop 三轮只读纵切证据](docs/evidence/AGENT-CONTROL-LOOP-BOUNDED-READONLY-EVIDENCE-20260825.md)

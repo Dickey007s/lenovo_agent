@@ -6,6 +6,7 @@ from pydantic import ValidationError
 from packages.contracts import ActionCandidate
 from packages.contracts.harness_models import (
     AgentControlLoopEffectReceipt,
+    AgentControlLoopNarrativeReconciliation,
     AgentControlLoopWorkspaceArtifact,
 )
 
@@ -968,3 +969,41 @@ def test_outbound_flow_outcome_round_trips_without_becoming_an_execution_receipt
     assert restored_receipt.outbound_flow_outcome.human_approval_required is True
     assert restored_receipt.outbound_flow_outcome.legal_opinion is False
     assert restored_receipt.outbound_flow_outcome.external_action == "none"
+
+
+def test_narrative_reconciliation_round_trip_keeps_only_sanitized_conflict_receipt() -> None:
+    reconciliation = AgentControlLoopNarrativeReconciliation.model_validate(
+        {
+            "reconciliation_id": "narrative-reconciliation-123456789abc",
+            "round_number": 1,
+            "status": "contradictory",
+            "authority": "deterministic_outcome",
+            "model_disposition": "rejected",
+            "outcome_revision": "outcome-rev-1234567890abcdef",
+            "effect_receipt_id": "effect-receipt-123456789abc",
+            "model_returned": True,
+            "comparable_claim_count": 2,
+            "conflicts": [
+                {
+                    "conflict_id": "narrative-conflict-abcdef123456",
+                    "kind": "incomplete_coverage",
+                    "narrative_path": "result.summary",
+                    "narrative_excerpt": "仅覆盖前 60 行。",
+                    "outcome_path": "ux_prioritization_outcome.analyzed_row_count",
+                    "expected": "212",
+                    "observed": "60",
+                    "severity": "error",
+                }
+            ],
+            "message": "模型说明与服务端全量复算冲突，未采用。",
+            "checked_at": datetime.now(timezone.utc),
+            "external_action": "none",
+        }
+    )
+    restored = AgentControlLoopNarrativeReconciliation.model_validate_json(
+        reconciliation.model_dump_json()
+    )
+    assert restored == reconciliation
+    assert restored.model_disposition == "rejected"
+    assert restored.conflicts[0].narrative_excerpt == "仅覆盖前 60 行。"
+    assert "provider" not in restored.model_dump_json().lower()

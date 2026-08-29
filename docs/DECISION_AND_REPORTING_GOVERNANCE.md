@@ -145,6 +145,16 @@ only a real PostgreSQL restart gate can support a claim that an open DecisionReq
 survives restart. `cancel` remains distinct from `decline`, and neither action is
 an approval or an external effect.
 
+When a deterministic Effect and a model narrative coexist, reporting must also
+record their reconciliation before calling the narrative adopted. `called`,
+`output_used`, Artifact/Effect status, reconciliation authority/disposition and
+Run status are independent facts. Contradictory or stale prose must not populate
+the public current Result, Finding, Follow-up, Brief or Commit; the passed
+Artifact remains valid. A public conflict receipt may retain only sanitized,
+bounded excerpts and structured expected/observed facts. Raw provider text,
+Prompt and CoT remain private. Without an admitted deterministic outcome, the
+narrative stays `model_only/review_required` rather than being labeled verified.
+
 ## 6. Evidence hierarchy
 
 | Evidence | Supports | Does not automatically support |

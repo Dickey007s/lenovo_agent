@@ -273,6 +273,18 @@ groups expose both conflicting frequency refs and no priority ref. These panels
 render `ux_prioritization_outcome`, do not parse source files or spend model
 budget, and keep long locators readable at 1440 px and 390 px.
 
+DR-0052 adds one current-conclusion rule after any admitted deterministic
+Effect. The workspace still shows verified files first. A separate
+`narrative_reconciliation` panel then says whether the returned model explanation
+was adopted, kept only as a supplement, or rejected. Rejected conflicts are
+collapsed by default and never create Finding or Follow-up actions. The Result
+view renders the server-recomputed conclusion when authority is
+`deterministic_outcome` and at least one Artifact or EffectReceipt actually
+passed; failed/bounded-only runs instead say that no usable deterministic result
+exists. Public Chinese copy uses “服务端复算结果/确定性成果”, while protocol field
+names remain English. Opening the receipt is read-only and spends no model or
+next-round budget.
+
 Open human decisions are authoritative in the Snapshot-level
 `decision_requests[]`; round-level copies are compatibility projections only.
 Closing or pressing Escape exits the review surface before the browser attempts a
