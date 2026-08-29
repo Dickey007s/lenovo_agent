@@ -2,7 +2,7 @@
 
 ## 当前结论
 
-`Draft -> Limited Verified pending remote gate`。固定 uiux-021 纵切已经完成严格来源合同、完整 212 行解析、来源推导规则、逐组 content-addressed rule refs、两份 CSV 独立复核、真实 `deepseek-v4-pro`、本地 PostgreSQL 进程重启、完整本地工程门和前台截图。待 PR 远端 PostgreSQL 门与合并完成后更新最终实现 SHA 和远端链接。
+`Limited Verified`。固定 uiux-021 纵切已经完成严格来源合同、完整 212 行解析、来源推导规则、逐组 content-addressed rule refs、两份 CSV 独立复核、真实 `deepseek-v4-pro`、本地 PostgreSQL 进程重启、完整本地工程门、前台截图和 PR #67 远端 PostgreSQL 门。实现提交为 `22aa685`；远端门见 [durable-agent-control-loop](https://github.com/Dickey007s/lenovo_agent/actions/runs/33226861708/job/99032179492)。
 
 ## 历史基线为何不足
 
@@ -50,7 +50,7 @@
 - `$env:TEST_DATABASE_DSN=...; uv run pytest -q`：`370 passed in 357.59s`，12 项真实 PostgreSQL 集成门全部执行且没有跳过。
 - `uv run ruff check .`、公共 manifest `--check`、`pnpm --dir apps/web lint` 与 `pnpm --dir apps/web build` 均通过。
 - 全量浏览器：`60 passed`；其中 TC-15 canonical、动态阈值和 Verifier failure 为 `3 passed`。
-- PR 与远端 `durable-agent-control-loop`：待创建并通过后补入。
+- [PR #67](https://github.com/Dickey007s/lenovo_agent/pull/67) 首轮远端 `durable-agent-control-loop` 已通过，用时 `53s`；最终文档提交仍需再次通过同一门后合并。
 
 ## 前台证据
 

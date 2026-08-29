@@ -30,7 +30,7 @@
 | TC-12 | 看板工具库补 Vitest 并修复 | ZIP + `TC-12真实测试报告.md` | 12 个唯一检查，两份成果共享 | 同测集 Stage A/B/C 红灯，Stage D 71/71；逐文件 coverage 与独立复跑通过 | 不改原始源码、不联网安装、不自动 PR；无 OS 级断网 |
 | TC-13 | 从批准问卷与规则推导画像清洗和策略草案 | Markdown + 逐原始行 CSV | 8 个来源/成果检查，两份成果共享 | `Limited Verified`（DR-0049）：当前来源动态 11/10/1/8/2/3、画像 3/3/2、priority witness 0；阈值/优先级/新样本变异动态生效，策略来源仍为 `no_approved_strategy_source` | 公开样本非客户研究；重复口径待批准；不联系客户、不写 CRM/商机、不触发营销 |
 | TC-14 | 从固定日志推导离线复盘与条件式止损提案 | Markdown + 观察/动作 CSV | 12 个来源/成果/安全边界检查，两份成果共享 | `Limited Verified`（DR-0050、PR #66、Run `harness:fe527536c857404f88f46d9a68b09397`）：当前来源动态 232 行、167 条观察、3 组来源冲突、2 个假设、8 个 ES + 3 个业务提案；target 全部 unresolved/not_applicable、approval required、executed=false；合法指标/冲突变异、篡改转红、下载解析和 PostgreSQL 顺序恢复通过 | 不连接或执行 Elasticsearch/HTTP 命令，不把相关性写成根因定论，不选 dedicated master，不执行限流/降级或生产审批 |
-| TC-15 | 从完整交互日志、规则与页面规范推导可回溯排序 | 聚合优先级 CSV + 逐行归因 CSV | 12 个来源/覆盖/规则引用/双成果/无动作检查，两份成果共享 | `Draft`（DR-0051）：本地来源变异、篡改门和前台 canonical/动态/失败已通过；真实 Provider/PostgreSQL/PR 收尾中。当前来源动态 212 行、87 组、P0-P4=25/40/14/6/2；逐组保留内容寻址 rule refs | 不把 bounded Preview 当完整来源，不把映射假设或方案模板冒充批准结论，不修改/发布生产界面或启动实验 |
+| TC-15 | 从完整交互日志、规则与页面规范推导可回溯排序 | 聚合优先级 CSV + 逐行归因 CSV | 12 个来源/覆盖/规则引用/双成果检查 + 1 个原件只读检查，两份成果共享 | `Limited Verified`（DR-0051、PR #67、Run `harness:731c429f82a941438b838fa8982699fd`）：完整 212 行、87 组、P0-P4=25/40/14/6/2；逐组内容寻址 rule refs、合法来源变异、双 CSV 下载复核、真实 Provider 和 PostgreSQL 重启通过 | 不把 bounded Preview 当完整来源，不把映射假设或方案模板冒充批准结论，不修改/发布生产界面或启动实验 |
 
 三个代码场景的命令由服务端固定，运行在一次性临时目录中，网络代理被清空，子进程只接收启动 Python/Node 所需的最小环境变量；API Key、Token、数据库 DSN、`PYTHONPATH` 和用户 shell hook 不会传入。这里证明的是固定测试包，不是可执行任意用户代码的生产沙箱，也不是 OS 级 socket 隔离。
 

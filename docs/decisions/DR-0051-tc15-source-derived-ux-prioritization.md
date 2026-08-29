@@ -1,6 +1,6 @@
 # DR-0051：TC-15 全量来源推导、逐组规则引用与人工方案边界
 
-- 状态：Draft；实现、真实 Provider、PostgreSQL、下载复核和远端门完成后更新为 Limited Verified
+- 状态：Limited Verified；实现 `22aa685`、真实 Provider、PostgreSQL、下载复核和 [PR #67 远端门](https://github.com/Dickey007s/lenovo_agent/actions/runs/33226861708/job/99032179492) 已通过
 - 日期：2026-08-29
 - Source：`USER-FEEDBACK-20260829-TC15-SOURCE-DERIVED-UX-PRIORITIZATION`
 - Scenario：`SCENARIO-036`
