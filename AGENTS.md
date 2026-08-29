@@ -90,6 +90,16 @@ feature recommendation. A passed Artifact proves only source, cleaning and file
 consistency; it does not prove customer research, strategy approval, CRM writes
 or sales effectiveness.
 
+DR-0050 governs the current TC-14 source-derived SRE incident-review slice.
+Read `docs/decisions/DR-0050-tc14-source-derived-sre-incident-review.md`,
+`docs/scenarios/SCENARIO-035-review-source-derived-sre-incident.md` and its
+Evidence before changing SRE-010 parsing, hypotheses, action proposals or the
+four-layer UI. A passed Artifact proves only frozen-log and generated-file
+consistency. Source conflicts remain visible; hypotheses are not root-cause
+proof; Elasticsearch endpoints remain unresolved; every proposal is approval-
+required and unexecuted. No code, test or demo may connect to Elasticsearch or
+execute generated HTTP/ES commands.
+
 DR-0040 governs TC-02 real-project refactoring. Read
 `docs/decisions/DR-0040-tc02-real-project-react-refactor.md`,
 `docs/scenarios/SCENARIO-026-refactor-real-search-agent-copy-with-bounded-react.md`

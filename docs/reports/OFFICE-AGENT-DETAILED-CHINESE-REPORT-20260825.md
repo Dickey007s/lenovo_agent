@@ -869,31 +869,49 @@ Run `harness:d1a3d9fca21d4e2299ac308bbaf73e1e`。
 
 ### 5.8 SRE 日志诊断与高风险止损建议
 
-**触发：** SRE 在大促故障中需要从 TXT log 形成时间线、根因假设与止损建议，但任何真实
-集群命令都必须由人控制。
+**触发：** SRE 在大促故障中需要从一份公开 TXT log 形成可复核观察、来源冲突、根因假设和
+条件式止损提案。任何真实集群命令和业务降级都不属于本轮授权。
 
-**用户动作：** 打开日志文本预览或直接要求 Agent 给出带来源的时间线和建议，
-并明确不得执行命令。
+**Agent 路径：** Planner/Analyst 继续负责整库选证据和可审查分析。固定 TC-14 效果门另行冻结
+唯一 SRE-010 日志，校验逻辑 ID、路径、声明大小、file ref 和原始字节。服务端逐行生成
+Observation，保留 locator/excerpt；Hypothesis 只通过 observation ID 连接支持、反证和局限；
+ActionProposal 必须保存风险、未解析目标、前置、回滚、执行后验证、官方语义链接、审批要求和
+`executed=false`。最终 Markdown 和 CSV 被重新解析，再与新鲜来源推导逐字段核对。
 
-**Agent 路径：** 当前可以只读日志、规划分析步骤并生成带文件引用的建议。计划中的 Tool
-标签只是业务意图，不会调用 shell、Elasticsearch 或外部集群。
+**当前来源事实：** 固定日志有 232 行、3 个索引、11 个列出节点（3 master/8 data），查询和
+写入 QPS 均是日志基线的 8 倍。系统动态识别三组矛盾：声明节点数 10 对列表/角色/health 11，
+health 的 48 个 UNASSIGNED 对 shard 明细 24，以及节点磁盘 53.9%-56.1% 对 allocation explain
+大于 85%。这些不是被系统“修正”的数据，而是必须带回现场复核的来源冲突。
 
-**停顿或失败：** 文件不完整、引用越界或模型计划请求未允许外部动作时安全停止。当前没有
-真实 Risk/Evidence/Approval/Permit 链路，因此不是“等待审批后可执行”，而是根本没有接入
-执行路径。
+**假设与建议：** 容量压力、查询形态、GC、队列拒绝和慢查询同时出现，只能支持“共同放大”
+假设，不能证明单一因果。NODE_LEFT、来源冲突和恢复事件作为反证或局限保留。第一阶段只给
+cluster/allocation/nodes/thread pool/stats/settings 等只读预检；`retry_failed`、refresh 和
+index-scoped cache clear 都是有前置、rollback 与 stop condition 的条件式写提案。来源中的
+`10.1.1.1` 是 dedicated master，不能被 Agent 猜成批准 endpoint，因而 ES target 保持
+`unresolved`。
 
-**前台输出：** 有界日志文本、模型调用与采用状态、服务端校验事件、建议性结果、引用按钮和
-“本轮没有外部动作”。
+**前台输出与交互影响：** 第一屏先说“这是固定公开日志的离线事故复盘与止损提案，不是在线
+监控、根因定论或命令执行回执”。随后分四层显示：两份成果的确定性检查；观察与三组来源冲突；
+假设和提案待 SRE 复核；ES 命令和业务降级均未发生。用户展开即可看到来源行、冲突两端、
+支持/反证、风险、前置、rollback 和验证，不必从旧 9/9 绿灯猜系统做了什么。
 
-**后端事实：** text preview、冻结来源、Plan allowlist、无 Tool Gateway 路由、citation
-membership 与终态 Snapshot。
+**后端事实：** `sre_diagnosis_outcome` 同时保存在两份 Artifact 与 EffectReceipt，包含动态指标、
+observations、source_conflicts、hypotheses、action_proposals、business_mitigations、
+`resolved_target_count=0`、`human_review_required=true`、`original_inputs_modified=false` 和
+`external_action=none`。模型调用/采用、Artifact Effect、Run 终态和真实外部动作始终是不同事实。
 
-**证据来源：** `TC-14`、`FORTE-PINNED-20260825`；Demo 3 只作为目标 Risk Gate 的验收视角。
+**技术差异：** 历史实现只从日志取 IP，再写死 QPS、资源、48 个 UNASSIGNED、根因、命令和
+9 项检查后自证。DR-0050 让 QPS、节点/角色、分片、慢查询、证据删除和冲突修正动态改变结果；
+来源/成果篡改转红。Elasticsearch 7.10 官方文档只解释 API 和节点语义，不批准当前现场、目标、
+参数或动作。
 
-**当前边界更新（2026-08-26，DR-0029）：** Finding 已可把服务端唯一匹配的逐字引用定位到
-安全预览文本行并前台高亮；这不是日志原生 byte offset、语义验证或命令执行证据。系统仍没有
-命令参数验证、真实审批、Permit 或 execution receipt；绝不能演示或宣称已在本机或集群执行
-止损命令。
+**证据来源：** `USER-FEEDBACK-20260829-TC14-SOURCE-DERIVED-SRE-DIAGNOSIS`、`DR-0050`、
+`SCENARIO-035`、`ELASTICSEARCH-7.10-OFFICIAL-SRE-ACTION-SEMANTICS-20260829`、固定 FORTE revision
+与对应真实 Run/下载/重启 manifest。旧固定 9 项 Evidence 保留为历史负例，不被改写。
+
+**当前边界：** 固定 SRE-010 离线事故复盘适配器不是在线监控、根因确定器、真实 Elasticsearch
+Connector、命令执行器或生产变更审批。代码、测试和演示都不连接 Elasticsearch，不执行生成的
+ES/curl/Invoke-WebRequest/http 命令；自动化与截图也不证明 SRE 用户理解或现场安全。
 
 ### 5.9 外部 SQL 或定时 Web 任务的能力阻断
 

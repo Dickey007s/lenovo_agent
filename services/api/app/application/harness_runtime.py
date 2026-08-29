@@ -3222,7 +3222,7 @@ class HarnessRuntime:
             )
             if execution is None:
                 raise HarnessError("确定性办公工具未返回执行结果")
-            if spec.scenario_id == "TC-10":
+            if spec.scenario_id in {"TC-10", "TC-14"}:
                 for file_ref in frozen.source_file_refs:
                     if (
                         self.catalog.checked_input_bytes(file_ref)
@@ -3322,6 +3322,7 @@ class HarnessRuntime:
                     finance_review_outcome=generated.finance_review_outcome,
                     outbound_flow_outcome=generated.outbound_flow_outcome,
                     customer_segmentation_outcome=generated.customer_segmentation_outcome,
+                    sre_diagnosis_outcome=generated.sre_diagnosis_outcome,
                     download_path=(f"/v1/harness/runs/{run_id}/artifacts/{artifact_id}"),
                     created_at=now,
                     content_sha256=stored.sha256,
@@ -3378,6 +3379,14 @@ class HarnessRuntime:
         customer_outcome = customer_outcomes[0] if customer_outcomes else None
         if customer_outcomes and any(item != customer_outcome for item in customer_outcomes[1:]):
             raise HarnessError("同一效果的客户画像清洗事实不一致")
+        sre_outcomes = [
+            item.sre_diagnosis_outcome
+            for item in records
+            if item.sre_diagnosis_outcome is not None
+        ]
+        sre_outcome = sre_outcomes[0] if sre_outcomes else None
+        if sre_outcomes and any(item != sre_outcome for item in sre_outcomes[1:]):
+            raise HarnessError("同一效果的 SRE 离线诊断事实不一致")
         receipt = AgentControlLoopEffectReceipt(
             receipt_id=receipt_id,
             capability_id=execution.capability_id,
@@ -3397,6 +3406,7 @@ class HarnessRuntime:
             finance_review_outcome=finance_outcome,
             outbound_flow_outcome=outbound_outcome,
             customer_segmentation_outcome=customer_outcome,
+            sre_diagnosis_outcome=sre_outcome,
             created_at=now,
         )
 

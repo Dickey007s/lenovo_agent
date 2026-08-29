@@ -1,0 +1,41 @@
+{
+  "schema_version": "tc14-ui-screenshot-evidence.v1",
+  "captured_at": "2026-08-29T07:42:08+08:00",
+  "capture_method": "Playwright system-browser full viewport screenshot after opening the service-derived TC-14 outcome and the Reliability Engineering folder; no CSS injection, element crop or content rewrite",
+  "source_manifest": "docs/evidence/manifests/tc14-public-sre-diagnosis-outcome-20260829.json",
+  "screenshots": [
+    {
+      "path": "docs/evidence/screenshots/tc14-sre-diagnosis-desktop.png",
+      "viewport": {
+        "width": 1440,
+        "height": 1100
+      },
+      "bytes": 152366,
+      "sha256": "4764c34752c86912a92803b7103e6246a93552d5d1379a08aead99ac1d67b016",
+      "visible_facts": [
+        "完整三栏工作区",
+        "可靠性工程目录仅显示批准的 log.txt",
+        "四层 SRE 复盘状态",
+        "三组来源冲突",
+        "未解析命令目标",
+        "右侧 Agent Control Loop 回执"
+      ]
+    },
+    {
+      "path": "docs/evidence/screenshots/tc14-sre-diagnosis-mobile.png",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "bytes": 58997,
+      "sha256": "03a2c2d5d8aa11d907dc36794492547fdaaa1c1daca19475955ee96358f39fcb",
+      "visible_facts": [
+        "单栏四层状态",
+        "来源冲突保持非绿色",
+        "所有真实动作未发生",
+        "长中文和指标无页面级横向溢出"
+      ]
+    }
+  ],
+  "claim_boundary": "截图来自受控 E2E 公共事实投影，只证明被测布局、文案和响应式几何；不证明用户理解、真实 Elasticsearch 状态、根因、审批或命令执行。"
+}

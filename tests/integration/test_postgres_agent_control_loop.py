@@ -45,6 +45,7 @@ from tests.unit.test_scenario_effect_runtime import (
     TC11_INSTRUCTION,
     TC12_INSTRUCTION,
     TC13_INSTRUCTION,
+    TC14_INSTRUCTION,
     LegalDelegationAnalyst,
     LegalDelegationPlanner,
     OnboardingAnalyst,
@@ -53,6 +54,8 @@ from tests.unit.test_scenario_effect_runtime import (
     OutboundFlowPlanner,
     ReleaseReadinessAnalyst,
     ReleaseReadinessPlanner,
+    SREDiagnosisAnalyst,
+    SREDiagnosisPlanner,
 )
 from tests.unit.test_harness_runtime import (
     AmbiguousCatalog,
@@ -833,6 +836,114 @@ async def test_postgres_restart_preserves_tc13_customer_outcome_and_two_artifact
         public_json = public_snapshot.model_dump_json()
         assert "content_sha256" not in public_json
         assert public_snapshot.effect_receipts[0].customer_segmentation_outcome == outcome
+        assert public_snapshot.effect_receipts[0].external_action == "none"
+    finally:
+        for runtime in reversed(runtimes):
+            await runtime.close()
+        if DATABASE_DSN and run_id:
+            async with await psycopg.AsyncConnection.connect(DATABASE_DSN) as connection:
+                async with connection.cursor() as cursor:
+                    for table in (
+                        "harness_idempotency",
+                        "harness_task_commit",
+                        "harness_artifact_version",
+                        "harness_run_state",
+                    ):
+                        await cursor.execute(
+                            f"DELETE FROM {table} WHERE owner_id = %s",  # nosec B608
+                            (owner,),
+                        )
+
+
+@pytest.mark.asyncio
+async def test_postgres_restart_preserves_tc14_sre_outcome_and_two_artifacts(
+    tmp_path: Path,
+) -> None:
+    owner = f"postgres-tc14-sre-{uuid4().hex}"
+    run_id = ""
+    runtimes: list[HarnessRuntime] = []
+    workspace_root = tmp_path / "tc14-run-workspaces"
+    try:
+        first = HarnessRuntime(
+            BenchmarkWorkspaceCatalog(FORTE_ROOT),
+            SREDiagnosisPlanner(),
+            SREDiagnosisAnalyst(),
+            PostgresHarnessStateStore(DATABASE_DSN),
+            effect_engine=ScenarioEffectEngine(),
+            artifact_store=RunWorkspaceArtifactStore(workspace_root),
+        )
+        runtimes.append(first)
+        await first.setup()
+        started = await first.start(
+            owner,
+            start_request(
+                idempotency_key=f"postgres-tc14-start-{uuid4().hex}",
+                instruction=TC14_INSTRUCTION,
+            ),
+        )
+        run_id = started.run.run_id
+        terminal = await wait_for_effect_run(first, owner, run_id)
+        assert terminal.status == "completed"
+        assert len(terminal.workspace_artifacts) == 2
+        receipt = terminal.effect_receipts[0]
+        assert receipt.status == "passed"
+        assert receipt.scenario_id == "TC-14"
+        assert receipt.sre_diagnosis_outcome is not None
+        outcome = receipt.sre_diagnosis_outcome
+        assert outcome.status == "incident_review_required"
+        assert outcome.source_line_count == 232
+        assert outcome.conflict_count == 3
+        assert outcome.hypothesis_count == 2
+        assert outcome.proposal_count == 8
+        assert outcome.business_mitigation_count == 3
+        assert outcome.resolved_target_count == 0
+        assert outcome.external_action == "none"
+
+        originals: dict[str, bytes] = {}
+        for artifact in terminal.workspace_artifacts:
+            assert artifact.verifier_status == "passed"
+            assert artifact.sre_diagnosis_outcome == outcome
+            _, originals[artifact.file_name] = await first.get_workspace_artifact(
+                owner, run_id, artifact.artifact_id
+            )
+        report = originals["ES故障诊断与止损建议.md"].decode("utf-8")
+        assert "不是在线监控、根因定论或命令执行回执" in report
+        assert "dedicated master" in report
+        ledger_rows = list(
+            csv.DictReader(
+                io.StringIO(originals["SRE事故观察与动作台账.csv"].decode("utf-8-sig"))
+            )
+        )
+        assert sum(row["记录类型"] == "conflict" for row in ledger_rows) == 3
+        assert sum(row["记录类型"] == "proposal" for row in ledger_rows) == 11
+        await first.close()
+
+        second = HarnessRuntime(
+            BenchmarkWorkspaceCatalog(FORTE_ROOT),
+            SREDiagnosisPlanner(),
+            SREDiagnosisAnalyst(),
+            PostgresHarnessStateStore(DATABASE_DSN),
+            effect_engine=ScenarioEffectEngine(),
+            artifact_store=RunWorkspaceArtifactStore(workspace_root),
+        )
+        runtimes.append(second)
+        await second.setup()
+        restored = await second.get(owner, run_id)
+        assert restored.effect_receipts[0].sre_diagnosis_outcome == outcome
+        restored_by_name = {item.file_name: item for item in restored.workspace_artifacts}
+        assert set(restored_by_name) == set(originals)
+        for file_name, content in originals.items():
+            artifact = restored_by_name[file_name]
+            assert artifact.sre_diagnosis_outcome == outcome
+            _, restored_content = await second.get_workspace_artifact(
+                owner, run_id, artifact.artifact_id
+            )
+            assert restored_content == content
+
+        public_snapshot = second.public_snapshot(restored)
+        public_json = public_snapshot.model_dump_json()
+        assert "content_sha256" not in public_json
+        assert public_snapshot.effect_receipts[0].sre_diagnosis_outcome == outcome
         assert public_snapshot.effect_receipts[0].external_action == "none"
     finally:
         for runtime in reversed(runtimes):

@@ -839,6 +839,156 @@ class AgentControlLoopCustomerSegmentationOutcome(StrictModel):
         return self
 
 
+class AgentControlLoopSREObservation(StrictModel):
+    """One source-bound fact extracted from the approved SRE-010 log."""
+
+    observation_id: str = Field(pattern=r"^sre-observation-[a-z0-9-]{3,100}$")
+    category: Literal[
+        "metadata",
+        "cluster",
+        "node",
+        "metric",
+        "gc",
+        "slow_query",
+        "queue",
+        "health",
+        "thread_pool",
+        "shard",
+        "query",
+        "recovery",
+        "side_event",
+        "allocation",
+        "unclassified",
+    ]
+    statement: str = Field(min_length=1, max_length=1_000)
+    source_file_ref: str = Field(min_length=1, max_length=120)
+    locator: str = Field(min_length=1, max_length=180)
+    excerpt: str = Field(min_length=1, max_length=2_000)
+    fields: dict[str, str] = Field(default_factory=dict, max_length=30)
+    status: Literal["observed", "unclassified"] = "observed"
+
+
+class AgentControlLoopSRESourceConflict(StrictModel):
+    """Two or more incompatible source observations that need SRE review."""
+
+    conflict_id: str = Field(pattern=r"^sre-conflict-[a-z0-9-]{3,100}$")
+    title: str = Field(min_length=1, max_length=240)
+    statement: str = Field(min_length=1, max_length=1_000)
+    side_a_observation_ids: list[str] = Field(min_length=1, max_length=100)
+    side_b_observation_ids: list[str] = Field(min_length=1, max_length=100)
+    locators: list[str] = Field(min_length=2, max_length=30)
+    impact: str = Field(min_length=1, max_length=800)
+    status: Literal["open", "resolved"]
+
+
+class AgentControlLoopSREHypothesis(StrictModel):
+    """A bounded diagnosis hypothesis, kept separate from observed facts."""
+
+    hypothesis_id: str = Field(pattern=r"^sre-hypothesis-[a-z0-9-]{3,100}$")
+    statement: str = Field(min_length=1, max_length=1_200)
+    confidence: Literal["low", "medium", "high"]
+    supporting_observation_ids: list[str] = Field(default_factory=list, max_length=100)
+    supporting_locators: list[str] = Field(default_factory=list, max_length=100)
+    counter_evidence_ids: list[str] = Field(default_factory=list, max_length=100)
+    counter_evidence_locators: list[str] = Field(default_factory=list, max_length=100)
+    limitations: list[str] = Field(min_length=1, max_length=20)
+
+
+class AgentControlLoopSREActionProposal(StrictModel):
+    """A review-only SRE proposal. It is never an execution receipt."""
+
+    proposal_id: str = Field(pattern=r"^sre-proposal-[a-z0-9-]{3,100}$")
+    kind: Literal["read_only_preflight", "write_change", "business_mitigation"]
+    title: str = Field(min_length=1, max_length=240)
+    risk_level: Literal["low", "medium", "high"]
+    command_template: str | None = Field(default=None, min_length=1, max_length=2_000)
+    action_text: str | None = Field(default=None, min_length=1, max_length=1_000)
+    target_status: Literal["unresolved", "not_applicable"]
+    target_rationale: str = Field(min_length=1, max_length=800)
+    preconditions: list[str] = Field(min_length=1, max_length=20)
+    rollback: str = Field(min_length=1, max_length=1_000)
+    verify_after: list[str] = Field(min_length=1, max_length=20)
+    official_reference: str | None = Field(default=None, min_length=1, max_length=500)
+    approval_required: Literal[True] = True
+    executed: Literal[False] = False
+    source_observation_ids: list[str] = Field(default_factory=list, max_length=100)
+
+    @model_validator(mode="after")
+    def validate_proposal_body(self) -> "AgentControlLoopSREActionProposal":
+        if bool(self.command_template) == bool(self.action_text):
+            raise ValueError("SRE proposal must contain exactly one command_template or action_text")
+        if self.kind == "business_mitigation" and self.target_status != "not_applicable":
+            raise ValueError("business mitigation does not use an Elasticsearch endpoint")
+        if self.kind != "business_mitigation" and self.target_status != "unresolved":
+            raise ValueError("Elasticsearch proposal target must remain unresolved")
+        return self
+
+
+class AgentControlLoopSREDiagnosisOutcome(StrictModel):
+    """Source-derived SRE facts kept separate from diagnosis approval and execution."""
+
+    outcome_id: str = Field(pattern=r"^sre-diagnosis-outcome-[a-z0-9-]{3,80}$")
+    status: Literal["incident_review_required", "invalid"]
+    decision: str = Field(min_length=1, max_length=700)
+    summary: str = Field(min_length=1, max_length=1_500)
+    source_line_count: int = Field(ge=1, le=100_000)
+    cluster_facts: dict[str, Any] = Field(default_factory=dict, max_length=30)
+    node_facts: dict[str, Any] = Field(default_factory=dict, max_length=30)
+    metric_facts: dict[str, Any] = Field(default_factory=dict, max_length=60)
+    timeline: list[str] = Field(default_factory=list, max_length=200)
+    observation_count: int = Field(ge=1, le=1_000)
+    conflict_count: int = Field(ge=0, le=100)
+    hypothesis_count: int = Field(ge=0, le=50)
+    proposal_count: int = Field(ge=0, le=100)
+    business_mitigation_count: int = Field(ge=0, le=50)
+    unclassified_count: int = Field(ge=0, le=1_000)
+    observations: list[AgentControlLoopSREObservation] = Field(min_length=1, max_length=1_000)
+    source_conflicts: list[AgentControlLoopSRESourceConflict] = Field(
+        default_factory=list, max_length=100
+    )
+    hypotheses: list[AgentControlLoopSREHypothesis] = Field(default_factory=list, max_length=50)
+    action_proposals: list[AgentControlLoopSREActionProposal] = Field(
+        default_factory=list, max_length=100
+    )
+    business_mitigations: list[AgentControlLoopSREActionProposal] = Field(
+        default_factory=list, max_length=50
+    )
+    resolved_target_count: Literal[0] = 0
+    human_review_required: Literal[True] = True
+    original_inputs_modified: Literal[False] = False
+    external_action: Literal["none"] = "none"
+
+    @model_validator(mode="after")
+    def validate_sre_projection(self) -> "AgentControlLoopSREDiagnosisOutcome":
+        if self.observation_count != len(self.observations):
+            raise ValueError("SRE observation_count must equal observations length")
+        if self.conflict_count != len(self.source_conflicts):
+            raise ValueError("SRE conflict_count must equal source_conflicts length")
+        if self.hypothesis_count != len(self.hypotheses):
+            raise ValueError("SRE hypothesis_count must equal hypotheses length")
+        if self.proposal_count != len(self.action_proposals):
+            raise ValueError("SRE proposal_count must equal action_proposals length")
+        if self.business_mitigation_count != len(self.business_mitigations):
+            raise ValueError("SRE business_mitigation_count must equal business_mitigations length")
+        if self.unclassified_count != sum(
+            item.status == "unclassified" for item in self.observations
+        ):
+            raise ValueError("SRE unclassified_count must equal unclassified observations")
+        observation_ids = [item.observation_id for item in self.observations]
+        if len(observation_ids) != len(set(observation_ids)):
+            raise ValueError("SRE observation ids must be unique")
+        known = set(observation_ids)
+        for hypothesis in self.hypotheses:
+            if not set(hypothesis.supporting_observation_ids).issubset(known):
+                raise ValueError("SRE hypothesis support must reference known observations")
+            if not set(hypothesis.counter_evidence_ids).issubset(known):
+                raise ValueError("SRE hypothesis counter evidence must reference known observations")
+        for proposal in (*self.action_proposals, *self.business_mitigations):
+            if not set(proposal.source_observation_ids).issubset(known):
+                raise ValueError("SRE proposal must reference known observations")
+        return self
+
+
 class AgentControlLoopFinanceCandidateSource(StrictModel):
     """One period-specific source row for a cross-period finance candidate."""
 
@@ -1111,6 +1261,7 @@ class AgentControlLoopWorkspaceArtifact(StrictModel):
     finance_review_outcome: AgentControlLoopFinanceReviewOutcome | None = None
     outbound_flow_outcome: AgentControlLoopOutboundFlowOutcome | None = None
     customer_segmentation_outcome: AgentControlLoopCustomerSegmentationOutcome | None = None
+    sre_diagnosis_outcome: AgentControlLoopSREDiagnosisOutcome | None = None
     download_path: str = Field(min_length=1, max_length=300)
     created_at: datetime
     original_inputs_modified: Literal[False] = False
@@ -1144,6 +1295,7 @@ class AgentControlLoopEffectReceipt(StrictModel):
     finance_review_outcome: AgentControlLoopFinanceReviewOutcome | None = None
     outbound_flow_outcome: AgentControlLoopOutboundFlowOutcome | None = None
     customer_segmentation_outcome: AgentControlLoopCustomerSegmentationOutcome | None = None
+    sre_diagnosis_outcome: AgentControlLoopSREDiagnosisOutcome | None = None
     created_at: datetime
     external_action: Literal["none"] = "none"
 

@@ -60,6 +60,7 @@ TC07_INSTRUCTION = "依据统一规则核查六份授权委托书，逐项说明
 TC06_INSTRUCTION = "依据两个岗位说明分别审阅五份简历，保留逐条证据并输出辅助筛选结果。"
 TC10_INSTRUCTION = "根据专业性说明生成信用卡 M1 逾期用户 AI 外呼催收流程图文档。"
 TC13_INSTRUCTION = "清洗问卷、完成客户画像分类，并生成差异化销售策略 Markdown 报告。"
+TC14_INSTRUCTION = "分析双十一 Elasticsearch 日志，给出根因与两个层面的紧急止损建议。"
 
 
 class OnboardingPlanner:
@@ -363,6 +364,56 @@ class CustomerSegmentationAnalyst:
                             role="observed",
                             label="一条公开问卷记录",
                             quote="101 | 金融科技 | 500-1000人 | 技术架构师 | 9 | 7 | 6 | 2",
+                        )
+                    ],
+                )
+            ],
+            follow_ups=[],
+            review_required=True,
+        )
+
+
+class SREDiagnosisPlanner:
+    model = "deepseek-v4-pro"
+
+    async def plan(self, *, scenario, files):
+        source = next(
+            item for item in files if item["display_path"] == "可靠性工程/log.txt"
+        )
+        return HarnessPlanCandidate(
+            summary="读取固定公开日志并形成可定位的事故复盘上下文",
+            selection_reason="固定 TC-14 效果门会另行冻结完整日志，并从来源字节重算观察、冲突、假设和未执行提案。",
+            units=[
+                HarnessPlanCandidateUnit(
+                    unit_id="read-sre-log",
+                    title="读取双十一 Elasticsearch 日志",
+                    objective="核对一条可回开的 QPS 观测",
+                    input_file_refs=[source["file_ref"]],
+                    tool="file.read",
+                )
+            ],
+        )
+
+
+class SREDiagnosisAnalyst:
+    model = "deepseek-v4-pro"
+
+    async def analyze(self, *, instruction, plan, files, validation_feedback=None):
+        source = files[0]
+        return HarnessTaskResult(
+            summary="已读取一条 QPS 观测；完整事故复盘由服务端固定 TC-14 效果门从批准日志独立重算。",
+            findings=[
+                HarnessFinding(
+                    plan_unit_id=plan.units[0].unit_id,
+                    title="查询 QPS 相对日志基线升高",
+                    detail="这条记录只作为可回开的模型分析证据；来源冲突、假设和提案由确定性效果门重算。",
+                    file_refs=[source["file_ref"]],
+                    evidence_quotes=[
+                        HarnessEvidenceQuote(
+                            file_ref=source["file_ref"],
+                            role="observed",
+                            label="查询 QPS 峰值与基线",
+                            quote="node.indices.search.query_qps: 峰值 4800/s（正常基线 600/s，激增 8 倍）",
                         )
                     ],
                 )
@@ -1170,6 +1221,108 @@ async def test_tc13_runtime_keeps_cleaning_strategy_review_and_customer_actions_
         public_outcome = public["effect_receipts"][0]["customer_segmentation_outcome"]
         assert public_outcome["source_row_count"] == 11
         assert public_outcome["priority_witness_count"] == 0
+        assert public_outcome["external_action"] == "none"
+        assert "content_sha256" not in json.dumps(public, ensure_ascii=False)
+    finally:
+        await runtime.close()
+
+
+@pytest.mark.asyncio
+async def test_tc14_runtime_keeps_observations_hypotheses_and_actions_separate(
+    tmp_path: Path,
+) -> None:
+    before = _forte_digests()
+    runtime = HarnessRuntime(
+        BenchmarkWorkspaceCatalog(FORTE_ROOT),
+        SREDiagnosisPlanner(),
+        SREDiagnosisAnalyst(),
+        effect_engine=ScenarioEffectEngine(),
+        artifact_store=RunWorkspaceArtifactStore(tmp_path / "run-workspaces"),
+    )
+    try:
+        started = await runtime.start(
+            "sre-diagnosis-owner",
+            HarnessRunStart(
+                idempotency_key="tc14-source-derived-sre-runtime-0001",
+                instruction=TC14_INSTRUCTION,
+            ),
+        )
+        snapshot = None
+        for _ in range(1_000):
+            candidate = await runtime.get("sre-diagnosis-owner", started.run.run_id)
+            if candidate.status in {"waiting_input", "completed", "stopped", "failed"}:
+                snapshot = candidate
+                break
+            await asyncio.sleep(0.01)
+        assert snapshot is not None
+        assert snapshot.status == "completed"
+        assert len(snapshot.workspace_artifacts) == 2
+        assert len(snapshot.effect_receipts) == 1
+
+        receipt = snapshot.effect_receipts[0]
+        assert receipt.status == "passed"
+        assert receipt.scenario_id == "TC-14"
+        assert receipt.sre_diagnosis_outcome is not None
+        outcome = receipt.sre_diagnosis_outcome
+        assert outcome.status == "incident_review_required"
+        assert outcome.source_line_count == 232
+        assert outcome.conflict_count == 3
+        assert outcome.hypothesis_count == 2
+        assert outcome.proposal_count == 8
+        assert outcome.business_mitigation_count == 3
+        assert outcome.node_facts["listed_count"] == 11
+        assert outcome.node_facts["listed_master_count"] == 3
+        assert outcome.node_facts["listed_data_count"] == 8
+        assert outcome.resolved_target_count == 0
+        assert outcome.human_review_required is True
+        assert outcome.original_inputs_modified is False
+        assert outcome.external_action == "none"
+        assert all(item.executed is False for item in outcome.action_proposals)
+        assert all(item.approval_required is True for item in outcome.action_proposals)
+        assert all(item.target_status == "unresolved" for item in outcome.action_proposals)
+
+        for artifact in snapshot.workspace_artifacts:
+            assert artifact.verifier_status == "passed"
+            assert artifact.sre_diagnosis_outcome == outcome
+            assert len({check.check_id for check in artifact.checks}) == 12
+            assert all(check.passed for check in artifact.checks)
+            assert artifact.review_required is True
+            assert artifact.external_action == "none"
+            assert artifact.source_file_refs == ["forte-df5ae9b9a1273380"]
+
+        by_name = {item.file_name: item for item in snapshot.workspace_artifacts}
+        _, report = await runtime.get_workspace_artifact(
+            "sre-diagnosis-owner",
+            snapshot.run_id,
+            by_name["ES故障诊断与止损建议.md"].artifact_id,
+        )
+        report_text = report.decode("utf-8")
+        assert "不是在线监控、根因定论或命令执行回执" in report_text
+        assert "dedicated master" in report_text
+        assert "external_action=none" in report_text
+
+        _, ledger = await runtime.get_workspace_artifact(
+            "sre-diagnosis-owner",
+            snapshot.run_id,
+            by_name["SRE事故观察与动作台账.csv"].artifact_id,
+        )
+        rows = list(csv.DictReader(io.StringIO(ledger.decode("utf-8-sig"))))
+        assert len(rows) == (
+            outcome.observation_count
+            + outcome.conflict_count
+            + outcome.hypothesis_count
+            + outcome.proposal_count
+            + outcome.business_mitigation_count
+        )
+        assert sum(row["记录类型"] == "conflict" for row in rows) == 3
+        assert sum(row["记录类型"] == "proposal" for row in rows) == 11
+        assert all(row["已执行"] != "true" for row in rows)
+        assert _forte_digests() == before
+
+        public = runtime.public_snapshot(snapshot).model_dump(mode="json")
+        public_outcome = public["effect_receipts"][0]["sre_diagnosis_outcome"]
+        assert public_outcome["conflict_count"] == 3
+        assert public_outcome["resolved_target_count"] == 0
         assert public_outcome["external_action"] == "none"
         assert "content_sha256" not in json.dumps(public, ensure_ascii=False)
     finally:

@@ -764,6 +764,84 @@ type CustomerSegmentationOutcome = {
   external_action: "none";
 };
 
+type SREObservation = {
+  observation_id: string;
+  category: string;
+  statement: string;
+  source_file_ref: string;
+  locator: string;
+  excerpt: string;
+  fields: Record<string, string>;
+  status: "observed" | "unclassified";
+};
+
+type SRESourceConflict = {
+  conflict_id: string;
+  title: string;
+  statement: string;
+  side_a_observation_ids: string[];
+  side_b_observation_ids: string[];
+  locators: string[];
+  impact: string;
+  status: "open" | "resolved";
+};
+
+type SREHypothesis = {
+  hypothesis_id: string;
+  statement: string;
+  confidence: "low" | "medium" | "high";
+  supporting_observation_ids: string[];
+  supporting_locators: string[];
+  counter_evidence_ids: string[];
+  counter_evidence_locators: string[];
+  limitations: string[];
+};
+
+type SREActionProposal = {
+  proposal_id: string;
+  kind: "read_only_preflight" | "write_change" | "business_mitigation";
+  title: string;
+  risk_level: "low" | "medium" | "high";
+  command_template: string | null;
+  action_text: string | null;
+  target_status: "unresolved" | "not_applicable";
+  target_rationale: string;
+  preconditions: string[];
+  rollback: string;
+  verify_after: string[];
+  official_reference: string | null;
+  approval_required: true;
+  executed: false;
+  source_observation_ids: string[];
+};
+
+type SREDiagnosisOutcome = {
+  outcome_id: string;
+  status: "incident_review_required" | "invalid";
+  decision: string;
+  summary: string;
+  source_line_count: number;
+  cluster_facts: Record<string, unknown>;
+  node_facts: Record<string, unknown>;
+  metric_facts: Record<string, unknown>;
+  timeline: string[];
+  observation_count: number;
+  conflict_count: number;
+  hypothesis_count: number;
+  proposal_count: number;
+  business_mitigation_count: number;
+  unclassified_count: number;
+  observations: SREObservation[];
+  source_conflicts: SRESourceConflict[];
+  hypotheses: SREHypothesis[];
+  action_proposals: SREActionProposal[];
+  business_mitigations: SREActionProposal[];
+  resolved_target_count: 0;
+  human_review_required: true;
+  original_inputs_modified: false;
+  external_action: "none";
+};
+
 type WorkspaceArtifact = {
   artifact_id: string;
   capability_id: string;
@@ -795,6 +873,7 @@ type WorkspaceArtifact = {
   finance_review_outcome: FinanceReviewOutcome | null;
   outbound_flow_outcome: OutboundFlowOutcome | null;
   customer_segmentation_outcome: CustomerSegmentationOutcome | null;
+  sre_diagnosis_outcome: SREDiagnosisOutcome | null;
   download_path: string;
   created_at: string;
   original_inputs_modified: false;
@@ -821,6 +900,7 @@ type EffectReceipt = {
   finance_review_outcome: FinanceReviewOutcome | null;
   outbound_flow_outcome: OutboundFlowOutcome | null;
   customer_segmentation_outcome: CustomerSegmentationOutcome | null;
+  sre_diagnosis_outcome: SREDiagnosisOutcome | null;
   created_at: string;
   external_action: "none";
 };
@@ -2456,6 +2536,101 @@ function normalizeCustomerSegmentationOutcome(value: unknown): CustomerSegmentat
   };
 }
 
+function normalizeSREObservation(value: unknown): SREObservation | null {
+  if (!value || typeof value !== "object") return null;
+  const raw = value as Record<string, unknown>;
+  const status = asText(raw.status);
+  if (!asText(raw.observation_id) || !asText(raw.locator) || !["observed", "unclassified"].includes(status)) return null;
+  return {
+    observation_id: asText(raw.observation_id),
+    category: asText(raw.category),
+    statement: asText(raw.statement),
+    source_file_ref: asText(raw.source_file_ref),
+    locator: asText(raw.locator),
+    excerpt: asText(raw.excerpt),
+    fields: asStringRecord(raw.fields),
+    status: status as SREObservation["status"],
+  };
+}
+
+function normalizeSREConflict(value: unknown): SRESourceConflict | null {
+  if (!value || typeof value !== "object") return null;
+  const raw = value as Record<string, unknown>;
+  const status = asText(raw.status);
+  if (!asText(raw.conflict_id) || !["open", "resolved"].includes(status)) return null;
+  return {
+    conflict_id: asText(raw.conflict_id), title: asText(raw.title), statement: asText(raw.statement),
+    side_a_observation_ids: asStrings(raw.side_a_observation_ids), side_b_observation_ids: asStrings(raw.side_b_observation_ids),
+    locators: asStrings(raw.locators), impact: asText(raw.impact), status: status as SRESourceConflict["status"],
+  };
+}
+
+function normalizeSREHypothesis(value: unknown): SREHypothesis | null {
+  if (!value || typeof value !== "object") return null;
+  const raw = value as Record<string, unknown>;
+  const confidence = asText(raw.confidence);
+  if (!asText(raw.hypothesis_id) || !["low", "medium", "high"].includes(confidence)) return null;
+  return {
+    hypothesis_id: asText(raw.hypothesis_id), statement: asText(raw.statement), confidence: confidence as SREHypothesis["confidence"],
+    supporting_observation_ids: asStrings(raw.supporting_observation_ids), supporting_locators: asStrings(raw.supporting_locators),
+    counter_evidence_ids: asStrings(raw.counter_evidence_ids), counter_evidence_locators: asStrings(raw.counter_evidence_locators),
+    limitations: asStrings(raw.limitations),
+  };
+}
+
+function normalizeSREProposal(value: unknown): SREActionProposal | null {
+  if (!value || typeof value !== "object") return null;
+  const raw = value as Record<string, unknown>;
+  const kind = asText(raw.kind); const risk = asText(raw.risk_level); const target = asText(raw.target_status);
+  const command = asText(raw.command_template) || null; const action = asText(raw.action_text) || null;
+  if (
+    !asText(raw.proposal_id)
+    || !["read_only_preflight", "write_change", "business_mitigation"].includes(kind)
+    || !["low", "medium", "high"].includes(risk)
+    || !["unresolved", "not_applicable"].includes(target)
+    || Boolean(command) === Boolean(action)
+    || raw.approval_required !== true
+    || raw.executed !== false
+  ) return null;
+  return {
+    proposal_id: asText(raw.proposal_id), kind: kind as SREActionProposal["kind"], title: asText(raw.title), risk_level: risk as SREActionProposal["risk_level"],
+    command_template: command, action_text: action, target_status: target as SREActionProposal["target_status"], target_rationale: asText(raw.target_rationale),
+    preconditions: asStrings(raw.preconditions), rollback: asText(raw.rollback), verify_after: asStrings(raw.verify_after),
+    official_reference: asText(raw.official_reference) || null, approval_required: true, executed: false, source_observation_ids: asStrings(raw.source_observation_ids),
+  };
+}
+
+function normalizeSREDiagnosisOutcome(value: unknown): SREDiagnosisOutcome | null {
+  if (!value || typeof value !== "object") return null;
+  const raw = value as Record<string, unknown>;
+  const status = asText(raw.status);
+  const observations = Array.isArray(raw.observations) ? raw.observations.map(normalizeSREObservation).filter((item): item is SREObservation => item !== null) : [];
+  const conflicts = Array.isArray(raw.source_conflicts) ? raw.source_conflicts.map(normalizeSREConflict).filter((item): item is SRESourceConflict => item !== null) : [];
+  const hypotheses = Array.isArray(raw.hypotheses) ? raw.hypotheses.map(normalizeSREHypothesis).filter((item): item is SREHypothesis => item !== null) : [];
+  const proposals = Array.isArray(raw.action_proposals) ? raw.action_proposals.map(normalizeSREProposal).filter((item): item is SREActionProposal => item !== null) : [];
+  const mitigations = Array.isArray(raw.business_mitigations) ? raw.business_mitigations.map(normalizeSREProposal).filter((item): item is SREActionProposal => item !== null) : [];
+  if (
+    !asText(raw.outcome_id) || !["incident_review_required", "invalid"].includes(status)
+    || observations.length !== asNumber(raw.observation_count) || conflicts.length !== asNumber(raw.conflict_count)
+    || hypotheses.length !== asNumber(raw.hypothesis_count) || proposals.length !== asNumber(raw.proposal_count)
+    || mitigations.length !== asNumber(raw.business_mitigation_count)
+    || observations.filter((item) => item.status === "unclassified").length !== asNumber(raw.unclassified_count)
+    || raw.resolved_target_count !== 0 || raw.human_review_required !== true
+    || raw.original_inputs_modified !== false || raw.external_action !== "none"
+  ) return null;
+  const clusterFacts = raw.cluster_facts && typeof raw.cluster_facts === "object" && !Array.isArray(raw.cluster_facts) ? raw.cluster_facts as Record<string, unknown> : {};
+  const nodeFacts = raw.node_facts && typeof raw.node_facts === "object" && !Array.isArray(raw.node_facts) ? raw.node_facts as Record<string, unknown> : {};
+  const metricFacts = raw.metric_facts && typeof raw.metric_facts === "object" && !Array.isArray(raw.metric_facts) ? raw.metric_facts as Record<string, unknown> : {};
+  return {
+    outcome_id: asText(raw.outcome_id), status: status as SREDiagnosisOutcome["status"], decision: asText(raw.decision), summary: asText(raw.summary),
+    source_line_count: asNumber(raw.source_line_count), cluster_facts: clusterFacts, node_facts: nodeFacts, metric_facts: metricFacts, timeline: asStrings(raw.timeline),
+    observation_count: observations.length, conflict_count: conflicts.length, hypothesis_count: hypotheses.length, proposal_count: proposals.length,
+    business_mitigation_count: mitigations.length, unclassified_count: asNumber(raw.unclassified_count), observations, source_conflicts: conflicts,
+    hypotheses, action_proposals: proposals, business_mitigations: mitigations, resolved_target_count: 0, human_review_required: true,
+    original_inputs_modified: false, external_action: "none",
+  };
+}
+
 function normalizeBusinessGateOutcome(value: unknown): BusinessGateOutcome | null {
   if (!value || typeof value !== "object") return null;
   const raw = value as Record<string, unknown>;
@@ -2535,6 +2710,7 @@ function normalizeWorkspaceArtifact(value: unknown): WorkspaceArtifact | null {
     finance_review_outcome: normalizeFinanceReviewOutcome(raw.finance_review_outcome),
     outbound_flow_outcome: normalizeOutboundFlowOutcome(raw.outbound_flow_outcome),
     customer_segmentation_outcome: normalizeCustomerSegmentationOutcome(raw.customer_segmentation_outcome),
+    sre_diagnosis_outcome: normalizeSREDiagnosisOutcome(raw.sre_diagnosis_outcome),
     download_path: asText(raw.download_path),
     created_at: asText(raw.created_at),
     original_inputs_modified: false,
@@ -2568,6 +2744,7 @@ function normalizeEffectReceipt(value: unknown): EffectReceipt | null {
     finance_review_outcome: normalizeFinanceReviewOutcome(raw.finance_review_outcome),
     outbound_flow_outcome: normalizeOutboundFlowOutcome(raw.outbound_flow_outcome),
     customer_segmentation_outcome: normalizeCustomerSegmentationOutcome(raw.customer_segmentation_outcome),
+    sre_diagnosis_outcome: normalizeSREDiagnosisOutcome(raw.sre_diagnosis_outcome),
     created_at: asText(raw.created_at),
     external_action: "none",
   };
@@ -4416,6 +4593,54 @@ function CustomerSegmentationOutcomePanel({ outcome, deterministicPassed }: { ou
   </section>;
 }
 
+function sreFact(value: unknown): string {
+  if (Array.isArray(value)) return value.join("、");
+  if (value && typeof value === "object") {
+    const range = value as Record<string, unknown>;
+    if (typeof range.min === "number" && typeof range.max === "number") return `${range.min}-${range.max}`;
+    return JSON.stringify(value);
+  }
+  return String(value ?? "-");
+}
+
+function SREDiagnosisOutcomePanel({ outcome, deterministicPassed }: { outcome: SREDiagnosisOutcome; deterministicPassed: boolean }) {
+  const proposalCount = outcome.proposal_count + outcome.business_mitigation_count;
+  const metricCards = [
+    ["查询 QPS", `${sreFact(outcome.metric_facts.query_qps_baseline)} → ${sreFact(outcome.metric_facts.query_qps)}/s`, `${sreFact(outcome.metric_facts.query_qps_multiplier)} 倍`],
+    ["写入 QPS", `${sreFact(outcome.metric_facts.write_qps_baseline)} → ${sreFact(outcome.metric_facts.write_qps)}/s`, `${sreFact(outcome.metric_facts.write_qps_multiplier)} 倍`],
+    ["节点口径", `${sreFact(outcome.node_facts.declared_count)} 声明 / ${sreFact(outcome.node_facts.listed_count)} 列表`, `${sreFact(outcome.node_facts.listed_master_count)} master · ${sreFact(outcome.node_facts.listed_data_count)} data`],
+    ["分片口径", `${sreFact(outcome.cluster_facts.health_unassigned)} health / ${sreFact(outcome.cluster_facts.detail_unassigned)} 明细`, "来源存在冲突"],
+  ];
+  return <section className={`sre-diagnosis-outcome is-${outcome.status}`} aria-label="SRE 离线事故复盘与止损提案">
+    <header>
+      <IconDatabase aria-hidden="true" />
+      <div><span>SRE 离线复盘</span><h3>这是固定公开日志的离线复盘与止损提案，不是在线监控、根因定论或命令执行回执</h3><p>{outcome.decision}</p></div>
+      <b>{outcome.conflict_count} 组冲突待核实</b>
+    </header>
+    <ol className="sre-diagnosis-statuses" aria-label="成果验证、来源冲突、SRE 复核与实际动作状态">
+      <li className={deterministicPassed ? "is-passed" : "is-failed"}><span>1</span><div><b>来源与两份成果</b><strong>{deterministicPassed ? "确定性检查通过" : "确定性检查未通过"}</strong><p>服务端重读批准日志，并独立解析最终 Markdown 和 CSV 逐字段核对。</p></div></li>
+      <li className={outcome.conflict_count > 0 ? "is-review" : "is-passed"}><span>2</span><div><b>观察与来源冲突</b><strong>{outcome.observation_count} 条观察 · {outcome.conflict_count} 组冲突</strong><p>确定性通过表示冲突被识别和保留，不表示日志内部数据一致。</p></div></li>
+      <li className="is-review"><span>3</span><div><b>假设与动作提案</b><strong>{outcome.hypothesis_count} 个假设 · {proposalCount} 个提案待 SRE 复核</strong><p>生产 endpoint 仍未解析，参数、风险、前置、回滚和验证都需审批。</p></div></li>
+      <li className="is-pending"><span>4</span><div><b>真实集群与业务动作</b><strong>全部未发生</strong><p>未连接 Elasticsearch，未执行 HTTP/ES 命令，也未实施限流或查询降级。</p></div></li>
+    </ol>
+    <section className="sre-diagnosis-summary" aria-label="动态日志事实摘要">{metricCards.map(([label, value, note]) => <div key={label}><span>{label}</span><strong>{value}</strong><p>{note}</p></div>)}</section>
+    <article className="sre-diagnosis-target"><IconAlertTriangle aria-hidden="true" /><div><b>命令目标尚未确定</b><p>日志中的 10.1.1.1 是 dedicated master，不能直接拿来发送客户端请求。所有提案都等待 SRE 提供非 dedicated-master 的批准协调入口。</p></div></article>
+    <details className="sre-diagnosis-details sre-conflicts" open><summary><IconAlertTriangle aria-hidden="true" /><span><b>查看 {outcome.conflict_count} 组来源冲突</b><small>冲突被识别，不等于已解决</small></span><IconChevronDown aria-hidden="true" /></summary><ol>{outcome.source_conflicts.map((conflict) => <li key={conflict.conflict_id}>
+      <header><code>{conflict.conflict_id}</code><b>{conflict.status === "open" ? "待核实" : "已解决"}</b></header><h4>{conflict.title}</h4><p>{conflict.statement}</p><dl><div><dt>来源位置</dt><dd>{conflict.locators.join(" · ")}</dd></div><div><dt>为什么重要</dt><dd>{conflict.impact}</dd></div></dl>
+    </li>)}</ol></details>
+    <details className="sre-diagnosis-details sre-hypotheses"><summary><IconEye aria-hidden="true" /><span><b>查看假设、支持与反证</b><small>{outcome.hypothesis_count} 个有边界假设</small></span><IconChevronDown aria-hidden="true" /></summary><ol>{outcome.hypotheses.map((hypothesis) => <li key={hypothesis.hypothesis_id}>
+      <header><code>{hypothesis.hypothesis_id}</code><b>置信度 {hypothesis.confidence}</b></header><p>{hypothesis.statement}</p><dl><div><dt>支持位置</dt><dd>{hypothesis.supporting_locators.join(" · ")}</dd></div><div><dt>反证/待核实</dt><dd>{hypothesis.counter_evidence_locators.join(" · ") || "无"}</dd></div><div><dt>当前局限</dt><dd>{hypothesis.limitations.join("；")}</dd></div></dl>
+    </li>)}</ol></details>
+    <details className="sre-diagnosis-details sre-proposals"><summary><IconRoute aria-hidden="true" /><span><b>查看 {proposalCount} 个未执行提案</b><small>{outcome.proposal_count} 个 ES 提案 · {outcome.business_mitigation_count} 个业务止损提案</small></span><IconChevronDown aria-hidden="true" /></summary><ol>{[...outcome.action_proposals, ...outcome.business_mitigations].map((proposal) => <li key={proposal.proposal_id} className={`is-${proposal.risk_level}`}>
+      <header><span><code>{proposal.proposal_id}</code><h4>{proposal.title}</h4></span><b>{proposal.risk_level === "high" ? "高风险" : proposal.risk_level === "medium" ? "中风险" : "低风险"} · 未执行</b></header>
+      {proposal.command_template ? <pre><code>{proposal.command_template}</code></pre> : <p>{proposal.action_text}</p>}
+      <dl><div><dt>目标</dt><dd>{proposal.target_status === "unresolved" ? "未解析，等待批准入口" : "不使用 ES endpoint"}</dd></div><div><dt>前置条件</dt><dd>{proposal.preconditions.join("；")}</dd></div><div><dt>回滚/停止</dt><dd>{proposal.rollback}</dd></div><div><dt>执行后验证</dt><dd>{proposal.verify_after.join("；")}</dd></div>{proposal.official_reference && <div><dt>官方 API 语义参考</dt><dd>{proposal.official_reference}</dd></div>}</dl>
+    </li>)}</ol></details>
+    <details className="sre-diagnosis-details sre-observations"><summary><IconFileDescription aria-hidden="true" /><span><b>逐条查看日志观察</b><small>{outcome.observation_count} 条 · {outcome.unclassified_count} 条待人工分类</small></span><IconChevronDown aria-hidden="true" /></summary><ol>{outcome.observations.map((observation) => <li key={observation.observation_id} className={observation.status === "unclassified" ? "is-unclassified" : ""}><header><code>{observation.observation_id}</code><b>{observation.category}</b></header><p>{observation.statement}</p><blockquote>{observation.excerpt}</blockquote><small>{observation.locator}</small></li>)}</ol></details>
+    <footer><IconShieldCheck aria-hidden="true" /><span>固定 SRE-010 离线复盘适配器。它不是在线监控、根因确定器、Elasticsearch Connector、命令执行器或生产变更审批。</span></footer>
+  </section>;
+}
+
 function WorkspaceArtifactSection({ artifacts, receipts }: { artifacts: WorkspaceArtifact[]; receipts: EffectReceipt[] }) {
   const [downloading, setDownloading] = useState<string | null>(null);
   const [downloadError, setDownloadError] = useState("");
@@ -4445,6 +4670,9 @@ function WorkspaceArtifactSection({ artifacts, receipts }: { artifacts: Workspac
     ?? null;
   const customerSegmentationOutcome = artifacts.find((artifact) => artifact.customer_segmentation_outcome)?.customer_segmentation_outcome
     ?? latestReceipt?.customer_segmentation_outcome
+    ?? null;
+  const sreDiagnosisOutcome = artifacts.find((artifact) => artifact.sre_diagnosis_outcome)?.sre_diagnosis_outcome
+    ?? latestReceipt?.sre_diagnosis_outcome
     ?? null;
   const businessBlocked = Boolean(businessGateOutcome && businessGateOutcome.status !== "passed");
   const deterministicPassed = artifacts.length > 0 && artifacts.every((artifact) => artifact.verifier_status === "passed");
@@ -4476,8 +4704,9 @@ function WorkspaceArtifactSection({ artifacts, receipts }: { artifacts: Workspac
     <header>
       <IconFileDescription aria-hidden="true" />
       <div><span>运行工作区</span><h3 id="workspace-artifacts-title">{artifacts.length > 0 ? `Agent 已生成 ${artifacts.length} 份真实成果文件` : "这项任务尚不能生成可信成果"}</h3><p>{artifacts.length > 0 ? "文件已写入本次 Run 的隔离目录，原始 FORTE 文件没有被修改。" : boundary?.result}</p></div>
-      <b>{businessGateOutcome?.status === "failed" ? `业务 Gate ${businessGateOutcome.failed_gate_count}/${businessGateOutcome.total_gate_count} 未通过` : businessGateOutcome?.status === "invalid" ? "来源校验失败" : candidateReviewOutcome ? "最终 HR 决定待人工处理" : financeReviewOutcome ? "最终财务处置待人工处理" : outboundFlowOutcome?.status === "invalid" ? "规则或图结构未通过" : outboundFlowOutcome ? "最终合规审批待人工处理" : customerSegmentationOutcome ? "策略草案待销售负责人复核" : artifacts.length > 0 ? checkSummary.sameChecklist ? `${artifacts.length} 份成果共享 ${checkSummary.total} 项确定性检查，${checkSummary.passed}/${checkSummary.total} 通过` : checkSummary.shared ? `${artifacts.length} 份成果共 ${checkSummary.total} 项唯一确定性检查，${checkSummary.passed}/${checkSummary.total} 通过` : `${checkSummary.passed}/${checkSummary.total} 项检查通过` : "未伪造结果"}</b>
+      <b>{businessGateOutcome?.status === "failed" ? `业务 Gate ${businessGateOutcome.failed_gate_count}/${businessGateOutcome.total_gate_count} 未通过` : businessGateOutcome?.status === "invalid" ? "来源校验失败" : candidateReviewOutcome ? "最终 HR 决定待人工处理" : financeReviewOutcome ? "最终财务处置待人工处理" : outboundFlowOutcome?.status === "invalid" ? "规则或图结构未通过" : outboundFlowOutcome ? "最终合规审批待人工处理" : customerSegmentationOutcome ? "策略草案待销售负责人复核" : sreDiagnosisOutcome ? `${sreDiagnosisOutcome.conflict_count} 组来源冲突待 SRE 核实` : artifacts.length > 0 ? checkSummary.sameChecklist ? `${artifacts.length} 份成果共享 ${checkSummary.total} 项确定性检查，${checkSummary.passed}/${checkSummary.total} 通过` : checkSummary.shared ? `${artifacts.length} 份成果共 ${checkSummary.total} 项唯一确定性检查，${checkSummary.passed}/${checkSummary.total} 通过` : `${checkSummary.passed}/${checkSummary.total} 项检查通过` : "未伪造结果"}</b>
     </header>
+    {sreDiagnosisOutcome && <SREDiagnosisOutcomePanel outcome={sreDiagnosisOutcome} deterministicPassed={deterministicPassed} />}
     {customerSegmentationOutcome && <CustomerSegmentationOutcomePanel outcome={customerSegmentationOutcome} deterministicPassed={deterministicPassed} />}
     {outboundFlowOutcome && <OutboundFlowOutcomePanel outcome={outboundFlowOutcome} deterministicPassed={deterministicPassed} />}
     {financeReviewOutcome && <FinanceReviewOutcomePanel outcome={financeReviewOutcome} deterministicPassed={deterministicPassed} />}
@@ -4487,7 +4716,7 @@ function WorkspaceArtifactSection({ artifacts, receipts }: { artifacts: Workspac
     {executionArtifact && <article className={`workspace-action-result${executionArtifact.verifier_status === "failed" ? " is-failed" : ""}`} aria-label="实际执行边界"><IconShieldCheck aria-hidden="true" /><div><span>这次实际发生了什么</span><h4>{executionArtifact.execution_summary}</h4><p>{executionArtifact.purpose}</p>{latestReceipt && <ul>{latestReceipt.prohibited_side_effects.map((item) => <li key={item}>{item}</li>)}</ul>}</div></article>}
     {artifacts.length > 0 && <ol>{artifacts.map((artifact) => <li key={artifact.artifact_id} className={artifact.verifier_status === "passed" ? "is-passed" : "is-failed"}>
       <div className="workspace-artifact-file"><span><IconFile aria-hidden="true" /></span><div><h4>{artifact.title}</h4><p>{artifact.summary}</p><small>文件：{artifact.file_name} · 第 {artifact.round_number} 轮 · {formatSize(artifact.size)} · {artifact.source_file_refs.length} 份内容来源</small></div></div>
-      <div className="workspace-artifact-status"><b>{artifact.verifier_status === "passed" ? <><IconCheck aria-hidden="true" />确定性检查通过</> : <><IconAlertTriangle aria-hidden="true" />检查未通过</>}</b><span>{artifact.record_count !== null ? `${artifact.record_count} 条记录 · ` : ""}{artifact.checks.filter((check) => check.passed).length}/{artifact.checks.length} 项检查{(checklistUsage.get(artifactChecklistKey(artifact)) ?? 0) > 1 ? " · 使用同一验证清单" : ""}</span>{artifact.business_gate_outcome && <small>只代表公式、来源和文件结构已复核，不代表业务 Gate 通过。</small>}{artifact.candidate_review_outcome && <small>只代表来源、条件计算和成果结构已复核，不代表录用或淘汰。</small>}{artifact.finance_review_outcome && <small>只代表来源、金额、候选枚举和成果结构已复核，不代表已经付款、核销、记账或确认坏账。</small>}{artifact.outbound_flow_outcome && <small>只代表来源规则、DOCX 和图结构已复核，不代表合规审批或外呼动作发生。</small>}{artifact.customer_segmentation_outcome && <small>只代表来源、清洗、画像裁决与成果结构已复核，不代表策略获批、销售有效或客户动作发生。</small>}</div>
+      <div className="workspace-artifact-status"><b>{artifact.verifier_status === "passed" ? <><IconCheck aria-hidden="true" />确定性检查通过</> : <><IconAlertTriangle aria-hidden="true" />检查未通过</>}</b><span>{artifact.record_count !== null ? `${artifact.record_count} 条记录 · ` : ""}{artifact.checks.filter((check) => check.passed).length}/{artifact.checks.length} 项检查{(checklistUsage.get(artifactChecklistKey(artifact)) ?? 0) > 1 ? " · 使用同一验证清单" : ""}</span>{artifact.business_gate_outcome && <small>只代表公式、来源和文件结构已复核，不代表业务 Gate 通过。</small>}{artifact.candidate_review_outcome && <small>只代表来源、条件计算和成果结构已复核，不代表录用或淘汰。</small>}{artifact.finance_review_outcome && <small>只代表来源、金额、候选枚举和成果结构已复核，不代表已经付款、核销、记账或确认坏账。</small>}{artifact.outbound_flow_outcome && <small>只代表来源规则、DOCX 和图结构已复核，不代表合规审批或外呼动作发生。</small>}{artifact.customer_segmentation_outcome && <small>只代表来源、清洗、画像裁决与成果结构已复核，不代表策略获批、销售有效或客户动作发生。</small>}{artifact.sre_diagnosis_outcome && <small>只代表日志、观察台账和成果结构已复核，不代表根因已确定、提案获批或任何命令已经执行。</small>}</div>
       <button type="button" onClick={() => void downloadArtifact(artifact)} disabled={downloading !== null}><IconDownload aria-hidden="true" />{downloading === artifact.artifact_id ? "正在下载" : "下载成果"}</button>
       {(artifact.deliverable_type || artifact.covered_period || artifact.statistic_basis || artifact.purpose) && <dl className={`workspace-artifact-semantics${artifact.deliverable_type ? " has-deliverable-type" : ""}`}>
         {artifact.deliverable_type && <div><dt>成果类型</dt><dd>{artifact.deliverable_type}</dd></div>}
