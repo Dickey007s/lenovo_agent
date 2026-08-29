@@ -8,6 +8,7 @@
 ## 直接交付
 
 - `exports/Office-Agent-技术差异与交互影响-20260829.pptx`：可编辑 PowerPoint，含 17 页中文演讲备注。
+- `OFFICE-AGENT-TECH-INTERACTION-CHINESE-SPEAKER-SCRIPT-20260829.md`：对应 17 页的 30 至 35 分钟完整中文讲稿，含转场和常见追问口径。
 - `sources/ONLINE-RESEARCH-AND-0716-CONTINUITY-20260829.md`：07-16 内容继承表，以及竞品官方材料、论文和人机交互研究的完整链接。
 - `design_spec.md`：逐页信息结构、截图和图示规划。
 - `svg_output/`：手工设计源稿；`svg_final/`：完成图标、图片和文本处理后的版本。
