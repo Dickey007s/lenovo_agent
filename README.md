@@ -377,6 +377,14 @@ multi-instance coordination and governed external action remain target work.
   file verification, contradictory observations, SRE review and the fact that
   no Elasticsearch or business action occurred. This is a fixed offline-review
   adapter, not monitoring, root-cause proof, a Connector or change approval.
+- `DR-0051` replaces TC-15's 120-row Preview calculation, fixed rule answers and
+  invented solution text with a full-workbook uiux-021 ledger. The service reads
+  all approved XLSX rows, derives severity/frequency/priority and page specs from
+  source bytes, retains duplicate/conflict/mapping assumptions, and independently
+  parses both generated CSVs. Every group exposes the exact content-addressed
+  source rules used. The UI separates deterministic coverage, data-quality facts,
+  prioritization review and the fact that no design, experiment or production UI
+  action occurred. This is not user research or a general UX analytics engine.
 - No target-user study has been run. Clarity, trust, efficiency and user value
   remain hypotheses.
 
@@ -421,6 +429,8 @@ The current TC-13 source-derived customer-segmentation increment is tracked in
 [`DR-0049-TC13-SOURCE-DERIVED-CUSTOMER-SEGMENTATION-EVIDENCE-20260829`](docs/evidence/DR-0049-TC13-SOURCE-DERIVED-CUSTOMER-SEGMENTATION-EVIDENCE-20260829.md).
 The current TC-14 source-derived SRE incident-review increment is tracked in
 [`DR-0050-TC14-SOURCE-DERIVED-SRE-DIAGNOSIS-EVIDENCE-20260829`](docs/evidence/DR-0050-TC14-SOURCE-DERIVED-SRE-DIAGNOSIS-EVIDENCE-20260829.md).
+The current TC-15 full-workbook UX-prioritization increment is tracked in
+[`DR-0051-TC15-SOURCE-DERIVED-UX-PRIORITIZATION-EVIDENCE-20260829`](docs/evidence/DR-0051-TC15-SOURCE-DERIVED-UX-PRIORITIZATION-EVIDENCE-20260829.md).
 
 ## Local run
 
@@ -526,6 +536,9 @@ pnpm --dir apps/web exec playwright test e2e/harness-workbench.spec.ts
 - [DR-0050：TC-14 来源推导 SRE 事故复盘与未执行提案](docs/decisions/DR-0050-tc14-source-derived-sre-incident-review.md)
 - [SCENARIO-035：从公开日志形成可复核事故复盘](docs/scenarios/SCENARIO-035-review-source-derived-sre-incident.md)
 - [TC-14 来源推导 SRE 复盘 Evidence](docs/evidence/DR-0050-TC14-SOURCE-DERIVED-SRE-DIAGNOSIS-EVIDENCE-20260829.md)
+- [DR-0051：TC-15 完整日志来源推导与逐组规则引用](docs/decisions/DR-0051-tc15-source-derived-ux-prioritization.md)
+- [SCENARIO-036：从完整交互日志形成可回溯优先级](docs/scenarios/SCENARIO-036-review-source-derived-ux-prioritization.md)
+- [TC-15 来源推导交互优先级 Evidence](docs/evidence/DR-0051-TC15-SOURCE-DERIVED-UX-PRIORITIZATION-EVIDENCE-20260829.md)
 - [可恢复 Control Loop Evidence](docs/evidence/DURABLE-EVIDENCE-GATE-ARTIFACT-EVOLUTION-EVIDENCE-20260826.md)
 - [整库自主研究 Evidence](docs/evidence/AUTONOMOUS-WHOLE-WORKSPACE-RESEARCH-EVIDENCE-20260825.md)
 - [Agent Control Loop 三轮只读纵切证据](docs/evidence/AGENT-CONTROL-LOOP-BOUNDED-READONLY-EVIDENCE-20260825.md)

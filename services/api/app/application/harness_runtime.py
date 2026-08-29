@@ -3323,6 +3323,7 @@ class HarnessRuntime:
                     outbound_flow_outcome=generated.outbound_flow_outcome,
                     customer_segmentation_outcome=generated.customer_segmentation_outcome,
                     sre_diagnosis_outcome=generated.sre_diagnosis_outcome,
+                    ux_prioritization_outcome=generated.ux_prioritization_outcome,
                     download_path=(f"/v1/harness/runs/{run_id}/artifacts/{artifact_id}"),
                     created_at=now,
                     content_sha256=stored.sha256,
@@ -3387,6 +3388,14 @@ class HarnessRuntime:
         sre_outcome = sre_outcomes[0] if sre_outcomes else None
         if sre_outcomes and any(item != sre_outcome for item in sre_outcomes[1:]):
             raise HarnessError("同一效果的 SRE 离线诊断事实不一致")
+        ux_outcomes = [
+            item.ux_prioritization_outcome
+            for item in records
+            if item.ux_prioritization_outcome is not None
+        ]
+        ux_outcome = ux_outcomes[0] if ux_outcomes else None
+        if ux_outcomes and any(item != ux_outcome for item in ux_outcomes[1:]):
+            raise HarnessError("同一效果的 UX 全量优先级事实不一致")
         receipt = AgentControlLoopEffectReceipt(
             receipt_id=receipt_id,
             capability_id=execution.capability_id,
@@ -3407,6 +3416,7 @@ class HarnessRuntime:
             outbound_flow_outcome=outbound_outcome,
             customer_segmentation_outcome=customer_outcome,
             sre_diagnosis_outcome=sre_outcome,
+            ux_prioritization_outcome=ux_outcome,
             created_at=now,
         )
 

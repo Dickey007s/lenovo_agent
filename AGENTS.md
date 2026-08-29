@@ -100,6 +100,18 @@ proof; Elasticsearch endpoints remain unresolved; every proposal is approval-
 required and unexecuted. No code, test or demo may connect to Elasticsearch or
 execute generated HTTP/ES commands.
 
+DR-0051 governs the current TC-15 full-workbook UX-prioritization slice. Read
+`docs/decisions/DR-0051-tc15-source-derived-ux-prioritization.md`,
+`docs/scenarios/SCENARIO-036-review-source-derived-ux-prioritization.md` and its
+Evidence before changing uiux-021 parsing, group rule references, solution
+wording or the four-layer UI. Calculations must use all approved XLSX rows, not
+the bounded browser Preview. Each group retains content-addressed severity,
+frequency and priority source-rule references; a disputed 3% boundary retains
+both frequency sides and applies no priority rule. Operation-to-spec mappings
+and concrete solutions remain review-required assumptions. A passed Artifact
+does not prove user research, experience improvement, production UI changes or
+an approved experiment.
+
 DR-0040 governs TC-02 real-project refactoring. Read
 `docs/decisions/DR-0040-tc02-real-project-react-refactor.md`,
 `docs/scenarios/SCENARIO-026-refactor-real-search-agent-copy-with-bounded-react.md`

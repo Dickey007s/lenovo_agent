@@ -989,6 +989,223 @@ class AgentControlLoopSREDiagnosisOutcome(StrictModel):
         return self
 
 
+class AgentControlLoopUXRule(StrictModel):
+    """One source-derived uiux-021 severity, frequency or priority rule."""
+
+    rule_id: str = Field(pattern=r"^ux-rule-[a-z0-9-]{3,100}$")
+    kind: Literal["severity", "frequency", "priority", "disposition"]
+    name: str = Field(min_length=1, max_length=180)
+    locator: str = Field(min_length=1, max_length=180)
+    excerpt: str = Field(min_length=1, max_length=1_500)
+    parameters: dict[str, str] = Field(default_factory=dict, max_length=20)
+
+
+class AgentControlLoopUXSpecElement(StrictModel):
+    """One page-level requirement parsed from the approved DOCX."""
+
+    spec_id: str = Field(pattern=r"^ux-spec-[0-9a-f]{12}$")
+    page_name: str = Field(min_length=1, max_length=120)
+    page_order: int = Field(ge=1, le=100)
+    element_name: str = Field(min_length=1, max_length=180)
+    element_order: int = Field(ge=1, le=100)
+    requirement: str = Field(min_length=1, max_length=1_500)
+    locator: str = Field(min_length=1, max_length=180)
+
+
+class AgentControlLoopUXMappingDecision(StrictModel):
+    """A visible adapter assumption between one operation and one source spec."""
+
+    mapping_id: str = Field(pattern=r"^ux-mapping-[0-9a-f]{12}$")
+    page_name: str = Field(min_length=1, max_length=120)
+    operation: str = Field(min_length=1, max_length=240)
+    status: Literal["controlled_adapter_assumption", "unmapped"]
+    spec_id: str | None = Field(default=None, pattern=r"^ux-spec-[0-9a-f]{12}$")
+    element_name: str | None = Field(default=None, min_length=1, max_length=180)
+    candidate_spec_ids: list[str] = Field(default_factory=list, max_length=30)
+    mapping_basis: str = Field(min_length=1, max_length=800)
+    review_required: Literal[True] = True
+
+
+class AgentControlLoopUXRowDecision(StrictModel):
+    """One complete source-row projection; no approved row may disappear."""
+
+    row_number: int = Field(ge=2, le=1_000_000)
+    locator: str = Field(min_length=1, max_length=180)
+    page_name: str = Field(min_length=1, max_length=120)
+    page_path: str = Field(min_length=1, max_length=300)
+    operation: str = Field(min_length=1, max_length=240)
+    operation_result: str = Field(min_length=1, max_length=120)
+    pain_type: str = Field(min_length=1, max_length=180)
+    failure_reason: str = Field(default="", max_length=1_500)
+    misclick_count: int = Field(ge=0, le=100_000)
+    exit_node: str = Field(default="", max_length=240)
+    retry_count: int = Field(ge=0, le=100_000)
+    status: Literal["included", "excluded", "manual_review"]
+    group_id: str | None = Field(default=None, pattern=r"^ux-group-[0-9a-f]{12}$")
+    mapping_id: str | None = Field(default=None, pattern=r"^ux-mapping-[0-9a-f]{12}$")
+    mapping_status: Literal["controlled_adapter_assumption", "unmapped", "not_applicable"]
+    duplicate_group_id: str | None = Field(
+        default=None, pattern=r"^ux-duplicate-[0-9a-f]{12}$"
+    )
+    duplicate_ordinal: int = Field(default=1, ge=1, le=100_000)
+    reason: str = Field(min_length=1, max_length=800)
+    data_quality_flags: list[str] = Field(default_factory=list, max_length=20)
+
+
+class AgentControlLoopUXGroupRuleRef(StrictModel):
+    """One source rule actually used, or retained as one side of a boundary conflict."""
+
+    role: Literal["severity", "frequency", "priority"]
+    rule_id: str = Field(pattern=r"^ux-rule-[a-z0-9-]{3,100}$")
+    locator: str = Field(min_length=1, max_length=180)
+    application: Literal["applied", "conflict_side"]
+
+
+class AgentControlLoopUXGroup(StrictModel):
+    """One full-log page x operation x pain aggregation."""
+
+    group_id: str = Field(pattern=r"^ux-group-[0-9a-f]{12}$")
+    page_name: str = Field(min_length=1, max_length=120)
+    page_path: str = Field(min_length=1, max_length=300)
+    operation: str = Field(min_length=1, max_length=240)
+    spec_id: str = Field(pattern=r"^ux-spec-[0-9a-f]{12}$")
+    element_name: str = Field(min_length=1, max_length=180)
+    pain_type: str = Field(min_length=1, max_length=180)
+    severity: Literal["严重", "中等", "轻微"]
+    scenario_count: int = Field(ge=1, le=1_000_000)
+    denominator: int = Field(ge=1, le=1_000_000)
+    ratio: str = Field(pattern=r"^(0|1|0\.[0-9]+)$")
+    frequency: Literal["高频", "中频", "低频", "边界待确认"]
+    priority: Literal["P0", "P1", "P2", "P3", "P4"] | None = None
+    disposition: str = Field(min_length=1, max_length=500)
+    spec_requirement: str = Field(min_length=1, max_length=1_500)
+    contributing_row_locators: list[str] = Field(min_length=1, max_length=1_000)
+    mapping_status: Literal["controlled_adapter_assumption"] = "controlled_adapter_assumption"
+    mapping_basis: str = Field(min_length=1, max_length=800)
+    rule_refs: list[AgentControlLoopUXGroupRuleRef] = Field(min_length=2, max_length=4)
+    data_quality_flags: list[str] = Field(default_factory=list, max_length=30)
+    suggestion_status: Literal["no_approved_solution_source"] = (
+        "no_approved_solution_source"
+    )
+    suggestion_template: str = Field(min_length=1, max_length=800)
+
+
+class AgentControlLoopUXRuleConflict(StrictModel):
+    """An unresolved contradiction inside the approved prioritization rules."""
+
+    conflict_id: str = Field(pattern=r"^ux-conflict-[a-z0-9-]{3,100}$")
+    title: str = Field(min_length=1, max_length=240)
+    locators: list[str] = Field(min_length=1, max_length=20)
+    statement: str = Field(min_length=1, max_length=1_000)
+    impact: str = Field(min_length=1, max_length=800)
+    status: Literal["open", "resolved"]
+
+
+class AgentControlLoopUXPrioritizationOutcome(StrictModel):
+    """Full-log prioritization facts kept separate from UX approval and release."""
+
+    outcome_id: str = Field(pattern=r"^ux-prioritization-outcome-[a-z0-9-]{3,80}$")
+    status: Literal["prioritization_review_required", "invalid"]
+    decision: str = Field(min_length=1, max_length=700)
+    summary: str = Field(min_length=1, max_length=1_500)
+    source_row_count: int = Field(ge=1, le=100_000)
+    analyzed_row_count: int = Field(ge=0, le=100_000)
+    included_pain_row_count: int = Field(ge=0, le=100_000)
+    excluded_no_pain_count: int = Field(ge=0, le=100_000)
+    success_with_pain_count: int = Field(ge=0, le=100_000)
+    group_count: int = Field(ge=0, le=100_000)
+    priority_counts: dict[str, int] = Field(default_factory=dict, max_length=5)
+    duplicate_group_count: int = Field(ge=0, le=100_000)
+    duplicate_extra_count: int = Field(ge=0, le=100_000)
+    unmapped_count: int = Field(ge=0, le=100_000)
+    uncovered_spec_count: int = Field(ge=0, le=10_000)
+    rules: list[AgentControlLoopUXRule] = Field(min_length=1, max_length=200)
+    specs: list[AgentControlLoopUXSpecElement] = Field(min_length=1, max_length=500)
+    mappings: list[AgentControlLoopUXMappingDecision] = Field(
+        default_factory=list, max_length=500
+    )
+    groups: list[AgentControlLoopUXGroup] = Field(default_factory=list, max_length=10_000)
+    row_decisions: list[AgentControlLoopUXRowDecision] = Field(
+        min_length=1, max_length=100_000
+    )
+    rule_conflicts: list[AgentControlLoopUXRuleConflict] = Field(
+        default_factory=list, max_length=100
+    )
+    suggestion_status: Literal["no_approved_solution_source"] = (
+        "no_approved_solution_source"
+    )
+    human_review_required: Literal[True] = True
+    original_inputs_modified: Literal[False] = False
+    external_action: Literal["none"] = "none"
+
+    @model_validator(mode="after")
+    def validate_ux_projection(self) -> "AgentControlLoopUXPrioritizationOutcome":
+        if self.source_row_count != len(self.row_decisions):
+            raise ValueError("UX source_row_count must equal row_decisions length")
+        if self.analyzed_row_count != self.source_row_count:
+            raise ValueError("UX analyzed_row_count must cover every source row")
+        if self.group_count != len(self.groups):
+            raise ValueError("UX group_count must equal groups length")
+        if self.included_pain_row_count != sum(
+            row.status == "included" for row in self.row_decisions
+        ):
+            raise ValueError("UX included count must equal included rows")
+        if self.excluded_no_pain_count != sum(
+            row.status == "excluded" for row in self.row_decisions
+        ):
+            raise ValueError("UX excluded count must equal excluded rows")
+        if self.success_with_pain_count != sum(
+            row.operation_result == "成功" and row.pain_type != "无"
+            for row in self.row_decisions
+        ):
+            raise ValueError("UX success-with-pain count must equal row facts")
+        expected_priority_counts = {
+            label: sum(group.priority == label for group in self.groups)
+            for label in ("P0", "P1", "P2", "P3", "P4")
+        }
+        if self.priority_counts != expected_priority_counts:
+            raise ValueError("UX priority_counts must equal group priorities")
+        group_ids = [group.group_id for group in self.groups]
+        if len(group_ids) != len(set(group_ids)):
+            raise ValueError("UX group ids must be unique")
+        known_groups = set(group_ids)
+        known_rules = {rule.rule_id: rule for rule in self.rules}
+        for group in self.groups:
+            if any(ref.rule_id not in known_rules for ref in group.rule_refs):
+                raise ValueError("UX group rule references must resolve")
+            severity_refs = [ref for ref in group.rule_refs if ref.role == "severity"]
+            frequency_refs = [ref for ref in group.rule_refs if ref.role == "frequency"]
+            priority_refs = [ref for ref in group.rule_refs if ref.role == "priority"]
+            if len(severity_refs) != 1 or severity_refs[0].application != "applied":
+                raise ValueError("UX group must apply exactly one severity rule")
+            if group.frequency == "边界待确认":
+                if (
+                    len(frequency_refs) != 2
+                    or any(ref.application != "conflict_side" for ref in frequency_refs)
+                    or priority_refs
+                    or group.priority is not None
+                ):
+                    raise ValueError(
+                        "UX boundary group must retain two frequency conflict sides and no priority rule"
+                    )
+            elif (
+                len(frequency_refs) != 1
+                or frequency_refs[0].application != "applied"
+                or len(priority_refs) != 1
+                or priority_refs[0].application != "applied"
+                or group.priority is None
+            ):
+                raise ValueError("UX classified group must apply frequency and priority rules")
+            if any(known_rules[ref.rule_id].locator != ref.locator for ref in group.rule_refs):
+                raise ValueError("UX group rule locator must match the source-derived rule")
+        if any(
+            row.group_id is not None and row.group_id not in known_groups
+            for row in self.row_decisions
+        ):
+            raise ValueError("UX row group references must resolve")
+        return self
+
+
 class AgentControlLoopFinanceCandidateSource(StrictModel):
     """One period-specific source row for a cross-period finance candidate."""
 
@@ -1262,6 +1479,7 @@ class AgentControlLoopWorkspaceArtifact(StrictModel):
     outbound_flow_outcome: AgentControlLoopOutboundFlowOutcome | None = None
     customer_segmentation_outcome: AgentControlLoopCustomerSegmentationOutcome | None = None
     sre_diagnosis_outcome: AgentControlLoopSREDiagnosisOutcome | None = None
+    ux_prioritization_outcome: AgentControlLoopUXPrioritizationOutcome | None = None
     download_path: str = Field(min_length=1, max_length=300)
     created_at: datetime
     original_inputs_modified: Literal[False] = False
@@ -1296,6 +1514,7 @@ class AgentControlLoopEffectReceipt(StrictModel):
     outbound_flow_outcome: AgentControlLoopOutboundFlowOutcome | None = None
     customer_segmentation_outcome: AgentControlLoopCustomerSegmentationOutcome | None = None
     sre_diagnosis_outcome: AgentControlLoopSREDiagnosisOutcome | None = None
+    ux_prioritization_outcome: AgentControlLoopUXPrioritizationOutcome | None = None
     created_at: datetime
     external_action: Literal["none"] = "none"
 

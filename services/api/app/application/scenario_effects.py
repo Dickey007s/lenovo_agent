@@ -21,7 +21,7 @@ import tempfile
 import textwrap
 import time
 import zipfile
-from collections import Counter, defaultdict
+from collections import Counter
 from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -41,6 +41,7 @@ from packages.contracts.harness_models import (
     AgentControlLoopLegalReviewOutcome,
     AgentControlLoopOutboundFlowOutcome,
     AgentControlLoopSREDiagnosisOutcome,
+    AgentControlLoopUXPrioritizationOutcome,
 )
 from services.api.app.application.candidate_review_effect import (
     CANDIDATE_LOGICAL_IDS,
@@ -96,6 +97,14 @@ from services.api.app.application.sre_diagnosis_effect import (
     SRESourceInput,
     build_sre_diagnosis,
 )
+from services.api.app.application.ux_prioritization_effect import (
+    BEHAVIOR_LOGICAL_ID as UX_BEHAVIOR_LOGICAL_ID,
+    RULES_LOGICAL_ID as UX_RULES_LOGICAL_ID,
+    SPEC_LOGICAL_ID as UX_SPEC_LOGICAL_ID,
+    UXPrioritizationValidationError,
+    UXSourceInput,
+    build_ux_prioritization,
+)
 
 
 class ScenarioEffectError(RuntimeError):
@@ -137,6 +146,7 @@ class GeneratedOfficeArtifact:
     outbound_flow_outcome: AgentControlLoopOutboundFlowOutcome | None = None
     customer_segmentation_outcome: AgentControlLoopCustomerSegmentationOutcome | None = None
     sre_diagnosis_outcome: AgentControlLoopSREDiagnosisOutcome | None = None
+    ux_prioritization_outcome: AgentControlLoopUXPrioritizationOutcome | None = None
 
     @property
     def verifier_status(self) -> str:
@@ -545,11 +555,15 @@ SCENARIO_EFFECT_SPECS: tuple[ScenarioEffectSpec, ...] = (
             ("用户体验", "交互行为痛点及优化规则.md"),
             ("用户体验", "页面级交互规范.docx"),
         ),
-        ("交互规范优化方案.csv",),
-        "validator-ux-pain-prioritization-v1",
-        "成果区显示真实 CSV、排序检查、失败原因与下载入口。",
-        ("workspace_artifacts[]", "effect_receipts[]", "deterministic_verification_completed"),
-        ("不修改生产界面", "不自动发布建议"),
+        ("交互规范优化方案.csv", "交互行为逐行归因台账.csv"),
+        "validator-ux-pain-prioritization-v2",
+        "分开显示完整行覆盖、排序事实、来源冲突/映射假设、待审批方案和未发生动作。",
+        (
+            "workspace_artifacts[].ux_prioritization_outcome",
+            "effect_receipts[].ux_prioritization_outcome",
+            "deterministic_verification_completed",
+        ),
+        ("不修改生产界面", "不自动发布建议", "不创建实验或把离线频次冒充用户研究"),
         "implemented",
         _contains_any(("交互", "痛点", "优先级"), ("交互", "痛点", "优化")),
     ),
@@ -585,7 +599,15 @@ class ScenarioEffectEngine:
                 key = (group, str(item.get("display_label")))
                 if key in requested_keys:
                     matches[key].append(str(item.get("file_ref")))
-        if spec.scenario_id in {"TC-05", "TC-06", "TC-07", "TC-10", "TC-13", "TC-14"}:
+        if spec.scenario_id in {
+            "TC-05",
+            "TC-06",
+            "TC-07",
+            "TC-10",
+            "TC-13",
+            "TC-14",
+            "TC-15",
+        }:
             folder_label = {
                 "TC-05": "财务管理",
                 "TC-06": "人力招聘",
@@ -593,6 +615,7 @@ class ScenarioEffectEngine:
                 "TC-10": "运营管理",
                 "TC-13": "销售运营",
                 "TC-14": "可靠性工程",
+                "TC-15": "用户体验",
             }[spec.scenario_id]
             expected_count = {
                 "TC-05": 3,
@@ -601,6 +624,7 @@ class ScenarioEffectEngine:
                 "TC-10": 1,
                 "TC-13": 2,
                 "TC-14": 1,
+                "TC-15": 3,
             }[spec.scenario_id]
             source_folder = next(
                 (folder for folder in folders if folder.get("display_label") == folder_label),
@@ -626,6 +650,7 @@ class ScenarioEffectEngine:
                         "TC-10": "Operations-008 运营管理目录必须恰好包含一份专业性说明",
                         "TC-13": "Sales-020 销售运营目录必须恰好包含一份问卷和一份规则",
                         "TC-14": "SRE-010 可靠性工程目录必须恰好包含一份批准日志",
+                        "TC-15": "uiux-021 用户体验目录必须恰好包含日志、规则和页面规范三份来源",
                     }[spec.scenario_id]
                 )
         preview_refs: list[str] = []
@@ -2974,191 +2999,105 @@ class ScenarioEffectEngine:
     def _ux_prioritization(
         self, catalog: ScenarioEffectCatalog, spec: ScenarioEffectSpec
     ) -> tuple[GeneratedOfficeArtifact, ...]:
-        previews = self._previews(catalog, spec)
-        source_refs = self._source_refs(previews)
-        behavior = previews["用户交互行为日志.xlsx"]
-        records = self._table_records(behavior)
-        total = len(records)
-        scenario_counts = Counter((row["页面名称"], row["操作动作"]) for row in records)
-        severity = {
-            "操作卡顿": "严重",
-            "渲染失败": "严重",
-            "反馈迟钝": "严重",
-            "操作失败": "严重",
-            "跳转失败": "严重",
-            "排版错乱": "中等",
-            "视觉抖动": "中等",
-            "文案截断": "中等",
-            "动效缺失": "轻微",
-        }
-        pain_order = {label: index for index, label in enumerate(severity)}
-        priority_matrix = {
-            ("高频", "严重"): "P0",
-            ("高频", "中等"): "P1",
-            ("高频", "轻微"): "P2",
-            ("中频", "严重"): "P1",
-            ("中频", "中等"): "P2",
-            ("中频", "轻微"): "P3",
-            ("低频", "严重"): "P2",
-            ("低频", "中等"): "P3",
-            ("低频", "轻微"): "P4",
-        }
-        element_map = {
-            ("首页", "点击功能入口图标"): "功能入口区",
-            ("首页", "点击Banner轮播图"): "Banner轮播",
-            ("首页", "点击最近阅读书籍"): "最近阅读",
-            ("首页", "点击底部导航Tab"): "底部导航",
-            ("首页", "点击搜索框"): "搜索入口",
-            ("阅读页", "左右滑动翻页"): "翻页手势",
-            ("阅读页", "点击屏幕中央显示工具栏"): "工具栏显示",
-            ("阅读页", "点击笔记按钮"): "笔记按钮",
-            ("阅读页", "点击字体设置按钮"): "字体设置",
-            ("阅读页", "拖拽进度条跳转章节"): "进度条",
-            ("阅读页", "点击退出按钮"): "退出保护",
-            ("笔记编辑页", "点击保存按钮"): "保存操作",
-            ("笔记编辑页", "关联书摘"): "关联书摘",
-            ("笔记编辑页", "选择标签"): "标签选择",
-            ("笔记编辑页", "输入笔记内容"): "输入笔记",
-            ("笔记编辑页", "点击取消按钮"): "取消操作",
-            ("书籍详情页", "点击加入书架按钮"): "加入书架按钮",
-            ("书籍详情页", "展开章节目录"): "章节目录",
-            ("书籍详情页", "展开书籍简介"): "书籍简介",
-            ("书籍详情页", "点击相关推荐书籍"): "相关推荐",
-            ("书籍详情页", "点击返回按钮"): "返回导航",
-            ("书架页", "切换网格/列表视图"): "书籍列表",
-            ("书架页", "点击分类Tab筛选"): "分类筛选",
-            ("书架页", "点击搜索图标"): "搜索入口",
-            ("书架页", "长按书籍进入编辑模式"): "编辑操作",
-        }
-        spec_order = (
-            [
-                ("首页", item)
-                for item in ("功能入口区", "Banner轮播", "最近阅读", "底部导航", "搜索入口")
-            ]
-            + [
-                ("阅读页", item)
-                for item in ("翻页手势", "工具栏显示", "笔记按钮", "字体设置", "进度条", "退出保护")
-            ]
-            + [
-                ("笔记编辑页", item)
-                for item in ("保存操作", "关联书摘", "标签选择", "输入笔记", "取消操作")
-            ]
-            + [
-                ("书籍详情页", item)
-                for item in (
-                    "封面展示区",
-                    "加入书架按钮",
-                    "章节目录",
-                    "书籍简介",
-                    "相关推荐",
-                    "返回导航",
-                )
-            ]
-            + [
-                ("书架页", item)
-                for item in ("书籍列表", "书籍卡片", "分类筛选", "搜索入口", "编辑操作", "空状态")
-            ]
+        sources = self._ux_source_inputs(catalog, spec)
+        source_refs = tuple(source.file_ref for source in sources)
+        original_bytes = {source.file_ref: source.content for source in sources}
+        try:
+            build = build_ux_prioritization(sources)
+        except UXPrioritizationValidationError as exc:
+            raise ScenarioEffectError(
+                f"TC-15 来源、规则或成果合同失败：{exc.code}：{exc.detail}"
+            ) from exc
+        source_unchanged = all(
+            catalog.checked_input_bytes(file_ref) == content
+            for file_ref, content in original_bytes.items()
         )
-        order_index = {key: index for index, key in enumerate(spec_order)}
-        grouped: dict[tuple[str, str, str], list[str]] = defaultdict(list)
-        operation_for_group: dict[tuple[str, str, str], str] = {}
-        for row in records:
-            pain = row["痛点类型"]
-            if pain not in severity:
-                continue
-            key = (row["页面名称"], element_map[(row["页面名称"], row["操作动作"])], pain)
-            if row["失败原因"] and row["失败原因"] not in grouped[key]:
-                grouped[key].append(row["失败原因"])
-            operation_for_group[key] = row["操作动作"]
-        suggestions = {
-            "操作卡顿": "按页面规范设定耗时门，拆分主线程阻塞并补充性能回归。",
-            "渲染失败": "增加资源降级与错误占位，限制峰值内存并补充崩溃回归。",
-            "反馈迟钝": "点击后立即反馈状态，异步完成再更新结果并防止重复提交。",
-            "操作失败": "补齐状态校验、失败提示与可重试回执，确保结果与视图一致。",
-            "跳转失败": "统一路由目标和参数校验，为目标页面增加加载失败恢复。",
-            "排版错乱": "使用稳定布局约束和动态文字适配，在目标机型做视觉回归。",
-            "视觉抖动": "固定布局尺寸并减少重复重排，以帧率和位移作为回归门。",
-            "文案截断": "按规范调整换行与省略策略，并覆盖小屏和长文本。",
-            "动效缺失": "补齐规范规定的状态过渡，同时尊重减少动态效果设置。",
-        }
-        output_rows: list[list[str]] = []
-        priority_order = {f"P{index}": index for index in range(5)}
-        for (page, element, pain), reasons in grouped.items():
-            operation = operation_for_group[(page, element, pain)]
-            ratio = scenario_counts[(page, operation)] / total
-            frequency = "高频" if ratio >= 0.05 else "中频" if ratio >= 0.03 else "低频"
-            priority = priority_matrix[(frequency, severity[pain])]
-            analysis = (
-                f"{page}“{operation}”出现 {scenario_counts[(page, operation)]} 次，占 {ratio:.1%}，为{frequency}；"
-                + "；".join(reasons)
+        checks = tuple(
+            self._check(item.check_id, item.label, item.passed, item.detail)
+            for item in build.checks
+        ) + (
+            self._check(
+                "check-ux-original-sources-read-only-v2",
+                "uiux-021 三份原始资料保持只读",
+                source_unchanged,
+                "生成后重新读取冻结 Catalog 字节；只写隔离 Run Workspace，不修改日志、规则或页面规范。",
+            ),
+        )
+        outcome = build.analysis.outcome
+        ready = all(check.passed for check in checks)
+        review_guidance = (
+            (
+                f"请 UX 负责人复核 {len(outcome.rule_conflicts)} 组规则冲突、"
+                f"{outcome.duplicate_group_count} 个重复事件组、{len(outcome.mappings)} 个映射假设，"
+                "并补充批准的具体优化方案与效果指标。当前没有修改界面、发布或创建实验。"
             )
-            output_rows.append([page, element, pain, priority, analysis, suggestions[pain]])
-        output_rows.sort(
-            key=lambda row: (
-                priority_order[row[3]],
-                order_index[(row[0], row[1])],
-                pain_order[row[2]],
+            if ready
+            else (
+                "当前来源重算或两份 CSV 复核失败，排序结果不得用于排期。"
+                "请查看失败检查，修复后创建新的 TC-15 Run。"
             )
         )
-        headers = ["页面名称", "交互元素", "痛点类型", "优先级", "痛点分析", "优化建议"]
-        content = self._csv_bytes(headers, output_rows)
-        parsed_headers, parsed_rows = self._parse_csv(content)
-        checks = (
-            self._check(
-                "check-ux-headers",
-                "表头顺序",
-                parsed_headers == headers,
-                "六列表头与任务合同完全一致。",
+        common_kwargs: dict[str, Any] = {
+            "source_file_refs": source_refs,
+            "validator_id": "validator-ux-pain-prioritization-v2",
+            "checks": checks,
+            "covered_period": "uiux-021 固定公开离线日志；不代表线上时间窗或真实用户总体",
+            "statistic_basis": (
+                f"完整读取 {outcome.source_row_count} 行，以全部操作为分母；"
+                "按来源严重度、频次与 P0-P4 矩阵计算，不使用 120 行安全 Preview。"
             ),
-            self._check(
-                "check-ux-coverage",
-                "痛点聚合完整",
-                len(parsed_rows) == len(grouped),
-                f"{len(grouped)} 个页面、元素、痛点组合均有一行。",
+            "purpose": "供 UX 负责人复核公开日志排序、映射假设和来源冲突，不作用户研究或生产修改。",
+            "review_guidance": review_guidance,
+            "execution_summary": (
+                f"服务端只读解析三份 uiux-021 来源，覆盖 {outcome.analyzed_row_count}/"
+                f"{outcome.source_row_count} 行并生成两份 CSV；原件和生产系统均未修改。"
             ),
-            self._check(
-                "check-ux-priority",
-                "P0-P4 计算",
-                all(row[3] in priority_order for row in parsed_rows),
-                "频次和严重度矩阵逐项计算。",
-            ),
-            self._check(
-                "check-ux-order",
-                "三级排序",
-                parsed_rows
-                == sorted(
-                    parsed_rows,
-                    key=lambda row: (
-                        priority_order[row[3]],
-                        order_index[(row[0], row[1])],
-                        pain_order[row[2]],
-                    ),
-                ),
-                "先优先级、再页面规范元素顺序、最后痛点类型顺序。",
-            ),
-            self._check(
-                "check-ux-reasons",
-                "失败原因可复查",
-                all("出现 " in row[4] and "占 " in row[4] for row in parsed_rows),
-                "每行保留次数、占比和失败原因。",
-            ),
-            self._check(
-                "check-ux-no-apply",
-                "建议未自动应用",
-                True,
-                "只生成运行工作区 CSV，不修改产品界面。",
-            ),
+            "ux_prioritization_outcome": outcome,
+        }
+        priority_text = "/".join(
+            f"{label}={outcome.priority_counts.get(label, 0)}"
+            for label in ("P0", "P1", "P2", "P3", "P4")
         )
         return (
             GeneratedOfficeArtifact(
-                "交互规范优化方案",
-                "交互规范优化方案.csv",
-                "text/csv",
-                content,
-                source_refs,
-                "validator-ux-pain-prioritization-v1",
-                checks,
-                f"{len(output_rows)} 条交互痛点已按 P0-P4、页面元素和痛点类型排序。",
+                title="交互痛点全量优先级台账",
+                file_name="交互规范优化方案.csv",
+                media_type="text/csv",
+                content=build.group_csv,
+                summary=(
+                    f"完整日志形成 {outcome.group_count} 个可排序组合，{priority_text}；"
+                    "具体优化方案仍待 UX 负责人批准。"
+                ),
+                deliverable_type="来源推导的聚合优先级 CSV",
+                key_outputs=(
+                    f"完整分母 {outcome.source_row_count} 行",
+                    f"痛点组合 {outcome.group_count} 个",
+                    priority_text,
+                    f"未覆盖规范元素 {outcome.uncovered_spec_count} 个",
+                ),
+                key_outputs_label="全量排序与来源边界",
+                record_count=outcome.group_count,
+                **common_kwargs,
+            ),
+            GeneratedOfficeArtifact(
+                title="交互行为逐行归因台账",
+                file_name="交互行为逐行归因台账.csv",
+                media_type="text/csv",
+                content=build.row_ledger_csv,
+                summary=(
+                    f"{outcome.analyzed_row_count}/{outcome.source_row_count} 行均有 included、"
+                    "excluded 或 manual_review 裁决；重复事件保留且未自动去重。"
+                ),
+                deliverable_type="逐原始行可复算 CSV 台账",
+                key_outputs=(
+                    f"有痛点 {outcome.included_pain_row_count} 行",
+                    f"无痛点 {outcome.excluded_no_pain_count} 行",
+                    f"成功但有痛点 {outcome.success_with_pain_count} 行",
+                    f"重复组 {outcome.duplicate_group_count} 个 / 额外重复事件 {outcome.duplicate_extra_count} 条",
+                ),
+                key_outputs_label="逐行覆盖与数据质量",
+                record_count=outcome.source_row_count,
+                **common_kwargs,
             ),
         )
 
@@ -3204,6 +3143,52 @@ class ScenarioEffectEngine:
             file_ref = str(item.get("file_ref"))
             result.append(
                 CustomerSourceInput(
+                    logical_id=logical_ids[label],
+                    file_name=label,
+                    display_path=str(item.get("display_path")),
+                    file_ref=file_ref,
+                    content=catalog.checked_input_bytes(file_ref),
+                    declared_size=int(item.get("size") or 0),
+                    allowlist_verified=True,
+                )
+            )
+        return tuple(result)
+
+    @staticmethod
+    def _ux_source_inputs(
+        catalog: ScenarioEffectCatalog, spec: ScenarioEffectSpec
+    ) -> tuple[UXSourceInput, ...]:
+        workspace = catalog.public_workspace()
+        folders = [
+            folder
+            for folder in workspace.get("folders") or []
+            if folder.get("display_label") == "用户体验"
+        ]
+        if len(folders) != 1:
+            raise ScenarioEffectError("uiux-021 用户体验目录必须唯一")
+        items = list(folders[0].get("files") or [])
+        expected_labels = [label for group, label in spec.source_labels if group == "用户体验"]
+        if len(items) != 3 or sorted(str(item.get("display_label")) for item in items) != sorted(
+            expected_labels
+        ):
+            raise ScenarioEffectError("uiux-021 用户体验目录必须恰好包含日志、规则和页面规范")
+        by_label: dict[str, dict[str, Any]] = {}
+        for item in items:
+            label = str(item.get("display_label"))
+            if label in by_label:
+                raise ScenarioEffectError(f"uiux-021 来源逻辑名称重复：{label}")
+            by_label[label] = item
+        logical_ids = {
+            "用户交互行为日志.xlsx": UX_BEHAVIOR_LOGICAL_ID,
+            "交互行为痛点及优化规则.md": UX_RULES_LOGICAL_ID,
+            "页面级交互规范.docx": UX_SPEC_LOGICAL_ID,
+        }
+        result: list[UXSourceInput] = []
+        for label in expected_labels:
+            item = by_label[label]
+            file_ref = str(item.get("file_ref"))
+            result.append(
+                UXSourceInput(
                     logical_id=logical_ids[label],
                     file_name=label,
                     display_path=str(item.get("display_path")),

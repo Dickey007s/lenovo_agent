@@ -449,6 +449,17 @@ and CSV are independently reparsed against a fresh source derivation, and
 This architecture proves an offline review file, not an online monitor,
 root-cause oracle, Elasticsearch Connector or durable production change.
 
+DR-0051 applies full-source derivation to the fixed uiux-021 adapter. Exactly
+one approved workbook, rule Markdown and page-specification DOCX are frozen.
+The service parses every XLSX row rather than the bounded Preview, derives the
+severity/frequency/priority ledger and page specs, and preserves duplicate-event,
+3% boundary and controlled mapping assumptions. Each group retains the exact
+content-addressed source rules and locators used; a boundary group keeps both
+frequency sides and no priority rule. Both generated CSVs are independently
+reparsed against a fresh source derivation. `ux_prioritization_outcome` is stored
+on both Artifacts and the EffectReceipt. This is not user research, online
+telemetry, an approved solution, an experiment runner or a production UI writer.
+
 ## 7. Eight module maturity
 
 | Module | Current implementation | Missing target work |

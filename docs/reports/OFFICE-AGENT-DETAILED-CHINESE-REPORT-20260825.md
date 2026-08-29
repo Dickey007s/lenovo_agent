@@ -913,7 +913,31 @@ observations、source_conflicts、hypotheses、action_proposals、business_mitig
 Connector、命令执行器或生产变更审批。代码、测试和演示都不连接 Elasticsearch，不执行生成的
 ES/curl/Invoke-WebRequest/http 命令；自动化与截图也不证明 SRE 用户理解或现场安全。
 
-### 5.9 外部 SQL 或定时 Web 任务的能力阻断
+### 5.9 完整交互日志排序、逐组规则依据与方案待批
+
+**触发：** UX 负责人希望结合交互日志、痛点规则和页面规范决定先看哪些问题，同时要求能够回到具体来源行并理解每组“为何这样分级”。
+
+**历史负例：** 旧实现把前台 bounded Preview 当成完整来源。批准 XLSX 有 212 个数据行，Preview 只有 120 行；旧成果的 66 组恰好等于前 120 行的有效组合，漏掉后 92 行新增的 21 组。66 个重叠组中还有 22 个因完整分母/计数变化而改变频次，例如“点击保存按钮”从 5/120 的中频变为 11/212 的高频。旧 6/6 仍全部绿色，因此“文件生成了”和“覆盖了完整来源”曾被错误混在一起。
+
+**Agent 路径：** Planner/Analyst 继续负责整库选证据和可审查分析。固定 TC-15 效果门另行冻结 uiux-021 的完整 XLSX、规则 Markdown 和页面规范 DOCX。服务端逐行解析 212 条操作，保留 locator、结果、痛点、误触、退出、重试和重复事件；从规则来源解析严重度、全量分母、3%/5% 档位和 3×3 优先级矩阵；从 DOCX 解析 5 个页面和 28 个规范元素。最终两份 CSV 被重新解析并与新鲜来源推导逐字段核对。
+
+**当前来源事实：** 当前来源动态得到 161 行有痛点、51 行无痛点但仍计入全量分母、55 行“成功但有痛点”；192 个唯一完整载荷、16 个重复组和 20 条额外重复事件。固定适配器不擅自去重。87 个 page×operation×pain 组合的当前分布是 P0/P1/P2/P3/P4=25/40/14/6/2；这些只是当前来源观测，不是生产 success 常量。
+
+**“为何这样分级”：** 每组保存真正采用的严重度、频率和优先级来源规则。规则 ID 由语义槽位和批准摘录/参数的短哈希组成，所以阈值、矩阵或严重度变化时引用随结论一起变化；locator 仍可读。当前规则对 3% 同时使用闭区间和开区间，系统将其保留为 source conflict。未来恰好 3% 的组同时列出两侧 frequency refs，并明确未应用 priority ref，而不是猜一个答案。
+
+**映射和建议边界：** 来源没有批准“操作动作到规范元素”的 crosswalk，24 个当前映射均显示为 `controlled_adapter_assumption/review_required`，4 个规范元素暂未覆盖。来源也没有批准“拆主线程”等具体方案，因此成果只显示来源矩阵处置、对应规范和待 UX 负责人补充/批准的模板，`suggestion_status=no_approved_solution_source`。
+
+**前台输出与交互影响：** 第一屏先说明“这是固定公开日志的离线排序，不是用户研究、线上遥测、设计效果证明或自动修复”，随后分四层显示：三份来源和两份 CSV 的确定性验证；212/212 行覆盖、重复和 3% 冲突；P0-P4 组合、contributors 与逐组 rule refs；方案、生产 UI、发布和实验全部未发生。用户不必从全局规则清单自己推断某组结论。
+
+**交互研究依据：** Microsoft Research 的 *Guidelines for Human-AI Interaction* 支持说明能力边界、展示上下文并允许纠正；Google HEART 支持把行为信号映射到产品目标和指标，也提醒单一离线频次不能证明体验改善；W3C Status Messages 与 Target Size 只用于动态状态可感知和移动端操作目标参考。这些研究/官方页面不批准 uiux-021 的具体排序或方案，也不能替代真实用户研究。
+
+**后端事实：** `ux_prioritization_outcome` 同时保存在两份 Artifact 与 EffectReceipt，包含逐行裁决、动态组合和分布、规则/规范/映射、每组 content-addressed `rule_refs`、重复事实、source conflict、人工决定和 `external_action=none`。模型采用、Artifact Effect、Run 状态和生产动作仍是四类事实。
+
+**证据来源：** `USER-FEEDBACK-20260829-TC15-SOURCE-DERIVED-UX-PRIORITIZATION`、`DR-0051`、`SCENARIO-036`、固定 FORTE revision，以及 Microsoft HAI Guidelines、Google HEART、W3C Status Messages/Target Size 的限定用途。旧 66 组/6 项 Evidence 作为 false-green 基线保留。
+
+**当前边界：** 当前只是固定 uiux-021 的离线优先级适配器，不是用户研究、线上遥测、通用产品分析、设计效果验证、自动修改 UI、A/B 实验或生产发布。自动化与截图不能证明真实 UX 用户理解或方案有效。
+
+### 5.10 外部 SQL 或定时 Web 任务的能力阻断
 
 **触发：** 用户希望分析远程 Datasette，或设置周期 Web 搜索并追加文件；对应公开任务目录
 只有 provenance，没有本地 `input/`。

@@ -261,6 +261,18 @@ support/counter evidence, risk, unresolved target, preconditions, rollback,
 verification and official API semantics. Expansion is read-only, calls no
 model and never executes a command.
 
+DR-0051 gives TC-15 a four-layer prioritization projection. The first screen
+states that the output is a full-workbook offline sort of fixed public logs,
+not user research, online telemetry, design-effect proof or automatic repair.
+It then separates deterministic source/two-CSV verification; complete row
+coverage plus duplicate/mapping/conflict facts; P0-P4 groups and contributors;
+and the explicit fact that concrete solutions, production UI changes, releases
+and experiments did not occur. Opening a group reveals the service-owned
+severity, frequency and priority rule IDs/locators actually used. Boundary
+groups expose both conflicting frequency refs and no priority ref. These panels
+render `ux_prioritization_outcome`, do not parse source files or spend model
+budget, and keep long locators readable at 1440 px and 390 px.
+
 Open human decisions are authoritative in the Snapshot-level
 `decision_requests[]`; round-level copies are compatibility projections only.
 Closing or pressing Escape exits the review surface before the browser attempts a

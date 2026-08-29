@@ -21,13 +21,58 @@ from xml.etree import ElementTree
 
 import httpx
 
+from services.api.app.application.benchmark_workspace_catalog import (
+    BenchmarkWorkspaceCatalog,
+)
 from services.api.app.application.scenario_effects import SCENARIO_EFFECT_SPECS
+from services.api.app.application.scenario_effects import ScenarioEffectEngine
+from services.api.app.application.ux_prioritization_effect import (
+    analyze_ux_sources,
+    verify_ux_artifacts,
+)
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 FORTE_ROOT = REPO_ROOT / "demo-enterprise-data" / "forte"
 DEFAULT_SCENARIOS = ("TC-01", "TC-05", "TC-10", "TC-13", "TC-14", "TC-15")
 SETTLED_STATUSES = {"waiting_input", "ready_to_execute", "completed", "stopped", "failed"}
+
+
+def _tc15_csv_content_gate(contents: dict[str, bytes]) -> dict[str, Any]:
+    expected_names = {"交互规范优化方案.csv", "交互行为逐行归因台账.csv"}
+    if set(contents) != expected_names:
+        return {
+            "passed": False,
+            "expected_files": sorted(expected_names),
+            "actual_files": sorted(contents),
+            "failure": "下载物不等于 TC-15 两份批准成果。",
+        }
+    catalog = BenchmarkWorkspaceCatalog(FORTE_ROOT)
+    spec = next(item for item in SCENARIO_EFFECT_SPECS if item.scenario_id == "TC-15")
+    sources = ScenarioEffectEngine._ux_source_inputs(catalog, spec)
+    checks = verify_ux_artifacts(
+        sources,
+        group_csv=contents["交互规范优化方案.csv"],
+        row_ledger_csv=contents["交互行为逐行归因台账.csv"],
+    )
+    outcome = analyze_ux_sources(sources).outcome
+    return {
+        "passed": all(item.passed for item in checks),
+        "source_row_count": outcome.source_row_count,
+        "analyzed_row_count": outcome.analyzed_row_count,
+        "group_count": outcome.group_count,
+        "priority_counts": outcome.priority_counts,
+        "duplicate_group_count": outcome.duplicate_group_count,
+        "duplicate_extra_count": outcome.duplicate_extra_count,
+        "rule_conflict_count": len(outcome.rule_conflicts),
+        "mapping_assumption_count": len(outcome.mappings),
+        "check_count": len(checks),
+        "failed_checks": [item.check_id for item in checks if not item.passed],
+        "boundary": (
+            "下载后重新读取三份批准来源并独立解析两份 CSV；通过仅证明固定 uiux-021 "
+            "来源、排序和成果结构一致，不证明用户研究、优化效果或生产修改。"
+        ),
+    }
 
 
 def _tc02_zip_content_gate(content: bytes) -> dict[str, Any]:
@@ -822,6 +867,7 @@ def _download_artifacts(
     artifacts: list[dict[str, Any]],
 ) -> list[dict[str, Any]]:
     downloads: list[dict[str, Any]] = []
+    tc15_contents: dict[str, bytes] = {}
     for artifact in artifacts:
         response = client.get(
             f"{api_base}/v1/harness/runs/{run_id}/artifacts/{artifact['artifact_id']}"
@@ -847,6 +893,8 @@ def _download_artifacts(
             and artifact.get("media_type") == "application/zip"
         ):
             content_gate = _tc12_zip_content_gate(response.content)
+        elif response.status_code == 200 and artifact.get("scenario_id") == "TC-15":
+            tc15_contents[str(artifact.get("file_name") or "")] = response.content
         downloads.append(
             {
                 "artifact_id": artifact["artifact_id"],
@@ -861,6 +909,11 @@ def _download_artifacts(
                 "content_gate": content_gate,
             }
         )
+    if tc15_contents:
+        paired_gate = _tc15_csv_content_gate(tc15_contents)
+        for item in downloads:
+            if item["file_name"] in tc15_contents:
+                item["content_gate"] = paired_gate
     return downloads
 
 
@@ -875,14 +928,15 @@ def _run_one(
 ) -> dict[str, Any]:
     spec = next(item for item in SCENARIO_EFFECT_SPECS if item.scenario_id == scenario_id)
     started_at = datetime.now(timezone.utc)
+    start_idempotency_key: str | None = None
     if existing_run_id is None:
-        idempotency_key = (
+        start_idempotency_key = (
             f"scenario-effect-live-{scenario_id.lower()}-{uuid.uuid4().hex}"
         )
         response = client.post(
             f"{api_base}/v1/harness/runs",
             json={
-                "idempotency_key": idempotency_key,
+                "idempotency_key": start_idempotency_key,
                 "instruction": spec.instruction,
                 "loop": {
                     "max_rounds": 12,
@@ -1056,6 +1110,7 @@ def _run_one(
         "title": spec.title,
         "instruction": spec.instruction,
         "run_id": run_id,
+        "start_idempotency_key": start_idempotency_key,
         "started_at": started_at.isoformat(),
         "observed_at": datetime.now(timezone.utc).isoformat(),
         "run_status": snapshot.get("status"),
@@ -1105,6 +1160,7 @@ def _run_one(
                 "review_guidance": item.get("review_guidance"),
                 "execution_summary": item.get("execution_summary"),
                 "outbound_flow_outcome": item.get("outbound_flow_outcome"),
+                "ux_prioritization_outcome": item.get("ux_prioritization_outcome"),
                 "self_test": item.get("self_test"),
                 "external_action": item.get("external_action"),
                 "original_inputs_modified": item.get("original_inputs_modified"),
