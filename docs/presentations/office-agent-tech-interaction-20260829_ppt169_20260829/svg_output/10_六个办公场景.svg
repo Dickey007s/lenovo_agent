@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720" width="1280" height="720">
+  <g id="background"><rect width="1280" height="720" fill="#F7F8FA"/><path d="M52 112H1228" stroke="#CBD5DF" stroke-width="2"/></g>
+  <g id="header">
+    <text x="52" y="78" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="46" font-weight="700" fill="#132A3A">六个办公场景，共用同一条治理主线</text>
+    <rect x="1084" y="46" width="144" height="34" rx="6" fill="#EDF1F4"/><text x="1156" y="69" text-anchor="middle" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#1769E0">场景地图</text>
+  </g>
+  <g id="scenario-list">
+    <path d="M78 158V594" stroke="#CBD5DF" stroke-width="4"/>
+    <circle cx="78" cy="190" r="22" fill="#1769E0"/><text x="78" y="197" text-anchor="middle" font-family="Consolas, &quot;Courier New&quot;, monospace" font-size="17" font-weight="700" fill="#FFFFFF">1</text>
+    <text x="118" y="184" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="24" font-weight="700" fill="#132A3A">TC-01 入职资产匹配</text>
+    <text x="118" y="212" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#5A6B7C">产物：资产匹配表　人工门：业务规则复核　边界：引用定位问题不等于成果失败</text>
+    <circle cx="78" cy="270" r="22" fill="#1769E0"/><text x="78" y="277" text-anchor="middle" font-family="Consolas, &quot;Courier New&quot;, monospace" font-size="17" font-weight="700" fill="#FFFFFF">2</text>
+    <text x="118" y="264" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="24" font-weight="700" fill="#132A3A">TC-05 三期往来款</text>
+    <text x="118" y="292" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#5A6B7C">产物：未收/未付统计　人工门：僵尸账款判断　边界：不核销、不记账</text>
+    <circle cx="78" cy="350" r="22" fill="#D97706"/><text x="78" y="357" text-anchor="middle" font-family="Consolas, &quot;Courier New&quot;, monospace" font-size="17" font-weight="700" fill="#FFFFFF">3</text>
+    <text x="118" y="344" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="24" font-weight="700" fill="#132A3A">TC-06 双岗位招聘筛选</text>
+    <text x="118" y="372" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#5A6B7C">产物：候选建议与依据　人工门：招聘负责人决定　边界：未录用、未淘汰</text>
+    <circle cx="78" cy="430" r="22" fill="#D97706"/><text x="78" y="437" text-anchor="middle" font-family="Consolas, &quot;Courier New&quot;, monospace" font-size="17" font-weight="700" fill="#FFFFFF">4</text>
+    <text x="118" y="424" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="24" font-weight="700" fill="#132A3A">TC-07 授权文件风控</text>
+    <text x="118" y="452" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#5A6B7C">产物：规则台账与风险候选　人工门：法务复核　边界：不代表法律意见</text>
+    <circle cx="78" cy="510" r="22" fill="#2E7D32"/><text x="78" y="517" text-anchor="middle" font-family="Consolas, &quot;Courier New&quot;, monospace" font-size="17" font-weight="700" fill="#FFFFFF">5</text>
+    <text x="118" y="504" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="24" font-weight="700" fill="#132A3A">TC-10 合规外呼流程</text>
+    <text x="118" y="532" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#5A6B7C">产物：流程图与 DOCX　人工门：执行批准　边界：不拨号、不写 CRM、不发短信</text>
+    <circle cx="78" cy="590" r="22" fill="#2E7D32"/><text x="78" y="597" text-anchor="middle" font-family="Consolas, &quot;Courier New&quot;, monospace" font-size="17" font-weight="700" fill="#FFFFFF">6</text>
+    <text x="118" y="584" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="24" font-weight="700" fill="#132A3A">TC-14 / TC-15 冲突诊断与说明对账</text>
+    <text x="118" y="612" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#5A6B7C">产物：条件式提案 / 排序成果　人工门：复核权威顺序　边界：不静默覆盖冲突</text>
+  </g>
+  <g id="governance-thread">
+    <rect x="928" y="158" width="300" height="454" rx="6" fill="#132A3A"/>
+    <text x="958" y="204" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="28" font-weight="700" fill="#FFFFFF">同一治理主线</text>
+    <text x="958" y="258" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="24" font-weight="700" fill="#FFFFFF">1 触发</text><text x="958" y="286" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#CBD5DF">用户只说业务目标</text>
+    <text x="958" y="336" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="24" font-weight="700" fill="#FFFFFF">2 路径</text><text x="958" y="364" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#CBD5DF">来源、计划、成果、验证</text>
+    <text x="958" y="414" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="24" font-weight="700" fill="#FFFFFF">3 停顿</text><text x="958" y="442" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#CBD5DF">只暂停受影响部分</text>
+    <text x="958" y="492" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="24" font-weight="700" fill="#FFFFFF">4 输出</text><text x="958" y="520" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#CBD5DF">成果、依据、决定、边界</text>
+    <text x="958" y="570" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="17" font-weight="700" fill="#FFFFFF">每个场景都可被反证</text>
+  </g>
+  <g id="footer">
+    <text x="52" y="690" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="14" fill="#7C8A98">场景设计依据：Microsoft HAI Guidelines · W3C PROV-O · OpenAI Agents SDK Human-in-the-loop</text>
+    <text x="1228" y="690" text-anchor="end" font-family="Consolas, &quot;Courier New&quot;, monospace" font-size="14" fill="#7C8A98">10 / 17</text>
+  </g>
+</svg>

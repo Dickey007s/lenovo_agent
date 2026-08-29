@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720" width="1280" height="720">
+  <g id="background"><rect width="1280" height="720" fill="#F7F8FA" /><path d="M52 112H1228" stroke="#CBD5DF" stroke-width="2" /></g>
+  <g id="header">
+    <text x="52" y="78" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="46" font-weight="700" fill="#132A3A">前台交互只需要先回答五个问题</text>
+    <path fill="#EDF1F4" d="M1090,46 H1222 A6,6 0 0 1 1228,52 V74 A6,6 0 0 1 1222,80 H1090 A6,6 0 0 1 1084,74 V52 A6,6 0 0 1 1090,46 Z" /><text x="1156" y="69" text-anchor="middle" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#1769E0">界面与体验</text>
+  </g>
+  <g id="five-questions">
+    <path fill="#FFFFFF" stroke="#CBD5DF" stroke-width="2" d="M58,148 H706 A6,6 0 0 1 712,154 V590 A6,6 0 0 1 706,596 H58 A6,6 0 0 1 52,590 V154 A6,6 0 0 1 58,148 Z" />
+    <text x="80" y="190" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="28" font-weight="700" fill="#132A3A">业务用户的阅读顺序</text>
+    <circle cx="92" cy="236" r="20" fill="#1769E0" /><text x="92" y="243" text-anchor="middle" font-family="Consolas, &quot;Courier New&quot;, monospace" font-size="17" font-weight="700" fill="#FFFFFF">1</text>
+    <text x="130" y="244" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="24" font-weight="700" fill="#132A3A">现在完成了什么？</text><text x="390" y="244" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#5A6B7C">成果文件与确定性检查置顶</text>
+    <circle cx="92" cy="306" r="20" fill="#1769E0" /><text x="92" y="313" text-anchor="middle" font-family="Consolas, &quot;Courier New&quot;, monospace" font-size="17" font-weight="700" fill="#FFFFFF">2</text>
+    <text x="130" y="314" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="24" font-weight="700" fill="#132A3A">依据是什么？</text><text x="390" y="314" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#5A6B7C">文件、原文位置与摘录可回开</text>
+    <circle cx="92" cy="376" r="20" fill="#D97706" /><text x="92" y="383" text-anchor="middle" font-family="Consolas, &quot;Courier New&quot;, monospace" font-size="17" font-weight="700" fill="#FFFFFF">3</text>
+    <text x="130" y="384" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="24" font-weight="700" fill="#132A3A">为什么停？</text><text x="390" y="384" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#5A6B7C">说明问题、影响范围和可选动作</text>
+    <circle cx="92" cy="446" r="20" fill="#D97706" /><text x="92" y="453" text-anchor="middle" font-family="Consolas, &quot;Courier New&quot;, monospace" font-size="17" font-weight="700" fill="#FFFFFF">4</text>
+    <text x="130" y="454" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="24" font-weight="700" fill="#132A3A">我确认后会改变什么？</text><text x="442" y="454" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#5A6B7C">只恢复哪条 Branch</text>
+    <circle cx="92" cy="516" r="20" fill="#2E7D32" /><text x="92" y="523" text-anchor="middle" font-family="Consolas, &quot;Courier New&quot;, monospace" font-size="17" font-weight="700" fill="#FFFFFF">5</text>
+    <text x="130" y="524" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="24" font-weight="700" fill="#132A3A">什么绝不会发生？</text><text x="390" y="524" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#5A6B7C">未执行边界与外部动作回执</text>
+    <text x="80" y="572" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="14" fill="#7C8A98">技术字段放入二级或审计层，不抢占首屏。</text>
+  </g>
+  <g id="information-layers">
+    <path fill="#132A3A" d="M746,148 H1222 A6,6 0 0 1 1228,154 V590 A6,6 0 0 1 1222,596 H746 A6,6 0 0 1 740,590 V154 A6,6 0 0 1 746,148 Z" />
+    <text x="768" y="190" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="28" font-weight="700" fill="#FFFFFF">三层信息架构</text>
+    <path fill="#FFFFFF" d="M774,220 H1194 A6,6 0 0 1 1200,226 V296 A6,6 0 0 1 1194,302 H774 A6,6 0 0 1 768,296 V226 A6,6 0 0 1 774,220 Z" />
+    <text x="792" y="250" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="24" font-weight="700" fill="#132A3A">首屏：当前结论</text>
+    <text x="792" y="280" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#5A6B7C">成果、复核状态、未执行边界</text>
+    <path fill="#EDF1F4" d="M774,320 H1194 A6,6 0 0 1 1200,326 V396 A6,6 0 0 1 1194,402 H774 A6,6 0 0 1 768,396 V326 A6,6 0 0 1 774,320 Z" />
+    <text x="792" y="350" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="24" font-weight="700" fill="#132A3A">展开：为什么</text>
+    <text x="792" y="380" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#5A6B7C">来源、校验、说明采用、局部决定</text>
+    <path fill="#FFFFFF" fill-opacity="0.08" stroke="#FFFFFF" stroke-opacity="0.25" stroke-width="2" d="M774,420 H1194 A6,6 0 0 1 1200,426 V496 A6,6 0 0 1 1194,502 H774 A6,6 0 0 1 768,496 V426 A6,6 0 0 1 774,420 Z" />
+    <text x="792" y="450" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="24" font-weight="700" fill="#FFFFFF">审计：系统事实</text>
+    <text x="792" y="480" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#CBD5DF">Snapshot、version、SSE、DecisionRecord</text>
+    <path fill="#D97706" d="M774,524 H1194 A6,6 0 0 1 1200,530 V568 A6,6 0 0 1 1194,574 H774 A6,6 0 0 1 768,568 V530 A6,6 0 0 1 774,524 Z" />
+    <text x="984" y="556" text-anchor="middle" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="17" font-weight="700" fill="#FFFFFF">目标：少解释概念，多解释下一步</text>
+  </g>
+  <g id="research-gate">
+    <text x="52" y="634" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="24" font-weight="700" fill="#132A3A">仍需用户研究验证：</text>
+    <text x="286" y="634" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#5A6B7C">能否无引导说出当前结果、来源、影响、下一步；并用 HEART 度量理解与负担。</text>
+  </g>
+  <g id="footer">
+    <text x="52" y="690" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="14" fill="#7C8A98">用户研究依据：Microsoft HAI Guidelines · W3C Status Messages / Target Size · Google HEART</text>
+    <text x="1228" y="690" text-anchor="end" font-family="Consolas, &quot;Courier New&quot;, monospace" font-size="14" fill="#7C8A98">16 / 17</text>
+  </g>
+</svg>

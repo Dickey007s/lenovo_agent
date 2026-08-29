@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720" width="1280" height="720">
+  <g id="background"><rect width="1280" height="720" fill="#F7F8FA"/><path d="M52 112H1228" stroke="#CBD5DF" stroke-width="2"/></g>
+  <g id="header">
+    <text x="52" y="78" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="46" font-weight="700" fill="#132A3A">Agent Control Loop：当前实现与缺口</text>
+    <rect x="1088" y="46" width="140" height="34" rx="6" fill="#EDF1F4"/><text x="1158" y="69" text-anchor="middle" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#1769E0">07-16 P11</text>
+  </g>
+  <g id="legend">
+    <rect x="52" y="136" width="108" height="30" rx="6" fill="#1769E0"/><text x="106" y="157" text-anchor="middle" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="14" fill="#FFFFFF">当前真实实现</text>
+    <rect x="172" y="136" width="108" height="30" rx="6" fill="#D97706"/><text x="226" y="157" text-anchor="middle" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="14" fill="#FFFFFF">部分近似</text>
+    <rect x="292" y="136" width="108" height="30" rx="6" fill="#7C8A98"/><text x="346" y="157" text-anchor="middle" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="14" fill="#FFFFFF">尚未实现</text>
+  </g>
+  <g id="loop-stages">
+    <path d="M126 278H1030" stroke="#CBD5DF" stroke-width="4"/>
+    <circle cx="182" cy="278" r="54" fill="#1769E0"/><use data-icon="tabler-outline/eye" x="162" y="244" width="40" height="40" fill="#FFFFFF" stroke-width="2"/><text x="182" y="316" text-anchor="middle" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="17" font-weight="700" fill="#FFFFFF">Observe</text>
+    <circle cx="382" cy="278" r="54" fill="#1769E0"/><use data-icon="tabler-outline/route" x="362" y="244" width="40" height="40" fill="#FFFFFF" stroke-width="2"/><text x="382" y="316" text-anchor="middle" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="17" font-weight="700" fill="#FFFFFF">Plan</text>
+    <circle cx="582" cy="278" r="54" fill="#D97706"/><use data-icon="tabler-outline/plug" x="562" y="244" width="40" height="40" fill="#FFFFFF" stroke-width="2"/><text x="582" y="316" text-anchor="middle" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="17" font-weight="700" fill="#FFFFFF">Act</text>
+    <circle cx="782" cy="278" r="54" fill="#D97706"/><use data-icon="tabler-outline/shield-check" x="762" y="244" width="40" height="40" fill="#FFFFFF" stroke-width="2"/><text x="782" y="316" text-anchor="middle" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="17" font-weight="700" fill="#FFFFFF">Verify</text>
+    <circle cx="982" cy="278" r="54" fill="#D97706"/><use data-icon="tabler-outline/versions" x="962" y="244" width="40" height="40" fill="#FFFFFF" stroke-width="2"/><text x="982" y="316" text-anchor="middle" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="17" font-weight="700" fill="#FFFFFF">Commit</text>
+    <path d="M1036 278H1120V208H182" fill="none" stroke="#D97706" stroke-width="3" stroke-dasharray="8 6"/>
+    <text x="1088" y="252" text-anchor="middle" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="14" fill="#B54708">最多三轮</text>
+  </g>
+  <g id="control-matrix">
+    <rect x="52" y="378" width="1176" height="198" rx="6" fill="#FFFFFF" stroke="#CBD5DF" stroke-width="2"/>
+    <text x="76" y="414" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="24" font-weight="700" fill="#132A3A">外围控制与状态</text>
+    <path d="M76 438H1204M264 438V556M452 438V556M640 438V556M828 438V556M1016 438V556" stroke="#E3E8ED" stroke-width="2"/>
+    <text x="90" y="472" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="17" font-weight="700" fill="#132A3A">Task Contract</text><text x="90" y="508" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="14" fill="#1769E0">当前：目标/范围冻结</text>
+    <text x="278" y="472" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="17" font-weight="700" fill="#132A3A">Evidence Gate</text><text x="278" y="508" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="14" fill="#1769E0">当前：Branch 级门</text>
+    <text x="466" y="472" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="17" font-weight="700" fill="#132A3A">Budget &amp; Stop</text><text x="466" y="508" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="14" fill="#B54708">部分：轮次/调用/期限</text>
+    <text x="654" y="472" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="17" font-weight="700" fill="#132A3A">Steer / Pause</text><text x="654" y="508" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="14" fill="#B54708">部分：安全点；无 Takeover</text>
+    <text x="842" y="472" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="17" font-weight="700" fill="#132A3A">Durable State</text><text x="842" y="508" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="14" fill="#B54708">部分：可选 PG 重启恢复</text>
+    <text x="1030" y="472" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="17" font-weight="700" fill="#132A3A">Trace</text><text x="1030" y="508" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="14" fill="#1769E0">当前：named SSE + Snapshot</text>
+  </g>
+  <g id="boundary">
+    <text x="52" y="620" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="24" font-weight="700" fill="#132A3A">当前本质：</text>
+    <text x="176" y="620" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="24" fill="#5A6B7C">有反馈与恢复的只读办公任务纵切，不是完整执行器。</text>
+    <text x="52" y="650" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="14" fill="#7C8A98">历史“约 30%”只属于早期架构审计基线，不是当前覆盖率或模型质量。</text>
+  </g>
+  <g id="footer">
+    <text x="52" y="690" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="14" fill="#7C8A98">线上运行时参照：LangGraph Persistence · OpenAI Agents SDK Human-in-the-loop · A2A Task States</text>
+    <text x="1228" y="690" text-anchor="end" font-family="Consolas, &quot;Courier New&quot;, monospace" font-size="14" fill="#7C8A98">09 / 17</text>
+  </g>
+</svg>

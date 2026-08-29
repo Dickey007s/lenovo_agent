@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720" width="1280" height="720">
+  <g id="background"><rect width="1280" height="720" fill="#F7F8FA"/><path d="M52 112H1228" stroke="#CBD5DF" stroke-width="2"/></g>
+  <g id="header">
+    <text x="52" y="78" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="46" font-weight="700" fill="#132A3A">TC-10 / TC-14：形成方案，不等于执行动作</text>
+    <rect x="1084" y="46" width="144" height="34" rx="6" fill="#EDF1F4"/><text x="1156" y="69" text-anchor="middle" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#1769E0">动作边界</text>
+  </g>
+  <g id="tc10-ledger">
+    <rect x="52" y="146" width="500" height="460" rx="6" fill="#FFFFFF" stroke="#1769E0" stroke-width="2"/>
+    <use data-icon="tabler-outline/route" x="78" y="172" width="34" height="34" fill="#1769E0" stroke-width="2"/>
+    <text x="128" y="198" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="28" font-weight="700" fill="#132A3A">TC-10 · 合规外呼流程</text>
+    <text x="78" y="242" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="17" font-weight="700" fill="#1769E0">触发</text><text x="140" y="242" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#1B2733">根据材料形成外呼流程与话术规则</text>
+    <text x="78" y="282" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="17" font-weight="700" fill="#1769E0">路径</text><text x="140" y="282" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#1B2733">来源抽取 → 节点/条件 → 流程图 → DOCX</text>
+    <rect x="78" y="320" width="448" height="92" rx="6" fill="#EDF1F4"/>
+    <use data-icon="tabler-outline/circle-check" x="98" y="342" width="26" height="26" fill="#2E7D32" stroke-width="2"/>
+    <text x="140" y="362" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="24" font-weight="700" fill="#2E7D32">已发生</text>
+    <text x="140" y="392" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#5A6B7C">生成流程图与可下载 DOCX，完成结构检查</text>
+    <rect x="78" y="430" width="448" height="116" rx="6" fill="#EDF1F4" stroke="#D97706" stroke-width="2"/>
+    <use data-icon="tabler-outline/alert-triangle" x="98" y="454" width="26" height="26" fill="#D97706" stroke-width="2"/>
+    <text x="140" y="474" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="24" font-weight="700" fill="#B54708">未发生</text>
+    <text x="140" y="506" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#5A6B7C">未拨号、未写 CRM、未发短信</text>
+    <text x="140" y="532" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="14" fill="#7C8A98">没有 Connector receipt，就不能显示“已执行”</text>
+  </g>
+  <g id="tc14-screenshot">
+    <rect x="580" y="146" width="648" height="460" rx="6" fill="#FFFFFF" stroke="#D97706" stroke-width="2"/>
+    <text x="606" y="184" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="28" font-weight="700" fill="#132A3A">TC-14 · SRE 冲突日志诊断</text>
+    <image href="../images/tc14-sre-diagnosis-desktop.png" x="606" y="204" width="596" height="288" preserveAspectRatio="xMidYMid meet"/>
+    <rect x="606" y="510" width="274" height="70" rx="6" fill="#EDF1F4"/>
+    <text x="624" y="538" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="17" font-weight="700" fill="#2E7D32">已发生：条件式诊断</text>
+    <text x="624" y="564" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="14" fill="#5A6B7C">保留支持、反证与止损提案</text>
+    <rect x="898" y="510" width="304" height="70" rx="6" fill="#EDF1F4" stroke="#D97706" stroke-width="2"/>
+    <text x="916" y="538" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="17" font-weight="700" fill="#B54708">未发生：生产变更</text>
+    <text x="916" y="564" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="14" fill="#5A6B7C">未执行 ES 命令，未触发业务降级</text>
+  </g>
+  <g id="shared-conclusion">
+    <path d="M52 634H1228" stroke="#1769E0" stroke-width="4"/>
+    <text x="52" y="664" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="24" font-weight="700" fill="#132A3A">前台输出必须同时写清：成果是什么，以及哪些业务动作没有发生。</text>
+  </g>
+  <g id="footer">
+    <text x="52" y="690" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="14" fill="#7C8A98">技术依据：OpenAI Agents SDK Human-in-the-loop · MCP Elicitation · W3C PROV-O；截图为当前系统实测</text>
+    <text x="1228" y="690" text-anchor="end" font-family="Consolas, &quot;Courier New&quot;, monospace" font-size="14" fill="#7C8A98">14 / 17</text>
+  </g>
+</svg>

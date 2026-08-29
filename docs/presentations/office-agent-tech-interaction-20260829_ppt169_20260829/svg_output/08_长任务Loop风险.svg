@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720" width="1280" height="720">
+  <g id="background"><rect width="1280" height="720" fill="#F7F8FA"/><path d="M52 112H1228" stroke="#CBD5DF" stroke-width="2"/></g>
+  <g id="header">
+    <text x="52" y="78" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="46" font-weight="700" fill="#132A3A">长任务 Loop 的风险，会被循环持续放大</text>
+    <rect x="1092" y="46" width="136" height="34" rx="6" fill="#EDF1F4"/><text x="1160" y="69" text-anchor="middle" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#1769E0">07-16 P10</text>
+  </g>
+  <g id="risk-matrix">
+    <rect x="52" y="154" width="744" height="430" rx="6" fill="#FFFFFF" stroke="#CBD5DF" stroke-width="2"/>
+    <text x="76" y="194" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="28" font-weight="700" fill="#132A3A">六类风险</text>
+    <path d="M76 218H772M424 218V558M76 332H772M76 446H772" stroke="#E3E8ED" stroke-width="2"/>
+    <circle cx="100" cy="260" r="18" fill="#C0362C"/><text x="100" y="267" text-anchor="middle" font-family="Consolas, &quot;Courier New&quot;, monospace" font-size="14" font-weight="700" fill="#FFFFFF">1</text>
+    <text x="132" y="256" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="24" font-weight="700" fill="#132A3A">方向漂移</text>
+    <text x="132" y="288" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#5A6B7C">中间目标逐步偏离 Task Contract</text>
+    <circle cx="448" cy="260" r="18" fill="#C0362C"/><text x="448" y="267" text-anchor="middle" font-family="Consolas, &quot;Courier New&quot;, monospace" font-size="14" font-weight="700" fill="#FFFFFF">2</text>
+    <text x="480" y="256" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="24" font-weight="700" fill="#132A3A">上下文退化</text>
+    <text x="480" y="288" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#5A6B7C">旧版本、噪声与关键约束丢失</text>
+    <circle cx="100" cy="374" r="18" fill="#D97706"/><text x="100" y="381" text-anchor="middle" font-family="Consolas, &quot;Courier New&quot;, monospace" font-size="14" font-weight="700" fill="#FFFFFF">3</text>
+    <text x="132" y="370" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="24" font-weight="700" fill="#132A3A">错误复利</text>
+    <text x="132" y="402" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#5A6B7C">未经验证的事实进入后续成果</text>
+    <circle cx="448" cy="374" r="18" fill="#D97706"/><text x="448" y="381" text-anchor="middle" font-family="Consolas, &quot;Courier New&quot;, monospace" font-size="14" font-weight="700" fill="#FFFFFF">4</text>
+    <text x="480" y="370" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="24" font-weight="700" fill="#132A3A">成本扩张</text>
+    <text x="480" y="402" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#5A6B7C">重试、工具与分支持续增长</text>
+    <circle cx="100" cy="488" r="18" fill="#B54708"/><text x="100" y="495" text-anchor="middle" font-family="Consolas, &quot;Courier New&quot;, monospace" font-size="14" font-weight="700" fill="#FFFFFF">5</text>
+    <text x="132" y="484" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="24" font-weight="700" fill="#132A3A">权限漂移</text>
+    <text x="132" y="516" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#5A6B7C">工具链扩展后超出原始授权</text>
+    <circle cx="448" cy="488" r="18" fill="#B54708"/><text x="448" y="495" text-anchor="middle" font-family="Consolas, &quot;Courier New&quot;, monospace" font-size="14" font-weight="700" fill="#FFFFFF">6</text>
+    <text x="480" y="484" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="24" font-weight="700" fill="#132A3A">停止困难</text>
+    <text x="480" y="516" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#5A6B7C">局部失败牵连整任务，用户难接管</text>
+  </g>
+  <g id="frontstage-response">
+    <rect x="824" y="154" width="404" height="430" rx="6" fill="#132A3A"/>
+    <text x="852" y="196" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="28" font-weight="700" fill="#FFFFFF">前台必须对应回答</text>
+    <use data-icon="tabler-outline/target-arrow" x="852" y="232" width="24" height="24" fill="#FFFFFF" stroke-width="2"/><text x="892" y="250" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#CBD5DF">当前目标是否仍然一致</text>
+    <use data-icon="tabler-outline/file-text" x="852" y="282" width="24" height="24" fill="#FFFFFF" stroke-width="2"/><text x="892" y="300" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#CBD5DF">当前用了哪一版来源</text>
+    <use data-icon="tabler-outline/chart-bar" x="852" y="332" width="24" height="24" fill="#FFFFFF" stroke-width="2"/><text x="892" y="350" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#CBD5DF">还剩多少轮次与调用预算</text>
+    <use data-icon="tabler-outline/lock" x="852" y="382" width="24" height="24" fill="#FFFFFF" stroke-width="2"/><text x="892" y="400" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#CBD5DF">允许与禁止的动作范围</text>
+    <use data-icon="tabler-outline/git-branch" x="852" y="432" width="24" height="24" fill="#FFFFFF" stroke-width="2"/><text x="892" y="450" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#CBD5DF">哪条 Branch 受影响</text>
+    <use data-icon="tabler-outline/player-pause" x="852" y="482" width="24" height="24" fill="#FFFFFF" stroke-width="2"/><text x="892" y="500" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#CBD5DF">如何暂停、恢复或接管</text>
+    <rect x="852" y="530" width="344" height="34" rx="6" fill="#D97706"/>
+    <text x="1024" y="553" text-anchor="middle" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="17" font-weight="700" fill="#FFFFFF">控制信息必须来自服务端事实</text>
+  </g>
+  <g id="current-boundary">
+    <use data-icon="tabler-outline/alert-triangle" x="52" y="614" width="22" height="22" fill="#D97706" stroke-width="2"/>
+    <text x="86" y="631" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="17" font-weight="700" fill="#132A3A">当前边界：</text>
+    <text x="184" y="631" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#5A6B7C">最多三轮只读 Control Loop；不是无限自治，也没有硬取消在途 HTTP。</text>
+  </g>
+  <g id="footer">
+    <text x="52" y="690" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="14" fill="#7C8A98">研究依据：Microsoft HAI Guidelines · Anthropic Context Engineering · LangGraph Persistence · ReAct</text>
+    <text x="1228" y="690" text-anchor="end" font-family="Consolas, &quot;Courier New&quot;, monospace" font-size="14" fill="#7C8A98">08 / 17</text>
+  </g>
+</svg>
