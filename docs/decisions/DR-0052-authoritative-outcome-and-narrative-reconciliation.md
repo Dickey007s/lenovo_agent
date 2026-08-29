@@ -1,6 +1,6 @@
 # DR-0052：服务端确定性成果与模型说明对账
 
-- 状态：Draft，待真实 Provider、PostgreSQL、完整工程门与 PR 证据收口
+- 状态：Limited Verified，限 TC-15、单 Run、便携 PostgreSQL、`deepseek-v4-pro` 与当前对账规则；不代表语义质量或用户体验
 - 日期：2026-08-29
 - Source：`USER-FEEDBACK-20260829-DETERMINISTIC-OUTCOME-NARRATIVE-CONFLICT`
 - Scenario：`SCENARIO-037`

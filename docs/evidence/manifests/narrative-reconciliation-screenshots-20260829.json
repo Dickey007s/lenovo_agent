@@ -1,0 +1,18 @@
+{
+  "schema_version": "narrative-reconciliation-screenshots.v1",
+  "status": "Limited Verified",
+  "run_id": "harness:e29ba8fee2134e59a7e4519a54a76d9c",
+  "screenshots": [
+    {
+      "path": "docs/evidence/screenshots/narrative-reconciliation-rejected-desktop-1440x1100.png",
+      "viewport": "1440x1100",
+      "assertion": "确定性成果是唯一当前结论，模型冲突详情默认折叠"
+    },
+    {
+      "path": "docs/evidence/screenshots/narrative-reconciliation-rejected-mobile-390x844.png",
+      "viewport": "390x844",
+      "assertion": "移动端无横向溢出且不显示被拒模型草稿为当前结论"
+    }
+  ],
+  "boundary": "截图是工程代理证据，不证明真实用户理解、信任、效率或业务价值。"
+}
