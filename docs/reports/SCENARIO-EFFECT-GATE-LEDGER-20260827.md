@@ -30,7 +30,7 @@
 | TC-12 | 看板工具库补 Vitest 并修复 | ZIP + `TC-12真实测试报告.md` | 12 个唯一检查，两份成果共享 | 同测集 Stage A/B/C 红灯，Stage D 71/71；逐文件 coverage 与独立复跑通过 | 不改原始源码、不联网安装、不自动 PR；无 OS 级断网 |
 | TC-13 | 从批准问卷与规则推导画像清洗和策略草案 | Markdown + 逐原始行 CSV | 8 个来源/成果检查，两份成果共享 | `Limited Verified`（DR-0049）：当前来源动态 11/10/1/8/2/3、画像 3/3/2、priority witness 0；阈值/优先级/新样本变异动态生效，策略来源仍为 `no_approved_strategy_source` | 公开样本非客户研究；重复口径待批准；不联系客户、不写 CRM/商机、不触发营销 |
 | TC-14 | 从固定日志推导离线复盘与条件式止损提案 | Markdown + 观察/动作 CSV | 12 个来源/成果/安全边界检查，两份成果共享 | `Limited Verified`（DR-0050、PR #66、Run `harness:fe527536c857404f88f46d9a68b09397`）：当前来源动态 232 行、167 条观察、3 组来源冲突、2 个假设、8 个 ES + 3 个业务提案；target 全部 unresolved/not_applicable、approval required、executed=false；合法指标/冲突变异、篡改转红、下载解析和 PostgreSQL 顺序恢复通过 | 不连接或执行 Elasticsearch/HTTP 命令，不把相关性写成根因定论，不选 dedicated master，不执行限流/降级或生产审批 |
-| TC-15 | 从完整交互日志、规则与页面规范推导可回溯排序 | 聚合优先级 CSV + 逐行归因 CSV | 12 个来源/覆盖/规则引用/双成果检查 + 1 个原件只读检查，两份成果共享 | `Limited Verified`（DR-0051、PR #67、Run `harness:731c429f82a941438b838fa8982699fd`）：完整 212 行、87 组、P0-P4=25/40/14/6/2；逐组内容寻址 rule refs、合法来源变异、双 CSV 下载复核、真实 Provider 和 PostgreSQL 重启通过 | 不把 bounded Preview 当完整来源，不把映射假设或方案模板冒充批准结论，不修改/发布生产界面或启动实验 |
+| TC-15 | 从完整交互日志、规则与页面规范推导可回溯排序，并对账模型说明 | 聚合优先级 CSV + 逐行归因 CSV | 12 个来源/覆盖/规则引用/双成果检查 + 1 个原件只读检查，两份成果共享；新增通用 narrative reconciliation | 确定性效果保持 `Limited Verified`（DR-0051、PR #67）：完整 212 行、87 组、P0-P4=25/40/14/6/2；历史 Run `harness:731c429f82a941438b838fa8982699fd` 的 Analyst 同时声称只覆盖 60 行并改写优先级，现作为 DR-0052 模型叙事假绿基线。新对账纵切待真实 Provider/PG/PR 收口。 | 不把 bounded Preview 当完整来源，不把模型 returned/completed 冒充 adopted，不把映射假设或方案模板冒充批准结论，不修改/发布生产界面或启动实验 |
 
 三个代码场景的命令由服务端固定，运行在一次性临时目录中，网络代理被清空，子进程只接收启动 Python/Node 所需的最小环境变量；API Key、Token、数据库 DSN、`PYTHONPATH` 和用户 shell hook 不会传入。这里证明的是固定测试包，不是可执行任意用户代码的生产沙箱，也不是 OS 级 socket 隔离。
 
@@ -50,8 +50,8 @@
 1. 首次六场景 live：`0/6`，模型已调用但工具被 Analyst 结构门挡住。
 2. 调整执行顺序：`6/6` 生成成果，但只 1 条 Analyst 输出采用。
 3. 简化 Analyst 输出合同：TC-05、TC-13 探针均 completed。
-4. 增加唯一安全 Unit 重绑：TC-10 completed；TC-15 的模型输出被采用并保留 waiting Branch。
-5. 当前六个优先场景均有真实模型采用和效果通过记录；TC-14/15 仍保留额外模型分支等待，这个边界不被涂绿。
+4. 增加唯一安全 Unit 重绑：TC-10 completed；TC-15 当时把模型输出记录为已采用并保留 waiting Branch。DR-0052 后续证明该 TC-15 说明与确定性成果冲突，因此这条只保留为历史运行记录，不再作为有效叙事采用证据。
+5. 六个优先场景都有真实模型调用与效果门记录，但模型“返回”不能再自动计为“采用”。DR-0052 之后，效果支持的 Run 还必须报告 narrative reconciliation；只有一致说明才进入当前结论。
 6. TC-02 旧门曾把缺真实 `workflow.py/search_agent.log` 的 9 文件迷你包判绿。DR-0040 保留该红灯，改为复制七个真实输入、下载后独立复测，并让声明与执行测试 ID 一致后才通过。
 7. TC-04 旧门曾把 105 项替身函数测试判绿。DR-0041 分开保留该 false green 与完整未修复副本的五个真实红灯；修复后五类 117 项测试、逐文件覆盖率和前台公开 ID 集合才共同决定效果状态。
 8. TC-04 总运行约一分钟不代表 API 可以一分钟不可用。`deterministic_office_tool_started` 必须在工作线程开始前进入 Snapshot/SSE；受控阻塞期间资料库、health 与 Run GET 仍可读。客户端 180 秒只作为总任务容忍，不是响应性修复，也不证明多 Worker 或 durable tool execution。
@@ -64,6 +64,7 @@
 15. TC-13 旧门写死样本 ID、8 条分类、排除名单、阈值、优先级和销售话术后自证。DR-0049 改为重读批准 CSV/Markdown 与两份成果 bytes；当前 11/10/1/8/2/3 和 3/3/2 只是来源观测，canonical 0 个优先级 witness 也如实显示。阈值、多标签、新样本和 ID 变异动态生效，未知规范、CSV 注入与成果篡改转红；没有批准来源的策略只保留待负责人补充模板。
 16. TC-14 旧门只提取 IP，其余 QPS、48 个 UNASSIGNED、根因、命令和 9 项检查由固定字符串自证。DR-0050 改为逐行重算 observation/conflict/hypothesis/proposal，并重读最终 Markdown/CSV。三组来源冲突不再被绿色文件覆盖；合法来源变异动态生效，所有 target 未解析、所有动作未执行，官方文档只解释 API 语义。
 17. TC-15 旧门只分析 120 行 Preview 并产出 66 组，漏掉完整 212 行中的 21 个尾部独有组，22 个重叠组频次也发生变化，但 6/6 仍绿。DR-0051 改为完整原始 XLSX、来源规则/规范推导、逐组 content-addressed rule refs 与双 CSV 重读验证；当前 87 组和分布只是来源观测，不是生产 success 常量。
+18. DR-0051 的首个真实 Run 暴露第二层假绿：确定性成果已完整复算，模型说明却声称只看 60 行、要求再统计 212 行并改写来源优先级，但旧 Runtime 仍 `output_used=true`。DR-0052 将 returned、reconciled、adopted 分开；冲突说明不得进入当前 Result，而 passed Artifact 保留。
 
 ## 汇报限制
 

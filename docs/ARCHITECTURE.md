@@ -460,6 +460,19 @@ reparsed against a fresh source derivation. `ux_prioritization_outcome` is store
 on both Artifacts and the EffectReceipt. This is not user research, online
 telemetry, an approved solution, an experiment runner or a production UI writer.
 
+DR-0052 adds a generic narrative-reconciliation step across Artifact Workspace &
+Verifier and Governance Control. A passed deterministic Effect is formed before
+the Analyst and may supply a compact, content-addressed
+`verified_effect_context`. After the normal structure, scope and Anchor checks,
+the Runtime compares model claims with the current structured outcome before it
+sets `output_used`. Consistent prose may be adopted; partial prose is only an
+internal supplement; contradictory or stale prose is rejected from public
+Result, Finding, Follow-up, Brief and Commit projections. Verified Artifact bytes
+and EffectReceipt remain intact. Snapshot/PostgreSQL persist the sanitized
+`narrative_reconciliation` receipt, while raw provider text remains private.
+The initial claim extractor is deliberately limited to uiux-021 facts; this is
+not a general semantic verifier.
+
 ## 7. Eight module maturity
 
 | Module | Current implementation | Missing target work |
@@ -470,8 +483,8 @@ telemetry, an approved solution, an experiment runner or a production UI writer.
 | Admission/Policy/Validator | server compilation and deterministic graph/source checks | dynamic topology admission |
 | Scheduler & Worker Manager | one bounded single-loop controller with server-owned Branch states and selective continuation | parallel/adaptive workers, leases and multi-instance recovery |
 | Tool Gateway | twelve fixed local deterministic office adapters with EffectReceipts; no model-owned dispatch | reusable governed tool registry, arbitrary safe commands, Web/SQL/Scheduler/Connector receipts |
-| Artifact Workspace & Verifier | independent append-only logical evidence-brief versions, citation membership, server-resolved preview Anchors, branch Evidence Gate, TaskCommit pointer/restore, plus isolated CSV/Markdown/DOCX/ZIP files and named deterministic validators for twelve fixed capabilities | general writable office workspace, reusable semantic/numeric verifier framework, conflict-aware edits and multi-host Artifact durability |
-| Checkpoint/Event/Governance | ordered events, branch/rollback controls, idempotent commands, independent records and optional PostgreSQL restart recovery | multi-instance lease/notification, in-flight cancellation, policy/approval/Permit integration |
+| Artifact Workspace & Verifier | independent append-only logical evidence-brief versions, citation membership, server-resolved preview Anchors, branch Evidence Gate, TaskCommit pointer/restore, isolated CSV/Markdown/DOCX/ZIP files and named deterministic validators for twelve fixed capabilities, plus deterministic-outcome/model-narrative reconciliation for the current TC-15 slice | general writable office workspace, reusable semantic/numeric verifier framework, broader narrative claim extraction, conflict-aware edits and multi-host Artifact durability |
+| Checkpoint/Event/Governance | ordered events, branch/rollback controls, idempotent commands, sanitized narrative-reconciliation receipts, independent records and optional PostgreSQL restart recovery | multi-instance lease/notification, in-flight cancellation, policy/approval/Permit integration |
 
 ## 8. Security and claim boundary
 

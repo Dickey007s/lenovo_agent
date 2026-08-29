@@ -112,6 +112,18 @@ and concrete solutions remain review-required assumptions. A passed Artifact
 does not prove user research, experience improvement, production UI changes or
 an approved experiment.
 
+DR-0052 governs deterministic-outcome and model-narrative reconciliation. Read
+`docs/decisions/DR-0052-authoritative-outcome-and-narrative-reconciliation.md`,
+`docs/scenarios/SCENARIO-037-reconcile-model-narrative-with-authoritative-outcome.md`
+and its Evidence before changing Analyst context, `output_used`, public Result,
+Brief/Commit projection or the result UI. A passed deterministic Effect is formed
+before Analyst and may supply compact `verified_effect_context`; model prose is
+adopted only after reconciliation. Contradictory or stale prose stays an audit
+receipt but cannot enter the public current conclusion, while verified Artifacts
+remain. The UI may claim deterministic authority only when both reconciliation
+authority and a passed Artifact/EffectReceipt exist. This does not prove semantic
+completeness, business validity or user understanding.
+
 DR-0040 governs TC-02 real-project refactoring. Read
 `docs/decisions/DR-0040-tc02-real-project-react-refactor.md`,
 `docs/scenarios/SCENARIO-026-refactor-real-search-agent-copy-with-bounded-react.md`

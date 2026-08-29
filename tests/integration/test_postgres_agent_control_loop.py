@@ -57,6 +57,7 @@ from tests.unit.test_scenario_effect_runtime import (
     ReleaseReadinessPlanner,
     SREDiagnosisAnalyst,
     SREDiagnosisPlanner,
+    ContradictoryUXPrioritizationAnalyst,
     UXPrioritizationAnalyst,
     UXPrioritizationPlanner,
 )
@@ -1001,6 +1002,9 @@ async def test_postgres_restart_preserves_tc15_ux_outcome_and_two_ledgers(
         assert receipt.scenario_id == "TC-15"
         assert receipt.ux_prioritization_outcome is not None
         outcome = receipt.ux_prioritization_outcome
+        assert terminal.narrative_reconciliation is not None
+        assert terminal.narrative_reconciliation.status == "consistent"
+        assert terminal.narrative_reconciliation.model_disposition == "adopted"
         assert outcome.status == "prioritization_review_required"
         assert (
             outcome.source_row_count,
@@ -1052,6 +1056,7 @@ async def test_postgres_restart_preserves_tc15_ux_outcome_and_two_ledgers(
         await second.setup()
         restored = await second.get(owner, run_id)
         assert restored.effect_receipts[0].ux_prioritization_outcome == outcome
+        assert restored.narrative_reconciliation == terminal.narrative_reconciliation
         restored_by_name = {item.file_name: item for item in restored.workspace_artifacts}
         assert set(restored_by_name) == set(originals)
         for file_name, content in originals.items():
@@ -1067,6 +1072,100 @@ async def test_postgres_restart_preserves_tc15_ux_outcome_and_two_ledgers(
         assert "content_sha256" not in public_json
         assert public_snapshot.effect_receipts[0].ux_prioritization_outcome == outcome
         assert public_snapshot.effect_receipts[0].external_action == "none"
+        assert public_snapshot.narrative_reconciliation == terminal.narrative_reconciliation
+    finally:
+        for runtime in reversed(runtimes):
+            await runtime.close()
+        if DATABASE_DSN and run_id:
+            async with await psycopg.AsyncConnection.connect(DATABASE_DSN) as connection:
+                async with connection.cursor() as cursor:
+                    for table in (
+                        "harness_idempotency",
+                        "harness_task_commit",
+                        "harness_artifact_version",
+                        "harness_run_state",
+                    ):
+                        await cursor.execute(
+                            f"DELETE FROM {table} WHERE owner_id = %s",  # nosec B608
+                            (owner,),
+                        )
+
+
+@pytest.mark.asyncio
+async def test_postgres_restart_preserves_rejected_tc15_model_draft_without_public_leak(
+    tmp_path: Path,
+) -> None:
+    owner = f"postgres-tc15-narrative-{uuid4().hex}"
+    run_id = ""
+    runtimes: list[HarnessRuntime] = []
+    workspace_root = tmp_path / "tc15-narrative-run-workspaces"
+    try:
+        first = HarnessRuntime(
+            BenchmarkWorkspaceCatalog(FORTE_ROOT),
+            UXPrioritizationPlanner(),
+            ContradictoryUXPrioritizationAnalyst(),
+            PostgresHarnessStateStore(DATABASE_DSN),
+            effect_engine=ScenarioEffectEngine(),
+            artifact_store=RunWorkspaceArtifactStore(workspace_root),
+        )
+        runtimes.append(first)
+        await first.setup()
+        started = await first.start(
+            owner,
+            start_request(
+                idempotency_key=f"postgres-tc15-narrative-{uuid4().hex}",
+                instruction=TC15_INSTRUCTION,
+            ),
+        )
+        run_id = started.run.run_id
+        terminal = await wait_for_effect_run(first, owner, run_id)
+        assert terminal.status == "completed"
+        assert terminal.result is None
+        assert terminal.analysis_receipt is not None
+        assert terminal.analysis_receipt.output_used is False
+        assert terminal.narrative_reconciliation is not None
+        assert terminal.narrative_reconciliation.status == "contradictory"
+        assert terminal.narrative_reconciliation.model_disposition == "rejected"
+        assert len(terminal.narrative_audit_drafts) == 1
+        assert len(terminal.workspace_artifacts) == 2
+        assert all(item.verifier_status == "passed" for item in terminal.workspace_artifacts)
+        original_artifacts: dict[str, bytes] = {}
+        for artifact in terminal.workspace_artifacts:
+            _, original_artifacts[artifact.file_name] = await first.get_workspace_artifact(
+                owner, run_id, artifact.artifact_id
+            )
+        await first.close()
+
+        second = HarnessRuntime(
+            BenchmarkWorkspaceCatalog(FORTE_ROOT),
+            UXPrioritizationPlanner(),
+            UXPrioritizationAnalyst(),
+            PostgresHarnessStateStore(DATABASE_DSN),
+            effect_engine=ScenarioEffectEngine(),
+            artifact_store=RunWorkspaceArtifactStore(workspace_root),
+        )
+        runtimes.append(second)
+        await second.setup()
+        restored = await second.get(owner, run_id)
+        assert restored.narrative_reconciliation == terminal.narrative_reconciliation
+        assert restored.result is None
+        assert restored.analysis_receipt is not None
+        assert restored.analysis_receipt.output_used is False
+        assert len(restored.narrative_audit_drafts) == 1
+        restored_by_name = {item.file_name: item for item in restored.workspace_artifacts}
+        for file_name, content in original_artifacts.items():
+            _, restored_content = await second.get_workspace_artifact(
+                owner, run_id, restored_by_name[file_name].artifact_id
+            )
+            assert restored_content == content
+        public = second.public_snapshot(restored).model_dump(mode="json")
+        assert public["result"] is None
+        assert public["narrative_reconciliation"]["model_disposition"] == "rejected"
+        assert "narrative_audit_drafts" not in public
+        assert any(
+            "重新统计全部212行" in item["narrative_excerpt"]
+            for item in public["narrative_reconciliation"]["conflicts"]
+        )
     finally:
         for runtime in reversed(runtimes):
             await runtime.close()

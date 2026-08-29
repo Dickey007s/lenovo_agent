@@ -937,6 +937,20 @@ ES/curl/Invoke-WebRequest/http 命令；自动化与截图也不证明 SRE 用�
 
 **当前边界：** 当前只是固定 uiux-021 的离线优先级适配器，不是用户研究、线上遥测、通用产品分析、设计效果验证、自动修改 UI、A/B 实验或生产发布。自动化与截图不能证明真实 UX 用户理解或方案有效。
 
+### 5.9.1 服务端确定性成果与模型说明只保留一个当前结论
+
+**新发现的失败样本：** 历史 Run `harness:731c429f82a941438b838fa8982699fd` 的服务端成果已经完整复算 212/212 行和 87 个组合；同一 Run 的 Analyst 却说“只展示前 60 行”，要求再次统计 212 行，并把一项来源矩阵 P0 改成 P1。旧 Runtime 仍把模型记录为 `output_used=true`。这说明仅把模型调用、确定性 Artifact 和 Run 终态分列还不够：用户仍会同时看到两套互相冲突的真相。
+
+**技术方案：** DR-0052 不新增第九模块，而是在 Artifact Workspace & Verifier 和 Governance Control 中加入通用 `narrative_reconciliation`。确定性 Effect 先形成；服务端把内容寻址的紧凑复算事实提供给 Analyst，bounded Preview 只作原文引用。模型返回后先通过既有范围/Anchor 门，再核对覆盖、计数、优先级、方案来源与 follow-up，最后才决定 `output_used`。
+
+**前台输出与交互影响：** 一致说明才进入当前 Result；不可比较说明只作为补充；冲突或过期说明默认折叠为“说明采用回执”，不再生成错误 Finding 或下一步按钮。已经验证的文件仍在，首屏写“成果已完成，模型说明未采用”，当前结论只保留服务端复算结果。只有 `authority=deterministic_outcome` 与 passed Artifact/EffectReceipt 同时存在时，页面才显示“以服务端确定性成果为准”；失败或受限回执明确显示尚无可采用结论。
+
+**后端事实：** `narrative_reconciliation.status` 区分 `consistent/partial/contradictory/stale/not_applicable`，`model_disposition` 区分 `adopted/supplemental/rejected`。冲突只公开稳定类型、脱敏摘录、结构化事实路径和期望/观测值；raw Provider response、Prompt 与 CoT 继续隐藏。Snapshot、named SSE 与 PostgreSQL 复读同一回执。
+
+**方案与来源：** 直接来源是 `USER-FEEDBACK-20260829-DETERMINISTIC-OUTCOME-NARRATIVE-CONFLICT`、历史真实 Run 负例、`DR-0052` 与 `SCENARIO-037`。它把此前“模型调用/采用分离”的工程原则推进为用户能感知的单一当前结论，而不是用文案掩盖冲突。
+
+**当前边界：** 首个具体 claim extractor 只覆盖固定 uiux-021 的结构化事实。对账只证明模型叙事与当前确定性事实是否一致，不证明叙事全面、排序有效或体验改善；没有确定性成果的任务仍是 model-only 并等待人工复核。
+
 ### 5.10 外部 SQL 或定时 Web 任务的能力阻断
 
 **触发：** 用户希望分析远程 Datasette，或设置周期 Web 搜索并追加文件；对应公开任务目录

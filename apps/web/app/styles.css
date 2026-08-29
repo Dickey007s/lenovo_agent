@@ -1015,6 +1015,43 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, summary:focus
 .result-proposals article button svg { width: 16px; }
 .result-view > footer { display: flex; align-items: flex-start; gap: 8px; padding: 12px 16px; color: var(--muted); background: #f7f9fa; font-size: 12px; line-height: 1.5; }
 .result-view > footer svg { width: 17px; flex: 0 0 auto; color: var(--green); }
+.result-view-stack { display: grid; align-content: start; gap: 0; min-width: 0; }
+.result-authority-placeholder { display: grid; grid-template-columns: 28px minmax(0, 1fr); gap: 10px; margin: 0 15px 14px; padding: 14px; border-left: 4px solid var(--green); background: #f5faf7; }
+.result-authority-placeholder > svg { width: 22px; color: var(--green); }
+.result-authority-placeholder span { color: var(--green); font-size: 12px; font-weight: 800; }
+.result-authority-placeholder h2 { margin: 3px 0 0; font-size: 17px; line-height: 1.45; letter-spacing: 0; }
+.result-authority-placeholder p { margin: 5px 0 0; color: var(--ink-soft); font-size: 12px; line-height: 1.65; }
+.result-authority-placeholder.is-failed { border-left-color: var(--red); background: #fff5f3; }
+.result-authority-placeholder.is-failed > svg,
+.result-authority-placeholder.is-failed span { color: var(--red); }
+
+.narrative-reconciliation { margin: 0 15px 14px; border: 1px solid #aac9b8; background: #fbfdfc; }
+.narrative-reconciliation.is-rejected { border-color: #dea76a; background: #fffaf2; }
+.narrative-reconciliation.is-supplemental { border-color: #d4b46f; background: #fffdf7; }
+.narrative-reconciliation > header { display: grid; grid-template-columns: 28px minmax(0, 1fr) auto; gap: 10px; align-items: start; padding: 13px 14px; }
+.narrative-reconciliation > header > svg { width: 22px; color: var(--green); }
+.narrative-reconciliation.is-rejected > header > svg, .narrative-reconciliation.is-supplemental > header > svg { color: #a86516; }
+.narrative-reconciliation > header span { color: #3a6b56; font-size: 11px; font-weight: 800; }
+.narrative-reconciliation > header h3 { margin: 3px 0 0; font-size: 16px; line-height: 1.45; letter-spacing: 0; }
+.narrative-reconciliation > header p { margin: 4px 0 0; color: var(--ink-soft); font-size: 12px; line-height: 1.65; }
+.narrative-reconciliation > header > b { padding: 5px 8px; color: #246347; background: #e7f5ed; font-size: 11px; white-space: nowrap; }
+.narrative-reconciliation.is-rejected > header > b, .narrative-reconciliation.is-supplemental > header > b { color: #8a5110; background: #fff0d5; }
+.narrative-reconciliation > details { border-top: 1px solid #e3d2b7; }
+.narrative-reconciliation > details > summary { min-height: 42px; display: flex; align-items: center; gap: 7px; padding: 0 14px; color: #825019; cursor: pointer; font-size: 12px; font-weight: 800; }
+.narrative-reconciliation > details > summary svg { width: 16px; flex: 0 0 auto; }
+.narrative-reconciliation > details > summary svg:last-child { margin-left: auto; transition: transform 140ms ease; }
+.narrative-reconciliation > details[open] > summary svg:last-child { transform: rotate(180deg); }
+.narrative-reconciliation > details > ol { display: grid; gap: 7px; margin: 0; padding: 0 14px 13px; list-style: none; }
+.narrative-reconciliation > details li { min-width: 0; padding: 10px; border-left: 4px solid #c8761b; background: #fff; }
+.narrative-reconciliation > details li.is-error { border-left-color: var(--red); }
+.narrative-reconciliation > details li b { color: #70420d; font-size: 13px; }
+.narrative-reconciliation > details li p { margin: 4px 0 8px; overflow-wrap: anywhere; color: var(--ink-soft); font-size: 12px; line-height: 1.6; }
+.narrative-reconciliation > details dl { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr)); gap: 1px; margin: 0; background: #eadfce; }
+.narrative-reconciliation > details dl > div { min-width: 0; padding: 8px; background: #fffaf4; }
+.narrative-reconciliation > details dt { color: #7d613c; font-size: 11px; font-weight: 800; }
+.narrative-reconciliation > details dd { margin: 3px 0 0; overflow-wrap: anywhere; color: #5b4d3d; font-size: 12px; line-height: 1.55; }
+.narrative-reconciliation > footer { display: flex; align-items: flex-start; gap: 7px; padding: 9px 14px; border-top: 1px solid #e6ddd0; color: #6c5c49; font-size: 11px; line-height: 1.55; }
+.narrative-reconciliation > footer svg { width: 16px; flex: 0 0 auto; }
 
 .evidence-review-backdrop { position: fixed; inset: 0; z-index: 80; padding: 14px; background: rgb(24 30 38 / 48%); }
 .evidence-review-page { width: min(1380px, 100%); height: 100%; min-width: 0; min-height: 0; display: grid; grid-template-rows: auto minmax(0, 1fr); margin: 0 auto; overflow: hidden; border: 1px solid #aeb8c3; border-radius: 6px; background: #fff; box-shadow: 0 18px 55px rgb(15 23 34 / 28%); }
@@ -1373,6 +1410,8 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, summary:focus
   .loop-gap-technical-details dl > div + div { border-top: 1px solid #d7dee6; border-left: 0; }
   .workspace-artifacts > header { grid-template-columns: 25px minmax(0, 1fr); }
   .workspace-artifacts > header > b { grid-column: 2; justify-self: start; }
+  .narrative-reconciliation > header { grid-template-columns: 25px minmax(0, 1fr); }
+  .narrative-reconciliation > header > b { grid-column: 2; justify-self: start; }
   .business-gate-outcome > header { grid-template-columns: 25px minmax(0, 1fr); }
   .business-gate-outcome > header > b { grid-column: 2; justify-self: start; }
   .legal-review-outcome > header { grid-template-columns: 25px minmax(0, 1fr); }
@@ -1417,6 +1456,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, summary:focus
   .task-composer h2 { font-size: 17px; }
   .task-composer textarea { min-height: 92px; font-size: 16px; }
   .workspace-artifacts { margin-right: 8px; margin-left: 8px; }
+  .narrative-reconciliation, .result-authority-placeholder { margin-right: 8px; margin-left: 8px; }
   .workspace-artifacts > ol > li { grid-template-columns: minmax(0, 1fr); }
   .business-gate-outcome { margin-right: 8px; margin-left: 8px; }
   .legal-review-outcome { margin-right: 8px; margin-left: 8px; }

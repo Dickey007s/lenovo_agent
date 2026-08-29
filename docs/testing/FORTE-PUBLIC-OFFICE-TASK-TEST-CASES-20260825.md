@@ -58,7 +58,7 @@ CSS、HTML、shell、log 等。它们覆盖结构化表格、长文档、扫描/
 | `TC-12` | `qa-003` | 为看板工具库补测试并修复源码 | JS + JSON | Demo 2 多任务 | 固定测试执行、隔离代码写入 | `Limited Verified`（DR-0042、PR #54/#55、Run `harness:d9355005af924d57bb1e9c526adca072`）：完整 11 文件副本，同一 71 项 Vitest 先红后绿、逐文件 coverage、独立复跑；固定 qa-003 适配器，没有自动 PR 或 OS 级断网 |
 | `TC-13` | `sales-020` | 客户画像清洗与销售策略 | CSV + MD | Demo 1/2 | 来源推导清洗、重复假设、策略复核 | `Limited Verified`（DR-0049、Run `harness:80a5e5c91a294ee687f28eed731570d3`）：Markdown + 逐原始行 CSV，8 项独立来源/成果检查；当前动态 11/10/1/8/2/3、画像 3/3/2、priority witness 0；固定公开样本适配器，不是客户研究、CRM 或销售效果证明 |
 | `TC-14` | `sre-010` | 大促 ES 日志离线复盘与条件式止损提案 | TXT log | Demo 1 + Demo 3 | 来源冲突、根因假设、未解析目标与禁止执行 | `Limited Verified`（DR-0050、PR #66、Run `harness:fe527536c857404f88f46d9a68b09397`）：来源推导 Markdown + CSV、12 项独立检查；当前动态 232 行、167 条观察、3 组来源冲突、2 个假设、8 个 ES + 3 个业务提案；真实 Provider、下载解析和 PostgreSQL 顺序恢复通过，全部动作未执行 |
-| `TC-15` | `uiux-021` | 完整交互日志归因与优先级复核 | XLSX + MD + DOCX | Demo 2 多任务 | 全量行覆盖、来源规则引用、双 CSV 独立复核 | `Limited Verified`（DR-0051、PR #67、Run `harness:731c429f82a941438b838fa8982699fd`）：13/13 检查、212 行/87 组、P0-P4=25/40/14/6/2；真实 Provider、下载重算、PostgreSQL 重启和远端门通过，旧 120 行/66 组/6 项保留为 false-green 基线 |
+| `TC-15` | `uiux-021` | 完整交互日志归因、优先级复核与模型说明对账 | XLSX + MD + DOCX | Demo 2 多任务 | 全量行覆盖、来源规则引用、双 CSV 独立复核、确定性成果与模型叙事单一当前结论 | `Limited Verified` 的确定性效果基线（DR-0051、PR #67）仍成立；历史 Run `harness:731c429f82a941438b838fa8982699fd` 的模型说明后来被确认与 212/87 权威事实冲突，保留为 DR-0052 false-green 基线。新对账纵切在真实 Provider/PG/PR 收口前为 `Draft`。 |
 
 ## 5. 单任务有界循环用例
 
@@ -241,6 +241,8 @@ CSS、HTML、shell、log 等。它们覆盖结构化表格、长文档、扫描/
 - 正向变异：合法新增行、同步新增痛点、阈值、严重度、矩阵和规范顺序变化应动态更新受影响组、分母、分布和 refs；来源消除 3% 冲突后仍通过。
 - 负向门：多/隐藏 Sheet、宏/外链、截断、额外/缺失规范表、非法值、未知规则，以及两份 CSV 的分母/计数/规范/边界/行集合/locator 篡改均转红。
 - 前台：四层显示确定性验证、全量覆盖/数据质量、逐组来源推导、方案待批与生产动作未发生；1440/390 可读。
+- 模型说明对账：准确复述 212/87 与当前 P0-P4 可采用；声称只覆盖 60/120、改写分组优先级、把未批准方案写成当前结论或重复要求全量统计必须 rejected；无可比事实只作 supplemental；过期 outcome revision 必须 stale。
+- 单一当前结论：被拒模型的 Result/Finding/Follow-up/Brief/Commit 均不得进入公共投影，passed Artifact 保留；只有 reconciliation authority 与 passed Artifact/Receipt 同时存在才显示服务端权威提示，failed/bounded-only 显示无可采用成果。
 - 禁止：把 P0 当作已立项，把离线频次当用户研究或效果证明，自动修改/发布生产界面或启动实验。
 
 ## 7. 外部依赖与高风险用例

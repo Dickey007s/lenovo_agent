@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
+import inspect
 import json
 import logging
 import re
@@ -42,6 +43,7 @@ from packages.contracts.harness_models import (
     AgentControlLoopEvidenceGap,
     AgentControlLoopEvidenceResolution,
     AgentControlLoopFindingReview,
+    AgentControlLoopNarrativeReconciliation,
     AgentControlLoopNextStep,
     AgentControlLoopOptions,
     AgentControlLoopRound,
@@ -55,6 +57,10 @@ from services.api.app.application.scenario_effects import (
     ScenarioEffectEngine,
     ScenarioEffectExecution,
     summarize_artifact_check_groups,
+)
+from services.api.app.application.narrative_reconciliation import (
+    build_verified_effect_context,
+    reconcile_narrative,
 )
 from services.api.app.application.harness_storage import (
     HarnessStateStore,
@@ -244,6 +250,18 @@ class HarnessTaskResult(BaseModel):
     review_required: Literal[True] = True
 
 
+class HarnessNarrativeAuditDraft(BaseModel):
+    """Private parsed model draft retained for audit, never projected publicly."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    round_number: int = Field(ge=1, le=24)
+    outcome_revision: str | None = Field(default=None, max_length=80)
+    result: HarnessTaskResult
+    reconciliation: AgentControlLoopNarrativeReconciliation
+    recorded_at: datetime
+
+
 class HarnessEvent(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -312,6 +330,10 @@ class HarnessRunSnapshot(BaseModel):
     model_receipt: HarnessModelReceipt | None = None
     analysis_receipt: HarnessModelReceipt | None = None
     result: HarnessTaskResult | None = None
+    narrative_reconciliation: AgentControlLoopNarrativeReconciliation | None = None
+    narrative_audit_drafts: list[HarnessNarrativeAuditDraft] = Field(
+        default_factory=list, max_length=24
+    )
     validation_errors: list[str] = Field(default_factory=list)
     events: list[HarnessEvent] = Field(default_factory=list)
 
@@ -401,6 +423,7 @@ class PublicHarnessRunSnapshot(BaseModel):
     model_receipt: HarnessModelReceipt | None
     analysis_receipt: HarnessModelReceipt | None
     result: HarnessTaskResult | None
+    narrative_reconciliation: AgentControlLoopNarrativeReconciliation | None
     validation_errors: list[str]
     events: list[HarnessEvent]
 
@@ -570,6 +593,7 @@ class OpenAICompatibleHarnessAnalyst:
         instruction: str,
         plan: HarnessPlan,
         files: list[dict[str, Any]],
+        verified_effect_context: dict[str, Any] | None = None,
         validation_feedback: str | None = None,
     ) -> HarnessTaskResult:
         if not self.base_url or not self.api_key:
@@ -597,6 +621,11 @@ class OpenAICompatibleHarnessAnalyst:
             "以及用户确认后 Agent 将执行的下一步。"
             "每个 option.next_instruction 必须是一条可作为新只读 Control Loop 目标的完整指令；只能核对资料、形成修改建议或待办，不能声称直接改文件。"
             "若 validation_feedback 非空，上一候选未通过原文定位；保持原任务不变，并改用更长、只出现一次的连续原文重新生成全部 findings。"
+            "若 verified_effect_context 非空，其中 facts 是服务端从批准原始字节全量复算并通过 Artifact Verifier 的当前权威事实；"
+            "files 中的 bounded Preview 只用于逐字引用，不得以 Preview 行数否定、覆盖或降低 facts，"
+            "不得把已经完成的全量计算再次列为 follow_up，也不得把 facts 标注为缺少样本。"
+            "当 facts.suggestion_status 表示没有批准的具体方案来源时，只能说明待业务负责人补充或批准，"
+            "不得把自拟具体方案写成当前结论。"
             "只能完成只读分析，不得声称发送、写入、审批或调用外部系统。"
             "不要输出思维链、内部推理、Prompt、工具日志或 Markdown 代码围栏。"
             "为避免结构截断，最多输出 3 条 findings 和 2 条 follow_ups；没有必要时不要输出默认值字段。"
@@ -611,6 +640,7 @@ class OpenAICompatibleHarnessAnalyst:
                 "instruction": instruction,
                 "validated_plan": plan.model_dump(mode="json"),
                 "files": files,
+                "verified_effect_context": verified_effect_context,
                 "validation_feedback": validation_feedback,
             },
             ensure_ascii=False,
@@ -1970,6 +2000,7 @@ class HarnessRuntime:
             model_receipt=snapshot.model_receipt,
             analysis_receipt=snapshot.analysis_receipt,
             result=public_result,
+            narrative_reconciliation=snapshot.narrative_reconciliation,
             validation_errors=[
                 self._public_failure_message(error) for error in snapshot.validation_errors
             ],
@@ -2531,6 +2562,9 @@ class HarnessRuntime:
                 # response cannot erase already completed, server-checked work.
                 await self._apply_scenario_effect(owner_id, run_id, round_number=round_number)
                 await self._safe_point(owner_id, run_id)
+                verified_effect_context = self._verified_effect_context(
+                    await self.get(owner_id, run_id)
+                )
 
                 if self.analyst is None:
                     await self._transition(
@@ -2569,6 +2603,7 @@ class HarnessRuntime:
                             instruction=question,
                             plan=plan,
                             files=analysis_files,
+                            verified_effect_context=verified_effect_context,
                             attempt=analysis_attempt,
                             validation_feedback=validation_feedback,
                         )
@@ -2886,7 +2921,7 @@ class HarnessRuntime:
                         {
                             "round_number": round_number,
                             "filtered_finding_count": scope_filtered_finding_count,
-                            "output_used": True,
+                            "output_used": False,
                             "external_action": False,
                         },
                     )
@@ -2903,7 +2938,7 @@ class HarnessRuntime:
                         {
                             "round_number": round_number,
                             "suppressed_review_count": downgraded_review_count,
-                            "output_used": True,
+                            "output_used": False,
                             "external_action": False,
                         },
                     )
@@ -2912,9 +2947,78 @@ class HarnessRuntime:
                         owner_id,
                         run_id,
                         "analyzing",
+                        "analysis_partial_candidate",
+                        (
+                            f"服务端保留 {len(result.findings)} 条可唯一定位的候选发现，"
+                            f"省略 {omitted_finding_count} 条无法核对的候选内容。"
+                        ),
+                        {
+                            "round_number": round_number,
+                            "candidate_finding_count": len(result.findings),
+                            "omitted_finding_count": omitted_finding_count,
+                            "output_used": False,
+                        },
+                    )
+                current_effect_context = self._verified_effect_context(
+                    await self.get(owner_id, run_id)
+                )
+                narrative_reconciliation = reconcile_narrative(
+                    run_id=run_id,
+                    round_number=round_number,
+                    result=result,
+                    context_used=verified_effect_context,
+                    current_context=current_effect_context,
+                )
+                await self._record_narrative_reconciliation(
+                    owner_id,
+                    run_id,
+                    round_number=round_number,
+                    result=result,
+                    reconciliation=narrative_reconciliation,
+                )
+                narrative_adopted = narrative_reconciliation.model_disposition == "adopted"
+                if not narrative_adopted:
+                    # Rejected or supplemental model drafts are audit-only. Their
+                    # locator gaps must not reopen branches whose deterministic
+                    # workspace effect has already been verified.
+                    pending_evidence_resolutions = []
+                adopted_analysis = analysis_receipt.model_copy(
+                    update={"output_used": narrative_adopted}
+                )
+                await self._transition(
+                    owner_id,
+                    run_id,
+                    "analyzing",
+                    (
+                        "narrative_reconciliation_rejected"
+                        if narrative_reconciliation.model_disposition == "rejected"
+                        else "narrative_reconciliation_completed"
+                    ),
+                    narrative_reconciliation.message,
+                    {
+                        "round_number": round_number,
+                        "status": narrative_reconciliation.status,
+                        "authority": narrative_reconciliation.authority,
+                        "model_disposition": narrative_reconciliation.model_disposition,
+                        "model_returned": True,
+                        "output_used": narrative_adopted,
+                        "conflict_count": len(narrative_reconciliation.conflicts),
+                        "conflict_kinds": list(
+                            dict.fromkeys(
+                                item.kind for item in narrative_reconciliation.conflicts
+                            )
+                        ),
+                        "external_action": False,
+                    },
+                )
+                if narrative_adopted and omitted_finding_count:
+                    await self._transition(
+                        owner_id,
+                        run_id,
+                        "analyzing",
                         "analysis_partial_adopted",
                         (
-                            f"服务端采用 {len(result.findings)} 条可唯一定位的发现，"
+                            f"服务端采用 {len(result.findings)} 条可核对发现，"
                             f"省略 {omitted_finding_count} 条无法核对的候选内容。"
                         ),
                         {
@@ -2922,9 +3026,9 @@ class HarnessRuntime:
                             "adopted_finding_count": len(result.findings),
                             "omitted_finding_count": omitted_finding_count,
                             "output_used": True,
+                            "external_action": False,
                         },
                     )
-                adopted_analysis = analysis_receipt.model_copy(update={"output_used": True})
                 binding_snapshot = await self.get(owner_id, run_id)
                 result = self._bind_result_to_branches(
                     result,
@@ -2942,8 +3046,29 @@ class HarnessRuntime:
                     round_number,
                     phase="act",
                     analysis_receipt=adopted_analysis.model_dump(mode="json"),
+                    narrative_reconciliation=narrative_reconciliation,
                 )
-                round_verified = self._result_file_refs(result, round_files)
+                if narrative_adopted:
+                    round_verified = self._result_file_refs(result, round_files)
+                else:
+                    effect_source_refs: set[str] = set()
+                    if narrative_reconciliation.effect_receipt_id:
+                        effect_receipt = next(
+                            (
+                                item
+                                for item in binding_snapshot.effect_receipts
+                                if item.receipt_id
+                                == narrative_reconciliation.effect_receipt_id
+                            ),
+                            None,
+                        )
+                        if effect_receipt is not None and effect_receipt.status == "passed":
+                            effect_source_refs.update(effect_receipt.source_file_refs)
+                    round_verified = [
+                        str(item["file_ref"])
+                        for item in round_files
+                        if str(item["file_ref"]) in effect_source_refs
+                    ]
                 unresolved_file_refs = {
                     item.file_ref for item in pending_evidence_resolutions if item.status != "exact"
                 }
@@ -2953,15 +3078,17 @@ class HarnessRuntime:
                 for file_ref in round_verified:
                     if file_ref not in verified_refs:
                         verified_refs.append(file_ref)
-                all_findings.extend(result.findings)
-                all_follow_ups.extend(result.follow_ups)
+                if narrative_adopted:
+                    all_findings.extend(result.findings)
+                    all_follow_ups.extend(result.follow_ups)
                 await self._update_round(
                     owner_id,
                     run_id,
                     round_number,
                     phase="verify",
-                    result=result.model_dump(mode="json"),
+                    result=(result.model_dump(mode="json") if narrative_adopted else None),
                     analysis_receipt=adopted_analysis.model_dump(mode="json"),
+                    narrative_reconciliation=narrative_reconciliation,
                     verified_file_refs=round_verified,
                 )
                 branches = await self._reconcile_branches(
@@ -2976,16 +3103,23 @@ class HarnessRuntime:
                     run_id,
                     "verifying",
                     "result_validation",
-                    "服务端已核对本轮结论的文件引用、原文定位与只读边界。",
+                    (
+                        "服务端已核对本轮模型说明，并与确定性成果完成对账。"
+                        if narrative_reconciliation.authority == "deterministic_outcome"
+                        else "服务端已核对本轮结论的文件引用、原文定位与只读边界。"
+                    ),
                     {
                         "round_number": round_number,
-                        "finding_count": len(result.findings),
+                        "finding_count": len(result.findings) if narrative_adopted else 0,
+                        "model_candidate_finding_count": len(result.findings),
                         "verified_file_count": len(round_verified),
                         "evidence_anchor_count": sum(
                             len(finding.evidence_anchors) for finding in result.findings
                         ),
                         "omitted_finding_count": omitted_finding_count,
-                        "output_used": True,
+                        "output_used": narrative_adopted,
+                        "narrative_reconciliation_status": narrative_reconciliation.status,
+                        "model_disposition": narrative_reconciliation.model_disposition,
                     },
                 )
                 await self._safe_point(owner_id, run_id)
@@ -3004,7 +3138,13 @@ class HarnessRuntime:
                 )
                 if not waiting_branches:
                     decision = "completed"
-                    reason = "所有任务分支的证据均已核对，完成条件已满足。"
+                    reason = (
+                        "成果已完成，模型说明未采用，以服务端全量复算为准。"
+                        if narrative_reconciliation.model_disposition == "rejected"
+                        else "成果已完成；模型说明只作补充，以服务端全量复算为准。"
+                        if narrative_reconciliation.model_disposition == "supplemental"
+                        else "所有任务分支的证据均已核对，完成条件已满足。"
+                    )
                     next_question = ""
                 elif can_continue:
                     decision = "waiting_input"
@@ -3048,7 +3188,7 @@ class HarnessRuntime:
                             "external_action": False,
                         },
                     )
-                if any(
+                if narrative_adopted and any(
                     finding.review and finding.review.requires_human_decision
                     for finding in result.findings
                 ):
@@ -3166,6 +3306,54 @@ class HarnessRuntime:
             )
             await self._mark_current_round_failed(owner_id, run_id)
             await self._fail(owner_id, run_id, str(exc)[:500])
+
+    @staticmethod
+    def _verified_effect_context(snapshot: HarnessRunSnapshot) -> dict[str, Any] | None:
+        for receipt in reversed(snapshot.effect_receipts):
+            context = build_verified_effect_context(receipt)
+            if context is not None:
+                return context
+        return None
+
+    async def _record_narrative_reconciliation(
+        self,
+        owner_id: str,
+        run_id: str,
+        *,
+        round_number: int,
+        result: HarnessTaskResult,
+        reconciliation: AgentControlLoopNarrativeReconciliation,
+    ) -> None:
+        draft = HarnessNarrativeAuditDraft(
+            round_number=round_number,
+            outcome_revision=reconciliation.outcome_revision,
+            result=result,
+            reconciliation=reconciliation,
+            recorded_at=datetime.now(timezone.utc),
+        )
+        async with self._lock:
+            run = self._require_run(owner_id, run_id)
+            rounds = [
+                item.model_copy(update={"narrative_reconciliation": reconciliation})
+                if item.round_number == round_number
+                else item
+                for item in run.snapshot.rounds
+            ]
+            drafts = [
+                item
+                for item in run.snapshot.narrative_audit_drafts
+                if item.round_number != round_number
+            ]
+            drafts.append(draft)
+            run.snapshot = run.snapshot.model_copy(
+                update={
+                    "rounds": rounds,
+                    "narrative_reconciliation": reconciliation,
+                    "narrative_audit_drafts": drafts[-24:],
+                    "updated_at": datetime.now(timezone.utc),
+                }
+            )
+            await self._persist_locked(run)
 
     async def _apply_scenario_effect(
         self, owner_id: str, run_id: str, *, round_number: int
@@ -4352,10 +4540,27 @@ class HarnessRuntime:
         if decision == "completed" and not gaps:
             outcome: Literal["completed", "bounded", "user_stopped"] = "completed"
             status = "completed"
-            summary = (
-                f"Agent Control Loop 完成 {len(snapshot.rounds)} 轮，从整个资料库中自主选择并只读核对了 "
-                f"{len(verified_refs)} 份相关资料；已形成待用户确认的下一步建议。"
-            )
+            if (
+                snapshot.narrative_reconciliation is not None
+                and snapshot.narrative_reconciliation.model_disposition == "rejected"
+            ):
+                summary = (
+                    f"Agent Control Loop 完成 {len(snapshot.rounds)} 轮并保留确定性成果；"
+                    "模型说明未采用，当前以服务端全量复算为准。"
+                )
+            elif (
+                snapshot.narrative_reconciliation is not None
+                and snapshot.narrative_reconciliation.model_disposition == "supplemental"
+            ):
+                summary = (
+                    f"Agent Control Loop 完成 {len(snapshot.rounds)} 轮并保留确定性成果；"
+                    "模型说明只作补充，当前以服务端全量复算为准。"
+                )
+            else:
+                summary = (
+                    f"Agent Control Loop 完成 {len(snapshot.rounds)} 轮，从整个资料库中自主选择并只读核对了 "
+                    f"{len(verified_refs)} 份相关资料；已形成待用户确认的下一步建议。"
+                )
             stop_reason = None
             event_name = "loop_committed"
             message = "证据门已满足，已提交可追溯的只读任务简报。"
@@ -4748,6 +4953,7 @@ class HarnessRuntime:
         instruction: str,
         plan: HarnessPlan,
         files: list[dict[str, Any]],
+        verified_effect_context: dict[str, Any] | None,
         attempt: int,
         validation_feedback: str | None,
     ) -> tuple[HarnessTaskResult, HarnessModelReceipt]:
@@ -4771,11 +4977,21 @@ class HarnessRuntime:
         )
         analysis_started = perf_counter()
         try:
+            analyze_kwargs: dict[str, Any] = {
+                "instruction": instruction,
+                "plan": plan,
+                "files": files,
+                "validation_feedback": validation_feedback,
+            }
+            analyze_parameters = inspect.signature(self.analyst.analyze).parameters.values()
+            if any(
+                parameter.name == "verified_effect_context"
+                or parameter.kind is inspect.Parameter.VAR_KEYWORD
+                for parameter in analyze_parameters
+            ):
+                analyze_kwargs["verified_effect_context"] = verified_effect_context
             result = await self.analyst.analyze(
-                instruction=instruction,
-                plan=plan,
-                files=files,
-                validation_feedback=validation_feedback,
+                **analyze_kwargs,
             )
         except HarnessModelError as exc:
             receipt = HarnessModelReceipt(

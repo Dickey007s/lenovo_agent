@@ -338,6 +338,57 @@ class AgentControlLoopBranch(StrictModel):
     updated_at: datetime
 
 
+AgentControlLoopNarrativeReconciliationStatus = Literal[
+    "consistent", "partial", "contradictory", "stale", "not_applicable"
+]
+AgentControlLoopNarrativeAuthority = Literal["deterministic_outcome", "model_only"]
+AgentControlLoopNarrativeModelDisposition = Literal["adopted", "supplemental", "rejected"]
+
+
+class AgentControlLoopNarrativeConflict(StrictModel):
+    """One sanitized contradiction between model prose and a verified outcome."""
+
+    conflict_id: str = Field(pattern=r"^narrative-conflict-[0-9a-f]{12}$")
+    kind: Literal[
+        "incomplete_coverage",
+        "outcome_count_mismatch",
+        "priority_mismatch",
+        "unsupported_solution_claim",
+        "redundant_completed_work",
+        "outcome_revision_mismatch",
+    ]
+    narrative_path: str = Field(min_length=1, max_length=240)
+    narrative_excerpt: str = Field(min_length=1, max_length=500)
+    outcome_path: str = Field(min_length=1, max_length=240)
+    expected: str = Field(min_length=1, max_length=500)
+    observed: str = Field(min_length=1, max_length=500)
+    severity: Literal["warning", "error"]
+
+
+class AgentControlLoopNarrativeReconciliation(StrictModel):
+    """Server-owned adoption receipt for model narrative versus verified facts."""
+
+    reconciliation_id: str = Field(pattern=r"^narrative-reconciliation-[0-9a-f]{12}$")
+    round_number: int = Field(ge=1, le=24)
+    status: AgentControlLoopNarrativeReconciliationStatus
+    authority: AgentControlLoopNarrativeAuthority
+    model_disposition: AgentControlLoopNarrativeModelDisposition
+    outcome_revision: str | None = Field(
+        default=None, pattern=r"^outcome-rev-[0-9a-f]{16}$"
+    )
+    effect_receipt_id: str | None = Field(
+        default=None, pattern=r"^effect-receipt-[0-9a-f]{12}$"
+    )
+    model_returned: bool
+    comparable_claim_count: int = Field(default=0, ge=0, le=100)
+    conflicts: list[AgentControlLoopNarrativeConflict] = Field(
+        default_factory=list, max_length=20
+    )
+    message: str = Field(min_length=1, max_length=800)
+    checked_at: datetime
+    external_action: Literal["none"] = "none"
+
+
 class AgentControlLoopRound(StrictModel):
     round_number: int = Field(ge=1, le=24)
     status: Literal["running", "completed", "stopped", "failed"]
@@ -350,6 +401,7 @@ class AgentControlLoopRound(StrictModel):
     model_receipt: dict[str, Any] | None = None
     result: dict[str, Any] | None = None
     analysis_receipt: dict[str, Any] | None = None
+    narrative_reconciliation: AgentControlLoopNarrativeReconciliation | None = None
     verified_file_refs: list[str] = Field(default_factory=list, max_length=20)
     evidence_gaps: list[AgentControlLoopEvidenceGap] = Field(default_factory=list, max_length=20)
     next_step: AgentControlLoopNextStep | None = None

@@ -487,6 +487,25 @@ facts, promote `no_approved_solution_source` templates into approved fixes, or
 interpret a passed Artifact as user research, experience improvement or a
 production action.
 
+Effect-backed rounds may additionally publish `narrative_reconciliation` on the
+Round and current Snapshot. Its public fields are `status`, `authority`,
+`model_disposition`, opaque `outcome_revision`, `effect_receipt_id`,
+`model_returned`, `comparable_claim_count`, sanitized `conflicts[]`, `message`
+and `checked_at`. Status is `consistent|partial|contradictory|stale|not_applicable`;
+authority is `deterministic_outcome|model_only`; disposition is
+`adopted|supplemental|rejected`. A conflict contains a stable ID, kind, public
+narrative/outcome paths, a short sanitized excerpt, expected/observed values and
+severity. Raw provider responses, prompts, CoT and private audit drafts are not
+part of the public API.
+
+`called=true` means the Analyst returned. `output_used=true` additionally
+requires `model_disposition=adopted`. A contradictory, stale or partial model
+response cannot populate public `result`, Findings, Follow-ups, the round Result,
+Brief or Commit; a passed deterministic Artifact and EffectReceipt remain valid.
+The initial deterministic claim comparison is implemented for the TC-15
+`ux_prioritization_outcome`; other tasks without an admitted structured outcome
+remain `model_only/review_required` rather than being labeled verified.
+
 `source_documents` and `contract.allowed_file_refs` are the full safe workspace
 index. They are not the files read by the Analyst. The authoritative per-round
 evidence scope is `rounds[].input_file_refs`, and the public reason is

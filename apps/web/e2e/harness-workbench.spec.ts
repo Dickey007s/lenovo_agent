@@ -2011,7 +2011,7 @@ function uxPrioritizationEffectSnapshot(
   body: { workspace_id: string; instruction: string },
   variant: "canonical" | "threshold" = "canonical",
 ) {
-  const base = snapshot(body, "completed", 21);
+  const base = snapshot(body, "completed", 20);
   const manifest = structuredClone(
     variant === "threshold" ? tc15UXPrioritizationThresholdManifest : tc15UXPrioritizationManifest,
   );
@@ -2076,8 +2076,60 @@ function uxPrioritizationEffectSnapshot(
     key_outputs_label: "逐行覆盖与数据质量",
     download_path: `/v1/harness/runs/${base.run_id}/artifacts/${artifactIds[1]}`,
   }];
+  const narrativeResult = {
+    summary: `服务端已全量复算 ${outcome.analyzed_row_count}/${outcome.source_row_count} 行，形成 ${outcome.group_count} 个痛点组合；模型说明与这些事实一致。`,
+    findings: [{
+      finding_id: "finding-151515151515",
+      affected_branch_ids: [],
+      title: "完整日志优先级事实已核对",
+      detail: `当前分布为 ${priorityText}，具体优化方案仍待 UX 负责人批准。`,
+      fact_summary: `${outcome.group_count} 组排序来自完整工作簿、来源规则和页面规范的服务端复算。`,
+      impact: "该排序可作为人工排期输入，但不能证明用户体验已经改善。",
+      file_refs: sourceRefs,
+      evidence_anchors: [],
+      evidence_resolutions: [],
+      review: null,
+    }],
+    follow_ups: [],
+    review_required: true,
+  };
+  const reconciliation = {
+    reconciliation_id: "narrative-reconciliation-151515151515",
+    round_number: 1,
+    status: "consistent",
+    authority: "deterministic_outcome",
+    model_disposition: "adopted",
+    outcome_revision: "outcome-rev-1515151515151515",
+    effect_receipt_id: "effect-receipt-151515151515",
+    model_returned: true,
+    comparable_claim_count: 7,
+    conflicts: [],
+    message: "模型说明中的可比数字和优先级已与服务端全量复算一致。",
+    checked_at: new Date().toISOString(),
+    external_action: "none",
+  };
   return {
     ...base,
+    result: narrativeResult,
+    analysis_receipt: { called: true, model: "deepseek-v4-pro", elapsed_ms: 2180, output_used: true },
+    narrative_reconciliation: reconciliation,
+    rounds: [{
+      ...base.rounds[0],
+      result: narrativeResult,
+      analysis_receipt: { called: true, model: "deepseek-v4-pro", elapsed_ms: 2180, output_used: true },
+      narrative_reconciliation: reconciliation,
+    }],
+    artifact_versions: base.artifact_versions.map((artifact) => ({
+      ...artifact,
+      summary: narrativeResult.summary,
+      findings: narrativeResult.findings,
+      follow_ups: [],
+    })),
+    brief: base.brief ? {
+      ...base.brief,
+      summary: "确定性成果与模型说明已完成事实对账；当前排序仍需 UX 负责人复核。",
+      unresolved_gaps: [],
+    } : null,
     workspace_artifacts: artifacts,
     effect_receipts: [{
       receipt_id: "effect-receipt-151515151515",
@@ -2096,7 +2148,113 @@ function uxPrioritizationEffectSnapshot(
       created_at: new Date().toISOString(),
       external_action: "none",
     }],
+    events: [
+      ...base.events,
+      { sequence: 21, event_name: "narrative_reconciliation_completed", occurred_at: new Date().toISOString(), status: "analyzing", message: reconciliation.message, details: { status: "consistent", model_disposition: "adopted", output_used: true } },
+    ],
     last_event_sequence: 21,
+  };
+}
+
+function rejectedUXNarrativeSnapshot(body: { workspace_id: string; instruction: string }) {
+  const base = uxPrioritizationEffectSnapshot(body);
+  const reconciliation = {
+    ...base.narrative_reconciliation,
+    reconciliation_id: "narrative-reconciliation-151515151516",
+    status: "contradictory",
+    model_disposition: "rejected",
+    comparable_claim_count: 3,
+    conflicts: [{
+      conflict_id: "narrative-conflict-151515151501",
+      kind: "incomplete_coverage",
+      narrative_path: "result.summary",
+      narrative_excerpt: "日志文件仅展示前60行，本次分析基于已提供样本。",
+      outcome_path: "ux_prioritization_outcome.analyzed_row_count",
+      expected: "完整覆盖 212/212 行",
+      observed: "只覆盖 60 行",
+      severity: "error",
+    }, {
+      conflict_id: "narrative-conflict-151515151502",
+      kind: "priority_mismatch",
+      narrative_path: "result.findings[0].detail",
+      narrative_excerpt: "高频且严重按矩阵应 P0，但考虑后列为 P1。",
+      outcome_path: "ux_prioritization_outcome.groups[group-note-detail].priority",
+      expected: "P0",
+      observed: "P1",
+      severity: "error",
+    }, {
+      conflict_id: "narrative-conflict-151515151503",
+      kind: "redundant_completed_work",
+      narrative_path: "result.follow_ups[0]",
+      narrative_excerpt: "重新统计全部212行并据此完成排序。",
+      outcome_path: "ux_prioritization_outcome.analyzed_row_count",
+      expected: "全量 212 行已经完成复算",
+      observed: "再次要求统计 212 行",
+      severity: "warning",
+    }],
+    message: "模型说明与服务端全量复算冲突，未采用。",
+  };
+  return {
+    ...base,
+    result: null,
+    analysis_receipt: { ...base.analysis_receipt, output_used: false },
+    narrative_reconciliation: reconciliation,
+    rounds: base.rounds.map((round) => ({
+      ...round,
+      result: null,
+      analysis_receipt: { ...round.analysis_receipt, output_used: false },
+      narrative_reconciliation: reconciliation,
+    })),
+    artifact_versions: base.artifact_versions.map((artifact) => ({
+      ...artifact,
+      summary: "确定性成果已保留；模型说明未采用，以服务端全量复算为准。",
+      findings: [],
+      follow_ups: [],
+    })),
+    brief: {
+      ...base.brief,
+      summary: "成果已完成，模型说明未采用，以服务端全量复算为准。",
+    },
+    events: [
+      ...base.events.filter((event) => event.event_name !== "narrative_reconciliation_completed"),
+      { sequence: 21, event_name: "narrative_reconciliation_rejected", occurred_at: new Date().toISOString(), status: "analyzing", message: reconciliation.message, details: { status: "contradictory", model_disposition: "rejected", output_used: false } },
+    ],
+  };
+}
+
+function partialUXNarrativeSnapshot(body: { workspace_id: string; instruction: string }) {
+  const base = uxPrioritizationEffectSnapshot(body);
+  const reconciliation = {
+    ...base.narrative_reconciliation,
+    reconciliation_id: "narrative-reconciliation-151515151517",
+    status: "partial",
+    model_disposition: "supplemental",
+    comparable_claim_count: 0,
+    conflicts: [],
+    message: "模型说明没有提供足够的可比事实，只作补充。",
+  };
+  return {
+    ...base,
+    result: null,
+    analysis_receipt: { ...base.analysis_receipt, output_used: false },
+    narrative_reconciliation: reconciliation,
+    rounds: base.rounds.map((round) => ({
+      ...round,
+      result: null,
+      analysis_receipt: { ...round.analysis_receipt, output_used: false },
+      narrative_reconciliation: reconciliation,
+    })),
+    artifact_versions: base.artifact_versions.map((artifact) => ({
+      ...artifact,
+      summary: "确定性成果已保留；模型说明只作补充，以服务端全量复算为准。",
+      findings: [],
+      follow_ups: [],
+    })),
+    brief: { ...base.brief, summary: "成果已完成；模型说明只作补充，以服务端全量复算为准。" },
+    events: [
+      ...base.events.filter((event) => event.event_name !== "narrative_reconciliation_completed"),
+      { sequence: 21, event_name: "narrative_reconciliation_completed", occurred_at: new Date().toISOString(), status: "analyzing", message: reconciliation.message, details: { status: "partial", model_disposition: "supplemental", output_used: false } },
+    ],
   };
 }
 
@@ -2108,6 +2266,20 @@ function failedUXPrioritizationEffectSnapshot(body: { workspace_id: string; inst
   return {
     ...base,
     status: "failed",
+    result: null,
+    analysis_receipt: { ...base.analysis_receipt, output_used: false },
+    narrative_reconciliation: null,
+    rounds: base.rounds.map((round) => ({
+      ...round,
+      result: null,
+      analysis_receipt: { ...round.analysis_receipt, output_used: false },
+      narrative_reconciliation: null,
+    })),
+    artifact_versions: base.artifact_versions.map((artifact) => ({
+      ...artifact,
+      findings: [],
+      follow_ups: [],
+    })),
     workspace_artifacts: base.workspace_artifacts.map((artifact) => ({
       ...artifact,
       verifier_status: "failed",
@@ -2142,7 +2314,7 @@ function locationFailureSnapshot(body: { workspace_id: string; instruction: stri
 }
 async function fulfillJson(route: Route, body: unknown, status = 200) { await route.fulfill({ status, contentType: "application/json", body: JSON.stringify(body) }); }
 
-async function mockHarness(page: Page, options: { failFirstStart?: boolean; failDecisionDefer?: boolean; disconnect?: boolean; failed?: boolean; locationFailure?: boolean; sourceRecovery?: boolean; sourceRecoveryThreeCandidates?: boolean; verifiedArtifactAuditPending?: boolean; verifiedArtifactAuditPendingDistinct?: boolean; verifiedFinanceArtifactAuditPending?: boolean; unverifiedArtifactLocationPending?: boolean; terminalArtifactLocationPending?: boolean; boundedRecovery?: boolean; effectArtifact?: boolean; financePositiveCandidate?: boolean; financeVerifierFailed?: boolean; outboundEffect?: boolean; outboundEffectDynamic?: boolean; outboundEffectFailed?: boolean; reactEffect?: boolean; evaluationEffect?: boolean; dashboardEffect?: boolean; dashboardEffectFailed?: boolean; releaseEffect?: boolean; releaseEffectRepaired?: boolean; releaseEffectFailed?: boolean; candidateEffect?: boolean; candidateEffectImproved?: boolean; candidateEffectFailed?: boolean; customerEffect?: boolean; customerEffectThreshold?: boolean; customerEffectWitness?: boolean; customerEffectFailed?: boolean; sreEffect?: boolean; sreEffectDynamic?: boolean; sreEffectFailed?: boolean; uxEffect?: boolean; uxEffectThreshold?: boolean; uxEffectFailed?: boolean; legalEffect?: boolean; legalEffectRepaired?: boolean; legalEffectFailed?: boolean; effectBoundary?: boolean; reviewTable?: boolean; workspaceFailures?: number; interactiveLoop?: boolean; evidenceGate?: boolean } = {}) {
+async function mockHarness(page: Page, options: { failFirstStart?: boolean; failDecisionDefer?: boolean; disconnect?: boolean; failed?: boolean; locationFailure?: boolean; sourceRecovery?: boolean; sourceRecoveryThreeCandidates?: boolean; verifiedArtifactAuditPending?: boolean; verifiedArtifactAuditPendingDistinct?: boolean; verifiedFinanceArtifactAuditPending?: boolean; unverifiedArtifactLocationPending?: boolean; terminalArtifactLocationPending?: boolean; boundedRecovery?: boolean; effectArtifact?: boolean; financePositiveCandidate?: boolean; financeVerifierFailed?: boolean; outboundEffect?: boolean; outboundEffectDynamic?: boolean; outboundEffectFailed?: boolean; reactEffect?: boolean; evaluationEffect?: boolean; dashboardEffect?: boolean; dashboardEffectFailed?: boolean; releaseEffect?: boolean; releaseEffectRepaired?: boolean; releaseEffectFailed?: boolean; candidateEffect?: boolean; candidateEffectImproved?: boolean; candidateEffectFailed?: boolean; customerEffect?: boolean; customerEffectThreshold?: boolean; customerEffectWitness?: boolean; customerEffectFailed?: boolean; sreEffect?: boolean; sreEffectDynamic?: boolean; sreEffectFailed?: boolean; uxEffect?: boolean; uxEffectThreshold?: boolean; uxEffectFailed?: boolean; uxNarrativeRejected?: boolean; uxNarrativePartial?: boolean; legalEffect?: boolean; legalEffectRepaired?: boolean; legalEffectFailed?: boolean; effectBoundary?: boolean; reviewTable?: boolean; workspaceFailures?: number; interactiveLoop?: boolean; evidenceGate?: boolean } = {}) {
   let workspaceCalls = 0; let startCalls = 0; let streamCalls = 0;
   let currentBody = { workspace_id: "forte-public-office", instruction: "" };
   // Mock snapshots intentionally cover several server state shapes in one route.
@@ -2231,6 +2403,10 @@ async function mockHarness(page: Page, options: { failFirstStart?: boolean; fail
           ? sreDiagnosisEffectSnapshot(body, "dynamic")
         : options.sreEffect
           ? sreDiagnosisEffectSnapshot(body)
+        : options.uxNarrativeRejected
+          ? rejectedUXNarrativeSnapshot(body)
+        : options.uxNarrativePartial
+          ? partialUXNarrativeSnapshot(body)
         : options.uxEffectFailed
           ? failedUXPrioritizationEffectSnapshot(body)
         : options.uxEffectThreshold
@@ -3186,6 +3362,7 @@ test("projects TC-15 full-workbook prioritization, source boundaries, and no pro
 
   const artifacts = page.locator(".workspace-artifacts");
   const outcome = page.getByRole("region", { name: "交互痛点全量优先级复核" });
+  const reconciliation = page.getByRole("region", { name: "模型说明与服务端事实对账" });
   await expect(artifacts).toContainText("Agent 已生成 2 份真实成果文件");
   await expect(artifacts.locator(":scope > header > b")).toHaveText("87 组排序待 UX 负责人复核");
   await expect(outcome.getByRole("heading", { name: "这是固定公开日志的离线排序，不是用户研究、线上遥测、设计效果证明或自动修复" })).toBeVisible();
@@ -3199,6 +3376,8 @@ test("projects TC-15 full-workbook prioritization, source boundaries, and no pro
   await expect(outcome).toContainText("全部尚未发生");
   await expect(outcome).toContainText("没有修改生产界面、发布版本或创建 A/B 实验");
   await expect(artifacts).toContainText("不代表方案获批、体验改善或生产 UI 已修改");
+  await expect(reconciliation).toContainText("模型说明已与服务端事实对账");
+  await expect(reconciliation).toContainText("已采用");
   await expect(page.locator(".loop-effect-conclusion")).toContainText("具体优化方案");
 
   const saveGroup = outcome.locator(".ux-prioritization-groups details").filter({ hasText: "点击保存按钮" }).first();
@@ -3255,6 +3434,65 @@ test("projects TC-15 full-workbook prioritization, source boundaries, and no pro
   }
 });
 
+test("keeps one current TC-15 conclusion when the returned model narrative is rejected", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 1100 });
+  await mockHarness(page, { uxNarrativeRejected: true });
+  await page.goto("/");
+  await page.getByRole("textbox", { name: "任务指令" }).fill("基于完整交互行为日志和页面规范，给出痛点优先级与优化建议。");
+  await page.getByRole("button", { name: "启动 Control Loop" }).click();
+
+  const outcome = page.getByRole("region", { name: "交互痛点全量优先级复核" });
+  const reconciliation = page.getByRole("region", { name: "模型说明与服务端事实对账" });
+  await expect(outcome).toContainText("212/212 行完整覆盖");
+  await expect(outcome).toContainText("87 组 · P0 25 · P1 40 · P2 14 · P3 6 · P4 2");
+  await expect(reconciliation).toContainText("成果已完成，模型说明未采用");
+  await expect(reconciliation).toContainText("页面只展示服务端全量复算的当前结论");
+  const conflictDetails = reconciliation.locator(":scope > details");
+  await expect(conflictDetails).not.toHaveAttribute("open", "");
+  await expect(reconciliation.getByText("日志文件仅展示前60行，本次分析基于已提供样本。")).not.toBeVisible();
+  await conflictDetails.locator("summary").click();
+  await expect(reconciliation).toContainText("覆盖范围不完整");
+  await expect(reconciliation).toContainText("完整覆盖 212/212 行");
+
+  await page.getByRole("button", { name: /成果与建议/ }).click();
+  await expect(page.getByRole("heading", { name: "以服务端确定性成果为准" })).toBeVisible();
+  await expect(page.locator(".result-findings")).toHaveCount(0);
+  await expect(page.locator(".result-proposals")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "重新统计全部212行并据此完成排序。" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: /成果与建议/ })).not.toContainText("1");
+
+  let overflow = await page.evaluate(() => ({ width: document.documentElement.clientWidth, scroll: document.documentElement.scrollWidth }));
+  expect(overflow.scroll).toBeLessThanOrEqual(overflow.width);
+  if (process.env.CAPTURE_NARRATIVE_RECONCILIATION_EVIDENCE === "1") {
+    const financeFolder = page.getByRole("treeitem", { name: "收起文件夹 财务管理" });
+    if (await financeFolder.isVisible()) await financeFolder.click();
+    const uxFolder = page.getByRole("treeitem", { name: "展开文件夹 用户体验" });
+    if (await uxFolder.isVisible()) await uxFolder.click();
+    await reconciliation.evaluate((element) => element.scrollIntoView({ block: "center" }));
+    await page.screenshot({ path: "../../docs/evidence/screenshots/narrative-reconciliation-rejected-desktop-1440x1100.png" });
+  }
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(page.getByRole("heading", { name: "成果已完成，模型说明未采用" })).toBeVisible();
+  overflow = await page.evaluate(() => ({ width: document.documentElement.clientWidth, scroll: document.documentElement.scrollWidth }));
+  expect(overflow.scroll).toBeLessThanOrEqual(overflow.width);
+  if (process.env.CAPTURE_NARRATIVE_RECONCILIATION_EVIDENCE === "1") {
+    await reconciliation.evaluate((element) => element.scrollIntoView({ block: "center" }));
+    await page.screenshot({ path: "../../docs/evidence/screenshots/narrative-reconciliation-rejected-mobile-390x844.png" });
+  }
+});
+
+test("labels partial TC-15 model prose as supplemental without replacing the outcome", async ({ page }) => {
+  await mockHarness(page, { uxNarrativePartial: true });
+  await page.goto("/");
+  await page.getByRole("textbox", { name: "任务指令" }).fill("基于完整交互行为日志和页面规范，给出痛点优先级与优化建议。");
+  await page.getByRole("button", { name: "启动 Control Loop" }).click();
+
+  const reconciliation = page.getByRole("region", { name: "模型说明与服务端事实对账" });
+  await expect(reconciliation).toContainText("当前结论来自服务端复算，模型说明仅作补充");
+  await expect(reconciliation).toContainText("不能覆盖确定性成果");
+  await expect(page.getByRole("region", { name: "交互痛点全量优先级复核" })).toContainText("212/212 行完整覆盖");
+});
+
 test("projects TC-15 threshold changes without stale canonical totals", async ({ page }) => {
   await mockHarness(page, { uxEffectThreshold: true });
   await page.goto("/");
@@ -3286,6 +3524,9 @@ test("keeps TC-15 visibly red when either generated CSV fails independent verifi
   await expect(artifacts).toContainText("当前排序不得用于排期");
   await expect(artifacts).not.toContainText("12/12 项检查通过");
   await expect(artifacts).toContainText("没有修改生产界面、发布或创建实验");
+  await page.getByRole("button", { name: /成果与建议/ }).click();
+  await expect(page.getByRole("heading", { name: "尚未形成可采用的确定性成果" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "以服务端确定性成果为准" })).toHaveCount(0);
 });
 
 test("keeps deterministic verification separate from the TC-11 business release decision", async ({ page }) => {
