@@ -50,7 +50,7 @@
 - `$env:TEST_DATABASE_DSN=...; uv run pytest -q`：`370 passed in 357.59s`，12 项真实 PostgreSQL 集成门全部执行且没有跳过。
 - `uv run ruff check .`、公共 manifest `--check`、`pnpm --dir apps/web lint` 与 `pnpm --dir apps/web build` 均通过。
 - 全量浏览器：`60 passed`；其中 TC-15 canonical、动态阈值和 Verifier failure 为 `3 passed`。
-- [PR #67](https://github.com/Dickey007s/lenovo_agent/pull/67) 首轮远端 `durable-agent-control-loop` 已通过，用时 `53s`；最终文档提交仍需再次通过同一门后合并。
+- [PR #67](https://github.com/Dickey007s/lenovo_agent/pull/67) 的实现提交与最终文档提交两轮远端 `durable-agent-control-loop` 均通过，分别用时 `53s` 与 [`52s`](https://github.com/Dickey007s/lenovo_agent/actions/runs/33226953865/job/99032436192)。
 
 ## 前台证据
 
