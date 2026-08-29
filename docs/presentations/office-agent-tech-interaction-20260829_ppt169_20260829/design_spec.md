@@ -179,13 +179,13 @@ Catalog read: 71 templates
 | P07 | pipeline_with_stages | `templates/charts/pipeline_with_stages.svg` | "Pick for 3-5 horizontal pipeline stages, each = title + 1-line description + output artifact, connected by arrows (data pipelines, ETL, build pipelines)." | 技术责任变化如何进入用户流程和前台反馈 |
 | P09 | process_flow | `templates/charts/process_flow.svg` | "Pick for 3-8 sequential steps connected by simple arrows — approval workflows, customer onboarding, request handling, lifecycle stages." | Observe、Plan、Act、Verify、Commit 与控制环 |
 | P10 | vertical_list | `templates/charts/vertical_list.svg` | "Pick for 3-6 numbered key points each with a short description — design principles, core tenets, action items, key takeaways, recommendations, executive summary points." | 六个具体办公场景作为后续 Demo 入口 |
-| P17 | chevron_chain_with_tail | `templates/charts/chevron_chain_with_tail.svg` | "Pick for 4-6 sequential chevron blocks plus a final wedge representing aggregate outcome — Porter's value chain (primary + support activities mapped to margin), process leading to a summary deliverable, contribution chain to a result." | 五步路线图汇聚到“可证伪差异” |
+| P21 | chevron_chain_with_tail | `templates/charts/chevron_chain_with_tail.svg` | "Pick for 4-6 sequential chevron blocks plus a final wedge representing aggregate outcome — Porter's value chain (primary + support activities mapped to margin), process leading to a summary deliverable, contribution chain to a result." | 五步路线图汇聚到“可证伪差异” |
 
 **Runners-up considered**:
 
 - `comparison_table` | rejected for P06：会把官方说明误读为同场能力胜负，违背“不从未提及推断做不到”的边界。
 - `circular_stages` | rejected for P09：当前不是无限自治循环，受限 Loop 有明确预算、暂停和终点。
-- `roadmap_vertical` | rejected for P17：路线不是日历里程碑，而是多个工程能力汇聚成一个可证伪结论。
+- `roadmap_vertical` | rejected for P21：路线不是日历里程碑，而是多个工程能力汇聚成一个可证伪结论。
 
 ---
 
@@ -202,6 +202,10 @@ Catalog read: 71 templates
 | `tc15-ux-prioritization-desktop.png` | 1440×1100 | 1.31 | TC-15 完整数据排序与规则依据 | Screenshot | #48 Side-by-side comparison (before/after, A/B, then/now) + #46 Background image + bordered "lens" rectangle highlighting a sub-region | user | Existing | 与 TC-14 并列展示 |  |  |
 | `narrative-reconciliation-rejected-desktop-1440x1100.png` | 1440×1100 | 1.31 | 当前系统桌面端冲突说明拒绝态 | Screenshot | #48 Side-by-side comparison (before/after, A/B, then/now) + #70 Image with thin colored matte frame | user | Existing | 当前结论与说明采用回执 |  |  |
 | `narrative-reconciliation-rejected-mobile-390x844.png` | 390×844 | 0.46 | 当前系统移动端同一拒绝态 | Screenshot | #48 Side-by-side comparison (before/after, A/B, then/now) + #70 Image with thin colored matte frame | user | Existing | 和桌面截图形成跨端对照 |  |  |
+| `dr-0036-tc01-live-run-completed.png` | 1440×1000 | 1.44 | 当前系统完整 Run：自然语言目标、全库检索、真实成果与有序 Trace | Screenshot | #19 Image floating in whitespace with thin frame and caption | user | Existing | 新增实操页主图，不裁掉输入区、成果卡或右侧 Trace |  |  |
+| `scenario-effect-gate-desktop.png` | 1280×720 | 1.78 | 当前系统真实成果、确定性检查与 EffectReceipt 全景 | Screenshot | #48 Side-by-side comparison + #70 thin matte frame | user | Existing | 展示成果文件与验证回执分层 |  |  |
+| `dr-0034-mixed-branch-actions-desktop.png` | 761×361 | 2.11 | 不同 Branch 的补定位与继续动作 | Screenshot | #46 bordered lens + inset | user | Existing | 作为局部恢复页的小图，不冒充完整运行证明 |  |  |
+| `dr-0037-review-readability-desktop.png` | 1380×972 | 1.42 | 可读性改进后的证据复核页 | Screenshot | #19 Image floating in whitespace with thin frame and caption | user | Existing | 展示事实、影响、动作、原文位置与安全预览 |  |  |
 
 所有截图均为当前系统实测留痕，不作为外部研究来源。竞品与技术方向页只使用线上官方页面、论文与正式用户交互研究，不生成或伪造竞品运行截图。现场反馈截图只标为“用户反馈样本”，不冒充正式目标用户研究。
 
@@ -286,13 +290,35 @@ Catalog read: 71 templates
 
 - **Content**: 完整 212 行 → 87 组与两份 passed CSV；模型若声称只看 60 行或改写 P0，服务端显示 `called=true` 但 `output_used=false`，只保留一个当前结论。强调这是固定场景一致性验证，不是通用真值证明器。
 
-### Part 4: 前台输出、研究与下一步
+### Part 4: 前台输出与实操纵切
 
 #### Slide 16 - 前台交互要回答五个问题
 
 - **Content**: 现在完成了什么、依据是什么、为什么停、我确认后会改变什么、什么绝不会发生；把成果置顶、状态可解释、证据可回开、局部决定和未执行边界落到桌面/移动端。研究依据为 Microsoft HAI Guidelines、W3C Status Messages、W3C Target Size 与 Google HEART；当前截图和现场反馈不是正式用户研究。
 
-#### Slide 17 - 下一阶段：把 07-16 方向变成可证伪证据
+#### Slide 17 - 我们到底做了什么：一条可核对的办公任务纵切
+
+- **Layout**: 左侧五步纵向链，右侧放当前完整 Run 实景。
+- **Content**: 15 个目录、96 份文件的安全资料库；自然语言任务；服务端计划与 Branch；Planner/Analyst 调用和采用回执；真实成果、确定性校验、Snapshot 与有序 Trace。明确当前纵切仍是有界只读研究和固定成果适配器。
+
+#### Slide 18 - 实操 1：用户只说目标，Agent 自主选择资料
+
+- **Layout**: 左侧 2/3 使用完整 Run 截图，右侧依次解释用户动作、服务端事实和前台反馈。
+- **Content**: 浏览器不提交 `selected_file_refs`；服务端冻结完整 allowlisted 输入索引；Planner 只看安全元数据并选择本轮证据；前台显示选中资料、模型是否采用、剩余预算和实时 Trace。自主选择不等于穷举正确。
+
+#### Slide 19 - 实操 2：证据有歧义，只恢复受影响的分支
+
+- **Layout**: 大图展示可读性改进后的证据复核页，小图展示不同 Branch 的处理动作。
+- **Content**: 用户先看事实、影响、下一步，再在安全预览里确认原文位置；选择只改变目标 Branch，已完成成果和其他 Branch 保留。选择的是来源位置，不是让用户替 Agent 对结论背书。
+
+#### Slide 20 - 实操 3：成果可检查，模型说明不覆盖事实
+
+- **Layout**: 左右并列真实成果/EffectReceipt 与模型说明拒绝态。
+- **Content**: 固定场景适配器在隔离 Run 工作区生成文件并执行具名确定性检查；模型 `called=true` 但与确定性结果冲突时 `output_used=false`；前台只保留一个当前结论，审计轨迹保留被拒说明。当前检查不等于通用语义真值证明。
+
+### Part 5: 研究与下一步
+
+#### Slide 21 - 下一阶段：把 07-16 方向变成可证伪证据
 
 - **Visualization**: `chevron_chain_with_tail`
 - **Content**: 原生 Locator → 携证成果包 → 通用业务 Verifier → Worker/Tool/Connector → 固定配置竞品挑战与目标用户研究；只有同场任务和用户研究通过后，差异候选才能升级为已验证优势。
@@ -304,7 +330,7 @@ Catalog read: 71 templates
 One speaker note file per page, saved to `notes/`:
 
 - **Filename**: match SVG name, for example `01_cover.md`.
-- **Total duration**: 28–32 minutes.
+- **Total duration**: 34–38 minutes.
 - **Style**: 中文会议主讲，结论先行；每页先说“这页要证明什么”，再说“事实、交互影响、边界”。
 - **Source retention**: 竞品、技术演进、交互设计和用户研究页在备注中保留线上官方页面、论文或研究页面的完整 URL；项目事实只标“当前系统实测”并说明测试范围，不把 README、Decision、Scenario 或内部报告列成研究来源。
 - **07-16 continuity**: 备注明确哪些判断沿用 07-16，哪些是当前系统实测补充，避免把新增字段名讲成新的产品概念。

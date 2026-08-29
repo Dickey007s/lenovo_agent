@@ -56,6 +56,10 @@
 - tc15_ux: images/tc15-ux-prioritization-desktop.png | no-crop
 - reconciliation_desktop: images/narrative-reconciliation-rejected-desktop-1440x1100.png | no-crop
 - reconciliation_mobile: images/narrative-reconciliation-rejected-mobile-390x844.png | no-crop
+- live_run_completed: images/dr-0036-tc01-live-run-completed.png | no-crop
+- effect_gate_full: images/scenario-effect-gate-desktop.png | no-crop
+- mixed_branch_actions: images/dr-0034-mixed-branch-actions-desktop.png | no-crop
+- review_readability: images/dr-0037-review-readability-desktop.png | no-crop
 
 ## page_rhythm
 - P01: anchor
@@ -74,7 +78,11 @@
 - P14: dense
 - P15: dense
 - P16: dense
-- P17: anchor
+- P17: dense
+- P18: dense
+- P19: dense
+- P20: dense
+- P21: anchor
 
 ## page_charts
 - P03: layered_architecture
@@ -84,7 +92,7 @@
 - P07: pipeline_with_stages
 - P09: process_flow
 - P10: vertical_list
-- P17: chevron_chain_with_tail
+- P21: chevron_chain_with_tail
 
 ## provenance
 - narrative_base: 07-16 future office agent deck
