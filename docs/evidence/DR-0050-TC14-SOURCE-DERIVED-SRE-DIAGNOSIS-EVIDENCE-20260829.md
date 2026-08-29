@@ -2,7 +2,7 @@
 
 ## 当前结论
 
-`Draft`，仅待 PR/远端 PostgreSQL 门与最终合并 SHA。固定 SRE-010 纵切的严格来源合同、动态观察/冲突/假设/提案、两份成果独立复核、真实 `deepseek-v4-pro`、本地 PostgreSQL 进程重启、完整本地工程门和前台截图均已通过；在远端门完成前仍不标 `Limited Verified`。
+`Limited Verified`。固定 SRE-010 纵切的严格来源合同、动态观察/冲突/假设/提案、两份成果独立复核、真实 `deepseek-v4-pro`、本地 PostgreSQL 进程重启、完整本地工程门、前台截图和 PR #66 远端 PostgreSQL 门均已通过。实现提交为 `802a65c`；远端门见 [durable-agent-control-loop](https://github.com/Dickey007s/lenovo_agent/actions/runs/33222157204/job/99018294686)。
 
 ## 历史基线为何不足
 
@@ -45,6 +45,7 @@
 - `$env:TEST_DATABASE_DSN=...; uv run pytest -q`：`329 passed in 343.63s`。
 - `uv run ruff check .`、公共 manifest `--check`、`pnpm --dir apps/web lint` 与 `pnpm --dir apps/web build` 均通过。
 - 全量浏览器：`57 passed`；其中 TC-14 canonical、动态节点/QPS 和 Verifier failure 为 `3 passed`。
+- [PR #66](https://github.com/Dickey007s/lenovo_agent/pull/66) 的远端 `durable-agent-control-loop` 于 2026-08-29 通过，用时 `51s`。
 
 ## 前台证据
 
@@ -52,9 +53,9 @@
 - 390×844 单栏截图：[`tc14-sre-diagnosis-mobile.png`](screenshots/tc14-sre-diagnosis-mobile.png)。长中文、指标和状态无页面级横向溢出。
 - 尺寸、bytes、SHA 与捕获方式：[`tc14-ui-screenshots-20260829.json`](manifests/tc14-ui-screenshots-20260829.json)。截图是受控 E2E 投影，不是用户研究。
 
-## 待补证据
+## 仍然缺少的证据
 
-- PR、远端 PostgreSQL workflow、最终合并 SHA 与最新 master 服务恢复。其余本地/真实 Run 门已闭合。
+- 自动化、真实 Provider、下载复核与顺序 PostgreSQL 恢复不能证明真实 SRE 用户理解、生产集群状态、根因因果、提案有效性或现场审批。
 
 ## 不能支持的结论
 

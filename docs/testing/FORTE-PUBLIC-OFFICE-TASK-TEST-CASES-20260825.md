@@ -57,7 +57,7 @@ CSS、HTML、shell、log 等。它们覆盖结构化表格、长文档、扫描/
 | `TC-11` | `pm-014` | 上线合规与风险评估 | MD + 3 个 XLSX | Demo 2 多任务 | 来源推导风险、正式 Gate、结构化报告与台账 | `Limited Verified`（DR-0043、PR #57/#58、Run `harness:d1a3d9fca21d4e2299ac308bbaf73e1e`）：18 行台账、四条正式 Gate、动态风险/未提测数量、PRD 等级来源变异、负向门、DOCX/CSV 下载解析与 PostgreSQL 顺序恢复；固定适配器，没有多 Worker 或真实发布 |
 | `TC-12` | `qa-003` | 为看板工具库补测试并修复源码 | JS + JSON | Demo 2 多任务 | 固定测试执行、隔离代码写入 | `Limited Verified`（DR-0042、PR #54/#55、Run `harness:d9355005af924d57bb1e9c526adca072`）：完整 11 文件副本，同一 71 项 Vitest 先红后绿、逐文件 coverage、独立复跑；固定 qa-003 适配器，没有自动 PR 或 OS 级断网 |
 | `TC-13` | `sales-020` | 客户画像清洗与销售策略 | CSV + MD | Demo 1/2 | 来源推导清洗、重复假设、策略复核 | `Limited Verified`（DR-0049、Run `harness:80a5e5c91a294ee687f28eed731570d3`）：Markdown + 逐原始行 CSV，8 项独立来源/成果检查；当前动态 11/10/1/8/2/3、画像 3/3/2、priority witness 0；固定公开样本适配器，不是客户研究、CRM 或销售效果证明 |
-| `TC-14` | `sre-010` | 大促 ES 日志离线复盘与条件式止损提案 | TXT log | Demo 1 + Demo 3 | 来源冲突、根因假设、未解析目标与禁止执行 | `Draft`（DR-0050，待真实 Run/PR 收口）：来源推导 Markdown + CSV、12 项独立检查；当前动态 232 行、167 条观察、3 组来源冲突、2 个假设、8 个 ES + 3 个业务提案，全部未执行 |
+| `TC-14` | `sre-010` | 大促 ES 日志离线复盘与条件式止损提案 | TXT log | Demo 1 + Demo 3 | 来源冲突、根因假设、未解析目标与禁止执行 | `Limited Verified`（DR-0050、PR #66、Run `harness:fe527536c857404f88f46d9a68b09397`）：来源推导 Markdown + CSV、12 项独立检查；当前动态 232 行、167 条观察、3 组来源冲突、2 个假设、8 个 ES + 3 个业务提案；真实 Provider、下载解析和 PostgreSQL 顺序恢复通过，全部动作未执行 |
 | `TC-15` | `uiux-021` | 交互痛点归因与优先级排序 | XLSX + MD + DOCX | Demo 2 多任务 | 排序验证、CSV 写入 | `Limited Verified`：真实 CSV + 6 项 P0-P4/稳定排序检查 |
 
 ## 5. 单任务有界循环用例

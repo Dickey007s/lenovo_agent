@@ -1,6 +1,6 @@
 # DR-0050：TC-14 来源推导 SRE 复盘、冲突保留与未执行提案
 
-- 状态：Draft；来源合同、动态解析、两份工件独立 Verifier 与前台四层事实已实现，真实 Provider/PostgreSQL/PR 证据待本分支收口
+- 状态：Limited Verified；实现 `802a65c`，PR #66 远端 PostgreSQL 门、真实 Provider、下载解析与 PostgreSQL 进程重启均通过
 - 日期：2026-08-29
 - Source：`USER-FEEDBACK-20260829-TC14-SOURCE-DERIVED-SRE-DIAGNOSIS`
 - Scenario：`SCENARIO-035`
