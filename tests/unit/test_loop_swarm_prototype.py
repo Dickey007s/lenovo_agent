@@ -59,7 +59,15 @@ def test_target_architecture_does_not_claim_future_capabilities_are_implemented(
 
     assert "不是当前能力清单" in content
     assert "尚未完成的目标能力" in content
-    assert "当前执行结果仍全部来自 Simulator" in content
+    assert "default 12-round" in content
+    assert "stable business `task_id`" in content
+    assert "`TopologyAdmission`" in content
+    assert "starts at most three read-only Workers" in content
+    assert "Tool Gateway" in content
+    assert "real Connectors" in content
+    assert "Writable office Artifacts" in content
+    assert "multi-instance leases" in content
+    assert "Current `Limited Verified` facts" in content
 
 
 def test_final_reference_set_preserves_the_reviewed_prototype() -> None:
