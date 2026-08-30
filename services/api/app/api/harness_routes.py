@@ -17,6 +17,7 @@ from services.api.app.application.harness_runtime import (
     HarnessNotFoundError,
     HarnessRunStart,
     HarnessContinuationRequest,
+    HarnessReadonlyWorkersRequest,
     HarnessRuntime,
 )
 from services.api.app.application.benchmark_scenario_catalog import BenchmarkScenarioError
@@ -121,6 +122,30 @@ async def list_harness_runs(
 ):
     snapshots = await runtime.list(owner_id)
     return {"runs": [runtime.public_snapshot(item) for item in snapshots[:limit]]}
+
+
+@router.post("/runs/{run_id}/workers", status_code=status.HTTP_202_ACCEPTED)
+async def execute_harness_workers(
+    run_id: str,
+    body: HarnessReadonlyWorkersRequest,
+    owner_id: Annotated[str, Depends(harness_owner)],
+    runtime: Annotated[HarnessRuntime, Depends(get_harness_runtime)],
+):
+    """Execute explicitly confirmed, admitted read-only Branch workers."""
+    try:
+        snapshot = await runtime.execute_admitted_workers_from_branches(
+            owner_id,
+            run_id,
+            branch_ids=body.branch_ids,
+            expected_version=body.expected_version,
+            idempotency_key=body.idempotency_key,
+            user_confirmed=body.confirmed,
+        )
+        return runtime.public_snapshot(snapshot)
+    except HarnessNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except HarnessConflictError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
 
 
 @router.get("/runs/{run_id}")

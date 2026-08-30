@@ -9,10 +9,9 @@ from .models import StrictModel
 
 
 ExecutionMode = Literal[
-    "tool_call",
-    "single_agent",
+    "single_controller",
     "fixed_workflow",
-    "adaptive_swarm",
+    "adaptive_readonly_workers",
 ]
 AdmissionStatus = Literal["recommended", "route_selected"]
 RouteSelectionSource = Literal["admission", "user_override"]
@@ -347,7 +346,7 @@ class Demo2ExecutionSnapshot(StrictModel):
     execution_id: str = Field(min_length=1, max_length=160)
     owner_id: str = Field(min_length=1, max_length=120)
     work_item_id: str = Field(min_length=1, max_length=120)
-    mode: Literal["adaptive_swarm"] = "adaptive_swarm"
+    mode: Literal["adaptive_readonly_workers"] = "adaptive_readonly_workers"
     status: ExecutionStatus
     version: int = Field(ge=1)
     last_event_sequence: int = Field(ge=0)
