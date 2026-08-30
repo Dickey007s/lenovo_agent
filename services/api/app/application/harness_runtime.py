@@ -403,7 +403,9 @@ class HarnessReadonlyWorkersRequest(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    branch_ids: list[str] = Field(min_length=1, max_length=3)
+    # Optional for the cockpit: the Scheduler's ready_branch_ids are the
+    # authority when the client does not provide an explicit subset.
+    branch_ids: list[str] = Field(default_factory=list, max_length=3)
     idempotency_key: str = Field(min_length=8, max_length=160)
     expected_version: int = Field(ge=1)
     confirmed: bool = False
@@ -1629,6 +1631,12 @@ class HarnessRuntime:
         snapshot = await self.get(owner_id, run_id)
         if self.analyst is None:
             raise HarnessConflictError("只读 Worker 分析器尚未配置")
+        if not branch_ids:
+            latest_step = snapshot.rounds[-1].next_step if snapshot.rounds else None
+            branch_ids = list(latest_step.ready_branch_ids) if latest_step else []
+            if not branch_ids:
+                branch_ids = [item.branch_id for item in snapshot.branches if item.status == "running"]
+            branch_ids = branch_ids[:3]
         branches = [self._branch_by_id(snapshot.branches, item) for item in branch_ids]
         if any(item is None for item in branches):
             raise HarnessConflictError("Worker 分支不存在")
