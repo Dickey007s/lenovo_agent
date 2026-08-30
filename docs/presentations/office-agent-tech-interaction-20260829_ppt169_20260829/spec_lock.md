@@ -82,7 +82,10 @@
 - P18: dense
 - P19: dense
 - P20: dense
-- P21: anchor
+- P21: dense
+- P22: dense
+- P23: dense
+- P24: anchor
 
 ## page_charts
 - P03: layered_architecture
@@ -92,7 +95,7 @@
 - P07: pipeline_with_stages
 - P09: process_flow
 - P10: vertical_list
-- P21: chevron_chain_with_tail
+- P24: chevron_chain_with_tail
 
 ## provenance
 - narrative_base: 07-16 future office agent deck

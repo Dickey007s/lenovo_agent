@@ -20,7 +20,10 @@
 | 09 | P11 Agent Control Loop | 当前模块级完成度 |
 | 10-15 | P12、P20、P21 的 Demo 讲法 | 六个真实办公场景 |
 | 17-20 | 07-16 的“持续、协作、治理、交付”主张 | 当前系统真实界面的完整操作纵切 |
-| 21 | P23-P24 路线与结论 | 可证伪挑战和目标用户研究门 |
+| 21 | P12 Demo 1：受控持久任务 | 当前 Branch、Evidence Gate、ArtifactVersion 与恢复的真实映射；跨端和长期 Worker 仍为目标 |
+| 22 | P20 Demo 2：智能工作驾驶舱 | 保留聚合、排序、路由与 Adaptive Swarm 目标；明确当前没有通用多 Worker |
+| 23 | P21 Demo 3：真实动作前的 Risk Gate | 保留 L0-L5 与 Permit 目标；补当前 Artifact、EffectReceipt 和“未发生”界面实测 |
+| 24 | P23-P24 路线与结论 | 可证伪挑战和目标用户研究门 |
 
 ## 竞品官方资料
 
@@ -49,10 +52,12 @@
    https://modelcontextprotocol.io/specification/draft/client/elicitation
 5. A2A Protocol，`Specification`：Task 状态、消息、Artifact 与输入需求。  
    https://a2a-protocol.org/dev/specification/
-6. LangGraph，`Persistence` 与 `Time travel`：Checkpoint、恢复点、状态复用和分支重跑。  
+6. OpenAI Agents SDK，`Human-in-the-loop`：在敏感工具调用前暂停，保存状态，并在批准、拒绝或修改后恢复。
+   https://openai.github.io/openai-agents-python/human_in_the_loop/
+7. LangGraph，`Persistence` 与 `Time travel`：Checkpoint、恢复点、状态复用和分支重跑。
    https://docs.langchain.com/oss/javascript/langgraph/persistence  
    https://docs.langchain.com/oss/python/langgraph/use-time-travel
-7. W3C，`PROV-O`：Entity、Activity、Agent、生成、使用和修订关系。  
+8. W3C，`PROV-O`：Entity、Activity、Agent、生成、使用和修订关系。
    https://www.w3.org/TR/prov-o/
 
 ## 人机交互与用户研究依据

@@ -1,0 +1,143 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720" width="1280" height="720">
+  <g id="background">
+    <rect width="1280" height="720" fill="#F7F8FA" />
+    <path d="M52 112H1228" fill="none" stroke="#CBD5DF" stroke-width="2" />
+  </g>
+  <g id="header">
+    <text x="52" y="78" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="46" font-weight="700" fill="#132A3A">Demo 2：组织维复杂性，驾驶舱怎样分配工作</text>
+    <path fill="#EDF1F4" d="M1078,45 H1222 A6,6 0 0 1 1228,51 V73 A6,6 0 0 1 1222,79 H1078 A6,6 0 0 1 1072,73 V51 A6,6 0 0 1 1078,45 Z" />
+    <text x="1150" y="68" text-anchor="middle" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#1769E0">07-16 目标演示</text>
+    <text x="52" y="146" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#5A6B7C">Swarm 不是新的聊天入口，而是驾驶舱在复杂任务上选择的一种执行方式；简单工作继续走更低成本的路径。</text>
+  </g>
+
+  <g id="cockpit-intake">
+    <text x="52" y="188" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="24" font-weight="700" fill="#132A3A">1. 聚合工作信号，先形成统一待办</text>
+    <path fill="#FFFFFF" stroke="#CBD5DF" stroke-width="2" d="M58,208 H1222 A6,6 0 0 1 1228,214 V298 A6,6 0 0 1 1222,304 H58 A6,6 0 0 1 52,298 V214 A6,6 0 0 1 58,208 Z" />
+    <path fill="#EDF1F4" d="M76,228 H176 A6,6 0 0 1 182,234 V276 A6,6 0 0 1 176,282 H76 A6,6 0 0 1 70,276 V234 A6,6 0 0 1 76,228 Z" />
+
+  <g transform="translate(82, 242)" fill="none" stroke="#1769E0" stroke-width="2">
+    <path d="M3 20l1.3 -3.9c-2.324 -3.437 -1.426 -7.872 2.1 -10.374c3.526 -2.501 8.59 -2.296 11.845 .48c3.255 2.777 3.695 7.266 1.029 10.501c-2.666 3.235 -7.615 4.215 -11.574 2.293l-4.7 1" />
+  </g>
+    <text x="116" y="261" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#132A3A">邮件</text>
+    <path fill="#EDF1F4" d="M200,228 H300 A6,6 0 0 1 306,234 V276 A6,6 0 0 1 300,282 H200 A6,6 0 0 1 194,276 V234 A6,6 0 0 1 200,228 Z" />
+
+  <g transform="translate(206, 242)" fill="none" stroke="#1769E0" stroke-width="2">
+    <path d="M8 7a4 4 0 1 0 8 0a4 4 0 0 0 -8 0" />
+    <path d="M6 21v-2a4 4 0 0 1 4 -4h4" />
+    <path d="M15 19l2 2l4 -4" />
+  </g>
+    <text x="240" y="261" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#132A3A">CRM</text>
+    <path fill="#EDF1F4" d="M324,228 H424 A6,6 0 0 1 430,234 V276 A6,6 0 0 1 424,282 H324 A6,6 0 0 1 318,276 V234 A6,6 0 0 1 324,228 Z" />
+
+  <g transform="translate(330, 242)" fill="none" stroke="#1769E0" stroke-width="2">
+    <path d="M3 9a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v9a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2l0 -9" />
+    <path d="M8 7v-2a2 2 0 0 1 2 -2h4a2 2 0 0 1 2 2v2" />
+    <path d="M12 12l0 .01" />
+    <path d="M3 13a20 20 0 0 0 18 0" />
+  </g>
+    <text x="364" y="261" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#132A3A">项目</text>
+    <path fill="#EDF1F4" d="M448,228 H548 A6,6 0 0 1 554,234 V276 A6,6 0 0 1 548,282 H448 A6,6 0 0 1 442,276 V234 A6,6 0 0 1 448,228 Z" />
+
+  <g transform="translate(454, 242)" fill="none" stroke="#1769E0" stroke-width="2">
+    <path d="M14 3v4a1 1 0 0 0 1 1h4" />
+    <path d="M17 21h-10a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2" />
+    <path d="M8 11h8v7h-8l0 -7" />
+    <path d="M8 15h8" />
+    <path d="M11 11v7" />
+  </g>
+    <text x="488" y="261" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#132A3A">报销</text>
+    <path fill="#EDF1F4" d="M572,228 H672 A6,6 0 0 1 678,234 V276 A6,6 0 0 1 672,282 H572 A6,6 0 0 1 566,276 V234 A6,6 0 0 1 572,228 Z" />
+
+  <g transform="translate(578, 242)" fill="none" stroke="#1769E0" stroke-width="2">
+    <path d="M4 16l6 -7l5 5l5 -6" />
+    <path d="M14 14a1 1 0 1 0 2 0a1 1 0 1 0 -2 0" />
+    <path d="M9 9a1 1 0 1 0 2 0a1 1 0 1 0 -2 0" />
+    <path d="M3 16a1 1 0 1 0 2 0a1 1 0 1 0 -2 0" />
+    <path d="M19 8a1 1 0 1 0 2 0a1 1 0 1 0 -2 0" />
+  </g>
+    <text x="612" y="261" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#132A3A">日历</text>
+    <path d="M694 255H736" fill="none" stroke="#1769E0" stroke-width="3" /><path d="M736 255L726 249V261Z" fill="#1769E0" />
+    <path fill="#132A3A" d="M758,220 H1200 A6,6 0 0 1 1206,226 V284 A6,6 0 0 1 1200,290 H758 A6,6 0 0 1 752,284 V226 A6,6 0 0 1 758,220 Z" />
+    <text x="774" y="248" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="24" font-weight="700" fill="#FFFFFF">智能工作驾驶舱</text>
+    <text x="774" y="274" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#CBD5DF">今日重点排序 · 解释截止时间与业务影响 · 用户可调整优先级</text>
+  </g>
+
+  <g id="routing">
+    <text x="52" y="342" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="24" font-weight="700" fill="#132A3A">2. 每项待办选择成本合适的执行方式</text>
+    <path fill="#FFFFFF" stroke="#1769E0" stroke-width="2" d="M58,362 H310 A6,6 0 0 1 316,368 V454 A6,6 0 0 1 310,460 H58 A6,6 0 0 1 52,454 V368 A6,6 0 0 1 58,362 Z" />
+
+  <g transform="translate(70, 382) scale(1.08333)" fill="none" stroke="#1769E0" stroke-width="2">
+    <path d="M9.785 6l8.215 8.215l-2.054 2.054a5.81 5.81 0 1 1 -8.215 -8.215l2.054 -2.054" />
+    <path d="M4 20l3.5 -3.5" />
+    <path d="M15 4l-3.5 3.5" />
+    <path d="M20 9l-3.5 3.5" />
+  </g>
+    <text x="108" y="402" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="24" font-weight="700" fill="#132A3A">Tool Call</text>
+    <text x="70" y="434" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#5A6B7C">简单查证或单步调用</text>
+    <path fill="#FFFFFF" stroke="#1769E0" stroke-width="2" d="M334,362 H586 A6,6 0 0 1 592,368 V454 A6,6 0 0 1 586,460 H334 A6,6 0 0 1 328,454 V368 A6,6 0 0 1 334,362 Z" />
+
+  <g transform="translate(346, 382) scale(1.08333)" fill="none" stroke="#1769E0" stroke-width="2">
+    <path d="M6 6a2 2 0 0 1 2 -2h8a2 2 0 0 1 2 2v4a2 2 0 0 1 -2 2h-8a2 2 0 0 1 -2 -2l0 -4" />
+    <path d="M12 2v2" />
+    <path d="M9 12v9" />
+    <path d="M15 12v9" />
+    <path d="M5 16l4 -2" />
+    <path d="M15 14l4 2" />
+    <path d="M9 18h6" />
+    <path d="M10 8v.01" />
+    <path d="M14 8v.01" />
+  </g>
+    <text x="384" y="402" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="24" font-weight="700" fill="#132A3A">Single Agent</text>
+    <text x="346" y="434" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#5A6B7C">独立草稿与单任务处理</text>
+    <path fill="#FFFFFF" stroke="#1769E0" stroke-width="2" d="M610,362 H862 A6,6 0 0 1 868,368 V454 A6,6 0 0 1 862,460 H610 A6,6 0 0 1 604,454 V368 A6,6 0 0 1 610,362 Z" />
+
+  <g transform="translate(622, 382) scale(1.08333)" fill="none" stroke="#1769E0" stroke-width="2">
+    <path d="M3 19a2 2 0 1 0 4 0a2 2 0 0 0 -4 0" />
+    <path d="M19 7a2 2 0 1 0 0 -4a2 2 0 0 0 0 4" />
+    <path d="M11 19h5.5a3.5 3.5 0 0 0 0 -7h-8a3.5 3.5 0 0 1 0 -7h4.5" />
+  </g>
+    <text x="660" y="402" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="24" font-weight="700" fill="#132A3A">Fixed Workflow</text>
+    <text x="622" y="434" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#5A6B7C">稳定、重复、步骤明确</text>
+    <path fill="#EDF1F4" stroke="#D97706" stroke-width="2" stroke-dasharray="8 6" d="M886,362 H1222 A6,6 0 0 1 1228,368 V454 A6,6 0 0 1 1222,460 H886 A6,6 0 0 1 880,454 V368 A6,6 0 0 1 886,362 Z" />
+
+  <g transform="translate(898, 382) scale(1.08333)" fill="none" stroke="#D97706" stroke-width="2">
+    <path d="M5 18a2 2 0 1 0 4 0a2 2 0 1 0 -4 0" />
+    <path d="M5 6a2 2 0 1 0 4 0a2 2 0 1 0 -4 0" />
+    <path d="M15 6a2 2 0 1 0 4 0a2 2 0 1 0 -4 0" />
+    <path d="M7 8l0 8" />
+    <path d="M9 18h6a2 2 0 0 0 2 -2v-5" />
+    <path d="M14 14l3 -3l3 3" />
+  </g>
+    <text x="936" y="402" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="24" font-weight="700" fill="#132A3A">Adaptive Swarm</text>
+    <text x="898" y="434" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#5A6B7C">高价值 · 跨来源 · 可并行 · 预算可承受</text>
+  </g>
+
+  <g id="swarm-path">
+    <text x="52" y="500" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="24" font-weight="700" fill="#132A3A">3. 复杂任务通过 Admission 后，围绕共享成果协作</text>
+    <path fill="#FFFFFF" stroke="#CBD5DF" stroke-width="2" d="M58,520 H866 A6,6 0 0 1 872,526 V606 A6,6 0 0 1 866,612 H58 A6,6 0 0 1 52,606 V526 A6,6 0 0 1 58,520 Z" />
+    <text x="76" y="556" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="17" font-weight="700" fill="#1769E0">Admission</text>
+    <path d="M168 550H202" fill="none" stroke="#1769E0" stroke-width="3" /><path d="M202 550L192 544V556Z" fill="#1769E0" />
+    <text x="220" y="556" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="17" font-weight="700" fill="#132A3A">Supervisor</text>
+    <path d="M322 550H356" fill="none" stroke="#1769E0" stroke-width="3" /><path d="M356 550L346 544V556Z" fill="#1769E0" />
+    <text x="374" y="556" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="17" font-weight="700" fill="#132A3A">Dynamic Workers</text>
+    <path d="M520 550H554" fill="none" stroke="#1769E0" stroke-width="3" /><path d="M554 550L544 544V556Z" fill="#1769E0" />
+    <text x="572" y="556" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="17" font-weight="700" fill="#132A3A">Shared Artifact</text>
+    <path d="M706 550H740" fill="none" stroke="#1769E0" stroke-width="3" /><path d="M740 550L730 544V556Z" fill="#1769E0" />
+    <text x="758" y="556" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="17" font-weight="700" fill="#132A3A">Verifier</text>
+    <text x="76" y="588" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="14" fill="#5A6B7C">Conflict Resolver 只在冲突时介入；统一成果、待确认事项和 Trace 最终回到同一个驾驶舱。</text>
+    <path fill="#FFFFFF" stroke="#D97706" stroke-width="2" d="M900,500 H1222 A6,6 0 0 1 1228,506 V606 A6,6 0 0 1 1222,612 H900 A6,6 0 0 1 894,606 V506 A6,6 0 0 1 900,500 Z" />
+    <path fill="#EDF1F4" d="M919,518 H983 A5,5 0 0 1 988,523 V539 A5,5 0 0 1 983,544 H919 A5,5 0 0 1 914,539 V523 A5,5 0 0 1 919,518 Z" />
+    <text x="951" y="537" text-anchor="middle" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="14" font-weight="700" fill="#B54708">当前边界</text>
+    <text x="914" y="566" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#1B2733">当前是单 Controller + 固定适配器；</text>
+    <text x="914" y="590" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#1B2733">通用多 Worker 自组织仍是目标。</text>
+  </g>
+
+  <g id="takeaway">
+    <path fill="#132A3A" d="M58,630 H1222 A6,6 0 0 1 1228,636 V656 A6,6 0 0 1 1222,662 H58 A6,6 0 0 1 52,656 V636 A6,6 0 0 1 58,630 Z" />
+    <text x="640" y="652" text-anchor="middle" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="17" font-weight="700" fill="#FFFFFF">交互变化：用户只管理优先级、理由和统一结果，不必在多个 Agent 对话之间手工搬运上下文。</text>
+  </g>
+  <g id="footer">
+    <text x="52" y="690" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="14" fill="#7C8A98">目标结构来源：07-16 Demo 2；线上实践依据：OpenClaw Multi-agent Routing · A2A Protocol · MCP</text>
+    <text x="1228" y="690" text-anchor="end" font-family="Consolas, &quot;Courier New&quot;, monospace" font-size="14" fill="#7C8A98">22 / 24</text>
+  </g>
+</svg>

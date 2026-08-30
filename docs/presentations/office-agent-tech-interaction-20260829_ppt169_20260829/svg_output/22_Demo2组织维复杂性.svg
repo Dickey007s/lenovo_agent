@@ -1,0 +1,85 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720" width="1280" height="720">
+  <g id="background">
+    <rect width="1280" height="720" fill="#F7F8FA"/>
+    <path d="M52 112H1228" fill="none" stroke="#CBD5DF" stroke-width="2"/>
+  </g>
+  <g id="header">
+    <text x="52" y="78" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="46" font-weight="700" fill="#132A3A">Demo 2：组织维复杂性，驾驶舱怎样分配工作</text>
+    <rect x="1072" y="45" width="156" height="34" rx="6" fill="#EDF1F4"/>
+    <text x="1150" y="68" text-anchor="middle" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#1769E0">07-16 目标演示</text>
+    <text x="52" y="146" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#5A6B7C">Swarm 不是新的聊天入口，而是驾驶舱在复杂任务上选择的一种执行方式；简单工作继续走更低成本的路径。</text>
+  </g>
+
+  <g id="cockpit-intake">
+    <text x="52" y="188" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="24" font-weight="700" fill="#132A3A">1. 聚合工作信号，先形成统一待办</text>
+    <rect x="52" y="208" width="1176" height="96" rx="6" fill="#FFFFFF" stroke="#CBD5DF" stroke-width="2"/>
+    <rect x="70" y="228" width="112" height="54" rx="6" fill="#EDF1F4"/>
+    <use data-icon="tabler-outline/message-circle" x="82" y="242" width="24" height="24" fill="#1769E0" stroke-width="2"/>
+    <text x="116" y="261" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#132A3A">邮件</text>
+    <rect x="194" y="228" width="112" height="54" rx="6" fill="#EDF1F4"/>
+    <use data-icon="tabler-outline/user-check" x="206" y="242" width="24" height="24" fill="#1769E0" stroke-width="2"/>
+    <text x="240" y="261" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#132A3A">CRM</text>
+    <rect x="318" y="228" width="112" height="54" rx="6" fill="#EDF1F4"/>
+    <use data-icon="tabler-outline/briefcase" x="330" y="242" width="24" height="24" fill="#1769E0" stroke-width="2"/>
+    <text x="364" y="261" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#132A3A">项目</text>
+    <rect x="442" y="228" width="112" height="54" rx="6" fill="#EDF1F4"/>
+    <use data-icon="tabler-outline/file-spreadsheet" x="454" y="242" width="24" height="24" fill="#1769E0" stroke-width="2"/>
+    <text x="488" y="261" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#132A3A">报销</text>
+    <rect x="566" y="228" width="112" height="54" rx="6" fill="#EDF1F4"/>
+    <use data-icon="tabler-outline/timeline" x="578" y="242" width="24" height="24" fill="#1769E0" stroke-width="2"/>
+    <text x="612" y="261" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#132A3A">日历</text>
+    <path d="M694 255H736" fill="none" stroke="#1769E0" stroke-width="3"/><path d="M736 255L726 249V261Z" fill="#1769E0"/>
+    <rect x="752" y="220" width="454" height="70" rx="6" fill="#132A3A"/>
+    <text x="774" y="248" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="24" font-weight="700" fill="#FFFFFF">智能工作驾驶舱</text>
+    <text x="774" y="274" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#CBD5DF">今日重点排序 · 解释截止时间与业务影响 · 用户可调整优先级</text>
+  </g>
+
+  <g id="routing">
+    <text x="52" y="342" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="24" font-weight="700" fill="#132A3A">2. 每项待办选择成本合适的执行方式</text>
+    <rect x="52" y="362" width="264" height="98" rx="6" fill="#FFFFFF" stroke="#1769E0" stroke-width="2"/>
+    <use data-icon="tabler-outline/plug" x="70" y="382" width="26" height="26" fill="#1769E0" stroke-width="2"/>
+    <text x="108" y="402" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="24" font-weight="700" fill="#132A3A">Tool Call</text>
+    <text x="70" y="434" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#5A6B7C">简单查证或单步调用</text>
+    <rect x="328" y="362" width="264" height="98" rx="6" fill="#FFFFFF" stroke="#1769E0" stroke-width="2"/>
+    <use data-icon="tabler-outline/robot" x="346" y="382" width="26" height="26" fill="#1769E0" stroke-width="2"/>
+    <text x="384" y="402" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="24" font-weight="700" fill="#132A3A">Single Agent</text>
+    <text x="346" y="434" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#5A6B7C">独立草稿与单任务处理</text>
+    <rect x="604" y="362" width="264" height="98" rx="6" fill="#FFFFFF" stroke="#1769E0" stroke-width="2"/>
+    <use data-icon="tabler-outline/route" x="622" y="382" width="26" height="26" fill="#1769E0" stroke-width="2"/>
+    <text x="660" y="402" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="24" font-weight="700" fill="#132A3A">Fixed Workflow</text>
+    <text x="622" y="434" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#5A6B7C">稳定、重复、步骤明确</text>
+    <rect x="880" y="362" width="348" height="98" rx="6" fill="#EDF1F4" stroke="#D97706" stroke-width="2" stroke-dasharray="8 6"/>
+    <use data-icon="tabler-outline/git-branch" x="898" y="382" width="26" height="26" fill="#D97706" stroke-width="2"/>
+    <text x="936" y="402" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="24" font-weight="700" fill="#132A3A">Adaptive Swarm</text>
+    <text x="898" y="434" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#5A6B7C">高价值 · 跨来源 · 可并行 · 预算可承受</text>
+  </g>
+
+  <g id="swarm-path">
+    <text x="52" y="500" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="24" font-weight="700" fill="#132A3A">3. 复杂任务通过 Admission 后，围绕共享成果协作</text>
+    <rect x="52" y="520" width="820" height="92" rx="6" fill="#FFFFFF" stroke="#CBD5DF" stroke-width="2"/>
+    <text x="76" y="556" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="17" font-weight="700" fill="#1769E0">Admission</text>
+    <path d="M168 550H202" fill="none" stroke="#1769E0" stroke-width="3"/><path d="M202 550L192 544V556Z" fill="#1769E0"/>
+    <text x="220" y="556" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="17" font-weight="700" fill="#132A3A">Supervisor</text>
+    <path d="M322 550H356" fill="none" stroke="#1769E0" stroke-width="3"/><path d="M356 550L346 544V556Z" fill="#1769E0"/>
+    <text x="374" y="556" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="17" font-weight="700" fill="#132A3A">Dynamic Workers</text>
+    <path d="M520 550H554" fill="none" stroke="#1769E0" stroke-width="3"/><path d="M554 550L544 544V556Z" fill="#1769E0"/>
+    <text x="572" y="556" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="17" font-weight="700" fill="#132A3A">Shared Artifact</text>
+    <path d="M706 550H740" fill="none" stroke="#1769E0" stroke-width="3"/><path d="M740 550L730 544V556Z" fill="#1769E0"/>
+    <text x="758" y="556" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="17" font-weight="700" fill="#132A3A">Verifier</text>
+    <text x="76" y="588" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="14" fill="#5A6B7C">Conflict Resolver 只在冲突时介入；统一成果、待确认事项和 Trace 最终回到同一个驾驶舱。</text>
+    <rect x="894" y="500" width="334" height="112" rx="6" fill="#FFFFFF" stroke="#D97706" stroke-width="2"/>
+    <rect x="914" y="518" width="74" height="26" rx="5" fill="#EDF1F4"/>
+    <text x="951" y="537" text-anchor="middle" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="14" font-weight="700" fill="#B54708">当前边界</text>
+    <text x="914" y="566" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#1B2733">当前是单 Controller + 固定适配器；</text>
+    <text x="914" y="590" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#1B2733">通用多 Worker 自组织仍是目标。</text>
+  </g>
+
+  <g id="takeaway">
+    <rect x="52" y="630" width="1176" height="32" rx="6" fill="#132A3A"/>
+    <text x="640" y="652" text-anchor="middle" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="17" font-weight="700" fill="#FFFFFF">交互变化：用户只管理优先级、理由和统一结果，不必在多个 Agent 对话之间手工搬运上下文。</text>
+  </g>
+  <g id="footer">
+    <text x="52" y="690" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="14" fill="#7C8A98">目标结构来源：07-16 Demo 2；线上实践依据：OpenClaw Multi-agent Routing · A2A Protocol · MCP</text>
+    <text x="1228" y="690" text-anchor="end" font-family="Consolas, &quot;Courier New&quot;, monospace" font-size="14" fill="#7C8A98">22 / 24</text>
+  </g>
+</svg>

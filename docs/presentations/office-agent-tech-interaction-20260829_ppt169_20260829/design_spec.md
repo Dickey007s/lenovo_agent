@@ -179,13 +179,13 @@ Catalog read: 71 templates
 | P07 | pipeline_with_stages | `templates/charts/pipeline_with_stages.svg` | "Pick for 3-5 horizontal pipeline stages, each = title + 1-line description + output artifact, connected by arrows (data pipelines, ETL, build pipelines)." | 技术责任变化如何进入用户流程和前台反馈 |
 | P09 | process_flow | `templates/charts/process_flow.svg` | "Pick for 3-8 sequential steps connected by simple arrows — approval workflows, customer onboarding, request handling, lifecycle stages." | Observe、Plan、Act、Verify、Commit 与控制环 |
 | P10 | vertical_list | `templates/charts/vertical_list.svg` | "Pick for 3-6 numbered key points each with a short description — design principles, core tenets, action items, key takeaways, recommendations, executive summary points." | 六个具体办公场景作为后续 Demo 入口 |
-| P21 | chevron_chain_with_tail | `templates/charts/chevron_chain_with_tail.svg` | "Pick for 4-6 sequential chevron blocks plus a final wedge representing aggregate outcome — Porter's value chain (primary + support activities mapped to margin), process leading to a summary deliverable, contribution chain to a result." | 五步路线图汇聚到“可证伪差异” |
+| P24 | chevron_chain_with_tail | `templates/charts/chevron_chain_with_tail.svg` | "Pick for 4-6 sequential chevron blocks plus a final wedge representing aggregate outcome — Porter's value chain (primary + support activities mapped to margin), process leading to a summary deliverable, contribution chain to a result." | 五步路线图汇聚到“可证伪差异” |
 
 **Runners-up considered**:
 
 - `comparison_table` | rejected for P06：会把官方说明误读为同场能力胜负，违背“不从未提及推断做不到”的边界。
 - `circular_stages` | rejected for P09：当前不是无限自治循环，受限 Loop 有明确预算、暂停和终点。
-- `roadmap_vertical` | rejected for P21：路线不是日历里程碑，而是多个工程能力汇聚成一个可证伪结论。
+- `roadmap_vertical` | rejected for P24：路线不是日历里程碑，而是多个工程能力汇聚成一个可证伪结论。
 
 ---
 
@@ -230,12 +230,12 @@ Catalog read: 71 templates
 #### Slide 03 - 一个底座、两层增强、三类控制
 
 - **Visualization**: `layered_architecture`
-- **Content**: Agent Runtime 底座；Agent Control Loop 与 Governed Adaptive Swarm 两层增强；Task / Evidence / Action 三类控制。明确当前只实现受限单 Loop 与固定成果适配器，多 Worker、通用 Tool Gateway 与真实外部动作仍是目标。
+- **Content**: 用“什么时候启动、解决什么、用户看到什么”解释三层关系。统一 Agent Runtime 是所有任务共用的状态、执行、证据与审计底座；Agent Control Loop 解决时间维连续性；Governed Adaptive Swarm 解决组织维复杂性；Task / Evidence / Action Control 横切所有层。当前只实现受限单 Loop、固定成果适配器和部分恢复；多 Worker 与真实外部动作仍是目标。
 
 #### Slide 04 - 八个最小运行时模块
 
 - **Visualization**: `icon_grid`
-- **Content**: 使用当前统一八模块名；每项同时写“用户看到什么”和“当前完成度”，避免只画后端架构。
+- **Content**: 不再堆八张并列卡片，而把八个模块整理成四段责任链：定范围（Workspace Catalog + Task Contract）、定计划（Planner + Policy Compiler/Validator）、推进与执行（Scheduler/Worker + Tool Gateway）、成果与恢复（Artifact/Verifier + Checkpoint/Event/Governance）。每段同时回答负责什么、用户看到什么、当前实现到哪里。
 
 #### Slide 05 - 技术演进：工程对象不断外扩
 
@@ -316,9 +316,23 @@ Catalog read: 71 templates
 - **Layout**: 左右并列真实成果/EffectReceipt 与模型说明拒绝态。
 - **Content**: 固定场景适配器在隔离 Run 工作区生成文件并执行具名确定性检查；模型 `called=true` 但与确定性结果冲突时 `output_used=false`；前台只保留一个当前结论，审计轨迹保留被拒说明。当前检查不等于通用语义真值证明。
 
-### Part 5: 研究与下一步
+### Part 5: 07-16 三个 Demo 的验收镜头
 
-#### Slide 21 - 下一阶段：把 07-16 方向变成可证伪证据
+#### Slide 21 - Demo 1：时间维连续性
+
+- **Content**: 恢复 07-16 P12 的单任务主线：Task Contract → Observe/Plan/Act → Verify 发现 2400 万与 2680 万口径冲突 → 只暂停 revenue-baseline → 用户 Steer → Commit 可追溯工件。对照当前真实实现与仍缺的跨端身份、通用可写成果和长期后台 Worker。
+
+#### Slide 22 - Demo 2：组织维复杂性
+
+- **Content**: 恢复 07-16 P20 的智能工作驾驶舱主线：五类工作信号聚合 → 今日重点与用户调序 → Tool Call / Single Agent / Fixed Workflow / Adaptive Swarm 分流 → Admission、动态 Worker、共享工件、Verifier/Resolver → 结果回到驾驶舱。明确当前没有通用多 Worker Runtime。
+
+#### Slide 23 - Demo 3：动作维风险控制
+
+- **Content**: 恢复 07-16 P21 的 Risk Gate：动作提案 → 影响预演 → Evidence/Risk Lens → L0-L5 → Human Gate → Permit → Execution Receipt。右侧用当前 Effect Gate 实景说明已实现的是成果、确定性效果和未发生边界，不是生产 Connector 执行。
+
+### Part 6: 研究与下一步
+
+#### Slide 24 - 下一阶段：把 07-16 方向变成可证伪证据
 
 - **Visualization**: `chevron_chain_with_tail`
 - **Content**: 原生 Locator → 携证成果包 → 通用业务 Verifier → Worker/Tool/Connector → 固定配置竞品挑战与目标用户研究；只有同场任务和用户研究通过后，差异候选才能升级为已验证优势。
@@ -330,7 +344,7 @@ Catalog read: 71 templates
 One speaker note file per page, saved to `notes/`:
 
 - **Filename**: match SVG name, for example `01_cover.md`.
-- **Total duration**: 34–38 minutes.
+- **Total duration**: 40–45 minutes.
 - **Style**: 中文会议主讲，结论先行；每页先说“这页要证明什么”，再说“事实、交互影响、边界”。
 - **Source retention**: 竞品、技术演进、交互设计和用户研究页在备注中保留线上官方页面、论文或研究页面的完整 URL；项目事实只标“当前系统实测”并说明测试范围，不把 README、Decision、Scenario 或内部报告列成研究来源。
 - **07-16 continuity**: 备注明确哪些判断沿用 07-16，哪些是当前系统实测补充，避免把新增字段名讲成新的产品概念。

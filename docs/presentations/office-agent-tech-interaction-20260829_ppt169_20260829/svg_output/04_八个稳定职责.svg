@@ -1,0 +1,96 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720" width="1280" height="720">
+  <g id="background">
+    <rect width="1280" height="720" fill="#F7F8FA"/>
+    <path d="M52 112H1228" fill="none" stroke="#CBD5DF" stroke-width="2"/>
+  </g>
+  <g id="header">
+    <text x="52" y="78" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="46" font-weight="700" fill="#132A3A">Agent 最小运行时：八个稳定职责</text>
+    <rect x="1054" y="45" width="174" height="34" rx="6" fill="#EDF1F4"/>
+    <text x="1141" y="68" text-anchor="middle" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#1769E0">07-16 内容展开</text>
+  </g>
+  <g id="legend">
+    <text x="52" y="148" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#5A6B7C">不要把八个模块理解成八个页面：它们是一次任务从“定范围”到“可恢复”的四段责任链。</text>
+    <circle cx="914" cy="142" r="7" fill="#1769E0"/>
+    <text x="930" y="148" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="14" fill="#5A6B7C">当前实现</text>
+    <circle cx="1022" cy="142" r="7" fill="#D97706"/>
+    <text x="1038" y="148" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="14" fill="#5A6B7C">部分近似</text>
+    <circle cx="1140" cy="142" r="7" fill="#7C8A98"/>
+    <text x="1156" y="148" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="14" fill="#5A6B7C">目标</text>
+  </g>
+
+  <g id="column-headings">
+    <text x="70" y="184" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="14" font-weight="700" fill="#7C8A98">责任阶段</text>
+    <text x="214" y="184" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="14" font-weight="700" fill="#7C8A98">两个稳定模块</text>
+    <text x="716" y="184" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="14" font-weight="700" fill="#7C8A98">后端必须负责什么</text>
+    <text x="1010" y="184" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="14" font-weight="700" fill="#7C8A98">前台要回答什么</text>
+  </g>
+
+  <g id="scope-stage">
+    <rect x="52" y="198" width="1176" height="92" rx="6" fill="#FFFFFF" stroke="#CBD5DF" stroke-width="2"/>
+    <rect x="52" y="198" width="134" height="92" rx="6" fill="#1769E0"/>
+    <text x="72" y="232" font-family="Consolas, &quot;Courier New&quot;, monospace" font-size="17" font-weight="700" fill="#FFFFFF">01</text>
+    <text x="72" y="264" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="24" font-weight="700" fill="#FFFFFF">定范围</text>
+    <use data-icon="tabler-outline/folders" x="210" y="218" width="26" height="26" fill="#1769E0" stroke-width="2"/>
+    <text x="246" y="238" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="17" font-weight="700" fill="#132A3A">Workspace Catalog &amp; Safe Preview</text>
+    <use data-icon="tabler-outline/clipboard-check" x="210" y="252" width="26" height="26" fill="#1769E0" stroke-width="2"/>
+    <text x="246" y="272" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="17" font-weight="700" fill="#132A3A">Task Contract</text>
+    <text x="716" y="232" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#1B2733">限定能读的资料；冻结目标、范围、</text>
+    <text x="716" y="258" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#1B2733">完成条件和禁止事项。</text>
+    <text x="1010" y="232" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="17" font-weight="700" fill="#132A3A">“你读了哪些资料？”</text>
+    <text x="1010" y="260" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="14" fill="#5A6B7C">目录、来源范围、任务自述</text>
+  </g>
+
+  <g id="plan-stage">
+    <rect x="52" y="302" width="1176" height="92" rx="6" fill="#EDF1F4" stroke="#CBD5DF" stroke-width="2"/>
+    <rect x="52" y="302" width="134" height="92" rx="6" fill="#1769E0"/>
+    <text x="72" y="336" font-family="Consolas, &quot;Courier New&quot;, monospace" font-size="17" font-weight="700" fill="#FFFFFF">02</text>
+    <text x="72" y="368" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="24" font-weight="700" fill="#FFFFFF">定计划</text>
+    <use data-icon="tabler-outline/route" x="210" y="322" width="26" height="26" fill="#1769E0" stroke-width="2"/>
+    <text x="246" y="342" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="17" font-weight="700" fill="#132A3A">Planner</text>
+    <use data-icon="tabler-outline/shield-check" x="210" y="356" width="26" height="26" fill="#1769E0" stroke-width="2"/>
+    <text x="246" y="376" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="17" font-weight="700" fill="#132A3A">Admission, Policy Compiler &amp; Plan Validator</text>
+    <text x="716" y="336" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#1B2733">模型先提议路线；服务端再校验预算、</text>
+    <text x="716" y="362" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#1B2733">依赖、资料范围和副作用。</text>
+    <text x="1010" y="336" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="17" font-weight="700" fill="#132A3A">“为什么这样拆？”</text>
+    <text x="1010" y="364" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="14" fill="#5A6B7C">分支、依赖、驳回与修复原因</text>
+  </g>
+
+  <g id="execution-stage">
+    <rect x="52" y="406" width="1176" height="92" rx="6" fill="#FFFFFF" stroke="#CBD5DF" stroke-width="2"/>
+    <rect x="52" y="406" width="134" height="92" rx="6" fill="#D97706"/>
+    <text x="72" y="440" font-family="Consolas, &quot;Courier New&quot;, monospace" font-size="17" font-weight="700" fill="#FFFFFF">03</text>
+    <text x="72" y="472" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="24" font-weight="700" fill="#FFFFFF">推进执行</text>
+    <use data-icon="tabler-outline/git-branch" x="210" y="426" width="26" height="26" fill="#D97706" stroke-width="2"/>
+    <text x="246" y="446" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="17" font-weight="700" fill="#132A3A">Scheduler &amp; Worker Manager</text>
+    <use data-icon="tabler-outline/plug" x="210" y="460" width="26" height="26" fill="#7C8A98" stroke-width="2"/>
+    <text x="246" y="480" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="17" font-weight="700" fill="#132A3A">Tool Gateway</text>
+    <text x="716" y="440" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#1B2733">决定哪个分支先做、谁来做、何时停；</text>
+    <text x="716" y="466" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#1B2733">真实工具动作需许可、幂等与回执。</text>
+    <text x="1010" y="440" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="17" font-weight="700" fill="#132A3A">“现在做到哪一步？”</text>
+    <text x="1010" y="468" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="14" fill="#5A6B7C">当前仅受限单 Loop；通用 Tool 为目标</text>
+  </g>
+
+  <g id="artifact-stage">
+    <rect x="52" y="510" width="1176" height="92" rx="6" fill="#EDF1F4" stroke="#CBD5DF" stroke-width="2"/>
+    <rect x="52" y="510" width="134" height="92" rx="6" fill="#D97706"/>
+    <text x="72" y="544" font-family="Consolas, &quot;Courier New&quot;, monospace" font-size="17" font-weight="700" fill="#FFFFFF">04</text>
+    <text x="72" y="576" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="24" font-weight="700" fill="#FFFFFF">成果恢复</text>
+    <use data-icon="tabler-outline/file-spreadsheet" x="210" y="530" width="26" height="26" fill="#D97706" stroke-width="2"/>
+    <text x="246" y="550" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="17" font-weight="700" fill="#132A3A">Artifact Workspace &amp; Verifier</text>
+    <use data-icon="tabler-outline/database" x="210" y="564" width="26" height="26" fill="#D97706" stroke-width="2"/>
+    <text x="246" y="584" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="17" font-weight="700" fill="#132A3A">Checkpoint, Event &amp; Governance Control</text>
+    <text x="716" y="544" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#1B2733">保存成果版本与校验；让 Snapshot 成为</text>
+    <text x="716" y="570" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#1B2733">状态权威，事件只负责有序投影。</text>
+    <text x="1010" y="544" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="17" font-weight="700" fill="#132A3A">“结果能否下载、核对、恢复？”</text>
+    <text x="1010" y="572" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="14" fill="#5A6B7C">固定成果校验、版本、审计与重启恢复</text>
+  </g>
+
+  <g id="takeaway">
+    <rect x="52" y="620" width="1176" height="34" rx="6" fill="#132A3A"/>
+    <text x="640" y="643" text-anchor="middle" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="17" font-weight="700" fill="#FFFFFF">模块对后端是职责；对用户则是四个问题：读什么、怎么做、做到哪、结果能否复核与恢复。</text>
+  </g>
+  <g id="footer">
+    <text x="52" y="690" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="14" fill="#7C8A98">当前系统实测；线上架构依据：ReAct · LangGraph Persistence · MCP · A2A Protocol</text>
+    <text x="1200" y="690" text-anchor="end" font-family="Consolas, &quot;Courier New&quot;, monospace" font-size="14" fill="#7C8A98">04 / 24</text>
+  </g>
+</svg>

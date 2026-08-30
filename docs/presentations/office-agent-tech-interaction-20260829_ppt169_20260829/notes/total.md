@@ -22,27 +22,41 @@
 
 ---
 
-# 03_主流方案在审什么
+# 03_一个底座两层增强三类控制
 
-这一页完整继承 07-16 的“一个底座、两层增强、三类控制”。统一 Runtime 负责 Task、State、Context、Execution、Capability、Evidence、Policy 和 Trace；长任务用 Agent Control Loop 增强，复杂任务用 Governed Adaptive Swarm 增强；Task、Evidence、Action 三类控制贯穿所有层。需要把当前边界说透：现在真实存在的是受限单 Loop、固定成果适配器和 Snapshot/SSE；多 Worker、通用 Tool Gateway、真实 Connector 仍是目标。线上运行时实践说明持久状态、人机暂停和恢复是常见方向，但业务语义仍需应用自己定义。
+这一页先不要急着记英文名，只看三层关系。最下面的统一 Agent Runtime 是每个任务都要经过的底座，它稳定承接任务、状态、上下文、执行、能力、证据、策略和追踪。没有这层，Agent 仍然只是一次模型调用，任务中断以后不知道从哪里继续，也无法说明某个结论或动作来自哪一步。
 
-转场：把底座继续拆开，就是 07-16 的八个稳定职责。
+第一层增强是 Agent Control Loop。它只在任务需要多轮推进、等待补证或恢复时发挥价值。07-16 希望它解决时间维连续性；当前已经落地的是受限单 Loop、服务端 Branch、Evidence Gate、ArtifactVersion 和 Snapshot/SSE。第二层增强是 Governed Adaptive Swarm，它面向高价值、跨来源、可并行的复杂工作，目标是用 Admission、Supervisor、多 Worker、共享成果和 Resolver 处理组织维复杂性；这部分当前还没有通用实现。
 
-证据/边界：https://docs.langchain.com/oss/javascript/langgraph/persistence ；https://openai.github.io/openai-agents-python/human_in_the_loop/
+左侧三类控制不是第三层业务能力，而是贯穿所有层的约束。Task Control 决定目标、预算、暂停与停止；Evidence Control 决定来源、冲突、验证和模型说明是否采用；Action Control 决定风险、审批、Permit 和执行回执。它们最终让前台只需要回答三件事：任务现在走到哪，当前结论凭什么成立，哪些动作真的发生了。
 
-预期问题：哪些模块已经能跑，哪些只是目标架构？
+转场：下一页把底座拆成八个稳定职责，并说明每两个模块共同回答一个用户问题。
+
+证据/边界：https://docs.langchain.com/oss/javascript/langgraph/persistence ；https://openai.github.io/openai-agents-python/human_in_the_loop/ ；https://modelcontextprotocol.io/specification/draft/client/elicitation
+
+预期问题：为什么不把所有任务都放进 Loop 或 Swarm？因为增强层有额外状态与协调成本，只有任务的时间跨度和组织复杂度值得时才应启用。
 
 ---
 
-# 04_技术差异改变用户流程
+# 04_八个稳定职责
 
-八个模块不是为了把架构画复杂，而是让每个用户状态都有责任主体。Catalog 负责能看什么，Task Contract 负责目标与范围，Planner 提议路径，Policy Compiler 决定能不能启动。后四项里，当前 Scheduler 只有受限单 Loop，Tool Gateway 还没有通用接入，Artifact 与 Verifier 依靠固定适配器，Checkpoint 和 Governance 有 Snapshot、SSE 与可选 PostgreSQL 恢复子集。用户不会直接操作模块名，但会看到浏览与回开、分支与依赖、成果与校验、暂停与恢复。蓝、橙、灰分别表示当前、部分和目标，不能互相替代。
+八个模块不是八个前台页面，而是一次任务从定范围到可恢复的四段责任链。
 
-转场：这些模块为什么会逐步出现，下一页沿着技术演进说明。
+第一段是“定范围”。Workspace Catalog & Safe Preview 负责哪些资料可以安全读取，Task Contract 负责目标、范围、完成条件和禁止事项。前台要回答的是“你读了哪些资料、任务边界是什么”。
 
-证据/边界：当前系统实测；MCP、ReAct、LangGraph 只作线上架构参照。
+第二段是“定计划”。Planner 可以提出分支、依赖和资料范围，但计划不能因为模型返回就直接运行。Admission、Policy Compiler & Plan Validator 还要校验预算、来源、依赖、工具和副作用。前台要回答的是“为什么这样拆、什么计划被拒绝或修复”。
 
-预期问题：八个模块会不会让前台变得更复杂？
+第三段是“推进执行”。Scheduler & Worker Manager 决定哪个分支先做、何时等待、何时恢复；Tool Gateway 应统一真实工具的授权、超时、幂等和回执。当前只有受限单 Controller 的纵切，通用 Worker 与 Tool Gateway 仍是目标。前台要回答的是“现在做到哪一步、哪个分支受影响、动作是否真的执行”。
+
+第四段是“成果恢复”。Artifact Workspace & Verifier 保存成果版本并执行当前固定场景的确定性检查；Checkpoint, Event & Governance Control 让 Snapshot 成为状态权威，SSE 只做有序投影，并提供可选 PostgreSQL 重启恢复子集。前台要回答的是“结果能否下载、核对、审计和恢复”。
+
+所以模块对后端是职责，对用户只有四个问题：读什么、怎么做、做到哪、结果能不能复核与恢复。蓝色表示当前实现，橙色表示部分近似，灰色表示目标，不能把目标模块写成现有能力。
+
+转场：这些职责为什么会逐步出现，下一页沿技术演进解释系统责任如何外扩。
+
+证据/边界：当前系统实测；ReAct、LangGraph、MCP 与 A2A 只作线上架构参照。
+
+预期问题：八个模块会不会让前台更复杂？不会要求用户操作模块名，但必须把模块产生的关键状态翻译成业务语言。
 
 ---
 
@@ -254,7 +268,7 @@ TC-15 的确定性成果覆盖 212 行、形成 87 组，P0 到 P4 为 25、40�
 
 当前边界仍然清楚：固定检查只证明特定字段、结构和效果，不是通用语义真值证明器；成果通过也不代表业务价值或最终判断自动成立。
 
-转场：有了这条实操纵切，最后再看下一阶段怎样把差异候选升级为证据。
+转场：有了这条当前纵切，下面把它重新放回 07-16 的三个 Demo，分别看时间、组织和动作三个维度哪些已经落地、哪些仍是目标。
 
 证据/边界：当前系统实测；固定成果适配器与叙事对账覆盖既定场景，不外推到任意办公任务。
 
@@ -262,7 +276,61 @@ TC-15 的确定性成果覆盖 212 行、形成 87 组，P0 到 P4 为 25、40�
 
 ---
 
-# 21_下一阶段证据路线
+# 21_Demo1时间维连续性
+
+Demo 1 来自 07-16 的时间维连续性。目标不是让 Agent 永远运行，而是让同一个 Task ID 在多轮任务中有稳定的任务契约、状态版本、分支和恢复点。流程仍然是 Task Contract、Observe、Plan、Act、Verify、Commit。
+
+07-16 的关键镜头是 Verify 同时发现正式口径 2,400 万和预测口径 2,680 万。正确处理不是整项任务失败，也不是让模型自行选择，而是 Evidence Gate 只让 revenue-baseline 分支进入 waiting_input；customer-facts 和 project-risk 分支继续产出并保留。用户给出 Steer，采用正式口径并保留预测差异说明，系统只恢复受影响分支，最后把版本、来源、验证结果和 Trace 一起 Commit。
+
+当前系统已经具备服务端 Branch、分支级 Evidence Gate、append-only ArtifactVersion、TaskCommit、局部恢复和可选 PostgreSQL 重启恢复。还没有生产级跨端身份、任意办公工件写入和长期后台 Worker。因此这一页不是把 07-16 演示冒充当前实测，而是说明我们已经完成了其中最关键的一段状态与证据纵切。
+
+前台变化是用户不必重开对话、重讲背景；他在同一任务里看见哪个分支完成、哪个分支为何停、选择后恢复什么、旧成果是否保留。
+
+转场：时间连续性解决以后，Demo 2 处理的是同时有很多待办和复杂分工时，工作如何被组织。
+
+证据/边界：https://docs.langchain.com/oss/javascript/langgraph/persistence ；https://openai.github.io/openai-agents-python/human_in_the_loop/
+
+预期问题：现在已经支持手机和电脑控制同一生产任务吗？没有，当前证明的是服务端状态、分支与恢复机制，生产身份和跨端控制仍是目标。
+
+---
+
+# 22_Demo2组织维复杂性
+
+Demo 2 保留 07-16 的智能工作驾驶舱。驾驶舱先聚合邮件、CRM、项目、报销和日历中的工作信号，生成今日重点，解释截止时间、客户等级和业务影响，并允许用户调整本次优先级。
+
+随后每项待办走成本合适的路径。简单查证用 Tool Call，独立草稿用 Single Agent，稳定重复任务用 Fixed Workflow，只有高价值、跨来源、可并行且预算可承受的任务才进入 Adaptive Swarm。Swarm Admission 通过后，Supervisor 根据覆盖度和依赖生成 Worker；Worker 围绕 Shared Artifact 协作；Verifier 检查事实和成果，Conflict Resolver 只在冲突时介入；最终统一结果、待确认项和 Trace 回到同一个驾驶舱。
+
+这一设计的交互价值不是“屏幕上出现更多 Agent”，而是用户只管理优先级、路由理由和统一成果，不需要在多个会话之间搬运上下文。系统还要解释为什么选择某条执行路径、Swarm 增加的质量或速度收益是否值得协调成本。
+
+当前产品没有通用多 Worker Runtime，也没有完整 Swarm Admission、Supervisor 和 Resolver。现状是单 Controller、服务端 Branch 与固定成果适配器。这一页明确保留 07-16 的目标产品形态，作为后续架构与用户研究方向，不写成现行能力。
+
+转场：无论任务由单 Agent、Workflow 还是 Swarm 完成，只要下一步涉及真实发送、付款或生产变更，都要进入 Demo 3 的动作风险门。
+
+证据/边界：https://docs.openclaw.ai/multi-agent ；https://a2a-protocol.org/dev/specification/ ；https://modelcontextprotocol.io/specification/draft/client/elicitation
+
+预期问题：多 Agent 一定比单 Agent 好吗？不一定，只有增量收益高于协调、验证和成本开销时才应该启动。
+
+---
+
+# 23_Demo3动作维风险控制
+
+Demo 3 保留 07-16 的 Risk Gate。Risk Lens 从动作影响、数据敏感度、可逆性、权限和缺失信息评估风险，再映射到 L0-L5：L0 自动执行，L1 执行并通知，L2 只生成草稿，L3 普通确认，L4 强确认，L5 直接拒绝。
+
+真正关键的是动作链。Agent 先提出方案，前台展示动作对象、影响范围和可逆性；Evidence Gate 与 Risk Lens 给出来源和风险理由；需要人工确认时，用户明确同意后才生成 Permit；执行后必须返回可核验的 ExecutionReceipt，或者明确写出动作未发生。这样“方案”“草稿”“批准”和“执行”不会被混成一个绿色完成状态。
+
+页面下半部分使用当前真实界面截图，说明目前已经实现的有限一段：实际 Artifact、具名 Validator、EffectReceipt 和未发生边界可以分层展示。但生产 Connector、身份授权、Permit 防重放与真实外部动作仍未实现，所以系统不会发送邮件、付款、写 CRM 或执行生产命令。
+
+前台的直接变化是按钮不能只写“确认”。用户必须先看见对象、影响、证据、风险级别、可逆性和执行回执，才能知道自己的点击究竟会改变什么。
+
+转场：三个 Demo 的方向保留，但下一步必须继续用可证伪证据而不是更多概念升级结论。
+
+证据/边界：https://openai.github.io/openai-agents-python/human_in_the_loop/ ；https://modelcontextprotocol.io/specification/draft/client/elicitation ；https://www.microsoft.com/en-us/research/publication/guidelines-for-human-ai-interaction/
+
+预期问题：当前是不是已经具备 L0-L5 的生产执行能力？没有，L0-L5 是目标控制模型，当前只有固定成果和未执行边界的有限实现。
+
+---
+
+# 24_下一阶段证据路线
 
 下一阶段仍然延续 07-16 的目标：让工作在约束下持续收敛，但结论必须经过五道证据门。先做 PDF、XLSX、DOCX 的格式原生 Locator；再让 Artifact、EffectReceipt、provenance 和未执行边界一起导出；随后把固定适配器扩展成可配置业务 Verifier；再引入 Worker、Tool、Connector、Permit 和幂等回执；最后冻结同一任务、模型和来源做竞品同场挑战，并开展目标用户研究。只有这些门通过，“差异候选”才可以升级为“已验证优势”。
 

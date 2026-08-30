@@ -4,24 +4,25 @@
 
 ## 内容与视觉
 
-- 21 页 SVG 与 21 份中文演讲备注一一对应。
-- 独立中文讲稿覆盖 P01-P21 共 21 个章节，并附 6 个常见追问口径；建议时长 34 至 38 分钟。
-- `svg_quality_checker.py`：21/21 通过，0 warning，0 error，未发现颜色、字体或字号偏离 `spec_lock.md`。
-- PowerPoint 原生可编辑版本导出成功：21 页，21 页均嵌入演讲备注。
-- 使用 Microsoft PowerPoint 将最终 PPTX 逐页导出为 1280×720 PNG；21/21 页面非空，重点人工检查 P01、P17-P21，未见标题、正文、截图或页码越界。
+- 24 页 SVG 与 24 份中文演讲备注一一对应。
+- 独立中文讲稿覆盖 P01-P24 共 24 个章节，并附 6 个常见追问口径；建议时长 40 至 45 分钟。
+- `svg_quality_checker.py`：24/24 通过，0 warning，0 error，未发现颜色、字体或字号偏离 `spec_lock.md`。
+- PowerPoint 原生可编辑版本 `Office-Agent-技术差异与交互影响-20260830-24页版-v2.pptx` 导出成功：24 页，24 页均嵌入演讲备注。
+- 使用 Microsoft PowerPoint 将最终 PPTX 逐页导出为 1280×720 PNG；24/24 页面非空，重点人工检查 P03、P04、P21-P24，未见标题、正文、截图或页码越界。
 
 ## 工程门
 
 - `uv run pytest -q tests/unit/test_reporting_governance.py`：4 passed。
 - `git diff --check`：通过。
-- PPTX ZIP 结构校验：通过。
-- PPTX SHA-256：`2E855C8131D3A744089E60FF5261DDAB014358CD3B83168C09193D89DFA5099F`。
+- 本地 Markdown 链接检查：2 个相对链接，0 缺失。
+- PPTX ZIP 结构校验：24 个 slide XML、24 个 notes XML，`testzip=None`。
+- PPTX SHA-256：`FDE97174AF39E1BF0E2131A118247C99C99D47FC85356F2C1C5CDF942EB2F54B`。
 
 ## 线上链接
 
-- `sources/ONLINE-RESEARCH-AND-0716-CONTINUITY-20260829.md` 共收录 18 个唯一线上链接。
-- 命令行检查中 15 个链接返回 HTTP 2xx/3xx。
-- OpenAI Help、OpenAI Codex App 与 Microsoft Research 三个页面对自动化 `curl` 返回 403；已在浏览器抓取通道确认页面可访问。这里把 403 记录为站点反自动化边界，不误报为失效链接。
+- `sources/ONLINE-RESEARCH-AND-0716-CONTINUITY-20260829.md` 共收录 19 个唯一线上链接。
+- 命令行检查中 17 个链接返回 HTTP 200。
+- OpenAI Help 与 OpenAI Codex App 两个页面对自动化 `curl` 返回 403；这里把 403 记录为站点反自动化边界，不误报为失效链接。
 
 ## 结论边界
 
