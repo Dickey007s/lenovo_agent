@@ -1466,6 +1466,12 @@ class HarnessRuntime:
                 )
             if merged.adopted_contributions and len(artifact_versions) < 24:
                 artifact_version = len(artifact_versions) + 1
+                artifact_id = (
+                    artifact_versions[-1].artifact_id
+                    if artifact_versions
+                    else "artifact-"
+                    + hashlib.sha256(f"{run_id}:evidence-brief".encode("utf-8")).hexdigest()[:12]
+                )
                 source_refs = sorted(
                     {
                         ref
@@ -1479,7 +1485,7 @@ class HarnessRuntime:
                     }
                 )[:20]
                 artifact = AgentControlLoopArtifactVersion(
-                    artifact_id=merged.artifact_id,
+                    artifact_id=artifact_id,
                     version=artifact_version,
                     title="只读 Worker 合入简报",
                     status="committed",
@@ -1511,7 +1517,9 @@ class HarnessRuntime:
                 last_commit = task_commit
                 # Keep the append-only worker merge receipt aligned with the
                 # actual normal ArtifactVersion it records.
-                merged = merged.model_copy(update={"version": artifact.version})
+                merged = merged.model_copy(
+                    update={"artifact_id": artifact.artifact_id, "version": artifact.version}
+                )
             run.snapshot = run.snapshot.model_copy(
                 update={
                     "worker_runs": [*run.snapshot.worker_runs, *contributions],
@@ -1681,6 +1689,7 @@ class HarnessRuntime:
                 attempt=1,
                 validation_feedback=None,
                 reserve_model_call=False,
+                record_round_receipt=False,
             )
             candidate = self._validate_candidate_result_scope(
                 candidate,
@@ -5744,6 +5753,7 @@ class HarnessRuntime:
         attempt: int,
         validation_feedback: str | None,
         reserve_model_call: bool = True,
+        record_round_receipt: bool = True,
     ) -> tuple[HarnessTaskResult, HarnessModelReceipt]:
         if reserve_model_call:
             await self._reserve_model_call(owner_id, run_id)
@@ -5790,14 +5800,15 @@ class HarnessRuntime:
                 or max(0, round((perf_counter() - analysis_started) * 1000)),
                 output_used=False,
             )
-            await self._set_analysis_receipt(owner_id, run_id, receipt)
-            await self._update_round(
-                owner_id,
-                run_id,
-                round_number,
-                phase="act",
-                analysis_receipt=receipt.model_dump(mode="json"),
-            )
+            if record_round_receipt:
+                await self._set_analysis_receipt(owner_id, run_id, receipt)
+                await self._update_round(
+                    owner_id,
+                    run_id,
+                    round_number,
+                    phase="act",
+                    analysis_receipt=receipt.model_dump(mode="json"),
+                )
             await self._transition(
                 owner_id,
                 run_id,
@@ -5820,14 +5831,15 @@ class HarnessRuntime:
             elapsed_ms=max(0, round((perf_counter() - analysis_started) * 1000)),
             output_used=False,
         )
-        await self._set_analysis_receipt(owner_id, run_id, receipt)
-        await self._update_round(
-            owner_id,
-            run_id,
-            round_number,
-            phase="act",
-            analysis_receipt=receipt.model_dump(mode="json"),
-        )
+        if record_round_receipt:
+            await self._set_analysis_receipt(owner_id, run_id, receipt)
+            await self._update_round(
+                owner_id,
+                run_id,
+                round_number,
+                phase="act",
+                analysis_receipt=receipt.model_dump(mode="json"),
+            )
         await self._transition(
             owner_id,
             run_id,
@@ -6662,12 +6674,17 @@ class HarnessRuntime:
         source_refs = sorted({ref for unit in plan.units for ref in unit.input_file_refs})
         source_facts: dict[str, dict[str, object]] = {}
         for file_ref in source_refs:
+            public_file = getattr(self.catalog, "public_file", None)
+            if not callable(public_file):
+                # Legacy test catalogs may expose only agent-safe inputs.  In
+                # that narrow compatibility case structural facts are
+                # unavailable and admission stays conservative.
+                continue
             try:
-                preview = self.catalog.public_file(file_ref)
-            except (KeyError, AttributeError):
-                # A legacy test/catalog may expose only agent-safe inputs. The
-                # structural fact is then unavailable, so admission remains
-                # conservative rather than failing an otherwise valid plan.
+                preview = public_file(file_ref)
+            except KeyError:
+                # A legacy catalog may omit a preview row.  Do not turn a
+                # missing structural hint into a broad runtime failure.
                 continue
             source_facts[file_ref] = {
                 key: preview.get(key)
