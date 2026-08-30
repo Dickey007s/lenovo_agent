@@ -99,14 +99,18 @@ branch pauses. The user sees what is ready, what is blocked, why they are needed
 and what their decision will change. Resume continues from durable state without
 repeating committed work.
 
-Current precursor: at most three read-only rounds, explicit file/model/deadline
-bounds, server-owned Branch DAG, branch-selective Evidence Gate, one budgeted
-plan repair, safe-point controls, independent append-only logical
-ArtifactVersion/TaskCommit records and history-preserving restore. PostgreSQL can
-recover the single-Controller checkpoint and records. Target additions: writable
-isolated office artifacts, semantic/numeric evidence, explicit conflicts,
-multi-instance lease/notification and verified source-file Commit. Initial
-acceptance data comes from FORTE administration, finance, sales and SRE folders.
+Current precursor: a default 12-round (maximum 24) read-only Controller with
+explicit file/model/active-deadline bounds, server-owned Branch DAG,
+branch-selective Evidence Gate, one budgeted plan repair, safe-point controls,
+independent append-only logical ArtifactVersion/TaskCommit records and
+history-preserving restore. PostgreSQL can recover the single-Controller
+checkpoint and records. The next target addition is a stable business `task_id`
+above bounded Runs, with parent Run, selected Branch, base Artifact/Commit and
+source-revision recheck receipts. It must create a new Run rather than mutate or
+infinitely extend a terminal Run. Later additions remain general writable office
+artifacts, broader semantic/numeric evidence, multi-instance lease/notification
+and verified source-file Commit. Initial acceptance data comes from FORTE
+administration, finance, sales and SRE folders.
 
 ## 6. Demo 2 target: governed adaptive office swarm
 
@@ -114,10 +118,25 @@ Multiple work units are admitted into an adaptive topology. Scheduler and
 Workers share immutable Artifact versions, add/reorder units when evidence
 changes and converge through a verifier rather than majority prose.
 
+The first target increment is service-owned `TopologyAdmission`, not autonomous
+worker spawning. It chooses `single_controller`, `fixed_workflow` or
+`adaptive_readonly_workers` from frozen source span, work-unit independence,
+dependencies, budget and risk. The high-cost worker route requires explicit user
+confirmation and starts at most three read-only Workers. `direct_tool` remains a
+future route until the general Tool Gateway exists. Every Worker contribution is
+a candidate that must pass source membership, Evidence Anchor, Branch Evidence
+Gate and applicable deterministic-outcome reconciliation before merge.
+
 The user sees business work packages, dependencies, actual model/tool receipts,
 replanning reason and convergence condition. Raw Worker prompts, chain-of-thought
 and private conversations stay hidden. Initial acceptance data comes from FORTE
 release readiness, legal review, recruitment and code-workspace folders.
+
+The detailed research, scenarios and falsifiable gates are recorded in
+[`DR-0053`](decisions/DR-0053-durable-task-lineage-and-explainable-topology-admission.md),
+[`SCENARIO-038`](scenarios/SCENARIO-038-durable-task-continuation-across-runs.md)
+and [`SCENARIO-039`](scenarios/SCENARIO-039-explainable-topology-and-verified-worker-convergence.md).
+They remain `Proposed` until implementation Evidence exists.
 
 ## 7. Demo 3 target: risk and action gate
 

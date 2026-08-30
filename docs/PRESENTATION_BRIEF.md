@@ -34,6 +34,10 @@ Agent Control Loop 的逐模块历史基线、当前有界效果纵切和后续�
 [`OFFICE-AGENT-DETAILED-CHINESE-REPORT-20260825`](reports/OFFICE-AGENT-DETAILED-CHINESE-REPORT-20260825.md)。
 最新“为什么必须选我们”的候选能力、八个竞品同场挑战和官方来源见
 [`COMPETITIVE-WHITE-SPACE-AND-FALSIFIABLE-DIFFERENTIATORS-20260826`](research/COMPETITIVE-WHITE-SPACE-AND-FALSIFIABLE-DIFFERENTIATORS-20260826.md)。
+07-16 Demo 1 时间维连续性与 Demo 2 组织维复杂性的下一阶段研究、八个场景、主流基线
+和交互影响见
+[`DEMO1-DEMO2-DURABLE-TASK-AND-ADAPTIVE-ORCHESTRATION-RESEARCH-20260830`](research/DEMO1-DEMO2-DURABLE-TASK-AND-ADAPTIVE-ORCHESTRATION-RESEARCH-20260830.md)；
+跨 Run Task lineage 与通用 Worker 路线当前仍为 `Proposed`。
 十五条场景的实际效果、失败修复轨迹、真实模型运行和外部边界见
 [`SCENARIO-EFFECT-GATE-20260827`](evidence/SCENARIO-EFFECT-GATE-20260827.md)
 与[中文效果账本](reports/SCENARIO-EFFECT-GATE-LEDGER-20260827.md)。
@@ -226,7 +230,7 @@ Agent Control Loop 的逐模块历史基线、当前有界效果纵切和后续�
 - “15 类 FORTE 任务已经全部解决”；
 - “有引用就证明结论或数字正确”；
 - “计划里出现操作，就说明工具或文件写入已经发生”；
-- “当前三轮只读 Loop 已等同完整 Demo 1 Durable Runtime，或 Demo 2/3 已全部完成”；
+- “当前顺序单 Controller 已等同完整 Demo 1 跨 Run Durable Runtime，或 Demo 2/3 已全部完成”；
 - “内存 Snapshot 具备跨进程持久化或多实例高可用”；
 - “PostgreSQL Snapshot 恢复等于在途模型调用可续跑、跨实例调度或多实例高可用”；
 - “独立 append-only 逻辑 ArtifactVersion/TaskCommit 等于真实办公文件写入、源文件回滚或 Tool Gateway 动作”；

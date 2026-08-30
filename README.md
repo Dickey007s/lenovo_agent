@@ -90,6 +90,13 @@ PostgreSQL also restores accepted snapshots and idempotency receipts after API
 restart. Adaptive Workers, writable office artifacts, multi-instance leases and
 governed external actions remain target architecture, not current claims.
 
+The next Demo 1/2 increment is specified in
+[`DR-0053`](docs/decisions/DR-0053-durable-task-lineage-and-explainable-topology-admission.md):
+Demo 1 adds a stable business Task identity across bounded Runs without changing
+old results; Demo 2 adds service-owned topology admission before any bounded
+read-only Workers can start, then gates every contribution before merge. This is
+`Proposed`, not current Runtime behavior or evidence of user-value improvement.
+
 ## Public data and preview boundary
 
 FORTE is pinned to commit
@@ -491,7 +498,11 @@ pnpm --dir apps/web exec playwright test e2e/harness-workbench.spec.ts
 - [详细中文汇报稿与 17 页图文规划](docs/reports/OFFICE-AGENT-DETAILED-CHINESE-REPORT-20260825.md)
 - [可证伪竞争差异、八个同场挑战与前台影响研究](docs/research/COMPETITIVE-WHITE-SPACE-AND-FALSIFIABLE-DIFFERENTIATORS-20260826.md)
 - [可处置人工决策与失败恢复研究](docs/research/ACTIONABLE-HUMAN-DECISION-AND-FAILURE-RECOVERY-20260826.md)
+- [Demo 1/2 跨 Run 任务连续性、拓扑准入与交互影响研究](docs/research/DEMO1-DEMO2-DURABLE-TASK-AND-ADAPTIVE-ORCHESTRATION-RESEARCH-20260830.md)
 - [来源台账](docs/decisions/SOURCE_REGISTER.md)
+- [DR-0053：跨 Run 任务谱系与可解释协作拓扑准入](docs/decisions/DR-0053-durable-task-lineage-and-explainable-topology-admission.md)
+- [SCENARIO-038：同一办公任务跨 Run 延续而不覆盖历史](docs/scenarios/SCENARIO-038-durable-task-continuation-across-runs.md)
+- [SCENARIO-039：可解释路线准入与受限 Worker 统一收敛](docs/scenarios/SCENARIO-039-explainable-topology-and-verified-worker-convergence.md)
 - [DR-0022](docs/decisions/DR-0022-workspace-folder-and-arbitrary-task-contract.md)
 - [SCENARIO-008](docs/scenarios/SCENARIO-008-whole-folder-office-workspace.md)
 - [DR-0023：三轮只读 Agent Control Loop](docs/decisions/DR-0023-agent-control-loop.md)

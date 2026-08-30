@@ -12,6 +12,14 @@
 8. 当前整库文件管理器、自主检索和原文定位变更再读 `docs/decisions/DR-0024-autonomous-whole-workspace-research.md`、`docs/decisions/DR-0028-hierarchical-workspace-and-evidence-review.md`、`docs/decisions/DR-0029-server-verified-evidence-anchors.md`、`docs/scenarios/SCENARIO-010-autonomous-whole-workspace-research.md`、`docs/scenarios/SCENARIO-014-inspect-agent-issue-in-context.md`、`docs/scenarios/SCENARIO-015-pinpoint-and-compare-agent-evidence.md`、`docs/research/WORKSPACE-CENTRIC-OFFICE-AGENT-INTERACTION-AND-SOURCES-20260825.md`、`docs/testing/FORTE-PUBLIC-OFFICE-TASK-TEST-CASES-20260825.md` 与对应 Evidence/Source。`DR-0022` 的客户端手工 `selected_file_refs` 已由 `DR-0024` 取代，但其公开数据、安全预览与来源边界继续有效。
 9. 修改 Agent Control Loop、文件夹自主研究、预算/停止、分支控制、成果恢复或 Durable State 时，再读 `docs/research/AGENT-CONTROL-LOOP-IMPLEMENTATION-AUDIT-20260825.md`、`docs/decisions/DR-0023-agent-control-loop.md`、`docs/decisions/DR-0024-autonomous-whole-workspace-research.md`、`docs/decisions/DR-0026-selective-branch-and-immutable-artifact-history.md`、`docs/decisions/DR-0031-active-budget-and-agent-owned-gap-recovery.md`、`docs/scenarios/SCENARIO-012-selective-branch-and-artifact-restore.md`、`docs/scenarios/SCENARIO-017-resume-agent-owned-evidence-gap.md` 与对应 Evidence/Source；`DR-0025` 只作整组补证和 Snapshot 内成果的历史基线。对外和设计文档统一称 `Agent Control Loop`；Workspace 是循环处理的办公资料环境，不另立 `Workspace Research Loop` 或 `Research Loop` 产品名称。历史约 `30%` 只表示实现 `8364b1e` 之前的架构成熟度基线；现行 Runtime 默认 12 轮、上限 24 轮，已有顺序单 Controller、服务端 Branch、分支级 Evidence Gate、独立 append-only 逻辑 ArtifactVersion/TaskCommit、历史成果恢复、12 个固定本地确定性办公能力的隔离 Run Workspace Artifact/Verifier，以及可选 PostgreSQL 重启恢复，但任意办公写入、生产安全沙箱、多实例协调、多 Worker 与外部动作仍未实现。
 
+继续 07-16 Demo 1 时间维连续性或 Demo 2 组织维复杂性时，再读
+`docs/research/DEMO1-DEMO2-DURABLE-TASK-AND-ADAPTIVE-ORCHESTRATION-RESEARCH-20260830.md`、
+`docs/decisions/DR-0053-durable-task-lineage-and-explainable-topology-admission.md`、
+`docs/scenarios/SCENARIO-038-durable-task-continuation-across-runs.md` 与
+`docs/scenarios/SCENARIO-039-explainable-topology-and-verified-worker-convergence.md`。
+`DR-0053` 当前是 `Proposed`：跨 Run `task_id`、Topology Admission、通用只读 Worker
+与 Contribution merge 均不得写成现行能力；开发应先完成同场负向门和工程 Evidence。
+
 DR-0032 additionally governs EvidenceResolution source revisions, DecisionRequest/
 DecisionRecord persistence and Finding/Branch-local restart recovery. Read
 `docs/decisions/DR-0032-persistent-decision-and-local-recovery.md`,
