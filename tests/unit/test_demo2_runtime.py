@@ -483,7 +483,7 @@ async def test_demo2_five_unit_dag_runs_two_scheduler_owned_waves_and_accumulate
     assert [item.version for item in second.artifact_versions] == [1, 2]
     assert second.artifact_versions[0].artifact_id == second.artifact_versions[1].artifact_id
     assert second.artifact_versions[1].finding_count == 5
-    assert second.budget.model_calls_used == 8  # planner + 3 + 2 workers, with one bounded repair
+    assert second.budget.model_calls_used == 6  # one Planner + three first-wave + two second-wave calls
     assert {event.event_name for event in second.events}.issuperset({"worker_returned", "contribution_adopted"})
     await runtime.close()
 
