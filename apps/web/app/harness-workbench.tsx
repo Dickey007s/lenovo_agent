@@ -4014,10 +4014,13 @@ export function HarnessWorkbench({ onActivityChange }: { onActivityChange?: (sta
   function applySnapshot(snapshot: HarnessRun, generation: number) {
     if (generation !== generationRef.current) return false;
     const current = runRef.current;
-    if (current && current.run_id !== snapshot.run_id) return false;
-    if (snapshot.last_event_sequence < lastSequenceRef.current || (current && snapshot.version < current.version)) return false;
+    const switchedRun = Boolean(current && current.run_id !== snapshot.run_id);
+    // Versions and event sequences are scoped to a Run. A continuation creates
+    // a child Run whose counters legitimately restart at 1; only enforce
+    // monotonicity while applying snapshots within the same Run.
+    if (!switchedRun && (snapshot.last_event_sequence < lastSequenceRef.current || (current && snapshot.version < current.version))) return false;
     runRef.current = snapshot;
-    lastSequenceRef.current = Math.max(lastSequenceRef.current, snapshot.last_event_sequence);
+    lastSequenceRef.current = switchedRun ? snapshot.last_event_sequence : Math.max(lastSequenceRef.current, snapshot.last_event_sequence);
     window.sessionStorage.setItem(RUN_SESSION_KEY, snapshot.run_id);
     setRun(snapshot);
     if (snapshot.events.length) setConnection(TERMINAL_STATUSES.has(snapshot.status) ? "available" : "live");
@@ -4272,6 +4275,13 @@ export function HarnessWorkbench({ onActivityChange }: { onActivityChange?: (sta
       const payload = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(asText((payload as Record<string, unknown>).detail, "任务没有继续"));
       const snapshot = normalizeRun(payload);
+      // Continuation switches to a new Run lineage. Reset the per-Run
+      // monotonic cursors only after a valid child snapshot is available so a
+      // failed request leaves the parent Run rendered and recoverable.
+      if (snapshot) {
+        runRef.current = null;
+        lastSequenceRef.current = 0;
+      }
       if (!snapshot || !applySnapshot(snapshot, generation)) throw new Error("续办任务回执格式无效");
       setView("loop");
       if (!TERMINAL_STATUSES.has(snapshot.status)) connectEvents(snapshot.run_id, generation, snapshot.last_event_sequence);

@@ -2539,6 +2539,135 @@ async function openFile(page: Page, file: string) {
   await page.locator(".workspace-tree-file").filter({ hasText: file }).click();
 }
 
+function demo1ContinuationSnapshot(body: { workspace_id: string; instruction: string }, branchId: string) {
+  const base = boundedAnalysisRecoverySnapshot(body) as any;
+  return {
+    ...base,
+    run_id: "harness:demo1-child",
+    task_id: "task-demo1-lineage",
+    run_sequence: 2,
+    parent_run_id: "harness:workspace-run",
+    continuation_reason: "bounded_stop",
+    carried_branch_id: branchId,
+    base_artifact_version: 1,
+    base_task_commit: "commit-demo1-parent",
+    workspace_revision: "workspace-rev-demo1",
+    recheck_file_refs: [workflowFile.file_ref],
+    source_revision_changed: false,
+    status: "planning",
+    control_state: "running",
+    version: 1,
+    current_round: 1,
+    rounds: base.rounds,
+    events: [{ sequence: 2, event_name: "round_started", occurred_at: new Date().toISOString(), status: "planning", message: "只核对该未完成分支的批准来源。", details: {} }],
+    last_event_sequence: 2,
+  };
+}
+
+function demo2Snapshot(body: { workspace_id: string; instruction: string }, wave: number) {
+  const base = snapshot(body, wave === 2 ? "completed" : "waiting_input", 20) as any;
+  const ids = ["demo2-root-a", "demo2-root-b", "demo2-root-c", "demo2-dependent-d", "demo2-dependent-e"];
+  const makeBranch = (branchId: string, status: string, dependsOn: string[] = []) => ({
+    branch_id: branchId,
+    unit_id: branchId,
+    round_number: 1,
+    parent_branch_id: null,
+    title: `工作包 ${branchId}`,
+    objective: "只读核对批准来源并形成结构化贡献。",
+    depends_on: dependsOn,
+    input_file_refs: [workflowFile.file_ref],
+    verified_file_refs: status === "completed" ? [workflowFile.file_ref] : [],
+    missing_file_refs: status === "completed" ? [] : [workflowFile.file_ref],
+    status,
+    requires_human_gate: false,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  });
+  const branches = wave === 0
+    ? [makeBranch(ids[0], "running"), makeBranch(ids[1], "running"), makeBranch(ids[2], "running"), makeBranch(ids[3], "pending", [ids[0]]), makeBranch(ids[4], "pending", [ids[1]])]
+    : wave === 1
+      ? [makeBranch(ids[0], "completed"), makeBranch(ids[1], "completed"), makeBranch(ids[2], "completed"), makeBranch(ids[3], "running", [ids[0]]), makeBranch(ids[4], "running", [ids[1]])]
+      : ids.map((id, index) => makeBranch(id, "completed", index > 2 ? [ids[index - 3]] : []));
+  const workers = wave === 0 ? [] : ids.slice(0, wave === 1 ? 3 : 5).map((branchId, index) => ({
+    worker_run_id: `worker-${branchId}`,
+    branch_id: branchId,
+    outcome: "adopted",
+    summary: `已核对 ${branchId} 的结构化贡献。`,
+    source_file_refs: [workflowFile.file_ref],
+    model_called: true,
+    output_used: true,
+    elapsed_ms: 120 + index,
+    error: null,
+  }));
+  const ready = wave === 0 ? ids.slice(0, 3) : wave === 1 ? ids.slice(3) : [];
+  const round = {
+    ...(base.rounds[0] ?? {}),
+    round_number: 1,
+    status: wave === 2 ? "completed" : "waiting_input",
+    phase: wave === 2 ? "evidence_gate" : "analysis",
+    question: body.instruction,
+    input_file_refs: [workflowFile.file_ref],
+    branch_ids: ids,
+    next_step: { decision: wave === 2 ? "completed" : "waiting_input", reason: wave === 1 ? "下一波 ready 分支已准备。" : "等待确认只读 Worker。", next_question: null, candidate_file_refs: [workflowFile.file_ref], candidate_branch_ids: ready, ready_branch_ids: ready, evidence_resolutions: [] },
+    result: wave === 2 ? { summary: "5 个工作包的只读贡献已按服务端证据门合入。", findings: ids.map((id) => ({ finding_id: `finding-${id}`, title: `贡献 ${id}`, detail: "服务端已采用该分支贡献。", file_refs: [workflowFile.file_ref], evidence_anchor: { file_ref: workflowFile.file_ref, locator_kind: "text_lines", start: 1, end: 1, excerpt: "class QueryAnalysisNode:" } })), follow_ups: [], review_required: true } : null,
+  };
+  return {
+    ...base,
+    run_id: "harness:demo2-run",
+    task_id: "task-demo2-topology",
+    run_sequence: 1,
+    status: wave === 2 ? "completed" : "waiting_input",
+    control_state: wave === 2 ? "running" : "paused",
+    rounds: [round],
+    current_round: 1,
+    branches,
+    topology_admission: { mode: "adaptive_readonly_workers", work_unit_breadth: 5, independent_branch_count: 3, dependency_parallelism: 3, source_span: 1, remaining_model_calls: 24, remaining_time_seconds: 7000, external_action: "none", reasons: ["3 条独立分支可并行，依赖分支将在首波完成后 ready。"], user_confirmation_required: true },
+    worker_runs: workers,
+    shared_artifacts: workers.length ? [{ artifact_id: "artifact-demo2", version: wave, adopted_worker_run_ids: workers.map((item) => item.worker_run_id), waiting_branch_ids: wave === 1 ? ids.slice(3) : [], failed_worker_run_ids: [], external_action: "none" }] : [],
+    result: wave === 2 ? round.result : null,
+    artifact_versions: wave === 2 ? [{ ...base.artifact_versions[0], artifact_id: "artifact-demo2", version: 2, finding_count: 5, findings: round.result.findings, source_file_refs: [workflowFile.file_ref] }] : [],
+    workspace_artifacts: [],
+    events: [{ sequence: wave + 1, event_name: wave === 0 ? "topology_confirmation_required" : wave === 1 ? "topology_workers_completed" : "topology_workers_completed", occurred_at: new Date().toISOString(), status: wave === 2 ? "completed" : "waiting_input", message: wave === 0 ? "等待确认启动只读 Worker。" : "Worker 回执已保存，下一波 ready 分支已公开。", details: {} }],
+    last_event_sequence: wave + 1,
+    version: 20 + wave,
+  };
+}
+
+async function mockDemoRuntime(page: Page, mode: "demo1" | "demo2") {
+  await mockHarness(page, { boundedRecovery: mode === "demo1" });
+  let wave = 0;
+  let continuationSnapshot: unknown = null;
+  let demo2Current: unknown = null;
+  await page.route("**/v1/harness/runs", async (route) => {
+    if (route.request().method() !== "POST") return route.fallback();
+    const body = route.request().postDataJSON() as { workspace_id: string; instruction: string };
+    if (mode === "demo2") demo2Current = demo2Snapshot(body, 0);
+    return fulfillJson(route, { run: mode === "demo2" ? demo2Current : boundedAnalysisRecoverySnapshot(body), replayed: false }, 202);
+  });
+  await page.route("**/*", async (route) => {
+    const url = new URL(route.request().url());
+    if (mode === "demo1" && url.pathname.includes("/continue") && route.request().method() === "POST") {
+      const body = route.request().postDataJSON() as { branch_id: string; instruction?: string };
+      continuationSnapshot = demo1ContinuationSnapshot({ workspace_id: "forte-public-office", instruction: body.instruction ?? "继续未完成任务" }, body.branch_id);
+      return fulfillJson(route, continuationSnapshot, 202);
+    }
+    if (mode === "demo1" && continuationSnapshot && route.request().method() === "GET" && url.pathname.includes("/runs/") && !url.pathname.endsWith("/events")) return fulfillJson(route, continuationSnapshot);
+    if (mode === "demo2" && demo2Current && route.request().method() === "GET" && url.pathname.includes("/runs/") && !url.pathname.endsWith("/events")) return fulfillJson(route, demo2Current);
+    if (mode === "demo2" && url.pathname.endsWith("/workers") && route.request().method() === "POST") {
+      wave += 1;
+      demo2Current = demo2Snapshot({ workspace_id: "forte-public-office", instruction: "验证拓扑" }, wave);
+      return fulfillJson(route, demo2Current, 202);
+    }
+    return route.fallback();
+  });
+  await page.route("**/v1/harness/runs/*/workers", async (route) => {
+    if (mode !== "demo2" || route.request().method() !== "POST") return route.fallback();
+    wave += 1;
+    demo2Current = demo2Snapshot({ workspace_id: "forte-public-office", instruction: "验证拓扑" }, wave);
+    return fulfillJson(route, demo2Current, 202);
+  });
+}
+
 test("shows one complete folder workspace instead of registered scenarios", async ({ page }) => {
   await mockHarness(page); await page.goto("/");
   await expect(page.getByRole("heading", { name: "办公资料库" })).toBeVisible();
@@ -2595,7 +2724,7 @@ test("runs an arbitrary task while the agent selects evidence from the whole wor
   await expect(page.locator(".loop-branches")).toContainText("形成分析结果");
   await expect(page.locator(".artifact-evolution")).toContainText("不可变成果历史");
   await expect(page.locator(".artifact-evolution")).toContainText("当前 v2");
-  await page.getByRole("button", { name: /发现与建议/ }).click();
+  await page.getByRole("button", { name: /成果与建议/ }).click();
   await expect(page.getByRole("heading", { name: /完成 2 轮/ })).toBeVisible();
   expect(await page.locator("body").innerText()).not.toContain("forte-");
 });
@@ -4056,7 +4185,7 @@ test("restores an immutable artifact version without overwriting history", async
       path: "../../docs/evidence/screenshots/dr-0026-artifact-restore.png",
     });
   }
-  await page.getByRole("button", { name: /发现与建议/ }).click();
+  await page.getByRole("button", { name: /成果与建议/ }).click();
   await expect(page.getByText("任务证据简报 v1 · 已恢复")).toBeVisible();
 });
 
@@ -4134,7 +4263,7 @@ test("opens a cited source file from an analysis finding", async ({ page }) => {
   await mockHarness(page); await page.goto("/");
   await page.getByRole("textbox", { name: "任务指令" }).fill("核对余额并引用来源文件。");
   await page.getByRole("button", { name: "启动 Control Loop" }).click();
-  await page.getByRole("button", { name: /发现与建议/ }).click();
+  await page.getByRole("button", { name: /成果与建议/ }).click();
   await page.getByRole("button", { name: "打开审查页" }).first().click();
   await expect(page.getByRole("dialog", { name: "需要你核对并决定下一步" })).toBeVisible();
   await expect(page.getByRole("dialog")).toContainText("高亮位置由服务端从逐字引用解析");
@@ -4164,7 +4293,7 @@ test("keeps the review body, evidence and safe table preview readable on desktop
   await page.goto("/");
   await page.getByRole("textbox", { name: "任务指令" }).fill("核对超长客商的期末余额并打开问题审查页。");
   await page.getByRole("button", { name: "启动 Control Loop" }).click();
-  await page.getByRole("button", { name: /发现与建议/ }).click();
+  await page.getByRole("button", { name: /成果与建议/ }).click();
   await page.getByRole("button", { name: "打开审查页" }).first().click();
 
   const dialog = page.getByRole("dialog");
@@ -4211,7 +4340,7 @@ test("turns a finding into an evidence-backed human decision and a new task", as
   const state = await mockHarness(page); await page.goto("/");
   await page.getByRole("textbox", { name: "任务指令" }).fill("核对新闻搜索路由并说明如何处理。");
   await page.getByRole("button", { name: "启动 Control Loop" }).click();
-  await page.getByRole("button", { name: /发现与建议/ }).click();
+  await page.getByRole("button", { name: /成果与建议/ }).click();
   await page.getByRole("button", { name: "打开审查页" }).first().click();
 
   const dialog = page.getByRole("dialog", { name: "需要你核对并决定下一步" });
@@ -4253,7 +4382,7 @@ test("records closing a pending decision as defer and restores the receipt", asy
   const state = await mockHarness(page); await page.goto("/");
   await page.getByRole("textbox", { name: "任务指令" }).fill("核对新闻搜索路由并说明如何处理。");
   await page.getByRole("button", { name: "启动 Control Loop" }).click();
-  await page.getByRole("button", { name: /发现与建议/ }).click();
+  await page.getByRole("button", { name: /成果与建议/ }).click();
   await page.getByRole("button", { name: "打开审查页" }).first().click();
   await page.getByRole("button", { name: "关闭问题审查页" }).click();
 
@@ -4264,7 +4393,7 @@ test("records closing a pending decision as defer and restores the receipt", asy
     finding_id: "finding-111111111111",
   });
 
-  await page.getByRole("button", { name: /发现与建议/ }).click();
+  await page.getByRole("button", { name: /成果与建议/ }).click();
   await page.getByRole("button", { name: "打开审查页" }).first().click();
   await expect(page.getByRole("dialog")).toContainText("人工决定已记录");
   await expect(page.getByRole("dialog")).toContainText("已暂缓");
@@ -4284,7 +4413,7 @@ test("always closes the review page even when the defer receipt conflicts", asyn
   const state = await mockHarness(page, { failDecisionDefer: true }); await page.goto("/");
   await page.getByRole("textbox", { name: "任务指令" }).fill("核对新闻搜索路由并说明如何处理。");
   await page.getByRole("button", { name: "启动 Control Loop" }).click();
-  await page.getByRole("button", { name: /发现与建议/ }).click();
+  await page.getByRole("button", { name: /成果与建议/ }).click();
   await page.getByRole("button", { name: "打开审查页" }).first().click();
 
   const dialog = page.getByRole("dialog", { name: "需要你核对并决定下一步" });
@@ -4537,22 +4666,20 @@ test("creates a new scoped task instead of pretending a budget-stopped run can r
   await page.setViewportSize({ width: 390, height: 844 });
   const mobileMetrics = await page.evaluate(() => ({ viewport: document.documentElement.clientWidth, scroll: document.documentElement.scrollWidth }));
   expect(mobileMetrics.scroll).toBeLessThanOrEqual(mobileMetrics.viewport);
-  await recovery.locator(".source-recovery-branches article").filter({ hasText: "读取相关资料" }).getByRole("button", { name: "用此分支创建新任务" }).click();
-
-  await expect.poll(() => state.starts.length).toBe(2);
+  const continuation = page.waitForRequest((request) => request.url().includes("/continue") && request.method() === "POST");
+  await recovery.locator(".source-recovery-branches article").filter({ hasText: "读取相关资料" }).getByRole("button", { name: "继续未完成任务" }).click();
+  const continuationRequest = await continuation;
+  const continuationBody = continuationRequest.postDataJSON() as { instruction?: string; branch_id?: string };
+  expect(continuationBody.branch_id).toBe("branch-111111111111");
   expect(state.controls).toHaveLength(0);
-  expect(state.starts[1].instruction).toContain(originalInstruction);
-  expect(state.starts[1].instruction).toContain("续办分支：读取相关资料");
-  expect(state.starts[1].instruction).toContain("优先核对版本号和测试日期");
-  expect(state.starts[1].instruction).toContain("这些只是历史选择，不限制新 Run 重新检索整个资料库");
-  expect(state.starts[1].instruction).toContain("只读分析，不修改原文件，不执行外部动作");
+  expect(continuationBody.instruction).toContain("优先核对版本号和测试日期");
 });
 
 test("starts a new whole-workspace loop only after the user confirms an agent proposal", async ({ page }) => {
   const state = await mockHarness(page); await page.goto("/");
   await page.getByRole("textbox", { name: "任务指令" }).fill("研究整个资料库并提出下一步。");
   await page.getByRole("button", { name: "启动 Control Loop" }).click();
-  await page.getByRole("button", { name: /发现与建议/ }).click();
+  await page.getByRole("button", { name: /成果与建议/ }).click();
   const proposal = "继续核对授权范围与财务往来之间是否存在执行约束，并形成待办清单。";
   await expect(page.getByText(proposal)).toBeVisible();
   await page.getByRole("button", { name: "查看形成依据" }).click();
@@ -4625,7 +4752,7 @@ test("mobile keeps file-manager browsing, task input, preview and trajectory usa
   expect(shortControls).toEqual([]);
   await page.getByRole("textbox", { name: "任务指令" }).fill("核对余额并打开问题审查页。");
   await page.getByRole("button", { name: "启动 Control Loop" }).click();
-  await page.getByRole("button", { name: /发现与建议/ }).click();
+  await page.getByRole("button", { name: /成果与建议/ }).click();
   await page.getByRole("button", { name: "打开审查页" }).first().click();
   await expect(page.getByRole("dialog")).toBeVisible();
   await expect(page.getByRole("dialog")).toContainText("选择一条，右侧打开真实文件并高亮对应位置");
@@ -4634,4 +4761,48 @@ test("mobile keeps file-manager browsing, task input, preview and trajectory usa
   const closeBox = await page.getByRole("button", { name: "关闭问题审查页" }).boundingBox();
   expect(closeBox?.width).toBeGreaterThanOrEqual(44);
   expect(closeBox?.height).toBeGreaterThanOrEqual(44);
+});
+
+test.describe("Demo 1/2 runtime acceptance", () => {
+  test("Demo 1 shows a durable task timeline and continues only the unfinished branch", async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 1100 });
+    await mockDemoRuntime(page, "demo1");
+    await page.goto("/");
+    await page.getByRole("textbox", { name: "任务指令" }).fill("继续未完成的资料核对任务。");
+    await page.getByRole("button", { name: "启动 Control Loop" }).click();
+    await page.getByRole("button", { name: "Agent 路径" }).click();
+    await expect(page.getByRole("button", { name: "继续未完成任务" }).first()).toBeVisible();
+    await expect(page.getByText(/不能继续原地运行/)).toBeVisible();
+    const continuation = page.waitForRequest((request) => request.url().includes("/continue") && request.method() === "POST");
+    await page.getByRole("button", { name: "继续未完成任务" }).first().click();
+    const continuationRequest = await continuation;
+    expect(continuationRequest.postDataJSON()).toMatchObject({ branch_id: "branch-222222222222" });
+    await expect(page.locator('[data-testid="task-lineage"]')).toContainText("任务持续链 · Run 2");
+    await expect(page.locator('[data-testid="task-lineage"]')).toContainText("本次只核对该未完成分支的批准来源");
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+    expect(overflow).toBeLessThanOrEqual(0);
+  });
+
+  test("Demo 2 requires confirmation, records worker receipts and exposes the next wave", async ({ page }) => {
+    await mockDemoRuntime(page, "demo2");
+    await page.goto("/");
+    await page.getByRole("textbox", { name: "任务指令" }).fill("按可解释拓扑核对多个独立工作包。");
+    await page.getByRole("button", { name: "启动 Control Loop" }).click();
+    await page.getByRole("button", { name: "Agent 路径" }).click();
+    const admission = page.locator('[data-testid="topology-admission"]');
+    await expect(admission).toContainText("已准入受限只读 Workers");
+    await expect(admission).toContainText("3 条独立分支可并行");
+    await expect(admission.getByRole("button", { name: "确认并启动只读 Worker" })).toBeEnabled();
+    await admission.getByRole("button", { name: "确认并启动只读 Worker" }).click();
+    await expect(admission).toContainText("实际 Worker 回执");
+    await expect(admission).toContainText("已合入");
+    await expect(admission.getByRole("button", { name: "继续下一批只读 Worker" })).toBeEnabled();
+    await admission.getByRole("button", { name: "继续下一批只读 Worker" }).click();
+    await expect(admission).toContainText("demo2-dependent-d");
+    await expect(page.locator(".loop-round-result")).toContainText("5 个工作包");
+    await page.setViewportSize({ width: 390, height: 844 });
+    const mobileOverflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+    expect(mobileOverflow).toBeLessThanOrEqual(0);
+    await expect(admission.getByText("实际 Worker 回执")).toBeVisible();
+  });
 });
