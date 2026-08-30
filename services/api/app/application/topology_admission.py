@@ -76,6 +76,10 @@ def admit_topology(
         remaining_model_calls=max(0, remaining_model_calls),
         remaining_time_seconds=max(0, remaining_time_seconds),
         reasons=reasons,
+        # Only the high-cost adaptive route needs an explicit human
+        # confirmation.  Single-controller and fixed-workflow routes are
+        # already the conservative default and must not create a phantom gate.
+        user_confirmation_required=mode == "adaptive_readonly_workers",
     )
 
 

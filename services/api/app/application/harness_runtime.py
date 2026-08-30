@@ -1288,6 +1288,8 @@ class HarnessRuntime:
         async with self._lock:
             run = self._require_run(owner_id, run_id)
             snapshot = run.snapshot
+            if snapshot.status in {"completed", "failed", "stopped"}:
+                raise HarnessConflictError("终态 Run 不能追加 Worker；请创建新的任务")
             if snapshot.version != expected_version:
                 raise HarnessConflictError("任务版本已更新，请刷新后重试")
             admission = snapshot.topology_admission or {}
