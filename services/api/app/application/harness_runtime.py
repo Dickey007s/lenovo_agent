@@ -1393,35 +1393,43 @@ class HarnessRuntime:
                 finding_by_id[finding.finding_id] = finding
             artifact_findings = list(finding_by_id.values())[:10]
             branch_by_id = {branch.branch_id: branch for branch in run.snapshot.branches}
+            updated_by_id: dict[str, AgentControlLoopBranch] = {}
             updated_branches: list[AgentControlLoopBranch] = []
             for branch in run.snapshot.branches:
                 contribution = contribution_by_branch.get(branch.branch_id)
                 if contribution is not None:
                     adopted = contribution.worker_run_id in adopted_worker_ids
-                    updated_branches.append(
-                        branch.model_copy(
-                            update={
-                                "status": "completed" if adopted else "waiting_input",
-                                "verified_file_refs": sorted(
-                                    set(branch.verified_file_refs)
-                                    | (set(contribution.source_file_refs) if adopted else set())
-                                )[:24],
-                                "missing_file_refs": [] if adopted else list(contribution.source_file_refs),
-                                "updated_at": now,
-                            }
-                        )
+                    updated = branch.model_copy(
+                        update={
+                            "status": "completed" if adopted else "waiting_input",
+                            "verified_file_refs": sorted(
+                                set(branch.verified_file_refs)
+                                | (set(contribution.source_file_refs) if adopted else set())
+                            )[:24],
+                            "missing_file_refs": [] if adopted else list(contribution.source_file_refs),
+                            "updated_at": now,
+                        }
                     )
+                    updated_branches.append(updated)
+                    updated_by_id[updated.branch_id] = updated
                     continue
-                dependencies = [branch_by_id[item] for item in branch.depends_on if item in branch_by_id]
+                dependencies = [
+                    updated_by_id.get(item, branch_by_id[item])
+                    for item in branch.depends_on
+                    if item in branch_by_id
+                ]
                 if branch.status in {"pending", "blocked", "running"}:
                     if any(item.status in {"failed", "blocked", "waiting_input"} for item in dependencies):
-                        updated_branches.append(branch.model_copy(update={"status": "blocked", "updated_at": now}))
+                        updated = branch.model_copy(update={"status": "blocked", "updated_at": now})
                     elif all(item.status == "completed" for item in dependencies):
-                        updated_branches.append(branch.model_copy(update={"status": "running", "updated_at": now}))
+                        updated = branch.model_copy(update={"status": "running", "updated_at": now})
                     else:
-                        updated_branches.append(branch.model_copy(update={"status": "pending", "updated_at": now}))
+                        updated = branch.model_copy(update={"status": "pending", "updated_at": now})
+                    updated_branches.append(updated)
+                    updated_by_id[updated.branch_id] = updated
                 else:
                     updated_branches.append(branch)
+                    updated_by_id[branch.branch_id] = branch
             all_branches_completed = bool(updated_branches) and all(
                 branch.status == "completed" for branch in updated_branches
             )

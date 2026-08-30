@@ -2,16 +2,20 @@ from __future__ import annotations
 
 import asyncio
 from datetime import datetime, timezone
+import time
 
 import pytest
 from fastapi.routing import APIRoute
 
 from services.api.app.application.harness_runtime import (
+    HarnessEvidenceQuote,
+    HarnessFinding,
     HarnessPlan,
     HarnessPlanCandidate,
     HarnessPlanCandidateUnit,
     HarnessPlanUnit,
     HarnessRunStart,
+    HarnessTaskResult,
     HarnessRuntime,
 )
 from packages.contracts.harness_models import AgentControlLoopControlRequest
@@ -237,6 +241,352 @@ async def test_adaptive_wait_persists_plan_and_override_reuses_same_round() -> N
         await asyncio.sleep(0.01)
     assert planner.calls == 1
     assert analyst.calls == 1, (final.status, final.control_state, [(e.event_name, e.message) for e in final.events], final.validation_errors)
+
+
+@pytest.mark.asyncio
+async def test_demo1_continuation_creates_child_run_with_exact_carried_branch_scope() -> None:
+    """A bounded terminal Run continues as a new Run, never as an in-place resume."""
+    from tests.unit.test_harness_runtime import AlwaysUnlocatableAnalyst, FakeCatalog, FakePlanner
+
+    runtime = HarnessRuntime(FakeCatalog(), FakePlanner(), AlwaysUnlocatableAnalyst())
+    started = await runtime.start(
+        "alice",
+        HarnessRunStart(
+            idempotency_key="demo1-parent-start-0001",
+            instruction="核对跨期资料并保留未完成分支",
+            loop={"max_rounds": 1, "max_files_per_round": 2, "max_model_calls": 6, "deadline_seconds": 120},
+        ),
+    )
+    parent = None
+    for _ in range(400):
+        candidate = await runtime.get("alice", started.run.run_id)
+        if candidate.status in {"waiting_input", "stopped"}:
+            parent = candidate
+            break
+        await asyncio.sleep(0.01)
+    assert parent is not None
+    if parent.status == "stopped":
+        terminal = parent
+    else:
+        stopped = await runtime.control(
+            "alice",
+            parent.run_id,
+            AgentControlLoopControlRequest(
+                command="stop",
+                idempotency_key="demo1-parent-stop-0001",
+                expected_version=parent.version,
+            ),
+        )
+        terminal = None
+        for _ in range(400):
+            candidate = await runtime.get("alice", stopped.run.run_id)
+            if candidate.status == "stopped":
+                terminal = candidate
+                break
+            await asyncio.sleep(0.01)
+        assert terminal is not None
+    branch = next(item for item in terminal.branches if item.status != "completed")
+    old_dump = terminal.model_dump(mode="json")
+    expected_refs = tuple(branch.missing_file_refs or branch.input_file_refs)
+    child = await runtime.continue_unfinished_task(
+        "alice",
+        terminal.run_id,
+        branch.branch_id,
+        idempotency_key="demo1-child-continue-0001",
+        expected_version=terminal.version,
+    )
+    assert child.run.task_id == terminal.task_id
+    assert child.run.run_id != terminal.run_id
+    assert child.run.run_sequence == terminal.run_sequence + 1
+    assert tuple(child.run.recheck_file_refs) == expected_refs
+    assert child.run.carried_branch_id == branch.branch_id
+    assert terminal.model_dump(mode="json") == old_dump
+    replay = await runtime.continue_unfinished_task(
+        "alice",
+        terminal.run_id,
+        branch.branch_id,
+        idempotency_key="demo1-child-continue-0001",
+        expected_version=terminal.version,
+    )
+    assert replay.run.run_id == child.run.run_id
+    await runtime.close()
+
+
+@pytest.mark.asyncio
+async def test_demo2_five_unit_dag_runs_two_scheduler_owned_waves_and_accumulates_v2() -> None:
+    """Three ready units run first; two dependents become ready only afterwards."""
+    from tests.unit.test_harness_runtime import FakeCatalog
+
+    refs = tuple(f"forte-{index:016x}" for index in range(1, 6))
+
+    class WaveCatalog(FakeCatalog):
+        def __init__(self) -> None:
+            super().__init__()
+            self.files = [
+                {
+                    "file_ref": ref,
+                    "folder_id": f"folder-{index}",
+                    "path": f"group-{index}/input.txt",
+                    "role": "input",
+                    "mime": "text/plain",
+                    "size": 20,
+                    "sha256": f"{index:x}" * 64,
+                    "display_label": f"资料 {index}",
+                    "display_group": f"业务组 {index}",
+                    "display_path": f"业务组 {index}/资料 {index}.txt",
+                    "display_summary": "文本文件",
+                }
+                for index, ref in enumerate(refs, start=1)
+            ]
+
+        def public_workspace(self) -> dict[str, object]:
+            workspace = super().public_workspace()
+            workspace["file_count"] = len(self.files)
+            workspace["folders"] = []
+            return workspace
+
+        def internal_workspace(self) -> dict[str, object]:
+            workspace = super().internal_workspace()
+            workspace["files"] = self.files
+            return workspace
+
+        def public_file(self, file_ref: str) -> dict[str, object]:
+            item = next(item for item in self.files if item["file_ref"] == file_ref)
+            return {
+                **item,
+                "kind": "text",
+                "columns": [],
+                "text": f"证据 {file_ref}",
+                "rows": [],
+                "total_rows": None,
+            }
+
+        def agent_file_inputs(self, file_refs: list[str]) -> list[dict[str, object]]:
+            return [
+                {
+                    "file_ref": ref,
+                    "display_label": next(item["display_label"] for item in self.files if item["file_ref"] == ref),
+                    "kind": "text",
+                    "columns": [],
+                    "text": f"证据 {ref}",
+                }
+                for ref in file_refs
+            ]
+
+    class FiveWavePlanner:
+        model = "test-planner"
+
+        def __init__(self) -> None:
+            self.calls = 0
+
+        async def plan(self, *, scenario, files):
+            self.calls += 1
+            return HarnessPlanCandidate(
+                summary="五个工作包的两波依赖计划",
+                selection_reason="服务端验证的有向依赖图",
+                units=[
+                    *[
+                        HarnessPlanCandidateUnit(
+                            unit_id=f"u{index}",
+                            title=f"独立工作包 {index}",
+                            objective=f"核对第 {index} 份资料",
+                            input_file_refs=[refs[index - 1]],
+                            tool="file.read",
+                        )
+                        for index in range(1, 4)
+                    ],
+                    HarnessPlanCandidateUnit(
+                        unit_id="u4",
+                        title="依赖工作包 4",
+                        objective="在工作包 1 完成后核对资料 4",
+                        input_file_refs=[refs[3]],
+                        depends_on=["u1"],
+                        tool="file.read",
+                    ),
+                    HarnessPlanCandidateUnit(
+                        unit_id="u5",
+                        title="依赖工作包 5",
+                        objective="在工作包 2 完成后核对资料 5",
+                        input_file_refs=[refs[4]],
+                        depends_on=["u2"],
+                        tool="file.read",
+                    ),
+                ],
+            )
+
+    class WaveAnalyst:
+        model = "test-analyst"
+
+        async def analyze(self, *, instruction, plan, files, validation_feedback=None):
+            item = files[0]
+            unit = plan.units[0]
+            ref = str(item["file_ref"])
+            return HarnessTaskResult(
+                summary=f"已核对 {ref}",
+                findings=[
+                    HarnessFinding(
+                        plan_unit_id=unit.unit_id,
+                        title=f"已定位 {unit.unit_id}",
+                        detail="该工作包有一处可回开的只读事实。",
+                        file_refs=[ref],
+                        evidence_quotes=[
+                            HarnessEvidenceQuote(
+                                file_ref=ref,
+                                role="support",
+                                label="工作包证据",
+                                quote=f"证据 {ref}",
+                            )
+                        ],
+                    )
+                ],
+                review_required=True,
+            )
+
+    runtime = HarnessRuntime(WaveCatalog(), FiveWavePlanner(), WaveAnalyst())
+    started = await runtime.start(
+        "alice",
+        HarnessRunStart(
+            idempotency_key="demo2-five-wave-start-0001",
+            instruction="核对五个相互关联的资料分支",
+            loop={"max_rounds": 1, "max_files_per_round": 8, "max_model_calls": 10, "deadline_seconds": 120},
+        ),
+    )
+    waiting = None
+    for _ in range(500):
+        candidate = await runtime.get("alice", started.run.run_id)
+        if candidate.status == "waiting_input" and candidate.topology_admission:
+            waiting = candidate
+            break
+        await asyncio.sleep(0.01)
+    assert waiting is not None
+    assert waiting.topology_admission.mode == "adaptive_readonly_workers"
+    assert waiting.rounds[0].next_step.ready_branch_ids == [
+        item.branch_id for item in waiting.branches if item.status == "running"
+    ]
+    assert [item.status for item in waiting.branches] == ["running", "running", "running", "pending", "pending"]
+    first = await runtime.execute_admitted_workers_from_branches(
+        "alice", waiting.run_id, branch_ids=[], expected_version=waiting.version,
+        idempotency_key="demo2-five-wave-workers-0001", user_confirmed=True,
+    )
+    assert first.status == "waiting_input"
+    assert len(first.worker_runs) == 3
+    assert len(first.shared_artifacts) == 1
+    assert [item.status for item in first.branches] == ["completed", "completed", "completed", "running", "running"]
+    assert first.rounds[0].next_step.ready_branch_ids == [first.branches[3].branch_id, first.branches[4].branch_id]
+    second = await runtime.execute_admitted_workers_from_branches(
+        "alice", first.run_id, branch_ids=[], expected_version=first.version,
+        idempotency_key="demo2-five-wave-workers-0002", user_confirmed=True,
+    )
+    assert second.status == "completed"
+    assert len(second.worker_runs) == 5
+    assert len(second.shared_artifacts) == 2
+    assert [item.version for item in second.artifact_versions] == [1, 2]
+    assert second.artifact_versions[0].artifact_id == second.artifact_versions[1].artifact_id
+    assert second.artifact_versions[1].finding_count == 5
+    assert second.budget.model_calls_used == 8  # planner + 3 + 2 workers, with one bounded repair
+    assert {event.event_name for event in second.events}.issuperset({"worker_returned", "contribution_adopted"})
+    await runtime.close()
+
+
+@pytest.mark.asyncio
+async def test_five_unit_dag_runtime_advances_from_roots_to_second_worker_wave() -> None:
+    from tests.unit.test_harness_runtime import FakeAnalyst, FakeCatalog
+
+    class FiveUnitDagPlanner:
+        model = "test-planner"
+
+        async def plan(self, *, scenario, files):
+            refs = [str(item["file_ref"]) for item in files]
+            roots = [
+                HarnessPlanCandidateUnit(
+                    unit_id=f"u{index}", title=f"独立分支 {index}", objective=f"核对独立事实 {index}",
+                    input_file_refs=[refs[(index - 1) % len(refs)]], tool="file.read",
+                )
+                for index in (1, 2, 3)
+            ]
+            dependents = [
+                HarnessPlanCandidateUnit(
+                    unit_id="u4", title="依赖分支 4", objective="在独立事实 1 上继续复核",
+                    input_file_refs=[refs[0]], depends_on=["u1"], tool="file.read",
+                ),
+                HarnessPlanCandidateUnit(
+                    unit_id="u5", title="依赖分支 5", objective="在独立事实 2 上继续复核",
+                    input_file_refs=[refs[1]], depends_on=["u2"], tool="file.read",
+                ),
+            ]
+            return HarnessPlanCandidate(
+                summary="三条独立分支与两条依赖分支",
+                selection_reason="服务端校验的 DAG",
+                units=roots + dependents,
+            )
+
+    runtime = HarnessRuntime(FakeCatalog(), FiveUnitDagPlanner(), FakeAnalyst())
+    started = await runtime.start(
+        "alice",
+        HarnessRunStart(
+            idempotency_key="five-unit-runtime-start-0001",
+            instruction="核对五条有依赖关系的办公事实",
+            loop={"max_rounds": 2, "max_files_per_round": 2, "max_model_calls": 8, "deadline_seconds": 120},
+        ),
+    )
+    deadline = time.monotonic() + 3
+    waiting = None
+    while time.monotonic() < deadline:
+        candidate = await runtime.get("alice", started.run.run_id)
+        if candidate.status == "waiting_input" and candidate.topology_admission is not None:
+            waiting = candidate
+            break
+        await asyncio.sleep(0.01)
+    assert waiting is not None
+    assert waiting.topology_admission.mode == "adaptive_readonly_workers"
+    by_unit = {item.unit_id: item for item in waiting.branches}
+    assert [by_unit[f"u{index}"].status for index in (1, 2, 3)] == ["running"] * 3
+    assert [by_unit[f"u{index}"].status for index in (4, 5)] == ["pending"] * 2
+
+    async def handler(request: ReadonlyWorkerRequest) -> ReadonlyWorkerContribution:
+        return ReadonlyWorkerContribution(
+            worker_run_id=request.worker_run_id,
+            branch_id=request.branch_id,
+            outcome="adopted",
+            summary="已通过服务端来源核对",
+            source_file_refs=request.source_file_refs,
+            evidence_anchors=("line:1",),
+            model_called=True,
+            output_used=True,
+        )
+
+    def requests_for(snapshot, unit_ids, suffix):
+        return [
+            ReadonlyWorkerRequest(
+                worker_run_id=f"worker-{unit_id}-{suffix}", branch_id=by_unit[unit_id].branch_id,
+                goal=by_unit[unit_id].objective, source_file_refs=tuple(by_unit[unit_id].input_file_refs),
+                expected_version=snapshot.version,
+            )
+            for unit_id in unit_ids
+        ]
+
+    first = await runtime.execute_admitted_readonly_workers(
+        "alice", started.run.run_id, expected_version=waiting.version,
+        idempotency_key="five-unit-wave-0001", worker_requests=requests_for(waiting, ("u1", "u2", "u3"), "one"),
+        handler=handler, user_confirmed=True,
+    )
+    ready_units = {item.unit_id for item in first.branches if item.status == "running"}
+    assert ready_units == {"u4", "u5"}, [(item.unit_id, item.status) for item in first.branches]
+    assert set(first.rounds[-1].next_step.ready_branch_ids) == {
+        by_unit[unit_id].branch_id for unit_id in ready_units
+    }
+
+    by_unit = {item.unit_id: item for item in first.branches}
+    second = await runtime.execute_admitted_readonly_workers(
+        "alice", started.run.run_id, expected_version=first.version,
+        idempotency_key="five-unit-wave-0002", worker_requests=requests_for(first, ("u4", "u5"), "two"),
+        handler=handler, user_confirmed=True,
+    )
+    assert second.status == "completed"
+    assert all(item.status == "completed" for item in second.branches)
+    assert [item.version for item in second.artifact_versions] == [1, 2]
+    assert [item.version for item in second.shared_artifacts] == [1, 2]
+    assert len({item.artifact_id for item in second.artifact_versions}) == 1
 
 
 @pytest.mark.asyncio
