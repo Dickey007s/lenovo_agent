@@ -283,6 +283,14 @@ class HarnessRunSnapshot(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     run_id: str
+    task_id: str = Field(default="task-000000000000", pattern=r"^task-[0-9a-f]{12}$")
+    run_sequence: int = Field(default=1, ge=1, le=10_000)
+    parent_run_id: str | None = Field(default=None, pattern=r"^harness:[0-9a-f]{32}$")
+    continuation_reason: str | None = Field(default=None, max_length=240)
+    carried_branch_id: str | None = Field(default=None, pattern=r"^branch-[0-9a-f]{12}$")
+    base_artifact_version: int | None = Field(default=None, ge=1, le=24)
+    base_task_commit: str | None = Field(default=None, pattern=r"^commit-[0-9a-f]{12}$")
+    workspace_revision: str = Field(default="unknown", min_length=1, max_length=120)
     owner_id: str
     workspace_id: Literal["forte-public-office"] = "forte-public-office"
     status: str
@@ -346,6 +354,12 @@ class HarnessRunStart(BaseModel):
     expected_version: int = Field(default=1, ge=1)
     instruction: str = Field(min_length=3, max_length=2_000)
     loop: AgentControlLoopOptions = Field(default_factory=AgentControlLoopOptions)
+    task_id: str | None = Field(default=None, pattern=r"^task-[0-9a-f]{12}$")
+    parent_run_id: str | None = Field(default=None, pattern=r"^harness:[0-9a-f]{32}$")
+    continuation_reason: str | None = Field(default=None, max_length=240)
+    carried_branch_id: str | None = Field(default=None, pattern=r"^branch-[0-9a-f]{12}$")
+    base_artifact_version: int | None = Field(default=None, ge=1, le=24)
+    base_task_commit: str | None = Field(default=None, pattern=r"^commit-[0-9a-f]{12}$")
 
     @field_validator("instruction")
     @classmethod
@@ -363,6 +377,18 @@ class HarnessRunStartResult(BaseModel):
 
     run: HarnessRunSnapshot
     replayed: bool = False
+
+
+class HarnessContinuationRequest(BaseModel):
+    """Owner command for a terminal Run's one-Branch continuation."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    branch_id: str = Field(pattern=r"^branch-[0-9a-f]{12}$")
+    idempotency_key: str = Field(min_length=8, max_length=160)
+    expected_version: int = Field(ge=1)
+    instruction: str | None = Field(default=None, min_length=3, max_length=2_000)
+    loop: AgentControlLoopOptions | None = None
 
 
 class PublicHarnessPlanUnit(BaseModel):
@@ -392,6 +418,14 @@ class PublicHarnessRunSnapshot(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     run_id: str
+    task_id: str = "task-000000000000"
+    run_sequence: int = 1
+    parent_run_id: str | None = None
+    continuation_reason: str | None = None
+    carried_branch_id: str | None = None
+    base_artifact_version: int | None = None
+    base_task_commit: str | None = None
+    workspace_revision: str = "unknown"
     owner_id: str
     workspace_id: Literal["forte-public-office"]
     status: str
@@ -1010,6 +1044,44 @@ class HarnessRuntime:
                 if replay.digest != digest:
                     raise HarnessConflictError("幂等键已用于不同 Harness 命令")
                 return replay.result.model_copy(update={"replayed": True}, deep=True)
+            parent: HarnessRunSnapshot | None = None
+            carried_branch: AgentControlLoopBranch | None = None
+            if request.parent_run_id is not None:
+                parent_run = self._runs.get((owner_id, request.parent_run_id))
+                if parent_run is None:
+                    raise HarnessNotFoundError("续办的旧任务不存在")
+                parent = parent_run.snapshot
+                if parent.status not in {"stopped", "failed", "completed"}:
+                    raise HarnessConflictError("只有已停止或已结束任务可以继续未完成任务")
+                if request.task_id is not None and request.task_id != parent.task_id:
+                    raise HarnessConflictError("续办任务的 task_id 与旧任务不一致")
+                if request.carried_branch_id is None:
+                    raise HarnessConflictError("继续未完成任务必须指定一个未完成分支")
+                carried_branch = next(
+                    (item for item in parent.branches if item.branch_id == request.carried_branch_id),
+                    None,
+                )
+                if carried_branch is None or carried_branch.status in {"completed"}:
+                    raise HarnessConflictError("只能续办旧任务中尚未完成的分支")
+                if request.base_artifact_version is not None and not any(
+                    item.version == request.base_artifact_version for item in parent.artifact_versions
+                ):
+                    raise HarnessConflictError("续办引用的成果版本不存在")
+                if request.base_task_commit is not None and not any(
+                    item.commit_id == request.base_task_commit for item in parent.commits
+                ):
+                    raise HarnessConflictError("续办引用的任务提交不存在")
+                # Branch objective is the authoritative carried goal.  User
+                # text remains an optional command input, never a replacement.
+                instruction = carried_branch.objective
+            task_id = request.task_id or (parent.task_id if parent else f"task-{uuid4().hex[:12]}")
+            run_sequence = (
+                max(
+                    [item.snapshot.run_sequence for item in self._runs.values() if item.snapshot.task_id == task_id]
+                    or [0]
+                )
+                + 1
+            )
             run_id = f"harness:{uuid4().hex}"
             now = datetime.now(timezone.utc)
             contract = AgentControlLoopContract(
@@ -1024,6 +1096,18 @@ class HarnessRuntime:
                 max_files_per_round=request.loop.max_files_per_round,
                 max_model_calls=request.loop.max_model_calls,
                 deadline_seconds=request.loop.deadline_seconds,
+                task_id=task_id,
+                run_sequence=run_sequence,
+                parent_run_id=parent.run_id if parent else None,
+                continuation_reason=(
+                    request.continuation_reason or "继续未完成任务"
+                    if parent
+                    else None
+                ),
+                carried_branch_id=carried_branch.branch_id if carried_branch else None,
+                base_artifact_version=request.base_artifact_version if parent else None,
+                base_task_commit=request.base_task_commit if parent else None,
+                workspace_revision=str(workspace.get("dataset_version", "forte-public-office")),
             )
             budget = AgentControlLoopBudget(
                 max_rounds=contract.max_rounds,
@@ -1033,6 +1117,14 @@ class HarnessRuntime:
             )
             snapshot = HarnessRunSnapshot(
                 run_id=run_id,
+                task_id=task_id,
+                run_sequence=run_sequence,
+                parent_run_id=parent.run_id if parent else None,
+                continuation_reason=(request.continuation_reason or "继续未完成任务") if parent else None,
+                carried_branch_id=carried_branch.branch_id if carried_branch else None,
+                base_artifact_version=request.base_artifact_version if parent else None,
+                base_task_commit=request.base_task_commit if parent else None,
+                workspace_revision=str(workspace.get("dataset_version", "forte-public-office")),
                 owner_id=owner_id,
                 workspace_id=request.workspace_id,
                 status="queued",
@@ -1076,6 +1168,49 @@ class HarnessRuntime:
             if run is None:
                 raise HarnessNotFoundError("Harness run 不存在")
             return run.snapshot.model_copy(deep=True)
+
+    async def continue_unfinished_task(
+        self,
+        owner_id: str,
+        run_id: str,
+        branch_id: str,
+        *,
+        idempotency_key: str,
+        expected_version: int,
+        instruction: str | None = None,
+        loop: AgentControlLoopOptions | None = None,
+    ) -> HarnessRunStartResult:
+        """Create a new Run for one unfinished Branch of a terminal Run.
+
+        This is intentionally implemented as a start command, not a resume:
+        the old Run and its immutable result history remain untouched.
+        """
+        old = await self.get(owner_id, run_id)
+        if old.version != expected_version:
+            raise HarnessConflictError("任务版本已更新，请刷新后重试")
+        branch = next((item for item in old.branches if item.branch_id == branch_id), None)
+        if branch is None or branch.status == "completed":
+            raise HarnessConflictError("只能继续一个尚未完成的任务分支")
+        return await self.start(
+            owner_id,
+            HarnessRunStart(
+                idempotency_key=idempotency_key,
+                expected_version=1,
+                instruction=instruction or branch.objective,
+                loop=loop or AgentControlLoopOptions(
+                    max_rounds=old.contract.max_rounds,
+                    max_files_per_round=old.contract.max_files_per_round,
+                    max_model_calls=old.contract.max_model_calls,
+                    deadline_seconds=old.contract.deadline_seconds,
+                ),
+                task_id=old.task_id,
+                parent_run_id=old.run_id,
+                continuation_reason="继续未完成任务",
+                carried_branch_id=branch.branch_id,
+                base_artifact_version=(old.artifact_versions[-1].version if old.artifact_versions else None),
+                base_task_commit=old.last_commit.commit_id if old.last_commit else None,
+            ),
+        )
 
     async def control(
         self,
@@ -1969,6 +2104,14 @@ class HarnessRuntime:
         ]
         return PublicHarnessRunSnapshot(
             run_id=snapshot.run_id,
+            task_id=snapshot.task_id,
+            run_sequence=snapshot.run_sequence,
+            parent_run_id=snapshot.parent_run_id,
+            continuation_reason=snapshot.continuation_reason,
+            carried_branch_id=snapshot.carried_branch_id,
+            base_artifact_version=snapshot.base_artifact_version,
+            base_task_commit=snapshot.base_task_commit,
+            workspace_revision=snapshot.workspace_revision,
             owner_id=snapshot.owner_id,
             workspace_id=snapshot.workspace_id,
             status=snapshot.status,

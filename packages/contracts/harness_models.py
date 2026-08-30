@@ -241,6 +241,17 @@ class AgentControlLoopContract(StrictModel):
     max_model_calls: int = Field(ge=2, le=60)
     deadline_seconds: int = Field(ge=20, le=14_400)
     external_action: Literal["none"] = "none"
+    # Durable task identity is separate from one executable Run.  These fields
+    # are server-owned when a continuation is created from an unfinished
+    # Branch; they are never inferred from model prose.
+    task_id: str = Field(default="task-000000000000", pattern=r"^task-[0-9a-f]{12}$")
+    run_sequence: int = Field(default=1, ge=1, le=10_000)
+    parent_run_id: str | None = Field(default=None, pattern=r"^harness:[0-9a-f]{32}$")
+    continuation_reason: str | None = Field(default=None, max_length=240)
+    carried_branch_id: str | None = Field(default=None, pattern=r"^branch-[0-9a-f]{12}$")
+    base_artifact_version: int | None = Field(default=None, ge=1, le=24)
+    base_task_commit: str | None = Field(default=None, pattern=r"^commit-[0-9a-f]{12}$")
+    workspace_revision: str = Field(default="unknown", min_length=1, max_length=120)
 
 
 class AgentControlLoopBudget(StrictModel):

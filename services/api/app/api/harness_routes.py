@@ -16,6 +16,7 @@ from services.api.app.application.harness_runtime import (
     HarnessError,
     HarnessNotFoundError,
     HarnessRunStart,
+    HarnessContinuationRequest,
     HarnessRuntime,
 )
 from services.api.app.application.benchmark_scenario_catalog import BenchmarkScenarioError
@@ -85,6 +86,31 @@ async def start_harness_run(
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     except (BenchmarkScenarioError, HarnessError) as exc:
         raise HTTPException(status_code=503, detail="办公资料库完整性校验失败") from exc
+
+
+@router.post("/runs/{run_id}/continue", status_code=status.HTTP_202_ACCEPTED)
+async def continue_harness_task(
+    run_id: str,
+    body: HarnessContinuationRequest,
+    owner_id: Annotated[str, Depends(harness_owner)],
+    runtime: Annotated[HarnessRuntime, Depends(get_harness_runtime)],
+):
+    """Create a new Run for exactly one unfinished Branch of a terminal task."""
+    try:
+        result = await runtime.continue_unfinished_task(
+            owner_id,
+            run_id,
+            body.branch_id,
+            idempotency_key=body.idempotency_key,
+            expected_version=body.expected_version,
+            instruction=body.instruction,
+            loop=body.loop,
+        )
+        return runtime.public_start_result(result)
+    except HarnessNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except HarnessConflictError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
 
 
 @router.get("/runs")
