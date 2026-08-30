@@ -19,6 +19,7 @@ from services.api.app.application.harness_runtime import (
 )
 from packages.contracts.harness_models import (
     AgentControlLoopArtifactFinding,
+    AgentControlLoopArtifactVersion,
     AgentControlLoopControlRequest,
 )
 from services.api.app.application.readonly_workers import (
@@ -740,12 +741,13 @@ def test_worker_merge_receipts_keep_prior_wave_and_align_versions() -> None:
 
 
 def test_worker_contribution_keeps_more_than_ten_findings_without_silent_top_n() -> None:
+    retained_refs = tuple(f"forte-{index:016x}" for index in range(1, 25))
     contribution = ReadonlyWorkerContribution(
         worker_run_id="worker-many-findings",
         branch_id="branch-many-findings",
         outcome="adopted",
         summary="保留全部逐项发现",
-        source_file_refs=("forte-1111111111111111",),
+        source_file_refs=retained_refs,
         evidence_anchors=("line:1",),
         model_called=True,
         output_used=True,
@@ -756,10 +758,24 @@ def test_worker_contribution_keeps_more_than_ten_findings_without_silent_top_n()
                 affected_branch_ids=["branch-many-findings"],
                 title=f"发现 {index}",
                 detail="逐项可审查事实",
-                file_refs=["forte-1111111111111111"],
+                file_refs=[retained_refs[(index - 1) % len(retained_refs)]],
             )
             for index in range(1, 12)
         ),
     )
     merged = merge_adopted_contributions([contribution])
     assert len(merged.adopted_contributions[0].findings) == 11
+    artifact = AgentControlLoopArtifactVersion(
+        artifact_id="artifact-0123456789ab",
+        version=1,
+        title="逐项成果",
+        status="committed",
+        summary="不截断的逐项成果",
+        findings=list(contribution.findings),
+        finding_count=11,
+        source_file_refs=list(retained_refs),
+        created_at=datetime.now(timezone.utc),
+    )
+    assert artifact.finding_count == len(artifact.findings) == 11
+    assert len(artifact.source_file_refs) == len(retained_refs)
+    assert set(artifact.source_file_refs) == set(retained_refs)

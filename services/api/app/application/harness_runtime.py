@@ -1499,7 +1499,7 @@ class HarnessRuntime:
                         for item in merged.adopted_contributions
                         for ref in item.source_file_refs
                     }
-                )[:20]
+                )
                 artifact = AgentControlLoopArtifactVersion(
                     artifact_id=artifact_id,
                     version=artifact_version,
@@ -4972,7 +4972,21 @@ class HarnessRuntime:
                 else [],
                 follow_ups=result.follow_ups[:4] if result else [],
                 evidence_gaps=gaps,
-                source_file_refs=round_snapshot.verified_file_refs,
+                # Keep every reference that backs a retained Finding. The
+                # round list is only a projection and must not drop refs that
+                # are still present in the Artifact payload.
+                source_file_refs=list(
+                    dict.fromkeys(
+                        [
+                            *round_snapshot.verified_file_refs,
+                            *(
+                                file_ref
+                                for finding in (result.findings if result else [])
+                                for file_ref in finding.file_refs
+                            ),
+                        ]
+                    )
+                ),
                 finding_count=len(result.findings) if result else 0,
                 parent_version=version - 1 if version > 1 else None,
                 created_at=datetime.now(timezone.utc),

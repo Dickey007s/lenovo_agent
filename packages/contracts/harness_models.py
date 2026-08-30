@@ -421,7 +421,9 @@ class AgentControlLoopRound(StrictModel):
     result: dict[str, Any] | None = None
     analysis_receipt: dict[str, Any] | None = None
     narrative_reconciliation: AgentControlLoopNarrativeReconciliation | None = None
-    verified_file_refs: list[str] = Field(default_factory=list, max_length=20)
+    # A round may cover many approved branches. This is a governance bound,
+    # not a top-N projection; callers must page work explicitly if exceeded.
+    verified_file_refs: list[str] = Field(default_factory=list, max_length=96)
     evidence_gaps: list[AgentControlLoopEvidenceGap] = Field(default_factory=list, max_length=20)
     next_step: AgentControlLoopNextStep | None = None
     started_at: datetime
@@ -503,7 +505,7 @@ class AgentControlLoopDecisionRequest(StrictModel):
 class AgentControlLoopBrief(StrictModel):
     outcome: Literal["completed", "bounded", "user_stopped"]
     summary: str = Field(min_length=1, max_length=3_000)
-    verified_file_refs: list[str] = Field(default_factory=list, max_length=20)
+    verified_file_refs: list[str] = Field(default_factory=list, max_length=96)
     unresolved_gaps: list[AgentControlLoopEvidenceGap] = Field(default_factory=list, max_length=20)
     rounds_completed: int = Field(ge=0, le=24)
     external_action: Literal["none"] = "none"
@@ -587,8 +589,8 @@ class AgentControlLoopArtifactVersion(StrictModel):
     findings: list[AgentControlLoopArtifactFinding] = Field(default_factory=list, max_length=96)
     follow_ups: list[str] = Field(default_factory=list, max_length=4)
     evidence_gaps: list[AgentControlLoopEvidenceGap] = Field(default_factory=list, max_length=20)
-    source_file_refs: list[str] = Field(default_factory=list, max_length=20)
-    finding_count: int = Field(ge=0, le=10)
+    source_file_refs: list[str] = Field(default_factory=list, max_length=96)
+    finding_count: int = Field(ge=0, le=96)
     parent_version: int | None = Field(default=None, ge=1, le=23)
     created_at: datetime
     review_required: Literal[True] = True
