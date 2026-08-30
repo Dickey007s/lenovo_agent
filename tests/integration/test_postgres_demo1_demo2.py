@@ -289,3 +289,83 @@ async def test_postgres_demo2_worker_artifact_receipt_restart_without_replay() -
             await runtime.close()
         if DATABASE_DSN:
             await _cleanup(owner)
+
+
+@pytest.mark.asyncio
+async def test_postgres_demo2_interrupted_worker_reservation_is_not_replayed() -> None:
+    """A persisted pre-dispatch reservation does not auto-run after restart."""
+
+    owner = f"postgres-demo2-interrupted-{uuid4().hex}"
+    runtimes: list[HarnessRuntime] = []
+    run_id = ""
+    try:
+        first = HarnessRuntime(
+            _cross_function_catalog(),
+            TwoUnitPlanner(),
+            FakeAnalyst(),
+            PostgresHarnessStateStore(DATABASE_DSN),
+        )
+        runtimes.append(first)
+        await first.setup()
+        started = await first.start(
+            owner,
+            HarnessRunStart(
+                idempotency_key=f"demo2-interrupted-start-{uuid4().hex}",
+                instruction="核对两个独立来源",
+                loop={"max_rounds": 1, "max_files_per_round": 2, "max_model_calls": 4, "deadline_seconds": 60},
+            ),
+        )
+        run_id = started.run.run_id
+        waiting = await _wait_for_status(first, owner, run_id, {"waiting_input"})
+        branch = next(item for item in waiting.branches if item.status == "running")
+        request = ReadonlyWorkerRequest(
+            worker_run_id="worker-interrupted",
+            branch_id=branch.branch_id,
+            goal=branch.objective,
+            source_file_refs=tuple(branch.input_file_refs),
+            expected_version=waiting.version,
+        )
+        entered = asyncio.Event()
+
+        async def blocking_handler(_request: ReadonlyWorkerRequest) -> ReadonlyWorkerContribution:
+            entered.set()
+            await asyncio.Future()
+            raise AssertionError("unreachable")
+
+        task = asyncio.create_task(
+            first.execute_admitted_readonly_workers(
+                owner,
+                run_id,
+                expected_version=waiting.version,
+                idempotency_key="demo2-interrupted-workers-0001",
+                worker_requests=[request],
+                handler=blocking_handler,
+                user_confirmed=True,
+            )
+        )
+        await asyncio.wait_for(entered.wait(), timeout=10)
+        reserved = await first.get(owner, run_id)
+        assert reserved.budget.model_calls_used == waiting.budget.model_calls_used + 1
+        task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+        await first.close()
+        runtimes.clear()
+
+        second = HarnessRuntime(
+            _cross_function_catalog(),
+            TwoUnitPlanner(),
+            FakeAnalyst(),
+            PostgresHarnessStateStore(DATABASE_DSN),
+        )
+        runtimes.append(second)
+        await second.setup()
+        restored = await second.get(owner, run_id)
+        assert restored.budget.model_calls_used == reserved.budget.model_calls_used
+        assert restored.worker_runs == []
+        assert not getattr(second, "_tasks", {})
+    finally:
+        for runtime in reversed(runtimes):
+            await runtime.close()
+        if DATABASE_DSN:
+            await _cleanup(owner)
