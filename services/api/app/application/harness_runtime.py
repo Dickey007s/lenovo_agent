@@ -360,12 +360,6 @@ class HarnessRunStart(BaseModel):
     expected_version: int = Field(default=1, ge=1)
     instruction: str = Field(min_length=3, max_length=2_000)
     loop: AgentControlLoopOptions = Field(default_factory=AgentControlLoopOptions)
-    task_id: str | None = Field(default=None, pattern=r"^task-[0-9a-f]{12}$")
-    parent_run_id: str | None = Field(default=None, pattern=r"^harness:[0-9a-f]{32}$")
-    continuation_reason: str | None = Field(default=None, max_length=240)
-    carried_branch_id: str | None = Field(default=None, pattern=r"^branch-[0-9a-f]{12}$")
-    base_artifact_version: int | None = Field(default=None, ge=1, le=24)
-    base_task_commit: str | None = Field(default=None, pattern=r"^commit-[0-9a-f]{12}$")
 
     @field_validator("instruction")
     @classmethod
@@ -1048,14 +1042,38 @@ class HarnessRuntime:
         except Exception as exc:
             raise HarnessError("FORTE 办公资料库暂时无法读取") from exc
 
-    async def start(self, owner_id: str, request: HarnessRunStart) -> HarnessRunStartResult:
+    async def start(
+        self,
+        owner_id: str,
+        request: HarnessRunStart,
+        *,
+        _task_id: str | None = None,
+        _parent_run_id: str | None = None,
+        _continuation_reason: str | None = None,
+        _carried_branch_id: str | None = None,
+        _base_artifact_version: int | None = None,
+        _base_task_commit: str | None = None,
+    ) -> HarnessRunStartResult:
         workspace = self.get_internal_workspace()
         if workspace.get("workspace_id") != request.workspace_id:
             raise HarnessNotFoundError("办公资料库不存在")
+        current_workspace_revision = str(
+            workspace.get("dataset_version", "forte-public-office")
+        )
         instruction = request.instruction
         workspace_files = self._index_files(workspace)
         digest = hashlib.sha256(
-            json.dumps(request.model_dump(), ensure_ascii=False, sort_keys=True).encode("utf-8")
+            json.dumps(
+                {
+                    "request": request.model_dump(),
+                    "parent_run_id": _parent_run_id,
+                    "carried_branch_id": _carried_branch_id,
+                    "base_artifact_version": _base_artifact_version,
+                    "base_task_commit": _base_task_commit,
+                },
+                ensure_ascii=False,
+                sort_keys=True,
+            ).encode("utf-8")
         ).hexdigest()
         idem_key = (owner_id, request.idempotency_key)
         async with self._lock:
@@ -1066,35 +1084,39 @@ class HarnessRuntime:
                 return replay.result.model_copy(update={"replayed": True}, deep=True)
             parent: HarnessRunSnapshot | None = None
             carried_branch: AgentControlLoopBranch | None = None
-            if request.parent_run_id is not None:
-                parent_run = self._runs.get((owner_id, request.parent_run_id))
+            if _parent_run_id is not None:
+                parent_run = self._runs.get((owner_id, _parent_run_id))
                 if parent_run is None:
                     raise HarnessNotFoundError("续办的旧任务不存在")
                 parent = parent_run.snapshot
                 if parent.status not in {"stopped", "failed", "completed"}:
                     raise HarnessConflictError("只有已停止或已结束任务可以继续未完成任务")
-                if request.task_id is not None and request.task_id != parent.task_id:
+                if parent.workspace_revision != current_workspace_revision:
+                    raise HarnessConflictError(
+                        "资料库版本已变化，旧分支引用已过期；请重新检索后再创建任务"
+                    )
+                if _task_id is not None and _task_id != parent.task_id:
                     raise HarnessConflictError("续办任务的 task_id 与旧任务不一致")
-                if request.carried_branch_id is None:
+                if _carried_branch_id is None:
                     raise HarnessConflictError("继续未完成任务必须指定一个未完成分支")
                 carried_branch = next(
-                    (item for item in parent.branches if item.branch_id == request.carried_branch_id),
+                    (item for item in parent.branches if item.branch_id == _carried_branch_id),
                     None,
                 )
                 if carried_branch is None or carried_branch.status in {"completed"}:
                     raise HarnessConflictError("只能续办旧任务中尚未完成的分支")
-                if request.base_artifact_version is not None and not any(
-                    item.version == request.base_artifact_version for item in parent.artifact_versions
+                if _base_artifact_version is not None and not any(
+                    item.version == _base_artifact_version for item in parent.artifact_versions
                 ):
                     raise HarnessConflictError("续办引用的成果版本不存在")
-                if request.base_task_commit is not None and not any(
-                    item.commit_id == request.base_task_commit for item in parent.commits
+                if _base_task_commit is not None and not any(
+                    item.commit_id == _base_task_commit for item in parent.commits
                 ):
                     raise HarnessConflictError("续办引用的任务提交不存在")
                 # Branch objective is the authoritative carried goal.  User
                 # text remains an optional command input, never a replacement.
                 instruction = carried_branch.objective
-            task_id = request.task_id or (parent.task_id if parent else f"task-{uuid4().hex[:12]}")
+            task_id = _task_id or (parent.task_id if parent else f"task-{uuid4().hex[:12]}")
             run_sequence = (
                 max(
                     [item.snapshot.run_sequence for item in self._runs.values() if item.snapshot.task_id == task_id]
@@ -1120,14 +1142,14 @@ class HarnessRuntime:
                 run_sequence=run_sequence,
                 parent_run_id=parent.run_id if parent else None,
                 continuation_reason=(
-                    request.continuation_reason or "继续未完成任务"
+                    _continuation_reason or "继续未完成任务"
                     if parent
                     else None
                 ),
                 carried_branch_id=carried_branch.branch_id if carried_branch else None,
-                base_artifact_version=request.base_artifact_version if parent else None,
-                base_task_commit=request.base_task_commit if parent else None,
-                workspace_revision=str(workspace.get("dataset_version", "forte-public-office")),
+                base_artifact_version=_base_artifact_version if parent else None,
+                base_task_commit=_base_task_commit if parent else None,
+                workspace_revision=current_workspace_revision,
             )
             budget = AgentControlLoopBudget(
                 max_rounds=contract.max_rounds,
@@ -1140,11 +1162,11 @@ class HarnessRuntime:
                 task_id=task_id,
                 run_sequence=run_sequence,
                 parent_run_id=parent.run_id if parent else None,
-                continuation_reason=(request.continuation_reason or "继续未完成任务") if parent else None,
+                continuation_reason=(_continuation_reason or "继续未完成任务") if parent else None,
                 carried_branch_id=carried_branch.branch_id if carried_branch else None,
-                base_artifact_version=request.base_artifact_version if parent else None,
-                base_task_commit=request.base_task_commit if parent else None,
-                workspace_revision=str(workspace.get("dataset_version", "forte-public-office")),
+                base_artifact_version=_base_artifact_version if parent else None,
+                base_task_commit=_base_task_commit if parent else None,
+                workspace_revision=current_workspace_revision,
                 owner_id=owner_id,
                 workspace_id=request.workspace_id,
                 status="queued",
@@ -1223,13 +1245,13 @@ class HarnessRuntime:
                     max_model_calls=old.contract.max_model_calls,
                     deadline_seconds=old.contract.deadline_seconds,
                 ),
-                task_id=old.task_id,
-                parent_run_id=old.run_id,
-                continuation_reason="继续未完成任务",
-                carried_branch_id=branch.branch_id,
-                base_artifact_version=(old.artifact_versions[-1].version if old.artifact_versions else None),
-                base_task_commit=old.last_commit.commit_id if old.last_commit else None,
             ),
+            _task_id=old.task_id,
+            _parent_run_id=old.run_id,
+            _continuation_reason="继续未完成任务",
+            _carried_branch_id=branch.branch_id,
+            _base_artifact_version=(old.artifact_versions[-1].version if old.artifact_versions else None),
+            _base_task_commit=old.last_commit.commit_id if old.last_commit else None,
         )
 
     async def execute_admitted_readonly_workers(
