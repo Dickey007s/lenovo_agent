@@ -4,7 +4,7 @@ Base URL: `http://localhost:8010`.
 
 ## 1. Public surface
 
-OpenAPI exposes eight paths and nine operations:
+OpenAPI exposes ten paths and eleven operations:
 
 | Method | Path | Purpose |
 | --- | --- | --- |
@@ -14,6 +14,8 @@ OpenAPI exposes eight paths and nine operations:
 | POST | `/v1/harness/runs` | start an idempotent bounded read-only Agent Control Loop |
 | GET | `/v1/harness/runs?limit=10` | list recent Owner-scoped Runs for recovery |
 | GET | `/v1/harness/runs/{run_id}` | Owner-scoped public Snapshot |
+| POST | `/v1/harness/runs/{run_id}/continue` | create a child Run for exactly one unfinished Branch of a terminal Run |
+| POST | `/v1/harness/runs/{run_id}/workers` | explicitly confirm and run one admitted read-only Worker wave |
 | GET | `/v1/harness/runs/{run_id}/artifacts/{artifact_id}` | Owner-scoped download of one verified Run Workspace file |
 | POST | `/v1/harness/runs/{run_id}/controls` | versioned, idempotent pause/resume/steer/stop/rollback |
 | GET | `/v1/harness/runs/{run_id}/events?after=N` | ordered named SSE after a sequence |
@@ -27,9 +29,9 @@ Run endpoints use `X-User-Id`; omission uses `demo_user`. This unsigned header
 is a demonstration Owner placeholder, not production authentication. Missing
 and wrong-owner Runs both return 404 before the SSE response is created.
 
-There are nine operations over eight OpenAPI paths because `GET` and `POST`
+There are eleven operations over ten OpenAPI paths because `GET` and `POST`
 share `/runs`. With `DATABASE_DSN`, accepted Run snapshots, start/control
-idempotency receipts, ArtifactVersions and TaskCommits are stored in
+idempotency receipts, continuation start receipts, ArtifactVersions and TaskCommits are stored in
 PostgreSQL; the latter two are independent append-only rows. Verified Run
 Workspace file metadata remains in the Snapshot, while the bytes live in the
 isolated server Artifact store and are rechecked on download. On startup, an
@@ -170,6 +172,72 @@ latest server update. It is Owner-scoped and exists so a browser without local
 session state can discover a recoverable nonterminal Run. The client must still
 GET the selected Run and reconnect SSE from its authoritative sequence.
 
+### 5.1 在同一 Task 下继续一条未完成 Branch
+
+```http
+POST /v1/harness/runs/{run_id}/continue
+X-User-Id: demo_user
+Content-Type: application/json
+```
+
+```json
+{
+  "branch_id": "branch-0123456789ab",
+  "idempotency_key": "continue-client-generated-key",
+  "expected_version": 41,
+  "instruction": "继续核对这条未完成工作线",
+  "loop": {
+    "max_rounds": 12,
+    "max_files_per_round": 16,
+    "max_model_calls": 30,
+    "deadline_seconds": 7200
+  }
+}
+```
+
+该命令不是恢复旧 Run。旧 Run 必须是 `completed/stopped/failed`，所选 Branch
+必须存在且未完成。服务端再次校验 Owner、旧 Run 当前版本、Branch 归属、幂等键、
+基线 Artifact/Commit 与当前 Workspace revision，然后创建一个 `version=1` 的 child Run。
+child 与父 Run 共享 `task_id`，并记录 `run_sequence`、`parent_run_id`、
+`carried_branch_id`、`base_artifact_version`、`base_task_commit`、
+`workspace_revision`、`recheck_file_refs` 和 `source_revision_changed`。
+
+child 的权威目标来自旧 Branch objective；请求中的 `instruction` 不能扩大来源范围。
+首轮只读取该 Branch 的 `missing_file_refs`，没有缺失列表时使用其批准输入。相同
+Owner/key/请求返回同一个 child 且 `replayed=true`；旧版本、完成 Branch、错 Owner
+或同 key 不同内容返回冲突/未找到。父 Snapshot、Event、ArtifactVersion 与 TaskCommit
+保持不变。
+
+### 5.2 确认并执行一批受限只读 Worker
+
+```http
+POST /v1/harness/runs/{run_id}/workers
+X-User-Id: demo_user
+Content-Type: application/json
+```
+
+```json
+{
+  "branch_ids": ["branch-0123456789ab", "branch-fedcba987654"],
+  "idempotency_key": "workers-client-generated-key",
+  "expected_version": 18,
+  "confirmed": true
+}
+```
+
+只有当前 Snapshot 的 `topology_admission.mode=adaptive_readonly_workers`、Run 非终态、
+用户明确 `confirmed=true` 且 Branch 为服务端 ready 时才可派发。`branch_ids` 可省略；
+此时服务端使用最新 `ready_branch_ids`，每批最多三个。每个 Worker 只获得自己的
+Branch objective 和批准 `input_file_refs`。模型调用预算在派发前进入版本化 Snapshot；
+预算不足、依赖未完成、重复 Branch、旧版本或越界来源全部拒绝，且不会部分派发。
+
+Worker 返回不等于采用。Runtime 记录 `worker_runs[]`，并按来源范围、Evidence Anchor、
+Branch 与适用 narrative reconciliation 形成 `adopted/ambiguous/rejected/failed`。
+只有 adopted findings 进入新的普通 `artifact_versions[]` 和 `commits[]`；
+`shared_artifacts[]` 保存本批 adopted/waiting/failed 回执。一个失败 Branch 不清空其他
+已采用贡献。相同幂等键不会重复合入；进程重启不会自动重放中断 Worker。当前实现是
+单 API 进程内的有界 Analyst Worker，不是队列、lease 或分布式 Worker Runtime。
+
 ## 6. Public Snapshot
 
 Important fields:
@@ -177,6 +245,16 @@ Important fields:
 ```json
 {
   "run_id": "harness:...",
+  "task_id": "task-0123456789ab",
+  "run_sequence": 2,
+  "parent_run_id": "harness:...",
+  "continuation_reason": "继续未完成任务",
+  "carried_branch_id": "branch-0123456789ab",
+  "base_artifact_version": 1,
+  "base_task_commit": "commit-0123456789ab",
+  "workspace_revision": "345c1ec1487139db9dd319787fa9405ba85d1869",
+  "recheck_file_refs": ["forte-..."],
+  "source_revision_changed": false,
   "workspace_id": "forte-public-office",
   "status": "completed",
   "version": 22,
@@ -225,6 +303,19 @@ Important fields:
   "control_events": [],
   "decision_requests": [],
   "decision_records": [],
+  "topology_admission": {
+    "mode": "fixed_workflow",
+    "work_unit_breadth": 3,
+    "independent_branch_count": 3,
+    "source_span": 3,
+    "remaining_model_calls": 27,
+    "remaining_time_seconds": 7190,
+    "external_action": "none",
+    "reasons": ["多个独立工作包来自同一目录/职能，先用固定流程避免把同源拆成伪并行。"],
+    "user_confirmation_required": false
+  },
+  "worker_runs": [],
+  "shared_artifacts": [],
   "workspace_artifacts": [
     {
       "artifact_id": "workspace-artifact-0123456789ab",
@@ -576,10 +667,11 @@ the current Run and resumes only the affected waiting Branch.
 `recovery_kind` does not imply that every Run is resumable. When the same
 recoverable gap reaches `status=stopped` with `next_step.decision=budget_exhausted`,
 the old Run is terminal and must not receive `resume` or `steer`. The client may
-use one ID from `candidate_branch_ids`, the matching Branch objective and optional
-user direction to POST a new whole-workspace Run. Prior Branches, receipts and
-ArtifactVersions remain on the old Snapshot; the new Planner autonomously selects
-and validates evidence again rather than inheriting the old file set as authority.
+use one ID from `candidate_branch_ids` and POST `/runs/{run_id}/continue`. Prior
+Branches, receipts and ArtifactVersions remain on the old Snapshot; the child Run
+keeps the same `task_id`, uses the matching Branch objective as authority and
+rechecks exactly that Branch's missing/approved refs. Optional user direction
+cannot widen the service-owned source scope.
 
 For a nonterminal Gap, the client derives its recovery sheet only from the latest
 Snapshot: `next_step.recovery_kind`, the bound Branch objective/status and refs,
@@ -729,12 +821,18 @@ Content-Type: application/json
 }
 ```
 
-Commands are `pause`, `resume`, `steer`, `stop`, `rollback` and `decision`.
+Commands are `pause`, `resume`, `steer`, `stop`, `rollback`, `decision` and
+`topology_override`.
 `steer` requires an instruction and applies only to the next round. Pause and
 stop are accepted immediately but applied only at a safe point between model
 calls. A stale version, illegal transition or same key with different content
 returns 409. An identical replay returns the first control result with
 `replayed=true`.
+
+`topology_override` 只在 `waiting_input` 且当前准入为
+`adaptive_readonly_workers` 时合法，并且只允许携带
+`"topology_mode":"single_controller"`。它复用已经保存和校验的 Plan，在同一 Run
+中走保守单 Controller 路径；不会再次调用 Planner，也不会启动 Worker。
 
 Human decisions use the same version/idempotency rules:
 
@@ -809,7 +907,13 @@ round_started
 planning_started
 planning_completed
 plan_validation_rejected (optional, followed by one retry)
+topology_admission
 plan_validation
+topology_confirmation_required (adaptive route stops here until confirmation)
+control_topology_override_recorded (optional conservative user choice)
+worker_returned (one per confirmed Worker)
+contribution_adopted / contribution_waiting / contribution_rejected
+topology_workers_completed
 deterministic_office_tool_started (when one fixed local capability is admitted)
 run_workspace_artifact_written (for each isolated file)
 deterministic_verification_completed (after all deterministic checks)
@@ -836,7 +940,13 @@ branch_resumed_from_checkpoint (when only one recovery Branch continues)
 round_started
 planning_started
 planning_completed
+topology_admission
 plan_validation
+topology_confirmation_required (only for adaptive_readonly_workers)
+control_topology_override_recorded (optional conservative user choice)
+worker_returned (one per confirmed Worker)
+contribution_adopted / contribution_waiting / contribution_rejected
+topology_workers_completed
 analysis_started
 analysis_completed
 result_validation

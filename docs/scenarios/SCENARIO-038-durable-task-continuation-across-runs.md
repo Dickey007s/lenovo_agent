@@ -1,6 +1,6 @@
 # SCENARIO-038：同一办公任务跨 Run 延续而不覆盖历史
 
-- 状态：`Proposed`
+- 状态：`Limited Verified`；本地合同/Runtime/API/浏览器纵切，PostgreSQL 与 Provider 门仍开放
 - 决策：`DR-0053`
 - Source：`USER-FEEDBACK-20260830-DEMO1-DEMO2-CONTINUATION`、
   `DURABLE-AGENT-RUNTIMES-OFFICIAL-20260830`、`HAI-MIXED-INITIATIVE-RESEARCH-20260830`
@@ -23,15 +23,15 @@
 ## 主路径
 
 1. 用户打开旧 Run，查看已完成、未完成和待核对 Branch，以及 v1/v2 等历史成果。
-2. 用户选择一条 Branch，点击“在同一任务下继续”。
-3. 前台先展示 continuation preview：父 Run、继承 Branch、基线成果、需要重核的来源、
-   新预算和旧成果不会被覆盖。
-4. 用户确认后，浏览器提交旧 Run expected version、幂等键和所选 Branch ID；不提交
-   客户端猜测的文件范围或内部来源 hash。
-5. 服务端校验 Owner、状态、Branch 归属、current source revision 与 idempotency，创建
+2. 用户选择一条 Branch，点击“继续未完成任务”。
+3. 浏览器提交旧 Run expected version、幂等键和所选 Branch ID；不提交客户端猜测的
+   文件范围或内部来源 hash。当前实现没有额外的提交前 continuation preview。
+4. 服务端校验 Owner、状态、Branch 归属、current Workspace revision 与 idempotency，创建
    相同 `task_id`、新 `run_id`、有 `parent_run_id` 的后继 Run。
-6. 未变化且已核对的事实作为 carried context；变化、stale、未完成或未过 Gate 的内容
-   进入 `recheck_items`。
+5. child Snapshot 记录 `carried_branch_id`、旧 Artifact/Commit 基线和该 Branch 的精确
+   `recheck_file_refs`；即便 Workspace revision 未变化，也重新核对这条 Branch 的批准
+   来源，不把旧模型自由文本当作新 Run 权威事实。
+6. 来源 revision 变化时 `source_revision_changed=true`，前台明确提示只重核批准范围。
 7. 后继 Run 在新合同和预算内继续 Observe/Plan/Act/Verify/Commit，只推进所选工作线。
 8. 新成果形成新的 ArtifactVersion 和 TaskCommit。旧 Run、旧 Event、旧 Artifact、旧
    Commit 和源文件保持不变。
@@ -60,8 +60,8 @@
 | 阶段 | 用户看到 | 用户可做 | 不应看到/推断 |
 | --- | --- | --- | --- |
 | 旧 Run 终态 | 已完成、待继续、预算停止原因、历史成果 | 选一条 Branch、打开旧证据 | “多加几轮”假按钮 |
-| 继续预览 | 父 Run、继承项、重核项、新预算、无外部动作 | 确认或取消 | raw hash、绝对路径、内部评分 |
-| 创建成功 | 同一 Task 的新 Run 时间轴、继承回执 | 进入新 Run、返回旧 Run | 旧 Run 被重新打开 |
+| 继续动作 | 目标 Branch、为何新建 Run、旧成果不覆盖 | 点击“继续未完成任务”或不处理 | raw hash、绝对路径、内部评分 |
+| 创建成功 | “任务持续链 · Run 2”、基线成果、精确重核范围 | 进入新 Run、查看父子关系 | 旧 Run 被重新打开 |
 | 来源变化 | 哪些事实需重核及原因 | 回开当前安全 Preview、继续或结束 | 旧证据天然仍正确 |
 | 新 Run 完成 | v2 与当前指针，v1 仍保留 | 下载/复核/恢复历史版本 | 源文件已写回或回滚 |
 
@@ -71,8 +71,8 @@
 | --- | --- |
 | 同一业务任务 | 新旧 Run `task_id` 相同 |
 | 新一段执行 | 新 `run_id`、`parent_run_id=旧 run_id` |
-| 已继承 | `ContinuationContract.carried_branch_ids` 与 receipt |
-| 需要重核 | `recheck_items[]` + current source revision result |
+| 继续的工作线 | `carried_branch_id`，且只能是旧 Run 的所选 Branch |
+| 需要重核 | `recheck_file_refs[]` + `source_revision_changed` + `workspace_revision` |
 | 旧成果保留 | 旧 ArtifactVersion/TaskCommit bytes 与行记录未变 |
 | 新成果 | 新 Run 的 ArtifactVersion + 新 TaskCommit |
 | 已从服务端恢复 | health task store=PostgreSQL + recovered Snapshot/Event |
@@ -82,19 +82,18 @@
 - 相同 Task 下至少存在两个 Run，父子关系、继承和重核范围可从公共业务投影核对。
 - 只推进所选 Branch，未选 Branch 和旧成果状态不变。
 - 来源变化时旧 Anchor 不被直接采用；用户可从重核项回开当前 Preview。
-- PostgreSQL 重启、SSE 断线、重复请求和旧 version 均有确定性结果。
+- 重复请求和旧 version 已有确定性自动化结果；PostgreSQL 重启测试已收集但本机无 DSN
+  而跳过，不能算已验证。
 - 1440/390 px 不要求用户复制 Prompt，也不把 Run、Task、Artifact 三种身份混成一条。
 
 ## 自动化验收用例
 
-1. `terminal_run_creates_child_run_under_same_task_id`。
-2. `continuation_carries_only_selected_branch_and_preserves_others`。
-3. `changed_source_revision_moves_carried_fact_to_recheck`。
-4. `same_idempotency_key_replays_same_child_run_receipt`。
-5. `stale_expected_version_creates_no_run_or_event`。
-6. `postgres_restart_preserves_lineage_and_current_commit_pointer`。
-7. `sse_reconnect_monotonically_projects_child_run_creation`。
-8. `mobile_continuation_preview_wraps_without_hiding_recheck_items`。
+1. `test_demo1_continuation_creates_child_run_with_exact_carried_branch_scope`。
+2. `test_demo1_continuation_http_route_returns_same_task_child_run`。
+3. `test_postgres_demo1_continuation_lineage_cas_and_restart`：已收集；无
+   `TEST_DATABASE_DSN` 时 skip。
+4. 浏览器 `Demo 1 shows a durable task timeline and continues only the unfinished branch`：
+   覆盖 child Run、批准来源、来源变化条件式提示、桌面/390 px 字号与无横向溢出。
 
 ## 设计来源 Source ID 与运行时 Fixture `source_ref`
 
@@ -106,6 +105,9 @@
 
 ## 当前边界
 
-当前 main 已有 Run 内 Branch/Artifact/Commit 和可选 PostgreSQL 恢复，但没有这里定义
-的跨 Run `task_id` 与 continuation contract。本场景在实现、真实 PostgreSQL、Provider、
-浏览器和 Evidence 完成前保持 `Proposed`；自动化也不证明目标用户更信任或更高效。
+当前实现已有服务端 `task_id`、同 Task child Run、单 Branch 范围、基线成果、Workspace
+revision/精确重核 refs、公共投影和 Task 时间线。它仍把 Task 身份保存在各 Run Snapshot
+中，没有独立 Task ledger/current pointer；revision 主要是 Workspace 数据集级，不是完整
+per-file 版本服务。新增 PostgreSQL 门在本机没有 DSN 而跳过，真实 Provider 未运行，
+也没有目标用户研究。因此这里只能标 `Limited Verified`，不能声称跨进程门、业务正确性、
+用户理解或效率已经改善。

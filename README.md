@@ -61,6 +61,7 @@ browse or search the whole repository
   -> one append-only logical evidence-brief ArtifactVersion per completed round
   -> separate TaskCommit selects the current version + proposed next tasks
   -> user may restore an older brief by creating another TaskCommit; history remains
+  -> terminal Run with an unfinished Branch may create a same-Task child Run that rechecks only approved refs
   -> human confirms one proposal -> independent new Control Loop
 ```
 
@@ -87,15 +88,20 @@ the others keep their state. Logical evidence briefs and TaskCommits are stored
 as independent append-only records, and a versioned rollback command can move
 the current result pointer without deleting history or modifying source files.
 PostgreSQL also restores accepted snapshots and idempotency receipts after API
-restart. Adaptive Workers, writable office artifacts, multi-instance leases and
-governed external actions remain target architecture, not current claims.
+restart.
 
-The next Demo 1/2 increment is specified in
-[`DR-0053`](docs/decisions/DR-0053-durable-task-lineage-and-explainable-topology-admission.md):
-Demo 1 adds a stable business Task identity across bounded Runs without changing
-old results; Demo 2 adds service-owned topology admission before any bounded
-read-only Workers can start, then gates every contribution before merge. This is
-`Proposed`, not current Runtime behavior or evidence of user-value improvement.
+The Demo 1/2 increment specified in
+[`DR-0053`](docs/decisions/DR-0053-durable-task-lineage-and-explainable-topology-admission.md)
+is now a limited current vertical slice. Demo 1 gives one business Task a stable
+`task_id` across bounded parent/child Runs; a terminal Run can create a new Run
+for exactly one unfinished Branch while the parent and its Artifact/Commit history
+remain immutable. Demo 2 compiles validated plan facts into
+`single_controller`, `fixed_workflow` or `adaptive_readonly_workers`; only the
+last route asks for explicit confirmation and dispatches at most three in-process,
+Branch-scoped read-only Analyst Workers per wave. Only anchored, adopted
+contributions enter a new normal ArtifactVersion/TaskCommit. This is not a
+distributed Worker platform, production lease system, general Tool Gateway or
+evidence that multi-Worker execution improves quality, time or user outcomes.
 
 ## Public data and preview boundary
 
@@ -117,7 +123,7 @@ does not enter ordinary UI or model-selected context. The user supplies an
 instruction; the server freezes all 96 stable refs, while the Planner sees only
 safe metadata and autonomously selects a bounded set for each round.
 
-## Eight-path API
+## Ten-path API
 
 ```text
 GET  /v1/health
@@ -126,13 +132,15 @@ GET  /v1/harness/workspace/files/{file_ref}
 POST /v1/harness/runs
 GET  /v1/harness/runs?limit={1..20}
 GET  /v1/harness/runs/{run_id}
+POST /v1/harness/runs/{run_id}/continue
+POST /v1/harness/runs/{run_id}/workers
 GET  /v1/harness/runs/{run_id}/artifacts/{artifact_id}
 POST /v1/harness/runs/{run_id}/controls
 GET  /v1/harness/runs/{run_id}/events?after={sequence}
 ```
 
-The former Scenario list/detail routes are not mounted. There are nine public
-operations over eight OpenAPI paths because `GET` and `POST` share `/runs`.
+The former Scenario list/detail routes are not mounted. There are eleven public
+operations over ten OpenAPI paths because `GET` and `POST` share `/runs`.
 `X-User-Id` remains an unsigned demonstration Owner placeholder. With
 `DATABASE_DSN`, accepted Run snapshots, command receipts, ArtifactVersions and
 TaskCommits are stored in PostgreSQL. Recovery rolls an interrupted model call
@@ -151,13 +159,16 @@ restart recovery is unavailable.
 7. Artifact Workspace & Verifier
 8. Checkpoint, Event & Governance Control
 
-Current implementation covers modules 1-4; a bounded single-loop controller
-subset of module 5; a 12-capability deterministic local adapter subset of
-module 6; a read-only result, citation, Evidence Gate, logical append-only
-ArtifactVersion, TaskCommit pointer/restore, isolated run-workspace file and
-deterministic verifier subset of module 7;
-and a Snapshot/event, branch control, idempotency and optional PostgreSQL
-restart-recovery subset of module 8. Distributed Worker scheduling, a general
+Current implementation covers modules 1-4, including deterministic topology
+admission; a bounded single-loop controller plus an explicitly confirmed,
+in-process read-only Worker subset of module 5; module 6 remains unconnected as a
+general Tool Gateway; module 7 includes a read-only result/citation/Evidence Gate,
+logical append-only ArtifactVersion, TaskCommit pointer/restore, twelve fixed
+deterministic local adapters with isolated run-workspace files, deterministic
+verifiers and gated Worker contribution merge;
+and a Snapshot/event, Task/Run lineage, branch/topology control, idempotency and
+optional PostgreSQL restart-recovery subset of module 8. Distributed Worker
+leases, cross-process dispatch, a general
 Tool Gateway, arbitrary source-file mutation, general semantic verification,
 multi-instance coordination and governed external action remain target work.
 
@@ -210,15 +221,17 @@ multi-instance coordination and governed external action remain target work.
   completed Branches and ArtifactVersions, while only affected Branches wait for
   candidate selection or guided recovery. When recovery reaches a
   `stopped/bounded` budget terminal, the UI no longer suggests that the old Run
-  can resume: it lists unfinished Branches and creates a new whole-workspace Run
-  for the selected Branch objective, preserving the old Run and artifacts.
+  can resume. The historical DR-0030 path created a fresh whole-workspace Run;
+  DR-0053 now supersedes that terminal recovery with a same-Task child Run whose
+  first scope is the selected Branch, preserving the old Run and artifacts.
   Security-scope violations still fail closed.
 - `DR-0031` raises the default active deadline from 120 to 1,200 seconds and
   excludes human waiting/pause from elapsed time. It also replaces vague
   “missing evidence” copy with an Agent-owned recovery sheet: failure type,
   affected Branch, attempted files, call/adoption receipt, preserved work and a
-  direct “retry only this Branch” action. Terminal Runs create a new task rather
-  than pretending to resume. A sanitized real `deepseek-v4-pro` run records a
+  direct “retry only this Branch” action. Terminal Runs create a new bounded
+  same-Task child Run rather than pretending to resume. A sanitized real
+  `deepseek-v4-pro` run records a
   12-second human wait with unchanged active elapsed, followed by one-Branch
   recovery and completion; this is control-path evidence, not an answer-quality
   claim.
@@ -304,6 +317,20 @@ multi-instance coordination and governed external action remain target work.
   without a green Artifact. This remains one fixed adapter, not an arbitrary
   test sandbox, OS-level network isolation, real endpoint integration, automatic
   PR path, multi Worker scheduler or resumable Tool Gateway.
+- `DR-0053` adds two bounded Demo 1/2 slices without creating Demo-specific
+  product modes. Demo 1 stores `task_id`, parent Run, run sequence, selected
+  unfinished Branch, base Artifact/Commit and current Workspace revision in the
+  child Snapshot; `/continue` creates a new Run and leaves the parent immutable.
+  Demo 2 persists a deterministic `TopologyAdmission`, separates admission from
+  `/workers` confirmation, reserves model-call budget before dispatch, limits a
+  wave to three ready Branches and appends only anchored adopted contributions to
+  the normal Artifact/Commit history. Analyst/Worker findings use a governance
+  maximum of 96 rather than a three-item analysis cap; the browser initially
+  shows three only as a collapsible density choice. Unit and 1440/390 browser gates pass. The
+  new PostgreSQL restart tests are committed but skipped locally without
+  `TEST_DATABASE_DSN`; no paid Provider run or target-user study was performed.
+  Therefore this is a limited in-process read-only slice, not proof of production
+  durability, distributed Workers or business benefit.
 - `DR-0042` replaces TC-12's historical repair-only 9/9 Vitest receipt with the
   complete 11-file qa-003 dashboard-toolkit copy and one manifest-owned 71-case
   test set. The same tests first expose the original alias failure, then the
@@ -410,6 +437,10 @@ The current whole-workspace interaction is tracked in
 [`AUTONOMOUS-WHOLE-WORKSPACE-RESEARCH-20260825`](docs/evidence/AUTONOMOUS-WHOLE-WORKSPACE-RESEARCH-EVIDENCE-20260825.md).
 The current Demo 1 branch/artifact increment is tracked in
 [`DEMO1-BRANCH-ARTIFACT-CONTROL-20260826`](docs/evidence/DEMO1-BRANCH-ARTIFACT-CONTROL-EVIDENCE-20260826.md).
+The current cross-Run lineage and bounded topology/Worker increment is tracked in
+[`DR-0053-DEMO1-DEMO2-RUNTIME-EVIDENCE-20260831`](docs/evidence/DR-0053-DEMO1-DEMO2-RUNTIME-EVIDENCE-20260831.md),
+with user-replayable checks in
+[`DEMO1-DEMO2-USER-VALIDATION-CASES-20260831`](docs/testing/DEMO1-DEMO2-USER-VALIDATION-CASES-20260831.md).
 The current folder hierarchy and issue-review interaction is tracked in
 [`WORKSPACE-TREE-AND-EVIDENCE-REVIEW-20260826`](docs/evidence/WORKSPACE-TREE-AND-EVIDENCE-REVIEW-EVIDENCE-20260826.md).
 The current active-budget and Agent-gap recovery increment is tracked in

@@ -93,8 +93,33 @@ server-owned `branch_id`; they do not imply parallel Workers or successful use o
 every listed file.
 If the same recovery reaches `stopped/bounded`, there is no next round inside the
 old Run. The UI replaces resume controls with unfinished Branch cards. Selecting
-one combines its objective with optional user direction and creates a new
-whole-workspace Run; the old Snapshot, receipts and ArtifactVersions stay intact.
+one calls the continuation endpoint and creates a child Run under the same
+`task_id`; the old Snapshot, receipts and ArtifactVersions stay intact. The child
+records `parent_run_id`, Run sequence, selected `carried_branch_id`, base
+Artifact/Commit pointers and the current Workspace revision. Its first round is
+restricted to the selected Branch's missing or approved refs. Optional user text
+cannot widen that scope or replace the Branch objective.
+
+The Task timeline appears in the same work area. It tells the user whether this
+is the first or a later Run, that the old result is preserved, and whether the
+Workspace revision changed. A continuation response can legitimately restart
+`version` and SSE sequence at 1 because counters belong to a Run, not a Task.
+The browser switches generation only after it has a valid child Snapshot; a 409,
+404 or transport failure leaves the parent Run rendered and recoverable.
+
+After Plan validation, the service also persists one `TopologyAdmission`.
+`single_controller` and `fixed_workflow` proceed conservatively without a phantom
+approval. `adaptive_readonly_workers` pauses before Analyst execution and shows
+the verified work-package/source/budget facts, the reason for the route and two
+real actions: confirm a bounded Worker wave or return to single Controller. The
+route is not a speed/quality prediction and the UI does not show Agent chat rooms.
+
+Confirmation dispatches only service-ready Branches, at most three per wave.
+Worker call budget is reserved before dispatch; each Worker sees only its Branch
+objective and approved refs. The cockpit then shows actual called/adopted/elapsed
+receipts. Anchored adopted findings enter a new normal ArtifactVersion/TaskCommit;
+failed, ambiguous or rejected contributions remain scoped receipts and leave only
+their Branch waiting. Completed dependencies can expose a later ready wave.
 
 Opening a Gap first shows an Agent-owned recovery sheet, not a request to edit a
 source file. `next_step.recovery_kind` distinguishes malformed analysis,
@@ -367,7 +392,10 @@ The right pane distinguishes:
 - `已采用`: provider returned and server checks accepted the output;
 - `未采用`: provider returned but checks rejected the output.
 
-The trace also projects `deterministic_office_tool_started`,
+The trace also projects `topology_admission`, optional
+`topology_confirmation_required`, `worker_returned`,
+`contribution_adopted/waiting/rejected`, `topology_workers_completed`,
+`deterministic_office_tool_started`,
 `run_workspace_artifact_written`, `deterministic_verification_completed` and
 `scenario_effect_failed` or `scenario_effect_bounded`. These events are ordered change notifications; the
 Snapshot remains authoritative.
@@ -379,7 +407,9 @@ allowlisted inputs on the event-loop thread, then passes only that immutable
 view to `asyncio.to_thread`; the worker cannot re-read the live Catalog. During
 this wait, workspace browsing, health, Run GET and SSE remain responsive.
 
-This is an interaction guarantee for one API process, not a Worker platform.
+The fixed deterministic adapter thread and the new Analyst Worker manager are
+both process-local. This is an interaction guarantee for one API process, not a
+distributed Worker platform.
 The in-process thread and its subprocesses do not survive an API restart;
 PostgreSQL restores the last committed Snapshot and pauses under the existing
 checkpoint rule. A failed builder emits `scenario_effect_failed` and no green
@@ -415,7 +445,8 @@ GET /v1/harness/runs/{run_id}/events?after={last_observed_sequence}
 Rules:
 
 1. apply only events for the current Run;
-2. never decrease Snapshot version or last event sequence;
+2. never decrease Snapshot version or last event sequence within the same
+   `run_id`; a validated child Run starts a new counter domain;
 3. use SSE only as ordered change notification;
 4. read the current Snapshot after business events;
 5. on nonterminal failure, reconnect from `after=N`;
@@ -433,6 +464,11 @@ browser fact, not a server task phase.
 | manifest integrity invalid | integrity-specific unavailable state | no stale catalog | repair/import source then retry |
 | preview error | file-specific safe error | file list and task draft | reopen or choose another file |
 | unknown start result | reconciling | same instruction/limits/key | replay identical request |
+| continuation uses stale parent version | parent Run remains visible; no child accepted | parent Snapshot, history and unfinished Branch | refresh parent, then retry with a new command key or replay the identical request |
+| Workspace revision changed before continuation | child Task timeline says the source changed and exposes Branch recheck refs | immutable parent Run and base Artifact/Commit pointers | re-read only the approved carried Branch; do not silently adopt old prose |
+| adaptive route waits for confirmation | topology reason, work packages, budget and `external_action=none` | validated Plan/Branches; no Worker call yet | confirm the ready wave or switch to single Controller |
+| one Worker fails or evidence is ambiguous | per-Worker receipt plus only its Branch waiting | other adopted contributions and prior ArtifactVersions/Commits | keep the affected Branch waiting or continue the next ready wave; dedicated Worker decision/retry remains future work |
+| API restarts during a Worker | recovered checkpoint; reserved budget remains; no Worker result is fabricated | persisted Snapshot before dispatch and completed history | user explicitly decides the next safe action; the in-flight Worker is not replayed |
 | model/schema/policy failure | safe stop plus receipt | whole-workspace contract, instruction and completed rounds | revise or create a fresh Run |
 | rejected plan candidate | not adopted plus bounded retry | frozen contract and used-call count | server retries once if budget allows; otherwise fails closed |
 | one or more source locations cannot be resolved | rejected/partial-adoption trace | valid Findings, approved Plan, files, Branches and receipts | retry once; adopt the valid subset or pause one candidate Branch with `recovery_kind=source_location` |
@@ -444,7 +480,7 @@ browser fact, not a server task phase.
 | pending human decision is closed | `decision_recorded(action=defer|cancel)` | Finding, evidence, user feedback draft and all execution facts | defer stays actionable; cancel closes the packet without marking the source rejected; use a fresh version for any later control |
 | repeated malformed analysis output | structure-rejected trace | approved Plan, files, Branches and both call receipts | pause one candidate Branch with `recovery_kind=analysis_output`; do not expose raw response |
 | evidence insufficient | Agent execution-gap sheet, waiting Branch, missing evidence and model adoption receipt | prior rounds, all Branch states, versions and citations | leave guidance empty and retry one Branch, optionally add direction, or preserve the gap |
-| recovery reaches budget terminal | `status=stopped`, `brief.outcome=bounded`, candidate Branches and `recovery_kind` | old Run, Plan, call receipts, Branch state and ArtifactVersions | choose one unfinished Branch, add optional direction and POST a new Task Contract; never resume the terminal Run |
+| recovery reaches budget terminal | `status=stopped`, `brief.outcome=bounded`, candidate Branches and `recovery_kind` | old Run, Plan, call receipts, Branch state and ArtifactVersions | choose one unfinished Branch and POST a same-Task child Run whose first scope is that Branch; never resume the terminal Run |
 | pause/steer/stop requested | pending until a safe point | current Snapshot and command receipt | reconcile returned version; resume or inspect terminal brief |
 | human reviews or pauses for a long time | active elapsed is frozen while waiting/paused | consumed active time, Branch state, versions and receipts | resume from the same active budget; wall-clock waiting does not force an immediate stop |
 | deterministic local effect fails | failed EffectReceipt and check details | source bytes, model receipts, prior Branches and any earlier verified Artifact | inspect the failed check; fix the owned adapter/validator and start a fresh run without altering FORTE inputs |

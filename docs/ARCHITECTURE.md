@@ -7,6 +7,8 @@ Browser: unified file manager + task composer + trace
   -> GET /v1/harness/workspace
   -> GET /v1/harness/workspace/files/{file_ref}
   -> POST user instruction + loop bounds
+  -> POST one terminal Branch continuation into a child Run
+  -> POST explicit admitted read-only Worker wave
   -> POST versioned pause/resume/steer/stop/rollback controls
   -> named SSE + Snapshot reconciliation
 
@@ -14,11 +16,13 @@ FastAPI Harness
   -> BenchmarkWorkspaceCatalog
   -> HarnessRuntime
        -> OpenAI-compatible Planner
-       -> server Policy Compiler + Plan Validator
+       -> server Policy Compiler + Plan Validator + Topology Admission
        -> admitted deterministic office adapter + run-workspace Artifact Verifier
        -> OpenAI-compatible Analyst
        -> Result/Citation Validator
        -> server-owned Branch DAG + branch Evidence Gate + bounded Loop Controller
+       -> explicitly confirmed, in-process Branch-scoped Analyst Workers
+       -> server adoption gate + deterministic contribution merge
        -> append-only logical ArtifactVersion + TaskCommit pointer/restore
        -> isolated real office Artifact store + Owner-scoped download
        -> HarnessStateStore
@@ -71,6 +75,24 @@ and loop bounds in the Run Snapshot. Client-owned `selected_file_refs` are not
 accepted. During a Run, the UI freezes the task composer rather than pretending
 new text would affect the active contract.
 
+### 3.1 Task identity and bounded continuation
+
+`task_id` identifies the business task; `run_id` identifies one bounded execution.
+A first Run starts at `run_sequence=1`. A terminal `completed/stopped/failed` Run
+with an unfinished Branch may accept an Owner-scoped, versioned and idempotent
+continuation command. The service creates a new Run under the same `task_id`, sets
+`parent_run_id`, carries exactly one `carried_branch_id`, records the latest base
+Artifact/Commit pointers and freezes the current Workspace revision. The child
+does not copy model prose as authority: its first evidence scope is exactly the
+selected Branch's `missing_file_refs`, or its approved inputs when no missing set
+exists. The parent Snapshot, events and versions are never rewritten.
+
+The child publicly exposes `recheck_file_refs` and whether the Workspace revision
+changed. A changed revision means the selected Branch must be re-read; it does not
+automatically invalidate or mutate the parent. This is a lineage slice stored in
+Run Snapshots and start idempotency records, not a separate Task database, current
+Task pointer, cross-tenant identity service or infinite Run resume.
+
 ## 4. Planning and analysis ownership
 
 The Planner returns strict JSON business intent. It does not own file identity,
@@ -87,6 +109,24 @@ The server compiles the candidate into a `HarnessPlan`:
 - every validated unit becomes a stable server-owned Branch with dependencies,
   evidence state and human-gate state; model output cannot assign Branch identity
   or completion.
+
+After that validation, `TopologyAdmission` deterministically chooses the smallest
+safe route from `single_controller`, `fixed_workflow` and
+`adaptive_readonly_workers`. It uses validated unit breadth/dependencies, frozen
+source-group/format facts, remaining model-call/time budget and side-effect/human
+gate facts. Same-function structured sources, more than three independent roots,
+insufficient budget or any side effect stay on a conservative route. Admission is
+persisted before execution and never proves time, cost or quality benefit.
+
+Only `adaptive_readonly_workers` pauses for explicit confirmation. The Worker API
+accepts at most three server-ready Branches per wave, reserves their model-call
+budget before dispatch and invokes the existing Analyst once per Branch with only
+that Branch's approved refs. Returned contributions are candidates. Out-of-scope,
+unanchored, ambiguous, failed or reconciliation-rejected contributions remain
+receipts but cannot enter the shared result. Adopted findings are merged by server
+rule into the normal append-only ArtifactVersion/TaskCommit history; dependency
+completion exposes a later ready wave. This manager is process-local and has no
+lease, queue, recursive spawn or cross-instance coordinator.
 
 After the Plan Validator accepts a plan, the Scenario Effect Gate may admit one
 of twelve fixed, server-owned local office capabilities by matching the original
@@ -105,7 +145,7 @@ once within the same budget; rejection and retry are ordered facts. The server
 also caps the union of model-selected refs at `max_files_per_round`, preserving
 the model's highest-priority order and repairing dependencies. The Analyst
 receives the user instruction, validated public plan and safe content only for
-that approved round. It returns 1-3 findings with approved refs, a short fact,
+that approved round. It may return up to 96 findings with approved refs, a short fact,
 separate impact, optional structured human-decision options, verbatim quote
 candidates and `review_required=true`. The Runtime ignores model-supplied
 locations, uniquely resolves each candidate against that same bounded safe
@@ -122,6 +162,11 @@ Chinese month/day window in the instruction is omitted with
 `contradiction` Anchor is removed with `decision_gate_suppressed`; neither rule
 weakens file-scope or Catalog-integrity fail-closed checks.
 
+The browser initially collapses the result after three findings only to control
+visual density; “查看其余 N 条发现” expands the remaining server-returned items.
+That presentation choice is not an analysis cap and must never truncate the
+Snapshot, ArtifactVersion or Worker contribution.
+
 If the first
 Analyst output cannot be uniquely located, the Runtime records
 `analysis_validation_rejected` and permits at most one new Analyst call within
@@ -135,7 +180,8 @@ yields a usable Finding, the Runtime preserves Plan/Branch/call facts and pauses
 with `next_step.recovery_kind=source_location`; repeated schema failures use
 `analysis_output`. If another round does not fit the budget, the same facts end
 as `stopped/bounded`: the terminal Run is not resumable, but its candidate Branch
-may seed a new Task Contract and whole-workspace Run. Out-of-scope references
+may seed a same-Task child Run whose first scope is that Branch's missing/approved
+refs. Out-of-scope references
 remain a fail-closed security error.
 
 The Evidence Gate compares referenced files with each Branch's approved set. It
@@ -251,6 +297,14 @@ The root page keeps three independently meaningful regions:
 
 The UI shows business facts and recovery actions, not internal protocol. A
 citation is an interaction: it selects and opens the referenced file preview.
+The same cockpit now also shows a Task timeline, parent/child Run number, what a
+continuation preserves/rechecks, the service-owned topology reason, budget facts,
+an explicit Worker confirmation or conservative override, and actual per-Worker
+called/adopted/elapsed receipts. A child Run may restart version and SSE sequence
+at 1, so browser monotonicity applies only within the same `run_id`; the switch is
+accepted only after a valid child Snapshot arrives, leaving the parent recoverable
+when the request fails. Worker conversations and raw provider responses never
+become separate user-facing chat panes.
 The Artifact area independently shows whether the model call happened, whether
 its output was adopted, whether a deterministic local effect passed, what file
 was written and which side effects did not occur. It never collapses these into
@@ -307,7 +361,8 @@ DR-0038 changes only the browser projection and action hierarchy for
 `source_location`. The UI derives verified/unverified/terminal presentation from
 server-owned Artifact/EffectReceipt, Run status and Gap facts. A nonterminal
 retry-only Gap resumes one bound Branch; a structured Resolution still uses the
-Decision protocol, and a terminal Run still creates a new Task Contract. Internal
+Decision protocol, and a terminal Run creates a new same-Task child Run for one
+approved Branch rather than reopening itself. Internal
 Branch/Gap/Resolution facts remain auditable under progressive disclosure. This
 projection does not mutate Snapshot truth or spend budget before an explicit action.
 
@@ -478,13 +533,13 @@ not a general semantic verifier.
 | Module | Current implementation | Missing target work |
 | --- | --- | --- |
 | Workspace Catalog & Safe Preview | full public folder, 96 refs, bounded previews and integrity checks | enterprise Connector/data policy |
-| Task Contract | user instruction, complete workspace scope, loop bounds, Owner/key/version | durable task contract and production identity |
+| Task Contract | user instruction, complete workspace scope, loop bounds, Owner/key/version, stable `task_id`, parent/child Run lineage and one-Branch recheck scope | separate production Task ledger, richer carried-fact policy and production identity |
 | Planner | strict candidate, autonomous evidence selection, per-round receipt and one bounded repair | retrieval-quality evaluation and richer replanning policy |
-| Admission/Policy/Validator | server compilation and deterministic graph/source checks | dynamic topology admission |
-| Scheduler & Worker Manager | one bounded single-loop controller with server-owned Branch states and selective continuation | parallel/adaptive workers, leases and multi-instance recovery |
+| Admission/Policy/Validator | server compilation, deterministic graph/source checks and three-route `TopologyAdmission` | measured benefit/cost policy, production risk admission and direct-tool route |
+| Scheduler & Worker Manager | bounded single-loop controller plus explicit waves of at most three in-process read-only Branch Workers, dependency readiness, budget reservation and partial-result preservation | durable leases/queue, recursive or cross-process workers and multi-instance recovery |
 | Tool Gateway | twelve fixed local deterministic office adapters with EffectReceipts; no model-owned dispatch | reusable governed tool registry, arbitrary safe commands, Web/SQL/Scheduler/Connector receipts |
-| Artifact Workspace & Verifier | independent append-only logical evidence-brief versions, citation membership, server-resolved preview Anchors, branch Evidence Gate, TaskCommit pointer/restore, isolated CSV/Markdown/DOCX/ZIP files and named deterministic validators for twelve fixed capabilities, plus deterministic-outcome/model-narrative reconciliation for the current TC-15 slice | general writable office workspace, reusable semantic/numeric verifier framework, broader narrative claim extraction, conflict-aware edits and multi-host Artifact durability |
-| Checkpoint/Event/Governance | ordered events, branch/rollback controls, idempotent commands, sanitized narrative-reconciliation receipts, independent records and optional PostgreSQL restart recovery | multi-instance lease/notification, in-flight cancellation, policy/approval/Permit integration |
+| Artifact Workspace & Verifier | independent append-only logical evidence-brief versions, citation membership, server-resolved preview Anchors, branch Evidence Gate, TaskCommit pointer/restore, isolated CSV/Markdown/DOCX/ZIP files and named deterministic validators for twelve fixed capabilities, narrative reconciliation, plus anchored Worker contribution adoption/merge | general writable office workspace, reusable semantic/numeric verifier framework, broader narrative claim extraction, conflict-aware edits and multi-host Artifact durability |
+| Checkpoint/Event/Governance | ordered events, Task/Run lineage, branch/topology/rollback controls, idempotent commands, sanitized receipts, independent records and optional PostgreSQL restart recovery | separate Task/Worker ledger, database CAS, multi-instance lease/notification, in-flight cancellation and policy/approval/Permit integration |
 
 ## 8. Security and claim boundary
 

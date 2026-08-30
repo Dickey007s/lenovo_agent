@@ -4,19 +4,19 @@
 
 | 字段 | 内容 |
 | --- | --- |
-| 状态 | `Proposed`；尚未形成工程 Evidence，不得写成当前能力 |
-| 日期 | 2026-08-30 |
+| 状态 | `Limited Verified`；仅限本决策列出的本地合同、Runtime 与浏览器自动化范围 |
+| 日期 | 2026-08-30；实现与研究复核 2026-08-31 |
 | 用户来源 | `USER-FEEDBACK-20260830-DEMO1-DEMO2-CONTINUATION` |
 | 研究 | [`DEMO1-DEMO2-DURABLE-TASK-AND-ADAPTIVE-ORCHESTRATION-RESEARCH-20260830`](../research/DEMO1-DEMO2-DURABLE-TASK-AND-ADAPTIVE-ORCHESTRATION-RESEARCH-20260830.md) |
 | 场景 | [`SCENARIO-038`](../scenarios/SCENARIO-038-durable-task-continuation-across-runs.md)、[`SCENARIO-039`](../scenarios/SCENARIO-039-explainable-topology-and-verified-worker-convergence.md) |
-| Evidence | 待实现后新增，不复用历史 Demo 1/2 截图冒充 |
+| Evidence | [`DR-0053-DEMO1-DEMO2-RUNTIME-EVIDENCE-20260831`](../evidence/DR-0053-DEMO1-DEMO2-RUNTIME-EVIDENCE-20260831.md)；原始门禁清单 [`demo1-demo2-runtime-20260831-validated-v2.json`](../evidence/manifests/demo1-demo2-runtime-20260831-validated-v2.json) |
 
 ## 问题
 
-当前 Agent Control Loop 已从历史最多三轮发展为默认最多 12 轮的单 Controller 有界
-Runtime，并具备 Run 内 Branch、分支级 Evidence Gate、append-only 逻辑
-`ArtifactVersion`/`TaskCommit`、有限成果适配器、Snapshot/named SSE 和可选 PostgreSQL
-恢复。但仍存在两个产品断点：
+本决策形成时，Agent Control Loop 已从历史最多三轮发展为默认最多 12 轮的单
+Controller 有界 Runtime，并具备 Run 内 Branch、分支级 Evidence Gate、append-only
+逻辑 `ArtifactVersion`/`TaskCommit`、有限成果适配器、Snapshot/named SSE 和可选
+PostgreSQL 恢复，当时存在两个产品断点：
 
 1. Run 到达终态或预算边界后，用户只能新建另一个 Run；服务端没有稳定业务 Task
    身份，也不能审计“新 Run 继承了什么、什么必须重核”。简单继续扩大单 Run 预算会
@@ -39,9 +39,10 @@ Runtime，并具备 Run 内 Branch、分支级 Evidence Gate、append-only 逻�
    ArtifactVersion、TaskCommit 永远不改写。
 4. 用户只选择需要继续的工作线。服务端重新校验 owner、expected version、幂等键、
    来源 revision 和 Branch 归属；未选分支不重跑。
-5. 来源未变化的已核对事实可作为 carried context；来源变化、完整性失败、过期 Anchor、
-   未完成模型调用和待决高风险事项必须重核，不得静默继承。
-6. 前台操作命名为“在同一任务下继续”，并明确这是一个新的有界 Run，而不是给旧 Run
+5. 当前纵切采取保守策略：所选 Branch 的批准来源始终进入 `recheck_file_refs`，旧模型
+   采用事实不作为 child 权威；来源变化额外令 `source_revision_changed=true`。未来若要
+   直接携带已核对事实，必须另加 per-file revision/Anchor 有效性门。
+6. 前台操作命名为“继续未完成任务”，并明确这是一个新的有界 Run，而不是给旧 Run
    无限加轮次。
 
 ### 2. Demo 2：先准入，再启动受限只读 Worker
@@ -51,8 +52,8 @@ Runtime，并具备 Run 内 Branch、分支级 Evidence Gate、append-only 逻�
    `single_controller`、`fixed_workflow`、`adaptive_readonly_workers`。
 2. 07-16 的 `direct_tool` 保留为目标路线，但在通用 Tool Gateway 未实现前只能返回
    unavailable/target，不得由固定适配器或前台动画冒充。
-3. Admission 只使用冻结的结构事实：来源跨度、工作包独立性、依赖耦合、预算、
-   side-effect/risk 与可验证收益依据。模型可以建议，不拥有最终路线。
+3. Admission 只使用冻结的结构事实：来源跨度、工作包独立性、依赖耦合、预算和
+   side-effect/risk。模型可以建议，不拥有最终路线；当前没有收益预测字段。
 4. `adaptive_readonly_workers` 必须显式显示预计 Worker 上限和预算，并由用户确认后
    才能启动。首个纵切最多三个并发 Worker，不允许递归增兵。
 5. 模块 5 `Scheduler & Worker Manager` 只调度由 validated plan 编译出的 Branch/WorkUnit；
@@ -60,10 +61,11 @@ Runtime，并具备 Run 内 Branch、分支级 Evidence Gate、append-only 逻�
 6. 模块 7 `Artifact Workspace & Verifier` 把每个 Worker 返回视为 Contribution candidate。
    候选必须通过现有 file membership、Evidence Anchor、Branch Evidence Gate 和适用的
    deterministic-outcome/narrative reconciliation，才能进入共享成果。
-7. 合并由稳定服务端规则完成。开放冲突、stale 来源、无 Anchor 或被拒贡献不得进入
-   当前 Artifact；最后返回、文字更长或置信语气更强都不构成覆盖权。
-8. 一个 Worker 失败只暂停其 WorkUnit/Branch。已采用 Contribution、旧 ArtifactVersion
-   和其他 Worker 的完成状态保留；恢复只新增版本，不原地改写。
+7. 合并由稳定服务端规则完成。当前无 Anchor、越 Branch 来源、异常或叙事对账被拒的
+   贡献不得进入 Artifact；最后返回、文字更长或语气更强都不构成覆盖权。Worker stale
+   revision 与通用数值冲突门仍是后续扩展。
+8. 一个 Worker 失败只影响其 Branch，已采用 Contribution、旧 ArtifactVersion 和其他
+   Worker 的完成状态保留。Worker 专属局部恢复状态机尚未实现。
 
 ## 八模块归属
 
@@ -78,38 +80,42 @@ Runtime，并具备 Run 内 Branch、分支级 Evidence Gate、append-only 逻�
 | 7. Artifact Workspace & Verifier | Contribution Gate、确定性合并、新 ArtifactVersion | 不做通用语义证明器 |
 | 8. Checkpoint, Event & Governance Control | Task/Run 谱系、Admission/Worker receipts、PG 恢复 | 不声称 HA、在途 HTTP 续跑 |
 
-## 拟议公开合同
+## 已实现公开合同
 
-字段名是实现约束候选；开发时可按现有命名规范调整，但语义不得丢失。
+以下记录 `DR-0053` 当前实现，而不是把目标对象包装成现行字段。没有独立
+`TaskIdentity`、`ContinuationContract`、`Contribution ID` 或 `MergeReceipt` 表；现行
+事实直接保存在 Run Snapshot、普通 ArtifactVersion/TaskCommit 与 Worker packet 中。
 
 ### Task 与 Run lineage
 
 | 对象 | 必需字段 | 语义 |
 | --- | --- | --- |
-| `TaskIdentity` | `task_id`、`owner_id`、`created_at` | 跨 Run 稳定业务任务身份 |
-| `RunLineage` | `run_id`、`task_id`、`parent_run_id`、`lineage_depth` | 一次有界执行及父子关系 |
-| `ContinuationContract` | `source_run_version`、`carried_branch_ids`、`base_artifact_version`、`base_task_commit_id`、`source_revision`、`recheck_items` | 本次继承与重核边界 |
-| `ContinuationReceipt` | `created_run_id`、`applied_version`、`idempotency_ref`、`carried_count`、`recheck_count` | 服务端实际创建结果 |
+| `HarnessRunSnapshot` / 公共投影 | `task_id`、`run_id`、`run_sequence`、`parent_run_id`、`continuation_reason`、`carried_branch_id` | 稳定业务 Task 与一次有界 Run 的父子关系 |
+| 同一 Snapshot | `base_artifact_version`、`base_task_commit`、`workspace_revision`、`recheck_file_refs`、`source_revision_changed` | 后继 Run 的成果基线、冻结 Workspace revision 与精确重核范围 |
+| `HarnessContinuationRequest` | `branch_id`、`expected_version`、`idempotency_key`、可选 `instruction/loop` | Owner-scoped、版本化、幂等地创建同 Task child Run；服务端 Branch 目标仍是范围权威 |
 
 ### Topology 与 Worker
 
 | 对象 | 必需字段 | 语义 |
 | --- | --- | --- |
-| `TopologyAdmission` | `route`、`state`、`reason_codes`、`policy_version`、`estimated_model_calls`、`max_parallel_workers`、`benefit_evidence`、`requires_confirmation` | 路线建议与准入事实 |
-| `WorkUnit` | `work_unit_id`、`branch_id`、`dependency_ids`、`allowed_file_refs`、`status` | 服务端批准的工作包 |
-| `WorkerReceipt` | `worker_run_id`、`work_unit_id`、`called`、`returned`、`elapsed_ms`、`output_used`、`stop_reason` | 实际 Worker 执行与采用分离 |
-| `Contribution` | `contribution_id`、`work_unit_id`、`finding_ids`、`evidence_resolution_ids`、`revision`、`status`、`rejection_reason` | 进入共享成果前的候选 |
-| `MergeReceipt` | `input_contribution_ids`、`adopted_ids`、`rejected_ids`、`conflict_ids`、`artifact_version`、`merge_policy_version` | 服务端合并结果 |
+| `TopologyAdmission` | `admission_version`、`mode`、`work_unit_breadth`、`independent_branch_count`、`dependency_parallelism`、`source_span`、`remaining_model_calls`、`remaining_time_seconds`、`external_action`、`reasons`、`user_confirmation_required` | 由 validated plan 与冻结服务端事实编译的路线建议 |
+| `HarnessReadonlyWorkersRequest` | `branch_ids`、`expected_version`、`idempotency_key`、`confirmed` | 只有明确确认后才可执行当前 ready Branch；空 `branch_ids` 时由服务端 Scheduler 选择 |
+| `ReadonlyWorkerRequest` | `worker_run_id`、`branch_id`、`goal`、`source_file_refs`、`expected_version` | 进程内只读 Analyst Worker 的最小批准范围 |
+| `ReadonlyWorkerContribution` | `worker_run_id`、`branch_id`、`outcome`、`summary`、`source_file_refs`、`evidence_anchors`、`model_called`、`output_used`、`elapsed_ms`、`error`、`narrative_reconciliation`、`findings` | Worker 返回、调用和采用分开；`findings` 上限 96，不再静默截为 3 |
+| `SharedArtifactMerge` | `artifact_id`、`version`、`adopted_worker_run_ids`、`adopted_contributions`、`waiting_branch_ids`、`failed_worker_run_ids`、`external_action` | 只合入 adopted 且有 Anchor 的贡献，并进入普通 append-only Artifact 历史 |
 
 ### 状态与事件
 
-- Admission：`proposed / confirmation_required / admitted / downgraded / rejected`。
-- WorkUnit：`pending / blocked / running / waiting_input / completed / failed / cancelled`。
-- Contribution：`candidate / verified / adopted / rejected / stale / conflicted`。
-- 建议 named SSE：`task_continuation_created`、`topology_admission_proposed`、
-  `topology_admitted`、`work_unit_started`、`worker_returned`、
-  `worker_contribution_adopted`、`worker_contribution_rejected`、
-  `work_unit_waiting_input`、`contributions_merged`。
+- 现行 Admission `mode` 为 `single_controller / fixed_workflow /
+  adaptive_readonly_workers`；只有第三种令 `user_confirmation_required=true`。
+- Branch 继续沿用现行 `waiting/running/completed/failed` 等状态；当前没有独立持久
+  `WorkUnit` 或 Worker lease 状态机。
+- Worker `outcome` 为 `adopted / failed / ambiguous / rejected`；`output_used=true` 只允许
+  adopted 且通过 Anchor/叙事对账的候选。
+- 现行 named SSE 为 `topology_admission`、`topology_confirmation_required`、
+  `control_topology_override_recorded`、`worker_returned`、`contribution_adopted`、
+  `contribution_waiting`、`contribution_rejected`、`topology_workers_completed`。child Run
+  由 `/continue` 返回新 Snapshot，不伪造一个尚不存在的 `task_continuation_created` 事件。
 
 事件仍只是 Snapshot 的有序投影；前台断线后必须 GET 对账，不能仅凭 SSE 推断当前态。
 
@@ -125,17 +131,19 @@ Runtime，并具备 Run 内 Branch、分支级 Evidence Gate、append-only 逻�
 | 预算不足、依赖高度耦合、完整性失败 | downgrade/reject | 不允许为了展示多 Agent 破坏安全边界 |
 | 存在真实工具/外部动作诉求 | 当前 `direct_tool` unavailable，转人工或只形成提案 | 模块 6 尚未接入 |
 
-`benefit_evidence` 只允许 `unknown / structural_parallelism / measured_baseline`。
-没有同场基线时一律不得显示具体节省百分比、质量提升或 ROI。
+当前协议没有 `benefit_evidence` 字段，只公开结构事实和 `reasons`。没有同场基线时一律
+不得显示具体节省百分比、质量提升或 ROI；未来若增加收益字段，只允许区分 unknown、
+结构并行依据和真实同场测量，不能用模型自评填充。
 
 ## 前台交互影响
 
 ### Demo 1
 
-用户在一个 Task 页面中查看多段 Run 历史。每段 Run 有自己的预算、状态和成果，但
-共享稳定任务目标。终态页面可选择一条未完成/受影响 Branch，前台先预览：
+用户在一个 Task 时间线中查看多段 Run。每段 Run 有自己的预算、状态和成果，但共享
+稳定 Task 身份。终态页面选择一条未完成/受影响 Branch 后，点击“继续未完成任务”；
+当前没有独立的提交前 continuation preview，child Snapshot 返回后在时间线中说明：
 
-- 将继承哪些完成事实和成果版本；
+- 以哪些旧成果版本为基线，但不把旧模型事实直接带为新结论；
 - 哪些来源因 revision 变化需要重核；
 - 新 Run 的预算和外部动作边界；
 - 旧 Run 与旧成果不会被覆盖。
@@ -151,7 +159,7 @@ Runtime，并具备 Run 内 Branch、分支级 Evidence Gate、append-only 逻�
 2. **工作包**：依赖、批准来源、实际 Worker 状态、等待/失败影响。
 3. **统一成果**：已采用/未采用 Contribution、冲突、Evidence、ArtifactVersion。
 
-只有 `confirmation_required` 的高成本只读 Worker 路线显示确认按钮。普通单 Controller
+只有 `user_confirmation_required=true` 的高成本只读 Worker 路线显示确认按钮。普通单 Controller
 和固定流程直接按既有合同运行；`direct_tool` 未实现时显示不可用，不提供假按钮。
 
 ## UI—服务端事实映射
@@ -159,16 +167,17 @@ Runtime，并具备 Run 内 Branch、分支级 Evidence Gate、append-only 逻�
 | 前台文案 | 服务端事实 | 禁止推断 |
 | --- | --- | --- |
 | 同一任务的新一段执行 | `task_id` 相同、`parent_run_id` 有值、新 `run_id` | 旧 Run 被修改或无限续命 |
-| 已继承 2 条工作线，1 项需重核 | continuation carried/recheck 明细 | 旧来源天然仍正确 |
-| 推荐固定流程 | Admission `route=fixed_workflow` + reason codes | Worker 已启动 |
-| 建议 3 个只读 Worker，等待确认 | `confirmation_required` + `max_parallel_workers=3` | 多 Worker 一定更快/更好 |
-| Worker 已返回、结果未采用 | `returned=true/output_used=false` + Contribution rejection | Worker 没调用或整个任务失败 |
-| 2 项可用，1 项待核对 | 两项 adopted、一项 waiting/conflicted | 最终任务已全部正确 |
+| 继续一条工作线，列出需重核来源 | `carried_branch_id`、`recheck_file_refs`、`source_revision_changed` | 旧来源天然仍正确或多个 Branch 被复制 |
+| 推荐固定流程 | Admission `mode=fixed_workflow` + `reasons[]` | Worker 已启动 |
+| 建议最多 3 个只读 Worker，等待确认 | `mode=adaptive_readonly_workers` + `user_confirmation_required=true` + `remaining_model_calls` | 多 Worker 一定更快/更好 |
+| Worker 已返回、结果未采用 | `model_called=true/output_used=false` + `outcome/error` | Worker 没调用或整个任务失败 |
+| 2 项可用，1 项待核对 | 两个 adopted `worker_runs` + 一个 waiting/failed Branch | 最终任务已全部正确 |
 | 已形成 v2，v1 保留 | 新 ArtifactVersion/TaskCommit | 源文件被回滚或写回 |
 
 ## 安全与治理
 
-- Owner、expected version 与幂等语义覆盖 continuation、Admission 确认和 WorkUnit 控制。
+- Owner、expected version 与幂等语义覆盖 continuation、Worker 确认和 topology override；
+  当前没有独立 WorkUnit control API。
 - Worker 只获得批准来源的最小范围；公共 API/DOM 不暴露 raw hash、绝对路径、Prompt、
   CoT、Provider response、密钥或内部验证表达式。
 - Catalog/Preview 完整性失败继续 fail closed。普通 Contribution 定位失败局部化；不能把
@@ -199,9 +208,15 @@ Runtime，并具备 Run 内 Branch、分支级 Evidence Gate、append-only 逻�
 - named SSE、Snapshot、PostgreSQL、幂等控制和浏览器投影一致。
 - 前台不显示内部 Agent 聊天，不把 `returned` 写成 adopted，不把推荐写成执行。
 
-工程门至少包括 unit、真实 PostgreSQL integration、真实 Provider 受控运行、API/DOM
-敏感字段扫描、1440/390 Playwright 与下载成果独立解析。自动化只能把决策升级到限定
-工程 `Limited Verified`，不能升级用户价值判断。
+当前本地门：unit `383 passed`；全量 Playwright `64 passed`；Ruff、compileall、Web
+lint/build 通过；后续公开投影与字号收尾定向 Python `65 passed`、桌面/390 px
+Playwright `2 passed`；来源变化条件式提示与 390 px Task 时间线又由两个独立 E2E
+补丁覆盖，目标 Playwright 均为 `2 passed`。新增 PostgreSQL integration 收集 3 项，但本机没有
+`TEST_DATABASE_DSN`，因此 `3 skipped`，不能算通过；真实 Provider 未获付费授权也未运行。
+这些自动化只把本决策升级到限定工程 `Limited Verified`，不升级用户价值判断。
+
+明确未通过/未执行的升级门是：真实 PostgreSQL、真实 Provider、Worker stale revision、
+通用数值冲突验证、Worker 专属持久局部恢复，以及目标用户形成性研究。
 
 ## 拒绝的替代方案
 
@@ -221,13 +236,15 @@ Runtime，并具备 Run 内 Branch、分支级 Evidence Gate、append-only 逻�
 | Claim | 状态 | 依据 | 升级条件 |
 | --- | --- | --- | --- |
 | 当前已有 Run 内分支、成果版本与可选 PG 恢复 | `Current` | 当前源码/living docs | 保持回归测试 |
-| 当前已有跨 Run Task lineage | `False` | 现行 Harness 无业务 `task_id` 协议 | 完成本决策 Demo 1 门 |
-| 当前已有通用多 Worker Runtime | `False` | 当前是单 Controller | 完成本决策 Demo 2 门 |
-| 路线准入是候选产品差异 | `Proposed` | 07-16 + 官方调研 | 同场基线和工程 Evidence |
+| 当前已有跨 Run Task lineage 的有限纵切 | `Limited Verified` | `task_id`/child Run/单 Branch/公共重核投影自动化与 Evidence | 真实 PostgreSQL + Provider 门，独立 Task ledger |
+| 当前已有进程内受限只读 Worker 纵切 | `Limited Verified` | 最多三 Worker、采用门、确定性合并、局部失败自动化 | durable queue/lease、多实例、真实 Provider |
+| 路线准入是本项目原生合同 | `Limited Verified` | 07-16 + 官方调研 + 确定性 unit/E2E | 同场基线验证业务收益 |
 | 统一驾驶舱提升理解/效率 | `Draft` | HAI 研究支持方向 | 目标用户形成性研究 |
 
 ## 边界
 
 本决策不声称竞品不能实现 Task lineage、Evidence Gate 或服务端收敛；只规定本项目的
-原生合同。它也不证明多 Worker 更快、更便宜、更正确，不实现真实 Connector、生产
-身份、可写源文件、多实例 lease、HA 或外部动作。实现前所有新增能力保持 `Proposed`。
+原生合同。它也不证明多 Worker 更快、更便宜、更正确。当前 Worker 是同一进程内的
+受限 Analyst 调用，不是通用分布式执行器；不存在 queue/lease、多实例所有权或 Worker
+专属 DecisionRequest。当前也不实现真实 Connector、生产身份、源文件写回、HA 或外部
+动作。PostgreSQL、Provider 和目标用户门未完成的结论必须继续明确标注。
