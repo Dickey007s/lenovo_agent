@@ -1128,6 +1128,14 @@ export type HarnessPlanNode = {
 
 export type HarnessRun = {
   run_id: string;
+  task_id: string;
+  run_sequence: number;
+  parent_run_id: string | null;
+  continuation_reason: string | null;
+  carried_branch_id: string | null;
+  base_artifact_version: number | null;
+  base_task_commit: string | null;
+  workspace_revision: string;
   workspace_id: string;
   status: string;
   version: number;
@@ -1159,6 +1167,43 @@ export type HarnessRun = {
   narrative_reconciliation: NarrativeReconciliation | null;
   validation_errors: string[];
   events: HarnessActivityItem[];
+  topology_admission: TopologyAdmission | null;
+  worker_runs: WorkerRunReceipt[];
+  shared_artifacts: SharedArtifactReceipt[];
+};
+
+type TopologyAdmission = {
+  mode: "single_controller" | "fixed_workflow" | "adaptive_readonly_workers";
+  work_unit_breadth: number;
+  independent_branch_count: number;
+  dependency_parallelism: number;
+  source_span: number;
+  remaining_model_calls: number;
+  remaining_time_seconds: number;
+  external_action: "none";
+  reasons: string[];
+  user_confirmation_required: boolean;
+};
+
+type WorkerRunReceipt = {
+  worker_run_id: string;
+  branch_id: string;
+  outcome: string;
+  summary: string;
+  source_file_refs: string[];
+  model_called: boolean;
+  output_used: boolean;
+  elapsed_ms: number;
+  error: string | null;
+};
+
+type SharedArtifactReceipt = {
+  artifact_id: string;
+  version: number;
+  adopted_worker_run_ids: string[];
+  waiting_branch_ids: string[];
+  failed_worker_run_ids: string[];
+  external_action: "none";
 };
 
 export type HarnessActivityItem = {
@@ -3191,8 +3236,50 @@ function normalizeRun(value: unknown): HarnessRun | null {
   const decisionRequests = Array.isArray(raw.decision_requests)
     ? raw.decision_requests.map(normalizeDecisionRequest).filter((item): item is DecisionRequest => item !== null)
     : [];
+  const admissionRaw = raw.topology_admission && typeof raw.topology_admission === "object"
+    ? raw.topology_admission as Record<string, unknown>
+    : null;
+  const admissionMode = asText(admissionRaw?.mode);
+  const topologyAdmission: TopologyAdmission | null = admissionRaw && ["single_controller", "fixed_workflow", "adaptive_readonly_workers"].includes(admissionMode)
+    ? {
+        mode: admissionMode as TopologyAdmission["mode"],
+        work_unit_breadth: asNumber(admissionRaw.work_unit_breadth),
+        independent_branch_count: asNumber(admissionRaw.independent_branch_count),
+        dependency_parallelism: asNumber(admissionRaw.dependency_parallelism),
+        source_span: asNumber(admissionRaw.source_span),
+        remaining_model_calls: asNumber(admissionRaw.remaining_model_calls),
+        remaining_time_seconds: asNumber(admissionRaw.remaining_time_seconds),
+        external_action: "none",
+        reasons: asStrings(admissionRaw.reasons),
+        user_confirmation_required: admissionRaw.user_confirmation_required !== false,
+      }
+    : null;
+  const workerRuns = Array.isArray(raw.worker_runs) ? raw.worker_runs.flatMap((item): WorkerRunReceipt[] => {
+    if (!item || typeof item !== "object") return [];
+    const worker = item as Record<string, unknown>;
+    const workerId = asText(worker.worker_run_id); const branchId = asText(worker.branch_id);
+    return workerId && branchId ? [{
+      worker_run_id: workerId, branch_id: branchId, outcome: asText(worker.outcome, "unknown"),
+      summary: asText(worker.summary), source_file_refs: asStrings(worker.source_file_refs),
+      model_called: worker.model_called === true, output_used: worker.output_used === true,
+      elapsed_ms: asNumber(worker.elapsed_ms), error: asText(worker.error) || null,
+    }] : [];
+  }) : [];
+  const sharedArtifacts = Array.isArray(raw.shared_artifacts) ? raw.shared_artifacts.flatMap((item): SharedArtifactReceipt[] => {
+    if (!item || typeof item !== "object") return [];
+    const artifact = item as Record<string, unknown>; const artifactId = asText(artifact.artifact_id);
+    return artifactId ? [{ artifact_id: artifactId, version: asNumber(artifact.version, 1), adopted_worker_run_ids: asStrings(artifact.adopted_worker_run_ids), waiting_branch_ids: asStrings(artifact.waiting_branch_ids), failed_worker_run_ids: asStrings(artifact.failed_worker_run_ids), external_action: "none" }] : [];
+  }) : [];
   return {
     run_id: runId,
+    task_id: asText(raw.task_id, "task-000000000000"),
+    run_sequence: asNumber(raw.run_sequence, 1),
+    parent_run_id: asText(raw.parent_run_id) || null,
+    continuation_reason: asText(raw.continuation_reason) || null,
+    carried_branch_id: asText(raw.carried_branch_id) || null,
+    base_artifact_version: typeof raw.base_artifact_version === "number" ? raw.base_artifact_version : null,
+    base_task_commit: asText(raw.base_task_commit) || null,
+    workspace_revision: asText(raw.workspace_revision, "unknown"),
     workspace_id: workspaceId,
     status: asText(raw.status, "queued"),
     version: asNumber(raw.version, 1),
@@ -3245,6 +3332,9 @@ function normalizeRun(value: unknown): HarnessRun | null {
     narrative_reconciliation: normalizeNarrativeReconciliation(raw.narrative_reconciliation),
     validation_errors: asStrings(raw.validation_errors),
     events: serverEvents.map(activityItem).sort((a, b) => a.sequence - b.sequence),
+    topology_admission: topologyAdmission,
+    worker_runs: workerRuns,
+    shared_artifacts: sharedArtifacts,
   };
 }
 
@@ -4451,6 +4541,18 @@ function LoopView({
         <span><b>{Math.ceil(run.budget.elapsed_ms / 1000)}</b>秒</span>
       </div>
     </header>
+    <section className="loop-lineage-strip" aria-label="任务时间线" data-testid="task-lineage">
+      <div><span>任务时间线</span><strong>Task {run.task_id.slice(-6)} · Run {run.run_sequence}</strong></div>
+      <p>{run.parent_run_id ? `本次是第 ${run.run_sequence} 次运行，承接旧 Run 的 ${run.carried_branch_id ? "一个未完成分支" : "已批准成果引用"}。旧成果保留，当前资料库版本重新核对。` : "这是该任务的首次 Run；后续未完成分支可以创建新的 Run。"}</p>
+      {run.parent_run_id && <small>新 Run · 保留成果{run.base_artifact_version ? ` v${run.base_artifact_version}` : ""} · 不修改原文件 · 外部动作：未发生</small>}
+    </section>
+    {run.topology_admission && <section className="loop-topology-admission" aria-label="拓扑准入" data-testid="topology-admission">
+      <header><div><span>服务端拓扑准入</span><h3>{run.topology_admission.mode === "adaptive_readonly_workers" ? "已准入受限只读 Workers" : run.topology_admission.mode === "fixed_workflow" ? "采用固定工作流" : "保持单 Controller"}</h3></div><b>{run.topology_admission.independent_branch_count} 条独立分支</b></header>
+      <p>{run.topology_admission.reasons[run.topology_admission.reasons.length - 1] || "依据已校验计划选择执行方式。"}</p>
+      <div className="loop-topology-facts"><span><b>{run.topology_admission.work_unit_breadth}</b> 工作包</span><span><b>{run.topology_admission.source_span}</b> 份来源</span><span><b>{run.topology_admission.remaining_model_calls}</b> 次剩余调用</span><span><b>{run.topology_admission.remaining_time_seconds}</b> 秒剩余时间</span><span>外部动作：<b>未发生</b></span></div>
+      {run.topology_admission.mode === "adaptive_readonly_workers" && run.worker_runs.length === 0 && <small>执行与准入分开；只有你明确确认后才会调用最多 3 个 Worker。</small>}
+      {run.worker_runs.length > 0 && <div className="loop-worker-receipts"><span>实际 Worker 回执</span>{run.worker_runs.map((worker) => <div key={worker.worker_run_id}><b>{worker.outcome === "adopted" ? "已合入" : worker.outcome === "failed" ? "执行失败" : "待处理"}</b><span>{worker.summary}</span><small>{worker.model_called ? "模型已调用" : "未调用"} · {worker.output_used ? "已采用" : "未采用"} · {worker.elapsed_ms} ms</small></div>)}</div>}
+    </section>}
     {run.status === "failed" && <section className="loop-failure-recovery" role="alert">
       <header><IconAlertTriangle aria-hidden="true" /><div><span>这次运行已停下，但不是死路</span><h3>{failedAtSourceLocation ? "候选结论无法唯一定位到原文" : "本轮结果没有通过服务端校验"}</h3></div></header>
       <ol>

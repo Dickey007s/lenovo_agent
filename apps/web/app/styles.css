@@ -222,6 +222,20 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, summary:focus
 .plan-view li footer .is-gate { color: var(--amber); background: var(--amber-soft); }
 
 .loop-view { min-height: 460px; }
+.loop-lineage-strip, .loop-topology-admission { margin: 10px 14px 0; padding: 10px 12px; border: 1px solid var(--line); background: #fff; }
+.loop-lineage-strip { display: grid; gap: 4px; }
+.loop-lineage-strip > div, .loop-topology-admission > header { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.loop-lineage-strip span, .loop-topology-admission span, .loop-worker-receipts > span { color: var(--blue); font-size: 11px; font-weight: 750; }
+.loop-lineage-strip strong { font-size: 12px; }
+.loop-lineage-strip p, .loop-lineage-strip small, .loop-topology-admission p, .loop-topology-admission small { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.5; }
+.loop-topology-admission > header h3 { margin: 3px 0 0; font-size: 14px; }
+.loop-topology-admission > header > b { color: var(--muted); font-size: 11px; }
+.loop-topology-facts { display: flex; flex-wrap: wrap; gap: 5px 14px; margin: 8px 0; color: var(--muted); font-size: 11px; }
+.loop-topology-facts b { color: var(--ink); }
+.loop-worker-receipts { display: grid; gap: 5px; margin-top: 8px; }
+.loop-worker-receipts > div { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 8px; align-items: baseline; padding-top: 5px; border-top: 1px solid #edf1f5; font-size: 11px; }
+.loop-worker-receipts > div > b { color: var(--green, #247443); }
+.loop-worker-receipts small { font-size: 10px; white-space: nowrap; }
 .loop-contract { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; padding: 15px; border-bottom: 1px solid var(--line); background: #f8fbff; }
 .loop-contract > div:first-child { min-width: 0; }
 .loop-contract span, .loop-round-detail > header span, .loop-round-files > span, .loop-round-result > span, .loop-gap > header span, .loop-round-detail > footer span, .loop-brief span { color: var(--blue); font-size: 11px; font-weight: 750; }
