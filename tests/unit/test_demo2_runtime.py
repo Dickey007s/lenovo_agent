@@ -579,6 +579,16 @@ async def test_runtime_artifact_version_keeps_eleven_worker_findings() -> None:
         )
         for index, branch in enumerate(branches, start=1)
     ]
+    with pytest.raises(HarnessConflictError, match="重复派发"):
+        await runtime.execute_admitted_readonly_workers(
+            "alice",
+            started.run.run_id,
+            expected_version=waiting.version,
+            idempotency_key="artifact-eleven-workers-duplicate",
+            worker_requests=[requests[0], requests[0].model_copy(update={"worker_run_id": "worker-eleven-duplicate"})],
+            handler=handler,
+            user_confirmed=True,
+        )
     result = await runtime.execute_admitted_readonly_workers(
         "alice",
         started.run.run_id,

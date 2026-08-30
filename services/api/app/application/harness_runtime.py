@@ -1323,6 +1323,8 @@ class HarnessRuntime:
                 raise HarnessConflictError("当前拓扑未获准启动只读 Worker")
             if len(worker_requests) < 1 or len(worker_requests) > 3:
                 raise HarnessConflictError("只读 Worker 数量必须在 1 到 3 之间")
+            if len({item.branch_id for item in worker_requests}) != len(worker_requests):
+                raise HarnessConflictError("同一批 Worker 不能重复派发同一分支")
             if any(item.expected_version != expected_version for item in worker_requests):
                 raise HarnessConflictError("Worker 请求版本与当前任务不一致")
             digest = hashlib.sha256(
