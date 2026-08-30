@@ -94,6 +94,8 @@ async def execute_readonly_workers(
                     outcome="failed",
                     summary="该工作分支执行失败，已保留其他分支成果。",
                     source_file_refs=request.source_file_refs,
+                    model_called=bool(getattr(exc, "called", False)),
+                    elapsed_ms=max(0, int(getattr(exc, "elapsed_ms", 0) or 0)),
                     error=str(exc)[:500],
                 )
             if set(result.source_file_refs) - set(request.source_file_refs):
@@ -104,6 +106,26 @@ async def execute_readonly_workers(
                         "error": "worker attempted to use a source outside its Branch",
                     }
                 )
+            # A model response is only a candidate.  Normalize receipts before
+            # merge so an adopted-looking response without an Anchor, or with
+            # a rejected narrative reconciliation, remains auditable but can
+            # never enter the shared Artifact.
+            if result.outcome == "adopted" and (
+                not result.evidence_anchors
+                or (
+                    result.narrative_reconciliation is not None
+                    and result.narrative_reconciliation.model_disposition == "rejected"
+                )
+            ):
+                return result.model_copy(
+                    update={
+                        "outcome": "rejected",
+                        "output_used": False,
+                        "error": result.error or "contribution failed the server adoption gate",
+                    }
+                )
+            if result.outcome in {"failed", "ambiguous", "rejected"}:
+                return result.model_copy(update={"output_used": False})
             return result
 
     return list(await asyncio.gather(*(run_one(request) for request in requests)))

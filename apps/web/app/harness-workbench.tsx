@@ -325,6 +325,7 @@ type LoopNextStep = {
   next_question: string | null;
   candidate_file_refs: string[];
   candidate_branch_ids: string[];
+  ready_branch_ids: string[];
   recovery_kind: "source_location" | "analysis_output" | null;
   evidence_resolutions: EvidenceResolution[];
   decision_requests: DecisionRequest[];
@@ -361,7 +362,7 @@ type LoopBranch = {
   input_file_refs: string[];
   verified_file_refs: string[];
   missing_file_refs: string[];
-  status: "running" | "completed" | "waiting_input" | "stopped" | "failed";
+  status: "running" | "pending" | "blocked" | "completed" | "waiting_input" | "stopped" | "failed";
   requires_human_gate: boolean;
   created_at: string;
   updated_at: string;
@@ -1252,8 +1253,10 @@ const NAMED_EVENTS = [
   "plan_validation",
   "topology_admission",
   "topology_confirmation_required",
-  "worker_completed",
-  "worker_failed",
+  "worker_returned",
+  "contribution_adopted",
+  "contribution_waiting",
+  "contribution_rejected",
   "topology_workers_completed",
   "ready_to_execute",
   "analysis_started",
@@ -2052,6 +2055,7 @@ function normalizeLoopRound(value: unknown): LoopRound | null {
     next_question: asText(nextRaw.next_question) || null,
     candidate_file_refs: asStrings(nextRaw.candidate_file_refs),
     candidate_branch_ids: asStrings(nextRaw.candidate_branch_ids),
+    ready_branch_ids: asStrings(nextRaw.ready_branch_ids),
     recovery_kind: ["source_location", "analysis_output"].includes(asText(nextRaw.recovery_kind))
       ? asText(nextRaw.recovery_kind) as LoopNextStep["recovery_kind"]
       : null,
@@ -3383,6 +3387,8 @@ function gateLabel(decision: LoopNextStep["decision"] | undefined) {
 function branchStatusLabel(status: LoopBranch["status"]) {
   return {
     running: "正在处理",
+    pending: "等待前序分支",
+    blocked: "前序分支未通过",
     completed: "已核对",
     waiting_input: "等你决定",
     stopped: "已停止",
@@ -4279,8 +4285,9 @@ export function HarnessWorkbench({ onActivityChange }: { onActivityChange?: (sta
   async function executeWorkers() {
     const current = runRef.current;
     if (!current || current.topology_admission?.mode !== "adaptive_readonly_workers") return false;
+    const advertisedReady = new Set(current.rounds.at(-1)?.next_step?.ready_branch_ids ?? []);
     const branchIds = current.branches
-      .filter((branch) => ["running", "waiting_input"].includes(branch.status))
+      .filter((branch) => branch.status === "running" && (advertisedReady.size === 0 || advertisedReady.has(branch.branch_id)))
       .slice(0, 3)
       .map((branch) => branch.branch_id);
     if (branchIds.length < 2) {

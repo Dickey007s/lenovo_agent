@@ -354,8 +354,8 @@ class HarnessRunSnapshot(BaseModel):
     # Demo 2 is projected into the same unified Run cockpit.  Admission is a
     # server fact; worker execution remains explicitly confirmed and bounded.
     topology_admission: TopologyAdmission | None = None
-    worker_runs: list[ReadonlyWorkerContribution] = Field(default_factory=list, max_length=3)
-    shared_artifacts: list[SharedArtifactMerge] = Field(default_factory=list, max_length=3)
+    worker_runs: list[ReadonlyWorkerContribution] = Field(default_factory=list, max_length=36)
+    shared_artifacts: list[SharedArtifactMerge] = Field(default_factory=list, max_length=24)
     worker_idempotency: dict[str, str] = Field(default_factory=dict, max_length=12)
 
 
@@ -481,8 +481,8 @@ class PublicHarnessRunSnapshot(BaseModel):
     validation_errors: list[str]
     events: list[HarnessEvent]
     topology_admission: TopologyAdmission | None = None
-    worker_runs: list[ReadonlyWorkerContribution] = Field(default_factory=list, max_length=3)
-    shared_artifacts: list[SharedArtifactMerge] = Field(default_factory=list, max_length=3)
+    worker_runs: list[ReadonlyWorkerContribution] = Field(default_factory=list, max_length=36)
+    shared_artifacts: list[SharedArtifactMerge] = Field(default_factory=list, max_length=24)
 
 
 class PublicHarnessRunStartResult(BaseModel):
@@ -685,7 +685,7 @@ class OpenAICompatibleHarnessAnalyst:
             "不得把自拟具体方案写成当前结论。"
             "只能完成只读分析，不得声称发送、写入、审批或调用外部系统。"
             "不要输出思维链、内部推理、Prompt、工具日志或 Markdown 代码围栏。"
-            "为避免结构截断，最多输出 3 条 findings 和 2 条 follow_ups；没有必要时不要输出默认值字段。"
+            "覆盖通过范围内所有有业务意义的 findings；遵守服务端 schema 与本轮预算上限（findings 最多 10 条、follow_ups 最多 4 条），不要为了截断而省略第 4 条或第 5 条发现。没有必要时不要输出默认值字段。"
             "每条 finding 只输出 plan_unit_id、title、detail、fact_summary、impact、file_refs、evidence_quotes，"
             "仅在人必须决策时再加 review；不要输出 finding_id、affected_branch_ids、evidence_anchors 或 evidence_resolutions。"
             "结论存在不确定性时直接写入 summary。follow_ups 应给出基于当前证据、可由用户确认后作为新任务启动的具体推进建议，"
@@ -1338,21 +1338,36 @@ class HarnessRuntime:
                 if item.branch_id not in branch_refs or set(item.source_file_refs) - branch_refs[item.branch_id]:
                     raise HarnessConflictError("Worker 只能读取自己 Branch 的批准来源")
                 branch = branches_by_id[item.branch_id]
+                if branch.status != "running":
+                    raise HarnessConflictError("只能派发服务端标记为 ready 的 Branch")
                 if any(
                     dependency_branch.status != "completed"
                     for dependency_id in branch.depends_on
                     if (dependency_branch := branches_by_id.get(dependency_id)) is not None
                 ):
                     raise HarnessConflictError("只能派发依赖已完成的 ready Branch；下游分支仍被阻塞")
+            budget = self._budget_with_elapsed(run)
+            if budget.model_calls_used + len(worker_requests) > budget.max_model_calls:
+                raise HarnessConflictError("剩余模型调用预算不足，未派发任何 Worker")
+            run.snapshot = run.snapshot.model_copy(
+                update={
+                    "budget": budget.model_copy(
+                        update={"model_calls_used": budget.model_calls_used + len(worker_requests)}
+                    ),
+                    "updated_at": datetime.now(timezone.utc),
+                }
+            )
+            await self._persist_locked(run)
 
         contributions = await execute_readonly_workers(worker_requests, handler, max_workers=3)
         merged = merge_adopted_contributions(contributions, version=1)
         now = datetime.now(timezone.utc)
-        worker_payload = [item.model_dump(mode="json") for item in contributions]
-        merged_payload = merged.model_dump(mode="json")
         async with self._lock:
             run = self._require_run(owner_id, run_id)
-            if run.snapshot.version != expected_version:
+            # Worker model receipts append ordered events and therefore bump
+            # the Run version while they are in flight.  The user CAS was
+            # checked before dispatch; only a version regression is invalid.
+            if run.snapshot.version < expected_version:
                 raise HarnessConflictError("任务版本已更新，Worker 结果未合入")
             artifact: AgentControlLoopArtifactVersion | None = None
             task_commit: AgentControlLoopCommit | None = None
@@ -1361,35 +1376,46 @@ class HarnessRuntime:
             last_commit = run.snapshot.last_commit
             contribution_by_branch = {item.branch_id: item for item in contributions}
             adopted_worker_ids = set(merged.adopted_worker_run_ids)
+            prior_findings = artifact_versions[-1].findings if artifact_versions else []
+            finding_by_id = {finding.finding_id: finding for finding in prior_findings}
             artifact_findings = [
                 finding
                 for contribution in merged.adopted_contributions
                 for finding in contribution.findings
-            ][:10]
-            updated_branches = [
-                branch.model_copy(
-                    update={
-                        "status": "completed"
-                        if contribution_by_branch[branch.branch_id].worker_run_id in adopted_worker_ids
-                        else "waiting_input",
-                        "verified_file_refs": sorted(
-                            set(branch.verified_file_refs)
-                            | (
-                                set(contribution_by_branch[branch.branch_id].source_file_refs)
-                                if contribution_by_branch[branch.branch_id].outcome == "adopted"
-                                else set()
-                            )
-                        )[:24],
-                        "missing_file_refs": []
-                        if contribution_by_branch[branch.branch_id].outcome == "adopted"
-                        else list(contribution_by_branch[branch.branch_id].source_file_refs),
-                        "updated_at": now,
-                    }
-                )
-                if branch.branch_id in contribution_by_branch
-                else branch
-                for branch in run.snapshot.branches
             ]
+            for finding in artifact_findings:
+                finding_by_id[finding.finding_id] = finding
+            artifact_findings = list(finding_by_id.values())[:10]
+            branch_by_id = {branch.branch_id: branch for branch in run.snapshot.branches}
+            updated_branches: list[AgentControlLoopBranch] = []
+            for branch in run.snapshot.branches:
+                contribution = contribution_by_branch.get(branch.branch_id)
+                if contribution is not None:
+                    adopted = contribution.worker_run_id in adopted_worker_ids
+                    updated_branches.append(
+                        branch.model_copy(
+                            update={
+                                "status": "completed" if adopted else "waiting_input",
+                                "verified_file_refs": sorted(
+                                    set(branch.verified_file_refs)
+                                    | (set(contribution.source_file_refs) if adopted else set())
+                                )[:24],
+                                "missing_file_refs": [] if adopted else list(contribution.source_file_refs),
+                                "updated_at": now,
+                            }
+                        )
+                    )
+                    continue
+                dependencies = [branch_by_id[item] for item in branch.depends_on if item in branch_by_id]
+                if branch.status in {"pending", "blocked", "running"}:
+                    if any(item.status in {"failed", "blocked", "waiting_input"} for item in dependencies):
+                        updated_branches.append(branch.model_copy(update={"status": "blocked", "updated_at": now}))
+                    elif all(item.status == "completed" for item in dependencies):
+                        updated_branches.append(branch.model_copy(update={"status": "running", "updated_at": now}))
+                    else:
+                        updated_branches.append(branch.model_copy(update={"status": "pending", "updated_at": now}))
+                else:
+                    updated_branches.append(branch)
             all_branches_completed = bool(updated_branches) and all(
                 branch.status == "completed" for branch in updated_branches
             )
@@ -1414,11 +1440,16 @@ class HarnessRuntime:
                 ]
                 next_step = AgentControlLoopNextStep(
                     decision="waiting_input",
-                    reason="部分 Worker 已合入，其余分支因失败或原文位置不明确而暂停。",
+                    reason=(
+                        "本批贡献已合入，下一批 ready Branch 已就绪；失败或位置不明确的分支保持暂停。"
+                        if ready_branch_ids
+                        else "部分 Worker 已合入，其余分支因失败或原文位置不明确而暂停。"
+                    ),
                     candidate_file_refs=waiting_file_refs[:20],
                     candidate_branch_ids=(
                         list(merged.waiting_branch_ids) + ready_branch_ids
                     )[:36],
+                    ready_branch_ids=ready_branch_ids[:36],
                 )
             worker_result = None
             if artifact_findings:
@@ -1431,6 +1462,11 @@ class HarnessRuntime:
                 artifact_version = len(artifact_versions) + 1
                 source_refs = sorted(
                     {
+                        ref
+                        for prior in artifact_versions
+                        for ref in prior.source_file_refs
+                    }
+                    | {
                         ref
                         for item in merged.adopted_contributions
                         for ref in item.source_file_refs
@@ -1467,11 +1503,13 @@ class HarnessRuntime:
                 artifact_versions.append(artifact)
                 commits.append(task_commit)
                 last_commit = task_commit
-                merged_payload["version"] = artifact.version
+                # Keep the append-only worker merge receipt aligned with the
+                # actual normal ArtifactVersion it records.
+                merged = merged.model_copy(update={"version": artifact.version})
             run.snapshot = run.snapshot.model_copy(
                 update={
-                    "worker_runs": worker_payload,
-                    "shared_artifacts": [merged_payload],
+                    "worker_runs": [*run.snapshot.worker_runs, *contributions],
+                    "shared_artifacts": [*run.snapshot.shared_artifacts, merged],
                     "artifact_versions": artifact_versions,
                     "commits": commits,
                     "last_commit": last_commit,
@@ -1520,7 +1558,7 @@ class HarnessRuntime:
                 owner_id,
                 run_id,
                 current_status,
-                "worker_completed" if contribution.outcome == "adopted" else "worker_failed",
+                "worker_returned",
                 contribution.summary,
                 {
                     "worker_run_id": contribution.worker_run_id,
@@ -1528,6 +1566,26 @@ class HarnessRuntime:
                     "outcome": contribution.outcome,
                     "model_called": contribution.model_called,
                     "output_used": contribution.output_used,
+                    "external_action": False,
+                },
+            )
+            disposition_event = (
+                "contribution_adopted"
+                if contribution.worker_run_id in merged.adopted_worker_run_ids
+                else "contribution_waiting"
+                if contribution.outcome == "ambiguous"
+                else "contribution_rejected"
+            )
+            await self._transition(
+                owner_id,
+                run_id,
+                current_status,
+                disposition_event,
+                contribution.summary,
+                {
+                    "worker_run_id": contribution.worker_run_id,
+                    "branch_id": contribution.branch_id,
+                    "outcome": contribution.outcome,
                     "external_action": False,
                 },
             )
@@ -1600,10 +1658,17 @@ class HarnessRuntime:
             if branch is None or unit is None:
                 raise HarnessPlanError("worker branch has no validated plan unit")
             files = self.catalog.agent_file_inputs(list(request.source_file_refs))
-            candidate = await self.analyst.analyze(
+            candidate, _worker_receipt = await self._invoke_analyst(
+                owner_id=owner_id,
+                run_id=run_id,
+                round_number=branch.round_number,
                 instruction=request.goal,
                 plan=HarnessPlan(summary=unit.objective, selection_reason="服务端 Branch 目标", units=[unit]),
                 files=files,
+                verified_effect_context=None,
+                attempt=1,
+                validation_feedback=None,
+                reserve_model_call=False,
             )
             candidate = self._validate_candidate_result_scope(
                 candidate,
@@ -1653,9 +1718,9 @@ class HarnessRuntime:
                 summary=(resolution.result.summary if resolution.result else "原文位置仍需人工核对"),
                 source_file_refs=request.source_file_refs,
                 evidence_anchors=anchors,
-                model_called=True,
+                model_called=_worker_receipt.called,
                 output_used=adopted,
-                elapsed_ms=int((perf_counter() - started) * 1000),
+                elapsed_ms=_worker_receipt.elapsed_ms or int((perf_counter() - started) * 1000),
                 narrative_reconciliation=reconciliation,
                 findings=artifact_findings,
             )
@@ -5666,8 +5731,10 @@ class HarnessRuntime:
         verified_effect_context: dict[str, Any] | None,
         attempt: int,
         validation_feedback: str | None,
+        reserve_model_call: bool = True,
     ) -> tuple[HarnessTaskResult, HarnessModelReceipt]:
-        await self._reserve_model_call(owner_id, run_id)
+        if reserve_model_call:
+            await self._reserve_model_call(owner_id, run_id)
         await self._transition(
             owner_id,
             run_id,
@@ -6725,7 +6792,9 @@ class HarnessRuntime:
                 depends_on=[branch_ids[item] for item in unit.depends_on],
                 input_file_refs=list(dict.fromkeys(unit.input_file_refs)),
                 missing_file_refs=list(dict.fromkeys(unit.input_file_refs)),
-                status="running",
+                # Only DAG roots are ready for dispatch. Dependents remain
+                # pending until their predecessor MergeReceipt is adopted.
+                status="pending" if unit.depends_on else "running",
                 requires_human_gate=unit.requires_human_gate,
                 created_at=now,
                 updated_at=now,

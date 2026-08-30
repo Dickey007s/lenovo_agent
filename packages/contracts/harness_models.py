@@ -74,6 +74,8 @@ AgentControlLoopCommand = Literal[
 ]
 AgentControlLoopBranchStatus = Literal[
     "running",
+    "pending",
+    "blocked",
     "completed",
     "waiting_input",
     "stopped",
@@ -327,6 +329,9 @@ class AgentControlLoopNextStep(StrictModel):
     next_question: str | None = Field(default=None, max_length=2_000)
     candidate_file_refs: list[str] = Field(default_factory=list, max_length=20)
     candidate_branch_ids: list[str] = Field(default_factory=list, max_length=36)
+    # The scheduler, not the browser, owns which branches are dispatchable.
+    # Keep this explicit while retaining candidate_branch_ids for compatibility.
+    ready_branch_ids: list[str] = Field(default_factory=list, max_length=36)
     recovery_kind: AgentControlLoopRecoveryKind | None = None
     evidence_resolutions: list[AgentControlLoopEvidenceResolution] = Field(
         default_factory=list, max_length=20
