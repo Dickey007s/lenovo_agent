@@ -500,6 +500,100 @@ async def test_five_unit_dag_runtime_advances_from_roots_to_second_worker_wave()
 
 
 @pytest.mark.asyncio
+async def test_runtime_artifact_version_keeps_eleven_worker_findings() -> None:
+    """The normal Runtime ArtifactVersion contract must not reintroduce a top-10 cap."""
+    from tests.unit.test_harness_runtime import FakeCatalog
+
+    class TwoUnitPlanner:
+        model = "test-planner"
+
+        async def plan(self, *, scenario, files):
+            refs = [str(item["file_ref"]) for item in files[:2]]
+            return HarnessPlanCandidate(
+                summary="两个只读工作包",
+                selection_reason="服务端计划校验",
+                units=[
+                    HarnessPlanCandidateUnit(
+                        unit_id=f"unit-{index}",
+                        title=f"工作包 {index}",
+                        objective="核对一份批准资料",
+                        input_file_refs=[ref],
+                        tool="file.read",
+                    )
+                    for index, ref in enumerate(refs, start=1)
+                ],
+            )
+
+    runtime = HarnessRuntime(FakeCatalog(), TwoUnitPlanner(), None)
+    started = await runtime.start(
+        "alice",
+        HarnessRunStart(
+            idempotency_key="artifact-eleven-start-0001",
+            instruction="核对两份独立资料",
+            loop={"max_rounds": 1, "max_files_per_round": 2, "max_model_calls": 4, "deadline_seconds": 120},
+        ),
+    )
+    waiting = None
+    for _ in range(300):
+        candidate = await runtime.get("alice", started.run.run_id)
+        if candidate.status == "waiting_input" and candidate.topology_admission is not None:
+            waiting = candidate
+            break
+        await asyncio.sleep(0.01)
+    assert waiting is not None
+    branches = [item for item in waiting.branches if item.status == "running"]
+    assert len(branches) == 2
+
+    async def handler(request: ReadonlyWorkerRequest) -> ReadonlyWorkerContribution:
+        branch = next(item for item in branches if item.branch_id == request.branch_id)
+        findings = tuple(
+            AgentControlLoopArtifactFinding(
+                finding_id=f"finding-{index:012x}",
+                plan_unit_id=branch.unit_id,
+                affected_branch_ids=[branch.branch_id],
+                title=f"逐项发现 {index}",
+                detail="运行时保留的逐项可审查事实。",
+                file_refs=list(request.source_file_refs),
+            )
+            for index in range(1, 12)
+        ) if branch is branches[0] else ()
+        return ReadonlyWorkerContribution(
+            worker_run_id=request.worker_run_id,
+            branch_id=request.branch_id,
+            outcome="adopted",
+            summary="已通过服务端来源核对",
+            source_file_refs=request.source_file_refs,
+            evidence_anchors=("line:1",),
+            model_called=True,
+            output_used=True,
+            findings=findings,
+        )
+
+    requests = [
+        ReadonlyWorkerRequest(
+            worker_run_id=f"worker-eleven-{index}",
+            branch_id=branch.branch_id,
+            goal=branch.objective,
+            source_file_refs=tuple(branch.input_file_refs),
+            expected_version=waiting.version,
+        )
+        for index, branch in enumerate(branches, start=1)
+    ]
+    result = await runtime.execute_admitted_readonly_workers(
+        "alice",
+        started.run.run_id,
+        expected_version=waiting.version,
+        idempotency_key="artifact-eleven-workers-0001",
+        worker_requests=requests,
+        handler=handler,
+        user_confirmed=True,
+    )
+    assert result.artifact_versions[-1].finding_count == 11
+    assert len(result.artifact_versions[-1].findings) == 11
+    await runtime.close()
+
+
+@pytest.mark.asyncio
 async def test_workers_are_branch_isolated_and_partial_merge_is_preserved() -> None:
     requests = [
         ReadonlyWorkerRequest(
