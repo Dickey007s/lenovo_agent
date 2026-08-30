@@ -4,10 +4,12 @@ import asyncio
 from datetime import datetime, timezone
 import time
 
+import httpx
 import pytest
 from fastapi.routing import APIRoute
 
 from services.api.app.application.harness_runtime import (
+    HarnessConflictError,
     HarnessPlan,
     HarnessPlanCandidate,
     HarnessPlanCandidateUnit,
@@ -15,7 +17,10 @@ from services.api.app.application.harness_runtime import (
     HarnessRunStart,
     HarnessRuntime,
 )
-from packages.contracts.harness_models import AgentControlLoopControlRequest
+from packages.contracts.harness_models import (
+    AgentControlLoopArtifactFinding,
+    AgentControlLoopControlRequest,
+)
 from services.api.app.application.readonly_workers import (
     ReadonlyWorkerContribution,
     ReadonlyWorkerRequest,
@@ -25,6 +30,7 @@ from services.api.app.application.readonly_workers import (
 from services.api.app.application.topology_admission import admit_topology
 from packages.contracts.harness_models import AgentControlLoopNarrativeReconciliation
 from services.api.app.main import create_app
+from services.api.app.api.harness_routes import get_harness_runtime
 
 
 def _plan(*, risky: bool = False) -> HarnessPlan:
@@ -245,7 +251,16 @@ async def test_demo1_continuation_creates_child_run_with_exact_carried_branch_sc
     """A bounded terminal Run continues as a new Run, never as an in-place resume."""
     from tests.unit.test_harness_runtime import AlwaysUnlocatableAnalyst, FakeCatalog, FakePlanner
 
-    runtime = HarnessRuntime(FakeCatalog(), FakePlanner(), AlwaysUnlocatableAnalyst())
+    class RevisableCatalog(FakeCatalog):
+        revision = "revision-v1"
+
+        def internal_workspace(self) -> dict[str, object]:
+            workspace = super().internal_workspace()
+            workspace["dataset_version"] = self.revision
+            return workspace
+
+    catalog = RevisableCatalog()
+    runtime = HarnessRuntime(catalog, FakePlanner(), AlwaysUnlocatableAnalyst())
     started = await runtime.start(
         "alice",
         HarnessRunStart(
@@ -285,6 +300,7 @@ async def test_demo1_continuation_creates_child_run_with_exact_carried_branch_sc
     branch = next(item for item in terminal.branches if item.status != "completed")
     old_dump = terminal.model_dump(mode="json")
     expected_refs = tuple(branch.missing_file_refs or branch.input_file_refs)
+    catalog.revision = "revision-v2"
     child = await runtime.continue_unfinished_task(
         "alice",
         terminal.run_id,
@@ -297,7 +313,18 @@ async def test_demo1_continuation_creates_child_run_with_exact_carried_branch_sc
     assert child.run.run_sequence == terminal.run_sequence + 1
     assert tuple(child.run.recheck_file_refs) == expected_refs
     assert child.run.carried_branch_id == branch.branch_id
+    assert child.run.source_revision_changed is True
     assert terminal.model_dump(mode="json") == old_dump
+    with pytest.raises(HarnessConflictError, match="版本"):
+        await runtime.continue_unfinished_task(
+            "alice", terminal.run_id, branch.branch_id,
+            idempotency_key="demo1-child-stale-0001", expected_version=terminal.version - 1,
+        )
+    with pytest.raises(Exception, match="不存在"):
+        await runtime.continue_unfinished_task(
+            "bob", terminal.run_id, branch.branch_id,
+            idempotency_key="demo1-child-owner-0001", expected_version=terminal.version,
+        )
     replay = await runtime.continue_unfinished_task(
         "alice",
         terminal.run_id,
@@ -307,6 +334,53 @@ async def test_demo1_continuation_creates_child_run_with_exact_carried_branch_sc
     )
     assert replay.run.run_id == child.run.run_id
     await runtime.close()
+
+
+@pytest.mark.asyncio
+async def test_demo1_continuation_http_route_returns_same_task_child_run() -> None:
+    from tests.unit.test_harness_runtime import AlwaysUnlocatableAnalyst, FakeCatalog, FakePlanner
+
+    runtime = HarnessRuntime(FakeCatalog(), FakePlanner(), AlwaysUnlocatableAnalyst())
+    started = await runtime.start(
+        "alice",
+        HarnessRunStart(
+            idempotency_key="demo1-http-parent-0001",
+            instruction="为未完成分支创建连续任务",
+            loop={"max_rounds": 1, "max_files_per_round": 2, "max_model_calls": 6, "deadline_seconds": 120},
+        ),
+    )
+    terminal = None
+    for _ in range(500):
+        candidate = await runtime.get("alice", started.run.run_id)
+        if candidate.status in {"stopped", "failed", "completed"}:
+            terminal = candidate
+            break
+        await asyncio.sleep(0.01)
+    assert terminal is not None and terminal.status == "stopped"
+    branch = next(item for item in terminal.branches if item.status != "completed")
+    app = create_app()
+    app.dependency_overrides[get_harness_runtime] = lambda: runtime
+    try:
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app=app), base_url="http://test"
+        ) as client:
+            response = await client.post(
+                f"/v1/harness/runs/{terminal.run_id}/continue",
+                headers={"X-User-Id": "alice"},
+                json={
+                    "branch_id": branch.branch_id,
+                    "idempotency_key": "demo1-http-child-0001",
+                    "expected_version": terminal.version,
+                },
+            )
+        assert response.status_code == 202
+        child = response.json()["run"]
+        assert child["task_id"] == terminal.task_id
+        assert child["run_id"] != terminal.run_id
+        assert child["run_sequence"] == terminal.run_sequence + 1
+    finally:
+        app.dependency_overrides.clear()
+        await runtime.close()
 
 
 @pytest.mark.asyncio
@@ -361,6 +435,7 @@ async def test_five_unit_dag_runtime_advances_from_roots_to_second_worker_wave()
     assert waiting is not None
     assert waiting.topology_admission.mode == "adaptive_readonly_workers"
     by_unit = {item.unit_id: item for item in waiting.branches}
+    by_branch = {item.branch_id: item for item in waiting.branches}
     assert [by_unit[f"u{index}"].status for index in (1, 2, 3)] == ["running"] * 3
     assert [by_unit[f"u{index}"].status for index in (4, 5)] == ["pending"] * 2
 
@@ -374,6 +449,16 @@ async def test_five_unit_dag_runtime_advances_from_roots_to_second_worker_wave()
             evidence_anchors=("line:1",),
             model_called=True,
             output_used=True,
+            findings=(
+                AgentControlLoopArtifactFinding(
+                    finding_id=f"finding-{request.branch_id[-12:]}",
+                        plan_unit_id=by_branch[request.branch_id].unit_id,
+                    affected_branch_ids=[request.branch_id],
+                        title=f"{request.branch_id} 已核对",
+                    detail="该分支贡献已通过来源定位门。",
+                    file_refs=list(request.source_file_refs),
+                ),
+            ),
         )
 
     def requests_for(snapshot, unit_ids, suffix):
@@ -398,6 +483,7 @@ async def test_five_unit_dag_runtime_advances_from_roots_to_second_worker_wave()
     }
 
     by_unit = {item.unit_id: item for item in first.branches}
+    by_branch = {item.branch_id: item for item in first.branches}
     second = await runtime.execute_admitted_readonly_workers(
         "alice", started.run.run_id, expected_version=first.version,
         idempotency_key="five-unit-wave-0002", worker_requests=requests_for(first, ("u4", "u5"), "two"),
@@ -408,6 +494,8 @@ async def test_five_unit_dag_runtime_advances_from_roots_to_second_worker_wave()
     assert [item.version for item in second.artifact_versions] == [1, 2]
     assert [item.version for item in second.shared_artifacts] == [1, 2]
     assert len({item.artifact_id for item in second.artifact_versions}) == 1
+    assert second.artifact_versions[0].finding_count == 3
+    assert second.artifact_versions[1].finding_count == 5
 
 
 @pytest.mark.asyncio
@@ -649,3 +737,29 @@ def test_worker_merge_receipts_keep_prior_wave_and_align_versions() -> None:
     assert receipt_v2.version == 2
     assert receipt_v2.adopted_worker_run_ids == ("worker-wave-two",)
     assert receipt_v1.model_dump() != receipt_v2.model_dump()
+
+
+def test_worker_contribution_keeps_more_than_ten_findings_without_silent_top_n() -> None:
+    contribution = ReadonlyWorkerContribution(
+        worker_run_id="worker-many-findings",
+        branch_id="branch-many-findings",
+        outcome="adopted",
+        summary="保留全部逐项发现",
+        source_file_refs=("forte-1111111111111111",),
+        evidence_anchors=("line:1",),
+        model_called=True,
+        output_used=True,
+        findings=tuple(
+            AgentControlLoopArtifactFinding(
+                finding_id=f"finding-{index:012x}",
+                plan_unit_id="unit-many",
+                affected_branch_ids=["branch-many-findings"],
+                title=f"发现 {index}",
+                detail="逐项可审查事实",
+                file_refs=["forte-1111111111111111"],
+            )
+            for index in range(1, 12)
+        ),
+    )
+    merged = merge_adopted_contributions([contribution])
+    assert len(merged.adopted_contributions[0].findings) == 11

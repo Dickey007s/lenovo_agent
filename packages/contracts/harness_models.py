@@ -581,7 +581,10 @@ class AgentControlLoopArtifactVersion(StrictModel):
     status: Literal["draft", "verified", "committed"]
     round_number: int = Field(default=1, ge=1, le=24)
     summary: str = Field(min_length=1, max_length=3_000)
-    findings: list[AgentControlLoopArtifactFinding] = Field(default_factory=list, max_length=10)
+    # This is a governance bound, not a product-level "top N".  If a task
+    # exceeds it the scheduler must page work into another round rather than
+    # silently dropping findings.
+    findings: list[AgentControlLoopArtifactFinding] = Field(default_factory=list, max_length=96)
     follow_ups: list[str] = Field(default_factory=list, max_length=4)
     evidence_gaps: list[AgentControlLoopEvidenceGap] = Field(default_factory=list, max_length=20)
     source_file_refs: list[str] = Field(default_factory=list, max_length=20)

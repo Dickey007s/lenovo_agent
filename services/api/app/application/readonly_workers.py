@@ -47,7 +47,7 @@ class ReadonlyWorkerContribution(BaseModel):
     # mistaken for an authoritative Artifact effect.
     narrative_reconciliation: AgentControlLoopNarrativeReconciliation | None = None
     findings: tuple[AgentControlLoopArtifactFinding, ...] = Field(
-        default_factory=tuple, max_length=10
+        default_factory=tuple, max_length=96
     )
 
 

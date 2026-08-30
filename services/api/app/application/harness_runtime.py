@@ -250,7 +250,7 @@ class HarnessTaskResult(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     summary: str = Field(min_length=1, max_length=3_000)
-    findings: list[HarnessFinding] = Field(min_length=1, max_length=10)
+    findings: list[HarnessFinding] = Field(min_length=1, max_length=96)
     follow_ups: list[str] = Field(default_factory=list, max_length=8)
     review_required: Literal[True] = True
 
@@ -687,7 +687,7 @@ class OpenAICompatibleHarnessAnalyst:
             "不得把自拟具体方案写成当前结论。"
             "只能完成只读分析，不得声称发送、写入、审批或调用外部系统。"
             "不要输出思维链、内部推理、Prompt、工具日志或 Markdown 代码围栏。"
-            "覆盖通过范围内所有有业务意义的 findings；遵守服务端 schema 与本轮预算上限（findings 最多 10 条、follow_ups 最多 4 条），不要为了截断而省略第 4 条或第 5 条发现。没有必要时不要输出默认值字段。"
+            "覆盖通过范围内所有有业务意义的 findings；遵守服务端 schema 与本轮预算上限，不要为了截断而省略任何发现。没有必要时不要输出默认值字段。"
             "每条 finding 只输出 plan_unit_id、title、detail、fact_summary、impact、file_refs、evidence_quotes，"
             "仅在人必须决策时再加 review；不要输出 finding_id、affected_branch_ids、evidence_anchors 或 evidence_resolutions。"
             "结论存在不确定性时直接写入 summary。follow_ups 应给出基于当前证据、可由用户确认后作为新任务启动的具体推进建议，"
@@ -1064,6 +1064,7 @@ class HarnessRuntime:
         _carried_branch_id: str | None = None,
         _base_artifact_version: int | None = None,
         _base_task_commit: str | None = None,
+        _parent_expected_version: int | None = None,
     ) -> HarnessRunStartResult:
         workspace = self.get_internal_workspace()
         if workspace.get("workspace_id") != request.workspace_id:
@@ -1081,6 +1082,7 @@ class HarnessRuntime:
                     "carried_branch_id": _carried_branch_id,
                     "base_artifact_version": _base_artifact_version,
                     "base_task_commit": _base_task_commit,
+                    "parent_expected_version": _parent_expected_version,
                     "workspace_revision": current_workspace_revision,
                 },
                 ensure_ascii=False,
@@ -1102,6 +1104,11 @@ class HarnessRuntime:
                 if parent_run is None:
                     raise HarnessNotFoundError("续办的旧任务不存在")
                 parent = parent_run.snapshot
+                if (
+                    _parent_expected_version is not None
+                    and parent.version != _parent_expected_version
+                ):
+                    raise HarnessConflictError("旧任务版本已更新，请刷新后重试")
                 if parent.status not in {"stopped", "failed", "completed"}:
                     raise HarnessConflictError("只有已停止或已结束任务可以继续未完成任务")
                 source_revision_changed = parent.workspace_revision != current_workspace_revision
@@ -1277,6 +1284,7 @@ class HarnessRuntime:
             _carried_branch_id=branch.branch_id,
             _base_artifact_version=(old.artifact_versions[-1].version if old.artifact_versions else None),
             _base_task_commit=old.last_commit.commit_id if old.last_commit else None,
+            _parent_expected_version=expected_version,
         )
 
     async def execute_admitted_readonly_workers(
@@ -1391,7 +1399,7 @@ class HarnessRuntime:
             ]
             for finding in artifact_findings:
                 finding_by_id[finding.finding_id] = finding
-            artifact_findings = list(finding_by_id.values())[:10]
+            artifact_findings = list(finding_by_id.values())
             branch_by_id = {branch.branch_id: branch for branch in run.snapshot.branches}
             updated_by_id: dict[str, AgentControlLoopBranch] = {}
             updated_branches: list[AgentControlLoopBranch] = []
@@ -5400,7 +5408,7 @@ class HarnessRuntime:
         if unique_findings:
             result = HarnessTaskResult(
                 summary=summary,
-                findings=unique_findings[:10],
+                findings=unique_findings,
                 follow_ups=unique_follow_ups[:4],
                 review_required=True,
             )
