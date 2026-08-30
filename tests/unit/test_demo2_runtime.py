@@ -335,6 +335,9 @@ async def test_demo1_continuation_creates_child_run_with_exact_carried_branch_sc
     assert child.run.carried_branch_id == branch.branch_id
     assert child.run.source_revision_changed is True
     assert terminal.model_dump(mode="json") == old_dump
+    public_child = runtime.public_snapshot(child.run)
+    assert public_child.source_revision_changed is True
+    assert tuple(public_child.recheck_file_refs) == expected_refs
     with pytest.raises(HarnessConflictError, match="版本"):
         await runtime.continue_unfinished_task(
             "alice", terminal.run_id, branch.branch_id,
@@ -398,6 +401,8 @@ async def test_demo1_continuation_http_route_returns_same_task_child_run() -> No
         assert child["task_id"] == terminal.task_id
         assert child["run_id"] != terminal.run_id
         assert child["run_sequence"] == terminal.run_sequence + 1
+        assert child["source_revision_changed"] is False
+        assert child["recheck_file_refs"] == list(branch.missing_file_refs or branch.input_file_refs)
     finally:
         app.dependency_overrides.clear()
         await runtime.close()

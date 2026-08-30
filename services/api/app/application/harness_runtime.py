@@ -2703,6 +2703,8 @@ class HarnessRuntime:
             base_artifact_version=snapshot.base_artifact_version,
             base_task_commit=snapshot.base_task_commit,
             workspace_revision=snapshot.workspace_revision,
+            recheck_file_refs=snapshot.recheck_file_refs,
+            source_revision_changed=snapshot.source_revision_changed,
             owner_id=snapshot.owner_id,
             workspace_id=snapshot.workspace_id,
             status=snapshot.status,
