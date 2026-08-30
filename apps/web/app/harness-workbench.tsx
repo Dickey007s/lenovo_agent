@@ -4260,8 +4260,11 @@ export function HarnessWorkbench({ onActivityChange }: { onActivityChange?: (sta
   async function continueTask(branchId: string, instructionOverride?: string) {
     const current = runRef.current;
     if (!current || !workspace || !TERMINAL_STATUSES.has(current.status)) return false;
-    setStarting(true); setError(""); closeTransport();
-    const generation = generationRef.current + 1; generationRef.current = generation;
+    setStarting(true); setError("");
+    // Keep the parent's stream and generation alive while the child command is
+    // in flight. A failed/invalid request must leave the parent UI recoverable;
+    // only a validated child snapshot switches the active lineage.
+    const nextGeneration = generationRef.current + 1;
     try {
       const response = await fetch(`${API_BASE}/v1/harness/runs/${encodeURIComponent(current.run_id)}/continue`, {
         method: "POST", headers: HEADERS,
@@ -4279,12 +4282,14 @@ export function HarnessWorkbench({ onActivityChange }: { onActivityChange?: (sta
       // monotonic cursors only after a valid child snapshot is available so a
       // failed request leaves the parent Run rendered and recoverable.
       if (snapshot) {
+        closeTransport();
+        generationRef.current = nextGeneration;
         runRef.current = null;
         lastSequenceRef.current = 0;
       }
-      if (!snapshot || !applySnapshot(snapshot, generation)) throw new Error("续办任务回执格式无效");
+      if (!snapshot || !applySnapshot(snapshot, nextGeneration)) throw new Error("续办任务回执格式无效");
       setView("loop");
-      if (!TERMINAL_STATUSES.has(snapshot.status)) connectEvents(snapshot.run_id, generation, snapshot.last_event_sequence);
+      if (!TERMINAL_STATUSES.has(snapshot.status)) connectEvents(snapshot.run_id, nextGeneration, snapshot.last_event_sequence);
       return true;
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "任务没有继续");
