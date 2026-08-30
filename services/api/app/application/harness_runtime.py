@@ -63,6 +63,10 @@ from services.api.app.application.narrative_reconciliation import (
     reconcile_narrative,
 )
 from services.api.app.application.topology_admission import TopologyAdmission
+from services.api.app.application.readonly_workers import (
+    ReadonlyWorkerContribution,
+    SharedArtifactMerge,
+)
 from services.api.app.application.harness_storage import (
     HarnessStateStore,
     InMemoryHarnessStateStore,
@@ -350,8 +354,8 @@ class HarnessRunSnapshot(BaseModel):
     # Demo 2 is projected into the same unified Run cockpit.  Admission is a
     # server fact; worker execution remains explicitly confirmed and bounded.
     topology_admission: TopologyAdmission | None = None
-    worker_runs: list[dict[str, Any]] = Field(default_factory=list, max_length=3)
-    shared_artifacts: list[dict[str, Any]] = Field(default_factory=list, max_length=3)
+    worker_runs: list[ReadonlyWorkerContribution] = Field(default_factory=list, max_length=3)
+    shared_artifacts: list[SharedArtifactMerge] = Field(default_factory=list, max_length=3)
     worker_idempotency: dict[str, str] = Field(default_factory=dict, max_length=12)
 
 
@@ -477,8 +481,8 @@ class PublicHarnessRunSnapshot(BaseModel):
     validation_errors: list[str]
     events: list[HarnessEvent]
     topology_admission: TopologyAdmission | None = None
-    worker_runs: list[dict[str, Any]] = Field(default_factory=list, max_length=3)
-    shared_artifacts: list[dict[str, Any]] = Field(default_factory=list, max_length=3)
+    worker_runs: list[ReadonlyWorkerContribution] = Field(default_factory=list, max_length=3)
+    shared_artifacts: list[SharedArtifactMerge] = Field(default_factory=list, max_length=3)
 
 
 class PublicHarnessRunStartResult(BaseModel):
