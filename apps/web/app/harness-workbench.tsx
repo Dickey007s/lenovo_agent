@@ -4290,8 +4290,8 @@ export function HarnessWorkbench({ onActivityChange }: { onActivityChange?: (sta
       .filter((branch) => branch.status === "running" && (advertisedReady.size === 0 || advertisedReady.has(branch.branch_id)))
       .slice(0, 3)
       .map((branch) => branch.branch_id);
-    if (branchIds.length < 2) {
-      setError("没有足够的独立分支可启动只读 Worker");
+    if (branchIds.length < (current.worker_runs.length === 0 ? 2 : 1)) {
+      setError(current.worker_runs.length === 0 ? "没有足够的独立分支可启动只读 Worker" : "当前没有服务端标记为 ready 的分支");
       return false;
     }
     setStarting(true); setError("");
@@ -4602,8 +4602,8 @@ function LoopView({
     const branchInstruction = [
       run.instruction,
       `续办分支：${branch.title}`,
-      `本次以“${branch.objective}”作为任务目标。请从整个资料库自主查找完成这一目标所需的最小证据，逐条提供可唯一定位的原文位置。`,
-      sourceLabels.length > 0 ? `上次 Run 为该分支选择过：${sourceLabels.join("、")}。这些只是历史选择，不限制新 Run 重新检索整个资料库。` : "新 Run 仍可自主检索整个资料库。",
+      `本次只继续“${branch.objective}”这一未完成分支。服务端会冻结并核对该分支已批准的来源，逐条提供可唯一定位的原文位置。`,
+      sourceLabels.length > 0 ? `本分支批准来源：${sourceLabels.join("、")}。来源版本如有变化，只重新核对这些来源，不携带旧的采用事实。` : "本分支没有可携带的来源引用，将先停下等待服务端重新建立批准范围。",
       "若仍无法核对，请明确列出缺少的文件、版本、字段或记录，不要生成无法回到原文的结论。",
       userDirection ? `用户补充：${userDirection}` : "",
       "边界：只读分析，不修改原文件，不执行外部动作。",
@@ -4626,7 +4626,7 @@ function LoopView({
     </header>
     <section className="loop-lineage-strip" aria-label="任务时间线" data-testid="task-lineage">
       <div><span>任务时间线</span><strong>任务持续链 · Run {run.run_sequence}</strong></div>
-      <p>{run.parent_run_id ? `本次是第 ${run.run_sequence} 次运行，承接旧 Run 的 ${run.carried_branch_id ? "一个未完成分支" : "已批准成果引用"}。旧成果保留，当前资料库版本重新核对。` : "这是该任务的首次 Run；后续未完成分支可以创建新的 Run。"}</p>
+      <p>{run.parent_run_id ? `本次是第 ${run.run_sequence} 次运行，承接旧 Run 的 ${run.carried_branch_id ? "一个未完成分支" : "已批准成果引用"}。旧成果保留，本次只核对该未完成分支的批准来源。` : "这是该任务的首次 Run；后续未完成分支可以创建新的 Run。"}</p>
       {run.source_revision_changed && <p><b>来源版本已变化</b>：本段只重新核对批准分支材料，不携带旧的采用事实。</p>}
       {run.parent_run_id && <small>新 Run · 保留成果{run.base_artifact_version ? ` v${run.base_artifact_version}` : ""} · 不修改原文件 · 外部动作：未发生</small>}
     </section>
@@ -4657,7 +4657,7 @@ function LoopView({
       <div className="source-recovery-facts"><span><b>只影响</b>{terminalRecoveryBranches.length} 条尚未完成的分支</span><span><b>已保留</b>Plan、调用回执、分支状态与{preservedArtifactVersion ? `成果 v${preservedArtifactVersion}` : "阶段成果"}</span><span><b>未发生</b>原文件修改或外部动作</span></div>
       <label><span>补充给新任务的方向（可选）</span><textarea value={recoveryDraft} onChange={(event) => setRecoveryDraft(event.target.value)} placeholder="例如：先核对上线配置清单与功能测试报告中的版本和日期字段" /></label>
       <div className="source-recovery-branches">{terminalRecoveryBranches.map((branch, index) => <article key={branch.branch_id}><div><b>{index === 0 ? "最小续办分支" : "可单独续办"}</b><h4>{branch.title}</h4><p>{branch.objective}</p><small>{branch.input_file_refs.length > 0 ? branch.input_file_refs.map(fileLabel).join(" · ") : "由 Agent 在整个资料库中重新选证"}</small></div><button type="button" disabled={starting} onClick={() => void onContinueTask(branch.branch_id, recoveryDraft.trim() || branch.objective)}><IconRefresh aria-hidden="true" />{starting ? "正在创建" : "继续未完成任务"}</button></article>)}</div>
-      <footer><IconShieldCheck aria-hidden="true" /><span>这是新的 Task Contract，不会覆盖或假装续跑旧 Run；新 Run 仍由服务端冻结整库索引并重新校验证据。</span></footer>
+      <footer><IconShieldCheck aria-hidden="true" /><span>这是同一任务的新 Run，不会覆盖或假装续跑旧 Run；只核对该未完成分支的批准来源，旧成果和回执保持不变。</span></footer>
     </section>}
     {!boundedTerminalRecovery && <section className="loop-controls" aria-label="人工控制">
       <div className="loop-control-actions">

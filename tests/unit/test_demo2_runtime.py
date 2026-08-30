@@ -343,6 +343,33 @@ async def test_worker_source_scope_violation_is_rejected_and_branch_waits() -> N
     assert merged.waiting_branch_ids == ("branch-scope",)
 
 
+@pytest.mark.asyncio
+async def test_worker_adoption_gate_normalizes_missing_anchor_to_rejected() -> None:
+    request = ReadonlyWorkerRequest(
+        worker_run_id="worker-no-anchor",
+        branch_id="branch-no-anchor",
+        goal="核对资料",
+        source_file_refs=("forte-1111111111111111",),
+        expected_version=1,
+    )
+
+    async def handler(_: ReadonlyWorkerRequest) -> ReadonlyWorkerContribution:
+        return ReadonlyWorkerContribution(
+            worker_run_id="worker-no-anchor",
+            branch_id="branch-no-anchor",
+            outcome="adopted",
+            summary="模型返回但没有可定位 Anchor",
+            source_file_refs=("forte-1111111111111111",),
+            model_called=True,
+            output_used=True,
+        )
+
+    result = (await execute_readonly_workers([request], handler))[0]
+    assert result.outcome == "rejected"
+    assert result.output_used is False
+    assert result.error is not None
+
+
 def test_worker_merge_is_a_normal_artifact_and_keeps_reconciliation_receipt() -> None:
     reconciliation = AgentControlLoopNarrativeReconciliation(
         reconciliation_id="narrative-reconciliation-0123456789ab",
@@ -421,3 +448,33 @@ def test_rejected_narrative_or_missing_anchor_never_enters_merge() -> None:
     merged = merge_adopted_contributions([result])
     assert merged.adopted_worker_run_ids == ()
     assert merged.waiting_branch_ids == ("branch-rejected",)
+
+
+def test_worker_merge_receipts_keep_prior_wave_and_align_versions() -> None:
+    wave_one = ReadonlyWorkerContribution(
+        worker_run_id="worker-wave-one",
+        branch_id="branch-wave-one",
+        outcome="adopted",
+        summary="第一批已核对",
+        source_file_refs=("forte-1111111111111111",),
+        evidence_anchors=("line:1",),
+        model_called=True,
+        output_used=True,
+    )
+    wave_two = ReadonlyWorkerContribution(
+        worker_run_id="worker-wave-two",
+        branch_id="branch-wave-two",
+        outcome="adopted",
+        summary="第二批已核对",
+        source_file_refs=("forte-2222222222222222",),
+        evidence_anchors=("line:2",),
+        model_called=True,
+        output_used=True,
+    )
+    receipt_v1 = merge_adopted_contributions([wave_one], version=1)
+    receipt_v2 = merge_adopted_contributions([wave_two], version=2)
+    assert receipt_v1.version == 1
+    assert receipt_v1.adopted_worker_run_ids == ("worker-wave-one",)
+    assert receipt_v2.version == 2
+    assert receipt_v2.adopted_worker_run_ids == ("worker-wave-two",)
+    assert receipt_v1.model_dump() != receipt_v2.model_dump()
