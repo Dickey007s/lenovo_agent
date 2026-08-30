@@ -4779,6 +4779,9 @@ test.describe("Demo 1/2 runtime acceptance", () => {
     expect(continuationRequest.postDataJSON()).toMatchObject({ branch_id: "branch-222222222222" });
     await expect(page.locator('[data-testid="task-lineage"]')).toContainText("任务持续链 · Run 2");
     await expect(page.locator('[data-testid="task-lineage"]')).toContainText("本次只核对该未完成分支的批准来源");
+    const lineageTextSizes = await page.locator('[data-testid="task-lineage"] span, [data-testid="task-lineage"] strong, [data-testid="task-lineage"] p, [data-testid="task-lineage"] small').evaluateAll((nodes) => nodes.map((node) => Number.parseFloat(getComputedStyle(node).fontSize)));
+    expect(lineageTextSizes.length).toBeGreaterThan(0);
+    expect(Math.min(...lineageTextSizes)).toBeGreaterThanOrEqual(13);
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
     expect(overflow).toBeLessThanOrEqual(0);
   });
@@ -4792,6 +4795,9 @@ test.describe("Demo 1/2 runtime acceptance", () => {
     const admission = page.locator('[data-testid="topology-admission"]');
     await expect(admission).toContainText("已准入受限只读 Workers");
     await expect(admission).toContainText("3 条独立分支可并行");
+    const admissionTextSizes = await admission.locator('h3, header > b, .loop-topology-facts, .loop-topology-facts b, .loop-worker-receipts > span, .loop-worker-receipts > div, .loop-worker-receipts small').evaluateAll((nodes) => nodes.map((node) => Number.parseFloat(getComputedStyle(node).fontSize)));
+    expect(admissionTextSizes.length).toBeGreaterThan(0);
+    expect(Math.min(...admissionTextSizes)).toBeGreaterThanOrEqual(12);
     await expect(admission.getByRole("button", { name: "确认并启动只读 Worker" })).toBeEnabled();
     await admission.getByRole("button", { name: "确认并启动只读 Worker" }).click();
     await expect(admission).toContainText("实际 Worker 回执");
@@ -4803,6 +4809,8 @@ test.describe("Demo 1/2 runtime acceptance", () => {
     await page.setViewportSize({ width: 390, height: 844 });
     const mobileOverflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
     expect(mobileOverflow).toBeLessThanOrEqual(0);
+    const mobileAdmissionSizes = await admission.locator('.loop-topology-facts, .loop-worker-receipts > div, .loop-worker-receipts small').evaluateAll((nodes) => nodes.map((node) => Number.parseFloat(getComputedStyle(node).fontSize)));
+    expect(Math.min(...mobileAdmissionSizes)).toBeGreaterThanOrEqual(12);
     await expect(admission.getByText("实际 Worker 回执")).toBeVisible();
   });
 });
