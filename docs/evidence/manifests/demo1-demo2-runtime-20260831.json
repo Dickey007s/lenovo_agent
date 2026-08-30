@@ -1,0 +1,24 @@
+{
+  "kind": "raw_runtime_evidence_manifest",
+  "captured_at": "2026-08-31",
+  "branch": "codex/demo1-demo2-runtime-20260830",
+  "commits": {
+    "demo1": "9d98fc5b3a6994e2f2719ee4992d0055db6536d8",
+    "demo2": "cfdbeb25179059e7638639e4e3c98433ec7793a5"
+  },
+  "tests": {
+    "demo2_unit": "uv run pytest -q tests/unit/test_demo2_runtime.py (6 passed)",
+    "focused_runtime": "uv run pytest -q tests/unit/test_demo2_runtime.py tests/unit/test_harness_runtime.py (54 passed)",
+    "ruff": "uv run ruff check services/api/app/application/harness_runtime.py (passed)"
+  },
+  "scope": [
+    "Demo 1 task identity and terminal Branch continuation contract",
+    "Demo 2 deterministic topology admission and explicitly confirmed bounded read-only workers"
+  ],
+  "not_verified": [
+    "provider-backed FORTE live run",
+    "PostgreSQL restart gate",
+    "390px/1440px browser E2E"
+  ],
+  "external_action": "none"
+}
