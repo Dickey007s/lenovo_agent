@@ -1356,6 +1356,10 @@ class HarnessRuntime:
                     "budget": budget.model_copy(
                         update={"model_calls_used": budget.model_calls_used + len(worker_requests)}
                     ),
+                    # Reserve the calls as a versioned state transition.  A
+                    # second dispatch carrying the same expected_version must
+                    # fail before it can start another set of workers.
+                    "version": run.snapshot.version + 1,
                     "updated_at": datetime.now(timezone.utc),
                 }
             )
