@@ -2,7 +2,7 @@
   "manifest_version": "demo1-demo2-runtime-evidence.validated-v2",
   "captured_at": "2026-08-31",
   "branch": "codex/demo1-demo2-runtime-20260830",
-  "code_head": "543d91b",
+  "code_head": "756e88c",
   "evidence_commit": null,
   "evidence_commit_status": "pending_manifest_commit",
   "scope": "Demo 1/2 源码、自动化验证与原始运行门；未修改 living docs、PPT 或 FORTE 原始输入",
@@ -35,9 +35,9 @@
     },
     "demo1_demo2_postgres_integration": {
       "command": "uv run pytest -q tests/integration/test_postgres_demo1_demo2.py",
-      "collected": 2,
+      "collected": 3,
       "passed": 0,
-      "skipped": 2,
+      "skipped": 3,
       "failed": 0,
       "status": "blocked_external",
       "reason": "本机未提供 TEST_DATABASE_DSN；无 docker/psql。测试已提交，CI/配置 DSN 后执行。"
