@@ -236,6 +236,10 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, summary:focus
 .loop-worker-receipts > div { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 8px; align-items: baseline; padding-top: 5px; border-top: 1px solid #edf1f5; font-size: 11px; }
 .loop-worker-receipts > div > b { color: var(--green, #247443); }
 .loop-worker-receipts small { font-size: 10px; white-space: nowrap; }
+.loop-worker-confirmation { display: grid; gap: 8px; margin-top: 8px; }
+.loop-worker-confirmation > div { display: flex; flex-wrap: wrap; gap: 8px; }
+.loop-worker-confirmation button { display: inline-flex; align-items: center; gap: 5px; }
+.loop-worker-confirmation .is-secondary { background: #fff; color: var(--ink); border-color: var(--line); }
 .loop-contract { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; padding: 15px; border-bottom: 1px solid var(--line); background: #f8fbff; }
 .loop-contract > div:first-child { min-width: 0; }
 .loop-contract span, .loop-round-detail > header span, .loop-round-files > span, .loop-round-result > span, .loop-gap > header span, .loop-round-detail > footer span, .loop-brief span { color: var(--blue); font-size: 11px; font-weight: 750; }

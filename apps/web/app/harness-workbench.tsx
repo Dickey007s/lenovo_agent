@@ -1250,6 +1250,9 @@ const NAMED_EVENTS = [
   "plan_validation_rejected",
   "plan_validation",
   "topology_admission",
+  "topology_confirmation_required",
+  "worker_completed",
+  "worker_failed",
   "topology_workers_completed",
   "ready_to_execute",
   "analysis_started",
@@ -4272,6 +4275,39 @@ export function HarnessWorkbench({ onActivityChange }: { onActivityChange?: (sta
     } finally { setStarting(false); }
   }
 
+  async function executeWorkers() {
+    const current = runRef.current;
+    if (!current || current.topology_admission?.mode !== "adaptive_readonly_workers") return false;
+    const branchIds = current.branches
+      .filter((branch) => ["running", "waiting_input"].includes(branch.status))
+      .slice(0, 3)
+      .map((branch) => branch.branch_id);
+    if (branchIds.length < 2) {
+      setError("没有足够的独立分支可启动只读 Worker");
+      return false;
+    }
+    setStarting(true); setError("");
+    try {
+      const response = await fetch(`${API_BASE}/v1/harness/runs/${encodeURIComponent(current.run_id)}/workers`, {
+        method: "POST", headers: HEADERS,
+        body: JSON.stringify({
+          branch_ids: branchIds,
+          expected_version: current.version,
+          idempotency_key: `workers-${randomKey()}`,
+          confirmed: true,
+        }),
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(asText((payload as Record<string, unknown>).detail, "只读 Worker 没有启动"));
+      const snapshot = normalizeRun(payload);
+      if (!snapshot || !applySnapshot(snapshot, generationRef.current)) throw new Error("Worker 回执格式无效");
+      return true;
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "只读 Worker 没有启动");
+      return false;
+    } finally { setStarting(false); }
+  }
+
   async function controlLoop(command: LoopCommand, options: LoopControlOptions = {}) {
     const current = runRef.current;
     if (!current || (TERMINAL_STATUSES.has(current.status) && !["rollback", "decision"].includes(command))) return false;
@@ -4398,7 +4434,7 @@ export function HarnessWorkbench({ onActivityChange }: { onActivityChange?: (sta
         </nav>
         <div className="workspace-content">
           {view === "data" && <FilePreview preview={preview} file={activeFile} loading={previewLoading} error={previewError} />}
-          {view === "loop" && <LoopView run={run} files={allFiles} controlBusy={controlBusy} onControl={controlLoop} onReview={setReviewRequest} onStartTask={startTask} onContinueTask={continueTask} starting={starting} />}
+          {view === "loop" && <LoopView run={run} files={allFiles} controlBusy={controlBusy} onControl={controlLoop} onReview={setReviewRequest} onStartTask={startTask} onContinueTask={continueTask} onExecuteWorkers={executeWorkers} starting={starting} />}
           {view === "result" && <ResultView result={run?.result ?? null} artifacts={run?.artifact_versions ?? []} workspaceArtifacts={run?.workspace_artifacts ?? []} receipts={run?.effect_receipts ?? []} reconciliation={run?.narrative_reconciliation ?? null} commit={run?.last_commit ?? null} decisions={run?.decision_records ?? []} decisionRequests={run?.decision_requests ?? []} files={allFiles} onOpenFile={openFile} onReview={setReviewRequest} onStartTask={startTask} starting={starting} />}
         </div>
         <details className="workspace-boundary"><summary><IconShieldCheck aria-hidden="true" />数据与执行边界</summary><p>{workspace.data_boundary} Agent 可以检索整个资料库，但每轮只读取服务端校验通过且受预算约束的文件；本轮不会修改原文件或执行外部动作。</p></details>
@@ -4444,6 +4480,7 @@ function LoopView({
   onReview,
   onStartTask,
   onContinueTask,
+  onExecuteWorkers,
   starting,
 }: {
   run: HarnessRun | null;
@@ -4453,6 +4490,7 @@ function LoopView({
   onReview: (request: EvidenceReviewRequest) => void;
   onStartTask: (instruction: string) => Promise<boolean>;
   onContinueTask: (branchId: string, instruction?: string) => Promise<boolean>;
+  onExecuteWorkers: () => Promise<boolean>;
   starting: boolean;
 }) {
   const [selectedRoundNumber, setSelectedRoundNumber] = useState(1);
@@ -4587,7 +4625,13 @@ function LoopView({
       <header><div><span>服务端拓扑准入</span><h3>{run.topology_admission.mode === "adaptive_readonly_workers" ? "已准入受限只读 Workers" : run.topology_admission.mode === "fixed_workflow" ? "采用固定工作流" : "保持单 Controller"}</h3></div><b>{run.topology_admission.independent_branch_count} 条独立分支</b></header>
       <p>{run.topology_admission.reasons[run.topology_admission.reasons.length - 1] || "依据已校验计划选择执行方式。"}</p>
       <div className="loop-topology-facts"><span><b>{run.topology_admission.work_unit_breadth}</b> 工作包</span><span><b>{run.topology_admission.source_span}</b> 份来源</span><span><b>{run.topology_admission.remaining_model_calls}</b> 次剩余调用</span><span><b>{run.topology_admission.remaining_time_seconds}</b> 秒剩余时间</span><span>外部动作：<b>未发生</b></span></div>
-      {run.topology_admission.mode === "adaptive_readonly_workers" && run.worker_runs.length === 0 && <small>执行与准入分开；只有你明确确认后才会调用最多 3 个 Worker。</small>}
+      {run.topology_admission.mode === "adaptive_readonly_workers" && run.worker_runs.length === 0 && <div className="loop-worker-confirmation">
+        <small>执行与准入分开；只有你明确确认后才会调用最多 3 个 Worker。当前不会自动调用 Analyst。</small>
+        <div>
+          <button type="button" onClick={() => void onExecuteWorkers()} disabled={starting || run.status !== "waiting_input"}><IconPlayerPlay aria-hidden="true" />{starting ? "正在启动" : "确认并启动只读 Worker"}</button>
+          <button type="button" className="is-secondary" onClick={() => void onStartTask(run.instruction)} disabled={starting}><IconRoute aria-hidden="true" />改回单 Controller</button>
+        </div>
+      </div>}
       {run.worker_runs.length > 0 && <div className="loop-worker-receipts"><span>实际 Worker 回执</span>{run.worker_runs.map((worker) => <div key={worker.worker_run_id}><b>{worker.outcome === "adopted" ? "已合入" : worker.outcome === "failed" ? "执行失败" : "待处理"}</b><span>{worker.summary}</span><small>{worker.model_called ? "模型已调用" : "未调用"} · {worker.output_used ? "已采用" : "未采用"} · {worker.elapsed_ms} ms</small></div>)}</div>}
     </section>}
     {run.status === "failed" && <section className="loop-failure-recovery" role="alert">

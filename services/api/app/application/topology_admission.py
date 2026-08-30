@@ -58,6 +58,9 @@ def admit_topology(
     elif risky:
         mode = "fixed_workflow"
         reasons.append("计划包含人工门或副作用意图，先使用固定流程，不启动只读 Worker。")
+    elif independent > 3:
+        mode = "fixed_workflow"
+        reasons.append("独立分支超过 3 条受限 Worker 上限，保持固定流程并分批核对。")
     elif remaining_model_calls < independent + 1:
         mode = "fixed_workflow"
         reasons.append("剩余模型调用不足以覆盖独立分支及合入校验，保持固定流程。")

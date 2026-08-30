@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+from datetime import datetime, timezone
 
 import pytest
 from fastapi.routing import APIRoute
@@ -13,6 +14,7 @@ from services.api.app.application.readonly_workers import (
     merge_adopted_contributions,
 )
 from services.api.app.application.topology_admission import admit_topology
+from packages.contracts.harness_models import AgentControlLoopNarrativeReconciliation
 from services.api.app.main import create_app
 
 
@@ -45,13 +47,31 @@ def test_admission_uses_validated_facts_and_never_admits_risky_workers() -> None
     assert admitted.mode == "adaptive_readonly_workers"
     assert admitted.independent_branch_count == 2
     assert admitted.external_action == "none"
+    assert admitted.user_confirmation_required is True
 
     fixed = admit_topology(_plan(risky=True), remaining_model_calls=8, remaining_time_seconds=120)
     assert fixed.mode == "fixed_workflow"
+    assert fixed.user_confirmation_required is False
     assert any("人工门" in reason or "副作用" in reason for reason in fixed.reasons)
 
     low_budget = admit_topology(_plan(), remaining_model_calls=1, remaining_time_seconds=120)
     assert low_budget.mode == "fixed_workflow"
+
+    oversized = HarnessPlan(
+        summary="四个只读工作包",
+        selection_reason="服务端验证",
+        units=[
+            HarnessPlanUnit(
+                unit_id=f"u{index}",
+                title=f"工作包 {index}",
+                objective="独立核对资料",
+                input_file_refs=[f"forte-{index:016x}"],
+                tool="file.read",
+            )
+            for index in range(4)
+        ],
+    )
+    assert admit_topology(oversized, remaining_model_calls=20, remaining_time_seconds=120).mode == "fixed_workflow"
 
 
 def test_single_controller_is_selected_when_only_one_independent_branch_exists() -> None:
@@ -175,3 +195,56 @@ async def test_worker_source_scope_violation_is_rejected_and_branch_waits() -> N
     merged = merge_adopted_contributions([result])
     assert merged.adopted_worker_run_ids == ()
     assert merged.waiting_branch_ids == ("branch-scope",)
+
+
+def test_worker_merge_is_a_normal_artifact_and_keeps_reconciliation_receipt() -> None:
+    reconciliation = AgentControlLoopNarrativeReconciliation(
+        reconciliation_id="narrative-reconciliation-0123456789ab",
+        round_number=1,
+        status="not_applicable",
+        authority="model_only",
+        model_disposition="adopted",
+        model_returned=True,
+        message="没有确定性成果，保留模型回执供审阅。",
+        checked_at=datetime.now(timezone.utc),
+    )
+    results = [
+        ReadonlyWorkerContribution(
+            worker_run_id="worker-success-1",
+            branch_id="branch-success-1",
+            outcome="adopted",
+            summary="已通过 Anchor 核对",
+            source_file_refs=("forte-1111111111111111",),
+            evidence_anchors=("line:1",),
+            model_called=True,
+            output_used=True,
+            narrative_reconciliation=reconciliation,
+        ),
+        ReadonlyWorkerContribution(
+            worker_run_id="worker-success-2",
+            branch_id="branch-success-2",
+            outcome="adopted",
+            summary="已通过 Anchor 核对",
+            source_file_refs=("forte-2222222222222222",),
+            evidence_anchors=("line:2",),
+            model_called=True,
+            output_used=True,
+            narrative_reconciliation=reconciliation,
+        ),
+        ReadonlyWorkerContribution(
+            worker_run_id="worker-ambiguous",
+            branch_id="branch-ambiguous",
+            outcome="ambiguous",
+            summary="原文位置不唯一",
+            source_file_refs=("forte-3333333333333333",),
+            model_called=True,
+            output_used=False,
+            narrative_reconciliation=reconciliation,
+        ),
+    ]
+    merged = merge_adopted_contributions(results, version=3)
+    assert merged.artifact_id.startswith("artifact-")
+    assert merged.version == 3
+    assert merged.adopted_worker_run_ids == ("worker-success-1", "worker-success-2")
+    assert merged.waiting_branch_ids == ("branch-ambiguous",)
+    assert all(item.narrative_reconciliation is not None for item in results)

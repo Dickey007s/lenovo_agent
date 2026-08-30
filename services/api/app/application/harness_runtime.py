@@ -1331,10 +1331,58 @@ class HarnessRuntime:
             run = self._require_run(owner_id, run_id)
             if run.snapshot.version != expected_version:
                 raise HarnessConflictError("任务版本已更新，Worker 结果未合入")
+            artifact: AgentControlLoopArtifactVersion | None = None
+            task_commit: AgentControlLoopCommit | None = None
+            artifact_versions = list(run.snapshot.artifact_versions)
+            commits = list(run.snapshot.commits)
+            last_commit = run.snapshot.last_commit
+            if merged.adopted_contributions and len(artifact_versions) < 24:
+                artifact_version = len(artifact_versions) + 1
+                source_refs = sorted(
+                    {
+                        ref
+                        for item in merged.adopted_contributions
+                        for ref in item.source_file_refs
+                    }
+                )[:20]
+                artifact = AgentControlLoopArtifactVersion(
+                    artifact_id=merged.artifact_id,
+                    version=artifact_version,
+                    title="只读 Worker 合入简报",
+                    status="committed",
+                    round_number=(run.snapshot.rounds[-1].round_number if run.snapshot.rounds else 1),
+                    summary=(
+                        f"服务端仅合入 {len(merged.adopted_contributions)} 条通过来源定位的只读 Worker 贡献；"
+                        "其余分支仍保持待处理。"
+                    ),
+                    source_file_refs=source_refs,
+                    finding_count=0,
+                    parent_version=artifact_versions[-1].version if artifact_versions else None,
+                    created_at=now,
+                )
+                commit_id = "commit-" + hashlib.sha256(
+                    f"{run_id}:worker:{artifact.artifact_id}:{artifact.version}".encode("utf-8")
+                ).hexdigest()[:12]
+                task_commit = AgentControlLoopCommit(
+                    commit_id=commit_id,
+                    artifact_id=artifact.artifact_id,
+                    artifact_version=artifact.version,
+                    operation="commit",
+                    parent_commit_id=last_commit.commit_id if last_commit else None,
+                    summary="已将通过来源与 Anchor 核对的只读 Worker 贡献写入逻辑成果版本。",
+                    committed_at=now,
+                )
+                artifact_versions.append(artifact)
+                commits.append(task_commit)
+                last_commit = task_commit
+                merged_payload["version"] = artifact.version
             run.snapshot = run.snapshot.model_copy(
                 update={
                     "worker_runs": worker_payload,
                     "shared_artifacts": [merged_payload],
+                    "artifact_versions": artifact_versions,
+                    "commits": commits,
+                    "last_commit": last_commit,
                     "worker_idempotency": {
                         **run.snapshot.worker_idempotency,
                         idempotency_key: digest,
@@ -1343,7 +1391,11 @@ class HarnessRuntime:
                     "version": run.snapshot.version + 1,
                 }
             )
-            await self._persist_locked(run)
+            await self._persist_locked(
+                run,
+                artifact_version=artifact,
+                task_commit=task_commit,
+            )
             if not hasattr(self, "_worker_idempotent"):
                 self._worker_idempotent = {}
             self._worker_idempotent[(owner_id, run_id, idempotency_key)] = (
@@ -1351,6 +1403,25 @@ class HarnessRuntime:
                 run.snapshot.model_copy(deep=True),
             )
             current_status = run.snapshot.status
+        # Keep a per-worker ordered receipt in the same event stream as the
+        # group merge.  A reconnecting cockpit can therefore show which
+        # Branch failed without treating the whole batch as failed.
+        for contribution in contributions:
+            await self._transition(
+                owner_id,
+                run_id,
+                current_status,
+                "worker_completed" if contribution.outcome == "adopted" else "worker_failed",
+                contribution.summary,
+                {
+                    "worker_run_id": contribution.worker_run_id,
+                    "branch_id": contribution.branch_id,
+                    "outcome": contribution.outcome,
+                    "model_called": contribution.model_called,
+                    "output_used": contribution.output_used,
+                    "external_action": False,
+                },
+            )
         await self._transition(
             owner_id,
             run_id,
@@ -1364,7 +1435,13 @@ class HarnessRuntime:
                 "external_action": False,
             },
         )
-        return await self.get(owner_id, run_id)
+        latest = await self.get(owner_id, run_id)
+        if hasattr(self, "_worker_idempotent"):
+            self._worker_idempotent[(owner_id, run_id, idempotency_key)] = (
+                digest,
+                latest.model_copy(deep=True),
+            )
+        return latest
 
     async def execute_admitted_workers_from_branches(
         self,
@@ -1431,6 +1508,14 @@ class HarnessRuntime:
                 request.goal,
             )
             adopted = resolution.result is not None and not resolution.evidence_resolutions
+            reconciliation = reconcile_narrative(
+                run_id=run_id,
+                round_number=branch.round_number,
+                result=resolution.result,
+                context_used=None,
+                current_context=None,
+                checked_at=datetime.now(timezone.utc),
+            )
             anchors = tuple(
                 f"{anchor.file_ref}:{anchor.locator_kind}:{anchor.start}-{anchor.end}"
                 for finding in (resolution.result.findings if resolution.result else [])
@@ -1446,6 +1531,7 @@ class HarnessRuntime:
                 model_called=True,
                 output_used=adopted,
                 elapsed_ms=int((perf_counter() - started) * 1000),
+                narrative_reconciliation=reconciliation,
             )
 
         return await self.execute_admitted_readonly_workers(
@@ -2935,6 +3021,30 @@ class HarnessRuntime:
                         0, contract.deadline_seconds - (await self.get(owner_id, run_id)).budget.elapsed_ms // 1000
                     ),
                 )
+                # Adaptive admission is a deliberately separate, user-gated
+                # route.  Do not continue into the ordinary Analyst path (or
+                # deterministic effects) until the cockpit posts an explicit
+                # Worker confirmation.  Conservative routes remain automatic.
+                admitted = (await self.get(owner_id, run_id)).topology_admission
+                if (
+                    admitted is not None
+                    and admitted.mode == "adaptive_readonly_workers"
+                    and admitted.user_confirmation_required
+                ):
+                    await self._transition(
+                        owner_id,
+                        run_id,
+                        "waiting_input",
+                        "topology_confirmation_required",
+                        "拓扑已准入受限只读 Worker；等待用户明确确认后才会调用 Analyst Worker。",
+                        {
+                            "mode": admitted.mode,
+                            "independent_branch_count": admitted.independent_branch_count,
+                            "worker_limit": 3,
+                            "external_action": False,
+                        },
+                    )
+                    return
                 await self._set_model_receipt(owner_id, run_id, adopted_receipt)
                 await self._update_round(
                     owner_id,

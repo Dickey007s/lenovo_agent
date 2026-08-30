@@ -10,6 +10,8 @@ from typing import Awaitable, Callable, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from packages.contracts.harness_models import AgentControlLoopNarrativeReconciliation
+
 
 class ReadonlyWorkerRequest(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
@@ -37,12 +39,18 @@ class ReadonlyWorkerContribution(BaseModel):
     output_used: bool = False
     elapsed_ms: int = Field(default=0, ge=0)
     error: str | None = Field(default=None, max_length=500)
+    # Every model receipt is reconciled, even when no deterministic effect is
+    # available.  ``model_only`` is intentionally visible so it cannot be
+    # mistaken for an authoritative Artifact effect.
+    narrative_reconciliation: AgentControlLoopNarrativeReconciliation | None = None
 
 
 class SharedArtifactMerge(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    artifact_id: str
+    # This is the id of the normal logical ArtifactVersion, not a second
+    # worker-only artifact namespace.
+    artifact_id: str = Field(pattern=r"^artifact-[0-9a-f]{12}$")
     version: int = Field(ge=1)
     adopted_worker_run_ids: tuple[str, ...] = Field(default_factory=tuple, max_length=3)
     adopted_contributions: tuple[ReadonlyWorkerContribution, ...] = Field(default_factory=tuple, max_length=3)
@@ -116,7 +124,7 @@ def merge_adopted_contributions(
         json.dumps([item.model_dump(mode="json") for item in adopted], sort_keys=True).encode()
     ).hexdigest()[:12]
     return SharedArtifactMerge(
-        artifact_id=f"shared-artifact-{digest}",
+        artifact_id=f"artifact-{digest}",
         version=version,
         adopted_worker_run_ids=tuple(item.worker_run_id for item in adopted),
         adopted_contributions=adopted,
