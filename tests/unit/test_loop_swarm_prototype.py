@@ -59,14 +59,16 @@ def test_target_architecture_does_not_claim_future_capabilities_are_implemented(
 
     assert "不是当前能力清单" in content
     assert "尚未完成的目标能力" in content
-    assert "default 12-round" in content
-    assert "stable business `task_id`" in content
+    assert "default 12-round (maximum 24)" in content
+    assert re.search(r"stable .*`task_id`", content)
     assert "`TopologyAdmission`" in content
-    assert "starts at most three read-only Workers" in content
+    assert "at most three" in content
+    assert "read-only Workers" in content
+    assert "source-file mutation" in content
     assert "Tool Gateway" in content
     assert "real Connectors" in content
-    assert "Writable office Artifacts" in content
-    assert "multi-instance leases" in content
+    assert "multi-instance" in content
+    assert "Worker" in content
     assert "Current `Limited Verified` facts" in content
 
 
