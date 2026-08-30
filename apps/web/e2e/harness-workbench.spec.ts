@@ -2553,7 +2553,7 @@ function demo1ContinuationSnapshot(body: { workspace_id: string; instruction: st
     base_task_commit: "commit-demo1-parent",
     workspace_revision: "workspace-rev-demo1",
     recheck_file_refs: [workflowFile.file_ref],
-    source_revision_changed: false,
+    source_revision_changed: true,
     status: "planning",
     control_state: "running",
     version: 1,
@@ -4779,6 +4779,8 @@ test.describe("Demo 1/2 runtime acceptance", () => {
     expect(continuationRequest.postDataJSON()).toMatchObject({ branch_id: "branch-222222222222" });
     await expect(page.locator('[data-testid="task-lineage"]')).toContainText("任务持续链 · Run 2");
     await expect(page.locator('[data-testid="task-lineage"]')).toContainText("本次只核对该未完成分支的批准来源");
+    await expect(page.locator('[data-testid="task-lineage"]')).toContainText("来源版本已变化");
+    await expect(page.locator('[data-testid="task-lineage"]')).toContainText("不携带旧的采用事实");
     const lineageTextSizes = await page.locator('[data-testid="task-lineage"] span, [data-testid="task-lineage"] strong, [data-testid="task-lineage"] p, [data-testid="task-lineage"] small').evaluateAll((nodes) => nodes.map((node) => Number.parseFloat(getComputedStyle(node).fontSize)));
     expect(lineageTextSizes.length).toBeGreaterThan(0);
     expect(Math.min(...lineageTextSizes)).toBeGreaterThanOrEqual(13);
