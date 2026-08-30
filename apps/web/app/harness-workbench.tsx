@@ -4627,11 +4627,11 @@ function LoopView({
       <header><div><span>服务端拓扑准入</span><h3>{run.topology_admission.mode === "adaptive_readonly_workers" ? "已准入受限只读 Workers" : run.topology_admission.mode === "fixed_workflow" ? "采用固定工作流" : "保持单 Controller"}</h3></div><b>{run.topology_admission.independent_branch_count} 条独立分支</b></header>
       <p>{run.topology_admission.reasons[run.topology_admission.reasons.length - 1] || "依据已校验计划选择执行方式。"}</p>
       <div className="loop-topology-facts"><span><b>{run.topology_admission.work_unit_breadth}</b> 工作包</span><span><b>{run.topology_admission.source_span}</b> 份来源</span><span><b>{run.topology_admission.remaining_model_calls}</b> 次剩余调用</span><span><b>{run.topology_admission.remaining_time_seconds}</b> 秒剩余时间</span><span>外部动作：<b>未发生</b></span></div>
-      {run.topology_admission.mode === "adaptive_readonly_workers" && run.worker_runs.length === 0 && <div className="loop-worker-confirmation">
-        <small>执行与准入分开；只有你明确确认后才会调用最多 3 个 Worker。当前不会自动调用 Analyst。</small>
+      {run.topology_admission.mode === "adaptive_readonly_workers" && run.status === "waiting_input" && run.branches.some((branch) => ["running", "waiting_input"].includes(branch.status)) && <div className="loop-worker-confirmation">
+        <small>{run.worker_runs.length === 0 ? "执行与准入分开；只有你明确确认后才会调用最多 3 个 Worker。当前不会自动调用 Analyst。" : "上一批结果已保留；仅对依赖已完成的下一批 ready Branch 继续调用。"}</small>
         <div>
-          <button type="button" onClick={() => void onExecuteWorkers()} disabled={starting || run.status !== "waiting_input"}><IconPlayerPlay aria-hidden="true" />{starting ? "正在启动" : "确认并启动只读 Worker"}</button>
-          <button type="button" className="is-secondary" onClick={() => void onControl("topology_override", { topologyMode: "single_controller" })} disabled={starting || controlBusy !== null}><IconRoute aria-hidden="true" />改回单 Controller</button>
+          <button type="button" onClick={() => void onExecuteWorkers()} disabled={starting || controlBusy !== null}><IconPlayerPlay aria-hidden="true" />{starting ? "正在启动" : run.worker_runs.length === 0 ? "确认并启动只读 Worker" : "继续下一批只读 Worker"}</button>
+          {run.worker_runs.length === 0 && <button type="button" className="is-secondary" onClick={() => void onControl("topology_override", { topologyMode: "single_controller" })} disabled={starting || controlBusy !== null}><IconRoute aria-hidden="true" />改回单 Controller</button>}
         </div>
       </div>}
       {run.worker_runs.length > 0 && <div className="loop-worker-receipts"><span>实际 Worker 回执</span>{run.worker_runs.map((worker) => <div key={worker.worker_run_id}><b>{worker.outcome === "adopted" ? "已合入" : worker.outcome === "failed" ? "执行失败" : "待处理"}</b><span>{worker.summary}</span><small>{worker.model_called ? "模型已调用" : "未调用"} · {worker.output_used ? "已采用" : "未采用"} · {worker.elapsed_ms} ms</small></div>)}</div>}

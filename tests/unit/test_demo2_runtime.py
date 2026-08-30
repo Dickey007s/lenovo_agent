@@ -6,7 +6,15 @@ from datetime import datetime, timezone
 import pytest
 from fastapi.routing import APIRoute
 
-from services.api.app.application.harness_runtime import HarnessPlan, HarnessPlanUnit
+from services.api.app.application.harness_runtime import (
+    HarnessPlan,
+    HarnessPlanCandidate,
+    HarnessPlanCandidateUnit,
+    HarnessPlanUnit,
+    HarnessRunStart,
+    HarnessRuntime,
+)
+from packages.contracts.harness_models import AgentControlLoopControlRequest
 from services.api.app.application.readonly_workers import (
     ReadonlyWorkerContribution,
     ReadonlyWorkerRequest,
@@ -152,6 +160,83 @@ def test_demo2_uses_unified_harness_routes_not_a_demo_selector() -> None:
     assert "/v1/harness/runs/{run_id}/workers" in paths
     assert "/v1/harness/runs/{run_id}/continue" in paths
     assert not any(path.startswith("/v1/demo2") for path in paths)
+
+
+@pytest.mark.asyncio
+async def test_adaptive_wait_persists_plan_and_override_reuses_same_round() -> None:
+    from tests.unit.test_harness_runtime import FakeAnalyst, FakeCatalog
+
+    class TwoIndependentPlanner:
+        model = "test-planner"
+
+        def __init__(self) -> None:
+            self.calls = 0
+
+        async def plan(self, *, scenario, files):
+            self.calls += 1
+            refs = [str(item["file_ref"]) for item in files[:2]]
+            return HarnessPlanCandidate(
+                summary="两个独立只读工作包",
+                selection_reason="服务端计划校验",
+                units=[
+                    HarnessPlanCandidateUnit(
+                        unit_id=f"independent-{index}",
+                        title="独立资料核对",
+                        objective="核对一份批准来源",
+                        input_file_refs=[ref],
+                        tool="file.read",
+                    )
+                    for index, ref in enumerate(refs, start=1)
+                ],
+            )
+
+    class CountingAnalyst(FakeAnalyst):
+        def __init__(self) -> None:
+            super().__init__()
+            self.calls = 0
+
+        async def analyze(self, **kwargs):
+            self.calls += 1
+            return await super().analyze(**kwargs)
+
+    planner = TwoIndependentPlanner()
+    analyst = CountingAnalyst()
+    runtime = HarnessRuntime(FakeCatalog(), planner, analyst)
+    request = HarnessRunStart(
+        idempotency_key="adaptive-plan-start-0001",
+        instruction="核对两份独立资料",
+        loop={"max_rounds": 1, "max_files_per_round": 2, "max_model_calls": 4, "deadline_seconds": 120},
+    )
+    started = await runtime.start("alice", request)
+    waiting = None
+    for _ in range(300):
+        candidate = await runtime.get("alice", started.run.run_id)
+        if candidate.status == "waiting_input" and candidate.topology_admission is not None:
+            waiting = candidate
+            break
+        await asyncio.sleep(0.01)
+    assert waiting is not None
+    assert waiting.topology_admission.mode == "adaptive_readonly_workers"
+    assert waiting.rounds[0].plan is not None
+    assert analyst.calls == 0
+    override = await runtime.control(
+        "alice",
+        started.run.run_id,
+        AgentControlLoopControlRequest(
+            command="topology_override",
+            topology_mode="single_controller",
+            idempotency_key="adaptive-override-0001",
+            expected_version=waiting.version,
+        ),
+    )
+    assert override.run.run_sequence == waiting.run_sequence
+    for _ in range(300):
+        final = await runtime.get("alice", started.run.run_id)
+        if final.status in {"completed", "failed", "stopped", "ready_to_execute"}:
+            break
+        await asyncio.sleep(0.01)
+    assert planner.calls == 1
+    assert analyst.calls == 1, (final.status, final.control_state, [(e.event_name, e.message) for e in final.events], final.validation_errors)
 
 
 @pytest.mark.asyncio
@@ -309,3 +394,30 @@ def test_worker_merge_is_a_normal_artifact_and_keeps_reconciliation_receipt() ->
     assert merged.adopted_worker_run_ids == ("worker-success-1", "worker-success-2")
     assert merged.waiting_branch_ids == ("branch-ambiguous",)
     assert all(item.narrative_reconciliation is not None for item in results)
+
+
+def test_rejected_narrative_or_missing_anchor_never_enters_merge() -> None:
+    rejected = AgentControlLoopNarrativeReconciliation(
+        reconciliation_id="narrative-reconciliation-fedcba987654",
+        round_number=1,
+        status="contradictory",
+        authority="deterministic_outcome",
+        model_disposition="rejected",
+        model_returned=True,
+        message="模型叙述与服务端事实冲突。",
+        checked_at=datetime.now(timezone.utc),
+    )
+    result = ReadonlyWorkerContribution(
+        worker_run_id="worker-rejected",
+        branch_id="branch-rejected",
+        outcome="adopted",
+        summary="候选结论被对账拒绝",
+        source_file_refs=("forte-1111111111111111",),
+        evidence_anchors=("line:1",),
+        model_called=True,
+        output_used=True,
+        narrative_reconciliation=rejected,
+    )
+    merged = merge_adopted_contributions([result])
+    assert merged.adopted_worker_run_ids == ()
+    assert merged.waiting_branch_ids == ("branch-rejected",)

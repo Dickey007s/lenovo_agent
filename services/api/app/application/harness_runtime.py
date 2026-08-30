@@ -1333,9 +1333,17 @@ class HarnessRuntime:
                     raise HarnessConflictError("幂等键已用于不同 Worker 命令")
                 return snapshot.model_copy(deep=True)
             branch_refs = {item.branch_id: set(item.input_file_refs) for item in snapshot.branches}
+            branches_by_id = {item.branch_id: item for item in snapshot.branches}
             for item in worker_requests:
                 if item.branch_id not in branch_refs or set(item.source_file_refs) - branch_refs[item.branch_id]:
                     raise HarnessConflictError("Worker 只能读取自己 Branch 的批准来源")
+                branch = branches_by_id[item.branch_id]
+                if any(
+                    dependency_branch.status != "completed"
+                    for dependency_id in branch.depends_on
+                    if (dependency_branch := branches_by_id.get(dependency_id)) is not None
+                ):
+                    raise HarnessConflictError("只能派发依赖已完成的 ready Branch；下游分支仍被阻塞")
 
         contributions = await execute_readonly_workers(worker_requests, handler, max_workers=3)
         merged = merge_adopted_contributions(contributions, version=1)
@@ -1352,6 +1360,7 @@ class HarnessRuntime:
             commits = list(run.snapshot.commits)
             last_commit = run.snapshot.last_commit
             contribution_by_branch = {item.branch_id: item for item in contributions}
+            adopted_worker_ids = set(merged.adopted_worker_run_ids)
             artifact_findings = [
                 finding
                 for contribution in merged.adopted_contributions
@@ -1361,7 +1370,7 @@ class HarnessRuntime:
                 branch.model_copy(
                     update={
                         "status": "completed"
-                        if contribution_by_branch[branch.branch_id].outcome == "adopted"
+                        if contribution_by_branch[branch.branch_id].worker_run_id in adopted_worker_ids
                         else "waiting_input",
                         "verified_file_refs": sorted(
                             set(branch.verified_file_refs)
@@ -1384,6 +1393,17 @@ class HarnessRuntime:
             all_branches_completed = bool(updated_branches) and all(
                 branch.status == "completed" for branch in updated_branches
             )
+            branch_state = {branch.branch_id: branch for branch in updated_branches}
+            ready_branch_ids = [
+                branch.branch_id
+                for branch in updated_branches
+                if branch.status == "running"
+                and all(
+                    branch_state.get(dependency_id) is not None
+                    and branch_state[dependency_id].status == "completed"
+                    for dependency_id in branch.depends_on
+                )
+            ]
             next_step = None
             if not all_branches_completed:
                 waiting_file_refs = [
@@ -1396,7 +1416,9 @@ class HarnessRuntime:
                     decision="waiting_input",
                     reason="部分 Worker 已合入，其余分支因失败或原文位置不明确而暂停。",
                     candidate_file_refs=waiting_file_refs[:20],
-                    candidate_branch_ids=list(merged.waiting_branch_ids),
+                    candidate_branch_ids=(
+                        list(merged.waiting_branch_ids) + ready_branch_ids
+                    )[:36],
                 )
             worker_result = None
             if artifact_findings:
@@ -3178,41 +3200,42 @@ class HarnessRuntime:
                         round_number=round_number,
                         parent_branch_id=target_branch_id,
                     )
-                await self._set_topology_admission(
-                    owner_id,
-                    run_id,
-                    plan,
-                    remaining_model_calls=max(
-                        0, contract.max_model_calls - (await self.get(owner_id, run_id)).budget.model_calls_used
-                    ),
-                    remaining_time_seconds=max(
-                        0, contract.deadline_seconds - (await self.get(owner_id, run_id)).budget.elapsed_ms // 1000
-                    ),
-                )
-                await self._set_model_receipt(owner_id, run_id, adopted_receipt)
-                await self._update_round(
-                    owner_id,
-                    run_id,
-                    round_number,
-                    phase="plan",
-                    input_file_refs=[str(item["file_ref"]) for item in round_files],
-                    branch_ids=branch_ids,
-                    plan=plan.model_dump(mode="json"),
-                    model_receipt=adopted_receipt.model_dump(mode="json"),
-                )
-                await self._transition(
-                    owner_id,
-                    run_id,
-                    "validating",
-                    "plan_validation",
-                    "服务端已校验本轮文件范围、工具、依赖与只读边界。",
-                    {
-                        "round_number": round_number,
-                        "unit_count": len(plan.units),
-                        "file_count": len(round_files),
-                        "output_used": True,
-                    },
-                )
+                if not reusing_plan:
+                    await self._set_topology_admission(
+                        owner_id,
+                        run_id,
+                        plan,
+                        remaining_model_calls=max(
+                            0, contract.max_model_calls - (await self.get(owner_id, run_id)).budget.model_calls_used
+                        ),
+                        remaining_time_seconds=max(
+                            0, contract.deadline_seconds - (await self.get(owner_id, run_id)).budget.elapsed_ms // 1000
+                        ),
+                    )
+                    await self._set_model_receipt(owner_id, run_id, adopted_receipt)
+                    await self._update_round(
+                        owner_id,
+                        run_id,
+                        round_number,
+                        phase="plan",
+                        input_file_refs=[str(item["file_ref"]) for item in round_files],
+                        branch_ids=branch_ids,
+                        plan=plan.model_dump(mode="json"),
+                        model_receipt=adopted_receipt.model_dump(mode="json"),
+                    )
+                    await self._transition(
+                        owner_id,
+                        run_id,
+                        "validating",
+                        "plan_validation",
+                        "服务端已校验本轮文件范围、工具、依赖与只读边界。",
+                        {
+                            "round_number": round_number,
+                            "unit_count": len(plan.units),
+                            "file_count": len(round_files),
+                            "output_used": True,
+                        },
+                    )
                 # Adaptive admission is a deliberately separate, user-gated
                 # route. Persist the plan and validation receipt first, then
                 # stop before effects or the ordinary Analyst path.
@@ -4764,6 +4787,13 @@ class HarnessRuntime:
     ) -> None:
         async with self._lock:
             run = self._require_run(owner_id, run_id)
+            if (
+                updates.get("phase") == "plan"
+                and "plan" in updates
+                and round_number == run.snapshot.current_round
+                and any(event.event_name == "control_topology_override_recorded" for event in run.snapshot.events)
+            ):
+                return
             rounds = [
                 item.model_copy(update=updates) if item.round_number == round_number else item
                 for item in run.snapshot.rounds
@@ -6485,6 +6515,13 @@ class HarnessRuntime:
             raise HarnessConflictError(f"未知 Harness 状态: {status}")
         async with self._lock:
             run = self._require_run(owner_id, run_id)
+            if (
+                name == "plan_validation"
+                and run.snapshot.topology_admission is not None
+                and run.snapshot.topology_admission.mode == "single_controller"
+                and any(event.event_name == "control_topology_override_recorded" for event in run.snapshot.events)
+            ):
+                return
             now = datetime.now(timezone.utc)
             event = HarnessEvent(
                 sequence=len(run.snapshot.events) + 1,
@@ -6548,7 +6585,7 @@ class HarnessRuntime:
         for file_ref in source_refs:
             try:
                 preview = self.catalog.public_file(file_ref)
-            except (KeyError, RuntimeError):
+            except (KeyError, AttributeError):
                 # A legacy test/catalog may expose only agent-safe inputs. The
                 # structural fact is then unavailable, so admission remains
                 # conservative rather than failing an otherwise valid plan.

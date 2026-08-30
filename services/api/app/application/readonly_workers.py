@@ -117,13 +117,21 @@ def merge_adopted_contributions(
     adopted = tuple(
         item
         for item in contributions
-        if item.outcome == "adopted" and item.output_used and item.evidence_anchors
+        if (
+            item.outcome == "adopted"
+            and item.output_used
+            and item.evidence_anchors
+            and (
+                item.narrative_reconciliation is None
+                or item.narrative_reconciliation.model_disposition != "rejected"
+            )
+        )
     )
+    adopted_ids = {item.worker_run_id for item in adopted}
     waiting = tuple(
         item.branch_id
         for item in contributions
-        if item.outcome in {"failed", "ambiguous", "rejected"}
-        or (item.outcome == "adopted" and not item.evidence_anchors)
+        if item.worker_run_id not in adopted_ids
     )
     failed = tuple(item.worker_run_id for item in contributions if item.outcome == "failed")
     digest = hashlib.sha256(
