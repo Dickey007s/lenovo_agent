@@ -8,14 +8,11 @@ import pytest
 from fastapi.routing import APIRoute
 
 from services.api.app.application.harness_runtime import (
-    HarnessEvidenceQuote,
-    HarnessFinding,
     HarnessPlan,
     HarnessPlanCandidate,
     HarnessPlanCandidateUnit,
     HarnessPlanUnit,
     HarnessRunStart,
-    HarnessTaskResult,
     HarnessRuntime,
 )
 from packages.contracts.harness_models import AgentControlLoopControlRequest
