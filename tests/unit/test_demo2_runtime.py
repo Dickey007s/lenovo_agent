@@ -34,6 +34,20 @@ from services.api.app.main import create_app
 from services.api.app.api.harness_routes import get_harness_runtime
 
 
+def _cross_function_catalog():
+    """Give runtime admission explicit, server-frozen cross-function facts."""
+    from tests.unit.test_harness_runtime import FakeCatalog
+
+    class CrossFunctionCatalog(FakeCatalog):
+        def public_file(self, file_ref: str):
+            payload = super().public_file(file_ref)
+            first_ref = self.files[0]["file_ref"]
+            payload["display_group"] = "销售" if file_ref == first_ref else "工程"
+            return payload
+
+    return CrossFunctionCatalog()
+
+
 def _plan(*, risky: bool = False) -> HarnessPlan:
     return HarnessPlan(
         summary="两个独立的只读核对工作包",
@@ -172,7 +186,7 @@ def test_demo2_uses_unified_harness_routes_not_a_demo_selector() -> None:
 
 @pytest.mark.asyncio
 async def test_adaptive_wait_persists_plan_and_override_reuses_same_round() -> None:
-    from tests.unit.test_harness_runtime import FakeAnalyst, FakeCatalog
+    from tests.unit.test_harness_runtime import FakeAnalyst
 
     class TwoIndependentPlanner:
         model = "test-planner"
@@ -203,13 +217,18 @@ async def test_adaptive_wait_persists_plan_and_override_reuses_same_round() -> N
             super().__init__()
             self.calls = 0
 
-        async def analyze(self, **kwargs):
+        async def analyze(self, *, instruction, plan, files, validation_feedback=None):
             self.calls += 1
-            return await super().analyze(**kwargs)
+            return await super().analyze(
+                instruction=instruction,
+                plan=plan,
+                files=files,
+                validation_feedback=validation_feedback,
+            )
 
     planner = TwoIndependentPlanner()
     analyst = CountingAnalyst()
-    runtime = HarnessRuntime(FakeCatalog(), planner, analyst)
+    runtime = HarnessRuntime(_cross_function_catalog(), planner, analyst)
     request = HarnessRunStart(
         idempotency_key="adaptive-plan-start-0001",
         instruction="核对两份独立资料",
@@ -386,7 +405,7 @@ async def test_demo1_continuation_http_route_returns_same_task_child_run() -> No
 
 @pytest.mark.asyncio
 async def test_five_unit_dag_runtime_advances_from_roots_to_second_worker_wave() -> None:
-    from tests.unit.test_harness_runtime import FakeAnalyst, FakeCatalog
+    from tests.unit.test_harness_runtime import FakeAnalyst
 
     class FiveUnitDagPlanner:
         model = "test-planner"
@@ -416,7 +435,7 @@ async def test_five_unit_dag_runtime_advances_from_roots_to_second_worker_wave()
                 units=roots + dependents,
             )
 
-    runtime = HarnessRuntime(FakeCatalog(), FiveUnitDagPlanner(), FakeAnalyst())
+    runtime = HarnessRuntime(_cross_function_catalog(), FiveUnitDagPlanner(), FakeAnalyst())
     started = await runtime.start(
         "alice",
         HarnessRunStart(
@@ -502,7 +521,6 @@ async def test_five_unit_dag_runtime_advances_from_roots_to_second_worker_wave()
 @pytest.mark.asyncio
 async def test_runtime_artifact_version_keeps_eleven_worker_findings() -> None:
     """The normal Runtime ArtifactVersion contract must not reintroduce a top-10 cap."""
-    from tests.unit.test_harness_runtime import FakeCatalog
 
     class TwoUnitPlanner:
         model = "test-planner"
@@ -524,7 +542,7 @@ async def test_runtime_artifact_version_keeps_eleven_worker_findings() -> None:
                 ],
             )
 
-    runtime = HarnessRuntime(FakeCatalog(), TwoUnitPlanner(), None)
+    runtime = HarnessRuntime(_cross_function_catalog(), TwoUnitPlanner(), None)
     started = await runtime.start(
         "alice",
         HarnessRunStart(

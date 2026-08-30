@@ -60,6 +60,19 @@ def admit_topology(
         )
         for ref in refs
     }
+    source_groups = {
+        str((source_facts or {}).get(ref, {}).get("display_group", ""))
+        for ref in refs
+    }
+    # A source structure is only a positive signal when the server has a
+    # non-empty frozen group fact for every referenced file.  Independent
+    # units from one directory/function stay on the conservative workflow;
+    # adaptive workers are reserved for genuinely cross-function material.
+    complete_source_groups = bool(source_facts) and all(
+        ref in source_facts and str(source_facts[ref].get("display_group", ""))
+        for ref in refs
+    )
+    same_display_group = complete_source_groups and len(source_groups) == 1
     same_structured_source_set = len(refs) >= 3 and len(structure_keys) == 1 and bool(source_facts)
     reasons: list[str] = [f"已校验 {breadth} 个工作单元，涉及 {len(refs)} 份来源材料。"]
 
@@ -75,6 +88,12 @@ def admit_topology(
     elif same_structured_source_set:
         mode = "fixed_workflow"
         reasons.append("多个独立工作包来自同结构同职能资料，先用固定流程避免把同源拆成伪并行。")
+    elif complete_source_groups and same_display_group:
+        mode = "fixed_workflow"
+        reasons.append("多个独立工作包来自同一目录/职能，先用固定流程避免把同源拆成伪并行。")
+    elif source_facts and not complete_source_groups:
+        mode = "fixed_workflow"
+        reasons.append("来源结构事实不完整或未能证明跨职能，保持固定流程。")
     elif remaining_model_calls < independent + 1:
         mode = "fixed_workflow"
         reasons.append("剩余模型调用不足以覆盖独立分支及合入校验，保持固定流程。")
