@@ -4786,6 +4786,12 @@ test.describe("Demo 1/2 runtime acceptance", () => {
     expect(Math.min(...lineageTextSizes)).toBeGreaterThanOrEqual(13);
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
     expect(overflow).toBeLessThanOrEqual(0);
+    await page.setViewportSize({ width: 390, height: 844 });
+    await expect(page.locator('[data-testid="task-lineage"]')).toContainText("来源版本已变化");
+    const mobileLineageTextSizes = await page.locator('[data-testid="task-lineage"] span, [data-testid="task-lineage"] strong, [data-testid="task-lineage"] p, [data-testid="task-lineage"] small').evaluateAll((nodes) => nodes.map((node) => Number.parseFloat(getComputedStyle(node).fontSize)));
+    expect(Math.min(...mobileLineageTextSizes)).toBeGreaterThanOrEqual(13);
+    const documentOverflow = await page.locator("[data-testid=task-lineage]").evaluate((element) => element.ownerDocument.documentElement.scrollWidth - element.ownerDocument.documentElement.clientWidth);
+    expect(documentOverflow).toBeLessThanOrEqual(0);
   });
 
   test("Demo 2 requires confirmation, records worker receipts and exposes the next wave", async ({ page }) => {
