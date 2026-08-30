@@ -82,6 +82,67 @@ def test_single_controller_is_selected_when_only_one_independent_branch_exists()
     assert admitted.independent_branch_count == 1
 
 
+def test_same_schema_finance_is_fixed_but_cross_function_independent_work_can_adapt() -> None:
+    finance_plan = HarnessPlan(
+        summary="三期同结构财务资料",
+        selection_reason="服务端验证",
+        units=[
+            HarnessPlanUnit(
+                unit_id=f"period-{index}",
+                title=f"第 {index} 期",
+                objective="核对同结构财务明细",
+                input_file_refs=[f"forte-{index:016x}"],
+                tool="file.read",
+            )
+            for index in range(1, 4)
+        ],
+    )
+    same_schema = {
+        f"forte-{index:016x}": {
+            "display_group": "财务管理",
+            "display_path": f"财务管理/{index}期.csv",
+            "mime": "text/csv",
+            "kind": "table",
+            "columns": ["客商", "余额"],
+        }
+        for index in range(1, 4)
+    }
+    fixed = admit_topology(
+        finance_plan,
+        remaining_model_calls=20,
+        remaining_time_seconds=120,
+        source_facts=same_schema,
+    )
+    assert fixed.mode == "fixed_workflow"
+    assert any("同结构" in reason for reason in fixed.reasons)
+
+    cross_function = finance_plan.model_copy(
+        update={
+            "units": [
+                item.model_copy(update={"input_file_refs": [f"forte-{index:016x}"]})
+                for index, item in enumerate(finance_plan.units, start=1)
+            ]
+        }
+    )
+    cross_facts = {
+        f"forte-{index:016x}": {
+            "display_group": group,
+            "display_path": f"{group}/input-{index}.txt",
+            "mime": "text/plain",
+            "kind": "text",
+            "columns": [],
+        }
+        for index, group in enumerate(("财务管理", "法务审查", "工程交付"), start=1)
+    }
+    adaptive = admit_topology(
+        cross_function,
+        remaining_model_calls=20,
+        remaining_time_seconds=120,
+        source_facts=cross_facts,
+    )
+    assert adaptive.mode == "adaptive_readonly_workers"
+
+
 def test_demo2_uses_unified_harness_routes_not_a_demo_selector() -> None:
     paths: set[str] = set()
     for included in create_app().routes:

@@ -38,7 +38,7 @@ type WorkspaceView = "data" | "loop" | "result";
 type FileTypeFilter = string;
 type PreviewKind = "table" | "document" | "pdf" | "text" | "unavailable";
 type LoopPhase = "observe" | "plan" | "act" | "verify" | "evidence_gate" | "commit";
-type LoopCommand = "pause" | "resume" | "steer" | "stop" | "rollback" | "decision";
+type LoopCommand = "pause" | "resume" | "steer" | "stop" | "rollback" | "decision" | "topology_override";
 type LoopControlOptions = {
   instruction?: string;
   branchId?: string;
@@ -51,6 +51,7 @@ type LoopControlOptions = {
   decisionRequestId?: string;
   sourceRevision?: string;
   feedback?: string;
+  topologyMode?: "single_controller";
 };
 type EvidenceRole = "expected" | "observed" | "support" | "contradiction" | "context";
 type EvidenceAnchor = {
@@ -4313,7 +4314,7 @@ export function HarnessWorkbench({ onActivityChange }: { onActivityChange?: (sta
     if (!current || (TERMINAL_STATUSES.has(current.status) && !["rollback", "decision"].includes(command))) return false;
     const normalizedInstruction = options.instruction?.trim() || undefined;
     const normalizedFeedback = options.feedback?.trim() || undefined;
-    const signature = JSON.stringify({ command, instruction: normalizedInstruction, branchId: options.branchId, artifactVersion: options.artifactVersion, decisionAction: options.decisionAction, findingId: options.findingId, resolutionId: options.resolutionId, selectedOptionId: options.selectedOptionId, selectedCandidateId: options.selectedCandidateId, decisionRequestId: options.decisionRequestId, sourceRevision: options.sourceRevision, feedback: normalizedFeedback, runId: current.run_id });
+    const signature = JSON.stringify({ command, instruction: normalizedInstruction, branchId: options.branchId, artifactVersion: options.artifactVersion, decisionAction: options.decisionAction, findingId: options.findingId, resolutionId: options.resolutionId, selectedOptionId: options.selectedOptionId, selectedCandidateId: options.selectedCandidateId, decisionRequestId: options.decisionRequestId, sourceRevision: options.sourceRevision, feedback: normalizedFeedback, topologyMode: options.topologyMode, runId: current.run_id });
     const controlCommand = controlCommandRef.current?.signature === signature
       ? controlCommandRef.current
       : { signature, key: `control-${randomKey()}` };
@@ -4338,6 +4339,7 @@ export function HarnessWorkbench({ onActivityChange }: { onActivityChange?: (sta
           decision_request_id: options.decisionRequestId,
           source_revision: options.sourceRevision,
           feedback: normalizedFeedback,
+          topology_mode: options.topologyMode,
         }),
       });
       const payload = await response.json().catch(() => ({}));
@@ -4629,7 +4631,7 @@ function LoopView({
         <small>执行与准入分开；只有你明确确认后才会调用最多 3 个 Worker。当前不会自动调用 Analyst。</small>
         <div>
           <button type="button" onClick={() => void onExecuteWorkers()} disabled={starting || run.status !== "waiting_input"}><IconPlayerPlay aria-hidden="true" />{starting ? "正在启动" : "确认并启动只读 Worker"}</button>
-          <button type="button" className="is-secondary" onClick={() => void onStartTask(run.instruction)} disabled={starting}><IconRoute aria-hidden="true" />改回单 Controller</button>
+          <button type="button" className="is-secondary" onClick={() => void onControl("topology_override", { topologyMode: "single_controller" })} disabled={starting || controlBusy !== null}><IconRoute aria-hidden="true" />改回单 Controller</button>
         </div>
       </div>}
       {run.worker_runs.length > 0 && <div className="loop-worker-receipts"><span>实际 Worker 回执</span>{run.worker_runs.map((worker) => <div key={worker.worker_run_id}><b>{worker.outcome === "adopted" ? "已合入" : worker.outcome === "failed" ? "执行失败" : "待处理"}</b><span>{worker.summary}</span><small>{worker.model_called ? "模型已调用" : "未调用"} · {worker.output_used ? "已采用" : "未采用"} · {worker.elapsed_ms} ms</small></div>)}</div>}

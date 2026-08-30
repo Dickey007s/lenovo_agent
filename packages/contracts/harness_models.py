@@ -70,6 +70,7 @@ AgentControlLoopCommand = Literal[
     "stop",
     "rollback",
     "decision",
+    "topology_override",
 ]
 AgentControlLoopBranchStatus = Literal[
     "running",
@@ -1615,6 +1616,7 @@ class AgentControlLoopControlRequest(StrictModel):
     candidate_digest: str | None = Field(default=None, max_length=128)
     source_revision: str | None = Field(default=None, max_length=128)
     feedback: str | None = Field(default=None, max_length=2_000)
+    topology_mode: Literal["single_controller"] | None = None
 
     @field_validator("instruction")
     @classmethod

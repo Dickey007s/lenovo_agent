@@ -10,7 +10,10 @@ from typing import Awaitable, Callable, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from packages.contracts.harness_models import AgentControlLoopNarrativeReconciliation
+from packages.contracts.harness_models import (
+    AgentControlLoopArtifactFinding,
+    AgentControlLoopNarrativeReconciliation,
+)
 
 
 class ReadonlyWorkerRequest(BaseModel):
@@ -43,6 +46,9 @@ class ReadonlyWorkerContribution(BaseModel):
     # available.  ``model_only`` is intentionally visible so it cannot be
     # mistaken for an authoritative Artifact effect.
     narrative_reconciliation: AgentControlLoopNarrativeReconciliation | None = None
+    findings: tuple[AgentControlLoopArtifactFinding, ...] = Field(
+        default_factory=tuple, max_length=10
+    )
 
 
 class SharedArtifactMerge(BaseModel):

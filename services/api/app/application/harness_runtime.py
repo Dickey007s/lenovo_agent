@@ -1158,7 +1158,14 @@ class HarnessRuntime:
                 base_artifact_version=_base_artifact_version if parent else None,
                 base_task_commit=_base_task_commit if parent else None,
                 workspace_revision=current_workspace_revision,
-                recheck_file_refs=(list(carried_branch.input_file_refs) if source_revision_changed and carried_branch else []),
+                # A continuation starts with the carried Branch's approved
+                # missing/input refs; it never lets a free-form instruction
+                # widen the first round back to the whole catalog.
+                recheck_file_refs=(
+                    list(carried_branch.missing_file_refs or carried_branch.input_file_refs)
+                    if carried_branch
+                    else []
+                ),
                 source_revision_changed=source_revision_changed,
             )
             budget = AgentControlLoopBudget(
@@ -1177,7 +1184,11 @@ class HarnessRuntime:
                 base_artifact_version=_base_artifact_version if parent else None,
                 base_task_commit=_base_task_commit if parent else None,
                 workspace_revision=current_workspace_revision,
-                recheck_file_refs=(list(carried_branch.input_file_refs) if source_revision_changed and carried_branch else []),
+                recheck_file_refs=(
+                    list(carried_branch.missing_file_refs or carried_branch.input_file_refs)
+                    if carried_branch
+                    else []
+                ),
                 source_revision_changed=source_revision_changed,
                 owner_id=owner_id,
                 workspace_id=request.workspace_id,
@@ -1340,6 +1351,60 @@ class HarnessRuntime:
             artifact_versions = list(run.snapshot.artifact_versions)
             commits = list(run.snapshot.commits)
             last_commit = run.snapshot.last_commit
+            contribution_by_branch = {item.branch_id: item for item in contributions}
+            artifact_findings = [
+                finding
+                for contribution in merged.adopted_contributions
+                for finding in contribution.findings
+            ][:10]
+            updated_branches = [
+                branch.model_copy(
+                    update={
+                        "status": "completed"
+                        if contribution_by_branch[branch.branch_id].outcome == "adopted"
+                        else "waiting_input",
+                        "verified_file_refs": sorted(
+                            set(branch.verified_file_refs)
+                            | (
+                                set(contribution_by_branch[branch.branch_id].source_file_refs)
+                                if contribution_by_branch[branch.branch_id].outcome == "adopted"
+                                else set()
+                            )
+                        )[:24],
+                        "missing_file_refs": []
+                        if contribution_by_branch[branch.branch_id].outcome == "adopted"
+                        else list(contribution_by_branch[branch.branch_id].source_file_refs),
+                        "updated_at": now,
+                    }
+                )
+                if branch.branch_id in contribution_by_branch
+                else branch
+                for branch in run.snapshot.branches
+            ]
+            all_branches_completed = bool(updated_branches) and all(
+                branch.status == "completed" for branch in updated_branches
+            )
+            next_step = None
+            if not all_branches_completed:
+                waiting_file_refs = [
+                    ref
+                    for contribution in contributions
+                    if contribution.outcome != "adopted"
+                    for ref in contribution.source_file_refs
+                ]
+                next_step = AgentControlLoopNextStep(
+                    decision="waiting_input",
+                    reason="部分 Worker 已合入，其余分支因失败或原文位置不明确而暂停。",
+                    candidate_file_refs=waiting_file_refs[:20],
+                    candidate_branch_ids=list(merged.waiting_branch_ids),
+                )
+            worker_result = None
+            if artifact_findings:
+                worker_result = HarnessTaskResult(
+                    summary="只读 Worker 已返回并通过服务端来源核对的部分结果。",
+                    findings=[HarnessFinding.model_validate(item.model_dump(mode="json")) for item in artifact_findings],
+                    follow_ups=["继续处理仍在等待的分支。"] if not all_branches_completed else [],
+                )
             if merged.adopted_contributions and len(artifact_versions) < 24:
                 artifact_version = len(artifact_versions) + 1
                 source_refs = sorted(
@@ -1359,8 +1424,9 @@ class HarnessRuntime:
                         f"服务端仅合入 {len(merged.adopted_contributions)} 条通过来源定位的只读 Worker 贡献；"
                         "其余分支仍保持待处理。"
                     ),
+                    findings=artifact_findings,
+                    finding_count=len(artifact_findings),
                     source_file_refs=source_refs,
-                    finding_count=0,
                     parent_version=artifact_versions[-1].version if artifact_versions else None,
                     created_at=now,
                 )
@@ -1387,6 +1453,23 @@ class HarnessRuntime:
                     "artifact_versions": artifact_versions,
                     "commits": commits,
                     "last_commit": last_commit,
+                    "branches": updated_branches,
+                    "result": worker_result,
+                    "rounds": [
+                        item.model_copy(
+                            update={
+                                "status": "completed",
+                                "phase": "commit",
+                                "result": worker_result.model_dump(mode="json") if worker_result else None,
+                                "next_step": next_step,
+                                "completed_at": now,
+                            }
+                        )
+                        if item.round_number == run.snapshot.current_round
+                        else item
+                        for item in run.snapshot.rounds
+                    ],
+                    "status": "completed" if all_branches_completed else "waiting_input",
                     "worker_idempotency": {
                         **run.snapshot.worker_idempotency,
                         idempotency_key: digest,
@@ -1525,6 +1608,22 @@ class HarnessRuntime:
                 for finding in (resolution.result.findings if resolution.result else [])
                 for anchor in finding.evidence_anchors
             )
+            artifact_findings = tuple(
+                AgentControlLoopArtifactFinding(
+                    finding_id=finding.finding_id,
+                    plan_unit_id=finding.plan_unit_id,
+                    affected_branch_ids=finding.affected_branch_ids or [branch.branch_id],
+                    title=finding.title,
+                    detail=finding.detail,
+                    fact_summary=finding.fact_summary,
+                    impact=finding.impact,
+                    file_refs=finding.file_refs,
+                    evidence_anchors=finding.evidence_anchors,
+                    evidence_resolutions=finding.evidence_resolutions,
+                    review=finding.review,
+                )
+                for finding in (resolution.result.findings if resolution.result else [])
+            )
             return ReadonlyWorkerContribution(
                 worker_run_id=request.worker_run_id,
                 branch_id=request.branch_id,
@@ -1536,6 +1635,7 @@ class HarnessRuntime:
                 output_used=adopted,
                 elapsed_ms=int((perf_counter() - started) * 1000),
                 narrative_reconciliation=reconciliation,
+                findings=artifact_findings,
             )
 
         return await self.execute_admitted_readonly_workers(
@@ -1591,10 +1691,20 @@ class HarnessRuntime:
                     digest=digest,
                     idempotency_key=idempotency_key,
                 )
-            if snapshot.status in {"ready_to_execute", "completed", "stopped", "failed"}:
+            if snapshot.status in {"ready_to_execute", "completed", "stopped", "failed"} and request.command != "topology_override":
                 raise HarnessConflictError("当前任务已经结束，不能再提交控制命令")
 
             command = request.command
+            if command == "topology_override":
+                admission = snapshot.topology_admission
+                if snapshot.status != "waiting_input" or admission is None:
+                    raise HarnessConflictError("当前任务没有等待拓扑确认")
+                if admission.mode != "adaptive_readonly_workers":
+                    raise HarnessConflictError("当前任务无需切换保守拓扑")
+                if request.topology_mode != "single_controller":
+                    raise HarnessConflictError("只允许切回 single_controller")
+            elif request.topology_mode is not None:
+                raise HarnessConflictError("只有拓扑切换命令可以携带 topology_mode")
             if command == "pause" and snapshot.control_state != "running":
                 raise HarnessConflictError("当前任务已经处于暂停或停止流程")
             if command == "resume" and snapshot.control_state not in {
@@ -1669,6 +1779,15 @@ class HarnessRuntime:
             elif command == "stop":
                 next_state = "stop_requested"
                 message = "停止请求已记录；系统会保留已核对结果并在安全点结束。"
+            elif command == "topology_override":
+                # Downgrading is an in-place, user-approved route choice. Keep
+                # the same Run/Task lineage and schedule its conservative
+                # controller path instead of creating a new task.
+                next_state = "running"
+                next_status = "planning"
+                control_status = "applied"
+                applied_version = next_version
+                message = "已按用户选择切回单 Controller；同一任务将从已保存计划继续，未调用只读 Worker。"
 
             control_event = AgentControlLoopControlEvent(
                 control_id=control_id,
@@ -1721,8 +1840,7 @@ class HarnessRuntime:
                 )
                 events.append(resumed_event)
                 last_event_sequence = resumed_event.sequence
-            run.snapshot = snapshot.model_copy(
-                update={
+            snapshot_updates: dict[str, Any] = {
                     "status": next_status,
                     "control_state": next_state,
                     "control_events": [*snapshot.control_events, control_event],
@@ -1732,7 +1850,18 @@ class HarnessRuntime:
                     "version": next_version,
                     "updated_at": now,
                 }
-            )
+            if command == "topology_override" and snapshot.topology_admission is not None:
+                snapshot_updates["topology_admission"] = snapshot.topology_admission.model_copy(
+                    update={
+                        "mode": "single_controller",
+                        "user_confirmation_required": False,
+                        "reasons": [
+                            *snapshot.topology_admission.reasons,
+                            "用户在执行前选择切回单 Controller；本次不调用只读 Worker。",
+                        ][:8],
+                    }
+                )
+            run.snapshot = snapshot.model_copy(update=snapshot_updates)
             result = HarnessControlResult(run=run.snapshot.model_copy(deep=True))
             existing = await self._persist_locked(
                 run,
@@ -1755,7 +1884,7 @@ class HarnessRuntime:
                 digest=digest, result=result
             )
             condition = run.condition
-            should_schedule = command == "resume" and run_id not in self._tasks
+            should_schedule = command in {"resume", "topology_override"} and run_id not in self._tasks
         async with condition:
             condition.notify_all()
         if should_schedule:
@@ -2937,6 +3066,9 @@ class HarnessRuntime:
             next_question = instruction
             evidence_recheck_refs: set[str] = set()
             target_branch_id = recovered.active_branch_id
+            if recovered.recheck_file_refs:
+                evidence_recheck_refs = set(recovered.recheck_file_refs)
+                target_branch_id = recovered.carried_branch_id
             if recovered.rounds and recovered.rounds[-1].next_step:
                 recovered_next_step = recovered.rounds[-1].next_step
                 next_question = recovered_next_step.next_question or instruction
@@ -2950,7 +3082,19 @@ class HarnessRuntime:
             terminal_decision = "completed"
 
             contract = recovered.contract
-            first_round = len(recovered.rounds) + 1
+            override_round = (
+                recovered.rounds[-1]
+                if recovered.rounds
+                and recovered.rounds[-1].plan is not None
+                and any(
+                    event.event_name == "control_topology_override_recorded"
+                    for event in recovered.events
+                )
+                else None
+            )
+            # A conservative topology choice continues the already validated
+            # packet. It must not create a second Planner round.
+            first_round = override_round.round_number if override_round else len(recovered.rounds) + 1
             for round_number in range(first_round, contract.max_rounds + 1):
                 await self._safe_point(owner_id, run_id)
                 all_remaining = [
@@ -2960,60 +3104,80 @@ class HarnessRuntime:
                     [
                         item
                         for item in all_remaining
+                        if override_round is not None
+                        and str(item["file_ref"]) in set(override_round.input_file_refs)
+                    ]
+                    if override_round is not None and round_number == override_round.round_number
+                    else (
+                    [
+                        item
+                        for item in all_remaining
                         if str(item["file_ref"]) in evidence_recheck_refs
                     ]
                     if evidence_recheck_refs
                     else all_remaining
+                    )
                 )
                 if not remaining:
                     break
 
-                steer = await self._consume_pending_steer(owner_id, run_id)
-                question = f"{next_question}\n本轮方向调整：{steer}" if steer else next_question
-                await self._start_round(
-                    owner_id,
-                    run_id,
-                    round_number=round_number,
-                    question=question,
-                    steer_instruction=steer,
-                )
-                await self._transition(
-                    owner_id,
-                    run_id,
-                    "planning",
-                    "round_started",
-                    (
-                        f"第 {round_number} 轮开始，正在核对上轮尚未覆盖的证据。"
-                        if evidence_recheck_refs
-                        else f"第 {round_number} 轮开始，正在确定本轮最小证据范围。"
-                    ),
-                    {
-                        "round_number": round_number,
-                        "remaining_file_count": len(remaining),
-                        "evidence_recheck": bool(evidence_recheck_refs),
-                    },
-                )
-
-                plan, adopted_receipt = await self._plan_with_bounded_repair(
-                    owner_id,
-                    run_id,
-                    workspace=workspace,
-                    question=question,
-                    round_number=round_number,
-                    remaining=remaining,
-                    contract=contract,
-                    steer_instruction=steer,
-                    require_all_files=bool(evidence_recheck_refs),
-                )
-                round_refs = self._plan_file_refs(plan, remaining)
-                round_files = [item for item in remaining if str(item["file_ref"]) in round_refs]
-                branch_ids = await self._set_plan(
-                    owner_id,
-                    run_id,
-                    plan,
-                    round_number=round_number,
-                    parent_branch_id=target_branch_id,
-                )
+                reusing_plan = override_round is not None and round_number == override_round.round_number
+                if reusing_plan:
+                    question = override_round.question
+                    steer = None
+                    plan = HarnessPlan.model_validate(override_round.plan)
+                    adopted_receipt = recovered.model_receipt or HarnessModelReceipt(
+                        called=True, model=self.planner.model, elapsed_ms=0, output_used=True
+                    )
+                    round_refs = set(override_round.input_file_refs)
+                    round_files = [item for item in remaining if str(item["file_ref"]) in round_refs]
+                    branch_ids = list(override_round.branch_ids)
+                else:
+                    steer = await self._consume_pending_steer(owner_id, run_id)
+                    question = f"{next_question}\n本轮方向调整：{steer}" if steer else next_question
+                    await self._start_round(
+                        owner_id,
+                        run_id,
+                        round_number=round_number,
+                        question=question,
+                        steer_instruction=steer,
+                    )
+                    await self._transition(
+                        owner_id,
+                        run_id,
+                        "planning",
+                        "round_started",
+                        (
+                            f"第 {round_number} 轮开始，正在核对上轮尚未覆盖的证据。"
+                            if evidence_recheck_refs
+                            else f"第 {round_number} 轮开始，正在确定本轮最小证据范围。"
+                        ),
+                        {
+                            "round_number": round_number,
+                            "remaining_file_count": len(remaining),
+                            "evidence_recheck": bool(evidence_recheck_refs),
+                        },
+                    )
+                    plan, adopted_receipt = await self._plan_with_bounded_repair(
+                        owner_id,
+                        run_id,
+                        workspace=workspace,
+                        question=question,
+                        round_number=round_number,
+                        remaining=remaining,
+                        contract=contract,
+                        steer_instruction=steer,
+                        require_all_files=bool(evidence_recheck_refs),
+                    )
+                    round_refs = self._plan_file_refs(plan, remaining)
+                    round_files = [item for item in remaining if str(item["file_ref"]) in round_refs]
+                    branch_ids = await self._set_plan(
+                        owner_id,
+                        run_id,
+                        plan,
+                        round_number=round_number,
+                        parent_branch_id=target_branch_id,
+                    )
                 await self._set_topology_admission(
                     owner_id,
                     run_id,
@@ -3025,30 +3189,6 @@ class HarnessRuntime:
                         0, contract.deadline_seconds - (await self.get(owner_id, run_id)).budget.elapsed_ms // 1000
                     ),
                 )
-                # Adaptive admission is a deliberately separate, user-gated
-                # route.  Do not continue into the ordinary Analyst path (or
-                # deterministic effects) until the cockpit posts an explicit
-                # Worker confirmation.  Conservative routes remain automatic.
-                admitted = (await self.get(owner_id, run_id)).topology_admission
-                if (
-                    admitted is not None
-                    and admitted.mode == "adaptive_readonly_workers"
-                    and admitted.user_confirmation_required
-                ):
-                    await self._transition(
-                        owner_id,
-                        run_id,
-                        "waiting_input",
-                        "topology_confirmation_required",
-                        "拓扑已准入受限只读 Worker；等待用户明确确认后才会调用 Analyst Worker。",
-                        {
-                            "mode": admitted.mode,
-                            "independent_branch_count": admitted.independent_branch_count,
-                            "worker_limit": 3,
-                            "external_action": False,
-                        },
-                    )
-                    return
                 await self._set_model_receipt(owner_id, run_id, adopted_receipt)
                 await self._update_round(
                     owner_id,
@@ -3073,6 +3213,29 @@ class HarnessRuntime:
                         "output_used": True,
                     },
                 )
+                # Adaptive admission is a deliberately separate, user-gated
+                # route. Persist the plan and validation receipt first, then
+                # stop before effects or the ordinary Analyst path.
+                admitted = (await self.get(owner_id, run_id)).topology_admission
+                if (
+                    admitted is not None
+                    and admitted.mode == "adaptive_readonly_workers"
+                    and admitted.user_confirmation_required
+                ):
+                    await self._transition(
+                        owner_id,
+                        run_id,
+                        "waiting_input",
+                        "topology_confirmation_required",
+                        "拓扑已准入受限只读 Worker；等待用户明确确认后才会调用 Analyst Worker。",
+                        {
+                            "mode": admitted.mode,
+                            "independent_branch_count": admitted.independent_branch_count,
+                            "worker_limit": 3,
+                            "external_action": False,
+                        },
+                    )
+                    return
                 # Deterministic office tools are admitted by the validated task
                 # contract, not by the Analyst's prose.  Persist their files and
                 # verifier receipts before narrative analysis so a rejected model
@@ -6367,10 +6530,38 @@ class HarnessRuntime:
     ) -> None:
         from services.api.app.application.topology_admission import admit_topology
 
+        existing = await self.get(owner_id, run_id)
+        if (
+            existing.topology_admission is not None
+            and existing.topology_admission.mode == "single_controller"
+            and any(
+                event.event_name == "control_topology_override_recorded"
+                for event in existing.events
+            )
+        ):
+            # The user already selected the conservative route for this
+            # packet. Do not recompute adaptive admission or create another
+            # confirmation gate while resuming the same round.
+            return
+        source_refs = sorted({ref for unit in plan.units for ref in unit.input_file_refs})
+        source_facts: dict[str, dict[str, object]] = {}
+        for file_ref in source_refs:
+            try:
+                preview = self.catalog.public_file(file_ref)
+            except (KeyError, RuntimeError):
+                # A legacy test/catalog may expose only agent-safe inputs. The
+                # structural fact is then unavailable, so admission remains
+                # conservative rather than failing an otherwise valid plan.
+                continue
+            source_facts[file_ref] = {
+                key: preview.get(key)
+                for key in ("display_group", "display_path", "mime", "kind", "columns")
+            }
         admission = admit_topology(
             plan,
             remaining_model_calls=remaining_model_calls,
             remaining_time_seconds=remaining_time_seconds,
+            source_facts=source_facts,
         )
         async with self._lock:
             run = self._require_run(owner_id, run_id)

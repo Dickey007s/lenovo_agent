@@ -42,6 +42,7 @@ def admit_topology(
     *,
     remaining_model_calls: int,
     remaining_time_seconds: int,
+    source_facts: dict[str, dict[str, object]] | None = None,
 ) -> TopologyAdmission:
     """Choose the smallest safe topology using only validated server facts."""
 
@@ -50,6 +51,16 @@ def admit_topology(
     refs = {ref for unit in plan.units for ref in unit.input_file_refs}
     dependent = sum(1 for unit in plan.units if unit.depends_on)
     risky = any(unit.side_effect != "none" or unit.requires_human_gate for unit in plan.units)
+    structure_keys = {
+        (
+            str((source_facts or {}).get(ref, {}).get("display_group", "")),
+            str((source_facts or {}).get(ref, {}).get("mime", "")),
+            str((source_facts or {}).get(ref, {}).get("kind", "")),
+            jsonable_columns((source_facts or {}).get(ref, {}).get("columns")),
+        )
+        for ref in refs
+    }
+    same_structured_source_set = len(refs) >= 3 and len(structure_keys) == 1 and bool(source_facts)
     reasons: list[str] = [f"已校验 {breadth} 个工作单元，涉及 {len(refs)} 份来源材料。"]
 
     if independent < 2:
@@ -61,6 +72,9 @@ def admit_topology(
     elif independent > 3:
         mode = "fixed_workflow"
         reasons.append("独立分支超过 3 条受限 Worker 上限，保持固定流程并分批核对。")
+    elif same_structured_source_set:
+        mode = "fixed_workflow"
+        reasons.append("多个独立工作包来自同结构同职能资料，先用固定流程避免把同源拆成伪并行。")
     elif remaining_model_calls < independent + 1:
         mode = "fixed_workflow"
         reasons.append("剩余模型调用不足以覆盖独立分支及合入校验，保持固定流程。")
@@ -88,3 +102,10 @@ def admit_topology(
 
 # Descriptive alias used by callers that treat admission as a policy engine.
 evaluate_topology_admission = admit_topology
+
+
+def jsonable_columns(value: object) -> tuple[str, ...]:
+    """Normalize server preview schema into a deterministic admission fact."""
+    if not isinstance(value, list):
+        return ()
+    return tuple(str(item) for item in value)
