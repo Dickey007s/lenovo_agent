@@ -24,6 +24,7 @@ TopologyMode = Literal[
 class TopologyAdmission(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
+    admission_version: Literal["topology-admission.v1"] = "topology-admission.v1"
     mode: TopologyMode
     work_unit_breadth: int = Field(ge=1)
     independent_branch_count: int = Field(ge=0)

@@ -62,6 +62,7 @@ from services.api.app.application.narrative_reconciliation import (
     build_verified_effect_context,
     reconcile_narrative,
 )
+from services.api.app.application.topology_admission import TopologyAdmission
 from services.api.app.application.harness_storage import (
     HarnessStateStore,
     InMemoryHarnessStateStore,
@@ -291,6 +292,8 @@ class HarnessRunSnapshot(BaseModel):
     base_artifact_version: int | None = Field(default=None, ge=1, le=24)
     base_task_commit: str | None = Field(default=None, pattern=r"^commit-[0-9a-f]{12}$")
     workspace_revision: str = Field(default="unknown", min_length=1, max_length=120)
+    recheck_file_refs: list[str] = Field(default_factory=list, max_length=24)
+    source_revision_changed: bool = False
     owner_id: str
     workspace_id: Literal["forte-public-office"] = "forte-public-office"
     status: str
@@ -346,7 +349,7 @@ class HarnessRunSnapshot(BaseModel):
     events: list[HarnessEvent] = Field(default_factory=list)
     # Demo 2 is projected into the same unified Run cockpit.  Admission is a
     # server fact; worker execution remains explicitly confirmed and bounded.
-    topology_admission: dict[str, Any] | None = None
+    topology_admission: TopologyAdmission | None = None
     worker_runs: list[dict[str, Any]] = Field(default_factory=list, max_length=3)
     shared_artifacts: list[dict[str, Any]] = Field(default_factory=list, max_length=3)
     worker_idempotency: dict[str, str] = Field(default_factory=dict, max_length=12)
@@ -437,6 +440,8 @@ class PublicHarnessRunSnapshot(BaseModel):
     base_artifact_version: int | None = None
     base_task_commit: str | None = None
     workspace_revision: str = "unknown"
+    recheck_file_refs: list[str] = Field(default_factory=list, max_length=24)
+    source_revision_changed: bool = False
     owner_id: str
     workspace_id: Literal["forte-public-office"]
     status: str
@@ -471,7 +476,7 @@ class PublicHarnessRunSnapshot(BaseModel):
     narrative_reconciliation: AgentControlLoopNarrativeReconciliation | None
     validation_errors: list[str]
     events: list[HarnessEvent]
-    topology_admission: dict[str, Any] | None = None
+    topology_admission: TopologyAdmission | None = None
     worker_runs: list[dict[str, Any]] = Field(default_factory=list, max_length=3)
     shared_artifacts: list[dict[str, Any]] = Field(default_factory=list, max_length=3)
 
@@ -1070,6 +1075,7 @@ class HarnessRuntime:
                     "carried_branch_id": _carried_branch_id,
                     "base_artifact_version": _base_artifact_version,
                     "base_task_commit": _base_task_commit,
+                    "workspace_revision": current_workspace_revision,
                 },
                 ensure_ascii=False,
                 sort_keys=True,
@@ -1084,6 +1090,7 @@ class HarnessRuntime:
                 return replay.result.model_copy(update={"replayed": True}, deep=True)
             parent: HarnessRunSnapshot | None = None
             carried_branch: AgentControlLoopBranch | None = None
+            source_revision_changed = False
             if _parent_run_id is not None:
                 parent_run = self._runs.get((owner_id, _parent_run_id))
                 if parent_run is None:
@@ -1091,10 +1098,7 @@ class HarnessRuntime:
                 parent = parent_run.snapshot
                 if parent.status not in {"stopped", "failed", "completed"}:
                     raise HarnessConflictError("只有已停止或已结束任务可以继续未完成任务")
-                if parent.workspace_revision != current_workspace_revision:
-                    raise HarnessConflictError(
-                        "资料库版本已变化，旧分支引用已过期；请重新检索后再创建任务"
-                    )
+                source_revision_changed = parent.workspace_revision != current_workspace_revision
                 if _task_id is not None and _task_id != parent.task_id:
                     raise HarnessConflictError("续办任务的 task_id 与旧任务不一致")
                 if _carried_branch_id is None:
@@ -1150,6 +1154,8 @@ class HarnessRuntime:
                 base_artifact_version=_base_artifact_version if parent else None,
                 base_task_commit=_base_task_commit if parent else None,
                 workspace_revision=current_workspace_revision,
+                recheck_file_refs=(list(carried_branch.input_file_refs) if source_revision_changed and carried_branch else []),
+                source_revision_changed=source_revision_changed,
             )
             budget = AgentControlLoopBudget(
                 max_rounds=contract.max_rounds,
@@ -1167,6 +1173,8 @@ class HarnessRuntime:
                 base_artifact_version=_base_artifact_version if parent else None,
                 base_task_commit=_base_task_commit if parent else None,
                 workspace_revision=current_workspace_revision,
+                recheck_file_refs=(list(carried_branch.input_file_refs) if source_revision_changed and carried_branch else []),
+                source_revision_changed=source_revision_changed,
                 owner_id=owner_id,
                 workspace_id=request.workspace_id,
                 status="queued",
@@ -1283,7 +1291,8 @@ class HarnessRuntime:
             if snapshot.version != expected_version:
                 raise HarnessConflictError("任务版本已更新，请刷新后重试")
             admission = snapshot.topology_admission or {}
-            if admission.get("mode") != "adaptive_readonly_workers":
+            admission_mode = admission.mode if isinstance(admission, TopologyAdmission) else admission.get("mode")
+            if admission_mode != "adaptive_readonly_workers":
                 raise HarnessConflictError("当前拓扑未获准启动只读 Worker")
             if len(worker_requests) < 1 or len(worker_requests) > 3:
                 raise HarnessConflictError("只读 Worker 数量必须在 1 到 3 之间")
@@ -6251,11 +6260,24 @@ class HarnessRuntime:
             run = self._require_run(owner_id, run_id)
             run.snapshot = run.snapshot.model_copy(
                 update={
-                    "topology_admission": admission.model_dump(mode="json"),
+                    "topology_admission": admission,
                     "updated_at": datetime.now(timezone.utc),
                 }
             )
             await self._persist_locked(run)
+        await self._transition(
+            owner_id,
+            run_id,
+            "validating",
+            "topology_admission",
+            "服务端已根据已校验计划选择执行拓扑；准入与实际执行分开。",
+            {
+                "mode": admission.mode,
+                "independent_branch_count": admission.independent_branch_count,
+                "external_action": False,
+                "user_confirmation_required": admission.user_confirmation_required,
+            },
+        )
 
     async def _set_analysis_receipt(
         self,

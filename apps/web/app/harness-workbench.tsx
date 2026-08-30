@@ -1136,6 +1136,8 @@ export type HarnessRun = {
   base_artifact_version: number | null;
   base_task_commit: string | null;
   workspace_revision: string;
+  recheck_file_refs: string[];
+  source_revision_changed: boolean;
   workspace_id: string;
   status: string;
   version: number;
@@ -1247,6 +1249,8 @@ const NAMED_EVENTS = [
   "planning_completed",
   "plan_validation_rejected",
   "plan_validation",
+  "topology_admission",
+  "topology_workers_completed",
   "ready_to_execute",
   "analysis_started",
   "analysis_completed",
@@ -3280,6 +3284,8 @@ function normalizeRun(value: unknown): HarnessRun | null {
     base_artifact_version: typeof raw.base_artifact_version === "number" ? raw.base_artifact_version : null,
     base_task_commit: asText(raw.base_task_commit) || null,
     workspace_revision: asText(raw.workspace_revision, "unknown"),
+    recheck_file_refs: asStrings(raw.recheck_file_refs),
+    source_revision_changed: raw.source_revision_changed === true,
     workspace_id: workspaceId,
     status: asText(raw.status, "queued"),
     version: asNumber(raw.version, 1),
@@ -4238,6 +4244,34 @@ export function HarnessWorkbench({ onActivityChange }: { onActivityChange?: (sta
     } finally { setStarting(false); }
   }
 
+  async function continueTask(branchId: string, instructionOverride?: string) {
+    const current = runRef.current;
+    if (!current || !workspace || !TERMINAL_STATUSES.has(current.status)) return false;
+    setStarting(true); setError(""); closeTransport();
+    const generation = generationRef.current + 1; generationRef.current = generation;
+    try {
+      const response = await fetch(`${API_BASE}/v1/harness/runs/${encodeURIComponent(current.run_id)}/continue`, {
+        method: "POST", headers: HEADERS,
+        body: JSON.stringify({
+          branch_id: branchId,
+          idempotency_key: `continue-${randomKey()}`,
+          expected_version: current.version,
+          instruction: instructionOverride?.trim() || undefined,
+        }),
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(asText((payload as Record<string, unknown>).detail, "任务没有继续"));
+      const snapshot = normalizeRun(payload);
+      if (!snapshot || !applySnapshot(snapshot, generation)) throw new Error("续办任务回执格式无效");
+      setView("loop");
+      if (!TERMINAL_STATUSES.has(snapshot.status)) connectEvents(snapshot.run_id, generation, snapshot.last_event_sequence);
+      return true;
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "任务没有继续");
+      return false;
+    } finally { setStarting(false); }
+  }
+
   async function controlLoop(command: LoopCommand, options: LoopControlOptions = {}) {
     const current = runRef.current;
     if (!current || (TERMINAL_STATUSES.has(current.status) && !["rollback", "decision"].includes(command))) return false;
@@ -4364,7 +4398,7 @@ export function HarnessWorkbench({ onActivityChange }: { onActivityChange?: (sta
         </nav>
         <div className="workspace-content">
           {view === "data" && <FilePreview preview={preview} file={activeFile} loading={previewLoading} error={previewError} />}
-          {view === "loop" && <LoopView run={run} files={allFiles} controlBusy={controlBusy} onControl={controlLoop} onReview={setReviewRequest} onStartTask={startTask} starting={starting} />}
+          {view === "loop" && <LoopView run={run} files={allFiles} controlBusy={controlBusy} onControl={controlLoop} onReview={setReviewRequest} onStartTask={startTask} onContinueTask={continueTask} starting={starting} />}
           {view === "result" && <ResultView result={run?.result ?? null} artifacts={run?.artifact_versions ?? []} workspaceArtifacts={run?.workspace_artifacts ?? []} receipts={run?.effect_receipts ?? []} reconciliation={run?.narrative_reconciliation ?? null} commit={run?.last_commit ?? null} decisions={run?.decision_records ?? []} decisionRequests={run?.decision_requests ?? []} files={allFiles} onOpenFile={openFile} onReview={setReviewRequest} onStartTask={startTask} starting={starting} />}
         </div>
         <details className="workspace-boundary"><summary><IconShieldCheck aria-hidden="true" />数据与执行边界</summary><p>{workspace.data_boundary} Agent 可以检索整个资料库，但每轮只读取服务端校验通过且受预算约束的文件；本轮不会修改原文件或执行外部动作。</p></details>
@@ -4409,6 +4443,7 @@ function LoopView({
   onControl,
   onReview,
   onStartTask,
+  onContinueTask,
   starting,
 }: {
   run: HarnessRun | null;
@@ -4417,6 +4452,7 @@ function LoopView({
   onControl: (command: LoopCommand, options?: LoopControlOptions) => Promise<boolean>;
   onReview: (request: EvidenceReviewRequest) => void;
   onStartTask: (instruction: string) => Promise<boolean>;
+  onContinueTask: (branchId: string, instruction?: string) => Promise<boolean>;
   starting: boolean;
 }) {
   const [selectedRoundNumber, setSelectedRoundNumber] = useState(1);
@@ -4525,7 +4561,7 @@ function LoopView({
       userDirection ? `用户补充：${userDirection}` : "",
       "边界：只读分析，不修改原文件，不执行外部动作。",
     ].filter(Boolean).join("\n");
-    await onStartTask(branchInstruction);
+    await onContinueTask(branch.branch_id, branchInstruction);
   };
   const showGeneratedArtifacts = () => {
     document.getElementById("workspace-artifacts-title")?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -4542,8 +4578,9 @@ function LoopView({
       </div>
     </header>
     <section className="loop-lineage-strip" aria-label="任务时间线" data-testid="task-lineage">
-      <div><span>任务时间线</span><strong>Task {run.task_id.slice(-6)} · Run {run.run_sequence}</strong></div>
+      <div><span>任务时间线</span><strong>任务持续链 · Run {run.run_sequence}</strong></div>
       <p>{run.parent_run_id ? `本次是第 ${run.run_sequence} 次运行，承接旧 Run 的 ${run.carried_branch_id ? "一个未完成分支" : "已批准成果引用"}。旧成果保留，当前资料库版本重新核对。` : "这是该任务的首次 Run；后续未完成分支可以创建新的 Run。"}</p>
+      {run.source_revision_changed && <p><b>来源版本已变化</b>：本段只重新核对批准分支材料，不携带旧的采用事实。</p>}
       {run.parent_run_id && <small>新 Run · 保留成果{run.base_artifact_version ? ` v${run.base_artifact_version}` : ""} · 不修改原文件 · 外部动作：未发生</small>}
     </section>
     {run.topology_admission && <section className="loop-topology-admission" aria-label="拓扑准入" data-testid="topology-admission">
@@ -4566,7 +4603,7 @@ function LoopView({
       <header><IconAlertTriangle aria-hidden="true" /><div><span>预算停止后的下一步</span><h3 id="terminal-recovery-title">当前 Run 已到预算边界，不能继续原地运行</h3><p><b>停止原因：{run.budget.stop_reason || "剩余预算不足以完成下一步"}。</b> 这不是整项工作丢失。旧 Run、调用回执和成果版本保持不变；请选择一个未完成分支，以它为目标创建新的独立 Run。</p></div></header>
       <div className="source-recovery-facts"><span><b>只影响</b>{terminalRecoveryBranches.length} 条尚未完成的分支</span><span><b>已保留</b>Plan、调用回执、分支状态与{preservedArtifactVersion ? `成果 v${preservedArtifactVersion}` : "阶段成果"}</span><span><b>未发生</b>原文件修改或外部动作</span></div>
       <label><span>补充给新任务的方向（可选）</span><textarea value={recoveryDraft} onChange={(event) => setRecoveryDraft(event.target.value)} placeholder="例如：先核对上线配置清单与功能测试报告中的版本和日期字段" /></label>
-      <div className="source-recovery-branches">{terminalRecoveryBranches.map((branch, index) => <article key={branch.branch_id}><div><b>{index === 0 ? "最小续办分支" : "可单独续办"}</b><h4>{branch.title}</h4><p>{branch.objective}</p><small>{branch.input_file_refs.length > 0 ? branch.input_file_refs.map(fileLabel).join(" · ") : "由 Agent 在整个资料库中重新选证"}</small></div><button type="button" disabled={starting} onClick={() => void startBranchRecoveryRun(branch)}><IconRefresh aria-hidden="true" />{starting ? "正在创建" : "用此分支创建新任务"}</button></article>)}</div>
+      <div className="source-recovery-branches">{terminalRecoveryBranches.map((branch, index) => <article key={branch.branch_id}><div><b>{index === 0 ? "最小续办分支" : "可单独续办"}</b><h4>{branch.title}</h4><p>{branch.objective}</p><small>{branch.input_file_refs.length > 0 ? branch.input_file_refs.map(fileLabel).join(" · ") : "由 Agent 在整个资料库中重新选证"}</small></div><button type="button" disabled={starting} onClick={() => void onContinueTask(branch.branch_id, recoveryDraft.trim() || branch.objective)}><IconRefresh aria-hidden="true" />{starting ? "正在创建" : "继续未完成任务"}</button></article>)}</div>
       <footer><IconShieldCheck aria-hidden="true" /><span>这是新的 Task Contract，不会覆盖或假装续跑旧 Run；新 Run 仍由服务端冻结整库索引并重新校验证据。</span></footer>
     </section>}
     {!boundedTerminalRecovery && <section className="loop-controls" aria-label="人工控制">

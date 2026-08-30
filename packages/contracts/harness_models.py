@@ -252,6 +252,8 @@ class AgentControlLoopContract(StrictModel):
     base_artifact_version: int | None = Field(default=None, ge=1, le=24)
     base_task_commit: str | None = Field(default=None, pattern=r"^commit-[0-9a-f]{12}$")
     workspace_revision: str = Field(default="unknown", min_length=1, max_length=120)
+    recheck_file_refs: list[str] = Field(default_factory=list, max_length=24)
+    source_revision_changed: bool = False
 
 
 class AgentControlLoopBudget(StrictModel):
