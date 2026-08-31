@@ -562,6 +562,39 @@ async def test_setup_is_the_only_legacy_task_backfill_point() -> None:
         await first.close()
 
 
+@pytest.mark.asyncio
+async def test_legacy_backfill_rejects_root_with_parent() -> None:
+    store = InMemoryHarnessStateStore()
+    first = HarnessRuntime(FakeCatalog(), FakePlanner(), FakeAnalyst(), state_store=store)
+    started = await first.start(
+        "legacy-root-owner",
+        HarnessRunStart(
+            idempotency_key="legacy-root-start-0001",
+            instruction="读取批准资料并保留任务时间线",
+        ),
+    )
+    try:
+        async with store._lock:
+            store._tasks.pop(("legacy-root-owner", started.run.task_id), None)
+            stored = store._runs[("legacy-root-owner", started.run.run_id)]
+            legacy_snapshot = dict(stored.snapshot)
+            legacy_snapshot.pop("task_version", None)
+            legacy_snapshot["parent_run_id"] = "harness:ffffffffffffffffffffffffffffffff"
+            store._runs[("legacy-root-owner", started.run.run_id)] = StoredHarnessRun(
+                owner_id=stored.owner_id,
+                run_id=stored.run_id,
+                snapshot=legacy_snapshot,
+                resume_status=stored.resume_status,
+            )
+        restored = HarnessRuntime(FakeCatalog(), FakePlanner(), FakeAnalyst(), state_store=store)
+        with pytest.raises(HarnessError, match="根节点"):
+            await restored.setup()
+        assert await store.get_task_record("legacy-root-owner", started.run.task_id) is None
+        await restored.close()
+    finally:
+        await first.close()
+
+
 def test_task_record_rejects_unsanitized_or_invalid_identity() -> None:
     with pytest.raises(ValidationError):
         _task(run_id="not-a-run")

@@ -964,6 +964,8 @@ class HarnessRuntime:
                 raise HarnessError("无法安全回填任务台账：Run sequence 不连续")
             if [item.task_version for item in ordered] != [item.run_sequence for item in ordered]:
                 raise HarnessError("无法安全回填任务台账：task_version 与 Run sequence 不一致")
+            if ordered[0].run_sequence != 1 or ordered[0].parent_run_id is not None:
+                raise HarnessError("无法安全回填任务台账：Run 根节点不一致")
             for previous, following in zip(ordered, ordered[1:], strict=False):
                 if following.parent_run_id != previous.run_id:
                     raise HarnessError("无法安全回填任务台账：Run lineage 不连续")
