@@ -1,6 +1,6 @@
 # Task Ledger V1 验收门（2026-08-31）
 
-- 状态：`Ready` 合同；实现与 Evidence 待补
+- 状态：`Limited Verified`；定向实现门通过，真实 PostgreSQL Task 门未运行
 - 决策：`DR-0054`
 - 场景：`SCENARIO-040`
 
@@ -21,6 +21,8 @@
 - 成功后 child 同 Task、新 Run、sequence+1，Task version+1/current=child；parent 全量
   Snapshot/Event/Artifact/Commit 不变。
 - store failure 注入必须使 Task、child、幂等 receipt 全部不变。
+- PostgreSQL continuation 必须在同一事务中同时校验 parent Run version 与 Task version，
+  不能只依赖某一 API 进程的内存预检。
 
 ## 3. TL-03 sibling CAS 与幂等
 
@@ -42,6 +44,7 @@
 - Task 时间线明确标“当前 Run”，旧 Run 和历史成果仍可打开。
 - continuation 请求包含两种 expected version。
 - Task 409 时保留 parent 画面与 SSE generation，提示刷新；刷新后只出现权威 child。
+- Task GET 失败时显示可重试状态，不能只依赖下一条 Run Snapshot 偶然触发重试。
 - 1440 px 与 390 px 正文不小于既有门槛，无页面级横向滚动。
 
 ## 6. 证明边界
@@ -53,7 +56,19 @@
 | PostgreSQL integration | 单数据库顺序事务与重启 | HA、lease、跨区域 |
 | browser mock/真实 API | 请求字段、冲突反馈和响应式投影 | 目标用户一定理解 |
 
-## 7. 本阶段禁止升级的结论
+## 7. 当前执行记录
+
+- 定向 memory/API/Demo 1/2 Python：`92 passed`。
+- PostgreSQL Task Ledger：`7 collected`、`7 skipped`，原因是未配置
+  `TEST_DATABASE_DSN`；不得写成真实数据库已通过。
+- Task Ledger browser mock：`4 passed`；Ruff、TypeScript lint 与 production build 通过。
+- 整库 Python：`410 passed, 23 skipped in 277.38s`；整库 Playwright：`68 passed
+  (2.6m)`。skip 仍按各自环境门解释，不能合并写成全功能验证。
+- 既有 TC-04 单测经独立复核为 `1 passed in 42.23s`，相关 scenario effects 为
+  `35 passed in 228.01s`；10 秒 faulthandler 只报告仍在等待真实 subprocess。真实
+  Provider 和目标用户研究均未运行。
+
+## 8. 本阶段禁止升级的结论
 
 - Task ledger 不等于 WorkUnit queue、Worker lease 或分布式执行器。
 - PostgreSQL 表已创建不等于真实 PostgreSQL 门已通过。

@@ -40,7 +40,11 @@ Agent Control Loop 的逐模块历史基线、当前有界效果纵切和后续�
 跨 Run Task lineage 与受限进程内只读 Worker 已形成 `Limited Verified` 纵切，
 工程 Evidence 见
 [`DR-0053-DEMO1-DEMO2-RUNTIME-EVIDENCE-20260831`](evidence/DR-0053-DEMO1-DEMO2-RUNTIME-EVIDENCE-20260831.md)。
-真实 PostgreSQL 新门与 Provider 同场运行仍未完成，不能写成通用/分布式 Worker。
+`DR-0054` 又把 Demo 1 的 lineage 升级为最小 owner-scoped Task Ledger/current pointer，
+工程 Evidence 见
+[`DR-0054-TASK-LEDGER-V1-EVIDENCE-20260831`](evidence/DR-0054-TASK-LEDGER-V1-EVIDENCE-20260831.md)。
+新增 Task Ledger 的真实 PostgreSQL 门与 Provider 同场运行仍未完成，不能写成生产级
+Task 服务或通用/分布式 Worker。
 十五条场景的实际效果、失败修复轨迹、真实模型运行和外部边界见
 [`SCENARIO-EFFECT-GATE-20260827`](evidence/SCENARIO-EFFECT-GATE-20260827.md)
 与[中文效果账本](reports/SCENARIO-EFFECT-GATE-LEDGER-20260827.md)。
@@ -58,11 +62,11 @@ Agent Control Loop 的逐模块历史基线、当前有界效果纵切和后续�
 | 7 | 安全预览把“Agent 读了什么”变成可见契约 | CSV/PDF/DOCX/TXT 预览拼图和安全说明 | 路径、大小、hash、符号链接和解析器测试 |
 | 8 | Harness 把模型调用、内容采用、确定性办公效果和整体 Loop 状态分开 | 事件、模型回执、可下载工件与检查结果时序 | Snapshot/Receipt/Artifact 事实；不展示思维链，也不把 `completed` 当作效果通过 |
 | 9 | Agent 说“有问题”之后，用户要同时看懂事实、影响、真实原文和自己必须决定的下一步 | 问题处置单：1 事实 -> 2 影响 -> 3 人工动作；证据与实际文件并排；A/B/C + 反馈 | `DR-0030/29`；推荐是模型候选，确认只创建新只读 Run |
-| 10 | Demo 1 把一次 Run 的停止变成同一 Task 的下一段执行；用户选择一条未完成工作线，旧成果不改，新 Run 只重核批准来源 | Task 时间线、Run 1→Run 2、继续未完成任务、基线成果与来源变化提示 | `DR-0053/SCENARIO-038`；child 是新 Run，版本可从 1 开始；本地 PG 新门跳过，不证明跨实例 durable Task |
+| 10 | Demo 1 把一次 Run 的停止变成同一 Task 的下一段执行；Task Ledger 决定哪个 child 才是当前工作面，用户选择一条未完成工作线，旧成果不改，新 Run 只重核批准来源 | Task 时间线、当前/历史 Run、Run 1→Run 2、双版本冲突后“打开当前 Run”、基线成果与来源变化提示 | `DR-0053/54`、`SCENARIO-038/040`；child 是新 Run，Run version 可从 1 开始；Task PG 七项测试本机跳过，不证明多实例 durable execution |
 | 11 | Demo 2 先解释为什么采用单 Controller、固定流程或受限 Worker，再由用户决定是否启动高成本路线 | 拓扑准入理由、3 个首波工作包、实际 called/adopted/elapsed 回执、下一波 ready、统一 ArtifactVersion | `DR-0053/SCENARIO-039`；当前每批最多 3 个进程内只读 Analyst Worker，不是通用/分布式 Swarm，也没有质量/成本优势结论 |
 | 12 | Demo 3 对单任务和多任务统一施加风险与动作控制 | 影响预演 -> 证据 -> 审批 -> Permit -> 回执 | 目标设计；当前没有真实外部动作 |
 | 13 | 当前 12 个本地 FORTE 场景已有真实隔离工件与确定性验证；3 个外部依赖场景明确阻断 | 12 通过、3 `blocked_external_boundary` 的效果账本；六个真实 `deepseek-v4-pro` 运行 | `DR-0035` 限定能力，不等于任意办公任务或用户价值；模型质量、效果验证、Loop 终态分开报告 |
-| 14 | 历史约 30% 审计基线已升级为可见分支、跨 Run Task 谱系、可解释拓扑、受限 Worker、可恢复逻辑成果和固定本地可写工件；下一步仍是通用 Tool Gateway、分布式 Worker 与外部动作治理 | Task→Run 时间线、Topology Admission、Branch Worker、Run Workspace Artifact 与 Demo 3 目标架构叠加图 | `30%` 只代表历史基线；当前 Worker 与真实工件都受限于单进程/固定适配器，不是通用 Agent 执行环境 |
+| 14 | 历史约 30% 审计基线已升级为可见分支、最小 Task Ledger/current pointer、跨 Run 谱系、可解释拓扑、受限 Worker、可恢复逻辑成果和固定本地可写工件；下一步是 WorkUnit Ledger、通用 Tool Gateway、分布式 Worker 与外部动作治理 | Task record→current Run→WorkUnit 目标链、Topology Admission、Branch Worker、Run Workspace Artifact 与 Demo 3 目标架构叠加图 | `30%` 只代表历史基线；当前 Task Ledger 不保存 WorkUnit/lease，Worker 与真实工件仍受限于单进程/固定适配器 |
 | 15 | 同一个任务可以“成果已通过、Agent 审计说明仍待修复”；用户必须先知道成果能否用，再决定是否处理引用位置 | TC-01 5/5 成果在前、两个同源 Gap 合并为一个审计项；PDF “技术/研发”断行修复前后 | `DR-0036`；Artifact 通过不等于 Run completed，Anchor 仍不证明语义正确 |
 | 16 | 成果文件必须在下载前说清“哪个期间、怎么算、拿来做什么” | TC-05 三张成果卡：两个 2026 明细与一个三期核对说明；问题审查页字号修复前后 | `DR-0037`；内容来源与任务上下文分开，Finance-018 仍是固定适配器；自动化不证明用户理解 |
 | 17 | 一个引用跳转缺口不应被包装成系统失败：先说成果是否已生成，再给一个动作 | TC-05 “成果已生成，还有 1 条说明缺少原表格位置”；查看成果、查找位置、技术详情三层 | `DR-0038`；只恢复目标 Branch，不覆盖 Artifact；未通过和旧 Run 使用不同话术 |
@@ -192,6 +196,7 @@ Agent Control Loop 的逐模块历史基线、当前有界效果纵切和后续�
 | 有界候选修复 | 模型返回未通过时不会静默采用 | `未采用` 与预算内重试 | `plan_validation_rejected` / `analysis_validation_rejected`、模型调用计数 |
 | EvidenceResolution + Finding 级恢复 | 一条坏引用不再抹掉全部有效结果；多候选或无候选都有明确下一步 | exact/ambiguous/unavailable、已保留/未采用/未发生 | `evidence_resolutions[]`、`partial_artifact_saved`、`next_step.recovery_kind` |
 | 预算终态分支续办 | 用户不会在不可恢复的页面里反复点“继续” | 旧 Run 已结束、保留项、未完成 Branch、用此分支创建同 Task 新 Run | `status=stopped`、`brief.outcome=bounded`、candidate Branch + `/continue`；不向旧 Run 发送 resume control |
+| Task current pointer 与双版本 CAS | 两个页面同时续办时，用户不用猜哪个 child 才是当前任务；失败页不丢旧成果 | “当前 Run/历史 Run”、中性状态冲突提示、“打开当前 Run”、Task 查询失败重试 | `GET /tasks/{task_id}`、`task_version` + parent `run.version`、原子 Task/Run/receipt；当前不等于 Task list、多实例调度或 WorkUnit queue |
 | 版本化人工决定 | 关闭不再等于“什么都没发生”，重连后仍能对账 | 接受/否决/暂缓、回执版本、无外部动作 | `decision_records[]`、`decision_recorded`、expected version + idempotency |
 | 人工确认下一步 | Agent 建议不会自动扩张任务；用户先看形成上下文 | “尚未逐项验证”“查看形成依据”“确认并启动” | 终态 `follow_ups` + Finding refs 上下文 + 新 Run POST |
 | 决定与证据重启恢复（DR-0032） | 用户不因 API 重启丢失待决候选或已完成成果 | 重启后继续同一 Decision Packet；接受后只恢复目标 Branch 并生成 v2 | 真实 PostgreSQL 顺序 Runtime 门已通过；当前仍嵌在 Snapshot JSONB 中，无独立 ledger/CAS，不证明多实例并发安全 |
@@ -214,6 +219,7 @@ Agent Control Loop 的逐模块历史基线、当前有界效果纵切和后续�
 - 新的 DecisionRecord 把 accept/decline/defer 绑定到 Finding/Resolution/Branch；它证明回执存在，不证明业务审批正确；
 - `exact/ambiguous/unavailable/stale/rejected` 是服务端拥有的原文位置状态，不是 Finding 真值；来源变化会进入 `stale`，候选重算不一致会进入 `rejected`；
 - DR-0032 的 `DecisionRequest`、来源修订校验、五态 EvidenceResolution、局部 Branch 恢复与 PostgreSQL 顺序重启门已在限定范围内实现；当前仍不能宣称独立决定账本、并发 CAS、多实例协调或在途调用恢复。
+- DR-0054 的最小 Task record、Task GET、Task/Run 双版本、sibling CAS、幂等 replay、current/history 前台和 fail-closed 旧数据恢复已有定向工程门；Task Ledger 定向 Python `92 passed`、浏览器 `4 passed`，整库 Python `410 passed, 23 skipped`、Playwright `68 passed`，Ruff/lint/build 通过。七项 PostgreSQL 测试仅收集并全部 skip，因此不能宣称真实 Task PostgreSQL 恢复、多实例协调或 WorkUnit durable state。
 - DR-0034 的全量门为 Python `83 passed, 2 skipped`、PostgreSQL `2 passed`、Harness browser `25 passed`，Ruff/lint/build 通过；它证明两类待处理动作的前台映射和 390 px 回归，不证明“3 秒内理解”或用户价值。
 - DR-0036 的门为 Python 定向 `78 passed`、本机全量 `116 passed, 3 skipped`、远端 PostgreSQL 17 `3 passed`、Harness browser `29 passed`、Ruff/lint/build 通过；一次真实 `deepseek-v4-pro` TC-01 在第 1 轮完成，真实 CSV 5/5、三 Branch 完成、0 Gap/开放 DecisionRequest。本机三个 skip 已由 PR #45 顺序 PostgreSQL 门补证，但仍不证明多实例；一次 Provider 成功也不证明重复稳定性或目标用户理解提升。
 - 两张确定性浏览器图分别展示“继续此分支”与“恢复 v1”；它们证明 UI/服务端字段映射，不是真实模型运行；
@@ -233,7 +239,7 @@ Agent Control Loop 的逐模块历史基线、当前有界效果纵切和后续�
 - “15 类 FORTE 任务已经全部解决”；
 - “有引用就证明结论或数字正确”；
 - “计划里出现操作，就说明工具或文件写入已经发生”；
-- “当前跨 Run Snapshot 字段已等同生产级 Durable Task 服务，或 Demo 2/3 已全部完成”；
+- “当前最小 Task Ledger/current pointer 已等同生产级 Durable Task/WorkUnit 服务，或 Demo 2/3 已全部完成”；
 - “内存 Snapshot 具备跨进程持久化或多实例高可用”；
 - “PostgreSQL Snapshot 恢复等于在途模型调用可续跑、跨实例调度或多实例高可用”；
 - “独立 append-only 逻辑 ArtifactVersion/TaskCommit 等于真实办公文件写入、源文件回滚或 Tool Gateway 动作”；

@@ -102,10 +102,18 @@ cannot widen that scope or replace the Branch objective.
 
 The Task timeline appears in the same work area. It tells the user whether this
 is the first or a later Run, that the old result is preserved, and whether the
-Workspace revision changed. A continuation response can legitimately restart
+Workspace revision changed. The browser also reads
+`GET /v1/harness/tasks/{task_id}` to distinguish the Task's authoritative current
+Run from a historical Run. Current status and Artifact/Commit pointers are derived
+from the current Run; the Task record does not duplicate the whole Snapshot.
+`run.version` guards one Run while `task_version` guards the cross-Run pointer, so
+the continuation request sends both expected versions. A continuation response can legitimately restart
 `version` and SSE sequence at 1 because counters belong to a Run, not a Task.
 The browser switches generation only after it has a valid child Snapshot; a 409,
-404 or transport failure leaves the parent Run rendered and recoverable.
+404 or transport failure leaves the parent Run rendered and recoverable. When a
+409 reveals that the current pointer moved, the parent is marked “历史 Run” and a
+visible action opens the authoritative Run. A failed Task GET keeps the parent and
+offers an explicit retry; it is not cached forever or reported as a successful refresh.
 
 After Plan validation, the service also persists one `TopologyAdmission`.
 `single_controller` and `fixed_workflow` proceed conservatively without a phantom
@@ -432,7 +440,8 @@ already changed the server.
 The current Run id is kept in browser session state. After refresh, the client
 first reconciles that id with `GET /runs/{run_id}`; when no local id exists it
 may discover the most recent nonterminal Owner Run through `GET /runs`. A
-`checkpoint_recovered` badge is shown only when that server event exists.
+known `task_id` is reconciled through Task GET so a historical parent cannot be
+mistaken for current. `checkpoint_recovered` is shown only when that server event exists.
 
 ## 7. Streaming and reconciliation
 
@@ -464,7 +473,9 @@ browser fact, not a server task phase.
 | manifest integrity invalid | integrity-specific unavailable state | no stale catalog | repair/import source then retry |
 | preview error | file-specific safe error | file list and task draft | reopen or choose another file |
 | unknown start result | reconciling | same instruction/limits/key | replay identical request |
-| continuation uses stale parent version | parent Run remains visible; no child accepted | parent Snapshot, history and unfinished Branch | refresh parent, then retry with a new command key or replay the identical request |
+| continuation uses stale parent or Task version | parent Run remains visible; no unverified child is accepted | parent Snapshot, history and unfinished Branch | refresh Task and parent; open the authoritative current Run if it moved, otherwise retry from current facts |
+| Task GET temporarily fails | parent/current screen remains visible with an explicit Task refresh error | rendered Run, local draft and SSE generation | retry Task GET; do not synthesize a current pointer or clear the Run |
+| Task pointer or lineage is inconsistent | fail-closed Task integrity state | immutable Run records and last rendered screen | repair durable state; GET must not backfill or pick by timestamp |
 | Workspace revision changed before continuation | child Task timeline says the source changed and exposes Branch recheck refs | immutable parent Run and base Artifact/Commit pointers | re-read only the approved carried Branch; do not silently adopt old prose |
 | adaptive route waits for confirmation | topology reason, work packages, budget and `external_action=none` | validated Plan/Branches; no Worker call yet | confirm the ready wave or switch to single Controller |
 | one Worker fails or evidence is ambiguous | per-Worker receipt plus only its Branch waiting | other adopted contributions and prior ArtifactVersions/Commits | keep the affected Branch waiting or continue the next ready wave; dedicated Worker decision/retry remains future work |
@@ -506,6 +517,15 @@ The real PostgreSQL 17.11 sequential gate now verifies pending-decision restart,
 target-Branch-only resume, v1/v2 preservation and a second restart. The browser
 path separately verifies desktop and 390 px candidate comparison, defer-then-final
 decision, cancel and reconnect; neither gate is a user study.
+
+DR-0054 adds a separate minimal Task record and append-only continuation receipt.
+Initial start and continuation share one aggregate commit with the Run and start
+idempotency receipt; sibling requests compete on `task_version`, while parent
+controls remain protected by `run.version`. Memory/API tests and browser mocks cover
+the current/historical projection, stale versions, replay and fail-closed reads.
+The six dedicated PostgreSQL Task Ledger tests are present but were skipped locally
+without `TEST_DATABASE_DSN`; this does not establish production multi-instance
+coordination, WorkUnit leases or high availability.
 DR-0034 adds only a browser projection gate: deterministic E2E checks retry-first
 and ambiguous-choice-first screens, disabled accept before selection, collapsed
 optional details and 390 px overflow. It does not change the DR-0032 persistence

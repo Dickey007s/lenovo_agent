@@ -19,7 +19,8 @@
    默认预算、append-only `ArtifactVersion`/`TaskCommit` 和可选 PostgreSQL 恢复之上，
    现已实现有限 `task_id`/child Run 纵切。一个终态 Run 可为一条服务端批准 Branch
    创建同 Task 的后继 Run，记录成果基线、Workspace revision 和精确重核 refs；旧 Run
-   不改写。独立 Task ledger、多实例当前指针与更细 per-file revision 仍未实现。
+   不改写。`DR-0054` 又加入最小 owner-scoped Task record/current pointer、Task GET 与
+   Task/Run 双版本 CAS；WorkUnit ledger、多实例执行协调与更细 per-file revision 仍未实现。
 2. **Demo 2 从“多 Agent 展示”升级为可解释的拓扑准入与服务端收敛。** 有限纵切现已
    落地：系统不按
    Prompt 中的“请多 Agent”直接扩容，而是由服务端根据来源跨度、工作包独立性、
@@ -42,7 +43,7 @@
   服务端编译 Branch、校验本轮来源、解析 Evidence Anchor，并维护 Snapshot/named SSE。
 - 每轮完成后可生成 append-only 逻辑 `ArtifactVersion`；`TaskCommit` 只移动当前版本
   指针，恢复历史成果不会删除新版或改写源文件。
-- 配置 PostgreSQL 时可保存 Snapshot、事件、幂等回执、成果和提交；重启后不会
+- 配置 PostgreSQL 时可保存 Snapshot、最小 Task record/continuation receipt、事件、幂等回执、成果和提交；重启后不会
   自动重放中断的模型调用，而是在可审查检查点暂停。
 - 十二个固定服务端适配器可在隔离 Run Workspace 生成有限类型成果并作确定性检查；
   这不是通用 Tool Gateway，也不是任意办公文件执行环境。
@@ -50,6 +51,11 @@
   `carried_branch_id`、基线 Artifact/Commit、Workspace revision 和 `recheck_file_refs`。
   `/continue` 从终态旧 Run 创建同 Task child Run，Owner/version/idempotency 与 Branch
   范围均由服务端校验；旧 Run 不重新打开。
+- 初始 start 与 continuation 现通过同一 State Store aggregate commit 写入最小 Task
+  record、Run Snapshot 和幂等回执。`task_version` 保护 current pointer，parent
+  `run.version` 保护旧 Run 条件；Task GET 返回 current Run 与最多 100 条近期 lineage，
+  当前状态、Artifact/Commit 从 Run 派生。失败页保留 parent，并可标记“历史 Run”后打开
+  权威 current Run。
 - Validated plan 现由服务端确定性编译三种 `TopologyAdmission`。只有
   `adaptive_readonly_workers` 需要确认；确认后每波最多三个进程内只读 Analyst Worker，
   只读 ready Branch 批准来源，返回与采用分开，只有 adopted + Anchor 的候选进入稳定
@@ -59,8 +65,10 @@
 
 ### 2.2 部分近似
 
-- `task_id` 已跨 child Run 稳定，但它仍分散保存在各 Run Snapshot，没有独立 Task
-  ledger、Task current pointer 或跨多个并发 child 的仲裁。
+- 最小 Task Ledger/current pointer 与单服务状态边界内的 sibling CAS 已实现，但没有
+  Task list、任意 current 回拨、production identity、WorkUnit/Contribution ledger 或
+  queue/lease。七项 PostgreSQL Task 测试当前因无 DSN 仅 collect/skip，不能据此宣称
+  真实数据库、多 API 实例执行或高可用已经验证。
 - `workspace_revision` 可提示数据集版本变化并公开精确重核 refs，但尚不是完整 per-file
   content revision/依赖图；后继 Run 保守重核所选 Branch 的批准来源。
 - Worker 具备 Branch 波次、最多三并发、预算预留和 partial merge，但只存在于当前 API
@@ -70,8 +78,8 @@
 
 ### 2.3 尚未实现
 
-- 独立 durable Task ledger/current pointer、多实例 Task CAS、per-file revision 与跨组织
-  通知/队列。
+- durable WorkUnit/Contribution ledger、多实例运行 ownership/lease、per-file revision
+  服务与跨组织通知/队列。
 - durable/distributed Worker queue、lease、远端调度、递归 Swarm、通用冲突对象和 Worker
   专属局部恢复协议。
 - 通用 Tool Gateway、真实 Connector、源文件写回、多实例协调、语义/数值通用 Verifier。
@@ -199,7 +207,9 @@ Provider。Fixture 通过不能升级模型质量、数据库恢复或用户价�
 ### 5.0.1 固定场景门之后的下一纵切：Task Ledger 先于 WorkUnit Ledger
 
 2026-08-31 固定场景门证明了单进程 Runtime 已能形成 child Run、两波 Worker partial
-merge 和 fixed 反例，也暴露了 current pointer 仍由 Run 集合间接推断的问题。
+merge 和 fixed 反例，也暴露了 current pointer 仍由 Run 集合间接推断的问题。随后
+`DR-0054` 已建立独立最小 Task record、Task current pointer、双版本 CAS、Task GET 和
+current/history 前台纵切。
 [OpenClaw Task Flow](https://docs.openclaw.ai/automation/taskflow) 的 durable flow record、
 revision conflict 与 linked tasks，以及
 [Restate Services](https://docs.restate.dev/foundations/services) 的 keyed persistent entity、
@@ -208,7 +218,9 @@ Task 级 CAS，再让 WorkUnit/Contribution ledger 绑定该写入边界。
 
 这不是把 OpenClaw 或 Restate 作为依赖，也不是新的竞品领先结论。若同时实现 Task、
 WorkUnit、queue、lease 和多实例，测试很难区分 current pointer、局部恢复和调度所有权
-分别由什么保证。因此 `DR-0054` 首版只做 Task ledger；WorkUnit ledger 作为下一纵切。
+分别由什么保证。因此 `DR-0054` 首版只做 Task ledger；当前定向工程门通过后，
+WorkUnit/Contribution ledger 成为下一纵切。真实 PostgreSQL、Provider 与用户研究仍是
+独立门，不能由 Task 表或 mock E2E 代替。
 
 ### 5.1 差异一：办公 Task lineage 与证据重核合同，而不是只有可恢复状态
 
@@ -321,8 +333,9 @@ Prompt、CoT、原始 Provider response、内部路径和内部验证字符串�
 - 后端事实：`task_id`、Run lineage、carried Branch、base Artifact/Commit、Workspace
    revision、start idempotency。
 - 设计来源：Temporal durable workflow、OpenClaw Task Flow、A2A Task lifecycle。
-- 当前边界：当前默认 12 轮且可到 24；跨 Run 单 Branch 继承协议已实现并有本地自动化，
-  但真实 PostgreSQL 门本机跳过、Provider 未运行，独立 Task ledger 仍缺失。
+- 当前边界：当前默认 12 轮且可到 24；跨 Run 单 Branch 继承、最小 Task Ledger、双版本
+  CAS 与 current/history UI 已有本地自动化，但真实 PostgreSQL Task 门本机跳过、
+  Provider 未运行，也没有 WorkUnit ledger 或多实例执行协调。
 
 ### 场景 C：API 重启后从检查点恢复，而不是重复模型调用
 
@@ -335,8 +348,8 @@ Prompt、CoT、原始 Provider response、内部路径和内部验证字符串�
 - 后端事实：Snapshot、ordered events、`checkpoint_recovered`、task store health、
   idempotency receipts。
 - 设计来源：OpenAI durable integrations、LangGraph persistence、Temporal。
-- 当前边界：单 PostgreSQL 顺序恢复已有历史 Evidence；新的跨 Run lineage PG 测试已收集
-  但本机无 DSN 而 skip，多实例 lease 未实现。
+- 当前边界：单 PostgreSQL 顺序恢复已有历史 Evidence；新的跨 Run lineage/Task Ledger
+  七项 PG 测试已收集但本机无 DSN 而 skip，多实例 lease 未实现。
 
 ### 场景 D：三期财务明细不应因为文件多就启动 Swarm
 
@@ -450,16 +463,17 @@ Agent 数量不是固定产品配置，而是服务端基于合同选择的成�
 
 ## 9. 开发顺序与可证伪门
 
-### 第一阶段：Demo 1 Task lineage（有限纵切已完成）
+### 第一阶段：Demo 1 Task lineage 与 Task Ledger V1（有限纵切已完成）
 
 1. 在现有八模块内扩展稳定 Task 身份、Run lineage、继承范围和来源重核回执。
 2. 后继 Run 只能由终态/预算停止的旧 Run 创建；旧 Run、Artifact、Commit 不变。
 3. 先覆盖单分支继承、来源变化、重复 start、PostgreSQL 重启和 SSE 对账。
 4. 前台只增加“在同一任务下继续”与继承说明，不引入无限预算措辞。
 
-当前门：本地任务、分支、来源投影、成果基线、幂等与浏览器门通过；真实 PostgreSQL
-测试已提交但本机无 `TEST_DATABASE_DSN` 而 skip，真实 Provider 未运行。下一步是完成
-这些外部门，并补独立 Task ledger/current pointer，而不是继续放大 Run 预算。
+当前门：本地任务、分支、来源投影、成果基线、最小 Task record、双版本 CAS、幂等、
+fail-closed 恢复与 current/history 浏览器门通过；真实 PostgreSQL Task 测试已提交但
+本机无 `TEST_DATABASE_DSN` 而 skip，真实 Provider 未运行。下一步是在不放大 Run
+预算的前提下补 WorkUnit/Contribution ledger，并单独完成这些外部门。
 
 ### 第二阶段：Demo 2 Topology Admission（有限纵切已完成）
 
@@ -502,7 +516,7 @@ finding 不截断、partial merge 和旧成果保留已有自动化；通用 sta
 | 当前默认最多 12 轮、上限 24 | `Current` | 当前 contract/source | 不等于适合无限长任务 |
 | 当前有 Run 内 Branch、Evidence Gate、Artifact/Commit、可选 PG 恢复 | `Current` | 当前源码与 living docs | 不等于多实例恢复 |
 | 持久状态、暂停和并行 Agent 已是主流能力 | `Research-supported` | OpenAI、LangGraph、Temporal、Codex、Claude、OpenClaw 官方资料 | 不是竞品同场实测 |
-| Task lineage + contribution adoption 有限纵切 | `Limited Verified` | 07-16、当前源码、unit/E2E/Evidence | PG/Provider/用户价值仍未验证 |
+| Task lineage + minimal Task Ledger + contribution adoption 有限纵切 | `Limited Verified` | 07-16、当前源码、unit/E2E/Evidence | Task PG/Provider/WorkUnit/用户价值仍未验证 |
 | Admission 可减少无意义多 Worker | `Hypothesis` | 多 Agent 成本/适用性资料 | 尚无本项目成本或质量实验 |
 | 统一驾驶舱比多聊天更清晰 | `Draft` | HAI/mixed-initiative 研究与产品假设 | 必须做目标用户研究 |
 
@@ -514,6 +528,7 @@ finding 不截断、partial merge 和旧成果保留已有自动化；通用 sta
   本项目拟建立的原生合同。
 - Anthropic 的 Token 和内部评测数字、IBM 群聊研究、Microsoft 通用指导均不能直接
   外推到本项目目标用户。
-- 本文是研发输入。源码、本地 unit/浏览器/负向测试和 Evidence 已使有限纵切升级为
-  `Limited Verified`；PostgreSQL、Provider、分布式运行和用户研究未完成的结论不得被
+- 本文是研发输入。源码、本地 unit/浏览器/负向测试和 Evidence 已使最小 Task Ledger 与
+  进程内 Worker 有限纵切升级为 `Limited Verified`；Task PostgreSQL、Provider、
+  WorkUnit/分布式运行和用户研究未完成的结论不得被
   一并升级。只有完成目标用户研究，体验判断才能升级。

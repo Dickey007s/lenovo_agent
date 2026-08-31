@@ -4,7 +4,7 @@ Base URL: `http://localhost:8010`.
 
 ## 1. Public surface
 
-OpenAPI exposes ten paths and eleven operations:
+OpenAPI exposes eleven paths and twelve operations:
 
 | Method | Path | Purpose |
 | --- | --- | --- |
@@ -14,6 +14,7 @@ OpenAPI exposes ten paths and eleven operations:
 | POST | `/v1/harness/runs` | start an idempotent bounded read-only Agent Control Loop |
 | GET | `/v1/harness/runs?limit=10` | list recent Owner-scoped Runs for recovery |
 | GET | `/v1/harness/runs/{run_id}` | Owner-scoped public Snapshot |
+| GET | `/v1/harness/tasks/{task_id}` | Owner-scoped current Task pointer and sanitized Run lineage |
 | POST | `/v1/harness/runs/{run_id}/continue` | create a child Run for exactly one unfinished Branch of a terminal Run |
 | POST | `/v1/harness/runs/{run_id}/workers` | explicitly confirm and run one admitted read-only Worker wave |
 | GET | `/v1/harness/runs/{run_id}/artifacts/{artifact_id}` | Owner-scoped download of one verified Run Workspace file |
@@ -25,14 +26,16 @@ workspace/thread/task/Demo prefixes are not mounted.
 
 ## 2. Owner and persistence
 
-Run endpoints use `X-User-Id`; omission uses `demo_user`. This unsigned header
+Run and Task endpoints use `X-User-Id`; omission uses `demo_user`. This unsigned header
 is a demonstration Owner placeholder, not production authentication. Missing
 and wrong-owner Runs both return 404 before the SSE response is created.
 
-There are eleven operations over ten OpenAPI paths because `GET` and `POST`
-share `/runs`. With `DATABASE_DSN`, accepted Run snapshots, start/control
-idempotency receipts, continuation start receipts, ArtifactVersions and TaskCommits are stored in
-PostgreSQL; the latter two are independent append-only rows. Verified Run
+There are twelve operations over eleven OpenAPI paths because `GET` and `POST`
+share `/runs`. With `DATABASE_DSN`, accepted Run snapshots, the minimal Task
+Ledger, Task continuation receipts, start/control idempotency receipts,
+ArtifactVersions and TaskCommits are stored in PostgreSQL; the latter two are
+independent append-only rows. Initial start and continuation use one State Store
+aggregate commit for the Task/current pointer, Run and idempotency facts. Verified Run
 Workspace file metadata remains in the Snapshot, while the bytes live in the
 isolated server Artifact store and are rechecked on download. On startup, an
 interrupted nonterminal Run is rolled back to completed rounds, receives
@@ -185,6 +188,7 @@ Content-Type: application/json
   "branch_id": "branch-0123456789ab",
   "idempotency_key": "continue-client-generated-key",
   "expected_version": 41,
+  "expected_task_version": 3,
   "instruction": "继续核对这条未完成工作线",
   "loop": {
     "max_rounds": 12,
@@ -196,8 +200,11 @@ Content-Type: application/json
 ```
 
 该命令不是恢复旧 Run。旧 Run 必须是 `completed/stopped/failed`，所选 Branch
-必须存在且未完成。服务端再次校验 Owner、旧 Run 当前版本、Branch 归属、幂等键、
+必须存在且未完成。服务端再次校验 Owner、旧 Run 当前版本、Task 当前版本、Branch 归属、幂等键、
 基线 Artifact/Commit 与当前 Workspace revision，然后创建一个 `version=1` 的 child Run。
+`expected_version` 保护 parent Run；`expected_task_version` 保护跨 Run 的 current pointer。
+任一过期都返回 409，不创建 child，也不更新 Task、Event、Artifact 或 Commit。相同
+Owner/key/payload 重试返回同一 child；同 key 不同 payload 返回 409。
 child 与父 Run 共享 `task_id`，并记录 `run_sequence`、`parent_run_id`、
 `carried_branch_id`、`base_artifact_version`、`base_task_commit`、
 `workspace_revision`、`recheck_file_refs` 和 `source_revision_changed`。
@@ -208,7 +215,51 @@ Owner/key/请求返回同一个 child 且 `replayed=true`；旧版本、完成 B
 或同 key 不同内容返回冲突/未找到。父 Snapshot、Event、ArtifactVersion 与 TaskCommit
 保持不变。
 
-### 5.2 确认并执行一批受限只读 Worker
+### 5.2 查询 Task 当前 Run 与历史
+
+```http
+GET /v1/harness/tasks/{task_id}
+X-User-Id: demo_user
+```
+
+代表性响应：
+
+```json
+{
+  "task_id": "task-0123456789ab",
+  "task_version": 4,
+  "current_run_id": "harness:...",
+  "run_sequence": 4,
+  "parent_run_id": "harness:...",
+  "workspace_revision": "345c1ec1487139db9dd319787fa9405ba85d1869",
+  "status": "completed",
+  "current_artifact_id": "artifact-...",
+  "current_artifact_version": 2,
+  "current_commit_id": "commit-...",
+  "lineage": [
+    {
+      "run_id": "harness:...",
+      "run_sequence": 1,
+      "parent_run_id": null,
+      "status": "stopped",
+      "created_at": "2026-08-31T02:00:00Z",
+      "updated_at": "2026-08-31T02:05:00Z"
+    }
+  ],
+  "lineage_total": 4,
+  "lineage_truncated": false
+}
+```
+
+Task record 只持有需要 CAS 的最小 current pointer；`status`、当前 Artifact/Commit 和
+lineage 来自它指向的 Run 记录，不在 Task 表复制。响应最多返回最近 100 条 lineage，
+`lineage_total/lineage_truncated` 明确是否省略更早记录。错误 Owner 与不存在 Task 使用
+相同 404。Task record 缺失但 Run 存在、current Run 缺失或 current 身份/版本不一致时
+返回 503，不合成 `unknown` 或按更新时间猜选。GET 不做临时 backfill；旧数据只在
+Runtime setup 时通过连续 sequence、无 parent 的根 Run 和完整 parent 链保守迁移，链路
+损坏会在 setup 阶段 fail closed。
+
+### 5.3 确认并执行一批受限只读 Worker
 
 ```http
 POST /v1/harness/runs/{run_id}/workers
@@ -246,6 +297,7 @@ Important fields:
 {
   "run_id": "harness:...",
   "task_id": "task-0123456789ab",
+  "task_version": 2,
   "run_sequence": 2,
   "parent_run_id": "harness:...",
   "continuation_reason": "继续未完成任务",
@@ -1028,6 +1080,9 @@ reconciliation; a nonterminal interruption uses GET plus `after=N` recovery.
 | preview 503 | selected byte failed integrity/safe parsing | never show stale/partial content |
 | Run/SSE 404 | missing or wrong Owner | same public response; clear stale Run |
 | start 409 | idempotency/contract conflict | preserve instruction/selection and reconcile |
+| Task GET 404 | Task missing or wrong Owner | same public response; do not reveal Task ownership |
+| Task GET 503 | Task/current Run/lineage integrity or durable read failed | keep the rendered Run, show explicit retry; never synthesize a current pointer |
+| continuation 409 | parent Run or Task version changed, Branch no longer eligible, or idempotency conflicts | keep the parent/SSE generation, refresh Task and Run, then open the authoritative current Run or retry from current facts |
 | control 409 | stale version or illegal transition | GET current Snapshot; preserve command draft and let the user retry |
 | decision 409 | Finding/Resolution/Branch binding is stale, or option/candidate is not owned by that record | GET current Snapshot; keep the user's feedback draft and choose from current facts |
 | branch control 409 | selected Branch is missing, no longer waiting or outside the current Gate | GET current Snapshot and choose a still-waiting Branch |

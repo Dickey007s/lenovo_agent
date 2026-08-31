@@ -1,6 +1,6 @@
 # SCENARIO-040：两个页面同时续办时只有一个当前 Run
 
-- 状态：`Proposed`
+- 状态：`Limited Verified`；memory/API/browser 定向门通过，真实 PostgreSQL Task 门未运行
 - 决策：`DR-0054`
 - Source：`USER-FEEDBACK-20260831-DEMO1-DEMO2-FIXED-SCENARIO-HARDENING`、
   `DURABLE-ENTITY-STATE-OFFICIAL-20260831`
@@ -38,7 +38,7 @@
 
 ## 后端事实
 
-- Task record：`task_id/task_version/current_run_id/current_run_sequence`；Run lineage 由同
+- Task record：`task_id/task_version/current_run_id/current_run_sequence/parent_run_id`；Run lineage 由同
   `task_id` 的不可变 Snapshot 派生，不在 Task 表再复制一份 `run_ids`。
 - parent Run：`expected_version`、Branch 归属、immutable Artifact/Commit。
 - continuation receipt：Owner、两种 expected version、幂等 digest 与 child Run。
@@ -49,7 +49,7 @@
 - **同幂等键同请求重试**：返回相同 child；Task version 不再递增。
 - **同幂等键不同请求**：409；不泄露原请求内容。
 - **旧 Run version**：即使 Task version 当前也拒绝，避免从过期 parent 状态继续。
-- **错误 Owner**：404/403；不能查询 Task 或 child 是否存在。
+- **错误 Owner**：与不存在对象相同的 404；不能查询 Task 或 child 是否存在。
 - **store 在事务中失败**：Task、child、receipt 全部回滚。
 - **重启前有在途模型调用**：只恢复已提交 Task/Run 检查点，不自动重放调用。
 - **旧数据有重复最大 run sequence**：backfill fail closed，不按 updated_at 猜 current。
@@ -62,4 +62,5 @@
 4. continuation 是否扩大了文件范围或触发外部动作？
 
 该场景的自动化通过只能证明版本与状态合同。用户是否理解冲突提示、是否减少误操作，
-仍需要目标用户形成性测试。
+仍需要目标用户形成性测试。真实 PostgreSQL Task 测试在本机因无 DSN 跳过，因此场景
+也不证明多 API 实例执行、崩溃恢复或高可用。

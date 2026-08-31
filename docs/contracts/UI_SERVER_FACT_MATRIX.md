@@ -107,8 +107,10 @@ Prompt、思维链、原始模型响应、绝对路径、哈希和内部策略�
 | Deterministic authority placeholder | a usable current service result exists even when model prose is not public | `narrative_reconciliation.authority=deterministic_outcome` **and** at least one passed Artifact or EffectReceipt | say “以服务端确定性成果为准” and link attention to the verified files above | workspace file/receipt presence alone, including failed/bounded evidence, establishes authority |
 | Failed/bounded-only result surface | no passed deterministic result and no adopted model result exists | only failed/bounded Artifact/EffectReceipt, or reconciliation lacks deterministic authority | say “尚未形成可采用的确定性成果” and point to failure/recovery details | failed receipt is a confirmed business conclusion or service authority |
 | Task branches | validated work units now have server-owned identity, dependency and evidence state | `branches[]`, `round.branch_ids` | created after plan validation; state changes only through server verification/control | Branch ID generation and validator internals |
-| Task timeline | this is Run N of one business Task; a child Run is a new bounded execution, not an reopened parent | `task_id`, `run_sequence`, `parent_run_id`, `continuation_reason` | first Run has no parent; continuation creates a new Run and may restart version/sequence at 1 | internal IDs as the primary label, infinite session continuity or parent mutation |
-| Continuation scope | exactly one unfinished parent Branch seeds the child and its first evidence recheck | `carried_branch_id`, `base_artifact_version`, `base_task_commit`, `workspace_revision`, `recheck_file_refs`, `source_revision_changed` | Owner/version/idempotency and Branch membership are checked twice around child creation; optional text cannot widen refs | old model prose as authority, silent source reuse, unrelated Branch replay or source-file change |
+| Task timeline | this is Run N of one business Task; a child Run is a new bounded execution, not an reopened parent; the rendered Run is current or historical | Run `task_id/task_version/run_sequence/parent_run_id`; `GET /tasks/{task_id}` current pointer and sanitized lineage | first Run has no parent; Task GET derives status/Artifact/Commit from the current Run, returns at most 100 recent lineage rows and never backfills on GET | internal IDs as the primary label, infinite session continuity, parent mutation or Task row duplicating all Run facts |
+| Continuation scope | exactly one unfinished parent Branch seeds the child and its first evidence recheck | `carried_branch_id`, `base_artifact_version`, `base_task_commit`, `workspace_revision`, `recheck_file_refs`, `source_revision_changed`; request `expected_version` + `expected_task_version` | Owner, parent Run version, Task current version, idempotency and Branch membership must all pass; optional text cannot widen refs | old model prose as authority, silent source reuse, unrelated Branch replay or source-file change |
+| Continuation conflict | the displayed parent or Task pointer is stale; no unverified child replaced the screen | HTTP 409, unchanged parent/SSE generation, refreshed Task projection | use neutral conflict copy first; only say “已有新 Run” after Task GET proves `current_run_id` differs, then provide “打开当前 Run” | every 409 means another page won, hiding Branch/Run conflicts, or switching to a guessed child |
+| Task projection unavailable | current pointer cannot be established from authoritative records | Task GET 503 or invalid sanitized payload | preserve the rendered Run and expose an explicit retry; a successful later GET may mark it current/historical | permanent client-side suppression, synthesized `unknown`, timestamp-based current selection or clearing history |
 | Agent-selected evidence | files chosen for this round and business reason | `round.input_file_refs`, `plan.selection_reason` | after server budget/compiler validation | full metadata index, model ranking internals |
 | Analyst started/returned | provider analysis stage, not completion | `analysis_started/completed` | per round | Prompt, CoT, raw response |
 | Analyst receipt | not called/adopted/not adopted and elapsed time | round `analysis_receipt.*` | independent of result validation | token/provider trace |
@@ -164,7 +166,7 @@ Prompt、思维链、原始模型响应、绝对路径、哈希和内部策略�
 | Steer next round | record a direction for the next round | control POST `steer`, `pending_steer`/ControlEvent | does not rewrite an already accepted round | claim that current result changed immediately |
 | Stop and keep | terminate at a safe point and preserve work | control POST `stop`, terminal Snapshot | idempotent replay returns original command result | deletion/rollback claim |
 | Restore result version | select a historical logical brief without overwriting history | control POST `rollback` with `artifact_version`; returned Snapshot/ControlEvent | completed committed Run only; expected version + idempotency; appends a TaskCommit | original file rollback or deletion of newer ArtifactVersion |
-| Version conflict | another fact is newer than this control | HTTP 409 + current Snapshot reconciliation | refresh, review, submit a new command | field-level merge not implemented |
+| Version conflict | another Run or Task fact is newer than this command | HTTP 409 + current Run/Task reconciliation | keep the current screen; refresh the relevant authority, review, then submit a new command | field-level merge or assuming every 409 created a child |
 
 ## 5. Preview and validation limits
 
@@ -191,8 +193,8 @@ Prompt、思维链、原始模型响应、绝对路径、哈希和内部策略�
 - “trajectory live” requires an open current EventSource; “service available”
   only requires successful HTTP.
 - Missing/wrong-owner Run returns the same 404.
-- `X-User-Id` is unsigned. With `DATABASE_DSN`, Snapshot, command receipts,
-  ArtifactVersions and TaskCommits are PostgreSQL-backed; without it they remain
+- `X-User-Id` is unsigned. With `DATABASE_DSN`, Snapshot, minimal Task records,
+  Task/start/control receipts, ArtifactVersions and TaskCommits are PostgreSQL-backed; without it they remain
   one-process memory.
 - Run Workspace Artifact metadata/effect receipts live in the Snapshot; same-host
   Artifact bytes live in a separate isolated store and are rechecked on download.
@@ -212,7 +214,9 @@ Prompt、思维链、原始模型响应、绝对路径、哈希和内部策略�
 - Pause/stop apply between provider calls; deadline prevents a new call but does
   not hard-cancel an in-flight request.
 - Browser refresh restores a known Run id; `GET /runs` can discover the latest
-  nonterminal Owner Run. There is not yet a full history chooser.
+  nonterminal Owner Run, and Task GET identifies the current Run plus a bounded
+  lineage projection. There is not yet a Task list, arbitrary current switch or
+  production history manager.
 
 ## 7. Evidence and applicability
 

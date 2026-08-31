@@ -4,21 +4,21 @@
 
 | 字段 | 内容 |
 | --- | --- |
-| 状态 | `Proposed`；源码、PostgreSQL 与浏览器 Evidence 尚未形成 |
+| 状态 | `Limited Verified`；memory/API/browser 定向门通过，真实 PostgreSQL Task 门未运行 |
 | 日期 | 2026-08-31 |
 | 用户来源 | `USER-FEEDBACK-20260831-DEMO1-DEMO2-FIXED-SCENARIO-HARDENING` |
 | 前置决策 | `DR-0053` 的有限 Task lineage 与固定场景门 |
 | 研究 | `DURABLE-AGENT-RUNTIMES-OFFICIAL-20260830`、`DURABLE-ENTITY-STATE-OFFICIAL-20260831` |
 | 场景 | [`SCENARIO-040`](../scenarios/SCENARIO-040-task-current-run-cas-and-restart.md) |
 | 测试合同 | [`TASK-LEDGER-V1-GATES-20260831`](../testing/TASK-LEDGER-V1-GATES-20260831.md) |
-| Evidence | 实现后新增；不得复用 DR-0053 固定 Fixture 结果冒充持久 Task 表已存在 |
+| Evidence | [`DR-0054-TASK-LEDGER-V1-EVIDENCE-20260831`](../evidence/DR-0054-TASK-LEDGER-V1-EVIDENCE-20260831.md) |
 
 ## 问题
 
 `DR-0053` 已经把 `task_id`、父子 Run、成果基线和来源重核范围放进每个 Run
-Snapshot，并证明单线程 continuation 不改写 parent。但当前 Runtime 仍通过扫描内存中
-全部 Run 计算下一个 `run_sequence`；没有独立 Task current pointer，也不能对两个并发
-continuation 做 Task 级版本仲裁。
+Snapshot，并证明单线程 continuation 不改写 parent。`DR-0054` 实施前，Runtime 仍通过
+扫描内存中全部 Run 计算下一个 `run_sequence`；没有独立 Task current pointer，也不能
+对两个并发 continuation 做 Task 级版本仲裁。下列断点是本次实现要关闭的历史基线。
 
 这会在用户流程中留下三个断点：
 
@@ -47,7 +47,7 @@ expected revision，过期写入冲突而不是覆盖新状态。
 
 ### 1. Task 成为独立服务端记录
 
-新增 Owner-scoped `TaskLedgerRecord`，只保存跨 Run 必须稳定且需要 CAS 的最小事实：
+新增 Owner-scoped `TaskRecord`，只保存跨 Run 必须稳定且需要 CAS 的最小事实：
 
 - `task_id`、`task_version`、`workspace_id`、`workspace_revision`；
 - `current_run_id`、`current_run_sequence`、`parent_run_id`；
@@ -129,6 +129,12 @@ WorkUnit 状态、依赖、最新 Contribution 和局部恢复版本，但不会
 5. memory store 重建 Runtime 后 Task current pointer 与 lineage 一致。
 6. 旧 Snapshot backfill 唯一时成功、冲突时 fail closed。
 7. PostgreSQL 测试必须包含条件更新和事务回滚；无 DSN 时明确 skip。
-8. 浏览器在 1440/390 px 标出当前 Run，409 时不提前切 SSE 或覆盖 parent。
+8. 浏览器标出当前/历史 Run，409 时不提前切 SSE 或覆盖 parent；Task GET 失败必须可重试。
 
-在源码、定向测试、整库门和新 Evidence 完成前，本决策保持 `Proposed`。
+当前 memory/API 定向门、Task Ledger browser mock、Ruff、lint 与 build 已通过；七项
+PostgreSQL integration 已收集但因本机无 `TEST_DATABASE_DSN` 全部 skip。既有 TC-04
+subprocess 经独立复核为约 42 秒的真实 baseline/compile/self-test 长任务，不是挂死或本
+分支回归；相关 scenario-effect 文件 `35 passed in 228.01s`。当前整库 Python 为
+`410 passed, 23 skipped`，整库 Playwright 为 `68 passed`。真实 Provider 和目标用户研究
+未运行。因此本决策只能标 `Limited Verified`，
+不能升级为生产 durable Task、WorkUnit/Worker durability 或用户价值结论。

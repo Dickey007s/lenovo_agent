@@ -111,8 +111,10 @@
 ## 当前边界
 
 当前实现已有服务端 `task_id`、同 Task child Run、单 Branch 范围、基线成果、Workspace
-revision/精确重核 refs、公共投影和 Task 时间线。它仍把 Task 身份保存在各 Run Snapshot
-中，没有独立 Task ledger/current pointer；revision 主要是 Workspace 数据集级，不是完整
-per-file 版本服务。新增 PostgreSQL 门在本机没有 DSN 而跳过，真实 Provider 未运行，
+revision/精确重核 refs、公共投影和 Task 时间线。`DR-0054` 又增加最小 owner-scoped
+Task record/current pointer、Task GET 和 Task/Run 双版本仲裁；Run Snapshot 仍拥有
+Branch、Budget、Event、Artifact/Commit 等执行细节。revision 主要是 Workspace 数据集级，
+不是完整 per-file 版本服务；也没有 WorkUnit ledger、queue/lease 或多实例执行协调。
+新增 Task PostgreSQL 门在本机没有 DSN 而跳过，真实 Provider 未运行，
 也没有目标用户研究。因此这里只能标 `Limited Verified`，不能声称跨进程门、业务正确性、
 用户理解或效率已经改善。

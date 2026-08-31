@@ -89,9 +89,24 @@ exists. The parent Snapshot, events and versions are never rewritten.
 
 The child publicly exposes `recheck_file_refs` and whether the Workspace revision
 changed. A changed revision means the selected Branch must be re-read; it does not
-automatically invalidate or mutate the parent. This is a lineage slice stored in
-Run Snapshots and start idempotency records, not a separate Task database, current
-Task pointer, cross-tenant identity service or infinite Run resume.
+automatically invalidate or mutate the parent.
+
+`DR-0054` adds a deliberately small owner-scoped Task Ledger above those immutable
+Run Snapshots. `TaskRecord` stores only the Task version, Workspace identity/revision,
+current Run/sequence/parent and timestamps. It does not duplicate Branch, Budget,
+Event, ArtifactVersion or TaskCommit arrays. `GET /v1/harness/tasks/{task_id}`
+follows the authoritative current pointer and derives current status, current
+Artifact/Commit and at most the latest 100 lineage items from Run Snapshots. A
+missing Task/current Run or an inconsistent identity fails closed rather than
+creating an `unknown` public state.
+
+There are now two concurrency domains. `run.version` protects controls within one
+Run; `task_version` protects cross-Run current selection. Initial start and
+continuation atomically commit Task, Run and start idempotency receipt through
+`HarnessStateStore`. Continuation also writes an append-only Task receipt and must
+match both expected versions, so sibling requests cannot both become current.
+This is not a cross-tenant identity service, Task list, arbitrary pointer switch,
+WorkUnit ledger, queue/lease, multi-instance coordinator or infinite Run resume.
 
 ## 4. Planning and analysis ownership
 
@@ -235,13 +250,18 @@ Control commands use expected version and owner-scoped idempotency. Pause and
 stop apply at safe points between calls; steer applies to the next round;
 rollback applies only to a terminal committed Run. `HarnessStateStore`
 atomically stores the accepted Snapshot and receipts, optionally with new
-append-only ArtifactVersion/TaskCommit rows. On PostgreSQL startup, terminal and
+append-only ArtifactVersion/TaskCommit rows. Initial start and cross-Run
+continuation additionally use one aggregate commit for the minimal Task record,
+Run, start idempotency and optional Task continuation receipt. On PostgreSQL startup, terminal and
 paused Runs plus their independent artifact history are restored. Any interrupted
 round and its uncommitted Branch records are removed, a `checkpoint_recovered`
 event is appended and the Run pauses
 at the last completed round; model calls are not automatically replayed. The
 browser restores its known Run id, or discovers the most recent nonterminal
-Owner Run via `GET /runs`. Memory fallback does not survive an API restart.
+Owner Run via `GET /runs`. When a Task pointer is known, Task GET identifies the
+authoritative current Run and marks a rendered parent as historical. A continuation
+409 keeps the parent and its SSE generation intact until the user opens the current
+Run. Memory fallback does not survive an API restart.
 `X-User-Id` is not signed authentication, and there is no multi-instance lease
 or notification channel.
 
@@ -303,7 +323,9 @@ an explicit Worker confirmation or conservative override, and actual per-Worker
 called/adopted/elapsed receipts. A child Run may restart version and SSE sequence
 at 1, so browser monotonicity applies only within the same `run_id`; the switch is
 accepted only after a valid child Snapshot arrives, leaving the parent recoverable
-when the request fails. Worker conversations and raw provider responses never
+when the request fails. Task GET supplies the current pointer and lineage; the UI
+labels current versus historical Run and offers a direct switch without rewriting
+the parent. Worker conversations and raw provider responses never
 become separate user-facing chat panes.
 The Artifact area independently shows whether the model call happened, whether
 its output was adopted, whether a deterministic local effect passed, what file
@@ -533,13 +555,13 @@ not a general semantic verifier.
 | Module | Current implementation | Missing target work |
 | --- | --- | --- |
 | Workspace Catalog & Safe Preview | full public folder, 96 refs, bounded previews and integrity checks | enterprise Connector/data policy |
-| Task Contract | user instruction, complete workspace scope, loop bounds, Owner/key/version, stable `task_id`, parent/child Run lineage and one-Branch recheck scope | separate production Task ledger, richer carried-fact policy and production identity |
+| Task Contract | user instruction, complete workspace scope, loop bounds, Owner/key/version, stable `task_id`, minimal owner-scoped Task record/current pointer, dual Run/Task version checks, parent/child Run lineage and one-Branch recheck scope | production identity, richer carried-fact policy, Task list and cross-tenant policy |
 | Planner | strict candidate, autonomous evidence selection, per-round receipt and one bounded repair | retrieval-quality evaluation and richer replanning policy |
 | Admission/Policy/Validator | server compilation, deterministic graph/source checks and three-route `TopologyAdmission` | measured benefit/cost policy, production risk admission and direct-tool route |
 | Scheduler & Worker Manager | bounded single-loop controller plus explicit waves of at most three in-process read-only Branch Workers, dependency readiness, budget reservation and partial-result preservation | durable leases/queue, recursive or cross-process workers and multi-instance recovery |
 | Tool Gateway | twelve fixed local deterministic office adapters with EffectReceipts; no model-owned dispatch | reusable governed tool registry, arbitrary safe commands, Web/SQL/Scheduler/Connector receipts |
 | Artifact Workspace & Verifier | independent append-only logical evidence-brief versions, citation membership, server-resolved preview Anchors, branch Evidence Gate, TaskCommit pointer/restore, isolated CSV/Markdown/DOCX/ZIP files and named deterministic validators for twelve fixed capabilities, narrative reconciliation, plus anchored Worker contribution adoption/merge | general writable office workspace, reusable semantic/numeric verifier framework, broader narrative claim extraction, conflict-aware edits and multi-host Artifact durability |
-| Checkpoint/Event/Governance | ordered events, Task/Run lineage, branch/topology/rollback controls, idempotent commands, sanitized receipts, independent records and optional PostgreSQL restart recovery | separate Task/Worker ledger, database CAS, multi-instance lease/notification, in-flight cancellation and policy/approval/Permit integration |
+| Checkpoint/Event/Governance | ordered events, minimal Task Ledger/current pointer, Task-level CAS, Task/Run lineage, branch/topology/rollback controls, idempotent commands, sanitized receipts, independent records and optional PostgreSQL restart recovery | durable WorkUnit/Contribution ledger, real Task PostgreSQL gate, multi-instance lease/notification, in-flight cancellation and policy/approval/Permit integration |
 
 ## 8. Security and claim boundary
 

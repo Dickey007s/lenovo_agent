@@ -103,6 +103,17 @@ contributions enter a new normal ArtifactVersion/TaskCommit. This is not a
 distributed Worker platform, production lease system, general Tool Gateway or
 evidence that multi-Worker execution improves quality, time or user outcomes.
 
+[`DR-0054`](docs/decisions/DR-0054-durable-task-ledger-and-current-run-cas.md)
+adds a limited owner-scoped Task Ledger. Initial start and one-Branch continuation
+atomically persist the Task pointer, Run Snapshot and idempotency receipt. A
+continuation must satisfy both the parent `run.version` and `task_version`; two
+sibling requests from the same Task version cannot both become current. The UI
+keeps a losing page on the immutable parent, marks it as historical and can open
+the authoritative current Run through `GET /v1/harness/tasks/{task_id}`. This is
+not a WorkUnit queue, Worker lease, production identity service or multi-instance
+coordinator. The seven PostgreSQL Task Ledger tests are committed but remain
+skipped locally without `TEST_DATABASE_DSN`.
+
 ## Public data and preview boundary
 
 FORTE is pinned to commit
@@ -123,7 +134,7 @@ does not enter ordinary UI or model-selected context. The user supplies an
 instruction; the server freezes all 96 stable refs, while the Planner sees only
 safe metadata and autonomously selects a bounded set for each round.
 
-## Ten-path API
+## Eleven-path API
 
 ```text
 GET  /v1/health
@@ -132,6 +143,7 @@ GET  /v1/harness/workspace/files/{file_ref}
 POST /v1/harness/runs
 GET  /v1/harness/runs?limit={1..20}
 GET  /v1/harness/runs/{run_id}
+GET  /v1/harness/tasks/{task_id}
 POST /v1/harness/runs/{run_id}/continue
 POST /v1/harness/runs/{run_id}/workers
 GET  /v1/harness/runs/{run_id}/artifacts/{artifact_id}
@@ -139,11 +151,11 @@ POST /v1/harness/runs/{run_id}/controls
 GET  /v1/harness/runs/{run_id}/events?after={sequence}
 ```
 
-The former Scenario list/detail routes are not mounted. There are eleven public
-operations over ten OpenAPI paths because `GET` and `POST` share `/runs`.
+The former Scenario list/detail routes are not mounted. There are twelve public
+operations over eleven OpenAPI paths because `GET` and `POST` share `/runs`.
 `X-User-Id` remains an unsigned demonstration Owner placeholder. With
-`DATABASE_DSN`, accepted Run snapshots, command receipts, ArtifactVersions and
-TaskCommits are stored in PostgreSQL. Recovery rolls an interrupted model call
+`DATABASE_DSN`, accepted Run snapshots, the minimal Task Ledger, command receipts,
+ArtifactVersions and TaskCommits are stored in PostgreSQL. Recovery rolls an interrupted model call
 back to the last completed round and pauses for the user; it never silently
 replays the call. Without a database, health reports `memory` and process-
 restart recovery is unavailable.
@@ -331,6 +343,16 @@ multi-instance coordination and governed external action remain target work.
   `TEST_DATABASE_DSN`; no paid Provider run or target-user study was performed.
   Therefore this is a limited in-process read-only slice, not proof of production
   durability, distributed Workers or business benefit.
+- `DR-0054` adds a minimal owner-scoped Task record and two-level optimistic
+  concurrency. Initial start and continuation commit Task/current pointer, Run
+  and receipts as one State Store transition; `task_version` protects cross-Run
+  current selection while `run.version` still protects one Run's controls. The
+  public Task projection derives status, Artifact/Commit pointers and up to 100
+  recent lineage items from immutable Run Snapshots. Targeted Python tests are
+  `92 passed`, Task Ledger browser tests are `4 passed`, Ruff/lint/build pass,
+  and seven PostgreSQL tests are collected but skipped locally without a DSN.
+  This does not prove real PostgreSQL execution, multi-instance safety, Provider
+  quality, user comprehension or a durable WorkUnit/Worker system.
 - `DR-0042` replaces TC-12's historical repair-only 9/9 Vitest receipt with the
   complete 11-file qa-003 dashboard-toolkit copy and one manifest-owned 71-case
   test set. The same tests first expose the original alias failure, then the
@@ -531,6 +553,9 @@ pnpm --dir apps/web exec playwright test e2e/harness-workbench.spec.ts
 - [可处置人工决策与失败恢复研究](docs/research/ACTIONABLE-HUMAN-DECISION-AND-FAILURE-RECOVERY-20260826.md)
 - [Demo 1/2 跨 Run 任务连续性、拓扑准入与交互影响研究](docs/research/DEMO1-DEMO2-DURABLE-TASK-AND-ADAPTIVE-ORCHESTRATION-RESEARCH-20260830.md)
 - [来源台账](docs/decisions/SOURCE_REGISTER.md)
+- [DR-0054：独立 Task Ledger 与当前 Run 版本控制](docs/decisions/DR-0054-durable-task-ledger-and-current-run-cas.md)
+- [SCENARIO-040：两个页面同时续办时只有一个当前 Run](docs/scenarios/SCENARIO-040-task-current-run-cas-and-restart.md)
+- [Task Ledger V1 工程 Evidence](docs/evidence/DR-0054-TASK-LEDGER-V1-EVIDENCE-20260831.md)
 - [DR-0053：跨 Run 任务谱系与可解释协作拓扑准入](docs/decisions/DR-0053-durable-task-lineage-and-explainable-topology-admission.md)
 - [SCENARIO-038：同一办公任务跨 Run 延续而不覆盖历史](docs/scenarios/SCENARIO-038-durable-task-continuation-across-runs.md)
 - [SCENARIO-039：可解释路线准入与受限 Worker 统一收敛](docs/scenarios/SCENARIO-039-explainable-topology-and-verified-worker-convergence.md)
