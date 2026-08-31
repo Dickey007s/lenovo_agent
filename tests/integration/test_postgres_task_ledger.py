@@ -130,14 +130,14 @@ async def test_task_ledger_two_stores_claim_initial_idempotency_before_task_writ
         restored = PostgresHarnessStateStore(DATABASE_DSN)
         await restored.setup()
         try:
-            task = await restored.get_task_record(owner, task_a.task_id)
+            tasks = [item for item in await restored.load_task_records() if item.owner_id == owner]
             runs = [item for item in await restored.load_runs() if item.owner_id == owner]
             idempotency = [item for item in await restored.load_idempotency() if item.owner_id == owner]
-            assert task is not None
+            assert len(tasks) == 1
             assert len(runs) == 1
             assert len([item for item in idempotency if item.idempotency_key == key]) == 1
             assert replays[0].result["run"]["run_id"] == runs[0].run_id
-            assert runs[0].run_id == task.current_run_id
+            assert runs[0].run_id == tasks[0].current_run_id
         finally:
             await restored.close()
     finally:
@@ -170,7 +170,11 @@ async def test_task_ledger_initial_idempotency_digest_conflict_has_no_orphan() -
         try:
             assert len([item for item in await restored.load_runs() if item.owner_id == owner]) == 1
             assert len([item for item in await restored.load_idempotency() if item.owner_id == owner and item.idempotency_key == key]) == 1
-            assert await restored.get_task_record(owner, task_a.task_id) is not None
+            tasks = [item for item in await restored.load_task_records() if item.owner_id == owner]
+            assert len(tasks) == 1
+            runs = [item for item in await restored.load_runs() if item.owner_id == owner]
+            assert len(runs) == 1
+            assert runs[0].run_id == tasks[0].current_run_id
         finally:
             await restored.close()
     finally:

@@ -6,6 +6,7 @@ than treating the task index as a second best-effort database.
 
 from __future__ import annotations
 
+import asyncio
 from datetime import datetime, timezone
 
 import httpx
@@ -14,7 +15,10 @@ from pydantic import ValidationError
 
 from services.api.app.api.harness_routes import get_harness_runtime
 from services.api.app.application.harness_runtime import (
+    AgentControlLoopControlRequest,
     HarnessContinuationRequest,
+    HarnessConflictError,
+    HarnessError,
     HarnessRunStart,
     HarnessRuntime,
 )
@@ -26,6 +30,7 @@ from services.api.app.application.harness_storage import (
 from services.api.app.application.task_ledger import TaskLedgerConflict, TaskRecord
 from services.api.app.main import create_app
 from tests.unit.test_harness_runtime import FakeAnalyst, FakeCatalog, FakePlanner
+from tests.unit.test_harness_runtime import wait_status, wait_terminal
 
 
 def _task(*, task_version: int = 1, run_id: str = "harness:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa") -> TaskRecord:
@@ -59,6 +64,23 @@ def _idem(key: str, run_id: str) -> StoredHarnessIdempotency:
         digest=f"digest-{key}",
         result={"run": {"run_id": run_id}},
     )
+
+
+async def _stopped_parent(runtime: HarnessRuntime, owner: str, key: str):
+    started = await runtime.start(
+        owner,
+        HarnessRunStart(
+            idempotency_key=key,
+            instruction="读取批准资料并保留任务时间线",
+        ),
+    )
+    waiting = await wait_status(runtime, owner, started.run.run_id, "waiting_input")
+    await runtime.control(
+        owner,
+        started.run.run_id,
+        AgentControlLoopControlRequest(command="stop", idempotency_key=f"{key}-stop", expected_version=waiting.version),
+    )
+    return await wait_terminal(runtime, owner, started.run.run_id)
 
 
 @pytest.mark.asyncio
@@ -299,6 +321,182 @@ async def test_continuation_requires_explicit_task_version() -> None:
             )
     finally:
         await runtime.close()
+
+
+@pytest.mark.asyncio
+async def test_runtime_sibling_cas_replay_and_stale_inputs_are_atomic() -> None:
+    owner = "ledger-sibling-owner"
+    runtime = HarnessRuntime(FakeCatalog(), FakePlanner(), FakeAnalyst())
+    try:
+        parent = await _stopped_parent(runtime, owner, "ledger-sibling-start-0001")
+        branch = next(item for item in parent.branches if item.status != "completed")
+        parent_before = parent.model_dump_json()
+        key_a = "ledger-sibling-child-a"
+        key_b = "ledger-sibling-child-b"
+        instruction_a = "第一份续办"
+        instruction_b = "第二份续办"
+
+        async def continue_with(key: str, instruction: str):
+            try:
+                return await runtime.continue_unfinished_task(
+                    owner, parent.run_id, branch.branch_id,
+                    idempotency_key=key, expected_version=parent.version,
+                    expected_task_version=parent.task_version, instruction=instruction,
+                )
+            except HarnessConflictError as exc:
+                return exc
+
+        outcomes = await asyncio.gather(
+            continue_with(key_a, instruction_a), continue_with(key_b, instruction_b)
+        )
+        winners = [item for item in outcomes if not isinstance(item, HarnessConflictError)]
+        assert len(winners) == 1
+        winner = winners[0]
+        child = winner.run
+        assert sum(isinstance(item, HarnessConflictError) for item in outcomes) == 1
+        assert (await runtime.get(owner, parent.run_id)).model_dump_json() == parent_before
+        runs = [item for item in await runtime.state_store.load_runs() if item.owner_id == owner]
+        assert len(runs) == 2
+        task = await runtime.state_store.get_task_record(owner, parent.task_id)
+        assert task is not None and task.current_run_id == child.run_id
+
+        replay = await runtime.continue_unfinished_task(
+            owner, parent.run_id, branch.branch_id,
+            idempotency_key=key_a if outcomes[0] is winner else key_b,
+            expected_version=parent.version, expected_task_version=parent.task_version,
+            instruction=instruction_a if outcomes[0] is winner else instruction_b,
+        )
+        assert replay.run.run_id == child.run_id
+        assert len([item for item in await runtime.state_store.load_runs() if item.owner_id == owner]) == 2
+
+        for call in (
+            dict(idempotency_key="ledger-sibling-different", expected_task_version=parent.task_version, instruction="冲突内容"),
+            dict(idempotency_key=key_a if outcomes[0] is winner else key_b, expected_task_version=2, instruction="冲突内容"),
+        ):
+            with pytest.raises(HarnessConflictError):
+                await runtime.continue_unfinished_task(
+                    owner, parent.run_id, branch.branch_id,
+                    expected_version=parent.version, **call,
+                )
+        with pytest.raises(HarnessError):
+            await runtime.continue_unfinished_task(
+                owner, child.run_id, branch.branch_id, idempotency_key="ledger-stale-run",
+                expected_version=parent.version, expected_task_version=parent.task_version,
+            )
+        with pytest.raises(HarnessConflictError):
+            await runtime.continue_unfinished_task(
+                owner, parent.run_id, branch.branch_id, idempotency_key="ledger-stale-task",
+                expected_version=parent.version, expected_task_version=99,
+            )
+        with pytest.raises(HarnessConflictError):
+            await runtime.continue_unfinished_task(
+                owner, parent.run_id, branch.branch_id, idempotency_key="ledger-historical",
+                expected_version=parent.version, expected_task_version=2,
+            )
+        with pytest.raises(HarnessError):
+            await runtime.continue_unfinished_task(
+                "other-owner", parent.run_id, branch.branch_id, idempotency_key="ledger-owner",
+                expected_version=parent.version, expected_task_version=parent.task_version,
+            )
+        assert len([item for item in await runtime.state_store.load_runs() if item.owner_id == owner]) == 2
+    finally:
+        await runtime.close()
+
+
+@pytest.mark.asyncio
+async def test_http_task_ledger_validation_and_continuation_failure_are_503_or_422() -> None:
+    owner = "ledger-http-owner"
+    runtime = HarnessRuntime(FakeCatalog(), FakePlanner(), FakeAnalyst())
+    parent = await _stopped_parent(runtime, owner, "ledger-http-start-0001")
+    branch = next(item for item in parent.branches if item.status != "completed")
+    app = create_app()
+    app.dependency_overrides[get_harness_runtime] = lambda: runtime
+    try:
+        async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as client:
+            missing = await client.post(
+                f"/v1/harness/runs/{parent.run_id}/continue", headers={"X-User-Id": owner},
+                json={"branch_id": branch.branch_id, "idempotency_key": "ledger-http-missing", "expected_version": parent.version},
+            )
+            assert missing.status_code == 422
+            task_record = await runtime.state_store.get_task_record(owner, parent.task_id)
+            assert task_record is not None
+            runtime.state_store._tasks.pop((owner, parent.task_id), None)
+            missing_task = await client.get(f"/v1/harness/tasks/{parent.task_id}", headers={"X-User-Id": owner})
+            assert missing_task.status_code == 503
+            runtime.state_store._tasks[(owner, parent.task_id)] = task_record
+            async def fail_commit(*args, **kwargs):
+                raise HarnessError("aggregate unavailable")
+            runtime.state_store.commit_task_transition = fail_commit  # type: ignore[method-assign]
+            before_runs = await runtime.state_store.load_runs()
+            before_idempotency = await runtime.state_store.load_idempotency()
+            failed = await client.post(
+                f"/v1/harness/runs/{parent.run_id}/continue", headers={"X-User-Id": owner},
+                json={"branch_id": branch.branch_id, "idempotency_key": "ledger-http-failure", "expected_version": parent.version, "expected_task_version": parent.task_version},
+            )
+            assert failed.status_code == 503
+            assert await runtime.state_store.load_runs() == before_runs
+            assert await runtime.state_store.load_idempotency() == before_idempotency
+    finally:
+        app.dependency_overrides.clear()
+        await runtime.close()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("case", ["duplicate_sequence", "broken_parent", "pointer_mismatch"])
+async def test_setup_rejects_broken_task_lineage_without_backfill(case: str) -> None:
+    owner = f"ledger-setup-{case}"
+    store = InMemoryHarnessStateStore()
+    first = HarnessRuntime(FakeCatalog(), FakePlanner(), FakeAnalyst(), state_store=store)
+    parent = await _stopped_parent(first, owner, f"ledger-setup-start-{case}")
+    try:
+        if case == "pointer_mismatch":
+            task = await store.get_task_record(owner, parent.task_id)
+            assert task is not None
+            store._tasks[(owner, parent.task_id)] = task.model_copy(update={"current_run_id": "harness:ffffffffffffffffffffffffffffffff"})
+        else:
+            stored = store._runs[(owner, parent.run_id)]
+            snapshot = dict(stored.snapshot)
+            run_id = "harness:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+            snapshot.update({"run_id": run_id, "version": 1, "run_sequence": 1 if case == "duplicate_sequence" else 2, "task_version": 1 if case == "duplicate_sequence" else 2, "parent_run_id": None if case == "duplicate_sequence" else "harness:ffffffffffffffffffffffffffffffff"})
+            store._runs[(owner, run_id)] = StoredHarnessRun(owner_id=owner, run_id=run_id, snapshot=snapshot, resume_status=stored.resume_status)
+        restored = HarnessRuntime(FakeCatalog(), FakePlanner(), FakeAnalyst(), state_store=store)
+        with pytest.raises(HarnessError):
+            await restored.setup()
+        await restored.close()
+    finally:
+        await first.close()
+
+
+@pytest.mark.asyncio
+async def test_task_lineage_truncates_101_runs_but_keeps_current() -> None:
+    owner = "ledger-lineage-101"
+    store = InMemoryHarnessStateStore()
+    first = HarnessRuntime(FakeCatalog(), FakePlanner(), FakeAnalyst(), state_store=store)
+    parent = await _stopped_parent(first, owner, "ledger-lineage-101-start")
+    try:
+        previous = parent.run_id
+        latest = parent.run_id
+        for sequence in range(2, 102):
+            run_id = f"harness:{sequence:032x}"
+            stored = store._runs[(owner, parent.run_id)]
+            snapshot = dict(stored.snapshot)
+            snapshot.update({"run_id": run_id, "version": 1, "run_sequence": sequence, "task_version": sequence, "parent_run_id": previous})
+            store._runs[(owner, run_id)] = StoredHarnessRun(owner_id=owner, run_id=run_id, snapshot=snapshot, resume_status=stored.resume_status)
+            previous = run_id
+            latest = run_id
+        task = await store.get_task_record(owner, parent.task_id)
+        assert task is not None
+        store._tasks[(owner, parent.task_id)] = task.model_copy(update={"current_run_id": latest, "task_version": 101, "run_sequence": 101})
+        restored = HarnessRuntime(FakeCatalog(), FakePlanner(), FakeAnalyst(), state_store=store)
+        await restored.setup()
+        payload = await restored.get_task(owner, parent.task_id)
+        assert payload.lineage_total == 101
+        assert payload.lineage_truncated is True
+        assert len(payload.lineage) == 100
+        assert payload.lineage[-1].run_id == latest
+        await restored.close()
+    finally:
+        await first.close()
 
 
 @pytest.mark.asyncio
