@@ -4774,7 +4774,7 @@ function LoopView({
     </header>
     <section className="loop-lineage-strip" aria-label="任务时间线" data-testid="task-lineage">
       <div><span>任务时间线</span><strong>任务持续链 · Run {run.run_sequence}</strong></div>
-      {taskPointerError && TERMINAL_STATUSES.has(run.status) && <div className="task-ledger-error"><small>{taskPointerError}</small><button type="button" onClick={onRetryTaskPointer} disabled={starting}><IconRefresh aria-hidden="true" />重试</button></div>}
+      {taskPointerError && <div className="task-ledger-error"><small>{taskPointerError}</small><button type="button" onClick={onRetryTaskPointer} disabled={starting}><IconRefresh aria-hidden="true" />重试</button></div>}
       {taskPointer && taskPointer.task_id === run.task_id && (taskPointer.current_run_id === run.run_id
         ? <small data-testid="task-ledger-pointer">当前任务 Run · 任务版本 v{taskPointer.task_version}</small>
         : <div className="task-ledger-history" data-testid="task-ledger-history"><small>历史 Run · 当前任务已进入 Run {taskPointer.run_sequence}</small><button type="button" onClick={() => void onOpenCurrentTask()} disabled={starting}><IconRoute aria-hidden="true" />打开当前 Run</button></div>)}

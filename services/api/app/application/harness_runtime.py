@@ -1499,12 +1499,18 @@ class HarnessRuntime:
         try:
             record, stored_runs = await self.state_store.get_task_aggregate(owner_id, task_id)
             record = TaskRecord.model_validate(record) if record is not None else None
-            task_snapshots = [
-                HarnessRunSnapshot.model_validate(item.snapshot)
-                for item in stored_runs
-                if item.owner_id == owner_id
-            ]
+            task_snapshots = []
+            for item in stored_runs:
+                if item.owner_id != owner_id:
+                    continue
+                snapshot = HarnessRunSnapshot.model_validate(item.snapshot)
+                if snapshot.owner_id != owner_id:
+                    raise HarnessError("任务台账 Run owner 不一致")
+                if snapshot.task_id == task_id:
+                    task_snapshots.append(snapshot)
         except Exception as exc:
+            if isinstance(exc, HarnessError):
+                raise
             raise HarnessError("任务台账 Run 读取失败") from exc
         if record is None:
             candidates = [item for item in task_snapshots if item.task_id == task_id]
@@ -1514,6 +1520,8 @@ class HarnessRuntime:
             # mutate the ledger, and a Run without its Task is an integrity
             # failure rather than a synthetic pointer.
             raise HarnessError("任务台账不可读取")
+        if record.owner_id != owner_id:
+            raise HarnessError("任务台账 owner 不一致")
         snapshots = [item for item in task_snapshots if item.task_id == task_id]
         snapshot = next((item for item in snapshots if item.run_id == record.current_run_id), None)
         if snapshot is None:

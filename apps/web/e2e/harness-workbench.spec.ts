@@ -2668,7 +2668,7 @@ async function mockDemoRuntime(page: Page, mode: "demo1" | "demo2") {
   });
 }
 
-async function mockTaskLedgerRuntime(page: Page, mode: "success" | "conflict" | "bad-task") {
+async function mockTaskLedgerRuntime(page: Page, mode: "success" | "conflict" | "bad-task" | "bad-child-task") {
   await mockHarness(page);
   const body = { workspace_id: "forte-public-office", instruction: "继续未完成任务" };
   const base = boundedAnalysisRecoverySnapshot(body) as any;
@@ -2705,6 +2705,7 @@ async function mockTaskLedgerRuntime(page: Page, mode: "success" | "conflict" | 
     if (url.pathname.includes("/v1/harness/tasks/") && method === "GET") {
       taskGets += 1;
       if (mode === "bad-task" && taskGets === 1) return fulfillJson(route, { detail: "temporary" }, 503);
+      if (mode === "bad-child-task" && currentTask === child && taskGets === 2) return fulfillJson(route, { detail: "temporary" }, 503);
       return fulfillJson(route, {
       task_id: currentTask.task_id,
       task_version: currentTask.task_version,
@@ -4946,5 +4947,18 @@ test.describe("Demo 1/2 runtime acceptance", () => {
     await page.getByRole("button", { name: "继续未完成任务" }).first().click();
     await expect(page.locator('[data-testid="task-ledger-pointer"]')).toContainText("当前任务 Run · 任务版本 v2");
     expect(state.taskGets).toBeGreaterThanOrEqual(2);
+  });
+
+  test("non-terminal Task GET failure exposes a retry action", async ({ page }) => {
+    const state = await mockTaskLedgerRuntime(page, "bad-child-task");
+    await page.goto("/");
+    await page.getByRole("textbox", { name: "任务指令" }).fill("继续未完成任务");
+    await page.getByRole("button", { name: "启动 Control Loop" }).click();
+    await page.getByRole("button", { name: "Agent 路径" }).click();
+    await page.getByRole("button", { name: "继续未完成任务" }).first().click();
+    await expect(page.getByRole("button", { name: "重试" })).toBeVisible();
+    await page.getByRole("button", { name: "重试" }).click();
+    await expect(page.locator('[data-testid="task-ledger-pointer"]')).toContainText("当前任务 Run · 任务版本 v2");
+    expect(state.taskGets).toBeGreaterThanOrEqual(3);
   });
 });

@@ -302,6 +302,43 @@ async def test_task_endpoint_fails_closed_when_task_store_read_raises() -> None:
 
 
 @pytest.mark.asyncio
+async def test_task_projection_rejects_cross_owner_aggregate_payload() -> None:
+    runtime = HarnessRuntime(FakeCatalog(), FakePlanner(), FakeAnalyst())
+    started = await runtime.start(
+        "ledger-owner",
+        HarnessRunStart(idempotency_key="ledger-owner-aggregate-0001", instruction="读取批准资料"),
+    )
+    original = await runtime.state_store.get_task_record("ledger-owner", started.run.task_id)
+    assert original is not None
+
+    async def forged_aggregate(owner_id: str, task_id: str):
+        return original.model_copy(update={"owner_id": "other-owner"}), []
+
+    runtime.state_store.get_task_aggregate = forged_aggregate  # type: ignore[method-assign]
+    try:
+        with pytest.raises(HarnessError, match="owner"):
+            await runtime.get_task("ledger-owner", started.run.task_id)
+    finally:
+        await runtime.close()
+
+
+@pytest.mark.asyncio
+async def test_memory_task_transition_rejects_non_incrementing_version() -> None:
+    store = InMemoryHarnessStateStore()
+    initial = _stored_run("harness:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+    task = _task()
+    await store.commit_task_transition(initial, task)
+    child = _stored_run("harness:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb")
+    with pytest.raises(TaskLedgerConflict, match="increment"):
+        await store.commit_task_transition(
+            child,
+            _task(task_version=3, run_id=child.run_id),
+            expected_task_version=1,
+        )
+    assert len(await store.load_runs()) == 1
+
+
+@pytest.mark.asyncio
 async def test_task_get_does_not_backfill_when_legacy_run_has_no_task_record() -> None:
     runtime = HarnessRuntime(FakeCatalog(), FakePlanner(), FakeAnalyst())
     started = await runtime.start(

@@ -590,6 +590,8 @@ class PostgresHarnessStateStore:
                         if existing is None or dict(existing[0]) != task.model_dump(mode="json"):
                             raise TaskLedgerConflict("task already exists with different identity")
                 else:
+                    if task.task_version != expected_task_version + 1:
+                        raise TaskLedgerConflict("task version must increment by one")
                     await cursor.execute(
                         "UPDATE harness_task_ledger SET task_version=%s,payload=%s,updated_at=NOW() WHERE owner_id=%s AND task_id=%s AND task_version=%s RETURNING task_id",
                         (task.task_version, Jsonb(task.model_dump(mode="json")), task.owner_id, task.task_id, expected_task_version),
