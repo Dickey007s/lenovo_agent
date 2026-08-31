@@ -113,6 +113,8 @@ async def continue_harness_task(
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except HarnessConflictError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except HarnessError as exc:
+        raise HTTPException(status_code=503, detail="任务台账事务暂时无法提交") from exc
 
 
 @router.get("/tasks/{task_id}")

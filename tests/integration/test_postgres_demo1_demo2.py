@@ -110,6 +110,7 @@ async def test_postgres_demo1_continuation_lineage_cas_and_restart(tmp_path: Pat
             branch.branch_id,
             idempotency_key=child_idem,
             expected_version=parent.version,
+            expected_task_version=parent.task_version,
         )
         assert child.run.task_id == parent.task_id
         assert child.run.parent_run_id == parent_id
@@ -138,6 +139,7 @@ async def test_postgres_demo1_continuation_lineage_cas_and_restart(tmp_path: Pat
             branch.branch_id,
             idempotency_key=child_idem,
             expected_version=parent.version,
+            expected_task_version=parent.task_version,
         )
         assert replay.replayed is True
         assert replay.run.run_id == child.run.run_id
@@ -148,6 +150,7 @@ async def test_postgres_demo1_continuation_lineage_cas_and_restart(tmp_path: Pat
                 branch.branch_id,
                 idempotency_key=f"demo1-old-version-{uuid4().hex}",
                 expected_version=parent.version - 1,
+                expected_task_version=parent.task_version,
             )
         with pytest.raises(Exception):
             await second.continue_unfinished_task(
@@ -156,6 +159,7 @@ async def test_postgres_demo1_continuation_lineage_cas_and_restart(tmp_path: Pat
                 branch.branch_id,
                 idempotency_key=f"demo1-owner-{uuid4().hex}",
                 expected_version=parent.version,
+                expected_task_version=parent.task_version,
             )
     finally:
         for runtime in reversed(runtimes):

@@ -210,9 +210,8 @@ async def test_demo1_http_continuation_preserves_parent_and_limits_changed_sourc
             assert stale.status_code == 409
             assert forbidden.status_code in {403, 404}
 
-            # With the catalog returned to its original revision, another
-            # child still carries exactly the same branch and explicitly
-            # reports that no source change required rechecking.
+            # A historical parent cannot fork a second child after its task
+            # pointer advanced, even when the source revision is unchanged.
             catalog.revision = "catalog-rev-1"
             async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as client:
                 unchanged_response = await client.post(
@@ -231,6 +230,52 @@ async def test_demo1_http_continuation_preserves_parent_and_limits_changed_sourc
             assert unchanged_response.status_code == 409, unchanged_response.text
         finally:
             app.dependency_overrides.clear()
+    finally:
+        await runtime.close()
+
+
+@pytest.mark.asyncio
+async def test_demo1_unchanged_revision_continuation_succeeds_in_independent_runtime() -> None:
+    """An unchanged source revision is a successful child flow, not a stale-parent fork."""
+
+    owner = "demo1-unchanged-acceptance-owner"
+    catalog = RevisionCatalog()
+    runtime = HarnessRuntime(catalog, FakePlanner(), MixedEvidenceAnalyst())
+    try:
+        started = await runtime.start(
+            owner,
+            HarnessRunStart(
+                idempotency_key="demo1-unchanged-parent-0001",
+                instruction="保留已完成事实并继续一个未完成分支",
+                loop={"max_rounds": 1, "max_files_per_round": 2, "max_model_calls": 6, "deadline_seconds": 120},
+            ),
+        )
+        waiting = await _wait_for(runtime, owner, started.run.run_id, lambda item: item.status in {"waiting_input", "stopped"})
+        branch = next(item for item in waiting.branches if item.status != "completed")
+        parent = waiting
+        if waiting.status == "waiting_input":
+            stopped = await runtime.control(
+                owner,
+                waiting.run_id,
+                AgentControlLoopControlRequest(
+                    command="stop",
+                    expected_version=waiting.version,
+                    idempotency_key="demo1-unchanged-stop-0001",
+                ),
+            )
+            parent = await _wait_for(runtime, owner, stopped.run.run_id, lambda item: item.status == "stopped")
+        child = await runtime.continue_unfinished_task(
+            owner,
+            parent.run_id,
+            branch.branch_id,
+            idempotency_key="demo1-unchanged-child-0001",
+            expected_version=parent.version,
+            expected_task_version=parent.task_version,
+        )
+        assert child.run.task_id == parent.task_id
+        assert child.run.run_sequence == parent.run_sequence + 1
+        assert child.run.source_revision_changed is False
+        assert child.run.recheck_file_refs == list(branch.missing_file_refs or branch.input_file_refs)
     finally:
         await runtime.close()
 

@@ -327,6 +327,7 @@ async def test_demo1_continuation_creates_child_run_with_exact_carried_branch_sc
         branch.branch_id,
         idempotency_key="demo1-child-continue-0001",
         expected_version=terminal.version,
+        expected_task_version=terminal.task_version,
     )
     assert child.run.task_id == terminal.task_id
     assert child.run.run_id != terminal.run_id
@@ -342,11 +343,13 @@ async def test_demo1_continuation_creates_child_run_with_exact_carried_branch_sc
         await runtime.continue_unfinished_task(
             "alice", terminal.run_id, branch.branch_id,
             idempotency_key="demo1-child-stale-0001", expected_version=terminal.version - 1,
+            expected_task_version=terminal.task_version,
         )
     with pytest.raises(Exception, match="不存在"):
         await runtime.continue_unfinished_task(
             "bob", terminal.run_id, branch.branch_id,
             idempotency_key="demo1-child-owner-0001", expected_version=terminal.version,
+            expected_task_version=terminal.task_version,
         )
     replay = await runtime.continue_unfinished_task(
         "alice",
@@ -354,6 +357,7 @@ async def test_demo1_continuation_creates_child_run_with_exact_carried_branch_sc
         branch.branch_id,
         idempotency_key="demo1-child-continue-0001",
         expected_version=terminal.version,
+        expected_task_version=terminal.task_version,
     )
     assert replay.run.run_id == child.run.run_id
     await runtime.close()

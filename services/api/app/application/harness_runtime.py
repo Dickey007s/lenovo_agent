@@ -23,7 +23,7 @@ from typing import Any, Literal, Protocol
 from uuid import uuid4
 
 import httpx
-from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
+from pydantic import BaseModel, ConfigDict, Field, StrictInt, ValidationError, field_validator
 
 from packages.contracts.harness_models import (
     AgentControlLoopArtifactVersion,
@@ -80,7 +80,6 @@ from services.api.app.application.task_ledger import (
     TaskLedgerConflict,
     TaskLedgerReceipt,
     TaskRecord,
-    command_digest,
 )
 
 runtime_logger = logging.getLogger("uvicorn.error")
@@ -401,7 +400,7 @@ class HarnessContinuationRequest(BaseModel):
     branch_id: str = Field(pattern=r"^branch-[0-9a-f]{12}$")
     idempotency_key: str = Field(min_length=8, max_length=160)
     expected_version: int = Field(ge=1)
-    expected_task_version: int = Field(ge=1)
+    expected_task_version: StrictInt = Field(ge=1)
     instruction: str | None = Field(default=None, min_length=3, max_length=2_000)
     loop: AgentControlLoopOptions | None = None
 
@@ -886,6 +885,35 @@ class HarnessRuntime:
         now = datetime.now(timezone.utc)
         terminal_statuses = {"ready_to_execute", "completed", "stopped", "failed"}
         stored_runs = await self.state_store.load_runs()
+        # Snapshots written before Task Ledger V1 did not carry task_version.
+        # Upgrade that field only while restoring durable state; request paths
+        # must never synthesize or repair a missing ledger entry.
+        normalized_runs: list[tuple[StoredHarnessRun, bool]] = []
+        for record in stored_runs:
+            raw_snapshot = record.snapshot
+            snapshot = HarnessRunSnapshot.model_validate(raw_snapshot)
+            migrated = "task_version" not in raw_snapshot
+            if migrated:
+                snapshot = snapshot.model_copy(update={"task_version": snapshot.run_sequence})
+            if record.owner_id != snapshot.owner_id:
+                raise HarnessError("持久化 Run owner 与快照不一致")
+            normalized_runs.append(
+                (
+                    StoredHarnessRun(
+                        owner_id=record.owner_id,
+                        run_id=record.run_id,
+                        snapshot=snapshot.model_dump(mode="json"),
+                        resume_status=record.resume_status,
+                    ),
+                    migrated,
+                )
+            )
+        stored_runs = [record for record, _ in normalized_runs]
+        migrated_run_ids = {
+            (record.owner_id, record.run_id)
+            for record, migrated in normalized_runs
+            if migrated
+        }
         stored_task_records = (
             await self.state_store.load_task_records()
             if hasattr(self.state_store, "load_task_records")
@@ -897,6 +925,8 @@ class HarnessRuntime:
         runs_by_task: dict[tuple[str, str], list[HarnessRunSnapshot]] = {}
         for stored in stored_runs:
             snapshot = HarnessRunSnapshot.model_validate(stored.snapshot)
+            if stored.run_id != snapshot.run_id:
+                raise HarnessError("持久化 Run 主键与快照不一致")
             runs_by_task.setdefault((stored.owner_id, snapshot.task_id), []).append(snapshot)
         for task in stored_task_records:
             task_runs = sorted(
@@ -906,8 +936,11 @@ class HarnessRuntime:
             if not task_runs:
                 raise HarnessError("任务台账指向不存在的 Run")
             sequences = [item.run_sequence for item in task_runs]
+            task_versions = [item.task_version for item in task_runs]
             if sequences != list(range(1, len(sequences) + 1)):
                 raise HarnessError("任务台账的 Run sequence 不连续")
+            if task_versions != sequences:
+                raise HarnessError("任务台账的 task_version 与 Run sequence 不一致")
             current = task_runs[-1]
             if (
                 current.run_id != task.current_run_id
@@ -926,6 +959,8 @@ class HarnessRuntime:
             ordered = sorted(task_runs, key=lambda item: item.run_sequence)
             if [item.run_sequence for item in ordered] != list(range(1, len(ordered) + 1)):
                 raise HarnessError("无法安全回填任务台账：Run sequence 不连续")
+            if [item.task_version for item in ordered] != [item.run_sequence for item in ordered]:
+                raise HarnessError("无法安全回填任务台账：task_version 与 Run sequence 不一致")
             for previous, following in zip(ordered, ordered[1:], strict=False):
                 if following.parent_run_id != previous.run_id:
                     raise HarnessError("无法安全回填任务台账：Run lineage 不连续")
@@ -1016,15 +1051,14 @@ class HarnessRuntime:
                 )
                 self._runs[(record.owner_id, record.run_id)] = run
                 # Conservative backfill for snapshots created before the
-                # task ledger existed.  It never changes a persisted task
-                # version or rewrites a historical Run.
+                # task ledger existed.  This is the only migration point.
                 if (
                     (record.owner_id, snapshot.task_id) not in existing_task_keys
                     and backfill_by_task.get((record.owner_id, snapshot.task_id))
                     is record
                 ):
                     await self._task_create(self._task_record_from_snapshot(snapshot))
-                if snapshot.status not in terminal_statuses:
+                if snapshot.status not in terminal_statuses or (record.owner_id, record.run_id) in migrated_run_ids:
                     await self._persist_locked(run)
 
             for record in await self.state_store.load_idempotency():
@@ -1236,13 +1270,10 @@ class HarnessRuntime:
                 source_revision_changed = parent.workspace_revision != current_workspace_revision
                 task_record = await self._task_get(owner_id, parent.task_id)
                 if task_record is None:
-                    task_record = await self._task_create(self._task_record_from_snapshot(parent))
-                requested_task_version = (
-                    task_record.task_version
-                    if _expected_task_version is None
-                    else _expected_task_version
-                )
-                if task_record.task_version != requested_task_version:
+                    raise HarnessError("任务台账不可读取")
+                if _expected_task_version is None:
+                    raise HarnessConflictError("续办必须提供 task 版本")
+                if task_record.task_version != _expected_task_version:
                     raise HarnessConflictError("task 版本已更新，请刷新后重试")
                 if (
                     task_record.current_run_id != parent.run_id
@@ -1382,14 +1413,11 @@ class HarnessRuntime:
                     recheck_file_refs=list(snapshot.recheck_file_refs),
                     created_at=now,
                 )
-                task_digest = command_digest(
-                    {
-                        "task_id": task_id,
-                        "parent_run_id": parent.run_id,
-                        "branch_id": carried_branch.branch_id,
-                        "expected_task_version": task_record.task_version,
-                    }
-                )
+                # Bind the append-only receipt to the complete continuation
+                # command, not merely its parent and branch.  This prevents
+                # replaying one idempotency key with a different payload or
+                # expected version.
+                task_digest = digest
             try:
                 # Initial creation and continuation are one state-store
                 # aggregate commit: run, task CAS, and receipts either all
@@ -1467,9 +1495,10 @@ class HarnessRuntime:
                 ]
             if not candidates:
                 raise HarnessNotFoundError("任务不存在")
-            record = await self._task_create(
-                self._task_record_from_snapshot(max(candidates, key=lambda item: item.run_sequence))
-            )
+            # Legacy records are migrated during setup only.  A GET must not
+            # mutate the ledger, and a Run without its Task is an integrity
+            # failure rather than a synthetic pointer.
+            raise HarnessError("任务台账不可读取")
         async with self._lock:
             current = self._runs.get((owner_id, record.current_run_id))
             if current is None:
@@ -1479,6 +1508,8 @@ class HarnessRuntime:
                 # like a valid task and hide recovery requirements.
                 raise HarnessError("任务台账 current Run 不可读取")
             snapshot = current.snapshot
+            if snapshot.task_id != record.task_id or snapshot.owner_id != record.owner_id:
+                raise HarnessError("任务台账 current Run 身份不一致")
             artifact = snapshot.artifact_versions[-1] if snapshot.artifact_versions else None
             lineage = [
                 PublicHarnessTaskLineageItem(
@@ -1508,7 +1539,9 @@ class HarnessRuntime:
                 current_artifact_id=artifact.artifact_id if artifact else None,
                 current_artifact_version=artifact.version if artifact else None,
                 current_commit_id=snapshot.last_commit.commit_id if snapshot.last_commit else None,
-                lineage=lineage[:100],
+                # Keep the current pointer visible when a long history is
+                # projected; lineage_total reports the omitted older entries.
+                lineage=lineage[-100:],
                 lineage_total=lineage_total,
                 lineage_truncated=lineage_truncated,
             )
@@ -1521,7 +1554,7 @@ class HarnessRuntime:
         *,
         idempotency_key: str,
         expected_version: int,
-        expected_task_version: int | None = None,
+        expected_task_version: int,
         instruction: str | None = None,
         loop: AgentControlLoopOptions | None = None,
     ) -> HarnessRunStartResult:
@@ -1531,6 +1564,8 @@ class HarnessRuntime:
         the old Run and its immutable result history remain untouched.
         """
         old = await self.get(owner_id, run_id)
+        if isinstance(expected_task_version, bool) or not isinstance(expected_task_version, int):
+            raise HarnessConflictError("续办必须提供有效的 task 版本")
         if old.version != expected_version:
             raise HarnessConflictError("任务版本已更新，请刷新后重试")
         branch = next((item for item in old.branches if item.branch_id == branch_id), None)

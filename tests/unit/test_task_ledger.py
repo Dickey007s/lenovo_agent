@@ -223,6 +223,86 @@ async def test_task_endpoint_fails_closed_when_current_run_pointer_is_missing() 
         await runtime.close()
 
 
+@pytest.mark.asyncio
+async def test_task_get_does_not_backfill_when_legacy_run_has_no_task_record() -> None:
+    runtime = HarnessRuntime(FakeCatalog(), FakePlanner(), FakeAnalyst())
+    started = await runtime.start(
+        "ledger-no-backfill-owner",
+        HarnessRunStart(
+            idempotency_key="ledger-no-backfill-start-0001",
+            instruction="读取批准资料并保留任务时间线",
+            loop={"max_rounds": 1, "max_files_per_round": 1, "max_model_calls": 2, "deadline_seconds": 60},
+        ),
+    )
+    try:
+        async with runtime._lock:
+            runtime.state_store._tasks.pop(("ledger-no-backfill-owner", started.run.task_id), None)
+        with pytest.raises(Exception, match="台账"):
+            await runtime.get_task("ledger-no-backfill-owner", started.run.task_id)
+        assert await runtime.state_store.get_task_record("ledger-no-backfill-owner", started.run.task_id) is None
+    finally:
+        await runtime.close()
+
+
+@pytest.mark.asyncio
+async def test_continuation_requires_explicit_task_version() -> None:
+    runtime = HarnessRuntime(FakeCatalog(), FakePlanner(), FakeAnalyst())
+    started = await runtime.start(
+        "ledger-version-owner",
+        HarnessRunStart(
+            idempotency_key="ledger-version-start-0001",
+            instruction="读取批准资料并保留任务时间线",
+            loop={"max_rounds": 1, "max_files_per_round": 1, "max_model_calls": 2, "deadline_seconds": 60},
+        ),
+    )
+    try:
+        with pytest.raises(TypeError):
+            await runtime.continue_unfinished_task(
+                "ledger-version-owner",
+                started.run.run_id,
+                "branch-aaaaaaaaaaaa",
+                idempotency_key="ledger-version-child-0001",
+                expected_version=started.run.version,
+            )
+    finally:
+        await runtime.close()
+
+
+@pytest.mark.asyncio
+async def test_setup_is_the_only_legacy_task_backfill_point() -> None:
+    store = InMemoryHarnessStateStore()
+    first = HarnessRuntime(FakeCatalog(), FakePlanner(), FakeAnalyst(), state_store=store)
+    started = await first.start(
+        "legacy-setup-owner",
+        HarnessRunStart(
+            idempotency_key="legacy-setup-start-0001",
+            instruction="读取批准资料并保留任务时间线",
+            loop={"max_rounds": 1, "max_files_per_round": 1, "max_model_calls": 2, "deadline_seconds": 60},
+        ),
+    )
+    try:
+        async with store._lock:
+            store._tasks.pop(("legacy-setup-owner", started.run.task_id), None)
+            stored = store._runs[("legacy-setup-owner", started.run.run_id)]
+            legacy_snapshot = dict(stored.snapshot)
+            legacy_snapshot.pop("task_version", None)
+            store._runs[("legacy-setup-owner", started.run.run_id)] = StoredHarnessRun(
+                owner_id=stored.owner_id,
+                run_id=stored.run_id,
+                snapshot=legacy_snapshot,
+                resume_status=stored.resume_status,
+            )
+        restored = HarnessRuntime(FakeCatalog(), FakePlanner(), FakeAnalyst(), state_store=store)
+        await restored.setup()
+        task = await store.get_task_record("legacy-setup-owner", started.run.task_id)
+        assert task is not None
+        assert task.task_version == started.run.run_sequence
+        assert (await restored.get("legacy-setup-owner", started.run.run_id)).task_version == started.run.run_sequence
+        await restored.close()
+    finally:
+        await first.close()
+
+
 def test_task_record_rejects_unsanitized_or_invalid_identity() -> None:
     with pytest.raises(ValidationError):
         _task(run_id="not-a-run")

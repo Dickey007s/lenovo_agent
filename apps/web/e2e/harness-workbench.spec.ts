@@ -4776,7 +4776,7 @@ test.describe("Demo 1/2 runtime acceptance", () => {
     const continuation = page.waitForRequest((request) => request.url().includes("/continue") && request.method() === "POST");
     await page.getByRole("button", { name: "继续未完成任务" }).first().click();
     const continuationRequest = await continuation;
-    expect(continuationRequest.postDataJSON()).toMatchObject({ branch_id: "branch-222222222222" });
+    expect(continuationRequest.postDataJSON()).toMatchObject({ branch_id: "branch-222222222222", expected_task_version: 1 });
     await expect(page.locator('[data-testid="task-lineage"]')).toContainText("任务持续链 · Run 2");
     await expect(page.locator('[data-testid="task-lineage"]')).toContainText("本次只核对该未完成分支的批准来源");
     await expect(page.locator('[data-testid="task-lineage"]')).toContainText("来源版本已变化");
