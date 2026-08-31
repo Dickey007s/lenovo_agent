@@ -371,7 +371,26 @@ async def test_postgres_demo2_interrupted_worker_reservation_is_not_replayed() -
         assert restored.budget.model_calls_used == reserved.budget.model_calls_used
         assert restored.worker_runs == []
         assert not getattr(second, "_tasks", {})
+
+        # A byte-for-byte replay of the original command reaches the durable
+        # reservation and is rejected as an interrupted attempt, not reported
+        # as a successful replay.
+        before_replay = (await second.get(owner, run_id)).model_dump(mode="json")
         with pytest.raises(HarnessConflictError, match="不会自动重放"):
+            await second.execute_admitted_readonly_workers(
+                owner,
+                run_id,
+                expected_version=waiting.version,
+                idempotency_key="demo2-interrupted-workers-0001",
+                worker_requests=[request],
+                handler=blocking_handler,
+                user_confirmed=True,
+            )
+        assert (await second.get(owner, run_id)).model_dump(mode="json") == before_replay
+
+        # Changing expected_version changes the command payload and must be a
+        # normal idempotency conflict, also without mutating the snapshot.
+        with pytest.raises(HarnessConflictError, match="不同 Worker 命令"):
             await second.execute_admitted_readonly_workers(
                 owner,
                 run_id,
@@ -381,6 +400,50 @@ async def test_postgres_demo2_interrupted_worker_reservation_is_not_replayed() -
                 handler=blocking_handler,
                 user_confirmed=True,
             )
+        assert (await second.get(owner, run_id)).model_dump(mode="json") == before_replay
+
+        async def recovery_handler(retry_request: ReadonlyWorkerRequest) -> ReadonlyWorkerContribution:
+            branch_after_recovery = next(
+                item for item in (await second.get(owner, run_id)).branches
+                if item.branch_id == retry_request.branch_id
+            )
+            finding = AgentControlLoopArtifactFinding(
+                finding_id="finding-checkpoint-retry",
+                plan_unit_id=branch_after_recovery.unit_id,
+                affected_branch_ids=[retry_request.branch_id],
+                title="检查点恢复后的显式重试",
+                detail="新的幂等键触发一次明确的只读重试。",
+                file_refs=list(retry_request.source_file_refs),
+            )
+            return ReadonlyWorkerContribution(
+                worker_run_id=retry_request.worker_run_id,
+                branch_id=retry_request.branch_id,
+                outcome="adopted",
+                summary="检查点恢复后的只读结果已通过服务端核对。",
+                source_file_refs=retry_request.source_file_refs,
+                evidence_anchors=("line:1",),
+                model_called=True,
+                output_used=True,
+                elapsed_ms=1,
+                findings=(finding,),
+            )
+
+        retry_request = request.model_copy(
+            update={"worker_run_id": "worker-checkpoint-retry", "expected_version": restored.version}
+        )
+        retried = await second.execute_admitted_readonly_workers(
+            owner,
+            run_id,
+            expected_version=restored.version,
+            idempotency_key="demo2-interrupted-workers-retry-0001",
+            worker_requests=[retry_request],
+            handler=recovery_handler,
+            user_confirmed=True,
+        )
+        assert retried.contributions[-1].worker_run_id == "worker-checkpoint-retry"
+        assert retried.contributions[-1].attempt == 2
+        retried_unit = next(item for item in retried.work_units if item.branch_id == request.branch_id)
+        assert retried_unit.attempt == 2
     finally:
         for runtime in reversed(runtimes):
             await runtime.close()
