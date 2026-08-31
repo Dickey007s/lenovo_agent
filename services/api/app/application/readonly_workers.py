@@ -114,7 +114,10 @@ async def execute_readonly_workers(
                 not result.evidence_anchors
                 or (
                     result.narrative_reconciliation is not None
-                    and result.narrative_reconciliation.model_disposition == "rejected"
+                    and (
+                        result.narrative_reconciliation.model_disposition == "rejected"
+                        or result.narrative_reconciliation.status in {"stale", "contradictory"}
+                    )
                 )
             ):
                 return result.model_copy(
@@ -145,7 +148,10 @@ def merge_adopted_contributions(
             and item.evidence_anchors
             and (
                 item.narrative_reconciliation is None
-                or item.narrative_reconciliation.model_disposition != "rejected"
+                or (
+                    item.narrative_reconciliation.model_disposition != "rejected"
+                    and item.narrative_reconciliation.status not in {"stale", "contradictory"}
+                )
             )
         )
     )

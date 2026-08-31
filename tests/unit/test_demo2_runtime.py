@@ -854,6 +854,38 @@ def test_rejected_narrative_or_missing_anchor_never_enters_merge() -> None:
     assert merged.waiting_branch_ids == ("branch-rejected",)
 
 
+@pytest.mark.parametrize("status", ["stale", "contradictory"])
+def test_stale_or_contradictory_narrative_never_enters_merge_even_if_marked_adopted(
+    status: str,
+) -> None:
+    reconciliation = AgentControlLoopNarrativeReconciliation(
+        reconciliation_id="narrative-reconciliation-abcdef123456",
+        round_number=1,
+        status=status,
+        authority="deterministic_outcome",
+        model_disposition="adopted",
+        model_returned=True,
+        message="模型叙述不能作为当前结论。",
+        checked_at=datetime.now(timezone.utc),
+    )
+    result = ReadonlyWorkerContribution(
+        worker_run_id=f"worker-{status}",
+        branch_id=f"branch-{status}",
+        outcome="adopted",
+        summary="状态异常的候选贡献",
+        source_file_refs=("forte-1111111111111111",),
+        evidence_anchors=("line:1",),
+        model_called=True,
+        output_used=True,
+        narrative_reconciliation=reconciliation,
+    )
+
+    merged = merge_adopted_contributions([result])
+
+    assert merged.adopted_worker_run_ids == ()
+    assert merged.waiting_branch_ids == (f"branch-{status}",)
+
+
 def test_worker_merge_receipts_keep_prior_wave_and_align_versions() -> None:
     wave_one = ReadonlyWorkerContribution(
         worker_run_id="worker-wave-one",
