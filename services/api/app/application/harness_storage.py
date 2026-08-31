@@ -95,6 +95,10 @@ class HarnessStateStore(Protocol):
 
     async def get_task_record(self, owner_id: str, task_id: str) -> TaskRecord | None: ...
 
+    async def get_task_aggregate(
+        self, owner_id: str, task_id: str
+    ) -> tuple[TaskRecord | None, list[StoredHarnessRun]]: ...
+
     async def create_task_record(self, task: TaskRecord) -> TaskRecord: ...
 
     async def commit_task_transition(
@@ -103,6 +107,8 @@ class HarnessStateStore(Protocol):
         task: TaskRecord,
         *,
         expected_task_version: int | None = None,
+        expected_parent_run_id: str | None = None,
+        expected_parent_version: int | None = None,
         task_receipt: TaskLedgerReceipt | None = None,
         task_digest: str | None = None,
         idempotency: StoredHarnessIdempotency | None = None,
@@ -294,6 +300,23 @@ class InMemoryHarnessStateStore:
             item = self._tasks.get((owner_id, task_id))
             return item.model_copy(deep=True) if item else None
 
+    async def get_task_aggregate(
+        self, owner_id: str, task_id: str
+    ) -> tuple[TaskRecord | None, list[StoredHarnessRun]]:
+        async with self._lock:
+            item = self._tasks.get((owner_id, task_id))
+            runs = [
+                StoredHarnessRun(
+                    owner_id=run.owner_id,
+                    run_id=run.run_id,
+                    snapshot=_clone(run.snapshot),
+                    resume_status=run.resume_status,
+                )
+                for (candidate_owner, _), run in self._runs.items()
+                if candidate_owner == owner_id and run.snapshot.get("task_id") == task_id
+            ]
+            return (item.model_copy(deep=True) if item else None), runs
+
     async def create_task_record(self, task: TaskRecord) -> TaskRecord:
         async with self._lock:
             key = (task.owner_id, task.task_id)
@@ -311,6 +334,8 @@ class InMemoryHarnessStateStore:
         task: TaskRecord,
         *,
         expected_task_version: int | None = None,
+        expected_parent_run_id: str | None = None,
+        expected_parent_version: int | None = None,
         task_receipt: TaskLedgerReceipt | None = None,
         task_digest: str | None = None,
         idempotency: StoredHarnessIdempotency | None = None,
@@ -326,6 +351,10 @@ class InMemoryHarnessStateStore:
                         raise TaskLedgerConflict("idempotency command conflict")
                     return previous
             task_key = (task.owner_id, task.task_id)
+            if expected_parent_run_id is not None:
+                parent = self._runs.get((run.owner_id, expected_parent_run_id))
+                if parent is None or parent.snapshot.get("version") != expected_parent_version:
+                    raise TaskLedgerConflict("parent Run version CAS failed")
             if (run.owner_id, run.run_id) in self._runs:
                 raise TaskLedgerConflict("run_id 已存在")
             current_task = self._tasks.get(task_key)
@@ -469,6 +498,28 @@ class PostgresHarnessStateStore:
                 row = await cursor.fetchone()
         return TaskRecord.model_validate(dict(row[0])) if row else None
 
+    async def get_task_aggregate(
+        self, owner_id: str, task_id: str
+    ) -> tuple[TaskRecord | None, list[StoredHarnessRun]]:
+        async with await psycopg.AsyncConnection.connect(self._dsn) as connection:
+            async with connection.cursor() as cursor:
+                await cursor.execute(
+                    "SELECT payload FROM harness_task_ledger WHERE owner_id=%s AND task_id=%s",
+                    (owner_id, task_id),
+                )
+                task_row = await cursor.fetchone()
+                await cursor.execute(
+                    "SELECT owner_id, run_id, snapshot, resume_status FROM harness_run_state WHERE owner_id=%s AND snapshot->>'task_id'=%s ORDER BY updated_at ASC",
+                    (owner_id, task_id),
+                )
+                run_rows = await cursor.fetchall()
+        task = TaskRecord.model_validate(dict(task_row[0])) if task_row else None
+        runs = [
+            StoredHarnessRun(owner_id=str(row[0]), run_id=str(row[1]), snapshot=dict(row[2]), resume_status=row[3])
+            for row in run_rows
+        ]
+        return task, runs
+
     async def create_task_record(self, task: TaskRecord) -> TaskRecord:
         async with await psycopg.AsyncConnection.connect(self._dsn) as connection:
             async with connection.cursor() as cursor:
@@ -487,6 +538,8 @@ class PostgresHarnessStateStore:
         task: TaskRecord,
         *,
         expected_task_version: int | None = None,
+        expected_parent_run_id: str | None = None,
+        expected_parent_version: int | None = None,
         task_receipt: TaskLedgerReceipt | None = None,
         task_digest: str | None = None,
         idempotency: StoredHarnessIdempotency | None = None,
@@ -515,6 +568,14 @@ class PostgresHarnessStateStore:
                             digest=str(previous[0]),
                             result=dict(previous[1]),
                         )
+                if expected_parent_run_id is not None:
+                    await cursor.execute(
+                        "SELECT snapshot->>'version' FROM harness_run_state WHERE owner_id=%s AND run_id=%s FOR UPDATE",
+                        (run.owner_id, expected_parent_run_id),
+                    )
+                    parent = await cursor.fetchone()
+                    if parent is None or int(parent[0]) != expected_parent_version:
+                        raise TaskLedgerConflict("parent Run version CAS failed")
                 if expected_task_version is None:
                     await cursor.execute(
                         "INSERT INTO harness_task_ledger(owner_id,task_id,task_version,payload) VALUES (%s,%s,%s,%s) ON CONFLICT (owner_id,task_id) DO NOTHING RETURNING task_id",

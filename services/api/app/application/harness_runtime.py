@@ -941,6 +941,8 @@ class HarnessRuntime:
                 raise HarnessError("任务台账的 Run sequence 不连续")
             if task_versions != sequences:
                 raise HarnessError("任务台账的 task_version 与 Run sequence 不一致")
+            if task_runs[0].run_sequence != 1 or task_runs[0].parent_run_id is not None:
+                raise HarnessError("任务台账 Run 根节点不一致")
             current = task_runs[-1]
             if (
                 current.run_id != task.current_run_id
@@ -948,6 +950,7 @@ class HarnessRuntime:
                 or current.owner_id != task.owner_id
                 or current.task_version != task.task_version
                 or current.run_sequence != task.run_sequence
+                or current.parent_run_id != task.parent_run_id
             ):
                 raise HarnessError("任务台账 current Run 指针不一致")
             for previous, following in zip(task_runs, task_runs[1:], strict=False):
@@ -1436,6 +1439,8 @@ class HarnessRuntime:
                         ),
                         child_task,
                         expected_task_version=task_record.task_version,
+                        expected_parent_run_id=parent.run_id,
+                        expected_parent_version=_parent_expected_version,
                         task_receipt=task_receipt,
                         task_digest=task_digest,
                         idempotency=start_idempotency,
@@ -1489,73 +1494,69 @@ class HarnessRuntime:
 
     async def get_task(self, owner_id: str, task_id: str) -> PublicHarnessTaskSnapshot:
         """Return a sanitized owner-scoped task pointer."""
-        record = await self._task_get(owner_id, task_id)
+        try:
+            record, stored_runs = await self.state_store.get_task_aggregate(owner_id, task_id)
+            record = TaskRecord.model_validate(record) if record is not None else None
+            task_snapshots = [
+                HarnessRunSnapshot.model_validate(item.snapshot)
+                for item in stored_runs
+                if item.owner_id == owner_id
+            ]
+        except Exception as exc:
+            raise HarnessError("任务台账 Run 读取失败") from exc
         if record is None:
-            async with self._lock:
-                candidates = [
-                    item.snapshot
-                    for (candidate_owner, _), item in self._runs.items()
-                    if candidate_owner == owner_id and item.snapshot.task_id == task_id
-                ]
+            candidates = [item for item in task_snapshots if item.task_id == task_id]
             if not candidates:
                 raise HarnessNotFoundError("任务不存在")
             # Legacy records are migrated during setup only.  A GET must not
             # mutate the ledger, and a Run without its Task is an integrity
             # failure rather than a synthetic pointer.
             raise HarnessError("任务台账不可读取")
-        async with self._lock:
-            current = self._runs.get((owner_id, record.current_run_id))
-            if current is None:
-                # A task pointer without its current Run is an integrity
-                # failure, not an indeterminate public status.  Returning a
-                # synthetic "unknown" Run would make a broken ledger look
-                # like a valid task and hide recovery requirements.
-                raise HarnessError("任务台账 current Run 不可读取")
-            snapshot = current.snapshot
-            if (
-                snapshot.task_id != record.task_id
-                or snapshot.owner_id != record.owner_id
-                or snapshot.task_version != record.task_version
-                or snapshot.run_sequence != record.run_sequence
-                or snapshot.workspace_id != record.workspace_id
-                or snapshot.workspace_revision != record.workspace_revision
-            ):
-                raise HarnessError("任务台账 current Run 身份不一致")
-            artifact = snapshot.artifact_versions[-1] if snapshot.artifact_versions else None
-            lineage = [
-                PublicHarnessTaskLineageItem(
-                    run_id=item.snapshot.run_id,
-                    run_sequence=item.snapshot.run_sequence,
-                    parent_run_id=item.snapshot.parent_run_id,
-                    status=item.snapshot.status,
-                    created_at=item.snapshot.created_at,
-                    updated_at=item.snapshot.updated_at,
-                )
-                for (candidate_owner, _), item in self._runs.items()
-                if candidate_owner == owner_id and item.snapshot.task_id == task_id
-            ]
-            lineage.sort(key=lambda item: item.run_sequence)
-            lineage_total = len(lineage)
-            lineage_truncated = lineage_total > 100
-            return PublicHarnessTaskSnapshot(
-                task_id=record.task_id,
-                task_version=record.task_version,
-                current_run_id=snapshot.run_id,
-                run_sequence=snapshot.run_sequence,
-                parent_run_id=snapshot.parent_run_id,
-                workspace_revision=snapshot.workspace_revision,
-                status=snapshot.status,
-                created_at=snapshot.created_at,
-                updated_at=snapshot.updated_at,
-                current_artifact_id=artifact.artifact_id if artifact else None,
-                current_artifact_version=artifact.version if artifact else None,
-                current_commit_id=snapshot.last_commit.commit_id if snapshot.last_commit else None,
-                # Keep the current pointer visible when a long history is
-                # projected; lineage_total reports the omitted older entries.
-                lineage=lineage[-100:],
-                lineage_total=lineage_total,
-                lineage_truncated=lineage_truncated,
+        snapshots = [item for item in task_snapshots if item.task_id == task_id]
+        snapshot = next((item for item in snapshots if item.run_id == record.current_run_id), None)
+        if snapshot is None:
+            raise HarnessError("任务台账 current Run 不可读取")
+        if (
+            snapshot.task_id != record.task_id
+            or snapshot.owner_id != record.owner_id
+            or snapshot.task_version != record.task_version
+            or snapshot.run_sequence != record.run_sequence
+            or snapshot.workspace_id != record.workspace_id
+            or snapshot.workspace_revision != record.workspace_revision
+        ):
+            raise HarnessError("任务台账 current Run 身份不一致")
+        artifact = snapshot.artifact_versions[-1] if snapshot.artifact_versions else None
+        lineage = [
+            PublicHarnessTaskLineageItem(
+                run_id=item.run_id,
+                run_sequence=item.run_sequence,
+                parent_run_id=item.parent_run_id,
+                status=item.status,
+                created_at=item.created_at,
+                updated_at=item.updated_at,
             )
+            for item in snapshots
+        ]
+        lineage.sort(key=lambda item: item.run_sequence)
+        lineage_total = len(lineage)
+        lineage_truncated = lineage_total > 100
+        return PublicHarnessTaskSnapshot(
+            task_id=record.task_id,
+            task_version=record.task_version,
+            current_run_id=snapshot.run_id,
+            run_sequence=snapshot.run_sequence,
+            parent_run_id=snapshot.parent_run_id,
+            workspace_revision=snapshot.workspace_revision,
+            status=snapshot.status,
+            created_at=snapshot.created_at,
+            updated_at=snapshot.updated_at,
+            current_artifact_id=artifact.artifact_id if artifact else None,
+            current_artifact_version=artifact.version if artifact else None,
+            current_commit_id=snapshot.last_commit.commit_id if snapshot.last_commit else None,
+            lineage=lineage[-100:],
+            lineage_total=lineage_total,
+            lineage_truncated=lineage_truncated,
+        )
 
     async def continue_unfinished_task(
         self,

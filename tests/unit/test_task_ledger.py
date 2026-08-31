@@ -216,7 +216,29 @@ async def test_task_endpoint_derives_current_run_and_lineage_from_runtime_start(
 
 
 @pytest.mark.asyncio
-async def test_task_endpoint_fails_closed_when_current_run_pointer_is_missing() -> None:
+async def test_task_get_reads_persisted_current_child_across_runtime_instances() -> None:
+    owner = "ledger-cross-runtime-owner"
+    store = InMemoryHarnessStateStore()
+    writer = HarnessRuntime(FakeCatalog(), FakePlanner(), FakeAnalyst(), state_store=store)
+    reader = HarnessRuntime(FakeCatalog(), FakePlanner(), FakeAnalyst(), state_store=store)
+    try:
+        parent = await _stopped_parent(writer, owner, "ledger-cross-runtime-start-0001")
+        branch = next(item for item in parent.branches if item.status != "completed")
+        child = await writer.continue_unfinished_task(
+            owner, parent.run_id, branch.branch_id,
+            idempotency_key="ledger-cross-runtime-child-0001",
+            expected_version=parent.version, expected_task_version=parent.task_version,
+        )
+        task = await reader.get_task(owner, parent.task_id)
+        assert task.current_run_id == child.run.run_id
+        assert task.task_version == child.run.task_version
+    finally:
+        await reader.close()
+        await writer.close()
+
+
+@pytest.mark.asyncio
+async def test_task_endpoint_reads_persisted_current_run_when_process_cache_is_missing() -> None:
     owner = "ledger-integrity-owner"
     runtime = HarnessRuntime(FakeCatalog(), FakePlanner(), FakeAnalyst())
     started = await runtime.start(
@@ -239,7 +261,8 @@ async def test_task_endpoint_fails_closed_when_current_run_pointer_is_missing() 
                 f"/v1/harness/tasks/{started.run.task_id}",
                 headers={"X-User-Id": owner},
             )
-        assert response.status_code == 503
+        assert response.status_code == 200
+        assert response.json()["current_run_id"] == started.run.run_id
     finally:
         app.dependency_overrides.clear()
         await runtime.close()
@@ -257,14 +280,14 @@ async def test_task_endpoint_fails_closed_when_task_store_read_raises() -> None:
             loop={"max_rounds": 1, "max_files_per_round": 1, "max_model_calls": 2, "deadline_seconds": 60},
         ),
     )
-    async def broken_task_read(owner_id: str, task_id: str) -> TaskRecord | None:
+    async def broken_task_read(owner_id: str, task_id: str):
         raise ValueError("database unavailable")
 
-    runtime.state_store.get_task_record = broken_task_read  # type: ignore[method-assign]
+    runtime.state_store.get_task_aggregate = broken_task_read  # type: ignore[method-assign]
     app = create_app()
     app.dependency_overrides[get_harness_runtime] = lambda: runtime
     try:
-        with pytest.raises(Exception, match="台账读取"):
+        with pytest.raises(Exception, match="台账 Run 读取"):
             await runtime.get_task(owner, started.run.task_id)
         async with httpx.AsyncClient(
             transport=httpx.ASGITransport(app=app), base_url="http://test"
@@ -442,7 +465,7 @@ async def test_http_task_ledger_validation_and_continuation_failure_are_503_or_4
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("case", ["duplicate_sequence", "broken_parent", "pointer_mismatch"])
+@pytest.mark.parametrize("case", ["duplicate_sequence", "broken_parent", "pointer_mismatch", "root_parent"])
 async def test_setup_rejects_broken_task_lineage_without_backfill(case: str) -> None:
     owner = f"ledger-setup-{case}"
     store = InMemoryHarnessStateStore()
@@ -453,6 +476,11 @@ async def test_setup_rejects_broken_task_lineage_without_backfill(case: str) -> 
             task = await store.get_task_record(owner, parent.task_id)
             assert task is not None
             store._tasks[(owner, parent.task_id)] = task.model_copy(update={"current_run_id": "harness:ffffffffffffffffffffffffffffffff"})
+        elif case == "root_parent":
+            stored = store._runs[(owner, parent.run_id)]
+            snapshot = dict(stored.snapshot)
+            snapshot["parent_run_id"] = "harness:ffffffffffffffffffffffffffffffff"
+            store._runs[(owner, parent.run_id)] = StoredHarnessRun(owner_id=owner, run_id=parent.run_id, snapshot=snapshot, resume_status=stored.resume_status)
         else:
             stored = store._runs[(owner, parent.run_id)]
             snapshot = dict(stored.snapshot)
@@ -486,7 +514,7 @@ async def test_task_lineage_truncates_101_runs_but_keeps_current() -> None:
             latest = run_id
         task = await store.get_task_record(owner, parent.task_id)
         assert task is not None
-        store._tasks[(owner, parent.task_id)] = task.model_copy(update={"current_run_id": latest, "task_version": 101, "run_sequence": 101})
+        store._tasks[(owner, parent.task_id)] = task.model_copy(update={"current_run_id": latest, "task_version": 101, "run_sequence": 101, "parent_run_id": f"harness:{100:032x}"})
         restored = HarnessRuntime(FakeCatalog(), FakePlanner(), FakeAnalyst(), state_store=store)
         await restored.setup()
         payload = await restored.get_task(owner, parent.task_id)

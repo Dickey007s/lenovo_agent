@@ -4926,7 +4926,7 @@ test.describe("Demo 1/2 runtime acceptance", () => {
     await page.getByRole("button", { name: "继续未完成任务" }).first().click();
     await expect(page.locator('[data-testid="task-lineage"]')).toContainText("任务持续链 · Run 1");
     await expect(page.locator('[data-testid="task-ledger-history"]')).toContainText("历史 Run · 当前任务已进入 Run 2");
-    await expect(page.locator("body")).toContainText("任务已由另一页面继续，请刷新当前 Run");
+    await expect(page.locator("body")).toContainText("任务或运行状态已更新");
     await expect(page.getByRole("button", { name: "打开当前 Run" })).toBeVisible();
     await page.getByRole("button", { name: "打开当前 Run" }).click();
     await expect(page.locator('[data-testid="task-lineage"]')).toContainText("任务持续链 · Run 2");
@@ -4939,6 +4939,9 @@ test.describe("Demo 1/2 runtime acceptance", () => {
     await page.goto("/");
     await page.getByRole("textbox", { name: "任务指令" }).fill("继续未完成任务");
     await page.getByRole("button", { name: "启动 Control Loop" }).click();
+    await expect(page.getByRole("button", { name: "重试" })).toBeVisible();
+    await page.getByRole("button", { name: "重试" }).click();
+    await expect(page.locator('[data-testid="task-ledger-pointer"]')).toContainText("当前任务 Run · 任务版本 v1");
     await page.getByRole("button", { name: "Agent 路径" }).click();
     await page.getByRole("button", { name: "继续未完成任务" }).first().click();
     await expect(page.locator('[data-testid="task-ledger-pointer"]')).toContainText("当前任务 Run · 任务版本 v2");

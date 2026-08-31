@@ -3990,6 +3990,7 @@ export function HarnessWorkbench({ onActivityChange }: { onActivityChange?: (sta
   const [view, setView] = useState<WorkspaceView>("data");
   const [run, setRun] = useState<HarnessRun | null>(null);
   const [taskPointer, setTaskPointer] = useState<TaskPointer | null>(null);
+  const [taskPointerError, setTaskPointerError] = useState("");
   const [workspaceStatus, setWorkspaceStatus] = useState<WorkspaceStatus>("checking");
   const [workspaceError, setWorkspaceError] = useState("");
   const [starting, setStarting] = useState(false);
@@ -4041,6 +4042,7 @@ export function HarnessWorkbench({ onActivityChange }: { onActivityChange?: (sta
     setRun(snapshot);
     const taskFetchKey = `${snapshot.task_id}:${snapshot.run_id}:${snapshot.task_version}`;
     if (taskFetchKeyRef.current !== taskFetchKey) {
+      setTaskPointerError("");
       refreshTaskPointer(snapshot.task_id, generation, snapshot.run_id, snapshot.task_version);
     }
     if (snapshot.events.length) setConnection(TERMINAL_STATUSES.has(snapshot.status) ? "available" : "live");
@@ -4061,6 +4063,7 @@ export function HarnessWorkbench({ onActivityChange }: { onActivityChange?: (sta
     taskFetchKeyRef.current = taskFetchKey;
     const clearFailedTaskFetch = () => {
       if (taskFetchKeyRef.current === taskFetchKey) taskFetchKeyRef.current = null;
+      if (generation === generationRef.current) setTaskPointerError("任务台账暂时无法读取，请重试");
     };
     void fetch(`${API_BASE}/v1/harness/tasks/${encodeURIComponent(taskId)}`, { headers: HEADERS })
       .then((response) => {
@@ -4110,6 +4113,7 @@ export function HarnessWorkbench({ onActivityChange }: { onActivityChange?: (sta
           current_commit_id: asText(raw.current_commit_id) || null,
           lineage,
         });
+        setTaskPointerError("");
       })
       .catch(clearFailedTaskFetch);
   }
@@ -4359,7 +4363,7 @@ export function HarnessWorkbench({ onActivityChange }: { onActivityChange?: (sta
       if (!response.ok) {
         if (response.status === 409) {
           refreshTaskPointer(current.task_id, generationRef.current, current.run_id, current.task_version, true);
-          throw new Error("任务已由另一页面继续，请刷新当前 Run");
+          throw new Error("任务或运行状态已更新");
         }
         throw new Error(asText((payload as Record<string, unknown>).detail, "任务没有继续"));
       }
@@ -4579,7 +4583,7 @@ export function HarnessWorkbench({ onActivityChange }: { onActivityChange?: (sta
         </nav>
         <div className="workspace-content">
           {view === "data" && <FilePreview preview={preview} file={activeFile} loading={previewLoading} error={previewError} />}
-          {view === "loop" && <LoopView run={run} taskPointer={taskPointer} files={allFiles} controlBusy={controlBusy} onControl={controlLoop} onReview={setReviewRequest} onStartTask={startTask} onContinueTask={continueTask} onOpenCurrentTask={openCurrentTask} onExecuteWorkers={executeWorkers} starting={starting} />}
+          {view === "loop" && <LoopView run={run} taskPointer={taskPointer} taskPointerError={taskPointerError} files={allFiles} controlBusy={controlBusy} onControl={controlLoop} onReview={setReviewRequest} onStartTask={startTask} onContinueTask={continueTask} onOpenCurrentTask={openCurrentTask} onRetryTaskPointer={() => run && refreshTaskPointer(run.task_id, generationRef.current, run.run_id, run.task_version, true)} onExecuteWorkers={executeWorkers} starting={starting} />}
           {view === "result" && <ResultView result={run?.result ?? null} artifacts={run?.artifact_versions ?? []} workspaceArtifacts={run?.workspace_artifacts ?? []} receipts={run?.effect_receipts ?? []} reconciliation={run?.narrative_reconciliation ?? null} commit={run?.last_commit ?? null} decisions={run?.decision_records ?? []} decisionRequests={run?.decision_requests ?? []} files={allFiles} onOpenFile={openFile} onReview={setReviewRequest} onStartTask={startTask} starting={starting} />}
         </div>
         <details className="workspace-boundary"><summary><IconShieldCheck aria-hidden="true" />数据与执行边界</summary><p>{workspace.data_boundary} Agent 可以检索整个资料库，但每轮只读取服务端校验通过且受预算约束的文件；本轮不会修改原文件或执行外部动作。</p></details>
@@ -4620,6 +4624,7 @@ function FilePreview({ preview, file, loading, error, anchor = null }: { preview
 function LoopView({
   run,
   taskPointer,
+  taskPointerError,
   files,
   controlBusy,
   onControl,
@@ -4627,11 +4632,13 @@ function LoopView({
   onStartTask,
   onContinueTask,
   onOpenCurrentTask,
+  onRetryTaskPointer,
   onExecuteWorkers,
   starting,
 }: {
   run: HarnessRun | null;
   taskPointer: TaskPointer | null;
+  taskPointerError: string;
   files: HarnessFile[];
   controlBusy: LoopCommand | null;
   onControl: (command: LoopCommand, options?: LoopControlOptions) => Promise<boolean>;
@@ -4639,6 +4646,7 @@ function LoopView({
   onStartTask: (instruction: string) => Promise<boolean>;
   onContinueTask: (branchId: string, instruction?: string) => Promise<boolean>;
   onOpenCurrentTask: () => Promise<boolean>;
+  onRetryTaskPointer: () => void;
   onExecuteWorkers: () => Promise<boolean>;
   starting: boolean;
 }) {
@@ -4766,6 +4774,7 @@ function LoopView({
     </header>
     <section className="loop-lineage-strip" aria-label="任务时间线" data-testid="task-lineage">
       <div><span>任务时间线</span><strong>任务持续链 · Run {run.run_sequence}</strong></div>
+      {taskPointerError && TERMINAL_STATUSES.has(run.status) && <div className="task-ledger-error"><small>{taskPointerError}</small><button type="button" onClick={onRetryTaskPointer} disabled={starting}><IconRefresh aria-hidden="true" />重试</button></div>}
       {taskPointer && taskPointer.task_id === run.task_id && (taskPointer.current_run_id === run.run_id
         ? <small data-testid="task-ledger-pointer">当前任务 Run · 任务版本 v{taskPointer.task_version}</small>
         : <div className="task-ledger-history" data-testid="task-ledger-history"><small>历史 Run · 当前任务已进入 Run {taskPointer.run_sequence}</small><button type="button" onClick={() => void onOpenCurrentTask()} disabled={starting}><IconRoute aria-hidden="true" />打开当前 Run</button></div>)}

@@ -246,6 +246,31 @@ async def test_task_ledger_sibling_cas_and_same_idempotency_replay() -> None:
 
 
 @pytest.mark.asyncio
+async def test_task_ledger_stale_parent_version_rolls_back_continuation() -> None:
+    owner = f"task-ledger-parent-cas-{uuid4().hex}"
+    store = PostgresHarnessStateStore(DATABASE_DSN)
+    try:
+        await store.setup()
+        initial = _task(owner)
+        initial_run = _run(owner, initial)
+        await store.commit_task_transition(initial_run, initial)
+        before_tasks = await store.load_task_records()
+        before_runs = await store.load_runs()
+        child = _task(owner, version=2).model_copy(update={"parent_run_id": initial.current_run_id})
+        with pytest.raises(TaskLedgerConflict, match="parent Run version"):
+            await store.commit_task_transition(
+                _run(owner, child, parent_run_id=initial.current_run_id), child,
+                expected_task_version=1, expected_parent_run_id=initial.current_run_id,
+                expected_parent_version=999,
+            )
+        assert await store.load_task_records() == before_tasks
+        assert await store.load_runs() == before_runs
+    finally:
+        await store.close()
+        await _cleanup(owner)
+
+
+@pytest.mark.asyncio
 async def test_task_ledger_transaction_rollback_leaves_no_orphan() -> None:
     owner = f"task-ledger-rollback-{uuid4().hex}"
     store = PostgresHarnessStateStore(DATABASE_DSN)
