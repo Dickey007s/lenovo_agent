@@ -1,5 +1,9 @@
 # Demo 1/2 用户试用与验收用例（2026-08-31）
 
+固定正例、反例和失败注入合同见
+[`DEMO1-DEMO2-FIXED-SCENARIO-GATES-20260831`](DEMO1-DEMO2-FIXED-SCENARIO-GATES-20260831.md)。
+本文件保留用户自行操作步骤；固定场景门负责工程可重复性，两者不能相互替代。
+
 ## 先说清两种验证
 
 1. **确定性工程验证**使用 Playwright mock API 和 Python Fixture，不调用付费 Provider。

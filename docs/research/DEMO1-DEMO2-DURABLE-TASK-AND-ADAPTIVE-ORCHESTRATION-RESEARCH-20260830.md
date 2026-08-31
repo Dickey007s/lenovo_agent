@@ -187,6 +187,15 @@ Horvitz 的
 以下措辞有意不用“竞品做不到”。公开资料未描述某项能力，不能推断产品绝对没有；
 本项目只能声明自身要提供的原生合同，并通过同场任务验证。
 
+### 5.0 先固定应用拥有的编排合同，再测 Provider 行为
+
+[OpenAI Agents SDK Testing](https://openai.github.io/openai-agents-python/testing/)
+明确区分应用/SDK 拥有的编排、guardrail、retry、streaming、session 测试与外部模型、
+网络或 Provider 集成测试，并允许用不发起真实模型请求的 deterministic Fixture 检查
+workflow drift。本项目不依赖该 SDK，但采用相同的验证边界：先固定 Task/Branch、
+Topology Admission、Worker scope、Artifact adoption 和前台投影，再单独验证真实
+Provider。Fixture 通过不能升级模型质量、数据库恢复或用户价值结论。
+
 ### 5.1 差异一：办公 Task lineage 与证据重核合同，而不是只有可恢复状态
 
 主流方案已经可以用 session、thread、run、workflow、Flow 或 task record 保存并恢复
