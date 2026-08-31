@@ -586,6 +586,7 @@ pnpm --dir apps/web exec playwright test e2e/harness-workbench.spec.ts
 - [SCENARIO-041：五个工作包的可恢复执行与局部成果收敛](docs/scenarios/SCENARIO-041-workunit-contribution-ledger-and-partial-convergence.md)
 - [SCENARIO-042：跨职能风险与待办简报的输入、过程与输出](docs/scenarios/SCENARIO-042-demo2-cross-functional-risk-brief.md)
 - [Demo 2 输入、过程与输出场景门](docs/testing/DEMO2-INPUT-PROCESS-OUTPUT-GATES-20260831.md)
+- [Demo 2 输入、过程与输出工程 Evidence](docs/evidence/DR-0055-DEMO2-INPUT-PROCESS-OUTPUT-EVIDENCE-20260831.md)
 - [WorkUnit / Contribution Ledger V1 工程 Evidence](docs/evidence/DR-0055-WORKUNIT-CONTRIBUTION-LEDGER-V1-EVIDENCE-20260831.md)
 - [DR-0053：跨 Run 任务谱系与可解释协作拓扑准入](docs/decisions/DR-0053-durable-task-lineage-and-explainable-topology-admission.md)
 - [SCENARIO-038：同一办公任务跨 Run 延续而不覆盖历史](docs/scenarios/SCENARIO-038-durable-task-continuation-across-runs.md)

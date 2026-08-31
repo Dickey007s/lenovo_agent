@@ -432,6 +432,13 @@ unconfirmed unit as `checkpoint_recovered_in_flight_worker`, and never replays i
 A new idempotency key and current Run version may explicitly retry only that
 recovered WorkUnit. This still is not a queue, lease or remote Worker runtime.
 
+When WorkUnits have formed logical `artifact_versions[]` but no real
+`workspace_artifacts[]`, the UI now labels the result as reviewable/restorable
+and explicitly says that no DOCX/CSV download exists. Each WorkUnit shows safe
+source labels and business dependency titles from the public Snapshot. This
+prevents a user from mistaking an append-only evidence brief for a written
+office file; it does not change the Artifact or file protocol.
+
 Elapsed milliseconds are an observed call duration, not production SLA or cost.
 The trajectory uses named server events and business summaries. It also exposes
 the authoritative round, budget usage and safe-point controls. Prompt,

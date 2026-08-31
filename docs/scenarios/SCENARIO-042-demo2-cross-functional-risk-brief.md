@@ -1,6 +1,7 @@
 # SCENARIO-042：跨职能风险与待办简报的两波只读收敛
 
-- 状态：`Draft`；场景合同与用户试用步骤已固定，源码/浏览器验收由独立开发任务执行中
+- 状态：`Limited Verified`；十份输入、三根两依赖、局部失败和前台输出已通过固定
+  Runtime/浏览器门，真实 Provider 与目标用户试用仍未验证
 - 日期：2026-08-31
 - 决策：`DR-0055`
 - 用户来源：`USER-FEEDBACK-20260831-DEMO2-INPUT-PROCESS-OUTPUT`
@@ -163,3 +164,6 @@ Worker 只能使用 Branch 批准来源；返回与采用分开；统一成果 a
 - Anchor 证明位置和批准来源 membership，不证明语义、穷举、算术或业务正确。
 - 当前没有下载版跨职能简报、真实 Connector、源文件写回、代码执行或外部动作。
 - 用户理解、信任、速度、成本和业务质量均仍为 `Draft`，需要形成性用户研究。
+
+固定 Runtime、浏览器命令、结果和结论边界见
+[`DR-0055 Demo 2 Evidence`](../evidence/DR-0055-DEMO2-INPUT-PROCESS-OUTPUT-EVIDENCE-20260831.md)。

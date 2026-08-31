@@ -216,6 +216,7 @@ reservation、digest 或内部 validator 字段。
 | 公共隐私终审 | 定向 `73 passed in 8.51s` | Run GET/SSE 移除 `owner_id`，内部鉴权保持 |
 | stale/contradictory 合入终审 | 定向 `75 passed in 3.13s` | Worker 规范化与 merge 双重拒绝 adopted-looking 候选 |
 | Runtime 聚合提交 failure injection | 定向 `76 passed in 3.21s` | reservation 失败零 dispatch；merge 失败回到安全 reservation 且无假成果 |
+| SCENARIO-042 输入/过程/输出 | 集成定向 `35 passed`、全量 Python `418 passed, 23 skipped`；Demo 2 浏览器 `2 passed`、全量浏览器修复后 `69 passed` | 固定十份来源、三根两依赖、局部 v1/v2 与逻辑成果边界；不是 Provider 或用户研究 |
 | Ruff / lint / build | 全部通过 | 静态与生产构建门，不证明真实 Provider 效果 |
 
 真实 PostgreSQL 门在最终通过前先暴露并修正了严格幂等预期、过期来源重试和 Worker
@@ -224,3 +225,6 @@ checkpoint 恢复会丢失 Branch DAG 三类问题。完整负向过程、源码
 PostgreSQL storage transaction 与 Runtime reservation/merge 两个聚合持久化点已有回滚门；
 这仍未穷举进程终止、驱动断连、网络分区、磁盘损坏或多实例竞争，不能扩大成任意故障点
 或 HA 保证。
+
+`SCENARIO-042` 的精确输入、两波状态、浏览器断言和本轮未执行项见
+[`Demo 2 Evidence`](../evidence/DR-0055-DEMO2-INPUT-PROCESS-OUTPUT-EVIDENCE-20260831.md)。

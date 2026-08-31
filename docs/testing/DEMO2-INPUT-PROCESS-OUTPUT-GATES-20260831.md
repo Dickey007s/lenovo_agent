@@ -1,6 +1,7 @@
 # Demo 2 输入、过程与输出场景门
 
-- 状态：`Draft`；等待独立开发任务提交源码与浏览器回归后回填 Evidence
+- 状态：`Limited Verified`；固定 Runtime/浏览器门已通过，真实 Provider、PostgreSQL
+  本轮复跑与目标用户理解仍未验证
 - 日期：2026-08-31
 - 场景：`SCENARIO-042`
 - 决策：`DR-0055`
@@ -89,3 +90,17 @@ pnpm --dir apps/web exec playwright test e2e/harness-workbench.spec.ts
 - 不能声称不同 FORTE 项目属于同一个真实公司、产品或发布批次；
 - 不能声称实现 distributed queue/lease、远端 Worker、多实例协调、Connector 或外部动作；
 - 不能从官方文档未提及某个字段，推断竞品绝对没有相应能力。
+
+## 7. 2026-08-31 实际结果
+
+- Runtime、固定场景与治理：`35 passed in 3.11s`；
+- 全量 Python：`418 passed, 23 skipped in 302.98s`；skip 不算通过；
+- Ruff、Web lint、生产 build：passed；
+- Demo 2 Playwright：`2 passed in 16.3s`，覆盖正向两波与搜索 Agent 歧义局部保留；
+- 全量 Playwright 首次 `66 passed / 3 failed`，修复 101 份 Fixture 和默认预览回归后为
+  `69 passed in 2.7m`；
+- 变更 Markdown 本地链接与 `git diff --check`：passed；
+- 未运行：本轮真实 Provider 与 PostgreSQL 场景复跑。
+
+完整命令、输入集合、实现提交和结论边界见
+[`Evidence`](../evidence/DR-0055-DEMO2-INPUT-PROCESS-OUTPUT-EVIDENCE-20260831.md)。
