@@ -1727,7 +1727,9 @@ async def test_http_contract_exposes_one_workspace_not_scenarios() -> None:
         events = await client.get(f"/v1/harness/runs/{run_id}/events", headers=headers)
 
     assert current.json()["workspace_id"] == "forte-public-office"
+    assert "owner_id" not in current.json()
     assert "event: loop_committed" in events.text
+    assert "owner_id" not in events.text
     assert "Finance-018/input" not in events.text
     openapi_paths = set(app.openapi()["paths"])
     assert "/v1/harness/workspace" in openapi_paths

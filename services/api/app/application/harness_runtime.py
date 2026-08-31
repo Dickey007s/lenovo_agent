@@ -471,7 +471,6 @@ class PublicHarnessRunSnapshot(BaseModel):
     workspace_revision: str = "unknown"
     recheck_file_refs: list[str] = Field(default_factory=list, max_length=24)
     source_revision_changed: bool = False
-    owner_id: str
     workspace_id: Literal["forte-public-office"]
     status: str
     version: int
@@ -3396,7 +3395,6 @@ class HarnessRuntime:
             workspace_revision=snapshot.workspace_revision,
             recheck_file_refs=snapshot.recheck_file_refs,
             source_revision_changed=snapshot.source_revision_changed,
-            owner_id=snapshot.owner_id,
             workspace_id=snapshot.workspace_id,
             status=snapshot.status,
             version=snapshot.version,
