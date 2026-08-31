@@ -102,11 +102,20 @@ class WorkUnitRecord(BaseModel):
             WorkUnitState.ADOPTED: set(),
             WorkUnitState.WAITING: {WorkUnitState.RESERVED, WorkUnitState.BLOCKED},
             WorkUnitState.REJECTED: set(),
-            WorkUnitState.FAILED: set(),
+            # Only an in-flight attempt made uncertain by checkpoint recovery
+            # may be explicitly retried. Ordinary execution failures remain
+            # terminal.
+            WorkUnitState.FAILED: {WorkUnitState.READY},
             WorkUnitState.BLOCKED: set(),
         }
         if target not in allowed[self.state]:
             raise WorkUnitLedgerConflict(f"illegal WorkUnit transition {self.state}->{target}")
+        if (
+            self.state == WorkUnitState.FAILED
+            and target == WorkUnitState.READY
+            and self.status_reason != WorkUnitStatusReason.CHECKPOINT_RECOVERED_IN_FLIGHT
+        ):
+            raise WorkUnitLedgerConflict("only checkpoint-recovered WorkUnit can be retried")
         now = datetime.now(timezone.utc)
         values: dict[str, Any] = {"state": target, "version": self.version + 1, "updated_at": now}
         if target == WorkUnitState.RESERVED:

@@ -1845,6 +1845,11 @@ class HarnessRuntime:
                 work_unit = work_unit_by_branch.get(request.branch_id)
                 if work_unit.state == WorkUnitState.PENDING:
                     work_unit = work_unit.transition(WorkUnitState.READY)
+                elif (
+                    work_unit.state == WorkUnitState.FAILED
+                    and work_unit.status_reason == WorkUnitStatusReason.CHECKPOINT_RECOVERED_IN_FLIGHT
+                ):
+                    work_unit = work_unit.transition(WorkUnitState.READY)
                 if work_unit.state not in {WorkUnitState.READY, WorkUnitState.WAITING}:
                     raise HarnessConflictError("该 WorkUnit 已有在途或终态尝试")
                 work_unit = work_unit.transition(WorkUnitState.RESERVED).model_copy(

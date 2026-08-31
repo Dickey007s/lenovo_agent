@@ -16,6 +16,7 @@ from services.api.app.application.workunit_ledger import (
     WorkUnitLedgerConflict,
     WorkUnitRecord,
     WorkUnitState,
+    WorkUnitStatusReason,
     WorkerModelReceipt,
     public_contribution,
     public_work_unit,
@@ -68,6 +69,13 @@ def test_work_unit_reuses_branch_key_and_has_explicit_state_machine() -> None:
     assert returned.transition(WorkUnitState.ADOPTED).state == WorkUnitState.ADOPTED
     with pytest.raises(WorkUnitLedgerConflict):
         record.transition(WorkUnitState.ADOPTED)
+    failed = running.transition(WorkUnitState.FAILED, error="worker stopped")
+    with pytest.raises(WorkUnitLedgerConflict, match="checkpoint-recovered"):
+        failed.transition(WorkUnitState.READY)
+    recovered = failed.model_copy(
+        update={"status_reason": WorkUnitStatusReason.CHECKPOINT_RECOVERED_IN_FLIGHT}
+    )
+    assert recovered.transition(WorkUnitState.READY).state == WorkUnitState.READY
     with pytest.raises(ValueError, match="work_unit_id"):
         WorkUnitRecord(**{**record.model_dump(), "branch_id": "branch-bbbbbbbbbbbb"})
 
