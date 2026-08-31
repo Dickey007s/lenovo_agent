@@ -7,6 +7,9 @@
   `MULTI-AGENT-ORCHESTRATION-OFFICIAL-20260830`、
   `AGENT-INTEROP-AND-ELICITATION-OFFICIAL-20260830`、
   `HAI-MIXED-INITIATIVE-RESEARCH-20260830`
+- 具体用户输入、十份公开来源、五个业务工作包和输出边界见
+  [`SCENARIO-042`](SCENARIO-042-demo2-cross-functional-risk-brief.md)；本场景保留通用
+  WorkUnit/Contribution 状态机与恢复异常，不再单独承担业务叙事。
 
 ## 用户、触发与完成条件
 

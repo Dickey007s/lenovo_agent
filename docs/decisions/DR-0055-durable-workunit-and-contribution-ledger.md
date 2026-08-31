@@ -168,6 +168,18 @@ reservation、digest 或内部 validator 字段。
   采用记录，局部失败不清空兄弟成果。
 - 两者共享 Task/Run/Branch/ArtifactVersion/TaskCommit，不形成两套产品或第九模块。
 
+## Demo 2 的具体输入、过程与输出
+
+`SCENARIO-041` 验证通用五单元 DAG 和持久台账；`SCENARIO-042` 把它落到一个可直接试的
+业务镜头。用户要求分别核对产品上线、搜索 Agent 运行和用户交互三条工作线，固定门使用
+十份真实 FORTE 输入的安全投影。第一波为三个跨职能根工作包，第二波为产品影响/交互
+优先级和搜索 Agent 风险/待办两个依赖工作包。搜索 Agent 分支出现引用歧义时，产品和
+交互贡献仍形成部分 v1，只有依赖它的下游阻塞。
+
+当前输出必须写成“可审查、可恢复的逻辑 ArtifactVersion”，不得说成已生成 DOCX/CSV；
+也不得把三条不同项目工作线的数值合成同一个产品结论。确定性 renderer、下载成果和
+独立 Verifier 是后续纵切，不属于 DR-0055 当前完成事实。
+
 ## 验证门
 
 1. 五单元 DAG 第一波三个 root、第二波两个 dependent；无 orphan/duplicate WorkUnit。

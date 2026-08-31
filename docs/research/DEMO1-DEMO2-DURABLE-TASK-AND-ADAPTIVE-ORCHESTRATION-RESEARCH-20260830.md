@@ -4,7 +4,7 @@
 - 状态：`Ready` 研究输入；对应有限 Runtime 已达 `Limited Verified`，产品价值与用户体验判断仍为 `Draft`
 - 用户来源：`USER-FEEDBACK-20260830-DEMO1-DEMO2-CONTINUATION`
 - 对应决策：`DR-0053`、`DR-0054`、`DR-0055`
-- 对应场景：`SCENARIO-038`、`SCENARIO-039`、`SCENARIO-040`、`SCENARIO-041`
+- 对应场景：`SCENARIO-038`、`SCENARIO-039`、`SCENARIO-040`、`SCENARIO-041`、`SCENARIO-042`
 
 ## 1. 研究问题与结论
 
@@ -126,6 +126,13 @@ Task Contract -> Observe -> Plan -> Act -> Verify -> Commit
 Demo 2 的价值不在屏幕上出现很多 Agent 头像，而在用户只管理优先级、路线理由、
 例外和统一成果。多 Worker 必须证明其任务可并行且收益可能覆盖协调成本；否则应
 回退到单 Controller 或固定流程。
+
+2026-08-31 的后续 Stakeholder 反馈要求进一步回到场景。`SCENARIO-042` 因此固定一条
+普通指令：分别核对产品上线、搜索 Agent 运行和用户交互三条工作线，形成跨职能风险与
+待办简报。固定门使用十份真实 FORTE 输入的安全投影，形成三个首波根工作包和两个依赖
+工作包；不同项目事实保持分组，不能汇成同一产品结论。当前输出只是可审查、可恢复的
+逻辑 `ArtifactVersion v1/v2`，尚无跨职能 DOCX/CSV renderer。这一具体化保留 07-16 的
+“路线分流、按需协作、统一出口”，但不冒充尚未接入的邮件、CRM、日历或多任务驾驶舱。
 
 ## 4. 主流技术已经解决了什么
 

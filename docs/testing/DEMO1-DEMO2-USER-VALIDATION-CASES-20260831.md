@@ -89,16 +89,25 @@ uv run pytest -q tests/integration/test_postgres_demo1_demo2.py
 若没有 waiting Branch，页面不应为了 Demo 强行显示续办按钮；这说明本次真实计划没有触发
 该路径，不是功能失败。请用 A/B 的固定 Fixture 验协议，再换任务观察真实 Planner。
 
-### C2. Demo 2 正向：跨职能只读上线核对
+### C2. Demo 2 正向：跨职能风险与待办简报
 
 建议输入：
 
-> 分别核对算法研发、法务和质量保障目录中与发布准备有关的资料，形成一份统一的只读上线核对简报；说明各工作包依赖和缺口，不修改文件，不调用外部系统。
+> 请分别核对产品上线、搜索 Agent 运行和用户交互三条工作线中最需要人工处理的风险与
+> 证据，形成一份跨职能风险与待办简报。按工作包列出已核对来源、关键发现、缺口、受
+> 影响下游和下一步；先独立核对，再统一收敛。不要修改源文件，不要执行代码，不调用
+> 外部系统。
 
 1. 查看路线说明是否来自实际 validated plan，而不是因为 Prompt 写了“多个 Agent”。
 2. 若系统推荐 adaptive route，先确认此时还没有 Worker 回执，再点击确认。
-3. 核对每个 Worker 的批准来源、`model_called`、`output_used`、耗时和 outcome。
-4. 若一项失败，确认其他 adopted 项和旧 Artifact 仍在；不要把 partial 成果当作全部正确。
+3. 核对三个首波工作包的批准来源是否分别来自产品管理、算法研发和用户体验，且不同
+   项目的数字没有被写成同一个产品结论。
+4. 核对每个 Worker 的 `model_called`、`output_used`、耗时、outcome 与 Anchor；“已返回”
+   和“已采用”不能合并成一个绿灯。
+5. 若一项失败，确认其他 adopted 项和旧 Artifact 仍在，并只阻塞依赖它的下游；不要把
+   partial 成果当作全部正确。
+6. 查看 v1/v2 时确认页面明确说明当前为逻辑成果版本，不是 DOCX/CSV 下载文件，也没有
+   修改源文件、执行代码或调用外部系统。
 
 真实 Provider 可能保守地产生单 Branch 或同职能来源，从而选择 single/fixed route。前台应
 如实解释，不应为了展示多 Worker 伪造并行。

@@ -345,6 +345,16 @@ Contribution。“已返回”和“进入成果”是两个状态，只有来�
 叙事对账通过的候选才能进入 ArtifactVersion v1/v2。重启不会自动重放不确定调用；用户
 只能用新幂等键和当前 version 重试目标 recovered WorkUnit。
 
+为避免这段实现只剩架构名词，`SCENARIO-042` 又把 Demo 2 固定为一条可直接试的办公
+指令：用户要求分别核对产品上线、搜索 Agent 运行和用户交互三条工作线，形成跨职能风险
+与待办简报。固定门使用十份真实 FORTE 输入的安全投影；第一波三个根工作包各自核对，
+第二波只做产品影响/交互优先级与搜索 Agent 风险/待办收敛。若搜索 Agent 引用位置有
+歧义，产品和交互贡献仍形成部分 v1，只有依赖它的下游阻塞。当前交付明确是可审查、可
+恢复的逻辑 ArtifactVersion，不是 DOCX/CSV 下载文件，也不把三个不同项目的数字写成
+同一个产品结论。详细输入、过程、输出与用户试用步骤见
+[`SCENARIO-042`](../scenarios/SCENARIO-042-demo2-cross-functional-risk-brief.md) 和
+[`Demo 2 场景门`](../testing/DEMO2-INPUT-PROCESS-OUTPUT-GATES-20260831.md)。
+
 这会把前台从“多个 Agent 聊天窗口”改成一张统一工作台：用户看业务工作包、依赖、
 “实际执行回执”“候选成果”“原文定位”和当前 v1/v2，不看 raw unit ID、Owner、revision、
 reservation digest、Prompt 或思维链。局部失败时先告诉用户哪些成果仍可用、影响哪个
