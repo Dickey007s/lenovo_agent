@@ -1004,6 +1004,17 @@ class HarnessRuntime:
                 snapshot = HarnessRunSnapshot.model_validate(record.snapshot)
                 resume_status = record.resume_status
                 if snapshot.status not in terminal_statuses:
+                    recovered_work_units = []
+                    for work_unit in snapshot.work_units:
+                        if work_unit.state in {WorkUnitState.RESERVED, WorkUnitState.RUNNING}:
+                            recovered_work_units.append(
+                                work_unit.transition(
+                                    WorkUnitState.FAILED,
+                                    error="checkpoint recovery stopped an in-flight Worker; automatic replay disabled",
+                                )
+                            )
+                        else:
+                            recovered_work_units.append(work_unit)
                     completed_rounds = [
                         item for item in snapshot.rounds if item.status == "completed"
                     ]
@@ -1029,6 +1040,11 @@ class HarnessRuntime:
                         details={
                             "completed_rounds": len(completed_rounds),
                             "automatic_model_replay": False,
+                            "in_flight_work_units": [
+                                item.work_unit_id
+                                for item in snapshot.work_units
+                                if item.state in {WorkUnitState.RESERVED, WorkUnitState.RUNNING}
+                            ],
                         },
                     )
                     last_round = completed_rounds[-1] if completed_rounds else None
@@ -1057,6 +1073,7 @@ class HarnessRuntime:
                             else None,
                             "events": [*snapshot.events, event],
                             "last_event_sequence": event.sequence,
+                            "work_units": recovered_work_units,
                             "version": snapshot.version + 1,
                             "updated_at": now,
                         }

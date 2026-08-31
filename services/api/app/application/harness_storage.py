@@ -44,11 +44,20 @@ def _validate_ledger_append(previous: dict[str, Any] | None, current: dict[str, 
     for key, old in old_rows.items():
         if old != new_rows[key]:
             raise RuntimeError("immutable Contribution conflict")
+    attempts: set[tuple[str, int]] = set()
+    for row in new_rows.values():
+        attempt_key = (str(row.get("work_unit_id")), int(row.get("attempt", 0)))
+        if attempt_key in attempts:
+            raise RuntimeError("duplicate WorkUnit contribution attempt")
+        attempts.add(attempt_key)
     old_units = {str(item.get("work_unit_id")): item for item in previous.get("work_units", [])}
+    new_units = {str(item.get("work_unit_id")): item for item in current.get("work_units", [])}
     for key, old in old_units.items():
-        new = {str(item.get("work_unit_id")): item for item in current.get("work_units", [])}.get(key)
+        new = new_units.get(key)
         if new is None or int(new.get("version", 0)) < int(old.get("version", 0)):
             raise RuntimeError("WorkUnit version cannot move backwards")
+        if new != old and int(new.get("version", 0)) == int(old.get("version", 0)):
+            raise RuntimeError("WorkUnit version CAS failed")
 
 
 @dataclass(frozen=True)
@@ -296,6 +305,8 @@ class InMemoryHarnessStateStore:
                     raise RuntimeError("immutable task commit conflict")
 
             previous_run = self._runs.get((run.owner_id, run.run_id))
+            if run.snapshot.get("owner_id") not in {None, run.owner_id}:
+                raise RuntimeError("Run owner scope mismatch")
             _validate_ledger_append(
                 previous_run.snapshot if previous_run is not None else None,
                 run.snapshot,
@@ -551,6 +562,13 @@ class PostgresHarnessStateStore:
                         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
                         PRIMARY KEY (owner_id, run_id, contribution_id)
                     )
+                    """
+                )
+                await cursor.execute(
+                    """
+                    CREATE UNIQUE INDEX IF NOT EXISTS harness_contribution_attempt_unique
+                    ON harness_contribution(owner_id, run_id,
+                        (payload->>'work_unit_id'), ((payload->>'attempt')::INTEGER))
                     """
                 )
 
@@ -897,12 +915,15 @@ class PostgresHarnessStateStore:
                     )
                 for work_unit in run.snapshot.get("work_units", []):
                     await cursor.execute(
-                        "SELECT version FROM harness_work_unit WHERE owner_id=%s AND run_id=%s AND work_unit_id=%s FOR UPDATE",
+                        "SELECT version, payload FROM harness_work_unit WHERE owner_id=%s AND run_id=%s AND work_unit_id=%s FOR UPDATE",
                         (run.owner_id, run.run_id, work_unit["work_unit_id"]),
                     )
                     previous = await cursor.fetchone()
-                    if previous is not None and int(previous[0]) > int(work_unit["version"]):
-                        raise RuntimeError("WorkUnit version cannot move backwards")
+                    if previous is not None:
+                        if int(previous[0]) > int(work_unit["version"]):
+                            raise RuntimeError("WorkUnit version cannot move backwards")
+                        if int(previous[0]) == int(work_unit["version"]) and dict(previous[1]) != work_unit:
+                            raise RuntimeError("WorkUnit version CAS failed")
                     await cursor.execute(
                         """
                         INSERT INTO harness_work_unit(owner_id,task_id,run_id,work_unit_id,version,payload,updated_at)

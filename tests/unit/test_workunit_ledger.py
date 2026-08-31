@@ -103,3 +103,13 @@ async def test_memory_snapshot_rejects_contribution_mutation_and_deletion() -> N
         await store.commit(
             StoredHarnessRun(owner_id=OWNER, run_id=RUN, snapshot={**run.snapshot, "contributions": []})
         )
+
+    duplicate = contribution().model_copy(update={"contribution_id": "contribution-bbbbbbbbbbbbbbbb"})
+    with pytest.raises(RuntimeError, match="duplicate"):
+        await store.commit(
+            StoredHarnessRun(
+                owner_id=OWNER,
+                run_id=RUN,
+                snapshot={**run.snapshot, "contributions": [first, duplicate.model_dump(mode="json")]},
+            )
+        )
