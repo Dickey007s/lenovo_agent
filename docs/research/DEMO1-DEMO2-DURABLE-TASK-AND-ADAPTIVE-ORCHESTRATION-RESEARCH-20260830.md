@@ -196,6 +196,20 @@ workflow drift。本项目不依赖该 SDK，但采用相同的验证边界：�
 Topology Admission、Worker scope、Artifact adoption 和前台投影，再单独验证真实
 Provider。Fixture 通过不能升级模型质量、数据库恢复或用户价值结论。
 
+### 5.0.1 固定场景门之后的下一纵切：Task Ledger 先于 WorkUnit Ledger
+
+2026-08-31 固定场景门证明了单进程 Runtime 已能形成 child Run、两波 Worker partial
+merge 和 fixed 反例，也暴露了 current pointer 仍由 Run 集合间接推断的问题。
+[OpenClaw Task Flow](https://docs.openclaw.ai/automation/taskflow) 的 durable flow record、
+revision conflict 与 linked tasks，以及
+[Restate Services](https://docs.restate.dev/foundations/services) 的 keyed persistent entity、
+single-writer/concurrent-reader 分工，共同支持一个保守顺序：先建立独立 Task record 和
+Task 级 CAS，再让 WorkUnit/Contribution ledger 绑定该写入边界。
+
+这不是把 OpenClaw 或 Restate 作为依赖，也不是新的竞品领先结论。若同时实现 Task、
+WorkUnit、queue、lease 和多实例，测试很难区分 current pointer、局部恢复和调度所有权
+分别由什么保证。因此 `DR-0054` 首版只做 Task ledger；WorkUnit ledger 作为下一纵切。
+
 ### 5.1 差异一：办公 Task lineage 与证据重核合同，而不是只有可恢复状态
 
 主流方案已经可以用 session、thread、run、workflow、Flow 或 task record 保存并恢复
