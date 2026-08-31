@@ -4,7 +4,7 @@
 
 | 字段 | 内容 |
 | --- | --- |
-| 状态 | `Limited Verified`；memory/API/browser 定向门通过，真实 PostgreSQL Task 门未运行 |
+| 状态 | `Limited Verified`；memory/API/browser 与隔离 PostgreSQL 17.11 单主机顺序门通过 |
 | 日期 | 2026-08-31 |
 | 用户来源 | `USER-FEEDBACK-20260831-DEMO1-DEMO2-FIXED-SCENARIO-HARDENING` |
 | 前置决策 | `DR-0053` 的有限 Task lineage 与固定场景门 |
@@ -132,9 +132,10 @@ WorkUnit 状态、依赖、最新 Contribution 和局部恢复版本，但不会
 8. 浏览器标出当前/历史 Run，409 时不提前切 SSE 或覆盖 parent；Task GET 失败必须可重试。
 
 当前 memory/API 定向门、Task Ledger browser mock、Ruff、lint 与 build 已通过；七项
-PostgreSQL integration 已收集但因本机无 `TEST_DATABASE_DSN` 全部 skip。既有 TC-04
+PostgreSQL integration 在隔离 PostgreSQL 17.11 上全部通过，包含 sibling/parent/Task CAS、
+事务回滚、重启复读和破损 parent version fail closed。既有 TC-04
 subprocess 经独立复核为约 42 秒的真实 baseline/compile/self-test 长任务，不是挂死或本
 分支回归；相关 scenario-effect 文件 `35 passed in 228.01s`。当前整库 Python 为
 `410 passed, 23 skipped`，整库 Playwright 为 `68 passed`。真实 Provider 和目标用户研究
 未运行。因此本决策只能标 `Limited Verified`，
-不能升级为生产 durable Task、WorkUnit/Worker durability 或用户价值结论。
+不能升级为多实例生产 durable Task、WorkUnit/Worker durability 或用户价值结论。

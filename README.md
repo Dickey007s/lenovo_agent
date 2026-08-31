@@ -111,8 +111,9 @@ sibling requests from the same Task version cannot both become current. The UI
 keeps a losing page on the immutable parent, marks it as historical and can open
 the authoritative current Run through `GET /v1/harness/tasks/{task_id}`. This is
 not a WorkUnit queue, Worker lease, production identity service or multi-instance
-coordinator. The seven PostgreSQL Task Ledger tests are committed but remain
-skipped locally without `TEST_DATABASE_DSN`.
+coordinator. The seven dedicated Task Ledger tests now pass against an isolated
+PostgreSQL 17.11 instance after a malformed-parent-version fail-closed fix; this
+is a single-host sequential transaction gate, not multi-instance execution or HA.
 
 ## Public data and preview boundary
 

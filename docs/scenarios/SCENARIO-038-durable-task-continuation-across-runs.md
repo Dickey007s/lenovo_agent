@@ -115,6 +115,6 @@ revision/精确重核 refs、公共投影和 Task 时间线。`DR-0054` 又增�
 Task record/current pointer、Task GET 和 Task/Run 双版本仲裁；Run Snapshot 仍拥有
 Branch、Budget、Event、Artifact/Commit 等执行细节。revision 主要是 Workspace 数据集级，
 不是完整 per-file 版本服务；也没有 WorkUnit ledger、queue/lease 或多实例执行协调。
-新增 Task PostgreSQL 门在本机没有 DSN 而跳过，真实 Provider 未运行，
-也没有目标用户研究。因此这里只能标 `Limited Verified`，不能声称跨进程门、业务正确性、
+新增 Task PostgreSQL 七项单主机顺序门已在隔离 PostgreSQL 17.11 上通过，真实 Provider
+未运行，也没有目标用户研究。因此这里只能标 `Limited Verified`，不能声称多实例门、业务正确性、
 用户理解或效率已经改善。

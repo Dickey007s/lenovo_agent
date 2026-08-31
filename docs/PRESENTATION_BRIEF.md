@@ -62,7 +62,7 @@ Task 服务或通用/分布式 Worker。
 | 7 | 安全预览把“Agent 读了什么”变成可见契约 | CSV/PDF/DOCX/TXT 预览拼图和安全说明 | 路径、大小、hash、符号链接和解析器测试 |
 | 8 | Harness 把模型调用、内容采用、确定性办公效果和整体 Loop 状态分开 | 事件、模型回执、可下载工件与检查结果时序 | Snapshot/Receipt/Artifact 事实；不展示思维链，也不把 `completed` 当作效果通过 |
 | 9 | Agent 说“有问题”之后，用户要同时看懂事实、影响、真实原文和自己必须决定的下一步 | 问题处置单：1 事实 -> 2 影响 -> 3 人工动作；证据与实际文件并排；A/B/C + 反馈 | `DR-0030/29`；推荐是模型候选，确认只创建新只读 Run |
-| 10 | Demo 1 把一次 Run 的停止变成同一 Task 的下一段执行；Task Ledger 决定哪个 child 才是当前工作面，用户选择一条未完成工作线，旧成果不改，新 Run 只重核批准来源 | Task 时间线、当前/历史 Run、Run 1→Run 2、双版本冲突后“打开当前 Run”、基线成果与来源变化提示 | `DR-0053/54`、`SCENARIO-038/040`；child 是新 Run，Run version 可从 1 开始；Task PG 七项测试本机跳过，不证明多实例 durable execution |
+| 10 | Demo 1 把一次 Run 的停止变成同一 Task 的下一段执行；Task Ledger 决定哪个 child 才是当前工作面，用户选择一条未完成工作线，旧成果不改，新 Run 只重核批准来源 | Task 时间线、当前/历史 Run、Run 1→Run 2、双版本冲突后“打开当前 Run”、基线成果与来源变化提示 | `DR-0053/54`、`SCENARIO-038/040`；child 是新 Run，Run version 可从 1 开始；Task PG 7/7 在隔离 PostgreSQL 17.11 通过，但不证明多实例 durable execution |
 | 11 | Demo 2 先解释为什么采用单 Controller、固定流程或受限 Worker，再由用户决定是否启动高成本路线 | 拓扑准入理由、3 个首波工作包、实际 called/adopted/elapsed 回执、下一波 ready、统一 ArtifactVersion | `DR-0053/SCENARIO-039`；当前每批最多 3 个进程内只读 Analyst Worker，不是通用/分布式 Swarm，也没有质量/成本优势结论 |
 | 12 | Demo 3 对单任务和多任务统一施加风险与动作控制 | 影响预演 -> 证据 -> 审批 -> Permit -> 回执 | 目标设计；当前没有真实外部动作 |
 | 13 | 当前 12 个本地 FORTE 场景已有真实隔离工件与确定性验证；3 个外部依赖场景明确阻断 | 12 通过、3 `blocked_external_boundary` 的效果账本；六个真实 `deepseek-v4-pro` 运行 | `DR-0035` 限定能力，不等于任意办公任务或用户价值；模型质量、效果验证、Loop 终态分开报告 |
@@ -219,7 +219,7 @@ Task 服务或通用/分布式 Worker。
 - 新的 DecisionRecord 把 accept/decline/defer 绑定到 Finding/Resolution/Branch；它证明回执存在，不证明业务审批正确；
 - `exact/ambiguous/unavailable/stale/rejected` 是服务端拥有的原文位置状态，不是 Finding 真值；来源变化会进入 `stale`，候选重算不一致会进入 `rejected`；
 - DR-0032 的 `DecisionRequest`、来源修订校验、五态 EvidenceResolution、局部 Branch 恢复与 PostgreSQL 顺序重启门已在限定范围内实现；当前仍不能宣称独立决定账本、并发 CAS、多实例协调或在途调用恢复。
-- DR-0054 的最小 Task record、Task GET、Task/Run 双版本、sibling CAS、幂等 replay、current/history 前台和 fail-closed 旧数据恢复已有定向工程门；Task Ledger 定向 Python `92 passed`、浏览器 `4 passed`，整库 Python `410 passed, 23 skipped`、Playwright `68 passed`，Ruff/lint/build 通过。七项 PostgreSQL 测试仅收集并全部 skip，因此不能宣称真实 Task PostgreSQL 恢复、多实例协调或 WorkUnit durable state。
+- DR-0054 的最小 Task record、Task GET、Task/Run 双版本、sibling CAS、幂等 replay、current/history 前台和 fail-closed 旧数据恢复已有定向工程门；Task Ledger 定向 Python `92 passed`、浏览器 `4 passed`，整库 Python `410 passed, 23 skipped`、Playwright `68 passed`，Ruff/lint/build 通过。随后隔离 PostgreSQL 17.11 的七项 Task transaction gate 全部通过，并补上破损 parent version fail-closed；这仍不证明多实例协调、WorkUnit durable state 或 Provider 质量。
 - DR-0034 的全量门为 Python `83 passed, 2 skipped`、PostgreSQL `2 passed`、Harness browser `25 passed`，Ruff/lint/build 通过；它证明两类待处理动作的前台映射和 390 px 回归，不证明“3 秒内理解”或用户价值。
 - DR-0036 的门为 Python 定向 `78 passed`、本机全量 `116 passed, 3 skipped`、远端 PostgreSQL 17 `3 passed`、Harness browser `29 passed`、Ruff/lint/build 通过；一次真实 `deepseek-v4-pro` TC-01 在第 1 轮完成，真实 CSV 5/5、三 Branch 完成、0 Gap/开放 DecisionRequest。本机三个 skip 已由 PR #45 顺序 PostgreSQL 门补证，但仍不证明多实例；一次 Provider 成功也不证明重复稳定性或目标用户理解提升。
 - 两张确定性浏览器图分别展示“继续此分支”与“恢复 v1”；它们证明 UI/服务端字段映射，不是真实模型运行；

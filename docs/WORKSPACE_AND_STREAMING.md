@@ -523,8 +523,11 @@ Initial start and continuation share one aggregate commit with the Run and start
 idempotency receipt; sibling requests compete on `task_version`, while parent
 controls remain protected by `run.version`. Memory/API tests and browser mocks cover
 the current/historical projection, stale versions, replay and fail-closed reads.
-The six dedicated PostgreSQL Task Ledger tests are present but were skipped locally
-without `TEST_DATABASE_DSN`; this does not establish production multi-instance
+The seven dedicated PostgreSQL Task Ledger tests now pass against an isolated
+PostgreSQL 17.11 instance. They cover initial/restart reads, owner scope, sibling
+CAS, stale parent version, idempotency and transactional rollback; malformed or
+missing parent `snapshot.version` fails closed. This remains a single-host
+sequential adapter gate and does not establish production multi-instance
 coordination, WorkUnit leases or high availability.
 DR-0034 adds only a browser projection gate: deterministic E2E checks retry-first
 and ambiguous-choice-first screens, disabled accept before selection, collapsed

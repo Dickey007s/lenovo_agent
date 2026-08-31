@@ -237,7 +237,7 @@ Playwright `2 passed`；来源变化条件式提示与 390 px Task 时间线又�
 | Claim | 状态 | 依据 | 升级条件 |
 | --- | --- | --- | --- |
 | 当前已有 Run 内分支、成果版本与可选 PG 恢复 | `Current` | 当前源码/living docs | 保持回归测试 |
-| 当前已有跨 Run Task lineage 与最小 Task Ledger 的有限纵切 | `Limited Verified` | `task_id`/child Run/单 Branch/Task GET/双版本 CAS/公共重核投影自动化与 Evidence | 真实 Task PostgreSQL + Provider 门，WorkUnit ledger 与多实例执行协调 |
+| 当前已有跨 Run Task lineage 与最小 Task Ledger 的有限纵切 | `Limited Verified` | `task_id`/child Run/单 Branch/Task GET/双版本 CAS/公共重核投影自动化、隔离 PostgreSQL 17.11 的 7 项顺序事务门与 Evidence | Provider 门、WorkUnit ledger 与多实例执行协调 |
 | 当前已有进程内受限只读 Worker 纵切 | `Limited Verified` | 最多三 Worker、采用门、确定性合并、局部失败自动化 | durable queue/lease、多实例、真实 Provider |
 | 路线准入是本项目原生合同 | `Limited Verified` | 07-16 + 官方调研 + 确定性 unit/E2E | 同场基线验证业务收益 |
 | 统一驾驶舱提升理解/效率 | `Draft` | HAI 研究支持方向 | 目标用户形成性研究 |

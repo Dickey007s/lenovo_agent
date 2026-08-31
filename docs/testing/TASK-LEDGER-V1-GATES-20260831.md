@@ -1,6 +1,6 @@
 # Task Ledger V1 验收门（2026-08-31）
 
-- 状态：`Limited Verified`；定向实现门通过，真实 PostgreSQL Task 门未运行
+- 状态：`Limited Verified`；定向实现门与隔离 PostgreSQL 17.11 单主机顺序门通过
 - 决策：`DR-0054`
 - 场景：`SCENARIO-040`
 
@@ -59,8 +59,9 @@
 ## 7. 当前执行记录
 
 - 定向 memory/API/Demo 1/2 Python：`92 passed`。
-- PostgreSQL Task Ledger：`7 collected`、`7 skipped`，原因是未配置
-  `TEST_DATABASE_DSN`；不得写成真实数据库已通过。
+- PostgreSQL Task Ledger：先实跑得到 `6 passed, 1 failed`，暴露破损 parent
+  `snapshot.version` 触发 `TypeError`；修复为 fail closed 并补负例后为 `7 passed in
+  4.11s`。Task Ledger 定向组合为 `30 passed in 6.26s`，PostgreSQL 17.11 已正常停止。
 - Task Ledger browser mock：`4 passed`；Ruff、TypeScript lint 与 production build 通过。
 - 整库 Python：`410 passed, 23 skipped in 277.38s`；整库 Playwright：`68 passed
   (2.6m)`。skip 仍按各自环境门解释，不能合并写成全功能验证。
@@ -71,6 +72,6 @@
 ## 8. 本阶段禁止升级的结论
 
 - Task ledger 不等于 WorkUnit queue、Worker lease 或分布式执行器。
-- PostgreSQL 表已创建不等于真实 PostgreSQL 门已通过。
+- PostgreSQL 单主机顺序门通过不等于多实例协调、高可用或数据库故障恢复通过。
 - current pointer 一致不等于业务结果正确。
 - 自动化不能替代 Provider 结果验证或用户研究。

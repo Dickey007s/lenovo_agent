@@ -196,8 +196,9 @@ model answer can still be numerically wrong.
 2. Preserve the bounded read-only Agent Control Loop, server-owned Branches and
    append-only logical result history.
 3. Preserve the implemented minimal Task Ledger/current pointer, cross-Run
-   lineage and bounded topology/Worker vertical; run its PostgreSQL and authorized
-   Provider gates without broadening claims.
+   lineage and bounded topology/Worker vertical; retain its real single-host
+   PostgreSQL transaction gate and run an authorized Provider gate separately
+   without broadening claims.
 4. Add a Task-bound WorkUnit/Contribution Ledger with explicit unit version,
    dependency, latest contribution and local recovery state before queue/lease work.
 5. Add file-level evidence locations plus task-specific deterministic validators.

@@ -7,12 +7,13 @@
 - 场景：[`SCENARIO-040`](../scenarios/SCENARIO-040-task-current-run-cas-and-restart.md)。
 - 测试合同：[`TASK-LEDGER-V1-GATES-20260831`](../testing/TASK-LEDGER-V1-GATES-20260831.md)。
 - 代码审计基线：`5d5f33a`；Luna 实现/测试原始提交
-  `57455c6`、`1c50ca9`、`78b9e07`、`be6fae0`、`043dfe0`、`e12ea9a`、`ab95c8d`；文档分支
+  `57455c6`、`1c50ca9`、`78b9e07`、`be6fae0`、`043dfe0`、`e12ea9a`、`ab95c8d`、
+  PostgreSQL 实跑修复 `7d7df33`；文档分支
   对应提交 `fc52b28`、`296caf2`、`0bb4650`、`0bd0aa6`、`c3bcf78`、`304ffe2`、`1f58e6f`。
 
 本 Evidence 只证明被列出的 owner-scoped Task record、双版本 continuation、
-current/history 前台和 fail-closed 恢复合同在当前自动化边界成立。它不证明真实
-PostgreSQL Task 恢复、多实例执行、Provider 质量、业务结果正确或用户体验改善。
+current/history 前台、fail-closed 恢复合同和隔离 PostgreSQL 17.11 单主机顺序事务在当前
+自动化边界成立。它不证明多实例执行、Provider 质量、业务结果正确或用户体验改善。
 
 ## 2. 场景与研究依据
 
@@ -74,8 +75,9 @@ Provider response 或内部 digest。
 | 门 | 命令 | 结果 | 能证明 | 不能证明 |
 | --- | --- | --- | --- | --- |
 | Task/Demo 定向 Python | `uv run pytest -q tests/unit/test_task_ledger.py tests/unit/test_harness_runtime.py tests/unit/test_demo2_runtime.py tests/acceptance/test_demo1_demo2_fixed_scenarios.py` | `92 passed in 4.12s` | memory/API Task 状态机、Demo 1/2 回归 | 真实 DB/Provider |
-| PostgreSQL 收集 | `uv run pytest -q tests/integration/test_postgres_task_ledger.py --collect-only` | `7 collected` | 七项门存在 | SQL 已执行 |
-| PostgreSQL 本机 | `uv run pytest -q tests/integration/test_postgres_task_ledger.py` | `7 skipped in 0.22s`，无 `TEST_DATABASE_DSN` | skip 边界明确 | 真实事务/CAS/restart |
+| PostgreSQL 首次实跑 | `uv run pytest -q tests/integration/test_postgres_task_ledger.py` | `6 passed, 1 failed in 3.19s` | 真正执行 SQL 并暴露 parent `snapshot.version` 缺失时的 `TypeError` | 修复已通过 |
+| PostgreSQL 修复后 | 同一命令；隔离 PostgreSQL 17.11 + Windows Selector test shim | `7 passed in 4.11s` | 单主机 initial/restart、owner、sibling/parent/Task CAS、幂等、事务回滚和破损版本 fail closed | 多实例、HA、数据库进程故障 |
+| Task Ledger PG 定向组合 | `uv run pytest -q tests/integration/test_postgres_task_ledger.py tests/unit/test_task_ledger.py` | `30 passed in 6.26s` | adapter 与模型合同定向回归 | 整库/Provider |
 | 整库 Python | `uv run pytest -q` | `410 passed, 23 skipped in 277.38s` | 当前整库 Python 回归 | 23 项环境门后的真实外部系统 |
 | Ruff | `uv run ruff check .` | `All checks passed!` | 当前整库 Python 静态规范 | 行为正确 |
 | Web lint | `pnpm --dir apps/web lint` | 通过 | TypeScript 类型门 | 浏览器行为 |
@@ -94,9 +96,9 @@ Provider response 或内部 digest。
    pointer 不一致或持久 payload Owner 不一致都 fail closed；legacy backfill 同样要求根 Run
    无 parent。
 4. 101 条 lineage 返回 `lineage_total=101`、`lineage_truncated=true`，公共列表保留 current。
-5. PostgreSQL 文件包含初始同幂等键竞争、不同 digest、sibling CAS、parent Run 与 Task
+5. PostgreSQL 实跑覆盖初始同幂等键竞争、不同 digest、sibling CAS、parent Run 与 Task
    双版本同事务校验、Task version 必须只递增 1、事务回滚、restart 与 current/lineage
-   复读，但本机没有执行这些 SQL 路径。
+   复读；缺失、`NULL` 或非整数 parent version 都按冲突 fail closed，事务零变化。
 
 ## 7. 未关闭的门与剩余边界
 
@@ -112,9 +114,17 @@ Provider response 或内部 digest。
 Ledger 回归。最终门随后完整通过 `410 passed, 23 skipped`，浏览器为 `68 passed`；本
 Evidence 使用的是当前运行数字，不复用此前 `386 passed` 历史结果。
 
-### 7.2 尚未执行
+### 7.2 真实 PostgreSQL 门
 
-- 没有 `TEST_DATABASE_DSN`，Task Ledger 的真实 PostgreSQL 七项门全部 skip；
+首次解除环境阻塞后，真实 PostgreSQL 17.11 运行得到 `6 passed, 1 failed`：parent CAS
+直接对 `NULL` 执行 `int(...)`，没有按合同返回 `TaskLedgerConflict`。`7d7df33` 改为只接受
+真正的整数版本，并增加合法 CAS 与三类破损值负例；复跑为 `7 passed`。测试使用临时
+Windows Selector event-loop shim，未改变生产代码的 event-loop 策略。数据库随后正常
+停止且端口关闭。临时目录因当前执行环境拒绝 `Remove-Item` 仍保留在系统 TEMP；其中
+没有运行进程，但清理状态必须与测试通过状态分开记录。
+
+### 7.3 尚未执行
+
 - 未运行付费/真实 Provider，不评价 Planner/Analyst 质量；
 - 未做两个真实 API 进程、多实例 lease/notification、崩溃注入或高可用验证；
 - 未实现 WorkUnit/Contribution ledger、durable Worker queue/lease 或远端 Worker；
@@ -125,5 +135,5 @@ Evidence 使用的是当前运行数字，不复用此前 `386 passed` 历史结
 可以说：当前 Demo 1 已有一个最小 Task authority，能在被测 memory/API/UI 范围内用
 Task/Run 双版本阻止 sibling child 同时成为 current，并保留旧 Run/成果。
 
-不能说：系统已经是生产级 durable Task/WorkUnit 平台、真实 PostgreSQL/多实例已通过、
+不能说：系统已经是生产级 durable Task/WorkUnit 平台、多实例 PostgreSQL 已通过、
 任务结果正确，或这种交互已经被用户证明更清晰。

@@ -1,6 +1,6 @@
 # SCENARIO-040：两个页面同时续办时只有一个当前 Run
 
-- 状态：`Limited Verified`；memory/API/browser 定向门通过，真实 PostgreSQL Task 门未运行
+- 状态：`Limited Verified`；memory/API/browser 与隔离 PostgreSQL 17.11 单主机顺序门通过
 - 决策：`DR-0054`
 - Source：`USER-FEEDBACK-20260831-DEMO1-DEMO2-FIXED-SCENARIO-HARDENING`、
   `DURABLE-ENTITY-STATE-OFFICIAL-20260831`
@@ -62,5 +62,6 @@
 4. continuation 是否扩大了文件范围或触发外部动作？
 
 该场景的自动化通过只能证明版本与状态合同。用户是否理解冲突提示、是否减少误操作，
-仍需要目标用户形成性测试。真实 PostgreSQL Task 测试在本机因无 DSN 跳过，因此场景
-也不证明多 API 实例执行、崩溃恢复或高可用。
+仍需要目标用户形成性测试。七项 PostgreSQL Task transaction gate 已在隔离 PostgreSQL
+17.11 上通过，覆盖 restart read、双版本事务、回滚和破损 parent version；该单主机顺序
+门仍不证明多个 API 实例协调、数据库进程崩溃恢复或高可用。
