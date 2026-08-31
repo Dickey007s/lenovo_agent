@@ -13,6 +13,7 @@ from packages.contracts.harness_models import (
     AgentControlLoopControlRequest,
 )
 from services.api.app.application.harness_runtime import (
+    HarnessConflictError,
     HarnessPlanCandidate,
     HarnessPlanCandidateUnit,
     HarnessRunStart,
@@ -370,6 +371,16 @@ async def test_postgres_demo2_interrupted_worker_reservation_is_not_replayed() -
         assert restored.budget.model_calls_used == reserved.budget.model_calls_used
         assert restored.worker_runs == []
         assert not getattr(second, "_tasks", {})
+        with pytest.raises(HarnessConflictError, match="不会自动重放"):
+            await second.execute_admitted_readonly_workers(
+                owner,
+                run_id,
+                expected_version=restored.version,
+                idempotency_key="demo2-interrupted-workers-0001",
+                worker_requests=[request.model_copy(update={"expected_version": restored.version})],
+                handler=blocking_handler,
+                user_confirmed=True,
+            )
     finally:
         for runtime in reversed(runtimes):
             await runtime.close()

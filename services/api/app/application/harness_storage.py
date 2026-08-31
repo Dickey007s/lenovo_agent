@@ -45,7 +45,12 @@ def _validate_ledger_append(previous: dict[str, Any] | None, current: dict[str, 
     owner_id = current.get("owner_id")
     task_id = current.get("task_id")
     run_id = current.get("run_id")
-    branches = {str(item.get("branch_id")): item for item in current.get("branches", [])}
+    branches: dict[str, dict[str, Any]] = {}
+    for branch in current.get("branches", []):
+        branch_id = str(branch.get("branch_id"))
+        if branch_id in branches:
+            raise RuntimeError("duplicate Branch id")
+        branches[branch_id] = branch
     unit_ids: set[str] = set()
     for unit in current_units:
         unit_id = str(unit.get("work_unit_id"))
@@ -64,7 +69,12 @@ def _validate_ledger_append(previous: dict[str, Any] | None, current: dict[str, 
             raise RuntimeError("WorkUnit references an unknown Branch")
         if branches:
             branch = branches[unit_id]
-            if unit.get("unit_id") != branch.get("unit_id") or set(unit.get("depends_on", [])) != set(branch.get("depends_on", [])):
+            if (
+                unit.get("unit_id") != branch.get("unit_id")
+                or set(unit.get("depends_on", [])) != set(branch.get("depends_on", []))
+                or set(unit.get("approved_file_refs", []))
+                != set(branch.get("input_file_refs", []))
+            ):
                 raise RuntimeError("WorkUnit projection disagrees with Branch")
     contribution_ids: set[str] = set()
     attempts: set[tuple[str, int]] = set()
@@ -85,6 +95,9 @@ def _validate_ledger_append(previous: dict[str, Any] | None, current: dict[str, 
             raise RuntimeError("Contribution branch key mismatch")
         if str(row.get("work_unit_id")) not in unit_ids:
             raise RuntimeError("Contribution references an unknown WorkUnit")
+        work_unit = next(
+            item for item in current_units if str(item.get("work_unit_id")) == str(row.get("work_unit_id"))
+        )
         if owner_id is not None and row.get("owner_id") != owner_id:
             raise RuntimeError("Contribution owner scope mismatch")
         if task_id is not None and row.get("task_id") != task_id:
@@ -93,6 +106,15 @@ def _validate_ledger_append(previous: dict[str, Any] | None, current: dict[str, 
             raise RuntimeError("Contribution Run scope mismatch")
         if branches and str(row.get("branch_id")) not in branches:
             raise RuntimeError("Contribution references an unknown Branch")
+        if set(row.get("approved_file_refs", [])) != set(work_unit.get("approved_file_refs", [])):
+            raise RuntimeError("Contribution approved sources disagree with WorkUnit")
+        if branches and set(row.get("approved_file_refs", [])) != set(
+            branches[str(row.get("branch_id"))].get("input_file_refs", [])
+        ):
+            raise RuntimeError("Contribution approved sources disagree with Branch")
+        workspace_revision = current.get("workspace_revision")
+        if workspace_revision and row.get("run_source_revision") != workspace_revision:
+            raise RuntimeError("Contribution Run source revision mismatch")
     if previous is None:
         return
     old_rows = {str(item.get("contribution_id")): item for item in previous.get("contributions", [])}

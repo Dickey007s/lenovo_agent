@@ -85,6 +85,7 @@ from services.api.app.application.harness_storage import (
     StoredHarnessIdempotency,
     StoredHarnessRun,
     StoredHarnessTaskCommit,
+    _validate_ledger_append,
 )
 from services.api.app.application.task_ledger import (
     TaskLedgerConflict,
@@ -933,12 +934,27 @@ class HarnessRuntime:
                         raise HarnessError("持久化 WorkUnit 越过当前 Run/Branch 边界")
                 work_unit_ids = {item.work_unit_id for item in stored_work_units}
                 for contribution in stored_contributions:
+                    work_unit = next(
+                        (
+                            item
+                            for item in stored_work_units
+                            if item.work_unit_id == contribution.work_unit_id
+                        ),
+                        None,
+                    )
                     if (
                         contribution.owner_id != record.owner_id
                         or contribution.task_id != snapshot.task_id
                         or contribution.run_id != record.run_id
                         or contribution.work_unit_id not in work_unit_ids
                         or contribution.branch_id not in branch_by_id
+                        or work_unit is None
+                        or contribution.branch_id != work_unit.branch_id
+                        or set(contribution.approved_file_refs)
+                        != set(work_unit.approved_file_refs)
+                        or set(contribution.approved_file_refs)
+                        != set(branch_by_id[contribution.branch_id].input_file_refs)
+                        or contribution.run_source_revision != snapshot.workspace_revision
                     ):
                         raise HarnessError("持久化 Contribution 越过当前 Run/Branch 边界")
                 if stored_work_units or stored_contributions:
@@ -948,6 +964,15 @@ class HarnessRuntime:
                             "contributions": stored_contributions,
                         }
                     )
+                # Re-run the complete append-only validator after replacing
+                # the aggregate projection with independent durable rows.
+                # This catches duplicate attempts and malformed rows that a
+                # primary-key lookup alone cannot detect.
+                if stored_work_units or stored_contributions or snapshot.work_units or snapshot.contributions:
+                    try:
+                        _validate_ledger_append(None, snapshot.model_dump(mode="json"))
+                    except RuntimeError as exc:
+                        raise HarnessError("持久化 WorkUnit/Contribution 校验失败") from exc
             migrated = "task_version" not in raw_snapshot
             if migrated:
                 snapshot = snapshot.model_copy(update={"task_version": snapshot.run_sequence})
@@ -1730,7 +1755,18 @@ class HarnessRuntime:
                 return previous_snapshot.model_copy(deep=True)
             durable_digest = snapshot.worker_idempotency.get(idempotency_key)
             if durable_digest is not None:
-                if durable_digest != digest:
+                if durable_digest.startswith("reserved:"):
+                    if durable_digest.removeprefix("reserved:") != digest:
+                        raise HarnessConflictError("幂等键已用于不同 Worker 命令")
+                    raise HarnessConflictError(
+                        "上一次只读 Worker 波次在持久化后中断，系统不会自动重放；请重新确认并使用新的幂等键"
+                    )
+                completed_digest = (
+                    durable_digest.removeprefix("completed:")
+                    if durable_digest.startswith("completed:")
+                    else durable_digest
+                )
+                if completed_digest != digest:
                     raise HarnessConflictError("幂等键已用于不同 Worker 命令")
                 return snapshot.model_copy(deep=True)
             if snapshot.status in {"completed", "failed", "stopped"}:
@@ -1851,7 +1887,7 @@ class HarnessRuntime:
                     "work_units": work_units,
                     "worker_idempotency": {
                         **snapshot.worker_idempotency,
-                        idempotency_key: digest,
+                        idempotency_key: f"reserved:{digest}",
                     },
                     "events": [*snapshot.events, *reservation_events],
                     "last_event_sequence": reservation_events[-1].sequence,
@@ -2242,7 +2278,7 @@ class HarnessRuntime:
                     "status": "completed" if all_branches_completed else "waiting_input",
                     "worker_idempotency": {
                         **run.snapshot.worker_idempotency,
-                        idempotency_key: digest,
+                        idempotency_key: f"completed:{digest}",
                     },
                     "events": [*run.snapshot.events, *completion_events],
                     "last_event_sequence": completion_events[-1].sequence,

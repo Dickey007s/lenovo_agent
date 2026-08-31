@@ -5,7 +5,11 @@ from datetime import datetime, timezone
 import pytest
 from pydantic import ValidationError
 
-from services.api.app.application.harness_storage import InMemoryHarnessStateStore, StoredHarnessRun
+from services.api.app.application.harness_storage import (
+    InMemoryHarnessStateStore,
+    StoredHarnessRun,
+    _validate_ledger_append,
+)
 from services.api.app.application.workunit_ledger import (
     ContributionGateStatus,
     ContributionRecord,
@@ -121,4 +125,41 @@ async def test_memory_snapshot_rejects_contribution_mutation_and_deletion() -> N
                 run_id=RUN,
                 snapshot={**run.snapshot, "contributions": [first, duplicate.model_dump(mode="json")]},
             )
+        )
+
+
+def test_ledger_binds_sources_to_branch_and_work_unit() -> None:
+    unit = work_unit().model_dump(mode="json")
+    row = contribution().model_dump(mode="json")
+    base = {
+        "owner_id": OWNER,
+        "task_id": TASK,
+        "run_id": RUN,
+        "workspace_revision": "run-rev-1",
+        "branches": [
+            {
+                "branch_id": BRANCH,
+                "unit_id": "u1",
+                "depends_on": [],
+                "input_file_refs": ["forte-aaaaaaaaaaaaaaaa"],
+            }
+        ],
+        "work_units": [unit],
+        "contributions": [row],
+    }
+    _validate_ledger_append(None, base)
+    with pytest.raises(RuntimeError, match="WorkUnit projection"):
+        _validate_ledger_append(
+            None,
+            {**base, "work_units": [{**unit, "approved_file_refs": ["forte-bbbbbbbbbbbbbbbb"]}]},
+        )
+    with pytest.raises(RuntimeError, match="Contribution approved sources"):
+        _validate_ledger_append(
+            None,
+            {**base, "contributions": [{**row, "approved_file_refs": ["forte-bbbbbbbbbbbbbbbb"]}]},
+        )
+    with pytest.raises(RuntimeError, match="source revision"):
+        _validate_ledger_append(
+            None,
+            {**base, "contributions": [{**row, "run_source_revision": "run-rev-2"}]},
         )
