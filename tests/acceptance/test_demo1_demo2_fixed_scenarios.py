@@ -297,8 +297,12 @@ class FiveUnitFailurePlanner:
                 *[
                     HarnessPlanCandidateUnit(
                         unit_id=f"root-{index}",
-                        title=f"独立工作包 {index}",
-                        objective="只读核对批准来源",
+                        title=("产品上线 Gate", "搜索 Agent 运行风险", "交互痛点证据")[index - 1],
+                        objective=(
+                            "核对产品上线 Gate 的来源条件与当前风险。",
+                            "核对搜索 Agent 运行记录与设计路径之间的风险。",
+                            "核对交互行为日志中的痛点证据与影响范围。",
+                        )[index - 1],
                         input_file_refs=[refs[(index - 1) % len(refs)]],
                         tool="file.read",
                     )
@@ -306,16 +310,16 @@ class FiveUnitFailurePlanner:
                 ],
                 HarnessPlanCandidateUnit(
                     unit_id="dependent-blocked",
-                    title="依赖歧义分支",
-                    objective="等待第三个根分支确定后继续",
+                    title="统一待办建议",
+                    objective="基于已采用的跨职能事实形成统一待办建议。",
                     input_file_refs=[refs[0]],
                     depends_on=["root-3"],
                     tool="file.read",
                 ),
                 HarnessPlanCandidateUnit(
                     unit_id="dependent-ready",
-                    title="依赖已采用分支",
-                    objective="在第一个根分支后继续核对",
+                    title="跨工作包优先级与影响核对",
+                    objective="汇总已采用工作包，核对跨职能优先级与影响。",
                     input_file_refs=[refs[1]],
                     depends_on=["root-1"],
                     tool="file.read",

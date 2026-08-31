@@ -236,6 +236,8 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, summary:focus
 .loop-worker-receipts > div { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 8px; align-items: baseline; padding-top: 5px; border-top: 1px solid #edf1f5; font-size: 13px; line-height: 1.55; }
 .loop-worker-receipts > div > b { color: var(--green, #247443); }
 .loop-worker-receipts small { font-size: 12px; line-height: 1.5; white-space: normal; }
+.loop-worker-receipts > div > span { min-width: 0; }
+.loop-worker-receipts > div > span small { display: block; margin-top: 2px; color: var(--muted); }
 .loop-worker-ledger { display: grid; gap: 6px; margin-top: 10px; }
 .loop-worker-ledger > span { color: var(--blue); font-size: 13px; font-weight: 750; }
 .loop-worker-ledger article { min-width: 0; padding: 7px 0 0; border-top: 1px solid #edf1f5; font-size: 13px; line-height: 1.5; }

@@ -4859,16 +4859,19 @@ function LoopView({
           {run.worker_runs.length === 0 && <button type="button" className="is-secondary" onClick={() => void onControl("topology_override", { topologyMode: "single_controller" })} disabled={starting || controlBusy !== null}><IconRoute aria-hidden="true" />改回单 Controller</button>}
         </div>
       </div>}
-      {run.worker_runs.length > 0 && <div className="loop-worker-receipts"><span>实际执行回执</span>{run.worker_runs.map((worker) => <div key={worker.worker_run_id}><b>{worker.outcome === "adopted" ? "已合入" : worker.outcome === "failed" ? "执行失败" : "待处理"}</b><span>{worker.summary}</span><small>{worker.model_called ? "模型已调用" : "未调用"} · {worker.output_used ? "已采用" : "未采用"} · {worker.elapsed_ms} ms</small></div>)}</div>}
+      {run.worker_runs.length > 0 && <div className="loop-worker-receipts"><span>实际执行回执</span>{run.worker_runs.map((worker) => <div key={worker.worker_run_id}><b>{worker.outcome === "adopted" ? "已合入" : worker.outcome === "failed" ? "执行失败" : "待处理"}</b><span>{worker.summary}<small>来源：{worker.source_file_refs.map(fileLabel).join("、") || "批准来源未显示"}</small></span><small>{worker.model_called ? "模型已调用" : "未调用"} · {worker.output_used ? "已采用" : "未采用"} · {worker.elapsed_ms} ms</small></div>)}</div>}
       {run.work_units.length > 0 && <div className="loop-worker-ledger" data-testid="worker-ledger">
         <span>工作包与成果采用记录</span>
         {run.work_units.slice().sort((left, right) => left.branch_id.localeCompare(right.branch_id)).map((unit) => {
           const branch = run.branches.find((item) => item.branch_id === unit.branch_id);
+          const dependencyLabels = unit.depends_on.map((dependency) => run.branches.find((item) => item.branch_id === dependency || item.unit_id === dependency)?.title).filter((title): title is string => Boolean(title));
+          const sourceLabels = unit.approved_file_refs.map(fileLabel);
           const records = run.contributions.filter((item) => item.branch_id === unit.branch_id);
           const latest = records[records.length - 1];
           return <article key={unit.branch_id}>
             <div><b>{branch?.title || "办公工作包"}</b><strong>{unit.state === "adopted" ? "已采用" : unit.state === "waiting" ? "已返回，待核对" : unit.state === "failed" ? "执行失败" : unit.state === "ready" ? "可执行" : unit.state === "running" ? "执行中" : unit.state === "blocked" ? "被依赖阻塞" : "待处理"}</strong></div>
-            <small>第 {unit.attempt} 次尝试 · {unit.depends_on.length ? `${unit.depends_on.length} 条前序依赖` : "无前序依赖"}</small>
+            <small>来源：{sourceLabels.join("、") || "批准来源未显示"}</small>
+            <small>{dependencyLabels.length ? `依赖：${dependencyLabels.join("、")}` : "依赖：无前序工作包"} · 第 {unit.attempt} 次尝试</small>
             {latest && <p><span>候选成果已返回</span> · {latest.gate_status === "adopted" ? "已采用" : "未采用"} · {latest.gate_reason}{latest.artifact_version ? ` · 成果版本 v${latest.artifact_version}` : ""}</p>}
             {!latest && unit.state === "failed" && unit.status_reason === "checkpoint_recovered_in_flight_worker" && <p>上次调用未确认返回，系统未自动重放；请确认后重新启动。</p>}
             {latest && <small>{latest.approved_file_refs.map(fileLabel).join(" · ")} · 原文定位 {latest.evidence_anchors.length > 0 ? `${latest.evidence_anchors.length} 处` : "未形成"}</small>}

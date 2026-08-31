@@ -2567,6 +2567,21 @@ function demo1ContinuationSnapshot(body: { workspace_id: string; instruction: st
 function demo2Snapshot(body: { workspace_id: string; instruction: string }, wave: number) {
   const base = snapshot(body, wave === 2 ? "completed" : "waiting_input", 20) as any;
   const ids = ["demo2-root-a", "demo2-root-b", "demo2-root-c", "demo2-dependent-d", "demo2-dependent-e"];
+  const businessTitles = ["产品上线 Gate", "搜索 Agent 运行风险", "交互痛点证据", "跨工作包优先级与影响核对", "统一待办建议"];
+  const businessObjectives = [
+    "核对产品上线 Gate 的来源条件与当前风险。",
+    "核对搜索 Agent 运行记录与设计路径之间的风险。",
+    "核对交互行为日志中的痛点证据与影响范围。",
+    "汇总前三个工作包，核对跨职能优先级与影响。",
+    "基于已采用的跨职能事实形成统一待办建议。",
+  ];
+  const sourceRefs = [
+    [outboundRuleFile.file_ref],
+    [workflowFile.file_ref, searchLogFile.file_ref],
+    [uxBehaviorFile.file_ref, uxRuleFile.file_ref, uxSpecFile.file_ref],
+    [outboundRuleFile.file_ref, workflowFile.file_ref, uxBehaviorFile.file_ref],
+    [outboundRuleFile.file_ref, workflowFile.file_ref, uxBehaviorFile.file_ref],
+  ];
   const makeBranch = (branchId: string, status: string, dependsOn: string[] = []) => ({
     // Keep protocol identifiers in the mocked payload, but give the cockpit
     // business-facing titles so the test catches accidental raw-ID rendering.
@@ -2574,12 +2589,12 @@ function demo2Snapshot(body: { workspace_id: string; instruction: string }, wave
     unit_id: branchId,
     round_number: 1,
     parent_branch_id: null,
-    title: ["独立资料核对一", "独立资料核对二", "独立资料核对三", "依赖结果复核一", "依赖结果复核二"][ids.indexOf(branchId)] ?? "办公工作包",
-    objective: "只读核对批准来源并形成结构化贡献。",
+    title: businessTitles[ids.indexOf(branchId)] ?? "办公工作包",
+    objective: businessObjectives[ids.indexOf(branchId)] ?? "只读核对批准来源并形成结构化贡献。",
     depends_on: dependsOn,
-    input_file_refs: [workflowFile.file_ref],
-    verified_file_refs: status === "completed" ? [workflowFile.file_ref] : [],
-    missing_file_refs: status === "completed" ? [] : [workflowFile.file_ref],
+    input_file_refs: sourceRefs[ids.indexOf(branchId)] ?? [workflowFile.file_ref],
+    verified_file_refs: status === "completed" ? (sourceRefs[ids.indexOf(branchId)] ?? [workflowFile.file_ref]) : [],
+    missing_file_refs: status === "completed" ? [] : (sourceRefs[ids.indexOf(branchId)] ?? [workflowFile.file_ref]),
     status,
     requires_human_gate: false,
     created_at: new Date().toISOString(),
@@ -2594,8 +2609,8 @@ function demo2Snapshot(body: { workspace_id: string; instruction: string }, wave
     worker_run_id: `worker-${branchId}`,
     branch_id: branchId,
     outcome: "adopted",
-    summary: "已完成一条独立资料的结构化核对。",
-    source_file_refs: [workflowFile.file_ref],
+    summary: `${businessTitles[ids.indexOf(branchId)]} 已完成结构化核对。`,
+    source_file_refs: sourceRefs[ids.indexOf(branchId)] ?? [workflowFile.file_ref],
     model_called: true,
     output_used: true,
     elapsed_ms: 120 + index,
@@ -2621,7 +2636,7 @@ function demo2Snapshot(body: { workspace_id: string; instruction: string }, wave
     attempt: 1,
     worker_run_id: worker.worker_run_id,
     approved_file_refs: worker.source_file_refs,
-    evidence_anchors: [{ file_ref: workflowFile.file_ref, role: "support", label: "服务端核对位置", locator_kind: "text_lines", start: 1, end: 1, excerpt: "class QueryAnalysisNode:" }],
+    evidence_anchors: [{ file_ref: (sourceRefs[ids.indexOf(worker.branch_id)] ?? [workflowFile.file_ref])[0], role: "support", label: "服务端核对位置", locator_kind: "text_lines", start: 1, end: 1, excerpt: "服务端批准来源中的可核对业务事实" }],
     model_receipt: { called: worker.model_called, output_used: worker.output_used, elapsed_ms: worker.elapsed_ms },
     gate_status: "adopted",
     gate_reason: "来源范围与原文定位已通过服务端核对。",
@@ -2636,11 +2651,23 @@ function demo2Snapshot(body: { workspace_id: string; instruction: string }, wave
     status: wave === 2 ? "completed" : "waiting_input",
     phase: wave === 2 ? "evidence_gate" : "analysis",
     question: body.instruction,
-    input_file_refs: [workflowFile.file_ref],
+    input_file_refs: Array.from(new Set(sourceRefs.flat())),
     branch_ids: ids,
-    next_step: { decision: wave === 2 ? "completed" : "waiting_input", reason: wave === 1 ? "下一波 ready 分支已准备。" : "等待确认只读 Worker。", next_question: null, candidate_file_refs: [workflowFile.file_ref], candidate_branch_ids: ready, ready_branch_ids: ready, evidence_resolutions: [] },
-    result: wave === 2 ? { summary: "5 个工作包的只读贡献已按服务端证据门合入。", findings: ids.map((_id, index) => ({ finding_id: `finding-${index + 1}`, title: `第 ${index + 1} 条核对结果`, detail: "服务端已采用该分支贡献。", file_refs: [workflowFile.file_ref], evidence_anchor: { file_ref: workflowFile.file_ref, locator_kind: "text_lines", start: 1, end: 1, excerpt: "class QueryAnalysisNode:" } })), follow_ups: [], review_required: true } : null,
+    next_step: { decision: wave === 2 ? "completed" : "waiting_input", reason: wave === 1 ? "下一波 ready 分支已准备。" : "等待确认只读 Worker。", next_question: null, candidate_file_refs: Array.from(new Set(sourceRefs.flat())), candidate_branch_ids: ready, ready_branch_ids: ready, evidence_resolutions: [] },
+    result: wave === 2 ? { summary: "5 个跨职能工作包的只读贡献已按服务端证据门合入。", findings: ids.map((id, index) => ({ finding_id: `finding-${index + 1}`, title: businessTitles[index], detail: `${businessTitles[index]} 的来源事实已通过服务端核对。`, file_refs: sourceRefs[index], evidence_anchor: { file_ref: sourceRefs[index][0], locator_kind: "text_lines", start: 1, end: 1, excerpt: "服务端批准来源中的可核对业务事实" } })), follow_ups: [], review_required: true } : null,
   };
+  const businessFindings = businessTitles.map((title, index) => ({
+    finding_id: `finding-${index + 1}`,
+    affected_branch_ids: [ids[index]],
+    title,
+    detail: `${title} 的来源事实已通过服务端核对。`,
+    fact_summary: `${title} 已形成可审查的来源事实。`,
+    impact: index > 2 ? "待跨职能负责人确认后形成下一步。" : "保留为跨职能简报的输入事实。",
+    file_refs: sourceRefs[index],
+    evidence_anchors: [{ file_ref: sourceRefs[index][0], role: "support", label: "服务端核对位置", locator_kind: "text_lines", start: 1, end: 1, excerpt: "服务端批准来源中的可核对业务事实" }],
+    evidence_resolutions: [],
+    review: { requires_human_decision: false, question: "", why_human: "", options: [], recommended_option_id: null, recommendation_reason: "", after_confirmation: "" },
+  }));
   return {
     ...base,
     run_id: "harness:demo2-run",
@@ -2651,13 +2678,18 @@ function demo2Snapshot(body: { workspace_id: string; instruction: string }, wave
     rounds: [round],
     current_round: 1,
     branches,
-    topology_admission: { mode: "adaptive_readonly_workers", work_unit_breadth: 5, independent_branch_count: 3, dependency_parallelism: 3, source_span: 1, remaining_model_calls: 24, remaining_time_seconds: 7000, external_action: "none", reasons: ["3 条独立分支可并行，依赖分支将在首波完成后 ready。"], user_confirmation_required: true },
+    topology_admission: { mode: "adaptive_readonly_workers", work_unit_breadth: 5, independent_branch_count: 3, dependency_parallelism: 3, source_span: 6, remaining_model_calls: 24, remaining_time_seconds: 7000, external_action: "none", reasons: ["3 个职能来源组形成 3 条独立根分支，依赖分支将在首波完成后 ready。"], user_confirmation_required: true },
     worker_runs: workers,
     work_units: workUnits,
     contributions,
     shared_artifacts: workers.length ? [{ artifact_id: "artifact-demo2", version: wave, adopted_worker_run_ids: workers.map((item) => item.worker_run_id), waiting_branch_ids: wave === 1 ? ids.slice(3) : [], failed_worker_run_ids: [], external_action: "none" }] : [],
     result: wave === 2 ? round.result : null,
-    artifact_versions: wave === 2 ? [{ ...base.artifact_versions[0], artifact_id: "artifact-demo2", version: 2, finding_count: 5, findings: round.result.findings, source_file_refs: [workflowFile.file_ref] }] : [],
+    artifact_versions: wave >= 1 ? [
+      { ...base.artifact_versions[0], artifact_id: "artifact-demo2", version: 1, title: "跨职能风险与待办简报", finding_count: 3, findings: businessFindings.slice(0, 3), source_file_refs: [outboundRuleFile.file_ref, workflowFile.file_ref, uxBehaviorFile.file_ref], parent_version: null },
+      ...(wave === 2 ? [{ ...base.artifact_versions[0], artifact_id: "artifact-demo2", version: 2, title: "跨职能风险与待办简报", finding_count: 5, findings: businessFindings, source_file_refs: [outboundRuleFile.file_ref, workflowFile.file_ref, uxBehaviorFile.file_ref], parent_version: 1 }] : []),
+    ] : [],
+    commits: wave === 2 ? [{ ...base.commits[0], commit_id: "commit-demo2", artifact_id: "artifact-demo2", artifact_version: 2, summary: "已提交跨职能风险与待办简报 v2，仍需业务负责人复核。" }] : [],
+    last_commit: wave === 2 ? { ...base.last_commit, commit_id: "commit-demo2", artifact_id: "artifact-demo2", artifact_version: 2, summary: "已提交跨职能风险与待办简报 v2，仍需业务负责人复核。" } : null,
     workspace_artifacts: [],
     events: [{ sequence: wave + 1, event_name: wave === 0 ? "topology_confirmation_required" : wave === 1 ? "topology_workers_completed" : "topology_workers_completed", occurred_at: new Date().toISOString(), status: wave === 2 ? "completed" : "waiting_input", message: wave === 0 ? "等待确认启动只读 Worker。" : "Worker 回执已保存，下一波 ready 分支已公开。", details: {} }],
     last_event_sequence: wave + 1,
@@ -4910,7 +4942,7 @@ test.describe("Demo 1/2 runtime acceptance", () => {
     await page.getByRole("button", { name: "Agent 路径" }).click();
     const admission = page.locator('[data-testid="topology-admission"]');
     await expect(admission).toContainText("已准入受限只读执行器");
-    await expect(admission).toContainText("3 条独立分支可并行");
+    await expect(admission).toContainText("3 个职能来源组形成 3 条独立根分支");
     const admissionTextSizes = await admission.locator('h3, header > b, .loop-topology-facts, .loop-topology-facts b, .loop-worker-receipts > span, .loop-worker-receipts > div, .loop-worker-receipts small').evaluateAll((nodes) => nodes.map((node) => Number.parseFloat(getComputedStyle(node).fontSize)));
     expect(admissionTextSizes.length).toBeGreaterThan(0);
     expect(Math.min(...admissionTextSizes)).toBeGreaterThanOrEqual(12);
@@ -4918,13 +4950,25 @@ test.describe("Demo 1/2 runtime acceptance", () => {
     await admission.getByRole("button", { name: "确认并启动只读执行器" }).click();
     await expect(admission).toContainText("实际执行回执");
     await expect(admission).toContainText("已合入");
+    await expect(admission).toContainText("产品上线 Gate");
+    await expect(admission).toContainText("来源：专业性说明.md");
+    await expect(admission).toContainText("来源：workflow.py、search_agent.log");
     await expect(admission.getByRole("button", { name: "继续下一批只读执行器" })).toBeEnabled();
     await admission.getByRole("button", { name: "继续下一批只读执行器" }).click();
-    await expect(admission).toContainText("依赖结果复核一");
+    await expect(admission).toContainText("跨工作包优先级与影响核对");
+    await expect(admission).toContainText("统一待办建议");
+    await expect(admission).toContainText("依赖：产品上线 Gate");
     await expect(admission).not.toContainText("demo2-root-");
     await expect(admission).not.toContainText("demo2-dependent-");
     await expect(admission).not.toContainText("u1");
-    await expect(page.locator(".loop-round-result")).toContainText("5 个工作包");
+    await expect(page.locator(".loop-round-result")).toContainText("5 个跨职能工作包");
+    await expect(page.locator(".artifact-evolution")).toContainText("v1");
+    await expect(page.locator(".artifact-evolution")).toContainText("v2");
+    await page.getByRole("button", { name: "成果与建议" }).click();
+    await expect(page.locator(".result-expand")).toContainText("查看其余 2 条发现");
+    await page.locator(".result-expand").click();
+    await expect(page.locator(".result-findings")).toContainText("统一待办建议");
+    await page.getByRole("button", { name: "Agent 路径" }).click();
     await page.setViewportSize({ width: 390, height: 844 });
     const mobileOverflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
     expect(mobileOverflow).toBeLessThanOrEqual(0);

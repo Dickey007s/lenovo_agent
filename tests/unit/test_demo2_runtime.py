@@ -175,6 +175,68 @@ def test_same_schema_finance_is_fixed_but_cross_function_independent_work_can_ad
     assert adaptive.mode == "adaptive_readonly_workers"
 
 
+def test_cross_function_brief_uses_three_roots_and_two_dependency_units() -> None:
+    """The business brief is admitted from source groups, not a Demo flag."""
+
+    roots = [
+        HarnessPlanUnit(
+            unit_id="product-gate",
+            title="产品上线 Gate",
+            objective="核对产品上线 Gate 的来源条件与当前风险。",
+            input_file_refs=["forte-product-gate"],
+            tool="file.read",
+        ),
+        HarnessPlanUnit(
+            unit_id="search-risk",
+            title="搜索 Agent 运行风险",
+            objective="核对搜索 Agent 运行记录与设计路径之间的风险。",
+            input_file_refs=["forte-search-risk"],
+            tool="file.read",
+        ),
+        HarnessPlanUnit(
+            unit_id="ux-evidence",
+            title="交互痛点证据",
+            objective="核对交互行为日志中的痛点证据与影响范围。",
+            input_file_refs=["forte-ux-evidence"],
+            tool="file.read",
+        ),
+    ]
+    plan = HarnessPlan(
+        summary="跨职能风险与待办简报",
+        selection_reason="服务端已校验三类职能来源和工作包依赖。",
+        units=[
+            *roots,
+            HarnessPlanUnit(
+                unit_id="priority-impact",
+                title="跨工作包优先级与影响核对",
+                objective="汇总已采用工作包，核对跨职能优先级与影响。",
+                input_file_refs=[item.input_file_refs[0] for item in roots],
+                depends_on=[item.unit_id for item in roots[:2]],
+                tool="file.read",
+            ),
+            HarnessPlanUnit(
+                unit_id="unified-todos",
+                title="统一待办建议",
+                objective="基于已采用的跨职能事实形成统一待办建议。",
+                input_file_refs=[item.input_file_refs[0] for item in roots],
+                depends_on=["priority-impact", "ux-evidence"],
+                tool="file.read",
+            ),
+        ],
+    )
+    source_facts = {
+        "forte-product-gate": {"display_group": "产品交付", "mime": "text/plain", "kind": "text", "columns": []},
+        "forte-search-risk": {"display_group": "算法研发", "mime": "text/plain", "kind": "text", "columns": []},
+        "forte-ux-evidence": {"display_group": "用户体验", "mime": "text/plain", "kind": "text", "columns": []},
+    }
+    admission = admit_topology(plan, remaining_model_calls=20, remaining_time_seconds=120, source_facts=source_facts)
+    assert admission.mode == "adaptive_readonly_workers"
+    assert admission.work_unit_breadth == 5
+    assert admission.independent_branch_count == 3
+    assert admission.source_span == 3
+    assert admission.user_confirmation_required is True
+
+
 def test_demo2_uses_unified_harness_routes_not_a_demo_selector() -> None:
     paths: set[str] = set()
     for included in create_app().routes:
