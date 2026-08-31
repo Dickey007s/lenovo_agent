@@ -428,8 +428,15 @@ async def test_postgres_demo2_interrupted_worker_reservation_is_not_replayed() -
                 findings=(finding,),
             )
 
-        retry_request = request.model_copy(
-            update={"worker_run_id": "worker-checkpoint-retry", "expected_version": restored.version}
+        restored_branch = next(
+            item for item in restored.branches if item.branch_id == request.branch_id
+        )
+        retry_request = ReadonlyWorkerRequest(
+            worker_run_id="worker-checkpoint-retry",
+            branch_id=restored_branch.branch_id,
+            goal=restored_branch.objective,
+            source_file_refs=tuple(restored_branch.input_file_refs),
+            expected_version=restored.version,
         )
         retried = await second.execute_admitted_readonly_workers(
             owner,
