@@ -30,6 +30,7 @@ from services.api.app.application.readonly_workers import (
 )
 from services.api.app.application.topology_admission import admit_topology
 from services.api.app.application.workunit_ledger import WorkUnitState
+from services.api.app.application.harness_storage import InMemoryHarnessStateStore
 from packages.contracts.harness_models import AgentControlLoopNarrativeReconciliation
 from services.api.app.main import create_app
 from services.api.app.api.harness_routes import get_harness_runtime
@@ -641,6 +642,157 @@ async def test_runtime_artifact_version_keeps_eleven_worker_findings() -> None:
     assert result.artifact_versions[-1].finding_count == 11
     assert len(result.artifact_versions[-1].findings) == 11
     await runtime.close()
+
+
+@pytest.mark.asyncio
+async def test_worker_reservation_and_merge_restore_memory_on_storage_failure() -> None:
+    """A rejected aggregate write must not advance the process-local snapshot."""
+    from tests.unit.test_harness_runtime import FakeAnalyst
+
+    class FailingStore(InMemoryHarnessStateStore):
+        fail_next = False
+
+        async def commit(self, *args, **kwargs):
+            if self.fail_next:
+                self.fail_next = False
+                raise RuntimeError("injected aggregate storage failure")
+            return await super().commit(*args, **kwargs)
+
+    class TwoBranchPlanner:
+        model = "test-planner"
+
+        async def plan(self, *, scenario, files):
+            refs = [str(item["file_ref"]) for item in files[:2]]
+            return HarnessPlanCandidate(
+                summary="两个独立只读工作包",
+                selection_reason="服务端校验的跨职能来源结构",
+                units=[
+                    HarnessPlanCandidateUnit(
+                        unit_id=f"unit-{index}",
+                        title=f"工作包 {index}",
+                        objective="核对批准来源",
+                        input_file_refs=[ref],
+                        tool="file.read",
+                    )
+                    for index, ref in enumerate(refs, 1)
+                ],
+            )
+
+    async def waiting_runtime():
+        store = FailingStore()
+        runtime = HarnessRuntime(_cross_function_catalog(), TwoBranchPlanner(), FakeAnalyst(), store)
+        started = await runtime.start(
+            "alice",
+            HarnessRunStart(
+                idempotency_key="worker-atomic-start-0001",
+                instruction="核对两个独立来源",
+                loop={"max_rounds": 1, "max_files_per_round": 2, "max_model_calls": 4, "deadline_seconds": 120},
+            ),
+        )
+        waiting = None
+        for _ in range(400):
+            candidate = await runtime.get("alice", started.run.run_id)
+            if candidate.status == "waiting_input" and candidate.topology_admission is not None:
+                waiting = candidate
+                break
+            await asyncio.sleep(0.01)
+        assert waiting is not None
+        return runtime, store, waiting
+
+    runtime, store, waiting = await waiting_runtime()
+    try:
+        branch = next(item for item in waiting.branches if item.status == "running")
+        request = ReadonlyWorkerRequest(
+            worker_run_id="worker-reservation-failure",
+            branch_id=branch.branch_id,
+            goal=branch.objective,
+            source_file_refs=tuple(branch.input_file_refs),
+            expected_version=waiting.version,
+        )
+        before = waiting.model_dump(mode="json")
+        calls = 0
+
+        async def handler(_: ReadonlyWorkerRequest) -> ReadonlyWorkerContribution:
+            nonlocal calls
+            calls += 1
+            raise AssertionError("reservation failure must happen before dispatch")
+
+        store.fail_next = True
+        with pytest.raises(RuntimeError, match="injected aggregate"):
+            await runtime.execute_admitted_readonly_workers(
+                "alice",
+                waiting.run_id,
+                expected_version=waiting.version,
+                idempotency_key="worker-reservation-failure-0001",
+                worker_requests=[request],
+                handler=handler,
+                user_confirmed=True,
+            )
+        assert calls == 0
+        assert (await runtime.get("alice", waiting.run_id)).model_dump(mode="json") == before
+    finally:
+        await runtime.close()
+
+    runtime, store, waiting = await waiting_runtime()
+    try:
+        branch = next(item for item in waiting.branches if item.status == "running")
+        request = ReadonlyWorkerRequest(
+            worker_run_id="worker-merge-failure",
+            branch_id=branch.branch_id,
+            goal=branch.objective,
+            source_file_refs=tuple(branch.input_file_refs),
+            expected_version=waiting.version,
+        )
+
+        async def handler(_: ReadonlyWorkerRequest) -> ReadonlyWorkerContribution:
+            store.fail_next = True
+            return ReadonlyWorkerContribution(
+                worker_run_id="worker-merge-failure",
+                branch_id=branch.branch_id,
+                outcome="adopted",
+                summary="已返回可核对贡献",
+                source_file_refs=tuple(branch.input_file_refs),
+                evidence_anchors=("line:1",),
+                model_called=True,
+                output_used=True,
+                findings=(
+                    AgentControlLoopArtifactFinding(
+                        finding_id="finding-merge-failure",
+                        plan_unit_id=branch.unit_id,
+                        affected_branch_ids=[branch.branch_id],
+                        title="可核对贡献",
+                        detail="贡献写入时注入存储失败。",
+                        file_refs=list(branch.input_file_refs),
+                    ),
+                ),
+            )
+
+        reserved = None
+        # The reservation is durable before the handler runs; capture it in
+        # the handler's first invocation through the next event-loop turn.
+        async def capture_reserved(request: ReadonlyWorkerRequest) -> ReadonlyWorkerContribution:
+            nonlocal reserved
+            reserved = await runtime.get("alice", waiting.run_id)
+            return await handler(request)
+
+        with pytest.raises(RuntimeError, match="injected aggregate"):
+            await runtime.execute_admitted_readonly_workers(
+                "alice",
+                waiting.run_id,
+                expected_version=waiting.version,
+                idempotency_key="worker-merge-failure-0001",
+                worker_requests=[request],
+                handler=capture_reserved,
+                user_confirmed=True,
+            )
+        assert reserved is not None
+        restored = await runtime.get("alice", waiting.run_id)
+        assert restored.model_dump(mode="json") == reserved.model_dump(mode="json")
+        assert restored.worker_idempotency.get("worker-merge-failure-0001", "").startswith("reserved:")
+        assert restored.contributions == []
+        assert restored.artifact_versions == []
+    finally:
+        await runtime.close()
 
 
 @pytest.mark.asyncio

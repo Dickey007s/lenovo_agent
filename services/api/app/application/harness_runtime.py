@@ -1919,13 +1919,21 @@ class HarnessRuntime:
                     "last_event_sequence": reservation_events[-1].sequence,
                 }
             )
-            await self._persist_locked(run)
+            try:
+                await self._persist_locked(run)
+            except Exception:
+                # The reservation is the dispatch gate.  If its durable write
+                # fails, do not leave the in-memory Run claiming calls were
+                # reserved when no Worker may have been dispatched.
+                run.snapshot = snapshot
+                raise
 
         contributions = await execute_readonly_workers(worker_requests, handler, max_workers=3)
         merged = merge_adopted_contributions(contributions, version=1)
         now = datetime.now(timezone.utc)
         async with self._lock:
             run = self._require_run(owner_id, run_id)
+            previous_snapshot = run.snapshot
             # Worker model receipts append ordered events and therefore bump
             # the Run version while they are in flight.  The user CAS was
             # checked before dispatch; only a version regression is invalid.
@@ -2312,11 +2320,18 @@ class HarnessRuntime:
                     "version": run.snapshot.version + 1,
                 }
             )
-            await self._persist_locked(
-                run,
-                artifact_version=artifact,
-                task_commit=task_commit,
-            )
+            try:
+                await self._persist_locked(
+                    run,
+                    artifact_version=artifact,
+                    task_commit=task_commit,
+                )
+            except Exception:
+                # Storage implementations are transactional, but restore the
+                # process-local projection too when a commit is rejected or
+                # interrupted so memory cannot get ahead of durable state.
+                run.snapshot = previous_snapshot
+                raise
             if not hasattr(self, "_worker_idempotent"):
                 self._worker_idempotent = {}
             self._worker_idempotent[(owner_id, run_id, idempotency_key)] = (
