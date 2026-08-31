@@ -10,6 +10,9 @@
 - `GET /v1/harness/tasks/{task_id}` 对 Owner 返回 sanitized Task 与 lineage；其他 Owner
   返回 404/403，不暴露 Owner、内部路径或 raw hash。
 - Run 公共 Snapshot 的 `task_id/task_version/current-run` 投影与 Task 查询一致。
+- Task 查询只读台账和它指向的 Run；不得在 GET 时临时扫描 Run 并写入缺失台账。
+  台账存在但 current Run 缺失、或旧 Run 存在但台账缺失时返回完整性错误，不合成
+  `unknown` 状态。当前 Artifact/Commit 指针由 current Run 派生，不在 Task 表重复维护。
 
 ## 2. TL-02 原子 continuation
 

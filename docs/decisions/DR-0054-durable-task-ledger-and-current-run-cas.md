@@ -47,17 +47,18 @@ expected revision，过期写入冲突而不是覆盖新状态。
 
 ### 1. Task 成为独立服务端记录
 
-新增 Owner-scoped `TaskLedgerRecord`，至少包含：
+新增 Owner-scoped `TaskLedgerRecord`，只保存跨 Run 必须稳定且需要 CAS 的最小事实：
 
-- `task_id`、`task_version`、`workspace_id`；
-- `current_run_id`、`current_run_sequence`、当前 Run 状态投影；
-- `current_artifact_version`、`current_task_commit`；
-- append-only `run_ids` 或等价可审计 lineage；
+- `task_id`、`task_version`、`workspace_id`、`workspace_revision`；
+- `current_run_id`、`current_run_sequence`、`parent_run_id`；
 - `created_at/updated_at`。
 
 `owner_id` 是服务端访问控制字段，不进入公共响应。Task 不是 chat session，也不是把
-所有 Run 内容复制一遍；Run Snapshot 继续拥有单次执行、Branch、Budget、Event 和成果
-细节。
+所有 Run 内容复制一遍；Run Snapshot 继续拥有单次执行、Branch、Budget、Event、
+ArtifactVersion 和 TaskCommit 细节。公共 Task 查询从权威 `current_run_id` 指向的
+Snapshot 派生当前状态、成果指针与完整 lineage，避免 Task 表和 Run 表分别保存同一成果
+事实后发生漂移。若 current Run 不存在或 lineage 不一致，查询和恢复都必须 fail closed，
+不能返回合成的 `unknown` 状态。
 
 ### 2. 两层 version 分工
 
