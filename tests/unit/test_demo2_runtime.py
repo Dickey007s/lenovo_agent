@@ -29,6 +29,7 @@ from services.api.app.application.readonly_workers import (
     merge_adopted_contributions,
 )
 from services.api.app.application.topology_admission import admit_topology
+from services.api.app.application.workunit_ledger import WorkUnitState
 from packages.contracts.harness_models import AgentControlLoopNarrativeReconciliation
 from services.api.app.main import create_app
 from services.api.app.api.harness_routes import get_harness_runtime
@@ -506,6 +507,11 @@ async def test_five_unit_dag_runtime_advances_from_roots_to_second_worker_wave()
         idempotency_key="five-unit-wave-0001", worker_requests=requests_for(waiting, ("u1", "u2", "u3"), "one"),
         handler=handler, user_confirmed=True,
     )
+    assert len(first.work_units) == 5
+    first_units = {item.unit_id: item for item in first.work_units}
+    assert [first_units[f"u{index}"].state for index in (1, 2, 3)] == [WorkUnitState.ADOPTED] * 3
+    assert [first_units[f"u{index}"].state for index in (4, 5)] == [WorkUnitState.READY] * 2
+    assert len(first.contributions) == 3
     ready_units = {item.unit_id for item in first.branches if item.status == "running"}
     assert ready_units == {"u4", "u5"}, [(item.unit_id, item.status) for item in first.branches]
     assert set(first.rounds[-1].next_step.ready_branch_ids) == {

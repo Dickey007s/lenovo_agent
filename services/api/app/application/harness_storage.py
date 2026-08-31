@@ -34,24 +34,76 @@ def _clone(value: dict[str, Any]) -> dict[str, Any]:
 
 
 def _validate_ledger_append(previous: dict[str, Any] | None, current: dict[str, Any]) -> None:
-    """Reject deletion or mutation of immutable Contribution rows at storage boundary."""
+    """Validate the complete ledger before accepting a snapshot.
+
+    This deliberately validates the first snapshot too.  A dict keyed by an
+    identifier would silently collapse duplicate rows and allow malformed
+    cross-run records through the storage boundary.
+    """
+    current_units = list(current.get("work_units", []))
+    current_contributions = list(current.get("contributions", []))
+    owner_id = current.get("owner_id")
+    task_id = current.get("task_id")
+    run_id = current.get("run_id")
+    branches = {str(item.get("branch_id")): item for item in current.get("branches", [])}
+    unit_ids: set[str] = set()
+    for unit in current_units:
+        unit_id = str(unit.get("work_unit_id"))
+        if unit_id in unit_ids:
+            raise RuntimeError("duplicate WorkUnit id")
+        unit_ids.add(unit_id)
+        if unit.get("work_unit_id") != unit.get("branch_id"):
+            raise RuntimeError("WorkUnit branch key mismatch")
+        if owner_id is not None and unit.get("owner_id") != owner_id:
+            raise RuntimeError("WorkUnit owner scope mismatch")
+        if task_id is not None and unit.get("task_id") != task_id:
+            raise RuntimeError("WorkUnit task scope mismatch")
+        if run_id is not None and unit.get("run_id") != run_id:
+            raise RuntimeError("WorkUnit Run scope mismatch")
+        if branches and unit_id not in branches:
+            raise RuntimeError("WorkUnit references an unknown Branch")
+        if branches:
+            branch = branches[unit_id]
+            if unit.get("unit_id") != branch.get("unit_id") or set(unit.get("depends_on", [])) != set(branch.get("depends_on", [])):
+                raise RuntimeError("WorkUnit projection disagrees with Branch")
+    contribution_ids: set[str] = set()
+    attempts: set[tuple[str, int]] = set()
+    for row in current_contributions:
+        contribution_id = str(row.get("contribution_id"))
+        if contribution_id in contribution_ids:
+            raise RuntimeError("duplicate contribution id")
+        contribution_ids.add(contribution_id)
+        try:
+            attempt = int(row.get("attempt"))
+        except (TypeError, ValueError):
+            raise RuntimeError("invalid Contribution attempt") from None
+        attempt_key = (str(row.get("work_unit_id")), attempt)
+        if attempt_key in attempts:
+            raise RuntimeError("duplicate WorkUnit contribution attempt")
+        attempts.add(attempt_key)
+        if row.get("work_unit_id") != row.get("branch_id"):
+            raise RuntimeError("Contribution branch key mismatch")
+        if str(row.get("work_unit_id")) not in unit_ids:
+            raise RuntimeError("Contribution references an unknown WorkUnit")
+        if owner_id is not None and row.get("owner_id") != owner_id:
+            raise RuntimeError("Contribution owner scope mismatch")
+        if task_id is not None and row.get("task_id") != task_id:
+            raise RuntimeError("Contribution task scope mismatch")
+        if run_id is not None and row.get("run_id") != run_id:
+            raise RuntimeError("Contribution Run scope mismatch")
+        if branches and str(row.get("branch_id")) not in branches:
+            raise RuntimeError("Contribution references an unknown Branch")
     if previous is None:
         return
     old_rows = {str(item.get("contribution_id")): item for item in previous.get("contributions", [])}
-    new_rows = {str(item.get("contribution_id")): item for item in current.get("contributions", [])}
+    new_rows = {str(item.get("contribution_id")): item for item in current_contributions}
     if not old_rows.keys() <= new_rows.keys():
         raise RuntimeError("append-only Contribution Ledger cannot delete rows")
     for key, old in old_rows.items():
         if old != new_rows[key]:
             raise RuntimeError("immutable Contribution conflict")
-    attempts: set[tuple[str, int]] = set()
-    for row in new_rows.values():
-        attempt_key = (str(row.get("work_unit_id")), int(row.get("attempt", 0)))
-        if attempt_key in attempts:
-            raise RuntimeError("duplicate WorkUnit contribution attempt")
-        attempts.add(attempt_key)
     old_units = {str(item.get("work_unit_id")): item for item in previous.get("work_units", [])}
-    new_units = {str(item.get("work_unit_id")): item for item in current.get("work_units", [])}
+    new_units = {str(item.get("work_unit_id")): item for item in current_units}
     for key, old in old_units.items():
         new = new_units.get(key)
         if new is None or int(new.get("version", 0)) < int(old.get("version", 0)):
@@ -844,6 +896,17 @@ class PostgresHarnessStateStore:
     ) -> StoredHarnessIdempotency | None:
         async with await psycopg.AsyncConnection.connect(self._dsn) as connection:
             async with connection.cursor() as cursor:
+                await cursor.execute(
+                    "SELECT snapshot FROM harness_run_state WHERE owner_id=%s AND run_id=%s FOR UPDATE",
+                    (run.owner_id, run.run_id),
+                )
+                prior_run = await cursor.fetchone()
+                if run.snapshot.get("owner_id") not in {None, run.owner_id}:
+                    raise RuntimeError("Run owner scope mismatch")
+                _validate_ledger_append(
+                    dict(prior_run[0]) if prior_run is not None else None,
+                    run.snapshot,
+                )
                 if idempotency is not None:
                     await cursor.execute(
                         """

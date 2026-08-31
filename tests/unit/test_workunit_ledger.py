@@ -77,6 +77,8 @@ def test_contribution_is_frozen_and_public_projection_removes_private_revisions(
     assert "catalog_source_revision" not in projected
     assert "raw" not in str(projected).lower()
     assert "reservation_id" not in public_work_unit(work_unit())
+    assert "owner_id" not in public_work_unit(work_unit())
+    assert "owner_id" not in projected
 
 
 @pytest.mark.asyncio
@@ -88,7 +90,14 @@ async def test_memory_snapshot_rejects_contribution_mutation_and_deletion() -> N
     run = StoredHarnessRun(
         owner_id=OWNER,
         run_id=RUN,
-        snapshot={"run_id": RUN, "contributions": [first], "work_units": [unit], "updated_at": now},
+        snapshot={
+            "run_id": RUN,
+            "owner_id": OWNER,
+            "task_id": TASK,
+            "contributions": [first],
+            "work_units": [unit],
+            "updated_at": now,
+        },
     )
     await store.commit(run)
     with pytest.raises(RuntimeError, match="immutable Contribution"):

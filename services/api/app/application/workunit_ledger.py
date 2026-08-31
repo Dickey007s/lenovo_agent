@@ -36,6 +36,12 @@ class WorkUnitState(StrEnum):
     BLOCKED = "blocked"
 
 
+class WorkUnitStatusReason(StrEnum):
+    """Finite, server-owned explanations safe for the public projection."""
+
+    CHECKPOINT_RECOVERED_IN_FLIGHT = "checkpoint_recovered_in_flight_worker"
+
+
 class ContributionGateStatus(StrEnum):
     PENDING = "pending"
     ADOPTED = "adopted"
@@ -67,6 +73,7 @@ class WorkUnitRecord(BaseModel):
     returned_at: datetime | None = None
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     error: str | None = Field(default=None, max_length=500)
+    status_reason: WorkUnitStatusReason | None = None
 
     @model_validator(mode="after")
     def branch_is_authority_key(self) -> "WorkUnitRecord":
@@ -74,7 +81,13 @@ class WorkUnitRecord(BaseModel):
             raise ValueError("work_unit_id must directly equal branch_id")
         return self
 
-    def transition(self, target: WorkUnitState, *, error: str | None = None) -> "WorkUnitRecord":
+    def transition(
+        self,
+        target: WorkUnitState,
+        *,
+        error: str | None = None,
+        status_reason: WorkUnitStatusReason | None = None,
+    ) -> "WorkUnitRecord":
         allowed: dict[WorkUnitState, set[WorkUnitState]] = {
             WorkUnitState.PENDING: {WorkUnitState.READY, WorkUnitState.BLOCKED},
             WorkUnitState.READY: {WorkUnitState.RESERVED, WorkUnitState.BLOCKED},
@@ -110,6 +123,8 @@ class WorkUnitRecord(BaseModel):
             values["returned_at"] = now
         if error is not None:
             values["error"] = error[:500]
+        if status_reason is not None:
+            values["status_reason"] = status_reason
         return self.model_copy(update=values)
 
 
@@ -140,7 +155,7 @@ class ContributionRecord(BaseModel):
     run_source_revision: str = Field(min_length=1, max_length=120)
     catalog_source_revision: str = Field(min_length=1, max_length=120)
     approved_file_refs: tuple[str, ...] = Field(min_length=1, max_length=24)
-    evidence_anchors: tuple[AgentControlLoopEvidenceAnchor, ...] = Field(default_factory=tuple, max_length=6)
+    evidence_anchors: tuple[AgentControlLoopEvidenceAnchor, ...] = Field(default_factory=tuple, max_length=96)
     model_receipt: WorkerModelReceipt
     gate_status: ContributionGateStatus
     gate_reason: str = Field(min_length=1, max_length=500)
@@ -165,11 +180,12 @@ def contribution_digest(record: ContributionRecord) -> str:
 
 
 def public_work_unit(record: WorkUnitRecord) -> dict[str, Any]:
-    return record.model_dump(mode="json", exclude={"reservation_id", "error"})
+    return record.model_dump(mode="json", exclude={"owner_id", "reservation_id", "error"})
 
 
 def public_contribution(record: ContributionRecord) -> dict[str, Any]:
     payload = record.model_dump(mode="json")
     payload.pop("run_source_revision", None)
     payload.pop("catalog_source_revision", None)
+    payload.pop("owner_id", None)
     return payload

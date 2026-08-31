@@ -1236,6 +1236,7 @@ type WorkUnitReceipt = {
   version: number;
   latest_contribution_id: string | null;
   returned_at: string | null;
+  status_reason: string | null;
 };
 
 type ContributionReceipt = {
@@ -3340,6 +3341,7 @@ function normalizeRun(value: unknown): HarnessRun | null {
       state: asText(unit.state, "pending"), attempt: asNumber(unit.attempt), version: asNumber(unit.version, 1),
       latest_contribution_id: asText(unit.latest_contribution_id) || null,
       returned_at: asText(unit.returned_at) || null,
+      status_reason: asText(unit.status_reason) || null,
     }] : [];
   }) : [];
   const contributions = Array.isArray(raw.contributions) ? raw.contributions.flatMap((item): ContributionReceipt[] => {
@@ -4859,14 +4861,15 @@ function LoopView({
       </div>}
       {run.worker_runs.length > 0 && <div className="loop-worker-receipts"><span>实际 Worker 回执</span>{run.worker_runs.map((worker) => <div key={worker.worker_run_id}><b>{worker.outcome === "adopted" ? "已合入" : worker.outcome === "failed" ? "执行失败" : "待处理"}</b><span>{worker.summary}</span><small>{worker.model_called ? "模型已调用" : "未调用"} · {worker.output_used ? "已采用" : "未采用"} · {worker.elapsed_ms} ms</small></div>)}</div>}
       {run.work_units.length > 0 && <div className="loop-worker-ledger" data-testid="worker-ledger">
-        <span>工作包与 Contribution Ledger</span>
+        <span>工作包与成果采用记录</span>
         {run.work_units.slice().sort((left, right) => left.work_unit_id.localeCompare(right.work_unit_id)).map((unit) => {
           const records = run.contributions.filter((item) => item.work_unit_id === unit.work_unit_id);
           const latest = records[records.length - 1];
           return <article key={unit.work_unit_id}>
             <div><b>{unit.unit_id}</b><strong>{unit.state === "adopted" ? "已采用" : unit.state === "waiting" ? "已返回，待核对" : unit.state === "failed" ? "执行失败" : unit.state}</strong></div>
-            <small>WorkUnit {unit.work_unit_id} · 第 {unit.attempt} 次尝试 · Branch 依赖 {unit.depends_on.length || "无"}</small>
-            {latest && <p><span>Contribution 已返回</span> · {latest.gate_status === "adopted" ? "已采用" : "未采用"} · {latest.gate_reason}{latest.artifact_version ? ` · ArtifactVersion v${latest.artifact_version}` : ""}</p>}
+            <small>第 {unit.attempt} 次尝试 · {unit.depends_on.length ? `${unit.depends_on.length} 条前序依赖` : "无前序依赖"}</small>
+            {latest && <p><span>候选已返回</span> · {latest.gate_status === "adopted" ? "已采用" : "未采用"} · {latest.gate_reason}{latest.artifact_version ? ` · 成果版本 v${latest.artifact_version}` : ""}</p>}
+            {!latest && unit.state === "failed" && unit.status_reason === "checkpoint_recovered_in_flight_worker" && <p>上次调用未确认返回，系统未自动重放；请确认后重新启动。</p>}
             {latest && <small>{latest.approved_file_refs.map(fileLabel).join(" · ")} · Anchor {latest.evidence_anchors.length > 0 ? `${latest.evidence_anchors.length} 处` : "未形成"}</small>}
           </article>;
         })}
