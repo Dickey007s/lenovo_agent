@@ -96,8 +96,14 @@ const uxSpecFile = fileItem(
   "DOCX",
   "document",
 );
-const workflowFile = fileItem("forte-5555555555555555", "forte-folder-555555555555", "workflow.py", "算法研发", "PY", "text", "search_agent_workflow/workflow.py");
-const searchLogFile = fileItem("forte-6666666666666666", "forte-folder-555555555555", "search_agent.log", "算法研发", "LOG", "text", "search_agent_workflow/search_agent.log");
+const productFolderId = "forte-folder-1d0cf9a4c9d7";
+const productPRDFile = fileItem("forte-ae635a33c4417b7e", productFolderId, "PRD_v2.5.md", "产品管理", "MD", "text");
+const productConfigFile = fileItem("forte-50a4c59bc850f820", productFolderId, "上线配置清单.xlsx", "产品管理", "XLSX", "table");
+const productTestFile = fileItem("forte-b4def0347f9b52d0", productFolderId, "功能测试报告.xlsx", "产品管理", "XLSX", "table");
+const productCompatFile = fileItem("forte-87e560ffccbc5358", productFolderId, "线上兼容环境测试报告.xlsx", "产品管理", "XLSX", "table");
+const workflowFile = fileItem("forte-2f73463ddf941c94", "forte-folder-555555555555", "workflow.py", "算法研发", "PY", "text", "search_agent_workflow/workflow.py");
+const toolsFile = fileItem("forte-04c603e979388bbe", "forte-folder-555555555555", "tools.py", "算法研发", "PY", "text", "search_agent_workflow/tools.py");
+const searchLogFile = fileItem("forte-daa8f1fbdd343272", "forte-folder-555555555555", "search_agent.log", "算法研发", "LOG", "text", "search_agent_workflow/search_agent.log");
 const legalRuleFile = fileItem("forte-legal-rules-01", pdfFile.folder_id, "授权委托书风控校验规则.md", "法务", "MD", "text");
 const legalDelegationFiles = Array.from({ length: 6 }, (_, index) => fileItem(
   `forte-legal-doc-0${index + 1}`,
@@ -109,6 +115,12 @@ const legalDelegationFiles = Array.from({ length: 6 }, (_, index) => fileItem(
 ));
 
 function fileItem(fileRef: string, folderId: string, label: string, group: string, extension: FileItem["extension"], kind: FileItem["preview_kind"], nestedPath?: string): FileItem {
+  const mime = extension === "CSV" ? "text/csv"
+    : extension === "XLSX" ? "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+      : extension === "DOCX" ? "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        : extension === "MD" ? "text/markdown"
+          : extension === "PY" ? "text/x-python"
+            : "text/plain";
   return {
     file_ref: fileRef,
     folder_id: folderId,
@@ -117,7 +129,7 @@ function fileItem(fileRef: string, folderId: string, label: string, group: strin
     display_path: `${group}/${nestedPath ?? label}`,
     display_summary: `${extension} 办公文件 · 12 KB`,
     extension,
-    mime: extension === "CSV" ? "text/csv" : extension === "TXT" ? "text/plain" : "application/octet-stream",
+    mime,
     size: 12_288,
     preview_kind: kind,
     preview_available: true,
@@ -125,11 +137,12 @@ function fileItem(fileRef: string, folderId: string, label: string, group: strin
 }
 
 const seedFolders = [
+  { folder_id: productFolderId, display_label: "产品管理", display_summary: "产品上线与测试资料", files: [productPRDFile, productConfigFile, productTestFile, productCompatFile] },
   { folder_id: csvFile.folder_id, display_label: "财务管理", display_summary: "跨期间往来资料", files: [financeH1File, financeH2File, csvFile] },
   { folder_id: pdfFile.folder_id, display_label: "法务", display_summary: "合同与授权材料", files: [legalRuleFile, ...legalDelegationFiles, pdfFile] },
   { folder_id: docxFile.folder_id, display_label: "人力招聘", display_summary: "岗位与候选人材料", files: candidateFiles },
   { folder_id: txtFile.folder_id, display_label: "可靠性工程", display_summary: "运行日志与服务资料", files: [txtFile] },
-  { folder_id: workflowFile.folder_id, display_label: "算法研发", display_summary: "搜索 Agent 代码与运行记录", files: [workflowFile, searchLogFile] },
+  { folder_id: workflowFile.folder_id, display_label: "算法研发", display_summary: "搜索 Agent 代码与运行记录", files: [workflowFile, toolsFile, searchLogFile] },
   { folder_id: outboundRuleFile.folder_id, display_label: "运营管理", display_summary: "外呼规则与运营资料", files: [outboundRuleFile] },
   { folder_id: customerSurveyFile.folder_id, display_label: "销售运营", display_summary: "公开问卷与画像规则", files: [customerSurveyFile, customerRuleFile] },
   { folder_id: uxBehaviorFile.folder_id, display_label: "用户体验", display_summary: "交互日志、排序规则与页面规范", files: [uxBehaviorFile, uxRuleFile, uxSpecFile] },
@@ -141,7 +154,7 @@ const folders = Array.from({ length: 15 }, (_, folderIndex) => {
   // Keep every named benchmark folder faithful to its controlled fixture.
   // The seven generic folders carry the remaining 69 inputs so the workspace
   // still exercises the production 15-folder / 96-file summary.
-  const targetCount = seed ? seed.files.length : folderIndex < 14 ? 10 : 9;
+  const targetCount = seed ? seed.files.length : folderIndex < 14 ? 11 : 14;
   const files = seed ? [...seed.files] : [];
   while (files.length < targetCount) {
     const fileIndex = foldersFileIndex(folderIndex, files.length);
@@ -2576,11 +2589,11 @@ function demo2Snapshot(body: { workspace_id: string; instruction: string }, wave
     "基于已采用的跨职能事实形成统一待办建议。",
   ];
   const sourceRefs = [
-    [outboundRuleFile.file_ref],
-    [workflowFile.file_ref, searchLogFile.file_ref],
-    [uxBehaviorFile.file_ref, uxRuleFile.file_ref, uxSpecFile.file_ref],
-    [outboundRuleFile.file_ref, workflowFile.file_ref, uxBehaviorFile.file_ref],
-    [outboundRuleFile.file_ref, workflowFile.file_ref, uxBehaviorFile.file_ref],
+    [productPRDFile.file_ref, productConfigFile.file_ref, productTestFile.file_ref, productCompatFile.file_ref],
+    [workflowFile.file_ref, toolsFile.file_ref, searchLogFile.file_ref],
+    [uxRuleFile.file_ref, uxBehaviorFile.file_ref, uxSpecFile.file_ref],
+    [productPRDFile.file_ref, productConfigFile.file_ref, productTestFile.file_ref, productCompatFile.file_ref, uxRuleFile.file_ref, uxBehaviorFile.file_ref, uxSpecFile.file_ref],
+    [workflowFile.file_ref, toolsFile.file_ref, searchLogFile.file_ref],
   ];
   const makeBranch = (branchId: string, status: string, dependsOn: string[] = []) => ({
     // Keep protocol identifiers in the mocked payload, but give the cockpit
@@ -2604,7 +2617,7 @@ function demo2Snapshot(body: { workspace_id: string; instruction: string }, wave
     ? [makeBranch(ids[0], "running"), makeBranch(ids[1], "running"), makeBranch(ids[2], "running"), makeBranch(ids[3], "pending", [ids[0]]), makeBranch(ids[4], "pending", [ids[1]])]
     : wave === 1
       ? [makeBranch(ids[0], "completed"), makeBranch(ids[1], "completed"), makeBranch(ids[2], "completed"), makeBranch(ids[3], "running", [ids[0]]), makeBranch(ids[4], "running", [ids[1]])]
-      : ids.map((id, index) => makeBranch(id, "completed", index > 2 ? [ids[index - 3]] : []));
+    : ids.map((id, index) => makeBranch(id, "completed", index === 3 ? [ids[0], ids[2]] : index === 4 ? [ids[1]] : []));
   const workers = wave === 0 ? [] : ids.slice(0, wave === 1 ? 3 : 5).map((branchId, index) => ({
     worker_run_id: `worker-${branchId}`,
     branch_id: branchId,
@@ -2678,15 +2691,15 @@ function demo2Snapshot(body: { workspace_id: string; instruction: string }, wave
     rounds: [round],
     current_round: 1,
     branches,
-    topology_admission: { mode: "adaptive_readonly_workers", work_unit_breadth: 5, independent_branch_count: 3, dependency_parallelism: 3, source_span: 6, remaining_model_calls: 24, remaining_time_seconds: 7000, external_action: "none", reasons: ["3 个职能来源组形成 3 条独立根分支，依赖分支将在首波完成后 ready。"], user_confirmation_required: true },
+    topology_admission: { mode: "adaptive_readonly_workers", work_unit_breadth: 5, independent_branch_count: 3, dependency_parallelism: 3, source_span: 3, remaining_model_calls: 24, remaining_time_seconds: 7000, external_action: "none", reasons: ["3 个职能来源组形成 3 条独立根分支，依赖分支将在首波完成后 ready。"], user_confirmation_required: true },
     worker_runs: workers,
     work_units: workUnits,
     contributions,
     shared_artifacts: workers.length ? [{ artifact_id: "artifact-demo2", version: wave, adopted_worker_run_ids: workers.map((item) => item.worker_run_id), waiting_branch_ids: wave === 1 ? ids.slice(3) : [], failed_worker_run_ids: [], external_action: "none" }] : [],
     result: wave === 2 ? round.result : null,
     artifact_versions: wave >= 1 ? [
-      { ...base.artifact_versions[0], artifact_id: "artifact-demo2", version: 1, title: "跨职能风险与待办简报", finding_count: 3, findings: businessFindings.slice(0, 3), source_file_refs: [outboundRuleFile.file_ref, workflowFile.file_ref, uxBehaviorFile.file_ref], parent_version: null },
-      ...(wave === 2 ? [{ ...base.artifact_versions[0], artifact_id: "artifact-demo2", version: 2, title: "跨职能风险与待办简报", finding_count: 5, findings: businessFindings, source_file_refs: [outboundRuleFile.file_ref, workflowFile.file_ref, uxBehaviorFile.file_ref], parent_version: 1 }] : []),
+      { ...base.artifact_versions[0], artifact_id: "artifact-demo2", version: 1, title: "跨职能风险与待办简报", finding_count: 3, findings: businessFindings.slice(0, 3), source_file_refs: Array.from(new Set(sourceRefs.flat())), parent_version: null },
+      ...(wave === 2 ? [{ ...base.artifact_versions[0], artifact_id: "artifact-demo2", version: 2, title: "跨职能风险与待办简报", finding_count: 5, findings: businessFindings, source_file_refs: Array.from(new Set(sourceRefs.flat())), parent_version: 1 }] : []),
     ] : [],
     commits: wave === 2 ? [{ ...base.commits[0], commit_id: "commit-demo2", artifact_id: "artifact-demo2", artifact_version: 2, summary: "已提交跨职能风险与待办简报 v2，仍需业务负责人复核。" }] : [],
     last_commit: wave === 2 ? { ...base.last_commit, commit_id: "commit-demo2", artifact_id: "artifact-demo2", artifact_version: 2, summary: "已提交跨职能风险与待办简报 v2，仍需业务负责人复核。" } : null,
@@ -2697,7 +2710,46 @@ function demo2Snapshot(body: { workspace_id: string; instruction: string }, wave
   };
 }
 
-async function mockDemoRuntime(page: Page, mode: "demo1" | "demo2") {
+function demo2PartialAmbiguousSnapshot(body: { workspace_id: string; instruction: string }) {
+  const current = demo2Snapshot(body, 1) as any;
+  const ids = ["demo2-root-a", "demo2-root-b", "demo2-root-c", "demo2-dependent-d", "demo2-dependent-e"];
+  const branches = current.branches.map((branch: any, index: number) => {
+    if (index === 1) return { ...branch, status: "waiting_input", verified_file_refs: [], missing_file_refs: branch.input_file_refs };
+    if (index === 3) return { ...branch, status: "blocked", verified_file_refs: [], missing_file_refs: branch.input_file_refs, depends_on: [ids[1]] };
+    if (index === 4) return { ...branch, status: "running", verified_file_refs: [], missing_file_refs: branch.input_file_refs, depends_on: [ids[0], ids[2]] };
+    return branch;
+  });
+  const workerRuns = current.worker_runs.map((worker: any, index: number) => index === 1
+    ? { ...worker, outcome: "ambiguous", summary: "搜索 Agent 运行风险存在多个原文位置，等待人工选择。", output_used: false }
+    : worker);
+  const contributions = current.contributions.map((contribution: any, index: number) => index === 1
+    ? { ...contribution, gate_status: "waiting", gate_reason: "原文位置存在多个候选，尚未进入简报。", evidence_anchors: [], artifact_version: null, summary: "搜索 Agent 运行风险暂不采用。" }
+    : contribution);
+  const workUnits = current.work_units.map((unit: any, index: number) => index === 1
+    ? { ...unit, state: "waiting", latest_contribution_id: unit.latest_contribution_id }
+    : index === 3 ? { ...unit, state: "blocked", latest_contribution_id: null } : unit);
+  const artifact = current.artifact_versions[0];
+  return {
+    ...current,
+    status: "waiting_input",
+    control_state: "paused",
+    branches,
+    worker_runs: workerRuns,
+    contributions,
+    work_units: workUnits,
+    shared_artifacts: [{ ...current.shared_artifacts[0], version: 1, waiting_branch_ids: [ids[1], ids[3]], adopted_worker_run_ids: [workerRuns[0].worker_run_id, workerRuns[2].worker_run_id] }],
+    artifact_versions: [{ ...artifact, finding_count: 2, findings: artifact.findings.filter((finding: any) => finding.title !== "搜索 Agent 运行风险") }],
+    rounds: [{ ...current.rounds[0], status: "waiting_input", phase: "evidence_gate", next_step: { ...current.rounds[0].next_step, decision: "waiting_input", reason: "搜索 Agent 运行风险存在歧义，只允许继续不依赖该分支的工作包。", candidate_branch_ids: [ids[4]], ready_branch_ids: [ids[4]] } }],
+    result: null,
+    commits: [],
+    last_commit: null,
+    events: [{ sequence: 2, event_name: "contribution_waiting", occurred_at: new Date().toISOString(), status: "waiting_input", message: "搜索 Agent 运行风险的贡献未采用，依赖分支保持阻塞。", details: {} }],
+    last_event_sequence: 2,
+    version: 21,
+  };
+}
+
+async function mockDemoRuntime(page: Page, mode: "demo1" | "demo2" | "demo2-partial") {
   await mockHarness(page, { boundedRecovery: mode === "demo1" });
   let wave = 0;
   let continuationSnapshot: unknown = null;
@@ -2705,8 +2757,8 @@ async function mockDemoRuntime(page: Page, mode: "demo1" | "demo2") {
   await page.route("**/v1/harness/runs", async (route) => {
     if (route.request().method() !== "POST") return route.fallback();
     const body = route.request().postDataJSON() as { workspace_id: string; instruction: string };
-    if (mode === "demo2") demo2Current = demo2Snapshot(body, 0);
-    return fulfillJson(route, { run: mode === "demo2" ? demo2Current : boundedAnalysisRecoverySnapshot(body), replayed: false }, 202);
+    if (mode === "demo2" || mode === "demo2-partial") demo2Current = demo2Snapshot(body, 0);
+    return fulfillJson(route, { run: mode === "demo2" || mode === "demo2-partial" ? demo2Current : boundedAnalysisRecoverySnapshot(body), replayed: false }, 202);
   });
   await page.route("**/*", async (route) => {
     const url = new URL(route.request().url());
@@ -2716,18 +2768,18 @@ async function mockDemoRuntime(page: Page, mode: "demo1" | "demo2") {
       return fulfillJson(route, continuationSnapshot, 202);
     }
     if (mode === "demo1" && continuationSnapshot && route.request().method() === "GET" && url.pathname.includes("/runs/") && !url.pathname.endsWith("/events")) return fulfillJson(route, continuationSnapshot);
-    if (mode === "demo2" && demo2Current && route.request().method() === "GET" && url.pathname.includes("/runs/") && !url.pathname.endsWith("/events")) return fulfillJson(route, demo2Current);
-    if (mode === "demo2" && url.pathname.endsWith("/workers") && route.request().method() === "POST") {
+    if ((mode === "demo2" || mode === "demo2-partial") && demo2Current && route.request().method() === "GET" && url.pathname.includes("/runs/") && !url.pathname.endsWith("/events")) return fulfillJson(route, demo2Current);
+    if ((mode === "demo2" || mode === "demo2-partial") && url.pathname.endsWith("/workers") && route.request().method() === "POST") {
       wave += 1;
-      demo2Current = demo2Snapshot({ workspace_id: "forte-public-office", instruction: "验证拓扑" }, wave);
+      demo2Current = mode === "demo2-partial" ? demo2PartialAmbiguousSnapshot({ workspace_id: "forte-public-office", instruction: "验证拓扑" }) : demo2Snapshot({ workspace_id: "forte-public-office", instruction: "验证拓扑" }, wave);
       return fulfillJson(route, demo2Current, 202);
     }
     return route.fallback();
   });
   await page.route("**/v1/harness/runs/*/workers", async (route) => {
-    if (mode !== "demo2" || route.request().method() !== "POST") return route.fallback();
+    if ((mode !== "demo2" && mode !== "demo2-partial") || route.request().method() !== "POST") return route.fallback();
     wave += 1;
-    demo2Current = demo2Snapshot({ workspace_id: "forte-public-office", instruction: "验证拓扑" }, wave);
+    demo2Current = mode === "demo2-partial" ? demo2PartialAmbiguousSnapshot({ workspace_id: "forte-public-office", instruction: "验证拓扑" }) : demo2Snapshot({ workspace_id: "forte-public-office", instruction: "验证拓扑" }, wave);
     return fulfillJson(route, demo2Current, 202);
   });
 }
@@ -4951,8 +5003,8 @@ test.describe("Demo 1/2 runtime acceptance", () => {
     await expect(admission).toContainText("实际执行回执");
     await expect(admission).toContainText("已合入");
     await expect(admission).toContainText("产品上线 Gate");
-    await expect(admission).toContainText("来源：专业性说明.md");
-    await expect(admission).toContainText("来源：workflow.py、search_agent.log");
+    await expect(admission).toContainText("来源：PRD_v2.5.md、上线配置清单.xlsx、功能测试报告.xlsx、线上兼容环境测试报告.xlsx");
+    await expect(admission).toContainText("来源：workflow.py、tools.py、search_agent.log");
     await expect(admission.getByRole("button", { name: "继续下一批只读执行器" })).toBeEnabled();
     await admission.getByRole("button", { name: "继续下一批只读执行器" }).click();
     await expect(admission).toContainText("跨工作包优先级与影响核对");
@@ -4964,6 +5016,7 @@ test.describe("Demo 1/2 runtime acceptance", () => {
     await expect(page.locator(".loop-round-result")).toContainText("5 个跨职能工作包");
     await expect(page.locator(".artifact-evolution")).toContainText("v1");
     await expect(page.locator(".artifact-evolution")).toContainText("v2");
+    await expect(page.locator(".artifact-evolution")).toContainText("当前为逻辑成果版本，可审查和恢复；尚未生成 DOCX/CSV 下载文件。");
     await page.getByRole("button", { name: "成果与建议" }).click();
     await expect(page.locator(".result-expand")).toContainText("查看其余 2 条发现");
     await page.locator(".result-expand").click();
@@ -4975,6 +5028,26 @@ test.describe("Demo 1/2 runtime acceptance", () => {
     const mobileAdmissionSizes = await admission.locator('.loop-topology-facts, .loop-worker-receipts > div, .loop-worker-receipts small').evaluateAll((nodes) => nodes.map((node) => Number.parseFloat(getComputedStyle(node).fontSize)));
     expect(Math.min(...mobileAdmissionSizes)).toBeGreaterThanOrEqual(12);
     await expect(admission.getByText("实际执行回执")).toBeVisible();
+  });
+
+  test("Demo 2 keeps product and UX v1 when search-risk evidence is ambiguous", async ({ page }) => {
+    await mockDemoRuntime(page, "demo2-partial");
+    await page.goto("/");
+    await page.getByRole("textbox", { name: "任务指令" }).fill("形成跨职能风险与待办简报。");
+    await page.getByRole("button", { name: "启动 Control Loop" }).click();
+    await page.getByRole("button", { name: "Agent 路径" }).click();
+    const admission = page.locator('[data-testid="topology-admission"]');
+    await admission.getByRole("button", { name: "确认并启动只读执行器" }).click();
+    await expect(admission).toContainText("搜索 Agent 运行风险存在多个原文位置");
+    await expect(admission).toContainText("已返回，待核对");
+    await expect(admission).toContainText("被依赖阻塞");
+    await expect(admission).toContainText("产品上线 Gate");
+    await expect(admission).toContainText("交互痛点证据");
+    await expect(admission).toContainText("统一待办建议");
+    await expect(page.locator(".artifact-evolution")).toContainText("当前为逻辑成果版本，可审查和恢复；尚未生成 DOCX/CSV 下载文件。");
+    await page.setViewportSize({ width: 390, height: 844 });
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+    expect(overflow).toBeLessThanOrEqual(0);
   });
 
   test("Task Ledger success sends both versions and renders the child as current", async ({ page }) => {

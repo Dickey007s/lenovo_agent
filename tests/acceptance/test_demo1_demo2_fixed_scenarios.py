@@ -33,7 +33,6 @@ from services.api.app.application.readonly_workers import (
 )
 from services.api.app.application.workunit_ledger import WorkUnitState
 from services.api.app.main import create_app
-from tests.unit.test_demo2_runtime import _cross_function_catalog
 from tests.unit.test_harness_runtime import (
     AmbiguousCatalog,
     FakeAnalyst,
@@ -41,6 +40,71 @@ from tests.unit.test_harness_runtime import (
     FakePlanner,
     MixedEvidenceAnalyst,
 )
+
+
+def _ten_file_cross_function_catalog():
+    """Use the ten public FORTE inputs in the three business source groups."""
+
+    class TenFileCatalog(FakeCatalog):
+        def __init__(self) -> None:
+            super().__init__()
+            entries = [
+                ("forte-ae635a33c4417b7e", "PRD_v2.5.md", "产品管理", "text/markdown", "text"),
+                ("forte-50a4c59bc850f820", "上线配置清单.xlsx", "产品管理", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "table"),
+                ("forte-b4def0347f9b52d0", "功能测试报告.xlsx", "产品管理", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "table"),
+                ("forte-87e560ffccbc5358", "线上兼容环境测试报告.xlsx", "产品管理", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "table"),
+                ("forte-2f73463ddf941c94", "workflow.py", "算法研发", "text/x-python", "text"),
+                ("forte-04c603e979388bbe", "tools.py", "算法研发", "text/x-python", "text"),
+                ("forte-daa8f1fbdd343272", "search_agent.log", "算法研发", "text/plain", "text"),
+                ("forte-0506a266b89dfef4", "交互行为痛点及优化规则.md", "用户体验", "text/markdown", "text"),
+                ("forte-3913d2ccb62b9b02", "用户交互行为日志.xlsx", "用户体验", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "table"),
+                ("forte-3f48165dbc47276d", "页面级交互规范.docx", "用户体验", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "document"),
+            ]
+            self.files = [
+                {
+                    "file_ref": ref,
+                    "folder_id": f"forte-folder-{group}",
+                    "path": f"{group}/input/{label}",
+                    "role": "input",
+                    "mime": mime,
+                    "size": 12,
+                    "sha256": f"{index + 1:064x}",
+                    "display_label": label,
+                    "display_group": group,
+                    "display_path": f"{group}/{label}",
+                    "display_summary": f"{group} 公开输入",
+                    "kind": kind,
+                    "columns": ["字段 1", "字段 2"] if kind == "table" else [],
+                }
+                for index, (ref, label, group, mime, kind) in enumerate(entries)
+            ]
+
+        def public_workspace(self) -> dict[str, object]:
+            workspace = super().public_workspace()
+            workspace["file_count"] = len(self.files)
+            workspace["folder_count"] = 3
+            workspace["previewable_file_count"] = len(self.files)
+            workspace["folders"] = [
+                {
+                    "folder_id": f"forte-folder-{group}",
+                    "display_label": group,
+                    "display_summary": f"{group} 公开输入",
+                    "availability": "local_input_bundle",
+                    "external_dependency_label": None,
+                    "file_count": len(files),
+                    "total_bytes": sum(int(file["size"]) for file in files),
+                    "files": files,
+                }
+                for group in ("产品管理", "算法研发", "用户体验")
+                for files in [[file for file in self.files if file["display_group"] == group]]
+            ]
+            return workspace
+
+        def public_file(self, file_ref: str) -> dict[str, object]:
+            file = next(item for item in self.files if item["file_ref"] == file_ref)
+            return {**file, "workspace_id": "forte-public-office", "rows": [], "text": "安全预览内容", "truncated": False}
+
+    return TenFileCatalog()
 
 
 async def _wait_for(runtime: HarnessRuntime, owner: str, run_id: str, predicate, *, seconds: float = 5):
@@ -303,7 +367,7 @@ class FiveUnitFailurePlanner:
                             "核对搜索 Agent 运行记录与设计路径之间的风险。",
                             "核对交互行为日志中的痛点证据与影响范围。",
                         )[index - 1],
-                        input_file_refs=[refs[(index - 1) % len(refs)]],
+                        input_file_refs=[refs[:4], refs[4:7], refs[7:10]][index - 1],
                         tool="file.read",
                     )
                     for index in (1, 2, 3)
@@ -312,7 +376,7 @@ class FiveUnitFailurePlanner:
                     unit_id="dependent-blocked",
                     title="统一待办建议",
                     objective="基于已采用的跨职能事实形成统一待办建议。",
-                    input_file_refs=[refs[0]],
+                    input_file_refs=refs[4:7],
                     depends_on=["root-2"],
                     tool="file.read",
                 ),
@@ -320,7 +384,7 @@ class FiveUnitFailurePlanner:
                     unit_id="dependent-ready",
                     title="跨工作包优先级与影响核对",
                     objective="汇总已采用工作包，核对跨职能优先级与影响。",
-                    input_file_refs=[refs[0], refs[2 % len(refs)]],
+                    input_file_refs=[*refs[:4], *refs[7:10]],
                     depends_on=["root-1", "root-3"],
                     tool="file.read",
                 ),
@@ -346,14 +410,14 @@ async def test_demo2_failure_wave_keeps_adopted_contributions_and_blocks_only_do
             return await super().analyze(**kwargs)
 
     analyst = CountingAnalyst()
-    runtime = HarnessRuntime(_cross_function_catalog(), planner, analyst)
+    runtime = HarnessRuntime(_ten_file_cross_function_catalog(), planner, analyst)
     try:
         started = await runtime.start(
             owner,
             HarnessRunStart(
                 idempotency_key="demo2-acceptance-start-0001",
                 instruction="核对五个跨职能工作包并保留局部成果",
-                loop={"max_rounds": 2, "max_files_per_round": 3, "max_model_calls": 8, "deadline_seconds": 120},
+                loop={"max_rounds": 2, "max_files_per_round": 10, "max_model_calls": 8, "deadline_seconds": 120},
             ),
         )
         waiting = await _wait_for(runtime, owner, started.run.run_id, lambda item: item.status == "waiting_input")

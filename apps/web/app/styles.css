@@ -244,6 +244,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, summary:focus
 .loop-worker-ledger article > div { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px; }
 .loop-worker-ledger article strong { color: var(--green, #247443); font-size: 13px; }
 .loop-worker-ledger article p, .loop-worker-ledger article small { margin: 2px 0 0; color: var(--muted); font-size: 12px; line-height: 1.5; overflow-wrap: anywhere; }
+.artifact-logical-note { margin: 8px 0 0; padding: 7px 9px; color: var(--muted); background: #f7f9fb; font-size: 12px; line-height: 1.5; }
 .loop-worker-confirmation { display: grid; gap: 8px; margin-top: 8px; }
 .loop-worker-confirmation > div { display: flex; flex-wrap: wrap; gap: 8px; }
 .loop-worker-confirmation button { display: inline-flex; align-items: center; gap: 5px; }
