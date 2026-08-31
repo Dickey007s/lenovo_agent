@@ -907,6 +907,19 @@ class HarnessRuntime:
         for record in stored_runs:
             raw_snapshot = record.snapshot
             snapshot = HarnessRunSnapshot.model_validate(raw_snapshot)
+            # PostgreSQL keeps the ledger rows beside the aggregate snapshot;
+            # when present they are the authority, while the snapshot fields
+            # remain a restart-safe public projection for memory mode.
+            if hasattr(self.state_store, "load_work_units"):
+                stored_work_units = await self.state_store.load_work_units(record.owner_id, record.run_id)
+                stored_contributions = await self.state_store.load_contributions(record.owner_id, record.run_id)
+                if stored_work_units or stored_contributions:
+                    snapshot = snapshot.model_copy(
+                        update={
+                            "work_units": stored_work_units,
+                            "contributions": stored_contributions,
+                        }
+                    )
             migrated = "task_version" not in raw_snapshot
             if migrated:
                 snapshot = snapshot.model_copy(update={"task_version": snapshot.run_sequence})
