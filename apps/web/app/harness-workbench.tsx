@@ -4849,31 +4849,32 @@ function LoopView({
       {run.parent_run_id && <small>新 Run · 保留成果{run.base_artifact_version ? ` v${run.base_artifact_version}` : ""} · 不修改原文件 · 外部动作：未发生</small>}
     </section>
     {run.topology_admission && <section className="loop-topology-admission" aria-label="拓扑准入" data-testid="topology-admission">
-      <header><div><span>服务端拓扑准入</span><h3>{run.topology_admission.mode === "adaptive_readonly_workers" ? "已准入受限只读 Workers" : run.topology_admission.mode === "fixed_workflow" ? "采用固定工作流" : "保持单 Controller"}</h3></div><b>{run.topology_admission.independent_branch_count} 条独立分支</b></header>
+      <header><div><span>服务端拓扑准入</span><h3>{run.topology_admission.mode === "adaptive_readonly_workers" ? "已准入受限只读执行器" : run.topology_admission.mode === "fixed_workflow" ? "采用固定工作流" : "保持单控制器"}</h3></div><b>{run.topology_admission.independent_branch_count} 条独立分支</b></header>
       <p>{run.topology_admission.reasons[run.topology_admission.reasons.length - 1] || "依据已校验计划选择执行方式。"}</p>
       <div className="loop-topology-facts"><span><b>{run.topology_admission.work_unit_breadth}</b> 工作包</span><span><b>{run.topology_admission.source_span}</b> 份来源</span><span><b>{run.topology_admission.remaining_model_calls}</b> 次剩余调用</span><span><b>{run.topology_admission.remaining_time_seconds}</b> 秒剩余时间</span><span>外部动作：<b>未发生</b></span></div>
       {run.topology_admission.mode === "adaptive_readonly_workers" && run.status === "waiting_input" && run.branches.some((branch) => ["running", "waiting_input"].includes(branch.status)) && <div className="loop-worker-confirmation">
-        <small>{run.worker_runs.length === 0 ? "执行与准入分开；只有你明确确认后才会调用最多 3 个 Worker。当前不会自动调用 Analyst。" : "上一批结果已保留；仅对依赖已完成的下一批 ready Branch 继续调用。"}</small>
+        <small>{run.worker_runs.length === 0 ? "执行与准入分开；只有你明确确认后才会调用最多 3 个只读执行器。当前不会自动调用分析模型。" : "上一批结果已保留；仅对依赖已完成的下一批可执行分支继续调用。"}</small>
         <div>
-          <button type="button" onClick={() => void onExecuteWorkers()} disabled={starting || controlBusy !== null}><IconPlayerPlay aria-hidden="true" />{starting ? "正在启动" : run.worker_runs.length === 0 ? "确认并启动只读 Worker" : "继续下一批只读 Worker"}</button>
+          <button type="button" onClick={() => void onExecuteWorkers()} disabled={starting || controlBusy !== null}><IconPlayerPlay aria-hidden="true" />{starting ? "正在启动" : run.worker_runs.length === 0 ? "确认并启动只读执行器" : "继续下一批只读执行器"}</button>
           {run.worker_runs.length === 0 && <button type="button" className="is-secondary" onClick={() => void onControl("topology_override", { topologyMode: "single_controller" })} disabled={starting || controlBusy !== null}><IconRoute aria-hidden="true" />改回单 Controller</button>}
         </div>
       </div>}
-      {run.worker_runs.length > 0 && <div className="loop-worker-receipts"><span>实际 Worker 回执</span>{run.worker_runs.map((worker) => <div key={worker.worker_run_id}><b>{worker.outcome === "adopted" ? "已合入" : worker.outcome === "failed" ? "执行失败" : "待处理"}</b><span>{worker.summary}</span><small>{worker.model_called ? "模型已调用" : "未调用"} · {worker.output_used ? "已采用" : "未采用"} · {worker.elapsed_ms} ms</small></div>)}</div>}
+      {run.worker_runs.length > 0 && <div className="loop-worker-receipts"><span>实际执行回执</span>{run.worker_runs.map((worker) => <div key={worker.worker_run_id}><b>{worker.outcome === "adopted" ? "已合入" : worker.outcome === "failed" ? "执行失败" : "待处理"}</b><span>{worker.summary}</span><small>{worker.model_called ? "模型已调用" : "未调用"} · {worker.output_used ? "已采用" : "未采用"} · {worker.elapsed_ms} ms</small></div>)}</div>}
       {run.work_units.length > 0 && <div className="loop-worker-ledger" data-testid="worker-ledger">
         <span>工作包与成果采用记录</span>
-        {run.work_units.slice().sort((left, right) => left.work_unit_id.localeCompare(right.work_unit_id)).map((unit) => {
-          const records = run.contributions.filter((item) => item.work_unit_id === unit.work_unit_id);
+        {run.work_units.slice().sort((left, right) => left.branch_id.localeCompare(right.branch_id)).map((unit) => {
+          const branch = run.branches.find((item) => item.branch_id === unit.branch_id);
+          const records = run.contributions.filter((item) => item.branch_id === unit.branch_id);
           const latest = records[records.length - 1];
-          return <article key={unit.work_unit_id}>
-            <div><b>{unit.unit_id}</b><strong>{unit.state === "adopted" ? "已采用" : unit.state === "waiting" ? "已返回，待核对" : unit.state === "failed" ? "执行失败" : unit.state}</strong></div>
+          return <article key={unit.branch_id}>
+            <div><b>{branch?.title || "办公工作包"}</b><strong>{unit.state === "adopted" ? "已采用" : unit.state === "waiting" ? "已返回，待核对" : unit.state === "failed" ? "执行失败" : unit.state === "ready" ? "可执行" : unit.state === "running" ? "执行中" : unit.state === "blocked" ? "被依赖阻塞" : "待处理"}</strong></div>
             <small>第 {unit.attempt} 次尝试 · {unit.depends_on.length ? `${unit.depends_on.length} 条前序依赖` : "无前序依赖"}</small>
-            {latest && <p><span>候选已返回</span> · {latest.gate_status === "adopted" ? "已采用" : "未采用"} · {latest.gate_reason}{latest.artifact_version ? ` · 成果版本 v${latest.artifact_version}` : ""}</p>}
+            {latest && <p><span>候选成果已返回</span> · {latest.gate_status === "adopted" ? "已采用" : "未采用"} · {latest.gate_reason}{latest.artifact_version ? ` · 成果版本 v${latest.artifact_version}` : ""}</p>}
             {!latest && unit.state === "failed" && unit.status_reason === "checkpoint_recovered_in_flight_worker" && <p>上次调用未确认返回，系统未自动重放；请确认后重新启动。</p>}
-            {latest && <small>{latest.approved_file_refs.map(fileLabel).join(" · ")} · Anchor {latest.evidence_anchors.length > 0 ? `${latest.evidence_anchors.length} 处` : "未形成"}</small>}
+            {latest && <small>{latest.approved_file_refs.map(fileLabel).join(" · ")} · 原文定位 {latest.evidence_anchors.length > 0 ? `${latest.evidence_anchors.length} 处` : "未形成"}</small>}
           </article>;
         })}
-        {run.contributions.some((item) => item.gate_status !== "adopted") && <small>部分结果可用：已采用 Contribution 与待核对/失败分支分别保留。</small>}
+        {run.contributions.some((item) => item.gate_status !== "adopted") && <small>部分结果可用：已采用成果与待核对/失败分支分别保留。</small>}
       </div>}
     </section>}
     {run.status === "failed" && <section className="loop-failure-recovery" role="alert">

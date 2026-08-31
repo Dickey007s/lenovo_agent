@@ -31,6 +31,7 @@ from services.api.app.application.readonly_workers import (
     ReadonlyWorkerContribution,
     ReadonlyWorkerRequest,
 )
+from services.api.app.application.workunit_ledger import WorkUnitState
 from services.api.app.main import create_app
 from tests.unit.test_demo2_runtime import _cross_function_catalog
 from tests.unit.test_harness_runtime import (
@@ -441,7 +442,12 @@ async def test_demo2_failure_wave_keeps_adopted_contributions_and_blocks_only_do
         assert sum(event.event_name == "contribution_recorded" for event in first.events) == 3
         assert first.last_commit is not None
         assert first.last_commit.artifact_version == 1
-        assert len(first.work_units) == 3
+        assert len(first.work_units) == 5
+        first_units = {item.unit_id: item for item in first.work_units}
+        assert [first_units[f"root-{index}"].state for index in (1, 2)] == [WorkUnitState.ADOPTED] * 2
+        assert first_units["root-3"].state == WorkUnitState.WAITING
+        assert first_units["dependent-ready"].state == WorkUnitState.READY
+        assert first_units["dependent-blocked"].state == WorkUnitState.BLOCKED
         assert len(first.contributions) == 3
         assert {item.gate_status for item in first.contributions} == {"adopted", "waiting"}
 
@@ -500,7 +506,13 @@ async def test_demo2_failure_wave_keeps_adopted_contributions_and_blocks_only_do
         statuses = {item.unit_id: item.status for item in second.branches}
         assert statuses["dependent-ready"] == "completed"
         assert statuses["dependent-blocked"] == "blocked"
-        assert len(second.work_units) == 4
+        assert len(second.work_units) == 5
+        second_units = {item.unit_id: item for item in second.work_units}
+        assert second_units["root-1"].state == WorkUnitState.ADOPTED
+        assert second_units["root-2"].state == WorkUnitState.ADOPTED
+        assert second_units["root-3"].state == WorkUnitState.WAITING
+        assert second_units["dependent-ready"].state == WorkUnitState.ADOPTED
+        assert second_units["dependent-blocked"].state == WorkUnitState.BLOCKED
         assert len(second.contributions) == 4
         assert any(event.event_name == "topology_workers_completed" for event in second.events)
     finally:

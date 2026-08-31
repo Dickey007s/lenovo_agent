@@ -2568,11 +2568,13 @@ function demo2Snapshot(body: { workspace_id: string; instruction: string }, wave
   const base = snapshot(body, wave === 2 ? "completed" : "waiting_input", 20) as any;
   const ids = ["demo2-root-a", "demo2-root-b", "demo2-root-c", "demo2-dependent-d", "demo2-dependent-e"];
   const makeBranch = (branchId: string, status: string, dependsOn: string[] = []) => ({
+    // Keep protocol identifiers in the mocked payload, but give the cockpit
+    // business-facing titles so the test catches accidental raw-ID rendering.
     branch_id: branchId,
     unit_id: branchId,
     round_number: 1,
     parent_branch_id: null,
-    title: `工作包 ${branchId}`,
+    title: ["独立资料核对一", "独立资料核对二", "独立资料核对三", "依赖结果复核一", "依赖结果复核二"][ids.indexOf(branchId)] ?? "办公工作包",
     objective: "只读核对批准来源并形成结构化贡献。",
     depends_on: dependsOn,
     input_file_refs: [workflowFile.file_ref],
@@ -2592,12 +2594,40 @@ function demo2Snapshot(body: { workspace_id: string; instruction: string }, wave
     worker_run_id: `worker-${branchId}`,
     branch_id: branchId,
     outcome: "adopted",
-    summary: `已核对 ${branchId} 的结构化贡献。`,
+    summary: "已完成一条独立资料的结构化核对。",
     source_file_refs: [workflowFile.file_ref],
     model_called: true,
     output_used: true,
     elapsed_ms: 120 + index,
     error: null,
+  }));
+  const workUnits = branches.map((branch) => ({
+    work_unit_id: branch.branch_id,
+    branch_id: branch.branch_id,
+    unit_id: branch.unit_id,
+    depends_on: branch.depends_on,
+    approved_file_refs: branch.input_file_refs,
+    state: branch.status === "completed" ? "adopted" : branch.status === "running" ? "ready" : branch.status,
+    attempt: workers.some((worker) => worker.branch_id === branch.branch_id) ? 1 : 0,
+    version: 1,
+    latest_contribution_id: workers.some((worker) => worker.branch_id === branch.branch_id) ? `contribution-${branch.branch_id}` : null,
+    returned_at: workers.some((worker) => worker.branch_id === branch.branch_id) ? new Date().toISOString() : null,
+    status_reason: null,
+  }));
+  const contributions = workers.map((worker) => ({
+    contribution_id: `contribution-${worker.branch_id}`,
+    work_unit_id: worker.branch_id,
+    branch_id: worker.branch_id,
+    attempt: 1,
+    worker_run_id: worker.worker_run_id,
+    approved_file_refs: worker.source_file_refs,
+    evidence_anchors: [{ file_ref: workflowFile.file_ref, role: "support", label: "服务端核对位置", locator_kind: "text_lines", start: 1, end: 1, excerpt: "class QueryAnalysisNode:" }],
+    model_receipt: { called: worker.model_called, output_used: worker.output_used, elapsed_ms: worker.elapsed_ms },
+    gate_status: "adopted",
+    gate_reason: "来源范围与原文定位已通过服务端核对。",
+    artifact_version: 1,
+    summary: worker.summary,
+    created_at: new Date().toISOString(),
   }));
   const ready = wave === 0 ? ids.slice(0, 3) : wave === 1 ? ids.slice(3) : [];
   const round = {
@@ -2609,7 +2639,7 @@ function demo2Snapshot(body: { workspace_id: string; instruction: string }, wave
     input_file_refs: [workflowFile.file_ref],
     branch_ids: ids,
     next_step: { decision: wave === 2 ? "completed" : "waiting_input", reason: wave === 1 ? "下一波 ready 分支已准备。" : "等待确认只读 Worker。", next_question: null, candidate_file_refs: [workflowFile.file_ref], candidate_branch_ids: ready, ready_branch_ids: ready, evidence_resolutions: [] },
-    result: wave === 2 ? { summary: "5 个工作包的只读贡献已按服务端证据门合入。", findings: ids.map((id) => ({ finding_id: `finding-${id}`, title: `贡献 ${id}`, detail: "服务端已采用该分支贡献。", file_refs: [workflowFile.file_ref], evidence_anchor: { file_ref: workflowFile.file_ref, locator_kind: "text_lines", start: 1, end: 1, excerpt: "class QueryAnalysisNode:" } })), follow_ups: [], review_required: true } : null,
+    result: wave === 2 ? { summary: "5 个工作包的只读贡献已按服务端证据门合入。", findings: ids.map((_id, index) => ({ finding_id: `finding-${index + 1}`, title: `第 ${index + 1} 条核对结果`, detail: "服务端已采用该分支贡献。", file_refs: [workflowFile.file_ref], evidence_anchor: { file_ref: workflowFile.file_ref, locator_kind: "text_lines", start: 1, end: 1, excerpt: "class QueryAnalysisNode:" } })), follow_ups: [], review_required: true } : null,
   };
   return {
     ...base,
@@ -2623,6 +2653,8 @@ function demo2Snapshot(body: { workspace_id: string; instruction: string }, wave
     branches,
     topology_admission: { mode: "adaptive_readonly_workers", work_unit_breadth: 5, independent_branch_count: 3, dependency_parallelism: 3, source_span: 1, remaining_model_calls: 24, remaining_time_seconds: 7000, external_action: "none", reasons: ["3 条独立分支可并行，依赖分支将在首波完成后 ready。"], user_confirmation_required: true },
     worker_runs: workers,
+    work_units: workUnits,
+    contributions,
     shared_artifacts: workers.length ? [{ artifact_id: "artifact-demo2", version: wave, adopted_worker_run_ids: workers.map((item) => item.worker_run_id), waiting_branch_ids: wave === 1 ? ids.slice(3) : [], failed_worker_run_ids: [], external_action: "none" }] : [],
     result: wave === 2 ? round.result : null,
     artifact_versions: wave === 2 ? [{ ...base.artifact_versions[0], artifact_id: "artifact-demo2", version: 2, finding_count: 5, findings: round.result.findings, source_file_refs: [workflowFile.file_ref] }] : [],
@@ -4877,25 +4909,28 @@ test.describe("Demo 1/2 runtime acceptance", () => {
     await page.getByRole("button", { name: "启动 Control Loop" }).click();
     await page.getByRole("button", { name: "Agent 路径" }).click();
     const admission = page.locator('[data-testid="topology-admission"]');
-    await expect(admission).toContainText("已准入受限只读 Workers");
+    await expect(admission).toContainText("已准入受限只读执行器");
     await expect(admission).toContainText("3 条独立分支可并行");
     const admissionTextSizes = await admission.locator('h3, header > b, .loop-topology-facts, .loop-topology-facts b, .loop-worker-receipts > span, .loop-worker-receipts > div, .loop-worker-receipts small').evaluateAll((nodes) => nodes.map((node) => Number.parseFloat(getComputedStyle(node).fontSize)));
     expect(admissionTextSizes.length).toBeGreaterThan(0);
     expect(Math.min(...admissionTextSizes)).toBeGreaterThanOrEqual(12);
-    await expect(admission.getByRole("button", { name: "确认并启动只读 Worker" })).toBeEnabled();
-    await admission.getByRole("button", { name: "确认并启动只读 Worker" }).click();
-    await expect(admission).toContainText("实际 Worker 回执");
+    await expect(admission.getByRole("button", { name: "确认并启动只读执行器" })).toBeEnabled();
+    await admission.getByRole("button", { name: "确认并启动只读执行器" }).click();
+    await expect(admission).toContainText("实际执行回执");
     await expect(admission).toContainText("已合入");
-    await expect(admission.getByRole("button", { name: "继续下一批只读 Worker" })).toBeEnabled();
-    await admission.getByRole("button", { name: "继续下一批只读 Worker" }).click();
-    await expect(admission).toContainText("demo2-dependent-d");
+    await expect(admission.getByRole("button", { name: "继续下一批只读执行器" })).toBeEnabled();
+    await admission.getByRole("button", { name: "继续下一批只读执行器" }).click();
+    await expect(admission).toContainText("依赖结果复核一");
+    await expect(admission).not.toContainText("demo2-root-");
+    await expect(admission).not.toContainText("demo2-dependent-");
+    await expect(admission).not.toContainText("u1");
     await expect(page.locator(".loop-round-result")).toContainText("5 个工作包");
     await page.setViewportSize({ width: 390, height: 844 });
     const mobileOverflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
     expect(mobileOverflow).toBeLessThanOrEqual(0);
     const mobileAdmissionSizes = await admission.locator('.loop-topology-facts, .loop-worker-receipts > div, .loop-worker-receipts small').evaluateAll((nodes) => nodes.map((node) => Number.parseFloat(getComputedStyle(node).fontSize)));
     expect(Math.min(...mobileAdmissionSizes)).toBeGreaterThanOrEqual(12);
-    await expect(admission.getByText("实际 Worker 回执")).toBeVisible();
+    await expect(admission.getByText("实际执行回执")).toBeVisible();
   });
 
   test("Task Ledger success sends both versions and renders the child as current", async ({ page }) => {
