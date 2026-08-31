@@ -21,6 +21,7 @@ from packages.contracts.harness_models import (
 )
 from services.api.app.api.harness_routes import get_harness_runtime
 from services.api.app.application.harness_runtime import (
+    HarnessConflictError,
     HarnessPlanCandidate,
     HarnessPlanCandidateUnit,
     HarnessRunStart,
@@ -233,7 +234,11 @@ async def test_demo1_http_continuation_preserves_parent_and_limits_changed_sourc
 class FiveUnitFailurePlanner:
     model = "test-planner"
 
+    def __init__(self) -> None:
+        self.calls = 0
+
     async def plan(self, *, scenario, files):
+        self.calls += 1
         refs = [str(item["file_ref"]) for item in files]
         return HarnessPlanCandidate(
             summary="三条独立分支与两条依赖分支",
@@ -274,7 +279,20 @@ async def test_demo2_failure_wave_keeps_adopted_contributions_and_blocks_only_do
     """A mixed worker wave creates a partial v1, not a group failure."""
 
     owner = "demo2-acceptance-owner"
-    runtime = HarnessRuntime(_cross_function_catalog(), FiveUnitFailurePlanner(), FakeAnalyst())
+    planner = FiveUnitFailurePlanner()
+
+    class CountingAnalyst(FakeAnalyst):
+        def __init__(self) -> None:
+            super().__init__()
+            self.calls = 0
+
+        async def analyze(self, **kwargs):
+            self.calls += 1
+            kwargs.pop("verified_effect_context", None)
+            return await super().analyze(**kwargs)
+
+    analyst = CountingAnalyst()
+    runtime = HarnessRuntime(_cross_function_catalog(), planner, analyst)
     try:
         started = await runtime.start(
             owner,
@@ -291,9 +309,13 @@ async def test_demo2_failure_wave_keeps_adopted_contributions_and_blocks_only_do
         assert set(roots) == {"root-1", "root-2", "root-3"}
         assert len(waiting.worker_runs) == 0
         assert any(event.event_name == "topology_confirmation_required" for event in waiting.events)
-        planner_calls = getattr(runtime.planner, "calls", None)
+        assert planner.calls == 1
+        assert analyst.calls == 0
+        worker_calls = 0
 
         async def handler(request: ReadonlyWorkerRequest) -> ReadonlyWorkerContribution:
+            nonlocal worker_calls
+            worker_calls += 1
             branch = next(item for item in waiting.branches if item.branch_id == request.branch_id)
             adopted = branch.unit_id in {"root-1", "root-2", "dependent-ready"}
             if not adopted:
@@ -348,7 +370,9 @@ async def test_demo2_failure_wave_keeps_adopted_contributions_and_blocks_only_do
             handler=handler,
             user_confirmed=True,
         )
-        assert planner_calls == getattr(runtime.planner, "calls", None)
+        assert planner.calls == 1
+        assert analyst.calls == 0
+        assert worker_calls == 3
         assert first.status == "waiting_input"
         assert len(first.worker_runs) == 3
         assert len(first.artifact_versions) == 1
@@ -375,6 +399,26 @@ async def test_demo2_failure_wave_keeps_adopted_contributions_and_blocks_only_do
         ready = next(item for item in first.branches if item.unit_id == "dependent-ready")
         blocked = next(item for item in first.branches if item.unit_id == "dependent-blocked")
         assert blocked.status == "blocked"
+        blocked_before = first.model_dump(mode="json")
+        with pytest.raises(HarnessConflictError):
+            await runtime.execute_admitted_readonly_workers(
+                owner,
+                started.run.run_id,
+                expected_version=first.version,
+                idempotency_key="demo2-acceptance-blocked-0001",
+                worker_requests=[
+                    ReadonlyWorkerRequest(
+                        worker_run_id="acceptance-worker-dependent-blocked",
+                        branch_id=blocked.branch_id,
+                        goal=blocked.objective,
+                        source_file_refs=tuple(blocked.input_file_refs),
+                        expected_version=first.version,
+                    )
+                ],
+                handler=handler,
+                user_confirmed=True,
+            )
+        assert (await runtime.get(owner, started.run.run_id)).model_dump(mode="json") == blocked_before
         second = await runtime.execute_admitted_readonly_workers(
             owner,
             started.run.run_id,
@@ -397,6 +441,9 @@ async def test_demo2_failure_wave_keeps_adopted_contributions_and_blocks_only_do
         assert second.artifact_versions[1].finding_count == 3
         assert second.last_commit is not None and second.last_commit.artifact_version == 2
         assert len(second.worker_runs) == 4
+        assert worker_calls == 4
+        assert analyst.calls == 0
+        assert planner.calls == 1
         statuses = {item.unit_id: item.status for item in second.branches}
         assert statuses["dependent-ready"] == "completed"
         assert statuses["dependent-blocked"] == "blocked"
@@ -448,14 +495,24 @@ async def test_demo2_same_schema_three_period_finance_stays_fixed_without_worker
 
     owner = "demo2-finance-acceptance-owner"
     planner = ThreePeriodPlanner()
-    analyst = FakeAnalyst()
+    class CountingAnalyst(FakeAnalyst):
+        def __init__(self) -> None:
+            super().__init__()
+            self.calls = 0
+
+        async def analyze(self, **kwargs):
+            self.calls += 1
+            kwargs.pop("verified_effect_context", None)
+            return await super().analyze(**kwargs)
+
+    analyst = CountingAnalyst()
     runtime = HarnessRuntime(ThreePeriodFinanceCatalog(), planner, analyst)
     try:
         started = await runtime.start(
             owner,
             HarnessRunStart(
                 idempotency_key="demo2-finance-start-0001",
-                instruction="顺序核对三期同结构财务明细",
+                instruction="顺序核对三期同结构财务明细，请用多个 Agent 并行处理。",
                 loop={"max_rounds": 1, "max_files_per_round": 3, "max_model_calls": 6, "deadline_seconds": 120},
             ),
         )
@@ -473,6 +530,11 @@ async def test_demo2_same_schema_three_period_finance_stays_fixed_without_worker
         assert planner.calls == 1
         assert final.model_receipt is not None and final.model_receipt.called is True
         assert final.analysis_receipt is not None and final.analysis_receipt.called is True
+        assert analyst.calls == 1
+        assert not any(
+            "worker" in event.event_name or "contribution" in event.event_name
+            for event in final.events
+        )
         assert final.status != "failed"
     finally:
         await runtime.close()
