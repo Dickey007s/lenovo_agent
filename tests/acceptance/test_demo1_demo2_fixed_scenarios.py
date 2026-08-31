@@ -313,15 +313,15 @@ class FiveUnitFailurePlanner:
                     title="统一待办建议",
                     objective="基于已采用的跨职能事实形成统一待办建议。",
                     input_file_refs=[refs[0]],
-                    depends_on=["root-3"],
+                    depends_on=["root-2"],
                     tool="file.read",
                 ),
                 HarnessPlanCandidateUnit(
                     unit_id="dependent-ready",
                     title="跨工作包优先级与影响核对",
                     objective="汇总已采用工作包，核对跨职能优先级与影响。",
-                    input_file_refs=[refs[1]],
-                    depends_on=["root-1"],
+                    input_file_refs=[refs[0], refs[2 % len(refs)]],
+                    depends_on=["root-1", "root-3"],
                     tool="file.read",
                 ),
             ],
@@ -371,7 +371,7 @@ async def test_demo2_failure_wave_keeps_adopted_contributions_and_blocks_only_do
             nonlocal worker_calls
             worker_calls += 1
             branch = next(item for item in waiting.branches if item.branch_id == request.branch_id)
-            adopted = branch.unit_id in {"root-1", "root-2", "dependent-ready"}
+            adopted = branch.unit_id in {"root-1", "root-3", "dependent-ready"}
             if not adopted:
                 return ReadonlyWorkerContribution(
                     worker_run_id=request.worker_run_id,
@@ -432,12 +432,16 @@ async def test_demo2_failure_wave_keeps_adopted_contributions_and_blocks_only_do
         assert len(first.artifact_versions) == 1
         assert first.artifact_versions[0].version == 1
         assert first.artifact_versions[0].finding_count == 2
+        assert {finding.title for finding in first.artifact_versions[0].findings} == {
+            "产品上线 Gate 已核对",
+            "交互痛点证据 已核对",
+        }
         assert first.shared_artifacts[-1].version == 1
         assert {item.outcome for item in first.worker_runs} == {"adopted", "ambiguous"}
         branches = {item.unit_id: item for item in first.branches}
         assert branches["root-1"].status == "completed"
-        assert branches["root-2"].status == "completed"
-        assert branches["root-3"].status == "waiting_input"
+        assert branches["root-2"].status == "waiting_input"
+        assert branches["root-3"].status == "completed"
         assert branches["dependent-ready"].status == "running"
         assert branches["dependent-blocked"].status == "blocked"
         assert set(first.rounds[-1].next_step.ready_branch_ids) == {branches["dependent-ready"].branch_id}
@@ -448,12 +452,14 @@ async def test_demo2_failure_wave_keeps_adopted_contributions_and_blocks_only_do
         assert first.last_commit.artifact_version == 1
         assert len(first.work_units) == 5
         first_units = {item.unit_id: item for item in first.work_units}
-        assert [first_units[f"root-{index}"].state for index in (1, 2)] == [WorkUnitState.ADOPTED] * 2
-        assert first_units["root-3"].state == WorkUnitState.WAITING
+        assert first_units["root-1"].state == WorkUnitState.ADOPTED
+        assert first_units["root-2"].state == WorkUnitState.WAITING
+        assert first_units["root-3"].state == WorkUnitState.ADOPTED
         assert first_units["dependent-ready"].state == WorkUnitState.READY
         assert first_units["dependent-blocked"].state == WorkUnitState.BLOCKED
         assert len(first.contributions) == 3
         assert {item.gate_status for item in first.contributions} == {"adopted", "waiting"}
+        assert all(item.branch_id != branches["dependent-blocked"].branch_id for item in first.contributions)
 
         # The ready dependent is the only legal second-wave dispatch.  The
         # ambiguous root keeps its downstream blocked and cannot be smuggled
@@ -502,6 +508,7 @@ async def test_demo2_failure_wave_keeps_adopted_contributions_and_blocks_only_do
         assert [item.version for item in second.artifact_versions] == [1, 2]
         assert second.artifact_versions[0].model_dump(mode="json") == v1_dump
         assert second.artifact_versions[1].finding_count == 3
+        assert any(finding.title == "跨工作包优先级与影响核对 已核对" for finding in second.artifact_versions[1].findings)
         assert second.last_commit is not None and second.last_commit.artifact_version == 2
         assert len(second.worker_runs) == 4
         assert worker_calls == 4
@@ -513,8 +520,8 @@ async def test_demo2_failure_wave_keeps_adopted_contributions_and_blocks_only_do
         assert len(second.work_units) == 5
         second_units = {item.unit_id: item for item in second.work_units}
         assert second_units["root-1"].state == WorkUnitState.ADOPTED
-        assert second_units["root-2"].state == WorkUnitState.ADOPTED
-        assert second_units["root-3"].state == WorkUnitState.WAITING
+        assert second_units["root-2"].state == WorkUnitState.WAITING
+        assert second_units["root-3"].state == WorkUnitState.ADOPTED
         assert second_units["dependent-ready"].state == WorkUnitState.ADOPTED
         assert second_units["dependent-blocked"].state == WorkUnitState.BLOCKED
         assert len(second.contributions) == 4
