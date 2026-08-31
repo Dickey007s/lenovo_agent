@@ -236,6 +236,12 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, summary:focus
 .loop-worker-receipts > div { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 8px; align-items: baseline; padding-top: 5px; border-top: 1px solid #edf1f5; font-size: 13px; line-height: 1.55; }
 .loop-worker-receipts > div > b { color: var(--green, #247443); }
 .loop-worker-receipts small { font-size: 12px; line-height: 1.5; white-space: normal; }
+.loop-worker-ledger { display: grid; gap: 6px; margin-top: 10px; }
+.loop-worker-ledger > span { color: var(--blue); font-size: 13px; font-weight: 750; }
+.loop-worker-ledger article { min-width: 0; padding: 7px 0 0; border-top: 1px solid #edf1f5; font-size: 13px; line-height: 1.5; }
+.loop-worker-ledger article > div { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px; }
+.loop-worker-ledger article strong { color: var(--green, #247443); font-size: 13px; }
+.loop-worker-ledger article p, .loop-worker-ledger article small { margin: 2px 0 0; color: var(--muted); font-size: 12px; line-height: 1.5; overflow-wrap: anywhere; }
 .loop-worker-confirmation { display: grid; gap: 8px; margin-top: 8px; }
 .loop-worker-confirmation > div { display: flex; flex-wrap: wrap; gap: 8px; }
 .loop-worker-confirmation button { display: inline-flex; align-items: center; gap: 5px; }

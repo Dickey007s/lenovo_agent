@@ -440,6 +440,9 @@ async def test_demo2_failure_wave_keeps_adopted_contributions_and_blocks_only_do
         assert any(event.event_name == "contribution_waiting" for event in first.events)
         assert first.last_commit is not None
         assert first.last_commit.artifact_version == 1
+        assert len(first.work_units) == 3
+        assert len(first.contributions) == 3
+        assert {item.gate_status for item in first.contributions} == {"adopted", "waiting"}
 
         # The ready dependent is the only legal second-wave dispatch.  The
         # ambiguous root keeps its downstream blocked and cannot be smuggled
@@ -496,6 +499,8 @@ async def test_demo2_failure_wave_keeps_adopted_contributions_and_blocks_only_do
         statuses = {item.unit_id: item.status for item in second.branches}
         assert statuses["dependent-ready"] == "completed"
         assert statuses["dependent-blocked"] == "blocked"
+        assert len(second.work_units) == 4
+        assert len(second.contributions) == 4
         assert any(event.event_name == "topology_workers_completed" for event in second.events)
     finally:
         await runtime.close()
@@ -575,6 +580,8 @@ async def test_demo2_same_schema_three_period_finance_stays_fixed_without_worker
         assert final.topology_admission.mode == "fixed_workflow"
         assert final.topology_admission.user_confirmation_required is False
         assert final.worker_runs == []
+        assert final.work_units == []
+        assert final.contributions == []
         assert not any(event.event_name == "topology_confirmation_required" for event in final.events)
         assert planner.calls == 1
         assert final.model_receipt is not None and final.model_receipt.called is True

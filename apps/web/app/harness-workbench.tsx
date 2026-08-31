@@ -1175,6 +1175,8 @@ export type HarnessRun = {
   topology_admission: TopologyAdmission | null;
   worker_runs: WorkerRunReceipt[];
   shared_artifacts: SharedArtifactReceipt[];
+  work_units: WorkUnitReceipt[];
+  contributions: ContributionReceipt[];
 };
 
 type TaskPointer = {
@@ -1223,6 +1225,35 @@ type SharedArtifactReceipt = {
   external_action: "none";
 };
 
+type WorkUnitReceipt = {
+  work_unit_id: string;
+  branch_id: string;
+  unit_id: string;
+  depends_on: string[];
+  approved_file_refs: string[];
+  state: string;
+  attempt: number;
+  version: number;
+  latest_contribution_id: string | null;
+  returned_at: string | null;
+};
+
+type ContributionReceipt = {
+  contribution_id: string;
+  work_unit_id: string;
+  branch_id: string;
+  attempt: number;
+  worker_run_id: string;
+  approved_file_refs: string[];
+  evidence_anchors: Array<Record<string, unknown>>;
+  model_receipt: { called: boolean; output_used: boolean; elapsed_ms: number };
+  gate_status: string;
+  gate_reason: string;
+  artifact_version: number | null;
+  summary: string;
+  created_at: string;
+};
+
 export type HarnessActivityItem = {
   sequence: number;
   eventName: string;
@@ -1266,6 +1297,11 @@ const NAMED_EVENTS = [
   "plan_validation",
   "topology_admission",
   "topology_confirmation_required",
+  "worker_wave_reserved",
+  "work_unit_started",
+  "contribution_recorded",
+  "work_unit_failed",
+  "worker_wave_committed",
   "worker_returned",
   "contribution_adopted",
   "contribution_waiting",
@@ -3295,6 +3331,32 @@ function normalizeRun(value: unknown): HarnessRun | null {
     const artifact = item as Record<string, unknown>; const artifactId = asText(artifact.artifact_id);
     return artifactId ? [{ artifact_id: artifactId, version: asNumber(artifact.version, 1), adopted_worker_run_ids: asStrings(artifact.adopted_worker_run_ids), waiting_branch_ids: asStrings(artifact.waiting_branch_ids), failed_worker_run_ids: asStrings(artifact.failed_worker_run_ids), external_action: "none" }] : [];
   }) : [];
+  const workUnits = Array.isArray(raw.work_units) ? raw.work_units.flatMap((item): WorkUnitReceipt[] => {
+    if (!item || typeof item !== "object") return [];
+    const unit = item as Record<string, unknown>; const id = asText(unit.work_unit_id);
+    return id ? [{
+      work_unit_id: id, branch_id: asText(unit.branch_id), unit_id: asText(unit.unit_id),
+      depends_on: asStrings(unit.depends_on), approved_file_refs: asStrings(unit.approved_file_refs),
+      state: asText(unit.state, "pending"), attempt: asNumber(unit.attempt), version: asNumber(unit.version, 1),
+      latest_contribution_id: asText(unit.latest_contribution_id) || null,
+      returned_at: asText(unit.returned_at) || null,
+    }] : [];
+  }) : [];
+  const contributions = Array.isArray(raw.contributions) ? raw.contributions.flatMap((item): ContributionReceipt[] => {
+    if (!item || typeof item !== "object") return [];
+    const record = item as Record<string, unknown>; const id = asText(record.contribution_id);
+    const receipt = record.model_receipt && typeof record.model_receipt === "object" ? record.model_receipt as Record<string, unknown> : {};
+    return id ? [{
+      contribution_id: id, work_unit_id: asText(record.work_unit_id), branch_id: asText(record.branch_id),
+      attempt: asNumber(record.attempt, 1), worker_run_id: asText(record.worker_run_id),
+      approved_file_refs: asStrings(record.approved_file_refs),
+      evidence_anchors: Array.isArray(record.evidence_anchors) ? record.evidence_anchors.filter((anchor): anchor is Record<string, unknown> => Boolean(anchor && typeof anchor === "object")) : [],
+      model_receipt: { called: receipt.called === true, output_used: receipt.output_used === true, elapsed_ms: asNumber(receipt.elapsed_ms) },
+      gate_status: asText(record.gate_status, "waiting"), gate_reason: asText(record.gate_reason),
+      artifact_version: typeof record.artifact_version === "number" ? record.artifact_version : null,
+      summary: asText(record.summary), created_at: asText(record.created_at),
+    }] : [];
+  }) : [];
   return {
     run_id: runId,
     task_id: asText(raw.task_id, "task-000000000000"),
@@ -3363,6 +3425,8 @@ function normalizeRun(value: unknown): HarnessRun | null {
     topology_admission: topologyAdmission,
     worker_runs: workerRuns,
     shared_artifacts: sharedArtifacts,
+    work_units: workUnits,
+    contributions,
   };
 }
 
@@ -4794,6 +4858,20 @@ function LoopView({
         </div>
       </div>}
       {run.worker_runs.length > 0 && <div className="loop-worker-receipts"><span>实际 Worker 回执</span>{run.worker_runs.map((worker) => <div key={worker.worker_run_id}><b>{worker.outcome === "adopted" ? "已合入" : worker.outcome === "failed" ? "执行失败" : "待处理"}</b><span>{worker.summary}</span><small>{worker.model_called ? "模型已调用" : "未调用"} · {worker.output_used ? "已采用" : "未采用"} · {worker.elapsed_ms} ms</small></div>)}</div>}
+      {run.work_units.length > 0 && <div className="loop-worker-ledger" data-testid="worker-ledger">
+        <span>工作包与 Contribution Ledger</span>
+        {run.work_units.slice().sort((left, right) => left.work_unit_id.localeCompare(right.work_unit_id)).map((unit) => {
+          const records = run.contributions.filter((item) => item.work_unit_id === unit.work_unit_id);
+          const latest = records[records.length - 1];
+          return <article key={unit.work_unit_id}>
+            <div><b>{unit.unit_id}</b><strong>{unit.state === "adopted" ? "已采用" : unit.state === "waiting" ? "已返回，待核对" : unit.state === "failed" ? "执行失败" : unit.state}</strong></div>
+            <small>WorkUnit {unit.work_unit_id} · 第 {unit.attempt} 次尝试 · Branch 依赖 {unit.depends_on.length || "无"}</small>
+            {latest && <p><span>Contribution 已返回</span> · {latest.gate_status === "adopted" ? "已采用" : "未采用"} · {latest.gate_reason}{latest.artifact_version ? ` · ArtifactVersion v${latest.artifact_version}` : ""}</p>}
+            {latest && <small>{latest.approved_file_refs.map(fileLabel).join(" · ")} · Anchor {latest.evidence_anchors.length > 0 ? `${latest.evidence_anchors.length} 处` : "未形成"}</small>}
+          </article>;
+        })}
+        {run.contributions.some((item) => item.gate_status !== "adopted") && <small>部分结果可用：已采用 Contribution 与待核对/失败分支分别保留。</small>}
+      </div>}
     </section>}
     {run.status === "failed" && <section className="loop-failure-recovery" role="alert">
       <header><IconAlertTriangle aria-hidden="true" /><div><span>这次运行已停下，但不是死路</span><h3>{failedAtSourceLocation ? "候选结论无法唯一定位到原文" : "本轮结果没有通过服务端校验"}</h3></div></header>
