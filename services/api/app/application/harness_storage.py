@@ -570,11 +570,17 @@ class PostgresHarnessStateStore:
                         )
                 if expected_parent_run_id is not None:
                     await cursor.execute(
-                        "SELECT snapshot->>'version' FROM harness_run_state WHERE owner_id=%s AND run_id=%s FOR UPDATE",
+                        "SELECT snapshot->'version' FROM harness_run_state WHERE owner_id=%s AND run_id=%s FOR UPDATE",
                         (run.owner_id, expected_parent_run_id),
                     )
                     parent = await cursor.fetchone()
-                    if parent is None or int(parent[0]) != expected_parent_version:
+                    raw_parent_version = parent[0] if parent is not None else None
+                    parent_version = (
+                        raw_parent_version
+                        if isinstance(raw_parent_version, int) and not isinstance(raw_parent_version, bool)
+                        else None
+                    )
+                    if parent_version is None or parent_version != expected_parent_version:
                         raise TaskLedgerConflict("parent Run version CAS failed")
                 if expected_task_version is None:
                     await cursor.execute(

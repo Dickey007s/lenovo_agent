@@ -57,6 +57,7 @@ def _run(owner: str, task: TaskRecord, *, run_id: str | None = None, parent_run_
             "run_sequence": task.run_sequence,
             "parent_run_id": parent_run_id,
             "owner_id": owner,
+            "version": 1,
         },
     )
 
@@ -265,6 +266,44 @@ async def test_task_ledger_stale_parent_version_rolls_back_continuation() -> Non
             )
         assert await store.load_task_records() == before_tasks
         assert await store.load_runs() == before_runs
+
+        malformed_versions = (
+            "jsonb_set(snapshot, '{version}', 'null'::jsonb, true)",
+            "jsonb_set(snapshot, '{version}', to_jsonb('not-an-integer'::text), true)",
+            "snapshot - 'version'",
+        )
+        for index, expression in enumerate(malformed_versions, start=1):
+            async with await psycopg.AsyncConnection.connect(DATABASE_DSN) as connection:
+                async with connection.cursor() as cursor:
+                    await cursor.execute(
+                        f"UPDATE harness_run_state SET snapshot = {expression} "
+                        "WHERE owner_id = %s AND run_id = %s",  # nosec B608
+                        (owner, initial.current_run_id),
+                    )
+            before_tasks = await store.load_task_records()
+            before_runs = await store.load_runs()
+            before_idempotency = await store.load_idempotency()
+            malformed_child = _task(owner, version=2)
+            malformed_child = malformed_child.model_copy(
+                update={"parent_run_id": initial.current_run_id}
+            )
+            with pytest.raises(TaskLedgerConflict, match="parent Run version"):
+                await store.commit_task_transition(
+                    _run(owner, malformed_child, parent_run_id=initial.current_run_id),
+                    malformed_child,
+                    expected_task_version=1,
+                    expected_parent_run_id=initial.current_run_id,
+                    expected_parent_version=1,
+                    idempotency=_idem(
+                        owner,
+                        f"ledger-malformed-parent-{index}",
+                        f"malformed-parent-{index}",
+                        _run(owner, malformed_child, parent_run_id=initial.current_run_id),
+                    ),
+                )
+            assert await store.load_task_records() == before_tasks
+            assert await store.load_runs() == before_runs
+            assert await store.load_idempotency() == before_idempotency
     finally:
         await store.close()
         await _cleanup(owner)
@@ -322,6 +361,8 @@ async def test_task_ledger_current_and_lineage_survive_restart() -> None:
                 created_at=datetime.now(timezone.utc),
             ),
             task_digest="lineage-child",
+            expected_parent_run_id=initial.current_run_id,
+            expected_parent_version=1,
         )
         await store.close()
         restored = PostgresHarnessStateStore(DATABASE_DSN)
