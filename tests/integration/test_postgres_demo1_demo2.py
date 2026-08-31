@@ -53,6 +53,8 @@ async def _cleanup(owner: str) -> None:
     async with await psycopg.AsyncConnection.connect(DATABASE_DSN) as connection:
         async with connection.cursor() as cursor:
             for table in (
+                "harness_task_ledger_receipt",
+                "harness_task_ledger",
                 "harness_idempotency",
                 "harness_task_commit",
                 "harness_artifact_version",

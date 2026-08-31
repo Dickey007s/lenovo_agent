@@ -145,6 +145,7 @@ async def test_demo1_http_continuation_preserves_parent_and_limits_changed_sourc
                     json={
                         "branch_id": branch.branch_id,
                         "expected_version": parent.version,
+                        "expected_task_version": parent.task_version,
                         "idempotency_key": "demo1-acceptance-child-0001",
                         "instruction": "请重新检查整个资料库并扩大范围。",
                     },
@@ -179,6 +180,7 @@ async def test_demo1_http_continuation_preserves_parent_and_limits_changed_sourc
                     json={
                         "branch_id": branch.branch_id,
                         "expected_version": parent.version,
+                        "expected_task_version": parent.task_version,
                         "idempotency_key": "demo1-acceptance-child-0001",
                         "instruction": "请重新检查整个资料库并扩大范围。",
                     },
@@ -189,6 +191,7 @@ async def test_demo1_http_continuation_preserves_parent_and_limits_changed_sourc
                     json={
                         "branch_id": branch.branch_id,
                         "expected_version": parent.version - 1,
+                        "expected_task_version": parent.task_version,
                         "idempotency_key": "demo1-acceptance-stale-0001",
                     },
                 )
@@ -198,6 +201,7 @@ async def test_demo1_http_continuation_preserves_parent_and_limits_changed_sourc
                     json={
                         "branch_id": branch.branch_id,
                         "expected_version": parent.version,
+                        "expected_task_version": parent.task_version,
                         "idempotency_key": "demo1-acceptance-owner-0001",
                     },
                 )
@@ -217,14 +221,14 @@ async def test_demo1_http_continuation_preserves_parent_and_limits_changed_sourc
                     json={
                         "branch_id": branch.branch_id,
                         "expected_version": parent.version,
+                        "expected_task_version": 2,
                         "idempotency_key": "demo1-acceptance-child-0002",
                     },
                 )
-            assert unchanged_response.status_code == 202, unchanged_response.text
-            unchanged_child = unchanged_response.json()["run"]
-            assert unchanged_child["task_id"] == parent_task_id
-            assert unchanged_child["source_revision_changed"] is False
-            assert unchanged_child["recheck_file_refs"] == carried_refs
+            # The task pointer now targets the first child; attempting to
+            # continue the historical parent is rejected even at the same
+            # source revision, so no second child can fork stale lineage.
+            assert unchanged_response.status_code == 409, unchanged_response.text
         finally:
             app.dependency_overrides.clear()
     finally:

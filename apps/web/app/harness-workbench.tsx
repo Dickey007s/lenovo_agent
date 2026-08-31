@@ -1131,6 +1131,7 @@ export type HarnessPlanNode = {
 export type HarnessRun = {
   run_id: string;
   task_id: string;
+  task_version: number;
   run_sequence: number;
   parent_run_id: string | null;
   continuation_reason: string | null;
@@ -1174,6 +1175,18 @@ export type HarnessRun = {
   topology_admission: TopologyAdmission | null;
   worker_runs: WorkerRunReceipt[];
   shared_artifacts: SharedArtifactReceipt[];
+};
+
+type TaskPointer = {
+  task_id: string;
+  task_version: number;
+  current_run_id: string;
+  run_sequence: number;
+  parent_run_id: string | null;
+  current_artifact_id: string | null;
+  current_artifact_version: number | null;
+  current_commit_id: string | null;
+  lineage: Array<{ run_id: string; run_sequence: number; parent_run_id: string | null; status: string }>;
 };
 
 type TopologyAdmission = {
@@ -3285,6 +3298,7 @@ function normalizeRun(value: unknown): HarnessRun | null {
   return {
     run_id: runId,
     task_id: asText(raw.task_id, "task-000000000000"),
+    task_version: asNumber(raw.task_version, 1),
     run_sequence: asNumber(raw.run_sequence, 1),
     parent_run_id: asText(raw.parent_run_id) || null,
     continuation_reason: asText(raw.continuation_reason) || null,
@@ -3975,6 +3989,7 @@ export function HarnessWorkbench({ onActivityChange }: { onActivityChange?: (sta
   const [reviewRequest, setReviewRequest] = useState<EvidenceReviewRequest | null>(null);
   const [view, setView] = useState<WorkspaceView>("data");
   const [run, setRun] = useState<HarnessRun | null>(null);
+  const [taskPointer, setTaskPointer] = useState<TaskPointer | null>(null);
   const [workspaceStatus, setWorkspaceStatus] = useState<WorkspaceStatus>("checking");
   const [workspaceError, setWorkspaceError] = useState("");
   const [starting, setStarting] = useState(false);
@@ -4023,6 +4038,7 @@ export function HarnessWorkbench({ onActivityChange }: { onActivityChange?: (sta
     lastSequenceRef.current = switchedRun ? snapshot.last_event_sequence : Math.max(lastSequenceRef.current, snapshot.last_event_sequence);
     window.sessionStorage.setItem(RUN_SESSION_KEY, snapshot.run_id);
     setRun(snapshot);
+    refreshTaskPointer(snapshot.task_id, generation);
     if (snapshot.events.length) setConnection(TERMINAL_STATUSES.has(snapshot.status) ? "available" : "live");
     return true;
   }
@@ -4033,6 +4049,40 @@ export function HarnessWorkbench({ onActivityChange }: { onActivityChange?: (sta
     const snapshot = normalizeRun(await response.json());
     if (!snapshot) throw new Error("任务状态格式无效");
     return applySnapshot(snapshot, generation) ? snapshot : runRef.current;
+  }
+
+  function refreshTaskPointer(taskId: string, generation: number) {
+    void fetch(`${API_BASE}/v1/harness/tasks/${encodeURIComponent(taskId)}`, { headers: HEADERS })
+      .then((response) => response.ok ? response.json() as Promise<unknown> : null)
+      .then((payload) => {
+        if (generation !== generationRef.current || !payload || typeof payload !== "object") return;
+        const raw = payload as Record<string, unknown>;
+        const currentRunId = asText(raw.current_run_id);
+        if (!currentRunId) return;
+        const returnedTaskId = asText(raw.task_id);
+        if (returnedTaskId !== taskId) return;
+        const lineage = Array.isArray(raw.lineage)
+          ? raw.lineage.filter((item): item is Record<string, unknown> => Boolean(item && typeof item === "object"))
+            .map((item) => ({
+              run_id: asText(item.run_id),
+              run_sequence: asNumber(item.run_sequence, 1),
+              parent_run_id: asText(item.parent_run_id) || null,
+              status: asText(item.status, "unknown"),
+            })).filter((item) => item.run_id)
+          : [];
+        setTaskPointer({
+          task_id: asText(raw.task_id, taskId),
+          task_version: asNumber(raw.task_version, 1),
+          current_run_id: currentRunId,
+          run_sequence: asNumber(raw.run_sequence, 1),
+          parent_run_id: asText(raw.parent_run_id) || null,
+          current_artifact_id: asText(raw.current_artifact_id) || null,
+          current_artifact_version: typeof raw.current_artifact_version === "number" ? raw.current_artifact_version : null,
+          current_commit_id: asText(raw.current_commit_id) || null,
+          lineage,
+        });
+      })
+      .catch(() => undefined);
   }
 
   function connectEvents(runId: string, generation: number, after: number) {
@@ -4224,7 +4274,7 @@ export function HarnessWorkbench({ onActivityChange }: { onActivityChange?: (sta
     startCommandRef.current = command;
     setStarting(true); setError(""); closeTransport();
     const generation = generationRef.current + 1;
-    generationRef.current = generation; runRef.current = null; lastSequenceRef.current = 0; setRun(null);
+    generationRef.current = generation; runRef.current = null; lastSequenceRef.current = 0; setRun(null); setTaskPointer(null);
     try {
       const response = await fetch(`${API_BASE}/v1/harness/runs`, {
         method: "POST",
@@ -4272,6 +4322,7 @@ export function HarnessWorkbench({ onActivityChange }: { onActivityChange?: (sta
           branch_id: branchId,
           idempotency_key: `continue-${randomKey()}`,
           expected_version: current.version,
+          expected_task_version: current.task_version,
           instruction: instructionOverride?.trim() || undefined,
         }),
       });
@@ -4286,6 +4337,7 @@ export function HarnessWorkbench({ onActivityChange }: { onActivityChange?: (sta
         generationRef.current = nextGeneration;
         runRef.current = null;
         lastSequenceRef.current = 0;
+        setTaskPointer(null);
       }
       if (!snapshot || !applySnapshot(snapshot, nextGeneration)) throw new Error("续办任务回执格式无效");
       setView("loop");
@@ -4641,6 +4693,7 @@ function LoopView({
     </header>
     <section className="loop-lineage-strip" aria-label="任务时间线" data-testid="task-lineage">
       <div><span>任务时间线</span><strong>任务持续链 · Run {run.run_sequence}</strong></div>
+      {taskPointer && <small data-testid="task-ledger-pointer">{taskPointer.current_run_id === run.run_id ? "当前任务 Run" : "历史 Run"} · 任务版本 v{taskPointer.task_version}</small>}
       <p>{run.parent_run_id ? `本次是第 ${run.run_sequence} 次运行，承接旧 Run 的 ${run.carried_branch_id ? "一个未完成分支" : "已批准成果引用"}。旧成果保留，本次只核对该未完成分支的批准来源。` : "这是该任务的首次 Run；后续未完成分支可以创建新的 Run。"}</p>
       {run.source_revision_changed && <p><b>来源版本已变化</b>：本段只重新核对批准分支材料，不携带旧的采用事实。</p>}
       {run.parent_run_id && <small>新 Run · 保留成果{run.base_artifact_version ? ` v${run.base_artifact_version}` : ""} · 不修改原文件 · 外部动作：未发生</small>}

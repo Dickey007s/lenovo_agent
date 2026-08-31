@@ -14,6 +14,11 @@ from typing import Any, Literal, Protocol
 
 import psycopg
 from psycopg.types.json import Jsonb
+from services.api.app.application.task_ledger import (
+    TaskLedgerConflict,
+    TaskLedgerReceipt,
+    TaskRecord,
+)
 
 
 IdempotencyKind = Literal["start", "control"]
@@ -86,6 +91,23 @@ class HarnessStateStore(Protocol):
         task_commit: StoredHarnessTaskCommit | None = None,
     ) -> StoredHarnessIdempotency | None: ...
 
+    async def load_task_records(self) -> list[TaskRecord]: ...
+
+    async def get_task_record(self, owner_id: str, task_id: str) -> TaskRecord | None: ...
+
+    async def create_task_record(self, task: TaskRecord) -> TaskRecord: ...
+
+    async def commit_task_transition(
+        self,
+        run: StoredHarnessRun,
+        task: TaskRecord,
+        *,
+        expected_task_version: int | None = None,
+        task_receipt: TaskLedgerReceipt | None = None,
+        task_digest: str | None = None,
+        idempotency: StoredHarnessIdempotency | None = None,
+    ) -> StoredHarnessIdempotency | None: ...
+
 
 class InMemoryHarnessStateStore:
     """Process-local adapter that also supports restart tests via shared instances."""
@@ -103,6 +125,8 @@ class InMemoryHarnessStateStore:
         self._task_commits: dict[
             tuple[str, str, str], StoredHarnessTaskCommit
         ] = {}
+        self._tasks: dict[tuple[str, str], TaskRecord] = {}
+        self._task_receipts: dict[tuple[str, str], tuple[str, TaskLedgerReceipt]] = {}
         self._lock = asyncio.Lock()
 
     async def setup(self) -> None:
@@ -261,6 +285,81 @@ class InMemoryHarnessStateStore:
             )
             return None
 
+    async def load_task_records(self) -> list[TaskRecord]:
+        async with self._lock:
+            return [item.model_copy(deep=True) for item in self._tasks.values()]
+
+    async def get_task_record(self, owner_id: str, task_id: str) -> TaskRecord | None:
+        async with self._lock:
+            item = self._tasks.get((owner_id, task_id))
+            return item.model_copy(deep=True) if item else None
+
+    async def create_task_record(self, task: TaskRecord) -> TaskRecord:
+        async with self._lock:
+            key = (task.owner_id, task.task_id)
+            current = self._tasks.get(key)
+            if current is not None:
+                if current.model_dump(mode="json") != task.model_dump(mode="json"):
+                    raise TaskLedgerConflict("task identity conflict")
+                return current.model_copy(deep=True)
+            self._tasks[key] = task.model_copy(deep=True)
+            return task.model_copy(deep=True)
+
+    async def commit_task_transition(
+        self,
+        run: StoredHarnessRun,
+        task: TaskRecord,
+        *,
+        expected_task_version: int | None = None,
+        task_receipt: TaskLedgerReceipt | None = None,
+        task_digest: str | None = None,
+        idempotency: StoredHarnessIdempotency | None = None,
+    ) -> StoredHarnessIdempotency | None:
+        """Atomically persist run, task pointer and receipts under one lock."""
+        async with self._lock:
+            idem_key = None
+            if idempotency is not None:
+                idem_key = (idempotency.owner_id, idempotency.kind, idempotency.idempotency_key)
+                previous = self._idempotency.get(idem_key)
+                if previous is not None:
+                    if previous.digest != idempotency.digest:
+                        raise TaskLedgerConflict("idempotency command conflict")
+                    return previous
+            task_key = (task.owner_id, task.task_id)
+            if (run.owner_id, run.run_id) in self._runs:
+                raise TaskLedgerConflict("run_id 已存在")
+            current_task = self._tasks.get(task_key)
+            if expected_task_version is None:
+                if current_task is not None and current_task.model_dump(mode="json") != task.model_dump(mode="json"):
+                    raise TaskLedgerConflict("task already exists with different identity")
+            else:
+                if current_task is None or current_task.task_version != expected_task_version:
+                    raise TaskLedgerConflict("task version CAS failed")
+                if task.task_version != expected_task_version + 1:
+                    raise TaskLedgerConflict("task version must increment by one")
+                if task_receipt is not None:
+                    receipt_key = (task.owner_id, task_receipt.idempotency_key)
+                    previous_receipt = self._task_receipts.get(receipt_key)
+                    if previous_receipt is not None:
+                        if previous_receipt[0] != (task_digest or ""):
+                            raise TaskLedgerConflict("task receipt idempotency conflict")
+                        return idempotency
+            if idempotency is not None and idem_key is not None:
+                self._idempotency[idem_key] = idempotency
+            self._tasks[task_key] = task.model_copy(deep=True)
+            if task_receipt is not None:
+                self._task_receipts[(task.owner_id, task_receipt.idempotency_key)] = (
+                    task_digest or "",
+                    task_receipt.model_copy(deep=True),
+                )
+            self._runs[(run.owner_id, run.run_id)] = StoredHarnessRun(
+                owner_id=run.owner_id,
+                run_id=run.run_id,
+                snapshot=_clone(run.snapshot),
+                resume_status=run.resume_status,
+            )
+            return None
+
 
 class PostgresHarnessStateStore:
     """PostgreSQL-backed snapshots and command receipts."""
@@ -325,8 +424,135 @@ class PostgresHarnessStateStore:
                     )
                     """
                 )
+                await cursor.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS harness_task_ledger (
+                        owner_id TEXT NOT NULL,
+                        task_id TEXT NOT NULL,
+                        task_version INTEGER NOT NULL,
+                        payload JSONB NOT NULL,
+                        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                        PRIMARY KEY (owner_id, task_id)
+                    )
+                    """
+                )
+                await cursor.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS harness_task_ledger_receipt (
+                        owner_id TEXT NOT NULL,
+                        idempotency_key TEXT NOT NULL,
+                        digest TEXT NOT NULL,
+                        payload JSONB NOT NULL,
+                        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                        PRIMARY KEY (owner_id, idempotency_key)
+                    )
+                    """
+                )
 
     async def close(self) -> None:
+        return None
+
+    async def load_task_records(self) -> list[TaskRecord]:
+        async with await psycopg.AsyncConnection.connect(self._dsn) as connection:
+            async with connection.cursor() as cursor:
+                await cursor.execute("SELECT payload FROM harness_task_ledger ORDER BY updated_at ASC")
+                rows = await cursor.fetchall()
+        return [TaskRecord.model_validate(dict(row[0])) for row in rows]
+
+    async def get_task_record(self, owner_id: str, task_id: str) -> TaskRecord | None:
+        async with await psycopg.AsyncConnection.connect(self._dsn) as connection:
+            async with connection.cursor() as cursor:
+                await cursor.execute(
+                    "SELECT payload FROM harness_task_ledger WHERE owner_id=%s AND task_id=%s",
+                    (owner_id, task_id),
+                )
+                row = await cursor.fetchone()
+        return TaskRecord.model_validate(dict(row[0])) if row else None
+
+    async def create_task_record(self, task: TaskRecord) -> TaskRecord:
+        async with await psycopg.AsyncConnection.connect(self._dsn) as connection:
+            async with connection.cursor() as cursor:
+                await cursor.execute(
+                    "INSERT INTO harness_task_ledger(owner_id,task_id,task_version,payload) VALUES (%s,%s,%s,%s) ON CONFLICT (owner_id,task_id) DO NOTHING",
+                    (task.owner_id, task.task_id, task.task_version, Jsonb(task.model_dump(mode="json"))),
+                )
+        existing = await self.get_task_record(task.owner_id, task.task_id)
+        if existing is None:
+            raise TaskLedgerConflict("task create failed")
+        return existing
+
+    async def commit_task_transition(
+        self,
+        run: StoredHarnessRun,
+        task: TaskRecord,
+        *,
+        expected_task_version: int | None = None,
+        task_receipt: TaskLedgerReceipt | None = None,
+        task_digest: str | None = None,
+        idempotency: StoredHarnessIdempotency | None = None,
+    ) -> StoredHarnessIdempotency | None:
+        """Persist task and child Run in one PostgreSQL transaction."""
+        async with await psycopg.AsyncConnection.connect(self._dsn) as connection:
+            async with connection.cursor() as cursor:
+                if idempotency is not None:
+                    await cursor.execute(
+                        "SELECT digest, result FROM harness_idempotency WHERE owner_id=%s AND kind=%s AND idempotency_key=%s FOR UPDATE",
+                        (idempotency.owner_id, idempotency.kind, idempotency.idempotency_key),
+                    )
+                    previous = await cursor.fetchone()
+                    if previous is not None:
+                        if str(previous[0]) != idempotency.digest:
+                            raise TaskLedgerConflict("idempotency command conflict")
+                        return StoredHarnessIdempotency(
+                            owner_id=idempotency.owner_id,
+                            kind=idempotency.kind,
+                            idempotency_key=idempotency.idempotency_key,
+                            digest=str(previous[0]),
+                            result=dict(previous[1]),
+                        )
+                if expected_task_version is None:
+                    await cursor.execute(
+                        "INSERT INTO harness_task_ledger(owner_id,task_id,task_version,payload) VALUES (%s,%s,%s,%s) ON CONFLICT (owner_id,task_id) DO NOTHING RETURNING task_id",
+                        (task.owner_id, task.task_id, task.task_version, Jsonb(task.model_dump(mode="json"))),
+                    )
+                    if await cursor.fetchone() is None:
+                        await cursor.execute(
+                            "SELECT payload FROM harness_task_ledger WHERE owner_id=%s AND task_id=%s",
+                            (task.owner_id, task.task_id),
+                        )
+                        existing = await cursor.fetchone()
+                        if existing is None or dict(existing[0]) != task.model_dump(mode="json"):
+                            raise TaskLedgerConflict("task already exists with different identity")
+                else:
+                    await cursor.execute(
+                        "UPDATE harness_task_ledger SET task_version=%s,payload=%s,updated_at=NOW() WHERE owner_id=%s AND task_id=%s AND task_version=%s RETURNING task_id",
+                        (task.task_version, Jsonb(task.model_dump(mode="json")), task.owner_id, task.task_id, expected_task_version),
+                    )
+                    if await cursor.fetchone() is None:
+                        raise TaskLedgerConflict("task version CAS failed")
+                if task_receipt is not None:
+                    await cursor.execute(
+                        "SELECT digest FROM harness_task_ledger_receipt WHERE owner_id=%s AND idempotency_key=%s FOR UPDATE",
+                        (task.owner_id, task_receipt.idempotency_key),
+                    )
+                    prior_receipt = await cursor.fetchone()
+                    if prior_receipt is not None and str(prior_receipt[0]) != (task_digest or ""):
+                        raise TaskLedgerConflict("task receipt idempotency conflict")
+                    await cursor.execute(
+                        "INSERT INTO harness_task_ledger_receipt(owner_id,idempotency_key,digest,payload) VALUES (%s,%s,%s,%s) ON CONFLICT (owner_id,idempotency_key) DO NOTHING",
+                        (task.owner_id, task_receipt.idempotency_key, task_digest or "", Jsonb(task_receipt.model_dump(mode="json"))),
+                    )
+                if idempotency is not None:
+                    await cursor.execute(
+                        "INSERT INTO harness_idempotency(owner_id,kind,idempotency_key,digest,result) VALUES (%s,%s,%s,%s,%s)",
+                        (idempotency.owner_id, idempotency.kind, idempotency.idempotency_key, idempotency.digest, Jsonb(idempotency.result)),
+                    )
+                await cursor.execute(
+                    "INSERT INTO harness_run_state(owner_id,run_id,snapshot,resume_status,updated_at) VALUES (%s,%s,%s,%s,NOW()) ON CONFLICT (owner_id,run_id) DO NOTHING RETURNING run_id",
+                    (run.owner_id, run.run_id, Jsonb(run.snapshot), run.resume_status),
+                )
+                if await cursor.fetchone() is None:
+                    raise TaskLedgerConflict("run_id 已存在")
         return None
 
     async def load_runs(self) -> list[StoredHarnessRun]:

@@ -391,9 +391,10 @@ async def test_demo1_continuation_http_route_returns_same_task_child_run() -> No
                 f"/v1/harness/runs/{terminal.run_id}/continue",
                 headers={"X-User-Id": "alice"},
                 json={
-                    "branch_id": branch.branch_id,
-                    "idempotency_key": "demo1-http-child-0001",
-                    "expected_version": terminal.version,
+                        "branch_id": branch.branch_id,
+                        "idempotency_key": "demo1-http-child-0001",
+                        "expected_version": terminal.version,
+                        "expected_task_version": terminal.task_version,
                 },
             )
         assert response.status_code == 202

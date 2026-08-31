@@ -104,6 +104,7 @@ async def continue_harness_task(
             body.branch_id,
             idempotency_key=body.idempotency_key,
             expected_version=body.expected_version,
+            expected_task_version=body.expected_task_version,
             instruction=body.instruction,
             loop=body.loop,
         )
@@ -112,6 +113,24 @@ async def continue_harness_task(
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except HarnessConflictError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
+@router.get("/tasks/{task_id}")
+async def get_harness_task(
+    task_id: str,
+    owner_id: Annotated[str, Depends(harness_owner)],
+    runtime: Annotated[HarnessRuntime, Depends(get_harness_runtime)],
+):
+    """Return only the caller's server-owned task pointer."""
+    try:
+        # owner_id is an authorization input, not public task content.
+        return (await runtime.get_task(owner_id, task_id)).model_dump(
+            mode="json", exclude={"owner_id"}
+        )
+    except HarnessNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except HarnessError as exc:
+        raise HTTPException(status_code=503, detail="任务台账完整性暂时无法确认") from exc
 
 
 @router.get("/runs")
