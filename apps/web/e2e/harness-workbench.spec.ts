@@ -137,7 +137,6 @@ function fileItem(fileRef: string, folderId: string, label: string, group: strin
 }
 
 const seedFolders = [
-  { folder_id: productFolderId, display_label: "产品管理", display_summary: "产品上线与测试资料", files: [productPRDFile, productConfigFile, productTestFile, productCompatFile] },
   { folder_id: csvFile.folder_id, display_label: "财务管理", display_summary: "跨期间往来资料", files: [financeH1File, financeH2File, csvFile] },
   { folder_id: pdfFile.folder_id, display_label: "法务", display_summary: "合同与授权材料", files: [legalRuleFile, ...legalDelegationFiles, pdfFile] },
   { folder_id: docxFile.folder_id, display_label: "人力招聘", display_summary: "岗位与候选人材料", files: candidateFiles },
@@ -146,15 +145,16 @@ const seedFolders = [
   { folder_id: outboundRuleFile.folder_id, display_label: "运营管理", display_summary: "外呼规则与运营资料", files: [outboundRuleFile] },
   { folder_id: customerSurveyFile.folder_id, display_label: "销售运营", display_summary: "公开问卷与画像规则", files: [customerSurveyFile, customerRuleFile] },
   { folder_id: uxBehaviorFile.folder_id, display_label: "用户体验", display_summary: "交互日志、排序规则与页面规范", files: [uxBehaviorFile, uxRuleFile, uxSpecFile] },
+  { folder_id: productFolderId, display_label: "产品管理", display_summary: "产品上线与测试资料", files: [productPRDFile, productConfigFile, productTestFile, productCompatFile] },
 ];
 
 const folders = Array.from({ length: 15 }, (_, folderIndex) => {
   const seed = seedFolders[folderIndex];
   const folderId = seed?.folder_id ?? `forte-folder-${String(folderIndex + 1).padStart(12, "0")}`;
   // Keep every named benchmark folder faithful to its controlled fixture.
-  // The seven generic folders carry the remaining 69 inputs so the workspace
+  // The six generic folders carry the remaining 64 inputs so the workspace
   // still exercises the production 15-folder / 96-file summary.
-  const targetCount = seed ? seed.files.length : folderIndex < 14 ? 11 : 14;
+  const targetCount = seed ? seed.files.length : folderIndex < 14 ? 10 : 14;
   const files = seed ? [...seed.files] : [];
   while (files.length < targetCount) {
     const fileIndex = foldersFileIndex(folderIndex, files.length);
