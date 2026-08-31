@@ -19,6 +19,11 @@ from services.api.app.application.task_ledger import (
     TaskLedgerReceipt,
     TaskRecord,
 )
+from services.api.app.application.workunit_ledger import (
+    ContributionRecord,
+    WorkUnitRecord,
+    contribution_digest,
+)
 
 
 IdempotencyKind = Literal["start", "control"]
@@ -26,6 +31,24 @@ IdempotencyKind = Literal["start", "control"]
 
 def _clone(value: dict[str, Any]) -> dict[str, Any]:
     return json.loads(json.dumps(value, ensure_ascii=False))
+
+
+def _validate_ledger_append(previous: dict[str, Any] | None, current: dict[str, Any]) -> None:
+    """Reject deletion or mutation of immutable Contribution rows at storage boundary."""
+    if previous is None:
+        return
+    old_rows = {str(item.get("contribution_id")): item for item in previous.get("contributions", [])}
+    new_rows = {str(item.get("contribution_id")): item for item in current.get("contributions", [])}
+    if not old_rows.keys() <= new_rows.keys():
+        raise RuntimeError("append-only Contribution Ledger cannot delete rows")
+    for key, old in old_rows.items():
+        if old != new_rows[key]:
+            raise RuntimeError("immutable Contribution conflict")
+    old_units = {str(item.get("work_unit_id")): item for item in previous.get("work_units", [])}
+    for key, old in old_units.items():
+        new = {str(item.get("work_unit_id")): item for item in current.get("work_units", [])}.get(key)
+        if new is None or int(new.get("version", 0)) < int(old.get("version", 0)):
+            raise RuntimeError("WorkUnit version cannot move backwards")
 
 
 @dataclass(frozen=True)
@@ -82,6 +105,10 @@ class HarnessStateStore(Protocol):
     async def load_task_commits(
         self, owner_id: str, run_id: str
     ) -> list[StoredHarnessTaskCommit]: ...
+
+    async def load_work_units(self, owner_id: str, run_id: str) -> list[WorkUnitRecord]: ...
+
+    async def load_contributions(self, owner_id: str, run_id: str) -> list[ContributionRecord]: ...
 
     async def commit(
         self,
@@ -199,6 +226,22 @@ class InMemoryHarnessStateStore:
                 if item.owner_id == owner_id and item.run_id == run_id
             ]
 
+    async def load_work_units(self, owner_id: str, run_id: str) -> list[WorkUnitRecord]:
+        async with self._lock:
+            run = self._runs.get((owner_id, run_id))
+            return [
+                WorkUnitRecord.model_validate(item)
+                for item in (run.snapshot.get("work_units", []) if run else [])
+            ]
+
+    async def load_contributions(self, owner_id: str, run_id: str) -> list[ContributionRecord]:
+        async with self._lock:
+            run = self._runs.get((owner_id, run_id))
+            return [
+                ContributionRecord.model_validate(item)
+                for item in (run.snapshot.get("contributions", []) if run else [])
+            ]
+
     async def commit(
         self,
         run: StoredHarnessRun,
@@ -251,6 +294,12 @@ class InMemoryHarnessStateStore:
                     and existing_commit.payload_digest != task_commit.payload_digest
                 ):
                     raise RuntimeError("immutable task commit conflict")
+
+            previous_run = self._runs.get((run.owner_id, run.run_id))
+            _validate_ledger_append(
+                previous_run.snapshot if previous_run is not None else None,
+                run.snapshot,
+            )
 
             if idempotency is not None and idempotency_key is not None:
                 self._idempotency[idempotency_key] = StoredHarnessIdempotency(
@@ -474,6 +523,33 @@ class PostgresHarnessStateStore:
                         payload JSONB NOT NULL,
                         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
                         PRIMARY KEY (owner_id, idempotency_key)
+                    )
+                    """
+                )
+                await cursor.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS harness_work_unit (
+                        owner_id TEXT NOT NULL,
+                        task_id TEXT NOT NULL,
+                        run_id TEXT NOT NULL,
+                        work_unit_id TEXT NOT NULL,
+                        version INTEGER NOT NULL,
+                        payload JSONB NOT NULL,
+                        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                        PRIMARY KEY (owner_id, run_id, work_unit_id)
+                    )
+                    """
+                )
+                await cursor.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS harness_contribution (
+                        owner_id TEXT NOT NULL,
+                        run_id TEXT NOT NULL,
+                        contribution_id TEXT NOT NULL,
+                        payload_digest TEXT NOT NULL,
+                        payload JSONB NOT NULL,
+                        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                        PRIMARY KEY (owner_id, run_id, contribution_id)
                     )
                     """
                 )
@@ -721,6 +797,26 @@ class PostgresHarnessStateStore:
             for row_owner, row_run, commit_id, payload_digest, payload in rows
         ]
 
+    async def load_work_units(self, owner_id: str, run_id: str) -> list[WorkUnitRecord]:
+        async with await psycopg.AsyncConnection.connect(self._dsn) as connection:
+            async with connection.cursor() as cursor:
+                await cursor.execute(
+                    "SELECT payload FROM harness_work_unit WHERE owner_id=%s AND run_id=%s ORDER BY work_unit_id",
+                    (owner_id, run_id),
+                )
+                rows = await cursor.fetchall()
+        return [WorkUnitRecord.model_validate(dict(row[0])) for row in rows]
+
+    async def load_contributions(self, owner_id: str, run_id: str) -> list[ContributionRecord]:
+        async with await psycopg.AsyncConnection.connect(self._dsn) as connection:
+            async with connection.cursor() as cursor:
+                await cursor.execute(
+                    "SELECT payload FROM harness_contribution WHERE owner_id=%s AND run_id=%s ORDER BY created_at, contribution_id",
+                    (owner_id, run_id),
+                )
+                rows = await cursor.fetchall()
+        return [ContributionRecord.model_validate(dict(row[0])) for row in rows]
+
     async def commit(
         self,
         run: StoredHarnessRun,
@@ -799,6 +895,40 @@ class PostgresHarnessStateStore:
                         payload_digest=task_commit.payload_digest,
                         payload=task_commit.payload,
                     )
+                for work_unit in run.snapshot.get("work_units", []):
+                    await cursor.execute(
+                        "SELECT version FROM harness_work_unit WHERE owner_id=%s AND run_id=%s AND work_unit_id=%s FOR UPDATE",
+                        (run.owner_id, run.run_id, work_unit["work_unit_id"]),
+                    )
+                    previous = await cursor.fetchone()
+                    if previous is not None and int(previous[0]) > int(work_unit["version"]):
+                        raise RuntimeError("WorkUnit version cannot move backwards")
+                    await cursor.execute(
+                        """
+                        INSERT INTO harness_work_unit(owner_id,task_id,run_id,work_unit_id,version,payload,updated_at)
+                        VALUES (%s,%s,%s,%s,%s,%s,NOW())
+                        ON CONFLICT (owner_id,run_id,work_unit_id) DO UPDATE SET
+                            task_id=EXCLUDED.task_id, version=EXCLUDED.version,
+                            payload=EXCLUDED.payload, updated_at=NOW()
+                        """,
+                        (
+                            run.owner_id,
+                            run.snapshot.get("task_id", ""),
+                            run.run_id,
+                            work_unit["work_unit_id"],
+                            work_unit["version"],
+                            Jsonb(work_unit),
+                        ),
+                    )
+                for contribution in run.snapshot.get("contributions", []):
+                    await self._insert_immutable(
+                        cursor,
+                        table="harness_contribution",
+                        key_columns=("owner_id", "run_id", "contribution_id"),
+                        key_values=(run.owner_id, run.run_id, contribution["contribution_id"]),
+                        payload_digest=contribution_digest(ContributionRecord.model_validate(contribution)),
+                        payload=contribution,
+                    )
                 await cursor.execute(
                     """
                     INSERT INTO harness_run_state (
@@ -822,7 +952,9 @@ class PostgresHarnessStateStore:
     async def _insert_immutable(
         cursor: psycopg.AsyncCursor[Any],
         *,
-        table: Literal["harness_artifact_version", "harness_task_commit"],
+        table: Literal[
+            "harness_artifact_version", "harness_task_commit", "harness_contribution"
+        ],
         key_columns: tuple[str, ...],
         key_values: tuple[Any, ...],
         payload_digest: str,
