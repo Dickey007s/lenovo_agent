@@ -3,8 +3,8 @@
 - 日期：2026-08-30；实现回填：2026-08-31
 - 状态：`Ready` 研究输入；对应有限 Runtime 已达 `Limited Verified`，产品价值与用户体验判断仍为 `Draft`
 - 用户来源：`USER-FEEDBACK-20260830-DEMO1-DEMO2-CONTINUATION`
-- 对应决策：`DR-0053`
-- 对应场景：`SCENARIO-038`、`SCENARIO-039`
+- 对应决策：`DR-0053`、`DR-0054`、`DR-0055`
+- 对应场景：`SCENARIO-038`、`SCENARIO-039`、`SCENARIO-040`、`SCENARIO-041`
 
 ## 1. 研究问题与结论
 
@@ -20,13 +20,16 @@
    现已实现有限 `task_id`/child Run 纵切。一个终态 Run 可为一条服务端批准 Branch
    创建同 Task 的后继 Run，记录成果基线、Workspace revision 和精确重核 refs；旧 Run
    不改写。`DR-0054` 又加入最小 owner-scoped Task record/current pointer、Task GET 与
-   Task/Run 双版本 CAS；WorkUnit ledger、多实例执行协调与更细 per-file revision 仍未实现。
+   Task/Run 双版本 CAS。`DR-0055` 又加入 Branch 绑定 WorkUnit、不可变 Contribution、
+   checkpoint 后目标显式恢复；多实例执行协调、queue/lease 与更细 per-file revision
+   仍未实现。
 2. **Demo 2 从“多 Agent 展示”升级为可解释的拓扑准入与服务端收敛。** 有限纵切现已
    落地：系统不按
    Prompt 中的“请多 Agent”直接扩容，而是由服务端根据来源跨度、工作包独立性、
    依赖耦合、预算与风险给出路线和理由。只有被确认的高并行只读任务才启动受限
    Worker；每个进程内 Worker 的候选必须经过现有引用、Anchor、Evidence Gate 和适用的
-   叙事/确定性对账，才能进入统一成果。它尚不是 durable/distributed Worker Runtime。
+   叙事/确定性对账，才能进入统一成果。完整 Branch DAG 与候选现在可在 Memory/
+   PostgreSQL 留痕，但它尚不是 durable queue/lease 或 distributed Worker Runtime。
 
 这两个方向保持 07-16 的原始分工：Demo 1 解决时间维连续性，Demo 2 解决组织维
 复杂性。它们不新增第九模块，也不恢复旧 Scenario/Demo 专属 API。
@@ -60,26 +63,30 @@
   `adaptive_readonly_workers` 需要确认；确认后每波最多三个进程内只读 Analyst Worker，
   只读 ready Branch 批准来源，返回与采用分开，只有 adopted + Anchor 的候选进入稳定
   partial merge 和普通 append-only Artifact/Commit。
+- `DR-0055` 把完整 validated Branch DAG 投影为 WorkUnit，在 dispatch 前持久化
+  reservation/attempt/预算，并把每次返回追加为不可变 Contribution。重启不自动重放
+  在途 Worker；新幂等键与当前 version 只恢复目标 checkpoint-recovered WorkUnit。
 - 前台已有 Task 时间线、来源变化/重核说明、路线理由、结构事实、Worker 确认、实际
   回执和下一波 ready 工作包；当前字号收尾确保新增事实面板正文约 13–14 px。
 
 ### 2.2 部分近似
 
 - 最小 Task Ledger/current pointer 与单服务状态边界内的 sibling CAS 已实现，但没有
-  Task list、任意 current 回拨、production identity、WorkUnit/Contribution ledger 或
-  queue/lease。七项 PostgreSQL Task transaction gate 已在隔离 PostgreSQL 17.11 上实跑
+  Task list、任意 current 回拨、production identity 或 queue/lease。七项 PostgreSQL
+  Task transaction gate 与三项 Demo WorkUnit 恢复门已在隔离 PostgreSQL 17.11 上实跑
   通过，但只证明单主机顺序事务，不证明多 API 实例执行或高可用。
 - `workspace_revision` 可提示数据集版本变化并公开精确重核 refs，但尚不是完整 per-file
   content revision/依赖图；后继 Run 保守重核所选 Branch 的批准来源。
-- Worker 具备 Branch 波次、最多三并发、预算预留和 partial merge，但只存在于当前 API
-  进程，没有 durable queue/lease、multi-instance ownership 或远端 Worker 协议。
+- Worker 具备 Branch 波次、最多三并发、预算预留、Branch 绑定 WorkUnit、不可变
+  Contribution 和 partial merge，但执行仍只存在于当前 API 进程，没有 durable
+  queue/lease、multi-instance ownership 或远端 Worker 协议。
 - 现有 Worker 等待复用 Branch 事实；没有 Worker 专属持久 `DecisionRequest`、通用
   `ConflictRecord` 或“只恢复某 Worker lease”的完整状态机。
 
 ### 2.3 尚未实现
 
-- durable WorkUnit/Contribution ledger、多实例运行 ownership/lease、per-file revision
-  服务与跨组织通知/队列。
+- distributed WorkUnit queue/lease、多实例运行 ownership、per-file revision 服务与
+  跨组织通知/队列。
 - durable/distributed Worker queue、lease、远端调度、递归 Swarm、通用冲突对象和 Worker
   专属局部恢复协议。
 - 通用 Tool Gateway、真实 Connector、源文件写回、多实例协调、语义/数值通用 Verifier。
@@ -204,7 +211,7 @@ workflow drift。本项目不依赖该 SDK，但采用相同的验证边界：�
 Topology Admission、Worker scope、Artifact adoption 和前台投影，再单独验证真实
 Provider。Fixture 通过不能升级模型质量、数据库恢复或用户价值结论。
 
-### 5.0.1 固定场景门之后的下一纵切：Task Ledger 先于 WorkUnit Ledger
+### 5.0.1 固定场景门之后的两步纵切：先 Task Ledger，再 WorkUnit Ledger
 
 2026-08-31 固定场景门证明了单进程 Runtime 已能形成 child Run、两波 Worker partial
 merge 和 fixed 反例，也暴露了 current pointer 仍由 Run 集合间接推断的问题。随后
@@ -218,9 +225,10 @@ Task 级 CAS，再让 WorkUnit/Contribution ledger 绑定该写入边界。
 
 这不是把 OpenClaw 或 Restate 作为依赖，也不是新的竞品领先结论。若同时实现 Task、
 WorkUnit、queue、lease 和多实例，测试很难区分 current pointer、局部恢复和调度所有权
-分别由什么保证。因此 `DR-0054` 首版只做 Task ledger；当前定向工程门通过后，
-WorkUnit/Contribution ledger 成为下一纵切。真实 PostgreSQL、Provider 与用户研究仍是
-独立门，不能由 Task 表或 mock E2E 代替。
+分别由什么保证。因此 `DR-0054` 首版只做 Task ledger；随后 `DR-0055` 才把 WorkUnit/
+Contribution 绑定到已验证的 Task/Run/Branch 写入边界。隔离 PostgreSQL 17.11 的七项
+Task 门与三项 Demo Worker 恢复门组合 `10 passed`，证明单主机顺序持久化与显式恢复，
+但不能代替 Provider、多实例、queue/lease 或用户研究。
 
 ### 5.1 差异一：办公 Task lineage 与证据重核合同，而不是只有可恢复状态
 
@@ -331,11 +339,12 @@ Prompt、CoT、原始 Provider response、内部路径和内部验证字符串�
 - 前台输出：不是“再加几轮”，而是“新一段执行”；显示父 Run、继承 2 项、重核 1 项、
   新预算和旧成果只读链接。
 - 后端事实：`task_id`、Run lineage、carried Branch、base Artifact/Commit、Workspace
-   revision、start idempotency。
+  revision、start idempotency。
 - 设计来源：Temporal durable workflow、OpenClaw Task Flow、A2A Task lifecycle。
 - 当前边界：当前默认 12 轮且可到 24；跨 Run 单 Branch 继承、最小 Task Ledger、双版本
   CAS 与 current/history UI 已有本地自动化，隔离 PostgreSQL 17.11 的七项顺序事务门
-  已通过；Provider 未运行，也没有 WorkUnit ledger 或多实例执行协调。
+  已通过；后续 WorkUnit ledger 也已形成有限纵切。Provider 未运行，仍没有
+  queue/lease 或多实例执行协调。
 
 ### 场景 C：API 重启后从检查点恢复，而不是重复模型调用
 
@@ -472,8 +481,9 @@ Agent 数量不是固定产品配置，而是服务端基于合同选择的成�
 
 当前门：本地任务、分支、来源投影、成果基线、最小 Task record、双版本 CAS、幂等、
 fail-closed 恢复、current/history 浏览器门和隔离 PostgreSQL 17.11 的七项顺序事务门
-通过；真实 Provider 未运行。下一步是在不放大 Run 预算的前提下补
-WorkUnit/Contribution ledger，并单独完成 Provider 与多实例等外部门。
+通过；真实 Provider 未运行。`DR-0055` 已在不放大 Run 预算的前提下补上
+WorkUnit/Contribution ledger；下一步应把 Provider、runtime failure injection、
+queue/lease 与多实例等外部门分别验证，不能混成一次“Swarm 完成”。
 
 ### 第二阶段：Demo 2 Topology Admission（有限纵切已完成）
 
@@ -493,8 +503,10 @@ baseline，也未做 Provider 同场运行。
 4. named SSE、Snapshot、PostgreSQL、断线恢复和幂等控制保持单调一致。
 
 当前门：Branch 隔离、最多三 Worker、依赖波次、异常、无 Anchor、越界来源、11 条
-finding 不截断、partial merge 和旧成果保留已有自动化；通用 stale/数值冲突、Worker
-专属恢复、真实 PostgreSQL/Provider 与分布式 lease 仍未完成。
+finding 不截断、partial merge、WorkUnit/Contribution append-only、旧成果保留和
+checkpoint-recovered 目标显式重试已有自动化；真实 PostgreSQL 17.11 三项 Demo 门已
+通过。通用 stale/数值冲突、Worker 专属 DecisionRequest、真实 Provider、runtime
+failure injection 与分布式 lease 仍未完成。
 
 ## 10. 用户研究与效果验证计划
 
@@ -516,7 +528,7 @@ finding 不截断、partial merge 和旧成果保留已有自动化；通用 sta
 | 当前默认最多 12 轮、上限 24 | `Current` | 当前 contract/source | 不等于适合无限长任务 |
 | 当前有 Run 内 Branch、Evidence Gate、Artifact/Commit、可选 PG 恢复 | `Current` | 当前源码与 living docs | 不等于多实例恢复 |
 | 持久状态、暂停和并行 Agent 已是主流能力 | `Research-supported` | OpenAI、LangGraph、Temporal、Codex、Claude、OpenClaw 官方资料 | 不是竞品同场实测 |
-| Task lineage + minimal Task Ledger + contribution adoption 有限纵切 | `Limited Verified` | 07-16、当前源码、unit/E2E、隔离 PostgreSQL 17.11 顺序门与 Evidence | Provider/WorkUnit/多实例/用户价值仍未验证 |
+| Task lineage + minimal Task Ledger + WorkUnit/Contribution adoption 有限纵切 | `Limited Verified` | 07-16、当前源码、unit/E2E、隔离 PostgreSQL 17.11 的 10 项 Task/Demo 顺序门与 Evidence | Provider、queue/lease、多实例、用户价值仍未验证 |
 | Admission 可减少无意义多 Worker | `Hypothesis` | 多 Agent 成本/适用性资料 | 尚无本项目成本或质量实验 |
 | 统一驾驶舱比多聊天更清晰 | `Draft` | HAI/mixed-initiative 研究与产品假设 | 必须做目标用户研究 |
 
@@ -528,7 +540,7 @@ finding 不截断、partial merge 和旧成果保留已有自动化；通用 sta
   本项目拟建立的原生合同。
 - Anthropic 的 Token 和内部评测数字、IBM 群聊研究、Microsoft 通用指导均不能直接
   外推到本项目目标用户。
-- 本文是研发输入。源码、本地 unit/浏览器/负向测试、隔离 PostgreSQL 17.11 Task 门和
-  Evidence 已使最小 Task Ledger 与进程内 Worker 有限纵切升级为 `Limited Verified`；
-  Provider、WorkUnit/分布式运行和用户研究未完成的结论不得被
+- 本文是研发输入。源码、本地 unit/浏览器/负向测试、隔离 PostgreSQL 17.11 Task/
+  WorkUnit 门和 Evidence 已使最小 Task Ledger 与进程内 Worker 台账有限纵切升级为
+  `Limited Verified`；Provider、queue/lease、分布式运行和用户研究未完成的结论不得被
   一并升级。只有完成目标用户研究，体验判断才能升级。

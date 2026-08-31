@@ -4,14 +4,14 @@
 
 | 字段 | 内容 |
 | --- | --- |
-| 状态 | `Draft`；等待源码、Memory/PostgreSQL、浏览器和固定场景门回填 |
+| 状态 | `Limited Verified`；Memory/API、固定场景、浏览器与隔离 PostgreSQL 17.11 单主机顺序门通过 |
 | 日期 | 2026-08-31 |
 | 用户来源 | `USER-FEEDBACK-20260831-DEMO1-DEMO2-FIXED-SCENARIO-HARDENING` |
 | 前置决策 | `DR-0053` 的可解释拓扑准入与受限 Worker；`DR-0054` 的独立 Task Ledger |
 | 研究来源 | `MULTI-AGENT-ORCHESTRATION-OFFICIAL-20260830`、`AGENT-INTEROP-AND-ELICITATION-OFFICIAL-20260830`、`HAI-MIXED-INITIATIVE-RESEARCH-20260830` |
 | 场景 | [`SCENARIO-041`](../scenarios/SCENARIO-041-workunit-contribution-ledger-and-partial-convergence.md) |
 | 测试合同 | [`WORKUNIT-CONTRIBUTION-LEDGER-V1-GATES-20260831`](../testing/WORKUNIT-CONTRIBUTION-LEDGER-V1-GATES-20260831.md) |
-| Evidence | 待运行后登记，不能由本文设计推断通过 |
+| Evidence | [`DR-0055-WORKUNIT-CONTRIBUTION-LEDGER-V1-EVIDENCE-20260831`](../evidence/DR-0055-WORKUNIT-CONTRIBUTION-LEDGER-V1-EVIDENCE-20260831.md) |
 
 ## 问题
 
@@ -28,6 +28,24 @@
 
 继续增加 Worker 数量不会关闭这些断点。下一纵切应先建立最小可恢复执行台账，把
 “任务如何拆分”“Worker 实际做了什么”“哪份候选获准进入成果”分成不同权威对象。
+
+## 当前实现结论
+
+本决策的有限纵切已经落地。Runtime 先把完整 Branch DAG 投影为 Branch 绑定的
+`WorkUnitRecord`，再按依赖选择 ready wave；模型调用之前持久化 reservation、attempt、
+预算和 named SSE，每次 Worker 返回追加不可变 `ContributionRecord`。Contribution 的
+“已返回”和“已采用”分开，只有通过批准来源、Anchor 与 Branch Gate 的候选才能进入
+新的 ArtifactVersion/TaskCommit。
+
+Memory 与 PostgreSQL 都保存独立 WorkUnit/Contribution 台账。Worker 在途时重启不会
+自动重放调用；服务端保留 validated Branch DAG、TopologyAdmission、已完成候选和成果，
+把未确认的 WorkUnit 标成 `checkpoint_recovered_in_flight_worker`。用户显式重试必须提交
+新的幂等键、当前 version 和原 Branch 来源，只恢复目标 WorkUnit 并新增 attempt；旧候选、
+兄弟 Branch 与 v1 均不覆盖。普通失败不因此获得隐式重试权。
+
+公共 Snapshot 提供脱敏工作包与候选投影，UI 使用业务标题以及“实际执行回执”“候选成果”
+“原文定位”，不显示 raw `u1`、Owner、revision、reservation digest 或内部 validator。
+这仍是进程内只读 Analyst Worker 的持久台账，不是完整执行器。
 
 ## 研究依据与不当推断边界
 
@@ -175,3 +193,22 @@ reservation、digest 或内部 validator 字段。
 
 因此，即使本决策的自动化全部通过，也只能把 Branch 绑定的只读进程内 Worker 台账标为
 `Limited Verified`，不能称为完整 Scheduler/Worker Runtime 或生产 Adaptive Swarm。
+
+## 验证结果
+
+| 门 | 2026-08-31 结果 | 结论边界 |
+| --- | --- | --- |
+| 全量 Python | `417 passed, 23 skipped in 283.30s` | 证明列出的源码合同；skip 不算通过 |
+| 隔离 PostgreSQL 17.11 | Demo 1/2 3 项 + Task Ledger 7 项，`10 passed in 10.84s` | 单主机顺序事务、重启复读与显式恢复；不是多实例 HA |
+| Playwright | `68 passed in 2.6m` | 包含 1440/390、中文业务标签与无 raw unit ID；不是用户研究 |
+| 公共隐私终审 | 定向 `73 passed in 8.51s` | Run GET/SSE 移除 `owner_id`，内部鉴权保持 |
+| stale/contradictory 合入终审 | 定向 `75 passed in 3.13s` | Worker 规范化与 merge 双重拒绝 adopted-looking 候选 |
+| Runtime 聚合提交 failure injection | 定向 `76 passed in 3.21s` | reservation 失败零 dispatch；merge 失败回到安全 reservation 且无假成果 |
+| Ruff / lint / build | 全部通过 | 静态与生产构建门，不证明真实 Provider 效果 |
+
+真实 PostgreSQL 门在最终通过前先暴露并修正了严格幂等预期、过期来源重试和 Worker
+checkpoint 恢复会丢失 Branch DAG 三类问题。完整负向过程、源码范围和剩余边界见
+[`Evidence`](../evidence/DR-0055-WORKUNIT-CONTRIBUTION-LEDGER-V1-EVIDENCE-20260831.md)。
+PostgreSQL storage transaction 与 Runtime reservation/merge 两个聚合持久化点已有回滚门；
+这仍未穷举进程终止、驱动断连、网络分区、磁盘损坏或多实例竞争，不能扩大成任意故障点
+或 HA 保证。

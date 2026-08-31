@@ -85,9 +85,9 @@ Provider/异常 Fixture 的验收镜头，不能由现有截图推断。
 | --- | --- |
 | 推荐固定流程 | Admission `mode=fixed_workflow` + `reasons[]` |
 | 建议最多三个 Worker，等待确认 | `mode=adaptive_readonly_workers`、`user_confirmation_required=true`；确认事件公开 `worker_limit=3` |
-| Worker 已开始/返回 | `worker_returned` 事件 + `worker_runs[].model_called/elapsed_ms/outcome` |
+| Worker 已开始/返回 | `work_unit_started/worker_returned/contribution_recorded` + `work_units[]/contributions[]` 与兼容 `worker_runs[]` |
 | Worker 已返回但未采用 | `model_called=true/output_used=false` + `outcome/error` |
-| 两项可用、一项待核对 | adopted `worker_runs` + `SharedArtifactMerge.waiting_branch_ids` |
+| 两项可用、一项待核对 | adopted/waiting `contributions[]` + `work_units[]` + `SharedArtifactMerge.waiting_branch_ids` |
 | 已合并为 v2 | `SharedArtifactMerge` + new normal ArtifactVersion/TaskCommit |
 | 未发生外部动作 | Contract `external_action=none` + no Tool/Connector receipt |
 
@@ -99,8 +99,9 @@ Provider/异常 Fixture 的验收镜头，不能由现有截图推断。
 - Branch 依赖/ready wave、Worker receipt、Contribution 和合并结果可从 Snapshot/Event 对账。
 - 无 Anchor、越 Branch 来源或叙事对账被拒的候选不进入当前 Artifact；通用数值冲突验证
   和 Worker stale revision gate 仍需按具体适配器扩展。
-- 单 Worker 失败不清空其他 adopted Contribution；当前没有 Worker 专属的持久局部恢复
-  DecisionRequest，因此“只重跑目标 WorkUnit”仍是下一阶段完成条件。
+- 单 Worker 失败不清空其他 adopted Contribution；`DR-0055` 已支持 PostgreSQL
+  checkpoint 后用新幂等键只重试目标 recovered WorkUnit，但仍没有 Worker 专属
+  DecisionRequest、queue/lease 或远端 Worker。
 - 用户无需打开多个 Agent 会话即可判断路线、失败影响和当前统一成果。
 
 ## 自动化验收用例
@@ -114,7 +115,8 @@ Provider/异常 Fixture 的验收镜头，不能由现有截图推断。
 7. `test_runtime_artifact_version_keeps_eleven_worker_findings` 与
    `test_worker_contribution_keeps_more_than_ten_findings_without_silent_top_n`。
 8. `test_postgres_demo2_worker_artifact_receipt_restart_without_replay` 与
-   `test_postgres_demo2_interrupted_worker_reservation_is_not_replayed`：已收集；无 DSN 时 skip。
+   `test_postgres_demo2_interrupted_worker_reservation_is_not_replayed` 等三项 Demo 1/2 门已在
+   隔离 PostgreSQL 17.11 上与七项 Task 门组合实跑为 `10 passed`。
 9. 浏览器 `Demo 2 requires confirmation, records worker receipts and exposes the next wave`：
    覆盖确认、两波、统一驾驶舱、可读字号和 390 px 无横向溢出。
 10. 聚焦门
@@ -146,8 +148,9 @@ Provider/异常 Fixture 的验收镜头，不能由现有截图推断。
 ## 当前边界
 
 当前实现已有确定性 `TopologyAdmission`、确认前零 Worker、最多三进程内只读 Analyst
-Worker、ready Branch 波次、调用/采用分离、Anchor/来源范围门、稳定 partial merge 与普通
+Worker、ready Branch 波次、调用/采用分离、Anchor/来源范围门、稳定 partial merge、
+Branch 绑定的 WorkUnit/Contribution 台账、checkpoint 后目标显式重试与普通
 ArtifactVersion/TaskCommit。它不是通用分布式 Worker Runtime：没有 queue、lease、
 multi-instance ownership、Worker 专属持久 DecisionRequest、通用 ConflictRecord 或
-Connector。新增 PostgreSQL 门本机因无 DSN 而跳过，真实 Provider 和用户研究未运行；
+Connector。隔离 PostgreSQL 17.11 单主机门已经通过，真实 Provider 和用户研究未运行；
 因此只标 `Limited Verified`。官方竞品资料也不证明其他产品不能实现同类合同。

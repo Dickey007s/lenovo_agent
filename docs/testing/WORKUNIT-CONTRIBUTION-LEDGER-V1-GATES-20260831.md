@@ -3,7 +3,8 @@
 - 日期：2026-08-31
 - 决策：`DR-0055`
 - 场景：`SCENARIO-041`
-- 状态：`Draft`；以下是待执行合同，不是通过记录
+- 状态：`Limited Verified`；合同已由源码、固定场景、浏览器与隔离 PostgreSQL 17.11
+  单主机顺序门验证，仍不包含真实 Provider、多实例或用户研究
 
 ## 1. 合同与权威关系
 
@@ -70,3 +71,24 @@ uv run pytest -q
 只有源码、定向/全量测试、真实 PG 门、浏览器和最终公共事实都通过，才能把本纵切标为
 `Limited Verified`。缺真实 PG 时必须写“Memory/API/browser 已验证，PostgreSQL 未验证”；
 缺 Provider 和目标用户研究时不得宣称生产 durability、多 Worker 收益或交互价值改善。
+
+## 8. 2026-08-31 执行记录
+
+| 门 | 结果 | 备注 |
+| --- | --- | --- |
+| 全量 Python | `417 passed, 23 skipped in 283.30s` | skip 继续按环境合同保留 |
+| Demo 1/2 + Task Ledger 真实 PostgreSQL | `10 passed in 10.84s` | 隔离 PostgreSQL 17.11；3 项 Demo + 7 项 Task |
+| Ruff | 通过 | `uv run ruff check .` |
+| 前台 lint / build | 通过 | Next.js 16.2.10 production build |
+| Playwright | `68 passed in 2.6m` | 包含 1440/390 和工作包中文业务投影 |
+| 公共 Snapshot 隐私终审 | `73 passed in 8.51s` | HTTP Run GET/SSE 无 `owner_id`；内部鉴权保留 |
+| stale/contradictory 候选负向终审 | `75 passed in 3.13s` | 规范化与 merge 均拒绝 adopted-looking 候选 |
+| Runtime 聚合提交 failure injection | `76 passed in 3.21s` | reservation 失败零 dispatch；merge 失败无假成果 |
+
+真实 PostgreSQL 门确认了 reservation 原键严格 replay、变化 payload 冲突、重启保留
+Branch DAG、已完成 Contribution 与 v1/v2、在途 Worker 不自动重放，以及新幂等键只恢复
+目标 checkpoint-recovered WorkUnit。固定财务反例确认不创建 WorkUnit/Contribution。
+原始工程说明与负向过程见
+[`DR-0055 Evidence`](../evidence/DR-0055-WORKUNIT-CONTRIBUTION-LEDGER-V1-EVIDENCE-20260831.md)。
+当前 failure injection 已覆盖 reservation 与 merge 两个聚合持久化点；后续仍需真实
+驱动断连、进程终止和多实例竞争门，不能把单进程回滚写成 HA。

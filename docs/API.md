@@ -282,16 +282,32 @@ Content-Type: application/json
 Branch objective 和批准 `input_file_refs`。模型调用预算在派发前进入版本化 Snapshot；
 预算不足、依赖未完成、重复 Branch、旧版本或越界来源全部拒绝，且不会部分派发。
 
-Worker 返回不等于采用。Runtime 记录 `worker_runs[]`，并按来源范围、Evidence Anchor、
-Branch 与适用 narrative reconciliation 形成 `adopted/ambiguous/rejected/failed`。
+Worker 返回不等于采用。Runtime 记录兼容投影 `worker_runs[]`，同时把完整 Branch DAG
+一对一投影为独立 `work_units[]`，并把每次返回追加为不可变 `contributions[]`。WorkUnit
+只记录执行状态、attempt、依赖、批准来源与候选指针；Branch 继续拥有业务目标和
+Evidence Gate。服务端按来源范围、Evidence Anchor、Branch 与适用 narrative
+reconciliation 形成 `adopted/ambiguous/rejected/failed`。
 只有 adopted findings 进入新的普通 `artifact_versions[]` 和 `commits[]`；
 `shared_artifacts[]` 保存本批 adopted/waiting/failed 回执。一个失败 Branch 不清空其他
-已采用贡献。相同幂等键不会重复合入；进程重启不会自动重放中断 Worker。当前实现是
-单 API 进程内的有界 Analyst Worker，不是队列、lease 或分布式 Worker Runtime。
+已采用贡献。相同幂等键和相同 payload 只回放原 reservation；相同键配变化 payload
+冲突。模型调用前必须先持久化 `reserved` WorkUnit、预算和
+`worker_wave_reserved`。返回后依次投影 `work_unit_started`、
+`contribution_recorded`、采用/等待/失败和 `worker_wave_committed`。
+
+PostgreSQL 重启保留 validated Branch DAG、TopologyAdmission、已完成 Contribution 和
+ArtifactVersion；未确认返回的在途 WorkUnit 变为
+`checkpoint_recovered_in_flight_worker`，绝不自动重放。只有新的幂等键、当前 Run
+version 和原 Branch 批准来源可以显式重试该目标单元。公共 WorkUnit 不含 Owner、
+reservation id 或内部 error；公共 Contribution 不含 raw Run/Catalog revision。当前实现
+是单 API 进程内的有界 Analyst Worker 台账，不是队列、lease 或分布式 Worker Runtime。
 
 ## 6. Public Snapshot
 
 Important fields:
+
+`owner_id` is private authorization state and is never part of this public
+model, Run GET, Run list or SSE JSON. WorkUnit/Contribution public projections
+also remove reservation identifiers and raw source revisions.
 
 ```json
 {
@@ -367,6 +383,35 @@ Important fields:
     "user_confirmation_required": false
   },
   "worker_runs": [],
+  "work_units": [
+    {
+      "work_unit_id": "branch-0123456789ab",
+      "branch_id": "branch-0123456789ab",
+      "unit_id": "verify-revenue",
+      "depends_on": [],
+      "approved_file_refs": ["forte-..."],
+      "state": "adopted",
+      "attempt": 1,
+      "version": 6,
+      "latest_contribution_id": "contribution-0123456789ab",
+      "status_reason": null
+    }
+  ],
+  "contributions": [
+    {
+      "contribution_id": "contribution-0123456789ab",
+      "work_unit_id": "branch-0123456789ab",
+      "branch_id": "branch-0123456789ab",
+      "attempt": 1,
+      "worker_run_id": "worker-0123456789ab",
+      "approved_file_refs": ["forte-..."],
+      "evidence_anchors": [],
+      "gate_status": "adopted",
+      "gate_reason": "服务端来源、定位与分支证据门通过",
+      "artifact_version": 1,
+      "summary": "已形成一份候选并进入阶段成果"
+    }
+  ],
   "shared_artifacts": [],
   "workspace_artifacts": [
     {
@@ -963,8 +1008,13 @@ topology_admission
 plan_validation
 topology_confirmation_required (adaptive route stops here until confirmation)
 control_topology_override_recorded (optional conservative user choice)
+worker_wave_reserved (WorkUnit reservation and budget committed before dispatch)
+work_unit_started (one per actually started WorkUnit)
 worker_returned (one per confirmed Worker)
+contribution_recorded (immutable candidate appended)
 contribution_adopted / contribution_waiting / contribution_rejected
+work_unit_failed (failed or checkpoint-recovered WorkUnit)
+worker_wave_committed (Snapshot, WorkUnit, Contribution and result projection reconciled)
 topology_workers_completed
 deterministic_office_tool_started (when one fixed local capability is admitted)
 run_workspace_artifact_written (for each isolated file)
@@ -996,8 +1046,13 @@ topology_admission
 plan_validation
 topology_confirmation_required (only for adaptive_readonly_workers)
 control_topology_override_recorded (optional conservative user choice)
+worker_wave_reserved
+work_unit_started
 worker_returned (one per confirmed Worker)
+contribution_recorded
 contribution_adopted / contribution_waiting / contribution_rejected
+work_unit_failed
+worker_wave_committed
 topology_workers_completed
 analysis_started
 analysis_completed
@@ -1015,10 +1070,13 @@ SSE remain available. `scenario_effect_failed` records a builder/verifier
 failure before the Run fail-closed path; it does not create an Artifact or an
 EffectReceipt.
 
-The worker thread receives only bytes and safe previews frozen from the
+The fixed-capability worker thread receives only bytes and safe previews frozen from the
 allowlisted Catalog before dispatch. It is not a durable execution lease: an
 API process restart cannot resume an in-flight subprocess, and PostgreSQL
-recovery still pauses at the existing checkpoint rather than replaying it.
+recovery still pauses at the existing checkpoint rather than replaying it. This
+is separate from DR-0055's read-only Analyst WorkUnit ledger: a committed Analyst
+Worker reservation preserves its Branch DAG and becomes an explicit recoverable
+failed unit, but is likewise never auto-replayed.
 
 TC-12 uses the same Artifact and EffectReceipt protocol rather than adding a
 Scenario API. A matching ordinary instruction may produce two downloadable
@@ -1093,7 +1151,7 @@ reconciliation; a nonterminal interruption uses GET plus `after=N` recovery.
 | passed `workspace_artifacts[]` plus `status=waiting_input` | deterministic outcome is downloadable, while Analyst audit location remains unresolved | show outcome first and group only same-source/same-failure gaps in the browser; do not change Snapshot Branches or claim `completed` |
 | `next_step.recovery_kind=source_location` | legal-scope candidate could not be uniquely mapped to safe Preview | for unavailable: show one recommended Branch retry with optional details collapsed; for ambiguous: require one explicit candidate choice before accept |
 | `next_step.recovery_kind=analysis_output` | provider responded twice without a usable public result structure | keep raw output hidden; show one recommended minimal-Branch retry, optional feedback or stop |
-| `checkpoint_recovered` | server restored a PostgreSQL Snapshot and paused | reconcile the trace; explicitly resume from the safe checkpoint |
+| `checkpoint_recovered` | server restored a PostgreSQL Snapshot and paused; a committed Worker reservation preserves its Branch DAG and marks only the unconfirmed WorkUnit as recovered failed | reconcile the trace; ordinary rounds resume from the safe checkpoint, while a recovered Worker unit requires a new idempotency key and current version for explicit target-only retry |
 | `loop_budget_stopped` | round/call/active deadline prevents another step; `budget.stop_reason` names the actual boundary | show the precise Chinese reason, bounded brief, preserved facts and candidate Branches; create a new Branch-scoped task instead of resuming the terminal Run |
 | `status=failed` | model/schema/plan/source/citation validation failed | show safe business error and no result |
 

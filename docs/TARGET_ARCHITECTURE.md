@@ -22,6 +22,8 @@ twelve fixed artifact adapters. It also has a limited Demo 1/2 vertical: stable
 Task lineage plus a minimal owner-scoped Task Ledger/current pointer across bounded
 Runs, deterministic topology admission and at most
 three in-process read-only Analyst Workers after explicit confirmation. Every
+validated Worker Branch now also has a minimal durable WorkUnit record and each
+return appends an immutable Contribution candidate in memory or PostgreSQL. Every
 source-file mutation, distributed Worker/lease, multi-instance coordination and
 Connector statement below is target design unless explicitly marked current.
 
@@ -33,10 +35,10 @@ Connector statement below is target design unless explicitly marked current.
 | 2. Task Contract | goal, workspace scope, budget, deadline and completion criteria | instruction + whole-workspace refs + bounded rounds/files/calls/deadline + stable `task_id`, minimal current pointer, dual Task/Run versions and Run lineage | user states intent without doing retrieval first, can identify the current Run and continue one approved Branch without rewriting context |
 | 3. Planner | retrieve evidence, propose work intent and dependencies | strict per-round Planner with autonomous evidence selection and one budgeted repair | users see what the Agent chose, why, and whether the plan was adopted |
 | 4. Admission, Policy Compiler & Validator | choose topology, compile policy, validate graph/sources/gates | server compilation/plan checks plus deterministic `single_controller` / `fixed_workflow` / `adaptive_readonly_workers` admission | route explanation shows why work stays single, uses a fixed workflow or waits for Worker confirmation |
-| 5. Scheduler & Worker Manager | bounded loop or adaptive workers, leases and replanning | one in-process bounded Controller plus an explicitly confirmed, process-local, maximum-three read-only Worker wave over ready Branches | live work map shows actual units, waiting and replanning without Worker chat |
+| 5. Scheduler & Worker Manager | bounded loop or adaptive workers, leases and replanning | one in-process bounded Controller plus an explicitly confirmed, process-local, maximum-three read-only Worker wave over ready Branches; full-DAG WorkUnits, pre-dispatch reservation and explicit checkpoint-recovered unit retry | live work map shows actual units, waiting and replanning without Worker chat |
 | 6. Tool Gateway | capability registry, Permit, idempotency and execution receipts | not connected | proposed impact appears before confirmation; actual impact after receipt |
-| 7. Artifact Workspace & Verifier | immutable versions, evidence, conflict and Commit | append-only logical evidence briefs/TaskCommits, fixed Run Workspace artifacts, citation/Anchor/Branch gates, result restore and deterministic merge of adopted Worker contributions | users review versions and evidence instead of trusting final prose |
-| 8. Checkpoint, Event & Governance Control | durable state, ordered events, risk/evidence/approval | ordered controls/events, per-Run monotonic streaming, minimal Task Ledger/current pointer, Task/Run lineage, memory or PostgreSQL Snapshot/records and safe restart recovery | current/history, concurrency conflicts, disconnect/restart recovery and human gates become explicit states |
+| 7. Artifact Workspace & Verifier | immutable versions, evidence, conflict and Commit | append-only logical evidence briefs/TaskCommits, fixed Run Workspace artifacts, citation/Anchor/Branch gates, immutable Contribution candidates, result restore and deterministic merge of adopted Worker contributions | users review versions and evidence instead of trusting final prose |
+| 8. Checkpoint, Event & Governance Control | durable state, ordered events, risk/evidence/approval | ordered controls/events, per-Run monotonic streaming, minimal Task Ledger/current pointer, Branch-bound WorkUnit/Contribution ledger, Task/Run lineage, memory or PostgreSQL records and safe restart recovery | current/history, candidate/adoption state, concurrency conflicts, disconnect/restart recovery and human gates become explicit states |
 
 ## 3. Shared runtime composition
 
@@ -56,13 +58,15 @@ Workspace Folder
 
 The current runtime validates a bounded Controller with Branch-selective resume,
 append-only logical ArtifactVersion/TaskCommit records, fixed isolated artifact
-adapters and optional PostgreSQL restart recovery. `DR-0053/54` add a limited
+adapters and optional PostgreSQL restart recovery. `DR-0053/54/55` add a limited
 Demo 1/2 vertical: a terminal Run can create a same-Task child Run for exactly
 one server-approved Branch, while a minimal owner-scoped Task record and
 `task_version` choose one authoritative current Run; a validated plan receives deterministic topology
 admission and, only after confirmation, may execute up to three in-process
 read-only Workers whose adopted contributions merge into the normal Artifact
-history. It does not validate source-file writes, distributed Workers, leases or
+history. `DR-0055` persists the Branch DAG as WorkUnits, appends every return as
+a Contribution, and supports no-auto-replay plus explicit target-only retry after
+a Worker checkpoint recovery. It does not validate source-file writes, distributed Workers, leases or
 multi-instance scheduling. Demo 3 validates the same cross-cutting action gate
 for both future topologies. Capabilities are registered once; a Demo identity
 never creates a special private executor.
@@ -122,10 +126,11 @@ Branch, base Artifact/Commit, frozen Workspace revision and exact recheck refs.
 The old Run stays immutable, and the browser resets its SSE cursor only after a
 valid child snapshot. `DR-0054` now atomically commits the Task/current pointer,
 Run and continuation receipts, requires parent Run plus Task expected versions,
-and exposes a sanitized current/history projection. Its PostgreSQL integration
-tests exist for CAS/replay/restart but were skipped locally without
-`TEST_DATABASE_DSN`, so that deployment gate remains open. Later additions are a
-durable WorkUnit/Contribution ledger, finer per-file source revisions, general
+and exposes a sanitized current/history projection. Seven Task tests and three
+Demo 1/2 Worker recovery tests passed against an isolated PostgreSQL 17.11
+instance. `DR-0055` adds a Branch-bound WorkUnit/Contribution ledger with strict
+reservation replay and explicit recovered-unit retry. Later additions are a
+distributed queue/lease, finer per-file source revisions, general
 writable office artifacts, broader semantic/numeric evidence, multi-instance
 lease/notification and verified source-file Commit. Initial acceptance data comes from FORTE administration,
 finance, sales and SRE folders.
@@ -149,6 +154,15 @@ Branch Evidence Gate and applicable narrative/deterministic reconciliation
 decide whether it is adopted before a stable merge into the normal Artifact
 history. A failed/ambiguous Worker does not erase adopted siblings.
 
+The second limited increment, `DR-0055`, persists the complete validated Branch
+DAG as WorkUnits before dispatch. Reservation, attempt, budget and an ordered
+event are committed before the model call; every return appends an immutable
+Contribution, while adoption remains a separate Gate. PostgreSQL restart
+preserves completed candidates and v1/v2, marks only an unconfirmed in-flight
+unit as recovered failed, and never auto-replays it. A new idempotency key plus
+current Run version can retry only that recovered unit. This is still not a
+durable queue, lease, remote Worker runtime or multi-instance scheduler.
+
 The user sees business work packages, dependencies, actual model/tool receipts,
 replanning reason and convergence condition. Raw Worker prompts, chain-of-thought
 and private conversations stay hidden. Initial acceptance data comes from FORTE
@@ -157,10 +171,12 @@ release readiness, legal review, recruitment and code-workspace folders.
 The detailed research, scenarios and falsifiable gates are recorded in
 [`DR-0053`](decisions/DR-0053-durable-task-lineage-and-explainable-topology-admission.md),
 [`SCENARIO-038`](scenarios/SCENARIO-038-durable-task-continuation-across-runs.md)
-and [`SCENARIO-039`](scenarios/SCENARIO-039-explainable-topology-and-verified-worker-convergence.md).
-The implemented subset is `Limited Verified` by unit and browser automation;
-real PostgreSQL execution, real Provider evidence and target-user research are
-still open and are not inferred from those tests.
+and [`SCENARIO-039`](scenarios/SCENARIO-039-explainable-topology-and-verified-worker-convergence.md),
+plus [`DR-0055`](decisions/DR-0055-durable-workunit-and-contribution-ledger.md)
+and [`SCENARIO-041`](scenarios/SCENARIO-041-workunit-contribution-ledger-and-partial-convergence.md).
+The implemented subset is `Limited Verified` by unit, browser and isolated
+single-host PostgreSQL 17.11 automation; real Provider evidence, remote or
+multi-instance execution and target-user research remain open.
 
 ## 7. Demo 3 target: risk and action gate
 
@@ -199,8 +215,9 @@ model answer can still be numerically wrong.
    lineage and bounded topology/Worker vertical; retain its real single-host
    PostgreSQL transaction gate and run an authorized Provider gate separately
    without broadening claims.
-4. Add a Task-bound WorkUnit/Contribution Ledger with explicit unit version,
-   dependency, latest contribution and local recovery state before queue/lease work.
+4. Preserve the implemented Task/Branch-bound WorkUnit/Contribution Ledger with
+   explicit unit version, dependency, immutable candidate and local recovery state;
+   next add a real queue/lease only after its ownership and failure semantics are tested.
 5. Add file-level evidence locations plus task-specific deterministic validators.
 6. Broaden the writable isolated Run workspace and immutable office-file
    Artifacts; keep source-file Commit separate from the current logical brief
@@ -223,7 +240,8 @@ Evidence Gate, fixed isolated Artifact adapters, ordered events and controls,
 optional PostgreSQL-backed single-Controller recovery, independent append-only
 logical brief/TaskCommit history, minimal owner-scoped Task record/current pointer,
 dual-version bounded Task/Run continuation, deterministic
-topology admission and an explicitly confirmed maximum-three in-process read-only
-Worker wave. Semantic correctness, source-file mutation, distributed or
+topology admission, an explicitly confirmed maximum-three in-process read-only
+Worker wave, Branch-bound WorkUnit state, immutable Contribution candidates and
+explicit checkpoint-recovered unit retry. Semantic correctness, source-file mutation, distributed or
 multi-instance Worker leases, Tool Gateway, real Connectors, production identity,
-durable WorkUnit state, measured Worker benefit and user value are not current capabilities.
+durable queue/lease ownership, measured Worker benefit and user value are not current capabilities.

@@ -16,12 +16,16 @@
 `docs/research/DEMO1-DEMO2-DURABLE-TASK-AND-ADAPTIVE-ORCHESTRATION-RESEARCH-20260830.md`、
 `docs/decisions/DR-0053-durable-task-lineage-and-explainable-topology-admission.md`、
 `docs/scenarios/SCENARIO-038-durable-task-continuation-across-runs.md` 与
-`docs/scenarios/SCENARIO-039-explainable-topology-and-verified-worker-convergence.md`。
+`docs/scenarios/SCENARIO-039-explainable-topology-and-verified-worker-convergence.md`；修改
+WorkUnit、Contribution 或 Worker checkpoint 恢复还必须读取
+`docs/decisions/DR-0055-durable-workunit-and-contribution-ledger.md`、
+`docs/scenarios/SCENARIO-041-workunit-contribution-ledger-and-partial-convergence.md` 与对应 Evidence。
 `DR-0053` 当前为限定 `Limited Verified`：跨 Run `task_id`、Topology Admission、
 显式确认的进程内只读 Worker 与 Contribution merge 已形成纵切，但只允许
 `external_action=none`、每批最多三个 ready Branch，并依赖现有 Analyst/Evidence Gate。
-不得把它写成通用/分布式 Worker Runtime；本地 PostgreSQL 新门因无
-`TEST_DATABASE_DSN` 跳过，真实 Provider 与目标用户研究也未完成。
+不得把它写成通用/分布式 Worker Runtime。`DR-0055` 已增加 Branch 绑定的最小持久
+WorkUnit/Contribution 台账，隔离 PostgreSQL 17.11 的 Demo/Task 组合门为 10 项通过；
+这仍是单主机顺序证据，真实 Provider、远端 Worker、多实例 lease 与目标用户研究未完成。
 
 DR-0032 additionally governs EvidenceResolution source revisions, DecisionRequest/
 DecisionRecord persistence and Finding/Branch-local restart recovery. Read
@@ -241,10 +245,10 @@ Source、Evidence 和 UI-server fact mapping，不能只更新 README。
 - `pause/resume/steer/stop/rollback/decision` 必须携带 expected version 与幂等键。Branch resume 还携带 `branch_id`；rollback 还携带 `artifact_version`，只新增 TaskCommit 并恢复逻辑 Brief，不删除历史或回滚源文件。decision 把 `accept/decline/defer/cancel` 绑定到当前 DecisionRequest/Finding/Resolution/Branch；accept 证据候选还必须携带 source revision，服务端重新读取 Catalog 并重算 candidate。关闭待决页记录 defer，defer 后仍可继续最终决定；cancel 不冒充 rejected。它们不改变原文件或外部状态。pause/stop 只在模型调用之间的安全点生效；steer 只影响下一轮；deadline 阻止新调用但不硬取消在途 HTTP 请求。预算终态必须显示 `budget.stop_reason` 的具体中文原因，不得只显示 raw `budget_exhausted`；terminal Run 不得 resume，只能按 Branch 创建新 Run。
 - 开放待决单以 Snapshot 顶层 `decision_requests[]` 为权威，旧轮次投影只作兼容读取。关闭或 Escape 必须先退出审查页，再尝试写入 defer；409/断网只显示非阻塞错误并刷新 Snapshot，不能把用户困在弹窗，也不能伪造回执成功。Evidence Gap 区固定使用“分支 -> 当前材料 -> Evidence Gate -> 下一步”的 Branch lane；各单元只能来自 Branch/Gap/Resolution/Decision 服务端事实，不得把可视分支解释成并行 Worker。普通可恢复 Branch 必须明确“无需核对文件，建议重试”，首屏只给一个推荐 resume 且折叠可选输入/审计；ambiguous Branch 必须明确“从 N 个原文位置中选 1 个”，不默认选择并在未选前禁用 accept。
 - Snapshot 是状态权威，SSE 是有序变更投影。浏览器只在同一 `run_id` 内单调应用 version/sequence；continuation 切换到新 child Run 时允许计数从 1 重新开始。nonterminal 断线用 GET + `after=N`，terminal event 后 final GET。
-- 配置 `DATABASE_DSN` 时，Run Snapshot、最小 Task record、Task continuation receipt、start/control 幂等回执以及独立 ArtifactVersion/TaskCommit 写入 PostgreSQL；重启恢复会删除未完成轮次、追加 `checkpoint_recovered` 并暂停，绝不自动重放中断的模型调用。历史 Run/Decision 的真实 PostgreSQL 顺序 Runtime 已有远端 Evidence；Task Ledger 的七项 PostgreSQL 测试又在隔离 PostgreSQL 17.11 上实跑通过，覆盖条件更新、回滚、重启复读和破损 parent version fail closed。这些单主机顺序门都不等于多实例 lease、高可用或在途 HTTP 续跑。未配置数据库时明确使用单进程 memory 且重启不恢复。`X-User-Id` 是未签名演示 Owner。
+- 配置 `DATABASE_DSN` 时，Run Snapshot、最小 Task record、Task continuation receipt、Branch 绑定的 WorkUnit/Contribution 台账、start/control/Worker reservation 幂等回执以及独立 ArtifactVersion/TaskCommit 写入 PostgreSQL。普通中断模型轮次仍删除未完成轮次、追加 `checkpoint_recovered` 并暂停；已经提交 Worker reservation 的恢复则保留 validated Branch DAG、TopologyAdmission、已完成候选和成果，把未确认的在途 WorkUnit 标成 checkpoint-recovered failed，绝不自动重放调用。新幂等键与当前 version 只允许显式重试目标恢复单元。历史 Run/Decision 有真实顺序 Evidence；Task Ledger 7 项和 Demo 1/2 WorkUnit 3 项又在隔离 PostgreSQL 17.11 上组合实跑 `10 passed`。这些单主机顺序门都不等于多实例 lease、高可用或在途 HTTP 续跑。未配置数据库时明确使用单进程 memory 且重启不恢复。`X-User-Id` 是未签名演示 Owner。
 - `start-demo.ps1` 的状态库优先级是 Docker、本轮 PowerShell 进程显式 `DATABASE_DSN`、memory。没有前两者时必须用空进程变量覆盖 `.env` 残留 DSN；模型配置仍可从 `.env` 读取。前台/汇报只以 `/v1/health.checkpoint/task_store` 判断本轮是否可恢复。
 - Catalog/preview 完整性失败必须 fail closed。前台区分 API 离线、workspace integrity failure、file preview failure 和 Run failure，不得填充静态假数据。
-- Demo 1/2/3 只是通用能力的验收镜头：Demo 1 当前覆盖分支推进、成果历史、局部恢复、同一 `task_id` 下的单 Branch child Run，以及 owner-scoped Task current pointer/双版本 CAS 的有限纵切；Demo 2 当前只覆盖确定性路线准入、用户确认、每批最多三个进程内只读 Worker、依赖波次和服务端贡献合入。它们不等于任意办公 Artifact、生产 Tool Gateway、durable WorkUnit queue、分布式调度或多实例协调。Demo 3 跨拓扑 Risk Gate 仍是目标能力。不得因 Demo 名或 Scenario ID 宣称未实现能力已经执行。
+- Demo 1/2/3 只是通用能力的验收镜头：Demo 1 当前覆盖分支推进、成果历史、局部恢复、同一 `task_id` 下的单 Branch child Run，以及 owner-scoped Task current pointer/双版本 CAS 的有限纵切；Demo 2 当前覆盖确定性路线准入、用户确认、每批最多三个进程内只读 Worker、完整 Branch DAG 的 WorkUnit 投影、不可变 Contribution、依赖波次、服务端贡献合入与 checkpoint-recovered 显式单元重试。它们不等于任意办公 Artifact、生产 Tool Gateway、durable queue/lease、远端 Worker、分布式调度或多实例协调。Demo 3 跨拓扑 Risk Gate 仍是目标能力。不得因 Demo 名或 Scenario ID 宣称未实现能力已经执行。
 - 自动化和截图是工程代理，不是用户研究。界面是否更清晰、信任/效率/价值是否提升均为 `Draft`。
 
 ## 八个统一模块
@@ -262,8 +266,8 @@ Source、Evidence 和 UI-server fact mapping，不能只更新 README。
 
 当前实现模块 1-4（含确定性 Topology Admission）、模块 5 的有界单 Loop Controller 与显式确认的进程内只读 Worker 子集、模块 7 的 12 个固定本地确定性办公适配器、受限 read-only
 Result/citation/服务端 Preview Evidence Anchor/Branch Evidence Gate/Worker Contribution Gate/独立 append-only 逻辑 ArtifactVersion/TaskCommit、隔离 Run Workspace 文件/确定性 Verifier 与恢复子集，
-以及模块 8 的 Snapshot、event、最小 owner-scoped Task Ledger/current pointer/双版本 CAS、Task/Run lineage、branch/topology/rollback control、idempotency 和可选 PostgreSQL
-restart-recovery 子集。durable WorkUnit ledger、分布式 Scheduler/Worker lease、模块 6 的真实 Tool Gateway、可写办公
+以及模块 8 的 Snapshot、event、最小 owner-scoped Task Ledger/current pointer/双版本 CAS、Branch 绑定的 WorkUnit/Contribution 台账、Task/Run lineage、branch/topology/rollback control、idempotency 和可选 PostgreSQL
+restart-recovery 子集。durable/distributed queue 与 Worker lease、模块 6 的真实 Tool Gateway、可写办公
 源文件、通用语义 Verifier、多实例协调、Risk/Evidence/Approval/Permit 和 Connector
 均是目标架构。
 

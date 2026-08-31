@@ -115,6 +115,19 @@ coordinator. The seven dedicated Task Ledger tests now pass against an isolated
 PostgreSQL 17.11 instance after a malformed-parent-version fail-closed fix; this
 is a single-host sequential transaction gate, not multi-instance execution or HA.
 
+[`DR-0055`](docs/decisions/DR-0055-durable-workunit-and-contribution-ledger.md)
+adds the next limited Demo 2 slice: every validated Worker Branch has a durable
+`WorkUnitRecord`, and every Worker return appends an immutable
+`ContributionRecord`. Reservation is committed before dispatch; returned and
+adopted remain different facts. PostgreSQL restart preserves the validated
+Branch DAG, completed contributions and v1/v2 history, marks an unconfirmed
+in-flight unit as checkpoint-recovered failed, and never auto-replays it. A new
+idempotency key plus current Run version can explicitly retry only that recovered
+unit. This is still an in-process read-only Analyst Worker ledger, not a durable
+queue, lease, remote Worker runtime or multi-instance scheduler. The isolated
+PostgreSQL 17.11 Demo/Task combination passed 10 tests; full Python passed
+414 with 23 environment skips, and Playwright passed 68.
+
 ## Public data and preview boundary
 
 FORTE is pinned to commit
@@ -155,10 +168,13 @@ GET  /v1/harness/runs/{run_id}/events?after={sequence}
 The former Scenario list/detail routes are not mounted. There are twelve public
 operations over eleven OpenAPI paths because `GET` and `POST` share `/runs`.
 `X-User-Id` remains an unsigned demonstration Owner placeholder. With
-`DATABASE_DSN`, accepted Run snapshots, the minimal Task Ledger, command receipts,
-ArtifactVersions and TaskCommits are stored in PostgreSQL. Recovery rolls an interrupted model call
-back to the last completed round and pauses for the user; it never silently
-replays the call. Without a database, health reports `memory` and process-
+`DATABASE_DSN`, accepted Run snapshots, the minimal Task Ledger, Branch-bound
+WorkUnits/Contributions, command/reservation receipts, ArtifactVersions and
+TaskCommits are stored in PostgreSQL. Ordinary recovery rolls an interrupted
+model round back to the last completed round. A committed Worker reservation
+instead preserves its validated Branch DAG and completed candidates, marks the
+unconfirmed unit recovered failed, and requires an explicit new-key retry. Neither
+path silently replays a call. Without a database, health reports `memory` and process-
 restart recovery is unavailable.
 
 ## Eight modules
@@ -174,13 +190,14 @@ restart recovery is unavailable.
 
 Current implementation covers modules 1-4, including deterministic topology
 admission; a bounded single-loop controller plus an explicitly confirmed,
-in-process read-only Worker subset of module 5; module 6 remains unconnected as a
+in-process read-only Worker, Branch-bound WorkUnit and append-only Contribution
+subset of module 5; module 6 remains unconnected as a
 general Tool Gateway; module 7 includes a read-only result/citation/Evidence Gate,
 logical append-only ArtifactVersion, TaskCommit pointer/restore, twelve fixed
 deterministic local adapters with isolated run-workspace files, deterministic
 verifiers and gated Worker contribution merge;
 and a Snapshot/event, Task/Run lineage, branch/topology control, idempotency and
-optional PostgreSQL restart-recovery subset of module 8. Distributed Worker
+optional PostgreSQL Task/WorkUnit restart-recovery subset of module 8. Distributed Worker
 leases, cross-process dispatch, a general
 Tool Gateway, arbitrary source-file mutation, general semantic verification,
 multi-instance coordination and governed external action remain target work.
@@ -340,8 +357,8 @@ multi-instance coordination and governed external action remain target work.
   the normal Artifact/Commit history. Analyst/Worker findings use a governance
   maximum of 96 rather than a three-item analysis cap; the browser initially
   shows three only as a collapsible density choice. Unit and 1440/390 browser gates pass. The
-  new PostgreSQL restart tests are committed but skipped locally without
-  `TEST_DATABASE_DSN`; no paid Provider run or target-user study was performed.
+  earlier three PostgreSQL restart tests have since run as part of the isolated
+  DR-0055 gate; no paid Provider run or target-user study was performed.
   Therefore this is a limited in-process read-only slice, not proof of production
   durability, distributed Workers or business benefit.
 - `DR-0054` adds a minimal owner-scoped Task record and two-level optimistic
@@ -351,9 +368,17 @@ multi-instance coordination and governed external action remain target work.
   public Task projection derives status, Artifact/Commit pointers and up to 100
   recent lineage items from immutable Run Snapshots. Targeted Python tests are
   `92 passed`, Task Ledger browser tests are `4 passed`, Ruff/lint/build pass,
-  and seven PostgreSQL tests are collected but skipped locally without a DSN.
-  This does not prove real PostgreSQL execution, multi-instance safety, Provider
-  quality, user comprehension or a durable WorkUnit/Worker system.
+  and seven PostgreSQL 17.11 tests pass. This proves only a single-host sequential
+  transaction gate, not multi-instance safety, Provider quality or user comprehension.
+- `DR-0055` binds every adaptive Worker Branch to an independently persisted
+  WorkUnit and appends every return as a Contribution candidate. Full-DAG
+  projection, two-wave v1/v2 convergence, partial waiting, fixed-workflow
+  exclusion, strict reservation replay and checkpoint-recovered explicit retry
+  are covered. Full Python is `417 passed, 23 skipped`; Playwright is `68 passed`;
+  the real PostgreSQL 17.11 Demo/Task gate is `10 passed`. The frontend shows
+  business work names, actual execution receipts, candidate outcomes and source
+  location without exposing raw unit IDs. This remains a local read-only ledger,
+  not a distributed scheduler, remote Worker platform or production executor.
 - `DR-0042` replaces TC-12's historical repair-only 9/9 Vitest receipt with the
   complete 11-file qa-003 dashboard-toolkit copy and one manifest-owned 71-case
   test set. The same tests first expose the original alias failure, then the
@@ -557,6 +582,9 @@ pnpm --dir apps/web exec playwright test e2e/harness-workbench.spec.ts
 - [DR-0054：独立 Task Ledger 与当前 Run 版本控制](docs/decisions/DR-0054-durable-task-ledger-and-current-run-cas.md)
 - [SCENARIO-040：两个页面同时续办时只有一个当前 Run](docs/scenarios/SCENARIO-040-task-current-run-cas-and-restart.md)
 - [Task Ledger V1 工程 Evidence](docs/evidence/DR-0054-TASK-LEDGER-V1-EVIDENCE-20260831.md)
+- [DR-0055：Branch 绑定的 WorkUnit 与不可变 Contribution 台账](docs/decisions/DR-0055-durable-workunit-and-contribution-ledger.md)
+- [SCENARIO-041：五个工作包的可恢复执行与局部成果收敛](docs/scenarios/SCENARIO-041-workunit-contribution-ledger-and-partial-convergence.md)
+- [WorkUnit / Contribution Ledger V1 工程 Evidence](docs/evidence/DR-0055-WORKUNIT-CONTRIBUTION-LEDGER-V1-EVIDENCE-20260831.md)
 - [DR-0053：跨 Run 任务谱系与可解释协作拓扑准入](docs/decisions/DR-0053-durable-task-lineage-and-explainable-topology-admission.md)
 - [SCENARIO-038：同一办公任务跨 Run 延续而不覆盖历史](docs/scenarios/SCENARIO-038-durable-task-continuation-across-runs.md)
 - [SCENARIO-039：可解释路线准入与受限 Worker 统一收敛](docs/scenarios/SCENARIO-039-explainable-topology-and-verified-worker-convergence.md)

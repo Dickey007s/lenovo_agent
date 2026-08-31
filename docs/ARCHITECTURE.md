@@ -106,7 +106,25 @@ continuation atomically commit Task, Run and start idempotency receipt through
 `HarnessStateStore`. Continuation also writes an append-only Task receipt and must
 match both expected versions, so sibling requests cannot both become current.
 This is not a cross-tenant identity service, Task list, arbitrary pointer switch,
-WorkUnit ledger, queue/lease, multi-instance coordinator or infinite Run resume.
+queue/lease, multi-instance coordinator or infinite Run resume.
+
+`DR-0055` adds an independent but Branch-bound WorkUnit/Contribution ledger below
+the Task boundary. The full validated Branch DAG is projected before dispatch;
+each WorkUnit owns only execution state, attempt, reservation and latest-candidate
+references, while Branch remains authoritative for business goal, dependencies,
+approved sources and Evidence Gate. Each Worker return appends an immutable
+Contribution. A returned candidate becomes part of the normal ArtifactVersion /
+TaskCommit history only after source, Anchor and Branch Gate checks.
+
+Memory and PostgreSQL implementations enforce Owner/Task/Run/Branch scope,
+append-only candidates, monotonic versions and parent Run CAS. Reservation and
+model-call budget are committed before dispatch. After a PostgreSQL restart, a
+committed Worker reservation preserves the validated Branch DAG,
+TopologyAdmission, completed Contributions and artifact history; an unconfirmed
+in-flight unit becomes `checkpoint_recovered_in_flight_worker` and is never
+auto-replayed. A new idempotency key plus the current Run version can explicitly
+retry only that recovered unit. This is a local read-only execution ledger, not a
+durable queue, Worker lease, remote execution service or multi-instance scheduler.
 
 ## 4. Planning and analysis ownership
 
@@ -253,10 +271,13 @@ atomically stores the accepted Snapshot and receipts, optionally with new
 append-only ArtifactVersion/TaskCommit rows. Initial start and cross-Run
 continuation additionally use one aggregate commit for the minimal Task record,
 Run, start idempotency and optional Task continuation receipt. On PostgreSQL startup, terminal and
-paused Runs plus their independent artifact history are restored. Any interrupted
-round and its uncommitted Branch records are removed, a `checkpoint_recovered`
-event is appended and the Run pauses
-at the last completed round; model calls are not automatically replayed. The
+paused Runs plus their independent artifact history are restored. An ordinary
+interrupted round removes its uncommitted Branch records, appends
+`checkpoint_recovered` and pauses at the last completed round. A round with a
+committed Worker reservation instead retains its validated Branch DAG,
+TopologyAdmission, completed Contributions and artifacts, and marks only the
+unconfirmed in-flight WorkUnit as checkpoint-recovered failed. Neither path
+automatically replays model calls. The
 browser restores its known Run id, or discovers the most recent nonterminal
 Owner Run via `GET /runs`. When a Task pointer is known, Task GET identifies the
 authoritative current Run and marks a rendered parent as historical. A continuation
@@ -558,10 +579,10 @@ not a general semantic verifier.
 | Task Contract | user instruction, complete workspace scope, loop bounds, Owner/key/version, stable `task_id`, minimal owner-scoped Task record/current pointer, dual Run/Task version checks, parent/child Run lineage and one-Branch recheck scope | production identity, richer carried-fact policy, Task list and cross-tenant policy |
 | Planner | strict candidate, autonomous evidence selection, per-round receipt and one bounded repair | retrieval-quality evaluation and richer replanning policy |
 | Admission/Policy/Validator | server compilation, deterministic graph/source checks and three-route `TopologyAdmission` | measured benefit/cost policy, production risk admission and direct-tool route |
-| Scheduler & Worker Manager | bounded single-loop controller plus explicit waves of at most three in-process read-only Branch Workers, dependency readiness, budget reservation and partial-result preservation | durable leases/queue, recursive or cross-process workers and multi-instance recovery |
+| Scheduler & Worker Manager | bounded single-loop controller plus explicit waves of at most three in-process read-only Branch Workers, full-DAG WorkUnit projection, dependency readiness, pre-dispatch reservation, partial-result preservation and explicit checkpoint-recovered unit retry | durable leases/queue, recursive or cross-process workers and multi-instance recovery |
 | Tool Gateway | twelve fixed local deterministic office adapters with EffectReceipts; no model-owned dispatch | reusable governed tool registry, arbitrary safe commands, Web/SQL/Scheduler/Connector receipts |
-| Artifact Workspace & Verifier | independent append-only logical evidence-brief versions, citation membership, server-resolved preview Anchors, branch Evidence Gate, TaskCommit pointer/restore, isolated CSV/Markdown/DOCX/ZIP files and named deterministic validators for twelve fixed capabilities, narrative reconciliation, plus anchored Worker contribution adoption/merge | general writable office workspace, reusable semantic/numeric verifier framework, broader narrative claim extraction, conflict-aware edits and multi-host Artifact durability |
-| Checkpoint/Event/Governance | ordered events, minimal Task Ledger/current pointer, Task-level CAS, Task/Run lineage, branch/topology/rollback controls, idempotent commands, sanitized receipts, independent records, optional PostgreSQL restart recovery and a real single-host PostgreSQL 17.11 Task transaction gate | durable WorkUnit/Contribution ledger, multi-instance lease/notification, in-flight cancellation and policy/approval/Permit integration |
+| Artifact Workspace & Verifier | independent append-only logical evidence-brief versions, citation membership, server-resolved preview Anchors, branch Evidence Gate, TaskCommit pointer/restore, isolated CSV/Markdown/DOCX/ZIP files and named deterministic validators for twelve fixed capabilities, narrative reconciliation, plus immutable Worker Contribution candidates and anchored adoption/merge | general writable office workspace, reusable semantic/numeric verifier framework, broader narrative claim extraction, conflict-aware edits and multi-host Artifact durability |
+| Checkpoint/Event/Governance | ordered events, minimal Task Ledger/current pointer, Task-level CAS, Branch-bound WorkUnit/Contribution ledger, Task/Run lineage, branch/topology/rollback controls, idempotent commands, sanitized receipts, independent records, optional PostgreSQL restart recovery and real single-host PostgreSQL 17.11 Task/WorkUnit transaction gates | distributed WorkUnit queue/lease, multi-instance notification/ownership, in-flight cancellation and policy/approval/Permit integration |
 
 ## 8. Security and claim boundary
 

@@ -212,12 +212,15 @@ PostgreSQL 恢复，当时存在两个产品断点：
 当前本地门：unit `383 passed`；全量 Playwright `64 passed`；Ruff、compileall、Web
 lint/build 通过；后续公开投影与字号收尾定向 Python `65 passed`、桌面/390 px
 Playwright `2 passed`；来源变化条件式提示与 390 px Task 时间线又由两个独立 E2E
-补丁覆盖，目标 Playwright 均为 `2 passed`。新增 PostgreSQL integration 收集 3 项，但本机没有
-`TEST_DATABASE_DSN`，因此 `3 skipped`，不能算通过；真实 Provider 未获付费授权也未运行。
+补丁覆盖，目标 Playwright 均为 `2 passed`。本决策最初新增的 3 项 PostgreSQL integration
+曾因没有 `TEST_DATABASE_DSN` 而 skip；后续 `DR-0055` 已在隔离 PostgreSQL 17.11 上与
+Task Ledger 组合实跑为 `10 passed`。真实 Provider 未获本轮付费授权也未运行。
 这些自动化只把本决策升级到限定工程 `Limited Verified`，不升级用户价值判断。
 
-明确未通过/未执行的升级门是：真实 PostgreSQL、真实 Provider、Worker stale revision、
-通用数值冲突验证、Worker 专属持久局部恢复，以及目标用户形成性研究。
+后续 `DR-0055` 已补 Branch 绑定 WorkUnit、append-only Contribution 和
+checkpoint-recovered 目标单元显式重试。仍未通过/未执行的升级门是：真实 Provider、
+distributed queue/lease、多实例 Worker ownership、通用数值冲突验证、Worker 专属
+DecisionRequest，以及目标用户形成性研究。
 
 ## 拒绝的替代方案
 
@@ -237,8 +240,8 @@ Playwright `2 passed`；来源变化条件式提示与 390 px Task 时间线又�
 | Claim | 状态 | 依据 | 升级条件 |
 | --- | --- | --- | --- |
 | 当前已有 Run 内分支、成果版本与可选 PG 恢复 | `Current` | 当前源码/living docs | 保持回归测试 |
-| 当前已有跨 Run Task lineage 与最小 Task Ledger 的有限纵切 | `Limited Verified` | `task_id`/child Run/单 Branch/Task GET/双版本 CAS/公共重核投影自动化、隔离 PostgreSQL 17.11 的 7 项顺序事务门与 Evidence | Provider 门、WorkUnit ledger 与多实例执行协调 |
-| 当前已有进程内受限只读 Worker 纵切 | `Limited Verified` | 最多三 Worker、采用门、确定性合并、局部失败自动化 | durable queue/lease、多实例、真实 Provider |
+| 当前已有跨 Run Task lineage 与最小 Task Ledger 的有限纵切 | `Limited Verified` | `task_id`/child Run/单 Branch/Task GET/双版本 CAS/公共重核投影自动化、隔离 PostgreSQL 17.11 的 7 项顺序事务门与 Evidence | Provider 门与多实例执行协调 |
+| 当前已有进程内受限只读 Worker 与 WorkUnit/Contribution 台账纵切 | `Limited Verified` | 最多三 Worker、采用门、完整 DAG、不可变候选、局部失败、目标恢复和隔离 PostgreSQL 17.11 三项 Demo 门 | durable queue/lease、多实例、远端 Worker、真实 Provider |
 | 路线准入是本项目原生合同 | `Limited Verified` | 07-16 + 官方调研 + 确定性 unit/E2E | 同场基线验证业务收益 |
 | 统一驾驶舱提升理解/效率 | `Draft` | HAI 研究支持方向 | 目标用户形成性研究 |
 
@@ -248,4 +251,5 @@ Playwright `2 passed`；来源变化条件式提示与 390 px Task 时间线又�
 原生合同。它也不证明多 Worker 更快、更便宜、更正确。当前 Worker 是同一进程内的
 受限 Analyst 调用，不是通用分布式执行器；不存在 queue/lease、多实例所有权或 Worker
 专属 DecisionRequest。当前也不实现真实 Connector、生产身份、源文件写回、HA 或外部
-动作。PostgreSQL、Provider 和目标用户门未完成的结论必须继续明确标注。
+动作。单主机 PostgreSQL 门虽已完成，Provider、多实例和目标用户门未完成的结论必须
+继续明确标注。

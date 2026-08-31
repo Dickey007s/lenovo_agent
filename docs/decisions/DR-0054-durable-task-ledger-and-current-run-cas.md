@@ -102,13 +102,14 @@ Task 时间线明确标记“当前 Run”。若 Task CAS 冲突，页面保留�
 
 ## 本阶段明确不做
 
-- 独立 WorkUnit/Contribution ledger、Worker queue/lease、远端 Worker 和多实例 HA；
+- Worker queue/lease、远端 Worker 和多实例 HA；
 - per-file revision 服务、源文件写回、真实 Connector 或外部动作；
 - Task list、删除、跨 Task 合并、任意 current pointer 回拨；
 - 把 PostgreSQL 表创建或测试收集写成真实数据库恢复已通过。
 
-WorkUnit ledger 是下一纵切：它将绑定本决策的 `task_id/task_version`，独立保存
-WorkUnit 状态、依赖、最新 Contribution 和局部恢复版本，但不会与 Task V1 同批冒进。
+后续 `DR-0055` 已按本决策的 `task_id/task_version` 边界落地 Branch 绑定的最小
+WorkUnit/Contribution ledger，独立保存执行状态、依赖、不可变候选和 checkpoint-recovered
+局部恢复版本。它没有改变本决策的 Task V1 范围，也没有加入 queue/lease 或多实例 HA。
 
 ## 前台交互影响
 
@@ -138,4 +139,4 @@ subprocess 经独立复核为约 42 秒的真实 baseline/compile/self-test 长�
 分支回归；相关 scenario-effect 文件 `35 passed in 228.01s`。当前整库 Python 为
 `410 passed, 23 skipped`，整库 Playwright 为 `68 passed`。真实 Provider 和目标用户研究
 未运行。因此本决策只能标 `Limited Verified`，
-不能升级为多实例生产 durable Task、WorkUnit/Worker durability 或用户价值结论。
+不能升级为多实例生产 durable Task、queue/lease Worker durability 或用户价值结论。

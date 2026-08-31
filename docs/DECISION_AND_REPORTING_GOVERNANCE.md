@@ -145,6 +145,16 @@ only a real PostgreSQL restart gate can support a claim that an open DecisionReq
 survives restart. `cancel` remains distinct from `decline`, and neither action is
 an approval or an external effect.
 
+For DR-0055, reports must keep Branch business authority, WorkUnit execution
+state, Contribution candidate and Artifact adoption as four separate facts.
+“reserved/running/returned/adopted” may not be collapsed into one completed
+label. A durability claim must name whether the record is memory- or
+PostgreSQL-backed, whether an in-flight call is replayed, and what idempotency /
+version contract governs an explicit retry. Public API/DOM evidence must also
+show that Owner, raw source revision, reservation digest and provider raw output
+remain private. A single-host PostgreSQL gate is not queue/lease, multi-instance
+ownership, remote Worker execution or high availability.
+
 When a deterministic Effect and a model narrative coexist, reporting must also
 record their reconciliation before calling the narrative adopted. `called`,
 `output_used`, Artifact/Effect status, reconciliation authority/disposition and

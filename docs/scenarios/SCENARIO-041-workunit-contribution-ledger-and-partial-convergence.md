@@ -1,6 +1,7 @@
 # SCENARIO-041：五个工作包的可恢复执行与局部成果收敛
 
-- 状态：`Draft`；等待 WorkUnit/Contribution Ledger V1 运行验证
+- 状态：`Limited Verified`；固定 Fixture、Memory/API、浏览器与隔离 PostgreSQL 17.11
+  单主机顺序门通过
 - 决策：`DR-0055`
 - Source：`USER-FEEDBACK-20260831-DEMO1-DEMO2-FIXED-SCENARIO-HARDENING`、
   `MULTI-AGENT-ORCHESTRATION-OFFICIAL-20260830`、
@@ -73,7 +74,8 @@
 - Agent 路径：重启读取 durable WorkUnit，将在途 attempt 标成需处理的失败状态；绝不
   自动重放模型调用，也不伪造 Contribution。
 - 前台输出：“上次调用未确认返回，未自动重试；已有成果保留”。
-- 用户动作：审查后创建新的 attempt；不能从旧页面假定 Provider 没有收费或副作用。
+- 用户动作：审查后使用新的幂等键和当前 version 显式重试该工作包；原幂等键只回放旧
+  reservation。不能从旧页面假定 Provider 没有收费或副作用。
 - 后端事实：持久 WorkUnit、attempt/version、checkpoint recovery 和无新增 Contribution。
 - 当前边界：首版没有 durable queue/lease、跨实例 Worker ownership 或在途 HTTP 续跑。
 
@@ -98,7 +100,13 @@
 
 ## 验证与局限
 
-自动化应验证五单元 DAG、局部失败、拒绝、重启、SSE/GET 对账和 1440/390 布局。固定
-Fixture 与截图只证明被测状态可复现，不能证明目标用户理解更快、信任更高、多 Worker
-更省成本或真实 Provider 更可靠。形成性用户研究仍需让参与者回答：哪项已返回、哪项已
-采用、失败影响谁、点击下一步会不会触发外部动作。
+当前自动化已经验证五单元 DAG 的三 root/两 dependent 两波推进、局部 waiting、兄弟
+成果保留、fixed workflow 反例、Snapshot/SSE 对账和 1440/390 布局。隔离 PostgreSQL
+17.11 门又验证已完成候选与 v1/v2 重启后保留、在途 WorkUnit 不自动重放，以及新幂等键
+只重试 checkpoint-recovered 目标 Branch；与 Task Ledger 一起最终为
+`10 passed in 10.84s`。整库结果为 `417 passed, 23 skipped`，Playwright 为 `68 passed`。
+
+这些固定 Fixture 与自动化只证明被测状态可复现，不能证明目标用户理解更快、信任更高、
+多 Worker 更省成本或真实 Provider 更可靠。形成性用户研究仍需让参与者回答：哪项已
+返回、哪项已采用、失败影响谁、点击下一步会不会触发外部动作。完整工程记录见
+[`DR-0055 Evidence`](../evidence/DR-0055-WORKUNIT-CONTRIBUTION-LEDGER-V1-EVIDENCE-20260831.md)。

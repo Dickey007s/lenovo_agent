@@ -304,8 +304,9 @@ flowchart LR
 
 **图 C 讲解词：** 绿色分支是服务端已经核对完成的工作，琥珀色分支仍缺一份引用。
 “继续此分支”不是 Demo 播放按钮，而是携带当前 version、幂等键和 `branch_id` 的服务端
-控制。回执返回前，前台不会把点击动画说成下一轮已经发生。Branch 仍由一个顺序
-Controller 推进，因此这张图不能用来宣称 Demo 2 的多个 Worker 已经并行执行。
+控制。回执返回前，前台不会把点击动画说成下一轮已经发生。这张历史图仍只展示顺序
+Controller；后续 `DR-0053/55` 的受限 Worker 与 WorkUnit 台账必须使用自己的当前证据，
+不能拿此图倒推多个 Worker 已执行。
 
 第二个变化是成果历史不再靠修改 Run JSON 表达。每个完成轮次的完整只读简报写入独立
 append-only ArtifactVersion；最终 Gate 另建 TaskCommit 指向当前版本。用户恢复旧版本时，
@@ -325,6 +326,41 @@ raw provider response。当前本地门为 Python `63 passed, 1 skipped`、Runti
 浏览器 `13 passed`、Ruff/lint/build 通过；PR #31 已合并为 `697e38b`，其 PostgreSQL 17.11 顺序 Runtime
 workflow 为 `1 passed in 1.84s`。自动化和截图仍不是用户研究，理解、信任、效率和任务价值继续标
 `Draft`。
+
+## 2026-08-31 Demo 1/2 实现回填：时间连续与组织收敛已经分层
+
+07-16 的两条主线没有改变。Demo 1 仍解决“同一任务过了一轮、停过一次或打开了两个页面，
+哪个结果才是当前工作面”；Demo 2 仍解决“任务被拆成多个工作包时，为什么值得并行、
+哪个候选真正进入统一成果”。新实现没有把两者混成一个无限预算的 Swarm。
+
+Demo 1 现在用最小 `TaskRecord/current_run_id/task_version` 管时间维连续性。一个终态 Run
+只能为一条服务端批准 Branch 创建 child Run；旧 Run、v1 和引用保持不可变。两个页面
+竞争续办时，Task version 决定只有一个 child 成为当前 Run，失败页面仍可打开权威当前
+Run。隔离 PostgreSQL 17.11 的七项 Task 事务门已经通过，但不证明多实例 Task 服务。
+
+Demo 2 现在先由 `TopologyAdmission` 在单 Controller、固定流程和受限只读 Worker 之间
+选择。只有真实独立且预算允许的 Branch 等待用户确认；三期同结构财务核对继续使用固定
+流程。确认后，完整 Branch DAG 投影为 WorkUnit，每次 Worker 返回追加不可变
+Contribution。“已返回”和“进入成果”是两个状态，只有来源、Anchor、Branch Gate 与
+叙事对账通过的候选才能进入 ArtifactVersion v1/v2。重启不会自动重放不确定调用；用户
+只能用新幂等键和当前 version 重试目标 recovered WorkUnit。
+
+这会把前台从“多个 Agent 聊天窗口”改成一张统一工作台：用户看业务工作包、依赖、
+“实际执行回执”“候选成果”“原文定位”和当前 v1/v2，不看 raw unit ID、Owner、revision、
+reservation digest、Prompt 或思维链。局部失败时先告诉用户哪些成果仍可用、影响哪个
+下游，再提供唯一恢复动作，而不是把整个任务涂成失败。
+
+这一设计参考 [OpenAI Agents SDK: Agent orchestration](https://openai.github.io/openai-agents-python/multi_agent/)、
+[Anthropic: How we built our multi-agent research system](https://www.anthropic.com/engineering/multi-agent-research-system)、
+[A2A Protocol specification](https://a2a-protocol.org/latest/specification/) 与
+[Microsoft Research: Guidelines for Human-AI Interaction](https://www.microsoft.com/en-us/research/publication/guidelines-for-human-ai-interaction/)。
+这些来源支持有限并行、Task/Artifact/事件分层和及时解释状态/后果的方向，不是竞品同场
+实测，也不能证明竞品做不到。
+
+当前工程门为全量 Python `417 passed, 23 skipped`、Playwright `68 passed`、隔离
+PostgreSQL 17.11 的 Demo/Task 组合 `10 passed`；公共 Snapshot Owner 隔离与叙事 stale/
+contradictory 双重拒绝又分别通过定向回归。它仍不是 durable queue/lease、远端 Worker、
+真实 Provider 效果、通用 Tool Gateway、外部动作或用户研究证据。
 
 ## 最新增补：从“用户先找文件”改为“Agent 找证据，人确认下一步”
 
@@ -519,7 +555,10 @@ chain-of-thought 或原始模型响应。
 
 它的主要交互对象依次是 Workspace、文件预览、用户任务、每轮自主选证据、Run Snapshot、
 named SSE、Planner/Analyst 回执、Plan、Finding、引用与下一步建议。Demo 1、Demo 2、Demo 3
-只是未来通用能力的验收视角，不是当前产品入口，也不会解锁隐藏执行器。
+是通用能力的验收视角，不是产品入口，也不会解锁隐藏执行器。Demo 1 当前已有最小
+Task Ledger/current pointer 与跨 Run 单 Branch 延续；Demo 2 当前已有确定性路线准入、
+显式确认的最多三个进程内只读 Worker，以及 Branch 绑定的 WorkUnit/Contribution 台账。
+它们仍不等于生产 Task 服务、distributed queue/lease 或通用执行器。
 
 ### 图示区二：不同首要对象如何改变默认流程
 
@@ -1223,7 +1262,7 @@ SSE、Snapshot 对账、引用成员和服务端原文位置，以及当前被�
 - 15 类 FORTE 原任务都已正确完成，或十二个固定适配器等于通用 Agent 执行能力；
 - 引用能够证明语义、算术、完整性或政策判断正确；
 - Planner 中出现 Tool 或 `run_workspace_write` 就表示工具或文件写入发生；
-- 当前逻辑 ArtifactVersion 或固定 Run Workspace Artifact 已等同源文件修改、通用 Tool Gateway、Demo 2 Adaptive Worker 或 Demo 3 真实动作 Gate；
+- 当前逻辑 ArtifactVersion、固定 Run Workspace Artifact 或受限 Demo 2 WorkUnit 台账已等同源文件修改、通用 Tool Gateway、分布式 Worker/lease 或 Demo 3 真实动作 Gate；
 - memory Run 能够跨重启恢复，或 PostgreSQL 顺序 Runtime 门已经证明多实例 lease、高可用和在途模型续跑；
 - 公开 FORTE 数据等于 Lenovo 或真实客户企业数据；
 - 新界面已经提升理解、信任、效率、采纳率或业务价值；

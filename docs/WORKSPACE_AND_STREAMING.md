@@ -401,8 +401,10 @@ The right pane distinguishes:
 - `未采用`: provider returned but checks rejected the output.
 
 The trace also projects `topology_admission`, optional
-`topology_confirmation_required`, `worker_returned`,
-`contribution_adopted/waiting/rejected`, `topology_workers_completed`,
+`topology_confirmation_required`, `worker_wave_reserved`, `work_unit_started`,
+`worker_returned`, `contribution_recorded`,
+`contribution_adopted/waiting/rejected`, `work_unit_failed`,
+`worker_wave_committed`, `topology_workers_completed`,
 `deterministic_office_tool_started`,
 `run_workspace_artifact_written`, `deterministic_verification_completed` and
 `scenario_effect_failed` or `scenario_effect_bounded`. These events are ordered change notifications; the
@@ -415,13 +417,20 @@ allowlisted inputs on the event-loop thread, then passes only that immutable
 view to `asyncio.to_thread`; the worker cannot re-read the live Catalog. During
 this wait, workspace browsing, health, Run GET and SSE remain responsive.
 
-The fixed deterministic adapter thread and the new Analyst Worker manager are
-both process-local. This is an interaction guarantee for one API process, not a
-distributed Worker platform.
-The in-process thread and its subprocesses do not survive an API restart;
-PostgreSQL restores the last committed Snapshot and pauses under the existing
-checkpoint rule. A failed builder emits `scenario_effect_failed` and no green
-Artifact/EffectReceipt.
+The fixed deterministic adapter thread and the Analyst Worker manager are both
+process-local. This is an interaction guarantee for one API process, not a
+distributed Worker platform. The fixed adapter thread and its subprocesses do
+not survive an API restart; PostgreSQL restores the last committed Snapshot and
+pauses under the existing checkpoint rule. A failed builder emits
+`scenario_effect_failed` and no green Artifact/EffectReceipt.
+
+DR-0055 gives the read-only Analyst Worker a narrower durable boundary. The full
+validated Branch DAG is saved as WorkUnits before dispatch, and each return is an
+immutable Contribution candidate. A restart after a committed reservation keeps
+that DAG, TopologyAdmission, completed candidates and Artifact history, marks the
+unconfirmed unit as `checkpoint_recovered_in_flight_worker`, and never replays it.
+A new idempotency key and current Run version may explicitly retry only that
+recovered WorkUnit. This still is not a queue, lease or remote Worker runtime.
 
 Elapsed milliseconds are an observed call duration, not production SLA or cost.
 The trajectory uses named server events and business summaries. It also exposes
@@ -478,8 +487,8 @@ browser fact, not a server task phase.
 | Task pointer or lineage is inconsistent | fail-closed Task integrity state | immutable Run records and last rendered screen | repair durable state; GET must not backfill or pick by timestamp |
 | Workspace revision changed before continuation | child Task timeline says the source changed and exposes Branch recheck refs | immutable parent Run and base Artifact/Commit pointers | re-read only the approved carried Branch; do not silently adopt old prose |
 | adaptive route waits for confirmation | topology reason, work packages, budget and `external_action=none` | validated Plan/Branches; no Worker call yet | confirm the ready wave or switch to single Controller |
-| one Worker fails or evidence is ambiguous | per-Worker receipt plus only its Branch waiting | other adopted contributions and prior ArtifactVersions/Commits | keep the affected Branch waiting or continue the next ready wave; dedicated Worker decision/retry remains future work |
-| API restarts during a Worker | recovered checkpoint; reserved budget remains; no Worker result is fabricated | persisted Snapshot before dispatch and completed history | user explicitly decides the next safe action; the in-flight Worker is not replayed |
+| one Worker fails or evidence is ambiguous | per-WorkUnit receipt plus only its Branch waiting/failed | other adopted Contributions and prior ArtifactVersions/Commits | keep the affected Branch waiting or continue the next ready wave; no Worker-specific DecisionRequest exists |
+| API restarts during a Worker | recovered checkpoint; the unconfirmed WorkUnit is marked recovered failed; no result is fabricated | validated Branch DAG, TopologyAdmission, completed Contributions, prior v1/v2 and reserved budget facts | use a new idempotency key, current version and original Branch scope to retry only that recovered unit; the in-flight call is never auto-replayed |
 | model/schema/policy failure | safe stop plus receipt | whole-workspace contract, instruction and completed rounds | revise or create a fresh Run |
 | rejected plan candidate | not adopted plus bounded retry | frozen contract and used-call count | server retries once if budget allows; otherwise fails closed |
 | one or more source locations cannot be resolved | rejected/partial-adoption trace | valid Findings, approved Plan, files, Branches and receipts | retry once; adopt the valid subset or pause one candidate Branch with `recovery_kind=source_location` |
@@ -529,6 +538,14 @@ CAS, stale parent version, idempotency and transactional rollback; malformed or
 missing parent `snapshot.version` fails closed. This remains a single-host
 sequential adapter gate and does not establish production multi-instance
 coordination, WorkUnit leases or high availability.
+
+DR-0055 adds independent Branch-bound WorkUnit and append-only Contribution rows
+to the same state-store boundary. The isolated PostgreSQL 17.11 Demo/Task
+combination passed 10 tests: three Demo 1/2 restart paths plus the seven Task
+Ledger transactions. It verifies strict reservation replay, Branch DAG and v1/v2
+preservation, no automatic replay, and explicit target-only retry of a recovered
+unit. It does not establish distributed queue/lease, remote Worker ownership,
+multi-instance safety, Provider effectiveness or user comprehension.
 DR-0034 adds only a browser projection gate: deterministic E2E checks retry-first
 and ambiguous-choice-first screens, disabled accept before selection, collapsed
 optional details and 390 px overflow. It does not change the DR-0032 persistence
