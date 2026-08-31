@@ -38,7 +38,8 @@
 
 ## 后端事实
 
-- Task record：`task_id/task_version/current_run_id/current_run_sequence/run_ids`。
+- Task record：`task_id/task_version/current_run_id/current_run_sequence`；Run lineage 由同
+  `task_id` 的不可变 Snapshot 派生，不在 Task 表再复制一份 `run_ids`。
 - parent Run：`expected_version`、Branch 归属、immutable Artifact/Commit。
 - continuation receipt：Owner、两种 expected version、幂等 digest 与 child Run。
 - State Store：Task 条件更新、child Run 和 receipt 同一提交边界。
