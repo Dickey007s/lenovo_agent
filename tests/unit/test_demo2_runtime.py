@@ -530,6 +530,8 @@ async def test_five_unit_dag_runtime_advances_from_roots_to_second_worker_wave()
     assert {item.state for item in second.work_units} == {"adopted"}
     assert len(second.contributions) == 5
     assert all(item.artifact_version in {1, 2} for item in second.contributions)
+    assert [event.event_name for event in second.events].count("worker_wave_reserved") == 2
+    assert [event.event_name for event in second.events].count("worker_wave_committed") == 2
 
 
 @pytest.mark.asyncio

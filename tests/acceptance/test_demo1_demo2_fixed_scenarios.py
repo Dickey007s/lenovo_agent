@@ -438,6 +438,7 @@ async def test_demo2_failure_wave_keeps_adopted_contributions_and_blocks_only_do
         assert set(first.rounds[-1].next_step.ready_branch_ids) == {branches["dependent-ready"].branch_id}
         assert any(event.event_name == "contribution_adopted" for event in first.events)
         assert any(event.event_name == "contribution_waiting" for event in first.events)
+        assert sum(event.event_name == "contribution_recorded" for event in first.events) == 3
         assert first.last_commit is not None
         assert first.last_commit.artifact_version == 1
         assert len(first.work_units) == 3
