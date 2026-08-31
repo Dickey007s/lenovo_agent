@@ -224,6 +224,39 @@ async def test_task_endpoint_fails_closed_when_current_run_pointer_is_missing() 
 
 
 @pytest.mark.asyncio
+async def test_task_endpoint_fails_closed_when_task_store_read_raises() -> None:
+    owner = "ledger-store-error-owner"
+    runtime = HarnessRuntime(FakeCatalog(), FakePlanner(), FakeAnalyst())
+    started = await runtime.start(
+        owner,
+        HarnessRunStart(
+            idempotency_key="ledger-store-error-start-0001",
+            instruction="读取批准资料并保留任务时间线",
+            loop={"max_rounds": 1, "max_files_per_round": 1, "max_model_calls": 2, "deadline_seconds": 60},
+        ),
+    )
+    async def broken_task_read(owner_id: str, task_id: str) -> TaskRecord | None:
+        raise ValueError("database unavailable")
+
+    runtime.state_store.get_task_record = broken_task_read  # type: ignore[method-assign]
+    app = create_app()
+    app.dependency_overrides[get_harness_runtime] = lambda: runtime
+    try:
+        with pytest.raises(Exception, match="台账读取"):
+            await runtime.get_task(owner, started.run.task_id)
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app=app), base_url="http://test"
+        ) as client:
+            response = await client.get(
+                f"/v1/harness/tasks/{started.run.task_id}", headers={"X-User-Id": owner}
+            )
+        assert response.status_code == 503
+    finally:
+        app.dependency_overrides.clear()
+        await runtime.close()
+
+
+@pytest.mark.asyncio
 async def test_task_get_does_not_backfill_when_legacy_run_has_no_task_record() -> None:
     runtime = HarnessRuntime(FakeCatalog(), FakePlanner(), FakeAnalyst())
     started = await runtime.start(

@@ -4059,15 +4059,37 @@ export function HarnessWorkbench({ onActivityChange }: { onActivityChange?: (sta
     const taskFetchKey = `${taskId}:${runId}:${taskVersion}`;
     if (!force && taskFetchKeyRef.current === taskFetchKey) return;
     taskFetchKeyRef.current = taskFetchKey;
+    const clearFailedTaskFetch = () => {
+      if (taskFetchKeyRef.current === taskFetchKey) taskFetchKeyRef.current = null;
+    };
     void fetch(`${API_BASE}/v1/harness/tasks/${encodeURIComponent(taskId)}`, { headers: HEADERS })
-      .then((response) => response.ok ? response.json() as Promise<unknown> : null)
+      .then((response) => {
+        if (!response.ok) {
+          clearFailedTaskFetch();
+          return null;
+        }
+        return response.json().catch(() => {
+          clearFailedTaskFetch();
+          return null;
+        });
+      })
       .then((payload) => {
-        if (generation !== generationRef.current || taskFetchKeyRef.current !== taskFetchKey || !payload || typeof payload !== "object") return;
+        if (generation !== generationRef.current || taskFetchKeyRef.current !== taskFetchKey) return;
+        if (!payload || typeof payload !== "object") {
+          clearFailedTaskFetch();
+          return;
+        }
         const raw = payload as Record<string, unknown>;
         const currentRunId = asText(raw.current_run_id);
-        if (!currentRunId) return;
+        if (!currentRunId) {
+          clearFailedTaskFetch();
+          return;
+        }
         const returnedTaskId = asText(raw.task_id);
-        if (returnedTaskId !== taskId) return;
+        if (returnedTaskId !== taskId) {
+          clearFailedTaskFetch();
+          return;
+        }
         const lineage = Array.isArray(raw.lineage)
           ? raw.lineage.filter((item): item is Record<string, unknown> => Boolean(item && typeof item === "object"))
             .map((item) => ({
@@ -4089,9 +4111,7 @@ export function HarnessWorkbench({ onActivityChange }: { onActivityChange?: (sta
           lineage,
         });
       })
-      .catch(() => {
-        if (taskFetchKeyRef.current === taskFetchKey) taskFetchKeyRef.current = null;
-      });
+      .catch(clearFailedTaskFetch);
   }
 
   function connectEvents(runId: string, generation: number, after: number) {
@@ -4365,6 +4385,39 @@ export function HarnessWorkbench({ onActivityChange }: { onActivityChange?: (sta
     } finally { setStarting(false); }
   }
 
+  async function openCurrentTask() {
+    const current = runRef.current;
+    const pointer = taskPointer;
+    if (!current || !pointer || pointer.task_id !== current.task_id || pointer.current_run_id === current.run_id) return false;
+    setStarting(true); setError("");
+    try {
+      const taskResponse = await fetch(`${API_BASE}/v1/harness/tasks/${encodeURIComponent(pointer.task_id)}`, { headers: HEADERS });
+      if (!taskResponse.ok) throw new Error("无法读取当前任务");
+      const taskPayload = await taskResponse.json() as Record<string, unknown>;
+      const taskId = asText(taskPayload.task_id);
+      const currentRunId = asText(taskPayload.current_run_id);
+      if (taskId !== pointer.task_id || !currentRunId) throw new Error("当前任务回执格式无效");
+      const runResponse = await fetch(`${API_BASE}/v1/harness/runs/${encodeURIComponent(currentRunId)}`, { headers: HEADERS });
+      if (!runResponse.ok) throw new Error("无法读取当前 Run");
+      const snapshot = normalizeRun(await runResponse.json());
+      if (!snapshot || snapshot.task_id !== taskId || snapshot.run_id !== currentRunId) throw new Error("当前 Run 回执格式无效");
+      const generation = generationRef.current + 1;
+      closeTransport();
+      generationRef.current = generation;
+      runRef.current = null;
+      lastSequenceRef.current = 0;
+      setTaskPointer(null);
+      taskFetchKeyRef.current = null;
+      if (!applySnapshot(snapshot, generation)) throw new Error("当前任务无法打开");
+      setView(TERMINAL_STATUSES.has(snapshot.status) && snapshot.result ? "result" : "loop");
+      if (!TERMINAL_STATUSES.has(snapshot.status)) connectEvents(snapshot.run_id, generation, snapshot.last_event_sequence);
+      return true;
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "无法打开当前任务");
+      return false;
+    } finally { setStarting(false); }
+  }
+
   async function executeWorkers() {
     const current = runRef.current;
     if (!current || current.topology_admission?.mode !== "adaptive_readonly_workers") return false;
@@ -4526,7 +4579,7 @@ export function HarnessWorkbench({ onActivityChange }: { onActivityChange?: (sta
         </nav>
         <div className="workspace-content">
           {view === "data" && <FilePreview preview={preview} file={activeFile} loading={previewLoading} error={previewError} />}
-          {view === "loop" && <LoopView run={run} taskPointer={taskPointer} files={allFiles} controlBusy={controlBusy} onControl={controlLoop} onReview={setReviewRequest} onStartTask={startTask} onContinueTask={continueTask} onExecuteWorkers={executeWorkers} starting={starting} />}
+          {view === "loop" && <LoopView run={run} taskPointer={taskPointer} files={allFiles} controlBusy={controlBusy} onControl={controlLoop} onReview={setReviewRequest} onStartTask={startTask} onContinueTask={continueTask} onOpenCurrentTask={openCurrentTask} onExecuteWorkers={executeWorkers} starting={starting} />}
           {view === "result" && <ResultView result={run?.result ?? null} artifacts={run?.artifact_versions ?? []} workspaceArtifacts={run?.workspace_artifacts ?? []} receipts={run?.effect_receipts ?? []} reconciliation={run?.narrative_reconciliation ?? null} commit={run?.last_commit ?? null} decisions={run?.decision_records ?? []} decisionRequests={run?.decision_requests ?? []} files={allFiles} onOpenFile={openFile} onReview={setReviewRequest} onStartTask={startTask} starting={starting} />}
         </div>
         <details className="workspace-boundary"><summary><IconShieldCheck aria-hidden="true" />数据与执行边界</summary><p>{workspace.data_boundary} Agent 可以检索整个资料库，但每轮只读取服务端校验通过且受预算约束的文件；本轮不会修改原文件或执行外部动作。</p></details>
@@ -4573,6 +4626,7 @@ function LoopView({
   onReview,
   onStartTask,
   onContinueTask,
+  onOpenCurrentTask,
   onExecuteWorkers,
   starting,
 }: {
@@ -4584,6 +4638,7 @@ function LoopView({
   onReview: (request: EvidenceReviewRequest) => void;
   onStartTask: (instruction: string) => Promise<boolean>;
   onContinueTask: (branchId: string, instruction?: string) => Promise<boolean>;
+  onOpenCurrentTask: () => Promise<boolean>;
   onExecuteWorkers: () => Promise<boolean>;
   starting: boolean;
 }) {
@@ -4711,7 +4766,9 @@ function LoopView({
     </header>
     <section className="loop-lineage-strip" aria-label="任务时间线" data-testid="task-lineage">
       <div><span>任务时间线</span><strong>任务持续链 · Run {run.run_sequence}</strong></div>
-      {taskPointer && taskPointer.task_id === run.task_id && taskPointer.current_run_id === run.run_id && <small data-testid="task-ledger-pointer">当前任务 Run · 任务版本 v{taskPointer.task_version}</small>}
+      {taskPointer && taskPointer.task_id === run.task_id && (taskPointer.current_run_id === run.run_id
+        ? <small data-testid="task-ledger-pointer">当前任务 Run · 任务版本 v{taskPointer.task_version}</small>
+        : <div className="task-ledger-history" data-testid="task-ledger-history"><small>历史 Run · 当前任务已进入 Run {taskPointer.run_sequence}</small><button type="button" onClick={() => void onOpenCurrentTask()} disabled={starting}><IconRoute aria-hidden="true" />打开当前 Run</button></div>)}
       <p>{run.parent_run_id ? `本次是第 ${run.run_sequence} 次运行，承接旧 Run 的 ${run.carried_branch_id ? "一个未完成分支" : "已批准成果引用"}。旧成果保留，本次只核对该未完成分支的批准来源。` : "这是该任务的首次 Run；后续未完成分支可以创建新的 Run。"}</p>
       {run.source_revision_changed && <p><b>来源版本已变化</b>：本段只重新核对批准分支材料，不携带旧的采用事实。</p>}
       {run.parent_run_id && <small>新 Run · 保留成果{run.base_artifact_version ? ` v${run.base_artifact_version}` : ""} · 不修改原文件 · 外部动作：未发生</small>}

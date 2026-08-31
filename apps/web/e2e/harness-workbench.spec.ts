@@ -2668,6 +2668,81 @@ async function mockDemoRuntime(page: Page, mode: "demo1" | "demo2") {
   });
 }
 
+async function mockTaskLedgerRuntime(page: Page, mode: "success" | "conflict" | "bad-task") {
+  await mockHarness(page);
+  const body = { workspace_id: "forte-public-office", instruction: "继续未完成任务" };
+  const base = boundedAnalysisRecoverySnapshot(body) as any;
+  const parent = {
+    ...base,
+    run_id: "harness:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    task_id: "task-aaaaaaaaaaaa",
+    task_version: 1,
+    run_sequence: 1,
+    status: "stopped",
+    control_state: "stopped",
+    version: 15,
+  };
+  const child = {
+    ...parent,
+    run_id: "harness:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    task_version: 2,
+    run_sequence: 2,
+    parent_run_id: parent.run_id,
+    status: "planning",
+    control_state: "running",
+    version: 1,
+    result: base.result,
+  };
+  let currentTask = parent;
+  let taskGets = 0;
+  let continuationCalls = 0;
+  await page.route("**/*", async (route) => {
+    const url = new URL(route.request().url());
+    const method = route.request().method();
+    if (url.pathname === "/v1/harness/runs" && method === "POST") {
+      return fulfillJson(route, { run: parent, replayed: false }, 202);
+    }
+    if (url.pathname.includes("/v1/harness/tasks/") && method === "GET") {
+      taskGets += 1;
+      if (mode === "bad-task" && taskGets === 1) return fulfillJson(route, { detail: "temporary" }, 503);
+      return fulfillJson(route, {
+      task_id: currentTask.task_id,
+      task_version: currentTask.task_version,
+      current_run_id: currentTask.run_id,
+      run_sequence: currentTask.run_sequence,
+      parent_run_id: currentTask.parent_run_id ?? null,
+      current_artifact_id: null,
+      current_artifact_version: null,
+      current_commit_id: null,
+      lineage: [
+        { run_id: parent.run_id, run_sequence: 1, parent_run_id: null, status: "stopped" },
+        ...(currentTask === child ? [{ run_id: child.run_id, run_sequence: 2, parent_run_id: parent.run_id, status: "completed" }] : []),
+      ],
+      lineage_total: currentTask === child ? 2 : 1,
+      lineage_truncated: false,
+      });
+    }
+    if (url.pathname.endsWith("/continue") && method === "POST") {
+      continuationCalls += 1;
+      if (mode === "conflict") {
+        currentTask = child;
+        return fulfillJson(route, { detail: "任务版本已更新" }, 409);
+      }
+      currentTask = child;
+      return fulfillJson(route, child, 202);
+    }
+    if (url.pathname.endsWith("/events") && method === "GET") {
+      return route.fulfill({ status: 200, contentType: "text/event-stream", body: "" });
+    }
+    if (url.pathname.startsWith("/v1/harness/runs/") && method === "GET") {
+      const runId = decodeURIComponent(url.pathname.split("/").at(-1) ?? "");
+      return fulfillJson(route, runId === child.run_id ? child : parent);
+    }
+    return route.fallback();
+  });
+  return { get taskGets() { return taskGets; }, get continuationCalls() { return continuationCalls; } };
+}
+
 test("shows one complete folder workspace instead of registered scenarios", async ({ page }) => {
   await mockHarness(page); await page.goto("/");
   await expect(page.getByRole("heading", { name: "办公资料库" })).toBeVisible();
@@ -4820,5 +4895,53 @@ test.describe("Demo 1/2 runtime acceptance", () => {
     const mobileAdmissionSizes = await admission.locator('.loop-topology-facts, .loop-worker-receipts > div, .loop-worker-receipts small').evaluateAll((nodes) => nodes.map((node) => Number.parseFloat(getComputedStyle(node).fontSize)));
     expect(Math.min(...mobileAdmissionSizes)).toBeGreaterThanOrEqual(12);
     await expect(admission.getByText("实际 Worker 回执")).toBeVisible();
+  });
+
+  test("Task Ledger success sends both versions and renders the child as current", async ({ page }) => {
+    const state = await mockTaskLedgerRuntime(page, "success");
+    await page.setViewportSize({ width: 1440, height: 1100 });
+    await page.goto("/");
+    await page.getByRole("textbox", { name: "任务指令" }).fill("继续未完成任务");
+    await page.getByRole("button", { name: "启动 Control Loop" }).click();
+    await page.getByRole("button", { name: "Agent 路径" }).click();
+    await page.getByRole("button", { name: "继续未完成任务" }).first().click();
+    await expect(page.locator('[data-testid="task-lineage"]')).toContainText("任务持续链 · Run 2");
+    await expect(page.locator('[data-testid="task-ledger-pointer"]')).toContainText("当前任务 Run · 任务版本 v2");
+    expect(state.continuationCalls).toBe(1);
+    const body = await page.evaluate(() => ({ width: document.documentElement.clientWidth, scroll: document.documentElement.scrollWidth }));
+    expect(body.scroll).toBeLessThanOrEqual(body.width);
+    await page.setViewportSize({ width: 390, height: 844 });
+    const mobile = await page.evaluate(() => ({ width: document.documentElement.clientWidth, scroll: document.documentElement.scrollWidth }));
+    expect(mobile.scroll).toBeLessThanOrEqual(mobile.width);
+    const sizes = await page.locator('[data-testid="task-lineage"] *').evaluateAll((nodes) => nodes.map((node) => Number.parseFloat(getComputedStyle(node).fontSize)).filter(Number.isFinite));
+    expect(Math.min(...sizes)).toBeGreaterThanOrEqual(13);
+  });
+
+  test("Task Ledger 409 keeps the parent stream, shows history, and opens the authority Run", async ({ page }) => {
+    const state = await mockTaskLedgerRuntime(page, "conflict");
+    await page.goto("/");
+    await page.getByRole("textbox", { name: "任务指令" }).fill("继续未完成任务");
+    await page.getByRole("button", { name: "启动 Control Loop" }).click();
+    await page.getByRole("button", { name: "Agent 路径" }).click();
+    await page.getByRole("button", { name: "继续未完成任务" }).first().click();
+    await expect(page.locator('[data-testid="task-lineage"]')).toContainText("任务持续链 · Run 1");
+    await expect(page.locator('[data-testid="task-ledger-history"]')).toContainText("历史 Run · 当前任务已进入 Run 2");
+    await expect(page.locator("body")).toContainText("任务已由另一页面继续，请刷新当前 Run");
+    await expect(page.getByRole("button", { name: "打开当前 Run" })).toBeVisible();
+    await page.getByRole("button", { name: "打开当前 Run" }).click();
+    await expect(page.locator('[data-testid="task-lineage"]')).toContainText("任务持续链 · Run 2");
+    await expect(page.locator('[data-testid="task-ledger-pointer"]')).toContainText("当前任务 Run · 任务版本 v2");
+    expect(state.taskGets).toBeGreaterThanOrEqual(3);
+  });
+
+  test("Task GET failure clears its retry key and recovers on the next child snapshot", async ({ page }) => {
+    const state = await mockTaskLedgerRuntime(page, "bad-task");
+    await page.goto("/");
+    await page.getByRole("textbox", { name: "任务指令" }).fill("继续未完成任务");
+    await page.getByRole("button", { name: "启动 Control Loop" }).click();
+    await page.getByRole("button", { name: "Agent 路径" }).click();
+    await page.getByRole("button", { name: "继续未完成任务" }).first().click();
+    await expect(page.locator('[data-testid="task-ledger-pointer"]')).toContainText("当前任务 Run · 任务版本 v2");
+    expect(state.taskGets).toBeGreaterThanOrEqual(2);
   });
 });

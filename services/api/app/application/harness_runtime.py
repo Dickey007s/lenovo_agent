@@ -1093,7 +1093,11 @@ class HarnessRuntime:
         return sorted(snapshots, key=lambda item: item.updated_at, reverse=True)
 
     async def _task_get(self, owner_id: str, task_id: str) -> TaskRecord | None:
-        return await self.state_store.get_task_record(owner_id, task_id)
+        try:
+            value = await self.state_store.get_task_record(owner_id, task_id)
+            return TaskRecord.model_validate(value) if value is not None else None
+        except Exception as exc:
+            raise HarnessError("任务台账读取失败") from exc
 
     async def _task_create(self, task: TaskRecord) -> TaskRecord:
         return await self.state_store.create_task_record(task)
@@ -1508,7 +1512,14 @@ class HarnessRuntime:
                 # like a valid task and hide recovery requirements.
                 raise HarnessError("任务台账 current Run 不可读取")
             snapshot = current.snapshot
-            if snapshot.task_id != record.task_id or snapshot.owner_id != record.owner_id:
+            if (
+                snapshot.task_id != record.task_id
+                or snapshot.owner_id != record.owner_id
+                or snapshot.task_version != record.task_version
+                or snapshot.run_sequence != record.run_sequence
+                or snapshot.workspace_id != record.workspace_id
+                or snapshot.workspace_revision != record.workspace_revision
+            ):
                 raise HarnessError("任务台账 current Run 身份不一致")
             artifact = snapshot.artifact_versions[-1] if snapshot.artifact_versions else None
             lineage = [

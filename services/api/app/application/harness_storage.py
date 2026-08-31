@@ -496,12 +496,17 @@ class PostgresHarnessStateStore:
             async with connection.cursor() as cursor:
                 if idempotency is not None:
                     await cursor.execute(
-                        "SELECT digest, result FROM harness_idempotency WHERE owner_id=%s AND kind=%s AND idempotency_key=%s FOR UPDATE",
-                        (idempotency.owner_id, idempotency.kind, idempotency.idempotency_key),
+                        "INSERT INTO harness_idempotency(owner_id,kind,idempotency_key,digest,result) VALUES (%s,%s,%s,%s,%s) ON CONFLICT (owner_id,kind,idempotency_key) DO NOTHING RETURNING idempotency_key",
+                        (idempotency.owner_id, idempotency.kind, idempotency.idempotency_key, idempotency.digest, Jsonb(idempotency.result)),
                     )
-                    previous = await cursor.fetchone()
-                    if previous is not None:
-                        if str(previous[0]) != idempotency.digest:
+                    claimed = await cursor.fetchone()
+                    if claimed is None:
+                        await cursor.execute(
+                            "SELECT digest, result FROM harness_idempotency WHERE owner_id=%s AND kind=%s AND idempotency_key=%s",
+                            (idempotency.owner_id, idempotency.kind, idempotency.idempotency_key),
+                        )
+                        previous = await cursor.fetchone()
+                        if previous is None or str(previous[0]) != idempotency.digest:
                             raise TaskLedgerConflict("idempotency command conflict")
                         return StoredHarnessIdempotency(
                             owner_id=idempotency.owner_id,
@@ -542,27 +547,6 @@ class PostgresHarnessStateStore:
                         "INSERT INTO harness_task_ledger_receipt(owner_id,idempotency_key,digest,payload) VALUES (%s,%s,%s,%s) ON CONFLICT (owner_id,idempotency_key) DO NOTHING",
                         (task.owner_id, task_receipt.idempotency_key, task_digest or "", Jsonb(task_receipt.model_dump(mode="json"))),
                     )
-                if idempotency is not None:
-                    await cursor.execute(
-                        "INSERT INTO harness_idempotency(owner_id,kind,idempotency_key,digest,result) VALUES (%s,%s,%s,%s,%s) ON CONFLICT (owner_id,kind,idempotency_key) DO NOTHING RETURNING idempotency_key",
-                        (idempotency.owner_id, idempotency.kind, idempotency.idempotency_key, idempotency.digest, Jsonb(idempotency.result)),
-                    )
-                    inserted = await cursor.fetchone()
-                    if inserted is None:
-                        await cursor.execute(
-                            "SELECT digest, result FROM harness_idempotency WHERE owner_id=%s AND kind=%s AND idempotency_key=%s",
-                            (idempotency.owner_id, idempotency.kind, idempotency.idempotency_key),
-                        )
-                        existing = await cursor.fetchone()
-                        if existing is None or str(existing[0]) != idempotency.digest:
-                            raise TaskLedgerConflict("idempotency command conflict")
-                        return StoredHarnessIdempotency(
-                            owner_id=idempotency.owner_id,
-                            kind=idempotency.kind,
-                            idempotency_key=idempotency.idempotency_key,
-                            digest=str(existing[0]),
-                            result=dict(existing[1]),
-                        )
                 await cursor.execute(
                     "INSERT INTO harness_run_state(owner_id,run_id,snapshot,resume_status,updated_at) VALUES (%s,%s,%s,%s,NOW()) ON CONFLICT (owner_id,run_id) DO NOTHING RETURNING run_id",
                     (run.owner_id, run.run_id, Jsonb(run.snapshot), run.resume_status),

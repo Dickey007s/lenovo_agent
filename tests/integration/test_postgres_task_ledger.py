@@ -106,6 +106,80 @@ async def test_task_ledger_initial_and_restart() -> None:
 
 
 @pytest.mark.asyncio
+async def test_task_ledger_two_stores_claim_initial_idempotency_before_task_write() -> None:
+    """Concurrent initial starts must not leave the losing random Task orphaned."""
+    owner = f"task-ledger-initial-race-{uuid4().hex}"
+    store_a = PostgresHarnessStateStore(DATABASE_DSN)
+    store_b = PostgresHarnessStateStore(DATABASE_DSN)
+    try:
+        await store_a.setup()
+        await store_b.setup()
+        task_a = _task(owner)
+        task_b = _task(owner)
+        run_a = _run(owner, task_a)
+        run_b = _run(owner, task_b)
+        key = "ledger-initial-race"
+        outcomes = await asyncio.gather(
+            store_a.commit_task_transition(run_a, task_a, idempotency=_idem(owner, key, "same-digest", run_a)),
+            store_b.commit_task_transition(run_b, task_b, idempotency=_idem(owner, key, "same-digest", run_b)),
+            return_exceptions=True,
+        )
+        assert all(not isinstance(item, Exception) for item in outcomes)
+        replays = [item for item in outcomes if isinstance(item, StoredHarnessIdempotency)]
+        assert len(replays) == 1
+        restored = PostgresHarnessStateStore(DATABASE_DSN)
+        await restored.setup()
+        try:
+            task = await restored.get_task_record(owner, task_a.task_id)
+            runs = [item for item in await restored.load_runs() if item.owner_id == owner]
+            idempotency = [item for item in await restored.load_idempotency() if item.owner_id == owner]
+            assert task is not None
+            assert len(runs) == 1
+            assert len([item for item in idempotency if item.idempotency_key == key]) == 1
+            assert replays[0].result["run"]["run_id"] == runs[0].run_id
+            assert runs[0].run_id == task.current_run_id
+        finally:
+            await restored.close()
+    finally:
+        await store_a.close()
+        await store_b.close()
+        await _cleanup(owner)
+
+
+@pytest.mark.asyncio
+async def test_task_ledger_initial_idempotency_digest_conflict_has_no_orphan() -> None:
+    owner = f"task-ledger-initial-digest-{uuid4().hex}"
+    store_a = PostgresHarnessStateStore(DATABASE_DSN)
+    store_b = PostgresHarnessStateStore(DATABASE_DSN)
+    try:
+        await store_a.setup()
+        await store_b.setup()
+        task_a = _task(owner)
+        task_b = _task(owner)
+        run_a = _run(owner, task_a)
+        run_b = _run(owner, task_b)
+        key = "ledger-initial-digest"
+        outcomes = await asyncio.gather(
+            store_a.commit_task_transition(run_a, task_a, idempotency=_idem(owner, key, "digest-a", run_a)),
+            store_b.commit_task_transition(run_b, task_b, idempotency=_idem(owner, key, "digest-b", run_b)),
+            return_exceptions=True,
+        )
+        assert sum(isinstance(item, TaskLedgerConflict) for item in outcomes) == 1
+        restored = PostgresHarnessStateStore(DATABASE_DSN)
+        await restored.setup()
+        try:
+            assert len([item for item in await restored.load_runs() if item.owner_id == owner]) == 1
+            assert len([item for item in await restored.load_idempotency() if item.owner_id == owner and item.idempotency_key == key]) == 1
+            assert await restored.get_task_record(owner, task_a.task_id) is not None
+        finally:
+            await restored.close()
+    finally:
+        await store_a.close()
+        await store_b.close()
+        await _cleanup(owner)
+
+
+@pytest.mark.asyncio
 async def test_task_ledger_sibling_cas_and_same_idempotency_replay() -> None:
     owner = f"task-ledger-race-{uuid4().hex}"
     store = PostgresHarnessStateStore(DATABASE_DSN)
