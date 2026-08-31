@@ -13,6 +13,10 @@
 [`demo1-demo2-runtime-20260831-validated-v2.json`](manifests/demo1-demo2-runtime-20260831-validated-v2.json)。
 旧 `demo1-demo2-runtime-20260831-final.json` 的红灯与边界保持原样，没有用新结果覆盖历史。
 
+后续固定正例、反例和失败注入门以 append-only 方式记录在
+[`DR-0053-DEMO1-DEMO2-FIXED-SCENARIO-GATES-EVIDENCE-20260831`](DR-0053-DEMO1-DEMO2-FIXED-SCENARIO-GATES-EVIDENCE-20260831.md)，
+没有改写本文件的原始运行数字。
+
 ## 实现谱系
 
 - 开发分支：`codex/demo1-demo2-runtime-20260830`。

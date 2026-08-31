@@ -1,9 +1,12 @@
 # Demo 1/2 固定场景门（2026-08-31）
 
-- 状态：`Ready` 验收合同；实现与运行结果待追加 Evidence
+- 状态：`Limited Verified`；固定 Fixture/Runtime/API 与既有浏览器门已通过，
+  PostgreSQL、Provider 和用户研究仍开放
 - 用户来源：`USER-FEEDBACK-20260831-DEMO1-DEMO2-FIXED-SCENARIO-HARDENING`
 - 决策：`DR-0053`
 - 场景：`SCENARIO-038`、`SCENARIO-039`
+- Evidence：
+  [`DR-0053-DEMO1-DEMO2-FIXED-SCENARIO-GATES-EVIDENCE-20260831`](../evidence/DR-0053-DEMO1-DEMO2-FIXED-SCENARIO-GATES-EVIDENCE-20260831.md)
 
 ## 1. 为什么先做固定场景门
 
@@ -58,7 +61,9 @@
 ### Agent 路径与后端事实
 
 1. 服务端产生 `mode=adaptive_readonly_workers` 和结构化 `reasons[]`。
-2. 确认前 Worker/模型调用为零；确认携带 expected version、幂等键和 ready Branch。
+2. Planner 已为计划和准入输入留下调用回执；用户确认前 Worker/Analyst Worker 调用
+   为零，等待确认不得新增模型调用。确认携带 expected version、幂等键和 ready
+   Branch。
 3. 第一波最多三个进程内只读 Worker；第二波只在依赖完成后进入
    `ready_branch_ids`。
 4. 注入至少两个 adopted 与一个 failed/ambiguous。返回不等于采用；只有批准 refs、
@@ -113,3 +118,6 @@
   运行命令；测试通过后再把本文件状态改为 `Limited Verified`。
 - 自动化结果追加到新 Evidence，不覆盖 `DR-0053` 既有 manifest 或历史红灯。
 - 真实 PostgreSQL、Provider 和用户研究未运行时继续单独标红，不得由 Fixture 代替。
+
+本轮聚焦 Python/Runtime 门为 `3 passed`；连同相关 Runtime 回归为 `68 passed`，定向
+浏览器门为 `2 passed`。精确命令、提交和不能证明的边界见上方 Evidence。

@@ -9,7 +9,7 @@
 | 用户来源 | `USER-FEEDBACK-20260830-DEMO1-DEMO2-CONTINUATION` |
 | 研究 | [`DEMO1-DEMO2-DURABLE-TASK-AND-ADAPTIVE-ORCHESTRATION-RESEARCH-20260830`](../research/DEMO1-DEMO2-DURABLE-TASK-AND-ADAPTIVE-ORCHESTRATION-RESEARCH-20260830.md) |
 | 场景 | [`SCENARIO-038`](../scenarios/SCENARIO-038-durable-task-continuation-across-runs.md)、[`SCENARIO-039`](../scenarios/SCENARIO-039-explainable-topology-and-verified-worker-convergence.md) |
-| Evidence | [`DR-0053-DEMO1-DEMO2-RUNTIME-EVIDENCE-20260831`](../evidence/DR-0053-DEMO1-DEMO2-RUNTIME-EVIDENCE-20260831.md)；原始门禁清单 [`demo1-demo2-runtime-20260831-validated-v2.json`](../evidence/manifests/demo1-demo2-runtime-20260831-validated-v2.json) |
+| Evidence | [`DR-0053-DEMO1-DEMO2-RUNTIME-EVIDENCE-20260831`](../evidence/DR-0053-DEMO1-DEMO2-RUNTIME-EVIDENCE-20260831.md)；[`DR-0053-DEMO1-DEMO2-FIXED-SCENARIO-GATES-EVIDENCE-20260831`](../evidence/DR-0053-DEMO1-DEMO2-FIXED-SCENARIO-GATES-EVIDENCE-20260831.md)；原始门禁清单 [`demo1-demo2-runtime-20260831-validated-v2.json`](../evidence/manifests/demo1-demo2-runtime-20260831-validated-v2.json) |
 
 ## 问题
 
@@ -201,7 +201,8 @@ PostgreSQL 恢复，当时存在两个产品断点：
 ### Demo 2 必须通过
 
 - 相同冻结合同得到相同 route/reason；单来源、强依赖、预算不足负例不启动 Worker。
-- `adaptive_readonly_workers` 未确认前没有 Worker/模型调用；确认后并发不超过 3。
+- `adaptive_readonly_workers` 未确认前没有 Worker/Analyst Worker 调用；Planner 已为
+  计划与准入留下调用回执，等待确认不得新增模型调用；确认后并发不超过 3。
 - 至少 4 个 WorkUnit 覆盖依赖、延迟、失败、歧义与成功；无 orphan unit。
 - 无来源、stale、篡改、错误算术或对账冲突的 Contribution 不进入 Artifact。
 - 一个 Worker 失败时其他 adopted Contribution 与旧 Artifact 保留；只恢复目标 WorkUnit。

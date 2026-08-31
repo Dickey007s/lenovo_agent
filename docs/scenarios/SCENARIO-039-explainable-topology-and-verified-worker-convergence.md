@@ -29,7 +29,8 @@
    `adaptive_readonly_workers`，同时公开结构事实、剩余 calls/time 和中文理由；当前没有
    独立收益分数字段，前台不得据此显示节省比例或质量提升。
 3. 单 Controller/固定流程按现有方式直接推进；高成本只读 Worker 路线追加
-   `topology_confirmation_required` 并停在 `waiting_input`，未确认前不产生 Worker 或模型调用。
+   `topology_confirmation_required` 并停在 `waiting_input`。Planner 此前已经为计划和准入
+   输入留下调用回执；未确认前不产生 Worker/Analyst Worker 调用，等待期间不新增模型调用。
 4. 用户看到业务化路线说明、预计上限和边界，确认或选择降级。
 5. 确认后，服务端从 validated plan 的 Branch DAG 取当前 `ready_branch_ids`，每波最多
    启动三个进程内只读 Analyst Worker；当前没有 durable queue/lease。
@@ -93,7 +94,8 @@ Provider/异常 Fixture 的验收镜头，不能由现有截图推断。
 ## 完成条件
 
 - 相同冻结合同的路线和理由稳定；低并行/强依赖/预算不足负例不启动 Worker。
-- 未确认 `adaptive_readonly_workers` 前没有模型调用；确认后并发和总数不越界。
+- 未确认 `adaptive_readonly_workers` 前没有 Worker/Analyst Worker 调用，等待确认不新增
+  模型调用；确认后并发和总数不越界。
 - Branch 依赖/ready wave、Worker receipt、Contribution 和合并结果可从 Snapshot/Event 对账。
 - 无 Anchor、越 Branch 来源或叙事对账被拒的候选不进入当前 Artifact；通用数值冲突验证
   和 Worker stale revision gate 仍需按具体适配器扩展。
@@ -115,6 +117,12 @@ Provider/异常 Fixture 的验收镜头，不能由现有截图推断。
    `test_postgres_demo2_interrupted_worker_reservation_is_not_replayed`：已收集；无 DSN 时 skip。
 9. 浏览器 `Demo 2 requires confirmation, records worker receipts and exposes the next wave`：
    覆盖确认、两波、统一驾驶舱、可读字号和 390 px 无横向溢出。
+10. 聚焦门
+    `test_demo2_failure_wave_keeps_adopted_contributions_and_blocks_only_downstream` 与
+    `test_demo2_same_schema_three_period_finance_stays_fixed_without_worker_route`：覆盖两波
+    2 adopted + 1 ambiguous、blocked 下游拒绝且状态不变、append-only v1/v2，以及 Prompt
+    要求多 Agent 时三期同结构资料仍为 fixed 且无 Worker/Contribution 事件；见
+    [`固定场景 Evidence`](../evidence/DR-0053-DEMO1-DEMO2-FIXED-SCENARIO-GATES-EVIDENCE-20260831.md)。
 
 ## 用户研究任务
 

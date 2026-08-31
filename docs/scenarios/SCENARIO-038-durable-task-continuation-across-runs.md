@@ -94,6 +94,11 @@
    `TEST_DATABASE_DSN` 时 skip。
 4. 浏览器 `Demo 1 shows a durable task timeline and continues only the unfinished branch`：
    覆盖 child Run、批准来源、来源变化条件式提示、桌面/390 px 字号与无横向溢出。
+5. 聚焦门
+   `test_demo1_http_continuation_preserves_parent_and_limits_changed_source_scope`：覆盖
+   changed/unchanged revision、父 Snapshot/Event/Artifact/Commit 不变、精确 child scope、
+   幂等 replay、旧 version 和 Owner 负向路径；见
+   [`固定场景 Evidence`](../evidence/DR-0053-DEMO1-DEMO2-FIXED-SCENARIO-GATES-EVIDENCE-20260831.md)。
 
 ## 设计来源 Source ID 与运行时 Fixture `source_ref`
 
