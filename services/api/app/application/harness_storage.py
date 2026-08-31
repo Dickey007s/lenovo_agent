@@ -42,6 +42,8 @@ def _validate_ledger_append(previous: dict[str, Any] | None, current: dict[str, 
     """
     current_units = list(current.get("work_units", []))
     current_contributions = list(current.get("contributions", []))
+    if (current_units or current_contributions) and not current.get("branches"):
+        raise RuntimeError("WorkUnit/Contribution rows require a Branch projection")
     owner_id = current.get("owner_id")
     task_id = current.get("task_id")
     run_id = current.get("run_id")

@@ -371,6 +371,14 @@ async def test_postgres_demo2_interrupted_worker_reservation_is_not_replayed() -
         assert restored.budget.model_calls_used == reserved.budget.model_calls_used
         assert restored.worker_runs == []
         assert not getattr(second, "_tasks", {})
+        assert {item.branch_id for item in restored.work_units} == {
+            item.branch_id for item in restored.branches
+        }
+        assert all(
+            item.approved_file_refs
+            == next(branch for branch in restored.branches if branch.branch_id == item.branch_id).input_file_refs
+            for item in restored.work_units
+        )
 
         # A byte-for-byte replay of the original command reaches the durable
         # reservation and is rejected as an interrupted attempt, not reported

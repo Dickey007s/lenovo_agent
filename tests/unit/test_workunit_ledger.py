@@ -106,6 +106,14 @@ async def test_memory_snapshot_rejects_contribution_mutation_and_deletion() -> N
             "run_id": RUN,
             "owner_id": OWNER,
             "task_id": TASK,
+            "branches": [
+                {
+                    "branch_id": BRANCH,
+                    "unit_id": "u1",
+                    "depends_on": [],
+                    "input_file_refs": ["forte-aaaaaaaaaaaaaaaa"],
+                }
+            ],
             "contributions": [first],
             "work_units": [unit],
             "updated_at": now,

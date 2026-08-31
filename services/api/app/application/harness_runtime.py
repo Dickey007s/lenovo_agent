@@ -1070,6 +1070,10 @@ class HarnessRuntime:
                 snapshot = HarnessRunSnapshot.model_validate(record.snapshot)
                 resume_status = record.resume_status
                 if snapshot.status not in terminal_statuses:
+                    worker_checkpoint = any(
+                        item.state in {WorkUnitState.RESERVED, WorkUnitState.RUNNING}
+                        for item in snapshot.work_units
+                    )
                     recovered_work_units = []
                     for work_unit in snapshot.work_units:
                         if work_unit.state in {WorkUnitState.RESERVED, WorkUnitState.RUNNING}:
@@ -1085,12 +1089,22 @@ class HarnessRuntime:
                     completed_rounds = [
                         item for item in snapshot.rounds if item.status == "completed"
                     ]
-                    completed_round_numbers = {item.round_number for item in completed_rounds}
-                    recovered_branches = [
-                        item
-                        for item in snapshot.branches
-                        if item.round_number in completed_round_numbers
-                    ]
+                    if worker_checkpoint:
+                        # Worker dispatch is a post-round action.  Its
+                        # reservation snapshot already contains a validated
+                        # Branch DAG and topology admission; retain that
+                        # projection so a user can explicitly retry only the
+                        # recovered WorkUnit with a new idempotency key.
+                        recovered_rounds = list(snapshot.rounds)
+                        recovered_branches = list(snapshot.branches)
+                    else:
+                        completed_round_numbers = {item.round_number for item in completed_rounds}
+                        recovered_rounds = completed_rounds
+                        recovered_branches = [
+                            item
+                            for item in snapshot.branches
+                            if item.round_number in completed_round_numbers
+                        ]
                     recovered_branch_ids = {item.branch_id for item in recovered_branches}
                     recovered_status = (
                         "waiting_input" if snapshot.status == "waiting_input" else "paused"
@@ -1114,30 +1128,38 @@ class HarnessRuntime:
                             ],
                         },
                     )
-                    last_round = completed_rounds[-1] if completed_rounds else None
+                    last_round = recovered_rounds[-1] if recovered_rounds else None
                     snapshot = snapshot.model_copy(
                         update={
                             "status": recovered_status,
                             "control_state": "paused",
-                            "rounds": completed_rounds,
+                            "rounds": recovered_rounds,
                             "branches": recovered_branches,
                             "active_branch_id": snapshot.active_branch_id
                             if snapshot.active_branch_id in recovered_branch_ids
                             else None,
-                            "current_round": len(completed_rounds),
-                            "plan": HarnessPlan.model_validate(last_round.plan)
-                            if last_round and last_round.plan
-                            else None,
-                            "model_receipt": HarnessModelReceipt.model_validate(
-                                last_round.model_receipt
-                            )
-                            if last_round and last_round.model_receipt
-                            else None,
-                            "analysis_receipt": HarnessModelReceipt.model_validate(
-                                last_round.analysis_receipt
-                            )
-                            if last_round and last_round.analysis_receipt
-                            else None,
+                            "current_round": snapshot.current_round if worker_checkpoint else len(recovered_rounds),
+                            "plan": (
+                                snapshot.plan
+                                if worker_checkpoint
+                                else HarnessPlan.model_validate(last_round.plan)
+                                if last_round and last_round.plan
+                                else None
+                            ),
+                            "model_receipt": (
+                                snapshot.model_receipt
+                                if worker_checkpoint
+                                else HarnessModelReceipt.model_validate(last_round.model_receipt)
+                                if last_round and last_round.model_receipt
+                                else None
+                            ),
+                            "analysis_receipt": (
+                                snapshot.analysis_receipt
+                                if worker_checkpoint
+                                else HarnessModelReceipt.model_validate(last_round.analysis_receipt)
+                                if last_round and last_round.analysis_receipt
+                                else None
+                            ),
                             "events": [*snapshot.events, event],
                             "last_event_sequence": event.sequence,
                             "work_units": recovered_work_units,
