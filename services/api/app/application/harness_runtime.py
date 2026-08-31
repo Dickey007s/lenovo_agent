@@ -67,6 +67,15 @@ from services.api.app.application.readonly_workers import (
     ReadonlyWorkerContribution,
     SharedArtifactMerge,
 )
+from services.api.app.application.workunit_ledger import (
+    ContributionRecord,
+    ContributionGateStatus,
+    WorkUnitState,
+    WorkUnitRecord,
+    WorkerModelReceipt,
+    public_contribution,
+    public_work_unit,
+)
 from services.api.app.application.harness_storage import (
     HarnessStateStore,
     InMemoryHarnessStateStore,
@@ -363,6 +372,10 @@ class HarnessRunSnapshot(BaseModel):
     worker_runs: list[ReadonlyWorkerContribution] = Field(default_factory=list, max_length=36)
     shared_artifacts: list[SharedArtifactMerge] = Field(default_factory=list, max_length=24)
     worker_idempotency: dict[str, str] = Field(default_factory=dict, max_length=12)
+    # These are the durable execution ledger projection.  Branch remains the
+    # authority for plan, dependency and evidence-gate facts.
+    work_units: list[WorkUnitRecord] = Field(default_factory=list, max_length=36)
+    contributions: list[ContributionRecord] = Field(default_factory=list, max_length=96)
 
 
 class HarnessRunStart(BaseModel):
@@ -493,6 +506,8 @@ class PublicHarnessRunSnapshot(BaseModel):
     topology_admission: TopologyAdmission | None = None
     worker_runs: list[ReadonlyWorkerContribution] = Field(default_factory=list, max_length=36)
     shared_artifacts: list[SharedArtifactMerge] = Field(default_factory=list, max_length=24)
+    work_units: list[dict[str, Any]] = Field(default_factory=list, max_length=36)
+    contributions: list[dict[str, Any]] = Field(default_factory=list, max_length=96)
 
 
 class PublicHarnessTaskLineageItem(BaseModel):
@@ -1690,6 +1705,66 @@ class HarnessRuntime:
             budget = self._budget_with_elapsed(run)
             if budget.model_calls_used + len(worker_requests) > budget.max_model_calls:
                 raise HarnessConflictError("剩余模型调用预算不足，未派发任何 Worker")
+            # Create the execution ledger only for the explicitly admitted
+            # adaptive topology.  The Branch remains the authority for the
+            # approved refs and dependency graph; WorkUnit is just its
+            # versioned execution pointer.
+            now = datetime.now(timezone.utc)
+            work_units = list(snapshot.work_units)
+            work_unit_by_branch = {item.branch_id: item for item in work_units}
+            for request in worker_requests:
+                branch = branches_by_id[request.branch_id]
+                work_unit = work_unit_by_branch.get(request.branch_id)
+                if work_unit is None:
+                    work_unit = WorkUnitRecord(
+                        owner_id=owner_id,
+                        task_id=snapshot.task_id,
+                        run_id=run_id,
+                        work_unit_id=branch.branch_id,
+                        branch_id=branch.branch_id,
+                        unit_id=branch.unit_id,
+                        depends_on=list(branch.depends_on),
+                        approved_file_refs=list(branch.input_file_refs),
+                        state=WorkUnitState.READY,
+                    )
+                elif set(work_unit.approved_file_refs) != set(branch.input_file_refs):
+                    raise HarnessConflictError("WorkUnit 批准来源与 Branch 不一致")
+                if work_unit.state == WorkUnitState.PENDING:
+                    work_unit = work_unit.transition(WorkUnitState.READY)
+                if work_unit.state not in {WorkUnitState.READY, WorkUnitState.WAITING}:
+                    raise HarnessConflictError("该 WorkUnit 已有在途或终态尝试")
+                work_unit = work_unit.transition(WorkUnitState.RESERVED).model_copy(
+                    update={
+                        "attempt": work_unit.attempt + 1,
+                        "reservation_id": f"worker-wave-{idempotency_key}",
+                    }
+                )
+                work_unit = work_unit.transition(WorkUnitState.RUNNING)
+                work_unit_by_branch[request.branch_id] = work_unit
+            work_units = [
+                work_unit_by_branch.get(item.branch_id, item) for item in work_units
+            ]
+            for request in worker_requests:
+                if request.branch_id not in {item.branch_id for item in work_units}:
+                    work_units.append(work_unit_by_branch[request.branch_id])
+            reservation_events = [
+                HarnessEvent(
+                    sequence=snapshot.last_event_sequence + 1,
+                    event_name="worker_wave_reserved",
+                    occurred_at=now,
+                    status="analyzing",
+                    message="已为获准的 WorkUnit 持久化 Worker 波次预留。",
+                    details={"work_unit_ids": [item.branch_id for item in worker_requests], "external_action": False},
+                ),
+                HarnessEvent(
+                    sequence=snapshot.last_event_sequence + 2,
+                    event_name="work_unit_started",
+                    occurred_at=now,
+                    status="analyzing",
+                    message="WorkUnit 已进入只读执行。",
+                    details={"work_unit_ids": [item.branch_id for item in worker_requests], "external_action": False},
+                ),
+            ]
             run.snapshot = run.snapshot.model_copy(
                 update={
                     "budget": budget.model_copy(
@@ -1699,7 +1774,10 @@ class HarnessRuntime:
                     # second dispatch carrying the same expected_version must
                     # fail before it can start another set of workers.
                     "version": run.snapshot.version + 1,
-                    "updated_at": datetime.now(timezone.utc),
+                    "updated_at": now,
+                    "work_units": work_units,
+                    "events": [*snapshot.events, *reservation_events],
+                    "last_event_sequence": reservation_events[-1].sequence,
                 }
             )
             await self._persist_locked(run)
@@ -1719,8 +1797,77 @@ class HarnessRuntime:
             artifact_versions = list(run.snapshot.artifact_versions)
             commits = list(run.snapshot.commits)
             last_commit = run.snapshot.last_commit
+            work_units = list(run.snapshot.work_units)
+            work_unit_by_branch = {item.branch_id: item for item in work_units}
             contribution_by_branch = {item.branch_id: item for item in contributions}
             adopted_worker_ids = set(merged.adopted_worker_run_ids)
+            adopted_artifact_version = (
+                len(artifact_versions) + 1
+                if adopted_worker_ids and len(artifact_versions) < 24
+                else None
+            )
+            contribution_records: list[ContributionRecord] = []
+            for contribution in contributions:
+                work_unit = work_unit_by_branch.get(contribution.branch_id)
+                if work_unit is None or work_unit.state != WorkUnitState.RUNNING:
+                    raise HarnessConflictError("Worker 返回时 WorkUnit 不在 running 状态")
+                anchors: list[AgentControlLoopEvidenceAnchor] = []
+                seen_anchor_keys: set[tuple[str, str, int, int]] = set()
+                for finding in contribution.findings:
+                    for anchor in finding.evidence_anchors:
+                        key = (anchor.file_ref, anchor.locator_kind, anchor.start, anchor.end)
+                        if key not in seen_anchor_keys:
+                            anchors.append(anchor)
+                            seen_anchor_keys.add(key)
+                if contribution.worker_run_id in adopted_worker_ids:
+                    gate_status = ContributionGateStatus.ADOPTED
+                    gate_reason = "来源范围与 Anchor 已通过服务端采用门。"
+                    next_state = WorkUnitState.ADOPTED
+                elif contribution.outcome == "failed":
+                    gate_status = ContributionGateStatus.FAILED
+                    gate_reason = contribution.error or "Worker 执行失败。"
+                    next_state = WorkUnitState.FAILED
+                elif contribution.outcome == "ambiguous":
+                    gate_status = ContributionGateStatus.WAITING
+                    gate_reason = "结果已返回，但原文位置不明确，等待用户核对。"
+                    next_state = WorkUnitState.WAITING
+                else:
+                    gate_status = ContributionGateStatus.REJECTED
+                    gate_reason = contribution.error or "贡献未通过服务端采用门。"
+                    next_state = WorkUnitState.REJECTED
+                contribution_record = ContributionRecord(
+                    owner_id=owner_id,
+                    task_id=run.snapshot.task_id,
+                    run_id=run_id,
+                    work_unit_id=contribution.branch_id,
+                    branch_id=contribution.branch_id,
+                    attempt=work_unit.attempt,
+                    worker_run_id=contribution.worker_run_id,
+                    run_source_revision=run.snapshot.workspace_revision,
+                    catalog_source_revision=str(getattr(self.catalog, "revision", "forte-public-catalog")),
+                    approved_file_refs=tuple(work_unit.approved_file_refs),
+                    evidence_anchors=tuple(anchors),
+                    model_receipt=WorkerModelReceipt(
+                        called=contribution.model_called,
+                        output_used=contribution.output_used,
+                        elapsed_ms=contribution.elapsed_ms,
+                    ),
+                    gate_status=gate_status,
+                    gate_reason=gate_reason,
+                    artifact_version=adopted_artifact_version if gate_status == ContributionGateStatus.ADOPTED else None,
+                    summary=contribution.summary,
+                )
+                contribution_records.append(contribution_record)
+                updated_work_unit = work_unit.transition(WorkUnitState.RETURNED, error=contribution.error)
+                updated_work_unit = updated_work_unit.model_copy(
+                    update={"latest_contribution_id": contribution_record.contribution_id}
+                )
+                updated_work_unit = updated_work_unit.transition(next_state, error=contribution.error)
+                work_unit_by_branch[contribution.branch_id] = updated_work_unit
+            work_units = [work_unit_by_branch.get(item.branch_id, item) for item in work_units]
+            for item in contribution_records:
+                if item.branch_id not in {unit.branch_id for unit in work_units}:
+                    work_units.append(work_unit_by_branch[item.branch_id])
             prior_findings = artifact_versions[-1].findings if artifact_versions else []
             finding_by_id = {finding.finding_id: finding for finding in prior_findings}
             artifact_findings = [
@@ -1871,6 +2018,8 @@ class HarnessRuntime:
                 update={
                     "worker_runs": [*run.snapshot.worker_runs, *contributions],
                     "shared_artifacts": [*run.snapshot.shared_artifacts, merged],
+                    "work_units": work_units,
+                    "contributions": [*run.snapshot.contributions, *contribution_records],
                     "artifact_versions": artifact_versions,
                     "commits": commits,
                     "last_commit": last_commit,
@@ -1930,6 +2079,36 @@ class HarnessRuntime:
                     "external_action": False,
                 },
             )
+            ledger_record = next(
+                item for item in contribution_records if item.worker_run_id == contribution.worker_run_id
+            )
+            await self._transition(
+                owner_id,
+                run_id,
+                current_status,
+                "contribution_recorded",
+                "Worker 结果已写入不可变 Contribution Ledger。",
+                {
+                    "contribution_id": ledger_record.contribution_id,
+                    "work_unit_id": ledger_record.work_unit_id,
+                    "gate_status": ledger_record.gate_status,
+                    "artifact_version": ledger_record.artifact_version,
+                    "external_action": False,
+                },
+            )
+            if contribution.outcome == "failed":
+                await self._transition(
+                    owner_id,
+                    run_id,
+                    current_status,
+                    "work_unit_failed",
+                    "WorkUnit 执行失败，相关下游依赖保持阻塞。",
+                    {
+                        "work_unit_id": contribution.branch_id,
+                        "contribution_id": ledger_record.contribution_id,
+                        "external_action": False,
+                    },
+                )
             disposition_event = (
                 "contribution_adopted"
                 if contribution.worker_run_id in merged.adopted_worker_run_ids
@@ -1960,6 +2139,19 @@ class HarnessRuntime:
                 "worker_count": len(contributions),
                 "adopted_count": len(merged.adopted_worker_run_ids),
                 "waiting_branch_count": len(merged.waiting_branch_ids),
+                "external_action": False,
+            },
+        )
+        await self._transition(
+            owner_id,
+            run_id,
+            current_status,
+            "worker_wave_committed",
+            "本批 WorkUnit 与 Contribution 已完成服务端提交。",
+            {
+                "work_unit_count": len(contributions),
+                "contribution_count": len(contribution_records),
+                "artifact_version": merged.version if merged.adopted_worker_run_ids else None,
                 "external_action": False,
             },
         )
@@ -3074,6 +3266,14 @@ class HarnessRuntime:
             topology_admission=snapshot.topology_admission,
             worker_runs=snapshot.worker_runs,
             shared_artifacts=snapshot.shared_artifacts,
+            work_units=[public_work_unit(item) for item in snapshot.work_units],
+            contributions=[
+                {
+                    **public_contribution(item),
+                    "summary": self._project_business_text(item.summary, ref_to_label),
+                }
+                for item in snapshot.contributions
+            ],
         )
 
     def public_control_result(self, result: HarnessControlResult) -> PublicHarnessControlResult:
