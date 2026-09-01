@@ -469,6 +469,10 @@ Adaptive Swarm 只是驾驶舱处理复杂任务的一种执行方式，不是�
 本次纠正见 [`DR-0057`](../decisions/DR-0057-agent-capability-page-and-smart-cockpit-boundary.md)、
 [`SCENARIO-044`](../scenarios/SCENARIO-044-agent-capability-page-and-future-smart-cockpit.md) 和
 [`Agent 能力页验收门`](../testing/AGENT-CAPABILITY-PAGE-AND-COCKPIT-BOUNDARY-GATES-20260901.md)。
+当前工程 Evidence 为能力页定向 Playwright `4 passed`、全量 Playwright `77 passed`、全量
+Python `418 passed, 23 skipped`，Ruff/lint/build/治理通过；桌面和 390 px 图见
+[`DR-0057 Evidence`](../evidence/DR-0057-AGENT-CAPABILITY-PAGE-EVIDENCE-20260901.md)。这些仍是
+固定 Fixture 证据，不是目标用户研究或智能工作驾驶舱完成证明。
 
 ## 最新增补：从“用户先找文件”改为“Agent 找证据，人确认下一步”
 
@@ -647,7 +651,8 @@ Reasoning、Action 与 Observation 交替出现，使下一步计划能够吸收
 当前 Office Agent 已实现最多二十四轮的有界近似：Workspace 观察、每轮 Planner、服务端
 校验、固定本地适配器或只读 Act、Analyst、确定性/引用验证和 Branch Evidence Gate，并支持预算停止、安全点控制、独立逻辑
 ArtifactVersion、TaskCommit、隔离 Run Workspace Artifact 与配置 PostgreSQL 时的顺序 Runtime 恢复。它仍没有通用 Tool Gateway、
-外部 Connector、并行 Worker 或多实例调度，因此不能称为完整 ReAct
+外部 Connector、分布式/远端 Worker 或多实例调度；当前只有每波最多三个的进程内
+只读 Analyst Worker，因此不能称为完整 ReAct
 执行器。普通 UI 展示 named SSE、模型回执、业务 Plan 和引用，明确不展示 Prompt、
 chain-of-thought 或原始模型响应。
 
@@ -665,8 +670,9 @@ chain-of-thought 或原始模型响应。
 named SSE、Planner/Analyst 回执、Plan、Finding、引用与下一步建议。Demo 1、Demo 2、Demo 3
 是通用能力的验收视角，不是产品入口，也不会解锁隐藏执行器。Demo 1 当前已有最小
 Task Ledger/current pointer 与跨 Run 单 Branch 延续；Demo 2 当前已有确定性路线准入、
-显式确认的最多三个进程内只读 Worker，以及 Branch 绑定的 WorkUnit/Contribution 台账。
-它们仍不等于生产 Task 服务、distributed queue/lease 或通用执行器。
+显式确认的最多三个进程内只读 Worker，以及 Branch 绑定的 WorkUnit/Contribution 台账，
+这些是支撑 Demo 2 的组织维能力，不代表智能工作驾驶舱已经实现。它们仍不等于生产 Task
+服务、distributed queue/lease 或通用执行器。
 
 ### 图示区二：不同首要对象如何改变默认流程
 

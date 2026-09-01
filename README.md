@@ -158,7 +158,10 @@ safe source labels and evidence review. Demo 2 itself remains the future smart
 work cockpit: a server-backed task queue that chooses Tool Call, Single Agent,
 Fixed Workflow or Adaptive Swarm and returns each task to one confirmation view.
 No cockpit route, queue or dispatch contract is implemented in this slice, and
-the UI does not render a placeholder that could be mistaken for one.
+the UI does not render a placeholder that could be mistaken for one. The
+integrated engineering gate passes 77 Playwright tests, 418 Python tests with 23
+environment skips, Ruff, lint, build and reporting governance; exact screenshots
+and claim boundaries are recorded in the DR-0057 Evidence.
 
 ## Public data and preview boundary
 

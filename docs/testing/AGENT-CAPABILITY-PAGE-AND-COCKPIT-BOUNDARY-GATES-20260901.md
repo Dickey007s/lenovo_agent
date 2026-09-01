@@ -1,7 +1,7 @@
 # Agent 能力页与驾驶舱边界验收门
 
 - 日期：2026-09-01
-- 状态：`Draft`；实现前合同
+- 状态：`Limited Verified`；工程门已执行，未来驾驶舱不在本轮验收范围
 - 决策：`DR-0057`
 - 场景：`SCENARIO-044`
 
@@ -66,6 +66,11 @@ git diff --check
 
 真实 PostgreSQL、真实 Provider 和形成性用户走查必须单列；没有运行就不能由 Fixture 或
 已有历史 Evidence 替代。
+
+2026-09-01 执行结果：能力页定向 Playwright `4 passed`，截图钩子 `1 passed`，全量
+Playwright `77 passed`，全量 Python `418 passed, 23 skipped`，Ruff、Web lint/build、
+汇报治理与 `git diff --check` 通过。详见
+[`DR-0057 Evidence`](../evidence/DR-0057-AGENT-CAPABILITY-PAGE-EVIDENCE-20260901.md)。
 
 ## 四、尚不验收的未来驾驶舱
 

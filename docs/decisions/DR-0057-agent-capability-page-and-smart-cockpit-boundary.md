@@ -4,14 +4,14 @@
 
 | 字段 | 内容 |
 | --- | --- |
-| 状态 | `Draft`；等待源码、浏览器和完整回归 Evidence |
+| 状态 | `Limited Verified`；Agent 能力页工程纵切，智能工作驾驶舱仍是目标设计 |
 | 日期 | 2026-09-01 |
 | 用户来源 | `USER-FEEDBACK-20260901-AGENT-CAPABILITY-PAGE-AND-FUTURE-COCKPIT` |
 | 研究输入 | `DEMO1-DEMO2-SEPARATED-VIEWS-AND-ADAPTIVE-SWARM-UI-RESEARCH-20260901` 纠正版 |
 | 前置决策 | `DR-0053`、`DR-0054`、`DR-0055`、`DR-0056` |
 | 场景 | [`SCENARIO-044`](../scenarios/SCENARIO-044-agent-capability-page-and-future-smart-cockpit.md) |
 | 测试合同 | [`AGENT-CAPABILITY-PAGE-AND-COCKPIT-BOUNDARY-GATES-20260901`](../testing/AGENT-CAPABILITY-PAGE-AND-COCKPIT-BOUNDARY-GATES-20260901.md) |
-| Evidence | 待实现提交、浏览器截图和验证日志形成后登记 |
+| Evidence | [`DR-0057-AGENT-CAPABILITY-PAGE-EVIDENCE-20260901`](../evidence/DR-0057-AGENT-CAPABILITY-PAGE-EVIDENCE-20260901.md) |
 
 ## 1. 冲突
 
@@ -105,8 +105,9 @@ Swarm。本项目不声称竞品做不到。当前差异假设仍是同一服务
   调度；
 - 不从截图、Fixture 或 Stakeholder 反馈推断目标用户理解、效率或信任已经改善。
 
-## 7. 进入 `Limited Verified` 的门槛
+## 7. `Limited Verified` 结果
 
-必须完成独立路由、两个能力使用同一 Snapshot、任务会话切换、历史只读、Adaptive/Fixed
-正反例、Workspace 往返、直接刷新、桌面/390 px、公共字段审计、定向和全量回归，并同步
-living docs 与 Evidence。智能驾驶舱无论本轮门是否通过，仍保持 `尚未实现`。
+独立路由、同一 Snapshot、任务会话切换、历史只读、Adaptive/Fixed 正反例、Workspace
+往返、直接刷新、真实证据审查、桌面/390 px、公共字段审计和全量回归已经通过工程门，
+结果见 DR-0057 Evidence。智能驾驶舱无论本轮门是否通过，仍保持 `尚未实现`；真实
+PostgreSQL、Provider 和目标用户走查也没有由本轮 Fixture 补证。

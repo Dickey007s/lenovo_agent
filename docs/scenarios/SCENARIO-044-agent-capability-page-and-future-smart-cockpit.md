@@ -1,9 +1,10 @@
 # SCENARIO-044：同页核对循环与协作能力，驾驶舱保持后续目标
 
-- 状态：`Draft`；等待实现与浏览器 Evidence
+- 状态：`Limited Verified`；能力页工程纵切，驾驶舱仍是目标设计
 - 日期：2026-09-01
 - 决策：`DR-0057`
 - 用户来源：`USER-FEEDBACK-20260901-AGENT-CAPABILITY-PAGE-AND-FUTURE-COCKPIT`
+- Evidence：[`DR-0057-AGENT-CAPABILITY-PAGE-EVIDENCE-20260901`](../evidence/DR-0057-AGENT-CAPABILITY-PAGE-EVIDENCE-20260901.md)
 
 ## 1. 目标用户与完成条件
 
