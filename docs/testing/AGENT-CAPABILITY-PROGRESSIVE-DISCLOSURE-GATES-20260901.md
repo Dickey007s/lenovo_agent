@@ -105,5 +105,6 @@ git diff --check
   lint/build/diff-check 通过；新增四张受控 Fixture 截图。纯前端收尾没有重跑
   Python、Ruff、Provider 或 PostgreSQL，初版基线不得冒充本提交的新验证。
 - Adaptive 执行工作面：定向 `9 passed`、最终全量 Playwright `80 passed`、Web
-  lint/build/diff-check 通过；新增 1440 与 390 px 受控 Fixture 截图。未重跑 Python、
-  Ruff、Provider 或 PostgreSQL。
+  lint/build/diff-check 通过；最终状态一致性定向 `3 passed`、截图相关 `8 passed`，可见
+  方向连线微调定向 `3 passed`，最后一次渲染微调沿用同日 `80 passed` 基线而未重复全量；
+  新增 1440 与 390 px 受控 Fixture 截图。未重跑 Python、Ruff、Provider 或 PostgreSQL。

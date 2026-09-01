@@ -56,7 +56,8 @@ Workspace 是办公工作面；新的 `/agent-capabilities` 把 Agent Control Lo
 把能力页或旧 dialog 说成驾驶舱已经完成。这个分层只改变前台投影；历史 Run 只读且不接
 SSE，当前 Worker 仍是单进程受限只读实现。Adaptive 正例的协作页现在进一步用左侧阶段
 轨、中央真实 WorkUnit DAG、右侧当前影响和底部成果条解释“为什么拆、谁依赖谁、哪里
-停、什么已经保留”；Fixed/Single 不画假 DAG。
+停、什么已经保留”；父子关系用方向连线表达，当前轮 `ready_branch_ids` 统一显示为“下一
+波待确认 / 可执行”，主要确认动作放在右侧当前影响区；Fixed/Single 不画假 DAG。
 Task/WorkUnit 的隔离 PostgreSQL 17.11 单主机顺序门已经通过，但 Provider 同场、多实例、
 远端 Worker 与用户研究仍未完成，不能写成生产级 Task 服务或通用/分布式 Worker。
 十五条场景的实际效果、失败修复轨迹、真实模型运行和外部边界见

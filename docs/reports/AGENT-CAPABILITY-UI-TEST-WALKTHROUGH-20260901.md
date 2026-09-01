@@ -149,8 +149,8 @@
 | --- | --- | --- |
 | 顶部任务与 Run | 这仍是当前任务的同一个 Snapshot，可以打开历史 Run 只读回看 | `instruction/contract.goal/run_sequence/status` 与 Task pointer |
 | 左侧阶段轨 | 协作不是 Worker 聊天墙，而是准入、工作包、贡献汇合、成果四段状态 | `topology_admission/work_units/contributions/artifact_versions` |
-| 中央依赖图 | 三个根工作包先完成，两个 dependent 只有依赖满足后进入下一波 | `work_units[].depends_on` 与 Branch/WorkUnit state；节点和边不硬编码 |
-| 右侧当前影响 | 只呈现 waiting/blocked、待采用贡献、人工决定或证据缺口对下游的真实影响 | waiting/blocked WorkUnit、Contribution、DecisionRequest、Evidence Gap |
+| 中央依赖图 | 三个根工作包先完成，父到子的方向折线说明两个 dependent 为什么只能进入下一波；ready 节点明确写“下一波待确认 / 可执行” | `work_units[].depends_on`、最新轮 `ready_branch_ids` 与 Branch/WorkUnit state；节点和边不硬编码 |
+| 右侧当前影响 | 下一波已就绪时，说明会启动哪些工作包，并把“继续下一批”放在同一区域；其他时候只呈现 waiting/blocked、待采用贡献、人工决定或证据缺口 | `ready_branch_ids`、waiting/blocked WorkUnit、Contribution、DecisionRequest、Evidence Gap |
 | 底部协作结果 | Worker 返回、服务端采用、待确认和逻辑成果版本是四件不同的事 | `worker_runs/contributions/artifact_versions/last_commit` |
 | 三个折叠入口 | 来源和回执仍可审计，但不再挤占主视图 | 批准来源、called/output_used/elapsed 与 Contribution Gate |
 

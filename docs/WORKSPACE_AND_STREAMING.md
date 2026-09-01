@@ -148,9 +148,13 @@ switch to a peer collaboration-method tab, or open one focused evidence decision
 The collaboration tab shows the actual route. For an Adaptive Snapshot it places
 admission, work packages, contribution convergence and verification/artifact on a
 left stage rail; lays out a dynamic DAG from public `work_units[].depends_on` in the
-main area; derives the right current-impact panel from waiting/blocked units,
+main area with visible parent-to-dependent arrows; projects the latest Round's
+`next_step.ready_branch_ids` as a confirmation-ready wave; derives the right
+current-impact panel from waiting/blocked units,
 waiting contributions, open decisions and Evidence gaps; and summarizes adoption
-and Artifact versions in a bottom result bar. Work-package details, approved sources
+and Artifact versions in a bottom result bar. When that ready wave needs confirmation,
+the matching explanation and primary action stay together in the impact panel.
+Work-package details, approved sources
 and called/adopted/elapsed receipts stay collapsed until requested. Single
 Controller, Fixed Workflow and Adaptive Swarm form the explanatory route frame, but
 only the service-owned mode is highlighted; non-adaptive Runs never render a

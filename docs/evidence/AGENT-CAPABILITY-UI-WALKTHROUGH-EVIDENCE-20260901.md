@@ -2,7 +2,8 @@
 
 - 状态：`Limited Verified`
 - 初始被测提交：`bc52a73ddcee77ed0b146411f09777461fc31c83`
-- 修正与执行工作面：`09e246b`、`fbf142c`、`fe0878f`
+- 修正与执行工作面：`09e246b`、`fbf142c`、`fe0878f`、`46f5521`、`ed8b82b`、
+  `0e8767f`、`43e8171`
 - 说明报告：[`AGENT-CAPABILITY-UI-TEST-WALKTHROUGH-20260901`](../reports/AGENT-CAPABILITY-UI-TEST-WALKTHROUGH-20260901.md)
 - 截图目录：[`ui-test-walkthrough-20260901`](screenshots/ui-test-walkthrough-20260901/)
 
@@ -76,10 +77,14 @@ pnpm --dir apps/web exec playwright test e2e/harness-workbench.spec.ts --grep "A
 [1440 px](screenshots/dr-0058-adaptive-execution-workspace-1440.png) 和
 [390 px](screenshots/dr-0058-adaptive-execution-workspace-390.png)。新增结构由当前 Snapshot
 驱动：左侧阶段轨、`work_units[].depends_on` 动态 DAG、右侧局部影响、底部成果条，以及
-折叠的来源/回执。Fixed/Single 反例不画假 DAG。
+折叠的来源/回执。最终截图中，父子依赖以可见方向折线呈现；最新 Round 的
+`ready_branch_ids` 在 DAG 节点、工作包明细、右侧“下一波已就绪”说明和确认动作中使用
+同一语义。Fixed/Single 反例不画假 DAG。
 
-修正后的 capability 定向门 `9 passed`，完整 Playwright `80 passed`，Web lint/build 和
-`git diff --check` 通过。后续纯前端收敛未重跑 Python、Ruff、Provider 或 PostgreSQL。
+修正后的 capability 定向门 `9 passed`，完整 Playwright `80 passed`；最终状态定向门
+`3 passed`、截图相关门 `8 passed`，可见连线微调又通过定向 `3 passed`。Web lint/build
+和 `git diff --check` 通过。最后一次纯渲染微调沿用同日 `80 passed` 基线，未重复全量；
+后续纯前端收敛未重跑 Python、Ruff、Provider 或 PostgreSQL。
 
 ## 6. 边界
 

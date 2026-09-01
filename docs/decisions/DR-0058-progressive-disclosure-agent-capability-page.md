@@ -140,8 +140,11 @@ Stakeholder 随后指出上述协作页仍只是摘要，不能清楚看出概�
 空间关系。第二次收敛由 Luna 分支 `db3f197`、`cbb2017`、`085c26e` 实现，并等价集成为
 `master` 的 `09e246b`、`fbf142c`、`fe0878f`。Adaptive 正例现在显示任务/Run 上下文、
 左侧阶段轨、真实 WorkUnit DAG、右侧当前影响和底部协作结果；Fixed/Single 仍不绘制假
-DAG。定向 `9 passed`、全量 Playwright `80 passed`、Web lint/build/diff-check 和新增
-1440/390 运行截图见同一 Evidence。
+DAG。最终状态与连线收敛由 Luna `6a49dbd`、`14ade7e`、`04e11cd`、`50f4c4b` 完成，
+等价集成为 `master` 的 `46f5521`、`ed8b82b`、`0e8767f`、`43e8171`：最新轮
+`ready_branch_ids` 同时驱动节点、明细、右侧说明与动作，依赖边从父节点底部明确指向子
+节点顶部。定向 `9 passed`、全量 Playwright `80 passed`、最终状态定向 `3 passed`、
+截图门 `8 passed`、Web lint/build/diff-check 和新增 1440/390 运行截图见同一 Evidence。
 
 这只证明被测公共 Snapshot 映射和交互状态成立。真实 Provider、PostgreSQL 本轮复跑与
 目标用户走查未执行，不能把本次状态写成体验改善或生产验证。
