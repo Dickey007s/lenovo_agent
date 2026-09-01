@@ -5090,7 +5090,7 @@ function AgentCapabilitiesSurface({
           <div><span>当前成果</span><strong>{run.artifact_versions.length ? `成果 v${run.artifact_versions.at(-1)?.version ?? 1}` : "尚无成果版本"}</strong><p>{run.topology_admission?.mode === "adaptive_readonly_workers" ? "每波最多 3 个只读执行单元；不连接外部系统。" : "本次采用固定流程，Adaptive Swarm 未启动"}</p></div>
         </section>
         <CollaborationOverview run={run} files={files} readOnly={isReadOnly} starting={starting} onExecuteWorkers={onExecuteWorkers} />
-      </> : <div className="agent-capability-empty"><IconRoute aria-hidden="true" /><p>等待当前 Run Snapshot；不会填充演示拓扑或伪造 Worker 回执。</p></div>}
+      </> : <div className="agent-capability-empty"><IconRoute aria-hidden="true" /><p>等待当前服务端状态；不会填充演示拓扑或伪造协作回执。</p></div>}
     </section>}
     {error && <p className="agent-capabilities-error" role="alert"><IconAlertTriangle aria-hidden="true" />{error}</p>}
     {reviewRequest && <EvidenceReviewDialog request={reviewRequest} files={files} onClose={onCloseReview} onOpenFile={onOpenFile} onStartTask={onStartTask} onControl={onControl} starting={starting} controlBusy={controlBusy} readOnly={isReadOnly} />}
