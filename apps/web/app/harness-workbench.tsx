@@ -3915,7 +3915,7 @@ function EvidenceReviewDialog({
           <ol>
             <li><span><IconGitCommit aria-hidden="true" /></span><div><b>{request.kind === "gap" ? "Agent 未完成" : "Agent 提出"}</b><p>{request.kind === "proposal" ? "形成一条待确认的下一步建议" : request.kind === "gap" ? "本轮没有交付可定位的证据，只停止受影响分支" : "形成一条待复核发现"}</p></div></li>
             <li><span><IconShieldCheck aria-hidden="true" /></span><div><b>服务端记录</b><p>{request.serverFact}</p></div></li>
-            <li className="is-current"><span><IconEye aria-hidden="true" /></span><div><b>{request.kind === "gap" ? "选择恢复方式" : "等待你核对"}</b><p>{request.kind === "gap" ? "你不需要修改源文件；可直接让 Agent 只重试这个分支。" : "对照右侧原始资料，判断 Agent 描述是否成立。"}</p></div></li>
+            <li className="is-current"><span><IconEye aria-hidden="true" /></span><div><b>{request.kind === "gap" ? "选择恢复方式" : "等待你核对"}</b><p>{request.kind === "gap" ? "你不需要修改源文件；可让 Agent 重新查找依据。" : "对照右侧原始资料，判断 Agent 描述是否成立。"}</p></div></li>
           </ol>
           <footer><IconAlertTriangle aria-hidden="true" /><p>{request.boundary}</p></footer>
         </aside>
@@ -3923,9 +3923,11 @@ function EvidenceReviewDialog({
           {request.kind !== "gap" && !isDirectRetryResolution && <section className={`evidence-review-claim${isAmbiguousResolution ? " is-ambiguous" : ""}`} aria-labelledby="review-summary-title">
             <header><span>{isAmbiguousResolution ? "下一步只做 1 件事" : "问题处置单"}</span><h3 id="review-summary-title">{isAmbiguousResolution ? `从 ${request.resolution?.candidates.length ?? 0} 个真实位置中选 1 个` : "先看事实，再看影响，最后决定下一步"}</h3></header>
             {isAmbiguousResolution ? <ol className="review-summary-steps">
-              <li><b>1</b><div><span>为什么需要你</span><strong>同一段原文匹配到多个位置，Agent 不能替你选择。</strong></div></li>
-              <li className="is-decision"><b>2</b><div><span>你只需要选什么</span><strong>从下方候选位置中选 1 个真实位置。</strong></div></li>
-              <li><b>3</b><div><span>选完发生什么</span><strong>只重跑“{request.branchTitle || "当前"}”分支；不修改文件，不执行外部动作。</strong></div></li>
+              <li><b>1</b><div><span>系统发现</span><strong>同一段原文匹配到多个位置，Agent 不能替你选择。</strong></div></li>
+              <li><b>2</b><div><span>影响</span><strong>当前只能确认原文位置，不能因此直接确认结论。</strong></div></li>
+              <li className="is-decision"><b>3</b><div><span>你要做什么</span><strong>从下方候选位置中选 1 个真实位置。</strong></div></li>
+              <li><b>4</b><div><span>会保留</span><strong>其他成果、已完成分支和历史记录均不回退。</strong></div></li>
+              <li><b>5</b><div><span>不会做</span><strong>不会修改文件，也不会执行外部动作。</strong></div></li>
             </ol> : <ol className="review-summary-steps">
               <li><b>1</b><div><span>系统发现</span><strong>{request.factSummary || request.title}</strong></div></li>
               <li><b>2</b><div><span>影响</span><strong>{request.impact || "影响尚未单独结构化，请先核对下方证据后再作判断。"}</strong></div></li>
@@ -3936,13 +3938,13 @@ function EvidenceReviewDialog({
             <details><summary>查看 Agent 的完整说明</summary><p>{request.detail}</p></details>
           </section>}
           {request.kind === "gap" && request.gapRecovery && <section className="evidence-gap-recovery" aria-labelledby="gap-recovery-title">
-            <header><div><span>{request.gapRecovery.mode === "inspect_only" ? "当前只能查看" : "下一步只做 1 件事"}</span><h3 id="gap-recovery-title">{request.gapRecovery.mode === "inspect_only" ? "查看停下原因，暂不启动新调用" : request.gapRecovery.mode === "new_run" ? "用此分支新建任务继续" : "直接让 Agent 重试此分支"}</h3><p>{request.gapRecovery.mode === "inspect_only" ? "当前状态没有可证明的原地恢复入口。" : request.gapRecovery.mode === "new_run" ? "旧 Run 已结束，不能原地续跑。不需要修改文件，也不需要填写内容；点击后会创建一个只处理此分支的新任务。" : "不需要修改文件，也不需要填写内容。只有你点击后，Agent 才会继续。"}</p></div><b>{request.gapRecovery.mode === "inspect_only" ? "仅查看" : "推荐"}</b></header>
-            <footer>{request.gapRecovery.mode !== "inspect_only" && <button type="button" className="is-primary" onClick={() => void recoverGap()} disabled={readOnly || controlBusy !== null || starting}><IconRefresh aria-hidden="true" />{starting || controlBusy ? "正在提交" : request.gapRecovery.mode === "new_run" ? "新建任务，只续办此分支" : "继续任务，只重试此分支"}</button>}<button type="button" onClick={() => void deferAndClose()} disabled={controlBusy !== null || starting}>暂不处理此分支</button></footer>
+            <header><div><span>{request.gapRecovery.mode === "inspect_only" ? "当前只能查看" : "下一步只做 1 件事"}</span><h3 id="gap-recovery-title">{request.gapRecovery.mode === "inspect_only" ? "查看停下原因，暂不启动新调用" : request.gapRecovery.mode === "new_run" ? "用此分支新建任务继续" : "让 Agent 重新查找依据"}</h3><p>{request.gapRecovery.mode === "inspect_only" ? "当前状态没有可证明的原地恢复入口。" : request.gapRecovery.mode === "new_run" ? "旧 Run 已结束，不能原地续跑。不需要修改文件，也不需要填写内容；点击后会创建一个只处理此分支的新任务。" : "不需要修改文件，也不需要填写内容。只有你点击后，Agent 才会继续查找依据。"}</p></div><b>{request.gapRecovery.mode === "inspect_only" ? "仅查看" : "推荐"}</b></header>
+            <footer>{request.gapRecovery.mode !== "inspect_only" && <button type="button" className="is-primary" onClick={() => void recoverGap()} disabled={readOnly || controlBusy !== null || starting}><IconRefresh aria-hidden="true" />{starting || controlBusy ? "正在提交" : request.gapRecovery.mode === "new_run" ? "新建任务，只续办此分支" : "继续任务，重新查找依据"}</button>}<button type="button" onClick={() => void deferAndClose()} disabled={controlBusy !== null || starting}>暂不处理此分支</button></footer>
             {request.gapRecovery.mode !== "inspect_only" && <details className="gap-extra-hint"><summary>我有额外线索</summary><label className="decision-feedback"><span>给 Agent 的线索（可选）</span><textarea value={decisionFeedback} onChange={(event) => setDecisionFeedback(event.target.value)} placeholder="例如：优先检查 F07、版本号和测试日期" /></label></details>}
           </section>}
           {isDirectRetryResolution && request.resolution && <section className="evidence-gap-recovery" aria-labelledby="resolution-retry-title">
-            <header><div><span>下一步只做 1 件事</span><h3 id="resolution-retry-title">直接让 Agent 重试此分支</h3><p>不需要修改文件，也不需要填写内容。只有你点击后，Agent 才会继续。</p></div><b>推荐</b></header>
-            <footer><button type="button" className="is-primary" disabled={readOnly || controlBusy !== null} onClick={() => void retryUnavailable()}><IconRefresh aria-hidden="true" />继续任务，只重试此分支</button><button type="button" onClick={() => void deferAndClose()} disabled={controlBusy !== null}>暂不处理此分支</button></footer>
+            <header><div><span>下一步只做 1 件事</span><h3 id="resolution-retry-title">让 Agent 重新查找依据</h3><p>不需要修改文件，也不需要填写内容。只有你点击后，Agent 才会继续查找依据。</p></div><b>推荐</b></header>
+            <footer><button type="button" className="is-primary" disabled={readOnly || controlBusy !== null} onClick={() => void retryUnavailable()}><IconRefresh aria-hidden="true" />让 Agent 重新查找依据</button><button type="button" onClick={() => void deferAndClose()} disabled={controlBusy !== null}>暂不处理此分支</button></footer>
             <details className="gap-extra-hint"><summary>我有额外线索</summary><label className="decision-feedback"><span>给 Agent 的线索（可选）</span><textarea value={decisionFeedback} onChange={(event) => setDecisionFeedback(event.target.value)} placeholder="例如：同时核对版本号和测试日期" /></label></details>
           </section>}
           <details className={`evidence-workbench-disclosure${request.kind === "gap" || isDirectRetryResolution ? " is-gap" : ""}`} open={request.kind === "gap" || isDirectRetryResolution ? undefined : true}>
@@ -3978,7 +3980,7 @@ function EvidenceReviewDialog({
                     </button>;
                   })}
                 </div>
-                {isAmbiguousResolution && <div className="resolution-choice-action" role="status"><span>{selectedCandidateId ? "已选 1 个位置。确认后只重跑这个分支。" : `请先从上方 ${request.resolution?.candidates.length ?? 0} 个位置中选 1 个。`}</span><button type="button" className="is-primary" disabled={readOnly || !selectedCandidateId || controlBusy !== null} onClick={() => void resolveEvidence()}><IconPlayerPlay aria-hidden="true" />采用此位置并只重跑本分支</button></div>}
+                {isAmbiguousResolution && <div className="resolution-choice-action" role="status"><span>{selectedCandidateId ? "已选 1 个位置。确认后只继续受影响部分，其他成果不变。" : `请先从上方 ${request.resolution?.candidates.length ?? 0} 个位置中选 1 个。`}</span><button type="button" className="is-primary" disabled={readOnly || !selectedCandidateId || controlBusy !== null} onClick={() => void resolveEvidence()}><IconPlayerPlay aria-hidden="true" />确认位置并继续</button></div>}
               </section> : reviewAnchors.length > 0 ? <section className="evidence-review-pinpoint" aria-labelledby="evidence-pinpoint-title">
                 <header><div><span>证据定位</span><h3 id="evidence-pinpoint-title">选择一条，右侧打开真实文件并高亮对应位置</h3></div><b>{reviewAnchors.length} 处</b></header>
                 <div className="evidence-anchor-map">
@@ -4027,7 +4029,7 @@ function EvidenceReviewDialog({
                 <button type="button" onClick={() => void cancelDecision()} disabled={readOnly || controlBusy !== null}>取消这次待决</button>
                 <button type="button" onClick={async () => { if (!readOnly && await onControl("stop")) onClose(); }} disabled={readOnly || controlBusy !== null}><IconPlayerStop aria-hidden="true" />结束并保留</button>
               </div>
-              {!isAmbiguousResolution && !isDirectRetryResolution && <button type="button" className="is-primary" disabled={readOnly || controlBusy !== null} onClick={() => void retryUnavailable()}><IconRefresh aria-hidden="true" />继续任务，只重试此分支</button>}
+              {!isAmbiguousResolution && !isDirectRetryResolution && <button type="button" className="is-primary" disabled={readOnly || controlBusy !== null} onClick={() => void retryUnavailable()}><IconRefresh aria-hidden="true" />让 Agent 重新查找依据</button>}
             </footer>
             </section>
           </details> : null}
@@ -5018,7 +5020,7 @@ function AgentCapabilitiesSurface({
   const [activeTab, setActiveTab] = useState<"progress" | "collaboration">("progress");
   const [showExecutionDetails, setShowExecutionDetails] = useState(false);
   useEffect(() => {
-    setActiveTab("progress");
+    setActiveTab(window.location.hash === "#adaptive-swarm" ? "collaboration" : "progress");
     setShowExecutionDetails(false);
   }, [run?.run_id]);
   const openCollaboration = () => {
@@ -5074,7 +5076,14 @@ function AgentCapabilitiesSurface({
     </section>}
     {activeTab === "collaboration" && <section id="adaptive-swarm" className="agent-capability-panel agent-capability-collaboration" role="tabpanel" data-testid="adaptive-swarm-capability" aria-labelledby="agent-collaboration-tab">
       <header className="agent-capability-panel-header"><div><span>B · 组织维</span><h2>Adaptive Swarm</h2><p>按需查看服务端 Snapshot 的路线、准入、WorkUnit、Worker、Contribution 与成果版本。</p></div>{run && <small>{isReadOnly ? "历史只读" : "当前 Run"} · Snapshot</small>}</header>
-      {run ? <AdaptiveSwarmWorkbench run={run} files={files} readOnly={isReadOnly} starting={starting} onClose={() => undefined} onExecuteWorkers={onExecuteWorkers} inline /> : <div className="agent-capability-empty"><IconRoute aria-hidden="true" /><p>等待当前 Run Snapshot；不会填充演示拓扑或伪造 Worker 回执。</p></div>}
+      {run ? <>
+        <section className="agent-collaboration-summary" aria-label="协作方式摘要" data-testid="agent-collaboration-summary">
+          <div><span>本次路线</span><strong>{run.topology_admission?.mode === "adaptive_readonly_workers" ? "受限只读 Worker" : run.topology_admission?.mode === "fixed_workflow" ? "固定流程" : run.topology_admission?.mode === "single_controller" ? "单一控制器" : "尚未形成路线"}</strong><p>{run.topology_admission?.reasons?.at(-1) ?? "等待服务端准入结果。"}</p></div>
+          <div><span>工作包与贡献</span><strong>{run.work_units.length} 个工作包</strong><p>{run.contributions.filter((item) => item.gate_status === "adopted").length} 个已采用 · {run.contributions.filter((item) => item.gate_status === "waiting").length} 个待核对 · {run.contributions.filter((item) => !["adopted", "waiting"].includes(item.gate_status)).length} 个未采用</p></div>
+          <div><span>当前成果</span><strong>{run.artifact_versions.length ? `Artifact v${run.artifact_versions.at(-1)?.version ?? 1}` : "尚无成果版本"}</strong><p>每波最多 3 个进程内只读 Worker；不是分布式调度。</p></div>
+        </section>
+        <details className="agent-collaboration-details"><summary>查看工作包与 Worker 记录</summary><AdaptiveSwarmWorkbench run={run} files={files} readOnly={isReadOnly} starting={starting} onClose={() => undefined} onExecuteWorkers={onExecuteWorkers} inline /></details>
+      </> : <div className="agent-capability-empty"><IconRoute aria-hidden="true" /><p>等待当前 Run Snapshot；不会填充演示拓扑或伪造 Worker 回执。</p></div>}
     </section>}
     {error && <p className="agent-capabilities-error" role="alert"><IconAlertTriangle aria-hidden="true" />{error}</p>}
     {reviewRequest && <EvidenceReviewDialog request={reviewRequest} files={files} onClose={onCloseReview} onOpenFile={onOpenFile} onStartTask={onStartTask} onControl={onControl} starting={starting} controlBusy={controlBusy} readOnly={isReadOnly} />}
