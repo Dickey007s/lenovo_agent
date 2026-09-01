@@ -15,10 +15,6 @@ export default function AgentCapabilitiesPage() {
           <span>真实 Run / Task / Snapshot 驱动</span>
         </div>
       </header>
-      <nav className="agent-capability-nav" aria-label="Agent 能力维度">
-        <a href="#control-loop"><b>A</b><span>Agent Control Loop</span><small>任务、Run、Round、Branch、证据与控制</small></a>
-        <a href="#adaptive-swarm"><b>B</b><span>Adaptive Swarm</span><small>准入、WorkUnit、Worker、Contribution 与成果版本</small></a>
-      </nav>
       <HarnessWorkbench capabilitiesOnly />
     </main>
   );

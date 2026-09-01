@@ -110,6 +110,33 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, summary:focus
 .agent-capabilities-link { min-height: 40px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 0 10px; border: 1px solid var(--line-strong); border-radius: 5px; color: var(--ink-soft); background: #fff; font-size: 13px; font-weight: 750; text-decoration: none; }
 .agent-capabilities-link:hover { border-color: #83a8d4; color: var(--blue); background: var(--blue-soft); }
 .agent-capabilities-link svg { width: 16px; }
+.agent-capability-tabs { display: flex; gap: 0; margin-top: 16px; border-bottom: 1px solid var(--line-strong); }
+.agent-capability-tabs button { min-width: 0; display: inline-flex; align-items: center; gap: 7px; padding: 11px 15px; border: 0; border-bottom: 3px solid transparent; color: var(--muted); background: transparent; font-size: 14px; font-weight: 750; cursor: pointer; }
+.agent-capability-tabs button:hover { color: var(--blue); background: var(--blue-soft); }
+.agent-capability-tabs button[aria-selected="true"] { border-bottom-color: var(--blue); color: var(--blue); background: #fff; }
+.agent-capability-tabs button svg { width: 17px; }
+.agent-capability-tabs button span, .agent-capability-tabs button small { display: block; }
+.agent-capability-tabs button small { color: var(--muted); font-size: 12px; font-weight: 500; }
+.agent-capability-panel { min-width: 0; border: 1px solid var(--line-strong); background: var(--paper); scroll-margin-top: 12px; }
+.agent-capability-panel-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; padding: 14px; border-bottom: 1px solid var(--line); }
+.agent-capability-panel-header > div { min-width: 0; }
+.agent-capability-panel-header span { color: var(--blue); font-size: 12px; font-weight: 750; }
+.agent-capability-panel-header h2 { margin: 3px 0 4px; font-size: 18px; }
+.agent-capability-panel-header p { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.5; }
+.agent-capability-panel-header > small { flex: 0 0 auto; color: var(--muted); font-size: 12px; }
+.agent-progress-summary { min-width: 0; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto; gap: 1px; margin: 12px 14px 0; border: 1px solid var(--line); background: var(--line); }
+.agent-progress-summary > div { min-width: 0; padding: 11px 12px; background: #f7f9fb; }
+.agent-progress-summary span { display: block; color: var(--muted); font-size: 12px; }
+.agent-progress-summary strong { display: block; margin-top: 3px; overflow-wrap: anywhere; color: var(--ink); font-size: 14px; line-height: 1.45; }
+.agent-progress-summary p { margin: 4px 0 0; color: var(--muted); font-size: 12px; line-height: 1.45; }
+.agent-progress-collaboration-link, .agent-execution-details-toggle { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 42px; padding: 0 12px; border: 1px solid var(--line-strong); color: var(--blue); background: #fff; font-size: 13px; font-weight: 750; cursor: pointer; }
+.agent-progress-collaboration-link { margin: 11px; }
+.agent-progress-collaboration-link:hover, .agent-execution-details-toggle:hover { border-color: #83a8d4; background: var(--blue-soft); }
+.agent-progress-collaboration-link svg, .agent-execution-details-toggle svg { width: 16px; }
+.agent-execution-details-toggle { margin: 12px 14px 0; }
+.agent-execution-details-toggle svg { transition: transform 140ms ease; }
+.agent-execution-details { min-width: 0; margin-top: 12px; border-top: 1px solid var(--line); }
+.agent-capability-panel > .agent-capability-task-input { margin-bottom: 14px; }
 .harness-app-divider {
   position: relative;
   z-index: 3;
@@ -1536,6 +1563,11 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, summary:focus
   .agent-capabilities-boundary { min-width: 0; }
   .agent-capability-nav, .agent-capability-tracks { grid-template-columns: 1fr; }
   .agent-capabilities-link { width: 100%; }
+  .agent-capability-tabs { margin-top: 12px; }
+  .agent-capability-tabs button { flex: 1 1 0; align-items: flex-start; flex-direction: column; gap: 3px; padding: 10px 11px; }
+  .agent-progress-summary { grid-template-columns: 1fr; margin-right: 10px; margin-left: 10px; }
+  .agent-progress-collaboration-link { margin: 10px; }
+  .agent-execution-details-toggle { width: calc(100% - 20px); margin-right: 10px; margin-left: 10px; }
   .agent-capabilities-live { margin-right: 0; margin-left: 0; padding: 8px; }
   .harness-app-shell { height: auto; min-height: 100dvh; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto 9px auto; overflow: visible; }
   .harness-workspace-shell { overflow: visible; padding: 10px; }

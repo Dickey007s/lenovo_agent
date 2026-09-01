@@ -5010,30 +5010,45 @@ function AgentCapabilitiesSurface({
 }) {
   const sessionTaskCount = new Set(sessionRuns.map((item) => item.task_id)).size;
   const isReadOnly = selectedRunCurrent !== true;
-  const scrollToAdaptive = () => {
+  const [activeTab, setActiveTab] = useState<"progress" | "collaboration">("progress");
+  const [showExecutionDetails, setShowExecutionDetails] = useState(false);
+  useEffect(() => {
+    setActiveTab("progress");
+    setShowExecutionDetails(false);
+  }, [run?.run_id]);
+  const openCollaboration = () => {
+    setActiveTab("collaboration");
     window.history.replaceState(null, "", "#adaptive-swarm");
-    document.getElementById("adaptive-swarm")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.requestAnimationFrame(() => document.getElementById("adaptive-swarm")?.scrollIntoView({ behavior: "smooth", block: "start" }));
   };
   const status = connection === "offline" ? "服务离线" : connection === "reconnecting" ? "正在恢复" : connection === "live" ? "实时连接" : "资料可用";
+  const evidenceGapCount = run?.rounds.reduce((total, round) => total + round.evidence_gaps.length, 0) ?? 0;
+  const currentPointer = taskPointer && run && taskPointer.task_id === run.task_id && taskPointer.current_run_id === run.run_id;
   return <section className="agent-capabilities-surface" data-testid="agent-capabilities-surface">
     <header className="agent-capabilities-toolbar">
-      <div><span>服务端能力投影</span><h2>同一 selected Run 的两种观察维度</h2><p>会话切换先校验 Task current pointer；历史 Run 只读，当前非终态 Run 才接收有序事件。</p></div>
+      <div><span>服务端能力投影</span><h2>同一 selected Run 的两种观察维度</h2><p>默认先看执行进展；协作方式按需展开。会话切换先校验 Task current pointer，历史 Run 只读。</p></div>
       <div className="agent-capabilities-toolbar-actions"><b className={`is-${connection}`}><i />{status}</b><button type="button" className="session-history-button" onClick={onToggleSessions} aria-expanded={sessionsOpen}><IconClock aria-hidden="true" />任务会话{sessionTaskCount ? <b>{sessionTaskCount}</b> : null}</button></div>
     </header>
     {sessionsOpen && <SessionHistory runs={sessionRuns} activeRunId={run?.run_id ?? null} loading={historyLoading} onRefresh={onRefreshSessions} onSelect={(snapshot) => onSelectSession(snapshot)} />}
     {selectedRunCurrent === false && run && <p className="read-only-banner" role="status"><IconEye aria-hidden="true" />历史 Run 只读查看，不接收实时事件，也不会执行控制、决策或启动新任务。</p>}
-    <div className="agent-capability-columns">
-      <section id="control-loop" className="agent-capability-track" data-testid="agent-control-loop-capability" aria-labelledby="agent-control-loop-title">
-        <header><div><span>A · 时间维</span><h2 id="agent-control-loop-title">Agent Control Loop</h2><p>任务会话、Round、Branch、Evidence、Artifact 与控制事实。</p></div>{run && <small>{isReadOnly ? "历史只读" : "当前 Run"} · Run {run.run_sequence}</small>}</header>
-        <div className="agent-capability-facts" aria-label="Control Loop 事实"><span>Task pointer <b>{taskPointer ? "已确认" : "待确认"}</b></span><span>Round <b>{run?.rounds.length ?? 0}</b></span><span>Branch <b>{run?.branches.length ?? 0}</b></span><span>Evidence <b>{run?.rounds.reduce((total, round) => total + round.evidence_gaps.length, 0) ?? 0} 个缺口</b></span><span>Artifact <b>{run?.artifact_versions.length ?? 0} 个版本</b></span><span>控制 <b>{run?.control_state ?? "未启动"}</b></span></div>
-        <div className="agent-capability-task-input"><label htmlFor="agent-capability-instruction">任务指令</label><textarea id="agent-capability-instruction" value={instruction} disabled={Boolean(run && !isReadOnly && !TERMINAL_STATUSES.has(run.status))} onChange={(event) => setInstruction(event.target.value)} placeholder="输入要推进的任务" aria-label="任务指令" /><button type="button" onClick={() => void onStartTask(instruction)} disabled={starting || instruction.trim().length < 3 || Boolean(run && !isReadOnly && !TERMINAL_STATUSES.has(run.status))}><IconSend aria-hidden="true" />{starting ? "正在启动" : "启动 Control Loop"}</button></div>
-        {run ? <LoopView run={run} taskPointer={taskPointer} taskPointerError={taskPointerError} files={files} controlBusy={controlBusy} onControl={onControl} onReview={onReview} onStartTask={onStartTask} onContinueTask={onContinueTask} onOpenCurrentTask={onCurrentTask} onRetryTaskPointer={onRetryTaskPointer} onExecuteWorkers={onExecuteWorkers} onOpenAdaptiveWorkbench={scrollToAdaptive} adaptiveActionLabel={run.topology_admission ? "跳到 Adaptive Swarm" : "查看 Adaptive Swarm 能力"} readOnly={isReadOnly} starting={starting} /> : <div className="agent-capability-empty"><IconRoute aria-hidden="true" /><p>启动或从任务会话选择一个 Run 后，这里会显示服务端 Round / Branch / Evidence / Artifact 事实。</p></div>}
-      </section>
-      <section id="adaptive-swarm" className="agent-capability-track agent-capability-track-adaptive" data-testid="adaptive-swarm-capability" aria-labelledby="adaptive-swarm-title">
-        <header><div><span>B · 组织维</span><h2 id="adaptive-swarm-title">Adaptive Swarm</h2><p>Topology Admission、WorkUnit DAG、Worker 回执、Contribution Gate 与 v1/v2。</p></div>{run && <small>{isReadOnly ? "历史只读" : "当前 Run"} · Snapshot</small>}</header>
-        {run ? <AdaptiveSwarmWorkbench run={run} files={files} readOnly={isReadOnly} starting={starting} onClose={() => undefined} onExecuteWorkers={onExecuteWorkers} inline /> : <div className="agent-capability-empty"><IconRoute aria-hidden="true" /><p>等待当前 Run Snapshot；不会填充演示拓扑或伪造 Worker 回执。</p></div>}
-      </section>
+    <div className="agent-capability-tabs" role="tablist" aria-label="Agent 能力视图">
+      <button type="button" role="tab" aria-selected={activeTab === "progress"} aria-controls="agent-progress-panel" data-testid="agent-progress-tab" onClick={() => { setActiveTab("progress"); window.history.replaceState(null, "", window.location.pathname); }}><IconRoute aria-hidden="true" /><span>执行进展</span><small>Task / Run / Round / 控制</small></button>
+      <button type="button" role="tab" aria-selected={activeTab === "collaboration"} aria-controls="agent-collaboration-panel" data-testid="agent-collaboration-tab" onClick={() => { setActiveTab("collaboration"); window.history.replaceState(null, "", "#adaptive-swarm"); }}><IconGitCommit aria-hidden="true" /><span>协作方式</span><small>准入 / WorkUnit / Worker / Contribution</small></button>
     </div>
+    {activeTab === "progress" && <section id="agent-progress-panel" className="agent-capability-panel agent-capability-progress" role="tabpanel" data-testid="agent-control-loop-capability" aria-labelledby="agent-progress-tab">
+      <header className="agent-capability-panel-header"><div><span>A · 时间维</span><h2>Agent Control Loop</h2><p>默认展示当前执行状态；完整轮次记录按需展开。</p></div>{run && <small>{isReadOnly ? "历史只读" : "当前 Run"} · Run {run.run_sequence}</small>}</header>
+      <div className="agent-capability-facts" aria-label="Control Loop 事实"><span>Task pointer <b>{taskPointerError ? "读取失败" : currentPointer ? "当前 Run" : taskPointer ? "历史 Run" : "待确认"}</b></span><span>Run <b>{run ? `第 ${run.run_sequence} 次` : "未启动"}</b></span><span>Round <b>{run ? `${run.current_round}/${run.rounds.length}` : "0"}</b></span><span>Branch <b>{run?.branches.length ?? 0}</b></span><span>Evidence <b>{evidenceGapCount} 个缺口</b></span><span>Artifact <b>{run?.artifact_versions.length ?? 0} 个版本</b></span></div>
+      {taskPointerError && <p className="agent-capabilities-error" role="alert"><IconAlertTriangle aria-hidden="true" />{taskPointerError}</p>}
+      {!run && <div className="agent-capability-empty"><IconRoute aria-hidden="true" /><p>启动或从任务会话选择一个 Run 后，这里会显示服务端执行进展。</p></div>}
+      {run && <section className="agent-progress-summary" aria-label="执行进展摘要" data-testid="agent-progress-summary"><div><span>当前状态</span><strong>{statusLabel(run.status)}</strong><p>{run.current_round ? `已推进至第 ${run.current_round} 轮` : "服务端正在建立第一轮"} · {evidenceGapCount ? "等待你的处理" : "服务端继续推进"}</p></div><div><span>已保留内容</span><strong>{run.artifact_versions.length ? `${run.artifact_versions.length} 个成果版本` : "尚无成果版本"}</strong><p>{evidenceGapCount ? `${evidenceGapCount} 个事项待处理` : "当前没有待处理事项"}</p></div><button type="button" className="agent-progress-collaboration-link" onClick={openCollaboration}><IconGitCommit aria-hidden="true" />查看协作方式</button></section>}
+      {!run && <div className="agent-capability-task-input"><label htmlFor="agent-capability-instruction">任务指令</label><textarea id="agent-capability-instruction" value={instruction} onChange={(event) => setInstruction(event.target.value)} placeholder="输入要推进的任务" aria-label="任务指令" /><button type="button" onClick={() => void onStartTask(instruction)} disabled={starting || instruction.trim().length < 3}><IconSend aria-hidden="true" />{starting ? "正在启动" : "启动 Control Loop"}</button></div>}
+      {run && <button type="button" className="agent-execution-details-toggle" aria-expanded={showExecutionDetails} onClick={() => setShowExecutionDetails((current) => !current)}><IconChevronDown aria-hidden="true" />{showExecutionDetails ? "收起完整执行记录" : "查看完整执行记录"}</button>}
+      {run && showExecutionDetails && <div className="agent-execution-details" data-testid="agent-execution-details"><LoopView run={run} taskPointer={taskPointer} taskPointerError={taskPointerError} files={files} controlBusy={controlBusy} onControl={onControl} onReview={onReview} onStartTask={onStartTask} onContinueTask={onContinueTask} onOpenCurrentTask={onCurrentTask} onRetryTaskPointer={onRetryTaskPointer} onExecuteWorkers={onExecuteWorkers} onOpenAdaptiveWorkbench={openCollaboration} adaptiveActionLabel={run.topology_admission ? "跳到 Adaptive Swarm" : "查看 Adaptive Swarm 能力"} readOnly={isReadOnly} starting={starting} /></div>}
+    </section>}
+    {activeTab === "collaboration" && <section id="adaptive-swarm" className="agent-capability-panel agent-capability-collaboration" role="tabpanel" data-testid="adaptive-swarm-capability" aria-labelledby="agent-collaboration-tab">
+      <header className="agent-capability-panel-header"><div><span>B · 组织维</span><h2>Adaptive Swarm</h2><p>按需查看服务端 Snapshot 的路线、准入、WorkUnit、Worker、Contribution 与成果版本。</p></div>{run && <small>{isReadOnly ? "历史只读" : "当前 Run"} · Snapshot</small>}</header>
+      {run ? <AdaptiveSwarmWorkbench run={run} files={files} readOnly={isReadOnly} starting={starting} onClose={() => undefined} onExecuteWorkers={onExecuteWorkers} inline /> : <div className="agent-capability-empty"><IconRoute aria-hidden="true" /><p>等待当前 Run Snapshot；不会填充演示拓扑或伪造 Worker 回执。</p></div>}
+    </section>}
     {error && <p className="agent-capabilities-error" role="alert"><IconAlertTriangle aria-hidden="true" />{error}</p>}
     {reviewRequest && <EvidenceReviewDialog request={reviewRequest} files={files} onClose={onCloseReview} onOpenFile={onOpenFile} onStartTask={onStartTask} onControl={onControl} starting={starting} controlBusy={controlBusy} readOnly={isReadOnly} />}
   </section>;
