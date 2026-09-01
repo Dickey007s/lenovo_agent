@@ -347,16 +347,23 @@ nonterminal Run reconnects from its own `last_event_sequence`. A child Run may
 restart version and sequence at 1, so browser monotonicity applies only within one
 `run_id` and the previous transport is closed before a switch.
 
-The main surface keeps the Demo 1 time view: Task Contract, parent/child Run,
-rounds, Branch Evidence Gate, control and immutable result history. Full
-Topology/WorkUnit/Worker/Contribution detail opens in a separate full-screen
-Adaptive Swarm workbench for the Demo 2 organization view. That workbench is a
-projection of `topology_admission`, `branches[]`, `work_units[]`,
-`worker_runs[]`, `contributions[]` and `artifact_versions[]`; it does not create
-another scheduler or hard-coded Demo path. It always distinguishes the actual
-route from the four-route explanatory frame and labels the current Worker path as
-bounded, in-process and read-only. Worker conversations and raw provider responses
-never become separate user-facing chat panes.
+The root remains the Workspace surface: safe files, task input, current result,
+review and operational Loop controls. `/agent-capabilities` is a second
+projection over the same selected Task/Run/Snapshot. It renders Agent Control
+Loop and Adaptive Swarm as peer capability areas: the first shows Task Contract,
+parent/child Run, rounds, Branch Evidence Gate, controls and immutable history;
+the second shows `topology_admission`, `branches[]`, `work_units[]`,
+`worker_runs[]`, `contributions[]` and `artifact_versions[]`. Both switch to the
+same historical Run and become read-only together. The existing full-screen
+Adaptive workbench can still be opened as an operational detail from the root,
+but it is not the Demo 2 product identity. Neither projection creates another
+scheduler or hard-coded Demo path, and Worker conversations/raw provider
+responses never become separate user-facing chat panes.
+
+The 07-16 Demo 2 identity remains a future smart work cockpit with a real task
+queue and server-owned routing among Tool Call, Single Agent, Fixed Workflow and
+Adaptive Swarm. There is no public queue/dispatch contract or cockpit route in
+the current system, so no placeholder is rendered as if that surface existed.
 The Artifact area independently shows whether the model call happened, whether
 its output was adopted, whether a deterministic local effect passed, what file
 was written and which side effects did not occur. It never collapses these into

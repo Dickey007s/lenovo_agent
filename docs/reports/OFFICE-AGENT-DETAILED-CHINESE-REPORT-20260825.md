@@ -376,7 +376,7 @@ PostgreSQL 17.11 的 Demo/Task 组合 `10 passed`；公共 Snapshot Owner 隔离
 contradictory 双重拒绝又分别通过定向回归。它仍不是 durable queue/lease、远端 Worker、
 真实 Provider 效果、通用 Tool Gateway、外部动作或用户研究证据。
 
-## 2026-09-01 前台分层：Demo 1 讲时间，Demo 2 讲组织
+## 2026-09-01 历史实现：先把时间维与组织维拆开
 
 用户这次指出的核心问题非常具体：虽然 Task lineage、TopologyAdmission、WorkUnit、Worker
 和 Contribution 都已经存在，但它们堆在一条长页面里，导致 Demo 1 和 Demo 2 都看不清。
@@ -426,6 +426,49 @@ Adaptive 工作台与 390 px 单列截图见
 [`DR-0056 Evidence`](../evidence/DR-0056-DEMO1-DEMO2-SEPARATED-WORKSPACES-EVIDENCE-20260901.md)。
 这些截图使用固定公开 Fixture，只证明 DOM、公开 Snapshot 与交互路径，不证明真实 Provider
 质量、分布式 Swarm、用户理解或业务价值。
+
+## 2026-09-01 产品边界纠正：能力页不是 Demo 2 驾驶舱
+
+Stakeholder 随后指出一个重要冲突：上面的工程拆分解决了“界面太挤”，却把 Adaptive
+Swarm 工作台误写成了 Demo 2 本身。07-16 基线的 Demo 2 产品形态始终是“智能工作
+驾驶舱”：用户先看到按优先级排列的真实业务任务，系统再为每项任务选择 Tool Call、
+Single Agent、Fixed Workflow 或 Adaptive Swarm，完成或待确认状态最后回到同一个驾驶舱。
+Adaptive Swarm 只是驾驶舱处理复杂任务的一种执行方式，不是驾驶舱的同义词。
+
+纠正后的信息架构有三个面，但仍只使用一套 Runtime：
+
+1. **Workspace** 负责资料、目标输入、安全预览、成果和例外处理，是日常办公工作面。
+2. **Agent 能力页** 负责解释 Agent 如何工作。`/agent-capabilities` 用同一个 selected
+   Task/Run/Snapshot 同页显示 Agent Control Loop 与 Adaptive Swarm。前者回答“同一个任务
+   如何跨轮次、跨 Run 继续”，后者回答“复杂任务为何拆成这些 WorkUnit、哪些 Worker
+   返回被服务端采用、失败影响哪些下游、当前成果是哪一版”。
+3. **智能工作驾驶舱** 是后续 Demo 2 的独立业务产品面。当前公开协议还没有任务队列、
+   优先级、跨 Task dispatch、四路线执行和返回驾驶舱合同，因此本轮不实现路由、不显示
+   占位入口，也不把 07-16 概念图冒充运行截图。
+
+这个纠正改变了用户流程。用户平时在 Workspace 完成工作；需要理解系统时，进入 Agent
+能力页，在同一个 Run 上把时间线和组织图对起来，而不是在两个页面之间猜它们是否属于
+同一任务。将来进入智能工作驾驶舱时，用户关心的是“今天先做什么、为什么这样排序、这项
+任务应走哪条执行路线、现在需要我确认什么”，而不是先学习 WorkUnit 或 Contribution
+协议。这样把工程可核对性与业务任务经营分开，避免普通用户被协议细节淹没，也避免技术
+工作台被包装成完整产品。
+
+以“跨职能风险与待办简报”为例，当前能力页可验证的输入、过程和输出是：用户在 Workspace
+输入普通办公目标；服务端若批准十份来源并选择 `adaptive_readonly_workers`，能力页同时
+展示 Loop 的 Task/Run/Round/Branch/Evidence/Artifact 链和 Adaptive 的三个根工作包、两个
+依赖工作包、Worker receipt、Contribution Gate 与 v1/v2。切换旧 Run 后两块一起只读，
+只有 current Run 接收 SSE；点击核对仍进入真实安全预览和 Evidence Anchor。若服务端选择
+`fixed_workflow`，页面明确显示本次没有 Worker，不补假拓扑。
+
+未来驾驶舱场景则不同：它应从真实任务队列开始，展示例如经营汇报、周报、邮件和报销核查
+的优先级与依据；其中只有高价值、高广度、高并行度且预算允许的工作进入 Adaptive Swarm。
+这一过程仍需新的公开合同、Scenario、工程 Evidence 和目标用户研究。现有自动化只能证明
+页面使用相同 Snapshot、历史只读、来源标签和回执映射正确，不能证明用户理解、效率、信任
+或业务质量已经改善。
+
+本次纠正见 [`DR-0057`](../decisions/DR-0057-agent-capability-page-and-smart-cockpit-boundary.md)、
+[`SCENARIO-044`](../scenarios/SCENARIO-044-agent-capability-page-and-future-smart-cockpit.md) 和
+[`Agent 能力页验收门`](../testing/AGENT-CAPABILITY-PAGE-AND-COCKPIT-BOUNDARY-GATES-20260901.md)。
 
 ## 最新增补：从“用户先找文件”改为“Agent 找证据，人确认下一步”
 

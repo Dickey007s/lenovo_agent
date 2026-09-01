@@ -24,6 +24,11 @@ OpenAPI exposes eleven paths and twelve operations:
 The former Scenario list/detail/preview routes and legacy
 workspace/thread/task/Demo prefixes are not mounted.
 
+`/agent-capabilities` is a browser route only. It composes the existing workspace,
+Run, Task and evidence-preview facts and adds no API path. The future Demo 2 smart
+work cockpit has no task-queue, priority, route-dispatch or return-to-cockpit
+contract in this API and must not be inferred from `topology_admission` alone.
+
 ## 2. Owner and persistence
 
 Run and Task endpoints use `X-User-Id`; omission uses `demo_user`. This unsigned header

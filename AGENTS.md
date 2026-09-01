@@ -222,7 +222,7 @@ Source、Evidence 和 UI-server fact mapping，不能只更新 README。
 
 ## 当前产品事实
 
-- 根页面是唯一 FORTE 办公资料库。产品没有注册 Scenario/Demo 选择器；旧邮件、文档、报价、任务、日历、报销、CRM、审计和固定 Customer A 入口均已退休。
+- 根页面是 FORTE 办公资料库与日常工作面；`/agent-capabilities` 只用同一 Task/Run/Snapshot 同页投影 Agent Control Loop 与 Adaptive Swarm 两种能力。产品没有注册 Scenario/Demo 选择器；旧邮件、文档、报价、任务、日历、报销、CRM、审计和固定 Customer A 入口均已退休。07-16 Demo 2 智能工作驾驶舱仍是后续独立产品面，当前没有任务队列、优先级或跨 Task dispatch 合同，也不得显示假入口。
 - 当前 OpenAPI 有十一个 path、十二个 operation：health、whole workspace、workspace file preview、Run start/list/get、Task get、单 Branch continuation、显式只读 Worker dispatch、Run Artifact download、control/events。旧 `/v1/harness/scenarios*` 不挂载。
 - FORTE 固定 commit `345c1ec1487139db9dd319787fa9405ba85d1869`。`public-suite-manifest.json` 是当前只读清单：15 个公开任务目录、96 个 input、111 个 task/input 文件、`1780445` bytes。官方完整 benchmark 报告 180 条，但公开仓库只提供每职业一个 demo；不得声称拿到未公开 165 条。
 - `task.md` 只作 provenance，不能进入普通 UI、Analyst 输入或成为隐藏默认任务。用户只需自己写 `instruction`；浏览器不得要求或提交客户端 `selected_file_refs`。
@@ -248,7 +248,7 @@ Source、Evidence 和 UI-server fact mapping，不能只更新 README。
 - 配置 `DATABASE_DSN` 时，Run Snapshot、最小 Task record、Task continuation receipt、Branch 绑定的 WorkUnit/Contribution 台账、start/control/Worker reservation 幂等回执以及独立 ArtifactVersion/TaskCommit 写入 PostgreSQL。普通中断模型轮次仍删除未完成轮次、追加 `checkpoint_recovered` 并暂停；已经提交 Worker reservation 的恢复则保留 validated Branch DAG、TopologyAdmission、已完成候选和成果，把未确认的在途 WorkUnit 标成 checkpoint-recovered failed，绝不自动重放调用。新幂等键与当前 version 只允许显式重试目标恢复单元。历史 Run/Decision 有真实顺序 Evidence；Task Ledger 7 项和 Demo 1/2 WorkUnit 3 项又在隔离 PostgreSQL 17.11 上组合实跑 `10 passed`。这些单主机顺序门都不等于多实例 lease、高可用或在途 HTTP 续跑。未配置数据库时明确使用单进程 memory 且重启不恢复。`X-User-Id` 是未签名演示 Owner。
 - `start-demo.ps1` 的状态库优先级是 Docker、本轮 PowerShell 进程显式 `DATABASE_DSN`、memory。没有前两者时必须用空进程变量覆盖 `.env` 残留 DSN；模型配置仍可从 `.env` 读取。前台/汇报只以 `/v1/health.checkpoint/task_store` 判断本轮是否可恢复。
 - Catalog/preview 完整性失败必须 fail closed。前台区分 API 离线、workspace integrity failure、file preview failure 和 Run failure，不得填充静态假数据。
-- Demo 1/2/3 只是通用能力的验收镜头：Demo 1 当前覆盖分支推进、成果历史、局部恢复、同一 `task_id` 下的单 Branch child Run，以及 owner-scoped Task current pointer/双版本 CAS 的有限纵切；Demo 2 当前覆盖确定性路线准入、用户确认、每批最多三个进程内只读 Worker、完整 Branch DAG 的 WorkUnit 投影、不可变 Contribution、依赖波次、服务端贡献合入与 checkpoint-recovered 显式单元重试。它们不等于任意办公 Artifact、生产 Tool Gateway、durable queue/lease、远端 Worker、分布式调度或多实例协调。Demo 3 跨拓扑 Risk Gate 仍是目标能力。不得因 Demo 名或 Scenario ID 宣称未实现能力已经执行。
+- Demo 1/2/3 只是通用能力的验收镜头：Demo 1 当前覆盖分支推进、成果历史、局部恢复、同一 `task_id` 下的单 Branch child Run，以及 owner-scoped Task current pointer/双版本 CAS 的有限纵切；支撑 Demo 2 的组织维能力当前覆盖确定性路线准入、用户确认、每批最多三个进程内只读 Worker、完整 Branch DAG 的 WorkUnit 投影、不可变 Contribution、依赖波次、服务端贡献合入与 checkpoint-recovered 显式单元重试，但 Demo 2 智能工作驾驶舱尚未实现。它们不等于任意办公 Artifact、生产 Tool Gateway、durable queue/lease、远端 Worker、分布式调度或多实例协调。Demo 3 跨拓扑 Risk Gate 仍是目标能力。不得因 Demo 名或 Scenario ID 宣称未实现能力已经执行。
 - 自动化和截图是工程代理，不是用户研究。界面是否更清晰、信任/效率/价值是否提升均为 `Draft`。
 
 ## 八个统一模块
@@ -275,6 +275,7 @@ restart-recovery 子集。durable/distributed queue 与 Worker lease、模块 6 
 
 ```text
 apps/web/app/page.tsx
+apps/web/app/agent-capabilities/page.tsx
 apps/web/app/harness-workbench.tsx
 apps/web/app/styles.css
 services/api/app/main.py

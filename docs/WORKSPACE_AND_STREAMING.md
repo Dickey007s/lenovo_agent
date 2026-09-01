@@ -135,20 +135,26 @@ route is not a speed/quality prediction and the UI does not show Agent chat room
 
 Confirmation dispatches only service-ready Branches, at most three per wave.
 Worker call budget is reserved before dispatch; each Worker sees only its Branch
-objective and approved refs. The cockpit then shows actual called/adopted/elapsed
+objective and approved refs. The organization projection then shows actual called/adopted/elapsed
 receipts. Anchored adopted findings enter a new normal ArtifactVersion/TaskCommit;
 failed, ambiguous or rejected contributions remain scoped receipts and leave only
 their Branch waiting. Completed dependencies can expose a later ready wave.
 
 The full organization projection is no longer forced into that narrow Loop
-surface. A full-screen “Adaptive Swarm 工作台” shows the actual route, the bounded
-Worker boundary, approved sources, a Supervisor-style Branch/WorkUnit dependency
-view, per-Worker called/adopted/elapsed receipt, immutable Contribution gate and
-ArtifactVersion v1/v2. Tool Call, Single Controller, Fixed Workflow and Adaptive
-Swarm form an explanatory route frame, but only the service-owned mode is
-highlighted. A non-adaptive Run explicitly says that no Worker started and never
-renders synthetic receipts. The workbench is a client projection over the same
-Snapshot and controls; it is not a new Demo API or distributed Swarm Runtime.
+surface. `/agent-capabilities` places the live Agent Control Loop and Adaptive
+Swarm projections beside each other over one selected Snapshot. The Adaptive
+area shows the actual route, bounded Worker boundary, approved sources, a
+Supervisor-style Branch/WorkUnit dependency view, called/adopted/elapsed
+receipts, immutable Contribution gate and ArtifactVersion v1/v2. The existing
+full-screen workbench remains an optional operational detail from the root. Tool
+Call, Single Controller, Fixed Workflow and Adaptive Swarm form an explanatory
+route frame, but only the service-owned mode is highlighted; non-adaptive Runs
+never render synthetic receipts. Neither surface is a new Demo API, a
+distributed Swarm Runtime or the Demo 2 smart cockpit.
+
+The future Demo 2 cockpit remains unrendered until a server-owned task queue,
+priority/routing facts and return-to-confirmation state exist. The current page
+does not hard-code “客户 A 经营汇报”, fake queue items or a dead cockpit entry.
 
 Opening a Gap first shows an Agent-owned recovery sheet, not a request to edit a
 source file. `next_step.recovery_kind` distinguishes malformed analysis,

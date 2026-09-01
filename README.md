@@ -17,7 +17,7 @@ external business action happened.
 
 ## Current product
 
-The root page is the only product entry:
+The root page is the daily Workspace entry:
 
 - left: one searchable, collapsible folder tree containing all 96 public FORTE
   input files, with file-type filters and no role or Demo partition;
@@ -31,6 +31,10 @@ The root page is the only product entry:
 - boundary: the Run freezes the complete allowlisted index; each round exposes
   only the Agent-selected, server-budgeted files to analysis. Originals stay
   read-only, results require review and no external action occurs.
+
+The root links to `/agent-capabilities`, an inspection route that renders Agent
+Control Loop and Adaptive Swarm facts from the same selected Snapshot. It is not
+a Demo selector, another Runtime or the future Demo 2 smart work cockpit.
 
 The default complete-task budget is 12 rounds, 16 files per round, 30 model
 calls and 7,200 Agent-active seconds. Public maxima are 24/24/60/14,400. Human
@@ -135,14 +139,26 @@ Demo API. The root page now groups the Owner's recent Runs by `task_id` as task
 conversations; an opened Run is checked against the Task current pointer before
 it is marked current or historical. Historical Runs remain inspectable but do
 not receive SSE or expose controls. Demo 1 stays on the main Agent Control Loop
-surface. Demo 2 opens a full-screen Adaptive Swarm workbench that projects the
+surface. The then-current implementation opened a full-screen Adaptive Swarm workbench that projects the
 actual TopologyAdmission, approved sources, Branch/WorkUnit dependencies,
 Worker receipts, Contribution gate and append-only Artifact versions. The
 workbench labels the current implementation as bounded, in-process and
 read-only; it is not a distributed Swarm, Task list service or proof of user
 benefit. The separated-view engineering gate passes 73 Playwright tests, lint,
 build and the existing 418-pass Python suite; screenshots and exact claim
-boundaries are recorded in the DR-0056 Evidence.
+boundaries are recorded in the DR-0056 Evidence. That Evidence remains valid for
+the tested dialog, but `DR-0057` supersedes its interpretation as the Demo 2
+product surface.
+
+[`DR-0057`](docs/decisions/DR-0057-agent-capability-page-and-smart-cockpit-boundary.md)
+corrects the product boundary against the 07-16 reference. The root remains the
+Workspace. `/agent-capabilities` shows the Agent Control Loop and Adaptive Swarm
+as two peer projections of the same selected Task/Run/Snapshot, including real
+safe source labels and evidence review. Demo 2 itself remains the future smart
+work cockpit: a server-backed task queue that chooses Tool Call, Single Agent,
+Fixed Workflow or Adaptive Swarm and returns each task to one confirmation view.
+No cockpit route, queue or dispatch contract is implemented in this slice, and
+the UI does not render a placeholder that could be mistaken for one.
 
 ## Public data and preview boundary
 
@@ -599,6 +615,10 @@ pnpm --dir apps/web exec playwright test e2e/harness-workbench.spec.ts
 - [SCENARIO-043：任务会话回看与 Adaptive Swarm 独立工作台](docs/scenarios/SCENARIO-043-task-conversations-and-adaptive-swarm-workbench.md)
 - [Demo 1 / Demo 2 分层工作面验收门](docs/testing/DEMO1-DEMO2-SEPARATED-WORKSPACE-GATES-20260901.md)
 - [Demo 1 / Demo 2 分层工作面工程 Evidence](docs/evidence/DR-0056-DEMO1-DEMO2-SEPARATED-WORKSPACES-EVIDENCE-20260901.md)
+- [DR-0057：Agent 能力页与智能工作驾驶舱边界](docs/decisions/DR-0057-agent-capability-page-and-smart-cockpit-boundary.md)
+- [SCENARIO-044：同页核对循环与协作能力，驾驶舱保持后续目标](docs/scenarios/SCENARIO-044-agent-capability-page-and-future-smart-cockpit.md)
+- [Agent 能力页与驾驶舱边界验收门](docs/testing/AGENT-CAPABILITY-PAGE-AND-COCKPIT-BOUNDARY-GATES-20260901.md)
+- [Agent 能力页工程 Evidence](docs/evidence/DR-0057-AGENT-CAPABILITY-PAGE-EVIDENCE-20260901.md)
 - [来源台账](docs/decisions/SOURCE_REGISTER.md)
 - [DR-0054：独立 Task Ledger 与当前 Run 版本控制](docs/decisions/DR-0054-durable-task-ledger-and-current-run-cas.md)
 - [SCENARIO-040：两个页面同时续办时只有一个当前 Run](docs/scenarios/SCENARIO-040-task-current-run-cas-and-restart.md)
