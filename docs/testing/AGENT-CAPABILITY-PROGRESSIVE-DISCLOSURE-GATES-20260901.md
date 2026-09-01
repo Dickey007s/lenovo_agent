@@ -98,3 +98,6 @@ git diff --check
 - `pnpm lint`、`pnpm build`、`uv run ruff check .`、`git diff --check`：通过；
 - 全量 Python：`418 passed, 23 skipped`；汇报治理：`4 passed`；
 - 五张运行截图、hash、测试边界和未验证项见 DR-0058 Evidence。
+- 视觉重构收尾：capability 定向 `4 passed`、最终全量 Playwright `77 passed`、Web
+  lint/build/diff-check 通过；新增四张受控 Fixture 截图。纯前端收尾没有重跑
+  Python、Ruff、Provider 或 PostgreSQL，初版基线不得冒充本提交的新验证。

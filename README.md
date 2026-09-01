@@ -35,8 +35,10 @@ The root page is the daily Workspace entry:
 The root links to `/agent-capabilities`, an inspection route that projects Agent
 Control Loop and Adaptive Swarm facts from the same selected Snapshot. It defaults
 to a concise execution-progress view; complete Loop records and the collaboration
-view are disclosed only when requested. It is not a Demo selector, another Runtime
-or the future Demo 2 smart work cockpit.
+view are disclosed only when requested. The collaboration view uses the actual
+service-selected route and a compact admission/work-package/contribution/artifact
+projection, while sources and execution receipts remain collapsed. It is not a
+Demo selector, another Runtime or the future Demo 2 smart work cockpit.
 
 The default complete-task budget is 12 rounds, 16 files per round, 30 model
 calls and 7,200 Agent-active seconds. Public maxima are 24/24/60/14,400. Human

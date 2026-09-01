@@ -5,7 +5,8 @@
 - 决策：[`DR-0058`](../decisions/DR-0058-progressive-disclosure-agent-capability-page.md)
 - 场景：[`SCENARIO-045`](../scenarios/SCENARIO-045-progressive-agent-capability-review.md)
 - 测试合同：[`AGENT-CAPABILITY-PROGRESSIVE-DISCLOSURE-GATES-20260901`](../testing/AGENT-CAPABILITY-PROGRESSIVE-DISCLOSURE-GATES-20260901.md)
-- 实现：Luna 分支 `656edfd` 至 `4c1ce50`；`master` 等价集成 `2673fe4` 至 `f0a281c`
+- 初版实现：Luna 分支 `656edfd` 至 `4c1ce50`；`master` 等价集成 `2673fe4` 至 `f0a281c`
+- 视觉重构：Luna 分支 `6901299` 至 `8b51be5`；`master` 等价集成 `58b4958` 至 `4916fcb`
 
 ## 1. 本轮证明了什么
 
@@ -14,8 +15,8 @@ Agent Control Loop 与 Adaptive Swarm 工作台：
 
 1. 默认“执行进展”只显示当前状态、主要待办、Branch 完成/等待摘要和当前成果版本；
 2. “查看完整执行记录”才显示既有 LoopView、Task lineage、Round/Branch、控制和历史；
-3. “协作方式”先显示服务端实际 route、WorkUnit/Contribution 与成果摘要，完整 Worker
-   工作台默认折叠；
+3. “协作方式”先显示服务端实际 route，以及任务准入、工作包、贡献汇合、核验与成果
+   四阶段投影；工作包明细、来源范围和执行回执默认折叠；
 4. 证据审查页把 Finding/Resolution 翻译为“系统发现、影响、你要做什么、会保留、不会
    做”，但确认请求仍携带服务端要求的版本、幂等、DecisionRequest 和来源修订字段。
 
@@ -28,7 +29,7 @@ Agent Control Loop 与 Adaptive Swarm 工作台：
 | --- | --- | --- | --- |
 | 四层与恢复定向 Playwright | `7 passed` | tab、disclosure、Fixed 反例、历史 Run、真实审查入口和新恢复文案在 Fixture 中成立 | Provider 输出、业务正确性或用户理解 |
 | 最终全量 Playwright | `77 passed` | Workspace、预览、现有 15 个场景、Loop/Swarm 与移动端回归未被本轮改坏 | 浏览器和网络的生产稳定性 |
-| 截图捕获定向门 | `4 passed` | 下列五张图片来自最终代码的固定公共 Fixture，不是概念图 | 真实 Provider 或真实用户运行 |
+| 截图捕获定向门 | `4 passed` | 初版五张图片和视觉重构补充四张图片均来自固定公共 Fixture，不是概念图 | 真实 Provider 或真实用户运行 |
 | Web lint / TypeScript | 通过 | TypeScript 静态门通过 | 运行期业务语义 |
 | Web production build | 通过 | Next.js `/` 与 `/agent-capabilities` 可生产构建 | 部署、SLA 或线上性能 |
 | 全量 Python | `418 passed, 23 skipped`，`277.87s` | UI 集成后现有 Runtime/合同 Python 回归保持 | 被 skip 的 PostgreSQL/环境集成 |
@@ -54,6 +55,24 @@ Agent Control Loop 与 Adaptive Swarm 工作台：
 截图中的任务内容、状态、来源数量和工作包来自确定性 Fixture，只证明 UI 对公共 Snapshot
 字段的映射。四张 `docs/evidence/assets/dr-0058-*-concept.png` 是 GPT Image 2 设计参考，未
 列入运行截图，也不参与工程结论。
+
+### 3.1 视觉重构补充截图
+
+以下图片保留初版截图，不覆盖历史 Evidence。它们绑定 `master` 的 `4916fcb`，证明本轮
+大幅收敛默认密度、提高可读字号、统一固定流程文案，并把组织视图改为四阶段与三组按需
+明细。它们仍是受控 Fixture，不是真实 Provider、生产 Run 或用户研究。
+
+| 截图 | 尺寸 / bytes / SHA-256 | 被测事实 |
+| --- | --- | --- |
+| [视觉重构：执行进展](screenshots/dr-0058-visual-redesign-progress-1440.png) | `1440 x 1100` / `59759` / `BB56D2F46947BC9415CD97FD2298C2D8C07F1B3D2BC929E0400C8CF87120AF07` | 当前任务、服务端继续/人工待办和成果版本在首屏分开；完整记录未展开 |
+| [视觉重构：固定流程](screenshots/dr-0058-visual-redesign-fixed-1440.png) | `1440 x 1100` / `83882` / `ED2712BE5982BD76B45E36E33C0205DED0372E195BF6872DAACC061B4FC58F03` | 固定流程被服务端选中；任务已准入、工作包处理中，贡献与成果等待前置；零 Worker 回执 |
+| [视觉重构：Adaptive Swarm](screenshots/dr-0058-visual-redesign-adaptive-1440.png) | `1440 x 1100` / `87049` / `407D1316430A5332F99D9C9DBC1D602D26485639FD3AED880F8C1F5D4276D881` | Adaptive route、5 个工作包、3 个已汇合贡献、1 个成果版本与显式下一批操作来自同一 Fixture Snapshot |
+| [视觉重构：固定流程 390 px](screenshots/dr-0058-visual-redesign-fixed-390.png) | `390 x 1358` / `75893` / `EEB0A8F651F3440EB1416E2407442F4D0A956E97F0BB74805F66E3A2D3958F1F` | 线路、阶段和三项 disclosure 在移动宽度无页面横向溢出 |
+
+视觉重构后的 capability 定向门为 `4 passed`，最终完整
+`harness-workbench.spec.ts` 为 `77 passed`，Web lint、production build 与
+`git diff --check` 通过。Python、Ruff、Provider 和 PostgreSQL 没有因纯前端收尾重跑；
+本文件第二节的 Python/Ruff 数值仍是初版同日基线，不能改写为本提交的新证据。
 
 ## 4. 用户流程与后端事实对照
 

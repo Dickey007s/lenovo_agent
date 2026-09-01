@@ -145,13 +145,12 @@ surface or simultaneously expanded with the complete Loop record.
 `/agent-capabilities` uses one selected Snapshot and defaults to a concise
 execution-progress panel. The user may directly reveal the complete Loop record,
 switch to a peer collaboration-method tab, or open one focused evidence decision.
-The collaboration summary shows the actual route, WorkUnit/Contribution state and
-current ArtifactVersion; bounded Worker details, approved sources, the
-Branch/WorkUnit dependency view and called/adopted/elapsed receipts stay collapsed
-until requested. The existing full-screen workbench remains an optional
-operational detail from the root. Tool Call, Single Controller, Fixed Workflow and
-Adaptive Swarm form an explanatory route frame, but only the service-owned mode is
-highlighted; non-adaptive Runs never render synthetic receipts. None of the four
+The collaboration tab shows the actual route and a compact four-stage projection:
+admission, work packages, contribution convergence, and verification/artifact.
+Work-package details, approved sources and called/adopted/elapsed receipts stay
+collapsed until requested. Single Controller, Fixed Workflow and Adaptive Swarm
+form the explanatory route frame, but only the service-owned mode is highlighted;
+non-adaptive Runs never render synthetic receipts. None of the four
 disclosure paths is a new Demo API, a distributed Swarm Runtime or the Demo 2 smart
 cockpit.
 
