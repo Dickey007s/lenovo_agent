@@ -2628,7 +2628,7 @@ function demo2Snapshot(body: { workspace_id: string; instruction: string }, wave
     updated_at: new Date().toISOString(),
   });
   const branches = wave === 0
-    ? [makeBranch(ids[0], "running"), makeBranch(ids[1], "running"), makeBranch(ids[2], "running"), makeBranch(ids[3], "pending", [ids[0]]), makeBranch(ids[4], "pending", [ids[1]])]
+    ? [makeBranch(ids[0], "running"), makeBranch(ids[1], "running"), makeBranch(ids[2], "running"), makeBranch(ids[3], "blocked", [ids[0]]), makeBranch(ids[4], "blocked", [ids[1]])]
     : wave === 1
       ? [makeBranch(ids[0], "completed"), makeBranch(ids[1], "completed"), makeBranch(ids[2], "completed"), makeBranch(ids[3], "running", [ids[0]]), makeBranch(ids[4], "running", [ids[1]])]
     : ids.map((id, index) => makeBranch(id, "completed", index === 3 ? [ids[0], ids[2]] : index === 4 ? [ids[1]] : []));
@@ -5182,7 +5182,11 @@ test.describe("Demo 1/2 runtime acceptance", () => {
     await expect(workbench).toContainText("Tool Call");
     await expect(workbench.locator(".adaptive-route-framework .is-active")).toHaveText("Adaptive Swarm");
     await expect(workbench.locator(".adaptive-source-list span")).toHaveCount(10);
+    await expect(workbench.locator(".adaptive-branch-grid li")).toHaveCount(5);
+    await expect(workbench.locator(".adaptive-branch-grid li")).toContainText(["产品上线 Gate", "搜索 Agent 运行风险", "交互痛点证据", "跨工作包优先级与影响核对", "统一待办建议"]);
+    await expect(workbench.locator(".adaptive-branch-grid")).toContainText("被依赖阻塞");
     await expect(workbench.locator(".adaptive-workunit-list article")).toHaveCount(5);
+    await expect(workbench.locator(".adaptive-workunit-list")).toContainText("被依赖阻塞");
     const factSizes = await workbench.locator(".adaptive-source-list span, .adaptive-branch-grid li p, .adaptive-receipt-list article span, .adaptive-version-list article span, .adaptive-boundary").evaluateAll((nodes) => nodes.map((node) => Number.parseFloat(getComputedStyle(node).fontSize)));
     expect(factSizes.length).toBeGreaterThan(0);
     expect(Math.min(...factSizes)).toBeGreaterThanOrEqual(13);
