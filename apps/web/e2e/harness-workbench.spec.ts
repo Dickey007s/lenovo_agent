@@ -5209,6 +5209,7 @@ test.describe("Demo 1/2 runtime acceptance", () => {
     await launch.click();
     const workbench = page.getByTestId("adaptive-workbench");
     await expect(workbench.getByRole("heading", { name: "协作方式详情" })).toBeVisible();
+    if (process.env.CAPTURE_CAPABILITY_SCREENSHOTS === "1") await workbench.screenshot({ path: capabilityScreenshotPath("capability-adaptive-workspace-focus-1440.png") });
     if (process.env.CAPTURE_DR0056_EVIDENCE === "1") await workbench.screenshot({ path: "../../docs/evidence/screenshots/dr-0056-adaptive-swarm-workbench.png" });
     await expect(workbench).toContainText("尚未有执行回执");
     await expect(workbench.locator(".adaptive-route-framework .is-active")).toHaveText("Adaptive Swarm");
@@ -5307,7 +5308,7 @@ test.describe("Demo 1/2 runtime acceptance", () => {
     await expect(dag.locator(".adaptive-dag-node")).toHaveCount(5);
     await expect(dag.locator(".adaptive-dag-node").filter({ hasText: "产品上线 Gate" })).toContainText("根");
     await expect(dag.locator(".adaptive-dag-node").filter({ hasText: "跨工作包优先级与影响核对" })).toContainText("依赖 1");
-    await expect(dag.locator(".adaptive-dag-node").filter({ hasText: "产品上线 Gate" })).toContainText("处理中");
+    await expect(dag.locator(".adaptive-dag-node").filter({ hasText: "产品上线 Gate" })).toContainText("下一波待确认 / 可执行");
     await expect(dag.locator(".adaptive-dag-node").filter({ hasText: "跨工作包优先级与影响核对" })).toContainText("等待前置工作");
     await expect(dag.locator("line")).toHaveCount(2);
     await expect(dag.locator("marker")).toHaveCount(1);
@@ -5413,6 +5414,10 @@ test.describe("Demo 1/2 runtime acceptance", () => {
     await expect(packageStage).toContainText("计划已拆解，等待确认");
     await collaboration.getByRole("button", { name: "确认并开始协作" }).click();
     await expect(packageStage).toContainText("正在处理");
+    const dependentNode = collaboration.getByTestId("adaptive-workunit-dag").locator(".adaptive-dag-node").filter({ hasText: "跨工作包优先级与影响核对" });
+    await expect(dependentNode).toContainText("下一波待确认 / 可执行");
+    await collaboration.locator(".collaboration-disclosure").first().locator("summary").click();
+    await expect(collaboration.locator(".collaboration-package-list article").filter({ hasText: "跨工作包优先级与影响核对" })).toContainText("下一波待确认 / 可执行");
     await collaboration.getByRole("button", { name: "继续下一批" }).click();
     await expect(collaboration.getByRole("status")).toContainText("协作已完成");
     await expect(collaboration.getByRole("button", { name: "继续下一批" })).toHaveCount(0);
