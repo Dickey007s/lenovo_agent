@@ -141,6 +141,22 @@
 已经没有下一批，按钮应该消失或禁用，并改成“协作已完成”，否则用户会误以为还能继续
 产生新工作。
 
+### 4.4 第二轮视觉纠正：从摘要改为执行工作面
+
+![Adaptive 执行工作面](../evidence/screenshots/dr-0058-adaptive-execution-workspace-1440.png)
+
+| 标注区 | 前台现在想表达什么 | 服务端事实 |
+| --- | --- | --- |
+| 顶部任务与 Run | 这仍是当前任务的同一个 Snapshot，可以打开历史 Run 只读回看 | `instruction/contract.goal/run_sequence/status` 与 Task pointer |
+| 左侧阶段轨 | 协作不是 Worker 聊天墙，而是准入、工作包、贡献汇合、成果四段状态 | `topology_admission/work_units/contributions/artifact_versions` |
+| 中央依赖图 | 三个根工作包先完成，两个 dependent 只有依赖满足后进入下一波 | `work_units[].depends_on` 与 Branch/WorkUnit state；节点和边不硬编码 |
+| 右侧当前影响 | 只呈现 waiting/blocked、待采用贡献、人工决定或证据缺口对下游的真实影响 | waiting/blocked WorkUnit、Contribution、DecisionRequest、Evidence Gap |
+| 底部协作结果 | Worker 返回、服务端采用、待确认和逻辑成果版本是四件不同的事 | `worker_runs/contributions/artifact_versions/last_commit` |
+| 三个折叠入口 | 来源和回执仍可审计，但不再挤占主视图 | 批准来源、called/output_used/elapsed 与 Contribution Gate |
+
+390 px 下依赖图降级为带“根/依赖 N”标签的纵向列表，右侧影响移到主区之后；这保证内容
+可读，但不把移动端伪装成仍有桌面连线画布。
+
 ## 5. 用例四：证据审查，不让用户自己找答案
 
 ![证据审查页](../evidence/screenshots/ui-test-walkthrough-20260901/case4-evidence-review.png)
@@ -158,10 +174,10 @@
 
 ## 6. 本轮结论与开发优先级
 
-1. **P0 交互修正**：Adaptive 第二波完成后移除“继续下一批”，显示明确终态。
-2. **P0 运行中语义**：把“状态待确认 / 当前没有待处理事项”改成“核对进行中 / 暂无需操作”。
-3. **P1 准入语义**：确认前把“正在处理”改成“等待确认”，严格区分 DAG 已创建与 Worker 已调用。
-4. **保留现状**：固定流程没有伪造 Worker；成果文件、模型说明和证据门分层是正确方向。
+1. **已修正 P0**：Adaptive 第二波完成后移除“继续下一批”，显示明确终态。
+2. **已修正 P0**：已有成果但后台仍核对时显示“核对进行中 / 暂无需操作”。
+3. **已修正 P1**：确认前显示“计划已拆解，等待确认”，严格区分 DAG 已创建与 Worker 已调用。
+4. **已完成视觉纠正**：协作页不再只是路线摘要，改为阶段轨、真实 DAG、当前影响和成果条。
 5. **后续用户走查**：自动化和本轮人工检查不能证明界面已更清楚，仍需让目标用户完成任务并记录误读、错误点击和完成时间。
 
 ## 7. 验证边界

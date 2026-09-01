@@ -145,12 +145,16 @@ surface or simultaneously expanded with the complete Loop record.
 `/agent-capabilities` uses one selected Snapshot and defaults to a concise
 execution-progress panel. The user may directly reveal the complete Loop record,
 switch to a peer collaboration-method tab, or open one focused evidence decision.
-The collaboration tab shows the actual route and a compact four-stage projection:
-admission, work packages, contribution convergence, and verification/artifact.
-Work-package details, approved sources and called/adopted/elapsed receipts stay
-collapsed until requested. Single Controller, Fixed Workflow and Adaptive Swarm
-form the explanatory route frame, but only the service-owned mode is highlighted;
-non-adaptive Runs never render synthetic receipts. None of the four
+The collaboration tab shows the actual route. For an Adaptive Snapshot it places
+admission, work packages, contribution convergence and verification/artifact on a
+left stage rail; lays out a dynamic DAG from public `work_units[].depends_on` in the
+main area; derives the right current-impact panel from waiting/blocked units,
+waiting contributions, open decisions and Evidence gaps; and summarizes adoption
+and Artifact versions in a bottom result bar. Work-package details, approved sources
+and called/adopted/elapsed receipts stay collapsed until requested. Single
+Controller, Fixed Workflow and Adaptive Swarm form the explanatory route frame, but
+only the service-owned mode is highlighted; non-adaptive Runs never render a
+synthetic DAG or receipt. None of the four
 disclosure paths is a new Demo API, a distributed Swarm Runtime or the Demo 2 smart
 cockpit.
 

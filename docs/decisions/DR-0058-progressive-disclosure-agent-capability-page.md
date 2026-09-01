@@ -51,8 +51,11 @@ Evidence、Artifact、WorkUnit、Worker 和 Contribution，虽然字段真实，
 ### 2.3 第三层：协作方式
 
 “协作方式”从同一 Snapshot 投影 TopologyAdmission、WorkUnit 依赖、Contribution 返回/
-采用和当前 Artifact。它先回答为什么选择当前 route，再显示最小必要拓扑。Worker 回执与
-采用依据默认折叠。
+采用和当前 Artifact。它先回答为什么选择当前 route，再形成一个可扫读的执行工作面：
+左侧阶段轨说明准入、工作包、贡献汇合与成果进度；中央根据 `work_units[].depends_on`
+动态排布根工作包和依赖工作包；右侧只显示由 waiting/blocked WorkUnit、等待中的
+Contribution、DecisionRequest 或 Evidence Gap 推导出的当前影响；底部汇总返回、采用、
+待确认和 Artifact 版本。Worker 回执与采用依据继续默认折叠。
 
 Adaptive 正例必须显示“受限只读 Worker、单进程、每波最多 3 个”；Fixed Workflow 或
 Single Controller 只显示真实准入结论，不填充假 WorkUnit。
@@ -97,7 +100,7 @@ preview 按真实定位类型回开原文。
 | Snapshot 同时包含 Loop 与 Swarm 事实 | 两块完整面同屏竞争注意力 | 同一 Run 下标签切换，身份不变 |
 | Branch/DecisionRequest 是局部状态 | 用户先看到大量分支与协议术语 | 默认只看到一个可处置问题，完整记录按需查看 |
 | ArtifactVersion append-only | 版本卡和过程混在一起 | 首屏只显示当前成果，历史进入第二层 |
-| WorkUnit/Contribution 返回与采用分离 | Worker 明细占据主视图 | 第三层先显示工作包和采用状态，回执折叠 |
+| WorkUnit/Contribution 返回与采用分离 | Worker 明细占据主视图，依赖关系难以扫读 | 第三层用真实 DAG、当前影响和成果条先解释协作，回执折叠 |
 | Evidence candidate 由服务端定位 | “缺引用/重试分支”难以理解 | 第四层直接选择真实原文位置并说明后果 |
 
 这只是产品假设。不能由设计图或自动化宣称理解、效率或信任已经改善。
@@ -132,6 +135,13 @@ Fixed 反例、hash 刷新、键盘 tab、桌面/390 px 和全量回归已经通
 嵌套和重复摘要，统一为“执行进展/协作方式”两条主路径；协作方式按服务端实际路线显示
 任务准入、工作包、贡献汇合、核验与成果，并把工作包、来源和执行回执分别折叠。固定
 流程和 Adaptive Swarm 的受控 Fixture、1440/390 截图与最终 `77 passed` 见同一 Evidence。
+
+Stakeholder 随后指出上述协作页仍只是摘要，不能清楚看出概念图中的 Adaptive Swarm
+空间关系。第二次收敛由 Luna 分支 `db3f197`、`cbb2017`、`085c26e` 实现，并等价集成为
+`master` 的 `09e246b`、`fbf142c`、`fe0878f`。Adaptive 正例现在显示任务/Run 上下文、
+左侧阶段轨、真实 WorkUnit DAG、右侧当前影响和底部协作结果；Fixed/Single 仍不绘制假
+DAG。定向 `9 passed`、全量 Playwright `80 passed`、Web lint/build/diff-check 和新增
+1440/390 运行截图见同一 Evidence。
 
 这只证明被测公共 Snapshot 映射和交互状态成立。真实 Provider、PostgreSQL 本轮复跑与
 目标用户走查未执行，不能把本次状态写成体验改善或生产验证。

@@ -16,7 +16,8 @@
 ### TC-PD-02：同一 Run 下切换协作方式
 
 切换“协作方式”。预期 Task/Run 身份不变，显示该 Snapshot 的 TopologyAdmission、
-WorkUnit 依赖、Contribution 采用和当前 Artifact；返回“执行进展”不重新选择 Run。
+WorkUnit 依赖、Contribution 采用和当前 Artifact。Adaptive 正例必须在一个工作面内显示
+左侧阶段轨、中央真实依赖图、右侧当前影响和底部协作结果；返回“执行进展”不重新选择 Run。
 
 ### TC-PD-03：完整执行记录按需展开
 
@@ -41,7 +42,9 @@ WorkUnit 依赖、Contribution 采用和当前 Artifact；返回“执行进展�
 ### TC-PD-07：Adaptive 与 Fixed 正反例
 
 Adaptive Fixture 显示真实工作包和“受限只读 Worker、单进程、每波最多 3 个”。Fixed 或
-Single Controller Fixture 显示真实 route/reason，零 Worker 且无假 WorkUnit。
+Single Controller Fixture 显示真实 route/reason，零 Worker 且无假 WorkUnit。3 root +
+2 dependent Fixture 必须得到 5 个节点和 2 条真实依赖；一个 waiting/blocked 工作包只能
+影响其依赖下游，兄弟分支和已采用成果继续保留。
 
 ### TC-PD-08：历史 Run 只读
 
@@ -101,3 +104,6 @@ git diff --check
 - 视觉重构收尾：capability 定向 `4 passed`、最终全量 Playwright `77 passed`、Web
   lint/build/diff-check 通过；新增四张受控 Fixture 截图。纯前端收尾没有重跑
   Python、Ruff、Provider 或 PostgreSQL，初版基线不得冒充本提交的新验证。
+- Adaptive 执行工作面：定向 `9 passed`、最终全量 Playwright `80 passed`、Web
+  lint/build/diff-check 通过；新增 1440 与 390 px 受控 Fixture 截图。未重跑 Python、
+  Ruff、Provider 或 PostgreSQL。

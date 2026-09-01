@@ -1,7 +1,8 @@
 # Agent 能力工作台 UI 走查 Evidence（2026-09-01）
 
 - 状态：`Limited Verified`
-- 被测提交：`bc52a73ddcee77ed0b146411f09777461fc31c83`
+- 初始被测提交：`bc52a73ddcee77ed0b146411f09777461fc31c83`
+- 修正与执行工作面：`09e246b`、`fbf142c`、`fe0878f`
 - 说明报告：[`AGENT-CAPABILITY-UI-TEST-WALKTHROUGH-20260901`](../reports/AGENT-CAPABILITY-UI-TEST-WALKTHROUGH-20260901.md)
 - 截图目录：[`ui-test-walkthrough-20260901`](screenshots/ui-test-walkthrough-20260901/)
 
@@ -68,7 +69,19 @@ pnpm --dir apps/web exec playwright test e2e/harness-workbench.spec.ts --grep "A
 前三项已发送给开发任务 `019fe97b-43a7-7760-a481-3498c2aeb678`，要求由独立开发提交
 修正并补浏览器门。
 
-## 5. 边界
+## 5. 修正回执
+
+开发任务已修正前三项状态语义，并按第二轮 Stakeholder 视觉反馈把“协作方式”从摘要
+改成执行工作面。受控截图见
+[1440 px](screenshots/dr-0058-adaptive-execution-workspace-1440.png) 和
+[390 px](screenshots/dr-0058-adaptive-execution-workspace-390.png)。新增结构由当前 Snapshot
+驱动：左侧阶段轨、`work_units[].depends_on` 动态 DAG、右侧局部影响、底部成果条，以及
+折叠的来源/回执。Fixed/Single 反例不画假 DAG。
+
+修正后的 capability 定向门 `9 passed`，完整 Playwright `80 passed`，Web lint/build 和
+`git diff --check` 通过。后续纯前端收敛未重跑 Python、Ruff、Provider 或 PostgreSQL。
+
+## 6. 边界
 
 - memory 状态库不支持本轮进程重启恢复验证；
 - Fixture 不冒充真实 Provider、多 Worker 或用户研究；

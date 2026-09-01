@@ -178,6 +178,14 @@ Worker and Contribution facts. This is a presentation change, not a new Runtime,
 distributed Swarm or completed smart work cockpit. Engineering checks and remaining
 research limits are recorded in the DR-0058 Evidence.
 
+The latest DR-0058 follow-up turns the Adaptive organization view from a route
+summary into a Snapshot-driven execution workspace: a left stage rail, a dynamic
+`work_units/depends_on` DAG, a derived current-impact panel and a compact result bar
+share one screen, while sources and receipts remain disclosures. Fixed and single
+routes still render no synthetic DAG or Worker activity. This closer visual match
+to the approved concept is verified only with controlled fixtures; it is not a
+distributed scheduler, a live user study or the future Demo 2 cockpit.
+
 ## Public data and preview boundary
 
 FORTE is pinned to commit

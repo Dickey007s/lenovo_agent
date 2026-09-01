@@ -7,6 +7,8 @@
 - 测试合同：[`AGENT-CAPABILITY-PROGRESSIVE-DISCLOSURE-GATES-20260901`](../testing/AGENT-CAPABILITY-PROGRESSIVE-DISCLOSURE-GATES-20260901.md)
 - 初版实现：Luna 分支 `656edfd` 至 `4c1ce50`；`master` 等价集成 `2673fe4` 至 `f0a281c`
 - 视觉重构：Luna 分支 `6901299` 至 `8b51be5`；`master` 等价集成 `58b4958` 至 `4916fcb`
+- Adaptive 执行工作面：Luna 分支 `db3f197`、`cbb2017`、`085c26e`；`master` 等价集成
+  `09e246b`、`fbf142c`、`fe0878f`
 
 ## 1. 本轮证明了什么
 
@@ -15,8 +17,8 @@ Agent Control Loop 与 Adaptive Swarm 工作台：
 
 1. 默认“执行进展”只显示当前状态、主要待办、Branch 完成/等待摘要和当前成果版本；
 2. “查看完整执行记录”才显示既有 LoopView、Task lineage、Round/Branch、控制和历史；
-3. “协作方式”先显示服务端实际 route，以及任务准入、工作包、贡献汇合、核验与成果
-   四阶段投影；工作包明细、来源范围和执行回执默认折叠；
+3. “协作方式”先显示服务端实际 route；Adaptive 正例以左侧四阶段、中央真实 WorkUnit
+   DAG、右侧当前影响和底部协作结果呈现，工作包明细、来源范围和执行回执默认折叠；
 4. 证据审查页把 Finding/Resolution 翻译为“系统发现、影响、你要做什么、会保留、不会
    做”，但确认请求仍携带服务端要求的版本、幂等、DecisionRequest 和来源修订字段。
 
@@ -29,6 +31,8 @@ Agent Control Loop 与 Adaptive Swarm 工作台：
 | --- | --- | --- | --- |
 | 四层与恢复定向 Playwright | `7 passed` | tab、disclosure、Fixed 反例、历史 Run、真实审查入口和新恢复文案在 Fixture 中成立 | Provider 输出、业务正确性或用户理解 |
 | 最终全量 Playwright | `77 passed` | Workspace、预览、现有 15 个场景、Loop/Swarm 与移动端回归未被本轮改坏 | 浏览器和网络的生产稳定性 |
+| Adaptive 执行工作面定向 Playwright | `9 passed` | 3 root + 2 dependent、2 条真实依赖、局部阻塞影响、Fixed 反例、历史只读和 390 px overflow 在 Fixture 中成立 | 真实 Provider 的拓扑选择、分布式调度或用户理解 |
+| Adaptive 执行工作面全量 Playwright | `80 passed` | 新工作面未破坏既有 Workspace、预览、Loop、场景与移动端浏览器门 | 生产稳定性、任务质量或业务收益 |
 | 截图捕获定向门 | `4 passed` | 初版五张图片和视觉重构补充四张图片均来自固定公共 Fixture，不是概念图 | 真实 Provider 或真实用户运行 |
 | Web lint / TypeScript | 通过 | TypeScript 静态门通过 | 运行期业务语义 |
 | Web production build | 通过 | Next.js `/` 与 `/agent-capabilities` 可生产构建 | 部署、SLA 或线上性能 |
@@ -73,6 +77,22 @@ Agent Control Loop 与 Adaptive Swarm 工作台：
 `harness-workbench.spec.ts` 为 `77 passed`，Web lint、production build 与
 `git diff --check` 通过。Python、Ruff、Provider 和 PostgreSQL 没有因纯前端收尾重跑；
 本文件第二节的 Python/Ruff 数值仍是初版同日基线，不能改写为本提交的新证据。
+
+### 3.2 Adaptive 执行工作面补充截图
+
+Stakeholder 对视觉重构截图复核后指出：原协作页仍主要是路线卡、阶段摘要和 disclosure，
+没有把 WorkUnit 的空间依赖、当前影响与成果汇合做成接近概念参考的执行工作面。下列截图
+绑定 `master` 的 `fe0878f`，保留旧图而不覆盖历史 Evidence。
+
+| 截图 | 尺寸 / bytes / SHA-256 | 被测事实 |
+| --- | --- | --- |
+| [Adaptive 执行工作面](screenshots/dr-0058-adaptive-execution-workspace-1440.png) | `1440 x 1100` / `113640` / `2C806D823717FD7C4ABD6C9367C526F417B7E1145EB321B564BEC8EAE1954084` | 同一 Fixture Snapshot 投影任务/Run、左侧阶段轨、5 个 WorkUnit、2 条依赖、右侧影响与 Artifact v1；3 个已采用贡献与后续工作包并存 |
+| [Adaptive 执行工作面 390 px](screenshots/dr-0058-adaptive-execution-workspace-390.png) | `390 x 2563` / `135019` / `B3B30FEBF84BA7EBAB0EEC381BFDFE354DADF880ABE4559624B39F6538F844A6` | 移动端把 DAG 降级为带“根/依赖 N”标签的纵向列表，当前影响移到主区之后且无页面横向溢出 |
+
+本次定向门为 `9 passed`，最终完整 `harness-workbench.spec.ts` 为 `80 passed`；Web lint、
+production build 与 `git diff --check` 通过。未重跑 Python、Ruff、Provider 或 PostgreSQL。
+截图仍是 controlled fixture，不能证明 Runtime 在任意真实任务中一定选择 Adaptive route，
+也不能证明用户理解、效率、信任或业务结果改善。
 
 ## 4. 用户流程与后端事实对照
 
