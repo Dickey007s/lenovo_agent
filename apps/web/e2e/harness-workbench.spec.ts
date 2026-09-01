@@ -5252,7 +5252,7 @@ test.describe("Demo 1/2 runtime acceptance", () => {
     await expect(surface.getByTestId("agent-progress-summary")).toContainText("等待处理");
     await expect(surface.getByTestId("agent-execution-details")).toHaveCount(0);
     const controlFacts = capabilities.getByTestId("agent-control-loop-capability");
-    await expect(controlFacts.locator(".agent-capability-facts")).toContainText("Task pointer");
+    await expect(controlFacts.locator(".agent-capability-facts")).toHaveCount(0);
     await controlFacts.getByRole("button", { name: "查看完整执行记录" }).click();
     await expect(surface.getByTestId("agent-execution-details")).toContainText("任务持续链");
     await expect(surface.getByTestId("agent-execution-details")).toContainText("服务端拓扑准入");
@@ -5330,7 +5330,7 @@ test.describe("Demo 1/2 runtime acceptance", () => {
     await page.getByRole("textbox", { name: "任务指令" }).fill("核对真实来源并保留审查回执");
     await page.getByRole("button", { name: "启动 Control Loop" }).click();
     const surface = page.getByTestId("agent-capabilities-surface");
-    await expect(surface.getByTestId("agent-control-loop-capability")).toContainText("Task pointer");
+    await expect(surface.getByTestId("agent-progress-summary")).toContainText("当前进展");
     await surface.getByRole("button", { name: "查看完整执行记录" }).click();
     await surface.getByRole("button", { name: /核对：/ }).first().click();
     await expect(page.locator(".evidence-review-page")).toBeVisible();
