@@ -1755,8 +1755,6 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, summary:focus
 .agent-execution-details { margin-top: 0; padding: 0 18px 18px; border-top: 1px solid #e4e8ed; }
 .agent-execution-details .loop-view { min-height: 0; border: 0; background: #fff; }
 .agent-capability-collaboration { background: #fbfcfd; }
-.agent-collaboration-summary { margin: 16px 18px 0; grid-template-columns: repeat(3, minmax(0, 1fr)); border-color: #d9e0e7; }
-.agent-collaboration-summary > div { background: #fafbfc; }
 
 .collaboration-overview { min-width: 0; padding: 18px; background: #fbfcfd; }
 .collaboration-overview-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; padding: 0 0 16px; }

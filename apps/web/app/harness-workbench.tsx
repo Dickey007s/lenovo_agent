@@ -5083,14 +5083,7 @@ function AgentCapabilitiesSurface({
     </section>}
     {activeTab === "collaboration" && <section id="adaptive-swarm" className="agent-capability-panel agent-capability-collaboration" role="tabpanel" data-testid="adaptive-swarm-capability" aria-labelledby="agent-collaboration-tab">
       <header className="agent-capability-panel-header"><div><span>协作方式</span><h2>如何完成这项工作</h2><p>按需查看服务端状态中的路线、工作包、成果汇合与核验结果。</p></div>{run && <small>{isReadOnly ? "历史只读" : "实时状态"}</small>}</header>
-      {run ? <>
-        <section className="agent-collaboration-summary" aria-label="协作方式摘要" data-testid="agent-collaboration-summary">
-          <div><span>本次采用方式</span><strong>{run.topology_admission?.mode === "adaptive_readonly_workers" ? "Adaptive Swarm" : run.topology_admission?.mode === "fixed_workflow" ? "Fixed" : run.topology_admission?.mode === "single_controller" ? "单一流程" : "尚未形成路线"}</strong><p>{run.topology_admission?.mode === "adaptive_readonly_workers" ? `${run.topology_admission.reasons?.at(-1) ?? "当前为受限只读协作。"} · 当前为受限只读协作` : run.topology_admission?.mode === "fixed_workflow" ? "本次采用固定流程，Adaptive Swarm 未启动" : "本次保持单一流程，Adaptive Swarm 未启动"}</p></div>
-          <div><span>工作包成果</span><strong>{run.work_units.length} 个工作包</strong><p>{run.contributions.filter((item) => item.gate_status === "adopted").length} 个已汇合 · {run.contributions.filter((item) => item.gate_status === "waiting").length} 个待核对 · {run.contributions.filter((item) => !["adopted", "waiting"].includes(item.gate_status)).length} 个未采用</p></div>
-          <div><span>当前成果</span><strong>{run.artifact_versions.length ? `成果 v${run.artifact_versions.at(-1)?.version ?? 1}` : "尚无成果版本"}</strong><p>{run.topology_admission?.mode === "adaptive_readonly_workers" ? "每波最多 3 个只读执行单元；不连接外部系统。" : "本次采用固定流程，Adaptive Swarm 未启动"}</p></div>
-        </section>
-        <CollaborationOverview run={run} files={files} readOnly={isReadOnly} starting={starting} onExecuteWorkers={onExecuteWorkers} />
-      </> : <div className="agent-capability-empty"><IconRoute aria-hidden="true" /><p>等待当前服务端状态；不会填充演示拓扑或伪造协作回执。</p></div>}
+      {run ? <CollaborationOverview run={run} files={files} readOnly={isReadOnly} starting={starting} onExecuteWorkers={onExecuteWorkers} /> : <div className="agent-capability-empty"><IconRoute aria-hidden="true" /><p>等待当前服务端状态；不会填充演示拓扑或伪造协作回执。</p></div>}
     </section>}
     {error && <p className="agent-capabilities-error" role="alert"><IconAlertTriangle aria-hidden="true" />{error}</p>}
     {reviewRequest && <EvidenceReviewDialog request={reviewRequest} files={files} onClose={onCloseReview} onOpenFile={onOpenFile} onStartTask={onStartTask} onControl={onControl} starting={starting} controlBusy={controlBusy} readOnly={isReadOnly} />}
