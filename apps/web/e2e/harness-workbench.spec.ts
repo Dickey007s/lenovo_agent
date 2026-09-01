@@ -5259,6 +5259,7 @@ test.describe("Demo 1/2 runtime acceptance", () => {
     await controlFacts.getByRole("button", { name: "跳到 Adaptive Swarm" }).click();
     await expect(page).toHaveURL(/#adaptive-swarm$/);
     const adaptive = capabilities.getByTestId("adaptive-workbench");
+    await capabilities.getByRole("button", { name: "查看工作包与 Worker 记录" }).click();
     await expect(adaptive.locator(".adaptive-route-framework .is-active")).toHaveText("Adaptive Swarm");
     await expect(adaptive.locator(".adaptive-summary")).toContainText("服务端实际路线");
     await expect(adaptive.locator(".adaptive-source-list span")).toHaveCount(10);
@@ -5314,6 +5315,7 @@ test.describe("Demo 1/2 runtime acceptance", () => {
     await page.getByRole("textbox", { name: "任务指令" }).fill("固定路线审查");
     await page.getByRole("button", { name: "启动 Control Loop" }).click();
     await page.getByTestId("agent-collaboration-tab").click();
+    await page.getByRole("button", { name: "查看工作包与 Worker 记录" }).click();
     const workbench = page.getByTestId("adaptive-workbench");
     await expect(workbench.locator(".adaptive-route-framework .is-active")).toHaveText("Fixed Workflow");
     await expect(workbench).toContainText("本次未启动 Adaptive Swarm");
