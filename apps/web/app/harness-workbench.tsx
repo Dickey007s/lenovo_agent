@@ -5029,7 +5029,7 @@ function AgentCapabilitiesSurface({
     window.requestAnimationFrame(() => document.getElementById("adaptive-swarm")?.scrollIntoView({ behavior: "smooth", block: "start" }));
   };
   const moveTab = (direction: 1 | -1) => {
-    const next = activeTab === "progress" ? (direction > 0 ? "collaboration" : "progress") : (direction > 0 ? "progress" : "collaboration");
+    const next = activeTab === "progress" ? "collaboration" : "progress";
     setActiveTab(next);
     window.history.replaceState(null, "", next === "collaboration" ? "#adaptive-swarm" : window.location.pathname);
     window.requestAnimationFrame(() => document.getElementById(next === "collaboration" ? "agent-collaboration-tab" : "agent-progress-tab")?.focus());
@@ -5084,9 +5084,9 @@ function AgentCapabilitiesSurface({
       <header className="agent-capability-panel-header"><div><span>B · 组织维</span><h2>Adaptive Swarm</h2><p>按需查看服务端 Snapshot 的路线、准入、WorkUnit、Worker、Contribution 与成果版本。</p></div>{run && <small>{isReadOnly ? "历史只读" : "当前 Run"} · Snapshot</small>}</header>
       {run ? <>
         <section className="agent-collaboration-summary" aria-label="协作方式摘要" data-testid="agent-collaboration-summary">
-          <div><span>本次路线</span><strong>{run.topology_admission?.mode === "adaptive_readonly_workers" ? "受限只读 Worker" : run.topology_admission?.mode === "fixed_workflow" ? "固定流程" : run.topology_admission?.mode === "single_controller" ? "单一控制器" : "尚未形成路线"}</strong><p>{run.topology_admission?.reasons?.at(-1) ?? "等待服务端准入结果。"}</p></div>
+          <div><span>本次路线</span><strong>{run.topology_admission?.mode === "adaptive_readonly_workers" ? "Adaptive Swarm" : run.topology_admission?.mode === "fixed_workflow" ? "Fixed Workflow" : run.topology_admission?.mode === "single_controller" ? "Single Controller" : "尚未形成路线"}</strong><p>{run.topology_admission?.reasons?.at(-1) ?? "等待服务端准入结果。"} · {run.topology_admission?.mode === "adaptive_readonly_workers" ? "当前有限实现：受限只读 Worker" : "本次未启动 Adaptive Swarm"}</p></div>
           <div><span>工作包与贡献</span><strong>{run.work_units.length} 个工作包</strong><p>{run.contributions.filter((item) => item.gate_status === "adopted").length} 个已采用 · {run.contributions.filter((item) => item.gate_status === "waiting").length} 个待核对 · {run.contributions.filter((item) => !["adopted", "waiting"].includes(item.gate_status)).length} 个未采用</p></div>
-          <div><span>当前成果</span><strong>{run.artifact_versions.length ? `Artifact v${run.artifact_versions.at(-1)?.version ?? 1}` : "尚无成果版本"}</strong><p>每波最多 3 个进程内只读 Worker；不是分布式调度。</p></div>
+          <div><span>当前成果</span><strong>{run.artifact_versions.length ? `Artifact v${run.artifact_versions.at(-1)?.version ?? 1}` : "尚无成果版本"}</strong><p>{run.topology_admission?.mode === "adaptive_readonly_workers" ? "每波最多 3 个进程内只读 Worker；不是分布式调度。" : "本次未启动 Worker；不是分布式调度。"}</p></div>
         </section>
         <details className="agent-collaboration-details"><summary>查看工作包与 Worker 记录</summary><AdaptiveSwarmWorkbench run={run} files={files} readOnly={isReadOnly} starting={starting} onClose={() => undefined} onExecuteWorkers={onExecuteWorkers} inline /></details>
       </> : <div className="agent-capability-empty"><IconRoute aria-hidden="true" /><p>等待当前 Run Snapshot；不会填充演示拓扑或伪造 Worker 回执。</p></div>}
