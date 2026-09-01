@@ -2352,6 +2352,20 @@ async function mockHarness(page: Page, options: { failFirstStart?: boolean; fail
       if (options.dashboardEffect) return route.fulfill({ status: 200, contentType: "application/zip", body: "mock-dashboard-zip-bytes", headers: { "Content-Disposition": "attachment; filename*=UTF-8''%E7%9C%8B%E6%9D%BF%E5%B7%A5%E5%85%B7%E5%BA%93%E4%BF%AE%E5%A4%8D%E5%8C%85.zip" } });
       return route.fulfill({ status: 200, contentType: "text/csv; charset=utf-8", body: "科目名称,客商名称,未付款项\n应付账款,星海科技,100.00\n", headers: { "Content-Disposition": "attachment; filename*=UTF-8''%E6%9C%AA%E4%BB%98%E7%BB%9F%E8%AE%A1.csv" } });
     }
+    if (path.startsWith("/v1/harness/tasks/") && route.request().method() === "GET") {
+      const taskId = currentSnapshot.task_id ?? "task-000000000000";
+      return fulfillJson(route, {
+        task_id: taskId,
+        task_version: currentSnapshot.task_version ?? 1,
+        current_run_id: currentSnapshot.run_id,
+        run_sequence: currentSnapshot.run_sequence ?? 1,
+        parent_run_id: currentSnapshot.parent_run_id ?? null,
+        current_artifact_id: currentSnapshot.last_commit?.artifact_id ?? null,
+        current_artifact_version: currentSnapshot.last_commit?.artifact_version ?? null,
+        current_commit_id: currentSnapshot.last_commit?.commit_id ?? null,
+        lineage: [{ run_id: currentSnapshot.run_id, run_sequence: currentSnapshot.run_sequence, parent_run_id: currentSnapshot.parent_run_id ?? null, status: currentSnapshot.status }],
+      });
+    }
     if (path === "/v1/harness/runs" && route.request().method() === "GET") {
       return fulfillJson(route, { runs: [] });
     }
@@ -2752,16 +2766,32 @@ function demo2PartialAmbiguousSnapshot(body: { workspace_id: string; instruction
 async function mockDemoRuntime(page: Page, mode: "demo1" | "demo2" | "demo2-partial") {
   await mockHarness(page, { boundedRecovery: mode === "demo1" });
   let wave = 0;
+  let demo1Current: unknown = null;
   let continuationSnapshot: unknown = null;
   let demo2Current: unknown = null;
   await page.route("**/v1/harness/runs", async (route) => {
     if (route.request().method() !== "POST") return route.fallback();
     const body = route.request().postDataJSON() as { workspace_id: string; instruction: string };
     if (mode === "demo2" || mode === "demo2-partial") demo2Current = demo2Snapshot(body, 0);
-    return fulfillJson(route, { run: mode === "demo2" || mode === "demo2-partial" ? demo2Current : boundedAnalysisRecoverySnapshot(body), replayed: false }, 202);
+    else demo1Current = boundedAnalysisRecoverySnapshot(body);
+    return fulfillJson(route, { run: mode === "demo2" || mode === "demo2-partial" ? demo2Current : demo1Current, replayed: false }, 202);
   });
   await page.route("**/*", async (route) => {
     const url = new URL(route.request().url());
+    if (url.pathname.includes("/v1/harness/tasks/") && route.request().method() === "GET") {
+      const current = (mode === "demo1" ? (continuationSnapshot ?? demo1Current) : demo2Current) as any;
+      return fulfillJson(route, {
+        task_id: current.task_id ?? "task-000000000000",
+        task_version: current.task_version ?? 1,
+        current_run_id: current.run_id,
+        run_sequence: current.run_sequence ?? 1,
+        parent_run_id: current.parent_run_id ?? null,
+        current_artifact_id: current.last_commit?.artifact_id ?? null,
+        current_artifact_version: current.last_commit?.artifact_version ?? null,
+        current_commit_id: current.last_commit?.commit_id ?? null,
+        lineage: [{ run_id: current.run_id, run_sequence: current.run_sequence ?? 1, parent_run_id: current.parent_run_id ?? null, status: current.status }],
+      });
+    }
     if (mode === "demo1" && url.pathname.includes("/continue") && route.request().method() === "POST") {
       const body = route.request().postDataJSON() as { branch_id: string; instruction?: string };
       continuationSnapshot = demo1ContinuationSnapshot({ workspace_id: "forte-public-office", instruction: body.instruction ?? "继续未完成任务" }, body.branch_id);
@@ -2781,6 +2811,52 @@ async function mockDemoRuntime(page: Page, mode: "demo1" | "demo2" | "demo2-part
     wave += 1;
     demo2Current = mode === "demo2-partial" ? demo2PartialAmbiguousSnapshot({ workspace_id: "forte-public-office", instruction: "验证拓扑" }) : demo2Snapshot({ workspace_id: "forte-public-office", instruction: "验证拓扑" }, wave);
     return fulfillJson(route, demo2Current, 202);
+  });
+}
+
+async function mockSessionHistoryRuntime(page: Page) {
+  await mockHarness(page);
+  const base = snapshot({ workspace_id: "forte-public-office", instruction: "会话基线" }, "completed", 16) as any;
+  const currentRun = { ...base, run_id: "harness:session-current", task_id: "task:session-alpha", run_sequence: 2, status: "planning", control_state: "running", result: null, events: [{ ...base.events[0], sequence: 4, status: "planning" }], last_event_sequence: 4, version: 4, instruction: "同一任务的最新 Run" };
+  const historyRun = { ...base, run_id: "harness:session-history", task_id: "task:session-alpha", run_sequence: 1, status: "completed", control_state: "completed", instruction: "同一任务的历史 Run" };
+  const otherTaskRun = { ...base, run_id: "harness:session-other", task_id: "task:session-beta", run_sequence: 1, status: "completed", control_state: "completed", instruction: "另一个任务" };
+  const runs = [currentRun, historyRun, otherTaskRun];
+  const taskById = new Map([[currentRun.task_id, currentRun], [otherTaskRun.task_id, otherTaskRun]]);
+  const eventRequests: string[] = [];
+  await page.route("**/*", async (route) => {
+    const url = new URL(route.request().url());
+    const method = route.request().method();
+    if (url.pathname === "/v1/harness/runs" && method === "GET") return fulfillJson(route, { runs });
+    if (url.pathname.startsWith("/v1/harness/tasks/") && method === "GET") {
+      const taskId = decodeURIComponent(url.pathname.split("/").at(-1) ?? "");
+      const current = taskById.get(taskId);
+      if (!current) return fulfillJson(route, { detail: "unknown task" }, 404);
+      return fulfillJson(route, { task_id: current.task_id, task_version: 2, current_run_id: current.run_id, run_sequence: current.run_sequence, parent_run_id: null, current_artifact_id: null, current_artifact_version: null, current_commit_id: null, lineage: [{ run_id: current.run_id, run_sequence: current.run_sequence, parent_run_id: null, status: current.status }] });
+    }
+    if (url.pathname.endsWith("/events") && method === "GET") {
+      eventRequests.push(url.pathname + url.search);
+      return route.fulfill({ status: 200, contentType: "text/event-stream", body: "" });
+    }
+    if (url.pathname.startsWith("/v1/harness/runs/") && method === "GET") {
+      const runId = decodeURIComponent(url.pathname.split("/").at(-1) ?? "");
+      const selected = runs.find((item) => item.run_id === runId);
+      return selected ? fulfillJson(route, selected) : fulfillJson(route, { detail: "unknown run" }, 404);
+    }
+    return route.fallback();
+  });
+  return { eventRequests };
+}
+
+async function mockFixedWorkflowRuntime(page: Page) {
+  await mockHarness(page);
+  const fixed = { ...demo2Snapshot({ workspace_id: "forte-public-office", instruction: "固定流程核对" }, 0), topology_admission: { mode: "fixed_workflow", work_unit_breadth: 5, independent_branch_count: 1, dependency_parallelism: 1, source_span: 10, remaining_model_calls: 24, remaining_time_seconds: 7000, external_action: "none", reasons: ["已按服务端策略选择固定工作流；本 Run 不启动 Adaptive Swarm。"], user_confirmation_required: false } } as any;
+  await page.route("**/*", async (route) => {
+    const url = new URL(route.request().url());
+    const method = route.request().method();
+    if (url.pathname === "/v1/harness/runs" && method === "POST") return fulfillJson(route, { run: fixed, replayed: false }, 202);
+    if (url.pathname.startsWith("/v1/harness/tasks/") && method === "GET") return fulfillJson(route, { task_id: fixed.task_id, task_version: 1, current_run_id: fixed.run_id, run_sequence: fixed.run_sequence, parent_run_id: null, current_artifact_id: null, current_artifact_version: null, current_commit_id: null, lineage: [{ run_id: fixed.run_id, run_sequence: fixed.run_sequence, parent_run_id: null, status: fixed.status }] });
+    if (url.pathname.startsWith("/v1/harness/runs/") && method === "GET" && !url.pathname.endsWith("/events")) return fulfillJson(route, fixed);
+    return route.fallback();
   });
 }
 
@@ -5000,6 +5076,7 @@ test.describe("Demo 1/2 runtime acceptance", () => {
     expect(Math.min(...admissionTextSizes)).toBeGreaterThanOrEqual(12);
     await expect(admission.getByRole("button", { name: "确认并启动只读执行器" })).toBeEnabled();
     await admission.getByRole("button", { name: "确认并启动只读执行器" }).click();
+    await admission.getByText("查看本轮 Worker 回执").click();
     await expect(admission).toContainText("实际执行回执");
     await expect(admission).toContainText("已合入");
     await expect(admission).toContainText("产品上线 Gate");
@@ -5027,6 +5104,7 @@ test.describe("Demo 1/2 runtime acceptance", () => {
     expect(mobileOverflow).toBeLessThanOrEqual(0);
     const mobileAdmissionSizes = await admission.locator('.loop-topology-facts, .loop-worker-receipts > div, .loop-worker-receipts small').evaluateAll((nodes) => nodes.map((node) => Number.parseFloat(getComputedStyle(node).fontSize)));
     expect(Math.min(...mobileAdmissionSizes)).toBeGreaterThanOrEqual(12);
+    await admission.getByText("查看本轮 Worker 回执").click();
     await expect(admission.getByText("实际执行回执")).toBeVisible();
   });
 
@@ -5048,6 +5126,101 @@ test.describe("Demo 1/2 runtime acceptance", () => {
     await page.setViewportSize({ width: 390, height: 844 });
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
     expect(overflow).toBeLessThanOrEqual(0);
+  });
+
+  test("task sessions preserve server order, isolate tasks, and keep history read-only", async ({ page }) => {
+    const state = await mockSessionHistoryRuntime(page);
+    await page.goto("/");
+    await page.getByRole("button", { name: /任务会话/ }).click();
+    const history = page.getByTestId("task-session-history");
+    await expect(history).toContainText("最近 20 个 Run 涉及的任务");
+    await expect(history.locator("[data-testid=task-session]")).toHaveCount(2);
+    await expect(history.locator("[data-testid=task-session]").first()).toContainText("最近记录 2 个 · 最近 Run 2");
+    const sessionRuns = history.locator("[data-testid=task-session]").first().locator("ol button span");
+    await expect(sessionRuns).toHaveCount(2);
+    await expect(sessionRuns.nth(0)).toHaveText("Run 2");
+    await expect(sessionRuns.nth(1)).toHaveText("Run 1");
+    await expect(history.locator("[data-testid=task-session]").nth(1)).toContainText("另一个任务");
+    if (process.env.CAPTURE_DR0056_EVIDENCE === "1") await history.screenshot({ path: "../../docs/evidence/screenshots/dr-0056-task-sessions.png" });
+    state.eventRequests.length = 0;
+    await history.locator("[data-testid=task-session]").first().getByRole("button", { name: /Run 1/ }).click();
+    await expect(page.getByRole("status")).toContainText("历史 Run 只读查看");
+    await expect(page.locator(".result-proposal-actions button").filter({ hasText: "确认并启动" })).toHaveCount(0);
+    await page.getByRole("button", { name: "Agent 路径" }).click();
+    await expect(page.locator(".loop-controls button").first()).toBeDisabled();
+    await expect.poll(() => state.eventRequests.length).toBe(0);
+  });
+
+  test("current nonterminal session reconnects from the latest sequence", async ({ page }) => {
+    await mockSessionHistoryRuntime(page);
+    const requests: string[] = [];
+    page.on("request", (request) => { if (request.url().includes("/events")) requests.push(request.url()); });
+    await page.goto("/");
+    await page.getByRole("button", { name: /任务会话/ }).click();
+    const history = page.getByTestId("task-session-history");
+    await history.locator("[data-testid=task-session]").first().getByRole("button", { name: /Run 1/ }).click();
+    await expect(page.getByRole("status")).toContainText("历史 Run 只读查看");
+    requests.length = 0;
+    await page.getByRole("button", { name: /任务会话/ }).click();
+    await page.getByTestId("task-session-history").locator("[data-testid=task-session]").first().getByRole("button", { name: /Run 2/ }).click();
+    await expect.poll(() => requests.length).toBeGreaterThan(0);
+    expect(requests.at(-1)).toContain("after=4");
+    await expect(page.getByTestId("task-ledger-pointer")).toContainText("当前任务 Run");
+  });
+
+  test("Adaptive workbench exposes canonical route facts and restores focus on Escape", async ({ page }) => {
+    await mockDemoRuntime(page, "demo2");
+    await page.goto("/");
+    await page.getByRole("textbox", { name: "任务指令" }).fill("按拓扑核对工作包");
+    await page.getByRole("button", { name: "启动 Control Loop" }).click();
+    await page.getByRole("button", { name: "Agent 路径" }).click();
+    const launch = page.getByRole("button", { name: "打开 Adaptive Swarm 工作台" });
+    await launch.click();
+    const workbench = page.getByTestId("adaptive-workbench");
+    await expect(workbench.getByRole("heading", { name: "Adaptive Swarm 工作台" })).toBeVisible();
+    if (process.env.CAPTURE_DR0056_EVIDENCE === "1") await workbench.screenshot({ path: "../../docs/evidence/screenshots/dr-0056-adaptive-swarm-workbench.png" });
+    await expect(workbench).toContainText("Tool Call");
+    await expect(workbench.locator(".adaptive-route-framework .is-active")).toHaveText("Adaptive Swarm");
+    await expect(workbench.locator(".adaptive-source-list span")).toHaveCount(10);
+    await expect(workbench.locator(".adaptive-workunit-list article")).toHaveCount(5);
+    const factSizes = await workbench.locator(".adaptive-source-list span, .adaptive-branch-grid li p, .adaptive-receipt-list article span, .adaptive-version-list article span, .adaptive-boundary").evaluateAll((nodes) => nodes.map((node) => Number.parseFloat(getComputedStyle(node).fontSize)));
+    expect(factSizes.length).toBeGreaterThan(0);
+    expect(Math.min(...factSizes)).toBeGreaterThanOrEqual(13);
+    await page.keyboard.press("Escape");
+    await expect(workbench).toBeHidden();
+    await expect(launch).toBeFocused();
+    const admission = page.getByTestId("topology-admission");
+    await admission.getByRole("button", { name: "确认并启动只读执行器" }).click();
+    await expect(admission).toContainText("实际执行回执");
+    await launch.click();
+    await expect(workbench.locator(".adaptive-version-list article")).toHaveCount(1);
+    await expect(workbench).toContainText("耗时 120 ms");
+    const receiptSizes = await workbench.locator(".adaptive-receipt-list article span").evaluateAll((nodes) => nodes.map((node) => Number.parseFloat(getComputedStyle(node).fontSize)));
+    expect(receiptSizes.length).toBeGreaterThan(0);
+    expect(Math.min(...receiptSizes)).toBeGreaterThanOrEqual(13);
+    await page.keyboard.press("Escape");
+    await admission.getByRole("button", { name: "继续下一批只读执行器" }).click();
+    await launch.click();
+    await expect(workbench.locator(".adaptive-version-list article")).toHaveCount(2);
+    if (process.env.CAPTURE_DR0056_EVIDENCE === "1") {
+      await page.setViewportSize({ width: 390, height: 844 });
+      await workbench.screenshot({ path: "../../docs/evidence/screenshots/dr-0056-adaptive-swarm-workbench-390.png" });
+    }
+  });
+
+  test("fixed workflow states that Adaptive Swarm and Tool Call did not run", async ({ page }) => {
+    await mockFixedWorkflowRuntime(page);
+    await page.goto("/");
+    await page.getByRole("textbox", { name: "任务指令" }).fill("固定流程核对");
+    await page.getByRole("button", { name: "启动 Control Loop" }).click();
+    await page.getByRole("button", { name: "Agent 路径" }).click();
+    await page.getByRole("button", { name: "打开 Adaptive Swarm 工作台" }).click();
+    const workbench = page.getByTestId("adaptive-workbench");
+    await expect(workbench.locator(".adaptive-route-framework .is-active")).toHaveText("Fixed Workflow");
+    await expect(workbench.locator(".adaptive-header-boundary")).toHaveText("本次未启动 Adaptive Swarm");
+    await expect(workbench).toContainText("本 Run 未执行 Tool Call");
+    await expect(workbench).toContainText("本次未启动 Worker");
+    await expect(workbench.locator(".adaptive-receipt-list")).toHaveCount(0);
   });
 
   test("Task Ledger success sends both versions and renders the child as current", async ({ page }) => {

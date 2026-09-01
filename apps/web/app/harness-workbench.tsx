@@ -4305,7 +4305,8 @@ export function HarnessWorkbench({ onActivityChange }: { onActivityChange?: (sta
       setInstruction(latest.instruction);
       setView(latest.result && TERMINAL_STATUSES.has(latest.status) ? "result" : "loop");
       setSessionsOpen(false);
-      setConnection("available");
+      if (selectedIsCurrent && !TERMINAL_STATUSES.has(latest.status)) connectEvents(latest.run_id, generation, latest.last_event_sequence);
+      else setConnection("available");
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "无法读取任务会话");
     }
@@ -4323,31 +4324,52 @@ export function HarnessWorkbench({ onActivityChange }: { onActivityChange?: (sta
         else if (response.status === 404) window.sessionStorage.removeItem(RUN_SESSION_KEY);
       }
       const candidates = await loadSessionRuns();
-      if (!snapshot) snapshot = candidates.find((item) => !TERMINAL_STATUSES.has(item.status)) ?? candidates[0] ?? null;
-      if (!snapshot) return;
+      let currentRunId: string | null = null;
+      let taskPointerFailure = false;
+      const readTaskCurrent = async (taskId: string) => {
+        const response = await fetch(`${API_BASE}/v1/harness/tasks/${encodeURIComponent(taskId)}`, { headers: HEADERS });
+        if (!response.ok) throw new Error("任务台账暂时无法确认当前 Run，请重试");
+        return asText((await response.json() as Record<string, unknown>).current_run_id);
+      };
+      if (snapshot) {
+        currentRunId = await readTaskCurrent(snapshot.task_id);
+        if (currentRunId !== snapshot.run_id) snapshot = null;
+      }
+      if (!snapshot) {
+        for (const candidate of candidates) {
+          try {
+            const candidateCurrentRunId = await readTaskCurrent(candidate.task_id);
+            if (candidateCurrentRunId === candidate.run_id) {
+              snapshot = candidate;
+              currentRunId = candidateCurrentRunId;
+              break;
+            }
+          } catch {
+            // A missing Task pointer is not permission to guess from list order.
+            taskPointerFailure = true;
+          }
+        }
+      }
+      if (!snapshot) {
+        if (taskPointerFailure) throw new Error("任务台账暂时无法确认当前 Run，请重试");
+        return;
+      }
       const generation = generationRef.current + 1;
       generationRef.current = generation;
       runRef.current = null;
       lastSequenceRef.current = 0;
-      setSelectedRunCurrent(null);
+      setSelectedRunCurrent(currentRunId === snapshot.run_id);
       if (!applySnapshot(snapshot, generation)) return;
       setInstruction(snapshot.instruction);
       setView(snapshot.result && TERMINAL_STATUSES.has(snapshot.status) ? "result" : "loop");
-      const taskResponse = await fetch(`${API_BASE}/v1/harness/tasks/${encodeURIComponent(snapshot.task_id)}`, { headers: HEADERS });
-      if (!taskResponse.ok) {
-        setSelectedRunCurrent(null);
-        setTaskPointerError("任务台账暂时无法确认当前 Run，请重试");
-        setConnection("available");
-        return;
-      }
-      const taskPayload = await taskResponse.json() as Record<string, unknown>;
-      const currentRunId = asText(taskPayload.current_run_id);
       const selectedIsCurrent = currentRunId === snapshot.run_id;
       setSelectedRunCurrent(selectedIsCurrent);
       if (selectedIsCurrent && !TERMINAL_STATUSES.has(snapshot.status)) {
         connectEvents(snapshot.run_id, generation, snapshot.last_event_sequence);
       } else setConnection("available");
-    } catch {
+    } catch (caught) {
+      setTaskPointerError(caught instanceof Error ? caught.message : "任务台账暂时无法确认当前 Run，请重试");
+      setError(caught instanceof Error ? caught.message : "任务台账暂时无法确认当前 Run，请重试");
       setConnection("available");
     }
   }
@@ -4671,13 +4693,14 @@ export function HarnessWorkbench({ onActivityChange }: { onActivityChange?: (sta
         <button type="button" className="icon-action" title="重新核对资料库" aria-label="重新核对资料库" onClick={() => void loadWorkspace()}><IconRefresh aria-hidden="true" /></button>
       </div>
     </header>
-    {sessionsOpen && <SessionHistory runs={sessionRuns} activeRunId={run?.run_id ?? null} selectedIsCurrent={selectedRunCurrent} loading={historyLoading} onRefresh={() => void loadSessionRuns()} onSelect={(snapshot) => { void openSessionRun(snapshot); }} />}
+    {sessionsOpen && <SessionHistory runs={sessionRuns} activeRunId={run?.run_id ?? null} loading={historyLoading} onRefresh={() => void loadSessionRuns()} onSelect={(snapshot) => { void openSessionRun(snapshot); }} />}
     <div className="workspace-facts" aria-label="资料库信息">
       <span><strong>{workspace.file_count}</strong> 份文件统一检索</span>
       <span><strong>{workspace.previewable_file_count}</strong> 份可安全预览</span>
       <span><strong>只读</strong> 不改原文件</span>
       <span><strong>{workspace.license}</strong> 公开许可</span>
     </div>
+    {selectedRunCurrent === false && run && <p className="read-only-banner" role="status"><IconEye aria-hidden="true" />历史 Run 只读查看，不接收实时事件，也不会执行控制、决策或启动新任务。</p>}
     <div className="data-workbench-grid">
       <aside className="dataset-browser" aria-label="FORTE 文件目录">
         <header>
@@ -4730,7 +4753,7 @@ export function HarnessWorkbench({ onActivityChange }: { onActivityChange?: (sta
         <div className="workspace-content">
           {view === "data" && <FilePreview preview={preview} file={activeFile} loading={previewLoading} error={previewError} />}
           {view === "loop" && <LoopView run={run} taskPointer={taskPointer} taskPointerError={taskPointerError} files={allFiles} controlBusy={controlBusy} onControl={controlLoop} onReview={setReviewRequest} onStartTask={startTask} onContinueTask={continueTask} onOpenCurrentTask={openCurrentTask} onRetryTaskPointer={() => run && refreshTaskPointer(run.task_id, generationRef.current, run.run_id, run.task_version, true)} onExecuteWorkers={executeWorkers} onOpenAdaptiveWorkbench={() => setAdaptiveWorkbenchOpen(true)} readOnly={isReadOnlyRun} starting={starting} />}
-          {view === "result" && <ResultView result={run?.result ?? null} artifacts={run?.artifact_versions ?? []} workspaceArtifacts={run?.workspace_artifacts ?? []} receipts={run?.effect_receipts ?? []} reconciliation={run?.narrative_reconciliation ?? null} commit={run?.last_commit ?? null} decisions={run?.decision_records ?? []} decisionRequests={run?.decision_requests ?? []} files={allFiles} onOpenFile={openFile} onReview={setReviewRequest} onStartTask={startTask} starting={starting} />}
+          {view === "result" && <ResultView result={run?.result ?? null} artifacts={run?.artifact_versions ?? []} workspaceArtifacts={run?.workspace_artifacts ?? []} receipts={run?.effect_receipts ?? []} reconciliation={run?.narrative_reconciliation ?? null} commit={run?.last_commit ?? null} decisions={run?.decision_records ?? []} decisionRequests={run?.decision_requests ?? []} files={allFiles} onOpenFile={openFile} onReview={setReviewRequest} onStartTask={startTask} starting={starting} readOnly={isReadOnlyRun} />}
         </div>
         <details className="workspace-boundary"><summary><IconShieldCheck aria-hidden="true" />数据与执行边界</summary><p>{workspace.data_boundary} Agent 可以检索整个资料库，但每轮只读取服务端校验通过且受预算约束的文件；本轮不会修改原文件或执行外部动作。</p></details>
         {error && run?.status !== "failed" && <div className="workspace-error" role="alert"><IconAlertTriangle aria-hidden="true" /><span>{error}</span></div>}
@@ -4771,14 +4794,12 @@ function FilePreview({ preview, file, loading, error, anchor = null }: { preview
 function SessionHistory({
   runs,
   activeRunId,
-  selectedIsCurrent,
   loading,
   onSelect,
   onRefresh,
 }: {
   runs: HarnessRun[];
   activeRunId: string | null;
-  selectedIsCurrent: boolean | null;
   loading: boolean;
   onSelect: (run: HarnessRun, readOnly: boolean) => void;
   onRefresh: () => void;
@@ -4789,7 +4810,7 @@ function SessionHistory({
     map.set(item.task_id, current);
     return map;
   }, new Map<string, HarnessRun[]>()).entries())
-    .map(([taskId, taskRuns]) => [taskId, taskRuns.sort((left, right) => right.run_sequence - left.run_sequence)] as const);
+    .map(([taskId, taskRuns]) => [taskId, taskRuns] as const);
   return <section className="session-drawer" aria-label="任务会话历史" data-testid="task-session-history">
     <header><div><span>服务端历史</span><h2>任务会话</h2><p>最近 20 个 Run 涉及的任务；不同任务分开，同一任务的每个 Run 保留在时间线上。打开旧记录只读查看。</p></div><button type="button" className="icon-action" title="刷新任务会话" aria-label="刷新任务会话" onClick={onRefresh} disabled={loading}><IconRefresh aria-hidden="true" /></button></header>
     {loading && <p className="session-empty">正在读取服务端 runs...</p>}
@@ -4797,14 +4818,12 @@ function SessionHistory({
     {!loading && groups.map(([taskId, taskRuns], index) => {
       const latest = taskRuns[0];
       return <article className="task-session" key={taskId} data-testid="task-session">
-        <header><div><span>任务会话 {index + 1}</span><strong>{latest?.instruction || "未命名任务"}</strong></div><small>最近记录 {taskRuns.length} 个 · 当前 Run {latest?.run_sequence ?? "-"}</small></header>
-        <ol>{taskRuns.slice().reverse().map((item) => {
-          const isLatest = item.run_id === latest?.run_id;
+        <header><div><span>任务会话 {index + 1}</span><strong>{latest?.instruction || "未命名任务"}</strong></div><small>最近记录 {taskRuns.length} 个 · 最近 Run {latest?.run_sequence ?? "-"}</small></header>
+        <ol>{taskRuns.map((item) => {
           const isSelected = activeRunId === item.run_id;
-          const isReadOnly = !isLatest || (selectedIsCurrent === false && activeRunId === item.run_id);
           return <li key={item.run_id} className={isSelected ? "is-selected" : ""}>
-            <button type="button" onClick={() => onSelect(item, isReadOnly)} aria-current={isSelected ? "page" : undefined}>
-              <span>Run {item.run_sequence}</span><b>{isSelected ? (isReadOnly ? "只读查看" : "当前运行") : isReadOnly ? "历史只读" : "可继续"}</b><small>{statusLabel(item.status)}</small>
+            <button type="button" onClick={() => onSelect(item, true)} aria-current={isSelected ? "page" : undefined}>
+              <span>Run {item.run_sequence}</span><b>打开记录</b><small>{statusLabel(item.status)}</small>
             </button>
           </li>;
         })}</ol>
@@ -4864,15 +4883,17 @@ function AdaptiveSwarmWorkbench({
   const readyBranches = new Set(run.rounds.at(-1)?.next_step?.ready_branch_ids ?? []);
   const route = admission?.mode === "adaptive_readonly_workers" ? "Adaptive Swarm" : admission?.mode === "fixed_workflow" ? "Fixed Workflow" : "Single Controller";
   const statusText = (status: string) => status === "completed" || status === "adopted" ? "已完成" : status === "blocked" ? "被依赖阻塞" : status === "waiting" || status === "waiting_input" ? "局部等待" : status === "failed" ? "执行失败" : status === "ready" ? "可执行" : "处理中";
+  const contributionText = (status: string) => ({ waiting: "待核对", rejected: "已拒绝", failed: "执行失败", adopted: "已采用" }[status] ?? "状态待确认");
   return <div className="adaptive-workbench-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
     <section ref={dialogRef} className="adaptive-workbench" role="dialog" aria-modal="true" aria-labelledby="adaptive-workbench-title" data-testid="adaptive-workbench">
-      <header className="adaptive-workbench-header"><div><span>任务编排工作台</span><h2 id="adaptive-workbench-title">Adaptive Swarm 工作台</h2><p>服务端 Snapshot 的当前投影 · Run {run.run_sequence}</p></div><button ref={closeButtonRef} type="button" className="icon-action" title="关闭工作台" aria-label="关闭工作台" onClick={onClose}><IconX aria-hidden="true" /></button></header>
+      <header className="adaptive-workbench-header"><div><span>任务编排工作台</span><h2 id="adaptive-workbench-title">Adaptive Swarm 工作台</h2><p>服务端 Snapshot 的当前投影 · Run {run.run_sequence}</p><b className="adaptive-header-boundary">{admission?.mode === "adaptive_readonly_workers" ? "当前有限实现：受限只读 Worker" : "本次未启动 Adaptive Swarm"}</b></div><button ref={closeButtonRef} type="button" className="icon-action" title="关闭工作台" aria-label="关闭工作台" onClick={onClose}><IconX aria-hidden="true" /></button></header>
       <div className="adaptive-workbench-body">
-        <section className="adaptive-summary" aria-label="拓扑准入摘要"><div><span>服务端实际路线</span><strong>{route}</strong><div className="adaptive-route-framework" aria-label="四种路线"><span className={route === "Single Controller" ? "is-active" : ""}>Single Controller</span><span className={route === "Fixed Workflow" ? "is-active" : ""}>Fixed Workflow</span><span className={route === "Adaptive Swarm" ? "is-active" : ""}>Adaptive Swarm</span><span>Demo 3 · Risk Gate</span></div><p>{admission?.reasons.at(-1) ?? "本次没有可显示的准入说明。"}</p></div><div className="adaptive-summary-facts"><b>{admission?.work_unit_breadth ?? run.branches.length}<small>工作包</small></b><b>{admission?.source_span ?? sourceRefs.length}<small>来源</small></b><b>{admission?.independent_branch_count ?? 0}<small>独立分支</small></b></div></section>
+        {run.work_units.length > 0 && <section className="adaptive-panel adaptive-workunits" aria-label="WorkUnit 台账"><header><div><span>WorkUnit 台账</span><h3>真实尝试、依赖和贡献状态</h3></div><small>来自当前 Snapshot</small></header><div className="adaptive-workunit-list">{run.work_units.map((unit) => { const branch = run.branches.find((item) => item.branch_id === unit.branch_id); const contribution = run.contributions.slice().reverse().find((item) => item.work_unit_id === unit.work_unit_id); return <article key={unit.work_unit_id}><b>{branch?.title || "工作包"}</b><span>{statusText(unit.state)} · 第 {unit.attempt} 次尝试</span><small>{unit.depends_on.length ? `依赖 ${unit.depends_on.length} 个前序工作包` : "无前序依赖"}{contribution ? ` · contribution ${contribution.gate_status} · 耗时 ${contribution.model_receipt.elapsed_ms} ms` : " · 尚无贡献回执"}</small></article>; })}</div></section>}
+        <section className="adaptive-summary" aria-label="拓扑准入摘要"><div><span>服务端实际路线</span><strong>{route}</strong><div className="adaptive-route-framework" aria-label="四种路线"><span>Tool Call <small>目标能力</small></span><span className={route === "Single Controller" ? "is-active" : ""}>Single Controller</span><span className={route === "Fixed Workflow" ? "is-active" : ""}>Fixed Workflow</span><span className={route === "Adaptive Swarm" ? "is-active" : ""}>Adaptive Swarm</span></div><p>{route === "Single Controller" || route === "Fixed Workflow" ? `本 Run 未执行 Tool Call；${admission?.reasons.at(-1) ?? "服务端保持当前路线。"}` : admission?.reasons.at(-1) ?? "本次没有可显示的准入说明。"}</p></div><div className="adaptive-summary-facts"><b>{admission?.work_unit_breadth ?? run.branches.length}<small>工作包</small></b><b>{admission?.source_span ?? sourceRefs.length}<small>来源</small></b><b>{admission?.independent_branch_count ?? 0}<small>独立分支</small></b></div></section>
         <section className="adaptive-panel"><header><div><span>来源范围</span><h3>本次批准的 {sourceRefs.length || admission?.source_span || 0} 份资料</h3></div><small>只显示安全文件名</small></header><div className="adaptive-source-list">{sourceRefs.length ? sourceRefs.slice(0, 10).map((ref) => <span key={ref}>{fileLabel(ref)}</span>) : <span>服务端尚未形成来源列表</span>}</div></section>
-        <section className="adaptive-panel"><header><div><span>Branch DAG</span><h3>{run.branches.length ? `${run.branches.length} 个工作包 · 依赖波次` : "尚未形成工作包"}</h3></div><small>3 root + 2 dependent 的固定演示形状仅在 Snapshot 有记录时显示</small></header><ol className="adaptive-branch-grid">{run.branches.length ? run.branches.map((branch) => <li key={branch.branch_id} className={branch.status === "blocked" ? "is-blocked" : ""}><div><b>{branch.title}</b><strong>{statusText(branch.status)}</strong></div><p>{branch.objective}</p><small>{branch.depends_on.length ? `依赖 ${branch.depends_on.length} 个前序工作包` : "Root 工作包"}{readyBranches.has(branch.branch_id) ? " · 本波可执行" : ""}</small></li>) : <li>服务端没有返回 Branch DAG。</li>}</ol></section>
-        <section className="adaptive-panel"><header><div><span>Worker 与贡献</span><h3>执行回执和采用状态分开</h3></div><small>{admission?.mode === "adaptive_readonly_workers" ? "当前有限实现：受限只读 Worker" : "本次未启动 Worker"}</small></header>{admission?.mode === "adaptive_readonly_workers" && <p className="adaptive-boundary">仅在用户确认后派发，每批最多 3 个分支；不执行外部动作。</p>}{admission?.mode !== "adaptive_readonly_workers" && <p className="adaptive-boundary">本次路由为 {route}，服务端原因：{admission?.reasons.at(-1) ?? "没有 Worker 准入"}。</p>}{run.worker_runs.length > 0 ? <div className="adaptive-receipt-list">{run.worker_runs.map((worker) => <article key={worker.worker_run_id}><b>{statusText(worker.outcome)}</b><span>{worker.summary}</span><small>{worker.source_file_refs.map(fileLabel).join("、") || "批准来源未显示"} · {worker.model_called ? "模型已调用" : "未调用"} · {worker.output_used ? "已采用" : "未采用"}</small></article>)}</div> : <p className="adaptive-empty">尚未有 Worker 回执。</p>}{run.contributions.length > 0 && <div className="adaptive-receipt-list">{run.contributions.map((contribution) => <article key={contribution.contribution_id}><b>{contribution.gate_status === "adopted" ? "贡献已采用" : "贡献待处理"}</b><span>{contribution.summary}</span><small>{contribution.approved_file_refs.map(fileLabel).join("、") || "批准来源未显示"} · {contribution.evidence_anchors.length ? `${contribution.evidence_anchors.length} 处原文定位` : "原文定位待补"}</small></article>)}</div>}{admission?.mode === "adaptive_readonly_workers" && !readOnly && <button type="button" className="adaptive-confirm" onClick={() => void onExecuteWorkers()} disabled={starting}><IconPlayerPlay aria-hidden="true" />{starting ? "正在启动" : run.worker_runs.length ? "继续下一波" : "确认并启动只读 Worker"}</button>}</section>
-        <section className="adaptive-panel adaptive-artifacts"><header><div><span>成果版本</span><h3>append-only Artifact history</h3></div><small>成果与局部阻塞并存</small></header><div className="adaptive-version-list">{run.artifact_versions.length ? run.artifact_versions.map((artifact) => <article key={artifact.artifact_id}><b>Artifact v{artifact.version}</b><span>{artifact.summary}</span><small>{artifact.finding_count} 条发现 · {run.last_commit?.artifact_version === artifact.version ? "当前提交" : "历史版本"}</small></article>) : <p className="adaptive-empty">尚未生成逻辑成果版本。</p>}</div>{run.contributions.some((item) => item.gate_status !== "adopted") && <p className="adaptive-partial"><IconAlertTriangle aria-hidden="true" />部分成果可用；阻塞分支不会抹掉已采用贡献。</p>}</section>
+        <section className="adaptive-panel"><header><div><span>Supervisor 工作图</span><h3>{run.branches.length ? `${run.branches.length} 个工作包 · 依赖波次` : "尚未形成工作包"}</h3></div><small>Branch / WorkUnit 依赖事实；3 root + 2 dependent 的固定形状仅在 Snapshot 有记录时显示</small></header><ol className="adaptive-branch-grid">{run.branches.length ? run.branches.map((branch) => <li key={branch.branch_id} className={branch.status === "blocked" ? "is-blocked" : ""}><div><b>{branch.title}</b><strong>{statusText(branch.status)}</strong></div><p>{branch.objective}</p><small>{branch.depends_on.length ? `依赖 ${branch.depends_on.length} 个前序工作包` : "Root 工作包"}{readyBranches.has(branch.branch_id) ? " · 本波可执行" : ""}</small></li>) : <li>服务端没有返回 Branch / WorkUnit 依赖图。</li>}</ol></section>
+         <section className="adaptive-panel"><header><div><span>Worker 与贡献</span><h3>执行回执和采用状态分开</h3></div><small>{admission?.mode === "adaptive_readonly_workers" ? "当前有限实现：受限只读 Worker" : "本次未启动 Worker"}</small></header>{admission?.mode === "adaptive_readonly_workers" && <p className="adaptive-boundary">仅在用户确认后派发，每批最多 3 个分支；不执行外部动作。</p>}{admission?.mode !== "adaptive_readonly_workers" && <p className="adaptive-boundary">本次路由为 {route}，服务端原因：{admission?.reasons.at(-1) ?? "没有 Worker 准入"}。</p>}{run.worker_runs.length > 0 ? <div className="adaptive-receipt-list">{run.worker_runs.map((worker) => <article key={worker.worker_run_id}><b>{statusText(worker.outcome)}</b><span>{worker.summary}</span><small>{worker.source_file_refs.map(fileLabel).join("、") || "批准来源未显示"} · {worker.model_called ? "模型已调用" : "未调用"} · {worker.output_used ? "已采用" : "未采用"} · 耗时 {worker.elapsed_ms} ms</small></article>)}</div> : <p className="adaptive-empty">尚未有 Worker 回执。</p>}{run.contributions.length > 0 && <div className="adaptive-receipt-list">{run.contributions.map((contribution) => <article key={contribution.contribution_id}><b>贡献{contributionText(contribution.gate_status)}</b><span>{contribution.summary}</span><small>{contribution.approved_file_refs.map(fileLabel).join("、") || "批准来源未显示"} · {contribution.evidence_anchors.length ? `${contribution.evidence_anchors.length} 处原文定位` : "原文定位待补"}</small></article>)}</div>}{admission?.mode === "adaptive_readonly_workers" && !readOnly && <button type="button" className="adaptive-confirm" onClick={() => void onExecuteWorkers()} disabled={starting}><IconPlayerPlay aria-hidden="true" />{starting ? "正在启动" : run.worker_runs.length ? "继续下一波" : "确认并启动只读 Worker"}</button>}</section>
+        <section className="adaptive-panel adaptive-artifacts"><header><div><span>成果版本</span><h3>append-only Artifact history</h3></div><small>成果与局部阻塞并存</small></header><div className="adaptive-version-list">{run.artifact_versions.length ? run.artifact_versions.map((artifact) => <article key={`${artifact.artifact_id}:${artifact.version}`}><b>Artifact v{artifact.version}</b><span>{artifact.summary}</span><small>{artifact.finding_count} 条发现 · {run.last_commit?.artifact_version === artifact.version ? "当前提交" : "历史版本"}</small></article>) : <p className="adaptive-empty">尚未生成逻辑成果版本。</p>}</div>{run.contributions.some((item) => item.gate_status !== "adopted") && <p className="adaptive-partial"><IconAlertTriangle aria-hidden="true" />部分成果可用；阻塞分支不会抹掉已采用贡献。</p>}</section>
       </div>
     </section>
   </div>;
@@ -5823,6 +5844,7 @@ function ResultView({
   onReview,
   onStartTask,
   starting,
+  readOnly,
 }: {
   result: HarnessResult | null;
   artifacts: ArtifactVersion[];
@@ -5837,6 +5859,7 @@ function ResultView({
   onReview: (request: EvidenceReviewRequest) => void;
   onStartTask: (instruction: string) => Promise<boolean>;
   starting: boolean;
+  readOnly: boolean;
 }) {
   const [expanded, setExpanded] = useState(false);
   const hasWorkspaceEvidence = workspaceArtifacts.length > 0 || receipts.length > 0;
@@ -5868,7 +5891,7 @@ function ResultView({
     {result.findings.length > 3 && <button type="button" className="result-expand" aria-expanded={expanded} onClick={() => setExpanded((current) => !current)}><IconChevronDown className={expanded ? "is-open" : ""} aria-hidden="true" />{expanded ? "收起详细发现" : `查看其余 ${result.findings.length - 3} 条发现`}</button>}
     {result.follow_ups.length > 0 && <section className="result-proposals" aria-labelledby="result-proposals-title">
       <header><span>Agent 建议的下一步</span><h3 id="result-proposals-title">先看形成依据，再决定是否启动新的 Control Loop</h3></header>
-      {result.follow_ups.map((item, index) => <article key={`${item}:${index}`}><div><b>建议 {index + 1}</b><p>{item}</p></div><div className="result-proposal-actions"><button type="button" className="is-review" onClick={() => onReview(proposalReviewRequest(item, index, result, latestRoundNumber))}><IconEye aria-hidden="true" />查看形成依据</button><button type="button" disabled={starting} onClick={() => void onStartTask(item)}><IconPlayerPlay aria-hidden="true" />{starting ? "正在启动" : "确认并启动"}</button></div></article>)}
+      {result.follow_ups.map((item, index) => <article key={`${item}:${index}`}><div><b>建议 {index + 1}</b><p>{item}</p></div><div className="result-proposal-actions"><button type="button" className="is-review" onClick={() => onReview(proposalReviewRequest(item, index, result, latestRoundNumber))}><IconEye aria-hidden="true" />查看形成依据</button>{!readOnly && <button type="button" disabled={starting} onClick={() => void onStartTask(item)}><IconPlayerPlay aria-hidden="true" />{starting ? "正在启动" : "确认并启动"}</button>}</div></article>)}
     </section>}
     <footer><IconShieldCheck aria-hidden="true" />这些建议由模型基于本轮已读取资料生成，尚未逐项验证；只有你点击确认后才会启动新任务，本轮没有修改原文件或执行外部动作。</footer>
   </article> : hasDeterministicAuthority ? <article className="result-authority-placeholder" aria-label="当前结论来源">
