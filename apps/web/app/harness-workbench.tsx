@@ -363,7 +363,7 @@ type LoopBranch = {
   input_file_refs: string[];
   verified_file_refs: string[];
   missing_file_refs: string[];
-  status: "running" | "pending" | "blocked" | "completed" | "waiting_input" | "stopped" | "failed";
+  status: "running" | "pending" | "blocked" | "completed" | "waiting_input" | "stopped" | "failed" | "rejected";
   requires_human_gate: boolean;
   created_at: string;
   updated_at: string;
@@ -2071,7 +2071,7 @@ function normalizeBranch(value: unknown): LoopBranch | null {
   const raw = value as Record<string, unknown>;
   const branchId = asText(raw.branch_id);
   const status = asText(raw.status);
-  if (!branchId || !["running", "pending", "blocked", "completed", "waiting_input", "stopped", "failed"].includes(status)) return null;
+  if (!branchId || !["running", "pending", "blocked", "completed", "waiting_input", "stopped", "failed", "rejected"].includes(status)) return null;
   return {
     branch_id: branchId,
     unit_id: asText(raw.unit_id),
@@ -3474,6 +3474,7 @@ function branchStatusLabel(status: LoopBranch["status"]) {
     waiting_input: "等你决定",
     stopped: "已停止",
     failed: "未通过",
+    rejected: "已拒绝",
   }[status];
 }
 
@@ -5137,6 +5138,7 @@ function CollaborationOverview({
         ? `${run.work_units.length} 个工作包 · 已拆解，正在处理`
         : `${run.work_units.length} 个工作包 · 正在处理 · ${completed}/${run.branches.length} 已完成`;
   const isAdaptive = mode === "adaptive_readonly_workers";
+  const readyBranches = new Set(run.rounds.at(-1)?.next_step?.ready_branch_ids ?? []);
   const graphUnits = run.work_units.map((unit) => ({ unit, branch: run.branches.find((branch) => branch.branch_id === unit.branch_id) }));
   const unitByRef = new Map<string, typeof graphUnits[number]>();
   graphUnits.forEach((item) => {
@@ -5168,14 +5170,18 @@ function CollaborationOverview({
     const parent = resolveUnit(dependency);
     const from = parent && graphPositions.get(parent.unit.work_unit_id);
     const to = graphPositions.get(item.unit.work_unit_id);
-    return from && to ? { key: `${parent.unit.work_unit_id}:${item.unit.work_unit_id}`, from, to } : null;
-  }).filter((edge): edge is { key: string; from: { x: number; y: number }; to: { x: number; y: number } } => Boolean(edge)));
+    return from && to ? { key: `${parent.unit.work_unit_id}:${item.unit.work_unit_id}`, fromId: parent.unit.work_unit_id, toId: item.unit.work_unit_id, from, to } : null;
+  }).filter((edge): edge is { key: string; fromId: string; toId: string; from: { x: number; y: number }; to: { x: number; y: number } } => Boolean(edge)));
+  const branchStatusText = (status: string) => ({ ready: "待处理", running: "处理中", waiting: "等待确认", waiting_input: "等待处理", blocked: "已阻塞", failed: "执行失败", rejected: "已拒绝", completed: "已完成", adopted: "已采用", pending: "待处理" }[status] ?? "状态待确认");
+  const readyBranchItems = run.branches.filter((branch) => readyBranches.has(branch.branch_id));
+  const workerConfirmationRequired = isAdaptive && run.status === "waiting_input" && readyBranchItems.length > 0;
   const pendingRequests = run.decision_requests.filter((request) => ["pending", "deferred"].includes(request.state ?? "pending"));
   const evidenceGaps = Array.from(new Map(run.rounds.flatMap((round) => round.evidence_gaps).map((gap) => [gap.gap_id, gap])).values());
   const waitingUnits = graphUnits.filter(({ branch, unit }) => branch?.status === "waiting_input" || unit.state === "waiting" || unit.state === "waiting_input");
   const blockedUnits = graphUnits.filter(({ branch, unit }) => branch?.status === "blocked" || unit.state === "blocked");
   const waitingContributionBranches = new Set(waitingUnits.map(({ unit }) => unit.branch_id));
   const impacts = [
+    ...(workerConfirmationRequired ? [{ key: "ready-confirmation", title: "下一波已就绪，等待你确认", detail: `将启动：${readyBranchItems.map((branch) => branch.title).join("、")}`, tone: "decision" }] : []),
     ...waitingUnits.map(({ branch, unit }) => ({ key: unit.work_unit_id, title: branch?.title ?? "工作包等待处理", detail: "等待真实的人工确认或服务端继续。", tone: "waiting" })),
     ...run.contributions.filter((contribution) => contribution.gate_status === "waiting" && !waitingContributionBranches.has(contribution.branch_id)).map((contribution) => ({ key: contribution.contribution_id, title: run.branches.find((branch) => branch.branch_id === contribution.branch_id)?.title ?? "贡献等待核对", detail: "贡献尚未通过服务端证据核对，相关下游不会提前执行。", tone: "waiting" })),
     ...blockedUnits.map(({ branch, unit }) => ({ key: unit.work_unit_id, title: branch?.title ?? "下游工作包", detail: "前置工作包尚未完成，当前不会提前执行。", tone: "blocked" })),
@@ -5206,7 +5212,7 @@ function CollaborationOverview({
       <main className="adaptive-collaboration-main">
         <header className="collaboration-overview-header">
           <div><span>协作方式</span><h3>{route}</h3><p>{routeReason}</p></div>
-          {isAdaptive && !readOnly && (adaptiveComplete ? <span className="collaboration-complete-state" role="status"><IconCircleCheck aria-hidden="true" />协作已完成</span> : <button type="button" className="collaboration-primary-action" onClick={() => void onExecuteWorkers()} disabled={starting}><IconPlayerPlay aria-hidden="true" />{starting ? "正在启动" : run.worker_runs.length ? "继续下一批" : "确认并开始协作"}</button>)}
+          {isAdaptive && !readOnly && (adaptiveComplete ? <span className="collaboration-complete-state" role="status"><IconCircleCheck aria-hidden="true" />协作已完成</span> : !workerConfirmationRequired && <button type="button" className="collaboration-primary-action" onClick={() => void onExecuteWorkers()} disabled={starting}><IconPlayerPlay aria-hidden="true" />{starting ? "正在启动" : run.worker_runs.length ? "继续下一批" : "确认并开始协作"}</button>)}
         </header>
         <section className="adaptive-route-explanation" aria-label="采用此路线的原因"><div><span>为什么采用这条路线</span><p>{isAdaptive ? "服务端识别出可独立处理的资料组，按依赖顺序拆分工作包；只有用户确认后才会派发只读 Worker。" : "服务端按依赖顺序保留一个主控流程，本次不会启动 Adaptive Swarm 或外部动作。"}</p></div><dl><div><dt>执行方式</dt><dd>{isAdaptive ? "单进程、顺序分波" : "单一服务端流程"}</dd></div><div><dt>每波上限</dt><dd>{isAdaptive ? "最多 3 个只读 Worker" : "不适用"}</dd></div><div><dt>外部动作</dt><dd>none · 不执行</dd></div></dl></section>
         <div className="collaboration-route-options" aria-label="三种协作路线">
@@ -5214,13 +5220,13 @@ function CollaborationOverview({
           <article className={mode === "fixed_workflow" ? "is-selected" : ""}><span>02</span><div><b>固定流程</b><p>本次采用固定流程，Adaptive Swarm 未启动。</p></div></article>
           <article className={mode === "adaptive_readonly_workers" ? "is-selected" : ""}><span>03</span><div><b>Adaptive Swarm</b><p>仅在确认后按批处理可独立工作的资料。</p></div></article>
         </div>
-        {isAdaptive ? <section className="adaptive-dag-panel" aria-label="工作包依赖图"><header><div><span>主区 · 真实执行图</span><h4>{run.work_units.length ? `${run.work_units.length} 个工作包 · 依赖波次` : "等待服务端形成工作包"}</h4></div><small>根在上，依赖在下 · {graphEdges.length} 条真实连接</small></header>{graphUnits.length ? <div className="adaptive-dag" data-testid="adaptive-workunit-dag" style={{ height: graphHeight }}><svg className="adaptive-dag-edges" viewBox={`0 0 100 ${graphHeight}`} preserveAspectRatio="none" aria-hidden="true">{graphEdges.map((edge) => <line key={edge.key} x1={edge.from.x} y1={edge.from.y} x2={edge.to.x} y2={edge.to.y} />)}</svg><div className="adaptive-dag-levels">{graphLevels.map((level, levelIndex) => <div className="adaptive-dag-level" key={levelIndex} style={{ gridTemplateColumns: `repeat(${graphColumns}, minmax(0, 1fr))` }}>{level.map(({ unit, branch }, index) => <article className={`adaptive-dag-node is-${branch?.status ?? unit.state}`} key={unit.work_unit_id} style={{ gridColumn: index + 1 }}><div><span>{levelIndex === 0 ? "根" : `依赖 ${unit.depends_on.length}`}</span><strong>{branch?.title ?? "工作包"}</strong></div><small>{branch?.status === "completed" ? "已完成" : branch?.status === "blocked" ? "等待前置工作" : branch?.status === "waiting_input" ? "等待处理" : "处理中"} · {unit.approved_file_refs.length} 份来源</small></article>)}</div>)}</div></div> : <p className="adaptive-empty">服务端没有返回工作包依赖图。</p>}</section> : <section className="adaptive-static-route" aria-label="固定流程说明"><span>本次为固定流程</span><strong>{route}</strong><p>{routeReason} 这里不绘制工作包依赖图，也不显示虚构的 Worker 或贡献。</p></section>}
+        {isAdaptive ? <section className="adaptive-dag-panel" aria-label="工作包依赖图"><header><div><span>主区 · 真实执行图</span><h4>{run.work_units.length ? `${run.work_units.length} 个工作包 · 依赖波次` : "等待服务端形成工作包"}</h4></div><small>根在上，依赖在下 · {graphEdges.length} 条真实连接</small></header>{graphUnits.length ? <div className="adaptive-dag" data-testid="adaptive-workunit-dag" style={{ height: graphHeight }}><svg className="adaptive-dag-edges" viewBox={`0 0 100 ${graphHeight}`} preserveAspectRatio="none" aria-hidden="true"><defs><marker id="adaptive-dag-arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 Z" fill="#557b9d" /></marker></defs>{graphEdges.map((edge) => <line className="adaptive-dag-edge" data-from={edge.fromId} data-to={edge.toId} data-dependency="depends_on" key={edge.key} x1={edge.from.x} y1={edge.from.y} x2={edge.to.x} y2={edge.to.y} markerEnd="url(#adaptive-dag-arrow)" />)}</svg><div className="adaptive-dag-levels">{graphLevels.map((level, levelIndex) => <div className="adaptive-dag-level" key={levelIndex} style={{ gridTemplateColumns: `repeat(${graphColumns}, minmax(0, 1fr))` }}>{level.map(({ unit, branch }, index) => <article className={`adaptive-dag-node is-${branch?.status ?? unit.state}`} key={unit.work_unit_id} style={{ gridColumn: index + 1 }}><div><span>{levelIndex === 0 ? "根" : `依赖 ${unit.depends_on.length}`}</span><strong>{branch?.title ?? "工作包"}</strong></div><small>{branchStatusText(branch?.status ?? unit.state)} · {unit.approved_file_refs.length} 份来源</small></article>)}</div>)}</div></div> : <p className="adaptive-empty">服务端没有返回工作包依赖图。</p>}</section> : <section className="adaptive-static-route" aria-label="固定流程说明"><span>本次为固定流程</span><strong>{route}</strong><p>{routeReason} 这里不绘制工作包依赖图，也不显示虚构的 Worker 或贡献。</p></section>}
         <section className="adaptive-result-bar" aria-label="协作结果摘要"><div><span>结果返回</span><strong>{run.last_commit ? "已提交当前成果" : run.artifact_versions.length ? "成果已返回" : "尚无成果"}</strong></div><div><span>贡献采用</span><strong>{run.contributions.length ? `${adopted}/${run.contributions.length} 已采用` : "等待回执"}</strong></div><div><span>待确认</span><strong>{impacts.length ? `${impacts.length} 项影响` : "无待处理事项"}</strong></div><div><span>成果版本</span><strong>{run.artifact_versions.length ? `Artifact v${run.artifact_versions.at(-1)?.version ?? 1}` : "尚无版本"}</strong></div><button type="button" className="adaptive-receipt-entry" onClick={openWorkerReceipts}><IconRoute aria-hidden="true" />Worker 回执</button></section>
-        <details className="collaboration-disclosure"><summary><IconGitCommit aria-hidden="true" />查看工作包明细<span>{run.branches.length} 个工作包</span><IconChevronDown aria-hidden="true" /></summary><div className="collaboration-package-list">{run.branches.length ? run.branches.map((branch) => <article key={branch.branch_id}><div><b>{branch.title}</b><strong>{branch.status === "completed" ? "已完成" : branch.status === "waiting_input" ? "等待处理" : branch.status === "blocked" ? "等待前置工作" : "处理中"}</strong></div><p>{branch.objective}</p><small>{branch.input_file_refs.map(fileLabel).join("、") || "服务端将从资料库选择来源"}</small></article>) : <p>服务端尚未形成工作包。</p>}</div></details>
+        <details className="collaboration-disclosure"><summary><IconGitCommit aria-hidden="true" />查看工作包明细<span>{run.branches.length} 个工作包</span><IconChevronDown aria-hidden="true" /></summary><div className="collaboration-package-list">{run.branches.length ? run.branches.map((branch) => <article key={branch.branch_id}><div><b>{branch.title}</b><strong>{branchStatusText(branch.status)}</strong></div><p>{branch.objective}</p><small>{branch.input_file_refs.map(fileLabel).join("、") || "服务端将从资料库选择来源"}</small></article>) : <p>服务端尚未形成工作包。</p>}</div></details>
         <details className="collaboration-disclosure"><summary><IconFileDescription aria-hidden="true" />查看来源范围<span>{sourceRefs.length} 份资料</span><IconChevronDown aria-hidden="true" /></summary><div className="collaboration-source-list">{sourceRefs.length ? sourceRefs.map((ref) => <span key={ref}>{fileLabel(ref)}</span>) : <p>服务端尚未形成来源列表。</p>}</div></details>
-        <details id="adaptive-worker-receipts" className="collaboration-disclosure"><summary><IconRoute aria-hidden="true" />查看执行回执<span>{run.worker_runs.length + run.contributions.length} 条记录</span><IconChevronDown aria-hidden="true" /></summary><div className="collaboration-receipt-list">{run.worker_runs.length || run.contributions.length ? [...run.worker_runs.map((worker) => <article key={worker.worker_run_id}><b>{worker.outcome === "adopted" ? "已汇合" : worker.outcome === "failed" ? "执行失败" : "待核对"}</b><span>{worker.summary}</span><small>{worker.model_called ? "模型已调用" : "未调用"} · {worker.output_used ? "已采用" : "未采用"}</small></article>), ...run.contributions.map((contribution) => <article key={contribution.contribution_id}><b>{contribution.gate_status === "adopted" ? "已汇合" : contribution.gate_status === "waiting" ? "待核对" : "未采用"}</b><span>{contribution.summary}</span><small>{contribution.approved_file_refs.map(fileLabel).join("、") || "批准来源未显示"}</small></article>)] : <p>尚未有执行回执。</p>}</div></details>
+        <details id="adaptive-worker-receipts" className="collaboration-disclosure"><summary><IconRoute aria-hidden="true" />查看执行回执<span>{run.worker_runs.length + run.contributions.length} 条记录</span><IconChevronDown aria-hidden="true" /></summary><div className="collaboration-receipt-list">{run.worker_runs.length || run.contributions.length ? [...run.worker_runs.map((worker) => <article key={worker.worker_run_id}><b>{worker.outcome === "adopted" ? "已汇合" : ["failed", "rejected"].includes(worker.outcome) ? (worker.outcome === "failed" ? "执行失败" : "已拒绝") : "待核对"}</b><span>{worker.summary}</span><small>{worker.model_called ? "模型已调用" : "未调用"} · {worker.output_used ? "已采用" : "未采用"}</small></article>), ...run.contributions.map((contribution) => <article key={contribution.contribution_id}><b>{contribution.gate_status === "adopted" ? "已汇合" : contribution.gate_status === "waiting" ? "待核对" : contribution.gate_status === "rejected" ? "已拒绝" : "未采用"}</b><span>{contribution.summary}</span><small>{contribution.approved_file_refs.map(fileLabel).join("、") || "批准来源未显示"}</small></article>)] : <p>尚未有执行回执。</p>}</div></details>
       </main>
-      <aside className="adaptive-impact-panel" aria-label="当前影响"><header><div><span>右侧 · 当前影响</span><h4>{impacts.length ? "有事项牵连" : "当前没有阻塞"}</h4></div>{impacts.length ? <IconAlertTriangle aria-hidden="true" /> : <IconCircleCheck aria-hidden="true" />}</header>{impacts.length ? <ul>{impacts.map((impact) => <li className={`is-${impact.tone}`} key={impact.key}><b>{impact.title}</b><p>{impact.detail}</p></li>)}</ul> : <div className="adaptive-impact-complete"><IconCircleCheck aria-hidden="true" /><strong>协作路径畅通</strong><p>没有等待中的工作包、人工决定或证据缺口。</p></div>}</aside>
+      <aside className="adaptive-impact-panel" aria-label="当前影响"><header><div><span>右侧 · 当前影响</span><h4>{impacts.length ? "有事项牵连" : "当前没有阻塞"}</h4></div>{impacts.length ? <IconAlertTriangle aria-hidden="true" /> : <IconCircleCheck className="is-complete-icon" aria-hidden="true" />}</header>{impacts.length ? <><ul>{impacts.map((impact) => <li className={`is-${impact.tone}`} key={impact.key}><b>{impact.title}</b><p>{impact.detail}</p></li>)}</ul>{workerConfirmationRequired && <button type="button" className="adaptive-impact-action" onClick={() => void onExecuteWorkers()} disabled={starting}><IconPlayerPlay aria-hidden="true" />{starting ? "正在启动" : run.worker_runs.length ? "继续下一批" : "确认并开始协作"}</button>}</> : <div className="adaptive-impact-complete"><IconCircleCheck aria-hidden="true" /><strong>协作路径畅通</strong><p>没有等待中的工作包、人工决定或证据缺口。</p></div>}</aside>
     </div>
   </div>;
 }
