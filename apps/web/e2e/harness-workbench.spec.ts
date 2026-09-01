@@ -2983,8 +2983,8 @@ test("runs an arbitrary task while the agent selects evidence from the whole wor
   await expect(page.getByText("规划模型")).toBeVisible();
   await expect(page.getByText("分析模型")).toBeVisible();
   await expect(page.locator(".loop-view").getByRole("heading", { name: instruction })).toBeVisible();
-  await page.getByRole("button", { name: /第 1 轮/ }).click();
-  await expect(page.getByText("Agent 本轮自主选择")).toBeVisible();
+  await page.getByRole("button", { name: /阶段 1/ }).click();
+  await expect(page.getByText("Agent 本次自动选择")).toBeVisible();
   await expect(page.getByText("文件名与摘要直接涉及当前目标，先读取这些最小证据。")).toBeVisible();
   await expect(page.getByText("待处理分支")).toBeVisible();
   await expect(page.locator(".loop-round-detail > footer strong")).toHaveText("等待人工输入");
@@ -5049,8 +5049,8 @@ test.describe("Demo 1/2 runtime acceptance", () => {
     await page.getByRole("button", { name: "继续未完成任务" }).first().click();
     const continuationRequest = await continuation;
     expect(continuationRequest.postDataJSON()).toMatchObject({ branch_id: "branch-222222222222", expected_task_version: 1 });
-    await expect(page.locator('[data-testid="task-lineage"]')).toContainText("任务持续链 · Run 2");
-    await expect(page.locator('[data-testid="task-lineage"]')).toContainText("本次只核对该未完成分支的批准来源");
+    await expect(page.locator('[data-testid="task-lineage"]')).toContainText("持续处理链 · 第 2 次");
+    await expect(page.locator('[data-testid="task-lineage"]')).toContainText("本次只核对该分支的批准来源");
     await expect(page.locator('[data-testid="task-lineage"]')).toContainText("来源版本已变化");
     await expect(page.locator('[data-testid="task-lineage"]')).toContainText("不携带旧的采用事实");
     const lineageTextSizes = await page.locator('[data-testid="task-lineage"] span, [data-testid="task-lineage"] strong, [data-testid="task-lineage"] p, [data-testid="task-lineage"] small').evaluateAll((nodes) => nodes.map((node) => Number.parseFloat(getComputedStyle(node).fontSize)));
@@ -5074,14 +5074,14 @@ test.describe("Demo 1/2 runtime acceptance", () => {
     await page.getByRole("button", { name: "启动 Control Loop" }).click();
     await page.getByRole("button", { name: "Agent 路径" }).click();
     const admission = page.locator('[data-testid="topology-admission"]');
-    await expect(admission).toContainText("已准入受限只读执行器");
+    await expect(admission).toContainText("已选择受限只读协作");
     await expect(admission).toContainText("3 个职能来源组形成 3 条独立根分支");
     const admissionTextSizes = await admission.locator('h3, header > b, .loop-topology-facts, .loop-topology-facts b, .loop-worker-receipts > span, .loop-worker-receipts > div, .loop-worker-receipts small').evaluateAll((nodes) => nodes.map((node) => Number.parseFloat(getComputedStyle(node).fontSize)));
     expect(admissionTextSizes.length).toBeGreaterThan(0);
     expect(Math.min(...admissionTextSizes)).toBeGreaterThanOrEqual(12);
     await expect(admission.getByRole("button", { name: "确认并启动只读执行器" })).toBeEnabled();
     await admission.getByRole("button", { name: "确认并启动只读执行器" }).click();
-    await admission.getByText("查看本轮 Worker 回执").click();
+    await admission.getByText("查看执行回执").click();
     await expect(admission).toContainText("实际执行回执");
     await expect(admission).toContainText("已合入");
     await expect(admission).toContainText("产品上线 Gate");
@@ -5109,7 +5109,7 @@ test.describe("Demo 1/2 runtime acceptance", () => {
     expect(mobileOverflow).toBeLessThanOrEqual(0);
     const mobileAdmissionSizes = await admission.locator('.loop-topology-facts, .loop-worker-receipts > div, .loop-worker-receipts small').evaluateAll((nodes) => nodes.map((node) => Number.parseFloat(getComputedStyle(node).fontSize)));
     expect(Math.min(...mobileAdmissionSizes)).toBeGreaterThanOrEqual(12);
-    await admission.getByText("查看本轮 Worker 回执").click();
+    await admission.getByText("查看执行回执").click();
     await expect(admission.getByText("实际执行回执")).toBeVisible();
   });
 
@@ -5170,7 +5170,7 @@ test.describe("Demo 1/2 runtime acceptance", () => {
     await page.getByTestId("task-session-history").locator("[data-testid=task-session]").first().getByRole("button", { name: /Run 2/ }).click();
     await expect.poll(() => requests.length).toBeGreaterThan(0);
     expect(requests.at(-1)).toContain("after=4");
-    await expect(page.getByTestId("task-ledger-pointer")).toContainText("当前任务 Run");
+    await expect(page.getByTestId("task-ledger-pointer")).toContainText("当前任务 · 版本 v2");
   });
 
   test("Adaptive workbench exposes canonical route facts and restores focus on Escape", async ({ page }) => {
@@ -5182,9 +5182,9 @@ test.describe("Demo 1/2 runtime acceptance", () => {
     const launch = page.getByRole("button", { name: "打开 Adaptive Swarm 工作台" });
     await launch.click();
     const workbench = page.getByTestId("adaptive-workbench");
-    await expect(workbench.getByRole("heading", { name: "Adaptive Swarm 工作台" })).toBeVisible();
+    await expect(workbench.getByRole("heading", { name: "协作方式详情" })).toBeVisible();
     if (process.env.CAPTURE_DR0056_EVIDENCE === "1") await workbench.screenshot({ path: "../../docs/evidence/screenshots/dr-0056-adaptive-swarm-workbench.png" });
-    await expect(workbench).toContainText("Tool Call");
+    await expect(workbench).toContainText("尚未有执行回执");
     await expect(workbench.locator(".adaptive-route-framework .is-active")).toHaveText("Adaptive Swarm");
     await expect(workbench.locator(".adaptive-source-list span")).toHaveCount(10);
     await expect(workbench.locator(".adaptive-branch-grid li")).toHaveCount(5);
@@ -5227,8 +5227,8 @@ test.describe("Demo 1/2 runtime acceptance", () => {
     const workbench = page.getByTestId("adaptive-workbench");
     await expect(workbench.locator(".adaptive-route-framework .is-active")).toHaveText("Fixed");
     await expect(workbench.locator(".adaptive-header-boundary")).toHaveText("本次未启动 Adaptive Swarm");
-    await expect(workbench).toContainText("本 Run 未执行 Tool Call");
-    await expect(workbench).toContainText("本次未启动 Worker");
+    await expect(workbench).toContainText("本次未启动协作执行");
+    await expect(workbench).toContainText("尚未有执行回执");
     await expect(workbench.locator(".adaptive-receipt-list")).toHaveCount(0);
   });
 
@@ -5356,8 +5356,8 @@ test.describe("Demo 1/2 runtime acceptance", () => {
     await page.getByRole("button", { name: "启动 Control Loop" }).click();
     await page.getByRole("button", { name: "Agent 路径" }).click();
     await page.getByRole("button", { name: "继续未完成任务" }).first().click();
-    await expect(page.locator('[data-testid="task-lineage"]')).toContainText("任务持续链 · Run 2");
-    await expect(page.locator('[data-testid="task-ledger-pointer"]')).toContainText("当前任务 Run · 任务版本 v2");
+    await expect(page.locator('[data-testid="task-lineage"]')).toContainText("持续处理链 · 第 2 次");
+    await expect(page.locator('[data-testid="task-ledger-pointer"]')).toContainText("当前任务 · 版本 v2");
     expect(state.continuationCalls).toBe(1);
     const body = await page.evaluate(() => ({ width: document.documentElement.clientWidth, scroll: document.documentElement.scrollWidth }));
     expect(body.scroll).toBeLessThanOrEqual(body.width);
@@ -5375,13 +5375,13 @@ test.describe("Demo 1/2 runtime acceptance", () => {
     await page.getByRole("button", { name: "启动 Control Loop" }).click();
     await page.getByRole("button", { name: "Agent 路径" }).click();
     await page.getByRole("button", { name: "继续未完成任务" }).first().click();
-    await expect(page.locator('[data-testid="task-lineage"]')).toContainText("任务持续链 · Run 1");
-    await expect(page.locator('[data-testid="task-ledger-history"]')).toContainText("历史 Run · 当前任务已进入 Run 2");
+    await expect(page.locator('[data-testid="task-lineage"]')).toContainText("持续处理链 · 第 1 次");
+    await expect(page.locator('[data-testid="task-ledger-history"]')).toContainText("历史记录 · 当前任务已进入第 2 次处理");
     await expect(page.locator("body")).toContainText("任务或运行状态已更新");
-    await expect(page.getByRole("button", { name: "打开当前 Run" })).toBeVisible();
-    await page.getByRole("button", { name: "打开当前 Run" }).click();
-    await expect(page.locator('[data-testid="task-lineage"]')).toContainText("任务持续链 · Run 2");
-    await expect(page.locator('[data-testid="task-ledger-pointer"]')).toContainText("当前任务 Run · 任务版本 v2");
+    await expect(page.getByRole("button", { name: "打开当前记录" })).toBeVisible();
+    await page.getByRole("button", { name: "打开当前记录" }).click();
+    await expect(page.locator('[data-testid="task-lineage"]')).toContainText("持续处理链 · 第 2 次");
+    await expect(page.locator('[data-testid="task-ledger-pointer"]')).toContainText("当前任务 · 版本 v2");
     expect(state.taskGets).toBeGreaterThanOrEqual(3);
   });
 
@@ -5392,10 +5392,10 @@ test.describe("Demo 1/2 runtime acceptance", () => {
     await page.getByRole("button", { name: "启动 Control Loop" }).click();
     await expect(page.getByRole("button", { name: "重试" })).toBeVisible();
     await page.getByRole("button", { name: "重试" }).click();
-    await expect(page.locator('[data-testid="task-ledger-pointer"]')).toContainText("当前任务 Run · 任务版本 v1");
+    await expect(page.locator('[data-testid="task-ledger-pointer"]')).toContainText("当前任务 · 版本 v1");
     await page.getByRole("button", { name: "Agent 路径" }).click();
     await page.getByRole("button", { name: "继续未完成任务" }).first().click();
-    await expect(page.locator('[data-testid="task-ledger-pointer"]')).toContainText("当前任务 Run · 任务版本 v2");
+    await expect(page.locator('[data-testid="task-ledger-pointer"]')).toContainText("当前任务 · 版本 v2");
     expect(state.taskGets).toBeGreaterThanOrEqual(2);
   });
 
@@ -5408,7 +5408,7 @@ test.describe("Demo 1/2 runtime acceptance", () => {
     await page.getByRole("button", { name: "继续未完成任务" }).first().click();
     await expect(page.getByRole("button", { name: "重试" })).toBeVisible();
     await page.getByRole("button", { name: "重试" }).click();
-    await expect(page.locator('[data-testid="task-ledger-pointer"]')).toContainText("当前任务 Run · 任务版本 v2");
+    await expect(page.locator('[data-testid="task-ledger-pointer"]')).toContainText("当前任务 · 版本 v2");
     expect(state.taskGets).toBeGreaterThanOrEqual(3);
   });
 });
