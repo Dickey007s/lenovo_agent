@@ -5228,7 +5228,7 @@ test.describe("Demo 1/2 runtime acceptance", () => {
     await page.getByRole("button", { name: "Agent 路径" }).click();
     await page.getByRole("button", { name: "打开 Adaptive Swarm 工作台" }).click();
     const workbench = page.getByTestId("adaptive-workbench");
-    await expect(workbench.locator(".adaptive-route-framework .is-active")).toHaveText("Fixed");
+    await expect(workbench.locator(".adaptive-route-framework .is-active")).toHaveText("固定流程");
     await expect(workbench.locator(".adaptive-header-boundary")).toHaveText("本次未启动 Adaptive Swarm");
     await expect(workbench).toContainText("本次未启动协作执行");
     await expect(workbench).toContainText("尚未有执行回执");
@@ -5276,6 +5276,12 @@ test.describe("Demo 1/2 runtime acceptance", () => {
     await expect(collaboration).toContainText("任务准入");
     await expect(collaboration.locator(".collaboration-route-options article")).toHaveCount(3);
     await expect(collaboration.locator(".collaboration-disclosure")).toHaveCount(3);
+    if (process.env.CAPTURE_CAPABILITY_SCREENSHOTS === "1") {
+      await collaboration.getByRole("button", { name: "确认并开始协作" }).click();
+      await expect(collaboration).toContainText("已汇合");
+      await page.setViewportSize({ width: 1440, height: 1100 });
+      await page.screenshot({ path: capabilityScreenshotPath("capability-desktop-adaptive-1440.png"), fullPage: true });
+    }
     await collaboration.locator(".collaboration-disclosure").first().locator("summary").click();
     await expect(collaboration.locator(".collaboration-package-list article")).toHaveCount(5);
     await expect(collaboration).toBeInViewport();
