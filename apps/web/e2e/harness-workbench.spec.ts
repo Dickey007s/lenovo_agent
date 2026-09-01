@@ -5299,11 +5299,30 @@ test.describe("Demo 1/2 runtime acceptance", () => {
     await expect(collaboration).toContainText("任务准入");
     await expect(collaboration.locator(".collaboration-route-options article")).toHaveCount(3);
     await expect(collaboration.locator(".collaboration-disclosure")).toHaveCount(3);
+    await expect(collaboration.locator(".adaptive-task-context")).toContainText("当前任务");
+    await expect(collaboration.locator(".adaptive-task-context")).toContainText("Run 1");
+    await expect(collaboration.locator(".adaptive-history-link")).toContainText("历史 Run（只读）");
+    const dag = collaboration.getByTestId("adaptive-workunit-dag");
+    await expect(dag.locator(".adaptive-dag-node")).toHaveCount(5);
+    await expect(dag.locator(".adaptive-dag-node").filter({ hasText: "产品上线 Gate" })).toContainText("根");
+    await expect(dag.locator(".adaptive-dag-node").filter({ hasText: "跨工作包优先级与影响核对" })).toContainText("依赖 1");
+    await expect(dag.locator("line")).toHaveCount(2);
+    await expect(collaboration.getByRole("complementary", { name: "当前影响" })).toContainText("前置工作包尚未完成");
+    await expect(collaboration.locator(".adaptive-result-bar")).toContainText("等待回执");
+    await page.setViewportSize({ width: 390, height: 844 });
+    await expect(dag.locator(".adaptive-dag-node").filter({ hasText: "依赖 1" })).toHaveCount(2);
+    const adaptiveMobileMetrics = await page.evaluate(() => ({ width: document.documentElement.clientWidth, scroll: document.documentElement.scrollWidth }));
+    expect(adaptiveMobileMetrics.scroll).toBeLessThanOrEqual(adaptiveMobileMetrics.width);
+    await page.setViewportSize({ width: 1440, height: 1100 });
     if (process.env.CAPTURE_CAPABILITY_SCREENSHOTS === "1") {
       await collaboration.getByRole("button", { name: "确认并开始协作" }).click();
       await expect(collaboration).toContainText("已汇合");
       await page.setViewportSize({ width: 1440, height: 1100 });
+      await page.evaluate(() => window.scrollTo(0, 0));
       await page.screenshot({ path: capabilityScreenshotPath("capability-desktop-adaptive-1440.png"), fullPage: true });
+      await page.setViewportSize({ width: 390, height: 844 });
+      await page.evaluate(() => window.scrollTo(0, 0));
+      await page.screenshot({ path: capabilityScreenshotPath("capability-mobile-adaptive-390.png"), fullPage: true });
     }
     await collaboration.locator(".collaboration-disclosure").first().locator("summary").click();
     await expect(collaboration.locator(".collaboration-package-list article")).toHaveCount(5);
@@ -5403,6 +5422,24 @@ test.describe("Demo 1/2 runtime acceptance", () => {
     await expect(summary).not.toContainText("状态待确认");
     await expect(summary).not.toContainText("服务端继续推进");
     await expect(summary).not.toContainText("当前没有待处理事项");
+  });
+
+  test("Agent capabilities route derives blocked downstream impact from Snapshot facts", async ({ page }) => {
+    await mockDemoRuntime(page, "demo2-partial");
+    await page.goto("/agent-capabilities");
+    await page.getByRole("textbox", { name: "任务指令" }).fill("核对存在来源歧义的工作包");
+    await page.getByRole("button", { name: "启动 Control Loop" }).click();
+    await page.getByTestId("agent-collaboration-tab").click();
+    const collaboration = page.getByTestId("collaboration-overview");
+    await collaboration.getByRole("button", { name: "确认并开始协作" }).click();
+    await expect(collaboration.getByTestId("adaptive-workunit-dag").locator(".adaptive-dag-node")).toHaveCount(5);
+    await expect(collaboration.getByRole("complementary", { name: "当前影响" })).toContainText("有事项牵连");
+    await expect(collaboration.getByRole("complementary", { name: "当前影响" })).toContainText("前置工作包尚未完成");
+    await expect(collaboration.getByRole("complementary", { name: "当前影响" })).toContainText("搜索 Agent 运行风险");
+    await page.setViewportSize({ width: 390, height: 844 });
+    await expect(collaboration.getByTestId("adaptive-workunit-dag")).toContainText("依赖 1");
+    const metrics = await page.evaluate(() => ({ width: document.documentElement.clientWidth, scroll: document.documentElement.scrollWidth }));
+    expect(metrics.scroll).toBeLessThanOrEqual(metrics.width);
   });
 
   test("Agent capabilities route exposes a real review entry without making history actionable", async ({ page }) => {
