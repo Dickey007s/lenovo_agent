@@ -1,4 +1,5 @@
 import { expect, test, type Page, type Route } from "@playwright/test";
+import path from "node:path";
 import tc04TestManifest from "../../../docs/evidence/manifests/tc04-public-test-manifest-20260828.json";
 import tc05FinanceReviewManifest from "../../../docs/evidence/manifests/tc05-public-finance-review-outcome-20260829.json";
 import tc06CandidateReviewManifest from "../../../docs/evidence/manifests/tc06-public-candidate-review-outcome-20260829.json";
@@ -28,6 +29,8 @@ type FileItem = {
   preview_kind: "table" | "document" | "pdf" | "text";
   preview_available: true;
 };
+
+const capabilityScreenshotPath = (name: string) => path.join(process.env.CAPABILITY_SCREENSHOT_DIR ?? path.resolve(process.cwd(), "..", ".."), name);
 
 const financeFolderId = "forte-folder-7af3b6e416d7";
 const financeH1File = fileItem("forte-81f51a0aa85b5c3c", financeFolderId, "2025往来明细-上半年.xlsx", "财务管理", "XLSX", "table");
@@ -5323,14 +5326,24 @@ test.describe("Demo 1/2 runtime acceptance", () => {
     await page.goto("/agent-capabilities");
     await page.getByRole("textbox", { name: "任务指令" }).fill("固定路线审查");
     await page.getByRole("button", { name: "启动 Control Loop" }).click();
+    if (process.env.CAPTURE_CAPABILITY_SCREENSHOTS === "1") {
+      await page.setViewportSize({ width: 1440, height: 1100 });
+      await page.screenshot({ path: capabilityScreenshotPath("capability-desktop-progress-1440.png"), fullPage: true });
+    }
     await page.getByTestId("agent-collaboration-tab").click();
     const workbench = page.getByTestId("collaboration-overview");
     await expect(workbench).toContainText("本次采用固定流程，Adaptive Swarm 未启动");
     await expect(workbench.locator(".collaboration-route-options article.is-selected")).toHaveCount(1);
     await expect(workbench.locator(".collaboration-disclosure").nth(2)).not.toHaveAttribute("open", "");
+    if (process.env.CAPTURE_CAPABILITY_SCREENSHOTS === "1") {
+      await page.screenshot({ path: capabilityScreenshotPath("capability-desktop-1440.png"), fullPage: true });
+    }
     await page.setViewportSize({ width: 390, height: 844 });
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
     expect(overflow).toBeLessThanOrEqual(0);
+    if (process.env.CAPTURE_CAPABILITY_SCREENSHOTS === "1") {
+      await page.screenshot({ path: capabilityScreenshotPath("capability-mobile-390.png"), fullPage: true });
+    }
   });
 
   test("Agent capabilities route exposes a real review entry without making history actionable", async ({ page }) => {
