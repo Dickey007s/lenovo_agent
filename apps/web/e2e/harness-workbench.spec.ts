@@ -5225,7 +5225,7 @@ test.describe("Demo 1/2 runtime acceptance", () => {
     await page.getByRole("button", { name: "Agent 路径" }).click();
     await page.getByRole("button", { name: "打开 Adaptive Swarm 工作台" }).click();
     const workbench = page.getByTestId("adaptive-workbench");
-    await expect(workbench.locator(".adaptive-route-framework .is-active")).toHaveText("Fixed Workflow");
+    await expect(workbench.locator(".adaptive-route-framework .is-active")).toHaveText("Fixed");
     await expect(workbench.locator(".adaptive-header-boundary")).toHaveText("本次未启动 Adaptive Swarm");
     await expect(workbench).toContainText("本 Run 未执行 Tool Call");
     await expect(workbench).toContainText("本次未启动 Worker");
