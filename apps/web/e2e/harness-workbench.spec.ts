@@ -5239,6 +5239,10 @@ test.describe("Demo 1/2 runtime acceptance", () => {
     await expect(surface.locator("#control-loop, #adaptive-swarm")).toHaveCount(2);
     await expect(surface.locator(".agent-capability-empty")).toHaveCount(2);
     await expect(capabilities.getByRole("link", { name: "返回工作现场" })).toHaveAttribute("href", "/");
+    await capabilities.locator(".agent-capability-nav a").nth(1).click();
+    await expect(page).toHaveURL(/#adaptive-swarm$/);
+    await expect(surface.getByTestId("adaptive-swarm-capability")).toBeVisible();
+    await expect(capabilities).not.toContainText("智能工作驾驶舱");
     await expect(capabilities.getByTestId("agent-capabilities-surface")).toContainText("不会填充演示拓扑或伪造 Worker 回执");
     await capabilities.getByRole("textbox", { name: "任务指令" }).fill("按组织维核对工作包");
     await capabilities.getByRole("button", { name: "启动 Control Loop" }).click();
@@ -5253,6 +5257,9 @@ test.describe("Demo 1/2 runtime acceptance", () => {
     const controlFacts = capabilities.getByTestId("agent-control-loop-capability");
     await expect(controlFacts.locator(".agent-capability-facts")).toContainText("Task pointer");
     await expect(controlFacts.locator(".loop-lineage-strip")).toContainText("任务持续链");
+    await controlFacts.getByRole("button", { name: "跳到 Adaptive Swarm" }).click();
+    await expect(page).toHaveURL(/#adaptive-swarm$/);
+    await expect(adaptive).toBeInViewport();
     if (process.env.CAPTURE_DR0057_EVIDENCE === "1") {
       await page.setViewportSize({ width: 1440, height: 1100 });
       await page.screenshot({ path: "../../docs/evidence/screenshots/dr-0057-agent-capabilities-desktop.png", fullPage: true });
@@ -5260,7 +5267,7 @@ test.describe("Demo 1/2 runtime acceptance", () => {
       await page.screenshot({ path: "../../docs/evidence/screenshots/dr-0057-agent-capabilities-390.png", fullPage: true });
     }
     await page.reload();
-    await expect(page).toHaveURL(/\/agent-capabilities$/);
+    await expect(page).toHaveURL(/\/agent-capabilities#adaptive-swarm$/);
     await expect(page.getByTestId("agent-control-loop-capability")).toBeVisible();
     await page.getByRole("link", { name: "返回工作现场" }).click();
     await expect(page).toHaveURL(/\/$/);

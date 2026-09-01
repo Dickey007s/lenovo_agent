@@ -4,9 +4,9 @@ export default function AgentCapabilitiesPage() {
   return (
     <main className="agent-capabilities-page" data-testid="agent-capabilities-page">
       <header className="agent-capabilities-header">
-        <div>
+        <div className="agent-capabilities-title">
           <a className="agent-capabilities-back" href="/">返回工作现场</a>
-          <span>Agent 能力</span>
+          <span className="agent-capabilities-kicker">Agent 能力</span>
           <h1>Agent 能力工作台</h1>
           <p>以同一份服务端 Snapshot 同时检视时间维执行事实与组织维编排事实。</p>
         </div>

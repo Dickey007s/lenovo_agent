@@ -5010,7 +5010,10 @@ function AgentCapabilitiesSurface({
 }) {
   const sessionTaskCount = new Set(sessionRuns.map((item) => item.task_id)).size;
   const isReadOnly = selectedRunCurrent !== true;
-  const scrollToAdaptive = () => document.getElementById("adaptive-swarm")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  const scrollToAdaptive = () => {
+    window.history.replaceState(null, "", "#adaptive-swarm");
+    document.getElementById("adaptive-swarm")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
   const status = connection === "offline" ? "服务离线" : connection === "reconnecting" ? "正在恢复" : connection === "live" ? "实时连接" : "资料可用";
   return <section className="agent-capabilities-surface" data-testid="agent-capabilities-surface">
     <header className="agent-capabilities-toolbar">
@@ -5024,7 +5027,7 @@ function AgentCapabilitiesSurface({
         <header><div><span>A · 时间维</span><h2 id="agent-control-loop-title">Agent Control Loop</h2><p>任务会话、Round、Branch、Evidence、Artifact 与控制事实。</p></div>{run && <small>{isReadOnly ? "历史只读" : "当前 Run"} · Run {run.run_sequence}</small>}</header>
         <div className="agent-capability-facts" aria-label="Control Loop 事实"><span>Task pointer <b>{taskPointer ? "已确认" : "待确认"}</b></span><span>Round <b>{run?.rounds.length ?? 0}</b></span><span>Branch <b>{run?.branches.length ?? 0}</b></span><span>Evidence <b>{run?.rounds.reduce((total, round) => total + round.evidence_gaps.length, 0) ?? 0} 个缺口</b></span><span>Artifact <b>{run?.artifact_versions.length ?? 0} 个版本</b></span><span>控制 <b>{run?.control_state ?? "未启动"}</b></span></div>
         <div className="agent-capability-task-input"><label htmlFor="agent-capability-instruction">任务指令</label><textarea id="agent-capability-instruction" value={instruction} disabled={Boolean(run && !isReadOnly && !TERMINAL_STATUSES.has(run.status))} onChange={(event) => setInstruction(event.target.value)} placeholder="输入要推进的任务" aria-label="任务指令" /><button type="button" onClick={() => void onStartTask(instruction)} disabled={starting || instruction.trim().length < 3 || Boolean(run && !isReadOnly && !TERMINAL_STATUSES.has(run.status))}><IconSend aria-hidden="true" />{starting ? "正在启动" : "启动 Control Loop"}</button></div>
-        {run ? <LoopView run={run} taskPointer={taskPointer} taskPointerError={taskPointerError} files={files} controlBusy={controlBusy} onControl={onControl} onReview={onReview} onStartTask={onStartTask} onContinueTask={onContinueTask} onOpenCurrentTask={onCurrentTask} onRetryTaskPointer={onRetryTaskPointer} onExecuteWorkers={onExecuteWorkers} onOpenAdaptiveWorkbench={scrollToAdaptive} readOnly={isReadOnly} starting={starting} /> : <div className="agent-capability-empty"><IconRoute aria-hidden="true" /><p>启动或从任务会话选择一个 Run 后，这里会显示服务端 Round / Branch / Evidence / Artifact 事实。</p></div>}
+        {run ? <LoopView run={run} taskPointer={taskPointer} taskPointerError={taskPointerError} files={files} controlBusy={controlBusy} onControl={onControl} onReview={onReview} onStartTask={onStartTask} onContinueTask={onContinueTask} onOpenCurrentTask={onCurrentTask} onRetryTaskPointer={onRetryTaskPointer} onExecuteWorkers={onExecuteWorkers} onOpenAdaptiveWorkbench={scrollToAdaptive} adaptiveActionLabel={run.topology_admission ? "跳到 Adaptive Swarm" : "查看 Adaptive Swarm 能力"} readOnly={isReadOnly} starting={starting} /> : <div className="agent-capability-empty"><IconRoute aria-hidden="true" /><p>启动或从任务会话选择一个 Run 后，这里会显示服务端 Round / Branch / Evidence / Artifact 事实。</p></div>}
       </section>
       <section id="adaptive-swarm" className="agent-capability-track agent-capability-track-adaptive" data-testid="adaptive-swarm-capability" aria-labelledby="adaptive-swarm-title">
         <header><div><span>B · 组织维</span><h2 id="adaptive-swarm-title">Adaptive Swarm</h2><p>Topology Admission、WorkUnit DAG、Worker 回执、Contribution Gate 与 v1/v2。</p></div>{run && <small>{isReadOnly ? "历史只读" : "当前 Run"} · Snapshot</small>}</header>
@@ -5050,6 +5053,7 @@ function LoopView({
   onRetryTaskPointer,
   onExecuteWorkers,
   onOpenAdaptiveWorkbench,
+  adaptiveActionLabel,
   readOnly,
   starting,
 }: {
@@ -5066,6 +5070,7 @@ function LoopView({
   onRetryTaskPointer: () => void;
   onExecuteWorkers: () => Promise<boolean>;
   onOpenAdaptiveWorkbench: () => void;
+  adaptiveActionLabel?: string;
   readOnly: boolean;
   starting: boolean;
 }) {
@@ -5212,7 +5217,7 @@ function LoopView({
           {run.worker_runs.length === 0 && <button type="button" className="is-secondary" onClick={() => void onControl("topology_override", { topologyMode: "single_controller" })} disabled={readOnly || starting || controlBusy !== null}><IconRoute aria-hidden="true" />改回单 Controller</button>}
         </div>
       </div>}
-      <button type="button" className="adaptive-workbench-launch" onClick={onOpenAdaptiveWorkbench}><IconRoute aria-hidden="true" />打开 Adaptive Swarm 工作台</button>
+      <button type="button" className="adaptive-workbench-launch" onClick={onOpenAdaptiveWorkbench}><IconRoute aria-hidden="true" />{adaptiveActionLabel ?? "打开 Adaptive Swarm 工作台"}</button>
       {run.worker_runs.length > 0 && <details className="loop-worker-details"><summary>查看本轮 Worker 回执</summary><div className="loop-worker-receipts"><span>实际执行回执</span>{run.worker_runs.map((worker) => <div key={worker.worker_run_id}><b>{worker.outcome === "adopted" ? "已合入" : worker.outcome === "failed" ? "执行失败" : "待处理"}</b><span>{worker.summary}<small>来源：{worker.source_file_refs.map(fileLabel).join("、") || "批准来源未显示"}</small></span><small>{worker.model_called ? "模型已调用" : "未调用"} · {worker.output_used ? "已采用" : "未采用"} · {worker.elapsed_ms} ms</small></div>)}</div></details>}
       {run.work_units.length > 0 && <details className="loop-worker-details"><summary>查看工作包与成果采用记录</summary><div className="loop-worker-ledger" data-testid="worker-ledger">
         <span>工作包与成果采用记录</span>
@@ -5235,7 +5240,7 @@ function LoopView({
       </div></details>}
       {readOnly && <p className="read-only-banner" role="status"><IconEye aria-hidden="true" />历史 Run 只读查看，不接收实时事件，也不会执行控制或启动 Worker。</p>}
     </section>}
-    {!run.topology_admission && <button type="button" className="adaptive-workbench-launch" onClick={onOpenAdaptiveWorkbench}><IconRoute aria-hidden="true" />查看协作路线</button>}
+    {!run.topology_admission && <button type="button" className="adaptive-workbench-launch" onClick={onOpenAdaptiveWorkbench}><IconRoute aria-hidden="true" />{adaptiveActionLabel ?? "查看协作路线"}</button>}
     {run.status === "failed" && <section className="loop-failure-recovery" role="alert">
       <header><IconAlertTriangle aria-hidden="true" /><div><span>这次运行已停下，但不是死路</span><h3>{failedAtSourceLocation ? "候选结论无法唯一定位到原文" : "本轮结果没有通过服务端校验"}</h3></div></header>
       <ol>
