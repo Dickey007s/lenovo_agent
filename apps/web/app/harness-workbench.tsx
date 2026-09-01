@@ -5028,6 +5028,12 @@ function AgentCapabilitiesSurface({
     window.history.replaceState(null, "", "#adaptive-swarm");
     window.requestAnimationFrame(() => document.getElementById("adaptive-swarm")?.scrollIntoView({ behavior: "smooth", block: "start" }));
   };
+  const moveTab = (direction: 1 | -1) => {
+    const next = activeTab === "progress" ? (direction > 0 ? "collaboration" : "progress") : (direction > 0 ? "progress" : "collaboration");
+    setActiveTab(next);
+    window.history.replaceState(null, "", next === "collaboration" ? "#adaptive-swarm" : window.location.pathname);
+    window.requestAnimationFrame(() => document.getElementById(next === "collaboration" ? "agent-collaboration-tab" : "agent-progress-tab")?.focus());
+  };
   const status = connection === "offline" ? "服务离线" : connection === "reconnecting" ? "正在恢复" : connection === "live" ? "实时连接" : "资料可用";
   const pendingDecisionRequests = run ? uniqueDecisionRequests([
     ...run.decision_requests,
@@ -5062,8 +5068,8 @@ function AgentCapabilitiesSurface({
     {sessionsOpen && <SessionHistory runs={sessionRuns} activeRunId={run?.run_id ?? null} loading={historyLoading} onRefresh={onRefreshSessions} onSelect={(snapshot) => onSelectSession(snapshot)} />}
     {selectedRunCurrent === false && run && <p className="read-only-banner" role="status"><IconEye aria-hidden="true" />历史 Run 只读查看，不接收实时事件，也不会执行控制、决策或启动新任务。</p>}
     <div className="agent-capability-tabs" role="tablist" aria-label="Agent 能力视图">
-      <button id="agent-progress-tab" type="button" role="tab" aria-selected={activeTab === "progress"} aria-controls="agent-progress-panel" data-testid="agent-progress-tab" onClick={() => { setActiveTab("progress"); window.history.replaceState(null, "", window.location.pathname); }}><IconRoute aria-hidden="true" /><span>执行进展</span><small>Task / Run / Round / 控制</small></button>
-      <button id="agent-collaboration-tab" type="button" role="tab" aria-selected={activeTab === "collaboration"} aria-controls="agent-collaboration-panel" data-testid="agent-collaboration-tab" onClick={() => { setActiveTab("collaboration"); window.history.replaceState(null, "", "#adaptive-swarm"); }}><IconGitCommit aria-hidden="true" /><span>协作方式</span><small>准入 / WorkUnit / Worker / Contribution</small></button>
+      <button id="agent-progress-tab" type="button" role="tab" tabIndex={activeTab === "progress" ? 0 : -1} aria-selected={activeTab === "progress"} aria-controls="agent-progress-panel" data-testid="agent-progress-tab" onKeyDown={(event) => { if (event.key === "ArrowRight" || event.key === "ArrowLeft") { event.preventDefault(); moveTab(event.key === "ArrowRight" ? 1 : -1); } }} onClick={() => { setActiveTab("progress"); window.history.replaceState(null, "", window.location.pathname); }}><IconRoute aria-hidden="true" /><span>执行进展</span><small>Task / Run / Round / 控制</small></button>
+      <button id="agent-collaboration-tab" type="button" role="tab" tabIndex={activeTab === "collaboration" ? 0 : -1} aria-selected={activeTab === "collaboration"} aria-controls="agent-collaboration-panel" data-testid="agent-collaboration-tab" onKeyDown={(event) => { if (event.key === "ArrowRight" || event.key === "ArrowLeft") { event.preventDefault(); moveTab(event.key === "ArrowRight" ? 1 : -1); } }} onClick={() => { setActiveTab("collaboration"); window.history.replaceState(null, "", "#adaptive-swarm"); }}><IconGitCommit aria-hidden="true" /><span>协作方式</span><small>准入 / WorkUnit / Worker / Contribution</small></button>
     </div>
     {activeTab === "progress" && <section id="agent-progress-panel" className="agent-capability-panel agent-capability-progress" role="tabpanel" data-testid="agent-control-loop-capability" aria-labelledby="agent-progress-tab">
       <header className="agent-capability-panel-header"><div><span>A · 时间维</span><h2>Agent Control Loop</h2><p>默认展示当前执行状态；完整轮次记录按需展开。</p></div>{run && <small>{isReadOnly ? "历史只读" : "当前 Run"} · Run {run.run_sequence}</small>}</header>
