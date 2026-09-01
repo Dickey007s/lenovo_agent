@@ -100,6 +100,17 @@ Artifact/Commit pointers and the current Workspace revision. Its first round is
 restricted to the selected Branch's missing or approved refs. Optional user text
 cannot widen that scope or replace the Branch objective.
 
+The header now exposes a bounded task-conversation drawer. It loads
+`GET /v1/harness/runs?limit=20`, preserves server order and groups only by
+`task_id`; neither instruction text nor `sessionStorage` defines a conversation.
+The number shown is the count of distinct Tasks discovered in those recent Runs,
+not an unlimited Task total. A list item is only an “open record” until Task GET
+confirms whether its Run is current. Switching first closes the previous
+EventSource and resets Run-scoped sequence state. Historical Runs are GET-only,
+while a confirmed current nonterminal Run reconnects SSE with
+`after=last_event_sequence`. Task GET failure does not guess from recency and
+leaves a visible retry/error state.
+
 The Task timeline appears in the same work area. It tells the user whether this
 is the first or a later Run, that the old result is preserved, and whether the
 Workspace revision changed. The browser also reads
@@ -128,6 +139,16 @@ objective and approved refs. The cockpit then shows actual called/adopted/elapse
 receipts. Anchored adopted findings enter a new normal ArtifactVersion/TaskCommit;
 failed, ambiguous or rejected contributions remain scoped receipts and leave only
 their Branch waiting. Completed dependencies can expose a later ready wave.
+
+The full organization projection is no longer forced into that narrow Loop
+surface. A full-screen “Adaptive Swarm 工作台” shows the actual route, the bounded
+Worker boundary, approved sources, a Supervisor-style Branch/WorkUnit dependency
+view, per-Worker called/adopted/elapsed receipt, immutable Contribution gate and
+ArtifactVersion v1/v2. Tool Call, Single Controller, Fixed Workflow and Adaptive
+Swarm form an explanatory route frame, but only the service-owned mode is
+highlighted. A non-adaptive Run explicitly says that no Worker started and never
+renders synthetic receipts. The workbench is a client projection over the same
+Snapshot and controls; it is not a new Demo API or distributed Swarm Runtime.
 
 Opening a Gap first shows an Agent-owned recovery sheet, not a request to edit a
 source file. `next_step.recovery_kind` distinguishes malformed analysis,

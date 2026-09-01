@@ -175,6 +175,13 @@ latest server update. It is Owner-scoped and exists so a browser without local
 session state can discover a recoverable nonterminal Run. The client must still
 GET the selected Run and reconnect SSE from its authoritative sequence.
 
+The current browser requests `limit=20` for a bounded task-conversation drawer
+and groups those returned Snapshots by `task_id`. This is not a Task-list or
+unlimited-history contract. Before labeling any opened record current, the
+browser calls `GET /v1/harness/tasks/{task_id}` and compares `current_run_id`;
+historical Runs are GET-only, while only a confirmed current nonterminal Run may
+open `/events?after=last_event_sequence`.
+
 ### 5.1 在同一 Task 下继续一条未完成 Branch
 
 ```http

@@ -376,6 +376,51 @@ PostgreSQL 17.11 的 Demo/Task 组合 `10 passed`；公共 Snapshot Owner 隔离
 contradictory 双重拒绝又分别通过定向回归。它仍不是 durable queue/lease、远端 Worker、
 真实 Provider 效果、通用 Tool Gateway、外部动作或用户研究证据。
 
+## 2026-09-01 前台分层：Demo 1 讲时间，Demo 2 讲组织
+
+用户这次指出的核心问题非常具体：虽然 Task lineage、TopologyAdmission、WorkUnit、Worker
+和 Contribution 都已经存在，但它们堆在一条长页面里，导致 Demo 1 和 Demo 2 都看不清。
+本轮因此没有再增加一种 Runtime，而是把同一份服务端事实拆成两个工作面。
+
+Demo 1 留在默认 Agent Control Loop。页面顶部新增“任务会话”，把 Owner 最近 20 个 Run
+按 `task_id` 分组：不同 Task 是不同会话，同一 Task 的 Run 1、Run 2 留在同一组。用户打开
+记录时，浏览器必须先用 Task current pointer 判断它是当前还是历史；历史 Run 可以查看
+Snapshot、证据、成果和轨迹，但不接 SSE，也不能发控制、决策或 Worker 命令。只有当前且
+非终态的 Run 才从自己的 `last_event_sequence` 恢复事件。这把“回看旧聊天”从浏览器缓存
+变成了服务端可核对的任务记录，同时明确当前只发现最近 20 个 Run，不伪装成无限 Task list。
+
+Demo 2 使用独立全屏“Adaptive Swarm 工作台”。工作台不是新的 Demo 接口，而是把当前
+Snapshot 中的 `topology_admission`、Branch/WorkUnit 依赖、批准来源、Worker
+`called/output_used/elapsed_ms`、Contribution Gate 和 ArtifactVersion v1/v2 放在一个
+组织视图里。顶部用 Tool Call、Single Controller、Fixed Workflow、Adaptive Swarm
+解释四条路线，但只高亮服务端实际路线；非 Adaptive Run 明确显示“本次未启动 Worker”，
+不画假的 Supervisor 或 Worker。Adaptive Run 第一眼同时显示“当前有限实现：受限只读
+Worker”，避免把最多每波三个进程内 Analyst 误解为分布式生产 Swarm。
+
+以“跨职能风险与待办简报”为例，用户输入仍是普通办公目标，不选择 Demo。服务端若根据
+十份批准来源形成三个独立根工作包和两个依赖工作包，工作台先显示 Supervisor 工作图和
+确认门；确认前没有 Worker 调用，确认后第一波分别核对产品上线、搜索 Agent 运行和用户
+交互。若搜索分支引用有歧义，Contribution 保持 waiting，只有依赖它的统一待办受阻；产品
+和交互贡献及已有 v1 保留。用户看到的不是五个 Agent 私聊，而是“谁做了什么、读了什么、
+返回是否采用、失败影响谁、当前成果是哪一版”。
+
+主流产品已经提供 thread、checkpoint、agent team、manager/worker 与共享 task list，
+因此这不是“竞品不能多 Agent”的结论。参考 [Introducing the Codex app](https://openai.com/index/introducing-the-codex-app/)、
+[LangGraph Persistence](https://docs.langchain.com/oss/python/langgraph/persistence)、
+[OpenAI Agents SDK orchestration](https://openai.github.io/openai-agents-python/multi_agent/)、
+[Anthropic multi-agent research system](https://www.anthropic.com/engineering/multi-agent-research-system)、
+[Claude Code agent teams](https://code.claude.com/docs/en/agent-teams) 与
+[OpenClaw Swarm](https://docs.openclaw.ai/tools/swarm)，本项目的差异假设是：办公用户应在
+同一条事实链里同时看到任务、批准来源、候选返回、服务端采用和成果版本，而不必进入每个
+Worker 私聊自行拼答案。[Microsoft HAI Guidelines](https://www.microsoft.com/en-us/research/publication/guidelines-for-human-ai-interaction/)
+支持及时说明状态、动作后果和纠错入口，但这些官方资料和工程截图仍不证明真实用户已经
+更快或更信任；该效果继续标为 `Draft`。
+
+决策、可直接试的两条输入、失败路径与浏览器门见
+[`DR-0056`](../decisions/DR-0056-demo1-loop-and-adaptive-swarm-workspaces.md)、
+[`SCENARIO-043`](../scenarios/SCENARIO-043-task-conversations-and-adaptive-swarm-workbench.md) 和
+[`分层工作面验收门`](../testing/DEMO1-DEMO2-SEPARATED-WORKSPACE-GATES-20260901.md)。
+
 ## 最新增补：从“用户先找文件”改为“Agent 找证据，人确认下一步”
 
 这次变化不是把 checkbox 换成搜索框，而是重新分配人和 Agent 的工作。旧流程要求用户先知道答案可能藏在哪些文件里，再把这些文件交给 Agent；这对小演示可控，却违背“大文件夹办公”的真实前提。当前流程把**目标表达权、过程监督权和下一步确认权**留给人，把**检索、证据缩小和跨文件关联**交给 Agent。

@@ -128,6 +128,19 @@ queue, lease, remote Worker runtime or multi-instance scheduler. The isolated
 PostgreSQL 17.11 Demo/Task combination passed 10 tests; full Python passed
 414 with 23 environment skips, and Playwright passed 68.
 
+[`DR-0056`](docs/decisions/DR-0056-demo1-loop-and-adaptive-swarm-workspaces.md)
+separates those two acceptance lenses in the frontstage without creating a
+Demo API. The root page now groups the Owner's recent Runs by `task_id` as task
+conversations; an opened Run is checked against the Task current pointer before
+it is marked current or historical. Historical Runs remain inspectable but do
+not receive SSE or expose controls. Demo 1 stays on the main Agent Control Loop
+surface. Demo 2 opens a full-screen Adaptive Swarm workbench that projects the
+actual TopologyAdmission, approved sources, Branch/WorkUnit dependencies,
+Worker receipts, Contribution gate and append-only Artifact versions. The
+workbench labels the current implementation as bounded, in-process and
+read-only; it is not a distributed Swarm, Task list service or proof of user
+benefit.
+
 ## Public data and preview boundary
 
 FORTE is pinned to commit
@@ -578,6 +591,10 @@ pnpm --dir apps/web exec playwright test e2e/harness-workbench.spec.ts
 - [可证伪竞争差异、八个同场挑战与前台影响研究](docs/research/COMPETITIVE-WHITE-SPACE-AND-FALSIFIABLE-DIFFERENTIATORS-20260826.md)
 - [可处置人工决策与失败恢复研究](docs/research/ACTIONABLE-HUMAN-DECISION-AND-FAILURE-RECOVERY-20260826.md)
 - [Demo 1/2 跨 Run 任务连续性、拓扑准入与交互影响研究](docs/research/DEMO1-DEMO2-DURABLE-TASK-AND-ADAPTIVE-ORCHESTRATION-RESEARCH-20260830.md)
+- [Demo 1/2 分层工作面与 Adaptive Swarm 前台研究](docs/research/DEMO1-DEMO2-SEPARATED-VIEWS-AND-ADAPTIVE-SWARM-UI-RESEARCH-20260901.md)
+- [DR-0056：Demo 1 Loop 与 Demo 2 Adaptive Swarm 分层工作面](docs/decisions/DR-0056-demo1-loop-and-adaptive-swarm-workspaces.md)
+- [SCENARIO-043：任务会话回看与 Adaptive Swarm 独立工作台](docs/scenarios/SCENARIO-043-task-conversations-and-adaptive-swarm-workbench.md)
+- [Demo 1 / Demo 2 分层工作面验收门](docs/testing/DEMO1-DEMO2-SEPARATED-WORKSPACE-GATES-20260901.md)
 - [来源台账](docs/decisions/SOURCE_REGISTER.md)
 - [DR-0054：独立 Task Ledger 与当前 Run 版本控制](docs/decisions/DR-0054-durable-task-ledger-and-current-run-cas.md)
 - [SCENARIO-040：两个页面同时续办时只有一个当前 Run](docs/scenarios/SCENARIO-040-task-current-run-cas-and-restart.md)

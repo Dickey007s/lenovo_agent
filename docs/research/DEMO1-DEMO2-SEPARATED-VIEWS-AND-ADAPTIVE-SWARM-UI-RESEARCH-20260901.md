@@ -72,7 +72,8 @@ team lead、teammate、共享 task list、依赖和直接会话，并明确该�
 选择器：
 
 - 每个 `task_id` 对应一个会话卡，卡片标题来自真实 `instruction` 摘要；
-- 同一 Task 的 Run 1、Run 2 等在会话内部展开，来源是 `GET /tasks/{task_id}` lineage；
+- 同一 Task 的 Run 1、Run 2 等按最近 Run 响应分组展开；打开记录后再用
+  `GET /tasks/{task_id}` 确认 current pointer，不把列表顺序当作权威；
 - 切换到历史 Run 后完整回看 Snapshot，但页面进入只读，不连接 SSE，也不允许控制；
 - 新指令创建新 Task/会话；续办一条分支创建同 Task 的 child Run；
 - 当前非终态 Run 才建立 SSE，避免历史页被新事件覆盖。

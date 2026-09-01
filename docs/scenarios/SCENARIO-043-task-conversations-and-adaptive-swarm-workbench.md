@@ -96,8 +96,8 @@ Topology/Worker 的完整台账不再挤占主页面；若本次存在协作路�
 ### 5.1 任务会话区
 
 - 会话标题：instruction 的安全摘要；
-- 状态：来自该 Task 当前 Run；
-- Run 数：来自 Task pointer `run_sequence/lineage`，不按浏览器缓存猜测；
+- 状态：每条记录来自其 Run Snapshot；只有打开后才用 Task pointer 标记 current/history；
+- Run 数：只统计最近 20 个 Run 响应中已经发现的同 Task 记录，不按浏览器缓存补齐；
 - 历史提示：最近 Run 发现范围受 `GET /runs?limit=20` 限制，不能显示“全部历史”；
 - 选择反馈：当前会话、当前 Run 与历史 Run 有明确区分。
 
@@ -148,7 +148,7 @@ Topology/Worker 的完整台账不再挤占主页面；若本次存在协作路�
 | 用户看到的内容 | 服务端事实 |
 | --- | --- |
 | 一条任务会话 | 相同 Owner 下相同 `task_id` 的 recent Run 集合 |
-| 会话内 Run 时间线 | Task pointer `current_run_id/run_sequence/lineage` |
+| 会话内 Run 时间线 | Owner 范围内 recent Runs 按 `task_id` 分组；Task pointer 只确认 current/history |
 | 历史只读 | 渲染 `run_id != current_run_id` |
 | 当前 Loop | Run Snapshot、rounds、branches、artifact_versions、events |
 | Adaptive 路线 | `topology_admission.mode/reasons/user_confirmation_required` |

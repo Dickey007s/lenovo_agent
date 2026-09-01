@@ -338,16 +338,25 @@ The root page keeps three independently meaningful regions:
 
 The UI shows business facts and recovery actions, not internal protocol. A
 citation is an interaction: it selects and opens the referenced file preview.
-The same cockpit now also shows a Task timeline, parent/child Run number, what a
-continuation preserves/rechecks, the service-owned topology reason, budget facts,
-an explicit Worker confirmation or conservative override, and actual per-Worker
-called/adopted/elapsed receipts. A child Run may restart version and SSE sequence
-at 1, so browser monotonicity applies only within the same `run_id`; the switch is
-accepted only after a valid child Snapshot arrives, leaving the parent recoverable
-when the request fails. Task GET supplies the current pointer and lineage; the UI
-labels current versus historical Run and offers a direct switch without rewriting
-the parent. Worker conversations and raw provider responses never
-become separate user-facing chat panes.
+The frontstage now separates two projections of the same Runtime. A recent-task
+drawer groups the Owner-scoped Run list by `task_id`; this is a bounded discovery
+view, not a browser-owned Task database. Opening an item first checks Task GET for
+the authoritative current pointer and then loads that Run Snapshot. A historical
+Run remains inspectable but is read-only and never receives SSE. Only the current
+nonterminal Run reconnects from its own `last_event_sequence`. A child Run may
+restart version and sequence at 1, so browser monotonicity applies only within one
+`run_id` and the previous transport is closed before a switch.
+
+The main surface keeps the Demo 1 time view: Task Contract, parent/child Run,
+rounds, Branch Evidence Gate, control and immutable result history. Full
+Topology/WorkUnit/Worker/Contribution detail opens in a separate full-screen
+Adaptive Swarm workbench for the Demo 2 organization view. That workbench is a
+projection of `topology_admission`, `branches[]`, `work_units[]`,
+`worker_runs[]`, `contributions[]` and `artifact_versions[]`; it does not create
+another scheduler or hard-coded Demo path. It always distinguishes the actual
+route from the four-route explanatory frame and labels the current Worker path as
+bounded, in-process and read-only. Worker conversations and raw provider responses
+never become separate user-facing chat panes.
 The Artifact area independently shows whether the model call happened, whether
 its output was adopted, whether a deterministic local effect passed, what file
 was written and which side effects did not occur. It never collapses these into

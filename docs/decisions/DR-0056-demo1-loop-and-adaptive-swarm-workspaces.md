@@ -51,9 +51,9 @@ Contribution 和 ArtifactVersion 全部放在一个纵向页面。虽然服务�
 
 - 会话身份严格等于 `task_id`，不是 instruction 文本、浏览器 tab 或时间戳；
 - `GET /v1/harness/runs?limit=20` 提供 Owner 范围内最近 Run，浏览器按 `task_id` 分组；
-- 每个组用最新 Run 的 instruction 摘要、当前状态和 `run_sequence` 显示一个会话卡；
-- 选中会话后，再以 `GET /v1/harness/tasks/{task_id}` 的 lineage 显示该 Task 最近最多
-  100 个 Run；点击某一 Run 必须 GET 它自己的公共 Snapshot；
+- 每个组用服务端最近列表中的 instruction 摘要、Run 数和 `run_sequence` 显示一个会话卡；
+- 首版会话时间线只展示最近 Run 列表中已经发现的记录；点击某一 Run 时先用
+  `GET /v1/harness/tasks/{task_id}` 确认 current pointer，再 GET 该 Run 的公共 Snapshot；
 - 前台明确“显示最近 20 个 Run 涉及的任务”，不能暗示拥有无限历史或 Task list API；
 - `sessionStorage` 只可记住最后打开的 Run，不得成为会话列表或状态权威。
 
@@ -132,7 +132,7 @@ Worker、WorkUnit、Contribution 区只显示真实空态，不能用演示图�
 | 前台状态 | 权威事实 | 用户可做 | 禁止暗示 |
 | --- | --- | --- | --- |
 | 任务会话卡 | Owner-scoped recent Run Snapshots，按 `task_id` 分组 | 打开某 Task 的最新/历史 Run | 无限历史、浏览器本地持久化、跨 Owner 可见 |
-| Run 时间线 | Task pointer `current_run_id/task_version/lineage` | 选择 Run、打开 current | 旧 Run 被重新启动、parent 被修改 |
+| Run 时间线 | recent Run 集合；打开后再以 Task pointer `current_run_id/task_version` 判定 current/history | 选择已发现的 Run、打开 current | 已显示无限 lineage、旧 Run 被重新启动、parent 被修改 |
 | 历史只读 | 渲染 Run 与 Task current pointer 不同 | 查看证据和成果 | 控制、SSE 或 Worker 调用仍作用于历史 |
 | Adaptive 摘要 | `topology_admission/work_units/contributions/artifact_versions` | 打开工作台 | 模型自己决定后已自动花费 |
 | 路线高亮 | `topology_admission.mode/reasons` | 查看原因、在允许时确认 Worker | 未实现路线已执行 |
