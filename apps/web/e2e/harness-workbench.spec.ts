@@ -1880,6 +1880,27 @@ function verifiedArtifactAuditPendingSnapshot(body: { workspace_id: string; inst
   };
 }
 
+function verifiedArtifactInProgressSnapshot(body: { workspace_id: string; instruction: string }) {
+  const base = verifiedArtifactAuditPendingSnapshot(body) as any;
+  return {
+    ...base,
+    status: "running",
+    control_state: "running",
+    decision_requests: [],
+    branches: base.branches.map((branch: any) => ({ ...branch, status: "running", missing_file_refs: [] })),
+    rounds: base.rounds.map((round: any) => ({
+      ...round,
+      status: "running",
+      phase: "analysis",
+      evidence_gaps: [],
+      next_step: { ...round.next_step, decision: "running", evidence_gaps: [], decision_requests: [] },
+    })),
+    events: [{ sequence: 12, event_name: "analysis_started", occurred_at: new Date().toISOString(), status: "running", message: "成果已生成，服务端继续核对来源。", details: {} }],
+    last_event_sequence: 12,
+    version: 13,
+  };
+}
+
 function verifiedFinanceArtifactAuditPendingSnapshot(body: { workspace_id: string; instruction: string }) {
   const base = verifiedArtifactAuditPendingSnapshot(body);
   const effect = verifiedEffectSnapshot(body);
@@ -2330,7 +2351,7 @@ function locationFailureSnapshot(body: { workspace_id: string; instruction: stri
 }
 async function fulfillJson(route: Route, body: unknown, status = 200) { await route.fulfill({ status, contentType: "application/json", body: JSON.stringify(body) }); }
 
-async function mockHarness(page: Page, options: { failFirstStart?: boolean; failDecisionDefer?: boolean; disconnect?: boolean; failed?: boolean; locationFailure?: boolean; sourceRecovery?: boolean; sourceRecoveryThreeCandidates?: boolean; verifiedArtifactAuditPending?: boolean; verifiedArtifactAuditPendingDistinct?: boolean; verifiedFinanceArtifactAuditPending?: boolean; unverifiedArtifactLocationPending?: boolean; terminalArtifactLocationPending?: boolean; boundedRecovery?: boolean; effectArtifact?: boolean; financePositiveCandidate?: boolean; financeVerifierFailed?: boolean; outboundEffect?: boolean; outboundEffectDynamic?: boolean; outboundEffectFailed?: boolean; reactEffect?: boolean; evaluationEffect?: boolean; dashboardEffect?: boolean; dashboardEffectFailed?: boolean; releaseEffect?: boolean; releaseEffectRepaired?: boolean; releaseEffectFailed?: boolean; candidateEffect?: boolean; candidateEffectImproved?: boolean; candidateEffectFailed?: boolean; customerEffect?: boolean; customerEffectThreshold?: boolean; customerEffectWitness?: boolean; customerEffectFailed?: boolean; sreEffect?: boolean; sreEffectDynamic?: boolean; sreEffectFailed?: boolean; uxEffect?: boolean; uxEffectThreshold?: boolean; uxEffectFailed?: boolean; uxNarrativeRejected?: boolean; uxNarrativePartial?: boolean; legalEffect?: boolean; legalEffectRepaired?: boolean; legalEffectFailed?: boolean; effectBoundary?: boolean; reviewTable?: boolean; workspaceFailures?: number; interactiveLoop?: boolean; evidenceGate?: boolean } = {}) {
+async function mockHarness(page: Page, options: { failFirstStart?: boolean; failDecisionDefer?: boolean; disconnect?: boolean; failed?: boolean; locationFailure?: boolean; sourceRecovery?: boolean; sourceRecoveryThreeCandidates?: boolean; verifiedArtifactAuditPending?: boolean; verifiedArtifactAuditPendingDistinct?: boolean; verifiedArtifactInProgress?: boolean; verifiedFinanceArtifactAuditPending?: boolean; unverifiedArtifactLocationPending?: boolean; terminalArtifactLocationPending?: boolean; boundedRecovery?: boolean; effectArtifact?: boolean; financePositiveCandidate?: boolean; financeVerifierFailed?: boolean; outboundEffect?: boolean; outboundEffectDynamic?: boolean; outboundEffectFailed?: boolean; reactEffect?: boolean; evaluationEffect?: boolean; dashboardEffect?: boolean; dashboardEffectFailed?: boolean; releaseEffect?: boolean; releaseEffectRepaired?: boolean; releaseEffectFailed?: boolean; candidateEffect?: boolean; candidateEffectImproved?: boolean; candidateEffectFailed?: boolean; customerEffect?: boolean; customerEffectThreshold?: boolean; customerEffectWitness?: boolean; customerEffectFailed?: boolean; sreEffect?: boolean; sreEffectDynamic?: boolean; sreEffectFailed?: boolean; uxEffect?: boolean; uxEffectThreshold?: boolean; uxEffectFailed?: boolean; uxNarrativeRejected?: boolean; uxNarrativePartial?: boolean; legalEffect?: boolean; legalEffectRepaired?: boolean; legalEffectFailed?: boolean; effectBoundary?: boolean; reviewTable?: boolean; workspaceFailures?: number; interactiveLoop?: boolean; evidenceGate?: boolean } = {}) {
   let workspaceCalls = 0; let startCalls = 0; let streamCalls = 0;
   let currentBody = { workspace_id: "forte-public-office", instruction: "" };
   // Mock snapshots intentionally cover several server state shapes in one route.
@@ -2383,6 +2404,8 @@ async function mockHarness(page: Page, options: { failFirstStart?: boolean; fail
           ? unverifiedArtifactLocationPendingSnapshot(body)
         : options.verifiedFinanceArtifactAuditPending
           ? verifiedFinanceArtifactAuditPendingSnapshot(body)
+      : options.verifiedArtifactInProgress
+        ? verifiedArtifactInProgressSnapshot(body)
       : options.verifiedArtifactAuditPending || options.verifiedArtifactAuditPendingDistinct
         ? verifiedArtifactAuditPendingSnapshot(body, options.verifiedArtifactAuditPendingDistinct)
         : options.reviewTable
@@ -2540,7 +2563,7 @@ async function mockHarness(page: Page, options: { failFirstStart?: boolean; fail
       streamCalls += 1; streams.push(url.toString());
       const after = Number(url.searchParams.get("after") ?? "0");
       const all = ["workspace_index", "round_started", "planning_started", "planning_completed", "plan_validation", "analysis_started", "analysis_completed", "result_validation", "evidence_gate", "round_started", "planning_started", "planning_completed", "analysis_started", "analysis_completed", "evidence_gate", options.failed ? "harness_failed" : "loop_committed"];
-      if (options.interactiveLoop || options.evidenceGate || options.sourceRecovery || options.verifiedArtifactAuditPending || options.verifiedArtifactAuditPendingDistinct || options.verifiedFinanceArtifactAuditPending || options.unverifiedArtifactLocationPending || options.terminalArtifactLocationPending || options.boundedRecovery) {
+      if (options.interactiveLoop || options.evidenceGate || options.sourceRecovery || options.verifiedArtifactAuditPending || options.verifiedArtifactAuditPendingDistinct || options.verifiedArtifactInProgress || options.verifiedFinanceArtifactAuditPending || options.unverifiedArtifactLocationPending || options.terminalArtifactLocationPending || options.boundedRecovery) {
         const sequence = Math.max(after + 1, currentSnapshot.last_event_sequence);
         const terminalEvent = currentSnapshot.status === "completed" ? "loop_committed" : currentSnapshot.status === "stopped" ? "loop_stopped" : currentSnapshot.status === "waiting_input" ? "evidence_gate" : "round_started";
         const body = `id: ${sequence}\nevent: ${terminalEvent}\ndata: ${JSON.stringify({ sequence, event_name: terminalEvent, occurred_at: new Date().toISOString(), message: "服务端状态已更新。" })}\n\n`;
@@ -2555,7 +2578,7 @@ async function mockHarness(page: Page, options: { failFirstStart?: boolean; fail
     }
     if (path.startsWith("/v1/harness/runs/")) {
       if (options.disconnect && streamCalls === 1) return fulfillJson(route, { ...snapshot(currentBody, "queued"), status: "indexing", last_event_sequence: 1, version: 2 });
-      if (options.interactiveLoop || options.evidenceGate || options.sourceRecovery || options.verifiedArtifactAuditPending || options.verifiedArtifactAuditPendingDistinct || options.verifiedFinanceArtifactAuditPending || options.unverifiedArtifactLocationPending || options.terminalArtifactLocationPending || options.boundedRecovery || options.locationFailure || options.effectArtifact || options.financePositiveCandidate || options.financeVerifierFailed || options.outboundEffect || options.outboundEffectDynamic || options.outboundEffectFailed || options.reactEffect || options.evaluationEffect || options.dashboardEffect || options.dashboardEffectFailed || options.releaseEffect || options.releaseEffectRepaired || options.releaseEffectFailed || options.candidateEffect || options.candidateEffectImproved || options.candidateEffectFailed || options.legalEffect || options.legalEffectRepaired || options.legalEffectFailed || options.effectBoundary) return fulfillJson(route, currentSnapshot);
+      if (options.interactiveLoop || options.evidenceGate || options.sourceRecovery || options.verifiedArtifactAuditPending || options.verifiedArtifactAuditPendingDistinct || options.verifiedArtifactInProgress || options.verifiedFinanceArtifactAuditPending || options.unverifiedArtifactLocationPending || options.terminalArtifactLocationPending || options.boundedRecovery || options.locationFailure || options.effectArtifact || options.financePositiveCandidate || options.financeVerifierFailed || options.outboundEffect || options.outboundEffectDynamic || options.outboundEffectFailed || options.reactEffect || options.evaluationEffect || options.dashboardEffect || options.dashboardEffectFailed || options.releaseEffect || options.releaseEffectRepaired || options.releaseEffectFailed || options.candidateEffect || options.candidateEffectImproved || options.candidateEffectFailed || options.legalEffect || options.legalEffectRepaired || options.legalEffectFailed || options.effectBoundary) return fulfillJson(route, currentSnapshot);
       currentSnapshot = snapshot(currentBody, options.failed ? "failed" : "completed");
       return fulfillJson(route, currentSnapshot);
     }
@@ -5350,6 +5373,36 @@ test.describe("Demo 1/2 runtime acceptance", () => {
     if (process.env.CAPTURE_CAPABILITY_SCREENSHOTS === "1") {
       await page.screenshot({ path: capabilityScreenshotPath("capability-mobile-390.png"), fullPage: true });
     }
+  });
+
+  test("Agent capabilities route distinguishes adaptive confirmation, progress, and completion", async ({ page }) => {
+    await mockDemoRuntime(page, "demo2");
+    await page.goto("/agent-capabilities");
+    await page.getByRole("textbox", { name: "任务指令" }).fill("按阶段确认协作路线");
+    await page.getByRole("button", { name: "启动 Control Loop" }).click();
+    await page.getByTestId("agent-collaboration-tab").click();
+    const collaboration = page.getByTestId("collaboration-overview");
+    const packageStage = collaboration.locator(".collaboration-stage-rail li").nth(1);
+    await expect(packageStage).toContainText("计划已拆解，等待确认");
+    await collaboration.getByRole("button", { name: "确认并开始协作" }).click();
+    await expect(packageStage).toContainText("正在处理");
+    await collaboration.getByRole("button", { name: "继续下一批" }).click();
+    await expect(collaboration.getByRole("status")).toContainText("协作已完成");
+    await expect(collaboration.getByRole("button", { name: "继续下一批" })).toHaveCount(0);
+    await expect(collaboration.locator(".collaboration-stage-rail li").nth(3)).toContainText("已形成");
+  });
+
+  test("Agent capabilities route labels a generated TC-01 artifact as checking in progress", async ({ page }) => {
+    await mockHarness(page, { verifiedArtifactInProgress: true });
+    await page.goto("/agent-capabilities");
+    await page.getByRole("textbox", { name: "任务指令" }).fill("核对已生成的入职资产成果");
+    await page.getByRole("button", { name: "启动 Control Loop" }).click();
+    const summary = page.getByTestId("agent-progress-summary");
+    await expect(summary).toContainText("核对进行中");
+    await expect(summary).toContainText("暂无需操作");
+    await expect(summary).not.toContainText("状态待确认");
+    await expect(summary).not.toContainText("服务端继续推进");
+    await expect(summary).not.toContainText("当前没有待处理事项");
   });
 
   test("Agent capabilities route exposes a real review entry without making history actionable", async ({ page }) => {

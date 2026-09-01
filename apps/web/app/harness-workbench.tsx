@@ -5059,6 +5059,7 @@ function AgentCapabilitiesSurface({
   const primaryDecision = decisionReviewItems[0] ?? null;
   const primaryDecisionDeferred = primaryDecision?.decisionRequest?.state === "deferred";
   const needsAttention = pendingDecisionRequests.length > 0;
+  const artifactChecking = Boolean(run && run.artifact_versions.length > 0 && ["queued", "indexing", "planning", "running", "analyzing"].includes(run.status) && !needsAttention && waitingBranches.length === 0);
   useEffect(() => {
     if (window.location.hash === "#adaptive-swarm") setActiveTab("collaboration");
   }, []);
@@ -5077,7 +5078,7 @@ function AgentCapabilitiesSurface({
       <header className="agent-capability-panel-header"><div><span>执行进展</span><h2>工作进展</h2><p>先看当前状态和主要待办，完整执行记录按需展开。</p>{run && <small className="agent-current-task">当前任务：{run.contract.goal}</small>}</div>{run && <small>{isReadOnly ? "历史只读" : "实时状态"}</small>}</header>
       {taskPointerError && <p className="agent-capabilities-error" role="alert"><IconAlertTriangle aria-hidden="true" />{taskPointerError}</p>}
       {!run && <div className="agent-capability-empty"><IconRoute aria-hidden="true" /><p>启动或从任务会话选择一个 Run 后，这里会显示服务端执行进展。</p></div>}
-      {run && <section className="agent-progress-summary" aria-label="执行进展摘要" data-testid="agent-progress-summary"><div><span>当前进展</span><strong>{statusLabel(run.status)}</strong><p>{run.current_round ? `已推进至第 ${run.current_round} 轮` : "服务端正在建立第一轮"} · {needsAttention ? "有事项需要你的处理" : waitingBranches.length ? "有分支等待服务端继续" : "服务端继续推进"}</p></div><div><span>主要待办</span>{primaryDecision ? <button type="button" className="agent-primary-review" onClick={() => !isReadOnly && onReview(primaryDecision)} disabled={isReadOnly}><strong>{primaryDecision.title}</strong><small>{primaryDecisionDeferred ? "已暂缓，仍可处理" : pendingDecisionRequests.length > 1 ? `还有 ${pendingDecisionRequests.length - 1} 项待处理` : "打开查看详情"}</small></button> : <strong>{waitingBranches.length ? `${waitingBranches.length} 个分支等待服务端继续` : "当前没有待处理事项"}</strong>}{waitingBranches.length > 0 && <ul className="agent-waiting-branches">{waitingBranches.slice(0, 3).map((branch) => <li key={branch.branch_id}>{branch.title}</li>)}</ul>}</div><div><span>执行结果</span><strong>{completedBranches} 个分支已完成</strong><p>{run.artifact_versions.length ? `当前成果第 ${run.artifact_versions.at(-1)?.version ?? 1} 版` : "尚无成果版本"}{waitingBranches.length ? ` · ${waitingBranches.length} 个分支等待处理` : ""}</p></div><button type="button" className="agent-progress-collaboration-link" onClick={openCollaboration}><IconGitCommit aria-hidden="true" />查看协作方式</button></section>}
+      {run && <section className="agent-progress-summary" aria-label="执行进展摘要" data-testid="agent-progress-summary"><div><span>当前进展</span><strong>{artifactChecking ? "核对进行中" : statusLabel(run.status)}</strong><p>{artifactChecking ? "成果已生成 · 服务端继续核对" : `${run.current_round ? `已推进至第 ${run.current_round} 轮` : "服务端正在建立第一轮"} · ${needsAttention ? "需要你处理" : waitingBranches.length ? "等待服务端继续" : "服务端继续推进"}`}</p></div><div><span>主要待办</span>{primaryDecision ? <button type="button" className="agent-primary-review" onClick={() => !isReadOnly && onReview(primaryDecision)} disabled={isReadOnly}><strong>{primaryDecision.title}</strong><small>{primaryDecisionDeferred ? "已暂缓，仍可处理" : pendingDecisionRequests.length > 1 ? `还有 ${pendingDecisionRequests.length - 1} 项待处理` : "打开查看详情"}</small></button> : <strong>{artifactChecking ? "暂无需操作" : waitingBranches.length ? `${waitingBranches.length} 个分支等待服务端继续` : "当前没有待处理事项"}</strong>}{waitingBranches.length > 0 && <ul className="agent-waiting-branches">{waitingBranches.slice(0, 3).map((branch) => <li key={branch.branch_id}>{branch.title}</li>)}</ul>}</div><div><span>执行结果</span><strong>{completedBranches} 个分支已完成</strong><p>{run.artifact_versions.length ? `当前成果第 ${run.artifact_versions.at(-1)?.version ?? 1} 版` : "尚无成果版本"}{waitingBranches.length ? ` · ${waitingBranches.length} 个分支等待处理` : ""}</p></div><button type="button" className="agent-progress-collaboration-link" onClick={openCollaboration}><IconGitCommit aria-hidden="true" />查看协作方式</button></section>}
       {!run && <div className="agent-capability-task-input"><label htmlFor="agent-capability-instruction">你想推进什么工作？</label><textarea id="agent-capability-instruction" value={instruction} onChange={(event) => setInstruction(event.target.value)} placeholder="输入要推进的工作" aria-label="任务指令" /><button type="button" aria-label="启动 Control Loop" onClick={() => void onStartTask(instruction)} disabled={starting || instruction.trim().length < 3}><IconSend aria-hidden="true" />{starting ? "正在启动" : "开始工作"}</button></div>}
       {run && <button type="button" className="agent-execution-details-toggle" aria-expanded={showExecutionDetails} onClick={() => setShowExecutionDetails((current) => !current)}><IconChevronDown aria-hidden="true" />{showExecutionDetails ? "收起完整执行记录" : "查看完整执行记录"}</button>}
       {run && showExecutionDetails && <div className="agent-execution-details" data-testid="agent-execution-details"><LoopView run={run} taskPointer={taskPointer} taskPointerError={taskPointerError} files={files} controlBusy={controlBusy} onControl={onControl} onReview={onReview} onStartTask={onStartTask} onContinueTask={onContinueTask} onOpenCurrentTask={onCurrentTask} onRetryTaskPointer={onRetryTaskPointer} onExecuteWorkers={onExecuteWorkers} onOpenAdaptiveWorkbench={openCollaboration} adaptiveActionLabel={run.topology_admission ? "跳到 Adaptive Swarm" : "查看 Adaptive Swarm 能力"} readOnly={isReadOnly} starting={starting} /></div>}
@@ -5115,10 +5116,27 @@ function CollaborationOverview({
   const stageClass = (condition: boolean, pending = false) => condition ? "is-complete" : pending ? "is-active" : "is-waiting";
   const packagesComplete = run.work_units.length > 0 && completed >= run.branches.length;
   const contributionsComplete = run.contributions.length > 0 && waiting === 0 && adopted >= run.contributions.length;
+  const adaptiveComplete = mode === "adaptive_readonly_workers"
+    && run.status === "completed"
+    && run.branches.length > 0
+    && run.branches.every((branch) => branch.status === "completed")
+    && run.contributions.length > 0
+    && run.contributions.every((contribution) => contribution.gate_status === "adopted")
+    && run.artifact_versions.length > 0;
+  const awaitingWorkerConfirmation = mode === "adaptive_readonly_workers" && run.work_units.length > 0 && run.worker_runs.length === 0 && run.contributions.length === 0 && run.status === "waiting_input";
+  const packageStatus = !run.work_units.length
+    ? "尚未形成工作包"
+    : packagesComplete
+      ? `${run.work_units.length} 个工作包 · 已完成`
+      : awaitingWorkerConfirmation
+        ? `${run.work_units.length} 个工作包 · 计划已拆解，等待确认`
+        : completed === 0
+          ? `${run.work_units.length} 个工作包 · 已拆解，正在处理`
+          : `${run.work_units.length} 个工作包 · 正在处理 · ${completed}/${run.branches.length} 已完成`;
   return <div className="collaboration-overview" data-testid="collaboration-overview">
     <header className="collaboration-overview-header">
       <div><span>本次协作编排</span><h3>{route}</h3><p>{mode === "fixed_workflow" || mode === "single_controller" ? "本次采用固定流程，Adaptive Swarm 未启动" : admission?.reasons?.at(-1) ?? "路线尚未由服务端确认。"}</p></div>
-      {mode === "adaptive_readonly_workers" && !readOnly && <button type="button" className="collaboration-primary-action" onClick={() => void onExecuteWorkers()} disabled={starting}><IconPlayerPlay aria-hidden="true" />{starting ? "正在启动" : run.worker_runs.length ? "继续下一批" : "确认并开始协作"}</button>}
+      {mode === "adaptive_readonly_workers" && !readOnly && (adaptiveComplete ? <span className="collaboration-complete-state" role="status"><IconCircleCheck aria-hidden="true" />协作已完成</span> : <button type="button" className="collaboration-primary-action" onClick={() => void onExecuteWorkers()} disabled={starting}><IconPlayerPlay aria-hidden="true" />{starting ? "正在启动" : run.worker_runs.length ? "继续下一批" : "确认并开始协作"}</button>)}
     </header>
     <div className="collaboration-route-options" aria-label="三种协作路线">
       <article className={mode === "single_controller" ? "is-selected" : ""}><span>01</span><div><b>单一流程</b><p>一个主控按顺序推进，适合依赖清晰的工作。</p></div></article>
@@ -5127,7 +5145,7 @@ function CollaborationOverview({
     </div>
     <ol className="collaboration-stage-rail" aria-label="协作处理阶段">
       <li className={stageClass(Boolean(admission), !admission)}><span>1</span><div><b>任务准入</b><small>{admission ? `已选 ${route}` : "等待服务端判断"}</small></div></li>
-      <li className={stageClass(packagesComplete, run.work_units.length > 0 && !packagesComplete)}><span>2</span><div><b>工作包</b><small>{run.work_units.length ? packagesComplete ? `${run.work_units.length} 个工作包 · 已完成` : completed === 0 ? `${run.work_units.length} 个工作包 · 已拆解，正在处理` : `${run.work_units.length} 个工作包 · ${completed}/${run.branches.length} 已完成` : "尚未形成工作包"}</small></div></li>
+      <li className={stageClass(packagesComplete, run.work_units.length > 0 && !packagesComplete)}><span>2</span><div><b>工作包</b><small>{packageStatus}</small></div></li>
       <li className={stageClass(contributionsComplete, run.contributions.length > 0 && !contributionsComplete)}><span>3</span><div><b>贡献汇合</b><small>{run.contributions.length ? `${adopted} 个已汇合 · ${waiting} 个待核对` : "等待服务端继续"}</small></div></li>
       <li className={stageClass(run.artifact_versions.length > 0)}><span>4</span><div><b>核验与成果</b><small>{run.artifact_versions.length ? `已形成 ${run.artifact_versions.length} 个成果版本` : "等待核验结果"}</small></div></li>
     </ol>

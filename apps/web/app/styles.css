@@ -1766,6 +1766,8 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, summary:focus
 .collaboration-overview-header p { max-width: 720px; margin: 0; color: var(--muted); font-size: 13px; line-height: 1.55; }
 .collaboration-primary-action { min-height: 40px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; flex: 0 0 auto; padding: 0 13px; border: 1px solid #165db4; border-radius: 4px; color: #fff; background: var(--blue); font-size: 14px; font-weight: 750; }
 .collaboration-primary-action svg { width: 16px; }
+.collaboration-complete-state { min-height: 40px; display: inline-flex; align-items: center; gap: 6px; padding: 0 12px; color: #176a46; background: #e8f5ee; font-size: 14px; font-weight: 750; }
+.collaboration-complete-state svg { width: 17px; }
 .collaboration-route-options { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
 .collaboration-route-options article { min-width: 0; display: grid; grid-template-columns: 30px minmax(0, 1fr); gap: 9px; padding: 12px; border: 1px solid #d9e0e7; background: #fff; }
 .collaboration-route-options article.is-selected { border-color: #83a8d4; box-shadow: inset 3px 0 var(--blue); background: #f3f8ff; }
