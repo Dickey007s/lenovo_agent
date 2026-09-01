@@ -1,6 +1,6 @@
 # 01_会回答不等于可交付
 
-这次汇报大部分内容沿用 07-16 的主线：未来办公 Agent 不是把聊天做得更长，而是让工作在持续、协作、治理和交付四个方向上收敛。右侧是当前系统真实 Workspace，15 个目录、96 份输入文件说明我们已经把抽象架构放进一个固定办公资料环境。今天新增的重点只有两个：第一，主流方案现在发展到哪里；第二，技术差异怎样具体改变用户动作和前台反馈。当前截图来自公开 FORTE 固定数据，不是企业生产环境，也不证明用户价值。
+这次汇报大部分内容沿用 07-16 的主线：未来办公 Agent 不是把聊天做得更长，而是让工作在持续、协作、治理和交付四个方向上收敛。右侧换成当前 Agent 能力页的真实运行截图；它把任务进展、协作方式和证据核对按需展开。15 个目录、96 份输入文件仍是这条能力链的固定办公资料环境。今天新增的重点只有两个：第一，主流方案现在发展到哪里；第二，技术差异怎样具体改变用户动作和前台反馈。当前截图来自公开 FORTE 固定数据，不是企业生产环境，也不证明用户价值。
 
 转场：先看 07-16 的三个 Demo 分工在当前版本里发生了什么变化。
 
@@ -8,11 +8,9 @@
 
 预期问题：这次相对 07-16 到底新增了什么，而不是换了一套说法？
 
----
-
 # 02_谁有资格成为当前结论
 
-07-16 把三个 Demo 分成时间连续性、复杂任务组织和动作风险。这个分工保留不变。当前版本真正补上的，是把每个 Demo 的进展落到 Workspace 范围、Branch 证据门、真实 Artifact 和未执行边界。对用户而言，界面不再只说 Agent 正在运行，而要说明为什么停、从哪里继续、谁在做、依赖什么、确认后会改变什么。这里的设计依据来自 Microsoft HAI Guidelines 对能力边界、上下文和纠正控制的要求，以及 ReAct 对环境反馈循环的启发。它们支持设计方向，不证明当前方案优于竞品。
+07-16 把三个 Demo 分成时间连续性、复杂任务组织和动作风险。这个分工保留不变。当前版本真正补上的，是把每个 Demo 的进展落到 Workspace 范围、Branch 证据门、WorkUnit 依赖、Contribution 采用、真实 Artifact 和未执行边界。Demo 2 已经不再只是目标框图：服务端能够给出真实 WorkUnit DAG，并以单进程、显式波次、每波最多三个只读 Worker 形成受控纵切；但它仍不是分布式 Swarm。对用户而言，界面不再只说 Agent 正在运行，而要说明为什么停、从哪里继续、谁依赖谁、哪一批需要确认、确认后会改变什么。这里的设计依据来自 Microsoft HAI Guidelines 对能力边界、上下文和纠正控制的要求，以及 ReAct 对环境反馈循环的启发。它们支持设计方向，不证明当前方案优于竞品。
 
 转场：下面回到 07-16 的核心架构，解释这些状态由谁负责。
 
@@ -20,13 +18,11 @@
 
 预期问题：为什么一定要拆成三个 Demo，而不是做一个大而全的 Agent？
 
----
-
 # 03_一个底座两层增强三类控制
 
 这一页先不要急着记英文名，只看三层关系。最下面的统一 Agent Runtime 是每个任务都要经过的底座，它稳定承接任务、状态、上下文、执行、能力、证据、策略和追踪。没有这层，Agent 仍然只是一次模型调用，任务中断以后不知道从哪里继续，也无法说明某个结论或动作来自哪一步。
 
-第一层增强是 Agent Control Loop。它只在任务需要多轮推进、等待补证或恢复时发挥价值。07-16 希望它解决时间维连续性；当前已经落地的是受限单 Loop、服务端 Branch、Evidence Gate、ArtifactVersion 和 Snapshot/SSE。第二层增强是 Governed Adaptive Swarm，它面向高价值、跨来源、可并行的复杂工作，目标是用 Admission、Supervisor、多 Worker、共享成果和 Resolver 处理组织维复杂性；这部分当前还没有通用实现。
+第一层增强是 Agent Control Loop。它只在任务需要多轮推进、等待补证或恢复时发挥价值。07-16 希望它解决时间维连续性；当前已经落地的是受限单 Loop、服务端 Branch、Evidence Gate、ArtifactVersion 和 Snapshot/SSE。第二层增强是 Governed Adaptive Swarm，它面向高价值、跨来源、可并行的复杂工作。当前已经形成最小受控纵切：Topology Admission、WorkUnit DAG、每波最多三个进程内只读 Worker、Contribution Gate 与统一 Artifact；但 durable queue、远端 Worker、通用 Resolver 和多实例调度仍是目标。
 
 左侧三类控制不是第三层业务能力，而是贯穿所有层的约束。Task Control 决定目标、预算、暂停与停止；Evidence Control 决定来源、冲突、验证和模型说明是否采用；Action Control 决定风险、审批、Permit 和执行回执。它们最终让前台只需要回答三件事：任务现在走到哪，当前结论凭什么成立，哪些动作真的发生了。
 
@@ -36,8 +32,6 @@
 
 预期问题：为什么不把所有任务都放进 Loop 或 Swarm？因为增强层有额外状态与协调成本，只有任务的时间跨度和组织复杂度值得时才应启用。
 
----
-
 # 04_八个稳定职责
 
 八个模块不是八个前台页面，而是一次任务从定范围到可恢复的四段责任链。
@@ -46,7 +40,7 @@
 
 第二段是“定计划”。Planner 可以提出分支、依赖和资料范围，但计划不能因为模型返回就直接运行。Admission、Policy Compiler & Plan Validator 还要校验预算、来源、依赖、工具和副作用。前台要回答的是“为什么这样拆、什么计划被拒绝或修复”。
 
-第三段是“推进执行”。Scheduler & Worker Manager 决定哪个分支先做、何时等待、何时恢复；Tool Gateway 应统一真实工具的授权、超时、幂等和回执。当前只有受限单 Controller 的纵切，通用 Worker 与 Tool Gateway 仍是目标。前台要回答的是“现在做到哪一步、哪个分支受影响、动作是否真的执行”。
+第三段是“推进执行”。Scheduler & Worker Manager 决定哪个分支先做、依赖谁、何时等待、何时恢复；当前已经支持服务端编译的 WorkUnit DAG、显式波次和每波最多三个进程内只读 Worker。Tool Gateway 仍应统一真实工具的授权、超时、幂等和回执，但当前没有通用实现。前台要回答的是“现在做到哪一步、谁依赖谁、哪个分支受影响、动作是否真的执行”。
 
 第四段是“成果恢复”。Artifact Workspace & Verifier 保存成果版本并执行当前固定场景的确定性检查；Checkpoint, Event & Governance Control 让 Snapshot 成为状态权威，SSE 只做有序投影，并提供可选 PostgreSQL 重启恢复子集。前台要回答的是“结果能否下载、核对、审计和恢复”。
 
@@ -58,8 +52,6 @@
 
 预期问题：八个模块会不会让前台更复杂？不会要求用户操作模块名，但必须把模块产生的关键状态翻译成业务语言。
 
----
-
 # 05_固定挑战现场
 
 这页把 07-16 的 P05 到 P09 合并成一条链。Prompt Engineering 关注一次指令与示例；ReAct 把工程对象扩展到 Action 和 Observation；Context Engineering 开始管理系统指令、工具、外部数据和历史；Harness Engineering 再把权限、沙箱和工具环境纳入系统；Loop Engineering 是我们对触发、验证、记录和恢复的方案归纳。最后一步是办公交付：业务成果、来源、人工决定和未执行边界都可复核。需要强调，这些阶段名不是学界统一年表，而是为了说明系统责任为什么不断外扩。
@@ -69,8 +61,6 @@
 证据/边界：https://arxiv.org/abs/2005.14165 ；https://arxiv.org/abs/2210.03629 ；https://www.anthropic.com/engineering/effective-context-engineering-for-ai-agents ；https://docs.langchain.com/oss/javascript/langgraph/persistence
 
 预期问题：Loop Engineering 是正式术语还是本方案的归纳？
-
----
 
 # 06_主流方案的交互对象
 
@@ -82,8 +72,6 @@ Microsoft 365 Copilot 让用户引用文件、邮件、会议和站点；ChatGPT
 
 预期问题：你们能否证明这些产品没有类似的业务治理能力？答案是不能，尚未同场实测。
 
----
-
 # 07_技术差异改变流程
 
 用户先说目标，服务端冻结完整允许范围，而不是要求用户提前猜文件；Planner 提议计划，服务端再校验预算、依赖、工具和禁止动作；模型被调用与模型输出被采用是两个事实；证据定位多义时只处理受影响 Branch；最后把 Artifact、说明和外部动作分层。于是前台每一步都能回答用户动作、反馈和后端事实。这个设计与 deep research 的来源控制、MCP Elicitation 的结构化补充请求、HAI Guidelines 的纠正与控制原则相互呼应，但当前实测仍局限于固定公开数据。
@@ -93,8 +81,6 @@ Microsoft 365 Copilot 让用户引用文件、邮件、会议和站点；ChatGPT
 证据/边界：https://help.openai.com/en/articles/10500283-deep-research ；https://modelcontextprotocol.io/specification/draft/client/elicitation ；https://www.microsoft.com/en-us/research/publication/guidelines-for-human-ai-interaction/
 
 预期问题：为什么不让模型自己判断哪些输出可信？
-
----
 
 # 08_长任务Loop风险
 
@@ -106,19 +92,15 @@ Microsoft 365 Copilot 让用户引用文件、邮件、会议和站点；ChatGPT
 
 预期问题：三轮预算是否足够？当前只能说它是固定上限，不是所有任务的合理预算。
 
----
-
 # 09_Agent_Control_Loop
 
 中心五段里，Observe 和 Plan 已有清晰纵切；Act 仍主要是只读分析和固定成果适配器；Verify 能做 Schema、引用定位和部分确定性成果检查；Commit 是 append-only 的逻辑 ArtifactVersion 与 TaskCommit。外围控制里，Task Contract、Evidence Gate 和 Trace 较完整，Budget、Steer/Pause、Durable State 是部分近似，Takeover 和通用执行仍缺。旧审计曾给出约 30% 的历史架构成熟度基线，但那不是当前覆盖率，更不是模型质量。现阶段最准确的说法是：有反馈与恢复的只读办公任务纵切。
 
 转场：下面不再讲抽象模块，直接看六个办公场景。
 
-证据/边界：https://docs.langchain.com/oss/javascript/langgraph/persistence ；https://openai.github.io/openai-agents-python/human_in_the_loop/ ；https://a2a-protocol.org/dev/specification/
+证据/边界：https://docs.langchain.com/oss/javascript/langgraph/persistence ；https://openai.github.io/openai-agents-python/human_in_the_loop/ ；https://a2a-protocol.org/v0.3.0/specification/
 
 预期问题：什么时候可以把它称为完整 Control Loop？
-
----
 
 # 10_六个办公场景
 
@@ -130,8 +112,6 @@ Microsoft 365 Copilot 让用户引用文件、邮件、会议和站点；ChatGPT
 
 预期问题：这些场景是不是为了 Demo 人工定制？答案是固定适配器范围内验证，尚未通用化。
 
----
-
 # 11_TC01入职资产
 
 用户输入的是根据时间表和规则生成 3 月 20 日到 4 月 20 日的资产匹配表。旧界面把已生成成果、引用定位缺口和 Loop 等待状态混在一起，用户自然会以为任务失败。实际上三件事可以同时成立：资产表通过文件检查；某段逐字 quote 在预览中出现多次，无法唯一定位；用户只需处理这一处审计问题。“缺一份引用”缺的是唯一可回开的定位，不是缺源文件，也不代表日期算错。当前前台把成果置顶、同源缺口合并，并说明补定位不影响现有成果。
@@ -141,8 +121,6 @@ Microsoft 365 Copilot 让用户引用文件、邮件、会议和站点；ChatGPT
 证据/边界：https://platform.claude.com/docs/en/build-with-claude/citations ；https://www.microsoft.com/en-us/research/publication/guidelines-for-human-ai-interaction/ ；左侧为用户反馈样本，非正式目标用户研究。
 
 预期问题：为什么服务端不能总是一次定位准确？因为当前主要依靠逐字 quote 与安全预览匹配，格式原生 Locator 仍需补齐。
-
----
 
 # 12_TC05三期往来款
 
@@ -154,8 +132,6 @@ Microsoft 365 Copilot 让用户引用文件、邮件、会议和站点；ChatGPT
 
 预期问题：0 条候选是否等于不存在僵尸账款？不等于，只表示这套固定启发式没有命中。
 
----
-
 # 13_高影响判断人工门
 
 招聘场景读取两份 JD 和五份简历，输出候选顺序、支持证据、缺失信息和复核项；材料冲突时进入待复核，系统不执行录用或淘汰。法务场景从六份授权文件抽取主体、期限和范围，形成规则台账与风险候选；不一致时不自动裁决，也不代表法律意见或签署动作。两边共同体现 HAI Guidelines 的原则：系统要说明能力边界、给出上下文、允许用户纠正，并在高影响决定中保留人的控制权。
@@ -165,8 +141,6 @@ Microsoft 365 Copilot 让用户引用文件、邮件、会议和站点；ChatGPT
 证据/边界：https://www.microsoft.com/en-us/research/publication/guidelines-for-human-ai-interaction/ ；自动化只验证固定成果，不验证公平性、法律适用性或业务效果。
 
 预期问题：候选建议是否可能放大偏见？可能，因此需要规则、证据、隐私与人工复核共同约束。
-
----
 
 # 14_方案不等于执行
 
@@ -178,8 +152,6 @@ TC-10 读取来源后生成流程图与 DOCX，这些文件和结构检查是真
 
 预期问题：未来接入 Connector 后如何防止重复动作？需要 Permit、版本、幂等和执行回执共同约束。
 
----
-
 # 15_TC15模型说明对账
 
 TC-15 的确定性成果覆盖 212 行、形成 87 组，P0 到 P4 为 25、40、14、6、2。真实模型调用却声称只看了 60 行，并改写 P0 优先级。如果前台同时展示两套说法，用户会看到假绿和重复待办。当前服务端把模型调用和采用拆开：模型仍是 called=true，但 output_used=false；回执为 contradictory、deterministic_outcome、rejected。两份通过检查的成果继续保留，冲突说明只进入审计轨迹。这个机制只验证固定场景的结构化事实一致性，不是通用真值判断。
@@ -190,8 +162,6 @@ TC-15 的确定性成果覆盖 212 行、形成 87 组，P0 到 P4 为 25、40�
 
 预期问题：一致就一定正确吗？不一定，一致只说明结构化事实没有冲突。
 
----
-
 # 16_前台交互五个问题
 
 业务用户首先要知道五件事：完成了什么、依据是什么、为什么停、确认后会改变什么、什么绝不会发生。首屏只放当前结论、成果、复核状态和未执行边界；展开层解释来源、校验、模型说明采用和局部决定；审计层再放 Snapshot、version、named SSE 和 DecisionRecord。这样技术事实没有消失，只是不抢占业务阅读顺序。现在的截图和现场反馈还不是正式用户研究。下一步要让目标用户无引导说出结果、来源、影响和下一步，并用 HEART 记录理解、负担与任务成功。
@@ -201,8 +171,6 @@ TC-15 的确定性成果覆盖 212 行、形成 87 组，P0 到 P4 为 25、40�
 证据/边界：https://www.microsoft.com/en-us/research/publication/guidelines-for-human-ai-interaction/ ；https://www.w3.org/WAI/WCAG21/Understanding/status-messages ；https://www.w3.org/WAI/WCAG21/Understanding/target-size ；https://research.google/pubs/measuring-the-user-experience-on-a-large-scale-user-centered-metrics-for-web-applications/
 
 预期问题：怎样证明界面真的更清晰？需要目标用户任务测试，不是更多截图。
-
----
 
 # 17_我们到底做了什么
 
@@ -220,8 +188,6 @@ TC-15 的确定性成果覆盖 212 行、形成 87 组，P0 到 P4 为 25、40�
 
 预期问题：这是不是一个为固定 Demo 写死的流程？当前确有固定成果适配器，但 Workspace、合同、分支、证据门、Snapshot 和 Trace 是通用运行时结构。
 
----
-
 # 18_实操1自主选择资料
 
 用户做的第一件事只有一个：写清业务目标。浏览器不会再要求用户先勾选文件，也不会提交客户端的 selected_file_refs。这样减少了一个“用户必须先知道答案在哪里”的前置负担。
@@ -237,8 +203,6 @@ TC-15 的确定性成果覆盖 212 行、形成 87 组，P0 到 P4 为 25、40�
 证据/边界：当前系统实测；全库范围、服务端 Planner 和前台 Trace 的显示均以本次 Snapshot 为准。
 
 预期问题：为什么不把全部 96 份文件都交给模型？因为服务端需要控制上下文、成本和来源范围，并保留每轮选择依据。
-
----
 
 # 19_实操2局部补证恢复
 
@@ -256,8 +220,6 @@ TC-15 的确定性成果覆盖 212 行、形成 87 组，P0 到 P4 为 25、40�
 
 预期问题：为什么还要人选位置？格式原生 Locator 尚未完全覆盖，当前保留可审计的人工决定比服务端猜一个位置更稳妥。
 
----
-
 # 20_实操3成果校验与说明拒绝
 
 左侧展示成果与业务效果分层。当前固定场景能够在隔离 Run 工作区生成真实文件，用户可以下载；系统还会执行具名确定性检查，并记录 EffectReceipt。与此同时，付款、核销、发送、写 CRM 等未发生动作会继续明确显示为未发生。
@@ -273,8 +235,6 @@ TC-15 的确定性成果覆盖 212 行、形成 87 组，P0 到 P4 为 25、40�
 证据/边界：当前系统实测；固定成果适配器与叙事对账覆盖既定场景，不外推到任意办公任务。
 
 预期问题：固定检查会不会把模型变得多余？不会，模型仍负责规划、跨资料归纳和提出候选；确定性检查负责约束可复算事实。
-
----
 
 # 21_Demo1时间维连续性
 
@@ -292,25 +252,23 @@ Demo 1 来自 07-16 的时间维连续性。目标不是让 Agent 永远运行�
 
 预期问题：现在已经支持手机和电脑控制同一生产任务吗？没有，当前证明的是服务端状态、分支与恢复机制，生产身份和跨端控制仍是目标。
 
----
-
 # 22_Demo2组织维复杂性
 
-Demo 2 保留 07-16 的智能工作驾驶舱。驾驶舱先聚合邮件、CRM、项目、报销和日历中的工作信号，生成今日重点，解释截止时间、客户等级和业务影响，并允许用户调整本次优先级。
+Demo 2 仍然保留 07-16 的智能工作驾驶舱作为目标产品面，但这一页不再只讲目标框图，而是先回答一个可以直接演示的输入、过程和输出。
 
-随后每项待办走成本合适的路径。简单查证用 Tool Call，独立草稿用 Single Agent，稳定重复任务用 Fixed Workflow，只有高价值、跨来源、可并行且预算可承受的任务才进入 Adaptive Swarm。Swarm Admission 通过后，Supervisor 根据覆盖度和依赖生成 Worker；Worker 围绕 Shared Artifact 协作；Verifier 检查事实和成果，Conflict Resolver 只在冲突时介入；最终统一结果、待确认项和 Trace 回到同一个驾驶舱。
+输入是一条复杂但只读的办公任务：分别核对产品上线、搜索 Agent 运行和用户交互三条工作线的风险与证据，先独立核对，再形成统一简报。用户不需要指定五个 Agent，也不需要自己分配会话。
 
-这一设计的交互价值不是“屏幕上出现更多 Agent”，而是用户只管理优先级、路由理由和统一成果，不需要在多个会话之间搬运上下文。系统还要解释为什么选择某条执行路径、Swarm 增加的质量或速度收益是否值得协调成本。
+过程由服务端事实决定。Topology Admission 编译出五个 WorkUnit，其中三个是根工作包，两个依赖前序结果。第一波返回后，三个 Contribution 分别进入采用门；只有带批准来源和可定位证据的候选才能进入 Artifact。两个依赖工作包显示“下一波待确认”，由用户明确启动，而不是后台无声扩张预算。
 
-当前产品没有通用多 Worker Runtime，也没有完整 Swarm Admission、Supervisor 和 Resolver。现状是单 Controller、服务端 Branch 与固定成果适配器。这一页明确保留 07-16 的目标产品形态，作为后续架构与用户研究方向，不写成现行能力。
+输出是一个统一工作面：左侧阶段轨回答现在走到哪，中央 DAG 回答谁依赖谁，右侧当前影响只突出唯一主要动作，底部结果条说明三份贡献已经采用、Artifact v1 已保留、还有两个工作包待确认。用户管理的是统一成果和下一步，不是多个 Agent 对话。
+
+边界必须讲清：这是单 API 进程、顺序波次、每波最多三个只读 Worker 的 controlled fixture。它不是 durable queue、远端 Worker、分布式 Swarm，也不是已经完成的智能工作驾驶舱；自动化和截图同样不能证明多 Worker 更快、更准或更易理解。
 
 转场：无论任务由单 Agent、Workflow 还是 Swarm 完成，只要下一步涉及真实发送、付款或生产变更，都要进入 Demo 3 的动作风险门。
 
-证据/边界：https://docs.openclaw.ai/multi-agent ；https://a2a-protocol.org/dev/specification/ ；https://modelcontextprotocol.io/specification/draft/client/elicitation
+证据/边界：https://docs.openclaw.ai/concepts/multi-agent ；https://a2a-protocol.org/v0.3.0/specification/ ；https://www.nngroup.com/articles/progressive-disclosure/
 
-预期问题：多 Agent 一定比单 Agent 好吗？不一定，只有增量收益高于协调、验证和成本开销时才应该启动。
-
----
+预期问题：多 Agent 一定比单 Agent 好吗？不一定，当前也没有效果证据；只有同任务、同模型、同来源和同预算下的增量收益高于协调与验证开销时，才应该启动 Adaptive 路线。
 
 # 23_Demo3动作维风险控制
 
@@ -328,14 +286,12 @@ Demo 3 保留 07-16 的 Risk Gate。Risk Lens 从动作影响、数据敏感度�
 
 预期问题：当前是不是已经具备 L0-L5 的生产执行能力？没有，L0-L5 是目标控制模型，当前只有固定成果和未执行边界的有限实现。
 
----
-
 # 24_下一阶段证据路线
 
-下一阶段仍然延续 07-16 的目标：让工作在约束下持续收敛，但结论必须经过五道证据门。先做 PDF、XLSX、DOCX 的格式原生 Locator；再让 Artifact、EffectReceipt、provenance 和未执行边界一起导出；随后把固定适配器扩展成可配置业务 Verifier；再引入 Worker、Tool、Connector、Permit 和幂等回执；最后冻结同一任务、模型和来源做竞品同场挑战，并开展目标用户研究。只有这些门通过，“差异候选”才可以升级为“已验证优势”。
+下一阶段仍然延续 07-16 的目标：让工作在约束下持续收敛，但结论必须经过五道证据门。先做 PDF、XLSX、DOCX 的格式原生 Locator；再让 Artifact、EffectReceipt、provenance 和未执行边界一起导出；随后把固定适配器扩展成可配置业务 Verifier；再把当前进程内 Worker 纵切升级为 durable queue/lease、远端 Worker 和多实例恢复，并接入 Tool、Connector、Permit 与幂等动作回执；最后冻结同一任务、模型、来源和预算做竞品同场挑战，并开展目标用户研究。只有这些门通过，“差异候选”才可以升级为“已验证优势”。
 
 转场：请评审决定的不是一句“看起来不错”，而是是否同意按这五道门继续生产证据。
 
-证据/边界：https://modelcontextprotocol.io/specification/draft/client/elicitation ；https://a2a-protocol.org/dev/specification/ ；https://www.w3.org/TR/prov-o/ ；https://www.microsoft.com/en-us/research/publication/guidelines-for-human-ai-interaction/ ；https://research.google/pubs/measuring-the-user-experience-on-a-large-scale-user-centered-metrics-for-web-applications/
+证据/边界：https://modelcontextprotocol.io/specification/draft/client/elicitation ；https://a2a-protocol.org/v0.3.0/specification/ ；https://www.w3.org/TR/prov-o/ ；https://www.microsoft.com/en-us/research/publication/guidelines-for-human-ai-interaction/ ；https://research.google/pubs/measuring-the-user-experience-on-a-large-scale-user-centered-metrics-for-web-applications/
 
 预期问题：当前可以对外承诺什么？只能承诺固定公开数据上的系统实测与明确边界，不承诺全面领先、生产 SLA 或用户价值。

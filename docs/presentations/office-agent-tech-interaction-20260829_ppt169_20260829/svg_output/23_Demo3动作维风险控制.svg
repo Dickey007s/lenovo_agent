@@ -4,7 +4,7 @@
     <path d="M52 112H1228" fill="none" stroke="#CBD5DF" stroke-width="2"/>
   </g>
   <g id="header">
-    <text x="52" y="78" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="46" font-weight="700" fill="#132A3A">Demo 3：动作维风险，方案与执行之间必须有 Gate</text>
+    <text x="52" y="78" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="44" font-weight="700" fill="#132A3A">Demo 3：动作维风险，方案与执行必须隔离</text>
     <rect x="1072" y="45" width="156" height="34" rx="6" fill="#EDF1F4"/>
     <text x="1150" y="68" text-anchor="middle" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#1769E0">07-16 目标演示</text>
     <text x="52" y="146" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#5A6B7C">生成建议、形成草稿和真实发送或付款是三种不同事实；风险越高，用户越需要在动作发生前看见影响。</text>

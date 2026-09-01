@@ -2,6 +2,6 @@
 
 转场：下面不再讲抽象模块，直接看六个办公场景。
 
-证据/边界：https://docs.langchain.com/oss/javascript/langgraph/persistence ；https://openai.github.io/openai-agents-python/human_in_the_loop/ ；https://a2a-protocol.org/dev/specification/
+证据/边界：https://docs.langchain.com/oss/javascript/langgraph/persistence ；https://openai.github.io/openai-agents-python/human_in_the_loop/ ；https://a2a-protocol.org/v0.3.0/specification/
 
 预期问题：什么时候可以把它称为完整 Control Loop？

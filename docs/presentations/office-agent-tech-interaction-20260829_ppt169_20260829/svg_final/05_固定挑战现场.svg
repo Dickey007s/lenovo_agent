@@ -42,7 +42,7 @@
     <text x="1110" y="410" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="17" font-weight="700" fill="#FFFFFF">用户可复核</text>
   </g>
   <g id="interaction-impact">
-    
+
   <g transform="translate(52, 520) scale(1.16667)" fill="none" stroke="#1769E0" stroke-width="2">
     <path d="M7 10h14l-4 -4" />
     <path d="M17 14h-14l4 4" />

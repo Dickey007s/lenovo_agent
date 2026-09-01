@@ -206,6 +206,9 @@ Catalog read: 71 templates
 | `scenario-effect-gate-desktop.png` | 1280×720 | 1.78 | 当前系统真实成果、确定性检查与 EffectReceipt 全景 | Screenshot | #48 Side-by-side comparison + #70 thin matte frame | user | Existing | 展示成果文件与验证回执分层 |  |  |
 | `dr-0034-mixed-branch-actions-desktop.png` | 761×361 | 2.11 | 不同 Branch 的补定位与继续动作 | Screenshot | #46 bordered lens + inset | user | Existing | 作为局部恢复页的小图，不冒充完整运行证明 |  |  |
 | `dr-0037-review-readability-desktop.png` | 1380×972 | 1.42 | 可读性改进后的证据复核页 | Screenshot | #19 Image floating in whitespace with thin frame and caption | user | Existing | 展示事实、影响、动作、原文位置与安全预览 |  |  |
+| `dr-0058-agent-capabilities-progress.png` | 1440×1100 | 1.31 | 最新 Agent 能力页默认任务进展 | Screenshot | #19 Image floating in whitespace with thin frame and caption | user | Existing | 封面使用完整截图，保留当前任务、待办与成果摘要 |  |  |
+| `dr-0058-adaptive-execution-workspace-1440.png` | 1440×1100 | 1.31 | Demo 2 受控 Adaptive 执行工作面 | Screenshot | #19 Image floating in whitespace with thin frame and caption + #46 bordered lens | user | Existing | 展示阶段轨、5 个 WorkUnit、真实依赖、下一波确认与 Artifact v1 |  |  |
+| `dr-0058-agent-capabilities-evidence-review.png` | 1440×1100 | 1.31 | 四层渐进披露中的原文核对页 | Screenshot | #19 Image floating in whitespace with thin frame and caption | user | Existing | 保留普通语言解释、安全预览与候选选择 |  |  |
 
 所有截图均为当前系统实测留痕，不作为外部研究来源。竞品与技术方向页只使用线上官方页面、论文与正式用户交互研究，不生成或伪造竞品运行截图。现场反馈截图只标为“用户反馈样本”，不冒充正式目标用户研究。
 
@@ -219,23 +222,23 @@ Catalog read: 71 templates
 
 - **Title**: 未来办公 Agent：从一次回答到可治理工作系统
 - **Subtitle**: 技术演进、主流方案、办公场景与前台交互影响
-- **Layout**: 左侧保留 07-16 的“持续 / 协作 / 治理 / 交付”主张，右侧使用当前 Workspace 实景。
+- **Layout**: 左侧保留 07-16 的“持续 / 协作 / 治理 / 交付”主张，右侧使用当前 Agent 能力页任务进展实景。
 
 #### Slide 02 - 这次改版带来的能力跃迁
 
 - **Title**: 从“回答与恢复”升级为“持续、协作、治理、交付”
-- **Core message**: 延续 07-16 的三段分工：Demo 1 管时间连续性，Demo 2 管复杂任务组织，Demo 3 管动作风险；当前版本把 Workspace、证据和真实成果补进这条链。
+- **Core message**: 延续 07-16 的三段分工：Demo 1 管时间连续性，Demo 2 管复杂任务组织，Demo 3 管动作风险；当前版本把 Workspace、WorkUnit、证据和真实成果补进这条链。
 - **Content**: 原 07-16 主张、当前真实纵切、尚未实现边界三层；不再放内部文档名作为来源。
 
 #### Slide 03 - 一个底座、两层增强、三类控制
 
 - **Visualization**: `layered_architecture`
-- **Content**: 用“什么时候启动、解决什么、用户看到什么”解释三层关系。统一 Agent Runtime 是所有任务共用的状态、执行、证据与审计底座；Agent Control Loop 解决时间维连续性；Governed Adaptive Swarm 解决组织维复杂性；Task / Evidence / Action Control 横切所有层。当前只实现受限单 Loop、固定成果适配器和部分恢复；多 Worker 与真实外部动作仍是目标。
+- **Content**: 用“什么时候启动、解决什么、用户看到什么”解释三层关系。统一 Agent Runtime 是所有任务共用的状态、执行、证据与审计底座；Agent Control Loop 解决时间维连续性；Governed Adaptive Swarm 解决组织维复杂性；Task / Evidence / Action Control 横切所有层。当前已有受限单 Loop、WorkUnit DAG、每波最多三个进程内只读 Worker、Contribution 采用台账和部分恢复；durable queue、远端 Worker、通用 Tool Gateway 与真实外部动作仍是目标。
 
 #### Slide 04 - 八个最小运行时模块
 
 - **Visualization**: `icon_grid`
-- **Content**: 不再堆八张并列卡片，而把八个模块整理成四段责任链：定范围（Workspace Catalog + Task Contract）、定计划（Planner + Policy Compiler/Validator）、推进与执行（Scheduler/Worker + Tool Gateway）、成果与恢复（Artifact/Verifier + Checkpoint/Event/Governance）。每段同时回答负责什么、用户看到什么、当前实现到哪里。
+- **Content**: 不再堆八张并列卡片，而把八个模块整理成四段责任链：定范围（Workspace Catalog + Task Contract）、定计划（Planner + Policy Compiler/Validator）、推进与执行（Scheduler/Worker + Tool Gateway）、成果与恢复（Artifact/Verifier + Checkpoint/Event/Governance）。推进阶段明确当前只有单进程、显式波次、每波最多三个只读 Worker，真实 Tool Gateway 仍是目标。每段同时回答负责什么、用户看到什么、当前实现到哪里。
 
 #### Slide 05 - 技术演进：工程对象不断外扩
 
@@ -324,7 +327,7 @@ Catalog read: 71 templates
 
 #### Slide 22 - Demo 2：组织维复杂性
 
-- **Content**: 恢复 07-16 P20 的智能工作驾驶舱主线：五类工作信号聚合 → 今日重点与用户调序 → Tool Call / Single Agent / Fixed Workflow / Adaptive Swarm 分流 → Admission、动态 Worker、共享工件、Verifier/Resolver → 结果回到驾驶舱。明确当前没有通用多 Worker Runtime。
+- **Content**: 保留 07-16 P20 的智能工作驾驶舱作为目标产品面，同时用当前真实界面回答输入、过程和输出：一个跨产品/算法/交互的只读核对任务 → Topology Admission 编译 5 个 WorkUnit、3 根与 2 依赖分两波推进 → 3/3 Contribution 采用、Artifact v1 保留、两个下一波工作包等待用户确认。明确当前只是单 API 进程、每波最多三个只读 Worker 的受控纵切，不是分布式 Swarm 或完整驾驶舱。
 
 #### Slide 23 - Demo 3：动作维风险控制
 
@@ -335,7 +338,7 @@ Catalog read: 71 templates
 #### Slide 24 - 下一阶段：把 07-16 方向变成可证伪证据
 
 - **Visualization**: `chevron_chain_with_tail`
-- **Content**: 原生 Locator → 携证成果包 → 通用业务 Verifier → Worker/Tool/Connector → 固定配置竞品挑战与目标用户研究；只有同场任务和用户研究通过后，差异候选才能升级为已验证优势。
+- **Content**: 原生 Locator → 携证成果包 → 通用业务 Verifier → durable queue/lease、远端 Worker、Tool/Connector/Permit → 固定配置竞品挑战与目标用户研究；只有同场任务和用户研究通过后，差异候选才能升级为已验证优势。
 
 ---
 

@@ -30,7 +30,7 @@
   <g id="frontstage-response">
     <path fill="#132A3A" d="M830,154 H1222 A6,6 0 0 1 1228,160 V578 A6,6 0 0 1 1222,584 H830 A6,6 0 0 1 824,578 V160 A6,6 0 0 1 830,154 Z" />
     <text x="852" y="196" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="28" font-weight="700" fill="#FFFFFF">前台必须对应回答</text>
-    
+
   <g transform="translate(852, 232)" fill="none" stroke="#FFFFFF" stroke-width="2">
     <path d="M11 12a1 1 0 1 0 2 0a1 1 0 1 0 -2 0" />
     <path d="M12 7a5 5 0 1 0 5 5" />
@@ -38,7 +38,7 @@
     <path d="M15 6v3h3l3 -3h-3v-3l-3 3" />
     <path d="M15 9l-3 3" />
   </g><text x="892" y="250" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#CBD5DF">当前目标是否仍然一致</text>
-    
+
   <g transform="translate(852, 282)" fill="none" stroke="#FFFFFF" stroke-width="2">
     <path d="M14 3v4a1 1 0 0 0 1 1h4" />
     <path d="M17 21h-10a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2" />
@@ -46,20 +46,20 @@
     <path d="M9 13l6 0" />
     <path d="M9 17l6 0" />
   </g><text x="892" y="300" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#CBD5DF">当前用了哪一版来源</text>
-    
+
   <g transform="translate(852, 332)" fill="none" stroke="#FFFFFF" stroke-width="2">
     <path d="M3 13a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v6a1 1 0 0 1 -1 1h-4a1 1 0 0 1 -1 -1l0 -6" />
     <path d="M15 9a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v10a1 1 0 0 1 -1 1h-4a1 1 0 0 1 -1 -1l0 -10" />
     <path d="M9 5a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v14a1 1 0 0 1 -1 1h-4a1 1 0 0 1 -1 -1l0 -14" />
     <path d="M4 20h14" />
   </g><text x="892" y="350" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#CBD5DF">还剩多少轮次与调用预算</text>
-    
+
   <g transform="translate(852, 382)" fill="none" stroke="#FFFFFF" stroke-width="2">
     <path d="M5 13a2 2 0 0 1 2 -2h10a2 2 0 0 1 2 2v6a2 2 0 0 1 -2 2h-10a2 2 0 0 1 -2 -2v-6" />
     <path d="M11 16a1 1 0 1 0 2 0a1 1 0 0 0 -2 0" />
     <path d="M8 11v-4a4 4 0 1 1 8 0v4" />
   </g><text x="892" y="400" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#CBD5DF">允许与禁止的动作范围</text>
-    
+
   <g transform="translate(852, 432)" fill="none" stroke="#FFFFFF" stroke-width="2">
     <path d="M5 18a2 2 0 1 0 4 0a2 2 0 1 0 -4 0" />
     <path d="M5 6a2 2 0 1 0 4 0a2 2 0 1 0 -4 0" />
@@ -68,7 +68,7 @@
     <path d="M9 18h6a2 2 0 0 0 2 -2v-5" />
     <path d="M14 14l3 -3l3 3" />
   </g><text x="892" y="450" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#CBD5DF">哪条 Branch 受影响</text>
-    
+
   <g transform="translate(852, 482)" fill="none" stroke="#FFFFFF" stroke-width="2">
     <path d="M6 6a1 1 0 0 1 1 -1h2a1 1 0 0 1 1 1v12a1 1 0 0 1 -1 1h-2a1 1 0 0 1 -1 -1l0 -12" />
     <path d="M14 6a1 1 0 0 1 1 -1h2a1 1 0 0 1 1 1v12a1 1 0 0 1 -1 1h-2a1 1 0 0 1 -1 -1l0 -12" />
@@ -77,7 +77,7 @@
     <text x="1024" y="553" text-anchor="middle" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="17" font-weight="700" fill="#FFFFFF">控制信息必须来自服务端事实</text>
   </g>
   <g id="current-boundary">
-    
+
   <g transform="translate(52, 614) scale(0.916667)" fill="none" stroke="#D97706" stroke-width="2">
     <path d="M12 9v4" />
     <path d="M10.363 3.591l-8.106 13.534a1.914 1.914 0 0 0 1.636 2.871h16.214a1.914 1.914 0 0 0 1.636 -2.87l-8.106 -13.536a1.914 1.914 0 0 0 -3.274 0" />

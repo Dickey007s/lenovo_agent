@@ -7,7 +7,7 @@
   <g id="input-periods">
     <text x="52" y="154" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="28" font-weight="700" fill="#132A3A">输入：三个期间</text>
     <path fill="#FFFFFF" stroke="#CBD5DF" stroke-width="2" d="M58,180 H306 A6,6 0 0 1 312,186 V248 A6,6 0 0 1 306,254 H58 A6,6 0 0 1 52,248 V186 A6,6 0 0 1 58,180 Z" />
-    
+
   <g transform="translate(72, 201) scale(1.16667)" fill="none" stroke="#1769E0" stroke-width="2">
     <path d="M14 3v4a1 1 0 0 0 1 1h4" />
     <path d="M17 21h-10a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2" />
@@ -16,7 +16,7 @@
     <path d="M11 11v7" />
   </g><text x="114" y="225" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="17" font-weight="700" fill="#132A3A">2025 上半年明细</text>
     <path fill="#FFFFFF" stroke="#CBD5DF" stroke-width="2" d="M338,180 H586 A6,6 0 0 1 592,186 V248 A6,6 0 0 1 586,254 H338 A6,6 0 0 1 332,248 V186 A6,6 0 0 1 338,180 Z" />
-    
+
   <g transform="translate(352, 201) scale(1.16667)" fill="none" stroke="#1769E0" stroke-width="2">
     <path d="M14 3v4a1 1 0 0 0 1 1h4" />
     <path d="M17 21h-10a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2" />
@@ -25,7 +25,7 @@
     <path d="M11 11v7" />
   </g><text x="394" y="225" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="17" font-weight="700" fill="#132A3A">2025 下半年明细</text>
     <path fill="#FFFFFF" stroke="#CBD5DF" stroke-width="2" d="M618,180 H866 A6,6 0 0 1 872,186 V248 A6,6 0 0 1 866,254 H618 A6,6 0 0 1 612,248 V186 A6,6 0 0 1 618,180 Z" />
-    
+
   <g transform="translate(632, 201) scale(1.16667)" fill="none" stroke="#1769E0" stroke-width="2">
     <path d="M14 3v4a1 1 0 0 0 1 1h4" />
     <path d="M17 21h-10a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2" />
@@ -38,7 +38,7 @@
   </g>
   <g id="artifacts">
     <path fill="#FFFFFF" stroke="#1769E0" stroke-width="2" d="M58,304 H406 A6,6 0 0 1 412,310 V530 A6,6 0 0 1 406,536 H58 A6,6 0 0 1 52,530 V310 A6,6 0 0 1 58,304 Z" />
-    
+
   <g transform="translate(76, 328) scale(1.33333)" fill="none" stroke="#1769E0" stroke-width="2">
     <path d="M14 3v4a1 1 0 0 0 1 1h4" />
     <path d="M17 21h-10a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2" />
@@ -53,7 +53,7 @@
     <text x="140" y="490" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#5A6B7C">条 · 当前固定来源</text>
 
     <path fill="#FFFFFF" stroke="#1769E0" stroke-width="2" d="M442,304 H790 A6,6 0 0 1 796,310 V530 A6,6 0 0 1 790,536 H442 A6,6 0 0 1 436,530 V310 A6,6 0 0 1 442,304 Z" />
-    
+
   <g transform="translate(460, 328) scale(1.33333)" fill="none" stroke="#1769E0" stroke-width="2">
     <path d="M14 3v4a1 1 0 0 0 1 1h4" />
     <path d="M17 21h-10a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2" />
@@ -68,7 +68,7 @@
     <text x="504" y="490" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#5A6B7C">条 · 当前固定来源</text>
 
     <path fill="#FFFFFF" stroke="#D97706" stroke-width="2" d="M826,304 H1222 A6,6 0 0 1 1228,310 V530 A6,6 0 0 1 1222,536 H826 A6,6 0 0 1 820,530 V310 A6,6 0 0 1 826,304 Z" />
-    
+
   <g transform="translate(844, 328) scale(1.33333)" fill="none" stroke="#D97706" stroke-width="2">
     <path d="M14 3v4a1 1 0 0 0 1 1h4" />
     <path d="M17 21h-10a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2" />

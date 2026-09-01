@@ -22,8 +22,8 @@
 
     <path d="M698 206H880L910 326L880 446H698L728 326Z" fill="#FFFFFF" stroke="#D97706" stroke-width="2" />
     <text x="738" y="252" font-family="Consolas, &quot;Courier New&quot;, monospace" font-size="17" font-weight="700" fill="#B54708">04</text>
-    <text x="738" y="292" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="24" font-weight="700" fill="#132A3A">执行能力</text>
-    <text x="738" y="330" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#5A6B7C">Worker / Tool</text><text x="738" y="358" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#5A6B7C">Connector / Permit</text><text x="738" y="386" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#5A6B7C">幂等与动作回执</text>
+    <text x="738" y="292" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="24" font-weight="700" fill="#132A3A">调度与动作</text>
+    <text x="718" y="330" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="15" fill="#5A6B7C">queue / lease / Worker</text><text x="718" y="358" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="13" fill="#5A6B7C">Tool / Connector / Permit</text><text x="718" y="386" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#5A6B7C">幂等回执</text>
 
     <path d="M910 206H1088L1118 326L1088 446H910L940 326Z" fill="#EDF1F4" stroke="#D97706" stroke-width="2" />
     <text x="950" y="252" font-family="Consolas, &quot;Courier New&quot;, monospace" font-size="17" font-weight="700" fill="#B54708">05</text>

@@ -96,10 +96,11 @@
     <path d="M20 9l-3.5 3.5" />
   </g>
     <text x="246" y="480" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="17" font-weight="700" fill="#132A3A">Tool Gateway</text>
-    <text x="716" y="440" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#1B2733">决定哪个分支先做、谁来做、何时停；</text>
-    <text x="716" y="466" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#1B2733">真实工具动作需许可、幂等与回执。</text>
+    <text x="716" y="440" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#1B2733">决定分支顺序、依赖、谁来做；</text>
+    <text x="716" y="466" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#1B2733">当前支持显式波次与受限只读 Worker。</text>
     <text x="1010" y="440" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="17" font-weight="700" fill="#132A3A">“现在做到哪一步？”</text>
-    <text x="1010" y="468" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="14" fill="#5A6B7C">当前仅受限单 Loop；通用 Tool 为目标</text>
+    <text x="1010" y="466" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="14" fill="#5A6B7C">当前：单进程，每波最多 3 个</text>
+    <text x="1010" y="486" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="14" fill="#5A6B7C">Tool Gateway 仍是目标</text>
   </g>
 
   <g id="artifact-stage">

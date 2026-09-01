@@ -55,10 +55,11 @@
     <path d="M9 18h6a2 2 0 0 0 2 -2v-5" />
     <path d="M14 14l3 -3l3 3" />
   </g>
-    <text x="418" y="252" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="24" font-weight="700" fill="#132A3A">增强 2：Governed Adaptive Swarm</text>
-    <text x="376" y="282" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#5A6B7C">高价值并行任务：Admission → Supervisor → 多 Worker → Resolver</text>
-    <path fill="#EDF1F4" d="M805,224 H869 A5,5 0 0 1 874,229 V245 A5,5 0 0 1 869,250 H805 A5,5 0 0 1 800,245 V229 A5,5 0 0 1 805,224 Z" />
-    <text x="837" y="243" text-anchor="middle" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="14" fill="#B54708">目标设计</text>
+    <text x="418" y="248" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="21" font-weight="700" fill="#132A3A">增强 2：Governed Adaptive Swarm</text>
+    <text x="376" y="276" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="15" fill="#5A6B7C">当前：Admission → WorkUnit DAG → ≤3 只读 Worker</text>
+    <text x="376" y="299" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="13" fill="#B54708">→ Contribution Gate；目标：持久队列 / 远程 Worker / 多实例调度</text>
+    <path fill="#EDF1F4" d="M809,222 H869 A5,5 0 0 1 874,227 V243 A5,5 0 0 1 869,248 H809 A5,5 0 0 1 804,243 V227 A5,5 0 0 1 809,222 Z" />
+    <text x="839" y="241" text-anchor="middle" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="13" fill="#B54708">受限纵切</text>
     <path d="M625 316V338" fill="none" stroke="#CBD5DF" stroke-width="3" />
     <path fill="#EDF1F4" stroke="#1769E0" stroke-width="2" d="M362,338 H888 A6,6 0 0 1 894,344 V438 A6,6 0 0 1 888,444 H362 A6,6 0 0 1 356,438 V344 A6,6 0 0 1 362,338 Z" />
 

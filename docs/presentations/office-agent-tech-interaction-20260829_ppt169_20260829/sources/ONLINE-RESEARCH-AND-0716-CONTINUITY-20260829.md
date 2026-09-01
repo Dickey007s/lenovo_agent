@@ -2,6 +2,7 @@
 
 ## 使用规则
 
+- 本表中的线上链接已于 2026-09-02 复核；页面版本变化后仍需在下一次汇报前重新检查。
 - 07-16《未来办公 Agent：Loop、Swarm 与受治理执行》是本次 PPT 的内容骨架，不作为外部研究来源。
 - README、Decision、Scenario、Evidence 和内部详细报告只用于核对当前系统事实，不在页面上冒充研究、竞品调研、文献或用户研究来源。
 - 竞品判断只依据线上官方材料；“官方材料未强调某能力”不能推出竞品做不到。
@@ -21,7 +22,7 @@
 | 10-15 | P12、P20、P21 的 Demo 讲法 | 六个真实办公场景 |
 | 17-20 | 07-16 的“持续、协作、治理、交付”主张 | 当前系统真实界面的完整操作纵切 |
 | 21 | P12 Demo 1：受控持久任务 | 当前 Branch、Evidence Gate、ArtifactVersion 与恢复的真实映射；跨端和长期 Worker 仍为目标 |
-| 22 | P20 Demo 2：智能工作驾驶舱 | 保留聚合、排序、路由与 Adaptive Swarm 目标；明确当前没有通用多 Worker |
+| 22 | P20 Demo 2：智能工作驾驶舱 | 驾驶舱仍是目标产品面；新增当前受控纵切的真实输入、5 个 WorkUnit DAG、两波推进、Contribution 采用、Artifact v1 与人工确认界面，并明确单进程/只读边界 |
 | 23 | P21 Demo 3：真实动作前的 Risk Gate | 保留 L0-L5 与 Permit 目标；补当前 Artifact、EffectReceipt 和“未发生”界面实测 |
 | 24 | P23-P24 路线与结论 | 可证伪挑战和目标用户研究门 |
 
@@ -38,7 +39,9 @@
 5. OpenClaw，`Background tasks`：Gateway 拥有的后台 Task、任务状态与可观察性。  
    https://docs.openclaw.ai/automation/tasks
 6. OpenClaw，`Multi-agent routing`：Agent、Workspace、Session 与路由隔离。  
-   https://docs.openclaw.ai/multi-agent
+   https://docs.openclaw.ai/concepts/multi-agent
+7. Anthropic，`Create custom subagents`：独立上下文、受限工具、前台/后台执行和恢复机制。
+   https://code.claude.com/docs/en/sub-agents
 
 ## 文献与技术方向
 
@@ -51,7 +54,7 @@
 4. Model Context Protocol，`Elicitation`：结构化补充信息请求、原因说明与取消语义。  
    https://modelcontextprotocol.io/specification/draft/client/elicitation
 5. A2A Protocol，`Specification`：Task 状态、消息、Artifact 与输入需求。  
-   https://a2a-protocol.org/dev/specification/
+   https://a2a-protocol.org/v0.3.0/specification/
 6. OpenAI Agents SDK，`Human-in-the-loop`：在敏感工具调用前暂停，保存状态，并在批准、拒绝或修改后恢复。
    https://openai.github.io/openai-agents-python/human_in_the_loop/
 7. LangGraph，`Persistence` 与 `Time travel`：Checkpoint、恢复点、状态复用和分支重跑。
@@ -70,6 +73,13 @@
    https://www.w3.org/WAI/WCAG21/Understanding/status-messages
 4. W3C，`Understanding Success Criterion 2.5.5: Target Size`：交互目标尺寸与可操作性。  
    https://www.w3.org/WAI/WCAG21/Understanding/target-size
+5. Nielsen Norman Group，`Progressive Disclosure`：首层保留核心任务，把低频复杂信息延后；同时提醒连续嵌套过深会增加迷失风险。
+   https://www.nngroup.com/articles/progressive-disclosure/
+6. Horvitz，`Principles of Mixed-Initiative User Interfaces`：在不确定条件下比较直接行动、询问用户与保持不打扰，为“只有服务端形成待决请求时才突出人工操作”提供设计依据。
+   https://www.microsoft.com/en-us/research/wp-content/uploads/2016/11/chi99horvitz.pdf
+7. W3C WAI-ARIA APG，`Tabs Pattern` 与 `Disclosure Pattern`：约束任务进展/协作方式切换和按需展开的键盘与可访问性行为。
+   https://www.w3.org/WAI/ARIA/apg/patterns/tabs/
+   https://www.w3.org/WAI/ARIA/apg/patterns/disclosure/
 
 ## 不能推出的结论
 

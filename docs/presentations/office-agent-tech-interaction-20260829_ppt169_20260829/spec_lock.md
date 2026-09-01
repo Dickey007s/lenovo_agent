@@ -38,8 +38,13 @@
 - subtitle: 32
 - lead: 28
 - subheading: 28
+- dense_heading: 21
+- compact_body: 18
 - annotation: 17
+- small_body: 16
+- compact_annotation: 15
 - footnote: 14
+- micro: 13
 
 ## icons
 - library: tabler-outline
@@ -60,6 +65,9 @@
 - effect_gate_full: images/scenario-effect-gate-desktop.png | no-crop
 - mixed_branch_actions: images/dr-0034-mixed-branch-actions-desktop.png | no-crop
 - review_readability: images/dr-0037-review-readability-desktop.png | no-crop
+- capability_progress: images/dr-0058-agent-capabilities-progress.png | no-crop
+- adaptive_execution_workspace: images/dr-0058-adaptive-execution-workspace-1440.png | no-crop
+- capability_evidence_review: images/dr-0058-agent-capabilities-evidence-review.png | no-crop
 
 ## page_rhythm
 - P01: anchor
@@ -99,6 +107,7 @@
 
 ## provenance
 - narrative_base: 07-16 future office agent deck
+- visual_identity: 07-16 light technical briefing; white/light-gray canvas, dark navy titles, blue evidence flow, orange human/risk gates, green adopted outcomes
 - research_sources: online official competitor docs, papers, and user-interaction research only
 - current_system_label: 当前系统实测
 - user_feedback_label: 用户反馈样本，非正式目标用户研究

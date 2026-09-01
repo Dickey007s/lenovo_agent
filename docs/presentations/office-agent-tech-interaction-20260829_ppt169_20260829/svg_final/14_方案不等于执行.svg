@@ -6,7 +6,7 @@
   </g>
   <g id="tc10-ledger">
     <path fill="#FFFFFF" stroke="#1769E0" stroke-width="2" d="M58,146 H546 A6,6 0 0 1 552,152 V600 A6,6 0 0 1 546,606 H58 A6,6 0 0 1 52,600 V152 A6,6 0 0 1 58,146 Z" />
-    
+
   <g transform="translate(78, 172) scale(1.41667)" fill="none" stroke="#1769E0" stroke-width="2">
     <path d="M3 19a2 2 0 1 0 4 0a2 2 0 0 0 -4 0" />
     <path d="M19 7a2 2 0 1 0 0 -4a2 2 0 0 0 0 4" />
@@ -16,7 +16,7 @@
     <text x="78" y="242" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="17" font-weight="700" fill="#1769E0">触发</text><text x="140" y="242" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#1B2733">根据材料形成外呼流程与话术规则</text>
     <text x="78" y="282" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="17" font-weight="700" fill="#1769E0">路径</text><text x="140" y="282" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#1B2733">来源抽取 → 节点/条件 → 流程图 → DOCX</text>
     <path fill="#EDF1F4" d="M84,320 H520 A6,6 0 0 1 526,326 V406 A6,6 0 0 1 520,412 H84 A6,6 0 0 1 78,406 V326 A6,6 0 0 1 84,320 Z" />
-    
+
   <g transform="translate(98, 342) scale(1.08333)" fill="none" stroke="#2E7D32" stroke-width="2">
     <path d="M3 12a9 9 0 1 0 18 0a9 9 0 1 0 -18 0" />
     <path d="M9 12l2 2l4 -4" />
@@ -24,7 +24,7 @@
     <text x="140" y="362" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="24" font-weight="700" fill="#2E7D32">已发生</text>
     <text x="140" y="392" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#5A6B7C">生成流程图与可下载 DOCX，完成结构检查</text>
     <path fill="#EDF1F4" stroke="#D97706" stroke-width="2" d="M84,430 H520 A6,6 0 0 1 526,436 V540 A6,6 0 0 1 520,546 H84 A6,6 0 0 1 78,540 V436 A6,6 0 0 1 84,430 Z" />
-    
+
   <g transform="translate(98, 454) scale(1.08333)" fill="none" stroke="#D97706" stroke-width="2">
     <path d="M12 9v4" />
     <path d="M10.363 3.591l-8.106 13.534a1.914 1.914 0 0 0 1.636 2.871h16.214a1.914 1.914 0 0 0 1.636 -2.87l-8.106 -13.536a1.914 1.914 0 0 0 -3.274 0" />

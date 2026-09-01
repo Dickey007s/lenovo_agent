@@ -10,12 +10,12 @@
   </g>
   <g id="core-message">
     <text x="52" y="158" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="28" font-weight="700" fill="#132A3A">三类控制不变，验证对象从“回答”扩展到“真实办公成果”</text>
-    <text x="52" y="193" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#5A6B7C">Demo 1 管时间连续性，Demo 2 管复杂任务组织，Demo 3 管动作风险；当前版本补上 Workspace、Artifact 与证据回开。</text>
+    <text x="52" y="193" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#5A6B7C">Demo 1 管时间连续性，Demo 2 管复杂任务组织，Demo 3 管动作风险；当前版本补上 Workspace、WorkUnit、Artifact 与证据回开。</text>
   </g>
   <g id="three-demos">
     <path fill="#FFFFFF" stroke="#CBD5DF" stroke-width="2" d="M58,240 H402 A6,6 0 0 1 408,246 V474 A6,6 0 0 1 402,480 H58 A6,6 0 0 1 52,474 V246 A6,6 0 0 1 58,240 Z" />
     <rect x="52" y="240" width="356" height="8" fill="#1769E0" />
-    
+
   <g transform="translate(76, 270) scale(1.25)" fill="none" stroke="#1769E0" stroke-width="2">
     <path d="M12 8l0 4l2 2" />
     <path d="M3.05 11a9 9 0 1 1 .5 4m-.5 5v-5h5" />
@@ -27,7 +27,7 @@
     <text x="76" y="448" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="17" font-weight="700" fill="#1769E0">前台：为什么停、从哪里继续</text>
     <path fill="#FFFFFF" stroke="#CBD5DF" stroke-width="2" d="M444,240 H788 A6,6 0 0 1 794,246 V474 A6,6 0 0 1 788,480 H444 A6,6 0 0 1 438,474 V246 A6,6 0 0 1 444,240 Z" />
     <rect x="438" y="240" width="356" height="8" fill="#2E7D32" />
-    
+
   <g transform="translate(462, 270) scale(1.25)" fill="none" stroke="#2E7D32" stroke-width="2">
     <path d="M5 18a2 2 0 1 0 4 0a2 2 0 1 0 -4 0" />
     <path d="M5 6a2 2 0 1 0 4 0a2 2 0 1 0 -4 0" />
@@ -38,12 +38,12 @@
   </g>
     <text x="508" y="294" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="28" font-weight="700" fill="#132A3A">Demo 2 · 协作</text>
     <text x="462" y="340" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="24" fill="#1B2733">复杂任务按需组织</text>
-    <text x="462" y="380" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#5A6B7C">当前：受限单 Loop 与固定适配器</text>
-    <text x="462" y="410" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#5A6B7C">目标：多 Worker 与共享工件</text>
-    <text x="462" y="448" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="17" font-weight="700" fill="#2E7D32">前台：谁在做、依赖什么</text>
+    <text x="462" y="380" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#5A6B7C">当前：WorkUnit DAG 与采用台账</text>
+    <text x="462" y="410" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#5A6B7C">边界：单进程、每波最多 3 个只读 Worker</text>
+    <text x="462" y="448" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="17" font-weight="700" fill="#2E7D32">前台：谁依赖谁、哪里需确认</text>
     <path fill="#FFFFFF" stroke="#CBD5DF" stroke-width="2" d="M830,240 H1222 A6,6 0 0 1 1228,246 V474 A6,6 0 0 1 1222,480 H830 A6,6 0 0 1 824,474 V246 A6,6 0 0 1 830,240 Z" />
     <rect x="824" y="240" width="404" height="8" fill="#D97706" />
-    
+
   <g transform="translate(848, 270) scale(1.25)" fill="none" stroke="#D97706" stroke-width="2">
     <path d="M11.46 20.846a12 12 0 0 1 -7.96 -14.846a12 12 0 0 0 8.5 -3a12 12 0 0 0 8.5 3a12 12 0 0 1 -.09 7.06" />
     <path d="M15 19l2 2l4 -4" />
