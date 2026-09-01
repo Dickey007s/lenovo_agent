@@ -4502,7 +4502,7 @@ test("holds an evidence gap until the user confirms another round", async ({ pag
   if (process.env.CAPTURE_DR0031_EVIDENCE === "1") {
     await retryDialog.screenshot({ path: "../../docs/evidence/screenshots/dr-0031-actionable-gap-recovery.png" });
   }
-  await retryDialog.getByRole("button", { name: "继续任务，重新查找依据" }).click();
+  await retryDialog.getByRole("button", { name: "让 Agent 重新查找依据" }).click();
   if (process.env.CAPTURE_DR0026_EVIDENCE === "1") {
     await page.locator(".loop-branches").screenshot({
       path: "../../docs/evidence/screenshots/dr-0026-branch-control.png",
