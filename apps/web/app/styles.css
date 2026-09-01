@@ -1863,8 +1863,8 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, summary:focus
 .adaptive-dag-node.is-running, .adaptive-dag-node.is-ready { border-left-color: var(--blue); }
 .adaptive-dag-node.is-waiting_input, .adaptive-dag-node.is-waiting { border-left-color: #bd7a13; background: #fffaf1; }
 .adaptive-dag-node.is-blocked { border-left-color: #a16877; background: #fff8fa; }
-.adaptive-dag-edges { position: absolute; inset: 0; z-index: 0; width: 100%; pointer-events: none; overflow: hidden; }
-.adaptive-dag-edges line { stroke: #6d8aa5; stroke-width: 1.2; stroke-dasharray: 2 1; vector-effect: non-scaling-stroke; }
+.adaptive-dag-edges { position: absolute; inset: 0; z-index: 0; width: 100%; height: 100%; pointer-events: none; overflow: hidden; }
+.adaptive-dag-edges path.adaptive-dag-edge { fill: none; stroke: #315b80; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
 .adaptive-dag-edges marker path { filter: drop-shadow(0 0 1px #fff); }
 .adaptive-static-route { margin-top: 14px; padding: 18px; border: 1px solid #d5dce4; border-left: 3px solid #7b8792; background: #f8fafc; }
 .adaptive-static-route span { color: var(--blue); font-size: 12px; font-weight: 800; }

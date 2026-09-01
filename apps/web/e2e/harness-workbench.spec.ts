@@ -5310,10 +5310,13 @@ test.describe("Demo 1/2 runtime acceptance", () => {
     await expect(dag.locator(".adaptive-dag-node").filter({ hasText: "跨工作包优先级与影响核对" })).toContainText("依赖 1");
     await expect(dag.locator(".adaptive-dag-node").filter({ hasText: "产品上线 Gate" })).toContainText("下一波待确认 / 可执行");
     await expect(dag.locator(".adaptive-dag-node").filter({ hasText: "跨工作包优先级与影响核对" })).toContainText("等待前置工作");
-    await expect(dag.locator("line")).toHaveCount(2);
+    await expect(dag.locator("path.adaptive-dag-edge")).toHaveCount(2);
     await expect(dag.locator("marker")).toHaveCount(1);
     await expect(dag.locator(".adaptive-dag-edge[data-dependency='depends_on']")).toHaveCount(2);
     await expect(dag.locator(".adaptive-dag-edge[data-from='demo2-root-a'][data-to='demo2-dependent-d']")).toHaveCount(1);
+    await expect(dag.locator(".adaptive-dag-edge[data-from='demo2-root-a'][data-to='demo2-dependent-d']")).toHaveAttribute("data-edge-kind", "parent-to-dependent");
+    await expect(dag.locator(".adaptive-dag-edge[data-from='demo2-root-a'][data-to='demo2-dependent-d']")).toHaveAttribute("marker-end", "url(#adaptive-dag-arrow)");
+    await expect(dag.locator(".adaptive-dag-edge[data-from='demo2-root-a'][data-to='demo2-dependent-d']")).toHaveAttribute("d", /M .* V .* H .* V/);
     await expect(collaboration.getByRole("complementary", { name: "当前影响" })).toContainText("下一波已就绪，等待你确认");
     await expect(collaboration.getByRole("complementary", { name: "当前影响" })).toContainText("将启动：产品上线 Gate、搜索 Agent 运行风险、交互痛点证据");
     await expect(collaboration.getByRole("complementary", { name: "当前影响" })).toContainText("前置工作包尚未完成");
