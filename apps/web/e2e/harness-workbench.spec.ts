@@ -4487,7 +4487,7 @@ test("holds an evidence gap until the user confirms another round", async ({ pag
   await page.getByRole("button", { name: "启动 Control Loop" }).click();
   await expect(page.locator(".loop-round-detail > footer strong")).toHaveText("等待人工输入");
   const retryLane = page.locator(".loop-gap-branches > li").filter({ hasText: "形成分析结果" });
-  await expect(retryLane).toContainText("无需核对文件，建议重试");
+  await expect(retryLane).toContainText("无需选择文件，可让 Agent 重新查找依据");
   await expect(retryLane.getByRole("button", { name: "继续此分支" })).toBeEnabled();
   expect(state.controls).toHaveLength(0);
   await retryLane.getByRole("button", { name: "继续此分支" }).click();
@@ -4502,7 +4502,7 @@ test("holds an evidence gap until the user confirms another round", async ({ pag
   if (process.env.CAPTURE_DR0031_EVIDENCE === "1") {
     await retryDialog.screenshot({ path: "../../docs/evidence/screenshots/dr-0031-actionable-gap-recovery.png" });
   }
-  await retryDialog.getByRole("button", { name: "继续任务，只重试此分支" }).click();
+  await retryDialog.getByRole("button", { name: "继续任务，重新查找依据" }).click();
   if (process.env.CAPTURE_DR0026_EVIDENCE === "1") {
     await page.locator(".loop-branches").screenshot({
       path: "../../docs/evidence/screenshots/dr-0026-branch-control.png",
@@ -4615,9 +4615,11 @@ test("turns a finding into an evidence-backed human decision and a new task", as
   if (process.env.CAPTURE_DR0030_EVIDENCE === "1") {
     await dialog.screenshot({ path: "../../docs/evidence/screenshots/dr-0030-actionable-finding-evidence.png" });
   }
-  await expect(dialog).toContainText("1发生了什么");
-  await expect(dialog).toContainText("2不处理的影响");
-  await expect(dialog).toContainText("3现在需要谁做什么");
+  await expect(dialog).toContainText("1系统发现");
+  await expect(dialog).toContainText("2影响");
+  await expect(dialog).toContainText("3你要做什么");
+  await expect(dialog).toContainText("4会保留");
+  await expect(dialog).toContainText("5不会做");
   await expect(dialog).toContainText("需要你决断");
   await expect(dialog).toContainText("来自 workflow.py · 第 8-11 行 · 服务端逐字匹配");
   await expect(dialog).toContainText("下方黄色区域是这段内容在文件预览中的实际位置");
@@ -4705,7 +4707,7 @@ test("accepts a source candidate for bounded branch recovery", async ({ page }) 
   await page.locator(".loop-gap-branches > li").first().getByRole("button", { name: "选择原文位置" }).click();
   const dialog = page.getByRole("dialog", { name: "从 2 个原文位置中选 1 个" });
   await expect(dialog).toContainText("从 2 个真实位置中选 1 个");
-  const acceptLocation = dialog.getByRole("button", { name: "采用此位置并只重跑本分支" });
+  const acceptLocation = dialog.getByRole("button", { name: "确认位置并继续" });
   await expect(acceptLocation).toBeDisabled();
   await dialog.getByRole("button", { name: /选择候选原文 2：workflow\.py/ }).click();
   await expect(acceptLocation).toBeEnabled();
@@ -4718,7 +4720,7 @@ test("accepts a source candidate for bounded branch recovery", async ({ page }) 
     await dialog.locator(".evidence-resolution-decision").screenshot({ path: "../../docs/evidence/screenshots/dr-0030-evidence-disambiguation-action.png" });
   }
   await dialog.getByText("查看技术回执与其他处理方式").click();
-  await dialog.getByRole("textbox", { name: "补充给重跑分支的反馈（可选）" }).fill("同时核对版本字段。" );
+  await dialog.getByRole("textbox", { name: "补充给这一项的说明（可选）" }).fill("同时核对版本字段。" );
   await acceptLocation.click();
 
   await expect.poll(() => state.controls.map((item) => item.command)).toEqual(["decision"]);
@@ -4743,11 +4745,13 @@ test("keeps three ambiguous locations comparable on mobile and records a bounded
   await expect(recovery).toContainText("需要选择原文的分支与可以直接重试的分支已经分开标注");
   await page.locator(".loop-gap-branches > li").first().getByRole("button", { name: "选择原文位置" }).click();
   const dialog = page.getByRole("dialog", { name: "从 3 个原文位置中选 1 个" });
-  await expect(dialog).toContainText("为什么需要你");
-  await expect(dialog).toContainText("你只需要选什么");
-  await expect(dialog).toContainText("选完发生什么");
+  await expect(dialog).toContainText("系统发现");
+  await expect(dialog).toContainText("影响");
+  await expect(dialog).toContainText("你要做什么");
+  await expect(dialog).toContainText("会保留");
+  await expect(dialog).toContainText("不会做");
   await expect(dialog.getByRole("button", { name: "关闭问题审查页" })).toBeVisible();
-  const acceptLocation = dialog.getByRole("button", { name: "采用此位置并只重跑本分支" });
+  const acceptLocation = dialog.getByRole("button", { name: "确认位置并继续" });
   await expect(acceptLocation).toBeDisabled();
   await expect(dialog.getByRole("button", { name: /选择候选原文 1：workflow\.py/ })).toBeVisible();
   await expect(dialog.getByRole("button", { name: /选择候选原文 2：workflow\.py/ })).toBeVisible();
@@ -4809,9 +4813,9 @@ test("keeps a deferred evidence request actionable until a final decision", asyn
 
   await page.locator(".loop-gap-branches > li").first().getByRole("button", { name: "选择原文位置" }).click();
   dialog = page.getByRole("dialog", { name: "从 2 个原文位置中选 1 个" });
-  await expect(dialog.getByRole("button", { name: "采用此位置并只重跑本分支" })).toBeVisible();
+  await expect(dialog.getByRole("button", { name: "确认位置并继续" })).toBeVisible();
   await dialog.getByRole("button", { name: /选择候选原文 1：workflow\.py/ }).click();
-  await dialog.getByRole("button", { name: "采用此位置并只重跑本分支" }).click();
+  await dialog.getByRole("button", { name: "确认位置并继续" }).click();
   await expect.poll(() => state.controls.length).toBe(2);
   expect(state.controls[1]).toMatchObject({ command: "decision", decision_action: "accept", selected_candidate_id: "candidate-111111111111" });
 });
@@ -4838,14 +4842,14 @@ test("shows one recommended retry action without making optional input look requ
   await page.getByRole("button", { name: "启动 Control Loop" }).click();
 
   const retryLane = page.locator(".loop-gap-branches > li").nth(1);
-  await expect(retryLane).toContainText("无需核对文件，建议重试");
+  await expect(retryLane).toContainText("无需选择文件，可让 Agent 重新查找依据");
   await retryLane.getByRole("button", { name: "继续此分支" }).click();
 
-  const dialog = page.getByRole("dialog", { name: /下一步：只重试/ });
+  const dialog = page.getByRole("dialog", { name: /让 Agent 重新查找依据/ });
   await expect(dialog).toContainText("下一步只做 1 件事");
-  await expect(dialog).toContainText("直接让 Agent 重试此分支");
+  await expect(dialog).toContainText("让 Agent 重新查找依据");
   await expect(dialog).toContainText("不需要修改文件，也不需要填写内容");
-  await expect(dialog.getByRole("button", { name: "继续任务，只重试此分支" })).toBeVisible();
+  await expect(dialog.getByRole("button", { name: "让 Agent 重新查找依据" })).toBeVisible();
   await expect(dialog.getByRole("button", { name: "暂不处理此分支" })).toBeVisible();
   await expect(dialog.getByText("我有额外线索")).toBeVisible();
   await expect(dialog.locator(".gap-extra-hint textarea")).toBeHidden();
@@ -4859,7 +4863,7 @@ test("shows one recommended retry action without making optional input look requ
     await page.screenshot({ path: "../../docs/evidence/screenshots/dr-0034-retry-action-mobile.png" });
   }
 
-  await dialog.getByRole("button", { name: "继续任务，只重试此分支" }).click();
+  await dialog.getByRole("button", { name: "让 Agent 重新查找依据" }).click();
   await expect.poll(() => state.controls.map((item) => item.command)).toEqual(["resume"]);
   expect(state.controls[0].branch_id).toBe("branch-222222222222");
 });
@@ -4882,7 +4886,7 @@ test("pauses an unlocatable result with a guided branch recovery", async ({ page
   await expect(page.locator(".loop-gap > header")).toContainText("共有 2 个待处理，每次处理 1 个");
   await expect(branchLanes.first()).toContainText("需要从 2 个原文位置中选 1 个");
   await expect(branchLanes.first().getByRole("button", { name: "选择原文位置" })).toBeVisible();
-  await expect(branchLanes.nth(1)).toContainText("无需核对文件，建议重试");
+  await expect(branchLanes.nth(1)).toContainText("无需选择文件，可让 Agent 重新查找依据");
   await expect(branchLanes.nth(1).getByRole("button", { name: "继续此分支" })).toBeVisible();
   if (process.env.CAPTURE_DR0034_EVIDENCE === "1") {
     await page.setViewportSize({ width: 1600, height: 1000 });
@@ -4893,13 +4897,13 @@ test("pauses an unlocatable result with a guided branch recovery", async ({ page
     await page.locator(".loop-gap").screenshot({ path: "../../docs/evidence/screenshots/dr-0033-branch-evidence-lanes.png" });
   }
   await branchLanes.nth(1).getByRole("button", { name: "继续此分支" }).click();
-  const retryDialog = page.getByRole("dialog", { name: /下一步：只重试/ });
+  const retryDialog = page.getByRole("dialog", { name: /让 Agent 重新查找依据/ });
   await retryDialog.getByText("我有额外线索").click();
   await retryDialog.getByRole("textbox", { name: "给 Agent 的线索（可选）" }).fill("优先核对版本字段和测试时间。");
   if (process.env.CAPTURE_DR0030_EVIDENCE === "1") {
     await retryDialog.screenshot({ path: "../../docs/evidence/screenshots/dr-0030-source-location-recovery.png" });
   }
-  await retryDialog.getByRole("button", { name: "继续任务，只重试此分支" }).click();
+  await retryDialog.getByRole("button", { name: "让 Agent 重新查找依据" }).click();
 
   await expect.poll(() => state.controls.map((control) => control.command)).toEqual(["steer", "resume"]);
   expect(state.controls[0].instruction).toContain("用户补充：优先核对版本字段和测试时间。");
