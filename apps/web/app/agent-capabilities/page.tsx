@@ -8,11 +8,11 @@ export default function AgentCapabilitiesPage() {
           <a className="agent-capabilities-back" href="/">返回工作现场</a>
           <span className="agent-capabilities-kicker">Agent 能力</span>
           <h1>Agent 能力工作台</h1>
-          <p>以同一份服务端 Snapshot 同时检视时间维执行事实与组织维编排事实。</p>
+          <p>用一份服务端状态，清晰查看工作进展、协作方式与可核对成果。</p>
         </div>
         <div className="agent-capabilities-boundary" role="note">
           <b>当前界面</b>
-          <span>真实 Run / Task / Snapshot 驱动</span>
+          <span>真实服务端状态驱动</span>
         </div>
       </header>
       <HarnessWorkbench capabilitiesOnly />
