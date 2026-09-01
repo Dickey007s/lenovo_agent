@@ -1809,6 +1809,9 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, summary:focus
 .adaptive-collaboration-shell { padding: 14px; background: #f5f7f9; }
 .adaptive-task-context { display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; padding: 14px 16px; border: 1px solid #d5dce4; background: #fff; }
 .adaptive-task-copy { min-width: 0; }
+.adaptive-context-back { display: inline-flex; align-items: center; gap: 5px; margin-bottom: 7px; color: var(--blue); font-size: 13px; font-weight: 700; text-decoration: none; }
+.adaptive-context-back:hover { text-decoration: underline; }
+.adaptive-context-back svg { width: 15px; }
 .adaptive-task-copy > span, .adaptive-route-explanation > div > span, .adaptive-dag-panel header span, .adaptive-impact-panel header span, .adaptive-result-bar span, .adaptive-sidebar-label { display: block; color: var(--blue); font-size: 12px; font-weight: 800; }
 .adaptive-task-copy strong { display: block; margin-top: 3px; overflow-wrap: anywhere; color: var(--ink); font-size: 17px; line-height: 1.4; }
 .adaptive-task-copy p { margin: 4px 0 0; overflow-wrap: anywhere; color: var(--muted); font-size: 13px; line-height: 1.45; }

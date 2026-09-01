@@ -5303,6 +5303,7 @@ test.describe("Demo 1/2 runtime acceptance", () => {
     await expect(collaboration.locator(".adaptive-task-context")).toContainText("Run 1");
     await expect(collaboration.locator(".adaptive-history-link")).toContainText("历史 Run（只读）");
     const dag = collaboration.getByTestId("adaptive-workunit-dag");
+    await expect(collaboration.getByRole("link", { name: "返回资料库" })).toHaveAttribute("href", "/");
     await expect(dag.locator(".adaptive-dag-node")).toHaveCount(5);
     await expect(dag.locator(".adaptive-dag-node").filter({ hasText: "产品上线 Gate" })).toContainText("根");
     await expect(dag.locator(".adaptive-dag-node").filter({ hasText: "跨工作包优先级与影响核对" })).toContainText("依赖 1");

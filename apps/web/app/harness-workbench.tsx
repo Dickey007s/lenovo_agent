@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   IconAlertTriangle,
+  IconArrowLeft,
   IconArrowRight,
   IconAdjustments,
   IconCheck,
@@ -5188,7 +5189,7 @@ function CollaborationOverview({
   const routeReason = mode === "fixed_workflow" || mode === "single_controller" ? "本次采用固定流程，Adaptive Swarm 未启动" : admission?.reasons?.at(-1) ?? "路线尚未由服务端确认。";
   return <div className={`collaboration-overview adaptive-collaboration-shell${isAdaptive ? " is-adaptive" : " is-fixed"}`} data-testid="collaboration-overview">
     <section className="adaptive-task-context" aria-label="当前任务上下文">
-      <div className="adaptive-task-copy"><span>当前任务</span><strong>{run.contract.goal || run.instruction}</strong><p>用户指令：{run.instruction}</p></div>
+      <div className="adaptive-task-copy"><a className="adaptive-context-back" href="/"><IconArrowLeft aria-hidden="true" />返回资料库</a><span>当前任务</span><strong>{run.contract.goal || run.instruction}</strong><p>用户指令：{run.instruction}</p></div>
       <div className="adaptive-run-context"><span className="adaptive-run-status"><i />{statusLabel(run.status)}</span><b>Run {run.run_sequence}</b><button type="button" className="adaptive-history-link" onClick={onOpenHistory}><IconClock aria-hidden="true" />历史 Run（只读）</button></div>
     </section>
     <div className="adaptive-collaboration-layout">
