@@ -4055,6 +4055,11 @@ export function HarnessWorkbench({ onActivityChange }: { onActivityChange?: (sta
   const [reviewRequest, setReviewRequest] = useState<EvidenceReviewRequest | null>(null);
   const [view, setView] = useState<WorkspaceView>("data");
   const [run, setRun] = useState<HarnessRun | null>(null);
+  const [sessionRuns, setSessionRuns] = useState<HarnessRun[]>([]);
+  const [sessionsOpen, setSessionsOpen] = useState(false);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [selectedRunCurrent, setSelectedRunCurrent] = useState<boolean | null>(null);
+  const [adaptiveWorkbenchOpen, setAdaptiveWorkbenchOpen] = useState(false);
   const [taskPointer, setTaskPointer] = useState<TaskPointer | null>(null);
   const [taskPointerError, setTaskPointerError] = useState("");
   const [workspaceStatus, setWorkspaceStatus] = useState<WorkspaceStatus>("checking");
@@ -4085,6 +4090,7 @@ export function HarnessWorkbench({ onActivityChange }: { onActivityChange?: (sta
     .map((folder) => filterWorkspaceTree(folder, fileSearch, fileTypeFilter))
     .filter((folder): folder is WorkspaceTreeFolder => folder !== null), [workspaceTree, fileSearch, fileTypeFilter]);
   const visibleFileCount = useMemo(() => filteredWorkspaceTree.reduce((total, folder) => total + treeFileCount(folder), 0), [filteredWorkspaceTree]);
+  const sessionTaskCount = useMemo(() => new Set(sessionRuns.map((item) => item.task_id)).size, [sessionRuns]);
   const forceTreeExpanded = Boolean(fileSearch.trim() || fileTypeFilter !== "ALL");
 
   function closeTransport() {
@@ -4103,6 +4109,15 @@ export function HarnessWorkbench({ onActivityChange }: { onActivityChange?: (sta
     // monotonicity while applying snapshots within the same Run.
     if (!switchedRun && (snapshot.last_event_sequence < lastSequenceRef.current || (current && snapshot.version < current.version))) return false;
     runRef.current = snapshot;
+    setSessionRuns((currentSessions) => {
+      const index = currentSessions.findIndex((item) => item.run_id === snapshot.run_id);
+      if (index >= 0) {
+        const next = [...currentSessions];
+        next[index] = snapshot;
+        return next;
+      }
+      return [snapshot, ...currentSessions].slice(0, 20);
+    });
     lastSequenceRef.current = switchedRun ? snapshot.last_event_sequence : Math.max(lastSequenceRef.current, snapshot.last_event_sequence);
     window.sessionStorage.setItem(RUN_SESSION_KEY, snapshot.run_id);
     setRun(snapshot);
@@ -4111,7 +4126,7 @@ export function HarnessWorkbench({ onActivityChange }: { onActivityChange?: (sta
       setTaskPointerError("");
       refreshTaskPointer(snapshot.task_id, generation, snapshot.run_id, snapshot.task_version);
     }
-    if (snapshot.events.length) setConnection(TERMINAL_STATUSES.has(snapshot.status) ? "available" : "live");
+    if (snapshot.events.length && selectedRunCurrent !== false) setConnection(TERMINAL_STATUSES.has(snapshot.status) ? "available" : "live");
     return true;
   }
 
@@ -4129,6 +4144,7 @@ export function HarnessWorkbench({ onActivityChange }: { onActivityChange?: (sta
     taskFetchKeyRef.current = taskFetchKey;
     const clearFailedTaskFetch = () => {
       if (taskFetchKeyRef.current === taskFetchKey) taskFetchKeyRef.current = null;
+      setSelectedRunCurrent(null);
       if (generation === generationRef.current) setTaskPointerError("任务台账暂时无法读取，请重试");
     };
     void fetch(`${API_BASE}/v1/harness/tasks/${encodeURIComponent(taskId)}`, { headers: HEADERS })
@@ -4179,6 +4195,7 @@ export function HarnessWorkbench({ onActivityChange }: { onActivityChange?: (sta
           current_commit_id: asText(raw.current_commit_id) || null,
           lineage,
         });
+        setSelectedRunCurrent(currentRunId === runId);
         setTaskPointerError("");
       })
       .catch(clearFailedTaskFetch);
@@ -4240,6 +4257,60 @@ export function HarnessWorkbench({ onActivityChange }: { onActivityChange?: (sta
     }
   }
 
+  async function loadSessionRuns() {
+    setHistoryLoading(true);
+    try {
+      const response = await fetch(`${API_BASE}/v1/harness/runs?limit=20`, { headers: HEADERS });
+      if (!response.ok) throw new Error("任务会话历史暂时无法读取");
+      const payload = await response.json() as { runs?: unknown[] };
+      const runs = Array.isArray(payload.runs)
+        ? payload.runs.map(normalizeRun).filter((item): item is HarnessRun => item !== null)
+        : [];
+      setSessionRuns(runs);
+      return runs;
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "任务会话历史暂时无法读取");
+      return [];
+    } finally {
+      setHistoryLoading(false);
+    }
+  }
+
+  async function openSessionRun(snapshot: HarnessRun) {
+    const generation = generationRef.current + 1;
+    closeTransport();
+    generationRef.current = generation;
+    runRef.current = null;
+    lastSequenceRef.current = 0;
+    setSelectedRunCurrent(null);
+    setRun(null);
+    setTaskPointer(null);
+    taskFetchKeyRef.current = null;
+    setAdaptiveWorkbenchOpen(false);
+    setReviewRequest(null);
+    setError("");
+    try {
+      const taskResponse = await fetch(`${API_BASE}/v1/harness/tasks/${encodeURIComponent(snapshot.task_id)}`, { headers: HEADERS });
+      if (!taskResponse.ok) throw new Error("任务台账暂时无法确认当前 Run");
+      const taskPayload = await taskResponse.json() as Record<string, unknown>;
+      const currentRunId = asText(taskPayload.current_run_id);
+      if (!currentRunId) throw new Error("任务台账缺少当前 Run");
+      const response = await fetch(`${API_BASE}/v1/harness/runs/${encodeURIComponent(snapshot.run_id)}`, { headers: HEADERS });
+      if (!response.ok) throw new Error("无法读取任务会话");
+      const latest = normalizeRun(await response.json());
+      if (!latest) throw new Error("任务会话回执格式无效");
+      const selectedIsCurrent = currentRunId === latest.run_id;
+      setSelectedRunCurrent(selectedIsCurrent);
+      if (!applySnapshot(latest, generation)) throw new Error("任务会话已更新，请重试");
+      setInstruction(latest.instruction);
+      setView(latest.result && TERMINAL_STATUSES.has(latest.status) ? "result" : "loop");
+      setSessionsOpen(false);
+      setConnection("available");
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "无法读取任务会话");
+    }
+  }
+
   async function restoreLatestRun() {
     if (restoreAttemptedRef.current) return;
     restoreAttemptedRef.current = true;
@@ -4251,27 +4322,31 @@ export function HarnessWorkbench({ onActivityChange }: { onActivityChange?: (sta
         if (response.ok) snapshot = normalizeRun(await response.json());
         else if (response.status === 404) window.sessionStorage.removeItem(RUN_SESSION_KEY);
       }
-      if (!snapshot) {
-        const response = await fetch(`${API_BASE}/v1/harness/runs?limit=10`, { headers: HEADERS });
-        if (response.ok) {
-          const payload = await response.json() as { runs?: unknown[] };
-          const candidates = Array.isArray(payload.runs)
-            ? payload.runs.map(normalizeRun).filter((item): item is HarnessRun => item !== null)
-            : [];
-          snapshot = candidates.find((item) => !TERMINAL_STATUSES.has(item.status)) ?? null;
-        }
-      }
+      const candidates = await loadSessionRuns();
+      if (!snapshot) snapshot = candidates.find((item) => !TERMINAL_STATUSES.has(item.status)) ?? candidates[0] ?? null;
       if (!snapshot) return;
       const generation = generationRef.current + 1;
       generationRef.current = generation;
       runRef.current = null;
       lastSequenceRef.current = 0;
+      setSelectedRunCurrent(null);
       if (!applySnapshot(snapshot, generation)) return;
       setInstruction(snapshot.instruction);
       setView(snapshot.result && TERMINAL_STATUSES.has(snapshot.status) ? "result" : "loop");
-      if (!TERMINAL_STATUSES.has(snapshot.status)) {
-        connectEvents(snapshot.run_id, generation, snapshot.last_event_sequence);
+      const taskResponse = await fetch(`${API_BASE}/v1/harness/tasks/${encodeURIComponent(snapshot.task_id)}`, { headers: HEADERS });
+      if (!taskResponse.ok) {
+        setSelectedRunCurrent(null);
+        setTaskPointerError("任务台账暂时无法确认当前 Run，请重试");
+        setConnection("available");
+        return;
       }
+      const taskPayload = await taskResponse.json() as Record<string, unknown>;
+      const currentRunId = asText(taskPayload.current_run_id);
+      const selectedIsCurrent = currentRunId === snapshot.run_id;
+      setSelectedRunCurrent(selectedIsCurrent);
+      if (selectedIsCurrent && !TERMINAL_STATUSES.has(snapshot.status)) {
+        connectEvents(snapshot.run_id, generation, snapshot.last_event_sequence);
+      } else setConnection("available");
     } catch {
       setConnection("available");
     }
@@ -4371,7 +4446,7 @@ export function HarnessWorkbench({ onActivityChange }: { onActivityChange?: (sta
       ? startCommandRef.current
       : { signature, key: randomKey() };
     startCommandRef.current = command;
-    setStarting(true); setError(""); closeTransport();
+    setStarting(true); setError(""); closeTransport(); setSelectedRunCurrent(null);
     const generation = generationRef.current + 1;
     generationRef.current = generation; runRef.current = null; lastSequenceRef.current = 0; setRun(null); setTaskPointer(null); taskFetchKeyRef.current = null;
     try {
@@ -4408,7 +4483,7 @@ export function HarnessWorkbench({ onActivityChange }: { onActivityChange?: (sta
 
   async function continueTask(branchId: string, instructionOverride?: string) {
     const current = runRef.current;
-    if (!current || !workspace || !TERMINAL_STATUSES.has(current.status)) return false;
+    if (!current || selectedRunCurrent !== true || !workspace || !TERMINAL_STATUSES.has(current.status)) return false;
     setStarting(true); setError("");
     // Keep the parent's stream and generation alive while the child command is
     // in flight. A failed/invalid request must leave the parent UI recoverable;
@@ -4444,6 +4519,7 @@ export function HarnessWorkbench({ onActivityChange }: { onActivityChange?: (sta
         lastSequenceRef.current = 0;
         setTaskPointer(null);
         taskFetchKeyRef.current = null;
+        setSelectedRunCurrent(null);
       }
       if (!snapshot || !applySnapshot(snapshot, nextGeneration)) throw new Error("续办任务回执格式无效");
       setView("loop");
@@ -4478,6 +4554,7 @@ export function HarnessWorkbench({ onActivityChange }: { onActivityChange?: (sta
       lastSequenceRef.current = 0;
       setTaskPointer(null);
       taskFetchKeyRef.current = null;
+      setSelectedRunCurrent(null);
       if (!applySnapshot(snapshot, generation)) throw new Error("当前任务无法打开");
       setView(TERMINAL_STATUSES.has(snapshot.status) && snapshot.result ? "result" : "loop");
       if (!TERMINAL_STATUSES.has(snapshot.status)) connectEvents(snapshot.run_id, generation, snapshot.last_event_sequence);
@@ -4490,7 +4567,7 @@ export function HarnessWorkbench({ onActivityChange }: { onActivityChange?: (sta
 
   async function executeWorkers() {
     const current = runRef.current;
-    if (!current || current.topology_admission?.mode !== "adaptive_readonly_workers") return false;
+    if (!current || selectedRunCurrent !== true || current.topology_admission?.mode !== "adaptive_readonly_workers") return false;
     const advertisedReady = new Set(current.rounds.at(-1)?.next_step?.ready_branch_ids ?? []);
     const branchIds = current.branches
       .filter((branch) => branch.status === "running" && (advertisedReady.size === 0 || advertisedReady.has(branch.branch_id)))
@@ -4524,7 +4601,7 @@ export function HarnessWorkbench({ onActivityChange }: { onActivityChange?: (sta
 
   async function controlLoop(command: LoopCommand, options: LoopControlOptions = {}) {
     const current = runRef.current;
-    if (!current || (TERMINAL_STATUSES.has(current.status) && !["rollback", "decision"].includes(command))) return false;
+    if (!current || selectedRunCurrent !== true || (TERMINAL_STATUSES.has(current.status) && !["rollback", "decision"].includes(command))) return false;
     const normalizedInstruction = options.instruction?.trim() || undefined;
     const normalizedFeedback = options.feedback?.trim() || undefined;
     const signature = JSON.stringify({ command, instruction: normalizedInstruction, branchId: options.branchId, artifactVersion: options.artifactVersion, decisionAction: options.decisionAction, findingId: options.findingId, resolutionId: options.resolutionId, selectedOptionId: options.selectedOptionId, selectedCandidateId: options.selectedCandidateId, decisionRequestId: options.decisionRequestId, sourceRevision: options.sourceRevision, feedback: normalizedFeedback, topologyMode: options.topologyMode, runId: current.run_id });
@@ -4582,16 +4659,19 @@ export function HarnessWorkbench({ onActivityChange }: { onActivityChange?: (sta
     {workspaceStatus === "unavailable" && <button type="button" onClick={() => void loadWorkspace()}><IconRefresh aria-hidden="true" />重新读取</button>}
   </div>;
 
-  const runActive = Boolean(run && !TERMINAL_STATUSES.has(run.status));
+  const isReadOnlyRun = selectedRunCurrent !== true;
+  const runActive = Boolean(run && !isReadOnlyRun && !TERMINAL_STATUSES.has(run.status));
 
   return <main className="data-workbench">
     <header className="data-workbench-header">
       <div><span>FORTE 公开办公数据</span><h1>办公资料库</h1><p>像文件管理器一样自由查看资料；下达目标后，Agent 会从整个资料库自主检索证据。</p></div>
       <div className="data-workbench-status">
         <b className={`is-${connection}`}><i />{connection === "offline" ? "服务离线" : connection === "reconnecting" ? "正在恢复" : "资料可用"}</b>
+        <button type="button" className="session-history-button" onClick={() => setSessionsOpen((current) => !current)} aria-expanded={sessionsOpen}><IconClock aria-hidden="true" />任务会话{sessionTaskCount ? <b>{sessionTaskCount}</b> : null}</button>
         <button type="button" className="icon-action" title="重新核对资料库" aria-label="重新核对资料库" onClick={() => void loadWorkspace()}><IconRefresh aria-hidden="true" /></button>
       </div>
     </header>
+    {sessionsOpen && <SessionHistory runs={sessionRuns} activeRunId={run?.run_id ?? null} selectedIsCurrent={selectedRunCurrent} loading={historyLoading} onRefresh={() => void loadSessionRuns()} onSelect={(snapshot) => { void openSessionRun(snapshot); }} />}
     <div className="workspace-facts" aria-label="资料库信息">
       <span><strong>{workspace.file_count}</strong> 份文件统一检索</span>
       <span><strong>{workspace.previewable_file_count}</strong> 份可安全预览</span>
@@ -4649,7 +4729,7 @@ export function HarnessWorkbench({ onActivityChange }: { onActivityChange?: (sta
         </nav>
         <div className="workspace-content">
           {view === "data" && <FilePreview preview={preview} file={activeFile} loading={previewLoading} error={previewError} />}
-          {view === "loop" && <LoopView run={run} taskPointer={taskPointer} taskPointerError={taskPointerError} files={allFiles} controlBusy={controlBusy} onControl={controlLoop} onReview={setReviewRequest} onStartTask={startTask} onContinueTask={continueTask} onOpenCurrentTask={openCurrentTask} onRetryTaskPointer={() => run && refreshTaskPointer(run.task_id, generationRef.current, run.run_id, run.task_version, true)} onExecuteWorkers={executeWorkers} starting={starting} />}
+          {view === "loop" && <LoopView run={run} taskPointer={taskPointer} taskPointerError={taskPointerError} files={allFiles} controlBusy={controlBusy} onControl={controlLoop} onReview={setReviewRequest} onStartTask={startTask} onContinueTask={continueTask} onOpenCurrentTask={openCurrentTask} onRetryTaskPointer={() => run && refreshTaskPointer(run.task_id, generationRef.current, run.run_id, run.task_version, true)} onExecuteWorkers={executeWorkers} onOpenAdaptiveWorkbench={() => setAdaptiveWorkbenchOpen(true)} readOnly={isReadOnlyRun} starting={starting} />}
           {view === "result" && <ResultView result={run?.result ?? null} artifacts={run?.artifact_versions ?? []} workspaceArtifacts={run?.workspace_artifacts ?? []} receipts={run?.effect_receipts ?? []} reconciliation={run?.narrative_reconciliation ?? null} commit={run?.last_commit ?? null} decisions={run?.decision_records ?? []} decisionRequests={run?.decision_requests ?? []} files={allFiles} onOpenFile={openFile} onReview={setReviewRequest} onStartTask={startTask} starting={starting} />}
         </div>
         <details className="workspace-boundary"><summary><IconShieldCheck aria-hidden="true" />数据与执行边界</summary><p>{workspace.data_boundary} Agent 可以检索整个资料库，但每轮只读取服务端校验通过且受预算约束的文件；本轮不会修改原文件或执行外部动作。</p></details>
@@ -4657,6 +4737,7 @@ export function HarnessWorkbench({ onActivityChange }: { onActivityChange?: (sta
       </section>
     </div>
     {reviewRequest && <EvidenceReviewDialog request={reviewRequest} files={allFiles} onClose={() => setReviewRequest(null)} onOpenFile={openFile} onStartTask={startTask} onControl={controlLoop} starting={starting} controlBusy={controlBusy} />}
+    {adaptiveWorkbenchOpen && run && <AdaptiveSwarmWorkbench run={run} files={allFiles} readOnly={isReadOnlyRun} starting={starting} onClose={() => setAdaptiveWorkbenchOpen(false)} onExecuteWorkers={executeWorkers} />}
   </main>;
 }
 
@@ -4687,6 +4768,116 @@ function FilePreview({ preview, file, loading, error, anchor = null }: { preview
   </article>;
 }
 
+function SessionHistory({
+  runs,
+  activeRunId,
+  selectedIsCurrent,
+  loading,
+  onSelect,
+  onRefresh,
+}: {
+  runs: HarnessRun[];
+  activeRunId: string | null;
+  selectedIsCurrent: boolean | null;
+  loading: boolean;
+  onSelect: (run: HarnessRun, readOnly: boolean) => void;
+  onRefresh: () => void;
+}) {
+  const groups = Array.from(runs.reduce((map, item) => {
+    const current = map.get(item.task_id) ?? [];
+    current.push(item);
+    map.set(item.task_id, current);
+    return map;
+  }, new Map<string, HarnessRun[]>()).entries())
+    .map(([taskId, taskRuns]) => [taskId, taskRuns.sort((left, right) => right.run_sequence - left.run_sequence)] as const);
+  return <section className="session-drawer" aria-label="任务会话历史" data-testid="task-session-history">
+    <header><div><span>服务端历史</span><h2>任务会话</h2><p>最近 20 个 Run 涉及的任务；不同任务分开，同一任务的每个 Run 保留在时间线上。打开旧记录只读查看。</p></div><button type="button" className="icon-action" title="刷新任务会话" aria-label="刷新任务会话" onClick={onRefresh} disabled={loading}><IconRefresh aria-hidden="true" /></button></header>
+    {loading && <p className="session-empty">正在读取服务端 runs...</p>}
+    {!loading && groups.length === 0 && <p className="session-empty">还没有任务会话。启动一个目标后，它会出现在这里。</p>}
+    {!loading && groups.map(([taskId, taskRuns], index) => {
+      const latest = taskRuns[0];
+      return <article className="task-session" key={taskId} data-testid="task-session">
+        <header><div><span>任务会话 {index + 1}</span><strong>{latest?.instruction || "未命名任务"}</strong></div><small>最近记录 {taskRuns.length} 个 · 当前 Run {latest?.run_sequence ?? "-"}</small></header>
+        <ol>{taskRuns.slice().reverse().map((item) => {
+          const isLatest = item.run_id === latest?.run_id;
+          const isSelected = activeRunId === item.run_id;
+          const isReadOnly = !isLatest || (selectedIsCurrent === false && activeRunId === item.run_id);
+          return <li key={item.run_id} className={isSelected ? "is-selected" : ""}>
+            <button type="button" onClick={() => onSelect(item, isReadOnly)} aria-current={isSelected ? "page" : undefined}>
+              <span>Run {item.run_sequence}</span><b>{isSelected ? (isReadOnly ? "只读查看" : "当前运行") : isReadOnly ? "历史只读" : "可继续"}</b><small>{statusLabel(item.status)}</small>
+            </button>
+          </li>;
+        })}</ol>
+      </article>;
+    })}
+  </section>;
+}
+
+function statusLabel(status: string) {
+  return {
+    running: "运行中",
+    waiting_input: "等待处理",
+    paused: "已暂停",
+    completed: "可复核",
+    stopped: "已停止",
+    failed: "未通过",
+  }[status] ?? "状态待确认";
+}
+
+function AdaptiveSwarmWorkbench({
+  run,
+  files,
+  readOnly,
+  starting,
+  onClose,
+  onExecuteWorkers,
+}: {
+  run: HarnessRun;
+  files: HarnessFile[];
+  readOnly: boolean;
+  starting: boolean;
+  onClose: () => void;
+  onExecuteWorkers: () => Promise<boolean>;
+}) {
+  const closeButtonRef = useRef<HTMLButtonElement | null>(null);
+  const dialogRef = useRef<HTMLElement | null>(null);
+  useEffect(() => {
+    const previous = document.activeElement as HTMLElement | null;
+    closeButtonRef.current?.focus();
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") { event.preventDefault(); onClose(); }
+      if (event.key === "Tab") {
+        const focusable = dialogRef.current?.querySelectorAll<HTMLElement>("button:not(:disabled), [href], input:not(:disabled), textarea:not(:disabled), select:not(:disabled), [tabindex]:not([tabindex=\"-1\"])");
+        if (!focusable?.length) return;
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+        if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+        else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+      }
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => { document.removeEventListener("keydown", onKeyDown); previous?.focus(); };
+  }, [onClose]);
+  const admission = run.topology_admission;
+  const fileLabel = (fileRef: string) => files.find((file) => file.file_ref === fileRef)?.display_label ?? "批准来源";
+  const sourceRefs = Array.from(new Set(run.branches.flatMap((branch) => branch.input_file_refs)));
+  const readyBranches = new Set(run.rounds.at(-1)?.next_step?.ready_branch_ids ?? []);
+  const route = admission?.mode === "adaptive_readonly_workers" ? "Adaptive Swarm" : admission?.mode === "fixed_workflow" ? "Fixed Workflow" : "Single Controller";
+  const statusText = (status: string) => status === "completed" || status === "adopted" ? "已完成" : status === "blocked" ? "被依赖阻塞" : status === "waiting" || status === "waiting_input" ? "局部等待" : status === "failed" ? "执行失败" : status === "ready" ? "可执行" : "处理中";
+  return <div className="adaptive-workbench-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
+    <section ref={dialogRef} className="adaptive-workbench" role="dialog" aria-modal="true" aria-labelledby="adaptive-workbench-title" data-testid="adaptive-workbench">
+      <header className="adaptive-workbench-header"><div><span>任务编排工作台</span><h2 id="adaptive-workbench-title">Adaptive Swarm 工作台</h2><p>服务端 Snapshot 的当前投影 · Run {run.run_sequence}</p></div><button ref={closeButtonRef} type="button" className="icon-action" title="关闭工作台" aria-label="关闭工作台" onClick={onClose}><IconX aria-hidden="true" /></button></header>
+      <div className="adaptive-workbench-body">
+        <section className="adaptive-summary" aria-label="拓扑准入摘要"><div><span>服务端实际路线</span><strong>{route}</strong><div className="adaptive-route-framework" aria-label="四种路线"><span className={route === "Single Controller" ? "is-active" : ""}>Single Controller</span><span className={route === "Fixed Workflow" ? "is-active" : ""}>Fixed Workflow</span><span className={route === "Adaptive Swarm" ? "is-active" : ""}>Adaptive Swarm</span><span>Demo 3 · Risk Gate</span></div><p>{admission?.reasons.at(-1) ?? "本次没有可显示的准入说明。"}</p></div><div className="adaptive-summary-facts"><b>{admission?.work_unit_breadth ?? run.branches.length}<small>工作包</small></b><b>{admission?.source_span ?? sourceRefs.length}<small>来源</small></b><b>{admission?.independent_branch_count ?? 0}<small>独立分支</small></b></div></section>
+        <section className="adaptive-panel"><header><div><span>来源范围</span><h3>本次批准的 {sourceRefs.length || admission?.source_span || 0} 份资料</h3></div><small>只显示安全文件名</small></header><div className="adaptive-source-list">{sourceRefs.length ? sourceRefs.slice(0, 10).map((ref) => <span key={ref}>{fileLabel(ref)}</span>) : <span>服务端尚未形成来源列表</span>}</div></section>
+        <section className="adaptive-panel"><header><div><span>Branch DAG</span><h3>{run.branches.length ? `${run.branches.length} 个工作包 · 依赖波次` : "尚未形成工作包"}</h3></div><small>3 root + 2 dependent 的固定演示形状仅在 Snapshot 有记录时显示</small></header><ol className="adaptive-branch-grid">{run.branches.length ? run.branches.map((branch) => <li key={branch.branch_id} className={branch.status === "blocked" ? "is-blocked" : ""}><div><b>{branch.title}</b><strong>{statusText(branch.status)}</strong></div><p>{branch.objective}</p><small>{branch.depends_on.length ? `依赖 ${branch.depends_on.length} 个前序工作包` : "Root 工作包"}{readyBranches.has(branch.branch_id) ? " · 本波可执行" : ""}</small></li>) : <li>服务端没有返回 Branch DAG。</li>}</ol></section>
+        <section className="adaptive-panel"><header><div><span>Worker 与贡献</span><h3>执行回执和采用状态分开</h3></div><small>{admission?.mode === "adaptive_readonly_workers" ? "当前有限实现：受限只读 Worker" : "本次未启动 Worker"}</small></header>{admission?.mode === "adaptive_readonly_workers" && <p className="adaptive-boundary">仅在用户确认后派发，每批最多 3 个分支；不执行外部动作。</p>}{admission?.mode !== "adaptive_readonly_workers" && <p className="adaptive-boundary">本次路由为 {route}，服务端原因：{admission?.reasons.at(-1) ?? "没有 Worker 准入"}。</p>}{run.worker_runs.length > 0 ? <div className="adaptive-receipt-list">{run.worker_runs.map((worker) => <article key={worker.worker_run_id}><b>{statusText(worker.outcome)}</b><span>{worker.summary}</span><small>{worker.source_file_refs.map(fileLabel).join("、") || "批准来源未显示"} · {worker.model_called ? "模型已调用" : "未调用"} · {worker.output_used ? "已采用" : "未采用"}</small></article>)}</div> : <p className="adaptive-empty">尚未有 Worker 回执。</p>}{run.contributions.length > 0 && <div className="adaptive-receipt-list">{run.contributions.map((contribution) => <article key={contribution.contribution_id}><b>{contribution.gate_status === "adopted" ? "贡献已采用" : "贡献待处理"}</b><span>{contribution.summary}</span><small>{contribution.approved_file_refs.map(fileLabel).join("、") || "批准来源未显示"} · {contribution.evidence_anchors.length ? `${contribution.evidence_anchors.length} 处原文定位` : "原文定位待补"}</small></article>)}</div>}{admission?.mode === "adaptive_readonly_workers" && !readOnly && <button type="button" className="adaptive-confirm" onClick={() => void onExecuteWorkers()} disabled={starting}><IconPlayerPlay aria-hidden="true" />{starting ? "正在启动" : run.worker_runs.length ? "继续下一波" : "确认并启动只读 Worker"}</button>}</section>
+        <section className="adaptive-panel adaptive-artifacts"><header><div><span>成果版本</span><h3>append-only Artifact history</h3></div><small>成果与局部阻塞并存</small></header><div className="adaptive-version-list">{run.artifact_versions.length ? run.artifact_versions.map((artifact) => <article key={artifact.artifact_id}><b>Artifact v{artifact.version}</b><span>{artifact.summary}</span><small>{artifact.finding_count} 条发现 · {run.last_commit?.artifact_version === artifact.version ? "当前提交" : "历史版本"}</small></article>) : <p className="adaptive-empty">尚未生成逻辑成果版本。</p>}</div>{run.contributions.some((item) => item.gate_status !== "adopted") && <p className="adaptive-partial"><IconAlertTriangle aria-hidden="true" />部分成果可用；阻塞分支不会抹掉已采用贡献。</p>}</section>
+      </div>
+    </section>
+  </div>;
+}
+
 function LoopView({
   run,
   taskPointer,
@@ -4700,6 +4891,8 @@ function LoopView({
   onOpenCurrentTask,
   onRetryTaskPointer,
   onExecuteWorkers,
+  onOpenAdaptiveWorkbench,
+  readOnly,
   starting,
 }: {
   run: HarnessRun | null;
@@ -4714,6 +4907,8 @@ function LoopView({
   onOpenCurrentTask: () => Promise<boolean>;
   onRetryTaskPointer: () => void;
   onExecuteWorkers: () => Promise<boolean>;
+  onOpenAdaptiveWorkbench: () => void;
+  readOnly: boolean;
   starting: boolean;
 }) {
   const [selectedRoundNumber, setSelectedRoundNumber] = useState(1);
@@ -4727,10 +4922,10 @@ function LoopView({
 
   const selectedRound = run.rounds.find((item) => item.round_number === selectedRoundNumber) ?? run.rounds.at(-1) ?? null;
   const terminal = TERMINAL_STATUSES.has(run.status);
-  const canResume = run.control_state === "paused" || run.control_state === "pause_requested";
+  const canResume = !readOnly && (run.control_state === "paused" || run.control_state === "pause_requested");
   const waitingForBranch = run.status === "waiting_input";
-  const canPause = !terminal && run.control_state === "running";
-  const canSteer = !terminal && ![ "stop_requested", "stopped" ].includes(run.control_state);
+  const canPause = !readOnly && !terminal && run.control_state === "running";
+  const canSteer = !readOnly && !terminal && ![ "stop_requested", "stopped" ].includes(run.control_state);
   const fileLabel = (fileRef: string) => files.find((file) => file.file_ref === fileRef)?.display_label ?? "允许范围内的文件";
   const roundBranches = selectedRound ? run.branches.filter((branch) => selectedRound.branch_ids.includes(branch.branch_id)) : [];
   const currentArtifactVersion = run.last_commit?.artifact_version ?? null;
@@ -4855,12 +5050,13 @@ function LoopView({
       {run.topology_admission.mode === "adaptive_readonly_workers" && run.status === "waiting_input" && run.branches.some((branch) => ["running", "waiting_input"].includes(branch.status)) && <div className="loop-worker-confirmation">
         <small>{run.worker_runs.length === 0 ? "执行与准入分开；只有你明确确认后才会调用最多 3 个只读执行器。当前不会自动调用分析模型。" : "上一批结果已保留；仅对依赖已完成的下一批可执行分支继续调用。"}</small>
         <div>
-          <button type="button" onClick={() => void onExecuteWorkers()} disabled={starting || controlBusy !== null}><IconPlayerPlay aria-hidden="true" />{starting ? "正在启动" : run.worker_runs.length === 0 ? "确认并启动只读执行器" : "继续下一批只读执行器"}</button>
-          {run.worker_runs.length === 0 && <button type="button" className="is-secondary" onClick={() => void onControl("topology_override", { topologyMode: "single_controller" })} disabled={starting || controlBusy !== null}><IconRoute aria-hidden="true" />改回单 Controller</button>}
+          <button type="button" onClick={() => void onExecuteWorkers()} disabled={readOnly || starting || controlBusy !== null}><IconPlayerPlay aria-hidden="true" />{starting ? "正在启动" : run.worker_runs.length === 0 ? "确认并启动只读执行器" : "继续下一批只读执行器"}</button>
+          {run.worker_runs.length === 0 && <button type="button" className="is-secondary" onClick={() => void onControl("topology_override", { topologyMode: "single_controller" })} disabled={readOnly || starting || controlBusy !== null}><IconRoute aria-hidden="true" />改回单 Controller</button>}
         </div>
       </div>}
-      {run.worker_runs.length > 0 && <div className="loop-worker-receipts"><span>实际执行回执</span>{run.worker_runs.map((worker) => <div key={worker.worker_run_id}><b>{worker.outcome === "adopted" ? "已合入" : worker.outcome === "failed" ? "执行失败" : "待处理"}</b><span>{worker.summary}<small>来源：{worker.source_file_refs.map(fileLabel).join("、") || "批准来源未显示"}</small></span><small>{worker.model_called ? "模型已调用" : "未调用"} · {worker.output_used ? "已采用" : "未采用"} · {worker.elapsed_ms} ms</small></div>)}</div>}
-      {run.work_units.length > 0 && <div className="loop-worker-ledger" data-testid="worker-ledger">
+      <button type="button" className="adaptive-workbench-launch" onClick={onOpenAdaptiveWorkbench}><IconRoute aria-hidden="true" />打开 Adaptive Swarm 工作台</button>
+      {run.worker_runs.length > 0 && <details className="loop-worker-details"><summary>查看本轮 Worker 回执</summary><div className="loop-worker-receipts"><span>实际执行回执</span>{run.worker_runs.map((worker) => <div key={worker.worker_run_id}><b>{worker.outcome === "adopted" ? "已合入" : worker.outcome === "failed" ? "执行失败" : "待处理"}</b><span>{worker.summary}<small>来源：{worker.source_file_refs.map(fileLabel).join("、") || "批准来源未显示"}</small></span><small>{worker.model_called ? "模型已调用" : "未调用"} · {worker.output_used ? "已采用" : "未采用"} · {worker.elapsed_ms} ms</small></div>)}</div></details>}
+      {run.work_units.length > 0 && <details className="loop-worker-details"><summary>查看工作包与成果采用记录</summary><div className="loop-worker-ledger" data-testid="worker-ledger">
         <span>工作包与成果采用记录</span>
         {run.work_units.slice().sort((left, right) => left.branch_id.localeCompare(right.branch_id)).map((unit) => {
           const branch = run.branches.find((item) => item.branch_id === unit.branch_id);
@@ -4878,8 +5074,10 @@ function LoopView({
           </article>;
         })}
         {run.contributions.some((item) => item.gate_status !== "adopted") && <small>部分结果可用：已采用成果与待核对/失败分支分别保留。</small>}
-      </div>}
+      </div></details>}
+      {readOnly && <p className="read-only-banner" role="status"><IconEye aria-hidden="true" />历史 Run 只读查看，不接收实时事件，也不会执行控制或启动 Worker。</p>}
     </section>}
+    {!run.topology_admission && <button type="button" className="adaptive-workbench-launch" onClick={onOpenAdaptiveWorkbench}><IconRoute aria-hidden="true" />查看协作路线</button>}
     {run.status === "failed" && <section className="loop-failure-recovery" role="alert">
       <header><IconAlertTriangle aria-hidden="true" /><div><span>这次运行已停下，但不是死路</span><h3>{failedAtSourceLocation ? "候选结论无法唯一定位到原文" : "本轮结果没有通过服务端校验"}</h3></div></header>
       <ol>
@@ -4887,22 +5085,22 @@ function LoopView({
         <li><b>2</b><span><strong>没有发生</strong>候选结果未被采用，也没有修改文件或执行外部动作。</span></li>
         <li><b>3</b><span><strong>建议这样继续</strong>{failedAtSourceLocation ? "缩小到一个分支，用更长且唯一的原文重新核对。" : "编辑上方任务目标，或按推荐的最小范围重新运行。"}</span></li>
       </ol>
-      <footer><span>{run.validation_errors[0] || "服务端已安全停止本轮任务。"}</span><button type="button" disabled={starting} onClick={() => void onStartTask(retryInstruction)}><IconRefresh aria-hidden="true" />{starting ? "正在重建任务" : "缩小范围重新核对"}</button></footer>
+      <footer><span>{run.validation_errors[0] || "服务端已安全停止本轮任务。"}</span><button type="button" disabled={readOnly || starting} onClick={() => void onStartTask(retryInstruction)}><IconRefresh aria-hidden="true" />{starting ? "正在重建任务" : "缩小范围重新核对"}</button></footer>
     </section>}
     {boundedTerminalRecovery && sourceLocationPresentation !== "terminal" && <section className="loop-terminal-recovery" aria-labelledby="terminal-recovery-title">
       <header><IconAlertTriangle aria-hidden="true" /><div><span>预算停止后的下一步</span><h3 id="terminal-recovery-title">当前 Run 已到预算边界，不能继续原地运行</h3><p><b>停止原因：{run.budget.stop_reason || "剩余预算不足以完成下一步"}。</b> 这不是整项工作丢失。旧 Run、调用回执和成果版本保持不变；请选择一个未完成分支，以它为目标创建新的独立 Run。</p></div></header>
       <div className="source-recovery-facts"><span><b>只影响</b>{terminalRecoveryBranches.length} 条尚未完成的分支</span><span><b>已保留</b>Plan、调用回执、分支状态与{preservedArtifactVersion ? `成果 v${preservedArtifactVersion}` : "阶段成果"}</span><span><b>未发生</b>原文件修改或外部动作</span></div>
       <label><span>补充给新任务的方向（可选）</span><textarea value={recoveryDraft} onChange={(event) => setRecoveryDraft(event.target.value)} placeholder="例如：先核对上线配置清单与功能测试报告中的版本和日期字段" /></label>
-      <div className="source-recovery-branches">{terminalRecoveryBranches.map((branch, index) => <article key={branch.branch_id}><div><b>{index === 0 ? "最小续办分支" : "可单独续办"}</b><h4>{branch.title}</h4><p>{branch.objective}</p><small>{branch.input_file_refs.length > 0 ? branch.input_file_refs.map(fileLabel).join(" · ") : "由 Agent 在整个资料库中重新选证"}</small></div><button type="button" disabled={starting} onClick={() => void onContinueTask(branch.branch_id, recoveryDraft.trim() || branch.objective)}><IconRefresh aria-hidden="true" />{starting ? "正在创建" : "继续未完成任务"}</button></article>)}</div>
+      <div className="source-recovery-branches">{terminalRecoveryBranches.map((branch, index) => <article key={branch.branch_id}><div><b>{index === 0 ? "最小续办分支" : "可单独续办"}</b><h4>{branch.title}</h4><p>{branch.objective}</p><small>{branch.input_file_refs.length > 0 ? branch.input_file_refs.map(fileLabel).join(" · ") : "由 Agent 在整个资料库中重新选证"}</small></div><button type="button" disabled={readOnly || starting} onClick={() => void onContinueTask(branch.branch_id, recoveryDraft.trim() || branch.objective)}><IconRefresh aria-hidden="true" />{starting ? "正在创建" : "继续未完成任务"}</button></article>)}</div>
       <footer><IconShieldCheck aria-hidden="true" /><span>这是同一任务的新 Run，不会覆盖或假装续跑旧 Run；只核对该未完成分支的批准来源，旧成果和回执保持不变。</span></footer>
     </section>}
     {!boundedTerminalRecovery && <section className="loop-controls" aria-label="人工控制">
       <div className="loop-control-actions">
-        <button type="button" onClick={() => void onControl(canResume ? "resume" : "pause")} disabled={controlBusy !== null || terminal || waitingForBranch || (!canResume && !canPause)}>
+          <button type="button" onClick={() => void onControl(canResume ? "resume" : "pause")} disabled={readOnly || controlBusy !== null || terminal || waitingForBranch || (!canResume && !canPause)}>
           {canResume ? <IconPlayerPlay aria-hidden="true" /> : <IconPlayerPause aria-hidden="true" />}
           {waitingForBranch ? "请选择待处理分支" : controlBusy === "pause" || controlBusy === "resume" ? "正在提交" : canResume ? "继续" : "暂停"}
         </button>
-        <button type="button" className="is-stop" onClick={() => void onControl("stop")} disabled={controlBusy !== null || terminal}><IconPlayerStop aria-hidden="true" />结束并保留现有结果</button>
+        <button type="button" className="is-stop" onClick={() => void onControl("stop")} disabled={readOnly || controlBusy !== null || terminal}><IconPlayerStop aria-hidden="true" />结束并保留现有结果</button>
       </div>
       <form onSubmit={async (event) => {
         event.preventDefault();
