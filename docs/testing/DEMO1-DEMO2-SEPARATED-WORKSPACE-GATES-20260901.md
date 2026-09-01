@@ -1,7 +1,7 @@
 # Demo 1 / Demo 2 分层工作面验收门
 
 - 日期：2026-09-01
-- 状态：`Limited Verified`（工程范围）；形成性用户走查未运行
+- 状态：`Historical Limited Verified`；页面归属由 `DR-0057` 后续门修订
 - 决策：`DR-0056`
 - 场景：`SCENARIO-043`
 - Evidence：[`DR-0056-DEMO1-DEMO2-SEPARATED-WORKSPACES-EVIDENCE-20260901`](../evidence/DR-0056-DEMO1-DEMO2-SEPARATED-WORKSPACES-EVIDENCE-20260901.md)

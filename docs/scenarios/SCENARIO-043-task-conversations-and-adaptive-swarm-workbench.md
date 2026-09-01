@@ -1,12 +1,16 @@
 # SCENARIO-043：任务会话回看与 Adaptive Swarm 独立工作台
 
-- 状态：`Limited Verified`（工程范围）；目标用户走查仍未运行
+- 状态：`Historical Limited Verified`；页面归属由 `SCENARIO-044` 修订
 - 日期：2026-09-01
 - 决策：`DR-0056`
 - 用户来源：`USER-FEEDBACK-20260901-DEMO1-DEMO2-SEPARATED-WORKSPACES`
 - 研究来源：Codex app、OpenAI Agents SDK、Anthropic、Claude Code、OpenClaw、LangGraph、
   Microsoft HAI 官方资料
 - 工程 Evidence：[`DR-0056-DEMO1-DEMO2-SEPARATED-WORKSPACES-EVIDENCE-20260901`](../evidence/DR-0056-DEMO1-DEMO2-SEPARATED-WORKSPACES-EVIDENCE-20260901.md)
+
+> 本场景的服务端事实与历史只读门仍是有效历史证据；“Adaptive Swarm 工作台即 Demo 2
+> 演示页”的解释不再是当前设计。现行场景见
+> [`SCENARIO-044`](SCENARIO-044-agent-capability-page-and-future-smart-cockpit.md)。
 
 ## 1. 场景目标
 

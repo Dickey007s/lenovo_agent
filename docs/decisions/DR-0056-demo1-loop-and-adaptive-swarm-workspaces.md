@@ -4,7 +4,7 @@
 
 | 字段 | 内容 |
 | --- | --- |
-| 状态 | `Limited Verified`（工程范围）；目标用户理解与体验效果仍为 `Draft` |
+| 状态 | `Historical Limited Verified`；页面归属已由 `DR-0057` 修订 |
 | 日期 | 2026-09-01 |
 | 用户来源 | `USER-FEEDBACK-20260901-DEMO1-DEMO2-SEPARATED-WORKSPACES` |
 | 前置决策 | `DR-0053` 的 Task lineage/Topology Admission、`DR-0054` 的 Task Ledger、`DR-0055` 的 WorkUnit/Contribution Ledger |
@@ -12,6 +12,11 @@
 | 场景 | [`SCENARIO-043`](../scenarios/SCENARIO-043-task-conversations-and-adaptive-swarm-workbench.md) |
 | 测试合同 | [`DEMO1-DEMO2-SEPARATED-WORKSPACE-GATES-20260901`](../testing/DEMO1-DEMO2-SEPARATED-WORKSPACE-GATES-20260901.md) |
 | Evidence | [`DR-0056-DEMO1-DEMO2-SEPARATED-WORKSPACES-EVIDENCE-20260901`](../evidence/DR-0056-DEMO1-DEMO2-SEPARATED-WORKSPACES-EVIDENCE-20260901.md) |
+
+> 2026-09-01 修订：本决策验证过的任务会话、历史只读和 Adaptive Snapshot 投影继续有效，
+> 但“全屏 Adaptive Swarm 工作台就是 Demo 2 演示面”的信息架构已被
+> [`DR-0057`](DR-0057-agent-capability-page-and-smart-cockpit-boundary.md) 取代。Loop 与
+> Adaptive Swarm 将并列进入独立 Agent 能力页；智能工作驾驶舱仍是后续 Demo 2 页面。
 
 ## 问题
 
