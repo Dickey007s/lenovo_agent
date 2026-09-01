@@ -5172,9 +5172,9 @@ function CollaborationOverview({
     const to = graphPositions.get(item.unit.work_unit_id);
     return from && to ? { key: `${parent.unit.work_unit_id}:${item.unit.work_unit_id}`, fromId: parent.unit.work_unit_id, toId: item.unit.work_unit_id, from, to } : null;
   }).filter((edge): edge is { key: string; fromId: string; toId: string; from: { x: number; y: number }; to: { x: number; y: number } } => Boolean(edge)));
-  const branchStatusText = (status: string) => ({ ready: "待处理", running: "处理中", waiting: "等待确认", waiting_input: "等待处理", blocked: "已阻塞", failed: "执行失败", rejected: "已拒绝", completed: "已完成", adopted: "已采用", pending: "待处理" }[status] ?? "状态待确认");
   const readyBranchItems = run.branches.filter((branch) => readyBranches.has(branch.branch_id));
   const workerConfirmationRequired = isAdaptive && run.status === "waiting_input" && readyBranchItems.length > 0;
+  const branchStatusText = (status: string) => ({ ready: workerConfirmationRequired ? "下一波待确认 / 可执行" : "可执行", running: "处理中", waiting: "等待确认", waiting_input: "等待处理", blocked: "等待前置工作", failed: "执行失败", rejected: "已拒绝", completed: "已完成", adopted: "已采用", pending: "待处理" }[status] ?? "状态待确认");
   const pendingRequests = run.decision_requests.filter((request) => ["pending", "deferred"].includes(request.state ?? "pending"));
   const evidenceGaps = Array.from(new Map(run.rounds.flatMap((round) => round.evidence_gaps).map((gap) => [gap.gap_id, gap])).values());
   const waitingUnits = graphUnits.filter(({ branch, unit }) => branch?.status === "waiting_input" || unit.state === "waiting" || unit.state === "waiting_input");

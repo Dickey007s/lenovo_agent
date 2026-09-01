@@ -5308,7 +5308,7 @@ test.describe("Demo 1/2 runtime acceptance", () => {
     await expect(dag.locator(".adaptive-dag-node").filter({ hasText: "产品上线 Gate" })).toContainText("根");
     await expect(dag.locator(".adaptive-dag-node").filter({ hasText: "跨工作包优先级与影响核对" })).toContainText("依赖 1");
     await expect(dag.locator(".adaptive-dag-node").filter({ hasText: "产品上线 Gate" })).toContainText("处理中");
-    await expect(dag.locator(".adaptive-dag-node").filter({ hasText: "跨工作包优先级与影响核对" })).toContainText("已阻塞");
+    await expect(dag.locator(".adaptive-dag-node").filter({ hasText: "跨工作包优先级与影响核对" })).toContainText("等待前置工作");
     await expect(dag.locator("line")).toHaveCount(2);
     await expect(dag.locator("marker")).toHaveCount(1);
     await expect(dag.locator(".adaptive-dag-edge[data-dependency='depends_on']")).toHaveCount(2);
