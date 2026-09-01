@@ -3636,8 +3636,11 @@ function evidenceLocationLabel(anchor: Pick<EvidenceAnchor, "locator_kind" | "st
 }
 
 function evidenceRevisionLabel(revision: string | null | undefined) {
-  if (!revision) return "本轮安全预览版本未提供";
-  return `源文件版本 ${revision.length > 14 ? `${revision.slice(0, 14)}…` : revision}`;
+  return revision ? "已按当前资料版本核对" : "当前资料版本未提供";
+}
+
+function evidenceLocatorLabel(locatorKind: EvidenceAnchor["locator_kind"]) {
+  return locatorKind === "table_rows" ? "表格行" : "文本行";
 }
 
 function resolutionStatusLabel(status: EvidenceResolution["status"]) {
@@ -3924,9 +3927,11 @@ function EvidenceReviewDialog({
               <li className="is-decision"><b>2</b><div><span>你只需要选什么</span><strong>从下方候选位置中选 1 个真实位置。</strong></div></li>
               <li><b>3</b><div><span>选完发生什么</span><strong>只重跑“{request.branchTitle || "当前"}”分支；不修改文件，不执行外部动作。</strong></div></li>
             </ol> : <ol className="review-summary-steps">
-              <li><b>1</b><div><span>发生了什么</span><strong>{request.factSummary || request.title}</strong></div></li>
-              <li><b>2</b><div><span>不处理的影响</span><strong>{request.impact || "影响尚未单独结构化，请先核对下方证据后再作判断。"}</strong></div></li>
-              <li className={request.review?.requires_human_decision ? "is-decision" : ""}><b>3</b><div><span>现在需要谁做什么</span><strong>{request.review?.requires_human_decision ? "需要你选择处理口径，Agent 不会替你决定。" : request.review ? "无需业务裁决，但结果仍需人工复核。" : "这是旧结果，尚未生成结构化处置选项。"}</strong></div></li>
+              <li><b>1</b><div><span>系统发现</span><strong>{request.factSummary || request.title}</strong></div></li>
+              <li><b>2</b><div><span>影响</span><strong>{request.impact || "影响尚未单独结构化，请先核对下方证据后再作判断。"}</strong></div></li>
+              <li className={request.review?.requires_human_decision ? "is-decision" : ""}><b>3</b><div><span>你要做什么</span><strong>{request.review?.requires_human_decision ? "选择一个处理口径，Agent 不会替你决定。" : request.review ? "无需业务裁决，但结果仍需人工复核。" : "这是旧结果，尚未生成结构化处置选项。"}</strong></div></li>
+              <li><b>4</b><div><span>会保留</span><strong>已完成分支、现有发现和已有成果版本均不回退。</strong></div></li>
+              <li><b>5</b><div><span>不会做</span><strong>不会修改原文件，也不会执行外部动作。</strong></div></li>
             </ol>}
             <details><summary>查看 Agent 的完整说明</summary><p>{request.detail}</p></details>
           </section>}
@@ -3969,7 +3974,7 @@ function EvidenceReviewDialog({
                       aria-label={`选择候选原文 ${index + 1}：${file?.display_label ?? "允许范围内文件"} ${evidenceLocationLabel(candidate, file)}`}
                     >
                       <b>{selected ? <IconCheck aria-hidden="true" /> : index + 1}</b>
-                      <span><small>{resolutionStatusLabel(request.resolution?.status ?? "ambiguous")} · 候选 {index + 1}</small><strong>{file?.display_label ?? "允许范围内文件"} · {evidenceLocationLabel(candidate, file)}</strong><em>{evidenceRevisionLabel(candidate.source_revision || request.resolution?.source_revision)}</em><q>{candidate.excerpt}</q><small className="evidence-candidate-difference">{difference}</small></span>
+                      <span><small>{resolutionStatusLabel(request.resolution?.status ?? "ambiguous")} · 候选 {index + 1} · {evidenceLocatorLabel(candidate.locator_kind)}</small><strong>{file?.display_label ?? "允许范围内文件"} · {evidenceLocationLabel(candidate, file)}</strong><em>{evidenceRevisionLabel(candidate.source_revision || request.resolution?.source_revision)}</em><q>{candidate.excerpt}</q><small className="evidence-candidate-difference">{difference}</small></span>
                     </button>;
                   })}
                 </div>
@@ -4000,13 +4005,13 @@ function EvidenceReviewDialog({
           </details>
           {request.decisionRecord && <section className="decision-record-receipt" role="status">
             <IconCircleCheck aria-hidden="true" />
-            <div><span>人工决定已记录 · v{request.decisionRecord.accepted_task_version}</span><b>{request.decisionRecord.action === "accept" ? "已接受" : request.decisionRecord.action === "decline" ? "已否决" : request.decisionRecord.action === "cancel" ? "已取消" : "已暂缓"}</b><p>回执 {request.decisionRecord.decision_id}{request.decisionRecord.idempotency_ref ? ` · 幂等 ${request.decisionRecord.idempotency_ref}` : ""} · 外部动作：无</p></div>
+            <div><span>人工决定已记录 · 当前任务版本</span><b>{request.decisionRecord.action === "accept" ? "已接受" : request.decisionRecord.action === "decline" ? "已否决" : request.decisionRecord.action === "cancel" ? "已取消" : "已暂缓"}</b><p>这次处理不会修改原文件，也不会执行外部动作。</p></div>
           </section>}
           {request.kind === "resolution" && request.resolution ? <details className={`resolution-audit-details${isAmbiguousResolution || isDirectRetryResolution ? " is-collapsed" : ""}`} open={isAmbiguousResolution || isDirectRetryResolution ? undefined : true}>
             <summary>{isAmbiguousResolution || isDirectRetryResolution ? "查看技术回执与其他处理方式" : "证据定位处理"}</summary>
             <section className="evidence-resolution-decision" aria-labelledby="resolution-decision-title">
             <header><div><span>证据定位状态</span><h3 id="resolution-decision-title">{request.resolution.status === "ambiguous" ? `${request.resolution.candidates.length} 个位置都匹配，需要你选择` : `${resolutionStatusLabel(request.resolution.status)}，需要决定恢复方式`}</h3><p>{request.resolution.reason}</p></div><b>{request.resolution.status === "ambiguous" ? `${request.resolution.candidates.length} 个候选` : resolutionStatusLabel(request.resolution.status)}</b></header>
-            {request.decisionRequest && <dl className="decision-request-meta"><div><dt>待决编号</dt><dd>{request.decisionRequest.request_id}</dd></div><div><dt>基于版本</dt><dd>Run v{request.decisionRequest.expected_version ?? "当前"} · {evidenceRevisionLabel(request.decisionRequest.source_revision || request.resolution.source_revision)}</dd></div><div><dt>绑定对象</dt><dd>受影响分支 · {request.decisionRequest.candidate_ids.length || request.resolution.candidates.length} 个候选</dd></div></dl>}
+            {request.decisionRequest && <p className="decision-request-meta">服务端已保留本次待决，并将选择限定在下方真实候选范围内。</p>}
             <ol className="resolution-impact-list">
               <li><b>1</b><span><strong>只影响哪里</strong>{request.branchTitle || "当前待处理分支"}</span></li>
               <li><b>2</b><span><strong>已经保留什么</strong>已完成分支、可核对发现和已有成果版本均不回退。</span></li>
@@ -5022,8 +5027,31 @@ function AgentCapabilitiesSurface({
     window.requestAnimationFrame(() => document.getElementById("adaptive-swarm")?.scrollIntoView({ behavior: "smooth", block: "start" }));
   };
   const status = connection === "offline" ? "服务离线" : connection === "reconnecting" ? "正在恢复" : connection === "live" ? "实时连接" : "资料可用";
-  const evidenceGapCount = run?.rounds.reduce((total, round) => total + round.evidence_gaps.length, 0) ?? 0;
-  const currentPointer = taskPointer && run && taskPointer.task_id === run.task_id && taskPointer.current_run_id === run.run_id;
+  const pendingDecisionRequests = run ? uniqueDecisionRequests([
+    ...run.decision_requests,
+    ...run.rounds.flatMap((round) => round.next_step?.decision_requests ?? []),
+  ]).filter((request) => ["pending", "deferred"].includes(request.state ?? "pending")) : [];
+  const waitingBranches = run?.branches.filter((branch) => branch.status === "waiting_input").sort((left, right) => left.title.localeCompare(right.title)) ?? [];
+  const completedBranches = run?.branches.filter((branch) => branch.status === "completed").length ?? 0;
+  const decisionReviewItems = run ? pendingDecisionRequests.map((request) => {
+    for (const round of [...run.rounds].reverse()) {
+      const resolution = (round.next_step?.evidence_resolutions ?? []).find((item) => item.decision_request?.request_id === request.request_id || item.resolution_id === request.resolution_id || item.finding_id === request.finding_id);
+      if (resolution) {
+        const branch = run.branches.find((item) => item.branch_id === (resolution.branch_id ?? request.branch_id));
+        return resolutionReviewRequest(resolution, round.round_number, branch?.title ?? null, run.decision_records, pendingDecisionRequests);
+      }
+      const finding = round.result?.findings.find((item) => item.finding_id === request.finding_id || item.decision_request?.request_id === request.request_id);
+      if (finding) return findingReviewRequest(finding, round.result?.findings.indexOf(finding) ?? 0, round.round_number, run.decision_records, pendingDecisionRequests);
+    }
+    const artifactFinding = run.artifact_versions.flatMap((artifact) => artifact.findings).find((item) => item.finding_id === request.finding_id || item.decision_request?.request_id === request.request_id);
+    if (artifactFinding) return findingReviewRequest(artifactFinding, 0, run.current_round || null, run.decision_records, pendingDecisionRequests);
+    return null;
+  }).filter((item): item is EvidenceReviewRequest => item !== null).sort((left, right) => left.title.localeCompare(right.title)) : [];
+  const primaryDecision = decisionReviewItems[0] ?? null;
+  const needsAttention = pendingDecisionRequests.length > 0;
+  useEffect(() => {
+    if (window.location.hash === "#adaptive-swarm") setActiveTab("collaboration");
+  }, []);
   return <section className="agent-capabilities-surface" data-testid="agent-capabilities-surface">
     <header className="agent-capabilities-toolbar">
       <div><span>服务端能力投影</span><h2>同一 selected Run 的两种观察维度</h2><p>默认先看执行进展；协作方式按需展开。会话切换先校验 Task current pointer，历史 Run 只读。</p></div>
@@ -5032,15 +5060,14 @@ function AgentCapabilitiesSurface({
     {sessionsOpen && <SessionHistory runs={sessionRuns} activeRunId={run?.run_id ?? null} loading={historyLoading} onRefresh={onRefreshSessions} onSelect={(snapshot) => onSelectSession(snapshot)} />}
     {selectedRunCurrent === false && run && <p className="read-only-banner" role="status"><IconEye aria-hidden="true" />历史 Run 只读查看，不接收实时事件，也不会执行控制、决策或启动新任务。</p>}
     <div className="agent-capability-tabs" role="tablist" aria-label="Agent 能力视图">
-      <button type="button" role="tab" aria-selected={activeTab === "progress"} aria-controls="agent-progress-panel" data-testid="agent-progress-tab" onClick={() => { setActiveTab("progress"); window.history.replaceState(null, "", window.location.pathname); }}><IconRoute aria-hidden="true" /><span>执行进展</span><small>Task / Run / Round / 控制</small></button>
-      <button type="button" role="tab" aria-selected={activeTab === "collaboration"} aria-controls="agent-collaboration-panel" data-testid="agent-collaboration-tab" onClick={() => { setActiveTab("collaboration"); window.history.replaceState(null, "", "#adaptive-swarm"); }}><IconGitCommit aria-hidden="true" /><span>协作方式</span><small>准入 / WorkUnit / Worker / Contribution</small></button>
+      <button id="agent-progress-tab" type="button" role="tab" aria-selected={activeTab === "progress"} aria-controls="agent-progress-panel" data-testid="agent-progress-tab" onClick={() => { setActiveTab("progress"); window.history.replaceState(null, "", window.location.pathname); }}><IconRoute aria-hidden="true" /><span>执行进展</span><small>Task / Run / Round / 控制</small></button>
+      <button id="agent-collaboration-tab" type="button" role="tab" aria-selected={activeTab === "collaboration"} aria-controls="agent-collaboration-panel" data-testid="agent-collaboration-tab" onClick={() => { setActiveTab("collaboration"); window.history.replaceState(null, "", "#adaptive-swarm"); }}><IconGitCommit aria-hidden="true" /><span>协作方式</span><small>准入 / WorkUnit / Worker / Contribution</small></button>
     </div>
     {activeTab === "progress" && <section id="agent-progress-panel" className="agent-capability-panel agent-capability-progress" role="tabpanel" data-testid="agent-control-loop-capability" aria-labelledby="agent-progress-tab">
       <header className="agent-capability-panel-header"><div><span>A · 时间维</span><h2>Agent Control Loop</h2><p>默认展示当前执行状态；完整轮次记录按需展开。</p></div>{run && <small>{isReadOnly ? "历史只读" : "当前 Run"} · Run {run.run_sequence}</small>}</header>
-      <div className="agent-capability-facts" aria-label="Control Loop 事实"><span>Task pointer <b>{taskPointerError ? "读取失败" : currentPointer ? "当前 Run" : taskPointer ? "历史 Run" : "待确认"}</b></span><span>Run <b>{run ? `第 ${run.run_sequence} 次` : "未启动"}</b></span><span>Round <b>{run ? `${run.current_round}/${run.rounds.length}` : "0"}</b></span><span>Branch <b>{run?.branches.length ?? 0}</b></span><span>Evidence <b>{evidenceGapCount} 个缺口</b></span><span>Artifact <b>{run?.artifact_versions.length ?? 0} 个版本</b></span></div>
       {taskPointerError && <p className="agent-capabilities-error" role="alert"><IconAlertTriangle aria-hidden="true" />{taskPointerError}</p>}
       {!run && <div className="agent-capability-empty"><IconRoute aria-hidden="true" /><p>启动或从任务会话选择一个 Run 后，这里会显示服务端执行进展。</p></div>}
-      {run && <section className="agent-progress-summary" aria-label="执行进展摘要" data-testid="agent-progress-summary"><div><span>当前状态</span><strong>{statusLabel(run.status)}</strong><p>{run.current_round ? `已推进至第 ${run.current_round} 轮` : "服务端正在建立第一轮"} · {evidenceGapCount ? "等待你的处理" : "服务端继续推进"}</p></div><div><span>已保留内容</span><strong>{run.artifact_versions.length ? `${run.artifact_versions.length} 个成果版本` : "尚无成果版本"}</strong><p>{evidenceGapCount ? `${evidenceGapCount} 个事项待处理` : "当前没有待处理事项"}</p></div><button type="button" className="agent-progress-collaboration-link" onClick={openCollaboration}><IconGitCommit aria-hidden="true" />查看协作方式</button></section>}
+      {run && <section className="agent-progress-summary" aria-label="执行进展摘要" data-testid="agent-progress-summary"><div><span>当前进展</span><strong>{statusLabel(run.status)}</strong><p>{run.current_round ? `已推进至第 ${run.current_round} 轮` : "服务端正在建立第一轮"} · {needsAttention ? "有事项需要你的处理" : waitingBranches.length ? "有分支等待服务端继续" : "服务端继续推进"}</p></div><div><span>主要待办</span>{primaryDecision ? <button type="button" className="agent-primary-review" onClick={() => !isReadOnly && onReview(primaryDecision)} disabled={isReadOnly}><strong>{primaryDecision.title}</strong><small>{pendingDecisionRequests.length > 1 ? `还有 ${pendingDecisionRequests.length - 1} 项待处理` : "打开查看详情"}</small></button> : <strong>{waitingBranches.length ? `${waitingBranches.length} 个分支等待服务端继续` : "当前没有待处理事项"}</strong>}{waitingBranches.length > 0 && <ul className="agent-waiting-branches">{waitingBranches.slice(0, 3).map((branch) => <li key={branch.branch_id}>{branch.title}</li>)}</ul>}</div><div><span>执行结果</span><strong>{completedBranches} 个分支已完成</strong><p>{run.artifact_versions.length ? `当前成果第 ${run.artifact_versions.at(-1)?.version ?? 1} 版` : "尚无成果版本"}{waitingBranches.length ? ` · ${waitingBranches.length} 个分支等待处理` : ""}</p></div><button type="button" className="agent-progress-collaboration-link" onClick={openCollaboration}><IconGitCommit aria-hidden="true" />查看协作方式</button></section>}
       {!run && <div className="agent-capability-task-input"><label htmlFor="agent-capability-instruction">任务指令</label><textarea id="agent-capability-instruction" value={instruction} onChange={(event) => setInstruction(event.target.value)} placeholder="输入要推进的任务" aria-label="任务指令" /><button type="button" onClick={() => void onStartTask(instruction)} disabled={starting || instruction.trim().length < 3}><IconSend aria-hidden="true" />{starting ? "正在启动" : "启动 Control Loop"}</button></div>}
       {run && <button type="button" className="agent-execution-details-toggle" aria-expanded={showExecutionDetails} onClick={() => setShowExecutionDetails((current) => !current)}><IconChevronDown aria-hidden="true" />{showExecutionDetails ? "收起完整执行记录" : "查看完整执行记录"}</button>}
       {run && showExecutionDetails && <div className="agent-execution-details" data-testid="agent-execution-details"><LoopView run={run} taskPointer={taskPointer} taskPointerError={taskPointerError} files={files} controlBusy={controlBusy} onControl={onControl} onReview={onReview} onStartTask={onStartTask} onContinueTask={onContinueTask} onOpenCurrentTask={onCurrentTask} onRetryTaskPointer={onRetryTaskPointer} onExecuteWorkers={onExecuteWorkers} onOpenAdaptiveWorkbench={openCollaboration} adaptiveActionLabel={run.topology_admission ? "跳到 Adaptive Swarm" : "查看 Adaptive Swarm 能力"} readOnly={isReadOnly} starting={starting} /></div>}
