@@ -46,6 +46,68 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, summary:focus
 }
 .harness-workspace-shell { min-width: 0; min-height: 0; overflow: auto; padding: 18px; }
 .harness-agent-shell { min-width: 0; min-height: 0; overflow: hidden; border-left: 1px solid var(--line); background: var(--paper); }
+.agent-capabilities-page { width: min(1540px, 100%); height: 100dvh; min-width: 0; overflow: auto; margin: 0 auto; padding: 22px 24px 42px; background: var(--canvas); }
+.agent-capabilities-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 22px; padding: 2px 0 16px; border-bottom: 1px solid var(--line); }
+.agent-capabilities-header > div:first-child { min-width: 0; }
+.agent-capabilities-back { display: inline-flex; align-items: center; min-height: 32px; margin-bottom: 7px; color: var(--blue); font-size: 13px; font-weight: 700; text-decoration: none; }
+.agent-capabilities-back:hover { text-decoration: underline; }
+.agent-capabilities-header span, .agent-capability-tracks article > span { color: var(--blue); font-size: 12px; font-weight: 750; }
+.agent-capabilities-header h1 { margin: 3px 0 4px; font-size: 27px; line-height: 1.2; }
+.agent-capabilities-header p { margin: 0; color: var(--muted); font-size: 14px; line-height: 1.5; }
+.agent-capabilities-boundary { min-width: 220px; display: grid; gap: 4px; padding: 10px 12px; border-left: 3px solid var(--blue); color: var(--ink-soft); background: var(--blue-soft); }
+.agent-capabilities-boundary b { color: var(--blue); font-size: 12px; }
+.agent-capabilities-boundary span { color: var(--ink-soft); font-size: 13px; font-weight: 600; }
+.agent-capability-nav { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; padding: 14px 0 0; }
+.agent-capability-nav a { min-width: 0; display: grid; grid-template-columns: 28px minmax(0, 1fr); gap: 1px 8px; padding: 11px 12px; border: 1px solid var(--line); color: var(--ink-soft); background: var(--paper); text-decoration: none; }
+.agent-capability-nav a:hover { border-color: #83a8d4; background: var(--blue-soft); }
+.agent-capability-nav b { grid-row: span 2; width: 25px; height: 25px; display: grid; place-items: center; color: #fff; background: var(--blue); font-size: 12px; }
+.agent-capability-nav span { color: var(--ink); font-size: 14px; font-weight: 750; }
+.agent-capability-nav small { color: var(--muted); font-size: 12px; line-height: 1.4; }
+.agent-capability-tracks { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; padding: 10px 0 0; }
+.agent-capability-tracks article { min-width: 0; padding: 12px; border: 1px solid var(--line); background: var(--paper); scroll-margin-top: 12px; }
+.agent-capability-tracks article h2 { margin: 3px 0 4px; font-size: 17px; }
+.agent-capability-tracks article p { margin: 0; color: var(--ink-soft); font-size: 13px; line-height: 1.55; }
+.agent-capability-tracks article small { display: block; margin-top: 8px; color: var(--muted); font-size: 12px; line-height: 1.45; }
+.agent-capabilities-surface { min-width: 0; display: grid; gap: 12px; margin-top: 16px; }
+.agent-capabilities-toolbar { position: relative; display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; padding: 13px 14px; border: 1px solid var(--line-strong); background: var(--paper); }
+.agent-capabilities-toolbar > div:first-child { min-width: 0; }
+.agent-capabilities-toolbar span, .agent-capability-track > header span { color: var(--blue); font-size: 12px; font-weight: 750; }
+.agent-capabilities-toolbar h2 { margin: 3px 0 4px; font-size: 18px; }
+.agent-capabilities-toolbar p { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.5; }
+.agent-capabilities-toolbar-actions { display: flex; align-items: center; gap: 9px; flex: 0 0 auto; }
+.agent-capabilities-toolbar-actions > b { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-size: 12px; white-space: nowrap; }
+.agent-capabilities-toolbar-actions > b i { width: 8px; height: 8px; border-radius: 50%; background: #9ba4ad; }
+.agent-capabilities-toolbar-actions > b.is-live i { background: var(--green); box-shadow: 0 0 0 3px var(--green-soft); }
+.agent-capability-columns { min-width: 0; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; align-items: start; }
+.agent-capability-track { min-width: 0; border: 1px solid var(--line-strong); background: var(--paper); scroll-margin-top: 12px; }
+.agent-capability-track > header { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; padding: 13px 14px; border-bottom: 1px solid var(--line); }
+.agent-capability-track > header > div { min-width: 0; }
+.agent-capability-track > header h2 { margin: 3px 0 4px; font-size: 18px; }
+.agent-capability-track > header p { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.5; }
+.agent-capability-track > header > small { flex: 0 0 auto; color: var(--muted); font-size: 12px; }
+.agent-capability-facts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1px; margin: 10px 14px 0; border: 1px solid var(--line); background: var(--line); }
+.agent-capability-facts span { min-width: 0; padding: 7px 8px; color: var(--muted); background: #f7f9fb; font-size: 12px; line-height: 1.4; }
+.agent-capability-facts b { display: block; margin-top: 2px; color: var(--ink); font-size: 13px; overflow-wrap: anywhere; }
+.agent-capability-task-input { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px; margin: 10px 14px 0; }
+.agent-capability-task-input label { grid-column: 1 / -1; color: var(--muted); font-size: 12px; font-weight: 700; }
+.agent-capability-task-input textarea { min-width: 0; min-height: 62px; resize: vertical; padding: 8px 9px; border: 1px solid var(--line-strong); border-radius: 4px; background: #fff; font-size: 13px; line-height: 1.45; }
+.agent-capability-task-input button { min-height: 42px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 0 11px; border: 1px solid #185caf; border-radius: 4px; color: #fff; background: var(--blue); font-size: 13px; font-weight: 750; }
+.agent-capability-task-input button svg { width: 16px; }
+.agent-capability-track > .loop-view { min-height: 0; margin-top: 10px; border-top: 1px solid var(--line); }
+.agent-capability-track-adaptive { overflow: hidden; }
+.agent-capability-track-adaptive .adaptive-workbench-inline { width: 100%; max-height: none; overflow: visible; border: 0; box-shadow: none; background: #f5f7f9; }
+.agent-capability-track-adaptive .adaptive-workbench-inline .adaptive-workbench-header { padding: 13px 14px; }
+.agent-capability-track-adaptive .adaptive-workbench-inline .adaptive-workbench-header h2 { font-size: 18px; }
+.agent-capability-track-adaptive .adaptive-workbench-inline .adaptive-workbench-body { max-height: none; overflow: visible; padding: 12px; }
+.agent-capability-track-adaptive .adaptive-workbench-inline .adaptive-summary, .agent-capability-track-adaptive .adaptive-workbench-inline .adaptive-panel { grid-column: 1 / -1; }
+.agent-capability-empty { min-height: 220px; display: grid; place-items: center; align-content: center; gap: 8px; padding: 18px; color: var(--muted); text-align: center; }
+.agent-capability-empty svg { width: 28px; color: var(--blue); }
+.agent-capability-empty p { max-width: 320px; margin: 0; font-size: 13px; line-height: 1.55; }
+.agent-capabilities-error { display: flex; align-items: center; gap: 7px; margin: 0; padding: 9px 12px; color: var(--red); background: var(--red-soft); font-size: 13px; }
+.agent-capabilities-error svg { width: 16px; flex: 0 0 auto; }
+.agent-capabilities-link { min-height: 40px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 0 10px; border: 1px solid var(--line-strong); border-radius: 5px; color: var(--ink-soft); background: #fff; font-size: 13px; font-weight: 750; text-decoration: none; }
+.agent-capabilities-link:hover { border-color: #83a8d4; color: var(--blue); background: var(--blue-soft); }
+.agent-capabilities-link svg { width: 16px; }
 .harness-app-divider {
   position: relative;
   z-index: 3;
@@ -282,6 +344,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, summary:focus
 .read-only-banner svg { width: 15px; flex: 0 0 auto; }
 .adaptive-workbench-backdrop { position: fixed; z-index: 100; inset: 0; display: grid; place-items: center; padding: 24px; background: rgba(26, 38, 50, .46); }
 .adaptive-workbench { width: min(1120px, 100%); max-height: calc(100dvh - 48px); display: grid; grid-template-rows: auto minmax(0, 1fr); overflow: hidden; border: 1px solid #bdc9d4; box-shadow: 0 24px 64px rgba(18, 34, 48, .28); background: #f5f7f9; }
+.adaptive-workbench-inline { width: 100%; max-height: none; overflow: visible; border: 0; box-shadow: none; }
 .adaptive-workbench-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; padding: 18px 20px; border-bottom: 1px solid var(--line); background: #fff; }
 .adaptive-workbench-header > div { min-width: 0; }
 .adaptive-workbench-header span, .adaptive-panel > header span, .adaptive-summary span { color: var(--blue); font-size: 12px; font-weight: 750; }
@@ -1458,12 +1521,20 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, summary:focus
 
 @media (max-width: 1050px) {
   .data-workbench-grid { grid-template-columns: 280px minmax(0, 1fr); }
+  .agent-capability-columns { grid-template-columns: 1fr; }
   .task-composer footer { align-items: flex-start; }
   .workspace-artifact-test-suites > div { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 @media (max-width: 760px) {
   body { overflow: auto; }
+  .agent-capabilities-page { height: auto; min-height: 100dvh; padding: 12px 10px 28px; }
+  .agent-capabilities-header { display: grid; gap: 10px; }
+  .agent-capabilities-header h1 { font-size: 23px; }
+  .agent-capabilities-boundary { min-width: 0; }
+  .agent-capability-nav, .agent-capability-tracks { grid-template-columns: 1fr; }
+  .agent-capabilities-link { width: 100%; }
+  .agent-capabilities-live { margin-right: 0; margin-left: 0; padding: 8px; }
   .harness-app-shell { height: auto; min-height: 100dvh; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto 9px auto; overflow: visible; }
   .harness-workspace-shell { overflow: visible; padding: 10px; }
   .harness-agent-shell { min-height: var(--harness-agent-height, 290px); max-height: none; overflow: visible; border-top: 1px solid var(--line); border-left: 0; }

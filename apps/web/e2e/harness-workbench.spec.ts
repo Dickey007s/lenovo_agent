@@ -5065,6 +5065,7 @@ test.describe("Demo 1/2 runtime acceptance", () => {
   test("Demo 2 requires confirmation, records worker receipts and exposes the next wave", async ({ page }) => {
     await mockDemoRuntime(page, "demo2");
     await page.goto("/");
+    await expect(page.getByRole("link", { name: "Agent 能力" })).toHaveAttribute("href", "/agent-capabilities");
     await page.getByRole("textbox", { name: "任务指令" }).fill("按可解释拓扑核对多个独立工作包。");
     await page.getByRole("button", { name: "启动 Control Loop" }).click();
     await page.getByRole("button", { name: "Agent 路径" }).click();
@@ -5225,6 +5226,96 @@ test.describe("Demo 1/2 runtime acceptance", () => {
     await expect(workbench).toContainText("本 Run 未执行 Tool Call");
     await expect(workbench).toContainText("本次未启动 Worker");
     await expect(workbench.locator(".adaptive-receipt-list")).toHaveCount(0);
+  });
+
+  test("Agent capabilities route keeps the two dimensions peer-level and navigable", async ({ page }) => {
+    await mockDemoRuntime(page, "demo2");
+    await page.goto("/agent-capabilities");
+    const capabilities = page.getByTestId("agent-capabilities-page");
+    await expect(capabilities.getByRole("heading", { name: "Agent 能力工作台" })).toBeVisible();
+    const surface = capabilities.getByTestId("agent-capabilities-surface");
+    await expect(surface.getByTestId("agent-control-loop-capability")).toContainText("Agent Control Loop");
+    await expect(surface.getByTestId("adaptive-swarm-capability")).toContainText("Adaptive Swarm");
+    await expect(surface.locator("#control-loop, #adaptive-swarm")).toHaveCount(2);
+    await expect(surface.locator(".agent-capability-empty")).toHaveCount(2);
+    await expect(capabilities.getByRole("link", { name: "返回工作现场" })).toHaveAttribute("href", "/");
+    await expect(capabilities.getByTestId("agent-capabilities-surface")).toContainText("不会填充演示拓扑或伪造 Worker 回执");
+    await capabilities.getByRole("textbox", { name: "任务指令" }).fill("按组织维核对工作包");
+    await capabilities.getByRole("button", { name: "启动 Control Loop" }).click();
+    const adaptive = capabilities.getByTestId("adaptive-workbench");
+    await expect(adaptive.locator(".adaptive-route-framework .is-active")).toHaveText("Adaptive Swarm");
+    await expect(adaptive.locator(".adaptive-summary")).toContainText("服务端实际路线");
+    await expect(adaptive.locator(".adaptive-source-list span")).toHaveCount(10);
+    await expect(adaptive.locator(".adaptive-source-list")).toContainText("PRD_v2.5.md");
+    await expect(adaptive.locator(".adaptive-source-list")).not.toContainText("forte-");
+    await expect(adaptive.locator(".adaptive-workunit-list article")).toHaveCount(5);
+    await expect(adaptive.locator(".adaptive-branch-grid li")).toHaveCount(5);
+    const controlFacts = capabilities.getByTestId("agent-control-loop-capability");
+    await expect(controlFacts.locator(".agent-capability-facts")).toContainText("Task pointer");
+    await expect(controlFacts.locator(".loop-lineage-strip")).toContainText("任务持续链");
+    if (process.env.CAPTURE_DR0057_EVIDENCE === "1") {
+      await page.setViewportSize({ width: 1440, height: 1100 });
+      await page.screenshot({ path: "../../docs/evidence/screenshots/dr-0057-agent-capabilities-desktop.png", fullPage: true });
+      await page.setViewportSize({ width: 390, height: 844 });
+      await page.screenshot({ path: "../../docs/evidence/screenshots/dr-0057-agent-capabilities-390.png", fullPage: true });
+    }
+    await page.reload();
+    await expect(page).toHaveURL(/\/agent-capabilities$/);
+    await expect(page.getByTestId("agent-control-loop-capability")).toBeVisible();
+    await page.getByRole("link", { name: "返回工作现场" }).click();
+    await expect(page).toHaveURL(/\/$/);
+    await expect(page.getByRole("heading", { name: "办公资料库" })).toBeVisible();
+    await page.getByRole("link", { name: "Agent 能力" }).click();
+    await expect(page).toHaveURL(/\/agent-capabilities$/);
+  });
+
+  test("Agent capabilities route reuses current/history and adaptive/fixed Snapshot facts", async ({ page }) => {
+    const state = await mockSessionHistoryRuntime(page);
+    await page.goto("/agent-capabilities");
+    await page.getByRole("button", { name: /任务会话/ }).click();
+    const history = page.getByTestId("task-session-history");
+    state.eventRequests.length = 0;
+    await history.locator("[data-testid=task-session]").first().getByRole("button", { name: /Run 1/ }).click();
+    await expect(page.getByRole("status")).toContainText("历史 Run 只读查看");
+    await expect.poll(() => state.eventRequests.length).toBe(0);
+    await page.getByRole("button", { name: /任务会话/ }).click();
+    await page.getByTestId("task-session-history").locator("[data-testid=task-session]").first().getByRole("button", { name: /Run 2/ }).click();
+    await expect.poll(() => state.eventRequests.length).toBeGreaterThan(0);
+    expect(state.eventRequests.at(-1)).toContain("after=4");
+    await expect(page.getByTestId("task-lineage")).toContainText("当前任务 Run");
+    await page.reload();
+    await expect(page.getByTestId("agent-capabilities-page")).toBeVisible();
+    await expect(page.getByTestId("agent-control-loop-capability")).toContainText("Agent Control Loop");
+    await expect(page.getByTestId("adaptive-swarm-capability")).toContainText("Adaptive Swarm");
+  });
+
+  test("Agent capabilities route shows fixed route boundary without fake workers", async ({ page }) => {
+    await mockFixedWorkflowRuntime(page);
+    await page.goto("/agent-capabilities");
+    await page.getByRole("textbox", { name: "任务指令" }).fill("固定路线审查");
+    await page.getByRole("button", { name: "启动 Control Loop" }).click();
+    const workbench = page.getByTestId("adaptive-workbench");
+    await expect(workbench.locator(".adaptive-route-framework .is-active")).toHaveText("Fixed Workflow");
+    await expect(workbench).toContainText("本次未启动 Adaptive Swarm");
+    await expect(workbench).toContainText("本次未启动 Worker");
+    await expect(workbench.locator(".adaptive-receipt-list")).toHaveCount(0);
+    await page.setViewportSize({ width: 390, height: 844 });
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+    expect(overflow).toBeLessThanOrEqual(0);
+  });
+
+  test("Agent capabilities route exposes a real review entry without making history actionable", async ({ page }) => {
+    await mockHarness(page, { reviewTable: true });
+    await page.goto("/agent-capabilities");
+    await page.getByRole("textbox", { name: "任务指令" }).fill("核对真实来源并保留审查回执");
+    await page.getByRole("button", { name: "启动 Control Loop" }).click();
+    const surface = page.getByTestId("agent-capabilities-surface");
+    await expect(surface.getByTestId("agent-control-loop-capability")).toContainText("Task pointer");
+    await surface.getByRole("button", { name: /核对：/ }).first().click();
+    await expect(page.locator(".evidence-review-page")).toBeVisible();
+    await expect(page.locator(".evidence-review-page")).toContainText("证据定位");
+    await page.getByRole("button", { name: "关闭问题审查页" }).click();
+    await expect(page.getByRole("dialog")).toHaveCount(0);
   });
 
   test("Task Ledger success sends both versions and renders the child as current", async ({ page }) => {

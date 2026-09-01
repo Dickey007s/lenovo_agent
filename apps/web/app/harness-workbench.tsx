@@ -3660,6 +3660,7 @@ function EvidenceReviewDialog({
   onControl,
   starting,
   controlBusy,
+  readOnly = false,
 }: {
   request: EvidenceReviewRequest;
   files: HarnessFile[];
@@ -3669,6 +3670,7 @@ function EvidenceReviewDialog({
   onControl: (command: LoopCommand, options?: LoopControlOptions) => Promise<boolean>;
   starting: boolean;
   controlBusy: LoopCommand | null;
+  readOnly?: boolean;
 }) {
   const closeButtonRef = useRef<HTMLButtonElement | null>(null);
   const reviewFiles = useMemo(() => request.fileRefs
@@ -3702,6 +3704,10 @@ function EvidenceReviewDialog({
   }, [request.reviewKey, request.review, request.resolution, reviewAnchors, reviewFiles]);
 
   const deferAndClose = useCallback(async () => {
+    if (readOnly) {
+      onClose();
+      return true;
+    }
     const shouldRecordDefer = !request.decisionRecord
       && request.decisionRequest?.state !== "deferred"
       && Boolean(request.findingId)
@@ -3717,7 +3723,7 @@ function EvidenceReviewDialog({
       sourceRevision: request.decisionRequest?.source_revision || request.resolution?.source_revision || undefined,
       feedback: decisionFeedback,
     });
-  }, [decisionFeedback, onClose, onControl, request.affectedBranchIds, request.decisionRecord, request.decisionRequest, request.findingId, request.kind, request.resolution, request.review?.requires_human_decision]);
+  }, [decisionFeedback, onClose, onControl, readOnly, request.affectedBranchIds, request.decisionRecord, request.decisionRequest, request.findingId, request.kind, request.resolution, request.review?.requires_human_decision]);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -3775,7 +3781,7 @@ function EvidenceReviewDialog({
       : `下一步：只重试“${request.branchTitle ?? "当前"}”分支`
     : request.title;
   const startDecisionTask = async () => {
-    if (!selectedOption || !request.findingId) return;
+    if (readOnly || !selectedOption || !request.findingId) return;
     const recorded = await onControl("decision", {
       decisionAction: "accept",
       findingId: request.findingId,
@@ -3794,7 +3800,7 @@ function EvidenceReviewDialog({
     if (await onStartTask(instruction)) onClose();
   };
   const declineFinding = async () => {
-    if (!request.findingId) return;
+    if (readOnly || !request.findingId) return;
     const recorded = await onControl("decision", {
       decisionAction: "decline",
       findingId: request.findingId,
@@ -3806,6 +3812,7 @@ function EvidenceReviewDialog({
     if (recorded) onClose();
   };
   const cancelDecision = async () => {
+    if (readOnly) { onClose(); return; }
     if (!request.findingId || (request.decisionRecord && request.decisionRecord.action !== "defer")) { onClose(); return; }
     const recorded = await onControl("decision", {
       decisionAction: "cancel",
@@ -3819,6 +3826,7 @@ function EvidenceReviewDialog({
     if (recorded) onClose();
   };
   const resolveEvidence = async () => {
+    if (readOnly) return;
     const resolution = request.resolution;
     if (!resolution || !selectedCandidateId || !request.findingId) return;
     const candidate = resolution.candidates.find((item) => item.candidate_id === selectedCandidateId);
@@ -3837,6 +3845,7 @@ function EvidenceReviewDialog({
     onClose();
   };
   const retryUnavailable = async () => {
+    if (readOnly) return;
     const resolution = request.resolution;
     if (!resolution || !request.findingId) return;
     const recorded = await onControl("decision", {
@@ -3860,6 +3869,7 @@ function EvidenceReviewDialog({
     onClose();
   };
   const recoverGap = async () => {
+    if (readOnly) return;
     const recovery = request.gapRecovery;
     if (!recovery) return;
     if (recovery.mode === "resume_branch" && recovery.branchId) {
@@ -3882,6 +3892,7 @@ function EvidenceReviewDialog({
     }
   };
   const startStructuredReview = async () => {
+    if (readOnly) return;
     const instruction = `复核以下问题，逐条定位原文并给出需要人工决定的处理选项：${request.title}`;
     if (await onStartTask(instruction)) onClose();
   };
@@ -3921,12 +3932,12 @@ function EvidenceReviewDialog({
           </section>}
           {request.kind === "gap" && request.gapRecovery && <section className="evidence-gap-recovery" aria-labelledby="gap-recovery-title">
             <header><div><span>{request.gapRecovery.mode === "inspect_only" ? "当前只能查看" : "下一步只做 1 件事"}</span><h3 id="gap-recovery-title">{request.gapRecovery.mode === "inspect_only" ? "查看停下原因，暂不启动新调用" : request.gapRecovery.mode === "new_run" ? "用此分支新建任务继续" : "直接让 Agent 重试此分支"}</h3><p>{request.gapRecovery.mode === "inspect_only" ? "当前状态没有可证明的原地恢复入口。" : request.gapRecovery.mode === "new_run" ? "旧 Run 已结束，不能原地续跑。不需要修改文件，也不需要填写内容；点击后会创建一个只处理此分支的新任务。" : "不需要修改文件，也不需要填写内容。只有你点击后，Agent 才会继续。"}</p></div><b>{request.gapRecovery.mode === "inspect_only" ? "仅查看" : "推荐"}</b></header>
-            <footer>{request.gapRecovery.mode !== "inspect_only" && <button type="button" className="is-primary" onClick={() => void recoverGap()} disabled={controlBusy !== null || starting}><IconRefresh aria-hidden="true" />{starting || controlBusy ? "正在提交" : request.gapRecovery.mode === "new_run" ? "新建任务，只续办此分支" : "继续任务，只重试此分支"}</button>}<button type="button" onClick={() => void deferAndClose()} disabled={controlBusy !== null || starting}>暂不处理此分支</button></footer>
+            <footer>{request.gapRecovery.mode !== "inspect_only" && <button type="button" className="is-primary" onClick={() => void recoverGap()} disabled={readOnly || controlBusy !== null || starting}><IconRefresh aria-hidden="true" />{starting || controlBusy ? "正在提交" : request.gapRecovery.mode === "new_run" ? "新建任务，只续办此分支" : "继续任务，只重试此分支"}</button>}<button type="button" onClick={() => void deferAndClose()} disabled={controlBusy !== null || starting}>暂不处理此分支</button></footer>
             {request.gapRecovery.mode !== "inspect_only" && <details className="gap-extra-hint"><summary>我有额外线索</summary><label className="decision-feedback"><span>给 Agent 的线索（可选）</span><textarea value={decisionFeedback} onChange={(event) => setDecisionFeedback(event.target.value)} placeholder="例如：优先检查 F07、版本号和测试日期" /></label></details>}
           </section>}
           {isDirectRetryResolution && request.resolution && <section className="evidence-gap-recovery" aria-labelledby="resolution-retry-title">
             <header><div><span>下一步只做 1 件事</span><h3 id="resolution-retry-title">直接让 Agent 重试此分支</h3><p>不需要修改文件，也不需要填写内容。只有你点击后，Agent 才会继续。</p></div><b>推荐</b></header>
-            <footer><button type="button" className="is-primary" disabled={controlBusy !== null} onClick={() => void retryUnavailable()}><IconRefresh aria-hidden="true" />继续任务，只重试此分支</button><button type="button" onClick={() => void deferAndClose()} disabled={controlBusy !== null}>暂不处理此分支</button></footer>
+            <footer><button type="button" className="is-primary" disabled={readOnly || controlBusy !== null} onClick={() => void retryUnavailable()}><IconRefresh aria-hidden="true" />继续任务，只重试此分支</button><button type="button" onClick={() => void deferAndClose()} disabled={controlBusy !== null}>暂不处理此分支</button></footer>
             <details className="gap-extra-hint"><summary>我有额外线索</summary><label className="decision-feedback"><span>给 Agent 的线索（可选）</span><textarea value={decisionFeedback} onChange={(event) => setDecisionFeedback(event.target.value)} placeholder="例如：同时核对版本号和测试日期" /></label></details>
           </section>}
           <details className={`evidence-workbench-disclosure${request.kind === "gap" || isDirectRetryResolution ? " is-gap" : ""}`} open={request.kind === "gap" || isDirectRetryResolution ? undefined : true}>
@@ -3962,7 +3973,7 @@ function EvidenceReviewDialog({
                     </button>;
                   })}
                 </div>
-                {isAmbiguousResolution && <div className="resolution-choice-action" role="status"><span>{selectedCandidateId ? "已选 1 个位置。确认后只重跑这个分支。" : `请先从上方 ${request.resolution?.candidates.length ?? 0} 个位置中选 1 个。`}</span><button type="button" className="is-primary" disabled={!selectedCandidateId || controlBusy !== null} onClick={() => void resolveEvidence()}><IconPlayerPlay aria-hidden="true" />采用此位置并只重跑本分支</button></div>}
+                {isAmbiguousResolution && <div className="resolution-choice-action" role="status"><span>{selectedCandidateId ? "已选 1 个位置。确认后只重跑这个分支。" : `请先从上方 ${request.resolution?.candidates.length ?? 0} 个位置中选 1 个。`}</span><button type="button" className="is-primary" disabled={readOnly || !selectedCandidateId || controlBusy !== null} onClick={() => void resolveEvidence()}><IconPlayerPlay aria-hidden="true" />采用此位置并只重跑本分支</button></div>}
               </section> : reviewAnchors.length > 0 ? <section className="evidence-review-pinpoint" aria-labelledby="evidence-pinpoint-title">
                 <header><div><span>证据定位</span><h3 id="evidence-pinpoint-title">选择一条，右侧打开真实文件并高亮对应位置</h3></div><b>{reviewAnchors.length} 处</b></header>
                 <div className="evidence-anchor-map">
@@ -4007,14 +4018,15 @@ function EvidenceReviewDialog({
             <footer>
               <div className="resolution-secondary-actions">
                 <button type="button" onClick={() => void deferAndClose()} disabled={controlBusy !== null}>保留现有结果，稍后处理</button>
-                <button type="button" onClick={() => setSourceHintMode(true)} disabled={controlBusy !== null || sourceHintMode}>补充来源</button>
-                <button type="button" onClick={() => void cancelDecision()} disabled={controlBusy !== null}>取消这次待决</button>
-                <button type="button" onClick={async () => { if (await onControl("stop")) onClose(); }} disabled={controlBusy !== null}><IconPlayerStop aria-hidden="true" />结束并保留</button>
+                <button type="button" onClick={() => setSourceHintMode(true)} disabled={readOnly || controlBusy !== null || sourceHintMode}>补充来源</button>
+                <button type="button" onClick={() => void cancelDecision()} disabled={readOnly || controlBusy !== null}>取消这次待决</button>
+                <button type="button" onClick={async () => { if (!readOnly && await onControl("stop")) onClose(); }} disabled={readOnly || controlBusy !== null}><IconPlayerStop aria-hidden="true" />结束并保留</button>
               </div>
-              {!isAmbiguousResolution && !isDirectRetryResolution && <button type="button" className="is-primary" disabled={controlBusy !== null} onClick={() => void retryUnavailable()}><IconRefresh aria-hidden="true" />继续任务，只重试此分支</button>}
+              {!isAmbiguousResolution && !isDirectRetryResolution && <button type="button" className="is-primary" disabled={readOnly || controlBusy !== null} onClick={() => void retryUnavailable()}><IconRefresh aria-hidden="true" />继续任务，只重试此分支</button>}
             </footer>
             </section>
           </details> : null}
+          {readOnly && <p className="read-only-banner" role="status"><IconEye aria-hidden="true" />历史 Run 只读查看；此页不记录暂缓、决策、恢复或新任务操作。</p>}
           {request.review?.requires_human_decision ? <section className="evidence-review-decision" aria-labelledby="review-decision-title">
             <header><div><span>需要你决断</span><h3 id="review-decision-title">{request.review.question}</h3><p>{request.review.why_human}</p></div><b>后续尚未执行</b></header>
             <div className="decision-options" role="radiogroup" aria-label="处理口径">
@@ -4027,9 +4039,9 @@ function EvidenceReviewDialog({
             {request.review.recommended_option_id && !showRecommendation && <div className="decision-recommendation-gate"><span><b>先形成你的判断</b><small>为避免 Agent 的解释先影响你的选择，推荐项默认隐藏。</small></span><button type="button" disabled={!selectedOptionId} onClick={() => setShowRecommendation(true)}><IconEye aria-hidden="true" />{selectedOptionId ? "对照 Agent 建议" : "先选择一个口径"}</button></div>}
             {request.review.recommended_option_id && showRecommendation && <p className="decision-reason"><b>Agent 推荐 {request.review.recommended_option_id}</b>{request.review.recommendation_reason}{selectedOptionId && selectedOptionId !== request.review.recommended_option_id ? ` 你的选择是 ${selectedOptionId}，系统不会替你改选。` : ""}</p>}
             <label className="decision-feedback"><span>补充给 Agent 的反馈（可选）</span><textarea value={decisionFeedback} onChange={(event) => setDecisionFeedback(event.target.value)} placeholder="例如：先以 PRD 为准，但把兼容测试的代码版本也核对清楚" /></label>
-            <footer><div><IconShieldCheck aria-hidden="true" /><span><b>{request.review.after_confirmation}</b><small>决定会先写入当前 Run 的版本化回执；接受后才启动新的只读 Control Loop。</small></span></div><div className="decision-footer-actions"><button type="button" onClick={() => void deferAndClose()} disabled={controlBusy !== null}>暂缓处理</button><button type="button" onClick={() => void cancelDecision()} disabled={controlBusy !== null}>取消这次待决</button><button type="button" onClick={() => void declineFinding()} disabled={controlBusy !== null}>否决这条发现</button><button type="button" className="is-primary" disabled={!selectedOption || starting || controlBusy !== null} onClick={() => void startDecisionTask()}><IconPlayerPlay aria-hidden="true" />{starting || controlBusy === "decision" ? "正在记录" : "接受并交给 Agent"}</button></div></footer>
+            <footer><div><IconShieldCheck aria-hidden="true" /><span><b>{request.review.after_confirmation}</b><small>决定会先写入当前 Run 的版本化回执；接受后才启动新的只读 Control Loop。</small></span></div><div className="decision-footer-actions"><button type="button" onClick={() => void deferAndClose()} disabled={controlBusy !== null}>暂缓处理</button><button type="button" onClick={() => void cancelDecision()} disabled={readOnly || controlBusy !== null}>取消这次待决</button><button type="button" onClick={() => void declineFinding()} disabled={readOnly || controlBusy !== null}>否决这条发现</button><button type="button" className="is-primary" disabled={readOnly || !selectedOption || starting || controlBusy !== null} onClick={() => void startDecisionTask()}><IconPlayerPlay aria-hidden="true" />{starting || controlBusy === "decision" ? "正在记录" : "接受并交给 Agent"}</button></div></footer>
           </section> : request.kind === "finding" ? <section className="evidence-review-legacy">
-            <IconAlertTriangle aria-hidden="true" /><div><b>{request.review ? "这条发现只需复核，不需要业务裁决" : "旧结果没有结构化处置选项"}</b><p>{request.review?.after_confirmation || "你仍可查看现有证据；重新核对后，Agent 会按新协议给出事实、影响和可确认的处理选项。"}</p></div>{!request.review && <button type="button" disabled={starting} onClick={() => void startStructuredReview()}><IconRefresh aria-hidden="true" />{starting ? "正在启动" : "重新核对并生成处置方案"}</button>}
+            <IconAlertTriangle aria-hidden="true" /><div><b>{request.review ? "这条发现只需复核，不需要业务裁决" : "旧结果没有结构化处置选项"}</b><p>{request.review?.after_confirmation || "你仍可查看现有证据；重新核对后，Agent 会按新协议给出事实、影响和可确认的处理选项。"}</p></div>{!request.review && <button type="button" disabled={readOnly || starting} onClick={() => void startStructuredReview()}><IconRefresh aria-hidden="true" />{starting ? "正在启动" : "重新核对并生成处置方案"}</button>}
           </section> : null}
         </main>
       </div>
@@ -4037,7 +4049,7 @@ function EvidenceReviewDialog({
   </div>;
 }
 
-export function HarnessWorkbench({ onActivityChange }: { onActivityChange?: (state: HarnessActivityState | null) => void }) {
+export function HarnessWorkbench({ onActivityChange, capabilitiesOnly = false }: { onActivityChange?: (state: HarnessActivityState | null) => void; capabilitiesOnly?: boolean }) {
   const [workspace, setWorkspace] = useState<HarnessWorkspace | null>(null);
   const [activeFileRef, setActiveFileRef] = useState("");
   const [preview, setPreview] = useState<HarnessPreview | null>(null);
@@ -4674,6 +4686,43 @@ export function HarnessWorkbench({ onActivityChange }: { onActivityChange?: (sta
     }
   }
 
+  if (capabilitiesOnly && workspaceStatus !== "online") return <div className={`data-workbench-empty ${workspaceStatus === "unavailable" ? "is-error" : ""}`}>
+    {workspaceStatus === "checking" ? <IconLoader2 aria-hidden="true" /> : <IconAlertTriangle aria-hidden="true" />}
+    <h1>{workspaceStatus === "checking" ? "正在核对 Agent 能力资料范围" : "Agent 能力资料范围暂时无法读取"}</h1>
+    <p>{workspaceStatus === "checking" ? "服务端正在校验公开文件清单、大小与完整性。" : workspaceError}</p>
+    {workspaceStatus === "unavailable" && <button type="button" onClick={() => void loadWorkspace()}><IconRefresh aria-hidden="true" />重新读取</button>}
+  </div>;
+
+  if (capabilitiesOnly) return <AgentCapabilitiesSurface
+    files={allFiles}
+    run={run}
+    taskPointer={taskPointer}
+    taskPointerError={taskPointerError}
+    sessionRuns={sessionRuns}
+    sessionsOpen={sessionsOpen}
+    historyLoading={historyLoading}
+    selectedRunCurrent={selectedRunCurrent}
+    instruction={instruction}
+    setInstruction={setInstruction}
+    starting={starting}
+    controlBusy={controlBusy}
+    connection={connection}
+    error={error}
+    onStartTask={startTask}
+    onControl={controlLoop}
+    onContinueTask={continueTask}
+    onCurrentTask={openCurrentTask}
+    onRetryTaskPointer={() => run && refreshTaskPointer(run.task_id, generationRef.current, run.run_id, run.task_version, true)}
+    onExecuteWorkers={executeWorkers}
+    onRefreshSessions={() => void loadSessionRuns()}
+    onToggleSessions={() => setSessionsOpen((current) => !current)}
+    onSelectSession={(snapshot) => { void openSessionRun(snapshot); }}
+    reviewRequest={reviewRequest}
+    onReview={setReviewRequest}
+    onOpenFile={openFile}
+    onCloseReview={() => setReviewRequest(null)}
+  />;
+
   if (workspaceStatus !== "online" || !workspace) return <div className={`data-workbench-empty ${workspaceStatus === "unavailable" ? "is-error" : ""}`}>
     {workspaceStatus === "checking" ? <IconLoader2 aria-hidden="true" /> : <IconAlertTriangle aria-hidden="true" />}
     <h1>{workspaceStatus === "checking" ? "正在核对办公资料库" : "办公资料库暂时无法读取"}</h1>
@@ -4689,6 +4738,7 @@ export function HarnessWorkbench({ onActivityChange }: { onActivityChange?: (sta
       <div><span>FORTE 公开办公数据</span><h1>办公资料库</h1><p>像文件管理器一样自由查看资料；下达目标后，Agent 会从整个资料库自主检索证据。</p></div>
       <div className="data-workbench-status">
         <b className={`is-${connection}`}><i />{connection === "offline" ? "服务离线" : connection === "reconnecting" ? "正在恢复" : "资料可用"}</b>
+        <a className="agent-capabilities-link" href="/agent-capabilities"><IconRoute aria-hidden="true" />Agent 能力</a>
         <button type="button" className="session-history-button" onClick={() => setSessionsOpen((current) => !current)} aria-expanded={sessionsOpen}><IconClock aria-hidden="true" />任务会话{sessionTaskCount ? <b>{sessionTaskCount}</b> : null}</button>
         <button type="button" className="icon-action" title="重新核对资料库" aria-label="重新核对资料库" onClick={() => void loadWorkspace()}><IconRefresh aria-hidden="true" /></button>
       </div>
@@ -4850,6 +4900,7 @@ function AdaptiveSwarmWorkbench({
   starting,
   onClose,
   onExecuteWorkers,
+  inline = false,
 }: {
   run: HarnessRun;
   files: HarnessFile[];
@@ -4857,10 +4908,12 @@ function AdaptiveSwarmWorkbench({
   starting: boolean;
   onClose: () => void;
   onExecuteWorkers: () => Promise<boolean>;
+  inline?: boolean;
 }) {
   const closeButtonRef = useRef<HTMLButtonElement | null>(null);
   const dialogRef = useRef<HTMLElement | null>(null);
   useEffect(() => {
+    if (inline) return;
     const previous = document.activeElement as HTMLElement | null;
     closeButtonRef.current?.focus();
     const onKeyDown = (event: KeyboardEvent) => {
@@ -4876,7 +4929,7 @@ function AdaptiveSwarmWorkbench({
     };
     document.addEventListener("keydown", onKeyDown);
     return () => { document.removeEventListener("keydown", onKeyDown); previous?.focus(); };
-  }, [onClose]);
+  }, [inline, onClose]);
   const admission = run.topology_admission;
   const fileLabel = (fileRef: string) => files.find((file) => file.file_ref === fileRef)?.display_label ?? "批准来源";
   const sourceRefs = Array.from(new Set(run.branches.flatMap((branch) => branch.input_file_refs)));
@@ -4884,9 +4937,8 @@ function AdaptiveSwarmWorkbench({
   const route = admission?.mode === "adaptive_readonly_workers" ? "Adaptive Swarm" : admission?.mode === "fixed_workflow" ? "Fixed Workflow" : "Single Controller";
   const statusText = (status: string) => status === "completed" || status === "adopted" ? "已完成" : status === "blocked" ? "被依赖阻塞" : status === "waiting" || status === "waiting_input" ? "局部等待" : status === "failed" ? "执行失败" : status === "ready" ? "可执行" : "处理中";
   const contributionText = (status: string) => ({ waiting: "待核对", rejected: "已拒绝", failed: "执行失败", adopted: "已采用" }[status] ?? "状态待确认");
-  return <div className="adaptive-workbench-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
-    <section ref={dialogRef} className="adaptive-workbench" role="dialog" aria-modal="true" aria-labelledby="adaptive-workbench-title" data-testid="adaptive-workbench">
-      <header className="adaptive-workbench-header"><div><span>任务编排工作台</span><h2 id="adaptive-workbench-title">Adaptive Swarm 工作台</h2><p>服务端 Snapshot 的当前投影 · Run {run.run_sequence}</p><b className="adaptive-header-boundary">{admission?.mode === "adaptive_readonly_workers" ? "当前有限实现：受限只读 Worker" : "本次未启动 Adaptive Swarm"}</b></div><button ref={closeButtonRef} type="button" className="icon-action" title="关闭工作台" aria-label="关闭工作台" onClick={onClose}><IconX aria-hidden="true" /></button></header>
+  const content = <section ref={dialogRef} className={`adaptive-workbench${inline ? " adaptive-workbench-inline" : ""}`} role={inline ? "region" : "dialog"} aria-modal={inline ? undefined : true} aria-labelledby="adaptive-workbench-title" data-testid="adaptive-workbench">
+      <header className="adaptive-workbench-header"><div><span>任务编排工作台</span><h2 id="adaptive-workbench-title">Adaptive Swarm 工作台</h2><p>服务端 Snapshot 的当前投影 · Run {run.run_sequence}</p><b className="adaptive-header-boundary">{admission?.mode === "adaptive_readonly_workers" ? "当前有限实现：受限只读 Worker" : "本次未启动 Adaptive Swarm"}</b></div>{!inline && <button ref={closeButtonRef} type="button" className="icon-action" title="关闭工作台" aria-label="关闭工作台" onClick={onClose}><IconX aria-hidden="true" /></button>}</header>
       <div className="adaptive-workbench-body">
         <section className="adaptive-summary" aria-label="拓扑准入摘要"><div><span>服务端实际路线</span><strong>{route}</strong><div className="adaptive-route-framework" aria-label="四种路线"><span>Tool Call <small>目标能力</small></span><span className={route === "Single Controller" ? "is-active" : ""}>Single Controller</span><span className={route === "Fixed Workflow" ? "is-active" : ""}>Fixed Workflow</span><span className={route === "Adaptive Swarm" ? "is-active" : ""}>Adaptive Swarm</span></div><p>{route === "Single Controller" || route === "Fixed Workflow" ? `本 Run 未执行 Tool Call；${admission?.reasons.at(-1) ?? "服务端保持当前路线。"}` : admission?.reasons.at(-1) ?? "本次没有可显示的准入说明。"}</p></div><div className="adaptive-summary-facts"><b>{admission?.work_unit_breadth ?? run.branches.length}<small>工作包</small></b><b>{admission?.source_span ?? sourceRefs.length}<small>来源</small></b><b>{admission?.independent_branch_count ?? 0}<small>独立分支</small></b></div></section>
         {run.work_units.length > 0 && <section className="adaptive-panel adaptive-workunits" aria-label="WorkUnit 台账"><header><div><span>WorkUnit 台账</span><h3>真实尝试、依赖和贡献状态</h3></div><small>来自当前 Snapshot</small></header><div className="adaptive-workunit-list">{run.work_units.map((unit) => { const branch = run.branches.find((item) => item.branch_id === unit.branch_id); const contribution = run.contributions.slice().reverse().find((item) => item.work_unit_id === unit.work_unit_id); return <article key={unit.work_unit_id}><b>{branch?.title || "工作包"}</b><span>{statusText(unit.state)} · 第 {unit.attempt} 次尝试</span><small>{unit.depends_on.length ? `依赖 ${unit.depends_on.length} 个前序工作包` : "无前序依赖"}{contribution ? ` · contribution ${contribution.gate_status} · 耗时 ${contribution.model_receipt.elapsed_ms} ms` : " · 尚无贡献回执"}</small></article>; })}</div></section>}
@@ -4895,8 +4947,93 @@ function AdaptiveSwarmWorkbench({
          <section className="adaptive-panel"><header><div><span>Worker 与贡献</span><h3>执行回执和采用状态分开</h3></div><small>{admission?.mode === "adaptive_readonly_workers" ? "当前有限实现：受限只读 Worker" : "本次未启动 Worker"}</small></header>{admission?.mode === "adaptive_readonly_workers" && <p className="adaptive-boundary">仅在用户确认后派发，每批最多 3 个分支；不执行外部动作。</p>}{admission?.mode !== "adaptive_readonly_workers" && <p className="adaptive-boundary">本次路由为 {route}，服务端原因：{admission?.reasons.at(-1) ?? "没有 Worker 准入"}。</p>}{run.worker_runs.length > 0 ? <div className="adaptive-receipt-list">{run.worker_runs.map((worker) => <article key={worker.worker_run_id}><b>{statusText(worker.outcome)}</b><span>{worker.summary}</span><small>{worker.source_file_refs.map(fileLabel).join("、") || "批准来源未显示"} · {worker.model_called ? "模型已调用" : "未调用"} · {worker.output_used ? "已采用" : "未采用"} · 耗时 {worker.elapsed_ms} ms</small></article>)}</div> : <p className="adaptive-empty">尚未有 Worker 回执。</p>}{run.contributions.length > 0 && <div className="adaptive-receipt-list">{run.contributions.map((contribution) => <article key={contribution.contribution_id}><b>贡献{contributionText(contribution.gate_status)}</b><span>{contribution.summary}</span><small>{contribution.approved_file_refs.map(fileLabel).join("、") || "批准来源未显示"} · {contribution.evidence_anchors.length ? `${contribution.evidence_anchors.length} 处原文定位` : "原文定位待补"}</small></article>)}</div>}{admission?.mode === "adaptive_readonly_workers" && !readOnly && <button type="button" className="adaptive-confirm" onClick={() => void onExecuteWorkers()} disabled={starting}><IconPlayerPlay aria-hidden="true" />{starting ? "正在启动" : run.worker_runs.length ? "继续下一波" : "确认并启动只读 Worker"}</button>}</section>
         <section className="adaptive-panel adaptive-artifacts"><header><div><span>成果版本</span><h3>append-only Artifact history</h3></div><small>成果与局部阻塞并存</small></header><div className="adaptive-version-list">{run.artifact_versions.length ? run.artifact_versions.map((artifact) => <article key={`${artifact.artifact_id}:${artifact.version}`}><b>Artifact v{artifact.version}</b><span>{artifact.summary}</span><small>{artifact.finding_count} 条发现 · {run.last_commit?.artifact_version === artifact.version ? "当前提交" : "历史版本"}</small></article>) : <p className="adaptive-empty">尚未生成逻辑成果版本。</p>}</div>{run.contributions.some((item) => item.gate_status !== "adopted") && <p className="adaptive-partial"><IconAlertTriangle aria-hidden="true" />部分成果可用；阻塞分支不会抹掉已采用贡献。</p>}</section>
       </div>
-    </section>
-  </div>;
+    </section>;
+  return inline ? content : <div className="adaptive-workbench-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>{content}</div>;
+}
+
+function AgentCapabilitiesSurface({
+  files,
+  run,
+  taskPointer,
+  taskPointerError,
+  sessionRuns,
+  sessionsOpen,
+  historyLoading,
+  selectedRunCurrent,
+  instruction,
+  setInstruction,
+  starting,
+  controlBusy,
+  connection,
+  error,
+  onStartTask,
+  onControl,
+  onContinueTask,
+  onCurrentTask,
+  onRetryTaskPointer,
+  onExecuteWorkers,
+  onRefreshSessions,
+  onToggleSessions,
+  onSelectSession,
+  reviewRequest,
+  onReview,
+  onOpenFile,
+  onCloseReview,
+}: {
+  files: HarnessFile[];
+  run: HarnessRun | null;
+  taskPointer: TaskPointer | null;
+  taskPointerError: string;
+  sessionRuns: HarnessRun[];
+  sessionsOpen: boolean;
+  historyLoading: boolean;
+  selectedRunCurrent: boolean | null;
+  instruction: string;
+  setInstruction: (value: string) => void;
+  starting: boolean;
+  controlBusy: LoopCommand | null;
+  connection: ConnectionState;
+  error: string;
+  onStartTask: (instruction: string) => Promise<boolean>;
+  onControl: (command: LoopCommand, options?: LoopControlOptions) => Promise<boolean>;
+  onContinueTask: (branchId: string, instruction?: string) => Promise<boolean>;
+  onCurrentTask: () => Promise<boolean>;
+  onRetryTaskPointer: () => void;
+  onExecuteWorkers: () => Promise<boolean>;
+  onRefreshSessions: () => void;
+  onToggleSessions: () => void;
+  onSelectSession: (snapshot: HarnessRun) => void;
+  reviewRequest: EvidenceReviewRequest | null;
+  onReview: (request: EvidenceReviewRequest) => void;
+  onOpenFile: (file: HarnessFile) => void;
+  onCloseReview: () => void;
+}) {
+  const sessionTaskCount = new Set(sessionRuns.map((item) => item.task_id)).size;
+  const isReadOnly = selectedRunCurrent !== true;
+  const scrollToAdaptive = () => document.getElementById("adaptive-swarm")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  const status = connection === "offline" ? "服务离线" : connection === "reconnecting" ? "正在恢复" : connection === "live" ? "实时连接" : "资料可用";
+  return <section className="agent-capabilities-surface" data-testid="agent-capabilities-surface">
+    <header className="agent-capabilities-toolbar">
+      <div><span>服务端能力投影</span><h2>同一 selected Run 的两种观察维度</h2><p>会话切换先校验 Task current pointer；历史 Run 只读，当前非终态 Run 才接收有序事件。</p></div>
+      <div className="agent-capabilities-toolbar-actions"><b className={`is-${connection}`}><i />{status}</b><button type="button" className="session-history-button" onClick={onToggleSessions} aria-expanded={sessionsOpen}><IconClock aria-hidden="true" />任务会话{sessionTaskCount ? <b>{sessionTaskCount}</b> : null}</button></div>
+    </header>
+    {sessionsOpen && <SessionHistory runs={sessionRuns} activeRunId={run?.run_id ?? null} loading={historyLoading} onRefresh={onRefreshSessions} onSelect={(snapshot) => onSelectSession(snapshot)} />}
+    {selectedRunCurrent === false && run && <p className="read-only-banner" role="status"><IconEye aria-hidden="true" />历史 Run 只读查看，不接收实时事件，也不会执行控制、决策或启动新任务。</p>}
+    <div className="agent-capability-columns">
+      <section id="control-loop" className="agent-capability-track" data-testid="agent-control-loop-capability" aria-labelledby="agent-control-loop-title">
+        <header><div><span>A · 时间维</span><h2 id="agent-control-loop-title">Agent Control Loop</h2><p>任务会话、Round、Branch、Evidence、Artifact 与控制事实。</p></div>{run && <small>{isReadOnly ? "历史只读" : "当前 Run"} · Run {run.run_sequence}</small>}</header>
+        <div className="agent-capability-facts" aria-label="Control Loop 事实"><span>Task pointer <b>{taskPointer ? "已确认" : "待确认"}</b></span><span>Round <b>{run?.rounds.length ?? 0}</b></span><span>Branch <b>{run?.branches.length ?? 0}</b></span><span>Evidence <b>{run?.rounds.reduce((total, round) => total + round.evidence_gaps.length, 0) ?? 0} 个缺口</b></span><span>Artifact <b>{run?.artifact_versions.length ?? 0} 个版本</b></span><span>控制 <b>{run?.control_state ?? "未启动"}</b></span></div>
+        <div className="agent-capability-task-input"><label htmlFor="agent-capability-instruction">任务指令</label><textarea id="agent-capability-instruction" value={instruction} disabled={Boolean(run && !isReadOnly && !TERMINAL_STATUSES.has(run.status))} onChange={(event) => setInstruction(event.target.value)} placeholder="输入要推进的任务" aria-label="任务指令" /><button type="button" onClick={() => void onStartTask(instruction)} disabled={starting || instruction.trim().length < 3 || Boolean(run && !isReadOnly && !TERMINAL_STATUSES.has(run.status))}><IconSend aria-hidden="true" />{starting ? "正在启动" : "启动 Control Loop"}</button></div>
+        {run ? <LoopView run={run} taskPointer={taskPointer} taskPointerError={taskPointerError} files={files} controlBusy={controlBusy} onControl={onControl} onReview={onReview} onStartTask={onStartTask} onContinueTask={onContinueTask} onOpenCurrentTask={onCurrentTask} onRetryTaskPointer={onRetryTaskPointer} onExecuteWorkers={onExecuteWorkers} onOpenAdaptiveWorkbench={scrollToAdaptive} readOnly={isReadOnly} starting={starting} /> : <div className="agent-capability-empty"><IconRoute aria-hidden="true" /><p>启动或从任务会话选择一个 Run 后，这里会显示服务端 Round / Branch / Evidence / Artifact 事实。</p></div>}
+      </section>
+      <section id="adaptive-swarm" className="agent-capability-track agent-capability-track-adaptive" data-testid="adaptive-swarm-capability" aria-labelledby="adaptive-swarm-title">
+        <header><div><span>B · 组织维</span><h2 id="adaptive-swarm-title">Adaptive Swarm</h2><p>Topology Admission、WorkUnit DAG、Worker 回执、Contribution Gate 与 v1/v2。</p></div>{run && <small>{isReadOnly ? "历史只读" : "当前 Run"} · Snapshot</small>}</header>
+        {run ? <AdaptiveSwarmWorkbench run={run} files={files} readOnly={isReadOnly} starting={starting} onClose={() => undefined} onExecuteWorkers={onExecuteWorkers} inline /> : <div className="agent-capability-empty"><IconRoute aria-hidden="true" /><p>等待当前 Run Snapshot；不会填充演示拓扑或伪造 Worker 回执。</p></div>}
+      </section>
+    </div>
+    {error && <p className="agent-capabilities-error" role="alert"><IconAlertTriangle aria-hidden="true" />{error}</p>}
+    {reviewRequest && <EvidenceReviewDialog request={reviewRequest} files={files} onClose={onCloseReview} onOpenFile={onOpenFile} onStartTask={onStartTask} onControl={onControl} starting={starting} controlBusy={controlBusy} readOnly={isReadOnly} />}
+  </section>;
 }
 
 function LoopView({
