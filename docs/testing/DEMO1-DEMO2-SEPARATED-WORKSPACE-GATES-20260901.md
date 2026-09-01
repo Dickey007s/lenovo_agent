@@ -1,9 +1,10 @@
 # Demo 1 / Demo 2 分层工作面验收门
 
 - 日期：2026-09-01
-- 状态：`Draft`；实现前合同
+- 状态：`Limited Verified`（工程范围）；形成性用户走查未运行
 - 决策：`DR-0056`
 - 场景：`SCENARIO-043`
+- Evidence：[`DR-0056-DEMO1-DEMO2-SEPARATED-WORKSPACES-EVIDENCE-20260901`](../evidence/DR-0056-DEMO1-DEMO2-SEPARATED-WORKSPACES-EVIDENCE-20260901.md)
 - 测试原则：所有前台状态必须来自公开 API/Snapshot；Fixture 不冒充真实 Provider；
   自动化不冒充用户研究
 
@@ -154,3 +155,13 @@ skip 必须单列。真实 Provider 也必须另留 Run manifest，不能由 moc
 
 记录任务完成率、错误点击、口述困惑点和完成时间。未完成这一步前，不得写“界面更清楚、
 降低认知负担、提高信任或效率”。
+
+## 四、2026-09-01 工程验收结果
+
+- 会话隔离、历史只读、current Run SSE 重连、Adaptive 工作台和 Fixed Workflow 反例的
+  定向浏览器门：`4 passed`；同轮生成桌面与 390 px 截图。
+- 全量 Playwright：`73 passed`；全量 Python：`418 passed, 23 skipped`；Ruff、前端
+  TypeScript lint、Next.js production build、汇报治理测试、变更 Markdown 链接检查和
+  `git diff --check` 通过。
+- 本轮未运行真实 Provider、独立 PostgreSQL 或五人形成性走查；Fixture 截图不能替代这些
+  证据，也不能证明界面已经更易理解。

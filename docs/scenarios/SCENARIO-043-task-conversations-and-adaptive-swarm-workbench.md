@@ -1,11 +1,12 @@
 # SCENARIO-043：任务会话回看与 Adaptive Swarm 独立工作台
 
-- 状态：`Draft`；等待实现、浏览器与用户走查
+- 状态：`Limited Verified`（工程范围）；目标用户走查仍未运行
 - 日期：2026-09-01
 - 决策：`DR-0056`
 - 用户来源：`USER-FEEDBACK-20260901-DEMO1-DEMO2-SEPARATED-WORKSPACES`
 - 研究来源：Codex app、OpenAI Agents SDK、Anthropic、Claude Code、OpenClaw、LangGraph、
   Microsoft HAI 官方资料
+- 工程 Evidence：[`DR-0056-DEMO1-DEMO2-SEPARATED-WORKSPACES-EVIDENCE-20260901`](../evidence/DR-0056-DEMO1-DEMO2-SEPARATED-WORKSPACES-EVIDENCE-20260901.md)
 
 ## 1. 场景目标
 

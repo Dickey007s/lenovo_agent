@@ -419,7 +419,13 @@ Worker 私聊自行拼答案。[Microsoft HAI Guidelines](https://www.microsoft.
 决策、可直接试的两条输入、失败路径与浏览器门见
 [`DR-0056`](../decisions/DR-0056-demo1-loop-and-adaptive-swarm-workspaces.md)、
 [`SCENARIO-043`](../scenarios/SCENARIO-043-task-conversations-and-adaptive-swarm-workbench.md) 和
-[`分层工作面验收门`](../testing/DEMO1-DEMO2-SEPARATED-WORKSPACE-GATES-20260901.md)。
+[`分层工作面验收门`](../testing/DEMO1-DEMO2-SEPARATED-WORKSPACE-GATES-20260901.md)。当前工程门为
+定向浏览器 `4 passed`、全量 Playwright `73 passed`、全量 Python
+`418 passed, 23 skipped`，Ruff/lint/build、治理和变更链接检查通过；任务会话、桌面
+Adaptive 工作台与 390 px 单列截图见
+[`DR-0056 Evidence`](../evidence/DR-0056-DEMO1-DEMO2-SEPARATED-WORKSPACES-EVIDENCE-20260901.md)。
+这些截图使用固定公开 Fixture，只证明 DOM、公开 Snapshot 与交互路径，不证明真实 Provider
+质量、分布式 Swarm、用户理解或业务价值。
 
 ## 最新增补：从“用户先找文件”改为“Agent 找证据，人确认下一步”
 

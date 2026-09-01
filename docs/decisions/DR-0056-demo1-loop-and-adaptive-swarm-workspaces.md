@@ -4,14 +4,14 @@
 
 | 字段 | 内容 |
 | --- | --- |
-| 状态 | `Draft`；等待源码、浏览器和完整回归 Evidence |
+| 状态 | `Limited Verified`（工程范围）；目标用户理解与体验效果仍为 `Draft` |
 | 日期 | 2026-09-01 |
 | 用户来源 | `USER-FEEDBACK-20260901-DEMO1-DEMO2-SEPARATED-WORKSPACES` |
 | 前置决策 | `DR-0053` 的 Task lineage/Topology Admission、`DR-0054` 的 Task Ledger、`DR-0055` 的 WorkUnit/Contribution Ledger |
 | 研究来源 | `DEMO1-DEMO2-SEPARATED-VIEWS-AND-ADAPTIVE-SWARM-UI-RESEARCH-20260901` |
 | 场景 | [`SCENARIO-043`](../scenarios/SCENARIO-043-task-conversations-and-adaptive-swarm-workbench.md) |
 | 测试合同 | [`DEMO1-DEMO2-SEPARATED-WORKSPACE-GATES-20260901`](../testing/DEMO1-DEMO2-SEPARATED-WORKSPACE-GATES-20260901.md) |
-| Evidence | 待实现提交、浏览器截图与验证日志形成后登记 |
+| Evidence | [`DR-0056-DEMO1-DEMO2-SEPARATED-WORKSPACES-EVIDENCE-20260901`](../evidence/DR-0056-DEMO1-DEMO2-SEPARATED-WORKSPACES-EVIDENCE-20260901.md) |
 
 ## 问题
 
@@ -158,6 +158,7 @@ Worker、WorkUnit、Contribution 区只显示真实空态，不能用演示图�
 
 ## 进入 `Limited Verified` 的门槛
 
-只有实现提交、定向/全量自动化、1440/390 截图、公共字段审计与 living docs 全部完成，
-本决策才能从 `Draft` 升为 `Limited Verified`。测试细节见对应测试合同；用户研究结论在
-任何情况下仍保持 `Draft`，直到真实目标用户完成任务走查。
+实现提交、定向/全量自动化、桌面/390 截图、公共字段审计与 living docs 已按 Evidence
+收口，因此工程状态为 `Limited Verified`。这只证明被测 Fixture、公开 Snapshot 与前台
+映射一致；真实 Provider、PostgreSQL 本轮复跑、用户理解和业务收益均未由本轮验证。
+用户研究结论继续保持 `Draft`，直到真实目标用户完成任务走查。
