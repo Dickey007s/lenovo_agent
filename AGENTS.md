@@ -222,7 +222,7 @@ Source、Evidence 和 UI-server fact mapping，不能只更新 README。
 
 ## 当前产品事实
 
-- 根页面是 FORTE 办公资料库与日常工作面；`/agent-capabilities` 只用同一 Task/Run/Snapshot 同页投影 Agent Control Loop 与 Adaptive Swarm 两种能力。产品没有注册 Scenario/Demo 选择器；旧邮件、文档、报价、任务、日历、报销、CRM、审计和固定 Customer A 入口均已退休。07-16 Demo 2 智能工作驾驶舱仍是后续独立产品面，当前没有任务队列、优先级或跨 Task dispatch 合同，也不得显示假入口。
+- 根页面是 FORTE 办公资料库与日常工作面；`/agent-capabilities` 只用同一 Task/Run/Snapshot 投影 Agent Control Loop 与 Adaptive Swarm 两种能力。默认只显示简化执行进展，完整执行记录和协作方式分别按需展开，证据决定进入专注核对页；不得把四层写成四个 Runtime 或四级连续导航。产品没有注册 Scenario/Demo 选择器；旧邮件、文档、报价、任务、日历、报销、CRM、审计和固定 Customer A 入口均已退休。07-16 Demo 2 智能工作驾驶舱仍是后续独立产品面，当前没有任务队列、优先级或跨 Task dispatch 合同，也不得显示假入口。
 - 当前 OpenAPI 有十一个 path、十二个 operation：health、whole workspace、workspace file preview、Run start/list/get、Task get、单 Branch continuation、显式只读 Worker dispatch、Run Artifact download、control/events。旧 `/v1/harness/scenarios*` 不挂载。
 - FORTE 固定 commit `345c1ec1487139db9dd319787fa9405ba85d1869`。`public-suite-manifest.json` 是当前只读清单：15 个公开任务目录、96 个 input、111 个 task/input 文件、`1780445` bytes。官方完整 benchmark 报告 180 条，但公开仓库只提供每职业一个 demo；不得声称拿到未公开 165 条。
 - `task.md` 只作 provenance，不能进入普通 UI、Analyst 输入或成为隐藏默认任务。用户只需自己写 `instruction`；浏览器不得要求或提交客户端 `selected_file_refs`。

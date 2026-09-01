@@ -111,3 +111,11 @@ Swarm。本项目不声称竞品做不到。当前差异假设仍是同一服务
 往返、直接刷新、真实证据审查、桌面/390 px、公共字段审计和全量回归已经通过工程门，
 结果见 DR-0057 Evidence。智能驾驶舱无论本轮门是否通过，仍保持 `尚未实现`；真实
 PostgreSQL、Provider 和目标用户走查也没有由本轮 Fixture 补证。
+
+## 8. 后续交互收敛
+
+本决策关于 Workspace、Agent 能力页和未来智能工作驾驶舱的产品边界继续有效。首版能力页
+“Loop 与 Adaptive Swarm 同屏完整展开”的表现形式，已由 Stakeholder 浏览器反馈判定为
+过于复杂；后续改由 [`DR-0058`](DR-0058-progressive-disclosure-agent-capability-page.md)
+规定四层渐进披露。该调整不改变同一 Task/Run/Snapshot 和历史只读事实，也不扩大当前
+Worker 或驾驶舱能力。

@@ -32,9 +32,11 @@ The root page is the daily Workspace entry:
   only the Agent-selected, server-budgeted files to analysis. Originals stay
   read-only, results require review and no external action occurs.
 
-The root links to `/agent-capabilities`, an inspection route that renders Agent
-Control Loop and Adaptive Swarm facts from the same selected Snapshot. It is not
-a Demo selector, another Runtime or the future Demo 2 smart work cockpit.
+The root links to `/agent-capabilities`, an inspection route that projects Agent
+Control Loop and Adaptive Swarm facts from the same selected Snapshot. It defaults
+to a concise execution-progress view; complete Loop records and the collaboration
+view are disclosed only when requested. It is not a Demo selector, another Runtime
+or the future Demo 2 smart work cockpit.
 
 The default complete-task budget is 12 rounds, 16 files per round, 30 model
 calls and 7,200 Agent-active seconds. Public maxima are 24/24/60/14,400. Human
@@ -162,6 +164,17 @@ the UI does not render a placeholder that could be mistaken for one. The
 integrated engineering gate passes 77 Playwright tests, 418 Python tests with 23
 environment skips, Ruff, lint, build and reporting governance; exact screenshots
 and claim boundaries are recorded in the DR-0057 Evidence.
+
+[`DR-0058`](docs/decisions/DR-0058-progressive-disclosure-agent-capability-page.md)
+keeps that one-Task/Run/Snapshot boundary but replaces the first dense, simultaneous
+projection with four direct disclosure paths: concise execution progress, complete
+execution record, collaboration method and one focused evidence decision. The first
+screen is driven by open `DecisionRequest`, Branch state and the current
+ArtifactVersion; it does not turn every Evidence gap into a user action. The
+organization view still shows only the service-owned route and real WorkUnit,
+Worker and Contribution facts. This is a presentation change, not a new Runtime,
+distributed Swarm or completed smart work cockpit. Engineering checks and remaining
+research limits are recorded in the DR-0058 Evidence.
 
 ## Public data and preview boundary
 
@@ -622,6 +635,10 @@ pnpm --dir apps/web exec playwright test e2e/harness-workbench.spec.ts
 - [SCENARIO-044：同页核对循环与协作能力，驾驶舱保持后续目标](docs/scenarios/SCENARIO-044-agent-capability-page-and-future-smart-cockpit.md)
 - [Agent 能力页与驾驶舱边界验收门](docs/testing/AGENT-CAPABILITY-PAGE-AND-COCKPIT-BOUNDARY-GATES-20260901.md)
 - [Agent 能力页工程 Evidence](docs/evidence/DR-0057-AGENT-CAPABILITY-PAGE-EVIDENCE-20260901.md)
+- [DR-0058：Agent 能力页四层渐进披露](docs/decisions/DR-0058-progressive-disclosure-agent-capability-page.md)
+- [SCENARIO-045：从任务进展逐层查看执行、协作与原文依据](docs/scenarios/SCENARIO-045-progressive-agent-capability-review.md)
+- [Agent 能力页四层渐进披露验收门](docs/testing/AGENT-CAPABILITY-PROGRESSIVE-DISCLOSURE-GATES-20260901.md)
+- [Agent 能力页四层渐进披露工程 Evidence](docs/evidence/DR-0058-AGENT-CAPABILITY-PROGRESSIVE-DISCLOSURE-EVIDENCE-20260901.md)
 - [来源台账](docs/decisions/SOURCE_REGISTER.md)
 - [DR-0054：独立 Task Ledger 与当前 Run 版本控制](docs/decisions/DR-0054-durable-task-ledger-and-current-run-cas.md)
 - [SCENARIO-040：两个页面同时续办时只有一个当前 Run](docs/scenarios/SCENARIO-040-task-current-run-cas-and-restart.md)

@@ -140,17 +140,20 @@ receipts. Anchored adopted findings enter a new normal ArtifactVersion/TaskCommi
 failed, ambiguous or rejected contributions remain scoped receipts and leave only
 their Branch waiting. Completed dependencies can expose a later ready wave.
 
-The full organization projection is no longer forced into that narrow Loop
-surface. `/agent-capabilities` places the live Agent Control Loop and Adaptive
-Swarm projections beside each other over one selected Snapshot. The Adaptive
-area shows the actual route, bounded Worker boundary, approved sources, a
-Supervisor-style Branch/WorkUnit dependency view, called/adopted/elapsed
-receipts, immutable Contribution gate and ArtifactVersion v1/v2. The existing
-full-screen workbench remains an optional operational detail from the root. Tool
-Call, Single Controller, Fixed Workflow and Adaptive Swarm form an explanatory
-route frame, but only the service-owned mode is highlighted; non-adaptive Runs
-never render synthetic receipts. Neither surface is a new Demo API, a
-distributed Swarm Runtime or the Demo 2 smart cockpit.
+The full organization projection is no longer forced into the narrow root Loop
+surface or simultaneously expanded with the complete Loop record.
+`/agent-capabilities` uses one selected Snapshot and defaults to a concise
+execution-progress panel. The user may directly reveal the complete Loop record,
+switch to a peer collaboration-method tab, or open one focused evidence decision.
+The collaboration summary shows the actual route, WorkUnit/Contribution state and
+current ArtifactVersion; bounded Worker details, approved sources, the
+Branch/WorkUnit dependency view and called/adopted/elapsed receipts stay collapsed
+until requested. The existing full-screen workbench remains an optional
+operational detail from the root. Tool Call, Single Controller, Fixed Workflow and
+Adaptive Swarm form an explanatory route frame, but only the service-owned mode is
+highlighted; non-adaptive Runs never render synthetic receipts. None of the four
+disclosure paths is a new Demo API, a distributed Swarm Runtime or the Demo 2 smart
+cockpit.
 
 The future Demo 2 cockpit remains unrendered until a server-owned task queue,
 priority/routing facts and return-to-confirmation state exist. The current page

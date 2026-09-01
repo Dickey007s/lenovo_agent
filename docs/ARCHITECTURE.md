@@ -349,16 +349,20 @@ restart version and sequence at 1, so browser monotonicity applies only within o
 
 The root remains the Workspace surface: safe files, task input, current result,
 review and operational Loop controls. `/agent-capabilities` is a second
-projection over the same selected Task/Run/Snapshot. It renders Agent Control
-Loop and Adaptive Swarm as peer capability areas: the first shows Task Contract,
-parent/child Run, rounds, Branch Evidence Gate, controls and immutable history;
-the second shows `topology_admission`, `branches[]`, `work_units[]`,
-`worker_runs[]`, `contributions[]` and `artifact_versions[]`. Both switch to the
-same historical Run and become read-only together. The existing full-screen
-Adaptive workbench can still be opened as an operational detail from the root,
-but it is not the Demo 2 product identity. Neither projection creates another
-scheduler or hard-coded Demo path, and Worker conversations/raw provider
-responses never become separate user-facing chat panes.
+projection over the same selected Task/Run/Snapshot. It no longer renders the
+complete Loop and Adaptive organization views simultaneously. The default
+`execution progress` panel deterministically summarizes status, the primary open
+DecisionRequest, Branch completion/waiting counts and the current ArtifactVersion.
+A disclosure reveals Task Contract, parent/child Run, rounds, Branch Evidence Gate,
+controls and immutable history. A peer `collaboration method` tab projects
+`topology_admission`, `branches[]`, `work_units[]`, `worker_runs[]`,
+`contributions[]` and `artifact_versions[]`, with the full Worker ledger collapsed
+by default. Evidence decisions open the existing focused review surface. Every
+panel switches to the same historical Run and becomes read-only together. The
+existing full-screen Adaptive workbench can still be opened as an operational
+detail from the root, but it is not the Demo 2 product identity. None of these
+projections creates another scheduler or hard-coded Demo path, and Worker
+conversations/raw provider responses never become separate user-facing chat panes.
 
 The 07-16 Demo 2 identity remains a future smart work cockpit with a real task
 queue and server-owned routing among Tool Call, Single Agent, Fixed Workflow and

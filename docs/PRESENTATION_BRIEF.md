@@ -49,10 +49,12 @@ Agent Control Loop 的逐模块历史基线、当前有界效果纵切和后续�
 `DR-0056` 先把两个镜头从一条长页面中拆开：最近 Run 按 `task_id` 分成任务会话，并形成
 独立全屏 Adaptive Swarm 工作台。该工程 Evidence 仍有效，但 `DR-0057` 纠正了产品解释：
 Workspace 是办公工作面；新的 `/agent-capabilities` 把 Agent Control Loop 与 Adaptive Swarm
-作为同一 Agent 的时间维和组织维能力，用同一个 Task/Run/Snapshot 同页呈现；07-16 Demo 2
-仍是后续单独实现的“智能工作驾驶舱”，Adaptive Swarm 只是它按需选择的一条路线。本轮不画
-假任务队列，也不把能力页或旧 dialog 说成驾驶舱已经完成。这个分层只改变前台投影，不新增
-Demo Runtime；历史 Run 只读且不接 SSE，当前 Worker 仍是单进程受限只读实现。
+作为同一 Agent 的时间维和组织维能力，共用同一个 Task/Run/Snapshot。`DR-0058` 又把首版
+两块完整面同屏改为四条直接路径：默认任务进展、按需完整执行记录、单独协作方式和专注
+原文核对。它们不是四级连续导航，也不是四套 Runtime。07-16 Demo 2 仍是后续单独实现的
+“智能工作驾驶舱”，Adaptive Swarm 只是它按需选择的一条路线。本轮不画假任务队列，也不
+把能力页或旧 dialog 说成驾驶舱已经完成。这个分层只改变前台投影；历史 Run 只读且不接
+SSE，当前 Worker 仍是单进程受限只读实现。
 Task/WorkUnit 的隔离 PostgreSQL 17.11 单主机顺序门已经通过，但 Provider 同场、多实例、
 远端 Worker 与用户研究仍未完成，不能写成生产级 Task 服务或通用/分布式 Worker。
 十五条场景的实际效果、失败修复轨迹、真实模型运行和外部边界见
@@ -73,7 +75,7 @@ Task/WorkUnit 的隔离 PostgreSQL 17.11 单主机顺序门已经通过，但 Pr
 | 8 | Harness 把模型调用、内容采用、确定性办公效果和整体 Loop 状态分开 | 事件、模型回执、可下载工件与检查结果时序 | Snapshot/Receipt/Artifact 事实；不展示思维链，也不把 `completed` 当作效果通过 |
 | 9 | Agent 说“有问题”之后，用户要同时看懂事实、影响、真实原文和自己必须决定的下一步 | 问题处置单：1 事实 -> 2 影响 -> 3 人工动作；证据与实际文件并排；A/B/C + 反馈 | `DR-0030/29`；推荐是模型候选，确认只创建新只读 Run |
 | 10 | Demo 1 把一次 Run 的停止变成同一 Task 的下一段执行；最近记录先按 `task_id` 隔离成任务会话，Task Ledger 再决定打开的 child 是否为当前工作面 | 任务会话抽屉、Run 1→Run 2、全局“历史 Run 只读”、当前非终态 Run 才恢复 SSE、基线成果与来源变化提示 | `DR-0053/54/56`、`SCENARIO-038/040/043`；会话发现只覆盖最近 20 个 Run，不是无限 Task list；child 是新 Run，Run version 可从 1 开始 |
-| 11 | 先把 Agent 能力与 Demo 产品面说清：能力页用同一 Snapshot 同时回答“任务怎样跨 Run 继续”和“复杂任务怎样拆解协作”；07-16 Demo 2 智能工作驾驶舱仍是下一阶段产品面 | `/agent-capabilities` 实际界面：Loop 时间线与 Adaptive 组织图同页，十份来源、3 root+2 dependent、Worker called/adopted/elapsed、Contribution Gate、v1/v2；旁注未来驾驶舱的队列与四路线，不画成当前截图 | `DR-0053/55/57`、`SCENARIO-039/041/042/044`；当前每批最多 3 个进程内只读 Analyst Worker；没有驾驶舱队列、跨 Task dispatch、durable queue/lease、分布式 Swarm 或质量收益证明 |
+| 11 | 先把 Agent 能力与 Demo 产品面说清：能力页用同一 Snapshot 回答“任务怎样跨 Run 继续”和“复杂任务怎样拆解协作”，但默认先回答“现在进展如何、是否需要我处理”；07-16 Demo 2 智能工作驾驶舱仍是下一阶段产品面 | `/agent-capabilities` 实际界面四镜头：任务进展、完整执行记录、协作方式、确认结论依据；协作镜头再展示实际来源、3 root+2 dependent、Worker called/adopted/elapsed、Contribution Gate、v1/v2；旁注未来驾驶舱队列与四路线，不画成当前截图 | `DR-0053/55/57/58`、`SCENARIO-039/041/042/044/045`；四层是同一 Snapshot 的渐进披露；当前每批最多 3 个进程内只读 Analyst Worker；没有驾驶舱队列、跨 Task dispatch、durable queue/lease、分布式 Swarm、用户研究或质量收益证明 |
 | 12 | Demo 3 对单任务和多任务统一施加风险与动作控制 | 影响预演 -> 证据 -> 审批 -> Permit -> 回执 | 目标设计；当前没有真实外部动作 |
 | 13 | 当前 12 个本地 FORTE 场景已有真实隔离工件与确定性验证；3 个外部依赖场景明确阻断 | 12 通过、3 `blocked_external_boundary` 的效果账本；六个真实 `deepseek-v4-pro` 运行 | `DR-0035` 限定能力，不等于任意办公任务或用户价值；模型质量、效果验证、Loop 终态分开报告 |
 | 14 | 历史约 30% 审计基线已升级为可见分支、最小 Task Ledger/current pointer、Branch 绑定的 WorkUnit/Contribution 台账、跨 Run 谱系、可解释拓扑、受限 Worker、可恢复逻辑成果和固定本地可写工件；下一步是 queue/lease、通用 Tool Gateway、分布式 Worker 与外部动作治理 | Task record→current Run→Branch/WorkUnit→Contribution→ArtifactVersion 的当前链路、Topology Admission、Run Workspace Artifact 与 Demo 3 目标架构叠加图 | `30%` 只代表历史基线；当前 WorkUnit 台账不是 durable queue/lease，Worker 与真实工件仍受限于单进程/固定适配器 |
@@ -235,6 +237,7 @@ Task/WorkUnit 的隔离 PostgreSQL 17.11 单主机顺序门已经通过，但 Pr
 - DR-0055 的 Branch 绑定 WorkUnit、append-only Contribution、两波 v1/v2、局部 waiting、严格 reservation replay、fixed-flow 反例和 checkpoint-recovered 目标重试已形成限定纵切；最新全量 Python `417 passed, 23 skipped`、Playwright `68 passed`，隔离 PostgreSQL 17.11 的 Demo/Task 组合为 `10 passed`，Ruff/lint/build 通过。这证明单主机持久台账，不证明 queue/lease、远端 Worker、多实例、Provider 效果或用户价值。
 - DR-0056 把 Demo 1 时间维和 Demo 2 组织维拆成任务会话、历史只读 Run 与独立 Adaptive Swarm 工作台；定向浏览器 `4 passed`、全量 Playwright `73 passed`、全量 Python `418 passed, 23 skipped`，Ruff/lint/build、治理与变更链接检查通过。截图来自固定 Fixture，不是真实 Provider 或用户研究；当前仍只是进程内、每波最多三个的只读 Worker。
 - DR-0057 纠正产品身份并新增 `/agent-capabilities`：Loop 与 Adaptive 使用同一个 selected Run 同页展示，历史一起只读，来源来自安全 Catalog，Evidence Review 仍可回开；能力页定向 `4 passed`、全量 Playwright `77 passed`、全量 Python `418 passed, 23 skipped`，Ruff/lint/build/治理通过。智能工作驾驶舱没有实现，也没有在前台放占位入口。
+- DR-0058 在不改 Runtime 的前提下把能力页收敛为四条渐进披露路径：默认任务进展、完整执行记录、协作方式和确认结论依据；主要待办来自 open DecisionRequest，完整 Loop 与 Worker 记录默认折叠。自动化与截图只证明被测工程映射，不能证明用户理解、效率或信任改善；本轮没有补真实 Provider、PostgreSQL 或目标用户研究。
 - DR-0034 的全量门为 Python `83 passed, 2 skipped`、PostgreSQL `2 passed`、Harness browser `25 passed`，Ruff/lint/build 通过；它证明两类待处理动作的前台映射和 390 px 回归，不证明“3 秒内理解”或用户价值。
 - DR-0036 的门为 Python 定向 `78 passed`、本机全量 `116 passed, 3 skipped`、远端 PostgreSQL 17 `3 passed`、Harness browser `29 passed`、Ruff/lint/build 通过；一次真实 `deepseek-v4-pro` TC-01 在第 1 轮完成，真实 CSV 5/5、三 Branch 完成、0 Gap/开放 DecisionRequest。本机三个 skip 已由 PR #45 顺序 PostgreSQL 门补证，但仍不证明多实例；一次 Provider 成功也不证明重复稳定性或目标用户理解提升。
 - 两张确定性浏览器图分别展示“继续此分支”与“恢复 v1”；它们证明 UI/服务端字段映射，不是真实模型运行；
