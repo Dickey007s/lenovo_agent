@@ -1,0 +1,1 @@
+这页是一个很朴素但很硬的约束：前端展示什么，后端就必须能证明什么。任务栏回指 TaskSnapshot，分支和冲突卡回指 Branch 与 ConflictRecord，共享工件回指 ArtifactVersion 和验证报告，待确认动作回指 ControlEvent 与 Approval，结果横幅回指 ExecutionReceipt；版本、digest、expected version 和 idempotency 负责把状态变化锁住。这个协议映射是当前工程不变量，但把它推广到所有业务场景仍是 Draft，所以前端不能自行补造秒完成、旧金额、风险、Permit 或模型调用事实。沿着这套共同语言，下一页把三个 Demo 放回同一个 Runtime 里看。

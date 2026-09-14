@@ -1,0 +1,1 @@
+这里要特别强调，“正在处理”不是动画做出来的，而是 Task 或 WorkCockpit Snapshot、Branch、Worker、ArtifactVersion、Verification 和 Receipt 的协议投影。GET 负责全量对账，SSE 负责有序变化，版本、序列、digest、message_id 和幂等键共同防止重复或晚到事件把界面带偏；缺少事实时，前台只显示状态待核对。当前固定路径属于 Limited Verified，跨进程 SSE、多实例通知和后台队列仍是 Draft。带着这个前提进入 Demo 2，先看用户选择路线之后为什么还不能算任务已经执行。

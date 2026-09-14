@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720">
+  <rect width="1280" height="720" fill="#FFFFFF"/>
+  <g id="title" font-family="Microsoft YaHei, Arial, sans-serif">
+    <text x="48" y="80" font-size="44" font-weight="700" fill="#182230" data-width="1184">办公任务中的边界与应对</text>
+    <text x="48" y="123" font-size="24" fill="#596579" data-width="1184">后果、证据、权限、版本和回执分别判断，不采用固定 L0-L5</text>
+  </g>
+  <g id="case-table" data-native-table="true" data-x="48" data-y="168" data-widths="230,190,480,284" data-heights="64,96,96,96,96" font-family="Microsoft YaHei, Arial, sans-serif">
+    <rect x="48" y="168" width="1184" height="64" fill="#F4F6F8"/>
+    <line x1="48" y1="232" x2="1232" y2="232" stroke="#DCE2E8" stroke-width="1"/>
+    <line x1="48" y1="328" x2="1232" y2="328" stroke="#DCE2E8" stroke-width="1"/>
+    <line x1="48" y1="424" x2="1232" y2="424" stroke="#DCE2E8" stroke-width="1"/>
+    <line x1="48" y1="520" x2="1232" y2="520" stroke="#DCE2E8" stroke-width="1"/>
+    <line x1="48" y1="616" x2="1232" y2="616" stroke="#DCE2E8" stroke-width="1"/>
+    <text x="64" y="209" data-row="0" data-col="0" font-size="24" font-weight="700" fill="#182230">情境</text>
+    <text x="294" y="209" data-row="0" data-col="1" font-size="24" font-weight="700" fill="#182230">边界</text>
+    <text x="484" y="209" data-row="0" data-col="2" font-size="24" font-weight="700" fill="#182230">处理方式</text>
+    <text x="964" y="209" data-row="0" data-col="3" font-size="24" font-weight="700" fill="#182230">当前状态</text>
+    <text x="64" y="289" data-row="1" data-col="0" font-size="24" fill="#182230">财务摘要</text>
+    <text x="294" y="289" data-row="1" data-col="1" font-size="24" fill="#182230">定位能力缺口</text>
+    <text x="484" y="273" data-row="1" data-col="2" font-size="24" fill="#182230"><tspan x="484" dy="0">Agent 先重试定位</tspan><tspan x="484" dy="34">已生成文件继续保留</tspan></text>
+    <text x="964" y="289" data-row="1" data-col="3" font-size="24" fill="#008A63">已有恢复</text>
+    <text x="64" y="385" data-row="2" data-col="0" font-size="24" fill="#182230">同句多处出现</text>
+    <text x="294" y="385" data-row="2" data-col="1" font-size="24" fill="#182230">证据歧义</text>
+    <text x="484" y="369" data-row="2" data-col="2" font-size="24" fill="#182230"><tspan x="484" dy="0">人选真实原文位置</tspan><tspan x="484" dy="34">来源过期后重新核对</tspan></text>
+    <text x="964" y="385" data-row="2" data-col="3" font-size="24" fill="#008A63">已有决定合同</text>
+    <text x="64" y="481" data-row="3" data-col="0" font-size="24" fill="#182230">UX 频率恰好 3%</text>
+    <text x="294" y="481" data-row="3" data-col="1" font-size="24" fill="#182230">规则冲突</text>
+    <text x="484" y="465" data-row="3" data-col="2" font-size="24" fill="#182230"><tspan x="484" dy="0">保留计算和两种口径</tspan><tspan x="484" dy="34">业务负责人确定规则</tspan></text>
+    <text x="964" y="481" data-row="3" data-col="3" font-size="24" fill="#B86A00">规则批准待实现</text>
+    <text x="64" y="577" data-row="4" data-col="0" font-size="24" fill="#182230">报告发送客户</text>
+    <text x="294" y="577" data-row="4" data-col="1" font-size="24" fill="#182230">对外动作权限</text>
+    <text x="484" y="561" data-row="4" data-col="2" font-size="24" fill="#182230"><tspan x="484" dy="0">保留内部成果，明确未发送</tspan><tspan x="484" dy="34">不因确认依据而开放外发</tspan></text>
+    <text x="964" y="577" data-row="4" data-col="3" font-size="24" fill="#B86A00">外部执行不支持</text>
+  </g>
+  <g id="footer" font-family="Microsoft YaHei, Arial, sans-serif">
+    <text x="48" y="661" font-size="24" fill="#1557D2" data-width="1184">报告文件通过检查，仍可能不满足上线或签署条件。</text>
+    <text x="48" y="696" font-size="16" fill="#596579" data-width="1100">来自八个办公案例的产品设计初稿。后果严重程度仍需评估，当前未实现自动风险评级。</text>
+    <text x="1198" y="696" font-size="16" fill="#596579" data-width="34">05</text>
+  </g>
+</svg>

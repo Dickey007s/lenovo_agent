@@ -1,0 +1,231 @@
+{
+  "schema_version": "complex-task-requirement-accounting.v1",
+  "captured_at": "2026-09-02T11:19:01.0036364Z",
+  "scope": "Public Snapshot-derived summary; no credentials, paths, digests, prompts or raw provider responses.",
+  "service": {
+    "status": "ok",
+    "model": "deepseek-v4-pro",
+    "checkpoint": "memory",
+    "task_store": "memory",
+    "web_status": 200
+  },
+  "visible_run": {
+    "run_id": "harness:e9e1f62564ae461bb525eca643fd5163",
+    "task_id": "task-976c08de42ab",
+    "status": "waiting_input",
+    "version": 17,
+    "round_count": 1,
+    "requirement_count": 6,
+    "planned_count": 4,
+    "deferred_count": 2,
+    "uncovered_count": 0,
+    "branch_count": 6,
+    "completed_branch_count": 2,
+    "waiting_branch_count": 4,
+    "topology": {
+      "mode": "fixed_workflow",
+      "work_unit_breadth": 4,
+      "independent_branch_count": 4,
+      "source_span": 15,
+      "external_action": "none",
+      "user_confirmation_required": false,
+      "reasons": [
+        "已校验 4 个工作单元，涉及 15 份来源材料。",
+        "独立分支超过 3 条受限 Worker 上限，保持固定流程并分批核对。"
+      ]
+    },
+    "model_calls_used": 3,
+    "files_verified": 9,
+    "elapsed_ms": 147238,
+    "analysis_receipt": {
+      "called": true,
+      "model": "deepseek-v4-pro",
+      "elapsed_ms": 56701,
+      "output_used": true,
+      "attempts": 2,
+      "validation_rejections": 1
+    },
+    "planned_requirements": [
+      {
+        "title": "产品上线条件核对",
+        "source_count": 4
+      },
+      {
+        "title": "财务跨期风险核对",
+        "source_count": 3
+      },
+      {
+        "title": "法务授权完整性核对",
+        "source_count": 7
+      },
+      {
+        "title": "外呼合规流程覆盖核对",
+        "source_count": 1
+      }
+    ],
+    "deferred_requirements": [
+      {
+        "title": "搜索Agent运行可靠性",
+        "source_count": 6
+      },
+      {
+        "title": "用户体验问题与优先级",
+        "source_count": 3
+      }
+    ],
+    "branches": [
+      {
+        "title": "产品上线条件核对",
+        "status": "waiting_input",
+        "approved_source_count": 4,
+        "missing_source_count": 2
+      },
+      {
+        "title": "财务跨期风险核对",
+        "status": "completed",
+        "approved_source_count": 3,
+        "missing_source_count": 0
+      },
+      {
+        "title": "法务授权完整性核对",
+        "status": "waiting_input",
+        "approved_source_count": 7,
+        "missing_source_count": 4
+      },
+      {
+        "title": "外呼合规流程覆盖核对",
+        "status": "completed",
+        "approved_source_count": 1,
+        "missing_source_count": 0
+      },
+      {
+        "title": "搜索Agent运行可靠性",
+        "status": "waiting_input",
+        "approved_source_count": 6,
+        "missing_source_count": 6
+      },
+      {
+        "title": "用户体验问题与优先级",
+        "status": "waiting_input",
+        "approved_source_count": 3,
+        "missing_source_count": 3
+      }
+    ],
+    "workspace_artifacts": [
+      {
+        "file_name": "上线合规与风险报告.docx",
+        "verifier_status": "passed",
+        "original_inputs_modified": false,
+        "external_action": "none"
+      },
+      {
+        "file_name": "上线功能风险逐项台账.csv",
+        "verifier_status": "passed",
+        "original_inputs_modified": false,
+        "external_action": "none"
+      }
+    ],
+    "event_names": [
+      "workspace_index",
+      "round_started",
+      "planning_started",
+      "planning_completed",
+      "topology_admission",
+      "plan_validation",
+      "deterministic_office_tool_started",
+      "run_workspace_artifact_written",
+      "run_workspace_artifact_written",
+      "deterministic_verification_completed",
+      "analysis_started",
+      "analysis_completed",
+      "analysis_validation_rejected",
+      "analysis_started",
+      "analysis_completed",
+      "narrative_reconciliation_completed",
+      "result_validation",
+      "evidence_gate"
+    ]
+  },
+  "recovery_run": {
+    "run_id": "harness:aaa335744fbc4d2b820da3bfacfed5ed",
+    "task_id": "task-523f8c98a9ec",
+    "status": "stopped",
+    "round_count": 3,
+    "branch_count": 8,
+    "model_calls_used": 8,
+    "files_verified": 14,
+    "elapsed_ms": 194753,
+    "stop_reason": "轮次预算已耗尽",
+    "artifact_version_count": 3,
+    "workspace_artifacts": [
+      {
+        "file_name": "上线合规与风险报告.docx",
+        "verifier_status": "passed",
+        "original_inputs_modified": false,
+        "external_action": "none"
+      },
+      {
+        "file_name": "上线功能风险逐项台账.csv",
+        "verifier_status": "passed",
+        "original_inputs_modified": false,
+        "external_action": "none"
+      }
+    ],
+    "analysis_attempt_count": 5,
+    "analysis_validation_rejection_count": 4,
+    "event_names": [
+      "workspace_index",
+      "round_started",
+      "planning_started",
+      "planning_completed",
+      "topology_admission",
+      "plan_validation",
+      "deterministic_office_tool_started",
+      "run_workspace_artifact_written",
+      "run_workspace_artifact_written",
+      "deterministic_verification_completed",
+      "analysis_started",
+      "analysis_completed",
+      "narrative_reconciliation_completed",
+      "result_validation",
+      "evidence_gate",
+      "control_resume_recorded",
+      "round_started",
+      "planning_started",
+      "planning_completed",
+      "topology_admission",
+      "plan_validation",
+      "analysis_started",
+      "analysis_completed",
+      "analysis_validation_rejected",
+      "analysis_started",
+      "analysis_completed",
+      "analysis_validation_rejected",
+      "narrative_reconciliation_completed",
+      "result_validation",
+      "evidence_gate",
+      "control_resume_recorded",
+      "branch_resumed_from_checkpoint",
+      "round_started",
+      "planning_started",
+      "planning_completed",
+      "topology_admission",
+      "plan_validation",
+      "analysis_started",
+      "analysis_completed",
+      "analysis_validation_rejected",
+      "analysis_started",
+      "analysis_completed",
+      "analysis_validation_rejected",
+      "narrative_reconciliation_completed",
+      "result_validation",
+      "evidence_gate",
+      "loop_budget_stopped"
+    ]
+  },
+  "limitations": [
+    "The service used process-local memory; another API restart will lose these runs.",
+    "The runs do not prove business correctness, completeness, user benefit or distributed execution.",
+    "No Internet search, source-file modification or external business action is evidenced."
+  ]
+}

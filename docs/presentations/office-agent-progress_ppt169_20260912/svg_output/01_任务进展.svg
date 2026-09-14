@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720">
+  <rect width="1280" height="720" fill="#FFFFFF"/>
+  <g id="title" font-family="Microsoft YaHei, Arial, sans-serif">
+    <text x="48" y="80" font-size="44" font-weight="700" fill="#182230" data-width="1184">原系统重构：任务进展</text>
+    <text x="48" y="123" font-size="24" fill="#596579" data-width="1184">保留原办公资料库、Control Loop 与 Swarm，继续优化同一系统</text>
+  </g>
+  <g id="body" font-family="Microsoft YaHei, Arial, sans-serif">
+    <text x="48" y="216" font-size="28" font-weight="700" fill="#1557D2" data-width="248">原入口保留</text>
+    <text x="48" y="260" font-size="24" fill="#182230" data-width="248">办公资料库与能力页</text>
+    <text x="48" y="296" font-size="24" fill="#182230" data-width="248">共用同一任务状态</text>
+    <text x="48" y="398" font-size="28" font-weight="700" fill="#1557D2" data-width="248">当前重点更清楚</text>
+    <text x="48" y="442" font-size="24" fill="#182230" data-width="248">先看待确认事项</text>
+    <text x="48" y="478" font-size="24" fill="#182230" data-width="248">再看分支与已有成果</text>
+    <text x="48" y="514" font-size="24" fill="#182230" data-width="248">无需先读完整日志</text>
+  </g>
+  <g id="figure">
+    <image href="../images/progress.png" x="320" y="151" width="912" height="512.73" preserveAspectRatio="xMidYMid meet"/>
+  </g>
+  <g id="footer" font-family="Microsoft YaHei, Arial, sans-serif">
+    <text x="48" y="696" font-size="16" fill="#596579" data-width="1080">原系统 React 页面，受控测试数据，2026-09-11。截图用于展示界面，不代表真实模型任务成功。</text>
+    <text x="1198" y="696" font-size="16" fill="#596579" data-width="34">01</text>
+  </g>
+</svg>

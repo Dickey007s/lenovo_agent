@@ -1,0 +1,162 @@
+{
+  "source": "E:\\Project\\Lenovo CAAI AI Agent\\docs\\presentations\\lenovo-agent-report-20260821_ppt169_20260821\\sources\\0716-v2.pptx",
+  "slide_count": 36,
+  "canvas": {
+    "width_px": 1280,
+    "height_px": 720,
+    "aspect": 1.7778
+  },
+  "theme": {
+    "palette": {
+      "background": "#FFFFFF",
+      "background_alt": "#E7E6E6",
+      "text": "#000000",
+      "text_alt": "#44546A",
+      "hyperlink": "#0563C1",
+      "accent1": "#4472C4",
+      "accent2": "#ED7D31",
+      "accent3": "#A5A5A5",
+      "accent4": "#FFC000",
+      "accent5": "#5B9BD5",
+      "accent6": "#70AD47",
+      "primary": "#4472C4"
+    },
+    "fonts": {
+      "title": {
+        "latin": "等线 Light"
+      },
+      "body": {
+        "latin": "等线"
+      }
+    },
+    "sizes": {
+      "title": 44.0,
+      "body": 28.0,
+      "body_levels": [
+        28.0,
+        24.0,
+        20.0,
+        18.0,
+        18.0,
+        18.0,
+        18.0,
+        18.0,
+        18.0
+      ]
+    }
+  },
+  "observed": {
+    "fonts": {
+      "latin": [
+        {
+          "value": "Microsoft YaHei",
+          "count": 24
+        },
+        {
+          "value": "微软雅黑",
+          "count": 15
+        },
+        {
+          "value": "Arial",
+          "count": 6
+        },
+        {
+          "value": "黑体",
+          "count": 5
+        }
+      ],
+      "ea": [
+        {
+          "value": "Microsoft YaHei",
+          "count": 24
+        },
+        {
+          "value": "微软雅黑",
+          "count": 15
+        },
+        {
+          "value": "Arial",
+          "count": 6
+        },
+        {
+          "value": "黑体",
+          "count": 5
+        }
+      ]
+    },
+    "sizes_pt": [
+      {
+        "value": 40.0,
+        "count": 18
+      },
+      {
+        "value": 24.0,
+        "count": 7
+      },
+      {
+        "value": 47.5,
+        "count": 6
+      },
+      {
+        "value": 28.0,
+        "count": 5
+      },
+      {
+        "value": 39.5,
+        "count": 4
+      },
+      {
+        "value": 12.0,
+        "count": 2
+      },
+      {
+        "value": 54.0,
+        "count": 2
+      },
+      {
+        "value": 10.5,
+        "count": 1
+      }
+    ],
+    "colors": [
+      {
+        "value": "#000000",
+        "count": 15
+      },
+      {
+        "value": "#124A8C",
+        "count": 14
+      },
+      {
+        "value": "#FF0000",
+        "count": 10
+      },
+      {
+        "value": "#003F87",
+        "count": 6
+      },
+      {
+        "value": "#2F5597",
+        "count": 6
+      },
+      {
+        "value": "#BFBFBF",
+        "count": 6
+      },
+      {
+        "value": "#1A5391",
+        "count": 4
+      },
+      {
+        "value": "#001F5F",
+        "count": 3
+      }
+    ]
+  },
+  "layout_sizes_pt": [
+    {
+      "value": 24.0,
+      "count": 1
+    }
+  ]
+}

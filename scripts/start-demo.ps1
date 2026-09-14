@@ -33,6 +33,7 @@ if ($DockerCommand) {
 $UseDockerPostgres = Test-Path -LiteralPath $Docker
 $UseConfiguredPostgres = -not [string]::IsNullOrWhiteSpace($env:DATABASE_DSN)
 if ($UseDockerPostgres) {
+    $env:STATE_STORE_MODE = "auto"
     $env:PATH = "$DockerBin;$env:PATH"
     docker info *> $null
     if ($LASTEXITCODE -ne 0) {
@@ -49,11 +50,12 @@ if ($UseDockerPostgres) {
     }
 } else {
     if ($UseConfiguredPostgres) {
+        $env:STATE_STORE_MODE = "auto"
         Write-Host "Using the configured external PostgreSQL state store." -ForegroundColor DarkGray
     } else {
-        # Process environment must override a stale DATABASE_DSN from .env so the
-        # launcher and API agree that this session is using the memory store.
-        $env:DATABASE_DSN = ""
+        # A named non-empty mode survives Windows Start-Process reliably and
+        # overrides a stale DATABASE_DSN loaded from .env without changing it.
+        $env:STATE_STORE_MODE = "memory"
         Write-Warning "Docker and DATABASE_DSN are unavailable; this session will use process-local memory and will not recover after an API restart."
     }
 }

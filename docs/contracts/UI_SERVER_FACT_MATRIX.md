@@ -1,5 +1,77 @@
 # UI-server fact matrix
 
+## DR-0063 original-system boundary projection
+
+[Decision](../decisions/DR-0063-integrated-copilot-boundaries-and-swarm-facts.md),
+[Scenario](../scenarios/SCENARIO-050-understand-boundaries-and-worker-adoption.md),
+[Evidence](../evidence/DR-0063-INTEGRATED-BOUNDARIES-AND-SWARM-FACTS-20260912.md).
+
+| UI state | Server authority / existing projection | Forbidden inference |
+| --- | --- | --- |
+| Evidence choice | Current DecisionRequest + ambiguous Resolution candidates | Choice means business approval or default selection |
+| Incomplete decision | Pending/deferred top-level requests minus usable review packets | Invent candidates or treat missing facts as a completed decision |
+| Read-only dispatch | Waiting Run + adaptive admission + ready IDs intersect actual Branches | Confirmation permits future waves, more sources or external actions |
+| Ready Branch and scope | That same ready set and its input_file_refs | Structural running means Worker dispatched; another waiting Branch defines the wave |
+| Retry | Existing Branch waiting/stopped/failed, Run terminal state, decision priority | Retry already succeeded, terminal Run resumes in place, original files need edits |
+| Business blocked/invalid | workspace_artifacts[].business_gate_outcome status/decision | Artifact passed means release/signature authorized |
+| History | Existing Task-current/readOnly projection | New permission on a historical Run |
+| Worker calls/adoption | worker_runs[].model_called/output_used | Unique Agent count, model names or DAG nodes prove calls |
+| Contribution adoption | contributions[].gate_status | Returned is adopted; historical attempts are unique completed work |
+| Route explanation | topology_admission mode/reasons/independent_branch_count/source_span; remaining calls explicitly at admission time | single_controller is fixed_workflow; rule thresholds are learned optima; admission budget is a live balance |
+
+These notices explain existing facts, with no new permission decision or control side effect. They do
+not implement long-document coverage, general business approval, external execution or user research.
+
+## DR-0062 standalone design exception
+
+2026-09-12 delivery clarification: the standalone HTML below is historical research material, not the intended Demo3 product surface. User-facing co-driving work must integrate into the existing Workspace/capability routes and retain Loop/Adaptive Swarm contracts. This clarification adds no implemented UI/server behavior; see [the integration correction](../sources/USER-FEEDBACK-20260912-integrate-copilot-in-existing-system.md).
+
+[Dynamic boundary prototype](../reports/copilot-boundary-design-20260911/index.html) is an offline Draft,
+not `/agent-capabilities` or a registered Scenario. `permission`, `approval`, `receipt`, `events` and retained
+A/B branches come from synthetic local `model.js` state, never a server Snapshot. Every approval/submission/receipt
+is simulated; `connect-src 'none'`, no API calls, real external actions remain zero. Its future authority mapping
+is explicitly unimplemented in [DR-0062](../decisions/DR-0062-dynamic-boundary-design-experiment.md).
+No current UI-server field, API, authorization or recovery contract changes.
+
+2026-09-12 comprehension projection, still offline only:
+
+| UI | Local authority | Guard / unverified scope |
+| --- | --- | --- |
+| 当前成果与邮件状态 | `file/evidence/localDone/receipt`, through `presenter.js` | Current draft, simulated receipt and no real email remain distinct |
+| 上次与本次范围 | `approval.reviewed` versus current recipient/file/policy revision | No guessed server approval; changed-back scope cannot revive consent |
+| 口径写入新稿 | `choice/localDone/revision` | Exact synthetic percentage and test condition; v3 current, v2 retained; no sending permission |
+| 核查失败或无记录 | Test-setting `reconcile.result` fixture | Remains unknown; no success inference, cancellation or resend |
+| 内部草稿 | `permission=denied/fallback` | Unapproved promise remains; no content repair or new authority |
+| 理解测试未开展 | Absence of participant observations; header-only CSV | Five prompts and code assertions are not user-study results |
+
+Current browser visual and interaction gate remains unverified. See [the dated review](../reports/copilot-boundary-design-20260911/usability-review-20260912.md).
+
+The 2026-09-12 research recommendation list uses generated `followup-data.js` from the dated paper/engineering ledgers. Type filtering, search and reading priority are local presentation state only, not a risk classifier or approval order. Source claims, project hypotheses, methods and limitations remain separate. No API request, model call, task mutation or new server fact is introduced; final browser rendering is still unverified.
+
+## DR-0061 reference-aligned capability surfaces
+
+| UI | Server authority | Guard |
+| --- | --- | --- |
+| 五阶段进展 | Current Round input/plan/analysis receipt/next_step and Artifact | Independent stages; artifact does not imply successful analysis or all gates |
+| 按轮执行记录 | `rounds[]/branch_ids/result/artifact_versions` | Historical detail does not reuse current Branch status as historical fact |
+| 协作 DAG | `work_units[].depends_on/state`, current ready branch IDs | Links and state only from IDs; no fake nodes, empty wave or distributed claim |
+| 当前/历史与控制 | Task current pointer + Run control state | Unknown pointer and history disable mutations; errors have visible recovery |
+| 候选位置与原文预览 | Exact Resolution and top-level DecisionRequest | Native radio has no default; preview does not select; same Finding may have multiple resolutions |
+| 来源 revision 和 stale | Top-level request, before nested legacy copies | Stale remains non-pending; old nested revision cannot win |
+| 确认失败 | Control response / refreshed Snapshot | No successful receipt invented; missing response remains unknown |
+| 终态确认 | Preserved DecisionRecord + separate continuation contract | Record location only; child Run requires explicit Branch continuation |
+| Demo 3 沙盘 | No Runtime facts | Draft examples; no network, approval or external action |
+| 协作页新建任务 | No new server fact; local draft and existing session history | Explicit progress/hash reset even for null Run; no POST, no old Run stop/delete; AC-01 |
+| 待核对判断 · 尚未确认 | Current Resolution `finding_title/fact_summary` | Displayed claim, not verified truth; no inference from candidate text; AC-03 |
+| 完整任务目标 | `run.contract.goal` | Local disclosure only; no new request or changed contract |
+| 底部证据选择状态与错误 | Local selected candidate ID + control result | Initially no selection; viewing never accepts; exact existing IDs and unknown-response semantics retained |
+
+Follow-up verification and open coverage issue: [AC-01 through AC-05](../testing/DEMO12-ACCEPTANCE-CASES-20260911.md).
+The actual UI and model may see different bounded source ranges. Current adopted prose and file
+membership do not prove the whole file was analyzed; Q-01 remains open.
+
+See [DR-0061](../decisions/DR-0061-reference-aligned-capabilities-and-evidence-choice.md) and its Evidence.
+
 This is the current `DR-0036` outcome-first evidence-localization surface on top
 of the `DR-0035` Scenario Effect Gate and Run Workspace Artifact surface,
 `DR-0034` one-action recovery, `DR-0033` closable
@@ -24,6 +96,7 @@ Prompt、思维链、原始模型响应、绝对路径、哈希和内部策略�
 | Expand/search/type filter | client changes visible branches of the file tree; search keeps matching ancestors open | browser state over server projection | no server mutation and no Agent scope change | no claim that visible files are the Run input |
 | File preview selection | choose what the user is looking at | browser state + preview GET | does not constrain Agent evidence | internal ref/path/hash |
 | Task composer | user writes the actual instruction | browser draft; POST/Snapshot `instruction` | required 3-2,000 chars | hidden benchmark-task fallback is forbidden |
+| New task draft | user left the selected Run view and is preparing an independent task; the previous task is preserved | browser state + session-scoped draft marker; absence of any start/control POST | close EventSource, invalidate old generation, clear current projection and focus blank input; refresh stays blank; history selection or valid new Snapshot exits draft | an empty server Task, stopped/deleted/completed old Run, persisted draft text or a new model call |
 | Loop bounds | user chooses hard limits before invocation | browser draft; Snapshot `contract.options` | defaults 12 rounds/16 files/30 calls/7200s; bounds 1-24/1-24/2-60/20-14400s | token/cost estimates not owned by server |
 | Run start | server accepted one independent bounded whole-workspace contract | POST Owner/key/version/instruction/options | unknown response reuses same key; changed or known retry uses new key | internal command signature |
 | Frozen active contract | current instruction, all stable refs and limits cannot silently change | Snapshot `scope_mode/allowed_file_refs` and run-active state | composer/options disabled until terminal | local edits pretending to affect active Run |
@@ -51,6 +124,7 @@ Prompt、思维链、原始模型响应、绝对路径、哈希和内部策略�
 | Planner receipt | not called/adopted/not adopted and elapsed time | round `model_receipt.called/output_used/elapsed_ms` | independent of plan validation | token/provider trace |
 | Candidate rejected | returned candidate was not adopted | `plan_validation_rejected` | at most one repair using the same call budget | raw validator/provider error |
 | Validated plan | server compiled/accepted this round's work intent | `plan_validation`, round public plan | after accepted candidate only | raw tool/effect/gate IDs |
+| Explicit requirement accounting | every supported numbered business item is either in this round, intentionally deferred with approved sources, or uncovered in the frozen index | public `plan.units[]/deferred_requirements[]/uncovered_requirements[]`; private validated `requirement_coverage[]` | validate contiguous indices, unique planned roots and allowlisted deferred refs before Plan adoption; file-budget trimming converts a whole root to deferred | private coverage table/search hint, claim that uncovered searched the Internet, or silent item loss |
 | Deterministic local effect started | one fixed server-owned capability matched the user instruction; its complete allowlisted inputs were frozen before dispatch | `deterministic_office_tool_started.details.capability_id/scenario_id/frozen_source_file_count/external_action`; current Snapshot/version | persisted after plan validation and before the synchronous builder enters `asyncio.to_thread`; no model field can create this authority | private adapter implementation, input bytes, fabricated percentage or claim that work already completed |
 | Long local effect remains observable | the fixed builder may still be running, while workspace, health, Run GET and SSE remain usable | open nonterminal Snapshot plus ordered started event; HTTP/SSE responsiveness gate | builder reads only a frozen Catalog view; one in-process `(owner, run, capability)` claim rejects duplicate dispatch | multi Worker, durable Tool Gateway, resumable subprocess or production SLA |
 | Local effect failed | the fixed builder/verifier did not complete and no verified deliverable was committed | `scenario_effect_failed`, then ordinary fail-closed Run facts; no new Artifact/EffectReceipt | failure event is persisted before the Run failure transition; prior Snapshot facts remain | failed package exists, old Artifact was overwritten or automatic recovery succeeded |
@@ -114,6 +188,7 @@ Prompt、思维链、原始模型响应、绝对路径、哈希和内部策略�
 | Agent-selected evidence | files chosen for this round and business reason | `round.input_file_refs`, `plan.selection_reason` | after server budget/compiler validation | full metadata index, model ranking internals |
 | Analyst started/returned | provider analysis stage, not completion | `analysis_started/completed` | per round | Prompt, CoT, raw response |
 | Analyst receipt | not called/adopted/not adopted and elapsed time | round `analysis_receipt.*` | independent of result validation | token/provider trace |
+| Analysis structure recovery | the Analyst returned truncated, invalid JSON/schema or an unavailable Provider response; no rejected prose became a result | `analysis_structure_rejected.details.failure_kind`, both call receipts, latest `next_step.recovery_kind=analysis_output` when neither attempt is usable | default 180-second Analyst timeout, at most 12,000 requested output tokens and one bounded repair; valid earlier Artifacts remain | raw response, generic success, hidden unlimited retry or claim that the model was never called |
 | Finding list density | the server may return more than three validated findings; the first three are only the initially expanded visual subset | `result.findings[]` / Artifact findings, contract maximum 96 | “查看其余 N 条发现” expands the rest without a new model call or state change | a three-finding analysis cap, silent truncation or claim of exhaustive coverage |
 | Citation and location validation | every Finding stays inside this round's approved refs and has at least one quote uniquely resolved in the exact bounded source | `result_validation`, `result.findings[].evidence_anchors` | before Evidence Gate; model quote candidates are removed before public projection | false semantic/numeric proof claim, raw quote candidate or model-supplied line number |
 | Layout-tolerant unique location | a PDF/DOCX Preview line wrap or punctuation split no longer creates a false missing citation when there is exactly one normalized location | strict match first; server line-mapped layout normalization; resulting exact Anchor | only after zero strict candidates and at least 12 normalized characters; multiple positions stay ambiguous | fuzzy/semantic match, native PDF coordinates, entailment or server guessing |
@@ -121,6 +196,7 @@ Prompt、思维链、原始模型响应、绝对路径、哈希和内部策略�
 | Human Gate admission | a model-proposed decision blocks the user only when the Finding has an exact contradiction Anchor | `decision_gate_suppressed` or a retained `review` plus contradiction Anchor | unsupported review becomes ordinary Finding review; true conflicts keep DecisionRequest flow | claim that all ordinary Findings are correct or need no human review |
 | Verified outcome with audit pending | a deterministic file is usable even though Agent source-location audit still waits | passed EffectReceipt, all visible Artifact checks passed, latest `waiting_input` Gap; UI label “成果可用，审计待补充” | Artifact/download/checks render before Branch/Gaps; only Gaps with the same candidate refs and failure detail may be grouped in the browser | Run `completed`, deleted/merged Branches, same-file distinct failures being one audit item or audit location proving task correctness |
 | Evidence gap Branch lane | the Agent has not produced an adoptable result for one or more bounded Branches; the header says how many are waiting and each row distinguishes “无需核对文件，建议重试” from “需要从 N 个原文位置中选 1 个” | `branches[]` joined by `evidence_gaps[].branch_id`; Branch input/verified/missing refs; top-level `decision_requests[]`; `EvidenceResolution.status/candidates[]` | prior rounds/branches/versions remain visible; opening is read-only; only a versioned Branch decision/resume creates work | claim that visual lanes prove parallel Workers, a candidate file is wrong or the evidence guarantees truth |
+| Deferred explicit requirement | the full frozen index has candidate sources, but the business item did not fit the current round | `plan.deferred_requirements[]` joined to its waiting Branch and `next_step.candidate_branch_ids` | show it separately from current units and uncovered items; “继续此项” resumes exactly that Branch | “Planner found no file”, completed work, a ready Worker, or an invented source |
 | Agent gap recovery sheet | retry-only user sees one recommended Branch action before optional explanation; ambiguous user first sees why a human is needed, what to select and what happens next | latest Round `next_step.recovery_kind`, bound Branch objective/status/input/verified refs, Gap candidates, EvidenceResolution and Planner/Analyst `called/output_used` | opening has no mutation; optional clue and audit/Preview are collapsed; waiting Run may steer then resume only that Branch; terminal Run creates a same-Task child Run for that Branch | raw validator text, invented row/highlight, mandatory source edit, mandatory feedback or replay of a terminal provider call |
 | Retry-only Branch action | user can continue one recoverable Branch without editing files or filling an answer | waiting Branch + non-ambiguous Gap/Resolution + recovery mode; control POST `resume(branch_id)` and optional prior `steer` | primary action is unique; opening does not call a model or charge the next round; unselected Branches remain waiting | automatic retry, hidden budget spend, all-Branch resume |
 | Gap/Branch review page | user can inspect where the gap occurred, what it says and which candidate/missing files are available | `round_number`, business Branch title, `evidence_gaps[]`, Branch `missing_file_refs`, Preview GET | open has no mutation; close/Escape exits immediately, then attempts a versioned `defer` only for an open structured decision; a 409/error stays visible outside the closed dialog and does not claim a receipt | raw Branch ID, claim that candidate files solve the gap, invented diff or trapping the user until a network write succeeds |
@@ -136,7 +212,7 @@ Prompt、思维链、原始模型响应、绝对路径、哈希和内部策略�
 | Historical Run view | the opened record is not the Task current pointer and is therefore review-only | selected Run Snapshot plus `GET /tasks/{task_id}.current_run_id` mismatch | close old EventSource, reset Run sequence, show global read-only banner; never send control/decision/Worker writes | terminal means historical, list recency proves current or a historical SSE is still active |
 | Current Run reconnection | the opened record is the Task current pointer and remains nonterminal | selected Run Snapshot plus matching Task `current_run_id`, `last_event_sequence` | connect named SSE only after both GETs succeed, using `after=last_event_sequence` | guessing current after Task GET failure or reusing another Run's sequence |
 | Topology admission | the server chose the smallest permitted execution shape from validated structure and remaining bounds | `topology_admission.mode/reasons/work_unit_breadth/independent_branch_count/source_span/remaining_*` plus `topology_admission` event | persisted after Plan validation; `single_controller`/`fixed_workflow` proceed conservatively; adaptive waits | model preference as policy, a speed/quality/ROI promise or Worker already running |
-| Adaptive Worker confirmation | an admitted read-only Worker wave has not started until the user confirms | `mode=adaptive_readonly_workers`, `user_confirmation_required=true`, `topology_confirmation_required`, current ready Branches | POST `/workers` with expected version, idempotency and `confirmed=true`, or `topology_override` to single Controller | auto-spawn, hidden model spend, recursive delegation or external action |
+| Adaptive Worker confirmation | an admitted non-empty read-only Worker wave has not started until the user confirms | `mode=adaptive_readonly_workers`, `user_confirmation_required=true`, `topology_confirmation_required`, non-empty current `ready_branch_ids` | only then POST `/workers` with expected version, idempotency and `confirmed=true`, or `topology_override` to single Controller; an empty ready set shows return-to-progress guidance | auto-spawn, empty-wave dispatch, hidden model spend, recursive delegation or external action |
 | Worker budget reservation | one to three ready Branch calls are reserved before in-process dispatch | incremented `budget.model_calls_used` and Snapshot version before handlers start | stale/duplicate/out-of-budget/blocked Branch request rejects the batch; restart does not auto-replay an interrupted Worker | queue/lease durability, provider cancellation or successful return |
 | Worker actual receipt | each Branch-scoped Analyst call is separated from adoption | `worker_runs[].model_called/output_used/elapsed_ms/outcome`, `worker_returned` | source refs must be a subset of the Branch; failed/ambiguous/rejected remains visible but unadopted | an Agent chat transcript, raw provider response or returned=accepted |
 | Worker contribution merge | only anchored adopted findings enter the normal shared result history | `contribution_adopted/waiting/rejected`, `shared_artifacts[]`, new `artifact_versions[]/commits[]` | one failed Branch preserves other adopted contributions; a later dependency wave uses server `ready_branch_ids` | last reply wins, semantic truth, distributed consensus or source-file write |
@@ -145,7 +221,7 @@ Prompt、思维链、原始模型响应、绝对路径、哈希和内部策略�
 | Logical result boundary | the current result is a reviewable/restorable logical version but no office download was generated | non-empty public `artifact_versions[]` and empty `workspace_artifacts[]`; WorkUnit cards join `approved_file_refs` to safe labels and `depends_on` to Branch titles | show source names, business dependencies and “当前为逻辑成果版本，可审查和恢复；尚未生成 DOCX/CSV 下载文件。”; hide raw unit ids and internal revisions | an existing DOCX/CSV, source-file write, deterministic file verification or a failed artifact builder |
 | Agent capabilities page | the user is inspecting time and organization dimensions of one selected Run | current public Task pointer plus Run `rounds/branches/events/artifact_versions/topology_admission/work_units/worker_runs/contributions`; safe workspace labels for refs | `/agent-capabilities` defaults to execution progress derived from the instruction, status, open DecisionRequest, Branch counts and current ArtifactVersion; complete Loop record and collaboration method are separate disclosures over the same Run; historical Run makes every layer read-only | a second Runtime, a static capability brochure, mixed Snapshots, hidden current-state guessing, every Gap promoted to a user task or the Demo 2 cockpit |
 | Focused evidence decision | one current open DecisionRequest requires a location choice or a bounded source-location recovery action | public DecisionRequest/EvidenceResolution packet, candidates, public source revision, expected Run version and safe Preview locator | explain system finding, impact, user action, preserved work and non-actions in ordinary language; candidate selection enables confirmation; request still carries server-required version/idempotency/request/revision fields | raw internal ids/digests, guessed locations, source edit request, semantic truth, full-task rerun or silent stale acceptance |
-| Collaboration method view | the user is inspecting the organization view of the same Run, not entering another Runtime | current public `topology_admission/branches/work_units/worker_runs/contributions/artifact_versions/decision_requests`; latest Round `next_step.ready_branch_ids`; current Round Evidence gaps | show the service-selected Single Controller, Fixed Workflow or Adaptive Swarm route; Adaptive uses a left stage rail, visible directional edges generated from `work_units[].depends_on`, a right impact panel derived from the confirmation-ready wave, waiting/blocked units, waiting contributions, open decisions and evidence gaps, plus a result bar from contributions and Artifact versions; ready node wording, impact explanation and primary confirmation action must agree; details and called/adopted/elapsed receipts remain disclosures; Fixed/Single never render a synthetic DAG | a Demo-specific API, the complete Demo 2 product surface, synthetic Worker chat, distributed Swarm, queue/lease, graph inference in the browser or user-value proof |
+| Collaboration method view | the user is inspecting the organization view of the same Run, not entering another Runtime | current public `topology_admission/branches/work_units/worker_runs/contributions/artifact_versions/decision_requests`; latest Round `next_step.ready_branch_ids`; current Round Evidence gaps | show the service-selected Single Controller, Fixed Workflow or Adaptive Swarm route; Adaptive uses a left stage rail, visible directional edges generated from `work_units[].depends_on`, a right impact panel derived from the confirmation-ready wave, waiting/blocked units, waiting contributions, open decisions and evidence gaps, plus a result bar from contributions and Artifact versions; ready node wording, impact explanation and primary confirmation action must agree; if ready is empty, show no Worker action and direct the user to progress for a real Branch resume; details and called/adopted/elapsed receipts remain disclosures; Fixed/Single never render a synthetic DAG | a Demo-specific API, the complete Demo 2 product surface, synthetic Worker chat, empty-wave dispatch, distributed Swarm, queue/lease, graph inference in the browser or user-value proof |
 | Future smart work cockpit | no current UI state is authorized | no public task-queue, priority, four-route dispatch or return-to-cockpit contract exists | do not render a placeholder, queue or actionable cockpit entry until an authoritative contract and Scenario exist | “客户 A” fixtures, static priority cards or Adaptive Swarm alone presented as the completed Demo 2 cockpit |
 | Worker checkpoint recovery | a restart did not confirm the in-flight return and did not silently replay it | `checkpoint_recovered`, target WorkUnit `state=failed`, `status_reason=checkpoint_recovered_in_flight_worker`, preserved Branch DAG/TopologyAdmission/Contributions | only a new idempotency key plus current Run version and original Branch scope may explicitly retry the recovered unit; ordinary failed units remain terminal | provider was not charged, in-flight HTTP cancellation, automatic resume, multi-instance ownership or queue durability |
 | User stopped | stop was applied at a safe point | `status=stopped`, `loop_stopped` | preserves completed rounds | rollback or deletion claim |
@@ -204,7 +280,8 @@ Prompt、思维链、原始模型响应、绝对路径、哈希和内部策略�
 - “trajectory live” requires an open current EventSource; “service available”
   only requires successful HTTP.
 - Missing/wrong-owner Run returns the same 404.
-- `X-User-Id` is unsigned. With `DATABASE_DSN`, Snapshot, minimal Task records,
+- `X-User-Id` is unsigned. With PostgreSQL selected by
+  `STATE_STORE_MODE=auto|postgres` and a non-empty `DATABASE_DSN`, Snapshot, minimal Task records,
   Branch-bound WorkUnits/Contributions, Task/start/control/Worker reservation receipts,
   ArtifactVersions and TaskCommits are PostgreSQL-backed; without it they remain
   one-process memory.
@@ -213,7 +290,8 @@ Prompt、思维链、原始模型响应、绝对路径、哈希和内部策略�
   This is not a transactional database/filesystem commit or multi-host durability.
 - Local `start-demo.ps1` chooses Docker first, then a `DATABASE_DSN` explicitly
   present in the launching PowerShell process, otherwise memory. In the final
-  case it overrides a stale `.env` database value. UI/service availability and
+  case it sets non-empty `STATE_STORE_MODE=memory` so Runtime ignores a stale
+  `.env` database value across Windows `Start-Process`. UI/service availability and
   restart-recovery claims must use `/v1/health.checkpoint` and `task_store`, not
   the launcher message or the mere presence of `.env`.
 - `checkpoint_recovered` proves a persisted Snapshot was restored and paused.

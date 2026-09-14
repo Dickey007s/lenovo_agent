@@ -109,8 +109,10 @@
 - narrative_base: 07-16 future office agent deck
 - visual_identity: 07-16 light technical briefing; white/light-gray canvas, dark navy titles, blue evidence flow, orange human/risk gates, green adopted outcomes
 - research_sources: online official competitor docs, papers, and user-interaction research only
-- current_system_label: 当前系统实测
-- user_feedback_label: 用户反馈样本，非正式目标用户研究
+- current_system_evidence: 固定公开场景的受控运行；Demo 2 为受控演示样例
+- user_research_boundary: 截图、自动化和现场反馈均不是正式目标用户研究
+- research_footer: 页面放可点击官方短链接，完整 URL 保留在演讲者备注 `[Sources]` 区块
+- compact_layout: 不保留页顶延续标签、日期、封面计数、空色带或没有独立信息价值的小字说明
 - forbidden_source_footer: README, DR, Scenario, Evidence, Detailed Chinese Report, internal document paths
 
 ## forbidden

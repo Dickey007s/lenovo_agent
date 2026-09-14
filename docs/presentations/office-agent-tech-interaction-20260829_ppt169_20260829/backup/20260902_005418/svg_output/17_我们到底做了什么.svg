@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720" width="1280" height="720">
+  <g id="background">
+    <rect width="1280" height="720" fill="#F7F8FA"/>
+    <path d="M52 112H1228" stroke="#CBD5DF" stroke-width="2"/>
+  </g>
+  <g id="header">
+    <text x="52" y="78" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="46" font-weight="700" fill="#132A3A">我们到底做了什么：跑通办公任务纵切</text>
+    <rect x="1068" y="46" width="160" height="34" rx="6" fill="#EDF1F4"/>
+    <text x="1148" y="69" text-anchor="middle" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#1769E0">当前系统实测</text>
+  </g>
+  <g id="process-steps">
+    <text x="52" y="152" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="28" font-weight="700" fill="#132A3A">不是回答页，而是一条可复核链路</text>
+    <path d="M78 204V506" stroke="#CBD5DF" stroke-width="4"/>
+    <circle cx="78" cy="214" r="20" fill="#1769E0"/>
+    <text x="78" y="221" text-anchor="middle" font-family="Consolas, &quot;Courier New&quot;, monospace" font-size="17" font-weight="700" fill="#FFFFFF">1</text>
+    <text x="116" y="208" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="24" font-weight="700" fill="#132A3A">Workspace</text>
+    <text x="116" y="236" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#5A6B7C">15 个目录 · 96 份安全预览</text>
+
+    <circle cx="78" cy="286" r="20" fill="#1769E0"/>
+    <text x="78" y="293" text-anchor="middle" font-family="Consolas, &quot;Courier New&quot;, monospace" font-size="17" font-weight="700" fill="#FFFFFF">2</text>
+    <text x="116" y="280" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="24" font-weight="700" fill="#132A3A">Task Contract</text>
+    <text x="116" y="308" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#5A6B7C">目标、范围、预算由服务端冻结</text>
+
+    <circle cx="78" cy="358" r="20" fill="#1769E0"/>
+    <text x="78" y="365" text-anchor="middle" font-family="Consolas, &quot;Courier New&quot;, monospace" font-size="17" font-weight="700" fill="#FFFFFF">3</text>
+    <text x="116" y="352" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="24" font-weight="700" fill="#132A3A">Planner + Analyst</text>
+    <text x="116" y="380" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#5A6B7C">调用、校验、采用分别留回执</text>
+
+    <circle cx="78" cy="430" r="20" fill="#D97706"/>
+    <text x="78" y="437" text-anchor="middle" font-family="Consolas, &quot;Courier New&quot;, monospace" font-size="17" font-weight="700" fill="#FFFFFF">4</text>
+    <text x="116" y="424" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="24" font-weight="700" fill="#132A3A">Branch Evidence Gate</text>
+    <text x="116" y="452" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#5A6B7C">局部停、局部补证、保留已完成成果</text>
+
+    <circle cx="78" cy="502" r="20" fill="#2E7D32"/>
+    <text x="78" y="509" text-anchor="middle" font-family="Consolas, &quot;Courier New&quot;, monospace" font-size="17" font-weight="700" fill="#FFFFFF">5</text>
+    <text x="116" y="496" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="24" font-weight="700" fill="#132A3A">Artifact + Receipt</text>
+    <text x="116" y="524" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#5A6B7C">真实文件、确定性检查、Snapshot 与 Trace</text>
+
+    <rect x="52" y="552" width="392" height="84" rx="6" fill="#132A3A"/>
+    <text x="76" y="586" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="24" font-weight="700" fill="#FFFFFF">用户得到的不是一句“完成”</text>
+    <text x="76" y="616" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#CBD5DF">而是成果、依据、影响和下一步。</text>
+  </g>
+  <g id="live-run-proof">
+    <rect x="468" y="140" width="760" height="528" rx="6" fill="#FFFFFF" stroke="#CBD5DF" stroke-width="2"/>
+    <image href="../images/dr-0036-tc01-live-run-completed.png" x="478" y="150" width="740" height="514" preserveAspectRatio="xMidYMid meet"/>
+    <rect x="488" y="162" width="152" height="32" rx="6" fill="#132A3A"/>
+    <text x="564" y="184" text-anchor="middle" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="17" font-weight="700" fill="#FFFFFF">真实运行界面</text>
+  </g>
+  <g id="footer">
+    <text x="52" y="690" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="14" fill="#7C8A98">当前边界：有界只读 Agent Control Loop + 固定成果适配器；不是通用执行器或生产 SLA 证明</text>
+    <text x="1228" y="690" text-anchor="end" font-family="Consolas, &quot;Courier New&quot;, monospace" font-size="14" fill="#7C8A98">17 / 24</text>
+  </g>
+</svg>

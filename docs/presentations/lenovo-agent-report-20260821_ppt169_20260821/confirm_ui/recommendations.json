@@ -1,0 +1,183 @@
+{
+  "tier": 2,
+  "lang": "zh-CN",
+  "recommend": {
+    "icons": "tabler-outline",
+    "image_usage": [
+      "provided"
+    ],
+    "formula_policy": "text-only",
+    "generation_mode": "continuous"
+  },
+  "page_count": {
+    "value": "16"
+  },
+  "color": {
+    "selected": 0,
+    "candidates": [
+      {
+        "name_zh": "证据蓝与状态绿",
+        "name_en": "Evidence Blue",
+        "note_zh": "推荐。以深蓝承载架构与事实，以联想红提示风险边界，以绿色只确认已验证状态；适合真实界面截图、协议图和证据标签并置。",
+        "note_en": "Recommended. Deep blue carries architecture and facts, red marks risk boundaries, and green is reserved for verified states; built for screenshots, protocol diagrams, and evidence labels.",
+        "palette": {
+          "background": "#F7F9FC",
+          "secondary_bg": "#EAF0F7",
+          "primary": "#0B3A70",
+          "accent": "#D71920",
+          "secondary_accent": "#16845B",
+          "body_text": "#172230"
+        }
+      },
+      {
+        "name_zh": "联想红与石墨黑",
+        "name_en": "Lenovo Signal Red",
+        "note_zh": "更有品牌记忆点。红色只用于关键转折、冲突和动作边界，黑白灰保持大面积阅读底色，避免整套页面变成警示色。",
+        "note_en": "More brand-forward. Red appears only at turning points, conflicts, and action boundaries while black, white, and gray carry the reading surface.",
+        "palette": {
+          "background": "#FFFFFF",
+          "secondary_bg": "#F1F2F4",
+          "primary": "#111820",
+          "accent": "#E2231A",
+          "secondary_accent": "#2E6FB5",
+          "body_text": "#2A3138"
+        }
+      },
+      {
+        "name_zh": "蓝图青与研究黄",
+        "name_en": "Blueprint Teal",
+        "note_zh": "更偏研究汇报。青色连接状态与时序，黄色突出关键判断，珊瑚红只表示未完成或待验证边界，适合八模块和受控执行瀑布。",
+        "note_en": "More research-oriented. Teal connects states and sequence, yellow lands key judgments, and coral red marks open or pending evidence.",
+        "palette": {
+          "background": "#F5FAFA",
+          "secondary_bg": "#E4F1F0",
+          "primary": "#073B4C",
+          "accent": "#0E918C",
+          "secondary_accent": "#E2A725",
+          "body_text": "#1E2C32"
+        }
+      }
+    ]
+  },
+  "typography": {
+    "selected": 0,
+    "candidates": [
+      {
+        "name_zh": "产品评审黑体",
+        "name_en": "Product Review Sans",
+        "note_zh": "推荐。中文标题有足够重量，英文协议名和 Demo 标签保持清晰；适合会议投影与会后阅读的均衡正文。",
+        "note_en": "Recommended. Strong enough for Chinese titles while keeping protocol names and Demo labels clear for both projection and close reading.",
+        "sample_heading": "让 Agent 做事之后，企业还需要什么？",
+        "sample_heading_latin": "After Agents Act, What Does the Enterprise Need?",
+        "sample_body": "从业务事实到可追责结果，每个前台状态都由服务端事实产生。",
+        "sample_body_latin": "Every visible state is backed by a server fact.",
+        "heading": {
+          "cjk": "Microsoft YaHei UI",
+          "latin": "Segoe UI",
+          "css": "'Microsoft YaHei UI','Segoe UI',Arial,sans-serif"
+        },
+        "body": {
+          "cjk": "Microsoft YaHei UI",
+          "latin": "Segoe UI",
+          "css": "'Microsoft YaHei UI','Segoe UI',Arial,sans-serif"
+        },
+        "body_size": 24,
+        "sizes": {
+          "title": 44,
+          "subtitle": 30,
+          "annotation": 18
+        }
+      },
+      {
+        "name_zh": "蓝图等线",
+        "name_en": "Blueprint DengXian",
+        "note_zh": "更偏工程系统感，适合协议映射、事件瀑布和八模块路径；标题与正文都保持克制，长段落不显拥挤。",
+        "note_en": "More systems-oriented for protocol maps, event waterfalls, and the eight-module path, with restrained density for long annotations.",
+        "sample_heading": "从 Task 到 Artifact，再到可控动作",
+        "sample_heading_latin": "From Task to Artifact to Controlled Action",
+        "sample_body": "选择、执行、验证和回执共享同一条可追溯事实链。",
+        "sample_body_latin": "Selection, execution, verification, and receipt share one traceable fact chain.",
+        "heading": {
+          "cjk": "DengXian",
+          "latin": "Arial",
+          "css": "DengXian,Arial,sans-serif"
+        },
+        "body": {
+          "cjk": "DengXian",
+          "latin": "Arial",
+          "css": "DengXian,Arial,sans-serif"
+        },
+        "body_size": 24,
+        "sizes": {
+          "title": 42,
+          "subtitle": 29,
+          "annotation": 18
+        }
+      },
+      {
+        "name_zh": "编辑叙事黑体",
+        "name_en": "Editorial Evidence Sans",
+        "note_zh": "更强调故事张力。大标题用于问题与判断，小字号只承载来源和边界，适合让三个 Demo 形成连续叙事。",
+        "note_en": "More narrative. Large titles carry the question and judgment; smaller text is reserved for sources and boundaries so the three Demos read as one story.",
+        "sample_heading": "冲突不是异常，而是用户需要看见的下一步",
+        "sample_heading_latin": "A Conflict Is the Next User Decision",
+        "sample_body": "先展示影响预演，再由服务端回执确认真正发生了什么。",
+        "sample_body_latin": "Preview the impact first, then let the server receipt confirm what happened.",
+        "heading": {
+          "cjk": "Microsoft YaHei",
+          "latin": "Aptos Display",
+          "css": "'Microsoft YaHei','Aptos Display',Arial,sans-serif"
+        },
+        "body": {
+          "cjk": "Microsoft YaHei",
+          "latin": "Aptos",
+          "css": "'Microsoft YaHei','Aptos',Arial,sans-serif"
+        },
+        "body_size": 24,
+        "sizes": {
+          "title": 46,
+          "subtitle": 31,
+          "annotation": 18
+        }
+      }
+    ]
+  },
+  "image_usage": [
+    "provided"
+  ],
+  "image_notes": {
+    "value": "主视觉只使用仓库内的真实项目材料：0716-v2.pptx 导出的界面截图、Demo 1/2/3 运行截图、客户 A 演示文件卡片和可复核证据图。封面用 Task→Artifact→Control 的三段真实界面截面；Demo 1 用任务阶段与文件冲突截图；Demo 2 用驾驶舱、事件瀑布和共享工件截图；Demo 3 用影响账本和确认 tray 截图。架构、对比矩阵、八模块、SSE 时序和四泳道实验用原生 SVG 图形重绘。不得用库存照片、机器人插画或伪造企业数据；所有界面截图旁标注演示数据、固定客户 A、Verified/Limited Verified/Draft 边界。"
+  },
+  "image_strategy": {
+    "selected": 0,
+    "candidates": [
+      {
+        "name": "证据拼贴",
+        "rendering": "provided-screenshot-collage",
+        "palette": "evidence-blue",
+        "visual": "三块真实界面截图沿 Task→Artifact→Control 形成连续路径，保留业务状态与关键标签，裁切只去除无关空白。",
+        "color": "截图保持原色，背景使用浅灰蓝，红色只圈出冲突与动作边界，绿色只标注验证回执。",
+        "mood": "可信、具体、可复核"
+      },
+      {
+        "name": "状态叙事",
+        "rendering": "provided-screenshot-with-native-diagram",
+        "palette": "lenovo-signal-red",
+        "visual": "左侧放真实前台截图，右侧用原生 SVG 状态流和证据标签解释前后端事实，不生成不存在的产品界面。",
+        "color": "白底承载截图，红色强调转折，蓝色连接 Snapshot/SSE，灰色收纳来源与边界。",
+        "mood": "清晰、克制、有行动感"
+      },
+      {
+        "name": "蓝图放大",
+        "rendering": "provided-business-document-and-flow",
+        "palette": "blueprint-teal",
+        "visual": "把客户 A 文件字段、事件序列和共享工件作为可读业务证据放大，用等宽标记展示 seq 9/10/15，但不暴露 raw payload 或内部 ID。",
+        "color": "青色表示状态流，黄色表示关键判断，珊瑚红表示待验证边界，背景保持高留白。",
+        "mood": "研究感、结构化、可审阅"
+      }
+    ]
+  },
+  "refine_spec": {
+    "value": false
+  }
+}

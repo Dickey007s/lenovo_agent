@@ -210,7 +210,14 @@ Catalog read: 71 templates
 | `dr-0058-adaptive-execution-workspace-1440.png` | 1440×1100 | 1.31 | Demo 2 受控 Adaptive 执行工作面 | Screenshot | #19 Image floating in whitespace with thin frame and caption + #46 bordered lens | user | Existing | 展示阶段轨、5 个 WorkUnit、真实依赖、下一波确认与 Artifact v1 |  |  |
 | `dr-0058-agent-capabilities-evidence-review.png` | 1440×1100 | 1.31 | 四层渐进披露中的原文核对页 | Screenshot | #19 Image floating in whitespace with thin frame and caption | user | Existing | 保留普通语言解释、安全预览与候选选择 |  |  |
 
-所有截图均为当前系统实测留痕，不作为外部研究来源。竞品与技术方向页只使用线上官方页面、论文与正式用户交互研究，不生成或伪造竞品运行截图。现场反馈截图只标为“用户反馈样本”，不冒充正式目标用户研究。
+当前系统页面截图只证明固定公开场景的受控运行，不作为外部研究来源；Demo 2 截图是受控演示样例，不是生产调度或分布式运行证据。竞品与技术方向页只使用线上官方页面、论文与正式用户交互研究，不生成或伪造竞品运行截图。截图、自动化和现场反馈都不冒充正式目标用户研究。
+
+### 精简版版面规则
+
+- 删除页顶延续标签、封面计数、日期、截图说明条和没有独立信息价值的状态徽标。
+- 页脚不再写泛化的“研究依据：某某方法”；研究页改放可点击的官方短链接，完整 URL 同步保留在演讲者备注的 `[Sources]` 区块。
+- 正文中文优先。产品正式模块名与外部产品名只在必要处保留，首次出现解释中文含义，后续不重复堆英文协议字段。
+- 小字只保留边界、预算和证据范围等会改变结论的信息；解释性补充移入讲稿或备注。
 
 ---
 
@@ -259,7 +266,7 @@ Catalog read: 71 templates
 
 #### Slide 08 - 长任务 Loop 的六类风险
 
-- **Content**: 方向漂移、上下文退化、错误复利、成本扩张、权限漂移、停止困难；研究依据为 Microsoft HAI Guidelines、ReAct 与持久运行时官方文档。当前最大边界是最多三轮只读 Loop，不是无限反馈驱动执行器。
+- **Content**: 方向漂移、上下文退化、错误复利、成本扩张、权限漂移、停止困难；研究依据为 Microsoft HAI Guidelines、ReAct 与持久运行时官方文档。当前默认 12 轮、公开上限 24 轮，并另受文件、模型调用与主动运行时间预算约束；它不是无限反馈驱动执行器。
 
 #### Slide 09 - Agent Control Loop：当前实现与缺口
 
@@ -277,7 +284,7 @@ Catalog read: 71 templates
 
 - **Content**: 触发、用户动作、Agent 路径、停顿、前台输出、后端事实、来源与边界完整展开；先展示可下载资产匹配表，再解释定位问题只影响审计引用，不等于日期或成果失败。
 
-#### Slide 12 - TC-05：三期往来款统计
+#### Slide 12 - TC-05：三份输入，各自对应不同成果
 
 - **Content**: 三份工作簿共同进入任务，但“未付统计.csv”和“未收统计.csv”只提取最新 2026 期的正数贷/借方余额；“跨期核对说明.md”才比较三个期间。前台必须解释三份成果各自代表什么；僵尸账款、核销和记账均保留财务复核。
 
@@ -285,7 +292,7 @@ Catalog read: 71 templates
 
 - **Content**: 招聘场景只形成候选建议与依据，不执行录用/淘汰；法务场景只形成规则台账与风险候选，不代表法律意见或签署动作。引用 Microsoft HAI Guidelines 的能力边界、纠正与控制原则。
 
-#### Slide 14 - TC-10 / TC-14：形成方案，不等于执行动作
+#### Slide 14 - TC-10 / TC-14：方案不等于执行
 
 - **Content**: 合规外呼只生成流程图/DOCX，不拨号、不写 CRM、不发短信；SRE 只形成条件式诊断与止损提案，不执行 ES 命令、不触发生产降级。前台同时列“已发生”和“未发生”。
 
@@ -304,7 +311,7 @@ Catalog read: 71 templates
 - **Layout**: 左侧五步纵向链，右侧放当前完整 Run 实景。
 - **Content**: 15 个目录、96 份文件的安全资料库；自然语言任务；服务端计划与 Branch；Planner/Analyst 调用和采用回执；真实成果、确定性校验、Snapshot 与有序 Trace。明确当前纵切仍是有界只读研究和固定成果适配器。
 
-#### Slide 18 - 实操 1：用户只说目标，Agent 自主选择资料
+#### Slide 18 - 实操 1：用户只说目标，智能体自主选择资料
 
 - **Layout**: 左侧 2/3 使用完整 Run 截图，右侧依次解释用户动作、服务端事实和前台反馈。
 - **Content**: 浏览器不提交 `selected_file_refs`；服务端冻结完整 allowlisted 输入索引；Planner 只看安全元数据并选择本轮证据；前台显示选中资料、模型是否采用、剩余预算和实时 Trace。自主选择不等于穷举正确。
@@ -327,7 +334,7 @@ Catalog read: 71 templates
 
 #### Slide 22 - Demo 2：组织维复杂性
 
-- **Content**: 保留 07-16 P20 的智能工作驾驶舱作为目标产品面，同时用当前真实界面回答输入、过程和输出：一个跨产品/算法/交互的只读核对任务 → Topology Admission 编译 5 个 WorkUnit、3 根与 2 依赖分两波推进 → 3/3 Contribution 采用、Artifact v1 保留、两个下一波工作包等待用户确认。明确当前只是单 API 进程、每波最多三个只读 Worker 的受控纵切，不是分布式 Swarm 或完整驾驶舱。
+- **Content**: 保留 07-16 P20 的智能工作驾驶舱作为目标产品面，同时用受控演示样例回答输入、过程和输出：一个跨产品、算法与交互的只读核对任务 → 路线准入编译 5 个工作包，3 个根工作包先运行、2 个依赖工作包等待下一批 → 首批 3 份贡献采用、成果版本 1 保留、两个工作包等待用户确认。明确当前只是单服务进程、顺序批次、每批最多三个只读执行单元，不是分布式协作或完整驾驶舱。
 
 #### Slide 23 - Demo 3：动作维风险控制
 
@@ -349,7 +356,7 @@ One speaker note file per page, saved to `notes/`:
 - **Filename**: match SVG name, for example `01_cover.md`.
 - **Total duration**: 40–45 minutes.
 - **Style**: 中文会议主讲，结论先行；每页先说“这页要证明什么”，再说“事实、交互影响、边界”。
-- **Source retention**: 竞品、技术演进、交互设计和用户研究页在备注中保留线上官方页面、论文或研究页面的完整 URL；项目事实只标“当前系统实测”并说明测试范围，不把 README、Decision、Scenario 或内部报告列成研究来源。
+- **Source retention**: 竞品、技术演进、交互设计和用户研究页在页面上放可点击官方短链接，并在备注中保留完整 URL；项目事实说明固定公开场景或受控演示范围，不把 README、Decision、Scenario 或内部报告列成外部研究来源。
 - **07-16 continuity**: 备注明确哪些判断沿用 07-16，哪些是当前系统实测补充，避免把新增字段名讲成新的产品概念。
 - **Boundary discipline**: 使用“当前真实实现 / 部分近似 / 目标设计 / Limited Verified / Draft”等证据标签；避免“全面准确、用户已经更信任、竞品不能做”。
 

@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self' file:; script-src 'self' file:; style-src 'self' file:; img-src 'self' file: data:; connect-src 'none'; object-src 'none'; base-uri 'none'">
+  <title>人机共驾边界 | Office Agent 方案评审</title>
+  <link rel="stylesheet" href="styles.css">
+  <script src="icons.js" defer></script>
+  <script src="cases.js" defer></script>
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="index.html"><span class="brand-mark" data-icon="IconTopologyStar3"></span><span>Office Agent <small>人机共驾</small></span></a>
+    <nav class="topnav" aria-label="方案页面">
+      <button class="nav-tab active" data-view="sandbox">边界演练</button>
+      <button class="nav-tab" data-view="matrix">规则矩阵</button>
+      <button class="nav-tab" data-view="library">案例库</button>
+      <button class="nav-tab" data-view="review">评审进展</button>
+    </nav>
+    <a class="icon-button" href="report.html" title="打开会议简报" aria-label="打开会议简报" data-icon="IconPresentation"></a>
+  </header>
+  <div class="scope-strip"><span class="tag blue">Draft · 设计沙盘</span><span>演示数据与本地状态，不连接 Runtime、不调用模型、不执行外部动作。</span><span class="date">2026.09.11</span></div>
+  <div id="announcement" class="announcement" role="status" aria-live="polite" hidden></div>
+  <main id="app"></main>
+  <footer class="page-footer"><span>Demo 1 时间维 + Demo 2 组织维 + Demo 3 跨拓扑边界</span><a href="guide.md">指导手册</a><a href="sources.md">来源与事实</a><a href="verification.md">验证记录</a><button id="export-session" class="text-button"><span data-icon="IconDownload"></span>导出演练记录</button></footer>
+  <dialog id="preview-dialog" aria-labelledby="preview-title"><div class="dialog-head"><h2 id="preview-title">示例原文</h2><button id="close-preview" class="icon-button" aria-label="关闭示例原文" title="关闭" data-icon="IconX"></button></div><div id="preview-content"></div></dialog>
+</body>
+</html>

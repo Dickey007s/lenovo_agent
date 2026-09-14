@@ -1,0 +1,757 @@
+{
+  "date": "2026-09-13",
+  "images": [
+    {
+      "id": "01",
+      "filename": "01-任务进展-操作与模块标注.png",
+      "source": "docs/reports/demo12-polish-20260911/screenshots/progress-1672.png",
+      "width": 3840,
+      "height": 2160,
+      "screenshot": {
+        "left": 150,
+        "top": 390,
+        "width": 2508,
+        "height": 1410
+      },
+      "checkedScreenshotPixels": 3461010,
+      "unexpectedChangedPixels": 0,
+      "overlayRects": [
+        {
+          "key": "A",
+          "x": 177,
+          "y": 402,
+          "w": 2452.5,
+          "h": 73.5
+        },
+        {
+          "key": "B",
+          "x": 337.5,
+          "y": 687,
+          "w": 637.5,
+          "h": 108
+        },
+        {
+          "key": "C",
+          "x": 340.5,
+          "y": 828,
+          "w": 2127,
+          "h": 157.5
+        },
+        {
+          "key": "D",
+          "x": 340.5,
+          "y": 1018.5,
+          "w": 2127,
+          "h": 264
+        },
+        {
+          "key": "E",
+          "x": 340.5,
+          "y": 1321.5,
+          "w": 2127,
+          "h": 243
+        },
+        {
+          "key": "F",
+          "x": 340.5,
+          "y": 1573.5,
+          "w": 2127,
+          "h": 193.5
+        }
+      ]
+    },
+    {
+      "id": "02",
+      "filename": "02-执行记录-操作与模块标注.png",
+      "source": "docs/reports/demo12-polish-20260911/screenshots/record-1672.png",
+      "width": 3840,
+      "height": 2160,
+      "screenshot": {
+        "left": 150,
+        "top": 390,
+        "width": 2508,
+        "height": 1410
+      },
+      "checkedScreenshotPixels": 3447412,
+      "unexpectedChangedPixels": 0,
+      "overlayRects": [
+        {
+          "key": "A",
+          "x": 339,
+          "y": 676.5,
+          "w": 265.5,
+          "h": 297
+        },
+        {
+          "key": "B",
+          "x": 654,
+          "y": 675,
+          "w": 1813.5,
+          "h": 117
+        },
+        {
+          "key": "C",
+          "x": 655.5,
+          "y": 933,
+          "w": 1812,
+          "h": 547.5
+        },
+        {
+          "key": "D",
+          "x": 2220,
+          "y": 1071,
+          "w": 222,
+          "h": 85.5
+        },
+        {
+          "key": "D",
+          "x": 2220,
+          "y": 1345.5,
+          "w": 222,
+          "h": 85.5
+        },
+        {
+          "key": "E",
+          "x": 655.5,
+          "y": 1518,
+          "w": 1812,
+          "h": 114
+        },
+        {
+          "key": "F",
+          "x": 655.5,
+          "y": 1659,
+          "w": 1812,
+          "h": 139.5
+        }
+      ]
+    },
+    {
+      "id": "03",
+      "filename": "03-蜂群协作-操作与模块标注.png",
+      "source": "docs/evidence/screenshots/dr-0063-fixture-swarm-1440.png",
+      "width": 3840,
+      "height": 2160,
+      "screenshot": {
+        "left": 481,
+        "top": 390,
+        "width": 1846,
+        "height": 1410
+      },
+      "checkedScreenshotPixels": 2526881,
+      "unexpectedChangedPixels": 0,
+      "overlayRects": [
+        {
+          "key": "A",
+          "x": 845.0363636363636,
+          "y": 528.4363636363637,
+          "w": 1365.1363636363635,
+          "h": 173.04545454545453
+        },
+        {
+          "key": "B",
+          "x": 845.0363636363636,
+          "y": 711.7363636363636,
+          "w": 1365.1363636363635,
+          "h": 161.5090909090909
+        },
+        {
+          "key": "C",
+          "x": 845.0363636363636,
+          "y": 933.4909090909091,
+          "w": 1026.7363636363636,
+          "h": 680.6454545454545
+        },
+        {
+          "key": "D",
+          "x": 1896.1272727272726,
+          "y": 933.4909090909091,
+          "w": 314.0454545454545,
+          "h": 474.27272727272725
+        },
+        {
+          "key": "E",
+          "x": 1912.790909090909,
+          "y": 1420.581818181818,
+          "w": 282,
+          "h": 74.34545454545454
+        },
+        {
+          "key": "F",
+          "x": 843.7545454545455,
+          "y": 1659,
+          "w": 1028.0181818181818,
+          "h": 139.71818181818182
+        }
+      ]
+    },
+    {
+      "id": "04",
+      "filename": "04-证据核对-操作与模块标注.png",
+      "source": "docs/reports/demo12-polish-20260911/screenshots/evidence-1672.png",
+      "width": 3840,
+      "height": 2160,
+      "screenshot": {
+        "left": 150,
+        "top": 390,
+        "width": 2508,
+        "height": 1410
+      },
+      "checkedScreenshotPixels": 3449986,
+      "unexpectedChangedPixels": 0,
+      "overlayRects": [
+        {
+          "key": "A",
+          "x": 244.5,
+          "y": 583.5,
+          "w": 654,
+          "h": 582
+        },
+        {
+          "key": "B",
+          "x": 244.5,
+          "y": 1185,
+          "w": 654,
+          "h": 324
+        },
+        {
+          "key": "C",
+          "x": 1023,
+          "y": 658.5,
+          "w": 1540.5,
+          "h": 256.5
+        },
+        {
+          "key": "D",
+          "x": 1027.5,
+          "y": 937.5,
+          "w": 1536,
+          "h": 745.5
+        },
+        {
+          "key": "E",
+          "x": 2320.5,
+          "y": 963,
+          "w": 217.5,
+          "h": 66
+        },
+        {
+          "key": "E",
+          "x": 2320.5,
+          "y": 1348.5,
+          "w": 217.5,
+          "h": 66
+        },
+        {
+          "key": "F",
+          "x": 183,
+          "y": 1699.5,
+          "w": 2434.5,
+          "h": 88.5
+        }
+      ]
+    }
+  ],
+  "textChecks": [
+    {
+      "text": "查看当前进展",
+      "actualWidth": 203,
+      "availableWidth": 675
+    },
+    {
+      "text": "定位待确认事项",
+      "actualWidth": 237,
+      "availableWidth": 675
+    },
+    {
+      "text": "点击确认引用位置",
+      "actualWidth": 271,
+      "availableWidth": 675
+    },
+    {
+      "text": "核对后按分支继续",
+      "actualWidth": 272,
+      "availableWidth": 675
+    },
+    {
+      "text": "任务与运行上下文",
+      "actualWidth": 335,
+      "availableWidth": 874
+    },
+    {
+      "text": "顶部显示任务目标、当前 Run 和状态；",
+      "actualWidth": 588,
+      "availableWidth": 959
+    },
+    {
+      "text": "返回资料库或查看其他运行，不混淆任务。",
+      "actualWidth": 641,
+      "availableWidth": 959
+    },
+    {
+      "text": "能力视图切换",
+      "actualWidth": 252,
+      "availableWidth": 874
+    },
+    {
+      "text": "执行进展看任务推进；协作方式看分工。",
+      "actualWidth": 606,
+      "availableWidth": 959
+    },
+    {
+      "text": "两者是同一任务的不同视图，不是新系统。",
+      "actualWidth": 641,
+      "availableWidth": 959
+    },
+    {
+      "text": "五阶段进展",
+      "actualWidth": 209,
+      "availableWidth": 874
+    },
+    {
+      "text": "读取、拆解、形成结论、核对依据、保留成果。",
+      "actualWidth": 711,
+      "availableWidth": 959
+    },
+    {
+      "text": "阶段状态分别判断，有草稿不等于任务完成。",
+      "actualWidth": 674,
+      "availableWidth": 959
+    },
+    {
+      "text": "当前待办与主操作",
+      "actualWidth": 334,
+      "availableWidth": 874
+    },
+    {
+      "text": "说明为什么要确认、涉及哪些资料。",
+      "actualWidth": 536,
+      "availableWidth": 959
+    },
+    {
+      "text": "点击「确认引用位置」进入专注核对页。",
+      "actualWidth": 605,
+      "availableWidth": 959
+    },
+    {
+      "text": "分支进展",
+      "actualWidth": 167,
+      "availableWidth": 874
+    },
+    {
+      "text": "每项展示子任务、批准资料和等待状态。",
+      "actualWidth": 606,
+      "availableWidth": 959
+    },
+    {
+      "text": "按需要处理一条分支，不重做无关成果。",
+      "actualWidth": 606,
+      "availableWidth": 959
+    },
+    {
+      "text": "当前成果与版本历史",
+      "actualWidth": 375,
+      "availableWidth": 874
+    },
+    {
+      "text": "查看已保留的简报和历史版本。",
+      "actualWidth": 466,
+      "availableWidth": 959
+    },
+    {
+      "text": "逻辑成果不代表原文件已被改写。",
+      "actualWidth": 501,
+      "availableWidth": 959
+    },
+    {
+      "text": "入口：办公资料库提交任务后，打开 Agent 能力页的「执行进展」。",
+      "actualWidth": 1014,
+      "availableWidth": 3648
+    },
+    {
+      "text": "读图要点：橙色表示待处理；草稿保留与任务完成是两件事。",
+      "actualWidth": 895,
+      "availableWidth": 3648
+    },
+    {
+      "text": "原系统 React 页面，2026-09-11 受控测试截图；数字与状态来自测试数据，不代表真实模型任务成功。",
+      "actualWidth": 1271,
+      "availableWidth": 3370
+    },
+    {
+      "text": "选择执行轮次",
+      "actualWidth": 203,
+      "availableWidth": 675
+    },
+    {
+      "text": "展开目标分支",
+      "actualWidth": 203,
+      "availableWidth": 675
+    },
+    {
+      "text": "查看资料与阶段",
+      "actualWidth": 238,
+      "availableWidth": 675
+    },
+    {
+      "text": "处理该项或查看版本",
+      "actualWidth": 305,
+      "availableWidth": 675
+    },
+    {
+      "text": "轮次导航",
+      "actualWidth": 168,
+      "availableWidth": 874
+    },
+    {
+      "text": "左侧按轮查看执行历史，并进入版本历史。",
+      "actualWidth": 641,
+      "availableWidth": 959
+    },
+    {
+      "text": "历史记录与当前待处理状态分开呈现。",
+      "actualWidth": 571,
+      "availableWidth": 959
+    },
+    {
+      "text": "执行概览",
+      "actualWidth": 168,
+      "availableWidth": 874
+    },
+    {
+      "text": "显示累计轮次、任务分支和当前待确认数。",
+      "actualWidth": 641,
+      "availableWidth": 959
+    },
+    {
+      "text": "这是数量概览，不代表所有分支已经完成。",
+      "actualWidth": 641,
+      "availableWidth": 959
+    },
+    {
+      "text": "分支详情与证据门",
+      "actualWidth": 334,
+      "availableWidth": 874
+    },
+    {
+      "text": "展开后看本轮批准资料及当前处理阶段。",
+      "actualWidth": 606,
+      "availableWidth": 959
+    },
+    {
+      "text": "证据门检查来源与定位，不自动证明结论正确。",
+      "actualWidth": 711,
+      "availableWidth": 959
+    },
+    {
+      "text": "处理这一项",
+      "actualWidth": 209,
+      "availableWidth": 874
+    },
+    {
+      "text": "跳转到该分支对应的核对或恢复操作。",
+      "actualWidth": 571,
+      "availableWidth": 959
+    },
+    {
+      "text": "只针对当前问题，其他已有成果继续保留。",
+      "actualWidth": 640,
+      "availableWidth": 959
+    },
+    {
+      "text": "本轮成果与版本",
+      "actualWidth": 293,
+      "availableWidth": 874
+    },
+    {
+      "text": "记录这一轮形成或保留的简报版本。",
+      "actualWidth": 536,
+      "availableWidth": 959
+    },
+    {
+      "text": "可以查看历史，不覆盖旧成果。",
+      "actualWidth": 466,
+      "availableWidth": 959
+    },
+    {
+      "text": "事件与模型调用回执",
+      "actualWidth": 378,
+      "availableWidth": 874
+    },
+    {
+      "text": "底部展开查看服务端事件及模型调用情况。",
+      "actualWidth": 640,
+      "availableWidth": 959
+    },
+    {
+      "text": "调用过、返回了、被采用，必须分开理解。",
+      "actualWidth": 641,
+      "availableWidth": 959
+    },
+    {
+      "text": "入口：任务进展页下方点击「查看完整执行记录」；顶部可返回任务进展。",
+      "actualWidth": 1099,
+      "availableWidth": 3648
+    },
+    {
+      "text": "读图要点：执行记录用于追溯过程；不是额外一套 Agent，也不是必须逐级经过的页面。",
+      "actualWidth": 1316,
+      "availableWidth": 3648
+    },
+    {
+      "text": "原系统 React 页面，2026-09-11 受控测试截图；仅为当时视口，底部回执区可继续向下查看。",
+      "actualWidth": 1159,
+      "availableWidth": 3370
+    },
+    {
+      "text": "查看协作条件与回执",
+      "actualWidth": 306,
+      "availableWidth": 675
+    },
+    {
+      "text": "沿连线阅读工作包",
+      "actualWidth": 272,
+      "availableWidth": 675
+    },
+    {
+      "text": "确认本批允许执行",
+      "actualWidth": 272,
+      "availableWidth": 675
+    },
+    {
+      "text": "查看返回与采用结果",
+      "actualWidth": 305,
+      "availableWidth": 675
+    },
+    {
+      "text": "协作方式与执行限制",
+      "actualWidth": 376,
+      "availableWidth": 874
+    },
+    {
+      "text": "说明为什么拆分，以及 Worker 的执行范围。",
+      "actualWidth": 679,
+      "availableWidth": 959
+    },
+    {
+      "text": "当前为单进程只读协作，每批最多 3 个。",
+      "actualWidth": 611,
+      "availableWidth": 959
+    },
+    {
+      "text": "准入、调用与贡献回执",
+      "actualWidth": 420,
+      "availableWidth": 874
+    },
+    {
+      "text": "准入表示允许协作，调用表示实际发起过。",
+      "actualWidth": 640,
+      "availableWidth": 959
+    },
+    {
+      "text": "3 条调用中 2 条采用，返回不等于进入成果。",
+      "actualWidth": 676,
+      "availableWidth": 959
+    },
+    {
+      "text": "工作包与依赖关系",
+      "actualWidth": 334,
+      "availableWidth": 874
+    },
+    {
+      "text": "每个框是工作包，连线表示前置依赖。",
+      "actualWidth": 571,
+      "availableWidth": 959
+    },
+    {
+      "text": "已就绪但待确认，不等于 Worker 已执行。",
+      "actualWidth": 642,
+      "availableWidth": 959
+    },
+    {
+      "text": "当前影响",
+      "actualWidth": 164,
+      "availableWidth": 874
+    },
+    {
+      "text": "右侧列出阻塞原因及受影响的下游工作。",
+      "actualWidth": 605,
+      "availableWidth": 959
+    },
+    {
+      "text": "一项等待，不代表所有独立工作都要停止。",
+      "actualWidth": 641,
+      "availableWidth": 959
+    },
+    {
+      "text": "继续下一批",
+      "actualWidth": 210,
+      "availableWidth": 874
+    },
+    {
+      "text": "显式确认本批就绪工作后才派发 Worker。",
+      "actualWidth": 633,
+      "availableWidth": 959
+    },
+    {
+      "text": "确认不会扩大来源范围或开放外部动作。",
+      "actualWidth": 606,
+      "availableWidth": 959
+    },
+    {
+      "text": "协作成果与回执入口",
+      "actualWidth": 375,
+      "availableWidth": 874
+    },
+    {
+      "text": "分别显示返回、采用、影响及成果版本。",
+      "actualWidth": 606,
+      "availableWidth": 959
+    },
+    {
+      "text": "「Worker 回执」可追查调用和采用依据。",
+      "actualWidth": 611,
+      "availableWidth": 959
+    },
+    {
+      "text": "入口：任务进展中切到「协作方式」；左侧可随时回到「执行进展」。",
+      "actualWidth": 1031,
+      "availableWidth": 3648
+    },
+    {
+      "text": "读图要点：这里是受限的主控 / Worker 协作，不是分布式蜂群；图中的框不等于真实调用次数。",
+      "actualWidth": 1442,
+      "availableWidth": 3648
+    },
+    {
+      "text": "原系统 React 页面，2026-09-12 受控测试截图；与其他图片为不同测试状态，不拼成同一次运行轨迹。",
+      "actualWidth": 1271,
+      "availableWidth": 3370
+    },
+    {
+      "text": "读清原因和影响",
+      "actualWidth": 236,
+      "availableWidth": 675
+    },
+    {
+      "text": "比较两处原文",
+      "actualWidth": 201,
+      "availableWidth": 675
+    },
+    {
+      "text": "主动选择一个位置",
+      "actualWidth": 272,
+      "availableWidth": 675
+    },
+    {
+      "text": "确认选择或暂不处理",
+      "actualWidth": 306,
+      "availableWidth": 675
+    },
+    {
+      "text": "为什么需要人参与",
+      "actualWidth": 334,
+      "availableWidth": 874
+    },
+    {
+      "text": "左上解释发现了什么、影响哪里、需要做什么。",
+      "actualWidth": 711,
+      "availableWidth": 959
+    },
+    {
+      "text": "先理解问题，再决定引用位置。",
+      "actualWidth": 465,
+      "availableWidth": 959
+    },
+    {
+      "text": "保留项与操作边界",
+      "actualWidth": 335,
+      "availableWidth": 874
+    },
+    {
+      "text": "说明哪些成果和历史保留，哪些动作不会发生。",
+      "actualWidth": 711,
+      "availableWidth": 959
+    },
+    {
+      "text": "不改原文件，也不重做无关已完成分支。",
+      "actualWidth": 606,
+      "availableWidth": 959
+    },
+    {
+      "text": "待核对判断与来源",
+      "actualWidth": 336,
+      "availableWidth": 874
+    },
+    {
+      "text": "右上显示尚未确认的判断，以及对应文件。",
+      "actualWidth": 640,
+      "availableWidth": 959
+    },
+    {
+      "text": "展示出来的候选判断，不等于已被验证。",
+      "actualWidth": 606,
+      "availableWidth": 959
+    },
+    {
+      "text": "候选位置与原文",
+      "actualWidth": 293,
+      "availableWidth": 874
+    },
+    {
+      "text": "两处原文并列，单选按钮起初都不选中。",
+      "actualWidth": 606,
+      "availableWidth": 959
+    },
+    {
+      "text": "用户对照上下文，主动选择一处。",
+      "actualWidth": 500,
+      "availableWidth": 959
+    },
+    {
+      "text": "在文件中查看",
+      "actualWidth": 252,
+      "availableWidth": 874
+    },
+    {
+      "text": "打开安全原文预览，核对上下文和具体位置。",
+      "actualWidth": 676,
+      "availableWidth": 959
+    },
+    {
+      "text": "查看不等于选中，更不等于批准。",
+      "actualWidth": 501,
+      "availableWidth": 959
+    },
+    {
+      "text": "选择状态与确认操作",
+      "actualWidth": 377,
+      "availableWidth": 874
+    },
+    {
+      "text": "底部显示选择状态；未选时不能确认。",
+      "actualWidth": 570,
+      "availableWidth": 959
+    },
+    {
+      "text": "也可暂不处理返回，保留问题和已有成果。",
+      "actualWidth": 641,
+      "availableWidth": 959
+    },
+    {
+      "text": "入口：从任务进展的「确认引用位置」，或执行记录的「处理这一项」进入。",
+      "actualWidth": 1133,
+      "availableWidth": 3648
+    },
+    {
+      "text": "读图要点：确认的是证据位置，不是业务批准；若 Run 已结束，还需显式创建同任务的新 Run 续办。",
+      "actualWidth": 1513,
+      "availableWidth": 3648
+    },
+    {
+      "text": "原系统 React 页面，2026-09-11 受控测试截图；原文位置由系统提供，标注没有改写任何界面内容。",
+      "actualWidth": 1243,
+      "availableWidth": 3370
+    }
+  ]
+}

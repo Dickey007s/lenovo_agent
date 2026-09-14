@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720">
+  <rect width="1280" height="720" fill="#FFFFFF"/>
+  <g id="title" font-family="Microsoft YaHei, Arial, sans-serif">
+    <text x="48" y="80" font-size="44" font-weight="700" fill="#182230" data-width="1184">Demo3 的整合方向</text>
+    <text x="48" y="123" font-size="24" fill="#596579" data-width="1184">共驾设计进入同一任务，沿用原 Control Loop 与 Adaptive Swarm</text>
+  </g>
+  <g id="figure">
+    <image href="../images/copilot-framework.png" x="48" y="165" width="744" height="496" preserveAspectRatio="xMidYMid meet"/>
+  </g>
+  <g id="body" font-family="Microsoft YaHei, Arial, sans-serif">
+    <text x="838" y="208" font-size="28" font-weight="700" fill="#008A63" data-width="394">已有整合</text>
+    <text x="838" y="252" font-size="24" fill="#182230" data-width="394">原页面已呈现边界说明</text>
+    <text x="838" y="288" font-size="24" fill="#182230" data-width="394">与协作调用、采用回执</text>
+    <text x="838" y="382" font-size="28" font-weight="700" fill="#B86A00" data-width="394">继续补齐</text>
+    <text x="838" y="426" font-size="24" fill="#182230" data-width="394">长文本覆盖与业务口径澄清</text>
+    <text x="838" y="462" font-size="24" fill="#182230" data-width="394">人的反馈触发局部成果更新</text>
+    <text x="838" y="552" font-size="28" font-weight="700" fill="#1557D2" data-width="394">下一步验证</text>
+    <text x="838" y="596" font-size="24" fill="#182230" data-width="394">漏问、无谓打扰、反馈利用</text>
+    <text x="838" y="632" font-size="24" fill="#182230" data-width="394">越权拦截与真人理解测试</text>
+  </g>
+  <g id="footer" font-family="Microsoft YaHei, Arial, sans-serif">
+    <text x="48" y="696" font-size="16" fill="#596579" data-width="1130">图为研究整合示意（imagegen）。Demo3 全场景闭环尚未完成，长文本覆盖问题仍开放。</text>
+    <text x="1198" y="696" font-size="16" fill="#596579" data-width="34">06</text>
+  </g>
+</svg>

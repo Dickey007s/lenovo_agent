@@ -1,5 +1,42 @@
 # Office Agent V0.2 中文汇报卡片
 
+## 下一次会议简稿
+
+优先使用 [三个 Demo、八个边界案例与蜂群差异简稿](reports/DEMO123-BOUNDARIES-AND-SWARM-BRIEF-20260912.md)，不制作新 PPT 或演示网站。主线是“Demo1 接着做，Demo2 分工与采用，Demo3 定义谁能决定什么”。原能力页已增加既有边界解释和协作回执事实，保留 Loop/Swarm；这只是第一部分前端整合，不是 Demo3 全场景闭环或业务授权。研究 HTML 不替代产品，离线测试不证明集成通过。蜂群是受限 orchestrator-worker，其贡献采用与局部恢复组合是可证伪工程差异候选，不是已证明的新算法或竞品优势。[本轮 Evidence](evidence/DR-0063-INTEGRATED-BOUNDARIES-AND-SWARM-FACTS-20260912.md) 单列验证范围。
+
+## 动态边界研究增量（2026-09-11）
+
+[研究与可操作原型](reports/copilot-boundary-design-20260911/index.html) 不以 L0-L5/R0-R3 作为设计约束。
+可讲：比较具体授权、澄清、失效、对账与接管的交互差异，研究中保留“少提示未带来更强越界保护”的反证。
+不可讲：有界授权已经优于逐动作确认，已完成目标用户实验，或当前具备真实审批/外部动作能力。
+[DR-0062](decisions/DR-0062-dynamic-boundary-design-experiment.md) 和 [SCENARIO-049](scenarios/SCENARIO-049-dynamic-boundary-handoff-design.md)
+仍为 Draft；场景与来源、前台交互影响、后端事实映射、验证与边界分别记账。
+
+2026-09-12 [用户理解迭代](reports/copilot-boundary-design-20260911/usability-review-20260912.md) 把“当前结果、原因、下一步后果”与工程术语分开，增加旧/新附件对照、未知查询失败路径和五个非诱导任务。可讲实际源码问题与测试，不可讲目标用户已经看懂；没有参与者结果，最终浏览器门也未完成。
+
+2026-09-12 [下一轮阅读推荐](reports/copilot-boundary-design-20260911/research/followup-20260912/recommendations.md) 增加 6 篇论文和 3 篇官方实践。可讲“共同参与不只是审批”，以及参与过多、主观信任未校准和检查成本的反例；不可讲本项目已完成共同计划编辑、自动权限分类或真人效果对照。合成用户评估、开发者样本与普通办公人员不能混称。
+
+## 2026-09-11 会议材料
+
+[Demo 1/2 重设计 HTML](reports/demo12-redesign-20260911/index.html) 对照用户参考与真实前端截图。
+可讲：同一任务的循环进展、按轮记录、WorkUnit 依赖、显式协作确认、候选位置选择与局部保留。
+不可讲：截图等于真实模型任务成功、图等于分布式 Swarm、已有风险引擎或通用审批系统。
+[人机共驾手册](reports/human-agent-copilot-20260911/guide.md)、
+[8 案例沙盘](reports/human-agent-copilot-20260911/index.html) 和
+[Demo 3 简报](reports/human-agent-copilot-20260911/report.html) 为 `Draft`，浏览器验证限制明确保留。
+三个 Demo 完成后的完整行业回溯仍是后续门，不由本轮定向引用替代。
+场景与来源、前台交互影响、后端事实映射、验证与边界见
+[DR-0061](decisions/DR-0061-reference-aligned-capabilities-and-evidence-choice.md)。
+
+后续 [主动验收报告](reports/demo12-acceptance-20260911/index.html) 记录真实 Provider 单任务与 91 项受控回归。
+两个 UI 问题已修复；真实日志任务的完整性未通过，模型输入截断前半段但摘要未限定范围。
+会上应展示这个失败案例，不得以调用回执、引用定位或全绿 E2E 代替全文业务正确性。
+
+[第二轮打磨报告](reports/demo12-polish-20260911/index.html) 展示长目标、空白任务、确认区可达性和自测迭代。
+[人机共驾研究资料库](reports/copilot-research-library-20260911/index.html) 提供论文、官方文档/博客、
+研究限制及 Demo 设计映射。可以讲适当依赖、核验成本与接管后的恢复粒度；不能讲“人机组合必然更好”、
+“增加解释必然减少过度依赖”或“有审批接口就等于权限安全”。风险分层与交互方案仍待目标用户验证。
+
 本文件记录面向会议、PPT 和产品评审的中文表述。英文只保留产品名、
 接口名、协议字段和原始来源标题。
 
@@ -58,6 +95,9 @@ SSE，当前 Worker 仍是单进程受限只读实现。Adaptive 正例的协作
 轨、中央真实 WorkUnit DAG、右侧当前影响和底部成果条解释“为什么拆、谁依赖谁、哪里
 停、什么已经保留”；父子关系用方向连线表达，当前轮 `ready_branch_ids` 统一显示为“下一
 波待确认 / 可执行”，主要确认动作放在右侧当前影响区；Fixed/Single 不画假 DAG。
+`DR-0060` 补上两个页面共同的“新建任务”入口：点击只退出当前 Run 投影并进入空白草稿，
+不创建空 Task、不停止旧 Run；提交指令后才由现有 start 协议创建独立 Task。旧任务仍可从
+任务会话返回，相同文字的新任务也使用新的幂等键。
 Task/WorkUnit 的隔离 PostgreSQL 17.11 单主机顺序门已经通过，但 Provider 同场、多实例、
 远端 Worker 与用户研究仍未完成，不能写成生产级 Task 服务或通用/分布式 Worker。
 十五条场景的实际效果、失败修复轨迹、真实模型运行和外部边界见
@@ -77,7 +117,7 @@ Task/WorkUnit 的隔离 PostgreSQL 17.11 单主机顺序门已经通过，但 Pr
 | 7 | 安全预览把“Agent 读了什么”变成可见契约 | CSV/PDF/DOCX/TXT 预览拼图和安全说明 | 路径、大小、hash、符号链接和解析器测试 |
 | 8 | Harness 把模型调用、内容采用、确定性办公效果和整体 Loop 状态分开 | 事件、模型回执、可下载工件与检查结果时序 | Snapshot/Receipt/Artifact 事实；不展示思维链，也不把 `completed` 当作效果通过 |
 | 9 | Agent 说“有问题”之后，用户要同时看懂事实、影响、真实原文和自己必须决定的下一步 | 问题处置单：1 事实 -> 2 影响 -> 3 人工动作；证据与实际文件并排；A/B/C + 反馈 | `DR-0030/29`；推荐是模型候选，确认只创建新只读 Run |
-| 10 | Demo 1 把一次 Run 的停止变成同一 Task 的下一段执行；最近记录先按 `task_id` 隔离成任务会话，Task Ledger 再决定打开的 child 是否为当前工作面 | 任务会话抽屉、Run 1→Run 2、全局“历史 Run 只读”、当前非终态 Run 才恢复 SSE、基线成果与来源变化提示 | `DR-0053/54/56`、`SCENARIO-038/040/043`；会话发现只覆盖最近 20 个 Run，不是无限 Task list；child 是新 Run，Run version 可从 1 开始 |
+| 10 | Demo 1 把一次 Run 的停止变成同一 Task 的下一段执行，同时允许用户显式开始另一项独立工作；最近记录按 `task_id` 隔离成任务会话，Task Ledger 再决定打开的 child 是否为当前工作面 | “新建任务”空白草稿、任务会话抽屉、Run 1→Run 2、全局“历史 Run 只读”、当前非终态 Run 才恢复 SSE、基线成果与来源变化提示 | `DR-0053/54/56/60`、`SCENARIO-038/040/043/047`；点击新建不创建空 Task 或停止旧 Run，提交后才创建；会话发现只覆盖最近 20 个 Run，不是无限 Task list；child 是新 Run，Run version 可从 1 开始 |
 | 11 | 先把 Agent 能力与 Demo 产品面说清：能力页用同一 Snapshot 回答“任务怎样跨 Run 继续”和“复杂任务怎样拆解协作”，但默认先回答“现在进展如何、是否需要我处理”；07-16 Demo 2 智能工作驾驶舱仍是下一阶段产品面 | `/agent-capabilities` 实际界面四镜头：任务进展、完整执行记录、协作方式、确认结论依据；协作镜头用左侧阶段轨、3 root+2 dependent 动态 DAG、右侧当前影响和底部成果条展示实际来源、Worker called/adopted/elapsed、Contribution Gate、v1/v2；旁注未来驾驶舱队列与四路线，不画成当前截图 | `DR-0053/55/57/58`、`SCENARIO-039/041/042/044/045`；四层是同一 Snapshot 的渐进披露；当前每批最多 3 个进程内只读 Analyst Worker；没有驾驶舱队列、跨 Task dispatch、durable queue/lease、分布式 Swarm、用户研究或质量收益证明 |
 | 12 | Demo 3 对单任务和多任务统一施加风险与动作控制 | 影响预演 -> 证据 -> 审批 -> Permit -> 回执 | 目标设计；当前没有真实外部动作 |
 | 13 | 当前 12 个本地 FORTE 场景已有真实隔离工件与确定性验证；3 个外部依赖场景明确阻断 | 12 通过、3 `blocked_external_boundary` 的效果账本；六个真实 `deepseek-v4-pro` 运行 | `DR-0035` 限定能力，不等于任意办公任务或用户价值；模型质量、效果验证、Loop 终态分开报告 |
@@ -241,6 +281,7 @@ Task/WorkUnit 的隔离 PostgreSQL 17.11 单主机顺序门已经通过，但 Pr
 - DR-0056 把 Demo 1 时间维和 Demo 2 组织维拆成任务会话、历史只读 Run 与独立 Adaptive Swarm 工作台；定向浏览器 `4 passed`、全量 Playwright `73 passed`、全量 Python `418 passed, 23 skipped`，Ruff/lint/build、治理与变更链接检查通过。截图来自固定 Fixture，不是真实 Provider 或用户研究；当前仍只是进程内、每波最多三个的只读 Worker。
 - DR-0057 纠正产品身份并新增 `/agent-capabilities`：Loop 与 Adaptive 使用同一个 selected Run 同页展示，历史一起只读，来源来自安全 Catalog，Evidence Review 仍可回开；能力页定向 `4 passed`、全量 Playwright `77 passed`、全量 Python `418 passed, 23 skipped`，Ruff/lint/build/治理通过。智能工作驾驶舱没有实现，也没有在前台放占位入口。
 - DR-0058 在不改 Runtime 的前提下把能力页收敛为四条渐进披露路径：默认任务进展、完整执行记录、协作方式和确认结论依据；主要待办来自 open DecisionRequest，协作方式把实际路线投影为任务准入、工作包、贡献汇合、核验与成果，工作包/来源/执行回执默认折叠。视觉重构最终 Playwright `77 passed`，但自动化与受控 Fixture 截图只证明工程映射，不能证明用户理解、效率或信任改善；本轮没有补真实 Provider、PostgreSQL 或目标用户研究。
+- DR-0060 在 Workspace 与 Agent 能力页增加“新建任务”：空白草稿本身无服务端写入，旧 Task/Run 不变，提交后才创建独立 Task；刷新保持草稿、历史可返回且相同文字的新任务使用新幂等键。定向和全量浏览器结果见本次 Evidence；没有补 Provider、PostgreSQL 或目标用户研究。
 - DR-0034 的全量门为 Python `83 passed, 2 skipped`、PostgreSQL `2 passed`、Harness browser `25 passed`，Ruff/lint/build 通过；它证明两类待处理动作的前台映射和 390 px 回归，不证明“3 秒内理解”或用户价值。
 - DR-0036 的门为 Python 定向 `78 passed`、本机全量 `116 passed, 3 skipped`、远端 PostgreSQL 17 `3 passed`、Harness browser `29 passed`、Ruff/lint/build 通过；一次真实 `deepseek-v4-pro` TC-01 在第 1 轮完成，真实 CSV 5/5、三 Branch 完成、0 Gap/开放 DecisionRequest。本机三个 skip 已由 PR #45 顺序 PostgreSQL 门补证，但仍不证明多实例；一次 Provider 成功也不证明重复稳定性或目标用户理解提升。
 - 两张确定性浏览器图分别展示“继续此分支”与“恢复 v1”；它们证明 UI/服务端字段映射，不是真实模型运行；

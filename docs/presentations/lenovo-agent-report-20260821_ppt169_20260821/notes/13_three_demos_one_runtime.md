@@ -1,0 +1,1 @@
+三个 Demo 不是三套互不相干的产品：Demo 1 处理时间连续性，Demo 2 处理复杂任务组织，Demo 3 处理业务副作用控制，共同使用 Contract、State、Context、Execution、Capability、Evidence、Policy 和 Trace。用户在不同工作区看到的虽然是阶段与冲突、路线与 Worker、影响预演与回执，但背后都回到来源、版本、事件和用户控制。三个固定纵切分别有对应运行证据，把它们统一成一套完整产品体验仍是 Draft。下一页不再讲结构，而是把已经证明、受限证明和待实验的范围逐项读清楚。

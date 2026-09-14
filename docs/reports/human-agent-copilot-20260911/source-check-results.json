@@ -1,0 +1,164 @@
+{
+  "generated_at": "2026-09-11T10:04:32.017Z",
+  "suite": "copilot-design-source-checks",
+  "status": "passed",
+  "scope": "Node VM source logic, markup strings, static assets and PostCSS syntax only",
+  "passed": 38,
+  "browser_rendering_verified": false,
+  "runtime_verified": false,
+  "external_action": "none",
+  "checks": [
+    {
+      "name": "eight cases and unique IDs",
+      "status": "passed"
+    },
+    {
+      "name": "case contract includes user, trigger, authority and acceptance",
+      "status": "passed"
+    },
+    {
+      "name": "cases have both independent evidence and permission facts",
+      "status": "passed"
+    },
+    {
+      "name": "all choice cases have at least two candidates",
+      "status": "passed"
+    },
+    {
+      "name": "initial candidate is not preselected",
+      "status": "passed"
+    },
+    {
+      "name": "initial confirm is disabled in generated markup",
+      "status": "passed"
+    },
+    {
+      "name": "unselected confirmation writes no local record",
+      "status": "passed"
+    },
+    {
+      "name": "selection records local intent, never a Runtime receipt",
+      "status": "passed"
+    },
+    {
+      "name": "duplicate confirmation is ignored",
+      "status": "passed"
+    },
+    {
+      "name": "conflict does not mark success",
+      "status": "passed"
+    },
+    {
+      "name": "conflict cannot prevent review exit",
+      "status": "passed"
+    },
+    {
+      "name": "offline does not mark success",
+      "status": "passed"
+    },
+    {
+      "name": "offline cannot prevent review exit",
+      "status": "passed"
+    },
+    {
+      "name": "stale does not mark success",
+      "status": "passed"
+    },
+    {
+      "name": "stale cannot prevent review exit",
+      "status": "passed"
+    },
+    {
+      "name": "stale source clears old candidate and blocks new acceptance",
+      "status": "passed"
+    },
+    {
+      "name": "refresh clears candidate and records no Runtime activity",
+      "status": "passed"
+    },
+    {
+      "name": "reset preserves old local records",
+      "status": "passed"
+    },
+    {
+      "name": "business recommendation is disabled before an initial choice",
+      "status": "passed"
+    },
+    {
+      "name": "business recommendation enabled after initial choice",
+      "status": "passed"
+    },
+    {
+      "name": "B03 records handoff only, not execution",
+      "status": "passed"
+    },
+    {
+      "name": "B04 records handoff only, not execution",
+      "status": "passed"
+    },
+    {
+      "name": "budget continuation does not claim to create a Run",
+      "status": "passed"
+    },
+    {
+      "name": "Agent-owned retry does not require input",
+      "status": "passed"
+    },
+    {
+      "name": "partial Worker case requires explicit choice",
+      "status": "passed"
+    },
+    {
+      "name": "file acknowledgment does not approve business Gate",
+      "status": "passed"
+    },
+    {
+      "name": "library risk filter selects R3 alone",
+      "status": "passed"
+    },
+    {
+      "name": "library supports explicit empty state",
+      "status": "passed"
+    },
+    {
+      "name": "HTML escaping prevents source text injecting markup",
+      "status": "passed"
+    },
+    {
+      "name": "no application network or provider calls",
+      "status": "passed"
+    },
+    {
+      "name": "CSP blocks network connections on both pages",
+      "status": "passed"
+    },
+    {
+      "name": "no external scripts, styles or media dependencies",
+      "status": "passed"
+    },
+    {
+      "name": "local HTML references resolve",
+      "status": "passed"
+    },
+    {
+      "name": "Markdown local links resolve",
+      "status": "passed"
+    },
+    {
+      "name": "Tabler icon assets have all requested symbols",
+      "status": "passed"
+    },
+    {
+      "name": "design source image exists with expected original size",
+      "status": "passed"
+    },
+    {
+      "name": "new text artifacts contain no trailing whitespace or conflict markers",
+      "status": "passed"
+    },
+    {
+      "name": "responsive CSS parses with repository PostCSS",
+      "status": "passed"
+    }
+  ]
+}

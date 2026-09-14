@@ -1,0 +1,95 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720" width="1280" height="720">
+  <g id="background">
+    <rect width="1280" height="720" fill="#F7F8FA"/>
+    <path d="M52 112H1228" fill="none" stroke="#CBD5DF" stroke-width="2"/>
+  </g>
+  <g id="header">
+    <text x="52" y="78" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="46" font-weight="700" fill="#132A3A">Demo 1：时间维连续性，单个任务如何持续推进</text>
+    <rect x="1072" y="45" width="156" height="34" rx="6" fill="#EDF1F4"/>
+    <text x="1150" y="68" text-anchor="middle" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#1769E0">07-16 目标演示</text>
+    <text x="52" y="146" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#5A6B7C">核心不是让 Agent 一直跑，而是让同一 Task ID 在证据冲突、用户纠偏和服务重启后仍能从可信状态继续。</text>
+  </g>
+
+  <g id="control-loop-flow">
+    <rect x="52" y="174" width="1176" height="126" rx="6" fill="#FFFFFF" stroke="#CBD5DF" stroke-width="2"/>
+    <g id="contract-step">
+      <circle cx="84" cy="204" r="18" fill="#1769E0"/><text x="84" y="210" text-anchor="middle" font-family="Consolas, &quot;Courier New&quot;, monospace" font-size="17" font-weight="700" fill="#FFFFFF">1</text>
+      <text x="60" y="244" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="17" font-weight="700" fill="#132A3A">Task Contract</text>
+      <text x="60" y="270" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="14" fill="#5A6B7C">目标、交付、完成条件</text>
+    </g>
+    <path d="M234 234H260" fill="none" stroke="#1769E0" stroke-width="3"/><path d="M260 234L250 228V240Z" fill="#1769E0"/>
+    <g id="observe-step">
+      <circle cx="294" cy="204" r="18" fill="#1769E0"/><text x="294" y="210" text-anchor="middle" font-family="Consolas, &quot;Courier New&quot;, monospace" font-size="17" font-weight="700" fill="#FFFFFF">2</text>
+      <text x="274" y="244" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="17" font-weight="700" fill="#132A3A">Observe</text>
+      <text x="274" y="270" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="14" fill="#5A6B7C">读事件、状态、来源</text>
+    </g>
+    <path d="M410 234H436" fill="none" stroke="#1769E0" stroke-width="3"/><path d="M436 234L426 228V240Z" fill="#1769E0"/>
+    <g id="plan-step">
+      <circle cx="470" cy="204" r="18" fill="#1769E0"/><text x="470" y="210" text-anchor="middle" font-family="Consolas, &quot;Courier New&quot;, monospace" font-size="17" font-weight="700" fill="#FFFFFF">3</text>
+      <text x="450" y="244" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="17" font-weight="700" fill="#132A3A">Plan</text>
+      <text x="450" y="270" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="14" fill="#5A6B7C">拆分支、依赖、预算</text>
+    </g>
+    <path d="M586 234H612" fill="none" stroke="#1769E0" stroke-width="3"/><path d="M612 234L602 228V240Z" fill="#1769E0"/>
+    <g id="act-step">
+      <circle cx="646" cy="204" r="18" fill="#1769E0"/><text x="646" y="210" text-anchor="middle" font-family="Consolas, &quot;Courier New&quot;, monospace" font-size="17" font-weight="700" fill="#FFFFFF">4</text>
+      <text x="626" y="244" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="17" font-weight="700" fill="#132A3A">Act</text>
+      <text x="626" y="270" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="14" fill="#5A6B7C">产出候选工件</text>
+    </g>
+    <path d="M762 234H788" fill="none" stroke="#D97706" stroke-width="3"/><path d="M788 234L778 228V240Z" fill="#D97706"/>
+    <g id="verify-step">
+      <circle cx="822" cy="204" r="18" fill="#D97706"/><text x="822" y="210" text-anchor="middle" font-family="Consolas, &quot;Courier New&quot;, monospace" font-size="17" font-weight="700" fill="#FFFFFF">5</text>
+      <text x="802" y="244" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="17" font-weight="700" fill="#132A3A">Verify</text>
+      <text x="802" y="270" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="14" fill="#C0362C">2,400 万 vs 2,680 万</text>
+    </g>
+    <path d="M966 234H992" fill="none" stroke="#2E7D32" stroke-width="3"/><path d="M992 234L982 228V240Z" fill="#2E7D32"/>
+    <g id="commit-step">
+      <circle cx="1026" cy="204" r="18" fill="#2E7D32"/><text x="1026" y="210" text-anchor="middle" font-family="Consolas, &quot;Courier New&quot;, monospace" font-size="17" font-weight="700" fill="#FFFFFF">6</text>
+      <text x="1006" y="244" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="17" font-weight="700" fill="#132A3A">Commit</text>
+      <text x="1006" y="270" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="14" fill="#5A6B7C">版本、来源、Trace</text>
+    </g>
+  </g>
+
+  <g id="branch-evidence-gate">
+    <text x="52" y="338" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="24" font-weight="700" fill="#132A3A">Evidence Gate 只暂停受影响分支</text>
+    <rect x="52" y="358" width="774" height="214" rx="6" fill="#FFFFFF" stroke="#CBD5DF" stroke-width="2"/>
+    <rect x="70" y="382" width="224" height="76" rx="6" fill="#EDF1F4" stroke="#2E7D32" stroke-width="2"/>
+    <use data-icon="tabler-outline/circle-check" x="88" y="402" width="26" height="26" fill="#2E7D32" stroke-width="2"/>
+    <text x="126" y="420" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="17" font-weight="700" fill="#132A3A">customer-facts</text>
+    <text x="88" y="444" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="14" fill="#2E7D32">继续产出并保留</text>
+    <rect x="310" y="382" width="224" height="76" rx="6" fill="#EDF1F4" stroke="#2E7D32" stroke-width="2"/>
+    <use data-icon="tabler-outline/circle-check" x="328" y="402" width="26" height="26" fill="#2E7D32" stroke-width="2"/>
+    <text x="366" y="420" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="17" font-weight="700" fill="#132A3A">project-risk</text>
+    <text x="328" y="444" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="14" fill="#2E7D32">继续产出并保留</text>
+    <rect x="550" y="382" width="258" height="76" rx="6" fill="#FFFFFF" stroke="#D97706" stroke-width="2"/>
+    <use data-icon="tabler-outline/player-pause" x="568" y="402" width="26" height="26" fill="#D97706" stroke-width="2"/>
+    <text x="606" y="420" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="17" font-weight="700" fill="#132A3A">revenue-baseline</text>
+    <text x="568" y="444" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="14" fill="#B54708">waiting_input：等待口径决定</text>
+    <path d="M678 458V484" fill="none" stroke="#D97706" stroke-width="3"/><path d="M678 484L672 474H684Z" fill="#D97706"/>
+    <rect x="310" y="490" width="498" height="62" rx="6" fill="#EDF1F4" stroke="#1769E0" stroke-width="2"/>
+    <use data-icon="tabler-outline/message-circle" x="330" y="507" width="26" height="26" fill="#1769E0" stroke-width="2"/>
+    <text x="370" y="514" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="17" font-weight="700" fill="#132A3A">Steer：采用正式口径，保留预测差异说明</text>
+    <text x="370" y="538" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="14" fill="#5A6B7C">只恢复该分支；已完成工件和版本不被覆盖</text>
+  </g>
+
+  <g id="current-mapping">
+    <text x="856" y="338" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="24" font-weight="700" fill="#132A3A">从 07-16 目标到当前事实</text>
+    <rect x="856" y="358" width="372" height="214" rx="6" fill="#FFFFFF" stroke="#CBD5DF" stroke-width="2"/>
+    <rect x="876" y="378" width="94" height="26" rx="5" fill="#EDF1F4"/>
+    <text x="923" y="397" text-anchor="middle" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="14" font-weight="700" fill="#1769E0">当前已落地</text>
+    <text x="876" y="430" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#1B2733">服务端 Branch 与分支级 Evidence Gate</text>
+    <text x="876" y="456" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#1B2733">append-only ArtifactVersion / TaskCommit</text>
+    <text x="876" y="482" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#1B2733">局部恢复与可选 PostgreSQL 重启恢复</text>
+    <path d="M876 500H1208" fill="none" stroke="#E3E8ED" stroke-width="2"/>
+    <text x="876" y="526" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="14" font-weight="700" fill="#B54708">仍是目标：生产跨端身份、通用可写办公工件、长期后台 Worker</text>
+  </g>
+
+  <g id="takeaway">
+    <rect x="52" y="600" width="1176" height="54" rx="6" fill="#132A3A"/>
+    <text x="76" y="633" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="17" font-weight="700" fill="#FFFFFF">交互变化：</text>
+    <text x="168" y="633" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#CBD5DF">用户不再重开对话、重讲背景，而是在同一任务里查看分支、处理冲突、恢复受影响部分。</text>
+  </g>
+  <g id="footer">
+    <text x="52" y="690" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="14" fill="#7C8A98">目标结构来源：07-16 Demo 1；线上实践依据：LangGraph Persistence · OpenAI Agents SDK Human-in-the-loop</text>
+    <text x="1228" y="690" text-anchor="end" font-family="Consolas, &quot;Courier New&quot;, monospace" font-size="14" fill="#7C8A98">21 / 24</text>
+  </g>
+</svg>

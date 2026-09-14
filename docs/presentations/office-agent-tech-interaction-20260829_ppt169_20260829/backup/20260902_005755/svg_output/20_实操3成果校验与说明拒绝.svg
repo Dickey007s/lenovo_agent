@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720" width="1280" height="720">
+  <g id="background">
+    <rect width="1280" height="720" fill="#F7F8FA"/>
+    <path d="M52 112H1228" stroke="#CBD5DF" stroke-width="2"/>
+  </g>
+  <g id="header">
+    <text x="52" y="78" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="46" font-weight="700" fill="#132A3A">实操 3：</text>
+    <text x="230" y="78" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="46" font-weight="700" fill="#132A3A">成果可检查，模型说明不覆盖事实</text>
+  </g>
+  <g id="artifact-proof">
+    <rect x="52" y="140" width="548" height="508" rx="6" fill="#FFFFFF" stroke="#2E7D32" stroke-width="2"/>
+    <text x="76" y="178" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="24" font-weight="700" fill="#132A3A">A. 成果与业务效果分层</text>
+    <image href="../images/scenario-effect-gate-desktop.png" x="66" y="196" width="520" height="293" preserveAspectRatio="xMidYMid meet"/>
+    <rect x="76" y="510" width="500" height="116" rx="6" fill="#EDF1F4"/>
+    <circle cx="100" cy="540" r="10" fill="#2E7D32"/>
+    <text x="122" y="546" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#1B2733">真实文件写入隔离 Run 工作区，可下载。</text>
+    <circle cx="100" cy="575" r="10" fill="#2E7D32"/>
+    <text x="122" y="581" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#1B2733">具名确定性检查与 EffectReceipt 可追溯。</text>
+    <circle cx="100" cy="610" r="10" fill="#D97706"/>
+    <text x="122" y="616" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#1B2733">未付款、未核销等动作继续明确为未发生。</text>
+  </g>
+  <g id="reconciliation-proof">
+    <rect x="628" y="140" width="600" height="508" rx="6" fill="#FFFFFF" stroke="#C0362C" stroke-width="2"/>
+    <text x="652" y="178" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="24" font-weight="700" fill="#132A3A">B. 模型被调用，不代表说明被采用</text>
+    <image href="../images/narrative-reconciliation-rejected-desktop-1440x1100.png" x="642" y="196" width="572" height="437" preserveAspectRatio="xMidYMid meet"/>
+    <rect x="654" y="206" width="232" height="32" rx="6" fill="#C0362C"/>
+    <text x="770" y="228" text-anchor="middle" font-family="Consolas, &quot;Courier New&quot;, monospace" font-size="17" font-weight="700" fill="#FFFFFF">called=true · output_used=false</text>
+  </g>
+  <g id="boundary">
+    <text x="52" y="674" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="17" font-weight="700" fill="#B54708">当前边界：</text>
+    <text x="146" y="674" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#5A6B7C">固定检查证明特定字段与效果，不是通用语义真值证明器；前台仍要求人工复核。</text>
+  </g>
+  <g id="footer">
+    <text x="52" y="704" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="14" fill="#7C8A98">交互变化：先展示可用成果与检查回执，再解释模型说明是否采用及其原因</text>
+    <text x="1228" y="704" text-anchor="end" font-family="Consolas, &quot;Courier New&quot;, monospace" font-size="14" fill="#7C8A98">20 / 24</text>
+  </g>
+</svg>

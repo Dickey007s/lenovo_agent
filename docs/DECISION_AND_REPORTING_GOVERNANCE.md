@@ -211,4 +211,11 @@ Before delivery, verify:
 - living docs and retirement lifecycle are synchronized;
 - governance test, Markdown link check and `git diff --check` pass.
 
+For user-facing changes, also deliver at least one concrete acceptance case: exact input,
+click sequence, expected observation, failure criterion and actual result. Execute it when feasible,
+record discovered failures before fixes, and keep unresolved content-quality issues separate from
+green UI tests. Fixture, real browser, Provider and business-effect evidence are distinct.
+See [2026-09-11 user feedback](sources/USER-FEEDBACK-20260911-self-testing-and-acceptance-cases.md)
+and [the reusable cases](testing/DEMO12-ACCEPTANCE-CASES-20260911.md).
+
 The current FORTE product application of this policy is [DR-0018](decisions/DR-0018-forte-data-workbench-and-verifiable-trace.md). The generic capability-composition rule is [DR-0019](decisions/DR-0019-capability-composed-agent-runtime.md). DR-0016/0017 remain historical foundations with their original evidence scope.

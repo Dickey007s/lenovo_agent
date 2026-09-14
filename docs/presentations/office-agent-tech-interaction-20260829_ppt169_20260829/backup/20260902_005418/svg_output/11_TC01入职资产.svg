@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720" width="1280" height="720">
+  <g id="background"><rect width="1280" height="720" fill="#F7F8FA"/><path d="M52 112H1228" stroke="#CBD5DF" stroke-width="2"/></g>
+  <g id="header">
+    <text x="52" y="78" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="46" font-weight="700" fill="#132A3A">TC-01：成果正确，不等于引用定位完整</text>
+    <rect x="1084" y="46" width="144" height="34" rx="6" fill="#EDF1F4"/><text x="1156" y="69" text-anchor="middle" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#1769E0">用户反馈驱动</text>
+  </g>
+  <g id="before-shot">
+    <rect x="52" y="150" width="360" height="456" rx="6" fill="#FFFFFF" stroke="#CBD5DF" stroke-width="2"/>
+    <text x="72" y="184" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="24" font-weight="700" fill="#C0362C">旧体验：成果与审计缺口混在一起</text>
+    <image href="../images/user-feedback-20260828-tc01-artifact-and-citation-confusion.png" x="68" y="208" width="328" height="344" preserveAspectRatio="xMidYMid meet"/>
+    <text x="72" y="580" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="14" fill="#7C8A98">用户反馈样本，非正式目标用户研究</text>
+  </g>
+  <g id="scenario-ledger">
+    <rect x="436" y="150" width="492" height="456" rx="6" fill="#FFFFFF" stroke="#1769E0" stroke-width="2"/>
+    <text x="460" y="184" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="24" font-weight="700" fill="#132A3A">现在把三个事实拆开</text>
+    <text x="460" y="222" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="17" font-weight="700" fill="#1769E0">触发</text>
+    <text x="516" y="222" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#1B2733">根据时间表和规则生成 3/20-4/20 资产匹配表</text>
+    <text x="460" y="260" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="17" font-weight="700" fill="#1769E0">路径</text>
+    <text x="516" y="260" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#1B2733">读取两份资料 → 生成 CSV → 文件检查 → 证据定位</text>
+    <text x="460" y="298" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="17" font-weight="700" fill="#2E7D32">成果</text>
+    <text x="516" y="298" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#1B2733">日期与资产表可通过确定性文件检查</text>
+    <text x="460" y="336" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="17" font-weight="700" fill="#B54708">停顿</text>
+    <text x="516" y="336" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#1B2733">同一逐字 quote 多次出现，无法唯一映射到原文位置</text>
+    <rect x="460" y="366" width="444" height="82" rx="6" fill="#EDF1F4"/>
+    <text x="480" y="394" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="17" font-weight="700" fill="#132A3A">“缺一份引用”到底是什么意思？</text>
+    <text x="480" y="424" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#5A6B7C">缺的是唯一可回开的定位，不是缺源文件，也不是日期算错。</text>
+    <text x="460" y="486" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="17" font-weight="700" fill="#1769E0">前台</text>
+    <text x="516" y="486" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#1B2733">成果置顶；同源缺口合并；只决定受影响定位</text>
+    <text x="460" y="524" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="17" font-weight="700" fill="#1769E0">后端</text>
+    <text x="516" y="524" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#1B2733">Artifact/Effect 与 Resolution/Branch 分开负责</text>
+    <text x="460" y="562" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="17" font-weight="700" fill="#B54708">边界</text>
+    <text x="516" y="562" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#1B2733">用户仍需复核资产规则与特殊备注</text>
+  </g>
+  <g id="after-shot">
+    <rect x="952" y="150" width="276" height="456" rx="6" fill="#FFFFFF" stroke="#2E7D32" stroke-width="2"/>
+    <text x="972" y="184" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="24" font-weight="700" fill="#2E7D32">现在：成果优先</text>
+    <image href="../images/dr-0036-tc01-outcome-first-desktop.png" x="972" y="206" width="236" height="350" preserveAspectRatio="xMidYMid meet"/>
+    <text x="972" y="580" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="14" fill="#7C8A98">当前系统实测</text>
+  </g>
+  <g id="footer">
+    <text x="52" y="690" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="14" fill="#7C8A98">设计依据：Anthropic Citations · Microsoft HAI Guidelines；截图只证明当前系统渲染与运行事实</text>
+    <text x="1228" y="690" text-anchor="end" font-family="Consolas, &quot;Courier New&quot;, monospace" font-size="14" fill="#7C8A98">11 / 24</text>
+  </g>
+</svg>

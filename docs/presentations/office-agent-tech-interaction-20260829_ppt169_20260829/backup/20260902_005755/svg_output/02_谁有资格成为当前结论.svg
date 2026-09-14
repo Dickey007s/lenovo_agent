@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720" width="1280" height="720">
+  <g id="background">
+    <rect width="1280" height="720" fill="#F7F8FA"/>
+    <path d="M52 112H1228" fill="none" stroke="#CBD5DF" stroke-width="2"/>
+  </g>
+  <g id="header">
+    <text x="52" y="78" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="46" font-weight="700" fill="#132A3A">这次改版带来的能力跃迁</text>
+    <rect x="1092" y="46" width="136" height="34" rx="6" fill="#EDF1F4"/>
+    <text x="1160" y="69" text-anchor="middle" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#1769E0">延续 07-16</text>
+  </g>
+  <g id="core-message">
+    <text x="52" y="158" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="28" font-weight="700" fill="#132A3A">三类控制不变，验证对象从“回答”扩展到“真实办公成果”</text>
+    <text x="52" y="193" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#5A6B7C">Demo 1 管时间连续性，Demo 2 管复杂任务组织，Demo 3 管动作风险；当前版本补上 Workspace、WorkUnit、Artifact 与证据回开。</text>
+  </g>
+  <g id="three-demos">
+    <rect x="52" y="240" width="356" height="240" rx="6" fill="#FFFFFF" stroke="#CBD5DF" stroke-width="2"/>
+    <rect x="52" y="240" width="356" height="8" fill="#1769E0"/>
+    <use data-icon="tabler-outline/history" x="76" y="270" width="30" height="30" fill="#1769E0" stroke-width="2"/>
+    <text x="122" y="294" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="28" font-weight="700" fill="#132A3A">Demo 1 · 持续</text>
+    <text x="76" y="340" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="24" fill="#1B2733">同一任务跨轮推进</text>
+    <text x="76" y="380" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#5A6B7C">新增：完整 Workspace 范围</text>
+    <text x="76" y="410" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#5A6B7C">新增：Branch 级证据门与恢复</text>
+    <text x="76" y="448" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="17" font-weight="700" fill="#1769E0">前台：为什么停、从哪里继续</text>
+    <rect x="438" y="240" width="356" height="240" rx="6" fill="#FFFFFF" stroke="#CBD5DF" stroke-width="2"/>
+    <rect x="438" y="240" width="356" height="8" fill="#2E7D32"/>
+    <use data-icon="tabler-outline/git-branch" x="462" y="270" width="30" height="30" fill="#2E7D32" stroke-width="2"/>
+    <text x="508" y="294" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="28" font-weight="700" fill="#132A3A">Demo 2 · 协作</text>
+    <text x="462" y="340" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="24" fill="#1B2733">复杂任务按需组织</text>
+    <text x="462" y="380" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#5A6B7C">当前：WorkUnit DAG 与采用台账</text>
+    <text x="462" y="410" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#5A6B7C">边界：单进程、每波最多 3 个只读 Worker</text>
+    <text x="462" y="448" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="17" font-weight="700" fill="#2E7D32">前台：谁依赖谁、哪里需确认</text>
+    <rect x="824" y="240" width="404" height="240" rx="6" fill="#FFFFFF" stroke="#CBD5DF" stroke-width="2"/>
+    <rect x="824" y="240" width="404" height="8" fill="#D97706"/>
+    <use data-icon="tabler-outline/shield-check" x="848" y="270" width="30" height="30" fill="#D97706" stroke-width="2"/>
+    <text x="894" y="294" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="28" font-weight="700" fill="#132A3A">Demo 3 · 治理</text>
+    <text x="848" y="340" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="24" fill="#1B2733">真实动作前展示后果</text>
+    <text x="848" y="380" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#5A6B7C">新增：Artifact 与 EffectReceipt</text>
+    <text x="848" y="410" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#5A6B7C">边界：无 Connector 回执即未执行</text>
+    <text x="848" y="448" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="17" font-weight="700" fill="#B54708">前台：会改变什么、不会发生什么</text>
+  </g>
+  <g id="conclusion">
+    <path d="M118 544H1162" fill="none" stroke="#1769E0" stroke-width="4"/>
+    <circle cx="118" cy="544" r="16" fill="#1769E0"/>
+    <text x="154" y="536" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="28" font-weight="700" fill="#132A3A">核心升级：Agent 的进展必须落到可核对的工作事实</text>
+    <text x="154" y="574" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#5A6B7C">当前系统实测只证明固定公开数据上的工程纵切，不证明生产能力或用户价值。</text>
+  </g>
+  <g id="footer">
+    <text x="52" y="690" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="14" fill="#7C8A98">线上研究依据：Microsoft HAI Guidelines · ReAct</text>
+    <text x="1228" y="690" text-anchor="end" font-family="Consolas, &quot;Courier New&quot;, monospace" font-size="14" fill="#7C8A98">02 / 24</text>
+  </g>
+</svg>

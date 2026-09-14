@@ -1,5 +1,39 @@
 # Office Agent V0.2 architecture
 
+## Integrated boundary projection (2026-09-12)
+
+[DR-0063](decisions/DR-0063-integrated-copilot-boundaries-and-swarm-facts.md) adds a pure
+`projectCopilotBoundaries` projection in the existing capability progress view. Selected Snapshot
+facts explain evidence choice, incomplete decisions, bounded dispatch/retry and failed business gates.
+This is not an authorization engine; the existing server owns permissions and control. Swarm summary
+counts Worker receipts separately from Contribution adoption. Ready Branches show awaiting dispatch,
+not executed work; displayed confirmation sources belong to that ready set. Loop, Task history,
+source revision controls and the in-process Worker runtime remain unchanged.
+
+## Reference-aligned UI projection (2026-09-11)
+
+[DR-0061](decisions/DR-0061-reference-aligned-capabilities-and-evidence-choice.md) changes only browser
+projection and review interaction. `CapabilityProgress`, `CapabilityExecutionRecord`, and
+`CollaborationOverview` read the selected Snapshot; `EvidenceReviewDialog` uses authoritative
+DecisionRequest/Resolution IDs and native, initially unselected radios. Nested legacy packets cannot
+override top-level revision/state; `stale` remains closed. A terminal decision records a location,
+not continuation. No new Runtime, endpoint, database schema, distributed worker or external action is
+introduced. Demo 3 HTML is an isolated Draft, not a registered product scenario.
+
+The follow-up acceptance pass resets the capability tab and hash explicitly on new-task actions,
+including repeated null-Run drafts; no Task or control request is created. Evidence choice projects
+Resolution title/summary as an unconfirmed claim. Playwright uses `.next-playwright` independently
+of the interactive dev build. A real run exposed a remaining coverage boundary: model inputs are
+capped at 12,000 characters per text file even when the browser can preview more. See the
+[acceptance evidence](evidence/DEMO12-SELF-TEST-ACCEPTANCE-EVIDENCE-20260911.md); full-source semantic coverage is not guaranteed.
+
+The next visual pass adds a local disclosure of `contract.goal`, a roomier draft composer,
+adaptive Branch widths and a fixed evidence-choice action bar. The visible selection is local UI
+state, not a DecisionRecord; only the existing versioned decision command records approval.
+No Runtime, API, persistence or model-input policy changes. The separate
+[research library](reports/copilot-research-library-20260911/index.html) is a design evidence collection,
+not an implemented risk engine or proof of human-AI performance improvements.
+
 ## 1. Current vertical slice
 
 ```text
@@ -26,8 +60,8 @@ FastAPI Harness
        -> append-only logical ArtifactVersion + TaskCommit pointer/restore
        -> isolated real office Artifact store + Owner-scoped download
        -> HarnessStateStore
-            -> PostgreSQL snapshots/receipts/artifacts/commits when DATABASE_DSN is configured
-            -> process-local memory fallback otherwise
+            -> PostgreSQL snapshots/receipts/artifacts/commits when selected by STATE_STORE_MODE/DSN
+            -> process-local memory when explicitly forced or no DSN exists in auto mode
 ```
 
 Only `health_router` and the Harness router are mounted. Legacy conversation,
@@ -78,6 +112,13 @@ new text would affect the active contract.
 ### 3.1 Task identity and bounded continuation
 
 `task_id` identifies the business task; `run_id` identifies one bounded execution.
+A browser “new task” action is deliberately not a Task record. It closes the
+selected EventSource and clears the client projection while leaving the previous
+server Task/Run unchanged. Only a later accepted `POST /v1/harness/runs` creates
+the new Task and its first Run. A session-scoped draft marker prevents automatic
+old-Run restoration after refresh, but it is not identity, persistence authority
+or a server-side conversation.
+
 A first Run starts at `run_sequence=1`. A terminal `completed/stopped/failed` Run
 with an unfinished Branch may accept an Owner-scoped, versioned and idempotent
 continuation command. The service creates a new Run under the same `task_id`, sets
@@ -126,6 +167,13 @@ auto-replayed. A new idempotency key plus the current Run version can explicitly
 retry only that recovered unit. This is a local read-only execution ledger, not a
 durable queue, Worker lease, remote execution service or multi-instance scheduler.
 
+Runtime construction accepts `STATE_STORE_MODE=auto|memory|postgres`. `auto`
+uses PostgreSQL only when a non-empty `DATABASE_DSN` exists; `memory` explicitly
+ignores a stale DSN, and `postgres` without a DSN fails closed. The Windows demo
+launcher uses the non-empty `memory` mode for fallback because an empty parent
+environment variable is not a reliable `.env` override across `Start-Process`.
+Health `checkpoint/task_store`, not launcher text, is the final persistence fact.
+
 ## 4. Planning and analysis ownership
 
 The Planner returns strict JSON business intent. It does not own file identity,
@@ -142,6 +190,18 @@ The server compiles the candidate into a `HarnessPlan`:
 - every validated unit becomes a stable server-owned Branch with dependencies,
   evidence state and human-gate state; model output cannot assign Branch identity
   or completion.
+
+For instructions that contain an explicit marker plus a contiguous numbered
+`1..N` requirement list, the Runtime also requires Planner accounting for each
+item (`N <= 12`). `planned` binds one unique root unit, `deferred` carries real
+allowlisted candidate refs that did not fit this round, and `uncovered` carries
+no fabricated ref because the frozen index has no recognizable source. The
+private accounting table is validator input; the public Plan exposes only
+`units[]`, `deferred_requirements[]` and `uncovered_requirements[]`. If the
+server file cap removes a complete root unit, it converts that item to deferred
+instead of silently losing it. An internal short text-heading
+`planner_search_hint` improves file discovery but never enters the public
+Workspace, Snapshot or Analyst evidence.
 
 After that validation, `TopologyAdmission` deterministically chooses the smallest
 safe route from `single_controller`, `fixed_workflow` and
@@ -195,13 +255,22 @@ Chinese month/day window in the instruction is omitted with
 `contradiction` Anchor is removed with `decision_gate_suppressed`; neither rule
 weakens file-scope or Catalog-integrity fail-closed checks.
 
+The production Analyst has a separate 180-second HTTP timeout and requests at
+most 12,000 output tokens. Its model-owned draft omits server IDs, Branch facts,
+anchors and resolutions. The prompt keeps complex output compact at no more
+than two candidate Findings per root unit and one per dependent unit, with a
+prompt-level total no greater than 24; the public/server contract still accepts
+up to 96 and the Runtime never silently truncates an accepted result. Output
+length exhaustion, invalid JSON, schema mismatch, Provider timeout/response,
+Branch binding and source-location rejection are classified separately.
+
 The browser initially collapses the result after three findings only to control
 visual density; “查看其余 N 条发现” expands the remaining server-returned items.
 That presentation choice is not an analysis cap and must never truncate the
 Snapshot, ArtifactVersion or Worker contribution.
 
-If the first
-Analyst output cannot be uniquely located, the Runtime records
+If the first Analyst output fails strict structure, Branch binding or unique
+source location, the Runtime records `analysis_structure_rejected` or
 `analysis_validation_rejected` and permits at most one new Analyst call within
 the same budget; the browser never receives rejected prose as an adopted result.
 The resolver records `exact`, `ambiguous`, `unavailable`, `stale` or `rejected`
@@ -406,6 +475,11 @@ resume first and collapses optional clues, stop reasons and Preview. An
 one explicit candidate choice and disables accept until that choice exists. This
 changes information order only; version, idempotency, budget and recovery remain
 server-owned.
+An explicitly deferred requirement is shown separately from the current Plan
+units and from uncovered material, with one real Branch-resume action. In the
+collaboration view, a waiting Adaptive Snapshot with no
+`next_step.ready_branch_ids` shows guidance to return to progress and cannot
+render a Worker-dispatch action for an empty wave.
 This is not a source-file Diff or semantic verification. Proposal context is
 explicitly not a per-proposal citation. Preview security and result-review
 boundaries remain available without turning the primary page into an

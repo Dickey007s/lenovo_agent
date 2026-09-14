@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720" width="1280" height="720">
+  <g id="background"><rect width="1280" height="720" fill="#F7F8FA"/><path d="M52 112H1228" stroke="#CBD5DF" stroke-width="2"/></g>
+  <g id="header">
+    <text x="52" y="78" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="46" font-weight="700" fill="#132A3A">技术演进：工程对象不断外扩</text>
+    <rect x="1060" y="46" width="168" height="34" rx="6" fill="#EDF1F4"/><text x="1144" y="69" text-anchor="middle" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#1769E0">07-16 P05-P09</text>
+  </g>
+  <g id="core-message">
+    <text x="52" y="156" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="28" font-weight="700" fill="#132A3A">不是模型突然“变成 Agent”，而是系统逐步接管更多责任</text>
+    <text x="52" y="190" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#5A6B7C">阶段名称是方案归纳，不代表学界统一命名；研究依据来自论文与产品官方实践。</text>
+  </g>
+  <g id="evolution-chain">
+    <path d="M52 248H1228V466H52Z" fill="#FFFFFF" stroke="#CBD5DF" stroke-width="2"/>
+    <path d="M52 248H242L270 357L242 466H52Z" fill="#EDF1F4" stroke="#1769E0" stroke-width="2"/>
+    <text x="72" y="300" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="24" font-weight="700" fill="#132A3A">Prompt</text>
+    <text x="72" y="330" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="24" font-weight="700" fill="#132A3A">Engineering</text>
+    <text x="72" y="382" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#5A6B7C">工程对象</text><text x="72" y="410" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#1769E0">单次指令与示例</text>
+
+    <path d="M270 248H442L470 357L442 466H270L298 357Z" fill="#FFFFFF" stroke="#1769E0" stroke-width="2"/>
+    <text x="306" y="300" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="24" font-weight="700" fill="#132A3A">Agent Loop</text>
+    <text x="306" y="330" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="24" font-weight="700" fill="#132A3A">ReAct</text>
+    <text x="306" y="382" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#5A6B7C">新增责任</text><text x="306" y="410" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#1769E0">Action / Observation</text>
+
+    <path d="M470 248H642L670 357L642 466H470L498 357Z" fill="#EDF1F4" stroke="#1769E0" stroke-width="2"/>
+    <text x="506" y="300" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="24" font-weight="700" fill="#132A3A">Context</text>
+    <text x="506" y="330" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="24" font-weight="700" fill="#132A3A">Engineering</text>
+    <text x="506" y="382" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#5A6B7C">新增责任</text><text x="506" y="410" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#1769E0">状态与信息选择</text>
+
+    <path d="M670 248H842L870 357L842 466H670L698 357Z" fill="#FFFFFF" stroke="#1769E0" stroke-width="2"/>
+    <text x="706" y="300" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="24" font-weight="700" fill="#132A3A">Harness</text>
+    <text x="706" y="330" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="24" font-weight="700" fill="#132A3A">Engineering</text>
+    <text x="706" y="382" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#5A6B7C">新增责任</text><text x="706" y="410" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#1769E0">工具、权限、沙箱</text>
+
+    <path d="M870 248H1042L1070 357L1042 466H870L898 357Z" fill="#EDF1F4" stroke="#1769E0" stroke-width="2"/>
+    <text x="906" y="300" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="24" font-weight="700" fill="#132A3A">Loop</text>
+    <text x="906" y="330" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="24" font-weight="700" fill="#132A3A">Engineering</text>
+    <text x="906" y="382" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#5A6B7C">新增责任</text><text x="906" y="410" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#1769E0">触发、验证、恢复</text>
+
+    <path d="M1070 248H1228V466H1070L1098 357Z" fill="#132A3A"/>
+    <text x="1110" y="300" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="24" font-weight="700" fill="#FFFFFF">办公交付</text>
+    <text x="1110" y="340" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#CBD5DF">业务成果</text>
+    <text x="1110" y="370" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#CBD5DF">证据与边界</text>
+    <text x="1110" y="410" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="17" font-weight="700" fill="#FFFFFF">用户可复核</text>
+  </g>
+  <g id="interaction-impact">
+    <use data-icon="tabler-outline/arrows-exchange" x="52" y="520" width="28" height="28" fill="#1769E0" stroke-width="2"/>
+    <text x="96" y="542" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="28" font-weight="700" fill="#132A3A">交互对象同步变化</text>
+    <text x="96" y="580" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#5A6B7C">从“改一句 Prompt”到“审查任务状态、来源、成果、恢复点与动作后果”。</text>
+  </g>
+  <g id="footer">
+    <text x="52" y="690" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="14" fill="#7C8A98">研究依据：Brown et al. (2020) · ReAct (2022) · Anthropic Context Engineering</text>
+    <text x="1228" y="690" text-anchor="end" font-family="Consolas, &quot;Courier New&quot;, monospace" font-size="14" fill="#7C8A98">05 / 24</text>
+  </g>
+</svg>

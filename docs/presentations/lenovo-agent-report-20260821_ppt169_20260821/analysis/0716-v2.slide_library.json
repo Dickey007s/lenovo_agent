@@ -1,0 +1,896 @@
+{
+  "schema": "template_fill_pptx_library.v1",
+  "source_pptx": "E:\\Project\\Lenovo CAAI AI Agent\\docs\\presentations\\lenovo-agent-report-20260821_ppt169_20260821\\sources\\0716-v2.pptx",
+  "slide_count": 36,
+  "canvas_px": {
+    "width": 1280,
+    "height": 720
+  },
+  "slides": [
+    {
+      "slide_index": 1,
+      "page_type": "cover_candidate",
+      "text_summary": "AI Agent 交互研究 进展汇报\n2025年7月16日\n单位：华南理工大学 未来技术学院\n汇报人：刘琦教授团队\n未来技术学院\nFUTURE TECH",
+      "slots": [
+        {
+          "slot_id": "s01_sh30",
+          "role": "title_candidate",
+          "text": "",
+          "paragraph_count": 0,
+          "geometry": {
+            "x": 0,
+            "y": -4,
+            "width": 1280,
+            "height": 724
+          },
+          "text_metrics": {
+            "font_size_px": null,
+            "paragraph_count": 0
+          }
+        },
+        {
+          "slot_id": "s01_sh16",
+          "role": "label_candidate",
+          "text": "AI Agent 交互研究 进展汇报",
+          "paragraph_count": 1,
+          "geometry": {
+            "x": 0,
+            "y": 235,
+            "width": 1280,
+            "height": 208
+          },
+          "text_metrics": {
+            "font_size_px": 72.0,
+            "paragraph_count": 1
+          }
+        },
+        {
+          "slot_id": "s01_sh5",
+          "role": "body_candidate",
+          "text": "2025年7月16日",
+          "paragraph_count": 1,
+          "geometry": {
+            "x": 425,
+            "y": 618,
+            "width": 429,
+            "height": 48
+          },
+          "text_metrics": {
+            "font_size_px": 32.0,
+            "paragraph_count": 1
+          }
+        },
+        {
+          "slot_id": "s01_sh6",
+          "role": "label_candidate",
+          "text": "单位：华南理工大学 未来技术学院",
+          "paragraph_count": 1,
+          "geometry": {
+            "x": 261,
+            "y": 546,
+            "width": 757,
+            "height": 55
+          },
+          "text_metrics": {
+            "font_size_px": 37.33,
+            "paragraph_count": 1
+          }
+        },
+        {
+          "slot_id": "s01_sh10",
+          "role": "title_candidate",
+          "text": "汇报人：刘琦教授团队",
+          "paragraph_count": 1,
+          "geometry": {
+            "x": 370,
+            "y": 467,
+            "width": 540,
+            "height": 61
+          },
+          "text_metrics": {
+            "font_size_px": 42.67,
+            "paragraph_count": 1
+          }
+        },
+        {
+          "slot_id": "s01_sh14",
+          "role": "title_candidate",
+          "text": "",
+          "paragraph_count": 0,
+          "geometry": {
+            "x": 0,
+            "y": 0,
+            "width": 0,
+            "height": 0
+          },
+          "text_metrics": {
+            "font_size_px": null,
+            "paragraph_count": 0
+          }
+        },
+        {
+          "slot_id": "s01_sh18",
+          "role": "title_candidate",
+          "text": "",
+          "paragraph_count": 0,
+          "geometry": {
+            "x": 0,
+            "y": 0,
+            "width": 0,
+            "height": 0
+          },
+          "text_metrics": {
+            "font_size_px": null,
+            "paragraph_count": 0
+          }
+        },
+        {
+          "slot_id": "s01_sh19",
+          "role": "title_candidate",
+          "text": "",
+          "paragraph_count": 0,
+          "geometry": {
+            "x": 0,
+            "y": 0,
+            "width": 0,
+            "height": 0
+          },
+          "text_metrics": {
+            "font_size_px": null,
+            "paragraph_count": 0
+          }
+        },
+        {
+          "slot_id": "s01_sh20",
+          "role": "title_candidate",
+          "text": "",
+          "paragraph_count": 0,
+          "geometry": {
+            "x": 0,
+            "y": 0,
+            "width": 0,
+            "height": 0
+          },
+          "text_metrics": {
+            "font_size_px": null,
+            "paragraph_count": 0
+          }
+        },
+        {
+          "slot_id": "s01_sh21",
+          "role": "title_candidate",
+          "text": "",
+          "paragraph_count": 0,
+          "geometry": {
+            "x": 0,
+            "y": 0,
+            "width": 0,
+            "height": 0
+          },
+          "text_metrics": {
+            "font_size_px": null,
+            "paragraph_count": 0
+          }
+        },
+        {
+          "slot_id": "s01_sh22",
+          "role": "title_candidate",
+          "text": "未来技术学院\nFUTURE TECH",
+          "paragraph_count": 2,
+          "geometry": {
+            "x": 1064,
+            "y": 20,
+            "width": 209,
+            "height": 63
+          },
+          "text_metrics": {
+            "font_size_px": 80.0,
+            "paragraph_count": 2
+          }
+        }
+      ],
+      "tables": [],
+      "charts": []
+    },
+    {
+      "slide_index": 2,
+      "page_type": "content_candidate",
+      "text_summary": "01 进展汇报：前沿办公AIAgent功能与demo重设计\n02  进展汇报：前沿办公 AI Agent 的工作区协同与安全治理设计\n提纲",
+      "slots": [
+        {
+          "slot_id": "s02_sh35",
+          "role": "title_candidate",
+          "text": "01 进展汇报：前沿办公AIAgent功能与demo重设计",
+          "paragraph_count": 1,
+          "geometry": {
+            "x": 138,
+            "y": 280,
+            "width": 1035,
+            "height": 77
+          },
+          "text_metrics": {
+            "font_size_px": 63.33,
+            "paragraph_count": 1
+          }
+        },
+        {
+          "slot_id": "s02_sh37",
+          "role": "body_candidate",
+          "text": "02  进展汇报：前沿办公 AI Agent 的工作区协同与安全治理设计",
+          "paragraph_count": 1,
+          "geometry": {
+            "x": 138,
+            "y": 392,
+            "width": 1083,
+            "height": 77
+          },
+          "text_metrics": {
+            "font_size_px": 63.33,
+            "paragraph_count": 1
+          }
+        },
+        {
+          "slot_id": "s02_sh17",
+          "role": "title_candidate",
+          "text": "提纲",
+          "paragraph_count": 1,
+          "geometry": {
+            "x": 1000,
+            "y": 111,
+            "width": 107,
+            "height": 63
+          },
+          "text_metrics": {
+            "font_size_px": 52.67,
+            "paragraph_count": 1
+          }
+        }
+      ],
+      "tables": [],
+      "charts": []
+    },
+    {
+      "slide_index": 3,
+      "page_type": "chapter_candidate",
+      "text_summary": "",
+      "slots": [],
+      "tables": [],
+      "charts": []
+    },
+    {
+      "slide_index": 4,
+      "page_type": "chapter_candidate",
+      "text_summary": "",
+      "slots": [],
+      "tables": [],
+      "charts": []
+    },
+    {
+      "slide_index": 5,
+      "page_type": "chapter_candidate",
+      "text_summary": "",
+      "slots": [],
+      "tables": [],
+      "charts": []
+    },
+    {
+      "slide_index": 6,
+      "page_type": "chapter_candidate",
+      "text_summary": "",
+      "slots": [],
+      "tables": [],
+      "charts": []
+    },
+    {
+      "slide_index": 7,
+      "page_type": "chapter_candidate",
+      "text_summary": "",
+      "slots": [],
+      "tables": [],
+      "charts": []
+    },
+    {
+      "slide_index": 8,
+      "page_type": "chapter_candidate",
+      "text_summary": "",
+      "slots": [],
+      "tables": [],
+      "charts": []
+    },
+    {
+      "slide_index": 9,
+      "page_type": "chapter_candidate",
+      "text_summary": "",
+      "slots": [],
+      "tables": [],
+      "charts": []
+    },
+    {
+      "slide_index": 10,
+      "page_type": "chapter_candidate",
+      "text_summary": "",
+      "slots": [],
+      "tables": [],
+      "charts": []
+    },
+    {
+      "slide_index": 11,
+      "page_type": "chapter_candidate",
+      "text_summary": "",
+      "slots": [],
+      "tables": [],
+      "charts": []
+    },
+    {
+      "slide_index": 12,
+      "page_type": "chapter_candidate",
+      "text_summary": "",
+      "slots": [],
+      "tables": [],
+      "charts": []
+    },
+    {
+      "slide_index": 13,
+      "page_type": "chapter_candidate",
+      "text_summary": "",
+      "slots": [],
+      "tables": [],
+      "charts": []
+    },
+    {
+      "slide_index": 14,
+      "page_type": "chapter_candidate",
+      "text_summary": "",
+      "slots": [],
+      "tables": [],
+      "charts": []
+    },
+    {
+      "slide_index": 15,
+      "page_type": "chapter_candidate",
+      "text_summary": "",
+      "slots": [],
+      "tables": [],
+      "charts": []
+    },
+    {
+      "slide_index": 16,
+      "page_type": "chapter_candidate",
+      "text_summary": "",
+      "slots": [],
+      "tables": [],
+      "charts": []
+    },
+    {
+      "slide_index": 17,
+      "page_type": "chapter_candidate",
+      "text_summary": "",
+      "slots": [],
+      "tables": [],
+      "charts": []
+    },
+    {
+      "slide_index": 18,
+      "page_type": "chapter_candidate",
+      "text_summary": "",
+      "slots": [],
+      "tables": [],
+      "charts": []
+    },
+    {
+      "slide_index": 19,
+      "page_type": "chapter_candidate",
+      "text_summary": "",
+      "slots": [],
+      "tables": [],
+      "charts": []
+    },
+    {
+      "slide_index": 20,
+      "page_type": "chapter_candidate",
+      "text_summary": "",
+      "slots": [],
+      "tables": [],
+      "charts": []
+    },
+    {
+      "slide_index": 21,
+      "page_type": "chapter_candidate",
+      "text_summary": "",
+      "slots": [],
+      "tables": [],
+      "charts": []
+    },
+    {
+      "slide_index": 22,
+      "page_type": "chapter_candidate",
+      "text_summary": "",
+      "slots": [],
+      "tables": [],
+      "charts": []
+    },
+    {
+      "slide_index": 23,
+      "page_type": "chapter_candidate",
+      "text_summary": "",
+      "slots": [],
+      "tables": [],
+      "charts": []
+    },
+    {
+      "slide_index": 24,
+      "page_type": "chapter_candidate",
+      "text_summary": "",
+      "slots": [],
+      "tables": [],
+      "charts": []
+    },
+    {
+      "slide_index": 25,
+      "page_type": "chapter_candidate",
+      "text_summary": "",
+      "slots": [],
+      "tables": [],
+      "charts": []
+    },
+    {
+      "slide_index": 26,
+      "page_type": "chapter_candidate",
+      "text_summary": "",
+      "slots": [],
+      "tables": [],
+      "charts": []
+    },
+    {
+      "slide_index": 27,
+      "page_type": "content_candidate",
+      "text_summary": "01 进展汇报：前沿办公AIAgent功能与demo重设计\n02  进展汇报：前沿办公 AI Agent 的工作区协同与安全治理设计\n提纲",
+      "slots": [
+        {
+          "slot_id": "s27_sh35",
+          "role": "title_candidate",
+          "text": "01 进展汇报：前沿办公AIAgent功能与demo重设计",
+          "paragraph_count": 1,
+          "geometry": {
+            "x": 138,
+            "y": 280,
+            "width": 1035,
+            "height": 77
+          },
+          "text_metrics": {
+            "font_size_px": 63.33,
+            "paragraph_count": 1
+          }
+        },
+        {
+          "slot_id": "s27_sh37",
+          "role": "body_candidate",
+          "text": "02  进展汇报：前沿办公 AI Agent 的工作区协同与安全治理设计",
+          "paragraph_count": 1,
+          "geometry": {
+            "x": 138,
+            "y": 392,
+            "width": 1083,
+            "height": 77
+          },
+          "text_metrics": {
+            "font_size_px": 63.33,
+            "paragraph_count": 1
+          }
+        },
+        {
+          "slot_id": "s27_sh17",
+          "role": "title_candidate",
+          "text": "提纲",
+          "paragraph_count": 1,
+          "geometry": {
+            "x": 1000,
+            "y": 111,
+            "width": 107,
+            "height": 63
+          },
+          "text_metrics": {
+            "font_size_px": 52.67,
+            "paragraph_count": 1
+          }
+        }
+      ],
+      "tables": [],
+      "charts": []
+    },
+    {
+      "slide_index": 28,
+      "page_type": "chapter_candidate",
+      "text_summary": "",
+      "slots": [
+        {
+          "slot_id": "s28_sh20",
+          "role": "title_candidate",
+          "text": "",
+          "paragraph_count": 0,
+          "geometry": {
+            "x": 1016,
+            "y": 400,
+            "width": 214,
+            "height": 194
+          },
+          "text_metrics": {
+            "font_size_px": null,
+            "paragraph_count": 0
+          }
+        }
+      ],
+      "tables": [],
+      "charts": []
+    },
+    {
+      "slide_index": 29,
+      "page_type": "chapter_candidate",
+      "text_summary": "",
+      "slots": [
+        {
+          "slot_id": "s29_sh2",
+          "role": "title_candidate",
+          "text": "",
+          "paragraph_count": 0,
+          "geometry": {
+            "x": 26,
+            "y": 169,
+            "width": 1229,
+            "height": 524
+          },
+          "text_metrics": {
+            "font_size_px": null,
+            "paragraph_count": 0
+          }
+        }
+      ],
+      "tables": [],
+      "charts": []
+    },
+    {
+      "slide_index": 30,
+      "page_type": "chapter_candidate",
+      "text_summary": "",
+      "slots": [],
+      "tables": [],
+      "charts": []
+    },
+    {
+      "slide_index": 31,
+      "page_type": "chapter_candidate",
+      "text_summary": "",
+      "slots": [],
+      "tables": [],
+      "charts": []
+    },
+    {
+      "slide_index": 32,
+      "page_type": "chapter_candidate",
+      "text_summary": "",
+      "slots": [],
+      "tables": [],
+      "charts": []
+    },
+    {
+      "slide_index": 33,
+      "page_type": "content_candidate",
+      "text_summary": "任一角色拒绝\n或授权失败\nDeny",
+      "slots": [
+        {
+          "slot_id": "s33_sh4",
+          "role": "title_candidate",
+          "text": "",
+          "paragraph_count": 0,
+          "geometry": {
+            "x": 640,
+            "y": 126,
+            "width": 608,
+            "height": 481
+          },
+          "text_metrics": {
+            "font_size_px": null,
+            "paragraph_count": 0
+          }
+        },
+        {
+          "slot_id": "s33_sh8",
+          "role": "label_candidate",
+          "text": "",
+          "paragraph_count": 0,
+          "geometry": {
+            "x": 32,
+            "y": 171,
+            "width": 608,
+            "height": 423
+          },
+          "text_metrics": {
+            "font_size_px": null,
+            "paragraph_count": 0
+          }
+        },
+        {
+          "slot_id": "s33_sh10",
+          "role": "label_candidate",
+          "text": "",
+          "paragraph_count": 0,
+          "geometry": {
+            "x": 574,
+            "y": 322,
+            "width": 21,
+            "height": 13
+          },
+          "text_metrics": {
+            "font_size_px": null,
+            "paragraph_count": 0
+          }
+        },
+        {
+          "slot_id": "s33_sh13",
+          "role": "label_candidate",
+          "text": "任一角色拒绝\n或授权失败",
+          "paragraph_count": 2,
+          "geometry": {
+            "x": 616,
+            "y": 296,
+            "width": 175,
+            "height": 65
+          },
+          "text_metrics": {
+            "font_size_px": 16.0,
+            "paragraph_count": 2
+          }
+        },
+        {
+          "slot_id": "s33_sh15",
+          "role": "label_candidate",
+          "text": "",
+          "paragraph_count": 0,
+          "geometry": {
+            "x": 693,
+            "y": 381,
+            "width": 21,
+            "height": 13
+          },
+          "text_metrics": {
+            "font_size_px": null,
+            "paragraph_count": 0
+          }
+        },
+        {
+          "slot_id": "s33_sh18",
+          "role": "label_candidate",
+          "text": "Deny",
+          "paragraph_count": 1,
+          "geometry": {
+            "x": 667,
+            "y": 422,
+            "width": 113,
+            "height": 42
+          },
+          "text_metrics": {
+            "font_size_px": 32.0,
+            "paragraph_count": 1
+          }
+        }
+      ],
+      "tables": [],
+      "charts": []
+    },
+    {
+      "slide_index": 34,
+      "page_type": "chapter_candidate",
+      "text_summary": "",
+      "slots": [],
+      "tables": [],
+      "charts": []
+    },
+    {
+      "slide_index": 35,
+      "page_type": "content_candidate",
+      "text_summary": "感知、编辑与执行闭环",
+      "slots": [
+        {
+          "slot_id": "s35_sh8",
+          "role": "title_candidate",
+          "text": "",
+          "paragraph_count": 0,
+          "geometry": {
+            "x": 24,
+            "y": 171,
+            "width": 570,
+            "height": 351
+          },
+          "text_metrics": {
+            "font_size_px": null,
+            "paragraph_count": 0
+          }
+        },
+        {
+          "slot_id": "s35_sh10",
+          "role": "label_candidate",
+          "text": "",
+          "paragraph_count": 0,
+          "geometry": {
+            "x": 669,
+            "y": 171,
+            "width": 570,
+            "height": 351
+          },
+          "text_metrics": {
+            "font_size_px": null,
+            "paragraph_count": 0
+          }
+        },
+        {
+          "slot_id": "s35_sh14",
+          "role": "title_candidate",
+          "text": "",
+          "paragraph_count": 0,
+          "geometry": {
+            "x": 0,
+            "y": 0,
+            "width": 1280,
+            "height": 82
+          },
+          "text_metrics": {
+            "font_size_px": null,
+            "paragraph_count": 0
+          }
+        },
+        {
+          "slot_id": "s35_sh2",
+          "role": "title_candidate",
+          "text": "感知、编辑与执行闭环",
+          "paragraph_count": 1,
+          "geometry": {
+            "x": 15,
+            "y": 15,
+            "width": 396,
+            "height": 55
+          },
+          "text_metrics": {
+            "font_size_px": 37.33,
+            "paragraph_count": 1
+          }
+        },
+        {
+          "slot_id": "s35_sh4",
+          "role": "label_candidate",
+          "text": "",
+          "paragraph_count": 0,
+          "geometry": {
+            "x": 15,
+            "y": 536,
+            "width": 1238,
+            "height": 177
+          },
+          "text_metrics": {
+            "font_size_px": null,
+            "paragraph_count": 0
+          }
+        }
+      ],
+      "tables": [],
+      "charts": []
+    },
+    {
+      "slide_index": 36,
+      "page_type": "ending_candidate",
+      "text_summary": "面向多工作区的统一框架",
+      "slots": [
+        {
+          "slot_id": "s36_sh11",
+          "role": "title_candidate",
+          "text": "",
+          "paragraph_count": 0,
+          "geometry": {
+            "x": 28,
+            "y": 168,
+            "width": 570,
+            "height": 351
+          },
+          "text_metrics": {
+            "font_size_px": null,
+            "paragraph_count": 0
+          }
+        },
+        {
+          "slot_id": "s36_sh15",
+          "role": "label_candidate",
+          "text": "",
+          "paragraph_count": 0,
+          "geometry": {
+            "x": 672,
+            "y": 168,
+            "width": 579,
+            "height": 351
+          },
+          "text_metrics": {
+            "font_size_px": null,
+            "paragraph_count": 0
+          }
+        },
+        {
+          "slot_id": "s36_sh17",
+          "role": "title_candidate",
+          "text": "",
+          "paragraph_count": 0,
+          "geometry": {
+            "x": 0,
+            "y": 2,
+            "width": 1280,
+            "height": 82
+          },
+          "text_metrics": {
+            "font_size_px": null,
+            "paragraph_count": 0
+          }
+        },
+        {
+          "slot_id": "s36_sh4",
+          "role": "title_candidate",
+          "text": "面向多工作区的统一框架",
+          "paragraph_count": 1,
+          "geometry": {
+            "x": 0,
+            "y": 14,
+            "width": 463,
+            "height": 55
+          },
+          "text_metrics": {
+            "font_size_px": 37.33,
+            "paragraph_count": 1
+          }
+        }
+      ],
+      "tables": [],
+      "charts": []
+    }
+  ],
+  "plan_contract": {
+    "schema": "template_fill_pptx_plan.v1",
+    "slides": [
+      {
+        "source_slide": 1,
+        "purpose": "封面 / 章节 / 内容 / 结尾",
+        "replacements": [
+          {
+            "slot_id": "s01_sh2",
+            "text": "替换后的文字"
+          }
+        ],
+        "table_edits": [
+          {
+            "table_id": "s01_tbl3",
+            "cells": [
+              {
+                "row": 0,
+                "col": 0,
+                "text": "替换后的单元格"
+              }
+            ]
+          }
+        ],
+        "chart_edits": [
+          {
+            "chart_id": "s01_ch4",
+            "categories": [
+              "A",
+              "B"
+            ],
+            "series": [
+              {
+                "name": "系列1",
+                "values": [
+                  1,
+                  2
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

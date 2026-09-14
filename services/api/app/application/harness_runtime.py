@@ -120,11 +120,13 @@ class HarnessModelError(HarnessError):
         called: bool = False,
         elapsed_ms: int = 0,
         model: str = "deepseek-v4-pro",
+        failure_kind: str = "model_error",
     ) -> None:
         super().__init__(message)
         self.called = called
         self.elapsed_ms = max(0, elapsed_ms)
         self.model = model
+        self.failure_kind = failure_kind
 
 
 class HarnessStopped(HarnessError):
@@ -203,6 +205,41 @@ class HarnessPlanCandidateUnit(BaseModel):
         return HarnessPlanUnit.artifact_name_is_server_safe(value)
 
 
+class HarnessUncoveredRequirement(BaseModel):
+    """One requested business check that has no approved source in this round."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    title: str = Field(min_length=1, max_length=240)
+    objective: str = Field(min_length=1, max_length=1_000)
+    reason: str = Field(min_length=1, max_length=1_000)
+
+
+class HarnessDeferredRequirement(BaseModel):
+    """One requested check with known sources intentionally postponed to a later round."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    title: str = Field(min_length=1, max_length=240)
+    objective: str = Field(min_length=1, max_length=1_000)
+    reason: str = Field(min_length=1, max_length=1_000)
+    candidate_file_refs: list[str] = Field(default_factory=list, max_length=24)
+
+
+class HarnessRequirementCoverage(BaseModel):
+    """Planner accounting for one explicitly numbered business requirement."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    requirement_index: int = Field(ge=1, le=12)
+    title: str = Field(min_length=1, max_length=240)
+    objective: str = Field(min_length=1, max_length=1_000)
+    status: Literal["planned", "deferred", "uncovered"]
+    unit_id: str | None = Field(default=None, min_length=1, max_length=120)
+    reason: str = Field(min_length=1, max_length=1_000)
+    candidate_file_refs: list[str] = Field(default_factory=list, max_length=24)
+
+
 class HarnessPlanCandidate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -213,6 +250,9 @@ class HarnessPlanCandidate(BaseModel):
         max_length=1_000,
     )
     units: list[HarnessPlanCandidateUnit] = Field(min_length=1, max_length=12)
+    requirement_coverage: list[HarnessRequirementCoverage] = Field(
+        default_factory=list, max_length=12
+    )
 
 
 class HarnessPlan(BaseModel):
@@ -221,6 +261,15 @@ class HarnessPlan(BaseModel):
     summary: str = Field(min_length=1, max_length=1_000)
     selection_reason: str = Field(min_length=1, max_length=1_000)
     units: list[HarnessPlanUnit] = Field(min_length=1, max_length=12)
+    uncovered_requirements: list[HarnessUncoveredRequirement] = Field(
+        default_factory=list, max_length=12
+    )
+    deferred_requirements: list[HarnessDeferredRequirement] = Field(
+        default_factory=list, max_length=12
+    )
+    requirement_coverage: list[HarnessRequirementCoverage] = Field(
+        default_factory=list, max_length=12
+    )
 
 
 class HarnessModelReceipt(BaseModel):
@@ -269,6 +318,85 @@ class HarnessTaskResult(BaseModel):
     findings: list[HarnessFinding] = Field(min_length=1, max_length=96)
     follow_ups: list[str] = Field(default_factory=list, max_length=8)
     review_required: Literal[True] = True
+
+
+class HarnessAnalystDecisionOptionDraft(BaseModel):
+    """Model-owned decision copy before Branch and source facts are attached."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    option_id: Literal["A", "B", "C"]
+    label: str = Field(min_length=1, max_length=80)
+    meaning: str = Field(min_length=1, max_length=240)
+    agent_next_step: str = Field(min_length=1, max_length=300)
+    next_instruction: str = Field(min_length=3, max_length=600)
+
+
+class HarnessAnalystFindingReviewDraft(BaseModel):
+    """Only the fields an Analyst may propose; governance fields stay server-owned."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    requires_human_decision: Literal[True] = True
+    question: str = Field(min_length=1, max_length=300)
+    why_human: str = Field(min_length=1, max_length=300)
+    options: list[HarnessAnalystDecisionOptionDraft] = Field(min_length=2, max_length=3)
+    recommended_option_id: Literal["A", "B", "C"]
+    recommendation_reason: str = Field(min_length=1, max_length=300)
+    after_confirmation: str = Field(min_length=1, max_length=300)
+
+
+class HarnessAnalystFindingDraft(BaseModel):
+    """The small, strict JSON contract sent to the model."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    plan_unit_id: str = Field(min_length=1, max_length=120)
+    title: str = Field(min_length=1, max_length=240)
+    detail: str = Field(min_length=1, max_length=800)
+    fact_summary: str | None = Field(default=None, max_length=400)
+    impact: str | None = Field(default=None, max_length=400)
+    file_refs: list[str] = Field(min_length=1, max_length=100)
+    evidence_quotes: list[HarnessEvidenceQuote] = Field(min_length=1, max_length=4)
+    review: HarnessAnalystFindingReviewDraft | None = None
+
+
+class HarnessAnalystResultDraft(BaseModel):
+    """Model response before IDs, anchors, resolutions and Branch bindings exist."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    summary: str = Field(min_length=1, max_length=1_200)
+    findings: list[HarnessAnalystFindingDraft] = Field(min_length=1, max_length=96)
+    follow_ups: list[str] = Field(default_factory=list, max_length=4)
+    review_required: Literal[True] = True
+
+    def to_task_result(self) -> HarnessTaskResult:
+        findings: list[HarnessFinding] = []
+        for draft in self.findings:
+            review = (
+                AgentControlLoopFindingReview.model_validate(draft.review.model_dump(mode="json"))
+                if draft.review is not None
+                else None
+            )
+            findings.append(
+                HarnessFinding(
+                    plan_unit_id=draft.plan_unit_id,
+                    title=draft.title,
+                    detail=draft.detail,
+                    fact_summary=draft.fact_summary,
+                    impact=draft.impact,
+                    file_refs=draft.file_refs,
+                    evidence_quotes=draft.evidence_quotes,
+                    review=review,
+                )
+            )
+        return HarnessTaskResult(
+            summary=self.summary,
+            findings=findings,
+            follow_ups=self.follow_ups,
+            review_required=True,
+        )
 
 
 class HarnessNarrativeAuditDraft(BaseModel):
@@ -454,6 +582,12 @@ class PublicHarnessPlan(BaseModel):
     summary: str
     selection_reason: str
     units: list[PublicHarnessPlanUnit]
+    uncovered_requirements: list[HarnessUncoveredRequirement] = Field(
+        default_factory=list, max_length=12
+    )
+    deferred_requirements: list[HarnessDeferredRequirement] = Field(
+        default_factory=list, max_length=12
+    )
 
 
 class PublicHarnessRunSnapshot(BaseModel):
@@ -627,6 +761,18 @@ class OpenAICompatibleHarnessPlanner:
             "如果 scenario.control_loop.validation_feedback 非空，必须先按反馈修正；文件数超限时只保留优先级最高的文件。"
             "如果 scenario.control_loop.evidence_recheck 为 true，files 中全部文件都是用户已确认继续核对的缺失证据，计划必须全部覆盖。"
             "selection_reason 必须用业务语言说明为什么选择这些文件，以及它们与目标的关系。"
+            "plan unit 表示一个可形成业务结论的工作包，不是一次底层文件读取；用户明确列出业务分支时，每个业务分支最多建立一个根单元，"
+            "同一分支需要多份文件时放在同一单元中。混合文件类型可使用 evidence.verify。"
+            "用户明确要求的冲突汇总、决策矩阵等依赖步骤必须成为带 depends_on 的下游单元，不能混入某个根分支或静默丢弃。"
+            "当 scenario.control_loop.explicit_business_requirement_count 大于 0 时，requirement_coverage 必须按编号逐项覆盖 1 到该数量，"
+            "不得缺号或重复。status=planned 时 unit_id 必须指向本轮对应的根工作包；"
+            "files 中存在对应来源、但受本轮文件预算或依赖顺序暂不执行时使用 status=deferred、unit_id=null，"
+            "并在 candidate_file_refs 中列出准备留到后续分支核对的真实 file_ref；"
+            "只有 files 整个冻结索引中没有任何可识别对应来源时才使用 status=uncovered、unit_id=null、candidate_file_refs=[]，不能伪造 file_ref。"
+            "status=planned 时 candidate_file_refs=[]，其来源只放在绑定工作单元的 input_file_refs。"
+            "uncovered 只是当前索引无法定位来源，不得声称搜索了互联网或企业外部系统；deferred 也不是本轮已执行。"
+            "files 中的 planner_search_hint 是从已批准输入提取的短标题，只能帮助检索候选文件，不能作为证据或分析结论。"
+            "每个下游汇总单元的 input_file_refs 必须覆盖全部直接前序单元的来源并去重；重复引用不额外占用全局文件预算。"
             "输入文件永远只读，禁止猜测或输出源文件路径、哈希或任意本地路径。"
             "读取文件使用 file.read/table.inspect/evidence.verify；生成结果使用 artifact.write。可以提供不含路径的逻辑 artifact_name 与 artifact_type；缺省时由服务端生成。"
             "只选择工作意图和 tool，不得输出 side_effect；写入范围、外部动作范围与强制人工确认由服务端根据能力确定。"
@@ -703,6 +849,26 @@ class OpenAICompatibleHarnessAnalyst:
         self.model = model
         self.timeout = timeout
 
+    @staticmethod
+    def _parse_model_content(
+        content: str, *, finish_reason: str | None = None
+    ) -> HarnessTaskResult:
+        if finish_reason == "length":
+            raise HarnessModelError(
+                "分析输出达到长度上限，JSON 未完整返回",
+                failure_kind="output_truncated",
+            )
+        normalized = content.strip()
+        if normalized.startswith("```"):
+            normalized = (
+                normalized.removeprefix("```json")
+                .removeprefix("```")
+                .removesuffix("```")
+                .strip()
+            )
+        draft = HarnessAnalystResultDraft.model_validate(json.loads(normalized))
+        return draft.to_task_result()
+
     async def analyze(
         self,
         *,
@@ -718,7 +884,10 @@ class OpenAICompatibleHarnessAnalyst:
                 called=False,
                 model=self.model,
             )
-        schema = json.dumps(HarnessTaskResult.model_json_schema(), ensure_ascii=False)
+        root_unit_count = sum(1 for unit in plan.units if not unit.depends_on)
+        dependent_unit_count = len(plan.units) - root_unit_count
+        max_findings = max(1, min(24, root_unit_count * 2 + dependent_unit_count))
+        schema = json.dumps(HarnessAnalystResultDraft.model_json_schema(), ensure_ascii=False)
         system = (
             "你是企业办公数据分析 Agent。只根据用户指令、已通过校验的计划和 files 中的公开办公数据回答。"
             "每个 finding 必须引用 files 中真实存在的 file_ref；不允许引用路径、哈希、任务标准答案或未提供的数据。"
@@ -726,15 +895,21 @@ class OpenAICompatibleHarnessAnalyst:
             "即使多个任务单元共享同一文件，也不能省略或猜测所属单元。"
             "每个 finding 只描述一个可处置问题。title 应是短标题；fact_summary 用不超过两句话说明发生了什么；impact 单独说明不处理的影响，"
             "不要把多个冲突、推测和建议塞进同一长段 detail。"
-            "每个 finding.evidence_quotes 必须给出 1 到 6 个可在对应文件中逐字找到的短片段，至少精确定位一处依据；"
+            "当 validated_plan.requirement_coverage 非空时，输出按业务工作包组织：每个 status=planned 的根单元先形成 1 条简洁的当前结论；"
+            "只有同一业务分支存在彼此独立、处置动作不同的阻断项时才增加第 2 条。每个下游汇总单元最多形成 1 条综合结论。"
+            "无论是否有 requirement_coverage，每个根单元最多 2 条 finding，每个下游单元最多 1 条，"
+            "findings 总数不得超过 output_limits.max_findings。即使一个分支包含多份授权书、多期表格或大量日志，也必须合并同类事实，"
+            "用计数、影响和少量代表性原文说明，不得逐文件、逐行或逐规则展开。"
+            "重复日志、同类表格行和同一规则下的多个样本应在 fact_summary 中汇总，不要逐行扩写成大量重复 findings。"
+            "每个 finding.evidence_quotes 必须给出 1 到 4 个可在对应文件中逐字找到的短片段，至少精确定位一处依据；"
             "role 用 expected 表示设计或规则预期，用 observed 表示实际记录，用 support 表示支持结论，用 contradiction 表示冲突，用 context 表示上下文。"
             "表格 quote 应组合足以唯一定位一行的连续单元格文本；文本 quote 应选可唯一定位的连续原文，不得改写。"
             "必须服从用户目标中的日期、对象、部门、版本和其他筛选条件；筛选范围外的记录不得作为 finding 或人工决策。"
-            "finding.evidence_anchors 必须返回空数组；位置、行号和展示摘录由服务端验证原文后生成。"
+            "不要输出 evidence_anchors；位置、行号和展示摘录由服务端验证原文后生成。"
             "只有存在真实业务冲突且必须由人选择口径时才输出 finding.review；其余情况必须省略 review。"
             "若规则已明确给出关键词、优先级或覆盖关系，不得把按规则即可确定的结果升级为人工决策。"
             "存在 contradiction 时 requires_human_decision 必须为 true，提供 2 个 A/B 互斥选项、推荐项、推荐理由，"
-            "以及用户确认后 Agent 将执行的下一步。"
+            "以及用户确认后 Agent 将执行的 agent_next_step。"
             "每个 option.next_instruction 必须是一条可作为新只读 Control Loop 目标的完整指令；只能核对资料、形成修改建议或待办，不能声称直接改文件。"
             "若 validation_feedback 非空，上一候选未通过原文定位；保持原任务不变，并改用更长、只出现一次的连续原文重新生成全部 findings。"
             "若 verified_effect_context 非空，其中 facts 是服务端从批准原始字节全量复算并通过 Artifact Verifier 的当前权威事实；"
@@ -744,9 +919,11 @@ class OpenAICompatibleHarnessAnalyst:
             "不得把自拟具体方案写成当前结论。"
             "只能完成只读分析，不得声称发送、写入、审批或调用外部系统。"
             "不要输出思维链、内部推理、Prompt、工具日志或 Markdown 代码围栏。"
-            "覆盖通过范围内所有有业务意义的 findings；遵守服务端 schema 与本轮预算上限，不要为了截断而省略任何发现。没有必要时不要输出默认值字段。"
+            "覆盖通过范围内所有有业务意义的结论；遵守服务端 schema 与本轮预算上限。summary 不超过六句话，detail 不重复引用原文，"
+            "follow_ups 只保留最关键的后续动作。没有必要时不要输出默认值字段。"
             "每条 finding 只输出 plan_unit_id、title、detail、fact_summary、impact、file_refs、evidence_quotes，"
-            "仅在人必须决策时再加 review；不要输出 finding_id、affected_branch_ids、evidence_anchors 或 evidence_resolutions。"
+            "仅在人必须决策时再加 review；不要输出 finding_id、affected_branch_ids、evidence_anchors、evidence_resolutions、"
+            "required_file_refs、estimated_additional_rounds 或 external_action。"
             "结论存在不确定性时直接写入 summary。follow_ups 应给出基于当前证据、可由用户确认后作为新任务启动的具体推进建议，"
             "不要写成泛化的‘请人工复核’。review_required 必须为 true。"
             "只输出符合 JSON Schema 的 JSON 对象。JSON Schema：" + schema
@@ -758,6 +935,13 @@ class OpenAICompatibleHarnessAnalyst:
                 "files": files,
                 "verified_effect_context": verified_effect_context,
                 "validation_feedback": validation_feedback,
+                "output_limits": {
+                    "max_findings": max_findings,
+                    "max_summary_characters": 600,
+                    "max_detail_characters_per_finding": 500,
+                    "max_evidence_quotes_per_finding": 4,
+                    "max_follow_ups": 4,
+                },
             },
             ensure_ascii=False,
         )
@@ -769,7 +953,7 @@ class OpenAICompatibleHarnessAnalyst:
             ],
             "response_format": {"type": "json_object"},
             "temperature": 0,
-            "max_tokens": 5_000,
+            "max_tokens": 12_000,
             "thinking": {"type": "disabled"},
         }
         headers = {"Authorization": f"Bearer {self.api_key}"}
@@ -791,28 +975,57 @@ class OpenAICompatibleHarnessAnalyst:
                         headers=headers,
                     )
                 response.raise_for_status()
-            content = response.json()["choices"][0]["message"]["content"]
+            response_payload = response.json()
+            choice = response_payload["choices"][0]
+            content = choice["message"]["content"]
             if not isinstance(content, str):
                 raise TypeError("model content is not text")
-            content = content.strip()
-            if content.startswith("```"):
-                content = (
-                    content.removeprefix("```json").removeprefix("```").removesuffix("```").strip()
-                )
-            return HarnessTaskResult.model_validate(json.loads(content))
-        except (
-            httpx.HTTPError,
-            KeyError,
-            IndexError,
-            TypeError,
-            json.JSONDecodeError,
-            ValidationError,
-        ) as exc:
+            finish_reason = choice.get("finish_reason")
+            return self._parse_model_content(content, finish_reason=finish_reason)
+        except HarnessModelError as exc:
             raise HarnessModelError(
-                "模型未返回合法的只读分析结果",
+                str(exc),
                 called=request_started,
                 elapsed_ms=round((perf_counter() - started) * 1000),
                 model=self.model,
+                failure_kind=exc.failure_kind,
+            ) from exc
+        except json.JSONDecodeError as exc:
+            raise HarnessModelError(
+                "分析输出不是完整 JSON",
+                called=request_started,
+                elapsed_ms=round((perf_counter() - started) * 1000),
+                model=self.model,
+                failure_kind="invalid_json",
+            ) from exc
+        except ValidationError as exc:
+            fields = []
+            for error in exc.errors(include_url=False, include_input=False)[:3]:
+                location = ".".join(str(item) for item in error.get("loc", ())) or "root"
+                fields.append(f"{location}:{error.get('type', 'invalid')}")
+            detail = "、".join(fields) or "字段不符合约束"
+            raise HarnessModelError(
+                f"分析 JSON 字段校验失败（{detail}）",
+                called=request_started,
+                elapsed_ms=round((perf_counter() - started) * 1000),
+                model=self.model,
+                failure_kind="invalid_schema",
+            ) from exc
+        except httpx.TimeoutException as exc:
+            raise HarnessModelError(
+                f"分析模型调用超过 {self.timeout:g} 秒，服务端已停止等待",
+                called=request_started,
+                elapsed_ms=round((perf_counter() - started) * 1000),
+                model=self.model,
+                failure_kind="provider_timeout",
+            ) from exc
+        except (httpx.HTTPError, KeyError, IndexError, TypeError) as exc:
+            raise HarnessModelError(
+                "分析服务响应不可用或缺少必要字段",
+                called=request_started,
+                elapsed_ms=round((perf_counter() - started) * 1000),
+                model=self.model,
+                failure_kind="provider_response",
             ) from exc
 
 
@@ -2104,23 +2317,54 @@ class HarnessRuntime:
             ]
             next_step = None
             if not all_branches_completed:
-                waiting_file_refs = [
-                    ref
-                    for contribution in contributions
-                    if contribution.outcome != "adopted"
-                    for ref in contribution.source_file_refs
+                waiting_branches = [
+                    branch for branch in updated_branches if branch.status == "waiting_input"
                 ]
+                deferred_waiting = [
+                    branch
+                    for branch in waiting_branches
+                    if branch.unit_id.startswith("deferred-requirement-")
+                ]
+                worker_waiting = [
+                    branch for branch in waiting_branches if branch not in deferred_waiting
+                ]
+                waiting_file_refs = list(
+                    dict.fromkeys(
+                        ref
+                        for branch in waiting_branches
+                        for ref in branch.missing_file_refs
+                    )
+                )
+                candidate_branch_ids = list(
+                    dict.fromkeys(
+                        [branch.branch_id for branch in waiting_branches] + ready_branch_ids
+                    )
+                )
+                if ready_branch_ids and waiting_branches:
+                    next_reason = (
+                        "本批贡献已合入，下一批可执行分支已就绪；"
+                        f"另有 {len(waiting_branches)} 个分支等待单独处理。"
+                    )
+                elif ready_branch_ids:
+                    next_reason = "本批贡献已合入，下一批可执行分支已就绪。"
+                elif deferred_waiting and not worker_waiting:
+                    next_reason = (
+                        "本轮可执行贡献已合入；"
+                        f"另有 {len(deferred_waiting)} 项已识别来源的后续分支，需单独继续后再核对。"
+                    )
+                elif deferred_waiting:
+                    next_reason = (
+                        "部分 Worker 已合入；"
+                        f"{len(worker_waiting)} 个分支因执行失败或原文位置不明确而暂停，"
+                        f"另有 {len(deferred_waiting)} 项已识别来源的后续分支等待单独继续。"
+                    )
+                else:
+                    next_reason = "部分 Worker 已合入，其余分支因执行失败或原文位置不明确而暂停。"
                 next_step = AgentControlLoopNextStep(
                     decision="waiting_input",
-                    reason=(
-                        "本批贡献已合入，下一批 ready Branch 已就绪；失败或位置不明确的分支保持暂停。"
-                        if ready_branch_ids
-                        else "部分 Worker 已合入，其余分支因失败或原文位置不明确而暂停。"
-                    ),
+                    reason=next_reason,
                     candidate_file_refs=waiting_file_refs[:20],
-                    candidate_branch_ids=(
-                        list(merged.waiting_branch_ids) + ready_branch_ids
-                    )[:36],
+                    candidate_branch_ids=candidate_branch_ids[:36],
                     ready_branch_ids=ready_branch_ids[:36],
                 )
             worker_result = None
@@ -3488,6 +3732,23 @@ class HarnessRuntime:
                 )
                 for unit in plan.units
             ],
+            uncovered_requirements=[
+                HarnessUncoveredRequirement(
+                    title=self._project_business_text(item.title, ref_to_label),
+                    objective=self._project_business_text(item.objective, ref_to_label),
+                    reason=self._project_business_text(item.reason, ref_to_label),
+                )
+                for item in plan.uncovered_requirements
+            ],
+            deferred_requirements=[
+                HarnessDeferredRequirement(
+                    title=self._project_business_text(item.title, ref_to_label),
+                    objective=self._project_business_text(item.objective, ref_to_label),
+                    reason=self._project_business_text(item.reason, ref_to_label),
+                    candidate_file_refs=item.candidate_file_refs,
+                )
+                for item in plan.deferred_requirements
+            ],
         )
 
     def _public_result(
@@ -4115,6 +4376,8 @@ class HarnessRuntime:
                 scope_filtered_finding_count = 0
                 downgraded_review_count = 0
                 recovery_kind: Literal["source_location", "analysis_output"] = "source_location"
+                analysis_failure_detail: str | None = None
+                analysis_failure_kind: str | None = None
                 for analysis_attempt in (1, 2):
                     try:
                         candidate, candidate_receipt = await self._invoke_analyst(
@@ -4130,29 +4393,42 @@ class HarnessRuntime:
                         )
                     except HarnessModelError as exc:
                         recovery_kind = "analysis_output"
+                        analysis_failure_detail = str(exc)[:240]
+                        analysis_failure_kind = exc.failure_kind
                         await self._transition(
                             owner_id,
                             run_id,
                             "analyzing",
                             "analysis_structure_rejected",
                             (
-                                "分析模型返回内容不符合可核对格式，正在受控重试。"
+                                f"{analysis_failure_detail}，正在受控重试。"
                                 if analysis_attempt == 1
-                                else "修复后的分析内容仍不符合可核对格式，未采用。"
+                                else f"修复后仍未通过：{analysis_failure_detail}。候选内容未采用。"
                             ),
                             {
                                 "round_number": round_number,
                                 "attempt": analysis_attempt,
                                 "model_called": exc.called,
                                 "output_used": False,
+                                "failure_kind": exc.failure_kind,
+                                "reason": analysis_failure_detail,
                             },
                         )
                         if analysis_attempt == 1:
-                            validation_feedback = (
-                                "上一候选没有通过严格 JSON 结构校验。请只输出 schema 要求的 JSON，"
-                                "每条 Finding 只描述一个问题；若不能生成完整 review，请省略 review，"
-                                "不要添加 Markdown、解释文字或额外字段。"
-                            )
+                            if exc.failure_kind == "output_truncated":
+                                validation_feedback = (
+                                    "上一候选在完整 JSON 返回前达到输出长度上限。保持所有独立问题，"
+                                    "但压缩 summary、detail 和 follow_ups，不重复背景或来源说明；"
+                                    "每条 Finding 优先保留一段足以唯一定位的短引用，只有同一问题必须对照时才增加第二段。"
+                                    "只输出 schema 要求的 JSON，不要添加 Markdown 或解释文字。"
+                                )
+                            else:
+                                validation_feedback = (
+                                    f"上一候选没有通过严格 JSON 结构校验：{analysis_failure_detail}。"
+                                    "请只输出 schema 要求的 JSON，"
+                                    "每条 Finding 只描述一个问题；若不能生成完整 review，请省略 review，"
+                                    "不要添加 Markdown、解释文字或额外字段。"
+                                )
                             continue
                         break
                     await self._safe_point(owner_id, run_id)
@@ -4196,15 +4472,28 @@ class HarnessRuntime:
                         if resolution.result is not None:
                             self._validate_result(resolution.result, round_files)
                     except HarnessPlanError as exc:
+                        recoverable_binding_error = str(exc) in {
+                            "分析结果绑定了不存在的计划单元",
+                            "分析结果引用超出其绑定计划单元的文件范围",
+                            "共享资料对应多个任务分支，Finding 必须提供 plan_unit_id",
+                        }
                         await self._transition(
                             owner_id,
                             run_id,
                             "analyzing",
                             "analysis_validation_rejected",
                             (
-                                "候选结论缺少可唯一定位的原文，未采用。"
+                                (
+                                    "候选结论没有绑定到单一业务分支，正在受控修复。"
+                                    if recoverable_binding_error
+                                    else "候选结论缺少可唯一定位的原文，未采用。"
+                                )
                                 if analysis_attempt == 1
-                                else "修复后的候选结论仍无法唯一定位原文，未采用。"
+                                else (
+                                    "修复后的候选结论仍跨越多个业务分支，未采用。"
+                                    if recoverable_binding_error
+                                    else "修复后的候选结论仍无法唯一定位原文，未采用。"
+                                )
                             ),
                             {
                                 "round_number": round_number,
@@ -4216,12 +4505,25 @@ class HarnessRuntime:
                             },
                         )
                         if analysis_attempt == 2:
+                            if recoverable_binding_error:
+                                recovery_kind = "analysis_output"
+                                analysis_failure_detail = str(exc)[:240]
+                                analysis_failure_kind = "branch_binding"
+                                break
                             raise
-                        validation_feedback = (
-                            "上一候选至少有一条 Finding 没有任何 quote 能在对应文件中唯一匹配。"
-                            "请重新生成全部 findings；每条至少选择一段更长、连续、只出现一次的原文，"
-                            "不要复用会在日志中重复出现的短句。"
-                        )
+                        if recoverable_binding_error:
+                            validation_feedback = (
+                                "上一候选至少有一条 Finding 跨越了多个计划单元。"
+                                "每条 finding.file_refs 必须完全属于其 plan_unit_id 的 input_file_refs；"
+                                "跨部门结论只能绑定到计划中覆盖这些来源的下游汇总单元。"
+                                "不要把多个业务分支的问题合并成一条 Finding。"
+                            )
+                        else:
+                            validation_feedback = (
+                                "上一候选至少有一条 Finding 没有任何 quote 能在对应文件中唯一匹配。"
+                                "请重新生成全部 findings；每条至少选择一段更长、连续、只出现一次的原文，"
+                                "不要复用会在日志中重复出现的短句。"
+                            )
                         continue
                     if resolution.result is not None:
                         resolution_score = (
@@ -4315,11 +4617,12 @@ class HarnessRuntime:
                     )
                     decision = "waiting_input" if can_continue else "budget_exhausted"
                     if recovery_kind == "analysis_output":
+                        format_reason = analysis_failure_detail or "分析结果未形成服务端可核对结构"
                         reason = (
-                            "分析模型已经响应，但返回内容未形成服务端可核对的结构。"
+                            f"分析模型已经响应，但{format_reason}。"
                             "本轮计划、文件范围和调用记录已保留；请缩小到一个分支后继续。"
                             if can_continue
-                            else "分析模型已经响应，但返回内容仍未形成可核对结构；当前预算不足以再次核对，"
+                            else f"分析模型已经响应，但{format_reason}；当前预算不足以再次核对，"
                             "系统已保留计划与调用记录并安全停止。"
                         )
                     else:
@@ -4381,6 +4684,7 @@ class HarnessRuntime:
                             "decision": decision,
                             "candidate_file_refs": next_step.candidate_file_refs,
                             "candidate_branch_ids": next_step.candidate_branch_ids,
+                            "failure_kind": analysis_failure_kind,
                             "external_action": False,
                         },
                     )
@@ -5551,6 +5855,9 @@ class HarnessRuntime:
                     remaining,
                     max_file_refs=contract.max_files_per_round,
                     require_all_files=require_all_files,
+                    expected_requirement_count=self._explicit_business_requirement_count(
+                        question
+                    ),
                 )
             except HarnessPlanError as exc:
                 last_error = exc
@@ -6632,6 +6939,9 @@ class HarnessRuntime:
                 "steer_instruction": steer_instruction,
                 "validation_feedback": validation_feedback,
                 "evidence_recheck": evidence_recheck,
+                "explicit_business_requirement_count": HarnessRuntime._explicit_business_requirement_count(
+                    instruction
+                ),
                 "external_action": "none",
             },
         }
@@ -6648,9 +6958,35 @@ class HarnessRuntime:
                 ),
                 "display_summary": item.get("display_summary", "公开办公输入文件"),
                 "mime": item.get("mime", "application/octet-stream"),
+                "planner_search_hint": item.get("planner_search_hint"),
             }
             for item in files
         ]
+
+    @staticmethod
+    def _explicit_business_requirement_count(instruction: str) -> int:
+        requirement_markers = (
+            "业务分支",
+            "以下分支",
+            "以下事项",
+            "以下要求",
+            "分别核对",
+            "分别检查",
+            "逐项核对",
+        )
+        if not any(marker in instruction for marker in requirement_markers):
+            return 0
+        numbered = [
+            int(match.group(1))
+            for match in re.finditer(r"(?<!\d)(1[0-2]|[1-9])\s*[\.、]\s*", instruction)
+        ]
+        if not numbered:
+            return 0
+        unique = set(numbered)
+        count = 0
+        while count + 1 in unique:
+            count += 1
+        return count if count >= 2 else 0
 
     @staticmethod
     def _index_files(workspace: dict[str, Any]) -> list[dict[str, Any]]:
@@ -6682,6 +7018,7 @@ class HarnessRuntime:
                             "display_group",
                             "display_path",
                             "display_summary",
+                            "planner_search_hint",
                         )
                         if key in item
                     },
@@ -7207,11 +7544,40 @@ class HarnessRuntime:
     ) -> HarnessPlan:
         """Compile model intent into server-owned scope, effect and gate policy."""
 
+        coverage = list(candidate.requirement_coverage)
+        planned_root_ids = {
+            str(item.unit_id)
+            for item in coverage
+            if item.status == "planned" and item.unit_id is not None
+        }
+        candidate_units = list(candidate.units)
+        if coverage:
+            unit_by_id = {item.unit_id: item for item in candidate_units}
+            ordered_root_ids = [
+                str(item.unit_id)
+                for item in sorted(coverage, key=lambda item: item.requirement_index)
+                if item.status == "planned" and item.unit_id in unit_by_id
+            ]
+            ordered_root_id_set = set(ordered_root_ids)
+            candidate_units = [unit_by_id[item] for item in ordered_root_ids]
+            candidate_units.extend(
+                item for item in candidate.units if item.unit_id not in ordered_root_id_set
+            )
+
         selected_refs: set[str] = set()
         candidate_payloads: list[dict[str, Any]] = []
         budget_trimmed = False
-        for candidate_unit in candidate.units:
+        for candidate_unit in candidate_units:
             payload = candidate_unit.model_dump(exclude={"side_effect"})
+            new_refs = set(payload["input_file_refs"]) - selected_refs
+            if (
+                coverage
+                and candidate_unit.unit_id in planned_root_ids
+                and max_file_refs is not None
+                and len(selected_refs) + len(new_refs) > max_file_refs
+            ):
+                budget_trimmed = True
+                continue
             bounded_refs: list[str] = []
             for file_ref in payload["input_file_refs"]:
                 if file_ref in selected_refs:
@@ -7226,6 +7592,19 @@ class HarnessRuntime:
                 continue
             payload["input_file_refs"] = bounded_refs
             candidate_payloads.append(payload)
+
+        if coverage:
+            while True:
+                kept_ids = {str(payload["unit_id"]) for payload in candidate_payloads}
+                filtered_payloads = [
+                    payload
+                    for payload in candidate_payloads
+                    if set(payload["depends_on"]).issubset(kept_ids)
+                ]
+                if len(filtered_payloads) == len(candidate_payloads):
+                    break
+                budget_trimmed = True
+                candidate_payloads = filtered_payloads
 
         kept_ids = {str(payload["unit_id"]) for payload in candidate_payloads}
         units: list[HarnessPlanUnit] = []
@@ -7256,10 +7635,55 @@ class HarnessRuntime:
                 "保留了模型排序中优先级最高的证据。"
             )
             selection_reason = f"{selection_reason[: 1_000 - len(budget_note)]}{budget_note}"
+        candidate_unit_by_id = {item.unit_id: item for item in candidate.units}
+        reconciled_coverage: list[HarnessRequirementCoverage] = []
+        for item in coverage:
+            if item.status == "planned" and item.unit_id not in kept_ids:
+                source_unit = candidate_unit_by_id.get(str(item.unit_id))
+                source_refs = (
+                    list(dict.fromkeys(source_unit.input_file_refs)) if source_unit else []
+                )
+                reason_suffix = "服务端本轮文件预算未能完整纳入该分支，已排入后续核对。"
+                reason = f"{item.reason.rstrip('。')}；{reason_suffix}"
+                reconciled_coverage.append(
+                    item.model_copy(
+                        update={
+                            "status": "deferred",
+                            "unit_id": None,
+                            "reason": reason[:1_000],
+                            "candidate_file_refs": source_refs[:24],
+                        }
+                    )
+                )
+            else:
+                reconciled_coverage.append(item)
+        coverage = reconciled_coverage
+        uncovered_requirements = [
+            HarnessUncoveredRequirement(
+                title=item.title,
+                objective=item.objective,
+                reason=item.reason,
+            )
+            for item in coverage
+            if item.status == "uncovered"
+        ]
+        deferred_requirements = [
+            HarnessDeferredRequirement(
+                title=item.title,
+                objective=item.objective,
+                reason=item.reason,
+                candidate_file_refs=item.candidate_file_refs,
+            )
+            for item in coverage
+            if item.status == "deferred"
+        ]
         return HarnessPlan(
             summary=candidate.summary,
             selection_reason=selection_reason,
             units=units,
+            uncovered_requirements=uncovered_requirements,
+            deferred_requirements=deferred_requirements,
+            requirement_coverage=coverage,
         )
 
     @classmethod
@@ -7271,6 +7695,7 @@ class HarnessRuntime:
         *,
         max_file_refs: int | None = None,
         require_all_files: bool = False,
+        expected_requirement_count: int = 0,
     ) -> None:
         allowed_refs = {str(item["file_ref"]) for item in files}
         allowed_tools = set(workspace.get("allowlisted_tools", []))
@@ -7282,6 +7707,39 @@ class HarnessRuntime:
         ids = [unit.unit_id for unit in plan.units]
         if len(ids) != len(set(ids)):
             raise HarnessPlanError("工作单元 ID 重复")
+        coverage_indices = [item.requirement_index for item in plan.requirement_coverage]
+        if len(coverage_indices) != len(set(coverage_indices)):
+            raise HarnessPlanError("业务要求覆盖表包含重复编号")
+        if expected_requirement_count and sorted(coverage_indices) != list(
+            range(1, expected_requirement_count + 1)
+        ):
+            raise HarnessPlanError(
+                f"用户明确列出 {expected_requirement_count} 个业务分支；"
+                "requirement_coverage 必须逐项记录 1 到该数量，不能漏项"
+            )
+        unit_by_id = {unit.unit_id: unit for unit in plan.units}
+        planned_unit_ids: list[str] = []
+        for coverage in plan.requirement_coverage:
+            if coverage.status == "planned":
+                if coverage.unit_id not in unit_by_id:
+                    raise HarnessPlanError("已计划的业务要求必须绑定本轮真实工作单元")
+                if unit_by_id[coverage.unit_id].depends_on:
+                    raise HarnessPlanError("业务分支覆盖项必须绑定根工作单元，而不是下游汇总单元")
+                if coverage.candidate_file_refs:
+                    raise HarnessPlanError("本轮已计划业务要求不能重复声明后续候选来源")
+                planned_unit_ids.append(str(coverage.unit_id))
+            else:
+                if coverage.unit_id is not None:
+                    raise HarnessPlanError("后续处理或当前缺少来源的业务要求不能绑定本轮工作单元")
+                if coverage.status == "deferred":
+                    if not coverage.candidate_file_refs:
+                        raise HarnessPlanError("后续处理业务要求必须列出已识别的候选来源")
+                    if not set(coverage.candidate_file_refs).issubset(allowed_refs):
+                        raise HarnessPlanError("后续处理业务要求引用了资料库索引之外的文件")
+                elif coverage.candidate_file_refs:
+                    raise HarnessPlanError("当前缺少来源的业务要求不能伪造候选文件")
+        if len(planned_unit_ids) != len(set(planned_unit_ids)):
+            raise HarnessPlanError("多个业务要求不能共用同一个根工作单元")
         referenced_refs = {file_ref for unit in plan.units for file_ref in unit.input_file_refs}
         if max_file_refs is not None and len(referenced_refs) > max_file_refs:
             raise HarnessPlanError(
@@ -7322,6 +7780,18 @@ class HarnessRuntime:
             unknown_deps = set(unit.depends_on) - set(ids)
             if unknown_deps:
                 raise HarnessPlanError("计划包含未知依赖")
+        if expected_requirement_count:
+            planned_root_ids = set(planned_unit_ids)
+            for unit in plan.units:
+                if unit.unit_id in planned_root_ids or not unit.depends_on:
+                    continue
+                required_refs = {
+                    file_ref
+                    for dependency in unit.depends_on
+                    for file_ref in unit_by_id[dependency].input_file_refs
+                }
+                if not required_refs.issubset(set(unit.input_file_refs)):
+                    raise HarnessPlanError("下游汇总工作单元必须覆盖全部直接前序来源")
         visiting: set[str] = set()
         visited: set[str] = set()
 
@@ -7556,7 +8026,7 @@ class HarnessRuntime:
             ]
             for unit in plan.units
         }
-        return [
+        branches = [
             AgentControlLoopBranch(
                 branch_id=branch_ids[unit.unit_id],
                 unit_id=unit.unit_id,
@@ -7576,6 +8046,29 @@ class HarnessRuntime:
             )
             for unit in plan.units
         ]
+        for index, requirement in enumerate(plan.deferred_requirements, start=1):
+            unit_id = f"deferred-requirement-{index}"
+            branch_id = "branch-" + hashlib.sha256(
+                f"{run_id}:{round_number}:{unit_id}:{requirement.title}".encode("utf-8")
+            ).hexdigest()[:12]
+            branches.append(
+                AgentControlLoopBranch(
+                    branch_id=branch_id,
+                    unit_id=unit_id,
+                    round_number=round_number,
+                    parent_branch_id=parent_branch_id,
+                    title=requirement.title,
+                    objective=requirement.objective,
+                    depends_on=[],
+                    input_file_refs=list(dict.fromkeys(requirement.candidate_file_refs)),
+                    missing_file_refs=list(dict.fromkeys(requirement.candidate_file_refs)),
+                    status="waiting_input",
+                    requires_human_gate=False,
+                    created_at=now,
+                    updated_at=now,
+                )
+            )
+        return branches
 
     async def _fail(self, owner_id: str, run_id: str, reason: str) -> None:
         async with self._lock:
@@ -7627,12 +8120,25 @@ def build_harness_runtime(settings: Any | None = None) -> HarnessRuntime:
         BenchmarkWorkspaceCatalog,
     )
 
+    state_store_mode = str(getattr(settings, "state_store_mode", "auto")).strip().lower()
+    if state_store_mode not in {"auto", "memory", "postgres"}:
+        raise ValueError("STATE_STORE_MODE must be auto, memory or postgres")
+    database_dsn = str(getattr(settings, "database_dsn", "")).strip()
     state_store: HarnessStateStore
-    if settings.database_dsn:
-        state_store = PostgresHarnessStateStore(settings.database_dsn)
+    if state_store_mode == "memory":
+        state_store = InMemoryHarnessStateStore()
+    elif database_dsn:
+        state_store = PostgresHarnessStateStore(database_dsn)
+    elif state_store_mode == "postgres":
+        raise ValueError("STATE_STORE_MODE=postgres requires DATABASE_DSN")
     else:
         state_store = InMemoryHarnessStateStore()
 
+    analysis_timeout = getattr(
+        settings,
+        "llm_analysis_timeout_seconds",
+        max(float(settings.llm_timeout_seconds), 180.0),
+    )
     return HarnessRuntime(
         BenchmarkWorkspaceCatalog(),
         OpenAICompatibleHarnessPlanner(
@@ -7645,7 +8151,7 @@ def build_harness_runtime(settings: Any | None = None) -> HarnessRuntime:
             base_url=settings.llm_base_url,
             api_key=settings.llm_api_key,
             model=settings.llm_model,
-            timeout=settings.llm_timeout_seconds,
+            timeout=analysis_timeout,
         ),
         state_store,
         ScenarioEffectEngine(),

@@ -15,6 +15,7 @@ htmlcov/
 *.py[cod]
 node_modules/
 .next/
+.next-playwright/
 dist/
 build/
 coverage/
@@ -37,3 +38,6 @@ browser-profile/
 *.cer
 id_rsa
 id_ed25519
+
+# Microsoft Office lock files are local editing state.
+~$*

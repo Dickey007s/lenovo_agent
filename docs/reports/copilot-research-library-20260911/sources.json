@@ -1,0 +1,222 @@
+{
+  "schema_version": 1,
+  "title": "办公 Agent 人机共驾研究库",
+  "retrieved_at": "2026-09-11",
+  "scope": "定向原始来源核验与设计推导；不是系统综述、竞品同场测试或完整行业回溯。",
+  "project_boundary": "Demo3 为 Draft；R0-R3 是设计假设。本文不改变 Runtime，external_action=none。",
+  "topics": ["主动与接管", "拒绝与延后", "审批与权限", "恢复与连续性", "信任与核验", "协作与评估"],
+  "sources": [
+    {
+      "id": "S01", "title": "Principles of Mixed-Initiative User Interfaces", "short_title": "混合主动权的设计原则",
+      "authors": "Eric Horvitz", "institution": "Microsoft Research", "year": 1999, "date": "1999-05", "date_note": "机构出版页标注 CHI 1999 / May 1999；PDF 路径年份不是发表年份。",
+      "type": "paper", "publication": "CHI 1999", "evidence_kind": "概念原则与系统实例", "topics": ["主动与接管", "拒绝与延后", "恢复与连续性"],
+      "url": "https://www.microsoft.com/en-us/research/publication/principles-mixed-initiative-user-interfaces/", "pdf_url": "https://www.microsoft.com/en-us/research/wp-content/uploads/2016/11/chi99horvitz.pdf",
+      "conclusion": "主动服务需要权衡不确定性、打扰成本与行动收益，同时保留直接调用、终止和修正的入口。",
+      "method": "以 LookOut 日程辅助系统阐述 12 项设计原则。", "strength": "适合定义交互原则，不是现代 LLM 办公成效的实验结论。",
+      "limits": ["没有给出通用风险阈值或四级接管表。", "系统时代、任务和模型与当前办公 Agent 不同。"],
+      "implications": {"Demo1": "保留明确暂停、停止和下一轮调整；区分立即关闭界面与安全点停止执行。", "Demo2": "只在需要组织选择时请求确认，避免每个 Worker 都打断用户。", "Demo3": "比较主动提醒、用户主动接管、暂不处理三种路径；延后不是默许。"},
+      "locator": "PDF pp. 1-2: Principles for Mixed-Initiative UI，尤其原则 3、5-9。", "read_scope": "机构元数据、PDF 原则与 LookOut 示例", "verified_at": "2026-09-11", "verification_method": "web.open 原始页面及 PDF"
+    },
+    {
+      "id": "S02", "title": "Towards Adjustable Autonomy for the Real World", "short_title": "接管是控制转移策略，不是一次弹窗",
+      "authors": "Paul Scerri; David V. Pynadath; Milind Tambe", "institution": "University of Southern California / Information Sciences Institute", "year": 2002, "date": "2002-09", "date_note": "PDF 首页 published 9/02；arXiv 是 2011-06-22 后补收录，不是新论文。",
+      "type": "paper", "publication": "JAIR 17, 171-228", "evidence_kind": "形式模型与部署系统", "topics": ["主动与接管", "恢复与连续性", "协作与评估"],
+      "url": "https://arxiv.org/abs/1106.4573", "pdf_url": "https://arxiv.org/pdf/1106.4573",
+      "conclusion": "团队中的一次性控制转交可能带来协调损失；接管应同时考虑人的响应时延和团队约束。",
+      "method": "提出 transfer-of-control strategy 与 MDP 建模，并在研究组日常协作系统中评估。", "strength": "有形式化与实际系统依据，但最优性依赖其模型和成本假设。",
+      "limits": ["不支持把等待超时直接映射为现代高风险动作自动批准。", "未验证本项目的 Branch、预算或多实例恢复协议。"],
+      "implications": {"Demo1": "展示等待期间保留了什么、恢复的范围以及时间预算是否冻结。", "Demo2": "C 等待人工时展示 A/B 已保留、汇总 E 的依赖，而非宣称全部停摆。", "Demo3": "把提醒、延后、改派责任人设计成可审计转移；超时不越过授权。"},
+      "locator": "摘要；PDF 首页书目信息；transfer-of-control strategies。", "read_scope": "摘要、PDF 元数据与策略说明；非逐页复现", "verified_at": "2026-09-11", "verification_method": "web.open + 原始 PDF 链接"
+    },
+    {
+      "id": "S03", "title": "Guidelines for Human-AI Interaction", "short_title": "18 条人机交互准则",
+      "authors": "Saleema Amershi; Dan Weld; Mihaela Vorvoreanu; Adam Fourney; Besmira Nushi; Penny Collisson; Jina Suh; Shamsi Iqbal; Paul N. Bennett; Kori Inkpen; Jaime Teevan; Ruth Kikin-Gil; Eric Horvitz", "institution": "Microsoft Research / University of Washington", "year": 2019, "date": "2019-05", "date_note": "论文 CHI 2019，会议 2019-05-04 至 05-09；不是 PDF 上传时间。",
+      "type": "paper", "publication": "CHI 2019", "evidence_kind": "多轮设计验证", "topics": ["主动与接管", "拒绝与延后", "信任与核验"],
+      "url": "https://www.microsoft.com/en-us/research/wp-content/uploads/2019/01/Guidelines-for-Human-AI-Interaction-camera-ready.pdf", "pdf_url": "https://www.microsoft.com/en-us/research/wp-content/uploads/2019/01/Guidelines-for-Human-AI-Interaction-camera-ready.pdf",
+      "conclusion": "能力边界、便捷退出、纠错和不确定时缩小服务范围，应贯穿 AI 交互，而不只增加解释。",
+      "method": "18 条准则，多轮评估包含 49 名设计实践者对 20 个 AI 产品的检验。", "strength": "支持设计检查清单；不直接证明本产品降低风险或提升效率。",
+      "limits": ["准则适用性验证不等于业务效果随机试验。", "未规定本项目 defer/cancel 的服务端语义。"],
+      "implications": {"Demo1": "成果、待核验范围、下一步和错误恢复分开展示。", "Demo2": "显示已返回与已采用的差异，而非用动画暗示可靠协作。", "Demo3": "退出要可用；原文歧义给互斥候选，不猜测用户意图。"},
+      "locator": "PDF Table 1，G1-G2、G7-G11、G16。", "read_scope": "摘要、方法概述与准则表", "verified_at": "2026-09-11", "verification_method": "web.open 原文 PDF"
+    },
+    {
+      "id": "S04", "title": "To Trust or to Think: Cognitive Forcing Functions Can Reduce Overreliance on AI in AI-assisted Decision-making", "short_title": "适度思考门槛与过度依赖",
+      "authors": "Zana Buçinca; Maja Barbara Malaya; Krzysztof Z. Gajos", "institution": "Harvard University / Lodz University of Technology", "year": 2021, "date": "2021-04", "date_note": "PDF 为 PACM HCI 5, CSCW1, Article 188 (April 2021)；arXiv 首次提交 2021-02-19。",
+      "type": "paper", "publication": "PACM HCI / CSCW 2021", "evidence_kind": "受控用户实验", "topics": ["信任与核验", "审批与权限"],
+      "url": "https://arxiv.org/abs/2102.09692", "pdf_url": "https://arxiv.org/pdf/2102.09692",
+      "conclusion": "在该实验中，促使用户主动思考的设计减少了错误建议的跟随，但较有效的设计也获得较差主观评价。",
+      "method": "N=199，对比三种认知强制设计、两种简单解释设计与无 AI 基线。", "strength": "提供有条件的行为证据，并揭示核验效果与体验的取舍。",
+      "limits": ["不能推导所有确认前都应强制输入理由。", "效果受认知动机及具体任务影响，未证明长期或企业场景效果。"],
+      "implications": {"Demo1": "在真正有歧义时让人先选择候选，普通重试不增加无谓表单。", "Demo2": "高影响汇总可提示检查一项关键假设，不让所有贡献逐条盖章。", "Demo3": "对比无默认选择、先判断再看建议；同时测误采纳、时间与负担。"},
+      "locator": "摘要；实验条件及讨论。", "read_scope": "摘要与 PDF 方法/结论概述", "verified_at": "2026-09-11", "verification_method": "web.open + 原始 PDF 链接"
+    },
+    {
+      "id": "S05", "title": "Explanations Can Reduce Overreliance on AI Systems During Decision-Making", "short_title": "解释是否降低核验成本，比解释长度更重要",
+      "authors": "Helena Vasconcelos; Matthew Jörke; Madeleine Grunde-McLaughlin; Tobias Gerstenberg; Michael S. Bernstein; Ranjay Krishna", "institution": "Stanford University / University of Washington", "year": 2023, "date": "2023-04", "date_note": "PDF 为 PACM HCI 7, CSCW1, Article 129 (April 2023)；arXiv v1 2022-12-13，v2 2023-01-26。",
+      "type": "paper", "publication": "CSCW 2023", "evidence_kind": "多项受控实验", "topics": ["信任与核验"],
+      "url": "https://arxiv.org/abs/2212.06823", "pdf_url": "https://arxiv.org/pdf/2212.06823",
+      "conclusion": "解释并非必然无效：当它有效降低检查 AI 预测的成本时，过度依赖可以减少。",
+      "method": "五项迷宫任务实验，N=731，操纵任务难度、解释难度和收益。", "strength": "支持成本收益机制；为“解释总有益/总无效”提供反例。",
+      "limits": ["模拟 AI 迷宫不是长文档办公 Agent。", "不能由此宣称证据高亮已提升本项目用户正确率。"],
+      "implications": {"Demo1": "候选与真实原文并排，高亮具体行而非只给长段模型理由。", "Demo2": "一键追溯贡献对应材料，降低核验多分支的导航成本。", "Demo3": "比较只显示解释与可定位证据的决策正确率，记录查阅时间。"},
+      "locator": "摘要与 Studies 1-5。", "read_scope": "摘要、PDF 原文与研究设计概述", "verified_at": "2026-09-11", "verification_method": "web.open + 原始 PDF 链接"
+    },
+    {
+      "id": "S06", "title": "When combinations of humans and AI are useful: A systematic review and meta-analysis", "short_title": "人机协作不自动产生协同增益",
+      "authors": "Michelle Vaccaro; Abdullah Almaatouq; Thomas Malone", "institution": "MIT Center for Collective Intelligence", "year": 2024, "date": "2024-10-28", "date_note": "出版原文 published online 28 October 2024。",
+      "type": "paper", "publication": "Nature Human Behaviour 8, 2293-2303", "evidence_kind": "预注册系统综述与元分析", "topics": ["协作与评估", "信任与核验"],
+      "url": "https://www.nature.com/articles/s41562-024-02024-1.pdf", "pdf_url": "https://www.nature.com/articles/s41562-024-02024-1.pdf",
+      "conclusion": "纳入研究中，人机组合平均弱于人或 AI 中的较佳单方；相对人单独的增强，不等于超越最佳单方的协同。",
+      "method": "106 项实验、370 个效应量；纳入 2020-01 至 2023-06 文献，要求人、AI、人机三类对照。", "strength": "本库最广泛的综合效果证据，但对象并非 2026 年 Agent。",
+      "limits": ["存在发表偏倚及任务、系统、实验设计异质性。", "创作子组 g=0.19、95% CI [-0.09, 0.48]，未显著高于零；不能宣称创作已证实协同增益。", "不能把平均负效应推成所有协作都无效。"],
+      "implications": {"Demo1": "验收除 Run 完成还要衡量结论完整性和人力时间。", "Demo2": "统一预算比较单 Controller 与多 Worker，不能以拓扑复杂度证明收益。", "Demo3": "至少设人工、AI、共驾对照，并将安全/权限约束与质量指标分别报告。"},
+      "locator": "PDF pp. 1-3: abstract、synergy vs augmentation、Figure 1、任务子组异质性。", "read_scope": "出版 PDF 摘要、结果与局限；HTML 正文入口抓取失败，PDF 成功", "verified_at": "2026-09-11", "verification_method": "web.open 出版社原始 PDF"
+    },
+    {
+      "id": "S07", "title": "The Impact of Generative AI on Critical Thinking: Self-Reported Reductions in Cognitive Effort and Confidence Effects From a Survey of Knowledge Workers", "short_title": "知识工作中的核验、整合与任务监督",
+      "authors": "Hao-Ping (Hank) Lee; Advait Sarkar; Lev Tankelevitch; Ian Drosos; Sean Rintel; Richard Banks; Nicholas Wilson", "institution": "Microsoft Research / Carnegie Mellon University", "year": 2025, "date": "2025-04", "date_note": "机构出版页 CHI 2025 / April 2025；不以一月 PDF 目录为会议日期。",
+      "type": "paper", "publication": "CHI 2025", "evidence_kind": "知识工作者自报调查", "topics": ["信任与核验", "主动与接管"],
+      "url": "https://www.microsoft.com/en-us/research/publication/the-impact-of-generative-ai-on-critical-thinking-self-reported-reductions-in-cognitive-effort-and-confidence-effects-from-a-survey-of-knowledge-workers/", "pdf_url": "https://www.microsoft.com/en-us/research/wp-content/uploads/2025/01/lee_2025_ai_critical_thinking_survey.pdf",
+      "conclusion": "较高的 GenAI 信心与较少的自报批判性思考相关；工作重心转向信息核验、整合及任务监督。",
+      "method": "319 位知识工作者提供 936 个使用实例的调查。", "strength": "贴近办公语境，但属于相关性和自报证据。",
+      "limits": ["不是 AI 导致认知能力下降的因果证明。", "不能用主观有帮助或信任评分代替客观核验效果。"],
+      "implications": {"Demo1": "把模型实际阅读范围和未覆盖部分显式暴露，不让流畅总结掩盖截断。", "Demo2": "汇总页能追溯来源、冲突与未采用贡献。", "Demo3": "区分用户觉得放心和用户真的识别了错误，两者分别测量。"},
+      "locator": "摘要、方法和局限；PDF 标题页。", "read_scope": "机构原始页面及 PDF 摘要/方法局限", "verified_at": "2026-09-11", "verification_method": "web.open 机构页面及原始 PDF"
+    },
+    {
+      "id": "S08", "title": "The Ethics of Advanced AI Assistants", "short_title": "代理自主性不能挤占人的自主权",
+      "authors": "Iason Gabriel; Arianna Manzini; Geoff Keeling 等 57 位作者", "institution": "Google DeepMind 等机构", "year": 2024, "date": "2024-04-24", "date_note": "此处为 arXiv 首次提交日；官方博客 2024-04-19，v2 2024-04-28。",
+      "type": "paper", "publication": "研究报告 / arXiv:2404.16244", "evidence_kind": "跨学科伦理分析", "topics": ["主动与接管", "审批与权限", "协作与评估"],
+      "url": "https://arxiv.org/abs/2404.16244", "pdf_url": null, "companion_url": "https://deepmind.google/blog/the-ethics-of-advanced-ai-assistants/",
+      "conclusion": "助手代理用户执行跨领域行动时，还需考虑价值对齐、操纵、隐私和对非用户的影响，而非只优化任务完成。",
+      "method": "概念性风险与伦理前瞻，官方作者博客解释自主权和控制的设计诉求。", "strength": "用于补全边界议题，不是风险发生率或某种 UI 有效性的实验。",
+      "limits": ["本轮成功核验摘要与作者官方解读；两处全文 PDF 抓取失败，未逐章研读。", "不将伦理建议写成本项目已经实现的安全保证。"],
+      "implications": {"Demo1": "目标修改与继续研究分开记录，不能替用户悄悄改变任务。", "Demo2": "Controller 保留责任边界，不把决策责任转嫁给 Worker。", "Demo3": "高影响外部动作无有效权限时拒绝执行，只产出待审建议。"},
+      "locator": "arXiv 摘要；官方博客 Human alignment / Communicating in natural language。", "read_scope": "原始摘要及作者机构博客；全文未核验", "verified_at": "2026-09-11", "verification_method": "web.open 原始摘要 + 官方解读"
+    },
+    {
+      "id": "S09", "title": "An Experimental Comparison of Cognitive Forcing Functions for Execution Plans in AI-Assisted Writing: Effects On Trust, Overreliance, and Perceived Critical Thinking", "short_title": "2026：审计划时检验假设，而非机械确认",
+      "authors": "Ahana Ghosh; Advait Sarkar; Siân Lindley; Christian Poelitz", "institution": "Max Planck Institute for Software Systems / Microsoft Research", "year": 2026, "date": "2026-01-25", "date_note": "arXiv v1 2026-01-25；PDF 明确写 preprint，未核验同行评审发表。",
+      "type": "paper", "publication": "预印本 / arXiv:2601.18033v1", "evidence_kind": "预印本受控实验与访谈", "topics": ["信任与核验", "审批与权限"],
+      "url": "https://arxiv.org/abs/2601.18033", "pdf_url": "https://arxiv.org/pdf/2601.18033",
+      "conclusion": "写作计划审阅实验中，假设检查比 WhatIf 更有效减少过度依赖；用户主观偏好并不与行为效果一致。",
+      "method": "214 人在线实验、12 人访谈，对比 None / Assumptions / WhatIf / Both。", "strength": "直接关联计划审阅；仍是未核验同行评审状态的单篇新研究。",
+      "limits": ["写作任务植入合成错误，不等于真实多 Agent 动作事故。", "文中分配过程有 random 与 round-robin 两种表述；不强化为严格随机对照。", "不据此要求每次低风险重试都回答测验。"],
+      "implications": {"Demo1": "用户调整下一轮时可检查一项关键假设，作为可选评审候选。", "Demo2": "汇总前核对被忽略的输入或依赖，而不是默认接受整张计划。", "Demo3": "新增可对照的“指出计划假设”沙盘，测错误识别与负担，不预先宣称有效。"},
+      "locator": "PDF p. 1 摘要和 preprint 声明；pp. 10-17 方法；pp. 23-26 访谈。", "read_scope": "原始摘要、PDF 方法/样本与部分定性结果", "verified_at": "2026-09-11", "verification_method": "web.open + 原始 PDF 链接"
+    },
+    {
+      "id": "S10", "title": "Interrupts", "short_title": "LangGraph：中断恢复会重跑节点",
+      "authors": "LangChain 文档团队", "institution": "LangChain / LangGraph", "year": null, "date": null, "date_note": "滚动官方文档，页面未提供可靠发布日期；核验版本以访问日为准。",
+      "type": "docs", "publication": "LangGraph Python 官方文档", "evidence_kind": "框架合同与代码示例", "topics": ["恢复与连续性", "审批与权限"],
+      "url": "https://docs.langchain.com/oss/python/langgraph/interrupts", "pdf_url": null,
+      "conclusion": "interrupt 依赖持久化和 thread_id；恢复会从包含中断的节点开头重跑，之前的副作用必须幂等或拆开。",
+      "method": "官方 API 合同与审批、编辑状态等样例。", "strength": "可支持框架语义对比，不是本仓库运行成功的证明。",
+      "limits": ["未在本仓库安装或实测此框架。", "节点恢复语义不能直接套用本项目终态 child Run 协议。"],
+      "implications": {"Demo1": "清楚区分运行中 resume 和终态同 Task 新 Run；展示会重做的范围。", "Demo2": "对比保留贡献、失败 WorkUnit 和新派发，不假装在途调用原地续跑。", "Demo3": "设计恢复前摘要：目标、来源版本、待执行动作和已保留成果。"},
+      "locator": "Pause using interrupt；Resuming interrupts；Side effects called before interrupt must be idempotent。", "read_scope": "文档中断、恢复、幂等及子图章节", "verified_at": "2026-09-11", "verification_method": "web.open 官方文档"
+    },
+    {
+      "id": "S11", "title": "Human-in-the-loop", "short_title": "OpenAI Agents SDK：审批绑定工具调用与暂停状态",
+      "authors": "OpenAI Agents SDK 维护团队", "institution": "OpenAI", "year": null, "date": null, "date_note": "滚动官方文档，无可靠单页发布日期；不声称固定 SDK 版本。",
+      "type": "docs", "publication": "OpenAI Agents SDK Python 官方文档", "evidence_kind": "框架合同与代码示例", "topics": ["审批与权限", "拒绝与延后", "恢复与连续性"],
+      "url": "https://openai.github.io/openai-agents-python/human_in_the_loop/", "pdf_url": null,
+      "conclusion": "敏感工具调用可暂停等待批准或拒绝，RunState 可序列化；待决任务还需保存定义版本并保护持久化上下文。",
+      "method": "needs_approval、interruptions、RunState 与长时审批说明。", "strength": "说明可实现的工程原语，不证明端到端安全。",
+      "limits": ["审批适用性取决于工具类型和应用策略；未做框架执行测试。", "本项目并未因此接入该 SDK、工具权限或外部写入。"],
+      "implications": {"Demo1": "确认来源版本失效时刷新待决事实，不能重用旧批准。", "Demo2": "嵌套 Worker 的请求集中进入可追溯责任界面，不混淆父子请求。", "Demo3": "默认一次动作一次授权；长期授权需单独范围和撤销设计，尚未接入。"},
+      "locator": "How the approval flow works；Long-running approvals；Versioning pending tasks。", "read_scope": "上述章节及工具适用性说明", "verified_at": "2026-09-11", "verification_method": "web.open 官方文档"
+    },
+    {
+      "id": "S12", "title": "Elicitation", "short_title": "MCP：接受、拒绝、取消不是同一事件",
+      "authors": "Model Context Protocol 维护者", "institution": "Model Context Protocol", "year": 2025, "date": "2025-11-25", "date_note": "固定协议版本日期，不代表此页最初发布日。",
+      "type": "docs", "publication": "MCP specification 2025-11-25", "evidence_kind": "固定版本协议规范", "topics": ["拒绝与延后", "审批与权限"],
+      "url": "https://modelcontextprotocol.io/specification/2025-11-25/client/elicitation", "pdf_url": null,
+      "conclusion": "用户明确拒绝与关闭未作选择有不同协议动作；客户端应允许拒绝并清楚说明请求者、目的和信息范围。",
+      "method": "accept / decline / cancel 响应、错误处理和安全要求。", "strength": "提供明确语义参考，不是当前产品的协议实现证据。",
+      "limits": ["MCP elicitation 收集信息，不等于通用执行授权或事务提交。", "本项目关闭审查写 defer，是本地合同，不能改称 MCP cancel 实现。"],
+      "implications": {"Demo1": "关闭界面先退出；未知回执不能显示已记录或默认拒绝。", "Demo2": "区分拒绝某个 Worker 派发与暂不决定，不替用户广泛撤销。", "Demo3": "分别演示接受、拒绝、延后、取消；显式标注与 MCP 只是语义参照。"},
+      "locator": "Response Actions；Error Handling；Security Considerations。", "read_scope": "固定版本原文上述章节", "verified_at": "2026-09-11", "verification_method": "web.open 官方规范"
+    },
+    {
+      "id": "S13", "title": "AI Risk Management Framework 1.0 — Appendix C: AI Risk Management and Human-AI Interaction", "short_title": "NIST：先定义人类监督的角色与责任",
+      "authors": "National Institute of Standards and Technology", "institution": "NIST", "year": 2023, "date": "2023-01", "date_note": "AI RMF 1.0 (2023)；网页提示修订中，本库不把草案或未来修订当现行 1.0。",
+      "type": "docs", "publication": "NIST AI 100-1", "evidence_kind": "治理框架", "topics": ["主动与接管", "信任与核验", "协作与评估"],
+      "url": "https://airc.nist.gov/airmf-resources/airmf/appendices/app-c-ai-risk-management-and-human-ai-interaction/", "pdf_url": "https://nvlpubs.nist.gov/nistpubs/ai/nist.ai.100-1.pdf",
+      "conclusion": "人类监督应有明确角色与责任，且人机组合可能放大偏差；有一个人在环中并不自动保证有效治理。",
+      "method": "风险管理框架对人机交互和评估需求的规范性分析。", "strength": "适合治理检查，不是认证、法律意见或产品安全评分。",
+      "limits": ["未规定本项目 R0-R3 的阈值。", "人的干预是否有效、是否得到支持和激励，仍需要部署后研究。"],
+      "implications": {"Demo1": "在进展与成果之间保留核验边界，不以完成状态免除复核。", "Demo2": "区分 Controller 责任、Worker 贡献和人工决策者。", "Demo3": "接管请求说明谁能决定、决定什么、拒绝后怎么办；记录覆盖与误放行。"},
+      "locator": "Appendix C 第 1、3、4 点及最后一段。", "read_scope": "官方 Appendix C 与框架 PDF 元数据", "verified_at": "2026-09-11", "verification_method": "web.open 官方原文及 PDF"
+    },
+    {
+      "id": "S14", "title": "Building effective agents", "short_title": "简单编排、环境反馈与停止条件",
+      "authors": "Erik S.; Barry Zhang", "institution": "Anthropic", "year": 2024, "date": "2024-12-19", "date_note": "原始发布日期；当前页面明确提示工具生态已变化，且正文有后续更新，不是 2024 存档快照。",
+      "type": "blog", "publication": "Anthropic Engineering", "evidence_kind": "工程经验", "topics": ["主动与接管", "恢复与连续性", "协作与评估"],
+      "url": "https://www.anthropic.com/engineering/building-effective-agents", "pdf_url": null,
+      "conclusion": "应从简单可组合方案开始；Agent 的灵活性伴随成本与时延，需要环境反馈、停止条件和适当人工检查点。",
+      "method": "厂商客户经验、工作流与 Agent 模式归纳。", "strength": "工程启发，不是可复制的统一性能比较。",
+      "limits": ["框架与模型例子会更新；未在相同预算下验证其适合本项目。", "不能把文章中的自动化能力当本仓库已有能力。"],
+      "implications": {"Demo1": "预算停止原因和实际工具回执优先于循环动画。", "Demo2": "先解释为何工作包适合分工，再展示协作图。", "Demo3": "允许系统缩小任务或请求澄清，不能为了显得自主而跨越权限。"},
+      "locator": "When (and when not) to use agents；Agents；Summary。", "read_scope": "官方文章编排模式、Agent 与局限章节", "verified_at": "2026-09-11", "verification_method": "web.open 官方文章，旧 research URL 重定向到 engineering"
+    },
+    {
+      "id": "S15", "title": "How we built our multi-agent research system", "short_title": "多 Agent：成本、可观测性与错误后的恢复",
+      "authors": "Anthropic Research / Engineering 团队", "institution": "Anthropic", "year": 2025, "date": "2025-06-13", "date_note": "官方页面 Published Jun 13, 2025；指标限定于文中系统与内部评估。",
+      "type": "blog", "publication": "Anthropic Engineering", "evidence_kind": "单系统工程经验与内部评估", "topics": ["协作与评估", "恢复与连续性", "信任与核验"],
+      "url": "https://www.anthropic.com/engineering/multi-agent-research-system", "pdf_url": null,
+      "conclusion": "独立探索有利于多 Agent 分工，但成本、依赖和恢复更复杂；人工测试仍能发现自动评估漏掉的来源与边界问题。",
+      "method": "研究系统架构、内部评估、人工测试和生产问题复盘。", "strength": "有真实工程语境，但厂商内部比较不可直接外推。",
+      "limits": ["不照搬其性能百分比到 Demo2。", "文章的并行系统不等于本项目最多三个进程内只读 Worker 的执行保证。"],
+      "implications": {"Demo1": "断点和历史成果应能解释，避免出错后整任务静默重跑。", "Demo2": "独立来源、调用/采用、失败/保留贡献各自展示，并比较同预算基线。", "Demo3": "“局部失败但成果保留”与“全部成功”作为两个不同案例验收。"},
+      "locator": "Benefits；Evaluating multi-agent systems；Production reliability and engineering challenges。", "read_scope": "官方原文成本、评估和可靠性段落", "verified_at": "2026-09-11", "verification_method": "web.open 官方文章"
+    },
+    {
+      "id": "S16", "title": "Agents, human agency, and the opportunity for every organization", "short_title": "2026：人的能动性还依赖组织支持",
+      "authors": "Microsoft WorkLab / Work Trend Index research team", "institution": "Microsoft", "year": 2026, "date": "2026-05-05", "date_note": "官方全球报告页面 May 5, 2026；以该页方法为准，不混用区域新闻日期或样本。",
+      "type": "report", "publication": "2026 Work Trend Index Annual Report", "evidence_kind": "厂商调查与遥测报告", "topics": ["主动与接管", "协作与评估"],
+      "url": "https://www.microsoft.com/en-us/worklab/work-trend-index/agents-human-agency-and-the-opportunity-for-every-organization", "pdf_url": null,
+      "conclusion": "报告将个人驾驭 AI 的能力与组织准备度分开；监督和判断能力还需要明确规则、管理支持和学习机制。",
+      "method": "全球 10 个市场、20,000 名 AI 使用者调查，并另列 Microsoft 365 匿名聚合遥测。", "strength": "提供当期工作情境信号；不是本产品或整个劳动市场的因果效果。",
+      "limits": ["组织准备度及相关模型是自报数据；相关分析不能解读为组织因素造成收益。", "厂商选样和产品生态边界明确，不把遥测与每项调查推导混算。"],
+      "implications": {"Demo1": "任务移交时传递目标、剩余事项和责任，而不只显示已完成百分比。", "Demo2": "技术拓扑之外，还要解释谁有资格批准汇总和后续动作。", "Demo3": "把角色不具备决定权限列为独立边界；用户研究纳入角色与培训差异。"},
+      "locator": "Section II 的 individual / organizational readiness；图表方法备注；Methodology。", "read_scope": "官方报告相关章节、日期与方法注释", "verified_at": "2026-09-11", "verification_method": "web.open 官方报告"
+    },
+    {
+      "id": "S17", "title": "Fine-Grained Appropriate Reliance: Human-AI Collaboration with a Multi-Step Transparent Decision Workflow for Complex Task Decomposition", "short_title": "分步判断：可见并不等于真的考虑过",
+      "authors": "Gaole He; Patrick Hemmer; Michael Vössing; Max Schemmer; Ujwal Gadiraju", "institution": "Delft University of Technology / Karlsruhe Institute of Technology", "year": 2025, "date": "2025-01-19", "date_note": "arXiv v1 提交日；页面标注 Work in progress，PDF DOI 为占位符，未核验同行评审发表。",
+      "type": "paper", "publication": "预印本 / arXiv:2501.10909v1", "evidence_kind": "预印本用户实验", "topics": ["信任与核验", "协作与评估"],
+      "url": "https://arxiv.org/abs/2501.10909", "pdf_url": "https://arxiv.org/pdf/2501.10909",
+      "conclusion": "复合事实核验中，分步透明流程仅在误导性建议等部分情境有优势，整体表现未优于一步流程；更多强制反思也可能加重负担。",
+      "method": "N=233，比较复合事实核验的多步透明与一步协作。", "strength": "与复杂任务拆解直接相关，但仍为特定任务的在研实证。",
+      "limits": ["原文整体比较无改进，局部收益不能写成普遍增益。", "多步 UI 与多 Worker Runtime 是两个不同变量。"],
+      "implications": {"Demo1": "执行记录支持逐分支判断，但不把展开日志等同有效监督。", "Demo2": "贡献按中间主张核验；测试用户是否真的发现误导性子结论。", "Demo3": "对比一步总确认与分步核对，并观察中间步骤的实际注意和纠错。"},
+      "locator": "PDF pp. 1-3，整体无提升、误导建议子情境和强制反思的负担。", "read_scope": "原始摘要、PDF 首页与引言结果概述；未复现研究", "verified_at": "2026-09-11", "verification_method": "web.open + 原始 PDF 链接"
+    },
+    {
+      "id": "S18", "title": "Appropriate Reliance Research Initiative", "short_title": "合适依赖，而不是最大化用户信任",
+      "authors": "Microsoft Research，项目负责人 Mihaela Vorvoreanu", "institution": "Microsoft Research", "year": 2024, "date": "2024-05-02", "date_note": "官方页面 Published May 2, 2024；研究链接列表为滚动更新。",
+      "type": "blog", "publication": "Microsoft Research / The New Future of Work", "evidence_kind": "官方研究议程", "topics": ["信任与核验", "协作与评估"],
+      "url": "https://www.microsoft.com/en-us/research/articles/appropriate-reliance-research-initiative/", "pdf_url": null,
+      "conclusion": "研究目标是同时减少错误输出被接受与正确输出被拒绝，而非单向提升对 AI 的信任。",
+      "method": "研究议程及相关研究、HAX 工具库入口。", "strength": "可校准术语和评估方向，不是一项新的效果实验。",
+      "limits": ["议程页没有提供本产品收益或风险改善数据。", "链接到论文不代表本轮已读完该页全部关联研究。"],
+      "implications": {"Demo1": "不能用批准率作为 UI 成功指标。", "Demo2": "同时记录误采纳和误拒绝贡献，避免只鼓励用户多接管。", "Demo3": "给出安全正确的建议作为对照，确认系统不会诱导不必要拒绝。"},
+      "locator": "页面定义、目标和研究入口。", "read_scope": "官方研究议程正文；关联论文未全部展开", "verified_at": "2026-09-11", "verification_method": "web.open 官方研究页"
+    }
+  ],
+  "rules": [
+    {"id": "R01", "name": "先说影响，再问一个必要问题", "sources": ["S01", "S02", "S03"], "demos": ["Demo1", "Demo2", "Demo3"], "proposal": "给出当前成果、受影响分支、等待原因和一个最小决定；无关分支保留。", "status": "设计推导；已有局部分支事实可承接", "acceptance": "用户能指出会改变哪一分支；无关结果不被重算或误写为失败。"},
+    {"id": "R02", "name": "退出不是批准，也不是业务拒绝", "sources": ["S01", "S03", "S12"], "demos": ["Demo1", "Demo3"], "proposal": "保持接受、拒绝、暂缓、取消分离；关闭先退出，回执未知则显示未知并刷新。", "status": "本地协议已有部分约束；MCP 仅作语义参照", "acceptance": "409、离线、旧来源版本均可关闭；不出现伪造已记录或静默默认选项。"},
+    {"id": "R03", "name": "让核验便宜，不让确认变成形式", "sources": ["S04", "S05", "S07", "S09", "S17", "S18"], "demos": ["Demo1", "Demo2", "Demo3"], "proposal": "原文位置并排、无预选；高影响判断可试验关键假设检查，普通重试不强加表单。", "status": "设计假设；尚无目标用户效果证据", "acceptance": "同时比较错误采纳、正确建议拒绝、核验时间与负担，而非只看点击完成率。"},
+    {"id": "R04", "name": "审批、权限、证据和动作结果分层", "sources": ["S08", "S11", "S12", "S13"], "demos": ["Demo2", "Demo3"], "proposal": "“同意”只绑定明确对象和有效版本；无权限不执行。文件检查通过不覆盖业务 Gate。", "status": "Draft；外部执行尚未接入，external_action=none", "acceptance": "来源变更使旧决定失效；没有 Connector 回执时绝不显示已发送、已发布或已写入。"},
+    {"id": "R05", "name": "恢复必须讲清重做粒度", "sources": ["S02", "S10", "S11", "S15"], "demos": ["Demo1", "Demo2", "Demo3"], "proposal": "显示保留成果和下一次重核范围；非终态 resume、终态 child Run、Worker 重试分别命名。", "status": "基于现行有限协议的交互推导；未移植框架", "acceptance": "终态不假装原地续跑；重启不自动重放 Worker；重复请求不会产生重复外部副作用。"},
+    {"id": "R06", "name": "证据有效不等于内容完整", "sources": ["S03", "S05", "S06", "S07"], "demos": ["Demo1", "Demo2", "Demo3"], "proposal": "分开标记可定位、已阅读范围、未覆盖内容与业务有效性；不以引用数遮盖材料截断。", "status": "设计建议；本轮不修复模型读取上限", "acceptance": "长日志尾部关键事实任务必须覆盖或明确未读；浏览器 Preview 长度不冒充模型读取量。"},
+    {"id": "R07", "name": "协作收益需要对照，不靠拓扑图证明", "sources": ["S06", "S13", "S14", "S15", "S16"], "demos": ["Demo1", "Demo2", "Demo3"], "proposal": "统一预算、来源与任务，分开评估人、AI、人机和单/多 Worker；说明人工责任和可接管权限。", "status": "评估方案候选；尚未实施固定配置同场试验", "acceptance": "报告质量、成本、恢复保留率和人类核验表现；未测维度不宣称领先。"}
+  ],
+  "excluded_or_limited": [
+    {"title": "Trust in Automation: Designing for Appropriate Reliance (Lee & See, 2004)", "reason": "检索到作者机构 PDF 与出版页，但实际打开分别 404 / 抓取失败；不计入 18 项成功核验来源，不据摘要单独推导规则。"},
+    {"title": "The Ethics of Advanced AI Assistants 完整 PDF", "reason": "原始摘要与官方作者解读成功打开；arXiv PDF、机构 PDF 抓取失败；保留 S08 为有限阅读，未提供未核验 PDF 下载项。"},
+    {"title": "Nature 元分析 HTML 正文", "reason": "HTML/DOI 打开失败，但出版社 PDF 成功打开；S06 以 PDF 为原始入口。"}
+  ]
+}

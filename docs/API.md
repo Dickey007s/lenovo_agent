@@ -1,5 +1,22 @@
 # Office Agent V0.2 API
 
+## 2026-09-12 boundary projection clarification
+
+[DR-0063](decisions/DR-0063-integrated-copilot-boundaries-and-swarm-facts.md) adds no path, operation,
+control kind or permission. `decision` remains a scoped evidence/decision record; `/workers` remains
+explicit bounded read-only dispatch; terminal `/continue` remains separate. Browser boundary notices
+do not issue business approvals, risk grades or external-action receipts. Worker calls, contributions,
+artifact verification and business gates remain independent facts.
+
+## 2026-09-11 projection clarification
+
+[DR-0061](decisions/DR-0061-reference-aligned-capabilities-and-evidence-choice.md) adds no operation.
+The redesigned UI retains start/control/continue/worker/version contracts. Evidence choices bind exact
+`resolution_id` and authoritative top-level `decision_request_id/source_revision`; different resolutions
+of one Finding are not interchangeable. The existing `stale` request state must not be displayed as
+pending. On a terminal Run, `decision(accept)` records a preserved choice, not a child Run; `/continue`
+remains a separate explicit action. A missing response is an unknown outcome, not proof of no write.
+
 Base URL: `http://localhost:8010`.
 
 ## 1. Public surface
@@ -36,7 +53,10 @@ is a demonstration Owner placeholder, not production authentication. Missing
 and wrong-owner Runs both return 404 before the SSE response is created.
 
 There are twelve operations over eleven OpenAPI paths because `GET` and `POST`
-share `/runs`. With `DATABASE_DSN`, accepted Run snapshots, the minimal Task
+share `/runs`. `STATE_STORE_MODE` accepts `auto`, `memory` or `postgres`.
+`auto` uses PostgreSQL when `DATABASE_DSN` is non-empty and otherwise memory;
+`memory` explicitly ignores a stale DSN, while `postgres` without a DSN fails
+startup. With PostgreSQL selected, accepted Run snapshots, the minimal Task
 Ledger, Task continuation receipts, start/control idempotency receipts,
 ArtifactVersions and TaskCommits are stored in PostgreSQL; the latter two are
 independent append-only rows. Initial start and continuation use one State Store
@@ -46,8 +66,7 @@ isolated server Artifact store and are rechecked on download. On startup, an
 interrupted nonterminal Run is rolled back to completed rounds, receives
 `checkpoint_recovered` and pauses; an in-flight provider request is never
 automatically replayed. In-flight HTTP requests, asyncio tasks and conditions
-remain process-local. Without `DATABASE_DSN`, the state store is memory and all
-Run state disappears on restart.
+remain process-local. In memory mode all Run state disappears on restart.
 
 ## 3. Whole workspace
 
@@ -162,6 +181,14 @@ accept `selected_file_refs`: the server freezes the complete allowlisted input
 index and the Planner autonomously selects a bounded evidence set for each
 round. Sending a client-owned file scope is rejected as an unknown field.
 
+If the instruction includes one of the supported explicit requirement markers
+and a contiguous `1..N` numbered list (`2 <= N <= 12`), the Planner candidate
+must account for every item as `planned`, `deferred` or `uncovered`. This is a
+bounded syntax, not a general natural-language requirement compiler. The
+private coverage table is never returned directly; the public Plan separates
+current `units[]`, approved-source `deferred_requirements[]` and no-source
+`uncovered_requirements[]`.
+
 `loop` is optional and defaults to the values above. Bounds are 1-24 rounds,
 1-24 files per round, 2-60 model calls and 20-14400 seconds. The server freezes
 these values plus `scope_mode=whole_workspace` and all stable input refs into
@@ -174,6 +201,13 @@ hard-cancel an in-flight provider HTTP request.
 The response is `202 Accepted` with `{"run": snapshot, "replayed": false}`.
 Reusing the same Owner/key/request returns the original start result with
 `replayed=true`. Reusing that key for different content returns 409.
+
+The browser's “新建任务” action adds no API operation. It first creates only a
+local blank-draft state and sends no request. The independent server Task exists
+only when this endpoint accepts the submitted instruction. Leaving the prior Run
+view does not call pause/stop/delete; identical text submitted after another
+explicit new-task action uses a new idempotency key, while an unresolved retry of
+the same start attempt keeps its original key.
 
 `GET /v1/harness/runs?limit=10` returns `{"runs": [...]}` ordered by the
 latest server update. It is Owner-scoped and exists so a browser without local
@@ -293,6 +327,8 @@ Content-Type: application/json
 此时服务端使用最新 `ready_branch_ids`，每批最多三个。每个 Worker 只获得自己的
 Branch objective 和批准 `input_file_refs`。模型调用预算在派发前进入版本化 Snapshot；
 预算不足、依赖未完成、重复 Branch、旧版本或越界来源全部拒绝，且不会部分派发。
+`ready_branch_ids=[]` 时前台不得提供 Worker 动作；普通
+`candidate_branch_ids` 或显式延后 Branch 只能走单 Branch control resume。
 
 Worker 返回不等于采用。Runtime 记录兼容投影 `worker_runs[]`，同时把完整 Branch DAG
 一对一投影为独立 `work_units[]`，并把每次返回追加为不可变 `contributions[]`。WorkUnit
@@ -550,7 +586,16 @@ also remove reservation identifiers and raw source revisions.
   "plan": {
     "summary": "...",
     "selection_reason": "为什么本轮选择这些文件",
-    "units": []
+    "units": [],
+    "deferred_requirements": [
+      {
+        "title": "搜索 Agent 运行可靠性",
+        "objective": "核对运行可靠性并给出来源。",
+        "reason": "已有批准来源，但本轮文件预算未能完整纳入。",
+        "candidate_file_refs": ["forte-..."]
+      }
+    ],
+    "uncovered_requirements": []
   },
   "model_receipt": {
     "called": true,
@@ -711,6 +756,10 @@ index. They are not the files read by the Analyst. The authoritative per-round
 evidence scope is `rounds[].input_file_refs`, and the public reason is
 `rounds[].plan.selection_reason`. The server compiler caps the union of those
 refs at `max_files_per_round` before any file content reaches the Analyst.
+For an explicit numbered requirement contract, a whole root unit removed by
+that cap becomes a public deferred requirement with a waiting Branch rather
+than disappearing. Internal `requirement_coverage` and
+`planner_search_hint` remain private Planner/compiler data.
 
 `branches[]` is the server-owned projection of validated plan units. Branch
 identity, dependency, verified/missing refs and status are not model-owned UI
@@ -756,6 +805,17 @@ unresolved Finding and candidates remain in `next_step.evidence_resolutions`; on
 their affected Branches wait. If no Finding can be adopted, the round is still
 preserved with `recovery_kind=source_location`. Repeated schema failures use
 `analysis_output`. Scope or integrity violations still fail closed.
+
+The production Analyst call has its own configurable timeout, default 180
+seconds, and requests at most 12,000 output tokens. Its strict draft schema does
+not accept server-owned IDs, Branch bindings, anchors or resolutions. The prompt
+asks for at most two candidate Findings per root unit and one per dependent
+unit, with a prompt-level maximum of 24; the public/server result contract still
+allows 96 and accepted Findings are never silently truncated. Length exhaustion,
+invalid JSON, schema mismatch and Provider timeout/response errors emit
+`analysis_structure_rejected` with a classified `failure_kind`; Branch binding
+and source-location failures use `analysis_validation_rejected`. Both paths
+allow at most one bounded repair.
 
 After resolution, the Runtime may omit a Finding when every verified `observed`
 month/day lies outside an explicit Chinese date window in the original instruction;
@@ -990,6 +1050,13 @@ The provider returns a plan candidate, not the public plan. The server compiles
 allowlisted intent into owned effect/gate semantics, then validates unit IDs,
 dependencies, source refs, tools, logical artifacts and human gates. Raw
 candidate fields and compiler errors are not public facts.
+
+For the bounded explicit-numbered syntax, the validator also requires every
+index once, one unique root unit for each `planned` item, real allowlisted refs
+for each `deferred` item and no refs for `uncovered`. Dependent summary units
+must contain the union of their direct predecessors' sources. The compiler may
+defer a complete root unit to satisfy the round file cap; it does not split that
+business requirement or silently erase it.
 
 A plan that fails structure or deterministic validation is marked `未采用`.
 The server permits at most one repair attempt, only when the same Loop budget

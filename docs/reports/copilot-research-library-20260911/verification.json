@@ -1,0 +1,259 @@
+{
+  "status": "passed",
+  "checked_at": "2026-09-11T11:34:19.139Z",
+  "scope": "Local source, data schema and Node VM presentation checks only",
+  "browser": "not_run_by_this_script",
+  "runtime": "not_run",
+  "provider_calls": 0,
+  "external_actions": 0,
+  "source_urls_rechecked": false,
+  "checks": [
+    {
+      "name": "18 unique source records and original URLs",
+      "status": "passed"
+    },
+    {
+      "name": "At least six papers and four official non-paper records",
+      "status": "passed"
+    },
+    {
+      "name": "S01: required provenance, constraints and three Demo implications",
+      "status": "passed"
+    },
+    {
+      "name": "S02: required provenance, constraints and three Demo implications",
+      "status": "passed"
+    },
+    {
+      "name": "S03: required provenance, constraints and three Demo implications",
+      "status": "passed"
+    },
+    {
+      "name": "S04: required provenance, constraints and three Demo implications",
+      "status": "passed"
+    },
+    {
+      "name": "S05: required provenance, constraints and three Demo implications",
+      "status": "passed"
+    },
+    {
+      "name": "S06: required provenance, constraints and three Demo implications",
+      "status": "passed"
+    },
+    {
+      "name": "S07: required provenance, constraints and three Demo implications",
+      "status": "passed"
+    },
+    {
+      "name": "S08: required provenance, constraints and three Demo implications",
+      "status": "passed"
+    },
+    {
+      "name": "S09: required provenance, constraints and three Demo implications",
+      "status": "passed"
+    },
+    {
+      "name": "S10: required provenance, constraints and three Demo implications",
+      "status": "passed"
+    },
+    {
+      "name": "S11: required provenance, constraints and three Demo implications",
+      "status": "passed"
+    },
+    {
+      "name": "S12: required provenance, constraints and three Demo implications",
+      "status": "passed"
+    },
+    {
+      "name": "S13: required provenance, constraints and three Demo implications",
+      "status": "passed"
+    },
+    {
+      "name": "S14: required provenance, constraints and three Demo implications",
+      "status": "passed"
+    },
+    {
+      "name": "S15: required provenance, constraints and three Demo implications",
+      "status": "passed"
+    },
+    {
+      "name": "S16: required provenance, constraints and three Demo implications",
+      "status": "passed"
+    },
+    {
+      "name": "S17: required provenance, constraints and three Demo implications",
+      "status": "passed"
+    },
+    {
+      "name": "S18: required provenance, constraints and three Demo implications",
+      "status": "passed"
+    },
+    {
+      "name": "Six requested themes have coverage",
+      "status": "passed"
+    },
+    {
+      "name": "2024, 2025 and 2026 sources plus classic works",
+      "status": "passed"
+    },
+    {
+      "name": "Rolling docs have no fabricated publication date",
+      "status": "passed"
+    },
+    {
+      "name": "Ethics full-text limitation and excluded source stay explicit",
+      "status": "passed"
+    },
+    {
+      "name": "New experimental sources explicitly remain preprints",
+      "status": "passed"
+    },
+    {
+      "name": "Seven design rules have valid references and non-verified statuses",
+      "status": "passed"
+    },
+    {
+      "name": "app.js: JavaScript syntax",
+      "status": "passed"
+    },
+    {
+      "name": "icons.js: JavaScript syntax",
+      "status": "passed"
+    },
+    {
+      "name": "sources-data.js: JavaScript syntax",
+      "status": "passed"
+    },
+    {
+      "name": "build.cjs: JavaScript syntax",
+      "status": "passed"
+    },
+    {
+      "name": "verify.cjs: JavaScript syntax",
+      "status": "passed"
+    },
+    {
+      "name": "Generated data is identical to sources.json",
+      "status": "passed"
+    },
+    {
+      "name": "Stylesheet parses using repository PostCSS",
+      "status": "passed"
+    },
+    {
+      "name": "HTML loads only local CSS and script assets",
+      "status": "passed"
+    },
+    {
+      "name": "CSP denies connections, frames, forms and remote font loading",
+      "status": "passed"
+    },
+    {
+      "name": "UI source has no network or Runtime connection APIs",
+      "status": "passed"
+    },
+    {
+      "name": "Text files have no trailing whitespace or merge markers",
+      "status": "passed"
+    },
+    {
+      "name": "Local icon set and license exist",
+      "status": "passed"
+    },
+    {
+      "name": "Initial render contains all 18 source rows",
+      "status": "passed"
+    },
+    {
+      "name": "Default reading sequence starts at classic foundations",
+      "status": "passed"
+    },
+    {
+      "name": "Search accepts Chinese and case-insensitive multi-term English",
+      "status": "passed"
+    },
+    {
+      "name": "Impossible search gives zero results",
+      "status": "passed"
+    },
+    {
+      "name": "Topic filter: 主动与接管",
+      "status": "passed"
+    },
+    {
+      "name": "Topic filter: 拒绝与延后",
+      "status": "passed"
+    },
+    {
+      "name": "Topic filter: 审批与权限",
+      "status": "passed"
+    },
+    {
+      "name": "Topic filter: 恢复与连续性",
+      "status": "passed"
+    },
+    {
+      "name": "Topic filter: 信任与核验",
+      "status": "passed"
+    },
+    {
+      "name": "Topic filter: 协作与评估",
+      "status": "passed"
+    },
+    {
+      "name": "Topic and type filters use intersection, not union",
+      "status": "passed"
+    },
+    {
+      "name": "Year sorting leaves undated docs at the end",
+      "status": "passed"
+    },
+    {
+      "name": "Details expose methods, limits, three Demos and verification date",
+      "status": "passed"
+    },
+    {
+      "name": "HTML escaping protects titles and fields",
+      "status": "passed"
+    },
+    {
+      "name": "Unsafe protocols never become source hyperlinks",
+      "status": "passed"
+    },
+    {
+      "name": "External source links carry noopener and noreferrer",
+      "status": "passed"
+    },
+    {
+      "name": "Demo mapping filters only applicable rules",
+      "status": "passed"
+    },
+    {
+      "name": "Filter event renders empty result and reset restores all",
+      "status": "passed"
+    },
+    {
+      "name": "Search blur preserves rendered buttons while select changes rerender",
+      "status": "passed"
+    },
+    {
+      "name": "Tab events project aria and hidden states",
+      "status": "passed"
+    },
+    {
+      "name": "Detail click/close event handlers restore trigger focus in harness",
+      "status": "passed"
+    },
+    {
+      "name": "Responsive constraints exist without viewport-scaled font or gradients",
+      "status": "passed"
+    },
+    {
+      "name": "Narrative preserves Draft, coverage failure and evaluation boundary",
+      "status": "passed"
+    }
+  ],
+  "passed": 61,
+  "failed": 0,
+  "note": "Passing asserts only the checks listed. Web opening was performed separately by the research agent; browser pixels, native dialog behavior, source correctness and Runtime are not validated here."
+}

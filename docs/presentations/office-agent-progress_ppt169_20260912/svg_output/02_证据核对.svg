@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720">
+  <rect width="1280" height="720" fill="#FFFFFF"/>
+  <g id="title" font-family="Microsoft YaHei, Arial, sans-serif">
+    <text x="48" y="80" font-size="44" font-weight="700" fill="#182230" data-width="1184">Agent Control Loop：证据核对</text>
+    <text x="48" y="123" font-size="24" fill="#596579" data-width="1184">为什么需要我、我该选什么、确认后影响哪里</text>
+  </g>
+  <g id="body" font-family="Microsoft YaHei, Arial, sans-serif">
+    <text x="48" y="216" font-size="28" font-weight="700" fill="#1557D2" data-width="248">只做必要的选择</text>
+    <text x="48" y="260" font-size="24" fill="#182230" data-width="248">对照两处原文</text>
+    <text x="48" y="296" font-size="24" fill="#182230" data-width="248">不替用户默认选择</text>
+    <text x="48" y="398" font-size="28" font-weight="700" fill="#008A63" data-width="248">恢复范围明确</text>
+    <text x="48" y="442" font-size="24" fill="#182230" data-width="248">只处理相关分支</text>
+    <text x="48" y="478" font-size="24" fill="#182230" data-width="248">其他成果与历史保留</text>
+    <text x="48" y="568" font-size="24" fill="#B86A00" data-width="248">选依据不授予</text>
+    <text x="48" y="604" font-size="24" fill="#B86A00" data-width="248">业务或外发权限</text>
+  </g>
+  <g id="figure">
+    <image href="../images/evidence.png" x="320" y="151" width="912" height="512.73" preserveAspectRatio="xMidYMid meet"/>
+  </g>
+  <g id="footer" font-family="Microsoft YaHei, Arial, sans-serif">
+    <text x="48" y="696" font-size="16" fill="#596579" data-width="1080">原系统受控测试截图，2026-09-11。终态任务记录选择后，仍需显式创建同任务的新 Run 续办。</text>
+    <text x="1198" y="696" font-size="16" fill="#596579" data-width="34">02</text>
+  </g>
+</svg>

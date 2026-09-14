@@ -13,6 +13,7 @@ from services.api.app.application.harness_runtime import (
     HarnessPlan,
     HarnessPlanCandidate,
     HarnessPlanCandidateUnit,
+    HarnessRequirementCoverage,
     HarnessPlanUnit,
     HarnessRunStart,
     HarnessRuntime,
@@ -601,6 +602,157 @@ async def test_five_unit_dag_runtime_advances_from_roots_to_second_worker_wave()
     assert all(item.artifact_version in {1, 2} for item in second.contributions)
     assert [event.event_name for event in second.events].count("worker_wave_reserved") == 2
     assert [event.event_name for event in second.events].count("worker_wave_committed") == 2
+
+
+@pytest.mark.asyncio
+async def test_adaptive_merge_keeps_budget_deferred_branch_actionable() -> None:
+    from tests.unit.test_harness_runtime import (
+        FakeAnalyst,
+        FakeCatalogWithDistractor,
+        REF_ONE,
+        REF_THREE,
+        REF_TWO,
+    )
+
+    class CrossFunctionThreeFileCatalog(FakeCatalogWithDistractor):
+        def public_file(self, file_ref: str):
+            try:
+                payload = super().public_file(file_ref)
+            except KeyError:
+                payload = {
+                    "file_ref": file_ref,
+                    "display_group": "法务",
+                    "display_path": "法务/无关法务说明.txt",
+                    "mime": "text/plain",
+                    "kind": "text",
+                    "columns": [],
+                }
+            payload["display_group"] = {
+                REF_ONE: "产品",
+                REF_TWO: "财务",
+                REF_THREE: "法务",
+            }[file_ref]
+            return payload
+
+    class ThreeRequirementPlanner:
+        model = "test-planner"
+
+        async def plan(self, *, scenario, files):
+            refs = [REF_ONE, REF_TWO, REF_THREE]
+            units = [
+                HarnessPlanCandidateUnit(
+                    unit_id=f"u{index}",
+                    title=f"业务要求 {index}",
+                    objective=f"核对业务要求 {index}",
+                    input_file_refs=[file_ref],
+                    tool="file.read",
+                )
+                for index, file_ref in enumerate(refs, start=1)
+            ]
+            coverage = [
+                HarnessRequirementCoverage(
+                    requirement_index=index,
+                    title=f"业务要求 {index}",
+                    objective=f"核对业务要求 {index}",
+                    status="planned",
+                    unit_id=f"u{index}",
+                    reason="冻结资料库中已有对应来源。",
+                )
+                for index in range(1, 4)
+            ]
+            return HarnessPlanCandidate(
+                summary="逐项核对三个业务要求。",
+                selection_reason="三个要求均有已批准来源。",
+                units=units,
+                requirement_coverage=coverage,
+            )
+
+    runtime = HarnessRuntime(
+        CrossFunctionThreeFileCatalog(), ThreeRequirementPlanner(), FakeAnalyst()
+    )
+    started = await runtime.start(
+        "alice",
+        HarnessRunStart(
+            idempotency_key="adaptive-deferred-start-0001",
+            instruction="分别核对以下业务分支：1. 产品；2. 财务；3. 法务。",
+            loop={
+                "max_rounds": 2,
+                "max_files_per_round": 2,
+                "max_model_calls": 8,
+                "deadline_seconds": 120,
+            },
+        ),
+    )
+    waiting = None
+    deadline = time.monotonic() + 3
+    while time.monotonic() < deadline:
+        candidate = await runtime.get("alice", started.run.run_id)
+        if candidate.status == "waiting_input" and candidate.topology_admission is not None:
+            waiting = candidate
+            break
+        await asyncio.sleep(0.01)
+
+    assert waiting is not None
+    assert waiting.topology_admission.mode == "adaptive_readonly_workers"
+    planned = [branch for branch in waiting.branches if branch.status == "running"]
+    deferred = [branch for branch in waiting.branches if branch.status == "waiting_input"]
+    assert len(planned) == 2
+    assert len(deferred) == 1
+    assert deferred[0].unit_id.startswith("deferred-requirement-")
+
+    branch_by_id = {branch.branch_id: branch for branch in waiting.branches}
+
+    async def handler(request: ReadonlyWorkerRequest) -> ReadonlyWorkerContribution:
+        branch = branch_by_id[request.branch_id]
+        return ReadonlyWorkerContribution(
+            worker_run_id=request.worker_run_id,
+            branch_id=request.branch_id,
+            outcome="adopted",
+            summary="已通过服务端来源核对",
+            source_file_refs=request.source_file_refs,
+            evidence_anchors=("line:1",),
+            model_called=True,
+            output_used=True,
+            findings=(
+                AgentControlLoopArtifactFinding(
+                    finding_id=f"finding-{request.branch_id[-12:]}",
+                    plan_unit_id=branch.unit_id,
+                    affected_branch_ids=[branch.branch_id],
+                    title=f"{branch.title} 已核对",
+                    detail="该分支贡献已通过来源定位门。",
+                    file_refs=list(request.source_file_refs),
+                ),
+            ),
+        )
+
+    requests = [
+        ReadonlyWorkerRequest(
+            worker_run_id=f"worker-deferred-{index}",
+            branch_id=branch.branch_id,
+            goal=branch.objective,
+            source_file_refs=tuple(branch.input_file_refs),
+            expected_version=waiting.version,
+        )
+        for index, branch in enumerate(planned, start=1)
+    ]
+    merged = await runtime.execute_admitted_readonly_workers(
+        "alice",
+        started.run.run_id,
+        expected_version=waiting.version,
+        idempotency_key="adaptive-deferred-wave-0001",
+        worker_requests=requests,
+        handler=handler,
+        user_confirmed=True,
+    )
+
+    next_step = merged.rounds[-1].next_step
+    assert merged.status == "waiting_input"
+    assert next_step is not None
+    assert next_step.ready_branch_ids == []
+    assert next_step.candidate_branch_ids == [deferred[0].branch_id]
+    assert next_step.candidate_file_refs == deferred[0].missing_file_refs
+    assert "已识别来源的后续分支" in next_step.reason
+    await runtime.close()
 
 
 @pytest.mark.asyncio

@@ -1,5 +1,45 @@
 # Office Agent V0.2
 
+## 正式入口与本轮方向
+
+继续在原系统上优化，不另建产品。办公资料库入口仍为 `/`，Agent Control Loop 与 Adaptive Swarm 入口仍为 `/agent-capabilities`；两处共用 `HarnessWorkbench` 和既有 Task/Run/Snapshot。默认本地地址分别为 `http://localhost:3000/` 与 `http://localhost:3000/agent-capabilities`，须先启动服务。
+
+**Demo3 的人机共驾交互要整合进上述系统，保留 Loop 与蜂群协作底座。** `docs/reports/` 中的 HTML 是辅助研究/评审材料，部分包含离线模拟，不是替代系统，也不能作为 Demo3 已整合的证据。前期原系统 UI 修改仍保留；近期独立共驾原型尚未接入原系统。
+
+[最新会议简稿：三个 Demo、八个边界案例与蜂群差异](docs/reports/DEMO123-BOUNDARIES-AND-SWARM-BRIEF-20260912.md) 取代只报论文数量的口径。原能力页已增加既有边界解释和协作调用/采用事实，ready 工作包不再写成已执行，原 Loop/Swarm 底座保留。见 [DR-0063](docs/decisions/DR-0063-integrated-copilot-boundaries-and-swarm-facts.md) 与 [本轮 Evidence](docs/evidence/DR-0063-INTEGRATED-BOUNDARIES-AND-SWARM-FACTS-20260912.md)。这不是通用权限引擎或 Demo3 全场景闭环完成；长文覆盖、业务批准和外部执行仍未实现。不新增 HTML 演示或 PPT。
+
+## 2026-09-11 UI 重设计
+
+`/agent-capabilities` 依用户参考图重构为任务进展、按轮执行记录、协作方式和专注证据核对。
+仍共用同一 Task / Run / Snapshot 与既有 API；无默认候选、历史只读、来源过期、终态续办和
+失败回执边界见 [DR-0061](docs/decisions/DR-0061-reference-aligned-capabilities-and-evidence-choice.md)。
+[HTML 评审报告](docs/reports/demo12-redesign-20260911/index.html) 提供参考对照与实际截图；
+[人机共驾交互沙盘](docs/reports/human-agent-copilot-20260911/index.html) 与
+[会议简报](docs/reports/human-agent-copilot-20260911/report.html) 是独立 `Draft` 设计包，不是
+已实现的 Demo 3 Runtime。[本轮 Evidence](docs/evidence/DR-0061-REFERENCE-ALIGNED-CAPABILITIES-EVIDENCE-20260911.md)
+单列真实测试与未验证范围。
+
+[主动实测与验收报告](docs/reports/demo12-acceptance-20260911/index.html) 和
+[5 条可操作用例](docs/testing/DEMO12-ACCEPTANCE-CASES-20260911.md) 记录了随后发现的两个 UI 问题与修复。
+全量浏览器回归 91 项通过，但真实日志任务的内容完整性未通过：模型单文件输入被截断，摘要未清楚限定范围。
+此开放问题不能被测试数量、可定位引用或已采用状态掩盖。
+
+[第二轮视觉与交互打磨](docs/reports/demo12-polish-20260911/index.html) 增加长目标全文展开、
+完整任务书写区、自适应分支宽度与始终可见的证据确认区，附可操作验收用例。
+[人机共驾研究资料库](docs/reports/copilot-research-library-20260911/index.html) 收集经核验的论文、
+官方文档与博客，并区分研究发现、工程合同和产品设计假设；它不是已实现的通用接管策略。
+
+[动态边界设计实验](docs/reports/copilot-boundary-design-20260911/index.html) 进一步脱离预设等级，
+以具体授权范围、内容澄清、版本失效、未知回执和主动接管组成 8 类离线情境，并保留最新研究反证。
+此方案仍为 [DR-0062 Draft](docs/decisions/DR-0062-dynamic-boundary-design-experiment.md)，不修改当前 Runtime 或真实动作权限。
+
+[2026-09-12 用户理解与测试迭代](docs/reports/copilot-boundary-design-20260911/usability-review-20260912.md)
+继续完善同一原型：明确“确认不等于发送”、查询失败保留未知、当前/历史草稿与具体数据条件，
+并增加五个非诱导理解任务。源码和自动化结果与尚未开展的目标用户测试、尚未完成的最终浏览器门分开记录。
+
+[2026-09-12 共驾调研推荐](docs/reports/copilot-boundary-design-20260911/research/followup-20260912/recommendations.md)
+增补 6 篇论文与 3 篇官方实践，重点为共同计划、参与的反效果、检查时机与局部纠错；同一 HTML 的“研究与方案”页提供筛选及证据限制。属于定向设计依据，不表示新能力或用户效果已验证。
+
 Office Agent is one FORTE-backed office folder, not a gallery of registered
 Demo scenarios. A user can browse the entire public office repository like a
 file manager, inspect bounded safe previews and submit only a goal. The Agent
@@ -40,6 +80,13 @@ service-selected route and a compact admission/work-package/contribution/artifac
 projection, while sources and execution receipts remain collapsed. It is not a
 Demo selector, another Runtime or the future Demo 2 smart work cockpit.
 
+Both the Workspace and Agent capabilities route expose **New task**. The action
+first opens a clean client draft, closes the selected Run stream and leaves the
+previous server Task/Run untouched. It does not create an empty Task or spend
+model budget. A new independent Task exists only after the user submits an
+instruction through the existing Run-start contract; recent task conversations
+remain available for return.
+
 The default complete-task budget is 12 rounds, 16 files per round, 30 model
 calls and 7,200 Agent-active seconds. Public maxima are 24/24/60/14,400. Human
 review in `waiting_input` and an explicit pause do not consume active time. The
@@ -50,8 +97,10 @@ The primary flow is:
 ```text
 browse or search the whole repository
   -> inspect safe file preview
+  -> explicitly open a new-task draft without stopping or deleting prior work
   -> author an original task
   -> freeze a whole-workspace AgentControlLoopContract and budget
+  -> explicitly numbered business requirements are accounted for as current, deferred or uncovered
   -> deepseek-v4-pro Planner selects a minimal evidence set and explains why
   -> server compiles and validates scope, tools, dependencies and effects
   -> an admitted deterministic office tool may write a real isolated Artifact
@@ -76,7 +125,12 @@ browse or search the whole repository
 Model receipts distinguish `未调用`, `已采用` and `未采用`. A returned model
 response that fails server validation is not presented as success. A rejected
 plan may be repaired once within the same model-call budget, and both the
-rejection and retry remain visible in the ordered trace. Ordinary UI
+rejection and retry remain visible in the ordered trace. Analyst calls use an
+independent 180-second timeout and a strict compact JSON draft; truncation,
+invalid JSON/schema, Provider failure, Branch binding and source-location
+failure remain distinct facts. One bounded repair may preserve an adoptable
+subset, otherwise only the affected Branch pauses with an explicit recovery
+kind. Ordinary UI
 hides Prompt, chain-of-thought, raw provider response, absolute path, digest,
 benchmark task/rubric/solution and internal effect/gate identifiers.
 
@@ -187,6 +241,26 @@ uses visible parent-to-dependent arrows, projects the current Round's
 `ready_branch_ids` as the next wave awaiting confirmation, and keeps that action in
 the current-impact panel. It is verified only with controlled fixtures; it is not a
 distributed scheduler, a live user study or the future Demo 2 cockpit.
+
+[`DR-0059`](docs/decisions/DR-0059-explicit-requirement-accounting-and-bounded-analysis-recovery.md)
+closes the visible “six requirements become five” ambiguity for a bounded
+numbered-input syntax. Each explicit item is recorded as a current Plan unit,
+an approved-source item deferred by this round's bounds, or an uncovered item
+in the frozen public index. Deferred items keep a real waiting Branch and can be
+continued one at a time; they are not mislabeled as missing data or silently
+sent to an empty Worker wave. Internal Catalog title hints help Planner retrieval
+without entering the public Workspace/Snapshot. Two real `deepseek-v4-pro` runs,
+fixed fixtures and exact limitations are recorded in the DR-0059 Evidence; they
+do not prove business correctness, general requirement parsing or user benefit.
+
+[`DR-0060`](docs/decisions/DR-0060-new-task-conversation-entry.md) adds the
+missing frontstage entry for an independent task conversation. “New task” is a
+browser draft state rather than a server Task: it closes the selected stream,
+clears the current projection, preserves prior history and creates nothing until
+submit. Refresh preserves draft mode; opening history or accepting a new Snapshot
+clears it. Repeating identical instruction text after another explicit new-task
+action uses a fresh idempotency key. This adds no API path, cloud draft or task
+deletion behavior.
 
 ## Public data and preview boundary
 
@@ -597,6 +671,8 @@ an OpenAI-compatible `/chat/completions` endpoint.
 LLM_BASE_URL=https://your-openai-compatible-endpoint.example/v1
 LLM_API_KEY=replace-me
 LLM_MODEL=deepseek-v4-pro
+LLM_ANALYSIS_TIMEOUT_SECONDS=180
+STATE_STORE_MODE=auto
 ```
 
 Never commit `.env`, API keys, production credentials or real customer data.
@@ -608,7 +684,10 @@ Never commit `.env`, API keys, production credentials or real customer data.
 
 本地启动器只把当前 PowerShell 进程中显式设置的 `DATABASE_DSN` 视为外部
 PostgreSQL 授权；没有 Docker 且没有该显式变量时，会覆盖 `.env` 中可能残留的
-数据库地址并明确回退到单进程 memory。模型端点、Key 与模型名仍可从 `.env`
+数据库地址：启动器设置非空 `STATE_STORE_MODE=memory`，Runtime 据此明确回退到
+单进程 memory，而不是依赖 Windows 后台进程能否继承空环境变量。默认
+`STATE_STORE_MODE=auto`；显式 `postgres` 但没有 DSN 会拒绝启动。模型端点、Key
+与模型名仍可从 `.env`
 读取。启动后以 `/v1/health` 的 `checkpoint`、`task_store` 为最终事实，不能只看
 启动提示推断是否具备重启恢复。
 
@@ -651,6 +730,13 @@ pnpm --dir apps/web exec playwright test e2e/harness-workbench.spec.ts
 - [SCENARIO-045：从任务进展逐层查看执行、协作与原文依据](docs/scenarios/SCENARIO-045-progressive-agent-capability-review.md)
 - [Agent 能力页四层渐进披露验收门](docs/testing/AGENT-CAPABILITY-PROGRESSIVE-DISCLOSURE-GATES-20260901.md)
 - [Agent 能力页四层渐进披露工程 Evidence](docs/evidence/DR-0058-AGENT-CAPABILITY-PROGRESSIVE-DISCLOSURE-EVIDENCE-20260901.md)
+- [DR-0059：显式要求逐项记账与受限分析恢复](docs/decisions/DR-0059-explicit-requirement-accounting-and-bounded-analysis-recovery.md)
+- [SCENARIO-046：六项复杂任务逐项记账并从分析失败继续](docs/scenarios/SCENARIO-046-account-for-explicit-requirements-and-recover-analysis.md)
+- [显式要求与分析恢复工程 Evidence](docs/evidence/DR-0059-EXPLICIT-REQUIREMENT-AND-ANALYSIS-RECOVERY-EVIDENCE-20260902.md)
+- [DR-0060：显式新建任务入口与独立草稿](docs/decisions/DR-0060-new-task-conversation-entry.md)
+- [SCENARIO-047：从当前工作进入一个独立新任务](docs/scenarios/SCENARIO-047-start-an-independent-task-conversation.md)
+- [新建任务会话验收门](docs/testing/NEW-TASK-CONVERSATION-GATES-20260903.md)
+- [新建任务会话工程 Evidence](docs/evidence/DR-0060-NEW-TASK-CONVERSATION-EVIDENCE-20260903.md)
 - [来源台账](docs/decisions/SOURCE_REGISTER.md)
 - [DR-0054：独立 Task Ledger 与当前 Run 版本控制](docs/decisions/DR-0054-durable-task-ledger-and-current-run-cas.md)
 - [SCENARIO-040：两个页面同时续办时只有一个当前 Run](docs/scenarios/SCENARIO-040-task-current-run-cas-and-restart.md)

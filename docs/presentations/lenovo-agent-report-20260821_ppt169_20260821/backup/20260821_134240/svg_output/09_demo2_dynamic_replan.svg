@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 1280 720" width="1280" height="720">
+  <g id="background"><rect width="1280" height="720" fill="#F7F9FC"/><text x="48" y="70" font-family="'Microsoft YaHei UI','Segoe UI',Arial,sans-serif" font-size="44" font-weight="700" fill="#172230">创新不在头像墙，而在发现冲突后改变工作组织</text><text x="48" y="108" font-family="'Microsoft YaHei UI','Segoe UI',Arial,sans-serif" font-size="18" fill="#526579">服务端事件把动态重排解释成用户能理解的业务原因</text></g>
+  <g id="evidence-canvas">
+    <rect x="48" y="142" width="704" height="489" fill="#FFFFFF" stroke="#CAD6E3"/>
+    <image x="60" y="154" width="680" height="465" xlink:href="../images/dr-0015-demo2-controlled-execution-1440-dynamic-replan.png" preserveAspectRatio="xMidYMid meet"/>
+    <circle cx="574" cy="322" r="24" fill="#D71920"/><text x="574" y="330" text-anchor="middle" font-family="Consolas,'Courier New',monospace" font-size="17" font-weight="700" fill="#FFFFFF">9</text>
+    <circle cx="654" cy="386" r="24" fill="#D71920"/><text x="654" y="394" text-anchor="middle" font-family="Consolas,'Courier New',monospace" font-size="17" font-weight="700" fill="#FFFFFF">10</text>
+  </g>
+  <g id="timeline">
+    <text x="790" y="160" font-family="'Microsoft YaHei UI','Segoe UI',Arial,sans-serif" font-size="18" font-weight="700" fill="#0B3A70">有序运行事实</text>
+    <line x1="824" y1="198" x2="824" y2="596" stroke="#CAD6E3" stroke-width="4"/>
+    <circle cx="824" cy="216" r="13" fill="#0B3A70"/><circle cx="824" cy="316" r="18" fill="#D71920"/><circle cx="824" cy="420" r="18" fill="#D71920"/><circle cx="824" cy="520" r="13" fill="#0B3A70"/><circle cx="824" cy="596" r="18" fill="#16845B"/>
+    <text x="860" y="212" font-family="Consolas,'Courier New',monospace" font-size="16" font-weight="700" fill="#0B3A70">SEQ 1—8</text><text x="860" y="238" font-family="'Microsoft YaHei UI','Segoe UI',Arial,sans-serif" font-size="20" font-weight="700" fill="#172230">初始 Worker 并行处理</text><text x="860" y="264" font-family="'Microsoft YaHei UI','Segoe UI',Arial,sans-serif" font-size="16" fill="#526579">收入事实、项目风险、客户要求</text>
+    <text x="860" y="312" font-family="Consolas,'Courier New',monospace" font-size="16" font-weight="700" fill="#D71920">SEQ 9</text><text x="860" y="338" font-family="'Microsoft YaHei UI','Segoe UI',Arial,sans-serif" font-size="22" font-weight="700" fill="#D71920">动态重排</text><text x="860" y="366" font-family="'Microsoft YaHei UI','Segoe UI',Arial,sans-serif" font-size="16" fill="#526579">两份文件的收入字段口径不一致</text>
+    <text x="860" y="416" font-family="Consolas,'Courier New',monospace" font-size="16" font-weight="700" fill="#D71920">SEQ 10</text><text x="860" y="442" font-family="'Microsoft YaHei UI','Segoe UI',Arial,sans-serif" font-size="22" font-weight="700" fill="#D71920">新增核对工作单元</text><text x="860" y="470" font-family="'Microsoft YaHei UI','Segoe UI',Arial,sans-serif" font-size="16" fill="#526579">验证“已实现收入”与“预测收入”</text>
+    <text x="860" y="516" font-family="Consolas,'Courier New',monospace" font-size="16" font-weight="700" fill="#0B3A70">SEQ 11—14</text><text x="860" y="542" font-family="'Microsoft YaHei UI','Segoe UI',Arial,sans-serif" font-size="20" font-weight="700" fill="#172230">共享工件收敛</text>
+    <text x="860" y="592" font-family="Consolas,'Courier New',monospace" font-size="16" font-weight="700" fill="#16845B">SEQ 15</text><text x="948" y="592" font-family="'Microsoft YaHei UI','Segoe UI',Arial,sans-serif" font-size="22" font-weight="700" fill="#16845B">执行完成</text><text x="860" y="620" font-family="'Microsoft YaHei UI','Segoe UI',Arial,sans-serif" font-size="16" fill="#526579">4 Worker · 5 Artifact · 无外部动作</text>
+  </g>
+  <g id="fact-strip"><rect x="48" y="646" width="1184" height="40" fill="#172230"/><text x="72" y="672" font-family="'Microsoft YaHei UI','Segoe UI',Arial,sans-serif" font-size="18" font-weight="700" fill="#FFFFFF">4 个模型输出被采用；运行耗时仅是本次观察，不是生产 SLA。</text></g>
+  <g id="footer"><text x="48" y="710" font-family="'Microsoft YaHei UI','Segoe UI',Arial,sans-serif" font-size="14" fill="#8291A3">仓库截图与 Snapshot manifest 可复核；Worker 内部对话与原始重排 code 不进入业务界面</text><text x="1232" y="710" text-anchor="end" font-family="Consolas,'Courier New',monospace" font-size="16" fill="#0B3A70">P09</text></g>
+</svg>

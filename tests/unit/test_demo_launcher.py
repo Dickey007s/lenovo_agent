@@ -9,10 +9,9 @@ def test_memory_fallback_overrides_a_stale_dotenv_database_dsn() -> None:
     script = START_DEMO.read_text(encoding="utf-8")
 
     configured_index = script.index("if ($UseConfiguredPostgres)")
-    clear_index = script.index('$env:DATABASE_DSN = ""', configured_index)
-    warning_index = script.index(
-        "this session will use process-local memory", clear_index
-    )
+    memory_index = script.index('$env:STATE_STORE_MODE = "memory"', configured_index)
+    warning_index = script.index("this session will use process-local memory", memory_index)
 
-    assert configured_index < clear_index < warning_index
-    assert script.count('$env:DATABASE_DSN = ""') == 1
+    assert configured_index < memory_index < warning_index
+    assert script.count('$env:STATE_STORE_MODE = "memory"') == 1
+    assert '$env:DATABASE_DSN = ""' not in script

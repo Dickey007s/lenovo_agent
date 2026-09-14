@@ -1,0 +1,87 @@
+{
+  "tier": 2,
+  "page_count": { "value": "6" },
+  "color": {
+    "selected": 0,
+    "candidates": [
+      { "name": "白底科技蓝", "palette": { "background": "#FFFFFF", "secondary_bg": "#F4F6F8", "primary": "#1557D2", "accent": "#008A63", "secondary_accent": "#B86A00", "body_text": "#182230" } },
+      { "name": "白底墨绿", "palette": { "background": "#FFFFFF", "secondary_bg": "#F3F6F5", "primary": "#086A54", "accent": "#1557D2", "secondary_accent": "#A86100", "body_text": "#20282A" } },
+      { "name": "白底炭黑", "palette": { "background": "#FFFFFF", "secondary_bg": "#F2F3F4", "primary": "#202124", "accent": "#1557D2", "secondary_accent": "#008A63", "body_text": "#202124" } }
+    ]
+  },
+  "typography": {
+    "selected": 0,
+    "candidates": [
+      {
+        "name": "微软雅黑与 Arial",
+        "heading": { "cjk": "Microsoft YaHei", "latin": "Arial", "css": "Microsoft YaHei, Arial, sans-serif" },
+        "body": { "cjk": "Microsoft YaHei", "latin": "Arial", "css": "Microsoft YaHei, Arial, sans-serif" },
+        "body_size": 24, "sizes": { "title": 44, "subtitle": 28, "annotation": 16 },
+        "sample_heading": "人机共驾的决策边界", "sample_heading_latin": "Office Agent",
+        "sample_body": "系统保留已完成成果，只恢复受影响部分。", "sample_body_latin": "Agent Control Loop and Adaptive Swarm"
+      },
+      {
+        "name": "等线与 Calibri",
+        "heading": { "cjk": "DengXian", "latin": "Calibri", "css": "DengXian, Calibri, sans-serif" },
+        "body": { "cjk": "DengXian", "latin": "Calibri", "css": "DengXian, Calibri, sans-serif" },
+        "body_size": 24, "sizes": { "title": 44, "subtitle": 28, "annotation": 16 },
+        "sample_heading": "人机共驾的决策边界", "sample_heading_latin": "Office Agent",
+        "sample_body": "系统保留已完成成果，只恢复受影响部分。", "sample_body_latin": "Agent Control Loop and Adaptive Swarm"
+      },
+      {
+        "name": "黑体标题与微软雅黑正文",
+        "heading": { "cjk": "SimHei", "latin": "Arial", "css": "SimHei, Arial, sans-serif" },
+        "body": { "cjk": "Microsoft YaHei", "latin": "Arial", "css": "Microsoft YaHei, Arial, sans-serif" },
+        "body_size": 24, "sizes": { "title": 44, "subtitle": 28, "annotation": 16 },
+        "sample_heading": "人机共驾的决策边界", "sample_heading_latin": "Office Agent",
+        "sample_body": "系统保留已完成成果，只恢复受影响部分。", "sample_body_latin": "Agent Control Loop and Adaptive Swarm"
+      }
+    ]
+  },
+  "image_strategy": {
+    "selected": 0,
+    "candidates": [
+      { "name": "极简研究示意", "rendering": "minimalist-swiss", "palette": "cool-corporate", "visual": "规整、留白、简洁的办公协作示意", "color": "白底为主，跟随选定强调色", "mood": "正式产品评审配图" },
+      { "name": "编辑式研究插图", "rendering": "editorial", "palette": "editorial-classic", "visual": "办公场景与文档关系解释人机分工", "color": "浅底配有限强调色", "mood": "研究专题解释性插图" },
+      { "name": "黑线研究手记", "rendering": "ink-notes", "palette": "mono-ink", "visual": "白底墨线与少量语义色", "color": "黑白为主，强调色点题", "mood": "精炼研究方法手记" }
+    ]
+  },
+  "image_notes": { "value": "三页产品展示使用原系统截图并注明受控测试数据。研究部分用内置 imagegen 生成研究示意，不能生成假系统截图、虚构结果或固定驾驶等级。" },
+  "refine_spec": { "value": false },
+  "lang": "zh",
+  "project_name": "Office Agent 系统优化与人机共驾调研",
+  "recommend": {
+    "icons": "none",
+    "formula_policy": "text-only",
+    "image_usage": ["provided", "ai"],
+    "image_ai_path": "host-native",
+    "generation_mode": "continuous",
+    "canvas": "ppt169",
+    "mode": "briefing",
+    "visual_style": "swiss-minimal",
+    "delivery_purpose": "balanced"
+  },
+  "audience": {
+    "value": "项目合作方和评审老师。6 页会议汇报，前 3 页展示原系统重构后的真实页面，后 3 页说明人机共驾的 Agent 论文机制、办公边界案例和整合方向。保留 Agent Control Loop 与 Adaptive Swarm，明确已有能力和待实现设计。"
+  },
+  "content_divergence": {
+    "value": "依据项目现有记录压缩表达，不新增未经验证的效果和创新性结论。真实页面截图使用项目受控测试截图，imagegen 只生成研究示意图，不生成或修改系统截图。"
+  },
+  "visual_style_spectrum": [
+    {
+      "id": "swiss-minimal",
+      "tag_zh": "简洁会议汇报（推荐）",
+      "note_zh": "像正式产品评审，截图大、文字少，与原系统浅色界面协调。"
+    },
+    {
+      "id": "editorial",
+      "tag_zh": "研究专题",
+      "note_zh": "像研究机构专题报告，增强论文与案例之间的阅读层次。"
+    },
+    {
+      "id": "dark-tech",
+      "tag_zh": "技术发布",
+      "note_zh": "像技术发布会，深色对比更强，但与浅色系统截图的风格距离更大。"
+    }
+  ]
+}

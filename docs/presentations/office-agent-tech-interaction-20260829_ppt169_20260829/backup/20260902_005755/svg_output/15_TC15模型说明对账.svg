@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720" width="1280" height="720">
+  <g id="background"><rect width="1280" height="720" fill="#F7F8FA"/><path d="M52 112H1228" stroke="#CBD5DF" stroke-width="2"/></g>
+  <g id="header">
+    <text x="52" y="78" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="46" font-weight="700" fill="#132A3A">TC-15：模型说明不能覆盖确定性成果</text>
+    <rect x="1076" y="46" width="152" height="34" rx="6" fill="#EDF1F4"/><text x="1152" y="69" text-anchor="middle" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#1769E0">单一当前结论</text>
+  </g>
+  <g id="desktop-proof">
+    <rect x="52" y="146" width="716" height="470" rx="6" fill="#FFFFFF" stroke="#CBD5DF" stroke-width="2"/>
+    <text x="76" y="182" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="24" font-weight="700" fill="#132A3A">当前系统实测：冲突说明被拒绝，成果仍保留</text>
+    <image href="../images/narrative-reconciliation-rejected-desktop-1440x1100.png" x="76" y="204" width="668" height="350" preserveAspectRatio="xMidYMid meet"/>
+    <text x="76" y="590" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="14" fill="#7C8A98">桌面端拒绝态 · 不伪造竞品或生产截图</text>
+  </g>
+  <g id="fact-stack">
+    <rect x="796" y="146" width="432" height="132" rx="6" fill="#EDF1F4" stroke="#2E7D32" stroke-width="2"/>
+    <text x="820" y="180" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="17" font-weight="700" fill="#2E7D32">确定性成果</text>
+    <text x="820" y="222" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="28" font-weight="700" fill="#132A3A">212/212 行 · 87 组</text>
+    <text x="820" y="254" font-family="Consolas, &quot;Courier New&quot;, monospace" font-size="17" fill="#5A6B7C">P0-P4 = 25 / 40 / 14 / 6 / 2</text>
+
+    <rect x="796" y="296" width="432" height="132" rx="6" fill="#EDF1F4" stroke="#C0362C" stroke-width="2"/>
+    <text x="820" y="330" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="17" font-weight="700" fill="#C0362C">模型冲突说明</text>
+    <text x="820" y="370" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#1B2733">声称只覆盖 60 行，并改写 P0 优先级</text>
+    <text x="820" y="402" font-family="Consolas, &quot;Courier New&quot;, monospace" font-size="17" fill="#C0362C">called=true · output_used=false</text>
+
+    <rect x="796" y="446" width="432" height="170" rx="6" fill="#132A3A"/>
+    <text x="820" y="480" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="17" font-weight="700" fill="#FFFFFF">服务端采用回执</text>
+    <text x="820" y="520" font-family="Consolas, &quot;Courier New&quot;, monospace" font-size="17" fill="#CBD5DF">contradictory</text>
+    <text x="820" y="550" font-family="Consolas, &quot;Courier New&quot;, monospace" font-size="17" fill="#CBD5DF">deterministic_outcome</text>
+    <text x="820" y="580" font-family="Consolas, &quot;Courier New&quot;, monospace" font-size="17" fill="#D97706">rejected</text>
+    <text x="1034" y="546" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="24" font-weight="700" fill="#FFFFFF">前台只保留</text>
+    <text x="1034" y="580" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="24" font-weight="700" fill="#FFFFFF">一套当前结论</text>
+  </g>
+  <g id="boundary">
+    <use data-icon="tabler-outline/alert-triangle" x="52" y="636" width="22" height="22" fill="#D97706" stroke-width="2"/>
+    <text x="86" y="653" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#5A6B7C">这只证明固定场景的结构化事实对账，不是通用自然语言真值证明器，也不证明排序方案带来用户价值。</text>
+  </g>
+  <g id="footer">
+    <text x="52" y="690" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="14" fill="#7C8A98">交互依据：Microsoft HAI Guidelines · W3C Status Messages；截图为当前系统实测</text>
+    <text x="1228" y="690" text-anchor="end" font-family="Consolas, &quot;Courier New&quot;, monospace" font-size="14" fill="#7C8A98">15 / 24</text>
+  </g>
+</svg>

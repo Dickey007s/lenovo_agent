@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 1280 720" width="1280" height="720">
+  <g id="background">
+    <rect x="0" y="0" width="1280" height="720" fill="#F7F9FC"/>
+    <rect x="0" y="0" width="12" height="720" fill="#D71920"/>
+    <line x1="70" y1="92" x2="1210" y2="92" stroke="#CAD6E3" stroke-width="1"/>
+    <text x="72" y="66" font-family="'Microsoft YaHei UI','Segoe UI',Arial,sans-serif" font-size="16" font-weight="700" fill="#0B3A70">OFFICE AGENT · 阶段性汇报</text>
+    <text x="1208" y="66" text-anchor="end" font-family="Consolas,'Courier New',monospace" font-size="16" fill="#526579">2026.08.21</text>
+  </g>
+  <g id="title">
+    <text x="72" y="196" font-family="'Microsoft YaHei UI','Segoe UI',Arial,sans-serif" font-size="56" font-weight="700" fill="#172230">让 Agent 做事之后，</text>
+    <text x="72" y="266" font-family="'Microsoft YaHei UI','Segoe UI',Arial,sans-serif" font-size="56" font-weight="700" fill="#172230">企业还需要什么？</text>
+    <text x="76" y="322" font-family="'Microsoft YaHei UI','Segoe UI',Arial,sans-serif" font-size="30" font-weight="600" fill="#0B3A70">从“调用发生”到“业务结果可被看见、验证、控制”</text>
+    <rect x="76" y="356" width="420" height="4" fill="#D71920"/>
+    <text x="76" y="408" font-family="'Microsoft YaHei UI','Segoe UI',Arial,sans-serif" font-size="24" fill="#526579">主流 Agent 正在让模型多做事</text>
+    <text x="76" y="445" font-family="'Microsoft YaHei UI','Segoe UI',Arial,sans-serif" font-size="24" fill="#526579">我们把工作置于事实、版本与控制之下</text>
+  </g>
+  <g id="evidence-windows">
+    <rect x="706" y="128" width="490" height="276" rx="6" fill="#FFFFFF" stroke="#CAD6E3" stroke-width="1.5"/>
+    <image x="716" y="138" width="470" height="256" xlink:href="../images/dr-0015-demo2-controlled-execution-1440-completed.png" preserveAspectRatio="xMidYMid meet"/>
+    <rect x="604" y="376" width="334" height="188" rx="6" fill="#FFFFFF" stroke="#CAD6E3" stroke-width="1.5"/>
+    <image x="612" y="384" width="318" height="172" xlink:href="../images/image41.png" preserveAspectRatio="xMidYMid meet"/>
+    <rect x="916" y="408" width="280" height="158" rx="6" fill="#FFFFFF" stroke="#CAD6E3" stroke-width="1.5"/>
+    <image x="924" y="416" width="264" height="142" xlink:href="../images/image46.png" preserveAspectRatio="xMidYMid meet"/>
+    <line x1="624" y1="590" x2="1178" y2="590" stroke="#D71920" stroke-width="3"/>
+    <circle cx="624" cy="590" r="7" fill="#D71920"/>
+    <circle cx="900" cy="590" r="7" fill="#0B3A70"/>
+    <circle cx="1178" cy="590" r="7" fill="#16845B"/>
+    <text x="624" y="620" text-anchor="middle" font-family="'Microsoft YaHei UI','Segoe UI',Arial,sans-serif" font-size="16" fill="#526579">任务</text>
+    <text x="900" y="620" text-anchor="middle" font-family="'Microsoft YaHei UI','Segoe UI',Arial,sans-serif" font-size="16" fill="#526579">工件</text>
+    <text x="1178" y="620" text-anchor="middle" font-family="'Microsoft YaHei UI','Segoe UI',Arial,sans-serif" font-size="16" fill="#526579">控制</text>
+  </g>
+  <g id="footer">
+    <line x1="72" y1="656" x2="1208" y2="656" stroke="#CAD6E3" stroke-width="1"/>
+    <text x="72" y="690" font-family="'Microsoft YaHei UI','Segoe UI',Arial,sans-serif" font-size="16" fill="#526579">联想 × 华南理工 · Office Agent V0.1</text>
+    <text x="1208" y="690" text-anchor="end" font-family="Consolas,'Courier New',monospace" font-size="16" fill="#0B3A70">P01</text>
+  </g>
+</svg>

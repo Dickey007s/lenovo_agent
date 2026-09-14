@@ -2044,6 +2044,200 @@ function boundedAnalysisRecoverySnapshot(body: { workspace_id: string; instructi
   };
 }
 
+function explicitRequirementCoverageSnapshot(body: { workspace_id: string; instruction: string }) {
+  const base = snapshot(body, "waiting_input", 20) as any;
+  const branchSpecs = [
+    ["product", "产品上线条件", productPRDFile.file_ref],
+    ["finance", "财务风险", csvFile.file_ref],
+    ["legal", "法务授权", legalRuleFile.file_ref],
+    ["reliability", "可靠性风险", searchLogFile.file_ref],
+    ["experience", "用户体验问题", uxBehaviorFile.file_ref],
+  ] as const;
+  const now = new Date().toISOString();
+  const branches = branchSpecs.map(([unitId, title, fileRef], index) => ({
+    branch_id: `branch-coverage-${String(index + 1).padStart(3, "0")}`,
+    unit_id: unitId,
+    round_number: 1,
+    parent_branch_id: null,
+    title,
+    objective: `核对${title}并保留来源。`,
+    depends_on: [],
+    input_file_refs: [fileRef],
+    verified_file_refs: [],
+    missing_file_refs: [fileRef],
+    status: "running",
+    requires_human_gate: false,
+    created_at: now,
+    updated_at: now,
+  }));
+  const uncovered = [{
+    title: "外呼合规流程覆盖",
+    objective: "核对外呼时段、频次、身份确认、第三方保护和投诉异议处理。",
+    reason: "冻结的公开资料库中没有定位到足以形成该分支的流程与规则来源。",
+  }];
+  const currentPlan = {
+    summary: "六项明确要求中，五项形成本轮分支，一项保留为资料缺口。",
+    selection_reason: "按用户逐项要求匹配冻结资料库中的已批准来源。",
+    units: branchSpecs.map(([unitId, title, fileRef]) => ({
+      unit_id: unitId,
+      title,
+      objective: `核对${title}并保留来源。`,
+      input_file_refs: [fileRef],
+      depends_on: [],
+      tool: "file.read",
+      requires_human_gate: false,
+      side_effect: "none",
+      artifact_name: null,
+      artifact_type: null,
+    })),
+    uncovered_requirements: uncovered,
+    deferred_requirements: [],
+  };
+  const round = {
+    ...base.rounds[0],
+    input_file_refs: branchSpecs.map(([, , fileRef]) => fileRef),
+    branch_ids: branches.map((branch) => branch.branch_id),
+    plan: currentPlan,
+    result: null,
+    analysis_receipt: null,
+    verified_file_refs: [],
+    evidence_gaps: [],
+    next_step: {
+      decision: "waiting_input",
+      reason: "五条只读分支已通过计划校验；另一项只记录冻结资料库的来源缺口。",
+      next_question: null,
+      candidate_file_refs: branchSpecs.map(([, , fileRef]) => fileRef),
+      candidate_branch_ids: branches.map((branch) => branch.branch_id),
+      ready_branch_ids: branches.map((branch) => branch.branch_id),
+      recovery_kind: null,
+      evidence_resolutions: [],
+    },
+  };
+  return {
+    ...base,
+    branches,
+    rounds: [round],
+    current_round: 1,
+    topology_admission: {
+      mode: "adaptive_readonly_workers",
+      work_unit_breadth: 5,
+      independent_branch_count: 5,
+      dependency_parallelism: 5,
+      source_span: 5,
+      remaining_model_calls: 20,
+      remaining_time_seconds: 7000,
+      external_action: "none",
+      reasons: ["五个有来源的独立只读工作包达到受限协作准入条件。"],
+      user_confirmation_required: true,
+    },
+    worker_runs: [],
+    work_units: [],
+    contributions: [],
+  };
+}
+
+function deferredRequirementCoverageSnapshot(body: { workspace_id: string; instruction: string }) {
+  const completed = demo2Snapshot(body, 2) as any;
+  const now = new Date().toISOString();
+  const deferredRequirement = {
+    title: "外呼合规流程覆盖",
+    objective: "核对外呼时段、频次、身份确认、第三方保护和投诉异议处理。",
+    reason: "服务端已识别候选来源，但本轮文件预算未能完整纳入，已排入后续核对。",
+    candidate_file_refs: [legalRuleFile.file_ref],
+  };
+  const deferredBranch = {
+    branch_id: "branch-coverage-deferred",
+    unit_id: "deferred-requirement-1",
+    round_number: 1,
+    parent_branch_id: null,
+    title: deferredRequirement.title,
+    objective: deferredRequirement.objective,
+    depends_on: [],
+    input_file_refs: deferredRequirement.candidate_file_refs,
+    verified_file_refs: [],
+    missing_file_refs: deferredRequirement.candidate_file_refs,
+    status: "waiting_input",
+    requires_human_gate: false,
+    created_at: now,
+    updated_at: now,
+  };
+  const plannedBranches = completed.branches;
+  const currentPlan = {
+    summary: "六项明确要求中，五项已完成只读核对，一项保留为已知来源的后续分支。",
+    selection_reason: "先完整保留五项本轮可执行工作，再公开受文件预算限制的第六项。",
+    units: plannedBranches.map((branch: any) => ({
+      unit_id: branch.unit_id,
+      title: branch.title,
+      objective: branch.objective,
+      input_file_refs: branch.input_file_refs,
+      depends_on: branch.depends_on,
+      tool: "file.read",
+      requires_human_gate: false,
+      side_effect: "none",
+      artifact_name: null,
+      artifact_type: null,
+    })),
+    uncovered_requirements: [],
+    deferred_requirements: [deferredRequirement],
+  };
+  const round = {
+    ...completed.rounds[0],
+    status: "waiting_input",
+    phase: "evidence_gate",
+    branch_ids: [...completed.rounds[0].branch_ids, deferredBranch.branch_id],
+    plan: currentPlan,
+    result: null,
+    evidence_gaps: [],
+    next_step: {
+      decision: "waiting_input",
+      reason: "本轮可执行贡献已合入；另有 1 项已识别来源的后续分支，需单独继续后再核对。",
+      next_question: null,
+      candidate_file_refs: deferredBranch.missing_file_refs,
+      candidate_branch_ids: [deferredBranch.branch_id],
+      ready_branch_ids: [],
+      recovery_kind: null,
+      evidence_resolutions: [],
+    },
+  };
+  return {
+    ...completed,
+    status: "waiting_input",
+    control_state: "paused",
+    version: completed.version + 1,
+    last_event_sequence: completed.last_event_sequence + 1,
+    rounds: [round],
+    branches: [...plannedBranches, deferredBranch],
+    active_branch_id: deferredBranch.branch_id,
+    topology_admission: {
+      ...completed.topology_admission,
+      reasons: ["五项本轮工作已完成；第六项受文件预算约束，保留为可单独继续的后续分支。"],
+    },
+    work_units: [...completed.work_units, {
+      work_unit_id: deferredBranch.branch_id,
+      branch_id: deferredBranch.branch_id,
+      unit_id: deferredBranch.unit_id,
+      depends_on: [],
+      approved_file_refs: deferredBranch.input_file_refs,
+      state: "pending",
+      attempt: 0,
+      version: 1,
+      latest_contribution_id: null,
+      returned_at: null,
+      status_reason: null,
+    }],
+    result: null,
+    brief: null,
+    events: [...completed.events, {
+      sequence: completed.last_event_sequence + 1,
+      event_name: "evidence_gate",
+      occurred_at: now,
+      status: "waiting_input",
+      message: "已完成本轮可执行工作；一项已知来源分支等待单独继续。",
+      details: {},
+    }],
+  };
+}
+
 function uxPrioritizationEffectSnapshot(
   body: { workspace_id: string; instruction: string },
   variant: "canonical" | "threshold" = "canonical",
@@ -2351,7 +2545,7 @@ function locationFailureSnapshot(body: { workspace_id: string; instruction: stri
 }
 async function fulfillJson(route: Route, body: unknown, status = 200) { await route.fulfill({ status, contentType: "application/json", body: JSON.stringify(body) }); }
 
-async function mockHarness(page: Page, options: { failFirstStart?: boolean; failDecisionDefer?: boolean; disconnect?: boolean; failed?: boolean; locationFailure?: boolean; sourceRecovery?: boolean; sourceRecoveryThreeCandidates?: boolean; verifiedArtifactAuditPending?: boolean; verifiedArtifactAuditPendingDistinct?: boolean; verifiedArtifactInProgress?: boolean; verifiedFinanceArtifactAuditPending?: boolean; unverifiedArtifactLocationPending?: boolean; terminalArtifactLocationPending?: boolean; boundedRecovery?: boolean; effectArtifact?: boolean; financePositiveCandidate?: boolean; financeVerifierFailed?: boolean; outboundEffect?: boolean; outboundEffectDynamic?: boolean; outboundEffectFailed?: boolean; reactEffect?: boolean; evaluationEffect?: boolean; dashboardEffect?: boolean; dashboardEffectFailed?: boolean; releaseEffect?: boolean; releaseEffectRepaired?: boolean; releaseEffectFailed?: boolean; candidateEffect?: boolean; candidateEffectImproved?: boolean; candidateEffectFailed?: boolean; customerEffect?: boolean; customerEffectThreshold?: boolean; customerEffectWitness?: boolean; customerEffectFailed?: boolean; sreEffect?: boolean; sreEffectDynamic?: boolean; sreEffectFailed?: boolean; uxEffect?: boolean; uxEffectThreshold?: boolean; uxEffectFailed?: boolean; uxNarrativeRejected?: boolean; uxNarrativePartial?: boolean; legalEffect?: boolean; legalEffectRepaired?: boolean; legalEffectFailed?: boolean; effectBoundary?: boolean; reviewTable?: boolean; workspaceFailures?: number; interactiveLoop?: boolean; evidenceGate?: boolean } = {}) {
+async function mockHarness(page: Page, options: { failFirstStart?: boolean; failDecisionDefer?: boolean; disconnect?: boolean; failed?: boolean; locationFailure?: boolean; sourceRecovery?: boolean; sourceRecoveryThreeCandidates?: boolean; verifiedArtifactAuditPending?: boolean; verifiedArtifactAuditPendingDistinct?: boolean; verifiedArtifactInProgress?: boolean; verifiedFinanceArtifactAuditPending?: boolean; unverifiedArtifactLocationPending?: boolean; terminalArtifactLocationPending?: boolean; boundedRecovery?: boolean; explicitRequirementCoverage?: boolean; deferredRequirementCoverage?: boolean; effectArtifact?: boolean; financePositiveCandidate?: boolean; financeVerifierFailed?: boolean; outboundEffect?: boolean; outboundEffectDynamic?: boolean; outboundEffectFailed?: boolean; reactEffect?: boolean; evaluationEffect?: boolean; dashboardEffect?: boolean; dashboardEffectFailed?: boolean; releaseEffect?: boolean; releaseEffectRepaired?: boolean; releaseEffectFailed?: boolean; candidateEffect?: boolean; candidateEffectImproved?: boolean; candidateEffectFailed?: boolean; customerEffect?: boolean; customerEffectThreshold?: boolean; customerEffectWitness?: boolean; customerEffectFailed?: boolean; sreEffect?: boolean; sreEffectDynamic?: boolean; sreEffectFailed?: boolean; uxEffect?: boolean; uxEffectThreshold?: boolean; uxEffectFailed?: boolean; uxNarrativeRejected?: boolean; uxNarrativePartial?: boolean; legalEffect?: boolean; legalEffectRepaired?: boolean; legalEffectFailed?: boolean; effectBoundary?: boolean; reviewTable?: boolean; workspaceFailures?: number; interactiveLoop?: boolean; evidenceGate?: boolean } = {}) {
   let workspaceCalls = 0; let startCalls = 0; let streamCalls = 0;
   let currentBody = { workspace_id: "forte-public-office", instruction: "" };
   // Mock snapshots intentionally cover several server state shapes in one route.
@@ -2478,6 +2672,10 @@ async function mockHarness(page: Page, options: { failFirstStart?: boolean; fail
         ? locationFailureSnapshot(body)
         : options.boundedRecovery
           ? boundedAnalysisRecoverySnapshot(body)
+        : options.deferredRequirementCoverage
+          ? deferredRequirementCoverageSnapshot(body)
+        : options.explicitRequirementCoverage
+          ? explicitRequirementCoverageSnapshot(body)
         : options.sourceRecovery
           ? sourceLocationRecoverySnapshot(body, options.sourceRecoveryThreeCandidates ? 3 : 2)
           : snapshot(body, options.evidenceGate ? "waiting_input" : options.interactiveLoop ? "planning" : "queued", options.interactiveLoop || options.evidenceGate ? controlSequence : 16);
@@ -2563,7 +2761,7 @@ async function mockHarness(page: Page, options: { failFirstStart?: boolean; fail
       streamCalls += 1; streams.push(url.toString());
       const after = Number(url.searchParams.get("after") ?? "0");
       const all = ["workspace_index", "round_started", "planning_started", "planning_completed", "plan_validation", "analysis_started", "analysis_completed", "result_validation", "evidence_gate", "round_started", "planning_started", "planning_completed", "analysis_started", "analysis_completed", "evidence_gate", options.failed ? "harness_failed" : "loop_committed"];
-      if (options.interactiveLoop || options.evidenceGate || options.sourceRecovery || options.verifiedArtifactAuditPending || options.verifiedArtifactAuditPendingDistinct || options.verifiedArtifactInProgress || options.verifiedFinanceArtifactAuditPending || options.unverifiedArtifactLocationPending || options.terminalArtifactLocationPending || options.boundedRecovery) {
+      if (options.interactiveLoop || options.evidenceGate || options.sourceRecovery || options.verifiedArtifactAuditPending || options.verifiedArtifactAuditPendingDistinct || options.verifiedArtifactInProgress || options.verifiedFinanceArtifactAuditPending || options.unverifiedArtifactLocationPending || options.terminalArtifactLocationPending || options.boundedRecovery || options.explicitRequirementCoverage || options.deferredRequirementCoverage) {
         const sequence = Math.max(after + 1, currentSnapshot.last_event_sequence);
         const terminalEvent = currentSnapshot.status === "completed" ? "loop_committed" : currentSnapshot.status === "stopped" ? "loop_stopped" : currentSnapshot.status === "waiting_input" ? "evidence_gate" : "round_started";
         const body = `id: ${sequence}\nevent: ${terminalEvent}\ndata: ${JSON.stringify({ sequence, event_name: terminalEvent, occurred_at: new Date().toISOString(), message: "服务端状态已更新。" })}\n\n`;
@@ -2578,7 +2776,7 @@ async function mockHarness(page: Page, options: { failFirstStart?: boolean; fail
     }
     if (path.startsWith("/v1/harness/runs/")) {
       if (options.disconnect && streamCalls === 1) return fulfillJson(route, { ...snapshot(currentBody, "queued"), status: "indexing", last_event_sequence: 1, version: 2 });
-      if (options.interactiveLoop || options.evidenceGate || options.sourceRecovery || options.verifiedArtifactAuditPending || options.verifiedArtifactAuditPendingDistinct || options.verifiedArtifactInProgress || options.verifiedFinanceArtifactAuditPending || options.unverifiedArtifactLocationPending || options.terminalArtifactLocationPending || options.boundedRecovery || options.locationFailure || options.effectArtifact || options.financePositiveCandidate || options.financeVerifierFailed || options.outboundEffect || options.outboundEffectDynamic || options.outboundEffectFailed || options.reactEffect || options.evaluationEffect || options.dashboardEffect || options.dashboardEffectFailed || options.releaseEffect || options.releaseEffectRepaired || options.releaseEffectFailed || options.candidateEffect || options.candidateEffectImproved || options.candidateEffectFailed || options.legalEffect || options.legalEffectRepaired || options.legalEffectFailed || options.effectBoundary) return fulfillJson(route, currentSnapshot);
+      if (options.interactiveLoop || options.evidenceGate || options.sourceRecovery || options.verifiedArtifactAuditPending || options.verifiedArtifactAuditPendingDistinct || options.verifiedArtifactInProgress || options.verifiedFinanceArtifactAuditPending || options.unverifiedArtifactLocationPending || options.terminalArtifactLocationPending || options.boundedRecovery || options.explicitRequirementCoverage || options.deferredRequirementCoverage || options.locationFailure || options.effectArtifact || options.financePositiveCandidate || options.financeVerifierFailed || options.outboundEffect || options.outboundEffectDynamic || options.outboundEffectFailed || options.reactEffect || options.evaluationEffect || options.dashboardEffect || options.dashboardEffectFailed || options.releaseEffect || options.releaseEffectRepaired || options.releaseEffectFailed || options.candidateEffect || options.candidateEffectImproved || options.candidateEffectFailed || options.legalEffect || options.legalEffectRepaired || options.legalEffectFailed || options.effectBoundary) return fulfillJson(route, currentSnapshot);
       currentSnapshot = snapshot(currentBody, options.failed ? "failed" : "completed");
       return fulfillJson(route, currentSnapshot);
     }
@@ -2767,7 +2965,7 @@ function demo2PartialAmbiguousSnapshot(body: { workspace_id: string; instruction
     : contribution);
   const workUnits = current.work_units.map((unit: any, index: number) => index === 1
     ? { ...unit, state: "waiting", latest_contribution_id: unit.latest_contribution_id }
-    : index === 3 ? { ...unit, state: "blocked", latest_contribution_id: null } : unit);
+    : index === 3 ? { ...unit, state: "blocked", depends_on: branches[index].depends_on, latest_contribution_id: null } : { ...unit, depends_on: branches[index].depends_on });
   const artifact = current.artifact_versions[0];
   return {
     ...current,
@@ -2843,21 +3041,44 @@ async function mockDemoRuntime(page: Page, mode: "demo1" | "demo2" | "demo2-part
 async function mockSessionHistoryRuntime(page: Page) {
   await mockHarness(page);
   const base = snapshot({ workspace_id: "forte-public-office", instruction: "会话基线" }, "completed", 16) as any;
-  const currentRun = { ...base, run_id: "harness:session-current", task_id: "task:session-alpha", run_sequence: 2, status: "planning", control_state: "running", result: null, events: [{ ...base.events[0], sequence: 4, status: "planning" }], last_event_sequence: 4, version: 4, instruction: "同一任务的最新 Run" };
+  const currentRun = { ...base, run_id: "harness:session-current", task_id: "task:session-alpha", task_version: 2, run_sequence: 2, status: "planning", control_state: "running", result: null, events: [{ ...base.events[0], sequence: 4, status: "planning" }], last_event_sequence: 4, version: 4, instruction: "同一任务的最新 Run" };
   const historyRun = { ...base, run_id: "harness:session-history", task_id: "task:session-alpha", run_sequence: 1, status: "completed", control_state: "completed", instruction: "同一任务的历史 Run" };
   const otherTaskRun = { ...base, run_id: "harness:session-other", task_id: "task:session-beta", run_sequence: 1, status: "completed", control_state: "completed", instruction: "另一个任务" };
   const runs = [currentRun, historyRun, otherTaskRun];
-  const taskById = new Map([[currentRun.task_id, currentRun], [otherTaskRun.task_id, otherTaskRun]]);
+  const taskById = new Map<string, any>([[currentRun.task_id, currentRun], [otherTaskRun.task_id, otherTaskRun]]);
   const eventRequests: string[] = [];
+  const starts: Record<string, any>[] = [];
+  const controlRequests: Record<string, any>[] = [];
   await page.route("**/*", async (route) => {
     const url = new URL(route.request().url());
     const method = route.request().method();
     if (url.pathname === "/v1/harness/runs" && method === "GET") return fulfillJson(route, { runs });
+    if (url.pathname === "/v1/harness/runs" && method === "POST") {
+      const body = route.request().postDataJSON() as Record<string, any>;
+      starts.push(body);
+      const ordinal = starts.length;
+      const created = {
+        ...(snapshot({ workspace_id: "forte-public-office", instruction: String(body.instruction ?? "新任务") }, "queued") as any),
+        run_id: `harness:session-new-${ordinal}`,
+        task_id: `task:session-gamma-${ordinal}`,
+        task_version: 1,
+        run_sequence: 1,
+        parent_run_id: null,
+        instruction: String(body.instruction ?? "新任务"),
+      };
+      runs.unshift(created);
+      taskById.set(created.task_id, created);
+      return fulfillJson(route, { run: created, replayed: false }, 202);
+    }
+    if (url.pathname.endsWith("/controls") && method === "POST") {
+      controlRequests.push(route.request().postDataJSON() as Record<string, any>);
+      return route.fallback();
+    }
     if (url.pathname.startsWith("/v1/harness/tasks/") && method === "GET") {
       const taskId = decodeURIComponent(url.pathname.split("/").at(-1) ?? "");
       const current = taskById.get(taskId);
       if (!current) return fulfillJson(route, { detail: "unknown task" }, 404);
-      return fulfillJson(route, { task_id: current.task_id, task_version: 2, current_run_id: current.run_id, run_sequence: current.run_sequence, parent_run_id: null, current_artifact_id: null, current_artifact_version: null, current_commit_id: null, lineage: [{ run_id: current.run_id, run_sequence: current.run_sequence, parent_run_id: null, status: current.status }] });
+      return fulfillJson(route, { task_id: current.task_id, task_version: current.task_version ?? 1, current_run_id: current.run_id, run_sequence: current.run_sequence, parent_run_id: null, current_artifact_id: null, current_artifact_version: null, current_commit_id: null, lineage: [{ run_id: current.run_id, run_sequence: current.run_sequence, parent_run_id: null, status: current.status }] });
     }
     if (url.pathname.endsWith("/events") && method === "GET") {
       eventRequests.push(url.pathname + url.search);
@@ -2870,12 +3091,12 @@ async function mockSessionHistoryRuntime(page: Page) {
     }
     return route.fallback();
   });
-  return { eventRequests };
+  return { eventRequests, starts, controlRequests };
 }
 
-async function mockFixedWorkflowRuntime(page: Page) {
+async function mockFixedWorkflowRuntime(page: Page, mode: "fixed_workflow" | "single_controller" = "fixed_workflow") {
   await mockHarness(page);
-  const fixed = { ...demo2Snapshot({ workspace_id: "forte-public-office", instruction: "固定流程核对" }, 0), topology_admission: { mode: "fixed_workflow", work_unit_breadth: 5, independent_branch_count: 1, dependency_parallelism: 1, source_span: 10, remaining_model_calls: 24, remaining_time_seconds: 7000, external_action: "none", reasons: ["已按服务端策略选择固定工作流；本 Run 不启动 Adaptive Swarm。"], user_confirmation_required: false } } as any;
+  const fixed = { ...demo2Snapshot({ workspace_id: "forte-public-office", instruction: "固定流程核对" }, 0), topology_admission: { mode, work_unit_breadth: 5, independent_branch_count: 1, dependency_parallelism: 1, source_span: 10, remaining_model_calls: 24, remaining_time_seconds: 7000, external_action: "none", reasons: [mode === "single_controller" ? "仅有一个独立工作包，由单一主控推进。" : "已按服务端策略选择固定工作流；本 Run 不启动 Adaptive Swarm。"], user_confirmation_required: false } } as any;
   await page.route("**/*", async (route) => {
     const url = new URL(route.request().url());
     const method = route.request().method();
@@ -2885,6 +3106,110 @@ async function mockFixedWorkflowRuntime(page: Page) {
     return route.fallback();
   });
 }
+
+test.describe("copilot integration", () => {
+  for (const count of [2, 3]) {
+    test(`keeps ${count} evidence choices distinct from business approval`, async ({ page }) => {
+      const state = await mockHarness(page, { sourceRecovery: true, sourceRecoveryThreeCandidates: count === 3 });
+      await page.goto("/agent-capabilities");
+      await page.getByRole("textbox", { name: "任务指令" }).fill("核对来源中重复出现的结论");
+      await page.getByRole("button", { name: "启动 Control Loop" }).click();
+      const boundary = page.getByTestId("copilot-boundary-summary");
+      await expect(boundary).toContainText(`保留 ${count} 个候选位置`);
+      await expect(boundary).toContainText("选择引用不是批准业务结论");
+      expect(state.controls).toHaveLength(0);
+      await page.getByRole("button", { name: "确认引用位置", exact: true }).click();
+      const dialog = page.getByRole("dialog");
+      await expect(dialog.getByRole("radio")).toHaveCount(count);
+      await expect(dialog.getByRole("radio", { checked: true })).toHaveCount(0);
+      await expect(dialog.getByRole("button", { name: "确认位置并继续", exact: true })).toBeDisabled();
+      expect(state.controls).toHaveLength(0);
+    });
+  }
+
+  test("explains branch retry without asking the user to repair files", async ({ page }) => {
+    await mockHarness(page, { boundedRecovery: true });
+    await page.route("**/v1/harness/runs", async (route) => {
+      if (route.request().method() !== "POST") return route.fallback();
+      const run = { ...boundedAnalysisRecoverySnapshot(route.request().postDataJSON()), decision_requests: [] };
+      return fulfillJson(route, { run, replayed: false }, 202);
+    });
+    await page.goto("/agent-capabilities");
+    await page.getByRole("textbox", { name: "任务指令" }).fill("补充未完成的分析");
+    await page.getByRole("button", { name: "启动 Control Loop" }).click();
+    const boundary = page.getByTestId("copilot-boundary-summary");
+    await expect(boundary.locator('[data-boundary="retry"]')).toContainText("不必先改文件或填写答案");
+    await expect(boundary.locator('[data-boundary="evidence"]')).toHaveCount(0);
+  });
+
+  test("does not hide an incomplete decision behind generic retry advice", async ({ page }) => {
+    await mockHarness(page, { boundedRecovery: true });
+    await page.goto("/agent-capabilities");
+    await page.getByRole("textbox", { name: "任务指令" }).fill("核对仍缺证据的待决事项");
+    await page.getByRole("button", { name: "启动 Control Loop" }).click();
+    const boundary = page.getByTestId("copilot-boundary-summary");
+    await expect(boundary.locator('[data-boundary="incomplete"]')).toContainText("不能把普通重试当成已经作出决定");
+    await expect(boundary.locator('[data-boundary="retry"]')).toHaveCount(0);
+  });
+
+  test("does not turn a verified release report into permission to release", async ({ page }) => {
+    await mockHarness(page, { releaseEffect: true });
+    await page.goto("/agent-capabilities");
+    await page.getByRole("textbox", { name: "任务指令" }).fill("核对上线材料");
+    await page.getByRole("button", { name: "启动 Control Loop" }).click();
+    const boundary = page.getByTestId("copilot-boundary-summary");
+    await expect(boundary.locator('[data-boundary="business"]')).toContainText("业务规则未通过");
+    await expect(boundary).toContainText("本系统不执行上线、签署或外发");
+    await expect(boundary.getByRole("button")).toHaveCount(0);
+  });
+
+  test("separates single controller from fixed workflow", async ({ page }) => {
+    await mockFixedWorkflowRuntime(page, "single_controller");
+    await page.goto("/agent-capabilities");
+    await page.getByRole("textbox", { name: "任务指令" }).fill("单一主控核对");
+    await page.getByRole("button", { name: "启动 Control Loop" }).click();
+    await page.getByTestId("agent-collaboration-tab").click();
+    const facts = page.getByTestId("swarm-fact-strip");
+    await expect(facts).toContainText("单一主控顺序推进");
+    await expect(facts).not.toContainText("本次采用固定流程");
+    await expect(facts).toContainText("尚无 Worker 返回回执");
+  });
+
+  test("uses real receipt counts and preserves partial adoption", async ({ page }) => {
+    await mockDemoRuntime(page, "demo2-partial");
+    await page.setViewportSize({ width: 1440, height: 1100 });
+    await page.goto("/agent-capabilities");
+    await page.getByRole("textbox", { name: "任务指令" }).fill("协作核对产品、搜索 Agent 和用户交互");
+    await page.getByRole("button", { name: "启动 Control Loop" }).click();
+    await expect(page.getByTestId("copilot-boundary-summary")).toContainText("3 个工作包已就绪");
+    await expect(page.locator(".cap-branch-grid article").filter({ hasText: "就绪，尚未派发" })).toHaveCount(3);
+    await expect(page.locator(".cap-attention-sources > span")).toHaveCount(10);
+    if (process.env.CAPTURE_CAPABILITY_SCREENSHOTS === "1") await page.screenshot({ path: capabilityScreenshotPath("dr-0063-fixture-boundaries-1440.png"), fullPage: true });
+    await page.getByTestId("agent-collaboration-tab").click();
+    const facts = page.getByTestId("swarm-fact-strip");
+    await expect(facts).toContainText("尚无 Worker 返回回执");
+    await expect(facts).toContainText("准入时剩余 24 次调用");
+    await page.getByTestId("collaboration-overview").getByRole("button", { name: "确认并开始协作" }).click();
+    await expect(facts).toContainText("3 条已调用");
+    await expect(facts).toContainText("2 条已采用");
+    await expect(facts).toContainText("2 / 3 份已采用");
+    await expect(facts).toContainText("1 份待核对");
+    const edges = page.locator(".adaptive-dag-edge");
+    await expect(edges).toHaveCount(3);
+    await expect(page.locator('.adaptive-dag-edge[data-from="demo2-root-a"][data-to="demo2-dependent-d"]')).toHaveCount(0);
+    await expect(page.locator('.adaptive-dag-edge[data-from="demo2-root-b"][data-to="demo2-dependent-d"]')).toHaveAttribute("d", / C /);
+    if (process.env.CAPTURE_CAPABILITY_SCREENSHOTS === "1") await page.screenshot({ path: capabilityScreenshotPath("dr-0063-fixture-swarm-1440.png"), fullPage: true });
+    await page.setViewportSize({ width: 390, height: 844 });
+    expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(0);
+    if (process.env.CAPTURE_CAPABILITY_SCREENSHOTS === "1") await page.screenshot({ path: capabilityScreenshotPath("dr-0063-fixture-swarm-390.png"), fullPage: true });
+    await page.getByTestId("agent-progress-tab").click();
+    await expect(page.getByTestId("copilot-boundary-summary")).toContainText("1 个工作包已就绪");
+    await expect(page.locator(".cap-branch-grid article").filter({ hasText: "就绪，尚未派发" })).toHaveCount(1);
+    await expect(page.locator(".cap-attention-sources > span")).toHaveCount(3);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(0);
+    if (process.env.CAPTURE_CAPABILITY_SCREENSHOTS === "1") await page.screenshot({ path: capabilityScreenshotPath("dr-0063-fixture-boundaries-390.png"), fullPage: true });
+  });
+});
 
 async function mockTaskLedgerRuntime(page: Page, mode: "success" | "conflict" | "bad-task" | "bad-child-task") {
   await mockHarness(page);
@@ -4723,6 +5048,218 @@ test("always closes the review page even when the defer receipt conflicts", asyn
   }
 });
 
+test("polish keeps long task goals readable without starting another task", async ({ page }) => {
+  const state = await mockHarness(page);
+  const instruction = "只读核对办公资料，明确来源、结论和待确认事项。".repeat(30);
+  await page.goto("/agent-capabilities");
+  await page.getByRole("textbox", { name: "任务指令", exact: true }).fill(instruction);
+  await page.getByRole("button", { name: "启动 Control Loop" }).click();
+  const goal = page.locator(".cap-task-goal");
+  for (const viewport of [{ width: 1280, height: 720 }, { width: 390, height: 844 }]) {
+    await page.setViewportSize(viewport);
+    await expect(goal.locator(".cap-goal-content")).toBeHidden();
+    await goal.getByLabel("查看完整任务目标").click();
+    await expect(goal.locator(".cap-goal-content p")).toHaveText(instruction);
+    const box = await goal.locator(".cap-goal-content").boundingBox();
+    expect(box).not.toBeNull();
+    expect(box!.x).toBeGreaterThanOrEqual(0);
+    expect(box!.x + box!.width).toBeLessThanOrEqual(viewport.width);
+    expect(box!.y + box!.height).toBeLessThanOrEqual(viewport.height);
+    await goal.getByLabel("查看完整任务目标").click();
+  }
+  expect(state.starts).toHaveLength(1);
+  expect(state.controls).toHaveLength(0);
+});
+
+test("polish keeps evidence actions visible before and after browsing candidates", async ({ page }) => {
+  const state = await mockHarness(page, { sourceRecovery: true });
+  await page.goto("/agent-capabilities");
+  await page.getByRole("textbox", { name: "任务指令", exact: true }).fill("核对新闻查询实际路由与原文位置");
+  await page.getByRole("button", { name: "启动 Control Loop" }).click();
+  await page.getByRole("button", { name: "确认引用位置", exact: true }).click();
+  const dialog = page.getByRole("dialog");
+  const confirm = dialog.getByRole("button", { name: "确认位置并继续", exact: true });
+  for (const viewport of [{ width: 1280, height: 720 }, { width: 390, height: 844 }]) {
+    await page.setViewportSize(viewport);
+    const before = await confirm.boundingBox();
+    expect(before!.y).toBeGreaterThanOrEqual(0);
+    expect(before!.y + before!.height).toBeLessThanOrEqual(viewport.height);
+    await expect(confirm).toBeDisabled();
+    await dialog.getByRole("radio").last().scrollIntoViewIfNeeded();
+    await dialog.getByRole("button", { name: "在文件中查看", exact: true }).last().click();
+    await expect(dialog.getByRole("region", { name: "资料原文预览" })).toBeVisible();
+    await expect(confirm).toBeDisabled();
+    await dialog.getByRole("button", { name: "收起原文预览", exact: true }).click();
+    const after = await confirm.boundingBox();
+    expect(after!.y + after!.height).toBeLessThanOrEqual(viewport.height);
+    expect(await dialog.evaluate((element) => element.scrollWidth - element.clientWidth)).toBeLessThanOrEqual(0);
+  }
+  await dialog.getByRole("radio").last().check();
+  await expect(dialog.locator(".cap-evidence-selection")).toHaveText("已选择位置 2");
+  await expect(confirm).toBeEnabled();
+  expect(state.controls).toHaveLength(0);
+});
+
+test("acceptance new task always opens a clean composer from collaboration", async ({ page }) => {
+  const state = await mockHarness(page);
+  await page.goto("/agent-capabilities#adaptive-swarm");
+  await expect(page.getByRole("tab", { name: "协作方式 Adaptive Swarm" })).toHaveAttribute("aria-selected", "true");
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    await page.getByRole("button", { name: "新建任务", exact: true }).click();
+    await expect(page.getByRole("tab", { name: "执行进展 Agent Control Loop" })).toHaveAttribute("aria-selected", "true");
+    const composer = page.getByRole("textbox", { name: "任务指令", exact: true });
+    await expect(composer).toBeVisible();
+    await expect(composer).toHaveValue("");
+    await expect(composer).toBeFocused();
+    expect(new URL(page.url()).hash).toBe("");
+    expect(state.starts).toHaveLength(0);
+    expect(state.controls).toHaveLength(0);
+    await composer.fill("尚未提交的临时任务");
+    await page.getByRole("tab", { name: "协作方式 Adaptive Swarm" }).click();
+  }
+});
+
+test("redesign keeps preview separate from a human choice and captures the four views", async ({ page }) => {
+  const errors: string[] = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  const state = await mockHarness(page, { sourceRecovery: true });
+  await page.setViewportSize({ width: 1672, height: 940 });
+  await page.goto("/agent-capabilities");
+  await page.getByRole("textbox", { name: "任务指令" }).fill("核对产品上线、搜索 Agent 运行与用户交互风险");
+  await page.getByRole("button", { name: "启动 Control Loop" }).click();
+  await expect(page.getByRole("button", { name: "确认引用位置" })).toBeEnabled();
+  const capture = async (name: string) => {
+    if (process.env.CAPTURE_CAPABILITY_SCREENSHOTS === "1") {
+      await page.screenshot({ path: capabilityScreenshotPath(name), fullPage: (await page.getByRole("dialog").count()) === 0 });
+    }
+  };
+  await capture("progress-1672.png");
+  await page.getByRole("button", { name: "查看完整执行记录" }).click();
+  await expect(page.locator(".cap-protocol-record")).not.toHaveAttribute("open", "");
+  await expect(page.locator(".cap-record-branches")).toContainText("2 个候选原文位置");
+  expect((await page.locator(".agent-capabilities-toolbar").boundingBox())?.y).toBeGreaterThanOrEqual(0);
+  await capture("record-1672.png");
+  await page.getByRole("button", { name: "返回任务进展", exact: true }).click();
+  await page.getByRole("button", { name: "确认引用位置" }).click();
+  const dialog = page.getByRole("dialog", { name: "从 2 个原文位置中选 1 个" });
+  const pendingClaim = dialog.getByRole("region", { name: "待核对判断" });
+  await expect(pendingClaim).toContainText("新闻路由候选原文位置不唯一");
+  await expect(pendingClaim).toContainText("Agent 引用的 route = choose 语句在同一文件出现两次。");
+  await expect(pendingClaim).toContainText("尚未确认");
+  await expect(dialog.getByRole("radio")).toHaveCount(2);
+  await expect(dialog.locator("input:checked")).toHaveCount(0);
+  await expect(dialog.getByRole("button", { name: "确认位置并继续" })).toBeDisabled();
+  expect(state.controls).toHaveLength(0);
+  await capture("evidence-1672.png");
+  await dialog.getByRole("button", { name: "在文件中查看" }).nth(1).click();
+  await expect(dialog.getByRole("region", { name: "资料原文预览" })).toBeVisible();
+  await expect(dialog.locator("input:checked")).toHaveCount(0);
+  expect(state.controls).toHaveLength(0);
+  await dialog.getByRole("button", { name: "收起原文预览" }).click();
+  await dialog.getByRole("button", { name: "关闭问题审查页" }).focus();
+  await page.keyboard.press("Shift+Tab");
+  await expect(dialog.getByRole("button", { name: "在文件中查看" }).last()).toBeFocused();
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(dialog).toBeVisible();
+  expect(await dialog.evaluate((element) => element.scrollWidth - element.clientWidth)).toBeLessThanOrEqual(0);
+  await dialog.evaluate(element => element.scrollTo({ top: 0, behavior: "instant" }));
+  await capture("evidence-390.png");
+  await dialog.getByRole("radio").last().scrollIntoViewIfNeeded();
+  await capture("evidence-candidates-390.png");
+  await dialog.getByRole("radio").nth(1).check();
+  await dialog.getByRole("button", { name: "确认位置并继续" }).click();
+  await expect(dialog).toHaveCount(0);
+  expect(state.controls).toHaveLength(1);
+  expect(state.controls[0]).toMatchObject({ command: "decision", decision_action: "accept", selected_candidate_id: "candidate-222222222222", branch_id: "branch-111111111111", source_revision: "rev-20260827-a", expected_version: 13 });
+  expect(state.controls[0].idempotency_key).toBeTruthy();
+  expect(errors).toEqual([]);
+});
+
+test("redesign preserves failed confirmation and always exits after a defer conflict", async ({ page }) => {
+  const state = await mockHarness(page, { sourceRecovery: true, failDecisionDefer: true });
+  await page.route("**/v1/harness/runs/*/controls", async (route) => {
+    if (route.request().postDataJSON().decision_action === "accept") return fulfillJson(route, { detail: "来源版本已变化" }, 409);
+    return route.fallback();
+  });
+  await page.goto("/agent-capabilities");
+  await page.getByRole("textbox", { name: "任务指令" }).fill("核对来源位置");
+  await page.getByRole("button", { name: "启动 Control Loop" }).click();
+  await page.getByRole("button", { name: "确认引用位置" }).click();
+  const dialog = page.getByRole("dialog");
+  await dialog.getByRole("radio").first().check();
+  await dialog.getByRole("button", { name: "确认位置并继续" }).click();
+  await expect(dialog.getByRole("alert")).toContainText("尚未确认是否写入");
+  await dialog.getByRole("button", { name: "关闭问题审查页" }).click();
+  await expect(dialog).toHaveCount(0);
+  await expect(page.locator(".agent-capabilities-error")).toContainText("暂缓回执未写入");
+  expect(state.controls.at(-1)?.decision_action).toBe("defer");
+});
+
+for (const variant of ["multiple", "stale", "terminal"] as const) {
+  test(`redesign projects ${variant} evidence decisions by authoritative IDs`, async ({ page }) => {
+    const state = await mockHarness(page, { sourceRecovery: true });
+    await page.route("**/v1/harness/runs", async (route) => {
+      if (route.request().method() !== "POST") return route.fallback();
+      const model = sourceLocationRecoverySnapshot(route.request().postDataJSON());
+      const resolution = model.rounds[0].next_step.evidence_resolutions[0];
+      const packet = model.decision_requests[0];
+      // Deliberately conflict with the authoritative top-level request.
+      Object.assign(resolution, { decision_request: { ...packet, source_revision: "revision-old" } });
+      packet.source_revision = "revision-current";
+      if (variant === "multiple") {
+        model.decision_requests.push({ ...packet, decision_request_id: "request-222222222222", resolution_id: "resolution-222222222222" });
+        model.rounds[0].next_step.evidence_resolutions.push({ ...resolution, resolution_id: "resolution-222222222222", finding_title: "最后一段原文位置待确认", candidates: resolution.candidates.map((item) => ({ ...item, excerpt: "second distinct excerpt" })) });
+      }
+      if (variant === "stale") packet.state = "stale";
+      if (variant === "terminal") Object.assign(model, { status: "stopped", control_state: "stopped" });
+      return fulfillJson(route, model);
+    });
+    await page.goto("/agent-capabilities");
+    await page.getByRole("textbox", { name: "任务指令" }).fill("检查来源待决边界");
+    await page.getByRole("button", { name: "启动 Control Loop" }).click();
+    if (variant === "stale") {
+      await expect(page.getByRole("button", { name: "确认引用位置" })).toHaveCount(0);
+      await page.getByRole("button", { name: "只重试此分支", exact: true }).click();
+      await expect(page.getByRole("dialog").getByRole("radio")).toHaveCount(0);
+      expect(state.controls).toHaveLength(0);
+      return;
+    }
+    if (variant === "multiple") {
+      await page.getByText("其余 1 项待确认").click();
+      await page.getByRole("button", { name: "最后一段原文位置待确认" }).click();
+      await expect(page.getByRole("dialog")).toContainText("second distinct excerpt");
+    } else await page.getByRole("button", { name: "确认引用位置" }).click();
+    const dialog = page.getByRole("dialog");
+    await dialog.getByRole("radio").first().check();
+    if (variant === "terminal") {
+      await expect(dialog).toContainText("确认只记录引用位置");
+      await expect(dialog.getByRole("button", { name: "确认位置并继续" })).toHaveCount(0);
+    }
+    await dialog.getByRole("button", { name: variant === "terminal" ? "记录引用位置" : "确认位置并继续" }).click();
+    expect(state.controls).toHaveLength(1);
+    expect(state.controls[0]).toMatchObject({ command: "decision", decision_action: "accept", source_revision: "revision-current", resolution_id: variant === "multiple" ? "resolution-222222222222" : "resolution-111111111111" });
+  });
+}
+
+test("redesign renders partial collaboration without clipped nodes at desktop and mobile", async ({ page }) => {
+  await mockDemoRuntime(page, "demo2-partial");
+  await page.setViewportSize({ width: 1672, height: 940 });
+  await page.goto("/agent-capabilities");
+  await page.getByRole("textbox", { name: "任务指令" }).fill("核对产品上线、搜索 Agent 运行与用户交互风险");
+  await page.getByRole("button", { name: "启动 Control Loop" }).click();
+  await page.getByTestId("agent-collaboration-tab").click();
+  await page.getByRole("button", { name: "确认并开始协作" }).click();
+  await expect(page.locator(".adaptive-dag-node.is-waiting")).toBeVisible();
+  for (const width of [1672, 1440, 390]) {
+    await page.setViewportSize({ width, height: width === 390 ? 844 : 940 });
+    const metrics = await page.locator(".adaptive-dag-node").evaluateAll((nodes) => nodes.map((node) => ({ height: node.clientHeight, content: node.scrollHeight })));
+    for (const metric of metrics) expect(metric.content).toBeLessThanOrEqual(metric.height);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(0);
+    await page.locator(".agent-capabilities-page").evaluate((element) => { element.scrollTop = 0; });
+    if (process.env.CAPTURE_CAPABILITY_SCREENSHOTS === "1") await page.screenshot({ path: capabilityScreenshotPath(`collaboration-${width}.png`), fullPage: true });
+  }
+});
+
 test("accepts a source candidate for bounded branch recovery", async ({ page }) => {
   const state = await mockHarness(page, { sourceRecovery: true }); await page.goto("/");
   await page.getByRole("textbox", { name: "任务指令" }).fill("核对跨文件版本冲突并逐条定位原文。");
@@ -4735,7 +5272,7 @@ test("accepts a source candidate for bounded branch recovery", async ({ page }) 
   await expect(dialog).toContainText("从 2 个真实位置中选 1 个");
   const acceptLocation = dialog.getByRole("button", { name: "确认位置并继续" });
   await expect(acceptLocation).toBeDisabled();
-  await dialog.getByRole("button", { name: /选择候选原文 2：workflow\.py/ }).click();
+  await dialog.getByRole("radio", { name: /选择候选原文 2：workflow\.py/ }).click();
   await expect(acceptLocation).toBeEnabled();
   if (process.env.CAPTURE_DR0032_EVIDENCE === "1") {
     await page.setViewportSize({ width: 1440, height: 1100 });
@@ -4773,15 +5310,15 @@ test("keeps three ambiguous locations comparable on mobile and records a bounded
   const dialog = page.getByRole("dialog", { name: "从 3 个原文位置中选 1 个" });
   await expect(dialog).toContainText("系统发现");
   await expect(dialog).toContainText("影响");
-  await expect(dialog).toContainText("你要做什么");
+  await expect(dialog).toContainText("你需要做什么");
   await expect(dialog).toContainText("会保留");
   await expect(dialog).toContainText("不会做");
   await expect(dialog.getByRole("button", { name: "关闭问题审查页" })).toBeVisible();
   const acceptLocation = dialog.getByRole("button", { name: "确认位置并继续" });
   await expect(acceptLocation).toBeDisabled();
-  await expect(dialog.getByRole("button", { name: /选择候选原文 1：workflow\.py/ })).toBeVisible();
-  await expect(dialog.getByRole("button", { name: /选择候选原文 2：workflow\.py/ })).toBeVisible();
-  await expect(dialog.getByRole("button", { name: /选择候选原文 3：workflow\.py/ })).toBeVisible();
+  await expect(dialog.getByRole("radio", { name: /选择候选原文 1：workflow\.py/ })).toBeVisible();
+  await expect(dialog.getByRole("radio", { name: /选择候选原文 2：workflow\.py/ })).toBeVisible();
+  await expect(dialog.getByRole("radio", { name: /选择候选原文 3：workflow\.py/ })).toBeVisible();
 
   const mobileMetrics = await page.evaluate(() => ({ viewport: document.documentElement.clientWidth, scroll: document.documentElement.scrollWidth }));
   expect(mobileMetrics.scroll).toBeLessThanOrEqual(mobileMetrics.viewport);
@@ -4790,7 +5327,7 @@ test("keeps three ambiguous locations comparable on mobile and records a bounded
   if (process.env.CAPTURE_DR0034_EVIDENCE === "1") {
     await page.screenshot({ path: "../../docs/evidence/screenshots/dr-0034-ambiguous-choice-mobile.png" });
   }
-  await dialog.getByRole("button", { name: /选择候选原文 3：workflow\.py/ }).click();
+  await dialog.getByRole("radio", { name: /选择候选原文 3：workflow\.py/ }).click();
   await expect(dialog).toContainText("已选 1 个位置");
   await expect(acceptLocation).toBeEnabled();
   if (process.env.CAPTURE_DR0032_EVIDENCE === "1") {
@@ -4809,20 +5346,23 @@ test("keeps three ambiguous locations comparable on mobile and records a bounded
   });
 });
 
-test("cancels an unresolved evidence request without presenting it as rejected", async ({ page }) => {
-  const state = await mockHarness(page, { sourceRecovery: true });
-  await page.goto("/");
-  await page.getByRole("textbox", { name: "任务指令" }).fill("核对路由证据，但暂不作出来源选择。");
-  await page.getByRole("button", { name: "启动 Control Loop" }).click();
-  await page.locator(".loop-gap-branches > li").first().getByRole("button", { name: "选择原文位置" }).click();
+for (const viewport of [{ width: 1280, height: 720 }, { width: 390, height: 844 }]) {
+  test(`cancels an unresolved evidence request without presenting it as rejected at ${viewport.width}px`, async ({ page }) => {
+    await page.setViewportSize(viewport);
+    const state = await mockHarness(page, { sourceRecovery: true });
+    await page.goto("/");
+    await page.getByRole("textbox", { name: "任务指令" }).fill("核对路由证据，但暂不作出来源选择。");
+    await page.getByRole("button", { name: "启动 Control Loop" }).click();
+    await page.locator(".loop-gap-branches > li").first().getByRole("button", { name: "选择原文位置" }).click();
 
-  const dialog = page.getByRole("dialog", { name: "从 2 个原文位置中选 1 个" });
-  await dialog.getByText("查看技术回执与其他处理方式").click();
-  await dialog.getByRole("button", { name: "取消这次待决" }).click();
-  await expect.poll(() => state.controls.length).toBe(1);
-  expect(state.controls[0]).toMatchObject({ command: "decision", decision_action: "cancel", resolution_id: "resolution-111111111111" });
-  expect(state.controls[0].selected_candidate_id).toBeUndefined();
-});
+    const dialog = page.getByRole("dialog", { name: "从 2 个原文位置中选 1 个" });
+    await dialog.getByText("查看技术回执与其他处理方式").click();
+    await dialog.getByRole("button", { name: "取消这次待决" }).click();
+    await expect.poll(() => state.controls.length).toBe(1);
+    expect(state.controls[0]).toMatchObject({ command: "decision", decision_action: "cancel", resolution_id: "resolution-111111111111" });
+    expect(state.controls[0].selected_candidate_id).toBeUndefined();
+  });
+}
 
 test("keeps a deferred evidence request actionable until a final decision", async ({ page }) => {
   const state = await mockHarness(page, { sourceRecovery: true });
@@ -4832,15 +5372,14 @@ test("keeps a deferred evidence request actionable until a final decision", asyn
 
   await page.locator(".loop-gap-branches > li").first().getByRole("button", { name: "选择原文位置" }).click();
   let dialog = page.getByRole("dialog", { name: "从 2 个原文位置中选 1 个" });
-  await dialog.getByText("查看技术回执与其他处理方式").click();
-  await dialog.getByRole("button", { name: "保留现有结果，稍后处理" }).click();
+  await dialog.getByRole("button", { name: "暂不处理", exact: true }).click();
   await expect.poll(() => state.controls.length).toBe(1);
   expect(state.controls[0].decision_action).toBe("defer");
 
   await page.locator(".loop-gap-branches > li").first().getByRole("button", { name: "选择原文位置" }).click();
   dialog = page.getByRole("dialog", { name: "从 2 个原文位置中选 1 个" });
   await expect(dialog.getByRole("button", { name: "确认位置并继续" })).toBeVisible();
-  await dialog.getByRole("button", { name: /选择候选原文 1：workflow\.py/ }).click();
+  await dialog.getByRole("radio", { name: /选择候选原文 1：workflow\.py/ }).click();
   await dialog.getByRole("button", { name: "确认位置并继续" }).click();
   await expect.poll(() => state.controls.length).toBe(2);
   expect(state.controls[1]).toMatchObject({ command: "decision", decision_action: "accept", selected_candidate_id: "candidate-111111111111" });
@@ -5182,6 +5721,80 @@ test.describe("Demo 1/2 runtime acceptance", () => {
     await expect.poll(() => state.eventRequests.length).toBe(0);
   });
 
+  test("new task opens a clean draft, preserves history, and creates an independent task only on submit", async ({ page }) => {
+    const state = await mockSessionHistoryRuntime(page);
+    await page.goto("/");
+    const instruction = page.getByRole("textbox", { name: "任务指令" });
+    await expect(instruction).toHaveValue("同一任务的最新 Run");
+    await expect(instruction).toBeDisabled();
+
+    state.eventRequests.length = 0;
+    await page.getByRole("button", { name: "新建任务", exact: true }).click();
+    await expect(page.getByRole("status")).toContainText("上一任务不会停止或删除");
+    await expect(instruction).toBeEnabled();
+    await expect(instruction).toHaveValue("");
+    await expect(instruction).toBeFocused();
+    expect(state.starts).toHaveLength(0);
+    expect(state.controlRequests).toHaveLength(0);
+    await expect.poll(() => state.eventRequests.length).toBe(0);
+    await expect.poll(() => page.evaluate(() => ({
+      activeRun: window.sessionStorage.getItem("office-agent:forte-public-office:active-run"),
+      newTaskDraft: window.sessionStorage.getItem("office-agent:forte-public-office:new-task-draft"),
+    }))).toEqual({ activeRun: null, newTaskDraft: "1" });
+
+    const historyButton = page.locator(".data-workbench-status").getByRole("button", { name: /任务会话/ });
+    await historyButton.click();
+    await expect(page.getByTestId("task-session-history").locator("[data-testid=task-session]")).toHaveCount(2);
+    await historyButton.click();
+    if (process.env.CAPTURE_DR0060_EVIDENCE === "1") {
+      await page.setViewportSize({ width: 1440, height: 1000 });
+      await page.screenshot({ path: "../../docs/evidence/screenshots/dr-0060-new-task-desktop.png", fullPage: true });
+    }
+
+    await instruction.fill("创建一份独立的新任务简报");
+    await page.getByRole("button", { name: "启动 Control Loop" }).click();
+    await expect.poll(() => state.starts.length).toBe(1);
+    expect(state.starts[0]?.instruction).toBe("创建一份独立的新任务简报");
+    await expect(page.getByRole("status").filter({ hasText: "新任务草稿" })).toHaveCount(0);
+    await expect.poll(() => page.evaluate(() => ({
+      activeRun: window.sessionStorage.getItem("office-agent:forte-public-office:active-run"),
+      newTaskDraft: window.sessionStorage.getItem("office-agent:forte-public-office:new-task-draft"),
+    }))).toEqual({ activeRun: "harness:session-new-1", newTaskDraft: null });
+    await historyButton.click();
+    await expect(page.getByTestId("task-session-history").locator("[data-testid=task-session]")).toHaveCount(3);
+    await historyButton.click();
+
+    await page.getByRole("button", { name: "新建任务", exact: true }).click();
+    await instruction.fill("创建一份独立的新任务简报");
+    await page.getByRole("button", { name: "启动 Control Loop" }).click();
+    await expect.poll(() => state.starts.length).toBe(2);
+    expect(state.starts[1]?.idempotency_key).not.toBe(state.starts[0]?.idempotency_key);
+    await historyButton.click();
+    await expect(page.getByTestId("task-session-history").locator("[data-testid=task-session]")).toHaveCount(4);
+  });
+
+  test("new task draft is available on the capabilities page and survives refresh", async ({ page }) => {
+    const state = await mockSessionHistoryRuntime(page);
+    await page.goto("/agent-capabilities");
+    await expect(page.getByTestId("agent-current-task").or(page.locator(".agent-current-task"))).toContainText("当前任务");
+    await page.getByRole("tab", { name: "协作方式 Adaptive Swarm" }).click();
+    await page.getByRole("button", { name: "新建任务", exact: true }).click();
+    await expect(page.getByRole("tab", { name: "执行进展 Agent Control Loop" })).toHaveAttribute("aria-selected", "true");
+    expect(new URL(page.url()).hash).toBe("");
+    await expect(page.getByRole("status")).toContainText("新任务草稿");
+    await expect(page.getByRole("textbox", { name: "任务指令" })).toBeFocused();
+    expect(state.starts).toHaveLength(0);
+
+    await page.reload();
+    await expect(page.getByRole("status")).toContainText("上一任务不会停止或删除");
+    await expect(page.locator(".agent-current-task")).toHaveCount(0);
+    await expect(page.getByRole("textbox", { name: "任务指令" })).toBeEnabled();
+    if (process.env.CAPTURE_DR0060_EVIDENCE === "1") {
+      await page.setViewportSize({ width: 390, height: 844 });
+      await page.screenshot({ path: "../../docs/evidence/screenshots/dr-0060-new-task-capabilities-390.png", fullPage: true });
+    }
+  });
+
   test("current nonterminal session reconnects from the latest sequence", async ({ page }) => {
     await mockSessionHistoryRuntime(page);
     const requests: string[] = [];
@@ -5266,7 +5879,7 @@ test.describe("Demo 1/2 runtime acceptance", () => {
     await expect(capabilities.getByRole("heading", { name: "Agent 能力工作台" })).toBeVisible();
     const surface = capabilities.getByTestId("agent-capabilities-surface");
     await expect(surface.getByRole("tab", { name: /执行进展/ })).toHaveAttribute("aria-selected", "true");
-    await expect(surface.getByTestId("agent-control-loop-capability")).toContainText("工作进展");
+    await expect(surface.getByTestId("agent-control-loop-capability")).toContainText("你想推进什么工作");
     await expect(surface.getByTestId("agent-collaboration-tab")).toHaveAttribute("aria-selected", "false");
     await expect(surface.getByTestId("agent-progress-tab")).toHaveAttribute("tabindex", "0");
     await expect(surface.getByTestId("agent-collaboration-tab")).toHaveAttribute("tabindex", "-1");
@@ -5275,8 +5888,9 @@ test.describe("Demo 1/2 runtime acceptance", () => {
     await surface.getByTestId("agent-collaboration-tab").press("ArrowLeft");
     await expect(surface.getByTestId("agent-progress-tab")).toHaveAttribute("aria-selected", "true");
     await expect(surface.getByTestId("adaptive-swarm-capability")).toHaveCount(0);
-    await expect(surface.locator(".agent-capability-empty")).toHaveCount(1);
-    await expect(capabilities.getByRole("link", { name: "返回工作现场" })).toHaveAttribute("href", "/");
+    await expect(surface.getByRole("textbox", { name: "任务指令" })).toBeEmpty();
+    await expect(surface.getByRole("button", { name: "启动 Control Loop" })).toBeDisabled();
+    await expect(capabilities.getByRole("link", { name: "返回办公资料库" })).toHaveAttribute("href", "/");
     await capabilities.getByTestId("agent-collaboration-tab").click();
     await expect(page).toHaveURL(/#adaptive-swarm$/);
     await expect(surface.getByTestId("adaptive-swarm-capability")).toBeVisible();
@@ -5291,6 +5905,7 @@ test.describe("Demo 1/2 runtime acceptance", () => {
     const controlFacts = capabilities.getByTestId("agent-control-loop-capability");
     await expect(controlFacts.locator(".agent-capability-facts")).toHaveCount(0);
     await controlFacts.getByRole("button", { name: "查看完整执行记录" }).click();
+    await page.locator(".cap-protocol-record > summary").click();
     await expect(surface.getByTestId("agent-execution-details")).toContainText("持续处理链");
     await expect(surface.getByTestId("agent-execution-details")).toContainText("服务端路线");
     await controlFacts.getByRole("button", { name: "跳到 Adaptive Swarm" }).click();
@@ -5299,16 +5914,16 @@ test.describe("Demo 1/2 runtime acceptance", () => {
     await expect(collaboration).toContainText("Adaptive Swarm");
     await expect(collaboration).toContainText("任务准入");
     await expect(collaboration.locator(".collaboration-route-options article")).toHaveCount(3);
-    await expect(collaboration.locator(".collaboration-disclosure")).toHaveCount(3);
-    await expect(collaboration.locator(".adaptive-task-context")).toContainText("当前任务");
-    await expect(collaboration.locator(".adaptive-task-context")).toContainText("Run 1");
-    await expect(collaboration.locator(".adaptive-history-link")).toContainText("历史 Run（只读）");
+    await expect(collaboration.locator(".collaboration-disclosure")).toHaveCount(4);
+    await expect(surface.locator(".agent-current-task")).toContainText("当前任务");
+    await expect(surface.getByRole("button", { name: "任务会话" })).toContainText("Run 1");
+    await expect(surface.getByRole("button", { name: "任务会话" })).toBeEnabled();
     const dag = collaboration.getByTestId("adaptive-workunit-dag");
-    await expect(collaboration.getByRole("link", { name: "返回资料库" })).toHaveAttribute("href", "/");
+    await expect(surface.getByRole("link", { name: "返回办公资料库" })).toHaveAttribute("href", "/");
     await expect(dag.locator(".adaptive-dag-node")).toHaveCount(5);
-    await expect(dag.locator(".adaptive-dag-node").filter({ hasText: "产品上线 Gate" })).toContainText("根");
+    await expect(dag.locator(".adaptive-dag-node").filter({ has: page.getByText("产品上线 Gate", { exact: true }) })).toContainText("根");
     await expect(dag.locator(".adaptive-dag-node").filter({ hasText: "跨工作包优先级与影响核对" })).toContainText("依赖 1");
-    await expect(dag.locator(".adaptive-dag-node").filter({ hasText: "产品上线 Gate" })).toContainText("下一波待确认 / 可执行");
+    await expect(dag.locator(".adaptive-dag-node").filter({ has: page.getByText("产品上线 Gate", { exact: true }) })).toContainText("下一波待确认 / 可执行");
     await expect(dag.locator(".adaptive-dag-node").filter({ hasText: "跨工作包优先级与影响核对" })).toContainText("等待前置工作");
     await expect(dag.locator("path.adaptive-dag-edge")).toHaveCount(2);
     await expect(dag.locator("marker")).toHaveCount(1);
@@ -5316,7 +5931,7 @@ test.describe("Demo 1/2 runtime acceptance", () => {
     await expect(dag.locator(".adaptive-dag-edge[data-from='demo2-root-a'][data-to='demo2-dependent-d']")).toHaveCount(1);
     await expect(dag.locator(".adaptive-dag-edge[data-from='demo2-root-a'][data-to='demo2-dependent-d']")).toHaveAttribute("data-edge-kind", "parent-to-dependent");
     await expect(dag.locator(".adaptive-dag-edge[data-from='demo2-root-a'][data-to='demo2-dependent-d']")).toHaveAttribute("marker-end", "url(#adaptive-dag-arrow)");
-    await expect(dag.locator(".adaptive-dag-edge[data-from='demo2-root-a'][data-to='demo2-dependent-d']")).toHaveAttribute("d", /M .* V .* H .* V/);
+    await expect(dag.locator(".adaptive-dag-edge[data-from='demo2-root-a'][data-to='demo2-dependent-d']")).toHaveAttribute("d", /M .* C .*, .*, /);
     await expect(collaboration.getByRole("complementary", { name: "当前影响" })).toContainText("下一波已就绪，等待你确认");
     await expect(collaboration.getByRole("complementary", { name: "当前影响" })).toContainText("将启动：产品上线 Gate、搜索 Agent 运行风险、交互痛点证据");
     await expect(collaboration.getByRole("complementary", { name: "当前影响" })).toContainText("前置工作包尚未完成");
@@ -5336,7 +5951,7 @@ test.describe("Demo 1/2 runtime acceptance", () => {
       await page.evaluate(() => window.scrollTo(0, 0));
       await page.screenshot({ path: capabilityScreenshotPath("capability-mobile-adaptive-390.png"), fullPage: true });
     }
-    await collaboration.locator(".collaboration-disclosure").first().locator("summary").click();
+    await collaboration.locator(".collaboration-disclosure").filter({ has: page.locator(".collaboration-package-list") }).locator("summary").click();
     await expect(collaboration.locator(".collaboration-package-list article")).toHaveCount(5);
     await expect(collaboration).toBeInViewport();
     if (process.env.CAPTURE_DR0057_EVIDENCE === "1") {
@@ -5349,7 +5964,7 @@ test.describe("Demo 1/2 runtime acceptance", () => {
     await expect(page).toHaveURL(/\/agent-capabilities#adaptive-swarm$/);
     await expect(page.getByTestId("agent-collaboration-tab")).toHaveAttribute("aria-selected", "true");
     await expect(page.getByTestId("adaptive-swarm-capability")).toBeVisible();
-    await page.getByRole("link", { name: "返回工作现场" }).click();
+    await page.getByRole("link", { name: "返回办公资料库" }).click();
     await expect(page).toHaveURL(/\/$/);
     await expect(page.getByRole("heading", { name: "办公资料库" })).toBeVisible();
     await page.getByRole("link", { name: "Agent 能力" }).click();
@@ -5371,10 +5986,11 @@ test.describe("Demo 1/2 runtime acceptance", () => {
     expect(state.eventRequests.at(-1)).toContain("after=4");
     await page.getByTestId("agent-progress-tab").click();
     await page.getByRole("button", { name: "查看完整执行记录" }).click();
+    await page.locator(".cap-protocol-record > summary").click();
     await expect(page.getByTestId("task-lineage")).toContainText("当前任务");
     await page.reload();
     await expect(page.getByTestId("agent-capabilities-page")).toBeVisible();
-    await expect(page.getByTestId("agent-control-loop-capability")).toContainText("工作进展");
+    await expect(page.getByRole("heading", { name: "任务进展", exact: true })).toBeVisible();
     await expect(page.getByTestId("agent-progress-tab")).toHaveAttribute("aria-selected", "true");
     await expect(page.getByTestId("adaptive-swarm-capability")).toHaveCount(0);
     await page.getByTestId("agent-collaboration-tab").click();
@@ -5419,7 +6035,7 @@ test.describe("Demo 1/2 runtime acceptance", () => {
     await expect(packageStage).toContainText("正在处理");
     const dependentNode = collaboration.getByTestId("adaptive-workunit-dag").locator(".adaptive-dag-node").filter({ hasText: "跨工作包优先级与影响核对" });
     await expect(dependentNode).toContainText("下一波待确认 / 可执行");
-    await collaboration.locator(".collaboration-disclosure").first().locator("summary").click();
+    await collaboration.locator(".collaboration-disclosure").filter({ has: page.locator(".collaboration-package-list") }).locator("summary").click();
     await expect(collaboration.locator(".collaboration-package-list article").filter({ hasText: "跨工作包优先级与影响核对" })).toContainText("下一波待确认 / 可执行");
     await collaboration.getByRole("button", { name: "继续下一批" }).click();
     await expect(collaboration.getByRole("status")).toContainText("协作已完成");
@@ -5438,6 +6054,73 @@ test.describe("Demo 1/2 runtime acceptance", () => {
     await expect(summary).not.toContainText("状态待确认");
     await expect(summary).not.toContainText("服务端继续推进");
     await expect(summary).not.toContainText("当前没有待处理事项");
+  });
+
+  test("Agent capabilities route accounts for every explicit requirement without inventing a sixth branch", async ({ page }) => {
+    await mockHarness(page, { explicitRequirementCoverage: true });
+    await page.goto("/agent-capabilities");
+    await page.getByRole("textbox", { name: "任务指令" }).fill("分别核对六项业务分支");
+    await page.getByRole("button", { name: "启动 Control Loop" }).click();
+
+    const summary = page.getByTestId("agent-progress-summary");
+    await expect(summary).toContainText("1 项缺少资料来源");
+    await page.getByRole("button", { name: "查看完整执行记录" }).click();
+    await page.locator(".cap-protocol-record > summary").click();
+    const branches = page.locator(".loop-branches");
+    await expect(branches).toContainText("5 条可执行分支，1 项资料缺口");
+    await expect(branches.locator(":scope > ol > li")).toHaveCount(5);
+    const uncovered = page.locator('[aria-label="本轮资料缺口"]');
+    await expect(uncovered).toContainText("外呼合规流程覆盖");
+    await expect(uncovered).toContainText("冻结的公开资料库");
+    await expect(uncovered).toContainText("系统没有搜索互联网");
+
+    await page.setViewportSize({ width: 390, height: 844 });
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+    expect(overflow).toBeLessThanOrEqual(0);
+  });
+
+  test("deferred explicit requirement remains actionable without offering an empty Worker wave", async ({ page }, testInfo) => {
+    const state = await mockHarness(page, { deferredRequirementCoverage: true });
+    await page.goto("/agent-capabilities");
+    await page.getByRole("textbox", { name: "任务指令" }).fill("分别核对六项业务分支");
+    await page.getByRole("button", { name: "启动 Control Loop" }).click();
+
+    await page.getByRole("button", { name: "查看完整执行记录" }).click();
+    await page.locator(".cap-protocol-record > summary").click();
+    const branches = page.locator(".loop-branches");
+    await expect(branches).toContainText("5 条可执行分支，1 项后续处理");
+    await expect(branches.locator(":scope > ol > li")).toHaveCount(5);
+    const deferred = page.getByRole("region", { name: "后续轮次核对项" });
+    await expect(deferred).toContainText("外呼合规流程覆盖");
+    await expect(deferred).toContainText("已知来源，尚未进入本轮");
+    await expect(deferred.getByRole("button", { name: "继续此项" })).toBeEnabled();
+    await expect(page.locator(".loop-worker-confirmation")).toHaveCount(0);
+
+    await page.getByRole("button", { name: "返回任务进展", exact: true }).click();
+    await page.getByTestId("agent-collaboration-tab").click();
+    const collaboration = page.getByTestId("collaboration-overview");
+    await expect(collaboration.getByRole("status")).toContainText("请回到工作进展选择后续分支");
+    await expect(collaboration.getByRole("button", { name: "继续下一批" })).toHaveCount(0);
+    await expect(collaboration.getByRole("button", { name: "确认并开始协作" })).toHaveCount(0);
+    await expect(collaboration.getByRole("button", { name: "处理待确认项" })).toBeVisible();
+    await expect(collaboration.getByRole("complementary", { name: "当前影响" })).toContainText("当前不属于可执行 Worker 波次");
+    if (process.env.CAPTURE_REQUIREMENT_COVERAGE === "1") {
+      await page.setViewportSize({ width: 1440, height: 1100 });
+      await page.screenshot({ path: testInfo.outputPath("deferred-requirement-desktop.png"), fullPage: true });
+    }
+
+    await page.setViewportSize({ width: 390, height: 844 });
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+    expect(overflow).toBeLessThanOrEqual(0);
+    if (process.env.CAPTURE_REQUIREMENT_COVERAGE === "1") {
+      await page.screenshot({ path: testInfo.outputPath("deferred-requirement-mobile.png"), fullPage: true });
+    }
+
+    await page.getByTestId("agent-progress-tab").click();
+    await page.getByRole("button", { name: "查看完整执行记录" }).click();
+    await page.locator(".cap-protocol-record > summary").click();
+    await deferred.getByRole("button", { name: "继续此项" }).click();
+    await expect.poll(() => state.controls.at(-1)?.branch_id).toBe("branch-coverage-deferred");
   });
 
   test("Agent capabilities route derives blocked downstream impact from Snapshot facts", async ({ page }) => {
@@ -5466,6 +6149,7 @@ test.describe("Demo 1/2 runtime acceptance", () => {
     const surface = page.getByTestId("agent-capabilities-surface");
     await expect(surface.getByTestId("agent-progress-summary")).toContainText("当前进展");
     await surface.getByRole("button", { name: "查看完整执行记录" }).click();
+    await page.locator(".cap-protocol-record > summary").click();
     await surface.getByRole("button", { name: /核对：/ }).first().click();
     await expect(page.locator(".evidence-review-page")).toBeVisible();
     await expect(page.locator(".evidence-review-page")).toContainText("证据定位");

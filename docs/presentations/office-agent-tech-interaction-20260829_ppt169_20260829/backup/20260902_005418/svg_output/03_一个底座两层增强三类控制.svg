@@ -1,0 +1,83 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720" width="1280" height="720">
+  <g id="background">
+    <rect width="1280" height="720" fill="#F7F8FA"/>
+    <path d="M52 112H1228" fill="none" stroke="#CBD5DF" stroke-width="2"/>
+  </g>
+  <g id="header">
+    <text x="52" y="78" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="46" font-weight="700" fill="#132A3A">一个底座、两层增强、三类控制</text>
+    <rect x="1054" y="45" width="174" height="34" rx="6" fill="#EDF1F4"/>
+    <text x="1141" y="68" text-anchor="middle" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#1769E0">07-16 架构主线</text>
+    <text x="52" y="146" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#5A6B7C">底座负责每次任务都要有的稳定能力；增强层只在任务变长、变复杂时启用；控制机制贯穿所有层。</text>
+  </g>
+  <g id="cross-cutting-controls">
+    <text x="52" y="188" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="24" font-weight="700" fill="#132A3A">三类控制：决定“能不能继续”</text>
+    <rect x="52" y="210" width="272" height="112" rx="6" fill="#FFFFFF" stroke="#1769E0" stroke-width="2"/>
+    <use data-icon="tabler-outline/target-arrow" x="70" y="230" width="26" height="26" fill="#1769E0" stroke-width="2"/>
+    <text x="108" y="250" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="24" font-weight="700" fill="#132A3A">Task Control</text>
+    <text x="70" y="280" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#5A6B7C">目标、范围、预算、暂停、停止</text>
+    <text x="70" y="304" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="14" fill="#1769E0">防止任务跑偏或无限继续</text>
+    <rect x="52" y="338" width="272" height="112" rx="6" fill="#FFFFFF" stroke="#2E7D32" stroke-width="2"/>
+    <use data-icon="tabler-outline/link" x="70" y="358" width="26" height="26" fill="#2E7D32" stroke-width="2"/>
+    <text x="108" y="378" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="24" font-weight="700" fill="#132A3A">Evidence Control</text>
+    <text x="70" y="408" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#5A6B7C">来源、冲突、验证、采用与拒绝</text>
+    <text x="70" y="432" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="14" fill="#2E7D32">防止模型说明覆盖业务事实</text>
+    <rect x="52" y="466" width="272" height="112" rx="6" fill="#FFFFFF" stroke="#D97706" stroke-width="2"/>
+    <use data-icon="tabler-outline/shield-check" x="70" y="486" width="26" height="26" fill="#D97706" stroke-width="2"/>
+    <text x="108" y="506" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="24" font-weight="700" fill="#132A3A">Action Control</text>
+    <text x="70" y="536" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#5A6B7C">风险、审批、Permit、执行回执</text>
+    <text x="70" y="560" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="14" fill="#B54708">防止“建议”被误认成“已执行”</text>
+  </g>
+  <g id="layered-runtime">
+    <text x="356" y="188" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="24" font-weight="700" fill="#132A3A">两层增强：任务越复杂，运行时越强</text>
+    <rect x="356" y="210" width="538" height="106" rx="6" fill="#FFFFFF" stroke="#D97706" stroke-width="2" stroke-dasharray="8 6"/>
+    <use data-icon="tabler-outline/git-branch" x="376" y="232" width="28" height="28" fill="#D97706" stroke-width="2"/>
+    <text x="418" y="248" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="21" font-weight="700" fill="#132A3A">增强 2：Governed Adaptive Swarm</text>
+    <text x="376" y="276" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="15" fill="#5A6B7C">当前：Admission → WorkUnit DAG → ≤3 只读 Worker</text>
+    <text x="376" y="299" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="13" fill="#B54708">→ Contribution Gate；目标：持久队列 / 远程 Worker / 多实例调度</text>
+    <rect x="804" y="222" width="70" height="26" rx="5" fill="#EDF1F4"/>
+    <text x="839" y="241" text-anchor="middle" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="13" fill="#B54708">受限纵切</text>
+    <path d="M625 316V338" fill="none" stroke="#CBD5DF" stroke-width="3"/>
+    <rect x="356" y="338" width="538" height="106" rx="6" fill="#EDF1F4" stroke="#1769E0" stroke-width="2"/>
+    <use data-icon="tabler-outline/refresh" x="376" y="360" width="28" height="28" fill="#1769E0" stroke-width="2"/>
+    <text x="418" y="380" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="24" font-weight="700" fill="#132A3A">增强 1：Agent Control Loop</text>
+    <text x="376" y="410" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#5A6B7C">长任务：按轮推进、按 Branch 补证、保留 Artifact 历史并可恢复</text>
+    <rect x="778" y="352" width="96" height="26" rx="5" fill="#FFFFFF"/>
+    <text x="826" y="371" text-anchor="middle" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="14" fill="#1769E0">当前受限实现</text>
+    <path d="M625 444V466" fill="none" stroke="#CBD5DF" stroke-width="3"/>
+    <rect x="356" y="466" width="538" height="112" rx="6" fill="#132A3A"/>
+    <use data-icon="tabler-outline/server" x="376" y="488" width="30" height="30" fill="#FFFFFF" stroke-width="2"/>
+    <text x="422" y="512" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="28" font-weight="700" fill="#FFFFFF">底座：Unified Agent Runtime</text>
+    <text x="376" y="544" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#CBD5DF">每个任务都稳定承接：Task · State · Context · Execution</text>
+    <text x="376" y="568" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#CBD5DF">Capability · Evidence · Policy · Trace</text>
+  </g>
+  <g id="frontstage-impact">
+    <text x="926" y="188" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="24" font-weight="700" fill="#132A3A">前台最终只回答三件事</text>
+    <rect x="926" y="210" width="302" height="368" rx="6" fill="#FFFFFF" stroke="#CBD5DF" stroke-width="2"/>
+    <circle cx="958" cy="254" r="18" fill="#1769E0"/>
+    <text x="958" y="260" text-anchor="middle" font-family="Consolas, &quot;Courier New&quot;, monospace" font-size="17" font-weight="700" fill="#FFFFFF">1</text>
+    <text x="990" y="248" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="17" font-weight="700" fill="#132A3A">任务现在走到哪</text>
+    <text x="990" y="275" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="14" fill="#5A6B7C">轮次、分支、版本、预算、恢复点</text>
+    <path d="M950 304H1204" fill="none" stroke="#E3E8ED" stroke-width="2"/>
+    <circle cx="958" cy="348" r="18" fill="#2E7D32"/>
+    <text x="958" y="354" text-anchor="middle" font-family="Consolas, &quot;Courier New&quot;, monospace" font-size="17" font-weight="700" fill="#FFFFFF">2</text>
+    <text x="990" y="342" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="17" font-weight="700" fill="#132A3A">当前结论凭什么成立</text>
+    <text x="990" y="369" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="14" fill="#5A6B7C">来源、成果校验、冲突与采用状态</text>
+    <path d="M950 398H1204" fill="none" stroke="#E3E8ED" stroke-width="2"/>
+    <circle cx="958" cy="442" r="18" fill="#D97706"/>
+    <text x="958" y="448" text-anchor="middle" font-family="Consolas, &quot;Courier New&quot;, monospace" font-size="17" font-weight="700" fill="#FFFFFF">3</text>
+    <text x="990" y="436" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="17" font-weight="700" fill="#132A3A">哪些动作发生了</text>
+    <text x="990" y="463" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="14" fill="#5A6B7C">影响预览、人工确认、执行或未发生</text>
+    <rect x="950" y="500" width="254" height="54" rx="6" fill="#EDF1F4"/>
+    <text x="1077" y="522" text-anchor="middle" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="14" font-weight="700" fill="#132A3A">用户不需要理解架构名词</text>
+    <text x="1077" y="544" text-anchor="middle" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="14" fill="#5A6B7C">只需看见状态、依据与下一步</text>
+  </g>
+  <g id="takeaway">
+    <rect x="52" y="606" width="1176" height="48" rx="6" fill="#EDF1F4"/>
+    <text x="76" y="637" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="17" font-weight="700" fill="#132A3A">一句话：</text>
+    <text x="148" y="637" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#5A6B7C">底座保证任务不失控，增强层处理时间和组织复杂度，三类控制保证结果与动作可被复核。</text>
+  </g>
+  <g id="footer">
+    <text x="52" y="690" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="14" fill="#7C8A98">线上实践依据：ReAct · LangGraph Persistence · OpenAI Agents SDK Human-in-the-loop · MCP</text>
+    <text x="1228" y="690" text-anchor="end" font-family="Consolas, &quot;Courier New&quot;, monospace" font-size="14" fill="#7C8A98">03 / 24</text>
+  </g>
+</svg>
