@@ -10,10 +10,12 @@ class Settings(BaseSettings):
     api_cors_origins: str = "http://localhost:3000"
     langgraph_checkpoint_dsn: str = ""
     database_dsn: str = ""
+    state_store_mode: str = "auto"
     llm_base_url: str = ""
     llm_api_key: str = ""
     llm_model: str = "deepseek-v4-pro"
     llm_timeout_seconds: float = 60
+    llm_analysis_timeout_seconds: float = 180
     llm_thinking_mode: str = "disabled"
     policy_version: str = "2026-07-v1"
     permit_private_key_path: str = ""

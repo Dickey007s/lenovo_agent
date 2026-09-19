@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 1280 720" width="1280" height="720">
+  <g id="background"><rect width="1280" height="720" fill="#F7F9FC"/><text x="56" y="74" font-family="'Microsoft YaHei UI','Segoe UI',Arial,sans-serif" font-size="44" font-weight="700" fill="#172230">多 Agent 不靠“互相转述”，而靠共享工件版本收敛</text><text x="56" y="112" font-family="'Microsoft YaHei UI','Segoe UI',Arial,sans-serif" font-size="18" fill="#526579">每个 Worker 交付带来源、版本、digest 与验证状态的 Artifact</text></g>
+  <g id="receipt-image">
+    <rect x="56" y="150" width="684" height="475" fill="#FFFFFF" stroke="#CAD6E3"/>
+    <image x="68" y="162" width="660" height="451" xlink:href="../images/dr-0015-demo2-controlled-execution-1440-completed-receipt.png" preserveAspectRatio="xMidYMid meet"/>
+  </g>
+  <g id="composition">
+    <rect x="780" y="150" width="444" height="104" fill="#0B3A70"/>
+    <text x="802" y="184" font-family="'Microsoft YaHei UI','Segoe UI',Arial,sans-serif" font-size="18" fill="#EAF0F7">父工件</text><text x="802" y="220" font-family="'Microsoft YaHei UI','Segoe UI',Arial,sans-serif" font-size="26" font-weight="700" fill="#FFFFFF">客户 A 可验证经营汇报包</text>
+    <line x1="1002" y1="254" x2="1002" y2="292" stroke="#0B3A70" stroke-width="3"/>
+    <line x1="830" y1="292" x2="1174" y2="292" stroke="#0B3A70" stroke-width="3"/>
+    <line x1="830" y1="292" x2="830" y2="316" stroke="#0B3A70" stroke-width="3"/><line x1="1002" y1="292" x2="1002" y2="316" stroke="#0B3A70" stroke-width="3"/><line x1="1174" y1="292" x2="1174" y2="316" stroke="#0B3A70" stroke-width="3"/>
+    <rect x="780" y="316" width="136" height="168" fill="#FFFFFF" stroke="#CAD6E3"/><rect x="934" y="316" width="136" height="168" fill="#FFFFFF" stroke="#CAD6E3"/><rect x="1088" y="316" width="136" height="168" fill="#FFFFFF" stroke="#CAD6E3"/>
+    <text x="796" y="350" font-family="'Microsoft YaHei UI','Segoe UI',Arial,sans-serif" font-size="17" font-weight="700" fill="#172230">收入事实</text><text x="796" y="382" font-family="'Microsoft YaHei UI','Segoe UI',Arial,sans-serif" font-size="15" fill="#526579">财务关账</text><text x="796" y="408" font-family="'Microsoft YaHei UI','Segoe UI',Arial,sans-serif" font-size="15" fill="#526579">销售预测</text><text x="796" y="452" font-family="Consolas,'Courier New',monospace" font-size="14" fill="#0B3A70">v2 · passed</text>
+    <text x="950" y="350" font-family="'Microsoft YaHei UI','Segoe UI',Arial,sans-serif" font-size="17" font-weight="700" fill="#172230">项目风险</text><text x="950" y="382" font-family="'Microsoft YaHei UI','Segoe UI',Arial,sans-serif" font-size="15" fill="#526579">周报来源</text><text x="950" y="408" font-family="'Microsoft YaHei UI','Segoe UI',Arial,sans-serif" font-size="15" fill="#526579">影响范围</text><text x="950" y="452" font-family="Consolas,'Courier New',monospace" font-size="14" fill="#16845B">v2 · passed</text>
+    <text x="1104" y="350" font-family="'Microsoft YaHei UI','Segoe UI',Arial,sans-serif" font-size="17" font-weight="700" fill="#172230">客户回复</text><text x="1104" y="382" font-family="'Microsoft YaHei UI','Segoe UI',Arial,sans-serif" font-size="15" fill="#526579">邮件要求</text><text x="1104" y="408" font-family="'Microsoft YaHei UI','Segoe UI',Arial,sans-serif" font-size="15" fill="#526579">草稿未发送</text><text x="1104" y="452" font-family="Consolas,'Courier New',monospace" font-size="14" fill="#16845B">v2 · passed</text>
+    <rect x="780" y="506" width="444" height="119" fill="#EAF0F7"/>
+    <text x="802" y="540" font-family="'Microsoft YaHei UI','Segoe UI',Arial,sans-serif" font-size="18" font-weight="700" fill="#0B3A70">用户能检查的四件事</text><text x="802" y="574" font-family="'Microsoft YaHei UI','Segoe UI',Arial,sans-serif" font-size="17" fill="#172230">来自哪里 · 谁处理 · 当前版本 · 是否验证</text><text x="802" y="604" font-family="'Microsoft YaHei UI','Segoe UI',Arial,sans-serif" font-size="16" fill="#526579">冲突只影响依赖分支，已验证工作被保留</text>
+  </g>
+  <g id="footer"><text x="56" y="670" font-family="'Microsoft YaHei UI','Segoe UI',Arial,sans-serif" font-size="14" fill="#8291A3">Fixed path Limited Verified；通用跨 Worker 一致性与分布式存储仍是 Draft</text><text x="1224" y="670" text-anchor="end" font-family="Consolas,'Courier New',monospace" font-size="16" fill="#0B3A70">P10</text></g>
+</svg>

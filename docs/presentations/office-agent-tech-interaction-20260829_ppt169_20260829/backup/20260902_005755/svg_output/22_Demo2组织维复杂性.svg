@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720" width="1280" height="720">
+  <g id="background">
+    <rect width="1280" height="720" fill="#F7F8FA"/>
+    <path d="M52 112H1228" fill="none" stroke="#CBD5DF" stroke-width="2"/>
+  </g>
+  <g id="header">
+    <text x="52" y="78" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="46" font-weight="700" fill="#132A3A">Demo 2：复杂任务怎样拆解并收敛</text>
+    <rect x="1054" y="46" width="174" height="34" rx="6" fill="#EDF1F4"/>
+    <text x="1141" y="69" text-anchor="middle" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#1769E0">当前系统实测</text>
+    <text x="52" y="146" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#5A6B7C">07-16 的智能工作驾驶舱仍是产品目标；当前先验证它底层的一段组织能力，而不是先造任务队列。</text>
+  </g>
+  <g id="input-process-output">
+    <path d="M84 198V544" fill="none" stroke="#CBD5DF" stroke-width="4"/>
+    <circle cx="84" cy="212" r="22" fill="#1769E0"/>
+    <text x="84" y="219" text-anchor="middle" font-family="Consolas, &quot;Courier New&quot;, monospace" font-size="18" font-weight="700" fill="#FFFFFF">1</text>
+    <text x="124" y="207" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="24" font-weight="700" fill="#132A3A">输入：一个复杂但只读的办公任务</text>
+    <text x="124" y="238" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#5A6B7C">跨产品、算法、交互三条工作线核对风险与证据，</text>
+    <text x="124" y="264" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#5A6B7C">先独立核对，再形成统一简报。</text>
+
+    <circle cx="84" cy="342" r="22" fill="#D97706"/>
+    <text x="84" y="349" text-anchor="middle" font-family="Consolas, &quot;Courier New&quot;, monospace" font-size="18" font-weight="700" fill="#FFFFFF">2</text>
+    <text x="124" y="337" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="24" font-weight="700" fill="#132A3A">过程：真实依赖决定执行波次</text>
+    <text x="124" y="368" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#5A6B7C">Topology Admission 编译出 5 个 WorkUnit：</text>
+    <text x="124" y="394" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#5A6B7C">3 个根工作包先执行，2 个依赖工作包等待下一波。</text>
+
+    <circle cx="84" cy="476" r="22" fill="#2E7D32"/>
+    <text x="84" y="483" text-anchor="middle" font-family="Consolas, &quot;Courier New&quot;, monospace" font-size="18" font-weight="700" fill="#FFFFFF">3</text>
+    <text x="124" y="471" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="24" font-weight="700" fill="#132A3A">输出：统一成果与一个明确待办</text>
+    <text x="124" y="502" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="16" fill="#5A6B7C">3/3 Contribution 已采用，Artifact v1 已保留；</text>
+    <text x="124" y="527" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="16" fill="#5A6B7C">右侧只突出“继续下一批”，</text>
+    <text x="124" y="552" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="16" fill="#5A6B7C">不要求用户管理多个会话。</text>
+  </g>
+  <g id="runtime-screenshot">
+    <rect x="558" y="166" width="670" height="456" rx="6" fill="#FFFFFF" stroke="#CBD5DF" stroke-width="2"/>
+    <image href="../images/dr-0058-adaptive-execution-workspace-1440.png" x="570" y="178" width="646" height="432" preserveAspectRatio="xMidYMid meet"/>
+    <rect x="578" y="190" width="132" height="30" rx="5" fill="#132A3A"/>
+    <text x="644" y="211" text-anchor="middle" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="14" font-weight="700" fill="#FFFFFF">受控 Adaptive 纵切</text>
+    <path d="M834 400H958" fill="none" stroke="#D97706" stroke-width="3"/>
+    <path d="M958 400L946 393V407Z" fill="#D97706"/>
+    <rect x="890" y="366" width="160" height="28" rx="5" fill="#FFFFFF" stroke="#D97706" stroke-width="2"/>
+    <text x="970" y="386" text-anchor="middle" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="14" font-weight="700" fill="#B54708">下一波由用户确认</text>
+  </g>
+  <g id="boundary">
+    <rect x="52" y="642" width="1176" height="40" rx="6" fill="#132A3A"/>
+    <text x="76" y="668" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="17" font-weight="700" fill="#FFFFFF">当前边界：</text>
+    <text x="164" y="668" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#FFFFFF">单 API 进程、顺序波次、每波最多 3 个只读 Worker；不是分布式 Swarm，也不是完整智能工作驾驶舱。</text>
+  </g>
+  <g id="footer">
+    <text x="52" y="706" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="14" fill="#7C8A98">线上研究依据：A2A Protocol · OpenClaw Multi-agent routing · Nielsen Norman Group Progressive Disclosure</text>
+    <text x="1228" y="706" text-anchor="end" font-family="Consolas, &quot;Courier New&quot;, monospace" font-size="14" fill="#7C8A98">22 / 24</text>
+  </g>
+</svg>

@@ -1,0 +1,87 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720" width="1280" height="720">
+  <g id="background"><rect width="1280" height="720" fill="#F7F8FA" /><path d="M52 112H1228" stroke="#CBD5DF" stroke-width="2" /></g>
+  <g id="header">
+    <text x="52" y="78" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="46" font-weight="700" fill="#132A3A">主流方案的差别，首先是“用户在审什么”</text>
+    <path fill="#EDF1F4" d="M1090,46 H1222 A6,6 0 0 1 1228,52 V74 A6,6 0 0 1 1222,80 H1090 A6,6 0 0 1 1084,74 V52 A6,6 0 0 1 1090,46 Z" /><text x="1156" y="69" text-anchor="middle" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#1769E0">竞品官方调研</text>
+  </g>
+  <g id="lead">
+    <text x="52" y="154" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="28" font-weight="700" fill="#132A3A">不做功能打勾表，比较一等交互对象</text>
+    <text x="52" y="188" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#5A6B7C">官方材料可以说明产品重心，不能据此推出竞品做不到其他能力。</text>
+  </g>
+  <g id="competitor-grid">
+    <path fill="#FFFFFF" stroke="#CBD5DF" stroke-width="2" d="M58,224 H406 A6,6 0 0 1 412,230 V376 A6,6 0 0 1 406,382 H58 A6,6 0 0 1 52,376 V230 A6,6 0 0 1 58,224 Z" />
+
+  <g transform="translate(74, 246) scale(1.16667)" fill="none" stroke="#1769E0" stroke-width="2">
+    <path d="M3 9a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v9a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2l0 -9" />
+    <path d="M8 7v-2a2 2 0 0 1 2 -2h4a2 2 0 0 1 2 2v2" />
+    <path d="M12 12l0 .01" />
+    <path d="M3 13a20 20 0 0 0 18 0" />
+  </g>
+    <text x="116" y="268" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="24" font-weight="700" fill="#132A3A">Microsoft 365 Copilot</text>
+    <text x="74" y="308" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#5A6B7C">审：文件、邮件、会议、站点与人员</text>
+    <text x="74" y="340" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="17" font-weight="700" fill="#1769E0">交互对象：工作内容与引用范围</text>
+
+    <path fill="#FFFFFF" stroke="#CBD5DF" stroke-width="2" d="M442,224 H790 A6,6 0 0 1 796,230 V376 A6,6 0 0 1 790,382 H442 A6,6 0 0 1 436,376 V230 A6,6 0 0 1 442,224 Z" />
+
+  <g transform="translate(458, 246) scale(1.16667)" fill="none" stroke="#1769E0" stroke-width="2">
+    <path d="M3 10a7 7 0 1 0 14 0a7 7 0 1 0 -14 0" />
+    <path d="M21 21l-6 -6" />
+  </g>
+    <text x="500" y="268" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="24" font-weight="700" fill="#132A3A">ChatGPT deep research</text>
+    <text x="458" y="308" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#5A6B7C">审：研究计划、来源、进度与报告</text>
+    <text x="458" y="340" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="17" font-weight="700" fill="#1769E0">交互对象：可中断的研究过程</text>
+
+    <path fill="#FFFFFF" stroke="#CBD5DF" stroke-width="2" d="M826,224 H1222 A6,6 0 0 1 1228,230 V376 A6,6 0 0 1 1222,382 H826 A6,6 0 0 1 820,376 V230 A6,6 0 0 1 826,224 Z" />
+
+  <g transform="translate(842, 246) scale(1.16667)" fill="none" stroke="#1769E0" stroke-width="2">
+    <path d="M5 18a2 2 0 1 0 4 0a2 2 0 1 0 -4 0" />
+    <path d="M5 6a2 2 0 1 0 4 0a2 2 0 1 0 -4 0" />
+    <path d="M15 6a2 2 0 1 0 4 0a2 2 0 1 0 -4 0" />
+    <path d="M7 8l0 8" />
+    <path d="M9 18h6a2 2 0 0 0 2 -2v-5" />
+    <path d="M14 14l3 -3l3 3" />
+  </g>
+    <text x="884" y="268" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="24" font-weight="700" fill="#132A3A">Codex App</text>
+    <text x="842" y="308" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#5A6B7C">审：Task、隔离工作区、Diff 与队列</text>
+    <text x="842" y="340" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="17" font-weight="700" fill="#1769E0">交互对象：代码任务与可审查变更</text>
+
+    <path fill="#FFFFFF" stroke="#CBD5DF" stroke-width="2" d="M58,406 H406 A6,6 0 0 1 412,412 V558 A6,6 0 0 1 406,564 H58 A6,6 0 0 1 52,558 V412 A6,6 0 0 1 58,406 Z" />
+
+  <g transform="translate(74, 428) scale(1.16667)" fill="none" stroke="#D97706" stroke-width="2">
+    <path d="M3 20l1.3 -3.9c-2.324 -3.437 -1.426 -7.872 2.1 -10.374c3.526 -2.501 8.59 -2.296 11.845 .48c3.255 2.777 3.695 7.266 1.029 10.501c-2.666 3.235 -7.615 4.215 -11.574 2.293l-4.7 1" />
+  </g>
+    <text x="116" y="450" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="24" font-weight="700" fill="#132A3A">Claude Code</text>
+    <text x="74" y="490" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#5A6B7C">审：项目上下文、工具动作与验证结果</text>
+    <text x="74" y="522" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="17" font-weight="700" fill="#B54708">交互对象：项目会话与工具循环</text>
+
+    <path fill="#FFFFFF" stroke="#CBD5DF" stroke-width="2" d="M442,406 H790 A6,6 0 0 1 796,412 V558 A6,6 0 0 1 790,564 H442 A6,6 0 0 1 436,558 V412 A6,6 0 0 1 442,406 Z" />
+
+  <g transform="translate(458, 428) scale(1.16667)" fill="none" stroke="#D97706" stroke-width="2">
+    <path d="M3 7a3 3 0 0 1 3 -3h12a3 3 0 0 1 3 3v2a3 3 0 0 1 -3 3h-12a3 3 0 0 1 -3 -3" />
+    <path d="M3 15a3 3 0 0 1 3 -3h12a3 3 0 0 1 3 3v2a3 3 0 0 1 -3 3h-12a3 3 0 0 1 -3 -3l0 -2" />
+    <path d="M7 8l0 .01" />
+    <path d="M7 16l0 .01" />
+  </g>
+    <text x="500" y="450" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="24" font-weight="700" fill="#132A3A">OpenClaw</text>
+    <text x="458" y="490" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#5A6B7C">审：Gateway Task、路由、会话与审批</text>
+    <text x="458" y="522" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="17" font-weight="700" fill="#B54708">交互对象：任务账本与运行通道</text>
+
+    <path fill="#FFFFFF" stroke="#CBD5DF" stroke-width="2" d="M826,406 H1222 A6,6 0 0 1 1228,412 V558 A6,6 0 0 1 1222,564 H826 A6,6 0 0 1 820,558 V412 A6,6 0 0 1 826,406 Z" />
+
+  <g transform="translate(842, 428) scale(1.16667)" fill="none" stroke="#D97706" stroke-width="2">
+    <path d="M20 11a8.1 8.1 0 0 0 -15.5 -2m-.5 -4v4h4" />
+    <path d="M4 13a8.1 8.1 0 0 0 15.5 2m.5 4v-4h-4" />
+  </g>
+    <text x="884" y="450" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="24" font-weight="700" fill="#132A3A">ReAct</text>
+    <text x="842" y="490" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#5A6B7C">审：Action 是否得到环境 Observation</text>
+    <text x="842" y="522" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="17" font-weight="700" fill="#B54708">交互对象：推理与环境反馈循环</text>
+  </g>
+  <g id="office-agent-position">
+    <path d="M52 610H1228" stroke="#1769E0" stroke-width="4" />
+    <text x="52" y="640" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="24" font-weight="700" fill="#132A3A">Office Agent 候选差异：用户审的是“资料 → 业务结论 → 成果 → 人工决定 → 未执行边界”</text>
+  </g>
+  <g id="footer">
+    <text x="52" y="690" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="14" fill="#7C8A98">官方来源：Microsoft Support · OpenAI Help / Codex App · Claude Code Docs · OpenClaw Docs · ReAct</text>
+    <text x="1228" y="690" text-anchor="end" font-family="Consolas, &quot;Courier New&quot;, monospace" font-size="14" fill="#7C8A98">06 / 24</text>
+  </g>
+</svg>

@@ -4,7 +4,7 @@
 
 ## 场景与来源
 
-对应 [DR-0054](../decisions/DR-0054-demo3-editable-drafts-and-human-judgment.md)、[SCENARIO-039](../scenarios/SCENARIO-039-demo3-human-judgment-and-return.md)和[用户来源](../sources/USER-FEEDBACK-20260919-demo3-completion.md)。原 DR-0053 的五类事项在当前分支继续有效，新增材料对照人工判断、原位草稿编辑、最近事项找回、差异展示与人工处理说明下载。
+对应 [DR-0065](../decisions/DR-0065-demo3-editable-drafts-and-human-judgment.md)、[SCENARIO-052](../scenarios/SCENARIO-052-demo3-human-judgment-and-return.md)和[用户来源](../sources/USER-FEEDBACK-20260919-demo3-completion.md)。原 DR-0053 的五类事项在当前分支继续有效，新增材料对照人工判断、原位草稿编辑、最近事项找回、差异展示与人工处理说明下载。
 
 ## 运行结果
 

@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Demo 1/2 实测与验收 · 2026-09-11</title>
+  <style>
+    :root { color-scheme: light; font-family: "Segoe UI", "Microsoft YaHei", sans-serif; color: #202733; background: #f7f8fa; }
+    * { box-sizing: border-box; letter-spacing: 0; }
+    body { margin: 0; }
+    header { background: white; border-bottom: 1px solid #dce2e8; padding: 20px 28px; }
+    header > div, main { max-width: 1240px; margin: auto; }
+    header > div { display: flex; gap: 20px; align-items: center; justify-content: space-between; flex-wrap: wrap; }
+    h1 { font-size: 24px; margin: 0; }
+    h2 { font-size: 21px; margin: 0 0 16px; }
+    h3 { font-size: 17px; margin: 0 0 8px; }
+    p, li, td { font-size: 15px; line-height: 1.8; }
+    p { margin: 8px 0; }
+    a { color: #0754dc; text-underline-offset: 3px; }
+    nav { display: flex; gap: 20px; font-size: 14px; flex-wrap: wrap; }
+    main { padding: 0 28px 40px; }
+    section { padding: 28px 0; border-bottom: 1px solid #dce2e8; }
+    .summary { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 24px; }
+    .summary > div { border-left: 3px solid #17844a; padding-left: 16px; }
+    .summary > div:last-child { border-color: #bc4833; }
+    .summary strong { display: block; font-size: 23px; margin-bottom: 8px; }
+    .muted { color: #626d7c; font-size: 14px; }
+    .good { color: #147a44; }
+    .open { color: #a13524; }
+    .table-scroll { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; background: white; min-width: 630px; }
+    th { text-align: left; font-size: 13px; color: #647080; background: #f0f3f6; }
+    th, td { padding: 12px 14px; border-bottom: 1px solid #dce2e8; vertical-align: top; }
+    th:first-child { width: 100px; }
+    td strong { font-size: 14px; }
+    details { background: white; border-top: 1px solid #dce2e8; padding: 16px 18px; }
+    summary { cursor: pointer; font-size: 16px; font-weight: 600; line-height: 1.7; }
+    details p { margin-top: 12px; }
+    .instruction { display: block; width: 100%; min-height: 135px; resize: vertical; background: #fafbfc; border: 1px solid #c9d2de; border-radius: 4px; padding: 14px; font: inherit; font-size: 15px; line-height: 1.9; color: #263042; }
+    .capture { margin: 18px 0 4px; }
+    .capture img { display: block; width: 100%; height: auto; border: 1px solid #d8e0e8; }
+    figcaption { color: #647080; font-size: 13px; line-height: 1.7; padding-top: 8px; }
+    .finding { border-left: 3px solid #c65f3c; padding-left: 20px; }
+    code { overflow-wrap: anywhere; font-family: Consolas, monospace; font-size: 13px; }
+    .scope { color: #73571b; background: #fff9e9; padding: 14px 18px; border-left: 3px solid #d5a239; }
+    label { display: block; margin: 8px 0; font-size: 15px; line-height: 1.8; }
+    input[type=checkbox] { accent-color: #0754dc; width: 17px; height: 17px; vertical-align: middle; margin: 0 10px 3px 0; }
+    :focus-visible { outline: 3px solid #80b0f5; outline-offset: 3px; }
+    @media(max-width:680px) { header { padding: 18px; } main { padding: 0 18px 30px; } h1 { font-size: 21px; } .summary { grid-template-columns: 1fr; gap: 20px; } section { padding: 22px 0; } details { padding: 14px 12px; } }
+    @media print { body { background: white; } nav { display: none; } .table-scroll { overflow: visible; } table { min-width: 0; } }
+  </style>
+</head>
+<body>
+  <header><div><h1>Demo 1/2 实测与验收</h1><nav><a href="http://localhost:3000/agent-capabilities">打开实际工作台</a><a href="../../testing/DEMO12-ACCEPTANCE-CASES-20260911.md">完整用例</a><a href="../../evidence/DEMO12-SELF-TEST-ACCEPTANCE-EVIDENCE-20260911.md">验证记录</a></nav></div></header>
+  <main>
+    <section aria-label="实测结论">
+      <p class="muted">2026-09-11 · 实际浏览器操作 + 真实 Provider 单任务 + 受控自动化</p>
+      <div class="summary"><div><strong>2 项 UI 修复</strong><p>协作页新任务没有输入框；证据页缺少正在核对的判断。</p></div><div><strong>3 次真实调用</strong><p>1 次 Planner、2 次 Analyst，保留两条发现，歧义处暂停。</p></div><div><strong>1 项质量问题未关闭</strong><p>模型只读到日志前段，却给出未限定范围的摘要。</p></div></div>
+      <p class="scope">本次不是“全部通过”：交互修复不等于内容质量通过。真实任务仍在等待处理，未替用户选择原文或启动下一轮。</p>
+    </section>
+    <section id="findings">
+      <h2>先看发现的问题</h2>
+      <div class="table-scroll"><table><thead><tr><th>编号</th><th>问题与复现</th><th>处理结果</th></tr></thead><tbody>
+        <tr><td>UI-01</td><td>协作方式 → 新建任务。只有草稿提示，输入框没出现；连续新建空草稿也会复现。</td><td><strong class="good">已修复并复验</strong><br>明确切回输入面、移除旧 hash、聚焦输入；旧 Run 不变。</td></tr>
+        <tr><td>UI-02</td><td>看见 4 个候选行，却没有在首屏说明当前哪条判断需要引用。</td><td><strong class="good">已修复并复验</strong><br>显示待核对标题和摘要，标为尚未确认，不代选。</td></tr>
+        <tr><td>Q-01</td><td>摘要只讲了 10:31 的四条 factual，遗漏 10:32 的 comparison/news/tutorial 和新闻专用路由。</td><td><strong class="open">未解决，内容验收不通过</strong><br>已定位单文件模型输入 12,000 字符上限与前段截断；需要覆盖与续读合同，不是多改一句提示词。</td></tr>
+      </tbody></table></div>
+      <details><summary>UI-01：实际页面修复前 / 后</summary><figure class="capture"><img src="screenshots/new-task-before.jpg" alt="修复前：协作页面仍显示，没有任务输入框"><figcaption>修复前实际页面。不是参考图或受控 Snapshot。</figcaption></figure><figure class="capture"><img src="screenshots/new-task-after.jpg" alt="修复后：执行进展包含空白任务输入框"><figcaption>修复后实际页面；自动化同时断言无 start/control 请求。</figcaption></figure></details>
+      <details><summary>UI-02：实际待核对判断与 4 个候选</summary><figure class="capture"><img src="screenshots/live-evidence-after.jpg" alt="显示尚未确认的新闻路由判断与未选中的原文候选"><figcaption>真实 Provider 输出。此判断未通过全文内容验收，展示不等于背书。</figcaption></figure></details>
+    </section>
+    <section id="quick-case">
+      <h2>你现在就能验收：不用调用模型</h2>
+      <p>打开工作台，按下面的顺序操作。检查框仅供本页手动记录，刷新会清空，不提交任何数据。</p>
+      <label><input type="checkbox">切到“协作方式”，点右上角“+”。应立即看到空白任务输入框，并自动聚焦。</label>
+      <label><input type="checkbox">输入几句话但不要提交，再切协作、再次点“+”。应清空并回到输入框。</label>
+      <label><input type="checkbox">刷新页面。应保持空白草稿，不恢复未提交文字，也不创建任务。</label>
+      <label><input type="checkbox">打开历史会话，回到刚才的日志核对任务。应保留 v1 草稿、3 次调用与等待状态。</label>
+      <p class="muted">失败判据：找不到输入框、误启动模型、旧任务消失、旧成果被清空。当前 memory 服务重启后不恢复任务，这与刷新浏览器不同。</p>
+    </section>
+    <section id="real-case">
+      <h2>真实任务输入与观察</h2>
+      <p class="muted">重新提交会调用当前配置的 Provider，结果可能不同。查看已保留的历史任务则无需再调用模型。</p>
+      <textarea class="instruction" aria-label="真实只读任务输入" readonly>只读核对算法研发中的 workflow.py 与 search_agent.log，检查设计路由与实际运行记录是否一致。逐项给出事实、影响、原文位置；不能定位时明确等待核对。不要修改文件，不要执行代码，不要发起外部动作。</textarea>
+      <p>本次真实路径：规划 → 两份来源 → 分析 → 定位拒绝 → 一次受控重试 → 保留 2 条发现与 v1 → 4 个位置待确认 → 暂缓。</p>
+      <p>调用数 3，active elapsed 63.559 秒；没有 Worker 派发、源文件改写或外部动作。原文预览能定位第 13 行；只查看没有自动选中；退出没有消耗下一轮。</p>
+      <details><summary>查看实际执行记录截图</summary><figure class="capture"><img src="screenshots/live-record.jpg" alt="实际执行记录包含保留摘要、待确认分支与三次调用预算"><figcaption>截图中的摘要存在 Q-01 覆盖问题，保留作失败证据。</figcaption></figure></details>
+    </section>
+    <section id="coverage">
+      <h2>为什么不能把这条任务算成功</h2>
+      <div class="finding"><h3>原文可预览，不代表模型读到了全部原文</h3><p>浏览器能显示 25,211 字符的日志；模型单文件输入被限制为前 12,000 字符，约到第 109 行。第二次启动从第 113 行才开始。当前结果没有把这个读取边界讲清楚。</p></div>
+      <div class="table-scroll"><table><thead><tr><th>原文位置</th><th>可人工核验的事实</th><th>对结论的约束</th></tr></thead><tbody><tr><td>13/39/65/91</td><td>第一次启动的四条查询均为 factual</td><td>可以描述前段，不能外推全文。</td></tr><tr><td>125/155/182/212</td><td>第二次启动出现 comparison、news、tutorial、news</td><td>全文不只有四条 factual。</td></tr><tr><td>162/216</td><td>实际选择 web_search_news</td><td>不能全局声称未触发新闻路由。</td></tr></tbody></table></div>
+      <p>下一步验收必须加入“后段出现反例”的用例，明确模型读取范围、未读区间、续读与完成门。本轮没有靠增大上限、固定结论文案或硬编码样本假装修好。</p>
+    </section>
+    <section id="regression">
+      <h2>自动化覆盖与边界</h2>
+      <p id="test-result">新建任务：先红（1 失败 / 2 通过）后绿（3 通过）。全量 Playwright：91 通过，3.3 分钟；TypeScript、生产构建、4 项文档治理检查通过。真实任务内容覆盖仍未通过。</p>
+      <p>覆盖了无预选、预览不选择、确认失败、defer 冲突退出、历史只读、局部协作保留、空波次禁用和窄屏。自动化使用受控 API，不等于真实模型多 Worker、真实 PostgreSQL 或业务正确性。</p>
+      <p><a href="../../testing/DEMO12-ACCEPTANCE-CASES-20260911.md">AC-01 至 AC-05 的步骤、失败判据和重跑命令</a></p>
+      <p class="muted">后续每次交付沿用：改动、输入、操作、预期、实际结果、失败与未验证项。不会只交一个绿色测试总数。</p>
+    </section>
+  </main>
+</body>
+</html>

@@ -56,11 +56,11 @@ function initial(): ActionInput {
   return { operation, title, content, target, due_date, source_ref };
 }
 
-export function OfficeActionWorkbench({ run, files, apiBase, headers, onSnapshot, onOpenSource, blocked }: {
+export function OfficeActionWorkbench({ run, files, apiBase, headers, onSnapshot, onOpenSource, blocked, readOnly = false }: {
   run: { run_id: string; version: number; office_action: OfficeAction | null } | null;
   files: { file_ref: string; display_label: string; display_path: string }[];
   apiBase: string; headers: Record<string, string>;
-  onSnapshot: (value: unknown) => void; onOpenSource: (ref: string) => void; blocked: boolean;
+  onSnapshot: (value: unknown) => void; onOpenSource: (ref: string) => void; blocked: boolean; readOnly?: boolean;
 }) {
   const action = run?.office_action ?? null;
   const [draft, setDraft] = useState<ActionInput>(initial);
@@ -169,7 +169,7 @@ export function OfficeActionWorkbench({ run, files, apiBase, headers, onSnapshot
     });
   }
   function control(command: string) {
-    if (!run || !shown) return;
+    if (!run || !shown || readOnly) return;
     void send(`${apiBase}/v1/harness/runs/${encodeURIComponent(run.run_id)}/action-controls`, {
       command, expected_version: run.version, action_revision: shown.revision,
       idempotency_key: `action-control-${crypto.randomUUID()}`,
@@ -218,6 +218,7 @@ export function OfficeActionWorkbench({ run, files, apiBase, headers, onSnapshot
       {!canLeave && <p>请先暂缓或结束当前事项，再打开另一件。</p>}
     </details>
     {blocked && <p role="status">当前资料研究任务尚未结束，请先处理该任务或停止后办理新事项。</p>}
+    {readOnly && shown && <p role="status">正在核对当前任务指针，或此记录仅供查看。核对通过前不能修改或确认事项。</p>}
     {error && <div className="office-action-error" role="alert"><p>{unknown ? "提交结果尚未确认。请保留本次请求，核对后继续。" : error}</p>{unknown && <><p>{error}</p><button disabled={busy} onClick={() => void send("", {}, true)}>重试同一请求</button></>}</div>}
     {shown && <div className={`office-action-state risk-${shown.risk_level}`} role="status"><span>{shown.risk_level} · {shown.mode}</span><p>{shown.result_message}</p></div>}
     {shown && <div className="office-control-context">
@@ -225,6 +226,7 @@ export function OfficeActionWorkbench({ run, files, apiBase, headers, onSnapshot
       <p>{shown.autonomy_level} · 第 {shown.revision} 版 · {STATE_LABELS[shown.status] ?? "请核对状态"}</p>
     </div>}
     {shown?.missing_fields.length ? <ul className="office-action-missing">{shown.missing_fields.map(item => <li key={item}>{item}</li>)}</ul> : null}
+    <fieldset className="office-action-authority" disabled={readOnly && !!shown}>
     {editable && <form onSubmit={event => { event.preventDefault(); shown ? control("revise") : submit(); }}>
       <fieldset disabled={busy || unknown || blocked}>
         <label>事项类型<select aria-label="事项类型" value={draft.operation} disabled={!!shown} onChange={event => {
@@ -281,5 +283,6 @@ export function OfficeActionWorkbench({ run, files, apiBase, headers, onSnapshot
     {shown && (shown.status === "denied" || shown.status === "deferred") && <button type="button" onClick={downloadHandoff}>下载人工处理说明</button>}
     {shown && <details className="office-action-history"><summary>查看操作记录（{shown.history.length}）</summary><ol>{shown.history.map((item, index) => <li key={index}><span>第 {item.revision} 版 · {new Date(item.at).toLocaleTimeString("zh-CN")}</span><p>{item.message}</p><details><summary>当时的内容</summary><pre>{item.input.title}{"\n"}{item.input.content}{item.input.alternative_content ? `\n材料 B：\n${item.input.alternative_content}` : ""}</pre>{item.content_snapshot != null && item.content_snapshot !== item.input.content && <><h4>当时的结果 / 草稿</h4><pre>{item.content_snapshot}</pre></>}</details></li>)}</ol></details>}
     {shown && canLeave && <button type="button" disabled={busy || unknown || draftEditing} onClick={() => { setNewItem(true); setDraft(initial()); setError(""); setChecks([]); }}>办理另一件事项</button>}
+    </fieldset>
   </section>;
 }

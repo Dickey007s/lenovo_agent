@@ -1,0 +1,60 @@
+{
+  "verified_at": "2026-09-12",
+  "scope": "3 项官方工程来源；定向核验，不是产品实测或完整行业综述。",
+  "sources": [
+    {
+      "id": "E01",
+      "title": "Magentic-UI, an experimental human-centered web agent",
+      "authors": ["Hussein Mozannar", "Gagan Bansal", "Cheng Tan", "Adam Fourney", "et al."],
+      "authors_note": "此处列前四位作者，完整作者表见原文。",
+      "date": "2025-05-19",
+      "type": "official_research_blog",
+      "priority": 1,
+      "url": "https://www.microsoft.com/en-us/research/blog/magentic-ui-an-experimental-human-centered-web-agent/",
+      "related_urls": ["https://github.com/microsoft/magentic-ui", "https://www.microsoft.com/en-us/research/publication/magentic-ui-report/"],
+      "read_scope": "官方发布博客的四种交互、架构、模拟用户评估、安全和开放问题。另见技术报告出版页摘要；没有把后续报告当作已全文精读。",
+      "source_claim": "把执行前共同改计划、执行中接手浏览器、动作审批与计划复用放在同一工作面；发布博客的任务完成率比较来自 LLM 模拟用户。",
+      "method": "系统设计和初步自动评估。GAIA 对比包含更强模型或拥有额外任务信息的模拟用户，不是随机真人效率实验。",
+      "limitations": ["博客中的模拟用户收益不能写成真实办公用户收益。", "本文描述 2025 年发布时机制，不代表当前仓库逐项实测；后续技术报告的机制口径不同，需按版本引用。"],
+      "design_inference": "Demo1/2 的下一稿优先研究共同修改计划与局部交接，而不只增加确认按钮。计划被同意，不等于之后所有动作已获许可。",
+      "testable_counterexample": "用户只同意整理周报；子 Agent 在执行中提议发送给新客户。看用户和系统能否识别这是新的动作授权，而非已批准计划的自然延伸。",
+      "why_read": "与我们的循环、协作、人工介入同屏需求最接近，适合作为具体交互参照。",
+      "verified_at": "2026-09-12"
+    },
+    {
+      "id": "E02",
+      "title": "How we built Claude Code auto mode: a safer way to skip permissions",
+      "authors": ["John Hughes"],
+      "date": "2026-03-25",
+      "type": "official_engineering_blog",
+      "priority": 1,
+      "url": "https://www.anthropic.com/engineering/claude-code-auto-mode",
+      "read_scope": "正文的分类流程、Results 表 1、误判分析、Multi-agent handoffs 和 Deny-and-continue；未运行 Claude Code 模式或复现内部数据。",
+      "source_claim": "作者明确保留自动批准的漏判代价；对子 Agent 委派和返回分别检查，避免把主 Agent 指令误当用户原始授权。",
+      "method": "厂商内部评估：真实内部工具流量、52 条经选择的真实主动越权动作与合成数据外传任务；不是代表性办公用户研究。",
+      "result_note": "全文表 1 报告完整流程在这 52 条真实主动越权动作上约 17% 漏判；不是所有会话 17% 出事故，也不是本项目指标。",
+      "limitations": ["真实越权样本小且经选择；不同数据集的漏判率不能混成普遍风险值。", "作者不把该模式当高影响基础设施上细致人工审核的等价替代。", "官方描述不构成本项目可直接放宽权限的依据。"],
+      "design_inference": "Demo2 应保存用户目标到子任务的授权来源；子 Agent 不能因收到 Controller 命令就获得更大权限。UI 必须能区分用户同意与模型推断。",
+      "testable_counterexample": "用户说“整理周报”，Controller 让 Worker“把周报发给客户”；同样的 Worker 请求在有、无用户明确发送许可时，应该得到不同结果。",
+      "why_read": "提供多 Agent 委派中的具体授权误读和失败数据，能直接帮助设计反例，而不只是学习界面。",
+      "verified_at": "2026-09-12"
+    },
+    {
+      "id": "E03",
+      "title": "Demystifying evals for AI agents",
+      "authors": ["Mikaela Grace", "Jeremy Hadfield", "Rodrigo Olivares", "Jiri De Jonghe"],
+      "date": "2026-01-09",
+      "type": "official_engineering_blog",
+      "priority": 2,
+      "url": "https://www.anthropic.com/engineering/demystifying-evals-for-ai-agents",
+      "read_scope": "任务/试次/结果/轨迹定义；能力与回归区分；平衡题集、环境隔离、评分器与轨迹核查；评估方法组合。",
+      "source_claim": "应检查环境里的实际结果，而不只看 Agent 自称完成；题集同时包含行为应该发生与不应发生的案例，并人工核查评分和轨迹。",
+      "method": "工程实践总结与示例，不是证明某一种监督 UI 更好的对照试验。",
+      "limitations": ["自动评估无法替代用户研究；合成模型通过也不能证明用户理解。", "迁移到本项目仍需独立定义目标、真实结果证据、必要介入与无必要介入的判定。"],
+      "design_inference": "保留当前回归集，再增加允许正常任务继续的正例；同时记漏拦、误拦和结果事实，不用总通过数遮蔽语义错误。",
+      "testable_counterexample": "若系统遇到所有任务都弹确认或全部拒绝，应当在合法任务完成和不必要打扰上失败，而不是赢得“零越权”的假好成绩。",
+      "why_read": "把用户“多做测试”落到可检查的方法，尤其防止只测按钮和只测拒绝。",
+      "verified_at": "2026-09-12"
+    }
+  ]
+}

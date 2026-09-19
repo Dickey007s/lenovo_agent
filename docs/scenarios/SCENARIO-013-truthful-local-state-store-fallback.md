@@ -20,7 +20,8 @@
 
 1. 启动器先判断 Docker 是否可用。
 2. 没有 Docker 时，只接受当前 PowerShell 进程显式传入的 `DATABASE_DSN` 作为外部 PostgreSQL 选择。
-3. 两者均没有时，启动器在子进程环境中显式清空 `DATABASE_DSN`，同时保留 `.env` 中的模型配置。
+3. 两者均没有时，启动器在子进程环境中设置非空 `STATE_STORE_MODE=memory`；Runtime
+   明确忽略 `.env` 中的数据库配置，同时保留模型配置。
 4. API 启动后通过 `/v1/health` 返回真实 `checkpoint` 与 `task_store`。
 5. Web 只有在 API 和页面均可访问后才报告 ready；用户可立即进入完整文件资料库。
 
@@ -36,10 +37,12 @@
 
 - 残留 `.env` DSN 不再让“memory 回退”卡在 API startup。
 - 启动器、health 和文档对状态库模式的描述一致。
-- 静态回归守住 fallback 中的显式清空；真实启动验证 API/Web 200。
+- 回归守住 fallback 中的显式 memory 模式、历史 DSN 覆盖与缺 DSN 的 postgres
+  fail-closed；真实启动验证 API/Web 200。
 - 不把 memory 启动成功描述为 Durable State 或 PostgreSQL 证据。
 
 ## 来源与边界
 
-- 来源：[`RUNTIME-OBSERVATION-20260826-21`](../sources/RUNTIME-OBSERVATION-20260826-21-startup-dsn-precedence.md)。
+- 来源：[`RUNTIME-OBSERVATION-20260826-21`](../sources/RUNTIME-OBSERVATION-20260826-21-startup-dsn-precedence.md)、
+  [`RUNTIME-OBSERVATION-20260902-START-PROCESS-EMPTY-ENV-FALLBACK`](../sources/RUNTIME-OBSERVATION-20260902-start-process-empty-env-fallback.md)。
 - 该场景是运行可靠性验收，不是用户研究；它不能证明前台理解、任务质量或业务价值改善。

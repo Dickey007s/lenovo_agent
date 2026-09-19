@@ -23,7 +23,7 @@ from typing import Any, Literal, Protocol
 from uuid import uuid4
 
 import httpx
-from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
+from pydantic import BaseModel, ConfigDict, Field, StrictInt, ValidationError, field_validator
 
 from packages.contracts.harness_models import (
     AgentControlLoopArtifactVersion,
@@ -62,6 +62,21 @@ from services.api.app.application.narrative_reconciliation import (
     build_verified_effect_context,
     reconcile_narrative,
 )
+from services.api.app.application.topology_admission import TopologyAdmission
+from services.api.app.application.readonly_workers import (
+    ReadonlyWorkerContribution,
+    SharedArtifactMerge,
+)
+from services.api.app.application.workunit_ledger import (
+    ContributionRecord,
+    ContributionGateStatus,
+    WorkUnitState,
+    WorkUnitStatusReason,
+    WorkUnitRecord,
+    WorkerModelReceipt,
+    public_contribution,
+    public_work_unit,
+)
 from services.api.app.application.harness_storage import (
     HarnessStateStore,
     InMemoryHarnessStateStore,
@@ -70,6 +85,12 @@ from services.api.app.application.harness_storage import (
     StoredHarnessIdempotency,
     StoredHarnessRun,
     StoredHarnessTaskCommit,
+    _validate_ledger_append,
+)
+from services.api.app.application.task_ledger import (
+    TaskLedgerConflict,
+    TaskLedgerReceipt,
+    TaskRecord,
 )
 
 from packages.contracts.office_actions import ActionInput, OfficeAction, OfficeActionControl
@@ -102,11 +123,13 @@ class HarnessModelError(HarnessError):
         called: bool = False,
         elapsed_ms: int = 0,
         model: str = "deepseek-v4-pro",
+        failure_kind: str = "model_error",
     ) -> None:
         super().__init__(message)
         self.called = called
         self.elapsed_ms = max(0, elapsed_ms)
         self.model = model
+        self.failure_kind = failure_kind
 
 
 class HarnessStopped(HarnessError):
@@ -185,6 +208,41 @@ class HarnessPlanCandidateUnit(BaseModel):
         return HarnessPlanUnit.artifact_name_is_server_safe(value)
 
 
+class HarnessUncoveredRequirement(BaseModel):
+    """One requested business check that has no approved source in this round."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    title: str = Field(min_length=1, max_length=240)
+    objective: str = Field(min_length=1, max_length=1_000)
+    reason: str = Field(min_length=1, max_length=1_000)
+
+
+class HarnessDeferredRequirement(BaseModel):
+    """One requested check with known sources intentionally postponed to a later round."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    title: str = Field(min_length=1, max_length=240)
+    objective: str = Field(min_length=1, max_length=1_000)
+    reason: str = Field(min_length=1, max_length=1_000)
+    candidate_file_refs: list[str] = Field(default_factory=list, max_length=24)
+
+
+class HarnessRequirementCoverage(BaseModel):
+    """Planner accounting for one explicitly numbered business requirement."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    requirement_index: int = Field(ge=1, le=12)
+    title: str = Field(min_length=1, max_length=240)
+    objective: str = Field(min_length=1, max_length=1_000)
+    status: Literal["planned", "deferred", "uncovered"]
+    unit_id: str | None = Field(default=None, min_length=1, max_length=120)
+    reason: str = Field(min_length=1, max_length=1_000)
+    candidate_file_refs: list[str] = Field(default_factory=list, max_length=24)
+
+
 class HarnessPlanCandidate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -195,6 +253,9 @@ class HarnessPlanCandidate(BaseModel):
         max_length=1_000,
     )
     units: list[HarnessPlanCandidateUnit] = Field(min_length=1, max_length=12)
+    requirement_coverage: list[HarnessRequirementCoverage] = Field(
+        default_factory=list, max_length=12
+    )
 
 
 class HarnessPlan(BaseModel):
@@ -203,6 +264,15 @@ class HarnessPlan(BaseModel):
     summary: str = Field(min_length=1, max_length=1_000)
     selection_reason: str = Field(min_length=1, max_length=1_000)
     units: list[HarnessPlanUnit] = Field(min_length=1, max_length=12)
+    uncovered_requirements: list[HarnessUncoveredRequirement] = Field(
+        default_factory=list, max_length=12
+    )
+    deferred_requirements: list[HarnessDeferredRequirement] = Field(
+        default_factory=list, max_length=12
+    )
+    requirement_coverage: list[HarnessRequirementCoverage] = Field(
+        default_factory=list, max_length=12
+    )
 
 
 class HarnessModelReceipt(BaseModel):
@@ -248,9 +318,88 @@ class HarnessTaskResult(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     summary: str = Field(min_length=1, max_length=3_000)
-    findings: list[HarnessFinding] = Field(min_length=1, max_length=10)
+    findings: list[HarnessFinding] = Field(min_length=1, max_length=96)
     follow_ups: list[str] = Field(default_factory=list, max_length=8)
     review_required: Literal[True] = True
+
+
+class HarnessAnalystDecisionOptionDraft(BaseModel):
+    """Model-owned decision copy before Branch and source facts are attached."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    option_id: Literal["A", "B", "C"]
+    label: str = Field(min_length=1, max_length=80)
+    meaning: str = Field(min_length=1, max_length=240)
+    agent_next_step: str = Field(min_length=1, max_length=300)
+    next_instruction: str = Field(min_length=3, max_length=600)
+
+
+class HarnessAnalystFindingReviewDraft(BaseModel):
+    """Only the fields an Analyst may propose; governance fields stay server-owned."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    requires_human_decision: Literal[True] = True
+    question: str = Field(min_length=1, max_length=300)
+    why_human: str = Field(min_length=1, max_length=300)
+    options: list[HarnessAnalystDecisionOptionDraft] = Field(min_length=2, max_length=3)
+    recommended_option_id: Literal["A", "B", "C"]
+    recommendation_reason: str = Field(min_length=1, max_length=300)
+    after_confirmation: str = Field(min_length=1, max_length=300)
+
+
+class HarnessAnalystFindingDraft(BaseModel):
+    """The small, strict JSON contract sent to the model."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    plan_unit_id: str = Field(min_length=1, max_length=120)
+    title: str = Field(min_length=1, max_length=240)
+    detail: str = Field(min_length=1, max_length=800)
+    fact_summary: str | None = Field(default=None, max_length=400)
+    impact: str | None = Field(default=None, max_length=400)
+    file_refs: list[str] = Field(min_length=1, max_length=100)
+    evidence_quotes: list[HarnessEvidenceQuote] = Field(min_length=1, max_length=4)
+    review: HarnessAnalystFindingReviewDraft | None = None
+
+
+class HarnessAnalystResultDraft(BaseModel):
+    """Model response before IDs, anchors, resolutions and Branch bindings exist."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    summary: str = Field(min_length=1, max_length=1_200)
+    findings: list[HarnessAnalystFindingDraft] = Field(min_length=1, max_length=96)
+    follow_ups: list[str] = Field(default_factory=list, max_length=4)
+    review_required: Literal[True] = True
+
+    def to_task_result(self) -> HarnessTaskResult:
+        findings: list[HarnessFinding] = []
+        for draft in self.findings:
+            review = (
+                AgentControlLoopFindingReview.model_validate(draft.review.model_dump(mode="json"))
+                if draft.review is not None
+                else None
+            )
+            findings.append(
+                HarnessFinding(
+                    plan_unit_id=draft.plan_unit_id,
+                    title=draft.title,
+                    detail=draft.detail,
+                    fact_summary=draft.fact_summary,
+                    impact=draft.impact,
+                    file_refs=draft.file_refs,
+                    evidence_quotes=draft.evidence_quotes,
+                    review=review,
+                )
+            )
+        return HarnessTaskResult(
+            summary=self.summary,
+            findings=findings,
+            follow_ups=self.follow_ups,
+            review_required=True,
+        )
 
 
 class HarnessNarrativeAuditDraft(BaseModel):
@@ -286,6 +435,17 @@ class HarnessRunSnapshot(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     run_id: str
+    task_id: str = Field(default="task-000000000000", pattern=r"^task-[0-9a-f]{12}$")
+    task_version: int = Field(default=1, ge=1)
+    run_sequence: int = Field(default=1, ge=1, le=10_000)
+    parent_run_id: str | None = Field(default=None, pattern=r"^harness:[0-9a-f]{32}$")
+    continuation_reason: str | None = Field(default=None, max_length=240)
+    carried_branch_id: str | None = Field(default=None, pattern=r"^branch-[0-9a-f]{12}$")
+    base_artifact_version: int | None = Field(default=None, ge=1, le=24)
+    base_task_commit: str | None = Field(default=None, pattern=r"^commit-[0-9a-f]{12}$")
+    workspace_revision: str = Field(default="unknown", min_length=1, max_length=120)
+    recheck_file_refs: list[str] = Field(default_factory=list, max_length=24)
+    source_revision_changed: bool = False
     owner_id: str
     workspace_id: Literal["forte-public-office"] = "forte-public-office"
     status: str
@@ -340,6 +500,16 @@ class HarnessRunSnapshot(BaseModel):
     validation_errors: list[str] = Field(default_factory=list)
     events: list[HarnessEvent] = Field(default_factory=list)
     office_action: OfficeAction | None = None
+    # Demo 2 is projected into the same unified Run cockpit.  Admission is a
+    # server fact; worker execution remains explicitly confirmed and bounded.
+    topology_admission: TopologyAdmission | None = None
+    worker_runs: list[ReadonlyWorkerContribution] = Field(default_factory=list, max_length=36)
+    shared_artifacts: list[SharedArtifactMerge] = Field(default_factory=list, max_length=24)
+    worker_idempotency: dict[str, str] = Field(default_factory=dict, max_length=12)
+    # These are the durable execution ledger projection.  Branch remains the
+    # authority for plan, dependency and evidence-gate facts.
+    work_units: list[WorkUnitRecord] = Field(default_factory=list, max_length=36)
+    contributions: list[ContributionRecord] = Field(default_factory=list, max_length=96)
 
 
 class HarnessRunStart(BaseModel):
@@ -370,6 +540,32 @@ class HarnessRunStartResult(BaseModel):
     replayed: bool = False
 
 
+class HarnessContinuationRequest(BaseModel):
+    """Owner command for a terminal Run's one-Branch continuation."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    branch_id: str = Field(pattern=r"^branch-[0-9a-f]{12}$")
+    idempotency_key: str = Field(min_length=8, max_length=160)
+    expected_version: int = Field(ge=1)
+    expected_task_version: StrictInt = Field(ge=1)
+    instruction: str | None = Field(default=None, min_length=3, max_length=2_000)
+    loop: AgentControlLoopOptions | None = None
+
+
+class HarnessReadonlyWorkersRequest(BaseModel):
+    """Explicit cockpit confirmation for at most three admitted Branches."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    # Optional for the cockpit: the Scheduler's ready_branch_ids are the
+    # authority when the client does not provide an explicit subset.
+    branch_ids: list[str] = Field(default_factory=list, max_length=3)
+    idempotency_key: str = Field(min_length=8, max_length=160)
+    expected_version: int = Field(ge=1)
+    confirmed: bool = False
+
+
 class PublicHarnessPlanUnit(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -391,13 +587,29 @@ class PublicHarnessPlan(BaseModel):
     summary: str
     selection_reason: str
     units: list[PublicHarnessPlanUnit]
+    uncovered_requirements: list[HarnessUncoveredRequirement] = Field(
+        default_factory=list, max_length=12
+    )
+    deferred_requirements: list[HarnessDeferredRequirement] = Field(
+        default_factory=list, max_length=12
+    )
 
 
 class PublicHarnessRunSnapshot(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     run_id: str
-    owner_id: str
+    task_id: str = "task-000000000000"
+    task_version: int = 1
+    run_sequence: int = 1
+    parent_run_id: str | None = None
+    continuation_reason: str | None = None
+    carried_branch_id: str | None = None
+    base_artifact_version: int | None = None
+    base_task_commit: str | None = None
+    workspace_revision: str = "unknown"
+    recheck_file_refs: list[str] = Field(default_factory=list, max_length=24)
+    source_revision_changed: bool = False
     workspace_id: Literal["forte-public-office"]
     status: str
     version: int
@@ -432,6 +644,44 @@ class PublicHarnessRunSnapshot(BaseModel):
     validation_errors: list[str]
     events: list[HarnessEvent]
     office_action: OfficeAction | None = None
+    topology_admission: TopologyAdmission | None = None
+    worker_runs: list[ReadonlyWorkerContribution] = Field(default_factory=list, max_length=36)
+    shared_artifacts: list[SharedArtifactMerge] = Field(default_factory=list, max_length=24)
+    work_units: list[dict[str, Any]] = Field(default_factory=list, max_length=36)
+    contributions: list[dict[str, Any]] = Field(default_factory=list, max_length=96)
+
+
+class PublicHarnessTaskLineageItem(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    run_id: str
+    run_sequence: int
+    parent_run_id: str | None
+    status: str
+    created_at: datetime
+    updated_at: datetime
+
+
+class PublicHarnessTaskSnapshot(BaseModel):
+    """Owner-scoped task projection derived from the current Run snapshot."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    task_id: str
+    task_version: int
+    current_run_id: str
+    run_sequence: int
+    parent_run_id: str | None
+    workspace_revision: str
+    status: str
+    created_at: datetime
+    updated_at: datetime
+    current_artifact_id: str | None
+    current_artifact_version: int | None
+    current_commit_id: str | None
+    lineage: list[PublicHarnessTaskLineageItem] = Field(default_factory=list, max_length=100)
+    lineage_total: int = Field(default=0, ge=0)
+    lineage_truncated: bool = False
 
 
 class PublicHarnessRunStartResult(BaseModel):
@@ -517,6 +767,18 @@ class OpenAICompatibleHarnessPlanner:
             "如果 scenario.control_loop.validation_feedback 非空，必须先按反馈修正；文件数超限时只保留优先级最高的文件。"
             "如果 scenario.control_loop.evidence_recheck 为 true，files 中全部文件都是用户已确认继续核对的缺失证据，计划必须全部覆盖。"
             "selection_reason 必须用业务语言说明为什么选择这些文件，以及它们与目标的关系。"
+            "plan unit 表示一个可形成业务结论的工作包，不是一次底层文件读取；用户明确列出业务分支时，每个业务分支最多建立一个根单元，"
+            "同一分支需要多份文件时放在同一单元中。混合文件类型可使用 evidence.verify。"
+            "用户明确要求的冲突汇总、决策矩阵等依赖步骤必须成为带 depends_on 的下游单元，不能混入某个根分支或静默丢弃。"
+            "当 scenario.control_loop.explicit_business_requirement_count 大于 0 时，requirement_coverage 必须按编号逐项覆盖 1 到该数量，"
+            "不得缺号或重复。status=planned 时 unit_id 必须指向本轮对应的根工作包；"
+            "files 中存在对应来源、但受本轮文件预算或依赖顺序暂不执行时使用 status=deferred、unit_id=null，"
+            "并在 candidate_file_refs 中列出准备留到后续分支核对的真实 file_ref；"
+            "只有 files 整个冻结索引中没有任何可识别对应来源时才使用 status=uncovered、unit_id=null、candidate_file_refs=[]，不能伪造 file_ref。"
+            "status=planned 时 candidate_file_refs=[]，其来源只放在绑定工作单元的 input_file_refs。"
+            "uncovered 只是当前索引无法定位来源，不得声称搜索了互联网或企业外部系统；deferred 也不是本轮已执行。"
+            "files 中的 planner_search_hint 是从已批准输入提取的短标题，只能帮助检索候选文件，不能作为证据或分析结论。"
+            "每个下游汇总单元的 input_file_refs 必须覆盖全部直接前序单元的来源并去重；重复引用不额外占用全局文件预算。"
             "输入文件永远只读，禁止猜测或输出源文件路径、哈希或任意本地路径。"
             "读取文件使用 file.read/table.inspect/evidence.verify；生成结果使用 artifact.write。可以提供不含路径的逻辑 artifact_name 与 artifact_type；缺省时由服务端生成。"
             "只选择工作意图和 tool，不得输出 side_effect；写入范围、外部动作范围与强制人工确认由服务端根据能力确定。"
@@ -593,6 +855,26 @@ class OpenAICompatibleHarnessAnalyst:
         self.model = model
         self.timeout = timeout
 
+    @staticmethod
+    def _parse_model_content(
+        content: str, *, finish_reason: str | None = None
+    ) -> HarnessTaskResult:
+        if finish_reason == "length":
+            raise HarnessModelError(
+                "分析输出达到长度上限，JSON 未完整返回",
+                failure_kind="output_truncated",
+            )
+        normalized = content.strip()
+        if normalized.startswith("```"):
+            normalized = (
+                normalized.removeprefix("```json")
+                .removeprefix("```")
+                .removesuffix("```")
+                .strip()
+            )
+        draft = HarnessAnalystResultDraft.model_validate(json.loads(normalized))
+        return draft.to_task_result()
+
     async def analyze(
         self,
         *,
@@ -608,7 +890,10 @@ class OpenAICompatibleHarnessAnalyst:
                 called=False,
                 model=self.model,
             )
-        schema = json.dumps(HarnessTaskResult.model_json_schema(), ensure_ascii=False)
+        root_unit_count = sum(1 for unit in plan.units if not unit.depends_on)
+        dependent_unit_count = len(plan.units) - root_unit_count
+        max_findings = max(1, min(24, root_unit_count * 2 + dependent_unit_count))
+        schema = json.dumps(HarnessAnalystResultDraft.model_json_schema(), ensure_ascii=False)
         system = (
             "你是企业办公数据分析 Agent。只根据用户指令、已通过校验的计划和 files 中的公开办公数据回答。"
             "每个 finding 必须引用 files 中真实存在的 file_ref；不允许引用路径、哈希、任务标准答案或未提供的数据。"
@@ -616,15 +901,21 @@ class OpenAICompatibleHarnessAnalyst:
             "即使多个任务单元共享同一文件，也不能省略或猜测所属单元。"
             "每个 finding 只描述一个可处置问题。title 应是短标题；fact_summary 用不超过两句话说明发生了什么；impact 单独说明不处理的影响，"
             "不要把多个冲突、推测和建议塞进同一长段 detail。"
-            "每个 finding.evidence_quotes 必须给出 1 到 6 个可在对应文件中逐字找到的短片段，至少精确定位一处依据；"
+            "当 validated_plan.requirement_coverage 非空时，输出按业务工作包组织：每个 status=planned 的根单元先形成 1 条简洁的当前结论；"
+            "只有同一业务分支存在彼此独立、处置动作不同的阻断项时才增加第 2 条。每个下游汇总单元最多形成 1 条综合结论。"
+            "无论是否有 requirement_coverage，每个根单元最多 2 条 finding，每个下游单元最多 1 条，"
+            "findings 总数不得超过 output_limits.max_findings。即使一个分支包含多份授权书、多期表格或大量日志，也必须合并同类事实，"
+            "用计数、影响和少量代表性原文说明，不得逐文件、逐行或逐规则展开。"
+            "重复日志、同类表格行和同一规则下的多个样本应在 fact_summary 中汇总，不要逐行扩写成大量重复 findings。"
+            "每个 finding.evidence_quotes 必须给出 1 到 4 个可在对应文件中逐字找到的短片段，至少精确定位一处依据；"
             "role 用 expected 表示设计或规则预期，用 observed 表示实际记录，用 support 表示支持结论，用 contradiction 表示冲突，用 context 表示上下文。"
             "表格 quote 应组合足以唯一定位一行的连续单元格文本；文本 quote 应选可唯一定位的连续原文，不得改写。"
             "必须服从用户目标中的日期、对象、部门、版本和其他筛选条件；筛选范围外的记录不得作为 finding 或人工决策。"
-            "finding.evidence_anchors 必须返回空数组；位置、行号和展示摘录由服务端验证原文后生成。"
+            "不要输出 evidence_anchors；位置、行号和展示摘录由服务端验证原文后生成。"
             "只有存在真实业务冲突且必须由人选择口径时才输出 finding.review；其余情况必须省略 review。"
             "若规则已明确给出关键词、优先级或覆盖关系，不得把按规则即可确定的结果升级为人工决策。"
             "存在 contradiction 时 requires_human_decision 必须为 true，提供 2 个 A/B 互斥选项、推荐项、推荐理由，"
-            "以及用户确认后 Agent 将执行的下一步。"
+            "以及用户确认后 Agent 将执行的 agent_next_step。"
             "每个 option.next_instruction 必须是一条可作为新只读 Control Loop 目标的完整指令；只能核对资料、形成修改建议或待办，不能声称直接改文件。"
             "若 validation_feedback 非空，上一候选未通过原文定位；保持原任务不变，并改用更长、只出现一次的连续原文重新生成全部 findings。"
             "若 verified_effect_context 非空，其中 facts 是服务端从批准原始字节全量复算并通过 Artifact Verifier 的当前权威事实；"
@@ -634,9 +925,11 @@ class OpenAICompatibleHarnessAnalyst:
             "不得把自拟具体方案写成当前结论。"
             "只能完成只读分析，不得声称发送、写入、审批或调用外部系统。"
             "不要输出思维链、内部推理、Prompt、工具日志或 Markdown 代码围栏。"
-            "为避免结构截断，最多输出 3 条 findings 和 2 条 follow_ups；没有必要时不要输出默认值字段。"
+            "覆盖通过范围内所有有业务意义的结论；遵守服务端 schema 与本轮预算上限。summary 不超过六句话，detail 不重复引用原文，"
+            "follow_ups 只保留最关键的后续动作。没有必要时不要输出默认值字段。"
             "每条 finding 只输出 plan_unit_id、title、detail、fact_summary、impact、file_refs、evidence_quotes，"
-            "仅在人必须决策时再加 review；不要输出 finding_id、affected_branch_ids、evidence_anchors 或 evidence_resolutions。"
+            "仅在人必须决策时再加 review；不要输出 finding_id、affected_branch_ids、evidence_anchors、evidence_resolutions、"
+            "required_file_refs、estimated_additional_rounds 或 external_action。"
             "结论存在不确定性时直接写入 summary。follow_ups 应给出基于当前证据、可由用户确认后作为新任务启动的具体推进建议，"
             "不要写成泛化的‘请人工复核’。review_required 必须为 true。"
             "只输出符合 JSON Schema 的 JSON 对象。JSON Schema：" + schema
@@ -648,6 +941,13 @@ class OpenAICompatibleHarnessAnalyst:
                 "files": files,
                 "verified_effect_context": verified_effect_context,
                 "validation_feedback": validation_feedback,
+                "output_limits": {
+                    "max_findings": max_findings,
+                    "max_summary_characters": 600,
+                    "max_detail_characters_per_finding": 500,
+                    "max_evidence_quotes_per_finding": 4,
+                    "max_follow_ups": 4,
+                },
             },
             ensure_ascii=False,
         )
@@ -659,7 +959,7 @@ class OpenAICompatibleHarnessAnalyst:
             ],
             "response_format": {"type": "json_object"},
             "temperature": 0,
-            "max_tokens": 5_000,
+            "max_tokens": 12_000,
             "thinking": {"type": "disabled"},
         }
         headers = {"Authorization": f"Bearer {self.api_key}"}
@@ -681,28 +981,57 @@ class OpenAICompatibleHarnessAnalyst:
                         headers=headers,
                     )
                 response.raise_for_status()
-            content = response.json()["choices"][0]["message"]["content"]
+            response_payload = response.json()
+            choice = response_payload["choices"][0]
+            content = choice["message"]["content"]
             if not isinstance(content, str):
                 raise TypeError("model content is not text")
-            content = content.strip()
-            if content.startswith("```"):
-                content = (
-                    content.removeprefix("```json").removeprefix("```").removesuffix("```").strip()
-                )
-            return HarnessTaskResult.model_validate(json.loads(content))
-        except (
-            httpx.HTTPError,
-            KeyError,
-            IndexError,
-            TypeError,
-            json.JSONDecodeError,
-            ValidationError,
-        ) as exc:
+            finish_reason = choice.get("finish_reason")
+            return self._parse_model_content(content, finish_reason=finish_reason)
+        except HarnessModelError as exc:
             raise HarnessModelError(
-                "模型未返回合法的只读分析结果",
+                str(exc),
                 called=request_started,
                 elapsed_ms=round((perf_counter() - started) * 1000),
                 model=self.model,
+                failure_kind=exc.failure_kind,
+            ) from exc
+        except json.JSONDecodeError as exc:
+            raise HarnessModelError(
+                "分析输出不是完整 JSON",
+                called=request_started,
+                elapsed_ms=round((perf_counter() - started) * 1000),
+                model=self.model,
+                failure_kind="invalid_json",
+            ) from exc
+        except ValidationError as exc:
+            fields = []
+            for error in exc.errors(include_url=False, include_input=False)[:3]:
+                location = ".".join(str(item) for item in error.get("loc", ())) or "root"
+                fields.append(f"{location}:{error.get('type', 'invalid')}")
+            detail = "、".join(fields) or "字段不符合约束"
+            raise HarnessModelError(
+                f"分析 JSON 字段校验失败（{detail}）",
+                called=request_started,
+                elapsed_ms=round((perf_counter() - started) * 1000),
+                model=self.model,
+                failure_kind="invalid_schema",
+            ) from exc
+        except httpx.TimeoutException as exc:
+            raise HarnessModelError(
+                f"分析模型调用超过 {self.timeout:g} 秒，服务端已停止等待",
+                called=request_started,
+                elapsed_ms=round((perf_counter() - started) * 1000),
+                model=self.model,
+                failure_kind="provider_timeout",
+            ) from exc
+        except (httpx.HTTPError, KeyError, IndexError, TypeError) as exc:
+            raise HarnessModelError(
+                "分析服务响应不可用或缺少必要字段",
+                called=request_started,
+                elapsed_ms=round((perf_counter() - started) * 1000),
+                model=self.model,
+                failure_kind="provider_response",
             ) from exc
 
 
@@ -769,6 +1098,8 @@ class HarnessRuntime:
         self.planner = planner
         self.analyst = analyst
         self.state_store = state_store or InMemoryHarnessStateStore()
+        # HarnessStateStore is the sole aggregate boundary for the task
+        # ledger, Run snapshot and command receipts.
         self.effect_engine = effect_engine
         self.artifact_store = artifact_store
         self._runs: dict[tuple[str, str], _Run] = {}
@@ -788,20 +1119,210 @@ class HarnessRuntime:
         await self.state_store.setup()
         now = datetime.now(timezone.utc)
         terminal_statuses = {"ready_to_execute", "completed", "stopped", "failed"}
+        stored_runs = await self.state_store.load_runs()
+        # Snapshots written before Task Ledger V1 did not carry task_version.
+        # Upgrade that field only while restoring durable state; request paths
+        # must never synthesize or repair a missing ledger entry.
+        normalized_runs: list[tuple[StoredHarnessRun, bool]] = []
+        for record in stored_runs:
+            raw_snapshot = record.snapshot
+            snapshot = HarnessRunSnapshot.model_validate(raw_snapshot)
+            # PostgreSQL keeps the ledger rows beside the aggregate snapshot;
+            # when present they are the authority, while the snapshot fields
+            # remain a restart-safe public projection for memory mode.
+            if hasattr(self.state_store, "load_work_units"):
+                stored_work_units = await self.state_store.load_work_units(record.owner_id, record.run_id)
+                stored_contributions = await self.state_store.load_contributions(record.owner_id, record.run_id)
+                branch_by_id = {item.branch_id: item for item in snapshot.branches}
+                if (snapshot.work_units and not stored_work_units) or (
+                    snapshot.contributions and not stored_contributions
+                ):
+                    raise HarnessError("持久化 WorkUnit/Contribution 与 Run 快照不一致")
+                for work_unit in stored_work_units:
+                    branch = branch_by_id.get(work_unit.branch_id)
+                    if (
+                        work_unit.owner_id != record.owner_id
+                        or work_unit.task_id != snapshot.task_id
+                        or work_unit.run_id != record.run_id
+                        or branch is None
+                        or work_unit.unit_id != branch.unit_id
+                        or set(work_unit.depends_on) != set(branch.depends_on)
+                        or set(work_unit.approved_file_refs) != set(branch.input_file_refs)
+                    ):
+                        raise HarnessError("持久化 WorkUnit 越过当前 Run/Branch 边界")
+                work_unit_ids = {item.work_unit_id for item in stored_work_units}
+                for contribution in stored_contributions:
+                    work_unit = next(
+                        (
+                            item
+                            for item in stored_work_units
+                            if item.work_unit_id == contribution.work_unit_id
+                        ),
+                        None,
+                    )
+                    if (
+                        contribution.owner_id != record.owner_id
+                        or contribution.task_id != snapshot.task_id
+                        or contribution.run_id != record.run_id
+                        or contribution.work_unit_id not in work_unit_ids
+                        or contribution.branch_id not in branch_by_id
+                        or work_unit is None
+                        or contribution.branch_id != work_unit.branch_id
+                        or set(contribution.approved_file_refs)
+                        != set(work_unit.approved_file_refs)
+                        or set(contribution.approved_file_refs)
+                        != set(branch_by_id[contribution.branch_id].input_file_refs)
+                        or contribution.run_source_revision != snapshot.workspace_revision
+                    ):
+                        raise HarnessError("持久化 Contribution 越过当前 Run/Branch 边界")
+                if stored_work_units or stored_contributions:
+                    snapshot = snapshot.model_copy(
+                        update={
+                            "work_units": stored_work_units,
+                            "contributions": stored_contributions,
+                        }
+                    )
+                # Re-run the complete append-only validator after replacing
+                # the aggregate projection with independent durable rows.
+                # This catches duplicate attempts and malformed rows that a
+                # primary-key lookup alone cannot detect.
+                if stored_work_units or stored_contributions or snapshot.work_units or snapshot.contributions:
+                    try:
+                        _validate_ledger_append(None, snapshot.model_dump(mode="json"))
+                    except RuntimeError as exc:
+                        raise HarnessError("持久化 WorkUnit/Contribution 校验失败") from exc
+            migrated = "task_version" not in raw_snapshot
+            if migrated:
+                snapshot = snapshot.model_copy(update={"task_version": snapshot.run_sequence})
+            if record.owner_id != snapshot.owner_id:
+                raise HarnessError("持久化 Run owner 与快照不一致")
+            normalized_runs.append(
+                (
+                    StoredHarnessRun(
+                        owner_id=record.owner_id,
+                        run_id=record.run_id,
+                        snapshot=snapshot.model_dump(mode="json"),
+                        resume_status=record.resume_status,
+                    ),
+                    migrated,
+                )
+            )
+        stored_runs = [record for record, _ in normalized_runs]
+        migrated_run_ids = {
+            (record.owner_id, record.run_id)
+            for record, migrated in normalized_runs
+            if migrated
+        }
+        stored_task_records = (
+            await self.state_store.load_task_records()
+            if hasattr(self.state_store, "load_task_records")
+            else []
+        )
+        existing_task_keys = {
+            (item.owner_id, item.task_id) for item in stored_task_records
+        }
+        runs_by_task: dict[tuple[str, str], list[HarnessRunSnapshot]] = {}
+        for stored in stored_runs:
+            snapshot = HarnessRunSnapshot.model_validate(stored.snapshot)
+            if stored.run_id != snapshot.run_id:
+                raise HarnessError("持久化 Run 主键与快照不一致")
+            runs_by_task.setdefault((stored.owner_id, snapshot.task_id), []).append(snapshot)
+        for task in stored_task_records:
+            task_runs = sorted(
+                runs_by_task.get((task.owner_id, task.task_id), []),
+                key=lambda item: item.run_sequence,
+            )
+            if not task_runs:
+                raise HarnessError("任务台账指向不存在的 Run")
+            sequences = [item.run_sequence for item in task_runs]
+            task_versions = [item.task_version for item in task_runs]
+            if sequences != list(range(1, len(sequences) + 1)):
+                raise HarnessError("任务台账的 Run sequence 不连续")
+            if task_versions != sequences:
+                raise HarnessError("任务台账的 task_version 与 Run sequence 不一致")
+            if task_runs[0].run_sequence != 1 or task_runs[0].parent_run_id is not None:
+                raise HarnessError("任务台账 Run 根节点不一致")
+            current = task_runs[-1]
+            if (
+                current.run_id != task.current_run_id
+                or current.task_id != task.task_id
+                or current.owner_id != task.owner_id
+                or current.task_version != task.task_version
+                or current.run_sequence != task.run_sequence
+                or current.parent_run_id != task.parent_run_id
+            ):
+                raise HarnessError("任务台账 current Run 指针不一致")
+            for previous, following in zip(task_runs, task_runs[1:], strict=False):
+                if following.parent_run_id != previous.run_id:
+                    raise HarnessError("任务台账 Run lineage 不连续")
+        for key, task_runs in runs_by_task.items():
+            if key in existing_task_keys:
+                continue
+            ordered = sorted(task_runs, key=lambda item: item.run_sequence)
+            if [item.run_sequence for item in ordered] != list(range(1, len(ordered) + 1)):
+                raise HarnessError("无法安全回填任务台账：Run sequence 不连续")
+            if [item.task_version for item in ordered] != [item.run_sequence for item in ordered]:
+                raise HarnessError("无法安全回填任务台账：task_version 与 Run sequence 不一致")
+            if ordered[0].run_sequence != 1 or ordered[0].parent_run_id is not None:
+                raise HarnessError("无法安全回填任务台账：Run 根节点不一致")
+            for previous, following in zip(ordered, ordered[1:], strict=False):
+                if following.parent_run_id != previous.run_id:
+                    raise HarnessError("无法安全回填任务台账：Run lineage 不连续")
+        backfill_by_task: dict[tuple[str, str], StoredHarnessRun] = {}
+        for stored in stored_runs:
+            snapshot = HarnessRunSnapshot.model_validate(stored.snapshot)
+            key = (stored.owner_id, snapshot.task_id)
+            previous = backfill_by_task.get(key)
+            if previous is None:
+                backfill_by_task[key] = stored
+                continue
+            previous_snapshot = HarnessRunSnapshot.model_validate(previous.snapshot)
+            if snapshot.run_sequence == previous_snapshot.run_sequence:
+                raise HarnessError(
+                    "无法安全回填任务台账：同一任务存在重复 run_sequence"
+                )
+            if snapshot.run_sequence > previous_snapshot.run_sequence:
+                backfill_by_task[key] = stored
         async with self._lock:
-            for record in await self.state_store.load_runs():
+            for record in stored_runs:
                 snapshot = HarnessRunSnapshot.model_validate(record.snapshot)
                 resume_status = record.resume_status
                 if snapshot.status not in terminal_statuses and snapshot.office_action is None:
+                    worker_checkpoint = any(
+                        item.state in {WorkUnitState.RESERVED, WorkUnitState.RUNNING}
+                        for item in snapshot.work_units
+                    )
+                    recovered_work_units = []
+                    for work_unit in snapshot.work_units:
+                        if work_unit.state in {WorkUnitState.RESERVED, WorkUnitState.RUNNING}:
+                            recovered_work_units.append(
+                                work_unit.transition(
+                                    WorkUnitState.FAILED,
+                                    error="checkpoint recovery stopped an in-flight Worker; automatic replay disabled",
+                                    status_reason=WorkUnitStatusReason.CHECKPOINT_RECOVERED_IN_FLIGHT,
+                                )
+                            )
+                        else:
+                            recovered_work_units.append(work_unit)
                     completed_rounds = [
                         item for item in snapshot.rounds if item.status == "completed"
                     ]
-                    completed_round_numbers = {item.round_number for item in completed_rounds}
-                    recovered_branches = [
-                        item
-                        for item in snapshot.branches
-                        if item.round_number in completed_round_numbers
-                    ]
+                    if worker_checkpoint:
+                        # Worker dispatch is a post-round action.  Its
+                        # reservation snapshot already contains a validated
+                        # Branch DAG and topology admission; retain that
+                        # projection so a user can explicitly retry only the
+                        # recovered WorkUnit with a new idempotency key.
+                        recovered_rounds = list(snapshot.rounds)
+                        recovered_branches = list(snapshot.branches)
+                    else:
+                        completed_round_numbers = {item.round_number for item in completed_rounds}
+                        recovered_rounds = completed_rounds
+                        recovered_branches = [
+                            item
+                            for item in snapshot.branches
+                            if item.round_number in completed_round_numbers
+                        ]
                     recovered_branch_ids = {item.branch_id for item in recovered_branches}
                     recovered_status = (
                         "waiting_input" if snapshot.status == "waiting_input" else "paused"
@@ -818,34 +1339,48 @@ class HarnessRuntime:
                         details={
                             "completed_rounds": len(completed_rounds),
                             "automatic_model_replay": False,
+                            "in_flight_work_units": [
+                                item.work_unit_id
+                                for item in snapshot.work_units
+                                if item.state in {WorkUnitState.RESERVED, WorkUnitState.RUNNING}
+                            ],
                         },
                     )
-                    last_round = completed_rounds[-1] if completed_rounds else None
+                    last_round = recovered_rounds[-1] if recovered_rounds else None
                     snapshot = snapshot.model_copy(
                         update={
                             "status": recovered_status,
                             "control_state": "paused",
-                            "rounds": completed_rounds,
+                            "rounds": recovered_rounds,
                             "branches": recovered_branches,
                             "active_branch_id": snapshot.active_branch_id
                             if snapshot.active_branch_id in recovered_branch_ids
                             else None,
-                            "current_round": len(completed_rounds),
-                            "plan": HarnessPlan.model_validate(last_round.plan)
-                            if last_round and last_round.plan
-                            else None,
-                            "model_receipt": HarnessModelReceipt.model_validate(
-                                last_round.model_receipt
-                            )
-                            if last_round and last_round.model_receipt
-                            else None,
-                            "analysis_receipt": HarnessModelReceipt.model_validate(
-                                last_round.analysis_receipt
-                            )
-                            if last_round and last_round.analysis_receipt
-                            else None,
+                            "current_round": snapshot.current_round if worker_checkpoint else len(recovered_rounds),
+                            "plan": (
+                                snapshot.plan
+                                if worker_checkpoint
+                                else HarnessPlan.model_validate(last_round.plan)
+                                if last_round and last_round.plan
+                                else None
+                            ),
+                            "model_receipt": (
+                                snapshot.model_receipt
+                                if worker_checkpoint
+                                else HarnessModelReceipt.model_validate(last_round.model_receipt)
+                                if last_round and last_round.model_receipt
+                                else None
+                            ),
+                            "analysis_receipt": (
+                                snapshot.analysis_receipt
+                                if worker_checkpoint
+                                else HarnessModelReceipt.model_validate(last_round.analysis_receipt)
+                                if last_round and last_round.analysis_receipt
+                                else None
+                            ),
                             "events": [*snapshot.events, event],
                             "last_event_sequence": event.sequence,
+                            "work_units": recovered_work_units,
                             "version": snapshot.version + 1,
                             "updated_at": now,
                         }
@@ -859,7 +1394,15 @@ class HarnessRuntime:
                     resume_status=resume_status,
                 )
                 self._runs[(record.owner_id, record.run_id)] = run
-                if snapshot.status not in terminal_statuses:
+                # Conservative backfill for snapshots created before the
+                # task ledger existed.  This is the only migration point.
+                if (
+                    (record.owner_id, snapshot.task_id) not in existing_task_keys
+                    and backfill_by_task.get((record.owner_id, snapshot.task_id))
+                    is record
+                ):
+                    await self._task_create(self._task_record_from_snapshot(snapshot))
+                if snapshot.status not in terminal_statuses or (record.owner_id, record.run_id) in migrated_run_ids:
                     await self._persist_locked(run)
 
             for record in await self.state_store.load_idempotency():
@@ -892,6 +1435,16 @@ class HarnessRuntime:
                 if candidate_owner == owner_id
             ]
         return sorted(snapshots, key=lambda item: item.updated_at, reverse=True)
+
+    async def _task_get(self, owner_id: str, task_id: str) -> TaskRecord | None:
+        try:
+            value = await self.state_store.get_task_record(owner_id, task_id)
+            return TaskRecord.model_validate(value) if value is not None else None
+        except Exception as exc:
+            raise HarnessError("任务台账读取失败") from exc
+
+    async def _task_create(self, task: TaskRecord) -> TaskRecord:
+        return await self.state_store.create_task_record(task)
 
     async def _persist_locked(
         self,
@@ -1000,10 +1553,26 @@ class HarnessRuntime:
         except Exception as exc:
             raise HarnessError("FORTE 办公资料库暂时无法读取") from exc
 
-    async def start(self, owner_id: str, request: HarnessRunStart) -> HarnessRunStartResult:
+    async def start(
+        self,
+        owner_id: str,
+        request: HarnessRunStart,
+        *,
+        _task_id: str | None = None,
+        _parent_run_id: str | None = None,
+        _continuation_reason: str | None = None,
+        _carried_branch_id: str | None = None,
+        _base_artifact_version: int | None = None,
+        _base_task_commit: str | None = None,
+        _parent_expected_version: int | None = None,
+        _expected_task_version: int | None = None,
+    ) -> HarnessRunStartResult:
         workspace = self.get_internal_workspace()
         if workspace.get("workspace_id") != request.workspace_id:
             raise HarnessNotFoundError("办公资料库不存在")
+        current_workspace_revision = str(
+            workspace.get("dataset_version", "forte-public-office")
+        )
         instruction = request.instruction
         workspace_files = self._index_files(workspace)
         payload = request.model_dump(mode="json")
@@ -1011,7 +1580,21 @@ class HarnessRuntime:
             # Keep persisted research-start keys compatible with the existing contract.
             payload.pop("action")
         digest = hashlib.sha256(
-            json.dumps(payload, ensure_ascii=False, sort_keys=True).encode("utf-8")
+            json.dumps(
+                {
+                    "request": payload,
+                    "parent_run_id": _parent_run_id,
+                    "carried_branch_id": _carried_branch_id,
+                    "base_artifact_version": _base_artifact_version,
+                    "base_task_commit": _base_task_commit,
+                    "parent_expected_version": _parent_expected_version,
+                    "expected_task_version": _expected_task_version,
+                    "continuation_reason": _continuation_reason,
+                    "workspace_revision": current_workspace_revision,
+                },
+                ensure_ascii=False,
+                sort_keys=True,
+            ).encode("utf-8")
         ).hexdigest()
         idem_key = (owner_id, request.idempotency_key)
         async with self._lock:
@@ -1020,6 +1603,60 @@ class HarnessRuntime:
                 if replay.digest != digest:
                     raise HarnessConflictError("幂等键已用于不同 Harness 命令")
                 return replay.result.model_copy(update={"replayed": True}, deep=True)
+            parent: HarnessRunSnapshot | None = None
+            carried_branch: AgentControlLoopBranch | None = None
+            source_revision_changed = False
+            task_record: TaskRecord | None = None
+            if _parent_run_id is not None:
+                parent_run = self._runs.get((owner_id, _parent_run_id))
+                if parent_run is None:
+                    raise HarnessNotFoundError("续办的旧任务不存在")
+                parent = parent_run.snapshot
+                if (
+                    _parent_expected_version is not None
+                    and parent.version != _parent_expected_version
+                ):
+                    raise HarnessConflictError("旧任务版本已更新，请刷新后重试")
+                if parent.status not in {"stopped", "failed", "completed"}:
+                    raise HarnessConflictError("只有已停止或已结束任务可以继续未完成任务")
+                source_revision_changed = parent.workspace_revision != current_workspace_revision
+                task_record = await self._task_get(owner_id, parent.task_id)
+                if task_record is None:
+                    raise HarnessError("任务台账不可读取")
+                if _expected_task_version is None:
+                    raise HarnessConflictError("续办必须提供 task 版本")
+                if task_record.task_version != _expected_task_version:
+                    raise HarnessConflictError("task 版本已更新，请刷新后重试")
+                if (
+                    task_record.current_run_id != parent.run_id
+                    or task_record.run_sequence != parent.run_sequence
+                    or task_record.owner_id != owner_id
+                ):
+                    raise HarnessConflictError("旧 Run 不是该任务当前指针，请刷新任务时间线")
+                if _task_id is not None and _task_id != parent.task_id:
+                    raise HarnessConflictError("续办任务的 task_id 与旧任务不一致")
+                if _carried_branch_id is None:
+                    raise HarnessConflictError("继续未完成任务必须指定一个未完成分支")
+                carried_branch = next(
+                    (item for item in parent.branches if item.branch_id == _carried_branch_id),
+                    None,
+                )
+                if carried_branch is None or carried_branch.status in {"completed"}:
+                    raise HarnessConflictError("只能续办旧任务中尚未完成的分支")
+                if _base_artifact_version is not None and not any(
+                    item.version == _base_artifact_version for item in parent.artifact_versions
+                ):
+                    raise HarnessConflictError("续办引用的成果版本不存在")
+                if _base_task_commit is not None and not any(
+                    item.commit_id == _base_task_commit for item in parent.commits
+                ):
+                    raise HarnessConflictError("续办引用的任务提交不存在")
+                # Branch objective is the authoritative carried goal.  User
+                # text remains an optional command input, never a replacement.
+                instruction = carried_branch.objective
+            task_id = _task_id or (parent.task_id if parent else f"task-{uuid4().hex[:12]}")
+            task_version = task_record.task_version + 1 if task_record else 1
+            run_sequence = task_record.run_sequence + 1 if task_record else 1
             run_id = f"harness:{uuid4().hex}"
             now = datetime.now(timezone.utc)
             contract = AgentControlLoopContract(
@@ -1034,6 +1671,27 @@ class HarnessRuntime:
                 max_files_per_round=request.loop.max_files_per_round,
                 max_model_calls=request.loop.max_model_calls,
                 deadline_seconds=request.loop.deadline_seconds,
+                task_id=task_id,
+                run_sequence=run_sequence,
+                parent_run_id=parent.run_id if parent else None,
+                continuation_reason=(
+                    _continuation_reason or "继续未完成任务"
+                    if parent
+                    else None
+                ),
+                carried_branch_id=carried_branch.branch_id if carried_branch else None,
+                base_artifact_version=_base_artifact_version if parent else None,
+                base_task_commit=_base_task_commit if parent else None,
+                workspace_revision=current_workspace_revision,
+                # A continuation starts with the carried Branch's approved
+                # missing/input refs; it never lets a free-form instruction
+                # widen the first round back to the whole catalog.
+                recheck_file_refs=(
+                    list(carried_branch.missing_file_refs or carried_branch.input_file_refs)
+                    if carried_branch
+                    else []
+                ),
+                source_revision_changed=source_revision_changed,
             )
             budget = AgentControlLoopBudget(
                 max_rounds=contract.max_rounds,
@@ -1043,6 +1701,21 @@ class HarnessRuntime:
             )
             snapshot = HarnessRunSnapshot(
                 run_id=run_id,
+                task_id=task_id,
+                task_version=task_version,
+                run_sequence=run_sequence,
+                parent_run_id=parent.run_id if parent else None,
+                continuation_reason=(_continuation_reason or "继续未完成任务") if parent else None,
+                carried_branch_id=carried_branch.branch_id if carried_branch else None,
+                base_artifact_version=_base_artifact_version if parent else None,
+                base_task_commit=_base_task_commit if parent else None,
+                workspace_revision=current_workspace_revision,
+                recheck_file_refs=(
+                    list(carried_branch.missing_file_refs or carried_branch.input_file_refs)
+                    if carried_branch
+                    else []
+                ),
+                source_revision_changed=source_revision_changed,
                 owner_id=owner_id,
                 workspace_id=request.workspace_id,
                 status="queued",
@@ -1074,16 +1747,78 @@ class HarnessRuntime:
                 active_since_perf=None if request.action is not None else perf_counter(),
             )
             result = HarnessRunStartResult(run=snapshot)
-            existing = await self._persist_locked(
-                current,
-                StoredHarnessIdempotency(
-                    owner_id=owner_id,
-                    kind="start",
-                    idempotency_key=request.idempotency_key,
-                    digest=digest,
-                    result=result.model_dump(mode="json"),
-                ),
+            start_idempotency = StoredHarnessIdempotency(
+                owner_id=owner_id,
+                kind="start",
+                idempotency_key=request.idempotency_key,
+                digest=digest,
+                result=result.model_dump(mode="json"),
             )
+            child_task = None
+            task_receipt = None
+            task_digest = None
+            if task_record is not None:
+                child_task = task_record.model_copy(
+                    update={
+                        "task_version": task_version,
+                        "current_run_id": run_id,
+                        "workspace_revision": snapshot.workspace_revision,
+                        "run_sequence": snapshot.run_sequence,
+                        "parent_run_id": parent.run_id,
+                        "updated_at": now,
+                    }
+                )
+                task_receipt = TaskLedgerReceipt(
+                    task_id=task_id,
+                    owner_id=owner_id,
+                    idempotency_key=request.idempotency_key,
+                    from_task_version=task_record.task_version,
+                    to_task_version=task_version,
+                    child_run_id=run_id,
+                    parent_run_id=parent.run_id,
+                    recheck_file_refs=list(snapshot.recheck_file_refs),
+                    created_at=now,
+                )
+                # Bind the append-only receipt to the complete continuation
+                # command, not merely its parent and branch.  This prevents
+                # replaying one idempotency key with a different payload or
+                # expected version.
+                task_digest = digest
+            try:
+                # Initial creation and continuation are one state-store
+                # aggregate commit: run, task CAS, and receipts either all
+                # become visible or none of them do.
+                if child_task is not None and task_receipt is not None:
+                    existing = await self.state_store.commit_task_transition(
+                        StoredHarnessRun(
+                            owner_id=owner_id,
+                            run_id=run_id,
+                            snapshot=snapshot.model_dump(mode="json"),
+                            resume_status=current.resume_status,
+                        ),
+                        child_task,
+                        expected_task_version=task_record.task_version,
+                        expected_parent_run_id=parent.run_id,
+                        expected_parent_version=_parent_expected_version,
+                        task_receipt=task_receipt,
+                        task_digest=task_digest,
+                        idempotency=start_idempotency,
+                    )
+                else:
+                    existing = await self.state_store.commit_task_transition(
+                        StoredHarnessRun(
+                            owner_id=owner_id,
+                            run_id=run_id,
+                            snapshot=snapshot.model_dump(mode="json"),
+                            resume_status=current.resume_status,
+                        ),
+                        self._task_record_from_snapshot(snapshot),
+                        idempotency=start_idempotency,
+                    )
+            except TaskLedgerConflict as exc:
+                raise HarnessConflictError(str(exc)) from exc
+            except Exception as exc:
+                raise HarnessError("任务台账事务提交失败") from exc
             if existing is not None:
                 if existing.digest != digest:
                     raise HarnessConflictError("幂等键已用于不同 Harness 命令")
@@ -1101,6 +1836,916 @@ class HarnessRuntime:
             if run is None:
                 raise HarnessNotFoundError("Harness run 不存在")
             return run.snapshot.model_copy(deep=True)
+
+    @staticmethod
+    def _task_record_from_snapshot(snapshot: HarnessRunSnapshot) -> TaskRecord:
+        return TaskRecord(
+            task_id=snapshot.task_id,
+            owner_id=snapshot.owner_id,
+            task_version=snapshot.task_version,
+            workspace_id=snapshot.workspace_id,
+            workspace_revision=snapshot.workspace_revision,
+            current_run_id=snapshot.run_id,
+            run_sequence=snapshot.run_sequence,
+            parent_run_id=snapshot.parent_run_id,
+            created_at=snapshot.created_at,
+            updated_at=snapshot.updated_at,
+        )
+
+    async def get_task(self, owner_id: str, task_id: str) -> PublicHarnessTaskSnapshot:
+        """Return a sanitized owner-scoped task pointer."""
+        try:
+            record, stored_runs = await self.state_store.get_task_aggregate(owner_id, task_id)
+            record = TaskRecord.model_validate(record) if record is not None else None
+            task_snapshots = []
+            for item in stored_runs:
+                if item.owner_id != owner_id:
+                    continue
+                snapshot = HarnessRunSnapshot.model_validate(item.snapshot)
+                if snapshot.owner_id != owner_id:
+                    raise HarnessError("任务台账 Run owner 不一致")
+                if snapshot.task_id == task_id:
+                    task_snapshots.append(snapshot)
+        except Exception as exc:
+            if isinstance(exc, HarnessError):
+                raise
+            raise HarnessError("任务台账 Run 读取失败") from exc
+        if record is None:
+            candidates = [item for item in task_snapshots if item.task_id == task_id]
+            if not candidates:
+                raise HarnessNotFoundError("任务不存在")
+            # Legacy records are migrated during setup only.  A GET must not
+            # mutate the ledger, and a Run without its Task is an integrity
+            # failure rather than a synthetic pointer.
+            raise HarnessError("任务台账不可读取")
+        if record.owner_id != owner_id:
+            raise HarnessError("任务台账 owner 不一致")
+        snapshots = [item for item in task_snapshots if item.task_id == task_id]
+        snapshot = next((item for item in snapshots if item.run_id == record.current_run_id), None)
+        if snapshot is None:
+            raise HarnessError("任务台账 current Run 不可读取")
+        if (
+            snapshot.task_id != record.task_id
+            or snapshot.owner_id != record.owner_id
+            or snapshot.task_version != record.task_version
+            or snapshot.run_sequence != record.run_sequence
+            or snapshot.workspace_id != record.workspace_id
+            or snapshot.workspace_revision != record.workspace_revision
+        ):
+            raise HarnessError("任务台账 current Run 身份不一致")
+        artifact = snapshot.artifact_versions[-1] if snapshot.artifact_versions else None
+        lineage = [
+            PublicHarnessTaskLineageItem(
+                run_id=item.run_id,
+                run_sequence=item.run_sequence,
+                parent_run_id=item.parent_run_id,
+                status=item.status,
+                created_at=item.created_at,
+                updated_at=item.updated_at,
+            )
+            for item in snapshots
+        ]
+        lineage.sort(key=lambda item: item.run_sequence)
+        lineage_total = len(lineage)
+        lineage_truncated = lineage_total > 100
+        return PublicHarnessTaskSnapshot(
+            task_id=record.task_id,
+            task_version=record.task_version,
+            current_run_id=snapshot.run_id,
+            run_sequence=snapshot.run_sequence,
+            parent_run_id=snapshot.parent_run_id,
+            workspace_revision=snapshot.workspace_revision,
+            status=snapshot.status,
+            created_at=snapshot.created_at,
+            updated_at=snapshot.updated_at,
+            current_artifact_id=artifact.artifact_id if artifact else None,
+            current_artifact_version=artifact.version if artifact else None,
+            current_commit_id=snapshot.last_commit.commit_id if snapshot.last_commit else None,
+            lineage=lineage[-100:],
+            lineage_total=lineage_total,
+            lineage_truncated=lineage_truncated,
+        )
+
+    async def continue_unfinished_task(
+        self,
+        owner_id: str,
+        run_id: str,
+        branch_id: str,
+        *,
+        idempotency_key: str,
+        expected_version: int,
+        expected_task_version: int,
+        instruction: str | None = None,
+        loop: AgentControlLoopOptions | None = None,
+    ) -> HarnessRunStartResult:
+        """Create a new Run for one unfinished Branch of a terminal Run.
+
+        This is intentionally implemented as a start command, not a resume:
+        the old Run and its immutable result history remain untouched.
+        """
+        old = await self.get(owner_id, run_id)
+        if isinstance(expected_task_version, bool) or not isinstance(expected_task_version, int):
+            raise HarnessConflictError("续办必须提供有效的 task 版本")
+        if old.version != expected_version:
+            raise HarnessConflictError("任务版本已更新，请刷新后重试")
+        branch = next((item for item in old.branches if item.branch_id == branch_id), None)
+        if branch is None or branch.status == "completed":
+            raise HarnessConflictError("只能继续一个尚未完成的任务分支")
+        return await self.start(
+            owner_id,
+            HarnessRunStart(
+                idempotency_key=idempotency_key,
+                expected_version=1,
+                instruction=instruction or branch.objective,
+                loop=loop or AgentControlLoopOptions(
+                    max_rounds=old.contract.max_rounds,
+                    max_files_per_round=old.contract.max_files_per_round,
+                    max_model_calls=old.contract.max_model_calls,
+                    deadline_seconds=old.contract.deadline_seconds,
+                ),
+            ),
+            _task_id=old.task_id,
+            _parent_run_id=old.run_id,
+            _continuation_reason="继续未完成任务",
+            _carried_branch_id=branch.branch_id,
+            _base_artifact_version=(old.artifact_versions[-1].version if old.artifact_versions else None),
+            _base_task_commit=old.last_commit.commit_id if old.last_commit else None,
+            _parent_expected_version=expected_version,
+            _expected_task_version=expected_task_version,
+        )
+
+    async def execute_admitted_readonly_workers(
+        self,
+        owner_id: str,
+        run_id: str,
+        *,
+        expected_version: int,
+        idempotency_key: str,
+        worker_requests: list[Any],
+        handler: Any,
+        user_confirmed: bool,
+    ) -> HarnessRunSnapshot:
+        """Run explicitly confirmed branch-scoped Workers and merge partial results.
+
+        This method is deliberately separate from the Planner path: admission
+        never dispatches work, and only this explicit receipt can do so.
+        """
+        from services.api.app.application.readonly_workers import (
+            execute_readonly_workers,
+            merge_adopted_contributions,
+        )
+
+        if not user_confirmed:
+            raise HarnessConflictError("启动只读 Worker 前必须由用户明确确认")
+        async with self._lock:
+            run = self._require_run(owner_id, run_id)
+            snapshot = run.snapshot
+            digest = hashlib.sha256(
+                json.dumps(
+                    [item.model_dump(mode="json") for item in worker_requests],
+                    sort_keys=True,
+                ).encode()
+            ).hexdigest()
+            previous = getattr(self, "_worker_idempotent", {}).get((owner_id, run_id, idempotency_key))
+            if previous is not None:
+                previous_digest, previous_snapshot = previous
+                if previous_digest != digest:
+                    raise HarnessConflictError("幂等键已用于不同 Worker 命令")
+                return previous_snapshot.model_copy(deep=True)
+            durable_digest = snapshot.worker_idempotency.get(idempotency_key)
+            if durable_digest is not None:
+                if durable_digest.startswith("reserved:"):
+                    if durable_digest.removeprefix("reserved:") != digest:
+                        raise HarnessConflictError("幂等键已用于不同 Worker 命令")
+                    raise HarnessConflictError(
+                        "上一次只读 Worker 波次在持久化后中断，系统不会自动重放；请重新确认并使用新的幂等键"
+                    )
+                completed_digest = (
+                    durable_digest.removeprefix("completed:")
+                    if durable_digest.startswith("completed:")
+                    else durable_digest
+                )
+                if completed_digest != digest:
+                    raise HarnessConflictError("幂等键已用于不同 Worker 命令")
+                return snapshot.model_copy(deep=True)
+            if snapshot.status in {"completed", "failed", "stopped"}:
+                raise HarnessConflictError("终态 Run 不能追加 Worker；请创建新的任务")
+            if snapshot.version != expected_version:
+                raise HarnessConflictError("任务版本已更新，请刷新后重试")
+            admission = snapshot.topology_admission or {}
+            admission_mode = admission.mode if isinstance(admission, TopologyAdmission) else admission.get("mode")
+            if admission_mode != "adaptive_readonly_workers":
+                raise HarnessConflictError("当前拓扑未获准启动只读 Worker")
+            if len(worker_requests) < 1 or len(worker_requests) > 3:
+                raise HarnessConflictError("只读 Worker 数量必须在 1 到 3 之间")
+            if len({item.branch_id for item in worker_requests}) != len(worker_requests):
+                raise HarnessConflictError("同一批 Worker 不能重复派发同一分支")
+            if any(item.expected_version != expected_version for item in worker_requests):
+                raise HarnessConflictError("Worker 请求版本与当前任务不一致")
+            branch_refs = {item.branch_id: set(item.input_file_refs) for item in snapshot.branches}
+            branches_by_id = {item.branch_id: item for item in snapshot.branches}
+            for item in worker_requests:
+                if item.branch_id not in branch_refs or set(item.source_file_refs) - branch_refs[item.branch_id]:
+                    raise HarnessConflictError("Worker 只能读取自己 Branch 的批准来源")
+                branch = branches_by_id[item.branch_id]
+                if branch.status != "running":
+                    raise HarnessConflictError("只能派发服务端标记为 ready 的 Branch")
+                if any(
+                    dependency_branch.status != "completed"
+                    for dependency_id in branch.depends_on
+                    if (dependency_branch := branches_by_id.get(dependency_id)) is not None
+                ):
+                    raise HarnessConflictError("只能派发依赖已完成的 ready Branch；下游分支仍被阻塞")
+            budget = self._budget_with_elapsed(run)
+            if budget.model_calls_used + len(worker_requests) > budget.max_model_calls:
+                raise HarnessConflictError("剩余模型调用预算不足，未派发任何 Worker")
+            if len(snapshot.artifact_versions) >= 24:
+                raise HarnessConflictError("成果版本容量已满，未派发任何 Worker")
+            # Create the execution ledger only for the explicitly admitted
+            # adaptive topology.  The Branch remains the authority for the
+            # approved refs and dependency graph; WorkUnit is just its
+            # versioned execution pointer.
+            now = datetime.now(timezone.utc)
+            work_units = list(snapshot.work_units)
+            work_unit_by_branch = {item.branch_id: item for item in work_units}
+            # Materialize the complete validated DAG on the first reservation;
+            # Branch remains the dependency authority and WorkUnit only mirrors
+            # its current schedulability.
+            for branch in snapshot.branches:
+                work_unit = work_unit_by_branch.get(branch.branch_id)
+                if work_unit is None:
+                    initial_state = (
+                        WorkUnitState.READY
+                        if branch.status == "running"
+                        else WorkUnitState.BLOCKED
+                        if branch.status == "blocked"
+                        else WorkUnitState.PENDING
+                    )
+                    work_unit = WorkUnitRecord(
+                        owner_id=owner_id,
+                        task_id=snapshot.task_id,
+                        run_id=run_id,
+                        work_unit_id=branch.branch_id,
+                        branch_id=branch.branch_id,
+                        unit_id=branch.unit_id,
+                        depends_on=list(branch.depends_on),
+                        approved_file_refs=list(branch.input_file_refs),
+                        state=initial_state,
+                    )
+                elif (
+                    set(work_unit.approved_file_refs) != set(branch.input_file_refs)
+                    or set(work_unit.depends_on) != set(branch.depends_on)
+                ):
+                    raise HarnessConflictError("WorkUnit projection 与 Branch 不一致")
+                work_unit_by_branch[branch.branch_id] = work_unit
+            work_units = list(work_unit_by_branch.values())
+            for request in worker_requests:
+                branch = branches_by_id[request.branch_id]
+                work_unit = work_unit_by_branch.get(request.branch_id)
+                if work_unit.state == WorkUnitState.PENDING:
+                    work_unit = work_unit.transition(WorkUnitState.READY)
+                elif (
+                    work_unit.state == WorkUnitState.FAILED
+                    and work_unit.status_reason == WorkUnitStatusReason.CHECKPOINT_RECOVERED_IN_FLIGHT
+                ):
+                    work_unit = work_unit.transition(WorkUnitState.READY)
+                if work_unit.state not in {WorkUnitState.READY, WorkUnitState.WAITING}:
+                    raise HarnessConflictError("该 WorkUnit 已有在途或终态尝试")
+                work_unit = work_unit.transition(WorkUnitState.RESERVED).model_copy(
+                    update={
+                        "attempt": work_unit.attempt + 1,
+                        "reservation_id": f"worker-wave-{idempotency_key}",
+                    }
+                )
+                work_unit = work_unit.transition(WorkUnitState.RUNNING)
+                work_unit_by_branch[request.branch_id] = work_unit
+            work_units = [work_unit_by_branch[item.branch_id] for item in work_units]
+            reservation_events = [
+                HarnessEvent(
+                    sequence=snapshot.last_event_sequence + 1,
+                    event_name="worker_wave_reserved",
+                    occurred_at=now,
+                    status="analyzing",
+                    message="已为获准的 WorkUnit 持久化 Worker 波次预留。",
+                    details={"work_unit_ids": [item.branch_id for item in worker_requests], "external_action": False},
+                ),
+                HarnessEvent(
+                    sequence=snapshot.last_event_sequence + 2,
+                    event_name="work_unit_started",
+                    occurred_at=now,
+                    status="analyzing",
+                    message="WorkUnit 已进入只读执行。",
+                    details={"work_unit_ids": [item.branch_id for item in worker_requests], "external_action": False},
+                ),
+            ]
+            run.snapshot = run.snapshot.model_copy(
+                update={
+                    "budget": budget.model_copy(
+                        update={"model_calls_used": budget.model_calls_used + len(worker_requests)}
+                    ),
+                    # Reserve the calls as a versioned state transition.  A
+                    # second dispatch carrying the same expected_version must
+                    # fail before it can start another set of workers.
+                    "version": run.snapshot.version + 1,
+                    "updated_at": now,
+                    "work_units": work_units,
+                    "worker_idempotency": {
+                        **snapshot.worker_idempotency,
+                        idempotency_key: f"reserved:{digest}",
+                    },
+                    "events": [*snapshot.events, *reservation_events],
+                    "last_event_sequence": reservation_events[-1].sequence,
+                }
+            )
+            try:
+                await self._persist_locked(run)
+            except Exception:
+                # The reservation is the dispatch gate.  If its durable write
+                # fails, do not leave the in-memory Run claiming calls were
+                # reserved when no Worker may have been dispatched.
+                run.snapshot = snapshot
+                raise
+
+        contributions = await execute_readonly_workers(worker_requests, handler, max_workers=3)
+        merged = merge_adopted_contributions(contributions, version=1)
+        now = datetime.now(timezone.utc)
+        async with self._lock:
+            run = self._require_run(owner_id, run_id)
+            previous_snapshot = run.snapshot
+            # Worker model receipts append ordered events and therefore bump
+            # the Run version while they are in flight.  The user CAS was
+            # checked before dispatch; only a version regression is invalid.
+            if run.snapshot.version < expected_version:
+                raise HarnessConflictError("任务版本已更新，Worker 结果未合入")
+            artifact: AgentControlLoopArtifactVersion | None = None
+            task_commit: AgentControlLoopCommit | None = None
+            artifact_versions = list(run.snapshot.artifact_versions)
+            commits = list(run.snapshot.commits)
+            last_commit = run.snapshot.last_commit
+            work_units = list(run.snapshot.work_units)
+            work_unit_by_branch = {item.branch_id: item for item in work_units}
+            contribution_by_branch = {item.branch_id: item for item in contributions}
+            adopted_worker_ids = set(merged.adopted_worker_run_ids)
+            adopted_artifact_version = (
+                len(artifact_versions) + 1
+                if adopted_worker_ids and len(artifact_versions) < 24
+                else None
+            )
+            contribution_records: list[ContributionRecord] = []
+            for contribution in contributions:
+                work_unit = work_unit_by_branch.get(contribution.branch_id)
+                if work_unit is None or work_unit.state != WorkUnitState.RUNNING:
+                    raise HarnessConflictError("Worker 返回时 WorkUnit 不在 running 状态")
+                anchors: list[AgentControlLoopEvidenceAnchor] = []
+                seen_anchor_keys: set[tuple[str, str, int, int]] = set()
+                for finding in contribution.findings:
+                    for anchor in finding.evidence_anchors:
+                        key = (anchor.file_ref, anchor.locator_kind, anchor.start, anchor.end)
+                        if key not in seen_anchor_keys:
+                            anchors.append(anchor)
+                            seen_anchor_keys.add(key)
+                if contribution.worker_run_id in adopted_worker_ids:
+                    gate_status = ContributionGateStatus.ADOPTED
+                    gate_reason = "来源范围与 Anchor 已通过服务端采用门。"
+                    next_state = WorkUnitState.ADOPTED
+                elif contribution.outcome == "failed":
+                    gate_status = ContributionGateStatus.FAILED
+                    gate_reason = contribution.error or "Worker 执行失败。"
+                    next_state = WorkUnitState.FAILED
+                elif contribution.outcome == "ambiguous":
+                    gate_status = ContributionGateStatus.WAITING
+                    gate_reason = "结果已返回，但原文位置不明确，等待用户核对。"
+                    next_state = WorkUnitState.WAITING
+                else:
+                    gate_status = ContributionGateStatus.REJECTED
+                    gate_reason = contribution.error or "贡献未通过服务端采用门。"
+                    next_state = WorkUnitState.REJECTED
+                contribution_record = ContributionRecord(
+                    owner_id=owner_id,
+                    task_id=run.snapshot.task_id,
+                    run_id=run_id,
+                    work_unit_id=contribution.branch_id,
+                    branch_id=contribution.branch_id,
+                    attempt=work_unit.attempt,
+                    worker_run_id=contribution.worker_run_id,
+                    run_source_revision=run.snapshot.workspace_revision,
+                    catalog_source_revision=str(getattr(self.catalog, "revision", "forte-public-catalog")),
+                    approved_file_refs=tuple(work_unit.approved_file_refs),
+                    evidence_anchors=tuple(anchors),
+                    model_receipt=WorkerModelReceipt(
+                        called=contribution.model_called,
+                        output_used=contribution.output_used,
+                        elapsed_ms=contribution.elapsed_ms,
+                    ),
+                    gate_status=gate_status,
+                    gate_reason=gate_reason,
+                    artifact_version=adopted_artifact_version if gate_status == ContributionGateStatus.ADOPTED else None,
+                    summary=contribution.summary,
+                )
+                contribution_records.append(contribution_record)
+                updated_work_unit = work_unit.transition(WorkUnitState.RETURNED, error=contribution.error)
+                updated_work_unit = updated_work_unit.model_copy(
+                    update={"latest_contribution_id": contribution_record.contribution_id}
+                )
+                updated_work_unit = updated_work_unit.transition(next_state, error=contribution.error)
+                work_unit_by_branch[contribution.branch_id] = updated_work_unit
+            work_units = [work_unit_by_branch.get(item.branch_id, item) for item in work_units]
+            for item in contribution_records:
+                if item.branch_id not in {unit.branch_id for unit in work_units}:
+                    work_units.append(work_unit_by_branch[item.branch_id])
+            prior_findings = artifact_versions[-1].findings if artifact_versions else []
+            finding_by_id = {finding.finding_id: finding for finding in prior_findings}
+            artifact_findings = [
+                finding
+                for contribution in merged.adopted_contributions
+                for finding in contribution.findings
+            ]
+            for finding in artifact_findings:
+                finding_by_id[finding.finding_id] = finding
+            artifact_findings = list(finding_by_id.values())
+            branch_by_id = {branch.branch_id: branch for branch in run.snapshot.branches}
+            updated_by_id: dict[str, AgentControlLoopBranch] = {}
+            updated_branches: list[AgentControlLoopBranch] = []
+            for branch in run.snapshot.branches:
+                contribution = contribution_by_branch.get(branch.branch_id)
+                if contribution is not None:
+                    adopted = contribution.worker_run_id in adopted_worker_ids
+                    updated = branch.model_copy(
+                        update={
+                            "status": "completed" if adopted else "waiting_input",
+                            "verified_file_refs": sorted(
+                                set(branch.verified_file_refs)
+                                | (set(contribution.source_file_refs) if adopted else set())
+                            )[:24],
+                            "missing_file_refs": [] if adopted else list(contribution.source_file_refs),
+                            "updated_at": now,
+                        }
+                    )
+                    updated_branches.append(updated)
+                    updated_by_id[updated.branch_id] = updated
+                    continue
+                dependencies = [
+                    updated_by_id.get(item, branch_by_id[item])
+                    for item in branch.depends_on
+                    if item in branch_by_id
+                ]
+                if branch.status in {"pending", "blocked", "running"}:
+                    if any(item.status in {"failed", "blocked", "waiting_input"} for item in dependencies):
+                        updated = branch.model_copy(update={"status": "blocked", "updated_at": now})
+                    elif all(item.status == "completed" for item in dependencies):
+                        updated = branch.model_copy(update={"status": "running", "updated_at": now})
+                    else:
+                        updated = branch.model_copy(update={"status": "pending", "updated_at": now})
+                    updated_branches.append(updated)
+                    updated_by_id[updated.branch_id] = updated
+                else:
+                    updated_branches.append(branch)
+                    updated_by_id[branch.branch_id] = branch
+            # Keep un-dispatched ledger rows useful to the cockpit without
+            # creating a second dependency truth: schedulability is copied
+            # from the newly updated Branch projection only.
+            synchronized_units: list[WorkUnitRecord] = []
+            for work_unit in work_units:
+                branch = updated_by_id.get(work_unit.branch_id)
+                if branch is None or work_unit.branch_id in contribution_by_branch:
+                    synchronized_units.append(work_unit)
+                    continue
+                desired = (
+                    WorkUnitState.BLOCKED
+                    if branch.status == "blocked"
+                    else WorkUnitState.READY
+                    if branch.status == "running"
+                    else WorkUnitState.PENDING
+                )
+                if desired == WorkUnitState.BLOCKED and work_unit.state in {
+                    WorkUnitState.PENDING,
+                    WorkUnitState.READY,
+                }:
+                    work_unit = work_unit.transition(WorkUnitState.BLOCKED)
+                elif desired == WorkUnitState.READY and work_unit.state == WorkUnitState.PENDING:
+                    work_unit = work_unit.transition(WorkUnitState.READY)
+                synchronized_units.append(work_unit)
+            work_units = synchronized_units
+            all_branches_completed = bool(updated_branches) and all(
+                branch.status == "completed" for branch in updated_branches
+            )
+            branch_state = {branch.branch_id: branch for branch in updated_branches}
+            ready_branch_ids = [
+                branch.branch_id
+                for branch in updated_branches
+                if branch.status == "running"
+                and all(
+                    branch_state.get(dependency_id) is not None
+                    and branch_state[dependency_id].status == "completed"
+                    for dependency_id in branch.depends_on
+                )
+            ]
+            next_step = None
+            if not all_branches_completed:
+                waiting_branches = [
+                    branch for branch in updated_branches if branch.status == "waiting_input"
+                ]
+                deferred_waiting = [
+                    branch
+                    for branch in waiting_branches
+                    if branch.unit_id.startswith("deferred-requirement-")
+                ]
+                worker_waiting = [
+                    branch for branch in waiting_branches if branch not in deferred_waiting
+                ]
+                waiting_file_refs = list(
+                    dict.fromkeys(
+                        ref
+                        for branch in waiting_branches
+                        for ref in branch.missing_file_refs
+                    )
+                )
+                candidate_branch_ids = list(
+                    dict.fromkeys(
+                        [branch.branch_id for branch in waiting_branches] + ready_branch_ids
+                    )
+                )
+                if ready_branch_ids and waiting_branches:
+                    next_reason = (
+                        "本批贡献已合入，下一批可执行分支已就绪；"
+                        f"另有 {len(waiting_branches)} 个分支等待单独处理。"
+                    )
+                elif ready_branch_ids:
+                    next_reason = "本批贡献已合入，下一批可执行分支已就绪。"
+                elif deferred_waiting and not worker_waiting:
+                    next_reason = (
+                        "本轮可执行贡献已合入；"
+                        f"另有 {len(deferred_waiting)} 项已识别来源的后续分支，需单独继续后再核对。"
+                    )
+                elif deferred_waiting:
+                    next_reason = (
+                        "部分 Worker 已合入；"
+                        f"{len(worker_waiting)} 个分支因执行失败或原文位置不明确而暂停，"
+                        f"另有 {len(deferred_waiting)} 项已识别来源的后续分支等待单独继续。"
+                    )
+                else:
+                    next_reason = "部分 Worker 已合入，其余分支因执行失败或原文位置不明确而暂停。"
+                next_step = AgentControlLoopNextStep(
+                    decision="waiting_input",
+                    reason=next_reason,
+                    candidate_file_refs=waiting_file_refs[:20],
+                    candidate_branch_ids=candidate_branch_ids[:36],
+                    ready_branch_ids=ready_branch_ids[:36],
+                )
+            worker_result = None
+            if artifact_findings:
+                worker_result = HarnessTaskResult(
+                    summary="只读 Worker 已返回并通过服务端来源核对的部分结果。",
+                    findings=[HarnessFinding.model_validate(item.model_dump(mode="json")) for item in artifact_findings],
+                    follow_ups=["继续处理仍在等待的分支。"] if not all_branches_completed else [],
+                )
+            if merged.adopted_contributions and len(artifact_versions) < 24:
+                artifact_version = len(artifact_versions) + 1
+                artifact_id = (
+                    artifact_versions[-1].artifact_id
+                    if artifact_versions
+                    else "artifact-"
+                    + hashlib.sha256(f"{run_id}:evidence-brief".encode("utf-8")).hexdigest()[:12]
+                )
+                source_refs = sorted(
+                    {
+                        ref
+                        for prior in artifact_versions
+                        for ref in prior.source_file_refs
+                    }
+                    | {
+                        ref
+                        for item in merged.adopted_contributions
+                        for ref in item.source_file_refs
+                    }
+                )
+                artifact = AgentControlLoopArtifactVersion(
+                    artifact_id=artifact_id,
+                    version=artifact_version,
+                    title="只读 Worker 合入简报",
+                    status="committed",
+                    round_number=(run.snapshot.rounds[-1].round_number if run.snapshot.rounds else 1),
+                    summary=(
+                        f"服务端仅合入 {len(merged.adopted_contributions)} 条通过来源定位的只读 Worker 贡献；"
+                        "其余分支仍保持待处理。"
+                    ),
+                    findings=artifact_findings,
+                    finding_count=len(artifact_findings),
+                    source_file_refs=source_refs,
+                    parent_version=artifact_versions[-1].version if artifact_versions else None,
+                    created_at=now,
+                )
+                commit_id = "commit-" + hashlib.sha256(
+                    f"{run_id}:worker:{artifact.artifact_id}:{artifact.version}".encode("utf-8")
+                ).hexdigest()[:12]
+                task_commit = AgentControlLoopCommit(
+                    commit_id=commit_id,
+                    artifact_id=artifact.artifact_id,
+                    artifact_version=artifact.version,
+                    operation="commit",
+                    parent_commit_id=last_commit.commit_id if last_commit else None,
+                    summary="已将通过来源与 Anchor 核对的只读 Worker 贡献写入逻辑成果版本。",
+                    committed_at=now,
+                )
+                artifact_versions.append(artifact)
+                commits.append(task_commit)
+                last_commit = task_commit
+                # Keep the append-only worker merge receipt aligned with the
+                # actual normal ArtifactVersion it records.
+                merged = merged.model_copy(
+                    update={"artifact_id": artifact.artifact_id, "version": artifact.version}
+                )
+            completion_events: list[HarnessEvent] = []
+            next_event_sequence = run.snapshot.last_event_sequence + 1
+            for contribution in contributions:
+                ledger_record = next(
+                    item for item in contribution_records
+                    if item.worker_run_id == contribution.worker_run_id
+                )
+                event_details = {
+                    "worker_run_id": contribution.worker_run_id,
+                    "branch_id": contribution.branch_id,
+                    "outcome": contribution.outcome,
+                    "external_action": False,
+                }
+                completion_events.append(HarnessEvent(
+                    sequence=next_event_sequence,
+                    event_name="worker_returned",
+                    occurred_at=now,
+                    status="analyzing",
+                    message=contribution.summary,
+                    details={
+                        **event_details,
+                        "model_called": contribution.model_called,
+                        "output_used": contribution.output_used,
+                    },
+                ))
+                next_event_sequence += 1
+                completion_events.append(HarnessEvent(
+                    sequence=next_event_sequence,
+                    event_name="contribution_recorded",
+                    occurred_at=now,
+                    status="analyzing",
+                    message="Worker 结果已写入不可变 Contribution Ledger。",
+                    details={
+                        "contribution_id": ledger_record.contribution_id,
+                        "work_unit_id": ledger_record.work_unit_id,
+                        "gate_status": ledger_record.gate_status,
+                        "artifact_version": ledger_record.artifact_version,
+                        "external_action": False,
+                    },
+                ))
+                next_event_sequence += 1
+                if contribution.outcome == "failed":
+                    completion_events.append(HarnessEvent(
+                        sequence=next_event_sequence,
+                        event_name="work_unit_failed",
+                        occurred_at=now,
+                        status="analyzing",
+                        message="WorkUnit 执行失败，相关下游依赖保持阻塞。",
+                        details={
+                            "work_unit_id": contribution.branch_id,
+                            "contribution_id": ledger_record.contribution_id,
+                            "external_action": False,
+                        },
+                    ))
+                    next_event_sequence += 1
+                completion_events.append(HarnessEvent(
+                    sequence=next_event_sequence,
+                    event_name=(
+                        "contribution_adopted"
+                        if contribution.worker_run_id in merged.adopted_worker_run_ids
+                        else "contribution_waiting"
+                        if contribution.outcome == "ambiguous"
+                        else "contribution_rejected"
+                    ),
+                    occurred_at=now,
+                    status="analyzing",
+                    message=contribution.summary,
+                    details=event_details,
+                ))
+                next_event_sequence += 1
+            completion_events.extend([
+                HarnessEvent(
+                    sequence=next_event_sequence,
+                    event_name="topology_workers_completed",
+                    occurred_at=now,
+                    status="analyzing",
+                    message="已收到只读 Worker 回执；仅通过来源定位的贡献进入共享成果，其余分支保留待处理。",
+                    details={
+                        "worker_count": len(contributions),
+                        "adopted_count": len(merged.adopted_worker_run_ids),
+                        "waiting_branch_count": len(merged.waiting_branch_ids),
+                        "external_action": False,
+                    },
+                ),
+                HarnessEvent(
+                    sequence=next_event_sequence + 1,
+                    event_name="worker_wave_committed",
+                    occurred_at=now,
+                    status="completed" if all_branches_completed else "waiting_input",
+                    message="本批 WorkUnit 与 Contribution 已完成服务端提交。",
+                    details={
+                        "work_unit_count": len(contributions),
+                        "contribution_count": len(contribution_records),
+                        "artifact_version": merged.version if merged.adopted_worker_run_ids else None,
+                        "external_action": False,
+                    },
+                ),
+            ])
+            run.snapshot = run.snapshot.model_copy(
+                update={
+                    "worker_runs": [*run.snapshot.worker_runs, *contributions],
+                    "shared_artifacts": [*run.snapshot.shared_artifacts, merged],
+                    "work_units": work_units,
+                    "contributions": [*run.snapshot.contributions, *contribution_records],
+                    "artifact_versions": artifact_versions,
+                    "commits": commits,
+                    "last_commit": last_commit,
+                    "branches": updated_branches,
+                    "result": worker_result,
+                    "rounds": [
+                        item.model_copy(
+                            update={
+                                "status": "completed",
+                                "phase": "commit",
+                                "result": worker_result.model_dump(mode="json") if worker_result else None,
+                                "next_step": next_step,
+                                "completed_at": now,
+                            }
+                        )
+                        if item.round_number == run.snapshot.current_round
+                        else item
+                        for item in run.snapshot.rounds
+                    ],
+                    "status": "completed" if all_branches_completed else "waiting_input",
+                    "worker_idempotency": {
+                        **run.snapshot.worker_idempotency,
+                        idempotency_key: f"completed:{digest}",
+                    },
+                    "events": [*run.snapshot.events, *completion_events],
+                    "last_event_sequence": completion_events[-1].sequence,
+                    "updated_at": now,
+                    "version": run.snapshot.version + 1,
+                }
+            )
+            try:
+                await self._persist_locked(
+                    run,
+                    artifact_version=artifact,
+                    task_commit=task_commit,
+                )
+            except Exception:
+                # Storage implementations are transactional, but restore the
+                # process-local projection too when a commit is rejected or
+                # interrupted so memory cannot get ahead of durable state.
+                run.snapshot = previous_snapshot
+                raise
+            if not hasattr(self, "_worker_idempotent"):
+                self._worker_idempotent = {}
+            self._worker_idempotent[(owner_id, run_id, idempotency_key)] = (
+                digest,
+                run.snapshot.model_copy(deep=True),
+            )
+            if not hasattr(self, "_worker_idempotent"):
+                self._worker_idempotent = {}
+            self._worker_idempotent[(owner_id, run_id, idempotency_key)] = (
+                digest,
+                run.snapshot.model_copy(deep=True),
+            )
+            return run.snapshot.model_copy(deep=True)
+
+    async def execute_admitted_workers_from_branches(
+        self,
+        owner_id: str,
+        run_id: str,
+        *,
+        branch_ids: list[str],
+        expected_version: int,
+        idempotency_key: str,
+        user_confirmed: bool,
+    ) -> HarnessRunSnapshot:
+        """Provider-backed worker vertical using only each Branch's sources."""
+        from services.api.app.application.readonly_workers import (
+            ReadonlyWorkerContribution,
+            ReadonlyWorkerRequest,
+        )
+
+        snapshot = await self.get(owner_id, run_id)
+        if self.analyst is None:
+            raise HarnessConflictError("只读 Worker 分析器尚未配置")
+        if not branch_ids:
+            latest_step = snapshot.rounds[-1].next_step if snapshot.rounds else None
+            branch_ids = list(latest_step.ready_branch_ids) if latest_step else []
+            if not branch_ids:
+                branch_ids = [item.branch_id for item in snapshot.branches if item.status == "running"]
+            branch_ids = branch_ids[:3]
+        branches = [self._branch_by_id(snapshot.branches, item) for item in branch_ids]
+        if any(item is None for item in branches):
+            raise HarnessConflictError("Worker 分支不存在")
+        requests = [
+            ReadonlyWorkerRequest(
+                worker_run_id=(
+                    "worker-"
+                    + hashlib.sha256(f"{idempotency_key}:{item.branch_id}".encode()).hexdigest()[:12]
+                ),
+                branch_id=item.branch_id,
+                goal=item.objective,
+                source_file_refs=tuple(item.input_file_refs),
+                expected_version=expected_version,
+            )
+            for item in branches
+            if item is not None
+        ]
+
+        async def handler(request: ReadonlyWorkerRequest) -> ReadonlyWorkerContribution:
+            started = perf_counter()
+            current = await self.get(owner_id, run_id)
+            branch = self._branch_by_id(current.branches, request.branch_id)
+            unit = next(
+                (item for item in (current.plan.units if current.plan else []) if item.unit_id == branch.unit_id),
+                None,
+            ) if branch else None
+            if branch is None or unit is None:
+                raise HarnessPlanError("worker branch has no validated plan unit")
+            files = self.catalog.agent_file_inputs(list(request.source_file_refs))
+            candidate, _worker_receipt = await self._invoke_analyst(
+                owner_id=owner_id,
+                run_id=run_id,
+                round_number=branch.round_number,
+                instruction=request.goal,
+                plan=HarnessPlan(summary=unit.objective, selection_reason="服务端 Branch 目标", units=[unit]),
+                files=files,
+                verified_effect_context=None,
+                attempt=1,
+                validation_feedback=None,
+                reserve_model_call=False,
+                record_round_receipt=False,
+            )
+            candidate = self._validate_candidate_result_scope(
+                candidate,
+                files,
+                HarnessPlan(summary=unit.objective, selection_reason="服务端 Branch 目标", units=[unit]),
+            )
+            resolution = self._resolve_evidence_anchors(
+                candidate,
+                files,
+                {str(item["file_ref"]): self._source_revision(item) for item in files},
+                request.goal,
+            )
+            adopted = resolution.result is not None and not resolution.evidence_resolutions
+            reconciliation = reconcile_narrative(
+                run_id=run_id,
+                round_number=branch.round_number,
+                result=resolution.result,
+                context_used=None,
+                current_context=None,
+                checked_at=datetime.now(timezone.utc),
+            )
+            anchors = tuple(
+                f"{anchor.file_ref}:{anchor.locator_kind}:{anchor.start}-{anchor.end}"
+                for finding in (resolution.result.findings if resolution.result else [])
+                for anchor in finding.evidence_anchors
+            )
+            artifact_findings = tuple(
+                AgentControlLoopArtifactFinding(
+                    finding_id=finding.finding_id,
+                    plan_unit_id=finding.plan_unit_id,
+                    affected_branch_ids=finding.affected_branch_ids or [branch.branch_id],
+                    title=finding.title,
+                    detail=finding.detail,
+                    fact_summary=finding.fact_summary,
+                    impact=finding.impact,
+                    file_refs=finding.file_refs,
+                    evidence_anchors=finding.evidence_anchors,
+                    evidence_resolutions=finding.evidence_resolutions,
+                    review=finding.review,
+                )
+                for finding in (resolution.result.findings if resolution.result else [])
+            )
+            return ReadonlyWorkerContribution(
+                worker_run_id=request.worker_run_id,
+                branch_id=request.branch_id,
+                outcome="adopted" if adopted else "ambiguous",
+                summary=(resolution.result.summary if resolution.result else "原文位置仍需人工核对"),
+                source_file_refs=request.source_file_refs,
+                evidence_anchors=anchors,
+                model_called=_worker_receipt.called,
+                output_used=adopted,
+                elapsed_ms=_worker_receipt.elapsed_ms or int((perf_counter() - started) * 1000),
+                narrative_reconciliation=reconciliation,
+                findings=artifact_findings,
+            )
+
+        return await self.execute_admitted_readonly_workers(
+            owner_id,
+            run_id,
+            expected_version=expected_version,
+            idempotency_key=idempotency_key,
+            worker_requests=requests,
+            handler=handler,
+            user_confirmed=user_confirmed,
+        )
 
     async def control(
         self,
@@ -1147,10 +2792,20 @@ class HarnessRuntime:
                     digest=digest,
                     idempotency_key=idempotency_key,
                 )
-            if snapshot.status in {"ready_to_execute", "completed", "stopped", "failed"}:
+            if snapshot.status in {"ready_to_execute", "completed", "stopped", "failed"} and request.command != "topology_override":
                 raise HarnessConflictError("当前任务已经结束，不能再提交控制命令")
 
             command = request.command
+            if command == "topology_override":
+                admission = snapshot.topology_admission
+                if snapshot.status != "waiting_input" or admission is None:
+                    raise HarnessConflictError("当前任务没有等待拓扑确认")
+                if admission.mode != "adaptive_readonly_workers":
+                    raise HarnessConflictError("当前任务无需切换保守拓扑")
+                if request.topology_mode != "single_controller":
+                    raise HarnessConflictError("只允许切回 single_controller")
+            elif request.topology_mode is not None:
+                raise HarnessConflictError("只有拓扑切换命令可以携带 topology_mode")
             if command == "pause" and snapshot.control_state != "running":
                 raise HarnessConflictError("当前任务已经处于暂停或停止流程")
             if command == "resume" and snapshot.control_state not in {
@@ -1225,6 +2880,15 @@ class HarnessRuntime:
             elif command == "stop":
                 next_state = "stop_requested"
                 message = "停止请求已记录；系统会保留已核对结果并在安全点结束。"
+            elif command == "topology_override":
+                # Downgrading is an in-place, user-approved route choice. Keep
+                # the same Run/Task lineage and schedule its conservative
+                # controller path instead of creating a new task.
+                next_state = "running"
+                next_status = "planning"
+                control_status = "applied"
+                applied_version = next_version
+                message = "已按用户选择切回单 Controller；同一任务将从已保存计划继续，未调用只读 Worker。"
 
             control_event = AgentControlLoopControlEvent(
                 control_id=control_id,
@@ -1277,8 +2941,7 @@ class HarnessRuntime:
                 )
                 events.append(resumed_event)
                 last_event_sequence = resumed_event.sequence
-            run.snapshot = snapshot.model_copy(
-                update={
+            snapshot_updates: dict[str, Any] = {
                     "status": next_status,
                     "control_state": next_state,
                     "control_events": [*snapshot.control_events, control_event],
@@ -1288,7 +2951,18 @@ class HarnessRuntime:
                     "version": next_version,
                     "updated_at": now,
                 }
-            )
+            if command == "topology_override" and snapshot.topology_admission is not None:
+                snapshot_updates["topology_admission"] = snapshot.topology_admission.model_copy(
+                    update={
+                        "mode": "single_controller",
+                        "user_confirmation_required": False,
+                        "reasons": [
+                            *snapshot.topology_admission.reasons,
+                            "用户在执行前选择切回单 Controller；本次不调用只读 Worker。",
+                        ][:8],
+                    }
+                )
+            run.snapshot = snapshot.model_copy(update=snapshot_updates)
             result = HarnessControlResult(run=run.snapshot.model_copy(deep=True))
             existing = await self._persist_locked(
                 run,
@@ -1311,7 +2985,7 @@ class HarnessRuntime:
                 digest=digest, result=result
             )
             condition = run.condition
-            should_schedule = command == "resume" and run_id not in self._tasks
+            should_schedule = command in {"resume", "topology_override"} and run_id not in self._tasks
         async with condition:
             condition.notify_all()
         if should_schedule:
@@ -2083,7 +3757,17 @@ class HarnessRuntime:
         ]
         return PublicHarnessRunSnapshot(
             run_id=snapshot.run_id,
-            owner_id=snapshot.owner_id,
+            task_id=snapshot.task_id,
+            task_version=snapshot.task_version,
+            run_sequence=snapshot.run_sequence,
+            parent_run_id=snapshot.parent_run_id,
+            continuation_reason=snapshot.continuation_reason,
+            carried_branch_id=snapshot.carried_branch_id,
+            base_artifact_version=snapshot.base_artifact_version,
+            base_task_commit=snapshot.base_task_commit,
+            workspace_revision=snapshot.workspace_revision,
+            recheck_file_refs=snapshot.recheck_file_refs,
+            source_revision_changed=snapshot.source_revision_changed,
             workspace_id=snapshot.workspace_id,
             status=snapshot.status,
             version=snapshot.version,
@@ -2120,6 +3804,17 @@ class HarnessRuntime:
             ],
             events=public_events,
             office_action=snapshot.office_action,
+            topology_admission=snapshot.topology_admission,
+            worker_runs=snapshot.worker_runs,
+            shared_artifacts=snapshot.shared_artifacts,
+            work_units=[public_work_unit(item) for item in snapshot.work_units],
+            contributions=[
+                {
+                    **public_contribution(item),
+                    "summary": self._project_business_text(item.summary, ref_to_label),
+                }
+                for item in snapshot.contributions
+            ],
         )
 
     def public_control_result(self, result: HarnessControlResult) -> PublicHarnessControlResult:
@@ -2151,6 +3846,23 @@ class HarnessRuntime:
                     artifact_type=unit.artifact_type,
                 )
                 for unit in plan.units
+            ],
+            uncovered_requirements=[
+                HarnessUncoveredRequirement(
+                    title=self._project_business_text(item.title, ref_to_label),
+                    objective=self._project_business_text(item.objective, ref_to_label),
+                    reason=self._project_business_text(item.reason, ref_to_label),
+                )
+                for item in plan.uncovered_requirements
+            ],
+            deferred_requirements=[
+                HarnessDeferredRequirement(
+                    title=self._project_business_text(item.title, ref_to_label),
+                    objective=self._project_business_text(item.objective, ref_to_label),
+                    reason=self._project_business_text(item.reason, ref_to_label),
+                    candidate_file_refs=item.candidate_file_refs,
+                )
+                for item in plan.deferred_requirements
             ],
         )
 
@@ -2570,6 +4282,9 @@ class HarnessRuntime:
             next_question = instruction
             evidence_recheck_refs: set[str] = set()
             target_branch_id = recovered.active_branch_id
+            if recovered.recheck_file_refs:
+                evidence_recheck_refs = set(recovered.recheck_file_refs)
+                target_branch_id = recovered.carried_branch_id
             if recovered.rounds and recovered.rounds[-1].next_step:
                 recovered_next_step = recovered.rounds[-1].next_step
                 next_question = recovered_next_step.next_question or instruction
@@ -2583,7 +4298,19 @@ class HarnessRuntime:
             terminal_decision = "completed"
 
             contract = recovered.contract
-            first_round = len(recovered.rounds) + 1
+            override_round = (
+                recovered.rounds[-1]
+                if recovered.rounds
+                and recovered.rounds[-1].plan is not None
+                and any(
+                    event.event_name == "control_topology_override_recorded"
+                    for event in recovered.events
+                )
+                else None
+            )
+            # A conservative topology choice continues the already validated
+            # packet. It must not create a second Planner round.
+            first_round = override_round.round_number if override_round else len(recovered.rounds) + 1
             for round_number in range(first_round, contract.max_rounds + 1):
                 await self._safe_point(owner_id, run_id)
                 all_remaining = [
@@ -2593,84 +4320,139 @@ class HarnessRuntime:
                     [
                         item
                         for item in all_remaining
+                        if override_round is not None
+                        and str(item["file_ref"]) in set(override_round.input_file_refs)
+                    ]
+                    if override_round is not None and round_number == override_round.round_number
+                    else (
+                    [
+                        item
+                        for item in all_remaining
                         if str(item["file_ref"]) in evidence_recheck_refs
                     ]
                     if evidence_recheck_refs
                     else all_remaining
+                    )
                 )
                 if not remaining:
                     break
 
-                steer = await self._consume_pending_steer(owner_id, run_id)
-                question = f"{next_question}\n本轮方向调整：{steer}" if steer else next_question
-                await self._start_round(
-                    owner_id,
-                    run_id,
-                    round_number=round_number,
-                    question=question,
-                    steer_instruction=steer,
-                )
-                await self._transition(
-                    owner_id,
-                    run_id,
-                    "planning",
-                    "round_started",
-                    (
-                        f"第 {round_number} 轮开始，正在核对上轮尚未覆盖的证据。"
-                        if evidence_recheck_refs
-                        else f"第 {round_number} 轮开始，正在确定本轮最小证据范围。"
-                    ),
-                    {
-                        "round_number": round_number,
-                        "remaining_file_count": len(remaining),
-                        "evidence_recheck": bool(evidence_recheck_refs),
-                    },
-                )
-
-                plan, adopted_receipt = await self._plan_with_bounded_repair(
-                    owner_id,
-                    run_id,
-                    workspace=workspace,
-                    question=question,
-                    round_number=round_number,
-                    remaining=remaining,
-                    contract=contract,
-                    steer_instruction=steer,
-                    require_all_files=bool(evidence_recheck_refs),
-                )
-                round_refs = self._plan_file_refs(plan, remaining)
-                round_files = [item for item in remaining if str(item["file_ref"]) in round_refs]
-                branch_ids = await self._set_plan(
-                    owner_id,
-                    run_id,
-                    plan,
-                    round_number=round_number,
-                    parent_branch_id=target_branch_id,
-                )
-                await self._set_model_receipt(owner_id, run_id, adopted_receipt)
-                await self._update_round(
-                    owner_id,
-                    run_id,
-                    round_number,
-                    phase="plan",
-                    input_file_refs=[str(item["file_ref"]) for item in round_files],
-                    branch_ids=branch_ids,
-                    plan=plan.model_dump(mode="json"),
-                    model_receipt=adopted_receipt.model_dump(mode="json"),
-                )
-                await self._transition(
-                    owner_id,
-                    run_id,
-                    "validating",
-                    "plan_validation",
-                    "服务端已校验本轮文件范围、工具、依赖与只读边界。",
-                    {
-                        "round_number": round_number,
-                        "unit_count": len(plan.units),
-                        "file_count": len(round_files),
-                        "output_used": True,
-                    },
-                )
+                reusing_plan = override_round is not None and round_number == override_round.round_number
+                if reusing_plan:
+                    question = override_round.question
+                    steer = None
+                    plan = HarnessPlan.model_validate(override_round.plan)
+                    adopted_receipt = recovered.model_receipt or HarnessModelReceipt(
+                        called=True, model=self.planner.model, elapsed_ms=0, output_used=True
+                    )
+                    round_refs = set(override_round.input_file_refs)
+                    round_files = [item for item in remaining if str(item["file_ref"]) in round_refs]
+                    branch_ids = list(override_round.branch_ids)
+                else:
+                    steer = await self._consume_pending_steer(owner_id, run_id)
+                    question = f"{next_question}\n本轮方向调整：{steer}" if steer else next_question
+                    await self._start_round(
+                        owner_id,
+                        run_id,
+                        round_number=round_number,
+                        question=question,
+                        steer_instruction=steer,
+                    )
+                    await self._transition(
+                        owner_id,
+                        run_id,
+                        "planning",
+                        "round_started",
+                        (
+                            f"第 {round_number} 轮开始，正在核对上轮尚未覆盖的证据。"
+                            if evidence_recheck_refs
+                            else f"第 {round_number} 轮开始，正在确定本轮最小证据范围。"
+                        ),
+                        {
+                            "round_number": round_number,
+                            "remaining_file_count": len(remaining),
+                            "evidence_recheck": bool(evidence_recheck_refs),
+                        },
+                    )
+                    plan, adopted_receipt = await self._plan_with_bounded_repair(
+                        owner_id,
+                        run_id,
+                        workspace=workspace,
+                        question=question,
+                        round_number=round_number,
+                        remaining=remaining,
+                        contract=contract,
+                        steer_instruction=steer,
+                        require_all_files=bool(evidence_recheck_refs),
+                    )
+                    round_refs = self._plan_file_refs(plan, remaining)
+                    round_files = [item for item in remaining if str(item["file_ref"]) in round_refs]
+                    branch_ids = await self._set_plan(
+                        owner_id,
+                        run_id,
+                        plan,
+                        round_number=round_number,
+                        parent_branch_id=target_branch_id,
+                    )
+                if not reusing_plan:
+                    await self._set_topology_admission(
+                        owner_id,
+                        run_id,
+                        plan,
+                        remaining_model_calls=max(
+                            0, contract.max_model_calls - (await self.get(owner_id, run_id)).budget.model_calls_used
+                        ),
+                        remaining_time_seconds=max(
+                            0, contract.deadline_seconds - (await self.get(owner_id, run_id)).budget.elapsed_ms // 1000
+                        ),
+                    )
+                    await self._set_model_receipt(owner_id, run_id, adopted_receipt)
+                    await self._update_round(
+                        owner_id,
+                        run_id,
+                        round_number,
+                        phase="plan",
+                        input_file_refs=[str(item["file_ref"]) for item in round_files],
+                        branch_ids=branch_ids,
+                        plan=plan.model_dump(mode="json"),
+                        model_receipt=adopted_receipt.model_dump(mode="json"),
+                    )
+                    await self._transition(
+                        owner_id,
+                        run_id,
+                        "validating",
+                        "plan_validation",
+                        "服务端已校验本轮文件范围、工具、依赖与只读边界。",
+                        {
+                            "round_number": round_number,
+                            "unit_count": len(plan.units),
+                            "file_count": len(round_files),
+                            "output_used": True,
+                        },
+                    )
+                # Adaptive admission is a deliberately separate, user-gated
+                # route. Persist the plan and validation receipt first, then
+                # stop before effects or the ordinary Analyst path.
+                admitted = (await self.get(owner_id, run_id)).topology_admission
+                if (
+                    admitted is not None
+                    and admitted.mode == "adaptive_readonly_workers"
+                    and admitted.user_confirmation_required
+                ):
+                    await self._transition(
+                        owner_id,
+                        run_id,
+                        "waiting_input",
+                        "topology_confirmation_required",
+                        "拓扑已准入受限只读 Worker；等待用户明确确认后才会调用 Analyst Worker。",
+                        {
+                            "mode": admitted.mode,
+                            "independent_branch_count": admitted.independent_branch_count,
+                            "worker_limit": 3,
+                            "external_action": False,
+                        },
+                    )
+                    return
                 # Deterministic office tools are admitted by the validated task
                 # contract, not by the Analyst's prose.  Persist their files and
                 # verifier receipts before narrative analysis so a rejected model
@@ -2709,6 +4491,8 @@ class HarnessRuntime:
                 scope_filtered_finding_count = 0
                 downgraded_review_count = 0
                 recovery_kind: Literal["source_location", "analysis_output"] = "source_location"
+                analysis_failure_detail: str | None = None
+                analysis_failure_kind: str | None = None
                 for analysis_attempt in (1, 2):
                     try:
                         candidate, candidate_receipt = await self._invoke_analyst(
@@ -2724,29 +4508,42 @@ class HarnessRuntime:
                         )
                     except HarnessModelError as exc:
                         recovery_kind = "analysis_output"
+                        analysis_failure_detail = str(exc)[:240]
+                        analysis_failure_kind = exc.failure_kind
                         await self._transition(
                             owner_id,
                             run_id,
                             "analyzing",
                             "analysis_structure_rejected",
                             (
-                                "分析模型返回内容不符合可核对格式，正在受控重试。"
+                                f"{analysis_failure_detail}，正在受控重试。"
                                 if analysis_attempt == 1
-                                else "修复后的分析内容仍不符合可核对格式，未采用。"
+                                else f"修复后仍未通过：{analysis_failure_detail}。候选内容未采用。"
                             ),
                             {
                                 "round_number": round_number,
                                 "attempt": analysis_attempt,
                                 "model_called": exc.called,
                                 "output_used": False,
+                                "failure_kind": exc.failure_kind,
+                                "reason": analysis_failure_detail,
                             },
                         )
                         if analysis_attempt == 1:
-                            validation_feedback = (
-                                "上一候选没有通过严格 JSON 结构校验。请只输出 schema 要求的 JSON，"
-                                "每条 Finding 只描述一个问题；若不能生成完整 review，请省略 review，"
-                                "不要添加 Markdown、解释文字或额外字段。"
-                            )
+                            if exc.failure_kind == "output_truncated":
+                                validation_feedback = (
+                                    "上一候选在完整 JSON 返回前达到输出长度上限。保持所有独立问题，"
+                                    "但压缩 summary、detail 和 follow_ups，不重复背景或来源说明；"
+                                    "每条 Finding 优先保留一段足以唯一定位的短引用，只有同一问题必须对照时才增加第二段。"
+                                    "只输出 schema 要求的 JSON，不要添加 Markdown 或解释文字。"
+                                )
+                            else:
+                                validation_feedback = (
+                                    f"上一候选没有通过严格 JSON 结构校验：{analysis_failure_detail}。"
+                                    "请只输出 schema 要求的 JSON，"
+                                    "每条 Finding 只描述一个问题；若不能生成完整 review，请省略 review，"
+                                    "不要添加 Markdown、解释文字或额外字段。"
+                                )
                             continue
                         break
                     await self._safe_point(owner_id, run_id)
@@ -2790,15 +4587,28 @@ class HarnessRuntime:
                         if resolution.result is not None:
                             self._validate_result(resolution.result, round_files)
                     except HarnessPlanError as exc:
+                        recoverable_binding_error = str(exc) in {
+                            "分析结果绑定了不存在的计划单元",
+                            "分析结果引用超出其绑定计划单元的文件范围",
+                            "共享资料对应多个任务分支，Finding 必须提供 plan_unit_id",
+                        }
                         await self._transition(
                             owner_id,
                             run_id,
                             "analyzing",
                             "analysis_validation_rejected",
                             (
-                                "候选结论缺少可唯一定位的原文，未采用。"
+                                (
+                                    "候选结论没有绑定到单一业务分支，正在受控修复。"
+                                    if recoverable_binding_error
+                                    else "候选结论缺少可唯一定位的原文，未采用。"
+                                )
                                 if analysis_attempt == 1
-                                else "修复后的候选结论仍无法唯一定位原文，未采用。"
+                                else (
+                                    "修复后的候选结论仍跨越多个业务分支，未采用。"
+                                    if recoverable_binding_error
+                                    else "修复后的候选结论仍无法唯一定位原文，未采用。"
+                                )
                             ),
                             {
                                 "round_number": round_number,
@@ -2810,12 +4620,25 @@ class HarnessRuntime:
                             },
                         )
                         if analysis_attempt == 2:
+                            if recoverable_binding_error:
+                                recovery_kind = "analysis_output"
+                                analysis_failure_detail = str(exc)[:240]
+                                analysis_failure_kind = "branch_binding"
+                                break
                             raise
-                        validation_feedback = (
-                            "上一候选至少有一条 Finding 没有任何 quote 能在对应文件中唯一匹配。"
-                            "请重新生成全部 findings；每条至少选择一段更长、连续、只出现一次的原文，"
-                            "不要复用会在日志中重复出现的短句。"
-                        )
+                        if recoverable_binding_error:
+                            validation_feedback = (
+                                "上一候选至少有一条 Finding 跨越了多个计划单元。"
+                                "每条 finding.file_refs 必须完全属于其 plan_unit_id 的 input_file_refs；"
+                                "跨部门结论只能绑定到计划中覆盖这些来源的下游汇总单元。"
+                                "不要把多个业务分支的问题合并成一条 Finding。"
+                            )
+                        else:
+                            validation_feedback = (
+                                "上一候选至少有一条 Finding 没有任何 quote 能在对应文件中唯一匹配。"
+                                "请重新生成全部 findings；每条至少选择一段更长、连续、只出现一次的原文，"
+                                "不要复用会在日志中重复出现的短句。"
+                            )
                         continue
                     if resolution.result is not None:
                         resolution_score = (
@@ -2909,11 +4732,12 @@ class HarnessRuntime:
                     )
                     decision = "waiting_input" if can_continue else "budget_exhausted"
                     if recovery_kind == "analysis_output":
+                        format_reason = analysis_failure_detail or "分析结果未形成服务端可核对结构"
                         reason = (
-                            "分析模型已经响应，但返回内容未形成服务端可核对的结构。"
+                            f"分析模型已经响应，但{format_reason}。"
                             "本轮计划、文件范围和调用记录已保留；请缩小到一个分支后继续。"
                             if can_continue
-                            else "分析模型已经响应，但返回内容仍未形成可核对结构；当前预算不足以再次核对，"
+                            else f"分析模型已经响应，但{format_reason}；当前预算不足以再次核对，"
                             "系统已保留计划与调用记录并安全停止。"
                         )
                     else:
@@ -2975,6 +4799,7 @@ class HarnessRuntime:
                             "decision": decision,
                             "candidate_file_refs": next_step.candidate_file_refs,
                             "candidate_branch_ids": next_step.candidate_branch_ids,
+                            "failure_kind": analysis_failure_kind,
                             "external_action": False,
                         },
                     )
@@ -4145,6 +5970,9 @@ class HarnessRuntime:
                     remaining,
                     max_file_refs=contract.max_files_per_round,
                     require_all_files=require_all_files,
+                    expected_requirement_count=self._explicit_business_requirement_count(
+                        question
+                    ),
                 )
             except HarnessPlanError as exc:
                 last_error = exc
@@ -4199,6 +6027,13 @@ class HarnessRuntime:
     ) -> None:
         async with self._lock:
             run = self._require_run(owner_id, run_id)
+            if (
+                updates.get("phase") == "plan"
+                and "plan" in updates
+                and round_number == run.snapshot.current_round
+                and any(event.event_name == "control_topology_override_recorded" for event in run.snapshot.events)
+            ):
+                return
             rounds = [
                 item.model_copy(update=updates) if item.round_number == round_number else item
                 for item in run.snapshot.rounds
@@ -4275,7 +6110,21 @@ class HarnessRuntime:
                 else [],
                 follow_ups=result.follow_ups[:4] if result else [],
                 evidence_gaps=gaps,
-                source_file_refs=round_snapshot.verified_file_refs,
+                # Keep every reference that backs a retained Finding. The
+                # round list is only a projection and must not drop refs that
+                # are still present in the Artifact payload.
+                source_file_refs=list(
+                    dict.fromkeys(
+                        [
+                            *round_snapshot.verified_file_refs,
+                            *(
+                                file_ref
+                                for finding in (result.findings if result else [])
+                                for file_ref in finding.file_refs
+                            ),
+                        ]
+                    )
+                ),
                 finding_count=len(result.findings) if result else 0,
                 parent_version=version - 1 if version > 1 else None,
                 created_at=datetime.now(timezone.utc),
@@ -4711,7 +6560,7 @@ class HarnessRuntime:
         if unique_findings:
             result = HarnessTaskResult(
                 summary=summary,
-                findings=unique_findings[:10],
+                findings=unique_findings,
                 follow_ups=unique_follow_ups[:4],
                 review_required=True,
             )
@@ -5071,8 +6920,11 @@ class HarnessRuntime:
         verified_effect_context: dict[str, Any] | None,
         attempt: int,
         validation_feedback: str | None,
+        reserve_model_call: bool = True,
+        record_round_receipt: bool = True,
     ) -> tuple[HarnessTaskResult, HarnessModelReceipt]:
-        await self._reserve_model_call(owner_id, run_id)
+        if reserve_model_call:
+            await self._reserve_model_call(owner_id, run_id)
         await self._transition(
             owner_id,
             run_id,
@@ -5116,14 +6968,15 @@ class HarnessRuntime:
                 or max(0, round((perf_counter() - analysis_started) * 1000)),
                 output_used=False,
             )
-            await self._set_analysis_receipt(owner_id, run_id, receipt)
-            await self._update_round(
-                owner_id,
-                run_id,
-                round_number,
-                phase="act",
-                analysis_receipt=receipt.model_dump(mode="json"),
-            )
+            if record_round_receipt:
+                await self._set_analysis_receipt(owner_id, run_id, receipt)
+                await self._update_round(
+                    owner_id,
+                    run_id,
+                    round_number,
+                    phase="act",
+                    analysis_receipt=receipt.model_dump(mode="json"),
+                )
             await self._transition(
                 owner_id,
                 run_id,
@@ -5146,14 +6999,15 @@ class HarnessRuntime:
             elapsed_ms=max(0, round((perf_counter() - analysis_started) * 1000)),
             output_used=False,
         )
-        await self._set_analysis_receipt(owner_id, run_id, receipt)
-        await self._update_round(
-            owner_id,
-            run_id,
-            round_number,
-            phase="act",
-            analysis_receipt=receipt.model_dump(mode="json"),
-        )
+        if record_round_receipt:
+            await self._set_analysis_receipt(owner_id, run_id, receipt)
+            await self._update_round(
+                owner_id,
+                run_id,
+                round_number,
+                phase="act",
+                analysis_receipt=receipt.model_dump(mode="json"),
+            )
         await self._transition(
             owner_id,
             run_id,
@@ -5200,6 +7054,9 @@ class HarnessRuntime:
                 "steer_instruction": steer_instruction,
                 "validation_feedback": validation_feedback,
                 "evidence_recheck": evidence_recheck,
+                "explicit_business_requirement_count": HarnessRuntime._explicit_business_requirement_count(
+                    instruction
+                ),
                 "external_action": "none",
             },
         }
@@ -5216,9 +7073,35 @@ class HarnessRuntime:
                 ),
                 "display_summary": item.get("display_summary", "公开办公输入文件"),
                 "mime": item.get("mime", "application/octet-stream"),
+                "planner_search_hint": item.get("planner_search_hint"),
             }
             for item in files
         ]
+
+    @staticmethod
+    def _explicit_business_requirement_count(instruction: str) -> int:
+        requirement_markers = (
+            "业务分支",
+            "以下分支",
+            "以下事项",
+            "以下要求",
+            "分别核对",
+            "分别检查",
+            "逐项核对",
+        )
+        if not any(marker in instruction for marker in requirement_markers):
+            return 0
+        numbered = [
+            int(match.group(1))
+            for match in re.finditer(r"(?<!\d)(1[0-2]|[1-9])\s*[\.、]\s*", instruction)
+        ]
+        if not numbered:
+            return 0
+        unique = set(numbered)
+        count = 0
+        while count + 1 in unique:
+            count += 1
+        return count if count >= 2 else 0
 
     @staticmethod
     def _index_files(workspace: dict[str, Any]) -> list[dict[str, Any]]:
@@ -5250,6 +7133,7 @@ class HarnessRuntime:
                             "display_group",
                             "display_path",
                             "display_summary",
+                            "planner_search_hint",
                         )
                         if key in item
                     },
@@ -5775,11 +7659,40 @@ class HarnessRuntime:
     ) -> HarnessPlan:
         """Compile model intent into server-owned scope, effect and gate policy."""
 
+        coverage = list(candidate.requirement_coverage)
+        planned_root_ids = {
+            str(item.unit_id)
+            for item in coverage
+            if item.status == "planned" and item.unit_id is not None
+        }
+        candidate_units = list(candidate.units)
+        if coverage:
+            unit_by_id = {item.unit_id: item for item in candidate_units}
+            ordered_root_ids = [
+                str(item.unit_id)
+                for item in sorted(coverage, key=lambda item: item.requirement_index)
+                if item.status == "planned" and item.unit_id in unit_by_id
+            ]
+            ordered_root_id_set = set(ordered_root_ids)
+            candidate_units = [unit_by_id[item] for item in ordered_root_ids]
+            candidate_units.extend(
+                item for item in candidate.units if item.unit_id not in ordered_root_id_set
+            )
+
         selected_refs: set[str] = set()
         candidate_payloads: list[dict[str, Any]] = []
         budget_trimmed = False
-        for candidate_unit in candidate.units:
+        for candidate_unit in candidate_units:
             payload = candidate_unit.model_dump(exclude={"side_effect"})
+            new_refs = set(payload["input_file_refs"]) - selected_refs
+            if (
+                coverage
+                and candidate_unit.unit_id in planned_root_ids
+                and max_file_refs is not None
+                and len(selected_refs) + len(new_refs) > max_file_refs
+            ):
+                budget_trimmed = True
+                continue
             bounded_refs: list[str] = []
             for file_ref in payload["input_file_refs"]:
                 if file_ref in selected_refs:
@@ -5794,6 +7707,19 @@ class HarnessRuntime:
                 continue
             payload["input_file_refs"] = bounded_refs
             candidate_payloads.append(payload)
+
+        if coverage:
+            while True:
+                kept_ids = {str(payload["unit_id"]) for payload in candidate_payloads}
+                filtered_payloads = [
+                    payload
+                    for payload in candidate_payloads
+                    if set(payload["depends_on"]).issubset(kept_ids)
+                ]
+                if len(filtered_payloads) == len(candidate_payloads):
+                    break
+                budget_trimmed = True
+                candidate_payloads = filtered_payloads
 
         kept_ids = {str(payload["unit_id"]) for payload in candidate_payloads}
         units: list[HarnessPlanUnit] = []
@@ -5824,10 +7750,55 @@ class HarnessRuntime:
                 "保留了模型排序中优先级最高的证据。"
             )
             selection_reason = f"{selection_reason[: 1_000 - len(budget_note)]}{budget_note}"
+        candidate_unit_by_id = {item.unit_id: item for item in candidate.units}
+        reconciled_coverage: list[HarnessRequirementCoverage] = []
+        for item in coverage:
+            if item.status == "planned" and item.unit_id not in kept_ids:
+                source_unit = candidate_unit_by_id.get(str(item.unit_id))
+                source_refs = (
+                    list(dict.fromkeys(source_unit.input_file_refs)) if source_unit else []
+                )
+                reason_suffix = "服务端本轮文件预算未能完整纳入该分支，已排入后续核对。"
+                reason = f"{item.reason.rstrip('。')}；{reason_suffix}"
+                reconciled_coverage.append(
+                    item.model_copy(
+                        update={
+                            "status": "deferred",
+                            "unit_id": None,
+                            "reason": reason[:1_000],
+                            "candidate_file_refs": source_refs[:24],
+                        }
+                    )
+                )
+            else:
+                reconciled_coverage.append(item)
+        coverage = reconciled_coverage
+        uncovered_requirements = [
+            HarnessUncoveredRequirement(
+                title=item.title,
+                objective=item.objective,
+                reason=item.reason,
+            )
+            for item in coverage
+            if item.status == "uncovered"
+        ]
+        deferred_requirements = [
+            HarnessDeferredRequirement(
+                title=item.title,
+                objective=item.objective,
+                reason=item.reason,
+                candidate_file_refs=item.candidate_file_refs,
+            )
+            for item in coverage
+            if item.status == "deferred"
+        ]
         return HarnessPlan(
             summary=candidate.summary,
             selection_reason=selection_reason,
             units=units,
+            uncovered_requirements=uncovered_requirements,
+            deferred_requirements=deferred_requirements,
+            requirement_coverage=coverage,
         )
 
     @classmethod
@@ -5839,6 +7810,7 @@ class HarnessRuntime:
         *,
         max_file_refs: int | None = None,
         require_all_files: bool = False,
+        expected_requirement_count: int = 0,
     ) -> None:
         allowed_refs = {str(item["file_ref"]) for item in files}
         allowed_tools = set(workspace.get("allowlisted_tools", []))
@@ -5850,6 +7822,39 @@ class HarnessRuntime:
         ids = [unit.unit_id for unit in plan.units]
         if len(ids) != len(set(ids)):
             raise HarnessPlanError("工作单元 ID 重复")
+        coverage_indices = [item.requirement_index for item in plan.requirement_coverage]
+        if len(coverage_indices) != len(set(coverage_indices)):
+            raise HarnessPlanError("业务要求覆盖表包含重复编号")
+        if expected_requirement_count and sorted(coverage_indices) != list(
+            range(1, expected_requirement_count + 1)
+        ):
+            raise HarnessPlanError(
+                f"用户明确列出 {expected_requirement_count} 个业务分支；"
+                "requirement_coverage 必须逐项记录 1 到该数量，不能漏项"
+            )
+        unit_by_id = {unit.unit_id: unit for unit in plan.units}
+        planned_unit_ids: list[str] = []
+        for coverage in plan.requirement_coverage:
+            if coverage.status == "planned":
+                if coverage.unit_id not in unit_by_id:
+                    raise HarnessPlanError("已计划的业务要求必须绑定本轮真实工作单元")
+                if unit_by_id[coverage.unit_id].depends_on:
+                    raise HarnessPlanError("业务分支覆盖项必须绑定根工作单元，而不是下游汇总单元")
+                if coverage.candidate_file_refs:
+                    raise HarnessPlanError("本轮已计划业务要求不能重复声明后续候选来源")
+                planned_unit_ids.append(str(coverage.unit_id))
+            else:
+                if coverage.unit_id is not None:
+                    raise HarnessPlanError("后续处理或当前缺少来源的业务要求不能绑定本轮工作单元")
+                if coverage.status == "deferred":
+                    if not coverage.candidate_file_refs:
+                        raise HarnessPlanError("后续处理业务要求必须列出已识别的候选来源")
+                    if not set(coverage.candidate_file_refs).issubset(allowed_refs):
+                        raise HarnessPlanError("后续处理业务要求引用了资料库索引之外的文件")
+                elif coverage.candidate_file_refs:
+                    raise HarnessPlanError("当前缺少来源的业务要求不能伪造候选文件")
+        if len(planned_unit_ids) != len(set(planned_unit_ids)):
+            raise HarnessPlanError("多个业务要求不能共用同一个根工作单元")
         referenced_refs = {file_ref for unit in plan.units for file_ref in unit.input_file_refs}
         if max_file_refs is not None and len(referenced_refs) > max_file_refs:
             raise HarnessPlanError(
@@ -5890,6 +7895,18 @@ class HarnessRuntime:
             unknown_deps = set(unit.depends_on) - set(ids)
             if unknown_deps:
                 raise HarnessPlanError("计划包含未知依赖")
+        if expected_requirement_count:
+            planned_root_ids = set(planned_unit_ids)
+            for unit in plan.units:
+                if unit.unit_id in planned_root_ids or not unit.depends_on:
+                    continue
+                required_refs = {
+                    file_ref
+                    for dependency in unit.depends_on
+                    for file_ref in unit_by_id[dependency].input_file_refs
+                }
+                if not required_refs.issubset(set(unit.input_file_refs)):
+                    raise HarnessPlanError("下游汇总工作单元必须覆盖全部直接前序来源")
         visiting: set[str] = set()
         visited: set[str] = set()
 
@@ -5920,6 +7937,13 @@ class HarnessRuntime:
             raise HarnessConflictError(f"未知 Harness 状态: {status}")
         async with self._lock:
             run = self._require_run(owner_id, run_id)
+            if (
+                name == "plan_validation"
+                and run.snapshot.topology_admission is not None
+                and run.snapshot.topology_admission.mode == "single_controller"
+                and any(event.event_name == "control_topology_override_recorded" for event in run.snapshot.events)
+            ):
+                return
             now = datetime.now(timezone.utc)
             event = HarnessEvent(
                 sequence=len(run.snapshot.events) + 1,
@@ -5953,6 +7977,78 @@ class HarnessRuntime:
                 update={"model_receipt": receipt, "updated_at": datetime.now(timezone.utc)}
             )
             await self._persist_locked(run)
+
+    async def _set_topology_admission(
+        self,
+        owner_id: str,
+        run_id: str,
+        plan: HarnessPlan,
+        *,
+        remaining_model_calls: int,
+        remaining_time_seconds: int,
+    ) -> None:
+        from services.api.app.application.topology_admission import admit_topology
+
+        existing = await self.get(owner_id, run_id)
+        if (
+            existing.topology_admission is not None
+            and existing.topology_admission.mode == "single_controller"
+            and any(
+                event.event_name == "control_topology_override_recorded"
+                for event in existing.events
+            )
+        ):
+            # The user already selected the conservative route for this
+            # packet. Do not recompute adaptive admission or create another
+            # confirmation gate while resuming the same round.
+            return
+        source_refs = sorted({ref for unit in plan.units for ref in unit.input_file_refs})
+        source_facts: dict[str, dict[str, object]] = {}
+        for file_ref in source_refs:
+            public_file = getattr(self.catalog, "public_file", None)
+            if not callable(public_file):
+                # Legacy test catalogs may expose only agent-safe inputs.  In
+                # that narrow compatibility case structural facts are
+                # unavailable and admission stays conservative.
+                continue
+            try:
+                preview = public_file(file_ref)
+            except KeyError:
+                # A legacy catalog may omit a preview row.  Do not turn a
+                # missing structural hint into a broad runtime failure.
+                continue
+            source_facts[file_ref] = {
+                key: preview.get(key)
+                for key in ("display_group", "display_path", "mime", "kind", "columns")
+            }
+        admission = admit_topology(
+            plan,
+            remaining_model_calls=remaining_model_calls,
+            remaining_time_seconds=remaining_time_seconds,
+            source_facts=source_facts,
+        )
+        async with self._lock:
+            run = self._require_run(owner_id, run_id)
+            run.snapshot = run.snapshot.model_copy(
+                update={
+                    "topology_admission": admission,
+                    "updated_at": datetime.now(timezone.utc),
+                }
+            )
+            await self._persist_locked(run)
+        await self._transition(
+            owner_id,
+            run_id,
+            "validating",
+            "topology_admission",
+            "服务端已根据已校验计划选择执行拓扑；准入与实际执行分开。",
+            {
+                "mode": admission.mode,
+                "independent_branch_count": admission.independent_branch_count,
+                "external_action": False,
+                "user_confirmation_required": admission.user_confirmation_required,
+            },
+        )
 
     async def _set_analysis_receipt(
         self,
@@ -6045,7 +8141,7 @@ class HarnessRuntime:
             ]
             for unit in plan.units
         }
-        return [
+        branches = [
             AgentControlLoopBranch(
                 branch_id=branch_ids[unit.unit_id],
                 unit_id=unit.unit_id,
@@ -6056,13 +8152,38 @@ class HarnessRuntime:
                 depends_on=[branch_ids[item] for item in unit.depends_on],
                 input_file_refs=list(dict.fromkeys(unit.input_file_refs)),
                 missing_file_refs=list(dict.fromkeys(unit.input_file_refs)),
-                status="running",
+                # Only DAG roots are ready for dispatch. Dependents remain
+                # pending until their predecessor MergeReceipt is adopted.
+                status="pending" if unit.depends_on else "running",
                 requires_human_gate=unit.requires_human_gate,
                 created_at=now,
                 updated_at=now,
             )
             for unit in plan.units
         ]
+        for index, requirement in enumerate(plan.deferred_requirements, start=1):
+            unit_id = f"deferred-requirement-{index}"
+            branch_id = "branch-" + hashlib.sha256(
+                f"{run_id}:{round_number}:{unit_id}:{requirement.title}".encode("utf-8")
+            ).hexdigest()[:12]
+            branches.append(
+                AgentControlLoopBranch(
+                    branch_id=branch_id,
+                    unit_id=unit_id,
+                    round_number=round_number,
+                    parent_branch_id=parent_branch_id,
+                    title=requirement.title,
+                    objective=requirement.objective,
+                    depends_on=[],
+                    input_file_refs=list(dict.fromkeys(requirement.candidate_file_refs)),
+                    missing_file_refs=list(dict.fromkeys(requirement.candidate_file_refs)),
+                    status="waiting_input",
+                    requires_human_gate=False,
+                    created_at=now,
+                    updated_at=now,
+                )
+            )
+        return branches
 
     async def _fail(self, owner_id: str, run_id: str, reason: str) -> None:
         async with self._lock:
@@ -6114,12 +8235,25 @@ def build_harness_runtime(settings: Any | None = None) -> HarnessRuntime:
         BenchmarkWorkspaceCatalog,
     )
 
+    state_store_mode = str(getattr(settings, "state_store_mode", "auto")).strip().lower()
+    if state_store_mode not in {"auto", "memory", "postgres"}:
+        raise ValueError("STATE_STORE_MODE must be auto, memory or postgres")
+    database_dsn = str(getattr(settings, "database_dsn", "")).strip()
     state_store: HarnessStateStore
-    if settings.database_dsn:
-        state_store = PostgresHarnessStateStore(settings.database_dsn)
+    if state_store_mode == "memory":
+        state_store = InMemoryHarnessStateStore()
+    elif database_dsn:
+        state_store = PostgresHarnessStateStore(database_dsn)
+    elif state_store_mode == "postgres":
+        raise ValueError("STATE_STORE_MODE=postgres requires DATABASE_DSN")
     else:
         state_store = InMemoryHarnessStateStore()
 
+    analysis_timeout = getattr(
+        settings,
+        "llm_analysis_timeout_seconds",
+        max(float(settings.llm_timeout_seconds), 180.0),
+    )
     return HarnessRuntime(
         BenchmarkWorkspaceCatalog(),
         OpenAICompatibleHarnessPlanner(
@@ -6132,7 +8266,7 @@ def build_harness_runtime(settings: Any | None = None) -> HarnessRuntime:
             base_url=settings.llm_base_url,
             api_key=settings.llm_api_key,
             model=settings.llm_model,
-            timeout=settings.llm_timeout_seconds,
+            timeout=analysis_timeout,
         ),
         state_store,
         ScenarioEffectEngine(),

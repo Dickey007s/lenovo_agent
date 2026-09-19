@@ -1,0 +1,56 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720" width="1280" height="720">
+  <g id="background"><rect width="1280" height="720" fill="#F7F8FA"/><path d="M52 112H1228" stroke="#CBD5DF" stroke-width="2"/></g>
+  <g id="header">
+    <text x="52" y="78" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="46" font-weight="700" fill="#132A3A">主流方案的差别，首先是“用户在审什么”</text>
+    <rect x="1084" y="46" width="144" height="34" rx="6" fill="#EDF1F4"/><text x="1156" y="69" text-anchor="middle" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#1769E0">竞品官方调研</text>
+  </g>
+  <g id="lead">
+    <text x="52" y="154" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="28" font-weight="700" fill="#132A3A">不做功能打勾表，比较一等交互对象</text>
+    <text x="52" y="188" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#5A6B7C">官方材料可以说明产品重心，不能据此推出竞品做不到其他能力。</text>
+  </g>
+  <g id="competitor-grid">
+    <rect x="52" y="224" width="360" height="158" rx="6" fill="#FFFFFF" stroke="#CBD5DF" stroke-width="2"/>
+    <use data-icon="tabler-outline/briefcase" x="74" y="246" width="28" height="28" fill="#1769E0" stroke-width="2"/>
+    <text x="116" y="268" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="24" font-weight="700" fill="#132A3A">Microsoft 365 Copilot</text>
+    <text x="74" y="308" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#5A6B7C">审：文件、邮件、会议、站点与人员</text>
+    <text x="74" y="340" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="17" font-weight="700" fill="#1769E0">交互对象：工作内容与引用范围</text>
+
+    <rect x="436" y="224" width="360" height="158" rx="6" fill="#FFFFFF" stroke="#CBD5DF" stroke-width="2"/>
+    <use data-icon="tabler-outline/search" x="458" y="246" width="28" height="28" fill="#1769E0" stroke-width="2"/>
+    <text x="500" y="268" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="24" font-weight="700" fill="#132A3A">ChatGPT deep research</text>
+    <text x="458" y="308" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#5A6B7C">审：研究计划、来源、进度与报告</text>
+    <text x="458" y="340" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="17" font-weight="700" fill="#1769E0">交互对象：可中断的研究过程</text>
+
+    <rect x="820" y="224" width="408" height="158" rx="6" fill="#FFFFFF" stroke="#CBD5DF" stroke-width="2"/>
+    <use data-icon="tabler-outline/git-branch" x="842" y="246" width="28" height="28" fill="#1769E0" stroke-width="2"/>
+    <text x="884" y="268" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="24" font-weight="700" fill="#132A3A">Codex App</text>
+    <text x="842" y="308" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#5A6B7C">审：Task、隔离工作区、Diff 与队列</text>
+    <text x="842" y="340" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="17" font-weight="700" fill="#1769E0">交互对象：代码任务与可审查变更</text>
+
+    <rect x="52" y="406" width="360" height="158" rx="6" fill="#FFFFFF" stroke="#CBD5DF" stroke-width="2"/>
+    <use data-icon="tabler-outline/message-circle" x="74" y="428" width="28" height="28" fill="#D97706" stroke-width="2"/>
+    <text x="116" y="450" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="24" font-weight="700" fill="#132A3A">Claude Code</text>
+    <text x="74" y="490" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#5A6B7C">审：项目上下文、工具动作与验证结果</text>
+    <text x="74" y="522" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="17" font-weight="700" fill="#B54708">交互对象：项目会话与工具循环</text>
+
+    <rect x="436" y="406" width="360" height="158" rx="6" fill="#FFFFFF" stroke="#CBD5DF" stroke-width="2"/>
+    <use data-icon="tabler-outline/server" x="458" y="428" width="28" height="28" fill="#D97706" stroke-width="2"/>
+    <text x="500" y="450" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="24" font-weight="700" fill="#132A3A">OpenClaw</text>
+    <text x="458" y="490" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#5A6B7C">审：Gateway Task、路由、会话与审批</text>
+    <text x="458" y="522" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="17" font-weight="700" fill="#B54708">交互对象：任务账本与运行通道</text>
+
+    <rect x="820" y="406" width="408" height="158" rx="6" fill="#FFFFFF" stroke="#CBD5DF" stroke-width="2"/>
+    <use data-icon="tabler-outline/refresh" x="842" y="428" width="28" height="28" fill="#D97706" stroke-width="2"/>
+    <text x="884" y="450" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="24" font-weight="700" fill="#132A3A">ReAct</text>
+    <text x="842" y="490" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#5A6B7C">审：Action 是否得到环境 Observation</text>
+    <text x="842" y="522" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="17" font-weight="700" fill="#B54708">交互对象：推理与环境反馈循环</text>
+  </g>
+  <g id="office-agent-position">
+    <path d="M52 610H1228" stroke="#1769E0" stroke-width="4"/>
+    <text x="52" y="640" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="24" font-weight="700" fill="#132A3A">Office Agent 候选差异：用户审的是“资料 → 业务结论 → 成果 → 人工决定 → 未执行边界”</text>
+  </g>
+  <g id="footer">
+    <text x="52" y="690" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="14" fill="#7C8A98">官方来源：Microsoft Support · OpenAI Help / Codex App · Claude Code Docs · OpenClaw Docs · ReAct</text>
+    <text x="1228" y="690" text-anchor="end" font-family="Consolas, &quot;Courier New&quot;, monospace" font-size="14" fill="#7C8A98">06 / 24</text>
+  </g>
+</svg>

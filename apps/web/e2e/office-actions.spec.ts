@@ -6,6 +6,7 @@ const headers = { "X-User-Id": "demo_user" };
 
 async function enter(page: Page) {
   await page.goto("/");
+  await page.getByRole("button", { name: "新建任务", exact: true }).click();
   await page.getByRole("button", { name: "办理事项", exact: true }).click();
   const another = page.getByRole("button", { name: "办理另一件事项" });
   if (await another.isVisible()) await another.click();
@@ -170,7 +171,7 @@ test("real API: edit a draft in place while preserving the source and history", 
   await expect(section.locator(".office-action-preview pre")).toHaveText(action.receipt.content);
   await section.getByText(/第 2 版修改了什么/).click();
   await expect(section.locator(".office-version-changes")).toContainText(action.source_excerpt);
-  await page.screenshot({ path: "../../docs/evidence/screenshots/DR0054-draft-edit.png", fullPage: true });
+  await page.screenshot({ path: "../../docs/evidence/screenshots/DEMO3-MERGE-draft-edit.png", fullPage: true });
   await page.reload();
   await expect(section.locator(".office-action-preview pre")).toHaveText(action.receipt.content);
 });
@@ -189,9 +190,9 @@ test("real API: human judgment survives defer, another task and re-opening", asy
   await expect(decide).toBeDisabled();
   await section.getByRole("radio", { name: "采用材料 B" }).check();
   await expect(decide).toBeDisabled();
-  await page.screenshot({ path: "../../docs/evidence/screenshots/DR0054-human-judgment.png", fullPage: true });
+  await page.screenshot({ path: "../../docs/evidence/screenshots/DEMO3-MERGE-human-judgment.png", fullPage: true });
   await decide.scrollIntoViewIfNeeded();
-  await page.screenshot({ path: "../../docs/evidence/screenshots/DR0054-human-controls.png", fullPage: true });
+  await page.screenshot({ path: "../../docs/evidence/screenshots/DEMO3-MERGE-human-controls.png", fullPage: true });
   await section.getByRole("button", { name: "暂时无法判断，稍后处理" }).click();
   await section.getByRole("button", { name: "办理另一件事项" }).click();
   await section.getByLabel("事项标题").fill("另一件个人备忘");
@@ -227,7 +228,7 @@ test("real API: mobile comparison, missing fields and explicit safe exit", async
   await section.getByRole("button", { name: "更新内容并重新核对" }).click();
   await expect(section.getByRole("button", { name: "记录这次判断" })).toBeDisabled();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
-  await page.screenshot({ path: "../../docs/evidence/screenshots/DR0054-mobile-judgment.png", fullPage: true });
+  await page.screenshot({ path: "../../docs/evidence/screenshots/DEMO3-MERGE-mobile-judgment.png", fullPage: true });
   await section.getByRole("button", { name: "暂时无法判断，稍后处理" }).click();
   const download = page.waitForEvent("download");
   await section.getByRole("button", { name: "下载人工处理说明" }).click();
@@ -270,4 +271,42 @@ test("real API: re-open a deferred incomplete item and repair the missing materi
   await expect(section.getByRole("group", { name: "材料对照" })).toContainText("周五");
   await expect(section.getByRole("button", { name: "记录这次判断" })).toBeDisabled();
   await section.getByRole("button", { name: "取消本次事项" }).click();
+});
+
+test("merged workbench: task history and capabilities reopen an action without starting research", async ({ page, request }) => {
+  const section = await enter(page);
+  await section.getByLabel("事项类型").selectOption("compare_materials");
+  const title = `合并验证材料-${Date.now()}`;
+  await section.getByLabel("事项标题").fill(title);
+  const started = page.waitForResponse(response => response.url() === `${api}/v1/harness/runs` && response.request().method() === "POST");
+  await section.getByRole("button", { name: "开始办理" }).click();
+  const run = (await (await started).json()).run;
+  await section.getByRole("button", { name: "暂时无法判断，稍后处理" }).click();
+  await expect(section.locator(".office-action-state")).toContainText("已暂缓，可稍后继续核对。");
+  const task = await request.get(`${api}/v1/harness/tasks/${run.task_id}`, { headers });
+  expect((await task.json()).current_run_id).toBe(run.run_id);
+  const posts: string[] = [];
+  page.on("request", item => { if (item.method() === "POST") posts.push(item.url()); });
+  await page.getByRole("button", { name: "新建任务", exact: true }).click();
+  await page.getByRole("button", { name: /^任务会话/ }).click();
+  await page.getByTestId("task-session").filter({ hasText: title }).getByRole("button", { name: /打开记录/ }).click();
+  await expect(section.getByRole("heading", { name: title, exact: true })).toBeVisible();
+  await page.goto("/agent-capabilities");
+  await expect(page.getByRole("region", { name: "单步事项" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: title, exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "取消本次事项" })).toBeEnabled();
+  expect(posts).toEqual([]);
+  await page.getByRole("button", { name: "取消本次事项" }).click();
+});
+
+test("merged workbench: unavailable Task pointer blocks action changes until rechecked", async ({ page }) => {
+  const section = await enter(page);
+  await page.route("**/v1/harness/tasks/**", route => route.fulfill({ status: 503, json: { detail: "test unavailable" } }));
+  await section.getByLabel("事项类型").selectOption("extract_excerpt");
+  await section.getByRole("button", { name: "开始办理" }).click();
+  await expect(section.getByRole("heading", { name: "摘录草稿" })).toBeVisible();
+  await expect(section.getByRole("button", { name: "编辑这份草稿" })).toBeDisabled();
+  await page.unroute("**/v1/harness/tasks/**");
+  await section.getByRole("button", { name: "核对最新状态" }).click();
+  await expect(section.getByRole("button", { name: "编辑这份草稿" })).toBeEnabled();
 });

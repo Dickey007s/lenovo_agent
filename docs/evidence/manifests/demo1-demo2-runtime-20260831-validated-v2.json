@@ -1,0 +1,78 @@
+{
+  "manifest_version": "demo1-demo2-runtime-evidence.validated-v2",
+  "captured_at": "2026-08-31",
+  "branch": "codex/demo1-demo2-runtime-20260830",
+  "code_head": "756e88c",
+  "evidence_commit": null,
+  "evidence_commit_status": "pending_manifest_commit",
+  "scope": "Demo 1/2 源码、自动化验证与原始运行门；未修改 living docs、PPT 或 FORTE 原始输入",
+  "checks": {
+    "targeted_pytest": {
+      "command": "uv run pytest -q tests/unit/test_demo2_runtime.py tests/unit/test_harness_runtime.py",
+      "passed": 65,
+      "failed": 0,
+      "status": "passed"
+    },
+    "full_unit_pytest": {
+      "command": "uv run pytest -q tests/unit --disable-warnings --maxfail=1",
+      "passed": 383,
+      "failed": 0,
+      "status": "passed"
+    },
+    "ruff": {"command": "uv run ruff check .", "status": "passed"},
+    "compileall": {
+      "command": "uv run python -m compileall -q packages services tests",
+      "status": "passed"
+    },
+    "web_lint": {"command": "pnpm --dir apps/web lint", "status": "passed"},
+    "web_build": {"command": "pnpm --dir apps/web build", "status": "passed"},
+    "playwright": {
+      "command": "pnpm --dir apps/web exec playwright test e2e/harness-workbench.spec.ts --reporter=line",
+      "passed": 64,
+      "failed": 0,
+      "status": "passed",
+      "notes": "clean servers；包含 Demo 1 1440/390 continuation 与 Demo 2 admission/确认/worker/下一波场景。child Run 使用真实低版本（version=1），未注入 CSS。"
+    },
+    "demo1_demo2_postgres_integration": {
+      "command": "uv run pytest -q tests/integration/test_postgres_demo1_demo2.py",
+      "collected": 3,
+      "passed": 0,
+      "skipped": 3,
+      "failed": 0,
+      "status": "blocked_external",
+      "reason": "本机未提供 TEST_DATABASE_DSN；无 docker/psql。测试已提交，CI/配置 DSN 后执行。"
+    },
+    "postgres_existing_gate_attempt": {
+      "command": "uv run pytest -q tests/integration/test_postgres_agent_control_loop.py",
+      "status": "blocked_external",
+      "reason": "单进程从主仓 .env 映射 TEST_DATABASE_DSN 后连接约 120 秒无输出，已安全中止；不计为通过。"
+    },
+    "provider": {
+      "status": "not_run",
+      "reason": "未启动付费 deepseek-v4-pro Run，避免在当前无可控额度/回执时产生不可审计调用。"
+    }
+  },
+  "last_failed_diagnosis": {
+    "status": "diagnosed_and_fixed",
+    "old_red": "52 passed / 10 failed",
+    "cause": "旧成果页签名、终态续办按钮与旧 whole-workspace 断言；另有 child Run 低版本被同 run 单调游标拒绝。",
+    "final_recheck": "64 passed / 0 failed"
+  },
+  "p0_facts": [
+    "Task identity 由服务端生成；continuation 创建同 task_id 的新 child Run，并只携带 carried Branch 的批准 refs。",
+    "收到新 run_id 后客户端重置旧 SSE generation/sequence；同一 Run 仍保持 version/sequence 单调，失败请求保留父 UI。",
+    "adaptive admission 在 Planner receipt、plan validation 与 versioned topology event 持久化后等待用户确认；不确认不调用 Analyst。",
+    "Worker 仅使用 ready_branch_ids，调用预算在 dispatch 前 CAS 预留；contribution 经 anchor/narrative gate 后才合入正常 ArtifactVersion/TaskCommit，worker receipts 与 findings append-only。",
+    "ArtifactVersion/findings/source refs 的治理上限为 96，超限不静默截断。"
+  ],
+  "historical_evidence": [
+    "demo1-demo2-runtime-20260831-final.json@b3af16d 保留旧红灯/边界，未原地改写。",
+    "98baa63 的旧 manifest 仍保留，不能作为最终绿灯。"
+  ],
+  "boundaries": [
+    "PG restart 与 Provider fixed FORTE evidence 在本机未验证；validated-v2 不称 fully-verified。",
+    "Playwright 使用受控 mock API，不能证明真实 Provider 质量、成本、SLA 或生产多 Worker 能力。",
+    "Worker 是有界只读执行垂直切片，不是通用 Tool Gateway、代码沙箱、生产 Connector 或多实例协调。",
+    "PG 即使在 CI 通过也只证明顺序 Runtime 恢复；不证明多 Worker lease、在途模型调用续跑或多实例并发安全。"
+  ]
+}

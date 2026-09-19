@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+from datetime import datetime, timezone
 
 import httpx
 import pytest
@@ -15,16 +16,20 @@ from packages.contracts.harness_models import (
 )
 
 from services.api.app.application.harness_runtime import (
+    HarnessAnalystResultDraft,
     HarnessConflictError,
     HarnessEvidenceQuote,
     HarnessFinding,
     HarnessModelError,
+    HarnessPlanError,
     HarnessPlanCandidate,
     HarnessPlanCandidateUnit,
     HarnessPlanUnit,
     HarnessRunStart,
     HarnessRuntime,
     HarnessTaskResult,
+    HarnessRequirementCoverage,
+    OpenAICompatibleHarnessAnalyst,
     build_harness_runtime,
 )
 from services.api.app.application.harness_storage import (
@@ -39,6 +44,293 @@ from services.api.app.main import create_app
 REF_ONE = "forte-1111111111111111"
 REF_TWO = "forte-2222222222222222"
 REF_THREE = "forte-3333333333333333"
+
+
+def analyst_draft_payload() -> dict[str, object]:
+    return {
+        "summary": "产品上线条件未全部满足。",
+        "findings": [
+            {
+                "plan_unit_id": "u1",
+                "title": "P0 功能覆盖不足",
+                "detail": "上线清单没有覆盖全部 P0 功能。",
+                "fact_summary": "P0 功能未全部进入上线清单。",
+                "impact": "当前版本不满足正式上线条件。",
+                "file_refs": [REF_ONE],
+                "evidence_quotes": [
+                    {
+                        "file_ref": REF_ONE,
+                        "role": "contradiction",
+                        "label": "上线条件",
+                        "quote": "P0 功能覆盖率必须达到 100%",
+                    }
+                ],
+            }
+        ],
+        "follow_ups": ["补齐缺失的 P0 功能证据后重新核对。"],
+        "review_required": True,
+    }
+
+
+def test_analyst_uses_model_owned_draft_before_server_result() -> None:
+    schema_text = json.dumps(HarnessAnalystResultDraft.model_json_schema())
+    assert "finding_id" not in schema_text
+    assert "affected_branch_ids" not in schema_text
+    assert "evidence_anchors" not in schema_text
+    assert "evidence_resolutions" not in schema_text
+
+    result = OpenAICompatibleHarnessAnalyst._parse_model_content(
+        json.dumps(analyst_draft_payload(), ensure_ascii=False)
+    )
+
+    assert result.summary == "产品上线条件未全部满足。"
+    assert result.findings[0].finding_id is None
+    assert result.findings[0].affected_branch_ids == []
+    assert result.findings[0].evidence_anchors == []
+    assert result.findings[0].evidence_resolutions == []
+
+
+def test_analyst_reports_truncated_json_separately() -> None:
+    with pytest.raises(HarnessModelError) as exc_info:
+        OpenAICompatibleHarnessAnalyst._parse_model_content(
+            '{"summary":"未完成"', finish_reason="length"
+        )
+
+    assert exc_info.value.failure_kind == "output_truncated"
+    assert "长度上限" in str(exc_info.value)
+
+
+def test_compiled_plan_preserves_requested_checks_without_sources() -> None:
+    candidate = HarnessPlanCandidate(
+        summary="先核对有来源的业务分支。",
+        selection_reason="外呼合规分支没有对应批准资料。",
+        units=[
+            HarnessPlanCandidateUnit(
+                unit_id="u1",
+                title="核对产品上线条件",
+                objective="核对产品资料。",
+                input_file_refs=[REF_ONE],
+                tool="file.read",
+            )
+        ],
+        requirement_coverage=[
+            HarnessRequirementCoverage(
+                requirement_index=1,
+                title="核对产品上线条件",
+                objective="核对产品资料。",
+                status="planned",
+                unit_id="u1",
+                reason="本轮已有对应批准来源。",
+            ),
+            HarnessRequirementCoverage(
+                requirement_index=2,
+                title="核对合规外呼流程覆盖",
+                objective="核对时段、频次、身份确认、第三方保护、投诉异议和核查覆盖。",
+                status="uncovered",
+                reason="冻结的公开资料库中没有对应流程或规则文件。",
+            ),
+            HarnessRequirementCoverage(
+                requirement_index=3,
+                title="核对用户交互问题",
+                objective="在下一轮读取用户体验资料并形成优先级。",
+                status="deferred",
+                reason="完整资料库已有来源，但本轮文件预算已用完。",
+                candidate_file_refs=[REF_TWO],
+            ),
+        ],
+    )
+
+    plan = HarnessRuntime._compile_plan(candidate)
+
+    assert len(plan.units) == 1
+    assert [item.title for item in plan.uncovered_requirements] == ["核对合规外呼流程覆盖"]
+    assert [item.title for item in plan.deferred_requirements] == ["核对用户交互问题"]
+    HarnessRuntime._validate_plan(
+        plan,
+        {
+            "allowlisted_tools": ["file.read", "table.inspect", "evidence.verify", "artifact.write"],
+            "allowed_side_effects": ["none", "run_workspace_write"],
+        },
+        FakeCatalog().files,
+        expected_requirement_count=3,
+    )
+
+    incomplete = plan.model_copy(update={"requirement_coverage": plan.requirement_coverage[:2]})
+    with pytest.raises(HarnessPlanError, match="明确列出 3 个业务分支"):
+        HarnessRuntime._validate_plan(
+            incomplete,
+            {
+                "allowlisted_tools": ["file.read", "table.inspect", "evidence.verify", "artifact.write"],
+                "allowed_side_effects": ["none", "run_workspace_write"],
+            },
+            FakeCatalog().files,
+            expected_requirement_count=3,
+        )
+
+
+def test_numbered_business_requirements_are_counted_for_plan_coverage() -> None:
+    instruction = (
+        "分别核对以下业务分支：1. 产品；2. 财务；3. 法务；4. 合规；"
+        "5. SRE；6. 用户体验。再做 A. 冲突矩阵。"
+    )
+
+    assert HarnessRuntime._explicit_business_requirement_count(instruction) == 6
+
+    alternate_wording = (
+        "请分别核对：\n1、产品；\n2、财务；\n3、法务；\n4、合规；\n"
+        "5、可靠性；\n6、用户体验。"
+    )
+    assert HarnessRuntime._explicit_business_requirement_count(alternate_wording) == 6
+
+    ordinary_sequence = "先读取资料，再形成结论，最后给出建议。"
+    assert HarnessRuntime._explicit_business_requirement_count(ordinary_sequence) == 0
+
+
+def test_explicit_business_summary_unit_covers_all_direct_dependency_sources() -> None:
+    candidate = HarnessPlanCandidate(
+        summary="先核对两个业务分支，再汇总冲突。",
+        selection_reason="两项都有批准来源。",
+        units=[
+            HarnessPlanCandidateUnit(
+                unit_id="product",
+                title="产品核对",
+                objective="核对产品状态。",
+                input_file_refs=[REF_ONE],
+                tool="file.read",
+            ),
+            HarnessPlanCandidateUnit(
+                unit_id="finance",
+                title="财务核对",
+                objective="核对财务风险。",
+                input_file_refs=[REF_TWO],
+                tool="table.inspect",
+            ),
+            HarnessPlanCandidateUnit(
+                unit_id="conflicts",
+                title="汇总跨部门冲突",
+                objective="形成冲突矩阵。",
+                input_file_refs=[REF_ONE],
+                tool="evidence.verify",
+                depends_on=["product", "finance"],
+            ),
+        ],
+        requirement_coverage=[
+            HarnessRequirementCoverage(
+                requirement_index=1,
+                title="产品核对",
+                objective="核对产品状态。",
+                status="planned",
+                unit_id="product",
+                reason="有批准来源。",
+            ),
+            HarnessRequirementCoverage(
+                requirement_index=2,
+                title="财务核对",
+                objective="核对财务风险。",
+                status="planned",
+                unit_id="finance",
+                reason="有批准来源。",
+            ),
+        ],
+    )
+    workspace = {
+        "allowlisted_tools": ["file.read", "table.inspect", "evidence.verify"],
+        "allowed_side_effects": ["none"],
+    }
+    files = [*FakeCatalog().files]
+
+    with pytest.raises(HarnessPlanError, match="下游汇总工作单元"):
+        HarnessRuntime._validate_plan(
+            HarnessRuntime._compile_plan(candidate),
+            workspace,
+            files,
+            expected_requirement_count=2,
+        )
+
+    candidate.units[2].input_file_refs = [REF_ONE, REF_TWO]
+    HarnessRuntime._validate_plan(
+        HarnessRuntime._compile_plan(candidate),
+        workspace,
+        files,
+        expected_requirement_count=2,
+    )
+
+
+def test_server_defers_whole_business_branch_when_round_file_budget_is_full() -> None:
+    candidate = HarnessPlanCandidate(
+        summary="两项要求都有来源。",
+        selection_reason="按业务要求顺序核对。",
+        units=[
+            HarnessPlanCandidateUnit(
+                unit_id="first",
+                title="第一项",
+                objective="核对第一项。",
+                input_file_refs=[REF_ONE],
+                tool="file.read",
+            ),
+            HarnessPlanCandidateUnit(
+                unit_id="second",
+                title="第二项",
+                objective="核对第二项。",
+                input_file_refs=[REF_TWO],
+                tool="file.read",
+            ),
+            HarnessPlanCandidateUnit(
+                unit_id="summary",
+                title="汇总",
+                objective="汇总两项。",
+                input_file_refs=[REF_ONE, REF_TWO],
+                depends_on=["first", "second"],
+                tool="evidence.verify",
+            ),
+        ],
+        requirement_coverage=[
+            HarnessRequirementCoverage(
+                requirement_index=1,
+                title="第一项",
+                objective="核对第一项。",
+                status="planned",
+                unit_id="first",
+                reason="有批准来源。",
+            ),
+            HarnessRequirementCoverage(
+                requirement_index=2,
+                title="第二项",
+                objective="核对第二项。",
+                status="planned",
+                unit_id="second",
+                reason="有批准来源。",
+            ),
+        ],
+    )
+
+    plan = HarnessRuntime._compile_plan(candidate, max_file_refs=1)
+
+    assert [unit.unit_id for unit in plan.units] == ["first"]
+    assert plan.requirement_coverage[1].status == "deferred"
+    assert plan.requirement_coverage[1].candidate_file_refs == [REF_TWO]
+    assert plan.deferred_requirements[0].candidate_file_refs == [REF_TWO]
+    HarnessRuntime._validate_plan(
+        plan,
+        {
+            "allowlisted_tools": ["file.read", "evidence.verify"],
+            "allowed_side_effects": ["none"],
+        },
+        FakeCatalog().files,
+        max_file_refs=1,
+        expected_requirement_count=2,
+    )
+    branches = HarnessRuntime._branches_for_plan(
+        "harness:test",
+        plan,
+        round_number=1,
+        parent_branch_id=None,
+        now=datetime.now(timezone.utc),
+    )
+    assert len(branches) == 2
+    assert branches[1].title == "第二项"
+    assert branches[1].status == "waiting_input"
+    assert branches[1].missing_file_refs == [REF_TWO]
 
 
 class FakeCatalog:
@@ -1324,6 +1616,62 @@ async def test_repeated_malformed_analysis_pauses_with_a_recovery_path() -> None
 
 
 @pytest.mark.asyncio
+async def test_repeated_cross_branch_finding_pauses_instead_of_failing_run() -> None:
+    class CrossBranchAnalyst:
+        model = "deepseek-v4-pro"
+
+        def __init__(self) -> None:
+            self.calls = 0
+
+        async def analyze(self, *, instruction, plan, files, validation_feedback=None):
+            self.calls += 1
+            return HarnessTaskResult(
+                summary="候选结论跨越两个工作包。",
+                findings=[
+                    HarnessFinding(
+                        plan_unit_id="u1",
+                        title="跨分支候选",
+                        detail="这条候选错误地混合了两个独立工作包。",
+                        file_refs=[REF_ONE, REF_TWO],
+                        evidence_quotes=[
+                            HarnessEvidenceQuote(
+                                file_ref=REF_ONE,
+                                role="support",
+                                label="第一份来源",
+                                quote="部门,金额\nA,100",
+                            ),
+                            HarnessEvidenceQuote(
+                                file_ref=REF_TWO,
+                                role="support",
+                                label="第二份来源",
+                                quote="复核说明",
+                            ),
+                        ],
+                    )
+                ],
+                review_required=True,
+            )
+
+    analyst = CrossBranchAnalyst()
+    runtime = HarnessRuntime(FakeCatalog(), FakePlanner(), analyst)
+    started = await runtime.start(
+        "alice",
+        start_request(idempotency_key="analysis-binding-recovery-0001"),
+    )
+
+    waiting = await wait_status(runtime, "alice", started.run.run_id, "waiting_input")
+
+    assert analyst.calls == 2
+    assert waiting.rounds[0].next_step is not None
+    assert waiting.rounds[0].next_step.recovery_kind == "analysis_output"
+    assert any(
+        event.event_name == "analysis_validation_rejected"
+        and event.details.get("reason") == "分析结果引用超出其绑定计划单元的文件范围"
+        for event in waiting.events
+    )
+
+
+@pytest.mark.asyncio
 async def test_confirmed_evidence_round_cannot_drift_to_unrelated_files() -> None:
     planner = FakePlanner()
     runtime = HarnessRuntime(FakeCatalogWithDistractor(), planner, FakeAnalyst())
@@ -1727,7 +2075,9 @@ async def test_http_contract_exposes_one_workspace_not_scenarios() -> None:
         events = await client.get(f"/v1/harness/runs/{run_id}/events", headers=headers)
 
     assert current.json()["workspace_id"] == "forte-public-office"
+    assert "owner_id" not in current.json()
     assert "event: loop_committed" in events.text
+    assert "owner_id" not in events.text
     assert "Finance-018/input" not in events.text
     openapi_paths = set(app.openapi()["paths"])
     assert "/v1/harness/workspace" in openapi_paths
@@ -2034,6 +2384,35 @@ def test_production_builder_uses_complete_workspace_catalog(monkeypatch) -> None
     assert workspace["workspace_id"] == "forte-public-office"
     assert workspace["folder_count"] == 15
     assert workspace["file_count"] == 96
+    assert runtime.analyst is not None
+    assert runtime.analyst.timeout == 180
+
+
+def test_production_builder_can_force_memory_over_stale_database_dsn() -> None:
+    class Settings:
+        llm_base_url = "https://example.invalid/v1"
+        llm_api_key = "test-key"
+        llm_model = "deepseek-v4-pro"
+        llm_timeout_seconds = 10
+        database_dsn = "postgresql://stale.invalid/office_agent"
+        state_store_mode = "memory"
+
+    runtime = build_harness_runtime(Settings())
+
+    assert runtime.backend_name == "memory"
+
+
+def test_production_builder_rejects_postgres_mode_without_dsn() -> None:
+    class Settings:
+        llm_base_url = "https://example.invalid/v1"
+        llm_api_key = "test-key"
+        llm_model = "deepseek-v4-pro"
+        llm_timeout_seconds = 10
+        database_dsn = ""
+        state_store_mode = "postgres"
+
+    with pytest.raises(ValueError, match="requires DATABASE_DSN"):
+        build_harness_runtime(Settings())
 
 
 def test_server_compiler_owns_artifact_write_effect() -> None:

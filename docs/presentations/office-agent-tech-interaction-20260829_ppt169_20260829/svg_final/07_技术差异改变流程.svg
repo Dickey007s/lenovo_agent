@@ -1,0 +1,71 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720" width="1280" height="720">
+  <g id="background"><rect width="1280" height="720" fill="#F7F8FA" /><path d="M52 112H1228" stroke="#CBD5DF" stroke-width="2" /></g>
+  <g id="header">
+    <text x="52" y="78" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="46" font-weight="700" fill="#132A3A">技术差异如何一步步改变用户流程</text>
+    <path fill="#EDF1F4" d="M1082,46 H1222 A6,6 0 0 1 1228,52 V74 A6,6 0 0 1 1222,80 H1082 A6,6 0 0 1 1076,74 V52 A6,6 0 0 1 1082,46 Z" /><text x="1152" y="69" text-anchor="middle" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#1769E0">因果链</text>
+  </g>
+  <g id="lead">
+    <text x="52" y="154" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="28" font-weight="700" fill="#132A3A">不是增加更多状态，而是重新分配“谁负责判断”</text>
+  </g>
+  <g id="pipeline">
+    <path d="M72 260H1208" stroke="#CBD5DF" stroke-width="4" />
+    <circle cx="150" cy="260" r="24" fill="#1769E0" /><text x="150" y="268" text-anchor="middle" font-family="Consolas, &quot;Courier New&quot;, monospace" font-size="17" font-weight="700" fill="#FFFFFF">1</text>
+    <circle cx="390" cy="260" r="24" fill="#1769E0" /><text x="390" y="268" text-anchor="middle" font-family="Consolas, &quot;Courier New&quot;, monospace" font-size="17" font-weight="700" fill="#FFFFFF">2</text>
+    <circle cx="630" cy="260" r="24" fill="#1769E0" /><text x="630" y="268" text-anchor="middle" font-family="Consolas, &quot;Courier New&quot;, monospace" font-size="17" font-weight="700" fill="#FFFFFF">3</text>
+    <circle cx="870" cy="260" r="24" fill="#D97706" /><text x="870" y="268" text-anchor="middle" font-family="Consolas, &quot;Courier New&quot;, monospace" font-size="17" font-weight="700" fill="#FFFFFF">4</text>
+    <circle cx="1110" cy="260" r="24" fill="#2E7D32" /><text x="1110" y="268" text-anchor="middle" font-family="Consolas, &quot;Courier New&quot;, monospace" font-size="17" font-weight="700" fill="#FFFFFF">5</text>
+
+    <path fill="#FFFFFF" stroke="#CBD5DF" stroke-width="2" d="M58,310 H242 A6,6 0 0 1 248,316 V550 A6,6 0 0 1 242,556 H58 A6,6 0 0 1 52,550 V316 A6,6 0 0 1 58,310 Z" />
+    <text x="72" y="344" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="24" font-weight="700" fill="#132A3A">Workspace 合同</text>
+    <text x="72" y="384" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="17" font-weight="700" fill="#1769E0">用户动作</text>
+    <text x="72" y="414" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#5A6B7C">只说业务目标</text>
+    <text x="72" y="458" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="17" font-weight="700" fill="#1769E0">前台反馈</text>
+    <text x="72" y="488" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#5A6B7C">整库范围已冻结</text>
+    <text x="72" y="526" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="14" fill="#7C8A98">后端：allowlisted index</text>
+
+    <path fill="#FFFFFF" stroke="#CBD5DF" stroke-width="2" d="M276,310 H460 A6,6 0 0 1 466,316 V550 A6,6 0 0 1 460,556 H276 A6,6 0 0 1 270,550 V316 A6,6 0 0 1 276,310 Z" />
+    <text x="290" y="344" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="24" font-weight="700" fill="#132A3A">计划编译</text>
+    <text x="290" y="384" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="17" font-weight="700" fill="#1769E0">用户动作</text>
+    <text x="290" y="414" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#5A6B7C">查看分支与依赖</text>
+    <text x="290" y="458" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="17" font-weight="700" fill="#1769E0">前台反馈</text>
+    <text x="290" y="488" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#5A6B7C">能读/能做/禁止项</text>
+    <text x="290" y="526" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="14" fill="#7C8A98">后端：validated plan</text>
+
+    <path fill="#FFFFFF" stroke="#CBD5DF" stroke-width="2" d="M494,310 H678 A6,6 0 0 1 684,316 V550 A6,6 0 0 1 678,556 H494 A6,6 0 0 1 488,550 V316 A6,6 0 0 1 494,310 Z" />
+    <text x="508" y="344" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="24" font-weight="700" fill="#132A3A">模型采用门</text>
+    <text x="508" y="384" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="17" font-weight="700" fill="#1769E0">用户动作</text>
+    <text x="508" y="414" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#5A6B7C">不再猜模型是否可信</text>
+    <text x="508" y="458" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="17" font-weight="700" fill="#1769E0">前台反馈</text>
+    <text x="508" y="488" font-family="Consolas, &quot;Courier New&quot;, monospace" font-size="14" fill="#5A6B7C">called / output_used</text>
+    <text x="508" y="526" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="14" fill="#7C8A98">后端：schema + policy gate</text>
+
+    <path fill="#FFFFFF" stroke="#D97706" stroke-width="2" d="M712,310 H896 A6,6 0 0 1 902,316 V550 A6,6 0 0 1 896,556 H712 A6,6 0 0 1 706,550 V316 A6,6 0 0 1 712,310 Z" />
+    <text x="726" y="344" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="24" font-weight="700" fill="#132A3A">局部恢复</text>
+    <text x="726" y="384" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="17" font-weight="700" fill="#B54708">用户动作</text>
+    <text x="726" y="414" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#5A6B7C">只处理受影响问题</text>
+    <text x="726" y="458" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="17" font-weight="700" fill="#B54708">前台反馈</text>
+    <text x="726" y="488" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#5A6B7C">原因、影响、选择后果</text>
+    <text x="726" y="526" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="14" fill="#7C8A98">后端：Branch + Decision</text>
+
+    <path fill="#132A3A" d="M930,310 H1222 A6,6 0 0 1 1228,316 V550 A6,6 0 0 1 1222,556 H930 A6,6 0 0 1 924,550 V316 A6,6 0 0 1 930,310 Z" />
+    <text x="948" y="344" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="24" font-weight="700" fill="#FFFFFF">可核对办公结论</text>
+    <text x="948" y="384" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="17" font-weight="700" fill="#FFFFFF">用户动作</text>
+    <text x="948" y="414" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#CBD5DF">下载成果，回开依据</text>
+    <text x="948" y="458" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="17" font-weight="700" fill="#FFFFFF">前台反馈</text>
+    <text x="948" y="488" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#CBD5DF">成果 / 说明 / 外部动作分层</text>
+    <text x="948" y="526" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="14" fill="#CBD5DF">后端：Artifact + Effect + Receipt</text>
+  </g>
+  <g id="boundary">
+
+  <g transform="translate(52, 606) scale(0.916667)" fill="none" stroke="#D97706" stroke-width="2">
+    <path d="M12 9v4" />
+    <path d="M10.363 3.591l-8.106 13.534a1.914 1.914 0 0 0 1.636 2.871h16.214a1.914 1.914 0 0 0 1.636 -2.87l-8.106 -13.536a1.914 1.914 0 0 0 -3.274 0" />
+    <path d="M12 16h.01" />
+  </g>
+    <text x="86" y="623" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#5A6B7C">当前只在固定公开数据与有限适配器中验证；不是竞品同场实测，也不是用户效果结论。</text>
+  </g>
+  <g id="footer">
+    <text x="52" y="690" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="14" fill="#7C8A98">研究依据：Microsoft HAI Guidelines · ChatGPT deep research source control · MCP Elicitation</text>
+    <text x="1228" y="690" text-anchor="end" font-family="Consolas, &quot;Courier New&quot;, monospace" font-size="14" fill="#7C8A98">07 / 24</text>
+  </g>
+</svg>

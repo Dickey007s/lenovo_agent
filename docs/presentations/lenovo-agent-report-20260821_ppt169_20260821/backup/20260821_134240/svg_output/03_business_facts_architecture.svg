@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720" width="1280" height="720">
+  <g id="background">
+    <rect width="1280" height="720" fill="#F7F9FC"/>
+    <text x="56" y="76" font-family="'Microsoft YaHei UI','Segoe UI',Arial,sans-serif" font-size="44" font-weight="700" fill="#172230">业务事实，是 Office Agent 的主语</text>
+    <text x="56" y="114" font-family="'Microsoft YaHei UI','Segoe UI',Arial,sans-serif" font-size="18" fill="#526579">自然语言提出建议；身份、来源、版本、风险与结果由服务端拥有</text>
+  </g>
+  <g id="user-layer">
+    <rect x="76" y="162" width="1128" height="112" fill="#EAF0F7" stroke="#CAD6E3" stroke-width="1.5"/>
+    <text x="98" y="193" font-family="'Microsoft YaHei UI','Segoe UI',Arial,sans-serif" font-size="18" font-weight="700" fill="#0B3A70">01 · 用户工作区</text>
+    <g id="workspaces">
+      <rect x="98" y="212" width="232" height="42" fill="#FFFFFF" stroke="#CAD6E3"/><rect x="346" y="212" width="232" height="42" fill="#FFFFFF" stroke="#CAD6E3"/><rect x="594" y="212" width="232" height="42" fill="#FFFFFF" stroke="#CAD6E3"/><rect x="842" y="212" width="232" height="42" fill="#FFFFFF" stroke="#CAD6E3"/>
+      <text x="214" y="239" text-anchor="middle" font-family="'Microsoft YaHei UI','Segoe UI',Arial,sans-serif" font-size="18" fill="#172230">邮件 / 日历</text><text x="462" y="239" text-anchor="middle" font-family="'Microsoft YaHei UI','Segoe UI',Arial,sans-serif" font-size="18" fill="#172230">报价 / 文档</text><text x="710" y="239" text-anchor="middle" font-family="'Microsoft YaHei UI','Segoe UI',Arial,sans-serif" font-size="18" fill="#172230">任务 / 成果</text><text x="958" y="239" text-anchor="middle" font-family="'Microsoft YaHei UI','Segoe UI',Arial,sans-serif" font-size="18" fill="#172230">审计 / 动作</text>
+    </g>
+  </g>
+  <g id="runtime-layer">
+    <rect x="76" y="298" width="1128" height="168" fill="#FFFFFF" stroke="#0B3A70" stroke-width="2"/>
+    <text x="98" y="330" font-family="'Microsoft YaHei UI','Segoe UI',Arial,sans-serif" font-size="18" font-weight="700" fill="#0B3A70">02 · 统一 Agent Runtime</text>
+    <rect x="98" y="352" width="188" height="88" fill="#0B3A70"/><rect x="300" y="352" width="188" height="88" fill="#EAF0F7"/><rect x="502" y="352" width="188" height="88" fill="#EAF0F7"/><rect x="704" y="352" width="188" height="88" fill="#EAF0F7"/><rect x="906" y="352" width="276" height="88" fill="#EAF0F7"/>
+    <use data-icon="tabler-outline/layout-dashboard" x="114" y="372" width="28" height="28" stroke="#FFFFFF" stroke-width="2" fill="none"/>
+    <text x="154" y="390" font-family="'Microsoft YaHei UI','Segoe UI',Arial,sans-serif" font-size="20" font-weight="700" fill="#FFFFFF">Task</text><text x="154" y="418" font-family="'Microsoft YaHei UI','Segoe UI',Arial,sans-serif" font-size="16" fill="#EAF0F7">合同与目标</text>
+    <use data-icon="tabler-outline/file-search" x="316" y="372" width="28" height="28" stroke="#0B3A70" stroke-width="2" fill="none"/><text x="356" y="390" font-family="'Microsoft YaHei UI','Segoe UI',Arial,sans-serif" font-size="20" font-weight="700" fill="#172230">Context</text><text x="356" y="418" font-family="'Microsoft YaHei UI','Segoe UI',Arial,sans-serif" font-size="16" fill="#526579">来源与版本</text>
+    <use data-icon="tabler-outline/bolt" x="518" y="372" width="28" height="28" stroke="#0B3A70" stroke-width="2" fill="none"/><text x="558" y="390" font-family="'Microsoft YaHei UI','Segoe UI',Arial,sans-serif" font-size="20" font-weight="700" fill="#172230">Execution</text><text x="558" y="418" font-family="'Microsoft YaHei UI','Segoe UI',Arial,sans-serif" font-size="16" fill="#526579">阶段与分支</text>
+    <use data-icon="tabler-outline/file-check" x="720" y="372" width="28" height="28" stroke="#16845B" stroke-width="2" fill="none"/><text x="760" y="390" font-family="'Microsoft YaHei UI','Segoe UI',Arial,sans-serif" font-size="20" font-weight="700" fill="#172230">Evidence</text><text x="760" y="418" font-family="'Microsoft YaHei UI','Segoe UI',Arial,sans-serif" font-size="16" fill="#526579">验证与冲突</text>
+    <use data-icon="tabler-outline/chart-infographic" x="922" y="372" width="28" height="28" stroke="#0B3A70" stroke-width="2" fill="none"/><text x="962" y="390" font-family="'Microsoft YaHei UI','Segoe UI',Arial,sans-serif" font-size="20" font-weight="700" fill="#172230">Artifact</text><text x="962" y="418" font-family="'Microsoft YaHei UI','Segoe UI',Arial,sans-serif" font-size="16" fill="#526579">共享交付物</text>
+  </g>
+  <g id="control-layer">
+    <rect x="76" y="490" width="1128" height="102" fill="#172230"/>
+    <text x="98" y="522" font-family="'Microsoft YaHei UI','Segoe UI',Arial,sans-serif" font-size="18" font-weight="700" fill="#FFFFFF">03 · 控制与执行边界</text>
+    <text x="98" y="562" font-family="'Microsoft YaHei UI','Segoe UI',Arial,sans-serif" font-size="22" font-weight="700" fill="#FFFFFF">Policy</text><text x="270" y="562" font-family="'Microsoft YaHei UI','Segoe UI',Arial,sans-serif" font-size="22" font-weight="700" fill="#FFFFFF">Evidence</text><text x="456" y="562" font-family="'Microsoft YaHei UI','Segoe UI',Arial,sans-serif" font-size="22" font-weight="700" fill="#FFFFFF">Approval</text><text x="644" y="562" font-family="'Microsoft YaHei UI','Segoe UI',Arial,sans-serif" font-size="22" font-weight="700" fill="#FFFFFF">Permit</text><text x="810" y="562" font-family="'Microsoft YaHei UI','Segoe UI',Arial,sans-serif" font-size="22" font-weight="700" fill="#FFFFFF">Simulator</text><text x="1012" y="562" font-family="'Microsoft YaHei UI','Segoe UI',Arial,sans-serif" font-size="22" font-weight="700" fill="#16845B">Receipt</text>
+  </g>
+  <g id="consequence-line">
+    <line x1="190" y1="626" x2="1090" y2="626" stroke="#D71920" stroke-width="3"/>
+    <circle cx="190" cy="626" r="7" fill="#D71920"/><circle cx="490" cy="626" r="7" fill="#0B3A70"/><circle cx="790" cy="626" r="7" fill="#0B3A70"/><circle cx="1090" cy="626" r="7" fill="#16845B"/>
+    <text x="190" y="658" text-anchor="middle" font-family="'Microsoft YaHei UI','Segoe UI',Arial,sans-serif" font-size="18" fill="#526579">来源</text><text x="490" y="658" text-anchor="middle" font-family="'Microsoft YaHei UI','Segoe UI',Arial,sans-serif" font-size="18" fill="#526579">工件</text><text x="790" y="658" text-anchor="middle" font-family="'Microsoft YaHei UI','Segoe UI',Arial,sans-serif" font-size="18" fill="#526579">控制</text><text x="1090" y="658" text-anchor="middle" font-family="'Microsoft YaHei UI','Segoe UI',Arial,sans-serif" font-size="18" fill="#16845B">回执</text>
+  </g>
+  <g id="footer"><text x="48" y="700" font-family="'Microsoft YaHei UI','Segoe UI',Arial,sans-serif" font-size="14" fill="#8291A3">前台隐藏 Prompt、思维链、Token 与底层日志，只投影业务事实</text><text x="1232" y="700" text-anchor="end" font-family="Consolas,'Courier New',monospace" font-size="16" fill="#0B3A70">P03</text></g>
+</svg>

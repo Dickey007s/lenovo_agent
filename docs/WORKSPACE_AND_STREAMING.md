@@ -1,6 +1,6 @@
 # Whole-folder workspace and streaming
 
-## 单步事项交互补充（DR-0053）
+## 单步事项交互补充（DR-0064）
 
 中心区“办理事项”使用六种通用操作表单，不增加 Scenario/Demo 选择器。个人整理
 显示可撤销结果；摘录允许原位编辑并保留来源；任务等待普通确认；发件等待三项强确认；受限请求显示原因。材料对照要求明确选择 A/B 和填写理由，保存判断不会启动后续任务。
@@ -13,10 +13,42 @@ memory 模式不支持进程重启恢复。现有 SSE 可投影 `office_action_*
 窄屏保留全文和完整联系地址；无语音确认或跨设备身份接续。
 
 最近事项仅显示 Owner 最近 20 个 Run 内的事项，GET 重开不执行任务。暂缓后可办理另一件，未保存编辑或尚待决定时不允许从列表切换。修改差异来自当前输入与历史输入；草稿历史保留 content_snapshot。受限/暂缓说明下载为本地文本，不发审批或消息。
-新命令事件 office_action_edit_draft/office_action_record_decision 复用原 SSE。详见 [DR-0054](decisions/DR-0054-demo3-editable-drafts-and-human-judgment.md)。
+新命令事件 office_action_edit_draft/office_action_record_decision 复用原 SSE。详见 [DR-0065](decisions/DR-0065-demo3-editable-drafts-and-human-judgment.md)。
 
 所有提交结果是隔离测试记录，非真实业务提交。详细对应见
 [开发版手册](design/DEMO3-DEVELOPMENT-HANDBOOK-20260918.md)。
+
+## Integrated boundary explanations (2026-09-12)
+
+The original capability progress explains Agent/user actions and their limits from current Snapshot
+facts, with history read-only. Collaboration exposes admission and actual Worker calls/adoption.
+Ready-work confirmation shows its own approved sources, not another waiting Branch's files.
+Opening these explanations calls no model and changes no permission. Routes, EventSource behavior
+and backend control contracts remain unchanged. See
+[DR-0063](decisions/DR-0063-integrated-copilot-boundaries-and-swarm-facts.md).
+
+## Reference UI update (2026-09-11)
+
+The capability route now defaults to business progress, with a separate round-record surface and a
+peer collaboration view. Its ambiguous evidence page separates preview from radio selection. Toolbar
+controls, version history and local branch recovery reuse the same Snapshot and existing commands;
+opening a view does not call a model. Task pointer errors remain actionable outside technical details.
+Top-level decision state/revision wins over nested compatibility copies; stale requests cannot reopen
+an acceptance flow. See [DR-0061](decisions/DR-0061-reference-aligned-capabilities-and-evidence-choice.md)
+and [SCENARIO-048](scenarios/SCENARIO-048-review-progress-collaboration-and-evidence-choice.md).
+
+Follow-up acceptance: new-task actions explicitly leave collaboration, remove its URL hash and
+focus the empty composer even when the Run ID is already null. Ambiguous review shows the
+Resolution's finding title and summary as an unconfirmed claim before the candidates.
+Neither transition authorizes a decision or calls a model. Reproduction steps and the remaining
+model-input truncation issue are in [the acceptance cases](testing/DEMO12-ACCEPTANCE-CASES-20260911.md).
+
+Visual follow-up: the two-line task heading opens its full server-owned goal without requests;
+the empty composer displays the actual workspace file count; Branch columns adapt to their count.
+The evidence-choice footer stays visible while reading candidates, labels local selection, and
+keeps submission errors near the action. Preview is still not selection or approval. The ordinary
+Run control bar stays in document flow so it cannot obscure existing Artifacts. See the
+[polish report and repeatable cases](reports/demo12-polish-20260911/README.md).
 
 ## 1. Interaction model
 
@@ -69,6 +101,19 @@ same idempotency key; a known terminal retry uses a fresh key and independent
 Run. Once accepted, the active instruction, whole-workspace scope and limits are
 frozen in the Snapshot and task controls are disabled until the Run terminates.
 
+The Workspace header and Agent capabilities toolbar expose “新建任务”. Clicking
+it does not POST, invoke a model, pause or stop the current Run. The browser closes
+the selected EventSource, invalidates late responses, clears the current Run/Task
+projection and focuses an empty instruction. A session-scoped marker preserves
+this blank-task mode across refresh while recent server Runs remain available in
+history. The marker is cleared when the user opens a historical/current Run or a
+new start returns a valid Snapshot. Draft text itself is not persisted.
+
+An explicit new-task action also releases the previous known start-command key.
+If the user submits identical text again, it is a new command and therefore a new
+Task. The existing unknown-response rule still reuses the same key while retrying
+one unresolved start attempt.
+
 ## 4. Preview contract
 
 | Preview | User-visible projection | Safety boundary |
@@ -111,8 +156,96 @@ server-owned `branch_id`; they do not imply parallel Workers or successful use o
 every listed file.
 If the same recovery reaches `stopped/bounded`, there is no next round inside the
 old Run. The UI replaces resume controls with unfinished Branch cards. Selecting
-one combines its objective with optional user direction and creates a new
-whole-workspace Run; the old Snapshot, receipts and ArtifactVersions stay intact.
+one calls the continuation endpoint and creates a child Run under the same
+`task_id`; the old Snapshot, receipts and ArtifactVersions stay intact. The child
+records `parent_run_id`, Run sequence, selected `carried_branch_id`, base
+Artifact/Commit pointers and the current Workspace revision. Its first round is
+restricted to the selected Branch's missing or approved refs. Optional user text
+cannot widen that scope or replace the Branch objective.
+
+The header now exposes a bounded task-conversation drawer. It loads
+`GET /v1/harness/runs?limit=20`, preserves server order and groups only by
+`task_id`; neither instruction text nor `sessionStorage` defines a conversation.
+The number shown is the count of distinct Tasks discovered in those recent Runs,
+not an unlimited Task total. A list item is only an “open record” until Task GET
+confirms whether its Run is current. Switching first closes the previous
+EventSource and resets Run-scoped sequence state. Historical Runs are GET-only,
+while a confirmed current nonterminal Run reconnects SSE with
+`after=last_event_sequence`. Task GET failure does not guess from recency and
+leaves a visible retry/error state.
+
+Opening “新建任务” does not remove any drawer entry. An active old Run may continue
+server-side after the browser unsubscribes; returning to it re-reads the Task
+pointer and Snapshot before reconnecting. The client must not describe this UI
+switch as stopping, deleting, completing or overwriting the previous task.
+
+The Task timeline appears in the same work area. It tells the user whether this
+is the first or a later Run, that the old result is preserved, and whether the
+Workspace revision changed. The browser also reads
+`GET /v1/harness/tasks/{task_id}` to distinguish the Task's authoritative current
+Run from a historical Run. Current status and Artifact/Commit pointers are derived
+from the current Run; the Task record does not duplicate the whole Snapshot.
+`run.version` guards one Run while `task_version` guards the cross-Run pointer, so
+the continuation request sends both expected versions. A continuation response can legitimately restart
+`version` and SSE sequence at 1 because counters belong to a Run, not a Task.
+The browser switches generation only after it has a valid child Snapshot; a 409,
+404 or transport failure leaves the parent Run rendered and recoverable. When a
+409 reveals that the current pointer moved, the parent is marked “历史 Run” and a
+visible action opens the authoritative Run. A failed Task GET keeps the parent and
+offers an explicit retry; it is not cached forever or reported as a successful refresh.
+
+When the instruction uses an explicit marker and a contiguous numbered list,
+the service accounts for each requested business item before the UI summarizes
+the Plan. Current `plan.units[]`, approved-source
+`deferred_requirements[]` and `uncovered_requirements[]` are three different
+public states. A deferred item keeps a waiting Branch and a one-item continue
+action; an uncovered item has no fabricated source ref. The private Planner
+coverage table and internal text-heading search hints never enter the public
+Workspace or browser.
+
+After Plan validation, the service also persists one `TopologyAdmission`.
+`single_controller` and `fixed_workflow` proceed conservatively without a phantom
+approval. `adaptive_readonly_workers` pauses before Analyst execution and shows
+the verified work-package/source/budget facts, the reason for the route and two
+real actions: confirm a bounded Worker wave or return to single Controller. The
+route is not a speed/quality prediction and the UI does not show Agent chat rooms.
+
+Confirmation dispatches only service-ready Branches, at most three per wave.
+Worker call budget is reserved before dispatch; each Worker sees only its Branch
+objective and approved refs. The organization projection then shows actual called/adopted/elapsed
+receipts. Anchored adopted findings enter a new normal ArtifactVersion/TaskCommit;
+failed, ambiguous or rejected contributions remain scoped receipts and leave only
+their Branch waiting. Completed dependencies can expose a later ready wave.
+If a waiting Snapshot has no `next_step.ready_branch_ids`, the collaboration
+view cannot offer Worker dispatch. It tells the user to return to execution
+progress and choose the real waiting Branch instead; `candidate_branch_ids`
+alone do not make an Adaptive Worker wave ready.
+
+The full organization projection is no longer forced into the narrow root Loop
+surface or simultaneously expanded with the complete Loop record.
+`/agent-capabilities` uses one selected Snapshot and defaults to a concise
+execution-progress panel. The user may directly reveal the complete Loop record,
+switch to a peer collaboration-method tab, or open one focused evidence decision.
+The collaboration tab shows the actual route. For an Adaptive Snapshot it places
+admission, work packages, contribution convergence and verification/artifact on a
+left stage rail; lays out a dynamic DAG from public `work_units[].depends_on` in the
+main area with visible parent-to-dependent arrows; projects the latest Round's
+`next_step.ready_branch_ids` as a confirmation-ready wave; derives the right
+current-impact panel from waiting/blocked units,
+waiting contributions, open decisions and Evidence gaps; and summarizes adoption
+and Artifact versions in a bottom result bar. When that ready wave needs confirmation,
+the matching explanation and primary action stay together in the impact panel.
+Work-package details, approved sources
+and called/adopted/elapsed receipts stay collapsed until requested. Single
+Controller, Fixed Workflow and Adaptive Swarm form the explanatory route frame, but
+only the service-owned mode is highlighted; non-adaptive Runs never render a
+synthetic DAG or receipt. None of the four
+disclosure paths is a new Demo API, a distributed Swarm Runtime or the Demo 2 smart
+cockpit.
+
+The future Demo 2 cockpit remains unrendered until a server-owned task queue,
+priority/routing facts and return-to-confirmation state exist. The current page
+does not hard-code “客户 A 经营汇报”, fake queue items or a dead cockpit entry.
 
 Opening a Gap first shows an Agent-owned recovery sheet, not a request to edit a
 source file. `next_step.recovery_kind` distinguishes malformed analysis,
@@ -385,7 +518,12 @@ The right pane distinguishes:
 - `已采用`: provider returned and server checks accepted the output;
 - `未采用`: provider returned but checks rejected the output.
 
-The trace also projects `deterministic_office_tool_started`,
+The trace also projects `topology_admission`, optional
+`topology_confirmation_required`, `worker_wave_reserved`, `work_unit_started`,
+`worker_returned`, `contribution_recorded`,
+`contribution_adopted/waiting/rejected`, `work_unit_failed`,
+`worker_wave_committed`, `topology_workers_completed`,
+`deterministic_office_tool_started`,
 `run_workspace_artifact_written`, `deterministic_verification_completed` and
 `scenario_effect_failed` or `scenario_effect_bounded`. These events are ordered change notifications; the
 Snapshot remains authoritative.
@@ -397,11 +535,27 @@ allowlisted inputs on the event-loop thread, then passes only that immutable
 view to `asyncio.to_thread`; the worker cannot re-read the live Catalog. During
 this wait, workspace browsing, health, Run GET and SSE remain responsive.
 
-This is an interaction guarantee for one API process, not a Worker platform.
-The in-process thread and its subprocesses do not survive an API restart;
-PostgreSQL restores the last committed Snapshot and pauses under the existing
-checkpoint rule. A failed builder emits `scenario_effect_failed` and no green
-Artifact/EffectReceipt.
+The fixed deterministic adapter thread and the Analyst Worker manager are both
+process-local. This is an interaction guarantee for one API process, not a
+distributed Worker platform. The fixed adapter thread and its subprocesses do
+not survive an API restart; PostgreSQL restores the last committed Snapshot and
+pauses under the existing checkpoint rule. A failed builder emits
+`scenario_effect_failed` and no green Artifact/EffectReceipt.
+
+DR-0055 gives the read-only Analyst Worker a narrower durable boundary. The full
+validated Branch DAG is saved as WorkUnits before dispatch, and each return is an
+immutable Contribution candidate. A restart after a committed reservation keeps
+that DAG, TopologyAdmission, completed candidates and Artifact history, marks the
+unconfirmed unit as `checkpoint_recovered_in_flight_worker`, and never replays it.
+A new idempotency key and current Run version may explicitly retry only that
+recovered WorkUnit. This still is not a queue, lease or remote Worker runtime.
+
+When WorkUnits have formed logical `artifact_versions[]` but no real
+`workspace_artifacts[]`, the UI now labels the result as reviewable/restorable
+and explicitly says that no DOCX/CSV download exists. Each WorkUnit shows safe
+source labels and business dependency titles from the public Snapshot. This
+prevents a user from mistaking an append-only evidence brief for a written
+office file; it does not change the Artifact or file protocol.
 
 Elapsed milliseconds are an observed call duration, not production SLA or cost.
 The trajectory uses named server events and business summaries. It also exposes
@@ -420,7 +574,8 @@ already changed the server.
 The current Run id is kept in browser session state. After refresh, the client
 first reconciles that id with `GET /runs/{run_id}`; when no local id exists it
 may discover the most recent nonterminal Owner Run through `GET /runs`. A
-`checkpoint_recovered` badge is shown only when that server event exists.
+known `task_id` is reconciled through Task GET so a historical parent cannot be
+mistaken for current. `checkpoint_recovered` is shown only when that server event exists.
 
 ## 7. Streaming and reconciliation
 
@@ -433,7 +588,8 @@ GET /v1/harness/runs/{run_id}/events?after={last_observed_sequence}
 Rules:
 
 1. apply only events for the current Run;
-2. never decrease Snapshot version or last event sequence;
+2. never decrease Snapshot version or last event sequence within the same
+   `run_id`; a validated child Run starts a new counter domain;
 3. use SSE only as ordered change notification;
 4. read the current Snapshot after business events;
 5. on nonterminal failure, reconnect from `after=N`;
@@ -451,8 +607,17 @@ browser fact, not a server task phase.
 | manifest integrity invalid | integrity-specific unavailable state | no stale catalog | repair/import source then retry |
 | preview error | file-specific safe error | file list and task draft | reopen or choose another file |
 | unknown start result | reconciling | same instruction/limits/key | replay identical request |
+| continuation uses stale parent or Task version | parent Run remains visible; no unverified child is accepted | parent Snapshot, history and unfinished Branch | refresh Task and parent; open the authoritative current Run if it moved, otherwise retry from current facts |
+| Task GET temporarily fails | parent/current screen remains visible with an explicit Task refresh error | rendered Run, local draft and SSE generation | retry Task GET; do not synthesize a current pointer or clear the Run |
+| Task pointer or lineage is inconsistent | fail-closed Task integrity state | immutable Run records and last rendered screen | repair durable state; GET must not backfill or pick by timestamp |
+| Workspace revision changed before continuation | child Task timeline says the source changed and exposes Branch recheck refs | immutable parent Run and base Artifact/Commit pointers | re-read only the approved carried Branch; do not silently adopt old prose |
+| adaptive route waits for confirmation | topology reason, work packages, budget and `external_action=none` | validated Plan/Branches; no Worker call yet | confirm the ready wave or switch to single Controller |
+| one Worker fails or evidence is ambiguous | per-WorkUnit receipt plus only its Branch waiting/failed | other adopted Contributions and prior ArtifactVersions/Commits | keep the affected Branch waiting or continue the next ready wave; no Worker-specific DecisionRequest exists |
+| API restarts during a Worker | recovered checkpoint; the unconfirmed WorkUnit is marked recovered failed; no result is fabricated | validated Branch DAG, TopologyAdmission, completed Contributions, prior v1/v2 and reserved budget facts | use a new idempotency key, current version and original Branch scope to retry only that recovered unit; the in-flight call is never auto-replayed |
 | model/schema/policy failure | safe stop plus receipt | whole-workspace contract, instruction and completed rounds | revise or create a fresh Run |
 | rejected plan candidate | not adopted plus bounded retry | frozen contract and used-call count | server retries once if budget allows; otherwise fails closed |
+| one explicit numbered requirement does not fit this round | separate “known source, deferred” item and waiting Branch | every numbered item, approved candidate refs and current Plan | continue that one Branch later; do not call it missing or silently drop it |
+| one explicit numbered requirement has no recognizable source in the frozen index | separate uncovered item without a file ref | the numbered requirement and all current Plan work | state the bounded workspace limit; do not claim an Internet search or invent a source |
 | one or more source locations cannot be resolved | rejected/partial-adoption trace | valid Findings, approved Plan, files, Branches and receipts | retry once; adopt the valid subset or pause one candidate Branch with `recovery_kind=source_location` |
 | PDF/DOCX layout splits one otherwise exact quote | no user interruption when the normalized location is unique | strict candidate, safe Preview line map and all scope checks | ignore layout whitespace/punctuation only after strict matching fails; require one location, otherwise keep ambiguous |
 | all verified observed dates in a Finding are outside the explicit instruction window | `analysis_scope_filtered` trace; no Gap or DecisionRequest for that Finding | in-scope Findings, Artifact and model receipt | omit only the out-of-window Finding; unsupported range expressions are not guessed |
@@ -460,9 +625,9 @@ browser fact, not a server task phase.
 | Artifact passed while source location still waits | outcome/download first, “成果已生成，还有 N 条说明缺少原表格位置”, same-source/same-failure gaps grouped | Artifact/EffectReceipt, every underlying Branch/Gap and current version | view generated files or explicitly resume one real Branch; technical facts stay collapsed; do not call the Run completed, collapse distinct failures or merge server Branches |
 | one source quote has multiple real matches | `evidence_disambiguation_required` + `EvidenceResolution(status=ambiguous)` | completed Branches, ArtifactVersion and all candidates | compare candidates; record the selected candidate; steer and resume only its Branch |
 | pending human decision is closed | `decision_recorded(action=defer|cancel)` | Finding, evidence, user feedback draft and all execution facts | defer stays actionable; cancel closes the packet without marking the source rejected; use a fresh version for any later control |
-| repeated malformed analysis output | structure-rejected trace | approved Plan, files, Branches and both call receipts | pause one candidate Branch with `recovery_kind=analysis_output`; do not expose raw response |
+| repeated truncated, non-JSON or schema-invalid analysis output | classified `analysis_structure_rejected` trace | approved Plan, files, Branches and both call receipts | retry once within the 180-second Analyst boundary, then pause one candidate Branch with `recovery_kind=analysis_output`; do not expose raw response |
 | evidence insufficient | Agent execution-gap sheet, waiting Branch, missing evidence and model adoption receipt | prior rounds, all Branch states, versions and citations | leave guidance empty and retry one Branch, optionally add direction, or preserve the gap |
-| recovery reaches budget terminal | `status=stopped`, `brief.outcome=bounded`, candidate Branches and `recovery_kind` | old Run, Plan, call receipts, Branch state and ArtifactVersions | choose one unfinished Branch, add optional direction and POST a new Task Contract; never resume the terminal Run |
+| recovery reaches budget terminal | `status=stopped`, `brief.outcome=bounded`, candidate Branches and `recovery_kind` | old Run, Plan, call receipts, Branch state and ArtifactVersions | choose one unfinished Branch and POST a same-Task child Run whose first scope is that Branch; never resume the terminal Run |
 | pause/steer/stop requested | pending until a safe point | current Snapshot and command receipt | reconcile returned version; resume or inspect terminal brief |
 | human reviews or pauses for a long time | active elapsed is frozen while waiting/paused | consumed active time, Branch state, versions and receipts | resume from the same active budget; wall-clock waiting does not force an immediate stop |
 | deterministic local effect fails | failed EffectReceipt and check details | source bytes, model receipts, prior Branches and any earlier verified Artifact | inspect the failed check; fix the owned adapter/validator and start a fresh run without altering FORTE inputs |
@@ -473,6 +638,11 @@ browser fact, not a server task phase.
 | API restart with PostgreSQL | recovered checkpoint, paused | completed rounds, Branch states, events, command receipts and independent ArtifactVersion/TaskCommit rows | inspect trace, then explicitly resume the intended Branch |
 | historical result restored | current pointer changes to a verified old brief | every ArtifactVersion and prior TaskCommit | review restored brief or select another version; original files stay unchanged |
 | API restart without PostgreSQL | no recoverable Run | browser task draft only | start a new Run or configure `DATABASE_DSN` |
+
+Local startup uses `STATE_STORE_MODE=auto|memory|postgres`. The Windows demo
+launcher selects non-empty `memory` for fallback so a stale `.env` DSN cannot
+re-enter through `Start-Process`; health remains the authoritative mode. This
+does not make memory durable.
 
 DR-0032 clarifies the PostgreSQL boundary: an open `DecisionRequest`, its
 `EvidenceResolution` candidates and a recorded `DecisionRecord` are durable only
@@ -488,6 +658,26 @@ The real PostgreSQL 17.11 sequential gate now verifies pending-decision restart,
 target-Branch-only resume, v1/v2 preservation and a second restart. The browser
 path separately verifies desktop and 390 px candidate comparison, defer-then-final
 decision, cancel and reconnect; neither gate is a user study.
+
+DR-0054 adds a separate minimal Task record and append-only continuation receipt.
+Initial start and continuation share one aggregate commit with the Run and start
+idempotency receipt; sibling requests compete on `task_version`, while parent
+controls remain protected by `run.version`. Memory/API tests and browser mocks cover
+the current/historical projection, stale versions, replay and fail-closed reads.
+The seven dedicated PostgreSQL Task Ledger tests now pass against an isolated
+PostgreSQL 17.11 instance. They cover initial/restart reads, owner scope, sibling
+CAS, stale parent version, idempotency and transactional rollback; malformed or
+missing parent `snapshot.version` fails closed. This remains a single-host
+sequential adapter gate and does not establish production multi-instance
+coordination, WorkUnit leases or high availability.
+
+DR-0055 adds independent Branch-bound WorkUnit and append-only Contribution rows
+to the same state-store boundary. The isolated PostgreSQL 17.11 Demo/Task
+combination passed 10 tests: three Demo 1/2 restart paths plus the seven Task
+Ledger transactions. It verifies strict reservation replay, Branch DAG and v1/v2
+preservation, no automatic replay, and explicit target-only retry of a recovered
+unit. It does not establish distributed queue/lease, remote Worker ownership,
+multi-instance safety, Provider effectiveness or user comprehension.
 DR-0034 adds only a browser projection gate: deterministic E2E checks retry-first
 and ambiguous-choice-first screens, disabled accept before selection, collapsed
 optional details and 390 px overflow. It does not change the DR-0032 persistence

@@ -71,6 +71,19 @@ def test_public_workspace_hides_benchmark_prompts_paths_and_hashes() -> None:
     )
 
 
+def test_internal_planner_heading_recovers_generic_filename_without_public_leak() -> None:
+    catalog = BenchmarkWorkspaceCatalog(ROOT)
+    internal = catalog.internal_workspace()
+    source = next(
+        item for item in internal["files"] if item["display_label"] == "专业性说明.md"
+    )
+
+    assert "AI 外呼催收流程" in source["planner_search_hint"]
+    assert "planner_search_hint" not in json.dumps(
+        catalog.public_workspace(), ensure_ascii=False
+    )
+
+
 @pytest.mark.parametrize(
     ("extension", "expected_kind"),
     [("CSV", "table"), ("PDF", "pdf"), ("DOCX", "document"), ("TXT", "text")],

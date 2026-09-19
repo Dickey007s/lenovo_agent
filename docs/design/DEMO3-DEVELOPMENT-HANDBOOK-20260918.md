@@ -120,8 +120,8 @@ Demo1 展示单个长任务的拆分推进，Demo2 展示多个任务的规划�
 
 ## 8. 验证与交付索引
 
-- [决策 DR-0053](../decisions/DR-0053-single-action-boundary-workbench.md)
-- [场景 SCENARIO-038](../scenarios/SCENARIO-038-single-action-boundary-workbench.md)
+- [决策 DR-0064](../decisions/DR-0064-single-action-boundary-workbench.md)
+- [场景 SCENARIO-051](../scenarios/SCENARIO-051-single-action-boundary-workbench.md)
 - [需求来源](../sources/USER-FEEDBACK-20260918-demo3-handbook.md)
 - [运行证据与测试结果](../evidence/DR-0053-SINGLE-ACTION-EVIDENCE-20260918.md)
 
@@ -129,7 +129,9 @@ Demo1 展示单个长任务的拆分推进，Demo2 展示多个任务的规划�
 
 ## 9. 2026-09-19 开发补充
 
-[DR-0054](../decisions/DR-0054-demo3-editable-drafts-and-human-judgment.md)、[SCENARIO-039](../scenarios/SCENARIO-039-demo3-human-judgment-and-return.md)与[运行证据](../evidence/DR-0054-DEMO3-COLLABORATION-EVIDENCE-20260919.md)记录本轮增量。
+主分支整合补充：六类事项现在也通过同一个 Task Ledger 形成独立 Task/Run；任务会话和能力页可打开，Task 指针未核对通过时不允许修改。研究/continuation/Worker 路径保持主分支合同，完整记录见[合并证据](../evidence/DEMO3-MASTER-MERGE-20260919.md)。合并后公开 API 为 12 个 path、13 个 operation。
+
+[DR-0065](../decisions/DR-0065-demo3-editable-drafts-and-human-judgment.md)、[SCENARIO-052](../scenarios/SCENARIO-052-demo3-human-judgment-and-return.md)与[运行证据](../evidence/DR-0054-DEMO3-COLLABORATION-EVIDENCE-20260919.md)记录本轮增量。
 
 compare_materials 接受 content/alternative_content 两段用户材料，完整时 awaiting_decision。record_decision 必须携带 selected_option=first/second 与非空 rationale，保存 decision 和 decision_note 回执，映射为 decided/completed。普通 confirm 无法代替判断。edit_draft 只接受 extract_excerpt/draft_ready，更新 preview/receipt.content，保留 source_excerpt 和历史 content_snapshot。两种命令复用既有 Owner、version、revision、幂等和持久化检查。
 

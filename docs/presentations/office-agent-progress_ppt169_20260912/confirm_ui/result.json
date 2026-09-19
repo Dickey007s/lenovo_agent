@@ -1,0 +1,22 @@
+{
+  "stage": "final",
+  "status": "confirmed",
+  "confirmation_channel": "chat",
+  "confirmation_text": "同意；确认（第二轮，采用推荐 A）",
+  "page_count": "6",
+  "color_selection": 0,
+  "typography_selection": 0,
+  "image_strategy_selection": 0,
+  "icons": "none",
+  "formula_policy": "text-only",
+  "image_usage": ["provided", "ai"],
+  "image_ai_path": "host-native",
+  "generation_mode": "continuous",
+  "refine_spec": false,
+  "canvas": "ppt169",
+  "audience": "项目合作方和评审老师，中文阶段汇报",
+  "content_divergence": "",
+  "mode": "briefing",
+  "visual_style": "swiss-minimal",
+  "delivery_purpose": "balanced"
+}

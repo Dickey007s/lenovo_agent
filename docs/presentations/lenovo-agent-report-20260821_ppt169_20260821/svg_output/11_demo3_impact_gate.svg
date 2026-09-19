@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 1280 720" width="1280" height="720">
+  <g id="background"><rect width="1280" height="720" fill="#F7F9FC"/><text x="48" y="70" font-family="'Microsoft YaHei UI','Segoe UI',Arial,sans-serif" font-size="44" font-weight="700" fill="#172230">Demo 3：用户批准的不是命令，而是一次具体业务后果</text><text x="48" y="108" font-family="'Microsoft YaHei UI','Segoe UI',Arial,sans-serif" font-size="18" fill="#526579">预演说明将发生什么；回执只说明实际发生了什么</text></g>
+  <g id="evidence">
+    <rect x="48" y="144" width="434" height="310" fill="#FFFFFF" stroke="#CAD6E3"/>
+    <image x="60" y="156" width="410" height="286" xlink:href="../images/image39.png" preserveAspectRatio="xMidYMid meet"/>
+    <rect x="48" y="474" width="434" height="164" fill="#FFFFFF" stroke="#CAD6E3"/>
+    <image x="60" y="486" width="410" height="140" xlink:href="../images/image46.png" preserveAspectRatio="xMidYMid meet"/>
+  </g>
+  <g id="impact-ledger">
+    <text x="522" y="164" font-family="'Microsoft YaHei UI','Segoe UI',Arial,sans-serif" font-size="18" font-weight="700" fill="#0B3A70">动作影响账本</text>
+    <rect x="522" y="184" width="710" height="82" fill="#FFFFFF" stroke="#CAD6E3"/><rect x="522" y="184" width="10" height="82" fill="#D71920"/>
+    <text x="554" y="216" font-family="'Microsoft YaHei UI','Segoe UI',Arial,sans-serif" font-size="19" font-weight="700" fill="#D71920">会改变</text><text x="676" y="216" font-family="'Microsoft YaHei UI','Segoe UI',Arial,sans-serif" font-size="19" font-weight="700" fill="#172230">客户回复草稿 → 受控发送动作</text><text x="554" y="246" font-family="'Microsoft YaHei UI','Segoe UI',Arial,sans-serif" font-size="16" fill="#526579">目标、主题、正文由当前已验证工件重建</text>
+    <rect x="522" y="278" width="710" height="82" fill="#FFFFFF" stroke="#CAD6E3"/><rect x="522" y="278" width="10" height="82" fill="#0B3A70"/>
+    <text x="554" y="310" font-family="'Microsoft YaHei UI','Segoe UI',Arial,sans-serif" font-size="19" font-weight="700" fill="#0B3A70">会重新核对</text><text x="706" y="310" font-family="'Microsoft YaHei UI','Segoe UI',Arial,sans-serif" font-size="19" font-weight="700" fill="#172230">证据、风险、权限与绑定版本</text><text x="554" y="340" font-family="'Microsoft YaHei UI','Segoe UI',Arial,sans-serif" font-size="16" fill="#526579">内容变化、参数不一致或证据不足时 fail closed</text>
+    <rect x="522" y="372" width="710" height="82" fill="#FFFFFF" stroke="#CAD6E3"/><rect x="522" y="372" width="10" height="82" fill="#16845B"/>
+    <text x="554" y="404" font-family="'Microsoft YaHei UI','Segoe UI',Arial,sans-serif" font-size="19" font-weight="700" fill="#16845B">保持不变</text><text x="676" y="404" font-family="'Microsoft YaHei UI','Segoe UI',Arial,sans-serif" font-size="19" font-weight="700" fill="#172230">已完成 Task、Artifact 与 Commit</text><text x="554" y="434" font-family="'Microsoft YaHei UI','Segoe UI',Arial,sans-serif" font-size="16" fill="#526579">拒绝或执行失败不会回滚已经验证的工作</text>
+    <rect x="522" y="466" width="710" height="82" fill="#FFFFFF" stroke="#CAD6E3"/><rect x="522" y="466" width="10" height="82" fill="#8291A3"/>
+    <text x="554" y="498" font-family="'Microsoft YaHei UI','Segoe UI',Arial,sans-serif" font-size="19" font-weight="700" fill="#526579">不会发生</text><text x="676" y="498" font-family="'Microsoft YaHei UI','Segoe UI',Arial,sans-serif" font-size="19" font-weight="700" fill="#172230">真实邮箱、CRM、OA 写入</text><text x="554" y="528" font-family="'Microsoft YaHei UI','Segoe UI',Arial,sans-serif" font-size="16" fill="#526579">当前仅调用 Simulator，外部副作用为 none</text>
+  </g>
+  <g id="pipeline">
+    <line x1="560" y1="596" x2="1188" y2="596" stroke="#CAD6E3" stroke-width="4"/>
+    <circle cx="560" cy="596" r="20" fill="#0B3A70"/><circle cx="686" cy="596" r="20" fill="#0B3A70"/><circle cx="812" cy="596" r="20" fill="#D71920"/><circle cx="938" cy="596" r="20" fill="#0B3A70"/><circle cx="1064" cy="596" r="20" fill="#0B3A70"/><circle cx="1188" cy="596" r="20" fill="#16845B"/>
+    <text x="560" y="634" text-anchor="middle" font-family="'Microsoft YaHei UI','Segoe UI',Arial,sans-serif" font-size="14" fill="#526579">工件绑定</text><text x="686" y="634" text-anchor="middle" font-family="'Microsoft YaHei UI','Segoe UI',Arial,sans-serif" font-size="14" fill="#526579">证据与风险</text><text x="812" y="634" text-anchor="middle" font-family="'Microsoft YaHei UI','Segoe UI',Arial,sans-serif" font-size="14" fill="#526579">人工批准</text><text x="938" y="634" text-anchor="middle" font-family="'Microsoft YaHei UI','Segoe UI',Arial,sans-serif" font-size="14" fill="#526579">一次性许可</text><text x="1064" y="634" text-anchor="middle" font-family="'Microsoft YaHei UI','Segoe UI',Arial,sans-serif" font-size="14" fill="#526579">受控工具</text><text x="1188" y="634" text-anchor="middle" font-family="'Microsoft YaHei UI','Segoe UI',Arial,sans-serif" font-size="14" fill="#16845B">执行回执</text>
+  </g>
+  <g id="footer"><text x="48" y="686" font-family="'Microsoft YaHei UI','Segoe UI',Arial,sans-serif" font-size="14" fill="#8291A3">Verified：固定 reply_draft → email.send Simulator；真实 Connector、生产身份与跨进程 Permit replay 未验证</text><text x="1232" y="686" text-anchor="end" font-family="Consolas,'Courier New',monospace" font-size="16" fill="#0B3A70">P11</text></g>
+</svg>

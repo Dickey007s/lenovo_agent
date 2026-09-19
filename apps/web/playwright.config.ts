@@ -39,7 +39,7 @@ export default defineConfig({
     },
     {
       command:
-        `pnpm exec cross-env NEXT_PUBLIC_API_BASE_URL=${apiUrl} ` +
+        `pnpm exec cross-env NEXT_DIST_DIR=.next-playwright NEXT_PUBLIC_API_BASE_URL=${apiUrl} ` +
         "next dev --hostname 127.0.0.1 --port 3011",
       url: webUrl,
       reuseExistingServer: false,

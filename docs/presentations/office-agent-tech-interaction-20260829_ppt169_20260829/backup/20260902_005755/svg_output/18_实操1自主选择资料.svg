@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720" width="1280" height="720">
+  <g id="background">
+    <rect width="1280" height="720" fill="#F7F8FA"/>
+    <path d="M52 112H1228" stroke="#CBD5DF" stroke-width="2"/>
+  </g>
+  <g id="header">
+    <text x="52" y="78" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="46" font-weight="700" fill="#132A3A">实操 1：用户只说目标，Agent 自主选择资料</text>
+  </g>
+  <g id="operation-screenshot">
+    <rect x="52" y="140" width="792" height="528" rx="6" fill="#FFFFFF" stroke="#CBD5DF" stroke-width="2"/>
+    <image href="../images/dr-0036-tc01-live-run-completed.png" x="62" y="150" width="772" height="508" preserveAspectRatio="xMidYMid meet"/>
+    <rect x="72" y="160" width="154" height="32" rx="6" fill="#1769E0"/>
+    <text x="149" y="182" text-anchor="middle" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="17" font-weight="700" fill="#FFFFFF">当前系统实测</text>
+  </g>
+  <g id="callouts">
+    <rect x="872" y="140" width="356" height="132" rx="6" fill="#FFFFFF" stroke="#1769E0" stroke-width="2"/>
+    <circle cx="902" cy="174" r="18" fill="#1769E0"/>
+    <text x="902" y="181" text-anchor="middle" font-family="Consolas, &quot;Courier New&quot;, monospace" font-size="17" font-weight="700" fill="#FFFFFF">1</text>
+    <text x="932" y="181" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="24" font-weight="700" fill="#132A3A">用户动作</text>
+    <text x="896" y="222" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#5A6B7C">只写自然语言目标，不先猜文件。</text>
+    <text x="896" y="248" font-family="Consolas, &quot;Courier New&quot;, monospace" font-size="14" fill="#1769E0">no selected_file_refs</text>
+
+    <rect x="872" y="288" width="356" height="152" rx="6" fill="#FFFFFF" stroke="#1769E0" stroke-width="2"/>
+    <circle cx="902" cy="322" r="18" fill="#1769E0"/>
+    <text x="902" y="329" text-anchor="middle" font-family="Consolas, &quot;Courier New&quot;, monospace" font-size="17" font-weight="700" fill="#FFFFFF">2</text>
+    <text x="932" y="329" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="24" font-weight="700" fill="#132A3A">服务端事实</text>
+    <text x="896" y="370" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#5A6B7C">冻结完整 allowlisted 索引；</text>
+    <text x="896" y="398" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#5A6B7C">Planner 只看安全元数据，提出本轮证据。</text>
+    <text x="896" y="424" font-family="Consolas, &quot;Courier New&quot;, monospace" font-size="14" fill="#1769E0">scope_mode=whole_workspace</text>
+
+    <rect x="872" y="456" width="356" height="132" rx="6" fill="#FFFFFF" stroke="#2E7D32" stroke-width="2"/>
+    <circle cx="902" cy="490" r="18" fill="#2E7D32"/>
+    <text x="902" y="497" text-anchor="middle" font-family="Consolas, &quot;Courier New&quot;, monospace" font-size="17" font-weight="700" fill="#FFFFFF">3</text>
+    <text x="932" y="497" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="24" font-weight="700" fill="#132A3A">前台反馈</text>
+    <text x="896" y="538" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#5A6B7C">展示资料依据、模型采用、剩余预算</text>
+    <text x="896" y="566" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#5A6B7C">以及实时有序 Trace。</text>
+
+    <rect x="872" y="604" width="356" height="64" rx="6" fill="#EDF1F4"/>
+    <text x="896" y="631" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="17" font-weight="700" fill="#B54708">边界</text>
+    <text x="896" y="655" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="14" fill="#5A6B7C">自主选资料不等于穷举正确，仍需复核。</text>
+  </g>
+  <g id="footer">
+    <text x="52" y="690" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="14" fill="#7C8A98">交互变化：从“用户先选文件”变为“用户说明目标，系统解释资料选择”</text>
+    <text x="1208" y="690" text-anchor="end" font-family="Consolas, &quot;Courier New&quot;, monospace" font-size="14" fill="#7C8A98">18 / 24</text>
+  </g>
+</svg>

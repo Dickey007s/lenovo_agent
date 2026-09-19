@@ -1,0 +1,1230 @@
+{
+  "schema": "openai.presentation.layout/v4",
+  "unit": "px",
+  "slide": {
+    "aid": "sl/mn7hp0",
+    "id": "mn7hp0",
+    "slide": 5,
+    "layoutId": "e02214de-0af7-4187-83d5-fb5e2331a537",
+    "layoutName": "Title Slide",
+    "layoutType": "title",
+    "masterLayoutId": "119304e4-55ba-4450-9c5f-672f895621ce",
+    "masterLayoutName": "Master",
+    "backgroundColor": "#FFFFFF",
+    "frame": {
+      "left": 0,
+      "top": 0,
+      "width": 1280,
+      "height": 720
+    }
+  },
+  "theme": {
+    "colorSchemeName": "ChatGPT",
+    "colors": {
+      "accent1": "#156082",
+      "accent2": "#E97132",
+      "accent3": "#196B24",
+      "accent4": "#0F9ED5",
+      "accent5": "#A02B93",
+      "accent6": "#4EA72E",
+      "bg1": "#FFFFFF",
+      "bg2": "#000000",
+      "tx1": "#1F1F1F",
+      "tx2": "#FFFFFF",
+      "dk1": "#000000",
+      "lt1": "#FFFFFF",
+      "dk2": "#0E2841",
+      "lt2": "#E8E8E8",
+      "hlink": "#467886",
+      "folHlink": "#96607D"
+    },
+    "typefaces": [
+      "Microsoft YaHei"
+    ]
+  },
+  "inheritedLayers": [
+    {
+      "scope": "layout",
+      "id": "e02214de-0af7-4187-83d5-fb5e2331a537",
+      "name": "Title Slide",
+      "type": "title",
+      "parentLayoutId": "119304e4-55ba-4450-9c5f-672f895621ce",
+      "elements": []
+    },
+    {
+      "scope": "master",
+      "id": "119304e4-55ba-4450-9c5f-672f895621ce",
+      "name": "Master",
+      "type": "master",
+      "elements": []
+    }
+  ],
+  "elements": [
+    {
+      "order": 1,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/ul4re1c3",
+      "id": "1",
+      "name": "办公任务中的边界与应对",
+      "bbox": [
+        48,
+        36,
+        1184,
+        59.4
+      ],
+      "geometry": "rect",
+      "text": "办公任务中的边界与应对",
+      "textPreview": "办公任务中的边界与应对",
+      "resolvedFontSize": 44,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 44,
+        "typeface": "Microsoft YaHei",
+        "color": "#182230",
+        "bold": true,
+        "alignment": "left",
+        "verticalAlignment": "top",
+        "wrap": "none",
+        "autoFit": "none",
+        "insets": {
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "left": 0
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "办公任务中的边界与应对"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "办公任务中的边界与应对",
+          "resolvedTextStyle": {
+            "fontSize": 44,
+            "typeface": "Microsoft YaHei",
+            "color": "#182230",
+            "bold": true,
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "办公任务中的边界与应对",
+              "fontSize": 44,
+              "typeface": "Microsoft YaHei",
+              "color": "#182230",
+              "bold": true,
+              "alignment": "left"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 2,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/hovq9gvu",
+      "id": "2",
+      "name": "后果、证据、权限、版本和回执分别判断，不采用固定 L0-L5",
+      "bbox": [
+        48,
+        99,
+        1184,
+        32.4
+      ],
+      "geometry": "rect",
+      "text": "后果、证据、权限、版本和回执分别判断，不采用固定 L0-L5",
+      "textPreview": "后果、证据、权限、版本和回执分别判断，不采用固定 L0-L5",
+      "resolvedFontSize": 24,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 24,
+        "typeface": "Microsoft YaHei",
+        "color": "#596579",
+        "alignment": "left",
+        "verticalAlignment": "top",
+        "wrap": "none",
+        "autoFit": "none",
+        "insets": {
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "left": 0
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "后果、证据、权限、版本和回执分别判断，不采用固定 L0-L5"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "后果、证据、权限、版本和回执分别判断，不采用固定 L0-L5",
+          "resolvedTextStyle": {
+            "fontSize": 24,
+            "typeface": "Microsoft YaHei",
+            "color": "#596579",
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "后果、证据、权限、版本和回执分别判断，不采用固定 L0-L5",
+              "fontSize": 24,
+              "typeface": "Microsoft YaHei",
+              "color": "#596579",
+              "alignment": "left"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 3,
+      "kind": "table",
+      "scope": "slide",
+      "aid": "tb/xkfulgfm",
+      "id": "3",
+      "bbox": [
+        48,
+        168,
+        1184,
+        448
+      ],
+      "text": "情境 | 边界 | 处理方式 | 当前状态\n财务摘要 | 定位能力缺口 | Agent 先重试定位\n已生成文件继续保留 | 已有恢复\n同句多处出现 | 证据歧义 | 人选真实原文位置\n来源过期后重新核对 | 已有决定合同\nUX 频率恰好 3% | 规则冲突 | 保留计算和两种口径\n业务负责人确定规则 | 规则批准待实现\n报告发送客户 | 对外动作权限 | 保留内部成果，明确未发送\n不因确认依据而开放外发 | 外部执行不支持",
+      "textPreview": "情境 | 边界 | 处理方式 | 当前状态 | 财务摘要 | 定位能力缺口 | Agent 先重试定位 | 已生成文件继续保留 | 已有恢复 | 同句多处出现 | 证据歧义 | 人选真实原文位置 | 来源过期后重新核对 | 已有决定合同 | UX 频率恰好 3% | 规则冲...",
+      "rows": 5,
+      "cols": 4,
+      "cells": [
+        {
+          "index": 1,
+          "row": 1,
+          "column": 1,
+          "bbox": [
+            48,
+            168,
+            230,
+            64
+          ],
+          "text": "情境",
+          "textPreview": "情境",
+          "fillColor": "#F4F6F8",
+          "paragraphs": [
+            {
+              "index": 1,
+              "text": "情境",
+              "resolvedTextStyle": {
+                "fontSize": 24,
+                "typeface": "Microsoft YaHei",
+                "color": "#182230",
+                "bold": true,
+                "alignment": "left"
+              },
+              "runs": [
+                {
+                  "index": 1,
+                  "text": "情境",
+                  "fontSize": 24,
+                  "typeface": "Microsoft YaHei",
+                  "color": "#182230",
+                  "bold": true,
+                  "alignment": "left"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "index": 2,
+          "row": 1,
+          "column": 2,
+          "bbox": [
+            278,
+            168,
+            190,
+            64
+          ],
+          "text": "边界",
+          "textPreview": "边界",
+          "fillColor": "#F4F6F8",
+          "paragraphs": [
+            {
+              "index": 1,
+              "text": "边界",
+              "resolvedTextStyle": {
+                "fontSize": 24,
+                "typeface": "Microsoft YaHei",
+                "color": "#182230",
+                "bold": true,
+                "alignment": "left"
+              },
+              "runs": [
+                {
+                  "index": 1,
+                  "text": "边界",
+                  "fontSize": 24,
+                  "typeface": "Microsoft YaHei",
+                  "color": "#182230",
+                  "bold": true,
+                  "alignment": "left"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "index": 3,
+          "row": 1,
+          "column": 3,
+          "bbox": [
+            468,
+            168,
+            480,
+            64
+          ],
+          "text": "处理方式",
+          "textPreview": "处理方式",
+          "fillColor": "#F4F6F8",
+          "paragraphs": [
+            {
+              "index": 1,
+              "text": "处理方式",
+              "resolvedTextStyle": {
+                "fontSize": 24,
+                "typeface": "Microsoft YaHei",
+                "color": "#182230",
+                "bold": true,
+                "alignment": "left"
+              },
+              "runs": [
+                {
+                  "index": 1,
+                  "text": "处理方式",
+                  "fontSize": 24,
+                  "typeface": "Microsoft YaHei",
+                  "color": "#182230",
+                  "bold": true,
+                  "alignment": "left"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "index": 4,
+          "row": 1,
+          "column": 4,
+          "bbox": [
+            948,
+            168,
+            284,
+            64
+          ],
+          "text": "当前状态",
+          "textPreview": "当前状态",
+          "fillColor": "#F4F6F8",
+          "paragraphs": [
+            {
+              "index": 1,
+              "text": "当前状态",
+              "resolvedTextStyle": {
+                "fontSize": 24,
+                "typeface": "Microsoft YaHei",
+                "color": "#182230",
+                "bold": true,
+                "alignment": "left"
+              },
+              "runs": [
+                {
+                  "index": 1,
+                  "text": "当前状态",
+                  "fontSize": 24,
+                  "typeface": "Microsoft YaHei",
+                  "color": "#182230",
+                  "bold": true,
+                  "alignment": "left"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "index": 5,
+          "row": 2,
+          "column": 1,
+          "bbox": [
+            48,
+            232,
+            230,
+            96
+          ],
+          "text": "财务摘要",
+          "textPreview": "财务摘要",
+          "fillColor": "#FFFFFF",
+          "paragraphs": [
+            {
+              "index": 1,
+              "text": "财务摘要",
+              "resolvedTextStyle": {
+                "fontSize": 24,
+                "typeface": "Microsoft YaHei",
+                "color": "#182230",
+                "alignment": "left"
+              },
+              "runs": [
+                {
+                  "index": 1,
+                  "text": "财务摘要",
+                  "fontSize": 24,
+                  "typeface": "Microsoft YaHei",
+                  "color": "#182230",
+                  "alignment": "left"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "index": 6,
+          "row": 2,
+          "column": 2,
+          "bbox": [
+            278,
+            232,
+            190,
+            96
+          ],
+          "text": "定位能力缺口",
+          "textPreview": "定位能力缺口",
+          "fillColor": "#FFFFFF",
+          "paragraphs": [
+            {
+              "index": 1,
+              "text": "定位能力缺口",
+              "resolvedTextStyle": {
+                "fontSize": 24,
+                "typeface": "Microsoft YaHei",
+                "color": "#182230",
+                "alignment": "left"
+              },
+              "runs": [
+                {
+                  "index": 1,
+                  "text": "定位能力缺口",
+                  "fontSize": 24,
+                  "typeface": "Microsoft YaHei",
+                  "color": "#182230",
+                  "alignment": "left"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "index": 7,
+          "row": 2,
+          "column": 3,
+          "bbox": [
+            468,
+            232,
+            480,
+            96
+          ],
+          "text": "Agent 先重试定位\n已生成文件继续保留",
+          "textPreview": "Agent 先重试定位 | 已生成文件继续保留",
+          "fillColor": "#FFFFFF",
+          "paragraphs": [
+            {
+              "index": 1,
+              "text": "Agent 先重试定位",
+              "resolvedTextStyle": {
+                "fontSize": 24,
+                "typeface": "Microsoft YaHei",
+                "color": "#182230",
+                "alignment": "left"
+              },
+              "runs": [
+                {
+                  "index": 1,
+                  "text": "Agent 先重试定位",
+                  "fontSize": 24,
+                  "typeface": "Microsoft YaHei",
+                  "color": "#182230",
+                  "alignment": "left"
+                }
+              ]
+            },
+            {
+              "index": 2,
+              "text": "已生成文件继续保留",
+              "resolvedTextStyle": {
+                "fontSize": 24,
+                "typeface": "Microsoft YaHei",
+                "color": "#182230",
+                "alignment": "left"
+              },
+              "runs": [
+                {
+                  "index": 1,
+                  "text": "已生成文件继续保留",
+                  "fontSize": 24,
+                  "typeface": "Microsoft YaHei",
+                  "color": "#182230",
+                  "alignment": "left"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "index": 8,
+          "row": 2,
+          "column": 4,
+          "bbox": [
+            948,
+            232,
+            284,
+            96
+          ],
+          "text": "已有恢复",
+          "textPreview": "已有恢复",
+          "fillColor": "#FFFFFF",
+          "paragraphs": [
+            {
+              "index": 1,
+              "text": "已有恢复",
+              "resolvedTextStyle": {
+                "fontSize": 24,
+                "typeface": "Microsoft YaHei",
+                "color": "#008A63",
+                "alignment": "left"
+              },
+              "runs": [
+                {
+                  "index": 1,
+                  "text": "已有恢复",
+                  "fontSize": 24,
+                  "typeface": "Microsoft YaHei",
+                  "color": "#008A63",
+                  "alignment": "left"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "index": 9,
+          "row": 3,
+          "column": 1,
+          "bbox": [
+            48,
+            328,
+            230,
+            96
+          ],
+          "text": "同句多处出现",
+          "textPreview": "同句多处出现",
+          "fillColor": "#FFFFFF",
+          "paragraphs": [
+            {
+              "index": 1,
+              "text": "同句多处出现",
+              "resolvedTextStyle": {
+                "fontSize": 24,
+                "typeface": "Microsoft YaHei",
+                "color": "#182230",
+                "alignment": "left"
+              },
+              "runs": [
+                {
+                  "index": 1,
+                  "text": "同句多处出现",
+                  "fontSize": 24,
+                  "typeface": "Microsoft YaHei",
+                  "color": "#182230",
+                  "alignment": "left"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "index": 10,
+          "row": 3,
+          "column": 2,
+          "bbox": [
+            278,
+            328,
+            190,
+            96
+          ],
+          "text": "证据歧义",
+          "textPreview": "证据歧义",
+          "fillColor": "#FFFFFF",
+          "paragraphs": [
+            {
+              "index": 1,
+              "text": "证据歧义",
+              "resolvedTextStyle": {
+                "fontSize": 24,
+                "typeface": "Microsoft YaHei",
+                "color": "#182230",
+                "alignment": "left"
+              },
+              "runs": [
+                {
+                  "index": 1,
+                  "text": "证据歧义",
+                  "fontSize": 24,
+                  "typeface": "Microsoft YaHei",
+                  "color": "#182230",
+                  "alignment": "left"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "index": 11,
+          "row": 3,
+          "column": 3,
+          "bbox": [
+            468,
+            328,
+            480,
+            96
+          ],
+          "text": "人选真实原文位置\n来源过期后重新核对",
+          "textPreview": "人选真实原文位置 | 来源过期后重新核对",
+          "fillColor": "#FFFFFF",
+          "paragraphs": [
+            {
+              "index": 1,
+              "text": "人选真实原文位置",
+              "resolvedTextStyle": {
+                "fontSize": 24,
+                "typeface": "Microsoft YaHei",
+                "color": "#182230",
+                "alignment": "left"
+              },
+              "runs": [
+                {
+                  "index": 1,
+                  "text": "人选真实原文位置",
+                  "fontSize": 24,
+                  "typeface": "Microsoft YaHei",
+                  "color": "#182230",
+                  "alignment": "left"
+                }
+              ]
+            },
+            {
+              "index": 2,
+              "text": "来源过期后重新核对",
+              "resolvedTextStyle": {
+                "fontSize": 24,
+                "typeface": "Microsoft YaHei",
+                "color": "#182230",
+                "alignment": "left"
+              },
+              "runs": [
+                {
+                  "index": 1,
+                  "text": "来源过期后重新核对",
+                  "fontSize": 24,
+                  "typeface": "Microsoft YaHei",
+                  "color": "#182230",
+                  "alignment": "left"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "index": 12,
+          "row": 3,
+          "column": 4,
+          "bbox": [
+            948,
+            328,
+            284,
+            96
+          ],
+          "text": "已有决定合同",
+          "textPreview": "已有决定合同",
+          "fillColor": "#FFFFFF",
+          "paragraphs": [
+            {
+              "index": 1,
+              "text": "已有决定合同",
+              "resolvedTextStyle": {
+                "fontSize": 24,
+                "typeface": "Microsoft YaHei",
+                "color": "#008A63",
+                "alignment": "left"
+              },
+              "runs": [
+                {
+                  "index": 1,
+                  "text": "已有决定合同",
+                  "fontSize": 24,
+                  "typeface": "Microsoft YaHei",
+                  "color": "#008A63",
+                  "alignment": "left"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "index": 13,
+          "row": 4,
+          "column": 1,
+          "bbox": [
+            48,
+            424,
+            230,
+            96
+          ],
+          "text": "UX 频率恰好 3%",
+          "textPreview": "UX 频率恰好 3%",
+          "fillColor": "#FFFFFF",
+          "paragraphs": [
+            {
+              "index": 1,
+              "text": "UX 频率恰好 3%",
+              "resolvedTextStyle": {
+                "fontSize": 24,
+                "typeface": "Microsoft YaHei",
+                "color": "#182230",
+                "alignment": "left"
+              },
+              "runs": [
+                {
+                  "index": 1,
+                  "text": "UX 频率恰好 3%",
+                  "fontSize": 24,
+                  "typeface": "Microsoft YaHei",
+                  "color": "#182230",
+                  "alignment": "left"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "index": 14,
+          "row": 4,
+          "column": 2,
+          "bbox": [
+            278,
+            424,
+            190,
+            96
+          ],
+          "text": "规则冲突",
+          "textPreview": "规则冲突",
+          "fillColor": "#FFFFFF",
+          "paragraphs": [
+            {
+              "index": 1,
+              "text": "规则冲突",
+              "resolvedTextStyle": {
+                "fontSize": 24,
+                "typeface": "Microsoft YaHei",
+                "color": "#182230",
+                "alignment": "left"
+              },
+              "runs": [
+                {
+                  "index": 1,
+                  "text": "规则冲突",
+                  "fontSize": 24,
+                  "typeface": "Microsoft YaHei",
+                  "color": "#182230",
+                  "alignment": "left"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "index": 15,
+          "row": 4,
+          "column": 3,
+          "bbox": [
+            468,
+            424,
+            480,
+            96
+          ],
+          "text": "保留计算和两种口径\n业务负责人确定规则",
+          "textPreview": "保留计算和两种口径 | 业务负责人确定规则",
+          "fillColor": "#FFFFFF",
+          "paragraphs": [
+            {
+              "index": 1,
+              "text": "保留计算和两种口径",
+              "resolvedTextStyle": {
+                "fontSize": 24,
+                "typeface": "Microsoft YaHei",
+                "color": "#182230",
+                "alignment": "left"
+              },
+              "runs": [
+                {
+                  "index": 1,
+                  "text": "保留计算和两种口径",
+                  "fontSize": 24,
+                  "typeface": "Microsoft YaHei",
+                  "color": "#182230",
+                  "alignment": "left"
+                }
+              ]
+            },
+            {
+              "index": 2,
+              "text": "业务负责人确定规则",
+              "resolvedTextStyle": {
+                "fontSize": 24,
+                "typeface": "Microsoft YaHei",
+                "color": "#182230",
+                "alignment": "left"
+              },
+              "runs": [
+                {
+                  "index": 1,
+                  "text": "业务负责人确定规则",
+                  "fontSize": 24,
+                  "typeface": "Microsoft YaHei",
+                  "color": "#182230",
+                  "alignment": "left"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "index": 16,
+          "row": 4,
+          "column": 4,
+          "bbox": [
+            948,
+            424,
+            284,
+            96
+          ],
+          "text": "规则批准待实现",
+          "textPreview": "规则批准待实现",
+          "fillColor": "#FFFFFF",
+          "paragraphs": [
+            {
+              "index": 1,
+              "text": "规则批准待实现",
+              "resolvedTextStyle": {
+                "fontSize": 24,
+                "typeface": "Microsoft YaHei",
+                "color": "#B86A00",
+                "alignment": "left"
+              },
+              "runs": [
+                {
+                  "index": 1,
+                  "text": "规则批准待实现",
+                  "fontSize": 24,
+                  "typeface": "Microsoft YaHei",
+                  "color": "#B86A00",
+                  "alignment": "left"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "index": 17,
+          "row": 5,
+          "column": 1,
+          "bbox": [
+            48,
+            520,
+            230,
+            96
+          ],
+          "text": "报告发送客户",
+          "textPreview": "报告发送客户",
+          "fillColor": "#FFFFFF",
+          "paragraphs": [
+            {
+              "index": 1,
+              "text": "报告发送客户",
+              "resolvedTextStyle": {
+                "fontSize": 24,
+                "typeface": "Microsoft YaHei",
+                "color": "#182230",
+                "alignment": "left"
+              },
+              "runs": [
+                {
+                  "index": 1,
+                  "text": "报告发送客户",
+                  "fontSize": 24,
+                  "typeface": "Microsoft YaHei",
+                  "color": "#182230",
+                  "alignment": "left"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "index": 18,
+          "row": 5,
+          "column": 2,
+          "bbox": [
+            278,
+            520,
+            190,
+            96
+          ],
+          "text": "对外动作权限",
+          "textPreview": "对外动作权限",
+          "fillColor": "#FFFFFF",
+          "paragraphs": [
+            {
+              "index": 1,
+              "text": "对外动作权限",
+              "resolvedTextStyle": {
+                "fontSize": 24,
+                "typeface": "Microsoft YaHei",
+                "color": "#182230",
+                "alignment": "left"
+              },
+              "runs": [
+                {
+                  "index": 1,
+                  "text": "对外动作权限",
+                  "fontSize": 24,
+                  "typeface": "Microsoft YaHei",
+                  "color": "#182230",
+                  "alignment": "left"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "index": 19,
+          "row": 5,
+          "column": 3,
+          "bbox": [
+            468,
+            520,
+            480,
+            96
+          ],
+          "text": "保留内部成果，明确未发送\n不因确认依据而开放外发",
+          "textPreview": "保留内部成果，明确未发送 | 不因确认依据而开放外发",
+          "fillColor": "#FFFFFF",
+          "paragraphs": [
+            {
+              "index": 1,
+              "text": "保留内部成果，明确未发送",
+              "resolvedTextStyle": {
+                "fontSize": 24,
+                "typeface": "Microsoft YaHei",
+                "color": "#182230",
+                "alignment": "left"
+              },
+              "runs": [
+                {
+                  "index": 1,
+                  "text": "保留内部成果，明确未发送",
+                  "fontSize": 24,
+                  "typeface": "Microsoft YaHei",
+                  "color": "#182230",
+                  "alignment": "left"
+                }
+              ]
+            },
+            {
+              "index": 2,
+              "text": "不因确认依据而开放外发",
+              "resolvedTextStyle": {
+                "fontSize": 24,
+                "typeface": "Microsoft YaHei",
+                "color": "#182230",
+                "alignment": "left"
+              },
+              "runs": [
+                {
+                  "index": 1,
+                  "text": "不因确认依据而开放外发",
+                  "fontSize": 24,
+                  "typeface": "Microsoft YaHei",
+                  "color": "#182230",
+                  "alignment": "left"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "index": 20,
+          "row": 5,
+          "column": 4,
+          "bbox": [
+            948,
+            520,
+            284,
+            96
+          ],
+          "text": "外部执行不支持",
+          "textPreview": "外部执行不支持",
+          "fillColor": "#FFFFFF",
+          "paragraphs": [
+            {
+              "index": 1,
+              "text": "外部执行不支持",
+              "resolvedTextStyle": {
+                "fontSize": 24,
+                "typeface": "Microsoft YaHei",
+                "color": "#B86A00",
+                "alignment": "left"
+              },
+              "runs": [
+                {
+                  "index": 1,
+                  "text": "外部执行不支持",
+                  "fontSize": 24,
+                  "typeface": "Microsoft YaHei",
+                  "color": "#B86A00",
+                  "alignment": "left"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "order": 4,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/7yt836dc",
+      "id": "4",
+      "name": "报告文件通过检查，仍可能不满足上线或签署条件。",
+      "bbox": [
+        48,
+        637,
+        1184,
+        32.4
+      ],
+      "geometry": "rect",
+      "text": "报告文件通过检查，仍可能不满足上线或签署条件。",
+      "textPreview": "报告文件通过检查，仍可能不满足上线或签署条件。",
+      "resolvedFontSize": 24,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 24,
+        "typeface": "Microsoft YaHei",
+        "color": "#1557D2",
+        "alignment": "left",
+        "verticalAlignment": "top",
+        "wrap": "none",
+        "autoFit": "none",
+        "insets": {
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "left": 0
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "报告文件通过检查，仍可能不满足上线或签署条件。"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "报告文件通过检查，仍可能不满足上线或签署条件。",
+          "resolvedTextStyle": {
+            "fontSize": 24,
+            "typeface": "Microsoft YaHei",
+            "color": "#1557D2",
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "报告文件通过检查，仍可能不满足上线或签署条件。",
+              "fontSize": 24,
+              "typeface": "Microsoft YaHei",
+              "color": "#1557D2",
+              "alignment": "left"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 5,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/mxkra1c7",
+      "id": "5",
+      "name": "来自八个办公案例的产品设计初稿。后果严重程度仍需评估，当前未实现自动风险评级。",
+      "bbox": [
+        48,
+        680,
+        1100,
+        21.6
+      ],
+      "geometry": "rect",
+      "text": "来自八个办公案例的产品设计初稿。后果严重程度仍需评估，当前未实现自动风险评级。",
+      "textPreview": "来自八个办公案例的产品设计初稿。后果严重程度仍需评估，当前未实现自动风险评级。",
+      "resolvedFontSize": 16,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 16,
+        "typeface": "Microsoft YaHei",
+        "color": "#596579",
+        "alignment": "left",
+        "verticalAlignment": "top",
+        "wrap": "none",
+        "autoFit": "none",
+        "insets": {
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "left": 0
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "来自八个办公案例的产品设计初稿。后果严重程度仍需评估，当前未实现自动风险评级。"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "来自八个办公案例的产品设计初稿。后果严重程度仍需评估，当前未实现自动风险评级。",
+          "resolvedTextStyle": {
+            "fontSize": 16,
+            "typeface": "Microsoft YaHei",
+            "color": "#596579",
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "来自八个办公案例的产品设计初稿。后果严重程度仍需评估，当前未实现自动风险评级。",
+              "fontSize": 16,
+              "typeface": "Microsoft YaHei",
+              "color": "#596579",
+              "alignment": "left"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 6,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/90vq5wvi",
+      "id": "6",
+      "name": "05",
+      "bbox": [
+        1198,
+        680,
+        34,
+        21.6
+      ],
+      "geometry": "rect",
+      "text": "05",
+      "textPreview": "05",
+      "resolvedFontSize": 16,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 16,
+        "typeface": "Microsoft YaHei",
+        "color": "#596579",
+        "alignment": "left",
+        "verticalAlignment": "top",
+        "wrap": "none",
+        "autoFit": "none",
+        "insets": {
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "left": 0
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "05"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "05",
+          "resolvedTextStyle": {
+            "fontSize": 16,
+            "typeface": "Microsoft YaHei",
+            "color": "#596579",
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "05",
+              "fontSize": 16,
+              "typeface": "Microsoft YaHei",
+              "color": "#596579",
+              "alignment": "left"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    }
+  ],
+  "composeRuns": []
+}

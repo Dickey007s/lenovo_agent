@@ -1,0 +1,66 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720" width="1280" height="720">
+  <g id="background"><rect width="1280" height="720" fill="#F7F9FC"/><text x="48" y="72" font-family="'Microsoft YaHei UI','Segoe UI',Arial,sans-serif" font-size="44" font-weight="700" fill="#172230">八个最小模块，把运行变成可持续、可验证、可控制</text><text x="48" y="112" font-family="'Microsoft YaHei UI','Segoe UI',Arial,sans-serif" font-size="18" fill="#526579">复杂能力不是默认常驻，而是按任务复杂度和风险按需装配</text></g>
+  <g id="maturity-ribbon">
+    <rect x="48" y="146" width="378" height="52" fill="#16845B"/><rect x="426" y="146" width="402" height="52" fill="#0B3A70"/><rect x="828" y="146" width="404" height="52" fill="#EAF0F7"/>
+    <text x="237" y="179" text-anchor="middle" font-family="'Microsoft YaHei UI','Segoe UI',Arial,sans-serif" font-size="18" font-weight="700" fill="#FFFFFF">固定纵切 · Limited Verified</text><text x="627" y="179" text-anchor="middle" font-family="'Microsoft YaHei UI','Segoe UI',Arial,sans-serif" font-size="18" font-weight="700" fill="#FFFFFF">协议与治理 · 已实现</text><text x="1030" y="179" text-anchor="middle" font-family="'Microsoft YaHei UI','Segoe UI',Arial,sans-serif" font-size="18" font-weight="700" fill="#526579">通用化与生产化 · Draft</text>
+  </g>
+  <g id="module-grid">
+    <rect x="48" y="218" width="282" height="142" fill="#FFFFFF" stroke="#CAD6E3"/><rect x="348" y="218" width="282" height="142" fill="#FFFFFF" stroke="#CAD6E3"/><rect x="648" y="218" width="282" height="142" fill="#FFFFFF" stroke="#CAD6E3"/><rect x="948" y="218" width="284" height="142" fill="#FFFFFF" stroke="#CAD6E3"/>
+    <rect x="48" y="380" width="282" height="142" fill="#FFFFFF" stroke="#CAD6E3"/><rect x="348" y="380" width="282" height="142" fill="#FFFFFF" stroke="#CAD6E3"/><rect x="648" y="380" width="282" height="142" fill="#FFFFFF" stroke="#CAD6E3"/><rect x="948" y="380" width="284" height="142" fill="#FFFFFF" stroke="#CAD6E3"/>
+    <rect x="48" y="218" width="8" height="142" fill="#16845B"/><rect x="348" y="218" width="8" height="142" fill="#16845B"/><rect x="648" y="218" width="8" height="142" fill="#0B3A70"/><rect x="948" y="218" width="8" height="142" fill="#0B3A70"/><rect x="48" y="380" width="8" height="142" fill="#0B3A70"/><rect x="348" y="380" width="8" height="142" fill="#0B3A70"/><rect x="648" y="380" width="8" height="142" fill="#0B3A70"/><rect x="948" y="380" width="8" height="142" fill="#D71920"/>
+    <!-- icon: tabler-outline/layout-dashboard -->
+  <g transform="translate(76, 242) scale(1.33333)" fill="none" stroke="#16845B" stroke-width="2">
+    <path d="M5 4h4a1 1 0 0 1 1 1v6a1 1 0 0 1 -1 1h-4a1 1 0 0 1 -1 -1v-6a1 1 0 0 1 1 -1" />
+    <path d="M5 16h4a1 1 0 0 1 1 1v2a1 1 0 0 1 -1 1h-4a1 1 0 0 1 -1 -1v-2a1 1 0 0 1 1 -1" />
+    <path d="M15 12h4a1 1 0 0 1 1 1v6a1 1 0 0 1 -1 1h-4a1 1 0 0 1 -1 -1v-6a1 1 0 0 1 1 -1" />
+    <path d="M15 4h4a1 1 0 0 1 1 1v2a1 1 0 0 1 -1 1h-4a1 1 0 0 1 -1 -1v-2a1 1 0 0 1 1 -1" />
+  </g><text x="124" y="266" font-family="'Microsoft YaHei UI','Segoe UI',Arial,sans-serif" font-size="22" font-weight="700" fill="#172230">Task Contract</text><text x="76" y="306" font-family="'Microsoft YaHei UI','Segoe UI',Arial,sans-serif" font-size="17" fill="#526579">目标、预算、截止时间</text><text x="76" y="334" font-family="'Microsoft YaHei UI','Segoe UI',Arial,sans-serif" font-size="15" fill="#16845B">固定路径已验证</text>
+    <!-- icon: tabler-outline/refresh -->
+  <g transform="translate(376, 242) scale(1.33333)" fill="none" stroke="#16845B" stroke-width="2">
+    <path d="M20 11a8.1 8.1 0 0 0 -15.5 -2m-.5 -4v4h4" />
+    <path d="M4 13a8.1 8.1 0 0 0 15.5 2m.5 4v-4h-4" />
+  </g><text x="424" y="266" font-family="'Microsoft YaHei UI','Segoe UI',Arial,sans-serif" font-size="22" font-weight="700" fill="#172230">Durable State</text><text x="376" y="306" font-family="'Microsoft YaHei UI','Segoe UI',Arial,sans-serif" font-size="17" fill="#526579">版本、事件、恢复</text><text x="376" y="334" font-family="'Microsoft YaHei UI','Segoe UI',Arial,sans-serif" font-size="15" fill="#16845B">Task 跨 API 证据</text>
+    <!-- icon: tabler-outline/file-search -->
+  <g transform="translate(676, 242) scale(1.33333)" fill="none" stroke="#0B3A70" stroke-width="2">
+    <path d="M14 3v4a1 1 0 0 0 1 1h4" />
+    <path d="M12 21h-5a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v4.5" />
+    <path d="M14 17.5a2.5 2.5 0 1 0 5 0a2.5 2.5 0 1 0 -5 0" />
+    <path d="M18.5 19.5l2.5 2.5" />
+  </g><text x="724" y="266" font-family="'Microsoft YaHei UI','Segoe UI',Arial,sans-serif" font-size="22" font-weight="700" fill="#172230">Context State</text><text x="676" y="306" font-family="'Microsoft YaHei UI','Segoe UI',Arial,sans-serif" font-size="17" fill="#526579">来源、活动视图、草稿</text><text x="676" y="334" font-family="'Microsoft YaHei UI','Segoe UI',Arial,sans-serif" font-size="15" fill="#0B3A70">服务端拥有事实</text>
+    <!-- icon: tabler-outline/bolt -->
+  <g transform="translate(976, 242) scale(1.33333)" fill="none" stroke="#0B3A70" stroke-width="2">
+    <path d="M13 3l0 7l6 0l-8 11l0 -7l-6 0l8 -11" />
+  </g><text x="1024" y="266" font-family="'Microsoft YaHei UI','Segoe UI',Arial,sans-serif" font-size="22" font-weight="700" fill="#172230">Execution Loop</text><text x="976" y="306" font-family="'Microsoft YaHei UI','Segoe UI',Arial,sans-serif" font-size="17" fill="#526579">Observe 到 Commit</text><text x="976" y="334" font-family="'Microsoft YaHei UI','Segoe UI',Arial,sans-serif" font-size="15" fill="#0B3A70">渐进阶段可见</text>
+    <!-- icon: tabler-outline/users-group -->
+  <g transform="translate(76, 404) scale(1.33333)" fill="none" stroke="#0B3A70" stroke-width="2">
+    <path d="M10 13a2 2 0 1 0 4 0a2 2 0 0 0 -4 0" />
+    <path d="M8 21v-1a2 2 0 0 1 2 -2h4a2 2 0 0 1 2 2v1" />
+    <path d="M15 5a2 2 0 1 0 4 0a2 2 0 0 0 -4 0" />
+    <path d="M17 10h2a2 2 0 0 1 2 2v1" />
+    <path d="M5 5a2 2 0 1 0 4 0a2 2 0 0 0 -4 0" />
+    <path d="M3 13v-1a2 2 0 0 1 2 -2h2" />
+  </g><text x="124" y="428" font-family="'Microsoft YaHei UI','Segoe UI',Arial,sans-serif" font-size="22" font-weight="700" fill="#172230">Capability Runtime</text><text x="76" y="468" font-family="'Microsoft YaHei UI','Segoe UI',Arial,sans-serif" font-size="17" fill="#526579">单 Agent、固定流、Swarm</text><text x="76" y="496" font-family="'Microsoft YaHei UI','Segoe UI',Arial,sans-serif" font-size="15" fill="#0B3A70">按需路由</text>
+    <!-- icon: tabler-outline/file-check -->
+  <g transform="translate(376, 404) scale(1.33333)" fill="none" stroke="#0B3A70" stroke-width="2">
+    <path d="M14 3v4a1 1 0 0 0 1 1h4" />
+    <path d="M17 21h-10a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2" />
+    <path d="M9 15l2 2l4 -4" />
+  </g><text x="424" y="428" font-family="'Microsoft YaHei UI','Segoe UI',Arial,sans-serif" font-size="22" font-weight="700" fill="#172230">Evidence Verifier</text><text x="376" y="468" font-family="'Microsoft YaHei UI','Segoe UI',Arial,sans-serif" font-size="17" fill="#526579">来源、冲突、质量检查</text><text x="376" y="496" font-family="'Microsoft YaHei UI','Segoe UI',Arial,sans-serif" font-size="15" fill="#0B3A70">不让模型自证</text>
+    <!-- icon: tabler-outline/shield-check -->
+  <g transform="translate(676, 404) scale(1.33333)" fill="none" stroke="#0B3A70" stroke-width="2">
+    <path d="M11.46 20.846a12 12 0 0 1 -7.96 -14.846a12 12 0 0 0 8.5 -3a12 12 0 0 0 8.5 3a12 12 0 0 1 -.09 7.06" />
+    <path d="M15 19l2 2l4 -4" />
+  </g><text x="724" y="428" font-family="'Microsoft YaHei UI','Segoe UI',Arial,sans-serif" font-size="22" font-weight="700" fill="#172230">Control Policy</text><text x="676" y="468" font-family="'Microsoft YaHei UI','Segoe UI',Arial,sans-serif" font-size="17" fill="#526579">风险、审批、Permit</text><text x="676" y="496" font-family="'Microsoft YaHei UI','Segoe UI',Arial,sans-serif" font-size="15" fill="#0B3A70">副作用前置控制</text>
+    <!-- icon: tabler-outline/server-2 -->
+  <g transform="translate(976, 404) scale(1.33333)" fill="none" stroke="#D71920" stroke-width="2">
+    <path d="M3 7a3 3 0 0 1 3 -3h12a3 3 0 0 1 3 3v2a3 3 0 0 1 -3 3h-12a3 3 0 0 1 -3 -3v-2" />
+    <path d="M3 15a3 3 0 0 1 3 -3h12a3 3 0 0 1 3 3v2a3 3 0 0 1 -3 3h-12a3 3 0 0 1 -3 -3l0 -2" />
+    <path d="M7 8l0 .01" />
+    <path d="M7 16l0 .01" />
+    <path d="M11 8h6" />
+    <path d="M11 16h6" />
+  </g><text x="1024" y="428" font-family="'Microsoft YaHei UI','Segoe UI',Arial,sans-serif" font-size="22" font-weight="700" fill="#172230">Trace / Checkpoint</text><text x="976" y="468" font-family="'Microsoft YaHei UI','Segoe UI',Arial,sans-serif" font-size="17" fill="#526579">可审计序列与状态指纹</text><text x="976" y="496" font-family="'Microsoft YaHei UI','Segoe UI',Arial,sans-serif" font-size="15" fill="#D71920">跨实例仍待验证</text>
+  </g>
+  <g id="projection"><rect x="48" y="558" width="1184" height="84" fill="#172230"/><text x="72" y="592" font-family="'Microsoft YaHei UI','Segoe UI',Arial,sans-serif" font-size="18" font-weight="700" fill="#16845B">前台原则</text><text x="72" y="624" font-family="'Microsoft YaHei UI','Segoe UI',Arial,sans-serif" font-size="24" font-weight="700" fill="#FFFFFF">用户只看可读业务状态；每个状态都回指 Snapshot、Event、Artifact 或 Receipt。</text></g>
+  <g id="footer"><text x="48" y="690" font-family="'Microsoft YaHei UI','Segoe UI',Arial,sans-serif" font-size="14" fill="#8291A3">成熟度随证据范围标记，不能从固定纵切外推通用能力</text><text x="1232" y="690" text-anchor="end" font-family="Consolas,'Courier New',monospace" font-size="16" fill="#0B3A70">P04</text></g>
+</svg>

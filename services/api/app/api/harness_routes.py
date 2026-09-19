@@ -17,6 +17,8 @@ from services.api.app.application.harness_runtime import (
     HarnessError,
     HarnessNotFoundError,
     HarnessRunStart,
+    HarnessContinuationRequest,
+    HarnessReadonlyWorkersRequest,
     HarnessRuntime,
 )
 from services.api.app.application.benchmark_scenario_catalog import BenchmarkScenarioError
@@ -88,6 +90,52 @@ async def start_harness_run(
         raise HTTPException(status_code=503, detail="办公资料库完整性校验失败") from exc
 
 
+@router.post("/runs/{run_id}/continue", status_code=status.HTTP_202_ACCEPTED)
+async def continue_harness_task(
+    run_id: str,
+    body: HarnessContinuationRequest,
+    owner_id: Annotated[str, Depends(harness_owner)],
+    runtime: Annotated[HarnessRuntime, Depends(get_harness_runtime)],
+):
+    """Create a new Run for exactly one unfinished Branch of a terminal task."""
+    try:
+        result = await runtime.continue_unfinished_task(
+            owner_id,
+            run_id,
+            body.branch_id,
+            idempotency_key=body.idempotency_key,
+            expected_version=body.expected_version,
+            expected_task_version=body.expected_task_version,
+            instruction=body.instruction,
+            loop=body.loop,
+        )
+        return runtime.public_start_result(result)
+    except HarnessNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except HarnessConflictError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except HarnessError as exc:
+        raise HTTPException(status_code=503, detail="任务台账事务暂时无法提交") from exc
+
+
+@router.get("/tasks/{task_id}")
+async def get_harness_task(
+    task_id: str,
+    owner_id: Annotated[str, Depends(harness_owner)],
+    runtime: Annotated[HarnessRuntime, Depends(get_harness_runtime)],
+):
+    """Return only the caller's server-owned task pointer."""
+    try:
+        # owner_id is an authorization input, not public task content.
+        return (await runtime.get_task(owner_id, task_id)).model_dump(
+            mode="json", exclude={"owner_id"}
+        )
+    except HarnessNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except HarnessError as exc:
+        raise HTTPException(status_code=503, detail="任务台账完整性暂时无法确认") from exc
+
+
 @router.get("/runs")
 async def list_harness_runs(
     owner_id: Annotated[str, Depends(harness_owner)],
@@ -96,6 +144,30 @@ async def list_harness_runs(
 ):
     snapshots = await runtime.list(owner_id)
     return {"runs": [runtime.public_snapshot(item) for item in snapshots[:limit]]}
+
+
+@router.post("/runs/{run_id}/workers", status_code=status.HTTP_202_ACCEPTED)
+async def execute_harness_workers(
+    run_id: str,
+    body: HarnessReadonlyWorkersRequest,
+    owner_id: Annotated[str, Depends(harness_owner)],
+    runtime: Annotated[HarnessRuntime, Depends(get_harness_runtime)],
+):
+    """Execute explicitly confirmed, admitted read-only Branch workers."""
+    try:
+        snapshot = await runtime.execute_admitted_workers_from_branches(
+            owner_id,
+            run_id,
+            branch_ids=body.branch_ids,
+            expected_version=body.expected_version,
+            idempotency_key=body.idempotency_key,
+            user_confirmed=body.confirmed,
+        )
+        return runtime.public_snapshot(snapshot)
+    except HarnessNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except HarnessConflictError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
 
 
 @router.get("/runs/{run_id}")

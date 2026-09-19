@@ -1,10 +1,27 @@
 # Office Agent V0.2 API
 
+## 2026-09-12 boundary projection clarification
+
+[DR-0063](decisions/DR-0063-integrated-copilot-boundaries-and-swarm-facts.md) adds no path, operation,
+control kind or permission. `decision` remains a scoped evidence/decision record; `/workers` remains
+explicit bounded read-only dispatch; terminal `/continue` remains separate. Browser boundary notices
+do not issue business approvals, risk grades or external-action receipts. Worker calls, contributions,
+artifact verification and business gates remain independent facts.
+
+## 2026-09-11 projection clarification
+
+[DR-0061](decisions/DR-0061-reference-aligned-capabilities-and-evidence-choice.md) adds no operation.
+The redesigned UI retains start/control/continue/worker/version contracts. Evidence choices bind exact
+`resolution_id` and authoritative top-level `decision_request_id/source_revision`; different resolutions
+of one Finding are not interchangeable. The existing `stale` request state must not be displayed as
+pending. On a terminal Run, `decision(accept)` records a preserved choice, not a child Run; `/continue`
+remains a separate explicit action. A missing response is an unknown outcome, not proof of no write.
+
 Base URL: `http://localhost:8010`.
 
 ## 1. Public surface
 
-OpenAPI exposes nine paths and ten operations:
+OpenAPI exposes twelve paths and thirteen operations:
 
 | Method | Path | Purpose |
 | --- | --- | --- |
@@ -14,6 +31,9 @@ OpenAPI exposes nine paths and ten operations:
 | POST | `/v1/harness/runs` | start an idempotent Agent Control Loop or an explicit isolated test action |
 | GET | `/v1/harness/runs?limit=10` | list recent Owner-scoped Runs for recovery |
 | GET | `/v1/harness/runs/{run_id}` | Owner-scoped public Snapshot |
+| GET | `/v1/harness/tasks/{task_id}` | Owner-scoped current Task pointer and sanitized Run lineage |
+| POST | `/v1/harness/runs/{run_id}/continue` | create a child Run for exactly one unfinished Branch of a terminal Run |
+| POST | `/v1/harness/runs/{run_id}/workers` | explicitly confirm and run one admitted read-only Worker wave |
 | GET | `/v1/harness/runs/{run_id}/artifacts/{artifact_id}` | Owner-scoped download of one verified Run Workspace file |
 | POST | `/v1/harness/runs/{run_id}/controls` | versioned, idempotent pause/resume/steer/stop/rollback |
 | POST | `/v1/harness/runs/{run_id}/action-controls` | versioned single-action confirm/revise/defer/cancel/undo |
@@ -22,26 +42,35 @@ OpenAPI exposes nine paths and ten operations:
 The former Scenario list/detail/preview routes and legacy
 workspace/thread/task/Demo prefixes are not mounted.
 
+`/agent-capabilities` is a browser route only. It composes the existing workspace,
+Run, Task and evidence-preview facts and adds no API path. The future Demo 2 smart
+work cockpit has no task-queue, priority, route-dispatch or return-to-cockpit
+contract in this API and must not be inferred from `topology_admission` alone.
+
 ## 2. Owner and persistence
 
-Run endpoints use `X-User-Id`; omission uses `demo_user`. This unsigned header
+Run and Task endpoints use `X-User-Id`; omission uses `demo_user`. This unsigned header
 is a demonstration Owner placeholder, not production authentication. Missing
 and wrong-owner Runs both return 404 before the SSE response is created.
 
-There are ten operations over nine OpenAPI paths because `GET` and `POST`
-share `/runs`. With `DATABASE_DSN`, accepted Run snapshots, start/control
-idempotency receipts, ArtifactVersions and TaskCommits are stored in
-PostgreSQL; the latter two are independent append-only rows. Verified Run
+There are thirteen operations over twelve OpenAPI paths because `GET` and `POST`
+share `/runs`. `STATE_STORE_MODE` accepts `auto`, `memory` or `postgres`.
+`auto` uses PostgreSQL when `DATABASE_DSN` is non-empty and otherwise memory;
+`memory` explicitly ignores a stale DSN, while `postgres` without a DSN fails
+startup. With PostgreSQL selected, accepted Run snapshots, the minimal Task
+Ledger, Task continuation receipts, start/control idempotency receipts,
+ArtifactVersions and TaskCommits are stored in PostgreSQL; the latter two are
+independent append-only rows. Initial start and continuation use one State Store
+aggregate commit for the Task/current pointer, Run and idempotency facts. Verified Run
 Workspace file metadata remains in the Snapshot, while the bytes live in the
 isolated server Artifact store and are rechecked on download. On startup, an
 interrupted nonterminal Run is rolled back to completed rounds, receives
 `checkpoint_recovered` and pauses; an in-flight provider request is never
 automatically replayed. In-flight HTTP requests, asyncio tasks and conditions
-remain process-local. Without `DATABASE_DSN`, the state store is memory and all
-Run state disappears on restart. Explicit single-action Runs restore their saved
+remain process-local. In memory mode all Run state disappears on restart. Explicit single-action Runs restore their saved
 Snapshot without loop recovery or action replay.
 
-### Single-action test records (DR-0053)
+### Single-action test records (DR-0064)
 
 `POST /runs` optionally accepts `action`, with required `operation` and `title`,
 and optional `content`, `target`, `due_date` (ISO date), `source_ref` (safe file ref).
@@ -198,6 +227,14 @@ accept `selected_file_refs`: the server freezes the complete allowlisted input
 index and the Planner autonomously selects a bounded evidence set for each
 round. Sending a client-owned file scope is rejected as an unknown field.
 
+If the instruction includes one of the supported explicit requirement markers
+and a contiguous `1..N` numbered list (`2 <= N <= 12`), the Planner candidate
+must account for every item as `planned`, `deferred` or `uncovered`. This is a
+bounded syntax, not a general natural-language requirement compiler. The
+private coverage table is never returned directly; the public Plan separates
+current `units[]`, approved-source `deferred_requirements[]` and no-source
+`uncovered_requirements[]`.
+
 `loop` is optional and defaults to the values above. Bounds are 1-24 rounds,
 1-24 files per round, 2-60 model calls and 20-14400 seconds. The server freezes
 these values plus `scope_mode=whole_workspace` and all stable input refs into
@@ -211,18 +248,175 @@ The response is `202 Accepted` with `{"run": snapshot, "replayed": false}`.
 Reusing the same Owner/key/request returns the original start result with
 `replayed=true`. Reusing that key for different content returns 409.
 
+The browser's “新建任务” action adds no API operation. It first creates only a
+local blank-draft state and sends no request. The independent server Task exists
+only when this endpoint accepts the submitted instruction. Leaving the prior Run
+view does not call pause/stop/delete; identical text submitted after another
+explicit new-task action uses a new idempotency key, while an unresolved retry of
+the same start attempt keeps its original key.
+
 `GET /v1/harness/runs?limit=10` returns `{"runs": [...]}` ordered by the
 latest server update. It is Owner-scoped and exists so a browser without local
 session state can discover a recoverable nonterminal Run. The client must still
 GET the selected Run and reconnect SSE from its authoritative sequence.
 
+The current browser requests `limit=20` for a bounded task-conversation drawer
+and groups those returned Snapshots by `task_id`. This is not a Task-list or
+unlimited-history contract. Before labeling any opened record current, the
+browser calls `GET /v1/harness/tasks/{task_id}` and compares `current_run_id`;
+historical Runs are GET-only, while only a confirmed current nonterminal Run may
+open `/events?after=last_event_sequence`.
+
+### 5.1 在同一 Task 下继续一条未完成 Branch
+
+```http
+POST /v1/harness/runs/{run_id}/continue
+X-User-Id: demo_user
+Content-Type: application/json
+```
+
+```json
+{
+  "branch_id": "branch-0123456789ab",
+  "idempotency_key": "continue-client-generated-key",
+  "expected_version": 41,
+  "expected_task_version": 3,
+  "instruction": "继续核对这条未完成工作线",
+  "loop": {
+    "max_rounds": 12,
+    "max_files_per_round": 16,
+    "max_model_calls": 30,
+    "deadline_seconds": 7200
+  }
+}
+```
+
+该命令不是恢复旧 Run。旧 Run 必须是 `completed/stopped/failed`，所选 Branch
+必须存在且未完成。服务端再次校验 Owner、旧 Run 当前版本、Task 当前版本、Branch 归属、幂等键、
+基线 Artifact/Commit 与当前 Workspace revision，然后创建一个 `version=1` 的 child Run。
+`expected_version` 保护 parent Run；`expected_task_version` 保护跨 Run 的 current pointer。
+任一过期都返回 409，不创建 child，也不更新 Task、Event、Artifact 或 Commit。相同
+Owner/key/payload 重试返回同一 child；同 key 不同 payload 返回 409。
+child 与父 Run 共享 `task_id`，并记录 `run_sequence`、`parent_run_id`、
+`carried_branch_id`、`base_artifact_version`、`base_task_commit`、
+`workspace_revision`、`recheck_file_refs` 和 `source_revision_changed`。
+
+child 的权威目标来自旧 Branch objective；请求中的 `instruction` 不能扩大来源范围。
+首轮只读取该 Branch 的 `missing_file_refs`，没有缺失列表时使用其批准输入。相同
+Owner/key/请求返回同一个 child 且 `replayed=true`；旧版本、完成 Branch、错 Owner
+或同 key 不同内容返回冲突/未找到。父 Snapshot、Event、ArtifactVersion 与 TaskCommit
+保持不变。
+
+### 5.2 查询 Task 当前 Run 与历史
+
+```http
+GET /v1/harness/tasks/{task_id}
+X-User-Id: demo_user
+```
+
+代表性响应：
+
+```json
+{
+  "task_id": "task-0123456789ab",
+  "task_version": 4,
+  "current_run_id": "harness:...",
+  "run_sequence": 4,
+  "parent_run_id": "harness:...",
+  "workspace_revision": "345c1ec1487139db9dd319787fa9405ba85d1869",
+  "status": "completed",
+  "current_artifact_id": "artifact-...",
+  "current_artifact_version": 2,
+  "current_commit_id": "commit-...",
+  "lineage": [
+    {
+      "run_id": "harness:...",
+      "run_sequence": 1,
+      "parent_run_id": null,
+      "status": "stopped",
+      "created_at": "2026-08-31T02:00:00Z",
+      "updated_at": "2026-08-31T02:05:00Z"
+    }
+  ],
+  "lineage_total": 4,
+  "lineage_truncated": false
+}
+```
+
+Task record 只持有需要 CAS 的最小 current pointer；`status`、当前 Artifact/Commit 和
+lineage 来自它指向的 Run 记录，不在 Task 表复制。响应最多返回最近 100 条 lineage，
+`lineage_total/lineage_truncated` 明确是否省略更早记录。错误 Owner 与不存在 Task 使用
+相同 404。Task record 缺失但 Run 存在、current Run 缺失或 current 身份/版本不一致时
+返回 503，不合成 `unknown` 或按更新时间猜选。GET 不做临时 backfill；旧数据只在
+Runtime setup 时通过连续 sequence、无 parent 的根 Run 和完整 parent 链保守迁移，链路
+损坏会在 setup 阶段 fail closed。
+
+### 5.3 确认并执行一批受限只读 Worker
+
+```http
+POST /v1/harness/runs/{run_id}/workers
+X-User-Id: demo_user
+Content-Type: application/json
+```
+
+```json
+{
+  "branch_ids": ["branch-0123456789ab", "branch-fedcba987654"],
+  "idempotency_key": "workers-client-generated-key",
+  "expected_version": 18,
+  "confirmed": true
+}
+```
+
+只有当前 Snapshot 的 `topology_admission.mode=adaptive_readonly_workers`、Run 非终态、
+用户明确 `confirmed=true` 且 Branch 为服务端 ready 时才可派发。`branch_ids` 可省略；
+此时服务端使用最新 `ready_branch_ids`，每批最多三个。每个 Worker 只获得自己的
+Branch objective 和批准 `input_file_refs`。模型调用预算在派发前进入版本化 Snapshot；
+预算不足、依赖未完成、重复 Branch、旧版本或越界来源全部拒绝，且不会部分派发。
+`ready_branch_ids=[]` 时前台不得提供 Worker 动作；普通
+`candidate_branch_ids` 或显式延后 Branch 只能走单 Branch control resume。
+
+Worker 返回不等于采用。Runtime 记录兼容投影 `worker_runs[]`，同时把完整 Branch DAG
+一对一投影为独立 `work_units[]`，并把每次返回追加为不可变 `contributions[]`。WorkUnit
+只记录执行状态、attempt、依赖、批准来源与候选指针；Branch 继续拥有业务目标和
+Evidence Gate。服务端按来源范围、Evidence Anchor、Branch 与适用 narrative
+reconciliation 形成 `adopted/ambiguous/rejected/failed`。
+只有 adopted findings 进入新的普通 `artifact_versions[]` 和 `commits[]`；
+`shared_artifacts[]` 保存本批 adopted/waiting/failed 回执。一个失败 Branch 不清空其他
+已采用贡献。相同幂等键和相同 payload 只回放原 reservation；相同键配变化 payload
+冲突。模型调用前必须先持久化 `reserved` WorkUnit、预算和
+`worker_wave_reserved`。返回后依次投影 `work_unit_started`、
+`contribution_recorded`、采用/等待/失败和 `worker_wave_committed`。
+
+PostgreSQL 重启保留 validated Branch DAG、TopologyAdmission、已完成 Contribution 和
+ArtifactVersion；未确认返回的在途 WorkUnit 变为
+`checkpoint_recovered_in_flight_worker`，绝不自动重放。只有新的幂等键、当前 Run
+version 和原 Branch 批准来源可以显式重试该目标单元。公共 WorkUnit 不含 Owner、
+reservation id 或内部 error；公共 Contribution 不含 raw Run/Catalog revision。当前实现
+是单 API 进程内的有界 Analyst Worker 台账，不是队列、lease 或分布式 Worker Runtime。
+
 ## 6. Public Snapshot
 
 Important fields:
 
+`owner_id` is private authorization state and is never part of this public
+model, Run GET, Run list or SSE JSON. WorkUnit/Contribution public projections
+also remove reservation identifiers and raw source revisions.
+
 ```json
 {
   "run_id": "harness:...",
+  "task_id": "task-0123456789ab",
+  "task_version": 2,
+  "run_sequence": 2,
+  "parent_run_id": "harness:...",
+  "continuation_reason": "继续未完成任务",
+  "carried_branch_id": "branch-0123456789ab",
+  "base_artifact_version": 1,
+  "base_task_commit": "commit-0123456789ab",
+  "workspace_revision": "345c1ec1487139db9dd319787fa9405ba85d1869",
+  "recheck_file_refs": ["forte-..."],
+  "source_revision_changed": false,
   "workspace_id": "forte-public-office",
   "status": "completed",
   "version": 22,
@@ -271,6 +465,48 @@ Important fields:
   "control_events": [],
   "decision_requests": [],
   "decision_records": [],
+  "topology_admission": {
+    "mode": "fixed_workflow",
+    "work_unit_breadth": 3,
+    "independent_branch_count": 3,
+    "source_span": 3,
+    "remaining_model_calls": 27,
+    "remaining_time_seconds": 7190,
+    "external_action": "none",
+    "reasons": ["多个独立工作包来自同一目录/职能，先用固定流程避免把同源拆成伪并行。"],
+    "user_confirmation_required": false
+  },
+  "worker_runs": [],
+  "work_units": [
+    {
+      "work_unit_id": "branch-0123456789ab",
+      "branch_id": "branch-0123456789ab",
+      "unit_id": "verify-revenue",
+      "depends_on": [],
+      "approved_file_refs": ["forte-..."],
+      "state": "adopted",
+      "attempt": 1,
+      "version": 6,
+      "latest_contribution_id": "contribution-0123456789ab",
+      "status_reason": null
+    }
+  ],
+  "contributions": [
+    {
+      "contribution_id": "contribution-0123456789ab",
+      "work_unit_id": "branch-0123456789ab",
+      "branch_id": "branch-0123456789ab",
+      "attempt": 1,
+      "worker_run_id": "worker-0123456789ab",
+      "approved_file_refs": ["forte-..."],
+      "evidence_anchors": [],
+      "gate_status": "adopted",
+      "gate_reason": "服务端来源、定位与分支证据门通过",
+      "artifact_version": 1,
+      "summary": "已形成一份候选并进入阶段成果"
+    }
+  ],
+  "shared_artifacts": [],
   "workspace_artifacts": [
     {
       "artifact_id": "workspace-artifact-0123456789ab",
@@ -396,7 +632,16 @@ Important fields:
   "plan": {
     "summary": "...",
     "selection_reason": "为什么本轮选择这些文件",
-    "units": []
+    "units": [],
+    "deferred_requirements": [
+      {
+        "title": "搜索 Agent 运行可靠性",
+        "objective": "核对运行可靠性并给出来源。",
+        "reason": "已有批准来源，但本轮文件预算未能完整纳入。",
+        "candidate_file_refs": ["forte-..."]
+      }
+    ],
+    "uncovered_requirements": []
   },
   "model_receipt": {
     "called": true,
@@ -557,6 +802,10 @@ index. They are not the files read by the Analyst. The authoritative per-round
 evidence scope is `rounds[].input_file_refs`, and the public reason is
 `rounds[].plan.selection_reason`. The server compiler caps the union of those
 refs at `max_files_per_round` before any file content reaches the Analyst.
+For an explicit numbered requirement contract, a whole root unit removed by
+that cap becomes a public deferred requirement with a waiting Branch rather
+than disappearing. Internal `requirement_coverage` and
+`planner_search_hint` remain private Planner/compiler data.
 
 `branches[]` is the server-owned projection of validated plan units. Branch
 identity, dependency, verified/missing refs and status are not model-owned UI
@@ -603,6 +852,17 @@ their affected Branches wait. If no Finding can be adopted, the round is still
 preserved with `recovery_kind=source_location`. Repeated schema failures use
 `analysis_output`. Scope or integrity violations still fail closed.
 
+The production Analyst call has its own configurable timeout, default 180
+seconds, and requests at most 12,000 output tokens. Its strict draft schema does
+not accept server-owned IDs, Branch bindings, anchors or resolutions. The prompt
+asks for at most two candidate Findings per root unit and one per dependent
+unit, with a prompt-level maximum of 24; the public/server result contract still
+allows 96 and accepted Findings are never silently truncated. Length exhaustion,
+invalid JSON, schema mismatch and Provider timeout/response errors emit
+`analysis_structure_rejected` with a classified `failure_kind`; Branch binding
+and source-location failures use `analysis_validation_rejected`. Both paths
+allow at most one bounded repair.
+
 After resolution, the Runtime may omit a Finding when every verified `observed`
 month/day lies outside an explicit Chinese date window in the original instruction;
 it emits `analysis_scope_filtered`. A model-proposed human review without an exact
@@ -622,10 +882,11 @@ the current Run and resumes only the affected waiting Branch.
 `recovery_kind` does not imply that every Run is resumable. When the same
 recoverable gap reaches `status=stopped` with `next_step.decision=budget_exhausted`,
 the old Run is terminal and must not receive `resume` or `steer`. The client may
-use one ID from `candidate_branch_ids`, the matching Branch objective and optional
-user direction to POST a new whole-workspace Run. Prior Branches, receipts and
-ArtifactVersions remain on the old Snapshot; the new Planner autonomously selects
-and validates evidence again rather than inheriting the old file set as authority.
+use one ID from `candidate_branch_ids` and POST `/runs/{run_id}/continue`. Prior
+Branches, receipts and ArtifactVersions remain on the old Snapshot; the child Run
+keeps the same `task_id`, uses the matching Branch objective as authority and
+rechecks exactly that Branch's missing/approved refs. Optional user direction
+cannot widen the service-owned source scope.
 
 For a nonterminal Gap, the client derives its recovery sheet only from the latest
 Snapshot: `next_step.recovery_kind`, the bound Branch objective/status and refs,
@@ -775,12 +1036,18 @@ Content-Type: application/json
 }
 ```
 
-Commands are `pause`, `resume`, `steer`, `stop`, `rollback` and `decision`.
+Commands are `pause`, `resume`, `steer`, `stop`, `rollback`, `decision` and
+`topology_override`.
 `steer` requires an instruction and applies only to the next round. Pause and
 stop are accepted immediately but applied only at a safe point between model
 calls. A stale version, illegal transition or same key with different content
 returns 409. An identical replay returns the first control result with
 `replayed=true`.
+
+`topology_override` 只在 `waiting_input` 且当前准入为
+`adaptive_readonly_workers` 时合法，并且只允许携带
+`"topology_mode":"single_controller"`。它复用已经保存和校验的 Plan，在同一 Run
+中走保守单 Controller 路径；不会再次调用 Planner，也不会启动 Worker。
 
 Human decisions use the same version/idempotency rules:
 
@@ -830,6 +1097,13 @@ allowlisted intent into owned effect/gate semantics, then validates unit IDs,
 dependencies, source refs, tools, logical artifacts and human gates. Raw
 candidate fields and compiler errors are not public facts.
 
+For the bounded explicit-numbered syntax, the validator also requires every
+index once, one unique root unit for each `planned` item, real allowlisted refs
+for each `deferred` item and no refs for `uncovered`. Dependent summary units
+must contain the union of their direct predecessors' sources. The compiler may
+defer a complete root unit to satisfy the round file cap; it does not split that
+business requirement or silently erase it.
+
 A plan that fails structure or deterministic validation is marked `未采用`.
 The server permits at most one repair attempt, only when the same Loop budget
 still has a model call and time available. Both attempts consume the budget and
@@ -855,7 +1129,18 @@ round_started
 planning_started
 planning_completed
 plan_validation_rejected (optional, followed by one retry)
+topology_admission
 plan_validation
+topology_confirmation_required (adaptive route stops here until confirmation)
+control_topology_override_recorded (optional conservative user choice)
+worker_wave_reserved (WorkUnit reservation and budget committed before dispatch)
+work_unit_started (one per actually started WorkUnit)
+worker_returned (one per confirmed Worker)
+contribution_recorded (immutable candidate appended)
+contribution_adopted / contribution_waiting / contribution_rejected
+work_unit_failed (failed or checkpoint-recovered WorkUnit)
+worker_wave_committed (Snapshot, WorkUnit, Contribution and result projection reconciled)
+topology_workers_completed
 deterministic_office_tool_started (when one fixed local capability is admitted)
 run_workspace_artifact_written (for each isolated file)
 deterministic_verification_completed (after all deterministic checks)
@@ -882,7 +1167,18 @@ branch_resumed_from_checkpoint (when only one recovery Branch continues)
 round_started
 planning_started
 planning_completed
+topology_admission
 plan_validation
+topology_confirmation_required (only for adaptive_readonly_workers)
+control_topology_override_recorded (optional conservative user choice)
+worker_wave_reserved
+work_unit_started
+worker_returned (one per confirmed Worker)
+contribution_recorded
+contribution_adopted / contribution_waiting / contribution_rejected
+work_unit_failed
+worker_wave_committed
+topology_workers_completed
 analysis_started
 analysis_completed
 result_validation
@@ -899,10 +1195,13 @@ SSE remain available. `scenario_effect_failed` records a builder/verifier
 failure before the Run fail-closed path; it does not create an Artifact or an
 EffectReceipt.
 
-The worker thread receives only bytes and safe previews frozen from the
+The fixed-capability worker thread receives only bytes and safe previews frozen from the
 allowlisted Catalog before dispatch. It is not a durable execution lease: an
 API process restart cannot resume an in-flight subprocess, and PostgreSQL
-recovery still pauses at the existing checkpoint rather than replaying it.
+recovery still pauses at the existing checkpoint rather than replaying it. This
+is separate from DR-0055's read-only Analyst WorkUnit ledger: a committed Analyst
+Worker reservation preserves its Branch DAG and becomes an explicit recoverable
+failed unit, but is likewise never auto-replayed.
 
 TC-12 uses the same Artifact and EffectReceipt protocol rather than adding a
 Scenario API. A matching ordinary instruction may produce two downloadable
@@ -964,6 +1263,9 @@ reconciliation; a nonterminal interruption uses GET plus `after=N` recovery.
 | preview 503 | selected byte failed integrity/safe parsing | never show stale/partial content |
 | Run/SSE 404 | missing or wrong Owner | same public response; clear stale Run |
 | start 409 | idempotency/contract conflict | preserve instruction/selection and reconcile |
+| Task GET 404 | Task missing or wrong Owner | same public response; do not reveal Task ownership |
+| Task GET 503 | Task/current Run/lineage integrity or durable read failed | keep the rendered Run, show explicit retry; never synthesize a current pointer |
+| continuation 409 | parent Run or Task version changed, Branch no longer eligible, or idempotency conflicts | keep the parent/SSE generation, refresh Task and Run, then open the authoritative current Run or retry from current facts |
 | control 409 | stale version or illegal transition | GET current Snapshot; preserve command draft and let the user retry |
 | decision 409 | Finding/Resolution/Branch binding is stale, or option/candidate is not owned by that record | GET current Snapshot; keep the user's feedback draft and choose from current facts |
 | branch control 409 | selected Branch is missing, no longer waiting or outside the current Gate | GET current Snapshot and choose a still-waiting Branch |
@@ -974,7 +1276,7 @@ reconciliation; a nonterminal interruption uses GET plus `after=N` recovery.
 | passed `workspace_artifacts[]` plus `status=waiting_input` | deterministic outcome is downloadable, while Analyst audit location remains unresolved | show outcome first and group only same-source/same-failure gaps in the browser; do not change Snapshot Branches or claim `completed` |
 | `next_step.recovery_kind=source_location` | legal-scope candidate could not be uniquely mapped to safe Preview | for unavailable: show one recommended Branch retry with optional details collapsed; for ambiguous: require one explicit candidate choice before accept |
 | `next_step.recovery_kind=analysis_output` | provider responded twice without a usable public result structure | keep raw output hidden; show one recommended minimal-Branch retry, optional feedback or stop |
-| `checkpoint_recovered` | server restored a PostgreSQL Snapshot and paused | reconcile the trace; explicitly resume from the safe checkpoint |
+| `checkpoint_recovered` | server restored a PostgreSQL Snapshot and paused; a committed Worker reservation preserves its Branch DAG and marks only the unconfirmed WorkUnit as recovered failed | reconcile the trace; ordinary rounds resume from the safe checkpoint, while a recovered Worker unit requires a new idempotency key and current version for explicit target-only retry |
 | `loop_budget_stopped` | round/call/active deadline prevents another step; `budget.stop_reason` names the actual boundary | show the precise Chinese reason, bounded brief, preserved facts and candidate Branches; create a new Branch-scoped task instead of resuming the terminal Run |
 | `status=failed` | model/schema/plan/source/citation validation failed | show safe business error and no result |
 

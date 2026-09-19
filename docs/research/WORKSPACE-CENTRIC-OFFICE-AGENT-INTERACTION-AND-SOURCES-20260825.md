@@ -136,6 +136,7 @@ Codex 和 Claude Code 仍在持续迭代，也可以扩展。本文不声称它�
 | 计划已接受 | 可读的有序工作计划 | 服务端编译并校验的 Plan | 原始 effect/gate 标识 |
 | 结果可复核 | 初步结论、引用按钮、复核提醒及 Agent 下一步建议 | 引用属于冻结 `file_ref` 的校验结果；建议属于终态 Snapshot | 正确性、外部动作或建议已执行的声明 |
 | 人确认下一轮 | “确认并启动”与新 Run 状态 | 独立 POST Run 的新 `run_id` 与幂等键 | 不把建议卡冒充后台自动执行 |
+| 同一 Task 继续一条未完成工作线 | 当前/历史 Run、旧成果保留、重核来源、冲突后打开当前 Run | Task GET、`task_version` + parent `run.version`、原子 Task/Run/receipt | 不把当前指针写成 WorkUnit queue、多实例调度或无限会话 |
 | 事件流中断 | 重连中和重试入口 | Transport 事实与最后 sequence | 补造的进度 |
 | 完整性异常 | 明确的来源异常与安全停止 | Catalog 控制的 503 | 部分或陈旧目录 |
 
@@ -150,6 +151,8 @@ Codex 和 Claude Code 仍在持续迭代，也可以扩展。本文不声称它�
 - 用户只提交原创目标；Agent 读取全库公共索引并自主选择逐轮证据；
 - 服务端按轮次限制文件正文、编译计划、校验模型回执、有序事件和引用；
 - 终态产生最多四项下一步建议，人确认后才启动独立新 Run；
+- 一个最小 owner-scoped Task Ledger：current Run 指针、Task/Run 双版本、同 Task child
+  lineage、Task GET、current/history 前台和 sibling continuation 仲裁；
 - 只读结果和“没有外部副作用”边界。
 
 ### 尚未证明
@@ -159,7 +162,8 @@ Codex 和 Claude Code 仍在持续迭代，也可以扩展。本文不声称它�
 - “确认下一轮”的交互是否在控制感与操作成本之间达到合适平衡；
 - 引用是否提高校准后的信任或错误发现率；
 - 模型是否能正确完成全部 15 类 FORTE 任务；
-- 持久化恢复、分布式 Worker、真实文件写入或 Connector；
+- Task Ledger 的真实 PostgreSQL、多实例执行协调、WorkUnit/Contribution durability，
+  以及分布式 Worker、真实文件写入或 Connector；
 - 生产身份、企业数据策略和代表性用户价值。
 
 ## 9. 后续汇报检查表

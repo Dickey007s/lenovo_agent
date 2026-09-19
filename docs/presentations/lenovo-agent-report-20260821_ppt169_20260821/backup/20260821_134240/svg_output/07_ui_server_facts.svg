@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720" width="1280" height="720">
+  <g id="background"><rect width="1280" height="720" fill="#F7F9FC"/><text x="56" y="76" font-family="'Microsoft YaHei UI','Segoe UI',Arial,sans-serif" font-size="44" font-weight="700" fill="#172230">“正在处理”不能靠动画，必须由服务端事实产生</text><text x="56" y="114" font-family="'Microsoft YaHei UI','Segoe UI',Arial,sans-serif" font-size="18" fill="#526579">GET 负责对账，SSE 负责有序变化，前端只做可读投影</text></g>
+  <g id="client">
+    <rect x="56" y="160" width="360" height="420" fill="#FFFFFF" stroke="#CAD6E3"/>
+    <rect x="56" y="160" width="360" height="56" fill="#0B3A70"/>
+    <text x="80" y="196" font-family="'Microsoft YaHei UI','Segoe UI',Arial,sans-serif" font-size="22" font-weight="700" fill="#FFFFFF">用户看到的业务状态</text>
+    <text x="82" y="262" font-family="'Microsoft YaHei UI','Segoe UI',Arial,sans-serif" font-size="22" font-weight="700" fill="#172230">读取资料</text><text x="82" y="292" font-family="'Microsoft YaHei UI','Segoe UI',Arial,sans-serif" font-size="17" fill="#526579">来源包已校验，正在形成任务上下文</text>
+    <line x1="80" y1="316" x2="392" y2="316" stroke="#CAD6E3"/>
+    <text x="82" y="360" font-family="'Microsoft YaHei UI','Segoe UI',Arial,sans-serif" font-size="22" font-weight="700" fill="#172230">协作单元运行中</text><text x="82" y="390" font-family="'Microsoft YaHei UI','Segoe UI',Arial,sans-serif" font-size="17" fill="#526579">哪个工作包、使用什么来源、当前回执</text>
+    <line x1="80" y1="414" x2="392" y2="414" stroke="#CAD6E3"/>
+    <text x="82" y="458" font-family="'Microsoft YaHei UI','Segoe UI',Arial,sans-serif" font-size="22" font-weight="700" fill="#D71920">等待你的决定</text><text x="82" y="488" font-family="'Microsoft YaHei UI','Segoe UI',Arial,sans-serif" font-size="17" fill="#526579">原因、候选事实、确认后影响</text>
+    <line x1="80" y1="512" x2="392" y2="512" stroke="#CAD6E3"/>
+    <text x="82" y="556" font-family="'Microsoft YaHei UI','Segoe UI',Arial,sans-serif" font-size="22" font-weight="700" fill="#16845B">业务工作包已收敛</text>
+  </g>
+  <g id="transport">
+    <line x1="448" y1="244" x2="818" y2="244" stroke="#0B3A70" stroke-width="3"/>
+    <polygon points="818,244 800,234 800,254" fill="#0B3A70"/>
+    <text x="632" y="226" text-anchor="middle" font-family="'Microsoft YaHei UI','Segoe UI',Arial,sans-serif" font-size="18" font-weight="700" fill="#0B3A70">GET Snapshot · 全量对账</text>
+    <line x1="818" y1="326" x2="448" y2="326" stroke="#16845B" stroke-width="3"/>
+    <polygon points="448,326 466,316 466,336" fill="#16845B"/>
+    <text x="632" y="308" text-anchor="middle" font-family="'Microsoft YaHei UI','Segoe UI',Arial,sans-serif" font-size="18" font-weight="700" fill="#16845B">SSE · 有序事件流</text>
+    <line x1="448" y1="408" x2="818" y2="408" stroke="#D71920" stroke-width="3" stroke-dasharray="10 8"/>
+    <polygon points="818,408 800,398 800,418" fill="#D71920"/>
+    <text x="632" y="390" text-anchor="middle" font-family="'Microsoft YaHei UI','Segoe UI',Arial,sans-serif" font-size="18" font-weight="700" fill="#D71920">Control + expected version</text>
+    <rect x="494" y="462" width="276" height="90" fill="#EAF0F7"/>
+    <text x="632" y="492" text-anchor="middle" font-family="'Microsoft YaHei UI','Segoe UI',Arial,sans-serif" font-size="17" font-weight="700" fill="#172230">乱序与重复保护</text><text x="632" y="520" text-anchor="middle" font-family="Consolas,'Courier New',monospace" font-size="15" fill="#526579">version · sequence · digest</text><text x="632" y="544" text-anchor="middle" font-family="Consolas,'Courier New',monospace" font-size="15" fill="#526579">message_id · idempotency-key</text>
+  </g>
+  <g id="server">
+    <rect x="848" y="160" width="376" height="420" fill="#172230"/>
+    <text x="876" y="198" font-family="'Microsoft YaHei UI','Segoe UI',Arial,sans-serif" font-size="22" font-weight="700" fill="#FFFFFF">服务端权威事实</text>
+    <rect x="876" y="232" width="320" height="64" fill="#0B3A70"/><text x="896" y="272" font-family="Consolas,'Courier New',monospace" font-size="18" font-weight="700" fill="#FFFFFF">Task / WorkCockpit Snapshot</text>
+    <rect x="876" y="312" width="320" height="64" fill="#FFFFFF"/><text x="896" y="352" font-family="Consolas,'Courier New',monospace" font-size="18" font-weight="700" fill="#172230">Branch / Worker / Conflict</text>
+    <rect x="876" y="392" width="320" height="64" fill="#FFFFFF"/><text x="896" y="432" font-family="Consolas,'Courier New',monospace" font-size="18" font-weight="700" fill="#172230">ArtifactVersion / Verification</text>
+    <rect x="876" y="472" width="320" height="64" fill="#16845B"/><text x="896" y="512" font-family="Consolas,'Courier New',monospace" font-size="18" font-weight="700" fill="#FFFFFF">ControlEvent / Receipt</text>
+  </g>
+  <g id="rule"><rect x="56" y="612" width="1168" height="54" fill="#EAF0F7"/><text x="80" y="646" font-family="'Microsoft YaHei UI','Segoe UI',Arial,sans-serif" font-size="22" font-weight="700" fill="#172230">缺少事实时，前台显示“状态待核对”，而不是推断完成、风险或模型调用。</text></g>
+  <g id="footer"><text x="56" y="700" font-family="'Microsoft YaHei UI','Segoe UI',Arial,sans-serif" font-size="14" fill="#8291A3">固定路径 Limited Verified；跨进程 SSE 通知、多实例与后台队列仍是 Draft</text><text x="1224" y="700" text-anchor="end" font-family="Consolas,'Courier New',monospace" font-size="16" fill="#0B3A70">P07</text></g>
+</svg>

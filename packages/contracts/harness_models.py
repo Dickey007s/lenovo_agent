@@ -70,9 +70,12 @@ AgentControlLoopCommand = Literal[
     "stop",
     "rollback",
     "decision",
+    "topology_override",
 ]
 AgentControlLoopBranchStatus = Literal[
     "running",
+    "pending",
+    "blocked",
     "completed",
     "waiting_input",
     "stopped",
@@ -241,6 +244,19 @@ class AgentControlLoopContract(StrictModel):
     max_model_calls: int = Field(ge=2, le=60)
     deadline_seconds: int = Field(ge=20, le=14_400)
     external_action: Literal["none"] = "none"
+    # Durable task identity is separate from one executable Run.  These fields
+    # are server-owned when a continuation is created from an unfinished
+    # Branch; they are never inferred from model prose.
+    task_id: str = Field(default="task-000000000000", pattern=r"^task-[0-9a-f]{12}$")
+    run_sequence: int = Field(default=1, ge=1, le=10_000)
+    parent_run_id: str | None = Field(default=None, pattern=r"^harness:[0-9a-f]{32}$")
+    continuation_reason: str | None = Field(default=None, max_length=240)
+    carried_branch_id: str | None = Field(default=None, pattern=r"^branch-[0-9a-f]{12}$")
+    base_artifact_version: int | None = Field(default=None, ge=1, le=24)
+    base_task_commit: str | None = Field(default=None, pattern=r"^commit-[0-9a-f]{12}$")
+    workspace_revision: str = Field(default="unknown", min_length=1, max_length=120)
+    recheck_file_refs: list[str] = Field(default_factory=list, max_length=24)
+    source_revision_changed: bool = False
 
 
 class AgentControlLoopBudget(StrictModel):
@@ -313,6 +329,9 @@ class AgentControlLoopNextStep(StrictModel):
     next_question: str | None = Field(default=None, max_length=2_000)
     candidate_file_refs: list[str] = Field(default_factory=list, max_length=20)
     candidate_branch_ids: list[str] = Field(default_factory=list, max_length=36)
+    # The scheduler, not the browser, owns which branches are dispatchable.
+    # Keep this explicit while retaining candidate_branch_ids for compatibility.
+    ready_branch_ids: list[str] = Field(default_factory=list, max_length=36)
     recovery_kind: AgentControlLoopRecoveryKind | None = None
     evidence_resolutions: list[AgentControlLoopEvidenceResolution] = Field(
         default_factory=list, max_length=20
@@ -402,7 +421,9 @@ class AgentControlLoopRound(StrictModel):
     result: dict[str, Any] | None = None
     analysis_receipt: dict[str, Any] | None = None
     narrative_reconciliation: AgentControlLoopNarrativeReconciliation | None = None
-    verified_file_refs: list[str] = Field(default_factory=list, max_length=20)
+    # A round may cover many approved branches. This is a governance bound,
+    # not a top-N projection; callers must page work explicitly if exceeded.
+    verified_file_refs: list[str] = Field(default_factory=list, max_length=96)
     evidence_gaps: list[AgentControlLoopEvidenceGap] = Field(default_factory=list, max_length=20)
     next_step: AgentControlLoopNextStep | None = None
     started_at: datetime
@@ -484,7 +505,7 @@ class AgentControlLoopDecisionRequest(StrictModel):
 class AgentControlLoopBrief(StrictModel):
     outcome: Literal["completed", "bounded", "user_stopped"]
     summary: str = Field(min_length=1, max_length=3_000)
-    verified_file_refs: list[str] = Field(default_factory=list, max_length=20)
+    verified_file_refs: list[str] = Field(default_factory=list, max_length=96)
     unresolved_gaps: list[AgentControlLoopEvidenceGap] = Field(default_factory=list, max_length=20)
     rounds_completed: int = Field(ge=0, le=24)
     external_action: Literal["none"] = "none"
@@ -562,11 +583,14 @@ class AgentControlLoopArtifactVersion(StrictModel):
     status: Literal["draft", "verified", "committed"]
     round_number: int = Field(default=1, ge=1, le=24)
     summary: str = Field(min_length=1, max_length=3_000)
-    findings: list[AgentControlLoopArtifactFinding] = Field(default_factory=list, max_length=10)
+    # This is a governance bound, not a product-level "top N".  If a task
+    # exceeds it the scheduler must page work into another round rather than
+    # silently dropping findings.
+    findings: list[AgentControlLoopArtifactFinding] = Field(default_factory=list, max_length=96)
     follow_ups: list[str] = Field(default_factory=list, max_length=4)
     evidence_gaps: list[AgentControlLoopEvidenceGap] = Field(default_factory=list, max_length=20)
-    source_file_refs: list[str] = Field(default_factory=list, max_length=20)
-    finding_count: int = Field(ge=0, le=10)
+    source_file_refs: list[str] = Field(default_factory=list, max_length=96)
+    finding_count: int = Field(ge=0, le=96)
     parent_version: int | None = Field(default=None, ge=1, le=23)
     created_at: datetime
     review_required: Literal[True] = True
@@ -1602,6 +1626,7 @@ class AgentControlLoopControlRequest(StrictModel):
     candidate_digest: str | None = Field(default=None, max_length=128)
     source_revision: str | None = Field(default=None, max_length=128)
     feedback: str | None = Field(default=None, max_length=2_000)
+    topology_mode: Literal["single_controller"] | None = None
 
     @field_validator("instruction")
     @classmethod

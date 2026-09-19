@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720">
+  <rect width="1280" height="720" fill="#FFFFFF"/>
+  <g id="title" font-family="Microsoft YaHei, Arial, sans-serif">
+    <text x="48" y="80" font-size="44" font-weight="700" fill="#182230" data-width="1184">Adaptive Swarm：分工与贡献采用</text>
+    <text x="48" y="123" font-size="24" fill="#596579" data-width="1184">服务端准入、工作包依赖和贡献回执在原协作页中呈现</text>
+  </g>
+  <g id="body" font-family="Microsoft YaHei, Arial, sans-serif">
+    <text x="48" y="222" font-size="48" font-weight="700" fill="#1557D2" data-width="425">2 条采用</text>
+    <text x="48" y="276" font-size="24" fill="#182230" data-width="414">3 条已调用，2 条输出获采用。</text>
+    <text x="48" y="312" font-size="24" fill="#182230" data-width="414">待核对项只影响真实依赖。</text>
+    <text x="48" y="402" font-size="28" font-weight="700" fill="#008A63" data-width="420">当前协作边界</text>
+    <text x="48" y="446" font-size="24" fill="#182230" data-width="414">每批最多 3 个进程内只读 Worker</text>
+    <text x="48" y="482" font-size="24" fill="#182230" data-width="414">显式确认后派发，权限不会扩大</text>
+    <text x="48" y="564" font-size="28" font-weight="700" fill="#1557D2" data-width="420">工程差异候选</text>
+    <text x="48" y="608" font-size="24" fill="#182230" data-width="414">来源约束、贡献核验、局部恢复</text>
+    <text x="48" y="644" font-size="24" fill="#182230" data-width="414">共同保留在长期任务与成果历史中</text>
+  </g>
+  <g id="figure">
+    <image href="../images/swarm.png" x="506" y="148" width="686" height="524.03" preserveAspectRatio="xMidYMid meet"/>
+  </g>
+  <g id="footer" font-family="Microsoft YaHei, Arial, sans-serif">
+    <text x="48" y="696" font-size="16" fill="#596579" data-width="1100">原系统受控测试截图，2026-09-12。尚无同配置竞品实测，不能报告算法创新、质量提升或成本下降。</text>
+    <text x="1198" y="696" font-size="16" fill="#596579" data-width="34">03</text>
+  </g>
+</svg>

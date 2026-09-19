@@ -1,0 +1,1 @@
+这一页请按三种状态来读。Verified 是 Demo 1 的文件冲突路径和 Demo 3 的 Simulator 动作账本，能陈述固定客户 A 路径可运行，也能明确外部真实写入未发生；Limited Verified 是 Demo 2 的固定客户 A、单 API 进程 memory、四个被采用的模型输出和十五个有序事件；Draft 则包括主流差异、通用 Swarm、真实 Connector、成本质量效率、用户价值以及生产恢复。换句话说，不能把 Verified 说成生产可靠性，不能把 Limited Verified 说成分布式 Worker 或 SLA，也不能把 Draft 说成已经实现或竞品做不到；问题是我们下一步怎样把 Draft 变成证据，答案就是四路由对照实验。

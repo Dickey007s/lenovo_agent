@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720" width="1280" height="720">
+  <g id="background"><rect width="1280" height="720" fill="#172230"/><rect x="0" y="0" width="12" height="720" fill="#D71920"/><text x="64" y="68" font-family="'Microsoft YaHei UI','Segoe UI',Arial,sans-serif" font-size="16" font-weight="700" fill="#8291A3">NEXT EVIDENCE LOOP</text></g>
+  <g id="closing-message">
+    <text x="64" y="176" font-family="'Microsoft YaHei UI','Segoe UI',Arial,sans-serif" font-size="56" font-weight="700" fill="#FFFFFF">下一阶段的目标，</text>
+    <text x="64" y="246" font-family="'Microsoft YaHei UI','Segoe UI',Arial,sans-serif" font-size="56" font-weight="700" fill="#FFFFFF">不是更多 Agent，</text>
+    <text x="64" y="316" font-family="'Microsoft YaHei UI','Segoe UI',Arial,sans-serif" font-size="56" font-weight="700" fill="#FFFFFF">而是更可信的工作交付。</text>
+    <rect x="68" y="352" width="500" height="5" fill="#D71920"/>
+    <text x="68" y="410" font-family="'Microsoft YaHei UI','Segoe UI',Arial,sans-serif" font-size="26" font-weight="600" fill="#EAF0F7">让用户看见 Agent 的影响，</text>
+    <text x="68" y="448" font-family="'Microsoft YaHei UI','Segoe UI',Arial,sans-serif" font-size="26" font-weight="600" fill="#EAF0F7">也让系统只承认它真正证明过的影响。</text>
+  </g>
+  <g id="roadmap">
+    <line x1="788" y1="132" x2="788" y2="604" stroke="#526579" stroke-width="4"/>
+    <circle cx="788" cy="166" r="28" fill="#D71920"/><circle cx="788" cy="304" r="28" fill="#0B3A70" stroke="#F7F9FC" stroke-width="2"/><circle cx="788" cy="442" r="28" fill="#0B3A70" stroke="#F7F9FC" stroke-width="2"/><circle cx="788" cy="580" r="28" fill="#16845B"/>
+    <text x="788" y="175" text-anchor="middle" font-family="Consolas,'Courier New',monospace" font-size="20" font-weight="700" fill="#FFFFFF">1</text><text x="788" y="313" text-anchor="middle" font-family="Consolas,'Courier New',monospace" font-size="20" font-weight="700" fill="#FFFFFF">2</text><text x="788" y="451" text-anchor="middle" font-family="Consolas,'Courier New',monospace" font-size="20" font-weight="700" fill="#FFFFFF">3</text><text x="788" y="589" text-anchor="middle" font-family="Consolas,'Courier New',monospace" font-size="20" font-weight="700" fill="#FFFFFF">4</text>
+    <text x="836" y="158" font-family="'Microsoft YaHei UI','Segoe UI',Arial,sans-serif" font-size="24" font-weight="700" fill="#FFFFFF">固化四路由对照</text><text x="836" y="190" font-family="'Microsoft YaHei UI','Segoe UI',Arial,sans-serif" font-size="17" fill="#8291A3">同任务、同来源、同模型条件</text>
+    <text x="836" y="296" font-family="'Microsoft YaHei UI','Segoe UI',Arial,sans-serif" font-size="24" font-weight="700" fill="#FFFFFF">补齐失败与恢复</text><text x="836" y="328" font-family="'Microsoft YaHei UI','Segoe UI',Arial,sans-serif" font-size="17" fill="#8291A3">预算、局部暂停、跨进程恢复</text>
+    <text x="836" y="434" font-family="'Microsoft YaHei UI','Segoe UI',Arial,sans-serif" font-size="24" font-weight="700" fill="#FFFFFF">开展无引导理解测试</text><text x="836" y="466" font-family="'Microsoft YaHei UI','Segoe UI',Arial,sans-serif" font-size="17" fill="#8291A3">至少 5 人，验证状态、原因与后果理解</text>
+    <text x="836" y="572" font-family="'Microsoft YaHei UI','Segoe UI',Arial,sans-serif" font-size="24" font-weight="700" fill="#FFFFFF">桥接已验证工件</text><text x="836" y="604" font-family="'Microsoft YaHei UI','Segoe UI',Arial,sans-serif" font-size="17" fill="#8291A3">只把通过验证的结果交给 Demo 3</text>
+  </g>
+  <g id="call"><rect x="64" y="530" width="566" height="96" fill="#F7F9FC"/><text x="88" y="568" font-family="'Microsoft YaHei UI','Segoe UI',Arial,sans-serif" font-size="18" font-weight="700" fill="#D71920">本次请求</text><text x="88" y="602" font-family="'Microsoft YaHei UI','Segoe UI',Arial,sans-serif" font-size="24" font-weight="700" fill="#172230">批准下一轮“证据生产”，而不是扩大宣传口径。</text></g>
+  <g id="footer"><line x1="64" y1="660" x2="1216" y2="660" stroke="#526579"/><text x="64" y="694" font-family="'Microsoft YaHei UI','Segoe UI',Arial,sans-serif" font-size="15" fill="#8291A3">Draft / next gate · 非生产路线承诺</text><text x="1216" y="694" text-anchor="end" font-family="Consolas,'Courier New',monospace" font-size="16" fill="#F7F9FC">P16</text></g>
+</svg>

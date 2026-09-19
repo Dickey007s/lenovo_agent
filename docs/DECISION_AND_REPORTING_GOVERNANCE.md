@@ -145,6 +145,16 @@ only a real PostgreSQL restart gate can support a claim that an open DecisionReq
 survives restart. `cancel` remains distinct from `decline`, and neither action is
 an approval or an external effect.
 
+For DR-0055, reports must keep Branch business authority, WorkUnit execution
+state, Contribution candidate and Artifact adoption as four separate facts.
+“reserved/running/returned/adopted” may not be collapsed into one completed
+label. A durability claim must name whether the record is memory- or
+PostgreSQL-backed, whether an in-flight call is replayed, and what idempotency /
+version contract governs an explicit retry. Public API/DOM evidence must also
+show that Owner, raw source revision, reservation digest and provider raw output
+remain private. A single-host PostgreSQL gate is not queue/lease, multi-instance
+ownership, remote Worker execution or high availability.
+
 When a deterministic Effect and a model narrative coexist, reporting must also
 record their reconciliation before calling the narrative adopted. `called`,
 `output_used`, Artifact/Effect status, reconciliation authority/disposition and
@@ -200,5 +210,12 @@ Before delivery, verify:
 - production identity, durable recovery, real Connector and user research are not inferred;
 - living docs and retirement lifecycle are synchronized;
 - governance test, Markdown link check and `git diff --check` pass.
+
+For user-facing changes, also deliver at least one concrete acceptance case: exact input,
+click sequence, expected observation, failure criterion and actual result. Execute it when feasible,
+record discovered failures before fixes, and keep unresolved content-quality issues separate from
+green UI tests. Fixture, real browser, Provider and business-effect evidence are distinct.
+See [2026-09-11 user feedback](sources/USER-FEEDBACK-20260911-self-testing-and-acceptance-cases.md)
+and [the reusable cases](testing/DEMO12-ACCEPTANCE-CASES-20260911.md).
 
 The current FORTE product application of this policy is [DR-0018](decisions/DR-0018-forte-data-workbench-and-verifiable-trace.md). The generic capability-composition rule is [DR-0019](decisions/DR-0019-capability-composed-agent-runtime.md). DR-0016/0017 remain historical foundations with their original evidence scope.

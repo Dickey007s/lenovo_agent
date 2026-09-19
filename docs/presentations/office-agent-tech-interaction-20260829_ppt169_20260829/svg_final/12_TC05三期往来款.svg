@@ -1,0 +1,94 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720" width="1280" height="720">
+  <g id="background"><rect width="1280" height="720" fill="#F7F8FA" /><path d="M52 112H1228" stroke="#CBD5DF" stroke-width="2" /></g>
+  <g id="header">
+    <text x="52" y="78" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="46" font-weight="700" fill="#132A3A">TC-05：三份输入，不等于三期各出一份结果</text>
+    <path fill="#EDF1F4" d="M1090,46 H1222 A6,6 0 0 1 1228,52 V74 A6,6 0 0 1 1222,80 H1090 A6,6 0 0 1 1084,74 V52 A6,6 0 0 1 1090,46 Z" /><text x="1156" y="69" text-anchor="middle" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#1769E0">语义说明</text>
+  </g>
+  <g id="input-periods">
+    <text x="52" y="154" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="28" font-weight="700" fill="#132A3A">输入：三个期间</text>
+    <path fill="#FFFFFF" stroke="#CBD5DF" stroke-width="2" d="M58,180 H306 A6,6 0 0 1 312,186 V248 A6,6 0 0 1 306,254 H58 A6,6 0 0 1 52,248 V186 A6,6 0 0 1 58,180 Z" />
+
+  <g transform="translate(72, 201) scale(1.16667)" fill="none" stroke="#1769E0" stroke-width="2">
+    <path d="M14 3v4a1 1 0 0 0 1 1h4" />
+    <path d="M17 21h-10a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2" />
+    <path d="M8 11h8v7h-8l0 -7" />
+    <path d="M8 15h8" />
+    <path d="M11 11v7" />
+  </g><text x="114" y="225" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="17" font-weight="700" fill="#132A3A">2025 上半年明细</text>
+    <path fill="#FFFFFF" stroke="#CBD5DF" stroke-width="2" d="M338,180 H586 A6,6 0 0 1 592,186 V248 A6,6 0 0 1 586,254 H338 A6,6 0 0 1 332,248 V186 A6,6 0 0 1 338,180 Z" />
+
+  <g transform="translate(352, 201) scale(1.16667)" fill="none" stroke="#1769E0" stroke-width="2">
+    <path d="M14 3v4a1 1 0 0 0 1 1h4" />
+    <path d="M17 21h-10a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2" />
+    <path d="M8 11h8v7h-8l0 -7" />
+    <path d="M8 15h8" />
+    <path d="M11 11v7" />
+  </g><text x="394" y="225" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="17" font-weight="700" fill="#132A3A">2025 下半年明细</text>
+    <path fill="#FFFFFF" stroke="#CBD5DF" stroke-width="2" d="M618,180 H866 A6,6 0 0 1 872,186 V248 A6,6 0 0 1 866,254 H618 A6,6 0 0 1 612,248 V186 A6,6 0 0 1 618,180 Z" />
+
+  <g transform="translate(632, 201) scale(1.16667)" fill="none" stroke="#1769E0" stroke-width="2">
+    <path d="M14 3v4a1 1 0 0 0 1 1h4" />
+    <path d="M17 21h-10a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2" />
+    <path d="M8 11h8v7h-8l0 -7" />
+    <path d="M8 15h8" />
+    <path d="M11 11v7" />
+  </g><text x="674" y="225" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="17" font-weight="700" fill="#132A3A">2026 期初明细</text>
+    <path d="M892 217H1188" stroke="#1769E0" stroke-width="4" /><path d="M1188 217L1168 205V229Z" fill="#1769E0" />
+    <text x="1040" y="202" text-anchor="middle" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="17" font-weight="700" fill="#1769E0">按不同目的生成三份成果</text>
+  </g>
+  <g id="artifacts">
+    <path fill="#FFFFFF" stroke="#1769E0" stroke-width="2" d="M58,304 H406 A6,6 0 0 1 412,310 V530 A6,6 0 0 1 406,536 H58 A6,6 0 0 1 52,530 V310 A6,6 0 0 1 58,304 Z" />
+
+  <g transform="translate(76, 328) scale(1.33333)" fill="none" stroke="#1769E0" stroke-width="2">
+    <path d="M14 3v4a1 1 0 0 0 1 1h4" />
+    <path d="M17 21h-10a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2" />
+    <path d="M8 11h8v7h-8l0 -7" />
+    <path d="M8 15h8" />
+    <path d="M11 11v7" />
+  </g>
+    <text x="124" y="354" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="28" font-weight="700" fill="#132A3A">未付统计.csv</text>
+    <text x="76" y="400" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#5A6B7C">只看最新 2026 期</text>
+    <text x="76" y="432" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#5A6B7C">提取正数贷方期末余额</text>
+    <text x="76" y="490" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="46" font-weight="700" fill="#1769E0">31</text>
+    <text x="140" y="490" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#5A6B7C">条 · 当前固定来源</text>
+
+    <path fill="#FFFFFF" stroke="#1769E0" stroke-width="2" d="M442,304 H790 A6,6 0 0 1 796,310 V530 A6,6 0 0 1 790,536 H442 A6,6 0 0 1 436,530 V310 A6,6 0 0 1 442,304 Z" />
+
+  <g transform="translate(460, 328) scale(1.33333)" fill="none" stroke="#1769E0" stroke-width="2">
+    <path d="M14 3v4a1 1 0 0 0 1 1h4" />
+    <path d="M17 21h-10a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2" />
+    <path d="M8 11h8v7h-8l0 -7" />
+    <path d="M8 15h8" />
+    <path d="M11 11v7" />
+  </g>
+    <text x="508" y="354" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="28" font-weight="700" fill="#132A3A">未收统计.csv</text>
+    <text x="460" y="400" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#5A6B7C">只看最新 2026 期</text>
+    <text x="460" y="432" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#5A6B7C">提取正数借方期末余额</text>
+    <text x="460" y="490" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="46" font-weight="700" fill="#1769E0">2</text>
+    <text x="504" y="490" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#5A6B7C">条 · 当前固定来源</text>
+
+    <path fill="#FFFFFF" stroke="#D97706" stroke-width="2" d="M826,304 H1222 A6,6 0 0 1 1228,310 V530 A6,6 0 0 1 1222,536 H826 A6,6 0 0 1 820,530 V310 A6,6 0 0 1 826,304 Z" />
+
+  <g transform="translate(844, 328) scale(1.33333)" fill="none" stroke="#D97706" stroke-width="2">
+    <path d="M14 3v4a1 1 0 0 0 1 1h4" />
+    <path d="M17 21h-10a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2" />
+    <path d="M9 9l1 0" />
+    <path d="M9 13l6 0" />
+    <path d="M9 17l6 0" />
+  </g>
+    <text x="892" y="354" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="28" font-weight="700" fill="#132A3A">跨期核对说明.md</text>
+    <text x="844" y="400" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#5A6B7C">这份文件才比较三个期间</text>
+    <text x="844" y="432" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#5A6B7C">同一科目 + 客商的借方余额是否连续不变</text>
+    <text x="844" y="490" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="46" font-weight="700" fill="#D97706">0</text>
+    <text x="888" y="490" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#5A6B7C">条风险候选 · 仍需财务复核</text>
+  </g>
+  <g id="frontstage-impact">
+    <path fill="#EDF1F4" d="M58,570 H1222 A6,6 0 0 1 1228,576 V634 A6,6 0 0 1 1222,640 H58 A6,6 0 0 1 52,634 V576 A6,6 0 0 1 58,570 Z" />
+    <text x="76" y="600" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI Semibold&quot;, Arial, sans-serif" font-size="24" font-weight="700" fill="#132A3A">前台必须先解释“每份成果代表什么”</text>
+    <text x="76" y="628" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="17" fill="#5A6B7C">统计完成不等于僵尸账款定论；系统未付款、未核销、未记账，也不替代会计政策判断。</text>
+  </g>
+  <g id="footer">
+    <text x="52" y="690" font-family="&quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, Arial, sans-serif" font-size="14" fill="#7C8A98">当前系统实测；交互依据：Microsoft HAI Guidelines · W3C PROV-O</text>
+    <text x="1228" y="690" text-anchor="end" font-family="Consolas, &quot;Courier New&quot;, monospace" font-size="14" fill="#7C8A98">12 / 24</text>
+  </g>
+</svg>

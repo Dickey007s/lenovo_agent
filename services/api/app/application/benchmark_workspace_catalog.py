@@ -200,6 +200,7 @@ class BenchmarkWorkspaceCatalog(BenchmarkScenarioCatalog):
                         "path": item.path,
                         "role": "input",
                         "sha256": item.sha256,
+                        "planner_search_hint": self._planner_search_hint(manifest, item),
                     }
                 )
         return {
@@ -441,6 +442,29 @@ class BenchmarkWorkspaceCatalog(BenchmarkScenarioCatalog):
             "preview_kind": kind,
             "preview_available": kind != "unavailable",
         }
+
+    def _planner_search_hint(
+        self, manifest: BenchmarkManifest, item: WorkspaceFileIndex
+    ) -> str | None:
+        """Expose one safe source heading to Planner retrieval, never to the public catalog."""
+
+        suffix = Path(item.path).suffix.lower()
+        if suffix not in self.TEXT_SUFFIXES:
+            return None
+        entry = BenchmarkFileEntry(
+            path=item.path,
+            sha256=item.sha256,
+            size=item.size,
+            mime=item.mime,
+            role="input",
+        )
+        raw = self._read_checked(self._safe_path(item.path), entry)
+        text, _ = self._preview_text(raw)
+        for line in text.splitlines():
+            normalized = re.sub(r"^\s{0,3}#{1,6}\s*", "", line).strip()
+            if normalized:
+                return normalized[:240]
+        return None
 
     @classmethod
     def _preview_kind(cls, suffix: str) -> str:

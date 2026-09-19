@@ -239,11 +239,21 @@ async def test_control_replay_after_store_reload_returns_original_receipt(runtim
         await restored.office_action_control("alice", run.run_id, request.model_copy(update={"command": "cancel"}))
 
 
-async def test_existing_research_start_digest_stays_compatible(runtime):
+async def test_mainline_research_start_digest_stays_compatible(runtime):
     request = HarnessRunStart(instruction="核对财务资料", idempotency_key="research-key-compatibility")
     legacy_payload = request.model_dump(exclude={"action"})
     expected = hashlib.sha256(json.dumps(
-        legacy_payload, ensure_ascii=False, sort_keys=True,
+        {
+            "request": legacy_payload,
+            "parent_run_id": None,
+            "carried_branch_id": None,
+            "base_artifact_version": None,
+            "base_task_commit": None,
+            "parent_expected_version": None,
+            "expected_task_version": None,
+            "continuation_reason": None,
+            "workspace_revision": str(runtime.get_internal_workspace().get("dataset_version", "forte-public-office")),
+        }, ensure_ascii=False, sort_keys=True,
     ).encode("utf-8")).hexdigest()
     try:
         await runtime.start("alice", request)
@@ -383,3 +393,52 @@ async def test_recent_list_and_restoration_keep_independent_actions_owner_scoped
     ))
     assert result.run.office_action.decision
     assert restored.planner.calls == 0
+
+
+@pytest.mark.parametrize("operation", [
+    "format_text", "extract_excerpt", "create_task", "send_message",
+    "restricted_action", "compare_materials",
+])
+async def test_action_uses_mainline_task_ledger_without_worker_or_continuation(runtime, operation):
+    run = await start(runtime, data(operation, **(
+        {"alternative_content": "材料 B"} if operation == "compare_materials" else {}
+    )))
+    task = await runtime.get_task("alice", run.task_id)
+    assert task.current_run_id == run.run_id
+    assert task.task_version == run.task_version == 1
+    assert task.status == run.status
+    assert [item.run_id for item in task.lineage] == [run.run_id]
+    assert run.topology_admission is None
+    assert not run.work_units and not run.contributions
+    before = run.model_dump(mode="json")
+    app = create_app()
+    app.state.harness_runtime = runtime
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as client:
+        foreign = await client.get(f"/v1/harness/tasks/{run.task_id}", headers={"X-User-Id": "bob"})
+        assert foreign.status_code == 404
+        for endpoint, body in [
+            ("continue", {"branch_id": "branch-000000000000", "expected_task_version": 1}),
+            ("workers", {"branch_ids": [], "confirmed": True}),
+        ]:
+            result = await client.post(f"/v1/harness/runs/{run.run_id}/{endpoint}", headers={"X-User-Id": "alice"}, json={
+                "expected_version": run.version, "idempotency_key": str(uuid4()), **body,
+            })
+            assert result.status_code == 409
+    assert (await runtime.get("alice", run.run_id)).model_dump(mode="json") == before
+    assert runtime.planner.calls == 0
+    restored = HarnessRuntime(FakeCatalog(), FakePlanner(), state_store=runtime.state_store)
+    await restored.setup()
+    assert (await restored.get_task("alice", run.task_id)).current_run_id == run.run_id
+    assert (await restored.get("alice", run.run_id)).office_action == run.office_action
+
+
+async def test_action_control_updates_task_projection_without_advancing_lineage(runtime):
+    run = await start(runtime, data("compare_materials", alternative_content="材料 B"))
+    result = await runtime.office_action_control("alice", run.run_id, command(
+        run, "record_decision", selected_option="second", rationale="人工核对后记录",
+    ))
+    task = await runtime.get_task("alice", run.task_id)
+    assert task.status == result.run.status == "completed"
+    assert task.task_version == 1
+    assert task.current_run_id == run.run_id
+    assert len(task.lineage) == 1

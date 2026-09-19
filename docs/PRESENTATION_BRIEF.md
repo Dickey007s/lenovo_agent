@@ -13,6 +13,43 @@ Demo1 讨论长任务拆分，Demo2 讨论多任务规划与并行，Demo3 展�
 已获业务批准、用户体验提升、Demo2 多 Worker 或通用 Risk Gate 已实现。
 见 [Demo3 设计与评审](design/DEMO3-DEVELOPMENT-HANDBOOK-20260918.md)。
 
+## 下一次会议简稿
+
+优先使用 [三个 Demo、八个边界案例与蜂群差异简稿](reports/DEMO123-BOUNDARIES-AND-SWARM-BRIEF-20260912.md)，不制作新 PPT 或演示网站。主线是“Demo1 接着做，Demo2 分工与采用，Demo3 定义谁能决定什么”。原能力页已增加既有边界解释和协作回执事实，保留 Loop/Swarm；这只是第一部分前端整合，不是 Demo3 全场景闭环或业务授权。研究 HTML 不替代产品，离线测试不证明集成通过。蜂群是受限 orchestrator-worker，其贡献采用与局部恢复组合是可证伪工程差异候选，不是已证明的新算法或竞品优势。[本轮 Evidence](evidence/DR-0063-INTEGRATED-BOUNDARIES-AND-SWARM-FACTS-20260912.md) 单列验证范围。
+
+## 动态边界研究增量（2026-09-11）
+
+[研究与可操作原型](reports/copilot-boundary-design-20260911/index.html) 不以 L0-L5/R0-R3 作为设计约束。
+可讲：比较具体授权、澄清、失效、对账与接管的交互差异，研究中保留“少提示未带来更强越界保护”的反证。
+不可讲：有界授权已经优于逐动作确认，已完成目标用户实验，或当前具备真实审批/外部动作能力。
+[DR-0062](decisions/DR-0062-dynamic-boundary-design-experiment.md) 和 [SCENARIO-049](scenarios/SCENARIO-049-dynamic-boundary-handoff-design.md)
+仍为 Draft；场景与来源、前台交互影响、后端事实映射、验证与边界分别记账。
+
+2026-09-12 [用户理解迭代](reports/copilot-boundary-design-20260911/usability-review-20260912.md) 把“当前结果、原因、下一步后果”与工程术语分开，增加旧/新附件对照、未知查询失败路径和五个非诱导任务。可讲实际源码问题与测试，不可讲目标用户已经看懂；没有参与者结果，最终浏览器门也未完成。
+
+2026-09-12 [下一轮阅读推荐](reports/copilot-boundary-design-20260911/research/followup-20260912/recommendations.md) 增加 6 篇论文和 3 篇官方实践。可讲“共同参与不只是审批”，以及参与过多、主观信任未校准和检查成本的反例；不可讲本项目已完成共同计划编辑、自动权限分类或真人效果对照。合成用户评估、开发者样本与普通办公人员不能混称。
+
+## 2026-09-11 会议材料
+
+[Demo 1/2 重设计 HTML](reports/demo12-redesign-20260911/index.html) 对照用户参考与真实前端截图。
+可讲：同一任务的循环进展、按轮记录、WorkUnit 依赖、显式协作确认、候选位置选择与局部保留。
+不可讲：截图等于真实模型任务成功、图等于分布式 Swarm、已有风险引擎或通用审批系统。
+[人机共驾手册](reports/human-agent-copilot-20260911/guide.md)、
+[8 案例沙盘](reports/human-agent-copilot-20260911/index.html) 和
+[Demo 3 简报](reports/human-agent-copilot-20260911/report.html) 为 `Draft`，浏览器验证限制明确保留。
+三个 Demo 完成后的完整行业回溯仍是后续门，不由本轮定向引用替代。
+场景与来源、前台交互影响、后端事实映射、验证与边界见
+[DR-0061](decisions/DR-0061-reference-aligned-capabilities-and-evidence-choice.md)。
+
+后续 [主动验收报告](reports/demo12-acceptance-20260911/index.html) 记录真实 Provider 单任务与 91 项受控回归。
+两个 UI 问题已修复；真实日志任务的完整性未通过，模型输入截断前半段但摘要未限定范围。
+会上应展示这个失败案例，不得以调用回执、引用定位或全绿 E2E 代替全文业务正确性。
+
+[第二轮打磨报告](reports/demo12-polish-20260911/index.html) 展示长目标、空白任务、确认区可达性和自测迭代。
+[人机共驾研究资料库](reports/copilot-research-library-20260911/index.html) 提供论文、官方文档/博客、
+研究限制及 Demo 设计映射。可以讲适当依赖、核验成本与接管后的恢复粒度；不能讲“人机组合必然更好”、
+“增加解释必然减少过度依赖”或“有审批接口就等于权限安全”。风险分层与交互方案仍待目标用户验证。
+
 本文件记录面向会议、PPT 和产品评审的中文表述。英文只保留产品名、
 接口名、协议字段和原始来源标题。
 
@@ -47,6 +84,35 @@ Agent Control Loop 的逐模块历史基线、当前有界效果纵切和后续�
 [`OFFICE-AGENT-DETAILED-CHINESE-REPORT-20260825`](reports/OFFICE-AGENT-DETAILED-CHINESE-REPORT-20260825.md)。
 最新“为什么必须选我们”的候选能力、八个竞品同场挑战和官方来源见
 [`COMPETITIVE-WHITE-SPACE-AND-FALSIFIABLE-DIFFERENTIATORS-20260826`](research/COMPETITIVE-WHITE-SPACE-AND-FALSIFIABLE-DIFFERENTIATORS-20260826.md)。
+07-16 Demo 1 时间维连续性与 Demo 2 组织维复杂性的下一阶段研究、八个场景、主流基线
+和交互影响见
+[`DEMO1-DEMO2-DURABLE-TASK-AND-ADAPTIVE-ORCHESTRATION-RESEARCH-20260830`](research/DEMO1-DEMO2-DURABLE-TASK-AND-ADAPTIVE-ORCHESTRATION-RESEARCH-20260830.md)；
+跨 Run Task lineage 与受限进程内只读 Worker 已形成 `Limited Verified` 纵切，
+工程 Evidence 见
+[`DR-0053-DEMO1-DEMO2-RUNTIME-EVIDENCE-20260831`](evidence/DR-0053-DEMO1-DEMO2-RUNTIME-EVIDENCE-20260831.md)。
+`DR-0054` 又把 Demo 1 的 lineage 升级为最小 owner-scoped Task Ledger/current pointer，
+工程 Evidence 见
+[`DR-0054-TASK-LEDGER-V1-EVIDENCE-20260831`](evidence/DR-0054-TASK-LEDGER-V1-EVIDENCE-20260831.md)。
+`DR-0055` 又把 Demo 2 的 Branch Worker 升级为最小 WorkUnit/Contribution 台账，
+工程 Evidence 见
+[`DR-0055-WORKUNIT-CONTRIBUTION-LEDGER-V1-EVIDENCE-20260831`](evidence/DR-0055-WORKUNIT-CONTRIBUTION-LEDGER-V1-EVIDENCE-20260831.md)。
+`DR-0056` 先把两个镜头从一条长页面中拆开：最近 Run 按 `task_id` 分成任务会话，并形成
+独立全屏 Adaptive Swarm 工作台。该工程 Evidence 仍有效，但 `DR-0057` 纠正了产品解释：
+Workspace 是办公工作面；新的 `/agent-capabilities` 把 Agent Control Loop 与 Adaptive Swarm
+作为同一 Agent 的时间维和组织维能力，共用同一个 Task/Run/Snapshot。`DR-0058` 又把首版
+两块完整面同屏改为四条直接路径：默认任务进展、按需完整执行记录、单独协作方式和专注
+原文核对。它们不是四级连续导航，也不是四套 Runtime。07-16 Demo 2 仍是后续单独实现的
+“智能工作驾驶舱”，Adaptive Swarm 只是它按需选择的一条路线。本轮不画假任务队列，也不
+把能力页或旧 dialog 说成驾驶舱已经完成。这个分层只改变前台投影；历史 Run 只读且不接
+SSE，当前 Worker 仍是单进程受限只读实现。Adaptive 正例的协作页现在进一步用左侧阶段
+轨、中央真实 WorkUnit DAG、右侧当前影响和底部成果条解释“为什么拆、谁依赖谁、哪里
+停、什么已经保留”；父子关系用方向连线表达，当前轮 `ready_branch_ids` 统一显示为“下一
+波待确认 / 可执行”，主要确认动作放在右侧当前影响区；Fixed/Single 不画假 DAG。
+`DR-0060` 补上两个页面共同的“新建任务”入口：点击只退出当前 Run 投影并进入空白草稿，
+不创建空 Task、不停止旧 Run；提交指令后才由现有 start 协议创建独立 Task。旧任务仍可从
+任务会话返回，相同文字的新任务也使用新的幂等键。
+Task/WorkUnit 的隔离 PostgreSQL 17.11 单主机顺序门已经通过，但 Provider 同场、多实例、
+远端 Worker 与用户研究仍未完成，不能写成生产级 Task 服务或通用/分布式 Worker。
 十五条场景的实际效果、失败修复轨迹、真实模型运行和外部边界见
 [`SCENARIO-EFFECT-GATE-20260827`](evidence/SCENARIO-EFFECT-GATE-20260827.md)
 与[中文效果账本](reports/SCENARIO-EFFECT-GATE-LEDGER-20260827.md)。
@@ -64,11 +130,11 @@ Agent Control Loop 的逐模块历史基线、当前有界效果纵切和后续�
 | 7 | 安全预览把“Agent 读了什么”变成可见契约 | CSV/PDF/DOCX/TXT 预览拼图和安全说明 | 路径、大小、hash、符号链接和解析器测试 |
 | 8 | Harness 把模型调用、内容采用、确定性办公效果和整体 Loop 状态分开 | 事件、模型回执、可下载工件与检查结果时序 | Snapshot/Receipt/Artifact 事实；不展示思维链，也不把 `completed` 当作效果通过 |
 | 9 | Agent 说“有问题”之后，用户要同时看懂事实、影响、真实原文和自己必须决定的下一步 | 问题处置单：1 事实 -> 2 影响 -> 3 人工动作；证据与实际文件并排；A/B/C + 反馈 | `DR-0030/29`；推荐是模型候选，确认只创建新只读 Run |
-| 10 | Agent Control Loop 会把计划变成可核对任务分支；前台先区分“授权重试”与“必须由人选择原文”，人阅读时不消耗 Agent 执行预算 | 单一推荐重试按钮、三候选原文且未选前禁用、active elapsed、成果 v1→v2、终态新 Run | `DR-0034/32/31/30`；真实 PostgreSQL 只证明顺序 Runtime；Branch 不等于并行 Worker，terminal Run 不可 resume |
-| 11 | Demo 2 验收多任务自组织、动态调度和共享工件汇聚 | Worker、依赖与动态重排图 | 目标设计；当前产品没有通用 Worker Runtime |
-| 12 | Demo 3 展示六类单步事项的介入差异 | 自动整理可撤销、可编辑摘录、普通确认、强确认、受限处理、材料分歧人工判断 | 固定规则与测试记录已接入；通用审批、Permit 和真实外部动作未实现 |
+| 10 | Demo 1 把一次 Run 的停止变成同一 Task 的下一段执行，同时允许用户显式开始另一项独立工作；最近记录按 `task_id` 隔离成任务会话，Task Ledger 再决定打开的 child 是否为当前工作面 | “新建任务”空白草稿、任务会话抽屉、Run 1→Run 2、全局“历史 Run 只读”、当前非终态 Run 才恢复 SSE、基线成果与来源变化提示 | `DR-0053/54/56/60`、`SCENARIO-038/040/043/047`；点击新建不创建空 Task 或停止旧 Run，提交后才创建；会话发现只覆盖最近 20 个 Run，不是无限 Task list；child 是新 Run，Run version 可从 1 开始 |
+| 11 | 先把 Agent 能力与 Demo 产品面说清：能力页用同一 Snapshot 回答“任务怎样跨 Run 继续”和“复杂任务怎样拆解协作”，但默认先回答“现在进展如何、是否需要我处理”；07-16 Demo 2 智能工作驾驶舱仍是下一阶段产品面 | `/agent-capabilities` 实际界面四镜头：任务进展、完整执行记录、协作方式、确认结论依据；协作镜头用左侧阶段轨、3 root+2 dependent 动态 DAG、右侧当前影响和底部成果条展示实际来源、Worker called/adopted/elapsed、Contribution Gate、v1/v2；旁注未来驾驶舱队列与四路线，不画成当前截图 | `DR-0053/55/57/58`、`SCENARIO-039/041/042/044/045`；四层是同一 Snapshot 的渐进披露；当前每批最多 3 个进程内只读 Analyst Worker；没有驾驶舱队列、跨 Task dispatch、durable queue/lease、分布式 Swarm、用户研究或质量收益证明 |
+| 12 | Demo 3 对单任务和多任务统一施加风险与动作控制 | 影响预演 -> 证据 -> 审批 -> Permit -> 回执 | 目标设计；当前没有真实外部动作 |
 | 13 | 当前 12 个本地 FORTE 场景已有真实隔离工件与确定性验证；3 个外部依赖场景明确阻断 | 12 通过、3 `blocked_external_boundary` 的效果账本；六个真实 `deepseek-v4-pro` 运行 | `DR-0035` 限定能力，不等于任意办公任务或用户价值；模型质量、效果验证、Loop 终态分开报告 |
-| 14 | 历史约 30% 审计基线已升级为可见分支、可恢复逻辑成果和固定本地可写工件；下一步仍是通用 Tool Gateway、多 Worker 与外部动作治理 | Branch、Run Workspace Artifact 与 Demo 2/3 目标架构叠加图 | `30%` 只代表历史基线；当前真实工件仅来自十二个服务端固定适配器，不是通用 Agent 执行环境 |
+| 14 | 历史约 30% 审计基线已升级为可见分支、最小 Task Ledger/current pointer、Branch 绑定的 WorkUnit/Contribution 台账、跨 Run 谱系、可解释拓扑、受限 Worker、可恢复逻辑成果和固定本地可写工件；下一步是 queue/lease、通用 Tool Gateway、分布式 Worker 与外部动作治理 | Task record→current Run→Branch/WorkUnit→Contribution→ArtifactVersion 的当前链路、Topology Admission、Run Workspace Artifact 与 Demo 3 目标架构叠加图 | `30%` 只代表历史基线；当前 WorkUnit 台账不是 durable queue/lease，Worker 与真实工件仍受限于单进程/固定适配器 |
 | 15 | 同一个任务可以“成果已通过、Agent 审计说明仍待修复”；用户必须先知道成果能否用，再决定是否处理引用位置 | TC-01 5/5 成果在前、两个同源 Gap 合并为一个审计项；PDF “技术/研发”断行修复前后 | `DR-0036`；Artifact 通过不等于 Run completed，Anchor 仍不证明语义正确 |
 | 16 | 成果文件必须在下载前说清“哪个期间、怎么算、拿来做什么” | TC-05 三张成果卡：两个 2026 明细与一个三期核对说明；问题审查页字号修复前后 | `DR-0037`；内容来源与任务上下文分开，Finance-018 仍是固定适配器；自动化不证明用户理解 |
 | 17 | 一个引用跳转缺口不应被包装成系统失败：先说成果是否已生成，再给一个动作 | TC-05 “成果已生成，还有 1 条说明缺少原表格位置”；查看成果、查找位置、技术详情三层 | `DR-0038`；只恢复目标 Branch，不覆盖 Artifact；未通过和旧 Run 使用不同话术 |
@@ -197,7 +263,10 @@ Agent Control Loop 的逐模块历史基线、当前有界效果纵切和后续�
 | 受控成果恢复 | 用户可以恢复旧简报且不丢掉新版 | “恢复”、当前 vN、“已恢复历史成果版本” | rollback ControlEvent、新 TaskCommit、`artifact_version_restored` |
 | 有界候选修复 | 模型返回未通过时不会静默采用 | `未采用` 与预算内重试 | `plan_validation_rejected` / `analysis_validation_rejected`、模型调用计数 |
 | EvidenceResolution + Finding 级恢复 | 一条坏引用不再抹掉全部有效结果；多候选或无候选都有明确下一步 | exact/ambiguous/unavailable、已保留/未采用/未发生 | `evidence_resolutions[]`、`partial_artifact_saved`、`next_step.recovery_kind` |
-| 预算终态分支续办 | 用户不会在不可恢复的页面里反复点“继续” | 旧 Run 已结束、保留项、未完成 Branch、用此分支创建新任务 | `status=stopped`、`brief.outcome=bounded`、candidate Branch + 新 Run POST；不向旧 Run 发送 control |
+| 预算终态分支续办 | 用户不会在不可恢复的页面里反复点“继续” | 旧 Run 已结束、保留项、未完成 Branch、用此分支创建同 Task 新 Run | `status=stopped`、`brief.outcome=bounded`、candidate Branch + `/continue`；不向旧 Run 发送 resume control |
+| Task current pointer 与双版本 CAS | 两个页面同时续办时，用户不用猜哪个 child 才是当前任务；失败页不丢旧成果 | “当前 Run/历史 Run”、中性状态冲突提示、“打开当前 Run”、Task 查询失败重试 | `GET /tasks/{task_id}`、`task_version` + parent `run.version`、原子 Task/Run/receipt；当前不等于 Task list、多实例调度或 WorkUnit queue |
+| WorkUnit 与候选采用台账 | 用户无需管理多个 Agent 聊天，也能区分哪个工作包实际执行、哪个只返回候选、哪个进入统一成果，以及失败影响谁 | 业务工作包、实际执行回执、候选成果、原文定位、v1/v2 和“已有可用成果” | `work_units[]`、`contributions[]`、Branch Gate、ArtifactVersion、named SSE；公共投影隐藏 raw unit ID/revision/reservation，当前不等于 queue/lease 或远端 Worker |
+| Worker checkpoint 显式恢复 | API 重启不会偷偷重放不确定的模型调用，也不会清空已采用兄弟成果 | “上次调用未确认返回，未自动重试”、目标工作包恢复入口、保留的 v1/v2 | `checkpoint_recovered_in_flight_worker` + 新幂等键 + 当前 Run version；只允许恢复目标单元，不证明 Provider 未收费或多实例安全 |
 | 版本化人工决定 | 关闭不再等于“什么都没发生”，重连后仍能对账 | 接受/否决/暂缓、回执版本、无外部动作 | `decision_records[]`、`decision_recorded`、expected version + idempotency |
 | 人工确认下一步 | Agent 建议不会自动扩张任务；用户先看形成上下文 | “尚未逐项验证”“查看形成依据”“确认并启动” | 终态 `follow_ups` + Finding refs 上下文 + 新 Run POST |
 | 决定与证据重启恢复（DR-0032） | 用户不因 API 重启丢失待决候选或已完成成果 | 重启后继续同一 Decision Packet；接受后只恢复目标 Branch 并生成 v2 | 真实 PostgreSQL 顺序 Runtime 门已通过；当前仍嵌在 Snapshot JSONB 中，无独立 ledger/CAS，不证明多实例并发安全 |
@@ -220,6 +289,12 @@ Agent Control Loop 的逐模块历史基线、当前有界效果纵切和后续�
 - 新的 DecisionRecord 把 accept/decline/defer 绑定到 Finding/Resolution/Branch；它证明回执存在，不证明业务审批正确；
 - `exact/ambiguous/unavailable/stale/rejected` 是服务端拥有的原文位置状态，不是 Finding 真值；来源变化会进入 `stale`，候选重算不一致会进入 `rejected`；
 - DR-0032 的 `DecisionRequest`、来源修订校验、五态 EvidenceResolution、局部 Branch 恢复与 PostgreSQL 顺序重启门已在限定范围内实现；当前仍不能宣称独立决定账本、并发 CAS、多实例协调或在途调用恢复。
+- DR-0054 的最小 Task record、Task GET、Task/Run 双版本、sibling CAS、幂等 replay、current/history 前台和 fail-closed 旧数据恢复已有定向工程门；Task Ledger 定向 Python `92 passed`、浏览器 `4 passed`，整库 Python `410 passed, 23 skipped`、Playwright `68 passed`，Ruff/lint/build 通过。随后隔离 PostgreSQL 17.11 的七项 Task transaction gate 全部通过，并补上破损 parent version fail-closed；这仍不证明多实例协调、WorkUnit durable state 或 Provider 质量。
+- DR-0055 的 Branch 绑定 WorkUnit、append-only Contribution、两波 v1/v2、局部 waiting、严格 reservation replay、fixed-flow 反例和 checkpoint-recovered 目标重试已形成限定纵切；最新全量 Python `417 passed, 23 skipped`、Playwright `68 passed`，隔离 PostgreSQL 17.11 的 Demo/Task 组合为 `10 passed`，Ruff/lint/build 通过。这证明单主机持久台账，不证明 queue/lease、远端 Worker、多实例、Provider 效果或用户价值。
+- DR-0056 把 Demo 1 时间维和 Demo 2 组织维拆成任务会话、历史只读 Run 与独立 Adaptive Swarm 工作台；定向浏览器 `4 passed`、全量 Playwright `73 passed`、全量 Python `418 passed, 23 skipped`，Ruff/lint/build、治理与变更链接检查通过。截图来自固定 Fixture，不是真实 Provider 或用户研究；当前仍只是进程内、每波最多三个的只读 Worker。
+- DR-0057 纠正产品身份并新增 `/agent-capabilities`：Loop 与 Adaptive 使用同一个 selected Run 同页展示，历史一起只读，来源来自安全 Catalog，Evidence Review 仍可回开；能力页定向 `4 passed`、全量 Playwright `77 passed`、全量 Python `418 passed, 23 skipped`，Ruff/lint/build/治理通过。智能工作驾驶舱没有实现，也没有在前台放占位入口。
+- DR-0058 在不改 Runtime 的前提下把能力页收敛为四条渐进披露路径：默认任务进展、完整执行记录、协作方式和确认结论依据；主要待办来自 open DecisionRequest，协作方式把实际路线投影为任务准入、工作包、贡献汇合、核验与成果，工作包/来源/执行回执默认折叠。视觉重构最终 Playwright `77 passed`，但自动化与受控 Fixture 截图只证明工程映射，不能证明用户理解、效率或信任改善；本轮没有补真实 Provider、PostgreSQL 或目标用户研究。
+- DR-0060 在 Workspace 与 Agent 能力页增加“新建任务”：空白草稿本身无服务端写入，旧 Task/Run 不变，提交后才创建独立 Task；刷新保持草稿、历史可返回且相同文字的新任务使用新幂等键。定向和全量浏览器结果见本次 Evidence；没有补 Provider、PostgreSQL 或目标用户研究。
 - DR-0034 的全量门为 Python `83 passed, 2 skipped`、PostgreSQL `2 passed`、Harness browser `25 passed`，Ruff/lint/build 通过；它证明两类待处理动作的前台映射和 390 px 回归，不证明“3 秒内理解”或用户价值。
 - DR-0036 的门为 Python 定向 `78 passed`、本机全量 `116 passed, 3 skipped`、远端 PostgreSQL 17 `3 passed`、Harness browser `29 passed`、Ruff/lint/build 通过；一次真实 `deepseek-v4-pro` TC-01 在第 1 轮完成，真实 CSV 5/5、三 Branch 完成、0 Gap/开放 DecisionRequest。本机三个 skip 已由 PR #45 顺序 PostgreSQL 门补证，但仍不证明多实例；一次 Provider 成功也不证明重复稳定性或目标用户理解提升。
 - 两张确定性浏览器图分别展示“继续此分支”与“恢复 v1”；它们证明 UI/服务端字段映射，不是真实模型运行；
@@ -239,11 +314,12 @@ Agent Control Loop 的逐模块历史基线、当前有界效果纵切和后续�
 - “15 类 FORTE 任务已经全部解决”；
 - “有引用就证明结论或数字正确”；
 - “计划里出现操作，就说明工具或文件写入已经发生”；
-- “当前三轮只读 Loop 已等同完整 Demo 1 Durable Runtime，或 Demo 2/3 已全部完成”；
+- “当前最小 Task Ledger/current pointer 与 WorkUnit/Contribution 台账已等同生产级 Durable Task/Worker 服务，或 Demo 2/3 已全部完成”；
 - “内存 Snapshot 具备跨进程持久化或多实例高可用”；
 - “PostgreSQL Snapshot 恢复等于在途模型调用可续跑、跨实例调度或多实例高可用”；
 - “独立 append-only 逻辑 ArtifactVersion/TaskCommit 等于真实办公文件写入、源文件回滚或 Tool Gateway 动作”；
-- “Branch 状态与逐条继续等于多个 Worker 已并行、自组织或动态调度”；
+- “一次进程内最多三个 Analyst Worker 等于分布式 Swarm、生产调度、Worker lease 或多实例恢复”；
+- “Topology Admission 证明多 Worker 更快、更便宜、更正确”；
 - “Evidence Gate 已验证语义真值、数值正确性或业务完整性”；
 - “整库、引用、计划、暂停、恢复或知识工作是本项目独有”；
 - 在没有固定配置竞品实测时声称“主流竞品做不到”或“全面领先”；

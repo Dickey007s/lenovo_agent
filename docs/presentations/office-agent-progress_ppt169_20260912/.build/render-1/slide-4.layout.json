@@ -1,0 +1,1420 @@
+{
+  "schema": "openai.presentation.layout/v4",
+  "unit": "px",
+  "slide": {
+    "aid": "sl/wqzo2n",
+    "id": "wqzo2n",
+    "slide": 4,
+    "layoutId": "e02214de-0af7-4187-83d5-fb5e2331a537",
+    "layoutName": "Title Slide",
+    "layoutType": "title",
+    "masterLayoutId": "119304e4-55ba-4450-9c5f-672f895621ce",
+    "masterLayoutName": "Master",
+    "backgroundColor": "#FFFFFF",
+    "frame": {
+      "left": 0,
+      "top": 0,
+      "width": 1280,
+      "height": 720
+    }
+  },
+  "theme": {
+    "colorSchemeName": "ChatGPT",
+    "colors": {
+      "accent1": "#156082",
+      "accent2": "#E97132",
+      "accent3": "#196B24",
+      "accent4": "#0F9ED5",
+      "accent5": "#A02B93",
+      "accent6": "#4EA72E",
+      "bg1": "#FFFFFF",
+      "bg2": "#000000",
+      "tx1": "#1F1F1F",
+      "tx2": "#FFFFFF",
+      "dk1": "#000000",
+      "lt1": "#FFFFFF",
+      "dk2": "#0E2841",
+      "lt2": "#E8E8E8",
+      "hlink": "#467886",
+      "folHlink": "#96607D"
+    },
+    "typefaces": [
+      "Microsoft YaHei"
+    ]
+  },
+  "inheritedLayers": [
+    {
+      "scope": "layout",
+      "id": "e02214de-0af7-4187-83d5-fb5e2331a537",
+      "name": "Title Slide",
+      "type": "title",
+      "parentLayoutId": "119304e4-55ba-4450-9c5f-672f895621ce",
+      "elements": []
+    },
+    {
+      "scope": "master",
+      "id": "119304e4-55ba-4450-9c5f-672f895621ce",
+      "name": "Master",
+      "type": "master",
+      "elements": []
+    }
+  ],
+  "elements": [
+    {
+      "order": 1,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/bu9ormh4",
+      "id": "1",
+      "name": "人机共驾调研：四条 Agent 技术线",
+      "bbox": [
+        48,
+        36,
+        1184,
+        59.4
+      ],
+      "geometry": "rect",
+      "text": "人机共驾调研：四条 Agent 技术线",
+      "textPreview": "人机共驾调研：四条 Agent 技术线",
+      "resolvedFontSize": 44,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 44,
+        "typeface": "Microsoft YaHei",
+        "color": "#182230",
+        "bold": true,
+        "alignment": "left",
+        "verticalAlignment": "top",
+        "wrap": "none",
+        "autoFit": "none",
+        "insets": {
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "left": 0
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "人机共驾调研：四条 Agent 技术线"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "人机共驾调研：四条 Agent 技术线",
+          "resolvedTextStyle": {
+            "fontSize": 44,
+            "typeface": "Microsoft YaHei",
+            "color": "#182230",
+            "bold": true,
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "人机共驾调研：四条 Agent 技术线",
+              "fontSize": 44,
+              "typeface": "Microsoft YaHei",
+              "color": "#182230",
+              "bold": true,
+              "alignment": "left"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 2,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/cvi50ryp",
+      "id": "2",
+      "name": "梳理 16 篇相关论文，重点抽读机制，并映射到原系统的办公任务",
+      "bbox": [
+        48,
+        99,
+        1184,
+        32.4
+      ],
+      "geometry": "rect",
+      "text": "梳理 16 篇相关论文，重点抽读机制，并映射到原系统的办公任务",
+      "textPreview": "梳理 16 篇相关论文，重点抽读机制，并映射到原系统的办公任务",
+      "resolvedFontSize": 24,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 24,
+        "typeface": "Microsoft YaHei",
+        "color": "#596579",
+        "alignment": "left",
+        "verticalAlignment": "top",
+        "wrap": "none",
+        "autoFit": "none",
+        "insets": {
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "left": 0
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "梳理 16 篇相关论文，重点抽读机制，并映射到原系统的办公任务"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "梳理 16 篇相关论文，重点抽读机制，并映射到原系统的办公任务",
+          "resolvedTextStyle": {
+            "fontSize": 24,
+            "typeface": "Microsoft YaHei",
+            "color": "#596579",
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "梳理 16 篇相关论文，重点抽读机制，并映射到原系统的办公任务",
+              "fontSize": 24,
+              "typeface": "Microsoft YaHei",
+              "color": "#596579",
+              "alignment": "left"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 3,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/dwb6tczu",
+      "id": "3",
+      "name": "选择性求助",
+      "bbox": [
+        48,
+        178,
+        355,
+        37.8
+      ],
+      "geometry": "rect",
+      "text": "选择性求助",
+      "textPreview": "选择性求助",
+      "resolvedFontSize": 28,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 28,
+        "typeface": "Microsoft YaHei",
+        "color": "#1557D2",
+        "bold": true,
+        "alignment": "left",
+        "verticalAlignment": "top",
+        "wrap": "none",
+        "autoFit": "none",
+        "insets": {
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "left": 0
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "选择性求助"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "选择性求助",
+          "resolvedTextStyle": {
+            "fontSize": 28,
+            "typeface": "Microsoft YaHei",
+            "color": "#1557D2",
+            "bold": true,
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "选择性求助",
+              "fontSize": 28,
+              "typeface": "Microsoft YaHei",
+              "color": "#1557D2",
+              "bold": true,
+              "alignment": "left"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 4,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/2p0nuxg7",
+      "id": "4",
+      "name": "HiL-Bench、SAGE-Agent（2026）",
+      "bbox": [
+        48,
+        228,
+        355,
+        21.6
+      ],
+      "geometry": "rect",
+      "text": "HiL-Bench、SAGE-Agent（2026）",
+      "textPreview": "HiL-Bench、SAGE-Agent（2026）",
+      "resolvedFontSize": 16,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 16,
+        "typeface": "Microsoft YaHei",
+        "color": "#596579",
+        "alignment": "left",
+        "verticalAlignment": "top",
+        "wrap": "none",
+        "autoFit": "none",
+        "insets": {
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "left": 0
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "HiL-Bench、SAGE-Agent（2026）"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "HiL-Bench、SAGE-Agent（2026）",
+          "resolvedTextStyle": {
+            "fontSize": 16,
+            "typeface": "Microsoft YaHei",
+            "color": "#596579",
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "HiL-Bench、SAGE-Agent（2026）",
+              "fontSize": 16,
+              "typeface": "Microsoft YaHei",
+              "color": "#596579",
+              "alignment": "left"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 5,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/3q94n2hs",
+      "id": "5",
+      "name": "判断何时继续查资料，何时必须问人。",
+      "bbox": [
+        454,
+        180,
+        778,
+        32.4
+      ],
+      "geometry": "rect",
+      "text": "判断何时继续查资料，何时必须问人。",
+      "textPreview": "判断何时继续查资料，何时必须问人。",
+      "resolvedFontSize": 24,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 24,
+        "typeface": "Microsoft YaHei",
+        "color": "#182230",
+        "alignment": "left",
+        "verticalAlignment": "top",
+        "wrap": "none",
+        "autoFit": "none",
+        "insets": {
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "left": 0
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "判断何时继续查资料，何时必须问人。"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "判断何时继续查资料，何时必须问人。",
+          "resolvedTextStyle": {
+            "fontSize": 24,
+            "typeface": "Microsoft YaHei",
+            "color": "#182230",
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "判断何时继续查资料，何时必须问人。",
+              "fontSize": 24,
+              "typeface": "Microsoft YaHei",
+              "color": "#182230",
+              "alignment": "left"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 6,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/ori5w7yd",
+      "id": "6",
+      "name": "区分执行失败与缺失口径，减少无谓打扰。",
+      "bbox": [
+        454,
+        218,
+        778,
+        32.4
+      ],
+      "geometry": "rect",
+      "text": "区分执行失败与缺失口径，减少无谓打扰。",
+      "textPreview": "区分执行失败与缺失口径，减少无谓打扰。",
+      "resolvedFontSize": 24,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 24,
+        "typeface": "Microsoft YaHei",
+        "color": "#182230",
+        "alignment": "left",
+        "verticalAlignment": "top",
+        "wrap": "none",
+        "autoFit": "none",
+        "insets": {
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "left": 0
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "区分执行失败与缺失口径，减少无谓打扰。"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "区分执行失败与缺失口径，减少无谓打扰。",
+          "resolvedTextStyle": {
+            "fontSize": 24,
+            "typeface": "Microsoft YaHei",
+            "color": "#182230",
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "区分执行失败与缺失口径，减少无谓打扰。",
+              "fontSize": 24,
+              "typeface": "Microsoft YaHei",
+              "color": "#182230",
+              "alignment": "left"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 7,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/psrmpczy",
+      "id": "7",
+      "name": "多轮反馈利用",
+      "bbox": [
+        48,
+        298,
+        355,
+        37.8
+      ],
+      "geometry": "rect",
+      "text": "多轮反馈利用",
+      "textPreview": "多轮反馈利用",
+      "resolvedFontSize": 28,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 28,
+        "typeface": "Microsoft YaHei",
+        "color": "#1557D2",
+        "bold": true,
+        "alignment": "left",
+        "verticalAlignment": "top",
+        "wrap": "none",
+        "autoFit": "none",
+        "insets": {
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "left": 0
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "多轮反馈利用"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "多轮反馈利用",
+          "resolvedTextStyle": {
+            "fontSize": 28,
+            "typeface": "Microsoft YaHei",
+            "color": "#1557D2",
+            "bold": true,
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "多轮反馈利用",
+              "fontSize": 28,
+              "typeface": "Microsoft YaHei",
+              "color": "#1557D2",
+              "bold": true,
+              "alignment": "left"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 8,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/mlkn61gr",
+      "id": "8",
+      "name": "SWEET-RL、Collaborative Gym",
+      "bbox": [
+        48,
+        348,
+        355,
+        21.6
+      ],
+      "geometry": "rect",
+      "text": "SWEET-RL、Collaborative Gym",
+      "textPreview": "SWEET-RL、Collaborative Gym",
+      "resolvedFontSize": 16,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 16,
+        "typeface": "Microsoft YaHei",
+        "color": "#596579",
+        "alignment": "left",
+        "verticalAlignment": "top",
+        "wrap": "none",
+        "autoFit": "none",
+        "insets": {
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "left": 0
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "SWEET-RL、Collaborative Gym"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "SWEET-RL、Collaborative Gym",
+          "resolvedTextStyle": {
+            "fontSize": 16,
+            "typeface": "Microsoft YaHei",
+            "color": "#596579",
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "SWEET-RL、Collaborative Gym",
+              "fontSize": 16,
+              "typeface": "Microsoft YaHei",
+              "color": "#596579",
+              "alignment": "left"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 9,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/nmtoz6xc",
+      "id": "9",
+      "name": "把人的回答用于后续计划与成果修正。",
+      "bbox": [
+        454,
+        300,
+        778,
+        32.4
+      ],
+      "geometry": "rect",
+      "text": "把人的回答用于后续计划与成果修正。",
+      "textPreview": "把人的回答用于后续计划与成果修正。",
+      "resolvedFontSize": 24,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 24,
+        "typeface": "Microsoft YaHei",
+        "color": "#182230",
+        "alignment": "left",
+        "verticalAlignment": "top",
+        "wrap": "none",
+        "autoFit": "none",
+        "insets": {
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "left": 0
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "把人的回答用于后续计划与成果修正。"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "把人的回答用于后续计划与成果修正。",
+          "resolvedTextStyle": {
+            "fontSize": 24,
+            "typeface": "Microsoft YaHei",
+            "color": "#182230",
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "把人的回答用于后续计划与成果修正。",
+              "fontSize": 24,
+              "typeface": "Microsoft YaHei",
+              "color": "#182230",
+              "alignment": "left"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 10,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/nyhobalk",
+      "id": "10",
+      "name": "沿用同一任务，检查反馈是否真正改变结果。",
+      "bbox": [
+        454,
+        338,
+        778,
+        32.4
+      ],
+      "geometry": "rect",
+      "text": "沿用同一任务，检查反馈是否真正改变结果。",
+      "textPreview": "沿用同一任务，检查反馈是否真正改变结果。",
+      "resolvedFontSize": 24,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 24,
+        "typeface": "Microsoft YaHei",
+        "color": "#182230",
+        "alignment": "left",
+        "verticalAlignment": "top",
+        "wrap": "none",
+        "autoFit": "none",
+        "insets": {
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "left": 0
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "沿用同一任务，检查反馈是否真正改变结果。"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "沿用同一任务，检查反馈是否真正改变结果。",
+          "resolvedTextStyle": {
+            "fontSize": 24,
+            "typeface": "Microsoft YaHei",
+            "color": "#182230",
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "沿用同一任务，检查反馈是否真正改变结果。",
+              "fontSize": 24,
+              "typeface": "Microsoft YaHei",
+              "color": "#182230",
+              "alignment": "left"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 11,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/mx8725kz",
+      "id": "11",
+      "name": "执行权限约束",
+      "bbox": [
+        48,
+        418,
+        355,
+        37.8
+      ],
+      "geometry": "rect",
+      "text": "执行权限约束",
+      "textPreview": "执行权限约束",
+      "resolvedFontSize": 28,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 28,
+        "typeface": "Microsoft YaHei",
+        "color": "#1557D2",
+        "bold": true,
+        "alignment": "left",
+        "verticalAlignment": "top",
+        "wrap": "none",
+        "autoFit": "none",
+        "insets": {
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "left": 0
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "执行权限约束"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "执行权限约束",
+          "resolvedTextStyle": {
+            "fontSize": 28,
+            "typeface": "Microsoft YaHei",
+            "color": "#1557D2",
+            "bold": true,
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "执行权限约束",
+              "fontSize": 28,
+              "typeface": "Microsoft YaHei",
+              "color": "#1557D2",
+              "bold": true,
+              "alignment": "left"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 12,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/90j6dk3a",
+      "id": "12",
+      "name": "AgentSpec、AgentDojo",
+      "bbox": [
+        48,
+        468,
+        355,
+        21.6
+      ],
+      "geometry": "rect",
+      "text": "AgentSpec、AgentDojo",
+      "textPreview": "AgentSpec、AgentDojo",
+      "resolvedFontSize": 16,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 16,
+        "typeface": "Microsoft YaHei",
+        "color": "#596579",
+        "alignment": "left",
+        "verticalAlignment": "top",
+        "wrap": "none",
+        "autoFit": "none",
+        "insets": {
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "left": 0
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "AgentSpec、AgentDojo"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "AgentSpec、AgentDojo",
+          "resolvedTextStyle": {
+            "fontSize": 16,
+            "typeface": "Microsoft YaHei",
+            "color": "#596579",
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "AgentSpec、AgentDojo",
+              "fontSize": 16,
+              "typeface": "Microsoft YaHei",
+              "color": "#596579",
+              "alignment": "left"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 13,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/ozqp4f25",
+      "id": "13",
+      "name": "动作发生前，由 Runtime 强制检查约束。",
+      "bbox": [
+        454,
+        420,
+        778,
+        32.4
+      ],
+      "geometry": "rect",
+      "text": "动作发生前，由 Runtime 强制检查约束。",
+      "textPreview": "动作发生前，由 Runtime 强制检查约束。",
+      "resolvedFontSize": 24,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 24,
+        "typeface": "Microsoft YaHei",
+        "color": "#182230",
+        "alignment": "left",
+        "verticalAlignment": "top",
+        "wrap": "none",
+        "autoFit": "none",
+        "insets": {
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "left": 0
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "动作发生前，由 Runtime 强制检查约束。"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "动作发生前，由 Runtime 强制检查约束。",
+          "resolvedTextStyle": {
+            "fontSize": 24,
+            "typeface": "Microsoft YaHei",
+            "color": "#182230",
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "动作发生前，由 Runtime 强制检查约束。",
+              "fontSize": 24,
+              "typeface": "Microsoft YaHei",
+              "color": "#182230",
+              "alignment": "left"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 14,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/b21ofulg",
+      "id": "14",
+      "name": "材料中的指令不构成授权，确认依据不开放外发。",
+      "bbox": [
+        454,
+        458,
+        778,
+        32.4
+      ],
+      "geometry": "rect",
+      "text": "材料中的指令不构成授权，确认依据不开放外发。",
+      "textPreview": "材料中的指令不构成授权，确认依据不开放外发。",
+      "resolvedFontSize": 24,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 24,
+        "typeface": "Microsoft YaHei",
+        "color": "#182230",
+        "alignment": "left",
+        "verticalAlignment": "top",
+        "wrap": "none",
+        "autoFit": "none",
+        "insets": {
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "left": 0
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "材料中的指令不构成授权，确认依据不开放外发。"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "材料中的指令不构成授权，确认依据不开放外发。",
+          "resolvedTextStyle": {
+            "fontSize": 24,
+            "typeface": "Microsoft YaHei",
+            "color": "#182230",
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "材料中的指令不构成授权，确认依据不开放外发。",
+              "fontSize": 24,
+              "typeface": "Microsoft YaHei",
+              "color": "#182230",
+              "alignment": "left"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 15,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/a1s76pkv",
+      "id": "15",
+      "name": "多 Agent 委派验证",
+      "bbox": [
+        48,
+        538,
+        355,
+        37.8
+      ],
+      "geometry": "rect",
+      "text": "多 Agent 委派验证",
+      "textPreview": "多 Agent 委派验证",
+      "resolvedFontSize": 28,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 28,
+        "typeface": "Microsoft YaHei",
+        "color": "#1557D2",
+        "bold": true,
+        "alignment": "left",
+        "verticalAlignment": "top",
+        "wrap": "none",
+        "autoFit": "none",
+        "insets": {
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "left": 0
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "多 Agent 委派验证"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "多 Agent 委派验证",
+          "resolvedTextStyle": {
+            "fontSize": 28,
+            "typeface": "Microsoft YaHei",
+            "color": "#1557D2",
+            "bold": true,
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "多 Agent 委派验证",
+              "fontSize": 28,
+              "typeface": "Microsoft YaHei",
+              "color": "#1557D2",
+              "bold": true,
+              "alignment": "left"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 16,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/x4j6h43m",
+      "id": "16",
+      "name": "Intelligent AI Delegation、MAST",
+      "bbox": [
+        48,
+        588,
+        380,
+        21.6
+      ],
+      "geometry": "rect",
+      "text": "Intelligent AI Delegation、MAST",
+      "textPreview": "Intelligent AI Delegation、MAST",
+      "resolvedFontSize": 16,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 16,
+        "typeface": "Microsoft YaHei",
+        "color": "#596579",
+        "alignment": "left",
+        "verticalAlignment": "top",
+        "wrap": "none",
+        "autoFit": "none",
+        "insets": {
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "left": 0
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "Intelligent AI Delegation、MAST"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "Intelligent AI Delegation、MAST",
+          "resolvedTextStyle": {
+            "fontSize": 16,
+            "typeface": "Microsoft YaHei",
+            "color": "#596579",
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "Intelligent AI Delegation、MAST",
+              "fontSize": 16,
+              "typeface": "Microsoft YaHei",
+              "color": "#596579",
+              "alignment": "left"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 17,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/w3ap8z21",
+      "id": "17",
+      "name": "委派时约束权限，返回后验证每份贡献。",
+      "bbox": [
+        454,
+        540,
+        778,
+        32.4
+      ],
+      "geometry": "rect",
+      "text": "委派时约束权限，返回后验证每份贡献。",
+      "textPreview": "委派时约束权限，返回后验证每份贡献。",
+      "resolvedFontSize": 24,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 24,
+        "typeface": "Microsoft YaHei",
+        "color": "#182230",
+        "alignment": "left",
+        "verticalAlignment": "top",
+        "wrap": "none",
+        "autoFit": "none",
+        "insets": {
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "left": 0
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "委派时约束权限，返回后验证每份贡献。"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "委派时约束权限，返回后验证每份贡献。",
+          "resolvedTextStyle": {
+            "fontSize": 24,
+            "typeface": "Microsoft YaHei",
+            "color": "#182230",
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "委派时约束权限，返回后验证每份贡献。",
+              "fontSize": 24,
+              "typeface": "Microsoft YaHei",
+              "color": "#182230",
+              "alignment": "left"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 18,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/jq1ojuls",
+      "id": "18",
+      "name": "防止错误交接、未核验采用和提前显示完成。",
+      "bbox": [
+        454,
+        578,
+        778,
+        32.4
+      ],
+      "geometry": "rect",
+      "text": "防止错误交接、未核验采用和提前显示完成。",
+      "textPreview": "防止错误交接、未核验采用和提前显示完成。",
+      "resolvedFontSize": 24,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 24,
+        "typeface": "Microsoft YaHei",
+        "color": "#182230",
+        "alignment": "left",
+        "verticalAlignment": "top",
+        "wrap": "none",
+        "autoFit": "none",
+        "insets": {
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "left": 0
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "防止错误交接、未核验采用和提前显示完成。"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "防止错误交接、未核验采用和提前显示完成。",
+          "resolvedTextStyle": {
+            "fontSize": 24,
+            "typeface": "Microsoft YaHei",
+            "color": "#182230",
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "防止错误交接、未核验采用和提前显示完成。",
+              "fontSize": 24,
+              "typeface": "Microsoft YaHei",
+              "color": "#182230",
+              "alignment": "left"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 19,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/yps7apk7",
+      "id": "19",
+      "name": "论文机制与项目设计推论分开。定向选读不等于全文精读、算法接入或效果复现。逐篇链接",
+      "bbox": [
+        48,
+        680,
+        1100,
+        21.6
+      ],
+      "geometry": "rect",
+      "text": "论文机制与项目设计推论分开。定向选读不等于全文精读、算法接入或效果复现。逐篇链接见本页备注。",
+      "textPreview": "论文机制与项目设计推论分开。定向选读不等于全文精读、算法接入或效果复现。逐篇链接见本页备注。",
+      "resolvedFontSize": 16,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 16,
+        "typeface": "Microsoft YaHei",
+        "color": "#596579",
+        "alignment": "left",
+        "verticalAlignment": "top",
+        "wrap": "none",
+        "autoFit": "none",
+        "insets": {
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "left": 0
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "论文机制与项目设计推论分开。定向选读不等于全文精读、算法接入或效果复现。逐篇链接见本页备注。"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "论文机制与项目设计推论分开。定向选读不等于全文精读、算法接入或效果复现。逐篇链接见本页备注。",
+          "resolvedTextStyle": {
+            "fontSize": 16,
+            "typeface": "Microsoft YaHei",
+            "color": "#596579",
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "论文机制与项目设计推论分开。定向选读不等于全文精读、算法接入或效果复现。逐篇链接见本页备注。",
+              "fontSize": 16,
+              "typeface": "Microsoft YaHei",
+              "color": "#596579",
+              "alignment": "left"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 20,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/uxgjyx8r",
+      "id": "20",
+      "name": "04",
+      "bbox": [
+        1198,
+        680,
+        34,
+        21.6
+      ],
+      "geometry": "rect",
+      "text": "04",
+      "textPreview": "04",
+      "resolvedFontSize": 16,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 16,
+        "typeface": "Microsoft YaHei",
+        "color": "#596579",
+        "alignment": "left",
+        "verticalAlignment": "top",
+        "wrap": "none",
+        "autoFit": "none",
+        "insets": {
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "left": 0
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "04"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "04",
+          "resolvedTextStyle": {
+            "fontSize": 16,
+            "typeface": "Microsoft YaHei",
+            "color": "#596579",
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "04",
+              "fontSize": 16,
+              "typeface": "Microsoft YaHei",
+              "color": "#596579",
+              "alignment": "left"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    }
+  ],
+  "composeRuns": []
+}

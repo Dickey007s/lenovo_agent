@@ -1,0 +1,5 @@
+No,Filename,Width,Height,AspectRatio,PixelAspectRatio,RatioSource,UsageCount,DisplayRatioVariants,AssetKind,SvgRenderable,PptxNativeSupported,SizeKB,Category,ImageArea_SxS,TextArea_SxS
+1,copilot-framework.png,1536,1024,1.50,1.50,pixel,1,,bitmap,True,True,1062.4,Standard landscape,812x541,328x600
+2,evidence.png,1672,940,1.78,1.78,pixel,1,,bitmap,True,True,98.8,Wide landscape,812x457,328x600
+3,progress.png,1672,940,1.78,1.78,pixel,1,,bitmap,True,True,82.5,Wide landscape,812x457,328x600
+4,swarm.png,1440,1100,1.31,1.31,pixel,1,,bitmap,True,True,112.9,Standard landscape,785x600,355x600

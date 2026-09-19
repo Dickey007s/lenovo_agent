@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 1280 720" width="1280" height="720">
+  <g id="background"><rect width="1280" height="720" fill="#F7F9FC"/><text x="48" y="70" font-family="'Microsoft YaHei UI','Segoe UI',Arial,sans-serif" font-size="44" font-weight="700" fill="#172230">Demo 2：用户确认后，Adaptive Swarm 才真正启动</text><text x="48" y="108" font-family="'Microsoft YaHei UI','Segoe UI',Arial,sans-serif" font-size="18" fill="#526579">“已选择路线”不是“任务已执行”，显式启动才创建受控 Execution Snapshot</text></g>
+  <g id="screenshots">
+    <rect x="48" y="144" width="420" height="292" fill="#FFFFFF" stroke="#CAD6E3"/>
+    <image x="58" y="154" width="400" height="272" xlink:href="../images/dr-0015-demo2-controlled-execution-1440-selected-not-started.png" preserveAspectRatio="xMidYMid meet"/>
+    <rect x="812" y="144" width="420" height="292" fill="#FFFFFF" stroke="#CAD6E3"/>
+    <image x="822" y="154" width="400" height="272" xlink:href="../images/dr-0015-demo2-controlled-execution-1440-running.png" preserveAspectRatio="xMidYMid meet"/>
+    <text x="258" y="466" text-anchor="middle" font-family="'Microsoft YaHei UI','Segoe UI',Arial,sans-serif" font-size="18" font-weight="700" fill="#526579">已选择 · 尚未启动</text><text x="1022" y="466" text-anchor="middle" font-family="'Microsoft YaHei UI','Segoe UI',Arial,sans-serif" font-size="18" font-weight="700" fill="#16845B">执行中 · Worker 回执可见</text>
+  </g>
+  <g id="start-gate">
+    <line x1="498" y1="288" x2="782" y2="288" stroke="#CAD6E3" stroke-width="4"/>
+    <polygon points="782,288 760,276 760,300" fill="#0B3A70"/>
+    <rect x="540" y="226" width="200" height="124" fill="#0B3A70"/>
+    <use data-icon="tabler-outline/bolt" x="562" y="246" width="32" height="32" stroke="#FFFFFF" stroke-width="2" fill="none"/>
+    <text x="608" y="268" font-family="'Microsoft YaHei UI','Segoe UI',Arial,sans-serif" font-size="20" font-weight="700" fill="#FFFFFF">明确启动</text>
+    <text x="640" y="306" text-anchor="middle" font-family="'Microsoft YaHei UI','Segoe UI',Arial,sans-serif" font-size="17" fill="#EAF0F7">创建 Execution</text><text x="640" y="332" text-anchor="middle" font-family="'Microsoft YaHei UI','Segoe UI',Arial,sans-serif" font-size="17" fill="#EAF0F7">冻结来源与预算</text>
+  </g>
+  <g id="pipeline">
+    <text x="48" y="520" font-family="'Microsoft YaHei UI','Segoe UI',Arial,sans-serif" font-size="18" font-weight="700" fill="#0B3A70">受控内部执行</text>
+    <line x1="112" y1="574" x2="1168" y2="574" stroke="#CAD6E3" stroke-width="4"/>
+    <circle cx="112" cy="574" r="25" fill="#0B3A70"/><circle cx="376" cy="574" r="25" fill="#0B3A70"/><circle cx="640" cy="574" r="25" fill="#0B3A70"/><circle cx="904" cy="574" r="25" fill="#D71920"/><circle cx="1168" cy="574" r="25" fill="#16845B"/>
+    <text x="112" y="581" text-anchor="middle" font-family="Consolas,'Courier New',monospace" font-size="16" font-weight="700" fill="#FFFFFF">1</text><text x="376" y="581" text-anchor="middle" font-family="Consolas,'Courier New',monospace" font-size="16" font-weight="700" fill="#FFFFFF">2</text><text x="640" y="581" text-anchor="middle" font-family="Consolas,'Courier New',monospace" font-size="16" font-weight="700" fill="#FFFFFF">3</text><text x="904" y="581" text-anchor="middle" font-family="Consolas,'Courier New',monospace" font-size="16" font-weight="700" fill="#FFFFFF">4</text><text x="1168" y="581" text-anchor="middle" font-family="Consolas,'Courier New',monospace" font-size="16" font-weight="700" fill="#FFFFFF">5</text>
+    <text x="112" y="620" text-anchor="middle" font-family="'Microsoft YaHei UI','Segoe UI',Arial,sans-serif" font-size="16" font-weight="700" fill="#172230">Admission 预演</text><text x="376" y="620" text-anchor="middle" font-family="'Microsoft YaHei UI','Segoe UI',Arial,sans-serif" font-size="16" font-weight="700" fill="#172230">确认本轮路线</text><text x="640" y="620" text-anchor="middle" font-family="'Microsoft YaHei UI','Segoe UI',Arial,sans-serif" font-size="16" font-weight="700" fill="#172230">3 个初始 Worker</text><text x="904" y="620" text-anchor="middle" font-family="'Microsoft YaHei UI','Segoe UI',Arial,sans-serif" font-size="16" font-weight="700" fill="#D71920">冲突触发增派</text><text x="1168" y="620" text-anchor="middle" font-family="'Microsoft YaHei UI','Segoe UI',Arial,sans-serif" font-size="16" font-weight="700" fill="#16845B">共享包核验完成</text>
+    <text x="1168" y="646" text-anchor="middle" font-family="'Microsoft YaHei UI','Segoe UI',Arial,sans-serif" font-size="14" fill="#16845B">无外部副作用</text>
+  </g>
+  <g id="footer"><text x="48" y="690" font-family="'Microsoft YaHei UI','Segoe UI',Arial,sans-serif" font-size="14" fill="#8291A3">Limited Verified：固定客户 A、单 API 进程、memory、4 次 deepseek-v4-pro 模型输出被采用</text><text x="1232" y="690" text-anchor="end" font-family="Consolas,'Courier New',monospace" font-size="16" fill="#0B3A70">P08</text></g>
+</svg>

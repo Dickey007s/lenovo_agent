@@ -304,8 +304,9 @@ flowchart LR
 
 **图 C 讲解词：** 绿色分支是服务端已经核对完成的工作，琥珀色分支仍缺一份引用。
 “继续此分支”不是 Demo 播放按钮，而是携带当前 version、幂等键和 `branch_id` 的服务端
-控制。回执返回前，前台不会把点击动画说成下一轮已经发生。Branch 仍由一个顺序
-Controller 推进，因此这张图不能用来宣称 Demo 2 的多个 Worker 已经并行执行。
+控制。回执返回前，前台不会把点击动画说成下一轮已经发生。这张历史图仍只展示顺序
+Controller；后续 `DR-0053/55` 的受限 Worker 与 WorkUnit 台账必须使用自己的当前证据，
+不能拿此图倒推多个 Worker 已执行。
 
 第二个变化是成果历史不再靠修改 Run JSON 表达。每个完成轮次的完整只读简报写入独立
 append-only ArtifactVersion；最终 Gate 另建 TaskCommit 指向当前版本。用户恢复旧版本时，
@@ -325,6 +326,153 @@ raw provider response。当前本地门为 Python `63 passed, 1 skipped`、Runti
 浏览器 `13 passed`、Ruff/lint/build 通过；PR #31 已合并为 `697e38b`，其 PostgreSQL 17.11 顺序 Runtime
 workflow 为 `1 passed in 1.84s`。自动化和截图仍不是用户研究，理解、信任、效率和任务价值继续标
 `Draft`。
+
+## 2026-08-31 Demo 1/2 实现回填：时间连续与组织收敛已经分层
+
+07-16 的两条主线没有改变。Demo 1 仍解决“同一任务过了一轮、停过一次或打开了两个页面，
+哪个结果才是当前工作面”；Demo 2 仍解决“任务被拆成多个工作包时，为什么值得并行、
+哪个候选真正进入统一成果”。新实现没有把两者混成一个无限预算的 Swarm。
+
+Demo 1 现在用最小 `TaskRecord/current_run_id/task_version` 管时间维连续性。一个终态 Run
+只能为一条服务端批准 Branch 创建 child Run；旧 Run、v1 和引用保持不可变。两个页面
+竞争续办时，Task version 决定只有一个 child 成为当前 Run，失败页面仍可打开权威当前
+Run。隔离 PostgreSQL 17.11 的七项 Task 事务门已经通过，但不证明多实例 Task 服务。
+
+Demo 2 现在先由 `TopologyAdmission` 在单 Controller、固定流程和受限只读 Worker 之间
+选择。只有真实独立且预算允许的 Branch 等待用户确认；三期同结构财务核对继续使用固定
+流程。确认后，完整 Branch DAG 投影为 WorkUnit，每次 Worker 返回追加不可变
+Contribution。“已返回”和“进入成果”是两个状态，只有来源、Anchor、Branch Gate 与
+叙事对账通过的候选才能进入 ArtifactVersion v1/v2。重启不会自动重放不确定调用；用户
+只能用新幂等键和当前 version 重试目标 recovered WorkUnit。
+
+为避免这段实现只剩架构名词，`SCENARIO-042` 又把 Demo 2 固定为一条可直接试的办公
+指令：用户要求分别核对产品上线、搜索 Agent 运行和用户交互三条工作线，形成跨职能风险
+与待办简报。固定门使用十份真实 FORTE 输入的安全投影；第一波三个根工作包各自核对，
+第二波只做产品影响/交互优先级与搜索 Agent 风险/待办收敛。若搜索 Agent 引用位置有
+歧义，产品和交互贡献仍形成部分 v1，只有依赖它的下游阻塞。当前交付明确是可审查、可
+恢复的逻辑 ArtifactVersion，不是 DOCX/CSV 下载文件，也不把三个不同项目的数字写成
+同一个产品结论。详细输入、过程、输出与用户试用步骤见
+[`SCENARIO-042`](../scenarios/SCENARIO-042-demo2-cross-functional-risk-brief.md) 和
+[`Demo 2 场景门`](../testing/DEMO2-INPUT-PROCESS-OUTPUT-GATES-20260831.md)。固定 Fixture 的
+Runtime `35 passed`、全量 Python `418 passed, 23 skipped`、全量浏览器修复后
+`69 passed` 及未运行的 Provider/PostgreSQL 边界见
+[`Demo 2 Evidence`](../evidence/DR-0055-DEMO2-INPUT-PROCESS-OUTPUT-EVIDENCE-20260831.md)；
+这些结果不证明用户理解或真实业务结论。
+
+这会把前台从“多个 Agent 聊天窗口”改成一张统一工作台：用户看业务工作包、依赖、
+“实际执行回执”“候选成果”“原文定位”和当前 v1/v2，不看 raw unit ID、Owner、revision、
+reservation digest、Prompt 或思维链。局部失败时先告诉用户哪些成果仍可用、影响哪个
+下游，再提供唯一恢复动作，而不是把整个任务涂成失败。
+
+这一设计参考 [OpenAI Agents SDK: Agent orchestration](https://openai.github.io/openai-agents-python/multi_agent/)、
+[Anthropic: How we built our multi-agent research system](https://www.anthropic.com/engineering/multi-agent-research-system)、
+[A2A Protocol specification](https://a2a-protocol.org/latest/specification/) 与
+[Microsoft Research: Guidelines for Human-AI Interaction](https://www.microsoft.com/en-us/research/publication/guidelines-for-human-ai-interaction/)。
+这些来源支持有限并行、Task/Artifact/事件分层和及时解释状态/后果的方向，不是竞品同场
+实测，也不能证明竞品做不到。
+
+当前工程门为全量 Python `417 passed, 23 skipped`、Playwright `68 passed`、隔离
+PostgreSQL 17.11 的 Demo/Task 组合 `10 passed`；公共 Snapshot Owner 隔离与叙事 stale/
+contradictory 双重拒绝又分别通过定向回归。它仍不是 durable queue/lease、远端 Worker、
+真实 Provider 效果、通用 Tool Gateway、外部动作或用户研究证据。
+
+## 2026-09-01 历史实现：先把时间维与组织维拆开
+
+用户这次指出的核心问题非常具体：虽然 Task lineage、TopologyAdmission、WorkUnit、Worker
+和 Contribution 都已经存在，但它们堆在一条长页面里，导致 Demo 1 和 Demo 2 都看不清。
+本轮因此没有再增加一种 Runtime，而是把同一份服务端事实拆成两个工作面。
+
+Demo 1 留在默认 Agent Control Loop。页面顶部新增“任务会话”，把 Owner 最近 20 个 Run
+按 `task_id` 分组：不同 Task 是不同会话，同一 Task 的 Run 1、Run 2 留在同一组。用户打开
+记录时，浏览器必须先用 Task current pointer 判断它是当前还是历史；历史 Run 可以查看
+Snapshot、证据、成果和轨迹，但不接 SSE，也不能发控制、决策或 Worker 命令。只有当前且
+非终态的 Run 才从自己的 `last_event_sequence` 恢复事件。这把“回看旧聊天”从浏览器缓存
+变成了服务端可核对的任务记录，同时明确当前只发现最近 20 个 Run，不伪装成无限 Task list。
+
+Demo 2 使用独立全屏“Adaptive Swarm 工作台”。工作台不是新的 Demo 接口，而是把当前
+Snapshot 中的 `topology_admission`、Branch/WorkUnit 依赖、批准来源、Worker
+`called/output_used/elapsed_ms`、Contribution Gate 和 ArtifactVersion v1/v2 放在一个
+组织视图里。顶部用 Tool Call、Single Controller、Fixed Workflow、Adaptive Swarm
+解释四条路线，但只高亮服务端实际路线；非 Adaptive Run 明确显示“本次未启动 Worker”，
+不画假的 Supervisor 或 Worker。Adaptive Run 第一眼同时显示“当前有限实现：受限只读
+Worker”，避免把最多每波三个进程内 Analyst 误解为分布式生产 Swarm。
+
+以“跨职能风险与待办简报”为例，用户输入仍是普通办公目标，不选择 Demo。服务端若根据
+十份批准来源形成三个独立根工作包和两个依赖工作包，工作台先显示 Supervisor 工作图和
+确认门；确认前没有 Worker 调用，确认后第一波分别核对产品上线、搜索 Agent 运行和用户
+交互。若搜索分支引用有歧义，Contribution 保持 waiting，只有依赖它的统一待办受阻；产品
+和交互贡献及已有 v1 保留。用户看到的不是五个 Agent 私聊，而是“谁做了什么、读了什么、
+返回是否采用、失败影响谁、当前成果是哪一版”。
+
+主流产品已经提供 thread、checkpoint、agent team、manager/worker 与共享 task list，
+因此这不是“竞品不能多 Agent”的结论。参考 [Introducing the Codex app](https://openai.com/index/introducing-the-codex-app/)、
+[LangGraph Persistence](https://docs.langchain.com/oss/python/langgraph/persistence)、
+[OpenAI Agents SDK orchestration](https://openai.github.io/openai-agents-python/multi_agent/)、
+[Anthropic multi-agent research system](https://www.anthropic.com/engineering/multi-agent-research-system)、
+[Claude Code agent teams](https://code.claude.com/docs/en/agent-teams) 与
+[OpenClaw Swarm](https://docs.openclaw.ai/tools/swarm)，本项目的差异假设是：办公用户应在
+同一条事实链里同时看到任务、批准来源、候选返回、服务端采用和成果版本，而不必进入每个
+Worker 私聊自行拼答案。[Microsoft HAI Guidelines](https://www.microsoft.com/en-us/research/publication/guidelines-for-human-ai-interaction/)
+支持及时说明状态、动作后果和纠错入口，但这些官方资料和工程截图仍不证明真实用户已经
+更快或更信任；该效果继续标为 `Draft`。
+
+决策、可直接试的两条输入、失败路径与浏览器门见
+[`DR-0056`](../decisions/DR-0056-demo1-loop-and-adaptive-swarm-workspaces.md)、
+[`SCENARIO-043`](../scenarios/SCENARIO-043-task-conversations-and-adaptive-swarm-workbench.md) 和
+[`分层工作面验收门`](../testing/DEMO1-DEMO2-SEPARATED-WORKSPACE-GATES-20260901.md)。当前工程门为
+定向浏览器 `4 passed`、全量 Playwright `73 passed`、全量 Python
+`418 passed, 23 skipped`，Ruff/lint/build、治理和变更链接检查通过；任务会话、桌面
+Adaptive 工作台与 390 px 单列截图见
+[`DR-0056 Evidence`](../evidence/DR-0056-DEMO1-DEMO2-SEPARATED-WORKSPACES-EVIDENCE-20260901.md)。
+这些截图使用固定公开 Fixture，只证明 DOM、公开 Snapshot 与交互路径，不证明真实 Provider
+质量、分布式 Swarm、用户理解或业务价值。
+
+## 2026-09-01 产品边界纠正：能力页不是 Demo 2 驾驶舱
+
+Stakeholder 随后指出一个重要冲突：上面的工程拆分解决了“界面太挤”，却把 Adaptive
+Swarm 工作台误写成了 Demo 2 本身。07-16 基线的 Demo 2 产品形态始终是“智能工作
+驾驶舱”：用户先看到按优先级排列的真实业务任务，系统再为每项任务选择 Tool Call、
+Single Agent、Fixed Workflow 或 Adaptive Swarm，完成或待确认状态最后回到同一个驾驶舱。
+Adaptive Swarm 只是驾驶舱处理复杂任务的一种执行方式，不是驾驶舱的同义词。
+
+纠正后的信息架构有三个面，但仍只使用一套 Runtime：
+
+1. **Workspace** 负责资料、目标输入、安全预览、成果和例外处理，是日常办公工作面。
+2. **Agent 能力页** 负责解释 Agent 如何工作。`/agent-capabilities` 用同一个 selected
+   Task/Run/Snapshot 同页显示 Agent Control Loop 与 Adaptive Swarm。前者回答“同一个任务
+   如何跨轮次、跨 Run 继续”，后者回答“复杂任务为何拆成这些 WorkUnit、哪些 Worker
+   返回被服务端采用、失败影响哪些下游、当前成果是哪一版”。
+3. **智能工作驾驶舱** 是后续 Demo 2 的独立业务产品面。当前公开协议还没有任务队列、
+   优先级、跨 Task dispatch、四路线执行和返回驾驶舱合同，因此本轮不实现路由、不显示
+   占位入口，也不把 07-16 概念图冒充运行截图。
+
+这个纠正改变了用户流程。用户平时在 Workspace 完成工作；需要理解系统时，进入 Agent
+能力页，在同一个 Run 上把时间线和组织图对起来，而不是在两个页面之间猜它们是否属于
+同一任务。将来进入智能工作驾驶舱时，用户关心的是“今天先做什么、为什么这样排序、这项
+任务应走哪条执行路线、现在需要我确认什么”，而不是先学习 WorkUnit 或 Contribution
+协议。这样把工程可核对性与业务任务经营分开，避免普通用户被协议细节淹没，也避免技术
+工作台被包装成完整产品。
+
+以“跨职能风险与待办简报”为例，当前能力页可验证的输入、过程和输出是：用户在 Workspace
+输入普通办公目标；服务端若批准十份来源并选择 `adaptive_readonly_workers`，能力页同时
+展示 Loop 的 Task/Run/Round/Branch/Evidence/Artifact 链和 Adaptive 的三个根工作包、两个
+依赖工作包、Worker receipt、Contribution Gate 与 v1/v2。切换旧 Run 后两块一起只读，
+只有 current Run 接收 SSE；点击核对仍进入真实安全预览和 Evidence Anchor。若服务端选择
+`fixed_workflow`，页面明确显示本次没有 Worker，不补假拓扑。
+
+未来驾驶舱场景则不同：它应从真实任务队列开始，展示例如经营汇报、周报、邮件和报销核查
+的优先级与依据；其中只有高价值、高广度、高并行度且预算允许的工作进入 Adaptive Swarm。
+这一过程仍需新的公开合同、Scenario、工程 Evidence 和目标用户研究。现有自动化只能证明
+页面使用相同 Snapshot、历史只读、来源标签和回执映射正确，不能证明用户理解、效率、信任
+或业务质量已经改善。
+
+本次纠正见 [`DR-0057`](../decisions/DR-0057-agent-capability-page-and-smart-cockpit-boundary.md)、
+[`SCENARIO-044`](../scenarios/SCENARIO-044-agent-capability-page-and-future-smart-cockpit.md) 和
+[`Agent 能力页验收门`](../testing/AGENT-CAPABILITY-PAGE-AND-COCKPIT-BOUNDARY-GATES-20260901.md)。
+当前工程 Evidence 为能力页定向 Playwright `4 passed`、全量 Playwright `77 passed`、全量
+Python `418 passed, 23 skipped`，Ruff/lint/build/治理通过；桌面和 390 px 图见
+[`DR-0057 Evidence`](../evidence/DR-0057-AGENT-CAPABILITY-PAGE-EVIDENCE-20260901.md)。这些仍是
+固定 Fixture 证据，不是目标用户研究或智能工作驾驶舱完成证明。
 
 ## 最新增补：从“用户先找文件”改为“Agent 找证据，人确认下一步”
 
@@ -503,7 +651,8 @@ Reasoning、Action 与 Observation 交替出现，使下一步计划能够吸收
 当前 Office Agent 已实现最多二十四轮的有界近似：Workspace 观察、每轮 Planner、服务端
 校验、固定本地适配器或只读 Act、Analyst、确定性/引用验证和 Branch Evidence Gate，并支持预算停止、安全点控制、独立逻辑
 ArtifactVersion、TaskCommit、隔离 Run Workspace Artifact 与配置 PostgreSQL 时的顺序 Runtime 恢复。它仍没有通用 Tool Gateway、
-外部 Connector、并行 Worker 或多实例调度，因此不能称为完整 ReAct
+外部 Connector、分布式/远端 Worker 或多实例调度；当前只有每波最多三个的进程内
+只读 Analyst Worker，因此不能称为完整 ReAct
 执行器。普通 UI 展示 named SSE、模型回执、业务 Plan 和引用，明确不展示 Prompt、
 chain-of-thought 或原始模型响应。
 
@@ -519,7 +668,11 @@ chain-of-thought 或原始模型响应。
 
 它的主要交互对象依次是 Workspace、文件预览、用户任务、每轮自主选证据、Run Snapshot、
 named SSE、Planner/Analyst 回执、Plan、Finding、引用与下一步建议。Demo 1、Demo 2、Demo 3
-只是未来通用能力的验收视角，不是当前产品入口，也不会解锁隐藏执行器。
+是通用能力的验收视角，不是产品入口，也不会解锁隐藏执行器。Demo 1 当前已有最小
+Task Ledger/current pointer 与跨 Run 单 Branch 延续；Demo 2 当前已有确定性路线准入、
+显式确认的最多三个进程内只读 Worker，以及 Branch 绑定的 WorkUnit/Contribution 台账，
+这些是支撑 Demo 2 的组织维能力，不代表智能工作驾驶舱已经实现。它们仍不等于生产 Task
+服务、distributed queue/lease 或通用执行器。
 
 ### 图示区二：不同首要对象如何改变默认流程
 
@@ -1223,7 +1376,7 @@ SSE、Snapshot 对账、引用成员和服务端原文位置，以及当前被�
 - 15 类 FORTE 原任务都已正确完成，或十二个固定适配器等于通用 Agent 执行能力；
 - 引用能够证明语义、算术、完整性或政策判断正确；
 - Planner 中出现 Tool 或 `run_workspace_write` 就表示工具或文件写入发生；
-- 当前逻辑 ArtifactVersion 或固定 Run Workspace Artifact 已等同源文件修改、通用 Tool Gateway、Demo 2 Adaptive Worker 或 Demo 3 真实动作 Gate；
+- 当前逻辑 ArtifactVersion、固定 Run Workspace Artifact 或受限 Demo 2 WorkUnit 台账已等同源文件修改、通用 Tool Gateway、分布式 Worker/lease 或 Demo 3 真实动作 Gate；
 - memory Run 能够跨重启恢复，或 PostgreSQL 顺序 Runtime 门已经证明多实例 lease、高可用和在途模型续跑；
 - 公开 FORTE 数据等于 Lenovo 或真实客户企业数据；
 - 新界面已经提升理解、信任、效率、采纳率或业务价值；

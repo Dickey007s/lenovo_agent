@@ -1,0 +1,69 @@
+{
+  "manifest_version": "demo1-demo2-runtime-evidence.v1",
+  "captured_at": "2026-08-31",
+  "branch": "codex/demo1-demo2-runtime-20260830",
+  "head": "49d970c8bd51b134b2c3e6bf8ef99d810121b4a6",
+  "scope": "源码与自动化验证；未修改 living docs、PPT 或 FORTE 原始输入",
+  "commits": [
+    "23b606b fix: preserve worker findings and artifact references",
+    "2032dd0 test: verify runtime preserves eleven worker findings",
+    "75360ac fix: reject duplicate worker branch dispatch",
+    "49d970c fix: require cross-function facts for adaptive admission"
+  ],
+  "checks": {
+    "targeted_pytest": {
+      "command": "uv run pytest -q tests/unit/test_demo2_runtime.py tests/unit/test_harness_runtime.py",
+      "passed": 65,
+      "failed": 0,
+      "status": "passed"
+    },
+    "full_unit_pytest": {
+      "command": "uv run pytest -q tests/unit --disable-warnings --maxfail=1",
+      "passed": 383,
+      "failed": 0,
+      "status": "passed"
+    },
+    "ruff": {
+      "command": "uv run ruff check .",
+      "status": "passed"
+    },
+    "compileall": {
+      "command": "uv run python -m compileall -q packages services tests",
+      "status": "passed"
+    },
+    "web_lint": {
+      "command": "pnpm --dir apps/web lint",
+      "status": "passed"
+    },
+    "web_build": {
+      "command": "pnpm --dir apps/web build",
+      "status": "passed"
+    },
+    "playwright": {
+      "command": "pnpm --dir apps/web exec playwright test e2e/harness-workbench.spec.ts",
+      "passed": 52,
+      "failed": 10,
+      "status": "failed",
+      "reason": "memory API runner has no LLM credentials; model-backed UI cases time out waiting for findings. Static artifact and recovery cases passed."
+    },
+    "postgres_restart": {
+      "status": "not_run",
+      "reason": "TEST_DATABASE_DSN is not configured and docker/psql are unavailable in this worktree."
+    },
+    "provider": {
+      "status": "not_run",
+      "reason": "No provider run was started; no model credentials were copied into the worktree."
+    }
+  },
+  "p0_facts": [
+    "ArtifactVersion.findings and finding_count accept 96; worker findings are not silently truncated at 10.",
+    "Artifact source_file_refs accept 96 and retain the union of round refs and retained Finding refs.",
+    "Adaptive admission requires complete server-frozen cross-function source facts; same-directory/same-function plans remain conservative.",
+    "Duplicate worker branch dispatch is rejected before model-call reservation."
+  ],
+  "boundaries": [
+    "Demo2 worker/provider/PG live evidence is not claimed by this manifest.",
+    "Playwright failures are retained as red evidence; no timeout is treated as pass.",
+    "The parent checkout's unrelated next-env, screenshots and PPT were not changed."
+  ]
+}

@@ -1,0 +1,147 @@
+{
+  "tier": 2,
+  "lang": "zh",
+  "recommend": {
+    "canvas": "ppt169",
+    "mode": "pyramid",
+    "visual_style": "data-journalism",
+    "delivery_purpose": "balanced",
+    "icons": "tabler-outline",
+    "image_usage": ["provided"],
+    "formula_policy": "text-only",
+    "generation_mode": "continuous"
+  },
+  "page_count": {
+    "value": "16-18"
+  },
+  "audience": {
+    "value": "Lenovo CAAI 产品、架构、前端与业务评审人员；用于项目会议和方案汇报。核心信息：主流单项能力已成为基线，Office Agent 的候选差异是可验证办公结论合同，它把用户从审阅一段 Agent 回答转向审阅来源、采用回执、确定性成果、恢复点和未执行边界。"
+  },
+  "content_divergence": {
+    "value": ""
+  },
+  "color": {
+    "selected": 0,
+    "candidates": [
+      {
+        "name": "证据蓝 + 审计琥珀",
+        "note": "推荐。浅色数据新闻底，蓝色表示可信流程，琥珀色只用于风险、待决与边界。",
+        "palette": {
+          "background": "#F7F8FA",
+          "secondary_bg": "#EDF1F4",
+          "primary": "#132A3A",
+          "accent": "#1769E0",
+          "secondary_accent": "#D97706",
+          "body_text": "#1B2733"
+        }
+      },
+      {
+        "name": "编辑黑 + 结论红 + 复核青",
+        "note": "更像商业杂志专题，适合突出主流基线与新方案之间的关键冲突。",
+        "palette": {
+          "background": "#FBFAF7",
+          "secondary_bg": "#F0EEE8",
+          "primary": "#1C1C1C",
+          "accent": "#C43D36",
+          "secondary_accent": "#137C8B",
+          "body_text": "#262626"
+        }
+      },
+      {
+        "name": "深色审计台 + 冷青 + 警示金",
+        "note": "更具技术演示感，适合大屏，但长时间阅读压力更高。",
+        "palette": {
+          "background": "#111820",
+          "secondary_bg": "#1B2632",
+          "primary": "#F3F6F9",
+          "accent": "#36A5D8",
+          "secondary_accent": "#F2B84B",
+          "body_text": "#E2E8EE"
+        }
+      }
+    ]
+  },
+  "typography": {
+    "selected": 0,
+    "candidates": [
+      {
+        "name": "清晰事实型",
+        "note": "推荐。适合投影和截图标注，中文与接口字段都保持清楚。",
+        "sample_heading": "模型返回，不等于当前结论",
+        "sample_heading_latin": "Returned is not adopted",
+        "sample_body": "用户审查来源、采用回执、确定性成果和未执行边界。",
+        "sample_body_latin": "Review sources, adoption receipts, outcomes and boundaries.",
+        "heading": {
+          "cjk": "Microsoft YaHei",
+          "latin": "Segoe UI Semibold",
+          "css": "'Microsoft YaHei','Segoe UI Semibold','Segoe UI',Arial,sans-serif"
+        },
+        "body": {
+          "cjk": "Microsoft YaHei",
+          "latin": "Segoe UI",
+          "css": "'Microsoft YaHei','Segoe UI',Arial,sans-serif"
+        },
+        "body_size": 24,
+        "sizes": {
+          "title": 46,
+          "subtitle": 32,
+          "annotation": 17
+        }
+      },
+      {
+        "name": "强标题评审型",
+        "note": "黑体标题更有决策感，正文保持微软雅黑，适合高层评审。",
+        "sample_heading": "真正的差异是结论采用合同",
+        "sample_heading_latin": "The contract is the product",
+        "sample_body": "每个绿色状态都要能回到服务端事实。",
+        "sample_body_latin": "Every green state must map to server truth.",
+        "heading": {
+          "cjk": "SimHei",
+          "latin": "Segoe UI Bold",
+          "css": "SimHei,'Segoe UI Bold','Segoe UI',Arial,sans-serif"
+        },
+        "body": {
+          "cjk": "Microsoft YaHei",
+          "latin": "Segoe UI",
+          "css": "'Microsoft YaHei','Segoe UI',Arial,sans-serif"
+        },
+        "body_size": 24,
+        "sizes": {
+          "title": 48,
+          "subtitle": 33,
+          "annotation": 17
+        }
+      },
+      {
+        "name": "编辑专题型",
+        "note": "宋体标题带研究报告质感，正文仍用无衬线，适合来源与边界较多的页面。",
+        "sample_heading": "从会回答，走向可复核",
+        "sample_heading_latin": "From answers to accountable outcomes",
+        "sample_body": "官方资料、项目 Evidence 与用户反馈使用不同证据标签。",
+        "sample_body_latin": "Official sources, runtime evidence and feedback stay distinct.",
+        "heading": {
+          "cjk": "SimSun",
+          "latin": "Segoe UI Semibold",
+          "css": "SimSun,'Segoe UI Semibold','Segoe UI',serif"
+        },
+        "body": {
+          "cjk": "Microsoft YaHei",
+          "latin": "Segoe UI",
+          "css": "'Microsoft YaHei','Segoe UI',Arial,sans-serif"
+        },
+        "body_size": 24,
+        "sizes": {
+          "title": 46,
+          "subtitle": 32,
+          "annotation": 17
+        }
+      }
+    ]
+  },
+  "image_notes": {
+    "value": "仅使用仓库现有真实截图：Workspace、TC-01 前后对照、Decision Packet、Artifact、TC-14、TC-15 与 narrative reconciliation；竞品页使用文字、品牌名和官方来源脚注，不伪造竞品运行截图。"
+  },
+  "refine_spec": {
+    "value": false
+  }
+}

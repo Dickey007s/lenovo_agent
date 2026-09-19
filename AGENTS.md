@@ -5,12 +5,34 @@
 1. `README.md`：唯一产品入口、能力边界和验收口径。
 2. `docs/ARCHITECTURE.md`：当前分层、信任边界和八模块成熟度。
 3. `docs/WORKSPACE_AND_STREAMING.md`：文件夹、预览、前端交互和 SSE。
-4. `docs/API.md`：当前九路径公开协议。
+4. `docs/API.md`：当前十二条 path、十三个 operation 的公开协议。
 5. `docs/contracts/UI_SERVER_FACT_MATRIX.md`：每个 UI 状态的服务端事实。
 6. `docs/PRESENTATION_BRIEF.md`：汇报叙事和禁止夸大的结论；制作会议/PPT 主讲稿时再读 `docs/reports/OFFICE-AGENT-DETAILED-CHINESE-REPORT-20260825.md` 与 `docs/research/COMPETITIVE-WHITE-SPACE-AND-FALSIFIABLE-DIFFERENTIATORS-20260826.md`。整库、引用、暂停、恢复和知识工作是主流基线，不得写成独占；未完成固定配置同场实测前，只能称“原生保证差异”或“可证伪候选”。
 7. `docs/DECISION_AND_REPORTING_GOVERNANCE.md`：方案、PR、Demo、汇报的硬门槛。
 8. 当前整库文件管理器、自主检索和原文定位变更再读 `docs/decisions/DR-0024-autonomous-whole-workspace-research.md`、`docs/decisions/DR-0028-hierarchical-workspace-and-evidence-review.md`、`docs/decisions/DR-0029-server-verified-evidence-anchors.md`、`docs/scenarios/SCENARIO-010-autonomous-whole-workspace-research.md`、`docs/scenarios/SCENARIO-014-inspect-agent-issue-in-context.md`、`docs/scenarios/SCENARIO-015-pinpoint-and-compare-agent-evidence.md`、`docs/research/WORKSPACE-CENTRIC-OFFICE-AGENT-INTERACTION-AND-SOURCES-20260825.md`、`docs/testing/FORTE-PUBLIC-OFFICE-TASK-TEST-CASES-20260825.md` 与对应 Evidence/Source。`DR-0022` 的客户端手工 `selected_file_refs` 已由 `DR-0024` 取代，但其公开数据、安全预览与来源边界继续有效。
-9. 修改 Agent Control Loop、文件夹自主研究、预算/停止、分支控制、成果恢复或 Durable State 时，再读 `docs/research/AGENT-CONTROL-LOOP-IMPLEMENTATION-AUDIT-20260825.md`、`docs/decisions/DR-0023-agent-control-loop.md`、`docs/decisions/DR-0024-autonomous-whole-workspace-research.md`、`docs/decisions/DR-0026-selective-branch-and-immutable-artifact-history.md`、`docs/decisions/DR-0031-active-budget-and-agent-owned-gap-recovery.md`、`docs/scenarios/SCENARIO-012-selective-branch-and-artifact-restore.md`、`docs/scenarios/SCENARIO-017-resume-agent-owned-evidence-gap.md` 与对应 Evidence/Source；`DR-0025` 只作整组补证和 Snapshot 内成果的历史基线。对外和设计文档统一称 `Agent Control Loop`；Workspace 是循环处理的办公资料环境，不另立 `Workspace Research Loop` 或 `Research Loop` 产品名称。历史约 `30%` 只表示实现 `8364b1e` 之前的架构成熟度基线；现行 Runtime 默认 12 轮、上限 24 轮，已有顺序单 Controller、服务端 Branch、分支级 Evidence Gate、独立 append-only 逻辑 ArtifactVersion/TaskCommit、历史成果恢复、12 个固定本地确定性办公能力的隔离 Run Workspace Artifact/Verifier，以及可选 PostgreSQL 重启恢复，但任意办公写入、生产安全沙箱、多实例协调、多 Worker 与外部动作仍未实现。
+9. 修改 Agent Control Loop、文件夹自主研究、预算/停止、分支控制、成果恢复或 Durable State 时，再读 `docs/research/AGENT-CONTROL-LOOP-IMPLEMENTATION-AUDIT-20260825.md`、`docs/decisions/DR-0023-agent-control-loop.md`、`docs/decisions/DR-0024-autonomous-whole-workspace-research.md`、`docs/decisions/DR-0026-selective-branch-and-immutable-artifact-history.md`、`docs/decisions/DR-0031-active-budget-and-agent-owned-gap-recovery.md`、`docs/scenarios/SCENARIO-012-selective-branch-and-artifact-restore.md`、`docs/scenarios/SCENARIO-017-resume-agent-owned-evidence-gap.md` 与对应 Evidence/Source；`DR-0025` 只作整组补证和 Snapshot 内成果的历史基线。对外和设计文档统一称 `Agent Control Loop`；Workspace 是循环处理的办公资料环境，不另立 `Workspace Research Loop` 或 `Research Loop` 产品名称。历史约 `30%` 只表示实现 `8364b1e` 之前的架构成熟度基线；现行 Runtime 默认 12 轮、上限 24 轮，已有顺序单 Controller、跨 Run Task lineage、确定性 Topology Admission、最多三个显式确认的进程内只读 Analyst Worker、服务端 Branch、分支级 Evidence Gate、独立 append-only 逻辑 ArtifactVersion/TaskCommit、历史成果恢复、12 个固定本地确定性办公能力的隔离 Run Workspace Artifact/Verifier，以及可选 PostgreSQL 重启恢复。任意办公写入、生产安全沙箱、分布式 Worker/lease、多实例协调与外部动作仍未实现。
+
+继续 07-16 Demo 1 时间维连续性或 Demo 2 组织维复杂性时，再读
+`docs/research/DEMO1-DEMO2-DURABLE-TASK-AND-ADAPTIVE-ORCHESTRATION-RESEARCH-20260830.md`、
+`docs/decisions/DR-0053-durable-task-lineage-and-explainable-topology-admission.md`、
+`docs/scenarios/SCENARIO-038-durable-task-continuation-across-runs.md` 与
+`docs/scenarios/SCENARIO-039-explainable-topology-and-verified-worker-convergence.md`；修改
+WorkUnit、Contribution 或 Worker checkpoint 恢复还必须读取
+`docs/decisions/DR-0055-durable-workunit-and-contribution-ledger.md`、
+`docs/scenarios/SCENARIO-041-workunit-contribution-ledger-and-partial-convergence.md` 与对应 Evidence。
+`DR-0053` 当前为限定 `Limited Verified`：跨 Run `task_id`、Topology Admission、
+显式确认的进程内只读 Worker 与 Contribution merge 已形成纵切，但只允许
+`external_action=none`、每批最多三个 ready Branch，并依赖现有 Analyst/Evidence Gate。
+不得把它写成通用/分布式 Worker Runtime。`DR-0055` 已增加 Branch 绑定的最小持久
+WorkUnit/Contribution 台账，隔离 PostgreSQL 17.11 的 Demo/Task 组合门为 10 项通过；
+这仍是单主机顺序证据，真实 Provider、远端 Worker、多实例 lease 与目标用户研究未完成。
+
+修改显式编号要求拆分、Planner 文件检索、Analyst 严格输出恢复或能力页延后分支时，再读
+`docs/decisions/DR-0059-explicit-requirement-accounting-and-bounded-analysis-recovery.md`、
+`docs/scenarios/SCENARIO-046-account-for-explicit-requirements-and-recover-analysis.md` 与对应
+Source/Evidence。当前只对带明确标记、连续编号 `1..N` 且 `N<=12` 的指令启用逐项记账；
+真实 Provider 六项首轮 4 本轮、2 延后、0 缺源。不得把内部检索提示当证据，把延后写成缺源，
+或把一次/两次 Provider 运行外推为通用拆分、业务正确性或用户效果。
 
 DR-0032 additionally governs EvidenceResolution source revisions, DecisionRequest/
 DecisionRecord persistence and Finding/Branch-local restart recovery. Read
@@ -37,7 +59,8 @@ that file edits and input are unnecessary, and keep optional clues/audit details
 collapsed. Ambiguous EvidenceResolution must say how many real positions require
 one human choice, never preselect a candidate and keep accept disabled until a
 choice exists. Opening either surface must not call a model or spend next-round
-budget; terminal Runs must create a new task rather than pretend to resume.
+budget; terminal Runs must create a new same-Task child Run for one approved Branch
+rather than pretend to resume the old Run.
 
 DR-0035 governs Scenario Effect Gate and real run-workspace files. Read
 `docs/decisions/DR-0035-scenario-effect-gate-and-run-workspace-artifacts.md`,
@@ -204,35 +227,39 @@ terminal Runs require distinct wording and recovery paths.
 源码永远高于文档。行为或叙事变化后必须同步 living docs、Decision、Scenario、
 Source、Evidence 和 UI-server fact mapping，不能只更新 README。
 
-## DR-0053 单步事项补充
+## DR-0064 单步事项补充
 
-修改单步事项前读取 `docs/decisions/DR-0053-single-action-boundary-workbench.md` 和
+修改单步事项前读取 `docs/decisions/DR-0064-single-action-boundary-workbench.md` 和
 `docs/design/DEMO3-DEVELOPMENT-HANDBOOK-20260918.md`。统一工作台中的“办理事项”
-使用显式 action 输入和固定服务端规则；DR-0053 的五类基线与 DR-0054 的六类当前操作均不调用模型，不执行外部动作。
+使用显式 action 输入和固定服务端规则；DR-0064 的五类基线与 DR-0065 的六类当前操作均不调用模型，不执行外部动作。
 风险、确认条件、状态与回执由服务端生成；修改令旧核对失效；禁止用普通 Loop
 controls 绕过 action-controls。回执是 Snapshot 测试记录，不是 Artifact/EffectReceipt。
 下文研究路径的 Planner/Analyst 和完整索引要求不构成此路径的模型调用声明。
 
-DR-0054 将事项扩展为六类，修改前还须读取
-`docs/decisions/DR-0054-demo3-editable-drafts-and-human-judgment.md` 与其 Evidence。
+DR-0065 将事项扩展为六类，修改前还须读取
+`docs/decisions/DR-0065-demo3-editable-drafts-and-human-judgment.md` 与其 Evidence。
 草稿编辑保留 source_excerpt 和历史 content_snapshot；材料对照必须由人明确
 选择并填写理由，只形成 decision_note，不启动后续动作。最近事项仅为 Owner 最近
 20 个 Run 的投影，不是全量待办或并行执行。人工说明下载不冒充审批或通知。
 
 ## 当前产品事实
 
-- 根页面是唯一 FORTE 办公资料库。产品没有注册 Scenario/Demo 选择器；旧邮件、文档、报价、任务、日历、报销、CRM、审计和固定 Customer A 入口均已退休。
-- 当前 OpenAPI 有九个 path、十个 operation：health、whole workspace、workspace file preview、Run start/list/get、Run Artifact download、control/action-controls/events。旧 `/v1/harness/scenarios*` 不挂载。
+- 根页面是 FORTE 办公资料库与日常工作面；`/agent-capabilities` 只用同一 Task/Run/Snapshot 投影 Agent Control Loop 与 Adaptive Swarm 两种能力。默认只显示简化执行进展，完整执行记录和协作方式分别按需展开，证据决定进入专注核对页；不得把四层写成四个 Runtime 或四级连续导航。产品没有注册 Scenario/Demo 选择器；旧邮件、文档、报价、任务、日历、报销、CRM、审计和固定 Customer A 入口均已退休。07-16 Demo 2 智能工作驾驶舱仍是后续独立产品面，当前没有任务队列、优先级或跨 Task dispatch 合同，也不得显示假入口。
+- Workspace 与 `/agent-capabilities` 都提供“新建任务”。点击只关闭当前 EventSource、清除当前 Run/Task 前台投影并进入 session-scoped 空白草稿；不得创建空 Task、调用模型、消费预算或停止/删除旧 Run。刷新保持草稿模式但不持久化未提交文字；打开历史或收到合法新 Snapshot 后退出草稿。只有提交后才由既有 `POST /runs` 创建独立 Task；显式再次新建即使文字相同也必须使用新幂等键，未知启动结果的同一次重试仍复用原 key。
+- 当前 OpenAPI 有十二个 path、十三个 operation：health、whole workspace、workspace file preview、Run start/list/get、Task get、单 Branch continuation、显式只读 Worker dispatch、Run Artifact download、control/action-controls/events。旧 `/v1/harness/scenarios*` 不挂载。
 - FORTE 固定 commit `345c1ec1487139db9dd319787fa9405ba85d1869`。`public-suite-manifest.json` 是当前只读清单：15 个公开任务目录、96 个 input、111 个 task/input 文件、`1780445` bytes。官方完整 benchmark 报告 180 条，但公开仓库只提供每职业一个 demo；不得声称拿到未公开 165 条。
 - `task.md` 只作 provenance，不能进入普通 UI、Analyst 输入或成为隐藏默认任务。用户只需自己写 `instruction`；浏览器不得要求或提交客户端 `selected_file_refs`。
 - 用户可在一个文件管理器式资料库中按服务端安全 `display_path` 逐级展开顶层目录和嵌套子目录，也可自由搜索、按类型筛选和查看文件，不按职业/角色建立产品入口。当前 96/96 输入可 bounded preview：XLSX/CSV、PDF、DOCX、TXT/Markdown/JSON/log/code。预览前必须校验 allowlist relative path、size、SHA-256、非 symlink、archive/format bounds；不得执行 macro/script 或加载 external resources。目录展开/搜索只是客户端展示状态，不改变整库 Run scope。
 - 公共 API/DOM/模型输入不得暴露 raw task/rubric/solution、绝对/内部路径、完整 hash、Prompt、CoT、raw provider response、密钥或内部 validator/effect 字符串。
-- 当前成功路径按轮真实调用 Planner 和 Analyst。`called/output_used/elapsed_ms` 必须分开显示；动画和配置模型名不是调用证据。`未采用` 表示模型已返回但服务端校验拒绝，不是未调用。Plan 可在同一预算内进行最多一次受控修复，拒绝与重试都必须进入有序 Trace。
+- 当前成功路径按轮真实调用 Planner 和 Analyst。`called/output_used/elapsed_ms` 必须分开显示；动画和配置模型名不是调用证据。`未采用` 表示模型已返回但服务端校验拒绝，不是未调用。Plan 可在同一预算内进行最多一次受控修复，拒绝与重试都必须进入有序 Trace。带明确标记且连续编号 `1..N` 的业务要求（当前 `N<=12`）必须逐项记为本轮 `units[]`、有批准来源的 `deferred_requirements[]` 或冻结索引缺源的 `uncovered_requirements[]`；后两者不得混成 Planner 漏项。私有 `requirement_coverage` 与 Catalog `planner_search_hint` 不进入公共 Workspace/Snapshot。
 - Run 创建时服务端冻结完整 allowlisted 输入索引，`scope_mode=whole_workspace`。Planner 只看到安全元数据并自主选择本轮证据；服务端拥有每轮文件预算、source scope、side effect、human gate、unit/dependency/tool/source validation。模型计划中的 `run_workspace_write` 仍只表示写入意图；只有 Snapshot `workspace_artifacts[]`、`effect_receipts[]` 和可下载 Artifact bytes 才证明当前 12 个固定本地确定性能力真的写入隔离 Run Workspace。它们不修改 FORTE 原件。
 - 每个新 finding 必须引用服务端批准的本轮 `file_ref`，并至少包含一处由 Runtime 从 Analyst 逐字 quote 候选中唯一匹配得到的 `evidence_anchor`。审查页按事实/影响/人工动作拆分 Finding，把证据索引与实际安全 Preview 并排，点击后回开并高亮文本行/表格行。需要人工决断时显示互斥选项、选择后的只读下一步与反馈框；推荐项须在用户先选初始口径后再主动显示，确认只创建独立新 Run，不得声称改文件。浏览器不得从 Finding 文案猜测位置，旧成果无 Anchor 时必须明确退化为文件级核对。Gap/Branch/Finding 必须提供问题描述、轮次/业务分支和关联文件入口；无 Anchor Gap 必须称为 Agent 执行缺口，说明结构/定位/覆盖类型、尝试文件、模型调用/采用、保留项和恢复动作，不得暗示用户修改源文件或猜行号。Git 风格只表示审查记录结构，不得伪造源文件 Diff。这些位置和引用只证明 location/membership，不证明 entailment、穷举或算术正确。
 - 严格文本 Anchor 无候选时可忽略安全 Preview 版面造成的空白/标点差异，但仍须唯一匹配；多位置继续 `ambiguous`，不得模糊猜测。用户指令中明确的中文月日闭区间可过滤所有已定位 `observed` 日期都在范围外的 Finding；当前不等于通用范围编译器。需要人工决断的 review 必须至少有一个 exact `contradiction` Anchor，否则降为普通复核。
 - 终态 `result.follow_ups` 最多显示 4 条 Agent 下一步建议。建议不是执行事实；当前协议没有逐项引用，审查页只能把 Finding refs 并集标为本轮上下文，不得冒充直接证据。只有用户点击“确认并启动”后才创建新的独立 Run，旧 Run/结果不得被覆盖。
 - 默认预算为 12 轮、每轮 16 文件、30 次模型调用和 7200 秒 active deadline；允许上限为 24/24/60/14400。`waiting_input`、显式 pause 和 terminal 状态冻结 elapsed，合法 resume 从已用 active elapsed 继续。validated plan unit 由服务端编译为稳定 Branch；Evidence Gate 按 Branch 维护已核对/缺失引用。证据不足且预算允许时进入 `waiting_input/paused`，用户只选择一条 waiting Branch 继续，下一轮范围严格等于该 Branch 的 `missing_file_refs`，其他 Branch 保持等待。合法范围内的 Analyst 原文定位或结构输出失败最多受控重试一次：可定位 Finding 可部分采用；全不可用时保留 Plan/Branch/调用事实，并以 `next_step.recovery_kind=source_location|analysis_output` 暂停最小分支；范围越权和完整性错误仍 fail closed。每个完成轮次生成独立 append-only 逻辑 evidence-brief ArtifactVersion，成功终态新增 TaskCommit 指针而不改写版本。当前固定确定性办公工具在计划校验后可生成真实隔离 Artifact 和检查回执；Analyst 未采用不会删除该成果。`completed` 仍只表示 Loop 合同通过，不自动证明模型质量、任意任务正确、原文件写入、Worker/Connector 或外部动作发生。
+- 新 Run 由服务端生成稳定 `task_id` 与 `run_sequence`。初始 start 与 continuation 会在同一 State Store 提交边界中写入 owner-scoped 最小 Task record、Run Snapshot 和幂等回执。Task record 只保存 `task_version`、Workspace revision、current Run/sequence/parent 与时间；公共状态、Artifact/Commit 指针和 lineage 从 current Run 与同 Task 的不可变 Snapshots 派生。`run.version` 保护单 Run 控制，`task_version` 保护跨 Run current pointer；continuation 必须同时提交两种 expected version。终态旧 Run 只能通过 `/continue` 选择一条未完成 Branch 创建 child Run；child 记录 `parent_run_id`、`carried_branch_id`、基线 Artifact/Commit、当前 `workspace_revision` 和精确 `recheck_file_refs`。父 Run 不变，child 首轮只核对该 Branch 的批准来源；来源版本变化只形成显式重核事实，不静默携带旧采用结论。
+- Planner 通过校验后，服务端从工作包独立性、依赖、冻结来源结构、剩余调用/时间和副作用编译 `TopologyAdmission`。`adaptive_readonly_workers` 必须等待用户确认；`/workers` 每批只派发 1-3 个 ready Branch，调用预算在派发前版本化预留。`ready_branch_ids=[]` 时不得显示或发送空 Worker 波次，延后要求只能从进展页继续其真实 waiting Branch。Worker 只读自己的 `input_file_refs`，返回与采用分开；只有通过来源范围、Evidence Anchor 和适用叙事对账的贡献进入新的正常 ArtifactVersion/TaskCommit。一个 Worker 失败或歧义时保留其他已采用贡献并让目标 Branch 等待；重启不自动重放中断 Worker。
+- Analyst/Worker `findings` 的现行治理上限为 96，不得重新引入“三条分析上限”或静默截断。前台默认只展开前三条是密度控制，必须提供“查看其余 N 条发现”，且不得改变 Snapshot/Artifact 内容。
 - passed Artifact 与 waiting audit gap 必须分开显示：成果先展示，Gap 只说明 Agent 来源位置待补充；候选来源和失败说明都相同的多个 Gap 可在浏览器合并展示，但 Snapshot Branch 不变，也不能把 Artifact 通过写成 Run `completed`。
 - TC-10 的流程设计 DOCX 必须把“来源规则、图结构、最终审批、真实动作”四层事实分开：Artifact/EffectReceipt 的 `outbound_flow_outcome` 保存动态规则账本、图完整性、审批与 `external_action=none`。前台和 DOCX 均明确未拨号、未写 CRM/短信、未写禁呼名单、未实际转人工；历史 13 项固定检查不能再充当当前来源覆盖证明。
 - TC-05 成果卡必须从服务端 Artifact 字段显示涵盖期间、统计口径、用途和可选记录数；两个 CSV 只绑定 2026 内容来源，三期说明才绑定三期来源与僵尸比较。EffectReceipt 的任务上下文不得冒充单个文件的内容覆盖。
@@ -240,11 +267,11 @@ DR-0054 将事项扩展为六类，修改前还须读取
 - TC-07 的两份成果共享服务端 `legal_review_outcome` 与法务 `business_gate_outcome`：六份批准 DOCX 各有 21 条来源推导判断，前台分开显示确定性检查、法务 Gate 和签署/人工复核。主体字段不得串线；六份空签署栏在无获批草稿豁免时触发 R05；律师证号没有 Registry/Connector 回执时为 `unverifiable`。通过 Artifact 不能表述为可签署、签名真实或授权有效。
 - `pause/resume/steer/stop/rollback/decision` 必须携带 expected version 与幂等键。Branch resume 还携带 `branch_id`；rollback 还携带 `artifact_version`，只新增 TaskCommit 并恢复逻辑 Brief，不删除历史或回滚源文件。decision 把 `accept/decline/defer/cancel` 绑定到当前 DecisionRequest/Finding/Resolution/Branch；accept 证据候选还必须携带 source revision，服务端重新读取 Catalog 并重算 candidate。关闭待决页记录 defer，defer 后仍可继续最终决定；cancel 不冒充 rejected。它们不改变原文件或外部状态。pause/stop 只在模型调用之间的安全点生效；steer 只影响下一轮；deadline 阻止新调用但不硬取消在途 HTTP 请求。预算终态必须显示 `budget.stop_reason` 的具体中文原因，不得只显示 raw `budget_exhausted`；terminal Run 不得 resume，只能按 Branch 创建新 Run。
 - 开放待决单以 Snapshot 顶层 `decision_requests[]` 为权威，旧轮次投影只作兼容读取。关闭或 Escape 必须先退出审查页，再尝试写入 defer；409/断网只显示非阻塞错误并刷新 Snapshot，不能把用户困在弹窗，也不能伪造回执成功。Evidence Gap 区固定使用“分支 -> 当前材料 -> Evidence Gate -> 下一步”的 Branch lane；各单元只能来自 Branch/Gap/Resolution/Decision 服务端事实，不得把可视分支解释成并行 Worker。普通可恢复 Branch 必须明确“无需核对文件，建议重试”，首屏只给一个推荐 resume 且折叠可选输入/审计；ambiguous Branch 必须明确“从 N 个原文位置中选 1 个”，不默认选择并在未选前禁用 accept。
-- Snapshot 是状态权威，SSE 是有序变更投影。浏览器只单调应用 version/sequence，nonterminal 断线用 GET + `after=N`，terminal event 后 final GET。
-- 配置 `DATABASE_DSN` 时，Run Snapshot、事件、start/control 幂等回执以及独立 ArtifactVersion/TaskCommit 写入 PostgreSQL；重启恢复会删除未完成轮次、追加 `checkpoint_recovered` 并暂停，绝不自动重放中断的模型调用。真实 PostgreSQL 顺序 Runtime 由 PR integration workflow 验证；这不等于多实例 lease、高可用或在途 HTTP 续跑。未配置数据库时明确使用单进程 memory 且重启不恢复。`X-User-Id` 是未签名演示 Owner。
-- `start-demo.ps1` 的状态库优先级是 Docker、本轮 PowerShell 进程显式 `DATABASE_DSN`、memory。没有前两者时必须用空进程变量覆盖 `.env` 残留 DSN；模型配置仍可从 `.env` 读取。前台/汇报只以 `/v1/health.checkpoint/task_store` 判断本轮是否可恢复。
+- Snapshot 是状态权威，SSE 是有序变更投影。浏览器只在同一 `run_id` 内单调应用 version/sequence；continuation 切换到新 child Run 时允许计数从 1 重新开始。nonterminal 断线用 GET + `after=N`，terminal event 后 final GET。
+- 配置 `DATABASE_DSN` 时，Run Snapshot、最小 Task record、Task continuation receipt、Branch 绑定的 WorkUnit/Contribution 台账、start/control/Worker reservation 幂等回执以及独立 ArtifactVersion/TaskCommit 写入 PostgreSQL。普通中断模型轮次仍删除未完成轮次、追加 `checkpoint_recovered` 并暂停；已经提交 Worker reservation 的恢复则保留 validated Branch DAG、TopologyAdmission、已完成候选和成果，把未确认的在途 WorkUnit 标成 checkpoint-recovered failed，绝不自动重放调用。新幂等键与当前 version 只允许显式重试目标恢复单元。历史 Run/Decision 有真实顺序 Evidence；Task Ledger 7 项和 Demo 1/2 WorkUnit 3 项又在隔离 PostgreSQL 17.11 上组合实跑 `10 passed`。这些单主机顺序门都不等于多实例 lease、高可用或在途 HTTP 续跑。未配置数据库时明确使用单进程 memory 且重启不恢复。`X-User-Id` 是未签名演示 Owner。
+- `start-demo.ps1` 的状态库优先级是 Docker、本轮 PowerShell 进程显式 `DATABASE_DSN`、memory。没有前两者时必须设置非空 `STATE_STORE_MODE=memory`，让 Runtime 明确忽略 `.env` 残留 DSN；不得再依赖 Windows `Start-Process` 继承空环境变量。`STATE_STORE_MODE=auto` 按 DSN 自动选择，显式 `postgres` 缺 DSN 时 fail closed；模型配置仍可从 `.env` 读取。前台/汇报只以 `/v1/health.checkpoint/task_store` 判断本轮是否可恢复。
 - Catalog/preview 完整性失败必须 fail closed。前台区分 API 离线、workspace integrity failure、file preview failure 和 Run failure，不得填充静态假数据。
-- Demo 1/2/3 只是通用能力的验收镜头：当前顺序 Agent Control Loop 已覆盖 Demo 1 的分支推进、成果历史、局部恢复和 12 个固定本地办公效果纵切；这不等于任意办公 Artifact、生产 Tool Gateway 或多实例协调。Demo 2 多 Worker 自组织仍是目标能力。Demo 3 已有六类独立单步测试事项，通用跨拓扑 Risk Gate 与真实业务动作仍未实现。不得因 Demo 名或 Scenario ID 宣称未实现能力已经执行。
+- Demo 1/2/3 只是通用能力的验收镜头：Demo 1 当前覆盖分支推进、成果历史、局部恢复、同一 `task_id` 下的单 Branch child Run，以及 owner-scoped Task current pointer/双版本 CAS 的有限纵切；支撑 Demo 2 的组织维能力当前覆盖确定性路线准入、用户确认、每批最多三个进程内只读 Worker、完整 Branch DAG 的 WorkUnit 投影、不可变 Contribution、依赖波次、服务端贡献合入与 checkpoint-recovered 显式单元重试，但 Demo 2 智能工作驾驶舱尚未实现。它们不等于任意办公 Artifact、生产 Tool Gateway、durable queue/lease、远端 Worker、分布式调度或多实例协调。Demo 3 已有六类独立单步测试事项；通用跨拓扑 Risk Gate 仍是目标能力。不得因 Demo 名或 Scenario ID 宣称未实现能力已经执行。
 - 自动化和截图是工程代理，不是用户研究。界面是否更清晰、信任/效率/价值是否提升均为 `Draft`。
 
 ## 八个统一模块
@@ -260,10 +287,10 @@ DR-0054 将事项扩展为六类，修改前还须读取
 7. Artifact Workspace & Verifier
 8. Checkpoint, Event & Governance Control
 
-当前实现模块 1-4、模块 5 的有界单 Loop Controller 子集、模块 6 的 12 个固定本地确定性办公适配器子集、模块 7 的受限 read-only
-Result/citation/服务端 Preview Evidence Anchor/Branch Evidence Gate/独立 append-only 逻辑 ArtifactVersion/TaskCommit、隔离 Run Workspace 文件/确定性 Verifier 与恢复子集，
-以及模块 8 的 Snapshot、event、branch/rollback control、idempotency 和可选 PostgreSQL
-restart-recovery 子集。分布式 Scheduler/Worker、模块 6 的真实 Tool Gateway、可写办公
+当前实现模块 1-4（含确定性 Topology Admission）、模块 5 的有界单 Loop Controller 与显式确认的进程内只读 Worker 子集、模块 7 的 12 个固定本地确定性办公适配器、受限 read-only
+Result/citation/服务端 Preview Evidence Anchor/Branch Evidence Gate/Worker Contribution Gate/独立 append-only 逻辑 ArtifactVersion/TaskCommit、隔离 Run Workspace 文件/确定性 Verifier 与恢复子集，
+以及模块 8 的 Snapshot、event、最小 owner-scoped Task Ledger/current pointer/双版本 CAS、Branch 绑定的 WorkUnit/Contribution 台账、Task/Run lineage、branch/topology/rollback control、idempotency 和可选 PostgreSQL
+restart-recovery 子集。durable/distributed queue 与 Worker lease、模块 6 的真实 Tool Gateway、可写办公
 源文件、通用语义 Verifier、多实例协调、Risk/Evidence/Approval/Permit 和 Connector
 均是目标架构。
 
@@ -271,6 +298,7 @@ restart-recovery 子集。分布式 Scheduler/Worker、模块 6 的真实 Tool G
 
 ```text
 apps/web/app/page.tsx
+apps/web/app/agent-capabilities/page.tsx
 apps/web/app/harness-workbench.tsx
 apps/web/app/styles.css
 services/api/app/main.py

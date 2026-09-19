@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720">
+  <rect width="1280" height="720" fill="#FFFFFF"/>
+  <g id="title" font-family="Microsoft YaHei, Arial, sans-serif">
+    <text x="48" y="80" font-size="44" font-weight="700" fill="#182230" data-width="1184">人机共驾调研：四条 Agent 技术线</text>
+    <text x="48" y="123" font-size="24" fill="#596579" data-width="1184">梳理 16 篇相关论文，重点抽读机制，并映射到原系统的办公任务</text>
+  </g>
+  <g id="body" font-family="Microsoft YaHei, Arial, sans-serif">
+    <text x="48" y="206" font-size="28" font-weight="700" fill="#1557D2" data-width="355">选择性求助</text>
+    <text x="48" y="244" font-size="16" fill="#596579" data-width="355">HiL-Bench、SAGE-Agent（2026）</text>
+    <text x="454" y="204" font-size="24" fill="#182230" data-width="778">判断何时继续查资料，何时必须问人。</text>
+    <text x="454" y="242" font-size="24" fill="#182230" data-width="778">区分执行失败与缺失口径，减少无谓打扰。</text>
+    <text x="48" y="326" font-size="28" font-weight="700" fill="#1557D2" data-width="355">多轮反馈利用</text>
+    <text x="48" y="364" font-size="16" fill="#596579" data-width="355">SWEET-RL、Collaborative Gym</text>
+    <text x="454" y="324" font-size="24" fill="#182230" data-width="778">把人的回答用于后续计划与成果修正。</text>
+    <text x="454" y="362" font-size="24" fill="#182230" data-width="778">沿用同一任务，检查反馈是否真正改变结果。</text>
+    <text x="48" y="446" font-size="28" font-weight="700" fill="#1557D2" data-width="355">执行权限约束</text>
+    <text x="48" y="484" font-size="16" fill="#596579" data-width="355">AgentSpec、AgentDojo</text>
+    <text x="454" y="444" font-size="24" fill="#182230" data-width="778">动作发生前，由 Runtime 强制检查约束。</text>
+    <text x="454" y="482" font-size="24" fill="#182230" data-width="778">材料中的指令不构成授权，确认依据不开放外发。</text>
+    <text x="48" y="566" font-size="28" font-weight="700" fill="#1557D2" data-width="355">多 Agent 委派验证</text>
+    <text x="48" y="604" font-size="16" fill="#596579" data-width="380">Intelligent AI Delegation、MAST</text>
+    <text x="454" y="564" font-size="24" fill="#182230" data-width="778">委派时约束权限，返回后验证每份贡献。</text>
+    <text x="454" y="602" font-size="24" fill="#182230" data-width="778">防止错误交接、未核验采用和提前显示完成。</text>
+  </g>
+  <g id="footer" font-family="Microsoft YaHei, Arial, sans-serif">
+    <text x="48" y="696" font-size="16" fill="#596579" data-width="1100">论文机制与项目设计推论分开。定向选读不等于全文精读、算法接入或效果复现。逐篇链接见本页备注。</text>
+    <text x="1198" y="696" font-size="16" fill="#596579" data-width="34">04</text>
+  </g>
+</svg>

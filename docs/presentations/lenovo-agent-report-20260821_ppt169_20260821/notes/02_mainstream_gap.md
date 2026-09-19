@@ -1,0 +1,1 @@
+先把比较的语气放稳：OpenClaw、Codex 和 Claude Code 都在增强执行、并行、权限或恢复能力，我们并不是在这里做性能排名。它们主要让用户看到 session、thread、command 或 diff，而 Office Agent 试图把用户看到的对象换成 Task、Branch、Artifact、冲突和执行回执。这个差异来自官方材料与源码审计，但没有正面对照基准，所以主流差异仍是 Draft，不能说竞品做不到。大家可能会问，为什么不能直接沿用执行框架，答案是企业要追问业务事实，下一页就是这个事实边界。

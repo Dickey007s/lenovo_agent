@@ -1,0 +1,17 @@
+No,Filename,Width,Height,AspectRatio,PixelAspectRatio,RatioSource,UsageCount,DisplayRatioVariants,AssetKind,SvgRenderable,PptxNativeSupported,SizeKB,Category,ImageArea_SxS,TextArea_SxS
+1,dr-0022-folder-workspace-desktop.png,1440,900,1.60,1.60,pixel,1,,bitmap,True,True,126.5,Wide landscape,812x508,328x600
+2,dr-0032-decision-packet-desktop.png,1440,1100,1.31,1.31,pixel,1,,bitmap,True,True,141.7,Standard landscape,785x600,355x600
+3,dr-0034-mixed-branch-actions-desktop.png,761,361,2.11,2.11,pixel,1,,bitmap,True,True,38.5,Ultra-wide,812x385,328x600
+4,dr-0036-tc01-live-run-completed.png,1440,1000,1.44,1.44,pixel,1,,bitmap,True,True,174.0,Standard landscape,812x564,328x600
+5,dr-0036-tc01-outcome-first-desktop.png,791,1686,0.47,0.47,pixel,1,,bitmap,True,True,84.8,Portrait,281x600,859x600
+6,dr-0037-review-readability-desktop.png,1380,972,1.42,1.42,pixel,1,,bitmap,True,True,138.9,Standard landscape,852x600,288x600
+7,dr-0058-adaptive-execution-workspace-1440.png,1440,1100,1.31,1.31,pixel,1,,bitmap,True,True,121.8,Standard landscape,785x600,355x600
+8,dr-0058-agent-capabilities-evidence-review.png,1440,1100,1.31,1.31,pixel,1,,bitmap,True,True,129.6,Standard landscape,785x600,355x600
+9,dr-0058-agent-capabilities-progress.png,1440,1100,1.31,1.31,pixel,1,,bitmap,True,True,58.3,Standard landscape,785x600,355x600
+10,narrative-reconciliation-rejected-desktop-1440x1100.png,1440,1100,1.31,1.31,pixel,1,,bitmap,True,True,171.2,Standard landscape,785x600,355x600
+11,narrative-reconciliation-rejected-mobile-390x844.png,390,844,0.46,0.46,pixel,1,,bitmap,True,True,49.4,Portrait,277x600,863x600
+12,scenario-effect-gate-artifact-desktop.png,441,605,0.73,0.73,pixel,1,,bitmap,True,True,41.0,Portrait,437x600,703x600
+13,scenario-effect-gate-desktop.png,1280,720,1.78,1.78,pixel,1,,bitmap,True,True,110.2,Wide landscape,812x457,328x600
+14,tc14-sre-diagnosis-desktop.png,1440,1100,1.31,1.31,pixel,1,,bitmap,True,True,148.8,Standard landscape,785x600,355x600
+15,tc15-ux-prioritization-desktop.png,1440,1100,1.31,1.31,pixel,1,,bitmap,True,True,161.0,Standard landscape,785x600,355x600
+16,user-feedback-20260828-tc01-artifact-and-citation-confusion.png,1374,1275,1.08,1.08,pixel,1,,bitmap,True,True,244.2,Near square,647x600,493x600

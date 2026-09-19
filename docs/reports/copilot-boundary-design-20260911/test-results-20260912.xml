@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="utf-8"?>
+<testsuites>
+	<testcase name="all eight cases have the intended initial boundary" time="0.002661" classname="test"/>
+	<testcase name="no preselection and no implicit approval" time="0.000503" classname="test"/>
+	<testcase name="acknowledgment, approval, execution, receipt are separate states" time="0.000319" classname="test"/>
+	<testcase name="file change invalidates prior decision and clears acknowledgment" time="0.000231" classname="test"/>
+	<testcase name="recipient change invalidates prior decision and clears acknowledgment" time="0.000239" classname="test"/>
+	<testcase name="policy change invalidates prior decision and clears acknowledgment" time="0.000237" classname="test"/>
+	<testcase name="expiry checked at submit; waiting never silently extends grant" time="0.000203" classname="test"/>
+	<testcase name="changing recipient away and back cannot revive a superseded approval" time="0.000209" classname="test"/>
+	<testcase name="context binding includes action kind and external scope" time="0.000381" classname="test"/>
+	<testcase name="permission denial cannot be bypassed by an approval field" time="0.000494" classname="test"/>
+	<testcase name="unknown or missing permission fails closed" time="0.000257" classname="test"/>
+	<testcase name="draft downgrade preserves denied permission, not blanket authorization" time="0.000149" classname="test"/>
+	<testcase name="all clarification updates only draft, no action approval" time="0.000151" classname="test"/>
+	<testcase name="guided clarification updates only draft, no action approval" time="0.000082" classname="test"/>
+	<testcase name="invalid evidence choice is not accepted" time="0.000183" classname="test"/>
+	<testcase name="resolved basis cannot silently change after a draft was produced" time="0.000171" classname="test"/>
+	<testcase name="an unsuccessful status lookup never means not sent and never resubmits" time="0.000352" classname="test"/>
+	<testcase name="unsupported scope edit must not invalidate a valid confirmation" time="0.000703" classname="test"/>
+	<testcase name="lost receipt freezes retries, cancel and range edits; reconciliation never resubmits" time="0.000247" classname="test"/>
+	<testcase name="takeover revokes unused consent; return is not approval" time="0.000155" classname="test"/>
+	<testcase name="takeover cannot conceal an uncertain external effect" time="0.000115" classname="test"/>
+	<testcase name="defer is not approval; reopening leaves waiting decision" time="0.000147" classname="test"/>
+	<testcase name="cancellation before execution is terminal and has no submission" time="0.000144" classname="test"/>
+	<testcase name="reducer is immutable, journal ordering and scenario reset are deterministic" time="0.000268" classname="test"/>
+	<testcase name="bounded adversarial transitions never allow duplicate simulated execution" time="0.351630" classname="test"/>
+	<testcase name="send: first-screen business status and next action match the model" time="0.002713" classname="test"/>
+	<testcase name="draft: first-screen business status and next action match the model" time="0.000452" classname="test"/>
+	<testcase name="evidence: first-screen business status and next action match the model" time="0.000239" classname="test"/>
+	<testcase name="forbidden: first-screen business status and next action match the model" time="0.000248" classname="test"/>
+	<testcase name="changed: first-screen business status and next action match the model" time="0.000420" classname="test"/>
+	<testcase name="expired: first-screen business status and next action match the model" time="0.000149" classname="test"/>
+	<testcase name="unknown: first-screen business status and next action match the model" time="0.000198" classname="test"/>
+	<testcase name="takeover: first-screen business status and next action match the model" time="0.000123" classname="test"/>
+	<testcase name="confirm screen explains the disabled action and checkbox is not approval" time="0.000726" classname="test"/>
+	<testcase name="approval tells the user that sending has not happened" time="0.000544" classname="test"/>
+	<testcase name="expiry explanation disappears after re-confirmation; initial note is not current truth" time="0.000304" classname="test"/>
+	<testcase name="file: show the exact old and new scope, not a generic mismatch" time="0.000195" classname="test"/>
+	<testcase name="recipient: show the exact old and new scope, not a generic mismatch" time="0.000125" classname="test"/>
+	<testcase name="policy: show the exact old and new scope, not a generic mismatch" time="0.000198" classname="test"/>
+	<testcase name="changed fixture compares v2 to v3; changed-back scope still explains revocation" time="0.001426" classname="test"/>
+	<testcase name="all: actual number and qualifier survive draft generation without email permission" time="0.000283" classname="test"/>
+	<testcase name="guided: actual number and qualifier survive draft generation without email permission" time="0.000164" classname="test"/>
+	<testcase name="internal fallback continues to show unapproved promise and no approval action" time="0.000162" classname="test"/>
+	<testcase name="unavailable: unknown is never projected as failure, cancellation or success" time="0.000192" classname="test"/>
+	<testcase name="not_found: unknown is never projected as failure, cancellation or success" time="0.000092" classname="test"/>
+	<testcase name="lookup success removes old uncertainty but still states no real email" time="0.000156" classname="test"/>
+	<testcase name="pause and return describe actual available operations, never fake human editing" time="0.000214" classname="test"/>
+	<testcase name="deferring a content decision does not use email-cancellation language" time="0.000182" classname="test"/>
+	<testcase name="cancelled send explains pre-send cancellation, not recall" time="0.000152" classname="test"/>
+	<testcase name="presenter does not alter authority or revive grants while reading" time="0.000233" classname="test"/>
+	<testcase name="all reachable bounded sequences keep enabled send action equal to authority" time="0.564132" classname="test"/>
+	<testcase name="HTML uses the tested presenter and all static render targets exist" time="0.000803" classname="test"/>
+	<!-- tests 52 -->
+	<!-- suites 0 -->
+	<!-- pass 52 -->
+	<!-- fail 0 -->
+	<!-- cancelled 0 -->
+	<!-- skipped 0 -->
+	<!-- todo 0 -->
+	<!-- duration_ms 695.2131 -->
+</testsuites>

@@ -1,9 +1,14 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import "./evidence-choice.css";
+import "./copilot-boundaries.css";
+import { projectCopilotBoundaries } from "./capability-boundaries";
+
+import { type RefObject, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { OfficeActionWorkbench, normalizeOfficeAction, type OfficeAction } from "./office-action-workbench";
 import {
   IconAlertTriangle,
+  IconArrowLeft,
   IconArrowRight,
   IconAdjustments,
   IconCheck,
@@ -24,6 +29,7 @@ import {
   IconPlayerPause,
   IconPlayerPlay,
   IconPlayerStop,
+  IconPlus,
   IconRefresh,
   IconRoute,
   IconSearch,
@@ -39,7 +45,7 @@ type WorkspaceView = "data" | "loop" | "result" | "actions";
 type FileTypeFilter = string;
 type PreviewKind = "table" | "document" | "pdf" | "text" | "unavailable";
 type LoopPhase = "observe" | "plan" | "act" | "verify" | "evidence_gate" | "commit";
-type LoopCommand = "pause" | "resume" | "steer" | "stop" | "rollback" | "decision";
+type LoopCommand = "pause" | "resume" | "steer" | "stop" | "rollback" | "decision" | "topology_override";
 type LoopControlOptions = {
   instruction?: string;
   branchId?: string;
@@ -52,6 +58,7 @@ type LoopControlOptions = {
   decisionRequestId?: string;
   sourceRevision?: string;
   feedback?: string;
+  topologyMode?: "single_controller";
 };
 type EvidenceRole = "expected" | "observed" | "support" | "contradiction" | "context";
 type EvidenceAnchor = {
@@ -84,7 +91,7 @@ type DecisionRequest = {
   idempotency_ref: string | null;
   candidate_ids: string[];
   consequence: string;
-  state: "pending" | "deferred" | "accepted" | "declined" | "cancelled" | "rejected" | null;
+  state: "pending" | "deferred" | "accepted" | "declined" | "cancelled" | "rejected" | "stale" | null;
 };
 type EvidenceResolution = {
   resolution_id: string;
@@ -103,7 +110,7 @@ type EvidenceResolution = {
   selected_candidate_id: string | null;
   source_revision?: string | null;
   decision_request?: DecisionRequest | null;
-  decision_status?: "pending" | "deferred" | "accepted" | "declined" | "cancelled" | "rejected" | null;
+  decision_status?: DecisionRequest["state"];
 };
 type FindingDecisionOption = {
   option_id: "A" | "B" | "C";
@@ -319,12 +326,23 @@ type EvidenceGap = {
   candidate_file_refs: string[];
 };
 
+type UncoveredRequirement = {
+  title: string;
+  objective: string;
+  reason: string;
+};
+
+type DeferredRequirement = UncoveredRequirement & {
+  candidate_file_refs: string[];
+};
+
 type LoopNextStep = {
   decision: "pending" | "next_round" | "completed" | "budget_exhausted" | "waiting_input" | "user_stopped" | "failed";
   reason: string;
   next_question: string | null;
   candidate_file_refs: string[];
   candidate_branch_ids: string[];
+  ready_branch_ids: string[];
   recovery_kind: "source_location" | "analysis_output" | null;
   evidence_resolutions: EvidenceResolution[];
   decision_requests: DecisionRequest[];
@@ -341,6 +359,8 @@ type LoopRound = {
   plan: HarnessPlanNode[];
   plan_summary: string | null;
   selection_reason: string | null;
+  uncovered_requirements: UncoveredRequirement[];
+  deferred_requirements: DeferredRequirement[];
   model_receipt: ModelReceipt | null;
   result: HarnessResult | null;
   analysis_receipt: ModelReceipt | null;
@@ -361,7 +381,7 @@ type LoopBranch = {
   input_file_refs: string[];
   verified_file_refs: string[];
   missing_file_refs: string[];
-  status: "running" | "completed" | "waiting_input" | "stopped" | "failed";
+  status: "running" | "pending" | "blocked" | "completed" | "waiting_input" | "stopped" | "failed" | "rejected";
   requires_human_gate: boolean;
   created_at: string;
   updated_at: string;
@@ -1130,6 +1150,17 @@ export type HarnessPlanNode = {
 export type HarnessRun = {
   office_action: OfficeAction | null;
   run_id: string;
+  task_id: string;
+  task_version: number;
+  run_sequence: number;
+  parent_run_id: string | null;
+  continuation_reason: string | null;
+  carried_branch_id: string | null;
+  base_artifact_version: number | null;
+  base_task_commit: string | null;
+  workspace_revision: string;
+  recheck_file_refs: string[];
+  source_revision_changed: boolean;
   workspace_id: string;
   status: string;
   version: number;
@@ -1161,6 +1192,87 @@ export type HarnessRun = {
   narrative_reconciliation: NarrativeReconciliation | null;
   validation_errors: string[];
   events: HarnessActivityItem[];
+  topology_admission: TopologyAdmission | null;
+  worker_runs: WorkerRunReceipt[];
+  shared_artifacts: SharedArtifactReceipt[];
+  work_units: WorkUnitReceipt[];
+  contributions: ContributionReceipt[];
+};
+
+type TaskPointer = {
+  task_id: string;
+  task_version: number;
+  current_run_id: string;
+  run_sequence: number;
+  parent_run_id: string | null;
+  current_artifact_id: string | null;
+  current_artifact_version: number | null;
+  current_commit_id: string | null;
+  lineage: Array<{ run_id: string; run_sequence: number; parent_run_id: string | null; status: string }>;
+};
+
+type TopologyAdmission = {
+  mode: "single_controller" | "fixed_workflow" | "adaptive_readonly_workers";
+  work_unit_breadth: number;
+  independent_branch_count: number;
+  dependency_parallelism: number;
+  source_span: number;
+  remaining_model_calls: number;
+  remaining_time_seconds: number;
+  external_action: "none";
+  reasons: string[];
+  user_confirmation_required: boolean;
+};
+
+type WorkerRunReceipt = {
+  worker_run_id: string;
+  branch_id: string;
+  outcome: string;
+  summary: string;
+  source_file_refs: string[];
+  model_called: boolean;
+  output_used: boolean;
+  elapsed_ms: number;
+  error: string | null;
+};
+
+type SharedArtifactReceipt = {
+  artifact_id: string;
+  version: number;
+  adopted_worker_run_ids: string[];
+  waiting_branch_ids: string[];
+  failed_worker_run_ids: string[];
+  external_action: "none";
+};
+
+type WorkUnitReceipt = {
+  work_unit_id: string;
+  branch_id: string;
+  unit_id: string;
+  depends_on: string[];
+  approved_file_refs: string[];
+  state: string;
+  attempt: number;
+  version: number;
+  latest_contribution_id: string | null;
+  returned_at: string | null;
+  status_reason: string | null;
+};
+
+type ContributionReceipt = {
+  contribution_id: string;
+  work_unit_id: string;
+  branch_id: string;
+  attempt: number;
+  worker_run_id: string;
+  approved_file_refs: string[];
+  evidence_anchors: Array<Record<string, unknown>>;
+  model_receipt: { called: boolean; output_used: boolean; elapsed_ms: number };
+  gate_status: string;
+  gate_reason: string;
+  artifact_version: number | null;
+  summary: string;
+  created_at: string;
 };
 
 export type HarnessActivityItem = {
@@ -1197,6 +1309,7 @@ export type HarnessActivityState = {
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8010";
 const HEADERS = { "Content-Type": "application/json", "X-User-Id": "demo_user" };
 const RUN_SESSION_KEY = "office-agent:forte-public-office:active-run";
+const NEW_TASK_DRAFT_SESSION_KEY = "office-agent:forte-public-office:new-task-draft";
 const NAMED_EVENTS = [
   "office_action_prepared", "office_action_confirm", "office_action_revise",
   "office_action_defer", "office_action_cancel", "office_action_undo",
@@ -1208,6 +1321,18 @@ const NAMED_EVENTS = [
   "planning_completed",
   "plan_validation_rejected",
   "plan_validation",
+  "topology_admission",
+  "topology_confirmation_required",
+  "worker_wave_reserved",
+  "work_unit_started",
+  "contribution_recorded",
+  "work_unit_failed",
+  "worker_wave_committed",
+  "worker_returned",
+  "contribution_adopted",
+  "contribution_waiting",
+  "contribution_rejected",
+  "topology_workers_completed",
   "ready_to_execute",
   "analysis_started",
   "analysis_completed",
@@ -1287,7 +1412,7 @@ function normalizeDecisionRequest(value: unknown): DecisionRequest | null {
     expected_version: expectedVersion,
     idempotency_ref: asText(raw.idempotency_ref) || null,
     candidate_ids: candidateIds,
-    consequence: asText(raw.consequence || raw.after_confirmation || raw.next_step, "只重跑受影响分支，不修改源文件，不执行外部动作。"),
+    consequence: asText(raw.consequence || raw.after_confirmation || raw.next_step, "只继续处理这一项，不修改原文件，不执行外部动作。"),
     state: normalizeDecisionState(raw.state || raw.decision_status || raw.status),
   };
 }
@@ -1296,7 +1421,7 @@ function normalizeDecisionState(value: unknown): DecisionRequest["state"] {
   const state = asText(value).toLowerCase();
   if (state === "open") return "pending";
   if (state === "canceled") return "cancelled";
-  return ["pending", "deferred", "accepted", "declined", "cancelled", "rejected"].includes(state)
+  return ["pending", "deferred", "accepted", "declined", "cancelled", "rejected", "stale"].includes(state)
     ? state as DecisionRequest["state"]
     : null;
 }
@@ -1424,7 +1549,7 @@ function findingReviewRequest(finding: HarnessFinding, index: number, roundNumbe
     affectedBranchIds: finding.affected_branch_ids,
     resolution: null,
     decisionRecord,
-    decisionRequest: finding.decision_request ?? decisionRequests.find((item) => item.finding_id === finding.finding_id) ?? null,
+    decisionRequest: decisionRequests.find((item) => item.request_id === finding.decision_request?.request_id || (item.resolution_id === null && item.finding_id === finding.finding_id)) ?? finding.decision_request ?? null,
     serverFact: finding.evidence_anchors.length
       ? `服务端已把 ${finding.evidence_anchors.length} 处原文片段唯一定位到本轮安全预览，并核对文件范围。`
       : "相关 file_ref 已通过本轮允许范围与引用成员关系校验，但旧结果没有精确位置。",
@@ -1841,11 +1966,11 @@ function resolutionReviewRequest(
     affectedBranchIds: resolution.branch_id ? [resolution.branch_id] : [],
     resolution,
     decisionRecord: [...decisions].reverse().find((item) => item.resolution_id === resolution.resolution_id) ?? null,
-    decisionRequest: resolution.decision_request ?? decisionRequests.find((item) => item.resolution_id === resolution.resolution_id || item.finding_id === resolution.finding_id) ?? null,
+    decisionRequest: decisionRequests.find((item) => item.resolution_id === resolution.resolution_id) ?? resolution.decision_request ?? decisionRequests.find((item) => item.resolution_id === null && item.finding_id === resolution.finding_id) ?? null,
     serverFact: resolution.status === "ambiguous"
       ? `服务端找到 ${resolution.candidates.length} 个真实位置，但不能替用户判断哪一个支撑当前结论。`
       : "服务端没有在本轮安全预览中找到该候选片段，受影响分支已暂停，其他结果保持不变。",
-    boundary: "选择候选只确认原文位置，不等于批准结论；继续后只重跑受影响分支，且不会修改文件或执行外部动作。",
+    boundary: "选择候选只确认原文位置，不等于批准结论；确认后只继续受影响部分，其他成果不变。",
     gapRecovery: null,
   };
 }
@@ -1947,10 +2072,37 @@ function normalizePlan(value: unknown) {
         : "none",
     }];
   }) : [];
+  const uncoveredRequirements = Array.isArray(raw?.uncovered_requirements)
+    ? raw.uncovered_requirements.flatMap((item): UncoveredRequirement[] => {
+        if (!item || typeof item !== "object") return [];
+        const requirement = item as Record<string, unknown>;
+        const title = asText(requirement.title);
+        const objective = asText(requirement.objective);
+        const reason = asText(requirement.reason);
+        return title && objective && reason ? [{ title, objective, reason }] : [];
+      })
+    : [];
+  const deferredRequirements = Array.isArray(raw?.deferred_requirements)
+    ? raw.deferred_requirements.flatMap((item): DeferredRequirement[] => {
+        if (!item || typeof item !== "object") return [];
+        const requirement = item as Record<string, unknown>;
+        const title = asText(requirement.title);
+        const objective = asText(requirement.objective);
+        const reason = asText(requirement.reason);
+        return title && objective && reason ? [{
+          title,
+          objective,
+          reason,
+          candidate_file_refs: asStrings(requirement.candidate_file_refs),
+        }] : [];
+      })
+    : [];
   return {
     units,
     summary: raw ? asText(raw.summary) || null : null,
     selectionReason: raw ? asText(raw.selection_reason) || null : null,
+    uncoveredRequirements,
+    deferredRequirements,
   };
 }
 
@@ -1970,7 +2122,7 @@ function normalizeBranch(value: unknown): LoopBranch | null {
   const raw = value as Record<string, unknown>;
   const branchId = asText(raw.branch_id);
   const status = asText(raw.status);
-  if (!branchId || !["running", "completed", "waiting_input", "stopped", "failed"].includes(status)) return null;
+  if (!branchId || !["running", "pending", "blocked", "completed", "waiting_input", "stopped", "failed", "rejected"].includes(status)) return null;
   return {
     branch_id: branchId,
     unit_id: asText(raw.unit_id),
@@ -2005,6 +2157,7 @@ function normalizeLoopRound(value: unknown): LoopRound | null {
     next_question: asText(nextRaw.next_question) || null,
     candidate_file_refs: asStrings(nextRaw.candidate_file_refs),
     candidate_branch_ids: asStrings(nextRaw.candidate_branch_ids),
+    ready_branch_ids: asStrings(nextRaw.ready_branch_ids),
     recovery_kind: ["source_location", "analysis_output"].includes(asText(nextRaw.recovery_kind))
       ? asText(nextRaw.recovery_kind) as LoopNextStep["recovery_kind"]
       : null,
@@ -2026,6 +2179,8 @@ function normalizeLoopRound(value: unknown): LoopRound | null {
     plan: plan.units,
     plan_summary: plan.summary,
     selection_reason: plan.selectionReason,
+    uncovered_requirements: plan.uncoveredRequirements,
+    deferred_requirements: plan.deferredRequirements,
     model_receipt: normalizeReceipt(raw.model_receipt),
     result: normalizeResult(raw.result),
     analysis_receipt: normalizeReceipt(raw.analysis_receipt),
@@ -3205,9 +3360,81 @@ function normalizeRun(value: unknown): HarnessRun | null {
   const decisionRequests = Array.isArray(raw.decision_requests)
     ? raw.decision_requests.map(normalizeDecisionRequest).filter((item): item is DecisionRequest => item !== null)
     : [];
+  const admissionRaw = raw.topology_admission && typeof raw.topology_admission === "object"
+    ? raw.topology_admission as Record<string, unknown>
+    : null;
+  const admissionMode = asText(admissionRaw?.mode);
+  const topologyAdmission: TopologyAdmission | null = admissionRaw && ["single_controller", "fixed_workflow", "adaptive_readonly_workers"].includes(admissionMode)
+    ? {
+        mode: admissionMode as TopologyAdmission["mode"],
+        work_unit_breadth: asNumber(admissionRaw.work_unit_breadth),
+        independent_branch_count: asNumber(admissionRaw.independent_branch_count),
+        dependency_parallelism: asNumber(admissionRaw.dependency_parallelism),
+        source_span: asNumber(admissionRaw.source_span),
+        remaining_model_calls: asNumber(admissionRaw.remaining_model_calls),
+        remaining_time_seconds: asNumber(admissionRaw.remaining_time_seconds),
+        external_action: "none",
+        reasons: asStrings(admissionRaw.reasons),
+        user_confirmation_required: admissionRaw.user_confirmation_required !== false,
+      }
+    : null;
+  const workerRuns = Array.isArray(raw.worker_runs) ? raw.worker_runs.flatMap((item): WorkerRunReceipt[] => {
+    if (!item || typeof item !== "object") return [];
+    const worker = item as Record<string, unknown>;
+    const workerId = asText(worker.worker_run_id); const branchId = asText(worker.branch_id);
+    return workerId && branchId ? [{
+      worker_run_id: workerId, branch_id: branchId, outcome: asText(worker.outcome, "unknown"),
+      summary: asText(worker.summary), source_file_refs: asStrings(worker.source_file_refs),
+      model_called: worker.model_called === true, output_used: worker.output_used === true,
+      elapsed_ms: asNumber(worker.elapsed_ms), error: asText(worker.error) || null,
+    }] : [];
+  }) : [];
+  const sharedArtifacts = Array.isArray(raw.shared_artifacts) ? raw.shared_artifacts.flatMap((item): SharedArtifactReceipt[] => {
+    if (!item || typeof item !== "object") return [];
+    const artifact = item as Record<string, unknown>; const artifactId = asText(artifact.artifact_id);
+    return artifactId ? [{ artifact_id: artifactId, version: asNumber(artifact.version, 1), adopted_worker_run_ids: asStrings(artifact.adopted_worker_run_ids), waiting_branch_ids: asStrings(artifact.waiting_branch_ids), failed_worker_run_ids: asStrings(artifact.failed_worker_run_ids), external_action: "none" }] : [];
+  }) : [];
+  const workUnits = Array.isArray(raw.work_units) ? raw.work_units.flatMap((item): WorkUnitReceipt[] => {
+    if (!item || typeof item !== "object") return [];
+    const unit = item as Record<string, unknown>; const id = asText(unit.work_unit_id);
+    return id ? [{
+      work_unit_id: id, branch_id: asText(unit.branch_id), unit_id: asText(unit.unit_id),
+      depends_on: asStrings(unit.depends_on), approved_file_refs: asStrings(unit.approved_file_refs),
+      state: asText(unit.state, "pending"), attempt: asNumber(unit.attempt), version: asNumber(unit.version, 1),
+      latest_contribution_id: asText(unit.latest_contribution_id) || null,
+      returned_at: asText(unit.returned_at) || null,
+      status_reason: asText(unit.status_reason) || null,
+    }] : [];
+  }) : [];
+  const contributions = Array.isArray(raw.contributions) ? raw.contributions.flatMap((item): ContributionReceipt[] => {
+    if (!item || typeof item !== "object") return [];
+    const record = item as Record<string, unknown>; const id = asText(record.contribution_id);
+    const receipt = record.model_receipt && typeof record.model_receipt === "object" ? record.model_receipt as Record<string, unknown> : {};
+    return id ? [{
+      contribution_id: id, work_unit_id: asText(record.work_unit_id), branch_id: asText(record.branch_id),
+      attempt: asNumber(record.attempt, 1), worker_run_id: asText(record.worker_run_id),
+      approved_file_refs: asStrings(record.approved_file_refs),
+      evidence_anchors: Array.isArray(record.evidence_anchors) ? record.evidence_anchors.filter((anchor): anchor is Record<string, unknown> => Boolean(anchor && typeof anchor === "object")) : [],
+      model_receipt: { called: receipt.called === true, output_used: receipt.output_used === true, elapsed_ms: asNumber(receipt.elapsed_ms) },
+      gate_status: asText(record.gate_status, "waiting"), gate_reason: asText(record.gate_reason),
+      artifact_version: typeof record.artifact_version === "number" ? record.artifact_version : null,
+      summary: asText(record.summary), created_at: asText(record.created_at),
+    }] : [];
+  }) : [];
   return {
     run_id: runId,
     office_action: normalizeOfficeAction(raw.office_action),
+    task_id: asText(raw.task_id, "task-000000000000"),
+    task_version: asNumber(raw.task_version, 1),
+    run_sequence: asNumber(raw.run_sequence, 1),
+    parent_run_id: asText(raw.parent_run_id) || null,
+    continuation_reason: asText(raw.continuation_reason) || null,
+    carried_branch_id: asText(raw.carried_branch_id) || null,
+    base_artifact_version: typeof raw.base_artifact_version === "number" ? raw.base_artifact_version : null,
+    base_task_commit: asText(raw.base_task_commit) || null,
+    workspace_revision: asText(raw.workspace_revision, "unknown"),
+    recheck_file_refs: asStrings(raw.recheck_file_refs),
+    source_revision_changed: raw.source_revision_changed === true,
     workspace_id: workspaceId,
     status: asText(raw.status, "queued"),
     version: asNumber(raw.version, 1),
@@ -3260,6 +3487,11 @@ function normalizeRun(value: unknown): HarnessRun | null {
     narrative_reconciliation: normalizeNarrativeReconciliation(raw.narrative_reconciliation),
     validation_errors: asStrings(raw.validation_errors),
     events: serverEvents.map(activityItem).sort((a, b) => a.sequence - b.sequence),
+    topology_admission: topologyAdmission,
+    worker_runs: workerRuns,
+    shared_artifacts: sharedArtifacts,
+    work_units: workUnits,
+    contributions,
   };
 }
 
@@ -3298,10 +3530,13 @@ function gateLabel(decision: LoopNextStep["decision"] | undefined) {
 function branchStatusLabel(status: LoopBranch["status"]) {
   return {
     running: "正在处理",
+    pending: "等待前序分支",
+    blocked: "前序分支未通过",
     completed: "已核对",
     waiting_input: "等你决定",
     stopped: "已停止",
     failed: "未通过",
+    rejected: "已拒绝",
   }[status];
 }
 
@@ -3466,8 +3701,11 @@ function evidenceLocationLabel(anchor: Pick<EvidenceAnchor, "locator_kind" | "st
 }
 
 function evidenceRevisionLabel(revision: string | null | undefined) {
-  if (!revision) return "本轮安全预览版本未提供";
-  return `源文件版本 ${revision.length > 14 ? `${revision.slice(0, 14)}…` : revision}`;
+  return revision ? "已按当前资料版本核对" : "当前资料版本未提供";
+}
+
+function evidenceLocatorLabel(locatorKind: EvidenceAnchor["locator_kind"]) {
+  return locatorKind === "table_rows" ? "表格行" : "文本行";
 }
 
 function resolutionStatusLabel(status: EvidenceResolution["status"]) {
@@ -3490,6 +3728,8 @@ function EvidenceReviewDialog({
   onControl,
   starting,
   controlBusy,
+  readOnly = false,
+  terminalRun = false,
 }: {
   request: EvidenceReviewRequest;
   files: HarnessFile[];
@@ -3499,6 +3739,8 @@ function EvidenceReviewDialog({
   onControl: (command: LoopCommand, options?: LoopControlOptions) => Promise<boolean>;
   starting: boolean;
   controlBusy: LoopCommand | null;
+  readOnly?: boolean;
+  terminalRun?: boolean;
 }) {
   const closeButtonRef = useRef<HTMLButtonElement | null>(null);
   const reviewFiles = useMemo(() => request.fileRefs
@@ -3515,6 +3757,8 @@ function EvidenceReviewDialog({
   const [showRecommendation, setShowRecommendation] = useState(false);
   const [sourceHintMode, setSourceHintMode] = useState(false);
   const [decisionFeedback, setDecisionFeedback] = useState("");
+  const [decisionError, setDecisionError] = useState("");
+  const [showCandidatePreview, setShowCandidatePreview] = useState(false);
   const selectedFile = reviewFiles.find((file) => file.file_ref === selectedFileRef) ?? null;
   const activeAnchor = activeAnchorIndex >= 0 && reviewAnchors[activeAnchorIndex]?.file_ref === selectedFileRef
     ? reviewAnchors[activeAnchorIndex]
@@ -3528,10 +3772,16 @@ function EvidenceReviewDialog({
     setShowRecommendation(false);
     setSourceHintMode(false);
     setDecisionFeedback("");
+    setDecisionError("");
+    setShowCandidatePreview(false);
     closeButtonRef.current?.focus();
   }, [request.reviewKey, request.review, request.resolution, reviewAnchors, reviewFiles]);
 
   const deferAndClose = useCallback(async () => {
+    if (readOnly) {
+      onClose();
+      return true;
+    }
     const shouldRecordDefer = !request.decisionRecord
       && request.decisionRequest?.state !== "deferred"
       && Boolean(request.findingId)
@@ -3547,11 +3797,19 @@ function EvidenceReviewDialog({
       sourceRevision: request.decisionRequest?.source_revision || request.resolution?.source_revision || undefined,
       feedback: decisionFeedback,
     });
-  }, [decisionFeedback, onClose, onControl, request.affectedBranchIds, request.decisionRecord, request.decisionRequest, request.findingId, request.kind, request.resolution, request.review?.requires_human_decision]);
+  }, [decisionFeedback, onClose, onControl, readOnly, request.affectedBranchIds, request.decisionRecord, request.decisionRequest, request.findingId, request.kind, request.resolution, request.review?.requires_human_decision]);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") void deferAndClose();
+      if (event.key === "Tab") {
+        const dialog = closeButtonRef.current?.closest<HTMLElement>('[role="dialog"]');
+        const focusable = Array.from(dialog?.querySelectorAll<HTMLElement>('button:not(:disabled), a[href], input:not(:disabled), textarea:not(:disabled), summary, [tabindex="0"]') ?? []).filter((element) => element.getClientRects().length > 0);
+        const first = focusable[0];
+        const last = focusable.at(-1);
+        if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
+        if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
+      }
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
@@ -3598,14 +3856,14 @@ function EvidenceReviewDialog({
   const dialogTitle = request.kind === "finding" && request.review?.requires_human_decision
     ? "需要你核对并决定下一步"
     : isAmbiguousResolution ? `从 ${request.resolution?.candidates.length ?? 0} 个原文位置中选 1 个`
-    : isDirectRetryResolution ? `下一步：只重试“${request.branchTitle ?? "当前"}”分支`
+    : isDirectRetryResolution ? "让 Agent 重新查找依据"
     : request.kind === "resolution" ? "需要你确认原文位置"
     : isDirectRetryGap ? request.gapRecovery?.mode === "new_run"
       ? `下一步：用“${request.branchTitle ?? "当前"}”分支新建任务`
-      : `下一步：只重试“${request.branchTitle ?? "当前"}”分支`
+      : "让 Agent 重新查找依据"
     : request.title;
   const startDecisionTask = async () => {
-    if (!selectedOption || !request.findingId) return;
+    if (readOnly || !selectedOption || !request.findingId) return;
     const recorded = await onControl("decision", {
       decisionAction: "accept",
       findingId: request.findingId,
@@ -3624,7 +3882,7 @@ function EvidenceReviewDialog({
     if (await onStartTask(instruction)) onClose();
   };
   const declineFinding = async () => {
-    if (!request.findingId) return;
+    if (readOnly || !request.findingId) return;
     const recorded = await onControl("decision", {
       decisionAction: "decline",
       findingId: request.findingId,
@@ -3636,6 +3894,7 @@ function EvidenceReviewDialog({
     if (recorded) onClose();
   };
   const cancelDecision = async () => {
+    if (readOnly) { onClose(); return; }
     if (!request.findingId || (request.decisionRecord && request.decisionRecord.action !== "defer")) { onClose(); return; }
     const recorded = await onControl("decision", {
       decisionAction: "cancel",
@@ -3649,10 +3908,12 @@ function EvidenceReviewDialog({
     if (recorded) onClose();
   };
   const resolveEvidence = async () => {
+    if (readOnly) return;
     const resolution = request.resolution;
     if (!resolution || !selectedCandidateId || !request.findingId) return;
     const candidate = resolution.candidates.find((item) => item.candidate_id === selectedCandidateId);
     if (!candidate) return;
+    setDecisionError("");
     const recorded = await onControl("decision", {
       decisionAction: "accept",
       findingId: request.findingId,
@@ -3663,10 +3924,11 @@ function EvidenceReviewDialog({
       sourceRevision: request.decisionRequest?.source_revision || resolution.source_revision || candidate.source_revision || undefined,
       feedback: decisionFeedback,
     });
-    if (!recorded) return;
+    if (!recorded) { setDecisionError("尚未确认是否写入。请返回任务进展刷新状态，核对服务端回执后再处理；不要假定操作成功或失败。"); return; }
     onClose();
   };
   const retryUnavailable = async () => {
+    if (readOnly) return;
     const resolution = request.resolution;
     if (!resolution || !request.findingId) return;
     const recorded = await onControl("decision", {
@@ -3690,6 +3952,7 @@ function EvidenceReviewDialog({
     onClose();
   };
   const recoverGap = async () => {
+    if (readOnly) return;
     const recovery = request.gapRecovery;
     if (!recovery) return;
     if (recovery.mode === "resume_branch" && recovery.branchId) {
@@ -3712,9 +3975,21 @@ function EvidenceReviewDialog({
     }
   };
   const startStructuredReview = async () => {
+    if (readOnly) return;
     const instruction = `复核以下问题，逐条定位原文并给出需要人工决定的处理选项：${request.title}`;
     if (await onStartTask(instruction)) onClose();
   };
+  if (isAmbiguousResolution && request.resolution) return <div className="evidence-review-backdrop cap-evidence-backdrop" role="presentation">
+    <section className="evidence-review-page cap-evidence-page" role="dialog" aria-modal="true" aria-label={`从 ${request.resolution.candidates.length} 个原文位置中选 1 个`}>
+      <header className="cap-evidence-header"><button ref={closeButtonRef} type="button" onClick={() => void deferAndClose()} aria-label="关闭问题审查页"><IconX />返回任务进展</button><h2 id="evidence-review-title">确认结论依据</h2><span><IconClock />{readOnly ? "历史只读" : "1 项待确认"}</span></header>
+      <div className="cap-evidence-layout"><aside className="cap-evidence-explanation"><h3>为什么需要你确认</h3><ol><li><b>1</b><div><h4>系统发现</h4><p>需要从 {request.resolution.candidates.length} 个真实位置中选 1 个，系统不会替你默认选择。</p></div></li><li><b>2</b><div><h4>会影响什么</h4><p>{request.branchTitle ? `“${request.branchTitle}”的引用位置待确认。` : "当前分支的引用位置待确认。"}位置匹配不能直接证明结论正确。</p></div></li><li><b>3</b><div><h4>你需要做什么</h4><p>比较候选原文，选择 1 个符合当前引用的位置。</p></div></li></ol><section><h4><IconCircleCheck />系统会保留</h4><p>已完成分支、已有成果版本与历史记录。</p><h4><IconShieldCheck />系统不会做</h4><p>不会修改原文件，不会执行外部动作，也不会重新执行其他已完成分支。</p></section><div className="cap-evidence-actions"><span className="cap-evidence-selection" aria-live="polite"><IconCircleDot aria-hidden="true" />{selectedCandidateId ? `已选择位置 ${request.resolution.candidates.findIndex((item) => item.candidate_id === selectedCandidateId) + 1}` : "尚未选择原文"}</span><button type="button" onClick={() => void deferAndClose()}>暂不处理</button><button type="button" className="is-primary" disabled={readOnly || !selectedCandidateId || controlBusy !== null} onClick={() => void resolveEvidence()}>{controlBusy ? "正在提交" : terminalRun ? "记录引用位置" : "确认位置并继续"}</button>{decisionError && <p role="alert" className="cap-decision-error">{decisionError}</p>}</div><details className="cap-evidence-audit"><summary>查看技术回执与其他处理方式</summary><p>{request.resolution.reason}</p><p>{request.serverFact}</p><label>补充给这一项的说明（可选）<textarea value={decisionFeedback} onChange={(event) => setDecisionFeedback(event.target.value)} /></label><button type="button" disabled={readOnly || controlBusy !== null} onClick={() => void cancelDecision()}>取消这次待决</button><button type="button" disabled={readOnly || controlBusy !== null} onClick={async () => { if (await onControl("stop")) onClose(); }}>结束并保留</button></details></aside>
+      <main className="cap-evidence-candidates"><h3>选择一处原文作为依据</h3><section className="cap-evidence-claim" aria-label="待核对判断"><span>待核对判断 · 尚未确认</span><h4>{request.title}</h4>{request.factSummary && <p>{request.factSummary}</p>}</section><p className="cap-evidence-file"><IconFileDescription />{reviewFiles.map((file) => file.display_label).join("、")}<span><IconShieldCheck />安全预览</span></p><div role="radiogroup" aria-label="候选原文位置" className="resolution-candidate-map">{request.resolution.candidates.map((candidate, index) => {
+        const file = files.find((item) => item.file_ref === candidate.file_ref);
+        const anchorIndex = reviewAnchors.findIndex((anchor) => anchor.file_ref === candidate.file_ref && anchor.start === candidate.start && anchor.end === candidate.end && anchor.excerpt === candidate.excerpt);
+        return <article className={`cap-candidate${selectedCandidateId === candidate.candidate_id ? " is-chosen" : ""}`} key={candidate.candidate_id}><header><label><input type="radio" name="evidence-candidate" checked={selectedCandidateId === candidate.candidate_id} onChange={() => setSelectedCandidateId(candidate.candidate_id)} aria-label={`选择候选原文 ${index + 1}：${file?.display_label ?? "批准来源"} ${evidenceLocationLabel(candidate, file)}`} /><b>位置 {index + 1} · {evidenceLocationLabel(candidate, file)}</b></label><button type="button" onClick={() => { if (anchorIndex >= 0) selectAnchor(anchorIndex); else { setActiveAnchorIndex(-1); setSelectedFileRef(candidate.file_ref); } setShowCandidatePreview(true); }}>在文件中查看<IconChevronRight /></button></header><div className="cap-candidate-context">{candidate.context_before && <p>{candidate.context_before}</p>}<blockquote><mark>{candidate.excerpt}</mark></blockquote>{candidate.context_after && <p>{candidate.context_after}</p>}{!candidate.context_before && !candidate.context_after && <small>当前候选没有额外上下文，可在文件中查看。</small>}</div></article>;
+      })}</div><p className="cap-evidence-consequence" role="status"><IconAlertTriangle />{selectedCandidateId ? "已选 1 个位置。" : "尚未选择位置。"}{terminalRun ? "当前 Run 已结束。确认只记录引用位置；返回任务进展后，可为未完成分支新建 Run。" : "确认后只继续受影响分支；已有成果版本不会被覆盖。"}</p>{showCandidatePreview && <section className="cap-candidate-preview" aria-label="资料原文预览"><header><h4>原文件中的位置</h4><button type="button" onClick={() => setShowCandidatePreview(false)} aria-label="收起原文预览"><IconX /></button></header><FilePreview preview={preview} file={selectedFile} loading={previewLoading} error={previewError} anchor={activeAnchor} /></section>}</main></div>
+    </section>
+  </div>;
   return <div className="evidence-review-backdrop" role="presentation">
     <section className={`evidence-review-page is-${tone}`} role="dialog" aria-modal="true" aria-labelledby="evidence-review-title">
       <header className="evidence-review-header">
@@ -3731,7 +4006,7 @@ function EvidenceReviewDialog({
           <ol>
             <li><span><IconGitCommit aria-hidden="true" /></span><div><b>{request.kind === "gap" ? "Agent 未完成" : "Agent 提出"}</b><p>{request.kind === "proposal" ? "形成一条待确认的下一步建议" : request.kind === "gap" ? "本轮没有交付可定位的证据，只停止受影响分支" : "形成一条待复核发现"}</p></div></li>
             <li><span><IconShieldCheck aria-hidden="true" /></span><div><b>服务端记录</b><p>{request.serverFact}</p></div></li>
-            <li className="is-current"><span><IconEye aria-hidden="true" /></span><div><b>{request.kind === "gap" ? "选择恢复方式" : "等待你核对"}</b><p>{request.kind === "gap" ? "你不需要修改源文件；可直接让 Agent 只重试这个分支。" : "对照右侧原始资料，判断 Agent 描述是否成立。"}</p></div></li>
+            <li className="is-current"><span><IconEye aria-hidden="true" /></span><div><b>{request.kind === "gap" ? "选择恢复方式" : "等待你核对"}</b><p>{request.kind === "gap" ? "你不需要修改源文件；可让 Agent 重新查找依据。" : "对照右侧原始资料，判断 Agent 描述是否成立。"}</p></div></li>
           </ol>
           <footer><IconAlertTriangle aria-hidden="true" /><p>{request.boundary}</p></footer>
         </aside>
@@ -3739,24 +4014,28 @@ function EvidenceReviewDialog({
           {request.kind !== "gap" && !isDirectRetryResolution && <section className={`evidence-review-claim${isAmbiguousResolution ? " is-ambiguous" : ""}`} aria-labelledby="review-summary-title">
             <header><span>{isAmbiguousResolution ? "下一步只做 1 件事" : "问题处置单"}</span><h3 id="review-summary-title">{isAmbiguousResolution ? `从 ${request.resolution?.candidates.length ?? 0} 个真实位置中选 1 个` : "先看事实，再看影响，最后决定下一步"}</h3></header>
             {isAmbiguousResolution ? <ol className="review-summary-steps">
-              <li><b>1</b><div><span>为什么需要你</span><strong>同一段原文匹配到多个位置，Agent 不能替你选择。</strong></div></li>
-              <li className="is-decision"><b>2</b><div><span>你只需要选什么</span><strong>从下方候选位置中选 1 个真实位置。</strong></div></li>
-              <li><b>3</b><div><span>选完发生什么</span><strong>只重跑“{request.branchTitle || "当前"}”分支；不修改文件，不执行外部动作。</strong></div></li>
+              <li><b>1</b><div><span>系统发现</span><strong>同一段原文匹配到多个位置，Agent 不能替你选择。</strong></div></li>
+              <li><b>2</b><div><span>影响</span><strong>当前只能确认原文位置，不能因此直接确认结论。</strong></div></li>
+              <li className="is-decision"><b>3</b><div><span>你要做什么</span><strong>从下方候选位置中选 1 个真实位置。</strong></div></li>
+              <li><b>4</b><div><span>会保留</span><strong>其他成果、已完成分支和历史记录均不回退。</strong></div></li>
+              <li><b>5</b><div><span>不会做</span><strong>不会修改文件，也不会执行外部动作。</strong></div></li>
             </ol> : <ol className="review-summary-steps">
-              <li><b>1</b><div><span>发生了什么</span><strong>{request.factSummary || request.title}</strong></div></li>
-              <li><b>2</b><div><span>不处理的影响</span><strong>{request.impact || "影响尚未单独结构化，请先核对下方证据后再作判断。"}</strong></div></li>
-              <li className={request.review?.requires_human_decision ? "is-decision" : ""}><b>3</b><div><span>现在需要谁做什么</span><strong>{request.review?.requires_human_decision ? "需要你选择处理口径，Agent 不会替你决定。" : request.review ? "无需业务裁决，但结果仍需人工复核。" : "这是旧结果，尚未生成结构化处置选项。"}</strong></div></li>
+              <li><b>1</b><div><span>系统发现</span><strong>{request.factSummary || request.title}</strong></div></li>
+              <li><b>2</b><div><span>影响</span><strong>{request.impact || "影响尚未单独结构化，请先核对下方证据后再作判断。"}</strong></div></li>
+              <li className={request.review?.requires_human_decision ? "is-decision" : ""}><b>3</b><div><span>你要做什么</span><strong>{request.review?.requires_human_decision ? "选择一个处理口径，Agent 不会替你决定。" : request.review ? "无需业务裁决，但结果仍需人工复核。" : "这是旧结果，尚未生成结构化处置选项。"}</strong></div></li>
+              <li><b>4</b><div><span>会保留</span><strong>已完成分支、现有发现和已有成果版本均不回退。</strong></div></li>
+              <li><b>5</b><div><span>不会做</span><strong>不会修改原文件，也不会执行外部动作。</strong></div></li>
             </ol>}
             <details><summary>查看 Agent 的完整说明</summary><p>{request.detail}</p></details>
           </section>}
           {request.kind === "gap" && request.gapRecovery && <section className="evidence-gap-recovery" aria-labelledby="gap-recovery-title">
-            <header><div><span>{request.gapRecovery.mode === "inspect_only" ? "当前只能查看" : "下一步只做 1 件事"}</span><h3 id="gap-recovery-title">{request.gapRecovery.mode === "inspect_only" ? "查看停下原因，暂不启动新调用" : request.gapRecovery.mode === "new_run" ? "用此分支新建任务继续" : "直接让 Agent 重试此分支"}</h3><p>{request.gapRecovery.mode === "inspect_only" ? "当前状态没有可证明的原地恢复入口。" : request.gapRecovery.mode === "new_run" ? "旧 Run 已结束，不能原地续跑。不需要修改文件，也不需要填写内容；点击后会创建一个只处理此分支的新任务。" : "不需要修改文件，也不需要填写内容。只有你点击后，Agent 才会继续。"}</p></div><b>{request.gapRecovery.mode === "inspect_only" ? "仅查看" : "推荐"}</b></header>
-            <footer>{request.gapRecovery.mode !== "inspect_only" && <button type="button" className="is-primary" onClick={() => void recoverGap()} disabled={controlBusy !== null || starting}><IconRefresh aria-hidden="true" />{starting || controlBusy ? "正在提交" : request.gapRecovery.mode === "new_run" ? "新建任务，只续办此分支" : "继续任务，只重试此分支"}</button>}<button type="button" onClick={() => void deferAndClose()} disabled={controlBusy !== null || starting}>暂不处理此分支</button></footer>
+            <header><div><span>{request.gapRecovery.mode === "inspect_only" ? "当前只能查看" : "下一步只做 1 件事"}</span><h3 id="gap-recovery-title">{request.gapRecovery.mode === "inspect_only" ? "查看停下原因，暂不启动新调用" : request.gapRecovery.mode === "new_run" ? "用此分支新建任务继续" : "让 Agent 重新查找依据"}</h3><p>{request.gapRecovery.mode === "inspect_only" ? "当前状态没有可证明的原地恢复入口。" : request.gapRecovery.mode === "new_run" ? "旧 Run 已结束，不能原地续跑。不需要修改文件，也不需要填写内容；点击后会创建一个只处理此分支的新任务。" : "不需要修改文件，也不需要填写内容。只有你点击后，Agent 才会继续查找依据。"}</p></div><b>{request.gapRecovery.mode === "inspect_only" ? "仅查看" : "推荐"}</b></header>
+            <footer>{request.gapRecovery.mode !== "inspect_only" && <button type="button" className="is-primary" onClick={() => void recoverGap()} disabled={readOnly || controlBusy !== null || starting}><IconRefresh aria-hidden="true" />{starting || controlBusy ? "正在提交" : request.gapRecovery.mode === "new_run" ? "新建任务，只续办此分支" : "让 Agent 重新查找依据"}</button>}<button type="button" onClick={() => void deferAndClose()} disabled={controlBusy !== null || starting}>暂不处理此分支</button></footer>
             {request.gapRecovery.mode !== "inspect_only" && <details className="gap-extra-hint"><summary>我有额外线索</summary><label className="decision-feedback"><span>给 Agent 的线索（可选）</span><textarea value={decisionFeedback} onChange={(event) => setDecisionFeedback(event.target.value)} placeholder="例如：优先检查 F07、版本号和测试日期" /></label></details>}
           </section>}
           {isDirectRetryResolution && request.resolution && <section className="evidence-gap-recovery" aria-labelledby="resolution-retry-title">
-            <header><div><span>下一步只做 1 件事</span><h3 id="resolution-retry-title">直接让 Agent 重试此分支</h3><p>不需要修改文件，也不需要填写内容。只有你点击后，Agent 才会继续。</p></div><b>推荐</b></header>
-            <footer><button type="button" className="is-primary" disabled={controlBusy !== null} onClick={() => void retryUnavailable()}><IconRefresh aria-hidden="true" />继续任务，只重试此分支</button><button type="button" onClick={() => void deferAndClose()} disabled={controlBusy !== null}>暂不处理此分支</button></footer>
+            <header><div><span>下一步只做 1 件事</span><h3 id="resolution-retry-title">让 Agent 重新查找依据</h3><p>不需要修改文件，也不需要填写内容。只有你点击后，Agent 才会继续查找依据。</p></div><b>推荐</b></header>
+            <footer><button type="button" className="is-primary" disabled={readOnly || controlBusy !== null} onClick={() => void retryUnavailable()}><IconRefresh aria-hidden="true" />让 Agent 重新查找依据</button><button type="button" onClick={() => void deferAndClose()} disabled={controlBusy !== null}>暂不处理此分支</button></footer>
             <details className="gap-extra-hint"><summary>我有额外线索</summary><label className="decision-feedback"><span>给 Agent 的线索（可选）</span><textarea value={decisionFeedback} onChange={(event) => setDecisionFeedback(event.target.value)} placeholder="例如：同时核对版本号和测试日期" /></label></details>
           </section>}
           <details className={`evidence-workbench-disclosure${request.kind === "gap" || isDirectRetryResolution ? " is-gap" : ""}`} open={request.kind === "gap" || isDirectRetryResolution ? undefined : true}>
@@ -3784,15 +4063,15 @@ function EvidenceReviewDialog({
                       type="button"
                       key={candidate.candidate_id}
                       className={`evidence-anchor-item is-${request.resolution?.role ?? "context"}${active ? " is-active" : ""}${selected ? " is-chosen" : ""}`}
-                      onClick={() => { if (anchorIndex >= 0) selectAnchor(anchorIndex); else setSelectedFileRef(candidate.file_ref); setSelectedCandidateId(candidate.candidate_id); }}
+                      onClick={() => { if (anchorIndex >= 0) selectAnchor(anchorIndex); else { setActiveAnchorIndex(-1); setSelectedFileRef(candidate.file_ref); } setSelectedCandidateId(candidate.candidate_id); }}
                       aria-label={`选择候选原文 ${index + 1}：${file?.display_label ?? "允许范围内文件"} ${evidenceLocationLabel(candidate, file)}`}
                     >
                       <b>{selected ? <IconCheck aria-hidden="true" /> : index + 1}</b>
-                      <span><small>{resolutionStatusLabel(request.resolution?.status ?? "ambiguous")} · 候选 {index + 1}</small><strong>{file?.display_label ?? "允许范围内文件"} · {evidenceLocationLabel(candidate, file)}</strong><em>{evidenceRevisionLabel(candidate.source_revision || request.resolution?.source_revision)}</em><q>{candidate.excerpt}</q><small className="evidence-candidate-difference">{difference}</small></span>
+                      <span><small>{resolutionStatusLabel(request.resolution?.status ?? "ambiguous")} · 候选 {index + 1} · {evidenceLocatorLabel(candidate.locator_kind)}</small><strong>{file?.display_label ?? "允许范围内文件"} · {evidenceLocationLabel(candidate, file)}</strong><em>{evidenceRevisionLabel(candidate.source_revision || request.resolution?.source_revision)}</em><q>{candidate.excerpt}</q><small className="evidence-candidate-difference">{difference}</small></span>
                     </button>;
                   })}
                 </div>
-                {isAmbiguousResolution && <div className="resolution-choice-action" role="status"><span>{selectedCandidateId ? "已选 1 个位置。确认后只重跑这个分支。" : `请先从上方 ${request.resolution?.candidates.length ?? 0} 个位置中选 1 个。`}</span><button type="button" className="is-primary" disabled={!selectedCandidateId || controlBusy !== null} onClick={() => void resolveEvidence()}><IconPlayerPlay aria-hidden="true" />采用此位置并只重跑本分支</button></div>}
+                {isAmbiguousResolution && <div className="resolution-choice-action" role="status"><span>{selectedCandidateId ? "已选 1 个位置。确认后只继续受影响部分，其他成果不变。" : `请先从上方 ${request.resolution?.candidates.length ?? 0} 个位置中选 1 个。`}</span><button type="button" className="is-primary" disabled={readOnly || !selectedCandidateId || controlBusy !== null} onClick={() => void resolveEvidence()}><IconPlayerPlay aria-hidden="true" />确认位置并继续</button></div>}
               </section> : reviewAnchors.length > 0 ? <section className="evidence-review-pinpoint" aria-labelledby="evidence-pinpoint-title">
                 <header><div><span>证据定位</span><h3 id="evidence-pinpoint-title">选择一条，右侧打开真实文件并高亮对应位置</h3></div><b>{reviewAnchors.length} 处</b></header>
                 <div className="evidence-anchor-map">
@@ -3819,32 +4098,33 @@ function EvidenceReviewDialog({
           </details>
           {request.decisionRecord && <section className="decision-record-receipt" role="status">
             <IconCircleCheck aria-hidden="true" />
-            <div><span>人工决定已记录 · v{request.decisionRecord.accepted_task_version}</span><b>{request.decisionRecord.action === "accept" ? "已接受" : request.decisionRecord.action === "decline" ? "已否决" : request.decisionRecord.action === "cancel" ? "已取消" : "已暂缓"}</b><p>回执 {request.decisionRecord.decision_id}{request.decisionRecord.idempotency_ref ? ` · 幂等 ${request.decisionRecord.idempotency_ref}` : ""} · 外部动作：无</p></div>
+            <div><span>人工决定已记录 · 当前任务版本</span><b>{request.decisionRecord.action === "accept" ? "已接受" : request.decisionRecord.action === "decline" ? "已否决" : request.decisionRecord.action === "cancel" ? "已取消" : "已暂缓"}</b><p>这次处理不会修改原文件，也不会执行外部动作。</p></div>
           </section>}
           {request.kind === "resolution" && request.resolution ? <details className={`resolution-audit-details${isAmbiguousResolution || isDirectRetryResolution ? " is-collapsed" : ""}`} open={isAmbiguousResolution || isDirectRetryResolution ? undefined : true}>
             <summary>{isAmbiguousResolution || isDirectRetryResolution ? "查看技术回执与其他处理方式" : "证据定位处理"}</summary>
             <section className="evidence-resolution-decision" aria-labelledby="resolution-decision-title">
             <header><div><span>证据定位状态</span><h3 id="resolution-decision-title">{request.resolution.status === "ambiguous" ? `${request.resolution.candidates.length} 个位置都匹配，需要你选择` : `${resolutionStatusLabel(request.resolution.status)}，需要决定恢复方式`}</h3><p>{request.resolution.reason}</p></div><b>{request.resolution.status === "ambiguous" ? `${request.resolution.candidates.length} 个候选` : resolutionStatusLabel(request.resolution.status)}</b></header>
-            {request.decisionRequest && <dl className="decision-request-meta"><div><dt>待决编号</dt><dd>{request.decisionRequest.request_id}</dd></div><div><dt>基于版本</dt><dd>Run v{request.decisionRequest.expected_version ?? "当前"} · {evidenceRevisionLabel(request.decisionRequest.source_revision || request.resolution.source_revision)}</dd></div><div><dt>绑定对象</dt><dd>受影响分支 · {request.decisionRequest.candidate_ids.length || request.resolution.candidates.length} 个候选</dd></div></dl>}
+            {request.decisionRequest && <p className="decision-request-meta">服务端已保留本次待决，并将选择限定在下方真实候选范围内。</p>}
             <ol className="resolution-impact-list">
               <li><b>1</b><span><strong>只影响哪里</strong>{request.branchTitle || "当前待处理分支"}</span></li>
               <li><b>2</b><span><strong>已经保留什么</strong>已完成分支、可核对发现和已有成果版本均不回退。</span></li>
-              <li><b>3</b><span><strong>继续后做什么</strong>{request.resolution.status === "ambiguous" ? "从你选择的位置重新核对，只重跑受影响分支。" : "寻找更长且唯一的原文；仍找不到就保留缺口。"}</span></li>
+              <li><b>3</b><span><strong>继续后做什么</strong>{request.resolution.status === "ambiguous" ? "确认后只继续受影响部分，其他成果不变。" : "让 Agent 重新查找依据；仍找不到就保留缺口。"}</span></li>
               <li><b>4</b><span><strong>不会发生什么</strong>不会改原文件，不会调用外部业务系统。</span></li>
             </ol>
             {request.resolution.status === "ambiguous" && <p className="resolution-choice-status">{selectedCandidateId ? "已选择一个真实位置；请再确认是否从这里继续。" : "请先在上方候选原文中选择一个位置。"}</p>}
-            <label className="decision-feedback"><span>{sourceHintMode ? "补充来源线索（可选，不要填写内部路径）" : "补充给重跑分支的反馈（可选）"}</span><textarea value={decisionFeedback} onChange={(event) => setDecisionFeedback(event.target.value)} placeholder={sourceHintMode ? "例如：优先查找与 F07 同一版本的兼容测试记录" : "例如：同时核对版本号和测试日期，不要只比较结论字段"} /></label>
+            <label className="decision-feedback"><span>{sourceHintMode ? "补充来源线索（可选，不要填写内部路径）" : "补充给这一项的说明（可选）"}</span><textarea value={decisionFeedback} onChange={(event) => setDecisionFeedback(event.target.value)} placeholder={sourceHintMode ? "例如：优先查找与 F07 同一版本的兼容测试记录" : "例如：同时核对版本号和测试日期，不要只比较结论字段"} /></label>
             <footer>
               <div className="resolution-secondary-actions">
                 <button type="button" onClick={() => void deferAndClose()} disabled={controlBusy !== null}>保留现有结果，稍后处理</button>
-                <button type="button" onClick={() => setSourceHintMode(true)} disabled={controlBusy !== null || sourceHintMode}>补充来源</button>
-                <button type="button" onClick={() => void cancelDecision()} disabled={controlBusy !== null}>取消这次待决</button>
-                <button type="button" onClick={async () => { if (await onControl("stop")) onClose(); }} disabled={controlBusy !== null}><IconPlayerStop aria-hidden="true" />结束并保留</button>
+                <button type="button" onClick={() => setSourceHintMode(true)} disabled={readOnly || controlBusy !== null || sourceHintMode}>补充来源</button>
+                <button type="button" onClick={() => void cancelDecision()} disabled={readOnly || controlBusy !== null}>取消这次待决</button>
+                <button type="button" onClick={async () => { if (!readOnly && await onControl("stop")) onClose(); }} disabled={readOnly || controlBusy !== null}><IconPlayerStop aria-hidden="true" />结束并保留</button>
               </div>
-              {!isAmbiguousResolution && !isDirectRetryResolution && <button type="button" className="is-primary" disabled={controlBusy !== null} onClick={() => void retryUnavailable()}><IconRefresh aria-hidden="true" />继续任务，只重试此分支</button>}
+              {!isAmbiguousResolution && !isDirectRetryResolution && <button type="button" className="is-primary" disabled={readOnly || controlBusy !== null} onClick={() => void retryUnavailable()}><IconRefresh aria-hidden="true" />让 Agent 重新查找依据</button>}
             </footer>
             </section>
           </details> : null}
+          {readOnly && <p className="read-only-banner" role="status"><IconEye aria-hidden="true" />历史 Run 只读查看；此页不记录暂缓、决策、恢复或新任务操作。</p>}
           {request.review?.requires_human_decision ? <section className="evidence-review-decision" aria-labelledby="review-decision-title">
             <header><div><span>需要你决断</span><h3 id="review-decision-title">{request.review.question}</h3><p>{request.review.why_human}</p></div><b>后续尚未执行</b></header>
             <div className="decision-options" role="radiogroup" aria-label="处理口径">
@@ -3857,9 +4137,9 @@ function EvidenceReviewDialog({
             {request.review.recommended_option_id && !showRecommendation && <div className="decision-recommendation-gate"><span><b>先形成你的判断</b><small>为避免 Agent 的解释先影响你的选择，推荐项默认隐藏。</small></span><button type="button" disabled={!selectedOptionId} onClick={() => setShowRecommendation(true)}><IconEye aria-hidden="true" />{selectedOptionId ? "对照 Agent 建议" : "先选择一个口径"}</button></div>}
             {request.review.recommended_option_id && showRecommendation && <p className="decision-reason"><b>Agent 推荐 {request.review.recommended_option_id}</b>{request.review.recommendation_reason}{selectedOptionId && selectedOptionId !== request.review.recommended_option_id ? ` 你的选择是 ${selectedOptionId}，系统不会替你改选。` : ""}</p>}
             <label className="decision-feedback"><span>补充给 Agent 的反馈（可选）</span><textarea value={decisionFeedback} onChange={(event) => setDecisionFeedback(event.target.value)} placeholder="例如：先以 PRD 为准，但把兼容测试的代码版本也核对清楚" /></label>
-            <footer><div><IconShieldCheck aria-hidden="true" /><span><b>{request.review.after_confirmation}</b><small>决定会先写入当前 Run 的版本化回执；接受后才启动新的只读 Control Loop。</small></span></div><div className="decision-footer-actions"><button type="button" onClick={() => void deferAndClose()} disabled={controlBusy !== null}>暂缓处理</button><button type="button" onClick={() => void cancelDecision()} disabled={controlBusy !== null}>取消这次待决</button><button type="button" onClick={() => void declineFinding()} disabled={controlBusy !== null}>否决这条发现</button><button type="button" className="is-primary" disabled={!selectedOption || starting || controlBusy !== null} onClick={() => void startDecisionTask()}><IconPlayerPlay aria-hidden="true" />{starting || controlBusy === "decision" ? "正在记录" : "接受并交给 Agent"}</button></div></footer>
+            <footer><div><IconShieldCheck aria-hidden="true" /><span><b>{request.review.after_confirmation}</b><small>决定会先写入当前 Run 的版本化回执；接受后才启动新的只读 Control Loop。</small></span></div><div className="decision-footer-actions"><button type="button" onClick={() => void deferAndClose()} disabled={controlBusy !== null}>暂缓处理</button><button type="button" onClick={() => void cancelDecision()} disabled={readOnly || controlBusy !== null}>取消这次待决</button><button type="button" onClick={() => void declineFinding()} disabled={readOnly || controlBusy !== null}>否决这条发现</button><button type="button" className="is-primary" disabled={readOnly || !selectedOption || starting || controlBusy !== null} onClick={() => void startDecisionTask()}><IconPlayerPlay aria-hidden="true" />{starting || controlBusy === "decision" ? "正在记录" : "接受并交给 Agent"}</button></div></footer>
           </section> : request.kind === "finding" ? <section className="evidence-review-legacy">
-            <IconAlertTriangle aria-hidden="true" /><div><b>{request.review ? "这条发现只需复核，不需要业务裁决" : "旧结果没有结构化处置选项"}</b><p>{request.review?.after_confirmation || "你仍可查看现有证据；重新核对后，Agent 会按新协议给出事实、影响和可确认的处理选项。"}</p></div>{!request.review && <button type="button" disabled={starting} onClick={() => void startStructuredReview()}><IconRefresh aria-hidden="true" />{starting ? "正在启动" : "重新核对并生成处置方案"}</button>}
+            <IconAlertTriangle aria-hidden="true" /><div><b>{request.review ? "这条发现只需复核，不需要业务裁决" : "旧结果没有结构化处置选项"}</b><p>{request.review?.after_confirmation || "你仍可查看现有证据；重新核对后，Agent 会按新协议给出事实、影响和可确认的处理选项。"}</p></div>{!request.review && <button type="button" disabled={readOnly || starting} onClick={() => void startStructuredReview()}><IconRefresh aria-hidden="true" />{starting ? "正在启动" : "重新核对并生成处置方案"}</button>}
           </section> : null}
         </main>
       </div>
@@ -3867,7 +4147,7 @@ function EvidenceReviewDialog({
   </div>;
 }
 
-export function HarnessWorkbench({ onActivityChange }: { onActivityChange?: (state: HarnessActivityState | null) => void }) {
+export function HarnessWorkbench({ onActivityChange, capabilitiesOnly = false }: { onActivityChange?: (state: HarnessActivityState | null) => void; capabilitiesOnly?: boolean }) {
   const [workspace, setWorkspace] = useState<HarnessWorkspace | null>(null);
   const [activeFileRef, setActiveFileRef] = useState("");
   const [preview, setPreview] = useState<HarnessPreview | null>(null);
@@ -3885,6 +4165,14 @@ export function HarnessWorkbench({ onActivityChange }: { onActivityChange?: (sta
   const [reviewRequest, setReviewRequest] = useState<EvidenceReviewRequest | null>(null);
   const [view, setView] = useState<WorkspaceView>("data");
   const [run, setRun] = useState<HarnessRun | null>(null);
+  const [sessionRuns, setSessionRuns] = useState<HarnessRun[]>([]);
+  const [sessionsOpen, setSessionsOpen] = useState(false);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [newTaskDraft, setNewTaskDraft] = useState(false);
+  const [selectedRunCurrent, setSelectedRunCurrent] = useState<boolean | null>(null);
+  const [adaptiveWorkbenchOpen, setAdaptiveWorkbenchOpen] = useState(false);
+  const [taskPointer, setTaskPointer] = useState<TaskPointer | null>(null);
+  const [taskPointerError, setTaskPointerError] = useState("");
   const [workspaceStatus, setWorkspaceStatus] = useState<WorkspaceStatus>("checking");
   const [workspaceError, setWorkspaceError] = useState("");
   const [starting, setStarting] = useState(false);
@@ -3897,10 +4185,13 @@ export function HarnessWorkbench({ onActivityChange }: { onActivityChange?: (sta
   const previewRequestRef = useRef(0);
   const generationRef = useRef(0);
   const runRef = useRef<HarnessRun | null>(null);
+  const newTaskDraftRef = useRef(false);
+  const instructionInputRef = useRef<HTMLTextAreaElement>(null);
   const lastSequenceRef = useRef(0);
   const startCommandRef = useRef<{ signature: string; key: string } | null>(null);
   const controlCommandRef = useRef<{ signature: string; key: string } | null>(null);
   const restoreAttemptedRef = useRef(false);
+  const taskFetchKeyRef = useRef<string | null>(null);
 
   const allFiles = useMemo(() => workspace?.folders.flatMap((folder) => folder.files) ?? [], [workspace]);
   const activeFile = allFiles.find((file) => file.file_ref === activeFileRef) ?? null;
@@ -3912,6 +4203,7 @@ export function HarnessWorkbench({ onActivityChange }: { onActivityChange?: (sta
     .map((folder) => filterWorkspaceTree(folder, fileSearch, fileTypeFilter))
     .filter((folder): folder is WorkspaceTreeFolder => folder !== null), [workspaceTree, fileSearch, fileTypeFilter]);
   const visibleFileCount = useMemo(() => filteredWorkspaceTree.reduce((total, folder) => total + treeFileCount(folder), 0), [filteredWorkspaceTree]);
+  const sessionTaskCount = useMemo(() => new Set(sessionRuns.map((item) => item.task_id)).size, [sessionRuns]);
   const forceTreeExpanded = Boolean(fileSearch.trim() || fileTypeFilter !== "ALL");
 
   function closeTransport() {
@@ -3921,16 +4213,62 @@ export function HarnessWorkbench({ onActivityChange }: { onActivityChange?: (sta
     reconnectTimerRef.current = undefined;
   }
 
+  function beginNewTask() {
+    closeTransport();
+    generationRef.current += 1;
+    runRef.current = null;
+    newTaskDraftRef.current = true;
+    lastSequenceRef.current = 0;
+    startCommandRef.current = null;
+    controlCommandRef.current = null;
+    taskFetchKeyRef.current = null;
+    window.sessionStorage.removeItem(RUN_SESSION_KEY);
+    window.sessionStorage.setItem(NEW_TASK_DRAFT_SESSION_KEY, "1");
+    setRun(null);
+    setTaskPointer(null);
+    setTaskPointerError("");
+    setSelectedRunCurrent(null);
+    setReviewRequest(null);
+    setAdaptiveWorkbenchOpen(false);
+    setSessionsOpen(false);
+    setInstruction("");
+    setView("data");
+    setError("");
+    setConnection("available");
+    setNewTaskDraft(true);
+    window.requestAnimationFrame(() => instructionInputRef.current?.focus());
+  }
+
   function applySnapshot(snapshot: HarnessRun, generation: number) {
     if (generation !== generationRef.current) return false;
     const current = runRef.current;
-    if (current && current.run_id !== snapshot.run_id) return false;
-    if (snapshot.last_event_sequence < lastSequenceRef.current || (current && snapshot.version < current.version)) return false;
+    const switchedRun = Boolean(current && current.run_id !== snapshot.run_id);
+    // Versions and event sequences are scoped to a Run. A continuation creates
+    // a child Run whose counters legitimately restart at 1; only enforce
+    // monotonicity while applying snapshots within the same Run.
+    if (!switchedRun && (snapshot.last_event_sequence < lastSequenceRef.current || (current && snapshot.version < current.version))) return false;
     runRef.current = snapshot;
-    lastSequenceRef.current = Math.max(lastSequenceRef.current, snapshot.last_event_sequence);
+    setSessionRuns((currentSessions) => {
+      const index = currentSessions.findIndex((item) => item.run_id === snapshot.run_id);
+      if (index >= 0) {
+        const next = [...currentSessions];
+        next[index] = snapshot;
+        return next;
+      }
+      return [snapshot, ...currentSessions].slice(0, 20);
+    });
+    lastSequenceRef.current = switchedRun ? snapshot.last_event_sequence : Math.max(lastSequenceRef.current, snapshot.last_event_sequence);
     window.sessionStorage.setItem(RUN_SESSION_KEY, snapshot.run_id);
+    window.sessionStorage.removeItem(NEW_TASK_DRAFT_SESSION_KEY);
+    newTaskDraftRef.current = false;
+    setNewTaskDraft(false);
     setRun(snapshot);
-    if (snapshot.events.length) setConnection(TERMINAL_STATUSES.has(snapshot.status) ? "available" : "live");
+    const taskFetchKey = `${snapshot.task_id}:${snapshot.run_id}:${snapshot.task_version}`;
+    if (taskFetchKeyRef.current !== taskFetchKey) {
+      setTaskPointerError("");
+      refreshTaskPointer(snapshot.task_id, generation, snapshot.run_id, snapshot.task_version);
+    }
+    if (snapshot.events.length && selectedRunCurrent !== false) setConnection(TERMINAL_STATUSES.has(snapshot.status) ? "available" : "live");
     return true;
   }
 
@@ -3940,6 +4278,75 @@ export function HarnessWorkbench({ onActivityChange }: { onActivityChange?: (sta
     const snapshot = normalizeRun(await response.json());
     if (!snapshot) throw new Error("任务状态格式无效");
     return applySnapshot(snapshot, generation) ? snapshot : runRef.current;
+  }
+
+  function refreshTaskPointer(taskId: string, generation: number, runId: string, taskVersion: number, force = false) {
+    const taskFetchKey = `${taskId}:${runId}:${taskVersion}`;
+    if (!force && taskFetchKeyRef.current === taskFetchKey) return;
+    taskFetchKeyRef.current = taskFetchKey;
+    const clearFailedTaskFetch = () => {
+      if (generation !== generationRef.current || taskFetchKeyRef.current !== taskFetchKey) return;
+      if (taskFetchKeyRef.current === taskFetchKey) taskFetchKeyRef.current = null;
+      setSelectedRunCurrent(null);
+      if (generation === generationRef.current) setTaskPointerError("任务台账暂时无法读取，请重试");
+    };
+    void fetch(`${API_BASE}/v1/harness/tasks/${encodeURIComponent(taskId)}`, { headers: HEADERS })
+      .then((response) => {
+        if (!response.ok) {
+          clearFailedTaskFetch();
+          return null;
+        }
+        return response.json().catch(() => {
+          clearFailedTaskFetch();
+          return null;
+        });
+      })
+      .then((payload) => {
+        if (generation !== generationRef.current || taskFetchKeyRef.current !== taskFetchKey) return;
+        if (!payload || typeof payload !== "object") {
+          clearFailedTaskFetch();
+          return;
+        }
+        const raw = payload as Record<string, unknown>;
+        const currentRunId = asText(raw.current_run_id);
+        if (!currentRunId) {
+          clearFailedTaskFetch();
+          return;
+        }
+        const returnedTaskId = asText(raw.task_id);
+        if (returnedTaskId !== taskId) {
+          clearFailedTaskFetch();
+          return;
+        }
+        const lineage = Array.isArray(raw.lineage)
+          ? raw.lineage.filter((item): item is Record<string, unknown> => Boolean(item && typeof item === "object"))
+            .map((item) => ({
+              run_id: asText(item.run_id),
+              run_sequence: asNumber(item.run_sequence, 1),
+              parent_run_id: asText(item.parent_run_id) || null,
+              status: asText(item.status, "unknown"),
+            })).filter((item) => item.run_id)
+          : [];
+        setTaskPointer({
+          task_id: asText(raw.task_id, taskId),
+          task_version: asNumber(raw.task_version, 1),
+          current_run_id: currentRunId,
+          run_sequence: asNumber(raw.run_sequence, 1),
+          parent_run_id: asText(raw.parent_run_id) || null,
+          current_artifact_id: asText(raw.current_artifact_id) || null,
+          current_artifact_version: typeof raw.current_artifact_version === "number" ? raw.current_artifact_version : null,
+          current_commit_id: asText(raw.current_commit_id) || null,
+          lineage,
+        });
+        setSelectedRunCurrent(currentRunId === runId);
+        setTaskPointerError("");
+        const current = runRef.current;
+        if (current?.run_id === runId && current.office_action) {
+          if (currentRunId !== runId || TERMINAL_STATUSES.has(current.status)) closeTransport();
+          else if (!eventSourceRef.current) connectEvents(runId, generation, current.last_event_sequence);
+        }
+      })
+      .catch(clearFailedTaskFetch);
   }
 
   function connectEvents(runId: string, generation: number, after: number) {
@@ -3998,10 +4405,75 @@ export function HarnessWorkbench({ onActivityChange }: { onActivityChange?: (sta
     }
   }
 
+  async function loadSessionRuns() {
+    setHistoryLoading(true);
+    try {
+      const response = await fetch(`${API_BASE}/v1/harness/runs?limit=20`, { headers: HEADERS });
+      if (!response.ok) throw new Error("任务会话历史暂时无法读取");
+      const payload = await response.json() as { runs?: unknown[] };
+      const runs = Array.isArray(payload.runs)
+        ? payload.runs.map(normalizeRun).filter((item): item is HarnessRun => item !== null)
+        : [];
+      setSessionRuns(runs);
+      return runs;
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "任务会话历史暂时无法读取");
+      return [];
+    } finally {
+      setHistoryLoading(false);
+    }
+  }
+
+  async function openSessionRun(snapshot: HarnessRun) {
+    const generation = generationRef.current + 1;
+    closeTransport();
+    generationRef.current = generation;
+    runRef.current = null;
+    newTaskDraftRef.current = false;
+    lastSequenceRef.current = 0;
+    window.sessionStorage.removeItem(NEW_TASK_DRAFT_SESSION_KEY);
+    setNewTaskDraft(false);
+    setSelectedRunCurrent(null);
+    setRun(null);
+    setTaskPointer(null);
+    taskFetchKeyRef.current = null;
+    setAdaptiveWorkbenchOpen(false);
+    setReviewRequest(null);
+    setError("");
+    try {
+      const taskResponse = await fetch(`${API_BASE}/v1/harness/tasks/${encodeURIComponent(snapshot.task_id)}`, { headers: HEADERS });
+      if (!taskResponse.ok) throw new Error("任务台账暂时无法确认当前 Run");
+      const taskPayload = await taskResponse.json() as Record<string, unknown>;
+      const currentRunId = asText(taskPayload.current_run_id);
+      if (!currentRunId) throw new Error("任务台账缺少当前 Run");
+      const response = await fetch(`${API_BASE}/v1/harness/runs/${encodeURIComponent(snapshot.run_id)}`, { headers: HEADERS });
+      if (!response.ok) throw new Error("无法读取任务会话");
+      const latest = normalizeRun(await response.json());
+      if (!latest) throw new Error("任务会话回执格式无效");
+      const selectedIsCurrent = currentRunId === latest.run_id;
+      setSelectedRunCurrent(selectedIsCurrent);
+      if (!applySnapshot(latest, generation)) throw new Error("任务会话已更新，请重试");
+      setInstruction(latest.instruction);
+      setView(latest.office_action ? "actions" : latest.result && TERMINAL_STATUSES.has(latest.status) ? "result" : "loop");
+      setSessionsOpen(false);
+      if (selectedIsCurrent && !TERMINAL_STATUSES.has(latest.status)) connectEvents(latest.run_id, generation, latest.last_event_sequence);
+      else setConnection("available");
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "无法读取任务会话");
+    }
+  }
+
   async function restoreLatestRun() {
     if (restoreAttemptedRef.current) return;
     restoreAttemptedRef.current = true;
     try {
+      if (window.sessionStorage.getItem(NEW_TASK_DRAFT_SESSION_KEY) === "1") {
+        newTaskDraftRef.current = true;
+        setNewTaskDraft(true);
+        await loadSessionRuns();
+        setConnection("available");
+        return;
+      }
       let snapshot: HarnessRun | null = null;
       const storedRunId = window.sessionStorage.getItem(RUN_SESSION_KEY);
       if (storedRunId) {
@@ -4009,28 +4481,56 @@ export function HarnessWorkbench({ onActivityChange }: { onActivityChange?: (sta
         if (response.ok) snapshot = normalizeRun(await response.json());
         else if (response.status === 404) window.sessionStorage.removeItem(RUN_SESSION_KEY);
       }
+      if (newTaskDraftRef.current) return;
+      const candidates = await loadSessionRuns();
+      if (newTaskDraftRef.current) return;
+      let currentRunId: string | null = null;
+      let taskPointerFailure = false;
+      const readTaskCurrent = async (taskId: string) => {
+        const response = await fetch(`${API_BASE}/v1/harness/tasks/${encodeURIComponent(taskId)}`, { headers: HEADERS });
+        if (!response.ok) throw new Error("任务台账暂时无法确认当前 Run，请重试");
+        return asText((await response.json() as Record<string, unknown>).current_run_id);
+      };
+      if (snapshot) {
+        currentRunId = await readTaskCurrent(snapshot.task_id);
+        if (currentRunId !== snapshot.run_id) snapshot = null;
+      }
       if (!snapshot) {
-        const response = await fetch(`${API_BASE}/v1/harness/runs?limit=10`, { headers: HEADERS });
-        if (response.ok) {
-          const payload = await response.json() as { runs?: unknown[] };
-          const candidates = Array.isArray(payload.runs)
-            ? payload.runs.map(normalizeRun).filter((item): item is HarnessRun => item !== null)
-            : [];
-          snapshot = candidates.find((item) => !TERMINAL_STATUSES.has(item.status)) ?? null;
+        for (const candidate of candidates) {
+          try {
+            const candidateCurrentRunId = await readTaskCurrent(candidate.task_id);
+            if (candidateCurrentRunId === candidate.run_id) {
+              snapshot = candidate;
+              currentRunId = candidateCurrentRunId;
+              break;
+            }
+          } catch {
+            // A missing Task pointer is not permission to guess from list order.
+            taskPointerFailure = true;
+          }
         }
       }
-      if (!snapshot) return;
+      if (newTaskDraftRef.current) return;
+      if (!snapshot) {
+        if (taskPointerFailure) throw new Error("任务台账暂时无法确认当前 Run，请重试");
+        return;
+      }
       const generation = generationRef.current + 1;
       generationRef.current = generation;
       runRef.current = null;
       lastSequenceRef.current = 0;
+      setSelectedRunCurrent(currentRunId === snapshot.run_id);
       if (!applySnapshot(snapshot, generation)) return;
       setInstruction(snapshot.instruction);
       setView(snapshot.office_action ? "actions" : snapshot.result && TERMINAL_STATUSES.has(snapshot.status) ? "result" : "loop");
-      if (!TERMINAL_STATUSES.has(snapshot.status)) {
+      const selectedIsCurrent = currentRunId === snapshot.run_id;
+      setSelectedRunCurrent(selectedIsCurrent);
+      if (selectedIsCurrent && !TERMINAL_STATUSES.has(snapshot.status)) {
         connectEvents(snapshot.run_id, generation, snapshot.last_event_sequence);
-      }
-    } catch {
+      } else setConnection("available");
+    } catch (caught) {
+      setTaskPointerError(caught instanceof Error ? caught.message : "任务台账暂时无法确认当前 Run，请重试");
+      setError(caught instanceof Error ? caught.message : "任务台账暂时无法确认当前 Run，请重试");
       setConnection("available");
     }
   }
@@ -4130,9 +4630,9 @@ export function HarnessWorkbench({ onActivityChange }: { onActivityChange?: (sta
       ? startCommandRef.current
       : { signature, key: randomKey() };
     startCommandRef.current = command;
-    setStarting(true); setError(""); closeTransport();
+    setStarting(true); setError(""); closeTransport(); setSelectedRunCurrent(null);
     const generation = generationRef.current + 1;
-    generationRef.current = generation; runRef.current = null; lastSequenceRef.current = 0; setRun(null);
+    generationRef.current = generation; runRef.current = null; lastSequenceRef.current = 0; setRun(null); setTaskPointer(null); taskFetchKeyRef.current = null;
     try {
       const response = await fetch(`${API_BASE}/v1/harness/runs`, {
         method: "POST",
@@ -4154,6 +4654,7 @@ export function HarnessWorkbench({ onActivityChange }: { onActivityChange?: (sta
       if (!response.ok) throw new Error(asText((payload as Record<string, unknown>).detail, "任务没有启动"));
       const snapshot = normalizeRun(payload);
       if (!snapshot || !applySnapshot(snapshot, generation)) throw new Error("任务回执格式无效");
+      startCommandRef.current = null;
       setView("loop");
       if (!TERMINAL_STATUSES.has(snapshot.status)) connectEvents(snapshot.run_id, generation, snapshot.last_event_sequence);
       else setConnection("available");
@@ -4165,12 +4666,130 @@ export function HarnessWorkbench({ onActivityChange }: { onActivityChange?: (sta
     } finally { setStarting(false); }
   }
 
+  async function continueTask(branchId: string, instructionOverride?: string) {
+    const current = runRef.current;
+    if (!current || selectedRunCurrent !== true || !workspace || !TERMINAL_STATUSES.has(current.status)) return false;
+    setStarting(true); setError("");
+    // Keep the parent's stream and generation alive while the child command is
+    // in flight. A failed/invalid request must leave the parent UI recoverable;
+    // only a validated child snapshot switches the active lineage.
+    const nextGeneration = generationRef.current + 1;
+    try {
+      const response = await fetch(`${API_BASE}/v1/harness/runs/${encodeURIComponent(current.run_id)}/continue`, {
+        method: "POST", headers: HEADERS,
+        body: JSON.stringify({
+          branch_id: branchId,
+          idempotency_key: `continue-${randomKey()}`,
+          expected_version: current.version,
+          expected_task_version: current.task_version,
+          instruction: instructionOverride?.trim() || undefined,
+        }),
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        if (response.status === 409) {
+          refreshTaskPointer(current.task_id, generationRef.current, current.run_id, current.task_version, true);
+          throw new Error("任务或运行状态已更新");
+        }
+        throw new Error(asText((payload as Record<string, unknown>).detail, "任务没有继续"));
+      }
+      const snapshot = normalizeRun(payload);
+      // Continuation switches to a new Run lineage. Reset the per-Run
+      // monotonic cursors only after a valid child snapshot is available so a
+      // failed request leaves the parent Run rendered and recoverable.
+      if (snapshot) {
+        closeTransport();
+        generationRef.current = nextGeneration;
+        runRef.current = null;
+        lastSequenceRef.current = 0;
+        setTaskPointer(null);
+        taskFetchKeyRef.current = null;
+        setSelectedRunCurrent(null);
+      }
+      if (!snapshot || !applySnapshot(snapshot, nextGeneration)) throw new Error("续办任务回执格式无效");
+      setView("loop");
+      if (!TERMINAL_STATUSES.has(snapshot.status)) connectEvents(snapshot.run_id, nextGeneration, snapshot.last_event_sequence);
+      return true;
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "任务没有继续");
+      return false;
+    } finally { setStarting(false); }
+  }
+
+  async function openCurrentTask() {
+    const current = runRef.current;
+    const pointer = taskPointer;
+    if (!current || !pointer || pointer.task_id !== current.task_id || pointer.current_run_id === current.run_id) return false;
+    setStarting(true); setError("");
+    try {
+      const taskResponse = await fetch(`${API_BASE}/v1/harness/tasks/${encodeURIComponent(pointer.task_id)}`, { headers: HEADERS });
+      if (!taskResponse.ok) throw new Error("无法读取当前任务");
+      const taskPayload = await taskResponse.json() as Record<string, unknown>;
+      const taskId = asText(taskPayload.task_id);
+      const currentRunId = asText(taskPayload.current_run_id);
+      if (taskId !== pointer.task_id || !currentRunId) throw new Error("当前任务回执格式无效");
+      const runResponse = await fetch(`${API_BASE}/v1/harness/runs/${encodeURIComponent(currentRunId)}`, { headers: HEADERS });
+      if (!runResponse.ok) throw new Error("无法读取当前 Run");
+      const snapshot = normalizeRun(await runResponse.json());
+      if (!snapshot || snapshot.task_id !== taskId || snapshot.run_id !== currentRunId) throw new Error("当前 Run 回执格式无效");
+      const generation = generationRef.current + 1;
+      closeTransport();
+      generationRef.current = generation;
+      runRef.current = null;
+      lastSequenceRef.current = 0;
+      setTaskPointer(null);
+      taskFetchKeyRef.current = null;
+      setSelectedRunCurrent(null);
+      if (!applySnapshot(snapshot, generation)) throw new Error("当前任务无法打开");
+      setView(TERMINAL_STATUSES.has(snapshot.status) && snapshot.result ? "result" : "loop");
+      if (!TERMINAL_STATUSES.has(snapshot.status)) connectEvents(snapshot.run_id, generation, snapshot.last_event_sequence);
+      return true;
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "无法打开当前任务");
+      return false;
+    } finally { setStarting(false); }
+  }
+
+  async function executeWorkers() {
+    const current = runRef.current;
+    if (!current || selectedRunCurrent !== true || current.topology_admission?.mode !== "adaptive_readonly_workers") return false;
+    const advertisedReady = new Set(current.rounds.at(-1)?.next_step?.ready_branch_ids ?? []);
+    const branchIds = current.branches
+      .filter((branch) => branch.status === "running" && (advertisedReady.size === 0 || advertisedReady.has(branch.branch_id)))
+      .slice(0, 3)
+      .map((branch) => branch.branch_id);
+    if (branchIds.length < (current.worker_runs.length === 0 ? 2 : 1)) {
+      setError(current.worker_runs.length === 0 ? "没有足够的独立分支可启动只读 Worker" : "当前没有服务端标记为 ready 的分支");
+      return false;
+    }
+    setStarting(true); setError("");
+    try {
+      const response = await fetch(`${API_BASE}/v1/harness/runs/${encodeURIComponent(current.run_id)}/workers`, {
+        method: "POST", headers: HEADERS,
+        body: JSON.stringify({
+          branch_ids: branchIds,
+          expected_version: current.version,
+          idempotency_key: `workers-${randomKey()}`,
+          confirmed: true,
+        }),
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(asText((payload as Record<string, unknown>).detail, "只读 Worker 没有启动"));
+      const snapshot = normalizeRun(payload);
+      if (!snapshot || !applySnapshot(snapshot, generationRef.current)) throw new Error("Worker 回执格式无效");
+      return true;
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "只读 Worker 没有启动");
+      return false;
+    } finally { setStarting(false); }
+  }
+
   async function controlLoop(command: LoopCommand, options: LoopControlOptions = {}) {
     const current = runRef.current;
-    if (!current || (TERMINAL_STATUSES.has(current.status) && !["rollback", "decision"].includes(command))) return false;
+    if (!current || selectedRunCurrent !== true || (TERMINAL_STATUSES.has(current.status) && !["rollback", "decision"].includes(command))) return false;
     const normalizedInstruction = options.instruction?.trim() || undefined;
     const normalizedFeedback = options.feedback?.trim() || undefined;
-    const signature = JSON.stringify({ command, instruction: normalizedInstruction, branchId: options.branchId, artifactVersion: options.artifactVersion, decisionAction: options.decisionAction, findingId: options.findingId, resolutionId: options.resolutionId, selectedOptionId: options.selectedOptionId, selectedCandidateId: options.selectedCandidateId, decisionRequestId: options.decisionRequestId, sourceRevision: options.sourceRevision, feedback: normalizedFeedback, runId: current.run_id });
+    const signature = JSON.stringify({ command, instruction: normalizedInstruction, branchId: options.branchId, artifactVersion: options.artifactVersion, decisionAction: options.decisionAction, findingId: options.findingId, resolutionId: options.resolutionId, selectedOptionId: options.selectedOptionId, selectedCandidateId: options.selectedCandidateId, decisionRequestId: options.decisionRequestId, sourceRevision: options.sourceRevision, feedback: normalizedFeedback, topologyMode: options.topologyMode, runId: current.run_id });
     const controlCommand = controlCommandRef.current?.signature === signature
       ? controlCommandRef.current
       : { signature, key: `control-${randomKey()}` };
@@ -4195,6 +4814,7 @@ export function HarnessWorkbench({ onActivityChange }: { onActivityChange?: (sta
           decision_request_id: options.decisionRequestId,
           source_revision: options.sourceRevision,
           feedback: normalizedFeedback,
+          topology_mode: options.topologyMode,
         }),
       });
       const payload = await response.json().catch(() => ({}));
@@ -4222,12 +4842,53 @@ export function HarnessWorkbench({ onActivityChange }: { onActivityChange?: (sta
     if (!snapshot) return;
     if (runRef.current?.run_id !== snapshot.run_id) {
       closeTransport(); generationRef.current += 1; runRef.current = null; lastSequenceRef.current = 0;
+      taskFetchKeyRef.current = null;
+      setTaskPointer(null); setSelectedRunCurrent(null); setReviewRequest(null);
     }
     applySnapshot(snapshot, generationRef.current);
     setConnection("available"); setView("actions");
     if (TERMINAL_STATUSES.has(snapshot.status)) closeTransport();
-    else if (!eventSourceRef.current) connectEvents(snapshot.run_id, generationRef.current, snapshot.last_event_sequence);
+    // Task GET establishes current/history authority before opening an action stream.
   }
+  if (capabilitiesOnly && workspaceStatus !== "online") return <div className={`data-workbench-empty ${workspaceStatus === "unavailable" ? "is-error" : ""}`}>
+    {workspaceStatus === "checking" ? <IconLoader2 aria-hidden="true" /> : <IconAlertTriangle aria-hidden="true" />}
+    <h1>{workspaceStatus === "checking" ? "正在核对 Agent 能力资料范围" : "Agent 能力资料范围暂时无法读取"}</h1>
+    <p>{workspaceStatus === "checking" ? "服务端正在校验公开文件清单、大小与完整性。" : workspaceError}</p>
+    {workspaceStatus === "unavailable" && <button type="button" onClick={() => void loadWorkspace()}><IconRefresh aria-hidden="true" />重新读取</button>}
+  </div>;
+
+  if (capabilitiesOnly && !run?.office_action) return <AgentCapabilitiesSurface
+    files={allFiles}
+    run={run}
+    taskPointer={taskPointer}
+    taskPointerError={taskPointerError}
+    sessionRuns={sessionRuns}
+    sessionsOpen={sessionsOpen}
+    historyLoading={historyLoading}
+    selectedRunCurrent={selectedRunCurrent}
+    instruction={instruction}
+    setInstruction={setInstruction}
+    instructionInputRef={instructionInputRef}
+    newTaskDraft={newTaskDraft}
+    starting={starting}
+    controlBusy={controlBusy}
+    connection={connection}
+    error={error}
+    onStartTask={startTask}
+    onControl={controlLoop}
+    onContinueTask={continueTask}
+    onCurrentTask={openCurrentTask}
+    onRetryTaskPointer={() => run && refreshTaskPointer(run.task_id, generationRef.current, run.run_id, run.task_version, true)}
+    onExecuteWorkers={executeWorkers}
+    onRefreshSessions={() => void loadSessionRuns()}
+    onToggleSessions={() => setSessionsOpen((current) => !current)}
+    onSelectSession={(snapshot) => { void openSessionRun(snapshot); }}
+    onNewTask={beginNewTask}
+    reviewRequest={reviewRequest}
+    onReview={setReviewRequest}
+    onOpenFile={openFile}
+    onCloseReview={() => setReviewRequest(null)}
+  />;
 
   if (workspaceStatus !== "online" || !workspace) return <div className={`data-workbench-empty ${workspaceStatus === "unavailable" ? "is-error" : ""}`}>
     {workspaceStatus === "checking" ? <IconLoader2 aria-hidden="true" /> : <IconAlertTriangle aria-hidden="true" />}
@@ -4236,22 +4897,29 @@ export function HarnessWorkbench({ onActivityChange }: { onActivityChange?: (sta
     {workspaceStatus === "unavailable" && <button type="button" onClick={() => void loadWorkspace()}><IconRefresh aria-hidden="true" />重新读取</button>}
   </div>;
 
-  const runActive = Boolean(run && !TERMINAL_STATUSES.has(run.status));
+  const isReadOnlyRun = selectedRunCurrent !== true;
+  const runActive = Boolean(run && !isReadOnlyRun && !TERMINAL_STATUSES.has(run.status));
 
   return <main className="data-workbench">
     <header className="data-workbench-header">
       <div><span>FORTE 公开办公数据</span><h1>办公资料库</h1><p>像文件管理器一样自由查看资料；下达目标后，Agent 会从整个资料库自主检索证据。</p></div>
       <div className="data-workbench-status">
         <b className={`is-${connection}`}><i />{connection === "offline" ? "服务离线" : connection === "reconnecting" ? "正在恢复" : "资料可用"}</b>
+        <button type="button" className="new-task-button" onClick={beginNewTask} disabled={starting}><IconPlus aria-hidden="true" />新建任务</button>
+        <a className="agent-capabilities-link" href="/agent-capabilities"><IconRoute aria-hidden="true" />Agent 能力</a>
+        <button type="button" className="session-history-button" onClick={() => setSessionsOpen((current) => !current)} aria-expanded={sessionsOpen}><IconClock aria-hidden="true" />任务会话{sessionTaskCount ? <b>{sessionTaskCount}</b> : null}</button>
         <button type="button" className="icon-action" title="重新核对资料库" aria-label="重新核对资料库" onClick={() => void loadWorkspace()}><IconRefresh aria-hidden="true" /></button>
       </div>
     </header>
+    {sessionsOpen && <SessionHistory runs={sessionRuns} activeRunId={run?.run_id ?? null} loading={historyLoading} onRefresh={() => void loadSessionRuns()} onSelect={(snapshot) => { void openSessionRun(snapshot); }} />}
     <div className="workspace-facts" aria-label="资料库信息">
       <span><strong>{workspace.file_count}</strong> 份文件统一检索</span>
       <span><strong>{workspace.previewable_file_count}</strong> 份可安全预览</span>
       <span><strong>只读</strong> 不改原文件</span>
       <span><strong>{workspace.license}</strong> 公开许可</span>
     </div>
+    {newTaskDraft && <p className="new-task-banner" role="status"><IconPlus aria-hidden="true" /><span><b>新任务草稿</b>上一任务不会停止或删除，可从任务会话返回。填写目标并启动后，才会创建新的服务端任务。</span></p>}
+    {selectedRunCurrent === false && run && <p className="read-only-banner" role="status"><IconEye aria-hidden="true" />历史 Run 只读查看，不接收实时事件，也不会执行控制、决策或启动新任务。</p>}
     <div className="data-workbench-grid">
       <aside className="dataset-browser" aria-label="FORTE 文件目录">
         <header>
@@ -4280,7 +4948,7 @@ export function HarnessWorkbench({ onActivityChange }: { onActivityChange?: (sta
         <section className="task-composer" aria-labelledby="task-composer-title" hidden={view === "actions"}>
           <div><span>研究整个资料库</span><h2 id="task-composer-title">你想让 Agent 找什么，或推进什么？</h2></div>
           {run?.recovered && <div className="checkpoint-restored"><IconRefresh aria-hidden="true" /><span><b>服务端检查点已恢复</b> 未完成的模型调用没有重放，你可以检查轨迹后继续。</span></div>}
-          <textarea value={instruction} disabled={runActive} onChange={(event) => setInstruction(event.target.value)} placeholder="例如：研究整个资料库，找出需要继续推动的工作，并逐条说明文件依据" aria-label="任务指令" />
+          <textarea ref={instructionInputRef} value={instruction} disabled={runActive} onChange={(event) => setInstruction(event.target.value)} placeholder="例如：研究整个资料库，找出需要继续推动的工作，并逐条说明文件依据" aria-label="任务指令" />
           <details className="loop-contract-settings">
             <summary><IconAdjustments aria-hidden="true" />Agent Control Loop · 最多 {maxRounds} 轮 / {maxModelCalls} 次模型调用 / {deadlineSeconds} 秒</summary>
             <div>
@@ -4303,16 +4971,17 @@ export function HarnessWorkbench({ onActivityChange }: { onActivityChange?: (sta
           <button type="button" className={view === "result" ? "is-active" : ""} onClick={() => setView("result")}><IconCircleCheck aria-hidden="true" />成果与建议{run?.workspace_artifacts.length ? <b>{run.workspace_artifacts.length}</b> : run?.result ? <b>{run.result.findings.length}</b> : null}</button>
         </nav>
         <div className="workspace-content">
-          <div hidden={view !== "actions"}><OfficeActionWorkbench run={run} files={allFiles} apiBase={API_BASE} headers={HEADERS} onSnapshot={acceptActionSnapshot} onOpenSource={(ref) => { const file = allFiles.find(item => item.file_ref === ref); if (file) openFile(file); }} blocked={runActive && !run?.office_action} /></div>
+          <div hidden={view !== "actions"}><OfficeActionWorkbench run={run} files={allFiles} apiBase={API_BASE} headers={HEADERS} onSnapshot={acceptActionSnapshot} onOpenSource={(ref) => { const file = allFiles.find(item => item.file_ref === ref); if (file) openFile(file); }} blocked={runActive && !run?.office_action} readOnly={Boolean(run?.office_action) && isReadOnlyRun} /></div>
           {view === "data" && <FilePreview preview={preview} file={activeFile} loading={previewLoading} error={previewError} />}
-          {view === "loop" && <LoopView run={run} files={allFiles} controlBusy={controlBusy} onControl={controlLoop} onReview={setReviewRequest} onStartTask={startTask} starting={starting} />}
-          {view === "result" && <ResultView result={run?.result ?? null} artifacts={run?.artifact_versions ?? []} workspaceArtifacts={run?.workspace_artifacts ?? []} receipts={run?.effect_receipts ?? []} reconciliation={run?.narrative_reconciliation ?? null} commit={run?.last_commit ?? null} decisions={run?.decision_records ?? []} decisionRequests={run?.decision_requests ?? []} files={allFiles} onOpenFile={openFile} onReview={setReviewRequest} onStartTask={startTask} starting={starting} />}
+          {view === "loop" && <LoopView run={run} taskPointer={taskPointer} taskPointerError={taskPointerError} files={allFiles} controlBusy={controlBusy} onControl={controlLoop} onReview={setReviewRequest} onStartTask={startTask} onContinueTask={continueTask} onOpenCurrentTask={openCurrentTask} onRetryTaskPointer={() => run && refreshTaskPointer(run.task_id, generationRef.current, run.run_id, run.task_version, true)} onExecuteWorkers={executeWorkers} onOpenAdaptiveWorkbench={() => setAdaptiveWorkbenchOpen(true)} readOnly={isReadOnlyRun} starting={starting} />}
+          {view === "result" && <ResultView result={run?.result ?? null} artifacts={run?.artifact_versions ?? []} workspaceArtifacts={run?.workspace_artifacts ?? []} receipts={run?.effect_receipts ?? []} reconciliation={run?.narrative_reconciliation ?? null} commit={run?.last_commit ?? null} decisions={run?.decision_records ?? []} decisionRequests={run?.decision_requests ?? []} files={allFiles} onOpenFile={openFile} onReview={setReviewRequest} onStartTask={startTask} starting={starting} readOnly={isReadOnlyRun} />}
         </div>
         <details className="workspace-boundary"><summary><IconShieldCheck aria-hidden="true" />数据与执行边界</summary><p>{workspace.data_boundary} Agent 可以检索整个资料库，但每轮只读取服务端校验通过且受预算约束的文件；本轮不会修改原文件或执行外部动作。</p></details>
         {error && run?.status !== "failed" && <div className="workspace-error" role="alert"><IconAlertTriangle aria-hidden="true" /><span>{error}</span></div>}
       </section>
     </div>
-    {reviewRequest && <EvidenceReviewDialog request={reviewRequest} files={allFiles} onClose={() => setReviewRequest(null)} onOpenFile={openFile} onStartTask={startTask} onControl={controlLoop} starting={starting} controlBusy={controlBusy} />}
+    {reviewRequest && <EvidenceReviewDialog request={reviewRequest} files={allFiles} onClose={() => setReviewRequest(null)} onOpenFile={openFile} onStartTask={startTask} onControl={controlLoop} starting={starting} controlBusy={controlBusy} readOnly={selectedRunCurrent !== true} terminalRun={Boolean(run && TERMINAL_STATUSES.has(run.status))} />}
+    {adaptiveWorkbenchOpen && run && <AdaptiveSwarmWorkbench run={run} files={allFiles} readOnly={isReadOnlyRun} starting={starting} onClose={() => setAdaptiveWorkbenchOpen(false)} onExecuteWorkers={executeWorkers} />}
   </main>;
 }
 
@@ -4343,21 +5012,613 @@ function FilePreview({ preview, file, loading, error, anchor = null }: { preview
   </article>;
 }
 
+function SessionHistory({
+  runs,
+  activeRunId,
+  loading,
+  onSelect,
+  onRefresh,
+}: {
+  runs: HarnessRun[];
+  activeRunId: string | null;
+  loading: boolean;
+  onSelect: (run: HarnessRun, readOnly: boolean) => void;
+  onRefresh: () => void;
+}) {
+  const groups = Array.from(runs.reduce((map, item) => {
+    const current = map.get(item.task_id) ?? [];
+    current.push(item);
+    map.set(item.task_id, current);
+    return map;
+  }, new Map<string, HarnessRun[]>()).entries())
+    .map(([taskId, taskRuns]) => [taskId, taskRuns] as const);
+  return <section className="session-drawer" aria-label="任务会话历史" data-testid="task-session-history">
+    <header><div><span>服务端历史</span><h2>任务会话</h2><p>最近 20 个 Run 涉及的任务；不同任务分开，同一任务的每个 Run 保留在时间线上。打开旧记录只读查看。</p></div><button type="button" className="icon-action" title="刷新任务会话" aria-label="刷新任务会话" onClick={onRefresh} disabled={loading}><IconRefresh aria-hidden="true" /></button></header>
+    {loading && <p className="session-empty">正在读取服务端 runs...</p>}
+    {!loading && groups.length === 0 && <p className="session-empty">还没有任务会话。启动一个目标后，它会出现在这里。</p>}
+    {!loading && groups.map(([taskId, taskRuns], index) => {
+      const latest = taskRuns[0];
+      return <article className="task-session" key={taskId} data-testid="task-session">
+        <header><div><span>任务会话 {index + 1}</span><strong>{latest?.instruction || "未命名任务"}</strong></div><small>最近记录 {taskRuns.length} 个 · 最近 Run {latest?.run_sequence ?? "-"}</small></header>
+        <ol>{taskRuns.map((item) => {
+          const isSelected = activeRunId === item.run_id;
+          return <li key={item.run_id} className={isSelected ? "is-selected" : ""}>
+            <button type="button" onClick={() => onSelect(item, true)} aria-current={isSelected ? "page" : undefined}>
+              <span>Run {item.run_sequence}</span><b>打开记录</b><small>{statusLabel(item.status)}</small>
+            </button>
+          </li>;
+        })}</ol>
+      </article>;
+    })}
+  </section>;
+}
+
+function statusLabel(status: string) {
+  return {
+    queued: "排队中",
+    indexing: "读取资料中",
+    planning: "规划中",
+    analyzing: "核对进行中",
+    ready_to_execute: "待复核",
+    running: "运行中",
+    waiting_input: "等待处理",
+    paused: "已暂停",
+    completed: "可复核",
+    stopped: "已停止",
+    failed: "未通过",
+  }[status] ?? "状态待确认";
+}
+
+function AdaptiveSwarmWorkbench({
+  run,
+  files,
+  readOnly,
+  starting,
+  onClose,
+  onExecuteWorkers,
+  inline = false,
+}: {
+  run: HarnessRun;
+  files: HarnessFile[];
+  readOnly: boolean;
+  starting: boolean;
+  onClose: () => void;
+  onExecuteWorkers: () => Promise<boolean>;
+  inline?: boolean;
+}) {
+  const closeButtonRef = useRef<HTMLButtonElement | null>(null);
+  const dialogRef = useRef<HTMLElement | null>(null);
+  useEffect(() => {
+    if (inline) return;
+    const previous = document.activeElement as HTMLElement | null;
+    closeButtonRef.current?.focus();
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") { event.preventDefault(); onClose(); }
+      if (event.key === "Tab") {
+        const focusable = dialogRef.current?.querySelectorAll<HTMLElement>("button:not(:disabled), [href], input:not(:disabled), textarea:not(:disabled), select:not(:disabled), [tabindex]:not([tabindex=\"-1\"])");
+        if (!focusable?.length) return;
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+        if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+        else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+      }
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => { document.removeEventListener("keydown", onKeyDown); previous?.focus(); };
+  }, [inline, onClose]);
+  const admission = run.topology_admission;
+  const fileLabel = (fileRef: string) => files.find((file) => file.file_ref === fileRef)?.display_label ?? "批准来源";
+  const sourceRefs = Array.from(new Set(run.branches.flatMap((branch) => branch.input_file_refs)));
+  const readyBranches = new Set(run.rounds.at(-1)?.next_step?.ready_branch_ids ?? []);
+  const runnableWorkerBranches = run.branches.filter((branch) => (
+    branch.status === "running" && (readyBranches.size === 0 || readyBranches.has(branch.branch_id))
+  ));
+  const canExecuteWorkerWave = runnableWorkerBranches.length >= (run.worker_runs.length === 0 ? 2 : 1);
+  const routeKey = admission?.mode ?? "single_controller";
+  const route = routeKey === "adaptive_readonly_workers" ? "Adaptive Swarm" : routeKey === "fixed_workflow" ? "固定流程" : "单一流程";
+  const statusText = (status: string) => status === "completed" || status === "adopted" ? "已完成" : status === "blocked" ? "被依赖阻塞" : status === "waiting" || status === "waiting_input" ? "局部等待" : status === "failed" ? "执行失败" : status === "ready" ? "可执行" : "处理中";
+  const contributionText = (status: string) => ({ waiting: "待核对", rejected: "已拒绝", failed: "执行失败", adopted: "已采用" }[status] ?? "状态待确认");
+  const content = <section ref={dialogRef} className={`adaptive-workbench${inline ? " adaptive-workbench-inline" : ""}`} role={inline ? "region" : "dialog"} aria-modal={inline ? undefined : true} aria-labelledby="adaptive-workbench-title" data-testid="adaptive-workbench">
+      <header className="adaptive-workbench-header"><div><span>协作方式</span><h2 id="adaptive-workbench-title">协作方式详情</h2><p>服务端当前状态的只读展示 · 第 {run.run_sequence} 次处理</p><b className="adaptive-header-boundary">{admission?.mode === "adaptive_readonly_workers" ? "当前为受限只读协作" : "本次未启动 Adaptive Swarm"}</b></div>{!inline && <button ref={closeButtonRef} type="button" className="icon-action" title="关闭协作方式详情" aria-label="关闭协作方式详情" onClick={onClose}><IconX aria-hidden="true" /></button>}</header>
+      <div className="adaptive-workbench-body">
+        <section className="adaptive-summary" aria-label="服务端路线摘要"><div><span>服务端实际路线</span><strong>{route}</strong><div className="adaptive-route-framework" aria-label="三种协作路线"><span className={routeKey === "single_controller" ? "is-active" : ""}>单一流程</span><span className={routeKey === "fixed_workflow" ? "is-active" : ""}>固定流程</span><span className={routeKey === "adaptive_readonly_workers" ? "is-active" : ""}>Adaptive Swarm</span></div><p>{routeKey === "single_controller" || routeKey === "fixed_workflow" ? `本次不启动外部动作；${admission?.reasons.at(-1) ?? "服务端保持当前路线。"}` : admission?.reasons.at(-1) ?? "本次没有可显示的路线说明。"}</p></div><div className="adaptive-summary-facts"><b>{admission?.work_unit_breadth ?? run.branches.length}<small>工作包</small></b><b>{admission?.source_span ?? sourceRefs.length}<small>来源</small></b><b>{admission?.independent_branch_count ?? 0}<small>独立分支</small></b></div></section>
+        {run.work_units.length > 0 && <section className="adaptive-panel adaptive-workunits" aria-label="工作包台账"><header><div><span>工作包台账</span><h3>真实尝试、依赖和成果状态</h3></div><small>来自当前服务端状态</small></header><div className="adaptive-workunit-list">{run.work_units.map((unit) => { const branch = run.branches.find((item) => item.branch_id === unit.branch_id); const contribution = run.contributions.slice().reverse().find((item) => item.work_unit_id === unit.work_unit_id); return <article key={unit.work_unit_id}><b>{branch?.title || "工作包"}</b><span>{statusText(unit.state)} · 第 {unit.attempt} 次尝试</span><small>{unit.depends_on.length ? `依赖 ${unit.depends_on.length} 个前序工作包` : "无前序依赖"}{contribution ? ` · 成果${contributionText(contribution.gate_status)} · 耗时 ${contribution.model_receipt.elapsed_ms} ms` : " · 尚无成果回执"}</small></article>; })}</div></section>}
+        <section className="adaptive-panel"><header><div><span>来源范围</span><h3>本次批准的 {sourceRefs.length || admission?.source_span || 0} 份资料</h3></div><small>只显示安全文件名</small></header><div className="adaptive-source-list">{sourceRefs.length ? sourceRefs.slice(0, 10).map((ref) => <span key={ref}>{fileLabel(ref)}</span>) : <span>服务端尚未形成来源列表</span>}</div></section>
+        <section className="adaptive-panel"><header><div><span>工作包依赖图</span><h3>{run.branches.length ? `${run.branches.length} 个工作包 · 依赖波次` : "尚未形成工作包"}</h3></div><small>服务端依赖事实；仅展示当前状态中的工作包</small></header><ol className="adaptive-branch-grid">{run.branches.length ? run.branches.map((branch) => <li key={branch.branch_id} className={branch.status === "blocked" ? "is-blocked" : ""}><div><b>{branch.title}</b><strong>{statusText(branch.status)}</strong></div><p>{branch.objective}</p><small>{branch.depends_on.length ? `依赖 ${branch.depends_on.length} 个前序工作包` : "无前序依赖"}{readyBranches.has(branch.branch_id) ? " · 本波可执行" : ""}</small></li>) : <li>服务端没有返回工作包依赖图。</li>}</ol></section>
+        <section className="adaptive-panel"><header><div><span>执行回执与成果</span><h3>执行回执和采用状态分开</h3></div><small>{admission?.mode === "adaptive_readonly_workers" ? "当前为受限只读协作" : "本次未启动协作执行"}</small></header>{admission?.mode === "adaptive_readonly_workers" && <p className="adaptive-boundary">仅在用户确认后派发，每批最多 3 个分支；不执行外部动作。</p>}{admission?.mode !== "adaptive_readonly_workers" && <p className="adaptive-boundary">本次路由为 {route}，服务端原因：{admission?.reasons.at(-1) ?? "没有协作执行准入"}。</p>}{run.worker_runs.length > 0 ? <div className="adaptive-receipt-list">{run.worker_runs.map((worker) => <article key={worker.worker_run_id}><b>{statusText(worker.outcome)}</b><span>{worker.summary}</span><small>{worker.source_file_refs.map(fileLabel).join("、") || "批准来源未显示"} · {worker.model_called ? "模型已调用" : "未调用"} · {worker.output_used ? "已采用" : "未采用"} · 耗时 {worker.elapsed_ms} ms</small></article>)}</div> : <p className="adaptive-empty">尚未有执行回执。</p>}{run.contributions.length > 0 && <div className="adaptive-receipt-list">{run.contributions.map((contribution) => <article key={contribution.contribution_id}><b>成果{contributionText(contribution.gate_status)}</b><span>{contribution.summary}</span><small>{contribution.approved_file_refs.map(fileLabel).join("、") || "批准来源未显示"} · {contribution.evidence_anchors.length ? `${contribution.evidence_anchors.length} 处原文定位` : "原文定位待补"}</small></article>)}</div>}{admission?.mode === "adaptive_readonly_workers" && !readOnly && canExecuteWorkerWave && <button type="button" className="adaptive-confirm" onClick={() => void onExecuteWorkers()} disabled={starting}><IconPlayerPlay aria-hidden="true" />{starting ? "正在启动" : run.worker_runs.length ? "继续下一波" : "确认并开始协作"}</button>}{admission?.mode === "adaptive_readonly_workers" && !readOnly && !canExecuteWorkerWave && run.branches.some((branch) => branch.status === "waiting_input") && <p className="adaptive-empty">当前没有可执行工作包；请回到工作进展，选择一个后续分支继续。</p>}</section>
+        <section className="adaptive-panel adaptive-artifacts"><header><div><span>成果版本</span><h3>append-only Artifact history</h3></div><small>成果与局部阻塞并存</small></header><div className="adaptive-version-list">{run.artifact_versions.length ? run.artifact_versions.map((artifact) => <article key={`${artifact.artifact_id}:${artifact.version}`}><b>Artifact v{artifact.version}</b><span>{artifact.summary}</span><small>{artifact.finding_count} 条发现 · {run.last_commit?.artifact_version === artifact.version ? "当前提交" : "历史版本"}</small></article>) : <p className="adaptive-empty">尚未生成逻辑成果版本。</p>}</div>{run.contributions.some((item) => item.gate_status !== "adopted") && <p className="adaptive-partial"><IconAlertTriangle aria-hidden="true" />部分成果可用；阻塞分支不会抹掉已采用贡献。</p>}</section>
+      </div>
+    </section>;
+  return inline ? content : <div className="adaptive-workbench-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>{content}</div>;
+}
+
+function AgentCapabilitiesSurface({
+  files,
+  run,
+  taskPointer,
+  taskPointerError,
+  sessionRuns,
+  sessionsOpen,
+  historyLoading,
+  selectedRunCurrent,
+  instruction,
+  setInstruction,
+  instructionInputRef,
+  newTaskDraft,
+  starting,
+  controlBusy,
+  connection,
+  error,
+  onStartTask,
+  onControl,
+  onContinueTask,
+  onCurrentTask,
+  onRetryTaskPointer,
+  onExecuteWorkers,
+  onRefreshSessions,
+  onToggleSessions,
+  onSelectSession,
+  onNewTask,
+  reviewRequest,
+  onReview,
+  onOpenFile,
+  onCloseReview,
+}: {
+  files: HarnessFile[];
+  run: HarnessRun | null;
+  taskPointer: TaskPointer | null;
+  taskPointerError: string;
+  sessionRuns: HarnessRun[];
+  sessionsOpen: boolean;
+  historyLoading: boolean;
+  selectedRunCurrent: boolean | null;
+  instruction: string;
+  setInstruction: (value: string) => void;
+  instructionInputRef: RefObject<HTMLTextAreaElement | null>;
+  newTaskDraft: boolean;
+  starting: boolean;
+  controlBusy: LoopCommand | null;
+  connection: ConnectionState;
+  error: string;
+  onStartTask: (instruction: string) => Promise<boolean>;
+  onControl: (command: LoopCommand, options?: LoopControlOptions) => Promise<boolean>;
+  onContinueTask: (branchId: string, instruction?: string) => Promise<boolean>;
+  onCurrentTask: () => Promise<boolean>;
+  onRetryTaskPointer: () => void;
+  onExecuteWorkers: () => Promise<boolean>;
+  onRefreshSessions: () => void;
+  onToggleSessions: () => void;
+  onSelectSession: (snapshot: HarnessRun) => void;
+  onNewTask: () => void;
+  reviewRequest: EvidenceReviewRequest | null;
+  onReview: (request: EvidenceReviewRequest) => void;
+  onOpenFile: (file: HarnessFile) => void;
+  onCloseReview: () => void;
+}) {
+  const sessionTaskCount = new Set(sessionRuns.map((item) => item.task_id)).size;
+  const isReadOnly = selectedRunCurrent !== true;
+  const [activeTab, setActiveTab] = useState<"progress" | "collaboration">("progress");
+  const [showExecutionDetails, setShowExecutionDetails] = useState(false);
+  const [showResult, setShowResult] = useState(false);
+  const [showVersions, setShowVersions] = useState(false);
+  const [showSteer, setShowSteer] = useState(false);
+  const [steerDirection, setSteerDirection] = useState("");
+  const surfaceRef = useRef<HTMLElement | null>(null);
+  useEffect(() => {
+    surfaceRef.current?.scrollIntoView({ block: "start", behavior: "instant" });
+  }, [activeTab, showExecutionDetails, run?.run_id]);
+  useEffect(() => {
+    setActiveTab(window.location.hash === "#adaptive-swarm" ? "collaboration" : "progress");
+    setShowExecutionDetails(false);
+    setShowResult(false);
+    setShowVersions(false);
+    setShowSteer(false);
+    setSteerDirection("");
+  }, [run?.run_id]);
+  const openCollaboration = () => {
+    setActiveTab("collaboration");
+    window.history.replaceState(null, "", "#adaptive-swarm");
+  };
+  const openNewTask = () => {
+    // Repeated drafts keep a null Run ID, so the Run-change effect cannot reset this view.
+    window.history.replaceState(null, "", window.location.pathname + window.location.search);
+    setActiveTab("progress");
+    setShowExecutionDetails(false);
+    setShowResult(false);
+    setShowVersions(false);
+    setShowSteer(false);
+    setSteerDirection("");
+    onNewTask();
+  };
+  const moveTab = (direction: 1 | -1) => {
+    const next = activeTab === "progress" ? "collaboration" : "progress";
+    setActiveTab(next);
+    window.history.replaceState(null, "", next === "collaboration" ? "#adaptive-swarm" : window.location.pathname);
+    window.requestAnimationFrame(() => document.getElementById(next === "collaboration" ? "agent-collaboration-tab" : "agent-progress-tab")?.focus());
+  };
+  const status = connection === "offline" ? "服务离线" : connection === "reconnecting" ? "正在恢复" : connection === "live" ? "实时连接" : "资料可用";
+  const pendingDecisionRequests = run ? uniqueDecisionRequests([
+    ...run.rounds.flatMap((round) => round.next_step?.decision_requests ?? []),
+    ...run.decision_requests,
+  ]).filter((request) => ["pending", "deferred"].includes(request.state ?? "pending")) : [];
+  const waitingBranches = run?.branches.filter((branch) => branch.status === "waiting_input").sort((left, right) => left.title.localeCompare(right.title)) ?? [];
+  const completedBranches = run?.branches.filter((branch) => branch.status === "completed").length ?? 0;
+  const uncoveredRequirements = run ? Array.from(new Map(
+    run.rounds.flatMap((round) => round.uncovered_requirements).map((item) => [item.title, item]),
+  ).values()) : [];
+  const pendingWorkLabel = [
+    waitingBranches.length ? `${waitingBranches.length} 个分支等待继续` : "",
+    uncoveredRequirements.length ? `${uncoveredRequirements.length} 项缺少资料来源` : "",
+  ].filter(Boolean).join(" · ");
+  const decisionReviewItems = run ? pendingDecisionRequests.map((request) => {
+    for (const round of [...run.rounds].reverse()) {
+      const resolution = (round.next_step?.evidence_resolutions ?? []).find((item) => request.resolution_id ? item.resolution_id === request.resolution_id : item.decision_request?.request_id === request.request_id);
+      if (resolution) {
+        const branch = run.branches.find((item) => item.branch_id === (resolution.branch_id ?? request.branch_id));
+        return resolutionReviewRequest(resolution, round.round_number, branch?.title ?? null, run.decision_records, pendingDecisionRequests);
+      }
+      const finding = round.result?.findings.find((item) => item.finding_id === request.finding_id || item.decision_request?.request_id === request.request_id);
+      if (finding) return findingReviewRequest(finding, round.result?.findings.indexOf(finding) ?? 0, round.round_number, run.decision_records, pendingDecisionRequests);
+    }
+    const artifactFinding = run.artifact_versions.flatMap((artifact) => artifact.findings).find((item) => item.finding_id === request.finding_id || item.decision_request?.request_id === request.request_id);
+    if (artifactFinding) return findingReviewRequest(artifactFinding, 0, run.current_round || null, run.decision_records, pendingDecisionRequests);
+    return null;
+  }).filter((item): item is EvidenceReviewRequest => item !== null).sort((left, right) => left.title.localeCompare(right.title)) : [];
+  const primaryDecision = decisionReviewItems[0] ?? null;
+  const primaryDecisionDeferred = primaryDecision?.decisionRequest?.state === "deferred";
+  const needsAttention = pendingDecisionRequests.length > 0;
+  const artifactChecking = Boolean(run && run.artifact_versions.length > 0 && ["queued", "indexing", "planning", "running", "analyzing"].includes(run.status) && !needsAttention && waitingBranches.length === 0);
+  useEffect(() => {
+    if (window.location.hash === "#adaptive-swarm") setActiveTab("collaboration");
+  }, []);
+  const currentArtifact = run?.artifact_versions.find((item) => item.version === run.last_commit?.artifact_version) ?? run?.artifact_versions.at(-1);
+  const openVersions = () => { setShowVersions((value) => !value); setShowResult(false); };
+  const reviewBranch = (branch: LoopBranch) => {
+    if (!run) return;
+    const decision = decisionReviewItems.find((item) => item.affectedBranchIds.includes(branch.branch_id) || item.decisionRequest?.branch_id === branch.branch_id);
+    if (decision) { onReview(decision); return; }
+    if (TERMINAL_STATUSES.has(run.status)) { void onContinueTask(branch.branch_id); return; }
+    const round = [...run.rounds].reverse().find((item) => item.branch_ids.includes(branch.branch_id)) ?? run.rounds.at(-1);
+    if (round) onReview(branchReviewRequest(branch, round.evidence_gaps, round, run));
+  };
+  return <section ref={surfaceRef} className={`agent-capabilities-surface${showExecutionDetails && activeTab === "progress" ? " is-record-view" : ""}${activeTab === "collaboration" ? " is-collaboration-view" : ""}`} data-testid="agent-capabilities-surface">
+    <header className="agent-capabilities-toolbar">
+      {showExecutionDetails && activeTab === "progress" ? <button type="button" className="cap-back" onClick={() => setShowExecutionDetails(false)}><IconArrowLeft />返回任务进展</button> : <a className="cap-back" href="/"><IconArrowLeft />返回办公资料库</a>}
+      <div className="cap-task-heading">{run ? <details className="cap-task-goal" key={run.run_id}><summary aria-label="查看完整任务目标"><h1 className="agent-current-task"><span className="sr-only">当前任务：</span>{run.contract.goal}</h1><IconChevronDown aria-hidden="true" /></summary><div className="cap-goal-content"><b>任务目标</b><p>{run.contract.goal}</p></div></details> : <h1>Agent 能力工作台</h1>}</div>
+      <div className="agent-capabilities-toolbar-actions">{run && <button type="button" onClick={onToggleSessions} aria-expanded={sessionsOpen} aria-label="任务会话">{selectedRunCurrent === false ? "历史" : selectedRunCurrent === true ? "当前" : "核对中"} Run {run.run_sequence}<IconChevronDown /></button>}<b className={`cap-run-state is-${run?.status ?? connection}`} title={status}><IconClock />{run ? statusLabel(run.status) : status}</b><button type="button" className="new-task-button icon-action" title="新建任务" aria-label="新建任务" onClick={openNewTask} disabled={starting}><IconPlus /></button>{!run && <button type="button" onClick={onToggleSessions} aria-label="任务会话"><IconClock />历史会话{sessionTaskCount ? ` ${sessionTaskCount}` : ""}</button>}</div>
+    </header>
+    {sessionsOpen && <SessionHistory runs={sessionRuns} activeRunId={run?.run_id ?? null} loading={historyLoading} onRefresh={onRefreshSessions} onSelect={(snapshot) => onSelectSession(snapshot)} />}
+    {newTaskDraft && <p className="new-task-banner" role="status"><IconPlus aria-hidden="true" /><span><b>新任务草稿</b>上一任务不会停止或删除，可从历史会话返回。填写目标并启动后，才会创建新的服务端任务。</span></p>}
+    {selectedRunCurrent === false && run && <p className="read-only-banner" role="status"><IconEye aria-hidden="true" />历史 Run 只读查看，不接收实时事件，也不会执行控制、决策或启动新任务。</p>}
+    {taskPointerError && <p className="cap-pointer-notice" role="alert">{taskPointerError}<button type="button" onClick={onRetryTaskPointer}>重试任务状态</button></p>}
+    {selectedRunCurrent === false && <p className="cap-pointer-notice">当前任务已进入其他 Run。<button type="button" disabled={starting} onClick={() => void onCurrentTask()}>打开当前记录</button></p>}
+    <div className="cap-content-shell">
+    <div className="cap-page-intro"><h2>{showExecutionDetails && activeTab === "progress" ? "执行记录" : "任务进展"}</h2><p>{run ? needsAttention ? `已保留现有成果，${pendingDecisionRequests.length} 项等待你确认` : pendingWorkLabel || (run.status === "completed" ? "本次执行已结束，成果仍需复核" : artifactChecking ? "成果已生成，核对进行中" : "正在推进当前任务") : "新任务"}</p></div>
+    <div className="agent-capability-tabs" role="tablist" aria-label="Agent 能力视图">
+      <button id="agent-progress-tab" type="button" role="tab" tabIndex={activeTab === "progress" ? 0 : -1} aria-selected={activeTab === "progress"} aria-controls="agent-progress-panel" data-testid="agent-progress-tab" onKeyDown={(event) => { if (event.key === "ArrowRight" || event.key === "ArrowLeft") { event.preventDefault(); moveTab(event.key === "ArrowRight" ? 1 : -1); } }} onClick={() => { setActiveTab("progress"); window.history.replaceState(null, "", window.location.pathname); }}><IconRoute aria-hidden="true" /><span>执行进展</span><small>Agent Control Loop</small></button>
+      <button id="agent-collaboration-tab" type="button" role="tab" tabIndex={activeTab === "collaboration" ? 0 : -1} aria-selected={activeTab === "collaboration"} aria-controls="adaptive-swarm" data-testid="agent-collaboration-tab" onKeyDown={(event) => { if (event.key === "ArrowRight" || event.key === "ArrowLeft") { event.preventDefault(); moveTab(event.key === "ArrowRight" ? 1 : -1); } }} onClick={() => { setActiveTab("collaboration"); window.history.replaceState(null, "", "#adaptive-swarm"); }}><IconGitCommit aria-hidden="true" /><span>协作方式</span><small>Adaptive Swarm</small></button>
+    </div>
+    {activeTab === "progress" && <section id="agent-progress-panel" className="agent-capability-panel agent-capability-progress" role="tabpanel" data-testid="agent-control-loop-capability" aria-labelledby="agent-progress-tab">
+      {taskPointerError && <p className="agent-capabilities-error" role="alert"><IconAlertTriangle aria-hidden="true" />{taskPointerError}</p>}
+      {run && !showExecutionDetails && <CapabilityProgress run={run} files={files} primaryDecision={primaryDecision} decisions={decisionReviewItems} readOnly={isReadOnly} busy={starting || controlBusy !== null} onReview={onReview} onReviewBranch={reviewBranch} onCollaboration={openCollaboration} onResult={() => setShowResult((value) => !value)} onVersions={openVersions} />}
+      {!run && <div className="agent-capability-task-input"><label htmlFor="agent-capability-instruction">你想推进什么工作？</label><textarea ref={instructionInputRef} id="agent-capability-instruction" value={instruction} onChange={(event) => setInstruction(event.target.value)} placeholder="描述任务目标、关注的问题和预期成果" aria-label="任务指令" /><footer><div className="cap-draft-scope"><span><IconFolder aria-hidden="true" />{files.length} 份办公资料</span><span><IconShieldCheck aria-hidden="true" />原始资料只读</span></div><button type="button" aria-label="启动 Control Loop" onClick={() => void onStartTask(instruction)} disabled={starting || instruction.trim().length < 3}><IconSend aria-hidden="true" />{starting ? "正在启动" : "开始工作"}</button></footer></div>}
+      {run && !showExecutionDetails && <footer className="cap-progress-links"><button type="button" className="agent-execution-details-toggle" aria-expanded={false} onClick={() => setShowExecutionDetails(true)}><IconRoute />查看完整执行记录</button><button type="button" onClick={openVersions}><IconClock />查看版本历史</button></footer>}
+      {run && showExecutionDetails && <div className="agent-execution-details" data-testid="agent-execution-details"><CapabilityExecutionRecord run={run} files={files} decisions={decisionReviewItems} onReview={onReview} onReviewBranch={reviewBranch} readOnly={isReadOnly} onVersions={openVersions} /><details className="cap-protocol-record"><summary>控制与完整审计记录<IconChevronDown /></summary><LoopView run={run} taskPointer={taskPointer} taskPointerError={taskPointerError} files={files} controlBusy={controlBusy} onControl={onControl} onReview={onReview} onStartTask={onStartTask} onContinueTask={onContinueTask} onOpenCurrentTask={onCurrentTask} onRetryTaskPointer={onRetryTaskPointer} onExecuteWorkers={onExecuteWorkers} onOpenAdaptiveWorkbench={openCollaboration} adaptiveActionLabel={run.topology_admission ? "跳到 Adaptive Swarm" : "查看 Adaptive Swarm 能力"} readOnly={isReadOnly} starting={starting} /></details></div>}
+    </section>}
+    {activeTab === "collaboration" && <section id="adaptive-swarm" className="agent-capability-panel agent-capability-collaboration" role="tabpanel" data-testid="adaptive-swarm-capability" aria-labelledby="agent-collaboration-tab">
+      {run ? <CollaborationOverview run={run} files={files} readOnly={isReadOnly} starting={starting} onExecuteWorkers={onExecuteWorkers} onOpenHistory={onToggleSessions} onReviewPrimary={primaryDecision ? () => onReview(primaryDecision) : waitingBranches[0] ? () => reviewBranch(waitingBranches[0]) : undefined} onProgress={() => { setActiveTab("progress"); window.history.replaceState(null, "", window.location.pathname); }} /> : <div className="agent-capability-empty"><IconRoute aria-hidden="true" /><p>等待当前服务端状态；不会填充演示拓扑或伪造协作回执。</p></div>}
+    </section>}
+    {run && showVersions && <section className="cap-versions" aria-label="版本历史"><header><h3>版本历史</h3><button type="button" aria-label="关闭版本历史" onClick={() => setShowVersions(false)}><IconX /></button></header>{run.artifact_versions.length ? run.artifact_versions.map((artifact) => <article key={artifact.artifact_id + artifact.version}><IconFileDescription /><div><b>{artifact.title} v{artifact.version}</b><p>{artifact.summary}</p><small>第 {artifact.round_number} 轮 · {artifact.finding_count} 条发现 · {artifact.version === currentArtifact?.version ? "当前成果" : "历史保留"}</small></div><button type="button" disabled={isReadOnly || starting || controlBusy !== null || run.status !== "completed" || !run.last_commit || artifact.version === run.last_commit.artifact_version} onClick={() => void onControl("rollback", { artifactVersion: artifact.version })}><IconRefresh />恢复此版本</button></article>) : <p>尚无成果版本</p>}</section>}
+    {run && showResult && <section className="cap-result-detail" aria-label="当前成果详情"><header><h3>当前成果</h3><button type="button" aria-label="关闭成果详情" onClick={() => setShowResult(false)}><IconX /></button></header><ResultView result={run.result ?? (currentArtifact ? { summary: currentArtifact.summary, findings: currentArtifact.findings, follow_ups: currentArtifact.follow_ups, review_required: true } : null)} artifacts={run.artifact_versions} workspaceArtifacts={run.workspace_artifacts} receipts={run.effect_receipts} reconciliation={run.narrative_reconciliation} commit={run.last_commit} decisions={run.decision_records} decisionRequests={run.decision_requests} files={files} onOpenFile={onOpenFile} onReview={onReview} onStartTask={onStartTask} starting={starting} readOnly={isReadOnly} /></section>}
+    {error && <p className="agent-capabilities-error" role="alert"><IconAlertTriangle aria-hidden="true" />{error}</p>}
+    </div>
+    {run && <footer className="cap-control-footer" aria-label="运行控制">
+      <button type="button" disabled={isReadOnly || controlBusy !== null || starting || TERMINAL_STATUSES.has(run.status) || run.status === "waiting_input" || !["running", "paused", "pause_requested"].includes(run.control_state)} onClick={() => void onControl(["paused", "pause_requested"].includes(run.control_state) ? "resume" : "pause")}>
+        {run.control_state === "paused" ? <IconPlayerPlay /> : <IconPlayerPause />}{run.control_state === "pause_requested" ? "撤销暂停请求" : run.control_state === "paused" ? "继续运行" : "暂停运行"}
+      </button>
+      <button type="button" disabled={isReadOnly || controlBusy !== null || starting || TERMINAL_STATUSES.has(run.status) || ["stop_requested", "stopped"].includes(run.control_state)} aria-expanded={showSteer} onClick={() => setShowSteer((value) => !value)}><IconAdjustments />调整下一轮</button>
+      <button type="button" className="is-stop" disabled={isReadOnly || controlBusy !== null || starting || TERMINAL_STATUSES.has(run.status)} onClick={() => void onControl("stop")}><IconPlayerStop />停止并保留成果</button>
+      <small>{run.budget.stop_reason ? `停止原因：${run.budget.stop_reason}` : `已用 ${Math.ceil(run.budget.elapsed_ms / 1000)} 秒 · ${run.budget.model_calls_used} 次模型调用`} · {status}</small>
+      {showSteer && <form className="cap-steer-form" onSubmit={async (event) => { event.preventDefault(); if (await onControl("steer", { instruction: steerDirection.trim() })) { setSteerDirection(""); setShowSteer(false); } }}><label htmlFor="cap-steer-direction">下一轮方向</label><input id="cap-steer-direction" value={steerDirection} onChange={(event) => setSteerDirection(event.target.value)} disabled={isReadOnly || controlBusy !== null || TERMINAL_STATUSES.has(run.status)} /><button type="submit" disabled={isReadOnly || controlBusy !== null || starting || TERMINAL_STATUSES.has(run.status) || steerDirection.trim().length < 3}><IconCheck />记录调整</button></form>}
+    </footer>}
+    {reviewRequest && <EvidenceReviewDialog request={reviewRequest} files={files} onClose={onCloseReview} onOpenFile={onOpenFile} onStartTask={onStartTask} onControl={onControl} starting={starting} controlBusy={controlBusy} readOnly={isReadOnly} terminalRun={Boolean(run && TERMINAL_STATUSES.has(run.status))} />}
+  </section>;
+}
+
+function CapabilityBoundarySummary({ run, primaryDecision, decisions, readOnly }: { run: HarnessRun; primaryDecision: EvidenceReviewRequest | null; decisions: EvidenceReviewRequest[]; readOnly: boolean }) {
+  const latest = run.rounds.at(-1);
+  const pending = run.decision_requests.filter((item) => ["pending", "deferred"].includes(item.state ?? "pending")).length;
+  const business = run.workspace_artifacts.find((item) => item.business_gate_outcome && item.business_gate_outcome.status !== "passed")?.business_gate_outcome;
+  const ready = new Set(latest?.next_step?.ready_branch_ids ?? []);
+  const notices = projectCopilotBoundaries({
+    readOnly, terminal: TERMINAL_STATUSES.has(run.status), status: run.status, controlState: run.control_state,
+    candidateCount: primaryDecision?.resolution?.status === "ambiguous" ? primaryDecision.resolution.candidates.length : 0,
+    hasDecision: Boolean(primaryDecision), unavailableDecisions: Math.max(0, pending - decisions.length),
+    readyWorkers: run.status === "waiting_input" && run.topology_admission?.mode === "adaptive_readonly_workers" ? run.branches.filter((branch) => ready.has(branch.branch_id)).length : 0,
+    waitingBranch: run.branches.some((branch) => branch.status === "waiting_input" || (TERMINAL_STATUSES.has(run.status) && ["failed", "stopped"].includes(branch.status))),
+    businessDecision: business?.decision ?? null, businessInvalid: business?.status === "invalid",
+  });
+  return <section className="copilot-boundary-summary" aria-label="人机共驾边界" data-testid="copilot-boundary-summary"><header><h3><IconShieldCheck />人机共驾边界</h3><span>原资料只读 · 不执行外部动作</span></header><dl>{notices.map((notice) => <div key={notice.key} className={`is-${notice.tone}`} data-boundary={notice.key}><dt>{notice.title}</dt><dd><p><b>Agent</b>{notice.agent}</p><p><b>你</b>{notice.human}</p><small>{notice.limit}</small></dd></div>)}</dl></section>;
+}
+
+function CapabilityProgress({ run, files, primaryDecision, decisions, readOnly, busy, onReview, onReviewBranch, onCollaboration, onResult, onVersions }: {
+  run: HarnessRun;
+  files: HarnessFile[];
+  primaryDecision: EvidenceReviewRequest | null;
+  decisions: EvidenceReviewRequest[];
+  readOnly: boolean;
+  busy: boolean;
+  onReview: (request: EvidenceReviewRequest) => void;
+  onReviewBranch: (branch: LoopBranch) => void;
+  onCollaboration: () => void;
+  onResult: () => void;
+  onVersions: () => void;
+}) {
+  const latest = run.rounds.at(-1);
+  const terminal = TERMINAL_STATUSES.has(run.status);
+  const waiting = run.branches.filter((branch) => branch.status === "waiting_input");
+  const deferredIds = new Set(latest?.deferred_requirements.map((item) => item.title) ?? []);
+  const readyBranchIds = new Set(latest?.next_step?.ready_branch_ids ?? []);
+  const readyBranches = run.branches.filter((branch) => readyBranchIds.has(branch.branch_id));
+  const hasWave = run.topology_admission?.mode === "adaptive_readonly_workers" && run.status === "waiting_input" && readyBranches.length > 0;
+  const artifact = run.artifact_versions.find((item) => item.version === run.last_commit?.artifact_version) ?? run.artifact_versions.at(-1);
+  const fileLabel = (ref: string) => files.find((file) => file.file_ref === ref)?.display_label ?? "批准来源";
+  const sourceChoice = primaryDecision?.resolution?.status === "ambiguous";
+  const primaryBranch = waiting[0] ?? (terminal ? run.branches.find((branch) => ["stopped", "failed"].includes(branch.status)) : undefined);
+  const attentionFileRefs = primaryDecision?.fileRefs ?? (hasWave ? Array.from(new Set(readyBranches.flatMap((branch) => branch.input_file_refs))) : primaryBranch?.input_file_refs ?? []);
+  const stages = [
+    { title: "读取资料", done: Boolean(latest?.input_file_refs.length), note: latest?.input_file_refs.length ? `${latest.input_file_refs.length} 份本轮资料` : "尚未读取" },
+    { title: "拆解任务", done: Boolean(latest?.plan.length), note: latest?.plan.length ? `${latest.plan.length} 个本轮工作包` : "尚未形成计划" },
+    { title: "形成结论", done: Boolean(latest?.analysis_receipt?.output_used || latest?.result), note: latest?.analysis_receipt?.output_used ? "已有采用内容" : run.contributions.length ? `${run.contributions.filter((item) => item.gate_status === "adopted").length} 份贡献已采用` : "尚未采用" },
+    { title: "核对依据", done: latest?.next_step?.decision === "completed", note: decisions.length ? `${decisions.length} 项待确认` : waiting.length ? `${waiting.length} 个分支待继续` : latest?.next_step?.decision === "completed" ? "本轮证据门通过" : "等待核对" },
+    { title: "保留成果", done: Boolean(artifact), note: artifact ? `已有 v${artifact.version}${artifact.status === "draft" ? " 草稿" : " 成果"}` : "尚无成果版本" },
+  ];
+  const needAction = Boolean(primaryDecision || hasWave || primaryBranch);
+  const pendingCount = run.decision_requests.filter((item) => ["pending", "deferred"].includes(item.state ?? "pending")).length;
+  const completed = run.branches.filter((branch) => branch.status === "completed").length;
+  const allPassed = run.workspace_artifacts.length > 0 && run.workspace_artifacts.every((item) => item.verifier_status === "passed");
+  const failedBusiness = run.workspace_artifacts.find((item) => item.business_gate_outcome?.status === "failed")?.business_gate_outcome;
+  return <section className="cap-overview" data-testid="agent-progress-summary" aria-label="执行进展摘要">
+    <span className="sr-only">当前进展：{statusLabel(run.status)}</span>
+    <ol className="cap-stepper" aria-label="本轮执行阶段">{stages.map((stage, index) => <li key={stage.title} className={`${stage.done ? "is-done" : "is-pending"}${index === (hasWave ? 1 : 3) && needAction ? " is-attention" : ""}`}><span className="cap-step-number">{stage.done ? <IconCheck /> : index + 1}</span><b>{stage.title}</b><small>{stage.note}</small></li>)}</ol>
+    {run.workspace_artifacts.length > 0 && <section className={`cap-verified-outcome${allPassed ? " is-passed" : " is-failed"}`}><IconFileDescription /><div><b>{allPassed ? `${run.workspace_artifacts.length} 份成果文件已通过确定性检查` : "成果文件仍有未通过检查"}</b><p>{failedBusiness?.decision ?? "文件检查与业务复核分开，原文件未修改。"}</p></div><button type="button" onClick={onResult}>查看已生成成果<IconChevronRight /></button></section>}
+    {needAction ? <section className="cap-attention" aria-label="当前待办"><IconAlertTriangle className="cap-attention-icon" /><div className="cap-attention-copy"><h3>{primaryDecision ? "现在需要你确认" : hasWave ? "协作计划已就绪" : terminal ? "本次执行已结束，保留未完成分支" : "无需核对文件，建议重试"}</h3><p>{sourceChoice ? `同一段内容匹配到 ${primaryDecision.resolution?.candidates.length} 个位置，需要你选择引用位置。` : primaryDecision ? primaryDecision.factSummary || primaryDecision.title : hasWave ? `${readyBranches.length} 个工作包等待你的协作确认，尚未派发本批 Worker。` : primaryBranch ? `${primaryBranch.title}：${terminal ? "继续时会创建同一任务的新 Run。" : "只继续这条分支，不需要修改文件或填写内容。"}` : "等待服务端更新。"}</p><small>{primaryDecision?.branchTitle ? `受影响：${primaryDecision.branchTitle}。` : ""}{completed} 个已完成分支与已有成果保持保留。</small><div className="cap-attention-sources">{attentionFileRefs.map((ref) => <span key={ref}><IconFile />{fileLabel(ref)}</span>)}</div></div><div className="cap-attention-actions"><button type="button" className="cap-primary" disabled={busy || (readOnly && !primaryDecision)} onClick={() => primaryDecision ? onReview(primaryDecision) : hasWave ? onCollaboration() : primaryBranch && onReviewBranch(primaryBranch)}>{primaryDecision ? sourceChoice ? "确认引用位置" : "查看并处理" : hasWave ? "查看协作计划" : terminal ? "新建 Run 继续此分支" : "只重试此分支"}<IconArrowRight /></button>{primaryDecision && <small>{primaryDecision.decisionRequest?.state === "deferred" ? "已暂缓，仍可处理" : "确认前不会启动下一轮"}</small>}</div></section> : <p className="cap-quiet-status"><IconCircleCheck />{terminal ? "本次执行已结束，当前没有待处理事项。" : artifact ? "成果已保留，核对进行中，暂无需操作。" : "当前没有需要你确认的事项。"}</p>}
+    {decisions.length > 1 && <details className="cap-disclosure"><summary>其余 {decisions.length - 1} 项待确认<IconChevronDown /></summary>{decisions.slice(1).map((item) => <button type="button" key={item.reviewKey} onClick={() => onReview(item)}>{item.title}<IconChevronRight /></button>)}</details>}
+    <CapabilityBoundarySummary run={run} primaryDecision={primaryDecision} decisions={decisions} readOnly={readOnly} />
+    {pendingCount > decisions.length && <p className="cap-unavailable" role="status">另有 {pendingCount - decisions.length} 项待决尚未取得完整证据，暂不能确认。</p>}
+    <section className="cap-branch-section"><header><h3>分支进展</h3><span>{completed} 个分支已完成 · {waiting.length} 个分支等待继续</span></header><div className="cap-branch-grid">{run.branches.map((branch) => <article key={branch.branch_id} className={`is-${branch.status}`}><div><span className="cap-state-icon">{branch.status === "completed" ? <IconCircleCheck /> : branch.status === "waiting_input" ? <IconClock /> : <IconCircleDot />}</span><h4>{branch.title}</h4><b>{hasWave && readyBranchIds.has(branch.branch_id) ? "就绪，尚未派发" : deferredIds.has(branch.title) ? "已延后" : branchStatusLabel(branch.status)}</b></div><p>{branch.status === "completed" ? `${branch.verified_file_refs.length} 份来源已核对，结果已保留。` : branch.status === "blocked" ? "等待前置工作包完成。" : `${branch.input_file_refs.length} 份批准来源${branch.missing_file_refs.length ? `，${branch.missing_file_refs.length} 份待核对` : ""}。`}</p>{branch.status === "waiting_input" && <button type="button" disabled={readOnly || busy} onClick={() => onReviewBranch(branch)}>处理此分支<IconChevronRight /></button>}</article>)}</div>{!run.branches.length && <p>任务分支尚未形成。</p>}</section>
+    {latest?.uncovered_requirements.length ? <section className="cap-uncovered"><h3>{latest.uncovered_requirements.length} 项缺少资料来源</h3>{latest.uncovered_requirements.map((item) => <p key={item.title}><b>{item.title}</b> · {item.reason}</p>)}</section> : null}
+    <section className="cap-artifact-section"><header><h3>当前成果</h3><button type="button" onClick={onVersions}>版本历史<IconChevronRight /></button></header><div className="cap-artifact-row"><IconFileDescription /><div><b>{artifact ? `${artifact.title} v${artifact.version}` : "尚无成果版本"}</b><small>{artifact ? `${artifact.status === "draft" ? "草稿已保留" : run.last_commit?.artifact_version === artifact.version ? "已提交，仍需复核" : "已保留，仍需复核"} · ${artifact.finding_count} 条发现` : "通过本轮核对后再形成成果"}</small></div><span>{artifact ? "逻辑简报，不代表原文件写回" : ""}</span><button type="button" disabled={!artifact && !run.workspace_artifacts.length} onClick={onResult}>查看成果<IconChevronRight /></button></div></section>
+  </section>;
+}
+
+function CapabilityExecutionRecord({ run, files, decisions, onReview, onReviewBranch, readOnly, onVersions }: {
+  run: HarnessRun;
+  files: HarnessFile[];
+  decisions: EvidenceReviewRequest[];
+  onReview: (request: EvidenceReviewRequest) => void;
+  onReviewBranch: (branch: LoopBranch) => void;
+  readOnly: boolean;
+  onVersions: () => void;
+}) {
+  const [roundNumber, setRoundNumber] = useState(run.current_round);
+  useEffect(() => setRoundNumber(run.current_round), [run.run_id, run.current_round]);
+  const round = run.rounds.find((item) => item.round_number === roundNumber) ?? run.rounds.at(-1);
+  const currentRound = round?.round_number === run.current_round;
+  const branches = run.branches.filter((branch) => round?.branch_ids.includes(branch.branch_id));
+  const artifact = run.artifact_versions.find((item) => item.round_number === round?.round_number);
+  return <div className="cap-record-layout"><nav className="cap-round-rail" aria-label="执行轮次"><h3>执行记录</h3>{run.rounds.map((item) => <button type="button" key={item.round_number} aria-current={round?.round_number === item.round_number ? "step" : undefined} onClick={() => setRoundNumber(item.round_number)}><span>{item.round_number === run.current_round ? <IconCircleDot /> : <IconCircleCheck />}</span><div><b>第 {item.round_number} 轮</b><small>{item.round_number === run.current_round ? "当前" : item.status === "completed" ? "已结束" : "历史记录"}</small></div></button>)}<button type="button" onClick={onVersions}><IconClock /><div><b>版本历史</b><small>{run.artifact_versions.length} 个版本</small></div></button></nav><main className="cap-record-main"><div className="cap-record-metrics"><div><IconRefresh /><strong>{run.rounds.length}</strong><span>轮执行记录</span></div><div><IconRoute /><strong>{run.branches.length}</strong><span>条任务分支</span></div><div><IconClock /><strong>{decisions.length}</strong><span>项当前待确认</span></div></div><header className="cap-record-heading"><h3>第 {round?.round_number ?? 1} 轮执行详情</h3><span>{currentRound ? "当前轮次" : "历史轮次"}</span></header><p className="cap-record-question">{round?.question ?? "正在建立本轮记录"}</p><div className="cap-record-branches">{branches.map((branch) => {
+    const matchingDecision = decisions.find((item) => item.decisionRequest?.branch_id === branch.branch_id);
+    const resolvedFindings = round?.result?.findings.filter((finding) => finding.affected_branch_ids.includes(branch.branch_id)) ?? [];
+    return <details className={`cap-record-branch is-${branch.status}`} key={`${roundNumber}:${branch.branch_id}`} open={currentRound && branch.status === "waiting_input"}><summary><IconCircleDot /><b>{branch.title}</b><span>{currentRound ? branchStatusLabel(branch.status) : "本轮记录"}</span><small>{currentRound ? matchingDecision?.resolution?.status === "ambiguous" ? `${matchingDecision.resolution.candidates.length} 个候选原文位置` : `${branch.verified_file_refs.length} 份来源已核对` : `${resolvedFindings.length} 条本轮发现`}</small><IconChevronDown /></summary><div className="cap-record-branch-body"><section><span>本轮批准资料</span>{branch.input_file_refs.filter((ref) => round?.input_file_refs.includes(ref)).map((ref) => <p key={ref}><IconFile />{files.find((file) => file.file_ref === ref)?.display_label ?? "批准来源"}</p>)}</section><section><span>{currentRound ? "当前阶段" : "轮次阶段"}</span><p>{LOOP_PHASES.find((phase) => phase.key === round?.phase)?.label ?? "观察"}</p><small>{currentRound ? branch.status === "waiting_input" ? "仅处理当前分支，其他成果保留。" : branch.objective : "历史轮次不使用当前分支状态推断当时结果。"}</small></section>{currentRound && branch.status === "waiting_input" ? <button type="button" className="cap-primary" disabled={readOnly} onClick={() => matchingDecision ? onReview(matchingDecision) : onReviewBranch(branch)}>处理这一项<IconArrowRight /></button> : resolvedFindings[0] ? <button type="button" onClick={() => onReview(findingReviewRequest(resolvedFindings[0], 0, round?.round_number ?? null, run.decision_records, run.decision_requests))}>核对本轮发现<IconEye /></button> : null}</div></details>;
+  })}</div><section className="cap-record-artifact"><IconFileDescription /><div><b>{artifact ? `${artifact.title} v${artifact.version}` : "本轮尚无成果版本"}</b><p>{artifact?.summary ?? "已有历史成果不会被覆盖。"}</p></div><button type="button" onClick={onVersions}>查看版本历史<IconChevronRight /></button></section><details className="cap-disclosure"><summary>服务端事件 <span>{run.events.length} 条</span><IconChevronDown /></summary><ol className="cap-event-list">{run.events.map((event) => <li key={event.sequence}><b>{event.label}</b><span>{event.detail}</span></li>)}</ol></details><details className="cap-disclosure"><summary>模型调用回执<IconChevronDown /></summary><Receipt receipt={round?.model_receipt ?? null} label="Planner" /><Receipt receipt={round?.analysis_receipt ?? null} label="Analyst" /></details></main></div>;
+}
+
+function CollaborationOverview({
+  run,
+  files,
+  readOnly,
+  starting,
+  onExecuteWorkers,
+  onOpenHistory,
+  onReviewPrimary,
+  onProgress,
+}: {
+  run: HarnessRun;
+  files: HarnessFile[];
+  readOnly: boolean;
+  starting: boolean;
+  onExecuteWorkers: () => Promise<boolean>;
+  onOpenHistory: () => void;
+  onReviewPrimary?: () => void;
+  onProgress?: () => void;
+}) {
+  const admission = run.topology_admission;
+  const mode = admission?.mode ?? null;
+  const route = mode === "adaptive_readonly_workers" ? "Adaptive Swarm" : mode === "fixed_workflow" ? "固定流程" : mode === "single_controller" ? "单一流程" : "等待服务端形成路线";
+  const fileLabel = (fileRef: string) => files.find((file) => file.file_ref === fileRef)?.display_label ?? "批准来源";
+  const sourceRefs = Array.from(new Set(run.branches.flatMap((branch) => branch.input_file_refs)));
+  const adopted = run.contributions.filter((item) => item.gate_status === "adopted").length;
+  const waiting = run.contributions.filter((item) => item.gate_status === "waiting").length;
+  const completed = run.branches.filter((branch) => branch.status === "completed").length;
+  const stageClass = (condition: boolean, pending = false) => condition ? "is-complete" : pending ? "is-active" : "is-waiting";
+  const packagesComplete = run.work_units.length > 0 && completed >= run.branches.length;
+  const contributionsComplete = run.contributions.length > 0 && waiting === 0 && adopted >= run.contributions.length;
+  const adaptiveComplete = mode === "adaptive_readonly_workers"
+    && run.status === "completed"
+    && run.branches.length > 0
+    && run.branches.every((branch) => branch.status === "completed")
+    && run.contributions.length > 0
+    && run.contributions.every((contribution) => contribution.gate_status === "adopted")
+    && run.artifact_versions.length > 0;
+  const awaitingWorkerConfirmation = mode === "adaptive_readonly_workers" && run.work_units.length > 0 && run.worker_runs.length === 0 && run.contributions.length === 0 && run.status === "waiting_input";
+  const packageStatus = !run.work_units.length
+    ? "尚未形成工作包"
+    : packagesComplete
+      ? `${run.work_units.length} 个工作包 · 已完成`
+      : awaitingWorkerConfirmation
+        ? `${run.work_units.length} 个工作包 · 计划已拆解，等待确认`
+      : completed === 0
+        ? `${run.work_units.length} 个工作包 · 已拆解，正在处理`
+        : `${run.work_units.length} 个工作包 · 正在处理 · ${completed}/${run.branches.length} 已完成`;
+  const isAdaptive = mode === "adaptive_readonly_workers";
+  const readyBranches = new Set(run.rounds.at(-1)?.next_step?.ready_branch_ids ?? []);
+  const graphUnits = run.work_units.map((unit) => ({ unit, branch: run.branches.find((branch) => branch.branch_id === unit.branch_id) }));
+  const unitByRef = new Map<string, typeof graphUnits[number]>();
+  graphUnits.forEach((item) => {
+    unitByRef.set(item.unit.work_unit_id, item);
+    unitByRef.set(item.unit.branch_id, item);
+    unitByRef.set(item.unit.unit_id, item);
+  });
+  const resolveUnit = (ref: string) => unitByRef.get(ref);
+  const depthMemo = new Map<string, number>();
+  const depthFor = (unitId: string, trail = new Set<string>()): number => {
+    const cached = depthMemo.get(unitId);
+    if (cached !== undefined) return cached;
+    if (trail.has(unitId)) return 0;
+    const item = unitByRef.get(unitId);
+    const parents = item?.unit.depends_on.map(resolveUnit).filter((parent): parent is typeof item => Boolean(parent)) ?? [];
+    const depth = parents.length ? 1 + Math.max(...parents.map((parent) => depthFor(parent.unit.work_unit_id, new Set([...trail, unitId])))) : 0;
+    depthMemo.set(unitId, depth);
+    return depth;
+  };
+  const graphLevels = Array.from({ length: graphUnits.length ? Math.max(...graphUnits.map((item) => depthFor(item.unit.work_unit_id))) + 1 : 0 }, (_, level) => graphUnits.filter((item) => depthFor(item.unit.work_unit_id) === level));
+  const graphColumns = Math.max(1, ...graphLevels.map((level) => level.length));
+  const graphLevelStep = 244;
+  const graphNodeHalfHeight = 96;
+  const graphHeight = Math.max(116, graphLevels.length * graphLevelStep);
+  const graphPositions = new Map(graphUnits.map((item) => {
+    const level = depthFor(item.unit.work_unit_id);
+    const index = graphLevels[level]?.findIndex((candidate) => candidate.unit.work_unit_id === item.unit.work_unit_id) ?? 0;
+    return [item.unit.work_unit_id, { x: ((index + (graphColumns - graphLevels[level].length) / 2 + 0.5) / graphColumns) * 100, y: level * graphLevelStep + graphNodeHalfHeight, level }] as const;
+  }));
+  const graphEdges = graphUnits.flatMap((item) => item.unit.depends_on.map((dependency) => {
+    const parent = resolveUnit(dependency);
+    const from = parent && graphPositions.get(parent.unit.work_unit_id);
+    const to = graphPositions.get(item.unit.work_unit_id);
+    if (!from || !to) return null;
+    const fromY = from.y + graphNodeHalfHeight;
+    const toY = to.y - graphNodeHalfHeight;
+    return { key: `${parent.unit.work_unit_id}:${item.unit.work_unit_id}`, fromId: parent.unit.work_unit_id, toId: item.unit.work_unit_id, from: { x: from.x, y: fromY }, to: { x: to.x, y: toY }, midY: fromY + (toY - fromY) / 2 };
+  }).filter((edge): edge is { key: string; fromId: string; toId: string; from: { x: number; y: number }; to: { x: number; y: number }; midY: number } => Boolean(edge)));
+  const readyBranchItems = run.branches.filter((branch) => readyBranches.has(branch.branch_id));
+  const workerConfirmationRequired = isAdaptive && run.status === "waiting_input" && readyBranchItems.length > 0;
+  const waitingWithoutReadyWave = isAdaptive
+    && run.status === "waiting_input"
+    && !workerConfirmationRequired
+    && run.branches.some((branch) => branch.status === "waiting_input");
+  const branchStatusText = (status: string) => ({ ready: workerConfirmationRequired ? "下一波待确认 / 可执行" : "可执行", running: "处理中", reserved: "已预留调用", returned: "已返回，待核对", waiting: "等待确认", waiting_input: "等待处理", blocked: "等待前置工作", failed: "执行失败", rejected: "已拒绝", completed: "已完成", adopted: "已采用", pending: "待处理" }[status] ?? "状态待确认");
+  const displayBranchStatus = (branch: LoopBranch) => branchStatusText(readyBranches.has(branch.branch_id) ? "ready" : branch.status);
+  const pendingRequests = run.decision_requests.filter((request) => ["pending", "deferred"].includes(request.state ?? "pending"));
+  const evidenceGaps = (run.rounds.at(-1)?.evidence_gaps ?? []).filter((gap) => !gap.branch_id || run.branches.some((branch) => branch.branch_id === gap.branch_id && branch.status !== "completed"));
+  const waitingUnits = graphUnits.filter(({ branch, unit }) => branch?.status === "waiting_input" || unit.state === "waiting" || unit.state === "waiting_input");
+  const blockedUnits = graphUnits.filter(({ branch, unit }) => branch?.status === "blocked" || unit.state === "blocked");
+  const waitingContributionBranches = new Set(waitingUnits.map(({ unit }) => unit.branch_id));
+  const impacts = [
+    ...(workerConfirmationRequired ? [{ key: "ready-confirmation", title: "下一波已就绪，等待你确认", detail: `将启动：${readyBranchItems.map((branch) => branch.title).join("、")}`, tone: "decision" }] : []),
+    ...waitingUnits.map(({ branch, unit }) => ({ key: unit.work_unit_id, title: branch?.title ?? "工作包等待处理", detail: waitingWithoutReadyWave ? "当前不属于可执行 Worker 波次；请回到工作进展选择这一后续分支。" : "等待真实的人工确认或服务端继续。", tone: "waiting" })),
+    ...run.contributions.filter((contribution) => contribution.gate_status === "waiting" && !waitingContributionBranches.has(contribution.branch_id)).map((contribution) => ({ key: contribution.contribution_id, title: run.branches.find((branch) => branch.branch_id === contribution.branch_id)?.title ?? "贡献等待核对", detail: "贡献尚未通过服务端证据核对，相关下游不会提前执行。", tone: "waiting" })),
+    ...blockedUnits.map(({ branch, unit }) => ({ key: unit.work_unit_id, title: branch?.title ?? "下游工作包", detail: "前置工作包尚未完成，当前不会提前执行。", tone: "blocked" })),
+    ...(pendingRequests.length ? [{ key: "decision-request", title: "有一项人工决定待处理", detail: "请从证据核对页选择下一步；当前不执行外部动作。", tone: "decision" }] : []),
+    ...evidenceGaps.map((gap) => ({ key: gap.gap_id, title: gap.label || "来源定位待补", detail: gap.detail, tone: "gap" })),
+  ];
+  const openWorkerReceipts = () => {
+    const details = document.getElementById("adaptive-worker-receipts") as HTMLDetailsElement | null;
+    if (details) { details.open = true; details.scrollIntoView({ behavior: "smooth", block: "start" }); }
+  };
+  const routeReason = mode === "fixed_workflow" ? "本次采用固定流程，Adaptive Swarm 未启动" : mode === "single_controller" ? "本次由单一主控顺序推进，Adaptive Swarm 未启动" : admission?.reasons?.at(-1) ?? "路线尚未由服务端确认。";
+  return <div className={`collaboration-overview adaptive-collaboration-shell${isAdaptive ? " is-adaptive" : " is-fixed"}`} data-testid="collaboration-overview">
+    <header className="cap-collaboration-heading"><div><h3>{isAdaptive ? "本次采用协作处理" : mode === "fixed_workflow" ? "本次采用固定流程" : "本次由单一主控推进"}</h3><p>{admission?.reasons.at(-1) ?? "等待服务端形成路线。"}</p></div><div>{isAdaptive ? <><span><IconShieldCheck />受限只读 Worker</span><span>单进程</span><span>每波最多 3 个</span></> : <span>Adaptive Swarm 未启动</span>}</div></header>
+    <dl className="swarm-fact-strip" aria-label="协作准入与采用事实" data-testid="swarm-fact-strip">
+      <div><dt>服务端准入</dt><dd>{admission ? `${admission.independent_branch_count} 个独立工作包 · ${admission.source_span} 份来源` : "尚无准入结论"}</dd><p>{workerConfirmationRequired ? `本批 ${readyBranchItems.length} 项等待确认；准入时剩余 ${admission?.remaining_model_calls ?? 0} 次调用。` : routeReason}</p></div>
+      <div><dt>Worker 实际回执</dt><dd>{run.worker_runs.filter((worker) => worker.model_called).length} 条已调用 · {run.worker_runs.filter((worker) => worker.output_used).length} 条已采用</dd><p>{run.worker_runs.length ? "调用和采用分别记账；返回文本不等于进入成果。" : "尚无 Worker 返回回执，不能从依赖图推断已执行。"}</p></div>
+      <div><dt>累计贡献候选</dt><dd>{adopted} / {run.contributions.length} 份已采用</dd><p>{run.contributions.filter((item) => item.gate_status === "rejected").length} 份被拒绝 · {waiting} 份待核对。来源与位置核对不等于业务正确性证明。</p></div>
+    </dl>
+    <div className="adaptive-collaboration-layout">
+      <aside className="adaptive-stage-sidebar" aria-label="协作阶段导航">
+        <span className="adaptive-sidebar-label">工作路径</span>
+        <ol className="collaboration-stage-rail" aria-label="协作处理阶段">
+          <li className={stageClass(Boolean(admission), !admission)}><span>1</span><div><b>任务准入</b><small>{admission ? `已选 ${route}` : "等待服务端判断"}</small></div></li>
+          <li className={stageClass(packagesComplete, run.work_units.length > 0 && !packagesComplete)}><span>2</span><div><b>工作包</b><small>{packageStatus}</small></div></li>
+          <li className={stageClass(contributionsComplete, run.contributions.length > 0 && !contributionsComplete)}><span>3</span><div><b>贡献汇合</b><small>{run.contributions.length ? `${adopted} 个已汇合 · ${waiting} 个待核对` : "等待服务端继续"}</small></div></li>
+          <li className={stageClass(run.artifact_versions.length > 0)}><span>4</span><div><b>核验与成果</b><small>{run.artifact_versions.length ? `已形成 ${run.artifact_versions.length} 个成果版本` : "等待核验结果"}</small></div></li>
+        </ol>
+        <div className="adaptive-sidebar-current"><span>当前协作</span><strong>{isAdaptive ? "Adaptive Swarm" : route}</strong><small>{isAdaptive ? "受限只读 Worker" : "单一服务端流程"}</small></div>
+      </aside>
+      <main className="adaptive-collaboration-main">
+        <header className="collaboration-overview-header">
+          <div><h3>任务如何协作完成</h3></div>
+          {isAdaptive && !readOnly && (adaptiveComplete
+            ? <span className="collaboration-complete-state" role="status"><IconCircleCheck aria-hidden="true" />协作已完成</span>
+            : waitingWithoutReadyWave
+              ? <span className="collaboration-waiting-state" role="status"><IconClock aria-hidden="true" />请回到工作进展选择后续分支</span>
+              : null)}
+        </header>
+        <details className="collaboration-disclosure cap-route-details"><summary>路线准入依据<IconChevronDown /></summary><section className="adaptive-route-explanation" aria-label="采用此路线的原因"><p>{routeReason}</p><p>{isAdaptive ? "单进程、顺序分波；每波最多 3 个只读 Worker。" : "本次未派发 Worker。"}外部动作：none · 不执行。</p></section><div className="collaboration-route-options" aria-label="三种协作路线">
+          <article className={mode === "single_controller" ? "is-selected" : ""}><span>01</span><div><b>单一流程</b><p>一个主控按顺序推进，适合依赖清晰的工作。</p></div></article>
+          <article className={mode === "fixed_workflow" ? "is-selected" : ""}><span>02</span><div><b>固定流程</b><p>本次采用固定流程，Adaptive Swarm 未启动。</p></div></article>
+          <article className={mode === "adaptive_readonly_workers" ? "is-selected" : ""}><span>03</span><div><b>Adaptive Swarm</b><p>仅在确认后按批处理可独立工作的资料。</p></div></article>
+        </div></details>
+        {isAdaptive ? <section className="adaptive-dag-panel" aria-label="工作包依赖图">
+          <header><span>{run.work_units.length} 个工作包</span><small>{graphEdges.length} 条依赖关系</small></header>
+          {graphUnits.length ? <div className="adaptive-dag" data-testid="adaptive-workunit-dag" style={{ height: graphHeight }}>
+            <svg className="adaptive-dag-edges" viewBox={`0 0 100 ${graphHeight}`} preserveAspectRatio="none" aria-hidden="true">
+              <defs><marker id="adaptive-dag-arrow" markerUnits="userSpaceOnUse" markerWidth="1.3" markerHeight="7" refX="6" refY="3.5" viewBox="0 0 6 7" orient="auto"><path d="M0,0 L6,3.5 L0,7 Z" fill="#8290a3" /></marker></defs>
+              {graphEdges.map((edge) => <path className="adaptive-dag-edge" data-from={edge.fromId} data-to={edge.toId} data-dependency="depends_on" data-edge-kind="parent-to-dependent" d={`M ${edge.from.x} ${edge.from.y} C ${edge.from.x} ${edge.midY}, ${edge.to.x} ${edge.midY}, ${edge.to.x} ${edge.to.y}`} key={edge.key} markerEnd="url(#adaptive-dag-arrow)" />)}
+            </svg>
+            <div className="adaptive-dag-levels">{graphLevels.map((level, levelIndex) => <div className="adaptive-dag-level" key={levelIndex}>
+              {level.map(({ unit, branch }) => <article className={`adaptive-dag-node is-${readyBranches.has(unit.branch_id) ? "ready" : unit.state}`} key={unit.work_unit_id} style={{ width: `calc(${100 / graphColumns}% - 18px)` }}>
+                <div><span>{graphUnits.findIndex((item) => item.unit.work_unit_id === unit.work_unit_id) + 1}</span><strong>{branch?.title ?? "工作包"}</strong></div>
+                <b className="cap-workunit-state">{["adopted", "completed"].includes(unit.state) ? <IconCircleCheck /> : ["waiting", "waiting_input", "blocked"].includes(unit.state) ? <IconClock /> : <IconCircleDot />}{readyBranches.has(unit.branch_id) ? branchStatusText("ready") : branchStatusText(unit.state)}</b>
+                <small>{unit.approved_file_refs.length} 份资料</small>
+                <small className="cap-workunit-dependency" title={unit.depends_on.map((ref) => resolveUnit(ref)?.branch?.title ?? "前置工作包").join("、")}>{unit.depends_on.length ? `依赖 ${unit.depends_on.length}：${unit.depends_on.map((ref) => { const parent = resolveUnit(ref); const index = graphUnits.findIndex((item) => item.unit.work_unit_id === parent?.unit.work_unit_id); return index >= 0 ? `工作包 ${index + 1}` : "前置工作包"; }).join("、")}` : "独立工作包（根）"}</small>
+              </article>)}
+            </div>)}</div>
+          </div> : <p className="adaptive-empty">服务端没有返回工作包依赖图。</p>}
+        </section> : <section className="adaptive-static-route" aria-label="固定流程说明"><strong>{route}</strong><p>{routeReason}</p></section>}
+        <section className="adaptive-result-bar" aria-label="协作结果摘要"><div><span>结果返回</span><strong>{run.last_commit ? "已提交当前成果" : run.artifact_versions.length ? "成果已返回" : "尚无成果"}</strong></div><div><span>贡献采用</span><strong>{run.contributions.length ? `${adopted}/${run.contributions.length} 已采用` : "等待回执"}</strong></div><div><span>待确认</span><strong>{impacts.length ? `${impacts.length} 项影响` : "无待处理事项"}</strong></div><div><span>成果版本</span><strong>{run.artifact_versions.length ? `Artifact v${run.artifact_versions.at(-1)?.version ?? 1}` : "尚无版本"}</strong></div><button type="button" className="adaptive-receipt-entry" onClick={openWorkerReceipts}><IconRoute aria-hidden="true" />Worker 回执</button></section>
+        <details className="collaboration-disclosure"><summary><IconGitCommit aria-hidden="true" />查看工作包明细<span>{run.branches.length} 个工作包</span><IconChevronDown aria-hidden="true" /></summary><div className="collaboration-package-list">{run.branches.length ? run.branches.map((branch) => <article key={branch.branch_id}><div><b>{branch.title}</b><strong>{displayBranchStatus(branch)}</strong></div><p>{branch.objective}</p><small>{branch.input_file_refs.map(fileLabel).join("、") || "服务端将从资料库选择来源"}</small></article>) : <p>服务端尚未形成工作包。</p>}</div></details>
+        <details className="collaboration-disclosure"><summary><IconFileDescription aria-hidden="true" />查看来源范围<span>{sourceRefs.length} 份资料</span><IconChevronDown aria-hidden="true" /></summary><div className="collaboration-source-list">{sourceRefs.length ? sourceRefs.map((ref) => <span key={ref}>{fileLabel(ref)}</span>) : <p>服务端尚未形成来源列表。</p>}</div></details>
+        <details id="adaptive-worker-receipts" className="collaboration-disclosure"><summary><IconRoute aria-hidden="true" />查看执行回执<span>{run.worker_runs.length + run.contributions.length} 条记录</span><IconChevronDown aria-hidden="true" /></summary><div className="collaboration-receipt-list">{run.worker_runs.length || run.contributions.length ? [...run.worker_runs.map((worker) => <article key={worker.worker_run_id}><b>{worker.outcome === "adopted" ? "已汇合" : ["failed", "rejected"].includes(worker.outcome) ? (worker.outcome === "failed" ? "执行失败" : "已拒绝") : "待核对"}</b><span>{worker.summary}</span><small>{worker.model_called ? "模型已调用" : "未调用"} · {worker.output_used ? "已采用" : "未采用"}</small></article>), ...run.contributions.map((contribution) => <article key={contribution.contribution_id}><b>{contribution.gate_status === "adopted" ? "已汇合" : contribution.gate_status === "waiting" ? "待核对" : contribution.gate_status === "rejected" ? "已拒绝" : "未采用"}</b><span>{contribution.summary}</span><small>{contribution.approved_file_refs.map(fileLabel).join("、") || "批准来源未显示"}</small></article>)] : <p>尚未有执行回执。</p>}</div></details>
+      </main>
+      <aside className="adaptive-impact-panel" aria-label="当前影响"><header><div><span>当前影响</span><h4>{impacts.length ? "有事项牵连" : "当前没有阻塞"}</h4></div>{impacts.length ? <IconAlertTriangle aria-hidden="true" /> : <IconCircleCheck className="is-complete-icon" aria-hidden="true" />}</header>{impacts.length ? <><ul>{impacts.map((impact) => <li className={`is-${impact.tone}`} key={impact.key}><b>{impact.title}</b><p>{impact.detail}</p></li>)}</ul>{workerConfirmationRequired && <button type="button" className="adaptive-impact-action" onClick={() => void onExecuteWorkers()} disabled={readOnly || starting}><IconPlayerPlay aria-hidden="true" />{starting ? "正在启动" : run.worker_runs.length ? "继续下一批" : "确认并开始协作"}</button>}{!workerConfirmationRequired && onReviewPrimary && <button type="button" className="adaptive-impact-action" onClick={onReviewPrimary} disabled={readOnly || starting}>处理待确认项<IconArrowRight /></button>}{waitingWithoutReadyWave && onProgress && <button type="button" className="cap-impact-progress" onClick={onProgress}>返回任务进展<IconChevronRight /></button>}</> : <div className="adaptive-impact-complete"><IconCircleCheck aria-hidden="true" /><strong>协作路径畅通</strong><p>没有等待中的工作包、人工决定或证据缺口。</p></div>}</aside>
+    </div>
+  </div>;
+}
+
 function LoopView({
   run,
+  taskPointer,
+  taskPointerError,
   files,
   controlBusy,
   onControl,
   onReview,
   onStartTask,
+  onContinueTask,
+  onOpenCurrentTask,
+  onRetryTaskPointer,
+  onExecuteWorkers,
+  onOpenAdaptiveWorkbench,
+  adaptiveActionLabel,
+  readOnly,
   starting,
 }: {
   run: HarnessRun | null;
+  taskPointer: TaskPointer | null;
+  taskPointerError: string;
   files: HarnessFile[];
   controlBusy: LoopCommand | null;
   onControl: (command: LoopCommand, options?: LoopControlOptions) => Promise<boolean>;
   onReview: (request: EvidenceReviewRequest) => void;
   onStartTask: (instruction: string) => Promise<boolean>;
+  onContinueTask: (branchId: string, instruction?: string) => Promise<boolean>;
+  onOpenCurrentTask: () => Promise<boolean>;
+  onRetryTaskPointer: () => void;
+  onExecuteWorkers: () => Promise<boolean>;
+  onOpenAdaptiveWorkbench: () => void;
+  adaptiveActionLabel?: string;
+  readOnly: boolean;
   starting: boolean;
 }) {
   const [selectedRoundNumber, setSelectedRoundNumber] = useState(1);
@@ -4371,12 +5632,23 @@ function LoopView({
 
   const selectedRound = run.rounds.find((item) => item.round_number === selectedRoundNumber) ?? run.rounds.at(-1) ?? null;
   const terminal = TERMINAL_STATUSES.has(run.status);
-  const canResume = run.control_state === "paused" || run.control_state === "pause_requested";
+  const canResume = !readOnly && (run.control_state === "paused" || run.control_state === "pause_requested");
   const waitingForBranch = run.status === "waiting_input";
-  const canPause = !terminal && run.control_state === "running";
-  const canSteer = !terminal && ![ "stop_requested", "stopped" ].includes(run.control_state);
+  const canPause = !readOnly && !terminal && run.control_state === "running";
+  const canSteer = !readOnly && !terminal && ![ "stop_requested", "stopped" ].includes(run.control_state);
   const fileLabel = (fileRef: string) => files.find((file) => file.file_ref === fileRef)?.display_label ?? "允许范围内的文件";
   const roundBranches = selectedRound ? run.branches.filter((branch) => selectedRound.branch_ids.includes(branch.branch_id)) : [];
+  const uncoveredRequirements = selectedRound?.uncovered_requirements ?? [];
+  const deferredRequirements = selectedRound?.deferred_requirements ?? [];
+  const plannedUnitIds = new Set(selectedRound?.plan.map((unit) => unit.node_id) ?? []);
+  const executableBranches = roundBranches.filter((branch) => plannedUnitIds.has(branch.unit_id));
+  const deferredBranches = roundBranches.filter((branch) => !plannedUnitIds.has(branch.unit_id));
+  const advertisedReadyBranches = new Set(selectedRound?.next_step?.ready_branch_ids ?? []);
+  const runnableWorkerBranchCount = run.branches.filter((branch) => (
+    branch.status === "running"
+    && (advertisedReadyBranches.size === 0 || advertisedReadyBranches.has(branch.branch_id))
+  )).length;
+  const canExecuteWorkerWave = runnableWorkerBranchCount >= (run.worker_runs.length === 0 ? 2 : 1);
   const currentArtifactVersion = run.last_commit?.artifact_version ?? null;
   const preservedArtifactVersion = run.artifact_versions.at(-1)?.version ?? currentArtifactVersion;
   const recoveryKind = selectedRound?.next_step?.recovery_kind ?? null;
@@ -4386,14 +5658,14 @@ function LoopView({
     && selectedRound?.next_step?.decision === "budget_exhausted"
     && Boolean(recoveryKind);
   const decisionRequests = uniqueDecisionRequests([
-    ...run.decision_requests,
     ...(selectedRound?.next_step?.decision_requests ?? []),
+    ...run.decision_requests,
   ]);
   const pendingResolutions = (selectedRound?.next_step?.evidence_resolutions ?? []).filter((resolution) => {
-    const request = resolution.decision_request ?? decisionRequests.find((item) => item.resolution_id === resolution.resolution_id || item.finding_id === resolution.finding_id);
+    const request = decisionRequests.find((item) => item.resolution_id === resolution.resolution_id) ?? resolution.decision_request;
     const record = [...run.decision_records].reverse().find((item) => item.resolution_id === resolution.resolution_id);
-    const decisionState = resolution.decision_status ?? request?.state ?? (record?.action === "accept" ? "accepted" : record?.action === "decline" ? "declined" : record?.action === "cancel" ? "cancelled" : record?.action === "defer" ? "deferred" : null);
-    return !["accepted", "declined", "cancelled", "rejected"].includes(decisionState ?? "");
+    const decisionState = request?.state ?? resolution.decision_status ?? (record?.action === "accept" ? "accepted" : record?.action === "decline" ? "declined" : record?.action === "cancel" ? "cancelled" : record?.action === "defer" ? "deferred" : null);
+    return !["accepted", "declined", "cancelled", "rejected", "stale"].includes(decisionState ?? "");
   });
   const hasOpenSourceChoice = pendingResolutions.some((resolution) => resolution.status === "ambiguous" && resolution.candidates.length > 1);
   const useUserLanguageLocationRecovery = recoveryKind === "source_location" && !hasOpenSourceChoice;
@@ -4460,13 +5732,13 @@ function LoopView({
     const branchInstruction = [
       run.instruction,
       `续办分支：${branch.title}`,
-      `本次以“${branch.objective}”作为任务目标。请从整个资料库自主查找完成这一目标所需的最小证据，逐条提供可唯一定位的原文位置。`,
-      sourceLabels.length > 0 ? `上次 Run 为该分支选择过：${sourceLabels.join("、")}。这些只是历史选择，不限制新 Run 重新检索整个资料库。` : "新 Run 仍可自主检索整个资料库。",
+      `本次只继续“${branch.objective}”这一未完成分支。服务端会冻结并核对该分支已批准的来源，逐条提供可唯一定位的原文位置。`,
+      sourceLabels.length > 0 ? `本分支批准来源：${sourceLabels.join("、")}。来源版本如有变化，只重新核对这些来源，不携带旧的采用事实。` : "本分支没有可携带的来源引用，将先停下等待服务端重新建立批准范围。",
       "若仍无法核对，请明确列出缺少的文件、版本、字段或记录，不要生成无法回到原文的结论。",
       userDirection ? `用户补充：${userDirection}` : "",
       "边界：只读分析，不修改原文件，不执行外部动作。",
     ].filter(Boolean).join("\n");
-    await onStartTask(branchInstruction);
+    await onContinueTask(branch.branch_id, branchInstruction);
   };
   const showGeneratedArtifacts = () => {
     document.getElementById("workspace-artifacts-title")?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -4474,7 +5746,7 @@ function LoopView({
 
   return <section className="loop-view" aria-labelledby="loop-view-title">
     <header className="loop-contract">
-      <div><span>Agent Control Loop</span><h2 id="loop-view-title">{run.contract.goal}</h2></div>
+      <div><span>完整执行记录</span><h2 id="loop-view-title">{run.contract.goal}</h2></div>
       <div className="loop-budget">
         <span><b>{run.budget.rounds_used}/{run.budget.max_rounds}</b>轮</span>
         <span><b>{run.budget.files_verified}</b>文件已核对</span>
@@ -4482,6 +5754,51 @@ function LoopView({
         <span><b>{Math.ceil(run.budget.elapsed_ms / 1000)}</b>秒</span>
       </div>
     </header>
+    <section className="loop-lineage-strip" aria-label="工作时间线" data-testid="task-lineage">
+      <div><span>工作时间线</span><strong>持续处理链 · 第 {run.run_sequence} 次</strong></div>
+      {taskPointerError && <div className="task-ledger-error"><small>{taskPointerError}</small><button type="button" onClick={onRetryTaskPointer} disabled={starting}><IconRefresh aria-hidden="true" />重试</button></div>}
+      {taskPointer && taskPointer.task_id === run.task_id && (taskPointer.current_run_id === run.run_id
+        ? <small data-testid="task-ledger-pointer">当前任务 · 版本 v{taskPointer.task_version}</small>
+        : <div className="task-ledger-history" data-testid="task-ledger-history"><small>历史记录 · 当前任务已进入第 {taskPointer.run_sequence} 次处理</small><button type="button" onClick={() => void onOpenCurrentTask()} disabled={starting}><IconRoute aria-hidden="true" />打开当前记录</button></div>)}
+      <p>{run.parent_run_id ? `本次是第 ${run.run_sequence} 次处理，承接上一条记录的${run.carried_branch_id ? "一个未完成分支" : "已批准成果引用"}。旧成果保留，本次只核对该分支的批准来源。` : "这是该任务的首次处理；后续未完成分支可以单独继续。"}</p>
+      {run.source_revision_changed && <p><b>来源版本已变化</b>：本段只重新核对批准分支材料，不携带旧的采用事实。</p>}
+      {run.parent_run_id && <small>新处理记录 · 保留成果{run.base_artifact_version ? ` v${run.base_artifact_version}` : ""} · 不修改原文件 · 外部动作：未发生</small>}
+    </section>
+    {run.topology_admission && <section className="loop-topology-admission" aria-label="服务端路线" data-testid="topology-admission">
+      <header><div><span>服务端路线</span><h3>{run.topology_admission.mode === "adaptive_readonly_workers" ? "已选择受限只读协作" : run.topology_admission.mode === "fixed_workflow" ? "本次采用固定流程" : "保持单一流程"}</h3></div><b>{run.topology_admission.independent_branch_count} 条独立分支</b></header>
+      <p>{run.topology_admission.reasons[run.topology_admission.reasons.length - 1] || "依据已校验计划选择执行方式。"}</p>
+      <div className="loop-topology-facts"><span><b>{run.topology_admission.work_unit_breadth}</b> 工作包</span><span><b>{run.topology_admission.source_span}</b> 份来源</span><span><b>{run.topology_admission.remaining_model_calls}</b> 次剩余调用</span><span><b>{run.topology_admission.remaining_time_seconds}</b> 秒剩余时间</span><span>外部动作：<b>未发生</b></span></div>
+      {run.topology_admission.mode === "adaptive_readonly_workers" && run.status === "waiting_input" && canExecuteWorkerWave && <div className="loop-worker-confirmation">
+        <small>{run.worker_runs.length === 0 ? "执行与准入分开；只有你明确确认后才会调用最多 3 个只读执行器。当前不会自动调用分析模型。" : "上一批结果已保留；仅对依赖已完成的下一批可执行分支继续调用。"}</small>
+        <div>
+          <button type="button" onClick={() => void onExecuteWorkers()} disabled={readOnly || starting || controlBusy !== null}><IconPlayerPlay aria-hidden="true" />{starting ? "正在启动" : run.worker_runs.length === 0 ? "确认并启动只读执行器" : "继续下一批只读执行器"}</button>
+          {run.worker_runs.length === 0 && <button type="button" className="is-secondary" onClick={() => void onControl("topology_override", { topologyMode: "single_controller" })} disabled={readOnly || starting || controlBusy !== null}><IconRoute aria-hidden="true" />改回单 Controller</button>}
+        </div>
+      </div>}
+      <button type="button" className="adaptive-workbench-launch" onClick={onOpenAdaptiveWorkbench}><IconRoute aria-hidden="true" />{adaptiveActionLabel ?? "打开 Adaptive Swarm 工作台"}</button>
+      {run.worker_runs.length > 0 && <details className="loop-worker-details"><summary>查看执行回执</summary><div className="loop-worker-receipts"><span>实际执行回执</span>{run.worker_runs.map((worker) => <div key={worker.worker_run_id}><b>{worker.outcome === "adopted" ? "已合入" : worker.outcome === "failed" ? "执行失败" : "待处理"}</b><span>{worker.summary}<small>来源：{worker.source_file_refs.map(fileLabel).join("、") || "批准来源未显示"}</small></span><small>{worker.model_called ? "模型已调用" : "未调用"} · {worker.output_used ? "已采用" : "未采用"} · {worker.elapsed_ms} ms</small></div>)}</div></details>}
+      {run.work_units.length > 0 && <details className="loop-worker-details"><summary>查看工作包与成果采用记录</summary><div className="loop-worker-ledger" data-testid="worker-ledger">
+        <span>工作包与成果采用记录</span>
+        {run.work_units.slice().sort((left, right) => left.branch_id.localeCompare(right.branch_id)).map((unit) => {
+          const branch = run.branches.find((item) => item.branch_id === unit.branch_id);
+          const dependencyLabels = unit.depends_on.map((dependency) => run.branches.find((item) => item.branch_id === dependency || item.unit_id === dependency)?.title).filter((title): title is string => Boolean(title));
+          const sourceLabels = unit.approved_file_refs.map(fileLabel);
+          const records = run.contributions.filter((item) => item.branch_id === unit.branch_id);
+          const latest = records[records.length - 1];
+          return <article key={unit.branch_id}>
+            <div><b>{branch?.title || "办公工作包"}</b><strong>{unit.state === "adopted" ? "已采用" : unit.state === "waiting" ? "已返回，待核对" : unit.state === "failed" ? "执行失败" : unit.state === "ready" ? "可执行" : unit.state === "running" ? "执行中" : unit.state === "blocked" ? "被依赖阻塞" : "待处理"}</strong></div>
+            <small>来源：{sourceLabels.join("、") || "批准来源未显示"}</small>
+            <small>{dependencyLabels.length ? `依赖：${dependencyLabels.join("、")}` : "依赖：无前序工作包"} · 第 {unit.attempt} 次尝试</small>
+            {latest && <p><span>候选成果已返回</span> · {latest.gate_status === "adopted" ? "已采用" : "未采用"} · {latest.gate_reason}{latest.artifact_version ? ` · 成果版本 v${latest.artifact_version}` : ""}</p>}
+            {!latest && unit.state === "failed" && unit.status_reason === "checkpoint_recovered_in_flight_worker" && <p>上次调用未确认返回，系统未自动重放；请确认后重新启动。</p>}
+            {latest && <small>{latest.approved_file_refs.map(fileLabel).join(" · ")} · 原文定位 {latest.evidence_anchors.length > 0 ? `${latest.evidence_anchors.length} 处` : "未形成"}</small>}
+          </article>;
+        })}
+        {run.contributions.some((item) => item.gate_status !== "adopted") && <small>部分结果可用：已采用成果与待核对/失败分支分别保留。</small>}
+      </div></details>}
+      {readOnly && <p className="read-only-banner" role="status"><IconEye aria-hidden="true" />历史记录只读查看，不接收实时事件，也不会执行控制或启动协作。</p>}
+    </section>}
+    {!run.topology_admission && <button type="button" className="adaptive-workbench-launch" onClick={onOpenAdaptiveWorkbench}><IconRoute aria-hidden="true" />{adaptiveActionLabel ?? "查看协作路线"}</button>}
     {run.status === "failed" && <section className="loop-failure-recovery" role="alert">
       <header><IconAlertTriangle aria-hidden="true" /><div><span>这次运行已停下，但不是死路</span><h3>{failedAtSourceLocation ? "候选结论无法唯一定位到原文" : "本轮结果没有通过服务端校验"}</h3></div></header>
       <ol>
@@ -4489,22 +5806,22 @@ function LoopView({
         <li><b>2</b><span><strong>没有发生</strong>候选结果未被采用，也没有修改文件或执行外部动作。</span></li>
         <li><b>3</b><span><strong>建议这样继续</strong>{failedAtSourceLocation ? "缩小到一个分支，用更长且唯一的原文重新核对。" : "编辑上方任务目标，或按推荐的最小范围重新运行。"}</span></li>
       </ol>
-      <footer><span>{run.validation_errors[0] || "服务端已安全停止本轮任务。"}</span><button type="button" disabled={starting} onClick={() => void onStartTask(retryInstruction)}><IconRefresh aria-hidden="true" />{starting ? "正在重建任务" : "缩小范围重新核对"}</button></footer>
+      <footer><span>{run.validation_errors[0] || "服务端已安全停止本轮任务。"}</span><button type="button" disabled={readOnly || starting} onClick={() => void onStartTask(retryInstruction)}><IconRefresh aria-hidden="true" />{starting ? "正在重建任务" : "缩小范围重新核对"}</button></footer>
     </section>}
     {boundedTerminalRecovery && sourceLocationPresentation !== "terminal" && <section className="loop-terminal-recovery" aria-labelledby="terminal-recovery-title">
       <header><IconAlertTriangle aria-hidden="true" /><div><span>预算停止后的下一步</span><h3 id="terminal-recovery-title">当前 Run 已到预算边界，不能继续原地运行</h3><p><b>停止原因：{run.budget.stop_reason || "剩余预算不足以完成下一步"}。</b> 这不是整项工作丢失。旧 Run、调用回执和成果版本保持不变；请选择一个未完成分支，以它为目标创建新的独立 Run。</p></div></header>
       <div className="source-recovery-facts"><span><b>只影响</b>{terminalRecoveryBranches.length} 条尚未完成的分支</span><span><b>已保留</b>Plan、调用回执、分支状态与{preservedArtifactVersion ? `成果 v${preservedArtifactVersion}` : "阶段成果"}</span><span><b>未发生</b>原文件修改或外部动作</span></div>
       <label><span>补充给新任务的方向（可选）</span><textarea value={recoveryDraft} onChange={(event) => setRecoveryDraft(event.target.value)} placeholder="例如：先核对上线配置清单与功能测试报告中的版本和日期字段" /></label>
-      <div className="source-recovery-branches">{terminalRecoveryBranches.map((branch, index) => <article key={branch.branch_id}><div><b>{index === 0 ? "最小续办分支" : "可单独续办"}</b><h4>{branch.title}</h4><p>{branch.objective}</p><small>{branch.input_file_refs.length > 0 ? branch.input_file_refs.map(fileLabel).join(" · ") : "由 Agent 在整个资料库中重新选证"}</small></div><button type="button" disabled={starting} onClick={() => void startBranchRecoveryRun(branch)}><IconRefresh aria-hidden="true" />{starting ? "正在创建" : "用此分支创建新任务"}</button></article>)}</div>
-      <footer><IconShieldCheck aria-hidden="true" /><span>这是新的 Task Contract，不会覆盖或假装续跑旧 Run；新 Run 仍由服务端冻结整库索引并重新校验证据。</span></footer>
+      <div className="source-recovery-branches">{terminalRecoveryBranches.map((branch, index) => <article key={branch.branch_id}><div><b>{index === 0 ? "最小续办分支" : "可单独续办"}</b><h4>{branch.title}</h4><p>{branch.objective}</p><small>{branch.input_file_refs.length > 0 ? branch.input_file_refs.map(fileLabel).join(" · ") : "由 Agent 在整个资料库中重新选证"}</small></div><button type="button" disabled={readOnly || starting} onClick={() => void onContinueTask(branch.branch_id, recoveryDraft.trim() || branch.objective)}><IconRefresh aria-hidden="true" />{starting ? "正在创建" : "继续未完成任务"}</button></article>)}</div>
+      <footer><IconShieldCheck aria-hidden="true" /><span>这是同一任务的新 Run，不会覆盖或假装续跑旧 Run；只核对该未完成分支的批准来源，旧成果和回执保持不变。</span></footer>
     </section>}
     {!boundedTerminalRecovery && <section className="loop-controls" aria-label="人工控制">
       <div className="loop-control-actions">
-        <button type="button" onClick={() => void onControl(canResume ? "resume" : "pause")} disabled={controlBusy !== null || terminal || waitingForBranch || (!canResume && !canPause)}>
+          <button type="button" onClick={() => void onControl(canResume ? "resume" : "pause")} disabled={readOnly || controlBusy !== null || terminal || waitingForBranch || (!canResume && !canPause)}>
           {canResume ? <IconPlayerPlay aria-hidden="true" /> : <IconPlayerPause aria-hidden="true" />}
           {waitingForBranch ? "请选择待处理分支" : controlBusy === "pause" || controlBusy === "resume" ? "正在提交" : canResume ? "继续" : "暂停"}
         </button>
-        <button type="button" className="is-stop" onClick={() => void onControl("stop")} disabled={controlBusy !== null || terminal}><IconPlayerStop aria-hidden="true" />结束并保留现有结果</button>
+        <button type="button" className="is-stop" onClick={() => void onControl("stop")} disabled={readOnly || controlBusy !== null || terminal}><IconPlayerStop aria-hidden="true" />结束并保留现有结果</button>
       </div>
       <form onSubmit={async (event) => {
         event.preventDefault();
@@ -4518,17 +5835,17 @@ function LoopView({
       {run.control_state === "paused" && <p>Loop 已暂停，现有轮次、引用和预算都已保留。</p>}
       {run.control_state === "stop_requested" && <p>正在到达停止安全点，不会启动新的模型调用。</p>}
     </section>}
-    <nav className="loop-round-tabs" aria-label="研究轮次">
+    <nav className="loop-round-tabs" aria-label="处理阶段">
       {run.rounds.length ? run.rounds.map((round) => <button type="button" key={round.round_number} className={round.round_number === selectedRound?.round_number ? "is-active" : ""} onClick={() => setSelectedRoundNumber(round.round_number)}>
         <span>{round.status === "completed" ? <IconCheck aria-hidden="true" /> : round.round_number}</span>
-        <b>第 {round.round_number} 轮</b>
+        <b>阶段 {round.round_number}</b>
         <small>{round.round_number === selectedRound?.round_number && sourceLocationPresentation ? selectedRoundGateLabel : round.next_step ? gateLabel(round.next_step.decision) : LOOP_PHASES.find((phase) => phase.key === round.phase)?.label}</small>
       </button>) : <span>服务端正在建立第一轮。</span>}
     </nav>
     {(run.workspace_artifacts.length > 0 || run.effect_receipts.length > 0) && <WorkspaceArtifactSection artifacts={run.workspace_artifacts} receipts={run.effect_receipts} />}
     {run.narrative_reconciliation && <NarrativeReconciliationPanel reconciliation={run.narrative_reconciliation} />}
     {selectedRound && <article className="loop-round-detail">
-      <header><div><span>本轮问题</span><h3>{selectedRound.question}</h3></div><b>{selectedRoundGateLabel}</b></header>
+      <header><div><span>当前问题</span><h3>{selectedRound.question}</h3></div><b>{selectedRoundGateLabel}</b></header>
       <ol className="loop-phase-rail">
         {LOOP_PHASES.slice(0, 5).map((phase, index) => {
           const activeIndex = LOOP_PHASES.findIndex((item) => item.key === selectedRound.phase);
@@ -4536,14 +5853,16 @@ function LoopView({
           return <li key={phase.key} className={complete ? "is-complete" : index === activeIndex ? "is-active" : ""}><span>{complete ? <IconCheck aria-hidden="true" /> : index + 1}</span><b>{phase.label}</b></li>;
         })}
       </ol>
-      {selectedRound.input_file_refs.length > 0 && <section className="loop-round-files"><span>Agent 本轮自主选择</span>{selectedRound.selection_reason && <p>{selectedRound.selection_reason}</p>}<div>{selectedRound.input_file_refs.map((ref) => <b key={ref}>{fileLabel(ref)}</b>)}</div></section>}
+      {selectedRound.input_file_refs.length > 0 && <section className="loop-round-files"><span>Agent 本次自动选择</span>{selectedRound.selection_reason && <p>{selectedRound.selection_reason}</p>}<div>{selectedRound.input_file_refs.map((ref) => <b key={ref}>{fileLabel(ref)}</b>)}</div></section>}
+      {uncoveredRequirements.length > 0 && <section className="loop-uncovered-requirements" aria-label="本轮资料缺口"><header><IconAlertTriangle aria-hidden="true" /><div><span>本轮未形成可执行分支</span><h3>{uncoveredRequirements.length} 项明确要求缺少对应来源</h3><p>这里只表示冻结的公开资料库中没有足够来源；系统没有搜索互联网，也不会用相近文件代替。</p></div></header><ol>{uncoveredRequirements.map((item) => <li key={item.title}><b>{item.title}</b><p>{item.objective}</p><small>{item.reason}</small></li>)}</ol></section>}
+      {deferredRequirements.length > 0 && <section className="loop-uncovered-requirements is-deferred" aria-label="后续轮次核对项"><header><IconRoute aria-hidden="true" /><div><span>已知来源，尚未进入本轮</span><h3>{deferredRequirements.length} 项排入后续轮次</h3><p>这些项目在完整资料库中有候选来源，只是受本轮文件预算或依赖顺序限制；不能算作资料缺失，也不能算已完成。</p></div></header><ol>{deferredRequirements.map((item, index) => { const branch = deferredBranches[index]; return <li key={item.title}><b>{item.title}</b><p>{item.objective}</p><small>{item.reason}</small>{branch?.status === "waiting_input" && waitingForBranch && <button type="button" onClick={() => void onControl("resume", { branchId: branch.branch_id })} disabled={!canResume || controlBusy !== null}><IconPlayerPlay aria-hidden="true" />{controlBusy === "resume" ? "正在启动" : "继续此项"}</button>}</li>; })}</ol></section>}
       {guidedRecovery && <section className="loop-source-recovery" aria-labelledby="source-recovery-title">
         <header><IconAlertTriangle aria-hidden="true" /><div><span>{sourceLocationPresentation === "verified" ? "成果文件和 Agent 说明分开处理" : sourceLocationPresentation === "unverified" ? "还需要找到说明对应的原表格位置" : "这轮需要分支级处理"}</span><h3 id="source-recovery-title">{sourceLocationPresentation === "verified" ? `成果已生成，还有 ${evidenceGapGroups.length} 条说明缺少原表格位置` : sourceLocationPresentation === "unverified" ? `成果尚未通过，还有 ${evidenceGapGroups.length} 条说明缺少原表格位置` : `共有 ${evidenceGapGroups.length} 个待处理，每次处理 1 个`}</h3><p>{sourceLocationPresentation === "verified" ? "成果文件已经通过检查；现在只需要为 Agent 说明找到可跳转、高亮的具体行或单元格。" : sourceLocationPresentation === "unverified" ? "系统已经找到相关文件，但还不能确认成果；需要先找到说明对应的具体行或单元格。" : pendingResolutions.some((item) => item.status === "ambiguous") ? "需要选择原文的分支与可以直接重试的分支已经分开标注。" : "这些分支都不需要你修改文件；选择一条后才会继续。"}</p></div></header>
         <div className="source-recovery-facts"><span><b>{sourceLocationPresentation === "verified" ? `${passedArtifactChecks}/${totalArtifactChecks} 通过` : "已保留"}</b>{sourceLocationPresentation === "verified" ? "成果文件检查" : "任务计划、文件范围和调用记录"}</span><span><b>{sourceLocationPresentation === "verified" ? "需要复核" : sourceLocationPresentation === "unverified" ? "需要查找" : "未采用"}</b>{sourceLocationPresentation === "verified" ? "这条 Agent 说明" : sourceLocationPresentation === "unverified" ? "说明对应的原表格位置" : "无法定位的候选结论"}</span><span><b>未发生</b>原文件修改或外部动作</span></div>
       </section>}
-      {roundBranches.length > 0 && sourceLocationPresentation === null && <section className="loop-branches" aria-label={`第 ${selectedRound.round_number} 轮任务分支`}>
-        <header><div><span>任务分支现场</span><h3>{roundBranches.length} 条分支，分别保留证据状态</h3></div><b>{roundBranches.filter((branch) => branch.status === "completed").length}/{roundBranches.length} 已核对</b></header>
-        <ol>{roundBranches.map((branch, index) => <li key={branch.branch_id} className={`is-${branch.status}${run.active_branch_id === branch.branch_id ? " is-selected" : ""}`}>
+      {executableBranches.length > 0 && sourceLocationPresentation === null && <section className="loop-branches" aria-label={`第 ${selectedRound.round_number} 轮任务分支`}>
+        <header><div><span>任务分支现场</span><h3>{executableBranches.length} 条可执行分支{deferredRequirements.length ? `，${deferredRequirements.length} 项后续处理` : ""}{uncoveredRequirements.length ? `，${uncoveredRequirements.length} 项资料缺口` : ""}</h3></div><b>{executableBranches.filter((branch) => branch.status === "completed").length}/{executableBranches.length} 已核对</b></header>
+        <ol>{executableBranches.map((branch, index) => <li key={branch.branch_id} className={`is-${branch.status}${run.active_branch_id === branch.branch_id ? " is-selected" : ""}`}>
           <span>{branch.status === "completed" ? <IconCheck aria-hidden="true" /> : index + 1}</span>
           <div><header><b>{branch.title}</b><small>{verifiedOutcomeWithAuditPending && branch.status === "waiting_input" ? "审计待补充" : branchStatusLabel(branch.status)}</small></header><p>{branch.objective}</p><footer><span>{branch.input_file_refs.length} 份资料</span>{branch.depends_on.length > 0 && <span>{branch.depends_on.length} 条前序依赖</span>}{branch.parent_branch_id && <span>续自上一轮</span>}{branch.missing_file_refs.length > 0 && <strong>{verifiedOutcomeWithAuditPending ? `${branch.missing_file_refs.length} 处来源待定位` : `缺 ${branch.missing_file_refs.length} 份引用`}</strong>}</footer></div>
           {branch.status === "waiting_input" && waitingForBranch && !guidedRecovery && <div className="loop-branch-actions"><button type="button" className="is-review" onClick={() => onReview(branchReviewRequest(branch, selectedRound.evidence_gaps, selectedRound, run))}><IconEye aria-hidden="true" />查看问题</button><button type="button" onClick={() => void onControl("resume", { branchId: branch.branch_id })} disabled={!canResume || controlBusy !== null}><IconPlayerPlay aria-hidden="true" />{controlBusy === "resume" ? "正在启动" : "继续此分支"}</button></div>}
@@ -4573,7 +5892,7 @@ function LoopView({
             ? `需要从 ${resolution.candidates.length} 个原文位置中选 1 个`
             : verifiedOutcomeWithAuditPending
               ? "Agent 未完成原文定位"
-              : "无需核对文件，建议重试";
+              : "无需选择文件，可让 Agent 重新查找依据";
           const reviewRequest = resolution
             ? resolutionReviewRequest(resolution, selectedRound.round_number, branch?.title ?? null, run.decision_records, decisionRequests)
             : gapReviewRequest(gap, index, selectedRound, branch, run);
@@ -4626,7 +5945,7 @@ function LoopView({
             ? "需要你选 1 个位置"
             : boundedTerminalRecovery
               ? "查看后创建新任务"
-              : "建议只重试此分支";
+              : "只继续处理这一项";
           const groupTitle = branch?.title ?? gap.label;
           return <li key={group.groupKey} className={`is-${branch?.status ?? "waiting_input"}`} aria-label={`分支：${groupTitle}`}>
             <section className="loop-gap-branch-identity"><span>分支 {index + 1}</span><h4>{groupTitle}</h4><b>{branch ? branchStatusLabel(branch.status) : "等待处理"}</b></section>
@@ -4645,6 +5964,7 @@ function LoopView({
     {run.artifact_versions.length > 0 && <section className="artifact-evolution" aria-label="成果版本">
       <header><div><span>不可变成果历史</span><h3>每轮形成一个可追溯版本</h3></div><b>{currentArtifactVersion ? `当前 v${currentArtifactVersion}` : "尚未提交"}</b></header>
       <ol>{run.artifact_versions.map((artifact) => <li key={`${artifact.artifact_id}:${artifact.version}`} className={currentArtifactVersion === artifact.version ? "is-current" : ""}><span>v{artifact.version}</span><div><b>{currentArtifactVersion === artifact.version ? "当前版本" : artifact.status === "verified" ? "已核对" : "阶段草稿"}</b><p>第 {artifact.round_number} 轮 · {artifact.finding_count} 条发现 · {artifact.source_file_refs.length} 份引用</p></div>{terminal && currentArtifactVersion !== artifact.version && <button type="button" title={`恢复为成果版本 v${artifact.version}`} onClick={() => void onControl("rollback", { artifactVersion: artifact.version })} disabled={controlBusy !== null}><IconRefresh aria-hidden="true" />{controlBusy === "rollback" ? "恢复中" : "恢复"}</button>}</li>)}</ol>
+      {run.workspace_artifacts.length === 0 && <p className="artifact-logical-note">当前为逻辑成果版本，可审查和恢复；尚未生成 DOCX/CSV 下载文件。</p>}
       {run.last_commit && <footer><IconCircleCheck aria-hidden="true" /><span>{run.last_commit.summary}</span><b>{run.commits.length} 次提交记录</b></footer>}
     </section>}
     {run.brief && <section className={`loop-brief is-${run.brief.outcome}`}><IconCircleCheck aria-hidden="true" /><div><span>任务简报</span><h3>{run.brief.summary}</h3><p>外部动作：未发生 · 结果仍需人工复核</p></div></section>}
@@ -5226,6 +6546,7 @@ function ResultView({
   onReview,
   onStartTask,
   starting,
+  readOnly,
 }: {
   result: HarnessResult | null;
   artifacts: ArtifactVersion[];
@@ -5240,6 +6561,7 @@ function ResultView({
   onReview: (request: EvidenceReviewRequest) => void;
   onStartTask: (instruction: string) => Promise<boolean>;
   starting: boolean;
+  readOnly: boolean;
 }) {
   const [expanded, setExpanded] = useState(false);
   const hasWorkspaceEvidence = workspaceArtifacts.length > 0 || receipts.length > 0;
@@ -5271,7 +6593,7 @@ function ResultView({
     {result.findings.length > 3 && <button type="button" className="result-expand" aria-expanded={expanded} onClick={() => setExpanded((current) => !current)}><IconChevronDown className={expanded ? "is-open" : ""} aria-hidden="true" />{expanded ? "收起详细发现" : `查看其余 ${result.findings.length - 3} 条发现`}</button>}
     {result.follow_ups.length > 0 && <section className="result-proposals" aria-labelledby="result-proposals-title">
       <header><span>Agent 建议的下一步</span><h3 id="result-proposals-title">先看形成依据，再决定是否启动新的 Control Loop</h3></header>
-      {result.follow_ups.map((item, index) => <article key={`${item}:${index}`}><div><b>建议 {index + 1}</b><p>{item}</p></div><div className="result-proposal-actions"><button type="button" className="is-review" onClick={() => onReview(proposalReviewRequest(item, index, result, latestRoundNumber))}><IconEye aria-hidden="true" />查看形成依据</button><button type="button" disabled={starting} onClick={() => void onStartTask(item)}><IconPlayerPlay aria-hidden="true" />{starting ? "正在启动" : "确认并启动"}</button></div></article>)}
+      {result.follow_ups.map((item, index) => <article key={`${item}:${index}`}><div><b>建议 {index + 1}</b><p>{item}</p></div><div className="result-proposal-actions"><button type="button" className="is-review" onClick={() => onReview(proposalReviewRequest(item, index, result, latestRoundNumber))}><IconEye aria-hidden="true" />查看形成依据</button>{!readOnly && <button type="button" disabled={starting} onClick={() => void onStartTask(item)}><IconPlayerPlay aria-hidden="true" />{starting ? "正在启动" : "确认并启动"}</button>}</div></article>)}
     </section>}
     <footer><IconShieldCheck aria-hidden="true" />这些建议由模型基于本轮已读取资料生成，尚未逐项验证；只有你点击确认后才会启动新任务，本轮没有修改原文件或执行外部动作。</footer>
   </article> : hasDeterministicAuthority ? <article className="result-authority-placeholder" aria-label="当前结论来源">
