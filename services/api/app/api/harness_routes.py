@@ -10,6 +10,7 @@ from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, s
 from starlette.responses import Response, StreamingResponse
 
 from packages.contracts.harness_models import AgentControlLoopControlRequest
+from packages.contracts.office_actions import OfficeActionControl
 
 from services.api.app.application.harness_runtime import (
     HarnessConflictError,
@@ -193,3 +194,21 @@ async def stream_harness_events(
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "Connection": "keep-alive"},
     )
+
+
+@router.post("/runs/{run_id}/action-controls")
+async def control_office_action(
+    run_id: str,
+    body: OfficeActionControl,
+    owner_id: Annotated[str, Depends(harness_owner)],
+    runtime: Annotated[HarnessRuntime, Depends(get_harness_runtime)],
+):
+    try:
+        result = await runtime.office_action_control(owner_id, run_id, body)
+        return runtime.public_control_result(result)
+    except HarnessNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except HarnessConflictError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except (BenchmarkScenarioError, HarnessError) as exc:
+        raise HTTPException(status_code=503, detail="资料当前无法核验，请稍后重新读取") from exc

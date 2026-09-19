@@ -1,5 +1,35 @@
 # UI-server fact matrix
 
+## DR-0053 单步事项
+
+| UI 位置与含义 | 服务端权威字段或事件 | 用户动作与恢复 | 默认隐藏 | 验证范围 |
+| --- | --- | --- | --- | --- |
+| 自动整理完成，可撤销 | `office_action.status=executed`、`receipt.kind=text_copy` | undo 恢复 before，保留 undone_at | 内部 ID | 单步单测及真实 API E2E；仅文本副本 |
+| 摘录草稿、来源 | `status=draft_ready`、source_excerpt、preview、history.content_snapshot | 查看原文；edit_draft 增加 revision、保留原输入和来源；下载当前草稿 | 内部源路径 | 逐字摘录和人工修订分开，不是模型摘要 |
+| 信息待补齐 | `status=needs_input`、missing_fields | revise 后 revision 加 1 | 原始异常 | 单测；不自行猜联系人 |
+| 普通/强确认 | risk_level、required_checks、input、impact | 当前 version/revision 下 confirm | 幂等键 | 规则权威在服务端；不是正式授权 |
+| 修改后重新核对 | revision、`office_action_revise` | 清空勾选；旧版本 409 后刷新 | 请求摘要 | 双版本冲突测试 |
+| 已暂缓/已取消 | status、history、defer/cancel event | 暂缓可继续，取消不可提交 | 调试字段 | Snapshot 恢复；memory 重启不持久化 |
+| 测试任务/发件结果 | receipt、external_action=none | 下载记录；不能重复确认 | record_id | 真正测试记录，不是外部业务效果 |
+| 受限，转人工 | status=denied、reason、无 receipt | 查看原因，不能继续执行 | 匹配实现细节 | 固定规则负向测试，非通用分类 |
+| 结果尚未确认 | 未取得有效 HTTP 回执 | 查询原 Run，重试原请求及同一幂等键 | 请求体存内存 | 真实 API 响应丢失 E2E，不推断失败 |
+| 右侧未调用模型 | office_action.model_called=false | 查看事项轨迹 | 模型配置不是调用证据 | 五类事项 Planner 调用数为 0 |
+
+历史五类基线见 [DR-0053 Evidence](../evidence/DR-0053-SINGLE-ACTION-EVIDENCE-20260918.md)，当前六类事项增量见 [DR-0054 Evidence](../evidence/DR-0054-DEMO3-COLLABORATION-EVIDENCE-20260919.md)。
+
+## DR-0054 人工判断与找回
+
+| UI 位置与含义 | 服务端权威字段或本地事实 | 用户动作与恢复 | 默认隐藏 | 验证范围 |
+| --- | --- | --- | --- | --- |
+| 材料对照待判断 | input.content/alternative_content，status=awaiting_decision | 未预选 A/B，理由必填；可修改、暂缓、取消 | 原始 ID | 只展示用户提供材料，不证明自动发现冲突 |
+| 人工判断已记录 | decision、receipt.kind=decision_note、status=decided | 下载记录，不能重复决定；两份材料不变 | 幂等键 | 版本/Owner/幂等检查；不是业务审批 |
+| 你正在编辑 | 浏览器编辑状态；保存后以 Snapshot 为准 | edit_draft 仅修改内部草稿；放弃回到已保存内容 | 未提交文本不冒充回执 | 真 API 保存、来源保留、旧版拒绝 |
+| 本版修改差异 | history.input/content_snapshot 与当前 input/preview | 核对具体字段，旧勾选清空 | 纯技术版本信息 | 不虚构源文件 Diff |
+| 最近事项找回 | GET /runs?limit=20，Owner-scoped，选择后 GET 当前 Run | 暂缓后可切换；未保存编辑/未决请求阻止切换 | Run ID | 仅最近记录，不是完整历史或并行调度 |
+| 人工处理说明 | 浏览器依据已保存 Snapshot 生成的本地文本 | 下载后由用户自行交接 | 内部 ID、路径 | 无审批、通知、委派回执 |
+
+新增事件均由原有 SSE 投影；打开最近事项与材料详情不调用模型。
+
 This is the current `DR-0036` outcome-first evidence-localization surface on top
 of the `DR-0035` Scenario Effect Gate and Run Workspace Artifact surface,
 `DR-0034` one-action recovery, `DR-0033` closable

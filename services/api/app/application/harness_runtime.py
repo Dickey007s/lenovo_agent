@@ -72,6 +72,9 @@ from services.api.app.application.harness_storage import (
     StoredHarnessTaskCommit,
 )
 
+from packages.contracts.office_actions import ActionInput, OfficeAction, OfficeActionControl
+from services.api.app.application.office_action_policy import control_action, prepare_action
+
 runtime_logger = logging.getLogger("uvicorn.error")
 
 
@@ -336,6 +339,7 @@ class HarnessRunSnapshot(BaseModel):
     )
     validation_errors: list[str] = Field(default_factory=list)
     events: list[HarnessEvent] = Field(default_factory=list)
+    office_action: OfficeAction | None = None
 
 
 class HarnessRunStart(BaseModel):
@@ -346,6 +350,7 @@ class HarnessRunStart(BaseModel):
     expected_version: int = Field(default=1, ge=1)
     instruction: str = Field(min_length=3, max_length=2_000)
     loop: AgentControlLoopOptions = Field(default_factory=AgentControlLoopOptions)
+    action: ActionInput | None = None
 
     @field_validator("instruction")
     @classmethod
@@ -426,6 +431,7 @@ class PublicHarnessRunSnapshot(BaseModel):
     narrative_reconciliation: AgentControlLoopNarrativeReconciliation | None
     validation_errors: list[str]
     events: list[HarnessEvent]
+    office_action: OfficeAction | None = None
 
 
 class PublicHarnessRunStartResult(BaseModel):
@@ -786,7 +792,7 @@ class HarnessRuntime:
             for record in await self.state_store.load_runs():
                 snapshot = HarnessRunSnapshot.model_validate(record.snapshot)
                 resume_status = record.resume_status
-                if snapshot.status not in terminal_statuses:
+                if snapshot.status not in terminal_statuses and snapshot.office_action is None:
                     completed_rounds = [
                         item for item in snapshot.rounds if item.status == "completed"
                     ]
@@ -1000,8 +1006,12 @@ class HarnessRuntime:
             raise HarnessNotFoundError("办公资料库不存在")
         instruction = request.instruction
         workspace_files = self._index_files(workspace)
+        payload = request.model_dump(mode="json")
+        if request.action is None:
+            # Keep persisted research-start keys compatible with the existing contract.
+            payload.pop("action")
         digest = hashlib.sha256(
-            json.dumps(request.model_dump(), ensure_ascii=False, sort_keys=True).encode("utf-8")
+            json.dumps(payload, ensure_ascii=False, sort_keys=True).encode("utf-8")
         ).hexdigest()
         idem_key = (owner_id, request.idempotency_key)
         async with self._lock:
@@ -1044,10 +1054,24 @@ class HarnessRuntime:
                 contract=contract,
                 budget=budget,
             )
+            if request.action is not None:
+                action = self._prepare_office_action(request.action)
+                snapshot.office_action = action
+                snapshot.status = self._office_action_run_status(action)
+                snapshot.control_state = "paused" if snapshot.status == "waiting_input" else "stopped"
+                snapshot.contract.completion_criteria = [
+                    "按当前动作内容判断处理方式，并保存可核对的结果",
+                    "仅产生本次文本副本或测试记录，不调用外部业务系统",
+                ]
+                snapshot.events = [HarnessEvent(
+                    sequence=1, event_name="office_action_prepared", occurred_at=now,
+                    status=snapshot.status, message=action.result_message,
+                )]
+                snapshot.last_event_sequence = 1
             current = _Run(
                 snapshot=snapshot,
                 condition=asyncio.Condition(),
-                active_since_perf=perf_counter(),
+                active_since_perf=None if request.action is not None else perf_counter(),
             )
             result = HarnessRunStartResult(run=snapshot)
             existing = await self._persist_locked(
@@ -1067,7 +1091,8 @@ class HarnessRuntime:
                 return restored.model_copy(update={"replayed": True}, deep=True)
             self._runs[(owner_id, run_id)] = current
             self._idempotent[idem_key] = _IdempotentStart(digest, result)
-            self._schedule_run(owner_id, run_id, workspace, instruction)
+            if request.action is None:
+                self._schedule_run(owner_id, run_id, workspace, instruction)
             return result.model_copy(deep=True)
 
     async def get(self, owner_id: str, run_id: str) -> HarnessRunSnapshot:
@@ -1104,6 +1129,8 @@ class HarnessRuntime:
                 raise HarnessConflictError(
                     f"任务版本已更新，当前为 v{snapshot.version}，请刷新后重试"
                 )
+            if snapshot.office_action is not None:
+                raise HarnessConflictError("请通过当前事项的核对、修改或取消入口办理")
             if request.command == "rollback":
                 return await self._rollback_control_locked(
                     owner_id,
@@ -1858,6 +1885,93 @@ class HarnessRuntime:
             replayed=result.replayed,
         )
 
+    def _prepare_office_action(
+        self, data: ActionInput, previous: OfficeAction | None = None
+    ) -> OfficeAction:
+        source = None
+        if data.source_ref:
+            if data.operation != "extract_excerpt":
+                raise HarnessConflictError("只有摘录事项可以读取来源资料")
+            source = self.get_file_preview(data.source_ref)
+        return prepare_action(data, source, previous=previous)
+
+    @staticmethod
+    def _office_action_run_status(action: OfficeAction) -> str:
+        if action.status in {"denied", "cancelled"}:
+            return "stopped"
+        if action.status in {"executed", "draft_ready", "undone", "decided"}:
+            return "completed"
+        return "waiting_input"
+
+    async def office_action_control(
+        self, owner_id: str, run_id: str, request: OfficeActionControl
+    ) -> HarnessControlResult:
+        digest = self._payload_digest({"office_action_run": run_id, **request.model_dump(mode="json")})
+        key = (owner_id, request.idempotency_key)
+        async with self._lock:
+            run = self._require_run(owner_id, run_id)
+            replay = self._control_idempotent.get(key)
+            if replay is not None:
+                if replay.digest != digest:
+                    raise HarnessConflictError("幂等键已用于其他操作")
+                return replay.result.model_copy(update={"replayed": True}, deep=True)
+            snapshot = run.snapshot
+            action = snapshot.office_action
+            if action is None:
+                raise HarnessConflictError("当前任务没有单步事项")
+            if snapshot.version != request.expected_version:
+                raise HarnessConflictError("事项已经更新，请核对最新内容")
+            try:
+                if request.command == "revise":
+                    if request.action_revision != action.revision:
+                        raise ValueError("内容版本已经变化")
+                    if action.status not in {
+                        "needs_input", "awaiting_confirmation", "deferred", "stale", "awaiting_decision"
+                    } or len(action.history) >= 59:
+                        raise ValueError("当前事项已结束或达到记录上限，请新建事项")
+                    if request.replacement is None:
+                        raise ValueError("请提供修改后的完整内容")
+                    if request.replacement.operation != action.input.operation:
+                        raise ValueError("改变动作类型需要新建事项")
+                    updated = self._prepare_office_action(request.replacement, previous=action)
+                else:
+                    updated = control_action(action, request)
+            except ValueError as exc:
+                raise HarnessConflictError(str(exc)) from exc
+            now = datetime.now(timezone.utc)
+            next_status = self._office_action_run_status(updated)
+            event = HarnessEvent(
+                sequence=snapshot.last_event_sequence + 1,
+                event_name=f"office_action_{request.command}", occurred_at=now,
+                status=next_status, message=updated.history[-1].message,
+            )
+            run.snapshot = snapshot.model_copy(update={
+                "office_action": updated, "status": next_status,
+                "control_state": "paused" if next_status == "waiting_input" else "stopped",
+                "version": snapshot.version + 1, "updated_at": now,
+                "last_event_sequence": event.sequence, "events": [*snapshot.events, event],
+            }, deep=True)
+            result = HarnessControlResult(run=run.snapshot.model_copy(deep=True))
+            try:
+                existing = await self._persist_locked(run, StoredHarnessIdempotency(
+                    owner_id=owner_id, kind="control", idempotency_key=request.idempotency_key,
+                    digest=digest, result=result.model_dump(mode="json"),
+                ))
+            except Exception:
+                run.snapshot = snapshot
+                raise
+            if existing is not None:
+                run.snapshot = snapshot
+                if existing.digest != digest:
+                    raise HarnessConflictError("幂等键已用于其他操作")
+                return HarnessControlResult.model_validate(existing.result).model_copy(
+                    update={"replayed": True}, deep=True
+                )
+            self._control_idempotent[key] = _IdempotentControl(digest=digest, result=result)
+            async with run.condition:
+                run.condition.notify_all()
+            return result.model_copy(deep=True)
+
     def public_snapshot(self, snapshot: HarnessRunSnapshot) -> PublicHarnessRunSnapshot:
         ref_to_label = {
             str(document.get("file_ref")): str(document.get("display_label", "所选公开办公文件"))
@@ -2005,6 +2119,7 @@ class HarnessRuntime:
                 self._public_failure_message(error) for error in snapshot.validation_errors
             ],
             events=public_events,
+            office_action=snapshot.office_action,
         )
 
     def public_control_result(self, result: HarnessControlResult) -> PublicHarnessControlResult:

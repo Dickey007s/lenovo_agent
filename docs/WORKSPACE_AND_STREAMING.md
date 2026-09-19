@@ -1,5 +1,23 @@
 # Whole-folder workspace and streaming
 
+## 单步事项交互补充（DR-0053）
+
+中心区“办理事项”使用六种通用操作表单，不增加 Scenario/Demo 选择器。个人整理
+显示可撤销结果；摘录允许原位编辑并保留来源；任务等待普通确认；发件等待三项强确认；受限请求显示原因。材料对照要求明确选择 A/B 和填写理由，保存判断不会启动后续任务。
+正文、完整对象、影响和修改入口同处工作区，右侧显示事项操作记录及“未调用模型”。
+事项打开时隐藏研究目标输入，已有研究任务未结束时不允许创建新事项。
+
+客户端通过 `office_action` 投影状态，修改后清空核对项。提交响应未知时保留同一
+请求体和幂等键，提供状态查询与同请求重试。刷新从原 Run Snapshot 恢复暂缓内容；
+memory 模式不支持进程重启恢复。现有 SSE 可投影 `office_action_*` 事件。
+窄屏保留全文和完整联系地址；无语音确认或跨设备身份接续。
+
+最近事项仅显示 Owner 最近 20 个 Run 内的事项，GET 重开不执行任务。暂缓后可办理另一件，未保存编辑或尚待决定时不允许从列表切换。修改差异来自当前输入与历史输入；草稿历史保留 content_snapshot。受限/暂缓说明下载为本地文本，不发审批或消息。
+新命令事件 office_action_edit_draft/office_action_record_decision 复用原 SSE。详见 [DR-0054](decisions/DR-0054-demo3-editable-drafts-and-human-judgment.md)。
+
+所有提交结果是隔离测试记录，非真实业务提交。详细对应见
+[开发版手册](design/DEMO3-DEVELOPMENT-HANDBOOK-20260918.md)。
+
 ## 1. Interaction model
 
 The product is one office folder, not a Scenario chooser. The persistent layout

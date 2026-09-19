@@ -1,5 +1,20 @@
 # Office Agent V0.2
 
+## 单步事项与 Demo3（2026-09-19）
+
+统一工作台增加“办理事项”：个人文本整理与撤销、资料逐字摘录、测试协作任务、
+测试发件强确认、受限请求及材料对照人工判断。摘录支持原位编辑，暂缓事项可从最近记录找回。
+此路径使用固定服务端规则和真实版本/幂等回执，不调用
+模型，也不连接真实办公系统；既有资料研究与 Artifact 能力保持原有范围。
+下文 Planner/Analyst、成果验证等说明适用于资料研究路径，不适用于这六类事项记录。
+
+[开发版指导手册与设计评审](docs/design/DEMO3-DEVELOPMENT-HANDBOOK-20260918.md)
+对应提交版 R01-R16 与 C00-C12，并列明未覆盖项。
+[DR-0053](docs/decisions/DR-0053-single-action-boundary-workbench.md) 与
+[运行证据](docs/evidence/DR-0053-SINGLE-ACTION-EVIDENCE-20260918.md)记录实现边界。
+当前公开 API 为 9 个 path、10 个 operation，增加 `/action-controls`。
+[DR-0054](docs/decisions/DR-0054-demo3-editable-drafts-and-human-judgment.md)与[本轮证据](docs/evidence/DR-0054-DEMO3-COLLABORATION-EVIDENCE-20260919.md)记录草稿版本、材料判断、最近事项与交接说明。
+
 Office Agent is one FORTE-backed office folder, not a gallery of registered
 Demo scenarios. A user can browse the entire public office repository like a
 file manager, inspect bounded safe previews and submit only a goal. The Agent
@@ -79,7 +94,7 @@ Demo names do not unlock capability or select private code paths:
   later resume;
 - Demo 2 tests multiple work units, adaptive scheduling and shared-artifact
   convergence;
-- Demo 3 applies a cross-cutting risk/action gate to either topology.
+- Demo 3 demonstrates independent simple actions with different human-control boundaries in the same workbench. The current six-operation slice uses fixed policy and isolated test records; a general cross-topology risk/action gate remains a target.
 
 The current Runtime is a `bounded_read_only_control_loop`. Validated plan units
 become server-owned task branches; a user can continue one waiting branch while
@@ -110,7 +125,7 @@ does not enter ordinary UI or model-selected context. The user supplies an
 instruction; the server freezes all 96 stable refs, while the Planner sees only
 safe metadata and autonomously selects a bounded set for each round.
 
-## Eight-path API
+## Nine-path API
 
 ```text
 GET  /v1/health
@@ -121,11 +136,12 @@ GET  /v1/harness/runs?limit={1..20}
 GET  /v1/harness/runs/{run_id}
 GET  /v1/harness/runs/{run_id}/artifacts/{artifact_id}
 POST /v1/harness/runs/{run_id}/controls
+POST /v1/harness/runs/{run_id}/action-controls
 GET  /v1/harness/runs/{run_id}/events?after={sequence}
 ```
 
-The former Scenario list/detail routes are not mounted. There are nine public
-operations over eight OpenAPI paths because `GET` and `POST` share `/runs`.
+The former Scenario list/detail routes are not mounted. There are ten public
+operations over nine OpenAPI paths because `GET` and `POST` share `/runs`.
 `X-User-Id` remains an unsigned demonstration Owner placeholder. With
 `DATABASE_DSN`, accepted Run snapshots, command receipts, ArtifactVersions and
 TaskCommits are stored in PostgreSQL. Recovery rolls an interrupted model call

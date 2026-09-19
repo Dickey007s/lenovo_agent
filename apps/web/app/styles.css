@@ -1695,3 +1695,71 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, summary:focus
   .ux-prioritization-groups details > summary em { max-width: none; text-align: left; }
   .ux-prioritization-groups dl, .ux-prioritization-rows dl { grid-template-columns: 1fr; }
 }
+/* Single-action review shares the workbench's quiet blue/gray surface. */
+.office-actions { padding: 24px; max-width: 920px; margin: 0 auto; color: #243449; }
+.office-action-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+.office-action-heading span { color: #63758b; font-size: 13px; }
+.office-action-heading h2 { margin: 8px 0 16px; font-size: 24px; }
+.office-actions p { line-height: 1.7; }
+.office-actions button { min-height: 44px; padding: 9px 14px; border: 1px solid #c9d5e2; background: #fff; border-radius: 8px; color: #28405e; cursor: pointer; }
+.office-actions button:disabled { opacity: .45; cursor: not-allowed; }
+.office-actions button.primary { background: #284d74; border-color: #284d74; color: #fff; }
+.office-actions :is(button, input, select, textarea):focus-visible { outline: 3px solid #91b1d7; outline-offset: 2px; }
+.office-action-environment { background: #f0f4f8; padding: 12px 16px; border-radius: 8px; font-size: 13px; color: #53657b; }
+.office-actions fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
+.office-actions label { display: grid; gap: 8px; margin: 16px 0; font-size: 14px; font-weight: 500; }
+.office-actions :is(input:not([type=checkbox]):not([type=radio]), select, textarea) { min-height: 44px; width: 100%; box-sizing: border-box; border: 1px solid #bfccdc; border-radius: 7px; padding: 10px 12px; color: #243449; background: #fff; font: inherit; }
+.office-actions textarea { resize: vertical; line-height: 1.7; }
+.office-action-buttons { display: flex; gap: 10px; flex-wrap: wrap; margin: 16px 0; }
+.office-action-state { padding: 16px; border-left: 4px solid #4f7699; background: #f0f5fa; margin: 20px 0; }
+.office-action-state span { font-size: 14px; font-weight: 650; }
+.office-action-state p { margin: 6px 0 0; }
+.office-action-state.risk-L4 { border-color: #ac792c; background: #fff9ed; }
+.office-action-state.risk-L5, .office-action-error { border-color: #b3524c; background: #fff1ef; }
+.office-action-error { padding: 14px; border-radius: 8px; }
+.office-action-preview, .office-action-receipt { border: 1px solid #d5dfeb; border-radius: 10px; padding: 18px; margin: 18px 0; }
+.office-actions h3 { font-size: 16px; margin: 0 0 10px; }
+.office-actions pre { white-space: pre-wrap; overflow-wrap: anywhere; font-family: inherit; font-size: 15px; line-height: 1.8; padding: 14px; background: #f7f9fc; border-radius: 6px; }
+.office-actions details { margin: 16px 0; }
+.office-actions summary { min-height: 44px; padding: 12px 0; cursor: pointer; font-size: 14px; }
+.office-risk-lens dl { display: grid; grid-template-columns: 100px minmax(0, 1fr); gap: 12px; font-size: 14px; line-height: 1.6; }
+.office-risk-lens dt { color: #65778b; }
+.office-risk-lens dd { margin: 0; overflow-wrap: anywhere; }
+.office-actions label.office-check { display: flex; align-items: flex-start; gap: 12px; min-height: 44px; padding: 8px 0; font-weight: 400; }
+.office-check input { width: 20px; height: 20px; flex-shrink: 0; }
+.office-action-history ol { padding-left: 22px; }
+.office-action-history li { padding: 8px; }
+.office-action-history li > span { font-size: 12px; color: #6a7e94; }
+.office-action-missing { padding: 12px 28px; color: #9d5626; background: #fff8ed; line-height: 1.8; }
+.office-control-context { border-bottom: 1px solid #d5dfeb; padding: 4px 0 14px; font-size: 14px; }
+.office-control-context span { font-weight: 600; }
+.office-control-context p { margin: 6px 0 0; color: #63758b; }
+.office-comparison { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; margin: 18px 0; }
+.office-comparison article { min-width: 0; padding: 16px; border: 1px solid #d5dfeb; border-radius: 10px; background: #fff; }
+.office-comparison pre { margin-bottom: 0; }
+.office-actions label.office-choice { display: flex; align-items: center; gap: 12px; min-height: 44px; border: 1px solid #d5dfeb; padding: 12px; border-radius: 8px; cursor: pointer; }
+.office-choice input { width: 20px; height: 20px; flex-shrink: 0; accent-color: #284d74; }
+.office-decision, .office-draft-edit { margin: 20px 0; }
+.office-decision legend { font-weight: 600; font-size: 16px; }
+.office-decision-result { padding: 18px; background: #edf5f1; border-left: 4px solid #4f8069; }
+.office-recent { border: 1px solid #d5dfeb; padding: 0 14px; border-radius: 10px; }
+.office-recent p { font-size: 13px; color: #63758b; }
+.office-recent ul { padding: 0; list-style: none; max-height: 320px; overflow-y: auto; }
+.office-recent li { margin: 8px 0; }
+.office-recent li button { display: grid; gap: 6px; width: 100%; text-align: left; overflow-wrap: anywhere; }
+.office-recent small { color: #63758b; font-size: 12px; }
+.office-recent [aria-current=true] { border-color: #284d74; background: #f0f5fa; }
+.office-version-changes h4 { margin: 12px 0 4px; font-size: 14px; }
+@media (max-width: 1100px) {
+  .office-comparison { grid-template-columns: minmax(0, 1fr); }
+}
+.task-composer[hidden], .workspace-content > [hidden] { display: none; }
+@media (max-width: 760px) {
+  .office-actions { padding: 16px 12px; }
+  .office-action-heading { flex-wrap: wrap; }
+  .office-action-heading h2 { font-size: 21px; }
+  .office-action-buttons > button { flex: 1 1 140px; }
+  .office-risk-lens dl { grid-template-columns: 1fr; gap: 5px; }
+  .office-risk-lens dd { margin-bottom: 12px; }
+  .workspace-tabs { flex-wrap: wrap; }
+}

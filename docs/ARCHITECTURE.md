@@ -1,5 +1,26 @@
 # Office Agent V0.2 architecture
 
+## DR-0053 single-action extension
+
+The same workbench now accepts explicit `ActionInput` in the existing Run start
+contract. A server-owned deterministic policy produces `office_action`, and
+versioned `/action-controls` persists its state, event and idempotent receipt via
+the existing store. This uses modules 2, 4 and 8; it starts no Planner/Analyst or
+Worker and adds no external Tool Gateway. Six operations create bounded text, human decision notes or
+isolated test records, never production office writes or verified Artifacts.
+Open nonterminal action snapshots restore as saved, without loop replay.
+The research architecture below remains specific to ordinary instruction Runs.
+See [DR-0053](decisions/DR-0053-single-action-boundary-workbench.md) and
+[DR-0054](decisions/DR-0054-demo3-editable-drafts-and-human-judgment.md).
+
+DR-0054 adds strict compare_materials input, edit_draft and record_decision
+controls without a new route. Editing retains source text and every saved draft
+version. A human choice binds both materials, explicit first/second selection,
+rationale, Owner and current versions. The browser projects recent action Runs
+from the existing Owner-scoped list and reopens them with GET; this does not
+resume work or provide a complete task history. Handoff text is a local download,
+not an approval, notification or Connector receipt.
+
 ## 1. Current vertical slice
 
 ```text

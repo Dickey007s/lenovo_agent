@@ -2595,7 +2595,7 @@ test("runs an arbitrary task while the agent selects evidence from the whole wor
   await expect(page.locator(".loop-branches")).toContainText("形成分析结果");
   await expect(page.locator(".artifact-evolution")).toContainText("不可变成果历史");
   await expect(page.locator(".artifact-evolution")).toContainText("当前 v2");
-  await page.getByRole("button", { name: /发现与建议/ }).click();
+  await page.getByRole("button", { name: /成果与建议/ }).click();
   await expect(page.getByRole("heading", { name: /完成 2 轮/ })).toBeVisible();
   expect(await page.locator("body").innerText()).not.toContain("forte-");
 });
@@ -4056,7 +4056,7 @@ test("restores an immutable artifact version without overwriting history", async
       path: "../../docs/evidence/screenshots/dr-0026-artifact-restore.png",
     });
   }
-  await page.getByRole("button", { name: /发现与建议/ }).click();
+  await page.getByRole("button", { name: /成果与建议/ }).click();
   await expect(page.getByText("任务证据简报 v1 · 已恢复")).toBeVisible();
 });
 
@@ -4134,7 +4134,7 @@ test("opens a cited source file from an analysis finding", async ({ page }) => {
   await mockHarness(page); await page.goto("/");
   await page.getByRole("textbox", { name: "任务指令" }).fill("核对余额并引用来源文件。");
   await page.getByRole("button", { name: "启动 Control Loop" }).click();
-  await page.getByRole("button", { name: /发现与建议/ }).click();
+  await page.getByRole("button", { name: /成果与建议/ }).click();
   await page.getByRole("button", { name: "打开审查页" }).first().click();
   await expect(page.getByRole("dialog", { name: "需要你核对并决定下一步" })).toBeVisible();
   await expect(page.getByRole("dialog")).toContainText("高亮位置由服务端从逐字引用解析");
@@ -4164,7 +4164,7 @@ test("keeps the review body, evidence and safe table preview readable on desktop
   await page.goto("/");
   await page.getByRole("textbox", { name: "任务指令" }).fill("核对超长客商的期末余额并打开问题审查页。");
   await page.getByRole("button", { name: "启动 Control Loop" }).click();
-  await page.getByRole("button", { name: /发现与建议/ }).click();
+  await page.getByRole("button", { name: /成果与建议/ }).click();
   await page.getByRole("button", { name: "打开审查页" }).first().click();
 
   const dialog = page.getByRole("dialog");
@@ -4211,7 +4211,7 @@ test("turns a finding into an evidence-backed human decision and a new task", as
   const state = await mockHarness(page); await page.goto("/");
   await page.getByRole("textbox", { name: "任务指令" }).fill("核对新闻搜索路由并说明如何处理。");
   await page.getByRole("button", { name: "启动 Control Loop" }).click();
-  await page.getByRole("button", { name: /发现与建议/ }).click();
+  await page.getByRole("button", { name: /成果与建议/ }).click();
   await page.getByRole("button", { name: "打开审查页" }).first().click();
 
   const dialog = page.getByRole("dialog", { name: "需要你核对并决定下一步" });
@@ -4253,7 +4253,7 @@ test("records closing a pending decision as defer and restores the receipt", asy
   const state = await mockHarness(page); await page.goto("/");
   await page.getByRole("textbox", { name: "任务指令" }).fill("核对新闻搜索路由并说明如何处理。");
   await page.getByRole("button", { name: "启动 Control Loop" }).click();
-  await page.getByRole("button", { name: /发现与建议/ }).click();
+  await page.getByRole("button", { name: /成果与建议/ }).click();
   await page.getByRole("button", { name: "打开审查页" }).first().click();
   await page.getByRole("button", { name: "关闭问题审查页" }).click();
 
@@ -4264,7 +4264,7 @@ test("records closing a pending decision as defer and restores the receipt", asy
     finding_id: "finding-111111111111",
   });
 
-  await page.getByRole("button", { name: /发现与建议/ }).click();
+  await page.getByRole("button", { name: /成果与建议/ }).click();
   await page.getByRole("button", { name: "打开审查页" }).first().click();
   await expect(page.getByRole("dialog")).toContainText("人工决定已记录");
   await expect(page.getByRole("dialog")).toContainText("已暂缓");
@@ -4284,7 +4284,7 @@ test("always closes the review page even when the defer receipt conflicts", asyn
   const state = await mockHarness(page, { failDecisionDefer: true }); await page.goto("/");
   await page.getByRole("textbox", { name: "任务指令" }).fill("核对新闻搜索路由并说明如何处理。");
   await page.getByRole("button", { name: "启动 Control Loop" }).click();
-  await page.getByRole("button", { name: /发现与建议/ }).click();
+  await page.getByRole("button", { name: /成果与建议/ }).click();
   await page.getByRole("button", { name: "打开审查页" }).first().click();
 
   const dialog = page.getByRole("dialog", { name: "需要你核对并决定下一步" });
@@ -4552,7 +4552,7 @@ test("starts a new whole-workspace loop only after the user confirms an agent pr
   const state = await mockHarness(page); await page.goto("/");
   await page.getByRole("textbox", { name: "任务指令" }).fill("研究整个资料库并提出下一步。");
   await page.getByRole("button", { name: "启动 Control Loop" }).click();
-  await page.getByRole("button", { name: /发现与建议/ }).click();
+  await page.getByRole("button", { name: /成果与建议/ }).click();
   const proposal = "继续核对授权范围与财务往来之间是否存在执行约束，并形成待办清单。";
   await expect(page.getByText(proposal)).toBeVisible();
   await page.getByRole("button", { name: "查看形成依据" }).click();
@@ -4625,7 +4625,7 @@ test("mobile keeps file-manager browsing, task input, preview and trajectory usa
   expect(shortControls).toEqual([]);
   await page.getByRole("textbox", { name: "任务指令" }).fill("核对余额并打开问题审查页。");
   await page.getByRole("button", { name: "启动 Control Loop" }).click();
-  await page.getByRole("button", { name: /发现与建议/ }).click();
+  await page.getByRole("button", { name: /成果与建议/ }).click();
   await page.getByRole("button", { name: "打开审查页" }).first().click();
   await expect(page.getByRole("dialog")).toBeVisible();
   await expect(page.getByRole("dialog")).toContainText("选择一条，右侧打开真实文件并高亮对应位置");

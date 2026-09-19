@@ -5,7 +5,7 @@
 1. `README.md`：唯一产品入口、能力边界和验收口径。
 2. `docs/ARCHITECTURE.md`：当前分层、信任边界和八模块成熟度。
 3. `docs/WORKSPACE_AND_STREAMING.md`：文件夹、预览、前端交互和 SSE。
-4. `docs/API.md`：当前八路径公开协议。
+4. `docs/API.md`：当前九路径公开协议。
 5. `docs/contracts/UI_SERVER_FACT_MATRIX.md`：每个 UI 状态的服务端事实。
 6. `docs/PRESENTATION_BRIEF.md`：汇报叙事和禁止夸大的结论；制作会议/PPT 主讲稿时再读 `docs/reports/OFFICE-AGENT-DETAILED-CHINESE-REPORT-20260825.md` 与 `docs/research/COMPETITIVE-WHITE-SPACE-AND-FALSIFIABLE-DIFFERENTIATORS-20260826.md`。整库、引用、暂停、恢复和知识工作是主流基线，不得写成独占；未完成固定配置同场实测前，只能称“原生保证差异”或“可证伪候选”。
 7. `docs/DECISION_AND_REPORTING_GOVERNANCE.md`：方案、PR、Demo、汇报的硬门槛。
@@ -204,10 +204,25 @@ terminal Runs require distinct wording and recovery paths.
 源码永远高于文档。行为或叙事变化后必须同步 living docs、Decision、Scenario、
 Source、Evidence 和 UI-server fact mapping，不能只更新 README。
 
+## DR-0053 单步事项补充
+
+修改单步事项前读取 `docs/decisions/DR-0053-single-action-boundary-workbench.md` 和
+`docs/design/DEMO3-DEVELOPMENT-HANDBOOK-20260918.md`。统一工作台中的“办理事项”
+使用显式 action 输入和固定服务端规则；DR-0053 的五类基线与 DR-0054 的六类当前操作均不调用模型，不执行外部动作。
+风险、确认条件、状态与回执由服务端生成；修改令旧核对失效；禁止用普通 Loop
+controls 绕过 action-controls。回执是 Snapshot 测试记录，不是 Artifact/EffectReceipt。
+下文研究路径的 Planner/Analyst 和完整索引要求不构成此路径的模型调用声明。
+
+DR-0054 将事项扩展为六类，修改前还须读取
+`docs/decisions/DR-0054-demo3-editable-drafts-and-human-judgment.md` 与其 Evidence。
+草稿编辑保留 source_excerpt 和历史 content_snapshot；材料对照必须由人明确
+选择并填写理由，只形成 decision_note，不启动后续动作。最近事项仅为 Owner 最近
+20 个 Run 的投影，不是全量待办或并行执行。人工说明下载不冒充审批或通知。
+
 ## 当前产品事实
 
 - 根页面是唯一 FORTE 办公资料库。产品没有注册 Scenario/Demo 选择器；旧邮件、文档、报价、任务、日历、报销、CRM、审计和固定 Customer A 入口均已退休。
-- 当前 OpenAPI 有八个 path、九个 operation：health、whole workspace、workspace file preview、Run start/list/get、Run Artifact download、control/events。旧 `/v1/harness/scenarios*` 不挂载。
+- 当前 OpenAPI 有九个 path、十个 operation：health、whole workspace、workspace file preview、Run start/list/get、Run Artifact download、control/action-controls/events。旧 `/v1/harness/scenarios*` 不挂载。
 - FORTE 固定 commit `345c1ec1487139db9dd319787fa9405ba85d1869`。`public-suite-manifest.json` 是当前只读清单：15 个公开任务目录、96 个 input、111 个 task/input 文件、`1780445` bytes。官方完整 benchmark 报告 180 条，但公开仓库只提供每职业一个 demo；不得声称拿到未公开 165 条。
 - `task.md` 只作 provenance，不能进入普通 UI、Analyst 输入或成为隐藏默认任务。用户只需自己写 `instruction`；浏览器不得要求或提交客户端 `selected_file_refs`。
 - 用户可在一个文件管理器式资料库中按服务端安全 `display_path` 逐级展开顶层目录和嵌套子目录，也可自由搜索、按类型筛选和查看文件，不按职业/角色建立产品入口。当前 96/96 输入可 bounded preview：XLSX/CSV、PDF、DOCX、TXT/Markdown/JSON/log/code。预览前必须校验 allowlist relative path、size、SHA-256、非 symlink、archive/format bounds；不得执行 macro/script 或加载 external resources。目录展开/搜索只是客户端展示状态，不改变整库 Run scope。
@@ -229,7 +244,7 @@ Source、Evidence 和 UI-server fact mapping，不能只更新 README。
 - 配置 `DATABASE_DSN` 时，Run Snapshot、事件、start/control 幂等回执以及独立 ArtifactVersion/TaskCommit 写入 PostgreSQL；重启恢复会删除未完成轮次、追加 `checkpoint_recovered` 并暂停，绝不自动重放中断的模型调用。真实 PostgreSQL 顺序 Runtime 由 PR integration workflow 验证；这不等于多实例 lease、高可用或在途 HTTP 续跑。未配置数据库时明确使用单进程 memory 且重启不恢复。`X-User-Id` 是未签名演示 Owner。
 - `start-demo.ps1` 的状态库优先级是 Docker、本轮 PowerShell 进程显式 `DATABASE_DSN`、memory。没有前两者时必须用空进程变量覆盖 `.env` 残留 DSN；模型配置仍可从 `.env` 读取。前台/汇报只以 `/v1/health.checkpoint/task_store` 判断本轮是否可恢复。
 - Catalog/preview 完整性失败必须 fail closed。前台区分 API 离线、workspace integrity failure、file preview failure 和 Run failure，不得填充静态假数据。
-- Demo 1/2/3 只是通用能力的验收镜头：当前顺序 Agent Control Loop 已覆盖 Demo 1 的分支推进、成果历史、局部恢复和 12 个固定本地办公效果纵切；这不等于任意办公 Artifact、生产 Tool Gateway 或多实例协调。Demo 2 多 Worker 自组织与 Demo 3 跨拓扑 Risk Gate 仍是目标能力。不得因 Demo 名或 Scenario ID 宣称未实现能力已经执行。
+- Demo 1/2/3 只是通用能力的验收镜头：当前顺序 Agent Control Loop 已覆盖 Demo 1 的分支推进、成果历史、局部恢复和 12 个固定本地办公效果纵切；这不等于任意办公 Artifact、生产 Tool Gateway 或多实例协调。Demo 2 多 Worker 自组织仍是目标能力。Demo 3 已有六类独立单步测试事项，通用跨拓扑 Risk Gate 与真实业务动作仍未实现。不得因 Demo 名或 Scenario ID 宣称未实现能力已经执行。
 - 自动化和截图是工程代理，不是用户研究。界面是否更清晰、信任/效率/价值是否提升均为 `Draft`。
 
 ## 八个统一模块
@@ -299,6 +314,7 @@ uv run ruff check .
 pnpm --dir apps/web lint
 pnpm --dir apps/web build
 pnpm --dir apps/web exec playwright test e2e/harness-workbench.spec.ts
+pnpm --dir apps/web exec playwright test e2e/office-actions.spec.ts
 ```
 
 本地启动与停止：

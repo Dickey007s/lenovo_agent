@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { OfficeActionWorkbench, normalizeOfficeAction, type OfficeAction } from "./office-action-workbench";
 import {
   IconAlertTriangle,
   IconArrowRight,
@@ -34,7 +35,7 @@ import {
 
 type ConnectionState = "connecting" | "available" | "live" | "reconnecting" | "offline";
 type WorkspaceStatus = "checking" | "online" | "unavailable";
-type WorkspaceView = "data" | "loop" | "result";
+type WorkspaceView = "data" | "loop" | "result" | "actions";
 type FileTypeFilter = string;
 type PreviewKind = "table" | "document" | "pdf" | "text" | "unavailable";
 type LoopPhase = "observe" | "plan" | "act" | "verify" | "evidence_gate" | "commit";
@@ -1127,6 +1128,7 @@ export type HarnessPlanNode = {
 };
 
 export type HarnessRun = {
+  office_action: OfficeAction | null;
   run_id: string;
   workspace_id: string;
   status: string;
@@ -1171,6 +1173,7 @@ export type HarnessActivityItem = {
 };
 
 export type HarnessActivityState = {
+  officeAction?: OfficeAction | null;
   workspaceTitle: string;
   instruction: string | null;
   runStatus: string | null;
@@ -1195,6 +1198,9 @@ const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8010"
 const HEADERS = { "Content-Type": "application/json", "X-User-Id": "demo_user" };
 const RUN_SESSION_KEY = "office-agent:forte-public-office:active-run";
 const NAMED_EVENTS = [
+  "office_action_prepared", "office_action_confirm", "office_action_revise",
+  "office_action_defer", "office_action_cancel", "office_action_undo",
+  "office_action_edit_draft", "office_action_record_decision",
   "workspace_index",
   "checkpoint_recovered",
   "round_started",
@@ -2034,6 +2040,14 @@ function normalizeLoopRound(value: unknown): LoopRound | null {
 
 function activityItem(event: HarnessServerEvent): HarnessActivityItem {
   const labels: Record<string, string> = {
+    office_action_prepared: "已判断本次处理方式",
+    office_action_confirm: "确认与测试结果已记录",
+    office_action_revise: "内容已更新，重新核对",
+    office_action_defer: "已保留待处理事项",
+    office_action_cancel: "本次事项已取消",
+    office_action_undo: "文本副本已恢复",
+    office_action_edit_draft: "内部草稿修改已保存",
+    office_action_record_decision: "人工判断已记录，原材料未修改",
     workspace_index: "已建立整个资料库索引",
     checkpoint_recovered: "已从服务端检查点恢复",
     planning_started: "规划模型开始组织任务",
@@ -3193,6 +3207,7 @@ function normalizeRun(value: unknown): HarnessRun | null {
     : [];
   return {
     run_id: runId,
+    office_action: normalizeOfficeAction(raw.office_action),
     workspace_id: workspaceId,
     status: asText(raw.status, "queued"),
     version: asNumber(raw.version, 1),
@@ -3325,11 +3340,12 @@ export function HarnessActivityPane({ state }: { state: HarnessActivityState | n
   return <section className="trace-pane" aria-labelledby="trace-title">
     <header>
       <div className="trace-avatar"><IconSparkles aria-hidden="true" /></div>
-      <div><span>可核对的执行路径</span><h2 id="trace-title">Agent Control Loop</h2></div>
+      <div><span>可核对的执行路径</span><h2 id="trace-title">{state.officeAction ? "事项处理记录" : "Agent Control Loop"}</h2></div>
       <b className={`is-${state.connection}`}><i />{connectionLabel}</b>
     </header>
     {state.instruction && <div className="trace-task"><span>任务目标</span><p>{state.instruction}</p></div>}
-    {state.budget && <div className="trace-loop-facts" aria-label="循环预算">
+    {state.officeAction && <div className="trace-task"><span>{state.officeAction.mode}</span><p>{state.officeAction.result_message}</p><small>本次按固定规则办理，未调用模型。</small></div>}
+    {state.budget && !state.officeAction && <div className="trace-loop-facts" aria-label="循环预算">
       <span><b>{state.currentRound || 0}/{state.budget.max_rounds}</b>轮次</span>
       <span><b>{state.budget.files_verified}</b>文件已核对</span>
       <span><b>{state.budget.model_calls_used}/{state.budget.max_model_calls}</b>模型调用</span>
@@ -3937,7 +3953,7 @@ export function HarnessWorkbench({ onActivityChange }: { onActivityChange?: (sta
       source.addEventListener(eventName, () => {
         if (generation !== generationRef.current) return;
         void refreshRun(runId, generation).then((snapshot) => {
-          if (snapshot && TERMINAL_EVENTS.has(eventName)) {
+          if (snapshot && (TERMINAL_EVENTS.has(eventName) || TERMINAL_STATUSES.has(snapshot.status))) {
             closeTransport();
             setConnection("available");
           }
@@ -4010,7 +4026,7 @@ export function HarnessWorkbench({ onActivityChange }: { onActivityChange?: (sta
       lastSequenceRef.current = 0;
       if (!applySnapshot(snapshot, generation)) return;
       setInstruction(snapshot.instruction);
-      setView(snapshot.result && TERMINAL_STATUSES.has(snapshot.status) ? "result" : "loop");
+      setView(snapshot.office_action ? "actions" : snapshot.result && TERMINAL_STATUSES.has(snapshot.status) ? "result" : "loop");
       if (!TERMINAL_STATUSES.has(snapshot.status)) {
         connectEvents(snapshot.run_id, generation, snapshot.last_event_sequence);
       }
@@ -4049,6 +4065,7 @@ export function HarnessWorkbench({ onActivityChange }: { onActivityChange?: (sta
   useEffect(() => {
     const artifactCheckSummary = summarizeArtifactChecks(run?.workspace_artifacts ?? []);
     onActivityChange?.({
+      officeAction: run?.office_action,
       workspaceTitle: workspace?.title ?? "FORTE 公开办公资料库",
       instruction: run?.instruction ?? null,
       runStatus: run?.status ?? null,
@@ -4200,6 +4217,18 @@ export function HarnessWorkbench({ onActivityChange }: { onActivityChange?: (sta
     }
   }
 
+  function acceptActionSnapshot(value: unknown) {
+    const snapshot = normalizeRun(value);
+    if (!snapshot) return;
+    if (runRef.current?.run_id !== snapshot.run_id) {
+      closeTransport(); generationRef.current += 1; runRef.current = null; lastSequenceRef.current = 0;
+    }
+    applySnapshot(snapshot, generationRef.current);
+    setConnection("available"); setView("actions");
+    if (TERMINAL_STATUSES.has(snapshot.status)) closeTransport();
+    else if (!eventSourceRef.current) connectEvents(snapshot.run_id, generationRef.current, snapshot.last_event_sequence);
+  }
+
   if (workspaceStatus !== "online" || !workspace) return <div className={`data-workbench-empty ${workspaceStatus === "unavailable" ? "is-error" : ""}`}>
     {workspaceStatus === "checking" ? <IconLoader2 aria-hidden="true" /> : <IconAlertTriangle aria-hidden="true" />}
     <h1>{workspaceStatus === "checking" ? "正在核对办公资料库" : "办公资料库暂时无法读取"}</h1>
@@ -4248,7 +4277,7 @@ export function HarnessWorkbench({ onActivityChange }: { onActivityChange?: (sta
         </ul> : <p className="dataset-unavailable">没有符合当前筛选条件的文件或目录。</p>}
       </aside>
       <section className="data-task-surface">
-        <section className="task-composer" aria-labelledby="task-composer-title">
+        <section className="task-composer" aria-labelledby="task-composer-title" hidden={view === "actions"}>
           <div><span>研究整个资料库</span><h2 id="task-composer-title">你想让 Agent 找什么，或推进什么？</h2></div>
           {run?.recovered && <div className="checkpoint-restored"><IconRefresh aria-hidden="true" /><span><b>服务端检查点已恢复</b> 未完成的模型调用没有重放，你可以检查轨迹后继续。</span></div>}
           <textarea value={instruction} disabled={runActive} onChange={(event) => setInstruction(event.target.value)} placeholder="例如：研究整个资料库，找出需要继续推动的工作，并逐条说明文件依据" aria-label="任务指令" />
@@ -4268,11 +4297,13 @@ export function HarnessWorkbench({ onActivityChange }: { onActivityChange?: (sta
           </footer>
         </section>
         <nav className="workspace-tabs" aria-label="工作区视图">
+          <button type="button" className={view === "actions" ? "is-active" : ""} onClick={() => setView("actions")}><IconShieldCheck aria-hidden="true" />办理事项</button>
           <button type="button" className={view === "data" ? "is-active" : ""} onClick={() => setView("data")}><IconFileDescription aria-hidden="true" />预览</button>
           <button type="button" className={view === "loop" ? "is-active" : ""} onClick={() => setView("loop")}><IconRoute aria-hidden="true" />Agent 路径{run?.rounds.length ? <b>{run.rounds.length}</b> : null}</button>
           <button type="button" className={view === "result" ? "is-active" : ""} onClick={() => setView("result")}><IconCircleCheck aria-hidden="true" />成果与建议{run?.workspace_artifacts.length ? <b>{run.workspace_artifacts.length}</b> : run?.result ? <b>{run.result.findings.length}</b> : null}</button>
         </nav>
         <div className="workspace-content">
+          <div hidden={view !== "actions"}><OfficeActionWorkbench run={run} files={allFiles} apiBase={API_BASE} headers={HEADERS} onSnapshot={acceptActionSnapshot} onOpenSource={(ref) => { const file = allFiles.find(item => item.file_ref === ref); if (file) openFile(file); }} blocked={runActive && !run?.office_action} /></div>
           {view === "data" && <FilePreview preview={preview} file={activeFile} loading={previewLoading} error={previewError} />}
           {view === "loop" && <LoopView run={run} files={allFiles} controlBusy={controlBusy} onControl={controlLoop} onReview={setReviewRequest} onStartTask={startTask} starting={starting} />}
           {view === "result" && <ResultView result={run?.result ?? null} artifacts={run?.artifact_versions ?? []} workspaceArtifacts={run?.workspace_artifacts ?? []} receipts={run?.effect_receipts ?? []} reconciliation={run?.narrative_reconciliation ?? null} commit={run?.last_commit ?? null} decisions={run?.decision_records ?? []} decisionRequests={run?.decision_requests ?? []} files={allFiles} onOpenFile={openFile} onReview={setReviewRequest} onStartTask={startTask} starting={starting} />}

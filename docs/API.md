@@ -4,18 +4,19 @@ Base URL: `http://localhost:8010`.
 
 ## 1. Public surface
 
-OpenAPI exposes eight paths and nine operations:
+OpenAPI exposes nine paths and ten operations:
 
 | Method | Path | Purpose |
 | --- | --- | --- |
 | GET | `/v1/health` | process health and configured model/storage labels |
 | GET | `/v1/harness/workspace` | whole public office folder projection |
 | GET | `/v1/harness/workspace/files/{file_ref}` | bounded, integrity-checked file preview |
-| POST | `/v1/harness/runs` | start an idempotent bounded read-only Agent Control Loop |
+| POST | `/v1/harness/runs` | start an idempotent Agent Control Loop or an explicit isolated test action |
 | GET | `/v1/harness/runs?limit=10` | list recent Owner-scoped Runs for recovery |
 | GET | `/v1/harness/runs/{run_id}` | Owner-scoped public Snapshot |
 | GET | `/v1/harness/runs/{run_id}/artifacts/{artifact_id}` | Owner-scoped download of one verified Run Workspace file |
 | POST | `/v1/harness/runs/{run_id}/controls` | versioned, idempotent pause/resume/steer/stop/rollback |
+| POST | `/v1/harness/runs/{run_id}/action-controls` | versioned single-action confirm/revise/defer/cancel/undo |
 | GET | `/v1/harness/runs/{run_id}/events?after=N` | ordered named SSE after a sequence |
 
 The former Scenario list/detail/preview routes and legacy
@@ -27,7 +28,7 @@ Run endpoints use `X-User-Id`; omission uses `demo_user`. This unsigned header
 is a demonstration Owner placeholder, not production authentication. Missing
 and wrong-owner Runs both return 404 before the SSE response is created.
 
-There are nine operations over eight OpenAPI paths because `GET` and `POST`
+There are ten operations over nine OpenAPI paths because `GET` and `POST`
 share `/runs`. With `DATABASE_DSN`, accepted Run snapshots, start/control
 idempotency receipts, ArtifactVersions and TaskCommits are stored in
 PostgreSQL; the latter two are independent append-only rows. Verified Run
@@ -37,7 +38,52 @@ interrupted nonterminal Run is rolled back to completed rounds, receives
 `checkpoint_recovered` and pauses; an in-flight provider request is never
 automatically replayed. In-flight HTTP requests, asyncio tasks and conditions
 remain process-local. Without `DATABASE_DSN`, the state store is memory and all
-Run state disappears on restart.
+Run state disappears on restart. Explicit single-action Runs restore their saved
+Snapshot without loop recovery or action replay.
+
+### Single-action test records (DR-0053)
+
+`POST /runs` optionally accepts `action`, with required `operation` and `title`,
+and optional `content`, `target`, `due_date` (ISO date), `source_ref` (safe file ref).
+Operations are `format_text`, `extract_excerpt`, `create_task`, `send_message`,
+`restricted_action`, `compare_materials`. Comparison optionally accepts
+`alternative_content` (at most 5000 characters); missing material waits for input.
+This field is rejected on other operations. Unknown action fields, including client risk, are rejected.
+Absent `action` preserves the ordinary research path. No model is called for actions.
+
+The public Snapshot includes nullable `office_action`: server-owned risk, autonomy,
+status, revision, policy version, input, preview, missing fields, required checks,
+impact, reversibility, receipt and history. Its `external_action=none`,
+`execution_environment=isolated_test_records` and `model_called=false` are explicit.
+A receipt is a Snapshot test record, not a verified Artifact or Connector result.
+
+`POST /runs/{run_id}/action-controls` accepts `command`, `expected_version`,
+`action_revision`, `idempotency_key`; `revise` requires `replacement` of the same
+operation. `confirm` supplies `reviewed_fields`: empty for L3, exactly
+`target/content/impact` for L4. Commands are `confirm/revise/defer/cancel/undo/edit_draft/record_decision`.
+`edit_draft` requires nonblank `edited_content` (max 5000) and only applies to
+extract_excerpt/draft_ready. It increments action revision, preserves source_excerpt
+and records content_snapshot on history. `record_decision` requires selected_option
+first/second and nonblank rationale (max 1000), only for complete compare_materials
+in awaiting_decision/deferred. It saves decision and a decision_note receipt,
+without changing either input or starting a follow-up. Irrelevant fields on other
+commands are rejected. Optional decision/history fields permit reading older snapshots;
+policy_version v2 records the current policy. This is not a cross-version idempotency
+receipt migration guarantee.
+
+Changes invalidate prior review; stale versions return 409, missing/wrong owner
+404, invalid input 422. Ordinary `/controls` rejects action Runs. Only executed
+personal formatting supports undo. Denied/cancelled actions cannot confirm.
+
+Events are `office_action_prepared`, `office_action_revise`, `office_action_confirm`,
+`office_action_defer`, `office_action_cancel`, `office_action_undo`,
+`office_action_edit_draft`, `office_action_record_decision`. They use the
+existing sequence and Snapshot projection. Action waiting states map to Run
+`waiting_input`; denied/cancelled to `stopped`; draft/executed/undone/decided to `completed`. Awaiting_decision is a waiting state;
+completed for decided means only that the human decision note was stored.
+Identical replay returns the original receipt; changed payload with the same key
+is rejected. Store failure does not publish the new in-memory state. This is a
+single-runtime guarantee, not distributed CAS or real external-effect deduplication.
 
 ## 3. Whole workspace
 
