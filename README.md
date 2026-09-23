@@ -12,6 +12,8 @@ Demo3 已与主分支的 Task 台账、只读 Worker 和新版能力页代码合
 模型，也不连接真实办公系统；既有资料研究与 Artifact 能力保持原有范围。
 下文 Planner/Analyst、成果验证等说明适用于资料研究路径，不适用于这六类事项记录。
 
+[对外提交版：设计指导手册](docs/design/submission/人机共驾设计指导手册_v1.0.md)、[边界情形与接管案例库](docs/design/submission/边界情形与接管案例库_v1.0.md)、[Demo3 设计方案与评审材料](docs/design/submission/Demo3设计方案与评审材料_v1.0.md)已纳入仓库，与下述内部开发版分开维护。
+
 [开发版指导手册与设计评审](docs/design/DEMO3-DEVELOPMENT-HANDBOOK-20260918.md)
 对应提交版 R01-R16 与 C00-C12，并列明未覆盖项。
 [DR-0064](docs/decisions/DR-0064-single-action-boundary-workbench.md) 与
