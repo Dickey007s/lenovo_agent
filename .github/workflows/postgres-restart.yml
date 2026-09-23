@@ -44,4 +44,10 @@ jobs:
           cache-dependency-path: apps/web/pnpm-lock.yaml
       - run: uv sync --frozen --all-groups
       - run: pnpm --dir apps/web install --frozen-lockfile --ignore-scripts
-      - run: uv run pytest tests/integration/test_postgres_agent_control_loop.py -q
+      - name: PostgreSQL restart, task, worker and cleanup regression
+        run: >-
+          uv run pytest
+          tests/integration/test_postgres_agent_control_loop.py
+          tests/integration/test_postgres_task_ledger.py
+          tests/integration/test_postgres_demo1_demo2.py
+          tests/integration/test_postgres_cleanup.py -q

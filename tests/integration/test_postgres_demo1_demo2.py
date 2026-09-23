@@ -5,8 +5,9 @@ import os
 from pathlib import Path
 from uuid import uuid4
 
-import psycopg
 import pytest
+
+from tests.postgres_helpers import cleanup_postgres_owner
 
 from packages.contracts.harness_models import (
     AgentControlLoopArtifactFinding,
@@ -51,17 +52,7 @@ async def _wait_for_status(runtime: HarnessRuntime, owner: str, run_id: str, sta
 
 
 async def _cleanup(owner: str) -> None:
-    async with await psycopg.AsyncConnection.connect(DATABASE_DSN) as connection:
-        async with connection.cursor() as cursor:
-            for table in (
-                "harness_task_ledger_receipt",
-                "harness_task_ledger",
-                "harness_idempotency",
-                "harness_task_commit",
-                "harness_artifact_version",
-                "harness_run_state",
-            ):
-                await cursor.execute(f"DELETE FROM {table} WHERE owner_id = %s", (owner,))  # nosec B608
+    await cleanup_postgres_owner(DATABASE_DSN, owner)
 
 
 @pytest.mark.asyncio

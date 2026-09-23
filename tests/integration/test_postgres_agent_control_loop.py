@@ -11,8 +11,9 @@ import zipfile
 from pathlib import Path
 from uuid import uuid4
 
-import psycopg
 import pytest
+
+from tests.postgres_helpers import cleanup_postgres_owner
 
 if sys.platform == "win32":
     asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
@@ -162,19 +163,8 @@ async def test_postgres_restart_preserves_verified_run_workspace_artifact(
     finally:
         for runtime in reversed(runtimes):
             await runtime.close()
-        if DATABASE_DSN and run_id:
-            async with await psycopg.AsyncConnection.connect(DATABASE_DSN) as connection:
-                async with connection.cursor() as cursor:
-                    for table in (
-                        "harness_idempotency",
-                        "harness_task_commit",
-                        "harness_artifact_version",
-                        "harness_run_state",
-                    ):
-                        await cursor.execute(
-                            f"DELETE FROM {table} WHERE owner_id = %s",  # nosec B608
-                            (owner,),
-                        )
+        if DATABASE_DSN:
+            await cleanup_postgres_owner(DATABASE_DSN, owner)
 
 
 @pytest.mark.asyncio
@@ -260,19 +250,8 @@ async def test_postgres_restart_preserves_tc12_real_vitest_artifacts(
     finally:
         for runtime in reversed(runtimes):
             await runtime.close()
-        if DATABASE_DSN and run_id:
-            async with await psycopg.AsyncConnection.connect(DATABASE_DSN) as connection:
-                async with connection.cursor() as cursor:
-                    for table in (
-                        "harness_idempotency",
-                        "harness_task_commit",
-                        "harness_artifact_version",
-                        "harness_run_state",
-                    ):
-                        await cursor.execute(
-                            f"DELETE FROM {table} WHERE owner_id = %s",  # nosec B608
-                            (owner,),
-                        )
+        if DATABASE_DSN:
+            await cleanup_postgres_owner(DATABASE_DSN, owner)
 
 
 @pytest.mark.asyncio
@@ -366,19 +345,8 @@ async def test_postgres_restart_preserves_tc11_artifacts_and_business_gates(
     finally:
         for runtime in reversed(runtimes):
             await runtime.close()
-        if DATABASE_DSN and run_id:
-            async with await psycopg.AsyncConnection.connect(DATABASE_DSN) as connection:
-                async with connection.cursor() as cursor:
-                    for table in (
-                        "harness_idempotency",
-                        "harness_task_commit",
-                        "harness_artifact_version",
-                        "harness_run_state",
-                    ):
-                        await cursor.execute(
-                            f"DELETE FROM {table} WHERE owner_id = %s",  # nosec B608
-                            (owner,),
-                        )
+        if DATABASE_DSN:
+            await cleanup_postgres_owner(DATABASE_DSN, owner)
 
 
 @pytest.mark.asyncio
@@ -518,19 +486,8 @@ async def test_postgres_restart_preserves_tc06_candidate_outcome_and_three_artif
     finally:
         for runtime in reversed(runtimes):
             await runtime.close()
-        if DATABASE_DSN and run_id:
-            async with await psycopg.AsyncConnection.connect(DATABASE_DSN) as connection:
-                async with connection.cursor() as cursor:
-                    for table in (
-                        "harness_idempotency",
-                        "harness_task_commit",
-                        "harness_artifact_version",
-                        "harness_run_state",
-                    ):
-                        await cursor.execute(
-                            f"DELETE FROM {table} WHERE owner_id = %s",  # nosec B608
-                            (owner,),
-                        )
+        if DATABASE_DSN:
+            await cleanup_postgres_owner(DATABASE_DSN, owner)
 
 
 @pytest.mark.asyncio
@@ -630,19 +587,8 @@ async def test_postgres_restart_preserves_tc05_finance_outcome_and_three_artifac
     finally:
         for runtime in reversed(runtimes):
             await runtime.close()
-        if DATABASE_DSN and run_id:
-            async with await psycopg.AsyncConnection.connect(DATABASE_DSN) as connection:
-                async with connection.cursor() as cursor:
-                    for table in (
-                        "harness_idempotency",
-                        "harness_task_commit",
-                        "harness_artifact_version",
-                        "harness_run_state",
-                    ):
-                        await cursor.execute(
-                            f"DELETE FROM {table} WHERE owner_id = %s",  # nosec B608
-                            (owner,),
-                        )
+        if DATABASE_DSN:
+            await cleanup_postgres_owner(DATABASE_DSN, owner)
 
 
 @pytest.mark.asyncio
@@ -728,19 +674,8 @@ async def test_postgres_restart_preserves_tc10_outbound_flow_outcome_and_docx(
     finally:
         for runtime in reversed(runtimes):
             await runtime.close()
-        if DATABASE_DSN and run_id:
-            async with await psycopg.AsyncConnection.connect(DATABASE_DSN) as connection:
-                async with connection.cursor() as cursor:
-                    for table in (
-                        "harness_idempotency",
-                        "harness_task_commit",
-                        "harness_artifact_version",
-                        "harness_run_state",
-                    ):
-                        await cursor.execute(
-                            f"DELETE FROM {table} WHERE owner_id = %s",  # nosec B608
-                            (owner,),
-                        )
+        if DATABASE_DSN:
+            await cleanup_postgres_owner(DATABASE_DSN, owner)
 
 
 @pytest.mark.asyncio
@@ -844,19 +779,8 @@ async def test_postgres_restart_preserves_tc13_customer_outcome_and_two_artifact
     finally:
         for runtime in reversed(runtimes):
             await runtime.close()
-        if DATABASE_DSN and run_id:
-            async with await psycopg.AsyncConnection.connect(DATABASE_DSN) as connection:
-                async with connection.cursor() as cursor:
-                    for table in (
-                        "harness_idempotency",
-                        "harness_task_commit",
-                        "harness_artifact_version",
-                        "harness_run_state",
-                    ):
-                        await cursor.execute(
-                            f"DELETE FROM {table} WHERE owner_id = %s",  # nosec B608
-                            (owner,),
-                        )
+        if DATABASE_DSN:
+            await cleanup_postgres_owner(DATABASE_DSN, owner)
 
 
 @pytest.mark.asyncio
@@ -952,19 +876,8 @@ async def test_postgres_restart_preserves_tc14_sre_outcome_and_two_artifacts(
     finally:
         for runtime in reversed(runtimes):
             await runtime.close()
-        if DATABASE_DSN and run_id:
-            async with await psycopg.AsyncConnection.connect(DATABASE_DSN) as connection:
-                async with connection.cursor() as cursor:
-                    for table in (
-                        "harness_idempotency",
-                        "harness_task_commit",
-                        "harness_artifact_version",
-                        "harness_run_state",
-                    ):
-                        await cursor.execute(
-                            f"DELETE FROM {table} WHERE owner_id = %s",  # nosec B608
-                            (owner,),
-                        )
+        if DATABASE_DSN:
+            await cleanup_postgres_owner(DATABASE_DSN, owner)
 
 
 @pytest.mark.asyncio
@@ -1076,19 +989,8 @@ async def test_postgres_restart_preserves_tc15_ux_outcome_and_two_ledgers(
     finally:
         for runtime in reversed(runtimes):
             await runtime.close()
-        if DATABASE_DSN and run_id:
-            async with await psycopg.AsyncConnection.connect(DATABASE_DSN) as connection:
-                async with connection.cursor() as cursor:
-                    for table in (
-                        "harness_idempotency",
-                        "harness_task_commit",
-                        "harness_artifact_version",
-                        "harness_run_state",
-                    ):
-                        await cursor.execute(
-                            f"DELETE FROM {table} WHERE owner_id = %s",  # nosec B608
-                            (owner,),
-                        )
+        if DATABASE_DSN:
+            await cleanup_postgres_owner(DATABASE_DSN, owner)
 
 
 @pytest.mark.asyncio
@@ -1169,19 +1071,8 @@ async def test_postgres_restart_preserves_rejected_tc15_model_draft_without_publ
     finally:
         for runtime in reversed(runtimes):
             await runtime.close()
-        if DATABASE_DSN and run_id:
-            async with await psycopg.AsyncConnection.connect(DATABASE_DSN) as connection:
-                async with connection.cursor() as cursor:
-                    for table in (
-                        "harness_idempotency",
-                        "harness_task_commit",
-                        "harness_artifact_version",
-                        "harness_run_state",
-                    ):
-                        await cursor.execute(
-                            f"DELETE FROM {table} WHERE owner_id = %s",  # nosec B608
-                            (owner,),
-                        )
+        if DATABASE_DSN:
+            await cleanup_postgres_owner(DATABASE_DSN, owner)
 
 
 @pytest.mark.asyncio
@@ -1289,19 +1180,8 @@ async def test_postgres_restart_preserves_tc07_legal_review_and_artifacts(
     finally:
         for runtime in reversed(runtimes):
             await runtime.close()
-        if DATABASE_DSN and run_id:
-            async with await psycopg.AsyncConnection.connect(DATABASE_DSN) as connection:
-                async with connection.cursor() as cursor:
-                    for table in (
-                        "harness_idempotency",
-                        "harness_task_commit",
-                        "harness_artifact_version",
-                        "harness_run_state",
-                    ):
-                        await cursor.execute(
-                            f"DELETE FROM {table} WHERE owner_id = %s",  # nosec B608
-                            (owner,),
-                        )
+        if DATABASE_DSN:
+            await cleanup_postgres_owner(DATABASE_DSN, owner)
 
 
 @pytest.mark.asyncio
@@ -1396,19 +1276,8 @@ async def test_postgres_recovers_loop_artifacts_commits_and_restore_pointer() ->
     finally:
         for runtime in reversed(runtimes):
             await runtime.close()
-        if DATABASE_DSN and run_id:
-            async with await psycopg.AsyncConnection.connect(DATABASE_DSN) as connection:
-                async with connection.cursor() as cursor:
-                    for table in (
-                        "harness_idempotency",
-                        "harness_task_commit",
-                        "harness_artifact_version",
-                        "harness_run_state",
-                    ):
-                        await cursor.execute(
-                            f"DELETE FROM {table} WHERE owner_id = %s",  # nosec B608
-                            (owner,),
-                        )
+        if DATABASE_DSN:
+            await cleanup_postgres_owner(DATABASE_DSN, owner)
 
 
 class TripleAmbiguousCatalog(AmbiguousCatalog):
@@ -1564,16 +1433,5 @@ async def test_postgres_restarts_with_pending_decision_and_resumes_only_target_b
     finally:
         for runtime in reversed(runtimes):
             await runtime.close()
-        if DATABASE_DSN and run_id:
-            async with await psycopg.AsyncConnection.connect(DATABASE_DSN) as connection:
-                async with connection.cursor() as cursor:
-                    for table in (
-                        "harness_idempotency",
-                        "harness_task_commit",
-                        "harness_artifact_version",
-                        "harness_run_state",
-                    ):
-                        await cursor.execute(
-                            f"DELETE FROM {table} WHERE owner_id = %s",  # nosec B608
-                            (owner,),
-                        )
+        if DATABASE_DSN:
+            await cleanup_postgres_owner(DATABASE_DSN, owner)
