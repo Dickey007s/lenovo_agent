@@ -1,11 +1,11 @@
-# DR-0064：统一工作台中的单步事项与人机边界
+# DR-0070：统一工作台中的单步事项与人机边界
 
 合并说明：本记录从 Demo3 分支旧编号迁入，原实现提交为 `f01a903`。主分支原有编号不变；历史 Evidence 保留当时的编号和测试范围。最新兼容性检查见[主分支合并记录](../evidence/DEMO3-MASTER-MERGE-20260919.md)。
 
 - 状态：Limited Verified；限固定策略、隔离测试记录和单进程运行。实现验证结果见 Evidence，不代表用户研究或正式设计方评审。
 - 日期：2026-09-18
 - Source：`USER-FEEDBACK-20260918-DEMO3-HANDBOOK`
-- Scenario：[SCENARIO-051](../scenarios/SCENARIO-051-single-action-boundary-workbench.md)
+- Scenario：[SCENARIO-057](../scenarios/SCENARIO-057-single-action-boundary-workbench.md)
 - 实现基线：`1276bc0`；首次汇总提交 `f01a903`，未建立 PR。主分支整合证据单列。
 
 ## 场景与来源

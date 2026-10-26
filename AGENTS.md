@@ -1,5 +1,49 @@
 # Office Agent V0.2 agent handoff
 
+## 2026-10-24 同任务后续分支
+
+DR-0087 / SCENARIO-074 将 follow_ups 从独立 Task 改为当前终态 Run 的同 Task child Run。
+原 continue 路由增加 purpose=follow_up，不混用 branch_id；必须保留 Owner、双版本、原子 Task 指针、幂等和旧 Snapshot。
+首轮说明展示真实 Plan/input coverage，不展示私有思维链；三个普通办公样例显式 analysis_only。
+后续模型上下文保留原目标与前段要求，不把旧结论作为证据。未完成 Branch 续办仍限定其来源。
+历史记录只读，不支持任意旧节点并行分叉。实测中断、模型局限、未知回执重试见对应 Evidence。
+
+## 2026-10-24 自主只读待办与真实实跑
+
+DR-0086 / SCENARIO-073 新增显式 `automatic_readonly` 启动策略，仅允许 analysis_only 且无 action。
+它在原 /runs 协议上逐项创建任务，按服务端准入自动执行只读 Worker 波次；manual 旧路径仍需确认。
+不能用自动策略执行副作用或人工门，不能把授权伪造成 user_confirmed=true。
+批次表仍是浏览器组织，不是持久 Batch/全局调度器；未知启动跨刷新恢复未完成。
+修改前读 DR-0086 及 Evidence。18 次实跑不等于全部成功，缺签字批准书仍会误选近似资料并触发引用失败。
+Demo1 局部续办已实测范围正确，但最新案例预算到限停止，不能声称恢复完成。
+本轮真实模型预览为 3010/8010，内存状态；旧 3000/8000 不代表已加载新增服务端策略。
+
+## 2026-10-10 终态减法与机制汇报
+
+DR-0076 / SCENARIO-063 仅精简根页 compact 投影：普通执行方式按需展开，终态去掉不可用控制，单轮不显示切换页签。
+通过文件的长说明可折叠，但失败、自测卡、业务否决、待办及可用控制必须保留；能力页与完整成果不变。
+汇报中的 9.21 真实两波交接不证明 9.22 reviewed_handoffs_v1 的真实闭环。验证范围以 DR-0076 Evidence 为准。
+
+## 2026-10-08 原工作区信息分层
+
+DR-0074 / SCENARIO-061 约束原资料库的执行详情折叠：只收起普通历史、本轮材料、全部完成分支及版本列表。
+续办/来源变化/历史只读/Task 查询错误、未完成分支、模型输入限制和人工控制不能隐藏；能力页完整记录不变。
+
+DR-0073 / SCENARIO-060 约束目录、过程记录、已提交任务设置的按需显示。
+关闭辅助区不取消任务、不关闭 SSE、不改变整库来源，也不得隐藏主区待办、业务否决或错误。
+测试截图写入当前 outputs，不覆盖过去报告图片。验收以对应 Evidence 为准。
+
+## 2026-10-07 整合约束
+
+当前整合合同见 `docs/decisions/DR-0072-unified-workbench-and-response-ownership.md` 与
+`docs/scenarios/SCENARIO-059-switch-workbench-without-stale-responses.md`，验证见对应 Evidence。
+保留原资料库、Loop/Swarm 和六类固定事项；一个工作台的任务视图，不新增三套产品。
+根页与能力页空白任务入口共用，`office_action` 不显示不适用的 Loop/成果控制。
+迟到响应必须校验发起会话归属，不能覆盖新草稿/新任务；这不表示服务端取消动作。
+本地 DR-0064/0065、SCENARIO-051/052 不变，远程 Demo3 已迁为 DR-0070/0071、057/058；
+历史 Evidence 原文件名、编号和测试数字保持原意。Worker 人工恢复到下游执行是下一纵切，
+不得借材料对照表单或入口合并声称其已闭合。
+
 这是当前产品基线。修改、分析或制作汇报前依次读取：
 
 1. `README.md`：唯一产品入口、能力边界和验收口径。
@@ -227,17 +271,17 @@ terminal Runs require distinct wording and recovery paths.
 源码永远高于文档。行为或叙事变化后必须同步 living docs、Decision、Scenario、
 Source、Evidence 和 UI-server fact mapping，不能只更新 README。
 
-## DR-0064 单步事项补充
+## DR-0070 单步事项补充
 
-修改单步事项前读取 `docs/decisions/DR-0064-single-action-boundary-workbench.md` 和
+修改单步事项前读取 `docs/decisions/DR-0070-single-action-boundary-workbench.md` 和
 `docs/design/DEMO3-DEVELOPMENT-HANDBOOK-20260918.md`。统一工作台中的“办理事项”
-使用显式 action 输入和固定服务端规则；DR-0064 的五类基线与 DR-0065 的六类当前操作均不调用模型，不执行外部动作。
+使用显式 action 输入和固定服务端规则；DR-0070 的五类基线与 DR-0071 的六类当前操作均不调用模型，不执行外部动作。
 风险、确认条件、状态与回执由服务端生成；修改令旧核对失效；禁止用普通 Loop
 controls 绕过 action-controls。回执是 Snapshot 测试记录，不是 Artifact/EffectReceipt。
 下文研究路径的 Planner/Analyst 和完整索引要求不构成此路径的模型调用声明。
 
-DR-0065 将事项扩展为六类，修改前还须读取
-`docs/decisions/DR-0065-demo3-editable-drafts-and-human-judgment.md` 与其 Evidence。
+DR-0071 将事项扩展为六类，修改前还须读取
+`docs/decisions/DR-0071-demo3-editable-drafts-and-human-judgment.md` 与其 Evidence。
 草稿编辑保留 source_excerpt 和历史 content_snapshot；材料对照必须由人明确
 选择并填写理由，只形成 decision_note，不启动后续动作。最近事项仅为 Owner 最近
 20 个 Run 的投影，不是全量待办或并行执行。人工说明下载不冒充审批或通知。

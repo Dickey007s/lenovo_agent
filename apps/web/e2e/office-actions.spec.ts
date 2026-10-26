@@ -6,12 +6,39 @@ const headers = { "X-User-Id": "demo_user" };
 
 async function enter(page: Page) {
   await page.goto("/");
+  if ((page.viewportSize()?.width ?? 1280) <= 1000) await page.getByRole("button", { name: "展开工作区导航" }).click();
   await page.getByRole("button", { name: "新建任务", exact: true }).click();
-  await page.getByRole("button", { name: "办理事项", exact: true }).click();
+  await page.getByRole("button", { name: "Demo 3 · 人机共驾", exact: true }).click();
+  if (await page.getByRole("button", { name: "收起工作区导航" }).isVisible() && await page.getByRole("button", { name: "收起工作区导航" }).getAttribute("aria-expanded") === "true") await page.getByRole("button", { name: "收起工作区导航" }).click();
   const another = page.getByRole("button", { name: "办理另一件事项" });
   if (await another.isVisible()) await another.click();
   return page.getByRole("region", { name: "单步事项" });
 }
+
+test("unified action workspace keeps content first and preferences optional", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  const section = await enter(page);
+  const preference = section.locator(".office-format-preference");
+  await expect(preference).not.toHaveAttribute("open");
+  await expect(section.getByLabel("事项内容", { exact: true })).toBeVisible();
+  await expect(section).toHaveCSS("border-top-width", "0px");
+  const typeBox = await section.getByLabel("事项类型").boundingBox();
+  const titleBox = await section.getByLabel("事项标题").boundingBox();
+  expect(Math.abs(typeBox!.y - titleBox!.y)).toBeLessThan(2);
+  const writes: string[] = [];
+  page.on("request", request => { if (request.method() === "POST") writes.push(request.url()); });
+  await preference.locator("summary").click();
+  await section.getByLabel("整理方式", { exact: true }).selectOption("compact");
+  expect(writes).toHaveLength(0);
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await section.getByRole("button", { name: "开始办理", exact: true }).click();
+  await expect(section.locator(".office-action-receipt")).toBeVisible();
+  const resultMessage = await section.locator(".office-action-receipt > div > p").innerText();
+  await expect(section.locator(".office-action-state")).not.toContainText(resultMessage);
+  await expect(section.getByRole("button", { name: "核对最新状态" })).toHaveAttribute("title", "核对最新状态");
+  await expect(section.getByRole("button", { name: "下载本次内容" })).toBeVisible();
+});
 
 test("real API: five actions, revision reset, defer recovery and receipts", async ({ page }) => {
   test.setTimeout(120_000);
@@ -122,6 +149,8 @@ test("real API: lost response replays original request without a second receipt"
   });
   await section.getByRole("button", { name: "确认创建测试任务" }).click();
   await expect(section.getByRole("alert")).toContainText("提交结果尚未确认");
+  await expect(page.getByRole("button", { name: "新建任务", exact: true })).toBeDisabled();
+  await expect(page.getByRole("button", { name: "Demo 1 · 单任务协作", exact: true })).toBeDisabled();
   await section.getByRole("button", { name: "重试同一请求" }).click();
   await expect(section.locator(".office-action-receipt")).toBeVisible();
   const runs = await (await request.get(`${api}/v1/harness/runs?limit=10`, { headers })).json();
@@ -148,7 +177,8 @@ test("real API: excerpt uses the selected allowlisted source, not supplemental t
   expect(action.source_excerpt).not.toContain("补充说明不应冒充");
   if (source.text) expect(action.source_excerpt).toBe(source.text.slice(0, 5000));
   else expect(action.source_excerpt).toContain(String(source.rows[0].values[0]));
-  await section.getByText(`核对来源：${source.display_label}`, { exact: true }).click();
+  await expect(section.getByText(`核对来源：${source.display_label}`, { exact: true })).toBeVisible();
+  await expect(section.locator(".office-source-review")).toHaveAttribute("open", "");
   await section.getByRole("button", { name: "打开资料预览" }).click();
   await expect(page.getByText("安全预览", { exact: true })).toBeVisible();
 });
@@ -160,7 +190,8 @@ test("real API: edit a draft in place while preserving the source and history", 
   await section.getByLabel("事项内容", { exact: true }).fill("原始资料：交付时间需项目经理确认。");
   await section.getByRole("button", { name: "开始办理" }).click();
   await section.getByRole("button", { name: "编辑这份草稿" }).click();
-  await expect(section.getByText("你正在编辑", { exact: true })).toBeVisible();
+  await expect(section.getByText("你正在编辑，修改尚未保存", { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Demo 1 · 单任务协作", exact: true })).toBeDisabled();
   await section.getByLabel("编辑摘录草稿").fill("人工修订：待核对交付日期，暂不外发。");
   const saved = page.waitForResponse(r => r.url().endsWith("/action-controls") && r.request().method() === "POST");
   await section.getByRole("button", { name: "保存草稿修改" }).click();
@@ -171,7 +202,7 @@ test("real API: edit a draft in place while preserving the source and history", 
   await expect(section.locator(".office-action-preview pre")).toHaveText(action.receipt.content);
   await section.getByText(/第 2 版修改了什么/).click();
   await expect(section.locator(".office-version-changes")).toContainText(action.source_excerpt);
-  await page.screenshot({ path: "../../docs/evidence/screenshots/DEMO3-MERGE-draft-edit.png", fullPage: true });
+  await page.screenshot({ path: "../../outputs/unified-ui-20261023/draft-edit.png", fullPage: true });
   await page.reload();
   await expect(section.locator(".office-action-preview pre")).toHaveText(action.receipt.content);
 });
@@ -190,9 +221,9 @@ test("real API: human judgment survives defer, another task and re-opening", asy
   await expect(decide).toBeDisabled();
   await section.getByRole("radio", { name: "采用材料 B" }).check();
   await expect(decide).toBeDisabled();
-  await page.screenshot({ path: "../../docs/evidence/screenshots/DEMO3-MERGE-human-judgment.png", fullPage: true });
+  await page.screenshot({ path: "../../outputs/unified-ui-20261023/human-judgment.png", fullPage: true });
   await decide.scrollIntoViewIfNeeded();
-  await page.screenshot({ path: "../../docs/evidence/screenshots/DEMO3-MERGE-human-controls.png", fullPage: true });
+  await page.screenshot({ path: "../../outputs/unified-ui-20261023/human-controls.png", fullPage: true });
   await section.getByRole("button", { name: "暂时无法判断，稍后处理" }).click();
   await section.getByRole("button", { name: "办理另一件事项" }).click();
   await section.getByLabel("事项标题").fill("另一件个人备忘");
@@ -228,7 +259,7 @@ test("real API: mobile comparison, missing fields and explicit safe exit", async
   await section.getByRole("button", { name: "更新内容并重新核对" }).click();
   await expect(section.getByRole("button", { name: "记录这次判断" })).toBeDisabled();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
-  await page.screenshot({ path: "../../docs/evidence/screenshots/DEMO3-MERGE-mobile-judgment.png", fullPage: true });
+  await page.screenshot({ path: "../../outputs/integration-20261007/screenshots/mobile-judgment.png", fullPage: true });
   await section.getByRole("button", { name: "暂时无法判断，稍后处理" }).click();
   const download = page.waitForEvent("download");
   await section.getByRole("button", { name: "下载人工处理说明" }).click();
@@ -288,9 +319,9 @@ test("merged workbench: task history and capabilities reopen an action without s
   const posts: string[] = [];
   page.on("request", item => { if (item.method() === "POST") posts.push(item.url()); });
   await page.getByRole("button", { name: "新建任务", exact: true }).click();
-  await page.getByRole("button", { name: /^任务会话/ }).click();
+  await page.getByRole("button", { name: "历史记录", exact: true }).click();
   await page.getByTestId("task-session").filter({ hasText: title }).getByRole("button", { name: /打开记录/ }).click();
-  await expect(section.getByRole("heading", { name: title, exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: title, exact: true, level: 1 })).toBeVisible();
   await page.goto("/agent-capabilities");
   await expect(page.getByRole("region", { name: "单步事项" })).toBeVisible();
   await expect(page.getByRole("heading", { name: title, exact: true })).toBeVisible();

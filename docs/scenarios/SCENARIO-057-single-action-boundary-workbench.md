@@ -1,8 +1,8 @@
-# SCENARIO-051：在同一工作台办理不同单步事项
+# SCENARIO-057：在同一工作台办理不同单步事项
 
 合并说明：本记录从 Demo3 分支旧编号迁入，原实现提交为 `f01a903`。主分支原有编号不变；历史 Evidence 保留当时的编号和测试范围。最新兼容性检查见[主分支合并记录](../evidence/DEMO3-MASTER-MERGE-20260919.md)。
 
-状态：Limited Verified，限固定策略、测试记录与单进程；执行证据见 [DR-0064 Evidence](../evidence/DR-0053-SINGLE-ACTION-EVIDENCE-20260918.md)。
+状态：Limited Verified，限固定策略、测试记录与单进程；执行证据见 [DR-0070 Evidence](../evidence/DR-0053-SINGLE-ACTION-EVIDENCE-20260918.md)。
 
 目标用户是需要整理、准备资料、安排协作或发送汇报的办公人员；设计评审人员观察每种事项为何采用不同介入方式。触发是用户需要完成一个具体动作，痛点是每种动作都弹同样的确认框，或将准备内容误认为已经提交。
 

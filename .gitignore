@@ -16,6 +16,12 @@ htmlcov/
 node_modules/
 .next/
 .next-playwright/
+.next-integration/
+.next-principles-preview/
+.next-ui-refinement-build/
+.next-ui-refinement-preview/
+.next-demo12-check/
+.next-outcomes-live/
 dist/
 build/
 coverage/
@@ -41,3 +47,11 @@ id_ed25519
 
 # Microsoft Office lock files are local editing state.
 ~$*
+
+# Isolated live-model demo server build cache.
+/apps/web/.next-demo12-live/
+/apps/web/.next-adaptive-swarm-20261024/
+
+# Named local previews and screen-recording sessions are not system source.
+/apps/web/.next-*/
+/.blurt/

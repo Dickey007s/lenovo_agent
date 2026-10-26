@@ -26,7 +26,9 @@ Demo3 提交 `f01a903` 与主分支 `9a4bbbf` 以普通 merge 整合，共同基
 
 ### 记录编号
 
-主分支已使用 DR-0053/0054 与 SCENARIO-038/039。Demo3 决策改为 [DR-0064](../decisions/DR-0064-single-action-boundary-workbench.md)、[DR-0065](../decisions/DR-0065-demo3-editable-drafts-and-human-judgment.md)，场景改为 [SCENARIO-051](../scenarios/SCENARIO-051-single-action-boundary-workbench.md)、[SCENARIO-052](../scenarios/SCENARIO-052-demo3-human-judgment-and-return.md)。
+2026-10-07 迁移注：以下文字保留 2026-09-19 的当时编号。为避开本地独立增量，本记录链接现指向 DR-0070/0071 和 SCENARIO-057/058；详情见[当前迁移表](DR-0072-INTEGRATION-20261007.md#编号迁移)。原提交、测试数字和结论未改。
+
+主分支已使用 DR-0053/0054 与 SCENARIO-038/039。Demo3 决策改为 [DR-0064](../decisions/DR-0070-single-action-boundary-workbench.md)、[DR-0065](../decisions/DR-0071-demo3-editable-drafts-and-human-judgment.md)，场景改为 [SCENARIO-051](../scenarios/SCENARIO-057-single-action-boundary-workbench.md)、[SCENARIO-052](../scenarios/SCENARIO-058-demo3-human-judgment-and-return.md)。
 
 历史 Evidence、Source ID 和截图文件名保留原名，避免改写历史测试标识；决策/场景链接指向新编号。仓库外的指导手册、评审稿、需求原件继续作为本地资料，不纳入此次上传。
 

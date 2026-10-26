@@ -59,7 +59,8 @@ def prepare_action(
         missing.append("请选择可预览的资料或填入待摘录文字")
     preview = data.content
     if operation == "format_text":
-        preview = "\n\n".join(line.strip() for line in data.content.splitlines() if line.strip())
+        separator = "\n" if data.format_style == "compact" else "\n\n"
+        preview = separator.join(line.strip() for line in data.content.splitlines() if line.strip())
         target_label = "本次个人文本副本"
     elif operation == "extract_excerpt":
         source_text = (source_text or "") if source is not None else data.content

@@ -78,6 +78,59 @@ async def test_format_undo_restores_exact_original_and_preserves_history(runtime
         await runtime.office_action_control("alice", run.run_id, command(undone.run, "undo"))
 
 
+@pytest.mark.parametrize("style,expected", [(None, "甲\n\n乙"), ("spaced", "甲\n\n乙"), ("compact", "甲\n乙")])
+async def test_text_style_is_bounded_and_undo_keeps_original(runtime, style, expected):
+    original = "  甲 \n\n 乙  "
+    run = await start(runtime, data("format_text", content=original, format_style=style))
+    assert run.office_action.preview == expected
+    assert run.office_action.receipt.content == expected
+    assert run.office_action.input.content == original
+    assert run.office_action.input.format_style == style
+    undone = await runtime.office_action_control("alice", run.run_id, command(run, "undo"))
+    assert undone.run.office_action.preview == original
+    assert runtime.planner.calls == 0
+
+
+@pytest.mark.parametrize("operation", ["extract_excerpt", "create_task", "send_message", "restricted_action", "compare_materials"])
+def test_personal_format_preference_cannot_apply_to_other_operations(operation):
+    with pytest.raises(ValidationError):
+        data(operation, format_style="compact")
+
+
+def test_absent_format_style_preserves_legacy_nested_serialization():
+    action = data("format_text")
+    request = HarnessRunStart(instruction="个人整理", idempotency_key="legacy-format-check", action=action)
+    payload = request.model_dump(mode="json")
+    assert "format_style" not in payload["action"]
+    assert "format_style" not in json.loads(request.model_dump_json())["action"]
+    assert ActionInput.model_validate(payload["action"]).format_style is None
+    with pytest.raises(ValidationError):
+        data("format_text", format_style="skip_confirmation")
+
+
+async def test_style_is_part_of_idempotent_request(runtime):
+    request = HarnessRunStart(instruction="个人整理", idempotency_key="style-idempotent-check", action=data("format_text", format_style="compact"))
+    first = await runtime.start("alice", request)
+    replay = await runtime.start("alice", request)
+    assert replay.run.run_id == first.run.run_id
+    with pytest.raises(HarnessConflictError):
+        await runtime.start("alice", request.model_copy(update={"action": data("format_text", format_style="spaced")}))
+
+
+async def test_take_old_draft_as_new_version_preserves_history_and_guards(runtime):
+    original = await start(runtime, data("extract_excerpt", content="原文甲\n原文乙"))
+    first = original.office_action.preview
+    edited = await runtime.office_action_control("alice", original.run_id, command(original, "edit_draft", edited_content="新写的内部草稿"))
+    restored = await runtime.office_action_control("alice", original.run_id, command(edited.run, "edit_draft", edited_content=first))
+    action = restored.run.office_action
+    assert action.revision == 3
+    assert action.preview == first
+    assert action.source_excerpt == original.office_action.source_excerpt
+    assert [entry.content_snapshot for entry in action.history] == [first, "新写的内部草稿", first]
+    with pytest.raises(HarnessConflictError):
+        await runtime.office_action_control("alice", original.run_id, command(edited.run, "edit_draft", edited_content="过期写入"))
+
+
 async def test_source_is_real_preview_and_injection_is_only_text(runtime):
     run = await start(runtime, data("extract_excerpt", source_ref=REF_TWO))
     assert run.office_action.source_label

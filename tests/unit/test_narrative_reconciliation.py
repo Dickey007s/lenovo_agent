@@ -190,3 +190,14 @@ def test_model_only_task_remains_review_required_without_false_verification() ->
     assert reconciliation.authority == "model_only"
     assert reconciliation.model_disposition == "adopted"
     assert "仍需人工复核" in reconciliation.message
+
+
+def test_human_review_request_is_not_an_unapproved_technical_solution() -> None:
+    context = _context()
+    reconciliation = reconcile_narrative(
+        run_id="harness:human-review", round_number=1,
+        result=_result("已全量复算212行，形成87个问题组合。", "需要人工确认归因口径。"),
+        context_used=context, current_context=context,
+    )
+    assert reconciliation.status == "consistent"
+    assert reconciliation.conflicts == []

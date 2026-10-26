@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+import hashlib
+import json
 
 import pytest
 from pydantic import ValidationError
@@ -18,6 +20,7 @@ from services.api.app.application.workunit_ledger import (
     WorkUnitState,
     WorkUnitStatusReason,
     WorkerModelReceipt,
+    contribution_digest,
     public_contribution,
     public_work_unit,
 )
@@ -91,6 +94,37 @@ def test_contribution_is_frozen_and_public_projection_removes_private_revisions(
     assert "reservation_id" not in public_work_unit(work_unit())
     assert "owner_id" not in public_work_unit(work_unit())
     assert "owner_id" not in projected
+
+
+def test_legacy_handoff_defaults_preserve_payloads_digests_and_cas() -> None:
+    for model in (WorkUnitRecord, ContributionRecord):
+        schema = model.model_json_schema(mode="serialization")
+        assert "input_contribution_ids" in schema["properties"]
+        assert "branch_id" in schema["properties"]
+    old_unit = work_unit().model_dump(mode="json", exclude={"input_contribution_ids"})
+    old_row = contribution().model_dump(mode="json", exclude={"input_contribution_ids"})
+    restored_unit = WorkUnitRecord.model_validate(old_unit)
+    restored_row = ContributionRecord.model_validate(old_row)
+    assert restored_unit.model_dump(mode="json") == old_unit
+    assert restored_row.model_dump(mode="json") == old_row
+    old_digest = hashlib.sha256(json.dumps(old_row, sort_keys=True, ensure_ascii=False).encode()).hexdigest()
+    assert contribution_digest(restored_row) == old_digest
+    base = {
+        "owner_id": OWNER, "task_id": TASK, "run_id": RUN,
+        "branches": [{"branch_id": BRANCH, "unit_id": "u1", "depends_on": [],
+                      "input_file_refs": ["forte-aaaaaaaaaaaaaaaa"]}],
+        "work_units": [old_unit], "contributions": [old_row],
+    }
+    restored = {**base, "work_units": [restored_unit.model_dump(mode="json")],
+                "contributions": [restored_row.model_dump(mode="json")]}
+    _validate_ledger_append(base, restored)
+    changed = restored_row.model_copy(update={"input_contribution_ids": ("contribution-parent",)})
+    assert contribution_digest(changed) != old_digest
+    with pytest.raises(RuntimeError, match="immutable Contribution"):
+        _validate_ledger_append(base, {**restored, "contributions": [changed.model_dump(mode="json")]})
+    changed_unit = restored_unit.model_copy(update={"input_contribution_ids": ("contribution-parent",)})
+    with pytest.raises(RuntimeError, match="WorkUnit version CAS"):
+        _validate_ledger_append(base, {**restored, "work_units": [changed_unit.model_dump(mode="json")]})
 
 
 @pytest.mark.asyncio

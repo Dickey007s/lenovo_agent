@@ -1,5 +1,488 @@
 import { expect, test, type Page, type Route } from "@playwright/test";
 import path from "node:path";
+
+test.describe("unified reference workbench", () => {
+  for (const width of [1586, 390]) {
+    test(`primary Agent keeps multiple work items and selected methods at ${width}`, async ({ page }) => {
+      await page.setViewportSize({ width, height: 1080 });
+      await mockHarness(page);
+      const run = { ...demo2Snapshot({ workspace_id: "forte-public-office", instruction: "整理两个清单" }, 2),
+        execution_policy: "automatic_readonly", work_units: [], worker_runs: [], contributions: [],
+        analysis_receipt: { called: true, output_used: true, model: "test-model", elapsed_ms: 100 } };
+      run.plan = { ...run.plan, units: run.plan.units.slice(0, 2), skill_ids: ["source_extract"] } as typeof run.plan;
+      run.branches = run.branches.slice(0, 2);
+      run.topology_admission = { ...run.topology_admission, mode: "single_controller",
+        reasons: ["两个清单由主 Agent 统一处理，无需额外组队。"] };
+      const posts: string[] = [];
+      page.on("request", r => { if (r.method() === "POST") posts.push(r.url()); });
+      await page.route("**/v1/harness/tasks/**", route => route.fulfill({ json: {
+        task_id: run.task_id, current_run_id: run.run_id, task_version: 1, run_sequence: 1, lineage: [],
+      } }));
+      await page.route(/\/v1\/harness\/runs(?:\/|$|\?)/, route => {
+        const pathname = new URL(route.request().url()).pathname;
+        if (pathname.endsWith("/events")) return route.fulfill({ contentType: "text/event-stream", body: "" });
+        return route.fulfill({ json: pathname === "/v1/harness/runs" ? { runs: [run] } : run });
+      });
+      await page.goto("/");
+      await page.getByRole("navigation", { name: "工作区视图" }).getByRole("button", { name: "任务", exact: true }).click();
+      const graph = page.getByRole("region", { name: "Agent 分工", exact: true });
+      await expect(graph.locator('.unified-workers article')).toHaveCount(1);
+      await expect(graph).toContainText("统一处理 2 个工作项");
+      await expect(graph.locator('.unified-topology-reasons')).not.toHaveAttribute('open');
+      await graph.getByText('查看分工依据', { exact: true }).click();
+      await expect(graph).toContainText("选用方法：原文清单整理");
+      expect(posts).toEqual([]);
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    });
+  }
+  for (const width of [1586, 390]) {
+    test(`adaptive adjustment distinguishes added work and unchanged review at ${width}`, async ({ page }) => {
+      await page.setViewportSize({ width, height: 1080 });
+      await mockHarness(page);
+      const run = { ...demo2Snapshot({ workspace_id: "forte-public-office", instruction: "准备报到说明" }, 2),
+        execution_policy: "automatic_readonly", adaptive_reviews: [
+          { review_id: "adjustment-1", status: "expanded", origin: "single_agent", reason: "人员备注与通用规则的适用范围需要核对。",
+            called: true, output_used: true, added_branch_ids: ["demo2-root-b"],
+            additions: [{ title: "核对个人例外", reason: "入职备注要求不开通研发权限，需保留这项例外。" }] },
+          { review_id: "adjustment-2", status: "unchanged", reason: "当前结果已覆盖目标，不再增加工作。",
+            called: true, output_used: true, added_branch_ids: [], additions: [] },
+        ] };
+      // Two executed stages: one initial analysis, then one result-driven check.
+      run.branches = run.branches.slice(0, 2);
+      run.branches[1].depends_on = [run.branches[0].branch_id];
+      run.work_units = run.work_units.slice(0, 2);
+      run.work_units[1].depends_on = [run.work_units[0].branch_id];
+      run.worker_runs = run.worker_runs.slice(0, 2);
+      run.contributions = run.contributions.slice(0, 2);
+      run.topology_admission = { ...run.topology_admission, work_unit_breadth: 2,
+        independent_branch_count: 1, dependency_parallelism: 0,
+        reasons: ["先执行一项分析；已返回结果需要追加核对。"] };
+      const posts: string[] = [];
+      page.on("request", r => { if (r.method() === "POST") posts.push(r.url()); });
+      await page.route("**/v1/harness/tasks/**", route => route.fulfill({ json: {
+        task_id: run.task_id, current_run_id: run.run_id, task_version: 1, run_sequence: 1, lineage: [],
+      } }));
+      await page.route(/\/v1\/harness\/runs(?:\/|$|\?)/, route => {
+        const pathname = new URL(route.request().url()).pathname;
+        if (pathname.endsWith("/events")) return route.fulfill({ contentType: "text/event-stream", body: "" });
+        return route.fulfill({ json: pathname === "/v1/harness/runs" ? { runs: [run] } : run });
+      });
+      await page.goto("/");
+      await page.getByRole("navigation", { name: "工作区视图" }).getByRole("button", { name: "任务", exact: true }).click();
+      const adjustment = page.getByRole("region", { name: "执行调整", exact: true });
+      await expect(adjustment).toContainText("根据结果新增 1 项工作");
+      await expect(adjustment).toContainText("单 Agent 处理后");
+      await expect(page.locator('.unified-coordinator')).toContainText("单 Agent 起步 → 按结果追加核对");
+      await expect(adjustment).toContainText("本次未新增工作");
+      await expect(adjustment.locator("details[open]")).toHaveCount(0);
+      await adjustment.getByText("查看新增原因", { exact: true }).click();
+      await expect(adjustment).toContainText("不开通研发权限");
+      expect(posts).toEqual([]);
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+      await page.screenshot({ path: `../../outputs/single-adaptive-20261026/regression/adjustment-${width}.png` });
+    });
+  }
+  for (const width of [1586, 390]) {
+    test(`five-worker stages keep results folded and dependencies visible at ${width}`, async ({ page }) => {
+      await page.setViewportSize({ width, height: 1080 });
+      await mockHarness(page);
+      const run = { ...demo2Snapshot({ workspace_id: "forte-public-office", instruction: "准备周度办公简报" }, 2), execution_policy: "automatic_readonly" };
+      run.result = { ...run.result!, findings: run.artifact_versions.at(-1)!.findings as never };
+      const posts: string[] = [];
+      page.on("request", request => { if (request.method() === "POST") posts.push(request.url()); });
+      await page.route("**/v1/harness/tasks/**", route => route.fulfill({ json: {
+        task_id: run.task_id, current_run_id: run.run_id, task_version: 1, run_sequence: 1, lineage: [],
+      } }));
+      await page.route(/\/v1\/harness\/runs(?:\/|$|\?)/, route => {
+        const pathname = new URL(route.request().url()).pathname;
+        if (pathname.endsWith("/events")) return route.fulfill({ contentType: "text/event-stream", body: "" });
+        return route.fulfill({ json: pathname === "/v1/harness/runs" ? { runs: [run] } : run });
+      });
+      await page.goto("/");
+      await page.getByRole("navigation", { name: "工作区视图" }).getByRole("button", { name: "任务", exact: true }).click();
+      const first = page.getByRole("region", { name: "协作阶段 1", exact: true });
+      const second = page.getByRole("region", { name: "协作阶段 2", exact: true });
+      await expect(first.locator('article')).toHaveCount(3);
+      await expect(second.locator('article')).toHaveCount(2);
+      await expect(second).toContainText("依赖：");
+      await expect(page.locator('.unified-worker-result')).toHaveCount(5);
+      await expect(page.locator('.unified-worker-result[open]')).toHaveCount(0);
+      await first.locator('.unified-worker-result summary').first().click();
+      await expect(first.locator('.unified-worker-output').first()).toBeVisible();
+      expect(posts).toEqual([]);
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+      await page.screenshot({ path: `../../outputs/blurt-feedback-20261025/stages-${width}.png` });
+    });
+  }
+  for (const width of [1586, 390]) {
+    test(`todo overview survives detail and space navigation without restarting at ${width}`, async ({ page }) => {
+      await page.setViewportSize({ width, height: 1000 });
+      await mockHarness(page);
+      const runs: Array<ReturnType<typeof snapshot> & { execution_policy: string }> = [];
+      const commands: unknown[] = [];
+      await page.route(/\/v1\/harness\/runs(?:\/|$|\?)/, route => {
+        const request = route.request();
+        const pathname = decodeURIComponent(new URL(request.url()).pathname);
+        if (pathname.endsWith("/events")) return route.fulfill({ contentType: "text/event-stream", body: "" });
+        if (request.method() === "POST") {
+          const body = request.postDataJSON(); commands.push(body);
+          const run = { ...snapshot({ ...body, workspace_id: "forte-public-office" }, "completed"),
+            run_id: `harness:${String(runs.length + 1).padStart(32, "0")}`, task_id: `task-${String(runs.length + 1).padStart(12, "0")}`, execution_policy: "automatic_readonly" };
+          runs.push(run); return route.fulfill({ status: 202, json: { run } });
+        }
+        return route.fulfill({ json: pathname === "/v1/harness/runs" ? { runs } : runs.find(run => pathname.endsWith(run.run_id)) });
+      });
+      const choose = async (name: string) => {
+        if (width < 760) await page.getByRole("button", { name: "展开工作区导航" }).click();
+        await page.getByRole("button", { name, exact: true }).click();
+      };
+      await page.goto("/");
+      await choose("Demo 2 · 自适应执行");
+      await page.getByLabel("待办示例", { exact: true }).selectOption("1");
+      await expect(page.getByRole("navigation", { name: "工作区视图" })).toBeHidden();
+      expect(commands).toHaveLength(0);
+      await page.getByRole("button", { name: "开始全部待办", exact: true }).click();
+      await expect(page.getByRole("button", { name: "查看任务", exact: true })).toHaveCount(3);
+      await expect(page.locator('.todo-instruction[open]')).toHaveCount(0);
+      await page.getByRole("button", { name: "查看任务", exact: true }).first().click();
+      await page.getByRole("button", { name: "返回本次待办", exact: true }).click();
+      await expect(page.getByRole("navigation", { name: "工作区视图" })).toBeHidden();
+      await expect(page.getByRole("button", { name: "查看任务", exact: true })).toHaveCount(3);
+      await choose("Demo 1 · 单任务协作");
+      await choose("Demo 2 · 自适应执行");
+      await expect(page.getByRole("button", { name: "查看任务", exact: true })).toHaveCount(3);
+      expect(commands).toHaveLength(3);
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+      if (width < 760) await page.getByRole("button", { name: "展开工作区导航" }).click();
+      await page.locator('.unified-new').click();
+      if (width < 760) await page.getByRole("button", { name: "收起工作区导航" }).click();
+      await expect(page.getByLabel("待办示例", { exact: true })).toBeVisible();
+      expect(commands).toHaveLength(3);
+    });
+  }
+  test("todo graph never reuses old attempt as current adopted output", async ({ page }) => {
+    await mockHarness(page);
+    const run = { ...demo2Snapshot({ workspace_id: "forte-public-office", instruction: "核对材料" }, 2), execution_policy: "automatic_readonly" };
+    run.work_units[0].attempt += 1;
+    run.work_units[0].state = "ready";
+    await page.route("**/v1/harness/tasks/**", route => route.fulfill({ json: {
+      task_id: run.task_id, current_run_id: run.run_id, task_version: 1, run_sequence: 1, lineage: [],
+    } }));
+    await page.route(/\/v1\/harness\/runs(?:\/|$|\?)/, route => {
+      const pathname = new URL(route.request().url()).pathname;
+      if (pathname.endsWith("/events")) return route.fulfill({ contentType: "text/event-stream", body: "" });
+      return route.fulfill({ json: pathname === "/v1/harness/runs" ? { runs: [run] } : run });
+    });
+    await page.goto("/");
+    await page.getByRole("navigation", { name: "工作区视图" }).getByRole("button", { name: "任务", exact: true }).click();
+    const first = page.locator('.unified-workers article').first();
+    await expect(first).toContainText("尚未派发");
+    await expect(first.locator('.unified-worker-output')).toHaveCount(0);
+    await expect(first).not.toContainText("成果已采用");
+  });
+  for (const width of [1586, 390]) {
+    test(`responsibility separates completed analysis and human judgment at ${width}`, async ({ page }) => {
+      await page.setViewportSize({ width, height: 1080 });
+      const state = await mockHarness(page);
+      const run = snapshot({ workspace_id: "forte-public-office", instruction: "整理现有规则，变更交给负责人决定" }, "completed");
+      await page.route(/\/v1\/harness\/runs(?:\/|$|\?)/, route => {
+        const pathname = new URL(route.request().url()).pathname;
+        if (pathname.endsWith("/events")) return route.fulfill({ contentType: "text/event-stream", body: "" });
+        return route.fulfill({ json: pathname === "/v1/harness/runs" ? { runs: [run] } : run });
+      });
+      await page.goto("/");
+      await page.getByRole("navigation", { name: "工作区视图" }).getByRole("button", { name: "任务", exact: true }).click();
+      const division = page.getByRole("region", { name: "本次人机分工", exact: true });
+      await expect(division.locator('[data-responsibility="analysis"]')).toHaveCount(1);
+      await expect(division.locator('[data-responsibility="judgment"]')).toHaveCount(1);
+      if (width < 760) await page.getByRole("button", { name: "展开工作区导航" }).click();
+      await expect(page.getByRole("complementary", { name: "最近任务" })).toContainText("待你判断");
+      if (width < 760) await page.getByRole("button", { name: "收起工作区导航" }).click();
+      await expect(division.locator(".responsibility-system")).not.toContainText("第一轮核对完成");
+      await division.locator(".responsibility-human").scrollIntoViewIfNeeded();
+      await page.screenshot({ path: `../../outputs/task-responsibility-20261024/regression/division-${width}.png`, fullPage: true });
+      await division.getByRole("button", { name: "查看问题与选项" }).click();
+      await expect(page.getByRole("dialog")).toContainText("不能替业务负责人决定");
+      expect(state.starts).toHaveLength(0);
+      expect(state.controls).toHaveLength(0);
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+      await page.screenshot({ path: `../../outputs/task-responsibility-20261024/regression/judgment-${width}.png`, fullPage: true });
+    });
+  }
+  test("responsibility presets do not execute before submit", async ({ page }) => {
+    const state = await mockHarness(page);
+    await page.goto("/");
+    await expect(page.locator(".office-division-examples[open]")).toHaveCount(0);
+    await page.locator(".office-division-examples summary").click();
+    await expect(page.locator(".office-division-examples button")).toHaveCount(6);
+    for (const title of ["核对 Excel 往来账", "准备新员工入职清单", "整理 Word 招聘要求", "按明确例外整理权限", "有余额，不等于已收款", "变更例外，先交负责人"]) {
+      await page.getByRole("button", { name: new RegExp(title) }).click();
+      await expect(page.getByRole("textbox", { name: "任务指令" })).not.toHaveValue('');
+    }
+    expect(state.starts).toHaveLength(0);
+    expect(state.controls).toHaveLength(0);
+  });
+  for (const width of [1586, 390]) {
+    test(`same task follow-up switches branches and retries lost receipt at ${width}`, async ({ page }) => {
+      await page.setViewportSize({ width, height: 1000 });
+      await mockHarness(page);
+      const parent = { ...snapshot({ workspace_id: "forte-public-office", instruction: "整理 Word 招聘检查表" }, "completed", 30),
+        task_id: "task-111111111111", task_version: 1, run_sequence: 1, parent_run_id: null as string | null };
+      parent.result!.follow_ups.push("另行整理招聘条件表格。");
+      const child = { ...parent, run_id: "harness:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee", parent_run_id: parent.run_id,
+        task_id: parent.task_id, task_version: 2, run_sequence: 2, instruction: parent.result!.follow_ups[0], continuation_reason: "执行后续建议",
+        rounds: parent.rounds.map(round => ({ ...round, question: '内部上下文 original_goal previous_request' })) };
+      let accepted = false, lost = false;
+      const commands: Record<string, unknown>[] = [];
+      const newTasks: unknown[] = [];
+      await page.route("**/v1/harness/tasks/**", route => route.fulfill({ json: {
+        task_id: parent.task_id, goal: parent.instruction, task_version: accepted ? 2 : 1,
+        current_run_id: accepted ? child.run_id : parent.run_id, run_sequence: accepted ? 2 : 1,
+        lineage: (accepted ? [parent, child] : [parent]).map(run => ({ run_id: run.run_id, run_sequence: run.run_sequence, parent_run_id: run.parent_run_id, status: run.status, instruction: run.instruction })),
+      } }));
+      await page.route(/\/v1\/harness\/runs(?:\/|$|\?)/, route => {
+        const url = new URL(route.request().url());
+        if (url.pathname.endsWith("/continue")) {
+          commands.push(route.request().postDataJSON()); accepted = true;
+          if (!lost) { lost = true; return route.abort(); }
+          return route.fulfill({ status: 202, json: { run: child, replayed: true } });
+        }
+        if (url.pathname.endsWith("/events")) return route.fulfill({ contentType: "text/event-stream", body: "" });
+        if (url.pathname === "/v1/harness/runs") {
+          if (route.request().method() === "POST") newTasks.push(route.request().postDataJSON());
+          return route.fulfill({ json: { runs: accepted ? [child, parent] : [parent] } });
+        }
+        return route.fulfill({ json: decodeURIComponent(url.pathname).endsWith(child.run_id) ? child : parent });
+      });
+      await page.goto("/");
+      await page.getByRole("navigation", { name: "工作区视图" }).getByRole("button", { name: "成果", exact: true }).click();
+      const continueButton = page.getByRole("button", { name: "确认并启动", exact: true }).first();
+      await continueButton.click();
+      await expect(page.getByRole("alert").filter({ hasText: "后续分支回执未确认" }).first()).toBeVisible();
+      await page.getByRole("button", { name: "确认并启动", exact: true }).nth(1).click();
+      await expect(page.getByRole("alert").filter({ hasText: "请先重试原操作" })).toBeVisible();
+      expect(commands).toHaveLength(1);
+      await continueButton.click();
+      const branches = page.getByRole("navigation", { name: "切换任务分支" });
+      await expect(branches.getByRole("button")).toHaveCount(2);
+      expect(commands).toHaveLength(2);
+      expect(commands[0]).toEqual(commands[1]);
+      expect(commands[0].purpose).toBe("follow_up");
+      expect(commands[0].expected_task_version).toBe(1);
+      expect(newTasks).toHaveLength(0);
+      await expect(page.getByRole("heading", { name: "整理 Word 招聘检查表", exact: true })).toBeVisible();
+      await page.locator('.unified-main-scroll').evaluate(element => element.scrollTo(0, element.scrollHeight));
+      await expect(branches).toBeInViewport();
+      await branches.getByRole("button", { name: /初始处理/ }).click();
+      await expect(page.getByText("历史运行，只读查看。", { exact: false })).toBeVisible();
+      await page.getByRole("navigation", { name: "工作区视图" }).getByRole("button", { name: "成果", exact: true }).click();
+      await expect(page.getByRole("button", { name: "确认并启动", exact: true })).toHaveCount(0);
+      await branches.getByRole("button", { name: /后续分支 1/ }).click();
+      await expect(page.getByRole("region", { name: "首轮任务安排" })).toBeVisible();
+      await expect(page.locator('.loop-round-detail > header')).not.toContainText('original_goal');
+      expect(commands).toHaveLength(2);
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+      await page.screenshot({ path: `../../outputs/blurt-feedback-20261025/branches-${width}.png` });
+    });
+  }
+  test("Blurt new task removes shortcuts and shows actual processing steps", async ({ page }) => {
+    const state = await mockHarness(page);
+    await page.goto("/");
+    await expect(page.getByRole("button", { name: /整理 Word 招聘要求|核对 Excel 往来账|准备新员工入职清单/ })).toHaveCount(0);
+    await expect(page.locator('.selection-summary')).toHaveCount(0);
+    await expect(page.locator('.loop-contract-settings')).not.toHaveAttribute('open');
+    await page.screenshot({ path: '../../outputs/blurt-feedback-20261025/new-task.png' });
+    await page.getByRole("textbox", { name: "任务指令" }).fill("整理文本评测岗位JD.docx的必备条件与加分条件，未写的学历标为未说明。");
+    expect(state.starts).toHaveLength(0);
+    await page.getByRole("button", { name: "启动 Control Loop", exact: true }).click();
+    const process = page.getByRole("region", { name: "首轮任务安排" });
+    await expect(process).toContainText("你的要求");
+    await expect(process).toContainText("本轮文件");
+    await expect(process).toContainText("处理安排");
+    await expect(process).toContainText("交付目标");
+    await expect(process.locator('.task-working-steps > li')).toHaveCount(3);
+    await expect(page.locator('.loop-view.is-compact .loop-budget')).not.toContainText('/');
+    await expect(process.locator('.responsibility-human')).not.toContainText('0 项');
+  });
+  test('Blurt hides empty human lane without hiding completed analysis', async ({ page }) => {
+    await mockHarness(page);
+    const run = snapshot({ workspace_id: 'forte-public-office', instruction: '整理现有资料' }, 'completed', 30);
+    run.result!.findings.forEach(finding => { if (finding.review) finding.review.requires_human_decision = false; });
+    run.decision_requests = [];
+    await page.route('**/v1/harness/runs**', route => {
+      const pathname = new URL(route.request().url()).pathname;
+      if (pathname.endsWith('/events')) return route.fulfill({ contentType: 'text/event-stream', body: '' });
+      return route.fulfill({ json: pathname === '/v1/harness/runs' ? { runs: [run] } : run });
+    });
+    await page.goto('/');
+    await page.getByRole('navigation', { name: '工作区视图' }).getByRole('button', { name: '任务', exact: true }).click();
+    await expect(page.locator('.responsibility-human')).toHaveCount(0);
+    await expect(page.getByRole('region', { name: '首轮任务安排' })).toBeVisible();
+  });
+  test("retained evidence remains visible when a later branch pauses without a public result", async ({ page }) => {
+    await mockHarness(page);
+    const original = snapshot({ workspace_id: "forte-public-office", instruction: "核对资料并保留已完成部分" }, "completed", 30);
+    const retained = { ...original, status: "waiting_input", result: null,
+      artifact_versions: [{ artifact_id: "artifact-111111111111", version: 1, title: "已保留的分析", kind: "evidence_brief",
+        status: "draft", round_number: 1, summary: "部分结果已保留", findings: original.result!.findings,
+        finding_count: original.result!.findings.length, source_file_refs: [], evidence_gaps: [], created_at: new Date().toISOString() }] };
+    await page.route("**/v1/harness/runs**", route => {
+      const pathname = new URL(route.request().url()).pathname;
+      if (pathname.endsWith("/events")) return route.fulfill({ contentType: "text/event-stream", body: "" });
+      return route.fulfill({ json: pathname === "/v1/harness/runs" ? { runs: [retained] } : retained });
+    });
+    await page.goto("/");
+    await page.getByRole("navigation", { name: "工作区视图" }).getByRole("button", { name: "依据", exact: true }).click();
+    await expect(page.locator(".unified-retained-evidence")).toContainText("成果 v1");
+    await expect(page.locator(".unified-evidence-finding blockquote").first()).toBeVisible();
+    await expect(page.getByText("尚未形成可展示的结论引用；已选资料不等于证据充分。", { exact: true })).toHaveCount(0);
+  });
+  for (const width of [1586, 390]) {
+    test(`automatic todo batch keeps three API requests and retries unknown receipt at ${width}`, async ({ page }) => {
+      await page.setViewportSize({ width, height: 992 });
+      await mockHarness(page);
+      const requests: Record<string, unknown>[] = [];
+      const accepted = new Map<string, ReturnType<typeof snapshot> & { execution_policy: string }>();
+      let loseFirstReceipt = true;
+      await page.route("**/v1/harness/runs**", async route => {
+        if (new URL(route.request().url()).pathname !== "/v1/harness/runs") return route.fallback();
+        if (route.request().method() === "GET") return route.fulfill({ json: { runs: [...accepted.values()] } });
+        const body = route.request().postDataJSON();
+        requests.push(body);
+        expect(body.execution_policy).toBe("automatic_readonly");
+        expect(body.output_preference).toBe("analysis_only");
+        const existing = accepted.get(body.idempotency_key);
+        const result = existing ?? { ...snapshot({ ...body, workspace_id: "forte-public-office" }, "completed", 19),
+          run_id: `harness:${String(accepted.size + 1).padStart(32, "0")}`,
+          task_id: `task-${String(accepted.size + 1).padStart(12, "0")}`, execution_policy: "automatic_readonly" };
+        accepted.set(body.idempotency_key, result);
+        if (loseFirstReceipt) { loseFirstReceipt = false; return route.abort(); }
+        return route.fulfill({ status: 202, json: { run: result, replayed: Boolean(existing) } });
+      });
+      await page.goto("/");
+      if (width < 760) await page.getByRole("button", { name: "展开工作区导航" }).click();
+      await page.getByRole("button", { name: "Demo 2 · 自适应执行", exact: true }).click();
+      expect(requests).toHaveLength(0);
+      await page.getByRole("button", { name: "开始全部待办", exact: true }).click();
+      await expect(page.getByRole("button", { name: "重试未确认的启动", exact: true })).toBeEnabled();
+      expect(requests).toHaveLength(3);
+      await expect(page.locator('#todo-0')).toBeDisabled();
+      await page.getByRole("button", { name: "重试未确认的启动", exact: true }).click();
+      await expect(page.getByRole("button", { name: "查看任务", exact: true })).toHaveCount(3);
+      expect(requests).toHaveLength(4);
+      expect(requests[0]).toEqual(requests[3]);
+      expect(accepted.size).toBe(3);
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+      await page.screenshot({ path: `../../outputs/office-todos-20261024/regression/batch-${width}.png` });
+    });
+  }
+  for (const width of [1586, 390]) {
+    test(`unified navigation preserves drafts and never dispatches at ${width}`, async ({ page }) => {
+      await page.setViewportSize({ width, height: 992 });
+      const state = await mockHarness(page);
+      const errors: string[] = [];
+      page.on("pageerror", error => errors.push(error.message));
+      await page.goto("/");
+      await page.getByRole("textbox", { name: "任务指令", exact: true }).fill("核对产品上线依据，保留未完成事项");
+      const choose = async (name: string) => {
+        if (width < 760) await page.getByRole("button", { name: "展开工作区导航" }).click();
+        await page.getByRole("button", { name, exact: true }).click();
+      };
+      await choose("Demo 2 · 自适应执行");
+      await expect(page.getByRole("region", { name: "多任务待办" })).toBeVisible();
+      await choose("Demo 1 · 单任务协作");
+      await expect(page.getByRole("textbox", { name: "任务指令", exact: true })).toHaveValue("核对产品上线依据，保留未完成事项");
+      await choose("Demo 3 · 人机共驾");
+      await expect(page.getByRole("region", { name: "单步事项" })).toBeVisible();
+      await expect(page.getByRole("navigation", { name: "工作区视图" }).getByRole("button")).toHaveText(["任务", "依据", "成果"]);
+      expect(state.starts).toHaveLength(0);
+      expect(state.controls).toHaveLength(0);
+      expect(errors).toEqual([]);
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+      await page.screenshot({ path: `../../outputs/unified-ui-20261023/action-entry-${width}.png` });
+    });
+
+    test(`unified evidence keeps source choice explicit at ${width}`, async ({ page }) => {
+      await page.setViewportSize({ width, height: 992 });
+      const state = await mockHarness(page, { sourceRecovery: true });
+      await page.goto("/");
+      await page.getByRole("textbox", { name: "任务指令", exact: true }).fill("核对重复引用，只继续受影响的工作项");
+      await page.getByRole("button", { name: "启动 Control Loop", exact: true }).click();
+      await expect(page.locator(".loop-gap").getByRole("button", { name: "选择原文位置" })).toBeVisible();
+      await page.getByRole("navigation", { name: "工作区视图" }).getByRole("button", { name: "依据", exact: true }).click();
+      await expect(page.getByRole("region", { name: "任务依据" })).toBeVisible();
+      await page.getByRole("button", { name: "查看核对详情", exact: true }).first().click();
+      const dialog = page.getByRole("dialog");
+      await expect(dialog.getByRole("radio")).toHaveCount(2);
+      await expect(dialog.getByRole("radio", { checked: true })).toHaveCount(0);
+      await expect(dialog.getByRole("button", { name: "确认位置并继续", exact: true })).toBeDisabled();
+      expect(state.controls).toHaveLength(0);
+      await page.screenshot({ path: `../../outputs/unified-ui-20261023/evidence-choice-${width}.png` });
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    });
+  }
+
+  test("unified evidence renders server quotes and safe source preview", async ({ page }) => {
+    await page.setViewportSize({ width: 1586, height: 992 });
+    const state = await mockHarness(page);
+    await page.goto("/");
+    await page.getByRole("textbox", { name: "任务指令", exact: true }).fill("检查办公资料的矛盾，说明文件依据");
+    await page.getByRole("button", { name: "启动 Control Loop", exact: true }).click();
+    await expect(page.getByRole("button", { name: "启动 Control Loop", exact: true })).toBeHidden();
+    await page.getByRole("navigation", { name: "工作区视图" }).getByRole("button", { name: "依据", exact: true }).click();
+    await expect(page.locator(".unified-evidence-finding blockquote").first()).toBeVisible();
+    await expect(page.locator(".file-preview")).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "在文件中查看", exact: true })).toHaveCount(0);
+    await page.getByRole("button", { name: "核对这条依据", exact: true }).first().click();
+    const inspection = page.getByRole('dialog');
+    await expect(inspection.locator(".file-preview")).toBeVisible();
+    await expect(inspection).not.toContainText('这是旧结果');
+    await expect(inspection.locator('.evidence-review-legacy')).toHaveCount(0);
+    await expect(inspection.locator('.evidence-review-history')).toHaveCount(0);
+    await expect(inspection.locator('.evidence-anchor-item.is-active')).toBeVisible();
+    expect(state.starts).toHaveLength(1);
+    expect(state.controls).toHaveLength(0);
+    await page.screenshot({ path: "../../outputs/blurt-feedback-20261025/evidence-desktop.png" });
+    await page.setViewportSize({ width: 390, height: 844 });
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    await inspection.locator('.file-preview').scrollIntoViewIfNeeded();
+    await page.screenshot({ path: '../../outputs/blurt-feedback-20261025/evidence-mobile.png' });
+    await page.keyboard.press('Escape');
+    await expect(inspection).toHaveCount(0);
+    await page.locator('.unified-source-files summary').click();
+    await page.locator('.unified-source-files button').first().click();
+    await expect(page.locator('.task-file-preview')).toBeFocused();
+    await expect(page.locator('.task-file-preview')).toBeInViewport();
+    expect(state.controls).toHaveLength(0);
+  });
+
+  test("unified collaboration renders actual work packages without automatic authorization", async ({ page }) => {
+    await page.setViewportSize({ width: 1586, height: 992 });
+    await mockDemoRuntime(page, "demo2-partial");
+    const dispatches: unknown[] = [];
+    page.on("request", request => { if (request.method() === "POST" && request.url().endsWith("/workers")) dispatches.push(request.postDataJSON()); });
+    await page.goto("/");
+    await page.getByRole("textbox", { name: "任务指令", exact: true }).fill("核对产品、搜索运行和用户交互风险");
+    await page.getByRole("button", { name: "启动 Control Loop", exact: true }).click();
+    await page.getByText("查看协作安排", { exact: true }).click();
+    await expect(page.getByRole("region", { name: "Agent 分工" })).toBeVisible();
+    await expect(page.locator(".unified-workers article")).toHaveCount(5);
+    expect(dispatches).toHaveLength(0);
+    await page.screenshot({ path: "../../outputs/blurt-feedback-20261025/team-planned.png" });
+    await page.getByRole("button", { name: "查看协作与派发", exact: true }).click();
+    const dialog = page.getByTestId("adaptive-workbench");
+    await expect(dialog.locator('.worker-identity')).toHaveCount(5);
+    await expect(dialog.locator('.unified-workers article').first()).toContainText('尚未派发');
+    await dialog.screenshot({ path: '../../outputs/blurt-feedback-20261025/team-dialog.png' });
+    await dialog.getByRole("button", { name: "确认并开始协作", exact: true }).click();
+    await expect.poll(() => dispatches.length).toBe(1);
+    await page.keyboard.press("Escape");
+    await expect(page.locator(".unified-workers .is-complete")).toHaveCount(2);
+    await expect(page.getByRole("region", { name: "Agent 分工", exact: true })).toContainText("已返回，未采用");
+    await page.locator(".unified-main-scroll").evaluate(element => element.scrollTo(0, 0));
+    await page.screenshot({ path: "../../outputs/blurt-feedback-20261025/team-partial.png" });
+  });
+});
 import tc04TestManifest from "../../../docs/evidence/manifests/tc04-public-test-manifest-20260828.json";
 import tc05FinanceReviewManifest from "../../../docs/evidence/manifests/tc05-public-finance-review-outcome-20260829.json";
 import tc06CandidateReviewManifest from "../../../docs/evidence/manifests/tc06-public-candidate-review-outcome-20260829.json";
@@ -31,6 +514,12 @@ type FileItem = {
 };
 
 const capabilityScreenshotPath = (name: string) => path.join(process.env.CAPABILITY_SCREENSHOT_DIR ?? path.resolve(process.cwd(), "..", ".."), name);
+
+test.beforeEach(async ({ page }, testInfo) => {
+  if (!process.env.CAPABILITY_SCREENSHOT_DIR) return;
+  const screenshot = page.screenshot.bind(page);
+  page.screenshot = options => screenshot({ ...options, path: options?.path ? capabilityScreenshotPath(`${testInfo.line}-${path.basename(String(options.path))}`) : undefined });
+});
 
 const financeFolderId = "forte-folder-7af3b6e416d7";
 const financeH1File = fileItem("forte-81f51a0aa85b5c3c", financeFolderId, "2025往来明细-上半年.xlsx", "财务管理", "XLSX", "table");
@@ -2786,6 +3275,8 @@ async function mockHarness(page: Page, options: { failFirstStart?: boolean; fail
 }
 
 async function openFile(page: Page, file: string) {
+  const directory = page.getByRole("button", { name: "资料目录", exact: true });
+  if (await directory.count() && await directory.getAttribute("aria-expanded") === "false") await directory.click();
   await page.getByRole("textbox", { name: "搜索文件或目录" }).fill(file);
   await page.locator(".workspace-tree-file").filter({ hasText: file }).click();
 }
@@ -2796,6 +3287,7 @@ function demo1ContinuationSnapshot(body: { workspace_id: string; instruction: st
     ...base,
     run_id: "harness:demo1-child",
     task_id: "task-demo1-lineage",
+    task_version: 2,
     run_sequence: 2,
     parent_run_id: "harness:workspace-run",
     continuation_reason: "bounded_stop",
@@ -2809,7 +3301,13 @@ function demo1ContinuationSnapshot(body: { workspace_id: string; instruction: st
     control_state: "running",
     version: 1,
     current_round: 1,
-    rounds: base.rounds,
+    // A child starts fresh; lineage pointers retain history, not parent execution state.
+    rounds: [{ round_number: 1, status: "running", phase: "plan", question: body.instruction,
+      input_file_refs: [], branch_ids: [], plan: [], model_receipt: null, analysis_receipt: null,
+      result: null, evidence_gaps: [], next_step: null }],
+    branches: [], active_branch_id: null, artifact_versions: [], last_commit: null, brief: null, result: null,
+    decision_requests: [], decision_records: [], evidence_resolutions: [],
+    budget: { ...base.budget, rounds_used: 1, model_calls_used: 0, files_verified: 0, elapsed_ms: 0, stop_reason: null },
     events: [{ sequence: 2, event_name: "round_started", occurred_at: new Date().toISOString(), status: "planning", message: "只核对该未完成分支的批准来源。", details: {} }],
     last_event_sequence: 2,
   };
@@ -3105,7 +3603,434 @@ async function mockFixedWorkflowRuntime(page: Page, mode: "fixed_workflow" | "si
     if (url.pathname.startsWith("/v1/harness/runs/") && method === "GET" && !url.pathname.endsWith("/events")) return fulfillJson(route, fixed);
     return route.fallback();
   });
+  return fixed;
 }
+
+async function openFirstResultReview(page: Page) {
+  const sources = page.locator(".result-sources").first();
+  if (await sources.getAttribute("open") === null) await sources.locator("summary").click();
+  await sources.getByRole("button", { name: "打开审查页", exact: true }).click();
+}
+
+test.describe("simple user walkthrough", () => {
+  for (const width of [1440, 390]) {
+    test(`browse, submit, inspect, collaborate and return without stacked detail at ${width}`, async ({ page }) => {
+      await mockDemoRuntime(page, "demo2");
+      await page.setViewportSize({ width, height: width === 1440 ? 1000 : 844 });
+      const posts: string[] = [];
+      page.on("request", (request) => { if (request.method() === "POST") posts.push(new URL(request.url()).pathname); });
+      const capture = async (name: string) => {
+        await page.evaluate(() => { document.querySelector(".agent-capabilities-page")?.scrollTo(0, 0); window.scrollTo(0, 0); });
+        expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(0);
+        await page.screenshot({ path: `../../outputs/ui-focus-20261008/screenshots/${name}-${width}.png` });
+      };
+      await page.goto("/");
+      await expect(page.getByRole("heading", { name: "办公资料库", exact: true })).toBeVisible();
+      await expect(page.locator(".task-examples")).not.toBeVisible();
+      await page.locator(".task-example-options > summary").click();
+      await page.locator(".task-examples button").first().click();
+      await expect(page.getByRole("textbox", { name: "任务指令" })).not.toBeEmpty();
+      await page.locator(".task-example-options > summary").click();
+      await page.getByRole("textbox", { name: "任务指令" }).fill("");
+      await capture("library");
+      await page.getByRole("link", { name: "Agent 能力", exact: true }).click();
+      await expect(page.getByRole("textbox", { name: "任务指令" })).toBeVisible();
+      await capture("new-task");
+      expect(posts).toHaveLength(0);
+      await page.getByRole("textbox", { name: "任务指令" }).fill("核对产品上线、搜索运行和用户体验，形成风险与待办简报");
+      await page.getByRole("button", { name: "启动 Control Loop" }).click();
+      await expect(page.getByRole("heading", { name: "协作计划已就绪" })).toBeVisible();
+      const progress = page.getByTestId("agent-progress-summary");
+      await expect(progress.locator(".cap-branch-section, .cap-artifact-section")).toHaveCount(0);
+      await expect(progress.locator(".task-delivery-rows details[open]")).toHaveCount(0);
+      await expect(page.getByTestId("copilot-boundary-summary")).not.toBeVisible();
+      await capture("progress-ready");
+      await page.getByRole("button", { name: "查看协作计划", exact: true }).click();
+      const graph = page.getByTestId("adaptive-workunit-dag");
+      const receipts = page.locator("#adaptive-worker-receipts");
+      await expect(graph.locator("article")).toHaveCount(5);
+      await expect(receipts).not.toHaveAttribute("open", "");
+      if (width === 1440) expect((await graph.boundingBox())!.y).toBeLessThan(600);
+      await capture("collaboration-ready");
+      expect(posts).toHaveLength(1);
+      await page.getByRole("button", { name: "确认并开始协作", exact: true }).click();
+      await expect(page.getByRole("button", { name: "继续下一批", exact: true })).toBeVisible();
+      await page.getByRole("button", { name: "继续下一批", exact: true }).click();
+      await expect(page.getByText("协作已完成", { exact: true })).toBeVisible();
+      await page.getByTestId("agent-progress-tab").click();
+      await expect(progress.getByRole("heading", { name: "当前成果", exact: true })).toHaveCount(1);
+      const savedPosts = posts.length;
+      await page.getByRole("button", { name: "查看成果", exact: true }).click();
+      const result = page.getByRole("region", { name: "当前成果详情", exact: true });
+      await expect(result).toBeFocused();
+      await expect(progress).not.toBeVisible();
+      await expect(page.getByRole("tablist", { name: "Agent 能力视图" })).toBeHidden();
+      expect((await result.boundingBox())!.y).toBeLessThan(220);
+      await capture("result");
+      await openFirstResultReview(page);
+      await expect(page.getByRole("dialog")).toBeVisible();
+      await page.keyboard.press("Escape");
+      await expect(page.getByRole("dialog")).toHaveCount(0);
+      await expect(result).toBeVisible();
+      await page.keyboard.press("Escape");
+      await expect(page.getByRole("button", { name: "查看成果", exact: true })).toBeFocused();
+      await expect(progress).toBeVisible();
+      await page.getByRole("button", { name: "查看版本历史", exact: true }).click();
+      await expect(page.getByRole("region", { name: "版本历史", exact: true })).toBeFocused();
+      await expect(progress).not.toBeVisible();
+      await page.getByRole("button", { name: "返回任务进展", exact: true }).click();
+      await expect(page.getByRole("button", { name: "查看版本历史", exact: true })).toBeFocused();
+      const row = page.locator(".task-delivery-rows details").first();
+      await row.locator("summary").focus();
+      await page.keyboard.press("Enter");
+      await expect(row).toHaveAttribute("open", "");
+      await expect(row.getByRole("button", { name: "核对依据" })).toBeVisible();
+      await page.keyboard.press("Enter");
+      await capture("progress-complete");
+      expect(posts).toHaveLength(savedPosts);
+      await page.getByRole("button", { name: "新建任务", exact: true }).click();
+      await expect(page.getByRole("textbox", { name: "任务指令" })).toHaveValue("");
+      expect(posts).toHaveLength(savedPosts);
+    });
+  }
+
+  test("failed business gate remains visible before opening details", async ({ page }) => {
+    await mockHarness(page, { releaseEffect: true });
+    await page.goto("/agent-capabilities");
+    await page.getByRole("textbox", { name: "任务指令" }).fill("核对上线条件并保留风险报告");
+    await page.getByRole("button", { name: "启动 Control Loop" }).click();
+    await expect(page.locator(".cap-verified-outcome")).toHaveClass(/is-failed/);
+    await expect(page.locator(".cap-verified-outcome")).toHaveCSS("background-color", "rgb(255, 247, 237)");
+    await expect(page.locator(".cap-verified-outcome b")).toHaveText("不得上线");
+    await expect(page.locator(".cap-verified-outcome")).toContainText("不得上线");
+    await expect(page.locator(".cap-quiet-status")).toHaveCount(0);
+    await expect(page.getByTestId("copilot-boundary-summary")).not.toBeVisible();
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    await page.screenshot({ path: "../../outputs/ui-focus-20261008/screenshots/business-blocked.png" });
+  });
+});
+
+test.describe("result-first reading", () => {
+  for (const width of [1920, 390]) {
+    test(`sources stay secondary and the summary remains reviewable at ${width}`, async ({ page }) => {
+      const run = await mockFixedWorkflowRuntime(page);
+      Object.assign(run, demo2Snapshot({ workspace_id: "forte-public-office", instruction: "分别核对上线、搜索和体验，形成风险与待办简报" }, 2));
+      const first = run.result.findings[0];
+      first.file_refs = [first.file_refs[0], first.file_refs[0], "unavailable-source", ...first.file_refs.slice(1)];
+      const posts: string[] = [];
+      page.on("request", (request) => { if (request.method() === "POST") posts.push(request.url()); });
+      await page.setViewportSize({ width, height: width === 1920 ? 1200 : 844 });
+      await page.goto("/agent-capabilities");
+      await page.getByRole("textbox", { name: "任务指令" }).fill("核对上线、搜索和体验");
+      await page.getByRole("button", { name: "启动 Control Loop" }).click();
+      await page.getByRole("button", { name: "查看成果", exact: true }).click();
+      const result = page.getByRole("region", { name: "当前成果详情", exact: true });
+      await expect(result.locator(".result-analysis-heading")).toContainText("已保存 · 结论待复核");
+      await expect(result.locator(".result-analysis-heading")).toHaveCSS("background-color", "rgb(247, 249, 252)");
+      await expect(result.locator(".result-sources[open]")).toHaveCount(0);
+      await expect(result.getByRole("button", { name: "打开审查页" })).toHaveCount(0);
+      expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(0);
+      await page.screenshot({ path: `../../outputs/ui-focus-20261008/screenshots/result-default-${width}.png`, fullPage: true });
+      const sources = result.locator(".result-sources").first();
+      await expect(sources.locator("summary")).toHaveText(`查看依据 · ${new Set(first.file_refs).size} 份资料`);
+      await sources.locator("summary").focus();
+      await page.keyboard.press("Enter");
+      await expect(sources).toHaveAttribute("open", "");
+      await expect(sources.getByText("资料信息暂不可用", { exact: true })).toBeVisible();
+      await expect(sources.getByRole("button", { name: "打开审查页", exact: true })).toBeVisible();
+      expect(posts).toHaveLength(1);
+      await sources.getByRole("button", { name: "打开审查页", exact: true }).click();
+      await expect(page.getByRole("dialog")).toBeVisible();
+      await page.keyboard.press("Escape");
+      await expect(result).toBeVisible();
+      await expect(sources).toHaveAttribute("open", "");
+      await result.getByRole("button", { name: "查看其余 2 条发现" }).click();
+      await expect(result.locator(".result-findings > section")).toHaveCount(5);
+      await expect(result.locator(".result-sources[open]")).toHaveCount(1);
+      expect(posts).toHaveLength(1);
+      expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(0);
+      await page.screenshot({ path: `../../outputs/ui-focus-20261008/screenshots/result-evidence-${width}.png`, fullPage: true });
+    });
+  }
+
+  for (const state of ["open", "deferred", "accepted", "stale"]) {
+    test(`the fifth finding follows the authoritative ${state} decision, not a hidden or stale badge`, async ({ page }) => {
+      const run = await mockFixedWorkflowRuntime(page);
+      const base = snapshot({ workspace_id: "forte-public-office", instruction: "核对七项业务事实" }, "completed");
+      const example = base.result!.findings[0];
+      const request = { decision_request_id: "request-result-fifth", finding_id: "finding-result-5", resolution_id: null, branch_id: example.affected_branch_ids[0], candidate_ids: [], state: "open", expected_version: base.version, consequence: "只记录本项判断，不执行外部动作。" };
+      const findings = Array.from({ length: 7 }, (_, index) => ({ ...example, finding_id: `finding-result-${index + 1}`, title: `业务核查项 ${index + 1}`, review: index === 4 ? example.review : null, decision_request: index === 4 ? request : null }));
+      Object.assign(run, base, { result: { ...base.result, findings }, decision_requests: [{ ...request, state }] });
+      await page.goto("/agent-capabilities");
+      await page.getByRole("textbox", { name: "任务指令" }).fill("核对七项业务事实");
+      await page.getByRole("button", { name: "启动 Control Loop" }).click();
+      await page.getByRole("button", { name: "查看成果", exact: true }).click();
+      const result = page.getByRole("region", { name: "当前成果详情", exact: true });
+      const pending = state === "open" || state === "deferred";
+      await expect(result.locator(".result-findings > section")).toHaveCount(pending ? 4 : 3);
+      await expect(result.locator(".result-decision-action")).toHaveCount(pending ? 1 : 0);
+      if (pending) {
+        await expect(result.getByRole("heading", { name: "业务核查项 5", exact: true })).toBeVisible();
+        await expect(result.getByRole("button", { name: "查看并处理", exact: true })).toBeVisible();
+      }
+      await result.getByRole("button", { name: `查看其余 ${pending ? 3 : 4} 条发现` }).click();
+      await expect(result.locator(".result-findings > section")).toHaveCount(7);
+      await expect(result.locator(".result-sources[open]")).toHaveCount(0);
+      await expect(result.locator(".result-decision-action")).toHaveCount(pending ? 1 : 0);
+    });
+  }
+});
+
+test("output agreement is explicit, conflict keeps the draft and correction uses a new key", async ({ page }) => {
+  await mockFixedWorkflowRuntime(page);
+  const requests: any[] = [];
+  await page.route("**/v1/harness/runs", async (route) => {
+    if (route.request().method() !== "POST") return route.fallback();
+    const body = route.request().postDataJSON(); requests.push(body);
+    if (body.output_preference === "workspace_files_allowed") return fulfillJson(route, { detail: [{ msg: "Value error, 输出选择与任务中的禁文件要求冲突，请选择仅页面分析或修改任务要求。" }] }, 422);
+    return route.fallback();
+  });
+  await page.goto("/agent-capabilities");
+  await page.getByRole("textbox", { name: "任务指令" }).fill("核对上线风险，不要生成文件");
+  await page.getByRole("radio", { name: "允许生成文件" }).check();
+  for (const width of [1440, 390]) {
+    await page.setViewportSize({ width, height: 1000 });
+    expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(0);
+    await page.screenshot({ path: `../../outputs/ui-focus-20261008/screenshots/agreement-${width}.png`, fullPage: true });
+  }
+  await page.getByRole("button", { name: "启动 Control Loop" }).click();
+  await expect(page.locator(".agent-capabilities-error")).toContainText("输出选择与任务中的禁文件要求冲突");
+  await expect(page.getByRole("textbox", { name: "任务指令" })).toHaveValue("核对上线风险，不要生成文件");
+  await page.getByRole("radio", { name: "仅页面分析" }).check();
+  await page.getByRole("button", { name: "启动 Control Loop" }).click();
+  await expect(page.getByTestId("task-delivery-ledger")).toBeVisible();
+  expect(requests.map((item) => item.output_preference)).toEqual(["workspace_files_allowed", "analysis_only"]);
+  expect(requests[0].idempotency_key).not.toBe(requests[1].idempotency_key);
+});
+
+test("reviewed handoffs expose disagreement and delivery without claiming approval", async ({ page }) => {
+  const run = await mockFixedWorkflowRuntime(page);
+  Object.assign(run, demo2Snapshot({ workspace_id: "forte-public-office", instruction: "核对产品上线、搜索运行及用户体验，汇总冲突与待办" }, 1));
+  run.contract.output_policy = "analysis_only";
+  const branch = run.branches[3];
+  run.contract.collaboration_protocol = "reviewed_handoffs_v1";
+  run.budget.model_calls_used = 6;
+  run.topology_admission.source_span = 10;
+  run.topology_admission.reasons = ["5 个工作包：3 个独立核查、2 个依赖分析。"];
+  run.rounds[0].next_step.ready_branch_ids = [];
+  run.worker_runs.forEach((worker: any) => { worker.work_role = "source_analysis"; });
+  for (const [index, verdict] of [[3, "conflict"], [4, "insufficient"]] as const) {
+    const target = run.branches[index];
+    const parent = run.contributions[index - 3];
+    const workerId = `review-actual-call-${index}`;
+    const contributionId = `review-candidate-${index}`;
+    target.status = "waiting_input";
+    Object.assign(run.work_units[index], { state: "waiting", latest_contribution_id: contributionId });
+    run.worker_runs.push({ worker_run_id: workerId, branch_id: target.branch_id, outcome: "rejected",
+      summary: "综合意见仍待复核", source_file_refs: target.input_file_refs, model_called: true, output_used: false,
+      elapsed_ms: 2100, work_role: "dependency_review", repair_count: 0,
+      error: "前序结论存在冲突或依据不足，本次综合未采用；已有成果未覆盖。",
+      dependency_assessments: [{ contribution_id: parent.contribution_id, verdict,
+        explanation: verdict === "conflict" ? "计划中的上线条件与实际记录口径不同，不能直接合并成已通过。" : "现有运行记录不足以证明风险已消除，需要保留未确认项。",
+        evidence_anchors: run.artifact_versions[0].findings[index - 3].evidence_anchors }] });
+    run.contributions.push({ ...parent, contribution_id: contributionId, work_unit_id: target.branch_id,
+      branch_id: target.branch_id, worker_run_id: workerId, gate_status: "rejected", artifact_version: null,
+      approved_file_refs: target.input_file_refs, input_contribution_ids: [parent.contribution_id],
+      model_receipt: { called: true, output_used: false, elapsed_ms: 2100 } });
+  }
+  await page.goto("/agent-capabilities");
+  await page.getByRole("textbox", { name: "任务指令" }).fill("核对产品上线、搜索运行及用户体验，汇总冲突与待办");
+  await page.getByRole("button", { name: "启动 Control Loop" }).click();
+  const ledger = page.getByTestId("task-delivery-ledger");
+  await expect(ledger).toContainText("业务结论仍需复核");
+  await ledger.getByRole("button", { name: "查看其余 2 个工作项" }).click();
+  await expect(ledger).toContainText("交叉核对待复核");
+  await ledger.getByRole("button", { name: "收起工作项" }).click();
+  await expect(ledger).not.toContainText("100%");
+  await expect(page.getByRole("heading", { name: "交叉核对存在分歧" })).toBeVisible();
+  for (const width of [1440, 390]) {
+    await page.setViewportSize({ width, height: 1000 });
+    await page.locator(".agent-capabilities-page").evaluate((element) => element.scrollTo(0, 0));
+    await page.evaluate(() => window.scrollTo(0, 0));
+    expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(0);
+    await page.screenshot({ path: `../../outputs/ui-focus-20261008/screenshots/delivery-${width}.png`, fullPage: true });
+    if (width === 1440) {
+      const height = await page.locator(".agent-capabilities-page").evaluate((element) => element.scrollHeight);
+      await page.setViewportSize({ width, height });
+      await page.screenshot({ path: "../../outputs/ui-focus-20261008/screenshots/delivery-1440-full.png", fullPage: true });
+    }
+  }
+  await page.getByTestId("agent-collaboration-tab").click();
+  await expect(page.getByTestId("worker-review-receipts")).not.toBeVisible();
+  for (const width of [1440, 390]) {
+    await page.setViewportSize({ width, height: 1000 });
+    await page.locator(".agent-capabilities-page").evaluate((element) => element.scrollTo(0, 0));
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await page.screenshot({ path: `../../outputs/ui-focus-20261008/screenshots/collaboration-disagreement-${width}.png` });
+  }
+  await page.getByTestId("agent-progress-tab").click();
+  await page.getByRole("button", { name: "查看交叉核对" }).click();
+  const reviews = page.getByTestId("worker-review-receipts");
+  await expect(reviews).toBeVisible();
+  await expect(page.locator("#adaptive-worker-receipts > summary")).toBeFocused();
+  await expect(reviews).toContainText("模型提出冲突，待复核");
+  await expect(reviews).toContainText("已有成果未覆盖");
+  await expect(reviews).not.toContainText("review-actual-call");
+  await expect(reviews).not.toContainText("contribution-");
+  const disputedNode = page.getByTestId("adaptive-workunit-dag").locator("article").filter({ hasText: branch.title });
+  await expect(disputedNode).toContainText("分歧待复核");
+  await expect(disputedNode).not.toContainText("可执行");
+  for (const width of [1440, 390]) {
+    await page.setViewportSize({ width, height: 1000 });
+    await page.locator(".agent-capabilities-page").evaluate((element) => element.scrollTo(0, 0));
+    await page.evaluate(() => window.scrollTo(0, 0));
+    expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(0);
+    await page.screenshot({ path: `../../outputs/ui-focus-20261008/screenshots/reviews-${width}.png`, fullPage: true });
+    if (width === 1440) {
+      const height = await page.locator(".agent-capabilities-page").evaluate((element) => element.scrollHeight);
+      await page.setViewportSize({ width, height });
+      await page.screenshot({ path: "../../outputs/ui-focus-20261008/screenshots/reviews-1440-full.png", fullPage: true });
+    }
+  }
+  run.worker_runs.forEach((worker: any) => { worker.model_called = false; });
+  await page.reload();
+  await page.getByTestId("agent-collaboration-tab").click();
+  await expect(reviews).toHaveCount(0);
+});
+
+test("shows the server no-file contract without inferring it from task wording", async ({ page }) => {
+  const run = await mockFixedWorkflowRuntime(page);
+  run.contract.output_policy = "analysis_only";
+  await page.goto("/agent-capabilities");
+  await page.getByRole("textbox", { name: "任务指令" }).fill("只展示分析，不要生成报告");
+  await page.getByRole("button", { name: "启动 Control Loop" }).click();
+  await expect(page.getByTestId("analysis-only-policy")).toContainText("本任务不生成或导出文件");
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(0);
+  delete run.contract.output_policy;
+  await page.reload();
+  await expect(page.getByTestId("analysis-only-policy")).toHaveCount(0);
+});
+
+test("shows versioned dependency handoffs only with actual model input receipts", async ({ page }) => {
+  const run = await mockFixedWorkflowRuntime(page);
+  Object.assign(run, demo2Snapshot({ workspace_id: "forte-public-office", instruction: "核对前序成果传递" }, 2));
+  run.contributions[3].input_contribution_ids = [run.contributions[0].contribution_id, run.contributions[2].contribution_id];
+  run.contributions[4].input_contribution_ids = [run.contributions[1].contribution_id];
+  run.contributions[4].gate_status = "waiting";
+  run.contributions[4].model_receipt.output_used = false;
+  run.contributions[4].artifact_version = null;
+  run.worker_runs[4].output_used = false;
+  run.worker_runs[4].outcome = "ambiguous";
+  run.branches[4].status = "waiting_input";
+  run.work_units[4].state = "waiting";
+  run.status = "waiting_input";
+  run.control_state = "paused";
+  run.topology_admission.source_span = 10;
+  run.topology_admission.reasons = ["5 个工作包：3 个独立核查、2 个依赖分析。"];
+  run.result = null;
+  run.rounds[0].result = null;
+  run.artifact_versions[1].findings = run.artifact_versions[1].findings.slice(0, 4);
+  run.artifact_versions[1].finding_count = 4;
+  run.commits = [];
+  run.last_commit = null;
+  await page.goto("/agent-capabilities");
+  await page.getByRole("textbox", { name: "任务指令" }).fill("核对前序成果传递");
+  await page.getByRole("button", { name: "启动 Control Loop" }).click();
+  await page.getByTestId("agent-collaboration-tab").click();
+  const handoffs = page.getByTestId("dependency-handoffs");
+  await expect(handoffs).not.toBeVisible();
+  await page.locator("#adaptive-worker-receipts > summary").click();
+  await expect(handoffs).toBeVisible();
+  await expect(handoffs.locator("li")).toHaveCount(2);
+  await expect(handoffs).toContainText("产品上线 Gate · v1");
+  await expect(handoffs).toContainText("本次贡献尚未采用");
+  await expect(handoffs).toContainText("统一待办建议");
+  await expect(handoffs).not.toContainText("contribution-");
+  for (const width of [1440, 390]) {
+    await page.setViewportSize({ width, height: 1000 });
+    await handoffs.scrollIntoViewIfNeeded();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(0);
+    await page.screenshot({ path: `../../outputs/ui-focus-20261008/screenshots/handoff-${width}.png`, fullPage: true });
+  }
+  run.contributions[3].input_contribution_ids = [];
+  run.contributions[4].model_receipt.called = false;
+  await page.reload();
+  await page.getByTestId("agent-collaboration-tab").click();
+  await expect(handoffs).toHaveCount(0);
+});
+
+test("shows actual bounded model input without claiming whole-file analysis", async ({ page }) => {
+  const run = await mockFixedWorkflowRuntime(page);
+  run.rounds[0].model_input_coverage = [
+    { file_ref: txtFile.file_ref, unit: "characters", provided_count: 12000, total_count: null, bounded: true },
+    { file_ref: csvFile.file_ref, unit: "rows", provided_count: 60, total_count: 212, bounded: true },
+  ];
+  await page.goto("/agent-capabilities");
+  await page.getByRole("textbox", { name: "任务指令" }).fill("核对资料范围");
+  await page.getByRole("button", { name: "启动 Control Loop" }).click();
+  const coverage = page.getByTestId("model-input-coverage");
+  await expect(coverage).toContainText("2 份仅提供部分内容，不能视为全文分析");
+  await coverage.locator("summary").click();
+  await expect(coverage).toContainText("12,000 字符");
+  await expect(coverage).toContainText("60 / 212 行");
+  await expect(coverage).not.toContainText("全文已分析");
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(0);
+});
+
+test("explains held model prose without labelling verified file generation a failure", async ({ page }) => {
+  const run = await mockFixedWorkflowRuntime(page);
+  const effect = verifiedEffectSnapshot({ workspace_id: "forte-public-office", instruction: "生成办公成果" });
+  run.workspace_artifacts = effect.workspace_artifacts;
+  run.effect_receipts = effect.effect_receipts;
+  run.narrative_reconciliation = {
+    reconciliation_id: "narrative-reconciliation-123456789abc", round_number: 1,
+    status: "partial", authority: "deterministic_outcome", model_disposition: "supplemental",
+    effect_receipt_id: effect.effect_receipts[0].receipt_id, outcome_revision: "outcome-rev-test",
+    model_returned: true, comparable_claim_count: 1, conflicts: [],
+    message: "模型说明仅保留为待复核草稿", checked_at: new Date().toISOString(), external_action: "none",
+  };
+  run.rounds[0].analysis_receipt = null;
+  run.rounds[0].result = null;
+  await page.goto("/agent-capabilities");
+  await page.getByRole("textbox", { name: "任务指令" }).fill("生成办公成果");
+  await page.getByRole("button", { name: "启动 Control Loop" }).click();
+  const progress = page.getByTestId("agent-progress-summary");
+  await expect(progress).toContainText("模型说明仅保留为待复核草稿");
+  await expect(progress).toContainText("这不表示文件生成失败");
+  run.effect_receipts[0].artifact_ids = [];
+  await page.reload();
+  await expect(progress).not.toContainText("这不表示文件生成失败");
+});
+
+test("shows the validated Branch plan before Worker execution records exist", async ({ page }) => {
+  const run = await mockFixedWorkflowRuntime(page);
+  run.topology_admission.mode = "adaptive_readonly_workers";
+  run.topology_admission.user_confirmation_required = true;
+  run.topology_admission.independent_branch_count = 3;
+  run.topology_admission.reasons = ["三条独立只读分支与两条依赖步骤已通过准入，等待确认。"];
+  run.rounds[0].plan = {
+    summary: "待确认的只读协作计划", selection_reason: "三条独立分支和两条依赖步骤",
+    units: run.branches.map((branch: any) => ({
+      unit_id: branch.unit_id, title: branch.title, objective: branch.objective,
+      input_file_refs: branch.input_file_refs, depends_on: branch.depends_on,
+      tool: "evidence.verify", requires_human_gate: false, side_effect: "none",
+    })),
+  };
+  run.work_units = [];
+  run.worker_runs = [];
+  run.contributions = [];
+  await page.goto("/agent-capabilities");
+  await page.getByRole("textbox", { name: "任务指令" }).fill("确认前查看只读工作包依赖");
+  await page.getByRole("button", { name: "启动 Control Loop" }).click();
+  await page.getByTestId("agent-collaboration-tab").click();
+  const collaboration = page.getByTestId("collaboration-overview");
+  await expect(collaboration).toContainText("5 个计划工作包 · 尚未派发");
+  await expect(collaboration.locator(".adaptive-dag-node")).toHaveCount(5);
+  await expect(collaboration).toContainText("0 条已调用");
+  await expect(collaboration.locator(".adaptive-dag-node.is-adopted")).toHaveCount(0);
+});
 
 test.describe("copilot integration", () => {
   for (const count of [2, 3]) {
@@ -3150,6 +4075,8 @@ test.describe("copilot integration", () => {
     const boundary = page.getByTestId("copilot-boundary-summary");
     await expect(boundary.locator('[data-boundary="incomplete"]')).toContainText("不能把普通重试当成已经作出决定");
     await expect(boundary.locator('[data-boundary="retry"]')).toHaveCount(0);
+    await expect(page.locator(".cap-unavailable")).toContainText("暂不能确认");
+    await expect(page.getByRole("button", { name: "只重试此分支", exact: true })).toHaveCount(0);
   });
 
   test("does not turn a verified release report into permission to release", async ({ page }) => {
@@ -3170,9 +4097,9 @@ test.describe("copilot integration", () => {
     await page.getByRole("button", { name: "启动 Control Loop" }).click();
     await page.getByTestId("agent-collaboration-tab").click();
     const facts = page.getByTestId("swarm-fact-strip");
-    await expect(facts).toContainText("单一主控顺序推进");
+    await expect(page.locator(".adaptive-static-route")).toContainText("单一主控顺序推进");
     await expect(facts).not.toContainText("本次采用固定流程");
-    await expect(facts).toContainText("尚无 Worker 返回回执");
+    await expect(facts).toContainText("0 条已调用 · 0 条已采用");
   });
 
   test("uses real receipt counts and preserves partial adoption", async ({ page }) => {
@@ -3182,13 +4109,13 @@ test.describe("copilot integration", () => {
     await page.getByRole("textbox", { name: "任务指令" }).fill("协作核对产品、搜索 Agent 和用户交互");
     await page.getByRole("button", { name: "启动 Control Loop" }).click();
     await expect(page.getByTestId("copilot-boundary-summary")).toContainText("3 个工作包已就绪");
-    await expect(page.locator(".cap-branch-grid article").filter({ hasText: "就绪，尚未派发" })).toHaveCount(3);
+    await expect(page.locator(".task-delivery-rows article").filter({ hasText: "就绪，尚未派发" })).toHaveCount(3);
     await expect(page.locator(".cap-attention-sources > span")).toHaveCount(10);
     if (process.env.CAPTURE_CAPABILITY_SCREENSHOTS === "1") await page.screenshot({ path: capabilityScreenshotPath("dr-0063-fixture-boundaries-1440.png"), fullPage: true });
     await page.getByTestId("agent-collaboration-tab").click();
     const facts = page.getByTestId("swarm-fact-strip");
-    await expect(facts).toContainText("尚无 Worker 返回回执");
-    await expect(facts).toContainText("准入时剩余 24 次调用");
+    await expect(facts).toContainText("0 条已调用 · 0 条已采用");
+    await expect(page.getByRole("complementary", { name: "当前影响" })).toContainText("准入时剩余 24 次调用");
     await page.getByTestId("collaboration-overview").getByRole("button", { name: "确认并开始协作" }).click();
     await expect(facts).toContainText("3 条已调用");
     await expect(facts).toContainText("2 条已采用");
@@ -3204,7 +4131,8 @@ test.describe("copilot integration", () => {
     if (process.env.CAPTURE_CAPABILITY_SCREENSHOTS === "1") await page.screenshot({ path: capabilityScreenshotPath("dr-0063-fixture-swarm-390.png"), fullPage: true });
     await page.getByTestId("agent-progress-tab").click();
     await expect(page.getByTestId("copilot-boundary-summary")).toContainText("1 个工作包已就绪");
-    await expect(page.locator(".cap-branch-grid article").filter({ hasText: "就绪，尚未派发" })).toHaveCount(1);
+    await page.getByRole("button", { name: "查看其余 2 个工作项", exact: true }).click();
+    await expect(page.locator(".task-delivery-rows article").filter({ hasText: "就绪，尚未派发" })).toHaveCount(1);
     await expect(page.locator(".cap-attention-sources > span")).toHaveCount(3);
     expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(0);
     if (process.env.CAPTURE_CAPABILITY_SCREENSHOTS === "1") await page.screenshot({ path: capabilityScreenshotPath("dr-0063-fixture-boundaries-390.png"), fullPage: true });
@@ -3287,6 +4215,102 @@ async function mockTaskLedgerRuntime(page: Page, mode: "success" | "conflict" | 
   return { get taskGets() { return taskGets; }, get continuationCalls() { return continuationCalls; } };
 }
 
+for (const width of [1920, 1280, 390]) {
+  test(`focused workbench preserves context without extra commands at ${width}`, async ({ page }) => {
+    await mockHarness(page, { evidenceGate: true });
+    await page.setViewportSize({ width, height: width === 390 ? 844 : 1080 });
+    const posts: string[] = [];
+    page.on("request", request => { if (request.method() === "POST") posts.push(request.url()); });
+    await page.goto("/");
+    const panel = page.getByRole("complementary", { name: "Agent 进度", includeHidden: true });
+    const toggle = page.getByRole("button", { name: "过程记录", exact: true });
+    await expect(panel).toBeHidden();
+    await page.getByRole("textbox", { name: "搜索文件或目录" }).fill("授权");
+    const directory = page.getByRole("button", { name: "资料目录", exact: true });
+    await directory.click();
+    await expect(page.locator("#workspace-file-browser")).toBeHidden();
+    await directory.click();
+    await expect(page.getByRole("textbox", { name: "搜索文件或目录" })).toHaveValue("授权");
+    await toggle.click();
+    await expect(panel).toBeVisible();
+    await expect(panel).toBeFocused();
+    await page.keyboard.press("Escape");
+    await expect(panel).toBeHidden();
+    await expect(toggle).toBeFocused();
+    await toggle.click();
+    await page.getByRole("button", { name: "收起过程记录" }).click();
+    await expect(toggle).toBeFocused();
+    expect(posts).toHaveLength(0);
+    await page.getByRole("button", { name: "新建任务", exact: true }).click();
+    await page.getByRole("textbox", { name: "任务指令" }).fill("核对资料，保留引用及待处理问题。");
+    await page.getByRole("button", { name: "启动 Control Loop", exact: true }).click();
+    await expect(page.locator(".workspace-current-task")).toContainText("核对资料");
+    await expect(page.locator(".task-composer")).toBeHidden();
+    await expect(page.locator("#workspace-file-browser")).toBeHidden();
+    await expect(page.locator(".loop-gap > header h3")).toBeVisible();
+    await expect(page.locator(".loop-gap").getByRole("button", { name: "继续此分支" })).toBeVisible();
+    await page.locator(".workspace-task-settings > summary").click();
+    await expect(page.getByRole("textbox", { name: "任务指令" })).toBeVisible();
+    await expect(page.getByRole("textbox", { name: "任务指令" })).toBeDisabled();
+    await page.locator(".workspace-task-settings > summary").click();
+    expect(posts).toHaveLength(1);
+    await page.evaluate(() => { document.querySelector(".harness-workspace-shell")?.scrollTo(0, 0); window.scrollTo(0, 0); });
+    expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(0);
+    const historyButton = page.locator(".data-workbench-status").getByRole("button", { name: /任务会话/ });
+    const historyBounds = await historyButton.boundingBox();
+    expect(historyBounds?.width).toBeGreaterThan(80);
+    expect(historyBounds?.height).toBeLessThanOrEqual(48);
+    await page.screenshot({ path: `../../outputs/ui-focus-20261008/screenshots/focused-waiting-${width}.png`, fullPage: true });
+  });
+}
+
+for (const width of [1920, 390]) {
+  for (const waiting of [false, true]) {
+    test(`execution detail stays secondary with waiting=${waiting} at ${width}`, async ({ page }) => {
+      const state = await mockHarness(page, { evidenceGate: waiting });
+      await page.setViewportSize({ width, height: width === 390 ? 844 : 1080 });
+      const errors: string[] = [];
+      const posts: string[] = [];
+      page.on("pageerror", error => errors.push(error.message));
+      page.on("request", request => { if (request.method() === "POST") posts.push(request.url()); });
+      await page.goto("/");
+      await page.getByRole("textbox", { name: "任务指令" }).fill("核对材料并保留可追溯的成果。");
+      await page.getByRole("button", { name: "启动 Control Loop", exact: true }).click();
+      await expect(page.locator(".loop-view.is-compact")).toBeVisible();
+      await expect(page.locator(".loop-budget")).toBeVisible();
+      await expect(page.getByTestId("task-lineage")).toBeHidden();
+      await expect(page.locator(".loop-phase-rail")).toBeHidden();
+      await expect(page.locator(".artifact-evolution")).toBeHidden();
+      if (waiting) {
+        await expect(page.locator(".loop-gap")).toBeVisible();
+        await expect(page.locator(".loop-gap").getByRole("button", { name: "继续此分支" })).toBeEnabled();
+        await expect(page.locator(".loop-controls").getByRole("button", { name: "结束并保留现有结果" })).toBeEnabled();
+      } else {
+        await expect(page.locator(".loop-branches")).toBeHidden();
+        await expect(page.locator(".loop-brief")).toBeVisible();
+      }
+      const disclosures = page.locator(".execution-detail > summary");
+      const recordDisclosure = disclosures.filter({ hasText: /^执行记录/ });
+      if (await recordDisclosure.count()) await recordDisclosure.click();
+      for (const title of ["处理历史", "本轮过程与材料", "成果版本"]) {
+        const summary = disclosures.filter({ hasText: title });
+        await summary.focus();
+        await page.keyboard.press("Enter");
+        await expect(summary.locator("..")).toHaveAttribute("open", "");
+        await page.keyboard.press("Enter");
+        await expect(summary.locator("..")).not.toHaveAttribute("open", "");
+        await expect(summary).toBeFocused();
+      }
+      expect(posts).toHaveLength(1);
+      expect(state.controls).toHaveLength(0);
+      expect(errors).toEqual([]);
+      expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(false);
+      await page.evaluate(() => { document.querySelector(".harness-workspace-shell")?.scrollTo(0, 0); window.scrollTo(0, 0); });
+      await page.screenshot({ path: `../../outputs/execution-focus-20261008/screenshots/${waiting ? "waiting" : "completed"}-${width}.png`, fullPage: true });
+    });
+  }
+}
+
 test("shows one complete folder workspace instead of registered scenarios", async ({ page }) => {
   await mockHarness(page); await page.goto("/");
   await expect(page.getByRole("heading", { name: "办公资料库" })).toBeVisible();
@@ -3331,14 +4355,17 @@ test("runs an arbitrary task while the agent selects evidence from the whole wor
     loop: { max_rounds: 12, max_files_per_round: 16, max_model_calls: 30, deadline_seconds: 7200 },
   });
   expect(state.starts[0]).not.toHaveProperty("selected_file_refs");
+  await page.getByRole("button", { name: "过程记录", exact: true }).click();
   await expect(page.getByText("规划模型")).toBeVisible();
   await expect(page.getByText("分析模型")).toBeVisible();
-  await expect(page.locator(".loop-view").getByRole("heading", { name: instruction })).toBeVisible();
+  await expect(page.locator(".workspace-current-task").getByRole("heading", { name: instruction })).toBeVisible();
+  await page.locator(".execution-detail > summary").filter({ hasText: /^执行记录/ }).click();
   await page.getByRole("button", { name: /阶段 1/ }).click();
+  await page.locator(".execution-detail > summary").filter({ hasText: "本轮过程与材料" }).click();
   await expect(page.getByText("Agent 本次自动选择")).toBeVisible();
   await expect(page.getByText("文件名与摘要直接涉及当前目标，先读取这些最小证据。")).toBeVisible();
-  await expect(page.getByText("待处理分支")).toBeVisible();
-  await expect(page.locator(".loop-round-detail > footer strong")).toHaveText("等待人工输入");
+  await expect(page.locator(".loop-gap > header h3")).toBeVisible();
+  await expect(page.locator(".loop-round-detail > footer strong, .loop-round-detail > .execution-detail > footer strong")).toHaveText("等待人工输入");
   await expect(page.locator(".loop-branches")).toContainText("任务分支现场");
   await expect(page.locator(".loop-branches")).toContainText("形成分析结果");
   await expect(page.locator(".artifact-evolution")).toContainText("不可变成果历史");
@@ -3376,6 +4403,15 @@ test("shows a real run-workspace file, deterministic checks and a download", asy
   await expect(artifacts).toContainText("1 份内容来源");
   await expect(artifacts).toContainText("3 份内容来源");
   await expect(artifacts).toContainText("原始 FORTE 文件没有被修改");
+  const fileDetails = artifacts.locator(".finance-file-details");
+  await expect(fileDetails).toHaveCount(3);
+  await expect(fileDetails.locator(".workspace-artifact-semantics").first()).not.toBeVisible();
+  await expect(artifacts.locator(".finance-file-purpose").first()).toContainText("2026");
+  await expect(artifacts.getByRole("button", { name: "下载成果" }).first()).toBeVisible();
+  await fileDetails.first().locator("summary").click();
+  await expect(fileDetails.locator(".workspace-artifact-semantics").first()).toBeVisible();
+  await expect(fileDetails.first().getByText("统计口径", { exact: true })).toBeVisible();
+  await fileDetails.first().locator("summary").click();
   await artifacts.getByText("查看逐项检查").first().click();
   await expect(artifacts).toContainText("31 条来源行的科目、客商、方向、金额、file_ref 与 Excel 位置完全一致");
   await artifacts.getByText("查看效果回执").click();
@@ -3459,6 +4495,9 @@ test("keeps TC-05 outcome red when the independent artifact verifier fails", asy
   await expect(artifacts).toContainText("当前文件不得采用");
   await expect(artifacts.locator(".workspace-effect-boundary")).toContainText("确定性效果门未通过");
   await expect(artifacts.locator(".workspace-artifact-status").first()).toContainText("检查未通过");
+  const failedFile = artifacts.locator(":scope > ol > li.is-failed").first();
+  await expect(failedFile.locator(".finance-file-details")).toHaveCount(0);
+  await expect(failedFile.locator(".workspace-artifact-review")).toBeVisible();
 });
 
 test("shows TC-10 source coverage, approval and non-execution as separate facts", async ({ page }) => {
@@ -4237,7 +5276,8 @@ test("labels partial TC-15 model prose as supplemental without replacing the out
 
   const reconciliation = page.getByRole("region", { name: "模型说明与服务端事实对账" });
   await expect(reconciliation).toContainText("当前结论来自服务端复算，模型说明仅作补充");
-  await expect(reconciliation).toContainText("不能覆盖确定性成果");
+  await expect(reconciliation).toContainText("不能覆盖已核验文件");
+  await expect(reconciliation).toContainText("数值核对不证明整段解释正确");
   await expect(page.getByRole("region", { name: "交互痛点全量优先级复核" })).toContainText("212/212 行完整覆盖");
 });
 
@@ -4683,6 +5723,21 @@ test("keeps a failed TC-12 fixed command red and tells the user not to merge", a
   await expect(artifacts).not.toContainText("所有确定性效果门通过");
 });
 
+test("showcase walkthrough separates passed checks from missing analysis authority", async ({ page }) => {
+  await mockHarness(page, { verifiedFinanceArtifactAuditPending: true });
+  await page.goto("/");
+  await page.getByRole("textbox", { name: "任务指令", exact: true }).fill("整理往来资料并核对依据");
+  await page.getByRole("button", { name: "启动 Control Loop", exact: true }).click();
+  await page.getByRole("button", { name: /^成果与建议/ }).click();
+  await expect(page.getByRole("heading", { name: "检查结果已保留，分析结论尚未形成" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "以服务端确定性成果为准" })).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "尚未形成可采用的确定性成果" })).toHaveCount(0);
+  await expect(page.locator(".workspace-artifact-status")).toHaveCount(3);
+  await page.goto("/agent-capabilities");
+  await page.getByRole("button", { name: "查看已生成成果", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "检查结果已保留，分析结论尚未形成" })).toBeVisible();
+});
+
 test("explains a verified finance result in user language and resumes only the location branch", async ({ page }) => {
   const state = await mockHarness(page, { verifiedFinanceArtifactAuditPending: true });
   await page.goto("/");
@@ -4749,7 +5804,7 @@ test("states clearly when an unverified result still needs an original table pos
   await expect(gap).not.toContainText("成果已生成，还有 1 条说明缺少原表格位置");
 });
 
-test("requires a new task when an old run ended before locating the table position", async ({ page }) => {
+test("keeps table-location recovery inside the original task after a run ends", async ({ page }) => {
   await mockHarness(page, { terminalArtifactLocationPending: true });
   await page.goto("/");
   await page.getByRole("textbox", { name: "任务指令" }).fill("继续核对旧任务中的财务说明。");
@@ -4757,10 +5812,10 @@ test("requires a new task when an old run ended before locating the table positi
 
   const gap = page.locator(".loop-gap");
   await expect(gap).toContainText("这次任务已结束，还有 1 条说明未定位");
-  await expect(gap).toContainText("旧 Run 不能原地继续");
-  await expect(gap.getByRole("button", { name: "创建新任务查找位置" })).toBeVisible();
-  await gap.getByRole("button", { name: "创建新任务查找位置" }).click();
-  await expect(page.getByRole("dialog")).toContainText("新建任务，只续办此分支");
+  await expect(gap).toContainText("本段执行已结束；在原任务内续办，旧记录保留");
+  await expect(gap.getByRole("button", { name: "在原任务内查找位置" })).toBeVisible();
+  await gap.getByRole("button", { name: "在原任务内查找位置" }).click();
+  await expect(page.getByRole("dialog")).toContainText("在原任务内续办此分支");
 });
 
 test("keeps distinct audit failures separate even when they reference the same file", async ({ page }) => {
@@ -4794,10 +5849,11 @@ test("restores an immutable artifact version without overwriting history", async
   await expect(page.locator(".artifact-evolution")).toContainText("当前 v2");
 
   const versionOne = page.locator(".artifact-evolution li").filter({ hasText: "v1" });
+  await page.locator(".execution-detail > summary").filter({ hasText: "成果版本" }).click();
   await versionOne.getByRole("button", { name: "恢复" }).click();
 
   await expect(page.locator(".artifact-evolution")).toContainText("当前 v1");
-  await expect(page.getByText("已恢复历史成果版本")).toBeVisible();
+  await expect(page.locator(".workspace-notices").getByText("已恢复历史成果版本")).toBeVisible();
   expect(state.controls.at(-1)).toMatchObject({ command: "rollback", artifact_version: 1 });
   if (process.env.CAPTURE_DR0026_EVIDENCE === "1") {
     await page.locator(".artifact-evolution").screenshot({
@@ -4805,14 +5861,50 @@ test("restores an immutable artifact version without overwriting history", async
     });
   }
   await page.getByRole("button", { name: /成果与建议/ }).click();
-  await expect(page.getByText("任务证据简报 v1 · 已恢复")).toBeVisible();
+  await expect(page.locator(".result-analysis-heading")).toContainText("分析记录 v1 · 已恢复");
 });
+
+for (const status of [202, 409]) {
+  test(`late Loop control ${status} cannot replace a newer task draft`, async ({ page }) => {
+    await mockHarness(page, { interactiveLoop: true });
+    await page.goto("/");
+    await page.getByRole("textbox", { name: "任务指令" }).fill("原任务等待暂停回执");
+    await page.getByRole("button", { name: "启动 Control Loop" }).click();
+    const pause = page.locator(".loop-control-actions").getByRole("button", { name: "暂停", exact: true });
+    await expect(pause).toBeEnabled();
+    let release!: () => void;
+    let ready!: () => void;
+    const gate = new Promise<void>(resolve => { release = resolve; });
+    const accepted = new Promise<void>(resolve => { ready = resolve; });
+    await page.route("**/runs/*/controls", async route => {
+      const control = route.request().postDataJSON();
+      ready();
+      await gate;
+      const run = snapshot({ workspace_id: "forte-public-office", instruction: "原任务等待暂停回执" }, "paused", control.expected_version + 1);
+      await fulfillJson(route, status === 202 ? { run, replayed: false } : { detail: "旧任务版本冲突" }, status);
+    });
+    await pause.click();
+    await accepted;
+    await page.getByRole("button", { name: "新建任务", exact: true }).click();
+    const draft = page.getByRole("textbox", { name: "任务指令" });
+    await draft.fill("新的独立任务草稿");
+    const finished = page.waitForEvent("requestfinished", request => request.url().endsWith("/controls"));
+    release();
+    await finished;
+    await page.evaluate(() => new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))));
+    await expect(draft).toHaveValue("新的独立任务草稿");
+    await expect(draft).toBeEnabled();
+    await expect(page.locator(".workspace-error")).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "启动 Control Loop" })).toBeEnabled();
+  });
+}
 
 test("pauses, steers and resumes the same Agent Control Loop from server receipts", async ({ page }) => {
   const state = await mockHarness(page, { interactiveLoop: true }); await page.goto("/");
   await page.getByRole("textbox", { name: "任务指令" }).fill("研究整个资料库，并在证据不足时继续下一轮。");
   await page.getByRole("button", { name: "启动 Control Loop" }).click();
   await expect(page.locator(".loop-view")).toContainText("第 1 轮");
+  await page.locator(".workspace-task-settings > summary").click();
   await expect(page.getByRole("button", { name: "当前 Loop 运行中" })).toBeDisabled();
   await expect(page.getByRole("textbox", { name: "任务指令" })).toBeDisabled();
   await expect(page.getByText(/Agent 正在整个资料库中自主检索/)).toBeVisible();
@@ -4836,7 +5928,7 @@ test("holds an evidence gap until the user confirms another round", async ({ pag
   const state = await mockHarness(page, { evidenceGate: true }); await page.goto("/");
   await page.getByRole("textbox", { name: "任务指令" }).fill("核对跨文件事实，证据不足时先停下来。 ");
   await page.getByRole("button", { name: "启动 Control Loop" }).click();
-  await expect(page.locator(".loop-round-detail > footer strong")).toHaveText("等待人工输入");
+  await expect(page.locator(".loop-round-detail > footer strong, .loop-round-detail > .execution-detail > footer strong")).toHaveText("等待人工输入");
   const retryLane = page.locator(".loop-gap-branches > li").filter({ hasText: "形成分析结果" });
   await expect(retryLane).toContainText("无需选择文件，可让 Agent 重新查找依据");
   await expect(retryLane.getByRole("button", { name: "继续此分支" })).toBeEnabled();
@@ -4870,10 +5962,11 @@ test("restores the current server run after a page reload", async ({ page }) => 
   const instruction = "研究整个资料库并保留可恢复轨迹。";
   await page.getByRole("textbox", { name: "任务指令" }).fill(instruction);
   await page.getByRole("button", { name: "启动 Control Loop" }).click();
-  await expect(page.locator(".loop-view")).toContainText(instruction);
+  await expect(page.locator(".workspace-current-task")).toContainText(instruction);
 
   await page.reload();
-  await expect(page.locator(".loop-view")).toContainText(instruction);
+  await expect(page.locator(".workspace-current-task")).toContainText(instruction);
+  await page.locator(".workspace-task-settings > summary").click();
   await expect(page.getByRole("button", { name: "当前 Loop 运行中" })).toBeDisabled();
 });
 
@@ -4883,7 +5976,7 @@ test("opens a cited source file from an analysis finding", async ({ page }) => {
   await page.getByRole("textbox", { name: "任务指令" }).fill("核对余额并引用来源文件。");
   await page.getByRole("button", { name: "启动 Control Loop" }).click();
   await page.getByRole("button", { name: /成果与建议/ }).click();
-  await page.getByRole("button", { name: "打开审查页" }).first().click();
+  await openFirstResultReview(page);
   await expect(page.getByRole("dialog", { name: "需要你核对并决定下一步" })).toBeVisible();
   await expect(page.getByRole("dialog")).toContainText("高亮位置由服务端从逐字引用解析");
   await expect(page.getByRole("dialog")).toContainText("设计预期");
@@ -4913,7 +6006,7 @@ test("keeps the review body, evidence and safe table preview readable on desktop
   await page.getByRole("textbox", { name: "任务指令" }).fill("核对超长客商的期末余额并打开问题审查页。");
   await page.getByRole("button", { name: "启动 Control Loop" }).click();
   await page.getByRole("button", { name: /成果与建议/ }).click();
-  await page.getByRole("button", { name: "打开审查页" }).first().click();
+  await openFirstResultReview(page);
 
   const dialog = page.getByRole("dialog");
   await expect(dialog).toContainText("星海科技股份有限公司华东区域企业服务中心");
@@ -4960,7 +6053,7 @@ test("turns a finding into an evidence-backed human decision and a new task", as
   await page.getByRole("textbox", { name: "任务指令" }).fill("核对新闻搜索路由并说明如何处理。");
   await page.getByRole("button", { name: "启动 Control Loop" }).click();
   await page.getByRole("button", { name: /成果与建议/ }).click();
-  await page.getByRole("button", { name: "打开审查页" }).first().click();
+  await openFirstResultReview(page);
 
   const dialog = page.getByRole("dialog", { name: "需要你核对并决定下一步" });
   if (process.env.CAPTURE_DR0030_EVIDENCE === "1") {
@@ -5004,7 +6097,7 @@ test("records closing a pending decision as defer and restores the receipt", asy
   await page.getByRole("textbox", { name: "任务指令" }).fill("核对新闻搜索路由并说明如何处理。");
   await page.getByRole("button", { name: "启动 Control Loop" }).click();
   await page.getByRole("button", { name: /成果与建议/ }).click();
-  await page.getByRole("button", { name: "打开审查页" }).first().click();
+  await openFirstResultReview(page);
   await page.getByRole("button", { name: "关闭问题审查页" }).click();
 
   await expect.poll(() => state.controls.length).toBe(1);
@@ -5015,7 +6108,7 @@ test("records closing a pending decision as defer and restores the receipt", asy
   });
 
   await page.getByRole("button", { name: /成果与建议/ }).click();
-  await page.getByRole("button", { name: "打开审查页" }).first().click();
+  await openFirstResultReview(page);
   await expect(page.getByRole("dialog")).toContainText("人工决定已记录");
   await expect(page.getByRole("dialog")).toContainText("已暂缓");
   if (process.env.CAPTURE_DR0030_EVIDENCE === "1") {
@@ -5035,7 +6128,7 @@ test("always closes the review page even when the defer receipt conflicts", asyn
   await page.getByRole("textbox", { name: "任务指令" }).fill("核对新闻搜索路由并说明如何处理。");
   await page.getByRole("button", { name: "启动 Control Loop" }).click();
   await page.getByRole("button", { name: /成果与建议/ }).click();
-  await page.getByRole("button", { name: "打开审查页" }).first().click();
+  await openFirstResultReview(page);
 
   const dialog = page.getByRole("dialog", { name: "需要你核对并决定下一步" });
   await dialog.getByRole("button", { name: "关闭问题审查页" }).click();
@@ -5116,6 +6209,243 @@ test("acceptance new task always opens a clean composer from collaboration", asy
     expect(state.controls).toHaveLength(0);
     await composer.fill("尚未提交的临时任务");
     await page.getByRole("tab", { name: "协作方式 Adaptive Swarm" }).click();
+  }
+});
+
+test.describe("concise waiting and collaboration copy", () => {
+  for (const width of [1672, 390]) {
+    test(`waiting keeps decisions visible and discloses receipts at ${width}`, async ({ page }) => {
+      const state = await mockHarness(page, { sourceRecovery: true });
+      const errors: string[] = [];
+      page.on("pageerror", error => errors.push(error.message));
+      await page.setViewportSize({ width, height: width === 390 ? 844 : 1050 });
+      await page.goto("/");
+      await page.getByRole("textbox", { name: "任务指令" }).fill("核对产品资料中的引用依据，保留成果");
+      await page.getByRole("button", { name: "启动 Control Loop", exact: true }).click();
+      const waiting = page.locator(".loop-gap");
+      const lanes = waiting.locator(".loop-gap-branches > li");
+      await expect(page.getByRole("heading", { name: "共有 2 个待处理，每次处理 1 个", exact: true })).toHaveCount(1);
+      await expect(lanes).toHaveCount(2);
+      await expect(lanes.first().getByText("需要从 2 个原文位置中选 1 个", { exact: true })).toBeVisible();
+      await expect(lanes.nth(1).getByRole("button", { name: "继续此分支" })).toBeVisible();
+      await expect(page.locator(".loop-branches")).toBeHidden();
+      await expect(page.getByTestId("task-delivery-ledger").getByRole("heading", { name: "形成分析结果" })).toBeVisible();
+      await expect(page.locator(".delivery-pending-actions")).toHaveCount(0);
+      const receipt = lanes.first().locator("details");
+      await expect(receipt).not.toHaveAttribute("open", "");
+      await receipt.locator("summary").focus();
+      await page.keyboard.press("Enter");
+      await expect(receipt.getByText("workflow.py、search_agent.log", { exact: true })).toBeVisible();
+      await page.keyboard.press("Enter");
+      expect(state.controls).toHaveLength(0);
+      expect(state.starts).toHaveLength(1);
+      expect(errors).toEqual([]);
+      expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(false);
+      // A two-issue mobile section should no longer become a four-stage vertical flow.
+      expect((await waiting.boundingBox())!.height).toBeLessThan(width === 390 ? 1000 : 650);
+      await waiting.getByRole("heading").first().click();
+      await page.evaluate(() => { document.querySelectorAll<HTMLElement>("*").forEach(element => { if (element.scrollTop) element.scrollTop = 0; }); });
+      await page.screenshot({ path: capabilityScreenshotPath(`concise-waiting-${width}.png`), fullPage: true });
+      await waiting.screenshot({ path: capabilityScreenshotPath(`waiting-section-${width}.png`) });
+      await lanes.first().getByRole("button", { name: "选择原文位置" }).click();
+      await expect(page.getByRole("dialog")).toBeVisible();
+      expect(state.controls).toHaveLength(0);
+    });
+
+    test(`collaboration summarizes blocked work without counting duplicate impacts at ${width}`, async ({ page }) => {
+      await mockDemoRuntime(page, "demo2-partial");
+      await page.setViewportSize({ width, height: width === 390 ? 844 : 1050 });
+      await page.goto("/agent-capabilities");
+      await page.getByRole("textbox", { name: "任务指令" }).fill("核对产品上线、搜索风险与用户交互");
+      await page.getByRole("button", { name: "启动 Control Loop" }).click();
+      await page.getByTestId("agent-collaboration-tab").click();
+      const collaboration = page.getByTestId("collaboration-overview");
+      await expect(collaboration.getByText("只读分析，不执行外部动作", { exact: true })).toBeVisible();
+      await expect(collaboration.locator(".adaptive-impact-panel")).toContainText("准入时剩余");
+      await collaboration.getByRole("button", { name: "确认并开始协作" }).click();
+      const posts: string[] = [];
+      page.on("request", request => { if (request.method() === "POST") posts.push(request.url()); });
+      const dag = collaboration.getByTestId("adaptive-workunit-dag");
+      await expect(dag.locator(".adaptive-dag-node")).toHaveCount(5);
+      await expect(dag).toContainText("依赖 1");
+      await expect(collaboration.locator(".adaptive-impact-panel li.is-blocked")).toHaveCount(1);
+      await expect(collaboration.locator(".adaptive-result-bar")).not.toContainText("项影响");
+      await expect(collaboration.locator(".adaptive-result-bar")).toContainText("有待处理事项");
+      await collaboration.getByRole("button", { name: "执行回执", exact: true }).click();
+      await expect(page.locator("#adaptive-worker-receipts")).toHaveAttribute("open", "");
+      await expect(page.locator(".swarm-fact-strip")).toContainText("条已调用");
+      await page.locator("#adaptive-worker-receipts > summary").click();
+      expect(posts).toEqual([]);
+      expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(false);
+      await collaboration.getByRole("heading", { name: "本次采用协作处理" }).click();
+      await page.evaluate(() => { document.querySelectorAll<HTMLElement>("*").forEach(element => { if (element.scrollTop) element.scrollTop = 0; }); });
+      await page.screenshot({ path: capabilityScreenshotPath(`concise-collaboration-${width}.png`), fullPage: true });
+      await collaboration.screenshot({ path: capabilityScreenshotPath(`collaboration-section-${width}.png`) });
+    });
+  }
+});
+
+test.describe("delivery-first root structure", () => {
+  for (const exceptional of ["bounded", "round-decision"] as const) {
+    test(`completed status cannot fold ${exceptional} warnings`, async ({ page }) => {
+      const run = await mockFixedWorkflowRuntime(page, "single_controller");
+      Object.assign(run, releaseReadinessEffectSnapshot({ workspace_id: "forte-public-office", instruction: "核对上线条件并保留来源限制" }));
+      const round = run.rounds.at(-1);
+      if (exceptional === "bounded") {
+        round.model_input_coverage = [{ file_ref: csvFile.file_ref, unit: "rows", provided_count: 60, total_count: 212, bounded: true }];
+      } else {
+        const pending = sourceLocationRecoverySnapshot({ workspace_id: run.workspace_id, instruction: run.instruction });
+        round.next_step.decision_requests = [{ ...pending.decision_requests[0], state: "pending" }];
+      }
+      await page.goto("/");
+      await page.getByRole("textbox", { name: "任务指令" }).fill(run.instruction);
+      await page.getByRole("button", { name: "启动 Control Loop", exact: true }).click();
+      await expect(page.locator(".loop-round-detail")).toBeVisible();
+      await expect(page.locator(".execution-detail > summary").filter({ hasText: /^执行记录/ })).toHaveCount(0);
+      if (exceptional === "bounded") await expect(page.getByTestId("model-input-coverage")).toContainText("仅提供部分内容");
+    });
+  }
+  for (const width of [1672, 390]) {
+    test(`file delivery precedes receipts and keeps business veto at ${width}`, async ({ page }) => {
+      const run = await mockFixedWorkflowRuntime(page, "single_controller");
+      Object.assign(run, releaseReadinessEffectSnapshot({ workspace_id: "forte-public-office", instruction: "核对上线条件并生成风险报告" }));
+      const posts: string[] = [];
+      const errors: string[] = [];
+      page.on("request", request => { if (request.method() === "POST") posts.push(request.url()); });
+      page.on("pageerror", error => errors.push(error.message));
+      await page.setViewportSize({ width, height: width === 390 ? 844 : 1050 });
+      await page.goto("/");
+      await page.getByRole("textbox", { name: "任务指令" }).fill(run.instruction);
+      await page.getByRole("button", { name: "启动 Control Loop", exact: true }).click();
+      const files = page.locator(".workspace-artifacts");
+      await expect(files).toBeVisible();
+      await expect(page.getByTestId("task-delivery-ledger")).toHaveCount(0);
+      await expect(files.getByRole("heading", { name: "不得上线", exact: true })).toBeVisible();
+      await expect(files.locator(".business-gate-list > li")).toHaveCount(run.workspace_artifacts[0].business_gate_outcome.gates.length);
+      await expect(files.getByRole("button", { name: "下载成果", exact: true })).toHaveCount(2);
+      await expect(page.locator(".loop-round-detail")).toBeHidden();
+      await expect(page.locator(".loop-effect-conclusion")).toBeHidden();
+      const record = page.locator(".execution-detail > summary").filter({ hasText: /^执行记录/ });
+      await expect(record).toBeVisible();
+      expect((await files.boundingBox())!.y).toBeLessThan((await record.boundingBox())!.y);
+      const calculation = files.locator(".gate-calculation > summary").first();
+      await calculation.focus();
+      await page.keyboard.press("Enter");
+      await expect(calculation.locator("..")).toHaveAttribute("open", "");
+      await page.keyboard.press("Enter");
+      await record.click();
+      await expect(page.locator(".loop-round-detail")).toBeVisible();
+      await record.click();
+      await page.getByRole("button", { name: "查看完整成果", exact: true }).click();
+      await expect(page.locator(".business-gate-outcome")).not.toHaveClass(/is-concise/);
+await page.getByRole("button", { name: /^执行进展/ }).click();
+      expect(posts).toHaveLength(1);
+      expect(errors).toEqual([]);
+      expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(false);
+      await page.screenshot({ path: capabilityScreenshotPath(`delivery-overview-${width}.png`), fullPage: true });
+    });
+
+    test(`all unfinished work remains frontstage across rounds at ${width}`, async ({ page }) => {
+      const run = await mockFixedWorkflowRuntime(page, "single_controller");
+      Object.assign(run, sourceLocationRecoverySnapshot({ workspace_id: "forte-public-office", instruction: "核对资料并逐项保留结果" }));
+      const template = run.branches[0];
+      run.branches = [
+        ...Array.from({ length: 4 }, (_, i) => ({ ...template, branch_id: `completed-${i}`, title: `已完成工作 ${i + 1}`, status: "completed" })),
+        ...run.branches,
+        { ...template, branch_id: "earlier-waiting", title: "上一轮尚待确认的工作", round_number: 1, status: "waiting_input" },
+      ];
+      await page.setViewportSize({ width, height: width === 390 ? 844 : 1050 });
+      await page.goto("/");
+      await page.getByRole("textbox", { name: "任务指令" }).fill(run.instruction);
+      await page.getByRole("button", { name: "启动 Control Loop", exact: true }).click();
+      const ledger = page.getByTestId("task-delivery-ledger");
+      await expect(ledger.getByRole("heading", { name: "上一轮尚待确认的工作" })).toBeVisible();
+      await expect(ledger.getByRole("button", { name: "处理：上一轮尚待确认的工作" })).toBeVisible();
+      await expect(page.locator(".loop-gap")).toBeVisible();
+      await expect(page.locator(".loop-controls")).toBeVisible();
+      await expect(ledger.getByRole("heading", { name: "已完成工作 1" })).toHaveCount(0);
+      await ledger.getByRole("button", { name: /项已完成工作/ }).click();
+      await expect(ledger.getByRole("heading", { name: "已完成工作 1" })).toBeVisible();
+      expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(false);
+      await page.screenshot({ path: capabilityScreenshotPath(`pending-overview-${width}.png`), fullPage: true });
+    });
+  }
+});
+
+test.describe("reference-led information hierarchy", () => {
+  for (const width of [1672, 390]) {
+    test(`root retains unfinished branches and visible recovery at ${width}`, async ({ page }) => {
+      await page.setViewportSize({ width, height: width === 390 ? 844 : 940 });
+      await mockHarness(page, { sourceRecovery: true });
+      const posts: string[] = [];
+      page.on("request", request => { if (request.method() === "POST") posts.push(request.url()); });
+      await page.goto("/");
+      await page.getByRole("textbox", { name: "任务指令" }).fill("核对产品资料中的引用依据，保留成果");
+      await page.getByRole("button", { name: "启动 Control Loop", exact: true }).click();
+      const delivery = page.getByTestId("task-delivery-ledger");
+      await expect(delivery).toBeVisible();
+      await expect(delivery.locator(".task-delivery-rows")).toBeVisible();
+      await expect(page.locator(".loop-gap")).toBeVisible();
+      await expect(page.locator(".loop-controls")).toBeVisible();
+      const initialPosts = posts.length;
+      await delivery.getByRole("button", { name: "查看成果", exact: true }).click();
+      await expect(page.locator(".loop-view")).toHaveCount(0);
+      await page.getByRole("button", { name: /^执行进展/ }).click();
+      await expect(page.locator(".loop-gap")).toBeVisible();
+      expect(posts).toHaveLength(initialPosts);
+      expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(false);
+      await page.screenshot({ path: capabilityScreenshotPath(`root-pending-${width}.png`), fullPage: true });
+    });
+
+    test(`verified files have one outcome entry and retain the business veto at ${width}`, async ({ page }) => {
+      await page.setViewportSize({ width, height: width === 390 ? 844 : 940 });
+      await mockHarness(page, { releaseEffect: true });
+      await page.goto("/agent-capabilities");
+      await page.getByRole("textbox", { name: "任务指令" }).fill("核对上线条件并生成风险报告");
+      await page.getByRole("button", { name: "启动 Control Loop", exact: true }).click();
+      await expect(page.locator(".cap-verified-outcome")).toContainText("不得上线");
+      await expect(page.getByTestId("task-delivery-ledger").getByRole("button", { name: "查看成果" })).toHaveCount(0);
+      await expect(page.getByTestId("task-delivery-ledger").getByRole("heading", { name: "工作项" })).toBeVisible();
+      await expect(page.locator(".cap-quiet-status")).toHaveCount(0);
+      expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(false);
+      await page.screenshot({ path: capabilityScreenshotPath(`outcome-${width}.png`), fullPage: true });
+      await page.getByRole("button", { name: "查看已生成成果" }).click();
+      await expect(page.getByRole("region", { name: "当前成果详情", exact: true })).toBeVisible();
+      await expect(page.locator(".workspace-artifacts")).toContainText("不得上线");
+    });
+
+    test(`collaboration prioritizes dependencies and keeps receipts inspectable at ${width}`, async ({ page }) => {
+      await page.setViewportSize({ width, height: width === 390 ? 844 : 940 });
+      const run = await mockFixedWorkflowRuntime(page);
+      Object.assign(run, demo2Snapshot({ workspace_id: "forte-public-office", instruction: "核对产品、搜索风险与用户体验" }, 1));
+      const posts: string[] = [];
+      const errors: string[] = [];
+      page.on("request", request => { if (request.method() === "POST") posts.push(request.url()); });
+      page.on("pageerror", error => errors.push(error.message));
+      await page.goto("/agent-capabilities");
+      await page.getByRole("textbox", { name: "任务指令" }).fill("核对产品、搜索风险与用户体验");
+      await page.getByRole("button", { name: "启动 Control Loop" }).click();
+      await page.getByTestId("agent-collaboration-tab").click();
+      const graph = page.getByTestId("adaptive-workunit-dag");
+      await expect(graph).toBeVisible();
+      await expect(graph.locator("article")).toHaveCount(5);
+      await expect(page.getByTestId("swarm-fact-strip")).toBeHidden();
+      const impact = page.getByRole("complementary", { name: "当前影响" });
+      await expect(impact).toContainText("准入时剩余");
+      await expect(impact.getByRole("button", { name: "继续下一批" })).toBeEnabled();
+      if (width > 800) expect((await graph.boundingBox())!.y).toBeLessThan(400);
+      const initialPosts = posts.length;
+      await page.screenshot({ path: capabilityScreenshotPath(`swarm-focused-${width}.png`), fullPage: true });
+      await page.locator("#adaptive-worker-receipts > summary").click();
+      await expect(page.getByTestId("swarm-fact-strip")).toBeVisible();
+      await expect(page.getByTestId("swarm-fact-strip")).toContainText("3 条已调用");
+      await page.locator("#adaptive-worker-receipts > summary").focus();
+      await page.keyboard.press("Enter");
+      await expect(page.getByTestId("swarm-fact-strip")).toBeHidden();
+      expect(posts).toHaveLength(initialPosts);
+      expect(errors).toEqual([]);
+      expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(false);
+    });
   }
 });
 
@@ -5266,7 +6596,8 @@ test("accepts a source candidate for bounded branch recovery", async ({ page }) 
   await page.getByRole("button", { name: "启动 Control Loop" }).click();
 
   const recovery = page.locator(".loop-source-recovery");
-  await expect(recovery).toContainText("需要选择原文的分支与可以直接重试的分支已经分开标注");
+  await expect(recovery.getByText("需要从 2 个原文位置中选 1 个", { exact: true })).toBeVisible();
+  await expect(recovery.getByRole("button", { name: "继续此分支" })).toBeVisible();
   await page.locator(".loop-gap-branches > li").first().getByRole("button", { name: "选择原文位置" }).click();
   const dialog = page.getByRole("dialog", { name: "从 2 个原文位置中选 1 个" });
   await expect(dialog).toContainText("从 2 个真实位置中选 1 个");
@@ -5305,7 +6636,8 @@ test("keeps three ambiguous locations comparable on mobile and records a bounded
   await page.getByRole("button", { name: "启动 Control Loop" }).click();
 
   const recovery = page.locator(".loop-source-recovery");
-  await expect(recovery).toContainText("需要选择原文的分支与可以直接重试的分支已经分开标注");
+  await expect(recovery.getByText("需要从 3 个原文位置中选 1 个", { exact: true })).toBeVisible();
+  await expect(recovery.getByRole("button", { name: "继续此分支" })).toBeVisible();
   await page.locator(".loop-gap-branches > li").first().getByRole("button", { name: "选择原文位置" }).click();
   const dialog = page.getByRole("dialog", { name: "从 3 个原文位置中选 1 个" });
   await expect(dialog).toContainText("系统发现");
@@ -5433,6 +6765,27 @@ test("shows one recommended retry action without making optional input look requ
   expect(state.controls[0].branch_id).toBe("branch-222222222222");
 });
 
+test("numeric rejection stays a warning without promising automatic repair", async ({ page }) => {
+  const state = await mockHarness(page, { sourceRecovery: true });
+  const run = sourceLocationRecoverySnapshot({ workspace_id: "forte-public-office", instruction: "只读核对产品计数" });
+  run.events[0] = { ...run.events[0], event_name: "analysis_numeric_rejected", message: "数字与批准来源不一致：P0 功能数应为 7，候选为 6。本次说明未采用。" };
+  await page.route("**/v1/harness/runs/**", async route => {
+    if (new URL(route.request().url()).pathname.endsWith("/events")) {
+      return route.fulfill({ status: 200, contentType: "text/event-stream", body: ": waiting\n\n" });
+    }
+    if (route.request().method() === "GET") return fulfillJson(route, run);
+    return route.fallback();
+  });
+  await page.addInitScript(id => sessionStorage.setItem("office-agent:forte-public-office:active-run", id), run.run_id);
+  await page.goto("/");
+  await expect(page.locator("#activity-panel")).toBeHidden();
+  await expect(page.locator(".workspace-notices").getByText("数字与批准来源不一致，未采用", { exact: true })).toBeVisible();
+  await expect(page.locator(".workspace-notices").getByText(/P0 功能数应为 7，候选为 6/)).toBeVisible();
+  await expect(page.getByText("原文位置未通过，正在受控重试", { exact: true })).toHaveCount(0);
+  expect(state.starts).toHaveLength(0);
+  expect(state.controls).toHaveLength(0);
+});
+
 test("pauses an unlocatable result with a guided branch recovery", async ({ page }) => {
   const state = await mockHarness(page, { sourceRecovery: true }); await page.goto("/");
   await page.getByRole("textbox", { name: "任务指令" }).fill("核对跨文件版本冲突并逐条定位原文。");
@@ -5476,7 +6829,7 @@ test("pauses an unlocatable result with a guided branch recovery", async ({ page
   await expect(page.locator(".loop-brief")).toContainText("完成 2 轮");
 });
 
-test("creates a new scoped task instead of pretending a budget-stopped run can resume", async ({ page }) => {
+test("continues a scoped branch in the same task instead of resuming a terminal run", async ({ page }) => {
   const state = await mockHarness(page, { boundedRecovery: true }); await page.goto("/");
   const originalInstruction = "核对资料库中的上线条件和测试结论。";
   await page.getByRole("textbox", { name: "任务指令" }).fill(originalInstruction);
@@ -5488,15 +6841,16 @@ test("creates a new scoped task instead of pretending a budget-stopped run can r
   await expect(recovery).toContainText("原文件修改或外部动作");
   await expect(page.locator(".trace-recovery-hint")).toContainText("本次 Run 已结束");
   await page.locator(".loop-gap").getByRole("button").first().click();
-  const gapDialog = page.getByRole("dialog", { name: /用“.*”分支新建任务/ });
-  await expect(gapDialog).toContainText("旧 Run 已结束，不能原地续跑");
-  await expect(gapDialog).toContainText("新建任务，只续办此分支");
-  await expect(gapDialog).toContainText("不需要修改文件，也不需要填写内容");
+  const gapDialog = page.getByRole("dialog", { name: /在原任务内续办“.*”/ });
+  await expect(gapDialog).toContainText("旧 Run 已结束");
+  await expect(gapDialog).toContainText("在原任务内续办此分支");
+  await expect(gapDialog).toContainText("不需要修改源文件");
+  await expect(gapDialog.getByRole("button", { name: "只续办此分支", exact: true })).toBeEnabled();
   if (process.env.CAPTURE_DR0031_EVIDENCE === "1") {
     await gapDialog.screenshot({ path: "../../docs/evidence/screenshots/dr-0031-terminal-gap-recovery.png" });
   }
   await gapDialog.getByRole("button", { name: "关闭问题审查页" }).click();
-  await recovery.getByRole("textbox", { name: "补充给新任务的方向（可选）" }).fill("优先核对版本号和测试日期。" );
+  await recovery.getByRole("textbox", { name: "补充给后续分支的方向（可选）" }).fill("优先核对版本号和测试日期。" );
   if (process.env.CAPTURE_DR0030_EVIDENCE === "1") {
     await recovery.screenshot({ path: "../../docs/evidence/screenshots/dr-0030-bounded-branch-recovery.png" });
   }
@@ -5512,21 +6866,25 @@ test("creates a new scoped task instead of pretending a budget-stopped run can r
   expect(continuationBody.instruction).toContain("优先核对版本号和测试日期");
 });
 
-test("starts a new whole-workspace loop only after the user confirms an agent proposal", async ({ page }) => {
+test("requests a same-task continuation only after the user confirms an agent proposal", async ({ page }) => {
   const state = await mockHarness(page); await page.goto("/");
   await page.getByRole("textbox", { name: "任务指令" }).fill("研究整个资料库并提出下一步。");
   await page.getByRole("button", { name: "启动 Control Loop" }).click();
-  await page.getByRole("button", { name: /成果与建议/ }).click();
+  await page.getByRole("navigation", { name: "工作区视图" }).getByRole("button", { name: "成果", exact: true }).click();
   const proposal = "继续核对授权范围与财务往来之间是否存在执行约束，并形成待办清单。";
   await expect(page.getByText(proposal)).toBeVisible();
-  await page.getByRole("button", { name: "查看形成依据" }).click();
+  await page.getByRole("button", { name: "查看建议说明" }).click();
   await expect(page.getByRole("dialog", { name: "建议 1" })).toBeVisible();
-  await expect(page.getByRole("dialog")).toContainText("当前协议没有为每条 follow_up 单独绑定引用");
+  await expect(page.getByRole("dialog")).toContainText("模型没有提供这条建议的独立理由或直接引用");
+  await expect(page.getByRole("dialog")).toContainText("不是原任务的未完成清单");
   await page.getByRole("button", { name: "关闭问题审查页" }).click();
+  const continuation = page.waitForRequest(request => request.url().endsWith("/continue") && request.method() === "POST");
   await page.getByRole("button", { name: "确认并启动" }).click();
-  await expect.poll(() => state.starts.length).toBe(2);
-  expect(state.starts[1].instruction).toBe(proposal);
-  expect(state.starts[1]).not.toHaveProperty("selected_file_refs");
+  const body = (await continuation).postDataJSON();
+  expect(state.starts).toHaveLength(1);
+  expect(body.instruction).toBe(proposal);
+  expect(body.purpose).toBe("follow_up");
+  expect(body).not.toHaveProperty("selected_file_refs");
 });
 
 test("reuses the same command key when a start response is unknown", async ({ page }) => {
@@ -5554,7 +6912,7 @@ test("explains an unavailable workspace and fails closed without a result", asyn
   await expect(page.getByRole("heading", { name: "办公资料库" })).toBeVisible();
   await page.getByRole("textbox", { name: "任务指令" }).fill("核对资料库中的余额变化。");
   await page.getByRole("button", { name: "启动 Control Loop" }).click();
-  await expect(page.getByText("本轮已安全停止")).toBeVisible();
+  await expect(page.locator(".workspace-notices").getByText("本轮已安全停止")).toBeVisible();
   await expect(page.locator(".loop-failure-recovery")).toContainText("这次运行已停下，但不是死路");
   await expect(page.getByRole("button", { name: "缩小范围重新核对" })).toBeEnabled();
   await page.getByRole("button", { name: "缩小范围重新核对" }).click();
@@ -5590,7 +6948,7 @@ test("mobile keeps file-manager browsing, task input, preview and trajectory usa
   await page.getByRole("textbox", { name: "任务指令" }).fill("核对余额并打开问题审查页。");
   await page.getByRole("button", { name: "启动 Control Loop" }).click();
   await page.getByRole("button", { name: /成果与建议/ }).click();
-  await page.getByRole("button", { name: "打开审查页" }).first().click();
+  await openFirstResultReview(page);
   await expect(page.getByRole("dialog")).toBeVisible();
   await expect(page.getByRole("dialog")).toContainText("选择一条，右侧打开真实文件并高亮对应位置");
   const reviewMetrics = await page.evaluate(() => ({ viewport: document.documentElement.clientWidth, scroll: document.documentElement.scrollWidth }));
@@ -5600,6 +6958,83 @@ test("mobile keeps file-manager browsing, task input, preview and trajectory usa
   expect(closeBox?.height).toBeGreaterThanOrEqual(44);
 });
 
+test.describe("Demo 1 calm execution surface", () => {
+  for (const width of [1920, 390]) {
+    for (const failed of [false, true]) {
+      test(`completed task removes inactive controls but retains warnings at ${width}, failed=${failed}`, async ({ page }) => {
+        await page.setViewportSize({ width, height: width === 390 ? 844 : 1200 });
+        const run = await mockFixedWorkflowRuntime(page, "single_controller");
+        const admission = run.topology_admission;
+        Object.assign(run, failed ? failedReleaseReadinessEffectSnapshot({ workspace_id: "forte-public-office", instruction: "核对上线条件并生成风险报告" }) : releaseReadinessEffectSnapshot({ workspace_id: "forte-public-office", instruction: "核对上线条件并生成风险报告" }));
+        run.topology_admission = admission;
+        const posts: string[] = [];
+        page.on("request", request => { if (request.method() === "POST") posts.push(request.url()); });
+        await page.goto("/");
+        await page.getByRole("textbox", { name: "任务指令" }).fill("核对上线条件并生成风险报告");
+        await page.getByRole("button", { name: "启动 Control Loop", exact: true }).click();
+        await expect(page.getByTestId("task-delivery-ledger")).toHaveCount(0);
+        await expect(page.locator(".workspace-artifacts")).toBeVisible();
+        await expect(page.locator(".business-gate-outcome > header")).toBeVisible();
+        await expect(page.getByTestId("topology-admission")).toBeHidden();
+        await expect(page.locator(".loop-controls")).toHaveCount(0);
+        await expect(page.locator(".loop-round-tabs")).toHaveCount(run.rounds.length === 1 ? 0 : 1);
+        const route = page.locator(".execution-detail > summary").filter({ hasText: "执行方式" });
+        await route.focus();
+        await page.keyboard.press("Enter");
+        await expect(page.getByTestId("topology-admission")).toBeVisible();
+        await page.keyboard.press("Enter");
+        await expect(route).toBeFocused();
+        if (failed) {
+          await expect(page.locator(".workspace-artifact-review.is-failed").first()).toBeVisible();
+          await expect(page.locator(".workspace-file-explanation")).toHaveCount(0);
+        } else {
+          await expect(page.locator(".workspace-file-explanation")).toHaveCount(2);
+          await expect(page.locator(".workspace-file-explanation .workspace-artifact-review").first()).toBeHidden();
+          await page.locator(".workspace-file-explanation > summary").first().click();
+          await expect(page.locator(".workspace-file-explanation .workspace-artifact-review").first()).toBeVisible();
+        }
+        await page.getByRole("button", { name: "查看完整成果", exact: true }).click();
+        await expect(page.locator(".workspace-artifacts")).toBeVisible();
+        await expect(page.locator(".workspace-file-explanation")).toHaveCount(0);
+        await expect(page.locator(".workspace-artifact-review").first()).toBeVisible();
+        expect(posts).toHaveLength(1);
+        expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(false);
+        await page.getByRole("button", { name: /^执行进展/ }).click();
+        await page.evaluate(() => { document.querySelector(".harness-workspace-shell")?.scrollTo(0, 0); window.scrollTo(0, 0); });
+        await page.screenshot({ path: process.env.CAPABILITY_SCREENSHOT_DIR ? capabilityScreenshotPath(`root-terminal-${failed}-${width}.png`) : `../../outputs/demo1-calm-20261010/terminal-${failed}-${width}.png` });
+      });
+    }
+  }
+});
+
+test.describe("Demo 1 outcome clarity", () => {
+  for (const failed of [false, true]) {
+    test(`real file records remain visible without a logical version, failed=${failed}`, async ({ page }) => {
+      const run = await mockFixedWorkflowRuntime(page);
+      Object.assign(run, failed ? failedReleaseReadinessEffectSnapshot({ workspace_id: "forte-public-office", instruction: "核对上线条件并生成风险报告" }) : releaseReadinessEffectSnapshot({ workspace_id: "forte-public-office", instruction: "核对上线条件并生成风险报告" }));
+      run.artifact_versions = [];
+      run.last_commit = null;
+      await page.goto("/");
+      await page.getByRole("textbox", { name: "任务指令" }).fill("核对上线条件并生成风险报告");
+      await page.getByRole("button", { name: "启动 Control Loop" }).click();
+      const ledger = page.locator(".workspace-artifacts");
+      await expect(ledger).toContainText("Agent 已生成 2 份真实成果文件");
+      await expect(ledger.locator(":scope > ol > li.is-passed")).toHaveCount(failed ? 0 : 2);
+      await expect(ledger).not.toContainText("尚无成果版本");
+      await expect(ledger.locator(".business-gate-outcome")).toBeVisible();
+      await expect(ledger.getByRole("button", { name: "查看完整成果", exact: true })).toBeEnabled();
+      await expect(page.locator(".workspace-context-toolbar > span")).toHaveText("办公资料库");
+      for (const width of [1920, 390]) {
+        await page.setViewportSize({ width, height: width === 1920 ? 1080 : 844 });
+        expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(0);
+        await page.screenshot({ path: `../../outputs/demo1-clarity-20261010/files-${failed}-${width}.png` });
+      }
+      await ledger.getByRole("button", { name: "查看完整成果", exact: true }).click();
+      await expect(page.locator(".workspace-artifacts")).toBeVisible();
+    });
+  }
+});
+
 test.describe("Demo 1/2 runtime acceptance", () => {
   test("Demo 1 shows a durable task timeline and continues only the unfinished branch", async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 1100 });
@@ -5607,17 +7042,21 @@ test.describe("Demo 1/2 runtime acceptance", () => {
     await page.goto("/");
     await page.getByRole("textbox", { name: "任务指令" }).fill("继续未完成的资料核对任务。");
     await page.getByRole("button", { name: "启动 Control Loop" }).click();
-    await page.getByRole("button", { name: "Agent 路径" }).click();
+await page.getByRole("button", { name: /^执行进展/ }).click();
     await expect(page.getByRole("button", { name: "继续未完成任务" }).first()).toBeVisible();
     await expect(page.getByText(/不能继续原地运行/)).toBeVisible();
     const continuation = page.waitForRequest((request) => request.url().includes("/continue") && request.method() === "POST");
-    await page.getByRole("button", { name: "继续未完成任务" }).first().click();
+    await page.locator(".workspace-content").getByRole("button", { name: "继续未完成任务" }).first().click();
     const continuationRequest = await continuation;
     expect(continuationRequest.postDataJSON()).toMatchObject({ branch_id: "branch-222222222222", expected_task_version: 1 });
     await expect(page.locator('[data-testid="task-lineage"]')).toContainText("持续处理链 · 第 2 次");
     await expect(page.locator('[data-testid="task-lineage"]')).toContainText("本次只核对该分支的批准来源");
     await expect(page.locator('[data-testid="task-lineage"]')).toContainText("来源版本已变化");
     await expect(page.locator('[data-testid="task-lineage"]')).toContainText("不携带旧的采用事实");
+    await expect(page.locator(".loop-view")).not.toContainText("到达预算边界");
+    await expect(page.locator(".loop-view")).not.toContainText("已停止");
+    await expect(page.getByTestId("task-delivery-ledger")).toContainText("本次尚未生成新成果");
+    await expect(page.locator(".loop-budget")).toContainText("0秒");
     const lineageTextSizes = await page.locator('[data-testid="task-lineage"] span, [data-testid="task-lineage"] strong, [data-testid="task-lineage"] p, [data-testid="task-lineage"] small').evaluateAll((nodes) => nodes.map((node) => Number.parseFloat(getComputedStyle(node).fontSize)));
     expect(lineageTextSizes.length).toBeGreaterThan(0);
     expect(Math.min(...lineageTextSizes)).toBeGreaterThanOrEqual(13);
@@ -5637,9 +7076,9 @@ test.describe("Demo 1/2 runtime acceptance", () => {
     await expect(page.getByRole("link", { name: "Agent 能力" })).toHaveAttribute("href", "/agent-capabilities");
     await page.getByRole("textbox", { name: "任务指令" }).fill("按可解释拓扑核对多个独立工作包。");
     await page.getByRole("button", { name: "启动 Control Loop" }).click();
-    await page.getByRole("button", { name: "Agent 路径" }).click();
+    await page.getByRole("button", { name: /^执行进展/ }).click();
     const admission = page.locator('[data-testid="topology-admission"]');
-    await expect(admission).toContainText("已选择受限只读协作");
+    await expect(admission).toContainText("由多个 Agent 分工处理");
     await expect(admission).toContainText("3 个职能来源组形成 3 条独立根分支");
     const admissionTextSizes = await admission.locator('h3, header > b, .loop-topology-facts, .loop-topology-facts b, .loop-worker-receipts > span, .loop-worker-receipts > div, .loop-worker-receipts small').evaluateAll((nodes) => nodes.map((node) => Number.parseFloat(getComputedStyle(node).fontSize)));
     expect(admissionTextSizes.length).toBeGreaterThan(0);
@@ -5668,7 +7107,7 @@ test.describe("Demo 1/2 runtime acceptance", () => {
     await expect(page.locator(".result-expand")).toContainText("查看其余 2 条发现");
     await page.locator(".result-expand").click();
     await expect(page.locator(".result-findings")).toContainText("统一待办建议");
-    await page.getByRole("button", { name: "Agent 路径" }).click();
+    await page.getByRole("button", { name: /^执行进展/ }).click();
     await page.setViewportSize({ width: 390, height: 844 });
     const mobileOverflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
     expect(mobileOverflow).toBeLessThanOrEqual(0);
@@ -5683,7 +7122,7 @@ test.describe("Demo 1/2 runtime acceptance", () => {
     await page.goto("/");
     await page.getByRole("textbox", { name: "任务指令" }).fill("形成跨职能风险与待办简报。");
     await page.getByRole("button", { name: "启动 Control Loop" }).click();
-    await page.getByRole("button", { name: "Agent 路径" }).click();
+    await page.getByRole("button", { name: /^执行进展/ }).click();
     const admission = page.locator('[data-testid="topology-admission"]');
     await admission.getByRole("button", { name: "确认并启动只读执行器" }).click();
     await expect(admission).toContainText("搜索 Agent 运行风险存在多个原文位置");
@@ -5716,8 +7155,10 @@ test.describe("Demo 1/2 runtime acceptance", () => {
     await history.locator("[data-testid=task-session]").first().getByRole("button", { name: /Run 1/ }).click();
     await expect(page.getByRole("status")).toContainText("历史 Run 只读查看");
     await expect(page.locator(".result-proposal-actions button").filter({ hasText: "确认并启动" })).toHaveCount(0);
-    await page.getByRole("button", { name: "Agent 路径" }).click();
-    await expect(page.locator(".loop-controls button").first()).toBeDisabled();
+    await page.getByRole("button", { name: /^执行进展/ }).click();
+    await expect(page.locator(".loop-controls")).toHaveCount(0);
+    await expect(page.getByRole("status")).toContainText("历史 Run 只读查看");
+    expect(state.controlRequests).toHaveLength(0);
     await expect.poll(() => state.eventRequests.length).toBe(0);
   });
 
@@ -5725,6 +7166,8 @@ test.describe("Demo 1/2 runtime acceptance", () => {
     const state = await mockSessionHistoryRuntime(page);
     await page.goto("/");
     const instruction = page.getByRole("textbox", { name: "任务指令" });
+    await expect(page.locator(".workspace-current-task")).toContainText("同一任务的最新 Run");
+    await page.locator(".workspace-task-settings > summary").click();
     await expect(instruction).toHaveValue("同一任务的最新 Run");
     await expect(instruction).toBeDisabled();
 
@@ -5812,12 +7255,104 @@ test.describe("Demo 1/2 runtime acceptance", () => {
     await expect(page.getByTestId("task-ledger-pointer")).toContainText("当前任务 · 版本 v2");
   });
 
+  for (const width of [1440, 390]) {
+    test(`user walkthrough keeps a saved draft readable and returns to pending work at ${width}`, async ({ page }) => {
+      await page.setViewportSize({ width, height: 1000 });
+      const state = await mockHarness(page, { sourceRecovery: true });
+      await page.goto("/");
+      await page.getByRole("combobox", { name: "文件类型" }).selectOption("XLSX");
+      await expect(page.locator(".workspace-tree-file")).toContainText(["2025往来明细-上半年.xlsx", "2025往来明细-下半年.xlsx", "2026往来明细.xlsx"]);
+      await page.getByRole("textbox", { name: "任务指令", exact: true }).fill("核对引用依据并保留阶段草稿");
+      await page.getByRole("button", { name: "启动 Control Loop", exact: true }).click();
+      expect(state.starts[0]).not.toHaveProperty("selected_file_refs");
+      await expect(page.getByRole("button", { name: "请选择待处理分支" })).toHaveCount(0);
+      await expect(page.getByLabel("调整下一轮方向", { exact: true })).toBeHidden();
+      await page.getByRole("button", { name: "查看成果", exact: true }).click();
+      await expect(page.locator(".result-analysis-heading")).toContainText("分析草稿 v1 · 已保留 · 结论待复核");
+      await expect(page.locator(".result-draft-summary")).toContainText("原文片段唯一定位");
+      await expect(page.getByText("暂无可展示的分析成果", { exact: true })).toHaveCount(0);
+      await page.screenshot({ path: capabilityScreenshotPath(`walkthrough-draft-${width}.png`), fullPage: true });
+      await page.getByRole("button", { name: "返回执行进展", exact: true }).click();
+      await expect(page.locator(".loop-gap").getByRole("button", { name: "选择原文位置" })).toBeVisible();
+      const adjustment = page.locator(".loop-controls details");
+      await adjustment.locator("summary").focus();
+      await page.keyboard.press("Enter");
+      await expect(page.getByLabel("调整下一轮方向", { exact: true })).toBeVisible();
+      expect(state.controls).toHaveLength(0);
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+    });
+
+    test(`user walkthrough puts cooperation confirmation before details at ${width}`, async ({ page }) => {
+      await page.setViewportSize({ width, height: 1000 });
+      await mockDemoRuntime(page, "demo2-partial");
+      const dispatches: unknown[] = [];
+      page.on("request", request => { if (request.method() === "POST" && request.url().endsWith("/workers")) dispatches.push(request.postDataJSON()); });
+      await page.goto("/");
+      await page.getByRole("textbox", { name: "任务指令", exact: true }).fill("核对产品、搜索运行和用户交互风险");
+      await page.getByRole("button", { name: "启动 Control Loop", exact: true }).click();
+      const launch = page.getByRole("button", { name: "打开 Adaptive Swarm 工作台" });
+      await launch.click();
+      const dialog = page.getByTestId("adaptive-workbench");
+      const confirm = dialog.getByRole("button", { name: "确认并开始协作", exact: true });
+      await expect(confirm).toBeInViewport();
+      await expect(dialog.locator(".adaptive-branch-grid")).toContainText("就绪，待你确认");
+      await expect(dialog.locator(".adaptive-branch-grid")).not.toContainText("处理中");
+      await expect(dialog.locator(".adaptive-workunit-list")).toBeHidden();
+      await expect(dialog.locator(".adaptive-source-list")).toBeHidden();
+      expect(dispatches).toHaveLength(0);
+      await page.screenshot({ path: capabilityScreenshotPath(`walkthrough-cooperation-${width}.png`), fullPage: true });
+      await confirm.click();
+      await expect.poll(() => dispatches.length).toBe(1);
+      await expect(dialog.locator(".adaptive-receipt-list")).toContainText("引用位置待核对");
+      await expect(dialog.locator(".adaptive-receipt-list")).toContainText("成果待核对");
+      await expect(dialog.locator(".adaptive-receipt-list > article")).toHaveCount(3);
+      await expect(dialog.locator(".adaptive-branch-grid")).toContainText("等待前置工作");
+      await expect(dialog.getByRole("button", { name: "继续下一波", exact: true })).toBeVisible();
+      await page.keyboard.press("Escape");
+      await expect(launch).toBeFocused();
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+    });
+  }
+
+  test("cooperation dialog never offers a batch when the ready list is empty", async ({ page }) => {
+    const fixed = await mockFixedWorkflowRuntime(page);
+    fixed.topology_admission.mode = "adaptive_readonly_workers";
+    fixed.rounds[0].next_step.ready_branch_ids = [];
+    await page.goto("/");
+    await page.getByRole("textbox", { name: "任务指令", exact: true }).fill("核对当前可执行工作");
+    await page.getByRole("button", { name: "启动 Control Loop", exact: true }).click();
+    await page.getByRole("button", { name: "打开 Adaptive Swarm 工作台" }).click();
+    await expect(page.getByRole("dialog").getByRole("button", { name: /确认并开始协作|继续下一波/ })).toHaveCount(0);
+    await expect(page.getByRole("dialog")).toContainText("部分工作尚未完成，已有成果保留");
+  });
+
+  for (const disposition of ["rejected", "supplemental"]) {
+    test(`saved draft does not reintroduce ${disposition} narrative on either surface`, async ({ page }) => {
+      const fixed = await mockFixedWorkflowRuntime(page);
+      fixed.result = null;
+      fixed.artifact_versions = [{ ...(snapshot({ workspace_id: "forte-public-office", instruction: "旧记录" }, "completed") as any).artifact_versions[0], summary: "不应进入当前结论的旧草稿" }];
+      fixed.narrative_reconciliation = { reconciliation_id: `narrative-${disposition}`, status: "partial", authority: "model_only", model_disposition: disposition, output_used: false, message: "当前模型说明未采用", conflicts: [] };
+      for (const path of ["/", "/agent-capabilities"]) {
+        await page.goto(path);
+        if (path === "/") {
+          await page.getByRole("textbox", { name: "任务指令", exact: true }).fill("核对当前结论");
+          await page.getByRole("button", { name: "启动 Control Loop", exact: true }).click();
+          await page.getByRole("button", { name: "查看成果", exact: true }).click();
+        } else {
+          await page.getByRole("button", { name: "查看成果", exact: true }).click();
+        }
+        await expect(page.getByText("暂无可展示的分析成果", { exact: true })).toBeVisible();
+        await expect(page.locator(".result-analysis-heading")).toHaveCount(0);
+      }
+    });
+  }
+
   test("Adaptive workbench exposes canonical route facts and restores focus on Escape", async ({ page }) => {
     await mockDemoRuntime(page, "demo2");
     await page.goto("/");
     await page.getByRole("textbox", { name: "任务指令" }).fill("按拓扑核对工作包");
     await page.getByRole("button", { name: "启动 Control Loop" }).click();
-    await page.getByRole("button", { name: "Agent 路径" }).click();
+    await page.getByRole("button", { name: /^执行进展/ }).click();
     const launch = page.getByRole("button", { name: "打开 Adaptive Swarm 工作台" });
     await launch.click();
     const workbench = page.getByTestId("adaptive-workbench");
@@ -5825,13 +7360,13 @@ test.describe("Demo 1/2 runtime acceptance", () => {
     if (process.env.CAPTURE_CAPABILITY_SCREENSHOTS === "1") await workbench.screenshot({ path: capabilityScreenshotPath("capability-adaptive-workspace-focus-1440.png") });
     if (process.env.CAPTURE_DR0056_EVIDENCE === "1") await workbench.screenshot({ path: "../../docs/evidence/screenshots/dr-0056-adaptive-swarm-workbench.png" });
     await expect(workbench).toContainText("尚未有执行回执");
-    await expect(workbench.locator(".adaptive-route-framework .is-active")).toHaveText("Adaptive Swarm");
+    await expect(workbench.locator(".adaptive-summary strong")).toHaveText("Adaptive Swarm");
     await expect(workbench.locator(".adaptive-source-list span")).toHaveCount(10);
     await expect(workbench.locator(".adaptive-branch-grid li")).toHaveCount(5);
     await expect(workbench.locator(".adaptive-branch-grid li")).toContainText(["产品上线 Gate", "搜索 Agent 运行风险", "交互痛点证据", "跨工作包优先级与影响核对", "统一待办建议"]);
-    await expect(workbench.locator(".adaptive-branch-grid")).toContainText("被依赖阻塞");
+    await expect(workbench.locator(".adaptive-branch-grid")).toContainText("等待前置工作");
     await expect(workbench.locator(".adaptive-workunit-list article")).toHaveCount(5);
-    await expect(workbench.locator(".adaptive-workunit-list")).toContainText("被依赖阻塞");
+    await expect(workbench.locator(".adaptive-workunit-list")).toContainText("等待前置工作");
     const factSizes = await workbench.locator(".adaptive-source-list span, .adaptive-branch-grid li p, .adaptive-receipt-list article span, .adaptive-version-list article span, .adaptive-boundary").evaluateAll((nodes) => nodes.map((node) => Number.parseFloat(getComputedStyle(node).fontSize)));
     expect(factSizes.length).toBeGreaterThan(0);
     expect(Math.min(...factSizes)).toBeGreaterThanOrEqual(13);
@@ -5862,10 +7397,11 @@ test.describe("Demo 1/2 runtime acceptance", () => {
     await page.goto("/");
     await page.getByRole("textbox", { name: "任务指令" }).fill("固定流程核对");
     await page.getByRole("button", { name: "启动 Control Loop" }).click();
-    await page.getByRole("button", { name: "Agent 路径" }).click();
+    await page.getByRole("button", { name: /^执行进展/ }).click();
+    await page.locator(".execution-detail > summary").filter({ hasText: "执行方式" }).click();
     await page.getByRole("button", { name: "打开 Adaptive Swarm 工作台" }).click();
     const workbench = page.getByTestId("adaptive-workbench");
-    await expect(workbench.locator(".adaptive-route-framework .is-active")).toHaveText("固定流程");
+    await expect(workbench.locator(".adaptive-summary strong")).toHaveText("固定流程");
     await expect(workbench.locator(".adaptive-header-boundary")).toHaveText("本次未启动 Adaptive Swarm");
     await expect(workbench).toContainText("本次未启动协作执行");
     await expect(workbench).toContainText("尚未有执行回执");
@@ -5907,12 +7443,12 @@ test.describe("Demo 1/2 runtime acceptance", () => {
     await controlFacts.getByRole("button", { name: "查看完整执行记录" }).click();
     await page.locator(".cap-protocol-record > summary").click();
     await expect(surface.getByTestId("agent-execution-details")).toContainText("持续处理链");
-    await expect(surface.getByTestId("agent-execution-details")).toContainText("服务端路线");
+    await expect(surface.getByTestId("agent-execution-details")).toContainText("协作安排");
     await controlFacts.getByRole("button", { name: "跳到 Adaptive Swarm" }).click();
     await expect(page).toHaveURL(/#adaptive-swarm$/);
     const collaboration = capabilities.getByTestId("collaboration-overview");
     await expect(collaboration).toContainText("Adaptive Swarm");
-    await expect(collaboration).toContainText("任务准入");
+    await expect(collaboration).toContainText("确定分工");
     await expect(collaboration.locator(".collaboration-route-options article")).toHaveCount(3);
     await expect(collaboration.locator(".collaboration-disclosure")).toHaveCount(4);
     await expect(surface.locator(".agent-current-task")).toContainText("当前任务");
@@ -5921,9 +7457,9 @@ test.describe("Demo 1/2 runtime acceptance", () => {
     const dag = collaboration.getByTestId("adaptive-workunit-dag");
     await expect(surface.getByRole("link", { name: "返回办公资料库" })).toHaveAttribute("href", "/");
     await expect(dag.locator(".adaptive-dag-node")).toHaveCount(5);
-    await expect(dag.locator(".adaptive-dag-node").filter({ has: page.getByText("产品上线 Gate", { exact: true }) })).toContainText("根");
+    await expect(dag.locator(".adaptive-dag-node").filter({ has: page.getByText("产品上线 Gate", { exact: true }) })).toContainText("无前置依赖");
     await expect(dag.locator(".adaptive-dag-node").filter({ hasText: "跨工作包优先级与影响核对" })).toContainText("依赖 1");
-    await expect(dag.locator(".adaptive-dag-node").filter({ has: page.getByText("产品上线 Gate", { exact: true }) })).toContainText("下一波待确认 / 可执行");
+    await expect(dag.locator(".adaptive-dag-node").filter({ has: page.getByText("产品上线 Gate", { exact: true }) })).toContainText("就绪，待你确认");
     await expect(dag.locator(".adaptive-dag-node").filter({ hasText: "跨工作包优先级与影响核对" })).toContainText("等待前置工作");
     await expect(dag.locator("path.adaptive-dag-edge")).toHaveCount(2);
     await expect(dag.locator("marker")).toHaveCount(1);
@@ -5940,6 +7476,16 @@ test.describe("Demo 1/2 runtime acceptance", () => {
     await expect(dag.locator(".adaptive-dag-node").filter({ hasText: "依赖 1" })).toHaveCount(2);
     const adaptiveMobileMetrics = await page.evaluate(() => ({ width: document.documentElement.clientWidth, scroll: document.documentElement.scrollWidth }));
     expect(adaptiveMobileMetrics.scroll).toBeLessThanOrEqual(adaptiveMobileMetrics.width);
+    const nodeMetrics = await dag.locator(".adaptive-dag-node").evaluateAll((nodes) => nodes.map((node) => ({
+      width: node.clientWidth, scrollWidth: node.scrollWidth, height: node.clientHeight, scrollHeight: node.scrollHeight,
+      left: node.getBoundingClientRect().left, right: node.getBoundingClientRect().right,
+    })));
+    for (const node of nodeMetrics) {
+      expect(node.scrollWidth).toBeLessThanOrEqual(node.width);
+      expect(node.scrollHeight).toBeLessThanOrEqual(node.height);
+      expect(node.left).toBeGreaterThanOrEqual(0);
+      expect(node.right).toBeLessThanOrEqual(390);
+    }
     await page.setViewportSize({ width: 1440, height: 1100 });
     if (process.env.CAPTURE_CAPABILITY_SCREENSHOTS === "1") {
       await collaboration.getByRole("button", { name: "确认并开始协作" }).click();
@@ -6034,9 +7580,9 @@ test.describe("Demo 1/2 runtime acceptance", () => {
     await collaboration.getByRole("button", { name: "确认并开始协作" }).click();
     await expect(packageStage).toContainText("正在处理");
     const dependentNode = collaboration.getByTestId("adaptive-workunit-dag").locator(".adaptive-dag-node").filter({ hasText: "跨工作包优先级与影响核对" });
-    await expect(dependentNode).toContainText("下一波待确认 / 可执行");
+    await expect(dependentNode).toContainText("就绪，待你确认");
     await collaboration.locator(".collaboration-disclosure").filter({ has: page.locator(".collaboration-package-list") }).locator("summary").click();
-    await expect(collaboration.locator(".collaboration-package-list article").filter({ hasText: "跨工作包优先级与影响核对" })).toContainText("下一波待确认 / 可执行");
+    await expect(collaboration.locator(".collaboration-package-list article").filter({ hasText: "跨工作包优先级与影响核对" })).toContainText("就绪，待你确认");
     await collaboration.getByRole("button", { name: "继续下一批" }).click();
     await expect(collaboration.getByRole("status")).toContainText("协作已完成");
     await expect(collaboration.getByRole("button", { name: "继续下一批" })).toHaveCount(0);
@@ -6132,13 +7678,49 @@ test.describe("Demo 1/2 runtime acceptance", () => {
     const collaboration = page.getByTestId("collaboration-overview");
     await collaboration.getByRole("button", { name: "确认并开始协作" }).click();
     await expect(collaboration.getByTestId("adaptive-workunit-dag").locator(".adaptive-dag-node")).toHaveCount(5);
-    await expect(collaboration.getByRole("complementary", { name: "当前影响" })).toContainText("有事项牵连");
+    await expect(collaboration.getByRole("complementary", { name: "当前影响" })).toContainText("有事项待处理");
     await expect(collaboration.getByRole("complementary", { name: "当前影响" })).toContainText("前置工作包尚未完成");
     await expect(collaboration.getByRole("complementary", { name: "当前影响" })).toContainText("搜索 Agent 运行风险");
     await page.setViewportSize({ width: 390, height: 844 });
     await expect(collaboration.getByTestId("adaptive-workunit-dag")).toContainText("依赖 1");
     const metrics = await page.evaluate(() => ({ width: document.documentElement.clientWidth, scroll: document.documentElement.scrollWidth }));
     expect(metrics.scroll).toBeLessThanOrEqual(metrics.width);
+  });
+
+  test("ambiguous Worker without a decision opens receipts instead of promising a simple retry", async ({ page }) => {
+    await mockHarness(page);
+    const run = demo2PartialAmbiguousSnapshot({ workspace_id: "forte-public-office", instruction: "核对存在来源歧义的工作包" });
+    run.rounds[0].next_step.ready_branch_ids = [];
+    run.rounds[0].next_step.candidate_branch_ids = [];
+    await page.route("**/v1/harness/runs/**", async route => {
+      if (new URL(route.request().url()).pathname.endsWith("/events")) {
+        return route.fulfill({ status: 200, contentType: "text/event-stream", body: ": waiting\n\n" });
+      }
+      if (route.request().method() === "GET") return fulfillJson(route, run);
+      return route.fallback();
+    });
+    await page.route("**/v1/harness/runs", async route => {
+      if (route.request().method() === "POST") return fulfillJson(route, { run, replayed: false }, 202);
+      return route.fallback();
+    });
+    await page.goto("/agent-capabilities");
+    await page.getByRole("textbox", { name: "任务指令" }).fill(run.instruction);
+    await page.getByRole("button", { name: "启动 Control Loop" }).click();
+    await expect(page.getByTestId("agent-progress-summary")).toBeVisible();
+    const posts: string[] = [];
+    page.on("request", (request) => { if (request.method() === "POST") posts.push(request.url()); });
+    const attention = page.getByRole("region", { name: "当前待办" });
+    await expect(attention).toContainText("引用位置尚未确定");
+    await expect(attention).toContainText("尚无可提交的确认项");
+    await expect(attention).not.toContainText("无需核对文件");
+    await expect(attention.getByRole("button", { name: "只重试此分支" })).toHaveCount(0);
+    await page.setViewportSize({ width: 390, height: 844 });
+    expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(0);
+    await attention.getByRole("button", { name: "查看核对详情" }).click();
+    await expect(page.getByTestId("agent-collaboration-tab")).toHaveAttribute("aria-selected", "true");
+    await expect(page.locator("#adaptive-worker-receipts")).toHaveAttribute("open", "");
+    await expect(page.locator("#adaptive-worker-receipts")).toContainText("搜索 Agent 运行风险存在多个原文位置");
+    expect(posts).toEqual([]);
   });
 
   test("Agent capabilities route exposes a real review entry without making history actionable", async ({ page }) => {
@@ -6163,8 +7745,8 @@ test.describe("Demo 1/2 runtime acceptance", () => {
     await page.goto("/");
     await page.getByRole("textbox", { name: "任务指令" }).fill("继续未完成任务");
     await page.getByRole("button", { name: "启动 Control Loop" }).click();
-    await page.getByRole("button", { name: "Agent 路径" }).click();
-    await page.getByRole("button", { name: "继续未完成任务" }).first().click();
+    await page.getByRole("navigation", { name: "工作区视图" }).getByRole("button", { name: "任务", exact: true }).click();
+    await page.locator(".workspace-content").getByRole("button", { name: "继续未完成任务" }).first().click();
     await expect(page.locator('[data-testid="task-lineage"]')).toContainText("持续处理链 · 第 2 次");
     await expect(page.locator('[data-testid="task-ledger-pointer"]')).toContainText("当前任务 · 版本 v2");
     expect(state.continuationCalls).toBe(1);
@@ -6182,7 +7764,7 @@ test.describe("Demo 1/2 runtime acceptance", () => {
     await page.goto("/");
     await page.getByRole("textbox", { name: "任务指令" }).fill("继续未完成任务");
     await page.getByRole("button", { name: "启动 Control Loop" }).click();
-    await page.getByRole("button", { name: "Agent 路径" }).click();
+    await page.getByRole("button", { name: /^执行进展/ }).click();
     await page.getByRole("button", { name: "继续未完成任务" }).first().click();
     await expect(page.locator('[data-testid="task-lineage"]')).toContainText("持续处理链 · 第 1 次");
     await expect(page.locator('[data-testid="task-ledger-history"]')).toContainText("历史记录 · 当前任务已进入第 2 次处理");
@@ -6202,7 +7784,7 @@ test.describe("Demo 1/2 runtime acceptance", () => {
     await expect(page.getByRole("button", { name: "重试" })).toBeVisible();
     await page.getByRole("button", { name: "重试" }).click();
     await expect(page.locator('[data-testid="task-ledger-pointer"]')).toContainText("当前任务 · 版本 v1");
-    await page.getByRole("button", { name: "Agent 路径" }).click();
+    await page.getByRole("button", { name: /^执行进展/ }).click();
     await page.getByRole("button", { name: "继续未完成任务" }).first().click();
     await expect(page.locator('[data-testid="task-ledger-pointer"]')).toContainText("当前任务 · 版本 v2");
     expect(state.taskGets).toBeGreaterThanOrEqual(2);
@@ -6213,7 +7795,7 @@ test.describe("Demo 1/2 runtime acceptance", () => {
     await page.goto("/");
     await page.getByRole("textbox", { name: "任务指令" }).fill("继续未完成任务");
     await page.getByRole("button", { name: "启动 Control Loop" }).click();
-    await page.getByRole("button", { name: "Agent 路径" }).click();
+    await page.getByRole("button", { name: /^执行进展/ }).click();
     await page.getByRole("button", { name: "继续未完成任务" }).first().click();
     await expect(page.getByRole("button", { name: "重试" })).toBeVisible();
     await page.getByRole("button", { name: "重试" }).click();
@@ -6221,3 +7803,66 @@ test.describe("Demo 1/2 runtime acceptance", () => {
     expect(state.taskGets).toBeGreaterThanOrEqual(3);
   });
 });
+
+// Opt-in recordings reuse these acceptance fixtures; they never call a model.
+if (process.env.RECORD_OFFICE_DEMO === "1") {
+  test("[recording] 02 Demo1 local branch continuation", async ({ browser }) => {
+    const { beginRecording } = await import("./recording-support");
+    const { page, mark, finish } = await beginRecording(browser, "02-continuation", "受控测试数据 · 非本次模型实跑");
+    await mockDemoRuntime(page, "demo1");
+    await page.goto("/");
+    await page.getByRole("textbox", { name: "任务指令" }).fill("继续未完成的资料核对任务。");
+    await mark("输入任务目标", "Demo1 关注时间维度：长任务遇到停止或证据缺口后，如何保留进展并继续。", 6);
+    await page.getByRole("button", { name: "启动 Control Loop" }).click();
+    await page.getByRole("button", { name: /^执行进展/ }).click();
+    await expect(page.getByRole("button", { name: "继续未完成任务" }).first()).toBeVisible();
+    await mark("识别未完成部分", "这组测试状态中，旧 Run 已停止；页面保留成果，并指出仍需继续处理的分支。", 8);
+    await page.getByRole("button", { name: "继续未完成任务" }).first().scrollIntoViewIfNeeded();
+    await mark("只继续目标分支", "选择一个未完成分支继续，不把整项任务从头再跑。", 5);
+    const continuation = page.waitForRequest(r => r.url().includes("/continue") && r.method() === "POST");
+    await page.getByRole("button", { name: "继续未完成任务" }).first().click();
+    const submitted = (await continuation).postDataJSON();
+    expect(submitted.branch_id).toBe("branch-222222222222");
+    const lineage = page.getByTestId("task-lineage");
+    await expect(lineage).toContainText("持续处理链 · 第 2 次");
+    await expect(lineage).toContainText("来源版本已变化");
+    await lineage.scrollIntoViewIfNeeded();
+    await mark("同一任务的新一轮", "输出是同一 Task 的第 2 次 Run；来源变化会明确提示，不静默沿用旧结论。本段未演示最终业务完成。", 9);
+    await finish({ source: "existing acceptance fixture: mockDemoRuntime(demo1)", realModelCalls: 0,
+      continuedOneBranch: true, expectedTaskVersion: submitted.expected_task_version, finalStage: "child run planning, not business completion" });
+  });
+
+  test("[recording] 03 Demo2 confirmed collaboration and results", async ({ browser }) => {
+    const { beginRecording } = await import("./recording-support");
+    const { page, mark, finish } = await beginRecording(browser, "03-collaboration", "受控测试数据 · 非本次模型实跑");
+    await mockDemoRuntime(page, "demo2");
+    await page.goto("/");
+    await page.getByRole("textbox", { name: "任务指令" }).fill("核对产品上线、搜索 Agent 与用户交互风险，形成跨职能简报。");
+    await mark("一个目标，多组材料", "Demo2 关注组织维度：一个办公目标拆成有依赖关系的工作包，不是多个独立任务的全局调度。", 6);
+    await page.getByRole("button", { name: "启动 Control Loop" }).click();
+    await page.getByRole("button", { name: /^执行进展/ }).click();
+    const admission = page.getByTestId("topology-admission");
+    await expect(admission).toContainText("由多个 Agent 分工处理");
+    await admission.scrollIntoViewIfNeeded();
+    await mark("先解释，再确认", "系统展示协作依据；需要用户确认，才启动当前可执行的只读工作包。", 7);
+    await admission.getByRole("button", { name: "确认并启动只读执行器" }).click();
+    await admission.getByText("查看执行回执").click();
+    await expect(admission).toContainText("已合入");
+    await admission.scrollIntoViewIfNeeded();
+    await mark("第一批贡献", "产品、搜索、交互三个根工作包返回贡献；返回和采用分开记录，后续工作依赖已采用结果。", 8);
+    await admission.getByRole("button", { name: "继续下一批只读执行器" }).click();
+    await expect(page.locator(".loop-round-result")).toContainText("5 个跨职能工作包");
+    await mark("继续依赖工作包", "第二批继续影响核对和待办汇总，形成新的逻辑成果版本。这里不是分布式 Worker。", 7);
+    await page.getByRole("button", { name: "成果与建议" }).click();
+    await page.locator(".result-expand").click();
+    await expect(page.locator(".result-findings")).toContainText("统一待办建议");
+    await page.locator(".result-findings").scrollIntoViewIfNeeded();
+    await mark("查看汇总成果", "输出是可审查的跨职能结论和待办。此测试场景只生成逻辑成果，没有 DOCX 或 CSV 下载文件。", 9);
+    await page.getByRole("link", { name: "Agent 能力", exact: true }).click();
+    await page.getByTestId("agent-collaboration-tab").click();
+    await expect(page.getByTestId("collaboration-overview")).toBeVisible();
+    await mark("按需查看协作结构", "仍是同一任务；在原有 Agent 能力页查看 Adaptive Swarm 的依赖关系，不另建一套演示系统。", 8);
+    await finish({ source: "existing acceptance fixture: mockDemoRuntime(demo2)", realModelCalls: 0,
+      waves: 2, workPackages: 5, output: "logical artifact versions, no downloadable office file", distributedWorkers: false });
+  });
+}

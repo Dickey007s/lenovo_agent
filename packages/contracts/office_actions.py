@@ -3,7 +3,7 @@
 from datetime import date, datetime
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_serializer, model_validator
 
 
 class ActionInput(BaseModel):
@@ -19,6 +19,15 @@ class ActionInput(BaseModel):
     due_date: date | None = None
     source_ref: str | None = Field(default=None, pattern=r"^forte-[0-9a-f]{16}$")
     alternative_content: str = Field(default="", max_length=5000)
+    format_style: Literal["spaced", "compact"] | None = None
+
+    @model_serializer(mode="wrap")
+    def serialize_compatible(self, handler):
+        payload = handler(self)
+        # Preserve existing request digests and snapshots when no style was supplied.
+        if self.format_style is None:
+            payload.pop("format_style", None)
+        return payload
 
     @field_validator("title", "content", "target", "alternative_content")
     @classmethod
@@ -29,6 +38,8 @@ class ActionInput(BaseModel):
 
     @model_validator(mode="after")
     def comparison_scope(self):
+        if self.format_style is not None and self.operation != "format_text":
+            raise ValueError("整理方式仅适用于个人文本，不改变其他事项的核对要求")
         if self.alternative_content and self.operation != "compare_materials":
             raise ValueError("只有材料对照事项可以提交第二份材料")
         return self

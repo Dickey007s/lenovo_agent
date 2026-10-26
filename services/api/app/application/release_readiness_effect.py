@@ -92,9 +92,10 @@ RISK_ORDER = {"none": 0, "minor": 1, "major": 2, "severe": 3}
 RISK_LABELS = {"none": "无", "minor": "次要", "major": "主要", "severe": "严重"}
 
 
-def build_release_readiness(
+def analyze_release_readiness(
     previews: dict[str, dict[str, Any]],
-) -> ReleaseReadinessBuild:
+) -> AgentControlLoopBusinessGateOutcome:
+    """Validate the fixed source bundle and calculate facts without rendering files."""
     prd_text = str(previews.get("PRD_v2.5.md", {}).get("text") or "")
     features = _parse_prd_features(prd_text)
     rules = _parse_prd_rules(prd_text)
@@ -191,6 +192,14 @@ def build_release_readiness(
         auxiliary_metrics=metrics,
         records=records,
     )
+    return outcome
+
+
+def build_release_readiness(
+    previews: dict[str, dict[str, Any]],
+) -> ReleaseReadinessBuild:
+    outcome = analyze_release_readiness(previews)
+    records = outcome.records
     missing_codes = tuple(
         record.record_id
         for record in records

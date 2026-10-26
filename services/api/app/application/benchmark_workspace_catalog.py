@@ -63,7 +63,8 @@ class BenchmarkWorkspaceCatalog(BenchmarkScenarioCatalog):
     MAX_ARCHIVE_ENTRIES = 400
     MAX_ARCHIVE_EXPANDED_BYTES = 60 * 1024 * 1024
     MAX_PREVIEW_TEXT = 30_000
-    MAX_AGENT_TEXT_PER_FILE = 12_000
+    MAX_PREVIEW_TABLE_ROWS = 240
+    MAX_AGENT_TEXT_PER_FILE = MAX_PREVIEW_TEXT
     MAX_AGENT_CONTEXT_BYTES = 120_000
     TEXT_SUFFIXES = {
         ".md",
@@ -347,7 +348,10 @@ class BenchmarkWorkspaceCatalog(BenchmarkScenarioCatalog):
                 payload["text"] = text
                 payload["truncated"] = bool(payload.get("truncated")) or len(text) < len(preview.get("text") or "")
             if isinstance(payload.get("rows"), list):
-                payload["rows"] = payload["rows"][:60]
+                payload["rows"] = payload["rows"][:self.MAX_PREVIEW_TABLE_ROWS]
+                payload["truncated"] = bool(payload.get("truncated")) or (
+                    len(payload["rows"]) < int(payload.get("total_rows") or len(payload["rows"]))
+                )
             encoded = json.dumps(payload, ensure_ascii=False).encode("utf-8")
             if used + len(encoded) > self.MAX_AGENT_CONTEXT_BYTES:
                 raise BenchmarkScenarioError("Agent 本轮选择的文件内容超过安全上下文上限，请缩小本轮证据范围后重试")

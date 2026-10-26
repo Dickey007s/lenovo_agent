@@ -17,6 +17,11 @@ from packages.contracts.harness_models import (
     AgentControlLoopEffectReceipt,
     AgentControlLoopNarrativeConflict,
     AgentControlLoopNarrativeReconciliation,
+    AgentControlLoopWorkspaceArtifact,
+)
+from services.api.app.application.office_narrative_facts import (
+    metric_discrepancies,
+    office_effect_facts,
 )
 
 
@@ -33,7 +38,7 @@ _LIMITED_COVERAGE = re.compile(
 )
 _UNSUPPORTED_SOLUTION = re.compile(
     r"(?:建议|应当|应该|应|需要|立即|优先).{0,90}"
-    r"(?:新增|增加|拆分|改为|调整|引入|实现|校验|提示|确认|弹窗|缓存|预加载|异步|路由|重试)"
+    r"(?:新增|增加|拆分|改为|调整|引入|实现|校验|弹窗|缓存|预加载|异步|路由|重试)"
 )
 _APPROVAL_HEDGE = re.compile(r"(?:草案|待.{0,12}(?:批准|补充|确认|复核)|未批准|仅供参考|不作为当前结论)")
 _REDUNDANT_WORK = re.compile(r"(?:全部|全量|完整|重新).{0,24}(?:统计|分析|覆盖|计算|排序)")
@@ -62,6 +67,7 @@ def _outcome_revision(outcome: dict[str, Any]) -> str:
 
 def build_verified_effect_context(
     receipt: AgentControlLoopEffectReceipt | None,
+    artifacts: list[AgentControlLoopWorkspaceArtifact] | None = None,
 ) -> dict[str, Any] | None:
     """Project a compact authoritative context for the Analyst.
 
@@ -70,7 +76,24 @@ def build_verified_effect_context(
     compact projector without changing the Analyst or reconciliation protocol.
     """
 
-    if receipt is None or receipt.status != "passed" or receipt.ux_prioritization_outcome is None:
+    if receipt is None or receipt.status != "passed":
+        return None
+    office = office_effect_facts(receipt, artifacts or [])
+    if office is not None:
+        kind, facts = office
+        return {
+            "authority": "server_verified_deterministic_outcome",
+            "outcome_type": kind,
+            "outcome_revision": _outcome_revision({"type": kind, "facts": facts}),
+            "effect_receipt_id": receipt.receipt_id,
+            "instruction": (
+                "以下为已经通过文件检查的确定性事实；数量、金额、比例不得重新猜测。"
+                "未通过业务 Gate 不等于文件生成失败；无候选不等于无业务风险。"
+                "模型解释仍为待复核草稿，不代表已执行外部动作或业务批准。"
+            ),
+            "facts": facts,
+        }
+    if receipt.ux_prioritization_outcome is None:
         return None
     outcome = receipt.ux_prioritization_outcome
     outcome_dump = outcome.model_dump(mode="json")
@@ -129,14 +152,15 @@ def build_verified_effect_context(
 
 
 def _narrative_fields(result: object) -> list[tuple[str, str]]:
-    fields: list[tuple[str, str]] = [("summary", _safe_text(getattr(result, "summary")))]
+    # Audit excerpts are bounded separately; validation must inspect the full field.
+    fields: list[tuple[str, str]] = [("summary", str(getattr(result, "summary")))]
     for index, finding in enumerate(getattr(result, "findings")):
         for name in ("title", "detail", "fact_summary", "impact"):
             value = getattr(finding, name, None)
             if value:
-                fields.append((f"findings[{index}].{name}", _safe_text(value)))
+                fields.append((f"findings[{index}].{name}", str(value)))
     for index, follow_up in enumerate(getattr(result, "follow_ups")):
-        fields.append((f"follow_ups[{index}]", _safe_text(follow_up)))
+        fields.append((f"follow_ups[{index}]", str(follow_up)))
     return fields
 
 
@@ -244,6 +268,41 @@ def reconcile_narrative(
     facts = context_used.get("facts")
     if not isinstance(facts, dict):
         raise ValueError("verified effect context facts are missing")
+    if context_used.get("outcome_type") != "ux_prioritization_outcome":
+        conflicts = []
+        compared = 0
+        for path, text in _narrative_fields(result):
+            count, differences = metric_discrepancies(context_used["outcome_type"], facts, text)
+            compared += count
+            for fact_path, expected, observed in differences:
+                conflicts.append(_conflict(
+                    run_id=run_id, round_number=round_number,
+                    kind="outcome_count_mismatch", path=path, excerpt=text,
+                    outcome_path=f"{context_used['outcome_type']}.{fact_path}",
+                    expected=expected, observed=observed,
+                ))
+        rejected = bool(conflicts)
+        return AgentControlLoopNarrativeReconciliation(
+            reconciliation_id=_stable_id(
+                "narrative-reconciliation", run_id, round_number, expected_revision,
+                "contradictory" if rejected else "partial",
+            ),
+            round_number=round_number,
+            status="contradictory" if rejected else "partial",
+            authority="deterministic_outcome",
+            model_disposition="rejected" if rejected else "supplemental",
+            outcome_revision=expected_revision,
+            effect_receipt_id=effect_receipt_id,
+            model_returned=True,
+            comparable_claim_count=min(compared, 100),
+            conflicts=conflicts[:20],
+            message=(
+                "模型说明与已核验文件的数值不一致，未采用；文件及业务复核状态保持不变。"
+                if rejected else
+                "已核验文件为当前成果；模型解释只保留为待复核草稿，数值检查不证明解释正确。"
+            ),
+            checked_at=now,
+        )
     source_count = int(facts.get("source_row_count") or 0)
     analyzed_count = int(facts.get("analyzed_row_count") or 0)
     group_count = int(facts.get("group_count") or 0)
@@ -497,8 +556,8 @@ def reconcile_narrative(
         outcome_revision=expected_revision,
         effect_receipt_id=effect_receipt_id,
         model_returned=True,
-        comparable_claim_count=comparable_claim_count,
-        conflicts=conflicts,
+        comparable_claim_count=min(comparable_claim_count, 100),
+        conflicts=conflicts[:20],
         message=message,
         checked_at=now,
     )

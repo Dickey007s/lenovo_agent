@@ -1,5 +1,23 @@
 # Demo3 开发版指导手册与设计评审
 
+## 2026-10-26 十二个预设案例
+
+原工作台的新事项表单加入折叠案例选择，共十二项，分直接处理与恢复、信息补齐、确认与变更、人工判断与暂缓四组。此为输入预设，不新增业务操作或绕过确认；现有六类服务端能力保持不变。每案材料、讲解步骤和原则对应见 [演示清单](../reports/demo3-examples-20261026/index.html)，合同和验证见 [DR-0098](../decisions/DR-0098-demo3-ready-boundary-examples.md)。下文没有案例选择器的文字为早期基线。
+
+## 2026-10-20 R12 / R14 / R10 增量
+
+DR-0079 在原系统加入个人文本整理方式的显式本地记忆与撤回，不保存正文或替代确认。
+旧摘录内容可取回编辑区，二次保存成为新版本；历史与来源保留。最近记录增加待处理筛选，
+仍仅覆盖二十个 Run。以下 10 月 19 日段落是当时状态，当前 R12 不再是完全未实现。
+完整合同及验证见 DR-0079 和对应 Evidence；正式授权、完整待办与跨设备恢复仍未接入。
+
+## 2026-10-19 原则实践补充
+
+[实践对照与交付材料](../deliverables/copilot-20261019/index.html)覆盖 R01-R16 的实现、设计与未验证部分。
+DR-0078 扩展待补信息、待确认、待判断及暂缓事项的本地交接导出，补齐对象、日期、已保存结果、
+需要谁决定什么、核对项、原文和返回限制；结果未知或编辑中不得导出。该说明不含未提交编辑，
+不改变事项状态，不产生委派、通知或正式审批。R12、企业权限及 Worker 人工恢复到依赖释放仍未实现。
+
 版本 1.1 · 2026-09-19；保留原文件名供已有链接使用。
 
 本文用于产品实现与联调。对外材料为[人机共驾设计指导手册](submission/人机共驾设计指导手册_v1.0.md)和[边界情形与接管案例库](submission/边界情形与接管案例库_v1.0.md)。两版沿用相同的 R01-R16 规则与 C00-C12 案例编号；对外版讨论可复用设计原则，本文记录实现取舍、接口和未覆盖项。
@@ -42,9 +60,9 @@ Demo1 展示单个长任务的拆分推进，Demo2 展示多个任务的规划�
 | R09 结果未知 | 保存原请求与幂等键，查询状态或重试同一请求 | 当前页保留；关闭标签后未决请求缓存不持久化 |
 | R10 接管上下文 | 保留材料、判断理由与暂缓状态；最近事项可重新打开；下载人工处理说明 | 仅最近 20 个 Run 内的事项，无完整待办箱或自动委派 |
 | R11 恢复范围 | 保留修改历史，区分取消、暂缓与撤销 | 不支持召回真实邮件 |
-| R12 长期偏好 | 保留为后续设计要求 | 不持久化“以后不用问” |
+| R12 长期偏好 | 显式记住个人文本 spaced/compact，按浏览器演示身份保存，可清除 | 只保存枚举，不记住联系人或扩大授权；无跨设备同步 |
 | R13 手机核对 | 窄屏布局、完整地址、正文、暂缓 | 无语音确认、设备检测或跨设备接续保证 |
-| R14 实际撤销 | 个人文本恢复原值，保留撤销时间；摘录支持原位保存人工修订 | 文本副本撤销；草稿历史可查，未新增草稿历史回滚 |
+| R14 实际撤销 | 个人文本恢复原值；旧摘录可取回编辑区，再保存为新版本 | 不是原地回滚；旧版本、来源保留；不能撤回外部动作 |
 | R15 服务端执行约束 | 风险、确认条件、终态均由固定服务端策略产生 | 未接生产级 Policy/Permit 或工具网关 |
 | R16 可追查记录 | history 保存各版输入及每次动作 | Snapshot 内记录，非独立合规审计账本；最多 60 条 |
 
@@ -120,8 +138,8 @@ Demo1 展示单个长任务的拆分推进，Demo2 展示多个任务的规划�
 
 ## 8. 验证与交付索引
 
-- [决策 DR-0064](../decisions/DR-0064-single-action-boundary-workbench.md)
-- [场景 SCENARIO-051](../scenarios/SCENARIO-051-single-action-boundary-workbench.md)
+- [决策 DR-0070](../decisions/DR-0070-single-action-boundary-workbench.md)
+- [场景 SCENARIO-057](../scenarios/SCENARIO-057-single-action-boundary-workbench.md)
 - [需求来源](../sources/USER-FEEDBACK-20260918-demo3-handbook.md)
 - [运行证据与测试结果](../evidence/DR-0053-SINGLE-ACTION-EVIDENCE-20260918.md)
 
@@ -131,7 +149,7 @@ Demo1 展示单个长任务的拆分推进，Demo2 展示多个任务的规划�
 
 主分支整合补充：六类事项现在也通过同一个 Task Ledger 形成独立 Task/Run；任务会话和能力页可打开，Task 指针未核对通过时不允许修改。研究/continuation/Worker 路径保持主分支合同，完整记录见[合并证据](../evidence/DEMO3-MASTER-MERGE-20260919.md)。合并后公开 API 为 12 个 path、13 个 operation。
 
-[DR-0065](../decisions/DR-0065-demo3-editable-drafts-and-human-judgment.md)、[SCENARIO-052](../scenarios/SCENARIO-052-demo3-human-judgment-and-return.md)与[运行证据](../evidence/DR-0054-DEMO3-COLLABORATION-EVIDENCE-20260919.md)记录本轮增量。
+[DR-0071](../decisions/DR-0071-demo3-editable-drafts-and-human-judgment.md)、[SCENARIO-058](../scenarios/SCENARIO-058-demo3-human-judgment-and-return.md)与[运行证据](../evidence/DR-0054-DEMO3-COLLABORATION-EVIDENCE-20260919.md)记录本轮增量。
 
 compare_materials 接受 content/alternative_content 两段用户材料，完整时 awaiting_decision。record_decision 必须携带 selected_option=first/second 与非空 rationale，保存 decision 和 decision_note 回执，映射为 decided/completed。普通 confirm 无法代替判断。edit_draft 只接受 extract_excerpt/draft_ready，更新 preview/receipt.content，保留 source_excerpt 和历史 content_snapshot。两种命令复用既有 Owner、version、revision、幂等和持久化检查。
 

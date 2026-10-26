@@ -1067,6 +1067,10 @@ class ScenarioEffectEngine:
                 validator_id="validator-onboarding-assets-v1",
                 checks=checks,
                 summary=f"已匹配 {len(output_rows)} 名日期范围内员工；原始 CSV 未修改。",
+                record_count=len(parsed_rows),
+                covered_period="3 月 20 日至 4 月 20 日（闭区间）",
+                statistic_basis="按来源日期筛选员工，应用岗位规则和备注覆盖；记录数为生成 CSV 数据行数。",
+                purpose="准备入职资产与权限清单；未采购设备或开通权限。",
             ),
         )
 

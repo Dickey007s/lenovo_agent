@@ -1,5 +1,184 @@
 # 来源台账
 
+## 2026-10-26 Demo3 预设边界案例
+
+- [用户要求](../sources/USER-FEEDBACK-20261026-demo3-more-examples.md)支持扩展可演示案例，不构成用户研究。
+- [DR-0098 Evidence](../evidence/DR-0098-DEMO3-EXAMPLES-20261026.md)记录十二组固定规则 API 案例、原交互回归与截图；无模型或外部动作。
+
+## 2026-10-26 主 Agent 设计对齐
+
+- `USER-FEEDBACK-20261026-PRIMARY-DESIGN-ALIGNMENT`: [用户授权与PPT范围确认](../sources/USER-FEEDBACK-20261026-primary-design-alignment.md)。支持原位设计调整，不证明最优分工。
+- `RUNTIME-20261026-PRIMARY-DESIGN`: [DR-0097 Evidence](../evidence/DR-0097-PRIMARY-DESIGN-20261026.md)。154项后端、18项前端门，4个真实任务共9次调用，3项完成、1项边界阻塞。没有本轮真实动态扩编。
+
+## 2026-10-26 按需追加协作
+
+- `USER-FEEDBACK-20261026-MODERN-DELEGATION`: [直接用户要求](../sources/USER-FEEDBACK-20261026-modern-delegation.md)。支持不依赖新 LangGraph 核心、保留原工作台的增量实现，不证明用户收益。
+- `RUNTIME-20261026-SINGLE-DELEGATION`: [DR-0096 Evidence](../evidence/DR-0096-SINGLE-AGENT-DELEGATION-20261026.md)。150项后端、16项前端门和三项真实任务；真实模型未新增工作。受控扩编不冒充真实扩编、语义正确性或并行收益。
+
+## 2026-10-25 当前入口与演示验收
+
+- [用户反馈](../sources/USER-FEEDBACK-20261025-demo-readiness.md)、[DR-0094](DR-0094-live-demo-readiness.md)、[SCENARIO-081](../scenarios/SCENARIO-081-ready-office-examples.md)、[Evidence](../evidence/DR-0094-DEMO-READINESS-20261025.md)。
+- 旧 API 拒绝自主执行参数；更新入口后实跑 17 次，筛选 7 例。样例结果、未采用为展示的运行、缺材料与人工判断边界分别记账。
+
+## 2026-10-25 Blurt 确认清单
+
+- [Source](../sources/USER-FEEDBACK-20261025-blurt-workbench.md)、[DR-0093](DR-0093-blurt-focused-workbench.md)、[SCENARIO-080](../scenarios/SCENARIO-080-focused-evidence-and-agent-lanes.md)、[Evidence](../evidence/DR-0093-BLURT-WORKBENCH-20261025.md)。
+- 12 项用户确认反馈；调用预算不擅自取消，旧建议理由不编造。原始录屏本地保存。
+
+## 2026-10-25 现系统演示页重跑
+
+- [用户原话](../sources/USER-FEEDBACK-20261024-showcase-rerun.md)、[DR-0092](DR-0092-live-showcase-refresh.md)、[SCENARIO-079](../scenarios/SCENARIO-079-browse-live-showcase.md)、[Evidence](../evidence/DR-0092-LIVE-SHOWCASE-20261025.md)。
+- 真实截图与固定规则事项明确区分；八个故事不等于八个独立模型实验。无新增 Runtime 能力声明。
+
+## 2026-10-24 结果驱动的自适应调整
+
+- 用户要求不预设人数或分工，由系统根据执行结果调整；[原话](../sources/USER-FEEDBACK-20261024-adaptive-progress.md)。
+- [DR-0091](DR-0091-result-driven-bounded-adaptation.md)、[SCENARIO-078](../scenarios/SCENARIO-078-result-driven-office-work.md)、[Evidence](../evidence/DR-0091-ADAPTIVE-PROGRESS-20261024.md)。
+- Limited Verified 只覆盖有界 Runtime 扩展门与前端事实投影；真实模型追加工作仍未观察到。历史五人分工不作为本次自主扩编证据。
+
+## 2026-10-24 超过双 Agent 的真实协作
+
+- Source ID: USER-FEEDBACK-20261024-MORE-THAN-TWO-AGENTS; [原话](../sources/USER-FEEDBACK-20261024-more-than-two-agents.md).
+- [DR-0090](DR-0090-multistage-worker-display.md), [SCENARIO-077](../scenarios/SCENARIO-077-five-worker-office-brief.md), [Evidence](../evidence/DR-0090-FIVE-WORKERS-20261024.md).
+- 新增3+2实际交接示例与依赖分层显示。来源未要求提升并发上限或绕过证据门槛。
+
+
+## 2026-10-24 Demo2 办公待办
+
+- Source ID：USER-FEEDBACK-20261024-DEMO2-OFFICE-TODOS；[来源](../sources/USER-FEEDBACK-20261024-demo2-office-todos.md)。
+- 用户要求简单办公待办实跑，说明单/多 Agent 执行与各自成果，简洁分层展示。不是代表性用户研究。
+- 对应 DR-0089 / SCENARIO-076；前台交互影响与 UI—后端事实映射见决策及事实表，不增加难度评分或新授权。
+
+## 2026-10-24 人机分工
+
+- Source ID：USER-FEEDBACK-20261024-HUMAN-AGENT-DIVISION；[来源](../sources/USER-FEEDBACK-20261024-human-agent-division.md)。
+- 用户直接要求设定任务实跑，区分可信的直接处理与真正需要人考虑的部分，不要把所有暂停等同人工接手。
+- 对应 DR-0088 / SCENARIO-075；使用已有来源/分支/决定回执投影，不新增虚构置信度，不放宽权限。
+
+## 2026-10-24 同任务分支与首轮说明
+
+- Source ID：USER-FEEDBACK-20261024-TASK-BRANCHES；[原话与边界](../sources/USER-FEEDBACK-20261024-task-branches-and-plain-office-cases.md)。
+- 用户直接要求：不因建议新建任务、首轮说清目标/资料/处理、采用普通 Excel/Word 样例。
+- 对应 DR-0087 / SCENARIO-074；服务端 Task lineage 与真实计划/输入回执为权威，不能展示私有思维链或宣称用户研究收益。
+
+## 2026-10-24 真实模型待办与证据展示
+
+- Source ID：USER-FEEDBACK-20261024-LIVE-DEMO12。
+- 用户直接要求：[来源记录](../sources/USER-FEEDBACK-20261024-live-demo12.md)。
+- 前台交互影响：可编辑多待办、单/多 Agent 实际路线、暂停时保留引用与中断细节。
+- UI—后端事实映射：execution_policy、TopologyAdmission、Branch、WorkUnit、Contribution、ArtifactVersion；不是前端自动确认。
+- 决策/场景：DR-0086 / SCENARIO-073；证据为对应实跑和定向测试记录，不是成功率或用户研究。
+
+## 2026-10-23 统一设计落地授权
+
+- USER-FEEDBACK-20261023-UNIFIED-REFERENCE-IMPLEMENTATION：[原话、三张参考图哈希与实现边界](../sources/USER-FEEDBACK-20261023-unified-reference-implementation.md)。支持原入口三栏与依据/成果重排，不支持把设计图当功能证据。对应 DR-0085 / SCENARIO-072。
+
+## 2026-10-23 能力演示需求
+
+- USER-FEEDBACK-20261023-CAPABILITY-SHOWCASE：[八案截图演示需求及附件哈希](../sources/USER-FEEDBACK-20261023-capability-showcase.md)。支持能力切换、示例输入和原系统截图讲解，不支持把受控回执称为真实模型能力。对应 DR-0084 / SCENARIO-071。
+
+## 2026-10-22 等待与协作文案
+
+- USER-FEEDBACK-20261022-WAITING-COPY：[精简等待说明与协作图](../sources/USER-FEEDBACK-20261022-waiting-copy.md)。支持原系统展示层精简，不支持隐藏待办、风险或声明用户收益。对应 DR-0082 / SCENARIO-069。
+
+## 2026-10-22 首页结构反馈
+
+- USER-FEEDBACK-20261022-TASK-OVERVIEW：[用户反馈与继续授权](../sources/USER-FEEDBACK-20261022-task-overview.md)。支持原工作台结构重排，不支持隐藏待办或声明用户效果。对应 DR-0081 / SCENARIO-068。
+
+## 2026-10-22 参考图与信息减法
+
+- USER-FEEDBACK-20261022-REFERENCE-UI-REFINEMENT：[用户原话、四张 Image 2 图及既有 nanoMuse 研究](../sources/USER-FEEDBACK-20261022-reference-ui-refinement.md)。支持原系统展示层去重，不支持隐藏待办、业务拒绝或宣称用户收益。对应 DR-0080 / SCENARIO-067。
+
+## 2026-10-20 继续落实未实现原则
+
+- USER-FEEDBACK-20261020-PRINCIPLE-IMPLEMENTATION：[用户原话与 R10/R12/R14 范围](../sources/USER-FEEDBACK-20261020-principle-implementation.md)。支持继续原系统实现，不只是文档对比；不支持全部原则完成、自动授权、外部执行或用户效果主张。对应 DR-0079 / SCENARIO-066。
+
+## 2026-10-19 原则实践与设计交付
+
+- USER-FEEDBACK-20261019-PRINCIPLES-DELIVERABLES：[直接需求与来源核对](../sources/USER-FEEDBACK-20261019-principles-deliverables.md)。支持扩展原则实践、整理六类文档并用三案录屏解释系统；不证明全部规则已实现、真实用户收益或新模型运行。旧 v7 原件本轮未找到，不能把历史引用说成已找回原件。
+
+## 2026-10-10 人机共驾案例审查
+
+- USER-FEEDBACK-20261010-COPILOT-CASES：[直接请求、队友案例及三篇文献复核](../sources/USER-FEEDBACK-20261010-copilot-cases.md)。支持先存档，再以 C02/C08/C11 定向优化原界面；不证明用户收益或完整 Demo2 人工恢复。
+
+## 2026-10-10 Demo1 办公交付
+
+- USER-20261010-BEFORE-AFTER：用户要求用实际例子讲清改善前后；[来源追加](../sources/USER-FEEDBACK-20261010-evidence-swarm-and-simple-ui.md)、[六例字段与证据](../reports/september-progress-20261010/BEFORE-AFTER.md)。保存运行、同错误回放与 UI 对照不混为效果实验。
+- USER-20261010-SYSTEM-FLOW：用户要求图表解释系统流程；[图表与来源映射](../reports/system-flow-20261010/README.md)。只支持本轮汇报图，不代表新能力或新增真实运行验收。
+- USER-20261010-EVIDENCE-SWARM-SIMPLE：[用户反馈与确认方向](../sources/USER-FEEDBACK-20261010-evidence-swarm-and-simple-ui.md)，用于 DR-0076 的原界面减法及汇报补充，不是用户研究或新增 Runtime 证明。
+- USER-20261010-PROGRESS-REPORT：用户要求九月以来本方进展的可视化 HTML，排除队友成果，供当晚解释系统与工作。见[归属、历史来源与报告验证](../reports/september-progress-20261010/README.md)。不新增 Runtime 或算法效果主张。
+
+- USER-20261010-DEMO1-CLARITY：[授权与走查](../sources/USER-FEEDBACK-20261010-demo1-clarity.md)，支持原系统成果与历史表达修正，非用户研究。
+- UI-20261010-DEMO1-CLARITY：[验收](../evidence/DR-0075-DEMO1-CLARITY-20261010.md)，区分模拟 UI 回归与真实任务，不外推长任务或业务效果。
+
+## 2026-10-08 工作区信息分层
+
+- USER-20261008-EXECUTION-DETAIL：[继续授权](../sources/USER-FEEDBACK-20261008-execution-detail.md)，只支持原执行区的信息分层，不是用户研究。
+- UI-20261008-EXECUTION-DETAIL：[本轮回执](../evidence/DR-0074-EXECUTION-DETAIL-20261008.md)，不据此声称模型、业务或真人理解效果。
+
+| Source ID | 来源 | 支持 | 边界 |
+| --- | --- | --- | --- |
+| USER-20261008-FOCUSED-WORKSPACE | [用户授权](../sources/USER-FEEDBACK-20261008-focused-workspace.md) | 在原系统落实渐进披露 | 非用户研究，不改权限 |
+| UI-20261008-FOCUSED-WORKSPACE | [验证账本](../evidence/DR-0073-FOCUSED-WORKSPACE-20261008.md) | 实际记录的展开/收起与回归 | 不补 Worker 恢复，不证明业务正确 |
+
+## 2026-10-07 统一工作台实现授权
+
+| Source ID | 类型与来源 | 支持 | 不能推出 | 状态 |
+| --- | --- | --- | --- | --- |
+| USER-FEEDBACK-20261007-UNIFIED-WORKBENCH | [本轮要求与范围](../sources/USER-FEEDBACK-20261007-unified-workbench.md)，Stakeholder | 合并原系统、共用入口、迟到响应隔离，保留 Loop/Swarm 与固定事项 | 覆盖本地工作、真实外部动作、Worker 人工恢复闭环、用户效果 | DR-0072 / SCENARIO-059 Limited Verified，范围见 Evidence |
+| RUNTIME-20261007-INTEGRATION | [组合版本回执](../evidence/DR-0072-INTEGRATION-20261007.md)，Repository / tests | 实际记录的集成测试、编号迁移与前台状态映射 | 历史测试自动适用于新组合、真实 Provider/PG/用户保证 | 逐项记录，未完成门保留待验证 |
+
+## 2026-10-07 项目重启与上游检查
+
+| Source ID | 类型与来源 | 支持 | 不能推出 | 状态 |
+| --- | --- | --- | --- | --- |
+| USER-20261007-PROJECT-RESTART | 用户要求查看 xyzhu1225 新提交和 nanoMuse，并“开子agent完成这些任务”；[本轮检查](../reports/restart-review-20261007/README.md) | 分工调查、安全取回、原系统整合评估 | 覆盖本地修改、外部动作或付费模型调用 | 已完成限定调查 |
+| REPO-20261007-DEMO3 | GitHub REST/Git 固定 fa974ae、独立快照源码、98 项单测、11 项浏览器及 1 项失败反例；[报告与证据](../reports/restart-review-20261007/README.md) | 原工作台单动作实现、合并冲突、迟到回执缺陷 | Loop/Swarm 决定恢复闭环、全量回归、数据库或真实办公动作 | Limited Verified |
+| REPO-20261007-NANOMUSE | 官方 nanoMuse 固定 4147170 的源码、README、两张仓库图片；[设计比较与固定链接](../reports/restart-review-20261007/README.md#nanomuse-的设计启发) | 渐进披露、确认信息结构、专注成果阅读的设计参考 | 宣传图等于当前实现、竞品功能实测、用户效果或可直接复制代码 | Draft 设计输入 |
+
+## 2026-09-22 只读数字与资料覆盖
+
+| Source ID | 类型与来源 | 支持 | 不能推出 | 决策 |
+| --- | --- | --- | --- | --- |
+| USER-FEEDBACK-20260922-SOURCE-CHECKS | [本轮继续请求](../sources/USER-FEEDBACK-20260922-source-checks.md)，Stakeholder | 原系统数字、覆盖、交接检查 | 新产品、自动代选、无限调用、外部动作 | DR-0069 / SCENARIO-056 |
+| RUNTIME-20260922-SOURCE-CHECKS | [回放、真实任务与门](../evidence/DR-0069-SOURCE-CHECKS-20260922.md)，Runtime / repository | 已知错误拒绝、范围供应、受控依赖隔离 | 通用语义正确、真实完整交接、用户效果、蜂群收益 | DR-0069 |
+
+## 2026-09-22 成果阅读与独立验收
+
+| Source ID | 类型与来源 | 支持 | 不能推出 | 决策 |
+| --- | --- | --- | --- | --- |
+| USER-FEEDBACK-20260922-RESULT-ACCEPTANCE | [本轮用户批准与范围](../sources/USER-FEEDBACK-20260922-result-acceptance.md)，Stakeholder | 原位成果简化，单项/协作/恢复三条验收 | 外部动作、自动代选证据、无限预算、新产品 | DR-0068 / SCENARIO-055 |
+| RUNTIME-20260922-RESULT-ACCEPTANCE | [真实任务、独立审计与受控门](../evidence/DR-0068-RESULT-ACCEPTANCE-20260922.md)，Runtime / source audit | 固定财务交付、局部恢复和引用可定位但数字错误的反例 | 通用正确性、目标用户理解、蜂群收益、多实例恢复 | DR-0068 |
+
+## 2026-09-22 任务优先的前端减法
+
+| Source ID | 类型与来源 | 支持 | 不能推出 | 决策 |
+| --- | --- | --- | --- | --- |
+| USER-FEEDBACK-20260922-SIMPLE-USER-WALKTHROUGH | [用户原话与本地设计审查方法](../sources/USER-FEEDBACK-20260922-simple-user-walkthrough.md)，Stakeholder / local skill | 在原系统实际走查，减少默认信息，按需看细节 | 删除能力、隐藏关键风险、另建 Demo、目标用户效果 | DR-0067 / SCENARIO-054 |
+| UX-WALKTHROUGH-20260922 | [当前前端、截图、浏览器与工程门](../evidence/DR-0067-SIMPLE-USER-WALKTHROUGH-20260922.md)，开发者角色扮演 / 受控自动化 | 导航、默认层级、返回焦点、真实状态投影的有限验证 | 真人理解、业务正确、真实 Provider 稳定性、生产部署 | DR-0067 |
+
+## 2026-09-22 论文与原系统四条路线
+
+| Source ID | 类型与来源 | 支持 | 不能推出 | 决策 |
+| --- | --- | --- | --- | --- |
+| USER-FEEDBACK-20260922-RESEARCH-DEMO12-ROUTES | [用户原话和范围](../sources/USER-FEEDBACK-20260922-research-and-demo12-routes.md)，Stakeholder，2026-09-22 | 正式 Agent/LLM 论文依据、路线 2/4/6/7 原位实现 | 目标用户效果、Demo3 接口授权或新算法 | DR-0066 / SCENARIO-053 |
+| RESEARCH-20260922-HUMAN-AGENT-TOP-VENUES | [8 篇正式论文的逐篇一手链接与核验](../research/HUMAN-AGENT-TOP-VENUE-TO-DEMO12-20260922.md)，Literature，2026-09-22 访问 | 有界反馈修复、交接核对、有限澄清、AI 产物检查的设计依据 | 论文结果可直接迁移；工程实现已复现论文算法；本项目用户收益 | DR-0066 research input |
+| RUNTIME-20260922-REVIEWED-HANDOFFS | [自动化、PG 恢复、截图和边界](../evidence/DR-0066-REVIEWED-HANDOFFS-20260922.md)，源码/Runtime Evidence，2026-09-22 | 输出约定、结构核对、单包一次修复、原页面事实投影 | 新真实 Provider 稳定性、语义真值、生产多实例或人机协同收益 | Limited Verified |
+
+## 2026-09-21 原系统持续优化
+
+| Source ID | 类型与来源 | 支持 | 不能推出 | 决策 |
+| --- | --- | --- | --- | --- |
+| USER-FEEDBACK-20260921-CONTINUE-DEMO12 | [持续优化原话与范围](../sources/USER-FEEDBACK-20260921-continue-demo12.md)，Stakeholder，2026-09-21 | 原位优化、主动发现问题、可操作测试；保留 Loop/Swarm | 用户研究结果、Demo3 接入授权、学术创新或产品质量保证 | DR-0065 / SCENARIO-052 |
+| RUNTIME-20260921-OUTPUT-HANDOFF | [源码与测试/真实运行记录](../evidence/DR-0065-OUTPUT-HANDOFF-20260921.md)，2026-09-21 | 限定输出拦截、前序摘要传递、历史回执兼容和局部采用 | 通用权限理解、全文推理传递、语义正确、蜂群收益、分布式执行 | Limited Verified |
+
+## 2026-09-20 Demo1/2 可靠性
+
+[用户前三项要求](../sources/USER-FEEDBACK-20260920-demo12-reliability.md) 对应
+[DR-0064](DR-0064-demo12-reliability-and-bounded-narratives.md) 与
+[真实运行/反例/工程验证](../evidence/DR-0064-DEMO12-RELIABILITY-20260920.md)。
+只支持限定可靠性改进，不证明通用语义正确、蜂群性能领先或 Demo3 接入完成。
+
 ## 2026-09-12 新增来源
 
 后续研究纠偏：用户要求增加真正涉及人工智能与智能体机制的论文，而非只围绕 UI / 信任讨论。[16 篇 LLM / Agent 选读与案例映射](../research/DEMO3-AI-AGENT-BOUNDARY-LITERATURE-20260912.md) 逐项记录一手链接、版本、算法/系统/评测类型、阅读范围及迁移限制；以结构化消歧、选择性求助、协作学习、运行时约束、委派验证为主线。此前 HCI 来源保留为辅助，不删除历史研究。此增量仅为研究与汇报更新，不改变 DR-0063 的限定验证范围，不新增协议、权限或执行能力。
@@ -183,10 +362,10 @@ DR-0063 增量：[用户边界案例与蜂群差异要求](../sources/USER-FEEDB
 | `DR-0051-TC15-SOURCE-DERIVED-UX-PRIORITIZATION-EVIDENCE-20260829` | 源码、XLSX/规则/规范变异、负向合同、真实 Provider、双 CSV 下载复核、PostgreSQL、公共前台 manifest 与截图 Evidence | [`DR-0051-TC15-SOURCE-DERIVED-UX-PRIORITIZATION-EVIDENCE-20260829.md`](../evidence/DR-0051-TC15-SOURCE-DERIVED-UX-PRIORITIZATION-EVIDENCE-20260829.md)；公共事实 [`tc15-public-ux-prioritization-outcome-20260829.json`](../evidence/manifests/tc15-public-ux-prioritization-outcome-20260829.json) 与阈值变体 [`tc15-public-ux-prioritization-outcome-threshold-20260829.json`](../evidence/manifests/tc15-public-ux-prioritization-outcome-threshold-20260829.json)；live/下载/重启 [`tc15-live-source-derived-ux-prioritization-20260829.json`](../evidence/manifests/tc15-live-source-derived-ux-prioritization-20260829.json)、[`tc15-live-source-derived-ux-prioritization-after-restart-20260829.json`](../evidence/manifests/tc15-live-source-derived-ux-prioritization-after-restart-20260829.json)；截图 [`tc15-ui-screenshots-20260829.json`](../evidence/manifests/tc15-ui-screenshots-20260829.json)；Run `harness:731c429f82a941438b838fa8982699fd`，Owner `X-User-Id: tc15-live-owner-20260829`；实现 [`22aa685`](https://github.com/Dickey007s/lenovo_agent/commit/22aa685)；[PR #67](https://github.com/Dickey007s/lenovo_agent/pull/67)；[PostgreSQL job](https://github.com/Dickey007s/lenovo_agent/actions/runs/33226861708/job/99032179492) | 2026-08-29，status `Limited Verified`；370 项真实 PostgreSQL 全量 Python、60 项 Playwright、13/13 检查、Planner/Analyst 均调用且采用、双 CSV 下载独立复核、API 重启复读和首轮远端门通过 | 证明固定 uiux-021 全量来源合同、动态规则/规范、逐组 content-addressed refs、映射/重复/3% 冲突边界和四层前台投影 | 不证明用户研究、线上遥测、优化效果、方案批准、生产 UI 修改、A/B 实验、多 Worker、多实例并发或外部动作 | Office Agent 项目组 | `DR-0051 / Limited Verified` |
 | `USER-FEEDBACK-20260829-DETERMINISTIC-OUTCOME-NARRATIVE-CONFLICT` | Stakeholder 对真实 Run 中确定性成果与模型说明冲突的复读反馈 | [`USER-FEEDBACK-20260829-deterministic-outcome-model-narrative-conflict.md`](../sources/USER-FEEDBACK-20260829-deterministic-outcome-model-narrative-conflict.md)；历史负例 manifest [`tc15-narrative-false-green-baseline-20260829.json`](../evidence/manifests/tc15-narrative-false-green-baseline-20260829.json) | 2026-08-29，Asia/Shanghai | 支持新增 returned/reconciled/adopted 分离、单一当前结论、冲突说明折叠和 failed/bounded 回执不冒充权威结果 | 单一 Stakeholder 反馈不是目标用户研究；不证明模型叙事全面、排序有效或体验改善 | Office Agent 项目组 | `DR-0052` |
 | `DR-0052-NARRATIVE-RECONCILIATION-EVIDENCE-20260829` | 协议、Runtime、PostgreSQL、live Provider、前台与截图 Evidence | [`DR-0052-NARRATIVE-RECONCILIATION-EVIDENCE-20260829.md`](../evidence/DR-0052-NARRATIVE-RECONCILIATION-EVIDENCE-20260829.md)；实现、Run、测试、PR 与远端门待 Evidence 收口 | 2026-08-29，status `Draft` | 目标证明固定 TC-15 纵切能拒绝与服务端复算冲突/过期的模型说明，同时保留 passed Artifact，并只投影一个当前结论 | 不证明通用语义验证、方案有效、用户理解、多 Worker、多实例并发或外部动作 | Office Agent 项目组 | `DR-0052 / Draft` |
-| `USER-FEEDBACK-20260918-DEMO3-HANDBOOK` | Stakeholder 需求、v7 边界文档与历史原型 | [来源记录](../sources/USER-FEEDBACK-20260918-demo3-handbook.md) | 2026-09-18 | 支持提交版/开发版分离、风险与接管案例、统一工作台中的独立单步事项 | 不是用户研究、正式设计评审、生产授权或真实业务接入证据 | Office Agent 项目组 | `DR-0064 / Limited Verified` |
-| `DR-0053-SINGLE-ACTION-EVIDENCE-20260918` | 工程测试、真实 API 浏览器流程与截图 | [Evidence](../evidence/DR-0053-SINGLE-ACTION-EVIDENCE-20260918.md) | 2026-09-18；本地未提交修改 | 固定规则、版本确认、幂等回执、撤销、暂缓与受限处理 | 不证明模型理解、真实发件、审批、多实例或用户收益 | Office Agent 项目组 | `DR-0064` |
-| `USER-FEEDBACK-20260919-DEMO3-COMPLETION` | Stakeholder 开发要求、新版指导手册与原型 | [来源记录](../sources/USER-FEEDBACK-20260919-demo3-completion.md) | 2026-09-19 | 支持六类单步事项、草稿编辑、人工判断、暂缓找回及设计评审材料 | 不授权真实发件或生产审批；不是正式设计评审或用户研究 | Office Agent 项目组 | `DR-0065` |
-| `DR-0054-DEMO3-COLLABORATION-EVIDENCE-20260919` | 单测、真实 API E2E、既有前端回归与截图 | [运行证据](../evidence/DR-0054-DEMO3-COLLABORATION-EVIDENCE-20260919.md) | 2026-09-19；本地未提交修改 | 405 项 Python 通过、13 项 PostgreSQL 条件跳过；70 项浏览器通过；后续定向复查见 Evidence | 不证明生产持久化、语义判断、实际外部动作或用户收益 | Office Agent 项目组 | `DR-0065 / Limited Verified` |
+| `USER-FEEDBACK-20260918-DEMO3-HANDBOOK` | Stakeholder 需求、v7 边界文档与历史原型 | [来源记录](../sources/USER-FEEDBACK-20260918-demo3-handbook.md) | 2026-09-18 | 支持提交版/开发版分离、风险与接管案例、统一工作台中的独立单步事项 | 不是用户研究、正式设计评审、生产授权或真实业务接入证据 | Office Agent 项目组 | `DR-0070 / Limited Verified` |
+| `DR-0053-SINGLE-ACTION-EVIDENCE-20260918` | 工程测试、真实 API 浏览器流程与截图 | [Evidence](../evidence/DR-0053-SINGLE-ACTION-EVIDENCE-20260918.md) | 2026-09-18；本地未提交修改 | 固定规则、版本确认、幂等回执、撤销、暂缓与受限处理 | 不证明模型理解、真实发件、审批、多实例或用户收益 | Office Agent 项目组 | `DR-0070` |
+| `USER-FEEDBACK-20260919-DEMO3-COMPLETION` | Stakeholder 开发要求、新版指导手册与原型 | [来源记录](../sources/USER-FEEDBACK-20260919-demo3-completion.md) | 2026-09-19 | 支持六类单步事项、草稿编辑、人工判断、暂缓找回及设计评审材料 | 不授权真实发件或生产审批；不是正式设计评审或用户研究 | Office Agent 项目组 | `DR-0071` |
+| `DR-0054-DEMO3-COLLABORATION-EVIDENCE-20260919` | 单测、真实 API E2E、既有前端回归与截图 | [运行证据](../evidence/DR-0054-DEMO3-COLLABORATION-EVIDENCE-20260919.md) | 2026-09-19；本地未提交修改 | 405 项 Python 通过、13 项 PostgreSQL 条件跳过；70 项浏览器通过；后续定向复查见 Evidence | 不证明生产持久化、语义判断、实际外部动作或用户收益 | Office Agent 项目组 | `DR-0071 / Limited Verified` |
 
 | `USER-FEEDBACK-20260830-DEMO1-DEMO2-CONTINUATION` | Stakeholder 对 07-16 Demo 1/2 的研发、调研、场景与分工要求 | [`USER-FEEDBACK-20260830-demo1-demo2-research-and-development.md`](../sources/USER-FEEDBACK-20260830-demo1-demo2-research-and-development.md) | 2026-08-30，Asia/Shanghai | 支持继续推进时间维 Task 连续性与组织维路线/多 Worker 收敛，并要求保留官方研究来源和前台交互因果链 | 单一 Stakeholder 反馈不是目标用户研究、竞品实测、工程 Evidence 或价值证明 | Office Agent 项目组 | `DR-0053 / research input` |
 | `DURABLE-AGENT-RUNTIMES-OFFICIAL-20260830` | Agent SDK/工作流运行时官方资料 | [OpenAI Agents SDK: Running agents](https://openai.github.io/openai-agents-python/running_agents/)、[Human-in-the-loop](https://openai.github.io/openai-agents-python/human_in_the_loop/)、[LangGraph Persistence](https://docs.langchain.com/oss/python/langgraph/persistence)、[LangGraph Interrupts](https://docs.langchain.com/oss/python/langgraph/interrupts)、[Temporal Documentation](https://docs.temporal.io/)、[OpenClaw Task Flow](https://docs.openclaw.ai/automation/taskflow) | 2026-08-30 访问，2026-08-31 复核核心链接 | 支持 Run/Thread/Workflow/Flow 的状态持久、暂停、恢复、长等待与故障恢复已是主流技术基线；OpenClaw Task Flow 还明确 JSON state、revision CAS、linked tasks 与 Gateway restart survival | 框架能力不等于办公 Branch/Evidence/Artifact 正确；durable identity/CAS 本身不是本项目独占差异，也不证明本项目纵切或竞品同类治理效果 | Office Agent 项目组 | `DR-0053 Demo 1 研究输入` |
@@ -216,7 +395,7 @@ DR-0063 增量：[用户边界案例与蜂群差异要求](../sources/USER-FEEDB
 | `DR-0059-EXPLICIT-REQUIREMENT-AND-ANALYSIS-RECOVERY-EVIDENCE-20260902` | 源码、定向/全量自动化、真实 Provider、无密钥运行摘要与桌面/移动截图 | [`DR-0059-EXPLICIT-REQUIREMENT-AND-ANALYSIS-RECOVERY-EVIDENCE-20260902.md`](../evidence/DR-0059-EXPLICIT-REQUIREMENT-AND-ANALYSIS-RECOVERY-EVIDENCE-20260902.md)；机器摘要 [`complex-task-requirement-accounting-20260902.json`](../evidence/manifests/complex-task-requirement-accounting-20260902.json) | 2026-09-02，status `Limited Verified`；六项真实 Provider 首轮为 4 本轮、2 延后、0 缺源，另有三轮 Branch 恢复与预算停止；定向 Python `93 passed`、定向浏览器 `2 passed`、全量 Python `429 passed, 23 skipped`、live 全量浏览器 `82 passed`、Ruff/lint/build/diff-check 通过 | 证明显式要求记账、Planner 内部搜索提示、Analyst 严格结构分类/一次修复、部分采用、延后分支入口和无空 Worker 波次在列出的范围成立 | 不证明业务结论、通用需求编译、PostgreSQL 本轮复跑、分布式执行、目标用户研究或体验收益 | Office Agent 项目组 | `DR-0059 / Limited Verified` |
 | `USER-FEEDBACK-20260903-NEW-TASK-CONVERSATION-ENTRY` | Stakeholder 直接产品反馈 | [`USER-FEEDBACK-20260903-new-task-conversation-entry.md`](../sources/USER-FEEDBACK-20260903-new-task-conversation-entry.md) | 2026-09-03，Asia/Shanghai；要求系统提供可新建对话和任务的入口 | 支持把现有独立 Task start 能力做成显式“新建任务”前台动作，并要求保留旧任务 | 单一 Stakeholder 反馈不决定后端模型、持久化方式或体验收益 | Office Agent 项目组 | `DR-0060 / SCENARIO-047` |
 | `DR-0060-NEW-TASK-CONVERSATION-EVIDENCE-20260903` | 前端源码、受控浏览器回归、生产构建与桌面/390 px 截图 | [`DR-0060-NEW-TASK-CONVERSATION-EVIDENCE-20260903.md`](../evidence/DR-0060-NEW-TASK-CONVERSATION-EVIDENCE-20260903.md) | 2026-09-03，status `Limited Verified`；定向 `3 passed`、全量 Playwright `84 passed`、reporting governance `4 passed`、lint/build/diff-check 通过 | 证明无副作用新任务草稿、刷新保持、历史返回、独立 Task 提交、相同文字新幂等键和两页面入口在被测范围成立 | 不证明 Provider、PostgreSQL、跨设备草稿、无限历史、用户价值或生产身份 | Office Agent 项目组 | `DR-0060 / Limited Verified` |
-| `USER-FEEDBACK-20260919-MERGE-DEMO3-MASTER` | 用户合并要求与 Git 基线 | [来源](../sources/USER-FEEDBACK-20260919-merge-demo3-master.md) | 2026-09-19；f01a903 + 9a4bbbf | 支持保留主分支能力并整合 Demo3，验证通过后推送 master | 不授权真实业务动作或覆盖远程历史 | Office Agent 项目组 | `DR-0064/0065 integration` |
-| `DEMO3-MASTER-MERGE-20260919` | 合并检查与回归证据 | [合并记录](../evidence/DEMO3-MASTER-MERGE-20260919.md) | 2026-09-19；最终状态见 Evidence | Task/事项隔离、主分支能力保留与工程回归 | 不证明真实 Provider、PostgreSQL 本轮复跑、外部动作或用户收益 | Office Agent 项目组 | `DR-0064/0065 integration` |
+| `USER-FEEDBACK-20260919-MERGE-DEMO3-MASTER` | 用户合并要求与 Git 基线 | [来源](../sources/USER-FEEDBACK-20260919-merge-demo3-master.md) | 2026-09-19；f01a903 + 9a4bbbf | 支持保留主分支能力并整合 Demo3，验证通过后推送 master | 不授权真实业务动作或覆盖远程历史 | Office Agent 项目组 | `DR-0070/0065 integration` |
+| `DEMO3-MASTER-MERGE-20260919` | 合并检查与回归证据 | [合并记录](../evidence/DEMO3-MASTER-MERGE-20260919.md) | 2026-09-19；最终状态见 Evidence | Task/事项隔离、主分支能力保留与工程回归 | 不证明真实 Provider、PostgreSQL 本轮复跑、外部动作或用户收益 | Office Agent 项目组 | `DR-0070/0065 integration` |
 | `USER-FEEDBACK-20260923-CI-FIX-AND-DEMO3-PREVIEW` | 用户授权、CI 失败日志、测试清理源码和本地预览 | [失败与修复记录](../evidence/POSTGRES-TEST-ISOLATION-20260923.md) | 2026-09-23；基线 7cbe736；包含合并前后两次失败 | 支持按 Owner 完整清理测试台账、扩展真实数据库回归和本地试用 | 不支持放宽完整性校验、清空业务库、真实外部动作或生产部署；本地 memory 不证明持久性 | Office Agent 项目组 | `Test isolation / existing Task-Run contract` |
-| `USER-FEEDBACK-20260923-PUBLISH-DEMO3-SUBMISSION` | 用户发布授权与既有提交版文稿 | [入库记录与原件哈希](../sources/USER-FEEDBACK-20260923-publish-demo3-submission.md) | 2026-09-23；保留文稿 2026-09-19 版本 | 支持三份设计提交材料入库及内部开发版链接修复 | 不构成新功能、文献复核、正式设计评审或用户研究证据 | Office Agent 项目组 | `Document publication / existing DR-0064/0065` |
+| `USER-FEEDBACK-20260923-PUBLISH-DEMO3-SUBMISSION` | 用户发布授权与既有提交版文稿 | [入库记录与原件哈希](../sources/USER-FEEDBACK-20260923-publish-demo3-submission.md) | 2026-09-23；保留文稿 2026-09-19 版本 | 支持三份设计提交材料入库及内部开发版链接修复 | 不构成新功能、文献复核、正式设计评审或用户研究证据 | Office Agent 项目组 | `Document publication / existing DR-0070/0065` |

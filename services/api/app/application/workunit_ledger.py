@@ -14,7 +14,7 @@ from enum import StrEnum
 from typing import Any
 from uuid import uuid4
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, SerializerFunctionWrapHandler, model_serializer, model_validator
 
 from packages.contracts.harness_models import AgentControlLoopEvidenceAnchor
 
@@ -74,6 +74,15 @@ class WorkUnitRecord(BaseModel):
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     error: str | None = Field(default=None, max_length=500)
     status_reason: WorkUnitStatusReason | None = None
+    input_contribution_ids: tuple[str, ...] = Field(default_factory=tuple, max_length=12)
+
+    @model_serializer(mode="wrap")
+    def serialize_compatible(self, handler: SerializerFunctionWrapHandler):
+        payload = handler(self)
+        # Empty handoffs must not change pre-handoff ledger rows or CAS values.
+        if not self.input_contribution_ids:
+            payload.pop("input_contribution_ids", None)
+        return payload
 
     @model_validator(mode="after")
     def branch_is_authority_key(self) -> "WorkUnitRecord":
@@ -164,7 +173,7 @@ class ContributionRecord(BaseModel):
     run_source_revision: str = Field(min_length=1, max_length=120)
     catalog_source_revision: str = Field(min_length=1, max_length=120)
     approved_file_refs: tuple[str, ...] = Field(min_length=1, max_length=24)
-    evidence_anchors: tuple[AgentControlLoopEvidenceAnchor, ...] = Field(default_factory=tuple, max_length=96)
+    evidence_anchors: tuple[AgentControlLoopEvidenceAnchor, ...] = Field(default_factory=tuple, max_length=96 * 6)
     model_receipt: WorkerModelReceipt
     gate_status: ContributionGateStatus
     gate_reason: str = Field(min_length=1, max_length=500)
@@ -173,6 +182,15 @@ class ContributionRecord(BaseModel):
     # A safe, bounded candidate summary is useful for audit projections.  It
     # is not a second Artifact store and never contains provider raw output.
     summary: str = Field(min_length=1, max_length=2_000)
+    input_contribution_ids: tuple[str, ...] = Field(default_factory=tuple, max_length=12)
+
+    @model_serializer(mode="wrap")
+    def serialize_compatible(self, handler: SerializerFunctionWrapHandler):
+        payload = handler(self)
+        # Preserve the exact payload and digest of immutable historical receipts.
+        if not self.input_contribution_ids:
+            payload.pop("input_contribution_ids", None)
+        return payload
 
     @model_validator(mode="after")
     def validate_branch_key(self) -> "ContributionRecord":

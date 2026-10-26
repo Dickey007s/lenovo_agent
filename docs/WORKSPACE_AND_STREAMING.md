@@ -1,6 +1,167 @@
 # Whole-folder workspace and streaming
 
-## 单步事项交互补充（DR-0064）
+## DR-0098 Demo3 Example Selection
+
+The new-action form offers twelve examples under a closed disclosure with four select groups. Choosing fills a fresh complete draft without a POST, stream change or approval. Existing actions must use original controls; busy/unknown/blocked locks remain. Materials are synthetic pasted text, not new workspace files. See [DR-0098](decisions/DR-0098-demo3-ready-boundary-examples.md).
+
+## DR-0097 One Executor, Multiple Work Items
+
+The existing Agent graph projects one primary executor when admission is single_controller and no Worker records exist. Plan length is work-item count, not Agent count. Analysis receipt owns execution/adoption state. Selected method names and routing reasons stay folded; inspection sends no POST. Existing Task/Run/SSE, errors and evidence remain. See [DR-0097](decisions/DR-0097-primary-agent-and-bounded-skills.md).
+
+## DR-0096 Single-agent Adjustment
+
+Existing graph shows one actual execution node for eligible single work. Review origin labels “单 Agent 处理后”; expanded review with added Branch IDs changes heading/todo summary to single-start/added-check wording. Unchanged reasons stay folded, errors stay visible. Existing SSE/Snapshot owns nodes; no extra stream, client dispatch or synthetic parallelism. See [DR-0096](decisions/DR-0096-single-agent-result-driven-delegation.md).
+
+## DR-0095 Shared Information Hierarchy
+
+Demo2 keeps one result preview, status and unresolved work upfront; complete instructions, receipts, budgets and additional results expand on demand. Unchanged adaptive-review reasons are folded without hiding actual workers or outcomes. Demo3 uses the same compact form and result hierarchy while preserving strong confirmation, unknown-request retry, source comparison and read-only controls. Hidden task surfaces explicitly retain `display:none`; hiding is not cancellation. Capture waits for the selected Run's final state and receipts, not the independently polled recent-list label. See [DR-0095](decisions/DR-0095-unified-demo-information-hierarchy.md) and its Evidence; no API or SSE contract change.
+
+## DR-0094 Ready Examples
+
+Demo1 now exposes all six existing office examples in one closed disclosure, never as constant cards. Selecting fills the original draft without a POST. Demo2 default goals use bounded named subjects and source fields, not Agent counts. Runtime, source scope and SSE are unchanged. See [DR-0094](decisions/DR-0094-live-demo-readiness.md) for live 3000/8000 alignment and fixed-sample coverage limits.
+
+## DR-0093 Evidence And Branch Navigation
+
+Ordinary findings open one focused source-review surface, without a synthetic human-decision form. File browsing scrolls and focuses the preview. Task lineage stays reachable while scrolling; zero-human-item columns disappear. These changes do not disconnect SSE, cancel tasks or change source scope. WorkUnit lanes share real receipt projection across task and collaboration views. See [DR-0093](decisions/DR-0093-blurt-focused-workbench.md).
+
+## DR-0091 Business Goals And Visible Adjustment
+
+Default examples no longer prescribe Agent counts or delegation. Initial route reasons remain visible with full detail folded. Task view projects only persisted adaptive_reviews, showing which returned batch prompted a decision and whether work was added. Addition reasons and every Worker result expand on demand. The UI subscribes to both new review events without creating another stream or calling a model on inspection. Background-only findings are excluded from delivered counts but now remain explicitly unfinished. Desktop/mobile readonly checks and known boundaries are in [Evidence](evidence/DR-0091-ADAPTIVE-PROGRESS-20261024.md).
+
+## DR-0090 Larger Collaboration View
+
+Three selectable example groups now include the default cross-department brief. Shared approved inputs, automatic readonly authority and streaming are unchanged. Work-package nodes display dependency stages, current status and optional result excerpts; all five nodes are retained, with no fake animation/count. Missing parents and unadopted output remain explicit. See [DR-0090](decisions/DR-0090-multistage-worker-display.md) and [SCENARIO-077](scenarios/SCENARIO-077-five-worker-office-brief.md).
+
+
+## DR-0089 Batch Overview And Readonly Return
+
+Six examples in two groups replace technical PRD/code defaults. After submission, full instructions collapse; outcome previews cover distinct completed Branches first, while unresolved work stays visible. Details and switching spaces retain the mounted batch. Return closes only the selected transport through existing draft navigation; it does not stop/restart any server Task. Explicit New Task resets the local composer. Refresh still loses the batch, not accepted server tasks. Selected Run SSE and recent-list polling are unchanged. See DR-0089/SCENARIO-076.
+
+## DR-0088 Visible Human-Agent Division
+
+The root's first-round area now separates accepted/completed analysis from human judgment or missing facts. Agent source/structure recovery and manual usage authorization are separate from business decisions. The three additional examples are collapsed; source and decision inspection reuse original dialogs and never POST on open. Completed Loop records with unresolved judgments/missing sources have explicit recent-list labels. No new upload, automatic resume or Demo2 manual dispatch is introduced. See DR-0088/SCENARIO-075.
+
+## DR-0087 Task Journey
+
+The shared root now offers three ordinary office examples and a pre-submit goal/files/output brief. The first-round view uses server Plan, input_file_refs and model_input_coverage, not generated animation or private reasoning. It collapses after completion or waiting so pending work remains accessible.
+Same-Task stage navigation fetches actual Run records; old stages are read-only and never start a model. Confirmed suggestions use `/continue`, retaining Task identity and the parent's stream until a validated child arrives. Unknown responses retain same-page command identity and lock navigation; refresh recovery of an unknown command is not implemented. Task lineage is still capped at100 and the recent sidebar at20 Runs. See DR-0087.
+
+## DR-0086 Todo Execution And Retained Evidence
+
+Demo2 draft presents three editable todos; one click sends three separate `/runs` requests with automatic_readonly and analysis_only. A response failure locks submitted text and reuses that item's key/payload within the page; accepted items are skipped on retry.
+The Team list polls real recent Runs every3 seconds; matching records never regress versions. Selected Run still uses original SSE/current Task/generation checks. Single-agent automatic tasks stay in Team by their persisted policy.
+No task runs merely from opening the composer. The batch composer is browser-local and not restored across refresh; accepted server tasks remain accessible in history while the state store exists.
+Evidence view keeps same-Run retained ArtifactVersion quotes visible if top-level Result is absent, clearly labelled as retained version. Human-decision findings remain visible beyond the first three. Automatic-mode Worker dispatch buttons are hidden, not auto-clicked.
+
+## DR-0085 Unified Root Layout
+
+The root now uses a shared navigation/task/content shell with task/evidence/result tabs. The source index remains shared, not isolated by the three presentation choices.
+Changing presentation creates a local draft, closes only the selected client transport and does not cancel prior server work. Analysis instruction drafts survive in-page presentation switching, not refresh.
+Task selection keeps the existing generation and current-pointer checks. New source preview is explicit; the library's default first file is not projected as current evidence.
+Action busy/unknown/editor state locks outer task switching. Existing inner action revision/idempotency and explicit review controls remain. See DR-0085 for the bounded scope.
+
+## DR-0084 Screenshot Showcase
+
+`docs/showcase/office-agent-20261023/index.html` groups eight screenshot narratives by capability.
+Tabs, arrows, native-size image viewing and copy are local-only; opening the original workbench never submits a task.
+The original result view preserves passed checks even without a current adopted analysis, without claiming deterministic authority.
+Original workspace, capability routes, SSE and action controls remain unchanged. See DR-0084 Evidence.
+
+## DR-0083 Task-to-Delivery Walkthrough
+
+The root progress tab is labelled 执行进展; results provide 返回执行进展. Saved analysis drafts remain review-required and cannot override failed file receipts or rejected/supplemental narratives.
+File types use a native select; filtering remains local and does not change whole-workspace scope. Waiting-only optional direction input discloses locally, while stop and branch recovery remain available.
+The existing collaboration modal puts confirmation first, preserves all dependency states, and folds source/attempt/version detail. Browsing and expanding do not POST or affect SSE. See DR-0083 Evidence for tested limits.
+
+## Waiting and Collaboration Copy (2026-10-22)
+
+DR-0082 keeps one compact waiting header and per-issue actions. Sources and raw reasons disclose locally.
+When the full-Run unfinished ledger is present, duplicate current-round branch details may fold;
+every unfinished item stays in that ledger, with its original review entry. Without it they remain open.
+The repeated waiting footer folds, not errors or business vetoes. Collaboration keeps all blocked names,
+ready-wave scope, admission budget and explicit dispatch. Disclosure does not change SSE or issue POST.
+
+## Delivery-First Root (2026-10-22)
+
+DR-0081 places real file delivery before audit history. All unfinished branches from the Run
+remain listed, with direct existing review actions. Ordinary completed records fold only when
+there are no open decisions, unfinished branches or selected-round gaps, deferred/missing requirements
+or bounded model coverage. History/source-change/errors stay separate. Local disclosure preserves SSE.
+
+## Reference-Led Disclosure (2026-10-22)
+
+DR-0080 removes root delivery rows only when every Branch is completed. Pending lists remain.
+Capability file outcomes keep their frontstage business verdict and single result entry.
+Collaboration prioritizes the existing dependency graph; detailed admission/call/adoption counts
+move into existing execution receipts. Disclosure is local, preserves SSE, and sends no commands.
+
+## Revocable Preference and Draft Recovery (2026-10-20)
+
+DR-0079 lets users explicitly remember a format_text style in this browser for the
+current unsigned demo identity. Only spaced/compact is stored, never text/contacts.
+Clearing affects future drafts, not the current one; storage failures remain visible.
+Other actions retain their full checks. Historical excerpt content first enters the
+editor without a request; saving creates a new draft revision using edit_draft.
+Recent actions can filter OPEN statuses, only within the latest twenty Runs.
+None of these viewing/filtering choices closes SSE or dispatches work.
+
+## Contextual Handoff (2026-10-19)
+
+Pending and denied office actions can download saved-state context including target,
+date, materials, current result and the next human decision. Busy, unknown and active
+editor states disable download. Export neither changes Run state nor closes SSE;
+recent items remain limited to twenty Runs. See DR-0078 and SCENARIO-065.
+
+## Case-Based Review (2026-10-10)
+
+DR-0077 keeps action drafts and sources adjacent, sources open by default and
+changed-field comparisons open for pending actions. Both disclosures remain local.
+Saved human edits are named separately from excerpts; judgment recording explicitly
+does not dispatch follow-up work. Unknown response context outranks generic terminal
+wording. Existing request body, version, SSE and idempotency behavior are unchanged.
+
+## Calm Terminal View (2026-10-10)
+
+DR-0076 folds ordinary route details, omits inactive terminal controls and a single-round tab in the
+root compact view. Active controls, adaptive confirmation, history warnings and errors remain visible.
+Passed-file explanations may collapse, excluding code self-test cards; full Results remain unchanged.
+Disclosures do not affect SSE, source scope, dispatch, resume or existing versions.
+
+## Task Delivery Clarity (2026-10-10)
+
+DR-0075 keeps file generation, logical versions and business decisions separate in the delivery summary.
+The preview filename appears only in preview view, never as implied task input. Historical rounds carry
+an explicit history label. None of these projections changes SSE, source scope or control authorization.
+
+## Focused Workspace (2026-10-08)
+
+[DR-0074](decisions/DR-0074-execution-detail-disclosure.md): root execution history/material/version details use native details,
+without requests. Non-completed branches and exceptional lineage stay expanded. Run changes reset only local detail state.
+
+The root header opens process records, closed by default. Opening focuses the pane; closing or Escape restores trigger focus.
+The directory defaults open in preview and closed in task/action views unless explicitly toggled;
+search, expanded paths and file selection survive collapse. Submitted research-task settings are
+initially collapsed. New task resets this presentation. These UI states send no business commands;
+Snapshot/SSE and main pending/error/result surfaces remain. See [DR-0073](decisions/DR-0073-focused-workspace-disclosure.md).
+Main notices retain the latest numeric/narrative rejection and artifact restore or current failure event,
+labelled as execution records rather than inferred current blockers. Explicit search keeps the directory visible
+if an initial history restore changes the selected view. Small-screen header controls wrap at natural widths.
+
+## Unified Task Entry (2026-10-07)
+
+Both `/` and `/agent-capabilities` offer “分析资料 / 办理事项” in a blank new-task context.
+The existing task history remains shared. A selected `office_action` Run uses the original action
+interface; inapplicable Loop/result controls are hidden rather than implying work occurred.
+Request success/error/409 refresh is scoped to the initiating session generation, with a second
+parent receipt check. A late response cannot replace a newer draft or task; this does not cancel
+the server action or create an approval. Unknown outcomes retain their existing idempotent recovery.
+See [DR-0072](decisions/DR-0072-unified-workbench-and-response-ownership.md): Limited Verified for
+shared entry, tested late-response isolation and coexistence. Initial task restoration checks its
+generation; starting another local action draft invalidates prior reads. Two additional navigation
+regressions passed individually and the final combined browser rerun passed 149 tests. Evidence keeps
+both red cases and the final result; this is not an exhaustive race or real-user guarantee.
+
+## 单步事项交互补充（DR-0070）
 
 中心区“办理事项”使用六种通用操作表单，不增加 Scenario/Demo 选择器。个人整理
 显示可撤销结果；摘录允许原位编辑并保留来源；任务等待普通确认；发件等待三项强确认；受限请求显示原因。材料对照要求明确选择 A/B 和填写理由，保存判断不会启动后续任务。
@@ -13,10 +174,78 @@ memory 模式不支持进程重启恢复。现有 SSE 可投影 `office_action_*
 窄屏保留全文和完整联系地址；无语音确认或跨设备身份接续。
 
 最近事项仅显示 Owner 最近 20 个 Run 内的事项，GET 重开不执行任务。暂缓后可办理另一件，未保存编辑或尚待决定时不允许从列表切换。修改差异来自当前输入与历史输入；草稿历史保留 content_snapshot。受限/暂缓说明下载为本地文本，不发审批或消息。
-新命令事件 office_action_edit_draft/office_action_record_decision 复用原 SSE。详见 [DR-0065](decisions/DR-0065-demo3-editable-drafts-and-human-judgment.md)。
+新命令事件 office_action_edit_draft/office_action_record_decision 复用原 SSE。详见 [DR-0071](decisions/DR-0071-demo3-editable-drafts-and-human-judgment.md)。
 
 所有提交结果是隔离测试记录，非真实业务提交。详细对应见
 [开发版手册](design/DEMO3-DEVELOPMENT-HANDBOOK-20260918.md)。
+## Reviewable Coverage (2026-09-22)
+
+[DR-0069](decisions/DR-0069-readonly-source-counts-and-reviewable-coverage.md) keeps the same workspace
+preview and capability views. The selected visible XLSX sheet can expose up to 240 rows; Analyst uses that
+same window, so later anchors remain inspectable. Text input uses up to 30000 characters; CSV retains its
+120-row preview. Coverage remains actual supplied rows/characters, not business-record count or understanding.
+`analysis_numeric_rejected` is an ordered warning in existing execution records, not a new page or permission.
+No automatic ambiguity choice, extra retry, source write or fake file-verification state is added.
+When the primary waiting Worker's latest outcome is ambiguous but no submit-ready decision or ready wave
+exists, progress says the location is unresolved and opens existing collaboration receipts instead of
+promising a simple retry. Decision and terminal precedence remain; browsing sends no POST.
+
+## Result Disclosure (2026-09-22)
+
+ResultView shows three ordinary findings plus every actionable pending/deferred finding, preserving
+original indices and the remaining-item count. Top-level DecisionRequest state outranks stale embedded
+requests. Each source list is a native details disclosure with unique-ref count; missing file metadata
+stays explicitly unavailable. Reading and keyboard expansion send no POST. Analysis is labeled saved,
+not verified. Finance file purpose/period and download stay visible; passed-file explanations fold,
+failed-file recovery stays open. No Snapshot/SSE/command change. See
+[DR-0068](decisions/DR-0068-result-reading-and-independent-task-acceptance.md).
+
+## Task-first Disclosure (2026-09-22)
+
+The root composer now discloses examples on demand; selecting one still only edits the draft.
+The capability page has one combined current Artifact / Branch list, with three compact rows and
+explicit access to all remaining items. Row summaries and evidence are expanded per item; long
+attention-source lists disclose their real count before expansion. Range explanations are secondary,
+but business failures, missing decision packets and model-input truncation warnings remain visible.
+Result and version views replace, rather than append below, the overview; return and Escape restore
+focus. An evidence dialog on top consumes Escape without closing the underlying result.
+Collaboration defaults to the actual DAG. Review/handoff details live in the existing receipt section;
+a disagreement action opens and focuses it directly. Snapshot, SSE and command semantics are unchanged.
+This supersedes the DR-0066 default density only; see [DR-0067](decisions/DR-0067-task-first-progressive-disclosure.md).
+
+## Agreement and Delivery (2026-09-22)
+
+The original composers offer native output-preference radios. Conflicting explicit inputs retain the
+draft after 422 and require correction before starting; no model is called by editing or inspection.
+The progress view retains generated-file facts, brings the current action forward, then shows a delivery
+ledger joined only by server Branch IDs and immutable Artifact findings. Three rows are expanded by
+default; expansion changes no backend facts. Missing bindings stay unknown, not guessed by titles.
+Collaboration shows called Worker roles, bounded retry counts and evidence-linked model assessments.
+Review disagreements take precedence over a stale ready-looking node; a ready WorkUnit outside the
+advertised dispatch set is not presented as executable. Historical records without fields invent none.
+Current/history behavior, source-review navigation, event version monotonicity and original routes remain.
+See [DR-0066](decisions/DR-0066-reviewed-handoffs-and-output-agreement.md); no human-effect claim follows.
+
+## Scoped Collaboration Inputs (2026-09-21)
+
+The original progress view shows a no-file notice only for server `contract.output_policy=analysis_only`.
+It never guesses from task text. Collaboration shows versioned parent-to-child handoff rows only when a
+Contribution has both `model_receipt.called=true` and nonempty `input_contribution_ids`. Parent titles
+and versions join existing receipts; unresolved IDs get a neutral unavailable label, not invented data.
+"Supplied to the downstream model" remains separate from "downstream contribution adopted" and from
+semantic correctness. Roots and historical runs without input receipts show no synthetic handoff.
+Rows wrap at desktop/mobile widths. Viewing them calls no model, spends no budget and changes neither
+original routes nor EventSource behavior. See [DR-0065](decisions/DR-0065-output-policy-and-scoped-dependency-handoffs.md).
+
+## Actual Model Input (2026-09-20)
+
+The existing progress page discloses `rounds[].model_input_coverage`: approved file identity,
+rows/characters/metadata, supplied count, known total and bounded flag. This comes from actual Analyst
+and Worker payloads, not the browsing selection or full deterministic adapter inputs. Opening the
+disclosure spends no budget. Historical rounds without this field render no invented coverage.
+Verified file generation and supplemental/rejected model explanation are shown separately. A linked
+passed Effect and Artifact are required for the new authority notice. Existing routes and SSE
+monotonicity remain unchanged. See [DR-0064](decisions/DR-0064-demo12-reliability-and-bounded-narratives.md).
 
 ## Integrated boundary explanations (2026-09-12)
 
