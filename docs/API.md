@@ -1,5 +1,204 @@
 # Office Agent V0.2 API
 
+## DR-0098 No Protocol Change
+
+Demo3 presets submit only the existing ActionInput through POST /runs. Catalog expected_status, principle IDs and presenter steps are never request fields. Actual state, checks and receipts remain server-owned; no new endpoint or authorization. See [DR-0098](decisions/DR-0098-demo3-ready-boundary-examples.md).
+
+## DR-0097 Plan Strategy and Selected Methods
+
+Plan adds optional `execution_approach={mode:primary|delegate,reason,benefit:none|parallel_depth|context_isolation|review_separation}` and `skill_ids[]` (source_extract/rule_compare/table_reconcile, max3). These are selection facts, not execution/permission receipts. Public reason uses business-text sanitization; procedure bodies remain private. Old records default null/empty. No new endpoint. See [DR-0097](decisions/DR-0097-primary-agent-and-bounded-skills.md).
+
+## DR-0096 Review Origin
+
+No new endpoint or authorization mode. `adaptive_reviews[].origin` is `single_agent | worker_wave`, default worker_wave for old records. Current topology changes from single_controller only in the validated addition commit; initial topology event remains. Eligible single execution has actual Worker/Contribution receipts. New Worker finding IDs are Branch-scoped; persisted old IDs stay unchanged. See [DR-0096](decisions/DR-0096-single-agent-result-driven-delegation.md).
+
+## DR-0093 Follow-up Question Projection
+
+No new fields or operations. For same-task follow-ups (`parent_run_id` and `continuation_reason=执行后续建议`), public `rounds[].question` is the user-facing Snapshot `instruction`, not the private Planner context containing prior goals. `steer_instruction` remains separate. This applies when projecting existing records as well as new runs. Private history is not rewritten. See [DR-0093](decisions/DR-0093-blurt-focused-workbench.md).
+
+## DR-0091 Additive Snapshot And Event Fields
+
+No new endpoint. Snapshot `adaptive_reviews[]` has at most2 records: review_id, status (reviewing/expanded/unchanged/blocked/discarded), after_wave, reason, called, output_used, elapsed_ms, created_at, trigger_finding_ids, added_branch_ids and additions. Each addition contains business title/objective/reason plus approved input refs and parent/trigger IDs. `expanded` means admitted work, not a returned Worker. SSE adds `adaptive_review_started` and `adaptive_review_completed`; both are ordered, versioned server facts. Coordination calls consume the same Run budget before invocation. Invalid proposals preserve existing output and expose blocked review, not silent completion. See [DR-0091](decisions/DR-0091-result-driven-bounded-adaptation.md).
+
+## DR-0090 No Protocol Or Concurrency Change
+
+The new default five-step brief still uses ordinary separate Run requests. Dependency-stage UI reads WorkUnit.depends_on, Branch, Contribution and Worker receipts. No endpoint, difficulty score, forced topology, permission or budget was added. Existing automatic_readonly dispatch remains bounded to three ready Workers per wave. Two live examples yielded3+2, not five simultaneous calls. See [Evidence](evidence/DR-0090-FIVE-WORKERS-20261024.md).
+
+
+## DR-0089 No Protocol Changes
+
+Six editable examples still submit separate original Run requests under automatic_readonly. Batch summaries use topology_admission, WorkUnit/Worker/Contribution receipts and existing adopted findings. Return to batch issues no mutation; batch membership is browser-local. All version/Owner/idempotency and unknown-start rules remain. No new batch endpoint or difficulty score.
+
+## DR-0088 Responsibility Display
+
+No path, operation, schema or permission change. The UI derives responsibility from existing public Branch, finding, DecisionRequest/Record, uncovered_requirements and next_step facts. `completed` remains Loop completion, not proof that all business questions are resolved. Decision acceptance and same-Task continuation keep their existing version/idempotency controls. No calibrated confidence value is returned. Planner source-type guidance is strengthened, not a new semantic-verification endpoint.
+
+## DR-0087 Follow-Up Continuation
+
+`POST /v1/harness/runs/{run_id}/continue` adds optional `purpose: unfinished_branch | follow_up`, default unfinished_branch.
+The default requires branch_id. Follow_up forbids branch_id and requires a nonblank instruction of at least3 characters. Both require idempotency_key, expected_version and expected_task_version. Invalid target combinations return422; stale/active/non-current parents return409; foreign Owner returns404.
+Follow_up creates a same-Task child Run, leaves parent immutable, inherits output restrictions, and does not inherit automatic Worker authorization. Exact replay returns the same child. Source scope is replanned; unfinished_branch retains its bounded missing-source scope.
+Task GET adds `goal`, and `lineage[].instruction/continuation_reason`. Original route counts remain12 paths/13 operations. This supersedes the earlier independent-Task suggestion contract, not office-action controls. See DR-0087 and Evidence.
+
+## DR-0086 Automatic Readonly Authorization
+
+Existing `POST /v1/harness/runs` accepts optional `execution_policy: manual | automatic_readonly` (default manual).
+Automatic requests require `output_preference=analysis_only` and no `action`; invalid combinations return422 before creation.
+Run Snapshot/public projection persist the policy; ordinary manual requests omit the default field in the start idempotency digest for compatibility.
+The automatic policy authorizes bounded, admitted readonly Worker waves without new per-wave user confirmations. Human decisions, writes and external actions are not authorized. Original `/workers` manual requests still require confirmation.
+No new API paths or Batch object. The UI submits three independent Runs, each with its own bounds. Snapshot/Task queries remain the authority; cross-refresh unknown batch-start recovery is not implemented.
+See DR-0086 and its Evidence. This supersedes earlier presentation-only notes only for this new explicit policy.
+
+## DR-0085 Presentation Only
+
+No endpoint or public input changed. Presentation space IDs are local UI state, not API workspace IDs or permission grants.
+Task grouping uses the existing recent Runs list. Source quotes use EvidenceAnchor; pending choices use the original DecisionRequest/Resolution. Worker dispatch remains explicitly confirmed.
+Automatic cross-Task scheduling, import and isolated Demo3 datasets are not added by the new root layout.
+
+## DR-0084 No API Changes
+
+The static showcase makes no API calls. Screenshot capture uses browser-local fixtures for Demo1/2 and existing action endpoints for Demo3 with independent test Owners.
+No new routes, scenario selectors, automatic task starts or authority fields. A neutral result fallback reads existing passed statuses only.
+
+## DR-0083 No API Changes
+
+No endpoints or public fields changed. Frontend Worker dispatch requires waiting_input and explicit membership in ready_branch_ids; an empty list no longer falls back to every running Branch.
+The existing three-Branch cap, confirmation, expected version, idempotency and Owner rules remain. Saved-version viewing sends no command. See DR-0083 Evidence.
+
+## DR-0082 Presentation Only
+
+Waiting copy and graph disclosure use existing fields and actions. No new route, operation,
+permission, model request or server state. Opening details and receipts sends no control command.
+
+## DR-0081 Presentation Only
+
+No API changes. Result navigation, calculation disclosure and execution-record disclosure send
+no commands. Branch review, download and controls retain their existing authority and contracts.
+
+## DR-0080 Presentation Only
+
+No protocol, route, authority, version or idempotency changes. Existing Branch, Artifact and
+Worker receipt fields drive local disclosure; opening receipts does not dispatch Workers.
+
+## DR-0079 Personal Text Format
+
+ActionInput optionally accepts format_style: spaced | compact. Non-null values are
+valid only for format_text; invalid values/other operations fail validation. None or
+omission retains the prior spaced behavior and omits the new key on serialization,
+preserving legacy request digests and nested Snapshot payload shape. Explicit styles
+are included in the versioned input and request digest. No new operation or path.
+Preference persistence is browser-local, not authorization. Draft recovery uses the
+existing edit_draft command; history is appended, not rolled back or overwritten.
+
+## DR-0078 Local Export Only
+
+No protocol changes. Handoff download is a local Blob from saved office_action
+fields and sends no mutation request. UI text describing who should decide is not
+an owner assignment, permission or external approval receipt.
+
+## DR-0077 Presentation Only
+
+No route, field or operation changes. Source/draft disclosures and revision change
+notices read the existing office_action. Decision notes still cannot dispatch
+Workers, edit sources, approve business actions or trigger downstream Runs.
+
+## DR-0076 Presentation Only
+
+No endpoint, field, command or authority change. Local route/file disclosures send no command;
+terminal controls omitted in the compact view were already disabled. Worker confirmation is not folded.
+
+## 2026-10-08 Presentation Only
+
+[DR-0074](decisions/DR-0074-execution-detail-disclosure.md) also adds no protocol or control operation;
+opening version history is local, while choosing restore still requires the existing versioned rollback request.
+
+[DR-0073](decisions/DR-0073-focused-workspace-disclosure.md) adds no endpoint, public field or permission.
+Directory, task-settings and activity-pane disclosure is client-local and sends no control POST.
+
+## 2026-10-07 Integrated Entry, Unchanged Protocol
+
+[DR-0072](decisions/DR-0072-unified-workbench-and-response-ownership.md) adds no endpoint or
+permission. The unified blank-task entry chooses ordinary research or the existing explicit `action`
+contract. Action controls, Loop decisions and Worker dispatch remain separate operations with their
+existing Owner/version/idempotency rules. Client session generation is not a public API field or
+server authorization. The count remains twelve paths and thirteen operations; Worker-human recovery
+is not added by reusing the action form.
+
+## 2026-09-22 Read-only Source Checks
+
+[DR-0069](decisions/DR-0069-readonly-source-counts-and-reviewable-coverage.md) changes no endpoint or
+request. `BenchmarkFilePreview.rows` accepts up to 240 rows; Workspace XLSX preview supplies this bound,
+while historical/CSV previews retain their own smaller limits. Existing total_rows/truncated/row_number
+and model_input_coverage keep their meanings; raw preview rows may include embedded headers.
+`analysis_numeric_rejected` records a single-controller rejection; existing analysis/Worker receipts expose
+called/output_used plus safe failure reasons (`source_numeric_conflict` or `source_numeric_contract`).
+The private read-only computation context is not an API field, source evidence or a passed EffectReceipt.
+No new read-only verification authority, automatic retry or file-generation permission is introduced.
+
+## 2026-09-22 Result Reading
+
+[DR-0068](decisions/DR-0068-result-reading-and-independent-task-acceptance.md) adds no endpoint,
+request, response field or permission. Result disclosures are browser-only; top-level DecisionRequest
+and existing Artifact/Commit facts remain authoritative. The offline acceptance audit does not write
+back into Snapshot or create a new semantic-verification field. Source-location adoption must not be
+represented as business correctness; a real read-only run now records a counterexample in Evidence.
+
+## 2026-09-22 Presentation-only Simplification
+
+[DR-0067](decisions/DR-0067-task-first-progressive-disclosure.md) changes no endpoint, request or
+response field. Opening result/version views and disclosing examples, work items or receipts are local
+browser actions, not Run creation, Worker dispatch or business approval. Existing command/version,
+history and evidence-source contracts remain authoritative.
+
+## 2026-09-22 Output Agreement and Reviewed Handoffs
+
+No new path or operation. `POST /runs` adds optional `output_preference`:
+`auto` (default), `analysis_only`, or `workspace_files_allowed`. Auto is omitted from serialization to
+preserve old request digests. Explicit allow plus a recognized no-file instruction returns 422 before
+Run creation/model use. It compiles server `contract.output_policy`; restrictive parent policy still wins.
+This permission does not promise a generated file or understand arbitrary natural-language conflicts.
+
+New Runs freeze `contract.collaboration_protocol=reviewed_handoffs_v1`; missing historical values use
+`legacy`. Called `worker_runs[]` may add `work_role` (`source_analysis|dependency_review|synthesis_review`),
+`repair_count` (0 or 1) and `dependency_assessments[]` with `contribution_id`,
+`verdict` (`supported|conflict|insufficient`), `explanation`, `finding_ids`, and located `evidence_anchors`.
+Empty legacy fields are omitted. Assessment identity and anchor membership are server validated;
+verdict is a model opinion, not semantic verification or a human DecisionRecord.
+
+Structural/location/handoff-structure errors may add one budgeted target-Worker attempt, recorded by
+`worker_repair_requested`. Budget, active deadline, control and WorkUnit state are checked before the
+new call. Ambiguous anchors, conflicts/insufficient evidence, scope violations and non-structural
+provider errors do not auto-retry. Existing versions, idempotency and append-only artifacts remain.
+See [DR-0066](decisions/DR-0066-reviewed-handoffs-and-output-agreement.md).
+
+## 2026-09-21 Output and Handoff Receipts
+
+No new path, request field or operation. `contract.output_policy` is server-owned:
+`workspace_files_allowed` (legacy default) or `analysis_only`. Only the latter disallows new fixed
+run-workspace files; it still permits logical analysis history. Recognition is a bounded set of explicit
+no-file phrases, not arbitrary language understanding. A same-Task child inherits a restrictive parent.
+
+`work_units[].input_contribution_ids` records reserved input. `contributions[].input_contribution_ids`
+records direct adopted-parent summaries supplied for a called dependent model. They are optional and
+omitted when empty, preserving legacy immutable payloads/digests. IDs identify receipts, not evidence
+Anchors. The browser cannot submit or edit dependency context. Before a new `/workers` reservation,
+stale/unadopted/missing/out-of-scope parent context fails with 409 and no model budget change.
+Completed idempotent replay does not revalidate live files or call models; the original payload digest
+must still match. `office_output_suppressed` records a skipped adapter, never a successful file write.
+See [DR-0065](decisions/DR-0065-output-policy-and-scoped-dependency-handoffs.md).
+
+## 2026-09-20 Additive Receipts
+
+No new path or operation. Round snapshots add optional/default-empty `model_input_coverage[]` entries:
+`file_ref`, `unit` (`characters|rows|metadata`), `provided_count`, nullable `total_count`, and `bounded`.
+These describe content supplied to models, not understood content. Existing `narrative_reconciliation`
+also covers onboarding, finance and release metrics; matching free prose can remain `supplemental`.
+Initial adaptive confirmation now has explicit `next_step.ready_branch_ids` before Worker reservation.
+Waiting pauses active time; dispatch rejects expired active budgets and pending pause/stop commands.
+Worker contribution aggregate anchors permit up to 576 (96 findings x 6), with per-finding limits
+unchanged. Planned explicit requirements can bind a unique validated dependent unit, not only a root.
+See [DR-0064](decisions/DR-0064-demo12-reliability-and-bounded-narratives.md) for boundaries.
+
 ## 2026-09-12 boundary projection clarification
 
 [DR-0063](decisions/DR-0063-integrated-copilot-boundaries-and-swarm-facts.md) adds no path, operation,
@@ -70,7 +269,7 @@ automatically replayed. In-flight HTTP requests, asyncio tasks and conditions
 remain process-local. In memory mode all Run state disappears on restart. Explicit single-action Runs restore their saved
 Snapshot without loop recovery or action replay.
 
-### Single-action test records (DR-0064)
+### Single-action test records (DR-0070)
 
 `POST /runs` optionally accepts `action`, with required `operation` and `title`,
 and optional `content`, `target`, `due_date` (ISO date), `source_ref` (safe file ref).

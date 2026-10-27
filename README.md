@@ -1,5 +1,164 @@
 # Office Agent V0.2
 
+本次系统源码同步的包含范围、运行入口与验证限制见 [2026-10-26 同步记录](docs/evidence/SYSTEM-SOURCE-SYNC-20261026.md)。截图、录屏、PPT 和渲染报告属于本地交付材料，本次不随源码上传；历史文档中的这些链接在仅克隆源码时可能不可用。
+
+## 2026-10-26 Demo3 十二个预设边界案例
+
+在原 Demo3 的新事项表单展开“演示案例”，可选择十二个办公场景，覆盖自动整理、撤销、草稿修订、缺信息、确认、重核、受限拒绝、材料判断和暂缓找回。选择仅填入可编辑材料，不提交或批准。全部沿用固定规则 API，不调用模型或执行外部动作。见 [案例讲解清单](docs/reports/demo3-examples-20261026/index.html)、[DR-0098](docs/decisions/DR-0098-demo3-ready-boundary-examples.md) 与 [验证](docs/evidence/DR-0098-DEMO3-EXAMPLES-20261026.md)。
+
+## 2026-10-26 主 Agent 优先与按需方法
+
+任务拆分不再直接等于 Agent 人数：真实 Planner 单独提出自行处理或委派建议，服务端保留准入权。三个固定处理方法按需加载；原工作台显示一个主 Agent 处理多个工作项。原入职交接指令实跑保留两项结果，由双执行改为一次主分析。多工作项主路径的处理后扩编仍待接通。见 [DR-0097](docs/decisions/DR-0097-primary-agent-and-bounded-skills.md)、[Evidence](docs/evidence/DR-0097-PRIMARY-DESIGN-20261026.md) 与 [设计对齐页](docs/reports/primary-design-alignment-20261026/index.html)。
+
+## 2026-10-26 单 Agent 后按结果追加核对
+
+Demo2 的合格单工作项也进入真实执行台账，并在结果返回后判断是否需要补核；不用先开多人团队。只有服务端批准新增工作才更新协作方式，保留原贡献和旧版本。不引入新框架依赖。150项后端、16项浏览器/投影检查通过；3项真实待办共10次调用均未追加，真实模型扩编仍未验证。见 [DR-0096](docs/decisions/DR-0096-single-agent-result-driven-delegation.md) 与 [Evidence](docs/evidence/DR-0096-SINGLE-AGENT-DELEGATION-20261026.md)。
+
+## 2026-10-26 三个工作区统一与分层展示
+
+Demo2 总览先看任务、状态和一条结果，指令、统计与其他结果按需展开；错误和未完成项不隐藏。Demo3 对齐原工作台的表单、状态条和来源对照，保留全部人工确认与风险控制。修复隐藏依据区域在总览底部出现的问题。23 项定向浏览器回归及类型检查通过；新版实跑截图按主区真实状态验收。见 [DR-0095](docs/decisions/DR-0095-unified-demo-information-hierarchy.md) 与 [Evidence](docs/evidence/DR-0095-UNIFIED-DEMO-POLISH-20261026.md)。
+
+## 2026-10-25 当前入口与实跑示例
+
+3000 入口的旧后台已存档并更新。Demo1 的六个示例统一收在折叠区；Demo2 默认三项待办缩小到明确的人员、招聘要求和账目记录。实跑 17 次、46 次调用，推荐 7 个有来源的案例；缺材料与待判断仍保留。不是所有 completed 结果都入选。入口预检：`node scripts/demo-service-preflight.cjs http://localhost:8000`。见 [DR-0094](docs/decisions/DR-0094-live-demo-readiness.md) 与 [实跑证据](docs/evidence/DR-0094-DEMO-READINESS-20261025.md)。
+
+## 2026-10-25 Blurt 录屏反馈改版
+
+按确认后的 12 项清单精简输入、依据核对与协作展示。普通引用一次进入原文，空人工栏不再出现；同任务分支保持可切换，Agent 分行显示真实状态。续办公开目标不再投影内部背景 JSON。实际预算和人工权限不变。
+处理步骤当前是执行流程展示；建议独立理由仍缺失，不把这些写成新模型能力。见 [DR-0093](docs/decisions/DR-0093-blurt-focused-workbench.md) 与 [验证及未完成项](docs/evidence/DR-0093-BLURT-WORKBENCH-20261025.md)。
+
+## 2026-10-25 手机对齐手册
+
+[36 页图文 PDF](output/pdf/office-agent-system-guide-20261025.pdf) 按当前代码与真实运行解释三个 Demo、证据捕获、人机交接和有限自适应协作。首次名词释义、实际案例、流程图与未实现边界均保留。见[阅读导览](docs/reports/system-alignment-20261025/index.html)和[来源与验证](docs/reports/system-alignment-20261025/README.md)。本次仅制作文档与只读截图，不构成新一轮模型能力评测。
+
+## 2026-10-25 新版实跑演示页
+
+[八个案例的截图演示](docs/showcase/office-agent-20261024/index.html)已用当前系统重跑，旧版保留。Demo1/2 是真实模型运行，Demo3 是不调用模型的固定规则事项。31 步展示使用 30 张不同的 1920x1200 截图；两种 Demo2 视角共用一批真实任务，不重复计数。结果、未完成部分与验证范围见 [DR-0092](docs/decisions/DR-0092-live-showcase-refresh.md) 和 [Evidence](docs/evidence/DR-0092-LIVE-SHOWCASE-20261025.md)。
+
+## 2026-10-24 Demo2 按结果调整的有限实现
+
+默认待办只写办公目标，不再规定 Agent 数量与分工。自动只读协作新增按结果评估：模型可提出追加工作，服务端核对来源、前序、预算后再派发。每批仍最多3个，累计工作项不等于同时运行人数。界面显示初始分工原因与实际调整，节点结果按需展开。
+18次真实任务启动、61次模型调用出现单 Agent、两人和三人安排；10次协调判断均未新增工作。动态追加链路仅有受控测试证据，不能声称真实模型扩编已验收。具体问题、测试与限制见 [DR-0091](docs/decisions/DR-0091-result-driven-bounded-adaptation.md) / [Evidence](docs/evidence/DR-0091-ADAPTIVE-PROGRESS-20261024.md)。下方五人示例是旧版预设分工的历史证据，不是本轮自主扩编结果。
+
+## 2026-10-24 Demo2 五个执行 Agent 与两阶段交接
+
+新增默认示例“跨部门简报 · 分阶段协作”。真实跑通两次：先3个 Agent 独立分析，再2个 Agent 接续核对和汇总；同组两个简单待办仍为单 Agent 路径。任务图按依赖分层，较多节点的结果按需展开。
+这是5个执行 Agent、每波最多3个，不是5个同时运行，也未修改调度策略。六个任务共20次真实调用，见 [DR-0090](docs/decisions/DR-0090-multistage-worker-display.md) / [Evidence](docs/evidence/DR-0090-FIVE-WORKERS-20261024.md)。
+[分工图与真实截图](docs/reports/swarm-stages-20261024/index.html)。
+
+
+## 2026-10-24 Demo2 办公待办与结果摘要
+
+两组共六个只读办公示例已各实跑两次，覆盖单 Agent、同类资料顺序处理、跨来源双 Agent 协作。待办启动后先看任务、实际执行与分析结果，指令和回执按需展开；详情可返回同一组待办。
+这是前台投影改进，不增加模型难度评分或新调度器。26次真实模型调用及边界见 [DR-0089](docs/decisions/DR-0089-office-todo-outcomes-and-routing.md) / [Evidence](docs/evidence/DR-0089-OFFICE-TODOS-20261024.md)。
+[六个案例与真实页面截图](docs/reports/office-todos-20261024/index.html)。
+
+## 2026-10-24 人机分工与三组真实案例
+
+原任务页新增“这次怎么分工”：系统已处理的分析、需要人的判断或材料、Agent 自身尚未完成的工作分开显示，不用虚构置信度百分比。
+“更多人机分工示例”提供明确入职例外、往来账缺银行回单、申请改变权限例外三组任务。已实跑三组并完成一次同任务的人类选择后续办。
+任务列表不会再把仍有待决或缺源的分析统一标为已完成；Demo2 自动只读策略不变。范围和误分类修正见 [DR-0088](docs/decisions/DR-0088-evidence-based-human-agent-division.md) / [Evidence](docs/evidence/DR-0088-TASK-RESPONSIBILITY-20261024.md)。
+[图文说明与真实页面](docs/reports/task-responsibility-20261024/index.html) 包含三组案例、一次同任务交接及尚未实现的边界。
+
+## 2026-10-24 同任务分支与普通办公案例
+
+Demo1 的后续建议改为同一 Task 内续办，保留原目标、原记录与成果，使用“初始处理 / 后续分支”切换。
+开始前展示预期文件与交付目标，首轮展示真实计划及已送入分析的资料；例子改为 Excel 往来账、入职清单、Word 招聘要求。
+执行后的建议经原 `/continue` 创建新的有界 Run，不另建业务 Task；历史只读，当前终态才能续办，不支持任意历史节点并行分叉。
+见 [DR-0087](docs/decisions/DR-0087-task-branches-and-first-round-brief.md) 与 [实测与限制](docs/evidence/DR-0087-TASK-JOURNEY-20261024.md)。下文“后续建议新建独立任务”为历史合同，已由本条替代。
+
+## 2026-10-24 真实待办执行与证据补齐
+
+Demo2 现可一次提交三个可编辑的只读待办，每项分别调用原 `/runs` API，并按服务端判断走单 Agent 或自动只读协作。
+新增通用 `automatic_readonly` 启动策略，非前端自动确认；旧手动策略仍是 API 默认值。没有新增持久 Batch、优先级队列或分布式调度。
+Demo1 暂停后仍展示已保留成果中的原文，明确未完成原因；Worker 核对来源计数已对齐 Branch。
+本次真实模型试用地址为 `http://localhost:3010/`，原3000预览未停；3010使用独立 memory 会话，重启不保留在线历史。
+见 [DR-0086](docs/decisions/DR-0086-automatic-readonly-todos-and-visible-evidence.md) 和 [本轮实测](docs/evidence/DR-0086-LIVE-DEMO12-20261024.md)。本条更新下文10月23日“多待办尚未接入”的历史范围。
+
+## 2026-10-23 统一界面第一阶段
+
+原 `/` 已改为参考图的三栏工作台：三个 Demo 入口共用任务、依据、成果视图；新增原文引用总览和真实工作包状态图。
+这次只替换前台组织方式，仍使用共享只读资料库和原 Task/Run。Demo2 多任务自动调度、资料导入、Demo3 独立目录尚未实现。
+`/agent-capabilities` 保留完整记录。旧版工作树已存档，边界及测试见 [DR-0085](docs/decisions/DR-0085-unified-reference-workbench.md) 和 [Evidence](docs/evidence/DR-0085-UNIFIED-UI-20261023.md)。
+本条替代下文历史版本中“没有 Demo 前台选择”的展示描述，但不改变 Runtime 或授权合同。
+
+## 2026-10-23 能力演示页
+
+[八个案例与 27 张原系统截图](docs/showcase/office-agent-20261023/index.html)：按任务推进、只读协作、人机共驾切换，离线浏览，不替换原工作台、不自动启动任务。
+Demo1/2 为受控回执截图，Demo3 为实际固定规则 API；来源与边界逐案标注。
+截图走查同时修正有通过检查却被称为“仅失败回执”的成果兜底提示，见 [DR-0084](docs/decisions/DR-0084-screenshot-capability-showcase.md) 与 [Evidence](docs/evidence/DR-0084-SHOWCASE-20261023.md)。
+
+## 2026-10-22 用户视角走查
+
+[DR-0083](docs/decisions/DR-0083-user-walkthrough-and-consistent-results.md) 修复根页已保留草稿却显示空白的矛盾；协作弹窗先展示确认与工作状态，再展开台账和来源。
+等待时可选调整折叠，文件筛选收为下拉；Loop/Swarm 与原入口保留。
+这是助手走查与受控回归，不是用户研究或新模型能力，见 [Evidence](docs/evidence/DR-0083-USER-WALKTHROUGH-20261022.md)。
+
+## 2026-10-22 等待说明与协作图减法
+
+[DR-0082](docs/decisions/DR-0082-concise-waiting-and-collaboration.md) 合并等待区重复说明，逐项保留问题和操作，资料/原因按需展开。
+协作图改用短状态文案，合并下游等待说明但保留全部名称；批准范围与预算不隐藏。
+原系统入口与后端协议不变，验证范围见 [Evidence](docs/evidence/DR-0082-WAITING-COPY-20261022.md)。
+
+## 2026-10-22 原任务页结构整理
+
+[DR-0081](docs/decisions/DR-0081-delivery-first-root-overview.md) 将真实成果提前，发布复核结论与文件并列；
+未完成工作不截断，普通成功执行记录按需展开。原 Loop/Swarm、完整成果和错误控制保留。
+当前验证见 [Evidence](docs/evidence/DR-0081-TASK-OVERVIEW-20261022.md)，不代表用户效果研究。
+
+## 2026-10-22 参考图对照与前端减法
+
+[DR-0080](docs/decisions/DR-0080-reference-led-information-hierarchy.md) 对照早期 Image 2 图：根页省略全已完成分支的重复清单，能力页合并文件成果入口，协作图优先于详细统计。
+待办、业务拒绝、原控制与完整记录保留；无 Runtime/API 变化。范围与验证见[本轮 Evidence](docs/evidence/DR-0080-REFERENCE-UI-20261022.md)。
+
+## 2026-10-20 原则继续落地
+
+[DR-0079](docs/decisions/DR-0079-revocable-preferences-and-draft-recovery.md) 在原事项工作台补个人文本整理偏好及撤回、旧摘录预览后保存为新版本、最近待处理筛选。
+偏好不代替确认，历史和原文不覆盖，最近列表仍只覆盖二十个 Run。验证范围见对应 Evidence，不代表全部原则已实现。
+
+## 2026-10-19 原则实践与评审交付
+
+[设计文档与三案视频](docs/deliverables/copilot-20261019/index.html)整理原型、场景流程、交互图、技术路径、亮点与体验指标。
+DR-0078 补强原事项页的已保存交接说明，不新增 Runtime 或审批能力。视频分别标明历史实跑、受控协作及真实固定规则 API；十六条原则的未实现项仍明确保留。
+
+## 2026-10-10 人机共驾案例审查
+
+先存档现有源码与未提交成果，再从队友 C02/C08/C11 回看原工作台：草稿与来源就近对照、
+内容变化时显式重核、人工判断不冒充自动续办。没有新增 Runtime 或独立产品入口。
+[三个案例图文解读](docs/reports/copilot-cases-20261010/index.html)区分研究依据、原能力和本轮调整；
+[DR-0077](docs/decisions/DR-0077-case-based-copilot-review.md)与对应 Evidence 记录验证边界。
+
+## 2026-10-10 Demo1 界面继续减法
+
+根任务区收起普通执行方式，终态不再展示不可用的 pause / stop / steer 控件，单轮省略切换条。
+通过文件的长说明按需展开；失败、自测卡、业务否决与可用控制保留。能力页完整记录不变。
+汇报补充证据捕获链与真实两波协作，见 [DR-0076](docs/decisions/DR-0076-calm-demo1-and-evidence-explanation.md) 与对应 Evidence。
+
+## 2026-10-10 Demo1 交付表达
+
+当前成果优先显示真实文件及文件检查结果，不再把逻辑版本空态写成没有产出；历史轮次与当前处理分开，
+预览文件名不再出现在执行/成果视图冒充任务输入。保留原入口与 Loop/Swarm。
+见 [DR-0075](docs/decisions/DR-0075-demo1-task-and-delivery-clarity.md) 和 [Evidence](docs/evidence/DR-0075-DEMO1-CLARITY-20261010.md)。
+
+## 2026-10-08 工作区信息分层
+
+续增：[执行记录分层](docs/decisions/DR-0074-execution-detail-disclosure.md)将普通历史、本轮材料、
+已完成分支与版本列表按需展开；未完成分支、续办/来源变化与错误不折叠。验证见对应 Evidence。
+
+原工作台的过程记录按需打开；资料目录可收起并保留筛选；已提交研究任务的输入与预算进入
+“任务要求与运行设置”，当前目标、问题和成果仍在主区。原 Loop/Swarm 与事项能力不变。
+见 [DR-0073](docs/decisions/DR-0073-focused-workspace-disclosure.md) 与[本轮验证](docs/evidence/DR-0073-FOCUSED-WORKSPACE-20261008.md)。
+
+## 2026-10-07 统一工作台整合
+
+本轮合并远程 Demo3 与本地 Demo1/2 优化，目标是一个办公工作台内的不同任务视图，
+不是三套系统。原资料库、Agent Control Loop、Adaptive Swarm 和六类固定单步事项均保留。
+入口共用与迟到响应隔离的合同见 [DR-0072](docs/decisions/DR-0072-unified-workbench-and-response-ownership.md)，
+当前验证状态见 [Evidence](docs/evidence/DR-0072-INTEGRATION-20261007.md)。该合同为 Limited Verified，
+仅限统一入口、已测试的迟到响应隔离与兼容共存；最终单次浏览器 149 项通过，后端 573 项通过、
+26 个 PG 条件跳过，末次类型检查与 webpack 构建通过。Worker 歧义人工确认到下游恢复仍是后续独立纵切。
+Demo3 文档为避免与本地编号冲突迁为 DR-0070/0071、SCENARIO-057/058，历史证据不重写。
+
 ## 单步事项与 Demo3（2026-09-19）
 
 Demo3 已与主分支的 Task 台账、只读 Worker 和新版能力页代码合并，验证进度及编号迁移见[合并记录](docs/evidence/DEMO3-MASTER-MERGE-20260919.md)。单步事项仍不调用模型或真实业务系统。
@@ -16,16 +175,66 @@ Demo3 已与主分支的 Task 台账、只读 Worker 和新版能力页代码合
 
 [开发版指导手册与设计评审](docs/design/DEMO3-DEVELOPMENT-HANDBOOK-20260918.md)
 对应提交版 R01-R16 与 C00-C12，并列明未覆盖项。
-[DR-0064](docs/decisions/DR-0064-single-action-boundary-workbench.md) 与
+[DR-0070](docs/decisions/DR-0070-single-action-boundary-workbench.md) 与
 [运行证据](docs/evidence/DR-0053-SINGLE-ACTION-EVIDENCE-20260918.md)记录实现边界。
 当前公开 API 为 12 个 path、13 个 operation，增加 `/action-controls`。
-[DR-0065](docs/decisions/DR-0065-demo3-editable-drafts-and-human-judgment.md)与[本轮证据](docs/evidence/DR-0054-DEMO3-COLLABORATION-EVIDENCE-20260919.md)记录草稿版本、材料判断、最近事项与交接说明。
+[DR-0071](docs/decisions/DR-0071-demo3-editable-drafts-and-human-judgment.md)与[本轮证据](docs/evidence/DR-0054-DEMO3-COLLABORATION-EVIDENCE-20260919.md)记录草稿版本、材料判断、最近事项与交接说明。
+## 2026-09-22 只读来源核对
+
+[DR-0069](docs/decisions/DR-0069-readonly-source-counts-and-reviewable-coverage.md) 在原 Loop/Worker
+路径拦截固定产品资料中的受支持计数冲突，不生成文件或假验证绿灯。XLSX 首个可见表最多 240 行，
+模型文本最多 30000 字符，总正文仍受 120000 字节约束；覆盖回执不等于完整理解。
+[本轮报告](docs/reports/demo12-source-checks-20260922/README.md) 保留两次真实任务仍待核对的事实，
+没有新增页面，也没有宣称真实下游交接或通用语义验证已完成。
+
+## 2026-09-22 成果分层与任务验收
+
+成果页先看结论，普通依据按需展开，所有待决仍默认可见；“分析记录已保存”不冒充结论正确。
+财务文件长口径收起，期间、用途、下载与复核边界保留。原入口和 Loop/Swarm 不变。
+两次真实任务共 8 次模型调用：财务三份文件独立复算通过；跨领域协作仍等待，且已采用分析
+出现 P0/提测数量错误，结论验收未通过。局部续办另用受控 Runtime 验证，不冒充真实模型恢复。
+见 [本轮结果、截图和自测](docs/reports/demo12-outcomes-20260922/README.md)、
+[DR-0068](docs/decisions/DR-0068-result-reading-and-independent-task-acceptance.md)。
+
+## 2026-09-22 前端减法与用户流程走查
+
+原入口与 Loop/Swarm 不变。进展页合并重复的分支/成果，工作项摘要和来源按需展开；成果与
+版本历史直接进入专注内容区，返回保留原页面状态。协作先看分工图，交接与核对意见进入既有
+回执详情；冲突、业务否决和不完整待决仍默认可见。
+见 [走查与可操作用例](docs/reports/demo12-simple-20260922/README.md) 和
+[DR-0067](docs/decisions/DR-0067-task-first-progressive-disclosure.md)。这是前端工程改进，不是真人效果研究。
+
+## 2026-09-22 论文驱动的局部修复与交接核对
+
+原任务输入增加显式输出约定；新 Run 的只读 Worker 增加按真实依赖分工、逐项前序核对与最多
+一次目标修复。歧义/分歧不会自动改成支持，已有成果保留。原进展页增加交付清单与待办优先，
+原协作页显示模型核对意见，Control Loop/Adaptive Swarm 与入口不变。
+见 [8 篇正式论文及迁移限制](docs/research/HUMAN-AGENT-TOP-VENUE-TO-DEMO12-20260922.md)、
+[本轮验收](docs/reports/demo12-research-20260922/README.md)、
+[DR-0066](docs/decisions/DR-0066-reviewed-handoffs-and-output-agreement.md)。
+这是限定工程实现，不是论文算法复现、独立真值验证或人类业务裁决闭环；Demo3 接入约定不变。
+
+## 2026-09-21 输出约束与前序成果传递
+
+继续改原系统，不更换入口。明确“只在页面展示 / 不生成文件”的新任务会在写入前拦截固定文件
+生成器；协作页新增真实的前序成果传递记录。下游 Worker 收到直接前序已采用摘要、版本及来源，
+但仍须回到批准原文核对引用。旧成果和任务记录保留，Demo3 接入约定不在本轮范围。
+见 [本轮实测与可操作用例](docs/reports/demo12-handoff-20260921/README.md)、
+[DR-0065](docs/decisions/DR-0065-output-policy-and-scoped-dependency-handoffs.md)。
+
+## 2026-09-20 Demo1/2 可靠性
+
+沿用原入口与 UI，本轮聚焦成果/模型说明对账、资料输入范围、局部续办与真实只读 Worker 验证。
+见 [可操作用例与真实运行记录](docs/reports/demo12-reliability-20260920/README.md)、
+[DR-0064](docs/decisions/DR-0064-demo12-reliability-and-bounded-narratives.md)。
+新对账只覆盖入职、财务、上线的受限指标；自由说明保留为待复核草稿。模型资料范围披露不等于
+全文续读完成。失败样本、真实 Provider 与确定性测试分别记账，本轮不处理 Demo3 接入约定。
 
 ## 正式入口与本轮方向
 
 继续在原系统上优化，不另建产品。办公资料库入口仍为 `/`，Agent Control Loop 与 Adaptive Swarm 入口仍为 `/agent-capabilities`；两处共用 `HarnessWorkbench` 和既有 Task/Run/Snapshot。默认本地地址分别为 `http://localhost:3000/` 与 `http://localhost:3000/agent-capabilities`，须先启动服务。
 
-**Demo3 的人机共驾交互要整合进上述系统，保留 Loop 与蜂群协作底座。** `docs/reports/` 中的 HTML 是辅助研究/评审材料，部分包含离线模拟，不是替代系统，也不能作为 Demo3 已整合的证据。前期原系统 UI 修改仍保留；近期独立共驾原型尚未接入原系统。
+**Demo3 沿用上述工作台，保留 Loop 与蜂群协作底座。** 远程已实现六类固定规则单步事项与版本化回执，本轮合入本地优化并收敛入口。它们不调用模型、不执行外部业务动作，也尚未成为 Worker 歧义恢复流程。`docs/reports/` 中的早期 HTML 仍是辅助研究/评审材料，部分包含离线模拟，不是替代系统或本轮集成证据。
 
 [最新会议简稿：三个 Demo、八个边界案例与蜂群差异](docs/reports/DEMO123-BOUNDARIES-AND-SWARM-BRIEF-20260912.md) 取代只报论文数量的口径。原能力页已增加既有边界解释和协作调用/采用事实，ready 工作包不再写成已执行，原 Loop/Swarm 底座保留。见 [DR-0063](docs/decisions/DR-0063-integrated-copilot-boundaries-and-swarm-facts.md) 与 [本轮 Evidence](docs/evidence/DR-0063-INTEGRATED-BOUNDARIES-AND-SWARM-FACTS-20260912.md)。这不是通用权限引擎或 Demo3 全场景闭环完成；长文覆盖、业务批准和外部执行仍未实现。不新增 HTML 演示或 PPT。
 

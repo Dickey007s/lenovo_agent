@@ -31,7 +31,15 @@
     ".next/dev/types/**/*.ts",
     ".next/dev/dev/types/**/*.ts",
     ".next-playwright/types/**/*.ts",
-    ".next-playwright/dev/types/**/*.ts"
+    ".next-playwright/dev/types/**/*.ts",
+    ".next-adaptive-swarm-20261024/types/**/*.ts",
+    ".next-adaptive-swarm-20261024/dev/types/**/*.ts",
+    ".next-single-adaptive-20261026/types/**/*.ts",
+    ".next-single-adaptive-20261026/dev/types/**/*.ts",
+    ".next-primary-design-20261026/types/**/*.ts",
+    ".next-primary-design-20261026/dev/types/**/*.ts",
+    ".next-demo3-examples/types/**/*.ts",
+    ".next-demo3-examples/dev/types/**/*.ts"
   ],
   "exclude": [
     "node_modules"

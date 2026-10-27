@@ -108,6 +108,7 @@ async def continue_harness_task(
             expected_task_version=body.expected_task_version,
             instruction=body.instruction,
             loop=body.loop,
+            purpose=body.purpose,
         )
         return runtime.public_start_result(result)
     except HarnessNotFoundError as exc:

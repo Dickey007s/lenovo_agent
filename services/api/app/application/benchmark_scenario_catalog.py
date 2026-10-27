@@ -644,7 +644,7 @@ class BenchmarkScenarioCatalog:
                     for index, value in enumerate(header_values)
                 ]
                 data_rows = normalized[1:]
-                limit = 120
+                limit = getattr(self, "MAX_PREVIEW_TABLE_ROWS", 120)
                 return {
                     "sheet_name": selected_name,
                     "columns": columns,

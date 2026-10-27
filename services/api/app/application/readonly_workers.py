@@ -8,12 +8,26 @@ import json
 from datetime import datetime, timezone
 from typing import Awaitable, Callable, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, SerializerFunctionWrapHandler, model_serializer
 
 from packages.contracts.harness_models import (
     AgentControlLoopArtifactFinding,
     AgentControlLoopNarrativeReconciliation,
 )
+from services.api.app.application.collaboration_review import DependencyAssessment, WorkerRole
+
+
+class ReadonlyDependencyContext(BaseModel):
+    """Adopted model context; never an independent source or a new permission."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    contribution_id: str = Field(min_length=1, max_length=160)
+    branch_id: str = Field(min_length=1, max_length=120)
+    artifact_version: int = Field(ge=1, le=24)
+    title: str = Field(min_length=1, max_length=240)
+    summary: str = Field(min_length=1, max_length=2_000)
+    source_file_refs: tuple[str, ...] = Field(min_length=1, max_length=24)
 
 
 class ReadonlyWorkerRequest(BaseModel):
@@ -24,6 +38,14 @@ class ReadonlyWorkerRequest(BaseModel):
     goal: str = Field(min_length=3, max_length=1_000)
     source_file_refs: tuple[str, ...] = Field(min_length=1, max_length=24)
     expected_version: int = Field(ge=1)
+    dependency_context: tuple[ReadonlyDependencyContext, ...] = Field(default_factory=tuple, max_length=12)
+
+    @model_serializer(mode="wrap")
+    def serialize_compatible(self, handler: SerializerFunctionWrapHandler):
+        payload = handler(self)
+        if not self.dependency_context:
+            payload.pop("dependency_context", None)
+        return payload
 
 
 WorkerOutcome = Literal["adopted", "failed", "ambiguous", "rejected"]
@@ -37,11 +59,15 @@ class ReadonlyWorkerContribution(BaseModel):
     outcome: WorkerOutcome
     summary: str = Field(min_length=1, max_length=2_000)
     source_file_refs: tuple[str, ...] = Field(min_length=1, max_length=24)
-    evidence_anchors: tuple[str, ...] = Field(default_factory=tuple, max_length=6)
+    evidence_anchors: tuple[str, ...] = Field(default_factory=tuple, max_length=96 * 6)
     model_called: bool = False
     output_used: bool = False
     elapsed_ms: int = Field(default=0, ge=0)
     error: str | None = Field(default=None, max_length=500)
+    input_contribution_ids: tuple[str, ...] = Field(default_factory=tuple, max_length=12)
+    work_role: WorkerRole | None = None
+    repair_count: int = Field(default=0, ge=0, le=1)
+    dependency_assessments: tuple[DependencyAssessment, ...] = Field(default_factory=tuple, max_length=12)
     # Every model receipt is reconciled, even when no deterministic effect is
     # available.  ``model_only`` is intentionally visible so it cannot be
     # mistaken for an authoritative Artifact effect.
@@ -49,6 +75,16 @@ class ReadonlyWorkerContribution(BaseModel):
     findings: tuple[AgentControlLoopArtifactFinding, ...] = Field(
         default_factory=tuple, max_length=96
     )
+
+    @model_serializer(mode="wrap")
+    def serialize_compatible(self, handler: SerializerFunctionWrapHandler):
+        payload = handler(self)
+        if not self.input_contribution_ids:
+            payload.pop("input_contribution_ids", None)
+        for key in ("work_role", "repair_count", "dependency_assessments"):
+            if not getattr(self, key):
+                payload.pop(key, None)
+        return payload
 
 
 class SharedArtifactMerge(BaseModel):
@@ -97,7 +133,17 @@ async def execute_readonly_workers(
                     model_called=bool(getattr(exc, "called", False)),
                     elapsed_ms=max(0, int(getattr(exc, "elapsed_ms", 0) or 0)),
                     error=str(exc)[:500],
+                    input_contribution_ids=(
+                        tuple(item.contribution_id for item in request.dependency_context)
+                        if getattr(exc, "called", False) else ()
+                    ),
                 )
+            result = result.model_copy(update={
+                "input_contribution_ids": (
+                    tuple(item.contribution_id for item in request.dependency_context)
+                    if result.model_called else ()
+                ),
+            })
             if set(result.source_file_refs) - set(request.source_file_refs):
                 return result.model_copy(
                     update={

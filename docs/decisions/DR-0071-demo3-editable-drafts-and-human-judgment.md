@@ -1,12 +1,12 @@
-# DR-0065：Demo3 草稿编辑、人工判断与事项找回
+# DR-0071：Demo3 草稿编辑、人工判断与事项找回
 
 合并说明：本记录从 Demo3 分支旧编号迁入，原实现提交为 `f01a903`。主分支原有编号不变；历史 Evidence 保留当时的编号和测试范围。最新兼容性检查见[主分支合并记录](../evidence/DEMO3-MASTER-MERGE-20260919.md)。
 
 - 状态：Limited Verified；限固定规则、单进程测试记录和已验证界面路径，运行结果见 [Evidence](../evidence/DR-0054-DEMO3-COLLABORATION-EVIDENCE-20260919.md)。
 - 日期：2026-09-19
 - Source：`USER-FEEDBACK-20260919-DEMO3-COMPLETION`
-- Scenario：[SCENARIO-052](../scenarios/SCENARIO-052-demo3-human-judgment-and-return.md)
-- 实现基线：`1276bc0`；首次汇总提交 `f01a903`，包含 DR-0064 的单步事项基础；未建立 PR。主分支整合证据单列。
+- Scenario：[SCENARIO-058](../scenarios/SCENARIO-058-demo3-human-judgment-and-return.md)
+- 实现基线：`1276bc0`；首次汇总提交 `f01a903`，包含 DR-0070 的单步事项基础；未建立 PR。主分支整合证据单列。
 
 ## 场景与来源
 

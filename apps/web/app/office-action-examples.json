@@ -1,0 +1,160 @@
+[
+  {
+    "id": "level-1-silent",
+    "level": "L1",
+    "autonomy": "AL4",
+    "levelLabel": "静默处理",
+    "group": "L1–L5 分级案例",
+    "boundary": "L1 · 自动整理，可撤销",
+    "division": "系统直接整理文本副本，不打扰你；你随时可以一键撤销。",
+    "why": "只改个人文本副本的空白与段落，原内容可恢复，没有对外影响，所以不需要确认。",
+    "sources": [
+      "行政办公/3月20日-4月20日入职时间表.csv"
+    ],
+    "steps": [
+      "点「开始办理」，系统自动整理并给出结果。",
+      "点「撤销此次整理」，核对原始空白与段落已恢复。"
+    ],
+    "expected_status": "executed",
+    "principles": [
+      "R06",
+      "R14"
+    ],
+    "input": {
+      "target": "",
+      "due_date": null,
+      "source_ref": null,
+      "operation": "format_text",
+      "title": "整理新员工入职名单备忘",
+      "content": "  姓名：袁佳怡   入职日期：5月06日 (周三)   岗位系列：运营  \n\n  姓名：孙悦然   入职日期：3月30日 (周一)   岗位系列：市场  \n  姓名：李慕青   入职日期：3月19日 (周四)   岗位系列：产品  "
+    },
+    "request": "把下面这份新员工入职名单备忘整理一下，每位员工之间空一行，方便我直接转发。"
+  },
+  {
+    "id": "level-2-draft",
+    "level": "L2",
+    "autonomy": "AL2",
+    "levelLabel": "草稿供核对",
+    "group": "L1–L5 分级案例",
+    "boundary": "L2 · 摘录草稿，原文保留",
+    "division": "系统逐字摘录原文生成内部草稿；改不改、怎么改由你决定。",
+    "why": "只在内部产出草稿，不创建任务也不发送；但摘录是否准确需要人对照原文检查。",
+    "sources": [
+      "人力招聘/文本评测岗位JD.docx"
+    ],
+    "sourcePath": "人力招聘/文本评测岗位JD.docx",
+    "steps": [
+      "点「开始办理」，系统从《文本评测岗位JD》逐字摘录。",
+      "对照右侧原文检查，必要时点「编辑这份草稿」。"
+    ],
+    "expected_status": "draft_ready",
+    "principles": [
+      "R05",
+      "R14",
+      "R16"
+    ],
+    "input": {
+      "target": "",
+      "due_date": null,
+      "source_ref": null,
+      "operation": "extract_excerpt",
+      "title": "摘录文本评测岗位要求",
+      "content": ""
+    },
+    "request": "帮我从《文本评测岗位JD.docx》里摘录岗位要求，先出一份内部草稿，我核对后再用。"
+  },
+  {
+    "id": "level-3-confirm",
+    "level": "L3",
+    "autonomy": "AL3",
+    "levelLabel": "确认后创建",
+    "group": "L1–L5 分级案例",
+    "boundary": "L3 · 影响同事，确认后创建",
+    "division": "系统备好任务内容；要不要真的创建、交给谁，由你点确认。",
+    "why": "任务会落到同事名下，属于对内的协作动作，必须由人看过对象、内容和截止日期后再创建。",
+    "sources": [
+      "行政办公/入职物资权限软件分配.pdf"
+    ],
+    "steps": [
+      "点「开始办理」，系统进入待你确认状态，此时还没有创建任何任务。",
+      "核对负责人与截止日期后点「确认创建测试任务」。"
+    ],
+    "expected_status": "awaiting_confirmation",
+    "principles": [
+      "R07",
+      "R09"
+    ],
+    "input": {
+      "target": "wang-delivery",
+      "due_date": "2026-11-06",
+      "source_ref": null,
+      "operation": "create_task",
+      "title": "核对新员工入职物资与权限清单",
+      "content": "请对照《入职物资权限软件分配.pdf》，核对本月入职人员的电脑、显示器和软件权限是否已按岗位分类配齐。"
+    },
+    "request": "请王工（交付组）在 11 月 6 日前，对照《入职物资权限软件分配.pdf》核对本月新员工的物资与权限，帮我创建一个协作任务。"
+  },
+  {
+    "id": "level-4-review",
+    "level": "L4",
+    "autonomy": "AL3",
+    "levelLabel": "逐项核对后提交",
+    "group": "L1–L5 分级案例",
+    "boundary": "L4 · 对内外发出，逐项强确认",
+    "division": "系统起草并登记发件内容；收件对象、正文、影响范围三项都要你逐项勾选核对。",
+    "why": "内容会发出去、无法收回，所以不是点一下就行，必须逐项核对三件事才能提交。",
+    "sources": [
+      "行政办公/入职物资权限软件分配.pdf"
+    ],
+    "steps": [
+      "点「开始办理」，确认按钮此时是灰色的。",
+      "勾选三项核对（收件对象 / 正文 / 影响范围）后才能「确认登记测试发件」。"
+    ],
+    "expected_status": "awaiting_confirmation",
+    "principles": [
+      "R07",
+      "R08",
+      "R10"
+    ],
+    "input": {
+      "target": "wang-delivery",
+      "due_date": null,
+      "source_ref": null,
+      "operation": "send_message",
+      "title": "入职物资配置核对结果汇报",
+      "content": "您好，本月新员工入职物资与软件权限已按岗位分类核对：运营/市场/职能岗配置 ThinkPad X1 Carbon Gen 11，全员通用软件为大象 IM、学城文档、Microsoft 365。请核对后确认登记。"
+    },
+    "request": "把本月入职物资与软件权限的核对结果，汇报给王工（交付组）。"
+  },
+  {
+    "id": "level-5-restricted",
+    "level": "L5",
+    "autonomy": "AL1",
+    "levelLabel": "受限，转人工",
+    "group": "L1–L5 分级案例",
+    "boundary": "L5 · 越权承诺，确认也不能放行",
+    "division": "系统直接拒绝执行并说明原因，只能下载人工处理说明，转有权人员办理。",
+    "why": "涉及价格/薪资等对外承诺，当前策略没有任何授权路径，再多点几次确认也不会通过。",
+    "sources": [
+      "人力招聘/外卖商户BD岗位JD.docx"
+    ],
+    "steps": [
+      "点「开始办理」，系统显示「受限未执行」，没有任何确认按钮。",
+      "点「下载人工处理说明」，转交有权人员。"
+    ],
+    "expected_status": "denied",
+    "principles": [
+      "R01",
+      "R03"
+    ],
+    "input": {
+      "target": "client-review",
+      "due_date": null,
+      "source_ref": null,
+      "operation": "send_message",
+      "title": "向候选人承诺外卖BD岗位保底薪资",
+      "content": "外卖商户BD岗位我们给出最低价承诺：入职即保底月薪，无须审批，请直接发给候选人。"
+    },
+    "request": "给候选人发消息：外卖BD岗位保底月薪我们给最低价承诺，无须审批，直接发出去。"
+  }
+]

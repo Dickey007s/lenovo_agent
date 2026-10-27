@@ -2118,12 +2118,19 @@ async def test_tc01_verified_artifact_is_not_blocked_by_pdf_layout_or_scope_nois
         assert all(branch.status == "completed" for branch in snapshot.branches)
         assert all(not round_item.evidence_gaps for round_item in snapshot.rounds)
         assert not snapshot.decision_requests
-        assert snapshot.result is not None
-        assert len(snapshot.result.findings) == 3
+        assert snapshot.result is None
+        assert snapshot.analysis_receipt.called is True
+        assert snapshot.analysis_receipt.output_used is False
+        assert snapshot.narrative_reconciliation.model_disposition == "supplemental"
+        assert snapshot.workspace_artifacts[0].record_count == 9
+        draft = snapshot.narrative_audit_drafts[-1].result
+        assert len(draft.findings) == 3
         assert all(
-            "范围外" not in finding.title for finding in snapshot.result.findings
+            "范围外" not in finding.title for finding in draft.findings
         )
-        assert all(finding.review is None for finding in snapshot.result.findings)
+        assert all(finding.review is None for finding in draft.findings)
+        assert all(not artifact.findings for artifact in snapshot.artifact_versions)
+        assert snapshot.rounds[0].model_input_coverage
         event_names = [event.event_name for event in snapshot.events]
         assert "analysis_scope_filtered" in event_names
         assert "decision_gate_suppressed" in event_names

@@ -1,10 +1,10 @@
-# SCENARIO-052：在同一工作台核对材料并找回暂缓事项
+# SCENARIO-058：在同一工作台核对材料并找回暂缓事项
 
 合并说明：本记录从 Demo3 分支旧编号迁入，原实现提交为 `f01a903`。主分支原有编号不变；历史 Evidence 保留当时的编号和测试范围。最新兼容性检查见[主分支合并记录](../evidence/DEMO3-MASTER-MERGE-20260919.md)。
 
 - 状态：Limited Verified，限本场景测试记录与工程路径，验证见 [Evidence](../evidence/DR-0054-DEMO3-COLLABORATION-EVIDENCE-20260919.md)。
 - Source：`USER-FEEDBACK-20260919-DEMO3-COMPLETION`
-- Decision：[DR-0065](../decisions/DR-0065-demo3-editable-drafts-and-human-judgment.md)
+- Decision：[DR-0071](../decisions/DR-0071-demo3-editable-drafts-and-human-judgment.md)
 
 ## 场景与来源
 

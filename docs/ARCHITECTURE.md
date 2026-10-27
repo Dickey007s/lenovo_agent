@@ -1,6 +1,137 @@
 # Office Agent V0.2 architecture
 
-## DR-0064 single-action extension
+## DR-0098 Prepared Action Inputs
+
+Twelve synthetic example inputs use the original OfficeActionWorkbench form and fixed server policy. The browser catalog carries presenter/test metadata separately from ActionInput; only input is submitted. No new runtime, policy, permission, model or workspace import. See [DR-0098](decisions/DR-0098-demo3-ready-boundary-examples.md).
+
+## DR-0097 Primary-first Planning
+
+Business units and execution strategy are separate. Built-in Planner proposes primary/delegate; automatic admission retains the final safety/budget decision. Multiple units can use one ordinary Analyst invocation without dropping Branch accounting. A three-entry trusted method catalog exposes metadata to planning and selected bodies only to analysis. No new framework or runtime. Single-unit/team post-result reviews remain; multi-unit primary expansion is still missing. See [DR-0097](decisions/DR-0097-primary-agent-and-bounded-skills.md).
+
+## DR-0096 Single-to-Delegated Execution
+
+Eligible automatic readonly single-unit plans use the existing Worker/Contribution ledger, keeping single_controller until validated additions commit. Existing reviewer/executor is reused, with no second scheduler or dependency. Review origin distinguishes single_agent/worker_wave. Branch-scoped finding IDs preserve same-title parent findings. Manual, deferred/uncovered, multi-unit conservative and unsafe routes remain unchanged. Supersedes DR-0091's single-controller exclusion only for this slice. See [DR-0096](decisions/DR-0096-single-agent-result-driven-delegation.md).
+
+## DR-0093 Focused Business Projection
+
+Follow-up private round questions remain model context; public round questions use the Snapshot instruction for same-task follow-up runs. Steering remains separate. No new route, execution authority or budget policy. The browser shares actual WorkUnit/Contribution lanes between task and collaboration views. See [decision](decisions/DR-0093-blurt-focused-workbench.md) and [evidence](evidence/DR-0093-BLURT-WORKBENCH-20261025.md).
+
+## DR-0091 Bounded Post-wave Adaptation
+
+In automatic_readonly collaboration, returned adopted contributions can trigger up to two budget-reserved coordinator calls. The coordinator sees bounded safe source content and actual findings, not privileged catalog fields. Validated additions extend the existing plan/Branch/WorkUnit graph atomically with the wave commit; no existing result is overwritten. Additions use the normal Worker, contribution, source and handoff gates. Max3 workers per ready wave; max2 additions per review; max12 plan units. Manual admission is unchanged. Pause/stop races discard additions; interrupted reviewing records become discarded and are not replayed. Single-controller routes do not yet expand this way. See [DR-0091](decisions/DR-0091-result-driven-bounded-adaptation.md) and its Evidence for the real-provider no-add boundary.
+
+## DR-0090 Dependency Stages
+
+The browser groups actual WorkUnits by dependency depth, resolving work_unit_id/unit_id/branch_id references; unknown parents and cycles stay unknown. Stages are not dispatch waves. Existing Contribution/attempt joins supply current results; more than three nodes use folded excerpts. The new five-step brief exercises existing DR-0066 handoffs and DR-0086 automatic_readonly, without Runtime or admission changes. See [DR-0090](decisions/DR-0090-multistage-worker-display.md).
+
+
+## DR-0089 Todo Outcome Projection
+
+Todo summaries reuse the responsibility projection; admission, active work, called receipts and adopted analysis remain separate. Work-package output joins the latest Contribution by ID, Branch and current attempt. The browser keeps its batch composer mounted across detail/space navigation, not across refresh. No Runtime, admission policy, store or permission change. See DR-0089/Evidence.
+
+## DR-0088 Evidence-Based Responsibility Projection
+
+`task-responsibility.ts` projects existing public findings, Branch completion, anchors, decisions, missing requirements and recovery facts. It does not add a confidence estimator, permission Gate or scheduler. Context-only citations and incomplete work do not count as autonomous completion. Public pending-business facts override the recent-list completed label, not the stored Run state. Planner guidance distinguishes related material from the actual required source type; this remains model guidance, not semantic validation. See DR-0088 and its Evidence.
+
+## DR-0087 Same-Task Follow-Up Stages
+
+The existing atomic Task transition now supports a terminal current Run's follow-up goal as well as an unfinished Branch. No separate runtime or fork tree is added. Task identity and immutable parent remain; a new bounded Run carries both parent and original-goal context without inheriting old findings as evidence. Output restrictions remain inherited, execution authorization defaults to manual. The Task GET projection adds original goal and per-stage instruction. See DR-0087/Evidence for scope and limitations; old independent follow-up Task descriptions are superseded.
+
+## DR-0086 Bounded Autonomous Readonly Tasks
+
+TodoBatch submits independent original Run starts, with a durable per-Run execution_policy. The browser does not execute workers or invent confirmation receipts.
+HarnessRuntime still compiles TopologyAdmission per validated plan. Automatic readonly Runs dispatch ready, never-attempted Branches through the existing scoped Worker reservation/merge path; source gates, budgets, versions and contribution ledgers remain authoritative.
+No persistent cross-Task batch, queue or multi-instance coordinator was added. Up to three UI tasks can overlap; each admitted wave is bounded to three Workers. The model, failure and output policy remain per Task.
+Evidence may come from current Result or explicitly labelled same-Run retained ArtifactVersion. Worker source counts now use Branch verified-ref unions. See DR-0086 for restart and semantic-coverage limitations.
+
+## DR-0085 Shared Reference Shell
+
+The root adds UnifiedWorkbench around the existing controller hooks. Three presentation spaces share the same file index, Task/Run client and specialized evidence/action controls.
+The recent list groups the latest twenty Run records by task_id; it is not a scheduler. No service, store, source scope, worker authorization or API changes.
+The evidence view reads public Result anchors and Branch-bound resolutions. Worker ambiguity without a decision returns to receipts, not fabricated recovery. See DR-0085 Evidence.
+
+## DR-0084 Static Capability Showcase
+
+The offline showcase is documentation, not a runtime selector or a replacement workbench.
+It replays original-UI screenshots with explicit fixture/live-fixed-rule provenance; navigation sends no API requests.
+ResultView adds a neutral passed-check/no-analysis message without changing the deterministic authority predicate, source state, store or APIs.
+
+## DR-0083 User Walkthrough Projection
+
+Root and capability results share the saved-version fallback only when no file/effect receipt exists and narrative disposition is not rejected/supplemental. Current results and deterministic outcome gates retain precedence.
+The existing collaboration dialog joins Worker and Contribution by both worker_run_id and branch_id for display; unmatched contributions remain visible. No ledger records are merged.
+Dispatch now fails closed on an empty server ready set and requires waiting_input. No backend, persistence or protocol changes. See DR-0083 and its Evidence.
+
+## Concise Waiting Projection (2026-10-22)
+
+DR-0082 consolidates repeated waiting explanations and simplifies graph labels only.
+Branch identity, WorkUnit dependencies, decision authority and receipt adoption are unchanged.
+Grouping downstream names is not a scheduler change. No Runtime, store or API changes.
+
+## Delivery-First Root (2026-10-22)
+
+DR-0081 reorders the root projection only. Artifact/Effect facts precede execution records;
+all unfinished Run branches remain frontstage, while ordinary successful records may fold.
+No controller, storage, protocol or permission changes. See its Scenario/Evidence.
+
+## Reference-Led Presentation (2026-10-22)
+
+DR-0080 only changes existing projections: completed-only root delivery rows are omitted;
+file outcomes have one capability entry; collaboration receipts disclose detailed counts.
+Unfinished branches remain, including cross-round work. No Runtime, storage or API changes.
+
+## Bounded Preferences and Recovery (2026-10-20)
+
+DR-0079 adds optional format_style to the fixed personal-text input. A deterministic
+separator choice changes only the isolated text copy. Absent values serialize as
+the prior contract. Browser-local preference storage never changes authorization.
+Old draft retrieval reuses versioned edit_draft, adding a new version, not rewriting
+history. Recent pending filtering is a GET-list projection. No new Runtime or route.
+
+## Saved-State Handoff (2026-10-19)
+
+DR-0078 is frontend-only: an enriched local text export of office_action saved fields,
+with transport/editor guards. It does not dispatch, approve, notify, persist a new
+ledger or change the eight-module architecture. See its Scenario/Evidence and the
+[design package](deliverables/copilot-20261019/index.html).
+
+## Case-Based Copilot Review (2026-10-10)
+
+DR-0077 changes only OfficeActionWorkbench presentation: nearby source review,
+current-revision change disclosure, explicit judgment-only outcome, and transport
+unknown-state wording. No change to Loop/Swarm, authority, Runtime or persistence.
+See [decision](decisions/DR-0077-case-based-copilot-review.md) and its Evidence.
+
+## Calm Root Projection (2026-10-10)
+
+DR-0076 only refines compact root disclosure, terminal inactive controls and single-round navigation.
+The full capability record, server state, evidence resolution and Worker protocol are unchanged.
+
+## Focused Workspace (2026-10-08)
+
+[DR-0074](decisions/DR-0074-execution-detail-disclosure.md) adds root-only execution disclosure.
+Its local compact flag does not alter Runtime, Snapshot normalization, controls or the capability detail view.
+
+DR-0073 changes browser layout only: optional activity pane, contextual directory and collapsed
+submitted-task settings. Task/Run/Snapshot and action/Worker authority are unchanged. Closing
+auxiliary content does not disconnect SSE or cancel work; main errors/decisions/results remain.
+See [contract](decisions/DR-0073-focused-workspace-disclosure.md) and [evidence](evidence/DR-0073-FOCUSED-WORKSPACE-20261008.md).
+
+## Unified Workbench Integration (2026-10-07)
+
+[DR-0072](decisions/DR-0072-unified-workbench-and-response-ownership.md) integrates the remote
+single-action slice with the local Loop/Swarm improvements. Both entry routes share the existing
+task context and blank-task choice. Action Runs show their existing action surface, not synthetic
+Loop progress or generated-file results. This does not merge action-control and Worker decision authority.
+Browser requests retain their originating session generation; success, error and conflict refresh must
+belong to that generation before updating the view. The parent also rejects obsolete-session receipts.
+This is frontend response ownership, not server cancellation or an additional permission ledger.
+The contract is Limited Verified for shared entry, tested response isolation and compatible coexistence.
+The final full-browser rerun after two additional navigation-race fixes passed all 149 tests;
+the final type check and webpack build passed. This does not establish Worker-human decision recovery
+or exhaustive network-race coverage; exact receipts and prior failures remain in Evidence.
+
+## DR-0070 single-action extension
 
 The same workbench now accepts explicit `ActionInput` in the existing Run start
 contract. A server-owned deterministic policy produces `office_action`, and
@@ -10,16 +141,84 @@ Worker and adds no external Tool Gateway. Six operations create bounded text, hu
 isolated test records, never production office writes or verified Artifacts.
 Open nonterminal action snapshots restore as saved, without loop replay.
 The research architecture below remains specific to ordinary instruction Runs.
-See [DR-0064](decisions/DR-0064-single-action-boundary-workbench.md) and
-[DR-0065](decisions/DR-0065-demo3-editable-drafts-and-human-judgment.md).
+See [DR-0070](decisions/DR-0070-single-action-boundary-workbench.md) and
+[DR-0071](decisions/DR-0071-demo3-editable-drafts-and-human-judgment.md).
 
-DR-0065 adds strict compare_materials input, edit_draft and record_decision
+DR-0071 adds strict compare_materials input, edit_draft and record_decision
 controls without a new route. Editing retains source text and every saved draft
 version. A human choice binds both materials, explicit first/second selection,
 rationale, Owner and current versions. The browser projects recent action Runs
 from the existing Owner-scoped list and reopens them with GET; this does not
 resume work or provide a complete task history. Handoff text is a local download,
 not an approval, notification or Connector receipt.
+## Read-only Source Counts (2026-09-22)
+
+[DR-0069](decisions/DR-0069-readonly-source-counts-and-reviewable-coverage.md) extracts pure fixed-release
+source analysis from file rendering. The shared Analyst invocation may supply scoped `readonly_context`
+and reject supported explicit count conflicts without an Effect, Artifact or automatic retry. It uses only
+the supplied complete four-file product bundle; missing scope establishes no whole-product authority.
+Ordinary accepted prose remains model-only/review-required. The file-generation reconciliation is unchanged.
+Workspace XLSX preview/model input now share a 240-row window and text input uses the existing 30000-character
+preview window, retaining the 120000-byte material ceiling. No paging, multi-sheet completion or semantic-use
+claim follows. Downstream prompts distinguish original text/cells from metadata and allow per-parent findings.
+
+## Result Reading and Independent Acceptance (2026-09-22)
+
+[DR-0068](decisions/DR-0068-result-reading-and-independent-task-acceptance.md) changes only result
+presentation and verification tooling. Saved analysis uses a neutral label; ordinary evidence is
+disclosed on demand, but all authoritative pending/deferred findings remain visible. Passed finance
+file explanations are secondary; failures, amounts, scope, purpose and review boundaries remain.
+No Runtime/API/state transition change. Two real-provider runs include a numeric-error counterexample
+in an adopted read-only contribution: scope/location adoption is not semantic verification.
+The independent download audit is offline acceptance tooling, not a new Runtime semantic gate.
+
+## Task-first Presentation (2026-09-22)
+
+[DR-0067](decisions/DR-0067-task-first-progressive-disclosure.md) consolidates the existing browser
+projection, not the Runtime. One delivery list replaces duplicate Branch/Artifact summaries. Result
+and version inspection hide the progress surface while preserving its local state and restoring focus.
+Collaboration prioritizes the actual DAG; detailed handoffs and reviews share the existing receipts
+disclosure. Critical business failure and incomplete DecisionRequest warnings remain frontstage.
+No API, policy, storage or model invocation changes; no new human-decision authority.
+
+## Reviewed Handoffs (2026-09-22)
+
+[DR-0066](decisions/DR-0066-reviewed-handoffs-and-output-agreement.md) extends the same bounded runtime.
+Output preference is validated before start, then frozen as server policy. New Run contracts opt into
+reviewed handoffs; legacy snapshots keep legacy behavior. The same Analyst interface receives a duty
+derived from actual direct-parent inputs, not a fabricated new Agent or distributed process.
+`collaboration_review.py` binds one model assessment to each provided Contribution and located source
+findings. Conflicts or insufficiency withhold the dependent candidate, preserving adopted siblings.
+Model verdicts are not independent semantic checks. Review receipts live in Snapshot worker records,
+not a new durable human-decision ledger. Target-only structural repair permits one separately budgeted
+call, guarded by control, deadline and WorkUnit state. No business approval or external action is added.
+
+## Output Policy and Handoffs (2026-09-21)
+
+[DR-0065](decisions/DR-0065-output-policy-and-scoped-dependency-handoffs.md) freezes a bounded
+`contract.output_policy` at Run start. Explicit no-file instructions suppress fixed adapters before
+input freezing or writing; compiled write units become read-only verification. Same-Task continuation
+cannot relax a parent's `analysis_only` policy. This is not a general natural-language permission engine.
+
+The public Worker path supplies each dependent Analyst with only its direct parents' adopted summaries,
+Contribution IDs, Artifact versions and approved source refs. Server checks bind these to the current
+Owner/Task/Run, source revisions and downstream scope before reservation. Summaries are untrusted model
+context, not original evidence; existing source/Anchor/reconciliation gates still govern adoption.
+WorkUnit input IDs describe the reserved input; Contribution input IDs describe supplied model context
+only when the model was called. Empty new fields are omitted to preserve historical immutable digests
+and WorkUnit CAS payloads. An empty-wave idempotent replay reconstructs the original wave, not today's
+ready set. No distributed execution, semantic-use guarantee or multi-instance ownership is introduced.
+
+## Demo 1/2 Reliability (2026-09-20)
+
+[DR-0064](decisions/DR-0064-demo12-reliability-and-bounded-narratives.md) extends the existing
+deterministic-result reconciliation to onboarding, finance and release metrics. Unmatched prose is
+unknown, and even matching numeric prose remains supplemental. The model payload supplies per-round
+input-coverage receipts, not proof of semantic or whole-document analysis. Adaptive admission now
+persists ready Branch IDs before confirmation; execution ledgers still begin at explicit reservation.
+Worker waves resume/freeze active time, preserve post-call rejection receipts and accept up to
+96 x 6 aggregate anchors. Numbered requirements may bind validated dependent units as well as roots.
+No new product, distributed runtime, external-action authority or Demo3 integration is introduced.
 
 ## Integrated boundary projection (2026-09-12)
 
@@ -214,7 +413,7 @@ The server compiles the candidate into a `HarnessPlan`:
 
 For instructions that contain an explicit marker plus a contiguous numbered
 `1..N` requirement list, the Runtime also requires Planner accounting for each
-item (`N <= 12`). `planned` binds one unique root unit, `deferred` carries real
+item (`N <= 12`). `planned` binds one unique validated root or dependent unit, `deferred` carries real
 allowlisted candidate refs that did not fit this round, and `uncovered` carries
 no fabricated ref because the frozen index has no recognizable source. The
 private accounting table is validator input; the public Plan exposes only

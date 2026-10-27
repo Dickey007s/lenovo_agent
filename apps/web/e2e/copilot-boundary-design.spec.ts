@@ -16,7 +16,7 @@ for(const viewport of viewports) {
     await page.goto(url);
     const selectCase = async(id:string)=>{
       const picker=page.locator('#case-picker');
-      if(await picker.isVisible()) await picker.selectOption(id);
+      if(await picker.isVisible()) { await picker.focus(); await picker.selectOption(id); }
       else await page.locator(`[data-case=${id}]`).click();
     };
     const noOverflow = async()=>expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1)).toBe(true);
@@ -69,7 +69,8 @@ for(const viewport of viewports) {
     await expect(page.getByRole('radio',{checked:true})).toHaveCount(0);
     await expect(page.locator('[data-action=resolve]')).toBeDisabled();
     await page.getByRole('radio').nth(1).check(); await page.locator('[data-action=resolve]').click();
-    await expect(page.locator('#preview')).toContainText('引导后样本');
+    await expect(page.locator('#preview')).toContainText('完成引导后的任务完成率');
+    await expect(page.locator('#preview')).toContainText('不代表未经引导的表现');
     await expect(page.locator('#preview')).toContainText('92%（46/50）');
     await expect(page.locator('#boundary-facts')).toContainText('本例不申请发送权限');
     await expect(page.locator('#outcome-summary')).toContainText('项目周报 v3.pdf');

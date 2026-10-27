@@ -216,7 +216,7 @@ class BenchmarkFilePreview(StrictModel):
     kind: BenchmarkPreviewKind
     sheet_name: str | None = Field(default=None, max_length=120)
     columns: list[str] = Field(default_factory=list, max_length=30)
-    rows: list[BenchmarkPreviewRow] = Field(default_factory=list, max_length=120)
+    rows: list[BenchmarkPreviewRow] = Field(default_factory=list, max_length=240)
     total_rows: int | None = Field(default=None, ge=0)
     text: str | None = Field(default=None, max_length=30_000)
     page_count: int | None = Field(default=None, ge=0, le=1_000)
@@ -257,6 +257,8 @@ class AgentControlLoopContract(StrictModel):
     workspace_revision: str = Field(default="unknown", min_length=1, max_length=120)
     recheck_file_refs: list[str] = Field(default_factory=list, max_length=24)
     source_revision_changed: bool = False
+    output_policy: Literal["workspace_files_allowed", "analysis_only"] = "workspace_files_allowed"
+    collaboration_protocol: Literal["legacy", "reviewed_handoffs_v1"] = "legacy"
 
 
 class AgentControlLoopBudget(StrictModel):
@@ -408,6 +410,16 @@ class AgentControlLoopNarrativeReconciliation(StrictModel):
     external_action: Literal["none"] = "none"
 
 
+class AgentControlLoopInputCoverage(StrictModel):
+    """Material actually supplied to an Analyst, not evidence it was understood."""
+
+    file_ref: str = Field(min_length=1, max_length=120)
+    unit: Literal["characters", "rows", "metadata"]
+    provided_count: int = Field(ge=0)
+    total_count: int | None = Field(default=None, ge=0)
+    bounded: bool
+
+
 class AgentControlLoopRound(StrictModel):
     round_number: int = Field(ge=1, le=24)
     status: Literal["running", "completed", "stopped", "failed"]
@@ -415,6 +427,9 @@ class AgentControlLoopRound(StrictModel):
     question: str = Field(min_length=3, max_length=2_000)
     steer_instruction: str | None = Field(default=None, max_length=2_000)
     input_file_refs: list[str] = Field(default_factory=list, max_length=24)
+    model_input_coverage: list[AgentControlLoopInputCoverage] = Field(
+        default_factory=list, max_length=96
+    )
     branch_ids: list[str] = Field(default_factory=list, max_length=12)
     plan: dict[str, Any] | None = None
     model_receipt: dict[str, Any] | None = None

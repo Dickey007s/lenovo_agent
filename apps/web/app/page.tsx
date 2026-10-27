@@ -8,6 +8,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { IconX } from "@tabler/icons-react";
 
 import {
   HarnessActivityPane,
@@ -30,6 +31,18 @@ export default function Page() {
   const [agentWidth, setAgentWidth] = useState(360);
   const [agentHeight, setAgentHeight] = useState(290);
   const [mobile, setMobile] = useState(false);
+  const [activityOpen, setActivityOpen] = useState(false);
+
+  function closeActivity() {
+    setActivityOpen(false);
+    window.requestAnimationFrame(() => document.getElementById("activity-toggle")?.focus());
+  }
+
+  function toggleActivity() {
+    if (activityOpen) return closeActivity();
+    setActivityOpen(true);
+    window.requestAnimationFrame(() => document.getElementById("activity-panel")?.focus());
+  }
 
   useEffect(() => {
     const query = window.matchMedia("(max-width: 760px)");
@@ -90,12 +103,13 @@ export default function Page() {
   } as CSSProperties;
 
   return (
-    <div className="harness-app-shell" ref={shellRef} style={style}>
+    <div className={`harness-app-shell${activityOpen ? "" : " is-focused"}`} ref={shellRef} style={style}>
       <section className="harness-workspace-shell" aria-label="工作现场">
-        <HarnessWorkbench onActivityChange={setActivity} />
+        <HarnessWorkbench onActivityChange={setActivity} activityOpen={activityOpen} onToggleActivity={toggleActivity} />
       </section>
       <div
         className="harness-app-divider"
+        hidden={!activityOpen}
         role="separator"
         aria-label="调整 Agent 面板大小"
         aria-orientation={mobile ? "horizontal" : "vertical"}
@@ -108,7 +122,8 @@ export default function Page() {
       >
         <span aria-hidden="true">•••</span>
       </div>
-      <aside className="harness-agent-shell" aria-label="Agent 进度">
+      <aside id="activity-panel" className="harness-agent-shell" aria-label="Agent 进度" hidden={!activityOpen} tabIndex={-1} onKeyDown={event => { if (event.key === "Escape") { event.stopPropagation(); closeActivity(); } }}>
+        <div className="activity-panel-toolbar"><span>过程记录</span><button type="button" className="icon-action" onClick={closeActivity} title="收起过程记录" aria-label="收起过程记录"><IconX aria-hidden="true" /></button></div>
         <HarnessActivityPane state={activity} />
       </aside>
     </div>

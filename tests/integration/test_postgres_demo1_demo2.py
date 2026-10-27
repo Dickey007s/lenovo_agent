@@ -5,6 +5,7 @@ import os
 from pathlib import Path
 from uuid import uuid4
 
+import psycopg
 import pytest
 
 from tests.postgres_helpers import cleanup_postgres_owner
@@ -32,6 +33,9 @@ from tests.unit.test_harness_runtime import (
     FakePlanner,
 )
 from tests.unit.test_demo2_runtime import _cross_function_catalog
+from tests.acceptance.test_demo1_demo2_fixed_scenarios import FiveUnitFailurePlanner, _ten_file_cross_function_catalog
+from tests.acceptance.test_demo12_output_and_dependencies import ContextAnalyst
+from tests.acceptance.test_demo12_reviewed_collaboration import DisagreementAnalyst
 
 
 DATABASE_DSN = os.getenv("TEST_DATABASE_DSN", "").strip()
@@ -53,6 +57,125 @@ async def _wait_for_status(runtime: HarnessRuntime, owner: str, run_id: str, sta
 
 async def _cleanup(owner: str) -> None:
     await cleanup_postgres_owner(DATABASE_DSN, owner)
+
+
+@pytest.mark.asyncio
+async def test_postgres_dependency_handoff_restores_legacy_roots_and_replays_without_calls():
+    owner = f"postgres-handoff-{uuid4().hex}"
+    runtimes = []
+    catalog = _ten_file_cross_function_catalog()
+
+    async def receipts():
+        async with await psycopg.AsyncConnection.connect(DATABASE_DSN) as connection:
+            cursor = await connection.execute(
+                "SELECT contribution_id, payload_digest, payload FROM harness_contribution "
+                "WHERE owner_id=%s ORDER BY contribution_id", (owner,),
+            )
+            return {row[0]: (row[1], row[2]) for row in await cursor.fetchall()}
+
+    def runtime():
+        instance = HarnessRuntime(catalog, FiveUnitFailurePlanner(), ContextAnalyst(),
+                                  PostgresHarnessStateStore(DATABASE_DSN))
+        runtimes.append(instance)
+        return instance
+
+    def comparable(snapshot):
+        payload = snapshot.model_dump(mode="json")
+        # Independent ledger queries have stable ID order, not reservation order.
+        payload["work_units"].sort(key=lambda row: row["work_unit_id"])
+        payload["contributions"].sort(key=lambda row: row["contribution_id"])
+        return payload
+
+    try:
+        first = runtime()
+        await first.setup()
+        started = await first.start(owner, HarnessRunStart(
+            instruction="只在页面展示五个工作包，不要生成文件。", idempotency_key=f"handoff-{uuid4().hex}",
+        ))
+        waiting = await _wait_for_status(first, owner, started.run.run_id, {"waiting_input"})
+        roots = await first.execute_admitted_workers_from_branches(
+            owner, waiting.run_id, branch_ids=[], expected_version=waiting.version,
+            idempotency_key="handoff-root-wave", user_confirmed=True,
+        )
+        original = await receipts()
+        assert len(original) == 3
+        assert all("input_contribution_ids" not in payload for _, payload in original.values())
+        await first.close()
+        runtimes.remove(first)
+
+        second = runtime()
+        await second.setup()
+        restored = await second.get(owner, waiting.run_id)
+        assert restored.events[:-1] == roots.events
+        assert restored.events[-1].event_name == "checkpoint_recovered"
+        assert restored.events[-1].details["automatic_model_replay"] is False
+        expected_recovery = roots.model_copy(update={
+            "control_state": "paused", "version": roots.version + 1,
+            "last_event_sequence": roots.last_event_sequence + 1,
+            "events": restored.events, "updated_at": restored.updated_at,
+        })
+        assert comparable(restored) == comparable(expected_recovery)
+        assert await receipts() == original
+        completed = await second.execute_admitted_workers_from_branches(
+            owner, waiting.run_id, branch_ids=[], expected_version=restored.version,
+            idempotency_key="handoff-dependent-wave", user_confirmed=True,
+        )
+        assert completed.status == "completed"
+        assert len([item for item in completed.contributions if item.input_contribution_ids]) == 2
+        full_receipts = await receipts()
+        assert len(full_receipts) == 5
+        assert all(full_receipts[key] == value for key, value in original.items())
+        await second.close()
+        runtimes.remove(second)
+
+        third = runtime()
+        await third.setup()
+        replay = await third.execute_admitted_workers_from_branches(
+            owner, waiting.run_id, branch_ids=[], expected_version=restored.version,
+            idempotency_key="handoff-dependent-wave", user_confirmed=True,
+        )
+        assert comparable(replay) == comparable(completed)
+        assert third.analyst.inputs == []
+        assert await receipts() == full_receipts
+    finally:
+        for instance in runtimes:
+            await instance.close()
+        await _cleanup(owner)
+
+
+@pytest.mark.asyncio
+async def test_postgres_handoff_disagreement_survives_restart_without_replay():
+    owner = f"postgres-review-{uuid4().hex}"
+    runtimes = []
+    try:
+        first = HarnessRuntime(_ten_file_cross_function_catalog(), FiveUnitFailurePlanner(), DisagreementAnalyst("conflict"),
+                               PostgresHarnessStateStore(DATABASE_DSN))
+        runtimes.append(first)
+        await first.setup()
+        started = await first.start(owner, HarnessRunStart(instruction="核对五项来源并保留不同结论", idempotency_key="review-pg-start"))
+        waiting = await _wait_for_status(first, owner, started.run.run_id, {"waiting_input"})
+        roots = await first.execute_admitted_workers_from_branches(owner, waiting.run_id, branch_ids=[],
+            expected_version=waiting.version, idempotency_key="review-pg-roots", user_confirmed=True)
+        disputed = await first.execute_admitted_workers_from_branches(owner, waiting.run_id, branch_ids=[],
+            expected_version=roots.version, idempotency_key="review-pg-disputed", user_confirmed=True)
+        assert len(disputed.worker_runs[-1].dependency_assessments) > 0
+        assert len(disputed.artifact_versions) == 1
+        await first.close()
+        runtimes.remove(first)
+        second = HarnessRuntime(_ten_file_cross_function_catalog(), FiveUnitFailurePlanner(), ContextAnalyst(),
+                                PostgresHarnessStateStore(DATABASE_DSN))
+        runtimes.append(second)
+        await second.setup()
+        restored = await second.get(owner, waiting.run_id)
+        assert restored.worker_runs == disputed.worker_runs
+        assert restored.artifact_versions == disputed.artifact_versions
+        assert restored.contract.collaboration_protocol == "reviewed_handoffs_v1"
+        assert not second.analyst.inputs
+        assert restored.budget.model_calls_used == disputed.budget.model_calls_used
+    finally:
+        for runtime in runtimes:
+            await runtime.close()
+        await _cleanup(owner)
 
 
 @pytest.mark.asyncio

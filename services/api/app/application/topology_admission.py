@@ -1,7 +1,7 @@
 """Deterministic topology admission for the bounded Demo 2 slice.
 
 This module only decides an execution shape from server-validated plan facts.
-It never assigns a score, predicts a cost/SLA, or lets a model request workers.
+It never assigns a score or predicts a cost/SLA. A model proposal cannot bypass gates.
 """
 
 from __future__ import annotations
@@ -43,6 +43,7 @@ def admit_topology(
     remaining_model_calls: int,
     remaining_time_seconds: int,
     source_facts: dict[str, dict[str, object]] | None = None,
+    allow_adaptive_waves: bool = False,
 ) -> TopologyAdmission:
     """Choose the smallest safe topology using only validated server facts."""
 
@@ -82,13 +83,19 @@ def admit_topology(
     elif risky:
         mode = "fixed_workflow"
         reasons.append("计划包含人工门或副作用意图，先使用固定流程，不启动只读 Worker。")
-    elif independent > 3:
+    elif allow_adaptive_waves and plan.execution_approach is not None and (
+        plan.execution_approach.mode == "primary" or plan.execution_approach.benefit == "none"
+    ):
+        mode = "single_controller"
+        reasons.append("工作项不等于 Agent：本次由主 Agent 统一处理，不额外组队。")
+        reasons.append(plan.execution_approach.reason)
+    elif independent > 3 and not allow_adaptive_waves:
         mode = "fixed_workflow"
         reasons.append("独立分支超过 3 条受限 Worker 上限，保持固定流程并分批核对。")
     elif same_structured_source_set:
         mode = "fixed_workflow"
         reasons.append("多个独立工作包来自同结构同职能资料，先用固定流程避免把同源拆成伪并行。")
-    elif complete_source_groups and same_display_group:
+    elif complete_source_groups and same_display_group and not (allow_adaptive_waves and len(refs) > 1):
         mode = "fixed_workflow"
         reasons.append("多个独立工作包来自同一目录/职能，先用固定流程避免把同源拆成伪并行。")
     elif source_facts and not complete_source_groups:
@@ -102,7 +109,9 @@ def admit_topology(
         reasons.append("剩余 Agent 执行时间不足，保持固定流程。")
     else:
         mode = "adaptive_readonly_workers"
-        reasons.append("存在至少 2 条真正独立分支、预算充足且 external_action=none。")
+        reasons.append(f"{independent} 项工作可以独立处理，资料与预算允许；每批最多同时执行 3 项。")
+        if allow_adaptive_waves and plan.execution_approach is not None:
+            reasons.append(f"模型提出的委派理由：{plan.execution_approach.reason}")
     return TopologyAdmission(
         mode=mode,
         work_unit_breadth=breadth,

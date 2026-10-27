@@ -1,0 +1,94 @@
+.office-actions.office-actions-unified {
+  color: #253047;
+  font-size: 14px;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+.unified-workbench .workspace-content:has(> div:not([hidden]) > .office-actions-unified) { border: 0; border-radius: 0; box-shadow: none; }
+.office-actions-unified .office-action-heading h2 { font-size: 24px; line-height: 1.5; margin: 0 0 12px; }
+.office-actions-unified .office-action-tools { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 32px; margin-bottom: 14px; }
+.office-actions-unified .office-action-environment { margin: 0; padding: 0; background: none; color: #718096; font-size: 12px; }
+.office-actions.office-actions-unified button { display: inline-flex; align-items: center; justify-content: center; gap: 7px; border-radius: 5px; min-height: 38px; font-size: 13px; padding: 8px 12px; }
+.office-actions.office-actions-unified button svg { width: 16px; height: 16px; flex-shrink: 0; }
+.office-actions.office-actions-unified button.primary { background: #2460ed; border-color: #2460ed; }
+.office-actions.office-actions-unified button.office-icon-button { width: 34px; height: 34px; min-height: 34px; padding: 7px; border: 0; color: #6c7b90; }
+.office-actions-unified .office-action-form-heading { display: grid; grid-template-columns: minmax(180px, .7fr) minmax(0, 1.3fr); gap: 20px; }
+.office-actions.office-actions-unified label { margin: 12px 0; gap: 7px; font-size: 14px; }
+.office-actions.office-actions-unified :is(input:not([type=checkbox]):not([type=radio]), select, textarea) { border: 1px solid #dce2eb; border-radius: 5px; min-height: 40px; padding: 9px 11px; font: inherit; }
+.office-actions-unified textarea { line-height: 1.7; }
+.office-actions-unified .office-action-examples select { width: 100%; min-width: 0; max-width: 100%; }
+.office-example-boundary { display: flex; flex-wrap: wrap; gap: 6px 18px; margin: 8px 0 16px; font-size: 13px; }
+.office-example-boundary strong { color: #2460ad; font-weight: 500; }
+.office-example-boundary span { color: #718096; }
+.office-actions.office-actions-unified details { border: 0; border-top: 1px solid #e5e8ee; border-radius: 0; margin: 16px 0; padding: 0; background: transparent; box-shadow: none; }
+.office-actions.office-actions-unified details > summary { min-height: 36px; padding: 10px 0; color: #596b82; font-size: 13px; }
+.office-actions-unified .office-format-preference[open] { padding-bottom: 8px; }
+.office-actions-unified .office-format-preference label:first-of-type { max-width: 320px; }
+.office-actions-unified .office-format-preference > p { color: #718096; font-size: 12px; }
+.office-actions.office-actions-unified .office-action-state { padding: 13px 16px; margin: 12px 0 20px; border-radius: 5px; border-left-width: 3px; }
+.office-actions-unified .office-action-state-heading { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; }
+.office-actions-unified .office-action-state-heading small { font-size: 12px; color: #64748b; }
+.office-actions-unified .office-control-context { border-bottom: 0; }
+.office-actions-unified .office-pending-context { margin: 6px 0 0; font-size: 13px; }
+.office-actions.office-actions-unified :is(.office-action-preview, .office-action-receipt) { border: 0; border-radius: 0; box-shadow: none; padding: 0; margin: 20px 0; }
+.office-actions.office-actions-unified h3 { font-size: 15px; margin-bottom: 10px; }
+.office-actions.office-actions-unified pre { font-family: inherit; font-size: 14px; line-height: 1.75; border: 1px solid #e5e8ee; border-radius: 5px; padding: 14px 16px; background: #f8fafc; margin: 10px 0; }
+.office-actions-unified .office-action-preview > p { font-size: 13px; color: #64748b; overflow-wrap: anywhere; }
+.office-actions-unified .office-action-preview > p:empty { display: none; }
+.office-actions.office-actions-unified .office-action-receipt { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 14px; border-top: 1px solid #e5e8ee; padding-top: 18px; }
+.office-actions-unified .office-action-receipt > div:first-child { flex: 1 1 250px; min-width: 0; }
+.office-actions-unified .office-action-receipt p { margin: 5px 0; }
+.office-actions-unified .office-action-receipt small { font-size: 12px; color: #8490a2; }
+.office-actions-unified .office-action-buttons { gap: 8px; margin: 14px 0; }
+.office-actions-unified :is(.office-action-review, .office-decision) { border-top: 1px solid #e5e8ee; padding-top: 18px; }
+.office-actions-unified :is(.office-action-review, .office-decision) legend { font-size: 15px; font-weight: 600; margin-bottom: 6px; }
+.office-actions.office-actions-unified label.office-check { min-height: 36px; padding: 5px 0; margin: 7px 0; font-size: 14px; }
+.office-actions-unified :is(.office-check, .office-choice) input { width: 18px; height: 18px; accent-color: #2460ed; }
+.office-actions-unified .office-comparison article { padding: 0; border: 0; border-radius: 0; }
+.office-actions-unified .office-comparison article + article { border-left: 1px solid #e5e8ee; padding-left: 18px; }
+.office-actions.office-actions-unified label.office-choice { display: inline-flex; width: auto; margin-right: 12px; padding: 10px 14px; border-radius: 5px; min-height: 40px; }
+.office-actions-unified .office-decision-result { border-radius: 5px; padding: 14px 16px; }
+.office-actions-unified .office-risk-lens dl { gap: 9px 16px; margin: 8px 0 14px; }
+.office-actions-unified .office-action-history li { padding: 8px 0; }
+.office-actions.office-actions-unified .office-draft-review .office-source-review { margin: 0; padding: 0 0 0 20px; border: 0; border-left: 1px solid #e5e8ee; }
+.office-actions.office-actions-unified .office-draft-review .office-source-review summary { padding-top: 0; }
+.office-level-cases { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 10px; margin: 6px 0 12px; }
+.office-level-cases button.office-level-case { display: flex; align-items: center; justify-content: flex-start; gap: 12px; text-align: left; padding: 11px 12px; border: 1px solid #dce3ed; background: #fff; color: #24364c; min-width: 0; }
+.office-level-cases button.office-level-case:hover { border-color: #2563eb; background: #f5f8ff; }
+.office-level-cases button.office-level-case.is-selected { border-color: #2460ed; background: #eef3ff; box-shadow: inset 0 0 0 1px #2460ed; }
+.office-level-case > b { flex: 0 0 auto; min-width: 34px; padding: 4px 0; border-radius: 4px; text-align: center; font-size: 13px; color: #fff; background: #64748b; }
+.office-level-case.level-L1 > b { background: #3f9d6b; }
+.office-level-case.level-L2 > b { background: #4a8fc4; }
+.office-level-case.level-L3 > b { background: #d29a1f; }
+.office-level-case.level-L4 > b { background: #d9731f; }
+.office-level-case.level-L5 > b { background: #c8433f; }
+.office-level-case > span { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.office-level-case strong { font-size: 13px; font-weight: 600; overflow-wrap: anywhere; }
+.office-level-case small { color: #66758a; font-size: 12px; }
+.office-example-boundary { flex-direction: column; align-items: flex-start; gap: 4px; }
+.office-example-boundary p { margin: 0; color: #4a5b73; font-size: 13px; line-height: 1.6; }
+details.office-legacy-examples { margin: 10px 0 0; }
+@media (max-width: 700px) {
+  .office-actions-unified .office-action-form-heading { grid-template-columns: minmax(0, 1fr); gap: 0; }
+  .office-actions-unified .office-comparison article + article { border: 0; padding: 0; }
+  .office-actions.office-actions-unified .office-draft-review .office-source-review { padding: 16px 0 0; border-left: 0; border-top: 1px solid #e5e8ee; }
+  .office-actions-unified .office-action-tools { align-items: flex-start; }
+  .office-actions-unified .office-action-buttons > button { flex: 1 1 140px; }
+}
+
+/* Demo3: lives inside the Demo1 composer section (portal host) */
+.office-composer-host { display: block; }
+.unified-workbench .office-composer-host form, .unified-workbench .office-composer-host fieldset { display: block; margin: 0; padding: 0; border: 0; min-width: 0; }
+.office-composer { display: grid; gap: 14px; }
+.unified-workbench .office-composer > textarea { width: 100%; min-height: 150px; height: 150px; margin: 0; padding: 18px; border: 1px solid #dce2eb; border-radius: 6px; background: #fff; font-size: 15px; line-height: 1.9; resize: none; cursor: default; box-shadow: none; }
+.office-composer > textarea::placeholder { color: #8a94a5; }
+.office-composer .office-demo-cases { margin: 0; }
+.office-composer .office-demo-cases > summary { cursor: pointer; }
+.office-manual { margin: 10px 0 0; }
+.office-manual > summary { cursor: pointer; color: #5b6678; font-size: 13px; }
+.unified-workbench .office-composer-host footer.office-launch { display: flex; padding: 12px 0 20px; gap: 12px; flex-wrap: wrap; }
+.unified-workbench .office-composer-host footer.office-launch > button { display: inline-flex; align-items: center; gap: 7px; min-height: 44px; border: 0; border-radius: 5px; padding: 11px 18px; font-size: 14px; font-weight: 750; color: #fff; background: #2460ed; }
+.unified-workbench .office-composer-host footer.office-launch > button:disabled { opacity: .5; }
+.unified-workbench .office-composer-host footer.office-launch > button svg { width: 18px; }
+@media (max-width: 700px) { .unified-workbench .office-composer-host footer.office-launch > button { width: 100%; } }

@@ -1,6 +1,325 @@
 # UI-server fact matrix
 
-## DR-0064 单步事项
+## DR-0098 Demo3 Examples
+
+| Surface | Authority | Boundary |
+| --- | --- | --- |
+| Twelve examples and selected boundary label | Browser catalog | Synthetic draft input, not executed or approved |
+| Start result, missing information, confirmation | Snapshot.office_action | Catalog expected_status is only test metadata |
+| Decision and deferred record | Server decision/history/status | Preset supplies neither choice nor rationale |
+| Source text in excerpt or comparison | Submitted synthetic content | Not an imported or independently verified workspace file |
+
+[Evidence](../evidence/DR-0098-DEMO3-EXAMPLES-20261026.md).
+
+## DR-0097 Primary Execution
+
+| Surface | Authoritative fact | Boundary |
+| --- | --- | --- |
+| One primary executor / multiple work items | single_controller + no work_units + actual Plan/Branches | Multiple items do not mean multiple calls |
+| Primary analysis adopted | analysis_receipt.output_used | Not business approval or full semantic correctness |
+| Selected methods, folded | plan.skill_ids | Selection, not a new Agent or tool permission |
+| Why primary / delegation | topology_admission.reasons + sanitized plan proposal | Model rationale, not measured utility |
+
+[Evidence](../evidence/DR-0097-PRIMARY-DESIGN-20261026.md). No new client mutations.
+
+## DR-0096 Single-start Delegation
+
+| Surface | Authoritative fact | Action and boundary |
+| --- | --- | --- |
+| 单 Agent 处理后 | adaptive_reviews.origin=single_agent | Expand reason, no model call on inspection |
+| 单 Agent 起步 / 追加核对 | expanded review + added_branch_ids + current topology | Admitted work, not necessarily dispatched or parallel |
+| Execution node and receipts | work_units/worker_runs/contributions | Inspect sources/results, no synthetic Agent |
+| Parent findings retained | Branch-scoped IDs + immutable versions | Separate work-package findings, not semantic truth |
+| Blocked/discarded adjustment | review status/reason + controls | Existing recovery/stop; no silent auto-retry; prompts hidden |
+
+Limited Verified within [DR-0096 Evidence](../evidence/DR-0096-SINGLE-AGENT-DELEGATION-20261026.md). Owner/version/idempotency unchanged. Live no-add observed; promotion tested with controlled outputs.
+
+## DR-0095 Unified Demo Projection
+
+| Surface | Authoritative fact | Not implied |
+| --- | --- | --- |
+| One result preview plus expandable remainder | Existing adopted findings and responsibility projection | Other results deleted or pending work resolved |
+| Collapsed instruction, calls and budget | Original Run instruction and budget fields | Limits removed or task restarted on expand |
+| Folded unchanged reason | adaptive_reviews status/reason; actual WorkUnits and Contributions remain visible | New work or dynamic expansion occurred |
+| Compact Demo3 status and review | office_action status/revision/required_checks/receipt | Model judgment, real send or business approval |
+| Hidden task surfaces | Browser selected view and native hidden attribute | Task cancellation, stopped stream or changed source scope |
+| Final screenshot | Selected Run terminal state and matching actual worker receipts | Recent-list completed alone proves main view is current |
+
+See [DR-0095](../decisions/DR-0095-unified-demo-information-hierarchy.md) and [Evidence](../evidence/DR-0095-UNIFIED-DEMO-POLISH-20261026.md).
+
+## DR-0094 Example Readiness
+
+| Surface | Authoritative fact | Not implied |
+| --- | --- | --- |
+| Folded office examples | Browser instruction draft; explicit submit starts Run | Selecting a case calls a model |
+| Recommended examples | Saved and live Run versions, adopted findings and source previews in DR-0094 Evidence | Every completed Run has complete business coverage |
+| Missing receipt / unapproved change | uncovered_requirements / review.requires_human_decision | Loop completed means business resolved |
+| Demo tool preflight | OpenAPI HarnessRunStart.execution_policy includes automatic_readonly | Full build identity, model health or guaranteed successful output |
+
+## DR-0093 Blurt Feedback Projection
+
+| Surface | Authoritative fact | Not implied |
+| --- | --- | --- |
+| Three processing phases | round input refs, adopted Plan, analysis receipt, preserved artifacts | New Planner subtask generation or private reasoning |
+| Source inspection | Finding anchors and safe Preview GET | Business decision required for every Finding |
+| Optional suggestions | Result follow_ups; context-only finding refs | Direct evidence, missing original requirement or generated rationale |
+| Sticky branch navigation | Task lineage/current_run_id and selected Run | New Task, overwritten history |
+| Agent lanes | WorkUnit attempt, matching Contribution and Worker, dependency identities | Dispatched Agent without receipt; dependency stage equals concurrent wave |
+| Follow-up goal | Same-task follow-up Snapshot instruction, separate steer_instruction | Private JSON context suitable for UI |
+| Used-call count | budget.model_calls_used | Budget cap removed |
+
+See [DR-0093](../decisions/DR-0093-blurt-focused-workbench.md) and [Evidence](../evidence/DR-0093-BLURT-WORKBENCH-20261025.md).
+
+## DR-0092 Offline Live Showcase
+
+| Presentation | Source fact | Not implied |
+| --- | --- | --- |
+| Actual model screenshots | Captured current app; Run IDs and budget.model_calls_used in manifests | Deterministic replay or semantic correctness |
+| Same-task continuation | Parent and child share task_id | External account changes |
+| Three worker receipts | worker_runs in same batch task | Three prescribed agents, optimality or dynamic expansion |
+| No added work | adaptive_reviews unchanged result | Expansion tested with real provider |
+| Missing bank receipt | plan.uncovered_requirements alongside adopted ledger Finding | completed means all business questions resolved |
+| Demo3 confirmation and test receipt | office_action model_called=false / external_action=none | Model-based decision or real email |
+| Offline step navigation | Local images and capture metadata | Starting or continuing a live Run |
+| Restored left screenshot / right case list | Original uncropped PNG, native-resolution lightbox | Changed system output or newly captured execution |
+
+## DR-0091 Adaptive Review Projection
+
+| UI | Server fact | Not implied |
+| --- | --- | --- |
+| 分工依据 | topology_admission reasons / source_span / independent_branch_count | calibrated difficulty or optimal team |
+| 第 N 批结果返回后 | adaptive_reviews.after_wave | graph dependency depth |
+| 根据结果新增 N 项工作 | expanded review plus added_branch_ids | model execution or adoption |
+| 查看新增原因 | validated proposal reason and triggering Finding/parent IDs | semantic correctness |
+| 本次未新增工作 | unchanged review | complete business coverage |
+| 执行中 / 成果已采用 | current WorkUnit / matching Contribution and Worker attempt | mere plan nodes |
+| 背景引用待补直接依据 | context-only anchors projected as unfinished | source deletion or failed Runtime |
+
+See [DR-0091](../decisions/DR-0091-result-driven-bounded-adaptation.md) / [Evidence](../evidence/DR-0091-ADAPTIVE-PROGRESS-20261024.md). Real-provider expansion remains unverified.
+
+## DR-0090 Multi-stage Collaboration
+
+| Surface | Authority | Limit |
+| --- | --- | --- |
+| Stage and number of work packages | WorkUnit IDs and depends_on graph | Dependency depth, not dispatch waves/concurrency |
+| Waiting for prior output | Parent WorkUnit joins and Branch completion | Missing parent stays waiting/unknown, not ready |
+| Source analysis / review / synthesis | Current Contribution-linked Worker.work_role | No role inferred from title |
+| Collapsed result | Latest Contribution matching Branch/attempt, adopted gate and finding | More than3 nodes collapse excerpts only; no hidden failed/pending status |
+| Five executed Workers in report | Actual five model_called/output_used receipts in each cited Run | Not six execution Agents including Planner, or five simultaneous Workers |
+
+[DR-0090](../decisions/DR-0090-multistage-worker-display.md) / [Evidence](../evidence/DR-0090-FIVE-WORKERS-20261024.md).
+
+
+## DR-0089 Office Todos
+
+| Surface | Server authority / action | Default hidden / limits |
+| --- | --- | --- |
+| Planned route vs running work | topology_admission.mode; work_units.state | Reasons expand; no learned difficulty or execution claim from admission |
+| Called / adopted receipt counts | worker_runs.model_called/output_used | Attempts, not unique Agents or total model calls |
+| Per-task delivered analysis | DR-0088 responsibility projection, distinct affected_branch_ids for preview | Full findings in task; missing/decision/unfinished items remain visible |
+| Current work-package result | latest_contribution_id + Branch + attempt + adopted Gate, then bound finding | Old-attempt output cannot be current success |
+| Return to this batch | browser-mounted accepted run_id list, existing GET/SSE | No POST; no persistent Batch; refresh loses local grouping |
+| Unknown start / new draft | existing original POST key/payload or local reset | Retry does not duplicate accepted items; new draft does not stop existing Tasks |
+
+Validation and lifecycle: DR-0089 / SCENARIO-076 / corresponding Evidence, Limited Verified. No new server facts or permissions.
+
+## DR-0088 Human-Agent Responsibility
+
+| Surface | Existing server facts | Limits |
+| --- | --- | --- |
+| 系统已处理 | Result or retained ArtifactVersion findings + all bound Branches completed + non-context anchor; no business veto/pending decision | Adopted analysis, not confidence calibration or real external execution |
+| 需要你参与 | finding.review + DecisionRequest/Record; all rounds' uncovered_requirements | Decision, source choice and missing fact remain different kinds |
+| Agent 未完成 | next_step.recovery_kind/candidate_branch_ids; incomplete Branch and Worker review | Not a demand for human guessing or a new auto-retry |
+| 协作用量授权 | waiting_input + ready_branch_ids + non-automatic policy | Not low confidence; never adds manual dispatch to automatic_readonly |
+| 最近任务待你判断/待补资料 | completed Loop plus unresolved public judgment/missing requirement | UI label only, does not rewrite Run status |
+| 查看问题与选项 | existing evidence dialog | No POST/model call until explicit decision; no preselection; history readonly |
+
+Source/Decision/Scenario/Evidence: DR-0088 / SCENARIO-075. Unknown or incomplete facts are not displayed as automatic success.
+
+## DR-0087 Same-Task Stages And First Round
+
+| Surface / action | Server fact | Recovery / hidden details | Validation boundary |
+| --- | --- | --- | --- |
+| Initial task title | Task.goal from earliest same-Task Snapshot | Not overwritten by latest suggestion | DR-0087, Limited Verified |
+| Follow-up stage navigation | Task.lineage, current_run_id; Run.parent_run_id | GET-only, history readonly, latest100 stages | Not concurrent forks |
+| Confirm suggestion | /continue purpose=follow_up, Run/Task versions and idempotency key | Unknown same-page retry; no second Task; no private CoT | Backend and browser tests plus live Run |
+| Expected files before submit | Explicit example text + Workspace display labels | Missing expected file is marked missing; not an executed read | Client draft, not server plan |
+| First-round processing | rounds[0].plan/input_file_refs/selection_reason | No plan means preparing; ordinary records collapse at waiting/terminal | Not private thought or approved business logic |
+| Supplied to analysis | model_input_coverage entries | No full hash/raw provider response; bounded input remains in full records | Not whole-file coverage or semantic correctness |
+
+
+## DR-0086 Real Todos And Evidence
+
+| Surface | Authority | Boundary |
+| --- | --- | --- |
+| Start all todos | Three distinct POST /runs responses | Browser launch grouping, not a persistent Batch queue |
+| Autonomous execution | Persisted execution_policy=automatic_readonly; analysis_only contract | Does not authorize human decisions, file writes or external effects |
+| Single/multiple execution Agents | Per-Run topology_admission; actual worker_runs | Structure-based assessment, not an objective difficulty score |
+| Automatic waves | automatic_topology_authorized, worker_wave_reserved, WorkUnit/Contribution | No front-end confirmation synthesis; no automatic retry of attempted failed/ambiguous Branches |
+| Retained evidence while waiting | Same-Run latest ArtifactVersion.findings when public Result is empty | Label version; not a completed task or newly approved business conclusion |
+| Verified source count | Unique Branch verified_file_refs, persisted to budget and current round | Not files merely selected/read, not semantic completeness |
+| Source-choice question | Actual Resolution candidates | Picking a location does not establish a missing business document |
+
+## DR-0085 Unified Reference Workbench
+
+| Surface | Authority | Local interaction | Boundary |
+| --- | --- | --- | --- |
+| Three Demo entries | UI presentation state | Open local draft; no POST | Shared file index, not isolated workspaces or routing authorization |
+| Recent tasks | Recent20 runs, task_id, highest run_sequence | Original GET/current pointer checks | Not exhaustive history, queue or batch scheduling |
+| Evidence excerpts | public Result findings.evidence_anchors | Safe file GET and anchor highlighting | Location is not entailment or business approval |
+| Source choice | Branch-bound Resolution and original DecisionRequest | Existing versioned decision | No default candidate; Worker without decision opens receipts |
+| Agent boxes | work_units, worker_runs, latest_contribution_id, attempt, gate_status | Existing cooperation review/dispatch dialog | Lines represent coordination; no fake parallel calls or autonomous authorization |
+| Action navigation lock | local busy/unknown/editing/draftEditing | Disable outer new/switch task controls | Does not cancel requests or alter server authority |
+| Common action result tab | office_action.receipt/content/result_message | Read only; return to action controls | Test record, not Artifact validation or external action |
+
+See [DR-0085](../decisions/DR-0085-unified-reference-workbench.md) and its Evidence. Old no-Demo-selector UI wording is superseded only at the presentation layer.
+
+## DR-0084 Screenshot Showcase and Result Fallback
+
+| UI meaning | Authority and local action | Boundary |
+| --- | --- | --- |
+| Screenshot step / case / input | Static authored cases.js + original captured image; navigation, zoom and copy only | No Task/Run start, model call or live progress |
+| Controlled Demo1/2 | Existing fixture Snapshots rendered by original UI | Not a new Provider run or downloadable-file validation |
+| Fixed-rule Demo3 capture | office_action.status/revision/receipt; per-case capture record | model_called=false, external_action=none; no automatic instruction parsing |
+| 检查结果已保留，分析结论尚未形成 | No public analysis, at least one passed Artifact/EffectReceipt, no deterministic authority combination | No assertion that all checks pass, business is approved or task completes; failures remain above |
+
+No backend or SSE changes. Internal fields remain hidden; fixture identities never authorize the original application. See [DR-0084](../decisions/DR-0084-screenshot-capability-showcase.md).
+
+## DR-0083 Walkthrough Corrections
+
+| UI | Authoritative fact | Boundary |
+| --- | --- | --- |
+| 已保留分析草稿 | Current Snapshot ArtifactVersion selected by Commit pointer or latest version | Only without Result/files/effect receipts and without rejected/supplemental reconciliation; review-required, not completion |
+| 就绪，待你确认 | waiting_input + running Branch in server ready_branch_ids | Explicit confirmation; max 3; empty ready set is not authorization |
+| 引用位置待核对 | Worker.outcome=ambiguous | No fake decision request or automatic recovery |
+| One execution row with adoption detail | Matching worker_run_id AND branch_id | Preserve individual contributions and orphan receipts; called and adopted remain separate |
+| File type menu and optional direction | Local UI state | No source-scope change or POST on disclosure |
+
+[Decision](../decisions/DR-0083-user-walkthrough-and-consistent-results.md) / [Evidence](../evidence/DR-0083-USER-WALKTHROUGH-20261022.md).
+
+## DR-0082 Concise Waiting and Collaboration
+
+| Surface | Server authority | Local action | Always visible | Boundary |
+| --- | --- | --- | --- | --- |
+| One waiting summary, per-issue action | Branch ID, Gap, Resolution candidates, DecisionRequest | Original review/resume; disclose source receipts | Issue, candidate count/retry nature, verified/unverified/terminal impact, action | No candidate default or new authority |
+| Folded duplicate branch details | Entire Run branches in existing delivery ledger | Row review and native details | Every unfinished branch including other rounds | Only folds when ledger exists; not a task queue |
+| Concise dependency diagram | WorkUnit.depends_on, ready IDs, Branch and gate_status | Existing approval and receipt review | Real node states/edges, approved wave scope, admission budget | No new dispatch or concurrency claim |
+| Grouped downstream impact | Blocked WorkUnits and their Branch titles | Read names; disclose raw gap reason | Every affected name; pending decision count from requests | Impact entries are not a unique pending-item count |
+
+All local disclosure is zero-command and preserves SSE. Existing read-only/version/idempotency guards remain.
+See [DR-0082](../decisions/DR-0082-concise-waiting-and-collaboration.md) and [Evidence](../evidence/DR-0082-WAITING-COPY-20261022.md).
+
+## DR-0081 Delivery-First Root
+
+| Surface | Server authority | Local interaction | Always retained | Boundary |
+| --- | --- | --- | --- | --- |
+| File-first overview | workspace_artifacts, effect_receipts, business_gate_outcome | Download; existing full results | Failed file, business decision, gate actual/threshold | Verification is not approval |
+| All unfinished work | Run branches[].status, full Run scope | Original branch review; expand completed work | Every non-completed branch, including other rounds | Not a cross-Task queue or dispatch |
+| Folded successful record | completed Run, all completed branches, no open decisions, no selected-round gap/deferred/uncovered/bounded input | Native details, keyboard | History/source change/query error, controls, failure and input limits | Zero POST; no state mutation |
+| Concise business conditions | gates[].label/actual/operator/threshold/result/formula | Formula disclosure | Decision and every formal condition | No client risk calculation |
+
+See [DR-0081](../decisions/DR-0081-delivery-first-root-overview.md) and its [Evidence](../evidence/DR-0081-TASK-OVERVIEW-20261022.md).
+
+## DR-0080 Reference-Led Hierarchy
+
+| Surface | Authority | Local action | Always retained | Boundary |
+| --- | --- | --- | --- | --- |
+| Root outcome-only ledger | every branches[].status = completed | Original result button; full round records | Any unfinished Branch keeps original ledger | Does not discard branch state or history |
+| Capability single file outcome | workspace_artifacts.length > 0 | Existing result view | Verification failure and business veto in frontstage outcome | Not business approval or Run completion |
+| Graph before detailed metrics | work_units/depends_on, worker_runs, contributions | Existing execution-receipts details | Current impact, approval scope, budget and action | Viewing sends no POST; no dispatch or invented dependency |
+
+See [DR-0080](../decisions/DR-0080-reference-led-information-hierarchy.md) and its [Evidence](../evidence/DR-0080-REFERENCE-UI-20261022.md).
+
+## DR-0079 Preference, Recovery and Recent Pending
+
+| Surface | Authority | Action and recovery | Hidden | Boundary |
+| --- | --- | --- | --- | --- |
+| Personal text style | input.format_style; None = existing spaced output | Explicit selection; deterministic preview/receipt; undo restores input | Local preference storage key | No external file mutation or permission |
+| Remember / clear style | Browser-local validated enum, current demo identity | Explicit opt-in/revoke; storage failure says unsaved; current draft unchanged on clear | No stored content or recipient | Not signed identity, cross-device preference or future authorization |
+| Take old draft content | history.content_snapshot, existing earlier revision | Local preview only; save with edit_draft creates new version; existing busy/unknown/readOnly/version guards | Internal IDs and keys | No source rewrite or dedicated server restore-provenance event |
+| Pending filter | latest 20 Owner Runs, office_action.status in OPEN | Select/filter/read GET only; current editing/switch guards remain | Internal Run IDs | Not exhaustive pending queue, priority or dispatch |
+
+See DR-0079 and its Evidence for validation, including stale revision rejection and zero-write viewing.
+
+## DR-0078 Saved-State Handoff
+
+| Surface | Authority | Action and recovery | Hidden by default | Verification and boundary |
+| --- | --- | --- | --- | --- |
+| Missing fields with no submission | office_action.missing_fields/status | Fill required fields; existing revise command | History | New missing-field browser test; not general entity resolution |
+| Download human handoff | input/revision/status/target_label/reason/result_message/required_checks/source_excerpt/impact/reversibility | Local file only; zero POST; next-decision prose not assigned authority | Internal Run IDs and raw provider data | DR-0078 Evidence; no approval or notification |
+| Export disabled | local unknown/busy/editing/draftEditing | Query/replay original request or finish editing first | Request body and idempotency key | No new server state or cross-tab recovery guarantee |
+
+## DR-0077 Case-Based Copilot Review
+
+| Surface | Authority | Interaction | Not implied |
+| --- | --- | --- | --- |
+| Draft beside source | office_action.preview/source_excerpt/status | Source initially open; local collapse, edit and preview preserved | Semantic summary, full-source coverage or user actually reviewed |
+| Human-revised title | draft_ready and saved history event=edit_draft | Read current edited draft | Original excerpt changed or business approved |
+| Changed fields and current version | earlier revision input/content_snapshot, current revision, OPEN status | Open comparison, existing fresh-check requirement | New approval policy, attachment or permission-change coverage |
+| Judgment-only wording | compare_materials, decision, decision_note receipt | Explicit choice and rationale; defer remains | Automatic downstream execution or source edit |
+| Unknown response context | local unknown flag | Original request replay/query | Server failure or known cancellation |
+
+[Decision](../decisions/DR-0077-case-based-copilot-review.md) / [Evidence](../evidence/DR-0077-COPILOT-CASES-20261010.md).
+
+## DR-0076 Calm Root View
+
+| Surface | Authority | Interaction | Not implied |
+| --- | --- | --- | --- |
+| Ordinary route disclosure | compact, readOnly, topology_admission.mode | Local keyboard disclosure; adaptive confirmation remains visible | Route changes or Worker dispatch |
+| No inactive terminal controls | TERMINAL_STATUSES and compact | Active controls / bounded continuation unchanged | Cancellation of a server operation |
+| Single-round tabs omitted | rounds.length = 1 and compact | Multi-round history and full capability record preserved | Rounds deleted or new completion semantics |
+| Passed-file explanation | verifier_status=passed, no self_test; existing finance rule | Local disclosure; full Result retains explanation | Approval; failure, self-tests and business panels are never hidden by this rule |
+
+[Decision](../decisions/DR-0076-calm-demo1-and-evidence-explanation.md) · [Evidence](../evidence/DR-0076-CALM-EVIDENCE-20261010.md).
+
+## DR-0075 Task Delivery Clarity
+
+| Surface | Authority | Interaction | Not implied |
+| --- | --- | --- | --- |
+| Generated / checked file counts | workspace_artifacts and verifier_status | Open existing results | Logical version existence, semantic completeness or approval |
+| Business warning | business_gate_outcome.status/decision | Visible before opening details | File checks override business veto |
+| Empty child delivery | parent_run_id, empty current artifacts | Prior records remain separate | Parent stopped state or files copied into current execution |
+| Historical round label | selected round_number versus current_round | Read previous round | Historical Gate is current Gate |
+| File name in context toolbar | activeFile only in preview view | Preview remains a local choice | Viewed file determines model input |
+
+[Decision](../decisions/DR-0075-demo1-task-and-delivery-clarity.md), [Evidence](../evidence/DR-0075-DEMO1-CLARITY-20261010.md).
+
+## DR-0074 Execution Detail
+
+| Surface | Authority | Interaction | Not implied |
+| --- | --- | --- | --- |
+| Root compact progress | current_round, status, budget | Read current phase and counters | Business approval |
+| Ordinary history | parent_run_id, source_revision_changed, selected Run/Task pointer | Local disclosure; exceptions remain expanded | Source changes or Task errors hidden |
+| Round material / completed branches | input_file_refs and every selected Branch status=completed | Local disclosure, original source names and states | Semantic correctness or Worker parallelism |
+| Version list | artifact_versions and last_commit | Expand without POST; restore uses existing control contract | Source file rollback, deleted versions |
+| Pending, failed, bounded and input limits | Existing Gap/Gate/receipt/coverage fields | Original visible control and recovery surfaces | Hiding errors as simplification |
+
+[Decision](../decisions/DR-0074-execution-detail-disclosure.md), [Evidence](../evidence/DR-0074-EXECUTION-DETAIL-20261008.md).
+
+## DR-0073 Focused Workspace
+
+| Surface | Authority | Interaction | Not implied |
+| --- | --- | --- | --- |
+| Current task / status | run.instruction / run.status | Read original goal; expand settings | Business completion or editable current contract |
+| Directory toggle | Workspace files plus local search / expansion | Collapse preserves selection; new task resets display preference | Changing Run scope or removing sources |
+| Process toggle | Existing activity Snapshot projection | Local show/hide; open focuses pane; close/Escape restores trigger focus | Stop, resume, disconnect SSE or approve |
+| Main pending / error / result | Existing authoritative Run and receipts | Original controls stay in main surface | Hidden log means no failure |
+| Important execution receipts | Latest numeric/narrative rejection; latest artifact restore or current failed Run failure event | Always visible independently of process pane; explicitly historical execution record | Old rejection proves current failure, or restore changed source files |
+
+[Contract](../decisions/DR-0073-focused-workspace-disclosure.md), [Evidence](../evidence/DR-0073-FOCUSED-WORKSPACE-20261008.md).
+
+## DR-0072 统一入口与响应归属（Limited Verified，最终组合浏览器 149 项通过）
+
+| UI 位置与含义 | 服务端权威字段或本地事实 | 用户动作与恢复 | 默认隐藏 | 验证范围 |
+| --- | --- | --- | --- | --- |
+| 空白新任务“分析资料 / 办理事项” | 本地表单选择；提交后 Run Snapshot | 两原入口共享，选择本身不执行任务 | 模式实现字段 | 已测入口与零调用查看，不新增 Demo API |
+| 当前事项视图 | `office_action` 与选中 Run | 使用原 action-controls；不显示无关 Loop/成果入口 | 内部 ID | 不冒充模型、Worker 或外部业务 |
+| 原历史列表 | Owner-scoped Run/Task 事实 | 重开原任务，遵守原只读/切换限制 | 存储键 | 不是新增全局队列 |
+| 切换后不被旧返回覆盖 | 请求发起时 sessionGeneration 与当前代次；事项局部 readRef | 忽略旧成功/错误/409刷新；父层再核对；新局部草稿失效旧读取 | 代次、旧原始响应 | 延迟成功/错误及两项导航反例先红后绿，最终组合门 149 项通过；不是服务端取消或全部竞态保证 |
+
+见 [DR-0072](../decisions/DR-0072-unified-workbench-and-response-ownership.md) 和[本轮证据](../evidence/DR-0072-INTEGRATION-20261007.md)。Worker 歧义的人工决定到依赖恢复不在此映射范围。
+
+## DR-0070 单步事项
 
 | UI 位置与含义 | 服务端权威字段或事件 | 用户动作与恢复 | 默认隐藏 | 验证范围 |
 | --- | --- | --- | --- | --- |
@@ -17,7 +336,7 @@
 
 历史五类基线见 [DR-0053 Evidence](../evidence/DR-0053-SINGLE-ACTION-EVIDENCE-20260918.md)，当前六类事项增量见 [DR-0054 Evidence](../evidence/DR-0054-DEMO3-COLLABORATION-EVIDENCE-20260919.md)。
 
-## DR-0065 人工判断与找回
+## DR-0071 人工判断与找回
 
 | UI 位置与含义 | 服务端权威字段或本地事实 | 用户动作与恢复 | 默认隐藏 | 验证范围 |
 | --- | --- | --- | --- | --- |
@@ -29,6 +348,86 @@
 | 人工处理说明 | 浏览器依据已保存 Snapshot 生成的本地文本 | 下载后由用户自行交接 | 内部 ID、路径 | 无审批、通知、委派回执 |
 
 新增事件均由原有 SSE 投影；打开最近事项与材料详情不调用模型。
+## DR-0069 Source Counts and Coverage
+
+| UI meaning | Server authority | Action / recovery | Not implied |
+| --- | --- | --- | --- |
+| 数字与批准来源不一致，未采用 | analysis_numeric_rejected / Worker error + called/output_used | Inspect original execution record; existing explicit branch recovery; no auto retry | Every number/wording or business rule verified, source needs edits |
+| Later XLSX rows remain inspectable | Existing Preview rows/row_number, up to 240 in first visible sheet | Original preview, scroll to target; no POST | Other sheets read, totals equal business-record counts |
+| Actual full or bounded model material | Existing model_input_coverage from actual payload | Original progressive disclosure | Supplied means understood, full workbook, authoritative semantic outcome |
+| Preserved sibling results after numeric rejection | Existing immutable contributions/artifact_versions and dependency state | Continue only admitted remaining work | Wrong parent supplied to dependent, whole task completed |
+| 引用位置尚未确定，尚无可提交的确认项 | Nonterminal primary waiting Branch's latest Worker outcome=ambiguous; no complete DecisionRequest or ready wave | Existing collaboration receipts, no POST; actual decisions and terminal rules keep precedence | Candidate selector exists, retry resolves ambiguity, human recovery is closed |
+
+[Decision](../decisions/DR-0069-readonly-source-counts-and-reviewable-coverage.md),
+[Evidence](../evidence/DR-0069-SOURCE-CHECKS-20260922.md). Model-only/review-required remains; no synthetic verified-file card.
+
+## DR-0068 Result Reading
+
+| UI meaning | Authority | Action / recovery | Not implied |
+| --- | --- | --- | --- |
+| 分析记录 vN 已保存 / 已恢复，结论待复核 | Existing ArtifactVersion / TaskCommit, `result.review_required` | Inspect current/history as before; neutral file marker | Saved means semantically correct, completed means approved |
+| 查看依据 N 份资料 | Unique Finding file refs and available safe file metadata | Native disclosure, keyboard supported; missing metadata says unavailable; original review route | Open means accept, new model call, guessed anchor or source name |
+| First three plus all active decisions | Authoritative request pending/deferred via existing resolver; legacy fallback only absent request | Direct action visible past item three; accepted/stale do not regain pending state | Collapsed means absent; stale embedded request outranks current authority |
+| Finance file purpose and compact explanation | Artifact `covered_period/purpose/verifier_status` and unchanged finance outcome | Passed-file detail folds; failed-file recovery stays visible; download unchanged | Two CSVs contain three periods; passed means payment/accounting approval |
+| 建议，尚未执行 | Existing `follow_ups` and explicit start path | Read context without a command; only deliberate start executes | Recommendation is completed work or directly evidenced finding |
+
+No API/Runtime changes. [Decision](../decisions/DR-0068-result-reading-and-independent-task-acceptance.md)
+and [Evidence](../evidence/DR-0068-RESULT-ACCEPTANCE-20260922.md) distinguish UI gates from task correctness.
+
+## DR-0067 Task-first Disclosure
+
+| UI meaning | Authority | Action / missing fact | Not implied |
+| --- | --- | --- | --- |
+| Compact current result and work items | Current Artifact/Commit, Branch IDs, ready IDs and deferred requirements | Expand one item or remaining items; exact findings binding retained | Collapsed items are completed, missing work was removed, or title-based evidence mapping |
+| Focused result / history | Same selected Run and immutable ArtifactVersions | Inspect without POST; return restores local state/focus; history controls stay guarded | A new Run, changed outcome, new permission or source mutation |
+| Graph first, receipt details secondary | WorkUnit dependencies, called Worker reviews and Contribution inputs | Disagreement remains visible; direct action opens the real receipt section | Hidden review means approved, graph means executed, model opinion means truth |
+| Business failed/invalid and incomplete decision | Artifact business_gate_outcome and authoritative pending DecisionRequests vs usable packets | Keep default warning; suppress green no-action / generic-retry advice respectively | File checks grant business permission, retry substitutes for human decision |
+| Task examples / source lists / range explanations | Local draft and existing safe file refs / server constraints | Native disclosure; no model or budget use | Viewing grants broader scope, modifies contract or starts a task |
+
+Scope: frontend only. [Decision](../decisions/DR-0067-task-first-progressive-disclosure.md),
+[Evidence](../evidence/DR-0067-SIMPLE-USER-WALKTHROUGH-20260922.md). No user-effect claim.
+
+## DR-0066 Reviewed Handoffs and Agreement
+
+| UI location / meaning | Server authority | Action and recovery | Hidden / prohibited inference |
+| --- | --- | --- | --- |
+| Composer: output preference | Local draft until `POST /runs`; then frozen `contract.output_policy` | Edit before start; 422 conflict retains draft; corrected submission uses a new key | A selected radio is not a recorded contract or generated file |
+| Progress: task delivery ledger | Current committed Artifact or latest draft; findings joined by `affected_branch_ids`; Branch verified refs | Open existing result/review; show 3 rows then expand; no binding stays unknown | No title-based matching, synthetic completion percent or business correctness claim |
+| Progress: 局部重试 1 次 | Latest Worker `repair_count=1` | Inspection only; later recovery uses existing versioned controls | Retry is not successful repair; hides private prompt/raw response |
+| Collaboration: role and review | Called Worker `work_role`; validated `dependency_assessments` and parent Contribution/Branch | Inspect actual source excerpt; missing/uncalled legacy data draws no review | Role labels do not prove separate models, independent opinions or actual semantic truth |
+| Current disagreement / waiting graph node | Waiting Branch + latest called Worker non-supported assessment | View existing collaboration/review before bounded continuation | Never auto-approve, auto-vote, or label disagreement as executable; retry is not a human ruling |
+| Preserved results after rejected synthesis | Existing append-only ArtifactVersions/Contributions; new Worker not adopted | Keep history and current usable work; only target can be continued | Failed synthesis did not erase/rewrite parent work; no source rollback |
+
+Lifecycle: Limited Verified. Same Owner/version/idempotency contracts. UI cannot submit its own review facts.
+[Decision](../decisions/DR-0066-reviewed-handoffs-and-output-agreement.md),
+[Evidence](../evidence/DR-0066-REVIEWED-HANDOFFS-20260922.md).
+
+## DR-0065 Output and Handoff Facts
+
+| UI location / meaning | Server authority | Transition / missing fact | Forbidden inference |
+| --- | --- | --- | --- |
+| Progress: 本任务不生成或导出文件 | `contract.output_policy=analysis_only` | Frozen at start; restrictive parent inherited; legacy default shows no notice | Arbitrary language understood, existing files deleted, no logical history |
+| Collaboration: 前序成果传递 | Called Contribution + nonempty `input_contribution_ids`; direct parent receipt title and `artifact_version` | After actual model call; unknown parent shows unavailable; roots/old receipts show no invented row | DAG edge alone proves a handoff, model understood/used all content, semantic correctness |
+| Handoff: 本次贡献已采用 / 尚未采用 | Downstream `gate_status` | Waiting/rejected remains distinct even when input was supplied | Provided means adopted; all parents or the whole task completed |
+| No new generated-file card | Empty `workspace_artifacts/effect_receipts`; optional `office_output_suppressed` event | Adapter skipped before freeze/write; normal logical versions remain | File generation succeeded, original files changed, external action happened |
+
+[Decision](../decisions/DR-0065-output-policy-and-scoped-dependency-handoffs.md),
+[Evidence](../evidence/DR-0065-OUTPUT-HANDOFF-20260921.md).
+
+## DR-0064 Reliability Facts
+
+| UI state | Server authority | Forbidden inference |
+| --- | --- | --- |
+| Actual model input | Round model_input_coverage from supplied Analyst/Worker payloads | Whole-document reading, understanding, or all rows analyzed |
+| File generated but prose held | deterministic reconciliation + matching passed Effect + bound passed Artifact | Numeric agreement proves the entire explanation; file generation failed |
+| Initial collaboration ready | Validated Branch DAG + next_step.ready_branch_ids, no WorkUnit yet | Worker already called or all numbered tasks independent |
+| Waiting between waves | Frozen active elapsed; new explicit reservation resumes it | Human reading time consumes execution budget |
+| Worker returned but rejected | called=true/output_used=false and contribution Gate | Validation rejection means no model call |
+| Numbered dependent item | Unique coverage binding to a validated dependent unit | Dependency already executed or its semantics proven |
+| Historical partial run | Immutable versions, same-Task child and precise recheck refs | Parent overwritten, rejected contribution adopted, or whole task repeated |
+
+[Decision](../decisions/DR-0064-demo12-reliability-and-bounded-narratives.md),
+[Evidence](../evidence/DR-0064-DEMO12-RELIABILITY-20260920.md).
 
 ## DR-0063 original-system boundary projection
 
