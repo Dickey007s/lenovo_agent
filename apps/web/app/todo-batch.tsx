@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { IconCheck, IconChevronRight, IconLoader2, IconPlayerPlay } from "@tabler/icons-react";
+import { IconArrowsExchange, IconCheck, IconChevronRight, IconLoader2, IconPlayerPlay, IconWand } from "@tabler/icons-react";
 import type { HarnessRun } from "./harness-workbench";
 import { todoSummary } from "./todo-summary";
 
@@ -27,12 +27,15 @@ export const BATCH_EXAMPLES = OFFICE_TODO_SETS[DEFAULT_TODO_SET].instructions;
 
 type Entry = { instruction: string; key: string; runId?: string; error?: string };
 
-export function TodoBatch({ apiBase, headers, normalize, runs, onCreated, onOpen, onLock }: {
+// A fresh to-do list starts blank; presets are only filled in when the user asks for them.
+const EMPTY_ENTRIES = (): Entry[] => BATCH_EXAMPLES.map(() => ({ instruction: "", key: "" }));
+
+export function TodoBatch({ apiBase, headers, normalize, runs, onCreated, onOpen, onLock, onSwitchSolo }: {
   apiBase: string; headers: Record<string, string>; normalize: (value: unknown) => HarnessRun | null;
   runs: HarnessRun[]; onCreated: (run: HarnessRun) => void; onOpen: (run: HarnessRun) => void;
-  onLock: (locked: boolean) => void;
+  onLock: (locked: boolean) => void; onSwitchSolo?: () => void;
 }) {
-  const [entries, setEntries] = useState<Entry[]>(BATCH_EXAMPLES.map(instruction => ({ instruction, key: "" })));
+  const [entries, setEntries] = useState<Entry[]>(EMPTY_ENTRIES);
   const [busy, setBusy] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [exampleSet, setExampleSet] = useState(DEFAULT_TODO_SET);
@@ -78,7 +81,7 @@ export function TodoBatch({ apiBase, headers, normalize, runs, onCreated, onOpen
     return run && todoSummary(run).complete;
   }).length;
   return <section className="todo-batch" aria-label="多任务待办">
-    <header><div><span>只读分析</span><h1>多任务待办</h1></div><span className="todo-total">{submitted ? `${completedCount} / ${entries.length} 项已完成` : `${entries.length} 项待办`}</span>{!submitted && <label className="todo-preset">待办示例<select aria-label="待办示例" value={exampleSet} onChange={event => { const index = Number(event.target.value); setExampleSet(index); setEntries(OFFICE_TODO_SETS[index].instructions.map(instruction => ({ instruction, key: "" }))); }}>{OFFICE_TODO_SETS.map((set, index) => <option key={set.name} value={index}>{set.name}</option>)}</select></label>}</header>
+    <header><div><span>只读分析</span><div className="todo-title-row"><h1>多任务待办</h1>{!submitted && onSwitchSolo && <button type="button" className="mode-switch" disabled={busy || unknown} onClick={onSwitchSolo} title="切换到单任务（Demo 1）"><IconArrowsExchange aria-hidden="true"/>切换单任务模式</button>}</div></div><span className="todo-total">{submitted ? `${completedCount} / ${entries.length} 项已完成` : `${entries.length} 项待办`}</span>{!submitted && <div className="todo-preset"><label>待办示例<select aria-label="待办示例" value={exampleSet} onChange={event => setExampleSet(Number(event.target.value))}>{OFFICE_TODO_SETS.map((set, index) => <option key={set.name} value={index}>{set.name}</option>)}</select></label><button type="button" className="todo-fill" disabled={busy} onClick={() => setEntries(OFFICE_TODO_SETS[exampleSet].instructions.map(instruction => ({ instruction, key: "" })))}><IconWand aria-hidden="true"/>整理待办</button></div>}</header>
     <ol>{entries.map((entry, index) => {
       const run = runs.find(item => item.run_id === entry.runId);
       const summary = run ? todoSummary(run) : null;
@@ -88,7 +91,7 @@ export function TodoBatch({ apiBase, headers, normalize, runs, onCreated, onOpen
       return <li key={index}>
         <div className="todo-number">{completed ? <IconCheck aria-hidden="true"/> : index + 1}</div>
         <div className="todo-body">{submitted ? <h2>{title}</h2> : <label htmlFor={`todo-${index}`}>待办 {index + 1} · {title}</label>}
-          {!submitted && <textarea id={`todo-${index}`} aria-label={`待办 ${index + 1}`} value={entry.instruction} maxLength={2000} onChange={event => setEntries(current => current.map((item, position) => position === index ? { ...item, instruction: event.target.value } : item))}/>}
+          {!submitted && <textarea id={`todo-${index}`} aria-label={`待办 ${index + 1}`} placeholder="输入这一项待办，或点击上方「整理待办」填入预设示例" value={entry.instruction} maxLength={2000} onChange={event => setEntries(current => current.map((item, position) => position === index ? { ...item, instruction: event.target.value } : item))}/>}
           {submitted && <div className="todo-receipt"><span className={completed ? "is-complete" : entry.error || summary?.concerns.length || run?.status === "waiting_input" ? "is-waiting" : ""}>{status}{completed && summary ? ` · ${summary.findings.length} 条分析` : ""}</span><span>{run?.topology_admission?.mode === "adaptive_readonly_workers" ? "多 Agent 协作" : run?.topology_admission ? "单 Agent 执行" : "评估执行方式"}</span>{run && <button disabled={busy || unknown} onClick={() => onOpen(run)}>查看任务<IconChevronRight aria-hidden="true"/></button>}</div>}
           {summary && <div className="todo-outcome">{!summary.findings.length && <strong className="is-empty">尚无已核对的分析</strong>}{summary.preview.slice(0, 1).map(item => <p key={item.id}>{item.finding?.fact_summary || item.title}</p>)}{summary.findings.length > 1 && <details className="todo-more-results"><summary>其余 {summary.findings.length - 1} 条分析</summary>{summary.findings.filter(item => item.id !== summary.preview[0]?.id).map(item => <p key={item.id}><b>{item.title}</b><br/>{item.finding?.fact_summary || item.finding?.detail}</p>)}</details>}{summary.concerns.length > 0 && <div className="todo-unfinished"><strong>未完成</strong><ul>{summary.concerns.map((text, i) => <li key={i}>{text}</li>)}</ul></div>}</div>}
           {submitted && <details className="todo-instruction"><summary>指令与执行记录</summary><p className="todo-original">{entry.instruction}</p>{run?.topology_admission && <><strong>分工依据</strong><ul>{run.topology_admission.reasons.map((reason, i) => <li key={i}>{reason}</li>)}</ul><p>{summary?.routing}</p><p>已用 {run.budget.model_calls_used} 次模型调用，上限 {run.budget.max_model_calls} 次</p></>}</details>}

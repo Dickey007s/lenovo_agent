@@ -43,6 +43,7 @@ import {
   IconShieldCheck,
   IconSparkles,
   IconX,
+  IconListCheck,
 } from "@tabler/icons-react";
 
 type ConnectionState = "connecting" | "available" | "live" | "reconnecting" | "offline";
@@ -4243,6 +4244,7 @@ export function HarnessWorkbench({ onActivityChange, capabilitiesOnly = false, a
   const [sessionsOpen, setSessionsOpen] = useState(false);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [newTaskDraft, setNewTaskDraft] = useState(false);
+  const [actionHost, setActionHost] = useState<HTMLElement | null>(null);
   const [selectedRunCurrent, setSelectedRunCurrent] = useState<boolean | null>(null);
   const [adaptiveWorkbenchOpen, setAdaptiveWorkbenchOpen] = useState(false);
   const [taskPointer, setTaskPointer] = useState<TaskPointer | null>(null);
@@ -5152,7 +5154,8 @@ export function HarnessWorkbench({ onActivityChange, capabilitiesOnly = false, a
           />)}
         </ul> : <p className="dataset-unavailable">没有符合当前筛选条件的文件或目录。</p>}
       </aside>;
-  const actionMode = Boolean(run?.office_action) || (!run && space === "copilot");
+  const actionDraft = !run && space === "copilot";
+  const actionMode = Boolean(run?.office_action) || actionDraft;
   return <UnifiedWorkbench space={space} onSpace={selectSpace} run={run} runs={sessionRuns} batchActive={batchHasTasks}
     loading={historyLoading} historyError={historyError} locked={starting || continuationUnknown || controlBusy !== null || actionNavigationLocked || batchNavigationLocked}
     onNew={newSpaceTask} onRefresh={() => void loadSessionRuns()} onSelect={snapshot => { void openSessionRun(snapshot); }}
@@ -5163,18 +5166,19 @@ export function HarnessWorkbench({ onActivityChange, capabilitiesOnly = false, a
     {selectedRunCurrent === false && run && <p className="read-only-banner" role="status"><IconEye aria-hidden="true" />历史运行，只读查看。<button onClick={() => void openCurrentTask()}>打开当前任务</button></p>}
     {newTaskDraft && space !== "team" && <p className="unified-draft-notice" role="status">新任务草稿 · 之前的任务保留在历史记录中</p>}
     {space === "team" && run && batchHasTasks && <button className="result-return todo-return" disabled={batchNavigationLocked || starting || continuationUnknown || controlBusy !== null} onClick={beginNewTask}><IconArrowLeft aria-hidden="true"/>返回本次待办</button>}
-    <div hidden={space !== "team" || Boolean(run)}><TodoBatch key={batchGeneration} apiBase={API_BASE} headers={HEADERS} normalize={normalizeRun} runs={sessionRuns} onLock={setBatchNavigationLocked} onOpen={snapshot => { void openSessionRun(snapshot); }} onCreated={snapshot => { setBatchHasTasks(true); setSessionRuns(current => [snapshot, ...current.filter(item => item.run_id !== snapshot.run_id)]); }}/></div>
+    <div hidden={space !== "team" || Boolean(run)}><TodoBatch key={batchGeneration} apiBase={API_BASE} headers={HEADERS} normalize={normalizeRun} runs={sessionRuns} onLock={setBatchNavigationLocked} onSwitchSolo={() => selectSpace("solo")} onOpen={snapshot => { void openSessionRun(snapshot); }} onCreated={snapshot => { setBatchHasTasks(true); setSessionRuns(current => [snapshot, ...current.filter(item => item.run_id !== snapshot.run_id)]); }}/></div>
       <section className="data-task-surface" hidden={space === "team" && !run}>
-        {actionMode && <header className="workspace-current-task unified-action-heading"><div><span>{run?.office_action ? `第 ${run.office_action.revision} 版` : "新建事项"}</span><h1>{run?.office_action?.input.title ?? "这次，需要完成什么？"}</h1></div></header>}
+        {run?.office_action && <header className="workspace-current-task unified-action-heading"><div><span>{run?.office_action ? `第 ${run.office_action.revision} 版` : "新建事项"}</span><h1>{run?.office_action?.input.title ?? "这次，需要完成什么？"}</h1></div></header>}
         {run && !run.office_action && <header className="workspace-current-task"><div><span>{run.run_sequence === 1 ? "初始处理" : `后续分支 ${run.run_sequence - 1}`}</span><h1 title={taskPointer?.goal || run.instruction}>{officeTaskTitle(taskPointer?.goal || run.instruction)}</h1></div><b>{statusLabel(run.status)}</b></header>}
         {run && !run.office_action && taskPointer && <TaskBranches items={taskPointer.lineage} selectedId={run.run_id} currentId={taskPointer.current_run_id} disabled={starting || continuationUnknown || controlBusy !== null} onSelect={id => void openTaskBranch(id)}/>}
         {run && !run.office_action && <div className="unified-task-facts" aria-label="本次任务概况"><div><IconFolder aria-hidden="true"/><span>已选资料<strong>{new Set(run.branches.flatMap(branch => branch.input_file_refs)).size} 份</strong></span></div><IconChevronRight aria-hidden="true"/><div><IconShieldCheck aria-hidden="true"/><span>工作项<strong>{run.branches.filter(branch => branch.status === "completed").length} / {run.branches.length} 已完成</strong></span></div><IconChevronRight aria-hidden="true"/><div><IconFileDescription aria-hidden="true"/><span>保留成果<strong>{run.workspace_artifacts.length ? `${run.workspace_artifacts.length} 份文件` : run.artifact_versions.length ? `草稿 v${run.artifact_versions.at(-1)?.version}` : "尚未生成"}</strong></span></div></div>}
         {run && !run.office_action && importantNotices.length > 0 && <section className="workspace-notices" aria-label="重要执行回执" aria-live="polite">{importantNotices.map(notice => <div key={notice.sequence} className={`is-${notice.tone}`}><IconInfoCircle aria-hidden="true" /><div><span>本次执行记录</span><strong>{notice.label}</strong><p>{notice.detail}</p></div></div>)}</section>}
-        <details key={run?.run_id ?? "draft"} className={`workspace-task-settings${run ? "" : " is-draft"}`} open={!run} hidden={actionMode || (space === "team" && !run)}>
+        <details key={run?.run_id ?? "draft"} className={`workspace-task-settings${run ? "" : " is-draft"}`} open={!run} hidden={Boolean(run?.office_action) || (space === "team" && !run)}>
           <summary><IconAdjustments aria-hidden="true" />任务要求与运行设置<IconChevronDown aria-hidden="true" /></summary>
-        <section className="task-composer" aria-labelledby="task-composer-title" hidden={actionMode}>
-          <div><span>办公资料库</span><h2 id="task-composer-title">这次，需要完成什么？</h2></div>
+        <section className="task-composer" aria-labelledby="task-composer-title" hidden={Boolean(run?.office_action)}>
+          <div><span>办公资料库</span><div className="task-composer-title-row"><h2 id="task-composer-title">这次，需要完成什么？</h2>{!run && space === "solo" && <button type="button" className="mode-switch" onClick={() => selectSpace("team")} disabled={starting || controlBusy !== null || actionNavigationLocked} title="切换到多任务待办（Demo 2）"><IconListCheck aria-hidden="true" />切换多任务模式</button>}</div></div>
           {run?.recovered && <div className="checkpoint-restored"><IconRefresh aria-hidden="true" /><span><b>服务端检查点已恢复</b> 未完成的模型调用没有重放，你可以检查轨迹后继续。</span></div>}
+          {actionDraft ? <div ref={setActionHost} className="office-composer-host" /> : <>
           <textarea ref={instructionInputRef} value={instruction} disabled={runActive} onChange={(event) => setInstruction(event.target.value)} placeholder="例如：研究整个资料库，找出需要继续推动的工作，并逐条说明文件依据" aria-label="任务指令" />
           <details className="unified-output-settings"><summary>交付要求</summary><OutputAgreement value={runActive && run ? run.contract.output_policy : outputPreference} onChange={setOutputPreference} disabled={runActive || starting} /></details>
           <details className="loop-contract-settings">
@@ -5190,6 +5194,7 @@ export function HarnessWorkbench({ onActivityChange, capabilitiesOnly = false, a
           <footer>
             <button type="button" onClick={() => void startTask()} disabled={runActive || starting || instruction.trim().length < 3}>{starting ? <IconLoader2 aria-hidden="true" /> : <IconSend aria-hidden="true" />}{starting ? "正在启动" : runActive ? "当前 Loop 运行中" : "启动 Control Loop"}</button>
           </footer>
+          </>}
         </section>
         </details>
         <nav className="workspace-tabs" aria-label="工作区视图">
@@ -5198,7 +5203,7 @@ export function HarnessWorkbench({ onActivityChange, capabilitiesOnly = false, a
           <button type="button" aria-current={view === "result" ? "page" : undefined} className={view === "result" ? "is-active" : ""} onClick={() => setView("result")}>成果{run?.workspace_artifacts.length ? <b>{run.workspace_artifacts.length}</b> : null}</button>
         </nav>
         <div className="workspace-content">
-          <div hidden={view !== "actions"}><OfficeActionWorkbench onNavigationLockChange={setActionNavigationLocked} sessionGeneration={generationRef.current} isSessionCurrent={(generation) => generation === generationRef.current} run={run} files={allFiles} apiBase={API_BASE} headers={HEADERS} onSnapshot={acceptActionSnapshot} onOpenSource={(ref) => { const file = allFiles.find(item => item.file_ref === ref); if (file) openFile(file); }} blocked={runActive && !run?.office_action} readOnly={Boolean(run?.office_action) && isReadOnlyRun} /></div>
+          <div hidden={view !== "actions"}><OfficeActionWorkbench composerHost={actionHost} onAnother={newSpaceTask} onNavigationLockChange={setActionNavigationLocked} sessionGeneration={generationRef.current} isSessionCurrent={(generation) => generation === generationRef.current} run={run} files={allFiles} apiBase={API_BASE} headers={HEADERS} onSnapshot={acceptActionSnapshot} onOpenSource={(ref) => { const file = allFiles.find(item => item.file_ref === ref); if (file) openFile(file); }} blocked={runActive && !run?.office_action} readOnly={Boolean(run?.office_action) && isReadOnlyRun} /></div>
           {view === "data" && <><TaskEvidence run={run} files={allFiles} onReview={setReviewRequest} onWorkers={() => setAdaptiveWorkbenchOpen(true)} onOpenFile={openFile}/>{activeFile && previewRequested && <div ref={previewSurfaceRef} tabIndex={-1} className="task-file-preview"><FilePreview key={activeFile.file_ref} preview={preview} file={activeFile} loading={previewLoading} error={previewError} anchor={previewAnchor?.file_ref === activeFile.file_ref ? previewAnchor : null} /></div>}</>}
           {view === "loop" && run && run.execution_policy !== "automatic_readonly" && !run.office_action && <TaskProcess run={run} files={allFiles} onEvidence={() => setView("data")} onFinding={finding => {
             const findings = run.result?.findings ?? run.artifact_versions.at(-1)?.findings ?? [];

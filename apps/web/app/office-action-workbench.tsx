@@ -1,9 +1,11 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { IconDownload, IconRefresh } from "@tabler/icons-react";
+import { createPortal } from "react-dom";
+import { IconDownload, IconLoader2, IconRefresh, IconSend } from "@tabler/icons-react";
 import "./office-action-unified.css";
 import exampleData from "./office-action-examples.json";
+import legacyExampleData from "./office-action-examples-legacy.json";
 
 export type ActionInput = {
   operation: "format_text" | "extract_excerpt" | "create_task" | "send_message" | "restricted_action" | "compare_materials";
@@ -11,8 +13,17 @@ export type ActionInput = {
   alternative_content?: string;
   format_style?: "spaced" | "compact";
 };
-const ACTION_EXAMPLES = exampleData as (Omit<(typeof exampleData)[number], "input"> & { input: ActionInput })[];
-const EXAMPLE_GROUPS = [...new Set(ACTION_EXAMPLES.map(item => item.group))];
+type ActionExample = {
+  request?: string; id: string; group: string; boundary: string; division: string; expected_status: string;
+  steps: string[]; principles: string[]; input: ActionInput;
+  level?: string; autonomy?: string; levelLabel?: string; why?: string; sources?: string[]; sourcePath?: string;
+};
+// Five headline cases, one per risk level L1-L5 (quiet -> strong confirmation), tied to real library files.
+const ACTION_EXAMPLES = exampleData as unknown as ActionExample[];
+// The earlier twelve boundary cases stay available, folded away from the main path.
+const LEGACY_EXAMPLES = legacyExampleData as unknown as ActionExample[];
+const ALL_EXAMPLES = [...ACTION_EXAMPLES, ...LEGACY_EXAMPLES];
+const LEGACY_GROUPS = [...new Set(LEGACY_EXAMPLES.map(item => item.group))];
 export type OfficeAction = {
   action_id: string; revision: number; input: ActionInput; status: string;
   risk_level: string; autonomy_level: string; mode: string; reason: string;
@@ -69,19 +80,23 @@ function initial(): ActionInput {
   return { operation, title, content, target, due_date, source_ref };
 }
 
-export function OfficeActionWorkbench({ run, files, apiBase, headers, onSnapshot, onOpenSource, blocked, sessionGeneration, isSessionCurrent, readOnly = false, onNavigationLockChange }: {
+export function OfficeActionWorkbench({ run, files, apiBase, headers, onSnapshot, onOpenSource, blocked, sessionGeneration, isSessionCurrent, readOnly = false, onNavigationLockChange, composerHost = null, onAnother }: {
   run: { run_id: string; version: number; office_action: OfficeAction | null } | null;
   files: { file_ref: string; display_label: string; display_path: string }[];
   apiBase: string; headers: Record<string, string>;
   onSnapshot: (value: unknown, generation: number) => void; onOpenSource: (ref: string) => void; blocked: boolean; readOnly?: boolean;
   sessionGeneration: number; isSessionCurrent: (generation: number) => boolean;
   onNavigationLockChange?: (locked: boolean) => void;
+  /** Demo1-style composer slot: when given (and no task is open) the launcher renders there instead of inline. */
+  composerHost?: HTMLElement | null;
+  onAnother?: () => void;
 }) {
   const action = run?.office_action ?? null;
   const [draft, setDraft] = useState<ActionInput>(initial);
   const [editing, setEditing] = useState(false);
   const [newItem, setNewItem] = useState(false);
   const [exampleId, setExampleId] = useState("");
+  const [manualOpen, setManualOpen] = useState(false);
   const [checks, setChecks] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -127,7 +142,7 @@ export function OfficeActionWorkbench({ run, files, apiBase, headers, onSnapshot
     setBusy(false); setError(""); setUnknown(false);
     setChecks([]); setChoice(""); setRationale("");
     setEditing(false); setDraftEditing(false); setRestoreFrom(null); setNewItem(false);
-    setExampleId("");
+    setExampleId(""); setManualOpen(false);
     if (!action) { setDraft(freshDraft()); setEditedText(""); setRecentOpen(false); }
   }, [sessionGeneration]);
   useEffect(() => {
@@ -154,7 +169,14 @@ export function OfficeActionWorkbench({ run, files, apiBase, headers, onSnapshot
     return () => controller.abort();
   }, [recentOpen, listRefresh, apiBase, headers, run?.run_id, run?.version, sessionGeneration]);
   const shown = newItem ? null : action;
-  const selectedExample = ACTION_EXAMPLES.find(item => item.id === exampleId);
+  const selectedExample = ALL_EXAMPLES.find(item => item.id === exampleId);
+  function applyExample(example: ActionExample) {
+    // Real-library cases resolve their file_ref at runtime from the display path, never from a hard-coded hash.
+    const source = example.sourcePath ? files.find(file => file.display_path === example.sourcePath) : undefined;
+    setExampleId(example.id);
+    setDraft({ ...example.input, source_ref: source?.file_ref ?? example.input.source_ref });
+    setError(""); setChecks([]); setChoice(""); setRationale("");
+  }
   const editable = !shown || editing || shown.status === "needs_input" || shown.status === "stale"
     || (shown.status === "deferred" && shown.missing_fields.length > 0);
   const open = !!shown && OPEN.has(shown.status);
@@ -272,34 +294,7 @@ export function OfficeActionWorkbench({ run, files, apiBase, headers, onSnapshot
     const link = document.createElement("a"); link.href = url; link.download = "人工处理说明.txt"; link.click();
     window.setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
-  return <section className="office-actions office-actions-unified" aria-label="单步事项">
-    <header className="office-action-heading"><div><h2 ref={titleRef} tabIndex={-1}>{shown ? shown.input.title : "这次需要做什么？"}</h2></div>
-    </header>
-    <div className="office-action-tools"><p className="office-action-environment">固定规则处理 · 仅保存在测试工作区 · 不发送或通知</p>
-      {shown && <button className="office-icon-button" type="button" aria-label="核对最新状态" title="核对最新状态" disabled={busy} onClick={() => void refresh()}><IconRefresh aria-hidden="true" /></button>}
-    </div>
-    {blocked && <p role="status">当前资料研究任务尚未结束，请先处理该任务或停止后办理新事项。</p>}
-    {readOnly && shown && <p role="status">正在核对当前任务指针，或此记录仅供查看。核对通过前不能修改或确认事项。</p>}
-    {error && <div className="office-action-error" role="alert"><p>{unknown ? "提交结果尚未确认。请保留本次请求，核对后继续。" : error}</p>{unknown && <><p>{error}</p><button disabled={busy} onClick={() => void send("", {}, true)}>重试同一请求</button></>}</div>}
-    {shown && <div className={`office-action-state office-control-context risk-${shown.risk_level}`} role="status">
-      <div className="office-action-state-heading"><span>{shown.risk_level} · {shown.mode}</span><small>第 {shown.revision} 版 · {STATE_LABELS[shown.status] ?? "请核对状态"}</small></div>
-      {!shown.receipt && <p>{shown.result_message}</p>}
-      {(unknown || editing || draftEditing || open) && <p className="office-pending-context">{unknown ? "结果待核对 · 暂不开始新的操作" : editing || draftEditing ? "你正在编辑，修改尚未保存" : "等待你处理 · 不会自动继续"}</p>}
-    </div>}
-    {shown?.missing_fields.length ? <div role="status"><p>还需要补齐以下信息，尚未创建或发送：</p><ul className="office-action-missing">{shown.missing_fields.map(item => <li key={item}>{item}</li>)}</ul></div> : null}
-    <fieldset className="office-action-authority" disabled={readOnly && !!shown}>
-    {editable && <form onSubmit={event => { event.preventDefault(); shown ? control("revise") : submit(); }}>
-      <fieldset disabled={busy || unknown || blocked}>
-        {!shown && <details className="office-action-examples">
-          <summary>演示案例 · {ACTION_EXAMPLES.length} 个</summary>
-          <label>选择案例<select aria-label="选择演示案例" value={exampleId} onChange={event => {
-            const example = ACTION_EXAMPLES.find(item => item.id === event.target.value);
-            setExampleId(event.target.value);
-            if (!example) return;
-            setDraft({ ...example.input }); setError(""); setChecks([]); setChoice(""); setRationale("");
-          }}><option value="">选择一个预设案例</option>{EXAMPLE_GROUPS.map(group => <optgroup label={group} key={group}>{ACTION_EXAMPLES.filter(item => item.group === group).map(item => <option key={item.id} value={item.id}>{item.input.title}</option>)}</optgroup>)}</select></label>
-          {selectedExample && <p className="office-example-boundary"><strong>{selectedExample.boundary}</strong><span>预设演示材料 · 填入后可修改，尚未提交</span></p>}
-        </details>}
+    const fields = <>
         <div className="office-action-form-heading"><label>事项类型<select aria-label="事项类型" value={draft.operation} disabled={!!shown} onChange={event => {
           setExampleId("");
           const option = OPERATIONS.find(item => item.value === event.target.value)!;
@@ -324,9 +319,53 @@ export function OfficeActionWorkbench({ run, files, apiBase, headers, onSnapshot
         {draft.operation === "compare_materials" && <><p>上方为材料 A，下方为材料 B。均为你提供的对照内容，系统不自动判断哪份正确。</p><label>材料 B<textarea aria-label="第二份材料" rows={5} maxLength={5000} value={draft.alternative_content ?? ""} onChange={event => setDraft({ ...draft, alternative_content: event.target.value })} /></label></>}
         {["create_task", "send_message"].includes(draft.operation) && <label>{draft.operation === "create_task" ? "负责人" : "收件人"}<select aria-label="办理对象" value={draft.target} onChange={event => setDraft({ ...draft, target: event.target.value })}><option value="">请选择具体联系人</option>{CONTACTS.filter(([id]) => draft.operation !== "create_task" || id !== "client-review").map(([id, label]) => <option key={id} value={id}>{label}</option>)}</select></label>}
         {draft.operation === "create_task" && <label>截止日期<input type="date" aria-label="截止日期" value={draft.due_date ?? ""} onChange={event => setDraft({ ...draft, due_date: event.target.value || null })} /></label>}
-        <div className="office-action-buttons"><button className="primary" type="submit">{busy ? "正在处理" : shown ? "更新内容并重新核对" : "开始办理"}</button>{shown && editing && <button type="button" onClick={() => { setEditing(false); setDraft(shown.input); }}>放弃修改</button>}</div>
+    </>;
+    const composer = !shown ? <div className="office-composer">
+      <textarea aria-label="办理指令" readOnly rows={6} value={selectedExample ? (selectedExample.request ?? `${selectedExample.input.title}\n${selectedExample.input.content}`) : ""} placeholder="例如：从下方示例里选一个 L1–L5 办公任务，指令会自动填入；本演示由固定规则直接给出结果，不调用大模型" />
+      <details className="office-division-examples office-demo-cases" open>
+        <summary>办公任务与人机分工示例</summary>
+        <div className="office-task-examples office-level-cases" role="group" aria-label="选择演示案例">{ACTION_EXAMPLES.map(item => <button type="button" key={item.id} aria-pressed={exampleId === item.id} className={`office-level-case level-${item.level}${exampleId === item.id ? " is-selected" : ""}`} onClick={() => applyExample(item)}>
+          <b>{item.level}</b><span><strong>{item.input.title}</strong><small>{item.levelLabel} · {item.autonomy}</small></span>
+        </button>)}</div>
+        {selectedExample && <div className="office-example-boundary"><strong>{selectedExample.boundary}</strong>
+          {selectedExample.why && <p>为什么是这一档：{selectedExample.why}</p>}
+          {selectedExample.sources?.length ? <p>结合资料库文件：{selectedExample.sources.join("、")}</p> : null}
+          <span>预设演示材料 · 点击“启动 Control Loop”后直接给出结果，不调用大模型</span></div>}
+        <details className="office-legacy-examples">
+          <summary>更多边界案例 · {LEGACY_EXAMPLES.length} 个（缺信息、改内容重核、材料冲突等）</summary>
+          <label>选择案例<select aria-label="选择更多边界案例" value={LEGACY_EXAMPLES.some(item => item.id === exampleId) ? exampleId : ""} onChange={event => {
+            const example = LEGACY_EXAMPLES.find(item => item.id === event.target.value);
+            if (example) { applyExample(example); setManualOpen(true); } else setExampleId("");
+          }}><option value="">选择一个边界案例</option>{LEGACY_GROUPS.map(group => <optgroup label={group} key={group}>{LEGACY_EXAMPLES.filter(item => item.group === group).map(item => <option key={item.id} value={item.id}>{item.input.title}</option>)}</optgroup>)}</select></label>
+        </details>
+      </details>
+    </div> : null;
+    const portalForm = !shown && !run && composerHost ? composerHost : null;
+    const manualForm = editable ? <form onSubmit={event => { event.preventDefault(); shown ? control("revise") : submit(); }}>
+      <fieldset disabled={busy || unknown || blocked}>
+        {composer}
+        {shown ? fields : <details className="office-manual" open={manualOpen} onToggle={event => setManualOpen(event.currentTarget.open)}><summary>调整办理参数（可选）</summary>{fields}</details>}
+        {shown ? <div className="office-action-buttons"><button className="primary" type="submit">{busy ? "正在处理" : "更新内容并重新核对"}</button>{editing && <button type="button" onClick={() => { setEditing(false); setDraft(shown.input); }}>放弃修改</button>}</div>
+          : <footer className="office-launch"><button className="primary" type="submit" disabled={!exampleId && !manualOpen}>{busy ? <IconLoader2 aria-hidden="true" /> : <IconSend aria-hidden="true" />}{busy ? "正在启动" : "启动 Control Loop"}</button></footer>}
       </fieldset>
-    </form>}
+    </form> : null;
+  return <section className="office-actions office-actions-unified" aria-label="单步事项">
+    <header className="office-action-heading"><div><h2 ref={titleRef} tabIndex={-1} hidden={!shown}>{shown ? shown.input.title : "这次需要做什么？"}</h2></div>
+    </header>
+    <div className="office-action-tools"><p className="office-action-environment">固定规则处理 · 仅保存在测试工作区 · 不发送或通知</p>
+      {shown && <button className="office-icon-button" type="button" aria-label="核对最新状态" title="核对最新状态" disabled={busy} onClick={() => void refresh()}><IconRefresh aria-hidden="true" /></button>}
+    </div>
+    {blocked && <p role="status">当前资料研究任务尚未结束，请先处理该任务或停止后办理新事项。</p>}
+    {readOnly && shown && <p role="status">正在核对当前任务指针，或此记录仅供查看。核对通过前不能修改或确认事项。</p>}
+    {error && <div className="office-action-error" role="alert"><p>{unknown ? "提交结果尚未确认。请保留本次请求，核对后继续。" : error}</p>{unknown && <><p>{error}</p><button disabled={busy} onClick={() => void send("", {}, true)}>重试同一请求</button></>}</div>}
+    {shown && <div className={`office-action-state office-control-context risk-${shown.risk_level}`} role="status">
+      <div className="office-action-state-heading"><span>{shown.risk_level} · {shown.mode}</span><small>第 {shown.revision} 版 · {STATE_LABELS[shown.status] ?? "请核对状态"}</small></div>
+      {!shown.receipt && <p>{shown.result_message}</p>}
+      {(unknown || editing || draftEditing || open) && <p className="office-pending-context">{unknown ? "结果待核对 · 暂不开始新的操作" : editing || draftEditing ? "你正在编辑，修改尚未保存" : "等待你处理 · 不会自动继续"}</p>}
+    </div>}
+    {shown?.missing_fields.length ? <div role="status"><p>还需要补齐以下信息，尚未创建或发送：</p><ul className="office-action-missing">{shown.missing_fields.map(item => <li key={item}>{item}</li>)}</ul></div> : null}
+    <fieldset className="office-action-authority" disabled={readOnly && !!shown}>
+    {portalForm ? createPortal(manualForm, portalForm) : manualForm}
     {shown && !editable && <>
       {shown.input.operation === "compare_materials" ? <div className="office-comparison" role="group" aria-label="材料对照">
         <article><h3>材料 A · 用户提供</h3><pre>{shown.input.content}</pre></article>
@@ -380,7 +419,7 @@ export function OfficeActionWorkbench({ run, files, apiBase, headers, onSnapshot
         window.requestAnimationFrame(() => editorRef.current?.focus());
       }}>取回第 {item.revision} 版内容</button>}
     </li>)}</ol></details>}
-    {shown && canLeave && <button type="button" disabled={busy || unknown || draftEditing} onClick={() => { readRef.current += 1; setNewItem(true); setExampleId(""); setDraft(freshDraft()); setError(""); setChecks([]); }}>办理另一件事项</button>}
+    {shown && canLeave && <button type="button" disabled={busy || unknown || draftEditing} onClick={() => { if (onAnother) { onAnother(); return; } readRef.current += 1; setNewItem(true); setExampleId(""); setManualOpen(false); setDraft(freshDraft()); setError(""); setChecks([]); }}>办理另一件事项</button>}
     </fieldset>
     <details className="office-recent" onToggle={event => setRecentOpen(event.currentTarget.open)}>
       <summary>最近事项与暂缓记录</summary>

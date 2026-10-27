@@ -18,9 +18,9 @@
 .office-actions.office-actions-unified :is(input:not([type=checkbox]):not([type=radio]), select, textarea) { border: 1px solid #dce2eb; border-radius: 5px; min-height: 40px; padding: 9px 11px; font: inherit; }
 .office-actions-unified textarea { line-height: 1.7; }
 .office-actions-unified .office-action-examples select { width: 100%; min-width: 0; max-width: 100%; }
-.office-actions-unified .office-example-boundary { display: flex; flex-wrap: wrap; gap: 6px 18px; margin: 8px 0 16px; font-size: 13px; }
-.office-actions-unified .office-example-boundary strong { color: #2460ad; font-weight: 500; }
-.office-actions-unified .office-example-boundary span { color: #718096; }
+.office-example-boundary { display: flex; flex-wrap: wrap; gap: 6px 18px; margin: 8px 0 16px; font-size: 13px; }
+.office-example-boundary strong { color: #2460ad; font-weight: 500; }
+.office-example-boundary span { color: #718096; }
 .office-actions.office-actions-unified details { border: 0; border-top: 1px solid #e5e8ee; border-radius: 0; margin: 16px 0; padding: 0; background: transparent; box-shadow: none; }
 .office-actions.office-actions-unified details > summary { min-height: 36px; padding: 10px 0; color: #596b82; font-size: 13px; }
 .office-actions-unified .office-format-preference[open] { padding-bottom: 8px; }
@@ -53,6 +53,22 @@
 .office-actions-unified .office-action-history li { padding: 8px 0; }
 .office-actions.office-actions-unified .office-draft-review .office-source-review { margin: 0; padding: 0 0 0 20px; border: 0; border-left: 1px solid #e5e8ee; }
 .office-actions.office-actions-unified .office-draft-review .office-source-review summary { padding-top: 0; }
+.office-level-cases { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 10px; margin: 6px 0 12px; }
+.office-level-cases button.office-level-case { display: flex; align-items: center; justify-content: flex-start; gap: 12px; text-align: left; padding: 11px 12px; border: 1px solid #dce3ed; background: #fff; color: #24364c; min-width: 0; }
+.office-level-cases button.office-level-case:hover { border-color: #2563eb; background: #f5f8ff; }
+.office-level-cases button.office-level-case.is-selected { border-color: #2460ed; background: #eef3ff; box-shadow: inset 0 0 0 1px #2460ed; }
+.office-level-case > b { flex: 0 0 auto; min-width: 34px; padding: 4px 0; border-radius: 4px; text-align: center; font-size: 13px; color: #fff; background: #64748b; }
+.office-level-case.level-L1 > b { background: #3f9d6b; }
+.office-level-case.level-L2 > b { background: #4a8fc4; }
+.office-level-case.level-L3 > b { background: #d29a1f; }
+.office-level-case.level-L4 > b { background: #d9731f; }
+.office-level-case.level-L5 > b { background: #c8433f; }
+.office-level-case > span { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.office-level-case strong { font-size: 13px; font-weight: 600; overflow-wrap: anywhere; }
+.office-level-case small { color: #66758a; font-size: 12px; }
+.office-example-boundary { flex-direction: column; align-items: flex-start; gap: 4px; }
+.office-example-boundary p { margin: 0; color: #4a5b73; font-size: 13px; line-height: 1.6; }
+details.office-legacy-examples { margin: 10px 0 0; }
 @media (max-width: 700px) {
   .office-actions-unified .office-action-form-heading { grid-template-columns: minmax(0, 1fr); gap: 0; }
   .office-actions-unified .office-comparison article + article { border: 0; padding: 0; }
@@ -60,3 +76,19 @@
   .office-actions-unified .office-action-tools { align-items: flex-start; }
   .office-actions-unified .office-action-buttons > button { flex: 1 1 140px; }
 }
+
+/* Demo3: lives inside the Demo1 composer section (portal host) */
+.office-composer-host { display: block; }
+.unified-workbench .office-composer-host form, .unified-workbench .office-composer-host fieldset { display: block; margin: 0; padding: 0; border: 0; min-width: 0; }
+.office-composer { display: grid; gap: 14px; }
+.unified-workbench .office-composer > textarea { width: 100%; min-height: 150px; height: 150px; margin: 0; padding: 18px; border: 1px solid #dce2eb; border-radius: 6px; background: #fff; font-size: 15px; line-height: 1.9; resize: none; cursor: default; box-shadow: none; }
+.office-composer > textarea::placeholder { color: #8a94a5; }
+.office-composer .office-demo-cases { margin: 0; }
+.office-composer .office-demo-cases > summary { cursor: pointer; }
+.office-manual { margin: 10px 0 0; }
+.office-manual > summary { cursor: pointer; color: #5b6678; font-size: 13px; }
+.unified-workbench .office-composer-host footer.office-launch { display: flex; padding: 12px 0 20px; gap: 12px; flex-wrap: wrap; }
+.unified-workbench .office-composer-host footer.office-launch > button { display: inline-flex; align-items: center; gap: 7px; min-height: 44px; border: 0; border-radius: 5px; padding: 11px 18px; font-size: 14px; font-weight: 750; color: #fff; background: #2460ed; }
+.unified-workbench .office-composer-host footer.office-launch > button:disabled { opacity: .5; }
+.unified-workbench .office-composer-host footer.office-launch > button svg { width: 18px; }
+@media (max-width: 700px) { .unified-workbench .office-composer-host footer.office-launch > button { width: 100%; } }

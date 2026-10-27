@@ -350,3 +350,18 @@
   .task-process details { margin-left: 0; }
   .task-branches header { flex-wrap: wrap; }
 }
+
+/* Demo1 <-> Demo2 mode switch, Demo2 preset filler */
+.task-composer-title-row, .todo-title-row { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 16px; }
+.unified-workbench .task-composer .task-composer-title-row h2 { margin: 8px 0 20px; }
+.todo-title-row h1 { margin: 8px 0; }
+.unified-workbench button.mode-switch { display: inline-flex; align-items: center; gap: 6px; min-height: 34px; padding: 6px 12px; border: 1px solid #2460ed; border-radius: 5px; background: #fff; color: #2460ed; font-size: 13px; font-weight: 500; cursor: pointer; white-space: nowrap; }
+.unified-workbench button.mode-switch:hover:not(:disabled) { background: #f1f5ff; }
+.unified-workbench button.mode-switch:disabled { opacity: .5; cursor: default; }
+.unified-workbench button.mode-switch svg { width: 16px; height: 16px; }
+.todo-preset > label { display: flex; align-items: center; gap: 12px; }
+.todo-preset .todo-fill { display: inline-flex; align-items: center; gap: 6px; min-height: 34px; padding: 6px 12px; border: 1px solid #2460ed; border-radius: 5px; background: #2460ed; color: #fff; font-size: 13px; cursor: pointer; }
+.todo-preset .todo-fill:hover:not(:disabled) { background: #1b4fd0; }
+.todo-preset .todo-fill:disabled { opacity: .5; cursor: default; }
+.todo-preset .todo-fill svg { width: 16px; height: 16px; }
+.todo-batch textarea::placeholder { color: #9aa5b5; }

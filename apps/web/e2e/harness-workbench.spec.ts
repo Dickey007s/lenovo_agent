@@ -138,7 +138,15 @@ test.describe("unified reference workbench", () => {
       };
       await page.goto("/");
       await choose("Demo 2 · 自适应执行");
+      // A fresh list starts blank: nothing is prefilled and nothing can be started yet.
+      for (const index of [0, 1, 2]) await expect(page.locator(`#todo-${index}`)).toHaveValue("");
+      await expect(page.getByRole("button", { name: "开始全部待办", exact: true })).toBeDisabled();
+      // Choosing a preset set alone must not fill anything; only the explicit button does.
       await page.getByLabel("待办示例", { exact: true }).selectOption("1");
+      for (const index of [0, 1, 2]) await expect(page.locator(`#todo-${index}`)).toHaveValue("");
+      await page.getByRole("button", { name: "整理待办", exact: true }).click();
+      for (const index of [0, 1, 2]) await expect(page.locator(`#todo-${index}`)).not.toHaveValue("");
+      await expect(page.locator("#todo-0")).toHaveValue(/通用办公软件清单/);
       await expect(page.getByRole("navigation", { name: "工作区视图" })).toBeHidden();
       expect(commands).toHaveLength(0);
       await page.getByRole("button", { name: "开始全部待办", exact: true }).click();
@@ -363,6 +371,7 @@ test.describe("unified reference workbench", () => {
       if (width < 760) await page.getByRole("button", { name: "展开工作区导航" }).click();
       await page.getByRole("button", { name: "Demo 2 · 自适应执行", exact: true }).click();
       expect(requests).toHaveLength(0);
+      await page.getByRole("button", { name: "整理待办", exact: true }).click();
       await page.getByRole("button", { name: "开始全部待办", exact: true }).click();
       await expect(page.getByRole("button", { name: "重试未确认的启动", exact: true })).toBeEnabled();
       expect(requests).toHaveLength(3);
@@ -400,6 +409,24 @@ test.describe("unified reference workbench", () => {
       expect(errors).toEqual([]);
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
       await page.screenshot({ path: `../../outputs/unified-ui-20261023/action-entry-${width}.png` });
+    });
+
+    test(`mode switch buttons jump between demo1 and demo2 without dispatching at ${width}`, async ({ page }) => {
+      await page.setViewportSize({ width, height: 992 });
+      const state = await mockHarness(page);
+      await page.goto("/");
+      const draft = "核对产品上线依据，保留未完成事项";
+      await page.getByRole("textbox", { name: "任务指令", exact: true }).fill(draft);
+      // Demo1 empty form -> multi-task mode (the same blank list Demo2 opens with).
+      await page.getByRole("button", { name: "切换多任务模式", exact: true }).click();
+      await expect(page.getByRole("region", { name: "多任务待办" })).toBeVisible();
+      for (const index of [0, 1, 2]) await expect(page.locator(`#todo-${index}`)).toHaveValue("");
+      // Demo2 -> back to the single input box exactly as Demo1 left it.
+      await page.getByRole("button", { name: "切换单任务模式", exact: true }).click();
+      await expect(page.getByRole("textbox", { name: "任务指令", exact: true })).toHaveValue(draft);
+      await expect(page.getByRole("button", { name: "切换多任务模式", exact: true })).toBeVisible();
+      expect(state.starts).toHaveLength(0);
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
     });
 
     test(`unified evidence keeps source choice explicit at ${width}`, async ({ page }) => {
