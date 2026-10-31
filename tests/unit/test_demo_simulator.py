@@ -80,3 +80,51 @@ async def test_independent_items_run_as_one_wave_then_the_summary_follows():
     assert run.status == "completed" and not run.validation_errors
     assert [wave.label for wave in public.workflow.waves] == ["第 1 波 · 3 个子 Agent 并行", "第 2 波 · 1 个子 Agent 并行"]
     assert all(node.status == "done" for node in public.workflow.nodes)
+
+
+@pytest.mark.asyncio
+async def test_follow_up_after_a_decision_completes_instead_of_asking_again():
+    instruction, key = FORK, "sim-follow-fork1"
+    from packages.contracts.harness_models import AgentControlLoopControlRequest
+
+    runtime = HarnessRuntime(BenchmarkWorkspaceCatalog(), NeverCalled(), NeverCalled())
+    try:
+        async def settle(run_id):
+            for _ in range(400):
+                run = await runtime.get("demo-user", run_id)
+                if run.status in {"completed", "failed", "stopped"}:
+                    return run
+                await asyncio.sleep(0.05)
+            return run
+
+        start = await runtime.start(
+            "demo-user",
+            HarnessRunStart(
+                instruction=instruction, idempotency_key=key, simulated=True,
+                execution_policy="automatic_readonly", output_preference="analysis_only",
+                loop={"max_rounds": 3, "max_files_per_round": 8, "max_model_calls": 8, "deadline_seconds": 120},
+            ),
+        )
+        run = await settle(start.run.run_id)
+        finding = next((item for item in run.result.findings if item.review), None)
+        assert finding is not None
+        option = finding.review.options[0]
+        branch = next(item for item in run.branches if item.unit_id == finding.plan_unit_id)
+        await runtime.control(
+            "demo-user", run.run_id,
+            AgentControlLoopControlRequest(
+                command="decision", idempotency_key="decide-follow-0001", expected_version=run.version,
+                decision_action="accept", finding_id=finding.finding_id, branch_id=branch.branch_id, selected_option_id=option.option_id,
+            ),
+        )
+        run = await runtime.get("demo-user", run.run_id)
+        child = await runtime.continue_unfinished_task(
+            "demo-user", run.run_id, None, idempotency_key="follow-up-0001", expected_version=run.version,
+            expected_task_version=run.task_version, instruction=option.next_instruction + "\n用户决定：A · 维持现规则。", purpose="follow_up",
+        )
+        run = await settle(child.run.run_id)
+        public = runtime.public_snapshot(run)
+        assert run.status == "completed" and not run.validation_errors
+        assert all(node.status == "done" for node in public.workflow.nodes)
+    finally:
+        await runtime.close()

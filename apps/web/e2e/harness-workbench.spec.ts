@@ -223,7 +223,7 @@ test.describe("unified reference workbench", () => {
     await expect(page.locator(".office-division-examples[open]")).toHaveCount(0);
     await page.locator(".office-division-examples summary").click();
     await expect(page.locator(".office-division-examples button")).toHaveCount(6);
-    for (const title of ["核对 Excel 往来账", "准备新员工入职清单", "整理 Word 招聘要求", "按明确例外整理权限", "有余额，不等于已收款", "变更例外，先交负责人"]) {
+    for (const title of ["核对 Excel 往来账", "准备新员工入职清单", "整理 Word 招聘要求", "按明确例外整理权限", "有余额，不等于已收款", "新人申请开通 GitHub Enterprise"]) {
       await page.getByRole("button", { name: new RegExp(title) }).click();
       await expect(page.getByRole("textbox", { name: "任务指令" })).not.toHaveValue('');
     }

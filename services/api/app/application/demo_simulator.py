@@ -43,6 +43,8 @@ _ITEM = re.compile(r"^\s*(\d{1,2})\s*[\.、．]\s*(.+?)\s*$")
 _SPLIT_MARKERS = ("分别", "分主题", "各自")
 _OWNER_DECISION = re.compile(r"负责人(?:来)?决定|不要自行裁决|需要?人(?:来)?确认|需要负责人")
 _DEPENDS_ON_ALL = re.compile(r"以上.{0,6}(?:都|均)?完成|汇总|之后再")
+# The runtime wraps a follow-up as "<background JSON>\n本次后续要求：\n<what the user chose>".
+_FOLLOW_UP_MARK = "\n本次后续要求：\n"
 
 
 def _stem(label: str) -> str:
@@ -83,6 +85,8 @@ class SimulatedPlanner:
     ) -> HarnessPlanCandidate:
         await asyncio.sleep(PLAN_DELAY_SECONDS)
         instruction = str(scenario.get("task_instruction") or scenario.get("goal") or "")
+        if _FOLLOW_UP_MARK in instruction:
+            return self._plan_follow_up(instruction, files)
         labels = {str(item["file_ref"]): str(item.get("display_label", "")) for item in files}
 
         def named(text: str) -> list[str]:
@@ -191,6 +195,39 @@ class SimulatedPlanner:
             selection_reason="演示模拟按任务里写明的文件名和编号拆分，没有调用模型。",
             units=units,
             requirement_coverage=coverage,
+        )
+
+
+    @staticmethod
+    def _plan_follow_up(instruction: str, files: list[dict[str, Any]]) -> HarnessPlanCandidate:
+        """A follow-up only does what the person just chose, on the files the original task named."""
+        background, request = instruction.split(_FOLLOW_UP_MARK, 1)
+        request = request.strip()
+        refs = [
+            str(item["file_ref"])
+            for item in files
+            if item.get("display_label") and _mentions(background, str(item["display_label"]))
+        ]
+        if not refs:
+            raise HarnessModelError(
+                "演示模拟找不到原任务用到的文件，无法继续后续处理",
+                called=False,
+                model=SIMULATED_MODEL,
+            )
+        # The first line is the chosen path; the rest is the decision record the UI appends.
+        goal = request.splitlines()[0].strip() or request
+        unit = HarnessPlanCandidateUnit(
+            unit_id="u1",
+            title=goal[:60],
+            objective=goal[:1000],
+            input_file_refs=list(dict.fromkeys(refs))[:4],
+            tool="evidence.verify",
+        )
+        return HarnessPlanCandidate(
+            summary="演示模拟：按你刚才的决定继续，只整理现规则允许的内容。",
+            selection_reason="演示模拟沿用原任务点名的文件，没有调用模型。",
+            units=[unit],
+            requirement_coverage=[],
         )
 
 

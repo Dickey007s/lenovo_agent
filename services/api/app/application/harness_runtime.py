@@ -7779,6 +7779,10 @@ class HarnessRuntime:
 
     @staticmethod
     def _explicit_business_requirement_count(instruction: str) -> int:
+        # A follow-up quotes the original numbered list only as background; only what is asked now counts.
+        marker = "\n本次后续要求：\n"
+        if marker in instruction:
+            instruction = instruction.split(marker, 1)[1]
         requirement_markers = (
             "业务分支",
             "以下分支",

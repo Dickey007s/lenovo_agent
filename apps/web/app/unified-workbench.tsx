@@ -17,7 +17,9 @@ export const WORKBENCH_SPACES = [
 
 export function runSpace(run: HarnessRun): WorkbenchSpace {
   if (run.office_action) return "copilot";
-  return run.execution_policy === "automatic_readonly" || run.topology_admission?.mode === "adaptive_readonly_workers" || run.worker_runs.length > 0 ? "team" : "solo";
+  // Only the to-do list (Demo 2) submits with the automatic policy. A single task that fans out to workers
+  // after the person confirms is still a Demo 1 task, so opening it must not switch workspace.
+  return run.execution_policy === "automatic_readonly" ? "team" : "solo";
 }
 
 function taskStatus(run: HarnessRun) {
