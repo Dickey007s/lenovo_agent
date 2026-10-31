@@ -40,3 +40,6 @@
 .task-controls { margin: 0 0 14px; border: 1px solid #e3e7ee; border-radius: 8px; background: #fafbfd; }
 .task-controls > summary { padding: 10px 14px; cursor: pointer; font-size: 12.5px; color: #55617a; }
 .task-controls > div { padding: 0 14px 14px; }
+
+.board-sim { grid-column: 1 / -1; margin: 0; padding: 8px 12px; border: 1px dashed #c9b27a; border-radius: 8px; background: #fff9e8; color: #6b5420; font-size: 12.5px; line-height: 1.5; }
+.board-sim strong { margin-right: 8px; padding: 1px 7px; border-radius: 999px; background: #f1dfa6; color: #5a4310; font-size: 12px; }

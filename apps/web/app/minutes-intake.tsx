@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { IconFileText, IconLoader2, IconScissors } from "@tabler/icons-react";
 import { DEMO_MINUTES } from "./minutes-demo";
+import { simulatedBody } from "./demo-mode";
 import type { MinutesSeed } from "./todo-batch";
 
 type SplitResponse = { is_multi: boolean; method: "model" | "rules"; summary: string; todos: MinutesSeed["todos"] };
@@ -31,7 +32,7 @@ export function MinutesIntake({ apiBase, headers, disabled, onSingle, onMulti }:
     setMessage("");
     try {
       const response = await fetch(`${apiBase}/v1/harness/minutes/split`, {
-        method: "POST", headers, body: JSON.stringify({ minutes: text }), signal: AbortSignal.timeout(90000),
+        method: "POST", headers, body: JSON.stringify({ minutes: text, ...simulatedBody() }), signal: AbortSignal.timeout(90000),
       });
       if (!response.ok) {
         const detail = await response.json().then(body => body?.detail).catch(() => null);

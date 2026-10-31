@@ -53,6 +53,7 @@ export function TaskBoard({ run, graph, onFocus, onFinding, onEvidence, onConfir
   const active = graph.state.status === "running";
 
   return <section className="board" aria-label="任务看板">
+    {run.simulated && <p className="board-sim" role="note"><strong>演示模式</strong>未调用模型。拆分与摘录由本地规则生成，只是按关键词摘出原文，不代表真实分析结论。</p>}
     <div className="board-col board-human">
       <h4><IconUser aria-hidden="true" />现在要你做的事<span>{waiting.length} 项</span></h4>
       {waiting.length ? <ul>{waiting.map(node => {

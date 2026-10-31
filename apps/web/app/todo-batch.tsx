@@ -5,6 +5,7 @@ import { IconArrowsExchange, IconCheck, IconChevronDown, IconFileText, IconChevr
 import type { HarnessRun } from "./harness-workbench";
 import { WorkflowTree } from "./workflow-tree";
 import { todoSummary } from "./todo-summary";
+import { simulatedBody } from "./demo-mode";
 
 export const OFFICE_TODO_SETS = [
   { name: "日常办公", instructions: [
@@ -78,7 +79,7 @@ export function TodoBatch({ apiBase, headers, normalize, runs, onCreated, onOpen
         const response = await fetch(`${apiBase}/v1/harness/runs`, {
           method: "POST", headers, signal: AbortSignal.timeout(20000),
           body: JSON.stringify({ instruction: next[index].instruction, idempotency_key: next[index].key,
-            output_preference: "analysis_only", execution_policy: "automatic_readonly",
+            output_preference: "analysis_only", execution_policy: "automatic_readonly", ...simulatedBody(),
             loop: { max_rounds: 3, max_files_per_round: 8, max_model_calls: 8, deadline_seconds: 600 } }),
         });
         if (!response.ok) throw new Error(`启动未确认（HTTP ${response.status}）`);

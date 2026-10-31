@@ -491,6 +491,7 @@ class HarnessRunSnapshot(BaseModel):
     instruction: str = Field(min_length=1, max_length=2_000)
     instruction_source: Literal["user"] = "user"
     execution_policy: Literal["manual", "automatic_readonly"] = "manual"
+    simulated: bool = False
     contract: AgentControlLoopContract
     budget: AgentControlLoopBudget
     rounds: list[AgentControlLoopRound] = Field(default_factory=list, max_length=24)
@@ -558,6 +559,8 @@ class HarnessRunStart(BaseModel):
     action: ActionInput | None = None
     output_preference: OutputPreference = "auto"
     execution_policy: Literal["manual", "automatic_readonly"] = "manual"
+    # Demo mode: plan and analyse with the offline simulator instead of the model.
+    simulated: bool = False
 
     @model_validator(mode="after")
     def validate_output_agreement(self):
@@ -574,6 +577,8 @@ class HarnessRunStart(BaseModel):
             payload.pop("output_preference", None)
         if self.execution_policy == "manual":
             payload.pop("execution_policy", None)
+        if not self.simulated:
+            payload.pop("simulated", None)
         return payload
 
     @field_validator("instruction")
@@ -686,6 +691,7 @@ class PublicHarnessRunSnapshot(BaseModel):
     instruction: str
     instruction_source: Literal["user"]
     execution_policy: Literal["manual", "automatic_readonly"] = "manual"
+    simulated: bool = False
     contract: AgentControlLoopContract
     budget: AgentControlLoopBudget
     rounds: list[AgentControlLoopRound]
@@ -1243,6 +1249,10 @@ class HarnessRuntime:
         self.catalog = catalog
         self.planner = planner
         self.analyst = analyst
+        from services.api.app.application.demo_simulator import SimulatedAnalyst, SimulatedPlanner
+
+        self._sim_planner = SimulatedPlanner()
+        self._sim_analyst = SimulatedAnalyst()
         self.state_store = state_store or InMemoryHarnessStateStore()
         # HarnessStateStore is the sole aggregate boundary for the task
         # ledger, Run snapshot and command receipts.
@@ -1883,6 +1893,7 @@ class HarnessRuntime:
                 instruction=instruction,
                 instruction_source="user",
                 execution_policy=request.execution_policy,
+                simulated=bool(getattr(request, "simulated", False) or (parent is not None and parent.simulated)),
                 contract=contract,
                 budget=budget,
             )
@@ -2875,6 +2886,7 @@ class HarnessRuntime:
             and snapshot.office_action is None
             and snapshot.topology_admission
             and snapshot.topology_admission.mode == "single_controller"
+            and not snapshot.simulated
             and callable(getattr(self.planner, "review_progress", None))
             and plan and len(plan.units) == 1
             and not plan.deferred_requirements and not plan.uncovered_requirements
@@ -2886,7 +2898,7 @@ class HarnessRuntime:
         )
 
     async def _review_worker_wave(self, owner_id, run_id, contributions):
-        reviewer = getattr(self.planner, "review_progress", None)
+        reviewer = None if self._is_simulated(owner_id, run_id) else getattr(self.planner, "review_progress", None)
         if not callable(reviewer):
             return None, []
         async with self._lock:
@@ -2998,7 +3010,7 @@ class HarnessRuntime:
                 parent is None or parent.status != "completed" or unit is None
                 or unit.state != WorkUnitState.ADOPTED or contribution is None
                 or contribution.gate_status != ContributionGateStatus.ADOPTED
-                or not contribution.model_receipt.called
+                or (not contribution.model_receipt.called and not snapshot.simulated)
                 or not contribution.model_receipt.output_used
                 or contribution.branch_id != dependency_id
                 or contribution.owner_id != snapshot.owner_id
@@ -4346,6 +4358,7 @@ class HarnessRuntime:
             instruction=snapshot.instruction,
             instruction_source=snapshot.instruction_source,
             execution_policy=snapshot.execution_policy,
+            simulated=snapshot.simulated,
             contract=public_contract,
             budget=snapshot.budget,
             rounds=public_rounds,
@@ -6525,7 +6538,7 @@ class HarnessRuntime:
             )
             started = perf_counter()
             try:
-                candidate = await self.planner.plan(
+                candidate = await self._planner_for(owner_id, run_id).plan(
                     scenario=self._planner_workspace(
                         workspace,
                         question,
@@ -6589,8 +6602,8 @@ class HarnessRuntime:
                 continue
 
             receipt = HarnessModelReceipt(
-                called=True,
-                model=getattr(self.planner, "model", self.MODEL),
+                called=not self._is_simulated(owner_id, run_id),
+                model=getattr(self._planner_for(owner_id, run_id), "model", self.MODEL),
                 elapsed_ms=max(0, round((perf_counter() - started) * 1000)),
                 output_used=False,
             )
@@ -7618,7 +7631,8 @@ class HarnessRuntime:
                 "files": files,
                 "validation_feedback": validation_feedback,
             }
-            analyze_parameters = inspect.signature(self.analyst.analyze).parameters.values()
+            analyst = self._analyst_for(owner_id, run_id)
+            analyze_parameters = inspect.signature(analyst.analyze).parameters.values()
             if dependency_context:
                 if not any(parameter.name == "dependency_context" or parameter.kind is inspect.Parameter.VAR_KEYWORD
                            for parameter in analyze_parameters):
@@ -7635,13 +7649,13 @@ class HarnessRuntime:
                 for parameter in analyze_parameters
             ):
                 analyze_kwargs["readonly_context"] = readonly_context
-            result = await self.analyst.analyze(
+            result = await analyst.analyze(
                 **analyze_kwargs,
             )
             numeric_error = readonly_numeric_error(readonly_context, result.model_dump(mode="json"))
             if numeric_error:
                 raise HarnessModelError(numeric_error, called=True,
-                                        model=getattr(self.analyst, "model", self.MODEL),
+                                        model=getattr(analyst, "model", self.MODEL),
                                         failure_kind="source_numeric_conflict")
         except HarnessModelError as exc:
             receipt = HarnessModelReceipt(
@@ -7678,8 +7692,8 @@ class HarnessRuntime:
             )
             raise
         receipt = HarnessModelReceipt(
-            called=True,
-            model=getattr(self.analyst, "model", self.MODEL),
+            called=not self._is_simulated(owner_id, run_id),
+            model=getattr(analyst, "model", self.MODEL),
             elapsed_ms=max(0, round((perf_counter() - analysis_started) * 1000)),
             output_used=False,
         )
@@ -8906,6 +8920,19 @@ class HarnessRuntime:
                 "output_used": bool(receipt and receipt.output_used),
             },
         )
+
+    def _is_simulated(self, owner_id: str, run_id: str) -> bool:
+        run = self._runs.get((owner_id, run_id))
+        return bool(run and run.snapshot.simulated)
+
+    def _planner_for(self, owner_id: str, run_id: str) -> HarnessPlanner:
+        return self._sim_planner if self._is_simulated(owner_id, run_id) else self.planner
+
+    def _analyst_for(self, owner_id: str, run_id: str) -> HarnessAnalyst:
+        if self._is_simulated(owner_id, run_id):
+            return self._sim_analyst
+        assert self.analyst is not None
+        return self.analyst
 
     def _require_run(self, owner_id: str, run_id: str) -> _Run:
         run = self._runs.get((owner_id, run_id))

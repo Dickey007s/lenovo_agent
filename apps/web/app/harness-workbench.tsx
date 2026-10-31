@@ -13,6 +13,7 @@ import { MinutesIntake } from "./minutes-intake";
 import { workerStages } from "./worker-stages";
 import { OFFICE_EXAMPLES, officeTaskTitle, TaskBranches } from "./task-journey";
 import { TaskBoard, TaskSteer } from "./task-board";
+import { simulatedBody } from "./demo-mode";
 import {
   IconAlertTriangle,
   IconArrowLeft,
@@ -1169,6 +1170,7 @@ export type HarnessPlanNode = {
 
 export type HarnessRun = {
   execution_policy: "manual" | "automatic_readonly";
+  simulated: boolean;
   office_action: OfficeAction | null;
   workflow: WorkflowGraph | null;
   run_id: string;
@@ -3481,6 +3483,7 @@ function normalizeRun(value: unknown): HarnessRun | null {
   return {
     run_id: runId,
     execution_policy: raw.execution_policy === "automatic_readonly" ? "automatic_readonly" : "manual",
+    simulated: raw.simulated === true,
     office_action: normalizeOfficeAction(raw.office_action),
     workflow: normalizeWorkflow(raw.workflow),
     task_id: asText(raw.task_id, "task-000000000000"),
@@ -4811,6 +4814,7 @@ export function HarnessWorkbench({ onActivityChange, capabilitiesOnly = false, a
           idempotency_key: command.key,
           expected_version: 1,
           instruction: taskInstruction,
+          ...simulatedBody(),
           ...(outputPreference === "auto" ? {} : { output_preference: outputPreference }),
           loop: {
             max_rounds: maxRounds,

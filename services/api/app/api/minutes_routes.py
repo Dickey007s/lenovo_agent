@@ -20,6 +20,8 @@ class MinutesSplitRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     minutes: str = Field(min_length=1, max_length=MAX_MINUTES_CHARS + 1000)
+    # Demo mode: split by rules only, no model call.
+    simulated: bool = False
 
 
 @router.post("/split", response_model=MinutesSplit)
@@ -28,8 +30,8 @@ async def split(request: MinutesSplitRequest) -> MinutesSplit:
     try:
         return await split_minutes(
             request.minutes,
-            base_url=settings.llm_base_url,
-            api_key=settings.llm_api_key,
+            base_url="" if request.simulated else settings.llm_base_url,
+            api_key="" if request.simulated else settings.llm_api_key,
             model=settings.llm_model,
             timeout=settings.llm_timeout_seconds,
         )
