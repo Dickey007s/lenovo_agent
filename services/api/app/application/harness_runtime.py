@@ -73,6 +73,7 @@ from services.api.app.application.collaboration_review import (
 from services.api.app.application.workflow_graph import (
     WorkflowGraph,
     build_control_loop_workflow,
+    collect_human_items,
     build_office_action_workflow,
 )
 from services.api.app.application.topology_admission import TopologyAdmission
@@ -4306,6 +4307,20 @@ class HarnessRuntime:
                     if item.state == "open" and item.branch_id
                 },
                 allowed_file_count=len(snapshot.contract.allowed_file_refs),
+                human_items=collect_human_items(
+                    findings=(
+                        snapshot.result.findings
+                        if snapshot.result is not None
+                        else snapshot.artifact_versions[-1].findings
+                        if snapshot.artifact_versions
+                        else []
+                    ),
+                    decision_requests=snapshot.decision_requests,
+                    decision_records=snapshot.decision_records,
+                    uncovered=public_plan.uncovered_requirements if public_plan is not None else [],
+                    branch_unit={item.branch_id: item.unit_id for item in public_branches},
+                ),
+                swarm=snapshot.execution_policy == "automatic_readonly",
             )
         return PublicHarnessRunSnapshot(
             run_id=snapshot.run_id,

@@ -372,3 +372,75 @@ def assess_delivery(*, artifact_count: int) -> RiskAssessment:
         {"intent_evidence", "authority"},
         ["R05", "R06", "R16"],
     )
+
+
+_GATE_TEXT = {
+    "judgment": (
+        "L3",
+        "AL3",
+        "分析发现了需要你拍板的事：系统不替你选。",
+        "你选定之前，这一项不会被当作结论写入。",
+        "你可以接受、拒绝、暂缓，或要求重新核对。",
+        "系统把问题、选项和原文依据放在一起，由你判断。",
+        "业务取舍属于有权限的人，系统不能自动越过。",
+        {"authority", "intent_evidence"},
+        ["R04", "R07", "R10"],
+    ),
+    "source_choice": (
+        "L2",
+        "AL2",
+        "同一处引用有多个候选位置，需要你对照原文挑出正确的一处。",
+        "你选定之前，这一项不会被当作已核对的依据。",
+        "可以重新选择，原文件不变。",
+        "候选位置并排展示，由你对照。这不是业务批准。",
+        "只决定引用位置，不授予任何业务权限。",
+        {"intent_evidence"},
+        ["R05", "R06"],
+    ),
+    "missing": (
+        "L2",
+        "AL2",
+        "资料库里没有找到这一项要求的来源，需要你补充真实材料。",
+        "补充之前，这一项保持空缺，其他已完成的工作不受影响。",
+        "补充材料后可以只重做这一项。",
+        "系统不会用相近的资料代替所需凭证，也不会猜测答案。",
+        "补充什么材料由你决定，系统不自行联网或向外索取。",
+        {"intent_evidence", "authority"},
+        ["R05", "R06", "R10"],
+    ),
+    "start": (
+        "L1",
+        "AL1",
+        "系统已经把任务拆成几项可以同时做的只读工作，等你同意后才分头启动。",
+        "你同意之前不会调用任何分析模型；同意后只读取资料，不改任何文件。",
+        "启动后可以中断任务；已读取的资料和原文件都不变。",
+        "拆分依据和每项工作要读的资料列在节点里，可以逐项查看。",
+        "是否花费模型调用与时间属于你的授权，系统不自行放大并行数量。",
+        {"authority"},
+        ["R04", "R09"],
+    ),
+}
+
+
+def assess_human_gate(*, kind: str, reason: str = "") -> RiskAssessment:
+    """A step that waits for a person. The level is the gate kind's convention, not a score."""
+
+    risk, autonomy, action, state, recover, evidence, authority, drivers, rules = _GATE_TEXT.get(
+        kind, _GATE_TEXT["judgment"]
+    )
+    return _assessment(
+        risk,
+        autonomy,
+        {
+            "action_object": action,
+            "data_flow": "只涉及本次任务已读取的资料，不外发。",
+            "state_change": state,
+            "blast_radius": "仅本次任务；其他并行工作继续推进。",
+            "recoverability": recover,
+            "intent_evidence": (reason + " " if reason else "") + evidence,
+            "authority": authority,
+            "environment": _ENV_NOTE,
+        },
+        drivers,
+        rules,
+    )

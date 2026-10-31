@@ -11,7 +11,8 @@ import { UnifiedWorkbench, runSpace, type WorkbenchSpace } from "./unified-workb
 import { TodoBatch, type MinutesSeed } from "./todo-batch";
 import { MinutesIntake } from "./minutes-intake";
 import { workerStages } from "./worker-stages";
-import { OFFICE_EXAMPLES, officeTaskTitle, TaskProcess, TaskBranches } from "./task-journey";
+import { OFFICE_EXAMPLES, officeTaskTitle, TaskBranches } from "./task-journey";
+import { TaskBoard, TaskSteer } from "./task-board";
 import {
   IconAlertTriangle,
   IconArrowLeft,
@@ -4237,6 +4238,8 @@ export function HarnessWorkbench({ onActivityChange, capabilitiesOnly = false, a
   const [space, setSpace] = useState<WorkbenchSpace>("solo");
   const [actionNavigationLocked, setActionNavigationLocked] = useState(false);
   const [batchNavigationLocked, setBatchNavigationLocked] = useState(false);
+  const [focusNode, setFocusNode] = useState<string | null>(null);
+  const officeActionRef = useRef<HTMLDivElement | null>(null);
   const [minutesSeed, setMinutesSeed] = useState<MinutesSeed | null>(null);
   const [batchGeneration, setBatchGeneration] = useState(0);
   const [batchHasTasks, setBatchHasTasks] = useState(false);
@@ -5211,20 +5214,26 @@ export function HarnessWorkbench({ onActivityChange, capabilitiesOnly = false, a
           <button type="button" aria-current={view === "result" ? "page" : undefined} className={view === "result" ? "is-active" : ""} onClick={() => setView("result")}>成果{run?.workspace_artifacts.length ? <b>{run.workspace_artifacts.length}</b> : null}</button>
         </nav>
         <div className="workspace-content">
-          {view === "actions" && run?.office_action && run.workflow && <WorkflowTree graph={run.workflow} title="办理流程（固定规则）" />}
-          <div hidden={view !== "actions"}><OfficeActionWorkbench composerHost={actionHost} onAnother={newSpaceTask} onNavigationLockChange={setActionNavigationLocked} sessionGeneration={generationRef.current} isSessionCurrent={(generation) => generation === generationRef.current} run={run} files={allFiles} apiBase={API_BASE} headers={HEADERS} onSnapshot={acceptActionSnapshot} onOpenSource={(ref) => { const file = allFiles.find(item => item.file_ref === ref); if (file) openFile(file); }} blocked={runActive && !run?.office_action} readOnly={Boolean(run?.office_action) && isReadOnlyRun} /></div>
+          {view === "actions" && run?.office_action && run.workflow && <>
+            <TaskSteer disabled={isReadOnlyRun} />
+            <WorkflowTree graph={run.workflow} title="办理流程（固定规则）" focusId={focusNode} />
+            <TaskBoard run={run} graph={run.workflow} onFocus={setFocusNode} onFinding={() => undefined} onEvidence={() => setView("data")} onConfirm={() => officeActionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })} />
+          </>}
+          <div ref={officeActionRef} hidden={view !== "actions"}><OfficeActionWorkbench composerHost={actionHost} onAnother={newSpaceTask} onNavigationLockChange={setActionNavigationLocked} sessionGeneration={generationRef.current} isSessionCurrent={(generation) => generation === generationRef.current} run={run} files={allFiles} apiBase={API_BASE} headers={HEADERS} onSnapshot={acceptActionSnapshot} onOpenSource={(ref) => { const file = allFiles.find(item => item.file_ref === ref); if (file) openFile(file); }} blocked={runActive && !run?.office_action} readOnly={Boolean(run?.office_action) && isReadOnlyRun} /></div>
           {view === "data" && <><TaskEvidence run={run} files={allFiles} onReview={setReviewRequest} onWorkers={() => setAdaptiveWorkbenchOpen(true)} onOpenFile={openFile}/>{activeFile && previewRequested && <div ref={previewSurfaceRef} tabIndex={-1} className="task-file-preview"><FilePreview key={activeFile.file_ref} preview={preview} file={activeFile} loading={previewLoading} error={previewError} anchor={previewAnchor?.file_ref === activeFile.file_ref ? previewAnchor : null} /></div>}</>}
-          {view === "loop" && run && !run.office_action && run.workflow && <WorkflowTree graph={run.workflow} title="任务流程" interruptBusy={controlBusy !== null || starting} onInterrupt={isReadOnlyRun ? undefined : () => void controlLoop("stop")} />}
-          {view === "loop" && run && run.execution_policy !== "automatic_readonly" && !run.office_action && <TaskProcess run={run} files={allFiles} onEvidence={() => setView("data")} onFinding={finding => {
-            const findings = run.result?.findings ?? run.artifact_versions.at(-1)?.findings ?? [];
-            const artifact = run.artifact_versions.find(item => item.findings.some(saved => saved.finding_id && saved.finding_id === finding.finding_id));
-            setReviewRequest(findingReviewRequest(finding, Math.max(0, findings.indexOf(finding)), artifact?.round_number ?? run.current_round, run.decision_records, run.decision_requests));
-          }} onFile={ref => { const file = allFiles.find(item => item.file_ref === ref); if (file) openFile(file); }}/>}
-          {view === "loop" && run && runSpace(run) === "team" && (run.execution_policy === "automatic_readonly" ? <TaskExecutionGraph run={run} onDetails={() => setAdaptiveWorkbenchOpen(true)}/> : <details className="task-collaboration-details"><summary>查看协作安排</summary><TaskExecutionGraph run={run} onDetails={() => setAdaptiveWorkbenchOpen(true)}/></details>)}
-          {view === "loop" && run && <LoopView key={run.run_id} compact onOpenResult={() => setView("result")} delivery={(!run.workspace_artifacts.length || run.branches.some(branch => branch.status !== "completed")) ? <TaskDeliveryLedger pendingFirst showOutcome={!run.workspace_artifacts.length} outcomeOnly={run.branches.every(branch => branch.status === "completed")} run={run} onReview={setReviewRequest} onResult={() => setView("result")} readOnly={isReadOnlyRun || starting || controlBusy !== null} onReviewBranch={(branch) => {
+          {view === "loop" && run && !run.office_action && run.workflow && <>
+            <TaskSteer disabled={isReadOnlyRun} running={runActive} />
+            <WorkflowTree graph={run.workflow} title={run.workflow.swarm ? "任务流程 · 蜂群调度" : "任务流程"} focusId={focusNode} interruptBusy={controlBusy !== null || starting} onInterrupt={isReadOnlyRun ? undefined : () => void controlLoop("stop")} />
+            <TaskBoard run={run} graph={run.workflow} onFocus={setFocusNode} onEvidence={() => setView("data")} busy={starting} onStart={isReadOnlyRun ? undefined : () => void executeWorkers()} onFinding={finding => {
+              const findings = run.result?.findings ?? run.artifact_versions.at(-1)?.findings ?? [];
+              const artifact = run.artifact_versions.find(item => item.findings.some(saved => saved.finding_id && saved.finding_id === finding.finding_id));
+              setReviewRequest(findingReviewRequest(finding, Math.max(0, findings.indexOf(finding)), artifact?.round_number ?? run.current_round, run.decision_records, run.decision_requests));
+            }} />
+          </>}
+          {view === "loop" && run && <details className="task-controls"><summary>过程记录与运行控制</summary><div><LoopView key={run.run_id} compact onOpenResult={() => setView("result")} delivery={(!run.workspace_artifacts.length || run.branches.some(branch => branch.status !== "completed")) ? <TaskDeliveryLedger pendingFirst showOutcome={!run.workspace_artifacts.length} outcomeOnly={run.branches.every(branch => branch.status === "completed")} run={run} onReview={setReviewRequest} onResult={() => setView("result")} readOnly={isReadOnlyRun || starting || controlBusy !== null} onReviewBranch={(branch) => {
             const round = [...run.rounds].reverse().find((item) => item.branch_ids.includes(branch.branch_id)) ?? run.rounds.at(-1);
             if (round) setReviewRequest(branchReviewRequest(branch, round.evidence_gaps, round, run));
-          }} /> : null} run={run} taskPointer={taskPointer} taskPointerError={taskPointerError} files={allFiles} controlBusy={controlBusy} onControl={controlLoop} onReview={setReviewRequest} onStartTask={startTask} onContinueTask={continueTask} onOpenCurrentTask={openCurrentTask} onRetryTaskPointer={() => run && refreshTaskPointer(run.task_id, generationRef.current, run.run_id, run.task_version, true)} onExecuteWorkers={executeWorkers} onOpenAdaptiveWorkbench={() => setAdaptiveWorkbenchOpen(true)} readOnly={isReadOnlyRun} starting={starting} />}
+          }} /> : null} run={run} taskPointer={taskPointer} taskPointerError={taskPointerError} files={allFiles} controlBusy={controlBusy} onControl={controlLoop} onReview={setReviewRequest} onStartTask={startTask} onContinueTask={continueTask} onOpenCurrentTask={openCurrentTask} onRetryTaskPointer={() => run && refreshTaskPointer(run.task_id, generationRef.current, run.run_id, run.task_version, true)} onExecuteWorkers={executeWorkers} onOpenAdaptiveWorkbench={() => setAdaptiveWorkbenchOpen(true)} readOnly={isReadOnlyRun} starting={starting} /></div></details>}
           {view === "result" && (run?.office_action ? <section className="unified-action-result"><h2>{run.office_action.receipt ? "结果记录" : "尚无结果记录"}</h2><p>{run.office_action.result_message}</p>{run.office_action.receipt && <pre>{run.office_action.receipt.content}</pre>}<p>测试记录，不表示真实发送或业务批准。</p><button onClick={() => setView("actions")}>返回事项与操作</button></section> : <><button type="button" className="result-return" onClick={() => setView("loop")}><IconArrowLeft aria-hidden="true" />返回任务</button><ResultView result={run?.result ?? null} artifacts={run?.artifact_versions ?? []} workspaceArtifacts={run?.workspace_artifacts ?? []} receipts={run?.effect_receipts ?? []} reconciliation={run?.narrative_reconciliation ?? null} commit={run?.last_commit ?? null} decisions={run?.decision_records ?? []} decisionRequests={run?.decision_requests ?? []} files={allFiles} onOpenFile={openFile} onReview={setReviewRequest} onStartTask={startTask} starting={starting} readOnly={isReadOnlyRun} /></>)}
         </div>
         <details className="workspace-boundary"><summary><IconShieldCheck aria-hidden="true" />数据与执行边界</summary>{run && view === "loop" && workspaceFacts}<p>{workspace.data_boundary} Agent 可以检索整个资料库，但每轮只读取服务端校验通过且受预算约束的文件；本轮不会修改原文件或执行外部动作。</p></details>

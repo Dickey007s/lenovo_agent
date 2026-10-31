@@ -11,6 +11,7 @@ explanation on demand.
 
 from __future__ import annotations
 
+from difflib import SequenceMatcher
 from typing import Any, Iterable, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -19,12 +20,13 @@ from services.api.app.application.action_dimensions import (
     RiskAssessment,
     assess_analysis_unit,
     assess_delivery,
+    assess_human_gate,
     assess_intake,
     assess_office_action,
 )
 
 NodeStatus = Literal["pending", "running", "done", "waiting_human", "failed", "stopped"]
-NodeKind = Literal["plan", "work_unit", "deliver", "action"]
+NodeKind = Literal["plan", "work_unit", "human_gate", "deliver", "action"]
 Actor = Literal["agent", "human", "system"]
 
 TOOL_LABELS = {
@@ -54,6 +56,9 @@ class WorkflowNode(BaseModel):
     sources: list[str] = Field(default_factory=list, max_length=12)
     depends_on: list[str] = Field(default_factory=list, max_length=12)
     branch_id: str | None = None
+    # human_gate nodes: which finding / request / missing requirement this is
+    ref_id: str | None = None
+    ref_kind: Literal["judgment", "source_choice", "missing", "start"] | None = None
     assessment: RiskAssessment
 
 
@@ -75,6 +80,17 @@ class WorkflowState(BaseModel):
     delegated_count: int = Field(default=0, ge=0, le=40)
 
 
+class WorkflowWave(BaseModel):
+    """One batch of sub-agents released together (swarm view only)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    index: int = Field(ge=1)
+    label: str
+    status: NodeStatus
+    node_ids: list[str] = Field(max_length=40)
+
+
 class WorkflowGraph(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -83,6 +99,98 @@ class WorkflowGraph(BaseModel):
     nodes: list[WorkflowNode]
     edges: list[WorkflowEdge]
     state: WorkflowState
+    swarm: bool = False
+    waves: list[WorkflowWave] = Field(default_factory=list, max_length=12)
+
+
+class HumanItem(BaseModel):
+    """Something a person has to do before the run can be delivered."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    item_id: str
+    kind: Literal["judgment", "source_choice", "missing"]
+    title: str
+    reason: str
+    parent_unit_ids: list[str] = Field(default_factory=list)
+
+
+def _same_topic(left: str, right: str, size: int = 6) -> bool:
+    """True when two short Chinese titles share a run of at least ``size`` characters."""
+
+    return SequenceMatcher(None, left, right).find_longest_match(0, len(left), 0, len(right)).size >= size
+
+
+_GATE_LABEL = {"judgment": "待你判断", "source_choice": "待核对依据", "missing": "待补资料", "start": "待确认启动"}
+_GATE_ORDER = ("judgment", "source_choice", "missing")
+
+
+def collect_human_items(
+    *,
+    findings: Iterable[Any],
+    decision_requests: Iterable[Any],
+    decision_records: Iterable[Any],
+    uncovered: Iterable[Any],
+    branch_unit: dict[str, str],
+) -> list[HumanItem]:
+    """Open human work, from the same receipts the task board uses (no new judgement)."""
+
+    requests = list(decision_requests)
+    requested = {item.finding_id for item in requests}
+    pending = {item.finding_id for item in requests if item.state in ("open", "deferred")}
+    decided = {item.finding_id for item in decision_records if item.action != "defer"}
+    items: list[HumanItem] = []
+    seen: set[str] = set()
+
+    def parents(branch_ids: Iterable[str], plan_unit_id: str | None) -> list[str]:
+        found = [branch_unit[b] for b in branch_ids if b in branch_unit]
+        if not found and plan_unit_id:
+            found = [plan_unit_id]
+        return list(dict.fromkeys(found))
+
+    for index, finding in enumerate(findings):
+        review = getattr(finding, "review", None)
+        if review is None or not review.requires_human_decision:
+            continue
+        fid = finding.finding_id or ""
+        if not (fid in pending or (fid not in requested and fid not in decided)):
+            continue
+        seen.add(fid)
+        items.append(
+            HumanItem(
+                item_id=fid or f"finding-{index}",
+                kind="judgment",
+                title=_short(review.question or finding.title, 80),
+                reason=_short(review.why_human, 300),
+                parent_unit_ids=parents(finding.affected_branch_ids, finding.plan_unit_id),
+            )
+        )
+    for request in requests:
+        if request.state not in ("open", "deferred") or request.finding_id in seen:
+            continue
+        seen.add(request.finding_id)
+        source_choice = bool(request.resolution_id)
+        items.append(
+            HumanItem(
+                item_id=request.decision_request_id,
+                kind="source_choice" if source_choice else "judgment",
+                title="核对引用位置" if source_choice else "待决事项",
+                reason=_short(request.reason, 300),
+                parent_unit_ids=parents(
+                    [request.branch_id] if request.branch_id else [], request.plan_unit_id
+                ),
+            )
+        )
+    for index, item in enumerate(uncovered):
+        items.append(
+            HumanItem(
+                item_id=f"missing-{index}",
+                kind="missing",
+                title=_short(item.title, 80),
+                reason=_short(item.reason, 300),
+            )
+        )
+    return items
 
 
 def _short(text: str, limit: int) -> str:
@@ -127,6 +235,8 @@ def build_control_loop_workflow(
     artifact_count: int,
     open_decision_branch_ids: set[str],
     allowed_file_count: int,
+    human_items: Iterable[HumanItem] = (),
+    swarm: bool = False,
 ) -> WorkflowGraph:
     state_status, state_label = _run_state(status, control_state)
     terminal_failure = state_status in {"failed", "stopped"}
@@ -134,6 +244,10 @@ def build_control_loop_workflow(
     workers = list(worker_runs)
     adaptive = topology_mode == "adaptive_readonly_workers"
     delegated = len({item.worker_run_id for item in workers}) if adaptive else 0
+    gates = list(human_items)
+    # Adaptive workers are admitted but not yet started: the first wave waits for the person's go-ahead.
+    await_start = adaptive and status == "waiting_input" and not workers and plan is not None
+    start_units: list[str] = []
 
     nodes: list[WorkflowNode] = []
     edges: list[WorkflowEdge] = []
@@ -173,6 +287,9 @@ def build_control_loop_workflow(
                 node_label = "已中断" if terminal_failure else "未开始"
             else:
                 node_status, node_label = _BRANCH_STATUS.get(branch.status, ("pending", "未开始"))
+                if await_start and node_status == "running" and not unit.depends_on:
+                    node_status, node_label = "pending", "待启动"
+                    start_units.append(unit.unit_id)
                 if branch.branch_id in open_decision_branch_ids and node_status != "done":
                     node_status, node_label = "waiting_human", "等你处理"
                 if getattr(branch, "requires_human_gate", False) and node_status == "waiting_human":
@@ -183,7 +300,7 @@ def build_control_loop_workflow(
                 facts.append(f"{len(branch.missing_file_refs)} 份文件尚未核对")
             if node_label == "等待前序":
                 facts.append("前序工作完成后才会开始")
-            agent_label = "只读 Worker" if adaptive else "主 Agent"
+            agent_label = f"子 Agent {len(unit_ids) + 1}" if swarm else "只读 Worker" if adaptive else "主 Agent"
             nodes.append(
                 WorkflowNode(
                     node_id=unit.unit_id,
@@ -212,10 +329,103 @@ def build_control_loop_workflow(
             for dependency in unit.depends_on or ["plan"]:
                 edges.append(WorkflowEdge(source=dependency, target=unit.unit_id))
 
-    all_done = bool(unit_ids) and all(
-        node.status == "done" for node in nodes if node.kind == "work_unit"
-    )
-    if state_status == "done":
+    start_gate = len(start_units) >= 2
+    if start_gate:
+        nodes.append(
+            WorkflowNode(
+                node_id="gate-start",
+                label=_short(f"确认后并行启动 {len(start_units)} 项", 22),
+                kind="human_gate",
+                status="waiting_human",
+                status_label=_GATE_LABEL["start"],
+                actor="human",
+                actor_label="需要你",
+                summary=f"计划里有 {len(start_units)} 项可以同时做的只读工作。你确认后才分头启动，每批最多同时 3 项；确认前不会调用分析模型。",
+                facts=["不修改任何文件", "确认后每批最多 3 项并行"],
+                depends_on=["plan"],
+                ref_id="start",
+                ref_kind="start",
+                assessment=assess_human_gate(kind="start"),
+            )
+        )
+        edges.append(WorkflowEdge(source="plan", target="gate-start"))
+        for edge in edges:
+            if edge.source == "plan" and edge.target in start_units:
+                edge.source = "gate-start"
+        for node in nodes:
+            if node.node_id in start_units:
+                node.depends_on = ["gate-start"]
+    else:
+        # Fewer than two independent units: nothing to fan out, leave the branch as it was.
+        for node in nodes:
+            if node.node_id in start_units:
+                node.status, node.status_label = "running", "处理中"
+        start_units = []
+
+    unit_nodes = [node for node in nodes if node.kind == "work_unit"]
+    unit_by_id = {node.node_id for node in unit_nodes}
+    gate_ids: list[str] = []
+    merged = 0
+    if state_status in {"done", "running", "waiting_human"} and plan is not None:
+        for gate in gates:
+            if gate.kind == "missing":
+                # The planner sometimes plans a unit for a requirement it also reports as having no
+                # source. Show one yellow step, not two.
+                twin = next(
+                    (
+                        node
+                        for node in unit_nodes
+                        if node.status in {"pending", "running", "waiting_human"}
+                        and node.ref_id is None
+                        and _same_topic(gate.title, node.label + node.summary)
+                    ),
+                    None,
+                )
+                if twin is not None:
+                    twin.status, twin.actor, twin.actor_label = "waiting_human", "human", "需要你"
+                    twin.status_label = _GATE_LABEL["missing"]
+                    twin.summary = _short(f"{gate.title}：{gate.reason}", 400)
+                    twin.ref_id, twin.ref_kind = gate.item_id, "missing"
+                    twin.assessment = assess_human_gate(kind="missing", reason=_short(gate.reason, 160))
+                    merged += 1
+                    continue
+            node_id = "gate-" + gate.item_id
+            parents = [parent for parent in gate.parent_unit_ids if parent in unit_by_id] or ["plan"]
+            nodes.append(
+                WorkflowNode(
+                    node_id=node_id,
+                    label=_short(gate.title, 22),
+                    kind="human_gate",
+                    status="waiting_human",
+                    status_label=_GATE_LABEL[gate.kind],
+                    actor="human",
+                    actor_label="需要你",
+                    summary=_short(f"{gate.title}：{gate.reason}", 400),
+                    facts=["等你处理；不依赖它的分支继续推进"],
+                    depends_on=parents,
+                    ref_id=gate.item_id,
+                    ref_kind=gate.kind,
+                    assessment=assess_human_gate(kind=gate.kind, reason=_short(gate.reason, 160)),
+                )
+            )
+            gate_ids.append(node_id)
+            for parent in parents:
+                edges.append(WorkflowEdge(source=parent, target=node_id))
+                leaves.discard(parent)
+    if start_gate:
+        state_label = _GATE_LABEL["start"]
+        if state_status in {"done", "running"}:
+            state_status = "waiting_human"
+    elif gate_ids or merged:
+        kinds = {gate.kind for gate in gates}
+        state_label = _GATE_LABEL[next(kind for kind in _GATE_ORDER if kind in kinds)]
+        if state_status in {"done", "running"}:
+            state_status = "waiting_human"
+    leaves |= set(gate_ids)
+    all_done = bool(unit_ids) and not (gate_ids or merged or start_gate) and all(node.status == "done" for node in unit_nodes)
+    if (gate_ids or merged or start_gate) and not terminal_failure:
+        deliver_status, deliver_label = "pending", "等你处理后交付"
+    elif state_status == "done":
         deliver_status, deliver_label = "done", "已完成"
     elif terminal_failure:
         deliver_status, deliver_label = ("failed", "未完成") if state_status == "failed" else ("stopped", "已中断")
@@ -243,16 +453,56 @@ def build_control_loop_workflow(
     for source in (sorted(leaves) if leaves else ["plan"]):
         edges.append(WorkflowEdge(source=source, target="deliver"))
 
+    waves: list[WorkflowWave] = []
+    if swarm and unit_nodes:
+        # Each work unit is one sub-agent; units with no unfinished dependency go out together.
+        depth: dict[str, int] = {}
+        by_id = {node.node_id: node for node in unit_nodes}
+
+        def level(node_id: str, trail: frozenset[str] = frozenset()) -> int:
+            if node_id in depth:
+                return depth[node_id]
+            deps = [d for d in by_id[node_id].depends_on if d in by_id and d not in trail]
+            depth[node_id] = 1 + max((level(d, trail | {node_id}) for d in deps), default=-1)
+            return depth[node_id]
+
+        for node in unit_nodes:
+            level(node.node_id)
+        for index in range(max(depth.values()) + 1):
+            members = [node for node in unit_nodes if depth[node.node_id] == index]
+            statuses = {node.status for node in members}
+            wave_status: NodeStatus = (
+                "failed" if "failed" in statuses
+                else "stopped" if "stopped" in statuses
+                else "waiting_human" if "waiting_human" in statuses
+                else "running" if "running" in statuses
+                else "done" if statuses == {"done"}
+                else "pending"
+            )
+            waves.append(
+                WorkflowWave(
+                    index=index + 1,
+                    label=f"第 {index + 1} 波 · {len(members)} 个子 Agent 并行",
+                    status=wave_status,
+                    node_ids=[node.node_id for node in members],
+                )
+            )
+        delegated = len(unit_nodes)
+
     return WorkflowGraph(
         mode="control_loop",
         nodes=nodes,
         edges=edges,
+        swarm=bool(waves),
+        waves=waves,
         state=WorkflowState(
             status=state_status,  # type: ignore[arg-type]
             label=state_label,
-            can_interrupt=state_status in {"running", "waiting_human"} and control_state == "running",
-            agent_count=1 + delegated,
-            delegated_count=delegated,
+            can_interrupt=state_status in {"running", "waiting_human"}
+            and control_state == "running"
+            and status not in _TERMINAL,
+            agent_count=min(40, 1 + delegated),
+            delegated_count=min(40, delegated),
         ),
     )
 

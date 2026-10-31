@@ -15,11 +15,14 @@ export type WorkflowNode = {
   node_id: string; label: string; kind: string; status: WorkflowStatus; status_label: string;
   actor: "agent" | "human" | "system"; actor_label: string; summary: string;
   facts: string[]; sources: string[]; depends_on: string[]; assessment: WorkflowAssessment;
+  ref_id: string | null; ref_kind: "judgment" | "source_choice" | "missing" | "start" | null;
 };
+export type WorkflowWave = { index: number; label: string; status: WorkflowStatus; node_ids: string[] };
 export type WorkflowGraph = {
   mode: "control_loop" | "office_action";
   nodes: WorkflowNode[]; edges: { source: string; target: string }[];
   state: { status: "running" | "waiting_human" | "done" | "failed" | "stopped"; label: string; can_interrupt: boolean; agent_count: number; delegated_count: number };
+  swarm: boolean; waves: WorkflowWave[];
 };
 
 const STATUSES: WorkflowStatus[] = ["pending", "running", "done", "waiting_human", "failed", "stopped"];
@@ -40,6 +43,8 @@ export function normalizeWorkflow(value: unknown): WorkflowGraph | null {
       node_id: text(node.node_id), label: text(node.label), kind: text(node.kind), status: node.status as WorkflowStatus,
       status_label: text(node.status_label), actor: node.actor === "human" || node.actor === "system" ? node.actor : "agent",
       actor_label: text(node.actor_label), summary: text(node.summary), facts: list(node.facts), sources: list(node.sources), depends_on: list(node.depends_on),
+      ref_id: typeof node.ref_id === "string" ? node.ref_id : null,
+      ref_kind: node.ref_kind === "judgment" || node.ref_kind === "source_choice" || node.ref_kind === "missing" || node.ref_kind === "start" ? node.ref_kind : null,
       assessment: {
         risk_level: text(assessment.risk_level), risk_title: text(assessment.risk_title), autonomy_level: text(assessment.autonomy_level), autonomy_title: text(assessment.autonomy_title),
         collaboration: text(assessment.collaboration), takeover_point: text(assessment.takeover_point), design_focus: text(assessment.design_focus), rules: list(assessment.rules),
@@ -53,15 +58,22 @@ export function normalizeWorkflow(value: unknown): WorkflowGraph | null {
   return {
     mode: raw.mode === "office_action" ? "office_action" : "control_loop", nodes,
     edges: (Array.isArray(raw.edges) ? raw.edges : []).flatMap(edge => edge && typeof edge === "object" ? [{ source: text((edge as Record<string, unknown>).source), target: text((edge as Record<string, unknown>).target) }] : []),
+    swarm: raw.swarm === true,
+    waves: (Array.isArray(raw.waves) ? raw.waves : []).flatMap(item => {
+      const wave = item as Record<string, unknown> | null;
+      return wave && typeof wave === "object" && typeof wave.index === "number" && STATUSES.includes(wave.status as WorkflowStatus)
+        ? [{ index: wave.index, label: text(wave.label), status: wave.status as WorkflowStatus, node_ids: list(wave.node_ids) }] : [];
+    }),
     state: { status: stateStatus, label: text(state.label), can_interrupt: state.can_interrupt === true, agent_count: typeof state.agent_count === "number" ? state.agent_count : 1, delegated_count: typeof state.delegated_count === "number" ? state.delegated_count : 0 },
   };
 }
 
-const NODE_W = 156, NODE_H = 60, COL_GAP = 52, ROW_GAP = 22, PAD_TOP = 30, PAD_X = 8, PAD_BOTTOM = 10;
+const NODE_W = 156, NODE_H = 60, COL_GAP = 52, ROW_GAP = 22, PAD_TOP = 30, PAD_X = 8, PAD_BOTTOM = 10, WAVE_TOP = 26;
 
 type Placed = { node: WorkflowNode; x: number; y: number };
 
 function layout(graph: WorkflowGraph) {
+  const padTop = PAD_TOP + (graph.swarm ? WAVE_TOP : 0);
   const incoming = new Map<string, string[]>();
   for (const edge of graph.edges) incoming.set(edge.target, [...(incoming.get(edge.target) ?? []), edge.source]);
   const depth = new Map<string, number>();
@@ -85,15 +97,15 @@ function layout(graph: WorkflowGraph) {
   const placed: Placed[] = [];
   for (const [layer, items] of layers) {
     const blockHeight = items.length * NODE_H + (items.length - 1) * ROW_GAP;
-    items.forEach((node, index) => placed.push({ node, x: PAD_X + layer * (NODE_W + COL_GAP), y: PAD_TOP + (innerHeight - blockHeight) / 2 + index * (NODE_H + ROW_GAP) }));
+    items.forEach((node, index) => placed.push({ node, x: PAD_X + layer * (NODE_W + COL_GAP), y: padTop + (innerHeight - blockHeight) / 2 + index * (NODE_H + ROW_GAP) }));
   }
-  return { placed, width: PAD_X * 2 + layerCount * NODE_W + (layerCount - 1) * COL_GAP, height: PAD_TOP + innerHeight + PAD_BOTTOM };
+  return { placed, width: PAD_X * 2 + layerCount * NODE_W + (layerCount - 1) * COL_GAP, height: padTop + innerHeight + PAD_BOTTOM };
 }
 
 const STATE_CLASS: Record<WorkflowGraph["state"]["status"], string> = { running: "is-running", waiting_human: "is-waiting", done: "is-done", failed: "is-failed", stopped: "is-failed" };
 
-export function WorkflowTree({ graph, onInterrupt, interruptBusy = false, compact = false, title = "任务流程" }: {
-  graph: WorkflowGraph; onInterrupt?: () => void; interruptBusy?: boolean; compact?: boolean; title?: string;
+export function WorkflowTree({ graph, onInterrupt, interruptBusy = false, compact = false, title = "任务流程", focusId = null }: {
+  graph: WorkflowGraph; onInterrupt?: () => void; interruptBusy?: boolean; compact?: boolean; title?: string; focusId?: string | null;
 }) {
   const { placed, width, height } = useMemo(() => layout(graph), [graph]);
   const byId = useMemo(() => new Map(placed.map(item => [item.node.node_id, item])), [placed]);
@@ -129,9 +141,10 @@ export function WorkflowTree({ graph, onInterrupt, interruptBusy = false, compac
     <header className="wf-head">
       <h3>{title}</h3>
       <div className="wf-head-right">
-        <span className="wf-agents" title={graph.mode === "office_action" ? "固定规则直接办理，不调用大模型" : `${graph.state.agent_count} 个 Agent（含 ${graph.state.delegated_count} 个委派）`}>
+        <span className="wf-agents" title={graph.mode === "office_action" ? "固定规则直接办理，不调用大模型" : graph.swarm ? `1 个主 Agent + ${graph.state.delegated_count} 个子 Agent（演示编排：每个工作项由一个子 Agent 承担）` : `${graph.state.agent_count} 个 Agent（含 ${graph.state.delegated_count} 个委派）`}>
           {Array.from({ length: Math.min(graph.state.agent_count, 6) }).map((_, index) => <IconRobot key={index} aria-hidden="true" />)}
           {graph.state.agent_count === 0 ? <em>固定规则</em> : <em>×{graph.state.agent_count}</em>}
+          {graph.swarm && <em className="wf-swarm-tag">蜂群 · 演示编排</em>}
         </span>
         <span className={`wf-state ${STATE_CLASS[graph.state.status]}`}>任务状态 · {graph.state.label}</span>
       </div>
@@ -147,17 +160,21 @@ export function WorkflowTree({ graph, onInterrupt, interruptBusy = false, compac
             return <path key={index} d={`M${x1} ${y1} C${mid} ${y1} ${mid} ${y2} ${x2 - 2} ${y2}`} className={`wf-edge${from.node.status === "done" ? " is-done" : ""}`} markerEnd="url(#wf-arrow)" />;
           })}
         </svg>
+        {graph.swarm && graph.waves.map(wave => {
+          const first = byId.get(wave.node_ids[0] ?? "");
+          return first ? <div key={wave.index} className={`wf-wave is-${wave.status}`} style={{ left: first.x, top: 0, width: NODE_W }}>{wave.label}</div> : null;
+        })}
         {placed.map(({ node, x, y }) => <div key={node.node_id} className="wf-slot" style={{ left: x, top: y, width: NODE_W, height: NODE_H }}>
           {node.status === "running" && <span className="wf-actor is-agent" title={node.actor_label}><IconRobot aria-hidden="true" /></span>}
           {node.status === "waiting_human" && <span className="wf-actor is-human" title="需要你处理"><IconUser aria-hidden="true" /></span>}
-          <button type="button" className={`wf-node is-${node.status}`} data-node={node.node_id} aria-label={`${node.label}，${node.status_label}，风险等级 ${node.assessment.risk_level}`}
+          <button type="button" className={`wf-node is-${node.status}${focusId === node.node_id ? " is-focus" : ""}`} data-node={node.node_id} aria-label={`${node.label}，${node.status_label}，风险等级 ${node.assessment.risk_level}`}
             aria-expanded={detailId === node.node_id}
             onMouseEnter={event => enter(node.node_id, event.currentTarget)} onMouseLeave={leave}
             onFocus={event => enter(node.node_id, event.currentTarget)} onBlur={leave}
             onClick={event => { const rect = event.currentTarget.getBoundingClientRect(); setPinned(current => current?.id === node.node_id ? null : { id: node.node_id, rect }); }}>
             <b className={`wf-risk level-${node.assessment.risk_level}`}>{node.assessment.risk_level}</b>
             <span className="wf-label">{node.label}</span>
-            <small>{node.status_label}</small>
+            <small>{graph.swarm && node.kind === "work_unit" ? `${node.actor_label} · ${node.status_label}` : node.status_label}</small>
           </button>
         </div>)}
       </div>
