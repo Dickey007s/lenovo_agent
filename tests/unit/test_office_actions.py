@@ -61,6 +61,10 @@ async def test_five_operations_have_distinct_effect_and_control(runtime, operati
     assert runtime.planner.calls == 0
     assert not runtime._tasks
     assert bool(action.receipt) == (operation in {"format_text", "extract_excerpt"})
+    workflow = runtime.public_snapshot(run).workflow
+    assert workflow and workflow.mode == "office_action" and len(workflow.nodes) == 1
+    assert workflow.nodes[0].assessment.risk_level == level
+    assert len(workflow.nodes[0].assessment.dimensions) == 8
     if operation == "restricted_action":
         with pytest.raises(HarnessConflictError):
             await runtime.office_action_control("alice", run.run_id, command(run))

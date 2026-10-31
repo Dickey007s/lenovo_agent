@@ -1130,6 +1130,14 @@ async def test_user_task_searches_the_whole_workspace_and_selects_evidence() -> 
     assert public.rounds[0].plan
     assert "2025 往来明细.csv" in str(public.rounds[0].plan["summary"])
     assert public.result and REF_ONE not in public.result.summary
+    # The projected workflow graph is derived from the same validated plan.
+    assert public.workflow and public.workflow.mode == "control_loop"
+    assert public.workflow.state.status == "done" and public.workflow.state.can_interrupt is False
+    assert [node.node_id for node in public.workflow.nodes][0] == "plan"
+    assert public.workflow.nodes[-1].node_id == "deliver" and public.workflow.nodes[-1].status == "done"
+    assert {node.node_id for node in public.workflow.nodes if node.kind == "work_unit"} == {unit.unit_id for unit in snapshot.plan.units}
+    assert all(len(node.assessment.dimensions) == 8 for node in public.workflow.nodes)
+    assert REF_ONE not in str(public.workflow.model_dump())
     assert snapshot.brief and snapshot.brief.outcome == "completed"
     assert snapshot.budget.rounds_used == 2
     assert snapshot.budget.model_calls_used == 4

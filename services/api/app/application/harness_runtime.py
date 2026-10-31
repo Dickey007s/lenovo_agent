@@ -70,6 +70,11 @@ from services.api.app.application.output_policy import OutputPreference, compile
 from services.api.app.application.collaboration_review import (
     DependencyAssessmentDraft, validate_dependency_assessments, worker_duty, worker_role,
 )
+from services.api.app.application.workflow_graph import (
+    WorkflowGraph,
+    build_control_loop_workflow,
+    build_office_action_workflow,
+)
 from services.api.app.application.topology_admission import TopologyAdmission
 from services.api.app.application.execution_approach import ExecutionApproach, SkillId, skill_catalog, load_skills
 from services.api.app.application.adaptive_review import (
@@ -710,6 +715,7 @@ class PublicHarnessRunSnapshot(BaseModel):
     work_units: list[dict[str, Any]] = Field(default_factory=list, max_length=36)
     contributions: list[dict[str, Any]] = Field(default_factory=list, max_length=96)
     adaptive_reviews: list[AdaptiveReviewRecord] = Field(default_factory=list, max_length=2)
+    workflow: WorkflowGraph | None = None
 
 
 class PublicHarnessTaskLineageItem(BaseModel):
@@ -4282,6 +4288,25 @@ class HarnessRuntime:
             )
             for item in snapshot.workspace_artifacts
         ]
+        if snapshot.office_action is not None:
+            workflow = build_office_action_workflow(snapshot.office_action)
+        else:
+            workflow = build_control_loop_workflow(
+                status=snapshot.status,
+                control_state=snapshot.control_state,
+                plan=public_plan,
+                branches=public_branches,
+                worker_runs=snapshot.worker_runs,
+                topology_mode=snapshot.topology_admission.mode if snapshot.topology_admission else None,
+                ref_to_label=ref_to_label,
+                artifact_count=len(snapshot.artifact_versions),
+                open_decision_branch_ids={
+                    item.branch_id
+                    for item in snapshot.decision_requests
+                    if item.state == "open" and item.branch_id
+                },
+                allowed_file_count=len(snapshot.contract.allowed_file_refs),
+            )
         return PublicHarnessRunSnapshot(
             run_id=snapshot.run_id,
             task_id=snapshot.task_id,
@@ -4341,6 +4366,7 @@ class HarnessRuntime:
                     "reason": self._project_business_text(addition.reason, ref_to_label),
                 }) for addition in item.additions],
             }) for item in snapshot.adaptive_reviews],
+            workflow=workflow,
             worker_runs=snapshot.worker_runs,
             shared_artifacts=snapshot.shared_artifacts,
             work_units=[public_work_unit(item) for item in snapshot.work_units],

@@ -2,12 +2,14 @@
 
 import "./evidence-choice.css";
 import "./copilot-boundaries.css";
+import { WorkflowTree, normalizeWorkflow, type WorkflowGraph } from "./workflow-tree";
 import { projectCopilotBoundaries } from "./capability-boundaries";
 
 import { type ReactNode, type RefObject, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { OfficeActionWorkbench, normalizeOfficeAction, type OfficeAction } from "./office-action-workbench";
 import { UnifiedWorkbench, runSpace, type WorkbenchSpace } from "./unified-workbench";
-import { TodoBatch } from "./todo-batch";
+import { TodoBatch, type MinutesSeed } from "./todo-batch";
+import { MinutesIntake } from "./minutes-intake";
 import { workerStages } from "./worker-stages";
 import { OFFICE_EXAMPLES, officeTaskTitle, TaskProcess, TaskBranches } from "./task-journey";
 import {
@@ -1167,6 +1169,7 @@ export type HarnessPlanNode = {
 export type HarnessRun = {
   execution_policy: "manual" | "automatic_readonly";
   office_action: OfficeAction | null;
+  workflow: WorkflowGraph | null;
   run_id: string;
   task_id: string;
   task_version: number;
@@ -3478,6 +3481,7 @@ function normalizeRun(value: unknown): HarnessRun | null {
     run_id: runId,
     execution_policy: raw.execution_policy === "automatic_readonly" ? "automatic_readonly" : "manual",
     office_action: normalizeOfficeAction(raw.office_action),
+    workflow: normalizeWorkflow(raw.workflow),
     task_id: asText(raw.task_id, "task-000000000000"),
     task_version: asNumber(raw.task_version, 1),
     run_sequence: asNumber(raw.run_sequence, 1),
@@ -4233,6 +4237,7 @@ export function HarnessWorkbench({ onActivityChange, capabilitiesOnly = false, a
   const [space, setSpace] = useState<WorkbenchSpace>("solo");
   const [actionNavigationLocked, setActionNavigationLocked] = useState(false);
   const [batchNavigationLocked, setBatchNavigationLocked] = useState(false);
+  const [minutesSeed, setMinutesSeed] = useState<MinutesSeed | null>(null);
   const [batchGeneration, setBatchGeneration] = useState(0);
   const [batchHasTasks, setBatchHasTasks] = useState(false);
   const [historyError, setHistoryError] = useState("");
@@ -5166,7 +5171,7 @@ export function HarnessWorkbench({ onActivityChange, capabilitiesOnly = false, a
     {selectedRunCurrent === false && run && <p className="read-only-banner" role="status"><IconEye aria-hidden="true" />历史运行，只读查看。<button onClick={() => void openCurrentTask()}>打开当前任务</button></p>}
     {newTaskDraft && space !== "team" && <p className="unified-draft-notice" role="status">新任务草稿 · 之前的任务保留在历史记录中</p>}
     {space === "team" && run && batchHasTasks && <button className="result-return todo-return" disabled={batchNavigationLocked || starting || continuationUnknown || controlBusy !== null} onClick={beginNewTask}><IconArrowLeft aria-hidden="true"/>返回本次待办</button>}
-    <div hidden={space !== "team" || Boolean(run)}><TodoBatch key={batchGeneration} apiBase={API_BASE} headers={HEADERS} normalize={normalizeRun} runs={sessionRuns} onLock={setBatchNavigationLocked} onSwitchSolo={() => selectSpace("solo")} onOpen={snapshot => { void openSessionRun(snapshot); }} onCreated={snapshot => { setBatchHasTasks(true); setSessionRuns(current => [snapshot, ...current.filter(item => item.run_id !== snapshot.run_id)]); }}/></div>
+    <div hidden={space !== "team" || Boolean(run)}><TodoBatch key={batchGeneration} apiBase={API_BASE} headers={HEADERS} normalize={normalizeRun} runs={sessionRuns} onLock={setBatchNavigationLocked} onSwitchSolo={() => selectSpace("solo")} seed={minutesSeed} onOpen={snapshot => { void openSessionRun(snapshot); }} onCreated={snapshot => { setBatchHasTasks(true); setSessionRuns(current => [snapshot, ...current.filter(item => item.run_id !== snapshot.run_id)]); }}/></div>
       <section className="data-task-surface" hidden={space === "team" && !run}>
         {run?.office_action && <header className="workspace-current-task unified-action-heading"><div><span>{run?.office_action ? `第 ${run.office_action.revision} 版` : "新建事项"}</span><h1>{run?.office_action?.input.title ?? "这次，需要完成什么？"}</h1></div></header>}
         {run && !run.office_action && <header className="workspace-current-task"><div><span>{run.run_sequence === 1 ? "初始处理" : `后续分支 ${run.run_sequence - 1}`}</span><h1 title={taskPointer?.goal || run.instruction}>{officeTaskTitle(taskPointer?.goal || run.instruction)}</h1></div><b>{statusLabel(run.status)}</b></header>}
@@ -5190,6 +5195,9 @@ export function HarnessWorkbench({ onActivityChange, capabilitiesOnly = false, a
               <label><span>Agent 执行时间</span><input type="number" min="20" max="14400" step="60" value={deadlineSeconds} disabled={runActive} onChange={(event) => setDeadlineSeconds(Math.max(20, Math.min(14400, Number(event.target.value) || 20)))} /></label>
             </div>
           </details>
+          {!run && space === "solo" && <MinutesIntake apiBase={API_BASE} headers={HEADERS} disabled={runActive || starting}
+            onSingle={text => { setInstruction(text); setOutputPreference("analysis_only"); }}
+            onMulti={seed => { setBatchGeneration(value => value + 1); setBatchHasTasks(false); setMinutesSeed({ ...seed, id: Date.now() }); selectSpace("team"); }} />}
           {!run && <details className="office-division-examples"><summary>办公任务与人机分工示例</summary><div className="office-task-examples">{OFFICE_EXAMPLES.map(example => <button type="button" key={example.title} disabled={runActive || starting} onClick={() => { setInstruction(example.instruction); setOutputPreference("analysis_only"); }}><IconFileDescription/><span>{example.title}</span></button>)}</div></details>}
           <footer>
             <button type="button" onClick={() => void startTask()} disabled={runActive || starting || instruction.trim().length < 3}>{starting ? <IconLoader2 aria-hidden="true" /> : <IconSend aria-hidden="true" />}{starting ? "正在启动" : runActive ? "当前 Loop 运行中" : "启动 Control Loop"}</button>
@@ -5203,8 +5211,10 @@ export function HarnessWorkbench({ onActivityChange, capabilitiesOnly = false, a
           <button type="button" aria-current={view === "result" ? "page" : undefined} className={view === "result" ? "is-active" : ""} onClick={() => setView("result")}>成果{run?.workspace_artifacts.length ? <b>{run.workspace_artifacts.length}</b> : null}</button>
         </nav>
         <div className="workspace-content">
+          {view === "actions" && run?.office_action && run.workflow && <WorkflowTree graph={run.workflow} title="办理流程（固定规则）" />}
           <div hidden={view !== "actions"}><OfficeActionWorkbench composerHost={actionHost} onAnother={newSpaceTask} onNavigationLockChange={setActionNavigationLocked} sessionGeneration={generationRef.current} isSessionCurrent={(generation) => generation === generationRef.current} run={run} files={allFiles} apiBase={API_BASE} headers={HEADERS} onSnapshot={acceptActionSnapshot} onOpenSource={(ref) => { const file = allFiles.find(item => item.file_ref === ref); if (file) openFile(file); }} blocked={runActive && !run?.office_action} readOnly={Boolean(run?.office_action) && isReadOnlyRun} /></div>
           {view === "data" && <><TaskEvidence run={run} files={allFiles} onReview={setReviewRequest} onWorkers={() => setAdaptiveWorkbenchOpen(true)} onOpenFile={openFile}/>{activeFile && previewRequested && <div ref={previewSurfaceRef} tabIndex={-1} className="task-file-preview"><FilePreview key={activeFile.file_ref} preview={preview} file={activeFile} loading={previewLoading} error={previewError} anchor={previewAnchor?.file_ref === activeFile.file_ref ? previewAnchor : null} /></div>}</>}
+          {view === "loop" && run && !run.office_action && run.workflow && <WorkflowTree graph={run.workflow} title="任务流程" interruptBusy={controlBusy !== null || starting} onInterrupt={isReadOnlyRun ? undefined : () => void controlLoop("stop")} />}
           {view === "loop" && run && run.execution_policy !== "automatic_readonly" && !run.office_action && <TaskProcess run={run} files={allFiles} onEvidence={() => setView("data")} onFinding={finding => {
             const findings = run.result?.findings ?? run.artifact_versions.at(-1)?.findings ?? [];
             const artifact = run.artifact_versions.find(item => item.findings.some(saved => saved.finding_id && saved.finding_id === finding.finding_id));
