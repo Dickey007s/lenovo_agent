@@ -4,6 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from services.api.app.api.harness_routes import health_router, router as harness_router
+from services.api.app.api.minutes_routes import router as minutes_router
 from services.api.app.application.harness_runtime import build_harness_runtime
 from services.api.app.config import get_settings
 
@@ -33,6 +34,7 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
     app.include_router(harness_router)
+    app.include_router(minutes_router)
     app.include_router(health_router)
     return app
 

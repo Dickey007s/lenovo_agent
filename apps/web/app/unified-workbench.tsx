@@ -5,6 +5,7 @@ import { IconAdjustments, IconChevronRight, IconClock, IconCube, IconFolder, Ico
 import type { HarnessRun } from "./harness-workbench";
 import { officeTaskTitle } from "./task-journey";
 import { projectTaskResponsibility } from "./task-responsibility";
+import { useDemoMode } from "./demo-mode";
 import "./unified-workbench.css";
 
 export type WorkbenchSpace = "solo" | "team" | "copilot";
@@ -16,7 +17,9 @@ export const WORKBENCH_SPACES = [
 
 export function runSpace(run: HarnessRun): WorkbenchSpace {
   if (run.office_action) return "copilot";
-  return run.execution_policy === "automatic_readonly" || run.topology_admission?.mode === "adaptive_readonly_workers" || run.worker_runs.length > 0 ? "team" : "solo";
+  // Only the to-do list (Demo 2) submits with the automatic policy. A single task that fans out to workers
+  // after the person confirms is still a Demo 1 task, so opening it must not switch workspace.
+  return run.execution_policy === "automatic_readonly" ? "team" : "solo";
 }
 
 function taskStatus(run: HarnessRun) {
@@ -60,6 +63,7 @@ export function UnifiedWorkbench({ space, onSpace, run, runs, loading, locked, h
 }) {
   const [filter, setFilter] = useState("");
   const [navigationOpen, setNavigationOpen] = useState(false);
+  const [simulated, setSimulated] = useDemoMode();
   useEffect(() => { setFilter(""); }, [space]);
   // This is a recent-task projection, never a fabricated execution queue.
   const latest = new Map<string, HarnessRun>();
@@ -78,6 +82,10 @@ export function UnifiedWorkbench({ space, onSpace, run, runs, loading, locked, h
       <button className="unified-new" onClick={onNew} disabled={locked}><IconPlus aria-hidden="true"/>新建任务</button>
       <p className="unified-label">工作区</p>
       <nav aria-label="演示工作区">{WORKBENCH_SPACES.map(item => <button key={item.id} aria-current={space === item.id ? "page" : undefined} disabled={locked} onClick={() => { onSpace(item.id); setNavigationOpen(false); }}><IconFolder aria-hidden="true"/><span>{item.label}</span></button>)}</nav>
+      <label className={`unified-sim${simulated ? " is-on" : ""}`} title="打开后，新提交的任务用本地规则模拟拆分与分析，不调用模型，几秒内出结果；内容只是按关键词摘出原文，不是真实分析。">
+        <input type="checkbox" role="switch" checked={simulated} disabled={locked} onChange={event => setSimulated(event.target.checked)}/>
+        <span><strong>演示模式</strong><small>{simulated ? "已开启 · 不调用模型" : "关闭 · 调用真实模型"}</small></span>
+      </label>
       <div className="unified-materials">{files}</div>
       <div className="unified-rail-bottom"><button onClick={onHistory} disabled={locked}><IconClock aria-hidden="true"/>历史记录</button><a href="/agent-capabilities" aria-disabled={locked || undefined} onClick={event => { if (locked) event.preventDefault(); }}><IconAdjustments aria-hidden="true"/>完整能力记录</a></div>
     </aside>

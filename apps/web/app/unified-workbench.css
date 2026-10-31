@@ -365,3 +365,46 @@
 .todo-preset .todo-fill:disabled { opacity: .5; cursor: default; }
 .todo-preset .todo-fill svg { width: 16px; height: 16px; }
 .todo-batch textarea::placeholder { color: #9aa5b5; }
+
+/* Demo 2: per-row expandable workflow tree + delegated-agent count */
+.todo-row-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.todo-tree-toggle { display: inline-flex; align-items: center; gap: 6px; padding: 0; border: 0; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; min-width: 0; }
+.todo-tree-toggle:disabled { cursor: default; opacity: .75; }
+.todo-tree-toggle h2 { margin: 0; }
+.todo-tree-toggle > svg { flex: none; width: 18px; height: 18px; transition: transform .15s; transform: rotate(-90deg); color: #5b6678; }
+.todo-tree-toggle[aria-expanded="true"] > svg { transform: none; }
+.todo-agents { flex: none; display: inline-flex; align-items: center; gap: 1px; color: #2460ed; }
+.todo-agents svg { width: 18px; height: 18px; }
+.todo-agents em { margin-left: 4px; font-style: normal; font-weight: 750; font-size: 13px; color: #43506a; }
+.todo-tree { margin-top: 8px; }
+
+/* Minutes -> to-dos (main entry) */
+.minutes-intake { margin: 10px 0 0; border: 1px solid var(--line, #e3e7ee); border-radius: 10px; background: #fff; }
+.minutes-intake > summary { display: flex; align-items: center; gap: 8px; padding: 10px 12px; cursor: pointer; font-size: 13px; font-weight: 600; color: #2b3445; list-style: none; }
+.minutes-intake > summary::-webkit-details-marker { display: none; }
+.minutes-intake > summary svg { width: 16px; height: 16px; color: #2f6fed; }
+.minutes-intake > p { margin: 0 12px 8px; font-size: 12.5px; line-height: 1.6; color: #667085; }
+.minutes-intake textarea { display: block; width: calc(100% - 24px); min-height: 150px; margin: 0 12px; padding: 10px; border: 1px solid #d5dbe6; border-radius: 8px; font: inherit; font-size: 13px; line-height: 1.6; resize: vertical; box-sizing: border-box; }
+.minutes-intake > div { display: flex; gap: 8px; justify-content: flex-end; padding: 10px 12px 12px; }
+.minutes-intake button { display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 12px; border-radius: 8px; border: 1px solid #c9d3e6; background: #fff; color: #2b3445; font-size: 13px; cursor: pointer; }
+.minutes-intake button.minutes-split { background: #2f6fed; border-color: #2f6fed; color: #fff; }
+.minutes-intake button:disabled { opacity: .5; cursor: not-allowed; }
+.minutes-intake button svg { width: 15px; height: 15px; }
+.minutes-intake .minutes-message { margin: 0 12px 12px; color: #b54708; }
+.todo-seed-note { display: flex; gap: 8px; align-items: flex-start; margin: 0 0 12px; padding: 10px 12px; border: 1px solid #b7d0ff; border-radius: 10px; background: #eef4ff; color: #1d3f8a; font-size: 13px; line-height: 1.6; }
+.todo-seed-note svg { flex: none; width: 16px; height: 16px; margin-top: 3px; }
+.todo-source { margin: 0 0 6px; font-size: 12.5px; color: #667085; }
+.todo-source summary { cursor: pointer; }
+.todo-source blockquote { margin: 6px 0 0; padding: 6px 10px; border-left: 3px solid #b7d0ff; background: #f7f9fc; color: #475467; line-height: 1.6; }
+
+.unified-sim { margin: 10px 16px 0; padding: 9px 11px; display: flex; align-items: center; gap: 10px; border: 1px solid #e0e4ec; border-radius: 10px; background: #fafbfd; cursor: pointer; }
+.unified-sim input { appearance: none; flex: none; width: 32px; height: 18px; border-radius: 999px; background: #cdd3de; position: relative; cursor: inherit; transition: background .15s; }
+.unified-sim input::after { content: ""; position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border-radius: 50%; background: #fff; transition: transform .15s; }
+.unified-sim input:checked { background: #c8962a; }
+.unified-sim input:checked::after { transform: translateX(14px); }
+.unified-sim input:disabled { opacity: .5; }
+.unified-sim span { display: grid; gap: 1px; min-width: 0; }
+.unified-sim strong { font-size: 13px; color: #2b3445; }
+.unified-sim small { font-size: 11.5px; color: #7a8497; }
+.unified-sim.is-on { border-color: #e2c97f; background: #fff9e8; }
+.unified-sim.is-on small { color: #8a6a1c; }

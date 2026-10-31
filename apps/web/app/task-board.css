@@ -1,0 +1,60 @@
+/* Shared lower half of every task page: steer box, human/system board. */
+.steer { display: grid; gap: 6px; margin: 0 0 12px; }
+.steer label { font-size: 12.5px; font-weight: 700; color: #43506a; }
+.steer > div { display: flex; gap: 8px; }
+.steer input { flex: 1; min-width: 0; height: 36px; padding: 0 12px; border: 1px solid #d5dbe6; border-radius: 8px; font: inherit; font-size: 13px; background: #fff; }
+.steer input:focus { outline: 2px solid rgba(36, 96, 237, .25); border-color: #2460ed; }
+.steer button { display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 14px; border: 0; border-radius: 8px; background: #2460ed; color: #fff; font-size: 13px; cursor: pointer; }
+.steer button:disabled { opacity: .45; cursor: not-allowed; }
+.steer button svg { width: 15px; height: 15px; }
+.steer ul { display: grid; gap: 4px; margin: 2px 0 0; padding: 0; list-style: none; }
+.steer li { display: flex; gap: 6px; align-items: flex-start; font-size: 12.5px; color: #3b4658; line-height: 1.6; }
+.steer li svg { flex: none; width: 14px; height: 14px; margin-top: 4px; color: #1c7a4a; }
+.steer li em { margin-left: 8px; font-style: normal; color: #8a94a6; }
+
+.board { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin: 0 0 14px; }
+.board-col { display: grid; align-content: start; gap: 8px; padding: 12px 14px; border: 1px solid #dce2eb; border-top-width: 3px; border-radius: 8px; background: #fff; }
+.board-human { border-top-color: #e0a800; }
+.board-system { border-top-color: #2f9e6a; }
+.board-col h4 { display: flex; align-items: center; gap: 6px; margin: 0; font-size: 13.5px; color: #1f2a3d; }
+.board-col h4 svg { width: 16px; height: 16px; }
+.board-human h4 svg { color: #b58300; }
+.board-system h4 svg { color: #2f9e6a; }
+.board-col h4 span { margin-left: auto; font-size: 12px; font-weight: 500; color: #6b778c; }
+.board-col ul { display: grid; gap: 10px; margin: 0; padding: 0; list-style: none; }
+.board-col li { display: grid; gap: 3px; padding-top: 8px; border-top: 1px solid #eef1f6; }
+.board-col li:first-child { padding-top: 0; border-top: 0; }
+.board-col li strong { font-size: 13px; color: #1f2a3d; line-height: 1.5; }
+.board-col li p { margin: 0; font-size: 12.5px; line-height: 1.6; color: #55617a; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.board-actions { display: flex; align-items: center; gap: 10px; margin-top: 2px; }
+.board-actions button { display: inline-flex; align-items: center; gap: 4px; padding: 0; border: 0; background: none; color: #2460ed; font-size: 12.5px; font-weight: 600; cursor: pointer; }
+.board-actions button svg { width: 14px; height: 14px; }
+.board-actions span { font-size: 11.5px; color: #8a94a6; }
+.board-col small { font-size: 12px; color: #6b778c; }
+.board-col details summary { cursor: pointer; font-size: 12.5px; color: #2460ed; }
+.board-col details ul { margin-top: 8px; }
+.board-empty { margin: 0; font-size: 12.5px; color: #8a94a6; }
+@media (max-width: 760px) { .board { grid-template-columns: 1fr; } }
+
+/* Collapsed legacy controls: still reachable when a run needs them, no longer the page body. */
+.task-controls { margin: 0 0 14px; border: 1px solid #e3e7ee; border-radius: 8px; background: #fafbfd; }
+.task-controls > summary { padding: 10px 14px; cursor: pointer; font-size: 12.5px; color: #55617a; }
+.task-controls > div { padding: 0 14px 14px; }
+
+.board-sim { grid-column: 1 / -1; margin: 0; padding: 8px 12px; border: 1px dashed #c9b27a; border-radius: 8px; background: #fff9e8; color: #6b5420; font-size: 12.5px; line-height: 1.5; }
+.board-sim strong { margin-right: 8px; padding: 1px 7px; border-radius: 999px; background: #f1dfa6; color: #5a4310; font-size: 12px; }
+
+.steer > div.steer-supply { display: grid; flex-direction: column; gap: 6px; padding: 10px 12px; border: 1px dashed #c9b27a; border-radius: 8px; background: #fffaf0; }
+.steer-supply p { margin: 0; font-size: 12.5px; color: #6b5420; }
+.steer-supply > input { height: 32px; }
+.steer-supply ul { max-height: 190px; overflow: auto; margin: 0; }
+.steer-supply li { display: block; }
+.steer-supply li button { display: flex; width: 100%; height: auto; padding: 6px 8px; border-radius: 6px; background: none; color: #2b3445; text-align: left; font-size: 12.5px; }
+.steer-supply li button:hover { background: #f1ead6; }
+.steer-supply li button svg { color: #8a6a1c; }
+.steer-none { color: #8a94a6; font-size: 12.5px; }
+.steer-picked { display: inline-flex; align-items: center; gap: 6px; width: fit-content; max-width: 100%; padding: 4px 6px 4px 10px; border-radius: 999px; background: #f1dfa6; color: #5a4310; font-size: 12.5px; }
+.steer-picked button { width: 20px; height: 20px; padding: 0; justify-content: center; background: none; color: #5a4310; }
+.steer button.steer-cancel { width: fit-content; height: auto; padding: 2px 0; background: none; color: #6b778c; font-size: 12px; }
+.steer-supply em { font-style: normal; color: #b3261e; font-size: 12.5px; }
+.board-carried { margin-left: 8px; padding: 1px 7px; border-radius: 999px; background: #f1dfa6; color: #5a4310; font-size: 11.5px; font-style: normal; font-weight: 500; }

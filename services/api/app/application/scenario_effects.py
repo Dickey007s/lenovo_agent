@@ -3246,7 +3246,12 @@ class ScenarioEffectEngine:
         ]
         if len(folders) != 1:
             raise ScenarioEffectError("Finance-018 财务管理目录必须唯一")
-        items = list(folders[0].get("files") or [])
+        # Only the period workbooks are sources; supporting documents (e.g. a bank receipt) may sit beside them.
+        items = [
+            item
+            for item in folders[0].get("files") or []
+            if str(item.get("display_label")).lower().endswith(".xlsx")
+        ]
         expected_labels = [label for group, label in spec.source_labels if group == "财务管理"]
         if len(items) != 3 or sorted(str(item.get("display_label")) for item in items) != sorted(
             expected_labels

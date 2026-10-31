@@ -11,10 +11,10 @@
     "local_input_bundle_task_count": 13,
     "task_only_external_dependency_count": 2,
     "task_instruction_file_count": 15,
-    "input_file_count": 96,
+    "input_file_count": 97,
     "task_instruction_bytes": 143462,
-    "input_bytes": 1636983,
-    "imported_bytes": 1780445
+    "input_bytes": 1875900,
+    "imported_bytes": 2019362
   },
   "excluded_upstream_material": [
     "data/assets/*/solution/**",
@@ -511,9 +511,10 @@
         "role": "task_instruction"
       },
       "input_dir": "Finance-018/input",
-      "input_file_count": 3,
-      "input_bytes": 39469,
+      "input_file_count": 4,
+      "input_bytes": 278386,
       "file_extensions": [
+        ".pdf",
         ".xlsx"
       ],
       "input_files": [
@@ -536,6 +537,13 @@
           "sha256": "4ee1f69d3346eea3b99660ab8a2efc946c93f00123ba83e121277bc7be66f4f3",
           "size": 12746,
           "mime": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          "role": "input"
+        },
+        {
+          "path": "Finance-018/input/银行到账回单-绵阳长城往来回款.pdf",
+          "sha256": "59db314fe1e41613e5b63fe83c68363abcccf77627b77b1f9d6632ad84d5ac93",
+          "size": 238917,
+          "mime": "application/pdf",
           "role": "input"
         }
       ]

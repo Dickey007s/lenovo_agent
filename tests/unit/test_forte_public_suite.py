@@ -28,10 +28,10 @@ def test_public_suite_contains_every_published_demo_input() -> None:
         "local_input_bundle_task_count": 13,
         "task_only_external_dependency_count": 2,
         "task_instruction_file_count": 15,
-        "input_file_count": 96,
+        "input_file_count": 97,
         "task_instruction_bytes": 143462,
-        "input_bytes": 1636983,
-        "imported_bytes": 1780445,
+        "input_bytes": 1875900,
+        "imported_bytes": 2019362,
     }
 
     declared_paths: set[str] = set()

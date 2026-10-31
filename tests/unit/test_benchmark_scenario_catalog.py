@@ -40,8 +40,8 @@ def test_workspace_indexes_complete_pinned_public_suite() -> None:
     assert manifest.scope.full_benchmark_task_count_reported_by_upstream == 180
     assert manifest.scope.public_demo_task_count == 15
     assert len(folders) == workspace["folder_count"] == 15
-    assert workspace["file_count"] == workspace["previewable_file_count"] == 96
-    assert sum(folder["file_count"] for folder in workspace["folders"]) == 96
+    assert workspace["file_count"] == workspace["previewable_file_count"] == 97
+    assert sum(folder["file_count"] for folder in workspace["folders"]) == 97
     assert {file["extension"] for file in public_files(workspace)}.issuperset(
         {"XLSX", "CSV", "PDF", "DOCX", "TXT"}
     )
@@ -116,13 +116,13 @@ def test_csv_pdf_docx_txt_previews_are_bounded_and_safe(
         assert preview["text"]
 
 
-def test_all_96_public_files_have_a_safe_preview() -> None:
+def test_all_97_public_files_have_a_safe_preview() -> None:
     catalog = BenchmarkWorkspaceCatalog(ROOT)
     workspace = catalog.public_workspace()
 
     previews = [catalog.public_file(str(file["file_ref"])) for file in public_files(workspace)]
 
-    assert len(previews) == 96
+    assert len(previews) == 97
     assert {preview["kind"] for preview in previews} == {
         "table",
         "document",

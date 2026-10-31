@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
+from difflib import SequenceMatcher
 import inspect
 import json
 import logging
@@ -69,6 +70,13 @@ from services.api.app.application.readonly_source_facts import (
 from services.api.app.application.output_policy import OutputPreference, compile_output_policy
 from services.api.app.application.collaboration_review import (
     DependencyAssessmentDraft, validate_dependency_assessments, worker_duty, worker_role,
+)
+from services.api.app.application.workflow_graph import (
+    WorkflowGraph,
+    build_control_loop_workflow,
+    HumanItem,
+    collect_human_items,
+    build_office_action_workflow,
 )
 from services.api.app.application.topology_admission import TopologyAdmission
 from services.api.app.application.execution_approach import ExecutionApproach, SkillId, skill_catalog, load_skills
@@ -458,6 +466,10 @@ class HarnessWorkspaceArtifactRecord(AgentControlLoopWorkspaceArtifact):
     content_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
 
 
+def _item_topic_match(left: str, right: str) -> bool:
+    return left == right or SequenceMatcher(None, left, right).find_longest_match(0, len(left), 0, len(right)).size >= 8
+
+
 class HarnessRunSnapshot(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -485,6 +497,9 @@ class HarnessRunSnapshot(BaseModel):
     instruction: str = Field(min_length=1, max_length=2_000)
     instruction_source: Literal["user"] = "user"
     execution_policy: Literal["manual", "automatic_readonly"] = "manual"
+    simulated: bool = False
+    # Human work an earlier run of this task left open and nobody has dealt with yet.
+    carried_human_items: list[HumanItem] = Field(default_factory=list, max_length=24)
     contract: AgentControlLoopContract
     budget: AgentControlLoopBudget
     rounds: list[AgentControlLoopRound] = Field(default_factory=list, max_length=24)
@@ -552,6 +567,8 @@ class HarnessRunStart(BaseModel):
     action: ActionInput | None = None
     output_preference: OutputPreference = "auto"
     execution_policy: Literal["manual", "automatic_readonly"] = "manual"
+    # Demo mode: plan and analyse with the offline simulator instead of the model.
+    simulated: bool = False
 
     @model_validator(mode="after")
     def validate_output_agreement(self):
@@ -568,6 +585,8 @@ class HarnessRunStart(BaseModel):
             payload.pop("output_preference", None)
         if self.execution_policy == "manual":
             payload.pop("execution_policy", None)
+        if not self.simulated:
+            payload.pop("simulated", None)
         return payload
 
     @field_validator("instruction")
@@ -680,6 +699,7 @@ class PublicHarnessRunSnapshot(BaseModel):
     instruction: str
     instruction_source: Literal["user"]
     execution_policy: Literal["manual", "automatic_readonly"] = "manual"
+    simulated: bool = False
     contract: AgentControlLoopContract
     budget: AgentControlLoopBudget
     rounds: list[AgentControlLoopRound]
@@ -710,6 +730,7 @@ class PublicHarnessRunSnapshot(BaseModel):
     work_units: list[dict[str, Any]] = Field(default_factory=list, max_length=36)
     contributions: list[dict[str, Any]] = Field(default_factory=list, max_length=96)
     adaptive_reviews: list[AdaptiveReviewRecord] = Field(default_factory=list, max_length=2)
+    workflow: WorkflowGraph | None = None
 
 
 class PublicHarnessTaskLineageItem(BaseModel):
@@ -1236,6 +1257,10 @@ class HarnessRuntime:
         self.catalog = catalog
         self.planner = planner
         self.analyst = analyst
+        from services.api.app.application.demo_simulator import SimulatedAnalyst, SimulatedPlanner
+
+        self._sim_planner = SimulatedPlanner()
+        self._sim_analyst = SimulatedAnalyst()
         self.state_store = state_store or InMemoryHarnessStateStore()
         # HarnessStateStore is the sole aggregate boundary for the task
         # ledger, Run snapshot and command receipts.
@@ -1876,6 +1901,8 @@ class HarnessRuntime:
                 instruction=instruction,
                 instruction_source="user",
                 execution_policy=request.execution_policy,
+                simulated=bool(getattr(request, "simulated", False) or (parent is not None and parent.simulated)),
+                carried_human_items=self._carry_human_items(parent, instruction) if parent is not None else [],
                 contract=contract,
                 budget=budget,
             )
@@ -2868,6 +2895,7 @@ class HarnessRuntime:
             and snapshot.office_action is None
             and snapshot.topology_admission
             and snapshot.topology_admission.mode == "single_controller"
+            and not snapshot.simulated
             and callable(getattr(self.planner, "review_progress", None))
             and plan and len(plan.units) == 1
             and not plan.deferred_requirements and not plan.uncovered_requirements
@@ -2879,7 +2907,7 @@ class HarnessRuntime:
         )
 
     async def _review_worker_wave(self, owner_id, run_id, contributions):
-        reviewer = getattr(self.planner, "review_progress", None)
+        reviewer = None if self._is_simulated(owner_id, run_id) else getattr(self.planner, "review_progress", None)
         if not callable(reviewer):
             return None, []
         async with self._lock:
@@ -2991,7 +3019,7 @@ class HarnessRuntime:
                 parent is None or parent.status != "completed" or unit is None
                 or unit.state != WorkUnitState.ADOPTED or contribution is None
                 or contribution.gate_status != ContributionGateStatus.ADOPTED
-                or not contribution.model_receipt.called
+                or (not contribution.model_receipt.called and not snapshot.simulated)
                 or not contribution.model_receipt.output_used
                 or contribution.branch_id != dependency_id
                 or contribution.owner_id != snapshot.owner_id
@@ -4282,6 +4310,35 @@ class HarnessRuntime:
             )
             for item in snapshot.workspace_artifacts
         ]
+        if snapshot.office_action is not None:
+            workflow = build_office_action_workflow(snapshot.office_action)
+        else:
+            workflow = build_control_loop_workflow(
+                status=snapshot.status,
+                control_state=snapshot.control_state,
+                plan=public_plan,
+                branches=public_branches,
+                worker_runs=snapshot.worker_runs,
+                topology_mode=snapshot.topology_admission.mode if snapshot.topology_admission else None,
+                ref_to_label=ref_to_label,
+                artifact_count=len(snapshot.artifact_versions),
+                open_decision_branch_ids={
+                    item.branch_id
+                    for item in snapshot.decision_requests
+                    if item.state == "open" and item.branch_id
+                },
+                allowed_file_count=len(snapshot.contract.allowed_file_refs),
+                human_items=[
+                    item.model_copy(
+                        update={
+                            "title": self._project_business_text(item.title, ref_to_label),
+                            "reason": self._project_business_text(item.reason, ref_to_label),
+                        }
+                    )
+                    for item in self._open_human_items(snapshot)
+                ],
+                swarm=snapshot.execution_policy == "automatic_readonly",
+            )
         return PublicHarnessRunSnapshot(
             run_id=snapshot.run_id,
             task_id=snapshot.task_id,
@@ -4306,6 +4363,7 @@ class HarnessRuntime:
             instruction=snapshot.instruction,
             instruction_source=snapshot.instruction_source,
             execution_policy=snapshot.execution_policy,
+            simulated=snapshot.simulated,
             contract=public_contract,
             budget=snapshot.budget,
             rounds=public_rounds,
@@ -4341,6 +4399,7 @@ class HarnessRuntime:
                     "reason": self._project_business_text(addition.reason, ref_to_label),
                 }) for addition in item.additions],
             }) for item in snapshot.adaptive_reviews],
+            workflow=workflow,
             worker_runs=snapshot.worker_runs,
             shared_artifacts=snapshot.shared_artifacts,
             work_units=[public_work_unit(item) for item in snapshot.work_units],
@@ -6484,7 +6543,7 @@ class HarnessRuntime:
             )
             started = perf_counter()
             try:
-                candidate = await self.planner.plan(
+                candidate = await self._planner_for(owner_id, run_id).plan(
                     scenario=self._planner_workspace(
                         workspace,
                         question,
@@ -6548,8 +6607,8 @@ class HarnessRuntime:
                 continue
 
             receipt = HarnessModelReceipt(
-                called=True,
-                model=getattr(self.planner, "model", self.MODEL),
+                called=not self._is_simulated(owner_id, run_id),
+                model=getattr(self._planner_for(owner_id, run_id), "model", self.MODEL),
                 elapsed_ms=max(0, round((perf_counter() - started) * 1000)),
                 output_used=False,
             )
@@ -7577,7 +7636,8 @@ class HarnessRuntime:
                 "files": files,
                 "validation_feedback": validation_feedback,
             }
-            analyze_parameters = inspect.signature(self.analyst.analyze).parameters.values()
+            analyst = self._analyst_for(owner_id, run_id)
+            analyze_parameters = inspect.signature(analyst.analyze).parameters.values()
             if dependency_context:
                 if not any(parameter.name == "dependency_context" or parameter.kind is inspect.Parameter.VAR_KEYWORD
                            for parameter in analyze_parameters):
@@ -7594,13 +7654,13 @@ class HarnessRuntime:
                 for parameter in analyze_parameters
             ):
                 analyze_kwargs["readonly_context"] = readonly_context
-            result = await self.analyst.analyze(
+            result = await analyst.analyze(
                 **analyze_kwargs,
             )
             numeric_error = readonly_numeric_error(readonly_context, result.model_dump(mode="json"))
             if numeric_error:
                 raise HarnessModelError(numeric_error, called=True,
-                                        model=getattr(self.analyst, "model", self.MODEL),
+                                        model=getattr(analyst, "model", self.MODEL),
                                         failure_kind="source_numeric_conflict")
         except HarnessModelError as exc:
             receipt = HarnessModelReceipt(
@@ -7637,8 +7697,8 @@ class HarnessRuntime:
             )
             raise
         receipt = HarnessModelReceipt(
-            called=True,
-            model=getattr(self.analyst, "model", self.MODEL),
+            called=not self._is_simulated(owner_id, run_id),
+            model=getattr(analyst, "model", self.MODEL),
             elapsed_ms=max(0, round((perf_counter() - analysis_started) * 1000)),
             output_used=False,
         )
@@ -7723,7 +7783,60 @@ class HarnessRuntime:
         ]
 
     @staticmethod
+    def _open_human_items(snapshot: HarnessRunSnapshot) -> list[HumanItem]:
+        """Everything a person still has to do on this run: its own items plus those carried in."""
+
+        own = collect_human_items(
+            findings=(
+                snapshot.result.findings
+                if snapshot.result is not None
+                else snapshot.artifact_versions[-1].findings
+                if snapshot.artifact_versions
+                else []
+            ),
+            decision_requests=snapshot.decision_requests,
+            decision_records=snapshot.decision_records,
+            uncovered=snapshot.plan.uncovered_requirements if snapshot.plan is not None else [],
+            branch_unit={item.branch_id: item.unit_id for item in snapshot.branches},
+        )
+        carried: list[HumanItem] = []
+        for item in snapshot.carried_human_items:
+            # The new plan may already raise the same question itself; show it once.
+            if any(item.kind == fresh.kind and _item_topic_match(item.title, fresh.title) for fresh in own):
+                continue
+            carried.append(item)
+        return [*own, *carried]
+
+    @classmethod
+    def _carry_human_items(cls, parent: HarnessRunSnapshot, instruction: str) -> list[HumanItem]:
+        """Open items of the parent that the new request does not deal with.
+
+        A decision made through the review dialog is already a receipt on the parent and is not
+        open any more. Supplying material or replying to a to-do names it in the request text.
+        """
+
+        carried: list[HumanItem] = []
+        for item in cls._open_human_items(parent):
+            core = item.title.replace("缺少来源：", "").rstrip("…").strip()[:16]
+            if core and core in instruction:
+                continue
+            carried.append(
+                item.model_copy(
+                    update={
+                        "item_id": item.item_id if item.carried else f"r{parent.run_sequence}-{item.item_id}"[:80],
+                        "parent_unit_ids": [],
+                        "carried": True,
+                    }
+                )
+            )
+        return carried[:24]
+
+    @staticmethod
     def _explicit_business_requirement_count(instruction: str) -> int:
+        # A follow-up quotes the original numbered list only as background; only what is asked now counts.
+        marker = "\n本次后续要求：\n"
+        if marker in instruction:
+            instruction = instruction.split(marker, 1)[1]
         requirement_markers = (
             "业务分支",
             "以下分支",
@@ -8865,6 +8978,19 @@ class HarnessRuntime:
                 "output_used": bool(receipt and receipt.output_used),
             },
         )
+
+    def _is_simulated(self, owner_id: str, run_id: str) -> bool:
+        run = self._runs.get((owner_id, run_id))
+        return bool(run and run.snapshot.simulated)
+
+    def _planner_for(self, owner_id: str, run_id: str) -> HarnessPlanner:
+        return self._sim_planner if self._is_simulated(owner_id, run_id) else self.planner
+
+    def _analyst_for(self, owner_id: str, run_id: str) -> HarnessAnalyst:
+        if self._is_simulated(owner_id, run_id):
+            return self._sim_analyst
+        assert self.analyst is not None
+        return self.analyst
 
     def _require_run(self, owner_id: str, run_id: str) -> _Run:
         run = self._runs.get((owner_id, run_id))
