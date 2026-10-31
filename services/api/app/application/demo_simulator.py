@@ -203,11 +203,16 @@ class SimulatedPlanner:
         """A follow-up only does what the person just chose, on the files the original task named."""
         background, request = instruction.split(_FOLLOW_UP_MARK, 1)
         request = request.strip()
-        refs = [
-            str(item["file_ref"])
-            for item in files
-            if item.get("display_label") and _mentions(background, str(item["display_label"]))
-        ]
+
+        def named(text: str) -> list[str]:
+            return [
+                str(item["file_ref"])
+                for item in files
+                if item.get("display_label") and _mentions(text, str(item["display_label"]))
+            ]
+
+        # Material the person just supplied is named in the request itself and takes the lead.
+        refs = named(request) or named(background)
         if not refs:
             raise HarnessModelError(
                 "演示模拟找不到原任务用到的文件，无法继续后续处理",
@@ -225,7 +230,7 @@ class SimulatedPlanner:
         )
         return HarnessPlanCandidate(
             summary="演示模拟：按你刚才的决定继续，只整理现规则允许的内容。",
-            selection_reason="演示模拟沿用原任务点名的文件，没有调用模型。",
+            selection_reason="演示模拟只读本次点名的文件（没点名则沿用原任务的文件），没有调用模型。",
             units=[unit],
             requirement_coverage=[],
         )

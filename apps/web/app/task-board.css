@@ -43,3 +43,17 @@
 
 .board-sim { grid-column: 1 / -1; margin: 0; padding: 8px 12px; border: 1px dashed #c9b27a; border-radius: 8px; background: #fff9e8; color: #6b5420; font-size: 12.5px; line-height: 1.5; }
 .board-sim strong { margin-right: 8px; padding: 1px 7px; border-radius: 999px; background: #f1dfa6; color: #5a4310; font-size: 12px; }
+
+.steer > div.steer-supply { display: grid; flex-direction: column; gap: 6px; padding: 10px 12px; border: 1px dashed #c9b27a; border-radius: 8px; background: #fffaf0; }
+.steer-supply p { margin: 0; font-size: 12.5px; color: #6b5420; }
+.steer-supply > input { height: 32px; }
+.steer-supply ul { max-height: 190px; overflow: auto; margin: 0; }
+.steer-supply li { display: block; }
+.steer-supply li button { display: flex; width: 100%; height: auto; padding: 6px 8px; border-radius: 6px; background: none; color: #2b3445; text-align: left; font-size: 12.5px; }
+.steer-supply li button:hover { background: #f1ead6; }
+.steer-supply li button svg { color: #8a6a1c; }
+.steer-none { color: #8a94a6; font-size: 12.5px; }
+.steer-picked { display: inline-flex; align-items: center; gap: 6px; width: fit-content; max-width: 100%; padding: 4px 6px 4px 10px; border-radius: 999px; background: #f1dfa6; color: #5a4310; font-size: 12.5px; }
+.steer-picked button { width: 20px; height: 20px; padding: 0; justify-content: center; background: none; color: #5a4310; }
+.steer button.steer-cancel { width: fit-content; height: auto; padding: 2px 0; background: none; color: #6b778c; font-size: 12px; }
+.steer-supply em { font-style: normal; color: #b3261e; font-size: 12.5px; }

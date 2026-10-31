@@ -128,3 +128,39 @@ async def test_follow_up_after_a_decision_completes_instead_of_asking_again():
         assert all(node.status == "done" for node in public.workflow.nodes)
     finally:
         await runtime.close()
+
+
+@pytest.mark.asyncio
+async def test_supplying_a_library_file_reads_that_file_and_finishes_the_paused_step():
+    runtime = HarnessRuntime(BenchmarkWorkspaceCatalog(), NeverCalled(), NeverCalled())
+    try:
+        async def settle(run_id):
+            for _ in range(400):
+                run = await runtime.get("demo-user", run_id)
+                if run.status in {"completed", "failed", "stopped"}:
+                    return run
+                await asyncio.sleep(0.05)
+            return run
+
+        first = await runtime.start(
+            "demo-user",
+            HarnessRunStart(
+                instruction=FORK, idempotency_key="sim-supply-0001", simulated=True,
+                execution_policy="automatic_readonly", output_preference="analysis_only",
+                loop={"max_rounds": 3, "max_files_per_round": 8, "max_model_calls": 8, "deadline_seconds": 120},
+            ),
+        )
+        run = await settle(first.run.run_id)
+        assert any(node.ref_kind == "missing" for node in runtime.public_snapshot(run).workflow.nodes)
+        child = await runtime.continue_unfinished_task(
+            "demo-user", run.run_id, None, idempotency_key="supply-follow-0001", expected_version=run.version,
+            expected_task_version=run.task_version, purpose="follow_up",
+            instruction="补充资料：用《外卖商户BD岗位JD》核对「银行到账回单」，说明能否据此印证这一项。",
+        )
+        run = await settle(child.run.run_id)
+        public = runtime.public_snapshot(run)
+        assert run.status == "completed" and not run.validation_errors
+        assert all(node.status == "done" for node in public.workflow.nodes)
+        assert any("外卖商户BD岗位JD" in finding.title for finding in run.result.findings)
+    finally:
+        await runtime.close()

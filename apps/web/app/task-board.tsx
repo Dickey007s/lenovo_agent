@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
-import { IconCheck, IconCornerDownRight, IconPlayerPlay, IconSend, IconUser } from "@tabler/icons-react";
-import type { HarnessRun } from "./harness-workbench";
+import { useEffect, useRef, useState } from "react";
+import { IconCheck, IconCornerDownRight, IconFileDescription, IconPlayerPlay, IconSend, IconUser, IconX } from "@tabler/icons-react";
+import type { HarnessFile, HarnessRun } from "./harness-workbench";
 import { projectTaskResponsibility } from "./task-responsibility";
 import type { WorkflowGraph, WorkflowNode } from "./workflow-tree";
 import "./task-board.css";
@@ -11,24 +11,73 @@ type Finding = NonNullable<HarnessRun["result"]>["findings"][number];
 
 const KIND_ACTION: Record<string, string> = { judgment: "查看问题与选项", source_choice: "核对依据", missing: "补充资料", start: "确认并启动" };
 
-// One place for "tell the agent something new". The demo records the request only; it does not
-// change a running task yet, and the page says so.
-export function TaskSteer({ disabled = false, running = false }: { disabled?: boolean; running?: boolean }) {
+export type SteerRequest = { nonce: number; subject: string };
+
+const stemOf = (label: string) => (label.includes(".") ? label.slice(0, label.lastIndexOf(".")) : label);
+
+// One place for "tell the agent something new". Typed text is only recorded in the demo and does not
+// change a running task. Supplying a library file for a missing source is real: it opens a follow-up
+// branch on the same task, so the paused step can finish.
+export function TaskSteer({ disabled = false, running = false, files = [], request = null, canSupply = false, onSupply }: {
+  disabled?: boolean; running?: boolean; files?: HarnessFile[]; request?: SteerRequest | null; canSupply?: boolean;
+  onSupply?: (instruction: string) => Promise<boolean>;
+}) {
   const [text, setText] = useState("");
   const [notes, setNotes] = useState<string[]>([]);
-  const submit = () => {
+  const [subject, setSubject] = useState<string | null>(null);
+  const [picked, setPicked] = useState<HarnessFile | null>(null);
+  const [query, setQuery] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [failed, setFailed] = useState("");
+  const inputRef = useRef<HTMLInputElement>(null);
+  const sectionRef = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    if (!request) return;
+    setSubject(request.subject); setPicked(null); setQuery(""); setFailed("");
+    setText(`为「${request.subject}」补充资料`);
+    sectionRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+    inputRef.current?.focus();
+  }, [request]);
+
+  const matches = files
+    .filter(file => !query.trim() || `${file.display_label} ${file.display_path}`.toLocaleLowerCase("zh-CN").includes(query.trim().toLocaleLowerCase("zh-CN")))
+    .slice(0, 8);
+  const supplying = Boolean(subject);
+  const submit = async () => {
     const value = text.trim();
-    if (!value || disabled) return;
+    if (disabled || busy) return;
+    if (supplying && picked && onSupply && canSupply) {
+      setBusy(true); setFailed("");
+      const ok = await onSupply(`补充资料：用《${stemOf(picked.display_label)}》核对「${subject}」，说明能否据此印证这一项。${value ? `\n用户补充：${value}` : ""}`);
+      setBusy(false);
+      if (ok) { setSubject(null); setPicked(null); setText(""); setQuery(""); } else setFailed("没有提交成功，请重试。");
+      return;
+    }
+    if (!value) return;
     setNotes(current => [...current, value].slice(-3));
     setText("");
   };
-  return <section className="steer" aria-label="修改任务要求">
+  const canSubmit = supplying ? Boolean(picked) && canSupply && !busy : Boolean(text.trim());
+  return <section className="steer" aria-label="修改任务要求" ref={sectionRef}>
     <label htmlFor="task-steer-input">{running ? "任务进行中，有新要求或想调整方向？" : "想补充新要求或调整方向？"}</label>
     <div>
-      <input id="task-steer-input" value={text} disabled={disabled} maxLength={300} placeholder="例如：先不要处理第 2 项，改成只列出缺口"
-        onChange={event => setText(event.target.value)} onKeyDown={event => { if (event.key === "Enter" && !event.nativeEvent.isComposing) submit(); }} />
-      <button type="button" disabled={disabled || !text.trim()} onClick={submit}><IconSend aria-hidden="true" />提交</button>
+      <input id="task-steer-input" ref={inputRef} value={text} disabled={disabled || busy} maxLength={300} placeholder="例如：先不要处理第 2 项，改成只列出缺口"
+        onChange={event => setText(event.target.value)} onKeyDown={event => { if (event.key === "Enter" && !event.nativeEvent.isComposing) void submit(); }} />
+      <button type="button" disabled={disabled || !canSubmit} onClick={() => void submit()}><IconSend aria-hidden="true" />{busy ? "正在提交" : supplying ? "补充并继续" : "提交"}</button>
     </div>
+    {supplying && <div className="steer-supply" role="group" aria-label="补充资料">
+      <p>为「{subject}」从资料库选一份资料{!canSupply && "（任务结束后才能继续）"}。资料只读，不会被修改。</p>
+      {picked
+        ? <span className="steer-picked"><IconFileDescription aria-hidden="true" />{picked.display_label}<button type="button" aria-label="取消选择" onClick={() => setPicked(null)}><IconX aria-hidden="true" /></button></span>
+        : <>
+          <input aria-label="搜索资料库" value={query} placeholder="搜索资料库文件名" onChange={event => setQuery(event.target.value)} />
+          <ul>{matches.map(file => <li key={file.file_ref}><button type="button" onClick={() => setPicked(file)}><IconFileDescription aria-hidden="true" />{file.display_label}</button></li>)}
+            {!matches.length && <li className="steer-none">没有匹配的文件</li>}</ul>
+        </>}
+      <button type="button" className="steer-cancel" onClick={() => { setSubject(null); setPicked(null); setText(""); }}>不补了</button>
+      {failed && <em role="alert">{failed}</em>}
+    </div>}
     {notes.length > 0 && <ul aria-live="polite">{notes.map((note, index) => <li key={index}><IconCheck aria-hidden="true" /><span>已记录：{note}<em>演示中暂不改变正在执行的任务</em></span></li>)}</ul>}
   </section>;
 }
@@ -40,9 +89,9 @@ function findingFor(run: HarnessRun, node: WorkflowNode): Finding | undefined {
 }
 
 // Same two questions on every page: what is waiting for me, and what has the system finished.
-export function TaskBoard({ run, graph, onFocus, onFinding, onEvidence, onConfirm, onStart, busy = false }: {
+export function TaskBoard({ run, graph, onFocus, onFinding, onEvidence, onConfirm, onStart, onSupply, busy = false }: {
   run: HarnessRun; graph: WorkflowGraph;
-  onFocus: (nodeId: string | null) => void; onFinding: (finding: Finding) => void; onEvidence: () => void; onConfirm?: () => void; onStart?: () => void; busy?: boolean;
+  onFocus: (nodeId: string | null) => void; onFinding: (finding: Finding) => void; onEvidence: () => void; onConfirm?: () => void; onStart?: () => void; onSupply?: (node: WorkflowNode) => void; busy?: boolean;
 }) {
   const office = graph.mode === "office_action";
   const waiting = graph.nodes.filter(node => node.status === "waiting_human" && (office || node.kind === "human_gate" || node.kind === "work_unit"));
@@ -66,7 +115,9 @@ export function TaskBoard({ run, graph, onFocus, onFinding, onEvidence, onConfir
               ? onConfirm && <button type="button" onClick={onConfirm}>去下方确认<IconCornerDownRight aria-hidden="true" /></button>
               : node.ref_kind === "start"
                 ? <button type="button" disabled={busy || !onStart} onClick={onStart}><IconPlayerPlay aria-hidden="true" />{busy ? "正在启动" : KIND_ACTION.start}</button>
-                : <button type="button" onClick={() => finding ? onFinding(finding) : onEvidence()}>{KIND_ACTION[node.ref_kind ?? "judgment"] ?? "处理"}</button>}
+                : node.ref_kind === "missing" && onSupply
+                  ? <button type="button" onClick={() => onSupply(node)}>{KIND_ACTION.missing}</button>
+                  : <button type="button" onClick={() => finding ? onFinding(finding) : onEvidence()}>{KIND_ACTION[node.ref_kind ?? "judgment"] ?? "处理"}</button>}
             <span>{node.assessment.risk_level} · {node.status_label}</span>
           </div>
         </li>;

@@ -12,7 +12,7 @@ import { TodoBatch, type MinutesSeed } from "./todo-batch";
 import { MinutesIntake } from "./minutes-intake";
 import { workerStages } from "./worker-stages";
 import { OFFICE_EXAMPLES, officeTaskTitle, TaskBranches } from "./task-journey";
-import { TaskBoard, TaskSteer } from "./task-board";
+import { TaskBoard, TaskSteer, type SteerRequest } from "./task-board";
 import { simulatedBody } from "./demo-mode";
 import {
   IconAlertTriangle,
@@ -4242,6 +4242,7 @@ export function HarnessWorkbench({ onActivityChange, capabilitiesOnly = false, a
   const [actionNavigationLocked, setActionNavigationLocked] = useState(false);
   const [batchNavigationLocked, setBatchNavigationLocked] = useState(false);
   const [focusNode, setFocusNode] = useState<string | null>(null);
+  const [steerRequest, setSteerRequest] = useState<SteerRequest | null>(null);
   const officeActionRef = useRef<HTMLDivElement | null>(null);
   const [minutesSeed, setMinutesSeed] = useState<MinutesSeed | null>(null);
   const [batchGeneration, setBatchGeneration] = useState(0);
@@ -5226,9 +5227,9 @@ export function HarnessWorkbench({ onActivityChange, capabilitiesOnly = false, a
           <div ref={officeActionRef} hidden={view !== "actions"}><OfficeActionWorkbench composerHost={actionHost} onAnother={newSpaceTask} onNavigationLockChange={setActionNavigationLocked} sessionGeneration={generationRef.current} isSessionCurrent={(generation) => generation === generationRef.current} run={run} files={allFiles} apiBase={API_BASE} headers={HEADERS} onSnapshot={acceptActionSnapshot} onOpenSource={(ref) => { const file = allFiles.find(item => item.file_ref === ref); if (file) openFile(file); }} blocked={runActive && !run?.office_action} readOnly={Boolean(run?.office_action) && isReadOnlyRun} /></div>
           {view === "data" && <><TaskEvidence run={run} files={allFiles} onReview={setReviewRequest} onWorkers={() => setAdaptiveWorkbenchOpen(true)} onOpenFile={openFile}/>{activeFile && previewRequested && <div ref={previewSurfaceRef} tabIndex={-1} className="task-file-preview"><FilePreview key={activeFile.file_ref} preview={preview} file={activeFile} loading={previewLoading} error={previewError} anchor={previewAnchor?.file_ref === activeFile.file_ref ? previewAnchor : null} /></div>}</>}
           {view === "loop" && run && !run.office_action && run.workflow && <>
-            <TaskSteer disabled={isReadOnlyRun} running={runActive} />
+            <TaskSteer disabled={isReadOnlyRun} running={runActive} files={allFiles} request={steerRequest} canSupply={TERMINAL_STATUSES.has(run.status) && !starting} onSupply={instruction => continueTask(undefined, instruction)} />
             <WorkflowTree graph={run.workflow} title={run.workflow.swarm ? "任务流程 · 蜂群调度" : "任务流程"} focusId={focusNode} interruptBusy={controlBusy !== null || starting} onInterrupt={isReadOnlyRun ? undefined : () => void controlLoop("stop")} />
-            <TaskBoard run={run} graph={run.workflow} onFocus={setFocusNode} onEvidence={() => setView("data")} busy={starting} onStart={isReadOnlyRun ? undefined : () => void executeWorkers()} onFinding={finding => {
+            <TaskBoard run={run} graph={run.workflow} onFocus={setFocusNode} onEvidence={() => setView("data")} busy={starting} onStart={isReadOnlyRun ? undefined : () => void executeWorkers()} onSupply={isReadOnlyRun ? undefined : node => setSteerRequest({ nonce: Date.now(), subject: node.label.replace(/^缺少来源：/, "") })} onFinding={finding => {
               const findings = run.result?.findings ?? run.artifact_versions.at(-1)?.findings ?? [];
               const artifact = run.artifact_versions.find(item => item.findings.some(saved => saved.finding_id && saved.finding_id === finding.finding_id));
               setReviewRequest(findingReviewRequest(finding, Math.max(0, findings.indexOf(finding)), artifact?.round_number ?? run.current_round, run.decision_records, run.decision_requests));
