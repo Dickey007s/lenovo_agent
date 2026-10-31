@@ -16,6 +16,8 @@ export type WorkflowNode = {
   actor: "agent" | "human" | "system"; actor_label: string; summary: string;
   facts: string[]; sources: string[]; depends_on: string[]; assessment: WorkflowAssessment;
   ref_id: string | null; ref_kind: "judgment" | "source_choice" | "missing" | "start" | null;
+  // 上一轮留下、这一轮还没处理的待办
+  carried: boolean;
 };
 export type WorkflowWave = { index: number; label: string; status: WorkflowStatus; node_ids: string[] };
 export type WorkflowGraph = {
@@ -44,6 +46,7 @@ export function normalizeWorkflow(value: unknown): WorkflowGraph | null {
       status_label: text(node.status_label), actor: node.actor === "human" || node.actor === "system" ? node.actor : "agent",
       actor_label: text(node.actor_label), summary: text(node.summary), facts: list(node.facts), sources: list(node.sources), depends_on: list(node.depends_on),
       ref_id: typeof node.ref_id === "string" ? node.ref_id : null,
+      carried: node.carried === true,
       ref_kind: node.ref_kind === "judgment" || node.ref_kind === "source_choice" || node.ref_kind === "missing" || node.ref_kind === "start" ? node.ref_kind : null,
       assessment: {
         risk_level: text(assessment.risk_level), risk_title: text(assessment.risk_title), autonomy_level: text(assessment.autonomy_level), autonomy_title: text(assessment.autonomy_title),

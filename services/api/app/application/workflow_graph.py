@@ -59,6 +59,8 @@ class WorkflowNode(BaseModel):
     # human_gate nodes: which finding / request / missing requirement this is
     ref_id: str | None = None
     ref_kind: Literal["judgment", "source_choice", "missing", "start"] | None = None
+    # human_gate nodes: left open by an earlier run of the same task and carried into this one
+    carried: bool = False
     assessment: RiskAssessment
 
 
@@ -113,6 +115,8 @@ class HumanItem(BaseModel):
     title: str
     reason: str
     parent_unit_ids: list[str] = Field(default_factory=list)
+    # Left open by an earlier run of the same task; still waiting for the person.
+    carried: bool = False
 
 
 def _same_topic(left: str, right: str, size: int = 6) -> bool:
@@ -368,7 +372,7 @@ def build_control_loop_workflow(
     merged = 0
     if state_status in {"done", "running", "waiting_human"} and plan is not None:
         for gate in gates:
-            if gate.kind == "missing":
+            if gate.kind == "missing" and not gate.carried:
                 # The planner sometimes plans a unit for a requirement it also reports as having no
                 # source. Show one yellow step, not two.
                 twin = next(
@@ -391,6 +395,9 @@ def build_control_loop_workflow(
                     continue
             node_id = "gate-" + gate.item_id
             parents = [parent for parent in gate.parent_unit_ids if parent in unit_by_id] or ["plan"]
+            facts = ["等你处理；不依赖它的分支继续推进"]
+            if gate.carried:
+                facts = ["上一轮留下的待办，这一轮还没有处理", *facts]
             nodes.append(
                 WorkflowNode(
                     node_id=node_id,
@@ -401,10 +408,11 @@ def build_control_loop_workflow(
                     actor="human",
                     actor_label="需要你",
                     summary=_short(f"{gate.title}：{gate.reason}", 400),
-                    facts=["等你处理；不依赖它的分支继续推进"],
+                    facts=facts,
                     depends_on=parents,
                     ref_id=gate.item_id,
                     ref_kind=gate.kind,
+                    carried=gate.carried,
                     assessment=assess_human_gate(kind=gate.kind, reason=_short(gate.reason, 160)),
                 )
             )

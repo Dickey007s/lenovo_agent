@@ -125,7 +125,11 @@ async def test_follow_up_after_a_decision_completes_instead_of_asking_again():
         run = await settle(child.run.run_id)
         public = runtime.public_snapshot(run)
         assert run.status == "completed" and not run.validation_errors
-        assert all(node.status == "done" for node in public.workflow.nodes)
+        # The decided question is gone; the still-missing receipt from the first run is carried over.
+        carried = [node for node in public.workflow.nodes if node.carried]
+        assert [node.ref_kind for node in carried] == ["missing"]
+        assert all(node.status == "done" for node in public.workflow.nodes if node.kind in ("plan", "work_unit"))
+        assert not any(node.ref_kind == "judgment" for node in public.workflow.nodes)
     finally:
         await runtime.close()
 
@@ -160,7 +164,24 @@ async def test_supplying_a_library_file_reads_that_file_and_finishes_the_paused_
         run = await settle(child.run.run_id)
         public = runtime.public_snapshot(run)
         assert run.status == "completed" and not run.validation_errors
-        assert all(node.status == "done" for node in public.workflow.nodes)
+        # The supplied item is settled; the other open question from the first run is still open.
+        assert not any(node.ref_kind == "missing" for node in public.workflow.nodes)
+        carried = [node for node in public.workflow.nodes if node.carried]
+        assert [node.ref_kind for node in carried] == ["judgment"]
+        assert all(node.status == "done" for node in public.workflow.nodes if node.kind in ("plan", "work_unit"))
         assert any("外卖商户BD岗位JD" in finding.title for finding in run.result.findings)
+
+        # Replying to the carried question settles it too, and nothing is left behind.
+        subject = carried[0].label.rstrip("…")
+        last = await runtime.continue_unfinished_task(
+            "demo-user", run.run_id, None, idempotency_key="reply-follow-0001", expected_version=run.version,
+            expected_task_version=run.task_version, purpose="follow_up",
+            instruction=f"回复待办「{subject}」：维持现规则，先不开通。",
+        )
+        run = await settle(last.run.run_id)
+        public = runtime.public_snapshot(run)
+        assert run.status == "completed" and not run.validation_errors
+        assert not any(node.carried or node.kind == "human_gate" for node in public.workflow.nodes)
+        assert all(node.status == "done" for node in public.workflow.nodes)
     finally:
         await runtime.close()

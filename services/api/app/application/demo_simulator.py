@@ -291,7 +291,8 @@ class SimulatedAnalyst:
         label = "、".join(_stem(str(item.get("display_label", "资料"))) for item in sources[:2]) if len(sources) > 1 else str(source.get("display_label", "资料"))
         quotes = [self._quote(item, objective) for item in sources]
         quote = quotes[0]
-        decision = bool(_OWNER_DECISION.search(objective))
+        # "回复待办「…」" quotes the to-do's title; the title is not a new instruction.
+        decision = bool(_OWNER_DECISION.search(re.sub(r"回复待办「[^」]*」", "", objective)))
         return HarnessAnalystFindingDraft(
             plan_unit_id=unit_id,
             title=(f"需要负责人决定：{_stem(label)}" if decision else title_override or f"已摘出《{_stem(label)}》的相关原文")[:200],

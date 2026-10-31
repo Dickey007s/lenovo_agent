@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
+from difflib import SequenceMatcher
 import inspect
 import json
 import logging
@@ -73,6 +74,7 @@ from services.api.app.application.collaboration_review import (
 from services.api.app.application.workflow_graph import (
     WorkflowGraph,
     build_control_loop_workflow,
+    HumanItem,
     collect_human_items,
     build_office_action_workflow,
 )
@@ -464,6 +466,10 @@ class HarnessWorkspaceArtifactRecord(AgentControlLoopWorkspaceArtifact):
     content_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
 
 
+def _item_topic_match(left: str, right: str) -> bool:
+    return left == right or SequenceMatcher(None, left, right).find_longest_match(0, len(left), 0, len(right)).size >= 8
+
+
 class HarnessRunSnapshot(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -492,6 +498,8 @@ class HarnessRunSnapshot(BaseModel):
     instruction_source: Literal["user"] = "user"
     execution_policy: Literal["manual", "automatic_readonly"] = "manual"
     simulated: bool = False
+    # Human work an earlier run of this task left open and nobody has dealt with yet.
+    carried_human_items: list[HumanItem] = Field(default_factory=list, max_length=24)
     contract: AgentControlLoopContract
     budget: AgentControlLoopBudget
     rounds: list[AgentControlLoopRound] = Field(default_factory=list, max_length=24)
@@ -1894,6 +1902,7 @@ class HarnessRuntime:
                 instruction_source="user",
                 execution_policy=request.execution_policy,
                 simulated=bool(getattr(request, "simulated", False) or (parent is not None and parent.simulated)),
+                carried_human_items=self._carry_human_items(parent, instruction) if parent is not None else [],
                 contract=contract,
                 budget=budget,
             )
@@ -4319,19 +4328,15 @@ class HarnessRuntime:
                     if item.state == "open" and item.branch_id
                 },
                 allowed_file_count=len(snapshot.contract.allowed_file_refs),
-                human_items=collect_human_items(
-                    findings=(
-                        snapshot.result.findings
-                        if snapshot.result is not None
-                        else snapshot.artifact_versions[-1].findings
-                        if snapshot.artifact_versions
-                        else []
-                    ),
-                    decision_requests=snapshot.decision_requests,
-                    decision_records=snapshot.decision_records,
-                    uncovered=public_plan.uncovered_requirements if public_plan is not None else [],
-                    branch_unit={item.branch_id: item.unit_id for item in public_branches},
-                ),
+                human_items=[
+                    item.model_copy(
+                        update={
+                            "title": self._project_business_text(item.title, ref_to_label),
+                            "reason": self._project_business_text(item.reason, ref_to_label),
+                        }
+                    )
+                    for item in self._open_human_items(snapshot)
+                ],
                 swarm=snapshot.execution_policy == "automatic_readonly",
             )
         return PublicHarnessRunSnapshot(
@@ -7776,6 +7781,55 @@ class HarnessRuntime:
             }
             for item in files
         ]
+
+    @staticmethod
+    def _open_human_items(snapshot: HarnessRunSnapshot) -> list[HumanItem]:
+        """Everything a person still has to do on this run: its own items plus those carried in."""
+
+        own = collect_human_items(
+            findings=(
+                snapshot.result.findings
+                if snapshot.result is not None
+                else snapshot.artifact_versions[-1].findings
+                if snapshot.artifact_versions
+                else []
+            ),
+            decision_requests=snapshot.decision_requests,
+            decision_records=snapshot.decision_records,
+            uncovered=snapshot.plan.uncovered_requirements if snapshot.plan is not None else [],
+            branch_unit={item.branch_id: item.unit_id for item in snapshot.branches},
+        )
+        carried: list[HumanItem] = []
+        for item in snapshot.carried_human_items:
+            # The new plan may already raise the same question itself; show it once.
+            if any(item.kind == fresh.kind and _item_topic_match(item.title, fresh.title) for fresh in own):
+                continue
+            carried.append(item)
+        return [*own, *carried]
+
+    @classmethod
+    def _carry_human_items(cls, parent: HarnessRunSnapshot, instruction: str) -> list[HumanItem]:
+        """Open items of the parent that the new request does not deal with.
+
+        A decision made through the review dialog is already a receipt on the parent and is not
+        open any more. Supplying material or replying to a to-do names it in the request text.
+        """
+
+        carried: list[HumanItem] = []
+        for item in cls._open_human_items(parent):
+            core = item.title.replace("缺少来源：", "").rstrip("…").strip()[:16]
+            if core and core in instruction:
+                continue
+            carried.append(
+                item.model_copy(
+                    update={
+                        "item_id": item.item_id if item.carried else f"r{parent.run_sequence}-{item.item_id}"[:80],
+                        "parent_unit_ids": [],
+                        "carried": True,
+                    }
+                )
+            )
+        return carried[:24]
 
     @staticmethod
     def _explicit_business_requirement_count(instruction: str) -> int:

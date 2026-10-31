@@ -2391,7 +2391,7 @@ def test_production_builder_uses_complete_workspace_catalog(monkeypatch) -> None
 
     assert workspace["workspace_id"] == "forte-public-office"
     assert workspace["folder_count"] == 15
-    assert workspace["file_count"] == 96
+    assert workspace["file_count"] == 97
     assert runtime.analyst is not None
     assert runtime.analyst.timeout == 180
 
