@@ -125,13 +125,24 @@ async def test_follow_up_after_a_decision_completes_instead_of_asking_again():
         run = await settle(child.run.run_id)
         public = runtime.public_snapshot(run)
         assert run.status == "completed" and not run.validation_errors
-        # The decided question is gone; the still-missing receipt from the first run is carried over.
-        carried = [node for node in public.workflow.nodes if node.carried]
-        assert [node.ref_kind for node in carried] == ["missing"]
-        assert all(node.status == "done" for node in public.workflow.nodes if node.kind in ("plan", "work_unit"))
-        assert not any(node.ref_kind == "judgment" for node in public.workflow.nodes)
+        # One tree: the decided question turned green, the still-missing receipt is still yellow.
+        _assert_one_tree(public.workflow)
+        waiting = [node for node in public.workflow.nodes if node.status == "waiting_human"]
+        assert [node.ref_kind for node in waiting] == ["missing"]
+        assert all(node.run_sequence == 1 for node in waiting)
+        assert all(node.status == "done" for node in public.workflow.nodes if node.ref_kind == "judgment")
     finally:
         await runtime.close()
+
+
+def _assert_one_tree(graph):
+    ids = [node.node_id for node in graph.nodes]
+    assert len(ids) == len(set(ids)), "node ids must be unique across runs"
+    assert sum(node.kind == "deliver" for node in graph.nodes) == 1
+    assert sum(node.kind == "plan" and node.run_sequence == 1 for node in graph.nodes) == 1
+    known = set(ids)
+    assert all(edge.source in known and edge.target in known for edge in graph.edges)
+    assert all(dep in known for node in graph.nodes for dep in node.depends_on)
 
 
 @pytest.mark.asyncio
@@ -164,11 +175,14 @@ async def test_supplying_a_library_file_reads_that_file_and_finishes_the_paused_
         run = await settle(child.run.run_id)
         public = runtime.public_snapshot(run)
         assert run.status == "completed" and not run.validation_errors
-        # The supplied item is settled; the other open question from the first run is still open.
-        assert not any(node.ref_kind == "missing" for node in public.workflow.nodes)
-        carried = [node for node in public.workflow.nodes if node.carried]
+        # Same tree, nodes updated: the supplied item turned green, the other open question stays yellow.
+        _assert_one_tree(public.workflow)
+        assert any(node.run_sequence == 2 for node in public.workflow.nodes)
+        missing = [node for node in public.workflow.nodes if node.ref_kind == "missing"]
+        assert missing and all(node.status == "done" and node.run_sequence == 1 for node in missing)
+        carried = [node for node in public.workflow.nodes if node.status == "waiting_human"]
         assert [node.ref_kind for node in carried] == ["judgment"]
-        assert all(node.status == "done" for node in public.workflow.nodes if node.kind in ("plan", "work_unit"))
+        assert carried[0].run_sequence == 1 and carried[0].carried
         assert any("外卖商户BD岗位JD" in finding.title for finding in run.result.findings)
 
         # Replying to the carried question settles it too, and nothing is left behind.
@@ -181,7 +195,9 @@ async def test_supplying_a_library_file_reads_that_file_and_finishes_the_paused_
         run = await settle(last.run.run_id)
         public = runtime.public_snapshot(run)
         assert run.status == "completed" and not run.validation_errors
-        assert not any(node.carried or node.kind == "human_gate" for node in public.workflow.nodes)
+        _assert_one_tree(public.workflow)
         assert all(node.status == "done" for node in public.workflow.nodes)
+        assert public.workflow.state.status == "done"
+        assert not any(node.carried for node in public.workflow.nodes)
     finally:
         await runtime.close()

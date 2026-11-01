@@ -58,3 +58,7 @@
 .steer button.steer-cancel { width: fit-content; height: auto; padding: 2px 0; background: none; color: #6b778c; font-size: 12px; }
 .steer-supply em { font-style: normal; color: #b3261e; font-size: 12.5px; }
 .board-carried { margin-left: 8px; padding: 1px 7px; border-radius: 999px; background: #f1dfa6; color: #5a4310; font-size: 11.5px; font-style: normal; font-weight: 500; }
+.board-queued { color: #5a4310; font-size: 12.5px; }
+.steer-queued { margin: 6px 0 0; padding: 0; list-style: none; font-size: 12.5px; }
+.steer-queued li { display: flex; gap: 6px; align-items: flex-start; }
+.steer-queued em { display: block; color: #6b7280; font-style: normal; }

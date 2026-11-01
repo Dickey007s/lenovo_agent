@@ -61,6 +61,8 @@ class WorkflowNode(BaseModel):
     ref_kind: Literal["judgment", "source_choice", "missing", "start"] | None = None
     # human_gate nodes: left open by an earlier run of the same task and carried into this one
     carried: bool = False
+    # Which run of the task added this node (the task keeps one tree; later runs extend it).
+    run_sequence: int = Field(default=1, ge=1)
     assessment: RiskAssessment
 
 
@@ -117,6 +119,8 @@ class HumanItem(BaseModel):
     parent_unit_ids: list[str] = Field(default_factory=list)
     # Left open by an earlier run of the same task; still waiting for the person.
     carried: bool = False
+    # Carried items: the node of the task tree that already represents this item.
+    node_id: str | None = None
 
 
 def _same_topic(left: str, right: str, size: int = 6) -> bool:
@@ -572,4 +576,143 @@ def build_office_action_workflow(action: Any, *, source_label: str | None = None
             agent_count=0,
             delegated_count=0,
         ),
+    )
+
+
+_OPEN_GATE_KINDS = {"judgment", "source_choice", "missing"}
+
+
+def carried_node_ids(prior: WorkflowGraph, items: Iterable[HumanItem], run_sequence: int) -> dict[str, str]:
+    """Map each still-open item of the parent run to the node of the task tree that shows it."""
+
+    found: dict[str, str] = {}
+    for item in items:
+        if item.carried and item.node_id:
+            found[item.item_id] = item.node_id
+            continue
+        node = next(
+            (
+                node
+                for node in prior.nodes
+                if node.ref_id == item.item_id
+                and node.ref_kind == item.kind
+                and node.status == "waiting_human"
+                and node.run_sequence == run_sequence
+            ),
+            None,
+        )
+        if node is not None:
+            found[item.item_id] = node.node_id
+    return found
+
+
+def merge_task_tree(
+    prior: WorkflowGraph,
+    current: WorkflowGraph,
+    *,
+    run_sequence: int,
+    carried: dict[str, str],
+) -> WorkflowGraph:
+    """Extend the task's one tree with a follow-up run instead of starting a second tree.
+
+    Earlier nodes stay where they were. A yellow step that this run settled turns green; one that is
+    still open stays yellow. The new plan hangs under what is finished so far, and a single delivery
+    node closes the tree.
+    """
+
+    prefix = f"r{run_sequence}-"
+    kept_open = set(carried.values())
+    old_deliver = {node.node_id for node in prior.nodes if node.kind == "deliver"}
+
+    old_nodes = [node.model_copy(deep=True) for node in prior.nodes if node.node_id not in old_deliver]
+    old_edges = [edge.model_copy() for edge in prior.edges if edge.source not in old_deliver and edge.target not in old_deliver]
+    for node in old_nodes:
+        node.carried = node.node_id in kept_open
+        if node.carried:
+            continue
+        if node.status == "waiting_human" and node.ref_kind in _OPEN_GATE_KINDS:
+            node.status, node.status_label = "done", "已处理"
+            node.actor, node.actor_label = "system", "已处理"
+            node.facts = ["之后的追加要求已处理这一项", *node.facts][:8]
+    if not kept_open:
+        for node in old_nodes:
+            if node.kind == "work_unit" and node.status == "waiting_human" and node.ref_kind is None:
+                node.status, node.status_label = "done", "已完成"
+                node.actor, node.actor_label = "agent", "主 Agent"
+
+    # Nodes of this run that already live in the tree (open items carried in) are not drawn twice.
+    redirect = {f"gate-{item_id}": node_id for item_id, node_id in carried.items()}
+    dropped = {node.node_id for node in current.nodes if node.carried and node.node_id in redirect}
+
+    def new_id(node_id: str) -> str:
+        if node_id in redirect:
+            return redirect[node_id]
+        return node_id if node_id == "deliver" else prefix + node_id
+
+    with_dep = {edge.source for edge in old_edges}
+    open_ids = kept_open
+    leaves = [node.node_id for node in old_nodes if node.node_id not in with_dep and node.node_id not in open_ids]
+
+    new_nodes: list[WorkflowNode] = []
+    for node in current.nodes:
+        if node.node_id in dropped:
+            continue
+        fresh = node.model_copy(deep=True)
+        fresh.node_id = new_id(node.node_id)
+        fresh.run_sequence = run_sequence
+        fresh.depends_on = list(dict.fromkeys(new_id(dep) for dep in node.depends_on))
+        if node.kind == "plan":
+            fresh.label = "理解新要求 · 追加计划"
+            fresh.depends_on = list(leaves)
+        new_nodes.append(fresh)
+
+    plan_id = new_id("plan")
+    new_edges: list[WorkflowEdge] = []
+    for edge in current.edges:
+        if edge.target in dropped:
+            continue
+        new_edges.append(WorkflowEdge(source=new_id(edge.source), target=new_id(edge.target)))
+    new_edges.extend(WorkflowEdge(source=leaf, target=plan_id) for leaf in leaves)
+    # Earlier open steps still hold up the delivery.
+    deliver = next((node for node in new_nodes if node.kind == "deliver"), None)
+    if deliver is not None:
+        for node_id in sorted(open_ids):
+            if node_id not in deliver.depends_on:
+                deliver.depends_on.append(node_id)
+            new_edges.append(WorkflowEdge(source=node_id, target=deliver.node_id))
+
+    seen: set[tuple[str, str]] = set()
+    edges: list[WorkflowEdge] = []
+    for edge in [*old_edges, *new_edges]:
+        key = (edge.source, edge.target)
+        if key not in seen and edge.source != edge.target:
+            seen.add(key)
+            edges.append(edge)
+
+    waves = [wave.model_copy(deep=True) for wave in prior.waves]
+    for wave in current.waves:
+        waves.append(
+            WorkflowWave(
+                index=len(waves) + 1,
+                label=wave.label,
+                status=wave.status,
+                node_ids=[new_id(node_id) for node_id in wave.node_ids],
+            )
+        )
+    for index, wave in enumerate(waves, start=1):
+        wave.index = index
+        wave.label = f"第 {index} 波 · {len(wave.node_ids)} 个子 Agent 并行"
+    state = current.state.model_copy(
+        update={
+            "agent_count": max(current.state.agent_count, prior.state.agent_count),
+            "delegated_count": max(current.state.delegated_count, prior.state.delegated_count),
+        }
+    )
+    return WorkflowGraph(
+        mode="control_loop",
+        nodes=[*old_nodes, *new_nodes],
+        edges=edges,
+        state=state,
+        swarm=bool(waves),
+        waves=waves,
     )

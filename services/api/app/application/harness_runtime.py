@@ -75,7 +75,9 @@ from services.api.app.application.workflow_graph import (
     WorkflowGraph,
     build_control_loop_workflow,
     HumanItem,
+    carried_node_ids,
     collect_human_items,
+    merge_task_tree,
     build_office_action_workflow,
 )
 from services.api.app.application.topology_admission import TopologyAdmission
@@ -500,6 +502,8 @@ class HarnessRunSnapshot(BaseModel):
     simulated: bool = False
     # Human work an earlier run of this task left open and nobody has dealt with yet.
     carried_human_items: list[HumanItem] = Field(default_factory=list, max_length=24)
+    # The task's tree as the parent run left it; this run extends it instead of drawing a new one.
+    prior_workflow: WorkflowGraph | None = None
     contract: AgentControlLoopContract
     budget: AgentControlLoopBudget
     rounds: list[AgentControlLoopRound] = Field(default_factory=list, max_length=24)
@@ -1875,6 +1879,11 @@ class HarnessRuntime:
                 max_model_calls=contract.max_model_calls,
                 deadline_seconds=contract.deadline_seconds,
             )
+            prior_workflow = (
+                self.public_snapshot(parent).workflow
+                if parent is not None and _follow_up and parent.office_action is None
+                else None
+            )
             snapshot = HarnessRunSnapshot(
                 run_id=run_id,
                 task_id=task_id,
@@ -1902,7 +1911,8 @@ class HarnessRuntime:
                 instruction_source="user",
                 execution_policy=request.execution_policy,
                 simulated=bool(getattr(request, "simulated", False) or (parent is not None and parent.simulated)),
-                carried_human_items=self._carry_human_items(parent, instruction) if parent is not None else [],
+                carried_human_items=self._carry_human_items(parent, instruction, prior_workflow) if parent is not None else [],
+                prior_workflow=prior_workflow,
                 contract=contract,
                 budget=budget,
             )
@@ -4339,6 +4349,17 @@ class HarnessRuntime:
                 ],
                 swarm=snapshot.execution_policy == "automatic_readonly",
             )
+            if snapshot.prior_workflow is not None and snapshot.run_sequence > 1:
+                workflow = merge_task_tree(
+                    snapshot.prior_workflow,
+                    workflow,
+                    run_sequence=snapshot.run_sequence,
+                    carried={
+                        item.item_id: item.node_id
+                        for item in snapshot.carried_human_items
+                        if item.node_id
+                    },
+                )
         return PublicHarnessRunSnapshot(
             run_id=snapshot.run_id,
             task_id=snapshot.task_id,
@@ -7808,7 +7829,9 @@ class HarnessRuntime:
         return [*own, *carried]
 
     @classmethod
-    def _carry_human_items(cls, parent: HarnessRunSnapshot, instruction: str) -> list[HumanItem]:
+    def _carry_human_items(
+        cls, parent: HarnessRunSnapshot, instruction: str, prior: WorkflowGraph | None = None
+    ) -> list[HumanItem]:
         """Open items of the parent that the new request does not deal with.
 
         A decision made through the review dialog is already a receipt on the parent and is not
@@ -7816,7 +7839,9 @@ class HarnessRuntime:
         """
 
         carried: list[HumanItem] = []
-        for item in cls._open_human_items(parent):
+        open_items = cls._open_human_items(parent)
+        node_ids = carried_node_ids(prior, open_items, parent.run_sequence) if prior is not None else {}
+        for item in open_items:
             core = item.title.replace("缺少来源：", "").rstrip("…").strip()[:16]
             if core and core in instruction:
                 continue
@@ -7826,6 +7851,7 @@ class HarnessRuntime:
                         "item_id": item.item_id if item.carried else f"r{parent.run_sequence}-{item.item_id}"[:80],
                         "parent_unit_ids": [],
                         "carried": True,
+                        "node_id": node_ids.get(item.item_id) or item.node_id,
                     }
                 )
             )

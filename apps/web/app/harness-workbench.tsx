@@ -11,7 +11,7 @@ import { UnifiedWorkbench, runSpace, type WorkbenchSpace } from "./unified-workb
 import { TodoBatch, type MinutesSeed } from "./todo-batch";
 import { MinutesIntake } from "./minutes-intake";
 import { workerStages } from "./worker-stages";
-import { OFFICE_EXAMPLES, officeTaskTitle, TaskBranches } from "./task-journey";
+import { OFFICE_EXAMPLES, officeTaskTitle } from "./task-journey";
 import { TaskBoard, TaskSteer, type SteerRequest } from "./task-board";
 import { simulatedBody } from "./demo-mode";
 import {
@@ -4243,6 +4243,9 @@ export function HarnessWorkbench({ onActivityChange, capabilitiesOnly = false, a
   const [batchNavigationLocked, setBatchNavigationLocked] = useState(false);
   const [focusNode, setFocusNode] = useState<string | null>(null);
   const [steerRequest, setSteerRequest] = useState<SteerRequest | null>(null);
+  // Supplements submitted while the task is still running: they join the same task tree once it settles.
+  const [queuedSupplies, setQueuedSupplies] = useState<{ id: string; taskId: string; instruction: string; subject: string; label: string }[]>([]);
+  const queueFiringRef = useRef(false);
   const officeActionRef = useRef<HTMLDivElement | null>(null);
   const [minutesSeed, setMinutesSeed] = useState<MinutesSeed | null>(null);
   const [batchGeneration, setBatchGeneration] = useState(0);
@@ -4593,7 +4596,8 @@ export function HarnessWorkbench({ onActivityChange, capabilitiesOnly = false, a
       if (generation !== generationRef.current) return;
       const currentRunId = asText(taskPayload.current_run_id);
       if (!currentRunId) throw new Error("任务台账缺少当前 Run");
-      const response = await fetch(`${API_BASE}/v1/harness/runs/${encodeURIComponent(snapshot.run_id)}`, { headers: HEADERS });
+      // One task, one tree: opening any run of a task opens the task as it stands now.
+      const response = await fetch(`${API_BASE}/v1/harness/runs/${encodeURIComponent(currentRunId)}`, { headers: HEADERS });
       if (!response.ok) throw new Error("无法读取任务会话");
       const latest = normalizeRun(await response.json());
       if (generation !== generationRef.current) return;
@@ -4916,25 +4920,25 @@ export function HarnessWorkbench({ onActivityChange, capabilitiesOnly = false, a
     } finally { if (generationRef.current === (applied ? nextGeneration : generation)) setStarting(false); }
   }
 
-  async function openTaskBranch(runId: string) {
-    const generation = generationRef.current;
-    const taskId = runRef.current?.task_id;
-    if (!taskId || !taskPointer?.lineage.some(item => item.run_id === runId) || starting || continuationUnknown) return;
-    setStarting(true);
-    try {
-      const response = await fetch(`${API_BASE}/v1/harness/runs/${encodeURIComponent(runId)}`, { headers: HEADERS });
-      if (!response.ok) throw new Error("分支记录暂时无法读取");
-      const snapshot = normalizeRun(await response.json());
-      if (generation !== generationRef.current) return;
-      if (!snapshot || snapshot.task_id !== taskId || snapshot.run_id !== runId) throw new Error("分支不属于当前任务");
-      await openSessionRun(snapshot);
-      if (runRef.current?.run_id === runId) setView("loop");
-    } catch (caught) {
-      if (generation === generationRef.current) setError(caught instanceof Error ? caught.message : "分支无法读取");
-    } finally {
-      if (generation === generationRef.current) setStarting(false);
-    }
+  async function supplyToTask(current: HarnessRun, instruction: string, subject: string, label: string) {
+    if (TERMINAL_STATUSES.has(current.status) && !starting && selectedRunCurrent === true) return continueTask(undefined, instruction);
+    // Still running (or waiting for a start): note it now, it joins the same tree as soon as the run settles.
+    setQueuedSupplies(items => [...items, { id: randomKey(), taskId: current.task_id, instruction, subject, label }]);
+    return true;
   }
+
+  // Queued supplements fire one at a time, as soon as the task has settled.
+  useEffect(() => {
+    if (!run || run.office_action || !TERMINAL_STATUSES.has(run.status) || starting || selectedRunCurrent !== true || continuationUnknown || queueFiringRef.current) return;
+    const next = queuedSupplies.find(item => item.taskId === run.task_id);
+    if (!next) return;
+    queueFiringRef.current = true;
+    setQueuedSupplies(items => items.filter(item => item.id !== next.id));
+    void continueTask(undefined, next.instruction).then(ok => {
+      if (!ok) setError(`排队的补充「${next.subject}」没有提交成功，请重新补充。`);
+    }).finally(() => { queueFiringRef.current = false; });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [run?.run_id, run?.status, run?.version, starting, selectedRunCurrent, queuedSupplies, continuationUnknown]);
 
   async function openCurrentTask() {
     const current = runRef.current;
@@ -5182,8 +5186,7 @@ export function HarnessWorkbench({ onActivityChange, capabilitiesOnly = false, a
     <div hidden={space !== "team" || Boolean(run)}><TodoBatch key={batchGeneration} apiBase={API_BASE} headers={HEADERS} normalize={normalizeRun} runs={sessionRuns} onLock={setBatchNavigationLocked} onSwitchSolo={() => selectSpace("solo")} seed={minutesSeed} onOpen={snapshot => { void openSessionRun(snapshot); }} onCreated={snapshot => { setBatchHasTasks(true); setSessionRuns(current => [snapshot, ...current.filter(item => item.run_id !== snapshot.run_id)]); }}/></div>
       <section className="data-task-surface" hidden={space === "team" && !run}>
         {run?.office_action && <header className="workspace-current-task unified-action-heading"><div><span>{run?.office_action ? `第 ${run.office_action.revision} 版` : "新建事项"}</span><h1>{run?.office_action?.input.title ?? "这次，需要完成什么？"}</h1></div></header>}
-        {run && !run.office_action && <header className="workspace-current-task"><div><span>{run.run_sequence === 1 ? "初始处理" : `后续分支 ${run.run_sequence - 1}`}</span><h1 title={taskPointer?.goal || run.instruction}>{officeTaskTitle(taskPointer?.goal || run.instruction)}</h1></div><b>{statusLabel(run.status)}</b></header>}
-        {run && !run.office_action && taskPointer && <TaskBranches items={taskPointer.lineage} selectedId={run.run_id} currentId={taskPointer.current_run_id} disabled={starting || continuationUnknown || controlBusy !== null} onSelect={id => void openTaskBranch(id)}/>}
+        {run && !run.office_action && <header className="workspace-current-task"><div><span>{run.run_sequence === 1 ? "初始处理" : `同一任务 · 已追加 ${run.run_sequence - 1} 次`}</span><h1 title={taskPointer?.goal || run.instruction}>{officeTaskTitle(taskPointer?.goal || run.instruction)}</h1></div><b>{statusLabel(run.status)}</b></header>}
         {run && !run.office_action && <div className="unified-task-facts" aria-label="本次任务概况"><div><IconFolder aria-hidden="true"/><span>已选资料<strong>{new Set(run.branches.flatMap(branch => branch.input_file_refs)).size} 份</strong></span></div><IconChevronRight aria-hidden="true"/><div><IconShieldCheck aria-hidden="true"/><span>工作项<strong>{run.branches.filter(branch => branch.status === "completed").length} / {run.branches.length} 已完成</strong></span></div><IconChevronRight aria-hidden="true"/><div><IconFileDescription aria-hidden="true"/><span>保留成果<strong>{run.workspace_artifacts.length ? `${run.workspace_artifacts.length} 份文件` : run.artifact_versions.length ? `草稿 v${run.artifact_versions.at(-1)?.version}` : "尚未生成"}</strong></span></div></div>}
         {run && !run.office_action && importantNotices.length > 0 && <section className="workspace-notices" aria-label="重要执行回执" aria-live="polite">{importantNotices.map(notice => <div key={notice.sequence} className={`is-${notice.tone}`}><IconInfoCircle aria-hidden="true" /><div><span>本次执行记录</span><strong>{notice.label}</strong><p>{notice.detail}</p></div></div>)}</section>}
         <details key={run?.run_id ?? "draft"} className={`workspace-task-settings${run ? "" : " is-draft"}`} open={!run} hidden={Boolean(run?.office_action) || (space === "team" && !run)}>
@@ -5227,9 +5230,9 @@ export function HarnessWorkbench({ onActivityChange, capabilitiesOnly = false, a
           <div ref={officeActionRef} hidden={view !== "actions"}><OfficeActionWorkbench composerHost={actionHost} onAnother={newSpaceTask} onNavigationLockChange={setActionNavigationLocked} sessionGeneration={generationRef.current} isSessionCurrent={(generation) => generation === generationRef.current} run={run} files={allFiles} apiBase={API_BASE} headers={HEADERS} onSnapshot={acceptActionSnapshot} onOpenSource={(ref) => { const file = allFiles.find(item => item.file_ref === ref); if (file) openFile(file); }} blocked={runActive && !run?.office_action} readOnly={Boolean(run?.office_action) && isReadOnlyRun} /></div>
           {view === "data" && <><TaskEvidence run={run} files={allFiles} onReview={setReviewRequest} onWorkers={() => setAdaptiveWorkbenchOpen(true)} onOpenFile={openFile}/>{activeFile && previewRequested && <div ref={previewSurfaceRef} tabIndex={-1} className="task-file-preview"><FilePreview key={activeFile.file_ref} preview={preview} file={activeFile} loading={previewLoading} error={previewError} anchor={previewAnchor?.file_ref === activeFile.file_ref ? previewAnchor : null} /></div>}</>}
           {view === "loop" && run && !run.office_action && run.workflow && <>
-            <TaskSteer disabled={isReadOnlyRun} running={runActive} files={allFiles} request={steerRequest} canSupply={TERMINAL_STATUSES.has(run.status) && !starting} onSupply={instruction => continueTask(undefined, instruction)} />
+            <TaskSteer disabled={isReadOnlyRun} running={runActive} files={allFiles} request={steerRequest} canSupply={!starting} queued={queuedSupplies.filter(item => item.taskId === run.task_id).map(item => item.label)} onSupply={(instruction, subject, label) => supplyToTask(run, instruction, subject, label)} />
             <WorkflowTree graph={run.workflow} title={run.workflow.swarm ? "任务流程 · 蜂群调度" : "任务流程"} focusId={focusNode} interruptBusy={controlBusy !== null || starting} onInterrupt={isReadOnlyRun ? undefined : () => void controlLoop("stop")} />
-            <TaskBoard run={run} graph={run.workflow} onFocus={setFocusNode} onEvidence={() => setView("data")} busy={starting} onStart={isReadOnlyRun ? undefined : () => void executeWorkers()} onSupply={isReadOnlyRun ? undefined : node => setSteerRequest({ nonce: Date.now(), subject: node.label.replace(/^缺少来源：/, "").replace(/…$/, ""), mode: node.ref_kind === "missing" ? "supply" : "reply" })} onFinding={finding => {
+            <TaskBoard run={run} graph={run.workflow} onFocus={setFocusNode} onEvidence={() => setView("data")} busy={starting} onStart={isReadOnlyRun ? undefined : () => void executeWorkers()} queued={queuedSupplies.filter(item => item.taskId === run.task_id).map(item => item.subject)} onSupply={isReadOnlyRun ? undefined : node => setSteerRequest({ nonce: Date.now(), subject: node.label.replace(/^缺少来源：/, "").replace(/…$/, ""), mode: node.ref_kind === "missing" ? "supply" : "reply" })} onFinding={finding => {
               const findings = run.result?.findings ?? run.artifact_versions.at(-1)?.findings ?? [];
               const artifact = run.artifact_versions.find(item => item.findings.some(saved => saved.finding_id && saved.finding_id === finding.finding_id));
               setReviewRequest(findingReviewRequest(finding, Math.max(0, findings.indexOf(finding)), artifact?.round_number ?? run.current_round, run.decision_records, run.decision_requests));

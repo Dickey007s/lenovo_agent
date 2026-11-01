@@ -19,9 +19,9 @@ const stemOf = (label: string) => (label.includes(".") ? label.slice(0, label.la
 // One place for "tell the agent something new". Typed text is only recorded in the demo and does not
 // change a running task. Supplying a library file for a missing source is real: it opens a follow-up
 // branch on the same task, so the paused step can finish.
-export function TaskSteer({ disabled = false, running = false, files = [], request = null, canSupply = false, onSupply }: {
-  disabled?: boolean; running?: boolean; files?: HarnessFile[]; request?: SteerRequest | null; canSupply?: boolean;
-  onSupply?: (instruction: string) => Promise<boolean>;
+export function TaskSteer({ disabled = false, running = false, files = [], request = null, canSupply = false, queued = [], onSupply }: {
+  disabled?: boolean; running?: boolean; files?: HarnessFile[]; request?: SteerRequest | null; canSupply?: boolean; queued?: string[];
+  onSupply?: (instruction: string, subject: string, label: string) => Promise<boolean>;
 }) {
   const [text, setText] = useState("");
   const [notes, setNotes] = useState<string[]>([]);
@@ -53,14 +53,14 @@ export function TaskSteer({ disabled = false, running = false, files = [], reque
     if (replying && subject && onSupply && canSupply) {
       if (value.length <= replyPrefix(subject).length) return;
       setBusy(true); setFailed("");
-      const ok = await onSupply(value.startsWith(replyPrefix(subject)) ? value : `${replyPrefix(subject)}${value}`);
+      const ok = await onSupply(value.startsWith(replyPrefix(subject)) ? value : `${replyPrefix(subject)}${value}`, subject, `回复「${subject}」`);
       setBusy(false);
       if (ok) { setSubject(null); setText(""); } else setFailed("没有提交成功，请重试。");
       return;
     }
     if (supplying && picked && onSupply && canSupply) {
       setBusy(true); setFailed("");
-      const ok = await onSupply(`补充资料：用《${stemOf(picked.display_label)}》核对「${subject}」，说明能否据此印证这一项。${value ? `\n用户补充：${value}` : ""}`);
+      const ok = await onSupply(`补充资料：用《${stemOf(picked.display_label)}》核对「${subject}」，说明能否据此印证这一项。${value ? `\n用户补充：${value}` : ""}`, subject ?? "", `补充「${subject}」← 《${stemOf(picked.display_label)}》`);
       setBusy(false);
       if (ok) { setSubject(null); setPicked(null); setText(""); setQuery(""); } else setFailed("没有提交成功，请重试。");
       return;
@@ -80,12 +80,12 @@ export function TaskSteer({ disabled = false, running = false, files = [], reque
       <button type="button" disabled={disabled || !canSubmit} onClick={() => void submit()}><IconSend aria-hidden="true" />{busy ? "正在提交" : supplying ? "补充并继续" : replying ? "回复并继续" : "提交"}</button>
     </div>
     {replying && <div className="steer-supply" role="group" aria-label="回复待办">
-      <p>这是上一轮留下的待办。写下你的判断，会开一个新的后续分支{!canSupply && "（任务结束后才能继续）"}。</p>
+      <p>这是之前留下的待办。写下你的判断，提交后会更新同一棵任务树{running && "；任务还在进行，会先排队，结束后自动并入"}。</p>
       <button type="button" className="steer-cancel" onClick={() => { setSubject(null); setText(""); setFailed(""); }}>先不回复</button>
       {failed && <em role="alert">{failed}</em>}
     </div>}
     {supplying && <div className="steer-supply" role="group" aria-label="补充资料">
-      <p>为「{subject}」从资料库选一份资料{!canSupply && "（任务结束后才能继续）"}。资料只读，不会被修改。</p>
+      <p>为「{subject}」从资料库选一份资料。资料只读，不会被修改{running ? "。任务还在进行，提交后会先排队，结束后自动并入同一棵任务树。" : "，提交后会更新同一棵任务树。"}</p>
       {picked
         ? <span className="steer-picked"><IconFileDescription aria-hidden="true" />{picked.display_label}<button type="button" aria-label="取消选择" onClick={() => setPicked(null)}><IconX aria-hidden="true" /></button></span>
         : <>
@@ -96,6 +96,7 @@ export function TaskSteer({ disabled = false, running = false, files = [], reque
       <button type="button" className="steer-cancel" onClick={() => { setSubject(null); setPicked(null); setText(""); }}>不补了</button>
       {failed && <em role="alert">{failed}</em>}
     </div>}
+    {queued.length > 0 && <ul className="steer-queued" aria-live="polite">{queued.map((label, index) => <li key={index}><IconCheck aria-hidden="true" /><span>已排队：{label}<em>当前工作结束后自动并入同一棵任务树</em></span></li>)}</ul>}
     {notes.length > 0 && <ul aria-live="polite">{notes.map((note, index) => <li key={index}><IconCheck aria-hidden="true" /><span>已记录：{note}<em>演示中暂不改变正在执行的任务</em></span></li>)}</ul>}
   </section>;
 }
@@ -107,8 +108,8 @@ function findingFor(run: HarnessRun, node: WorkflowNode): Finding | undefined {
 }
 
 // Same two questions on every page: what is waiting for me, and what has the system finished.
-export function TaskBoard({ run, graph, onFocus, onFinding, onEvidence, onConfirm, onStart, onSupply, busy = false }: {
-  run: HarnessRun; graph: WorkflowGraph;
+export function TaskBoard({ run, graph, onFocus, onFinding, onEvidence, onConfirm, onStart, onSupply, busy = false, queued = [] }: {
+  run: HarnessRun; graph: WorkflowGraph; queued?: string[];
   onFocus: (nodeId: string | null) => void; onFinding: (finding: Finding) => void; onEvidence: () => void; onConfirm?: () => void; onStart?: () => void; onSupply?: (node: WorkflowNode) => void; busy?: boolean;
 }) {
   const office = graph.mode === "office_action";
@@ -116,7 +117,11 @@ export function TaskBoard({ run, graph, onFocus, onFinding, onEvidence, onConfir
   const handled = office
     ? graph.nodes.filter(node => node.status === "done" || node.status === "failed")
     : [];
-  const system = office ? [] : projectTaskResponsibility(run).system;
+  // The task is one tree: what earlier rounds finished or settled stays listed here.
+  const earlier = office ? [] : graph.nodes
+    .filter(node => node.run_sequence < run.run_sequence && node.status === "done" && (node.kind === "work_unit" || node.ref_kind))
+    .map(node => ({ id: `earlier-${node.node_id}`, title: node.ref_kind ? `${node.label}（已处理）` : node.label, reason: node.summary }));
+  const system = office ? [] : [...projectTaskResponsibility(run).system, ...earlier];
   const active = graph.state.status === "running";
 
   return <section className="board" aria-label="任务看板">
@@ -133,6 +138,7 @@ export function TaskBoard({ run, graph, onFocus, onFinding, onEvidence, onConfir
               ? onConfirm && <button type="button" onClick={onConfirm}>去下方确认<IconCornerDownRight aria-hidden="true" /></button>
               : node.ref_kind === "start"
                 ? <button type="button" disabled={busy || !onStart} onClick={onStart}><IconPlayerPlay aria-hidden="true" />{busy ? "正在启动" : KIND_ACTION.start}</button>
+                : queued.includes(node.label.replace(/^缺少来源：/, "").replace(/…$/, "")) ? <span className="board-queued">已排队，结束后自动并入</span>
                 : node.ref_kind === "missing" && onSupply
                   ? <button type="button" onClick={() => onSupply(node)}>{KIND_ACTION.missing}</button>
                   : node.carried && onSupply
