@@ -18,6 +18,8 @@ export type WorkflowNode = {
   ref_id: string | null; ref_kind: "judgment" | "source_choice" | "missing" | "start" | null;
   // 上一轮留下、这一轮还没处理的待办
   carried: boolean;
+  // 这个节点是任务的第几次处理加进来的
+  run_sequence: number;
 };
 export type WorkflowWave = { index: number; label: string; status: WorkflowStatus; node_ids: string[] };
 export type WorkflowGraph = {
@@ -47,6 +49,7 @@ export function normalizeWorkflow(value: unknown): WorkflowGraph | null {
       actor_label: text(node.actor_label), summary: text(node.summary), facts: list(node.facts), sources: list(node.sources), depends_on: list(node.depends_on),
       ref_id: typeof node.ref_id === "string" ? node.ref_id : null,
       carried: node.carried === true,
+      run_sequence: typeof node.run_sequence === "number" ? node.run_sequence : 1,
       ref_kind: node.ref_kind === "judgment" || node.ref_kind === "source_choice" || node.ref_kind === "missing" || node.ref_kind === "start" ? node.ref_kind : null,
       assessment: {
         risk_level: text(assessment.risk_level), risk_title: text(assessment.risk_title), autonomy_level: text(assessment.autonomy_level), autonomy_title: text(assessment.autonomy_title),
@@ -117,6 +120,7 @@ export function WorkflowTree({ graph, onInterrupt, interruptBusy = false, compac
   const [detailId, setDetailId] = useState<string | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const root = useRef<HTMLElement | null>(null);
+  const scroller = useRef<HTMLDivElement | null>(null);
   const cardNode = pinned ?? hover;
   const card = cardNode ? graph.nodes.find(node => node.node_id === cardNode.id) : undefined;
   const detail = detailId ? graph.nodes.find(node => node.node_id === detailId) : undefined;
@@ -131,6 +135,15 @@ export function WorkflowTree({ graph, onInterrupt, interruptBusy = false, compac
     window.addEventListener("keydown", close); window.addEventListener("mousedown", outside);
     return () => { window.removeEventListener("keydown", close); window.removeEventListener("mousedown", outside); };
   }, [pinned]);
+  // A tree that grows past the panel keeps the step that needs attention (else the delivery) in view.
+  const shape = graph.nodes.map(node => `${node.node_id}:${node.status}`).join("|");
+  useEffect(() => {
+    const box = scroller.current;
+    if (!box || box.scrollWidth <= box.clientWidth + 4) return;
+    const target = placed.find(item => item.node.status === "waiting_human") ?? placed.find(item => item.node.kind === "deliver");
+    if (target) box.scrollTo({ left: Math.max(0, target.x + NODE_W / 2 - box.clientWidth / 2), behavior: "smooth" });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [shape]);
   useEffect(() => { if (detailId && !graph.nodes.some(node => node.node_id === detailId)) setDetailId(null); }, [graph, detailId]);
 
   const cardStyle = cardNode ? (() => {
@@ -152,7 +165,7 @@ export function WorkflowTree({ graph, onInterrupt, interruptBusy = false, compac
         <span className={`wf-state ${STATE_CLASS[graph.state.status]}`}>任务状态 · {graph.state.label}</span>
       </div>
     </header>
-    <div className="wf-scroll">
+    <div className="wf-scroll" ref={scroller}>
       <div className="wf-canvas" style={{ width, height }}>
         <svg width={width} height={height} aria-hidden="true">
           <defs><marker id="wf-arrow" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L8 4L0 8z" fill="#9aa6b8" /></marker></defs>
