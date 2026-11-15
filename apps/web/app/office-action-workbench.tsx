@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { IconDownload, IconLoader2, IconRefresh, IconSend } from "@tabler/icons-react";
 import "./office-action-unified.css";
+import { JudgementPanel, type RiskJudgement } from "./risk-judgement";
 import exampleData from "./office-action-examples.json";
 import legacyExampleData from "./office-action-examples-legacy.json";
 
@@ -33,7 +34,9 @@ export type OfficeAction = {
   receipt: { record_id: string; kind: string; content: string; target: string; created_at: string; undone_at: string | null } | null;
   history: { revision: number; event: string; message: string; at: string; input: ActionInput; content_snapshot?: string | null }[];
   decision?: { option: "first" | "second"; rationale: string; selected_content: string; at: string } | null;
+  judgement?: RiskJudgement | null;
 };
+
 
 export function normalizeOfficeAction(value: unknown): OfficeAction | null {
   if (!value || typeof value !== "object") return null;
@@ -56,8 +59,11 @@ const OPERATIONS: { value: ActionInput["operation"]; label: string; title: strin
 const CONTACTS = [
   ["wang-engineering", "王工 · 研发组 · wang.engineering@example.invalid"],
   ["wang-delivery", "王工 · 交付组 · wang.delivery@example.invalid"],
-  ["client-review", "客户评审联系人 · review@example.invalid"],
+  ["wang-supplier", "王工 · 星河设备供应商（外部） · wang@xinghe-supplier.example.invalid"],
+  ["client-review", "客户评审联系人（外部） · review@example.invalid"],
 ];
+const EXTERNAL_CONTACTS = new Set(["wang-supplier", "client-review"]);
+
 const CHECK_LABELS: Record<string, string> = {
   target: "已核对完整收件对象", content: "已核对这份正文", impact: "已了解本次提交范围与撤回限制",
 };
@@ -317,7 +323,7 @@ export function OfficeActionWorkbench({ run, files, apiBase, headers, onSnapshot
         {draft.operation === "extract_excerpt" && <label>摘录来源<select aria-label="摘录来源" value={draft.source_ref ?? ""} onChange={event => setDraft({ ...draft, source_ref: event.target.value || null })}><option value="">使用下方填入的文字</option>{files.map(file => <option key={file.file_ref} value={file.file_ref}>{file.display_path || file.display_label}</option>)}</select></label>}
         <label>{draft.source_ref ? "补充说明（不计入摘录）" : "内容"}<textarea aria-label="事项内容" value={draft.content} maxLength={5000} rows={6} onChange={event => setDraft({ ...draft, content: event.target.value })} /></label>
         {draft.operation === "compare_materials" && <><p>上方为材料 A，下方为材料 B。均为你提供的对照内容，系统不自动判断哪份正确。</p><label>材料 B<textarea aria-label="第二份材料" rows={5} maxLength={5000} value={draft.alternative_content ?? ""} onChange={event => setDraft({ ...draft, alternative_content: event.target.value })} /></label></>}
-        {["create_task", "send_message"].includes(draft.operation) && <label>{draft.operation === "create_task" ? "负责人" : "收件人"}<select aria-label="办理对象" value={draft.target} onChange={event => setDraft({ ...draft, target: event.target.value })}><option value="">请选择具体联系人</option>{CONTACTS.filter(([id]) => draft.operation !== "create_task" || id !== "client-review").map(([id, label]) => <option key={id} value={id}>{label}</option>)}</select></label>}
+        {["create_task", "send_message"].includes(draft.operation) && <label>{draft.operation === "create_task" ? "负责人" : "收件人"}<select aria-label="办理对象" value={draft.target} onChange={event => setDraft({ ...draft, target: event.target.value })}><option value="">请选择具体联系人</option>{CONTACTS.filter(([id]) => draft.operation !== "create_task" || !EXTERNAL_CONTACTS.has(id)).map(([id, label]) => <option key={id} value={id}>{label}</option>)}</select></label>}
         {draft.operation === "create_task" && <label>截止日期<input type="date" aria-label="截止日期" value={draft.due_date ?? ""} onChange={event => setDraft({ ...draft, due_date: event.target.value || null })} /></label>}
     </>;
     const composer = !shown ? <div className="office-composer">
@@ -363,7 +369,7 @@ export function OfficeActionWorkbench({ run, files, apiBase, headers, onSnapshot
       {!shown.receipt && <p>{shown.result_message}</p>}
       {(unknown || editing || draftEditing || open) && <p className="office-pending-context">{unknown ? "结果待核对 · 暂不开始新的操作" : editing || draftEditing ? "你正在编辑，修改尚未保存" : "等待你处理 · 不会自动继续"}</p>}
     </div>}
-    {shown?.missing_fields.length ? <div role="status"><p>还需要补齐以下信息，尚未创建或发送：</p><ul className="office-action-missing">{shown.missing_fields.map(item => <li key={item}>{item}</li>)}</ul></div> : null}
+    {shown?.missing_fields.length ? <div role="status"><p>还需要补齐以下信息，尚未创建或发送：</p><ul className="office-action-missing">{shown.missing_fields.map(item => <li key={item}>{item}</li>)}</ul>{shown.judgement && <details className="office-risk-lens office-judgement-pending"><summary>为什么暂按 {shown.judgement.risk_level} 处理</summary><JudgementPanel judgement={shown.judgement} /></details>}</div> : null}
     <fieldset className="office-action-authority" disabled={readOnly && !!shown}>
     {portalForm ? createPortal(manualForm, portalForm) : manualForm}
     {shown && !editable && <>
@@ -387,7 +393,7 @@ export function OfficeActionWorkbench({ run, files, apiBase, headers, onSnapshot
         </form> : <button disabled={busy || unknown} onClick={() => { setRestoreFrom(null); setEditedText(shown.preview); setDraftEditing(true); }}>编辑这份草稿</button>}
       </div>}
       {shown.input.operation === "format_text" && <details><summary>查看整理前的内容</summary><pre>{shown.before}</pre></details>}
-      <details className="office-risk-lens" open={shown.risk_level === "L4" || shown.risk_level === "L5"}><summary>影响与处理依据</summary><dl><dt>处理原因</dt><dd>{shown.reason}</dd><dt>将影响什么</dt><dd>{shown.impact}</dd><dt>恢复方式</dt><dd>{shown.reversibility}</dd><dt>处理权限</dt><dd>{shown.autonomy_level} · 第 {shown.revision} 版</dd></dl></details>
+      <details className="office-risk-lens" open={shown.risk_level === "L4" || shown.risk_level === "L5"}><summary>影响与处理依据</summary><dl><dt>处理原因</dt><dd>{shown.reason}</dd><dt>将影响什么</dt><dd>{shown.impact}</dd><dt>恢复方式</dt><dd>{shown.reversibility}</dd><dt>处理权限</dt><dd>{shown.autonomy_level} · 第 {shown.revision} 版</dd></dl>{shown.judgement && <JudgementPanel judgement={shown.judgement} />}</details>
       {shown.source_excerpt && shown.status !== "draft_ready" && <details><summary>核对来源：{shown.source_label ?? "用户填写内容"}</summary><pre>{shown.source_excerpt}</pre>{shown.input.source_ref && <button onClick={() => onOpenSource(shown.input.source_ref!)}>打开资料预览</button>}</details>}
       {changes.length > 0 && open && <p className="office-recheck-notice" role="status">内容已变更：{changes.map(([label]) => label).join("、")}。旧核对已失效，请重新核对第 {shown.revision} 版。</p>}
       {changes.length > 0 && <details className="office-version-changes" open={open || undefined}><summary>第 {shown.revision} 版修改了什么（{changes.length} 项）</summary>
@@ -404,7 +410,7 @@ export function OfficeActionWorkbench({ run, files, apiBase, headers, onSnapshot
         <label>判断理由<textarea aria-label="判断理由" value={rationale} maxLength={1000} rows={3} onChange={event => setRationale(event.target.value)} /></label>
         <div className="office-action-buttons"><button className="primary" type="submit" disabled={!choice || !rationale.trim()}>记录这次判断</button><button type="button" onClick={() => { setEditing(true); setChecks([]); }}>修改内容</button><button type="button" onClick={() => control("defer")}>暂时无法判断，稍后处理</button><button type="button" onClick={() => control("cancel")}>取消本次事项</button></div>
         </fieldset></form>}
-      {open && !unknown && shown.input.operation !== "compare_materials" && <div className="office-action-review"><fieldset disabled={busy}><legend>{shown.risk_level === "L4" ? "请逐项核对当前内容" : "是否按以上内容创建测试任务？"}</legend>{shown.required_checks.map(item => <label className="office-check" key={item}><input type="checkbox" checked={checks.includes(item)} onChange={event => setChecks(current => event.target.checked ? [...current, item] : current.filter(value => value !== item))} />{CHECK_LABELS[item]}</label>)}
+      {open && !unknown && shown.input.operation !== "compare_materials" && <div className="office-action-review"><fieldset disabled={busy}><legend>{shown.risk_level === "L4" ? "请逐项核对当前内容" : shown.input.operation === "create_task" ? "是否按以上内容创建测试任务？" : "是否按以上内容登记这条内部消息？"}</legend>{shown.required_checks.map(item => <label className="office-check" key={item}><input type="checkbox" checked={checks.includes(item)} onChange={event => setChecks(current => event.target.checked ? [...current, item] : current.filter(value => value !== item))} />{CHECK_LABELS[item]}</label>)}
         <div className="office-action-buttons"><button type="button" className="primary" disabled={shown.required_checks.some(item => !checks.includes(item))} onClick={() => control("confirm")}>{shown.input.operation === "create_task" ? "确认创建测试任务" : "确认登记测试发件"}</button><button type="button" onClick={() => { setEditing(true); setChecks([]); }}>修改内容</button><button type="button" onClick={() => control("defer")}>稍后处理</button><button type="button" onClick={() => control("cancel")}>取消本次事项</button></div>
       </fieldset></div>}
     </>}

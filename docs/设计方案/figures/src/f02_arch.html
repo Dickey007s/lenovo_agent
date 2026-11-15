@@ -1,0 +1,80 @@
+<!DOCTYPE html><html lang="zh-CN"><head><meta charset="UTF-8"><link rel="stylesheet" href="fig.css">
+<style>
+body{height:740px}
+.stack{display:grid;grid-template-columns:150px 1fr;gap:10px 14px}
+.lyr{display:flex;align-items:center;justify-content:center;flex-direction:column;border-radius:10px;color:#fff;font-weight:700;font-size:19px;text-align:center;padding:8px}
+.lyr small{font-size:12.5px;font-weight:400;opacity:.85;margin-top:3px}
+.row{display:flex;gap:10px;align-items:stretch}
+.m{flex:1;background:#fff;border:1.5px solid var(--line);border-radius:10px;padding:10px 12px}
+.m b{display:block;font-size:16px;color:var(--deep)}
+.m span{display:block;font-size:13px;color:var(--gray);margin-top:3px;line-height:1.4}
+.m code{font-family:Menlo,monospace;font-size:11.5px;color:#3B82C4}
+.loop{flex:1;display:flex;align-items:center;gap:0;background:#fff;border:1.5px solid #9cc0e6;border-radius:10px;padding:10px 12px}
+.loop .nd{font-size:14.5px;padding:7px 9px}
+.side{position:absolute;right:44px;top:120px;width:0}
+.pr{margin-top:16px;display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+.p{border-radius:10px;padding:10px 14px;background:var(--soft);border:1.5px solid var(--line)}
+.p .k{font-size:16.5px;font-weight:700;color:var(--deep)}.p .v{font-size:13.5px;color:var(--gray);margin-top:2px;line-height:1.45}
+</style></head><body>
+<div class="ttl"><span class="no">图 2</span><h1>技术架构：模型提议，服务端决定</h1><span class="sub">FastAPI + Next.js；所有业务事实由服务端持有</span></div>
+<div class="stack">
+ <div class="lyr" style="background:#E4702B">交互层<small>apps/web · Next.js</small></div>
+ <div class="row">
+  <div class="m"><b>统一工作台</b><span>三栏：工作区 / 任务列表 / 任务详情<br><code>unified-workbench.tsx</code></span></div>
+  <div class="m"><b>工作流树</b><span>节点 L 等级 · 三色状态 · 波次分组<br><code>workflow-tree.tsx</code></span></div>
+  <div class="m"><b>问题审查页</b><span>证据定位 · 选项 · 推荐默认隐藏<br><code>harness-workbench.tsx</code></span></div>
+  <div class="m"><b>多待办与纪要</b><span>纪要拆分 · 逐项确认 · 批量启动<br><code>minutes-intake / todo-batch</code></span></div>
+  <div class="m"><b>Risk Lens</b><span>五因子判定面板 · 核对项 · 移动端<br><code>office-action-workbench / risk-judgement</code></span></div>
+ </div>
+ <div class="lyr" style="background:#62738A">接口层<small>services/api · FastAPI</small></div>
+ <div class="row">
+  <div class="m"><b>/v1/harness/runs</b><span>启动任务（单任务 / 待办 / 办公动作）</span></div>
+  <div class="m"><b>/runs/{id}/continue</b><span>同一任务追加分支</span></div>
+  <div class="m"><b>/runs/{id}/controls</b><span>决断 · 暂缓 · 补资料 · 停止</span></div>
+  <div class="m"><b>/runs/{id}/action-controls</b><span>确认 · 修改 · 撤销 · 记录判断</span></div>
+  <div class="m"><b>/minutes/split · /workspace</b><span>纪要拆待办 · 资料库与预览</span></div>
+ </div>
+ <div class="lyr" style="background:#124A8C">Agent 运行层<small>harness_runtime.py</small></div>
+ <div class="loop">
+  <div class="nd">冻结资料范围</div><div class="gap"></div>
+  <div class="nd">规划<small>Planner 模型</small></div><div class="gap"></div>
+  <div class="nd srv">计划校验</div><div class="gap"></div>
+  <div class="nd srv">拓扑准入<small>单主控 / 固定流程 / 子 Agent</small></div><div class="gap"></div>
+  <div class="nd">分波执行<small>每波 ≤ 3 子 Agent</small></div><div class="gap"></div>
+  <div class="nd srv">采用门<small>来源 · 依赖 · 对账</small></div><div class="gap"></div>
+  <div class="nd srv">证据门</div><div class="gap"></div>
+  <div class="nd hu">人工门</div><div class="gap"></div>
+  <div class="nd ok">交付 / 追加</div>
+ </div>
+ <div class="lyr" style="background:#3d4d63">规则与校验层<small>确定性 · 不调用模型</small></div>
+ <div class="row">
+  <div class="m"><b>来源事实</b><span>行号 / 单元格 / 页码逐字定位<br><code>readonly_source_facts.py</code></span></div>
+  <div class="m"><b>拓扑准入</b><span>独立分支、人工门、预算决定是否委派<br><code>topology_admission.py</code></span></div>
+  <div class="m"><b>采用与依赖</b><span>子 Agent 结果合入前核对<br><code>collaboration_review.py</code></span></div>
+  <div class="m"><b>五因子判定</b><span>下限 → 合并规则 → AL → 介入顺序<br><code>risk_judgement.py</code></span></div>
+  <div class="m"><b>办公动作策略</b><span>缺信息、受限、确认绑定版本<br><code>office_action_policy.py</code></span></div>
+ </div>
+ <div class="lyr" style="background:#2E9E83">数据层<small>只读资料 + 版本化产物</small></div>
+ <div class="row">
+  <div class="m"><b>共享资料库</b><span>FORTE 企业公开样例 97 份 · 原件只读</span></div>
+  <div class="m"><b>运行工作区</b><span>每次运行独立副本 · 成果按版本保留</span></div>
+  <div class="m"><b>任务账本</b><span>Task / Run / WorkUnit / Contribution</span></div>
+  <div class="m"><b>状态存储</b><span>内存默认 · PostgreSQL + LangGraph 检查点可选</span></div>
+  <div class="m"><b>测试记录</b><span>建任务、发件只写隔离记录，不连真实系统</span></div>
+ </div>
+ <div class="lyr" style="background:#9CA3AF">模型层</div>
+ <div class="row">
+  <div class="m"><b>规划模型</b><span>拆步骤、提出委派理由，60 s 超时</span></div>
+  <div class="m"><b>分析模型</b><span>读资料、给结论与引用，180 s 超时</span></div>
+  <div class="m"><b>纪要拆分</b><span>模型拆分，失败退回编号规则</span></div>
+  <div class="m"><b>OpenAI 兼容接口</b><span>当前接入 DeepSeek V4 Pro，可替换</span></div>
+  <div class="m"><b>演示模式</b><span>离线模拟规划与分析，零模型调用</span></div>
+ </div>
+</div>
+<div class="pr">
+ <div class="p"><div class="k">① 事实归服务端</div><div class="v">文件、行号、权限、联系人由服务端给出，模型不能新增</div></div>
+ <div class="p"><div class="k">② 引用要能找到</div><div class="v">每条结论回到原文位置，找不到就记为证据缺口</div></div>
+ <div class="p"><div class="k">③ 委派要有收益</div><div class="v">工作项不等于 Agent，收益不成立就由主 Agent 自办</div></div>
+ <div class="p"><div class="k">④ 等级由规则算</div><div class="v">五因子判定可复查，模型的说明不改变等级</div></div>
+</div>
+</body></html>

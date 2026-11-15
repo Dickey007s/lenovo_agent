@@ -545,6 +545,7 @@ def build_office_action_workflow(action: Any, *, source_label: str | None = None
         risk_level=action.risk_level,
         autonomy_level=action.autonomy_level,
         restricted_reason=action.reason if action.risk_level == "L5" else None,
+        judgement=getattr(action, "judgement", None),
     )
     facts = [f"协作方式：{action.mode}", action.reversibility]
     if action.missing_fields:

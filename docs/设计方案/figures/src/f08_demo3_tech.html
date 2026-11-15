@@ -1,0 +1,52 @@
+<!DOCTYPE html><html lang="zh-CN"><head><meta charset="UTF-8"><link rel="stylesheet" href="fig.css">
+<style>
+body{height:620px}
+.pipe{display:flex;align-items:stretch}
+.st{width:270px;background:#fff;border:1.5px solid var(--line);border-radius:12px;padding:12px 14px;display:flex;flex-direction:column;gap:6px}
+.st h3{font-size:17px;color:var(--deep);display:flex;align-items:center;gap:8px}
+.st code{font-family:Menlo,monospace;font-size:11.5px;color:#3B82C4}
+.st li{font-size:13.5px;color:var(--text);line-height:1.45;margin-left:16px}
+.st.k{background:var(--soft);border-color:#9cc0e6}
+.gap{align-self:center}
+table{border-collapse:collapse;width:100%;font-size:14px}
+th,td{border-bottom:1px solid #E3EAF3;padding:6px 8px;text-align:left}
+th{color:var(--gray);font-weight:500;font-size:13px}
+tr.drv{background:#FFF3EA}
+.ex{display:grid;grid-template-columns:1.3fr 1fr;gap:18px;margin-top:20px}
+.res{font-size:15px;margin-top:8px;color:var(--deep)}
+.res b{color:var(--blue)}
+.ver{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+.v{background:#fff;border:1.5px solid var(--line);border-radius:10px;padding:10px 12px}
+.v b{font-size:24px;color:var(--blue)}.v span{display:block;font-size:13px;color:var(--gray)}
+</style></head><body>
+<div class="ttl"><span class="no">图 18</span><h1>Demo 3 技术路径：五因子判定引擎</h1><span class="sub">risk_judgement.py · 等级由规则算出，界面展示每一步</span></div>
+<div class="pipe">
+ <div class="st"><h3><span class="chip AL">1</span>办公动作输入</h3><code>ActionInput</code><ul><li>类型：整理 / 摘录 / 建任务 / 发消息 / 对照</li><li>对象：通讯录联系人（内部 / 外部）</li><li>标题、正文、来源资料</li></ul></div><div class="gap"></div>
+ <div class="st"><h3><span class="chip AL">2</span>取因子值</h3><code>judge_action()</code><ul><li>动作类型给默认值</li><li>对象不明 → 按外部，标“不明按高”</li><li>正文 / 资料含薪资、报价 → 高敏感</li><li>最低价承诺、无须审批 → 无权</li></ul></div><div class="gap"></div>
+ <div class="st k"><h3><span class="chip AL">3</span>判定</h3><code>judge(ActionFactors)</code><ul><li>5 个因子查下限表</li><li>6 条合并规则，顺序固定</li><li>等级上限 × 动作形态 → AL</li><li>介入原因排序，一次只问一件</li></ul></div><div class="gap"></div>
+ <div class="st"><h3><span class="chip AL">4</span>判定记录</h3><code>RiskJudgement</code><ul><li>因子取值、下限、依据</li><li>命中的规则与说明</li><li>等级、上限、AL、此刻处理</li><li>阈值版本 thresholds.default.v1</li></ul></div><div class="gap"></div>
+ <div class="st"><h3><span class="chip AL">5</span>界面与状态</h3><code>office_action_policy · workflow_graph</code><ul><li>状态：自动 / 草稿 / 待确认 / 受限</li><li>L4 才要求三项核对</li><li>8 维度说明标出“决定等级”</li><li>Risk Lens 展开判定面板</li></ul></div>
+</div>
+<div class="ex">
+ <div class="card" style="padding:14px 16px;background:#fff">
+  <div class="big">例：向外部供应商发送配置需求</div>
+  <table style="margin-top:8px"><tr><th>判定因子</th><th>取值</th><th>下限</th></tr>
+   <tr class="drv"><td>状态变化</td><td>对外发送，属于正式提交</td><td><span class="chip L4">L4</span></td></tr>
+   <tr class="drv"><td>影响范围</td><td>收件人在组织通讯录以外</td><td><span class="chip L4">L4</span></td></tr>
+   <tr class="drv"><td>恢复能力</td><td>外发后不可收回</td><td><span class="chip L4">L4</span></td></tr>
+   <tr><td>数据敏感度</td><td>常规业务资料</td><td><span class="chip L0">L0</span></td></tr>
+   <tr><td>权限与制度</td><td>本人有权，无需审批</td><td><span class="chip L0">L0</span></td></tr></table>
+  <div class="res">就高 → <b>L4</b>　·　AL = min（AL3，需要实施）= <b>AL3</b>　·　此刻处理：<b>执行授权 · 强确认</b></div>
+ </div>
+ <div>
+  <div class="big" style="margin-bottom:8px">怎样验证判定一致</div>
+  <div class="ver">
+   <div class="v"><b>15</b><span>案例库“判定过程”参考答案（C00–C11 及变体）</span></div>
+   <div class="v"><b>13</b><span>手册 4.7 节易混淆判例</span></div>
+   <div class="v"><b>36 / 36</b><span>判定单元测试通过</span></div>
+   <div class="v"><b>100%</b><span>与手册参考答案一致（等级与 AL）</span></div>
+  </div>
+  <div class="note" style="margin-top:10px">阈值取手册默认值（内部批量 &gt;10 人、重大批量 ≥50 条等），可按组织制度调整，调整后记录阈值版本。</div>
+ </div>
+</div>
+</body></html>
