@@ -1,0 +1,35 @@
+<!DOCTYPE html><html lang="zh-CN"><head><meta charset="UTF-8"><title>图 16 澄清后重判</title><style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{width:1600px;font-family:"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;color:#404040;background:#fff;padding:30px 40px}
+.ttl{display:flex;align-items:center;gap:14px;margin-bottom:18px}
+.ttl .no{background:#124A8C;color:#fff;font-weight:700;font-size:18px;padding:4px 12px;border-radius:6px}
+.ttl h1{font-size:28px;color:#12396A}.ttl .sub{font-size:17px;color:#62738A}
+.wrap{display:grid;grid-template-columns:1080px 1fr;gap:22px;align-items:start}
+.shot{position:relative;border:1.5px solid #CAD8E9;border-radius:12px;overflow:hidden;box-shadow:0 6px 18px rgba(18,57,106,.08)}
+.shot img{display:block;width:1080px}
+.hl{position:absolute;border:2.5px solid #E4702B;border-radius:6px;background:rgba(228,112,43,.06)}
+.pin{position:absolute;width:30px;height:30px;border-radius:50%;background:#E4702B;color:#fff;font-weight:700;font-size:16px;display:flex;align-items:center;justify-content:center;box-shadow:0 0 0 3px #fff}
+.notes{display:flex;flex-direction:column;gap:9px}
+.tagline{font-size:14px;color:#124A8C;font-weight:700;background:#EAF2FB;border-radius:8px;padding:8px 12px}
+.n{display:grid;grid-template-columns:30px 1fr;gap:10px;align-items:start;background:#fff;border:1.5px solid #CAD8E9;border-radius:10px;padding:9px 11px}
+.n i{width:28px;height:28px;border-radius:50%;background:#E4702B;color:#fff;font-style:normal;font-weight:700;display:flex;align-items:center;justify-content:center;font-size:15px}
+.n b{display:block;font-size:16px;color:#12396A}.n span{display:block;font-size:13.5px;color:#62738A;line-height:1.45;margin-top:2px}
+
+.pair{display:grid;grid-template-columns:1fr 80px 1fr;gap:10px;align-items:center}
+.pair .c{border:1.5px solid #CAD8E9;border-radius:12px;padding:10px;background:#fff}
+.pair .c img{display:block;width:100%}
+.pair h3{font-size:18px;color:#12396A;margin-bottom:8px;display:flex;gap:8px;align-items:center}
+.chip{display:inline-block;color:#fff;font-weight:700;border-radius:5px;padding:1px 9px;font-size:14px}
+.arr{font-size:15px;color:#124A8C;font-weight:700;text-align:center}
+</style></head><body>
+<div class="ttl"><span class="no">图 16</span><h1>Demo 3 澄清后重判：“交给王工”从 L4 降到 L3</h1><span class="sub">案例 C06 · 不明按高 → 变化即重判</span></div>
+<div class="pair">
+ <div class="c"><h3><span class="chip" style="background:#E4702B">L4</span>澄清前：三位“王工”，其中一位在外部</h3><img src="../screenshots/c06-1-judgement.png"></div>
+ <div class="arr">选定<br>研发组王工<br>→</div>
+ <div class="c"><h3><span class="chip" style="background:#D9A21B">L3</span>澄清后：内部 1 人，按事实重判</h3><img src="../screenshots/c06-2-judgement.png"></div>
+</div>
+<div class="notes" style="margin-top:16px;display:grid;grid-template-columns:repeat(3,1fr)">
+ <div class="n"><i>1</i><div><b>不明按高</b><span>影响范围未知时按外部判定，并标出“不明按高”</span></div></div>
+ <div class="n"><i>2</i><div><b>一次只问一件</b><span>先问“是哪位王工”，界面同时提示“后续还需：强确认”</span></div></div>
+ <div class="n"><i>3</i><div><b>重判且旧确认失效</b><span>选定后第 2 版重新判定为 L3，只需普通确认</span></div></div>
+</div></body></html>

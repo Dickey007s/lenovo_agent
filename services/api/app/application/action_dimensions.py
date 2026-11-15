@@ -1,15 +1,18 @@
 """Risk level and eight-dimension explanation for one Agent action.
 
-The tables follow ``docs/design/submission/人机共驾设计指导手册_v1.0.md``:
+The tables follow ``人机共驾设计指导手册 v1.1``:
 
-* section 1: eight things to establish for every action;
-* section 3: L0-L5 risk levels and the default collaboration / takeover point;
-* section 3: AL0-AL5 autonomy levels, recorded separately from risk.
+* section 1: eight questions that describe every action (the explanation layer);
+* section 4.1: L0-L5 risk levels and the default collaboration / takeover point;
+* section 4.4: AL0-AL5 autonomy levels, recorded separately from risk.
 
-Everything here is deterministic.  The level comes from the operation kind (a
-product convention, as the manual stresses), not from a score computed over the
-dimensions.  ``drives_level`` only marks which dimensions explain that level so a
-reader can see *why* an action sits where it does.  No model is called.
+For office actions (Demo 3) the level and autonomy are computed by the
+five-factor judgement in ``risk_judgement.py`` (section 4.2-4.4).  Five of the
+eight questions map one-to-one to the five factors; "动作和对象" and "意图和证据"
+supply factor values and "使用环境" only changes the interaction (R13).  When a
+judgement is supplied, ``drives_level`` marks the dimensions whose factor floor
+equals the final level.  Intake and human-gate steps keep their documented
+conventions.  Everything here is deterministic.  No model is called.
 """
 
 from __future__ import annotations
@@ -17,6 +20,17 @@ from __future__ import annotations
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
+
+from packages.contracts.risk_judgement import RiskJudgement
+
+# Five-factor key -> eight-dimension key (manual 4.2 "来自哪个问题").
+FACTOR_TO_DIMENSION: dict[str, str] = {
+    "state_change": "state_change",
+    "scope": "blast_radius",
+    "recoverability": "recoverability",
+    "sensitivity": "data_flow",
+    "authority": "authority",
+}
 
 RiskLevel = Literal["L0", "L1", "L2", "L3", "L4", "L5"]
 AutonomyLevel = Literal["AL0", "AL1", "AL2", "AL3", "AL4", "AL5"]
@@ -86,8 +100,10 @@ class RiskAssessment(BaseModel):
     design_focus: str
     dimensions: list[DimensionFinding] = Field(min_length=8, max_length=8)
     rules: list[str] = Field(default_factory=list, max_length=8)
-    # The level is looked up from the operation kind, not computed from the dimensions.
-    basis: Literal["operation_default"] = "operation_default"
+    # five_factor: computed by risk_judgement.judge; convention: documented default
+    # for intake / human-gate steps (manual 4.5 intervention points, not actions).
+    basis: Literal["operation_default", "five_factor"] = "operation_default"
+    judgement: RiskJudgement | None = None
 
 
 def _assessment(
@@ -96,7 +112,11 @@ def _assessment(
     findings: dict[str, str],
     drivers: set[str],
     rules: list[str],
+    judgement: RiskJudgement | None = None,
 ) -> RiskAssessment:
+    if judgement is not None:
+        risk, autonomy = judgement.risk_level, judgement.autonomy_level
+        drivers = {FACTOR_TO_DIMENSION[f.key] for f in judgement.factors if f.drives_level}
     title, collaboration, takeover, focus = RISK_LEVELS[risk]
     autonomy_title, _ = AUTONOMY_LEVELS[autonomy]
     return RiskAssessment(
@@ -117,6 +137,8 @@ def _assessment(
             for key, label in DIMENSION_LABELS.items()
         ],
         rules=rules,
+        basis="five_factor" if judgement is not None else "operation_default",
+        judgement=judgement,
     )
 
 
@@ -133,6 +155,7 @@ def assess_office_action(
     risk_level: str | None = None,
     autonomy_level: str | None = None,
     restricted_reason: str | None = None,
+    judgement: RiskJudgement | None = None,
 ) -> RiskAssessment:
     """Eight-dimension explanation for one office action.
 
@@ -210,7 +233,7 @@ def assess_office_action(
         ),
         "restricted_action": (
             "L5",
-            "AL1",
+            "AL2",
             {
                 "action_object": "这是一项被组织规则限制的动作。",
                 "data_flow": "不读取也不传送任何资料来实施它。",
@@ -245,7 +268,10 @@ def assess_office_action(
     # restricted action, whatever operation the user picked.
     key = "restricted_action" if risk_level == "L5" else operation
     default_risk, default_autonomy, findings, drivers, rules = table[key]
-    return _assessment(risk_level or default_risk, autonomy_level or default_autonomy, findings, drivers, rules)
+    return _assessment(
+        risk_level or default_risk, autonomy_level or default_autonomy, findings, drivers, rules,
+        judgement=judgement,
+    )
 
 
 # --------------------------------------------------------------------------
@@ -272,6 +298,31 @@ def assess_intake(*, file_count: int) -> RiskAssessment:
         {"state_change", "blast_radius"},
         ["R01", "R02"],
     )
+
+
+def _work_unit_judgement(kind: str, file_count: int) -> RiskJudgement:
+    """Five-factor judgement for a Demo 1/2 work unit (read-only analysis by design)."""
+
+    from services.api.app.application.risk_judgement import ActionFactors, judge
+
+    if kind == "external_action":
+        factors = ActionFactors(
+            state_change="external_commit", scope="external", recoverability="irreversible",
+            sensitivity="routine", authority="own", action_form="implement",
+            basis={"state_change": "若实施即为对外发送。", "scope": "作用到外部对象。",
+                   "recoverability": "外发后无法收回。"},
+            interventions={"execution_authorization"},
+        )
+    else:
+        factors = ActionFactors(
+            state_change="draft", scope="self", recoverability="full",
+            sensitivity="routine", authority="own", action_form="content",
+            basis={"state_change": "只产生分析结果或版本化草稿，不修改资料库原文件。",
+                   "scope": "结果仅本次任务可见。", "recoverability": "按版本保留，可回退或重做。",
+                   "sensitivity": f"读取 {file_count} 份已获准的常规办公资料。",
+                   "authority": "读取范围受资料库白名单约束。"},
+        )
+    return judge(factors)
 
 
 def assess_analysis_unit(
@@ -302,6 +353,7 @@ def assess_analysis_unit(
             },
             {"data_flow", "recoverability", "authority"},
             ["R07", "R09", "R15"],
+            judgement=_work_unit_judgement("external_action", file_count),
         )
     if requires_human_gate:
         return _assessment(
@@ -336,6 +388,7 @@ def assess_analysis_unit(
             },
             {"state_change", "recoverability"},
             ["R05", "R06", "R11"],
+            judgement=_work_unit_judgement("draft", file_count),
         )
     return _assessment(
         "L2",
@@ -352,6 +405,7 @@ def assess_analysis_unit(
         },
         {"state_change", "intent_evidence"},
         ["R05", "R06"],
+        judgement=_work_unit_judgement("draft", file_count),
     )
 
 
@@ -371,6 +425,7 @@ def assess_delivery(*, artifact_count: int) -> RiskAssessment:
         },
         {"intent_evidence", "authority"},
         ["R05", "R06", "R16"],
+        judgement=_work_unit_judgement("draft", artifact_count),
     )
 
 

@@ -1,4 +1,9 @@
-"""Deterministic policy and bounded local records. No connector or model calls."""
+"""Deterministic policy and bounded local records. No connector or model calls.
+
+Risk level and autonomy come from the five-factor judgement
+(``risk_judgement.judge``); an operation kind only supplies default factor
+values for the action it describes.
+"""
 
 from datetime import datetime, timezone
 from uuid import uuid4
@@ -6,13 +11,114 @@ from uuid import uuid4
 from packages.contracts.office_actions import (
     ActionDecision, ActionHistory, ActionInput, ActionReceipt, OfficeAction, OfficeActionControl,
 )
+from packages.contracts.risk_judgement import RiskJudgement
+from services.api.app.application.risk_judgement import (
+    ActionFactors, forbidden_terms, judge, pressure_of, sensitivity_of,
+)
 
 
 CONTACTS = {
     "wang-engineering": "王工 · 研发组 · wang.engineering@example.invalid",
     "wang-delivery": "王工 · 交付组 · wang.delivery@example.invalid",
-    "client-review": "客户评审联系人 · review@example.invalid",
+    "wang-supplier": "王工 · 星河设备供应商（外部） · wang@xinghe-supplier.example.invalid",
+    "client-review": "客户评审联系人（外部） · review@example.invalid",
 }
+# Contacts outside the organisation's directory (manual 4.2: "外部").
+EXTERNAL_CONTACTS = {"wang-supplier", "client-review"}
+
+
+def judge_action(
+    data: ActionInput, *, source_text: str = "", missing: list[str], revision: int = 1,
+) -> RiskJudgement:
+    """Describe one office action with the five factors and judge it."""
+
+    operation = data.operation
+    text = data.title + data.content + data.alternative_content
+    known = data.target in CONTACTS
+    external = data.target in EXTERNAL_CONTACTS
+    sensitivity, sensitivity_basis = sensitivity_of(text, source_text)
+    forbidden = forbidden_terms(text)
+    unknown: set = set()
+    basis: dict = {"sensitivity": sensitivity_basis}
+    interventions: set = set()
+    details: dict = {}
+    authority = "forbidden" if operation == "restricted_action" or forbidden else "own"
+    basis["authority"] = (
+        "内容含「" + "、".join(forbidden) + "」，超出本人授权，组织规则不允许自动实施。" if forbidden
+        else "该动作被组织规则列为受限事项。" if operation == "restricted_action"
+        else "本人有权办理，测试策略无需额外审批。"
+    )
+    if operation == "format_text":
+        state, scope, recover, form = "own_content", "self", "full", "implement"
+        basis.update(state_change="只改本人文本副本的空白与段落。", scope="仅本人。",
+                     recoverability="系统保留整理前的原文，可完整恢复。")
+        # Sensitivity follows the data flow (manual 4.2): local formatting of the
+        # user's own copy moves no data to any model, person or system.
+        sensitivity = "routine"
+        basis["sensitivity"] = "只在本地规则中处理本人副本，资料不流向模型、他人或其他系统。"
+    elif operation == "extract_excerpt":
+        state, scope, recover, form = "draft", "self", "full", "content"
+        basis.update(state_change="只生成内部摘录草稿，不修改业务记录。", scope="草稿仅本人可见。",
+                     recoverability="丢弃草稿不影响原资料。")
+    elif operation == "compare_materials":
+        state, scope, recover, form = "draft", "self", "full", "suggest"
+        basis.update(state_change="只并列材料、记录判断，不改原材料。", scope="仅本人。",
+                     recoverability="判断记录可以重做。")
+        interventions.add("business_judgment")
+        details["business_judgment"] = "两份材料由你选定口径"
+    elif operation == "create_task":
+        state, recover, form = "internal_record", "partial", "implement"
+        if not known or external:
+            # Unknown assignee: the directory also contains external people (rule 3).
+            scope = "external"
+            unknown.add("scope")
+            basis["scope"] = "负责人尚未确定唯一对象，候选中含外部联系人，按外部判定。"
+        else:
+            scope = "internal_small"
+            basis["scope"] = "指派给 1 位内部同事。"
+        basis.update(state_change="新增一条内部协作记录。",
+                     recoverability="创建后需由对方配合处理，只能部分恢复。")
+    elif operation in {"send_message", "restricted_action"}:
+        form = "implement"
+        if known and not external:
+            state, scope, recover = "internal_record", "internal_small", "partial"
+            basis.update(state_change="发送一条内部消息。", scope="收件人为 1 位内部同事。",
+                         recoverability="消息撤回后对方可能已看到，按部分恢复。")
+        else:
+            state, scope, recover = "external_commit", "external", "irreversible"
+            if not known:
+                unknown.update({"scope", "state_change", "recoverability"})
+                basis["scope"] = "收件对象尚未确定，候选中含外部联系人，按外部判定。"
+            else:
+                basis["scope"] = "收件人在组织通讯录以外。"
+            basis.update(state_change="对外发送，属于正式提交。",
+                         recoverability="外发后无法收回（撤消发送窗口不足 24 小时）。")
+    else:  # pragma: no cover - ActionInput forbids other operations
+        raise ValueError(operation)
+
+    if authority == "forbidden":
+        interventions.add("restricted")
+        details["restricted"] = "转有权人员或正式流程"
+    if missing:
+        interventions.add("missing_info")
+        details["missing_info"] = "、".join(item.removeprefix("请") for item in missing[:2])
+    if form == "implement" and operation in {"create_task", "send_message"}:
+        interventions.add("execution_authorization")
+    judgement = judge(ActionFactors(
+        state_change=state, scope=scope, recoverability=recover, sensitivity=sensitivity,
+        authority=authority, action_form=form, unknown=unknown, basis=basis,
+        pressure_signals=pressure_of(text), revision=revision,
+        interventions=interventions, intervention_details=details,
+    ))
+    if judgement.intervention == "execution_authorization" or "执行授权" in "".join(judgement.follow_ups):
+        label = "强确认" if judgement.risk_level == "L4" else "普通确认"
+        if judgement.intervention == "execution_authorization":
+            judgement.intervention_label = f"执行授权：{label}"
+        else:
+            judgement.follow_ups = [
+                f"执行授权：{label}" if item.startswith("执行授权") else item for item in judgement.follow_ups
+            ]
+    return judgement
 
 
 def prepare_action(
@@ -20,19 +126,11 @@ def prepare_action(
 ) -> OfficeAction:
     now = datetime.now(timezone.utc)
     operation = data.operation
-    risk, autonomy, mode = {
-        "format_text": ("L1", "AL4", "自动整理，可撤销"),
-        "extract_excerpt": ("L2", "AL2", "摘录草稿"),
-        "create_task": ("L3", "AL3", "确认后创建"),
-        "send_message": ("L4", "AL3", "核对后提交"),
-        "restricted_action": ("L5", "AL1", "受限，转人工办理"),
-        "compare_materials": ("L2", "AL1", "材料对照，由你判断"),
-    }[operation]
     missing = []
     target_label = CONTACTS.get(data.target, "尚未指定唯一联系人")
     if operation in {"create_task", "send_message"} and data.target not in CONTACTS:
         missing.append("请选择一位具体联系人")
-    if operation == "create_task" and data.target == "client-review":
+    if operation == "create_task" and data.target in EXTERNAL_CONTACTS:
         missing.append("协作任务仅支持测试通讯录中的内部成员")
     if operation == "create_task" and data.due_date is None:
         missing.append("请填写截止日期")
@@ -70,12 +168,21 @@ def prepare_action(
         target_label = "用户提供的两份对照材料"
     elif operation == "restricted_action":
         target_label = "受限业务内容，仅供人工核对"
-    restricted = operation == "restricted_action" or (
-        operation == "send_message"
-        and any(word in data.title + data.content for word in ("最低折扣", "最低价承诺", "无须审批"))
+    judgement = judge_action(
+        data, source_text=source_text or "", missing=missing,
+        revision=previous.revision + 1 if previous else 1,
     )
-    if restricted:
-        risk, autonomy, mode = "L5", "AL1", "受限，转人工办理"
+    risk, autonomy = judgement.risk_level, judgement.autonomy_level
+    restricted = risk == "L5"
+    mode = (
+        "受限，转人工办理" if restricted else {
+            "format_text": "自动整理，可撤销",
+            "extract_excerpt": "摘录草稿",
+            "create_task": "确认后创建",
+            "send_message": "逐项核对后提交" if risk == "L4" else "确认后发送",
+            "compare_materials": "材料对照，由你判断",
+        }.get(operation, "受限，转人工办理")
+    )
     status = (
         "denied" if restricted else "needs_input" if missing else
         "executed" if operation == "format_text" else
@@ -105,7 +212,8 @@ def prepare_action(
         revision=previous.revision + 1 if previous else 1,
         input=data, status=status, risk_level=risk, autonomy_level=autonomy, mode=mode,
         reason=reason, missing_fields=missing,
-        required_checks=["target", "content", "impact"] if risk == "L4" else [],
+        required_checks=(["target", "content", "impact"]
+                         if risk == "L4" and operation in {"create_task", "send_message"} else []),
         target_label=target_label, before=data.content, preview=preview,
         source_label=source_label, source_excerpt=source_text,
         impact=impact,
@@ -114,6 +222,7 @@ def prepare_action(
                        "两份材料保持原样，判断记录不改写原文。" if operation == "compare_materials" else
                        "本次仅保存测试记录；真实业务撤回能力须由相应系统提供。"),
         result_message=reason, history=list(previous.history) if previous else [],
+        judgement=judgement,
     )
     if status in {"executed", "draft_ready"}:
         action.receipt = ActionReceipt(

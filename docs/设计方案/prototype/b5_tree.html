@@ -1,0 +1,20 @@
+<!DOCTYPE html><html lang="zh-CN"><head><meta charset="UTF-8"><title>图 11 Demo 2 工作流树：一波波并行，状态一眼可见</title><style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{width:1600px;font-family:"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;color:#404040;background:#fff;padding:30px 40px}
+.ttl{display:flex;align-items:center;gap:14px;margin-bottom:18px}
+.ttl .no{background:#124A8C;color:#fff;font-weight:700;font-size:18px;padding:4px 12px;border-radius:6px}
+.ttl h1{font-size:28px;color:#12396A}.ttl .sub{font-size:17px;color:#62738A}
+.wrap{display:grid;grid-template-columns:1080px 1fr;gap:22px;align-items:start}
+.shot{position:relative;border:1.5px solid #CAD8E9;border-radius:12px;overflow:hidden;box-shadow:0 6px 18px rgba(18,57,106,.08)}
+.shot img{display:block;width:1080px}
+.hl{position:absolute;border:2.5px solid #E4702B;border-radius:6px;background:rgba(228,112,43,.06)}
+.pin{position:absolute;width:30px;height:30px;border-radius:50%;background:#E4702B;color:#fff;font-weight:700;font-size:16px;display:flex;align-items:center;justify-content:center;box-shadow:0 0 0 3px #fff}
+.notes{display:flex;flex-direction:column;gap:9px}
+.tagline{font-size:14px;color:#124A8C;font-weight:700;background:#EAF2FB;border-radius:8px;padding:8px 12px}
+.n{display:grid;grid-template-columns:30px 1fr;gap:10px;align-items:start;background:#fff;border:1.5px solid #CAD8E9;border-radius:10px;padding:9px 11px}
+.n i{width:28px;height:28px;border-radius:50%;background:#E4702B;color:#fff;font-style:normal;font-weight:700;display:flex;align-items:center;justify-content:center;font-size:15px}
+.n b{display:block;font-size:16px;color:#12396A}.n span{display:block;font-size:13.5px;color:#62738A;line-height:1.45;margin-top:2px}
+</style></head><body>
+<div class="ttl"><span class="no">图 11</span><h1>Demo 2 工作流树：一波波并行，状态一眼可见</h1></div>
+<div class="wrap"><div class="shot"><img src="boards/b5_tree.png"><div class="hl" style="left:582px;top:399px;width:123px;height:22px"></div><div class="pin" style="left:569px;top:386px">1</div><div class="hl" style="left:738px;top:399px;width:123px;height:22px"></div><div class="pin" style="left:725px;top:386px">2</div><div class="hl" style="left:758px;top:377px;width:193px;height:20px"></div><div class="pin" style="left:745px;top:364px">3</div><div class="hl" style="left:582px;top:441px;width:123px;height:51px"></div><div class="pin" style="left:569px;top:428px">4</div><div class="hl" style="left:738px;top:564px;width:123px;height:51px"></div><div class="pin" style="left:725px;top:551px">5</div><div class="hl" style="left:952px;top:376px;width:93px;height:22px"></div><div class="pin" style="left:939px;top:363px">6</div><div class="hl" style="left:382px;top:330px;width:616px;height:27px"></div><div class="pin" style="left:370px;top:317px">7</div></div>
+<div class="notes"><div class="tagline">真实模型 · 6 项工作 · 5 + 1 个子 Agent</div><div class="n"><i>1</i><div><b>第 1 波</b><span>5 项互不依赖的工作同时开始</span></div></div><div class="n"><i>2</i><div><b>第 2 波</b><span>汇总项等前一波通过采用门后才开始</span></div></div><div class="n"><i>3</i><div><b>Agent 数</b><span>1 个主 Agent + 6 个子 Agent</span></div></div><div class="n"><i>4</i><div><b>子 Agent 节点</b><span>名称、编号、状态；悬停看摘要，点开看 8 个维度</span></div></div><div class="n"><i>5</i><div><b>汇总节点</b><span>依赖边指明它用到了哪些前序结果</span></div></div><div class="n"><i>6</i><div><b>任务状态</b><span>处理中 / 待你判断 / 已完成</span></div></div><div class="n"><i>7</i><div><b>运行中补充</b><span>新要求排队，在下一步生效</span></div></div></div></div></body></html>

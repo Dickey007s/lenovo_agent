@@ -92,3 +92,4 @@ details.office-legacy-examples { margin: 10px 0 0; }
 .unified-workbench .office-composer-host footer.office-launch > button:disabled { opacity: .5; }
 .unified-workbench .office-composer-host footer.office-launch > button svg { width: 18px; }
 @media (max-width: 700px) { .unified-workbench .office-composer-host footer.office-launch > button { width: 100%; } }
+

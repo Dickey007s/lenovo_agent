@@ -5,6 +5,8 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_serializer, model_validator
 
+from packages.contracts.risk_judgement import RiskJudgement
+
 
 class ActionInput(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -74,14 +76,16 @@ class ActionDecision(BaseModel):
 class OfficeAction(BaseModel):
     action_id: str
     revision: int = 1
-    policy_version: Literal["office-actions.test.v1", "office-actions.test.v2"] = "office-actions.test.v2"
+    policy_version: Literal[
+        "office-actions.test.v1", "office-actions.test.v2", "office-actions.test.v3",
+    ] = "office-actions.test.v3"
     input: ActionInput
     status: Literal[
         "needs_input", "awaiting_confirmation", "deferred", "draft_ready",
         "executed", "denied", "cancelled", "undone", "stale", "awaiting_decision", "decided",
     ]
-    risk_level: Literal["L1", "L2", "L3", "L4", "L5"]
-    autonomy_level: Literal["AL1", "AL2", "AL3", "AL4"]
+    risk_level: Literal["L0", "L1", "L2", "L3", "L4", "L5"]
+    autonomy_level: Literal["AL0", "AL1", "AL2", "AL3", "AL4", "AL5"]
     mode: str
     reason: str
     missing_fields: list[str] = Field(default_factory=list)
@@ -96,6 +100,8 @@ class OfficeAction(BaseModel):
     result_message: str
     receipt: ActionReceipt | None = None
     decision: ActionDecision | None = None
+    # Five-factor judgement that produced risk_level / autonomy_level (v3 policy).
+    judgement: RiskJudgement | None = None
     history: list[ActionHistory] = Field(default_factory=list, max_length=60)
     execution_environment: Literal["isolated_test_records"] = "isolated_test_records"
     external_action: Literal["none"] = "none"

@@ -1,0 +1,68 @@
+<!DOCTYPE html><html lang="zh-CN"><head><meta charset="UTF-8"><link rel="stylesheet" href="fig.css">
+<style>
+body{height:620px}
+.wrap{display:grid;grid-template-columns:330px 1fr;gap:22px}
+.ctx{display:flex;flex-direction:column;gap:10px}
+.lvl{border-radius:10px;padding:10px 14px;color:#fff;font-weight:700;font-size:16px}
+.lvl small{display:block;font-weight:400;font-size:13px;opacity:.9;margin-top:2px}
+.funnel{display:flex;flex-direction:column;align-items:center;gap:6px}
+.pipe{display:flex;align-items:center}
+.pipe .nd{width:168px;font-size:15px}
+.qt{font-family:Menlo,monospace;font-size:12px;background:#fff;border:1.5px dashed #9cc0e6;border-radius:6px;padding:4px 6px;margin-top:5px;color:#12396A;text-align:left;font-weight:400}
+.outs{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:22px}
+.o{border-radius:12px;border:1.5px solid var(--line);background:#fff;padding:12px 14px}
+.o h3{font-size:18px;display:flex;align-items:center;gap:8px}
+.o p{font-size:14px;color:var(--gray);line-height:1.5;margin-top:6px}
+.o .ui{margin-top:8px;border:1.5px solid var(--line);border-radius:8px;background:#F7FAFD;padding:8px;font-size:13px;color:#3d4d63}
+.dec{margin-top:16px;display:grid;grid-template-columns:1.2fr 1fr;gap:16px}
+.opt{display:flex;gap:8px;align-items:flex-start;background:#fff;border:1.5px solid var(--line);border-radius:8px;padding:7px 9px;margin-top:6px;font-size:14px}
+.opt b{background:var(--blue);color:#fff;border-radius:4px;padding:0 6px;font-size:12px}
+.opt.sel{border-color:#E4702B;background:#FFF6EF}
+.bud{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-top:8px}
+.bd{background:#fff;border:1.5px solid var(--line);border-radius:8px;padding:8px 10px}
+.bd b{font-size:20px;color:var(--blue)}.bd span{display:block;font-size:12.5px;color:var(--gray)}
+</style></head><body>
+<div class="ttl"><span class="no">图 8</span><h1>Demo 1 技术路径：上下文收束 + Agent 循环 + 服务端校验</h1></div>
+<div class="wrap">
+ <div class="ctx">
+  <div class="big">上下文怎样收束</div>
+  <div class="funnel">
+   <div class="lvl" style="background:#9CA3AF;width:310px">整个资料库 97 份<small>只给索引，不给全文</small></div>
+   <div class="lvl" style="background:#3B82C4;width:260px">本轮选中 ≤ 16 份<small>Planner 按任务挑选</small></div>
+   <div class="lvl" style="background:#124A8C;width:210px">工作项相关片段<small>表格行 · 段落 · 页</small></div>
+   <div class="lvl" style="background:#12396A;width:160px">引用原文<small>逐字可定位</small></div>
+  </div>
+  <div class="big" style="margin-top:6px">运行预算（可调）</div>
+  <div class="bud">
+   <div class="bd"><b>12</b><span>最多轮次</span></div><div class="bd"><b>16</b><span>每轮文件数</span></div>
+   <div class="bd"><b>30</b><span>模型调用上限</span></div><div class="bd"><b>7200 s</b><span>执行时限</span></div>
+  </div>
+ </div>
+ <div>
+  <div class="pipe">
+   <div class="nd" style="width:230px">分析模型给结论<div class="qt">claim: 不开通研发权限<br>quote: "特殊备注：不开通研发权限"</div></div><div class="gap"></div>
+   <div class="nd srv">服务端逐字匹配<small>在冻结的资料副本中查找</small></div><div class="gap"></div>
+   <div class="nd srv">绑定位置<small>文件 · 第 14 行 · 列</small></div><div class="gap"></div>
+   <div class="nd srv">证据门<small>每个分支都核对过才放行</small></div><div class="gap"></div>
+   <div class="nd ok">结论入稿<small>草稿 v1 · 可回退</small></div>
+  </div>
+  <div class="outs">
+   <div class="o" style="border-top:5px solid #2E9E83"><h3><span class="chip L2">L2</span>唯一定位</h3><p>引用在原文中只出现一处，结论直接入稿；界面高亮对应行。</p><div class="ui">📄 3月20日-4月20日入职时间表.csv · 第 14 行</div></div>
+   <div class="o" style="border-top:5px solid #3B82C4"><h3><span class="chip L2">L2</span>多处候选</h3><p>同一句在多处出现，列出候选位置，由人挑出正确的一处，不当作业务批准。</p><div class="ui">候选 A 第 9 页 ｜ 候选 B 第 12 页</div></div>
+   <div class="o" style="border-top:5px solid #D9A21B"><h3><span class="chip L2">L2</span>找不到</h3><p>记为证据缺口，停下请人补资料；补齐后只重做这一项。</p><div class="ui">缺：银行到账回单 → [从资料库补充]</div></div>
+  </div>
+  <div class="dec">
+   <div class="card" style="padding:12px 14px;border-color:#F3C9AE;background:#FFFAF6">
+    <div class="big" style="color:#b4531d"><span class="chip L3">L3</span> 规则冲突：交人决定</div>
+    <div class="opt"><b>A</b><span>维持现规则，驳回变更请求</span></div>
+    <div class="opt sel"><b>B</b><span>整理变更申请，提交负责人审批</span></div>
+    <div class="note" style="margin-top:6px">先选，再点“对照 Agent 建议”；推荐默认隐藏，避免先入为主</div>
+   </div>
+   <div class="card" style="padding:12px 14px">
+    <div class="big">决定之后</div>
+    <div class="note" style="margin-top:6px">① 决定写入版本化回执<br>② 启动新的只读 Control Loop<br>③ 新分支挂在同一任务下，原结果保留<br>④ 全程不改原文件、不执行外部动作</div>
+   </div>
+  </div>
+ </div>
+</div>
+</body></html>

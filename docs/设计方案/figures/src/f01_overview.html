@@ -1,0 +1,99 @@
+<!DOCTYPE html><html lang="zh-CN"><head><meta charset="UTF-8"><link rel="stylesheet" href="fig.css">
+<style>
+body{height:900px}
+.entry{display:flex;align-items:center;gap:18px;margin:0 auto 12px;width:1100px}
+.box{flex:1;background:#fff;border:2px solid var(--blue);border-radius:14px;padding:16px 20px;display:flex;align-items:center;gap:16px}
+.box .q{font-size:24px;font-weight:700;color:var(--deep)}
+.inp{flex:1;height:44px;border:1.5px solid var(--line);border-radius:8px;background:#F7FAFD;display:flex;align-items:center;padding:0 14px;color:#8aa0b8;font-size:15px}
+.btn{background:var(--blue);color:#fff;font-weight:700;border-radius:8px;padding:10px 16px;font-size:15px;white-space:nowrap}
+.split{display:flex;justify-content:center;margin:4px 0 0}
+.cols{display:grid;grid-template-columns:repeat(3,1fr);gap:22px;margin-top:6px}
+.col{border-radius:14px;border:1.5px solid var(--line);background:var(--soft);padding:18px 18px 16px;display:flex;flex-direction:column;gap:12px}
+.col h2{display:flex;align-items:center;gap:10px;font-size:24px;color:var(--deep)}
+.col h2 .n{background:var(--blue);color:#fff;font-size:15px;border-radius:6px;padding:2px 9px}
+.col .one{font-size:17px;color:var(--blue);font-weight:700}
+.col .scene{font-size:14px;color:var(--gray)}
+.feat{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.f{background:#fff;border:1.5px solid var(--line);border-radius:9px;padding:9px 10px;font-size:15px;font-weight:700;color:var(--deep);display:flex;gap:8px;align-items:center}
+.f i{width:10px;height:10px;border-radius:50%;flex:none;background:var(--blue)}
+.ill{height:150px;background:#fff;border:1.5px solid var(--line);border-radius:10px;display:flex;align-items:center;justify-content:center}
+.lens{margin-top:20px;border-radius:14px;padding:14px 20px;background:linear-gradient(90deg,#F2F6FB,#FFF6EF);border:1.5px solid #E7CDB8;display:flex;align-items:center;gap:18px}
+.lens .k{font-size:20px;font-weight:700;color:#b4531d;white-space:nowrap}
+.lv{display:flex;gap:6px}
+.lv .chip{font-size:15px;padding:4px 10px}
+.base{margin-top:14px;display:grid;grid-template-columns:repeat(5,1fr);gap:12px}
+.b{background:#fff;border:1.5px solid var(--line);border-left:6px solid #62738A;border-radius:10px;padding:10px 12px}
+.b .k{font-size:16px;font-weight:700;color:#3d4d63}.b .v{font-size:13.5px;color:var(--gray);margin-top:2px}
+</style></head><body>
+<div class="ttl"><span class="no">图 1</span><h1>总体框架：一个入口，三类协作</h1><span class="sub">单任务讲依据，多任务讲分工，每个动作讲边界</span></div>
+
+<div class="entry"><div class="box"><span class="q">这次，需要完成什么？</span><div class="inp">输入任务，或粘贴一段会议纪要</div><span class="btn">启动</span></div></div>
+<div class="split"><svg width="1512" height="70" viewBox="0 0 1512 70">
+ <path d="M756 0 V22 M252 22 H1260 M252 22 V62 M756 22 V62" stroke="#124A8C" stroke-width="2.5" fill="none"/>
+ <path d="M246 56 L252 66 L258 56 M750 56 L756 66 L762 56" stroke="#124A8C" stroke-width="2.5" fill="none"/>
+ <path d="M1260 22 V62" stroke="#E4702B" stroke-width="2.5" stroke-dasharray="6 4"/><path d="M1254 56 L1260 66 L1266 56" stroke="#E4702B" stroke-width="2.5" fill="none"/>
+ <rect x="400" y="8" width="160" height="28" rx="14" fill="#fff" stroke="#CAD8E9"/><text x="480" y="27" font-size="14" fill="#124A8C" text-anchor="middle" font-weight="700">判出 1 件事</text>
+ <rect x="890" y="8" width="180" height="28" rx="14" fill="#fff" stroke="#CAD8E9"/><text x="980" y="27" font-size="14" fill="#124A8C" text-anchor="middle" font-weight="700">判出多件事 → 拆待办</text>
+ <rect x="1290" y="8" width="200" height="28" rx="14" fill="#FFF6EF" stroke="#F3C9AE"/><text x="1390" y="27" font-size="14" fill="#b4531d" text-anchor="middle" font-weight="700">每个将要执行的动作</text>
+</svg></div>
+
+<div class="cols">
+ <div class="col">
+  <h2><span class="n">Demo 1</span>单任务协作</h2>
+  <div class="one">有依据才往下做，该停的地方停</div><div class="scene">固定办公 · 资料核对、清单整理、规则判断</div>
+  <div class="ill"><svg width="420" height="130" viewBox="0 0 420 130">
+   <g font-size="13" font-weight="700" text-anchor="middle">
+   <rect x="6" y="48" width="78" height="34" rx="7" fill="#E9F6F1" stroke="#A8D9C7"/><text x="45" y="70" fill="#1d7a63">理解任务</text>
+   <rect x="110" y="48" width="78" height="34" rx="7" fill="#E9F6F1" stroke="#A8D9C7"/><text x="149" y="70" fill="#1d7a63">读资料</text>
+   <rect x="214" y="48" width="86" height="34" rx="7" fill="#FFF8E4" stroke="#EED48F"/><text x="257" y="70" fill="#8B6200">待你判断</text>
+   <rect x="326" y="48" width="86" height="34" rx="7" fill="#F3F5F8" stroke="#D5DCE6"/><text x="369" y="70" fill="#3d4d63">交付</text></g>
+   <path d="M84 65 H108 M188 65 H212 M300 65 H324" stroke="#CAD8E9" stroke-width="2"/>
+   <circle cx="257" cy="30" r="12" fill="#E4702B"/><text x="257" y="35" font-size="13" fill="#fff" text-anchor="middle" font-weight="700">人</text>
+   <rect x="110" y="96" width="190" height="26" rx="6" fill="#fff" stroke="#124A8C" stroke-width="1.5"/><text x="205" y="114" font-size="12.5" fill="#124A8C" text-anchor="middle">原文 · 第 14 行 · 逐字定位</text>
+   <path d="M149 82 V96" stroke="#124A8C" stroke-width="1.5" stroke-dasharray="3 2"/></svg></div>
+  <div class="feat"><div class="f"><i></i>结论带原文位置</div><div class="f"><i></i>服务端逐字核对</div><div class="f"><i style="background:#D9A21B"></i>缺事实 → 补资料</div><div class="f"><i style="background:#E4702B"></i>规则冲突 → 交人</div><div class="f"><i style="background:#3B82C4"></i>先判断再看建议</div><div class="f"><i style="background:#2E9E83"></i>追问长在同一棵树</div></div>
+ </div>
+ <div class="col">
+  <h2><span class="n">Demo 2</span>自适应执行</h2>
+  <div class="one">任务很多，只在关键处找人</div><div class="scene">协同办公 · 会议纪要、多部门待办、并行核对</div>
+  <div class="ill"><svg width="420" height="130" viewBox="0 0 420 130">
+   <rect x="6" y="50" width="62" height="30" rx="7" fill="#E9F6F1" stroke="#A8D9C7"/><text x="37" y="70" font-size="13" fill="#1d7a63" text-anchor="middle" font-weight="700">主 Agent</text>
+   <g fill="#EAF2FB" stroke="#3B82C4" stroke-width="1.5"><rect x="120" y="6" width="80" height="24" rx="6"/><rect x="120" y="36" width="80" height="24" rx="6"/><rect x="120" y="66" width="80" height="24" rx="6"/><rect x="120" y="96" width="80" height="24" rx="6"/></g>
+   <g font-size="12" fill="#12396A" text-anchor="middle" font-weight="700"><text x="160" y="22">子 Agent 1</text><text x="160" y="52">子 Agent 2</text><text x="160" y="82">子 Agent 3</text><text x="160" y="112">子 Agent 4</text></g>
+   <path d="M68 65 C95 65 95 18 120 18 M68 65 C95 65 95 48 120 48 M68 65 C95 65 95 78 120 78 M68 65 C95 65 95 108 120 108" stroke="#2E9E83" stroke-width="1.6" fill="none"/>
+   <rect x="250" y="50" width="76" height="30" rx="7" fill="#EAF2FB" stroke="#3B82C4" stroke-width="1.5"/><text x="288" y="70" font-size="12" fill="#12396A" text-anchor="middle" font-weight="700">汇总</text>
+   <path d="M200 18 C226 18 226 65 250 65 M200 48 C226 48 226 65 250 65 M200 78 C226 78 226 65 250 65 M200 108 C226 108 226 65 250 65" stroke="#CAD8E9" stroke-width="1.6" fill="none"/>
+   <rect x="346" y="50" width="68" height="30" rx="7" fill="#F3F5F8" stroke="#D5DCE6"/><text x="380" y="70" font-size="12" fill="#3d4d63" text-anchor="middle" font-weight="700">交付</text>
+   <path d="M326 65 H346" stroke="#CAD8E9" stroke-width="1.6"/>
+   <text x="160" y="4" font-size="0">.</text><rect x="104" y="0" width="112" height="0"/>
+   <text x="160" y="0" font-size="0"></text><rect x="232" y="8" width="112" height="22" rx="11" fill="#fff" stroke="#CAD8E9"/><text x="288" y="23" font-size="11.5" fill="#62738A" text-anchor="middle">第 1 波 → 第 2 波</text></svg></div>
+  <div class="feat"><div class="f"><i></i>纪要自动拆待办</div><div class="f"><i></i>资料补全再开工</div><div class="f"><i style="background:#2E9E83"></i>默认主 Agent 自办</div><div class="f"><i style="background:#3B82C4"></i>有收益才委派</div><div class="f"><i style="background:#3B82C4"></i>按依赖分波执行</div><div class="f"><i style="background:#D9A21B"></i>工作流树三色状态</div></div>
+ </div>
+ <div class="col">
+  <h2><span class="n">Demo 3</span>人机共驾</h2>
+  <div class="one">Agent 越能干，越知道边界在哪</div><div class="scene">移动办公 · 发消息、建任务、外发、受限请求</div>
+  <div class="ill"><svg width="420" height="130" viewBox="0 0 420 130">
+   <g font-size="12" font-weight="700" fill="#fff" text-anchor="middle">
+   <rect x="10" y="78" width="56" height="40" rx="6" fill="#2E9E83"/><text x="38" y="102">L1</text>
+   <rect x="76" y="64" width="56" height="54" rx="6" fill="#3B82C4"/><text x="104" y="95">L2</text>
+   <rect x="142" y="50" width="56" height="68" rx="6" fill="#D9A21B"/><text x="170" y="88">L3</text>
+   <rect x="208" y="34" width="56" height="84" rx="6" fill="#E4702B"/><text x="236" y="80">L4</text>
+   <rect x="274" y="16" width="56" height="102" rx="6" fill="#C8382E"/><text x="302" y="71">L5</text></g>
+   <g font-size="11" fill="#62738A" text-anchor="middle"><text x="38" y="72">自动</text><text x="104" y="58">草稿</text><text x="170" y="44">确认</text><text x="236" y="28">强确认</text><text x="302" y="10">拒绝</text></g>
+   <rect x="352" y="14" width="56" height="104" rx="10" fill="#fff" stroke="#12396A" stroke-width="2"/><rect x="360" y="28" width="40" height="8" rx="3" fill="#CAD8E9"/><rect x="360" y="42" width="40" height="8" rx="3" fill="#CAD8E9"/><rect x="360" y="56" width="30" height="8" rx="3" fill="#CAD8E9"/><rect x="360" y="90" width="40" height="14" rx="4" fill="#124A8C"/></svg></div>
+  <div class="feat"><div class="f"><i></i>8 个问题描述动作</div><div class="f"><i></i>5 因子定等级</div><div class="f"><i style="background:#12396A"></i>AL = min(上限, 形态)</div><div class="f"><i style="background:#E4702B"></i>一次只问一件事</div><div class="f"><i style="background:#C8382E"></i>受限动作直接拦</div><div class="f"><i style="background:#62738A"></i>手机保留决定信息</div></div>
+ </div>
+</div>
+
+<div class="lens"><span class="k">贯穿三场景的人机共驾规范</span>
+ <div class="lv"><span class="chip L0">L0</span><span class="chip L1">L1</span><span class="chip L2">L2</span><span class="chip L3">L3</span><span class="chip L4">L4</span><span class="chip L5">L5</span></div>
+ <span class="note">Demo 1/2 工作流树的每个节点标出等级；Demo 3 每个办公动作按五因子判定等级与自主程度</span></div>
+
+<div class="base">
+ <div class="b"><div class="k">共享资料库</div><div class="v">97 份企业文件 · 原件只读</div></div>
+ <div class="b"><div class="k">服务端校验</div><div class="v">模型提议，程序决定</div></div>
+ <div class="b"><div class="k">任务账本</div><div class="v">Task · Run · 版本化成果</div></div>
+ <div class="b"><div class="k">统一工作台</div><div class="v">桌面 / 手机同一套界面</div></div>
+ <div class="b"><div class="k">演示模式</div><div class="v">离线规则，不调用模型</div></div>
+</div>
+</body></html>

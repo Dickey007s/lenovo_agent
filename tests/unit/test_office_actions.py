@@ -47,14 +47,16 @@ def runtime():
     return HarnessRuntime(FakeCatalog(), FakePlanner())
 
 
-@pytest.mark.parametrize("operation,level,state", [
-    ("format_text", "L1", "executed"), ("extract_excerpt", "L2", "draft_ready"),
-    ("create_task", "L3", "awaiting_confirmation"),
-    ("send_message", "L4", "awaiting_confirmation"),
-    ("restricted_action", "L5", "denied"),
+@pytest.mark.parametrize("operation,level,state,changes", [
+    ("format_text", "L1", "executed", {}), ("extract_excerpt", "L2", "draft_ready", {}),
+    ("create_task", "L3", "awaiting_confirmation", {}),
+    # Manual v1.1 4.7: an internal message is L3, the same message to an external contact is L4.
+    ("send_message", "L3", "awaiting_confirmation", {}),
+    ("send_message", "L4", "awaiting_confirmation", {"target": "wang-supplier"}),
+    ("restricted_action", "L5", "denied", {}),
 ])
-async def test_five_operations_have_distinct_effect_and_control(runtime, operation, level, state):
-    run = await start(runtime, data(operation))
+async def test_five_operations_have_distinct_effect_and_control(runtime, operation, level, state, changes):
+    run = await start(runtime, data(operation, **changes))
     action = run.office_action
     assert (action.risk_level, action.status) == (level, state)
     assert action.external_action == "none"
@@ -65,6 +67,8 @@ async def test_five_operations_have_distinct_effect_and_control(runtime, operati
     assert workflow and workflow.mode == "office_action" and len(workflow.nodes) == 1
     assert workflow.nodes[0].assessment.risk_level == level
     assert len(workflow.nodes[0].assessment.dimensions) == 8
+    assert workflow.nodes[0].assessment.basis == "five_factor"
+    assert workflow.nodes[0].assessment.judgement.risk_level == level
     if operation == "restricted_action":
         with pytest.raises(HarnessConflictError):
             await runtime.office_action_control("alice", run.run_id, command(run))

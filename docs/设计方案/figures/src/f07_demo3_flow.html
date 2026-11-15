@@ -1,0 +1,47 @@
+<!DOCTYPE html><html lang="zh-CN"><head><meta charset="UTF-8"><link rel="stylesheet" href="fig.css">
+<style>
+body{height:600px}
+.pipe{display:flex;align-items:stretch}
+.pipe .nd{width:170px;font-size:15.5px;display:flex;flex-direction:column;justify-content:center;position:relative}
+.pipe .nd .n{position:absolute;top:-10px;left:-8px;width:24px;height:24px;border-radius:50%;background:#12396A;color:#fff;font-size:12px;display:flex;align-items:center;justify-content:center}
+.pipe .gap{align-self:center}
+.outs{display:grid;grid-template-columns:repeat(5,1fr);gap:14px;margin-top:64px;position:relative}
+.oc{border-radius:12px;border:1.5px solid var(--line);background:#fff;overflow:hidden}
+.oc .h{padding:9px 12px;color:#fff;font-weight:700;font-size:17px;display:flex;justify-content:space-between;align-items:center}
+.oc .h small{font-size:13px;font-weight:700;background:rgba(255,255,255,.22);border-radius:4px;padding:1px 6px}
+.oc .b{padding:10px 12px;font-size:13.5px;color:var(--text);line-height:1.5}
+.oc .ui{margin:0 12px 12px;border:1.5px solid var(--line);border-radius:8px;background:#F7FAFD;padding:8px;font-size:12.5px;color:#3d4d63}
+.oc .ui .bt{display:inline-block;margin:4px 4px 0 0;padding:2px 8px;border-radius:5px;font-size:12px;font-weight:700;border:1.5px solid #124A8C;color:#124A8C;background:#fff}
+.oc .ui .bt.p{background:#124A8C;color:#fff}.oc .ui .bt.d{background:#E5E9EF;border-color:#E5E9EF;color:#9aa6b5}
+.oc .ui .ck{display:block;margin-top:3px}
+.loops{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:18px}
+.lp{border-radius:10px;padding:10px 14px;border:1.5px dashed}
+.lp b{font-size:16px}.lp span{display:block;font-size:13.5px;color:var(--gray);margin-top:3px;line-height:1.45}
+</style></head><body>
+<div class="ttl"><span class="no">图 13</span><h1>Demo 3 用户流程：每个动作先判定，再决定谁来做</h1><span class="sub">固定规则，不调用模型；从发起到出结果约 3 秒</span></div>
+<div class="pipe">
+ <div class="nd hu"><span class="n">1</span>用户发起事项<small>示例或自填：类型 · 对象 · 内容</small></div><div class="gap"></div>
+ <div class="nd"><span class="n">2</span>描述动作<small>8 个问题</small></div><div class="gap"></div>
+ <div class="nd srv"><span class="n">3</span>5 因子定下限<small>状态 · 范围 · 恢复 · 敏感 · 权限</small></div><div class="gap"></div>
+ <div class="nd srv"><span class="n">4</span>合并规则<small>受限优先 · 就高 · 不明按高</small></div><div class="gap"></div>
+ <div class="nd srv"><span class="n">5</span>自主程度<small>min（等级上限，动作形态）</small></div><div class="gap"></div>
+ <div class="nd wait"><span class="n">6</span>介入顺序<small>一次只问排在最前的一件</small></div><div class="gap"></div>
+ <div class="nd ok"><span class="n">7</span>执行 · 回执 · 记录<small>只写隔离测试记录</small></div>
+</div>
+<svg width="1512" height="60" style="position:absolute;left:44px;top:216px">
+ <path d="M1090 0 V24 H140 V54 M1090 24 H1370 V54 M445 24 V54 M755 24 V54 M1065 24 V54" stroke="#9fb4cc" stroke-width="2" fill="none"/>
+ <g fill="#9fb4cc"><path d="M134 48 L140 58 L146 48 Z"/><path d="M439 48 L445 58 L451 48 Z"/><path d="M749 48 L755 58 L761 48 Z"/><path d="M1059 48 L1065 58 L1071 48 Z"/><path d="M1364 48 L1370 58 L1376 48 Z"/></g>
+</svg>
+<div class="outs">
+ <div class="oc"><div class="h L1">L1 自动完成<small>AL4</small></div><div class="b">整理本人入职名单备忘：只改个人副本，可完整恢复。</div><div class="ui">已整理 · 原内容可恢复<br><span class="bt">撤销此次整理</span><span class="bt">查看整理前</span></div></div>
+ <div class="oc"><div class="h L2">L2 草稿供核对<small>AL2</small></div><div class="b">摘录岗位 JD 要求：只生成内部草稿，原文并排。</div><div class="ui">草稿 ｜ 原文并排<br><span class="bt">编辑这份草稿</span><span class="bt">打开资料预览</span></div></div>
+ <div class="oc"><div class="h L3">L3 普通确认<small>AL3</small></div><div class="b">给交付组王工建核对任务：内部 1 人，需对方配合撤回。</div><div class="ui">负责人 · 截止 11-06<br><span class="bt p">确认创建测试任务</span><span class="bt">修改</span><span class="bt">稍后</span></div></div>
+ <div class="oc"><div class="h L4">L4 逐项强确认<small>AL3</small></div><div class="b">向外部供应商发配置需求：外发、不可收回，三项都要勾。</div><div class="ui"><span class="ck">☐ 完整收件对象</span><span class="ck">☐ 这份正文</span><span class="ck">☐ 提交范围与撤回限制</span><span class="bt d">确认登记测试发件</span></div></div>
+ <div class="oc"><div class="h L5">L5 受限拒绝<small>AL2</small></div><div class="b">向候选人承诺保底薪资：无权作出，确认也不能放行。</div><div class="ui">受限未执行 · 原因：超出本人授权<br><span class="bt">下载人工处理说明</span></div></div>
+</div>
+<div class="loops">
+ <div class="lp" style="border-color:#D9A21B;background:#FFFBF0"><b style="color:#8B6200">补齐信息后重判</b><span>“交给王工”有三位候选，其中一位是外部供应商：澄清前按 L4；选定研发组王工后重判为 L3（C06）</span></div>
+ <div class="lp" style="border-color:#C8382E;background:#FFF7F6"><b style="color:#A42E25">内容变化，旧确认失效</b><span>改了收件人、正文或附件，版本号 +1，必须按新版本重新核对（C08 · R08）</span></div>
+ <div class="lp" style="border-color:#62738A;background:#F7F9FB"><b style="color:#3d4d63">手机端同一套判定</b><span>地址、正文、核对项完整保留；离开页面视为暂缓，不视为同意（C12 · R13）</span></div>
+</div>
+</body></html>

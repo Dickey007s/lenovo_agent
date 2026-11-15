@@ -1,0 +1,61 @@
+<!DOCTYPE html><html lang="zh-CN"><head><meta charset="UTF-8"><link rel="stylesheet" href="fig.css">
+<style>
+body{height:700px}
+.wrap{display:grid;grid-template-columns:690px 1fr;gap:26px}
+.q{display:grid;grid-template-columns:34px 1fr 190px;gap:10px;align-items:center;margin-bottom:8px}
+.q .cond{background:#fff;border:1.5px solid var(--line);border-radius:9px;padding:8px 12px;font-size:15px;color:var(--deep);font-weight:700}
+.q .cond small{display:block;font-weight:400;color:var(--gray);font-size:12.5px}
+.q .res{border-radius:9px;padding:8px 10px;font-size:14.5px;font-weight:700;text-align:center}
+.r1{background:#E9F6F1;color:#1d7a63;border:1.5px solid #A8D9C7}
+.r2{background:#F3F5F8;color:#3d4d63;border:1.5px solid #D5DCE6}
+.r3{background:#EAF2FB;color:#124A8C;border:2px solid #3B82C4}
+.dot{width:30px;height:30px;font-size:15px}
+.waves{background:#fff;border:1.5px solid var(--line);border-radius:12px;padding:14px}
+.adopt{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:12px}
+.ad{background:var(--soft);border:1.5px solid var(--line);border-radius:9px;padding:9px 11px}
+.ad b{font-size:15px;color:var(--deep)}.ad span{display:block;font-size:13px;color:var(--gray);margin-top:2px;line-height:1.4}
+</style></head><body>
+<div class="ttl"><span class="no">图 12</span><h1>Demo 2 技术路径：委派判定与分波执行</h1><span class="sub">topology_admission.py · 只用服务端已校验的事实</span></div>
+<div class="wrap">
+ <div>
+  <div class="big" style="margin-bottom:10px">按顺序检查，命中即停</div>
+  <div class="q"><div class="dot">1</div><div class="cond">独立分支少于 2 条<small>没有可并行的工作</small></div><div class="res r1">单主控</div></div>
+  <div class="q"><div class="dot">2</div><div class="cond">计划含人工门或副作用意图<small>先走固定流程，不启动子 Agent</small></div><div class="res r2">固定流程</div></div>
+  <div class="q"><div class="dot">3</div><div class="cond">规划未提出委派收益<small>mode = primary 或 benefit = none</small></div><div class="res r1">主 Agent 自办</div></div>
+  <div class="q"><div class="dot">4</div><div class="cond">工作项来自同结构、同职能资料<small>拆开也只是伪并行</small></div><div class="res r2">固定流程</div></div>
+  <div class="q"><div class="dot">5</div><div class="cond">来源结构事实不完整<small>无法证明跨职能</small></div><div class="res r2">固定流程</div></div>
+  <div class="q"><div class="dot">6</div><div class="cond">剩余模型调用 &lt; 独立分支 + 1<small>不够覆盖分支与合入校验</small></div><div class="res r2">固定流程</div></div>
+  <div class="q"><div class="dot">7</div><div class="cond">剩余执行时间 &lt; 20 秒</div><div class="res r2">固定流程</div></div>
+  <div class="q"><div class="dot" style="background:#3B82C4">✓</div><div class="cond" style="border-color:#3B82C4">以上都不成立<small>收益：并行深度 / 上下文隔离 / 独立复核</small></div><div class="res r3">子 Agent 分波</div></div>
+ </div>
+ <div>
+  <div class="waves">
+   <div class="big">一次真实运行：本周办公盘点（6 项）</div>
+   <svg width="780" height="300" viewBox="0 0 780 300" style="margin-top:6px">
+    <rect x="160" y="2" width="200" height="24" rx="12" fill="#EAF2FB" stroke="#3B82C4"/><text x="260" y="19" font-size="13" fill="#124A8C" text-anchor="middle" font-weight="700">第 1 波 · 5 个子 Agent</text>
+    <rect x="430" y="2" width="200" height="24" rx="12" fill="#EAF2FB" stroke="#3B82C4"/><text x="530" y="19" font-size="13" fill="#124A8C" text-anchor="middle" font-weight="700">第 2 波 · 1 个子 Agent</text>
+    <rect x="4" y="134" width="120" height="44" rx="9" fill="#E9F6F1" stroke="#A8D9C7" stroke-width="1.5"/><text x="64" y="161" font-size="14" fill="#1d7a63" text-anchor="middle" font-weight="700">理解 · 计划</text>
+    <g font-size="13" font-weight="700" fill="#12396A" text-anchor="middle">
+     <rect x="170" y="40" width="180" height="40" rx="8" fill="#EAF2FB" stroke="#3B82C4" stroke-width="1.5"/><text x="260" y="65">吴嘉木入职信息</text>
+     <rect x="170" y="90" width="180" height="40" rx="8" fill="#EAF2FB" stroke="#3B82C4" stroke-width="1.5"/><text x="260" y="115">通用软件配置</text>
+     <rect x="170" y="140" width="180" height="40" rx="8" fill="#EAF2FB" stroke="#3B82C4" stroke-width="1.5"/><text x="260" y="165">文本评测岗必备条件</text>
+     <rect x="170" y="190" width="180" height="40" rx="8" fill="#EAF2FB" stroke="#3B82C4" stroke-width="1.5"/><text x="260" y="215">BD 岗学历与沟通</text>
+     <rect x="170" y="240" width="180" height="40" rx="8" fill="#EAF2FB" stroke="#3B82C4" stroke-width="1.5"/><text x="260" y="265">绵阳长城往来金额</text>
+     <rect x="440" y="134" width="180" height="44" rx="8" fill="#EAF2FB" stroke="#3B82C4" stroke-width="1.5"/><text x="530" y="161">汇总本周办公要点</text></g>
+    <g stroke="#2E9E83" stroke-width="1.6" fill="none"><path d="M124 156 C150 156 145 60 170 60"/><path d="M124 156 C150 156 145 110 170 110"/><path d="M124 156 H170"/><path d="M124 156 C150 156 145 210 170 210"/><path d="M124 156 C150 156 145 260 170 260"/></g>
+    <g stroke="#9fb4cc" stroke-width="1.6" fill="none"><path d="M350 60 C400 60 395 156 440 156"/><path d="M350 110 C400 110 395 156 440 156"/><path d="M350 160 H440"/><path d="M350 210 C400 210 395 156 440 156"/><path d="M350 260 C400 260 395 156 440 156"/></g>
+    <rect x="660" y="134" width="110" height="44" rx="9" fill="#E9F6F1" stroke="#A8D9C7" stroke-width="1.5"/><text x="715" y="161" font-size="14" fill="#1d7a63" text-anchor="middle" font-weight="700">交付</text>
+    <path d="M620 156 H660" stroke="#9fb4cc" stroke-width="1.6"/>
+    <text x="260" y="296" font-size="12" fill="#62738A" text-anchor="middle">同一波内最多 3 个同时执行</text>
+    <text x="530" y="200" font-size="12" fill="#62738A" text-anchor="middle">等前 5 项都通过采用门</text>
+   </svg>
+  </div>
+  <div class="adopt">
+   <div class="ad"><b>采用门：来源</b><span>结论引用的文件在本轮冻结范围内，且能定位</span></div>
+   <div class="ad"><b>采用门：依赖</b><span>后一波只用已采用的前序结果</span></div>
+   <div class="ad"><b>采用门：失败</b><span>保留其他贡献，只重做出错的一项</span></div>
+  </div>
+  <div class="ad" style="margin-top:10px;background:#FFF6EF;border-color:#F3C9AE"><b style="color:#b4531d">启动确认门</b><span>分波委派会多花模型调用与时间，须经用户授权：单任务里弹出启动确认，多待办里“开始全部待办”即为授权；单主控与固定流程不额外打扰。</span></div>
+ </div>
+</div>
+</body></html>

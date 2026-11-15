@@ -1,0 +1,37 @@
+<!DOCTYPE html><html lang="zh-CN"><head><meta charset="UTF-8"><title>图 17 移动端</title><style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{width:1600px;font-family:"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;color:#404040;background:#fff;padding:30px 40px}
+.ttl{display:flex;align-items:center;gap:14px;margin-bottom:18px}
+.ttl .no{background:#124A8C;color:#fff;font-weight:700;font-size:18px;padding:4px 12px;border-radius:6px}
+.ttl h1{font-size:28px;color:#12396A}.ttl .sub{font-size:17px;color:#62738A}
+.wrap{display:grid;grid-template-columns:1080px 1fr;gap:22px;align-items:start}
+.shot{position:relative;border:1.5px solid #CAD8E9;border-radius:12px;overflow:hidden;box-shadow:0 6px 18px rgba(18,57,106,.08)}
+.shot img{display:block;width:1080px}
+.hl{position:absolute;border:2.5px solid #E4702B;border-radius:6px;background:rgba(228,112,43,.06)}
+.pin{position:absolute;width:30px;height:30px;border-radius:50%;background:#E4702B;color:#fff;font-weight:700;font-size:16px;display:flex;align-items:center;justify-content:center;box-shadow:0 0 0 3px #fff}
+.notes{display:flex;flex-direction:column;gap:9px}
+.tagline{font-size:14px;color:#124A8C;font-weight:700;background:#EAF2FB;border-radius:8px;padding:8px 12px}
+.n{display:grid;grid-template-columns:30px 1fr;gap:10px;align-items:start;background:#fff;border:1.5px solid #CAD8E9;border-radius:10px;padding:9px 11px}
+.n i{width:28px;height:28px;border-radius:50%;background:#E4702B;color:#fff;font-style:normal;font-weight:700;display:flex;align-items:center;justify-content:center;font-size:15px}
+.n b{display:block;font-size:16px;color:#12396A}.n span{display:block;font-size:13.5px;color:#62738A;line-height:1.45;margin-top:2px}
+
+.phones{display:grid;grid-template-columns:repeat(3,330px) 1fr;gap:26px;align-items:start}
+.ph{border:10px solid #12396A;border-radius:34px;overflow:hidden;box-shadow:0 8px 22px rgba(18,57,106,.18)}
+.ph img{display:block;width:310px}
+.cap{margin-top:10px;font-size:15px;font-weight:700;color:#12396A;text-align:center}
+.cap small{display:block;font-weight:400;color:#62738A;font-size:13px;margin-top:2px}
+</style></head><body>
+<div class="ttl"><span class="no">图 17</span><h1>Demo 3 移动端：手机上保留做决定所需的信息</h1><span class="sub">390 × 844 · 同一套判定与核对</span></div>
+<div class="phones">
+ <div><div class="ph"><img src="../screenshots/d3m-L4-a.png"></div><div class="cap">① 状态与完整内容<small>收件人地址、正文不折叠</small></div></div>
+ <div><div class="ph"><img src="../screenshots/d3m-L4-b.png"></div><div class="cap">② 判定过程<small>五因子表格完整保留</small></div></div>
+ <div><div class="ph"><img src="../screenshots/d3m-L4-c.png"></div><div class="cap">③ 逐项核对后确认<small>三项未勾完按钮保持灰色</small></div></div>
+ <div class="notes">
+  <div class="tagline">对应规则 R13 · 案例 C12</div>
+  <div class="n"><i>1</i><div><b>信息不缩水</b><span>地址、金额、附件版本在手机上完整可见，不为版面省略</span></div></div>
+  <div class="n"><i>2</i><div><b>判定一致</b><span>桌面与手机调用同一判定结果，等级不因设备降低</span></div></div>
+  <div class="n"><i>3</i><div><b>离开不等于同意</b><span>关闭页面后事项保持待确认，可在“最近事项与暂缓记录”中继续；内容变了就重新核对</span></div></div>
+  <div class="n"><i>4</i><div><b>大按钮、明确动作</b><span>“确认登记测试发件”“稍后处理”并列，修改与取消同样好找</span></div></div>
+  <div class="n"><i>5</i><div><b>不探测环境</b><span>系统不检测用户所处场合，不为此开启录音或摄像</span></div></div>
+ </div>
+</div></body></html>

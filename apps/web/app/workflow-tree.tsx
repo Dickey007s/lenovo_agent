@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { IconRobot, IconUser, IconPlayerStop, IconX } from "@tabler/icons-react";
 import "./workflow-tree.css";
+import { JudgementPanel, normalizeJudgement, type RiskJudgement } from "./risk-judgement";
 
 export type WorkflowStatus = "pending" | "running" | "done" | "waiting_human" | "failed" | "stopped";
 export type WorkflowDimension = { key: string; label: string; finding: string; drives_level: boolean };
@@ -10,6 +11,7 @@ export type WorkflowAssessment = {
   risk_level: string; risk_title: string; autonomy_level: string; autonomy_title: string;
   collaboration: string; takeover_point: string; design_focus: string;
   dimensions: WorkflowDimension[]; rules: string[];
+  judgement?: RiskJudgement | null;
 };
 export type WorkflowNode = {
   node_id: string; label: string; kind: string; status: WorkflowStatus; status_label: string;
@@ -54,6 +56,7 @@ export function normalizeWorkflow(value: unknown): WorkflowGraph | null {
       assessment: {
         risk_level: text(assessment.risk_level), risk_title: text(assessment.risk_title), autonomy_level: text(assessment.autonomy_level), autonomy_title: text(assessment.autonomy_title),
         collaboration: text(assessment.collaboration), takeover_point: text(assessment.takeover_point), design_focus: text(assessment.design_focus), rules: list(assessment.rules),
+        judgement: normalizeJudgement(assessment.judgement),
         dimensions: assessment.dimensions.flatMap(entry => entry && typeof entry === "object"
           ? [{ key: text((entry as Record<string, unknown>).key), label: text((entry as Record<string, unknown>).label), finding: text((entry as Record<string, unknown>).finding), drives_level: (entry as Record<string, unknown>).drives_level === true }] : []),
       },
@@ -218,7 +221,10 @@ export function WorkflowTree({ graph, onInterrupt, interruptBusy = false, compac
       <ul className="wf-dims">{detail.assessment.dimensions.map(item => <li key={item.key} className={item.drives_level ? "is-driver" : ""}><b>{item.label}{item.drives_level && <em>决定等级</em>}</b><span>{item.finding}</span></li>)}</ul>
       {detail.facts.length > 0 && <><h4>执行信息</h4><ul className="wf-facts">{detail.facts.map((item, index) => <li key={index}>{item}</li>)}</ul></>}
       {detail.sources.length > 0 && <><h4>依据文件</h4><ul className="wf-facts">{detail.sources.map((item, index) => <li key={index}>{item}</li>)}</ul></>}
-      <p className="wf-note">等级按操作类型取手册里的默认约定，维度只用来说明原因，不是打分得出。{detail.assessment.rules.length > 0 && <> 对应规则：{detail.assessment.rules.join("、")}。</>}</p>
+      {detail.assessment.judgement && <><h4>五个因子怎样定级</h4><JudgementPanel judgement={detail.assessment.judgement} /></>}
+      <p className="wf-note">{detail.assessment.judgement
+        ? "等级由五个判定因子取下限、按合并规则得出；八个维度用于说明这一步。"
+        : "这一步是等待人处理的环节，等级取手册中该介入方式的默认约定。"}{detail.assessment.rules.length > 0 && <> 对应规则：{detail.assessment.rules.join("、")}。</>}</p>
     </section>}
   </section>;
 }
