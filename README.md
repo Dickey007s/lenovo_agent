@@ -30,6 +30,7 @@
 - `figures/`：流程、架构、技术图与原型标注图 PNG，源文件在 `figures/src/`，用 `render.sh <名称> <高度>` 重新导出；
 - `prototype/`：交互原型标注图 HTML，可用 html.to.design 导入 Figma；源图坐标在 `boards/boards.json`，用 `make_boards.py` 重新生成；
 - `screenshots/`：原型系统运行截图。
+- `设计方案交付核对清单.md`：按合同任务书逐条核对本方案的交付位置与缺口（Figma、PDF、出行场景等）。
 
 文档中的步骤数和耗时为真实模型各跑一次的实测：
 
